@@ -61,6 +61,29 @@ scripts. Windows players who only want to play can take the ready-made zip from 
    At the login screen use **any name** and the server's **password**. Pick a class on the
    character screen and enter the world.
 
+## Host a game (Windows)
+
+Double-click **Host Basin Battle.bat** in this folder (or run `scripts\host-windows.ps1` in
+PowerShell) and leave the window open while you play.
+
+- The first run installs Rust if it's missing (a few minutes; no Visual Studio needed), asks for
+  your WoW 1.12.1 folder once (remembered in `settings-windows.txt`) and builds the server
+  (5-10 minutes). Later runs rebuild only what changed.
+- Options go after it, as on the Mac: `"Host Basin Battle.bat" --password ember`.
+- When Windows asks whether `htl-server` may use the network, allow it.
+- To play on the same PC, use the Windows zip's **Play Basin Battle.bat** with the address
+  `127.0.0.1`.
+
+## Host a game (Linux)
+
+Run `scripts/host-linux.sh` in a terminal (or under `tmux`/`screen` on a server). It builds only
+the server, so it works on a headless machine or a VPS.
+
+- It needs a C compiler and `curl` (`sudo apt install build-essential pkg-config curl` on
+  Debian/Ubuntu); it installs Rust itself if it's missing.
+- It asks for the 1.12.1 `Data` folder once, or set it: `WOW_DATA=/srv/wow/Data scripts/host-linux.sh`.
+- Open TCP ports 3724, 8085 and 8086 in the firewall (`sudo ufw allow 3724,8085,8086/tcp`).
+
 ## Friends joining
 
 **On the same network:** they run `scripts/play.sh <your computer's address>`, e.g.
@@ -296,6 +319,12 @@ panics and stuck enemies.
 - **Login says incorrect password**: everyone uses the host's password; the name can be anything.
 - **Friends time out**: check the ports are forwarded (3724, 8085, 8086) and that you hosted with
   `--public-host`.
+
+## Working on it together
+
+Several people and AI agents work on this repository at once. Before changing anything, read
+[AGENTS.md](AGENTS.md): sync first, small branches, test and push often, merge through pull
+requests once CI passes.
 
 ## Legal
 

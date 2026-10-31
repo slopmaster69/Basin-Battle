@@ -1,0 +1,57 @@
+# Push a tag (git tag v0.4.0 && git push origin v0.4.0) to build "Basin Battle for Windows.zip":
+# the pinned benilla client with this repo's patches, built for Windows, plus the launcher and the
+# add-ons, attached to a GitHub release for that tag. It holds no WoW files.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-zip:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the pinned benilla and apply the patches
+        shell: bash
+        run: |
+          rev=$(sed -n 's/^BENILLA_REV="\(.*\)"/\1/p' scripts/common.sh)
+          repo=$(sed -n 's/^BENILLA_REPO="\(.*\)"/\1/p' scripts/common.sh)
+          git clone -q "$repo" benilla
+          git -C benilla checkout -q "$rev"
+          for p in patches/benilla/*.patch; do
+            git -C benilla apply --whitespace=nowarn "$GITHUB_WORKSPACE/$p"
+          done
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: benilla
+
+      - name: "Build the client (the player build, its settings and add-ons beside the exe)"
+        working-directory: benilla
+        run: cargo build --release -p benilla --bin benilla --no-default-features
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = "dist-out/Basin Battle for Windows"
+          New-Item -ItemType Directory -Force -Path "$out/benilla-config/AddOns" | Out-Null
+          Copy-Item benilla/target/release/benilla.exe "$out/"
+          Copy-Item "dist/windows/Play Basin Battle.bat", "dist/windows/Play Elwynn Survival.bat", `
+            dist/windows/launcher.ps1, dist/windows/README.txt, dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/"
+          # As config.default.toml: the launcher copies it to config.toml on a first run only.
+          Copy-Item dist/windows/benilla-config/config.toml "$out/benilla-config/config.default.toml"
+          Copy-Item -Recurse addon/BasinBattle, addon/ElwynnSurvival "$out/benilla-config/AddOns/"
+          Compress-Archive -Path $out -DestinationPath "dist-out/Basin Battle for Windows.zip"
+
+      - name: Attach to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-out/Basin Battle for Windows.zip
+          generate_release_notes: true
