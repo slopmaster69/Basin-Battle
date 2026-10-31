@@ -518,7 +518,15 @@ fn blows_land_on_a_boar_and_the_shield_blocks_its_charge() {
 
 #[test]
 fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
-    let server = start_with(None, false);
+    // No wild creatures (as a Siege world has none): timber lies at random in three spots, one
+    // of them on a Darkspear Berserker patrol, and heroes sent to a pile there fell before they
+    // could use it (#2). The raid brings its own.
+    let mut rules = content();
+    rules.packs.clear();
+    rules.roams.clear();
+    rules.camps.clear();
+    let spawn = rules.world.spawn;
+    let server = start_content(None, false, rules);
     let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
     let ag = enter(&mut a);
     let mut b = Client::connect(server.login, "ben", "hold", REALM).unwrap();
@@ -529,8 +537,7 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     assert!(a.wait(2.0, |p| creates_guid(p, bg)).is_some(), "ann sees ben");
     assert!(b.until(0.5, |c| placed(c).iter().any(|(g, ..)| *g == ag)), "ben sees ann");
     // For a failure to say what went on: who felled whom (the kill feed) and their falls and
-    // gettings-up from the start, then what a hero's been told lately and their bar. (Issue #2:
-    // both heroes have been seen to fall right after entering, before the camp's pile.)
+    // gettings-up from the start, then what a hero's been told lately and their bar.
     let story = |c: &Client| {
         let lines = addon_lines(c, "ES");
         let mut l: Vec<String> = lines.iter().filter(|l| l.starts_with("KF\t") || l.starts_with("DE\t")).cloned().collect();
@@ -541,8 +548,9 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     };
 
     // Both at the same timber pile, both using it at once: two uses between them, then it's gone
-    // for both, and nobody gets a third.
-    let (node, at) = objects_with(&a, 1248)[0];
+    // for both, and nobody gets a third. The pile nearest them, not whichever was sent first.
+    let near = |p: &[f32; 3]| (p[0] - spawn[0]).powi(2) + (p[1] - spawn[1]).powi(2);
+    let (node, at) = objects_with(&a, 1248).into_iter().min_by(|x, y| near(&x.1).total_cmp(&near(&y.1))).expect("a timber pile");
     for c in [&mut a, &mut b] {
         stand(c, [at[0] + 1.5, at[1], at[2]], std::f32::consts::PI);
     }
@@ -1370,7 +1378,10 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
     a.seen.clear();
     a.chat(".es e");
     assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tSL\t1\t"))).is_some(), "the muster's window");
+    // Ann first: the first in the queue holds the first base (the Stables), and two chats sent
+    // at once can reach the server in either order (#2).
     a.chat(".siege join 1v1");
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You wait for"))).is_some(), "ann waits for a match");
     b.chat(".siege join 1v1");
     b.seen.clear();
     b.drain(sg.countdown);
