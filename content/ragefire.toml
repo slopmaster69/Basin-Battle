@@ -1,0 +1,1164 @@
+# Ragefire Chasm: the caves of fire under Orgrimmar, where the Searing Blade hides and the troggs
+# dig. A dungeon of its own beside the Deadmines (read like deadmines.toml: its lists join the
+# rest; [dungeon] is its world).
+#
+# Places are WoW coordinates on map 389 (OrgrimmarInstance, a WMO-only map: x north, y west, z
+# up). In at the top of the chasm; down the trogg tunnels to the deep chamber (Bazzalan) and the
+# lava pit (Jergosh at his ritual); up to the Searing Blade's camp (the second lamp); west through
+# the burning caves to the far ledge, where Taragaman the Hungerer feeds. Out the way you came.
+
+[dungeon]
+key = "ragefire"
+name = "Ragefire Chasm"
+map = 389
+map_dir = "OrgrimmarInstance"
+area = 2437
+icon = "Spell_Fire_Incinerate"
+blurb = "The caves of fire under Orgrimmar, and the cult that hides in them"
+first_page = "The top of the chasm, where the troggs' tunnels start down into the fire."
+welcome = "Ragefire Chasm. The Searing Blade hides down here, and something older feeds at the bottom of it. Two lamps: one at the top of the chasm, one in the cult's own camp. Rest at a lamp to heal, fill your Draughts (T) and send the cave's dwellers back where they were. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "searing_token"
+hero_health = 0.7
+exit = [6.2, -17.6, -18.3]
+exit_radius = 5.0
+exit_boss = "taragaman"
+weapon_chance = 0.08
+armor_chance = 0.06
+boss_extra_chance = 0.25
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# --- lamps: only two ---------------------------------------------------------------------------------
+
+[[dungeon.lamp]]
+key = "ragefire_top"
+name = "The Top of the Chasm"
+at = [6.2, -17.6, -18.3]
+facing = 3.6
+
+[[dungeon.lamp]]
+key = "ragefire_camp"
+name = "The Searing Blade's Camp"
+at = [-114.0, 18.3, -18.7]
+facing = 1.3
+
+# --- secrets -----------------------------------------------------------------------------------------
+
+# The deep chamber's far corner, up a slope nobody climbs: Jergosh's grimoire, hidden from his own.
+[[dungeon.door]]
+key = "jergosh_grimoire"
+name = "The Invoker's Grimoire"
+kind = "hidden"
+at = [-306.0, -6.3, -52.5]
+find = 4.5
+reveals = ["grimoire_cache", "grimoire_page"]
+text = "up the slope in the deep chamber's corner: Jergosh's grimoire, its binding-ward still warm. Whatever it keeps bound, it isn't now."
+
+[[dungeon.box]]
+key = "grimoire_cache"
+at = [-306.0, -8.0, -52.5]
+facing = 1.5
+loot = { draught_flask = 1, searing_token = 14 }
+
+[[dungeon.note]]
+key = "grimoire_page"
+name = "A Torn Page, Still Warm"
+at = [-305.0, -4.5, -52.5]
+facing = 1.5
+text = "\"...the Heart of Ragefire answers the Invoker while the grimoire holds it. Should the book be taken from its place and the Invoker die, nothing will hold the Heart at all.\""
+
+# A ledge above the cult's camp, reached by the rocks at its back.
+[[dungeon.door]]
+key = "camp_ledge"
+name = "A Ledge Above the Camp"
+kind = "hidden"
+at = [-77.4, 90.4, -7.3]
+find = 4.0
+reveals = ["ledge_cache"]
+text = "up on the ledge over the camp: the cult's tithes, hidden from its own collectors."
+
+[[dungeon.box]]
+key = "ledge_cache"
+at = [-78.5, 91.5, -7.3]
+facing = 3.0
+loot = { searing_token = 16, tonic = 1 }
+
+# The west cave's high ledge: a tauren who came for the cult, and stayed.
+[[dungeon.door]]
+key = "maur_ledge"
+name = "Maur's Ledge"
+kind = "hidden"
+at = [-341.9, 257.6, -8.1]
+find = 4.0
+reveals = ["maur"]
+text = "on the west cave's high ledge: a tauren in Grimtotem paint, who turns from the fire to look at you."
+
+# --- notes -------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "korkron_report"
+name = "A Kor'kron Report"
+at = [-5.9, -42.0, -21.7]
+facing = 3.6
+text = "\"The Searing Blade are in the chasm, under the Cleft. Their Invoker keeps a grimoire. Our scout saw him carry it down to the deep chamber and come back without it. He hid it from his own.\""
+
+[[dungeon.note]]
+key = "ritual_notes"
+name = "Jergosh's Ritual Notes"
+at = [-101.8, 42.0, -17.8]
+facing = 1.0
+text = "\"The pit is ready. The Heart stirs under the lava when I call it, and the grimoire keeps it from turning on me. Nobody touches the grimoire. NOBODY.\""
+
+[[dungeon.note]]
+key = "grimtotem_feather"
+name = "A Grimtotem Feather"
+at = [-305.6, 246.2, -12.5]
+facing = 0.5
+text = "A painted feather, Grimtotem colours, tucked in a crack in the rock. Above it, scratched with a knife: an arrow, pointing up and east."
+
+# --- the cave's dwellers -----------------------------------------------------------------------------
+
+# The first hall: troggs, and Oggleflint over them.
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-29.8, -42.0]
+z = -21.8
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_shaman"
+at = [-17.8, -65.9]
+z = -21.4
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rf_oggleflint"
+key = "oggleflint"
+at = [-46.0, -42.0]
+z = -21.8
+radius = 0.0
+count = 1
+
+# The tunnels down: earthborers in the walls, troggs on the slope.
+[[dungeon.pack]]
+mob = "rf_earthborer"
+at = [-101.6, -40.4]
+z = -29.0
+radius = 3.0
+count = 2
+hidden = 7.0
+
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-159.4, -30.0]
+z = -38.8
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_shaman"
+at = [-183.9, -29.6]
+z = -44.6
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rf_earthborer"
+at = [-233.9, -32.2]
+z = -56.4
+radius = 3.0
+count = 2
+hidden = 7.0
+
+# The deep chamber: Bazzalan and the cult's watch.
+[[dungeon.pack]]
+mob = "rf_bazzalan"
+key = "bazzalan"
+at = [-281.2, -42.8]
+z = -60.8
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-269.8, -54.0]
+z = -60.6
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_warlock"
+at = [-293.7, -42.3]
+z = -60.8
+radius = 0.0
+count = 1
+
+# Back north towards the pit.
+[[dungeon.pack]]
+mob = "rf_enforcer"
+at = [-221.0, 6.1]
+z = -42.9
+radius = 3.0
+count = 2
+link = 12.0
+
+# The lava pit: Jergosh at his ritual, molten things in the fire.
+[[dungeon.pack]]
+mob = "rf_jergosh"
+key = "jergosh"
+at = [-197.8, -36.0]
+z = -65.4
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rf_molten"
+at = [-173.8, -18.0]
+z = -65.5
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.hazard]]
+name = "the pit's lava"
+at = [-186.0, -48.0, -65.4]
+radius = 4.0
+damage = 22
+every = 6.0
+phase = 1.5
+warn = 1.3
+spell = 10604
+boss = "jergosh"
+
+[[dungeon.hazard]]
+name = "the pit's lava"
+at = [-205.0, -22.0, -65.5]
+radius = 4.0
+damage = 22
+every = 6.0
+phase = 3.5
+warn = 1.3
+spell = 10604
+boss = "jergosh"
+
+[[dungeon.hazard]]
+name = "the pit's lava"
+at = [-176.0, -30.0, -65.5]
+radius = 4.0
+damage = 22
+every = 8.0
+phase = 5.0
+warn = 1.3
+spell = 10604
+boss = "jergosh"
+
+# Up to the camp.
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-150.3, 17.1]
+z = -22.4
+radius = 2.5
+count = 2
+link = 12.0
+
+# The Searing Blade's camp.
+[[dungeon.pack]]
+mob = "rf_enforcer"
+at = [-101.8, 54.0]
+z = -18.2
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-125.8, 66.0]
+z = -21.6
+radius = 3.5
+count = 3
+link = 14.0
+
+[[dungeon.pack]]
+mob = "rf_warlock"
+at = [-137.8, 78.0]
+z = -21.3
+radius = 0.0
+count = 1
+
+# West through the burning caves.
+[[dungeon.pack]]
+mob = "rf_molten"
+at = [-197.2, 79.6]
+z = -23.6
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_earthborer"
+at = [-258.7, 90.8]
+z = -25.0
+radius = 3.0
+count = 2
+hidden = 7.0
+
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-233.9, 150.1]
+z = -18.8
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_enforcer"
+at = [-245.6, 161.9]
+z = -18.6
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-305.8, 138.1]
+z = -24.8
+radius = 3.5
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_molten"
+at = [-293.6, 198.4]
+z = -25.5
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_enforcer"
+at = [-353.8, 198.0]
+z = -22.3
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rf_warlock"
+at = [-365.8, 210.0]
+z = -21.9
+radius = 0.0
+count = 1
+
+# What the west ledge keeps.
+[[dungeon.pack]]
+mob = "rf_maur"
+key = "maur"
+at = [-364.6, 258.1]
+z = -5.3
+radius = 0.0
+count = 1
+rare = true
+
+# The far ledge: Taragaman the Hungerer, and the fire at his feet.
+[[dungeon.pack]]
+mob = "rf_taragaman"
+key = "taragaman"
+at = [-395.0, 152.0]
+z = 7.7
+radius = 0.0
+count = 1
+
+[[dungeon.hazard]]
+name = "a gout of flame"
+at = [-401.8, 162.0, 7.7]
+radius = 3.5
+damage = 24
+every = 7.0
+phase = 2.0
+warn = 1.3
+spell = 10604
+boss = "taragaman"
+
+[[dungeon.hazard]]
+name = "a gout of flame"
+at = [-378.2, 149.4, 7.8]
+radius = 3.5
+damage = 24
+every = 7.0
+phase = 4.5
+warn = 1.3
+spell = 10604
+boss = "taragaman"
+
+[[dungeon.hazard]]
+name = "a gout of flame"
+at = [-401.8, 140.0, 7.7]
+radius = 3.5
+damage = 24
+every = 9.0
+phase = 6.5
+warn = 1.3
+spell = 10604
+boss = "taragaman"
+
+# --- items ---------------------------------------------------------------------------------------------
+
+[[item]]
+key = "searing_token"
+name = "Searing Blade Token"
+display = 4006
+icon = "INV_Misc_Gem_Ruby_01"
+kind = "resource"
+stack = 50
+text = "A red stone the Searing Blade carry as their mark. The lamps' quartermaster in Ragefire trades it; you drop it all when you fall below."
+
+[[item]]
+key = "oggleflint_mantle"
+name = "Oggleflint's Stone Mantle"
+display = 5944
+icon = "INV_Shoulder_01"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.09
+weight = 0.02
+text = "The trogg chief's: chips of the chasm's rock, lashed on with gut."
+
+[[item]]
+key = "bazzalan_legs"
+name = "Bazzalan's Satyr-Hide Leggings"
+display = 1356
+icon = "INV_Pants_01"
+kind = "armor"
+slot = "legs"
+reduce = 0.1
+text = "Cut from something with hooves. Don't ask what."
+
+[[item]]
+key = "jergosh_robe"
+name = "The Invoker's Robe"
+display = 12694
+icon = "INV_Chest_Cloth_38"
+kind = "armor"
+slot = "chest"
+reduce = 0.09
+text = "Jergosh's: the hem scorched where the Heart answered him."
+
+[[item]]
+key = "taragaman_helm"
+name = "The Hungerer's Horned Helm"
+display = 4180
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.12
+weight = 0.03
+text = "A mail cap with a demon's horn bolted to it. Taragaman wore it as a joke. It isn't funny."
+
+[[item]]
+key = "ember_breastplate"
+name = "Heart-Forged Breastplate"
+display = 954
+icon = "INV_Chest_Chain"
+kind = "armor"
+slot = "chest"
+reduce = 0.2
+weight = 0.05
+text = "Mail forged in the Heart of Ragefire's own fire: still warm, and harder than it looks."
+
+[[item]]
+key = "maur_mantle"
+name = "Maur's Grimtotem Mantle"
+display = 5282
+icon = "INV_Shoulder_04"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.11
+weight = 0.01
+text = "Painted Grimtotem colours. Maur came down here hunting the cult; the fire got him first."
+
+# --- the cave's dwellers --------------------------------------------------------------------------------
+
+# Troggs: a club, two swings, and a third if you stand there.
+[[mob]]
+key = "rf_trogg"
+name = "Ragefire Trogg"
+subname = "Ragefire Chasm"
+display = 160
+health = 100
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 14.0
+leash = 30.0
+drops = { searing_token = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 12
+  range = 2.6
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "swings"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 11, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 11, recovery = 0.2 }, { clip = 17, take = 0, windup = 0.5, damage = 14, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 1.5
+  min_range = 3.5
+  max_range = 8.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 4.5, damage = 14, recovery = 0.9 } ]
+
+# Trogg shamans: lightning from the back.
+[[mob]]
+key = "rf_shaman"
+name = "Ragefire Shaman"
+subname = "Ragefire Chasm"
+display = 726
+health = 80
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+keep_away = 8.0
+drops = { searing_token = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.3
+  damage = 16
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 1.0
+  cooldown = 1.6
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 4.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.3, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "shock ring"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+
+# Earthborers: out of the walls when you pass, a bite and a burrowing lunge.
+[[mob]]
+key = "rf_earthborer"
+name = "Earthborer"
+subname = "Ragefire Chasm"
+display = 7549
+health = 110
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 14.0
+leash = 26.0
+drops = { searing_token = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 13
+  range = 2.8
+  arc = 100.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 240.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "bites"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "burrow"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 12.0
+  steps = [ { clip = 17, take = 1, windup = 0.9, lunge = 7.0, damage = 18, heavy = true, recovery = 1.1, kit = 356, look = 26271 } ]
+
+# Searing Blade cultists: fire from afar, a ring of it close in.
+[[mob]]
+key = "rf_cultist"
+name = "Searing Blade Cultist"
+subname = "The Searing Blade"
+display = 1313
+health = 85
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 5415
+grip = "staff"
+keep_away = 8.0
+drops = { searing_token = [2, 4] }
+gear = ["red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.3
+  damage = 17
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 133
+  recovery = 1.0
+  cooldown = 1.6
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "fireball"
+  weight = 3.0
+  min_range = 4.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.3, damage = 17, range = 26.0, radius = 1.5, speed = 20.0, spell = 133, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "fire ring"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+
+# Searing Blade enforcers: a two-handed axe, and the cult's fury in it.
+[[mob]]
+key = "rf_enforcer"
+name = "Searing Blade Enforcer"
+subname = "The Searing Blade"
+display = 1311
+health = 170
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 22598
+grip = "2h"
+posture = 110
+drops = { searing_token = [3, 5] }
+gear = ["defias_jerkin"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.8
+  damage = 20
+  range = 3.3
+  arc = 140.0
+  recovery = 1.0
+  cooldown = 1.4
+  turn_rate = 190.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "two chops"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.75, damage = 18, recovery = 0.25 }, { clip = 18, take = 1, windup = 0.6, damage = 19, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "overhead"
+  weight = 1.5
+  steps = [ { clip = 58, windup = 1.25, damage = 30, arc = 70.0, recovery = 1.3, kit = 379 } ]
+
+# Searing Blade warlocks: shadow, and an imp called up when they're hurt.
+[[mob]]
+key = "rf_warlock"
+name = "Searing Blade Warlock"
+subname = "The Searing Blade"
+display = 1314
+health = 95
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 8.0
+drops = { searing_token = [3, 5] }
+gear = ["red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 17
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 17, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 1.0 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.9
+  pattern = "shadow bolt"
+  text = "\"Servant! To me!\""
+  summon = ["imp"]
+
+# Molten elementals: fire that walks, and burns all round it.
+[[mob]]
+key = "rf_molten"
+name = "Molten Elemental"
+subname = "Ragefire Chasm"
+display = 1070
+scale = 0.7
+health = 130
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 14.0
+leash = 26.0
+drops = { searing_token = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.65
+  damage = 15
+  range = 2.8
+  arc = 120.0
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "blows"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.6, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.5, damage = 14, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "flare"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 1.0, range = 4.5, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.1, kit = 356, look = 10604 } ]
+
+# --- Ragefire's bosses -----------------------------------------------------------------------------------
+
+# Oggleflint: the trogg chief, a club the size of a hero.
+[[mob]]
+key = "rf_oggleflint"
+name = "Oggleflint"
+subname = "Trogg Chief"
+display = 1193
+health = 820
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+boss = true
+posture = 220
+drops = { searing_token = [14, 18] }
+trophy = { oggleflint_mantle = 1 }
+gear = ["oggleflint_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.8
+  damage = 26
+  range = 3.2
+  arc = 140.0
+  recovery = 1.0
+  cooldown = 1.4
+  turn_rate = 180.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "clubs"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.75, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.6, damage = 24, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "cleave"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 126, windup = 0.9, range = 4.2, arc = 360.0, damage = 20, heavy = true, recovery = 1.1, kit = 369 } ]
+  [[mob.pattern]]
+  name = "stomp"
+  weight = 1.5
+  below = 0.6
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 5.5, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 26271 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.85
+  pattern = "stomp"
+  text = "Oggleflint bellows; troggs come running."
+  summon = ["rf_trogg", "rf_trogg"]
+  [[mob.phase]]
+  at = 0.25
+  speed = 0.75
+  might = 1.2
+  pattern = "cleave"
+  text = "Oggleflint goes wild, swinging at anything near him."
+  shove = 5.0
+  look = 26271
+
+# Bazzalan: a satyr in the cult's service, quick and poisonous.
+[[mob]]
+key = "rf_bazzalan"
+name = "Bazzalan"
+subname = "The Searing Blade"
+display = 2007
+scale = 1.2
+health = 900
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 16.0
+leash = 30.0
+evade = 0.35
+boss = true
+posture = 200
+drops = { searing_token = [18, 24] }
+trophy = { bazzalan_legs = 1 }
+gear = ["bazzalan_legs"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.42
+  damage = 18
+  range = 2.7
+  arc = 100.0
+  recovery = 0.6
+  cooldown = 0.9
+  turn_rate = 280.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 15, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.32, damage = 15, recovery = 0.1 }, { clip = 17, take = 0, windup = 0.32, damage = 15, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.5, damage = 20, heavy = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "pounce"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 12.0
+  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 7.0, damage = 22, recovery = 0.9 } ]
+  # A spit of venom where you stand.
+  [[mob.pattern]]
+  name = "venom"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 20.0
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 20.0, radius = 3.0, speed = 18.0, spell = 6917, look = 8245, blockable = false, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "frenzy"
+  weight = 2.0
+  below = 0.4
+  steps = [ { clip = 17, take = 0, windup = 0.35, damage = 14, recovery = 0.06 }, { clip = 17, take = 1, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 17, take = 0, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 17, take = 1, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 17, take = 0, windup = 0.5, lunge = 3.0, damage = 22, heavy = true, recovery = 1.4 } ]
+  [[mob.phase]]
+  at = 0.65
+  speed = 0.88
+  pattern = "venom"
+  text = "\"Hehehe... you smell of the surface. Delicious.\""
+  [[mob.phase]]
+  at = 0.4
+  speed = 0.78
+  might = 1.15
+  pattern = "frenzy"
+  text = "\"Enough games!\""
+  summon = ["rf_cultist"]
+  shove = 4.5
+  look = 8245
+
+# Jergosh the Invoker: the cult's master, at his ritual in the lava pit.
+[[mob]]
+key = "rf_jergosh"
+name = "Jergosh the Invoker"
+subname = "The Searing Blade"
+display = 1310
+scale = 1.2
+health = 1050
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 200
+keep_away = 7.0
+drops = { searing_token = [22, 28] }
+trophy = { jergosh_robe = 1 }
+gear = ["jergosh_robe"]
+respawn = 0.0
+# Whoever took his grimoire from its hiding place finds out what it was holding.
+then = "rf_heart"
+then_after = 3.5
+then_needs = "jergosh_grimoire"
+then_text = "The lava in the pit heaves. With the Invoker dead and his grimoire gone, nothing holds the Heart of Ragefire down."
+then_kit = 356
+then_look = 10604
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 0.9 } ]
+  # Fire called up out of the pit where you stand.
+  [[mob.pattern]]
+  name = "invocation"
+  weight = 2.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.4, damage = 28, range = 26.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "staff"
+  weight = 1.5
+  max_range = 3.0
+  steps = [ { ranged = false, clip = 54, windup = 0.9, damage = 16, range = 4.5, arc = 360.0, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  [[mob.pattern]]
+  name = "rain of fire"
+  weight = 2.0
+  below = 0.4
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 1.4 } ]
+  [[mob.phase]]
+  at = 0.7
+  speed = 0.9
+  pattern = "invocation"
+  text = "\"The Heart hears me! Burn!\""
+  summon = ["rf_molten"]
+  [[mob.phase]]
+  at = 0.4
+  speed = 0.8
+  might = 1.15
+  pattern = "rain of fire"
+  text = "\"Rise, fire! Rise and take them!\""
+  summon = ["imp", "imp"]
+  [[mob.phase]]
+  at = 0.15
+  speed = 0.7
+  might = 1.2
+  pattern = "staff"
+  text = "\"No... the ritual... is not... finished!\""
+  shove = 5.5
+  look = 10604
+
+# The Heart of Ragefire: what the Invoker kept bound under the pit.
+[[mob]]
+key = "rf_heart"
+name = "The Heart of Ragefire"
+subname = "Unbound"
+display = 1070
+scale = 1.8
+health = 1100
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 30.0
+leash = 40.0
+boss = true
+posture = 320
+drops = { searing_token = [40, 50] }
+gear = ["ember_breastplate"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.85
+  damage = 30
+  range = 3.8
+  arc = 150.0
+  recovery = 1.1
+  cooldown = 1.4
+  turn_rate = 170.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "blows"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.8, damage = 28, recovery = 0.25 }, { clip = 17, take = 1, windup = 0.6, damage = 30, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "eruption"
+  weight = 2.0
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 6.5, arc = 360.0, damage = 28, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 10604 } ]
+  [[mob.pattern]]
+  name = "magma"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.0, damage = 24, range = 26.0, radius = 4.0, speed = 14.0, spell = 133, look = 10604, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 24, range = 26.0, radius = 4.0, speed = 14.0, spell = 133, look = 10604, blockable = false, recovery = 1.3 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "eruption"
+  text = "The Heart flares white; molten things crawl up out of the pit."
+  summon = ["rf_molten", "rf_molten"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "magma"
+  text = "The Heart of Ragefire roars like a forge."
+  shove = 6.5
+  look = 10604
+
+# Taragaman the Hungerer: a demon at the bottom of the chasm, feeding.
+[[mob]]
+key = "rf_taragaman"
+name = "Taragaman the Hungerer"
+subname = "Ragefire Chasm"
+display = 1912
+scale = 1.05
+health = 1500
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 32.0
+boss = true
+posture = 320
+drops = { searing_token = [30, 40] }
+trophy = { taragaman_helm = 1 }
+gear = ["taragaman_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.8
+  damage = 32
+  range = 3.6
+  arc = 140.0
+  recovery = 1.05
+  cooldown = 1.4
+  turn_rate = 180.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.75, damage = 28, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.6, damage = 30, recovery = 1.1 } ]
+  # An uppercut that throws you down.
+  [[mob.pattern]]
+  name = "uppercut"
+  weight = 2.0
+  max_range = 3.2
+  steps = [ { clip = 57, windup = 1.0, damage = 34, arc = 80.0, heavy = true, recovery = 1.2, kit = 379 } ]
+  # Fire all round him.
+  [[mob.pattern]]
+  name = "fire nova"
+  weight = 1.5
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 6.5, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 10604 } ]
+  [[mob.pattern]]
+  name = "leap"
+  weight = 1.5
+  min_range = 6.0
+  max_range = 15.0
+  steps = [ { clip = 57, windup = 1.1, lunge = 9.0, range = 4.0, arc = 360.0, damage = 36, heavy = true, recovery = 1.4, kit = 379, look = 10604 } ]
+  [[mob.pattern]]
+  name = "hunger"
+  weight = 2.5
+  below = 0.3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 24, heavy = false, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.4, damage = 24, heavy = false, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.4, damage = 24, heavy = false, recovery = 0.08 }, { clip = 54, windup = 0.8, range = 6.0, arc = 360.0, damage = 30, heavy = true, blockable = false, recovery = 1.7, look = 10604 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "fire nova"
+  text = "\"Your flesh will feed the Hunger!\""
+  look = 10604
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.78
+  might = 1.15
+  pattern = "hunger"
+  text = "\"HUNGRY! SO HUNGRY!\""
+  summon = ["imp", "imp"]
+  shove = 6.0
+  look = 10604
+  [[mob.phase]]
+  at = 0.1
+  speed = 0.68
+  might = 1.25
+  pattern = "hunger"
+  text = "Taragaman tears at the rock in a frenzy, fire pouring off him."
+  shove = 6.0
+
+# Maur Grimtotem: a tauren who came hunting the cult.
+[[mob]]
+key = "rf_maur"
+name = "Maur Grimtotem"
+subname = "Fire-Mad"
+display = 4726
+scale = 1.2
+health = 880
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 1441
+grip = "2h"
+boss = true
+posture = 280
+drops = { searing_token = [24, 30] }
+gear = ["maur_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.9
+  damage = 34
+  range = 3.5
+  arc = 140.0
+  recovery = 1.15
+  cooldown = 1.5
+  turn_rate = 170.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "swings"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.85, damage = 30, recovery = 0.25 }, { clip = 18, take = 1, windup = 0.7, damage = 32, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "war stomp"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 26271 } ]
+  [[mob.pattern]]
+  name = "charge"
+  weight = 1.5
+  min_range = 6.0
+  max_range = 15.0
+  steps = [ { clip = 18, take = 1, windup = 1.0, lunge = 9.0, damage = 36, recovery = 1.4, kit = 379 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "war stomp"
+  text = "\"The fire... it whispers... it wants you too!\""
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "charge"
+  text = "\"Earthmother forgive me!\""
+  shove = 6.0
+  look = 26271

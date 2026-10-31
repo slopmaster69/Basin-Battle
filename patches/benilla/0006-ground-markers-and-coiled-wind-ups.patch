@@ -1,0 +1,796 @@
+From dd2dfd283562b40b112fd0327c67ecb583c9eb43 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Thu, 29 Oct 2026 18:31:19 -0600
+Subject: [PATCH] Ground markers for an aimed ability and blows coming down;
+ creature wind-ups that coil and snap; the right button the add-on's
+
+SetAimMarker("circle", range, radius) lays a terrain-projected circle where the reticle's line
+lands within range (as the Elwynn Survival server traces it: from the eye and the shoulder, along
+the view's facing and elevation, pulled back to the range and dropped to the ground), and
+GetAimPoint() reads it back. SetGroundMarker(key, x, y, z, radius, seconds[, hostile]) and
+ClearGroundMarker([key]) lay timed circles (red for what's coming at us). Both use the
+ground-targeting reticle's projector and textures. HasActionCombat() is 5.
+
+A creature's wind-up asked to run well past its clip's own pace no longer plays as one slow
+motion: the clip goes at its own speed into the coil, holds there, and snaps onto its impact at
+1.8 times its speed, landing when the server says.
+
+Under the action mouse the right button is the add-on's binding (the guard): its release no
+longer ends a script's MouselookStart (the steering mouse), and it arms no right-click interact.
+---
+ .../benilla-app/src/creature_anim/action.rs   | 109 ++++++-
+ crates/benilla-app/src/player/camera.rs       |   4 +-
+ crates/benilla-app/src/target/aim_marker.rs   | 294 ++++++++++++++++++
+ crates/benilla-app/src/target/mod.rs          |  15 +-
+ crates/benilla-ui/src/action_combat.rs        | 182 ++++++++++-
+ 5 files changed, 594 insertions(+), 10 deletions(-)
+ create mode 100644 crates/benilla-app/src/target/aim_marker.rs
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index bb300285..950ddbed 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -37,6 +37,14 @@ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+ const IMPACT_TAGS: [&[u8; 4]; 5] = [b"$AH0", b"$AH1", b"$AH2", b"$AH3", b"$CAH"];
+ /// How far a clip's speed is bent to fit its timing.
+ const RATE_RANGE: (f32, f32) = (0.25, 4.0);
++/// A creature's wind-up slowed past this share of its clip's own plays as a coil and a snap:
++/// the clip at its own pace to `COIL_AT` of the way to its impact, a slow creep `COIL_CREEP`
++/// further for as long as the wind-up has left, and the rest at `COIL_SNAP_RATE` times its own
++/// speed, so a heavy is read in the held pose and lands fast.
++const COIL_SLOW: f32 = 1.35;
++const COIL_AT: f32 = 0.62;
++const COIL_CREEP: f32 = 0.08;
++const COIL_SNAP_RATE: f32 = 1.8;
+ /// An action clip fades in and out over these.
+ const FADE_IN: f32 = 0.08;
+ const FADE_OUT: f32 = 0.16;
+@@ -115,6 +123,8 @@ pub(crate) struct ActionClip {
+     shuffle: bool,
+     /// A struck body's reaction, not a blow or a hold of the script's own.
+     reaction: bool,
++    /// A creature's slow wind-up, played as a held coil and a snap (see [`COIL_SLOW`]).
++    coil: bool,
+     /// Nodes of the clips it replaced, to stop before it plays (gathered across replacements in
+     /// one frame, so none is left playing frozen).
+     release: Vec<AnimationNodeIndex>,
+@@ -292,12 +302,49 @@ impl ActionClip {
+             told: false,
+             shuffle: false,
+             reaction: false,
++            coil: false,
+             release: Vec::new(),
+         }
+     }
+ 
++    /// The coil's two marks on the clip clock and the snap's real seconds.
++    fn coil_marks(&self) -> (f32, f32, f32) {
++        let b = self.key * (COIL_AT + COIL_CREEP);
++        let snap = ((self.key - b) / COIL_SNAP_RATE).max(0.04);
++        (self.key * COIL_AT, b, snap)
++    }
++
++    /// The next point on the clip clock where the speed changes (infinity: none ahead).
++    fn next_mark(&self) -> f32 {
++        if self.key <= 0.0 || self.t >= self.key {
++            return f32::INFINITY;
++        }
++        if self.coil {
++            let (a, b, _) = self.coil_marks();
++            if self.t < a {
++                return a;
++            }
++            if self.t < b {
++                return b;
++            }
++        }
++        self.key
++    }
++
+     /// This instant's clip speed.
+     fn rate(&self) -> f32 {
++        if self.coil && self.key > 0.0 && self.t < self.key {
++            let (a, b, snap) = self.coil_marks();
++            return if self.t < a {
++                1.0
++            } else if self.t < b {
++                // Held: whatever the wind-up has left after the pace in and the snap.
++                let hold = (self.windup - snap - a).max(0.05);
++                ((b - a) / hold).max(0.01)
++            } else {
++                (self.key - b) / snap
++            };
++        }
+         let r = if self.key > 0.0 {
+             if self.t < self.key {
+                 if self.windup > 0.0 {
+@@ -322,16 +369,22 @@ impl ActionClip {
+     /// recovery's; past the end it loops (a held looping clip) or holds the last pose.
+     fn advance(&mut self, dt: f32) {
+         let mut left = dt;
+-        for _ in 0..2 {
++        for _ in 0..4 {
+             let rate = self.rate();
+-            let to_key = if self.key > 0.0 && self.t < self.key {
+-                (self.key - self.t) / rate
++            let mark = self.next_mark();
++            let to_mark = if mark.is_finite() {
++                (mark - self.t) / rate
+             } else {
+                 f32::INFINITY
+             };
+-            let step = left.min(to_key);
+-            self.t += step * rate;
+-            left -= step;
++            if left >= to_mark {
++                // Exactly onto the mark, so the next pace is read past it.
++                self.t = mark;
++                left -= to_mark;
++            } else {
++                self.t += left * rate;
++                left = 0.0;
++            }
+             if left <= 0.0 {
+                 break;
+             }
+@@ -450,6 +503,10 @@ pub(super) fn drain_action_calls(
+                 clip.windup = impact;
+                 clip.recovery = recovery;
+                 clip.looping = false;
++                // A creature's (a unit named by a creature guid) slow wind-up: a coil, then the snap.
++                clip.coil = guid_of(&unit).is_some_and(|g| g >> 48 == 0xF130 || g >> 48 == 0xF150)
++                    && clip.key > 0.0
++                    && impact > clip.key * COIL_SLOW;
+                 start_clip(&mut commands, &mut clips, entity, clip);
+                 // The trail starts with the swing, on each hand's weapon.
+                 if let Some((packed, duration_ms)) = trail {
+@@ -1294,6 +1351,7 @@ mod tests {
+             told: false,
+             shuffle: false,
+             reaction: false,
++            coil: false,
+             release: Vec::new(),
+         }
+     }
+@@ -1309,6 +1367,45 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn a_slow_creature_wind_up_holds_its_coil_and_snaps_onto_the_impact_on_time() {
++        // A 0.4 s swing to its impact asked to land at 1.2 s.
++        let mut c = clip(0.4, 1.2, 1.2);
++        c.coil = true;
++        let (a, b, snap) = c.coil_marks();
++        let mut real = 0.0_f32;
++        let mut at_coil = None;
++        let mut at_snap = None;
++        while c.t < 0.4 - 1.0e-4 && real < 3.0 {
++            c.advance(0.01);
++            real += 0.01;
++            if at_coil.is_none() && c.t >= a - 1.0e-4 {
++                at_coil = Some(real);
++            }
++            if at_snap.is_none() && c.t >= b - 1.0e-4 {
++                at_snap = Some(real);
++            }
++        }
++        assert!(
++            (real - 1.2).abs() < 0.021,
++            "the impact still at 1.2 s: {real}"
++        );
++        let (at_coil, at_snap) = (at_coil.unwrap(), at_snap.unwrap());
++        assert!(
++            (at_coil - a).abs() < 0.021,
++            "the coil reached at its own pace: {at_coil}"
++        );
++        assert!(
++            (real - at_snap - snap).abs() < 0.021,
++            "the strike snaps in {snap} s: {}",
++            real - at_snap
++        );
++        // A wind-up near its clip's own pace plays straight.
++        let mut d = clip(0.4, 0.45, 1.2);
++        d.coil = false;
++        assert!((d.rate() - 0.4 / 0.45).abs() < 1.0e-5);
++    }
++
+     #[test]
+     fn a_clip_lands_its_impact_on_time_and_takes_the_recovery_after() {
+         let mut c = clip(0.4, 0.2, 1.2);
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index 6d6bc38a..f70f06d3 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -830,7 +830,9 @@ pub(super) fn latch_world_mouse(
+         // The right button's release ends a scripted channel too, wherever its press went: in
+         // freelook every button event goes to the `WorldFrame` (`0x492b50`), whose TURNORACTION up
+         // runs `TurnOrActionStop` (`0x514160`), `0x515090(1, 0, …)`.
+-        if buttons.just_released(MouseButton::Right) {
++        // Basin Battle's action mouse keeps a script's look through it: the right button is the
++        // add-on's binding there (the guard), and its release mustn't drop the steering mouse.
++        if buttons.just_released(MouseButton::Right) && !benilla_ui::action_combat::action_mouse() {
+             wm.scripted = false;
+         }
+         // The world enter behind the cover clears the whole word (`0x5144c0` → `0x514b70(-1, …)`).
+diff --git a/crates/benilla-app/src/target/aim_marker.rs b/crates/benilla-app/src/target/aim_marker.rs
+new file mode 100644
+index 00000000..3a69c765
+--- /dev/null
++++ b/crates/benilla-app/src/target/aim_marker.rs
+@@ -0,0 +1,294 @@
++//! Basin Battle's ground markers, not part of 1.12.1: the aim's circle under the reticle while the
++//! Elwynn Survival add-on asks for one (`SetAimMarker`), and the timed circles it lays where a
++//! blow is coming down (`SetGroundMarker`). Both are terrain-projected decals through the same
++//! projector as the ground-targeting reticle ([`super::reticle`]), with its two textures: green
++//! for ours, red for what's coming at us.
++//!
++//! The aim's point is found as the Elwynn Survival server finds it, so the circle lies where the
++//! cast will land: the reticle's line from the hero's eye (1.9 yd up, the shoulder's 0.75 to the
++//! right while the aiming camera is up), along the view's facing and elevation, to the first
++//! ground or wall it meets within `range` + 3 yards; past `range` on the map it is pulled back to
++//! `range` and dropped to the ground there. The add-on can read it back (`GetAimPoint`).
++
++use bevy::prelude::*;
++
++use crate::net::SelfPlayer;
++use benilla_assets::coords::{bevy_to_wow, wow_to_bevy};
++use benilla_ui::action_combat::{self, GroundMarkerCall};
++use benilla_world::collision::PickOccluder;
++use benilla_world::decal::{DecalFrame, WorldDecal};
++use benilla_world::particles::buffer::EffectVertex;
++use benilla_world::view::WorldCamera;
++
++/// The reticle's line starts this high over the feet, and this far to the right while aiming
++/// over the shoulder (the server's `EYE` and `SHOULDER`).
++const EYE: f32 = 1.9;
++const SHOULDER: f32 = 0.75;
++/// The line runs this much past the range, as the server's does from the camera.
++const OVERSHOOT: f32 = 3.0;
++/// The decal box's vertical half-height, as the reticle's.
++const VERT: f32 = 2.0;
++/// The most ground markers kept at once.
++const MAX_MARKERS: usize = 48;
++
++#[derive(Resource)]
++pub(super) struct MarkerAssets {
++    ours: Handle<Image>,
++    theirs: Handle<Image>,
++}
++
++/// One projected circle: where, how wide, its triangles, and the surfaces they were cut from.
++#[derive(Default, Clone)]
++struct Circle {
++    center: Vec3,
++    radius: f32,
++    surfaces: usize,
++    verts: Vec<EffectVertex>,
++}
++
++impl Circle {
++    /// Project it afresh if it moved, changed size or the ground under it streamed in.
++    fn place(&mut self, decals: &WorldDecal, center: Vec3, radius: f32) {
++        let surfaces = decals.receiver_count();
++        if !self.verts.is_empty()
++            && self.center.distance_squared(center) < 1.0e-4
++            && (self.radius - radius).abs() < 1.0e-3
++            && self.surfaces == surfaces
++        {
++            return;
++        }
++        self.center = center;
++        self.radius = radius;
++        self.surfaces = surfaces;
++        self.verts.clear();
++        let frame = DecalFrame {
++            center,
++            sin: 0.0,
++            cos: 1.0,
++            min_x: -radius,
++            max_x: radius,
++            min_z: -radius,
++            max_z: radius,
++            min_y: -VERT,
++            max_y: VERT,
++        };
++        decals.project(
++            &mut self.verts,
++            &frame,
++            |p| ((VERT - p.y.abs()) / VERT).clamp(0.0, 1.0),
++            |x, z| frame.rect_uv(x, z),
++        );
++    }
++}
++
++/// The aim's circle, while one is asked for and the line meets somewhere.
++#[derive(Resource, Default)]
++pub(super) struct AimMarkerState {
++    circle: Circle,
++    shown: bool,
++}
++
++/// A timed marker: its key (the add-on's), until when (seconds of app time), and whose.
++struct Ground {
++    key: String,
++    until: f32,
++    hostile: bool,
++    circle: Circle,
++}
++
++#[derive(Resource, Default)]
++pub(super) struct GroundMarkers {
++    list: Vec<Ground>,
++}
++
++pub(super) fn setup_aim_marker(mut commands: Commands, asset_server: Res<AssetServer>) {
++    commands.insert_resource(MarkerAssets {
++        ours: asset_server.load::<Image>("mpq://interface/spellshadow/spell-shadow-acceptable.blp"),
++        theirs: asset_server
++            .load::<Image>("mpq://interface/spellshadow/spell-shadow-unacceptable.blp"),
++    });
++    commands.init_resource::<AimMarkerState>();
++    commands.init_resource::<GroundMarkers>();
++}
++
++/// The first ground or wall along `dir` from `from` within `max`, as a distance.
++fn first_hit(
++    spatial: &avian3d::prelude::SpatialQuery,
++    occluders: &Query<(), With<PickOccluder>>,
++    from: Vec3,
++    dir: Vec3,
++    max: f32,
++) -> Option<f32> {
++    let dir = Dir3::new(dir).ok()?;
++    spatial
++        .cast_ray_predicate(
++            from,
++            dir,
++            max,
++            true,
++            &benilla_world::collision::WorldCollision::body_filter(),
++            &|e| occluders.contains(e),
++        )
++        .map(|hit| hit.distance)
++}
++
++/// Where the reticle's line lands for an aim of `range` yards, in Bevy space.
++pub(crate) fn aim_point(
++    spatial: &avian3d::prelude::SpatialQuery,
++    occluders: &Query<(), With<PickOccluder>>,
++    feet: Vec3,
++    range: f32,
++) -> Vec3 {
++    let (yaw, pitch) = (
++        action_combat::view_facing(),
++        action_combat::view_elevation(),
++    );
++    let right = if action_combat::aim_camera() {
++        SHOULDER
++    } else {
++        0.0
++    };
++    let w = bevy_to_wow(feet);
++    // The server's right of a facing `yaw`: (sin, -cos) on the map.
++    let origin = wow_to_bevy([
++        w[0] + yaw.sin() * right,
++        w[1] - yaw.cos() * right,
++        w[2] + EYE,
++    ]);
++    let dir = wow_to_bevy([
++        yaw.cos() * pitch.cos(),
++        yaw.sin() * pitch.cos(),
++        pitch.sin(),
++    ]);
++    let reach = range + OVERSHOOT;
++    let mut at = origin + dir * first_hit(spatial, occluders, origin, dir, reach).unwrap_or(reach);
++    // No farther than the range on the map.
++    let flat = Vec2::new(at.x - feet.x, at.z - feet.z);
++    if flat.length() > range {
++        let k = range / flat.length().max(0.01);
++        at = Vec3::new(feet.x + flat.x * k, at.y, feet.z + flat.y * k);
++    }
++    // Down to the ground there (from a little above, as the server's ground search).
++    let top = at + Vec3::Y * 1.0;
++    match first_hit(spatial, occluders, top, Vec3::NEG_Y, 60.0) {
++        Some(d) => top - Vec3::Y * d,
++        None => at,
++    }
++}
++
++/// Place the aim's circle each frame while the add-on asks for one.
++#[allow(clippy::too_many_arguments)]
++pub(super) fn update_aim_marker(
++    spatial: avian3d::prelude::SpatialQuery,
++    occluders: Query<(), With<PickOccluder>>,
++    me: Query<&GlobalTransform, With<SelfPlayer>>,
++    decals: WorldDecal,
++    time: Res<Time>,
++    mut state: ResMut<AimMarkerState>,
++    mut grounds: ResMut<GroundMarkers>,
++) {
++    let feet = me.single().ok().map(|t| t.translation());
++    match (action_combat::aim_marker(), feet) {
++        (Some(m), Some(feet)) => {
++            let at = aim_point(&spatial, &occluders, feet, m.range);
++            state.circle.place(&decals, at, m.radius.max(0.3));
++            state.shown = !state.circle.verts.is_empty();
++            action_combat::set_aim_point(Some(bevy_to_wow(at)));
++        }
++        _ => {
++            state.shown = false;
++            action_combat::set_aim_point(None);
++        }
++    }
++    // The timed markers: new ones (or a key again: moved), cleared ones, the lapsed.
++    let now = time.elapsed_secs();
++    for call in action_combat::take_ground_markers() {
++        match call {
++            GroundMarkerCall::Set {
++                key,
++                pos,
++                radius,
++                secs,
++                hostile,
++            } => {
++                grounds.list.retain(|g| g.key != key);
++                if grounds.list.len() >= MAX_MARKERS {
++                    grounds.list.remove(0);
++                }
++                let mut g = Ground {
++                    key,
++                    until: now + secs,
++                    hostile,
++                    circle: Circle::default(),
++                };
++                g.circle.place(&decals, wow_to_bevy(pos), radius.max(0.2));
++                grounds.list.push(g);
++            }
++            GroundMarkerCall::Clear { key } => match key {
++                Some(k) => grounds.list.retain(|g| g.key != k),
++                None => grounds.list.clear(),
++            },
++        }
++    }
++    grounds.list.retain(|g| g.until > now);
++    // Ground that streamed in under one: projected again.
++    for g in &mut grounds.list {
++        let (c, r) = (g.circle.center, g.circle.radius);
++        g.circle.place(&decals, c, r);
++    }
++}
++
++fn push_circle(
++    draw: &mut benilla_world::particles::buffer::WorldEffectDraw,
++    cam: Entity,
++    texture: AssetId<Image>,
++    circle: &Circle,
++    alpha: f32,
++) {
++    if circle.verts.is_empty() {
++        return;
++    }
++    let mut batch = draw.batch(cam, texture).anchored(circle.center).rung(
++        benilla_world::sky_order::Rung::RETICLE,
++        benilla_world::sky_order::Rung::DECAL_RASTER,
++    );
++    batch.extend(circle.verts.iter().map(|v| EffectVertex {
++        pos: v.pos,
++        uv: v.uv,
++        color: [1.0, 1.0, 1.0, v.color[3] * alpha],
++    }));
++    batch.tris();
++}
++
++/// Draw them: the aim's green, a warning red (fading in over its last moments).
++pub(super) fn push_aim_marker(
++    assets: Option<Res<MarkerAssets>>,
++    state: Option<Res<AimMarkerState>>,
++    grounds: Option<Res<GroundMarkers>>,
++    time: Res<Time>,
++    cam: Query<Entity, With<WorldCamera>>,
++    mut draw: benilla_world::particles::buffer::WorldEffectDraw,
++) {
++    let (Some(assets), Ok(cam)) = (assets, cam.single()) else {
++        return;
++    };
++    if let Some(state) = state.as_deref() {
++        if state.shown {
++            push_circle(&mut draw, cam, assets.ours.id(), &state.circle, 1.0);
++        }
++    }
++    let now = time.elapsed_secs();
++    if let Some(grounds) = grounds.as_deref() {
++        for g in &grounds.list {
++            let texture = if g.hostile {
++                assets.theirs.id()
++            } else {
++                assets.ours.id()
++            };
++            // Brighter as it comes down.
++            let left = (g.until - now).max(0.0);
++            let alpha = if left < 0.4 { 1.0 } else { 0.75 };
++            push_circle(&mut draw, cam, texture, &g.circle, alpha);
++        }
++    }
++}
+diff --git a/crates/benilla-app/src/target/mod.rs b/crates/benilla-app/src/target/mod.rs
+index 07121a9b..f92ff841 100644
+--- a/crates/benilla-app/src/target/mod.rs
++++ b/crates/benilla-app/src/target/mod.rs
+@@ -11,6 +11,7 @@ use benilla_assets::AssetSet;
+ use benilla_world::interact::{WorldClick, WorldRightClick};
+ use benilla_world::schedule::WorldStage;
+ 
++mod aim_marker;
+ mod by_name;
+ // `pub(crate)` for the chest live probe, which drives the mouse's own `click::resolve_go_action`.
+ pub(crate) mod click;
+@@ -238,7 +239,10 @@ pub(crate) fn latch_press_pick(
+         MouseButton::Left
+     };
+     let left = buttons.just_pressed(primary) && !buttons.pressed(MouseButton::Right);
+-    let right = buttons.just_pressed(MouseButton::Right) && !buttons.pressed(primary);
++    // Under it the right button is the add-on's too (the guard): no right-click interact.
++    let right = buttons.just_pressed(MouseButton::Right)
++        && !buttons.pressed(primary)
++        && !benilla_ui::action_combat::action_mouse();
+     if !(left || right) {
+         return;
+     }
+@@ -338,6 +342,7 @@ impl Plugin for TargetPlugin {
+                 (
+                     ring::setup_ring,
+                     reticle::setup_reticle,
++                    aim_marker::setup_aim_marker,
+                     (ring::load_factions, scan::load_creature_types).after(AssetSet::Open),
+                 ),
+             )
+@@ -444,11 +449,17 @@ impl Plugin for TargetPlugin {
+                     .after(WorldStage::Net)
+                     .before(WorldStage::Input),
+             )
++            // Basin Battle's ground markers, off this frame's view and the world's ground.
++            .add_systems(Update, aim_marker::update_aim_marker.after(TargetUpdate))
+             .add_systems(PostUpdate, highlight::apply_highlight)
+             // The ring's stream push, after the frame's stream clear.
+             .add_systems(
+                 PostUpdate,
+-                (ring::push_ring, reticle::push_reticle)
++                (
++                    ring::push_ring,
++                    reticle::push_reticle,
++                    aim_marker::push_aim_marker,
++                )
+                     .after(benilla_world::particles::buffer::begin_effect_frame),
+             );
+     }
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index fa7cb7eb..a29b94ec 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -61,6 +61,16 @@
+ //! - `ActionMoveKeys()`: the movement keys held, as forward (1, -1 back, 0) and right (1, -1 left).
+ //! - `GetActionAim()`: where the view's centre looks, as a facing on the map (radians, the
+ //!   game's own) and an elevation (radians, up positive): the reticle's line.
++//!
++//! The fifth round (`HasActionCombat() >= 5`), the ground under an aimed ability:
++//!
++//! - `SetAimMarker(shape, range, radius)`: a circle (`shape` `"circle"`) `radius` yards wide on
++//!   the ground where the reticle's line lands within `range` yards, drawn every frame until
++//!   `SetAimMarker(nil)`.
++//! - `GetAimPoint()`: where that is (WoW `x, y, z`), or nil with no marker up.
++//! - `SetGroundMarker(key, x, y, z, radius, seconds[, hostile])`: a circle on the ground there for
++//!   that long (red when `hostile`, else green); the same key again moves it.
++//! - `ClearGroundMarker([key])`: take one away (all of them with no key).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -356,12 +366,75 @@ pub fn aim_shape() -> (f32, f32, f32) {
+     (f(&AIM_DISTANCE), f(&AIM_RIGHT), f(&AIM_UP))
+ }
+ 
++/// The aim's ground marker the add-on asks for.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct AimMarker {
++    pub range: f32,
++    pub radius: f32,
++}
++
++static AIM_MARKER: std::sync::Mutex<Option<AimMarker>> = std::sync::Mutex::new(None);
++static AIM_POINT: std::sync::Mutex<Option<[f32; 3]>> = std::sync::Mutex::new(None);
++
++/// The aim's circle, while one is asked for.
++pub fn aim_marker() -> Option<AimMarker> {
++    AIM_MARKER.lock().ok().and_then(|m| *m)
++}
++
++/// Where the aim's circle lies this frame (WoW coordinates), for `GetAimPoint`.
++pub fn set_aim_point(p: Option<[f32; 3]>) {
++    if let Ok(mut a) = AIM_POINT.lock() {
++        *a = p;
++    }
++}
++
++pub fn aim_point() -> Option<[f32; 3]> {
++    AIM_POINT.lock().ok().and_then(|a| *a)
++}
++
++/// A timed ground marker asked for or taken away.
++#[derive(Clone, Debug, PartialEq)]
++pub enum GroundMarkerCall {
++    Set {
++        key: String,
++        pos: [f32; 3],
++        radius: f32,
++        secs: f32,
++        hostile: bool,
++    },
++    Clear {
++        key: Option<String>,
++    },
++}
++
++static GROUND_MARKERS: std::sync::Mutex<Vec<GroundMarkerCall>> = std::sync::Mutex::new(Vec::new());
++
++/// The ground markers asked for since the last call.
++pub fn take_ground_markers() -> Vec<GroundMarkerCall> {
++    GROUND_MARKERS
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
++}
++
++fn push_ground(call: GroundMarkerCall) {
++    if let Ok(mut v) = GROUND_MARKERS.lock() {
++        if v.len() < 256 {
++            v.push(call);
++        }
++    }
++}
++
+ /// Switch both off (leaving the world, a new session).
+ pub fn reset() {
+     ACTION_MOUSE.store(false, Ordering::Relaxed);
+     AIM_CAMERA.store(false, Ordering::Relaxed);
+     UNIT_COLLISION.store(false, Ordering::Relaxed);
+     push(ActionCall::Lock { unit: None });
++    if let Ok(mut m) = AIM_MARKER.lock() {
++        *m = None;
++    }
++    push_ground(GroundMarkerCall::Clear { key: None });
+ }
+ 
+ /// The keys of a dash: `"f"`, `"b"`, `"l"`, `"r"` and their pairs, as `(forward, right)`.
+@@ -452,7 +525,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(4))?,
++        lua.create_function(|_, _: MultiValue| Ok(5))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -673,6 +746,68 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+         "GetActionAim",
+         lua.create_function(|_, _: MultiValue| Ok((view_facing(), view_elevation())))?,
+     )?;
++    g.set(
++        "SetAimMarker",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let want = match (
++                text(v.first()).as_deref(),
++                number(v.get(1), 0.0, 200.0),
++                number(v.get(2), 0.0, 60.0),
++            ) {
++                (Some("circle"), Some(range), Some(radius)) => Some(AimMarker { range, radius }),
++                _ => None,
++            };
++            if let Ok(mut m) = AIM_MARKER.lock() {
++                *m = want;
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "GetAimPoint",
++        lua.create_function(|_, _: MultiValue| {
++            Ok(match aim_point() {
++                Some(p) => (Some(p[0]), Some(p[1]), Some(p[2])),
++                None => (None, None, None),
++            })
++        })?,
++    )?;
++    g.set(
++        "SetGroundMarker",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let key = text(v.first())
++                .or_else(|| number(v.first(), f32::MIN, f32::MAX).map(|n| format!("{n}")));
++            if let (Some(key), Some(x), Some(y), Some(z), Some(radius), Some(secs)) = (
++                key,
++                number(v.get(1), -1.0e6, 1.0e6),
++                number(v.get(2), -1.0e6, 1.0e6),
++                number(v.get(3), -1.0e6, 1.0e6),
++                number(v.get(4), 0.0, 60.0),
++                number(v.get(5), 0.0, 120.0),
++            ) {
++                push_ground(GroundMarkerCall::Set {
++                    key,
++                    pos: [x, y, z],
++                    radius,
++                    secs,
++                    hostile: truthy(v.get(6)),
++                });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ClearGroundMarker",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let key = text(v.first())
++                .or_else(|| number(v.first(), f32::MIN, f32::MAX).map(|n| format!("{n}")));
++            push_ground(GroundMarkerCall::Clear { key });
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "TakeActionMarkers",
+         lua.create_function(|lua, _: MultiValue| {
+@@ -743,6 +878,51 @@ mod tests {
+         assert_eq!(probe(3.0, 90.0, false), Some(2));
+     }
+ 
++    #[test]
++    fn ground_markers_queue_and_the_aim_marker_holds() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        lua.load(r#"SetAimMarker("circle", 30, 5) SetGroundMarker("a", 1, 2, 3, 4, 2.5, true) ClearGroundMarker("a") SetGroundMarker(7, 0, 0, 0, 1, 1)"#)
++            .exec()
++            .unwrap();
++        assert_eq!(
++            aim_marker(),
++            Some(AimMarker {
++                range: 30.0,
++                radius: 5.0
++            })
++        );
++        let calls = take_ground_markers();
++        assert_eq!(calls.len(), 3, "{calls:?}");
++        assert_eq!(
++            calls[0],
++            GroundMarkerCall::Set {
++                key: "a".into(),
++                pos: [1.0, 2.0, 3.0],
++                radius: 4.0,
++                secs: 2.5,
++                hostile: true
++            }
++        );
++        assert_eq!(
++            calls[1],
++            GroundMarkerCall::Clear {
++                key: Some("a".into())
++            }
++        );
++        assert!(
++            matches!(&calls[2], GroundMarkerCall::Set { key, hostile: false, .. } if key == "7")
++        );
++        lua.load("SetAimMarker(nil)").exec().unwrap();
++        assert_eq!(aim_marker(), None);
++        set_aim_point(Some([1.0, 2.0, 3.0]));
++        let (x, z): (f32, f32) = lua
++            .load("local x, y, z = GetAimPoint() return x, z")
++            .eval()
++            .unwrap();
++        assert_eq!((x, z), (1.0, 3.0));
++    }
++
+     #[test]
+     fn the_move_keys_come_back_as_held() {
+         for (f, s) in [(0, 0), (1, 0), (-1, 1), (0, -1), (1, 1)] {
+-- 
+2.43.0
+

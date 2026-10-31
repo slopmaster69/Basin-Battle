@@ -1,0 +1,1160 @@
+# The Priest: Light and Shadow. Heals and shields that keep the team (and the Ancient's
+# defenders) standing, holy fire and shadow that wear the Scourge down.
+#   Discipline - shields and empowerment: Power Word: Shield, Inner Focus, Power Infusion.
+#   Holy       - the Light: Smite, Holy Fire, Holy Nova, heals, Spirit of Redemption, Lightwell.
+#   Shadow     - torment: Shadow Word: Pain, Mind Blast, Shadow Weaving, Vampiric Embrace,
+#                Shadowform (no holy spells while in it).
+# The core spells feed each other: Mind Blast hits targets in Shadow Word: Pain harder, and
+# Smite hits targets burning with Holy Fire harder.
+# See mage.toml for how this file works.
+
+[[tree]]
+key = "discipline"
+name = "Discipline"
+text = "Shields and empowerment: Power Word: Shield, Inner Focus, Power Infusion."
+icon = 1243
+background = "PriestDiscipline"
+
+[[tree]]
+key = "holy"
+name = "Holy"
+text = "The Light: Smite, Holy Fire, Holy Nova and heals, Lightwell."
+icon = 2061
+background = "PriestHoly"
+
+[[tree]]
+key = "shadow"
+name = "Shadow"
+text = "Torment: Shadow Word: Pain, Mind Blast, Vampiric Embrace, Shadowform."
+icon = 589
+background = "PriestShadow"
+
+# --- spells --------------------------------------------------------------------------------------
+
+[[spell]]
+key = "smite"
+name = "Smite"
+tree = "holy"
+core = true
+kind = "bolt"
+school = "holy"
+icon = 585
+cooldown = 1.5
+damage = 1.25
+range = 30
+vs_burning = 0.25
+note = "Holy Fire sets enemies burning."
+cast = 1.8
+
+  [[spell.perk]]
+  key = "searing_light"
+  name = "Searing Light"
+  text = "30% more damage."
+  add = { power = 0.3 }
+  [[spell.perk]]
+  key = "divine_fury"
+  name = "Divine Fury"
+  text = "Cooldown 0.8 sec shorter."
+  add = { cooldown = -0.8 }
+  [[spell.perk]]
+  key = "blessed_smite"
+  name = "Blessed Smite"
+  rarity = "uncommon"
+  text = "Heals the most hurt ally near you for 50% of the damage it deals."
+  set = { mend = 0.5 }
+  [[spell.perk]]
+  key = "chastise"
+  name = "Chastise"
+  rarity = "uncommon"
+  text = "25% chance to stun the target for 2 sec."
+  set = { stun_chance = 0.25, stun_secs = 2 }
+  [[spell.perk]]
+  key = "smite_the_wicked"
+  name = "Smite the Wicked"
+  rarity = "rare"
+  text = "Burning enemies take 50% more again, and 15% more critical strike chance."
+  add = { vs_burning = 0.5, crit = 0.15 }
+
+[[spell]]
+key = "shadow_word_pain"
+name = "Shadow Word: Pain"
+tree = "shadow"
+core = true
+kind = "bolt"
+school = "shadow"
+icon = 589
+cooldown = 2.5
+range = 30
+dot = 1.8
+dot_secs = 18
+note = "Without a target it seeks an enemy not yet in pain."
+  [[spell.perk]]
+  key = "improved_shadow_word_pain"
+  name = "Improved Shadow Word: Pain"
+  text = "Lasts 6 sec longer, dealing a third more."
+  add = { dot_secs = 6 }
+  pct = { dot = 0.33 }
+  [[spell.perk]]
+  key = "pain_spike"
+  name = "Pain Spike"
+  text = "Also strikes at once for 0.8 times your hit."
+  add = { damage = 0.8 }
+  [[spell.perk]]
+  key = "twin_shadows"
+  name = "Twin Shadows"
+  rarity = "uncommon"
+  text = "Also afflicts an enemy next to your target."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "shadow_weave"
+  name = "Shadow Weave"
+  rarity = "uncommon"
+  text = "Leaves a stack of Shadow Vulnerability: +4% shadow damage taken per stack, up to 5."
+  set = { vuln_shadow = 1 }
+  [[spell.perk]]
+  key = "contagion"
+  name = "Contagion"
+  rarity = "rare"
+  text = "When an afflicted enemy dies, the pain jumps to 2 enemies nearby."
+  set = { spread_on_death = 2 }
+
+[[spell]]
+key = "mind_blast"
+name = "Mind Blast"
+tree = "shadow"
+core = true
+kind = "bolt"
+school = "shadow"
+icon = 8092
+cooldown = 6
+damage = 2.4
+range = 30
+speed = 30
+vs_afflicted = 0.3
+note = ""
+cast = 1.5
+
+  [[spell.perk]]
+  key = "improved_mind_blast"
+  name = "Improved Mind Blast"
+  text = "Cooldown 1.5 sec shorter."
+  add = { cooldown = -1.5 }
+  [[spell.perk]]
+  key = "mind_shatter"
+  name = "Mind Shatter"
+  text = "Enemies in Shadow Word: Pain take 40% more again."
+  add = { vs_afflicted = 0.4 }
+  [[spell.perk]]
+  key = "blackout"
+  name = "Blackout"
+  rarity = "uncommon"
+  text = "30% chance to stun the target for 2 sec."
+  set = { stun_chance = 0.3, stun_secs = 2 }
+  [[spell.perk]]
+  key = "psychic_echo"
+  name = "Psychic Echo"
+  rarity = "uncommon"
+  text = "Also blasts the nearest enemy in Shadow Word: Pain."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "mind_spike"
+  name = "Mind Spike"
+  rarity = "rare"
+  text = "20% more critical strike chance, and its crits deal 30% more."
+  add = { crit = 0.2, crit_mult = 0.3 }
+
+[[spell]]
+key = "holy_nova"
+name = "Holy Nova"
+tree = "holy"
+core = true
+rarity = "uncommon"
+kind = "nova"
+school = "holy"
+icon = 15237
+cooldown = 5
+damage = 0.4
+heal = 0.05
+radius = 10
+note = ""
+  [[spell.perk]]
+  key = "improved_holy_nova"
+  name = "Improved Holy Nova"
+  text = "Reaches 4 yd further."
+  add = { radius = 4 }
+  [[spell.perk]]
+  key = "radiance"
+  name = "Radiance"
+  text = "Heals for 4% of max health more."
+  add = { heal = 0.04 }
+  [[spell.perk]]
+  key = "quick_nova"
+  name = "Quickened Light"
+  rarity = "uncommon"
+  text = "Cooldown 1.5 sec shorter."
+  add = { cooldown = -1.5 }
+  [[spell.perk]]
+  key = "sacred_nova"
+  name = "Sacred Flame"
+  rarity = "uncommon"
+  text = "35% more damage, and it sets enemies burning for 0.3 times your hit over 4 sec."
+  add = { power = 0.35 }
+  set = { dot = 0.3, dot_secs = 4 }
+  [[spell.perk]]
+  key = "blinding_light"
+  name = "Blinding Light"
+  rarity = "rare"
+  text = "20% chance to stun each enemy hit for 1.5 sec."
+  set = { stun_chance = 0.2, stun_secs = 1.5 }
+
+[[spell]]
+key = "power_word_shield"
+name = "Power Word: Shield"
+tree = "discipline"
+kind = "shield"
+school = "holy"
+icon = 17
+target = "ally"
+cooldown = 8
+absorb = 0.25
+duration = 15
+range = 30
+note = ""
+  [[spell.perk]]
+  key = "improved_power_word_shield"
+  name = "Improved Power Word: Shield"
+  text = "Absorbs 30% more."
+  pct = { absorb = 0.3 }
+  [[spell.perk]]
+  key = "quick_shield"
+  name = "Quick Shield"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "shield_spread"
+  name = "Shield Spread"
+  rarity = "uncommon"
+  text = "Also shields the next most hurt ally."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "martyrs_shield"
+  name = "Holy Bulwark"
+  rarity = "uncommon"
+  text = "When it breaks, it bursts for 0.8 times your hit to enemies within 8 yd."
+  set = { burst = 0.8 }
+  [[spell.perk]]
+  key = "reflective_shield"
+  name = "Reflective Shield"
+  rarity = "rare"
+  text = "Strikes back at attackers for 50% of what it absorbs."
+  set = { reflect = 0.5 }
+
+[[spell]]
+key = "renew"
+name = "Renew"
+tree = "holy"
+kind = "hot"
+school = "holy"
+icon = 139
+target = "ally"
+cooldown = 5
+hot = 0.25
+hot_secs = 15
+range = 40
+note = "Healing beside hired defenders mends them too, and blesses them: 30% more damage for 8 sec."
+  [[spell.perk]]
+  key = "improved_renew_perk"
+  name = "Improved Renew"
+  text = "Heals 30% more."
+  pct = { hot = 0.3 }
+  [[spell.perk]]
+  key = "rapid_renew"
+  name = "Rapid Renewal"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "spreading_renew"
+  name = "Spreading Renew"
+  rarity = "uncommon"
+  text = "Also renews the next most hurt ally."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "blessed_renewal"
+  name = "Blessed Renewal"
+  rarity = "uncommon"
+  text = "Also heals 6% of max health at once."
+  set = { heal = 0.06 }
+  [[spell.perk]]
+  key = "everlasting_renew"
+  name = "Everlasting Light"
+  rarity = "rare"
+  text = "Lasts 9 sec longer, healing 60% more."
+  add = { hot_secs = 9 }
+  pct = { hot = 0.6 }
+
+[[spell]]
+key = "flash_heal"
+name = "Flash Heal"
+tree = "holy"
+kind = "heal"
+school = "holy"
+icon = 2061
+target = "ally"
+cooldown = 6
+heal = 0.28
+range = 40
+note = "Healing beside hired defenders mends them too, and blesses them: 30% more damage for 8 sec."
+cast = 1.2
+
+  [[spell.perk]]
+  key = "improved_flash_heal"
+  name = "Improved Healing"
+  text = "Heals 30% more."
+  pct = { heal = 0.3 }
+  [[spell.perk]]
+  key = "swift_heal"
+  name = "Swift Mend"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "binding_heal"
+  name = "Binding Heal"
+  rarity = "uncommon"
+  text = "Also heals you (or a second ally) for the same."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "greater_heal"
+  name = "Greater Heal"
+  rarity = "uncommon"
+  text = "Heals 60% more, but its cooldown is 2 sec longer."
+  pct = { heal = 0.6 }
+  add = { cooldown = 2 }
+  [[spell.perk]]
+  key = "holy_word"
+  name = "Holy Word"
+  rarity = "rare"
+  text = "Also leaves a Renew on the target, and 20% more critical strike chance."
+  add = { crit = 0.2 }
+  set = { hot = 0.15, hot_secs = 9 }
+
+[[spell]]
+key = "holy_fire"
+name = "Holy Fire"
+tree = "holy"
+rarity = "uncommon"
+kind = "bolt"
+school = "holy"
+icon = 14914
+cooldown = 8
+damage = 2.0
+range = 30
+speed = 26
+dot = 0.7
+dot_secs = 10
+note = "The target Burns: Smite deals more to it."
+cast = 2.5
+
+  [[spell.perk]]
+  key = "improved_holy_fire"
+  name = "Improved Holy Fire"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "searing_flames"
+  name = "Searing Flames"
+  text = "Burns 60% more."
+  pct = { dot = 0.6 }
+  [[spell.perk]]
+  key = "holy_fire_spread"
+  name = "Purifying Flames"
+  rarity = "uncommon"
+  text = "Also sets 2 more enemies near your target burning."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "holy_wrath"
+  name = "Holy Wrath"
+  rarity = "uncommon"
+  text = "25% more critical strike chance."
+  add = { crit = 0.25 }
+  [[spell.perk]]
+  key = "cleansing_flame"
+  name = "Cleansing Flame"
+  rarity = "rare"
+  text = "Heals the most hurt ally near you for 40% of the damage it deals."
+  set = { mend = 0.4 }
+
+[[spell]]
+key = "mind_flay"
+name = "Mind Flay"
+tree = "shadow"
+rarity = "uncommon"
+kind = "bolt"
+school = "shadow"
+icon = 15407
+cooldown = 4
+channel = 2.25
+damage = 0.6
+projectiles = 3
+range = 20
+speed = 40
+slow = 0.5
+slow_secs = 3
+note = ""
+  [[spell.perk]]
+  key = "improved_mind_flay"
+  name = "Improved Mind Flay"
+  text = "One more wave."
+  add = { projectiles = 1 }
+  [[spell.perk]]
+  key = "mind_flay_reach"
+  name = "Shadow Reach"
+  text = "Reaches 10 yd further."
+  add = { range = 10 }
+  [[spell.perk]]
+  key = "tormenting_flay"
+  name = "Torment"
+  rarity = "uncommon"
+  text = "Deals 50% more to enemies in Shadow Word: Pain."
+  add = { vs_afflicted = 0.5 }
+  [[spell.perk]]
+  key = "mind_sear"
+  name = "Mind Sear"
+  rarity = "uncommon"
+  text = "Each wave also hits enemies within 6 yd of the target for 40%."
+  set = { splash = 0.4, splash_radius = 6 }
+  [[spell.perk]]
+  key = "siphoning_flay"
+  name = "Siphon Life"
+  rarity = "rare"
+  text = "Heals you for 40% of the damage it deals."
+  set = { leech = 0.4 }
+
+[[spell]]
+key = "psychic_scream"
+name = "Psychic Scream"
+tree = "shadow"
+rarity = "uncommon"
+kind = "nova"
+school = "shadow"
+icon = 8122
+cooldown = 22
+radius = 8
+fear_secs = 4
+note = ""
+  [[spell.perk]]
+  key = "improved_psychic_scream"
+  name = "Improved Psychic Scream"
+  text = "Cooldown 6 sec shorter."
+  add = { cooldown = -6 }
+  [[spell.perk]]
+  key = "wide_scream"
+  name = "Howl of Terror"
+  text = "Reaches 4 yd further."
+  add = { radius = 4 }
+  [[spell.perk]]
+  key = "lingering_terror"
+  name = "Lingering Terror"
+  rarity = "uncommon"
+  text = "Terror lasts 2 sec longer."
+  add = { fear_secs = 2 }
+  [[spell.perk]]
+  key = "terror"
+  name = "Mind-Shattering Scream"
+  rarity = "uncommon"
+  text = "Deals 0.5 times your hit and leaves 2 stacks of Shadow Vulnerability."
+  set = { damage = 0.5, vuln_shadow = 2 }
+  [[spell.perk]]
+  key = "dark_whispers"
+  name = "Dark Whispers"
+  rarity = "rare"
+  text = "Afflicts everything it hits with Shadow Word: Pain."
+  set = { dot = 1.2, dot_secs = 12 }
+
+[[spell]]
+key = "prayer_of_healing"
+name = "Prayer of Healing"
+tree = "holy"
+rarity = "rare"
+kind = "heal"
+school = "holy"
+icon = 596
+target = "ally"
+cooldown = 15
+heal = 0.28
+targets = 4
+range = 30
+note = "Healing beside hired defenders mends them too, and blesses them: 30% more damage for 8 sec."
+cast = 2.5
+
+  [[spell.perk]]
+  key = "improved_prayer"
+  name = "Improved Prayer of Healing"
+  text = "Cooldown 5 sec shorter."
+  add = { cooldown = -5 }
+  [[spell.perk]]
+  key = "prayer_of_mending"
+  name = "Prayer of Mending"
+  text = "Heals 30% more."
+  pct = { heal = 0.3 }
+  [[spell.perk]]
+  key = "prayer_of_spirit"
+  name = "Prayer of Spirit"
+  rarity = "uncommon"
+  text = "Also leaves a Renew on everyone it heals."
+  set = { hot = 0.12, hot_secs = 12 }
+  [[spell.perk]]
+  key = "prayer_of_shadow"
+  name = "Prayer of Shadow Protection"
+  rarity = "uncommon"
+  text = "Also shields everyone it heals for 8% of their max health."
+  set = { absorb = 0.08, duration = 10 }
+  [[spell.perk]]
+  key = "divine_hymn"
+  name = "Divine Hymn"
+  rarity = "rare"
+  text = "Reaches 15 yd further and heals 6 allies."
+  add = { range = 15, targets = 2 }
+
+[[spell]]
+key = "devouring_plague"
+name = "Devouring Plague"
+tree = "shadow"
+rarity = "rare"
+kind = "bolt"
+school = "shadow"
+icon = 2944
+cooldown = 15
+range = 30
+dot = 3.0
+dot_secs = 24
+leech = 0.5
+note = ""
+  [[spell.perk]]
+  key = "improved_devouring_plague"
+  name = "Improved Devouring Plague"
+  text = "Cooldown 5 sec shorter."
+  add = { cooldown = -5 }
+  [[spell.perk]]
+  key = "virulent_plague"
+  name = "Virulent Plague"
+  text = "Deals 40% more."
+  pct = { dot = 0.4 }
+  [[spell.perk]]
+  key = "plague_spread"
+  name = "Pestilence"
+  rarity = "uncommon"
+  text = "Also infects 2 more enemies near your target."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "plague_contagion"
+  name = "Contagion"
+  rarity = "uncommon"
+  text = "When an infected enemy dies, the plague jumps to 2 enemies nearby."
+  set = { spread_on_death = 2 }
+  [[spell.perk]]
+  key = "plague_weave"
+  name = "Black Plague"
+  rarity = "rare"
+  text = "Leaves 2 stacks of Shadow Vulnerability."
+  set = { vuln_shadow = 2 }
+
+[[spell]]
+key = "desperate_prayer"
+name = "Desperate Prayer"
+tree = "discipline"
+kind = "heal"
+school = "holy"
+icon = 13908
+target = "self"
+cooldown = 20
+heal = 0.35
+note = ""
+  [[spell.perk]]
+  key = "improved_desperate_prayer"
+  name = "Improved Desperate Prayer"
+  text = "Cooldown 6 sec shorter."
+  add = { cooldown = -6 }
+  [[spell.perk]]
+  key = "fervent_prayer"
+  name = "Fervent Prayer"
+  text = "Heals 30% more."
+  pct = { heal = 0.3 }
+  [[spell.perk]]
+  key = "elunes_grace"
+  name = "Elune's Grace"
+  rarity = "uncommon"
+  text = "Also shields you for 15% of your max health."
+  set = { absorb = 0.15, duration = 10 }
+  [[spell.perk]]
+  key = "feedback"
+  name = "Feedback"
+  rarity = "uncommon"
+  text = "Also bursts for 0.8 times your hit to enemies within 8 yd."
+  set = { damage = 0.8, radius = 8 }
+  [[spell.perk]]
+  key = "fear_ward"
+  name = "Fear Ward"
+  rarity = "rare"
+  text = "Also makes you take 30% less damage for 6 sec."
+  set = { buff_value = 0.3, duration = 6 }
+
+[[spell]]
+key = "inner_fire"
+name = "Inner Fire"
+tree = "discipline"
+kind = "buff"
+school = "holy"
+icon = 588
+effect = "inner_fire"
+cooldown = 10
+duration = 120
+buff_value = 0.12
+buff_value2 = 0.08
+note = "For 2 min you deal 12% more damage and take 8% less."
+  [[spell.perk]]
+  key = "improved_inner_fire_perk"
+  name = "Improved Inner Fire"
+  text = "8% more damage while it lasts."
+  add = { buff_value = 0.08 }
+  [[spell.perk]]
+  key = "inner_ward"
+  name = "Inner Ward"
+  text = "You take 6% less damage again."
+  add = { buff_value2 = 0.06 }
+  [[spell.perk]]
+  key = "inner_light"
+  name = "Inner Light"
+  rarity = "uncommon"
+  text = "Lights a Renew on you when cast."
+  set = { hot = 0.2, hot_secs = 12 }
+  [[spell.perk]]
+  key = "inner_flame"
+  name = "Inner Flame"
+  rarity = "uncommon"
+  text = "Bursts for 0.8 times your hit to enemies within 8 yd when cast."
+  set = { damage = 0.8, radius = 8 }
+  [[spell.perk]]
+  key = "shared_fire"
+  name = "Shared Flame"
+  rarity = "rare"
+  text = "Also lights the fire in every ally within 30 yd."
+  set = { targets = 4, range = 30 }
+
+# --- spells learned from talents ---------------------------------------------------------------
+
+[[spell]]
+key = "inner_focus"
+name = "Inner Focus"
+tree = "discipline"
+talent = true
+kind = "buff"
+school = "holy"
+icon = 14751
+effect = "inner_focus"
+cooldown = 30
+duration = 30
+note = "Your next spell is a critical strike and doesn't trigger its cooldown."
+
+[[spell]]
+key = "power_infusion"
+name = "Power Infusion"
+tree = "discipline"
+talent = true
+kind = "buff"
+school = "holy"
+icon = 10060
+effect = "power_infusion"
+target = "ally"
+cooldown = 60
+duration = 15
+buff_value = 0.25
+range = 40
+note = "Infuses your selected ally (or the nearest, or you) with power: 25% more damage and haste for 15 sec."
+
+[[spell]]
+key = "lightwell"
+name = "Lightwell"
+tree = "holy"
+talent = true
+kind = "zone"
+school = "holy"
+icon = 724
+target = "self"
+cooldown = 60
+duration = 30
+radius = 12
+heal = 0.025
+note = "Raises a Lightwell at your feet."
+
+[[spell]]
+key = "shadowform"
+name = "Shadowform"
+tree = "shadow"
+talent = true
+kind = "toggle"
+school = "shadow"
+icon = 15473
+effect = "shadowform"
+cooldown = 1.5
+buff_value = 0.2
+buff_value2 = 0.15
+note = "While in it: 20% more shadow damage and 15% less damage taken, but no holy spells or heals."
+
+# --- talents --------------------------------------------------------------------------------------
+
+# Discipline
+
+[[talent]]
+key = "wand_specialization"
+name = "Wand Specialization"
+tree = "discipline"
+tier = 1
+col = 1
+ranks = 3
+icon = 6057
+text = "Your wand deals {0%} more damage."
+values = [0.12]
+  [[talent.effect]]
+  stats = { auto = 0.12 }
+
+[[talent]]
+key = "improved_power_word_fortitude"
+name = "Improved Power Word: Fortitude"
+tree = "discipline"
+tier = 1
+col = 2
+ranks = 2
+icon = 14749
+text = "You and every ally have {0%} more max health."
+values = [0.04]
+  [[talent.effect]]
+  team = { health = 0.04 }
+
+[[talent]]
+key = "improved_power_word_shield"
+name = "Improved Power Word: Shield"
+tree = "discipline"
+tier = 2
+col = 1
+ranks = 3
+icon = 14748
+text = "Your shields absorb {0%} more."
+values = [0.1]
+  [[talent.effect]]
+  stats = { absorb = 0.1 }
+
+[[talent]]
+key = "inner_focus"
+name = "Inner Focus"
+tree = "discipline"
+tier = 2
+col = 2
+icon = 14751
+text = "Learn Inner Focus: your next spell is a critical strike and doesn't trigger its cooldown."
+grants = "inner_focus"
+
+[[talent]]
+key = "martyrdom"
+name = "Martyrdom"
+tree = "discipline"
+tier = 2
+col = 3
+ranks = 2
+icon = 14531
+text = "When a blow takes more than 8% of your health, a {0%} chance of Focused Casting: your cooldowns recover 30% faster for 6 sec."
+values = [0.25]
+  [[talent.effect]]
+  proc = "martyrdom"
+  amount = 0.25
+
+[[talent]]
+key = "mental_agility"
+name = "Mental Agility"
+tree = "discipline"
+tier = 3
+col = 1
+ranks = 3
+icon = 14520
+text = "Your cooldowns recover {0%} faster."
+values = [0.04]
+  [[talent.effect]]
+  stats = { cdr = 0.04 }
+
+[[talent]]
+key = "improved_inner_fire"
+name = "Improved Inner Fire"
+tree = "discipline"
+tier = 3
+col = 2
+ranks = 3
+icon = 14747
+text = "A fire burns within you: {0%} more damage and {1%} less damage taken."
+values = [0.04, 0.02]
+  [[talent.effect]]
+  stats = { damage = 0.04, taken = 0.02 }
+
+[[talent]]
+key = "divine_spirit"
+name = "Divine Spirit"
+tree = "discipline"
+tier = 4
+col = 1
+icon = 14752
+text = "You and allies within 30 yd deal 5% more damage and regenerate 0.3% of max health every second."
+  [[talent.effect]]
+  team = { damage = 0.05, regen = 0.003 }
+
+[[talent]]
+key = "force_of_will"
+name = "Force of Will"
+tree = "discipline"
+tier = 4
+col = 2
+ranks = 3
+icon = 18544
+text = "Your spells deal {0%} more damage and have {1%} more critical strike chance."
+values = [0.03, 0.01]
+  [[talent.effect]]
+  stats = { damage = 0.03, crit = 0.01 }
+
+[[talent]]
+key = "power_infusion"
+name = "Power Infusion"
+tree = "discipline"
+tier = 5
+col = 2
+icon = 10060
+text = "Learn Power Infusion: an ally (or you) deals 25% more damage with 25% more haste for 15 sec."
+grants = "power_infusion"
+
+# Holy
+
+[[talent]]
+key = "holy_specialization"
+name = "Holy Specialization"
+tree = "holy"
+tier = 1
+col = 1
+ranks = 3
+icon = 14889
+text = "Your holy spells have {0%} more critical strike chance."
+values = [0.02]
+  [[talent.effect]]
+  spells = "school:holy"
+  add = { crit = 0.02 }
+
+[[talent]]
+key = "improved_renew"
+name = "Improved Renew"
+tree = "holy"
+tier = 1
+col = 2
+ranks = 3
+icon = 14908
+text = "Your healing over time heals {0%} more."
+values = [0.1]
+  [[talent.effect]]
+  spells = "all"
+  pct = { hot = 0.1 }
+
+[[talent]]
+key = "divine_fury"
+name = "Divine Fury"
+tree = "holy"
+tier = 2
+col = 1
+ranks = 3
+icon = 18530
+text = "Smite and Holy Fire recover {0s} faster."
+values = [0.25]
+  [[talent.effect]]
+  spells = "smite,holy_fire"
+  add = { cooldown = -0.25 }
+
+[[talent]]
+key = "searing_light"
+name = "Searing Light"
+tree = "holy"
+tier = 2
+col = 2
+ranks = 2
+icon = 14909
+text = "Smite, Holy Fire and Holy Nova deal {0%} more damage."
+values = [0.06]
+  [[talent.effect]]
+  spells = "smite,holy_fire,holy_nova"
+  add = { power = 0.06 }
+
+[[talent]]
+key = "holy_reach"
+name = "Holy Reach"
+tree = "holy"
+tier = 3
+col = 1
+ranks = 2
+icon = 27789
+text = "Your holy spells reach {0yd} further and their areas are {1%} wider."
+values = [3, 0.1]
+  [[talent.effect]]
+  spells = "school:holy"
+  more = { range = 3 }
+  pct = { radius = 0.1 }
+
+[[talent]]
+key = "inspiration"
+name = "Inspiration"
+tree = "holy"
+tier = 3
+col = 2
+ranks = 3
+icon = 14892
+text = "Those you heal take {0%} less damage for 10 sec."
+values = [0.03]
+  [[talent.effect]]
+  proc = "inspiration"
+  amount = 0.03
+
+[[talent]]
+key = "spiritual_healing"
+name = "Spiritual Healing"
+tree = "holy"
+tier = 4
+col = 1
+ranks = 3
+icon = 14898
+text = "Your heals and shields are {0%} stronger."
+values = [0.08]
+  [[talent.effect]]
+  stats = { heal = 0.08 }
+
+[[talent]]
+key = "spirit_of_redemption"
+name = "Spirit of Redemption"
+tree = "holy"
+tier = 4
+col = 2
+icon = 20711
+text = "When you fall, your spirit heals you and allies within 30 yd for 3% of max health every second for 8 sec, and you rise 4 sec sooner."
+  [[talent.effect]]
+  proc = "spirit_of_redemption"
+  amount = 0.03
+
+[[talent]]
+key = "lightwell"
+name = "Lightwell"
+tree = "holy"
+tier = 5
+col = 2
+icon = 724
+text = "Learn Lightwell: you and allies near it heal 2.5% of max health every second for 30 sec."
+grants = "lightwell"
+
+# Shadow
+
+[[talent]]
+key = "spirit_tap"
+name = "Spirit Tap"
+tree = "shadow"
+tier = 1
+col = 1
+ranks = 3
+icon = 15270
+text = "After a kill you deal {0%} more damage and regenerate {1%} of max health every second for 8 sec."
+values = [0.05, 0.005]
+  [[talent.effect]]
+  proc = "spirit_tap"
+  amount = 0.05
+
+[[talent]]
+key = "blackout"
+name = "Blackout"
+tree = "shadow"
+tier = 1
+col = 2
+ranks = 3
+icon = 15268
+text = "Your shadow spells have a {0%} chance to stun the target for 2 sec."
+values = [0.03]
+  [[talent.effect]]
+  spells = "school:shadow"
+  add = { stun_chance = 0.03 }
+
+[[talent]]
+key = "improved_shadow_word_pain"
+name = "Improved Shadow Word: Pain"
+tree = "shadow"
+tier = 2
+col = 1
+ranks = 2
+icon = 15275
+text = "Your shadow damage over time lasts {0s} longer and deals {1%} more."
+values = [3, 0.15]
+  [[talent.effect]]
+  spells = "school:shadow"
+  more = { dot_secs = 3 }
+  pct = { dot = 0.15 }
+
+[[talent]]
+key = "shadow_focus"
+name = "Shadow Focus"
+tree = "shadow"
+tier = 2
+col = 2
+ranks = 2
+icon = 15260
+text = "Your shadow spells have {0%} more critical strike chance."
+values = [0.03]
+  [[talent.effect]]
+  spells = "school:shadow"
+  add = { crit = 0.03 }
+
+[[talent]]
+key = "shadow_weaving"
+name = "Shadow Weaving"
+tree = "shadow"
+tier = 3
+col = 1
+ranks = 3
+icon = 15257
+text = "Your shadow spells have a {0%} chance to leave Shadow Vulnerability: +4% shadow damage taken per stack, up to 5."
+values = [0.34]
+  [[talent.effect]]
+  spells = "school:shadow"
+  add = { vuln_shadow = 0.34 }
+
+[[talent]]
+key = "improved_mind_blast"
+name = "Improved Mind Blast"
+tree = "shadow"
+tier = 3
+col = 2
+ranks = 3
+icon = 15273
+text = "Mind Blast recovers {0s} faster."
+values = [0.5]
+  [[talent.effect]]
+  spells = "mind_blast"
+  add = { cooldown = -0.5 }
+
+[[talent]]
+key = "vampiric_embrace"
+name = "Vampiric Embrace"
+tree = "shadow"
+tier = 4
+col = 1
+icon = 15286
+text = "Your shadow damage heals you and allies within 30 yd for 8% of it."
+  [[talent.effect]]
+  proc = "vampiric_embrace"
+  amount = 0.08
+
+[[talent]]
+key = "darkness"
+name = "Darkness"
+tree = "shadow"
+tier = 4
+col = 2
+ranks = 3
+icon = 15259
+text = "Your shadow spells deal {0%} more damage."
+values = [0.04]
+  [[talent.effect]]
+  spells = "school:shadow"
+  add = { power = 0.04 }
+
+[[talent]]
+key = "shadowform"
+name = "Shadowform"
+tree = "shadow"
+tier = 5
+col = 2
+icon = 15473
+text = "Learn Shadowform: 20% more shadow damage and 15% less damage taken, but no holy spells or heals while in it."
+grants = "shadowform"
+
+
+# --- combinations: offered only to a priest holding both spells --------------------------------------
+
+[[talent]]
+key = "mind_spike"
+name = "Mind Spike"
+tree = "shadow"
+tier = 3
+col = 4
+icon = 8092
+text = "With Mind Blast and Shadow Word: Pain: Mind Blast deals 40% more to enemies in pain."
+requires = ["mind_blast", "shadow_word_pain"]
+  [[talent.effect]]
+  spells = "mind_blast"
+  add = { vs_afflicted = 0.4 }
+
+[[talent]]
+key = "plague_flay"
+name = "Plague Flay"
+tree = "shadow"
+tier = 4
+col = 4
+icon = 15407
+text = "With Mind Flay and Devouring Plague: Mind Flay deals 50% more to afflicted enemies and heals you for 5% of it."
+requires = ["mind_flay", "devouring_plague"]
+  [[talent.effect]]
+  spells = "mind_flay"
+  add = { vs_afflicted = 0.5, leech = 0.05 }
+
+[[talent]]
+key = "holy_fervor"
+name = "Holy Fervor"
+tree = "holy"
+tier = 3
+col = 4
+icon = 14914
+text = "With Smite and Holy Fire: Smite deals 40% more to burning enemies, and Holy Fire deals 15% more."
+requires = ["smite", "holy_fire"]
+  [[talent.effect]]
+  spells = "smite"
+  add = { vs_burning = 0.4 }
+  [[talent.effect]]
+  spells = "holy_fire"
+  add = { power = 0.15 }
+
+[[talent]]
+key = "radiance"
+name = "Radiance"
+tree = "holy"
+tier = 4
+col = 4
+icon = 15237
+text = "With Holy Nova and Renew: Holy Nova reaches 4 yd further and is 30% stronger."
+requires = ["holy_nova", "renew"]
+  [[talent.effect]]
+  spells = "holy_nova"
+  add = { radius = 4, power = 0.3 }
+
+[[talent]]
+key = "reflective_shield"
+name = "Reflective Shield"
+tree = "discipline"
+tier = 3
+col = 4
+icon = 17
+text = "With Power Word: Shield and Smite: your shields hit back for 30% of what they absorb."
+requires = ["power_word_shield", "smite"]
+  [[talent.effect]]
+  spells = "power_word_shield"
+  add = { reflect = 0.3 }
+
+[[talent]]
+key = "focused_will"
+name = "Focused Will"
+tree = "discipline"
+tier = 4
+col = 4
+icon = 14751
+text = "With Inner Focus and Mind Blast: Mind Blast crits 25% more often, and Inner Focus comes back 20 sec sooner."
+requires = ["inner_focus", "mind_blast"]
+  [[talent.effect]]
+  spells = "mind_blast"
+  add = { crit = 0.25 }
+  [[talent.effect]]
+  spells = "inner_focus"
+  add = { cooldown = -20 }

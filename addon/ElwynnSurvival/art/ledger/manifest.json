@@ -1,0 +1,2418 @@
+{
+  "schema_version": 1,
+  "coordinate_origin": "top-left",
+  "rect_units": "pixels",
+  "tga": {
+    "type": 2,
+    "bits_per_pixel": 32,
+    "alpha_bits": 8,
+    "descriptor": "0x28",
+    "compression": "none"
+  },
+  "generator": "Built-in imagegen; deterministic Pillow/numpy export",
+  "fonts": [
+    {
+      "file": "fonts/IMFellEnglish-Regular.ttf",
+      "license": "fonts/imfellenglish-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/imfellenglish/IMFeENrm28P.ttf",
+      "family": "imfellenglish",
+      "weight": 400,
+      "format": "static TrueType",
+      "sha256": "fe9705bbde51af802719246d4608d08d37bde956ab99d9a590da996a5221a24c"
+    },
+    {
+      "file": "fonts/IMFellEnglishSC-Regular.ttf",
+      "license": "fonts/imfellenglishsc-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/imfellenglishsc/IMFeENsc28P.ttf",
+      "family": "imfellenglishsc",
+      "weight": 400,
+      "format": "static TrueType",
+      "sha256": "102324fb5434bb5da7963533426b0ad44c85bbc9e7755067535c9d11464a176b"
+    },
+    {
+      "file": "fonts/CrimsonPro-Regular.ttf",
+      "license": "fonts/crimsonpro-OFL.txt",
+      "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/crimsonpro/CrimsonPro%5Bwght%5D.ttf",
+      "family": "crimsonpro",
+      "weight": 400,
+      "format": "static TrueType",
+      "sha256": "84fa6dea37d3876ad79058cd013d8357eccfe6a8d4b36c8e010b082f5795a80a"
+    }
+  ],
+  "assets": [
+    {
+      "name": "parchment_fill",
+      "size": [
+        512,
+        512
+      ],
+      "kind": "tile",
+      "tint": false,
+      "use": "Seamless aged parchment, faint fibres and stains, no dark edges.",
+      "tile_axes": "xy",
+      "file": "parchment_fill.tga",
+      "source": "../../../art-src/ledger/parchment_fill.png",
+      "imagegen_exec": "exec-7de992ff-c66e-406b-bc8f-0bd1251bf402.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "9879bb38ebbb7d2c35e5adf68bc95d623c454cdb0157411d627d4a6ba88377d5",
+      "sha256": "e62aab11c0bfaf0b3457121c21f3219a092d0469c53ac3b1899626e3ba086fd1"
+    },
+    {
+      "name": "parchment_frame",
+      "size": [
+        512,
+        512
+      ],
+      "kind": "atlas",
+      "tint": false,
+      "use": "Torn aged parchment border with blank parchment interior and transparent exterior.",
+      "insets": {
+        "left": 64,
+        "top": 64,
+        "right": 64,
+        "bottom": 64
+      },
+      "rects": {
+        "top_left": [
+          0,
+          0,
+          64,
+          64
+        ],
+        "top": [
+          64,
+          0,
+          256,
+          64
+        ],
+        "top_right": [
+          320,
+          0,
+          64,
+          64
+        ],
+        "left": [
+          0,
+          64,
+          64,
+          256
+        ],
+        "right": [
+          320,
+          64,
+          64,
+          256
+        ],
+        "bottom_left": [
+          0,
+          320,
+          64,
+          64
+        ],
+        "bottom": [
+          64,
+          320,
+          256,
+          64
+        ],
+        "bottom_right": [
+          320,
+          320,
+          64,
+          64
+        ]
+      },
+      "nineslice": true,
+      "source_layout": "frame",
+      "file": "parchment_frame.tga",
+      "source": "../../../art-src/ledger/parchment_frame.png",
+      "imagegen_exec": "exec-d9244d16-d421-4c78-924b-c544cf149157.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "2fbe0216ea4f33d5533ad1f461702b7a69cb417e0085a882f5395e6a61bf63cb",
+      "sha256": "615c4ed076251049fb9841ecbdafb351f00d04c04c2e3f5a2404a23aaac41241"
+    },
+    {
+      "name": "leather_frame",
+      "size": [
+        512,
+        512
+      ],
+      "kind": "atlas",
+      "tint": false,
+      "use": "Dark leather book cover border with stitching and brass corner caps, empty transparent centre.",
+      "insets": {
+        "left": 64,
+        "top": 64,
+        "right": 64,
+        "bottom": 64
+      },
+      "rects": {
+        "top_left": [
+          0,
+          0,
+          64,
+          64
+        ],
+        "top": [
+          64,
+          0,
+          256,
+          64
+        ],
+        "top_right": [
+          320,
+          0,
+          64,
+          64
+        ],
+        "left": [
+          0,
+          64,
+          64,
+          256
+        ],
+        "right": [
+          320,
+          64,
+          64,
+          256
+        ],
+        "bottom_left": [
+          0,
+          320,
+          64,
+          64
+        ],
+        "bottom": [
+          64,
+          320,
+          256,
+          64
+        ],
+        "bottom_right": [
+          320,
+          320,
+          64,
+          64
+        ]
+      },
+      "nineslice": true,
+      "source_layout": "frame",
+      "file": "leather_frame.tga",
+      "source": "../../../art-src/ledger/leather_frame.png",
+      "imagegen_exec": "exec-184fd546-368f-4ca3-aa5d-b97e5d830035.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "9346a074c01f36c47e539d95429a3e54a5d302c367817734515536c068c56a5d",
+      "sha256": "e6161f32230c250e717286508fab4a52a325c53edbc2e011119392741f72415b"
+    },
+    {
+      "name": "leather_spine",
+      "size": [
+        128,
+        512
+      ],
+      "kind": "tile",
+      "tint": false,
+      "use": "Vertically tiling leather book spine with raised horizontal bands.",
+      "tile_axes": "y",
+      "file": "leather_spine.tga",
+      "source": "../../../art-src/ledger/leather_spine.png",
+      "imagegen_exec": "exec-e5e27e86-156b-48e1-94b1-9752ce503aaf.png",
+      "source_size": [
+        887,
+        1774
+      ],
+      "source_sha256": "8ed0ab297cbe1b2747c3dc2721d10aa061a44db082dc2c1be1b72d41b18717e7",
+      "sha256": "c07fc0fb83037a4e9e7484a2fb0f0f17c54a9de1ba1e3dc73c6bdab4e8b1255d"
+    },
+    {
+      "name": "spine_strap",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Horizontal leather strap with a brass buckle crossing the book spine.",
+      "file": "spine_strap.tga",
+      "source": "../../../art-src/ledger/spine_strap.png",
+      "imagegen_exec": "exec-1a05f12b-f0cb-47e8-9d46-a640d03348a5.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "b7ff7607d6332855fd927892d4074de25666bb7ad78426de54efe8adca337621",
+      "sha256": "a44a6b27b6f42ca0cb888468af6cdf3849c6305e853b55f78e0e5e72431128e5"
+    },
+    {
+      "name": "book_gutter",
+      "size": [
+        64,
+        512
+      ],
+      "kind": "tile",
+      "tint": false,
+      "use": "Vertical narrow parchment page fold, shadowed down its middle.",
+      "tile_axes": "y",
+      "file": "book_gutter.tga",
+      "source": "../../../art-src/ledger/book_gutter.png",
+      "imagegen_exec": "exec-1163129a-0325-4f27-9df6-2b1d8b86e578.png",
+      "source_size": [
+        793,
+        1983
+      ],
+      "source_sha256": "1ff60f5067f52ec086b344464fb8807e03d251123affd76bc9e447622d193c29",
+      "sha256": "6e4365ed5f0659b45762fd379219fcb1af08fee09266e791176d79c46ce4fc8c"
+    },
+    {
+      "name": "scrap_note_a",
+      "size": [
+        256,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Blank torn parchment HUD note, tear variation a.",
+      "file": "scrap_note_a.tga",
+      "source": "../../../art-src/ledger/scrap_note_a.png",
+      "imagegen_exec": "exec-0bec7653-f016-4c01-a251-15a9e8b588f4.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "494bda548b3a09569fab827601f7e580cd5b6cf9fa873ae143fccde4e41651fd",
+      "sha256": "f26f64683d59ae89e6fc0d3a4d62003dcb3ee796cecc63e7de610bfcb4c49708"
+    },
+    {
+      "name": "scrap_note_b",
+      "size": [
+        256,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Blank torn parchment HUD note, tear variation b.",
+      "file": "scrap_note_b.tga",
+      "source": "../../../art-src/ledger/scrap_note_b.png",
+      "imagegen_exec": "exec-aee451a2-f4e9-4bc5-a043-a63228c62813.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "54b813d69911351758d1462d28aff8b187f1aa613dc9d2c8a11d60426804dfba",
+      "sha256": "3433af291d6f8260878ad97b28d5a46947ed9c437b4b6825ace33552b8c08041"
+    },
+    {
+      "name": "scrap_note_c",
+      "size": [
+        256,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Blank torn parchment HUD note, tear variation c.",
+      "file": "scrap_note_c.tga",
+      "source": "../../../art-src/ledger/scrap_note_c.png",
+      "imagegen_exec": "exec-c4c848d5-b42f-429c-83d3-794d24dda17b.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "7e772b75e048a84b6777d19aeee5ac7edf101a7155ef053ca49e25a475804dbe",
+      "sha256": "7c6ce119d4d29e306c07048afb478c5d47ddc949956777af0a41e6e61129ab9b"
+    },
+    {
+      "name": "pinned_note",
+      "size": [
+        512,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Wide blank parchment quest note, blank red wax seal and ribbon at left end.",
+      "file": "pinned_note.tga",
+      "source": "../../../art-src/ledger/pinned_note.png",
+      "imagegen_exec": "exec-f938b38d-2917-4db1-a494-14c19e26a938.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "35d0b7067347c9dffd2e726bbbe9e9e405217c74c789be22ad61b8213b1c6b03",
+      "sha256": "926b71386b00ebaa427f3c458e53e99c5bf217c20d9462802c2f9a5981d9fec0"
+    },
+    {
+      "name": "detail_card",
+      "size": [
+        256,
+        256
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Clean blank aged parchment detail card with softly irregular edges.",
+      "insets": {
+        "left": 48,
+        "top": 48,
+        "right": 48,
+        "bottom": 48
+      },
+      "file": "detail_card.tga",
+      "source": "../../../art-src/ledger/detail_card.png",
+      "imagegen_exec": "exec-ec65dfe1-5c4a-4907-bb9e-56f0290da556.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "0d5b33ccf46be9c24356eb96d58110a95c252fa30724a43fbf8547bb572955bc",
+      "sha256": "cf9c13e10cb0b9683c4f36b48b29e09b23cb827b65d79832a685f4e8f023171f"
+    },
+    {
+      "name": "divider_vine",
+      "size": [
+        512,
+        32
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Fine sepia ink horizontal rule with leafy sprig flourishes at both ends.",
+      "file": "divider_vine.tga",
+      "source": "../../../art-src/ledger/divider_vine.png",
+      "imagegen_exec": "exec-a996eead-422d-4c43-b224-8eed70fb10da.png",
+      "source_size": [
+        1586,
+        992
+      ],
+      "source_sha256": "583413dcebb2f02aab22ff5948ebb980f9b09dbe9ad99b6d77afdc7030fb1083",
+      "sha256": "b5d4f1a915bf7b9fa206bf73723de954804c9b33572c20223f42a997bf995412"
+    },
+    {
+      "name": "divider_small",
+      "size": [
+        64,
+        32
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Small symmetrical centred ink botanical ornament.",
+      "file": "divider_small.tga",
+      "source": "../../../art-src/ledger/divider_small.png",
+      "imagegen_exec": "exec-2b481213-a365-4210-af70-6afd3a37ad5f.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "af5b887eaabbf5210fb3fec13cce07f8deca25c4fd8c3ebc9ef86b9e89ac33dd",
+      "sha256": "1aa69149087656001ff2cdf4f8c0da2332acd74ee3815b7cc2c7906e9a720ea7"
+    },
+    {
+      "name": "header_sprig_left",
+      "size": [
+        128,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Single sepia ink oak sprig, growing toward the right, for a title ornament.",
+      "file": "header_sprig_left.tga",
+      "source": "../../../art-src/ledger/header_sprig_left.png",
+      "imagegen_exec": "exec-ceb6bd1a-dd5e-4a98-bfff-2bc7799996b5.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "22b74eb4a2c935d1fb16bcec58dda6da113da4ff4c9ba0875c5d445701ca7159",
+      "sha256": "526d5d23d4e72ff8f81fca067feec76665f62e06474efbbeebc895dca19ebba5"
+    },
+    {
+      "name": "paper_vignette",
+      "size": [
+        512,
+        512
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Soft irregular burnt-paper screen-edge vignette, clear transparent centre.",
+      "file": "paper_vignette.tga",
+      "source": "../../../art-src/ledger/paper_vignette.png",
+      "imagegen_exec": "exec-9ff8823b-353b-4522-a89d-14137829f99c.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "01d144c878936234c32f385c900840b13e596ce8234d7d79c0a7dc159cf4bede",
+      "sha256": "80b7c3dcbc290d858a9685ad25ce317d8d0cd1b4c85994ea1907c9851326e33f"
+    },
+    {
+      "name": "button_normal",
+      "size": [
+        256,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Dark stained wood button plate, thin brass rim, blank centre.",
+      "insets": {
+        "left": 24,
+        "top": 24,
+        "right": 24,
+        "bottom": 24
+      },
+      "file": "button_normal.tga",
+      "source": "../../../art-src/ledger/button_normal.png",
+      "imagegen_exec": "exec-0bf4dc80-d5d6-478e-80bd-5a44a101693b.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "8a71ab98ffec4da85b3352e50ef4068c3fdd321135fb8d490d7a33c3a6f649c4",
+      "sha256": "bfa303ae59fa79716f83912c37187d1a3df884db9537e2eaccba17db39aeefe8"
+    },
+    {
+      "name": "button_hover",
+      "size": [
+        256,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Dark stained wood button plate, warm brighter brass rim, blank centre.",
+      "insets": {
+        "left": 24,
+        "top": 24,
+        "right": 24,
+        "bottom": 24
+      },
+      "file": "button_hover.tga",
+      "source": "../../../art-src/ledger/button_hover.png",
+      "imagegen_exec": "exec-2d98b3b4-cdc7-45da-94e2-a1f76d6c8c1d.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "2789f89dd613f92c72b5850a19b03298604e3255f403426ca6448a63710d40ca",
+      "sha256": "ec2c4b13181832be6e5d3a41c27384358071a2ff11041f0fd3bd51c6c4bfbc3a"
+    },
+    {
+      "name": "button_pressed",
+      "size": [
+        256,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Dark stained wood button plate inset two pixels with an inner shadow, blank centre.",
+      "insets": {
+        "left": 24,
+        "top": 24,
+        "right": 24,
+        "bottom": 24
+      },
+      "file": "button_pressed.tga",
+      "source": "../../../art-src/ledger/button_pressed.png",
+      "imagegen_exec": "exec-ddbe548d-5576-43c7-a0ab-b112e9df730e.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "5333e330b95c5c2c3fec02a542da0b4b26774efd9cc5607d5d810a9f402996e3",
+      "sha256": "b9f5b858575ab8894706845a921b881507f65032d5a1a35db2253026e8da13b0"
+    },
+    {
+      "name": "button_disabled",
+      "size": [
+        256,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Faded parchment button plate, dull sepia rim, blank centre.",
+      "insets": {
+        "left": 24,
+        "top": 24,
+        "right": 24,
+        "bottom": 24
+      },
+      "file": "button_disabled.tga",
+      "source": "../../../art-src/ledger/button_disabled.png",
+      "imagegen_exec": "exec-edec6582-b51c-4aee-9b62-b886f995f0d0.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "1150a7a9667efa65b7ce1356454e567732331a8b284de7b987b7b427eecb6155",
+      "sha256": "335866001eac1d6034f83d829d6552651b0c6296db9fd7ba7d51d071f5a9841d"
+    },
+    {
+      "name": "tab_active",
+      "size": [
+        256,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Blank parchment folder tab: light, open bottom edge to join the page.",
+      "insets": {
+        "left": 24,
+        "top": 16,
+        "right": 24,
+        "bottom": 16
+      },
+      "file": "tab_active.tga",
+      "source": "../../../art-src/ledger/tab_active.png",
+      "imagegen_exec": "exec-cc64eea3-eb9f-4101-a780-e1077b117420.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "9d9cfa74913f22c8d7f75a67b7b2c806df7f4742825b473d3b7beaf5b53236ac",
+      "sha256": "299d8935df612b40283fce4218f8ce9759b6c1094cb5ba75c49904e375be400e"
+    },
+    {
+      "name": "tab_inactive",
+      "size": [
+        256,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Blank parchment folder tab: darker, closed base, sits behind the page.",
+      "insets": {
+        "left": 24,
+        "top": 16,
+        "right": 24,
+        "bottom": 16
+      },
+      "file": "tab_inactive.tga",
+      "source": "../../../art-src/ledger/tab_inactive.png",
+      "imagegen_exec": "exec-fe39f38b-0a93-4d5f-9779-57882a981ca2.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "a863b207e0df1d026437feb87a8b32baecd319c0144bc851043d819448b0cdc8",
+      "sha256": "b40ae4eb9c1bdce131d878d2d642677e0d2d1a369651b4a4628d5f81442ea134"
+    },
+    {
+      "name": "seal_red",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Blank slightly irregular embossed round red wax seal, no emblem.",
+      "file": "seal_red.tga",
+      "source": "../../../art-src/ledger/seal_red.png",
+      "imagegen_exec": "exec-b24a8fdc-fa18-4a2d-92b3-338b31ac5903.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "50e1a31ac40c79ebc0b4b692fc31d26d918ae634100b31c46fe5044e42a8bb84",
+      "sha256": "20cf266013eefd837add3ead6194e6679fe76da09e39ca9984b93ac0a477f4dc"
+    },
+    {
+      "name": "seal_blue",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Blank slightly irregular embossed round blue wax seal, no emblem.",
+      "file": "seal_blue.tga",
+      "source": "../../../art-src/ledger/seal_blue.png",
+      "imagegen_exec": "exec-baf7eaba-2abc-4261-9904-672f89c3e931.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "058b4ac07a87e92510f219c06925f6e2390f844b26fde044859a5e381edb5712",
+      "sha256": "06ec9835f0a866f283a16cc2669bc7777feb15874ba296e50ae8c912cb1730e0"
+    },
+    {
+      "name": "seal_grey",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Blank slightly irregular embossed round grey wax seal, no emblem.",
+      "file": "seal_grey.tga",
+      "source": "../../../art-src/ledger/seal_grey.png",
+      "imagegen_exec": "exec-c5d74d38-127d-4693-a176-32b0bad61fa8.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "dffe714b410ef1ddad328a9fb80718ae072fa37a59ebacdc218b9cece4d678b9",
+      "sha256": "f3200a9a628ab895b7281171a2132fe358d407c9e6a78fe003803c3a84e75839"
+    },
+    {
+      "name": "seal_check",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Red wax seal embossed with one simple pressed check mark, no letters.",
+      "file": "seal_check.tga",
+      "source": "../../../art-src/ledger/seal_check.png",
+      "imagegen_exec": "exec-47449913-1034-4080-85ce-417bb9e573ed.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "0a86f6b3086c4d87bdfff316d2bac4fa7ce82aac7301cb5ea33c4c519698ed05",
+      "sha256": "e30e638243de08c2ae806b174a99786fd27d7b6ed5a92eb0173e30e8b3c85c3b"
+    },
+    {
+      "name": "seal_ribbon",
+      "size": [
+        128,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Small red fabric ribbon tails hanging below a blank round wax seal.",
+      "file": "seal_ribbon.tga",
+      "source": "../../../art-src/ledger/seal_ribbon.png",
+      "imagegen_exec": "exec-60827b36-062b-4114-b37c-ad2de6e403ed.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "e06e3ca115452b6eb99fd317b6b15889d8f323cf531e26571ead3fb8d7800efb",
+      "sha256": "9c3be2f0be61d70bc2a0389f9a3b2203033ab96b00a1ee2f20b29e81c7a9dec6"
+    },
+    {
+      "name": "close_ink",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Hand-drawn sepia circle enclosing two crossed diagonal ink strokes. ",
+      "file": "close_ink.tga",
+      "source": "../../../art-src/ledger/close_ink.png",
+      "imagegen_exec": "exec-884523f9-bd0c-4952-bdd6-5b099817b6bd.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "28212ce62d8b4ee4c91ddef5f73015fddb53b8c37e3875839f1f836382327518",
+      "sha256": "ffc00715ed8defa7da736f13210e07c351583565aec70b9fea8751c02074c1db"
+    },
+    {
+      "name": "close_ink_hover",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Hand-drawn sepia circle enclosing two crossed diagonal ink strokes. Warmer brass wash for hover.",
+      "file": "close_ink_hover.tga",
+      "source": "../../../art-src/ledger/close_ink_hover.png",
+      "imagegen_exec": "exec-0150e28c-0663-4b9a-be73-f364e28b7446.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "d3a610c0675364672d27e88d2b7f296e12d1660ce0ebc80fc811d27641c575cc",
+      "sha256": "6a8b038ad2f0c810f031956ce32fca2594e196590e7f3e992f0bdec9a86fbed0"
+    },
+    {
+      "name": "ex_ribbon",
+      "size": [
+        128,
+        32
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Blank red ribbon tag, subtle folds and notched ends.",
+      "file": "ex_ribbon.tga",
+      "source": "../../../art-src/ledger/ex_ribbon.png",
+      "imagegen_exec": "exec-c213104f-e95a-4f75-8018-dc4ec64c34f8.png",
+      "source_size": [
+        2172,
+        724
+      ],
+      "source_sha256": "79bbc37fa6d1990ead51fb8dd08790f68f6cc8ba4138cde65a589c67d3f97157",
+      "sha256": "6401c95120c8b3a3f4d274b9c5e9736e6a930144b7b6e1db7e581e77bb5f16c9"
+    },
+    {
+      "name": "ability_roundel",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Parchment disc border with double ink ring and brass bezel; centre opening truly transparent.",
+      "file": "ability_roundel.tga",
+      "icon_rect": [
+        28,
+        28,
+        72,
+        72
+      ],
+      "source": "../../../art-src/ledger/ability_roundel.png",
+      "imagegen_exec": "exec-f9d21991-81c3-4880-a8a2-67fd418b6cc3.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "b250f7a238c711af73068c21f0ca4e452bc3ae83d262b3d92a3750406063df1c",
+      "sha256": "92829e039c91df145ca41615ba9de0c15b4e17f3554dbe3d8a476bcd5ce015f0"
+    },
+    {
+      "name": "ability_roundel_glow",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Soft circular ring glow outside an ability bezel, clear transparent centre.",
+      "file": "ability_roundel_glow.tga",
+      "source": "../../../art-src/ledger/ability_roundel_glow.png",
+      "imagegen_exec": "exec-d5fa5235-1f9e-490c-ae46-169da5341db0.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "d0203ad246c37a5fcacb37d0e26e9146365f7f29fdc750f970abd9900d2a4b85",
+      "sha256": "2c97ad70e661ffc584a00150c6387567d013b7dfd6e58b1bd13ae0b375bb72e9"
+    },
+    {
+      "name": "ability_icon_mask",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Solid clean circular mask, diameter 88 percent of canvas, soft anti-aliased edge.",
+      "file": "ability_icon_mask.tga",
+      "icon_rect": [
+        28,
+        28,
+        72,
+        72
+      ],
+      "source": "../../../art-src/ledger/ability_icon_mask.png",
+      "imagegen_exec": "exec-87b453f1-b20b-431e-9c39-33f0976cd4d2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "3b28868abc8664d90b0947f316e1cdddd19c7a1cc241c0240fef73aaa501a4c5",
+      "sha256": "441038be8cfb2705c4db5dc734c82ca632da44ed3345917b9c1ce8d988ced39d"
+    },
+    {
+      "name": "cooldown_wash",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Filled round ink-wash disc with subtly ragged edges.",
+      "file": "cooldown_wash.tga",
+      "icon_rect": [
+        28,
+        28,
+        72,
+        72
+      ],
+      "source": "../../../art-src/ledger/cooldown_wash.png",
+      "imagegen_exec": "exec-ba7487d0-c4ca-4237-9875-229748e24688.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "ee3b7a23e8689931e71c95306157293fd51acf3cf5950dd55f8a4606c85e2236",
+      "sha256": "15dadf2f01bbdaece417e2820cddd641392065b3b2d648b1c49160ca588afd2f"
+    },
+    {
+      "name": "action_strap",
+      "size": [
+        512,
+        128
+      ],
+      "kind": "atlas",
+      "tint": false,
+      "use": "Horizontal leather action-bar strap, stitched top and bottom, brass rivets on rounded end caps.",
+      "rects": {
+        "left": [
+          0,
+          0,
+          64,
+          128
+        ],
+        "middle": [
+          64,
+          0,
+          128,
+          128
+        ],
+        "right": [
+          192,
+          0,
+          64,
+          128
+        ]
+      },
+      "source_layout": "strap",
+      "file": "action_strap.tga",
+      "source": "../../../art-src/ledger/action_strap.png",
+      "imagegen_exec": "exec-560c293d-8888-4ce8-bd33-5132dc421d32.png",
+      "source_size": [
+        2048,
+        768
+      ],
+      "source_sha256": "04d47436fa5e523da390f83be2ca61da7372797a3ed7ebed255c626cc4a589d2",
+      "sha256": "8693e69dd1139c062a1e83a4b052c4b14e7647126da151dbece8bdecb07c4027"
+    },
+    {
+      "name": "bar_brush_fill",
+      "size": [
+        512,
+        32
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Horizontal solid brush stroke fill with dry-brush ends.",
+      "file": "bar_brush_fill.tga",
+      "source": "../../../art-src/ledger/bar_brush_fill.png",
+      "imagegen_exec": "exec-4c650ea8-b079-4d37-a0f9-68d32f875ad9.png",
+      "source_size": [
+        1586,
+        992
+      ],
+      "source_sha256": "46da8df663f0c8c8d003f7b8a66fa2291dca058fcd332d4f9c263e83a65a7930",
+      "sha256": "fa469e73f3d03ff69ec82b38780170fb161793c0227a6741083336780fd67bfb"
+    },
+    {
+      "name": "bar_frame",
+      "size": [
+        512,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Thin ink outlined torn parchment trough with long transparent centre, for health bar.",
+      "insets": {
+        "left": 32,
+        "top": 12,
+        "right": 32,
+        "bottom": 12
+      },
+      "file": "bar_frame.tga",
+      "source": "../../../art-src/ledger/bar_frame.png",
+      "imagegen_exec": "exec-46e06466-b3a9-4066-9717-7a468b801553.png",
+      "source_size": [
+        2172,
+        724
+      ],
+      "source_sha256": "083df683d486bbbfd68ebf95cc2e114e9a5ad142a33a45d2c8a523a18fee891f",
+      "sha256": "522c08d05b699ec58eb97b37c05997373a4e3aa76f5c0cd8dd9ddeaee5ee7eb1"
+    },
+    {
+      "name": "bar_frame_thin",
+      "size": [
+        512,
+        32
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Thin ink outlined torn parchment trough with long transparent centre, for stamina.",
+      "insets": {
+        "left": 24,
+        "top": 8,
+        "right": 24,
+        "bottom": 8
+      },
+      "file": "bar_frame_thin.tga",
+      "source": "../../../art-src/ledger/bar_frame_thin.png",
+      "imagegen_exec": "exec-f509286e-1498-46ef-8706-c346792cf8c3.png",
+      "source_size": [
+        1586,
+        992
+      ],
+      "source_sha256": "f9cf24817f4d81552ce1063f075322016a7875032e536e46660dabc65e390489",
+      "sha256": "7ea03ff00350373e0a7d3097d922569e5bdcddbc7eed578fd6d837ff36d1174b"
+    },
+    {
+      "name": "candle_body",
+      "size": [
+        64,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Unlit warm ivory pillar candle, wax drips and short dark wick, no flame.",
+      "file": "candle_body.tga",
+      "source": "../../../art-src/ledger/candle_body.png",
+      "imagegen_exec": "exec-385d0007-db9b-4c55-b12c-0ae32c5d4153.png",
+      "source_size": [
+        887,
+        1774
+      ],
+      "source_sha256": "074851847884c6b36ef9f82b86d8e8f64b9ef0fe357f8bc99dc19aeb288fc500",
+      "sha256": "c19977aa37d73bad1e4311b7ec47770ee174d32fe544798b7d259dcb5483e3ab"
+    },
+    {
+      "name": "candle_flame",
+      "size": [
+        256,
+        64
+      ],
+      "kind": "flipbook",
+      "tint": false,
+      "use": "Four flame animation frames, same candle flame flickers subtly from orange to pale yellow, each frame isolated with transparent background and warm halo.",
+      "frames": [
+        {
+          "rect": [
+            0,
+            0,
+            64,
+            64
+          ],
+          "duration_ms": 120
+        },
+        {
+          "rect": [
+            64,
+            0,
+            64,
+            64
+          ],
+          "duration_ms": 120
+        },
+        {
+          "rect": [
+            128,
+            0,
+            64,
+            64
+          ],
+          "duration_ms": 120
+        },
+        {
+          "rect": [
+            192,
+            0,
+            64,
+            64
+          ],
+          "duration_ms": 120
+        }
+      ],
+      "file": "candle_flame.tga",
+      "source": "../../../art-src/ledger/candle_flame.png",
+      "imagegen_exec": "exec-bc65775e-9aa9-44f7-874d-65bd915b4fd0.png",
+      "source_size": [
+        1983,
+        793
+      ],
+      "source_sha256": "8b0e9c0d1064733337aec5b169e1f66e2343c0d19c202453bc259f45a3a9b5e0",
+      "sha256": "8ff11133579b0a871a31ec9220ac207e731bea38a71bb07d56770cca15b822bf"
+    },
+    {
+      "name": "candle_smoke",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "A delicate curling wisp of candle smoke.",
+      "file": "candle_smoke.tga",
+      "source": "../../../art-src/ledger/candle_smoke.png",
+      "imagegen_exec": "exec-9441b602-534c-455c-a344-c486c89d5fb9.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "9fe1e88975cffd7fec064ba33774387c520b231e62b92073c382116f54184120",
+      "sha256": "edd3b0b83b345159757708f1cf27c2789d741a7f18e7a9f65044058e180c31b1"
+    },
+    {
+      "name": "stamp_frame",
+      "size": [
+        128,
+        64
+      ],
+      "kind": "nineslice",
+      "tint": true,
+      "use": "Rough ink-stamp rectangular border, empty transparent centre.",
+      "insets": {
+        "left": 12,
+        "top": 20,
+        "right": 12,
+        "bottom": 20
+      },
+      "content_rect": [
+        0,
+        8,
+        128,
+        48
+      ],
+      "logical_insets": {
+        "left": 12,
+        "top": 12,
+        "right": 12,
+        "bottom": 12
+      },
+      "file": "stamp_frame.tga",
+      "source": "../../../art-src/ledger/stamp_frame.png",
+      "imagegen_exec": "exec-2c10144b-7b17-4a42-9421-b493078dfb50.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "104cc1b3d1d4b2642961658c5f6a61a47daebca745649b78b2d92d514169bcc9",
+      "sha256": "5404315fc70de0f2160c0c356faf044bd9c17cec497237b348a5f509216ffa79"
+    },
+    {
+      "name": "effect_frame",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Small parchment and ink roundel border for status icon, transparent centre.",
+      "file": "effect_frame.tga",
+      "source": "../../../art-src/ledger/effect_frame.png",
+      "imagegen_exec": "exec-4b73f2af-d121-4b77-8bd5-d3a819aa3e76.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "d5a46f5d6db17a20e6fcf35eec71811e75d17b1ce505b55ef23053b409da33bd",
+      "sha256": "e210a95ed4a949c40f40567223f28531c336188c457539eb5f128dfcfc0b9af6"
+    },
+    {
+      "name": "reticle_ring",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Brush ink ring with a gap at lower left and four short cardinal ticks.",
+      "file": "reticle_ring.tga",
+      "source": "../../../art-src/ledger/reticle_ring.png",
+      "imagegen_exec": "exec-5ef7f2d3-79d7-4e9b-8eb9-ff7e84fe097e.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "69af099af1172530f80ee3d2083866f3215c8ece8a50a1b027f1539e09e0640c",
+      "sha256": "c7c25c22eb7efbed4812ef903e08cc6cb813d97103e16b86a66578edcdb15aec"
+    },
+    {
+      "name": "reticle_charge",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "A single smooth circular stroke following a targeting ring, no ticks, transparent centre.",
+      "file": "reticle_charge.tga",
+      "source": "../../../art-src/ledger/reticle_charge.png",
+      "imagegen_exec": "exec-baa7524d-e3e4-4436-afa9-fe07bbe9d470.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "c0225283113c9688c1d2fdeca68da35ade5259a9e6e3ff04beb0c56c5d906fa0",
+      "sha256": "dab465b216b58aa11b4a1194b43399d0c55b0bdbfbd38c291ce4d324c9425e91"
+    },
+    {
+      "name": "reticle_dot",
+      "size": [
+        32,
+        32
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "A small slightly irregular filled ink dot centred on the canvas.",
+      "file": "reticle_dot.tga",
+      "source": "../../../art-src/ledger/reticle_dot.png",
+      "imagegen_exec": "exec-aa89a60d-d3f6-43fb-8352-e9e1329706d3.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "d3bc7b3f5822566a74766d3c2b2cb4f516ce3bae14871eaf378fb5cd4623a0f7",
+      "sha256": "099f9a1c019f82631532f75196888b76142976065f0198950b1dc319bb7e56b7"
+    },
+    {
+      "name": "ground_marker_hatch",
+      "size": [
+        256,
+        256
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Top view circular spell marker, hatched ink inside hand drawn rim.",
+      "file": "ground_marker_hatch.tga",
+      "source": "../../../art-src/ledger/ground_marker_hatch.png",
+      "imagegen_exec": "exec-f2e04e7a-d609-4600-8370-67dcee48b8a3.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "65cf26d1531e3cee204f33fbe5f8f2a827081f3f7d2691dddc9d0a0f4c4ad3cf",
+      "sha256": "9ee85174abc897996b2e736de58f5006f67513a0ae54729c3448cdaa338adb0c"
+    },
+    {
+      "name": "ground_marker_cone",
+      "size": [
+        256,
+        256
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Top view 60 degree cone of hatched ink, apex at bottom centre, hand drawn rim.",
+      "file": "ground_marker_cone.tga",
+      "source": "../../../art-src/ledger/ground_marker_cone.png",
+      "imagegen_exec": "exec-a7f27ab2-387b-4452-be6d-54728482d213.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "cd841555e14c434d18b5a3ed0d016ece61edd6de00257fdcc66b9c9d9ec3a112",
+      "sha256": "9e285f7b6fa0e4310283b33a853e08ce027087899b39ba027a62c690d719db16"
+    },
+    {
+      "name": "hitmark_ink",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Four quick diagonal ink slashes around an empty centre.",
+      "file": "hitmark_ink.tga",
+      "source": "../../../art-src/ledger/hitmark_ink.png",
+      "imagegen_exec": "exec-54657caa-ff0f-41e1-b74a-75c4dee3bcdb.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "610171f5bb7b1ca530d12a93013578678ee82c49f3295a5c81f4e271ff44c309",
+      "sha256": "e104d5f50f1ebf2a385657300219b07d6ac6f6d399ccdece9561e2a506eab586"
+    },
+    {
+      "name": "micro_frame",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Square parchment and brass icon frame, transparent centre. ",
+      "file": "micro_frame.tga",
+      "source": "../../../art-src/ledger/micro_frame.png",
+      "imagegen_exec": "exec-35540330-4b63-471f-945a-cc2d65547004.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "ecaeebab4bea2daaae4f132f5fa4ad5b9d8d32f9ac48b91edfc59c13553dce8f",
+      "sha256": "6f506a7e970f04a4617d122e96886ba0259b644039bf19130a226e8958ac91db"
+    },
+    {
+      "name": "micro_frame_hover",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Square parchment and brass icon frame, transparent centre. Warm luminous brass hover rim.",
+      "file": "micro_frame_hover.tga",
+      "source": "../../../art-src/ledger/micro_frame_hover.png",
+      "imagegen_exec": "exec-0a4e895f-c0c0-468d-b146-1f2975a8ef80.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "3ca94f9c42d69529f27c461722a989d9ce4556d6f851516c7a2c5d71f09a6811",
+      "sha256": "7aede49af5dba67337eb5a9640a9546d66cf86a9671b2de933ae65c807e2b56f"
+    },
+    {
+      "name": "crest_warrior",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: crossed swords over a round shield.",
+      "file": "crest_warrior.tga",
+      "source": "../../../art-src/ledger/crest_warrior.png",
+      "imagegen_exec": "exec-01773b11-3427-4389-901c-1a35d5b7a8b6.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "675eaf269e01f21ebcd6fe7d605b347a499d0f1488ec0aaa54cddd93d9a3ce8c",
+      "sha256": "3c299a661f6e6eefc891792e913206df17b2de3eddb0bb68b98ae8797bece7c5"
+    },
+    {
+      "name": "crest_paladin",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: war hammer before a rising sun.",
+      "file": "crest_paladin.tga",
+      "source": "../../../art-src/ledger/crest_paladin.png",
+      "imagegen_exec": "exec-025ac5a8-9e9d-4073-9867-a8cd3e40818c.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "b79df5f6d2bac4fa7fee0e337d8dede6503b84d85636ece36507c707b28534a1",
+      "sha256": "9a8414c4a50c3a3dee900a43f86bed4e912c1d76490fa4ed68f6038eb26b8a62"
+    },
+    {
+      "name": "crest_hunter",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: longbow with a paw print.",
+      "file": "crest_hunter.tga",
+      "source": "../../../art-src/ledger/crest_hunter.png",
+      "imagegen_exec": "exec-139dd5d5-33bb-48cc-9e2d-74eaf0f067c0.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "764af5c0e85ef854c3623be0ea1754eec41638513e62f168c4106f65cdf575cc",
+      "sha256": "940b13df9966b01b86febc87cc70ff459f28e1f6dcd421ef8fa1360bde251d9a"
+    },
+    {
+      "name": "crest_rogue",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: crossed daggers behind a hood.",
+      "file": "crest_rogue.tga",
+      "source": "../../../art-src/ledger/crest_rogue.png",
+      "imagegen_exec": "exec-1cb538c5-8fc0-4b3e-a8d8-360811d51f51.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "77d9e76f56758e93b262545e4e6054b44ad7e51f17fb80ee4853b63c3d3e8dc6",
+      "sha256": "3d21e743e098dfa05d370d8a9849186ef6da8b6d8928e11f97a41424a01af912"
+    },
+    {
+      "name": "crest_priest",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: radiant halo with rays.",
+      "file": "crest_priest.tga",
+      "source": "../../../art-src/ledger/crest_priest.png",
+      "imagegen_exec": "exec-17f9c22d-0875-43c8-b13a-e1d97605a3db.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "ca96fba24d7630e209187d4280dce9344567c933ee21e30e4cb8c576b5554f7b",
+      "sha256": "a5eac97db869f12ae6e228f6bbc3c3505f8b27bcada48057a82a7f488ac35ddb"
+    },
+    {
+      "name": "crest_shaman",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: carved totem with forked lightning.",
+      "file": "crest_shaman.tga",
+      "source": "../../../art-src/ledger/crest_shaman.png",
+      "imagegen_exec": "exec-f99d5555-c156-468a-ada3-665b932875ea.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "4a24df1d144e505022b82e7a5e3130a99c3fc6cc956505d1757320b8e6bc9442",
+      "sha256": "47ed2ea2957f6260b6f61f12c4832118dd34ae9f23f06feab3173658352d53c9"
+    },
+    {
+      "name": "crest_mage",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: four point arcane star inside ring of abstract non-alphabetic geometric marks.",
+      "file": "crest_mage.tga",
+      "source": "../../../art-src/ledger/crest_mage.png",
+      "imagegen_exec": "exec-fdfa8e4e-c4a7-4d21-aee3-e4f823b2fd8a.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "602337154ac0724cb5da73c3edb802408f7cd22fb53257f346b298295f2ab3b6",
+      "sha256": "1a8656d3b91546b8a832795978af7ef98c0d9496522e4e712378c6d51761b854"
+    },
+    {
+      "name": "crest_warlock",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: slitted eye wreathed in flame.",
+      "file": "crest_warlock.tga",
+      "source": "../../../art-src/ledger/crest_warlock.png",
+      "imagegen_exec": "exec-c532550e-c155-4b4a-987c-a0a193dbad5c.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "bbfe3313fd4d65d9275ddb75973df0b70e9c30ef3195172aa136eb1b4f48106c",
+      "sha256": "65571b3d43811121a653a2b7fab1adfea545e97c3ae7302382d4018a9e9b5c1d"
+    },
+    {
+      "name": "crest_druid",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Original woodcut crest: oak leaf crossed with antlers.",
+      "file": "crest_druid.tga",
+      "source": "../../../art-src/ledger/crest_druid.png",
+      "imagegen_exec": "exec-58ac2a84-5b1c-40dc-80a5-cbce5ad5a8b8.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "e2af35f65a56818745dd7124f9ab6f727836bf0f2d45a16faea6b93df037a962",
+      "sha256": "0222c7a9eeb073612ad278848e2ab95b32b0dab1f8388c2706f97ee21d207c54"
+    },
+    {
+      "name": "slot_primary",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Clear woodcut slot role glyph: single arrowhead.",
+      "file": "slot_primary.tga",
+      "source": "../../../art-src/ledger/slot_primary.png",
+      "imagegen_exec": "exec-dc714377-a27b-42ae-be8b-1a773346dfc1.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "afb6e0bffcf79dfad714af2cf3b46d85a19b18188f5612ee60e93dee51dbb2d5",
+      "sha256": "89ec93a3b16e1274d7b91f284d13ccb16ddbe893648f7aa6d63010478f97c8ea"
+    },
+    {
+      "name": "slot_area",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Clear woodcut slot role glyph: burst of three arrowheads.",
+      "file": "slot_area.tga",
+      "source": "../../../art-src/ledger/slot_area.png",
+      "imagegen_exec": "exec-959cc2b0-f739-4440-8585-2e4c7b231fd8.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "b338040d7c5702fde5288510a177dce1ecbdf5b70363be7aa27caad06dd8ea12",
+      "sha256": "30ef8c083f1ddfd6e34f1b30537bf2bbd967331b5066a3e9e6ee2c4f8edf018f"
+    },
+    {
+      "name": "slot_control",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Clear woodcut slot role glyph: chain link.",
+      "file": "slot_control.tga",
+      "source": "../../../art-src/ledger/slot_control.png",
+      "imagegen_exec": "exec-2a23be8e-c6af-4a10-8206-45d81d6ebcbb.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "1a5fb213bbd9a12d184e7796ed48c5055efbd955b27dd4d8f973b5122a7a254d",
+      "sha256": "e8456eedf0e8e96f81e464c6e3480c80857af529880b343b0dd776908c6b3312"
+    },
+    {
+      "name": "slot_mobility",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Clear woodcut slot role glyph: winged boot.",
+      "file": "slot_mobility.tga",
+      "source": "../../../art-src/ledger/slot_mobility.png",
+      "imagegen_exec": "exec-db9c6551-b612-47be-8714-216e8bfbbd8f.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "1a7ce6c613a7e75897bdca8ceb768fe5f6b7ad8bc99d158d802365bb69e81752",
+      "sha256": "1ff32170bb15f66f4f6c22592a8aa86930b21947e82b8e817b97bc94af032557"
+    },
+    {
+      "name": "slot_counter",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Clear woodcut slot role glyph: raised shield.",
+      "file": "slot_counter.tga",
+      "source": "../../../art-src/ledger/slot_counter.png",
+      "imagegen_exec": "exec-4fab83c7-3ffd-4283-850c-b8801a31fa73.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "9096303215f81aa5e4a52964a89369a85b2d0f68814540db4793ab26e97e306c",
+      "sha256": "7cb3284e5c3eecba80e4d6948bea1e2d1eef0a51ec4bba295e6b8fb3115940a6"
+    },
+    {
+      "name": "slot_ultimate",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Clear woodcut slot role glyph: crown of flame.",
+      "file": "slot_ultimate.tga",
+      "source": "../../../art-src/ledger/slot_ultimate.png",
+      "imagegen_exec": "exec-11581f15-0ee8-45f8-b246-b8ee17817139.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "4a2f4294c520b19171f5e6e9ca2cb619dc60fb3f2d378162d7591dc6c99d15cd",
+      "sha256": "c1a6f39fc69601a7c3a56effff495fed677a85e56239879471ba36c6a575f99d"
+    },
+    {
+      "name": "cell_normal",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Blank ledger table cell.",
+      "insets": {
+        "left": 16,
+        "top": 32,
+        "right": 16,
+        "bottom": 32
+      },
+      "content_rect": [
+        0,
+        16,
+        128,
+        96
+      ],
+      "logical_insets": {
+        "left": 16,
+        "top": 16,
+        "right": 16,
+        "bottom": 16
+      },
+      "file": "cell_normal.tga",
+      "source": "../../../art-src/ledger/cell_normal.png",
+      "imagegen_exec": "exec-6627af72-232d-4ab6-b31d-fa475de75063.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "967f02aabca6118ff00307ecf38ce5e88915960b64b636f9741369c3b8a2bb0d",
+      "sha256": "7b6fc40b2f0f57ad28760ad5e822b0a083701280aeae8b3ea002b64b09c88075"
+    },
+    {
+      "name": "cell_hover",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Blank ledger table cell with faint ochre wash.",
+      "insets": {
+        "left": 16,
+        "top": 32,
+        "right": 16,
+        "bottom": 32
+      },
+      "content_rect": [
+        0,
+        16,
+        128,
+        96
+      ],
+      "logical_insets": {
+        "left": 16,
+        "top": 16,
+        "right": 16,
+        "bottom": 16
+      },
+      "file": "cell_hover.tga",
+      "source": "../../../art-src/ledger/cell_hover.png",
+      "imagegen_exec": "exec-9cbbd8e9-2e1a-4775-b79e-dd8d566fc398.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "eac45c57a00421d4de66fdfc042d955f3850466b33737ae0b3420fd9255c1edb",
+      "sha256": "7e678e4ae3b9e9c124890c03f17c788c2c15970564e16d44827b61e8b064dacc"
+    },
+    {
+      "name": "cell_equipped",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Blank ledger table cell with red ink underline and small blank red seal at upper right.",
+      "insets": {
+        "left": 16,
+        "top": 32,
+        "right": 16,
+        "bottom": 32
+      },
+      "content_rect": [
+        0,
+        16,
+        128,
+        96
+      ],
+      "logical_insets": {
+        "left": 16,
+        "top": 16,
+        "right": 16,
+        "bottom": 16
+      },
+      "file": "cell_equipped.tga",
+      "source": "../../../art-src/ledger/cell_equipped.png",
+      "imagegen_exec": "exec-22cb1e2f-197e-49bd-b5f4-4caf9f468ac6.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "b5eda6549f0fa11cc1859b02875a514387f649cd2d4ce5a65b6f7e9b5e6e5f57",
+      "sha256": "eb2992013c72d8f7c1947b968f1a71616ecf2539a331a00287aad527b997686e"
+    },
+    {
+      "name": "cell_locked",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "nineslice",
+      "tint": false,
+      "use": "Faded blank ledger table cell with pencil hatching.",
+      "insets": {
+        "left": 16,
+        "top": 32,
+        "right": 16,
+        "bottom": 32
+      },
+      "content_rect": [
+        0,
+        16,
+        128,
+        96
+      ],
+      "logical_insets": {
+        "left": 16,
+        "top": 16,
+        "right": 16,
+        "bottom": 16
+      },
+      "file": "cell_locked.tga",
+      "source": "../../../art-src/ledger/cell_locked.png",
+      "imagegen_exec": "exec-4846a053-aed0-4c4e-8be5-7e89feadb4c1.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "64bc39b2f6105ec7f80a12b23ccb7491199bbb854a88b9045f0dda66ffa9322a",
+      "sha256": "116b43fde800a8489664987651873c59fbdea1f8d9fc15dd3d219036585ac871"
+    },
+    {
+      "name": "icon_frame_ink",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Hand inked square border to overlay an icon, transparent centre.",
+      "file": "icon_frame_ink.tga",
+      "source": "../../../art-src/ledger/icon_frame_ink.png",
+      "imagegen_exec": "exec-ccf88d32-915b-4c4e-a95d-61e736ce175d.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "d5275dbc06b203f2e991ea709ad46856e5b2bd8df8c0fd0df64362dfd00517b1",
+      "sha256": "cb3052fc4a084e1dade166e43ff1020766276f15e63ad98327cd180689de62de"
+    },
+    {
+      "name": "build_cooking_fire",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: stone ring, logs, pot on a tripod, small warm fire.",
+      "file": "build_cooking_fire.tga",
+      "source": "../../../art-src/ledger/build_cooking_fire.png",
+      "imagegen_exec": "exec-56641bc7-c38c-46a3-bcf3-2540a3c5f0fb.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "39cbe63f6ae695fee5949d2cf20632103ed646cfdddd614c3ef25cdae57fced7",
+      "sha256": "d119659792176af45da7d10302532e0b454f4c66db660ecd899410c62cc087cd"
+    },
+    {
+      "name": "build_smithing_anvil",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: anvil on a stump and a hammer.",
+      "file": "build_smithing_anvil.tga",
+      "source": "../../../art-src/ledger/build_smithing_anvil.png",
+      "imagegen_exec": "exec-c25edcad-9946-4c65-8e5b-c8a0e4e70088.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "c77661ac5766147d31a8c5a8bff063e45877f9a1478de4655f5b97ea7fd0cc9d",
+      "sha256": "403b999bb49d87865406133533f2b9b14de2022fb21c0f6a501bbaf16fa2c754"
+    },
+    {
+      "name": "build_tanning_rack",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: wooden tanning rack with a stretched hide.",
+      "file": "build_tanning_rack.tga",
+      "source": "../../../art-src/ledger/build_tanning_rack.png",
+      "imagegen_exec": "exec-3c715a8a-f058-4c83-8d6a-c0b65404b693.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "7629e8a2f5d3190142dc2dcf2cb4f943814013ff16a890fd4f6fbd8b28ec15b6",
+      "sha256": "68ac907740d91e2b98f83a2dd699f69052c85d1ec4cd86c41dab726ca78e6bfc"
+    },
+    {
+      "name": "build_cauldron",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: herbalist iron cauldron with subtle herb sprigs.",
+      "file": "build_cauldron.tga",
+      "source": "../../../art-src/ledger/build_cauldron.png",
+      "imagegen_exec": "exec-34f10e49-df3d-4225-88bd-c05e9f6dc43b.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "cd2f7b1b868c9a8a55cd47d088f0c2f041ce3c828f120d5d451e259d78b1d5ca",
+      "sha256": "d708fc946f0dc40fbdf71e7b0b25b962474c5c2cb9c7827cee20aa06d186f88e"
+    },
+    {
+      "name": "build_workbench",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: wooden workbench with simple hand tools.",
+      "file": "build_workbench.tga",
+      "source": "../../../art-src/ledger/build_workbench.png",
+      "imagegen_exec": "exec-cd44a4d1-48e1-41c4-b446-e3055f34c16c.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "df3e55ad9978e27403ab92fe05c08e5ac7ebb464b12735155f25c7c54c7e2817",
+      "sha256": "a7f6bab3a0595fb429125a49f2aee240f2fd735ddc10408269b907c9d579c3df"
+    },
+    {
+      "name": "build_palisade",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: a short row of sharpened wooden stakes.",
+      "file": "build_palisade.tga",
+      "source": "../../../art-src/ledger/build_palisade.png",
+      "imagegen_exec": "exec-db6e70ee-3d7c-4a23-8667-7513cbb8d47f.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "eca3f8aeb0cdebd65722e56d08c8bf265350d6990a26253bb56aed3be9bc9f6f",
+      "sha256": "804306231af51b67d03e2afb4aa9380726f22990b69c18021d90c8bdd9d76d44"
+    },
+    {
+      "name": "build_barricade",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: crossed wooden spikes.",
+      "file": "build_barricade.tga",
+      "source": "../../../art-src/ledger/build_barricade.png",
+      "imagegen_exec": "exec-46df2af3-a7f2-445f-ac85-4244b0f5f1d8.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "6ef37ff57a71041df9f95be1e8f9ae2f4c1a47e5830243e459f066d10091b11c",
+      "sha256": "fd2b11bcd765b8ab6c70278be1d276274c9f37849fa9bf2a194477834930a854"
+    },
+    {
+      "name": "build_spike_pit",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: shallow pit with sharpened spikes.",
+      "file": "build_spike_pit.tga",
+      "source": "../../../art-src/ledger/build_spike_pit.png",
+      "imagegen_exec": "exec-7fab246a-905c-42de-b2f1-adfff10ddacf.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "e2885eaf6494d288520ae14fca5bc174a8d5aeec409ace4fe21a3ed9e10c0ce8",
+      "sha256": "3983a9fca8c91f3aba9c7e60a6134a48ffaac2db7b88af7dc304c47599dce921"
+    },
+    {
+      "name": "build_militia_post",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: small wooden guard shelter with blank pennant on a pole.",
+      "file": "build_militia_post.tga",
+      "source": "../../../art-src/ledger/build_militia_post.png",
+      "imagegen_exec": "exec-0a23ba01-3e49-4c0c-a544-35fd0ace0573.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "a1111a8e9cd404c6a5552f495c92d295755387592965b704ebcc9603331284e1",
+      "sha256": "212ca4f3d1084466c11065e10e28e8f4b74b0416b6f40fe90f10af755b387871"
+    },
+    {
+      "name": "build_watchtower",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: wooden lookout on stilts.",
+      "file": "build_watchtower.tga",
+      "source": "../../../art-src/ledger/build_watchtower.png",
+      "imagegen_exec": "exec-b02e6493-9617-46ac-a176-b5ff2ab4a0c2.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "212d0075195ed4868d776d0e95a4f1d0307951f32a80e4a10a10ad2c03d23049",
+      "sha256": "4b7d77fd9d616d066e93a272b4b7a6c9459a7a27af108cd1f14a76e43ae41a7d"
+    },
+    {
+      "name": "build_brazier",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: iron brazier with small glowing coals.",
+      "file": "build_brazier.tga",
+      "source": "../../../art-src/ledger/build_brazier.png",
+      "imagegen_exec": "exec-7d0e670f-1058-419d-b69c-611ba83145ee.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "09cb0718f348fb573a95854e37fe888361b81f73a0b6107a590bc77463aea138",
+      "sha256": "ec3d1e7aa5c883ba7c085c7468df9ec32d0661682e8ee70ee340fec74d325a56"
+    },
+    {
+      "name": "build_healing_well",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: small stone well with bucket and simple wooden canopy.",
+      "file": "build_healing_well.tga",
+      "source": "../../../art-src/ledger/build_healing_well.png",
+      "imagegen_exec": "exec-b593308d-3dc6-4473-9537-7458c22f755f.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "fc98288b5c0a0871f784ef8dfdf1aa8497aaddf19c70aa38526c555ef3c9fe99",
+      "sha256": "9c630e9cff00cedcdcf056ed2ecdb4da3e9e19cd485cd76c409f1771cadf02d1"
+    },
+    {
+      "name": "build_forge",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: compact stone forge with bellows.",
+      "file": "build_forge.tga",
+      "source": "../../../art-src/ledger/build_forge.png",
+      "imagegen_exec": "exec-ebf9bdde-426a-4da8-b76d-8756940c5b24.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "1c446d0dd61ab0c4ae0f0baa3a8cb04076ba6b83fd90deb3fa0494a6d13ddb51",
+      "sha256": "df8e4111476209e7a3f7e04d3d236018cfcfd916b625da870d97f69c317a2357"
+    },
+    {
+      "name": "build_lumber_camp",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Three-quarter view ink line drawing with a light watercolour wash: chopping block, axe and stacked logs.",
+      "file": "build_lumber_camp.tga",
+      "source": "../../../art-src/ledger/build_lumber_camp.png",
+      "imagegen_exec": "exec-2f36eb43-9d20-43cf-ae31-7a37c9302a5a.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "0af0f2093790240a80563b5b185dadb6ace14046074b028132d0e23e927e23bd",
+      "sha256": "36fc6909e67c26267df3235d20d662b7d0dde7bdbe8427b6891b3771e05f3a63"
+    },
+    {
+      "name": "place_ok",
+      "size": [
+        256,
+        256
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Top view chalk-like dashed placement ring with small corner ticks.",
+      "file": "place_ok.tga",
+      "source": "../../../art-src/ledger/place_ok.png",
+      "imagegen_exec": "exec-015c4e48-e8a3-4e22-985d-66108de9d735.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "0b478a12012325d183fcab6ef35ebfaf2824e6adbcbc378262adc92adc356f6d",
+      "sha256": "e3c14aa4b9376789750305eb9491de7892b2af9a0b8851c349cd6c071480c358"
+    },
+    {
+      "name": "place_blocked",
+      "size": [
+        256,
+        256
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Top view ink placement ring with hatching and a struck-through edge; white alpha shape to tint red in game.",
+      "file": "place_blocked.tga",
+      "source": "../../../art-src/ledger/place_blocked.png",
+      "imagegen_exec": "exec-9cf3cf1b-0b90-4ae2-a241-59de785ec2f7.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "4f4838a36435e3aa7ac99c8db99660b352768f1b3271c334ddb78ad3e712da81",
+      "sha256": "179fb1b38679b29c448829a5ace382dc4626907b6b8acfb192ba7da73cd06d1d"
+    },
+    {
+      "name": "res_timber",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: two split logs.",
+      "file": "res_timber.tga",
+      "source": "../../../art-src/ledger/res_timber.png",
+      "imagegen_exec": "exec-b5821905-b96e-4f25-8aca-b076ab18a4c8.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "d8748c4ad96662a0032b228b378d24a00eea25953f4e54c53ab6fc6eb1e0ff16",
+      "sha256": "dcedd9808ecdc5711711fcdd8e0e5c9bbfcf759100f63656e99248635c9812d7"
+    },
+    {
+      "name": "res_copper",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: raw copper ore chunk with green patina.",
+      "file": "res_copper.tga",
+      "source": "../../../art-src/ledger/res_copper.png",
+      "imagegen_exec": "exec-dde1f9ff-c5bf-4293-9f3e-df598083b1cf.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "0f49057c4852d66de7c21f3f305cdef452c1b9ed90281d49ac36130fe8031ba0",
+      "sha256": "22e8e8f4c36a7e218d653c235e80bc7bd73964af88418254bb6c4323671b4f11"
+    },
+    {
+      "name": "res_meat",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: raw meat.",
+      "file": "res_meat.tga",
+      "source": "../../../art-src/ledger/res_meat.png",
+      "imagegen_exec": "exec-642b8b03-864c-4449-9ba4-cec7475cf23f.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "6d80b6e4b0464613bf2d89b1e17497bc0ec2f56138dd7077968870aff2cd3170",
+      "sha256": "ffb202a9abc99763a4f5c705171453ded2eedb99c43916478a3245ddcef0e099"
+    },
+    {
+      "name": "res_roast",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: roast meat on the bone.",
+      "file": "res_roast.tga",
+      "source": "../../../art-src/ledger/res_roast.png",
+      "imagegen_exec": "exec-f7c8310b-9db5-4a02-80d5-4a3d2e319c6b.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "03144af3a9e625bdc1354ed7f01623fa8de31b33720d31a9f0d09be4e86c7331",
+      "sha256": "eafb068f86d7881d0b587660d88ab63428870c1718324e565867cbe4cb16d0af"
+    },
+    {
+      "name": "res_stone",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: two rough stones.",
+      "file": "res_stone.tga",
+      "source": "../../../art-src/ledger/res_stone.png",
+      "imagegen_exec": "exec-015ca3aa-0c55-43de-9dc8-e68d7a30c528.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "597a37c6270ca9fcdde281bd3b52372cc327c27cac5edeedc824cbb332978688",
+      "sha256": "ca671f23fef47945c3f3dbe3df06a7f569b999b4c765c2f23cbd785fd70b3cae"
+    },
+    {
+      "name": "res_hide",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: a folded animal hide.",
+      "file": "res_hide.tga",
+      "source": "../../../art-src/ledger/res_hide.png",
+      "imagegen_exec": "exec-4b9ed7d2-bb0a-40ab-8c3b-80ebcdc06a45.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "5a032a09989e551e667a01dc9ef40de9d25980e450d71522c4ecd275aab479aa",
+      "sha256": "0029bf5c2f1b4653fe97b0d0462c377e5e3296d3fda5723199a2724e4834051d"
+    },
+    {
+      "name": "res_bronze",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: one bronze ingot.",
+      "file": "res_bronze.tga",
+      "source": "../../../art-src/ledger/res_bronze.png",
+      "imagegen_exec": "exec-514d7e9f-cc6a-4662-9312-55a3a0431183.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "49c5e1f6ba4f26f8784f2ecbbdd842404ebaf107af02319f0356620dd70872d9",
+      "sha256": "70d6aed725018d3e5bdda038298acf246e42b9c005c9bff31aa49bd110052cf9"
+    },
+    {
+      "name": "res_gold",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Ink and light watercolour resource icon: one gold coin with entirely blank face.",
+      "file": "res_gold.tga",
+      "source": "../../../art-src/ledger/res_gold.png",
+      "imagegen_exec": "exec-35724627-309f-4896-9a0c-96297647bc1d.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "babfb60402189ab779be8e157a32c308ba340fffe64020018d2125f34f45a2cd",
+      "sha256": "406f1fe9db35547230c28bdfe49c1b5cff8da1ee4a414c76ee9fc48a5b4746c1"
+    },
+    {
+      "name": "pocket_empty",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Stitched dark leather inventory pocket, empty dark centre.",
+      "file": "pocket_empty.tga",
+      "source": "../../../art-src/ledger/pocket_empty.png",
+      "imagegen_exec": "exec-b953d294-6e87-4dff-886f-6fbdacba38b5.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "0804b324bad1ebf4defb9b65aebb8b01815b9ca2a45d89255bfd210ed5c32fb1",
+      "sha256": "795d855c78750c1c853a5176cf835df75254c4aa4f565e085297b33d758e1e56"
+    },
+    {
+      "name": "pocket_filled",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Stitched dark leather inventory pocket, slightly raised centre, no item inside.",
+      "file": "pocket_filled.tga",
+      "source": "../../../art-src/ledger/pocket_filled.png",
+      "imagegen_exec": "exec-b0f8b1bb-4413-4f50-aaec-3bcd7a77befd.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "f65b7697e35176cba5dac53456c9458f44a6379a66dc1ee72ad7d64f1ccce57f",
+      "sha256": "dbc3acfee9313c36eced55cc7f4c06c1ae0605e4e9c6cdfb29be260627231bf1"
+    },
+    {
+      "name": "pocket_selected",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Stitched dark leather inventory pocket, brass outline and warm glow.",
+      "file": "pocket_selected.tga",
+      "source": "../../../art-src/ledger/pocket_selected.png",
+      "imagegen_exec": "exec-09c4af32-bfd0-4649-89d6-ce199dbdf6bb.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "e73357a27a03955f6b586b773aebe58695ecc37f48a42f1dec01315d8a9d2f73",
+      "sha256": "6431958834b552a4745d2c2be1917eee23d5ecb5fedc9e5e88b16b838d3e9405"
+    },
+    {
+      "name": "pocket_hover",
+      "size": [
+        64,
+        64
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Stitched dark leather inventory pocket, warm highlighted stitching.",
+      "file": "pocket_hover.tga",
+      "source": "../../../art-src/ledger/pocket_hover.png",
+      "imagegen_exec": "exec-99bb635b-2d14-4ca8-80d2-cd0048b300cd.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "81b1fddb831349f717112034124307933471c77689c57e40aea1f974af22d07e",
+      "sha256": "a81512c8dc6f4a3f8ff9af215731bdcadfd0830cf1bd2e05dfd40732a25bf229"
+    },
+    {
+      "name": "count_plate",
+      "size": [
+        32,
+        32
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Tiny blank parchment disc for a stack count.",
+      "file": "count_plate.tga",
+      "source": "../../../art-src/ledger/count_plate.png",
+      "imagegen_exec": "exec-4292b130-5f31-4eda-8835-3a1555f06d6a.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "642b7c0fb32cd99ab50abdc3de6c3aaaddccdc240f1fef39dc5ac71b1fcb05c6",
+      "sha256": "75fd2fcb0d9f79bca3083c5a8821267afe364e13529eb8dd84998041190a825e"
+    },
+    {
+      "name": "chest_header",
+      "size": [
+        512,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Front view top of an open iron bound wooden chest, lid open, no contents, a UI header silhouette.",
+      "file": "chest_header.tga",
+      "source": "../../../art-src/ledger/chest_header.png",
+      "imagegen_exec": "exec-54749793-57f9-4b76-89f6-fcd287831d1e.png",
+      "source_size": [
+        2172,
+        724
+      ],
+      "source_sha256": "1e33af96395c71da6ecd4affd6e070887b718d0425838f3f4d5e2e5386cab6b8",
+      "sha256": "62b6c219d4dd2b67a6fa69fa0c84861637bb4e9763eeda5e6d049e7f6467d93e"
+    },
+    {
+      "name": "rack_board",
+      "size": [
+        512,
+        256
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Front view wooden pegboard with empty wooden pegs, no weapons.",
+      "file": "rack_board.tga",
+      "source": "../../../art-src/ledger/rack_board.png",
+      "imagegen_exec": "exec-0312f6c9-efc5-48c3-b4e7-c7ef0c2abed0.png",
+      "source_size": [
+        1774,
+        887
+      ],
+      "source_sha256": "18e2aa62fe3346e6ed11336e9d78256dacf0f26e818d741ce417c33a1065c6fb",
+      "sha256": "d1bc9470ff55ff3793e2bacec8f3727dad429f988e3ded009927b66033370c71"
+    },
+    {
+      "name": "torn_banner",
+      "size": [
+        512,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Wide blank torn parchment page banner for announcements.",
+      "file": "torn_banner.tga",
+      "source": "../../../art-src/ledger/torn_banner.png",
+      "imagegen_exec": "exec-71dcd7e3-62c3-4b4e-9a3a-65b7fae55b4d.png",
+      "source_size": [
+        2172,
+        724
+      ],
+      "source_sha256": "58520594ec2669ccbb19c455542a508c0345b21c45f80817722322b12e3327e3",
+      "sha256": "7f903816b9ecb05c7173aea1734a44388db6da936f429e4bf87f9dca36149f00"
+    },
+    {
+      "name": "feed_strip",
+      "size": [
+        512,
+        32
+      ],
+      "kind": "tile",
+      "tint": false,
+      "use": "Horizontally seamless thin blank parchment strip, top and bottom edges slightly feathered.",
+      "tile_axes": "x",
+      "file": "feed_strip.tga",
+      "source": "../../../art-src/ledger/feed_strip.png",
+      "imagegen_exec": "exec-289ef6ff-3ada-4f48-91a7-c8f28cab2ff1.png",
+      "source_size": [
+        1586,
+        992
+      ],
+      "source_sha256": "33a862928b58c741c35633881f84bd066914966cabee7abc60d486f46c458615",
+      "sha256": "5b6e4e171eeb80bf70df73f971ed136c368f732a107c9528f687f33382b75a31"
+    },
+    {
+      "name": "toast_ribbon",
+      "size": [
+        512,
+        128
+      ],
+      "kind": "single",
+      "tint": false,
+      "use": "Wide blank parchment ribbon with curled ends, no writing.",
+      "file": "toast_ribbon.tga",
+      "source": "../../../art-src/ledger/toast_ribbon.png",
+      "imagegen_exec": "exec-e8807912-bb7f-4ae3-b538-dd7cbab2d9be.png",
+      "source_size": [
+        2048,
+        768
+      ],
+      "source_sha256": "6c23b1325061b23c00d51daf799e83135ecdfc4a6ebf89abbc93931631426318",
+      "sha256": "ccb8c33826671b3aea9ddf20d88be89c85db96faefd16b635b17a73ad79f2c96"
+    },
+    {
+      "name": "ink_splat_a",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Expressive irregular ink splatter, variation a.",
+      "file": "ink_splat_a.tga",
+      "source": "../../../art-src/ledger/ink_splat_a.png",
+      "imagegen_exec": "exec-6d09ca3a-c173-4bc3-a92e-1b1c3987200c.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "b3acadd212a0abce74929f72b52647475f6d72ba4e10967b10a9121048d96ea3",
+      "sha256": "a7932de722dad079183a11ca0d90e58bf512113acb22a02e927ad9db53a7c124"
+    },
+    {
+      "name": "ink_splat_b",
+      "size": [
+        128,
+        128
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Expressive irregular ink splatter, variation b.",
+      "file": "ink_splat_b.tga",
+      "source": "../../../art-src/ledger/ink_splat_b.png",
+      "imagegen_exec": "exec-f333ac17-f05a-4676-935b-3962517171ab.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "9a6540f9c5df3e6bf184757a00de25e3e68ed314dffe4b2e520e0b03e9d01670",
+      "sha256": "2b5e7bd5875119e08ee0cddb42d012fde9b1c003d174f4dacffd92a370f656ae"
+    },
+    {
+      "name": "ember_spark",
+      "size": [
+        32,
+        32
+      ],
+      "kind": "single",
+      "tint": true,
+      "use": "Single small tapered ember spark particle.",
+      "file": "ember_spark.tga",
+      "source": "../../../art-src/ledger/ember_spark.png",
+      "imagegen_exec": "exec-53167814-d163-41ca-9585-39a07ad7427b.png",
+      "source_size": [
+        1254,
+        1254
+      ],
+      "source_sha256": "83057dfb68d361c43148df2a73294c062964c93438e6e645667fd429407373c5",
+      "sha256": "9249f2c0e53476391c273fdede2729ba84ed9e1999d9c7b4e22343912ad1b52e"
+    }
+  ]
+}

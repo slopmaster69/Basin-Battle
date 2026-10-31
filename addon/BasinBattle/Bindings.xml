@@ -1,0 +1,5 @@
+<Bindings>
+  <Binding name="BASINBATTLE_SHOP" header="BASINBATTLE">
+    BasinBattle.ToggleShop()
+  </Binding>
+</Bindings>

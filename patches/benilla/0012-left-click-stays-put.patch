@@ -1,0 +1,23 @@
+Elwynn Survival: a left click no longer runs the hero forward.
+
+Under the action mouse the add-on holds MouselookStart for the whole of action mode, so the turn
+channel was always up and every left press made the both-button run. Only the right button
+really held runs with the left now (not while aiming), as in the stock client.
+
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -721,6 +721,14 @@
+     /// Both channels held: the both-button run (`0x514da0` nets `0x1` and `0x2` as forward).
+     /// Under the action mouse the left button still runs with the right, but not while aiming.
+     pub(super) fn both(&self) -> bool {
++        if benilla_ui::action_combat::action_mouse() {
++            // The add-on holds the look itself (`MouselookStart`), so the turn channel is always
++            // up: only the right button really held runs with the left; a left click alone is a
++            // swing and stays put.
++            return self.held(LookButton::Right)
++                && (self.held(LookButton::Left)
++                    || (self.left_run && !benilla_ui::action_combat::aim_camera()));
++        }
+         self.turn()
+             && (self.held(LookButton::Left)
+                 || (self.left_run && !benilla_ui::action_combat::aim_camera()))

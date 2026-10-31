@@ -1,0 +1,961 @@
+# The Scarlet Monastery's Cathedral: the Crusade's heart, where Commander Mograine guards the
+# altar and High Inquisitor Whitemane will not let him stay dead. A dungeon of its own beside the
+# Deadmines (read like deadmines.toml: its lists join the rest; [dungeon] is its world).
+#
+# Places are WoW coordinates on map 189 (MonasteryInstances: x north, y west, z up), only the
+# Cathedral wing's part of it read. In by the courtyard gate; through the courtyard's Crusade; the
+# nave (the second lamp); and the altar, where Mograine stands and Whitemane waits. Behind the
+# altar, a door nobody opens. Out by the gate.
+
+[dungeon]
+key = "cathedral"
+name = "Scarlet Monastery: Cathedral"
+map = 189
+map_dir = "MonasteryInstances"
+area = 796
+window = [[740.0, 1230.0], [1250.0, 1490.0]]
+icon = "Spell_Holy_HolySmite"
+blurb = "The Crusade's heart: Mograine at the altar, and Whitemane who won't let him die"
+first_page = "The Cathedral's courtyard gate. The Crusade sings inside; they've heard you coming."
+welcome = "The Scarlet Monastery's Cathedral. Commander Mograine guards the altar, and High Inquisitor Whitemane will not let him stay dead. Two lamps: the courtyard gate, and the nave. Rest at a lamp to heal, fill your Draughts (T) and send the Crusade back to its prayers. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "scarlet_insignia"
+hero_health = 0.7
+exit = [855.7, 1321.5, 18.7]
+exit_radius = 5.0
+exit_boss = "mograine"
+weapon_chance = 0.08
+armor_chance = 0.06
+boss_extra_chance = 0.25
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# --- lamps: only two ---------------------------------------------------------------------------------
+
+[[dungeon.lamp]]
+key = "cathedral_gate"
+name = "The Courtyard Gate"
+at = [855.7, 1321.5, 18.7]
+facing = 0.4
+
+[[dungeon.lamp]]
+key = "cathedral_nave"
+name = "The Nave"
+at = [1013.5, 1361.5, 27.3]
+facing = 0.0
+
+# --- doors -------------------------------------------------------------------------------------------
+
+[[dungeon.door]]
+key = "altar_fog"
+name = "The Altar"
+kind = "fog"
+at = [1052.0, 1397.0, 27.5]
+boss = "mograine"
+bars = [[1052.0, 1330.0], [1052.0, 1465.0]]
+
+# --- secrets -----------------------------------------------------------------------------------------
+
+# Behind the altar: a door nobody opens, and the Inquisitor the Crusade locked behind it.
+[[dungeon.door]]
+key = "fairbanks_door"
+name = "The Door Behind the Altar"
+kind = "hidden"
+at = [1205.5, 1397.5, 29.0]
+find = 4.0
+reveals = ["fairbanks"]
+text = "the door behind the altar was never locked from the outside. The thing behind it stands up."
+
+# The courtyard's west chapel: the Crusade's reliquary, and a shard of something that burned.
+[[dungeon.door]]
+key = "scarlet_reliquary"
+name = "The Crusade's Reliquary"
+kind = "hidden"
+at = [785.5, 1289.4, 18.7]
+find = 4.0
+reveals = ["reliquary_cache", "reliquary_inscription"]
+text = "in the courtyard's west chapel: the Crusade's reliquary, and in it a shard of a blade that still smoulders. It knows the name Mograine."
+
+[[dungeon.box]]
+key = "reliquary_cache"
+at = [787.0, 1291.0, 18.7]
+facing = 0.4
+loot = { draught_flask = 1, scarlet_insignia = 14 }
+
+[[dungeon.note]]
+key = "reliquary_inscription"
+name = "The Reliquary's Inscription"
+at = [784.0, 1287.5, 18.7]
+facing = 0.4
+text = "\"A shard of the Ashbringer, which the elder Mograine bore. Whoever carries its memory to the altar will see the son burn as the father did, should the High Inquisitor raise him one time too many.\""
+
+# A chaplain's hiding place in the courtyard.
+[[dungeon.door]]
+key = "chaplain_cache"
+name = "A Chaplain's Hiding Place"
+kind = "hidden"
+at = [892.7, 1434.2, 18.7]
+find = 4.0
+reveals = ["tithe_box"]
+text = "behind a statue in the courtyard: the tithes a chaplain kept for himself."
+
+[[dungeon.box]]
+key = "tithe_box"
+at = [893.5, 1436.0, 18.7]
+facing = 3.0
+loot = { scarlet_insignia = 16, tonic = 1, whetstone = 1 }
+
+# --- notes -------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "crusade_hymn"
+name = "A Crusade Hymnal"
+at = [870.1, 1325.2, 18.0]
+facing = 0.4
+text = "\"...and Whitemane shall raise him, and raise him again, for the Commander is the Crusade's sword and she its hand.\" In the margin, in a smaller hand: \"The reliquary in the west chapel holds a shard of the Ashbringer. The Inquisitor says never to bring it near him.\""
+
+[[dungeon.note]]
+key = "fairbanks_warning"
+name = "A Warning on the Altar Steps"
+at = [1145.4, 1361.3, 30.7]
+facing = 0.0
+text = "\"Do not open the door behind the altar. Fairbanks is not what he was.\""
+
+# --- the Crusade ---------------------------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "sc_gallant"
+at = [833.3, 1312.9]
+z = 18.7
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_wizard"
+at = [809.4, 1289.3]
+z = 18.7
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sc_myrmidon"
+at = [870.5, 1373.5]
+z = 18.0
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_chaplain"
+at = [893.2, 1385.4]
+z = 18.6
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sc_monk"
+at = [905.5, 1409.5]
+z = 18.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_centurion"
+at = [929.0, 1386.0]
+z = 19.7
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_wizard"
+at = [953.5, 1397.5]
+z = 18.3
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_abbot"
+key = "abbot"
+at = [941.6, 1421.8]
+z = 18.2
+radius = 0.0
+count = 1
+
+# The nave.
+[[dungeon.pack]]
+mob = "sc_champion"
+at = [1013.5, 1385.5]
+z = 27.2
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_chaplain"
+at = [1037.5, 1397.5]
+z = 27.3
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_myrmidon"
+at = [1037.5, 1433.5]
+z = 27.3
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_monk"
+at = [1037.5, 1361.5]
+z = 27.3
+radius = 2.5
+count = 2
+link = 12.0
+
+# The altar: Commander Mograine.
+[[dungeon.pack]]
+mob = "sc_mograine"
+key = "mograine"
+at = [1145.5, 1397.5]
+z = 31.7
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sc_champion"
+at = [1121.0, 1409.4]
+z = 30.3
+radius = 3.0
+count = 2
+link = 10.0
+
+# What the door behind the altar keeps.
+[[dungeon.pack]]
+mob = "sc_fairbanks"
+key = "fairbanks"
+at = [1205.5, 1397.5]
+z = 29.0
+radius = 0.0
+count = 1
+rare = true
+
+# Holy fire on the altar steps while Mograine (and whoever comes after him) fights.
+[[dungeon.hazard]]
+name = "holy fire"
+at = [1134.3, 1385.1, 30.4]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 2.0
+warn = 1.4
+spell = 24171
+boss = "mograine"
+
+[[dungeon.hazard]]
+name = "holy fire"
+at = [1133.9, 1421.1, 30.3]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 4.5
+warn = 1.4
+spell = 24171
+boss = "mograine"
+
+# --- items --------------------------------------------------------------------------------------------
+
+[[item]]
+key = "scarlet_insignia"
+name = "Scarlet Insignia"
+display = 6244
+icon = "INV_Misc_Coin_05"
+kind = "resource"
+stack = 50
+text = "A Crusade insignia. The lamps' quartermaster in the Cathedral trades them; you drop them all when you fall below."
+
+[[item]]
+key = "mograine_breastplate"
+name = "Scarlet Commander's Breastplate"
+display = 2968
+icon = "INV_Chest_Plate01"
+kind = "armor"
+slot = "chest"
+reduce = 0.24
+weight = 0.08
+text = "Mograine's: red plate, and it's been through more deaths than yours will."
+
+[[item]]
+key = "whitemane_mantle"
+name = "Whitemane's Mantle"
+display = 2539
+icon = "INV_Shoulder_06"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.1
+text = "The High Inquisitor's: you feel, faintly, that someone wants you to get up again."
+
+[[item]]
+key = "fairbanks_helm"
+name = "Fairbanks's Crusader Helm"
+display = 4180
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.13
+weight = 0.03
+text = "The Inquisitor's helm, worn over what's left of him."
+
+[[item]]
+key = "ashen_legs"
+name = "Ashen Legplates"
+display = 3414
+icon = "INV_Pants_04"
+kind = "armor"
+slot = "legs"
+reduce = 0.14
+weight = 0.03
+text = "Scorched by the Ashbringer's shadow. They smell of a great fire, long ago."
+
+[[item]]
+key = "abbot_robe"
+name = "Abbot's Robe"
+display = 12645
+icon = "INV_Chest_Cloth_24"
+kind = "armor"
+slot = "chest"
+reduce = 0.09
+text = "The Abbot's: heavy with gold thread and prayers."
+
+# --- the Crusade -----------------------------------------------------------------------------------------
+
+[[mob]]
+key = "sc_gallant"
+name = "Scarlet Gallant"
+subname = "The Scarlet Crusade"
+display = 2464
+health = 140
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 1928
+grip = "1h"
+posture = 90
+drops = { scarlet_insignia = [2, 4] }
+gear = ["defias_leggings"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 15
+  range = 2.8
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 230.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "blade"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 14, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 14, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 20, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "crusader strike"
+  weight = 1.5
+  min_range = 3.5
+  max_range = 9.0
+  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 5.5, damage = 18, recovery = 0.9, kit = 379 } ]
+
+[[mob]]
+key = "sc_myrmidon"
+name = "Scarlet Myrmidon"
+subname = "The Scarlet Crusade"
+display = 2462
+health = 170
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 22598
+grip = "2h"
+posture = 110
+drops = { scarlet_insignia = [3, 5] }
+gear = ["defias_jerkin"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.8
+  damage = 20
+  range = 3.3
+  arc = 140.0
+  recovery = 1.0
+  cooldown = 1.4
+  turn_rate = 190.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "two chops"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.75, damage = 18, recovery = 0.25 }, { clip = 18, take = 1, windup = 0.6, damage = 19, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "overhead"
+  weight = 1.5
+  steps = [ { clip = 58, windup = 1.25, damage = 30, arc = 70.0, recovery = 1.3, kit = 379 } ]
+
+[[mob]]
+key = "sc_centurion"
+name = "Scarlet Centurion"
+subname = "The Scarlet Crusade"
+display = 2465
+health = 160
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 1928
+grip = "1h"
+shield = 2456
+block = 0.45
+posture = 110
+drops = { scarlet_insignia = [3, 5] }
+gear = ["defias_shoulders"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 15
+  range = 2.8
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "blade"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.85 } ]
+  [[mob.pattern]]
+  name = "shield bash"
+  weight = 1.5
+  max_range = 2.6
+  steps = [ { clip = 95, windup = 0.4, damage = 9, range = 2.8, arc = 90.0, heavy = true, recovery = 0.8 } ]
+
+[[mob]]
+key = "sc_champion"
+name = "Scarlet Champion"
+subname = "The Scarlet Crusade"
+display = 2463
+health = 190
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 2056
+grip = "2h"
+posture = 130
+drops = { scarlet_insignia = [3, 6] }
+gear = ["defias_jerkin"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.85
+  damage = 22
+  range = 3.4
+  arc = 140.0
+  recovery = 1.05
+  cooldown = 1.4
+  turn_rate = 180.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "hammer"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.8, damage = 20, recovery = 0.25 }, { clip = 58, windup = 1.0, damage = 28, arc = 80.0, recovery = 1.2, kit = 379 } ]
+  [[mob.pattern]]
+  name = "holy strike"
+  weight = 1.5
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 1.0, range = 4.8, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.1, kit = 356, look = 24171 } ]
+
+[[mob]]
+key = "sc_monk"
+name = "Scarlet Monk"
+subname = "The Scarlet Crusade"
+display = 2471
+health = 130
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+evade = 0.3
+drops = { scarlet_insignia = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.4
+  damage = 12
+  range = 2.5
+  arc = 90.0
+  recovery = 0.6
+  cooldown = 0.9
+  turn_rate = 260.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "fists"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.38, damage = 10, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.3, damage = 10, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.3, damage = 10, recovery = 0.08 }, { clip = 54, windup = 0.5, damage = 14, range = 2.8, arc = 90.0, heavy = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "flying kick"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 10.0
+  steps = [ { clip = 95, windup = 0.5, lunge = 6.0, damage = 15, heavy = true, recovery = 0.9 } ]
+
+[[mob]]
+key = "sc_wizard"
+name = "Scarlet Wizard"
+subname = "The Scarlet Crusade"
+display = 2469
+health = 85
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 8.0
+drops = { scarlet_insignia = [2, 4] }
+gear = ["red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.3
+  damage = 17
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 133
+  recovery = 1.0
+  cooldown = 1.6
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "fireball"
+  weight = 3.0
+  min_range = 4.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.3, damage = 17, range = 26.0, radius = 1.5, speed = 20.0, spell = 133, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "flamestrike"
+  weight = 2.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.5, damage = 22, range = 24.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
+
+[[mob]]
+key = "sc_chaplain"
+name = "Scarlet Chaplain"
+subname = "The Scarlet Crusade"
+display = 2467
+health = 100
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 7.0
+drops = { scarlet_insignia = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 16
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "smite"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 16, range = 26.0, radius = 3.0, speed = 20.0, spell = 133, look = 24171, blockable = false, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "holy nova"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 24171 } ]
+
+# --- the Cathedral's bosses ---------------------------------------------------------------------------------
+
+[[mob]]
+key = "sc_abbot"
+name = "Scarlet Abbot"
+subname = "The Scarlet Crusade"
+display = 2466
+scale = 1.15
+health = 800
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 200
+keep_away = 6.0
+drops = { scarlet_insignia = [14, 20] }
+gear = ["abbot_robe"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 3.0
+  speed = 20.0
+  spell = 133
+  look = 24171
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = false
+  [[mob.pattern]]
+  name = "smite"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 3.0, speed = 20.0, spell = 133, look = 24171, blockable = false, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "holy nova"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 24171 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "holy nova"
+  text = "\"The Light condemns you!\""
+  summon = ["sc_monk", "sc_monk"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "smite"
+  text = "The Abbot's voice cracks as he prays louder."
+  shove = 5.0
+  look = 24171
+
+# Scarlet Commander Mograine: the Crusade's sword. When he falls, Whitemane comes.
+[[mob]]
+key = "sc_mograine"
+name = "Scarlet Commander Mograine"
+subname = "The Scarlet Crusade"
+display = 2042
+scale = 1.15
+health = 1300
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 1161
+grip = "1h"
+shield = 2456
+block = 0.5
+boss = true
+posture = 300
+drops = { scarlet_insignia = [20, 26] }
+trophy = { mograine_breastplate = 1 }
+gear = ["mograine_breastplate"]
+respawn = 0.0
+then = "sc_whitemane"
+then_after = 2.5
+then_text = "\"Mograine has fallen! You shall pay for this treachery!\" High Inquisitor Whitemane comes running down the nave."
+then_kit = 379
+then_look = 24171
+  [mob.attack]
+  windup = 0.6
+  damage = 26
+  range = 3.0
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "mace"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 24, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.45, damage = 24, recovery = 0.12 }, { clip = 57, windup = 0.85, damage = 34, heavy = true, recovery = 1.1, kit = 379 } ]
+  [[mob.pattern]]
+  name = "shield bash"
+  weight = 2.0
+  max_range = 2.8
+  steps = [ { clip = 95, windup = 0.4, damage = 14, range = 3.0, arc = 90.0, heavy = true, recovery = 0.7, kit = 379 } ]
+  [[mob.pattern]]
+  name = "crusader strike"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 12.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 8.0, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
+  [[mob.pattern]]
+  name = "hammer of justice"
+  weight = 2.0
+  below = 0.5
+  steps = [ { clip = 57, windup = 1.1, range = 4.0, arc = 90.0, damage = 44, heavy = true, recovery = 0.3, kit = 379 }, { clip = 54, windup = 0.6, range = 5.5, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.4, look = 24171 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.85
+  pattern = "hammer of justice"
+  text = "\"Infidels! They must be purified!\""
+  summon = ["sc_champion"]
+  [[mob.phase]]
+  at = 0.25
+  speed = 0.72
+  might = 1.2
+  pattern = "crusader strike"
+  text = "\"The Light... protects... me!\""
+  shove = 5.5
+  look = 24171
+
+# High Inquisitor Whitemane: she won't let him stay dead.
+[[mob]]
+key = "sc_whitemane"
+name = "High Inquisitor Whitemane"
+subname = "The Scarlet Crusade"
+display = 2047
+scale = 1.15
+health = 1100
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 30.0
+leash = 40.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 240
+keep_away = 6.0
+drops = { scarlet_insignia = [24, 30] }
+trophy = { whitemane_mantle = 1 }
+gear = ["whitemane_mantle"]
+respawn = 0.0
+# Whoever brought the memory of the Ashbringer from the reliquary sees Mograine rise a last time.
+then = "sc_ashen"
+then_after = 4.0
+then_needs = "scarlet_reliquary"
+then_text = "Whitemane falls across Mograine's body, and the shard you carry burns white. Mograine stands, and he is on fire. \"Father... I see you now...\""
+then_kit = 356
+then_look = 24171
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 24
+  range = 26.0
+  arc = 360.0
+  radius = 3.0
+  speed = 20.0
+  spell = 133
+  look = 24171
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 230.0
+  lock = 0.3
+  blockable = false
+  [[mob.pattern]]
+  name = "holy smite"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 26.0, radius = 3.0, speed = 20.0, spell = 133, look = 24171, blockable = false, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "staff"
+  weight = 2.0
+  max_range = 3.0
+  steps = [ { ranged = false, clip = 17, windup = 0.55, damage = 18, range = 2.9, arc = 100.0, recovery = 0.15 }, { ranged = false, clip = 17, windup = 0.45, damage = 18, range = 2.9, arc = 100.0, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "deep sleep"
+  weight = 2.0
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 7.0, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 27808 } ]
+  # At half: "Arise, my champion!", and Mograine stands again beside her.
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "deep sleep"
+  text = "\"Arise, my champion!\""
+  summon = ["sc_mograine_risen"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "holy smite"
+  text = "\"The Light will not fail me!\""
+  shove = 5.0
+  look = 24171
+
+# Mograine, raised by Whitemane: no shield now, only fury.
+[[mob]]
+key = "sc_mograine_risen"
+name = "Scarlet Commander Mograine"
+subname = "Raised"
+display = 2042
+scale = 1.15
+health = 650
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 30.0
+leash = 40.0
+weapon = 1161
+grip = "1h"
+posture = 220
+drops = { scarlet_insignia = [4, 8] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 26
+  range = 3.0
+  arc = 110.0
+  recovery = 0.75
+  cooldown = 1.0
+  turn_rate = 240.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "mace"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 22, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.38, damage = 22, recovery = 0.1 }, { clip = 57, windup = 0.7, damage = 32, heavy = true, recovery = 1.0, kit = 379 } ]
+
+# The Ashbringer's shadow: Mograine, burning, a last time.
+[[mob]]
+key = "sc_ashen"
+name = "Mograine"
+subname = "The Ashbringer's Shadow"
+display = 2461
+scale = 1.25
+health = 1300
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 30.0
+leash = 40.0
+weapon = 2056
+grip = "2h"
+boss = true
+posture = 340
+drops = { scarlet_insignia = [50, 60] }
+gear = ["ashen_legs"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.8
+  damage = 34
+  range = 3.6
+  arc = 140.0
+  recovery = 1.0
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "ashbringer"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.75, damage = 30, recovery = 0.2 }, { clip = 18, take = 1, windup = 0.6, damage = 30, recovery = 0.2 }, { clip = 58, windup = 0.9, range = 4.5, arc = 360.0, damage = 40, heavy = true, recovery = 1.2, kit = 379, look = 24171 } ]
+  [[mob.pattern]]
+  name = "consecration"
+  weight = 2.0
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 7.0, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 24171 } ]
+  [[mob.pattern]]
+  name = "judgement"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 30, range = 26.0, radius = 4.0, speed = 14.0, spell = 133, look = 24171, blockable = false, recovery = 1.1 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "consecration"
+  text = "\"The Crusade... was a lie... and I was its sword.\""
+  look = 24171
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.25
+  pattern = "ashbringer"
+  text = "The fire round Mograine roars up into the vaults."
+  shove = 7.0
+  look = 24171
+
+# High Inquisitor Fairbanks: what the Crusade locked behind the altar.
+[[mob]]
+key = "sc_fairbanks"
+name = "High Inquisitor Fairbanks"
+subname = "Behind the Altar"
+display = 5230
+scale = 1.15
+health = 1000
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 26.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 240
+drops = { scarlet_insignia = [26, 32] }
+gear = ["fairbanks_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 24
+  range = 3.0
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "staff"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 0.12 }, { clip = 57, windup = 0.85, damage = 30, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "curse of blood"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.2, damage = 26, range = 22.0, radius = 3.5, speed = 14.0, spell = 686, look = 24050, blockable = false, recovery = 1.0 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "curse of blood"
+  text = "\"They locked me in... with the dark... and the dark was kind.\""
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "staff"
+  text = "Fairbanks laughs, and the laugh goes on too long."
+  shove = 5.0
+  look = 24050

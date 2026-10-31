@@ -1,0 +1,938 @@
+# The Scarlet Monastery's Graveyard: the Crusade's dead, who won't stay buried, and the
+# torturers who keep the living company. A dungeon of its own beside the Deadmines (read like
+# deadmines.toml: its lists join the rest; [dungeon] is its world).
+#
+# Places are WoW coordinates on map 189 (MonasteryInstances: x north, y west, z up), only the
+# Graveyard wing's part of it read. In by the chapel door; down to the lower yard (Interrogator
+# Vishas at his work); up into the graveyard itself (Ironspine walks it); the mausoleum steps (the
+# second lamp); and down into the crypt, where Bloodmage Thalnos keeps the dead awake. Out by the
+# chapel door. It's Hallow's End: one grave in the yard has a pumpkin on it.
+
+[dungeon]
+key = "graveyard"
+name = "Scarlet Monastery: Graveyard"
+map = 189
+map_dir = "MonasteryInstances"
+area = 796
+window = [[1590.0, 950.0], [1900.0, 1470.0]]
+icon = "Spell_Shadow_RaiseDead"
+blurb = "The Crusade's dead, who won't stay buried, and their torturers"
+first_page = "The Graveyard's chapel door. The bells have stopped; the digging hasn't."
+welcome = "The Scarlet Monastery's Graveyard. The Crusade buries its dead here, and they don't stay buried; the Interrogator keeps the living busy. Two lamps: the chapel door, and the mausoleum steps. Rest at a lamp to heal, fill your Draughts (T) and send the dead back to their graves for a while. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "grave_dust"
+hero_health = 0.7
+exit = [1687.1, 1027.6, 18.7]
+exit_radius = 5.0
+exit_boss = "thalnos"
+weapon_chance = 0.08
+armor_chance = 0.06
+boss_extra_chance = 0.25
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# --- lamps: only two ---------------------------------------------------------------------------------
+
+[[dungeon.lamp]]
+key = "graveyard_chapel"
+name = "The Chapel Door"
+at = [1687.1, 1027.6, 18.7]
+facing = 0.9
+
+[[dungeon.lamp]]
+key = "graveyard_mausoleum"
+name = "The Mausoleum Steps"
+at = [1792.0, 1372.0, 18.9]
+facing = 1.57
+
+# --- secrets -----------------------------------------------------------------------------------------
+
+# A grave in the yard's far corner with no headstone, freshly turned, a carved pumpkin on it.
+[[dungeon.door]]
+key = "horseman_grave"
+name = "A Grave With a Pumpkin on It"
+kind = "hidden"
+at = [1851.7, 1327.3, 18.0]
+find = 4.0
+reveals = ["grave_goods", "grave_rhyme"]
+text = "a grave with no headstone, freshly turned, a carved pumpkin grinning on top of it. Something under the earth laughs. It's Hallow's End; the dead remember."
+
+[[dungeon.box]]
+key = "grave_goods"
+at = [1851.5, 1324.5, 18.0]
+facing = 3.0
+loot = { draught_flask = 1, grave_dust = 14 }
+
+[[dungeon.note]]
+key = "grave_rhyme"
+name = "A Rhyme Scratched on a Pumpkin"
+at = [1853.0, 1329.0, 18.0]
+facing = 3.0
+text = "\"Ride from the grave on Hallow's night, when the Bloodmage falls and the candles light. One who has found where the rider sleeps will meet him there when the dead man weeps.\""
+
+# The yard's north-east crypt: something that never sleeps.
+[[dungeon.door]]
+key = "azshir_crypt"
+name = "A Sealed Crypt"
+kind = "hidden"
+at = [1852.0, 1415.0, 22.7]
+find = 4.0
+reveals = ["azshir"]
+text = "the seal on the crypt has cracked from the inside. Something comes out of it, wailing."
+
+# Among the graves, one with a champion's arms carved on it.
+[[dungeon.door]]
+key = "champion_grave"
+name = "A Champion's Grave"
+kind = "hidden"
+at = [1820.9, 1281.8, 17.7]
+find = 4.0
+reveals = ["champion"]
+text = "a grave carved with a champion's arms: the earth over it heaves, and its champion climbs out."
+
+# --- notes -------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "sexton_log"
+name = "The Sexton's Log"
+at = [1671.0, 1028.9, 18.7]
+facing = 0.9
+text = "\"Buried four more today; dug up three again by nightfall. Thalnos says it's the cold. It isn't the cold. And somebody keeps putting a pumpkin on the grave in the far corner, the one with no stone. Every Hallow's End.\""
+
+[[dungeon.note]]
+key = "vishas_ledger"
+name = "The Interrogator's Ledger"
+at = [1777.8, 1146.3, 7.6]
+facing = 1.57
+text = "A list of names, each crossed out in red. At the bottom: \"The champion's grave in the yard: I hear him at night. He wants out. Let him have the yard, if he likes.\""
+
+# --- the dead and their keepers ----------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "gy_torturer"
+at = [1641.6, 1027.6]
+z = 18.7
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_phantasm"
+at = [1717.0, 1099.0]
+z = 6.8
+radius = 3.0
+count = 2
+link = 10.0
+
+# The lower yard: Interrogator Vishas at his work.
+[[dungeon.pack]]
+mob = "gy_vishas"
+key = "vishas"
+at = [1761.3, 1117.6]
+z = 7.5
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "gy_torturer"
+at = [1760.5, 1131.8]
+z = 7.6
+radius = 2.5
+count = 2
+link = 12.0
+
+# The graveyard itself.
+[[dungeon.pack]]
+mob = "gy_zombie"
+at = [1806.5, 1222.8]
+z = 17.8
+radius = 3.5
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_spirit"
+at = [1777.4, 1251.8]
+z = 17.6
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_scryer"
+at = [1761.0, 1281.8]
+z = 18.2
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "gy_ironspine"
+key = "ironspine"
+at = [1792.0, 1282.0]
+z = 18.2
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "gy_ghoul"
+at = [1746.8, 1312.0]
+z = 18.1
+radius = 3.0
+count = 3
+hidden = 6.0
+
+[[dungeon.pack]]
+mob = "gy_phantasm"
+at = [1806.6, 1342.0]
+z = 18.7
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_zombie"
+at = [1837.0, 1341.9]
+z = 17.8
+radius = 3.0
+count = 2
+hidden = 6.0
+
+[[dungeon.pack]]
+mob = "gy_scryer"
+at = [1822.2, 1371.8]
+z = 18.2
+radius = 2.0
+count = 2
+link = 12.0
+
+# What the champion's grave and the crypt keep.
+[[dungeon.pack]]
+mob = "gy_champion"
+key = "champion"
+at = [1820.4, 1267.0]
+z = 17.6
+radius = 0.0
+count = 1
+rare = true
+
+[[dungeon.pack]]
+mob = "gy_azshir"
+key = "azshir"
+at = [1837.0, 1415.1]
+z = 22.4
+radius = 0.0
+count = 1
+rare = true
+
+# The crypt: Bloodmage Thalnos.
+[[dungeon.pack]]
+mob = "gy_spirit"
+at = [1762.0, 1401.9]
+z = 21.0
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_thalnos"
+key = "thalnos"
+at = [1778.0, 1401.6]
+z = -0.6
+radius = 0.0
+count = 1
+
+[[dungeon.hazard]]
+name = "the crypt's flame"
+at = [1772.0, 1401.6, -0.6]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 2.0
+warn = 1.4
+spell = 10604
+boss = "thalnos"
+
+[[dungeon.hazard]]
+name = "the crypt's flame"
+at = [1784.0, 1401.6, -0.6]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 4.5
+warn = 1.4
+spell = 10604
+boss = "thalnos"
+
+# --- items --------------------------------------------------------------------------------------------
+
+[[item]]
+key = "grave_dust"
+name = "Grave Dust"
+display = 2956
+icon = "INV_Misc_Bone_02"
+kind = "resource"
+stack = 50
+text = "Dust from the Crusade's graves. The lamps' quartermaster in the Graveyard trades it; you drop it all when you fall below."
+
+[[item]]
+key = "vishas_hood"
+name = "The Interrogator's Hood"
+display = 3862
+icon = "INV_Helmet_04"
+kind = "armor"
+slot = "head"
+reduce = 0.08
+text = "Vishas's: it's seen a great deal it shouldn't have."
+
+[[item]]
+key = "ironspine_mantle"
+name = "Ironspine's Bone Mantle"
+display = 3119
+icon = "INV_Shoulder_05"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.11
+weight = 0.02
+text = "Vertebrae bound with iron wire. They creak when you turn your head."
+
+[[item]]
+key = "thalnos_robe"
+name = "Bloodmage's Robe"
+display = 12654
+icon = "INV_Chest_Cloth_40"
+kind = "armor"
+slot = "chest"
+reduce = 0.1
+text = "Thalnos's: dyed with something that isn't dye."
+
+[[item]]
+key = "champion_legs"
+name = "Fallen Champion's Legguards"
+display = 3414
+icon = "INV_Pants_04"
+kind = "armor"
+slot = "legs"
+reduce = 0.12
+weight = 0.02
+text = "The champion's: they remember a better death than his."
+
+[[item]]
+key = "azshir_mantle"
+name = "Sleepless Mantle"
+display = 1060
+icon = "INV_Shoulder_02"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.1
+text = "Azshir's: you won't sleep well in it either."
+
+[[item]]
+key = "rider_helm"
+name = "The Rider's Hollow Helm"
+display = 4145
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.15
+weight = 0.03
+text = "There was never a head in it. On Hallow's End you can hear it laugh."
+
+# --- the dead and their keepers -----------------------------------------------------------------------
+
+[[mob]]
+key = "gy_torturer"
+name = "Scarlet Torturer"
+subname = "The Scarlet Crusade"
+display = 2607
+health = 120
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 2699
+grip = "dagger"
+evade = 0.2
+drops = { grave_dust = [2, 4] }
+gear = ["defias_leggings"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 12
+  range = 2.5
+  arc = 90.0
+  recovery = 0.65
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "knives"
+  weight = 3.0
+  steps = [ { clip = 85, take = 0, windup = 0.4, damage = 10, recovery = 0.1 }, { clip = 88, take = 0, windup = 0.34, damage = 10, recovery = 0.1 }, { clip = 85, take = 0, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 1.5
+  min_range = 3.5
+  max_range = 8.0
+  steps = [ { clip = 85, take = 0, windup = 0.5, lunge = 4.5, damage = 15, recovery = 0.8 } ]
+
+[[mob]]
+key = "gy_scryer"
+name = "Scarlet Scryer"
+subname = "The Scarlet Crusade"
+display = 2603
+health = 90
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 8.0
+drops = { grave_dust = [2, 4] }
+gear = ["red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 17
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 22.0
+  spell = 116
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "frostbolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 17, range = 26.0, radius = 1.5, speed = 22.0, spell = 116, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "frost ring"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+
+[[mob]]
+key = "gy_zombie"
+name = "Unburied Crusader"
+subname = "The Graveyard"
+display = 1200
+health = 120
+run_speed = 5.5
+walk_speed = 1.6
+aggro = 13.0
+leash = 26.0
+posture = 80
+drops = { grave_dust = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.75
+  damage = 15
+  range = 2.6
+  arc = 110.0
+  recovery = 1.0
+  cooldown = 1.4
+  turn_rate = 180.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.7, damage = 13, recovery = 0.25 }, { clip = 17, take = 1, windup = 0.6, damage = 14, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "grab"
+  weight = 1.5
+  min_range = 3.0
+  max_range = 7.0
+  steps = [ { clip = 17, take = 1, windup = 0.9, lunge = 4.0, damage = 18, heavy = true, recovery = 1.2 } ]
+
+[[mob]]
+key = "gy_ghoul"
+name = "Graveyard Ghoul"
+subname = "The Graveyard"
+display = 519
+health = 110
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 14.0
+leash = 28.0
+drops = { grave_dust = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 12
+  range = 2.6
+  arc = 100.0
+  recovery = 0.7
+  cooldown = 1.0
+  turn_rate = 250.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "frenzy"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.42, damage = 10, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.34, damage = 10, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.45, damage = 13, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "leap"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 11.0
+  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 6.5, damage = 15, recovery = 0.9 } ]
+
+[[mob]]
+key = "gy_phantasm"
+name = "Haunting Phantasm"
+subname = "The Graveyard"
+display = 10700
+health = 95
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 15.0
+leash = 26.0
+drops = { grave_dust = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 13
+  range = 2.6
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "chill touch"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 12, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "wail"
+  weight = 1.5
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 1.0, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27808 } ]
+
+[[mob]]
+key = "gy_spirit"
+name = "Anguished Dead"
+subname = "The Graveyard"
+display = 915
+health = 100
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+keep_away = 6.0
+drops = { grave_dust = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 15
+  range = 24.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.2, damage = 15, range = 24.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "keening"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 5.0, arc = 360.0, damage = 13, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27812 } ]
+
+# --- the Graveyard's bosses -------------------------------------------------------------------------------
+
+[[mob]]
+key = "gy_vishas"
+name = "Interrogator Vishas"
+subname = "The Scarlet Crusade"
+display = 2968
+health = 850
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 2699
+grip = "dagger"
+evade = 0.2
+boss = true
+posture = 200
+drops = { grave_dust = [14, 20] }
+trophy = { vishas_hood = 1 }
+gear = ["vishas_hood"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 20
+  range = 2.6
+  arc = 90.0
+  recovery = 0.65
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "knives"
+  weight = 3.0
+  steps = [ { clip = 85, take = 0, windup = 0.42, damage = 16, recovery = 0.08 }, { clip = 88, take = 0, windup = 0.34, damage = 16, recovery = 0.08 }, { clip = 85, take = 0, windup = 0.34, damage = 16, recovery = 0.08 }, { clip = 88, take = 0, windup = 0.5, damage = 22, heavy = true, recovery = 0.9 } ]
+  # A word of pain: shadow where you stand.
+  [[mob.pattern]]
+  name = "shadow word"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.2, damage = 24, range = 22.0, radius = 3.5, speed = 14.0, spell = 686, look = 27812, blockable = false, recovery = 1.0 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.85
+  pattern = "shadow word"
+  text = "\"Tell me... tell me everything!\""
+  summon = ["gy_torturer"]
+  [[mob.phase]]
+  at = 0.25
+  speed = 0.72
+  might = 1.2
+  pattern = "knives"
+  text = "\"Naughty secrets!\""
+  shove = 5.0
+  look = 27812
+
+[[mob]]
+key = "gy_ironspine"
+name = "Ironspine"
+subname = "The Graveyard"
+display = 158
+scale = 2.0
+health = 1100
+run_speed = 6.0
+walk_speed = 1.8
+aggro = 16.0
+leash = 30.0
+weapon = 2056
+grip = "2h"
+boss = true
+posture = 320
+drops = { grave_dust = [18, 24] }
+trophy = { ironspine_mantle = 1 }
+gear = ["ironspine_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.95
+  damage = 36
+  range = 3.8
+  arc = 140.0
+  recovery = 1.2
+  cooldown = 1.5
+  turn_rate = 160.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "hammer"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.9, damage = 32, recovery = 0.3 }, { clip = 58, windup = 1.0, damage = 46, arc = 80.0, recovery = 1.4, kit = 379 } ]
+  # Poisoned bone dust coughed out where you stand.
+  [[mob.pattern]]
+  name = "poison cloud"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 20.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 20.0, radius = 4.0, speed = 14.0, spell = 6917, look = 22786, blockable = false, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "bone storm"
+  weight = 1.5
+  max_range = 4.5
+  steps = [ { clip = 126, windup = 1.0, range = 5.0, arc = 360.0, damage = 24, heavy = true, recovery = 0.2, kit = 369 }, { clip = 126, windup = 0.6, range = 5.0, arc = 360.0, damage = 26, heavy = true, recovery = 1.4 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.85
+  pattern = "bone storm"
+  text = "Ironspine's bones grind; the graves round him split open."
+  summon = ["gy_zombie", "gy_zombie"]
+  [[mob.phase]]
+  at = 0.25
+  speed = 0.72
+  might = 1.25
+  pattern = "hammer"
+  text = "Ironspine's ribs crack open, and something green pours out of them."
+  shove = 6.0
+  look = 22786
+
+[[mob]]
+key = "gy_thalnos"
+name = "Bloodmage Thalnos"
+subname = "The Graveyard"
+display = 1565
+scale = 1.2
+health = 1300
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 240
+keep_away = 7.0
+drops = { grave_dust = [26, 34] }
+trophy = { thalnos_robe = 1 }
+gear = ["thalnos_robe"]
+respawn = 0.0
+# Whoever found the grave with the pumpkin on it meets the one who sleeps in it.
+then = "gy_rider"
+then_after = 4.0
+then_needs = "horseman_grave"
+then_text = "Thalnos falls, and every candle in the crypt lights at once. From the yard above comes the sound of hooves, and laughter."
+then_kit = 218
+then_look = 10604
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 24
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 133
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "fireball"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 26.0, radius = 1.5, speed = 20.0, spell = 133, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "flame spike"
+  weight = 2.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.4, damage = 30, range = 26.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "fire nova"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  [[mob.pattern]]
+  name = "blood rite"
+  weight = 2.0
+  below = 0.4
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 0.9, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 1.4 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "flame spike"
+  text = "\"We hunger for vengeance.\""
+  summon = ["gy_spirit"]
+  [[mob.phase]]
+  at = 0.4
+  speed = 0.78
+  might = 1.1
+  pattern = "blood rite"
+  text = "\"No rest... for the angry dead!\""
+  summon = ["gy_phantasm", "gy_phantasm"]
+  [[mob.phase]]
+  at = 0.12
+  speed = 0.7
+  might = 1.2
+  pattern = "fire nova"
+  text = "\"More... blood...\""
+  shove = 5.5
+  look = 10604
+
+# The Headless Rider: what sleeps under the pumpkin, abroad on Hallow's End.
+[[mob]]
+key = "gy_rider"
+name = "The Headless Rider"
+subname = "Hallow's End"
+display = 6353
+scale = 1.1
+health = 1300
+run_speed = 8.5
+walk_speed = 2.5
+aggro = 30.0
+leash = 40.0
+weapon = 1928
+grip = "1h"
+boss = true
+posture = 320
+drops = { grave_dust = [50, 60] }
+gear = ["rider_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 28
+  range = 3.4
+  arc = 130.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 240.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "cleave"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 24, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.4, damage = 24, recovery = 0.1 }, { clip = 57, windup = 0.8, damage = 34, heavy = true, recovery = 1.0, kit = 379 } ]
+  # A charge across the yard, fire where the hooves come down.
+  [[mob.pattern]]
+  name = "ride"
+  weight = 2.5
+  min_range = 5.0
+  max_range = 18.0
+  steps = [ { clip = 17, take = 1, windup = 0.9, lunge = 12.0, range = 3.8, arc = 360.0, damage = 34, heavy = true, blockable = false, recovery = 1.1, kit = 379, look = 10604 } ]
+  # A burning pumpkin, thrown.
+  [[mob.pattern]]
+  name = "pumpkin"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.0, damage = 26, range = 24.0, radius = 3.5, speed = 16.0, spell = 14814, look = 10604, blockable = false, recovery = 1.0 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "pumpkin"
+  text = "The Rider laughs with no head to laugh with. \"Hallow's End! Who will light the candles?\""
+  summon = ["gy_phantasm", "gy_phantasm"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.7
+  might = 1.2
+  pattern = "ride"
+  text = "\"Your head... will do nicely!\""
+  shove = 6.5
+  look = 10604
+
+[[mob]]
+key = "gy_champion"
+name = "Fallen Champion"
+subname = "The Graveyard"
+display = 1576
+scale = 1.3
+health = 850
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 2056
+grip = "2h"
+boss = true
+posture = 280
+drops = { grave_dust = [22, 28] }
+gear = ["champion_legs"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.9
+  damage = 34
+  range = 3.6
+  arc = 140.0
+  recovery = 1.15
+  cooldown = 1.5
+  turn_rate = 170.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "swings"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.85, damage = 30, recovery = 0.25 }, { clip = 18, take = 1, windup = 0.7, damage = 32, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "grave slam"
+  weight = 1.5
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.1, range = 6.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 26271 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "grave slam"
+  text = "\"I died for the Crusade! I will not die for you!\""
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "swings"
+  text = "The champion's eyes burn cold."
+  shove = 5.5
+  look = 26271
+
+[[mob]]
+key = "gy_azshir"
+name = "Azshir the Sleepless"
+subname = "The Graveyard"
+display = 8783
+scale = 0.8
+health = 800
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+boss = true
+posture = 200
+keep_away = 6.0
+drops = { grave_dust = [22, 28] }
+gear = ["azshir_mantle"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 24.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 230.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 24.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "terrify"
+  weight = 2.0
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 6.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.1, kit = 218, look = 27812 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "terrify"
+  text = "Azshir's wail rises; the graves round her answer."
+  summon = ["gy_ghoul", "gy_ghoul"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "shadow bolt"
+  text = "\"Sleep... I want to SLEEP!\""
+  shove = 5.0
+  look = 27812

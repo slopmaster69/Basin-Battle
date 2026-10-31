@@ -1,0 +1,1407 @@
+# Basin Battle: game content and tuning.
+#
+# Everything here refers to the game by number (display IDs, race and class IDs, spell IDs for
+# icons and visuals), never by copying its files. Change the numbers, restart the server, play.
+# Cards live in cards.toml and gear in gear.toml, next to this file.
+#
+# Entry numbers the client caches (creatures, items) are derived from positions in these lists:
+# add new enemies and cards at the END of their list so existing ones keep their numbers.
+
+[game]
+# How many different spells (cards that fire on their own) and passives (everything else) a build
+# holds. Once a kind is full, offers of that kind only rank up what you have.
+spell_slots = 6
+passive_slots = 6
+# The Hearthstone: seconds to channel, and seconds until it can be used again.
+hearth_secs = 3
+hearth_cooldown = 20
+# Spells cast by hand (the add-on's bar, keys 1-6): a short global cooldown between casts, and
+# a little more damage than letting them fire on their own (.bb auto).
+gcd_secs = 1.0
+hand_cast_bonus = 0.15
+# A fallen hero gets up at the Ancient after respawn_secs (+respawn_per_wave a wave, at most
+# respawn_cap). Only the Ancient falling ends a run.
+respawn_secs = 8.0
+respawn_per_wave = 1.0
+respawn_cap = 20.0
+# Seconds between the first player arriving and wave 1. Anyone can type .start in chat to skip.
+countdown_secs = 30
+# Seconds of rest between waves; after a boss wave the break is longer (time for an expedition).
+intermission_secs = 20
+boss_intermission_secs = 40
+# Clearing this wave wins the run (the fourth boss, the Archlich, leads it); endless waves follow.
+victory_wave = 20
+# The world stops while anyone chooses a card, and every pick must be made before it goes on.
+pause_for_picks = true
+# Seconds a dead enemy lies on the ground before it disappears; lootable corpses stay longer.
+corpse_secs = 6.0
+loot_corpse_secs = 45.0
+# Players heal this share of their health every second.
+player_regen_per_sec = 0.015
+# Share of its full health the hub regains after each cleared wave.
+hub_repair_per_wave = 0.15
+# Seconds of warning before an Escalation once the last base is claimed.
+escalation_warning_secs = 20
+# Gold every player gets for each enemy killed (times the enemy's gold weight, times the wave).
+gold_per_kill = 5
+gold_per_kill_per_wave = 0.25
+# And a bounty for every cleared wave: wave_gold + wave_gold_per_wave x the wave, to everyone.
+wave_gold = 10
+wave_gold_per_wave = 4
+
+[hub]
+name = "Ancient of the Basin"
+subname = "Right-click for upgrades"
+display_id = 2429
+level = 60
+health = 6000
+# The hub's health also grows each wave, so late waves don't one-shot it.
+health_per_wave = 0.08
+# How close an enemy must get to strike the hub, in yards from its centre.
+reach = 6.0
+bounding_radius = 2.5
+
+[levels]
+max_level = 60
+# Every level adds this share of the class's level-1 health and damage.
+health_per_level = 0.07
+damage_per_level = 0.07
+# Experience to go from level L to L+1: xp_base + xp_per_level * L.
+xp_base = 100
+xp_per_level = 30
+# A level a wave: kills carry a hero at most levels_per_wave levels a wave (the experience bar
+# fills over a wave and waits there). Objectives give bonus levels on top: boss_bonus for each
+# boss killed, base_bonus the first time each base is claimed in a run.
+levels_per_wave = 1
+boss_bonus = 1
+base_bonus = 1
+
+[scaling]
+# What elites (and the Stitched Horrors guarding bases) cast; see [[ability]] below.
+elite_abilities = ["crushing_slam"]
+# Enemy health: health_base x (1 + health_per_wave x (wave-1)) x health_early per wave up to
+# wave late_from, then x health_late per wave. The levels' growth is matched by health_early and
+# health_late; health_per_wave keeps up with upgrades, talents and gear. Fewer, tougher enemies:
+# a single-target spell takes three or four hits on a normal enemy all run long.
+health_base = 1.3
+health_per_wave = 0.10
+# From wave `late_from` enemy health compounds faster: heroes' spells, upgrades and gear grow
+# steeply as a run goes on, and the waves must outgrow them, or the run gets easier as it goes.
+health_early = 1.03
+health_late = 1.08
+late_from = 4
+# Damage per wave, and how much harder enemy swings and shots land on heroes (defences and the
+# Ancient take the plain amount): a normal enemy's hit is a few percent of a hero's health.
+damage_wave = 1.08
+hero_damage = 1.7
+hero_damage_per_wave = 0.08
+# x1.7 at wave 1, and hero_damage_per_wave more each wave after: about x3.2 by wave 20 (2.5 from
+# the start was a little much early). Armour stretches with the enemies' level (gear.toml), so a
+# normal hit grows from about 2% of a hero's health early to 5-8% by waves 15-20. Elites,
+# bosses' marked strikes and the rare Plague Butcher are the spikes. The server log's
+# [balance] lines show what each hero took every wave.
+# And on the Ancient's defences (treants, springs, hired defenders), so they wear down under
+# a pack's attack and have to be guarded or rebuilt.
+defence_damage = 1.2
+# Each Escalation (cycle) multiplies enemy health and damage.
+health_cycle = 1.4
+damage_cycle = 1.2
+# Enemies in a wave: (count_base + count_per_wave * (wave-1)) * (count_player_base + count_per_player * players):
+# x0.33 alone, x0.56 for two, x0.78 for three, x1 for four.
+count_base = 13
+count_per_wave = 1.8
+count_player_base = 0.11
+count_per_player = 0.2225
+# Most enemies alive per wave; beyond this, extra enemies become extra health.
+count_cap = 60
+# Share of a wave that spawns elite, and how much tougher elites are.
+elite_share_base = 0.05
+elite_share_per_wave = 0.008
+elite_share_cap = 0.30
+elite_health = 5.0
+elite_damage = 2.0
+elite_scale = 1.35
+# A boss every boss_every waves, with this many times a normal enemy's health.
+boss_every = 5
+boss_health = 12.0
+boss_health_per_extra_player = 0.5
+# Seconds between spawns on one lane.
+spawn_interval = 1.1
+# The endless stream: every open lane whose base isn't claimed sends one more enemy every
+# stream_secs during a wave and every stream_rest_secs between waves (solo; faster with more
+# heroes), up to stream_cap alive.
+# It starts at stream_from_wave. Stream enemies don't hold up the end of a wave and give half
+# the experience and gold.
+# Claiming a base shuts its stream off.
+stream_from_wave = 2
+# Waves march fast down the long lanes (x1.5, +0.03 a wave, at most x1.9) and slow to their
+# own pace once they pick a fight or come within march_until yards of the Ancient.
+march_speed = 1.5
+march_speed_per_wave = 0.03
+march_speed_cap = 1.9
+march_until = 50.0
+# Before stream_ramp_waves it comes 1 + (stream_ramp_waves - wave) / 3 times slower (x3 at wave 2).
+stream_ramp_waves = 8
+stream_secs = 5.0
+stream_rest_secs = 9.0
+stream_cap = 24
+# A hero alone (no one to cover the other bridge): enemies have solo_health and solo_damage of
+# their usual health and damage, the stream comes solo_stream_slower times slower, and only
+# solo_stream_cap of stream_cap of it is alive at once.
+# A party: each hero past the first adds party_health to enemy health and party_damage to their
+# damage, and spawns come party_spawn faster (four heroes cover, heal and stand by each other:
+# for four, x1.6 health, x1.6 damage, and spawns 1.9 times as fast).
+party_health = 0.2
+party_damage = 0.2
+party_spawn = 0.3
+solo_health = 0.85
+solo_damage = 0.85
+solo_stream_slower = 1.6
+solo_stream_cap = 0.5
+# [first wave, lanes]: waves 1-3 use 2 lanes, then 3, then all.
+lanes_by_wave = [[1, 2], [4, 3], [9, 4]]
+
+[bases]
+# Bases open for expeditions from this wave of the first cycle.
+open_from_wave = 3
+# Guardians at each base: one elite of `guardian_elite` and `guardian_adds` of the wave's enemies.
+guardian_elite = "golem"
+# (A swarm to push through: many, each a little weaker than a wave's enemy.)
+guardian_adds = 8
+# Guardian health is this many normal enemies' worth, times (1 + guardian_per_claim per base already
+# claimed this cycle).
+guardian_health = 1.6
+guardian_per_claim = 0.15
+# Guardians stay within this many yards of their base.
+leash = 35.0
+# Channel to claim a base, in seconds. Hits push it back a quarter second each (2 seconds at most);
+# moving breaks it.
+channel_secs = 6.0
+# A claimed base sends this much smaller a share of its lane's enemies.
+lane_cut = 0.4
+gate_display = 11659
+cache_display = 9832
+banner_display = 14542
+claimed_display = 14541
+
+# Classes players can pick, in character-screen order. All Alliance, so everyone speaks the same
+# chat language.
+# race: 1 Human, 3 Dwarf, 4 Night Elf, 7 Gnome. gender: 0 male, 1 female.
+# power: 0 mana, 1 rage, 3 energy. Health and damage are at level 1 with the starting weapon.
+# range: melee 5.5, ranged classes attack from afar with `attack_spell`'s missile.
+[[class]]
+key = "warrior"
+name = "Warrior"
+class_id = 1
+race = 1
+gender = 0
+display_id = 49
+faction = 1
+power = 1
+max_power = 1000
+# Warriors are the tanks: the most health, plate, and 10% less damage taken from everything
+# (15% made them all but unkillable late on, with hits of 1-2% of their health; enemies' blows
+# also grow faster each wave now).
+health = 680
+taken = 0.10
+damage = [100, 140]
+attack_secs = 2.4
+range = 5.5
+attack_spell = 0
+main_stat = "strength"
+armor = "plate"
+weapon_slot = 15
+appearance = [2, 3, 1, 2, 1]
+
+[[class]]
+key = "priest"
+name = "Priest"
+class_id = 5
+race = 1
+gender = 1
+display_id = 50
+faction = 1
+power = 0
+max_power = 6000
+health = 390
+damage = [76, 104]
+attack_secs = 1.8
+range = 28.0
+attack_spell = 5019
+main_stat = "intellect"
+armor = "cloth"
+weapon_slot = 15
+appearance = [4, 2, 5, 3, 0]
+
+[[class]]
+key = "mage"
+class_id = 8
+name = "Mage"
+race = 7
+gender = 0
+display_id = 1563
+faction = 115
+power = 0
+max_power = 6000
+health = 360
+damage = [90, 124]
+attack_secs = 1.8
+range = 28.0
+attack_spell = 5019
+main_stat = "intellect"
+armor = "cloth"
+weapon_slot = 15
+appearance = [1, 2, 1, 3, 1]
+
+[[class]]
+key = "hunter"
+name = "Hunter"
+class_id = 3
+race = 3
+gender = 1
+display_id = 54
+faction = 3
+power = 0
+max_power = 4000
+health = 440
+damage = [92, 128]
+attack_secs = 2.0
+range = 32.0
+attack_spell = 75
+main_stat = "agility"
+armor = "mail"
+weapon_slot = 17
+appearance = [2, 1, 4, 1, 0]
+
+# Enemies, at wave 1. creature_type: 6 undead. rank: 0 normal, 1 elite, 3 boss.
+# hub_damage multiplies what a hit does to the hub, so swarms pressure the hub and bruisers
+# pressure players. `weight` is how often it appears once unlocked, `xp` and `gold` its share.
+[[enemy]]
+key = "skeleton"
+name = "Risen Skeleton"
+display_id = 158
+health = 260
+damage = [6, 8]
+attack_secs = 1.0
+speed = 5.5
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 10.0
+hub_damage = 1.0
+first_wave = 1
+weight = 1.0
+xp = 1.0
+bases = ["the Stables"]
+
+[[enemy]]
+key = "ghoul"
+name = "Ravenous Ghoul"
+display_id = 137
+health = 340
+damage = [8, 11]
+attack_secs = 0.9
+speed = 6.5
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 14.0
+hub_damage = 0.6
+first_wave = 1
+weight = 1.0
+xp = 1.2
+bases = ["the Farm"]
+abilities = ["ghoul_pounce"]
+
+[[enemy]]
+key = "gargoyle"
+name = "Bone Gargoyle"
+display_id = 7533
+health = 280
+damage = [6, 9]
+attack_secs = 0.8
+speed = 7.5
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 6.0
+hub_damage = 1.8
+first_wave = 2
+weight = 1.0
+xp = 1.1
+bases = ["the Gold Mine"]
+abilities = ["gargoyle_dive"]
+
+[[enemy]]
+key = "golem"
+name = "Stitched Horror"
+display_id = 1061
+health = 900
+damage = [15, 22]
+attack_secs = 1.4
+speed = 4.5
+scale = 1.3
+creature_type = 6
+rank = 1
+aggro_radius = 16.0
+hub_damage = 1.5
+first_wave = 9
+weight = 0.15
+xp = 3.0
+
+# --- each base sends its own kind of dead (bases = where they come from; empty = anywhere) ---
+abilities = ["crushing_slam"]
+
+[[enemy]]
+key = "plague_rat"
+name = "Plague Rat"
+display_id = 1141
+health = 110
+damage = [3, 5]
+attack_secs = 0.7
+speed = 8.0
+scale = 2.0
+creature_type = 1
+rank = 0
+aggro_radius = 10.0
+hub_damage = 1.0
+first_wave = 1
+weight = 1.4
+xp = 0.5
+bases = ["the Farm"]
+
+[[enemy]]
+key = "farmhand"
+name = "Plagued Farmhand"
+display_id = 1201
+health = 380
+damage = [8, 11]
+attack_secs = 1.2
+speed = 4.5
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 12.0
+hub_damage = 1.2
+first_wave = 2
+weight = 0.8
+xp = 1.2
+bases = ["the Farm"]
+abilities = ["blight_splash"]
+
+[[enemy]]
+key = "skeletal_steed"
+name = "Skeletal Charger"
+display_id = 5050
+health = 330
+damage = [9, 13]
+attack_secs = 1.1
+speed = 8.0
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 16.0
+hub_damage = 1.0
+first_wave = 2
+weight = 0.6
+xp = 1.4
+bases = ["the Stables"]
+abilities = ["trample"]
+
+[[enemy]]
+key = "blighted_kobold"
+name = "Blighted Tunneler"
+display_id = 163
+health = 200
+damage = [5, 7]
+attack_secs = 0.8
+speed = 6.5
+scale = 1.0
+creature_type = 7
+rank = 0
+aggro_radius = 10.0
+hub_damage = 1.0
+first_wave = 1
+weight = 1.2
+xp = 0.8
+bases = ["the Gold Mine"]
+abilities = ["cave_in"]
+
+[[enemy]]
+key = "crypt_fiend"
+name = "Crypt Fiend"
+display_id = 3004
+health = 450
+damage = [10, 14]
+attack_secs = 1.3
+speed = 5.0
+scale = 0.9
+creature_type = 6
+rank = 0
+aggro_radius = 14.0
+hub_damage = 1.5
+first_wave = 3
+weight = 0.6
+xp = 1.6
+bases = ["the Gold Mine"]
+abilities = ["web_spray"]
+
+[[enemy]]
+key = "banshee"
+name = "Wailing Banshee"
+display_id = 10690
+health = 230
+damage = [8, 11]
+attack_secs = 1.1
+speed = 7.0
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 14.0
+hub_damage = 1.2
+first_wave = 1
+weight = 1.0
+xp = 1.0
+bases = ["the Lumber Mill"]
+abilities = ["wail"]
+
+[[enemy]]
+key = "lost_spirit"
+name = "Lost Woodsman"
+display_id = 10700
+health = 180
+damage = [6, 9]
+attack_secs = 0.9
+speed = 6.5
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 10.0
+hub_damage = 1.0
+first_wave = 2
+weight = 0.8
+xp = 0.8
+bases = ["the Lumber Mill"]
+abilities = ["axe_throw"]
+
+[[enemy]]
+key = "rotting_treant"
+name = "Rotting Treant"
+display_id = 14383
+health = 550
+damage = [12, 16]
+attack_secs = 1.5
+speed = 4.0
+scale = 0.55
+creature_type = 6
+rank = 0
+aggro_radius = 12.0
+hub_damage = 2.0
+first_wave = 3
+weight = 0.5
+xp = 2.0
+bases = ["the Lumber Mill"]
+
+# --- roles: enemies from every base that make you split up -----------------------------------
+# role "siege" tears down defences (siege = damage multiplier against them), "archer" shoots from
+# `range` yards, "healer" mends the most hurt enemy near it (heal = share of max health every
+# heal_secs), "flanker" takes the long road and runs past players and defences for the Ancient.
+# `title` shows under the name.
+abilities = ["root_slam"]
+
+[[enemy]]
+key = "siegebreaker"
+name = "Scourge Siegebreaker"
+title = "Siege: wrecks defences"
+display_id = 2695
+health = 900
+damage = [14, 20]
+attack_secs = 1.8
+speed = 4.2
+scale = 0.85
+creature_type = 6
+rank = 0
+aggro_radius = 8.0
+hub_damage = 2.0
+first_wave = 6
+weight = 0.18
+xp = 2.5
+role = "siege"
+siege = 3.5
+abilities = ["quake"]
+
+[[enemy]]
+key = "bonecaster"
+name = "Skeletal Bonecaster"
+title = "Archer: shoots from range"
+display_id = 1245
+health = 220
+damage = [7, 10]
+attack_secs = 2.0
+speed = 5.5
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 22.0
+hub_damage = 1.0
+first_wave = 4
+weight = 0.35
+xp = 1.2
+role = "archer"
+range = 22.0
+shot_spell = 686
+abilities = ["shadow_volley"]
+
+[[enemy]]
+key = "dark_mender"
+name = "Dark Mender"
+title = "Healer: kill it first"
+display_id = 14703
+health = 300
+damage = [4, 6]
+attack_secs = 1.6
+speed = 5.5
+scale = 0.8
+creature_type = 6
+rank = 0
+aggro_radius = 8.0
+hub_damage = 0.5
+first_wave = 7
+weight = 0.25
+xp = 1.8
+role = "healer"
+heal = 0.1
+heal_secs = 3.5
+heal_spell = 16588
+
+[[enemy]]
+key = "ghoul_runner"
+name = "Ghoul Runner"
+title = "Flanker: runs for the Ancient"
+display_id = 414
+health = 260
+damage = [9, 12]
+attack_secs = 0.9
+speed = 9.0
+scale = 0.75
+creature_type = 6
+rank = 0
+aggro_radius = 0.0
+hub_damage = 2.5
+first_wave = 8
+weight = 0.25
+xp = 1.4
+role = "flanker"
+
+[[enemy]]
+key = "plague_bloat"
+name = "Plague Bloat"
+title = "Bursts: keep away, or kill it first"
+display_id = 1201
+health = 420
+damage = [5, 7]
+attack_secs = 1.5
+speed = 5.0
+scale = 1.35
+creature_type = 6
+rank = 0
+aggro_radius = 18.0
+hub_damage = 1.5
+first_wave = 5
+weight = 0.3
+xp = 1.6
+role = "bomber"
+abilities = ["bloat_burst"]
+
+[[enemy]]
+key = "necromancer"
+name = "Scourge Necromancer"
+title = "Summoner: raises skeletons, kill it first"
+display_id = 16309
+health = 380
+damage = [6, 9]
+attack_secs = 2.2
+speed = 5.0
+scale = 1.0
+creature_type = 7
+rank = 0
+aggro_radius = 24.0
+hub_damage = 0.5
+first_wave = 9
+weight = 0.22
+xp = 2.0
+role = "archer"
+range = 24.0
+shot_spell = 686
+summon = "skeleton"
+summon_count = 2
+summon_secs = 10.0
+summon_cap = 4
+summon_spell = 8853
+add_health = 0.35
+
+[[enemy]]
+key = "bone_construct"
+name = "Bone Construct"
+title = "Splits: falls apart into skeletons"
+display_id = 14706
+health = 800
+damage = [12, 17]
+attack_secs = 1.5
+speed = 4.8
+scale = 1.0
+creature_type = 6
+rank = 0
+aggro_radius = 14.0
+hub_damage = 1.5
+first_wave = 11
+weight = 0.2
+xp = 2.5
+split_into = "skeleton"
+split_count = 3
+add_health = 0.3
+abilities = ["root_slam"]
+
+[[enemy]]
+key = "wraith"
+name = "Restless Wraith"
+title = "Haunt: drifts after you and pulses death: keep away"
+display_id = 146
+health = 520
+damage = [6, 9]
+attack_secs = 2.0
+speed = 4.2
+scale = 1.1
+creature_type = 6
+rank = 0
+aggro_radius = 40.0
+hub_damage = 0.5
+first_wave = 12
+weight = 0.18
+xp = 2.0
+role = "haunt"
+pulse = 1.1
+pulse_radius = 5.0
+pulse_spell = 1395
+
+# A saboteur: it ignores heroes and defences, runs the short road to the Ancient and blows itself
+# up there, tearing `blast` of the Ancient's health off. Fragile: catch it on the way.
+[[enemy]]
+key = "sapper"
+name = "Plague Sapper"
+title = "Saboteur: runs to blow up the Ancient, stop it"
+display_id = 519
+health = 160
+damage = [4, 6]
+attack_secs = 1.5
+speed = 8.0
+scale = 0.7
+creature_type = 6
+rank = 0
+aggro_radius = 0.0
+hub_damage = 1.0
+first_wave = 6
+weight = 0.14
+xp = 1.2
+role = "sapper"
+blast = 0.05
+
+# A support: hangs back and shoots, and its war cry drives every enemy within 15 yards on (25%
+# more damage, 20% faster). Kill it and the pack slows.
+[[enemy]]
+key = "herald"
+name = "Shrieking Herald"
+title = "Herald: drives the pack on, kill it first"
+display_id = 10698
+health = 320
+damage = [4, 6]
+attack_secs = 2.0
+speed = 5.0
+scale = 0.85
+creature_type = 6
+rank = 0
+aggro_radius = 14.0
+hub_damage = 0.5
+first_wave = 8
+weight = 0.15
+xp = 1.8
+role = "herald"
+range = 22.0
+shot_spell = 686
+
+# Rare and slow: a Butcher's Cleave takes 40% of a hero's health, however tough. The only enemy
+# that hurts by a share of health; its cleave is marked long before it lands.
+[[enemy]]
+key = "butcher"
+name = "Plague Butcher"
+title = "Butcher: its Cleave takes 40% of your health, step out"
+display_id = 7864
+health = 1400
+damage = [14, 20]
+attack_secs = 2.4
+speed = 4.0
+scale = 1.2
+creature_type = 6
+rank = 0
+aggro_radius = 14.0
+hub_damage = 1.5
+first_wave = 9
+weight = 0.04
+xp = 4.0
+abilities = ["butcher_cleave"]
+
+# Bosses come every fifth wave, in this order, then round again stronger. Their health is set by
+# [scaling] boss_health; `health` here only sets them apart from each other.
+[[boss]]
+key = "skeleton_lord"
+name = "Bonelord Kharos"
+display_id = 518
+health = 260
+damage = [20, 28]
+attack_secs = 1.2
+speed = 5.0
+scale = 1.75
+creature_type = 6
+rank = 3
+aggro_radius = 20.0
+hub_damage = 3.0
+first_wave = 5
+weight = 1.0
+xp = 15.0
+abilities = ["bone_storm", "grave_spikes", "bone_spears"]
+phase_adds = "skeleton"
+phase_add_count = 4
+add_health = 1.0
+
+[[boss]]
+key = "abomination"
+name = "Gutrender"
+display_id = 1061
+health = 330
+damage = [24, 32]
+attack_secs = 1.4
+speed = 4.5
+scale = 2.2
+creature_type = 6
+rank = 3
+aggro_radius = 20.0
+hub_damage = 3.0
+first_wave = 10
+weight = 1.0
+xp = 15.0
+abilities = ["bile", "crushing_slam", "bile_spew"]
+phase_adds = "plague_bloat"
+phase_add_count = 2
+add_health = 1.0
+
+[[boss]]
+key = "gargoyle_matriarch"
+name = "Matriarch Vesh"
+display_id = 7616
+health = 300
+damage = [22, 30]
+attack_secs = 1.0
+speed = 6.0
+scale = 1.0
+creature_type = 6
+rank = 3
+aggro_radius = 20.0
+hub_damage = 4.0
+first_wave = 15
+weight = 1.0
+xp = 15.0
+abilities = ["stone_rain", "wing_slam", "dive_bomb"]
+phase_adds = "gargoyle"
+phase_add_count = 4
+add_health = 1.0
+
+[[boss]]
+key = "lich"
+name = "Archlich Morvane"
+display_id = 7919
+health = 360
+damage = [26, 35]
+attack_secs = 1.1
+speed = 4.0
+scale = 1.5
+creature_type = 6
+rank = 3
+aggro_radius = 25.0
+hub_damage = 5.0
+first_wave = 20
+weight = 1.0
+xp = 15.0
+abilities = ["frost_tomb", "death_nova", "frost_ring"]
+phase_adds = "bonecaster"
+phase_add_count = 3
+add_health = 1.0
+
+# Abilities bosses and elites cast. Each one warns first: a marker on the ground, the caster
+# standing still to cast, and a warning on the screens of the players in danger; then it lands.
+# kind "slam" hits everyone within `radius` of the caster; "pool" drops a patch under up to
+# `targets` players that hurts every second for `duration` seconds. `damage` is a multiple of one
+# of the caster's average melee hits (a pool: every second). Spells name the cast, draw the marker
+# (`telegraph`) and the landing (`impact`).
+# The one strike that hurts by a share of health: a Plague Butcher's long, well-marked cleave.
+[[ability]]
+key = "butcher_cleave"
+name = "Butcher's Cleave"
+kind = "slam"
+cast_secs = 2.5
+radius = 8.0
+damage = 6.0
+health_share = 0.4
+cooldown = 14.0
+first_after = 4.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+warn = "Butcher's Cleave: get out, it takes 40% of your health!"
+
+[[ability]]
+key = "crushing_slam"
+name = "Crushing Slam"
+kind = "slam"
+cast_secs = 2.0
+radius = 7.0
+damage = 5.0
+cooldown = 12.0
+first_after = 3.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+warn = "Crushing Slam: step away!"
+
+[[ability]]
+key = "bone_storm"
+name = "Bone Storm"
+kind = "slam"
+cast_secs = 2.5
+radius = 11.0
+damage = 8.0
+cooldown = 14.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+warn = "Bone Storm: get away from the Bonelord!"
+
+[[ability]]
+key = "grave_spikes"
+name = "Grave Spikes"
+kind = "pool"
+cast_secs = 1.8
+radius = 5.0
+damage = 1.8
+duration = 5.0
+targets = 2
+cooldown = 11.0
+first_after = 7.0
+spell = 5740
+telegraph = 5740
+school = 5
+warn = "Grave Spikes under you: move!"
+
+[[ability]]
+key = "bile"
+name = "Putrid Bile"
+kind = "pool"
+cast_secs = 1.8
+radius = 5.0
+damage = 1.8
+duration = 6.0
+targets = 2
+cooldown = 10.0
+spell = 5740
+telegraph = 5740
+school = 3
+slow = 0.4
+warn = "Putrid Bile under you: move!"
+
+[[ability]]
+key = "stone_rain"
+name = "Stone Rain"
+kind = "pool"
+cast_secs = 2.0
+radius = 5.0
+damage = 1.6
+duration = 5.0
+targets = 3
+cooldown = 10.0
+spell = 1510
+telegraph = 1510
+warn = "Stone Rain under you: move!"
+
+[[ability]]
+key = "wing_slam"
+name = "Wing Slam"
+kind = "slam"
+cast_secs = 1.8
+radius = 9.0
+damage = 7.0
+cooldown = 13.0
+first_after = 6.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+warn = "Wing Slam: get clear of the Matriarch!"
+
+[[ability]]
+key = "frost_tomb"
+name = "Frost Tomb"
+kind = "pool"
+cast_secs = 2.2
+radius = 6.0
+damage = 2.0
+duration = 5.0
+targets = 4
+cooldown = 12.0
+spell = 10
+telegraph = 10
+school = 4
+slow = 0.5
+warn = "Frost Tomb under you: move!"
+
+[[ability]]
+key = "death_nova"
+name = "Death Nova"
+kind = "slam"
+cast_secs = 3.0
+radius = 14.0
+damage = 10.0
+cooldown = 20.0
+first_after = 9.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+school = 5
+warn = "Death Nova: run from the Archlich!"
+
+# Lines and rings: a row of marks to step out of sideways, and a ring of marks that is safe
+# only inside, by the boss's feet. With a slam (run out) a ring (run in) makes a boss a dance.
+[[ability]]
+key = "bone_spears"
+name = "Bone Spears"
+kind = "line"
+cast_secs = 1.8
+radius = 3.0
+length = 32.0
+damage = 4.0
+cooldown = 9.0
+first_after = 4.0
+spell = 1510
+telegraph = 1510
+warn = "Bone Spears: step out of the line!"
+
+[[ability]]
+key = "bile_spew"
+name = "Bile Spew"
+kind = "line"
+cast_secs = 1.8
+radius = 3.5
+length = 28.0
+damage = 1.4
+duration = 4.0
+cooldown = 11.0
+first_after = 5.0
+spell = 5740
+telegraph = 5740
+school = 3
+slow = 0.4
+warn = "Bile Spew: step out of the line!"
+
+[[ability]]
+key = "dive_bomb"
+name = "Dive Bomb"
+kind = "line"
+cast_secs = 1.6
+radius = 3.5
+length = 36.0
+damage = 4.5
+cooldown = 10.0
+first_after = 4.0
+spell = 2120
+telegraph = 2120
+impact = 6343
+warn = "Dive Bomb: step out of the line!"
+
+[[ability]]
+key = "frost_ring"
+name = "Frost Ring"
+kind = "ring"
+cast_secs = 2.6
+radius = 5.5
+ring = 12.0
+damage = 7.0
+cooldown = 20.0
+first_after = 16.0
+spell = 10
+telegraph = 10
+school = 4
+slow = 0.5
+warn = "Frost Ring: get in close to the Archlich!"
+
+# --- what ordinary enemies throw at you: small marked circles to step out of -----------------
+# kind "pool" with a short duration is a one-off strike where the marker stood.
+
+[[ability]]
+key = "ghoul_pounce"
+name = "Pounce"
+kind = "pool"
+cast_secs = 1.3
+radius = 3.5
+damage = 2.2
+duration = 0.4
+targets = 1
+cooldown = 9.0
+first_after = 2.0
+spell = 2120
+telegraph = 2120
+warn = "A ghoul pounces at you: step aside!"
+
+[[ability]]
+key = "gargoyle_dive"
+name = "Dive"
+kind = "pool"
+cast_secs = 1.4
+radius = 4.0
+damage = 2.4
+duration = 0.4
+targets = 1
+cooldown = 10.0
+first_after = 3.0
+spell = 2120
+telegraph = 2120
+warn = "A gargoyle dives at you: move!"
+
+[[ability]]
+key = "blight_splash"
+name = "Blight Splash"
+kind = "pool"
+cast_secs = 1.6
+radius = 4.0
+damage = 0.8
+duration = 5.0
+targets = 1
+cooldown = 13.0
+first_after = 4.0
+spell = 5740
+telegraph = 5740
+school = 3
+slow = 0.3
+warn = "Blight under you: get out!"
+
+[[ability]]
+key = "web_spray"
+name = "Web Spray"
+kind = "pool"
+cast_secs = 1.6
+radius = 4.5
+damage = 0.5
+duration = 5.0
+targets = 1
+cooldown = 12.0
+first_after = 3.0
+spell = 10
+telegraph = 10
+school = 3
+slow = 0.6
+warn = "Webs under you: get out!"
+
+[[ability]]
+key = "cave_in"
+name = "Cave-In"
+kind = "pool"
+cast_secs = 1.8
+radius = 4.0
+damage = 2.6
+duration = 0.4
+targets = 1
+cooldown = 12.0
+first_after = 4.0
+spell = 1510
+telegraph = 1510
+warn = "The ground gives way under you: move!"
+
+[[ability]]
+key = "wail"
+name = "Wail"
+kind = "slam"
+cast_secs = 1.5
+radius = 6.0
+damage = 1.8
+cooldown = 11.0
+first_after = 3.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+school = 5
+warn = "A banshee wails: get clear!"
+
+[[ability]]
+key = "axe_throw"
+name = "Axe Throw"
+kind = "pool"
+cast_secs = 1.2
+radius = 3.0
+damage = 2.0
+duration = 0.4
+targets = 1
+cooldown = 8.0
+first_after = 2.0
+spell = 2120
+telegraph = 2120
+warn = "An axe is coming: step aside!"
+
+[[ability]]
+key = "root_slam"
+name = "Root Slam"
+kind = "slam"
+cast_secs = 2.0
+radius = 7.0
+damage = 2.5
+cooldown = 13.0
+first_after = 3.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+slow = 0.5
+warn = "Roots burst from the ground: get clear!"
+
+[[ability]]
+key = "trample"
+name = "Trample"
+kind = "line"
+cast_secs = 1.4
+radius = 3.0
+length = 22.0
+damage = 2.2
+cooldown = 9.0
+first_after = 2.0
+spell = 2120
+telegraph = 2120
+warn = "A charger is about to run you down: step aside!"
+
+[[ability]]
+key = "shadow_volley"
+name = "Shadow Volley"
+kind = "pool"
+cast_secs = 1.8
+radius = 3.5
+damage = 1.8
+duration = 0.4
+targets = 2
+cooldown = 11.0
+first_after = 4.0
+spell = 5740
+telegraph = 5740
+school = 5
+warn = "Shadow bolts are falling on you: move!"
+
+[[ability]]
+key = "quake"
+name = "Quake"
+kind = "slam"
+cast_secs = 2.2
+radius = 8.0
+damage = 3.0
+cooldown = 14.0
+first_after = 4.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+warn = "The Siegebreaker stamps: get clear!"
+
+[[ability]]
+key = "bloat_burst"
+name = "Burst"
+kind = "slam"
+cast_secs = 2.2
+radius = 6.5
+damage = 7.0
+cooldown = 99.0
+first_after = 0.0
+spell = 16914
+telegraph = 16914
+impact = 6343
+school = 3
+suicide = true
+warn = "A bloat is about to burst: get away from it!"
+
+# The Ancient's defences, bought with gold at the Ancient (right-click it). They stand in the world
+# around it: Treant Protectors hurl bolts at enemies in reach, Healing Springs heal everyone near
+# them (and the Ancient a little), Basin Defenders fight at its feet. Fortifying adds
+# upgrade_bonus to all their damage and healing per rank. Costs are listed one per building.
+# Damage is a share of a normal enemy's health this wave (reference_health, scaled like enemies).
+# The hunter's pet (a wolf): a bite's share of the hunter's hit every 2 seconds, its health as
+# a share of the hunter's, seconds to return after it falls, run speed, look.
+[pet]
+damage = 0.45
+health = 0.7
+respawn = 12
+speed = 8.0
+display = 780
+scale = 1.0
+name = "Wolf"
+
+[defenses]
+reference_health = 300
+protector_costs = [50, 100, 170, 260]
+spring_costs = [80, 180]
+defender_costs = [30, 50, 75, 105, 140, 180]
+protector_ring = 11.0
+spring_ring = 9.0
+protector_range = 32.0
+protector_secs = 1.6
+protector_damage = 0.06
+protector_spell = 5176
+protector_display = 1921
+protector_scale = 0.6
+spring_radius = 14.0
+spring_heal = 0.025
+spring_hub_heal = 0.0015
+spring_spell = 5394
+spring_display = 2030
+spring_scale = 1.6
+defender_damage = 0.08
+defender_display = 164
+# The longsword they swing (an item display): the guard model has no unarmed attack.
+defender_weapon = 1928
+upgrade_cost = 120
+upgrade_growth = 1.5
+upgrade_bonus = 0.2
+# Defences and the Ancient's upgrades are shared: each hero past the first adds this share to
+# their price (x2.5 for four), as every hero earns gold from every kill.
+party_price = 0.5
+# Enemies attack defences they pass within `aggro` yards of. Toughness is in normal-enemy
+# healths at the current wave; everything standing is mended between waves.
+protector_health = 9.0
+spring_health = 12.0
+defender_health = 6.0
+aggro = 9.0
+# A defence holds at most this many enemies at once: more than that and the rest march on past
+# it, to the next defence, a hero or the Ancient (one soldier can't hold a whole wave). Each
+# Promotion lets a defender hold one more.
+hold = 4
+# Riflemen shoot from behind the line; clerics heal heroes and soldiers near them.
+rifleman_costs = [60, 90, 130, 180]
+rifleman_damage = 0.07
+rifleman_range = 26.0
+rifleman_health = 3.5
+rifleman_display = 1406
+rifleman_weapon = 2409
+cleric_costs = [90, 160]
+cleric_heal = 0.05
+cleric_range = 25.0
+cleric_health = 4.0
+cleric_display = 1616
+cleric_weapon = 1161
+# The defenders' ranks: Promotion raises them all, a new look and a better sword and shield each.
+[[defenses.ranks]]
+name = "Basin Defender"
+display = 164
+weapon = 1928
+
+[[defenses.ranks]]
+name = "Basin Footman"
+display = 1769
+weapon = 1928
+shield = 2331
+
+[[defenses.ranks]]
+name = "Knight of the Basin"
+display = 2042
+weapon = 2806
+shield = 18533
+
+[[defenses.ranks]]
+name = "Stormwind Guard"
+display = 1984
+weapon = 25053
+shield = 31733
+
+# Sprint pick-ups: wind totems along each lane. Walk into one for a burst of speed.
+[sprint]
+# Where along each lane, from the spawn end (0) to the hub (1).
+along = [0.3, 0.68]
+display_id = 4590
+scale = 1.3
+speed = 0.7
+secs = 8.0
+respawn = 25.0
+reach = 3.0
+
+# Escalation affixes: one joins at each Escalation, in a random order.
+# kind: bursting, bolstering, raging, swift, frostbound, necrotic.
+[[affix]]
+key = "swift"
+name = "Swift"
+text = "Enemies move 25% faster."
+spell = 2983
+
+[[affix]]
+key = "raging"
+name = "Raging"
+text = "Enemies below 30% health deal 50% more damage."
+spell = 12328
+
+[[affix]]
+key = "bursting"
+name = "Bursting"
+text = "Enemies burst on death, burning everyone within 5 yards for 10% of their health."
+spell = 1949
+
+[[affix]]
+key = "bolstering"
+name = "Bolstering"
+text = "When an enemy dies, others within 10 yards gain 15% health and damage (up to three times)."
+spell = 6673
+
+[[affix]]
+key = "frostbound"
+name = "Frostbound"
+text = "Enemy hits slow you by 20% for 2 seconds."
+spell = 116
+
+[[affix]]
+key = "necrotic"
+name = "Necrotic"
+text = "Enemy hits reduce healing on you by 5% per stack, up to 50%."
+spell = 172
+
+# Renown: earned at the end of every run and kept between runs, per player name. It never adds
+# raw power, only ways to bend the luck of card offers.
+[[renown]]
+key = "reroll"
+name = "Reroll"
+text = "One more card reroll each run."
+costs = [20, 50, 100]
+
+[[renown]]
+key = "banish"
+name = "Banish"
+text = "One more banish each run: remove a card from your offers for the rest of the run."
+costs = [30, 70, 140]
+
+[[renown]]
+key = "skip"
+name = "Skip"
+text = "One more skip each run: pass on an offer for gold."
+costs = [15, 40]
+
+[[renown]]
+key = "wider"
+name = "Wider Choice"
+text = "Card offers show 4 cards instead of 3."
+costs = [150]
+
+[[renown]]
+key = "lock"
+name = "Card Lock"
+text = "Lock one card in an offer to see it again next time."
+costs = [80]
+
+[[renown]]
+key = "head_start"
+name = "Head Start"
+text = "A second starting ability pick before the first wave."
+costs = [60]

@@ -1,0 +1,27 @@
+[package]
+name = "htl-server"
+description = "Basin Battle game server: a 1.12.1 login and world server that runs the wave-defense game"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "htl-server"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+crossbeam-channel.workspace = true
+rand.workspace = true
+serde.workspace = true
+toml.workspace = true
+wow_srp.workspace = true
+benilla-protocol.workspace = true
+htl-sim = { path = "../htl-sim" }
+htl-map = { path = "../htl-map" }
+htl-survival = { path = "../htl-survival" }
+
+[dev-dependencies]
+anyhow.workspace = true
+benilla-srp = { git = "https://github.com/samwhosung/benilla", rev = "c23d0163d5efa1ae39e4748877fe4ba831202848" }
+image = { version = "0.25", default-features = false, features = ["png"] }

@@ -1,0 +1,757 @@
+diff --git a/crates/benilla-app/src/camera_shake.rs b/crates/benilla-app/src/camera_shake.rs
+index 17c6f05b..1fc256df 100644
+--- a/crates/benilla-app/src/camera_shake.rs
++++ b/crates/benilla-app/src/camera_shake.rs
+@@ -74,6 +74,11 @@ impl CameraShakes {
+         });
+     }
+ 
++    /// Enqueue a shake made up on the spot (Basin Battle's action animation).
++    pub(crate) fn add_custom(&mut self, row: CameraShake, pos: Vec3, now: f32) {
++        self.add(row, pos, now);
++    }
++
+     /// Enqueue a `SpellEffectCameraShakes` group (`0x6ecb40`): its three slots in order, zeros
+     /// skipped, a preset the table lacks dropped (`0x511d40`'s bounds check). A slot repeated
+     /// (group 4 is `15 · 14 · 15`) enqueues twice and the copy loses the tie-break.
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index 90893c4f..0a94f0f9 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -29,6 +29,11 @@ pub(crate) use twist::{wrap_pi, BodyTwist};
+ /// (`0x683dd0`); a parked unit's events fire only for a `MORE_AUDIBLE` template.
+ mod lod;
+ 
++/// Basin Battle's action animation: timed clips, trails, hit-stop, shake, the roll, the aim pitch
++/// and the camera's unit collision, all driven by an add-on.
++mod action;
++pub(crate) use action::unit_hit;
++
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+ /// paperdoll shows); behaviour reads `armed_main`/`armed_off`, which apply the disarm ladder.
+ #[derive(Component, Clone, Copy, Default, PartialEq, Eq)]
+@@ -1090,6 +1095,7 @@ impl Plugin for CreatureAnimPlugin {
+     fn build(&self, app: &mut App) {
+         net::register(app);
+         twist::plugin(app);
++        action::plugin(app);
+         lod::plugin(app);
+         breath::register(app);
+         // The breath classifier runs at its own 10 s cadence, outside the chain.
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+new file mode 100644
+index 00000000..097c4de8
+--- /dev/null
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -0,0 +1,453 @@
++//! Basin Battle's action animation (not in 1.12.1), driven by an add-on through
++//! [`benilla_ui::action_combat`]: any clip as a one-shot timed to land its impact keyframe when
++//! the server's blow does, a weapon trail over it, hit-stop (the animation held a moment as a blow
++//! lands), camera shake, a procedural roll over a dodge's dash, the upper body following the aim,
++//! and a camera that stops short of other units instead of entering them. Nothing here runs until
++//! an add-on calls in, so the stock client is unchanged.
++
++use std::f32::consts::TAU;
++use std::sync::Mutex;
++
++use benilla_assets::ModelAnimations;
++use benilla_ui::action_combat::{self, ActionCall};
++use benilla_world::rig_anim::RigPose;
++use bevy::animation::transition::AnimationTransitions;
++use bevy::prelude::*;
++
++use super::select::Mode;
++use super::{find_resolved, AnimData, AnimDriver, BodyTwist, EmoteAnim, PlaySeq};
++use crate::net::{GuidIndex, NetEntity, SelfPlayer};
++
++/// The impact keyframes an attack clip authors (`$AH0`..`$AH3`, `$CAH`), what a blow's timing
++/// is fitted to.
++const IMPACT_TAGS: [&[u8; 4]; 5] = [b"$AH0", b"$AH1", b"$AH2", b"$AH3", b"$CAH"];
++/// A clip with no impact keyframe lands about here.
++const IMPACT_SHARE: f32 = 0.4;
++/// How far a clip's speed is bent to fit its timing.
++const RATE_RANGE: (f32, f32) = (0.35, 3.0);
++/// How long a timed rate waits for its clip to start (a combat clip already playing defers it).
++const RATE_WAIT: f32 = 1.5;
++/// The roll's pivot above the feet, as a share of the unit's height (about the hips).
++const ROLL_PIVOT: f32 = 0.9;
++/// How far the body must have moved before the roll knows which way it tumbles.
++const ROLL_DIRECTION_AFTER: f32 = 0.15;
++/// A roll asked for again this soon after the last began is the same dodge.
++const ROLL_ECHO: f32 = 0.25;
++/// The upper body follows the aim this much, up to this far.
++const AIM_PITCH_SHARE: f32 = 0.8;
++const AIM_PITCH_MAX: f32 = 0.7;
++/// The camera's unit collision: a body is this wide and tall, and the camera keeps this far off.
++const BODY_RADIUS: f32 = 0.55;
++const BODY_HEIGHT: f32 = 2.1;
++const BODY_CLEARANCE: f32 = 0.3;
++/// Units within this of the hero can block the camera.
++const OCCLUDER_RANGE: f32 = 20.0;
++
++/// A clip timed to its fit: this rate while it plays, for a little while.
++#[derive(Component)]
++pub(crate) struct ActionRate {
++    anim: u16,
++    rate: f32,
++    until: f32,
++}
++
++/// The animation held still until then.
++#[derive(Component)]
++pub(crate) struct HitStopped {
++    until: f32,
++    paused: bool,
++}
++
++/// A roll in progress: when it started, how long it lasts, where the body was, and once it has
++/// moved, the world axis it tumbles about. Each root bone keeps its animated pose (`base`) and
++/// what the roll last wrote over it.
++#[derive(Component)]
++pub(crate) struct ActionRoll {
++    start: f32,
++    secs: f32,
++    from: Vec3,
++    axis: Option<Vec3>,
++    bones: Vec<(usize, Transform, Transform)>,
++}
++
++/// Other units near the hero, as (feet, radius, height), for the camera's unit collision.
++static OCCLUDERS: Mutex<Vec<(Vec3, f32, f32)>> = Mutex::new(Vec::new());
++
++/// The units that could block the camera this frame.
++pub(crate) fn occluders() -> Vec<(Vec3, f32, f32)> {
++    OCCLUDERS.lock().map(|v| v.clone()).unwrap_or_default()
++}
++
++/// How far along a camera boom from `head` (direction `dir`, length `len`) another unit's body
++/// starts, so the camera can stop short of it; `None` when the way is clear. A body the head is
++/// already inside (a clinch) is passed through.
++pub(crate) fn unit_hit(head: Vec3, dir: Vec3, len: f32) -> Option<f32> {
++    let inside = |p: Vec3, feet: Vec3, r: f32, h: f32| {
++        let flat = Vec2::new(p.x - feet.x, p.z - feet.z).length();
++        flat < r && p.y > feet.y - 0.2 && p.y < feet.y + h
++    };
++    let mut best: Option<f32> = None;
++    for (feet, r, h) in occluders() {
++        if inside(head, feet, r + 0.1, h) {
++            continue;
++        }
++        let mut s = 0.4;
++        while s < len {
++            if inside(head + dir * s, feet, r, h) {
++                let at = (s - BODY_CLEARANCE).max(0.3);
++                best = Some(best.map_or(at, |b: f32| b.min(at)));
++                break;
++            }
++            s += 0.08;
++        }
++    }
++    best
++}
++
++/// A unit named by a script: `"player"`, or a guid in hex (`0x...`) or decimal.
++fn resolve(name: &str, me: Option<Entity>, index: &GuidIndex) -> Option<Entity> {
++    if name.eq_ignore_ascii_case("player") {
++        return me;
++    }
++    let guid = match name.strip_prefix("0x").or_else(|| name.strip_prefix("0X")) {
++        Some(hex) => u64::from_str_radix(hex, 16).ok()?,
++        None => name.parse::<u64>().ok()?,
++    };
++    index.0.get(&guid).copied()
++}
++
++/// When a clip's blow lands: its first impact keyframe, else a share of its length.
++fn impact_time(clip: &benilla_assets::AnimClip) -> f32 {
++    clip.events
++        .iter()
++        .find(|e| IMPACT_TAGS.iter().any(|t| **t == e.ident))
++        .map(|e| e.time)
++        .filter(|t| *t > 0.0)
++        .unwrap_or(clip.duration * IMPACT_SHARE)
++}
++
++/// Apply the scripts' calls: clips (with their rate and trail), hit-stops, shakes and rolls.
++/// Before the driver, so a clip asked for this frame plays this frame.
++#[allow(clippy::too_many_arguments)]
++pub(super) fn drain_action_calls(
++    mut commands: Commands,
++    time: Res<Time>,
++    index: Option<Res<GuidIndex>>,
++    me: Query<Entity, With<SelfPlayer>>,
++    units: Query<(&ModelAnimations, &Transform)>,
++    anim_data: Option<Res<AnimData>>,
++    mut play_seq: ResMut<PlaySeq>,
++    mut emotes: MessageWriter<EmoteAnim>,
++    mut trails: MessageWriter<crate::weapon_trail::TrailArm>,
++    mut shakes: ResMut<crate::camera_shake::CameraShakes>,
++    mut rolling: Query<&mut ActionRoll>,
++) {
++    let calls = action_combat::take_calls();
++    if calls.is_empty() {
++        return;
++    }
++    let now = time.elapsed_secs();
++    let me = me.single().ok();
++    let empty = GuidIndex::default();
++    let index = index.as_deref().unwrap_or(&empty);
++    let catalog = anim_data.as_deref().map(|d| &d.0);
++    for call in calls {
++        match call {
++            ActionCall::Anim { unit, anim, impact, trail } => {
++                let Some(entity) = resolve(&unit, me, index) else { continue };
++                let Ok((anims, _)) = units.get(entity) else { continue };
++                let Some(clip) = find_resolved(anims, anim, catalog) else { continue };
++                emotes.write(EmoteAnim { entity, anim_id: anim, seq: play_seq.next(), via_player: false });
++                if impact > 0.0 {
++                    let rate = (impact_time(clip) / impact).clamp(RATE_RANGE.0, RATE_RANGE.1);
++                    commands.entity(entity).try_insert(ActionRate { anim, rate, until: now + RATE_WAIT });
++                }
++                if let Some((packed, duration_ms)) = trail {
++                    trails.write(crate::weapon_trail::TrailArm {
++                        entity,
++                        trail: benilla_formats::TrailProc { packed, duration_ms },
++                    });
++                }
++            }
++            ActionCall::HitStop { unit, secs } => {
++                if let Some(entity) = resolve(&unit, me, index) {
++                    commands.entity(entity).try_insert(HitStopped { until: now + secs, paused: false });
++                }
++            }
++            ActionCall::Shake { inches, secs, frequency } => {
++                let at = me.and_then(|e| units.get(e).ok()).map_or(Vec3::ZERO, |(_, t)| t.translation);
++                // Up and down, and a little side to side, dying away.
++                for (direction, share) in [(2, 1.0), (1, 0.45)] {
++                    shakes.add_custom(
++                        benilla_formats::CameraShake {
++                            id: 0,
++                            shake_type: 1,
++                            direction,
++                            amplitude: inches * share,
++                            frequency: frequency * if direction == 1 { 0.8 } else { 1.0 },
++                            duration: secs,
++                            phase: 0.0,
++                            coefficient: 4.0 / secs.max(0.05),
++                        },
++                        at,
++                        now,
++                    );
++                }
++            }
++            ActionCall::Roll { unit, secs } => {
++                let Some(entity) = resolve(&unit, me, index) else { continue };
++                let Ok((_, t)) = units.get(entity) else { continue };
++                if let Ok(mut roll) = rolling.get_mut(entity) {
++                    // The same dodge told twice (the prediction, then the server): one tumble.
++                    if now - roll.start < ROLL_ECHO {
++                        continue;
++                    }
++                    // A new dodge before the last one finished starts over, keeping the bones'
++                    // animated poses: taking the half-turned body as the pose would leave it
++                    // turned, hanging in the air, once the roll ended.
++                    roll.start = now;
++                    roll.secs = secs;
++                    roll.from = t.translation;
++                    roll.axis = None;
++                    continue;
++                }
++                commands.entity(entity).try_insert(ActionRoll { start: now, secs, from: t.translation, axis: None, bones: Vec::new() });
++            }
++        }
++    }
++}
++
++/// After the driver: a timed clip runs at its fitted rate, and a hit-stop holds the clocks.
++pub(super) fn apply_action_rates(
++    mut commands: Commands,
++    time: Res<Time>,
++    mut units: Query<(
++        Entity,
++        &AnimDriver,
++        &mut AnimationPlayer,
++        &AnimationTransitions,
++        Option<&ActionRate>,
++        Option<&mut HitStopped>,
++        Has<crate::aura_visual::AnimRateFreeze>,
++    )>,
++) {
++    let now = time.elapsed_secs();
++    for (entity, drv, mut player, tr, rate, stop, aura_frozen) in &mut units {
++        if let Some(r) = rate {
++            let node = match drv.overlay {
++                Some(ov) if ov.id == r.anim => Some(ov.node),
++                _ if matches!(drv.mode, Mode::Swing { id, .. } if id == r.anim) => tr.get_main_animation(),
++                _ => None,
++            };
++            if let Some(active) = node.and_then(|n| player.animation_mut(n)) {
++                if active.speed() != r.rate && active.speed() != 0.0 {
++                    active.set_speed(r.rate);
++                }
++            }
++            if now >= r.until {
++                commands.entity(entity).try_remove::<ActionRate>();
++            }
++        }
++        if let Some(mut stop) = stop {
++            if now < stop.until {
++                for (_, anim) in player.playing_animations_mut() {
++                    anim.pause();
++                }
++                stop.paused = true;
++            } else {
++                // The aura freeze owns the clocks while it holds them.
++                if stop.paused && !aura_frozen {
++                    for (_, anim) in player.playing_animations_mut() {
++                        anim.resume();
++                    }
++                }
++                commands.entity(entity).try_remove::<HitStopped>();
++            }
++        }
++    }
++}
++
++/// The upper body follows the aiming camera's pitch (our own hero, while aiming).
++pub(super) fn aim_pitch(time: Res<Time>, mut me: Query<&mut BodyTwist, With<SelfPlayer>>) {
++    let Ok(mut twist) = me.single_mut() else { return };
++    let want = if action_combat::aim_camera() {
++        (action_combat::view_elevation() * AIM_PITCH_SHARE).clamp(-AIM_PITCH_MAX, AIM_PITCH_MAX)
++    } else {
++        0.0
++    };
++    let k = 1.0 - (-14.0 * time.delta_secs()).exp();
++    let next = twist.pitch + (want - twist.pitch) * k;
++    twist.pitch = if (next - want).abs() < 1.0e-3 { want } else { next };
++}
++
++/// The roll, in the pose post-pass: every root bone turns head over heels about the hips, along
++/// the way the body is moving, over the roll's time.
++pub(super) fn apply_action_roll(
++    mut commands: Commands,
++    time: Res<Time>,
++    mut units: Query<(Entity, &mut ActionRoll, &Transform, Option<&NetEntity>)>,
++    mut rigs: Query<&mut RigPose>,
++    globals: Query<&GlobalTransform>,
++) {
++    let now = time.elapsed_secs();
++    for (entity, mut roll, t, net) in &mut units {
++        let Ok(mut rig) = rigs.get_mut(entity) else {
++            commands.entity(entity).try_remove::<ActionRoll>();
++            continue;
++        };
++        let roll = &mut *roll;
++        let done = (now - roll.start) / roll.secs.max(0.05);
++        if done >= 1.0 {
++            // Back to the animated pose.
++            for (b, base, last) in roll.bones.drain(..) {
++                if let Some(cur) = rig.locals.get_mut(b) {
++                    if *cur == last {
++                        *cur = base;
++                        rig.pose_dirty = true;
++                    }
++                }
++            }
++            commands.entity(entity).try_remove::<ActionRoll>();
++            continue;
++        }
++        if roll.axis.is_none() {
++            let moved = Vec3::new(t.translation.x - roll.from.x, 0.0, t.translation.z - roll.from.z);
++            if moved.length() >= ROLL_DIRECTION_AFTER {
++                roll.axis = Some(Vec3::Y.cross(moved.normalize()));
++            }
++        }
++        let Some(axis) = roll.axis else {
++            // Not moving (yet): upright, the animated pose back on any bone still turned.
++            for (b, base, last) in roll.bones.iter_mut() {
++                if let Some(cur) = rig.locals.get_mut(*b) {
++                    if *cur == *last && *cur != *base {
++                        *cur = *base;
++                        *last = *base;
++                        rig.pose_dirty = true;
++                    }
++                }
++            }
++            continue;
++        };
++        let Ok(frame) = globals.get(rig.joints_root) else { continue };
++        // Eased: slow in, fast through the tumble, slow out.
++        let e = done * done * (3.0 - 2.0 * done);
++        let angle = TAU * e;
++        let scale = net.map_or(1.0, |n| n.scale.max(0.1));
++        // The pivot from the model frame itself (its feet), so the frame and the pivot agree even
++        // as the dash carries the body several inches a frame.
++        let pivot = frame.translation() + Vec3::Y * ROLL_PIVOT * scale;
++        let frame = frame.affine();
++        let turn = frame.inverse()
++            * bevy::math::Affine3A::from_translation(pivot)
++            * bevy::math::Affine3A::from_quat(Quat::from_axis_angle(axis, angle))
++            * bevy::math::Affine3A::from_translation(-pivot)
++            * frame;
++        let roots: Vec<usize> = (0..rig.locals.len()).filter(|b| rig.parents.get(*b).copied().unwrap_or(0) < 0).collect();
++        for b in roots {
++            let Some(cur) = rig.locals.get(b).copied() else { continue };
++            let slot = match roll.bones.iter().position(|(x, ..)| *x == b) {
++                Some(i) => i,
++                None => {
++                    roll.bones.push((b, cur, cur));
++                    roll.bones.len() - 1
++                }
++            };
++            // A bone the animation re-keyed this frame is a new base; one still holding our write
++            // keeps the old, so the turn never compounds.
++            let (_, base, last) = roll.bones[slot];
++            let base = if cur == last { base } else { cur };
++            let (_, rot, pos) = (turn * bevy::math::Affine3A::from_scale_rotation_translation(base.scale, base.rotation, base.translation))
++                .to_scale_rotation_translation();
++            let out = Transform { translation: pos, rotation: rot.normalize(), scale: base.scale };
++            roll.bones[slot] = (b, base, out);
++            if out != cur {
++                rig.locals[b] = out;
++                rig.pose_dirty = true;
++            }
++        }
++    }
++}
++
++/// Gather the units that could block the camera (only while an add-on asks for it).
++pub(super) fn collect_occluders(
++    me: Query<&Transform, With<SelfPlayer>>,
++    units: Query<(&Transform, &NetEntity), Without<SelfPlayer>>,
++) {
++    let mut out = Vec::new();
++    if action_combat::unit_collision() {
++        if let Ok(here) = me.single() {
++            for (t, n) in &units {
++                let kind = n.kind;
++                if !matches!(kind, benilla_protocol::EntityKind::Unit | benilla_protocol::EntityKind::Player) {
++                    continue;
++                }
++                if t.translation.distance_squared(here.translation) > OCCLUDER_RANGE * OCCLUDER_RANGE {
++                    continue;
++                }
++                let s = n.scale.max(0.2);
++                out.push((t.translation, BODY_RADIUS * s, BODY_HEIGHT * s));
++            }
++        }
++    }
++    if let Ok(mut v) = OCCLUDERS.lock() {
++        *v = out;
++    }
++}
++
++pub(super) fn plugin(app: &mut App) {
++    app.add_systems(
++        Update,
++        (
++            drain_action_calls
++                .before(super::drive_animations)
++                .after(benilla_world::schedule::WorldStage::Net)
++                .after(crate::vm_pass::VmPass::End)
++                .before(crate::weapon_trail::fire_weapon_trails),
++            apply_action_rates
++                .after(super::drive_animations)
++                .after(crate::aura_visual::apply_aura_anim_rate),
++            aim_pitch,
++            collect_occluders,
++        ),
++    )
++    .add_systems(
++        PostUpdate,
++        apply_action_roll
++            .in_set(benilla_world::rig_anim::PosePost)
++            .after(super::twist::apply_body_twist),
++    );
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_camera_stops_short_of_a_body_on_its_boom_and_passes_one_it_starts_in() {
++        let head = Vec3::new(0.0, 1.8, 0.0);
++        let dir = Vec3::new(0.0, 0.0, 1.0);
++        *OCCLUDERS.lock().unwrap() = vec![(Vec3::new(0.0, 0.0, 3.0), 0.55, 2.1)];
++        let hit = unit_hit(head, dir, 6.0).expect("a body in the way");
++        assert!(hit > 2.0 && hit < 2.5, "short of it: {hit}");
++        // Clear to the side.
++        *OCCLUDERS.lock().unwrap() = vec![(Vec3::new(2.0, 0.0, 3.0), 0.55, 2.1)];
++        assert_eq!(unit_hit(head, dir, 6.0), None);
++        // A body the head is inside (a clinch) is passed through.
++        *OCCLUDERS.lock().unwrap() = vec![(Vec3::new(0.2, 0.0, 0.0), 0.55, 2.1)];
++        assert_eq!(unit_hit(head, dir, 6.0), None);
++        OCCLUDERS.lock().unwrap().clear();
++    }
++
++    #[test]
++    fn units_are_named_by_player_or_guid() {
++        let mut index = GuidIndex::default();
++        let e = Entity::from_raw_u32(7).unwrap();
++        index.0.insert(0xF130_0000_0000_0025, e);
++        let me = Entity::from_raw_u32(3).unwrap();
++        assert_eq!(resolve("player", Some(me), &index), Some(me));
++        assert_eq!(resolve("0XF130000000000025", Some(me), &index), Some(e));
++        assert_eq!(resolve("0xf130000000000025", Some(me), &index), Some(e));
++        assert_eq!(resolve("nonsense", Some(me), &index), None);
++    }
++}
+diff --git a/crates/benilla-app/src/creature_anim/twist.rs b/crates/benilla-app/src/creature_anim/twist.rs
+index 37edce6f..16b5f5c5 100644
+--- a/crates/benilla-app/src/creature_anim/twist.rs
++++ b/crates/benilla-app/src/creature_anim/twist.rs
+@@ -11,6 +11,9 @@ use bevy::prelude::*;
+ pub(crate) struct BodyTwist {
+     /// `wrap(aim − rendered root yaw)` in radians; zero while the body faces its aim.
+     pub(crate) yaw_gap: f32,
++    /// Basin Battle's aim pitch (radians, up positive): the spine leans back to look up and
++    /// forward to look down, composed after the yaw twist.
++    pub(crate) pitch: f32,
+     spine: Option<Channel>,
+     head: Option<Channel>,
+ }
+@@ -19,6 +22,7 @@ impl BodyTwist {
+     pub(crate) fn new(spine: Option<u16>, head: Option<u16>) -> Self {
+         Self {
+             yaw_gap: 0.0,
++            pitch: 0.0,
+             spine: spine.map(Channel::new),
+             head: head.map(Channel::new),
+         }
+@@ -87,7 +91,7 @@ pub(super) fn apply_body_twist(
+     // `WOW_NO_TWIST=1` stands the pass down and logs the gap it would have closed.
+     if twist_off() {
+         for (_, t) in &units {
+-            if t.yaw_gap != 0.0 {
++            if t.yaw_gap != 0.0 || t.pitch != 0.0 {
+                 info!(
+                     "twist: STOOD DOWN (WOW_NO_TWIST) — yaw_gap was {:.5} rad",
+                     t.yaw_gap
+@@ -101,8 +105,9 @@ pub(super) fn apply_body_twist(
+             .get(unit)
+             .is_ok_and(|s| s.0.unit_mount_display_id() != 0);
+         let (spine, head) = armed_shares(twist.yaw_gap, mounted);
++        let pitch = if mounted { 0.0 } else { twist.pitch };
+         let twist = &mut *twist;
+-        for (channel, angle) in [(&mut twist.spine, spine), (&mut twist.head, head)] {
++        for (channel, angle, lean) in [(&mut twist.spine, spine, pitch), (&mut twist.head, head, 0.0)] {
+             let Some(ch) = channel else { continue };
+             let bone = ch.bone as usize;
+             let Some((cur, base, out)) = ({
+@@ -110,7 +115,7 @@ pub(super) fn apply_body_twist(
+                 rig.and_then(|rig| {
+                     let cur = rig.locals.get(bone)?.rotation;
+                     let base = if cur == ch.last_out { ch.base } else { cur };
+-                    let out = if angle == 0.0 {
++                    let out = if angle == 0.0 && lean == 0.0 {
+                         base
+                     } else {
+                         // The bone's rotation: its own ancestor chain…
+@@ -154,7 +159,14 @@ pub(super) fn apply_body_twist(
+                             };
+                             e = p;
+                         }
+-                        (base * Quat::from_axis_angle(g.inverse() * Vec3::Y, angle)).normalize()
++                        let inv = g.inverse();
++                        let yawed = base * Quat::from_axis_angle(inv * Vec3::Y, angle);
++                        // The lean about the body's right (+X with the body facing −Z).
++                        if lean == 0.0 {
++                            yawed.normalize()
++                        } else {
++                            (yawed * Quat::from_axis_angle(inv * Vec3::X, lean)).normalize()
++                        }
+                     };
+                     Some((cur, base, out))
+                 })
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index d6a83498..596b298c 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -1332,6 +1332,18 @@ pub(super) fn seat_camera(
+     // `0x7c2c40`, hit at `0x7c2e5f`) with no near floor. That leg is a ray (`0x672170` has no
+     // radius), so `cast_camera` traces water as a ray and solids as a sphere.
+     let hit = collide.cast_camera(head, boom, dynamics.options.water_collision);
++    // Basin Battle: other units' bodies stop the camera too (only while an add-on asks), so it
++    // never ends up inside someone.
++    let hit = if benilla_ui::action_combat::unit_collision() {
++        match crate::creature_anim::unit_hit(head, boom / boom_len, boom_len) {
++            Some(u) => Some(hit.map_or(u, |h| h.min(u))),
++            None => hit,
++        }
++    } else {
++        hit
++    };
++    // The view's elevation, for the aim's upper-body lean.
++    benilla_ui::action_combat::set_view_elevation(cam_fwd.y.clamp(-1.0, 1.0).asin());
+     // The solver's clip verdict (`0x50e570`'s `0x30000`, OR'd into `[cam+0x90]` by the driver):
+     // [`SmartPivot`]'s sixth conjunct, so an unobstructed camera never pivots.
+     rig.clipped = hit.is_some();
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 68f87abc..07b5e324 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -10,7 +10,19 @@
+ //! - `SetAimCamera(on[, distance[, right[, up]]])`: ease the camera in close over the right
+ //!   shoulder (yards back, to the right, and up from the framing pivot), slow the look a little
+ //!   for precision, and keep a left click from running while it's up.
+-//! - `HasActionCombat()`: 1, so an add-on can tell this client from a stock one.
++//! - `HasActionCombat()`: 1 (2 with the calls below), so an add-on can tell this client from a
++//!   stock one.
++//!
++//! The action-animation calls, for a unit named `"player"` or by its guid (`"0xF1300..."`):
++//!
++//! - `PlayUnitAnimation(unit, animId[, impact[, trail[, trailMs]]])`: play any `AnimationData`
++//!   clip the model has as a one-shot, timed so its impact keyframe lands `impact` seconds in
++//!   (its own speed when absent), with a weapon trail (`"AARRGGBB"`) over its swing.
++//! - `HitStop(unit, ms)`: freeze the unit's animation for a moment, the weight of a blow landing.
++//! - `ShakeCamera(inches, seconds[, frequency])`: shake the view.
++//! - `RollUnit(unit, seconds)`: tumble the body head over heels along the way it's moving, over
++//!   a dodge's dash.
++//! - `SetCameraUnitCollision(on)`: the camera stops short of a unit instead of entering it.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -21,6 +33,47 @@ static AIM_CAMERA: AtomicBool = AtomicBool::new(false);
+ static AIM_DISTANCE: AtomicU32 = AtomicU32::new(2.4f32.to_bits());
+ static AIM_RIGHT: AtomicU32 = AtomicU32::new(0.75f32.to_bits());
+ static AIM_UP: AtomicU32 = AtomicU32::new(0.25f32.to_bits());
++static UNIT_COLLISION: AtomicBool = AtomicBool::new(false);
++/// The view's elevation (radians, up positive), written by the camera each frame.
++static VIEW_ELEVATION: AtomicU32 = AtomicU32::new(0);
++
++/// One action-animation call from a script, for the app to apply.
++#[derive(Clone, Debug, PartialEq)]
++pub enum ActionCall {
++    Anim { unit: String, anim: u16, impact: f32, trail: Option<(u32, u32)> },
++    HitStop { unit: String, secs: f32 },
++    Shake { inches: f32, secs: f32, frequency: f32 },
++    Roll { unit: String, secs: f32 },
++}
++
++static CALLS: std::sync::Mutex<Vec<ActionCall>> = std::sync::Mutex::new(Vec::new());
++
++/// The calls made since the last take, in call order.
++pub fn take_calls() -> Vec<ActionCall> {
++    CALLS.lock().map(|mut v| std::mem::take(&mut *v)).unwrap_or_default()
++}
++
++fn push(call: ActionCall) {
++    if let Ok(mut v) = CALLS.lock() {
++        // A runaway script can't grow it without bound.
++        if v.len() < 256 {
++            v.push(call);
++        }
++    }
++}
++
++/// The camera keeps out of other units' bodies.
++pub fn unit_collision() -> bool {
++    UNIT_COLLISION.load(Ordering::Relaxed)
++}
++
++pub fn set_view_elevation(rad: f32) {
++    VIEW_ELEVATION.store(rad.to_bits(), Ordering::Relaxed);
++}
++
++pub fn view_elevation() -> f32 {
++    f32::from_bits(VIEW_ELEVATION.load(Ordering::Relaxed))
++}
+ 
+ /// The left button is the add-on's and the middle button plays the stock left button's part.
+ pub fn action_mouse() -> bool {
+@@ -42,6 +95,30 @@ pub fn aim_shape() -> (f32, f32, f32) {
+ pub fn reset() {
+     ACTION_MOUSE.store(false, Ordering::Relaxed);
+     AIM_CAMERA.store(false, Ordering::Relaxed);
++    UNIT_COLLISION.store(false, Ordering::Relaxed);
++}
++
++fn text(v: Option<&Value>) -> Option<String> {
++    match v? {
++        Value::String(s) => s.to_str().ok().map(|s| s.trim().to_string()),
++        Value::Integer(i) => Some(i.to_string()),
++        Value::Number(n) => Some(format!("{}", *n as i64)),
++        _ => None,
++    }
++}
++
++/// A trail colour: `"AARRGGBB"` (or `"0x..."`), or a number.
++fn colour(v: Option<&Value>) -> Option<u32> {
++    match v? {
++        Value::Integer(i) => u32::try_from(*i).ok(),
++        Value::Number(n) => Some(*n as u32),
++        Value::String(s) => {
++            let s = s.to_str().ok()?;
++            let s = s.trim().trim_start_matches("0x").trim_start_matches("0X");
++            u32::from_str_radix(s, 16).ok()
++        }
++        _ => None,
++    }
+ }
+ 
+ /// A Lua truth as the 1.12 API reads flags: nil, false and 0 are off.
+@@ -93,7 +170,62 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(1))?,
++        lua.create_function(|_, _: MultiValue| Ok(2))?,
++    )?;
++    g.set(
++        "SetCameraUnitCollision",
++        lua.create_function(|_, args: MultiValue| {
++            UNIT_COLLISION.store(truthy(args.front()), Ordering::Relaxed);
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "PlayUnitAnimation",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let (Some(unit), Some(anim)) = (text(v.first()), number(v.get(1), 0.0, 1000.0)) else {
++                return Ok(());
++            };
++            let impact = number(v.get(2), 0.0, 10.0).unwrap_or(0.0);
++            let trail = colour(v.get(3)).map(|c| {
++                let ms = number(v.get(4), 50.0, 3000.0).unwrap_or(600.0) as u32;
++                (c, ms)
++            });
++            push(ActionCall::Anim { unit, anim: anim as u16, impact, trail });
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "HitStop",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(unit), Some(ms)) = (text(v.first()), number(v.get(1), 0.0, 500.0)) {
++                push(ActionCall::HitStop { unit, secs: ms / 1000.0 });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ShakeCamera",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(inches), Some(secs)) = (number(v.first(), 0.0, 40.0), number(v.get(1), 0.0, 3.0)) {
++                let frequency = number(v.get(2), 1.0, 60.0).unwrap_or(18.0);
++                push(ActionCall::Shake { inches, secs, frequency });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "RollUnit",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(unit) = text(v.first()) {
++                let secs = number(v.get(1), 0.15, 2.0).unwrap_or(0.5);
++                push(ActionCall::Roll { unit, secs });
++            }
++            Ok(())
++        })?,
+     )?;
+     Ok(())
+ }

@@ -1,0 +1,305 @@
+# Basin Battle
+
+A co-op roguelike wave-defence game for up to four players, played in the
+[benilla](https://github.com/samwhosung/benilla) World of Warcraft 1.12.1 client. Endless waves of
+undead march on the Ancient of the Basin in the middle of Arathi Basin. Build your Warrior, Priest,
+Mage or Hunter as you go: pick class spells, upgrades and talents that change how they play, gear up from Militia greens to glowing legendaries, raid
+the four outer bases, and see how deep you can get.
+
+One player hosts a small server on their computer; everyone (the host included) plays with
+benilla. Every player needs their own WoW 1.12.1 game files: nothing here contains or shares them.
+
+The same server also runs **Elwynn Survival**, a separate experiment on its own realm: a footman
+of Goldshire with an axe, a shield, a dodge and a bow, gathering, building a camp and holding it
+against the Horde: orcs, trolls, tauren and Forsaken who fight in souls-like strings of blows,
+three raids that each end with a champion, and the journal to lead the way. Its book also opens
+**Siege**: one against one up to four each for themselves in Arathi Basin, each holding a camp
+against the waves the others buy and send. See [docs/elwynn-survival.md](docs/elwynn-survival.md); play it with
+`scripts/play-survival.sh` (or **Play Elwynn Survival.bat** on Windows).
+
+## Get the code
+
+```sh
+git clone https://github.com/slopmaster69/Basin-Battle.git
+cd Basin-Battle
+```
+
+Or download it as a zip from the green **Code** button on GitHub. Either way you get everything
+except the WoW 1.12.1 game files, which every player brings themselves: the server, the add-ons,
+the client patches (the setup script downloads benilla itself and applies them), and the
+scripts. Windows players who only want to play can take the ready-made zip from the
+[Releases](https://github.com/slopmaster69/Basin-Battle/releases) page instead.
+
+## Host a game (Mac)
+
+1. Open Terminal in this folder and run the one-time setup (10-30 minutes the first time):
+
+   ```sh
+   scripts/setup-mac.sh
+   ```
+
+   It installs Apple's command line tools and Rust if they're missing, downloads benilla, finds
+   your 1.12.1 `Data` folder (or asks for it) and builds everything.
+
+2. Start the server and leave that Terminal window open:
+
+   ```sh
+   scripts/host.sh                    # password: hold
+   scripts/host.sh --password ember   # or choose one
+   ```
+
+   The server's log goes to `logs/host-<date>.log`. After each wave it writes `[balance]` lines:
+   the enemies' level, health and swing, and for each hero their health, armour, the damage they
+   took (hits, average, biggest and from what), falls and damage dealt.
+
+3. In a second Terminal window, start playing:
+
+   ```sh
+   scripts/play.sh
+   ```
+
+   At the login screen use **any name** and the server's **password**. Pick a class on the
+   character screen and enter the world.
+
+## Friends joining
+
+**On the same network:** they run `scripts/play.sh <your computer's address>`, e.g.
+`scripts/play.sh 192.168.1.20` (System Settings → Wi-Fi → Details shows your address).
+
+**Over the internet:**
+
+1. On your router, forward TCP ports **3724**, **8085** and (for Elwynn Survival) **8086** to your
+   Mac.
+2. Find your public address (search "what is my IP"), and host with it:
+   `scripts/host.sh --public-host 203.0.113.7`
+3. Friends play with that address. If macOS asks whether `htl-server` may accept incoming
+   connections, allow it.
+
+**Friends on Windows:** share `Basin Battle for Windows.zip` (in this folder once it's built) with
+them, e.g. through a Dropbox link or the repository's Releases page. It holds the ready-made client, a launcher and a README. They
+unzip it, double-click **Play Basin Battle.bat**, pick their own WoW 1.12.1 folder and type your
+address. Nothing to install or build. The zip contains no WoW files: each friend needs their own
+1.12.1 install.
+
+## Playing
+
+- **The interface:** a small add-on that comes with the game draws the card picker, your spell bar,
+  the wave tracker at the top of the screen, an objective tracker on the right (what to do right
+  now) and the big banners. Pick cards with a click or keys 1-4, reroll
+  with R. The world pauses while anyone is choosing (up to a minute, then the first card is taken),
+  so picks never pile up and nobody is hit while reading.
+  The add-on sets up the keys once: A and D strafe (turn with the mouse or the arrow keys), spells
+  on 1, 2, 3, 4, Q and E, and B opens the shop. Keys you've changed yourself are left alone;
+  rebind Action Button 1-6 in Key Bindings to move the spell keys (the bar shows the new keys).
+  Drag a spell onto another button (or Shift-click both) to swap their keys.
+- **Health bars:** the add-on turns on friendly nameplates, so treants, springs, defenders and
+  the party show their health (V adds the enemies'). Defences wear down when packs stop to
+  attack them (enemy blows land x1.2 on them; bosses' at their plain weight).
+- **Taking hits:** normal enemies hit heroes 1.2x their listed damage at wave 1, 0.08x more each
+  wave (about 2.5x by wave 20), and enemy health compounds faster from wave 4, so the waves keep
+  outgrowing the heroes' spells and gear; armour now counts (a
+  full plate set takes about half of every blow, cloth about a quarter; the curve stretches with
+  each Escalation as gear's armour grows). Warriors have the most health and take 10% less from
+  everything. The one share-of-health strike is the rare Plague Butcher's marked cleave (40%).
+- **Enemy roles:** Plague Sappers run past everything to blow a share off the Ancient's health
+  (stop them on the way); Shrieking Heralds' war cry drives nearby enemies on (25% more damage,
+  20% faster); bases are guarded by a swarm to push through. The endless stream pauses while a
+  boss leads a wave.
+- **Danger circles:** where an enemy's ability will land (or is burning), a glowing circle
+  marks the ground at its full size. Hunters' traps show on the ground where they lie.
+- **Falls hurt:** as in 1.12, a drop of more than about 28 yards takes health, and about 80 is
+  the end of you.
+- **Damage meter:** on the right, under the fronts: Party ranks everyone's damage this wave,
+  with lines for the Base defences (treants and the Ancient) and the Soldiers (Basin Defenders);
+  You breaks your own down by spell (pets and auto-attacks included), with a Reset.
+- **Six spells:** cards' spells and the spells talents teach share the six keys. Once all six
+  are full, no more new spells are offered: only upgrades and passive talents.
+- **Start of a run:** pick one of three core spells of your class, one from each talent tree
+  (a Mage chooses between Arcane Missiles, Fireball and Frostbolt). Your spells sit on the first
+  six buttons of the action bar: press 1, 2, 3, 4, Q or E (or click) to cast them at your target, or at the
+  nearest enemy when you have none. A short global cooldown keeps a rhythm; pressing a key just before it ends queues the spell.
+  Mage and Priest nukes and heals (and Aimed Shot) have cast times: stand still until the bar fills,
+  moving interrupts it. Arcane Missiles and Mind Flay are channelled: their missiles fly
+  over two seconds while you stand still, and stepping away loses the rest. Presence of Mind, Inner Focus and Clearcasting make the next one instant.
+  Casting by hand
+  deals 15% more than letting them fire on their own (`.bb auto`, or the Auto/Manual switch above
+  the bar, toggles that; without the add-on they always fire on their own). Right-click enemies to
+  auto-attack as well. Mages, Priests and Hunters attack from range; Warriors build rage by
+  fighting and spend it on their strikes.
+- **Spells and upgrades:** every level a window offers three cards: a new
+  spell of your class (up to six), or an **upgrade** for one you hold. Each spell has its own
+  upgrades, up to four, and each changes how it plays rather than just adding damage: Frostbolt
+  can freeze, Frost Nova can make the next Fire Blast hit frozen enemies harder, Rend can spread
+  when its target dies, Hunter's Mark can jump to a new target. Spells work together: Scorch makes
+  enemies weaker to fire, Shadow Word: Pain sets up Mind Blast, Serpent Sting sets up Arcane Shot,
+  Rend sets up Heroic Strike. Hover a card to see what it does now and after. Closed the window? Type `.cards`.
+- **Talents:** every other level-up offer includes a talent card at full rank, so you won't
+  have them all: choose. Press N (or the Talents button above the bar) to see what you hold in
+  your three trees, with the game's own artwork: Arcane, Fire and Frost; Arms, Fury and
+  Protection; Discipline, Holy and Shadow; Beast Mastery, Marksmanship and Survival. Talents reshape your
+  spells (Shatter makes frozen enemies take critical hits, Ignite makes fire crits burn, Deep
+  Wounds makes warrior crits bleed) and some teach new spells, which take one of your six keys (Presence of Mind,
+  Combustion, Mortal Strike, Shield Slam, Shadowform, Bestial Wrath...). A talent that only
+  reshapes a spell is offered only while you hold that spell (no Thunder Clap talents without
+  Thunder Clap), and **combinations** open when you hold two spells that go together: Whirlwind
+  and Rend make Rending Whirl (Whirlwind bleeds), Frostbolt and Fireball make Frostfire, Mind
+  Blast and Shadow Word: Pain make Mind Spike, Arcane Shot and Serpent Sting make Venom Shot, and
+  more: six for each class, in the fourth column of the trees.
+- **Warrior weapon paths:** three points into a tree opens its path, and a warrior takes one a
+  run. **Path of the Shieldbearer** (Protection) trades the greatsword for a one-handed sword
+  and a shield: tougher, and a chance to block. **Path of the Berserker** (Fury) for a sword and
+  an axe: faster, with extra swings. **Path of the Greatsword** (Arms) keeps it in both hands
+  for bigger crits. The weapons that drop afterwards follow your path.
+- **Shoulder to Shoulder:** heroes within 12 yards of each other deal 10% more damage and take
+  10% less (the crown on your buff bar). Hold a bridge together, but spread out of marked ground.
+- **Pets:** Hunters fight with a wolf that holds enemies' attention and comes back after it falls.
+- **Levels and gear:** heroes start at level 1 and reach 60 around wave 30. Gear drops after waves
+  and from elites and bosses into your bags, never onto you: the message says whether it beats
+  what you wear there, and you right-click it in your bags to put it on (or keep the look you
+  like). A piece above your level says when you can wear it. Each Escalation brings the next tier
+  of your class set, and four or six set pieces unlock bonuses.
+- **The lanes:** every lane runs from a base's flag to the Ancient, and each base sends its own
+  dead: the Farm ghouls, plague rats and farmhands; the Stables skeletons and chargers; the Gold
+  Mine gargoyles, tunnelers and crypt fiends; the Lumber Mill banshees, lost woodsmen and rotting
+  treants. From wave 2 every base you haven't claimed also sends a steady stream between waves.
+  Waves march quickly down the lanes and slow to their own pace when they reach the fight. The
+  first wave is a warm-up with no elites.
+- **Bases:** from wave 3, Blight Gates open at the Farm, Stables, Gold Mine and Lumber Mill. Kill a
+  base's guardians (they drop next-tier gear, and grow with every wave you leave them), open its relic cache (a rare card and a set piece of
+  your choice), then right-click its banner to claim it (a 6 second channel; hits slow it down a
+  little, moving breaks it). Each claimed base gives the whole team a boon and thins its lane. The
+  Hearthstone in your bags (or the rune button by the wave tracker) takes you home.
+- **Roads and bridges:** enemies keep to Arathi's roads and never wade the river. Each base sends
+  half its wave down each of the two roads leaving it, and every road into the Blacksmith crosses
+  one of its two bridges, so waves from different bases meet at the crossroads and the bridges:
+  hold a bridge and you hold several lanes at once. Enemies on the longer road walk faster, so both
+  halves arrive together.
+- **Bridge posts:** each bridge has a standard on the Blacksmith's side. Defences can be built
+  there as well as by the Ancient: pick the place with the tabs on the Shop's defences row (bought
+  at home like everything else). Treants flank the road, springs stand behind, defenders block the
+  bridgehead.
+- **Fronts:** under the objective tracker, a panel shows each bridge (and the Ancient): between
+  waves, how many of the next wave come that way, which special enemies, and where the boss
+  comes; during a wave, how many are on their way now. Click Hold to tell everyone you've got a
+  bridge (your name shows on it), or Help! to call for help where you stand. Without the add-on:
+  `.hold 1`, `.sos`, and the preview is in chat. When nobody is near the Ancient and it's hit,
+  everyone hears where from ("under attack from the north-east!").
+- **Marked strikes:** many enemies wind up a big hit on the ground first: the spot is marked, then the
+  blow. Step out of it (a green "Dodged!" says you made it). Bosses and chargers also mark lines (step aside) and the Archlich a ring
+  of frost that is safe only inside, by its feet, right after a Death Nova that sends you running
+  out. Plague Bloats from wave 5 waddle up and burst where they stand; killing a
+  caster before its strike lands cancels it.
+- **Waves with a twist:** wave 7 (and 17, 27...) is the Swarm, twice as many enemies at half
+  the toughness and no elites; wave 12 (22, 32...) is the Vanguard, a few enemies, every one an
+  elite. The preview between waves says so.
+- **Elites with a twist:** a wave's elites come Vampiric (heal as they hit), Frenzied (attack
+  fast), Swift (run fast) or Thorned (hurt whoever hits them up close: fight them from range).
+- **Boss fights:** every fifth wave a boss leads. At half health it calls its dead to its side
+  (skeletons, bloats, gargoyles, bonecasters), and at a quarter it rages and hits much harder.
+  A fallen boss leaves a **power** for each hero to choose: the boss's own (Kharos's crown raises
+  your kills, Gutrender's hunger makes you bigger and drinks life, Vesh's wings speed you, Morvane's
+  phylactery wards you) or one of your class's (Bladestorm, Meteor, Plaguebringer, Volley Master
+  and more). Powers last the run, and many show on you: an aura's glow, or a bigger frame.
+- **The map:** press M. The add-on marks enemies, elites and bosses, your defences, the bridge
+  posts and your party on Arathi's own map, live, and a call for help pulses red where it was
+  made.
+- **Enemies with a job:** from wave 4 Skeletal Bonecasters shoot from range, from wave 6 Scourge
+  Siegebreakers walk past you to wreck your defences, from wave 7 Dark Menders heal the others
+  (kill them first), from wave 8 Ghoul Runners take the long road and run past everyone for
+  the Ancient, from wave 9 Scourge Necromancers raise skeletons while they fight (kill them
+  first), from wave 11 Bone Constructs fall apart into three skeletons when they die, and from wave 12
+  Restless Wraiths drift after you, pulsing death around them: keep away or burn them down. The
+  line under each name says what it does.
+- **Victory:** hold wave 20, led by Archlich Morvane, and the run is won: a banner, 50 Renown, and
+  a VICTORY mark on the boards. The waves go on after, endless, for a deeper record.
+- **Escalation:** claiming all four bases escalates the run: enemies grow much stronger, a new
+  affix joins, everyone picks a legendary, and the bases reset with fresh guardians. Legendaries
+  include your class's own (Titan's Grip and Unbreakable for warriors, Archmage and Frostbinder,
+  Saint and Void Lord, Pack Leader and Deadeye) and everyone's (Colossus, Stormcaller, Wrath of the
+  Basin, Guardian of the Ancient, Avatar, Twin Spirits...); one you already hold comes up less
+  often than new ones. They're in `content/powers.toml` and `content/cards.toml`.
+- **The shop:** Bruni Ironhammer, the dwarf with the hammer by the Ancient, sells everything: go
+  home between waves to buy. Near her (or the Ancient), B, the Shop button above your spell bar
+  or a right-click on her opens the shop; away from home it tells you to come back. Every
+  purchase is a card showing its price and what it does. Build its defences, which stand in the world
+  around it: Treant Protectors (up to 4) hurl bolts at enemies in reach, Healing Springs (up to 2)
+  heal everyone near them, Basin Defenders (up to 6) fight at its feet, Basin Riflemen (up to 4)
+  shoot from behind the line, Basin Clerics (up to 2) heal heroes and soldiers near them, and
+  Fortifying makes them
+  all stronger. Enemies passing a defence stop to tear it down, but each one holds at most four at
+  once: the rest march on past it to the next defence, a hero or the Ancient; a fallen one can be bought again,
+  and everything standing is mended between waves. It also sells more health, Thornbark, weapon
+  enchants (10% more power for your spells of that school), and, once a wave, the Wrath of the
+  Ancient: every enemy within 35 yards of it rooted for 5 seconds and a quarter of its health torn
+  away, for when the wave is at the door. Gold comes from kills and a bounty for every wave cleared.
+- **Your soldiers:** the shop's soldiers tab trains them. **Promote** raises every Basin
+  Defender a rank, each one stronger and dressed for it: Basin Footman (sword and shield), Knight
+  of the Basin, then Stormwind Guard. **March Orders** (free) send a soldier from the Ancient to a
+  bridge post or back: pick where under SEND TO, and they walk there along the roads, so send them
+  before the wave. Riflemen and Clerics stay behind the line wherever they're posted.
+- **Items (the shop's Hero tab):** five rings, necklaces, trinkets, cloaks, tabards or helms on
+  offer to each hero, new ones every wave (or Restock for a little gold). They fill the slots the
+  class sets leave empty (neck, two rings, two trinkets, back, tabard); a helm takes the set
+  helm's place (and its share of the set bonus). Cloaks, tabards and helms show on you. A worn one
+  can be **reforged** to the tier dropping now, so a favourite keeps up. Each changes how you
+  play: a Heartwood
+  Locket mends the Ancient as you fight, a Cracked Phylactery raises your kills as skeletons, an
+  Amulet of the Glass Cannon trades toughness for damage, a Trapper's Kit widens a hunter's traps.
+  Each card says what you wear in its slot now. Cloaks hang on your back. Bought ones go straight
+  on if a slot is free, else into your bags: drag them onto your character to swap. They're all
+  in `content/items.toml`.
+- **Falling:** a fallen hero gets up at the Ancient after a few seconds (8, plus one a wave, at
+  most 20). Only the Ancient falling ends a run.
+- **Endless:** waves never stop growing. If the Ancient falls, the run ends and your depth is recorded: `.best` shows the boards. Every run earns **Renown**, which
+  stays with your name: `.renown` buys rerolls, banishes, skips, wider offers and more. It never
+  adds raw power.
+- Chat commands: `.start`, `.status`, `.cards`, `.pick 1-4`, `.hearth`, `.best`, `.renown`,
+  `.hold <n>`, `.sos`, `.restart`, `.bb auto`. Press N for talents.
+
+## Tuning
+
+Everything is in the `content` folder: [`game.toml`](content/game.toml) (classes, enemies, scaling,
+bases, affixes, Renown), [`classes/`](content/classes) (each class's spells, upgrades and talent
+trees), [`cards.toml`](content/cards.toml) (legendaries), [`powers.toml`](content/powers.toml) (class
+legendaries and bosses' powers), [`items.toml`](content/items.toml) (the shop's items) and
+[`gear.toml`](content/gear.toml) (set looks, names and stat budgets). Edit them and restart the
+server. High scores and Renown are kept in `saves/basin-battle.toml`.
+
+## How it fits together
+
+| Folder | What it is |
+| --- | --- |
+| `crates/htl-sim` | The game rules: waves, enemies, combat, the hub. No networking. |
+| `crates/htl-map` | Builds the arena from your 1.12.1 data: terrain, buildings, water, lanes. |
+| `crates/htl-server` | The login and world servers benilla connects to (Basin Battle's and Elwynn Survival's). |
+| `crates/htl-survival` | Elwynn Survival's rules. |
+| `content/game.toml` | Game content and numbers. |
+| `scripts/` | Setup, host and play scripts. |
+| `patches/benilla/` | This folder's changes to the client (Elwynn Survival's action mouse and aiming camera, then its action animation: predicted swings, hit-stop, camera shake, the dodge roll, aim pitch, and a camera that stays out of bodies; then the action layer: clips that own the body with blends and an upper-body split, local lunges and dashes, reactions, lock-on and its camera, and the camera kick; then a blow's weight played the moment it connects, the lock-on as the target, shuffle steps, kits and voices on call; then hit-stops that never leave a stance stuck, flinches that leave a blow in hand playing, impacts that land with the blow, and the bow's aim on the locked foe), applied on top of the pinned benilla by the setup and play scripts, which rebuild the client when they change. |
+
+`cargo test` runs the rules' tests and an end-to-end test where benilla's own protocol code logs
+in, plays and checks every packet the server sends. `scripts/check-addon.sh` runs the add-on in
+benilla's own UI script host against the lines a real session sends, and lists any Lua error.
+
+Balance tools (run by hand, `cargo test --release -p htl-sim <name> -- --ignored --nocapture`):
+`power_curve` (hits to kill, wave by wave), `class_dps_report`, `solo_survival_sweep` (16 seeds
+per class; `BRIDGED=1` for two bridges, `DODGE=1` for bots that step out of marked ground),
+`defence_share_report` (four bots: who does the killing, the Ancient's lowest health and hero
+deaths per wave) and `solo_death_report` (`TRACE=1` to follow a bot). On the host's own map,
+`cargo run --release -p htl-map --example roads -- <Data> soak 21` plays many waves to catch
+panics and stuck enemies.
+
+## Troubleshooting
+
+- **"tell me where your 1.12.1 game data is"**: delete `settings.sh` and run again to re-pick the
+  `Data` folder. It must be a 1.12.1 (build 5875) install, not the modern WoW Classic.
+- **Login says incorrect password**: everyone uses the host's password; the name can be anything.
+- **Friends time out**: check the ports are forwarded (3724, 8085, 8086) and that you hosted with
+  `--public-host`.
+
+## Legal
+
+Basin Battle is an independent fan project, not affiliated with or endorsed by Blizzard
+Entertainment. It ships no Blizzard content. World of Warcraft is a trademark of Blizzard
+Entertainment, Inc. Our code is licensed under [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-APACHE),
+at your option.

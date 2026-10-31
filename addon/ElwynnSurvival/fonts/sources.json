@@ -1,0 +1,26 @@
+[
+  {
+    "file": "fonts/IMFellEnglish-Regular.ttf",
+    "license": "fonts/imfellenglish-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/imfellenglish/IMFeENrm28P.ttf",
+    "family": "imfellenglish",
+    "weight": 400,
+    "format": "static TrueType"
+  },
+  {
+    "file": "fonts/IMFellEnglishSC-Regular.ttf",
+    "license": "fonts/imfellenglishsc-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/imfellenglishsc/IMFeENsc28P.ttf",
+    "family": "imfellenglishsc",
+    "weight": 400,
+    "format": "static TrueType"
+  },
+  {
+    "file": "fonts/CrimsonPro-Regular.ttf",
+    "license": "fonts/crimsonpro-OFL.txt",
+    "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/crimsonpro/CrimsonPro%5Bwght%5D.ttf",
+    "family": "crimsonpro",
+    "weight": 400,
+    "format": "static TrueType"
+  }
+]

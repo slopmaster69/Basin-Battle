@@ -1,0 +1,95 @@
+O~2~level~A NEW RUN~Choose Your First Spell~Cast it with key 1. Every pick after this shapes your build.~3~3~Reroll (1)~-1~~3~1~0~0
+C~2~0~INV_Misc_QuestionMark~0~Arcane Missiles~1~5~Spell~Arcane~5~Launches |cffffffff5|r missiles at your target within |cffffffff30|r yd, |cffffffff42|r |cffff9cf6Arcane damage|r each. Channelled over |cffffffff2|r sec: stand still, or the rest is lost.~~Arcane~Takes a spell slot · 1/6
+C~2~1~INV_Misc_QuestionMark~0~Frostbolt~1~5~Spell~Frost~2.5~Strikes your target within |cffffffff30|r yd for |cffffffff150|r |cff8ad8ffFrost damage|r. Chills it: |cffffffff30%|r slower for |cffffffff4|r sec. |cffffffff1.8|r sec cast: stand still.~~Frost~Takes a spell slot · 1/6
+C~2~2~INV_Misc_QuestionMark~0~Fireball~1~5~Spell~Fire~3.5~Strikes your target within |cffffffff35|r yd for |cffffffff210|r |cffff8a4aFire damage|r. Then |cffffffff30|r |cffff8a4aFire damage|r over |cffffffff6|r sec. |cffffffff2.5|r sec cast: stand still.~~Fire~Takes a spell slot · 1/6
+OS~2
+!table.insert(SAID, "picker shown: " .. tostring(BasinBattlePicker:IsShown()))
+!HOVER = BasinBattlePicker.cards[1]
+!table.insert(SAID, "banish before hover: " .. tostring(BasinBattlePicker.cards[2].banish:IsShown()))
+!table.insert(SAID, "banish on hover: " .. tostring(BasinBattlePicker.cards[1].banish:IsShown()) .. " lock " .. tostring(BasinBattlePicker.cards[1].lock:IsShown()))
+!HOVER = nil
+!BasinBattle.Pick(1)
+PZ~Alice
+PZ~
+BH~Bonelord Kharos~734
+BH~Bonelord Kharos~200
+!table.insert(SAID, "boss bar: " .. tostring(BasinBattleBoss:IsShown()))
+X~Bonelord Kharos~Bone Spears~1800~1~Bone Spears: step out of the line!~1
+X~Risen Skeleton~Pounce~1200~1~Pounce: move!~0
+BH~
+!table.insert(SAID, "boss bar after: " .. tostring(BasinBattleBoss:IsShown()))
+S~victory~VICTORY!~The Ancient stands
+PG~1~Alice needs help at the north bridge!
+A~Bonelord Kharos calls its dead: 2 Risen Skeletons join the fight!
+!BasinBattle.ToggleShop()
+!BasinBattle.ToggleShop()
+!BasinBattle.ToggleTalents()
+!BasinBattle.ToggleTalents()
+!WorldMapFrame:Show()
+MP~
+MP~
+!WorldMapFrame:Hide()
+@PLAYER_DEAD
+@PLAYER_ALIVE
+@PLAYER_LEVEL_UP 3
+@PLAYER_MONEY
+!this = BasinBattleSpell1; local f = BasinBattleSpell1:GetScript("OnDragStart"); if f then f() end
+!this = BasinBattleSpell2; local f = BasinBattleSpell2:GetScript("OnReceiveDrag"); if f then f() end
+!this = BasinBattleSpell1; local f = BasinBattleSpell1:GetScript("OnDragStop"); if f then f() end
+!table.insert(SAID, "done")
+RS~0~7~843~Alice^mage^14^212^48213^3^17;Bob^warrior^13^180^39800^1^4
+!table.insert(SAID, "scoreboard: " .. tostring(BasinBattleScore:IsShown()))
+RS~1~20~1500~Alice^mage^40^2000^1234567^0^30~50
+!SetBinding("B", "OPENALLBAGS") BasinBattle.ApplyKeys() table.insert(SAID, "B is " .. tostring(GetBindingAction("B")))
+DG~Bone Spears
+!table.insert(SAID, "dodged shown")
+!BasinBattle.ToggleShop()
+!local s = BasinBattleShop; local out = "ui " .. tostring(UIParent:GetWidth()) .. "x" .. tostring(UIParent:GetHeight()); for i = 1, table.getn(s.cards) do local c = s.cards[i]; if c:IsShown() then out = out .. string.format(" [%d %.0f..%.0f]", i, c:GetLeft() or -1, c:GetRight() or -1) end end; table.insert(SAID, out)
+!BasinBattle.ToggleShop()
+!WorldMapFrame:Show()
+MP~e^500^500;!^400^400;P^450^450
+!WorldMapFrame:Hide()
+FR~7~1^the north bridge^5^0^^^0^0^0^;2^the south bridge^4^0^^^0^0^0^;0^the Ancient^0^0^^^0^0^0^~The Swarm
+!table.insert(SAID, "fronts head: " .. tostring(BasinBattleFronts.head:GetText()))
+O~9~level~A NEW RUN~Choose Your First Spell~Cast it with key 1. Every pick after this shapes your build.~3~3~Reroll (1)~-1~~3~1~0~0
+C~9~0~Spell_Frost_FrostBolt02~2~Brittle Ice~3~5~Upgrade~Frost~0~Frostbolt freezes its target for 2 sec.~~Frost~Upgrade 2 of 4 for Frostbolt
+C~9~1~Spell_Fire_FlameBolt~3~Improved Fireball~1~1~Talent~~0~Fireball casts 0.5 sec faster.~~Fire~Talent · Fire tree
+C~9~2~Spell_Arcane_Blast~1~Arcane Explosion~1~5~Spell~Arcane~4~Blasts everything within 10 yd.~~Arcane~Takes a spell slot · 3/6
+OS~9
+!local p = BasinBattlePicker.cards; table.insert(SAID, "cards: " .. p[1].card.ribbonText:GetText() .. " / " .. p[1].card.sub:GetText() .. " | " .. p[2].card.ribbonText:GetText() .. " / " .. p[2].card.sub:GetText() .. " ring " .. tostring(p[2].card.iconRing:IsShown()) .. " | " .. p[3].card.ribbonText:GetText() .. " / " .. p[3].card.sub:GetText())
+!BasinBattle.Pick(1)
+PZ~Probe
+!table.insert(SAID, "pick button: " .. tostring(BasinBattlePaused.pick:IsShown()) .. " mine " .. tostring(BasinBattlePaused.mine))
+MC~Aimed Shot~2500
+!table.insert(SAID, "my cast bar: " .. tostring(BasinBattleMyCast:IsShown()))
+MC~
+!table.insert(SAID, "my cast bar after: " .. tostring(BasinBattleMyCast:IsShown()))
+Q~1~1.0~-1~frostbolt^Spell_Frost_FrostBolt02^Frostbolt^1^1^2.5^1.2^0^0^0;pom^Spell_Nature_EnchantArmor^Presence of Mind^1^2^60^0^0^1^0
+!table.insert(SAID, "key 1 label: " .. BasinBattleSpell1.key:GetText() .. ", slot 2: " .. tostring(BasinBattleSpell2:IsShown()))
+DM~7~Corios^hunter^183200;David^warrior^95400
+DP~312~41250~Aimed Shot^20100;Auto Shot^9800;Wolf^7300;Arcane Shot^4050
+!table.insert(SAID, "meter: " .. tostring(BasinBattleMeter:IsShown()) .. " rows " .. tostring(BasinBattleMeter:GetHeight()))
+!BasinBattle.DrawMeter()
+SH~protector^Spell_Nature_Wrath^Treant Protector^Defence^0 of 4 planted^120^2^^Plants a treant.;strengthen^Spell_Nature_Regeneration^Strengthen the Ancient^The Ancient^Bought 0 times^60^2^^More health.;drill^Spell_Nature_AncestralGuardian^Drill the Defenders^Your soldiers^Rank 0 of 5^100^2^^Hits harder.;item:0^INV_Jewelry_Ring_10^Band of Thorns^Items^Ring  ·  Tier 1^70^1^^Enemies that strike you take 0.4 times your hit.|n|cff9d9d9d+6 Stamina.|r;restock^INV_Misc_Bag_10^Restock^Items^4 on offer^20^0^^Four fresh wares.;enchant:fire^Spell_Fire_FlameBolt^Fire Enchantment^Your weapon^Enchantment^88^1^^Fire spells.
+!BasinBattle.shop.cat = "hero"
+!BasinBattle.OpenShop()
+!table.insert(SAID, "hero tab cards: " .. tostring(BasinBattleShop:IsShown()))
+!BasinBattle.shop.cat = "soldiers"
+!BasinBattle.LayoutShop()
+!BasinBattle.HideShop()
+Q~1~1.0~-1~frostbolt^Spell_Frost_FrostBolt02^Frostbolt^1^1^2.5^1.2^0^0^0;^^^^^^^^^;^^^^^^^^^;fireball^Spell_Fire_FlameBolt^Fireball^1^1^3.5^0^0^0^0
+!table.insert(SAID, "gap bar: 1 " .. tostring(BasinBattle.spells.slots[1] ~= nil) .. " 2 " .. tostring(BasinBattle.spells.slots[2] ~= nil) .. " 4 " .. tostring(BasinBattle.spells.slots[4] ~= nil))
+H~3~0~intermission~5~5000~6000~0~0~4~2
+!table.insert(SAID, "countdown at 5: " .. tostring(BasinBattleCountdown:IsShown()))
+H~3~0~intermission~4~5000~6000~0~0~4~2
+H~4~0~wave~0~5000~6000~12~0~4~2
+# The shop is bought at home: away, B says so and nothing opens; at home it opens; walking off closes it.
+!BasinBattleShop:Hide()
+SA~0~Bruni Ironhammer by the Ancient of the Basin
+!BasinBattle.ToggleShop()
+!table.insert(SAID, "away: shop open " .. tostring(BasinBattleShop:IsShown()) .. ", vendor " .. BasinBattle.shop.vendor)
+SA~1~Bruni Ironhammer by the Ancient of the Basin
+!BasinBattle.ToggleShop()
+!table.insert(SAID, "home: shop open " .. tostring(BasinBattleShop:IsShown()))
+SA~0~Bruni Ironhammer by the Ancient of the Basin
+!table.insert(SAID, "walked off: shop open " .. tostring(BasinBattleShop:IsShown()))

@@ -1,0 +1,1159 @@
+# Razorfen Kraul: the quillboar's warren of thorns in the southern Barrens, where Charlga
+# Razorflank speaks for Agamaggan. A dungeon of its own beside the Deadmines (read like
+# deadmines.toml: its lists join the rest; [dungeon] is its world).
+#
+# Places are WoW coordinates on map 47 (RazorfenKraulInstance: x north, y west, z up), only the
+# warren's part of it read. In at the thorn gate; down to Roogug's hollow; the east loop (Aggem
+# Thorncurse, and Death Speaker Jargba at its far end); down into the warren's heart (the second
+# lamp) and its pit (Overlord Ramtusk); Agathelos's pen; and up through the thorn tunnels to
+# Charlga Razorflank. Out by the gate.
+
+[dungeon]
+key = "razorfen"
+name = "Razorfen Kraul"
+map = 47
+map_dir = "RazorfenKraulInstance"
+area = 491
+window = [[1890.0, 1370.0], [2250.0, 2050.0]]
+icon = "INV_Misc_Root_02"
+blurb = "The quillboar's warren of thorns, where Charlga speaks for Agamaggan"
+first_page = "The thorn gate at the top of the warren. Mind the spines."
+welcome = "Razorfen Kraul. The quillboar dig their warren under Agamaggan's thorns, and Charlga Razorflank speaks for the dead demigod. Two lamps: one at the thorn gate, one in the warren's heart. Rest at a lamp to heal, fill your Draughts (T) and send the quillboar back to their burrows. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "thorn_fetish"
+hero_health = 0.7
+exit = [1943.0, 1544.6, 82.0]
+exit_radius = 5.0
+exit_boss = "charlga"
+weapon_chance = 0.08
+armor_chance = 0.06
+boss_extra_chance = 0.25
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# --- lamps: only two ---------------------------------------------------------------------------------
+
+[[dungeon.lamp]]
+key = "razorfen_gate"
+name = "The Thorn Gate"
+at = [1943.0, 1544.6, 82.0]
+facing = 0.8
+
+[[dungeon.lamp]]
+key = "razorfen_heart"
+name = "The Warren's Heart"
+at = [2107.5, 1792.2, 48.7]
+facing = 1.2
+
+# --- secrets -----------------------------------------------------------------------------------------
+
+# A shrine to Agamaggan under the thorns at the warren's south-west, where Charlga takes her
+# power. Whoever touches it, Agamaggan notices.
+[[dungeon.door]]
+key = "agamaggan_shrine"
+name = "Agamaggan's Shrine"
+kind = "hidden"
+at = [2077.0, 2002.0, 63.2]
+find = 4.0
+reveals = ["shrine_cache", "charlga_vow"]
+text = "under the thorns: a shrine of bones and tusks to Agamaggan, still warm with blood. Something vast, long dead, takes notice of you."
+
+[[dungeon.box]]
+key = "shrine_cache"
+at = [2078.6, 1999.0, 63.0]
+facing = 3.0
+loot = { draught_flask = 1, thorn_fetish = 14 }
+
+[[dungeon.note]]
+key = "charlga_vow"
+name = "A Thornweaver's Vow, Carved in Bone"
+at = [2075.7, 2004.0, 63.3]
+facing = 3.0
+text = "Carved small, in quillboar script someone has glossed in Common: \"Charlga is Agamaggan's tongue. Should the tongue be cut out, and the shrine touched by an outsider's hand, the Great Boar will speak for himself.\""
+
+# The far end of the east loop, past the Death Speaker: his cache.
+[[dungeon.door]]
+key = "jargba_cache"
+name = "The Death Speaker's Cache"
+kind = "hidden"
+at = [2153.3, 1430.8, 74.4]
+find = 4.0
+reveals = ["bone_cache"]
+text = "behind the Death Speaker's altar: what the dead were given to keep."
+
+[[dungeon.box]]
+key = "bone_cache"
+at = [2152.0, 1428.0, 74.2]
+facing = 0.0
+loot = { thorn_fetish = 16, tonic = 1, whetstone = 1 }
+
+# A side burrow off the tunnels west of the heart: an earthcaller who never came out.
+[[dungeon.door]]
+key = "halmgar_burrow"
+name = "A Side Burrow"
+kind = "hidden"
+at = [2032.7, 1761.6, 60.6]
+find = 4.0
+reveals = ["halmgar"]
+text = "a burrow off the tunnel, its floor scored with circles: an earthcaller looks up from his work."
+
+# --- notes -------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "tauren_warning"
+name = "A Tauren Scout's Warning"
+at = [1946.0, 1548.0, 82.0]
+facing = 0.8
+text = "\"Charlga Razorflank leads the quillboar here; she says she speaks for Agamaggan, who died on these thorns. Her people say she keeps his shrine somewhere deep in the south-west of the warren. Do not touch it.\""
+
+[[dungeon.note]]
+key = "scratched_hide"
+name = "A Scratched Hide"
+at = [2062.0, 1612.0, 62.8]
+facing = 0.0
+text = "A hide scratched with a map of tunnels. One side burrow, west of the warren's heart, is marked with circles and the word: HALMGAR."
+
+# --- the quillboar -----------------------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "rk_quilguard"
+at = [2002.2, 1596.5]
+z = 81.1
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2018.0, 1657.1]
+z = 82.0
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2047.8, 1463.1]
+z = 68.3
+radius = 3.0
+count = 2
+link = 12.0
+
+# Roogug's hollow.
+[[dungeon.pack]]
+mob = "rk_roogug"
+key = "roogug"
+at = [2062.0, 1597.0]
+z = 62.8
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2062.8, 1627.0]
+z = 64.3
+radius = 2.0
+count = 2
+link = 12.0
+
+# The east loop: Aggem Thorncurse, and the Death Speaker at its end.
+[[dungeon.pack]]
+mob = "rk_dustweaver"
+at = [2135.3, 1463.3]
+z = 66.7
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_aggem"
+key = "aggem"
+at = [2182.1, 1523.7]
+z = 71.5
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rk_quilguard"
+at = [2182.7, 1505.6]
+z = 73.2
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_acolyte"
+at = [2136.9, 1506.7]
+z = 72.8
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_jargba"
+key = "jargba"
+at = [2152.0, 1417.2]
+z = 74.1
+radius = 0.0
+count = 1
+
+# Down towards the heart.
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2122.1, 1671.6]
+z = 59.0
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2152.1, 1686.8]
+z = 57.9
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2151.8, 1627.1]
+z = 81.8
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_acolyte"
+at = [2062.2, 1702.6]
+z = 58.4
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_halmgar"
+key = "halmgar"
+at = [2048.1, 1762.4]
+z = 59.3
+radius = 0.0
+count = 1
+rare = true
+
+# The pit below the heart: Overlord Ramtusk.
+[[dungeon.pack]]
+mob = "rk_ramtusk"
+key = "ramtusk"
+at = [2137.0, 1837.0]
+z = 47.5
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rk_quilguard"
+at = [2137.0, 1822.0]
+z = 47.0
+radius = 2.5
+count = 2
+link = 12.0
+
+# Agathelos's pen.
+[[dungeon.pack]]
+mob = "rk_agathelos"
+key = "agathelos"
+at = [2047.0, 1852.0]
+z = 55.9
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2032.8, 1852.7]
+z = 56.5
+radius = 3.0
+count = 2
+link = 12.0
+
+# The thorn tunnels up to Charlga.
+[[dungeon.pack]]
+mob = "rk_dustweaver"
+at = [2077.1, 1927.2]
+z = 65.8
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2167.3, 1957.5]
+z = 58.2
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_acolyte"
+at = [2182.5, 1971.4]
+z = 56.2
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_charlga"
+key = "charlga"
+at = [2197.0, 1897.0]
+z = 71.5
+radius = 0.0
+count = 1
+
+# Agamaggan's thorns, while Charlga fights.
+[[dungeon.hazard]]
+name = "thorns bursting up"
+at = [2182.4, 1896.6, 71.7]
+radius = 3.5
+damage = 20
+every = 7.0
+phase = 2.0
+warn = 1.4
+spell = 26271
+boss = "charlga"
+knockdown = true
+
+[[dungeon.hazard]]
+name = "thorns bursting up"
+at = [2196.3, 1910.0, 70.8]
+radius = 3.5
+damage = 20
+every = 7.0
+phase = 4.5
+warn = 1.4
+spell = 26271
+boss = "charlga"
+knockdown = true
+
+# --- items --------------------------------------------------------------------------------------------
+
+[[item]]
+key = "thorn_fetish"
+name = "Thorn Fetish"
+display = 1503
+icon = "INV_Misc_Bone_03"
+kind = "resource"
+stack = 50
+text = "A bone and thorn charm every quillboar carries. The lamps' quartermaster in Razorfen Kraul trades them; you drop them all when you fall below."
+
+[[item]]
+key = "roogug_mantle"
+name = "Roogug's Earthen Mantle"
+display = 5282
+icon = "INV_Shoulder_04"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.09
+text = "Packed earth and tusk: it hums when you stand still."
+
+[[item]]
+key = "aggem_legs"
+name = "Thorncurse Leggings"
+display = 1356
+icon = "INV_Pants_01"
+kind = "armor"
+slot = "legs"
+reduce = 0.1
+text = "Aggem's: thorns woven into the leather, points out."
+
+[[item]]
+key = "jargba_robe"
+name = "Death Speaker's Robe"
+display = 12645
+icon = "INV_Chest_Cloth_24"
+kind = "armor"
+slot = "chest"
+reduce = 0.09
+text = "Jargba's: it whispers in quillboar when the wind is right."
+
+[[item]]
+key = "ramtusk_helm"
+name = "Ramtusk's Tusked Helm"
+display = 4180
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.12
+weight = 0.03
+text = "The Overlord's: two great tusks bolted to a mail cap."
+
+[[item]]
+key = "agathelos_hide"
+name = "Agathelos's Hide Vest"
+display = 8664
+icon = "INV_Chest_Leather_07"
+kind = "armor"
+slot = "chest"
+reduce = 0.14
+weight = 0.02
+text = "The Raging boar's hide: bristles still on it, and they still bristle."
+
+[[item]]
+key = "charlga_mantle"
+name = "Charlga's Thornweave Mantle"
+display = 2539
+icon = "INV_Shoulder_06"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.12
+weight = 0.01
+text = "Woven of Agamaggan's own thorns. Charlga wore it to speak for him."
+
+[[item]]
+key = "agamaggan_tusk_helm"
+name = "Helm of the Great Boar"
+display = 4145
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.15
+weight = 0.04
+text = "Hammered round a shard of Agamaggan's own tusk. It is heavy with something more than its weight."
+
+[[item]]
+key = "halmgar_mantle"
+name = "Earthcaller's Mantle"
+display = 5944
+icon = "INV_Shoulder_01"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.1
+text = "Halmgar's: stones sewn on in circles."
+
+# --- the quillboar ----------------------------------------------------------------------------------------
+
+[[mob]]
+key = "rk_quilguard"
+name = "Razorfen Quilguard"
+subname = "Razorfen Kraul"
+display = 1341
+health = 140
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 19126
+grip = "1h"
+posture = 90
+drops = { thorn_fetish = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 15
+  range = 2.8
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "chops"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  # Quills shot out all round him.
+  [[mob.pattern]]
+  name = "quills"
+  weight = 1.5
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 13, heavy = true, blockable = false, recovery = 1.0, kit = 369 } ]
+
+[[mob]]
+key = "rk_defender"
+name = "Razorfen Defender"
+subname = "Razorfen Kraul"
+display = 4644
+scale = 0.8
+health = 170
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+weapon = 19126
+grip = "1h"
+shield = 2456
+block = 0.45
+posture = 110
+drops = { thorn_fetish = [3, 5] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 15
+  range = 2.8
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 210.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "chops"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "shield bash"
+  weight = 1.5
+  max_range = 2.6
+  steps = [ { clip = 95, windup = 0.4, damage = 9, range = 2.8, arc = 90.0, heavy = true, recovery = 0.8 } ]
+
+[[mob]]
+key = "rk_geomancer"
+name = "Razorfen Geomancer"
+subname = "Razorfen Kraul"
+display = 4642
+scale = 0.75
+health = 85
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 8.0
+drops = { thorn_fetish = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.3
+  damage = 16
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 133
+  recovery = 1.0
+  cooldown = 1.6
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "fireball"
+  weight = 3.0
+  min_range = 4.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.3, damage = 16, range = 26.0, radius = 1.5, speed = 20.0, spell = 133, blockable = true, recovery = 1.0 } ]
+  # Stone called up out of the ground where you stand.
+  [[mob.pattern]]
+  name = "earth spike"
+  weight = 2.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.3, damage = 18, range = 22.0, radius = 3.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
+
+[[mob]]
+key = "rk_dustweaver"
+name = "Razorfen Dustweaver"
+subname = "Razorfen Kraul"
+display = 1963
+health = 90
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 8.0
+drops = { thorn_fetish = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 15
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 15, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "dust devil"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 22786 } ]
+
+[[mob]]
+key = "rk_acolyte"
+name = "Death's Head Acolyte"
+subname = "Razorfen Kraul"
+display = 1964
+health = 95
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 7.0
+drops = { thorn_fetish = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 16
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 16, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "bone burst"
+  weight = 1.5
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.4, damage = 20, range = 22.0, radius = 3.5, speed = 12.0, spell = 27812, look = 24050, blockable = false, recovery = 1.2 } ]
+
+[[mob]]
+key = "rk_boar"
+name = "Raging Agam'ar"
+subname = "Razorfen Kraul"
+display = 1208
+health = 110
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 15.0
+leash = 28.0
+drops = { thorn_fetish = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 13
+  range = 2.7
+  arc = 100.0
+  recovery = 0.75
+  cooldown = 1.0
+  turn_rate = 240.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "gores"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.48, damage = 12, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 13, recovery = 0.85 } ]
+  [[mob.pattern]]
+  name = "charge"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 13.0
+  steps = [ { clip = 17, take = 1, windup = 0.8, lunge = 8.0, damage = 18, heavy = true, recovery = 1.0, kit = 379 } ]
+
+# --- Razorfen's bosses -----------------------------------------------------------------------------------
+
+[[mob]]
+key = "rk_roogug"
+name = "Roogug"
+subname = "Earthcaller"
+display = 4643
+health = 850
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 220
+keep_away = 6.0
+drops = { thorn_fetish = [14, 20] }
+trophy = { roogug_mantle = 1 }
+gear = ["roogug_mantle"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "earthquake"
+  weight = 2.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.3, damage = 24, range = 24.0, radius = 4.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "staff"
+  weight = 1.5
+  max_range = 3.0
+  steps = [ { ranged = false, clip = 54, windup = 0.9, damage = 16, range = 4.5, arc = 360.0, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 26271 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "earthquake"
+  text = "Roogug slams his staff down; the hollow's walls crack and spit stone."
+  summon = ["rk_quilguard"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "staff"
+  text = "Roogug squeals for the earth to swallow you."
+  shove = 5.0
+  look = 26271
+
+[[mob]]
+key = "rk_aggem"
+name = "Aggem Thorncurse"
+subname = "Razorfen Kraul"
+display = 4645
+health = 900
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 220
+keep_away = 6.0
+drops = { thorn_fetish = [16, 22] }
+trophy = { aggem_legs = 1 }
+gear = ["aggem_legs"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "thorn bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "thorn curse"
+  weight = 2.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.3, damage = 26, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 26271, blockable = false, recovery = 1.1 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "thorn curse"
+  text = "\"Agamaggan's thorns grow in you!\""
+  summon = ["rk_boar", "rk_boar"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "thorn bolt"
+  text = "Aggem shrieks, and thorns burst up all round him."
+  shove = 5.0
+  look = 26271
+
+[[mob]]
+key = "rk_jargba"
+name = "Death Speaker Jargba"
+subname = "Razorfen Kraul"
+display = 1253
+health = 900
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 200
+keep_away = 6.0
+drops = { thorn_fetish = [16, 22] }
+trophy = { jargba_robe = 1 }
+gear = ["jargba_robe"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "death's word"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 24050 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "death's word"
+  text = "\"The dead hear Jargba! Rise!\""
+  summon = ["risen_skeleton", "risen_skeleton"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "shadow bolt"
+  text = "\"Jargba... will speak... for you... too...\""
+  shove = 5.0
+  look = 24050
+
+[[mob]]
+key = "rk_ramtusk"
+name = "Overlord Ramtusk"
+subname = "Razorfen Kraul"
+display = 4644
+health = 1150
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 22598
+grip = "2h"
+boss = true
+posture = 300
+drops = { thorn_fetish = [22, 28] }
+trophy = { ramtusk_helm = 1 }
+gear = ["ramtusk_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.85
+  damage = 34
+  range = 3.5
+  arc = 140.0
+  recovery = 1.1
+  cooldown = 1.4
+  turn_rate = 170.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "two chops"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.8, damage = 30, recovery = 0.25 }, { clip = 18, take = 1, windup = 0.65, damage = 32, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "overhead"
+  weight = 2.0
+  steps = [ { clip = 58, windup = 1.4, damage = 50, arc = 70.0, heavy = true, recovery = 1.5, kit = 379 } ]
+  [[mob.pattern]]
+  name = "war stomp"
+  weight = 1.5
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 26271 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.85
+  pattern = "war stomp"
+  text = "\"Razorfen! To your Overlord!\""
+  summon = ["rk_defender", "rk_quilguard"]
+  [[mob.phase]]
+  at = 0.25
+  speed = 0.72
+  might = 1.2
+  pattern = "overhead"
+  text = "Ramtusk froths at the tusks."
+  shove = 6.0
+  look = 26271
+
+[[mob]]
+key = "rk_agathelos"
+name = "Agathelos the Raging"
+subname = "Razorfen Kraul"
+display = 1167
+health = 1100
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 18.0
+leash = 30.0
+boss = true
+posture = 300
+drops = { thorn_fetish = [20, 26] }
+trophy = { agathelos_hide = 1 }
+gear = ["agathelos_hide"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 28
+  range = 3.2
+  arc = 120.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 230.0
+  lock = 0.25
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "gores"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 24, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.45, damage = 24, recovery = 0.12 }, { clip = 17, take = 0, windup = 0.6, damage = 32, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "trample"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 15.0
+  steps = [ { clip = 17, take = 1, windup = 0.9, lunge = 10.0, range = 3.5, arc = 360.0, damage = 34, heavy = true, recovery = 1.2, kit = 379, look = 26271 } ]
+  [[mob.pattern]]
+  name = "rage"
+  weight = 2.0
+  below = 0.3
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 20, recovery = 0.05 }, { clip = 17, take = 1, windup = 0.3, damage = 20, recovery = 0.05 }, { clip = 17, take = 0, windup = 0.3, damage = 20, recovery = 0.05 }, { clip = 17, take = 1, windup = 0.7, lunge = 4.0, damage = 34, recovery = 1.5 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.85
+  pattern = "trample"
+  text = "Agathelos paws the ground and snorts fire."
+  look = 26271
+  [[mob.phase]]
+  at = 0.3
+  speed = 0.72
+  might = 1.2
+  pattern = "rage"
+  text = "Agathelos goes berserk, smashing into the thorns and back."
+  summon = ["rk_boar", "rk_boar"]
+  shove = 6.0
+
+[[mob]]
+key = "rk_charlga"
+name = "Charlga Razorflank"
+subname = "Agamaggan's Tongue"
+display = 4646
+health = 1400
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 20.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 260
+keep_away = 6.0
+drops = { thorn_fetish = [30, 40] }
+trophy = { charlga_mantle = 1 }
+gear = ["charlga_mantle"]
+respawn = 0.0
+# Whoever touched Agamaggan's shrine finds the Great Boar speaking for himself.
+then = "rk_avatar"
+then_after = 4.0
+then_needs = "agamaggan_shrine"
+then_text = "Charlga's body is lifted off the ground by thorns that weren't there. A shape of thorn and bone and tusk stands up out of the warren: Agamaggan, speaking for himself."
+then_kit = 356
+then_look = 26271
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 24
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "thorn wall"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 26271 } ]
+  [[mob.pattern]]
+  name = "chain lightning"
+  weight = 2.0
+  below = 0.5
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 0.9, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.3 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "thorn wall"
+  text = "\"Agamaggan's thorns protect his children!\""
+  summon = ["rk_defender"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.78
+  might = 1.15
+  pattern = "chain lightning"
+  text = "\"The Great Boar speaks through me! HEAR HIM!\""
+  summon = ["rk_geomancer", "rk_boar"]
+  [[mob.phase]]
+  at = 0.1
+  speed = 0.7
+  might = 1.2
+  pattern = "thorn wall"
+  text = "Charlga's voice breaks into a boar's scream."
+  shove = 6.0
+  look = 26271
+
+[[mob]]
+key = "rk_avatar"
+name = "Avatar of Agamaggan"
+subname = "The Great Boar"
+display = 1167
+scale = 1.6
+health = 1400
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 30.0
+leash = 40.0
+boss = true
+posture = 340
+drops = { thorn_fetish = [50, 60] }
+gear = ["agamaggan_tusk_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.75
+  damage = 34
+  range = 3.8
+  arc = 140.0
+  recovery = 1.0
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "tusks"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.7, damage = 30, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.55, damage = 30, recovery = 0.15 }, { clip = 17, take = 0, windup = 0.8, damage = 40, recovery = 1.1, kit = 379 } ]
+  [[mob.pattern]]
+  name = "great charge"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 18.0
+  steps = [ { clip = 17, take = 1, windup = 1.0, lunge = 12.0, range = 4.0, arc = 360.0, damage = 40, heavy = true, blockable = false, recovery = 1.3, kit = 379, look = 26271 } ]
+  [[mob.pattern]]
+  name = "thornstorm"
+  weight = 2.0
+  max_range = 6.0
+  steps = [ { clip = 54, windup = 1.2, range = 7.5, arc = 360.0, damage = 28, heavy = true, blockable = false, recovery = 1.3, kit = 356, look = 26271 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "thornstorm"
+  text = "The Avatar bellows; boars come running from every burrow in the Kraul."
+  summon = ["rk_boar", "rk_boar", "rk_boar"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "great charge"
+  text = "The thorns round the Avatar wither; it fights like something dying for the second time."
+  shove = 7.0
+  look = 26271
+
+[[mob]]
+key = "rk_halmgar"
+name = "Earthcaller Halmgar"
+subname = "Razorfen Kraul"
+display = 4642
+health = 780
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 200
+keep_away = 6.0
+drops = { thorn_fetish = [20, 26] }
+gear = ["halmgar_mantle"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "earth spike"
+  weight = 2.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.3, damage = 24, range = 24.0, radius = 4.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "earth spike"
+  text = "Halmgar calls; stone things climb out of his circles."
+  summon = ["rockling", "rockling"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "lightning"
+  text = "The circles on the floor flare white."
+  shove = 5.0
+  look = 26271

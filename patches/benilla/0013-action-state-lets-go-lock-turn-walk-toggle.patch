@@ -1,0 +1,146 @@
+Elwynn Survival: what the add-on held lets go when it can't, a slower lock-on turn, and a walk
+toggle that isn't lost.
+
+- Leaving the world (a logout) or a new UI VM (a ReloadUI, the add-on turned off) resets the action
+  mouse, aim camera, lock-on and markers, and drops a scripted MouselookStart nothing is left to
+  stop: the next screen has its cursor, and the hero doesn't keep steering or running.
+- The body turns to a locked-on unit at 5 rad/s (was 9): quick enough to keep a foe in front,
+  slow enough that one rolling past gets behind for a moment.
+- A TOGGLERUN press refused while rooted or riding a spline (the action server roots a hero for a
+  moment through many of its moves) waits and goes once it's off, instead of seeming to do nothing
+  and leaving the walk stuck.
+
+diff -ru a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1078,6 +1078,29 @@
+     }
+ }
+ 
++/// Leaving the world (a logout, a disconnect): the add-on's action mouse, aim camera, lock-on and
++/// markers all let go, so the next screen has its cursor whatever the add-on managed to undo.
++pub(super) fn reset_action_on_world_exit(mut lock: ResMut<LockOn>) {
++    action_combat::reset();
++    lock.0 = None;
++}
++
++/// A new UI VM (a `ReloadUI`, an add-on turned off): what the old one's add-on held is let go, as
++/// nothing is left to undo it; an add-on that wants it again asks again.
++pub(super) fn reset_action_on_new_vm(
++    script: Option<NonSend<benilla_ui::script::UiScript>>,
++    mut seen: Local<u64>,
++    mut lock: ResMut<LockOn>,
++) {
++    let Some(script) = script else { return };
++    let now = script.session();
++    if *seen != 0 && now != *seen {
++        action_combat::reset();
++        lock.0 = None;
++    }
++    *seen = now;
++}
++
+ /// The lock-on point, and letting go of a unit that's gone, dead or too far.
+ pub(super) fn track_lock_on(
+     mut lock: ResMut<LockOn>,
+@@ -1275,9 +1298,14 @@
+                 collect_nearby,
+                 track_lock_on,
+                 shuffle_on_lock_turn.after(drain_action_calls),
++                reset_action_on_new_vm,
+             ),
+         )
+         .add_systems(
++            OnExit(crate::client_state::ClientState::InWorld),
++            reset_action_on_world_exit,
++        )
++        .add_systems(
+             PostUpdate,
+             (
+                 apply_action_clips
+diff -ru a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -818,8 +818,16 @@
+     window: Single<&Window, With<PrimaryWindow>>,
+     mut hosted_vm: crate::script_calls::HostedVm,
+     cover: Option<Res<crate::loading_screen::LoadingScreen>>,
++    // Basin Battle: the VM whose script holds the look, so a new one (a `ReloadUI`, the add-on
++    // turned off) doesn't inherit a `MouselookStart` nothing is left to stop.
++    mut vm_seen: Local<u64>,
+ ) {
+     hosted_vm.run(|mut script| {
++        let session = script.as_ref().map_or(0, |s| s.session());
++        let swapped = *vm_seen != 0 && session != 0 && session != *vm_seen;
++        if session != 0 {
++            *vm_seen = session;
++        }
+         let calls = script
+             .as_mut()
+             .map(|s| s.take_look_calls())
+@@ -830,6 +838,9 @@
+         let over_ui = pointer_over_ui.0 || press_consumed.is_some_and(|c| c.0);
+         let world_press = rig.look.is_some() || (cursor_in_viewport(&window, camera) && !over_ui);
+         let wm = &mut rig.world_mouse;
++        if swapped {
++            wm.scripted = false;
++        }
+         wm.update(&buttons, world_press);
+         // The script's calls, made since the last latch, before this frame's release.
+         for call in calls {
+diff -ru a/crates/benilla-app/src/player/controller.rs b/crates/benilla-app/src/player/controller.rs
+--- a/crates/benilla-app/src/player/controller.rs
++++ b/crates/benilla-app/src/player/controller.rs
+@@ -974,8 +974,9 @@
+     })
+ }
+ 
+-/// How fast the body turns to a locked-on unit, radians a second.
+-const LOCK_TURN_RATE: f32 = 9.0;
++/// How fast the body turns to a locked-on unit, radians a second: about 290° a second, quick
++/// enough to keep a foe in front, slow enough that one rolling past gets behind for a moment.
++const LOCK_TURN_RATE: f32 = 5.0;
+ 
+ /// Basin Battle's action dash ([`benilla_ui::action_combat::take_dashes`]): the new ones queued, a
+ /// due one started (with the keys held now when it named none, a step back with none held), and
+diff -ru a/crates/benilla-app/src/player/walk.rs b/crates/benilla-app/src/player/walk.rs
+--- a/crates/benilla-app/src/player/walk.rs
++++ b/crates/benilla-app/src/player/walk.rs
+@@ -31,7 +31,9 @@
+     body: &BodyQuery,
+     binds: &crate::bindings::BindingsState,
+ ) {
+-    if !binds.fired(crate::bindings::Input::ToggleRun) {
++    use std::sync::atomic::Ordering;
++    let pressed = binds.fired(crate::bindings::Input::ToggleRun);
++    if !pressed && !PENDING.load(Ordering::Relaxed) {
+         return;
+     }
+     let dead = body
+@@ -45,13 +47,26 @@
+     let want = !player.walking;
+     if toggle_refused(dead, rooted, on_spline) {
+         // Silent, as in the reference; the trace tag ([`super::move_trace::gait`]) records it.
++        // Basin Battle deviation: the action server roots a hero for a moment through many of its
++        // moves, so a press refused then waits and goes once the root is off (a second press
++        // takes it back), rather than seeming to do nothing and leaving the walk stuck.
++        if pressed {
++            PENDING.fetch_xor(true, Ordering::Relaxed);
++        }
++        if dead {
++            PENDING.store(false, Ordering::Relaxed);
++        }
+         super::move_trace::gait("REFUSED", want, dead, rooted, on_spline);
+         return;
+     }
++    PENDING.store(false, Ordering::Relaxed);
+     player.walking = want;
+     super::move_trace::gait("commit", want, dead, rooted, on_spline);
+ }
+ 
++/// A `TOGGLERUN` press refused while rooted or riding a spline, still to go (Basin Battle).
++static PENDING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
++
+ #[cfg(test)]
+ mod tests {
+     use super::toggle_refused;

@@ -1,0 +1,1236 @@
+# The Hunter: a marksman with a beast at their side. Your wolf fights your target (or the nearest
+# enemy), comes back after a short rest if it falls, and grows with Beast Mastery.
+#   Beast Mastery - the pet: Claw, Mend Pet, Furious Howl, Intimidation, Bestial Wrath.
+#   Marksmanship  - shots: Arcane Shot, Aimed Shot, Multi-Shot, Hunter's Mark, Trueshot Aura.
+#   Survival      - traps and toughness: Serpent Sting, Freezing and Explosive Traps, Wyvern Sting.
+# The core spells feed each other: Arcane Shot hits poisoned enemies (Serpent Sting) harder,
+# and Hunter's Mark makes your target take more from you and your pet.
+# See mage.toml for how this file works.
+
+[[tree]]
+key = "beast_mastery"
+name = "Beast Mastery"
+text = "Your pet: Claw, Mend Pet, Intimidation, Bestial Wrath."
+icon = 1515
+background = "HunterBeastMastery"
+
+[[tree]]
+key = "marksmanship"
+name = "Marksmanship"
+text = "Shots: Aimed Shot, Multi-Shot, Hunter's Mark, Trueshot Aura."
+icon = 19434
+background = "HunterMarksmanship"
+
+[[tree]]
+key = "survival"
+name = "Survival"
+text = "Traps and toughness: Serpent Sting, Freezing Trap, Wyvern Sting."
+icon = 1499
+background = "HunterSurvival"
+
+# --- spells --------------------------------------------------------------------------------------
+
+[[spell]]
+key = "arcane_shot"
+name = "Arcane Shot"
+tree = "marksmanship"
+core = true
+kind = "bolt"
+school = "arcane"
+icon = 3044
+cooldown = 4
+damage = 1.0
+range = 35
+speed = 40
+vs_stung = 0.3
+note = "Serpent Sting poisons enemies."
+  [[spell.perk]]
+  key = "improved_arcane_shot_perk"
+  name = "Improved Arcane Shot"
+  text = "Cooldown 1 sec shorter."
+  add = { cooldown = -1 }
+  [[spell.perk]]
+  key = "trueshot"
+  name = "Trueshot"
+  text = "30% more damage."
+  add = { power = 0.3 }
+  [[spell.perk]]
+  key = "arcane_splinters_shot"
+  name = "Arcane Splinters"
+  rarity = "uncommon"
+  text = "40% of its damage also hits enemies within 6 yd of the target."
+  set = { splash = 0.4, splash_radius = 6 }
+  [[spell.perk]]
+  key = "hawk_eye_shot"
+  name = "Hawk Eye"
+  rarity = "uncommon"
+  text = "Reaches 8 yd further, with 10% more critical strike chance."
+  add = { range = 8, crit = 0.1 }
+  [[spell.perk]]
+  key = "chimera_shot"
+  name = "Venom Burst"
+  rarity = "rare"
+  text = "Sets off the target's Serpent Sting: 50% of what's left of it lands at once."
+  set = { detonate = 0.5 }
+
+[[spell]]
+key = "serpent_sting"
+name = "Serpent Sting"
+tree = "survival"
+core = true
+kind = "bolt"
+school = "nature"
+icon = 1978
+cooldown = 2.5
+range = 35
+speed = 40
+dot = 1.7
+dot_secs = 15
+note = "The target is Poisoned: Arcane Shot deals more to it. Without a target it seeks an enemy not yet stung."
+  [[spell.perk]]
+  key = "improved_serpent_sting_perk"
+  name = "Improved Serpent Sting"
+  text = "Poisons 35% more."
+  pct = { dot = 0.35 }
+  [[spell.perk]]
+  key = "lingering_venom"
+  name = "Lingering Venom"
+  text = "Lasts 6 sec longer, dealing 40% more."
+  add = { dot_secs = 6 }
+  pct = { dot = 0.4 }
+  [[spell.perk]]
+  key = "double_sting"
+  name = "Double Sting"
+  rarity = "uncommon"
+  text = "Also stings an enemy next to your target."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "wyverns_venom"
+  name = "Crippling Venom"
+  rarity = "uncommon"
+  text = "Slows the target by 30% for 6 sec."
+  set = { slow = 0.3, slow_secs = 6 }
+  [[spell.perk]]
+  key = "noxious_stings"
+  name = "Noxious Stings"
+  rarity = "rare"
+  text = "When a stung enemy dies, the venom jumps to 2 enemies nearby."
+  set = { spread_on_death = 2 }
+
+[[spell]]
+key = "claw"
+name = "Claw"
+tree = "beast_mastery"
+core = true
+kind = "pet"
+school = "physical"
+icon = 16827
+cooldown = 4
+damage = 1.0
+range = 40
+note = "Without a target it picks the nearest enemy."
+  [[spell.perk]]
+  key = "rake"
+  name = "Rake"
+  text = "Leaves a bleed for 0.6 times your hit over 9 sec."
+  set = { dot = 0.6, dot_secs = 9 }
+  [[spell.perk]]
+  key = "frenzied_claw"
+  name = "Frenzied Claw"
+  text = "Cooldown 1.5 sec shorter."
+  add = { cooldown = -1.5 }
+  [[spell.perk]]
+  key = "savage_claw"
+  name = "Savage Rend"
+  rarity = "uncommon"
+  text = "20% more critical strike chance, and its crits deal 30% more."
+  add = { crit = 0.2, crit_mult = 0.3 }
+  [[spell.perk]]
+  key = "pounce"
+  name = "Pounce"
+  rarity = "uncommon"
+  text = "25% chance to stun the target for 2 sec."
+  set = { stun_chance = 0.25, stun_secs = 2 }
+  [[spell.perk]]
+  key = "maul"
+  name = "Maul"
+  rarity = "rare"
+  text = "Also mauls 2 enemies next to the target."
+  add = { targets = 2 }
+
+[[spell]]
+key = "multi_shot"
+name = "Multi-Shot"
+tree = "marksmanship"
+kind = "bolt"
+school = "physical"
+icon = 2643
+cooldown = 6
+damage = 0.8
+targets = 2
+range = 35
+speed = 40
+note = ""
+  [[spell.perk]]
+  key = "improved_multi_shot"
+  name = "Improved Multi-Shot"
+  text = "Strikes 2 more enemies."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "quick_draw"
+  name = "Quick Draw"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "serpent_spread"
+  name = "Serpent Spread"
+  rarity = "uncommon"
+  text = "Poisons everything it hits, for 0.6 times your hit over 9 sec."
+  set = { dot = 0.6, dot_secs = 9 }
+  [[spell.perk]]
+  key = "barrage_perk"
+  name = "Barrage"
+  rarity = "uncommon"
+  text = "30% more damage."
+  add = { power = 0.3 }
+  [[spell.perk]]
+  key = "explosive_shot"
+  name = "Explosive Shot"
+  rarity = "rare"
+  text = "Each arrow explodes for 40% of its damage to enemies within 5 yd."
+  set = { splash = 0.4, splash_radius = 5 }
+
+[[spell]]
+key = "concussive_shot"
+name = "Concussive Shot"
+tree = "marksmanship"
+kind = "bolt"
+school = "physical"
+icon = 5116
+cooldown = 8
+damage = 0.5
+range = 35
+speed = 40
+slow = 0.5
+slow_secs = 4
+  [[spell.perk]]
+  key = "improved_concussive_shot_perk"
+  name = "Improved Concussive Shot"
+  text = "30% chance to stun for 3 sec."
+  set = { stun_chance = 0.3, stun_secs = 3 }
+  [[spell.perk]]
+  key = "quick_concussive"
+  name = "Quick Concussion"
+  text = "Cooldown 3 sec shorter."
+  add = { cooldown = -3 }
+  [[spell.perk]]
+  key = "scatter_concussive"
+  name = "Scattering Shot"
+  rarity = "uncommon"
+  text = "Also dazes 2 more enemies near your target."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "dazing_shot"
+  name = "Dazing Shot"
+  rarity = "uncommon"
+  text = "Deals 50% more to enemies already slowed, and slows 20% more."
+  add = { vs_chilled = 0.5, slow = 0.2 }
+  [[spell.perk]]
+  key = "binding_shot"
+  name = "Binding Shot"
+  rarity = "rare"
+  text = "Roots the target for 3 sec."
+  set = { root_secs = 3 }
+
+[[spell]]
+key = "hunters_mark"
+name = "Hunter's Mark"
+tree = "marksmanship"
+kind = "bolt"
+school = "arcane"
+icon = 1130
+cooldown = 4
+range = 40
+mark = 0.15
+note = "One mark at a time. Without a target it marks the toughest enemy near you. The Ancient's defences turn on your mark and hit it 25% harder."
+  [[spell.perk]]
+  key = "improved_hunters_mark_perk"
+  name = "Improved Hunter's Mark"
+  text = "The mark adds 10% more."
+  add = { mark = 0.1 }
+  [[spell.perk]]
+  key = "exposed"
+  name = "Expose Weakness"
+  text = "You have 10% more critical strike chance against the marked target."
+  set = { crit = 0.1 }
+  [[spell.perk]]
+  key = "hunters_prey"
+  name = "Hunter's Prey"
+  rarity = "uncommon"
+  text = "When the marked target dies, the mark jumps to the nearest enemy."
+  set = { jump_on_death = 1 }
+  [[spell.perk]]
+  key = "pack_leader"
+  name = "Pack Leader"
+  rarity = "uncommon"
+  text = "Your pet runs to the marked target and deals 25% more to it."
+  set = { buff_value = 0.25 }
+  [[spell.perk]]
+  key = "marked_for_death"
+  name = "Marked for Death"
+  rarity = "rare"
+  text = "When the marked target dies, your other spells' cooldowns finish."
+  set = { reset_on_kill = 1 }
+
+[[spell]]
+key = "volley"
+name = "Volley"
+tree = "marksmanship"
+rarity = "uncommon"
+kind = "zone"
+school = "physical"
+icon = 1510
+target = "cluster"
+cooldown = 14
+radius = 8
+duration = 6
+tick = 0.32
+range = 35
+  [[spell.perk]]
+  key = "improved_volley"
+  name = "Improved Volley"
+  text = "3 yd wider."
+  add = { radius = 3 }
+  [[spell.perk]]
+  key = "rain_of_arrows"
+  name = "Rain of Arrows"
+  text = "Lasts 3 sec longer."
+  add = { duration = 3 }
+  [[spell.perk]]
+  key = "barbed_volley"
+  name = "Barbed Arrows"
+  rarity = "uncommon"
+  text = "35% more damage each second."
+  pct = { tick = 0.35 }
+  [[spell.perk]]
+  key = "pinning_volley"
+  name = "Pinning Volley"
+  rarity = "uncommon"
+  text = "Slows everything in it by 40%."
+  set = { slow = 0.4, slow_secs = 2 }
+  [[spell.perk]]
+  key = "fire_volley"
+  name = "Fire Arrows"
+  rarity = "rare"
+  text = "Sets what it hits burning for 0.3 times your hit over 4 sec."
+  set = { dot = 0.3, dot_secs = 4 }
+
+[[spell]]
+key = "explosive_trap"
+name = "Explosive Trap"
+tree = "survival"
+rarity = "uncommon"
+kind = "trap"
+school = "fire"
+icon = 13813
+visual = 13812
+cooldown = 15
+damage = 1.0
+radius = 8
+duration = 8
+tick = 0.14
+trigger_radius = 4
+note = ""
+  [[spell.perk]]
+  key = "improved_explosive_trap"
+  name = "Clever Trap"
+  text = "35% more damage."
+  add = { power = 0.35 }
+  [[spell.perk]]
+  key = "quick_trap"
+  name = "Quick Trapping"
+  text = "Cooldown 4 sec shorter."
+  add = { cooldown = -4 }
+  [[spell.perk]]
+  key = "wide_explosion"
+  name = "Big Bang"
+  rarity = "uncommon"
+  text = "Explodes 4 yd wider."
+  add = { radius = 4 }
+  [[spell.perk]]
+  key = "concussive_blast"
+  name = "Concussive Blast"
+  rarity = "uncommon"
+  text = "Stuns everything it hits for 2 sec."
+  set = { stun_chance = 1, stun_secs = 2 }
+  [[spell.perk]]
+  key = "immolation"
+  name = "Immolation Trap"
+  rarity = "rare"
+  text = "Sets everything it hits burning for 1.2 times your hit over 10 sec."
+  set = { dot = 1.2, dot_secs = 10 }
+
+[[spell]]
+key = "freezing_trap"
+name = "Freezing Trap"
+tree = "survival"
+rarity = "uncommon"
+kind = "trap"
+school = "frost"
+icon = 1499
+visual = 3355
+cooldown = 18
+radius = 5
+freeze_chance = 1
+freeze_secs = 8
+trigger_radius = 4
+note = ""
+  [[spell.perk]]
+  key = "improved_freezing_trap"
+  name = "Deep Freeze"
+  text = "Freezes 3 sec longer."
+  add = { freeze_secs = 3 }
+  [[spell.perk]]
+  key = "quick_freeze_trap"
+  name = "Trap Launcher"
+  text = "Cooldown 5 sec shorter."
+  add = { cooldown = -5 }
+  [[spell.perk]]
+  key = "wide_freeze"
+  name = "Frost Trap"
+  rarity = "uncommon"
+  text = "Freezes 4 yd wider."
+  add = { radius = 4 }
+  [[spell.perk]]
+  key = "shattering_trap"
+  name = "Shattering Trap"
+  rarity = "uncommon"
+  text = "Deals 1 times your hit to what it freezes."
+  set = { damage = 1.0 }
+  [[spell.perk]]
+  key = "frost_lock"
+  name = "Frost Lock"
+  rarity = "rare"
+  text = "Frozen enemies take 3 Winter's Chill-style stacks: you crit them 6% more."
+  set = { vuln_frost = 3 }
+
+[[spell]]
+key = "aimed_shot"
+name = "Aimed Shot"
+tree = "marksmanship"
+rarity = "rare"
+kind = "bolt"
+school = "physical"
+icon = 19434
+cooldown = 9
+damage = 3.8
+range = 40
+speed = 50
+crit = 0.1
+cast = 2.5
+
+  [[spell.perk]]
+  key = "improved_aimed_shot"
+  name = "Steady Aim"
+  text = "Cooldown 3 sec shorter."
+  add = { cooldown = -3 }
+  [[spell.perk]]
+  key = "piercing_shot"
+  name = "Piercing Shots"
+  rarity = "uncommon"
+  text = "Leaves a bleed for 0.8 times your hit over 8 sec."
+  set = { dot = 0.8, dot_secs = 8 }
+  [[spell.perk]]
+  key = "sniper_training"
+  name = "Sniper Training"
+  rarity = "uncommon"
+  text = "20% more critical strike chance."
+  add = { crit = 0.2 }
+  [[spell.perk]]
+  key = "killing_shot"
+  name = "Kill Shot"
+  rarity = "uncommon"
+  text = "Deals double damage to enemies below 25% health."
+  set = { execute = 1.0, execute_at = 0.25 }
+  [[spell.perk]]
+  key = "careful_aim"
+  name = "Careful Aim"
+  rarity = "rare"
+  text = "Its crits deal 75% more."
+  add = { crit_mult = 0.75 }
+
+[[spell]]
+key = "rapid_fire"
+name = "Rapid Fire"
+tree = "marksmanship"
+rarity = "uncommon"
+kind = "buff"
+school = "physical"
+icon = 3045
+effect = "rapid_fire"
+cooldown = 45
+duration = 15
+buff_value = 0.4
+note = "For 15 sec your shots come 40% faster and your cooldowns recover 40% faster."
+  [[spell.perk]]
+  key = "improved_rapid_fire"
+  name = "Improved Rapid Fire"
+  text = "Cooldown 15 sec shorter."
+  add = { cooldown = -15 }
+  [[spell.perk]]
+  key = "sustained_fire"
+  name = "Sustained Fire"
+  text = "Lasts 5 sec longer."
+  add = { duration = 5 }
+  [[spell.perk]]
+  key = "rapid_killing"
+  name = "Rapid Killing"
+  rarity = "uncommon"
+  text = "20% faster again."
+  add = { buff_value = 0.2 }
+  [[spell.perk]]
+  key = "pack_fire"
+  name = "Call of the Wild"
+  rarity = "uncommon"
+  text = "Your pet attacks 40% faster while it lasts."
+  set = { buff_value2 = 0.4 }
+  [[spell.perk]]
+  key = "readiness"
+  name = "Readiness"
+  rarity = "rare"
+  text = "Casting it finishes the cooldowns of your other spells."
+  set = { reset_others = 1 }
+
+[[spell]]
+key = "mend_pet"
+name = "Mend Pet"
+tree = "beast_mastery"
+kind = "special"
+school = "nature"
+icon = 136
+effect = "mend_pet"
+cooldown = 12
+hot = 0.5
+hot_secs = 10
+note = "Heals your pet 50% of its health over 10 sec. If it has fallen, it comes back at once."
+  [[spell.perk]]
+  key = "improved_mend_pet"
+  name = "Improved Mend Pet"
+  text = "Heals 40% more."
+  pct = { hot = 0.4 }
+  [[spell.perk]]
+  key = "quick_mend"
+  name = "Quick Mend"
+  text = "Cooldown 4 sec shorter."
+  add = { cooldown = -4 }
+  [[spell.perk]]
+  key = "spirit_mend"
+  name = "Spirit Mend"
+  rarity = "uncommon"
+  text = "Also heals you 15% of your max health over 10 sec."
+  set = { heal = 0.15 }
+  [[spell.perk]]
+  key = "bestial_fury"
+  name = "Bestial Fury"
+  rarity = "uncommon"
+  text = "Your pet deals 30% more damage for 10 sec."
+  set = { buff_value = 0.3 }
+  [[spell.perk]]
+  key = "revive_pet"
+  name = "Revive Pet"
+  rarity = "rare"
+  text = "Also makes your pet take 40% less damage for 10 sec."
+  set = { buff_value2 = 0.4 }
+
+[[spell]]
+key = "furious_howl"
+name = "Furious Howl"
+tree = "beast_mastery"
+rarity = "uncommon"
+kind = "buff"
+school = "physical"
+icon = 24597
+effect = "furious_howl"
+target = "team"
+cooldown = 30
+duration = 10
+buff_value = 0.15
+range = 30
+note = "Your pet howls: you, your pet and allies within 30 yd deal 15% more damage for 10 sec."
+  [[spell.perk]]
+  key = "improved_howl"
+  name = "Improved Furious Howl"
+  text = "10% more damage again."
+  add = { buff_value = 0.1 }
+  [[spell.perk]]
+  key = "long_howl"
+  name = "Long Howl"
+  text = "Lasts 5 sec longer."
+  add = { duration = 5 }
+  [[spell.perk]]
+  key = "quick_howl"
+  name = "Call of the Pack"
+  rarity = "uncommon"
+  text = "Cooldown 8 sec shorter."
+  add = { cooldown = -8 }
+  [[spell.perk]]
+  key = "terrifying_howl"
+  name = "Terrifying Howl"
+  rarity = "uncommon"
+  text = "Enemies within 10 yd of your pet flee for 3 sec."
+  set = { fear_secs = 3, radius = 10 }
+  [[spell.perk]]
+  key = "rallying_howl"
+  name = "Rallying Howl"
+  rarity = "rare"
+  text = "Also heals everyone it reaches 10% of their max health."
+  set = { heal = 0.1 }
+
+[[spell]]
+key = "raptor_strike"
+name = "Raptor Strike"
+tree = "survival"
+kind = "bolt"
+school = "physical"
+icon = 2973
+cooldown = 5
+damage = 1.4
+range = 6
+note = ""
+  [[spell.perk]]
+  key = "wing_clip"
+  name = "Wing Clip"
+  text = "Slows the target by 50% for 6 sec."
+  set = { slow = 0.5, slow_secs = 6 }
+  [[spell.perk]]
+  key = "quick_raptor"
+  name = "Swift Strikes"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "mongoose_bite"
+  name = "Mongoose Bite"
+  rarity = "uncommon"
+  text = "25% more critical strike chance."
+  add = { crit = 0.25 }
+  [[spell.perk]]
+  key = "counterattack"
+  name = "Counterattack"
+  rarity = "uncommon"
+  text = "Roots the target for 3 sec."
+  set = { root_secs = 3 }
+  [[spell.perk]]
+  key = "carve"
+  name = "Carve"
+  rarity = "rare"
+  text = "Strikes 3 enemies next to the target too."
+  add = { targets = 3 }
+
+[[spell]]
+key = "feign_death"
+name = "Feign Death"
+tree = "survival"
+rarity = "uncommon"
+kind = "special"
+school = "physical"
+icon = 5384
+effect = "feign_death"
+cooldown = 30
+heal = 0.1
+radius = 30
+note = "Enemies attacking you lose interest and go back to the Ancient, and you recover 10% of your max health."
+  [[spell.perk]]
+  key = "improved_feign_death"
+  name = "Improved Feign Death"
+  text = "Cooldown 10 sec shorter."
+  add = { cooldown = -10 }
+  [[spell.perk]]
+  key = "playing_dead"
+  name = "Playing Dead"
+  text = "Recover 15% more health."
+  add = { heal = 0.15 }
+  [[spell.perk]]
+  key = "disengage"
+  name = "Disengage"
+  rarity = "uncommon"
+  text = "You run 40% faster for 4 sec after."
+  set = { speed_buff = 0.4, speed_secs = 4 }
+  [[spell.perk]]
+  key = "snake_trap"
+  name = "Snake Trap"
+  rarity = "uncommon"
+  text = "Leaves snakes behind: enemies within 8 yd are poisoned for 0.8 times your hit over 8 sec."
+  set = { dot = 0.8, dot_secs = 8, radius = 8 }
+  [[spell.perk]]
+  key = "flare"
+  name = "Flare"
+  rarity = "rare"
+  text = "Enemies within 10 yd are stunned for 2 sec."
+  set = { stun_chance = 1, stun_secs = 2, radius = 10 }
+
+# --- spells learned from talents ---------------------------------------------------------------
+
+[[spell]]
+key = "intimidation"
+name = "Intimidation"
+tree = "beast_mastery"
+talent = true
+kind = "pet"
+school = "physical"
+icon = 19577
+cooldown = 30
+damage = 1.0
+range = 40
+stun_chance = 1
+stun_secs = 3
+note = ""
+
+[[spell]]
+key = "bestial_wrath"
+name = "Bestial Wrath"
+tree = "beast_mastery"
+talent = true
+kind = "buff"
+school = "physical"
+icon = 19574
+effect = "bestial_wrath"
+cooldown = 60
+duration = 18
+buff_value = 0.5
+note = "For 18 sec your pet deals 50% more damage and takes 50% less."
+
+[[spell]]
+key = "scatter_shot"
+name = "Scatter Shot"
+tree = "marksmanship"
+talent = true
+kind = "bolt"
+school = "physical"
+icon = 19503
+cooldown = 30
+damage = 0.5
+range = 20
+speed = 40
+splash = 0.01
+splash_radius = 5
+stun_chance = 1
+stun_secs = 4
+note = "Enemies within 5 yd of it are stunned too."
+
+[[spell]]
+key = "deterrence"
+name = "Deterrence"
+tree = "survival"
+talent = true
+kind = "buff"
+school = "physical"
+icon = 19263
+effect = "deterrence"
+cooldown = 60
+duration = 10
+buff_value = 0.5
+note = "For 10 sec you take 50% less damage."
+
+[[spell]]
+key = "wyvern_sting"
+name = "Wyvern Sting"
+tree = "survival"
+talent = true
+kind = "bolt"
+school = "nature"
+icon = 19386
+cooldown = 30
+range = 35
+speed = 40
+splash = 0.01
+splash_radius = 6
+freeze_chance = 1
+freeze_secs = 5
+dot = 1.2
+dot_secs = 6
+note = "Enemies within 6 yd of it are caught too: they sleep, then the venom burns."
+
+# --- talents --------------------------------------------------------------------------------------
+
+# Beast Mastery
+
+[[talent]]
+key = "endurance_training"
+name = "Endurance Training"
+tree = "beast_mastery"
+tier = 1
+col = 1
+ranks = 3
+icon = 19583
+text = "Your pet has {0%} more health, and you {1%} more."
+values = [0.1, 0.02]
+  [[talent.effect]]
+  stats = { pet_health = 0.1, health = 0.02 }
+
+[[talent]]
+key = "improved_aspect_of_the_hawk"
+name = "Improved Aspect of the Hawk"
+tree = "beast_mastery"
+tier = 1
+col = 2
+ranks = 3
+icon = 19552
+text = "Your Auto Shots have a {0%} chance to give you Quick Shots: 30% faster shots for 8 sec."
+values = [0.03]
+  [[talent.effect]]
+  proc = "quick_shots"
+  amount = 0.03
+
+[[talent]]
+key = "unleashed_fury"
+name = "Unleashed Fury"
+tree = "beast_mastery"
+tier = 2
+col = 1
+ranks = 3
+icon = 19616
+text = "Your pet deals {0%} more damage."
+values = [0.08]
+  [[talent.effect]]
+  stats = { pet_damage = 0.08 }
+
+[[talent]]
+key = "thick_hide"
+name = "Thick Hide"
+tree = "beast_mastery"
+tier = 2
+col = 2
+ranks = 2
+icon = 16929
+text = "Your pet takes {0%} less damage."
+values = [0.1]
+  [[talent.effect]]
+  stats = { pet_taken = 0.1 }
+
+[[talent]]
+key = "improved_revive_pet"
+name = "Improved Revive Pet"
+tree = "beast_mastery"
+tier = 2
+col = 3
+ranks = 2
+icon = 24443
+text = "Your pet comes back {0s} sooner when it falls."
+values = [3]
+  [[talent.effect]]
+  stats = { respawn = 3 }
+
+[[talent]]
+key = "ferocity"
+name = "Ferocity"
+tree = "beast_mastery"
+tier = 3
+col = 1
+ranks = 3
+icon = 19598
+text = "Your pet has {0%} more critical strike chance."
+values = [0.04]
+  [[talent.effect]]
+  stats = { pet_crit = 0.04 }
+
+[[talent]]
+key = "intimidation"
+name = "Intimidation"
+tree = "beast_mastery"
+tier = 3
+col = 2
+icon = 19577
+text = "Learn Intimidation: your pet charges your target and stuns it for 3 sec."
+grants = "intimidation"
+
+[[talent]]
+key = "spirit_bond"
+name = "Spirit Bond"
+tree = "beast_mastery"
+tier = 4
+col = 1
+ranks = 2
+icon = 19578
+text = "You and your pet regenerate {0%} of max health every second."
+values = [0.005]
+  [[talent.effect]]
+  stats = { regen = 0.005, pet_regen = 0.005 }
+
+[[talent]]
+key = "frenzy"
+name = "Frenzy"
+tree = "beast_mastery"
+tier = 4
+col = 2
+ranks = 3
+icon = 19621
+text = "Your pet's critical strikes have a {0%} chance to make it attack 30% faster for 8 sec."
+values = [0.25]
+  [[talent.effect]]
+  proc = "frenzy"
+  amount = 0.25
+
+[[talent]]
+key = "bestial_wrath"
+name = "Bestial Wrath"
+tree = "beast_mastery"
+tier = 5
+col = 2
+icon = 19574
+text = "Learn Bestial Wrath: for 18 sec your pet deals 50% more damage and takes 50% less."
+grants = "bestial_wrath"
+
+# Marksmanship
+
+[[talent]]
+key = "lethal_shots"
+name = "Lethal Shots"
+tree = "marksmanship"
+tier = 1
+col = 1
+ranks = 3
+icon = 19426
+text = "{0%} more critical strike chance."
+values = [0.02]
+  [[talent.effect]]
+  stats = { crit = 0.02 }
+
+[[talent]]
+key = "improved_concussive_shot"
+name = "Improved Concussive Shot"
+tree = "marksmanship"
+tier = 1
+col = 2
+ranks = 2
+icon = 19407
+text = "Concussive Shot has a {0%} chance to stun for 3 sec."
+values = [0.1]
+  [[talent.effect]]
+  spells = "concussive_shot"
+  add = { stun_chance = 0.1 }
+  set = { stun_secs = 3 }
+
+[[talent]]
+key = "improved_hunters_mark"
+name = "Improved Hunter's Mark"
+tree = "marksmanship"
+tier = 2
+col = 1
+ranks = 3
+icon = 19421
+text = "Hunter's Mark adds {0%} more."
+values = [0.05]
+  [[talent.effect]]
+  spells = "hunters_mark"
+  add = { mark = 0.05 }
+
+[[talent]]
+key = "improved_arcane_shot"
+name = "Improved Arcane Shot"
+tree = "marksmanship"
+tier = 2
+col = 2
+ranks = 2
+icon = 19454
+text = "Arcane Shot recovers {0s} faster."
+values = [0.5]
+  [[talent.effect]]
+  spells = "arcane_shot"
+  add = { cooldown = -0.5 }
+
+[[talent]]
+key = "hawk_eye"
+name = "Hawk Eye"
+tree = "marksmanship"
+tier = 3
+col = 1
+ranks = 2
+icon = 19498
+text = "Your shots reach {0yd} further."
+values = [3]
+  [[talent.effect]]
+  spells = "all"
+  more = { range = 3 }
+
+[[talent]]
+key = "mortal_shots"
+name = "Mortal Shots"
+tree = "marksmanship"
+tier = 3
+col = 2
+ranks = 3
+icon = 19485
+text = "Your critical strikes deal {0%} more damage."
+values = [0.1]
+  [[talent.effect]]
+  spells = "all"
+  add = { crit_mult = 0.1 }
+
+[[talent]]
+key = "scatter_shot"
+name = "Scatter Shot"
+tree = "marksmanship"
+tier = 4
+col = 1
+icon = 19503
+text = "Learn Scatter Shot: stuns the target and enemies near it for 4 sec."
+grants = "scatter_shot"
+
+[[talent]]
+key = "barrage"
+name = "Barrage"
+tree = "marksmanship"
+tier = 4
+col = 2
+ranks = 3
+icon = 19461
+text = "Multi-Shot and Volley deal {0%} more damage."
+values = [0.08]
+  [[talent.effect]]
+  spells = "multi_shot,volley"
+  add = { power = 0.08 }
+
+[[talent]]
+key = "trueshot_aura"
+name = "Trueshot Aura"
+tree = "marksmanship"
+tier = 5
+col = 1
+icon = 19506
+text = "You and allies within 30 yd deal 8% more damage."
+  [[talent.effect]]
+  team = { damage = 0.08 }
+
+[[talent]]
+key = "ranged_weapon_specialization"
+name = "Ranged Weapon Specialization"
+tree = "marksmanship"
+tier = 5
+col = 3
+ranks = 3
+icon = 19507
+text = "Your shots and Auto Shot deal {0%} more damage."
+values = [0.04]
+  [[talent.effect]]
+  spells = "school:physical"
+  add = { power = 0.04 }
+  [[talent.effect]]
+  spells = "school:arcane"
+  add = { power = 0.04 }
+  [[talent.effect]]
+  stats = { auto = 0.04 }
+
+# Survival
+
+[[talent]]
+key = "monster_slaying"
+name = "Monster Slaying"
+tree = "survival"
+tier = 1
+col = 1
+ranks = 3
+icon = 24293
+text = "You deal {0%} more damage to elites and bosses."
+values = [0.04]
+  [[talent.effect]]
+  stats = { elite_damage = 0.04 }
+
+[[talent]]
+key = "survivalist"
+name = "Survivalist"
+tree = "survival"
+tier = 1
+col = 2
+ranks = 3
+icon = 19255
+text = "{0%} more max health."
+values = [0.04]
+  [[talent.effect]]
+  stats = { health = 0.04 }
+
+[[talent]]
+key = "clever_traps"
+name = "Clever Traps"
+tree = "survival"
+tier = 2
+col = 1
+ranks = 2
+icon = 19239
+text = "Your traps deal {0%} more and freeze {1s} longer."
+values = [0.15, 1]
+  [[talent.effect]]
+  spells = "kind:trap"
+  add = { power = 0.15 }
+  more = { freeze_secs = 1 }
+
+[[talent]]
+key = "entrapment"
+name = "Entrapment"
+tree = "survival"
+tier = 2
+col = 2
+ranks = 2
+icon = 19184
+text = "Your traps and Raptor Strike root what they hit for {0s}."
+values = [1.5]
+  [[talent.effect]]
+  spells = "kind:trap,raptor_strike"
+  add = { root_secs = 1.5 }
+
+[[talent]]
+key = "savage_strikes"
+name = "Savage Strikes"
+tree = "survival"
+tier = 2
+col = 3
+ranks = 2
+icon = 19159
+text = "Raptor Strike and Claw have {0%} more critical strike chance."
+values = [0.1]
+  [[talent.effect]]
+  spells = "raptor_strike,claw"
+  add = { crit = 0.1 }
+
+[[talent]]
+key = "trap_mastery"
+name = "Trap Mastery"
+tree = "survival"
+tier = 3
+col = 1
+ranks = 2
+icon = 19376
+text = "Your traps recover {0s} faster."
+values = [2]
+  [[talent.effect]]
+  spells = "kind:trap"
+  add = { cooldown = -2 }
+
+[[talent]]
+key = "deterrence"
+name = "Deterrence"
+tree = "survival"
+tier = 3
+col = 2
+icon = 19263
+text = "Learn Deterrence: for 10 sec you take 50% less damage."
+grants = "deterrence"
+
+[[talent]]
+key = "killer_instinct"
+name = "Killer Instinct"
+tree = "survival"
+tier = 4
+col = 1
+ranks = 3
+icon = 19370
+text = "{0%} more critical strike chance."
+values = [0.02]
+  [[talent.effect]]
+  stats = { crit = 0.02 }
+
+[[talent]]
+key = "lightning_reflexes"
+name = "Lightning Reflexes"
+tree = "survival"
+tier = 4
+col = 2
+ranks = 3
+icon = 4778
+text = "You deal {0%} more damage and run {1%} faster."
+values = [0.03, 0.02]
+  [[talent.effect]]
+  stats = { damage = 0.03, speed = 0.02 }
+
+[[talent]]
+key = "wyvern_sting"
+name = "Wyvern Sting"
+tree = "survival"
+tier = 5
+col = 2
+icon = 19386
+text = "Learn Wyvern Sting: puts the target and enemies near it to sleep for 5 sec, then poisons them."
+grants = "wyvern_sting"
+
+
+# --- combinations: offered only to a hunter holding both spells --------------------------------------
+
+[[talent]]
+key = "venom_shot"
+name = "Venom Shot"
+tree = "marksmanship"
+tier = 3
+col = 4
+icon = 3044
+text = "With Arcane Shot and Serpent Sting: Arcane Shot deals 40% more to stung enemies."
+requires = ["arcane_shot", "serpent_sting"]
+  [[talent.effect]]
+  spells = "arcane_shot"
+  add = { vs_stung = 0.4 }
+
+[[talent]]
+key = "marked_volley"
+name = "Marked Volley"
+tree = "marksmanship"
+tier = 4
+col = 4
+icon = 2643
+text = "With Hunter's Mark and Multi-Shot: Multi-Shot strikes one more enemy and deals 40% more to marked ones."
+requires = ["hunters_mark", "multi_shot"]
+  [[talent.effect]]
+  spells = "multi_shot"
+  add = { vs_marked = 0.4, targets = 1 }
+
+[[talent]]
+key = "coordinated_assault"
+name = "Coordinated Assault"
+tree = "beast_mastery"
+tier = 3
+col = 4
+icon = 1082
+text = "With Claw and Hunter's Mark: your pet's Claw deals 50% more to marked enemies."
+requires = ["claw", "hunters_mark"]
+  [[talent.effect]]
+  spells = "claw"
+  add = { vs_marked = 0.5 }
+
+[[talent]]
+key = "primal_howl"
+name = "Primal Howl"
+tree = "beast_mastery"
+tier = 4
+col = 4
+icon = 24604
+text = "With Furious Howl and Bestial Wrath: Furious Howl comes back 5 sec sooner and Bestial Wrath 15 sec sooner."
+requires = ["furious_howl", "bestial_wrath"]
+  [[talent.effect]]
+  spells = "furious_howl"
+  add = { cooldown = -5 }
+  [[talent.effect]]
+  spells = "bestial_wrath"
+  add = { cooldown = -15 }
+
+[[talent]]
+key = "trap_and_shoot"
+name = "Trap and Shoot"
+tree = "survival"
+tier = 3
+col = 4
+icon = 1499
+text = "With Freezing Trap and Aimed Shot: Aimed Shot deals 50% more to frozen enemies."
+requires = ["freezing_trap", "aimed_shot"]
+  [[talent.effect]]
+  spells = "aimed_shot"
+  add = { vs_frozen = 0.5 }
+
+[[talent]]
+key = "scorched_volley"
+name = "Scorched Volley"
+tree = "survival"
+tier = 4
+col = 4
+icon = 13813
+text = "With Explosive Trap and Volley: Volley covers 2 yd more and deals 40% more to burning enemies."
+requires = ["explosive_trap", "volley"]
+  [[talent.effect]]
+  spells = "volley"
+  add = { vs_burning = 0.4, radius = 2 }

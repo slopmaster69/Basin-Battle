@@ -1,0 +1,288 @@
+From c9a3236f22e08e39ae555c1e7e86198d8f381975 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Wed, 28 Oct 2026 17:56:43 -0600
+Subject: [PATCH] Action-combat mouse and aiming camera for Elwynn Survival
+
+SetActionMouse(on): the left button is the add-on's (its BUTTON1 binding), never the camera's;
+the middle button orbits and selects in its place; left+right still runs, except while aiming.
+SetAimCamera(on[, back, right, up]): ease the camera in over the right shoulder, steadier look.
+HasActionCombat(): 1 on a client with these.
+---
+ crates/benilla-app/src/player/camera.rs | 52 +++++++++++--
+ crates/benilla-app/src/target/mod.rs    | 10 ++-
+ crates/benilla-ui/src/action_combat.rs  | 99 +++++++++++++++++++++++++
+ crates/benilla-ui/src/lib.rs            |  1 +
+ crates/benilla-ui/src/script/mod.rs     |  2 +
+ 5 files changed, 157 insertions(+), 7 deletions(-)
+ create mode 100644 crates/benilla-ui/src/action_combat.rs
+
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index 3f9c8cfe..d6a83498 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -595,6 +595,9 @@ pub(crate) struct CameraControl {
+     /// `[cam+0x90] & 0x30000`, written only by the solver `0x50e570`, [`SmartPivot`]'s sixth
+     /// conjunct; the look session reads it a frame later, as `0x50fee0` (from `0x514446`) does.
+     pub(super) clipped: bool,
++    /// Basin Battle's aiming camera, 0 (off) to 1 (in close over the shoulder), eased toward
++    /// what [`benilla_ui::action_combat::aim_camera`] asks for.
++    pub(super) aim_blend: f32,
+ }
+ 
+ impl CameraControl {
+@@ -642,11 +645,20 @@ impl LookButton {
+     fn button(self) -> MouseButton {
+         match self {
+             LookButton::Right => MouseButton::Right,
++            // Basin Battle's action mouse: the middle button plays the left button's world part
++            // (orbit, select), and the left button is the add-on's.
++            LookButton::Left if benilla_ui::action_combat::action_mouse() => MouseButton::Middle,
+             LookButton::Left => MouseButton::Left,
+         }
+     }
+ }
+ 
++/// How fast the aiming camera eases in and out (per second, exponential): most of the way in a
++/// fifth of a second.
++const AIM_EASE_RATE: f32 = 14.0;
++/// The look slows by this share at full aim, for a steadier hand.
++const AIM_LOOK_DAMPING: f32 = 0.3;
++
+ /// The mouse buttons the world owns, latched at the press, and the two channels they drive. 1.12
+ /// reads the `TurnOrAction` and `CameraOrSelectOrMove` bindings, which a press a UI frame captured
+ /// never dispatches: no mouse bit in `[InputControl+0x4]`, no look session, no [`FollowState`].
+@@ -669,6 +681,10 @@ pub(super) struct WorldMouse {
+     /// The fourth argument of this frame's last mouse-bit release, which `0x50f940` stores as the
+     /// camera's sticky bit when the release ends mouselook; `None` with no release call.
+     release_sticky: Option<bool>,
++    /// Under the action mouse: the left button held from a world press, which still makes the
++    /// both-button run with the right (not while aiming), and its down edge this frame.
++    left_run: bool,
++    left_run_down: bool,
+ }
+ 
+ impl WorldMouse {
+@@ -695,14 +711,20 @@ impl WorldMouse {
+     }
+ 
+     /// Both channels held: the both-button run (`0x514da0` nets `0x1` and `0x2` as forward).
++    /// Under the action mouse the left button still runs with the right, but not while aiming.
+     pub(super) fn both(&self) -> bool {
+-        self.turn() && self.held(LookButton::Left)
++        self.turn()
++            && (self.held(LookButton::Left)
++                || (self.left_run && !benilla_ui::action_combat::aim_camera()))
+     }
+ 
+     /// A channel rose this frame, by a press or a `MouselookStart`: with [`Self::both`], the
+     /// transition into the both-button run (`0x514a73`, in the set helper both reach).
+     pub(super) fn rose(&self) -> bool {
+-        self.down(LookButton::Left) || self.down(LookButton::Right) || self.scripted_rise
++        self.down(LookButton::Left)
++            || self.down(LookButton::Right)
++            || self.scripted_rise
++            || self.left_run_down
+     }
+ 
+     /// A `MouselookStart`/`Stop` this frame: no click may settle from the gesture in flight.
+@@ -722,6 +744,14 @@ impl WorldMouse {
+             self.down[i] = world_press && buttons.just_pressed(b.button());
+             self.held[i] = (self.held[i] || self.down[i]) && buttons.pressed(b.button());
+         }
++        if benilla_ui::action_combat::action_mouse() {
++            self.left_run_down = world_press && buttons.just_pressed(MouseButton::Left);
++            self.left_run =
++                (self.left_run || self.left_run_down) && buttons.pressed(MouseButton::Left);
++        } else {
++            self.left_run = false;
++            self.left_run_down = false;
++        }
+     }
+ 
+     /// `MouselookStart` (`on`) or `MouselookStop`: one bit, whoever set it, so a stop also ends
+@@ -899,7 +929,8 @@ pub(super) fn run_look_session(
+     }
+     // Both tests accumulate the rotation the press asked for, charged before the pitch clamp: the
+     // reference accumulates raw motion, so a drag pinned at the pitch limit still spends budget.
+-    let (yaw_rate, pitch_rate) = (look_cfg.yaw_rate(), look_cfg.pitch_rate());
++    let steady = 1.0 - AIM_LOOK_DAMPING * rig.aim_blend;
++    let (yaw_rate, pitch_rate) = (look_cfg.yaw_rate() * steady, look_cfg.pitch_rate() * steady);
+     let dyaw = (motion.x * yaw_rate).abs();
+     let dpitch = (motion.y * pitch_rate).abs();
+     for test in [&mut *left_click, &mut *right_click].into_iter().flatten() {
+@@ -1279,8 +1310,19 @@ pub(super) fn seat_camera(
+     };
+     // `Transform::forward()` is exactly `rotation * -Z`; computed here so the write can be gated.
+     let cam_fwd = arm_rotation * Vec3::NEG_Z;
+-    let pivot = player_pos + Vec3::Y * cam_pivot_height;
+-    let seat = pivot - cam_fwd * rig.distance;
++    // Basin Battle's aiming camera: in close over the right shoulder while an add-on asks, eased
++    // both ways. First person stays first person.
++    let want = if benilla_ui::action_combat::aim_camera() { 1.0 } else { 0.0 };
++    rig.aim_blend += (want - rig.aim_blend) * (1.0 - (-AIM_EASE_RATE * dt).exp());
++    if (want - rig.aim_blend).abs() < 1.0e-3 {
++        rig.aim_blend = want;
++    }
++    let blend = if rig.distance < 0.75 { 0.0 } else { rig.aim_blend };
++    let (aim_back, aim_right, aim_up) = benilla_ui::action_combat::aim_shape();
++    let distance = rig.distance + (aim_back - rig.distance) * blend;
++    let shoulder = (arm_rotation * Vec3::X) * (aim_right * blend) + Vec3::Y * (aim_up * blend);
++    let pivot = player_pos + Vec3::Y * cam_pivot_height + shoulder;
++    let seat = pivot - cam_fwd * distance;
+     let boom = seat - head;
+     let boom_len = boom.length().max(1.0e-3);
+     // The camera collides with the WMO camera/LOS faces (DETAIL kept, NOCAMCOLLIDE dropped),
+diff --git a/crates/benilla-app/src/target/mod.rs b/crates/benilla-app/src/target/mod.rs
+index aff7c6ee..5662721e 100644
+--- a/crates/benilla-app/src/target/mod.rs
++++ b/crates/benilla-app/src/target/mod.rs
+@@ -231,8 +231,14 @@ pub(crate) fn latch_press_pick(
+ ) {
+     // Either button's down edge arms a pick (`0x514810`, clickModes 1 and 2); a chord does not
+     // re-latch, as `0x51481a` refuses to arm while the other button is held.
+-    let left = buttons.just_pressed(MouseButton::Left) && !buttons.pressed(MouseButton::Right);
+-    let right = buttons.just_pressed(MouseButton::Right) && !buttons.pressed(MouseButton::Left);
++    // Basin Battle's action mouse: the middle button selects in the left button's stead.
++    let primary = if benilla_ui::action_combat::action_mouse() {
++        MouseButton::Middle
++    } else {
++        MouseButton::Left
++    };
++    let left = buttons.just_pressed(primary) && !buttons.pressed(MouseButton::Right);
++    let right = buttons.just_pressed(MouseButton::Right) && !buttons.pressed(primary);
+     if !(left || right) {
+         return;
+     }
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+new file mode 100644
+index 00000000..68f87abc
+--- /dev/null
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -0,0 +1,99 @@
++//! Basin Battle's action-combat extension, not part of 1.12.1: a soulslike mouse and an aiming
++//! camera for the Elwynn Survival add-on. Everything here is off until an add-on switches it on,
++//! so the stock client behaves exactly as before.
++//!
++//! - `SetActionMouse(on)`: the left button belongs to the add-on (its `BUTTON1` binding: a swing
++//!   or a shot) and never to the camera, so it neither drags the view nor selects. The middle
++//!   button takes over the left button's world role: drag to orbit the camera, click to select
++//!   or use. Holding left and right together still runs forward, except while the aiming camera
++//!   is up.
++//! - `SetAimCamera(on[, distance[, right[, up]]])`: ease the camera in close over the right
++//!   shoulder (yards back, to the right, and up from the framing pivot), slow the look a little
++//!   for precision, and keep a left click from running while it's up.
++//! - `HasActionCombat()`: 1, so an add-on can tell this client from a stock one.
++
++use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
++
++use mlua::{Lua, MultiValue, Value};
++
++static ACTION_MOUSE: AtomicBool = AtomicBool::new(false);
++static AIM_CAMERA: AtomicBool = AtomicBool::new(false);
++static AIM_DISTANCE: AtomicU32 = AtomicU32::new(2.4f32.to_bits());
++static AIM_RIGHT: AtomicU32 = AtomicU32::new(0.75f32.to_bits());
++static AIM_UP: AtomicU32 = AtomicU32::new(0.25f32.to_bits());
++
++/// The left button is the add-on's and the middle button plays the stock left button's part.
++pub fn action_mouse() -> bool {
++    ACTION_MOUSE.load(Ordering::Relaxed)
++}
++
++/// The over-the-shoulder aiming camera is wanted.
++pub fn aim_camera() -> bool {
++    AIM_CAMERA.load(Ordering::Relaxed)
++}
++
++/// The aiming camera's seat: yards behind the pivot, to its right, and above it.
++pub fn aim_shape() -> (f32, f32, f32) {
++    let f = |a: &AtomicU32| f32::from_bits(a.load(Ordering::Relaxed));
++    (f(&AIM_DISTANCE), f(&AIM_RIGHT), f(&AIM_UP))
++}
++
++/// Switch both off (leaving the world, a new session).
++pub fn reset() {
++    ACTION_MOUSE.store(false, Ordering::Relaxed);
++    AIM_CAMERA.store(false, Ordering::Relaxed);
++}
++
++/// A Lua truth as the 1.12 API reads flags: nil, false and 0 are off.
++fn truthy(v: Option<&Value>) -> bool {
++    match v {
++        None | Some(Value::Nil) => false,
++        Some(Value::Boolean(b)) => *b,
++        Some(Value::Integer(i)) => *i != 0,
++        Some(Value::Number(n)) => *n != 0.0,
++        Some(_) => true,
++    }
++}
++
++fn number(v: Option<&Value>, lo: f32, hi: f32) -> Option<f32> {
++    let n = match v? {
++        Value::Integer(i) => *i as f32,
++        Value::Number(n) => *n as f32,
++        Value::String(s) => s.to_str().ok()?.trim().parse::<f32>().ok()?,
++        _ => return None,
++    };
++    n.is_finite().then(|| n.clamp(lo, hi))
++}
++
++pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
++    let g = lua.globals();
++    g.set(
++        "SetActionMouse",
++        lua.create_function(|_, args: MultiValue| {
++            ACTION_MOUSE.store(truthy(args.front()), Ordering::Relaxed);
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "SetAimCamera",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(d) = number(v.get(1), 0.5, 15.0) {
++                AIM_DISTANCE.store(d.to_bits(), Ordering::Relaxed);
++            }
++            if let Some(r) = number(v.get(2), -3.0, 3.0) {
++                AIM_RIGHT.store(r.to_bits(), Ordering::Relaxed);
++            }
++            if let Some(u) = number(v.get(3), -2.0, 3.0) {
++                AIM_UP.store(u.to_bits(), Ordering::Relaxed);
++            }
++            AIM_CAMERA.store(truthy(v.first()), Ordering::Relaxed);
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "HasActionCombat",
++        lua.create_function(|_, _: MultiValue| Ok(1))?,
++    )?;
++    Ok(())
++}
+diff --git a/crates/benilla-ui/src/lib.rs b/crates/benilla-ui/src/lib.rs
+index 543500ec..7eb3794c 100644
+--- a/crates/benilla-ui/src/lib.rs
++++ b/crates/benilla-ui/src/lib.rs
+@@ -5,6 +5,7 @@
+ // the same API through `benilla_ui::mlua`.
+ pub extern crate benilla_mlua as mlua;
+ 
++pub mod action_combat;
+ pub mod auction_sort;
+ pub mod bindings_xml;
+ pub mod civil;
+diff --git a/crates/benilla-ui/src/script/mod.rs b/crates/benilla-ui/src/script/mod.rs
+index e3bf0e23..12b3bf1f 100644
+--- a/crates/benilla-ui/src/script/mod.rs
++++ b/crates/benilla-ui/src/script/mod.rs
+@@ -744,6 +744,8 @@ fn install_in_game(lua: &Lua) -> mlua::Result<()> {
+     follow::install(lua)?;
+     camera_view::install(lua)?;
+     input_verbs::install(lua)?;
++    // Basin Battle's action-combat extension (`SetActionMouse`, `SetAimCamera`).
++    crate::action_combat::install(lua)?;
+     session::install(lua)?;
+     pvp::install(lua)?;
+     worn_display::install(lua)?;
+-- 
+2.43.0
+

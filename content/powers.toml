@@ -1,0 +1,342 @@
+# Basin Battle: powers, the picks that change a run.
+#
+#   source = "escalation"  offered (with cards.toml's legendaries) when the run escalates
+#   source = "boss"        offered when a boss falls, in place of an ordinary card: a boss's own
+#                          (`boss` = its key in game.toml) or any boss's
+#   class                  only for this class (its spell patches may name its spells)
+#   icon                   the spell whose icon the card and the buff bar show
+#   aura                   a spell whose lasting look the hero wears while they hold it
+#   grow                   how much bigger it makes the hero (0.2: 20%)
+#   rarity                 legendary (escalations) or epic (bosses), by default
+#   [[power.effect]]       as an item's: `stats` (kit.rs ITEM_STATS), `team` (an aura on you and
+#                          allies within 30 yd), a `proc` with an `amount`, or a spell patch with
+#                          `spells` (all, school:fire, tree:arms, kind:nova, or spell keys) and
+#                          add / pct / set / more on the spell's numbers.
+#
+# Entry order doesn't matter to the client: add, remove and reorder freely.
+
+# --- Escalation legendaries: for everyone -----------------------------------------------------------
+
+[[power]]
+key = "colossus"
+name = "Colossus"
+source = "escalation"
+icon = 12975
+grow = 0.25
+text = "You grow a quarter taller: 35% more max health, 12% less damage taken, and you move 8% slower."
+  [[power.effect]]
+  stats = { health = 0.35, taken = 0.12, speed = -0.08 }
+
+[[power]]
+key = "stormcaller"
+name = "Stormcaller"
+source = "escalation"
+icon = 324
+aura = 324
+text = "Lightning wreathes you: enemies that strike you in melee take 0.6 times your hit, the first 3 to hit you each wave take twice your hit, and you attack and cast 10% faster."
+  [[power.effect]]
+  stats = { thorns = 0.6, lightning = 2.0, haste = 0.10 }
+
+[[power]]
+key = "wrath_of_the_basin"
+name = "Wrath of the Basin"
+source = "escalation"
+icon = 1719
+aura = 1719
+text = "A red fury: you deal 20% more damage and crit 10% more often, but take 10% more."
+  [[power.effect]]
+  stats = { damage = 0.20, crit = 0.10, taken = -0.10 }
+
+[[power]]
+key = "guardian_of_the_ancient"
+name = "Guardian of the Ancient"
+source = "escalation"
+icon = 22812
+aura = 22812
+text = "Bark covers you: 10% of all your damage heals the Ancient, defences within 20 yd of you deal 50% more, and you take 8% less."
+  [[power.effect]]
+  stats = { hub_leech = 0.10, defence_aura = 0.50, taken = 0.08 }
+
+# --- Escalation legendaries: by class --------------------------------------------------------------
+
+[[power]]
+key = "titans_grip"
+name = "Titan's Grip"
+source = "escalation"
+class = "warrior"
+icon = 12294
+aura = 12328
+text = "Heroic Strike, Mortal Strike, Execute and Bloodthirst cleave 2 more enemies and deal 25% more."
+  [[power.effect]]
+  spells = "heroic_strike,mortal_strike,execute,bloodthirst"
+  add = { targets = 2, power = 0.25 }
+
+[[power]]
+key = "unbreakable"
+name = "Unbreakable"
+source = "escalation"
+class = "warrior"
+icon = 20230
+aura = 20230
+text = "You take 15% less damage, and enemies that strike you in melee take your full hit back."
+  [[power.effect]]
+  stats = { taken = 0.15, thorns = 1.0 }
+
+[[power]]
+key = "archmage"
+name = "Archmage"
+source = "escalation"
+class = "mage"
+icon = 12042
+aura = 12042
+text = "Your spells deal 20% more and recharge 15% faster."
+  [[power.effect]]
+  stats = { cdr = 0.15 }
+  [[power.effect]]
+  spells = "all"
+  add = { power = 0.20 }
+
+[[power]]
+key = "frostbinder"
+name = "Frostbinder"
+source = "escalation"
+class = "mage"
+icon = 13033
+aura = 13033
+text = "Ice clings to you: your frost spells freeze a quarter of what they hit for 2 sec and deal 15% more."
+  [[power.effect]]
+  spells = "school:frost"
+  add = { freeze_chance = 0.25, power = 0.15 }
+  set = { freeze_secs = 2 }
+
+[[power]]
+key = "saint"
+name = "Saint"
+source = "escalation"
+class = "priest"
+icon = 10060
+aura = 10060
+text = "Your heals and shields are 30% stronger, and you and allies within 30 yd regenerate 1% of health a second."
+  [[power.effect]]
+  stats = { heal = 0.30 }
+  team = { regen = 0.01 }
+
+[[power]]
+key = "void_lord"
+name = "Void Lord"
+source = "escalation"
+class = "priest"
+icon = 15473
+aura = 15473
+text = "Shadow takes you: your shadow spells deal 30% more, and all your damage heals you for 6% of it."
+  [[power.effect]]
+  stats = { leech = 0.06 }
+  [[power.effect]]
+  spells = "school:shadow"
+  add = { power = 0.30 }
+
+[[power]]
+key = "pack_leader"
+name = "Pack Leader"
+source = "escalation"
+class = "hunter"
+icon = 19574
+grow = 0.10
+text = "Your pet deals 60% more, has 60% more health and crits 10% more often."
+  [[power.effect]]
+  stats = { pet_damage = 0.60, pet_health = 0.60, pet_crit = 0.10 }
+
+[[power]]
+key = "deadeye"
+name = "Deadeye"
+source = "escalation"
+class = "hunter"
+icon = 19434
+text = "Aimed Shot, Arcane Shot and Multi-Shot crit 20% more often, and their crits deal 50% more."
+  [[power.effect]]
+  spells = "aimed_shot,arcane_shot,multi_shot"
+  add = { crit = 0.20, crit_mult = 0.50 }
+
+# --- Boss powers: each boss's own ---------------------------------------------------------------------
+
+[[power]]
+key = "bonelords_crown"
+name = "Crown of the Bonelord"
+source = "boss"
+boss = "skeleton_lord"
+icon = 20711
+text = "Kharos's crown: 30% of the enemies you kill rise as skeletons that fight for you for 20 sec, and once a wave a killing blow leaves you at 30% health."
+  [[power.effect]]
+  stats = { raise_dead = 0.30, undying = 1 }
+
+[[power]]
+key = "gutrenders_hunger"
+name = "Gutrender's Hunger"
+source = "boss"
+boss = "abomination"
+icon = 12328
+grow = 0.12
+text = "You grow on what you kill: all your damage heals you for 10% of it, and you have 15% more max health."
+  [[power.effect]]
+  stats = { leech = 0.10, health = 0.15 }
+
+[[power]]
+key = "veshs_wings"
+name = "Vesh's Wings"
+source = "boss"
+boss = "gargoyle_matriarch"
+icon = 2983
+text = "You move 25% faster, and your attacks strike again at once 25% of the time."
+  [[power.effect]]
+  stats = { speed = 0.25, windfury = 0.25 }
+
+[[power]]
+key = "phylactery_of_morvane"
+name = "Phylactery of Morvane"
+source = "boss"
+boss = "lich"
+icon = 23723
+aura = 1463
+text = "Your spells have a 20% chance to cast twice, and a ward absorbs damage up to 20% of your max health, renewed 10 sec after it breaks."
+  [[power.effect]]
+  stats = { echo = 0.20, shield = 0.20 }
+
+# --- Boss powers: any boss, by class --------------------------------------------------------------------
+
+[[power]]
+key = "bladestorm"
+name = "Bladestorm"
+source = "boss"
+class = "warrior"
+icon = 1680
+aura = 18499
+text = "Whirlwind spins twice 60% of the time, reaches 3 yd further and deals 30% more."
+  [[power.effect]]
+  spells = "whirlwind"
+  add = { echo = 0.60, radius = 3, power = 0.30 }
+
+[[power]]
+key = "juggernaut"
+name = "Juggernaut"
+source = "boss"
+class = "warrior"
+icon = 100
+text = "Charge recharges 7 sec sooner, works from any distance, and hits for 1.3 times your hit."
+  [[power.effect]]
+  spells = "charge"
+  add = { cooldown = -7, damage = 1.0 }
+  set = { min_range = 0 }
+
+[[power]]
+key = "bloodbath"
+name = "Bloodbath"
+source = "boss"
+class = "warrior"
+icon = 2687
+text = "You gain 3 rage every second while fighting, and every ability costs 5 less."
+  [[power.effect]]
+  stats = { rage_regen = 3.0 }
+  [[power.effect]]
+  spells = "all"
+  add = { cost = -5 }
+
+[[power]]
+key = "meteor"
+name = "Meteor"
+source = "boss"
+class = "mage"
+icon = 133
+text = "Fireball, Pyroblast and Flamestrike splash half their damage onto everything within 6 yd."
+  [[power.effect]]
+  spells = "fireball,pyroblast,flamestrike"
+  add = { splash = 0.5, splash_radius = 6 }
+
+[[power]]
+key = "arcane_torrent"
+name = "Arcane Torrent"
+source = "boss"
+class = "mage"
+icon = 5143
+text = "Arcane Missiles fires 2 more missiles and every missile deals 20% more."
+  [[power.effect]]
+  spells = "arcane_missiles"
+  add = { projectiles = 2, power = 0.20 }
+
+[[power]]
+key = "winter_queen"
+name = "Winter Queen"
+source = "boss"
+class = "mage"
+icon = 10
+text = "Blizzard, Frost Nova and Cone of Cold cover 4 yd more ground and deal 40% more."
+  [[power.effect]]
+  spells = "blizzard,frost_nova,cone_of_cold"
+  add = { radius = 4, power = 0.40 }
+
+[[power]]
+key = "holy_avenger"
+name = "Holy Avenger"
+source = "boss"
+class = "priest"
+icon = 585
+text = "Smite, Holy Fire and Holy Nova deal 50% more, and 30% of their damage heals the most hurt ally near you."
+  [[power.effect]]
+  spells = "smite,holy_fire,holy_nova"
+  add = { power = 0.50, mend = 0.30 }
+
+[[power]]
+key = "plaguebringer"
+name = "Plaguebringer"
+source = "boss"
+class = "priest"
+icon = 589
+text = "Shadow Word: Pain and Devouring Plague do 60% more over time and strike 2 more enemies."
+  [[power.effect]]
+  spells = "shadow_word_pain,devouring_plague"
+  pct = { dot = 0.60 }
+  add = { targets = 2 }
+
+[[power]]
+key = "guardian_angel"
+name = "Guardian Angel"
+source = "boss"
+class = "priest"
+icon = 17
+text = "Power Word: Shield absorbs 50% more, and below 35% health you're immune to damage for 4 sec (once a minute)."
+  [[power.effect]]
+  stats = { divine = 4 }
+  [[power.effect]]
+  spells = "power_word_shield"
+  pct = { absorb = 0.50 }
+
+[[power]]
+key = "beastmaster"
+name = "Beastmaster"
+source = "boss"
+class = "hunter"
+icon = 19574
+text = "Your pet deals twice the damage and heals 2% of its health every second."
+  [[power.effect]]
+  stats = { pet_damage = 1.0, pet_regen = 0.02 }
+
+[[power]]
+key = "volley_master"
+name = "Volley Master"
+source = "boss"
+class = "hunter"
+icon = 1510
+text = "Volley and Multi-Shot reach 4 yd further, strike 2 more enemies and deal 40% more."
+  [[power.effect]]
+  spells = "volley,multi_shot"
+  add = { radius = 4, targets = 2, power = 0.40 }
+
+[[power]]
+key = "trap_lord"
+name = "Trap Lord"
+source = "boss"
+class = "hunter"
+icon = 13813
+text = "Your traps are 3 yd wider, come back 5 sec sooner and hit 50% harder."
+  [[power.effect]]
+  spells = "explosive_trap,freezing_trap"
+  add = { radius = 3, cooldown = -5, power = 0.50 }

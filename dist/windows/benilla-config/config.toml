@@ -1,0 +1,8 @@
+# benilla local config — CVar values that moved off their defaults.
+# Managed by the client; hand edits are read on next launch and preserved on save.
+[cvars]
+mouseSpeed = "0.5"
+readEULA = "1"
+readScanning = "1"
+readTOS = "1"
+realmName = "Basin Battle"

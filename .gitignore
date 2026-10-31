@@ -1,0 +1,11 @@
+/target
+/benilla
+/.debug
+/.sync
+/settings.sh
+/settings-windows.txt
+/saves
+/tools/addon-harness/target
+logs/
+.DS_Store
+*.zip

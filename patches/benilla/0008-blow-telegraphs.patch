@@ -1,0 +1,542 @@
+From cb7c939525fba441ff0ed32093b3b463caf96311 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Thu, 29 Oct 2026 20:01:57 -0600
+Subject: [PATCH] Telegraphs: a creature's blow drawn on the ground under it,
+ its shape, reach and timing
+
+SetTelegraph(key, unit, "wedge"|"ring", reach, arc, seconds, kind, parrySeconds, focus) lays
+the blow's own shape (a wedge of its arc, or a ring all round) out to its reach, turning and
+moving with the creature, and a filled copy growing from it to meet the rim as the blow lands.
+A blow no guard stops is red; one that can be blocked is orange, its rim gold through the
+parry's window. Not focused (meant for someone else): a faint outline. ClearTelegraph([key])
+takes one away. The shapes are textures made in the client (no game file), projected through
+the ground-targeting reticle's decal projector. HasActionCombat() is 7.
+---
+ crates/benilla-app/src/target/mod.rs       |   8 +-
+ crates/benilla-app/src/target/telegraph.rs | 300 +++++++++++++++++++++
+ crates/benilla-ui/src/action_combat.rs     | 134 ++++++++-
+ 3 files changed, 440 insertions(+), 2 deletions(-)
+ create mode 100644 crates/benilla-app/src/target/telegraph.rs
+
+diff --git a/crates/benilla-app/src/target/mod.rs b/crates/benilla-app/src/target/mod.rs
+index f92ff841..233c3ca4 100644
+--- a/crates/benilla-app/src/target/mod.rs
++++ b/crates/benilla-app/src/target/mod.rs
+@@ -45,6 +45,7 @@ mod reticle;
+ pub(crate) mod ring;
+ mod scan;
+ mod script;
++mod telegraph;
+ pub(crate) use script::ScriptSelect;
+ mod track;
+ #[cfg(test)]
+@@ -450,7 +451,11 @@ impl Plugin for TargetPlugin {
+                     .before(WorldStage::Input),
+             )
+             // Basin Battle's ground markers, off this frame's view and the world's ground.
+-            .add_systems(Update, aim_marker::update_aim_marker.after(TargetUpdate))
++            .init_resource::<telegraph::Telegraphs>()
++            .add_systems(
++                Update,
++                (aim_marker::update_aim_marker, telegraph::update_telegraphs).after(TargetUpdate),
++            )
+             .add_systems(PostUpdate, highlight::apply_highlight)
+             // The ring's stream push, after the frame's stream clear.
+             .add_systems(
+@@ -459,6 +464,7 @@ impl Plugin for TargetPlugin {
+                     ring::push_ring,
+                     reticle::push_reticle,
+                     aim_marker::push_aim_marker,
++                    telegraph::push_telegraphs,
+                 )
+                     .after(benilla_world::particles::buffer::begin_effect_frame),
+             );
+diff --git a/crates/benilla-app/src/target/telegraph.rs b/crates/benilla-app/src/target/telegraph.rs
+new file mode 100644
+index 00000000..08912e10
+--- /dev/null
++++ b/crates/benilla-app/src/target/telegraph.rs
+@@ -0,0 +1,300 @@
++//! Basin Battle's blow telegraphs, not part of 1.12.1: a creature's blow winding up, drawn on the
++//! ground under it for the Elwynn Survival add-on (`SetTelegraph`). The shape is the blow's own
++//! (a wedge of its arc, or a ring all round) out to the reach it lands at, turning and moving with
++//! the creature; a second, filled copy grows from the creature to the edge as the blow comes, so
++//! it meets the rim at the impact; a blow a guard stops is orange and its rim flares gold for the
++//! parry's window; one no guard stops is red. A blow meant for someone else is a faint outline.
++//!
++//! The shapes are textures made here (no game file), projected through the ground-targeting
++//! reticle's decal projector ([`super::reticle`]).
++
++use std::collections::HashMap;
++
++use bevy::asset::RenderAssetUsages;
++use bevy::prelude::*;
++use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
++
++use benilla_ui::action_combat::{self, TelegraphCall};
++use benilla_world::decal::{DecalFrame, WorldDecal};
++use benilla_world::particles::buffer::EffectVertex;
++use benilla_world::view::WorldCamera;
++
++/// The shape textures' size (px), and the share of their half-width the shape's edge sits at.
++const TEX: u32 = 128;
++const EDGE: f32 = 0.97;
++/// The decal box's vertical half-height: a creature on a slope still lays its shape.
++const VERT: f32 = 2.5;
++/// The most drawn at once.
++const MAX_TELEGRAPHS: usize = 24;
++/// Kept a moment past the blow, so the strike shows as it lands.
++const LINGER: f32 = 0.15;
++
++const RED: [f32; 3] = [1.0, 0.16, 0.1];
++const ORANGE: [f32; 3] = [1.0, 0.55, 0.15];
++const GOLD: [f32; 3] = [1.0, 0.88, 0.35];
++
++/// One shape projected under a creature: where, how it was cut, its triangles.
++#[derive(Default)]
++struct Layer {
++    key: (Vec3, f32, f32, usize),
++    verts: Vec<EffectVertex>,
++}
++
++impl Layer {
++    /// Project the shape `radius` out from `feet`, turned to the WoW facing `yaw`, afresh when it
++    /// moved, turned, grew or the ground under it streamed in.
++    fn place(&mut self, decals: &WorldDecal, feet: Vec3, yaw: f32, radius: f32) {
++        let key = (feet, yaw, radius, decals.receiver_count());
++        if !self.verts.is_empty()
++            && key.0.distance_squared(self.key.0) < 1.0e-4
++            && (key.1 - self.key.1).abs() < 1.0e-3
++            && (key.2 - self.key.2).abs() < 1.0e-3
++            && key.3 == self.key.3
++        {
++            return;
++        }
++        self.key = key;
++        self.verts.clear();
++        let frame = DecalFrame {
++            center: feet,
++            sin: 0.0,
++            cos: 1.0,
++            min_x: -radius,
++            max_x: radius,
++            min_z: -radius,
++            max_z: radius,
++            min_y: -VERT,
++            max_y: VERT,
++        };
++        // The texture's +u is the creature's forward: WoW (cos, sin) is Bevy (-sin, -cos) on the
++        // ground, and its right (sin, -cos) is Bevy (cos, -sin).
++        let (s, c) = yaw.sin_cos();
++        let r = radius.max(0.05);
++        decals.project(
++            &mut self.verts,
++            &frame,
++            |p| ((VERT - p.y.abs()) / VERT).clamp(0.0, 1.0),
++            |x, z| {
++                let fwd = -x * s - z * c;
++                let side = x * c - z * s;
++                [0.5 + fwd / (2.0 * r), 0.5 + side / (2.0 * r)]
++            },
++        );
++    }
++}
++
++/// A blow being telegraphed.
++struct Telegraph {
++    key: String,
++    unit: u64,
++    ring: bool,
++    reach: f32,
++    arc: f32,
++    start: f32,
++    secs: f32,
++    unblockable: bool,
++    parry: f32,
++    focus: bool,
++    outline: Layer,
++    sweep: Layer,
++}
++
++#[derive(Resource, Default)]
++pub(super) struct Telegraphs {
++    list: Vec<Telegraph>,
++    /// The shape textures, by (ring, arc in whole degrees, filled).
++    textures: HashMap<(bool, u16, bool), Handle<Image>>,
++}
++
++/// A shape texture: `filled` a soft fill brightening outward to the edge, else the outline (a
++/// bright rim and sides over a faint fill). The shape points along +u from the centre.
++fn shape_image(ring: bool, arc_deg: f32, filled: bool) -> Image {
++    let half = (arc_deg.clamp(5.0, 360.0) / 2.0).to_radians();
++    let mut data = vec![0u8; (TEX * TEX * 4) as usize];
++    let c = TEX as f32 / 2.0;
++    for j in 0..TEX {
++        for i in 0..TEX {
++            let dx = (i as f32 + 0.5 - c) / (c * EDGE);
++            let dy = (j as f32 + 0.5 - c) / (c * EDGE);
++            let r = (dx * dx + dy * dy).sqrt();
++            if r > 1.0 {
++                continue;
++            }
++            let ang = dy.atan2(dx).abs();
++            if !ring && ang > half {
++                continue;
++            }
++            // How near the edge: the rim, and a wedge's two sides.
++            let rim = 1.0 - r;
++            let side = if ring { 1.0 } else { (half - ang) * r };
++            let edge = rim.min(side);
++            let a = if filled {
++                // Brighter toward the front of what's grown so far.
++                40.0 + 90.0 * r * r
++            } else if edge < 0.05 {
++                235.0
++            } else {
++                30.0 + 25.0 * r
++            };
++            let k = ((j * TEX + i) * 4) as usize;
++            data[k..k + 4].copy_from_slice(&[255, 255, 255, a as u8]);
++        }
++    }
++    Image::new(
++        Extent3d {
++            width: TEX,
++            height: TEX,
++            depth_or_array_layers: 1,
++        },
++        TextureDimension::D2,
++        data,
++        TextureFormat::Rgba8UnormSrgb,
++        RenderAssetUsages::default(),
++    )
++}
++
++impl Telegraphs {
++    fn texture(
++        &mut self,
++        images: &mut Assets<Image>,
++        ring: bool,
++        arc: f32,
++        filled: bool,
++    ) -> Handle<Image> {
++        let key = (ring, if ring { 360 } else { arc.round() as u16 }, filled);
++        self.textures
++            .entry(key)
++            .or_insert_with(|| images.add(shape_image(ring, arc, filled)))
++            .clone()
++    }
++}
++
++/// Take the script's telegraphs, drop the finished and the orphaned, and lay each under its
++/// creature as it stands now.
++pub(super) fn update_telegraphs(
++    time: Res<Time>,
++    index: Option<Res<crate::net::GuidIndex>>,
++    units: Query<&GlobalTransform>,
++    decals: WorldDecal,
++    mut state: ResMut<Telegraphs>,
++) {
++    let now = time.elapsed_secs();
++    for call in action_combat::take_telegraphs() {
++        match call {
++            TelegraphCall::Set {
++                key,
++                unit,
++                ring,
++                reach,
++                arc,
++                secs,
++                unblockable,
++                parry,
++                focus,
++            } => {
++                state.list.retain(|t| t.key != key);
++                if state.list.len() >= MAX_TELEGRAPHS {
++                    state.list.remove(0);
++                }
++                state.list.push(Telegraph {
++                    key,
++                    unit,
++                    ring,
++                    reach,
++                    arc,
++                    start: now,
++                    secs,
++                    unblockable,
++                    parry,
++                    focus,
++                    outline: Layer::default(),
++                    sweep: Layer::default(),
++                });
++            }
++            TelegraphCall::Clear { key } => match key {
++                Some(k) => state.list.retain(|t| t.key != k),
++                None => state.list.clear(),
++            },
++        }
++    }
++    let Some(index) = index else {
++        state.list.clear();
++        return;
++    };
++    state.list.retain(|t| now <= t.start + t.secs + LINGER);
++    for t in &mut state.list {
++        let Some(tf) = index.0.get(&t.unit).and_then(|e| units.get(*e).ok()) else {
++            t.outline.verts.clear();
++            t.sweep.verts.clear();
++            continue;
++        };
++        let feet = tf.translation();
++        let yaw = tf.rotation().to_euler(EulerRot::YXZ).0;
++        t.outline.place(&decals, feet, yaw, t.reach);
++        if t.focus {
++            let share = ((now - t.start) / t.secs.max(0.05)).clamp(0.0, 1.0);
++            t.sweep
++                .place(&decals, feet, yaw, (t.reach * share).max(0.15));
++        }
++    }
++}
++
++fn push_layer(
++    draw: &mut benilla_world::particles::buffer::WorldEffectDraw,
++    cam: Entity,
++    texture: AssetId<Image>,
++    layer: &Layer,
++    rgb: [f32; 3],
++    alpha: f32,
++) {
++    if layer.verts.is_empty() || alpha <= 0.0 {
++        return;
++    }
++    let mut batch = draw.batch(cam, texture).anchored(layer.key.0).rung(
++        benilla_world::sky_order::Rung::RETICLE,
++        benilla_world::sky_order::Rung::DECAL_RASTER,
++    );
++    batch.extend(layer.verts.iter().map(|v| EffectVertex {
++        pos: v.pos,
++        uv: v.uv,
++        color: [rgb[0], rgb[1], rgb[2], v.color[3] * alpha],
++    }));
++    batch.tris();
++}
++
++/// Draw them: the outline in its kind's colour (gold through the parry's window), the growing
++/// fill under it; faint, outline only, for a blow meant for someone else.
++pub(super) fn push_telegraphs(
++    time: Res<Time>,
++    mut images: ResMut<Assets<Image>>,
++    state: Option<ResMut<Telegraphs>>,
++    cam: Query<Entity, With<WorldCamera>>,
++    mut draw: benilla_world::particles::buffer::WorldEffectDraw,
++) {
++    let (Some(mut state), Ok(cam)) = (state, cam.single()) else {
++        return;
++    };
++    let now = time.elapsed_secs();
++    let mut jobs = Vec::new();
++    for k in 0..state.list.len() {
++        let (ring, arc) = (state.list[k].ring, state.list[k].arc);
++        let outline = state.texture(&mut images, ring, arc, false);
++        let fill = state.texture(&mut images, ring, arc, true);
++        jobs.push((k, outline, fill));
++    }
++    for (k, outline, fill) in jobs {
++        let t = &state.list[k];
++        let elapsed = now - t.start;
++        let in_window = !t.unblockable && elapsed >= t.secs - t.parry && elapsed <= t.secs + 0.05;
++        let (rgb, alpha) = match (t.unblockable, in_window) {
++            (true, _) => (RED, 0.95),
++            (false, true) => (GOLD, 1.0),
++            (false, false) => (ORANGE, 0.85),
++        };
++        let alpha = if t.focus { alpha } else { alpha * 0.35 };
++        push_layer(&mut draw, cam, outline.id(), &t.outline, rgb, alpha);
++        if t.focus {
++            push_layer(&mut draw, cam, fill.id(), &t.sweep, rgb, 0.55);
++        }
++    }
++}
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 3ec8afb3..e8021e17 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -79,6 +79,15 @@
+ //!   it. A creature's blow that no guard stops shows this way.
+ //! - Our own body takes the server's sheath byte (as others' do) while an add-on drives the action
+ //!   layer, so a spell's stow or a throw's ranged draw hands the weapon back once its clip is done.
++//!
++//! The seventh (`HasActionCombat() >= 7`), a creature's blow drawn under it:
++//!
++//! - `SetTelegraph(key, unit, shape, reach, arcDegrees, seconds, kind, parrySeconds, focus)`: a
++//!   `"wedge"` of the arc (or a `"ring"` all round) `reach` yards out from the unit, turning and
++//!   moving with it, a fill growing out to the edge to meet it as the blow lands `seconds` from
++//!   now; `kind` `"unblockable"` is red, else orange with its rim gold for the last
++//!   `parrySeconds` (the parry's window); `focus` false draws only a faint outline.
++//! - `ClearTelegraph([key])`: take one away (all with no key).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -423,6 +432,52 @@ pub enum GroundMarkerCall {
+ 
+ static GROUND_MARKERS: std::sync::Mutex<Vec<GroundMarkerCall>> = std::sync::Mutex::new(Vec::new());
+ 
++/// A blow's telegraph asked for or taken away.
++#[derive(Clone, Debug, PartialEq)]
++pub enum TelegraphCall {
++    Set {
++        key: String,
++        unit: u64,
++        ring: bool,
++        reach: f32,
++        arc: f32,
++        secs: f32,
++        unblockable: bool,
++        parry: f32,
++        focus: bool,
++    },
++    Clear {
++        key: Option<String>,
++    },
++}
++
++static TELEGRAPHS: std::sync::Mutex<Vec<TelegraphCall>> = std::sync::Mutex::new(Vec::new());
++
++/// The telegraphs asked for since the last call.
++pub fn take_telegraphs() -> Vec<TelegraphCall> {
++    TELEGRAPHS
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
++}
++
++fn push_telegraph(call: TelegraphCall) {
++    if let Ok(mut v) = TELEGRAPHS.lock() {
++        if v.len() < 256 {
++            v.push(call);
++        }
++    }
++}
++
++/// A unit named by its guid (`"0xF13..."` or decimal).
++fn unit_guid(v: Option<&Value>) -> Option<u64> {
++    let t = text(v)?;
++    match t.strip_prefix("0x").or_else(|| t.strip_prefix("0X")) {
++        Some(hex) => u64::from_str_radix(hex, 16).ok(),
++        None => t.parse().ok(),
++    }
++}
++
+ /// The ground markers asked for since the last call.
+ pub fn take_ground_markers() -> Vec<GroundMarkerCall> {
+     GROUND_MARKERS
+@@ -449,6 +504,7 @@ pub fn reset() {
+         *m = None;
+     }
+     push_ground(GroundMarkerCall::Clear { key: None });
++    push_telegraph(TelegraphCall::Clear { key: None });
+ }
+ 
+ /// The keys of a dash: `"f"`, `"b"`, `"l"`, `"r"` and their pairs, as `(forward, right)`.
+@@ -539,7 +595,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(6))?,
++        lua.create_function(|_, _: MultiValue| Ok(7))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -738,6 +794,42 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetTelegraph",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(key), Some(unit), Some(reach), Some(secs)) = (
++                text(v.first()),
++                unit_guid(v.get(1)),
++                number(v.get(3), 0.1, 60.0),
++                number(v.get(5), 0.05, 30.0),
++            ) {
++                push_telegraph(TelegraphCall::Set {
++                    key,
++                    unit,
++                    ring: text(v.get(2)).is_some_and(|s| s.eq_ignore_ascii_case("ring")),
++                    reach,
++                    arc: number(v.get(4), 1.0, 360.0).unwrap_or(90.0),
++                    secs,
++                    unblockable: text(v.get(6))
++                        .is_some_and(|s| s.eq_ignore_ascii_case("unblockable")),
++                    parry: number(v.get(7), 0.0, 5.0).unwrap_or(0.0),
++                    focus: truthy(v.get(8)),
++                });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ClearTelegraph",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            push_telegraph(TelegraphCall::Clear {
++                key: text(v.first()),
++            });
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "SetUnitWeaponGlow",
+         lua.create_function(|_, args: MultiValue| {
+@@ -952,6 +1044,46 @@ mod tests {
+         assert_eq!((x, z), (1.0, 3.0));
+     }
+ 
++    #[test]
++    fn a_telegraph_is_queued_with_its_shape_kind_and_window() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        lua.load(r#"SetTelegraph("es9", "0xF130000000000025", "wedge", 3.4, 120, 1.2, "block", 0.25, 1) SetTelegraph("es10", "0xF130000000000026", "ring", 6, 360, 2, "unblockable", 0, nil) ClearTelegraph("es9")"#)
++            .exec()
++            .unwrap();
++        let calls = take_telegraphs();
++        assert_eq!(calls.len(), 3, "{calls:?}");
++        assert_eq!(
++            calls[0],
++            TelegraphCall::Set {
++                key: "es9".into(),
++                unit: 0xF130000000000025,
++                ring: false,
++                reach: 3.4,
++                arc: 120.0,
++                secs: 1.2,
++                unblockable: false,
++                parry: 0.25,
++                focus: true,
++            }
++        );
++        assert!(matches!(
++            &calls[1],
++            TelegraphCall::Set {
++                ring: true,
++                unblockable: true,
++                focus: false,
++                ..
++            }
++        ));
++        assert_eq!(
++            calls[2],
++            TelegraphCall::Clear {
++                key: Some("es9".into())
++            }
++        );
++    }
++
+     #[test]
+     fn the_move_keys_come_back_as_held() {
+         for (f, s) in [(0, 0), (1, 0), (-1, 1), (0, -1), (1, 1)] {
+-- 
+2.43.0
+

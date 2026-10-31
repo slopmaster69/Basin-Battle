@@ -1,0 +1,388 @@
+# Elwynn Survival lines beyond what the server test saw, then checks.
+!table.insert(SAID, "awake: " .. tostring(ElwynnSurvival.awake) .. " mode " .. tostring(ElwynnSurvival.mode) .. " catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()) .. " action client " .. tostring(ElwynnSurvival.ActionClient()))
+!local t = {} for _, k in ipairs({"W","A","S","D","SPACE","V","Q","E","1","2","3","4","CTRL-Q","SHIFT-Q","CTRL-SHIFT-Q","F","R","T","B","N","X","TAB","K","5","BUTTON1","SHIFT-BUTTON1","BUTTON2","BUTTON3"}) do table.insert(t, k .. "=" .. tostring(GetBindingAction(k))) end table.insert(SAID, "keys: " .. table.concat(t, " "))
+!local t = {} for _, k in ipairs({"CTRL-S","CTRL-W","CTRL-SHIFT-S","SHIFT-SPACE","CTRL-SPACE","CTRL-SHIFT-SPACE","CTRL-F","CTRL-TAB","SHIFT-TAB","SHIFT-V"}) do table.insert(t, k .. "=" .. tostring(GetBindingAction(k))) end table.insert(SAID, "chords: " .. table.concat(t, " "))
+!ElwynnSurvival.SetKey("JUMP", "V") table.insert(SAID, "jump on V: V=" .. tostring(GetBindingAction("V")) .. " SHIFT-V=" .. tostring(GetBindingAction("SHIFT-V")) .. " bars " .. tostring((GetBindingKey("ES_BARS"))) .. " card " .. ElwynnSurvival.ControlKey(14))
+!ElwynnSurvival.SetKey("JUMP", nil) table.insert(SAID, "jump back: SPACE=" .. tostring(GetBindingAction("SPACE")) .. " V=" .. tostring(GetBindingAction("V")))
+!ElwynnSurvivalSettings.custom = { ES_JUMP = "V", ES_AB1 = "Z" } ElwynnSurvival.Rebind() table.insert(SAID, "stale custom: V=" .. tostring(GetBindingAction("V")) .. " Z=" .. tostring(GetBindingAction("Z")) .. " Q=" .. tostring(GetBindingAction("Q")))
+!ElwynnSurvivalSettings.layout = 1 ElwynnSurvivalSettings.ownKeys = 1 table.insert(SAID, "old layout reset: " .. tostring(ElwynnSurvival.CheckLayout()) .. " custom " .. tostring(ElwynnSurvivalSettings.custom) .. " own " .. tostring(ElwynnSurvivalSettings.ownKeys)) ElwynnSurvival.Rebind()
+!for i = 1, 4 do ElwynnSurvival.StepMouse(-1) end table.insert(SAID, string.format("mouse slower: %.2f saved %s", ElwynnSurvival.MouseSpeed(), tostring(ElwynnSurvivalSettings.mouse)))
+!for i = 1, 30 do ElwynnSurvival.StepMouse(-1) end table.insert(SAID, string.format("mouse slowest: %.2f", ElwynnSurvival.MouseSpeed()))
+!ElwynnSurvival.SetMouseSpeed(0.5)
+!ElwynnSurvival.Bars() table.insert(SAID, "bars off: " .. tostring(ElwynnSurvivalSettings.noBars)) ElwynnSurvival.Bars()
+!table.insert(SAID, "chrome: action bar shown " .. tostring(MainMenuBar:IsVisible()) .. ", player frame " .. tostring(PlayerFrame:IsVisible()) .. ", minimap " .. tostring(MinimapCluster:IsVisible()) .. ", bar " .. tostring(ElwynnSurvivalBar:IsVisible()))
+!this = ElwynnSurvivalCatcher; arg1 = "LeftButton"; ElwynnSurvivalCatcher:GetScript("OnMouseDown")()
+!this = ElwynnSurvivalCatcher; arg1 = "LeftButton"; ElwynnSurvivalCatcher:GetScript("OnMouseUp")()
+!this = ElwynnSurvivalCatcher; arg1 = "RightButton"; ElwynnSurvivalCatcher:GetScript("OnMouseDown")()
+!table.insert(SAID, "right held: mouselooking " .. tostring(IsMouselooking()) .. ", guard " .. tostring(ElwynnSurvival.guardHeld))
+!this = ElwynnSurvivalCatcher; arg1 = "RightButton"; ElwynnSurvivalCatcher:GetScript("OnMouseUp")()
+!table.insert(SAID, "right let go: mouselooking " .. tostring(IsMouselooking()))
+!ElwynnSurvival.Guard("down")
+!ElwynnSurvival.Guard("down")
+!ElwynnSurvival.Guard("up")
+!ElwynnSurvival.Sprint(true)
+!ElwynnSurvival.Sprint(true)
+!ElwynnSurvival.Sprint(false)
+!ElwynnSurvival.Guard("down")
+!ChatFrameEditBox:Show()
+!table.insert(SAID, "typing: guard held " .. tostring(ElwynnSurvival.guardHeld))
+!ChatFrameEditBox:Hide()
+!for _, w in ipairs({"bag","character","map","menu","help"}) do ElwynnSurvival.Open(w) end table.insert(SAID, "opened: " .. table.concat(OPENED, ", "))
+!ElwynnSurvival.ToggleKeys()
+!local t = {} for i = 1, table.getn(ElwynnSurvival.CONTROLS) do table.insert(t, ElwynnSurvival.CONTROLS[i][1] .. " = " .. ElwynnSurvival.ControlKey(i)) end table.insert(SAID, "card: " .. table.concat(t, "; "))
+!table.insert(SAID, "card profile: " .. ElwynnSurvivalKeys.profile:GetText())
+!this = ElwynnSurvivalKeys.switch; ElwynnSurvivalKeys.switch:GetScript("OnClick")()
+!table.insert(SAID, "own keys: S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. "; " .. ElwynnSurvivalKeys.profile:GetText())
+!this = ElwynnSurvivalKeys.switch; ElwynnSurvivalKeys.switch:GetScript("OnClick")()
+!table.insert(SAID, "elwynn keys again: S is " .. tostring(GetBindingAction("S")))
+!ElwynnSurvival.ToggleKeys()
+!ElwynnSurvival.ToggleMode()
+!table.insert(SAID, "after tab: " .. ElwynnSurvival.mode .. ", catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()))
+!ElwynnSurvival.ToggleMode()
+A	charge	0.20	0.00	aimed_shot
+A	guard	0.00	0.00
+!table.insert(SAID, "guard icon " .. string.format("%.2f", ElwynnSurvivalVitals.guard:GetAlpha()))
+A	stagger	0.00	0.80
+A	craft	0.40	2.50	Roast Boar
+!table.insert(SAID, "working: " .. tostring(ElwynnSurvivalAction and ElwynnSurvivalAction.label and ElwynnSurvivalAction.label:GetText()))
+A	build	0.00	4.00	Cooking Fire
+A	repair	1.00	3.00	Smithing Anvil
+A	ready	0.00	0.00
+FL	Parry!
+!table.insert(SAID, "flash: " .. tostring(ElwynnSurvivalFlash:IsShown()))
+BN	Kobold Raid	From the south-west road in 25 seconds
+CF	raid	Ring the bell? 6 kobolds will march on the camp from the south-west road in 25 seconds.
+!table.insert(SAID, "confirm: " .. tostring(ElwynnSurvivalConfirm:IsShown()) .. " mode " .. ElwynnSurvival.mode)
+!ElwynnSurvivalConfirm.yes:GetScript("OnClick")()
+H	150	200	40	100	melee	Footman's Axe	5	16	34	-90	warning	12	6	0	2
+!table.insert(SAID, "reach icon " .. string.format("%.2f", ElwynnSurvivalVitals.reach:GetAlpha()) .. " health " .. ElwynnSurvivalVitals.healthText:GetText() .. " gear shown " .. tostring(ElwynnSurvivalGear:IsShown()))
+H	150	200	40	100	melee	Footman's Axe	5	16	-1	0	active	0	4	1	0
+# The ability bar: five keys (defense and the ultimate empty), a cooldown, an EX version each.
+AB	ranged~aimed_throw~Aimed Throw~INV_ThrowingAxe_01~projectile~line~0.00~0.70~0.0~6.0~1~2~34.0~0.4~0~0~fan_of_axes~Fan of Axes~INV_ThrowingAxe_01~25~projectile~line~30.0~0.4~0~Throw a hand axe along the reticle. Charged, it flies farther and hits harder.~14–22 damage · 24–34 yd · charge up to 0.7 s · 6 s cooldown · 2 charges~Three axes at once in a spread.~3 × 12–18 damage · 24–30 yd · 25 Valor~1~warrior^close~sundering_blow~Sundering Blow~Ability_Warrior_Sunder~art~self~0.00~0.00~3.0~9.0~0~1~0.0~0.0~0~0~unstoppable_blow~Unstoppable Blow~Ability_Warrior_SavageBlow~25~art~self~0.0~0.0~150~A slow overhead that staggers.~220% weapon damage · 0.75 s wind-up · 28 stamina · 9 s cooldown~No guard stops it and no parry turns it.~240% weapon damage · 0.75 s wind-up · 28 stamina · 25 Valor~0~warrior^utility~charge~Charge~Ability_Warrior_Charge~dash~line~0.00~0.00~0.0~12.0~2~2~20.0~0.0~0~0~intercept~Intercept~Ability_Rogue_Sprint~25~dash~line~20.0~0.0~0~Dash along the reticle.~10 damage · 20 yd · 12 s cooldown~The Charge, and it stuns.~12 damage · 20 yd · 25 Valor~1~warrior^defense~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^ultimate~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+VA	30	100	25
+!table.insert(SAID, "bar: " .. tostring(ElwynnSurvivalAbilities:IsShown()) .. " key " .. tostring(ElwynnSurvivalAbilities.slots[1].keyText:GetText()) .. " ex pip " .. tostring(ElwynnSurvivalAbilities.slots[1].pip:IsShown()) .. " close cooling " .. tostring(ElwynnSurvivalAbilities.slots[2].cd:GetText()) .. " charges " .. tostring(ElwynnSurvivalAbilities.slots[3].count:GetText()) .. " ultimate empty " .. tostring(ElwynnSurvival.slots[5].key == "") .. " valor " .. tostring(ElwynnSurvivalValor.text:GetText()) .. " width health " .. tostring(ElwynnSurvivalVitals.health:GetWidth()) .. " keys " .. tostring(ElwynnSurvivalAbilities:GetWidth()))
+!TIP = {} OLDTT = { GameTooltip.SetText, GameTooltip.AddLine, GameTooltip.AddDoubleLine } GameTooltip.SetText = function(self, t) TIP = { t } end GameTooltip.AddLine = function(self, t) table.insert(TIP, t) end GameTooltip.AddDoubleLine = function(self, a, b) table.insert(TIP, a .. " [" .. b .. "]") end
+!this = ElwynnSurvivalAbilities.slots[1]; ElwynnSurvivalAbilities.slots[1]:GetScript("OnEnter")()
+!table.insert(SAID, "tip: " .. table.concat(TIP, " | "))
+!GameTooltip.SetText, GameTooltip.AddLine, GameTooltip.AddDoubleLine = OLDTT[1], OLDTT[2], OLDTT[3]
+BP
+!ElwynnSurvival.Ability(2, nil, "down")
+!ElwynnSurvival.Ability(1, 1, "down")
+!ElwynnSurvival.Ability(1, nil, "up")
+!table.insert(SAID, "ability keys: " .. SAID[table.getn(SAID) - 1] .. " | " .. SAID[table.getn(SAID)])
+# Held a moment, an ability key gives its EX version: an aimed one at once, then EX at the hold.
+!CLOCK = GetTime ElwynnSurvival.exHold = nil ElwynnSurvival.Ability(1, nil, "down")
+!table.insert(SAID, "held: " .. SAID[table.getn(SAID)])
+!local h = ElwynnSurvival.exHold h.at = h.at - 0.3 ElwynnSurvival.StepExHold() table.insert(SAID, "after the hold: " .. SAID[table.getn(SAID)])
+!ElwynnSurvival.Ability(1, nil, "up") table.insert(SAID, "let go: " .. tostring(ElwynnSurvival.exHold))
+A	aim	0.00	0.00	frostbolt
+!table.insert(SAID, "aiming: reticle " .. tostring(ElwynnSurvivalAim:IsShown()) .. " " .. tostring(ElwynnSurvivalAim.name:GetText()) .. " camera " .. tostring(ElwynnSurvival.aimCam))
+!ElwynnSurvival.Attack("down")
+A	charge	0.10	0.00	frostbolt
+!table.insert(SAID, "charging: bar " .. tostring(ElwynnSurvivalAction:IsShown()) .. " " .. tostring(ElwynnSurvivalAction.label:GetText()))
+!ElwynnSurvival.Attack("up")
+A	cast	0.00	0.40	frostbolt
+!table.insert(SAID, "cast: reticle " .. tostring(ElwynnSurvivalAim:IsShown()) .. " camera " .. tostring(ElwynnSurvival.aimCam))
+A	aim	0.00	0.00	flamestrike
+!function SetAimMarker(shape, range, radius) table.insert(SAID, "marker " .. tostring(shape) .. " " .. tostring(range) .. " " .. tostring(radius)) end ElwynnSurvival.DrawAim()
+!ElwynnSurvival.Guard("down") ElwynnSurvival.Guard("up")
+A	ready	0.00	0.00
+!SetAimMarker = nil
+CC	root~2.5~0^grace~3.0~0
+CC	stun~1.5~0
+!table.insert(SAID, "cc: " .. tostring(ElwynnSurvivalCc:IsShown()))
+CC	
+NP	Gather	Peacebloom
+!table.insert(SAID, "prompt: " .. tostring(ElwynnSurvivalPrompt:IsShown()) .. " " .. tostring(ElwynnSurvivalPrompt.text:GetText()) .. " key " .. tostring(ElwynnSurvivalPrompt.key.word:GetText()))
+NP
+!table.insert(SAID, "prompt gone: " .. tostring(ElwynnSurvivalPrompt:IsShown()))
+HL	12
+HL	5
+!table.insert(SAID, "healed: " .. tostring(ElwynnSurvivalHeal.text:GetText()))
+DA	0.40	30.0	1.5700
+# The board: an owned card on its key, another owned, one to unlock, a locked ultimate.
+TR	1	Dev build: every card	aimed_throw~Aimed Throw~ranged~warrior~INV_ThrowingAxe_01~1~0~ranged~projectile~1~0.00~0.70~Throw a hand axe.~14–22 damage · 6 s cooldown~fan_of_axes~Fan of Axes~INV_ThrowingAxe_01~25~Three axes at once.~3 × 12–18 damage · 25 Valor^shadow_bolt~Shadow Bolt~ranged~warlock~Spell_Shadow_ShadowBolt~1~0~~projectile~1~0.50~1.00~A bolt that Marks.~16–26 damage · 2.5 s cooldown~shadowburn~Shadowburn~Spell_Shadow_ScourgeBuild~25~Instant and fast.~24 damage · 25 Valor^backstab~Backstab~close~rogue~Ability_BackStab~0~1~~art~0~0.00~0.00~A quick stab.~120% weapon damage · ×3 from behind~ambush~Ambush~Ability_Rogue_Ambush~50~Steps behind first.~140% weapon damage · 50 Valor^sanctuary~Sanctuary~ultimate~paladin~Spell_Holy_DivineIntervention~0~0~~ground~0~0.00~0.00~An 8 yard ring.~heals 4% a second · the whole Valor bar~~~~~~
+!table.insert(SAID, "board: " .. tostring(ElwynnSurvivalTree:IsShown()) .. " card 1 " .. tostring(ElwynnSurvival.tree.cards[1].name:GetText()) .. " [" .. tostring(ElwynnSurvival.tree.cards[1].state:GetText()) .. "] card 13 " .. tostring(ElwynnSurvival.tree.cards[13].state:GetText()) .. " card 38 " .. tostring(ElwynnSurvival.tree.cards[38].state:GetText()) .. " detail " .. tostring(ElwynnSurvival.tree.regular.title:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.charged.title:GetText()) .. " dev " .. tostring(ElwynnSurvival.tree.full:IsShown()))
+!this = ElwynnSurvival.tree.cards[8]; ElwynnSurvival.tree.cards[8]:GetScript("OnClick")()
+!this = ElwynnSurvival.tree.cards[13]; ElwynnSurvival.tree.cards[13]:GetScript("OnClick")()
+!this = ElwynnSurvival.tree.cards[13]; ElwynnSurvival.tree.cards[13]:GetScript("OnEnter")() table.insert(SAID, "hover: " .. tostring(ElwynnSurvival.tree.regular.how:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.charged.how:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.charged.facts:GetText()))
+!ElwynnSurvival.Tree()
+!table.insert(SAID, "tree closed: " .. tostring(ElwynnSurvivalTree:IsShown()))
+!ElwynnSurvival.Tree()
+!ElwynnSurvival.SetMode("action")
+H	120	200	5	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2	Kobold Brute	150	220	bow
+!table.insert(SAID, "foe: " .. tostring(ElwynnSurvivalFoe:IsShown()) .. " " .. tostring(ElwynnSurvivalFoe.name:GetText()) .. ", hurt edge " .. tostring(ElwynnSurvivalHurt:IsShown()) .. ", meals " .. tostring(ElwynnSurvivalGear.down.count:GetText()))
+WD
+HT	31	heavy	hit
+!table.insert(SAID, "hit marker " .. tostring(ElwynnSurvivalHit:IsShown()))
+KF	Bren	Probe
+KF		Ayla
+!table.insert(SAID, "feed: " .. tostring(ElwynnSurvivalFeed.rows[1]:IsShown()) .. " " .. tostring(ElwynnSurvivalFeed.rows[1].killer:GetText()) .. " > " .. tostring(ElwynnSurvivalFeed.rows[1].victim:GetText()) .. "; " .. tostring(ElwynnSurvivalFeed.rows[2].victim:GetText()))
+H	120	200	5	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2		0	0	bow
+!ElwynnSurvival.Dodge("down")
+!ElwynnSurvival.Dodge("up")
+!table.insert(SAID, "tap space: " .. SAID[table.getn(SAID)])
+!ElwynnSurvival.Dodge("down")
+!local x = 1
+!local x = 2
+!local x = 3
+!local x = 4
+!table.insert(SAID, "held space: sprinting " .. tostring(ElwynnSurvival.sprintHeld))
+!ElwynnSurvival.Dodge("up")
+!local x = 5
+!table.insert(SAID, "let go: sprinting " .. tostring(ElwynnSurvival.sprintHeld))
+!ElwynnSurvival.Heavy("down")
+!ElwynnSurvival.Heavy("up")
+!ElwynnSurvival.Eat()
+AN	0X12345	17	0.32	50F2EEE4	470	0
+IM	0X12345	0X23456	heavy	hit	1	0
+RO	0X12345	0.45	0
+AR	axe~Footman's Axe~one-handed~1~Quick and light.^greatsword~Footman's Claymore~two-handed~0~Two-handed: slow, wide sweeps.^crossbow~Militia Crossbow~ranged~0~Click to shoot.
+!table.insert(SAID, "rack: " .. tostring(ElwynnSurvivalWindow:IsShown()) .. " " .. ElwynnSurvivalWindow.title:GetText() .. " mode " .. ElwynnSurvival.mode)
+!this = ElwynnSurvivalWindow.rows[2].go; ElwynnSurvivalWindow.rows[2].go:GetScript("OnClick")()
+W	7	Cooking Fire	roast~Roast Boar~2 Boar Meat~1
+!this = ElwynnSurvivalWindow.rows[1].go; ElwynnSurvivalWindow.rows[1].go:GetScript("OnClick")()
+S	wood~Elwynn Timber~12~0^axe~Footman's Axe~1~1
+# The chest's grid: a slot each with its icon and count; past fifty it pages. Hovered, the strip
+# says what it is; a click takes one, Shift five, right-click all; gear is put on.
+S	r0~Thing 0~0~0~Does 0.~INV_Stone_04^r1~Thing 1~1~0~Does 1.~INV_Stone_04^r2~Thing 2~2~0~Does 2.~INV_Stone_04^r3~Thing 3~3~0~Does 3.~INV_Stone_04^r4~Thing 4~4~0~Does 4.~INV_Stone_04^r5~Thing 5~5~0~Does 5.~INV_Stone_04^r6~Thing 6~6~0~Does 6.~INV_Stone_04^r7~Thing 7~7~0~Does 7.~INV_Stone_04^r8~Thing 8~8~0~Does 8.~INV_Stone_04^r9~Thing 9~9~0~Does 9.~INV_Stone_04^r10~Thing 10~10~0~Does 10.~INV_Stone_04^r11~Thing 11~11~0~Does 11.~INV_Stone_04^r12~Thing 12~12~0~Does 12.~INV_Stone_04^r13~Thing 13~13~0~Does 13.~INV_Stone_04^r14~Thing 14~14~0~Does 14.~INV_Stone_04^r15~Thing 15~15~0~Does 15.~INV_Stone_04^r16~Thing 16~16~0~Does 16.~INV_Stone_04^r17~Thing 17~17~0~Does 17.~INV_Stone_04^r18~Thing 18~18~0~Does 18.~INV_Stone_04^r19~Thing 19~19~0~Does 19.~INV_Stone_04^r20~Thing 20~20~0~Does 20.~INV_Stone_04^r21~Thing 21~21~0~Does 21.~INV_Stone_04^r22~Thing 22~22~0~Does 22.~INV_Stone_04^r23~Thing 23~23~0~Does 23.~INV_Stone_04^r24~Thing 24~24~0~Does 24.~INV_Stone_04^r25~Thing 25~25~0~Does 25.~INV_Stone_04^r26~Thing 26~26~0~Does 26.~INV_Stone_04^r27~Thing 27~27~0~Does 27.~INV_Stone_04^r28~Thing 28~28~0~Does 28.~INV_Stone_04^r29~Thing 29~29~0~Does 29.~INV_Stone_04^r30~Thing 30~30~0~Does 30.~INV_Stone_04^r31~Thing 31~31~0~Does 31.~INV_Stone_04^r32~Thing 32~32~0~Does 32.~INV_Stone_04^r33~Thing 33~33~0~Does 33.~INV_Stone_04^r34~Thing 34~34~0~Does 34.~INV_Stone_04^r35~Thing 35~35~0~Does 35.~INV_Stone_04^r36~Thing 36~36~0~Does 36.~INV_Stone_04^r37~Thing 37~37~0~Does 37.~INV_Stone_04^r38~Thing 38~38~0~Does 38.~INV_Stone_04^r39~Thing 39~39~0~Does 39.~INV_Stone_04^r40~Thing 40~40~0~Does 40.~INV_Stone_04^r41~Thing 41~41~0~Does 41.~INV_Stone_04^r42~Thing 42~42~0~Does 42.~INV_Stone_04^r43~Thing 43~43~0~Does 43.~INV_Stone_04^r44~Thing 44~44~0~Does 44.~INV_Stone_04^r45~Thing 45~45~0~Does 45.~INV_Stone_04^r46~Thing 46~46~0~Does 46.~INV_Stone_04^r47~Thing 47~47~0~Does 47.~INV_Stone_04^r48~Thing 48~48~0~Does 48.~INV_Stone_04^r49~Thing 49~49~0~Does 49.~INV_Stone_04^r50~Thing 50~50~0~Does 50.~INV_Stone_04^r51~Thing 51~51~0~Does 51.~INV_Stone_04^r52~Thing 52~52~0~Does 52.~INV_Stone_04^r53~Thing 53~53~0~Does 53.~INV_Stone_04^r54~Thing 54~54~0~Does 54.~INV_Stone_04^hide_jerkin~Hide Jerkin~1~2~Takes a tenth off.~INV_Chest_Leather_07
+!table.insert(SAID, "chest page: " .. tostring(ElwynnSurvivalWindow.pageText:GetText()) .. " next " .. tostring(ElwynnSurvivalWindow.next:IsShown()) .. " slot 3 count " .. tostring(ElwynnSurvivalWindow.slots[3].count:GetText()))
+!this = ElwynnSurvivalWindow.slots[3]; arg1 = "LeftButton"; ElwynnSurvivalWindow.slots[3]:GetScript("OnClick")()
+!this = ElwynnSurvivalWindow.slots[3]; arg1 = "RightButton"; ElwynnSurvivalWindow.slots[3]:GetScript("OnClick")()
+!this = ElwynnSurvivalWindow.next; ElwynnSurvivalWindow.next:GetScript("OnClick")()
+!this = ElwynnSurvivalWindow.slots[6]; ElwynnSurvivalWindow.slots[6]:GetScript("OnEnter")()
+!table.insert(SAID, "page 2: " .. tostring(ElwynnSurvivalWindow.pageText:GetText()) .. " slot 6 " .. tostring(ElwynnSurvivalWindow.detailName:GetText()) .. " / " .. tostring(ElwynnSurvivalWindow.detail:GetText()) .. " / " .. tostring(ElwynnSurvivalWindow.hint:GetText()) .. " shown " .. tostring(ElwynnSurvivalWindow.slots[6]:IsShown()) .. " " .. tostring(ElwynnSurvivalWindow.slots[7]:IsShown()))
+!this = ElwynnSurvivalWindow.slots[6]; arg1 = "LeftButton"; ElwynnSurvivalWindow.slots[6]:GetScript("OnClick")()
+!this = ElwynnSurvivalWindow.slots[6]; ElwynnSurvivalWindow.slots[6]:GetScript("OnLeave")()
+# The build menu: icons, a cost red where short, the strip on hover.
+BM	cooking~Cooking Fire~Elwynn Timber:6:32~1~1~Turns raw meat into roasts.~Spell_Fire_Fire^smithy~Smithing Anvil~Fargodeep Copper:4:1;Elwynn Timber:8:32~0~0~Works copper.~Trade_BlackSmithing
+!table.insert(SAID, "build: " .. tostring(ElwynnSurvivalWindow.rows[1].name:GetText()) .. " [" .. tostring(ElwynnSurvivalWindow.rows[1].tag:GetText()) .. "] " .. tostring(ElwynnSurvivalWindow.rows[2].cost:GetText()) .. " strip " .. tostring(ElwynnSurvivalWindow.detail:GetText()))
+!this = ElwynnSurvivalWindow.rows[2]; ElwynnSurvivalWindow.rows[2]:GetScript("OnEnter")()
+!table.insert(SAID, "build hover: " .. tostring(ElwynnSurvivalWindow.detailName:GetText()) .. " / " .. tostring(ElwynnSurvivalWindow.hint:GetText()))
+!this = ElwynnSurvivalWindow.rows[2]; ElwynnSurvivalWindow.rows[2]:GetScript("OnLeave")()
+!this = ElwynnSurvivalWindow.close; ElwynnSurvivalWindow.close:GetScript("OnClick")()
+!table.insert(SAID, "closed: mode " .. ElwynnSurvival.mode .. " catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()))
+BP	Smithing Anvil	8 Elwynn Timber, 4 Fargodeep Copper	Needs 4 more Fargodeep Copper.	-9530.0~120.0~60.5~2.0
+!table.insert(SAID, "placing: mode " .. ElwynnSurvival.mode .. "; " .. ElwynnSurvivalPlacing.keys:GetText())
+!ElwynnSurvival.Use()
+!ElwynnSurvival.Rotate()
+BP
+!table.insert(SAID, "placed: mode " .. ElwynnSurvival.mode)
+!UIParent:Hide()
+!table.insert(SAID, "map open: catcher visible " .. tostring(ElwynnSurvivalCatcher:IsVisible()))
+!UIParent:Show()
+!table.insert(SAID, "map closed: catcher visible " .. tostring(ElwynnSurvivalCatcher:IsVisible()) .. " mode " .. ElwynnSurvival.mode)
+# The third round's action layer: its calls stubbed and recorded.
+!function HasActionCombat() return 3 end function SetActionMouse() end CALLS = {} local function rec(n) return function() table.insert(CALLS, n) end end PlayUnitAnimation = rec("anim") ActionDash = rec("dash") RollUnit = rec("roll") ReactUnit = rec("react") SetLockOn = rec("lock") CameraKick = rec("kick") StopUnitAnimation = rec("stop") HitStop = rec("hitstop") ShakeCamera = rec("shake")
+!table.insert(SAID, "action layer: " .. tostring(ElwynnSurvival.ActionLayer()))
+H	150	200	100	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2		0	0	bow	17	0.38	0.86	57	0.56	1.13	14	22	22
+MV	0	0.25	0.45	0.65	0.60	0.18	0.45	16.0	0.25	17~0~0.380~0.480~0.70~14.0^17~1~0.380~0.500~0.70~14.0^57~0~0.456~0.600~1.00~16.8	57~0~0.556~0.580~1.00~22.4	17~1~0.380~0.520~2.40~14.0	59~0~0.250~0.450~0.60~16.0	95~0~0.270~0.500~0.40~12.0
+A	ready	0.00	0.00
+!CALLS = {} ElwynnSurvival.Attack("down") ElwynnSurvival.Attack("up")
+!table.insert(SAID, "light: " .. table.concat(CALLS, ",") .. " combo next " .. tostring(ElwynnSurvival.comboNext))
+!CALLS = {} ElwynnSurvival.Attack("down") ElwynnSurvival.Attack("up")
+!table.insert(SAID, "too early to chain: " .. table.concat(CALLS, ","))
+AN	0xF1	17	0.380	50F2EEE4	530	1	0	0.480	0.70	light	0
+!table.insert(SAID, "server's own swing, already played: " .. table.concat(CALLS, ","))
+RE	0xF1	14	0.6	0.8	0.30	0.80	1
+RE	0xF130000000000025	9	1.0	0.0	0.15	0.00	0
+!table.insert(SAID, "reactions: " .. table.concat(CALLS, ",") .. " mine dropped " .. tostring(ElwynnSurvival.mine == nil))
+LO	0xF130000000000025
+!table.insert(SAID, "locked: " .. tostring(ElwynnSurvival.lockOn))
+!local n = table.getn(SAID) ElwynnSurvival.Lock("down") ElwynnSurvival.Lock("up") ElwynnSurvival.NextFoe() local t = {} for i = n + 1, table.getn(SAID) do table.insert(t, SAID[i]) end table.insert(SAID, "tab locked, then ctrl-tab: " .. table.concat(t, " | "))
+LO	0x0
+PI	7
+A	guard	0.00	0.00
+!CALLS = {} ElwynnSurvival.guardHeld = true ElwynnSurvival.Attack("down") ElwynnSurvival.Attack("up") ElwynnSurvival.guardHeld = nil
+!table.insert(SAID, "guard + attack: " .. table.concat(CALLS, ","))
+A	ready	0.00	0.00
+!ElwynnSurvival.mine = nil CALLS = {} ElwynnSurvival.Dodge("down") ElwynnSurvival.Dodge("up")
+!table.insert(SAID, "dodge: " .. table.concat(CALLS, ","))
+IM	0xF1	0xF2	heavy	hit	1	0
+!table.insert(SAID, "heavy landed: " .. table.concat(CALLS, ","))
+# A blow on our guard sounds (the shield's, else the blade's); a parry rings.
+!OLDPSF = PlaySoundFile function PlaySoundFile(f) table.insert(SAID, "sound " .. f) end
+IM	0xF130000000000025	0xF1	light	block	0	1
+IM	0xF130000000000025	0xF1	light	parry	0	1
+!PlaySoundFile = OLDPSF
+# The journal.
+GL	3	17	Provisions	Hunt boars for meat and cook three roasts at the fire.	1	3
+!table.insert(SAID, "goal: " .. tostring(ElwynnSurvivalInfo.goal and ElwynnSurvivalInfo.goal:GetText()))
+# Effects, the quick item and armor.
+H	150	200	100	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2		0	0	bow	17	0.38	0.86	57	0.56	1.13	14	22	22	Hearty Stew	2	14
+EF	Well Fed~171~stamina^Honed~95~might
+!table.insert(SAID, "effects: " .. tostring(ElwynnSurvival.vitals.effects:GetText()) .. " | quick " .. tostring(ElwynnSurvival.gear.quickName:GetText()))
+!ElwynnSurvival.Cycle()
+# The fourth round: our own blow's weight as it connects, a dodge aside, a knockdown, others'
+# dodges and a creature's wound-up swing.
+!function HasActionCombat() return 4 end function REC(n) return function() table.insert(CALLS, n) end end PROBE = "0xF130000000000025" function ActionProbe() return PROBE end MARKS = {} function TakeActionMarkers() local m = MARKS MARKS = {} return m end ActionKit = REC("kit") PlayUnitVocal = REC("vocal") function ActionMoveKeys() return 0, 0 end
+!table.insert(SAID, "local hits: " .. tostring(ElwynnSurvival.LocalHits()))
+MV	0	0.25	0.45	0.65	0.60	0.18	0.45	16.0	0.25	17~0~0.380~0.480~0.70~14.0~2.50~90^17~1~0.380~0.500~0.70~14.0~2.50~90^57~0~0.456~0.600~1.00~16.8~2.50~90	57~0~0.556~0.580~1.00~22.4~2.50~90	17~1~0.380~0.520~2.40~14.0~2.50~90	59~0~0.250~0.450~0.60~16.0~2.50~100	95~0~0.270~0.500~0.40~12.0~2.40~80	1
+A	ready	0.00	0.00
+!ElwynnSurvival.mine = nil ElwynnSurvival.comboUntil = nil CALLS = {} ElwynnSurvival.Attack("down") ElwynnSurvival.Attack("up") table.insert(MARKS, "impact player") ElwynnSurvival.Markers()
+!table.insert(SAID, "own blow connects: " .. table.concat(CALLS, ","))
+!CALLS = {}
+IM	0xF1	0xF130000000000025	light	hit	1	0
+!table.insert(SAID, "the server's word on it: " .. table.concat(CALLS, ",") .. ";")
+A	ready	0.00	0.00
+!ElwynnSurvival.mine = nil CALLS = {} function ActionMoveKeys() return 0, 1 end ElwynnSurvival.Dodge("down") ElwynnSurvival.Dodge("up")
+!table.insert(SAID, "dodge right: " .. table.concat(CALLS, ","))
+!CALLS = {}
+RE	0xF130000000000025	121	1.0	0.0	0.00	0.00	0	1.50
+RO	0xF130000000000025	0.45	0	left
+AN	0xF130000000000025	16	0.950	-	0	0	1	0.900	0	mob	0
+!table.insert(SAID, "knockdown, a dodge aside, a creature's swing: " .. table.concat(CALLS, ","))
+# Walking with the bow drawn: the upper body holds the draw; stopped (or loosed), it lets go.
+!CALLS = {} OLDPUA = PlayUnitAnimation PlayUnitAnimation = function(u, a, i, t, ms, v, r, body) table.insert(CALLS, "anim " .. a .. " " .. tostring(body)) end OLDSUA = StopUnitAnimation StopUnitAnimation = function() table.insert(CALLS, "stop") end function ActionMoveKeys() return 1, 0 end
+H	150	200	100	100	bow	Hunting Bow	5	16	-1	0	idle	0	0	0	1	2		0	0	bow
+A	charge	0.20	0.00	aimed_shot
+!ElwynnSurvival.BowWalk()
+!function ActionMoveKeys() return 0, 0 end ElwynnSurvival.BowWalk()
+!table.insert(SAID, "bow walk: " .. table.concat(CALLS, ",")) PlayUnitAnimation = OLDPUA StopUnitAnimation = OLDSUA
+A	ready	0.00	0.00
+H	150	200	100	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2		0	0	bow
+# A cast's clip, ours and another's.
+!CALLS = {}
+AN	0xF1	54	0.300	-	0	1	0	0.300	0	cast	0
+AN	0xF2	54	0.300	-	0	0	0	0.300	0	cast	0
+!table.insert(SAID, "casts played: " .. table.concat(CALLS, ","))
+# Blows coming down: their circles laid on the ground by the client, and taken away.
+!function SetGroundMarker(k, x, y, z, r, secs, hostile) table.insert(SAID, "ground " .. k .. " " .. x .. " " .. r .. " " .. secs .. " " .. tostring(hostile)) end function ClearGroundMarker(k) table.insert(SAID, "ground gone " .. tostring(k)) end
+MK	77	-9450.50	-60.25	56.00	3.50	1.20
+MK	77
+!SetGroundMarker, ClearGroundMarker = nil, nil
+# A creature's blow drawn under it, and gone.
+!function SetTelegraph(k, u, sh, r, a, secs, kind, parry, focus) table.insert(SAID, "telegraph " .. k .. " " .. u .. " " .. sh .. " " .. r .. " " .. a .. " " .. secs .. " " .. kind .. " " .. parry .. " " .. tostring(focus)) end function ClearTelegraph(k) table.insert(SAID, "telegraph gone " .. tostring(k)) end
+TG	91	0XF130000000000025	wedge	3.40	120	1.20	block	0.25	1
+TG	91
+!SetTelegraph, ClearTelegraph = nil, nil
+# The steering mouse: held in action mode, let go while a window is up.
+!OLDML = { MouselookStart, MouselookStop, IsMouselooking } LOOKING = false function MouselookStart() LOOKING = true end function MouselookStop() LOOKING = false end function IsMouselooking() return LOOKING end ElwynnSurvival.SetMode("action")
+!table.insert(SAID, "steering: " .. tostring(LOOKING))
+!ElwynnSurvival.ToggleKeys()
+!table.insert(SAID, "card up: steering " .. tostring(LOOKING))
+!ElwynnSurvival.ToggleKeys()
+!table.insert(SAID, "card down: steering " .. tostring(LOOKING))
+!ElwynnSurvival.SetMode("cursor")
+!table.insert(SAID, "cursor mode: steering " .. tostring(LOOKING))
+!ElwynnSurvival.SetMode("action") MouselookStart, MouselookStop, IsMouselooking = OLDML[1], OLDML[2], OLDML[3]
+# The controls card: change a key, a clash, Backspace back, the options.
+!ElwynnSurvival.ToggleKeys()
+!this = ElwynnSurvivalKeys.rows[16][3]; ElwynnSurvivalKeys.rows[16][3]:GetScript("OnClick")()
+!table.insert(SAID, "capture: " .. tostring(ElwynnSurvivalCapture:IsShown()) .. " " .. tostring(ElwynnSurvivalCapture.text:GetText()))
+!this = ElwynnSurvivalCapture; arg1 = "F1"; ElwynnSurvivalCapture:GetScript("OnKeyDown")()
+!table.insert(SAID, "rebound: F1 is " .. tostring(GetBindingAction("F1")) .. ", Q is " .. tostring(GetBindingAction("Q")) .. ", CTRL-F1 is " .. tostring(GetBindingAction("CTRL-F1")) .. ", card says " .. ElwynnSurvival.ControlKey(16) .. ", bar key " .. tostring(ElwynnSurvivalAbilities.slots[1].keyText:GetText()))
+!this = ElwynnSurvivalKeys.rows[17][3]; ElwynnSurvivalKeys.rows[17][3]:GetScript("OnClick")()
+!this = ElwynnSurvivalCapture; arg1 = "F1"; ElwynnSurvivalCapture:GetScript("OnKeyDown")()
+!table.insert(SAID, "clash: F1 is " .. tostring(GetBindingAction("F1")) .. ", spell shows " .. ElwynnSurvival.ControlKey(16))
+!this = ElwynnSurvivalKeys.rows[6][3]; ElwynnSurvivalKeys.rows[6][3]:GetScript("OnClick")()
+!this = ElwynnSurvivalCapture; arg1 = "Button4"; ElwynnSurvivalCapture:GetScript("OnMouseDown")()
+!table.insert(SAID, "mouse rebound: attack shows " .. ElwynnSurvival.ControlKey(6) .. ", BUTTON4 is " .. tostring(GetBindingAction("BUTTON4")))
+!this = ElwynnSurvivalKeys.reset; ElwynnSurvivalKeys.reset:GetScript("OnClick")()
+!table.insert(SAID, "reset: Q is " .. tostring(GetBindingAction("Q")) .. ", F1 is " .. tostring(GetBindingAction("F1")) .. ", attack " .. ElwynnSurvival.ControlKey(6))
+!this = ElwynnSurvivalKeys.middle; ElwynnSurvivalKeys.middle:GetScript("OnClick")()
+!table.insert(SAID, "middle lock: BUTTON3 is " .. tostring(GetBindingAction("BUTTON3")) .. " / " .. tostring(ElwynnSurvivalKeys.middle.label:GetText()))
+!this = ElwynnSurvivalKeys.middle; ElwynnSurvivalKeys.middle:GetScript("OnClick")()
+!this = ElwynnSurvivalKeys.where; ElwynnSurvivalKeys.where:GetScript("OnClick")()
+!this = ElwynnSurvivalKeys.size; ElwynnSurvivalKeys.size:GetScript("OnClick")()
+!table.insert(SAID, "vitals: " .. tostring(ElwynnSurvivalKeys.where.label:GetText()) .. ", " .. tostring(ElwynnSurvivalKeys.size.label:GetText()) .. ", scale " .. string.format("%.2f", ElwynnSurvivalVitals:GetScale()))
+!local t = {} for i = 1, table.getn(ElwynnSurvival.CONTROLS) do table.insert(t, ElwynnSurvival.CONTROLS[i][1] .. " = " .. ElwynnSurvival.ControlKey(i)) end table.insert(SAID, "card: " .. table.concat(t, "; "))
+!ElwynnSurvival.ToggleKeys()
+!ElwynnSurvival.Lock()
+# The whole journal (J): it opens on the page of the goal it's on.
+GJ	Goal 1~0~Do thing 1.~2 Elwynn Timber^Goal 2~0~Do thing 2.~2 Elwynn Timber^Goal 3~0~Do thing 3.~2 Elwynn Timber^Goal 4~0~Do thing 4.~2 Elwynn Timber^Goal 5~0~Do thing 5.~2 Elwynn Timber^Goal 6~0~Do thing 6.~2 Elwynn Timber^Goal 7~0~Do thing 7.~2 Elwynn Timber^Goal 8~0~Do thing 8.~2 Elwynn Timber^Goal 9~0~Do thing 9.~2 Elwynn Timber^Goal 10~0~Do thing 10.~2 Elwynn Timber^Goal 11~0~Do thing 11.~2 Elwynn Timber^Goal 12~0~Do thing 12.~2 Elwynn Timber^Goal 13~0~Do thing 13.~2 Elwynn Timber^Goal 14~0~Do thing 14.~2 Elwynn Timber^Goal 15~1~Do thing 15.~2 Elwynn Timber^Goal 16~2~Do thing 16.~2 Elwynn Timber^Goal 17~2~Do thing 17.~2 Elwynn Timber^Goal 18~2~Do thing 18.~2 Elwynn Timber
+!ElwynnSurvival.Journal()
+!table.insert(SAID, "journal: " .. tostring(ElwynnSurvivalWindow:IsShown()) .. " " .. tostring(ElwynnSurvivalWindow.pageText:GetText()) .. " row 2 " .. tostring(ElwynnSurvivalWindow.rows[2].name:GetText()) .. " / " .. tostring(ElwynnSurvivalWindow.rows[2].cost:GetText()))
+!ElwynnSurvival.Journal()
+!table.insert(SAID, "journal closed: " .. tostring(ElwynnSurvivalWindow:IsShown()))
+# A blow no guard stops: the red mark; on a client that can, the creature's weapon red instead.
+WN	1.30
+!table.insert(SAID, "danger: " .. tostring(ElwynnSurvivalDanger:IsShown()))
+!ElwynnSurvivalDanger:Hide() function SetUnitWeaponGlow(u, c, s) table.insert(SAID, "weapon glow " .. u .. " " .. c .. " " .. string.format("%.1f", s)) end
+WN	1.30	0XF130000000000025
+WG	0XF130000000000026	0.90
+!table.insert(SAID, "danger with a red weapon: mark " .. tostring(ElwynnSurvivalDanger:IsShown())) SetUnitWeaponGlow = nil
+# A champion's bar: shown while he fights near, redder in his second wind, gone after.
+BS	Warlord Gorzak	900	1200	0
+BS	Warlord Gorzak	500	1200	1
+!table.insert(SAID, "boss bar: " .. tostring(ElwynnSurvivalBoss:IsShown()) .. " " .. tostring(ElwynnSurvival.boss.name:GetText()))
+# Trading blows with the champion: one bar for him, not two; another foe goes under his.
+H	150	200	100	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2	Warlord Gorzak	500	1200	bow
+!local _, _, _, _, y = ElwynnSurvivalBoss:GetPoint(1) table.insert(SAID, "boss and its foe bar: boss " .. tostring(ElwynnSurvivalBoss:IsShown()) .. " at " .. tostring(y) .. ", foe " .. tostring(ElwynnSurvivalFoe:IsShown()))
+H	150	200	100	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2	Warsong Grunt	180	300	bow
+!local _, _, _, _, y = ElwynnSurvivalFoe:GetPoint(1) table.insert(SAID, "another foe: " .. tostring(ElwynnSurvivalFoe:IsShown()) .. " at " .. tostring(y))
+BS
+!table.insert(SAID, "boss bar after: " .. tostring(ElwynnSurvivalBoss:IsShown()))
+# The book at camp: shut, then its pages; a page goes down.
+BK	0	landing~The Smugglers' Landing
+!table.insert(SAID, "book shut: " .. tostring(ElwynnSurvival.win.kind) .. " " .. tostring(ElwynnSurvival.win.rows[1]:IsShown()))
+BK	1	landing~The Smugglers' Landing^beach~The Cove Beach
+!table.insert(SAID, "book: " .. tostring(ElwynnSurvival.win.rows[2].name:GetText()) .. " / " .. tostring(ElwynnSurvival.win.rows[2].go.cmd))
+!this = ElwynnSurvivalWindow.rows[1].go; ElwynnSurvivalWindow.rows[1].go:GetScript("OnClick")()
+# The Proving Ring: its page first, even while the rest is cipher; its count in the corner; its banner.
+BK	0	landing~The Smugglers' Landing	arena~The Proving Ring~7
+!table.insert(SAID, "book ring: " .. tostring(ElwynnSurvival.win.rows[1].name:GetText()) .. " [" .. tostring(ElwynnSurvival.win.rows[1].tag:GetText()) .. "] " .. tostring(ElwynnSurvival.win.rows[1].go.cmd) .. ", row 2 shown " .. tostring(ElwynnSurvival.win.rows[2]:IsShown()))
+BK	1	landing~The Smugglers' Landing^beach~The Cove Beach	arena~The Proving Ring~7
+!table.insert(SAID, "book with ring: " .. tostring(ElwynnSurvival.win.rows[2].tag:GetText()) .. " " .. tostring(ElwynnSurvival.win.rows[3].go.cmd))
+AA	3	4	-1	7
+!table.insert(SAID, "ring: " .. tostring(ElwynnSurvivalInfo.raid:GetText()))
+AA	3	0	6	7
+!table.insert(SAID, "ring between: " .. tostring(ElwynnSurvivalInfo.raid:GetText()))
+AW	3	0	6	7	2
+!table.insert(SAID, "ring banner: " .. tostring(ElwynnSurvival.win.title:GetText()) .. " / " .. tostring(ElwynnSurvival.win.rows[1].go.cmd) .. " / " .. tostring(ElwynnSurvival.win.rows[2].go.cmd) .. " / " .. tostring(ElwynnSurvival.win.detail:GetText()))
+!this = ElwynnSurvivalWindow.rows[1].go; ElwynnSurvivalWindow.rows[1].go:GetScript("OnClick")()
+AA
+!table.insert(SAID, "ring gone: '" .. tostring(ElwynnSurvivalInfo.raid:GetText()) .. "' " .. tostring(ElwynnSurvival.arena))
+# Below: no building; a lamp's window with rest, home, a lamp and a ware.
+WR	below
+!ElwynnSurvival.Build()
+LP	beach	The Cove Beach	2	4	landing~The Smugglers' Landing	whetstone~Rough Sharpening Stone~6~1~INV_Stone_SharpeningStone_01	9
+!table.insert(SAID, "lamp: " .. tostring(ElwynnSurvival.win.title:GetText()) .. " / " .. tostring(ElwynnSurvival.win.rows[1].tag:GetText()) .. " / " .. tostring(ElwynnSurvival.win.rows[3].go.cmd) .. " / " .. tostring(ElwynnSurvival.win.rows[4].go.cmd))
+!this = ElwynnSurvivalWindow.rows[1].go; ElwynnSurvivalWindow.rows[1].go:GetScript("OnClick")()
+WR	camp
+DE	3
+!table.insert(SAID, "down shown: " .. tostring(ElwynnSurvivalDown:IsShown()))
+DE	0
+PM	2~3~1~5~0~2	camp~-9506~104~camp~1~The Camp~Your camp.~^forests_edge~-9900~660~foes~0~Forest's Edge~Hogger roams.~^northshire~-8905~-175~sanctum~0~Northshire Abbey~The priest's shrine.~Spell_Holy_PowerWordShield
+!table.insert(SAID, "pins heard: " .. tostring(table.getn(ElwynnSurvival.pins)) .. ", first " .. tostring(ElwynnSurvival.pins[1].name) .. " found " .. tostring(ElwynnSurvival.pins[1].found))
+!WorldMapFrame = CreateFrame("Frame", "WorldMapFrame", UIParent) WorldMapDetailFrame = CreateFrame("Frame", "WorldMapDetailFrame", WorldMapFrame) WorldMapDetailFrame:SetWidth(1002) WorldMapDetailFrame:SetHeight(668) WorldMapButton = CreateFrame("Button", "WorldMapButton", WorldMapDetailFrame) WorldMapFrame:Show() GetMapInfo = function() return "Elwynn" end
+!ElwynnSurvival.DrawPins()
+!local n = 0 for i = 1, table.getn(ElwynnSurvival.pinFrames) do if ElwynnSurvival.pinFrames[i]:IsShown() then n = n + 1 end end table.insert(SAID, "pins on the map: " .. n .. ", map shown " .. tostring(WorldMapFrame:IsVisible()) .. ", tally " .. tostring(ElwynnSurvival.pinText and ElwynnSurvival.pinText:GetText()))
+!GetMapInfo = function() return "Westfall" end ElwynnSurvival.DrawPins()
+!local n = 0 for i = 1, table.getn(ElwynnSurvival.pinFrames) do if ElwynnSurvival.pinFrames[i]:IsShown() then n = n + 1 end end table.insert(SAID, "pins on another map: " .. n)
+# Siege: the book's page, the muster, the ledger, the corner; the floor markers turned off.
+BK	0		arena~The Proving Ring~3	siege~The Siege of Arathi Basin~Camps against camps.
+!table.insert(SAID, "book siege row: " .. tostring(ElwynnSurvival.win.rows[2].name:GetText()) .. " -> " .. tostring(ElwynnSurvival.win.rows[2].go.cmd))
+WR	siege
+SL	1	No match under way	0	1v1~One against one~The Stables against the Farm.~2~Ann~1^2v2~Two against two~Two to a camp.~4~~0
+!table.insert(SAID, "muster: " .. tostring(ElwynnSurvival.win.kind) .. " / " .. tostring(ElwynnSurvival.win.rows[1].tag:GetText()) .. " / " .. tostring(ElwynnSurvival.win.rows[1].go.cmd) .. " / " .. tostring(ElwynnSurvival.win.rows[2].go.cmd) .. " / " .. tostring(ElwynnSurvival.win.rows[3].go.cmd))
+SB	0	100	20	the Farm	0	kobolds~3 Kobold Laborer~15~1~1~1~~Diggers.~kobold_laborer^overseer~Warsong Overseer~120~8~8~0~From wave 8.~Wide cleaves.~overseer
+!table.insert(SAID, "ledger ignored while the muster is up: " .. tostring(ElwynnSurvival.win.kind))
+SB	1	100	20	the Farm	0	kobolds~3 Kobold Laborer~15~1~1~1~~Diggers.~kobold_laborer^overseer~Warsong Overseer~120~8~8~0~From wave 8.~Wide cleaves.~overseer
+!table.insert(SAID, "ledger: " .. tostring(ElwynnSurvival.win.kind) .. " / " .. tostring(ElwynnSurvival.win.rows[1].name:GetText()) .. " / " .. tostring(ElwynnSurvival.win.rows[2].go.cmd) .. " / " .. tostring(ElwynnSurvival.win.rows[3].cost:GetText()))
+SG	running	3	15	42	135	24	the Stables~2810~3000~0~1~0~Ann^the Farm~3000~3000~0~0~1~Bob	Kobold Laborer~3	
+!table.insert(SAID, "siege corner: " .. tostring(ElwynnSurvivalInfo.raid:GetText()) .. " | " .. string.gsub(tostring(ElwynnSurvivalInfo.siege:GetText()), "\n", " / "))
+!ElwynnSurvival.Build()
+SG
+!table.insert(SAID, "siege gone: '" .. tostring(ElwynnSurvivalInfo.siege:GetText()) .. "'")
+WR	camp
+!SetGroundMarker = SetGroundMarker or function() end ClearGroundMarker = ClearGroundMarker or function() end
+!this = ElwynnSurvivalKeys.marks; ElwynnSurvivalKeys.marks:GetScript("OnClick")()
+!table.insert(SAID, "markers: " .. tostring(ElwynnSurvival.MarksOn()) .. " / " .. tostring(ElwynnSurvivalKeys.marks.label:GetText()))
+MK	t1	1	2	3	2	1	0
+!table.insert(SAID, "a marker while off: " .. tostring(ElwynnSurvival.marksUp.mk["est1"]))
+!this = ElwynnSurvivalKeys.marks; ElwynnSurvivalKeys.marks:GetScript("OnClick")()
+MK	t1	1	2	3	2	1	0
+!table.insert(SAID, "a marker while on: " .. tostring(ElwynnSurvival.marksUp.mk["est1"]))
+# The book with its dungeons (through Ledger.lua's dressing, which must pass them on).
+WR	camp
+BK	0		arena~The Proving Ring~0	siege~The Siege~Camps.	deadmines~The Deadmines~~1~1~3~1~~^stockade~The Stockade~INV_Misc_Key_04~0~1~2~1~A prison~The gate
+!local t = {} for i = 1, 8 do local r = ElwynnSurvival.win.rows[i] if r and r:IsShown() then table.insert(t, tostring(r.name:GetText())) end end table.insert(SAID, "book with dungeons: " .. table.concat(t, " | "))
+# Below, with nothing else to point at: the corner's arrow points north.
+WR	below
+H	200	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90
+!table.insert(SAID, "below, the arrow: " .. tostring(ElwynnSurvivalInfo:IsShown() and "info" or "no info") .. " / " .. tostring(ElwynnSurvival.infoCacheText and ElwynnSurvival.infoCacheText() or "?"))
+WR	camp
+@PLAYER_LEAVING_WORLD
+!table.insert(SAID, "asleep: " .. tostring(ElwynnSurvival.awake) .. ", S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. ", catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()) .. ", action bar back " .. tostring(MainMenuBar:IsVisible()) .. ", bar " .. tostring(ElwynnSurvivalBar:IsVisible()))
+!table.insert(SAID, "after leaving: action bar visible " .. tostring(MainMenuBar:IsVisible()) .. ", player frame " .. tostring(PlayerFrame:IsVisible()))

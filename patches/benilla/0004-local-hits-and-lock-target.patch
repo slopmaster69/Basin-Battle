@@ -1,0 +1,810 @@
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 652bf5bb..02975138 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -16,6 +16,9 @@
+ //! - Hit-stop (the clocks held a moment as a blow lands), camera shake, weapon trails, the upper
+ //!   body following the aim, a lock-on target for the camera and the body, and a camera that stops
+ //!   short of other units instead of entering them.
++//! - The fourth round: the units near us for the script's own blow test, spell kits and voices
++//!   played here and now, the clips' impact keyframes told back to the script, the lock-on's unit
++//!   selected (its circle under it), and the feet stepping round as the lock-on turns us in place.
+ 
+ use std::f32::consts::TAU;
+ use std::sync::Mutex;
+@@ -41,6 +44,9 @@ const FADE_OUT: f32 = 0.16;
+ /// the second, the whole body again.
+ const MOVING_ABOVE: f32 = 1.2;
+ const STILL_BELOW: f32 = 0.6;
++/// Moving this long hands the legs to the gait (a lunge's step is shorter, so a blow stepping in
++/// keeps its own stance, sliding the little way rather than flicking the legs to a run and back).
++const LEGS_AFTER: f32 = 0.22;
+ /// How far the body must have moved before a roll knows which way it tumbles, and how long it
+ /// waits for that before giving up on the tumble (a dodge into a wall).
+ const ROLL_DIRECTION_AFTER: f32 = 0.12;
+@@ -59,6 +65,14 @@ const BODY_HEIGHT: f32 = 2.1;
+ const BODY_CLEARANCE: f32 = 0.3;
+ /// Units within this of the hero can block the camera.
+ const OCCLUDER_RANGE: f32 = 20.0;
++/// Units within this of the hero are offered to the script's blow test.
++const NEARBY_RANGE: f32 = 12.0;
++/// Turning faster than this (rad/s) standing still while locked on steps the feet round; the
++/// shuffle clips (`AnimationData` ShuffleLeft, ShuffleRight) are held this long past the turn.
++const SHUFFLE_ABOVE: f32 = 1.2;
++const SHUFFLE_HOLD: f32 = 0.15;
++const SHUFFLE_LEFT: u16 = 11;
++const SHUFFLE_RIGHT: u16 = 12;
+ /// The lock-on point: this far up a locked unit (scaled), and how far off it lets go.
+ const LOCK_HEIGHT: f32 = 1.3;
+ const LOCK_RANGE: f32 = 45.0;
+@@ -92,6 +106,10 @@ pub(crate) struct ActionClip {
+     last_pos: Option<Vec3>,
+     /// Seconds the body has been moving (positive) or still (negative), for the body switch.
+     moving_for: f32,
++    /// Its impact keyframe has been told to the script.
++    told: bool,
++    /// A shuffle step of the lock-on's turn, not a script's clip.
++    shuffle: bool,
+ }
+ 
+ impl ActionClip {
+@@ -192,6 +210,22 @@ fn resolve(name: &str, me: Option<Entity>, index: &GuidIndex) -> Option<Entity>
+     index.0.get(&guid).copied()
+ }
+ 
++/// The guid a script's unit names, if it names one by guid.
++fn guid_of(name: &str) -> Option<u64> {
++    match name.strip_prefix("0x").or_else(|| name.strip_prefix("0X")) {
++        Some(hex) => u64::from_str_radix(hex, 16).ok(),
++        None => name.parse::<u64>().ok(),
++    }
++}
++
++/// A cheap spread for picking a take: the clock's fraction.
++fn spread(now: f32, n: usize) -> usize {
++    if n <= 1 {
++        return 0;
++    }
++    ((now * 7919.0).fract().abs() * n as f32) as usize % n
++}
++
+ /// When a clip's blow lands: its first impact keyframe, else 0 (none).
+ fn impact_time(clip: &benilla_assets::AnimClip) -> f32 {
+     clip.events
+@@ -240,6 +274,8 @@ impl ActionClip {
+             stopping: None,
+             last_pos: None,
+             moving_for: 0.0,
++            told: false,
++            shuffle: false,
+         }
+     }
+ 
+@@ -348,6 +384,9 @@ pub(super) fn drain_action_calls(
+     mut clips: Query<&mut ActionClip>,
+     mut tilts: Query<&mut ActionTilt>,
+     mut lock: ResMut<LockOn>,
++    mut kits: MessageWriter<super::spell_visual::KitPush>,
++    mut play_seq: ResMut<super::PlaySeq>,
++    env: Option<Res<super::EnvDamageTable>>,
+ ) {
+     let calls = action_combat::take_calls();
+     if calls.is_empty() {
+@@ -413,6 +452,8 @@ pub(super) fn drain_action_calls(
+                 from,
+                 lean,
+                 hold,
++                fit,
++                variation,
+             } => {
+                 let Some(entity) = resolve(&unit, me, index) else {
+                     continue;
+@@ -420,9 +461,29 @@ pub(super) fn drain_action_calls(
+                 let Ok((anims, t)) = units.get(entity) else {
+                     continue;
+                 };
+-                if let Some(take) = take_of(anims, anim, None, catalog) {
++                // Any of the model's takes on it, when asked.
++                let variation = match variation {
++                    Some(usize::MAX) => {
++                        let head = find_resolved(anims, anim, catalog).map(|c| c.anim_id);
++                        let n = anims
++                            .clips
++                            .iter()
++                            .filter(|c| Some(c.anim_id) == head)
++                            .count();
++                        Some(spread(now, n))
++                    }
++                    v => v,
++                };
++                if let Some(take) = take_of(anims, anim, variation, catalog) {
+                     let mut clip = ActionClip::new(take, ActionBody::Auto);
+                     clip.hold = hold;
++                    if fit > 0.0 {
++                        // The whole of it over that long, on the whole body (a knockdown).
++                        clip.key = 0.0;
++                        clip.windup = fit;
++                        clip.looping = false;
++                        clip.body = ActionBody::Full;
++                    }
+                     start_clip(&mut commands, &mut clips, entity, clip);
+                 }
+                 // Thrown back along the blow (WoW axes in, Bevy out), flat.
+@@ -533,8 +594,29 @@ pub(super) fn drain_action_calls(
+             }
+             ActionCall::Lock { unit } => {
+                 lock.0 = unit
+-                    .and_then(|u| resolve(&u, me, index))
++                    .as_deref()
++                    .and_then(|u| resolve(u, me, index))
+                     .filter(|e| Some(*e) != me);
++                // The locked unit is the target too: its circle marks it.
++                if lock.0.is_some() {
++                    if let Some(g) = unit.as_deref().and_then(guid_of) {
++                        action_combat::ask_select(g);
++                    }
++                }
++            }
++            ActionCall::Kit { unit, kit } => {
++                let Some(entity) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                // The hard-landing dust is the fall's environmental kit.
++                let kit_id = kit.or_else(|| env.as_ref().and_then(|t| t.0.kit_id(2)));
++                if let Some(kit_id) = kit_id {
++                    kits.write(super::spell_visual::KitPush {
++                        entity,
++                        kit_id,
++                        seq: play_seq.next(),
++                    });
++                }
+             }
+         }
+     }
+@@ -554,11 +636,13 @@ pub(super) fn apply_action_clips(
+         &Transform,
+         Option<&HitStopped>,
+         Option<&ReleaseNodes>,
++        Option<&crate::net::Guid>,
++        Has<SelfPlayer>,
+     )>,
+ ) {
+     let dt = time.delta_secs();
+     let now = time.elapsed_secs();
+-    for (entity, mut clip, mut player, anims, t, stop, release) in &mut units {
++    for (entity, mut clip, mut player, anims, t, stop, release, guid, mine) in &mut units {
+         let clip = &mut *clip;
+         if let Some(r) = release {
+             for n in &r.0 {
+@@ -570,6 +654,18 @@ pub(super) fn apply_action_clips(
+         if !frozen && dt > 0.0 {
+             clip.advance(dt);
+         }
++        // The blow lands in the clip: tell the script, which plays its weight.
++        if !clip.told && clip.key > 0.0 && clip.t >= clip.key && !clip.shuffle {
++            clip.told = true;
++            let who = if mine {
++                "player".to_string()
++            } else {
++                guid.map_or_else(String::new, |g| format!("0x{:X}", g.0))
++            };
++            if !who.is_empty() {
++                action_combat::push_marker(format!("impact {who}"));
++            }
++        }
+         // The blend.
+         match clip.stopping {
+             Some(fade) => clip.lambda -= dt / fade.max(0.01),
+@@ -604,7 +700,8 @@ pub(super) fn apply_action_clips(
+                     && if clip.on_upper {
+                         clip.moving_for > -0.15
+                     } else {
+-                        clip.moving_for > 0.08
++                        // Longer than a lunge's step: a blow stepping in keeps its own legs.
++                        clip.moving_for > LEGS_AFTER
+                     }
+             }
+         };
+@@ -904,6 +1001,105 @@ pub(super) fn collect_occluders(
+     }
+ }
+ 
++/// The units near us, for the script's own blow test ([`action_combat::probe`]).
++#[allow(clippy::type_complexity)]
++pub(super) fn collect_nearby(
++    me: Query<&Transform, With<SelfPlayer>>,
++    units: Query<
++        (
++            &Transform,
++            &NetEntity,
++            &crate::net::Guid,
++            Option<&crate::net::ObjectStore>,
++        ),
++        Without<SelfPlayer>,
++    >,
++) {
++    let Ok(here) = me.single() else {
++        action_combat::set_nearby(action_combat::Nearby::default());
++        return;
++    };
++    let mut out = Vec::new();
++    for (t, n, g, store) in &units {
++        let player = match n.kind {
++            benilla_protocol::EntityKind::Player => true,
++            benilla_protocol::EntityKind::Unit => false,
++            _ => continue,
++        };
++        if t.translation.distance_squared(here.translation) > NEARBY_RANGE * NEARBY_RANGE {
++            continue;
++        }
++        let alive = !store.is_some_and(|s| s.0.unit_is_dead());
++        out.push((g.0, t.translation.to_array(), player, alive));
++    }
++    action_combat::set_nearby(action_combat::Nearby {
++        hero: Some((here.translation.to_array(), action_combat::hero_yaw())),
++        units: out,
++    });
++}
++
++/// Locked on and turned in place: the feet step round (the shuffle clips), as a turning key would
++/// make them.
++pub(super) fn shuffle_on_lock_turn(
++    mut commands: Commands,
++    time: Res<Time>,
++    lock: Res<LockOn>,
++    anim_data: Option<Res<AnimData>>,
++    mut me: Query<
++        (
++            Entity,
++            &Transform,
++            &ModelAnimations,
++            Option<&mut ActionClip>,
++        ),
++        With<SelfPlayer>,
++    >,
++    mut last: Local<Option<(f32, Vec3)>>,
++) {
++    let dt = time.delta_secs();
++    let Ok((entity, t, anims, clip)) = me.single_mut() else {
++        return;
++    };
++    let yaw = action_combat::hero_yaw();
++    let prev = last.replace((yaw, t.translation));
++    if lock.0.is_none() || dt <= 0.0 {
++        return;
++    }
++    let Some((prev_yaw, prev_pos)) = prev else {
++        return;
++    };
++    let rate = super::wrap_pi(yaw - prev_yaw) / dt;
++    let moved = Vec2::new(t.translation.x - prev_pos.x, t.translation.z - prev_pos.z).length() / dt;
++    if rate.abs() < SHUFFLE_ABOVE || moved > STILL_BELOW {
++        return;
++    }
++    // A turn left raises the yaw.
++    let anim = if rate > 0.0 {
++        SHUFFLE_LEFT
++    } else {
++        SHUFFLE_RIGHT
++    };
++    match clip {
++        // A script's clip owns the body; a step already under way keeps going.
++        Some(mut c) if c.shuffle && c.id == anim => {
++            c.held = 0.0;
++            c.hold = SHUFFLE_HOLD;
++            c.stopping = None;
++        }
++        Some(c) if !c.shuffle => {}
++        _ => {
++            let catalog = anim_data.as_deref().map(|d| &d.0);
++            if let Some(take) = take_of(anims, anim, None, catalog) {
++                let mut c = ActionClip::new(take, ActionBody::Full);
++                c.looping = true;
++                c.hold = SHUFFLE_HOLD;
++                c.shuffle = true;
++                commands.entity(entity).try_insert(c);
++            }
++        }
++    }
++}
++
+ pub(super) fn plugin(app: &mut App) {
+     app.init_resource::<LockOn>()
+         .add_systems(
+@@ -919,7 +1115,9 @@ pub(super) fn plugin(app: &mut App) {
+                     .after(crate::aura_visual::apply_aura_anim_rate),
+                 aim_pitch,
+                 collect_occluders,
++                collect_nearby,
+                 track_lock_on,
++                shuffle_on_lock_turn.after(drain_action_calls),
+             ),
+         )
+         .add_systems(
+@@ -1026,6 +1224,19 @@ mod tests {
+             stopping: None,
+             last_pos: None,
+             moving_for: 0.0,
++            told: false,
++            shuffle: false,
++        }
++    }
++
++    #[test]
++    fn a_script_names_a_guid_in_hex_or_decimal_and_a_take_spreads_over_the_ones_there_are() {
++        assert_eq!(guid_of("0xF130000000000025"), Some(0xF130000000000025));
++        assert_eq!(guid_of("37"), Some(37));
++        assert_eq!(guid_of("player"), None);
++        assert_eq!(spread(1.234, 1), 0);
++        for k in 0..50 {
++            assert!(spread(k as f32 * 0.37, 3) < 3);
+         }
+     }
+ 
+diff --git a/crates/benilla-app/src/player/controller.rs b/crates/benilla-app/src/player/controller.rs
+index f5e28ef1..6afc0c51 100644
+--- a/crates/benilla-app/src/player/controller.rs
++++ b/crates/benilla-app/src/player/controller.rs
+@@ -305,6 +305,8 @@ pub(super) fn control(
+             }
+         }
+     }
++    // Our facing, for the action script's own blow test.
++    benilla_ui::action_combat::set_hero_yaw(player.face_yaw);
+     {
+         let cur = cursor_opts.bypass_change_detection();
+         if cur.visible != opts_shadow.visible
+@@ -462,6 +464,8 @@ pub(super) fn control(
+             may_translate,
+             may_turn,
+         );
++        // The movement keys held, for the action script (which way a dodge goes).
++        benilla_ui::action_combat::set_move_keys(axes.fwd, axes.side);
+         // Basin Battle's action dash: while it runs, our body holds its keys (the way it set off)
+         // at its speed, whatever is pressed, so a dodge or a lunge goes at once and commits.
+         action_dash(&mut player, &mut axes, time.elapsed_secs(), may_translate);
+diff --git a/crates/benilla-app/src/sound/combat.rs b/crates/benilla-app/src/sound/combat.rs
+index b4027396..3b1a4afe 100644
+--- a/crates/benilla-app/src/sound/combat.rs
++++ b/crates/benilla-app/src/sound/combat.rs
+@@ -640,13 +640,87 @@ fn combat_sounds(
+     }
+ }
+ 
++/// Basin Battle's action script asks a unit for its voice (`PlayUnitVocal`, not part of 1.12.1):
++/// the same exertion and injury kits a swing plays, on the same buses, without the chance roll.
++#[allow(clippy::too_many_arguments)]
++fn script_vocals(
++    units: Query<(&Transform, &NetEntity)>,
++    me: Query<Entity, With<crate::net::SelfPlayer>>,
++    index: Option<Res<crate::net::GuidIndex>>,
++    voices: Option<Res<CreatureVoices>>,
++    kits: Option<ResMut<SoundKits>>,
++    assets: Option<Res<WorldAssets>>,
++    mut out: NonSendMut<SoundOutput>,
++    config: Res<SoundConfig>,
++    listener: Res<AudioListener>,
++) {
++    let asked = benilla_ui::action_combat::take_vocals();
++    if asked.is_empty() {
++        return;
++    }
++    let (Some(voices), Some(mut kits), Some(assets), Some(index)) = (voices, kits, assets, index)
++    else {
++        return;
++    };
++    let me = me.single().ok();
++    for (unit, kind) in asked {
++        let entity = if unit.eq_ignore_ascii_case("player") {
++            me
++        } else {
++            let hex = unit.trim_start_matches("0x").trim_start_matches("0X");
++            u64::from_str_radix(hex, 16)
++                .ok()
++                .and_then(|g| index.0.get(&g).copied())
++        };
++        let Some((t, net)) = entity.and_then(|e| units.get(e).ok()) else {
++            continue;
++        };
++        let Some(v) = net.display_id.and_then(|d| voices.0.for_display(d)) else {
++            continue;
++        };
++        let yours = Some(entity) == Some(me) && me.is_some();
++        let (kit, bus) = match kind.as_str() {
++            "exertion" => (v.exertion[0], Bus::EXERTION),
++            "exertion_crit" => (v.exertion[1], Bus::EXERTION),
++            "injury" => (
++                v.injury[0],
++                if yours { Bus::SELF_INJURY } else { Bus::INJURY },
++            ),
++            "injury_crit" => (
++                v.injury[1],
++                if yours { Bus::SELF_INJURY } else { Bus::INJURY },
++            ),
++            _ => continue,
++        };
++        if kit == 0 {
++            continue;
++        }
++        if let Err(e) = play_kit_ext(
++            &mut kits,
++            &assets,
++            &mut out,
++            &config,
++            listener.pos,
++            KitRef::Id(kit),
++            Some(t.translation),
++            SoundCategory::Sfx,
++            PlayExtras { bus, ..default() },
++        ) {
++            warn!("script vocal (kit {kit}): {e:#}");
++        }
++    }
++}
++
+ /// Registration hook for [`super::SoundPlugin`].
+ pub(super) fn plugin(app: &mut App) {
+     app.add_systems(
+         Startup,
+         (load_weapon_impacts, load_weapon_swings).after(AssetSet::Open),
+     )
+-    .add_systems(Update, combat_sounds.in_set(WorldStage::Present));
++    .add_systems(
++        Update,
++        (combat_sounds, script_vocals).in_set(WorldStage::Present),
++    );
+ }
+ 
+ #[cfg(test)]
+diff --git a/crates/benilla-app/src/target/mod.rs b/crates/benilla-app/src/target/mod.rs
+index 5662721e..07121a9b 100644
+--- a/crates/benilla-app/src/target/mod.rs
++++ b/crates/benilla-app/src/target/mod.rs
+@@ -438,6 +438,12 @@ impl Plugin for TargetPlugin {
+             )
+             // PostUpdate: the brighten sets MeshTag bit 31 after every Update writer that
+             // overwrites the whole tag.
++            .add_systems(
++                Update,
++                script::select_for_lock_on
++                    .after(WorldStage::Net)
++                    .before(WorldStage::Input),
++            )
+             .add_systems(PostUpdate, highlight::apply_highlight)
+             // The ring's stream push, after the frame's stream clear.
+             .add_systems(
+diff --git a/crates/benilla-app/src/target/script.rs b/crates/benilla-app/src/target/script.rs
+index 212d8368..e7e4e825 100644
+--- a/crates/benilla-app/src/target/script.rs
++++ b/crates/benilla-app/src/target/script.rs
+@@ -168,6 +168,14 @@ impl ScriptSelect<'_, '_> {
+     }
+ }
+ 
++/// Basin Battle's lock-on makes its unit the selection (`SetLockOn`, not part of 1.12.1), through
++/// the one `SetSelection` path a click takes, so the unit's circle marks it.
++pub(super) fn select_for_lock_on(mut commit: SelectCommit) {
++    if let Some(guid) = benilla_ui::action_combat::take_select() {
++        commit.select(guid);
++    }
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index a35d5f08..c68482ea 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -43,6 +43,22 @@
+ //! - `SetLockOn(unit)`: the camera and the body keep facing that unit (`nil` lets go).
+ //! - `CameraKick(share, seconds)`: the camera punches in by that share of its distance and eases
+ //!   back.
++//!
++//! The fourth round (`HasActionCombat() >= 4`):
++//!
++//! - `ActionProbe(range, arcDegrees[, players])`: the unit nearest in front of us within `range`
++//!   yards and `arcDegrees` of our facing (players only when `players` is true), as its guid
++//!   (`"0x..."`), or nil: what our own blow is crossing, for its weight played at once.
++//! - `ActionKit(unit, kitId)`: play a `SpellVisualKit` on the unit here and now (`"dust"`: the
++//!   game's own hard-landing dust).
++//! - `PlayUnitVocal(unit, kind)`: the unit's own voice: `"exertion"`, `"exertion_crit"`,
++//!   `"injury"` or `"injury_crit"`, from where it stands.
++//! - `TakeActionMarkers()`: what's happened since the last call, as a list of strings: `"impact
++//!   <unit>"` as an action clip crosses its impact keyframe (`player` for ours, else the guid).
++//! - `ReactUnit(unit, animId, fromX, fromY, lean, holdSecs, fitSecs, variation)`: `fitSecs` plays the
++//!   whole clip over that long (a knockdown); `variation` picks a take (`"random"` any of them).
++//! - `SetLockOn(unit)` also makes the unit the target, so its selection circle marks it.
++//! - `ActionMoveKeys()`: the movement keys held, as forward (1, -1 back, 0) and right (1, -1 left).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -88,6 +104,10 @@ pub enum ActionCall {
+         from: (f32, f32),
+         lean: f32,
+         hold: f32,
++        /// The whole clip over this long (0: its own speed).
++        fit: f32,
++        /// The take: `None` the first, `Some(usize::MAX)` any.
++        variation: Option<usize>,
+     },
+     HitStop {
+         unit: String,
+@@ -108,6 +128,120 @@ pub enum ActionCall {
+     Lock {
+         unit: Option<String>,
+     },
++    Kit {
++        unit: String,
++        /// `None`: the hard-landing dust.
++        kit: Option<u32>,
++    },
++}
++
++/// Our body and the units near it this frame (Bevy space: `(x, z)` on the ground, `y` up), for
++/// [`probe`]: our feet and facing (the camera's yaw convention, forward `-Z` turned by it), then
++/// each unit's guid, feet, whether it's a player and whether it's alive.
++#[derive(Clone, Debug, Default)]
++pub struct Nearby {
++    pub hero: Option<([f32; 3], f32)>,
++    pub units: Vec<(u64, [f32; 3], bool, bool)>,
++}
++
++static NEARBY: std::sync::Mutex<Option<Nearby>> = std::sync::Mutex::new(None);
++/// Our facing as the mover holds it, written each frame.
++static HERO_YAW: AtomicU32 = AtomicU32::new(0);
++
++/// The movement keys held: forward (+1) or back (-1), and right (+1) or left (-1).
++static MOVE_KEYS: AtomicU32 = AtomicU32::new(0);
++
++pub fn set_move_keys(fwd: i32, side: i32) {
++    let pack = ((fwd.signum() + 1) as u32) | (((side.signum() + 1) as u32) << 2);
++    MOVE_KEYS.store(pack, Ordering::Relaxed);
++}
++
++pub fn move_keys() -> (i32, i32) {
++    let p = MOVE_KEYS.load(Ordering::Relaxed);
++    ((p & 3) as i32 - 1, ((p >> 2) & 3) as i32 - 1)
++}
++
++pub fn set_hero_yaw(yaw: f32) {
++    HERO_YAW.store(yaw.to_bits(), Ordering::Relaxed);
++}
++
++pub fn hero_yaw() -> f32 {
++    f32::from_bits(HERO_YAW.load(Ordering::Relaxed))
++}
++
++pub fn set_nearby(n: Nearby) {
++    if let Ok(mut v) = NEARBY.lock() {
++        *v = Some(n);
++    }
++}
++
++/// The unit nearest in front of us within `range` yards and `arc` degrees of our facing, alive
++/// (players only when `players`): what our blow is crossing.
++pub fn probe(range: f32, arc: f32, players: bool) -> Option<u64> {
++    let n = NEARBY.lock().ok()?.clone()?;
++    let (feet, yaw) = n.hero?;
++    // Forward is -Z turned by the yaw about +Y.
++    let (fx, fz) = (-yaw.sin(), -yaw.cos());
++    let half = (arc * 0.5).to_radians();
++    let mut best: Option<(f32, u64)> = None;
++    for (guid, at, player, alive) in n.units {
++        if !alive || (player && !players) {
++            continue;
++        }
++        let (dx, dz) = (at[0] - feet[0], at[2] - feet[2]);
++        let d = (dx * dx + dz * dz).sqrt();
++        // Its body's width counts toward the reach.
++        if d > range + 0.5 || (at[1] - feet[1]).abs() > 3.0 {
++            continue;
++        }
++        let off = if d < 1.0e-3 {
++            0.0
++        } else {
++            ((dx * fx + dz * fz) / d).clamp(-1.0, 1.0).acos()
++        };
++        if off > half && !(d < 0.9 && off < std::f32::consts::FRAC_PI_2) {
++            continue;
++        }
++        if best.is_none_or(|(b, _)| d < b) {
++            best = Some((d, guid));
++        }
++    }
++    best.map(|(_, g)| g)
++}
++
++/// A voice a script asked a unit for: the unit, and which (`"exertion"`, `"injury"`, with
++/// `_crit`).
++static VOCALS: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
++
++pub fn take_vocals() -> Vec<(String, String)> {
++    VOCALS
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
++}
++
++/// What the action layer saw happen, for the script to take.
++static MARKERS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
++
++pub fn push_marker(m: String) {
++    if let Ok(mut v) = MARKERS.lock() {
++        if v.len() < 64 {
++            v.push(m);
++        }
++    }
++}
++
++/// A lock-on asks for its unit to be the selection too: the guid, for the target's own path.
++static SELECT: std::sync::Mutex<Option<u64>> = std::sync::Mutex::new(None);
++
++pub fn ask_select(guid: u64) {
++    if let Ok(mut v) = SELECT.lock() {
++        *v = Some(guid);
++    }
++}
++
++pub fn take_select() -> Option<u64> {
++    SELECT.lock().ok().and_then(|mut v| v.take())
+ }
+ 
+ /// A dash our own body runs: how long, how fast, which way (`(forward, right)` in -1..=1, `None`
+@@ -299,7 +433,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(3))?,
++        lua.create_function(|_, _: MultiValue| Ok(4))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -411,12 +545,23 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 );
+                 let lean = number(v.get(4), 0.0, 1.5).unwrap_or(0.0);
+                 let hold = number(v.get(5), 0.0, 10.0).unwrap_or(0.0);
++                let fit = number(v.get(6), 0.0, 10.0).unwrap_or(0.0);
++                let variation = match v.get(7) {
++                    Some(Value::String(s))
++                        if s.to_str().is_ok_and(|s| s.eq_ignore_ascii_case("random")) =>
++                    {
++                        Some(usize::MAX)
++                    }
++                    other => number(other, 0.0, 16.0).map(|n| n as usize),
++                };
+                 push(ActionCall::React {
+                     unit,
+                     anim: anim as u16,
+                     from,
+                     lean,
+                     hold,
++                    fit,
++                    variation,
+                 });
+             }
+             Ok(())
+@@ -454,6 +599,71 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "ActionProbe",
++        lua.create_function(|lua, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let range = number(v.first(), 0.0, 20.0).unwrap_or(2.5);
++            let arc = number(v.get(1), 0.0, 360.0).unwrap_or(90.0);
++            let players = truthy(v.get(2));
++            match probe(range, arc, players) {
++                Some(g) => Ok(Value::String(lua.create_string(format!("0x{g:X}"))?)),
++                None => Ok(Value::Nil),
++            }
++        })?,
++    )?;
++    g.set(
++        "ActionKit",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(unit) = text(v.first()) {
++                let kit = match v.get(1) {
++                    Some(Value::String(s))
++                        if s.to_str().is_ok_and(|s| s.eq_ignore_ascii_case("dust")) =>
++                    {
++                        Some(None)
++                    }
++                    other => number(other, 1.0, 100_000.0).map(|n| Some(n as u32)),
++                };
++                if let Some(kit) = kit {
++                    push(ActionCall::Kit { unit, kit });
++                }
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "PlayUnitVocal",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(unit), Some(kind)) = (text(v.first()), text(v.get(1))) {
++                if let Ok(mut q) = VOCALS.lock() {
++                    if q.len() < 16 {
++                        q.push((unit, kind.to_ascii_lowercase()));
++                    }
++                }
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ActionMoveKeys",
++        lua.create_function(|_, _: MultiValue| Ok(move_keys()))?,
++    )?;
++    g.set(
++        "TakeActionMarkers",
++        lua.create_function(|lua, _: MultiValue| {
++            let list = MARKERS
++                .lock()
++                .map(|mut v| std::mem::take(&mut *v))
++                .unwrap_or_default();
++            let t = lua.create_table()?;
++            for (i, m) in list.into_iter().enumerate() {
++                t.set(i + 1, m)?;
++            }
++            Ok(t)
++        })?,
++    )?;
+     g.set(
+         "CameraKick",
+         lua.create_function(|_, args: MultiValue| {
+@@ -470,3 +680,51 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     Ok(())
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_probe_finds_the_nearest_unit_in_front_and_not_behind_or_too_far() {
++        // Facing -Z (yaw 0): a unit 2 yards ahead, one behind, one ahead but far, a player.
++        set_nearby(Nearby {
++            hero: Some(([0.0, 0.0, 0.0], 0.0)),
++            units: vec![
++                (1, [0.0, 0.0, -2.0], false, true),
++                (2, [0.0, 0.0, 1.5], false, true),
++                (3, [0.0, 0.0, -9.0], false, true),
++                (4, [0.3, 0.0, -1.2], true, true),
++                (5, [0.0, 0.0, -1.0], false, false),
++            ],
++        });
++        assert_eq!(probe(3.0, 90.0, false), Some(1), "the creature ahead");
++        assert_eq!(
++            probe(3.0, 90.0, true),
++            Some(4),
++            "with friendly fire, the nearer hero"
++        );
++        assert_eq!(
++            probe(1.0, 90.0, false),
++            None,
++            "too short for any but the dead one"
++        );
++        // Turned round (yaw pi: facing +Z): the one that was behind.
++        set_nearby(Nearby {
++            hero: Some(([0.0, 0.0, 0.0], std::f32::consts::PI)),
++            units: vec![
++                (1, [0.0, 0.0, -2.0], false, true),
++                (2, [0.0, 0.0, 1.5], false, true),
++            ],
++        });
++        assert_eq!(probe(3.0, 90.0, false), Some(2));
++    }
++
++    #[test]
++    fn the_move_keys_come_back_as_held() {
++        for (f, s) in [(0, 0), (1, 0), (-1, 1), (0, -1), (1, 1)] {
++            set_move_keys(f, s);
++            assert_eq!(move_keys(), (f, s));
++        }
++    }
++}

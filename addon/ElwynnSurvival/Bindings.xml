@@ -1,0 +1,86 @@
+<Bindings>
+  <Binding name="ES_ATTACK" runOnUp="true" header="ELWYNNSURVIVAL">
+    ElwynnSurvival.Attack(keystate)
+  </Binding>
+  <Binding name="ES_HEAVY" runOnUp="true">
+    ElwynnSurvival.Heavy(keystate)
+  </Binding>
+  <Binding name="ES_GUARD" runOnUp="true">
+    ElwynnSurvival.Guard(keystate)
+  </Binding>
+  <Binding name="ES_DODGE" runOnUp="true">
+    ElwynnSurvival.Dodge(keystate)
+  </Binding>
+  <Binding name="ES_AB1" runOnUp="true">
+    ElwynnSurvival.Ability(1, nil, keystate)
+  </Binding>
+  <Binding name="ES_AB2" runOnUp="true">
+    ElwynnSurvival.Ability(2, nil, keystate)
+  </Binding>
+  <Binding name="ES_AB3" runOnUp="true">
+    ElwynnSurvival.Ability(3, nil, keystate)
+  </Binding>
+  <Binding name="ES_AB4" runOnUp="true">
+    ElwynnSurvival.Ability(4, nil, keystate)
+  </Binding>
+  <Binding name="ES_AB5" runOnUp="true">
+    ElwynnSurvival.Ability(5, nil, keystate)
+  </Binding>
+  <Binding name="ES_EX1" runOnUp="true">
+    ElwynnSurvival.Ability(1, 1, keystate)
+  </Binding>
+  <Binding name="ES_EX2" runOnUp="true">
+    ElwynnSurvival.Ability(2, 1, keystate)
+  </Binding>
+  <Binding name="ES_EX3" runOnUp="true">
+    ElwynnSurvival.Ability(3, 1, keystate)
+  </Binding>
+  <Binding name="ES_EX4" runOnUp="true">
+    ElwynnSurvival.Ability(4, 1, keystate)
+  </Binding>
+  <Binding name="ES_USE">
+    ElwynnSurvival.Use()
+  </Binding>
+  <Binding name="ES_SHEATHE">
+    ElwynnSurvival.Sheathe()
+  </Binding>
+  <Binding name="ES_EAT">
+    ElwynnSurvival.Eat()
+  </Binding>
+  <Binding name="ES_CYCLE">
+    ElwynnSurvival.Cycle()
+  </Binding>
+  <Binding name="ES_BAG">
+    ElwynnSurvival.Bag()
+  </Binding>
+  <Binding name="ES_TREE">
+    ElwynnSurvival.Tree()
+  </Binding>
+  <Binding name="ES_JOURNAL">
+    ElwynnSurvival.Journal()
+  </Binding>
+  <Binding name="ES_BUILD">
+    ElwynnSurvival.Build()
+  </Binding>
+  <Binding name="ES_ROTATE">
+    ElwynnSurvival.Rotate()
+  </Binding>
+  <Binding name="ES_LOCK" runOnUp="true">
+    ElwynnSurvival.Lock(keystate)
+  </Binding>
+  <Binding name="ES_NEXT">
+    ElwynnSurvival.NextFoe()
+  </Binding>
+  <Binding name="ES_BARS">
+    ElwynnSurvival.Bars()
+  </Binding>
+  <Binding name="ES_JUMP">
+    ElwynnSurvival.Jump()
+  </Binding>
+  <Binding name="ES_MODE">
+    ElwynnSurvival.ToggleMode()
+  </Binding>
+  <Binding name="ES_KEYS">
+    ElwynnSurvival.ToggleKeys()
+  </Binding>
+</Bindings>

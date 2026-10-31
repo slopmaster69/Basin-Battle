@@ -1,0 +1,2810 @@
+# The Deadmines: Elwynn Survival's souls-like dungeon, read beside survival.toml. Its lists
+# ([[item]], [[mob]], [[weapon]]...) join survival.toml's (what's found below is good above too);
+# [dungeon] is the world below: the Smuggler's Logbook at camp, the lamps, doors, strongboxes and
+# every fight, laid out on the instance's own ground (map 36, read from the host's game data).
+#
+# Places are WoW coordinates on map 36 (x north, y west, z up). The run goes backwards: in by the
+# smugglers' tunnel off Ironclad Cove, out through the mine's front door into Moonbrook.
+
+[dungeon]
+name = "The Deadmines"
+# The logbook lies on a lectern beside the camp's chest (Elwynn).
+book = [-9511.0, 110.0]
+book_facing = 5.5
+# The camp holds its first raid before the book can be read.
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "plunder"
+# Each hero below past the first: foes take this share more health (and their blows
+# `combat.hero_damage` more), as on the surface.
+hero_health = 0.7
+# Out the front door (the mine's mouth), once Rhahk'Zor is down.
+exit = [-16.4, -383.1, 61.8]
+exit_radius = 5.0
+exit_boss = "rhahkzor"
+weapon_chance = 0.08
+armor_chance = 0.06
+# A boss: one of its pieces falls for certain, each other piece this often.
+boss_extra_chance = 0.25
+# The bosses stand again (and the strongboxes fill) this long after the first was beaten, once
+# no hero is below: the Deadmines can be run again for their loot. Lamps, gates and shortcuts
+# stay as they are.
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# The smugglers come ashore on the cove's east beach, below their tunnel.
+[[dungeon.lamp]]
+key = "landing"
+name = "The Smugglers' Landing"
+at = [-80.0, -936.0, 40.0]
+facing = 3.2
+
+[[item]]
+key = "draught"
+name = "Miner's Draught"
+display = 18099
+icon = "INV_Drink_04"
+kind = "food"
+stack = 6
+use_secs = 1.4
+heal = 0.4
+below = true
+text = "The only heal in the Deadmines: drink with R for 40% of your health. Every rest at a lamp fills your Draughts again."
+
+[[item]]
+key = "draught_flask"
+name = "Draught Flask"
+display = 18117
+icon = "INV_Drink_13"
+kind = "resource"
+stack = 1
+text = "A miner's spare flask: one Draught more at every rest, for good (up to six)."
+
+[[item]]
+key = "plunder"
+name = "Defias Plunder"
+display = 7629
+icon = "INV_Misc_Coin_04"
+kind = "resource"
+stack = 50
+text = "The Brotherhood's loot. The lamps' quartermaster trades it; you drop it all when you fall below."
+
+# --- the way through: lamps -----------------------------------------------------------------------
+# Three lamps the whole way, and long walks between them: in by the sea tunnel (the landing), up it
+# to the cove's east beach, round the scaffold that rings the Juggernaut to the dry dock, west
+# through the Ironclad Door and up the Cannon Gallery to the Foundry; the next lamp is past
+# Gilnid, at its back door, and the last in the galleries before Rhahk'Zor.
+
+# --- area 1: the cove's east beach ------------------------------------------------------------------
+
+# The smugglers' tunnel runs back from the landing into the cliff: a pirate waits in its mouth,
+# unseen until you're on him, and two more guard its strongbox where it drops away.
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-85.0, -958.0]
+z = 42.5
+radius = 0.0
+count = 1
+hidden = 5.0
+
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-94.0, -988.0]
+z = 36.0
+radius = 2.0
+count = 2
+link = 12.0
+
+# A squallshaper on the slope down to the pier, casting up at the landing.
+[[dungeon.pack]]
+mob = "dm_squallshaper"
+at = [-67.4, -914.1]
+z = 17.7
+radius = 0.0
+count = 1
+link = 10.0
+
+# Pirates in twos on the sand, walking the beach.
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-74.0, -922.0]
+z = 32.0
+radius = 2.0
+count = 2
+link = 14.0
+route = [[-62.0, -912.0]]
+wait = 6.0
+
+# Cookie at his stew pot by the pier.
+[[dungeon.pack]]
+key = "cookie"
+mob = "dm_cookie"
+at = [-63.0, -900.0]
+z = 16.0
+radius = 0.0
+count = 1
+
+# --- area 2: the scaffold round the Juggernaut ------------------------------------------------------
+
+# A crossbowman on the scaffold's upper ring, over the walkway as it rounds the stern.
+[[dungeon.pack]]
+mob = "dm_crossbowman"
+at = [-98.0, -800.0]
+z = 30.6
+radius = 0.0
+count = 1
+
+# Pirates on the lower ring as it rounds the bow.
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-34.0, -846.0]
+z = 19.0
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_squallshaper"
+at = [-24.0, -832.0]
+z = 19.4
+radius = 0.0
+count = 1
+link = 14.0
+
+# Mr. Smite holds the island where the scaffold comes down to the dry dock.
+[[dungeon.pack]]
+key = "smite"
+mob = "dm_smite"
+at = [-2.0, -768.0]
+z = 9.5
+radius = 0.0
+count = 1
+
+# On the Juggernaut (off the way: up from the scaffold's south-west platform): Captain Greenskin
+# and his crew on the main deck, and Edwin VanCleef at the stern.
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-62.0, -797.0]
+z = 39.5
+radius = 2.5
+count = 2
+link = 16.0
+
+[[dungeon.pack]]
+key = "greenskin"
+mob = "dm_greenskin"
+elite = true
+at = [-62.0, -815.0]
+z = 41.5
+radius = 0.0
+count = 1
+link = 16.0
+
+[[dungeon.pack]]
+key = "vancleef"
+mob = "dm_vancleef"
+at = [-84.0, -820.0]
+z = 39.5
+radius = 0.0
+count = 1
+
+# --- strongboxes ------------------------------------------------------------------------------------
+
+# Down the smugglers' tunnel, above the drop.
+[[dungeon.box]]
+key = "tunnel"
+at = [-110.0, -1003.0, 34.0]
+facing = 1.6
+loot = { draught_flask = 1, plunder = 10 }
+
+# --- weapons and gear found below ---------------------------------------------------------------
+
+# The Defias Pirate's cutlass: quick, with a long reach for its kind.
+[[weapon]]
+key = "pirate_cutlass"
+windup = 0.27
+active = 0.11
+recovery = 0.36
+stamina = 12.0
+damage = [15, 20]
+range = 3.4
+arc = 100.0
+targets = 1
+subclass = 7
+
+[[item]]
+key = "pirate_cutlass"
+name = "Pirate's Cutlass"
+display = 1853
+icon = "INV_Sword_13"
+kind = "weapon"
+text = "A Defias Pirate's cutlass: quick, with a long reach for a one-handed blade."
+
+[[item]]
+key = "red_bandana"
+name = "Red Defias Mask"
+display = 8266
+icon = "INV_Misc_Bandana_03"
+kind = "armor"
+slot = "head"
+reduce = 0.04
+text = "The Brotherhood's red mask: a little off every blow, and no weight at all."
+
+# The Squallshaper's staff: two-handed, a long reach, guards with the haft.
+[[weapon]]
+key = "squall_staff"
+windup = 0.40
+active = 0.12
+recovery = 0.52
+stamina = 18.0
+damage = [22, 28]
+range = 4.6
+arc = 70.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 38
+subclass = 6
+
+[[item]]
+key = "squall_staff"
+name = "Squallshaper's Staff"
+display = 5415
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Two-handed: a long reach and quick for its length. Guards with the haft."
+
+[[ranged]]
+key = "defias_crossbow"
+draw_secs = 0.0
+min_draw = 0.0
+stamina = 7.0
+damage = [42, 42]
+range = 45.0
+hit_radius = 0.4
+arrow_speed = 60.0
+recovery = 2.1
+spell = 75
+subclass = 18
+
+[[item]]
+key = "defias_crossbow"
+name = "Defias Crossbow"
+display = 2462
+icon = "INV_Weapon_Crossbow_02"
+kind = "bow"
+text = "One slow, hard bolt at full power, then a long reload."
+
+# Cookie's: a blow that lands on a wind-up knocks it aside, whatever the blow.
+[[weapon]]
+key = "cookie_tenderizer"
+windup = 0.34
+active = 0.12
+recovery = 0.42
+stamina = 14.0
+damage = [17, 23]
+range = 3.0
+arc = 100.0
+targets = 1
+stagger = 1.0
+subclass = 4
+
+[[item]]
+key = "cookie_tenderizer"
+name = "Cookie's Tenderizer"
+display = 1161
+icon = "INV_Mace_06"
+kind = "weapon"
+text = "Cookie's meat mallet. Hit a foe while it's winding up a blow (after it draws back, before it swings) and that blow is knocked aside and the foe staggered for 1 s; light blows do it too. Not on a boss, a heavy creature's braced wind-up (only a heavy blow breaks that), or one knocked aside a moment ago."
+
+# Mr. Smite's: the heaviest swing there is.
+[[weapon]]
+key = "smite_hammer"
+windup = 0.78
+active = 0.16
+recovery = 0.90
+stamina = 32.0
+damage = [56, 70]
+range = 3.6
+arc = 130.0
+targets = 3
+stagger = 1.4
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 5
+posture = 1.5
+
+[[item]]
+key = "smite_hammer"
+name = "Smite's Mighty Hammer"
+display = 2056
+icon = "INV_Hammer_04"
+kind = "weapon"
+text = "Mr. Smite's: the heaviest swing there is, and it breaks a stance half again as fast."
+
+# VanCleef's own: the timed guard comes easier with it in hand.
+[[weapon]]
+key = "cruel_barb"
+windup = 0.25
+active = 0.10
+recovery = 0.32
+stamina = 11.0
+damage = [18, 24]
+range = 3.1
+arc = 95.0
+targets = 1
+subclass = 7
+parry = 0.12
+
+[[item]]
+key = "cruel_barb"
+name = "Cruel Barb"
+display = 1928
+icon = "INV_Sword_27"
+kind = "weapon"
+text = "Edwin VanCleef's sword: quick, and a parry comes easier with it (a wider moment for the timed guard)."
+
+[[item]]
+key = "blackened_armor"
+name = "Blackened Defias Armor"
+display = 14781
+icon = "INV_Chest_Leather_03"
+kind = "armor"
+slot = "chest"
+reduce = 0.2
+weight = 0.03
+text = "VanCleef's own: the protection of mail at the weight of leather."
+
+# --- the Brotherhood below --------------------------------------------------------------------------
+
+[[mob]]
+key = "dm_pirate"
+name = "Defias Pirate"
+subname = "Defias Brotherhood"
+display = 2347
+health = 110
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 14.0
+leash = 30.0
+weapon = 1853
+grip = "1h"
+shield = 2456
+block = 0.3
+evade = 0.15
+drops = { plunder = [2, 4] }
+gear = ["pirate_cutlass", "red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 13
+  range = 2.7
+  arc = 100.0
+  recovery = 0.7
+  cooldown = 1.1
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  # Two slashes, right then left.
+  [[mob.pattern]]
+  name = "two slashes"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.4, damage = 12, recovery = 0.8 } ]
+  # In from a few strides off.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 8.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 4.0, damage = 15, recovery = 0.9 } ]
+  # The cutlass held back, glowing: it catches a panicked dodge.
+  [[mob.pattern]]
+  name = "feint"
+  weight = 1.0
+  steps = [ { clip = 17, take = 0, windup = 1.05, damage = 16, recovery = 0.7, kit = 379 } ]
+
+[[mob]]
+key = "dm_squallshaper"
+name = "Defias Squallshaper"
+subname = "Defias Brotherhood"
+display = 2349
+health = 85
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 24.0
+leash = 32.0
+weapon = 5415
+grip = "staff"
+keep_away = 13.0
+drops = { plunder = [2, 5] }
+gear = ["squall_staff"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 18
+  range = 26.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 2.4
+  turn_rate = 300.0
+  lock = 0.3
+  blockable = true
+  # A bolt of water that strikes where its target stood when the cast ended.
+  speed = 24.0
+  radius = 1.6
+  spell = 116
+  [[mob.pattern]]
+  name = "water bolt"
+  weight = 3.0
+  min_range = 4.5
+  steps = [ {} ]
+  [[mob.pattern]]
+  name = "two bolts"
+  weight = 1.5
+  min_range = 6.0
+  steps = [ { windup = 1.1, recovery = 0.2 }, { windup = 0.6, recovery = 1.2 } ]
+  # Crowded, a squall all round that throws you down, and then it backs off.
+  [[mob.pattern]]
+  name = "squall"
+  weight = 4.0
+  steps = [ { ranged = false, clip = 54, take = 0, windup = 0.7, range = 4.2, arc = 360.0, damage = 12, heavy = true, recovery = 1.1, kit = 124, look = 27808 } ]
+
+[[mob]]
+key = "dm_crossbowman"
+name = "Defias Crossbowman"
+subname = "Defias Brotherhood"
+display = 2318
+health = 90
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 32.0
+leash = 32.0
+bow = 2462
+grip = "bow"
+keep_away = 18.0
+drops = { plunder = [2, 4] }
+gear = ["defias_crossbow"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  # One slow, hard bolt, aimed a long while: rush it during the reload.
+  windup = 1.8
+  damage = 30
+  range = 40.0
+  arc = 0.0
+  recovery = 1.2
+  cooldown = 3.6
+  turn_rate = 300.0
+  lock = 0.6
+  blockable = true
+  speed = 55.0
+  radius = 1.0
+  spell = 75
+  [[mob.pattern]]
+  name = "bolt"
+  weight = 3.0
+  min_range = 4.5
+  steps = [ {} ]
+  [[mob.pattern]]
+  name = "kick"
+  weight = 4.0
+  steps = [ { ranged = false, clip = 95, take = 0, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6 } ]
+
+# Cookie, the Brotherhood's cook: an early lesson in reading a wind-up and a ring on the ground.
+[[mob]]
+key = "dm_cookie"
+name = "Cookie"
+subname = "The Brotherhood's Cook"
+display = 1305
+scale = 1.3
+health = 650
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 16.0
+leash = 30.0
+weapon = 1161
+grip = "1h"
+boss = true
+posture = 150
+drops = { plunder = [12, 16] }
+trophy = { cookie_tenderizer = 1 }
+gear = ["cookie_tenderizer", "cookie_trousers"]
+respawn = 0.0
+# Whoever carries his secret ingredient into the fight sees what the stew does to him: he lies
+# still a while, then gets up bigger.
+then = "dm_cookie_gorged"
+then_after = 3.5
+then_needs = "secret_ingredient"
+then_text = "\"Mmmrrrggglll... MORE STEW!\" Cookie gulps down the last of the pot, and grows."
+then_kit = 356
+then_look = 10987
+  [mob.attack]
+  windup = 0.7
+  damage = 20
+  range = 2.8
+  arc = 110.0
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.3
+  blockable = true
+  # Three turns as he weakens: the ladle all round him, then pots of stew three at a time
+  # (each marked where it'll land), then the pot boiling over at his feet.
+  [[mob.phase]]
+  at = 0.75
+  speed = 0.95
+  pattern = "ladle spin"
+  text = "\"Mrgl! Hot! HOT!\""
+  look = 10987
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.9
+  might = 1.1
+  pattern = "three pots"
+  text = "\"Mmmrrrggglll! Stew's ready!\""
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.8
+  might = 1.2
+  pattern = "boil over"
+  text = "\"Mrrgllll... it's... BOILING OVER!\""
+  shove = 5.0
+  look = 10987
+  # A cleaver string of two.
+  [[mob.pattern]]
+  name = "cleaver"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.65, damage = 18, recovery = 0.25 }, { clip = 17, take = 1, windup = 0.5, damage = 20, recovery = 1.0 } ]
+  # The ladle swung wide and slow.
+  [[mob.pattern]]
+  name = "ladle"
+  weight = 2.0
+  steps = [ { clip = 57, windup = 1.1, damage = 26, arc = 170.0, heavy = true, recovery = 1.2, kit = 379 } ]
+  # A pot of stew thrown to where you stand: its ring is on the ground from the moment he
+  # raises it (his hand smoking), and it lobs, so near or far there's time to step out.
+  [[mob.pattern]]
+  name = "pot"
+  weight = 1.2
+  min_range = 6.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.2, damage = 22, range = 22.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "three pots"
+  weight = 0.0
+  max_range = 30.0
+  steps = [ { ranged = true, windup = 1.1, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.35 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.35 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.6 } ]
+  # From his first turn: the ladle swung all the way round him.
+  [[mob.pattern]]
+  name = "ladle spin"
+  weight = 1.5
+  below = 0.75
+  max_range = 3.5
+  steps = [ { clip = 126, windup = 0.9, range = 4.2, arc = 360.0, damage = 22, heavy = true, recovery = 1.2, kit = 369 } ]
+  # At the last: stew splashed in rings about him, two at once, then one more where you stand.
+  [[mob.pattern]]
+  name = "boil over"
+  weight = 1.0
+  below = 0.2
+  max_range = 30.0
+  steps = [ { clip = 126, windup = 1.1, range = 5.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 0.2, kit = 356, look = 10987 }, { ranged = true, windup = 0.9, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.4 } ]
+  [[mob.pattern]]
+  name = "pots"
+  weight = 1.5
+  below = 0.5
+  min_range = 6.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.0, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.35 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.4 } ]
+
+# Mr. Smite, the first mate: his tells change with his weapons.
+[[mob]]
+key = "dm_smite"
+name = "Mr. Smite"
+subname = "The Juggernaut's First Mate"
+display = 2026
+scale = 1.2
+health = 1100
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 18.0
+leash = 36.0
+weapon = 2056
+grip = "2h"
+boss = true
+posture = 260
+drops = { plunder = [20, 26] }
+trophy = { smite_hammer = 1 }
+gear = ["smite_hammer", "smite_breastplate"]
+respawn = 0.0
+# The alarm as he turns to fight, his line as he changes weapons.
+aggro_sound = 5775
+enrage_sound = 5778
+  [mob.attack]
+  windup = 0.95
+  damage = 40
+  range = 3.6
+  arc = 130.0
+  recovery = 1.25
+  cooldown = 1.5
+  turn_rate = 160.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  # Two turns: at two thirds he stamps and changes his grip (the flurry and the charge come with
+  # it); at a third he stamps again and the hammer comes down like a maul, the floor cracking.
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.85
+  pattern = "stamp"
+  text = "\"You landlubbers are tougher than I thought! I'll have to improvise!\""
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.75
+  might = 1.2
+  pattern = "stamp"
+  text = "\"D'ah! Now you're making me angry!\""
+  shove = 6.0
+  look = 26271
+  # A wide sweep.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.9, damage = 36, arc = 170.0, recovery = 1.1 } ]
+  # A delayed overhead: it waits out a panicked dodge.
+  [[mob.pattern]]
+  name = "delayed overhead"
+  weight = 2.0
+  steps = [ { clip = 58, windup = 1.5, damage = 58, arc = 70.0, recovery = 1.5, kit = 379 } ]
+  # A stomp that throws down everyone close.
+  [[mob.pattern]]
+  name = "stomp"
+  weight = 1.5
+  max_range = 3.2
+  steps = [ { clip = 181, windup = 0.8, range = 4.8, arc = 360.0, damage = 22, heavy = true, recovery = 1.0, kit = 356 } ]
+  [[mob.pattern]]
+  name = "stamp"
+  weight = 0.0
+  max_range = 40.0
+  steps = [ { clip = 181, windup = 1.3, range = 6.5, arc = 360.0, damage = 26, heavy = true, blockable = false, poise = true, recovery = 0.6, kit = 389 } ]
+  # Then: a flurry of four.
+  # At the last: the hammer brought down two-handed, and the floor cracks where it lands.
+  [[mob.pattern]]
+  name = "maul"
+  weight = 2.5
+  below = 0.33
+  steps = [ { clip = 58, windup = 1.25, range = 4.5, arc = 90.0, damage = 52, heavy = true, recovery = 0.4, kit = 379 }, { clip = 181, windup = 0.7, range = 5.5, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.6, look = 26271 } ]
+  [[mob.pattern]]
+  name = "flurry"
+  weight = 3.0
+  below = 0.66
+  steps = [ { clip = 18, take = 0, windup = 0.55, damage = 28, heavy = false, recovery = 0.12 }, { clip = 18, take = 1, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { clip = 18, take = 0, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { clip = 58, windup = 0.75, damage = 44, recovery = 1.6 } ]
+  [[mob.pattern]]
+  name = "charge"
+  weight = 1.5
+  below = 0.66
+  min_range = 5.0
+  max_range = 12.0
+  steps = [ { clip = 58, windup = 1.0, lunge = 7.0, damage = 46, arc = 110.0, recovery = 1.4, kit = 379 } ]
+
+# Captain Greenskin, on the main deck: an elite, gone for good once beaten.
+[[mob]]
+key = "dm_greenskin"
+name = "Captain Greenskin"
+subname = "The Juggernaut's Captain"
+display = 7113
+scale = 1.5
+health = 520
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 30.0
+weapon = 1853
+grip = "1h"
+evade = 0.2
+posture = 150
+drops = { plunder = [14, 18] }
+gear = ["pirate_cutlass", "red_bandana", "greenskin_tricorne"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 18
+  range = 2.8
+  arc = 110.0
+  recovery = 0.7
+  cooldown = 1.0
+  turn_rate = 240.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "three cuts"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 16, recovery = 0.12 }, { clip = 57, windup = 0.72, damage = 24, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 9.0
+  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 5.0, damage = 22, recovery = 0.9 } ]
+  # A cleave all round him when he's crowded.
+  [[mob.pattern]]
+  name = "cleave"
+  weight = 1.5
+  max_range = 3.0
+  steps = [ { clip = 126, windup = 0.75, range = 4.0, arc = 360.0, damage = 18, recovery = 1.1, kit = 369 } ]
+  # At half: all hands on deck; then a harpoon thrown at whoever keeps their distance.
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.9
+  pattern = "cleave"
+  text = "\"All hands! Repel boarders!\""
+  summon = ["dm_pirate", "dm_pirate"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.8
+  might = 1.15
+  pattern = "harpoon"
+  text = "\"I'll have yer hide for a sail!\""
+  [[mob.pattern]]
+  name = "harpoon"
+  weight = 2.0
+  below = 0.5
+  min_range = 5.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.0, damage = 24, range = 26.0, radius = 2.0, speed = 24.0, spell = 23065, blockable = true, recovery = 1.0 } ]
+
+# Edwin VanCleef, at the Juggernaut's stern: a fight for when you're ready, early or late.
+[[mob]]
+key = "dm_vancleef"
+name = "Edwin VanCleef"
+subname = "Defias Kingpin"
+display = 2029
+scale = 1.2
+health = 1500
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 16.0
+leash = 30.0
+weapon = 1928
+off_hand = 2806
+grip = "1h"
+evade = 0.25
+boss = true
+posture = 300
+drops = { plunder = [40, 50] }
+trophy = { cruel_barb = 1, blackened_armor = 1 }
+gear = ["cruel_barb", "vancleef_pauldrons"]
+respawn = 0.0
+# Those who found his quarters (and read what he wrote there) find he isn't done.
+then = "dm_vancleef_unbowed"
+then_after = 4.0
+then_needs = "vancleef_quarters"
+then_text = "\"You think the Brotherhood dies with me? Stormwind will BURN!\""
+then_kit = 218
+then_look = 24050
+# His own voice: "None may challenge the Brotherhood!" as he turns to fight, a health line at
+# his second wind, a gloat over a hero he fells.
+aggro_sound = 5780
+enrage_sound = 5782
+slay_sound = 5781
+  [mob.attack]
+  windup = 0.45
+  damage = 24
+  range = 2.9
+  arc = 110.0
+  recovery = 0.6
+  cooldown = 0.9
+  turn_rate = 280.0
+  lock = 0.2
+  blockable = true
+  # Three turns: two Blackguards from the shadows at two thirds; two more and quicker blades at
+  # a third; at the last, everything he has left.
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.9
+  pattern = "blade storm"
+  text = "\"Lapdogs, all of you!\""
+  summon = ["dm_blackguard", "dm_blackguard"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.8
+  might = 1.1
+  pattern = "blade storm"
+  text = "\"Fools! Our cause is righteous!\""
+  summon = ["dm_blackguard", "dm_blackguard"]
+  [[mob.phase]]
+  at = 0.12
+  speed = 0.7
+  might = 1.2
+  pattern = "thousand cuts"
+  text = "\"The Brotherhood shall prevail!\""
+  shove = 5.0
+  kit = 218
+  # Fast strings of four.
+  [[mob.pattern]]
+  name = "string"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.42, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.34, damage = 20, recovery = 0.12 }, { clip = 17, take = 0, windup = 0.34, damage = 20, recovery = 0.12 }, { clip = 57, windup = 0.62, damage = 30, heavy = true, recovery = 1.0 } ]
+  # A lunge from far off.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 10.0
+  steps = [ { clip = 17, take = 1, windup = 0.5, lunge = 6.0, damage = 28, recovery = 0.9 } ]
+  # A blade held back, glowing: dodge early and it finds you.
+  [[mob.pattern]]
+  name = "riposte stance"
+  weight = 1.5
+  steps = [ { clip = 57, windup = 1.4, damage = 40, arc = 140.0, heavy = true, recovery = 1.1, kit = 379 } ]
+  [[mob.pattern]]
+  name = "blade storm"
+  weight = 0.0
+  max_range = 40.0
+  steps = [ { clip = 126, windup = 1.0, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { clip = 126, windup = 0.45, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1 }, { clip = 126, windup = 0.45, range = 4.5, arc = 360.0, damage = 26, recovery = 1.6 } ]
+  # At the very last: a string that doesn't stop.
+  [[mob.pattern]]
+  name = "thousand cuts"
+  weight = 1.5
+  below = 0.12
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 18, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.28, damage = 18, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.28, damage = 18, recovery = 0.08 }, { clip = 57, windup = 0.7, damage = 34, heavy = true, recovery = 1.8 } ]
+  [[mob.pattern]]
+  name = "storm"
+  weight = 1.5
+  below = 0.33
+  steps = [ { clip = 126, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { clip = 126, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, recovery = 1.4 } ]
+
+# VanCleef's Blackguards: unseen until close, two daggers, a stab from behind.
+[[mob]]
+key = "dm_blackguard"
+name = "Defias Blackguard"
+subname = "Defias Brotherhood"
+display = 2357
+health = 120
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 14.0
+leash = 30.0
+weapon = 2699
+grip = "dagger"
+off_hand = 2635
+evade = 0.45
+drops = { plunder = [3, 5] }
+gear = ["red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.4
+  damage = 10
+  range = 2.4
+  arc = 80.0
+  recovery = 0.6
+  cooldown = 0.9
+  turn_rate = 280.0
+  lock = 0.15
+  blockable = true
+  [[mob.pattern]]
+  name = "flurry"
+  weight = 3.0
+  steps = [ { clip = 85, take = 0, windup = 0.38, damage = 8, recovery = 0.12 }, { clip = 88, take = 0, windup = 0.33, damage = 8, recovery = 0.12 }, { clip = 85, take = 0, windup = 0.33, damage = 8, recovery = 0.12 }, { clip = 88, take = 0, windup = 0.5, damage = 12, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 8.0
+  steps = [ { clip = 85, take = 0, windup = 0.5, lunge = 4.5, damage = 14, recovery = 0.8 } ]
+
+# --- the journal's steps below (after the camp's own) -----------------------------------------------
+
+[[goal]]
+title = "Cookie's stew"
+text = "Down in the Deadmines, the Brotherhood's cook keeps his pot by the cove's east pier. Put him out of business."
+kind = "kill"
+what = "dm_cookie"
+reward = { meat = 6, peacebloom = 4 }
+
+[[goal]]
+title = "The first mate"
+text = "Mr. Smite holds the island where the scaffold round the Juggernaut comes down to the dry dock. Beat him, and keep going: the next lamp is past the Foundry."
+kind = "kill"
+what = "dm_smite"
+reward = { bronze = 4, leather = 2 }
+
+# === phase 3: the Cannon Gallery, the Foundry, the Mast Room =======================================
+# West through the Ironclad Door the gallery climbs to the Foundry's doors; Gilnid works its pit,
+# and its back door (up the ramp round the wall) opens when he falls. A workshop passage runs on to
+# the Mast Room, where Sneed rides his shredder; its far door opens on the galleries.
+
+[[dungeon.lamp]]
+key = "foundry"
+name = "The Foundry's Back Door"
+at = [-250.0, -578.0, 51.1]
+facing = 3.1
+
+# --- area 3: the Cannon Gallery ---------------------------------------------------------------------
+
+# Pirates on the gallery floor past the door.
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-110.0, -650.0]
+z = 7.2
+radius = 2.0
+count = 2
+link = 12.0
+
+# Woodcutters on the climb, an engineer above them throwing down.
+[[dungeon.pack]]
+mob = "dm_woodcutter"
+at = [-128.0, -622.0]
+z = 12.9
+radius = 2.0
+count = 2
+link = 14.0
+
+[[dungeon.pack]]
+mob = "dm_engineer"
+at = [-135.0, -596.0]
+z = 16.7
+radius = 0.0
+count = 1
+link = 16.0
+
+# A Blackguard in the side alcove, over its strongbox.
+[[dungeon.pack]]
+mob = "dm_blackguard"
+at = [-108.4, -618.1]
+z = 13.7
+radius = 0.0
+count = 1
+hidden = 5.0
+
+[[dungeon.box]]
+key = "gallery"
+at = [-105.0, -616.0, 14.2]
+facing = 2.2
+loot = { draught_flask = 1, plunder = 12 }
+
+# --- area 4: the Foundry ----------------------------------------------------------------------------
+
+# Its doors fog over while Gilnid fights; the back door, at the top of the ramp, opens when he falls.
+[[dungeon.door]]
+key = "foundry_fog"
+name = "Foundry Door"
+kind = "fog"
+at = [-176.5, -580.0, 19.3]
+facing = 0.0
+boss = "gilnid"
+bars = [[-176.5, -574.5], [-176.5, -586.0]]
+
+[[dungeon.door]]
+key = "foundry_gate"
+name = "Foundry's back door"
+kind = "gate"
+at = [-240.0, -579.0, 51.2]
+facing = 0.0
+boss = "gilnid"
+bars = [[-240.0, -572.0], [-240.0, -586.0]]
+text = "With Gilnid down, the Foundry's back door stands open at the top of the ramp."
+
+# Gilnid in the pit, by the smelter.
+[[dungeon.pack]]
+key = "gilnid"
+mob = "dm_gilnid"
+at = [-205.0, -592.0]
+z = 21.0
+radius = 0.0
+count = 1
+
+# The smelter's molten channels overflow while he fights.
+[[dungeon.hazard]]
+name = "molten iron"
+# Molten Metal: iron spilling over, warned by the ground heating first.
+spell = 5213
+at = [-198.0, -590.0, 21.0]
+radius = 3.0
+damage = 24
+every = 6.0
+phase = 0.0
+boss = "gilnid"
+
+[[dungeon.hazard]]
+name = "molten iron"
+# Molten Metal: iron spilling over, warned by the ground heating first.
+spell = 5213
+at = [-212.0, -572.0, 21.0]
+radius = 3.0
+damage = 24
+every = 6.0
+phase = 2.0
+boss = "gilnid"
+
+[[dungeon.hazard]]
+name = "molten iron"
+# Molten Metal: iron spilling over, warned by the ground heating first.
+spell = 5213
+at = [-205.0, -600.0, 21.0]
+radius = 3.0
+damage = 24
+every = 6.0
+phase = 4.0
+boss = "gilnid"
+
+# Blackguards on the ramp, engineers on the ring above.
+[[dungeon.pack]]
+mob = "dm_blackguard"
+at = [-186.0, -599.0]
+z = 37.6
+radius = 0.0
+count = 1
+hidden = 5.0
+
+[[dungeon.pack]]
+mob = "dm_blackguard"
+at = [-178.0, -580.0]
+z = 45.7
+radius = 0.0
+count = 1
+hidden = 5.0
+
+[[dungeon.pack]]
+mob = "dm_engineer"
+at = [-215.0, -555.0]
+z = 51.2
+radius = 0.0
+count = 1
+link = 18.0
+
+[[dungeon.pack]]
+mob = "dm_engineer"
+at = [-230.0, -570.0]
+z = 51.2
+radius = 0.0
+count = 1
+link = 18.0
+
+# --- area 5: the workshop passage -------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "dm_woodcutter"
+at = [-300.0, -580.0]
+z = 47.2
+radius = 1.5
+count = 2
+link = 14.0
+
+[[dungeon.pack]]
+mob = "dm_engineer"
+at = [-292.0, -555.0]
+z = 49.4
+radius = 0.0
+count = 1
+link = 16.0
+
+[[dungeon.box]]
+key = "workshop"
+at = [-295.0, -605.0, 47.6]
+facing = 1.0
+loot = { draught_flask = 1, plunder = 15 }
+
+# --- area 6: the Mast Room --------------------------------------------------------------------------
+
+[[dungeon.door]]
+key = "mast_fog"
+name = "Mast Room Door"
+kind = "fog"
+at = [-290.3, -537.0, 49.4]
+facing = 1.6
+boss = "sneed"
+bars = [[-284.0, -537.0], [-297.0, -537.0]]
+
+[[dungeon.door]]
+key = "mast_gate"
+name = "Mast Room's north door"
+kind = "gate"
+at = [-244.0, -482.0, 49.4]
+facing = 1.6
+boss = "sneed"
+bars = [[-244.0, -468.0], [-244.0, -497.0]]
+text = "Sneed is beaten: the Mast Room's north door opens on the galleries."
+
+# Sneed in his shredder; he climbs out of the wreck.
+[[dungeon.pack]]
+key = "sneed"
+mob = "dm_shredder"
+at = [-288.0, -505.0]
+z = 50.0
+radius = 0.0
+count = 1
+
+# --- gear from the Foundry and the Mast Room --------------------------------------------------------
+
+# The goblins' felling axe: a wide chop that takes two.
+[[weapon]]
+key = "goblin_axe"
+windup = 0.30
+active = 0.11
+recovery = 0.40
+stamina = 13.0
+damage = [16, 22]
+range = 3.1
+arc = 115.0
+targets = 2
+subclass = 0
+
+[[item]]
+key = "goblin_axe"
+name = "Goblin Woodcutter's Axe"
+display = 453
+icon = "INV_Axe_04"
+kind = "weapon"
+text = "A felling axe: one-handed, and its wide chop takes two."
+
+# An engineer's wrench: a knock that jars a wind-up.
+[[weapon]]
+key = "goblin_wrench"
+windup = 0.32
+active = 0.12
+recovery = 0.40
+stamina = 13.0
+damage = [14, 19]
+range = 2.9
+arc = 100.0
+targets = 1
+stagger = 0.6
+subclass = 4
+
+[[item]]
+key = "goblin_wrench"
+name = "Engineer's Wrench"
+display = 1610
+icon = "INV_Misc_Wrench_01"
+kind = "weapon"
+text = "A goblin engineer's wrench. Hit a foe while it's winding up a blow and that blow is knocked aside and the foe staggered for a moment (0.6 s); light blows do it too. Not on a boss, a heavy creature's braced wind-up, or one knocked aside a moment ago."
+
+# Gilnid's: one hand, and it breaks a stance like a two-hander.
+[[weapon]]
+key = "gilnid_wrench"
+windup = 0.34
+active = 0.12
+recovery = 0.42
+stamina = 15.0
+damage = [22, 28]
+range = 3.0
+arc = 105.0
+targets = 1
+stagger = 0.6
+subclass = 4
+posture = 1.6
+
+[[item]]
+key = "gilnid_wrench"
+name = "The Smelter's Spanner"
+display = 1653
+icon = "INV_Misc_Wrench_01"
+kind = "weapon"
+text = "Gilnid's own: one-handed, yet it breaks a stance faster than a two-hander."
+
+# Sneed's: quick, and cruel from behind.
+[[weapon]]
+key = "sneed_machete"
+windup = 0.24
+active = 0.10
+recovery = 0.30
+stamina = 11.0
+damage = [17, 23]
+range = 3.0
+arc = 95.0
+targets = 1
+subclass = 7
+backstab = 3.0
+
+[[item]]
+key = "sneed_machete"
+name = "Sneed's Machete"
+display = 1552
+icon = "INV_Sword_04"
+kind = "weapon"
+text = "Sneed's: quick, and a blow from behind does three times its damage."
+
+# --- the Foundry's goblins --------------------------------------------------------------------------
+
+# Engineers: keep their distance and throw dynamite, marked where it'll land.
+[[mob]]
+key = "dm_engineer"
+name = "Goblin Engineer"
+subname = "Defias Brotherhood"
+display = 7047
+health = 80
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 24.0
+leash = 32.0
+weapon = 1610
+grip = "1h"
+keep_away = 12.0
+drops = { plunder = [2, 4] }
+gear = ["goblin_wrench"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.3
+  damage = 20
+  range = 22.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 2.8
+  turn_rate = 300.0
+  lock = 0.3
+  blockable = false
+  speed = 14.0
+  radius = 2.6
+  spell = 4062
+  look = 3204
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 3.0
+  min_range = 4.5
+  steps = [ {} ]
+  [[mob.pattern]]
+  name = "two sticks"
+  weight = 1.5
+  min_range = 6.0
+  steps = [ { windup = 1.1, recovery = 0.2 }, { windup = 0.6, recovery = 1.3 } ]
+  # Crowded, a wrench to the knee.
+  [[mob.pattern]]
+  name = "wrench"
+  weight = 4.0
+  steps = [ { ranged = false, clip = 17, take = 0, windup = 0.45, damage = 8, range = 2.6, arc = 90.0, blockable = true, recovery = 0.6 } ]
+
+# Woodcutters: two chops, then a slow one overhead.
+[[mob]]
+key = "dm_woodcutter"
+name = "Goblin Woodcutter"
+subname = "Defias Brotherhood"
+display = 7048
+health = 120
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 14.0
+leash = 30.0
+weapon = 453
+grip = "1h"
+evade = 0.1
+drops = { plunder = [2, 4] }
+gear = ["goblin_axe"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 14
+  range = 2.7
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "two chops"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 13, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 13, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "felling chop"
+  weight = 1.5
+  steps = [ { clip = 57, windup = 1.0, damage = 22, heavy = true, recovery = 1.1 } ]
+
+# Gilnid, the Smelter: a wrench up close, molten iron thrown far, and the channels overflowing.
+[[mob]]
+key = "dm_gilnid"
+name = "Gilnid"
+subname = "The Smelter"
+display = 7125
+scale = 1.6
+health = 1300
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 1653
+grip = "1h"
+boss = true
+posture = 260
+drops = { plunder = [26, 32] }
+trophy = { gilnid_wrench = 1 }
+gear = ["gilnid_wrench", "gilnid_pauldrons"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 24
+  range = 3.0
+  arc = 110.0
+  recovery = 0.9
+  cooldown = 1.2
+  turn_rate = 210.0
+  lock = 0.3
+  blockable = true
+  # Turns: at two thirds his crew down from the ring and the iron poured three ladles at a time;
+  # at a third the crucible itself tipped out round him (and slag spat at whoever runs).
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.85
+  pattern = "pour"
+  text = "\"My smelter! You'll be scrap by the time I'm done!\""
+  summon = ["dm_woodcutter", "dm_woodcutter"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.75
+  might = 1.15
+  pattern = "crucible"
+  text = "\"Into the slag with you! ALL of you!\""
+  shove = 5.5
+  look = 3204
+  [[mob.pattern]]
+  name = "crucible"
+  weight = 1.5
+  below = 0.33
+  max_range = 30.0
+  steps = [ { clip = 126, windup = 1.2, range = 5.5, arc = 360.0, damage = 28, heavy = true, blockable = false, recovery = 0.3, kit = 356, look = 3204 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 1.4 } ]
+  [[mob.pattern]]
+  name = "two knocks"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 0.9 } ]
+  # The spanner raised high and held: it waits out a panicked dodge.
+  [[mob.pattern]]
+  name = "overhead"
+  weight = 2.0
+  steps = [ { clip = 57, windup = 1.3, damage = 44, arc = 80.0, heavy = true, recovery = 1.3, kit = 379 } ]
+  # Crowded, a kick that clears room.
+  [[mob.pattern]]
+  name = "kick"
+  weight = 1.5
+  max_range = 2.6
+  steps = [ { clip = 95, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
+  # A ladle of molten iron to where you stand.
+  [[mob.pattern]]
+  name = "ladle"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 24.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "pour"
+  weight = 0.0
+  max_range = 30.0
+  steps = [ { ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.5 } ]
+  # Then: three knocks and the overhead, quicker.
+  [[mob.pattern]]
+  name = "hammering"
+  weight = 3.0
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 17, take = 0, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 57, windup = 0.8, damage = 36, heavy = true, recovery = 1.5 } ]
+
+# Sneed's Shredder: slow and heavy, its saws unstoppable; Sneed climbs out of the wreck.
+[[mob]]
+key = "dm_shredder"
+name = "Sneed's Shredder"
+subname = "Lumbermaster"
+display = 1269
+scale = 1.1
+health = 950
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+boss = true
+posture = 320
+drops = { plunder = [10, 14] }
+respawn = 0.0
+then = "dm_sneed"
+then_text = "\"My shredder! Oh, you'll pay for that, you will!\""
+  # At half its engine screams: quicker saws, a grind all round as it turns.
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.8
+  pattern = "grind"
+  text = "The shredder's engine screams; smoke pours out of it."
+  shove = 5.0
+  [mob.attack]
+  windup = 0.85
+  damage = 32
+  range = 3.4
+  arc = 140.0
+  recovery = 1.1
+  cooldown = 1.5
+  turn_rate = 150.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "saws"
+  weight = 3.0
+  steps = [ { clip = 16, take = 0, windup = 0.85, damage = 30, recovery = 0.25 }, { clip = 16, take = 1, windup = 0.6, damage = 32, recovery = 1.2 } ]
+  # The saws ground into the floor all round it: it throws you down.
+  [[mob.pattern]]
+  name = "grind"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 130, windup = 1.3, range = 4.8, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.4, kit = 356 } ]
+  # From far off it comes at you, saws first.
+  [[mob.pattern]]
+  name = "charge"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 14.0
+  steps = [ { clip = 16, take = 1, windup = 1.0, lunge = 8.0, damage = 38, recovery = 1.6, kit = 379 } ]
+
+# Sneed: out of the wreck, quick and dodging, the machete in strings.
+[[mob]]
+key = "dm_sneed"
+name = "Sneed"
+subname = "Lumbermaster"
+display = 7124
+health = 700
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 20.0
+leash = 30.0
+weapon = 1552
+grip = "1h"
+evade = 0.3
+boss = true
+posture = 200
+drops = { plunder = [30, 36] }
+trophy = { sneed_machete = 1 }
+gear = ["sneed_machete", "sneed_leggings"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 20
+  range = 2.8
+  arc = 110.0
+  recovery = 0.65
+  cooldown = 0.9
+  turn_rate = 280.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "three cuts"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 18, recovery = 0.12 }, { clip = 57, windup = 0.7, damage = 28, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 10.0
+  steps = [ { clip = 17, take = 1, windup = 0.5, lunge = 6.0, damage = 24, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "kick"
+  weight = 1.5
+  max_range = 2.6
+  steps = [ { clip = 95, windup = 0.3, damage = 8, range = 2.8, arc = 90.0, recovery = 0.5 } ]
+  # The machete held back, glowing: dodge early and it finds you.
+  [[mob.pattern]]
+  name = "feint"
+  weight = 1.0
+  steps = [ { clip = 17, take = 0, windup = 1.1, damage = 26, recovery = 0.7, kit = 379 } ]
+  # At half: a bomb from his belt at his feet, and he goes for you like a mad thing.
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.8
+  might = 1.1
+  pattern = "frenzy"
+  text = "\"That shredder cost more than you'll ever see!\""
+  shove = 4.5
+  look = 3204
+  [[mob.pattern]]
+  name = "frenzy"
+  weight = 2.5
+  below = 0.5
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 16, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 57, windup = 0.6, lunge = 3.0, damage = 26, heavy = true, recovery = 1.3 } ]
+
+[[goal]]
+title = "The Smelter"
+text = "Gilnid works the Foundry's pit, west up the Cannon Gallery from the dry dock. Beat him and his back door opens at the top of the ramp."
+kind = "kill"
+what = "dm_gilnid"
+reward = { ore = 8, bronze = 4 }
+
+[[goal]]
+title = "The Lumbermaster"
+text = "Sneed rides his shredder in the Mast Room, past the Foundry's workshop. Wreck it, then beat the goblin who climbs out."
+kind = "kill"
+what = "dm_sneed"
+reward = { wood = 10, linen = 4 }
+
+# === phase 4: the galleries and the mine's mouth ===================================================
+# North from the Mast Room the old mine's galleries wind east to the mouth, where Rhahk'Zor keeps
+# the front door shut; past him lies Moonbrook.
+
+[[dungeon.lamp]]
+key = "galleries"
+name = "The Galleries"
+at = [-112.5, -405.0, 59.9]
+facing = 0.3
+
+# --- area 7: the galleries --------------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "dm_miner"
+at = [-220.0, -492.5]
+z = 48.3
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_dynamiter"
+at = [-190.0, -505.0]
+z = 53.2
+radius = 0.0
+count = 1
+link = 16.0
+
+# A Blackguard in the north-east nook, over its strongbox.
+[[dungeon.pack]]
+mob = "dm_blackguard"
+at = [-150.0, -530.0]
+z = 50.2
+radius = 0.0
+count = 1
+hidden = 5.0
+
+[[dungeon.box]]
+key = "nook"
+at = [-152.0, -532.0, 50.2]
+facing = 2.6
+loot = { plunder = 18, tonic = 1 }
+
+# The overseer at the junction; his miners walk the gallery north.
+[[dungeon.pack]]
+mob = "dm_overseer"
+at = [-190.0, -480.0]
+z = 54.0
+radius = 0.0
+count = 1
+link = 14.0
+
+[[dungeon.pack]]
+mob = "dm_miner"
+at = [-190.0, -442.5]
+z = 53.6
+radius = 2.0
+count = 2
+link = 14.0
+route = [[-205.0, -430.0]]
+wait = 6.0
+
+[[dungeon.pack]]
+mob = "dm_miner"
+at = [-140.0, -400.0]
+z = 58.2
+radius = 2.0
+count = 2
+link = 14.0
+
+# A dynamiter in the east lobe, by the miners' cache.
+[[dungeon.pack]]
+mob = "dm_dynamiter"
+at = [-112.5, -442.5]
+z = 55.4
+radius = 0.0
+count = 1
+link = 18.0
+
+[[dungeon.box]]
+key = "lobe"
+at = [-115.0, -445.0, 55.4]
+facing = 1.2
+loot = { plunder = 20, tonic = 2 }
+
+# --- area 8: the mine's mouth -----------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "dm_overseer"
+at = [-70.0, -380.0]
+z = 54.2
+radius = 0.0
+count = 1
+link = 14.0
+
+[[dungeon.pack]]
+mob = "dm_miner"
+at = [-62.5, -350.0]
+z = 55.9
+radius = 2.0
+count = 2
+link = 14.0
+
+# Rhahk'Zor holds the front door.
+[[dungeon.pack]]
+key = "rhahkzor"
+mob = "dm_rhahkzor"
+at = [-40.0, -385.0]
+z = 55.8
+radius = 0.0
+count = 1
+
+# --- gear from the galleries ------------------------------------------------------------------------
+
+# A miner's pick: it chips at a stance.
+[[weapon]]
+key = "miner_pick"
+windup = 0.34
+active = 0.12
+recovery = 0.44
+stamina = 14.0
+damage = [17, 23]
+range = 3.0
+arc = 90.0
+targets = 1
+subclass = 0
+posture = 1.3
+
+[[item]]
+key = "miner_pick"
+name = "Defias Miner's Pick"
+display = 1378
+icon = "INV_Pick_02"
+kind = "weapon"
+text = "A miner's pick: one-handed, and its point chips at a stance."
+
+# Rhahk'Zor's: a wide two-handed swing that takes three and knocks a wind-up aside.
+[[weapon]]
+key = "rhahkzor_maul"
+windup = 0.70
+active = 0.15
+recovery = 0.80
+stamina = 28.0
+damage = [48, 60]
+range = 3.7
+arc = 150.0
+targets = 3
+stagger = 1.0
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 5
+posture = 1.3
+
+[[item]]
+key = "rhahkzor_maul"
+name = "Rhahk'Zor's Maul"
+display = 1478
+icon = "INV_Hammer_09"
+kind = "weapon"
+text = "Rhahk'Zor's: a two-handed swing as wide as they come, three struck and their wind-ups knocked aside."
+
+# (The Defias outfit the creatures wear has no icon of its own in the game's data, so the bags
+# showed a question mark: these pieces wear the nearest leather that has one.)
+[[item]]
+key = "defias_jerkin"
+name = "Defias Leather Vest"
+display = 8648
+icon = "INV_Chest_Leather_09"
+kind = "armor"
+slot = "chest"
+reduce = 0.12
+text = "The Brotherhood's leathers: a little better than hide, and no weight at all."
+
+[[item]]
+key = "defias_shoulders"
+name = "Defias Shoulderpads"
+display = 1057
+icon = "INV_Shoulder_08"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.05
+text = "The Brotherhood's shoulderpads: a little off every blow."
+
+[[item]]
+key = "defias_leggings"
+name = "Defias Leggings"
+display = 4481
+icon = "INV_Pants_02"
+kind = "armor"
+slot = "legs"
+reduce = 0.08
+weight = 0.01
+text = "The Brotherhood's leggings."
+
+# --- the captains' armour -----------------------------------------------------------------------
+# Each boss wears a piece of its own: one of a boss's pieces (its weapon or its armour) falls
+# for certain each time it's beaten, the others each `boss_extra_chance`.
+
+[[item]]
+key = "cookie_trousers"
+name = "Cookie's Stew-Spattered Trousers"
+display = 685
+icon = "INV_Pants_03"
+kind = "armor"
+slot = "legs"
+reduce = 0.09
+text = "The cook's own: they've taken a ladle or two."
+
+[[item]]
+key = "smite_breastplate"
+name = "Smite's Plated Vest"
+display = 2968
+icon = "INV_Chest_Plate01"
+kind = "armor"
+slot = "chest"
+reduce = 0.22
+weight = 0.08
+text = "Mr. Smite's: heavy plate, a fifth off every blow and more, and you'll feel its weight."
+
+[[item]]
+key = "greenskin_tricorne"
+name = "Greenskin's Tricorne"
+display = 13805
+icon = "INV_Helmet_30"
+kind = "armor"
+slot = "head"
+reduce = 0.07
+text = "The goblin captain's hat, a size too small."
+
+[[item]]
+key = "vancleef_pauldrons"
+name = "VanCleef's Pauldrons"
+display = 1057
+icon = "INV_Shoulder_08"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.1
+text = "Edwin VanCleef's shoulderguards: leather over steel, no weight at all."
+
+[[item]]
+key = "gilnid_pauldrons"
+name = "Gilnid's Smelting Pauldrons"
+display = 4109
+icon = "INV_Shoulder_03"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.09
+weight = 0.02
+text = "The smelter's mail shoulders, scorched black."
+
+[[item]]
+key = "sneed_leggings"
+name = "Sneed's Grease-Stained Leggings"
+display = 1353
+icon = "INV_Pants_05"
+kind = "armor"
+slot = "legs"
+reduce = 0.11
+weight = 0.01
+text = "The lumberjack's own, oiled against the shredder's spray."
+
+[[item]]
+key = "rhahkzor_helm"
+name = "Rhahk'Zor's Helm"
+display = 1126
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.1
+weight = 0.03
+text = "The ogre foreman's mail cap, padded for a human head."
+
+# --- the mine's Brotherhood -------------------------------------------------------------------------
+
+# Miners: two pick strikes, or one held high.
+[[mob]]
+key = "dm_miner"
+name = "Defias Miner"
+subname = "Defias Brotherhood"
+display = 2311
+health = 105
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 14.0
+leash = 30.0
+weapon = 1378
+grip = "1h"
+evade = 0.1
+drops = { plunder = [2, 4] }
+gear = ["miner_pick", "defias_leggings"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 14
+  range = 2.7
+  arc = 100.0
+  recovery = 0.8
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "two strikes"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 13, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 13, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "pick held high"
+  weight = 1.5
+  steps = [ { clip = 57, windup = 1.05, damage = 22, heavy = true, recovery = 1.1, kit = 379 } ]
+
+# Overseers: a shield and a cutlass, and the shield in your face if you crowd them.
+[[mob]]
+key = "dm_overseer"
+name = "Defias Overseer"
+subname = "Defias Brotherhood"
+display = 3341
+health = 220
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 30.0
+weapon = 1853
+grip = "1h"
+shield = 2456
+block = 0.45
+evade = 0.1
+posture = 110
+drops = { plunder = [5, 8] }
+gear = ["pirate_cutlass", "red_bandana", "defias_jerkin", "defias_shoulders"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 16
+  range = 2.8
+  arc = 100.0
+  recovery = 0.75
+  cooldown = 1.1
+  turn_rate = 230.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "three cuts"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 15, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.42, damage = 15, recovery = 0.12 }, { clip = 57, windup = 0.75, damage = 22, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "shield bash"
+  weight = 2.0
+  max_range = 2.6
+  steps = [ { clip = 59, windup = 0.4, damage = 8, range = 2.6, arc = 80.0, heavy = true, recovery = 0.8 } ]
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 1.5
+  min_range = 3.5
+  max_range = 8.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 4.5, damage = 18, recovery = 0.9 } ]
+
+# Dynamiters: three sticks at a time from afar, a kick close in.
+[[mob]]
+key = "dm_dynamiter"
+name = "Defias Dynamiter"
+subname = "Defias Brotherhood"
+display = 2345
+health = 85
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 26.0
+leash = 32.0
+weapon = 18575
+grip = "1h"
+keep_away = 14.0
+drops = { plunder = [3, 5] }
+gear = ["red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 22
+  range = 24.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 3.0
+  turn_rate = 300.0
+  lock = 0.3
+  blockable = false
+  speed = 14.0
+  radius = 3.0
+  spell = 7978
+  look = 3204
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 2.0
+  min_range = 4.5
+  steps = [ {} ]
+  [[mob.pattern]]
+  name = "three sticks"
+  weight = 2.0
+  min_range = 7.0
+  steps = [ { windup = 1.0, recovery = 0.2 }, { windup = 0.55, recovery = 0.2 }, { windup = 0.55, recovery = 1.6 } ]
+  [[mob.pattern]]
+  name = "kick"
+  weight = 4.0
+  steps = [ { ranged = false, clip = 95, take = 0, windup = 0.35, damage = 7, range = 2.6, arc = 80.0, blockable = true, recovery = 0.6 } ]
+
+# Rhahk'Zor, the Brotherhood's foreman: huge, slow, wide; at the last, a roar that throws all down.
+[[mob]]
+key = "dm_rhahkzor"
+name = "Rhahk'Zor"
+subname = "The Foreman"
+display = 1051
+health = 1900
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 18.0
+leash = 32.0
+weapon = 1478
+grip = "2h"
+boss = true
+posture = 340
+drops = { plunder = [40, 50] }
+trophy = { rhahkzor_maul = 1 }
+gear = ["rhahkzor_maul", "rhahkzor_helm"]
+respawn = 0.0
+aggro_sound = 5774
+  [mob.attack]
+  windup = 0.95
+  damage = 40
+  range = 3.8
+  arc = 150.0
+  recovery = 1.3
+  cooldown = 1.6
+  turn_rate = 150.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  # Turns: at three quarters a roar, and the miners come running; at two fifths the roar that
+  # throws all down and the maul faster; at the last he pounds the floor till it cracks.
+  [[mob.phase]]
+  at = 0.75
+  speed = 0.95
+  pattern = "roar"
+  text = "\"VanCleef pay big for your heads!\""
+  summon = ["dm_miner", "dm_miner"]
+  [[mob.phase]]
+  at = 0.4
+  speed = 0.8
+  pattern = "roar"
+  text = "\"Rhahk'Zor smash you all flat!\""
+  [[mob.phase]]
+  at = 0.15
+  speed = 0.72
+  might = 1.25
+  pattern = "pound"
+  text = "\"RHAHK'ZOR... SMASH!\""
+  shove = 7.0
+  look = 26271
+  [[mob.pattern]]
+  name = "pound"
+  weight = 2.0
+  below = 0.15
+  max_range = 40.0
+  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 0.2, kit = 356, look = 26271 }, { clip = 54, windup = 0.7, range = 7.0, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 0.2, look = 26271 }, { clip = 58, windup = 0.9, damage = 56, arc = 80.0, heavy = true, recovery = 1.8, kit = 379 } ]
+  [[mob.pattern]]
+  name = "two swings"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.9, damage = 38, arc = 150.0, recovery = 0.3 }, { clip = 18, take = 1, windup = 0.7, damage = 40, arc = 150.0, recovery = 1.3 } ]
+  # The maul held high: it waits out a panicked dodge.
+  [[mob.pattern]]
+  name = "slam"
+  weight = 2.0
+  steps = [ { clip = 58, windup = 1.45, damage = 60, arc = 70.0, recovery = 1.6, kit = 379 } ]
+  [[mob.pattern]]
+  name = "stomp"
+  weight = 1.5
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 26, heavy = true, recovery = 1.1, kit = 356 } ]
+  [[mob.pattern]]
+  name = "rush"
+  weight = 1.5
+  min_range = 6.0
+  max_range = 16.0
+  steps = [ { clip = 18, take = 1, windup = 1.1, lunge = 9.0, damage = 44, recovery = 1.6, kit = 379 } ]
+  [[mob.pattern]]
+  name = "roar"
+  weight = 0.0
+  max_range = 40.0
+  steps = [ { clip = 55, windup = 1.2, range = 7.0, arc = 360.0, damage = 20, heavy = true, blockable = false, poise = true, recovery = 0.6, kit = 389 } ]
+  [[mob.pattern]]
+  name = "fury"
+  weight = 3.0
+  below = 0.4
+  steps = [ { clip = 18, take = 0, windup = 0.6, damage = 34, heavy = false, recovery = 0.15 }, { clip = 18, take = 1, windup = 0.5, damage = 34, heavy = false, recovery = 0.15 }, { clip = 58, windup = 0.9, damage = 52, recovery = 1.8 } ]
+
+[[goal]]
+title = "The foreman"
+text = "Rhahk'Zor keeps the mine's front door shut, east through the galleries from the Mast Room. Beat him."
+kind = "kill"
+what = "dm_rhahkzor"
+reward = { bronze = 6, leather = 4 }
+
+[[goal]]
+title = "Out into Moonbrook"
+text = "With Rhahk'Zor down the front door stands open. Walk out of the Deadmines."
+kind = "delve"
+what = "end"
+reward = { roast = 4, linen = 4 }
+
+# === secrets, rares and the Brotherhood's other hands ===============================================
+# What isn't on the way through: a hidden pantry, a captain's quarters, a cave-in that isn't one,
+# powder crates stacked across an alcove, a prisoner nobody talks about. Notes lying about say
+# where to look. Some bosses aren't done when they fall, for those who found the right thing.
+
+# --- notes ------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "smugglers_tally"
+name = "A Smuggler's Tally"
+at = [-84.0, -939.0, 40.0]
+facing = 2.0
+text = "\"Two crates salt pork, one keg rum, one jar of something for the cook. He says it's his secret ingredient and he keeps it in the little tent at the south end of the cove, where the pirates won't drink it. Whatever's in that jar MOVES. Don't open it.\""
+
+[[dungeon.note]]
+key = "smite_orders"
+name = "Orders, Sealed in Red"
+at = [-8.0, -772.0, 9.5]
+facing = 1.0
+text = "\"Smite: the Juggernaut is yours to guard. My quarters at the stern are MINE. Nobody goes aft of the mast; nobody reads what I leave there. Not you, not the goblins, not my own daughter's tutor. -- E. V.\""
+
+[[dungeon.note]]
+key = "gilnid_ledger"
+name = "Gilnid's Ledger"
+at = [-247.0, -575.0, 51.1]
+facing = 3.0
+text = "\"Silver out of the east lobe: none since the cave-in. Johnson swears there's a seam at the very back of it, past the pond, and that the foreman wants it for himself. Johnson went back for it alone. Not seen in a week.\""
+
+[[dungeon.note]]
+key = "miners_diary"
+name = "A Miner's Diary"
+at = [-116.0, -402.0, 59.9]
+facing = 4.0
+text = "\"They keep a man in the back of the goblins' workshop, past the last of the sawhorses. Fine clothes, gone to rags. He doesn't sleep. He talks to the dark in a voice that isn't his. Stay away from the back of the workshop.\""
+
+[[dungeon.note]]
+key = "frosted_letter"
+name = "A Frost-Rimed Letter"
+at = [-151.4, -587.1, 19.3]
+facing = 0.5
+text = "\"Marisa -- if the Kingpin's men come for you, the powder crates in the gallery's alcove are only stacked against the gap. Get behind them and wait. Burn this. -- a friend\""
+
+# --- secrets ----------------------------------------------------------------------------------------
+
+# The cook's pantry: the smaller of the two tents at the south end of the cove, before you reach
+# him (in from the landing, down the beach and south).
+[[dungeon.door]]
+key = "cookie_pantry"
+name = "Cookie's Pantry"
+kind = "hidden"
+at = [-159.0, -908.0, 8.8]
+find = 4.0
+reveals = ["pantry"]
+text = "inside the little tent at the south end of the cove, under a heap of nets: Cookie's pantry, and a jar that wriggles."
+
+[[dungeon.box]]
+key = "pantry"
+at = [-158.6, -907.4, 8.8]
+facing = 2.0
+loot = { secret_ingredient = 1, plunder = 8 }
+
+# VanCleef's quarters, aft of the Juggernaut's mast: a letter, and his strongbox.
+[[dungeon.door]]
+key = "vancleef_quarters"
+name = "VanCleef's Quarters"
+kind = "hidden"
+at = [-105.0, -818.0, 37.9]
+find = 4.0
+reveals = ["quarters", "vancleef_letter"]
+text = "aft of the mast, under the stern: VanCleef's quarters, and a letter he never sent."
+
+[[dungeon.note]]
+key = "vancleef_letter"
+name = "A Letter, Never Sent"
+at = [-106.0, -815.0, 37.8]
+facing = 1.5
+text = "\"My dearest Vanessa -- if this reaches you, I am dead and Stormwind has won nothing. They took everything from us; I will not let them take the Brotherhood. Even dead, I will stand. Even dead, I will not bow. -- your father\""
+
+[[dungeon.box]]
+key = "quarters"
+at = [-105.0, -821.0, 37.9]
+facing = 1.5
+loot = { draught_flask = 1, plunder = 20 }
+
+# The east lobe's back wall: a seam of silver, and Miner Johnson, who sealed himself in with it.
+[[dungeon.door]]
+key = "johnson_seam"
+name = "Johnson's Seam"
+kind = "hidden"
+at = [-118.0, -450.0, 55.6]
+find = 4.0
+reveals = ["johnson"]
+text = "in the east lobe's back wall, a seam of silver dug out by hand, and the man who dug it turns round."
+
+# The powder crates across the cannon gallery's alcove.
+[[dungeon.door]]
+key = "marisa_alcove"
+name = "Stacked Powder Crates"
+kind = "illusory"
+display = 31
+at = [-110.0, -615.0, 14.2]
+facing = 0.0
+scale = 1.8
+bars = [[-110.0, -607.0], [-110.0, -623.0]]
+reveals = ["marisa", "gallery"]
+text = "the crates are empty, and stacked across a gap: behind them, the alcove, and Marisa du'Paige."
+
+# The back of the goblins' workshop, past the sawhorses: the noble they keep.
+[[dungeon.door]]
+key = "noble_cell"
+name = "The Back of the Workshop"
+kind = "hidden"
+at = [-300.0, -611.0, 47.6]
+find = 4.0
+reveals = ["noble"]
+text = "in the back of the workshop: a man in the rags of fine clothes, talking to the dark. He turns."
+
+# --- the rares the secrets keep ---------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "dm_miner_johnson"
+key = "johnson"
+at = [-120.0, -438.0]
+z = 54.8
+radius = 0.0
+count = 1
+rare = true
+
+[[dungeon.pack]]
+mob = "dm_marisa"
+key = "marisa"
+at = [-103.4, -617.1]
+z = 14.3
+radius = 0.0
+count = 1
+rare = true
+
+[[dungeon.pack]]
+mob = "dm_noble"
+key = "noble"
+at = [-303.0, -609.0]
+z = 47.6
+radius = 0.0
+count = 1
+rare = true
+
+# --- the Brotherhood's other hands, on the way -------------------------------------------------------
+
+# A wizard on the beach behind the pirates, an evoker pair on the Juggernaut's deck.
+[[dungeon.pack]]
+mob = "dm_wizard"
+at = [-40.0, -850.0]
+z = 18.7
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "dm_evoker"
+at = [-70.0, -808.0]
+z = 40.0
+radius = 3.0
+count = 2
+link = 10.0
+
+# A goblin craftsman over the cannon gallery's floor.
+[[dungeon.pack]]
+mob = "dm_craftsman"
+at = [-122.4, -640.1]
+z = 12.6
+radius = 0.0
+count = 1
+
+# A taskmaster driving strip miners in the galleries.
+[[dungeon.pack]]
+mob = "dm_taskmaster"
+at = [-160.0, -400.0]
+z = 56.6
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "dm_strip_miner"
+at = [-165.0, -395.0]
+z = 57.5
+radius = 4.0
+count = 3
+link = 14.0
+
+# A wizard at the mine's mouth, beside the overseer.
+[[dungeon.pack]]
+mob = "dm_wizard"
+at = [-56.0, -372.0]
+z = 55.0
+radius = 0.0
+count = 1
+
+# --- items -------------------------------------------------------------------------------------------
+
+[[item]]
+key = "secret_ingredient"
+name = "Cookie's Secret Ingredient"
+display = 4112
+icon = "INV_Misc_Food_15"
+kind = "resource"
+stack = 1
+below = true
+text = "A jar of something that wriggles. Cookie puts it in his stew. Carry it into a fight with him and see what it does to him when he's beaten."
+
+[[item]]
+key = "gorged_apron"
+name = "Cookie's Gorged Apron"
+display = 12314
+icon = "INV_Chest_Cloth_21"
+kind = "armor"
+slot = "chest"
+reduce = 0.14
+weight = 0.02
+text = "Stained past saving and stretched past its seams. Whatever was in that jar, it's soaked in."
+
+[[item]]
+key = "vancleef_mask"
+name = "VanCleef's Mask"
+display = 3086
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.12
+text = "The Kingpin's own, cut from the Brotherhood's red. He wouldn't bow in it, even dead."
+
+[[item]]
+key = "johnson_helm"
+name = "Miner Johnson's Lamp-Cap"
+display = 1200
+icon = "INV_Helmet_02"
+kind = "armor"
+slot = "head"
+reduce = 0.09
+weight = 0.01
+text = "A mail cap with a lamp's soot on the brim. Johnson found the silver; the silver didn't save him."
+
+[[item]]
+key = "marisa_mantle"
+name = "Marisa's Frosted Mantle"
+display = 4109
+icon = "INV_Shoulder_03"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.1
+text = "Rimed with frost that never melts. Marisa du'Paige hid from the Brotherhood; then she joined it."
+
+[[item]]
+key = "noble_doublet"
+name = "Brainwashed Noble's Doublet"
+display = 12645
+icon = "INV_Chest_Cloth_24"
+kind = "armor"
+slot = "chest"
+reduce = 0.1
+text = "Fine cloth gone to rags. The voice that spoke through him is quiet now."
+
+# --- Cookie, gorged: what his secret ingredient does to him ----------------------------------------
+
+[[mob]]
+key = "dm_cookie_gorged"
+name = "Cookie"
+subname = "Gorged on the Stew"
+display = 1773
+scale = 0.85
+health = 820
+run_speed = 6.0
+walk_speed = 2.0
+aggro = 30.0
+leash = 40.0
+boss = true
+posture = 260
+drops = { plunder = [30, 40] }
+gear = ["gorged_apron"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.85
+  damage = 28
+  range = 3.4
+  arc = 140.0
+  recovery = 1.0
+  cooldown = 1.4
+  turn_rate = 170.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  # Two slaps, then the belly.
+  [[mob.pattern]]
+  name = "slaps"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.7, damage = 24, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.55, damage = 24, recovery = 0.2 }, { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 30, heavy = true, recovery = 1.3, kit = 356, look = 10987 } ]
+  # From far off: the belly-flop, and a splash where he lands.
+  [[mob.pattern]]
+  name = "belly-flop"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 16.0
+  steps = [ { clip = 54, windup = 1.2, lunge = 9.0, range = 4.5, arc = 360.0, damage = 38, heavy = true, blockable = false, recovery = 1.6, kit = 379, look = 10987 } ]
+  # Stew spewed in a line of splashes.
+  [[mob.pattern]]
+  name = "spew"
+  weight = 2.0
+  min_range = 6.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.3 }, { ranged = true, windup = 0.8, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.3 }, { ranged = true, windup = 0.8, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.3 }, { ranged = true, windup = 0.8, damage = 22, range = 26.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.5 } ]
+  # At half: his brood climb out of the pot.
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  might = 1.1
+  pattern = "spew"
+  text = "\"Mrrgl! Babies! Come to Cookie!\" Murlocs climb out of the stew."
+  summon = ["murloc_streamrunner", "murloc_streamrunner"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.75
+  might = 1.2
+  pattern = "belly-flop"
+  text = "\"MMMRRRGGGLLL!\""
+  shove = 6.0
+  look = 10987
+
+# --- Edwin VanCleef, unbowed: those who read his letter find he meant it ----------------------------
+
+[[mob]]
+key = "dm_vancleef_unbowed"
+name = "Edwin VanCleef"
+subname = "Unbowed"
+display = 2029
+scale = 1.3
+health = 1100
+run_speed = 8.0
+walk_speed = 2.4
+aggro = 30.0
+leash = 40.0
+weapon = 1928
+off_hand = 2806
+grip = "1h"
+evade = 0.3
+boss = true
+posture = 320
+drops = { plunder = [60, 80] }
+gear = ["vancleef_mask"]
+respawn = 0.0
+aggro_sound = 5780
+slay_sound = 5781
+  [mob.attack]
+  windup = 0.4
+  damage = 26
+  range = 3.0
+  arc = 110.0
+  recovery = 0.55
+  cooldown = 0.8
+  turn_rate = 300.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "string"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 22, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.3, damage = 22, recovery = 0.1 }, { clip = 17, take = 0, windup = 0.3, damage = 22, recovery = 0.1 }, { clip = 57, windup = 0.6, damage = 32, heavy = true, recovery = 0.9 } ]
+  # Out of the shadows at you, and a burst of shadow where he lands.
+  [[mob.pattern]]
+  name = "shadowstep"
+  weight = 2.5
+  min_range = 4.0
+  max_range = 14.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 9.0, range = 3.5, arc = 360.0, damage = 30, heavy = true, recovery = 0.9, kit = 218, look = 24050 } ]
+  [[mob.pattern]]
+  name = "riposte stance"
+  weight = 1.5
+  steps = [ { clip = 57, windup = 1.3, damage = 44, arc = 140.0, heavy = true, recovery = 1.0, kit = 379 } ]
+  [[mob.pattern]]
+  name = "blade storm"
+  weight = 1.5
+  max_range = 4.0
+  steps = [ { clip = 126, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { clip = 126, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, heavy = false, recovery = 0.1 }, { clip = 126, windup = 0.4, range = 4.5, arc = 360.0, damage = 28, recovery = 1.4, look = 24050 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.8
+  pattern = "blade storm"
+  text = "\"To me, Brotherhood! One last time!\""
+  summon = ["dm_blackguard", "dm_blackguard"]
+  kit = 218
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.7
+  might = 1.2
+  pattern = "shadowstep"
+  text = "\"I... will... not... BOW!\""
+  shove = 5.5
+  look = 24050
+
+# --- the rares ---------------------------------------------------------------------------------------
+
+# Miner Johnson: he found the silver and sealed himself in with it.
+[[mob]]
+key = "dm_miner_johnson"
+name = "Miner Johnson"
+subname = "Silver-Mad"
+display = 2363
+scale = 1.15
+health = 720
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 30.0
+weapon = 1378
+grip = "1h"
+boss = true
+posture = 200
+drops = { plunder = [24, 30] }
+gear = ["johnson_helm", "miner_pick"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 22
+  range = 2.8
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.1
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "picks"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 20, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.45, damage = 20, recovery = 0.15 }, { clip = 57, windup = 0.9, damage = 32, heavy = true, recovery = 1.1, kit = 379 } ]
+  # A stick of blasting powder at his feet: he steps back from it, you don't.
+  [[mob.pattern]]
+  name = "blasting powder"
+  weight = 1.5
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.2, range = 5.0, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 3204 } ]
+  [[mob.pattern]]
+  name = "thrown charge"
+  weight = 1.5
+  min_range = 6.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.0, damage = 24, range = 22.0, radius = 3.5, speed = 15.0, spell = 7978, look = 3204, blockable = false, recovery = 1.2 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "blasting powder"
+  text = "\"MINE! The silver's MINE!\""
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.75
+  might = 1.2
+  pattern = "thrown charge"
+  text = "\"If I can't have it, nobody can!\""
+  shove = 5.0
+  look = 3204
+
+# Marisa du'Paige: a mage who hid from the Brotherhood, and then joined it. Frost and a dagger.
+[[mob]]
+key = "dm_marisa"
+name = "Marisa du'Paige"
+subname = "Brotherhood Spellblade"
+display = 2317
+health = 640
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 18.0
+leash = 30.0
+weapon = 2699
+grip = "dagger"
+evade = 0.35
+boss = true
+posture = 180
+keep_away = 6.0
+drops = { plunder = [22, 28] }
+gear = ["marisa_mantle", "defias_shoulders"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 16
+  range = 2.5
+  arc = 90.0
+  recovery = 0.6
+  cooldown = 0.9
+  turn_rate = 280.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "frostbolt"
+  weight = 3.0
+  min_range = 4.0
+  max_range = 28.0
+  steps = [ { ranged = true, windup = 1.2, damage = 24, range = 28.0, radius = 1.5, speed = 22.0, spell = 116, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "cuts"
+  weight = 2.0
+  steps = [ { clip = 85, take = 0, windup = 0.38, damage = 14, recovery = 0.1 }, { clip = 88, take = 0, windup = 0.32, damage = 14, recovery = 0.1 }, { clip = 85, take = 0, windup = 0.45, damage = 18, recovery = 0.8 } ]
+  # Crowded: a ring of frost at her feet, and she steps away.
+  [[mob.pattern]]
+  name = "frost ring"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 5.0, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 0.8, kit = 356, look = 27808 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "frost ring"
+  text = "\"You won't take me back to Stormwind!\""
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.7
+  might = 1.15
+  pattern = "frostbolt"
+  text = "\"Cold... so cold...\""
+  shove = 5.0
+  look = 27808
+
+# The Brainwashed Noble: what speaks through him isn't him.
+[[mob]]
+key = "dm_noble"
+name = "Brainwashed Noble"
+subname = "Not Himself"
+display = 2364
+health = 600
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 160
+keep_away = 7.0
+drops = { plunder = [20, 26] }
+gear = ["noble_doublet"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 0.9 } ]
+  # The voice through him: a burst of shadow where you stand, marked a moment ahead.
+  [[mob.pattern]]
+  name = "the voice"
+  weight = 2.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.4, damage = 30, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "staff"
+  weight = 1.5
+  max_range = 3.0
+  steps = [ { ranged = false, clip = 17, windup = 0.6, damage = 16, range = 2.8, arc = 100.0, recovery = 0.8 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "the voice"
+  text = "The noble's mouth moves, but the voice is deeper: \"You will serve, as he serves.\""
+  summon = ["dm_blackguard"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.75
+  might = 1.2
+  pattern = "the voice"
+  text = "\"Please... make it stop...\""
+  shove = 5.0
+  look = 27812
+
+# --- the Brotherhood's other hands -------------------------------------------------------------------
+
+# Defias Wizards: a fireball from afar, and a ring of frost if you close in.
+[[mob]]
+key = "dm_wizard"
+name = "Defias Wizard"
+subname = "Defias Brotherhood"
+display = 2329
+health = 85
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 5415
+grip = "staff"
+keep_away = 8.0
+drops = { plunder = [3, 5] }
+gear = ["defias_jerkin"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.3
+  damage = 18
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 133
+  recovery = 1.0
+  cooldown = 1.6
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "fireball"
+  weight = 3.0
+  min_range = 4.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.3, damage = 18, range = 26.0, radius = 1.5, speed = 20.0, spell = 133, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "frost ring"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+
+# Defias Evokers: shadow from the Juggernaut's deck.
+[[mob]]
+key = "dm_evoker"
+name = "Defias Evoker"
+subname = "Defias Brotherhood"
+display = 2353
+health = 90
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 8.0
+drops = { plunder = [3, 5] }
+gear = ["red_bandana"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 17
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 17, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 1.0 } ]
+  # A burst of shadow where you stand: roll out of the mark.
+  [[mob.pattern]]
+  name = "void burst"
+  weight = 1.5
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.5, damage = 22, range = 22.0, radius = 3.5, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.3 } ]
+
+# A goblin craftsman: bombs from up high, and a wrench if you reach him.
+[[mob]]
+key = "dm_craftsman"
+name = "Goblin Craftsman"
+subname = "Venture Co."
+display = 7049
+health = 100
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 1610
+grip = "1h"
+keep_away = 7.0
+drops = { plunder = [3, 5] }
+gear = ["goblin_wrench"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 12
+  range = 2.6
+  arc = 100.0
+  recovery = 0.7
+  cooldown = 1.0
+  turn_rate = 240.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "bomb"
+  weight = 3.0
+  min_range = 5.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.1, damage = 18, range = 22.0, radius = 3.5, speed = 14.0, spell = 4062, look = 3204, blockable = false, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "wrench"
+  weight = 2.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.8 } ]
+
+# A taskmaster: a whip with a long reach, and miners who work harder when he's hurt.
+[[mob]]
+key = "dm_taskmaster"
+name = "Defias Taskmaster"
+subname = "Defias Brotherhood"
+display = 2316
+health = 240
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 30.0
+weapon = 1161
+grip = "1h"
+posture = 120
+drops = { plunder = [6, 9] }
+gear = ["defias_jerkin", "defias_leggings"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 16
+  range = 4.2
+  arc = 60.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "lash"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.6, range = 4.5, arc = 50.0, damage = 15, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.5, range = 4.5, arc = 50.0, damage = 15, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "crack"
+  weight = 1.5
+  steps = [ { clip = 57, windup = 1.0, range = 5.0, arc = 70.0, damage = 24, heavy = true, recovery = 1.1, kit = 379 } ]
+  # Hurt: he whips up two more strip miners from the dark.
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "crack"
+  text = "\"Back to work, you dogs! Kill them!\""
+  summon = ["dm_strip_miner", "dm_strip_miner"]
+
+# Strip miners: worn out, in threes, a pick each.
+[[mob]]
+key = "dm_strip_miner"
+name = "Defias Strip Miner"
+subname = "Defias Brotherhood"
+display = 2312
+health = 70
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 14.0
+leash = 30.0
+weapon = 1378
+grip = "1h"
+drops = { plunder = [1, 3] }
+gear = ["miner_pick"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.65
+  damage = 11
+  range = 2.6
+  arc = 100.0
+  recovery = 0.85
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "pick"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.65, damage = 11, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "two picks"
+  weight = 1.5
+  steps = [ { clip = 17, take = 0, windup = 0.6, damage = 10, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.5, damage = 10, recovery = 0.9 } ]

@@ -1,0 +1,1477 @@
+# Basin Battle cards: what players pick between waves and from relic caches.
+#
+# Each card shows on the buff bar with the icon of `spell` (or `aura`, a spell with the same icon that
+# doesn't paint an effect on your character); its rank is the stack count. Picking a
+# card you already hold ranks it up (max 5). Abilities, modifiers and triggers gain half their
+# rank-1 strength per rank; stats gain their full amount per rank.
+#
+# Damage numbers are multiples of your "hit": your weapon's damage per second times 2, so they
+# grow with level and gear and don't depend on attack speed.
+#
+# rarity: common, uncommon, rare, epic, legendary. classes: which class the spell comes from; anyone
+# can draw any card, so cross-class builds are the point. Offers lean towards cards that share
+# tags with what you already hold.
+# school: 0 physical, 1 holy, 2 fire, 3 nature, 4 frost, 5 shadow, 6 arcane.
+
+# --- abilities: fire on their own -----------------------------------------------------------------
+
+[[card]]
+key = "fireball"
+name = "Fireball"
+rarity = "common"
+classes = ["mage"]
+tags = ["fire", "ranged"]
+spell = 133
+kind = "bolt"
+cooldown = 4.0
+damage = 1.1
+range = 30.0
+school = 2
+
+[[card]]
+key = "frostbolt"
+name = "Frostbolt"
+rarity = "common"
+classes = ["mage"]
+tags = ["frost", "ranged"]
+spell = 116
+aura = 1142
+kind = "bolt"
+cooldown = 4.5
+damage = 0.9
+range = 30.0
+school = 4
+slow = 0.4
+slow_secs = 4.0
+
+[[card]]
+key = "arcane_missiles"
+name = "Arcane Missiles"
+rarity = "uncommon"
+classes = ["mage"]
+tags = ["arcane", "ranged"]
+spell = 5143
+visual = 7268
+kind = "bolt"
+cooldown = 5.0
+damage = 0.5
+projectiles = 3
+range = 30.0
+school = 6
+
+[[card]]
+key = "chain_lightning"
+name = "Chain Lightning"
+rarity = "rare"
+classes = ["hunter", "mage"]
+tags = ["nature", "chain"]
+spell = 421
+kind = "bolt"
+cooldown = 8.0
+damage = 1.6
+range = 30.0
+school = 3
+chain = 3
+falloff = 0.8
+
+[[card]]
+key = "thunder_clap"
+name = "Thunder Clap"
+rarity = "common"
+classes = ["warrior"]
+tags = ["physical", "aoe"]
+spell = 6343
+aura = 1343
+kind = "nova"
+cooldown = 6.0
+damage = 0.7
+radius = 8.0
+school = 0
+slow = 0.2
+slow_secs = 5.0
+
+[[card]]
+key = "whirlwind"
+name = "Whirlwind"
+rarity = "uncommon"
+classes = ["warrior"]
+tags = ["physical", "aoe", "melee"]
+spell = 1680
+kind = "nova"
+cooldown = 8.0
+damage = 1.3
+radius = 8.0
+school = 0
+
+[[card]]
+key = "consecration"
+name = "Consecration"
+rarity = "uncommon"
+classes = ["priest", "warrior"]
+tags = ["holy", "aoe"]
+spell = 26573
+kind = "zone"
+at = "self"
+cooldown = 10.0
+damage = 0.3
+radius = 8.0
+duration = 8.0
+school = 1
+
+[[card]]
+key = "blizzard"
+name = "Blizzard"
+rarity = "rare"
+classes = ["mage"]
+tags = ["frost", "aoe"]
+spell = 10
+kind = "zone"
+at = "pack"
+cooldown = 12.0
+damage = 0.35
+radius = 8.0
+duration = 8.0
+range = 30.0
+school = 4
+slow = 0.3
+slow_secs = 2.0
+
+[[card]]
+key = "rain_of_fire"
+name = "Rain of Fire"
+rarity = "rare"
+classes = ["mage", "priest"]
+tags = ["fire", "aoe", "dot"]
+spell = 5740
+aura = 5741
+kind = "zone"
+at = "pack"
+cooldown = 12.0
+damage = 0.5
+radius = 8.0
+duration = 6.0
+range = 30.0
+school = 2
+
+[[card]]
+key = "holy_nova"
+name = "Holy Nova"
+rarity = "rare"
+classes = ["priest"]
+tags = ["holy", "aoe", "heal"]
+spell = 15237
+kind = "nova"
+cooldown = 10.0
+damage = 0.9
+radius = 10.0
+school = 1
+heal = 0.08
+
+[[card]]
+key = "multi_shot"
+name = "Multi-Shot"
+rarity = "uncommon"
+classes = ["hunter"]
+tags = ["physical", "ranged"]
+spell = 2643
+visual = 75
+kind = "bolt"
+cooldown = 5.0
+damage = 0.8
+targets = 3
+range = 32.0
+school = 0
+
+[[card]]
+key = "frost_nova"
+name = "Frost Nova"
+rarity = "rare"
+classes = ["mage"]
+tags = ["frost", "defense"]
+spell = 122
+aura = 1194
+kind = "nova"
+cooldown = 15.0
+damage = 0.3
+radius = 10.0
+school = 4
+root_secs = 4.0
+
+# --- modifiers: change your attacks and abilities --------------------------------------------------
+
+[[card]]
+key = "shadow_word_pain"
+name = "Shadow Word: Pain"
+rarity = "uncommon"
+classes = ["priest"]
+tags = ["shadow", "dot"]
+spell = 589
+kind = "modifier"
+modifier = "dot"
+amount = 0.3
+secs = 6.0
+school = 5
+
+[[card]]
+key = "kindling"
+name = "Kindling"
+rarity = "uncommon"
+classes = ["mage"]
+tags = ["fire", "dot"]
+spell = 348
+aura = 134
+kind = "modifier"
+modifier = "burn"
+amount = 0.25
+secs = 4.0
+school = 2
+
+[[card]]
+key = "sweeping_strikes"
+name = "Sweeping Strikes"
+rarity = "common"
+classes = ["warrior"]
+tags = ["physical", "melee"]
+spell = 845
+kind = "modifier"
+modifier = "cleave"
+amount = 0.5
+
+[[card]]
+key = "wide_reach"
+name = "Wide Reach"
+rarity = "uncommon"
+tags = ["aoe"]
+spell = 1449
+kind = "modifier"
+modifier = "radius"
+amount = 0.25
+
+[[card]]
+key = "quickened"
+name = "Quickened"
+rarity = "uncommon"
+tags = []
+spell = 13750
+aura = 1293
+kind = "modifier"
+modifier = "cdr"
+amount = 0.15
+
+[[card]]
+key = "echo"
+name = "Echo"
+rarity = "epic"
+classes = ["mage", "priest"]
+tags = ["arcane"]
+spell = 10060
+aura = 12295
+kind = "modifier"
+modifier = "echo"
+amount = 0.2
+
+[[card]]
+key = "splitting"
+name = "Splitting"
+rarity = "epic"
+classes = ["hunter"]
+tags = ["ranged", "chain"]
+spell = 2643
+kind = "modifier"
+modifier = "split"
+amount = 0.5
+
+# --- stats ------------------------------------------------------------------------------------------
+
+[[card]]
+key = "might"
+name = "Might"
+rarity = "common"
+tags = []
+spell = 19740
+kind = "stat"
+stat = "damage"
+amount = 0.10
+
+[[card]]
+key = "fury"
+name = "Fury"
+rarity = "common"
+tags = []
+spell = 13877
+kind = "stat"
+stat = "haste"
+amount = 0.08
+
+[[card]]
+key = "precision"
+name = "Precision"
+rarity = "common"
+classes = ["hunter", "warrior"]
+tags = []
+spell = 19434
+aura = 20931
+kind = "stat"
+stat = "crit"
+amount = 0.05
+
+[[card]]
+key = "fortitude"
+name = "Fortitude"
+rarity = "common"
+classes = ["priest", "warrior"]
+tags = ["defense"]
+spell = 1243
+kind = "stat"
+stat = "health"
+amount = 0.12
+
+[[card]]
+key = "renewal"
+name = "Renewal"
+rarity = "common"
+classes = ["priest"]
+tags = ["heal"]
+spell = 139
+aura = 4987
+kind = "stat"
+stat = "regen"
+amount = 0.01
+
+[[card]]
+key = "swiftness"
+name = "Swiftness"
+rarity = "uncommon"
+classes = ["hunter"]
+tags = ["speed"]
+spell = 2983
+aura = 2984
+kind = "stat"
+stat = "speed"
+amount = 0.10
+
+# --- triggers -----------------------------------------------------------------------------------------
+
+[[card]]
+key = "lightning_shield"
+name = "Lightning Shield"
+rarity = "uncommon"
+classes = ["warrior", "hunter"]
+tags = ["nature", "defense"]
+spell = 324
+aura = 1138
+visual = 26364
+kind = "trigger"
+trigger = "lightning_shield"
+amount = 0.6
+school = 3
+
+[[card]]
+key = "bloodthirst"
+name = "Bloodthirst"
+rarity = "uncommon"
+classes = ["warrior"]
+tags = ["physical", "heal"]
+spell = 23881
+kind = "trigger"
+trigger = "bloodthirst"
+amount = 0.05
+
+[[card]]
+key = "divine_shield"
+name = "Divine Shield"
+rarity = "rare"
+classes = ["priest", "warrior"]
+tags = ["holy", "defense"]
+spell = 642
+aura = 1050
+kind = "trigger"
+trigger = "divine_shield"
+amount = 3.0
+cooldown = 60.0
+
+[[card]]
+key = "raise_dead"
+name = "Raise Dead"
+rarity = "epic"
+classes = ["priest"]
+tags = ["shadow", "summon"]
+spell = 17473
+kind = "trigger"
+trigger = "raise_dead"
+amount = 0.15
+secs = 20.0
+
+# --- team auras ----------------------------------------------------------------------------------------
+
+[[card]]
+key = "devotion_aura"
+name = "Devotion Aura"
+rarity = "rare"
+classes = ["priest", "warrior"]
+tags = ["holy", "defense"]
+spell = 465
+kind = "team"
+team = "damage_taken"
+amount = 0.10
+radius = 30.0
+
+[[card]]
+key = "battle_shout"
+name = "Battle Shout"
+rarity = "rare"
+classes = ["warrior", "hunter"]
+tags = ["physical"]
+spell = 6673
+kind = "team"
+team = "damage"
+amount = 0.12
+radius = 30.0
+
+# --- legendaries: from Escalations ------------------------------------------------------------------
+
+[[card]]
+key = "soul_harvest"
+name = "Soul Harvest"
+rarity = "legendary"
+tags = ["shadow"]
+spell = 17877
+kind = "trigger"
+trigger = "soul_harvest"
+amount = 0.001
+
+[[card]]
+key = "mark_of_the_ancient"
+name = "Mark of the Ancient"
+rarity = "legendary"
+tags = []
+spell = 9885
+kind = "stat"
+stat = "per_wave"
+amount = 0.015
+
+[[card]]
+key = "twin_spirits"
+name = "Twin Spirits"
+rarity = "legendary"
+tags = ["arcane"]
+spell = 12042
+aura = 403
+kind = "modifier"
+modifier = "echo"
+amount = 0.25
+
+[[card]]
+key = "undying"
+name = "Undying Will"
+rarity = "legendary"
+tags = ["defense"]
+spell = 20711
+kind = "trigger"
+trigger = "undying"
+amount = 1.0
+
+[[card]]
+key = "avatar"
+name = "Avatar"
+rarity = "legendary"
+tags = []
+spell = 12292
+kind = "stat"
+stat = "avatar"
+amount = 0.15
+# You stand 15% taller.
+grow = 0.15
+
+# --- more abilities ------------------------------------------------------------------------------
+
+[[card]]
+key = "arcane_explosion"
+name = "Arcane Explosion"
+rarity = "common"
+classes = ["mage"]
+tags = ["arcane", "aoe"]
+spell = 1449
+kind = "nova"
+cooldown = 5.0
+damage = 0.6
+radius = 10.0
+school = 6
+
+[[card]]
+key = "smite"
+name = "Smite"
+rarity = "common"
+classes = ["priest"]
+tags = ["holy", "ranged"]
+spell = 585
+kind = "bolt"
+cooldown = 3.5
+damage = 0.9
+range = 30.0
+school = 1
+
+[[card]]
+key = "mind_blast"
+name = "Mind Blast"
+rarity = "uncommon"
+classes = ["priest"]
+tags = ["shadow", "ranged"]
+spell = 8092
+kind = "bolt"
+cooldown = 6.0
+damage = 1.8
+range = 30.0
+school = 5
+
+[[card]]
+key = "arcane_shot"
+name = "Arcane Shot"
+rarity = "common"
+classes = ["hunter"]
+tags = ["arcane", "ranged"]
+spell = 3044
+kind = "bolt"
+cooldown = 4.0
+damage = 1.0
+range = 32.0
+school = 6
+
+[[card]]
+key = "volley"
+name = "Volley"
+rarity = "rare"
+classes = ["hunter"]
+tags = ["physical", "aoe"]
+spell = 1510
+kind = "zone"
+at = "pack"
+cooldown = 12.0
+damage = 0.45
+radius = 8.0
+duration = 6.0
+range = 32.0
+school = 6
+
+[[card]]
+key = "cleave"
+name = "Cleave"
+rarity = "common"
+classes = ["warrior"]
+tags = ["physical", "melee"]
+spell = 845
+kind = "nova"
+cooldown = 4.0
+damage = 0.8
+radius = 6.0
+school = 0
+
+# --- from every class: build across classes -------------------------------------------------------
+
+[[card]]
+key = "shadow_bolt"
+name = "Shadow Bolt"
+rarity = "common"
+classes = ["warlock"]
+tags = ["shadow", "ranged"]
+spell = 686
+kind = "bolt"
+cooldown = 4.0
+damage = 1.1
+range = 30.0
+school = 5
+
+[[card]]
+key = "corruption"
+name = "Corruption"
+rarity = "common"
+classes = ["warlock"]
+tags = ["shadow", "dot"]
+spell = 172
+aura = 6221
+kind = "bolt"
+cooldown = 5.0
+damage = 0.0
+dot = 1.4
+dot_secs = 12.0
+range = 30.0
+school = 5
+
+[[card]]
+key = "immolate"
+name = "Immolate"
+rarity = "uncommon"
+classes = ["warlock"]
+tags = ["fire", "dot"]
+spell = 348
+aura = 134
+kind = "bolt"
+cooldown = 6.0
+damage = 0.6
+dot = 0.9
+dot_secs = 12.0
+range = 30.0
+school = 2
+
+[[card]]
+key = "searing_pain"
+name = "Searing Pain"
+rarity = "common"
+classes = ["warlock"]
+tags = ["fire", "ranged"]
+spell = 5676
+kind = "bolt"
+cooldown = 2.5
+damage = 0.55
+range = 30.0
+school = 2
+
+[[card]]
+key = "drain_life"
+name = "Drain Life"
+rarity = "uncommon"
+classes = ["warlock"]
+tags = ["shadow", "heal"]
+spell = 689
+aura = 1367
+kind = "bolt"
+cooldown = 6.0
+damage = 0.9
+leech = 0.6
+range = 30.0
+school = 5
+
+[[card]]
+key = "death_coil"
+name = "Death Coil"
+rarity = "rare"
+classes = ["warlock"]
+tags = ["shadow", "defense"]
+spell = 6789
+kind = "bolt"
+cooldown = 15.0
+damage = 1.6
+leech = 1.0
+root_secs = 2.0
+range = 30.0
+school = 5
+
+[[card]]
+key = "conflagrate"
+name = "Conflagrate"
+rarity = "rare"
+classes = ["warlock"]
+tags = ["fire"]
+spell = 17962
+kind = "bolt"
+cooldown = 10.0
+damage = 2.2
+range = 30.0
+school = 2
+
+[[card]]
+key = "curse_of_agony"
+name = "Curse of Agony"
+rarity = "common"
+classes = ["warlock"]
+tags = ["shadow", "dot"]
+spell = 980
+kind = "bolt"
+cooldown = 6.0
+damage = 0.0
+dot = 1.6
+dot_secs = 18.0
+targets = 2
+range = 30.0
+school = 5
+
+[[card]]
+key = "hellfire"
+name = "Hellfire"
+rarity = "rare"
+classes = ["warlock"]
+tags = ["fire", "aoe"]
+spell = 1949
+kind = "zone"
+at = "self"
+cooldown = 14.0
+damage = 0.45
+radius = 10.0
+duration = 8.0
+school = 2
+
+[[card]]
+key = "lightning_bolt"
+name = "Lightning Bolt"
+rarity = "common"
+classes = ["shaman"]
+tags = ["nature", "ranged"]
+spell = 403
+kind = "bolt"
+cooldown = 4.0
+damage = 1.2
+range = 30.0
+school = 3
+
+[[card]]
+key = "earth_shock"
+name = "Earth Shock"
+rarity = "common"
+classes = ["shaman"]
+tags = ["nature"]
+spell = 8042
+kind = "bolt"
+cooldown = 5.0
+damage = 0.9
+range = 20.0
+school = 3
+
+[[card]]
+key = "flame_shock"
+name = "Flame Shock"
+rarity = "uncommon"
+classes = ["shaman"]
+tags = ["fire", "dot"]
+spell = 8050
+kind = "bolt"
+cooldown = 6.0
+damage = 0.5
+dot = 0.9
+dot_secs = 12.0
+range = 20.0
+school = 2
+
+[[card]]
+key = "frost_shock"
+name = "Frost Shock"
+rarity = "uncommon"
+classes = ["shaman"]
+tags = ["frost"]
+spell = 8056
+kind = "bolt"
+cooldown = 7.0
+damage = 0.8
+slow = 0.5
+slow_secs = 8.0
+range = 20.0
+school = 4
+
+[[card]]
+key = "fire_nova"
+name = "Fire Nova Totem"
+rarity = "uncommon"
+classes = ["shaman"]
+tags = ["fire", "aoe"]
+spell = 1535
+kind = "nova"
+cooldown = 8.0
+damage = 0.9
+radius = 10.0
+school = 2
+
+[[card]]
+key = "magma_totem"
+name = "Magma Totem"
+rarity = "rare"
+classes = ["shaman"]
+tags = ["fire", "aoe"]
+spell = 8190
+kind = "zone"
+at = "self"
+cooldown = 14.0
+damage = 0.3
+radius = 8.0
+duration = 12.0
+school = 2
+
+[[card]]
+key = "healing_wave"
+name = "Healing Wave"
+rarity = "common"
+classes = ["shaman"]
+tags = ["nature", "heal"]
+spell = 331
+kind = "heal"
+cooldown = 6.0
+heal = 0.12
+range = 40.0
+school = 3
+
+[[card]]
+key = "chain_heal"
+name = "Chain Heal"
+rarity = "rare"
+classes = ["shaman"]
+tags = ["nature", "heal", "chain"]
+spell = 1064
+kind = "heal"
+cooldown = 8.0
+heal = 0.1
+targets = 3
+range = 40.0
+school = 3
+
+[[card]]
+key = "moonfire"
+name = "Moonfire"
+rarity = "common"
+classes = ["druid"]
+tags = ["arcane", "dot"]
+spell = 8921
+kind = "bolt"
+cooldown = 4.0
+damage = 0.5
+dot = 0.6
+dot_secs = 9.0
+range = 30.0
+school = 6
+
+[[card]]
+key = "wrath"
+name = "Wrath"
+rarity = "common"
+classes = ["druid"]
+tags = ["nature", "ranged"]
+spell = 5176
+kind = "bolt"
+cooldown = 3.0
+damage = 0.9
+range = 30.0
+school = 3
+
+[[card]]
+key = "starfire"
+name = "Starfire"
+rarity = "uncommon"
+classes = ["druid"]
+tags = ["arcane", "ranged"]
+spell = 2912
+kind = "bolt"
+cooldown = 9.0
+damage = 2.2
+range = 30.0
+school = 6
+
+[[card]]
+key = "insect_swarm"
+name = "Insect Swarm"
+rarity = "uncommon"
+classes = ["druid"]
+tags = ["nature", "dot"]
+spell = 5570
+aura = 24978
+kind = "bolt"
+cooldown = 6.0
+damage = 0.0
+dot = 1.2
+dot_secs = 12.0
+range = 30.0
+school = 3
+
+[[card]]
+key = "entangling_roots"
+name = "Entangling Roots"
+rarity = "uncommon"
+classes = ["druid"]
+tags = ["nature", "defense"]
+spell = 339
+aura = 1435
+kind = "bolt"
+cooldown = 12.0
+damage = 0.2
+dot = 0.4
+dot_secs = 12.0
+root_secs = 4.0
+targets = 3
+range = 30.0
+school = 3
+
+[[card]]
+key = "hurricane"
+name = "Hurricane"
+rarity = "rare"
+classes = ["druid"]
+tags = ["nature", "aoe"]
+spell = 16914
+kind = "zone"
+at = "pack"
+cooldown = 15.0
+damage = 0.4
+radius = 10.0
+duration = 10.0
+range = 30.0
+slow = 0.25
+slow_secs = 2.0
+school = 3
+
+[[card]]
+key = "swipe"
+name = "Swipe"
+rarity = "common"
+classes = ["druid"]
+tags = ["physical", "aoe", "melee"]
+spell = 779
+kind = "nova"
+cooldown = 4.0
+damage = 0.7
+radius = 6.0
+school = 0
+
+[[card]]
+key = "rejuvenation"
+name = "Rejuvenation"
+rarity = "common"
+classes = ["druid"]
+tags = ["nature", "heal"]
+spell = 774
+kind = "stat"
+stat = "regen"
+amount = 0.008
+
+[[card]]
+key = "thorns"
+name = "Thorns"
+rarity = "common"
+classes = ["druid"]
+tags = ["nature", "defense"]
+spell = 467
+kind = "trigger"
+trigger = "thorns"
+amount = 0.3
+school = 3
+
+[[card]]
+key = "holy_fire"
+name = "Holy Fire"
+rarity = "uncommon"
+classes = ["priest"]
+tags = ["holy", "dot"]
+spell = 14914
+kind = "bolt"
+cooldown = 7.0
+damage = 1.0
+dot = 0.5
+dot_secs = 10.0
+range = 30.0
+school = 1
+
+[[card]]
+key = "mind_flay"
+name = "Mind Flay"
+rarity = "uncommon"
+classes = ["priest"]
+tags = ["shadow"]
+spell = 15407
+aura = 5139
+kind = "bolt"
+cooldown = 5.0
+damage = 0.9
+slow = 0.5
+slow_secs = 3.0
+range = 20.0
+school = 5
+
+[[card]]
+key = "psychic_scream"
+name = "Psychic Scream"
+rarity = "uncommon"
+classes = ["priest"]
+tags = ["shadow", "defense"]
+spell = 8122
+aura = 8123
+kind = "nova"
+cooldown = 20.0
+damage = 0.2
+radius = 8.0
+root_secs = 3.0
+school = 5
+
+[[card]]
+key = "flash_heal"
+name = "Flash Heal"
+rarity = "common"
+classes = ["priest"]
+tags = ["holy", "heal"]
+spell = 2061
+kind = "heal"
+cooldown = 5.0
+heal = 0.1
+range = 40.0
+school = 1
+
+[[card]]
+key = "prayer_of_healing"
+name = "Prayer of Healing"
+rarity = "rare"
+classes = ["priest"]
+tags = ["holy", "heal"]
+spell = 596
+kind = "heal"
+cooldown = 12.0
+heal = 0.08
+targets = 4
+range = 30.0
+school = 1
+
+[[card]]
+key = "power_word_shield"
+name = "Power Word: Shield"
+rarity = "uncommon"
+classes = ["priest"]
+tags = ["holy", "defense"]
+spell = 17
+aura = 1277
+kind = "trigger"
+trigger = "shield"
+amount = 0.15
+cooldown = 10.0
+
+[[card]]
+key = "vampiric_embrace"
+name = "Vampiric Embrace"
+rarity = "rare"
+classes = ["priest"]
+tags = ["shadow", "heal"]
+spell = 15286
+kind = "stat"
+stat = "leech"
+amount = 0.06
+
+[[card]]
+key = "holy_shock"
+name = "Holy Shock"
+rarity = "rare"
+classes = ["paladin"]
+tags = ["holy"]
+spell = 20473
+kind = "bolt"
+cooldown = 8.0
+damage = 1.4
+range = 20.0
+school = 1
+
+[[card]]
+key = "exorcism"
+name = "Exorcism"
+rarity = "uncommon"
+classes = ["paladin"]
+tags = ["holy"]
+spell = 879
+kind = "bolt"
+cooldown = 10.0
+damage = 1.8
+range = 30.0
+school = 1
+
+[[card]]
+key = "hammer_of_wrath"
+name = "Hammer of Wrath"
+rarity = "rare"
+classes = ["paladin"]
+tags = ["holy"]
+spell = 24275
+kind = "bolt"
+cooldown = 8.0
+damage = 1.6
+execute = 1.5
+range = 30.0
+school = 1
+
+[[card]]
+key = "judgement"
+name = "Judgement"
+rarity = "common"
+classes = ["paladin"]
+tags = ["holy"]
+spell = 20271
+kind = "bolt"
+cooldown = 6.0
+damage = 1.0
+range = 10.0
+school = 1
+
+[[card]]
+key = "fire_blast"
+name = "Fire Blast"
+rarity = "common"
+classes = ["mage"]
+tags = ["fire"]
+spell = 2136
+kind = "bolt"
+cooldown = 5.0
+damage = 1.0
+range = 20.0
+school = 2
+
+[[card]]
+key = "scorch"
+name = "Scorch"
+rarity = "common"
+classes = ["mage"]
+tags = ["fire", "ranged"]
+spell = 2948
+kind = "bolt"
+cooldown = 2.5
+damage = 0.6
+range = 30.0
+school = 2
+
+[[card]]
+key = "pyroblast"
+name = "Pyroblast"
+rarity = "rare"
+classes = ["mage"]
+tags = ["fire", "dot"]
+spell = 11366
+kind = "bolt"
+cooldown = 15.0
+damage = 3.0
+dot = 0.8
+dot_secs = 12.0
+range = 35.0
+school = 2
+
+[[card]]
+key = "cone_of_cold"
+name = "Cone of Cold"
+rarity = "uncommon"
+classes = ["mage"]
+tags = ["frost", "aoe"]
+spell = 120
+aura = 1241
+kind = "nova"
+cooldown = 8.0
+damage = 0.7
+radius = 10.0
+slow = 0.5
+slow_secs = 6.0
+school = 4
+
+[[card]]
+key = "blast_wave"
+name = "Blast Wave"
+rarity = "rare"
+classes = ["mage"]
+tags = ["fire", "aoe"]
+spell = 11113
+aura = 879
+kind = "nova"
+cooldown = 12.0
+damage = 1.2
+radius = 10.0
+slow = 0.5
+slow_secs = 6.0
+school = 2
+
+[[card]]
+key = "flamestrike"
+name = "Flamestrike"
+rarity = "uncommon"
+classes = ["mage"]
+tags = ["fire", "aoe"]
+spell = 2120
+aura = 711
+kind = "zone"
+at = "pack"
+cooldown = 12.0
+damage = 0.35
+radius = 8.0
+duration = 8.0
+range = 30.0
+school = 2
+
+[[card]]
+key = "sinister_strike"
+name = "Sinister Strike"
+rarity = "common"
+classes = ["rogue"]
+tags = ["physical", "melee"]
+spell = 1752
+kind = "bolt"
+cooldown = 3.0
+damage = 1.0
+range = 7.0
+school = 0
+
+[[card]]
+key = "eviscerate"
+name = "Eviscerate"
+rarity = "uncommon"
+classes = ["rogue"]
+tags = ["physical", "melee"]
+spell = 2098
+kind = "bolt"
+cooldown = 10.0
+damage = 2.4
+range = 7.0
+school = 0
+
+[[card]]
+key = "rupture"
+name = "Rupture"
+rarity = "common"
+classes = ["rogue"]
+tags = ["physical", "dot"]
+spell = 1943
+kind = "bolt"
+cooldown = 8.0
+damage = 0.0
+dot = 1.8
+dot_secs = 16.0
+range = 7.0
+school = 0
+
+[[card]]
+key = "deadly_poison"
+name = "Deadly Poison"
+rarity = "common"
+classes = ["rogue"]
+tags = ["nature", "dot"]
+spell = 2823
+kind = "modifier"
+modifier = "dot"
+amount = 0.25
+secs = 12.0
+school = 3
+
+[[card]]
+key = "blade_flurry"
+name = "Blade Flurry"
+rarity = "rare"
+classes = ["rogue"]
+tags = ["physical", "melee"]
+spell = 13877
+kind = "modifier"
+modifier = "cleave"
+amount = 0.6
+
+[[card]]
+key = "cold_blood"
+name = "Cold Blood"
+rarity = "uncommon"
+classes = ["rogue"]
+tags = ["physical"]
+spell = 14177
+aura = 2890
+kind = "stat"
+stat = "crit"
+amount = 0.08
+
+[[card]]
+key = "mortal_strike"
+name = "Mortal Strike"
+rarity = "rare"
+classes = ["warrior"]
+tags = ["physical", "melee"]
+spell = 12294
+kind = "bolt"
+cooldown = 6.0
+damage = 1.8
+range = 7.0
+school = 0
+
+[[card]]
+key = "execute"
+name = "Execute"
+rarity = "uncommon"
+classes = ["warrior"]
+tags = ["physical", "melee"]
+spell = 5308
+kind = "bolt"
+cooldown = 4.0
+damage = 0.8
+execute = 3.0
+range = 7.0
+school = 0
+
+[[card]]
+key = "heroic_strike"
+name = "Heroic Strike"
+rarity = "common"
+classes = ["warrior"]
+tags = ["physical", "melee"]
+spell = 78
+kind = "bolt"
+cooldown = 3.0
+damage = 0.9
+range = 7.0
+school = 0
+
+[[card]]
+key = "rend"
+name = "Rend"
+rarity = "common"
+classes = ["warrior"]
+tags = ["physical", "dot"]
+spell = 772
+kind = "bolt"
+cooldown = 6.0
+damage = 0.0
+dot = 1.0
+dot_secs = 15.0
+range = 7.0
+school = 0
+
+[[card]]
+key = "sudden_death"
+name = "Sudden Death"
+rarity = "uncommon"
+classes = ["warrior"]
+tags = ["physical"]
+spell = 12292
+kind = "stat"
+stat = "execute"
+amount = 0.5
+
+[[card]]
+key = "serpent_sting"
+name = "Serpent Sting"
+rarity = "common"
+classes = ["hunter"]
+tags = ["nature", "dot"]
+spell = 1978
+kind = "bolt"
+cooldown = 5.0
+damage = 0.0
+dot = 1.0
+dot_secs = 15.0
+range = 32.0
+school = 3
+
+[[card]]
+key = "aimed_shot"
+name = "Aimed Shot"
+rarity = "rare"
+classes = ["hunter"]
+tags = ["physical", "ranged"]
+spell = 19434
+aura = 20931
+kind = "bolt"
+cooldown = 9.0
+damage = 2.6
+range = 35.0
+school = 0
+
+[[card]]
+key = "concussive_shot"
+name = "Concussive Shot"
+rarity = "common"
+classes = ["hunter"]
+tags = ["physical", "ranged"]
+spell = 5116
+aura = 4769
+kind = "bolt"
+cooldown = 6.0
+damage = 0.4
+slow = 0.5
+slow_secs = 4.0
+range = 32.0
+school = 0
+
+[[card]]
+key = "explosive_trap"
+name = "Explosive Trap"
+rarity = "uncommon"
+classes = ["hunter"]
+tags = ["fire", "aoe"]
+spell = 13813
+kind = "zone"
+at = "self"
+cooldown = 15.0
+damage = 0.4
+radius = 8.0
+duration = 8.0
+school = 2
+
+[[card]]
+key = "windfury_weapon"
+name = "Windfury Weapon"
+rarity = "uncommon"
+classes = ["shaman"]
+tags = ["nature", "melee"]
+spell = 8232
+kind = "modifier"
+modifier = "windfury"
+amount = 0.2
+
+[[card]]
+key = "windfury_totem"
+name = "Windfury Totem"
+rarity = "rare"
+classes = ["shaman"]
+tags = ["nature"]
+spell = 8512
+kind = "team"
+team = "haste"
+amount = 0.1
+radius = 30.0
+
+[[card]]
+key = "healing_stream"
+name = "Healing Stream Totem"
+rarity = "uncommon"
+classes = ["shaman"]
+tags = ["nature", "heal"]
+spell = 5394
+kind = "team"
+team = "regen"
+amount = 0.008
+radius = 30.0
+
+[[card]]
+key = "trueshot_aura"
+name = "Trueshot Aura"
+rarity = "rare"
+classes = ["hunter"]
+tags = ["physical"]
+spell = 19506
+kind = "team"
+team = "damage"
+amount = 0.1
+radius = 30.0
+
+[[card]]
+key = "presence_of_mind"
+name = "Presence of Mind"
+rarity = "epic"
+classes = ["mage"]
+tags = ["arcane"]
+spell = 12043
+aura = 12295
+kind = "modifier"
+modifier = "cdr"
+amount = 0.25
+
+[[card]]
+key = "combustion"
+name = "Combustion"
+rarity = "epic"
+classes = ["mage"]
+tags = ["fire"]
+spell = 11129
+kind = "stat"
+stat = "crit"
+amount = 0.12
+
+[[card]]
+key = "elemental_mastery"
+name = "Elemental Mastery"
+rarity = "epic"
+classes = ["shaman"]
+tags = ["nature"]
+spell = 16166
+kind = "modifier"
+modifier = "echo"
+amount = 0.25
+
+[[card]]
+key = "shadowform"
+name = "Shadowform"
+rarity = "epic"
+classes = ["priest"]
+tags = ["shadow"]
+spell = 15473
+aura = 15286
+kind = "stat"
+stat = "damage"
+amount = 0.25

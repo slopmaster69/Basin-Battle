@@ -1,0 +1,500 @@
+From b10240f196949efc50fb0a80eff156eabbaeb9bd Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Thu, 29 Oct 2026 14:00:33 -0600
+Subject: [PATCH] Stances that never stick, flinches that keep a blow, impacts
+ that land, the bow's aim line
+
+The hit-stop holds every clip at speed 0 and gives each its speed back, instead of pausing: a
+paused main clip that the driver re-armed away from mid-stop is never faded by Bevy's transitions
+and played on at full weight once resumed, leaving a swing, block or reel stuck over the gait. A
+hit-stop asked again while one runs extends it. Clips replaced (twice in a frame, or the lock-on
+shuffle's other foot) release their nodes. A flinch on a body winding up its own blow keeps that
+clip and carries the hit in the lean. The action layer's swing results (HitInfo 0x10000) land at
+once while an add-on drives it. The camera's unit collision skips dead bodies and passes through
+one right behind the head. Aiming while locked on centres the view on the locked unit.
+GetActionAim() gives the add-on the view centre's facing and elevation, for a shot along the
+reticle's line.
+---
+ .../benilla-app/src/creature_anim/action.rs   | 175 ++++++++++++------
+ crates/benilla-app/src/creature_anim/net.rs   |  18 +-
+ crates/benilla-app/src/player/camera.rs       |  40 +++-
+ crates/benilla-ui/src/action_combat.rs        |  23 +++
+ 4 files changed, 193 insertions(+), 63 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 02975138..bb300285 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -63,6 +63,9 @@ const AIM_PITCH_MAX: f32 = 0.7;
+ const BODY_RADIUS: f32 = 0.55;
+ const BODY_HEIGHT: f32 = 2.1;
+ const BODY_CLEARANCE: f32 = 0.3;
++/// A body that would bring the camera closer than this to the head is passed through instead (one
++/// right behind us would put the view inside our own head, staring at whoever is in front).
++const BODY_NEAREST: f32 = 1.4;
+ /// Units within this of the hero can block the camera.
+ const OCCLUDER_RANGE: f32 = 20.0;
+ /// Units within this of the hero are offered to the script's blow test.
+@@ -110,6 +113,11 @@ pub(crate) struct ActionClip {
+     told: bool,
+     /// A shuffle step of the lock-on's turn, not a script's clip.
+     shuffle: bool,
++    /// A struck body's reaction, not a blow or a hold of the script's own.
++    reaction: bool,
++    /// Nodes of the clips it replaced, to stop before it plays (gathered across replacements in
++    /// one frame, so none is left playing frozen).
++    release: Vec<AnimationNodeIndex>,
+ }
+ 
+ impl ActionClip {
+@@ -119,11 +127,20 @@ impl ActionClip {
+     }
+ }
+ 
+-/// The animation held still until then.
++/// The animation held still until then: every clip playing at speed 0 meanwhile, each one's own
++/// speed kept to give back. Not `pause()`: a paused clip a transition leaves (the driver re-arming
++/// its gait mid-stop) is never faded or stopped by Bevy's transitions, and once resumed it plays
++/// on at full weight over everything after it, a stance left stuck on the body.
+ #[derive(Component)]
+ pub(crate) struct HitStopped {
+     until: f32,
+-    paused: bool,
++    held: Vec<(AnimationNodeIndex, f32)>,
++}
++
++impl HitStopped {
++    fn new(until: f32) -> Self {
++        Self { until, held: Vec::new() }
++    }
+ }
+ 
+ /// How a tilt turns the body.
+@@ -153,10 +170,6 @@ pub(crate) struct ActionTilt {
+ #[derive(Resource, Default)]
+ pub(crate) struct LockOn(Option<Entity>);
+ 
+-/// Nodes of a replaced clip, to stop before the new one plays.
+-#[derive(Component, Default)]
+-pub(crate) struct ReleaseNodes(Vec<AnimationNodeIndex>);
+-
+ /// Other units near the hero, as (feet, radius, height), for the camera's unit collision.
+ static OCCLUDERS: Mutex<Vec<(Vec3, f32, f32)>> = Mutex::new(Vec::new());
+ /// The lock-on point this frame (Bevy space), for the camera and the mover.
+@@ -188,8 +201,10 @@ pub(crate) fn unit_hit(head: Vec3, dir: Vec3, len: f32) -> Option<f32> {
+         let mut s = 0.4;
+         while s < len {
+             if inside(head + dir * s, feet, r, h) {
+-                let at = (s - BODY_CLEARANCE).max(0.3);
+-                best = Some(best.map_or(at, |b: f32| b.min(at)));
++                let at = s - BODY_CLEARANCE;
++                if at >= BODY_NEAREST {
++                    best = Some(best.map_or(at, |b: f32| b.min(at)));
++                }
+                 break;
+             }
+             s += 0.08;
+@@ -276,6 +291,8 @@ impl ActionClip {
+             moving_for: 0.0,
+             told: false,
+             shuffle: false,
++            reaction: false,
++            release: Vec::new(),
+         }
+     }
+ 
+@@ -351,24 +368,33 @@ fn start_clip(
+     clip: ActionClip,
+ ) {
+     if let Ok(mut old) = clips.get_mut(entity) {
+-        let lambda = if old.stopping.is_some() {
+-            0.0
+-        } else {
+-            old.lambda
+-        };
+-        let stale: Vec<AnimationNodeIndex> = old
+-            .nodes()
+-            .filter(|n| *n != clip.full && Some(*n) != clip.upper)
+-            .collect();
+-        *old = ActionClip { lambda, ..clip };
+-        if !stale.is_empty() {
+-            commands.entity(entity).try_insert(ReleaseNodes(stale));
+-        }
++        replace_clip(&mut old, clip);
+     } else {
+         commands.entity(entity).try_insert(clip);
+     }
+ }
+ 
++/// A clip in place of the one playing: it keeps the blend (unless that one was letting go), and
++/// the old one's nodes, with any still waiting to stop, are stopped before it plays.
++fn replace_clip(old: &mut ActionClip, clip: ActionClip) {
++    let lambda = if old.stopping.is_some() {
++        0.0
++    } else {
++        old.lambda
++    };
++    let mut release = std::mem::take(&mut old.release);
++    release.extend(
++        old.nodes()
++            .filter(|n| *n != clip.full && Some(*n) != clip.upper),
++    );
++    release.retain(|n| *n != clip.full && Some(*n) != clip.upper);
++    *old = ActionClip {
++        lambda,
++        release,
++        ..clip
++    };
++}
++
+ /// Apply the scripts' calls: clips, stops, reactions, hit-stops, shakes, rolls, the lock-on.
+ #[allow(clippy::too_many_arguments)]
+ pub(super) fn drain_action_calls(
+@@ -386,7 +412,10 @@ pub(super) fn drain_action_calls(
+     mut lock: ResMut<LockOn>,
+     mut kits: MessageWriter<super::spell_visual::KitPush>,
+     mut play_seq: ResMut<super::PlaySeq>,
+-    env: Option<Res<super::EnvDamageTable>>,
++    (env, mut stops): (
++        Option<Res<super::EnvDamageTable>>,
++        Query<&mut HitStopped>,
++    ),
+ ) {
+     let calls = action_combat::take_calls();
+     if calls.is_empty() {
+@@ -474,8 +503,22 @@ pub(super) fn drain_action_calls(
+                     }
+                     v => v,
+                 };
+-                if let Some(take) = take_of(anims, anim, variation, catalog) {
++                // A flinch (no hold, no fall) on a body winding up its own blow (or in a hold of
++                // the script's) leaves that playing: the blow still lands, and its swing must show;
++                // the lean and the stop carry the hit. Past the blow's impact, the flinch plays.
++                let light = hold <= 0.0 && fit <= 0.0;
++                let busy = clips.get(entity).is_ok_and(|c| {
++                    let until = if c.key > 0.0 { c.key } else { c.len - 2.0e-3 };
++                    !c.reaction && !c.shuffle && c.stopping.is_none() && c.t < until
++                });
++                let take = if light && busy {
++                    None
++                } else {
++                    take_of(anims, anim, variation, catalog)
++                };
++                if let Some(take) = take {
+                     let mut clip = ActionClip::new(take, ActionBody::Auto);
++                    clip.reaction = true;
+                     clip.hold = hold;
+                     if fit > 0.0 {
+                         // The whole of it over that long, on the whole body (a knockdown).
+@@ -514,10 +557,13 @@ pub(super) fn drain_action_calls(
+             }
+             ActionCall::HitStop { unit, secs } => {
+                 if let Some(entity) = resolve(&unit, me, index) {
+-                    commands.entity(entity).try_insert(HitStopped {
+-                        until: now + secs,
+-                        paused: false,
+-                    });
++                    // One under way runs on to the later end, keeping the speeds it holds.
++                    match stops.get_mut(entity) {
++                        Ok(mut s) => s.until = s.until.max(now + secs),
++                        Err(_) => {
++                            commands.entity(entity).try_insert(HitStopped::new(now + secs));
++                        }
++                    }
+                 }
+             }
+             ActionCall::Shake {
+@@ -635,20 +681,16 @@ pub(super) fn apply_action_clips(
+         &ModelAnimations,
+         &Transform,
+         Option<&HitStopped>,
+-        Option<&ReleaseNodes>,
+         Option<&crate::net::Guid>,
+         Has<SelfPlayer>,
+     )>,
+ ) {
+     let dt = time.delta_secs();
+     let now = time.elapsed_secs();
+-    for (entity, mut clip, mut player, anims, t, stop, release, guid, mine) in &mut units {
++    for (entity, mut clip, mut player, anims, t, stop, guid, mine) in &mut units {
+         let clip = &mut *clip;
+-        if let Some(r) = release {
+-            for n in &r.0 {
+-                player.stop(*n);
+-            }
+-            commands.entity(entity).try_remove::<ReleaseNodes>();
++        for n in std::mem::take(&mut clip.release) {
++            player.stop(n);
+         }
+         let frozen = stop.is_some_and(|s| now < s.until);
+         if !frozen && dt > 0.0 {
+@@ -738,29 +780,34 @@ pub(super) fn apply_action_clips(
+     }
+ }
+ 
+-/// After the driver: a hit-stop holds the clocks.
++/// After the driver: a hit-stop holds the clocks (each clip's speed to 0, whatever the driver
++/// set it to this frame kept to give back), and gives them back when it ends.
+ pub(super) fn apply_hit_stops(
+     mut commands: Commands,
+     time: Res<Time>,
+-    mut units: Query<(
+-        Entity,
+-        &mut AnimationPlayer,
+-        &mut HitStopped,
+-        Has<crate::aura_visual::AnimRateFreeze>,
+-    )>,
++    mut units: Query<(Entity, &mut AnimationPlayer, &mut HitStopped)>,
+ ) {
+     let now = time.elapsed_secs();
+-    for (entity, mut player, mut stop, aura_frozen) in &mut units {
++    for (entity, mut player, mut stop) in &mut units {
++        let stop = &mut *stop;
+         if now < stop.until {
+-            for (_, anim) in player.playing_animations_mut() {
+-                anim.pause();
++            for (node, anim) in player.playing_animations_mut() {
++                let speed = anim.speed();
++                if speed != 0.0 {
++                    match stop.held.iter_mut().find(|(n, _)| n == node) {
++                        Some(h) => h.1 = speed,
++                        None => stop.held.push((*node, speed)),
++                    }
++                    anim.set_speed(0.0);
++                }
+             }
+-            stop.paused = true;
+         } else {
+-            // The aura freeze owns the clocks while it holds them.
+-            if stop.paused && !aura_frozen {
+-                for (_, anim) in player.playing_animations_mut() {
+-                    anim.resume();
++            for (node, speed) in stop.held.drain(..) {
++                if let Some(a) = player.animation_mut(node) {
++                    // Unless something set it since.
++                    if a.speed() == 0.0 {
++                        a.set_speed(speed);
++                    }
+                 }
+             }
+             commands.entity(entity).try_remove::<HitStopped>();
+@@ -973,12 +1020,23 @@ pub(super) fn track_lock_on(
+ /// Gather the units that could block the camera (only while an add-on asks for it).
+ pub(super) fn collect_occluders(
+     me: Query<&Transform, With<SelfPlayer>>,
+-    units: Query<(&Transform, &NetEntity), Without<SelfPlayer>>,
++    units: Query<
++        (
++            &Transform,
++            &NetEntity,
++            Option<&crate::net::ObjectStore>,
++        ),
++        Without<SelfPlayer>,
++    >,
+ ) {
+     let mut out = Vec::new();
+     if action_combat::unit_collision() {
+         if let Ok(here) = me.single() {
+-            for (t, n) in &units {
++            for (t, n, store) in &units {
++                // A body on the ground is no wall to the camera.
++                if store.is_some_and(|s| s.0.unit_is_dead()) {
++                    continue;
++                }
+                 let kind = n.kind;
+                 if !matches!(
+                     kind,
+@@ -1087,14 +1145,20 @@ pub(super) fn shuffle_on_lock_turn(
+             c.stopping = None;
+         }
+         Some(c) if !c.shuffle => {}
+-        _ => {
++        old => {
+             let catalog = anim_data.as_deref().map(|d| &d.0);
+             if let Some(take) = take_of(anims, anim, None, catalog) {
+                 let mut c = ActionClip::new(take, ActionBody::Full);
+                 c.looping = true;
+                 c.hold = SHUFFLE_HOLD;
+                 c.shuffle = true;
+-                commands.entity(entity).try_insert(c);
++                match old {
++                    // The other foot's step: the one under way gives way (its node stopped).
++                    Some(mut o) => replace_clip(&mut o, c),
++                    None => {
++                        commands.entity(entity).try_insert(c);
++                    }
++                }
+             }
+         }
+     }
+@@ -1151,6 +1215,9 @@ mod tests {
+         // A body the head is inside (a clinch) is passed through.
+         *OCCLUDERS.lock().unwrap() = vec![(Vec3::new(0.2, 0.0, 0.0), 0.55, 2.1)];
+         assert_eq!(unit_hit(head, dir, 6.0), None);
++        // One right behind us is passed through too: the view never ends up in our own head.
++        *OCCLUDERS.lock().unwrap() = vec![(Vec3::new(0.0, 0.0, 1.2), 0.55, 2.1)];
++        assert_eq!(unit_hit(head, dir, 6.0), None);
+         OCCLUDERS.lock().unwrap().clear();
+     }
+ 
+@@ -1226,6 +1293,8 @@ mod tests {
+             moving_for: 0.0,
+             told: false,
+             shuffle: false,
++            reaction: false,
++            release: Vec::new(),
+         }
+     }
+ 
+diff --git a/crates/benilla-app/src/creature_anim/net.rs b/crates/benilla-app/src/creature_anim/net.rs
+index b7c4aae9..e3a0b7ca 100644
+--- a/crates/benilla-app/src/creature_anim/net.rs
++++ b/crates/benilla-app/src/creature_anim/net.rs
+@@ -337,7 +337,23 @@ fn attacker_state(
+             attacker: e,
+             ..swing
+         };
+-        receive_swing(swing, pending, sinks);
++        // Deviation (Basin Battle's action layer): its blows play on clips of its own, which the
++        // driver's key walk never scans, and their results come without the swing (`HitInfo
++        // 0x10000`) when the blow lands; the reference would hold the record for an impact key that
++        // never comes and show it only as text at the next swing. Here it lands at once.
++        if s.hit_info & 0x10000 != 0 && benilla_ui::action_combat::layer_live() {
++            stop_swing(e, pending, sinks);
++            if !super::impact::lootable_victim(&sinks.stores, swing.victim) {
++                sinks.fire(SwingImpact {
++                    swing,
++                    text_only: false,
++                    natural: None,
++                    pos: None,
++                });
++            }
++        } else {
++            receive_swing(swing, pending, sinks);
++        }
+         swings.write(swing);
+     } else if swing.victim.is_some_and(|v| {
+         // The unresolved-attacker leg (`0x625823` → `0x625a3e`) calls the gated dispatcher
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index d10d2672..6d6bc38a 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -1300,15 +1300,32 @@ pub(super) fn seat_camera(
+     // Basin Battle's lock-on: the view swings round behind us onto the locked unit, looking a
+     // little down over both, whatever the mouse does.
+     if let Some(target) = crate::creature_anim::lock_point() {
+-        let to = target - player_pos;
+-        let flat = Vec2::new(to.x, to.z).length();
+-        if flat > 0.3 {
+-            let k = 1.0 - (-LOCK_EASE_RATE * dt).exp();
+-            let want_yaw = f32::atan2(-to.x, -to.z);
+-            cam.yaw += crate::creature_anim::wrap_pi(want_yaw - cam.yaw) * k;
+-            let rise = (to.y - cam_pivot_height).atan2(flat).clamp(-0.5, 0.5);
+-            let want_pitch = (LOCK_PITCH + rise * 0.5).clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
+-            cam.pitch += (want_pitch - cam.pitch) * k;
++        if benilla_ui::action_combat::aim_camera() {
++            // Aiming: the view's centre (the reticle, through the shoulder pivot) on the locked
++            // unit's chest, not the melee framing's look down over both.
++            let (_, aim_right, aim_up) = benilla_ui::action_combat::aim_shape();
++            let right = Vec3::new(cam.yaw.cos(), 0.0, -cam.yaw.sin());
++            let pivot = player_pos + Vec3::Y * (cam_pivot_height + aim_up) + right * aim_right;
++            let to = target - pivot;
++            let flat = Vec2::new(to.x, to.z).length();
++            if flat > 0.5 {
++                let k = 1.0 - (-AIM_EASE_RATE * dt).exp();
++                let want_yaw = f32::atan2(-to.x, -to.z);
++                cam.yaw += crate::creature_anim::wrap_pi(want_yaw - cam.yaw) * k;
++                let want_pitch = to.y.atan2(flat).clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
++                cam.pitch += (want_pitch - cam.pitch) * k;
++            }
++        } else {
++            let to = target - player_pos;
++            let flat = Vec2::new(to.x, to.z).length();
++            if flat > 0.3 {
++                let k = 1.0 - (-LOCK_EASE_RATE * dt).exp();
++                let want_yaw = f32::atan2(-to.x, -to.z);
++                cam.yaw += crate::creature_anim::wrap_pi(want_yaw - cam.yaw) * k;
++                let rise = (to.y - cam_pivot_height).atan2(flat).clamp(-0.5, 0.5);
++                let want_pitch = (LOCK_PITCH + rise * 0.5).clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
++                cam.pitch += (want_pitch - cam.pitch) * k;
++            }
+         }
+     }
+     // The framing pivot is `feet + cam_pivot_height`; at zoom 0 the camera sits on it. One sweep
+@@ -1390,6 +1407,11 @@ pub(super) fn seat_camera(
+     };
+     // The view's elevation, for the aim's upper-body lean.
+     benilla_ui::action_combat::set_view_elevation(cam_fwd.y.clamp(-1.0, 1.0).asin());
++    // And its facing on the map, for a shot along the reticle's line.
++    let w = benilla_assets::coords::bevy_to_wow(cam_fwd);
++    if w[0].abs() + w[1].abs() > 1.0e-4 {
++        benilla_ui::action_combat::set_view_facing(w[1].atan2(w[0]).rem_euclid(std::f32::consts::TAU));
++    }
+     // The solver's clip verdict (`0x50e570`'s `0x30000`, OR'd into `[cam+0x90]` by the driver):
+     // [`SmartPivot`]'s sixth conjunct, so an unobstructed camera never pivots.
+     rig.clipped = hit.is_some();
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index c68482ea..fa7cb7eb 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -59,6 +59,8 @@
+ //!   whole clip over that long (a knockdown); `variation` picks a take (`"random"` any of them).
+ //! - `SetLockOn(unit)` also makes the unit the target, so its selection circle marks it.
+ //! - `ActionMoveKeys()`: the movement keys held, as forward (1, -1 back, 0) and right (1, -1 left).
++//! - `GetActionAim()`: where the view's centre looks, as a facing on the map (radians, the
++//!   game's own) and an elevation (radians, up positive): the reticle's line.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -70,6 +72,7 @@ static AIM_DISTANCE: AtomicU32 = AtomicU32::new(2.4f32.to_bits());
+ static AIM_RIGHT: AtomicU32 = AtomicU32::new(0.75f32.to_bits());
+ static AIM_UP: AtomicU32 = AtomicU32::new(0.25f32.to_bits());
+ static UNIT_COLLISION: AtomicBool = AtomicBool::new(false);
++static VIEW_FACING: AtomicU32 = AtomicU32::new(0);
+ /// The view's elevation (radians, up positive), written by the camera each frame.
+ static VIEW_ELEVATION: AtomicU32 = AtomicU32::new(0);
+ 
+@@ -308,6 +311,12 @@ fn push(call: ActionCall) {
+     }
+ }
+ 
++/// Whether an add-on is driving the action layer now (it asks for the camera's unit collision
++/// while it does).
++pub fn layer_live() -> bool {
++    unit_collision()
++}
++
+ /// The camera keeps out of other units' bodies.
+ pub fn unit_collision() -> bool {
+     UNIT_COLLISION.load(Ordering::Relaxed)
+@@ -321,6 +330,16 @@ pub fn view_elevation() -> f32 {
+     f32::from_bits(VIEW_ELEVATION.load(Ordering::Relaxed))
+ }
+ 
++/// The way the view looks, as a facing on the world's map (radians, the game's own: 0 north,
++/// rising toward the west), written by the camera each frame.
++pub fn set_view_facing(rad: f32) {
++    VIEW_FACING.store(rad.to_bits(), Ordering::Relaxed);
++}
++
++pub fn view_facing() -> f32 {
++    f32::from_bits(VIEW_FACING.load(Ordering::Relaxed))
++}
++
+ /// The left button is the add-on's and the middle button plays the stock left button's part.
+ pub fn action_mouse() -> bool {
+     ACTION_MOUSE.load(Ordering::Relaxed)
+@@ -650,6 +669,10 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+         "ActionMoveKeys",
+         lua.create_function(|_, _: MultiValue| Ok(move_keys()))?,
+     )?;
++    g.set(
++        "GetActionAim",
++        lua.create_function(|_, _: MultiValue| Ok((view_facing(), view_elevation())))?,
++    )?;
+     g.set(
+         "TakeActionMarkers",
+         lua.create_function(|lua, _: MultiValue| {
+-- 
+2.43.0
+

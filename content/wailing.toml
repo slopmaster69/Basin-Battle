@@ -1,0 +1,1348 @@
+# The Wailing Caverns: Naralex's dream gone bad under the Barrens, the Druids of the Fang and the
+# deviate things they've made. A dungeon of its own beside the Deadmines (read like
+# deadmines.toml: its lists join the rest; [dungeon] is its world).
+#
+# Places are WoW coordinates on map 43 (WailingCaverns, a WMO-only map: x north, y west, z up).
+# In by the mouth; down into the central pit (Lady Anacondra), north to the pool (Kresh), the low
+# south tunnel (Lord Cobrahn), the east caves (Skum's pool, Lord Pythas); the second lamp at the
+# western crossing; then the long western warren (Lord Serpentis) to its end, where Verdan the
+# Everliving grows over Naralex. Out by the mouth.
+
+[dungeon]
+key = "wailing"
+name = "The Wailing Caverns"
+map = 43
+map_dir = "WailingCaverns"
+area = 718
+icon = "Spell_Nature_Sleep"
+blurb = "Naralex's dream gone bad, under the Barrens"
+first_page = "The caverns' mouth, where the wailing starts. Every way from here winds down."
+welcome = "The Wailing Caverns. The Druids of the Fang dream Naralex's nightmare and make it flesh; their deviate things fill every cave. Two lamps: one at the mouth, one at the western crossing. Rest at a lamp to heal, fill your Draughts (T) and send the dreamers back to their dreaming. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "deviate_fang"
+hero_health = 0.7
+exit = [-141.9, 127.6, -77.0]
+exit_radius = 5.0
+exit_boss = "verdan"
+weapon_chance = 0.08
+armor_chance = 0.06
+boss_extra_chance = 0.25
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# --- lamps: only two ---------------------------------------------------------------------------------
+
+[[dungeon.lamp]]
+key = "wailing_mouth"
+name = "The Caverns' Mouth"
+at = [-141.9, 127.6, -77.0]
+facing = 1.0
+
+[[dungeon.lamp]]
+key = "wailing_crossing"
+name = "The Western Crossing"
+at = [-142.1, -7.8, -75.9]
+facing = 4.7
+
+# --- secrets -----------------------------------------------------------------------------------------
+
+# The far southern bulge of the western warren: a disciple of Naralex, asleep for good, and his
+# journal. Whoever reads it carries the dream's true shape with them.
+[[dungeon.door]]
+key = "naralex_dream"
+name = "The Disciple's Rest"
+kind = "hidden"
+at = [-202.4, -338.0, -71.0]
+find = 4.5
+reveals = ["disciple_cache", "disciple_journal"]
+text = "in the warren's far bulge: a disciple of Naralex, long dead in his sleep, his journal open on his chest. You read the last page, and the dream reads you back."
+
+[[dungeon.box]]
+key = "disciple_cache"
+at = [-203.5, -336.0, -71.0]
+facing = 1.0
+loot = { draught_flask = 1, deviate_fang = 14 }
+
+[[dungeon.note]]
+key = "disciple_journal"
+name = "A Disciple's Journal"
+at = [-201.0, -339.5, -71.0]
+facing = 1.0
+text = "\"Verdan is not the nightmare. Verdan is only what grows over it. When the Everliving falls, what Naralex truly dreams will come up through the roots, and it is hungry. Whoever has read this: it knows you now.\""
+
+# A ledge off the low south tunnel: the Fang's cache.
+[[dungeon.door]]
+key = "fang_cache"
+name = "The Fang's Cache"
+kind = "hidden"
+at = [-337.0, 37.4, -99.0]
+find = 4.0
+reveals = ["fang_stash"]
+text = "past the end of the low tunnel: the Druids of the Fang's cache, wrapped in shed skins."
+
+[[dungeon.box]]
+key = "fang_stash"
+at = [-337.2, 22.0, -102.0]
+facing = 1.6
+loot = { deviate_fang = 16, tonic = 1, whetstone = 1 }
+
+# A nook at the far end of the east caves: something small and quick lives there.
+[[dungeon.door]]
+key = "faerie_nook"
+name = "A Glittering Nook"
+kind = "hidden"
+at = [-97.1, 457.2, -71.6]
+find = 4.0
+reveals = ["faerie"]
+text = "the nook glitters with dust that wasn't there a moment ago; something blinks out of the air."
+
+# --- notes -------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "ebru_warning"
+name = "A Cenarion Warning"
+at = [-139.0, 131.0, -77.0]
+facing = 1.0
+text = "\"Naralex went down to heal the Barrens by dreaming. His disciples followed; they call themselves the Druids of the Fang now. One of his first disciples hid from them in the far south of the western warren, they say, and wrote down what Naralex truly dreams. Find him.\""
+
+[[dungeon.note]]
+key = "fang_orders"
+name = "The Fanglords' Orders"
+at = [7.9, 277.2, -86.1]
+facing = 0.0
+text = "\"Anacondra holds the pit. Cobrahn, the low south tunnel. Pythas, the east caves. Serpentis, the western warren. None passes to the Everliving.\" Underneath, smaller: \"Our cache is past the end of the low tunnel. Tell no one.\""
+
+# --- the dreamers and their deviates -----------------------------------------------------------------
+
+# The way down from the mouth.
+[[dungeon.pack]]
+mob = "wc_adder"
+at = [-110.9, 142.3]
+z = -80.8
+radius = 3.0
+count = 2
+link = 10.0
+
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-110.6, 202.9]
+z = -81.7
+radius = 0.0
+count = 1
+
+# The central pit: Lady Anacondra and her druids.
+[[dungeon.pack]]
+mob = "wc_anacondra"
+key = "anacondra"
+at = [-37.1, 187.2]
+z = -96.4
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-37.1, 172.2]
+z = -96.3
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_lasher"
+at = [-52.1, 277.2]
+z = -92.8
+radius = 3.0
+count = 2
+link = 10.0
+
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [-67.0, 112.3]
+z = -88.9
+radius = 3.0
+count = 2
+link = 10.0
+
+# The upper centre.
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [7.9, 157.3]
+z = -88.0
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [37.9, 247.2]
+z = -88.0
+radius = 3.0
+count = 2
+link = 12.0
+
+# The north pool: Kresh.
+[[dungeon.pack]]
+mob = "wc_kresh"
+key = "kresh"
+at = [112.7, 232.8]
+z = -96.2
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "wc_shambler"
+at = [128.5, 202.0]
+z = -101.8
+radius = 0.0
+count = 1
+
+# The low south tunnel: Lord Cobrahn.
+[[dungeon.pack]]
+mob = "wc_adder"
+at = [-202.0, 22.2]
+z = -105.6
+radius = 3.0
+count = 3
+hidden = 6.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-232.1, -7.8]
+z = -105.7
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_cobrahn"
+key = "cobrahn"
+at = [-292.1, 7.3]
+z = -105.8
+radius = 0.0
+count = 1
+
+# The east caves: Skum's pool below, Lord Pythas above.
+[[dungeon.pack]]
+mob = "wc_skum"
+key = "skum"
+at = [-67.1, 412.2]
+z = -107.0
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [53.1, 397.4]
+z = -62.5
+radius = 3.0
+count = 2
+link = 10.0
+
+[[dungeon.pack]]
+mob = "wc_pythas"
+key = "pythas"
+at = [7.9, 502.3]
+z = -57.8
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-6.9, 502.1]
+z = -56.1
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_dreadfang"
+at = [-82.3, 472.1]
+z = -67.4
+radius = 0.0
+count = 1
+
+# What the glittering nook keeps.
+[[dungeon.pack]]
+mob = "wc_faerie"
+key = "faerie"
+at = [-92.0, 460.0]
+z = -70.0
+radius = 0.0
+count = 1
+rare = true
+
+# Past the western crossing: the warren.
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-156.8, -52.3]
+z = -77.1
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_shambler"
+at = [-172.1, -97.8]
+z = -66.7
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-51.9, -157.7]
+z = -77.5
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_lasher"
+at = [-22.1, -82.8]
+z = -68.2
+radius = 3.0
+count = 3
+link = 10.0
+
+[[dungeon.pack]]
+mob = "wc_dreadfang"
+at = [-52.1, -247.8]
+z = -68.8
+radius = 3.0
+count = 2
+link = 12.0
+
+# Lord Serpentis, deep in the warren.
+[[dungeon.pack]]
+mob = "wc_serpentis"
+key = "serpentis"
+at = [-112.0, -262.8]
+z = -58.0
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [-262.0, -292.9]
+z = -67.4
+radius = 3.0
+count = 2
+link = 10.0
+
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-292.1, -307.8]
+z = -67.7
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-262.1, -217.8]
+z = -63.5
+radius = 3.0
+count = 3
+link = 14.0
+
+[[dungeon.pack]]
+mob = "wc_shambler"
+at = [-202.1, -187.8]
+z = -62.5
+radius = 3.0
+count = 2
+link = 12.0
+
+# The warren's end: Verdan the Everliving, grown over Naralex.
+[[dungeon.pack]]
+mob = "wc_verdan"
+key = "verdan"
+at = [-352.1, -112.8]
+z = -64.2
+radius = 0.0
+count = 1
+
+# The dream's thorns, while Verdan fights.
+[[dungeon.hazard]]
+name = "grasping roots"
+at = [-352.1, -127.8, -64.0]
+radius = 3.5
+damage = 20
+every = 7.0
+phase = 2.0
+warn = 1.4
+spell = 26271
+boss = "verdan"
+knockdown = true
+
+[[dungeon.hazard]]
+name = "grasping roots"
+at = [-367.0, -112.8, -64.6]
+radius = 3.5
+damage = 20
+every = 7.0
+phase = 4.5
+warn = 1.4
+spell = 26271
+boss = "verdan"
+knockdown = true
+
+# --- items --------------------------------------------------------------------------------------------
+
+[[item]]
+key = "deviate_fang"
+name = "Deviate Fang"
+display = 1515
+icon = "INV_Misc_Bone_01"
+kind = "resource"
+stack = 50
+text = "A fang from one of the deviate things. The lamps' quartermaster in the Wailing Caverns trades them; you drop them all when you fall below."
+
+[[item]]
+key = "anacondra_mantle"
+name = "Anacondra's Serpent Mantle"
+display = 2539
+icon = "INV_Shoulder_06"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.09
+text = "Lady Anacondra's: shed skins, stitched in rows."
+
+[[item]]
+key = "cobrahn_helm"
+name = "Cobrahn's Hood"
+display = 3862
+icon = "INV_Helmet_04"
+kind = "armor"
+slot = "head"
+reduce = 0.08
+text = "Lord Cobrahn's: it smells of the low tunnel, and of snake."
+
+[[item]]
+key = "pythas_vest"
+name = "Pythas's Fang-Studded Vest"
+display = 10076
+icon = "INV_Chest_Leather_01"
+kind = "armor"
+slot = "chest"
+reduce = 0.12
+weight = 0.01
+text = "Lord Pythas's: leather studded with the fangs of the things he made."
+
+[[item]]
+key = "serpentis_legs"
+name = "Serpentis's Scaled Leggings"
+display = 3414
+icon = "INV_Pants_04"
+kind = "armor"
+slot = "legs"
+reduce = 0.11
+text = "Lord Serpentis's: scales that shift colour when you aren't looking."
+
+[[item]]
+key = "kresh_helm"
+name = "Kresh's Shell-Helm"
+display = 4417
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.12
+weight = 0.03
+text = "A helm hammered out of the old turtle's shell. Heavy, and very, very hard."
+
+[[item]]
+key = "skum_legs"
+name = "Skum's Hide Leggings"
+display = 12388
+icon = "INV_Pants_06"
+kind = "armor"
+slot = "legs"
+reduce = 0.1
+text = "Thunder lizard hide: it crackles when you walk."
+
+[[item]]
+key = "verdan_breastplate"
+name = "Living Root Breastplate"
+display = 15414
+icon = "INV_Chest_Leather_02"
+kind = "armor"
+slot = "chest"
+reduce = 0.18
+weight = 0.03
+text = "Roots grown into the shape of a breastplate. It is still growing."
+
+[[item]]
+key = "mutanus_mantle"
+name = "Mutanus's Scale Mantle"
+display = 3119
+icon = "INV_Shoulder_05"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.13
+weight = 0.02
+text = "Scales from the thing Naralex dreamed. They are cold, and they don't smell of anything at all."
+
+[[item]]
+key = "faerie_mantle"
+name = "Glittering Mantle"
+display = 1060
+icon = "INV_Shoulder_02"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.08
+text = "Dusted with something that glitters. Now and then you see a flicker at the edge of your eye."
+
+# --- the deviates ---------------------------------------------------------------------------------------
+
+# Deviate adders: quick bites, and a spit.
+[[mob]]
+key = "wc_adder"
+name = "Deviate Adder"
+subname = "Wailing Caverns"
+display = 2954
+health = 80
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 14.0
+leash = 26.0
+drops = { deviate_fang = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 10
+  range = 2.5
+  arc = 90.0
+  recovery = 0.7
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "bites"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.42, damage = 9, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.36, damage = 10, recovery = 0.8 } ]
+  [[mob.pattern]]
+  name = "spit"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 16.0
+  steps = [ { ranged = true, windup = 0.9, damage = 12, range = 16.0, radius = 2.5, speed = 18.0, spell = 6917, look = 8245, blockable = false, recovery = 1.0 } ]
+
+# Deviate ravagers: raptors, a leap and a rending string.
+[[mob]]
+key = "wc_ravager"
+name = "Deviate Ravager"
+subname = "Wailing Caverns"
+display = 615
+health = 130
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 16.0
+leash = 30.0
+drops = { deviate_fang = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 14
+  range = 2.8
+  arc = 100.0
+  recovery = 0.75
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "rend"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.48, damage = 12, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.38, damage = 12, recovery = 0.1 }, { clip = 17, take = 0, windup = 0.5, damage = 16, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "leap"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 12.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 7.0, damage = 18, recovery = 0.9 } ]
+
+# Deviate lashers: plants that whip from a distance.
+[[mob]]
+key = "wc_lasher"
+name = "Deviate Lasher"
+subname = "Wailing Caverns"
+display = 8149
+health = 95
+run_speed = 6.0
+walk_speed = 1.8
+aggro = 14.0
+leash = 24.0
+drops = { deviate_fang = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 12
+  range = 4.0
+  arc = 70.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "lash"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.6, range = 4.2, arc = 60.0, damage = 11, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.5, range = 4.2, arc = 60.0, damage = 12, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "thrash"
+  weight = 1.5
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 13, heavy = true, recovery = 1.0, kit = 369 } ]
+
+# Deviate shamblers: slow, huge, and a slam that throws you down.
+[[mob]]
+key = "wc_shambler"
+name = "Deviate Shambler"
+subname = "Wailing Caverns"
+display = 863
+health = 200
+run_speed = 6.0
+walk_speed = 1.8
+aggro = 14.0
+leash = 26.0
+posture = 120
+drops = { deviate_fang = [3, 5] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.85
+  damage = 20
+  range = 3.2
+  arc = 130.0
+  recovery = 1.1
+  cooldown = 1.5
+  turn_rate = 170.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "slams"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.8, damage = 18, recovery = 0.25 }, { clip = 17, take = 1, windup = 0.65, damage = 20, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "ground slam"
+  weight = 1.5
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 1.1, range = 5.0, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.2, kit = 356, look = 26271 } ]
+
+# Evolving ectoplasm: oozes that split when they die.
+[[mob]]
+key = "wc_ectoplasm"
+name = "Evolving Ectoplasm"
+subname = "Wailing Caverns"
+display = 767
+health = 110
+run_speed = 6.0
+walk_speed = 1.8
+aggro = 14.0
+leash = 24.0
+drops = { deviate_fang = [1, 3] }
+respawn = 0.0
+then = "wc_ooze"
+then_text = "The ectoplasm splits; a smaller blob crawls out of it."
+  [mob.attack]
+  windup = 0.6
+  damage = 12
+  range = 2.6
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 200.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "slaps"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 11, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 11, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "splash"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 16.0
+  steps = [ { ranged = true, windup = 1.0, damage = 12, range = 16.0, radius = 3.0, speed = 14.0, spell = 6917, look = 8245, blockable = false, recovery = 1.1 } ]
+
+[[mob]]
+key = "wc_ooze"
+name = "Ectoplasmic Blob"
+subname = "Wailing Caverns"
+display = 767
+scale = 0.6
+health = 50
+run_speed = 6.5
+walk_speed = 1.8
+aggro = 14.0
+leash = 24.0
+drops = { deviate_fang = [0, 1] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 8
+  range = 2.2
+  arc = 100.0
+  recovery = 0.7
+  cooldown = 1.0
+  turn_rate = 220.0
+  lock = 0.2
+  blockable = true
+
+# Deviate dreadfangs: winged serpents that spit lightning.
+[[mob]]
+key = "wc_dreadfang"
+name = "Deviate Dreadfang"
+subname = "Wailing Caverns"
+display = 1974
+health = 120
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+keep_away = 6.0
+drops = { deviate_fang = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 12
+  range = 2.8
+  arc = 100.0
+  recovery = 0.75
+  cooldown = 1.0
+  turn_rate = 240.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "bites"
+  weight = 2.0
+  steps = [ { clip = 17, take = 0, windup = 0.48, damage = 11, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 12, recovery = 0.85 } ]
+  [[mob.pattern]]
+  name = "lightning breath"
+  weight = 3.0
+  min_range = 4.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.1, damage = 15, range = 22.0, radius = 2.0, speed = 24.0, spell = 403, blockable = true, recovery = 1.0 } ]
+
+# Druids of the Fang: lightning and sleep; when one falls, the serpent in him crawls out.
+[[mob]]
+key = "wc_druid"
+name = "Druid of the Fang"
+subname = "Wailing Caverns"
+display = 1285
+health = 90
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 7.0
+drops = { deviate_fang = [2, 4] }
+respawn = 0.0
+then = "wc_fang_serpent"
+then_text = "The druid's body slumps, and the serpent he'd become in his dreams crawls out of it."
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 16
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 1.0 } ]
+  # A wave of sleep: a shove of dream all round him.
+  [[mob.pattern]]
+  name = "dream wave"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 1.0, range = 4.5, arc = 360.0, damage = 10, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+
+[[mob]]
+key = "wc_fang_serpent"
+name = "Fang Serpent"
+subname = "A Druid's Dream"
+display = 1206
+scale = 1.2
+health = 70
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 16.0
+leash = 26.0
+drops = { deviate_fang = [1, 2] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 10
+  range = 2.5
+  arc = 90.0
+  recovery = 0.7
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.2
+  blockable = true
+
+# --- the Fanglords and the rest ----------------------------------------------------------------------------
+
+# Lady Anacondra: lightning and thorns, in the central pit.
+[[mob]]
+key = "wc_anacondra"
+name = "Lady Anacondra"
+subname = "Fanglord"
+display = 1700
+scale = 1.15
+health = 850
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 200
+keep_away = 7.0
+drops = { deviate_fang = [16, 22] }
+trophy = { anacondra_mantle = 1 }
+gear = ["anacondra_mantle"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "thorns"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 5.0, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 26271 } ]
+  [[mob.pattern]]
+  name = "storm"
+  weight = 2.0
+  below = 0.5
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.3 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "storm"
+  text = "\"None can stand against the Serpent Lords!\""
+  summon = ["wc_adder", "wc_adder"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "thorns"
+  text = "\"The dream... will not end... for you!\""
+  shove = 5.0
+  look = 26271
+
+# Lord Cobrahn: a staff, venom, and at the last the serpent himself.
+[[mob]]
+key = "wc_cobrahn"
+name = "Lord Cobrahn"
+subname = "Fanglord"
+display = 1542
+health = 900
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 220
+drops = { deviate_fang = [16, 22] }
+trophy = { cobrahn_helm = 1 }
+gear = ["cobrahn_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 20
+  range = 3.0
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "staff"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 18, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.45, damage = 18, recovery = 0.15 }, { clip = 57, windup = 0.85, damage = 26, heavy = true, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "venom"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 20.0
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 20.0, radius = 3.0, speed = 18.0, spell = 6917, look = 8245, blockable = false, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 20, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "coil"
+  weight = 2.0
+  below = 0.5
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.35, damage = 16, recovery = 0.08 }, { clip = 54, windup = 0.7, range = 4.5, arc = 360.0, damage = 22, heavy = true, recovery = 1.3, look = 8245 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "coil"
+  text = "\"You will never wake from this nightmare!\""
+  look = 8245
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "venom"
+  text = "Cobrahn's skin splits; scales show underneath."
+  summon = ["wc_fang_serpent", "wc_fang_serpent"]
+  shove = 5.0
+
+# Lord Pythas: lightning and a thunderclap, over the east caves.
+[[mob]]
+key = "wc_pythas"
+name = "Lord Pythas"
+subname = "Fanglord"
+display = 1701
+scale = 1.15
+health = 900
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 220
+keep_away = 6.0
+drops = { deviate_fang = [16, 22] }
+trophy = { pythas_vest = 1 }
+gear = ["pythas_vest"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 22
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 24.0
+  spell = 403
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "thunderclap"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356 } ]
+  [[mob.pattern]]
+  name = "chain"
+  weight = 2.0
+  below = 0.5
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.2 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  pattern = "thunderclap"
+  text = "\"The coils of death will crush you!\""
+  summon = ["wc_dreadfang"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "chain"
+  text = "\"Naralex... forgive... us...\""
+  shove = 5.0
+  look = 10604
+
+# Lord Serpentis: the last of the Fanglords, deep in the warren.
+[[mob]]
+key = "wc_serpentis"
+name = "Lord Serpentis"
+subname = "Fanglord"
+display = 1703
+scale = 1.2
+health = 1000
+run_speed = 7.2
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 240
+drops = { deviate_fang = [20, 26] }
+trophy = { serpentis_legs = 1 }
+gear = ["serpentis_legs"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 22
+  range = 3.0
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 230.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "staff"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 57, windup = 0.8, damage = 30, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "lightning"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 26.0, radius = 1.5, speed = 24.0, spell = 403, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "strike"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 12.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 7.0, damage = 26, heavy = true, recovery = 1.0, kit = 379 } ]
+  [[mob.pattern]]
+  name = "nightmare"
+  weight = 2.0
+  below = 0.35
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.3, damage = 30, range = 26.0, radius = 4.0, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.2 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "strike"
+  text = "\"I am the serpent king! I can do anything!\""
+  [[mob.phase]]
+  at = 0.35
+  speed = 0.78
+  might = 1.15
+  pattern = "nightmare"
+  text = "\"Sleep! SLEEP, and dream with us!\""
+  summon = ["wc_druid", "wc_druid"]
+  [[mob.phase]]
+  at = 0.12
+  speed = 0.7
+  might = 1.2
+  pattern = "staff"
+  text = "Serpentis hisses, and his shape blurs between man and snake."
+  shove = 5.5
+  look = 27812
+
+# Kresh: the old turtle of the north pool, slow and very hard to hurt.
+[[mob]]
+key = "wc_kresh"
+name = "Kresh"
+subname = "Wailing Caverns"
+display = 2308
+health = 1000
+run_speed = 5.5
+walk_speed = 1.6
+aggro = 14.0
+leash = 24.0
+boss = true
+posture = 360
+drops = { deviate_fang = [14, 20] }
+trophy = { kresh_helm = 1 }
+gear = ["kresh_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.9
+  damage = 26
+  range = 3.2
+  arc = 120.0
+  recovery = 1.1
+  cooldown = 1.5
+  turn_rate = 150.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "bites"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.85, damage = 24, recovery = 0.3 }, { clip = 17, take = 1, windup = 0.7, damage = 26, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "shell slam"
+  weight = 1.5
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.2, range = 5.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.3, kit = 356, look = 10987 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.85
+  might = 1.15
+  pattern = "shell slam"
+  text = "Kresh pulls into his shell and comes out snapping."
+  look = 10987
+
+# Skum: a thunder lizard in the low east pool, lightning off its back.
+[[mob]]
+key = "wc_skum"
+name = "Skum"
+subname = "Wailing Caverns"
+display = 1539
+health = 950
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 26.0
+boss = true
+posture = 260
+drops = { deviate_fang = [14, 20] }
+trophy = { skum_legs = 1 }
+gear = ["skum_legs"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.7
+  damage = 24
+  range = 3.2
+  arc = 130.0
+  recovery = 0.95
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "stomps"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.55, damage = 24, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "chained bolt"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 24.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "charge"
+  weight = 1.5
+  min_range = 6.0
+  max_range = 15.0
+  steps = [ { clip = 17, take = 1, windup = 1.0, lunge = 9.0, damage = 30, heavy = true, recovery = 1.3, kit = 379 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  might = 1.15
+  pattern = "chained bolt"
+  text = "Sparks crawl over Skum's back; the pool hums."
+  shove = 5.0
+  look = 10604
+
+# Verdan the Everliving: what grows over Naralex's dream.
+[[mob]]
+key = "wc_verdan"
+name = "Verdan the Everliving"
+subname = "Wailing Caverns"
+display = 480
+scale = 0.85
+health = 1600
+run_speed = 5.8
+walk_speed = 1.8
+aggro = 18.0
+leash = 30.0
+boss = true
+posture = 340
+drops = { deviate_fang = [30, 40] }
+trophy = { verdan_breastplate = 1 }
+gear = ["verdan_breastplate"]
+respawn = 0.0
+# Whoever read the disciple's journal meets what Naralex truly dreams.
+then = "wc_mutanus"
+then_after = 4.0
+then_needs = "naralex_dream"
+then_text = "Verdan collapses into a heap of roots, and something comes up through them. Far off, Naralex screams in his sleep."
+then_kit = 356
+then_look = 27812
+  [mob.attack]
+  windup = 0.9
+  damage = 32
+  range = 3.8
+  arc = 150.0
+  recovery = 1.15
+  cooldown = 1.5
+  turn_rate = 160.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "slams"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.85, damage = 28, recovery = 0.25 }, { clip = 17, take = 1, windup = 0.7, damage = 30, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "grasping vines"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.2, damage = 24, range = 24.0, radius = 4.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "wild growth"
+  weight = 1.5
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 6.5, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.3, kit = 356, look = 26271 } ]
+  [[mob.pattern]]
+  name = "everliving"
+  weight = 2.5
+  below = 0.3
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 24, heavy = false, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.45, damage = 24, heavy = false, recovery = 0.1 }, { clip = 54, windup = 0.8, range = 6.5, arc = 360.0, damage = 30, heavy = true, blockable = false, recovery = 1.7, look = 26271 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "wild growth"
+  text = "Verdan's roots rip up out of the floor all round it."
+  summon = ["wc_lasher", "wc_lasher"]
+  look = 26271
+  [[mob.phase]]
+  at = 0.3
+  speed = 0.78
+  might = 1.15
+  pattern = "everliving"
+  text = "Verdan heals over its wounds in a heave of green; then the green turns black."
+  summon = ["wc_shambler"]
+  shove = 6.0
+  look = 26271
+
+# Mutanus the Devourer: what Naralex truly dreams.
+[[mob]]
+key = "wc_mutanus"
+name = "Mutanus the Devourer"
+subname = "Naralex's Nightmare"
+display = 4910
+scale = 1.0
+health = 1300
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 30.0
+leash = 40.0
+boss = true
+posture = 320
+drops = { deviate_fang = [50, 60] }
+gear = ["mutanus_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.65
+  damage = 28
+  range = 3.4
+  arc = 130.0
+  recovery = 0.9
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "devour"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.6, damage = 24, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.48, damage = 24, recovery = 0.12 }, { clip = 57, windup = 0.85, damage = 34, heavy = true, recovery = 1.1, kit = 379 } ]
+  # A wail that throws everyone down.
+  [[mob.pattern]]
+  name = "naralex's nightmare"
+  weight = 2.0
+  max_range = 6.0
+  steps = [ { clip = 54, windup = 1.2, range = 7.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 27812 } ]
+  [[mob.pattern]]
+  name = "terrify"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 28, range = 26.0, radius = 4.0, speed = 14.0, spell = 27812, look = 27812, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 28, range = 26.0, radius = 4.0, speed = 14.0, spell = 27812, look = 27812, blockable = false, recovery = 1.3 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "naralex's nightmare"
+  text = "Mutanus wails; every deviate thing in the warren answers."
+  summon = ["wc_ravager", "wc_ravager"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "terrify"
+  text = "Far off, Naralex stirs. Mutanus thrashes, as if it felt him wake."
+  shove = 6.5
+  look = 27812
+
+# The Deviate Faerie Dragon: small, quick, and it blinks.
+[[mob]]
+key = "wc_faerie"
+name = "Deviate Faerie Dragon"
+subname = "Wailing Caverns"
+display = 2158
+health = 650
+run_speed = 8.0
+walk_speed = 2.4
+aggro = 16.0
+leash = 26.0
+evade = 0.4
+boss = true
+posture = 160
+keep_away = 6.0
+drops = { deviate_fang = [20, 26] }
+gear = ["faerie_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 16
+  range = 2.6
+  arc = 100.0
+  recovery = 0.6
+  cooldown = 0.9
+  turn_rate = 280.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "bites"
+  weight = 2.0
+  steps = [ { clip = 17, take = 0, windup = 0.42, damage = 14, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.34, damage = 14, recovery = 0.8 } ]
+  [[mob.pattern]]
+  name = "arcane breath"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 22.0
+  steps = [ { ranged = true, windup = 1.0, damage = 18, range = 22.0, radius = 3.0, speed = 20.0, spell = 116, look = 27808, blockable = false, recovery = 0.9 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.8
+  pattern = "arcane breath"
+  text = "The faerie dragon blinks out of sight and back, laughing."
+  shove = 4.5
+  look = 27808

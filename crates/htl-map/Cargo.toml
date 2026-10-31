@@ -1,0 +1,15 @@
+[package]
+name = "htl-map"
+description = "Builds the Basin Battle arena from the host's own 1.12.1 game data"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+htl-sim = { path = "../htl-sim" }
+benilla-formats.workspace = true
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+toml.workspace = true

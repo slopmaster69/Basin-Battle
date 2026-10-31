@@ -1,0 +1,359 @@
+# Siege: a page of the Smuggler's Logbook that takes heroes to Arathi Basin, where each side holds
+# a camp round its Hearth against waves of creatures, the base wave everyone faces and whatever
+# the other side bought to send. Every creature sent raises the sender's income for the rest of
+# the match, so attacking is also an investment. A match is one against one, two against two
+# (two heroes sharing a camp), three or four each for themselves; the last Hearth standing wins,
+# or the healthiest after the last wave. Everyone starts each match the same: their class's Q
+# and E, the plain kit; the match's gold buys defences, sends and the board's other cards. What
+# a hero carries at camp stays at camp.
+#
+# Read beside survival.toml (its lists join the camp's: the Hearth is a station only Siege
+# builds).
+
+[siege]
+name = "the Siege of Arathi Basin"
+page = "The Siege of Arathi Basin"
+text = "Hold a camp in Arathi Basin against the waves your rivals buy for you, and buy theirs: every creature you send raises your income for the rest of the match."
+# Where heroes wait for a match (Trollbane Hall's yard, looking down into the basin), and the
+# Blacksmith between the camps (the contested middle: its veins pay gold).
+lobby = [1294.4, 1308.9, -10.8]
+lobby_facing = 3.95
+middle = [995.7, 1025.9, -43.7]
+# Seconds from a match filling to its start (each hero is told which camp they'll hold); before
+# the first wave; each wave (the next comes on time, the last one beaten or not, unless everyone
+# is ready sooner: F at your Hearth, and it comes `ready_secs` after the last one is); the warning
+# of what's been bought for you; after the end, before everyone is back in the hall.
+countdown = 15.0
+first_gap = 45.0
+wave_secs = 55.0
+warn_secs = 10.0
+over_secs = 20.0
+ready_secs = 5.0
+# Waves in a match: after the last one's time is up, the healthiest Hearth wins.
+waves = 20
+# Gold: what a hero starts with, their income paid at every wave's start (each send adds its
+# own), a foe's own `health` times this for felling it, the share of a hero's gold taken by the
+# rival who fells them.
+start_gold = 100
+start_income = 20
+kill_gold = 0.08
+steal = 0.15
+# A camp's building ground round its Hearth, and how far out along the way to the middle its gate
+# is (where the waves come in).
+build_radius = 40.0
+gate_walk = 70.0
+# Down in a match: back up at your Hearth this long after.
+respawn_secs = 8.0
+# The camps' heart (a station of its own, below).
+hearth = "hearth"
+# What a defence costs in a match, in gold (mending a wrecked one: half).
+build = { palisade = 15, barricade = 20, watchtower = 60 }
+# A card from the board (N), by its row, in gold.
+cards = { ranged = 80, close = 80, utility = 60, defense = 70, ultimate = 150 }
+# The base wave every camp faces: what the first is worth (in foes' `cost`), how much more each
+# after, the share more for each hero past the first in the camp, the most at once, and the
+# share more health each wave past the first. A wave not beaten is still there when the next
+# comes, so they're kept small: two or three to begin with, five or six at the end.
+budget = 1.4
+growth = 0.35
+per_hero = 0.6
+most = 6
+toughen = 0.04
+# A match's foes against heroes who start with two cards: this share of their usual health (the
+# camp's are 1.6 times their entry's) and of their blows' damage.
+foe_health = 0.6
+foe_damage = 0.7
+# The most creatures a hero can send for one wave: 4 for the first, one more each wave after
+# (8 by the fifth, 23 by the twentieth).
+send_cap = 4
+send_cap_growth = 1
+# The gold a gather at one of the contested middle's veins pays (`[[siege.node]]` below).
+vein_gold = 12
+# Every wave's start, each hero still standing is given these (the only food and salves in a
+# match), up to `supply_most` of each in the bags.
+supply = { roast = 1, salve = 1 }
+supply_most = 3
+
+# The camps, round the basin: the Stables (north-east), the Farm (south-west), the Gold Mine
+# (south-east, down in its pit) and the Lumber Mill (north-west, up on its bluff). `facing` looks
+# toward the middle.
+[[siege.base]]
+key = "stables"
+name = "the Stables"
+at = [1177.7, 1183.4, -56.2]
+facing = 3.85
+
+[[siege.base]]
+key = "farm"
+name = "the Farm"
+at = [824.0, 826.5, -57.7]
+facing = 0.86
+
+[[siege.base]]
+key = "gold_mine"
+name = "the Gold Mine"
+at = [1172.0, 829.2, -102.6]
+facing = 2.30
+
+[[siege.base]]
+key = "lumber_mill"
+name = "the Lumber Mill"
+at = [813.1, 1183.6, 11.9]
+facing = 5.57
+
+# The ways to play: which camps, and how many heroes share each.
+[[siege.mode]]
+key = "1v1"
+name = "One against one"
+text = "The Stables against the Farm, across the basin."
+bases = ["stables", "farm"]
+per_base = 1
+
+[[siege.mode]]
+key = "2v2"
+name = "Two against two"
+text = "Two heroes to a camp, the Stables against the Farm: one Hearth, two purses."
+bases = ["stables", "farm"]
+per_base = 2
+
+[[siege.mode]]
+key = "1v1v1"
+name = "Three, each for themselves"
+text = "The Stables, the Gold Mine and the Lumber Mill: send to whom you like."
+bases = ["stables", "gold_mine", "lumber_mill"]
+per_base = 1
+
+[[siege.mode]]
+key = "1v1v1v1"
+name = "Four, each for themselves"
+text = "Every camp in the basin taken: send to whom you like."
+bases = ["stables", "farm", "gold_mine", "lumber_mill"]
+per_base = 1
+
+# The base wave's foes: each from its wave on, worth its cost.
+[[siege.roster]]
+mob = "boar"
+from = 1
+cost = 0.6
+[[siege.roster]]
+mob = "wolf"
+from = 1
+cost = 0.6
+[[siege.roster]]
+mob = "kobold_vermin"
+from = 1
+cost = 0.5
+[[siege.roster]]
+mob = "gnoll_runt"
+from = 1
+cost = 0.7
+[[siege.roster]]
+mob = "murloc_forager"
+from = 2
+cost = 0.7
+[[siege.roster]]
+mob = "kobold_laborer"
+from = 3
+cost = 0.9
+[[siege.roster]]
+mob = "defias_thug"
+from = 3
+cost = 1.0
+[[siege.roster]]
+mob = "defias_footpad"
+from = 4
+cost = 0.9
+[[siege.roster]]
+mob = "prowler"
+from = 4
+cost = 0.9
+[[siege.roster]]
+mob = "defias_conjurer"
+from = 5
+cost = 0.9
+[[siege.roster]]
+mob = "gnoll_brute"
+from = 6
+cost = 1.4
+[[siege.roster]]
+mob = "blackrock_grunt"
+from = 8
+cost = 1.4
+[[siege.roster]]
+mob = "black_bear"
+from = 9
+cost = 1.6
+[[siege.roster]]
+mob = "defiler"
+from = 10
+cost = 1.3
+
+# The mercenary board: who you can send, at what, the income each adds for the rest of the
+# match, and from which wave. What's bought comes with the target's next wave (they're warned
+# `warn_secs` before). `once`: one per hero per match.
+[[siege.send]]
+key = "kobolds"
+mob = "kobold_laborer"
+count = 3
+cost = 15
+income = 1
+from = 1
+text = "Three kobold diggers: they swarm whatever stands in the way."
+
+[[siege.send]]
+key = "murlocs"
+mob = "murloc_forager"
+count = 4
+cost = 25
+income = 2
+from = 2
+text = "Four murlocs, quick and weak: they surround a hero alone."
+
+[[siege.send]]
+key = "wolves"
+mob = "wolf"
+count = 3
+cost = 30
+income = 2
+from = 2
+text = "A pack of three wolves: they circle and bite from behind."
+
+[[siege.send]]
+key = "footpads"
+mob = "defias_footpad"
+count = 2
+cost = 40
+income = 3
+from = 3
+text = "Two Defias footpads: quick blades that punish a guard held too long."
+
+[[siege.send]]
+key = "spiders"
+mob = "mine_spider"
+count = 2
+cost = 45
+income = 3
+from = 4
+text = "Two mine spiders out of Jasperlode."
+
+[[siege.send]]
+key = "brute"
+mob = "gnoll_brute"
+count = 1
+cost = 60
+income = 4
+from = 4
+text = "A Riverpaw brute: a slow, heavy overhead that punishes greed."
+
+[[siege.send]]
+key = "conjurers"
+mob = "defias_conjurer"
+count = 2
+cost = 70
+income = 5
+from = 5
+text = "Two Defias conjurers: fire from afar on heroes and towers alike."
+
+[[siege.send]]
+key = "berserkers"
+mob = "berserker"
+count = 2
+cost = 80
+income = 5
+from = 6
+text = "Two Darkspear berserkers: flurries of three (parry the first and the rest never come)."
+
+[[siege.send]]
+key = "mystics"
+mob = "gnoll_mystic"
+count = 2
+cost = 90
+income = 6
+from = 7
+text = "Two Riverpaw mystics: lightning from the back of the wave."
+
+[[siege.send]]
+key = "bear"
+mob = "black_bear"
+count = 1
+cost = 100
+income = 6
+from = 7
+text = "An Elwynn black bear: a lot of health and heavy paws."
+
+[[siege.send]]
+key = "brave"
+mob = "brave"
+count = 1
+cost = 110
+income = 7
+from = 8
+text = "A Bloodhoof brave with his great mace (poised: a light blow doesn't knock it aside)."
+
+[[siege.send]]
+key = "overseer"
+mob = "overseer"
+count = 1
+cost = 120
+income = 8
+from = 8
+text = "A Warsong overseer and his two-handed axe: wide cleaves, an overhead through the guard."
+
+[[siege.send]]
+key = "hogger"
+mob = "hogger"
+count = 1
+cost = 400
+income = 25
+from = 10
+once = true
+text = "Hogger himself. One per hero per match."
+
+[[siege.send]]
+key = "warlord"
+mob = "warlord"
+count = 1
+cost = 700
+income = 40
+from = 12
+once = true
+text = "Warlord Gorzak and his great axe, whirlwind and all. One per hero per match."
+
+# A camp's Hearth: its heart. It falls, the camp is out. Only Siege builds one (never the build
+# menu); raiders go for it once nothing stands in their way.
+[[station]]
+key = "hearth"
+name = "Hearth"
+display = 655
+icon = "Spell_Fire_Fire"
+scale = 1.6
+footprint = 2.5
+cost = {}
+repair = {}
+health = 4000
+menu = false
+text = "The camp's heart. If it falls, the camp is out."
+
+# Gold, as costs read in a match (it's a purse, not something carried).
+[[item]]
+key = "gold"
+name = "Gold"
+display = 7368
+stack = 1000000
+icon = "INV_Misc_Coin_01"
+kind = "resource"
+text = "Siege's gold: from your income, the foes you fell and the Blacksmith's veins."
+
+# The Blacksmith's veins round the middle (gathered for gold, not ore).
+[[siege.node]]
+key = "siege_vein"
+item = "ore"
+name = "Rich Vein"
+display = 310
+gather_secs = 3.0
+yield = [1, 1]
+uses = 1
+respawn = 60.0
+areas = [ { at = [995.7, 1025.9], radius = 24.0 } ]
+count = 6
+spacing = 6.0

@@ -1,0 +1,618 @@
+From f0ef08d7b4a6639fb657dfe0ab15436d2730bf7a Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Fri, 30 Oct 2026 00:42:21 -0600
+Subject: [PATCH] Ability markers: aim shapes, strips, shapes at a spot, a
+ friend's colour
+
+The eighth round of the action-combat calls. SetAimMarker also lays a
+strip (a projectile's path), a cone or a ring round the hero along the
+view; SetTelegraph takes a strip shape (with its width) and a friendly
+kind (blue); SetTelegraphAt lays a shape on the ground at a spot facing a
+way (a sky-fall's ring, a strip). HasActionCombat is 8.
+---
+ crates/benilla-app/src/target/aim_marker.rs |   4 +-
+ crates/benilla-app/src/target/telegraph.rs  | 189 ++++++++++++++++----
+ crates/benilla-ui/src/action_combat.rs      | 160 ++++++++++++++---
+ 3 files changed, 301 insertions(+), 52 deletions(-)
+
+diff --git a/crates/benilla-app/src/target/aim_marker.rs b/crates/benilla-app/src/target/aim_marker.rs
+index 3a69c765..9f4f9f82 100644
+--- a/crates/benilla-app/src/target/aim_marker.rs
++++ b/crates/benilla-app/src/target/aim_marker.rs
+@@ -188,7 +188,9 @@ pub(super) fn update_aim_marker(
+     mut grounds: ResMut<GroundMarkers>,
+ ) {
+     let feet = me.single().ok().map(|t| t.translation());
+-    match (action_combat::aim_marker(), feet) {
++    // The strip, cone and ring shapes lie under the hero (`super::telegraph`); this is the circle.
++    let circle = action_combat::aim_marker().filter(|m| m.shape == action_combat::AimShape::Circle);
++    match (circle, feet) {
+         (Some(m), Some(feet)) => {
+             let at = aim_point(&spatial, &occluders, feet, m.range);
+             state.circle.place(&decals, at, m.radius.max(0.3));
+diff --git a/crates/benilla-app/src/target/telegraph.rs b/crates/benilla-app/src/target/telegraph.rs
+index 4d7f8b81..54968e62 100644
+--- a/crates/benilla-app/src/target/telegraph.rs
++++ b/crates/benilla-app/src/target/telegraph.rs
+@@ -6,6 +6,11 @@
+ //! window; one no guard stops is red. A blow meant for someone else is fainter. No stroke: the
+ //! areas are soft fills.
+ //!
++//! A hero's ability is drawn the same way (the eighth round): a wind-up under them (a wedge, a
++//! ring, or a strip along their facing), or a shape laid at a spot (a sky-fall's ring, a strip),
++//! red to their foes and blue to themselves and their friends. While an ability is aimed, its
++//! shape lies under the hero too, along the view: a projectile's path, a cone, a ring round them.
++//!
+ //! The shapes are textures made here (no game file), projected through the ground-targeting
+ //! reticle's decal projector ([`super::reticle`]).
+ 
+@@ -15,7 +20,8 @@ use bevy::asset::RenderAssetUsages;
+ use bevy::prelude::*;
+ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+ 
+-use benilla_ui::action_combat::{self, TelegraphCall};
++use benilla_assets::coords::wow_to_bevy;
++use benilla_ui::action_combat::{self, AimShape, TeleKind, TeleShape, TelegraphCall};
+ use benilla_world::decal::{DecalFrame, WorldDecal};
+ use benilla_world::particles::buffer::EffectVertex;
+ use benilla_world::view::WorldCamera;
+@@ -33,11 +39,15 @@ const LINGER: f32 = 0.15;
+ const RED: [f32; 3] = [1.0, 0.16, 0.1];
+ const ORANGE: [f32; 3] = [1.0, 0.55, 0.15];
+ const GOLD: [f32; 3] = [1.0, 0.88, 0.35];
++/// A friend's (and our own) ability, and the aim's shape under us.
++const BLUE: [f32; 3] = [0.35, 0.72, 1.0];
++const AIM: [f32; 3] = [0.6, 0.95, 0.75];
+ 
+ /// One shape projected under a creature: where, how it was cut, its triangles.
+ #[derive(Default)]
+ struct Layer {
+     key: (Vec3, f32, f32, usize),
++    width: f32,
+     verts: Vec<EffectVertex>,
+ }
+ 
+@@ -82,18 +92,57 @@ impl Layer {
+             },
+         );
+     }
++
++    /// A strip from `feet` along the WoW facing `yaw`, `len` long and `width` wide: the frame is
++    /// the strip itself (its x along the facing, z across), the texture's u its length.
++    fn place_line(&mut self, decals: &WorldDecal, feet: Vec3, yaw: f32, len: f32, width: f32) {
++        let key = (feet, yaw, len, decals.receiver_count());
++        if !self.verts.is_empty()
++            && key.0.distance_squared(self.key.0) < 1.0e-4
++            && (key.1 - self.key.1).abs() < 1.0e-3
++            && (key.2 - self.key.2).abs() < 1.0e-3
++            && (width - self.width).abs() < 1.0e-3
++            && key.3 == self.key.3
++        {
++            return;
++        }
++        self.key = key;
++        self.width = width;
++        self.verts.clear();
++        let half = (width / 2.0).max(0.1);
++        let frame = DecalFrame {
++            center: feet,
++            sin: yaw.cos(),
++            cos: -yaw.sin(),
++            min_x: -0.2,
++            max_x: len.max(0.3),
++            min_z: -half,
++            max_z: half,
++            min_y: -VERT,
++            max_y: VERT,
++        };
++        decals.project(
++            &mut self.verts,
++            &frame,
++            |p| ((VERT - p.y.abs()) / VERT).clamp(0.0, 1.0),
++            |x, z| frame.rect_uv(x, z),
++        );
++    }
+ }
+ 
+ /// A blow being telegraphed.
+ struct Telegraph {
+     key: String,
+     unit: u64,
+-    ring: bool,
++    /// At a spot (Bevy space) facing a WoW facing, not under a unit.
++    at: Option<(Vec3, f32)>,
++    shape: TeleShape,
+     reach: f32,
+     arc: f32,
++    width: f32,
+     start: f32,
+     secs: f32,
+-    unblockable: bool,
++    kind: TeleKind,
+     parry: f32,
+     focus: bool,
+     outline: Layer,
+@@ -103,8 +152,41 @@ struct Telegraph {
+ #[derive(Resource, Default)]
+ pub(super) struct Telegraphs {
+     list: Vec<Telegraph>,
+-    /// The shape textures, by (ring, arc in whole degrees, filled).
+-    textures: HashMap<(bool, u16, bool), Handle<Image>>,
++    /// The aimed ability's shape under the hero (a strip, a cone, a ring), while one is up.
++    aim: Option<(TeleShape, f32)>,
++    aim_layer: Layer,
++    /// The shape textures, by (shape, arc in whole degrees, filled).
++    textures: HashMap<(u8, u16, bool), Handle<Image>>,
++}
++
++/// A strip's texture: its area with softened sides, brighter toward its far end when `filled`.
++fn line_image(filled: bool) -> Image {
++    let mut data = vec![0u8; (TEX * TEX * 4) as usize];
++    for j in 0..TEX {
++        for i in 0..TEX {
++            // u (i) along the strip, v (j) across it.
++            let u = (i as f32 + 0.5) / TEX as f32;
++            let v = (j as f32 + 0.5) / TEX as f32;
++            let edge = (u.min(1.0 - u) / 0.02).min(v.min(1.0 - v) / 0.08).clamp(0.0, 1.0);
++            if u < 0.01 || u > 0.99 || v < 0.02 || v > 0.98 {
++                continue;
++            }
++            let a = if filled { (40.0 + 90.0 * u * u) * edge } else { (40.0 + 30.0 * u) * edge };
++            let k = ((j * TEX + i) * 4) as usize;
++            data[k..k + 4].copy_from_slice(&[255, 255, 255, a as u8]);
++        }
++    }
++    Image::new(
++        Extent3d {
++            width: TEX,
++            height: TEX,
++            depth_or_array_layers: 1,
++        },
++        TextureDimension::D2,
++        data,
++        TextureFormat::Rgba8UnormSrgb,
++        RenderAssetUsages::default(),
++    )
+ }
+ 
+ /// A shape texture: `filled` a soft fill brightening outward to the edge, else the area (a faint
+@@ -156,24 +238,41 @@ impl Telegraphs {
+     fn texture(
+         &mut self,
+         images: &mut Assets<Image>,
+-        ring: bool,
++        shape: TeleShape,
+         arc: f32,
+         filled: bool,
+     ) -> Handle<Image> {
+-        let key = (ring, if ring { 360 } else { arc.round() as u16 }, filled);
++        let (code, arc_key) = match shape {
++            TeleShape::Ring => (1u8, 360),
++            TeleShape::Line => (2u8, 0),
++            TeleShape::Wedge => (0u8, arc.round() as u16),
++        };
+         self.textures
+-            .entry(key)
+-            .or_insert_with(|| images.add(shape_image(ring, arc, filled)))
++            .entry((code, arc_key, filled))
++            .or_insert_with(|| match shape {
++                TeleShape::Line => images.add(line_image(filled)),
++                _ => images.add(shape_image(shape == TeleShape::Ring, arc, filled)),
++            })
+             .clone()
+     }
+ }
+ 
++/// Lay a shape out from `feet` along the WoW facing `yaw`.
++#[allow(clippy::too_many_arguments)]
++fn place_shape(layer: &mut Layer, decals: &WorldDecal, shape: TeleShape, feet: Vec3, yaw: f32, reach: f32, width: f32) {
++    match shape {
++        TeleShape::Line => layer.place_line(decals, feet, yaw, reach, width),
++        _ => layer.place(decals, feet, yaw, reach),
++    }
++}
++
+ /// Take the script's telegraphs, drop the finished and the orphaned, and lay each under its
+ /// creature as it stands now.
+ pub(super) fn update_telegraphs(
+     time: Res<Time>,
+     index: Option<Res<crate::net::GuidIndex>>,
+     units: Query<&GlobalTransform>,
++    me: Query<&GlobalTransform, With<crate::net::SelfPlayer>>,
+     decals: WorldDecal,
+     mut state: ResMut<Telegraphs>,
+ ) {
+@@ -183,11 +282,13 @@ pub(super) fn update_telegraphs(
+             TelegraphCall::Set {
+                 key,
+                 unit,
+-                ring,
++                at,
++                shape,
+                 reach,
+                 arc,
++                width,
+                 secs,
+-                unblockable,
++                kind,
+                 parry,
+                 focus,
+             } => {
+@@ -198,12 +299,14 @@ pub(super) fn update_telegraphs(
+                 state.list.push(Telegraph {
+                     key,
+                     unit,
+-                    ring,
++                    at: at.map(|(p, yaw)| (wow_to_bevy(p), yaw)),
++                    shape,
+                     reach,
+                     arc,
++                    width,
+                     start: now,
+                     secs,
+-                    unblockable,
++                    kind,
+                     parry,
+                     focus,
+                     outline: Layer::default(),
+@@ -216,24 +319,45 @@ pub(super) fn update_telegraphs(
+             },
+         }
+     }
++    // The aimed ability's shape under us, along the view.
++    let aim = action_combat::aim_marker().and_then(|m| match m.shape {
++        AimShape::Line => Some((TeleShape::Line, m.range, m.radius * 2.0, 0.0)),
++        AimShape::Cone => Some((TeleShape::Wedge, m.range, 0.0, m.arc)),
++        AimShape::Ring => Some((TeleShape::Ring, m.radius, 0.0, 360.0)),
++        AimShape::Circle => None,
++    });
++    match (aim, me.single().ok()) {
++        (Some((shape, reach, width, arc)), Some(tf)) => {
++            let yaw = action_combat::view_facing();
++            place_shape(&mut state.aim_layer, &decals, shape, tf.translation(), yaw, reach.max(0.3), width.max(0.3));
++            state.aim = Some((shape, arc));
++        }
++        _ => {
++            state.aim = None;
++            state.aim_layer.verts.clear();
++        }
++    }
+     let Some(index) = index else {
+         state.list.clear();
+         return;
+     };
+     state.list.retain(|t| now <= t.start + t.secs + LINGER);
+     for t in &mut state.list {
+-        let Some(tf) = index.0.get(&t.unit).and_then(|e| units.get(*e).ok()) else {
+-            t.outline.verts.clear();
+-            t.sweep.verts.clear();
+-            continue;
++        let (feet, yaw) = match t.at {
++            Some(spot) => spot,
++            None => {
++                let Some(tf) = index.0.get(&t.unit).and_then(|e| units.get(*e).ok()) else {
++                    t.outline.verts.clear();
++                    t.sweep.verts.clear();
++                    continue;
++                };
++                (tf.translation(), tf.rotation().to_euler(EulerRot::YXZ).0)
++            }
+         };
+-        let feet = tf.translation();
+-        let yaw = tf.rotation().to_euler(EulerRot::YXZ).0;
+-        t.outline.place(&decals, feet, yaw, t.reach);
++        place_shape(&mut t.outline, &decals, t.shape, feet, yaw, t.reach, t.width);
+         if t.focus {
+             let share = ((now - t.start) / t.secs.max(0.05)).clamp(0.0, 1.0);
+-            t.sweep
+-                .place(&decals, feet, yaw, (t.reach * share).max(0.15));
++            place_shape(&mut t.sweep, &decals, t.shape, feet, yaw, (t.reach * share).max(0.15), t.width);
+         }
+     }
+ }
+@@ -274,21 +398,26 @@ pub(super) fn push_telegraphs(
+         return;
+     };
+     let now = time.elapsed_secs();
++    if let Some((shape, arc)) = state.aim {
++        let tex = state.texture(&mut images, shape, arc, false);
++        push_layer(&mut draw, cam, tex.id(), &state.aim_layer, AIM, 0.9);
++    }
+     let mut jobs = Vec::new();
+     for k in 0..state.list.len() {
+-        let (ring, arc) = (state.list[k].ring, state.list[k].arc);
+-        let outline = state.texture(&mut images, ring, arc, false);
+-        let fill = state.texture(&mut images, ring, arc, true);
++        let (shape, arc) = (state.list[k].shape, state.list[k].arc);
++        let outline = state.texture(&mut images, shape, arc, false);
++        let fill = state.texture(&mut images, shape, arc, true);
+         jobs.push((k, outline, fill));
+     }
+     for (k, outline, fill) in jobs {
+         let t = &state.list[k];
+         let elapsed = now - t.start;
+-        let in_window = !t.unblockable && elapsed >= t.secs - t.parry && elapsed <= t.secs + 0.05;
+-        let (rgb, alpha) = match (t.unblockable, in_window) {
+-            (true, _) => (RED, 0.95),
+-            (false, true) => (GOLD, 1.0),
+-            (false, false) => (ORANGE, 0.85),
++        let in_window = t.kind == TeleKind::Block && elapsed >= t.secs - t.parry && elapsed <= t.secs + 0.05;
++        let (rgb, alpha) = match (t.kind, in_window) {
++            (TeleKind::Unblockable, _) => (RED, 0.95),
++            (TeleKind::Friendly, _) => (BLUE, 0.8),
++            (TeleKind::Block, true) => (GOLD, 1.0),
++            (TeleKind::Block, false) => (ORANGE, 0.85),
+         };
+         let alpha = if t.focus { alpha } else { alpha * 0.5 };
+         push_layer(&mut draw, cam, outline.id(), &t.outline, rgb, alpha);
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index e8021e17..92e97f38 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -64,9 +64,11 @@
+ //!
+ //! The fifth round (`HasActionCombat() >= 5`), the ground under an aimed ability:
+ //!
+-//! - `SetAimMarker(shape, range, radius)`: a circle (`shape` `"circle"`) `radius` yards wide on
+-//!   the ground where the reticle's line lands within `range` yards, drawn every frame until
+-//!   `SetAimMarker(nil)`.
++//! - `SetAimMarker(shape, range, radius[, arc])`: a circle (`shape` `"circle"`) `radius` yards wide
++//!   on the ground where the reticle's line lands within `range` yards, drawn every frame until
++//!   `SetAimMarker(nil)`. From the eighth round also `"line"` (a strip from the feet along the view,
++//!   `range` long and `radius` either side: a projectile's path), `"cone"` (`range` out over `arc`
++//!   degrees) and `"self"` (a ring `radius` round the feet).
+ //! - `GetAimPoint()`: where that is (WoW `x, y, z`), or nil with no marker up.
+ //! - `SetGroundMarker(key, x, y, z, radius, seconds[, hostile])`: a circle on the ground there for
+ //!   that long (red when `hostile`, else green); the same key again moves it.
+@@ -80,6 +82,11 @@
+ //! - Our own body takes the server's sheath byte (as others' do) while an add-on drives the action
+ //!   layer, so a spell's stow or a throw's ranged draw hands the weapon back once its clip is done.
+ //!
++//! The eighth (`HasActionCombat() >= 8`): `SetTelegraph`'s shape may be `"line"` (a strip `reach`
++//! long, its tenth argument the width) and its kind `"friendly"` (a friend's, blue);
++//! `SetTelegraphAt(key, x, y, z, facing, shape, reach, arc, seconds, kind, width, focus)` lays one
++//! on the ground at a spot (a sky-fall's ring, a strip), facing that way; the aim marker's shapes.
++//!
+ //! The seventh (`HasActionCombat() >= 7`), a creature's blow drawn under it:
+ //!
+ //! - `SetTelegraph(key, unit, shape, reach, arcDegrees, seconds, kind, parrySeconds, focus)`: a
+@@ -389,11 +396,23 @@ pub fn aim_shape() -> (f32, f32, f32) {
+     (f(&AIM_DISTANCE), f(&AIM_RIGHT), f(&AIM_UP))
+ }
+ 
++/// The aim marker's shape: a circle where the reticle lands, a strip or a cone from the feet
++/// along the view, or a ring round the feet.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum AimShape {
++    Circle,
++    Line,
++    Cone,
++    Ring,
++}
++
+ /// The aim's ground marker the add-on asks for.
+ #[derive(Clone, Copy, Debug, PartialEq)]
+ pub struct AimMarker {
++    pub shape: AimShape,
+     pub range: f32,
+     pub radius: f32,
++    pub arc: f32,
+ }
+ 
+ static AIM_MARKER: std::sync::Mutex<Option<AimMarker>> = std::sync::Mutex::new(None);
+@@ -432,17 +451,53 @@ pub enum GroundMarkerCall {
+ 
+ static GROUND_MARKERS: std::sync::Mutex<Vec<GroundMarkerCall>> = std::sync::Mutex::new(Vec::new());
+ 
+-/// A blow's telegraph asked for or taken away.
++/// A telegraph's shape: a wedge of its arc, a ring all round, a strip.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum TeleShape {
++    Wedge,
++    Ring,
++    Line,
++}
++
++/// Whose it is and what stops it: a guard (orange, gold for the parry), nothing (red), or a
++/// friend's (blue).
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum TeleKind {
++    Block,
++    Unblockable,
++    Friendly,
++}
++
++fn tele_shape(v: Option<&Value>) -> TeleShape {
++    match text(v).map(|s| s.to_ascii_lowercase()).as_deref() {
++        Some("ring") => TeleShape::Ring,
++        Some("line") => TeleShape::Line,
++        _ => TeleShape::Wedge,
++    }
++}
++
++fn tele_kind(v: Option<&Value>) -> TeleKind {
++    match text(v).map(|s| s.to_ascii_lowercase()).as_deref() {
++        Some("unblockable") => TeleKind::Unblockable,
++        Some("friendly") => TeleKind::Friendly,
++        _ => TeleKind::Block,
++    }
++}
++
++/// A blow's telegraph asked for or taken away: under a unit (`unit`), or at a spot facing a way
++/// (`at`, WoW coordinates and facing).
+ #[derive(Clone, Debug, PartialEq)]
+ pub enum TelegraphCall {
+     Set {
+         key: String,
+         unit: u64,
+-        ring: bool,
++        at: Option<([f32; 3], f32)>,
++        shape: TeleShape,
+         reach: f32,
+         arc: f32,
++        width: f32,
+         secs: f32,
+-        unblockable: bool,
++        kind: TeleKind,
+         parry: f32,
+         focus: bool,
+     },
+@@ -595,7 +650,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(7))?,
++        lua.create_function(|_, _: MultiValue| Ok(8))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -807,12 +862,13 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 push_telegraph(TelegraphCall::Set {
+                     key,
+                     unit,
+-                    ring: text(v.get(2)).is_some_and(|s| s.eq_ignore_ascii_case("ring")),
++                    at: None,
++                    shape: tele_shape(v.get(2)),
+                     reach,
+                     arc: number(v.get(4), 1.0, 360.0).unwrap_or(90.0),
++                    width: number(v.get(9), 0.0, 60.0).unwrap_or(0.0),
+                     secs,
+-                    unblockable: text(v.get(6))
+-                        .is_some_and(|s| s.eq_ignore_ascii_case("unblockable")),
++                    kind: tele_kind(v.get(6)),
+                     parry: number(v.get(7), 0.0, 5.0).unwrap_or(0.0),
+                     focus: truthy(v.get(8)),
+                 });
+@@ -820,6 +876,35 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetTelegraphAt",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(key), Some(x), Some(y), Some(z), Some(reach), Some(secs)) = (
++                text(v.first()),
++                number(v.get(1), -1.0e6, 1.0e6),
++                number(v.get(2), -1.0e6, 1.0e6),
++                number(v.get(3), -1.0e6, 1.0e6),
++                number(v.get(6), 0.1, 80.0),
++                number(v.get(8), 0.05, 30.0),
++            ) {
++                push_telegraph(TelegraphCall::Set {
++                    key,
++                    unit: 0,
++                    at: Some(([x, y, z], number(v.get(4), -100.0, 100.0).unwrap_or(0.0))),
++                    shape: tele_shape(v.get(5)),
++                    reach,
++                    arc: number(v.get(7), 1.0, 360.0).unwrap_or(360.0),
++                    width: number(v.get(10), 0.0, 60.0).unwrap_or(0.0),
++                    secs,
++                    kind: tele_kind(v.get(9)),
++                    parry: 0.0,
++                    focus: truthy(v.get(11)),
++                });
++            }
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "ClearTelegraph",
+         lua.create_function(|_, args: MultiValue| {
+@@ -871,12 +956,20 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+         "SetAimMarker",
+         lua.create_function(|_, args: MultiValue| {
+             let v: Vec<Value> = args.into_iter().collect();
+-            let want = match (
+-                text(v.first()).as_deref(),
+-                number(v.get(1), 0.0, 200.0),
+-                number(v.get(2), 0.0, 60.0),
+-            ) {
+-                (Some("circle"), Some(range), Some(radius)) => Some(AimMarker { range, radius }),
++            let shape = match text(v.first()).map(|s| s.to_ascii_lowercase()).as_deref() {
++                Some("circle") => Some(AimShape::Circle),
++                Some("line") => Some(AimShape::Line),
++                Some("cone") => Some(AimShape::Cone),
++                Some("self") => Some(AimShape::Ring),
++                _ => None,
++            };
++            let want = match (shape, number(v.get(1), 0.0, 200.0), number(v.get(2), 0.0, 60.0)) {
++                (Some(shape), Some(range), Some(radius)) => Some(AimMarker {
++                    shape,
++                    range,
++                    radius,
++                    arc: number(v.get(3), 1.0, 360.0).unwrap_or(90.0),
++                }),
+                 _ => None,
+             };
+             if let Ok(mut m) = AIM_MARKER.lock() {
+@@ -1009,8 +1102,10 @@ mod tests {
+         assert_eq!(
+             aim_marker(),
+             Some(AimMarker {
++                shape: AimShape::Circle,
+                 range: 30.0,
+-                radius: 5.0
++                radius: 5.0,
++                arc: 90.0
+             })
+         );
+         let calls = take_ground_markers();
+@@ -1058,11 +1153,13 @@ mod tests {
+             TelegraphCall::Set {
+                 key: "es9".into(),
+                 unit: 0xF130000000000025,
+-                ring: false,
++                at: None,
++                shape: TeleShape::Wedge,
+                 reach: 3.4,
+                 arc: 120.0,
++                width: 0.0,
+                 secs: 1.2,
+-                unblockable: false,
++                kind: TeleKind::Block,
+                 parry: 0.25,
+                 focus: true,
+             }
+@@ -1070,8 +1167,8 @@ mod tests {
+         assert!(matches!(
+             &calls[1],
+             TelegraphCall::Set {
+-                ring: true,
+-                unblockable: true,
++                shape: TeleShape::Ring,
++                kind: TeleKind::Unblockable,
+                 focus: false,
+                 ..
+             }
+@@ -1084,6 +1181,27 @@ mod tests {
+         );
+     }
+ 
++    #[test]
++    fn the_eighth_rounds_strips_spots_friends_and_aim_shapes() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        lua.load(r#"SetTelegraph("es1", "0x0000000000000007", "line", 14, 0, 0.5, "friendly", 0, 1, 3) SetTelegraphAt("es2", 10, 20, 5, 1.5, "ring", 6, 360, 1.25, "unblockable", 0, 1) SetAimMarker("cone", 10, 0, 70)"#)
++            .exec()
++            .unwrap();
++        let calls = take_telegraphs();
++        assert!(matches!(
++            &calls[0],
++            TelegraphCall::Set { shape: TeleShape::Line, kind: TeleKind::Friendly, width, .. } if (*width - 3.0).abs() < 1e-4
++        ));
++        assert!(matches!(
++            &calls[1],
++            TelegraphCall::Set { unit: 0, at: Some((p, f)), shape: TeleShape::Ring, kind: TeleKind::Unblockable, .. }
++                if *p == [10.0, 20.0, 5.0] && (*f - 1.5).abs() < 1e-4
++        ));
++        assert!(matches!(aim_marker(), Some(AimMarker { shape: AimShape::Cone, arc, .. }) if (arc - 70.0).abs() < 1e-4));
++        lua.load("SetAimMarker(nil)").exec().unwrap();
++    }
++
+     #[test]
+     fn the_move_keys_come_back_as_held() {
+         for (f, s) in [(0, 0), (1, 0), (-1, 1), (0, -1), (1, 1)] {
+-- 
+2.43.0
+

@@ -1,0 +1,12 @@
+[package]
+name = "addon-harness"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Runs the add-on in benilla's own UI script host (the client's Lua and frame API) with
+# stand-ins for the stock interface: see scripts/check-addon.sh.
+[dependencies]
+benilla-ui = { git = "https://github.com/samwhosung/benilla", rev = "c23d0163d5efa1ae39e4748877fe4ba831202848" }
+
+[workspace]

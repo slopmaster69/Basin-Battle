@@ -1,0 +1,24 @@
+[workspace]
+resolver = "2"
+members = ["crates/htl-sim", "crates/htl-survival", "crates/htl-map", "crates/htl-server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+toml_edit = "0.22"
+rand = "0.8"
+crossbeam-channel = "0.5"
+# benilla, pinned: the client we target. Its protocol crate gives us opcode numbers and a real
+# client to test against; its formats crate reads the host's 1.12.1 data for the arena.
+benilla-protocol = { git = "https://github.com/samwhosung/benilla", rev = "c23d0163d5efa1ae39e4748877fe4ba831202848" }
+benilla-formats = { git = "https://github.com/samwhosung/benilla", rev = "c23d0163d5efa1ae39e4748877fe4ba831202848", default-features = false }
+wow_srp = { version = "0.7", default-features = false, features = ["srp-default-math"] }
+
+[profile.release]
+debug = 1

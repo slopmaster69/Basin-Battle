@@ -1,0 +1,1228 @@
+# Shadowfang Keep: Arugal's keep in Silverpine, its halls full of his worgen and its old lords'
+# ghosts. A dungeon of its own beside the Deadmines (read like deadmines.toml: its lists join the
+# rest; [dungeon] is its world).
+#
+# Places are WoW coordinates on map 33 (Shadowfang: x north, y west, z up), only the keep's part
+# of it read. In by the gate; the courtyard (Rethilgore, and Razorclaw in the kitchen yard at its
+# south end); the great hall east (Baron Silverlaine's ghost, and the second lamp); the chapel up in
+# the west wing (Commander Springvale); the walk above the courtyard (Odo the Blindwatcher); the
+# upper rooms (Fenrus) and the rampart (Wolf Master Nandos); and the top, where Arugal waits. Out
+# by the gate.
+
+[dungeon]
+key = "shadowfang"
+name = "Shadowfang Keep"
+map = 33
+map_dir = "Shadowfang"
+area = 209
+window = [[-330.0, 2040.0], [-40.0, 2350.0]]
+icon = "Spell_Shadow_Charm"
+blurb = "Arugal's keep in Silverpine, full of his worgen and its old lords' ghosts"
+first_page = "The keep's gate, under the broken portcullis. The howling starts past the courtyard."
+welcome = "Shadowfang Keep. Arugal's worgen hold the halls, and the keep's old lords haven't left either. Two lamps: one at the gate, one at the far end of the great hall. Rest at a lamp to heal, fill your Draughts (T) and send the keep's dwellers back to their posts. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "moonsilver"
+hero_health = 0.7
+exit = [-234.6, 2117.9, 77.3]
+exit_radius = 5.0
+exit_boss = "arugal"
+weapon_chance = 0.08
+armor_chance = 0.06
+boss_extra_chance = 0.25
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# --- lamps: only two ---------------------------------------------------------------------------------
+
+[[dungeon.lamp]]
+key = "shadowfang_gate"
+name = "The Keep's Gate"
+at = [-234.6, 2117.9, 77.3]
+facing = 1.57
+
+[[dungeon.lamp]]
+key = "shadowfang_hall"
+name = "The Great Hall's Hearth"
+at = [-66.5, 2153.5, 87.6]
+facing = 3.14
+
+# --- secrets -----------------------------------------------------------------------------------------
+
+# Arugal's study, high in the west wing: his journal, and what he did to himself.
+[[dungeon.door]]
+key = "arugal_journal"
+name = "Arugal's Study"
+kind = "hidden"
+at = [-247.4, 2319.5, 97.0]
+find = 4.0
+reveals = ["study_cache", "arugal_last_entry"]
+text = "a study high in the west wing, its desk under a drift of torn pages: Arugal's journal. The last entries are in a hand that shakes, then claws."
+
+[[dungeon.box]]
+key = "study_cache"
+at = [-246.6, 2317.5, 96.5]
+facing = 0.0
+loot = { draught_flask = 1, moonsilver = 14 }
+
+[[dungeon.note]]
+key = "arugal_last_entry"
+name = "Arugal's Journal, the Last Page"
+at = [-248.5, 2321.0, 97.0]
+facing = 0.0
+text = "\"My children. My beautiful children. The curse that made them is in my blood now too; I have tasted it. When they come for me, and they will, let them see what their father truly is.\""
+
+# The kitchen yard's cellar, behind Razorclaw's block: the butcher's own larder.
+[[dungeon.door]]
+key = "butcher_larder"
+name = "The Butcher's Larder"
+kind = "hidden"
+at = [-210.0, 2273.0, 73.6]
+find = 3.5
+reveals = ["larder_cache"]
+text = "behind the butcher's block, a larder nobody wanted to open. Under the meat, someone's savings."
+
+[[dungeon.box]]
+key = "larder_cache"
+at = [-209.0, 2275.0, 73.6]
+facing = 1.57
+loot = { moonsilver = 16, tonic = 1 }
+
+# A corner of the courtyard where the dead stand watch.
+[[dungeon.door]]
+key = "deathsworn_corner"
+name = "The Deathsworn's Corner"
+kind = "hidden"
+at = [-162.2, 2237.8, 77.1]
+find = 4.0
+reveals = ["deathsworn"]
+text = "in the courtyard's far corner the air goes cold. A captain of the dead turns from his watch."
+
+# --- notes -------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "dalaran_report"
+name = "A Kirin Tor Report"
+at = [-222.7, 2117.8, 77.7]
+facing = 1.57
+text = "\"Arugal summoned the worgen to fight the Scourge. He calls them his children. He has locked himself in the top of the keep with them. His study in the west wing is where he wrote everything down, if anyone can reach it.\""
+
+[[dungeon.note]]
+key = "servants_gossip"
+name = "A Servant's Note"
+at = [-233.8, 2177.5, 77.7]
+facing = 0.0
+text = "\"The butcher keeps more than meat behind his block. And don't go in the courtyard's north-east corner after dark: the dead Deathsworn still keep their watch there.\""
+
+# --- the keep's dwellers -----------------------------------------------------------------------------
+
+# The courtyard: Rethilgore and his worgen.
+[[dungeon.pack]]
+mob = "sf_wolfguard"
+at = [-222.5, 2141.0]
+z = 80.9
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sf_rethilgore"
+key = "rethilgore"
+at = [-222.5, 2177.5]
+z = 78.5
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sf_darksoul"
+at = [-210.5, 2201.5]
+z = 78.5
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sf_worg"
+at = [-186.8, 2213.9]
+z = 78.4
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sf_servitor"
+at = [-210.6, 2237.7]
+z = 78.3
+radius = 3.0
+count = 2
+link = 10.0
+
+# The kitchen yard: Razorclaw the Butcher.
+[[dungeon.pack]]
+mob = "sf_razorclaw"
+key = "razorclaw"
+at = [-198.5, 2261.5]
+z = 73.8
+radius = 0.0
+count = 1
+
+# What the cold corner keeps.
+[[dungeon.pack]]
+mob = "sf_deathsworn"
+key = "deathsworn"
+at = [-162.2, 2225.3]
+z = 77.0
+radius = 0.0
+count = 1
+rare = true
+
+# The great hall: Baron Silverlaine's ghost, and his servants.
+[[dungeon.pack]]
+mob = "sf_servitor"
+at = [-138.3, 2153.8]
+z = 87.5
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sf_moonwalker"
+at = [-126.5, 2165.5]
+z = 87.5
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sf_silverlaine"
+key = "silverlaine"
+at = [-102.5, 2153.5]
+z = 87.5
+radius = 0.0
+count = 1
+
+# The west wing: the chapel, Commander Springvale.
+[[dungeon.pack]]
+mob = "sf_steed"
+at = [-282.0, 2275.6]
+z = 96.0
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sf_wolfguard"
+at = [-295.9, 2298.4]
+z = 91.8
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sf_springvale"
+key = "springvale"
+at = [-258.5, 2321.0]
+z = 96.6
+radius = 0.0
+count = 1
+
+# The walk above the courtyard: Odo the Blindwatcher.
+[[dungeon.pack]]
+mob = "sf_odo"
+key = "odo"
+at = [-234.7, 2250.4]
+z = 101.5
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sf_darksoul"
+at = [-187.6, 2141.7]
+z = 97.5
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sf_moonwalker"
+at = [-209.5, 2105.3]
+z = 97.8
+radius = 0.0
+count = 1
+
+# The upper rooms: Fenrus the Devourer.
+[[dungeon.pack]]
+mob = "sf_fenrus"
+key = "fenrus"
+at = [-99.0, 2229.0]
+z = 106.1
+radius = 0.0
+count = 1
+
+# The rampart: Wolf Master Nandos and his pack.
+[[dungeon.pack]]
+mob = "sf_nandos"
+key = "nandos"
+at = [-78.0, 2299.0]
+z = 108.2
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sf_worg"
+at = [-66.1, 2299.2]
+z = 103.3
+radius = 3.0
+count = 3
+link = 14.0
+
+# The top: Archmage Arugal.
+[[dungeon.pack]]
+mob = "sf_arugal"
+key = "arugal"
+at = [-126.2, 2179.3]
+z = 113.1
+radius = 0.0
+count = 1
+
+# The keep's own shadows, while Arugal fights.
+[[dungeon.hazard]]
+name = "Arugal's void"
+at = [-121.0, 2183.0, 113.1]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 2.0
+warn = 1.4
+spell = 27812
+boss = "arugal"
+
+[[dungeon.hazard]]
+name = "Arugal's void"
+at = [-131.0, 2175.0, 113.1]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 4.5
+warn = 1.4
+spell = 27812
+boss = "arugal"
+
+# --- items --------------------------------------------------------------------------------------------
+
+[[item]]
+key = "moonsilver"
+name = "Moonsilver Coin"
+display = 9649
+icon = "INV_Misc_Coin_03"
+kind = "resource"
+stack = 50
+text = "Old Gilnean silver, struck with a moon. The lamps' quartermaster in Shadowfang Keep trades it; you drop it all when you fall below."
+
+[[item]]
+key = "rethilgore_mantle"
+name = "Rethilgore's Pelt Mantle"
+display = 2539
+icon = "INV_Shoulder_06"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.09
+text = "Worgen pelt over leather. It still sheds."
+
+[[item]]
+key = "razorclaw_apron"
+name = "Butcher's Apron"
+display = 12314
+icon = "INV_Chest_Cloth_21"
+kind = "armor"
+slot = "chest"
+reduce = 0.11
+text = "Razorclaw's: stained beyond saving, and stiff with it."
+
+[[item]]
+key = "silverlaine_helm"
+name = "Silverlaine's Family Helm"
+display = 4145
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.13
+weight = 0.03
+text = "The Silverlaines' own, polished by a ghost every night for a hundred years."
+
+[[item]]
+key = "springvale_breastplate"
+name = "Springvale's Sharp Breastplate"
+display = 2968
+icon = "INV_Chest_Plate01"
+kind = "armor"
+slot = "chest"
+reduce = 0.22
+weight = 0.08
+text = "Commander Springvale's: a paladin's plate, tarnished black by what he served after."
+
+[[item]]
+key = "odo_hood"
+name = "Odo's Blindfold Hood"
+display = 3862
+icon = "INV_Helmet_04"
+kind = "armor"
+slot = "head"
+reduce = 0.08
+text = "The Blindwatcher's: a hood with no eyeholes. He never needed them."
+
+[[item]]
+key = "fenrus_legs"
+name = "Fenrus's Hide Leggings"
+display = 12388
+icon = "INV_Pants_06"
+kind = "armor"
+slot = "legs"
+reduce = 0.12
+text = "The Devourer's hide: thick enough to turn a blade."
+
+[[item]]
+key = "nandos_mantle"
+name = "Wolf Master's Mantle"
+display = 5944
+icon = "INV_Shoulder_01"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.11
+weight = 0.01
+text = "Nandos's: wolf skulls stitched to the shoulders, for the pack to know him."
+
+[[item]]
+key = "arugal_robe"
+name = "Arugal's Robe"
+display = 12694
+icon = "INV_Chest_Cloth_38"
+kind = "armor"
+slot = "chest"
+reduce = 0.1
+text = "The Archmage's: Dalaran's violet, gone dark at the hem."
+
+[[item]]
+key = "cursed_mantle"
+name = "Cursed Worgen Mantle"
+display = 3119
+icon = "INV_Shoulder_05"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.14
+weight = 0.02
+text = "Torn from what Arugal became. It's warm, and it itches at the full moon."
+
+[[item]]
+key = "deathsworn_helm"
+name = "Deathsworn Captain's Helm"
+display = 4417
+icon = "INV_Helmet_03"
+kind = "armor"
+slot = "head"
+reduce = 0.12
+weight = 0.03
+text = "The dead captain's helm. It is very cold."
+
+# --- the keep's dwellers --------------------------------------------------------------------------------
+
+[[mob]]
+key = "sf_wolfguard"
+name = "Shadowfang Wolfguard"
+subname = "Shadowfang Keep"
+display = 202
+health = 140
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 15.0
+leash = 30.0
+posture = 90
+drops = { moonsilver = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 15
+  range = 2.8
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 230.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 13, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.42, damage = 13, recovery = 0.12 }, { clip = 17, take = 0, windup = 0.55, damage = 17, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "pounce"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 11.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 6.5, damage = 18, recovery = 0.9 } ]
+
+[[mob]]
+key = "sf_darksoul"
+name = "Shadowfang Darksoul"
+subname = "Shadowfang Keep"
+display = 657
+health = 110
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 16.0
+leash = 30.0
+drops = { moonsilver = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 13
+  range = 2.7
+  arc = 100.0
+  recovery = 0.75
+  cooldown = 1.0
+  turn_rate = 240.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 12, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 12, recovery = 0.9 } ]
+  # A shadow curse thrown where you stand.
+  [[mob.pattern]]
+  name = "curse"
+  weight = 1.5
+  min_range = 4.0
+  max_range = 18.0
+  steps = [ { ranged = true, windup = 1.1, damage = 14, range = 18.0, radius = 3.0, speed = 14.0, spell = 686, look = 27812, blockable = false, recovery = 1.0 } ]
+
+[[mob]]
+key = "sf_moonwalker"
+name = "Shadowfang Moonwalker"
+subname = "Shadowfang Keep"
+display = 729
+health = 95
+run_speed = 7.5
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+keep_away = 7.0
+drops = { moonsilver = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 16
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 230.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "shadow bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 16, range = 26.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "howl"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27812 } ]
+
+[[mob]]
+key = "sf_worg"
+name = "Bleak Worg"
+subname = "Shadowfang Keep"
+display = 557
+health = 95
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 16.0
+leash = 28.0
+drops = { moonsilver = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.45
+  damage = 12
+  range = 2.6
+  arc = 90.0
+  recovery = 0.7
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "bites"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.42, damage = 11, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.36, damage = 12, recovery = 0.8 } ]
+  [[mob.pattern]]
+  name = "leap"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 12.0
+  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 7.0, damage = 16, recovery = 0.9 } ]
+
+[[mob]]
+key = "sf_servitor"
+name = "Haunted Servitor"
+subname = "Shadowfang Keep"
+display = 5430
+health = 100
+run_speed = 6.5
+walk_speed = 2.0
+aggro = 14.0
+leash = 26.0
+drops = { moonsilver = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 13
+  range = 2.6
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "chill touch"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 12, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "wail"
+  weight = 1.5
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 1.0, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27808 } ]
+
+[[mob]]
+key = "sf_steed"
+name = "Fel Steed"
+subname = "Shadowfang Keep"
+display = 2830
+health = 180
+run_speed = 8.0
+walk_speed = 2.2
+aggro = 16.0
+leash = 28.0
+posture = 100
+drops = { moonsilver = [3, 5] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 16
+  range = 3.0
+  arc = 120.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "hooves"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 15, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 15, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "trample"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 14.0
+  steps = [ { clip = 17, take = 1, windup = 0.9, lunge = 9.0, damage = 22, heavy = true, recovery = 1.1, kit = 379, look = 10604 } ]
+
+# --- Shadowfang's bosses ----------------------------------------------------------------------------------
+
+[[mob]]
+key = "sf_rethilgore"
+name = "Rethilgore"
+subname = "The Cell Keeper"
+display = 522
+health = 850
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+boss = true
+posture = 220
+drops = { moonsilver = [14, 20] }
+trophy = { rethilgore_mantle = 1 }
+gear = ["rethilgore_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.65
+  damage = 24
+  range = 3.0
+  arc = 120.0
+  recovery = 0.9
+  cooldown = 1.2
+  turn_rate = 210.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.6, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.5, damage = 20, recovery = 0.12 }, { clip = 57, windup = 0.85, damage = 30, heavy = true, recovery = 1.1, kit = 379 } ]
+  [[mob.pattern]]
+  name = "soul drain"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 20.0
+  steps = [ { ranged = true, windup = 1.2, damage = 22, range = 20.0, radius = 3.0, speed = 14.0, spell = 686, look = 27812, blockable = false, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "rend"
+  weight = 2.0
+  below = 0.5
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.06 }, { clip = 17, take = 1, windup = 0.32, damage = 16, recovery = 0.06 }, { clip = 17, take = 0, windup = 0.32, damage = 16, recovery = 0.06 }, { clip = 57, windup = 0.7, lunge = 3.0, damage = 28, heavy = true, recovery = 1.4 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "rend"
+  text = "\"The keys stay with me! Arugal's orders!\""
+  summon = ["sf_worg"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "soul drain"
+  text = "Rethilgore howls, and the courtyard howls back."
+  shove = 5.0
+  look = 27812
+
+[[mob]]
+key = "sf_razorclaw"
+name = "Razorclaw the Butcher"
+subname = "Shadowfang Keep"
+display = 104
+scale = 1.3
+health = 900
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 15.0
+leash = 26.0
+weapon = 1161
+grip = "1h"
+boss = true
+posture = 240
+drops = { moonsilver = [16, 22] }
+trophy = { razorclaw_apron = 1 }
+gear = ["razorclaw_apron"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.7
+  damage = 26
+  range = 3.0
+  arc = 120.0
+  recovery = 0.95
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "cleavers"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 57, windup = 0.9, damage = 32, heavy = true, recovery = 1.1, kit = 379 } ]
+  [[mob.pattern]]
+  name = "butcher's sweep"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 126, windup = 0.85, range = 4.2, arc = 360.0, damage = 22, heavy = true, recovery = 1.1, kit = 369 } ]
+  [[mob.pattern]]
+  name = "thrown cleaver"
+  weight = 1.5
+  min_range = 5.0
+  max_range = 20.0
+  steps = [ { ranged = true, windup = 1.0, damage = 22, range = 20.0, radius = 2.0, speed = 24.0, spell = 23065, blockable = true, recovery = 1.0 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.8
+  might = 1.15
+  pattern = "butcher's sweep"
+  text = "\"Fresh meat! Fresh MEAT!\""
+  shove = 5.0
+  look = 26271
+
+[[mob]]
+key = "sf_silverlaine"
+name = "Baron Silverlaine"
+subname = "The Keep's Old Lord"
+display = 146
+scale = 1.25
+health = 1000
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 1928
+grip = "1h"
+boss = true
+posture = 260
+drops = { moonsilver = [20, 26] }
+trophy = { silverlaine_helm = 1 }
+gear = ["silverlaine_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 22
+  range = 2.9
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 240.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "fencing"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.4, damage = 20, recovery = 0.1 }, { clip = 17, take = 0, windup = 0.4, damage = 20, recovery = 0.1 }, { clip = 57, windup = 0.7, damage = 30, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2.0
+  min_range = 3.5
+  max_range = 10.0
+  steps = [ { clip = 17, take = 1, windup = 0.5, lunge = 6.0, damage = 26, recovery = 0.9 } ]
+  # A veil of shadow: cold all round him.
+  [[mob.pattern]]
+  name = "veil of shadow"
+  weight = 2.0
+  below = 0.6
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.1, kit = 218, look = 27808 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.86
+  pattern = "veil of shadow"
+  text = "\"You trespass in the house of Silverlaine.\""
+  summon = ["sf_servitor", "sf_servitor"]
+  [[mob.phase]]
+  at = 0.25
+  speed = 0.74
+  might = 1.2
+  pattern = "fencing"
+  text = "\"This keep was ours before the wolves. It will be ours after.\""
+  shove = 5.0
+  look = 27808
+
+[[mob]]
+key = "sf_springvale"
+name = "Commander Springvale"
+subname = "Fallen Paladin"
+display = 1583
+scale = 1.2
+health = 1050
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 2056
+grip = "2h"
+boss = true
+posture = 300
+drops = { moonsilver = [20, 26] }
+trophy = { springvale_breastplate = 1 }
+gear = ["springvale_breastplate"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.85
+  damage = 32
+  range = 3.5
+  arc = 130.0
+  recovery = 1.1
+  cooldown = 1.4
+  turn_rate = 180.0
+  lock = 0.35
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "hammer"
+  weight = 3.0
+  steps = [ { clip = 18, take = 0, windup = 0.8, damage = 28, recovery = 0.25 }, { clip = 58, windup = 1.0, damage = 40, arc = 80.0, recovery = 1.3, kit = 379 } ]
+  # Unholy consecration: the ground round him burns.
+  [[mob.pattern]]
+  name = "desecration"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.1, range = 6.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 24050 } ]
+  [[mob.pattern]]
+  name = "judgement"
+  weight = 2.0
+  below = 0.5
+  steps = [ { clip = 58, windup = 1.2, range = 4.0, arc = 90.0, damage = 48, heavy = true, recovery = 0.3, kit = 379 }, { clip = 54, windup = 0.6, range = 5.5, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.5, look = 24050 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "desecration"
+  text = "\"The Light has abandoned this place. So have I.\""
+  look = 24050
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "judgement"
+  text = "\"Judgement! JUDGEMENT!\""
+  shove = 5.5
+  look = 24050
+
+[[mob]]
+key = "sf_odo"
+name = "Odo the Blindwatcher"
+subname = "Shadowfang Keep"
+display = 563
+health = 1000
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 20.0
+leash = 30.0
+boss = true
+posture = 260
+drops = { moonsilver = [18, 24] }
+trophy = { odo_hood = 1 }
+gear = ["odo_hood"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.7
+  damage = 26
+  range = 3.2
+  arc = 130.0
+  recovery = 0.95
+  cooldown = 1.3
+  turn_rate = 210.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.65, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.52, damage = 22, recovery = 1.0 } ]
+  # A howl that throws down all round him.
+  [[mob.pattern]]
+  name = "howling rage"
+  weight = 2.0
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 6.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.2, kit = 389 } ]
+  [[mob.pattern]]
+  name = "pounce"
+  weight = 1.5
+  min_range = 5.0
+  max_range = 14.0
+  steps = [ { clip = 17, take = 1, windup = 0.8, lunge = 8.0, damage = 28, heavy = true, recovery = 1.1, kit = 379 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "howling rage"
+  text = "Odo sniffs the air, and turns his blind face straight at you."
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.76
+  might = 1.15
+  pattern = "howling rage"
+  text = "Odo's howl rises higher; worgen answer from all over the keep."
+  summon = ["sf_darksoul", "sf_darksoul"]
+  shove = 6.0
+
+[[mob]]
+key = "sf_fenrus"
+name = "Fenrus the Devourer"
+subname = "Shadowfang Keep"
+display = 246
+scale = 1.5
+health = 1100
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 18.0
+leash = 30.0
+boss = true
+posture = 280
+drops = { moonsilver = [20, 26] }
+trophy = { fenrus_legs = 1 }
+gear = ["fenrus_legs"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 26
+  range = 3.2
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 230.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "maul"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 0.1 }, { clip = 17, take = 0, windup = 0.6, damage = 30, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "leap"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 14.0
+  steps = [ { clip = 17, take = 1, windup = 0.7, lunge = 8.0, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
+  [[mob.pattern]]
+  name = "devour"
+  weight = 2.0
+  below = 0.4
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 18, recovery = 0.05 }, { clip = 17, take = 1, windup = 0.3, damage = 18, recovery = 0.05 }, { clip = 17, take = 0, windup = 0.3, damage = 18, recovery = 0.05 }, { clip = 17, take = 1, windup = 0.3, damage = 18, recovery = 0.05 }, { clip = 17, take = 0, windup = 0.6, damage = 32, heavy = true, recovery = 1.5 } ]
+  [[mob.phase]]
+  at = 0.6
+  speed = 0.85
+  pattern = "leap"
+  text = "Fenrus snarls; his wolves come out of the shadows."
+  summon = ["sf_worg", "sf_worg"]
+  [[mob.phase]]
+  at = 0.25
+  speed = 0.72
+  might = 1.2
+  pattern = "devour"
+  text = "Fenrus goes for your throat in a frenzy."
+  shove = 5.0
+
+[[mob]]
+key = "sf_nandos"
+name = "Wolf Master Nandos"
+subname = "Shadowfang Keep"
+display = 564
+health = 1000
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+boss = true
+posture = 260
+drops = { moonsilver = [20, 26] }
+trophy = { nandos_mantle = 1 }
+gear = ["nandos_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 24
+  range = 3.0
+  arc = 120.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 220.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 21, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.45, damage = 21, recovery = 0.12 }, { clip = 57, windup = 0.8, damage = 30, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "call of the pack"
+  weight = 1.5
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.1, kit = 389 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "call of the pack"
+  text = "\"Come, my pets! Supper!\""
+  summon = ["sf_worg", "sf_worg"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.78
+  might = 1.15
+  pattern = "call of the pack"
+  text = "\"More! Come to your master!\""
+  summon = ["sf_wolfguard", "sf_worg"]
+  shove = 5.5
+
+[[mob]]
+key = "sf_arugal"
+name = "Archmage Arugal"
+subname = "Master of Shadowfang"
+display = 2353
+scale = 1.0
+health = 1500
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 20.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 260
+keep_away = 8.0
+drops = { moonsilver = [30, 40] }
+trophy = { arugal_robe = 1 }
+gear = ["arugal_robe"]
+respawn = 0.0
+# Whoever read his journal sees what he truly is now.
+then = "sf_arugal_cursed"
+then_after = 4.0
+then_needs = "arugal_journal"
+then_text = "Arugal's body twists on the floor; it gets up on four legs, then on two, and it is not Arugal any more. \"Let my children see what their father truly is!\""
+then_kit = 218
+then_look = 27812
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 24
+  range = 28.0
+  arc = 360.0
+  radius = 1.5
+  speed = 20.0
+  spell = 686
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 230.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "void bolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 28.0
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 28.0, radius = 1.5, speed = 20.0, spell = 686, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "thunder shock"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  [[mob.pattern]]
+  name = "arugal's curse"
+  weight = 2.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.4, damage = 30, range = 26.0, radius = 4.0, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "shadow barrage"
+  weight = 2.0
+  below = 0.4
+  min_range = 3.0
+  max_range = 28.0
+  steps = [ { ranged = true, windup = 0.9, damage = 20, range = 28.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 1.2 } ]
+  [[mob.phase]]
+  at = 0.7
+  speed = 0.88
+  pattern = "arugal's curse"
+  text = "\"Who dares interfere with the sons of Arugal?\""
+  summon = ["sf_darksoul"]
+  [[mob.phase]]
+  at = 0.4
+  speed = 0.78
+  might = 1.1
+  pattern = "shadow barrage"
+  text = "\"You, too, shall serve!\""
+  summon = ["sf_wolfguard", "sf_moonwalker"]
+  [[mob.phase]]
+  at = 0.15
+  speed = 0.7
+  might = 1.2
+  pattern = "thunder shock"
+  text = "\"Release me... from... this... curse...\""
+  shove = 6.0
+  look = 27812
+
+[[mob]]
+key = "sf_arugal_cursed"
+name = "Arugal"
+subname = "Worgen-Cursed"
+display = 523
+scale = 0.75
+health = 1200
+run_speed = 8.0
+walk_speed = 2.4
+aggro = 30.0
+leash = 40.0
+boss = true
+posture = 300
+drops = { moonsilver = [50, 60] }
+gear = ["cursed_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.5
+  damage = 28
+  range = 3.2
+  arc = 120.0
+  recovery = 0.75
+  cooldown = 1.0
+  turn_rate = 260.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "claws"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 24, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.36, damage = 24, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.36, damage = 24, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.6, damage = 34, heavy = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "pounce"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 14.0
+  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 9.0, range = 3.5, arc = 360.0, damage = 32, heavy = true, recovery = 0.9, kit = 218, look = 27812 } ]
+  [[mob.pattern]]
+  name = "howl"
+  weight = 1.5
+  max_range = 5.0
+  steps = [ { clip = 54, windup = 1.1, range = 7.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.2, kit = 389, look = 27812 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.8
+  pattern = "howl"
+  text = "The cursed thing that was Arugal howls; his children answer."
+  summon = ["sf_worg", "sf_worg"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.7
+  might = 1.2
+  pattern = "pounce"
+  text = "It stops, for a moment, and looks at you with Arugal's eyes. Then it springs."
+  shove = 6.0
+  look = 27812
+
+[[mob]]
+key = "sf_deathsworn"
+name = "Deathsworn Captain"
+subname = "Still On Watch"
+display = 158
+scale = 1.35
+health = 850
+run_speed = 6.8
+walk_speed = 2.0
+aggro = 16.0
+leash = 28.0
+weapon = 1853
+grip = "1h"
+shield = 2456
+block = 0.45
+boss = true
+posture = 260
+drops = { moonsilver = [22, 28] }
+gear = ["deathsworn_helm"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.6
+  damage = 24
+  range = 2.9
+  arc = 110.0
+  recovery = 0.85
+  cooldown = 1.2
+  turn_rate = 210.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "cuts"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 22, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.45, damage = 22, recovery = 0.12 }, { clip = 57, windup = 0.85, damage = 32, heavy = true, recovery = 1.1 } ]
+  [[mob.pattern]]
+  name = "shield bash"
+  weight = 2.0
+  max_range = 2.8
+  steps = [ { clip = 95, windup = 0.4, damage = 12, range = 3.0, arc = 90.0, heavy = true, recovery = 0.8, kit = 379 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "cuts"
+  text = "\"Hold the line... hold the line...\""
+  summon = ["sf_servitor", "sf_servitor"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "shield bash"
+  text = "The dead captain's sword glows cold blue."
+  shove = 5.0
+  look = 27808

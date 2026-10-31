@@ -1,0 +1,778 @@
+# Basin Battle: the Hero tab's wares. Rings, necklaces, trinkets, cloaks and tabards for the slots
+# the class sets leave empty (neck, two fingers, two trinkets, back, tabard), and helms that take
+# the set helm's place (its share of the set bonus for a look and an effect). Each one changes how
+# you play. Worn ones can be reforged at the shop to the tier dropping now.
+#
+# The shop shows each hero five of these at a time, at the gear tier of the wave (so their stats
+# keep up), restocked every wave. A Restock card rolls a fresh four for a little gold.
+#
+#   slot      neck, finger, trinket, back, head or tabard (fingers and trinkets come in pairs)
+#   quality   uncommon, rare, epic or legendary: the price and how often it turns up
+#   display   the item's look (ItemDisplayInfo), and `icon` the matching icon for the shop card. A
+#             cloak's display must carry a cape texture (Cape_...) or nothing hangs on the back.
+#   class     only offered to this class (and its spell effects may name its spells)
+#   from_wave not offered before this wave
+#   stats     shares of the slot's stat points: stamina, strength, agility, intellect, spirit, or
+#             main (the wearer's class stat). A cloak also has a little armour.
+#   text      what the tooltip and the shop card say it does
+#   [[item.effect]] as a talent's: `stats` (any of kit.rs ITEM_STATS), `team` (an aura on you and
+#             allies within 30 yd), a `proc` with an `amount`, or a spell patch with `spells`.
+#
+# The items' own effects:
+#   gold_find      you pick up that much more gold
+#   hub_leech      that share of all your damage heals the Ancient
+#   defence_aura   defences within 20 yd of you deal that much more damage
+#   rise           you get back up that much sooner after falling
+#   undying        once a wave, a killing blow leaves you at 30% health
+#   divine         below 35% health, immune to damage for that many seconds (once a minute)
+# and the cards' passives: thorns and lightning (multiples of your hit), leech, execute, echo,
+# cleave, windfury, split, radius, shield, raise_dead, soul_harvest, bloodthirst, per_wave.
+
+# --- necks ----------------------------------------------------------------------------------------
+
+[[item]]
+key = "heartwood_locket"
+name = "Heartwood Locket"
+slot = "neck"
+quality = "rare"
+display = 9859
+icon = "INV_Jewelry_Necklace_07"
+stats = { stamina = 0.6, main = 0.4 }
+text = "5% of all your damage heals the Ancient of the Basin."
+  [[item.effect]]
+  stats = { hub_leech = 0.05 }
+
+[[item]]
+key = "glass_cannon"
+name = "Amulet of the Glass Cannon"
+slot = "neck"
+quality = "epic"
+display = 2612
+icon = "INV_Jewelry_Amulet_07"
+from_wave = 4
+stats = { main = 1.0 }
+text = "You deal 25% more damage, and take 20% more."
+  [[item.effect]]
+  stats = { damage = 0.25, taken = -0.20 }
+
+[[item]]
+key = "second_wind"
+name = "Talisman of Second Wind"
+slot = "neck"
+quality = "uncommon"
+display = 1404
+icon = "INV_Jewelry_Amulet_01"
+stats = { stamina = 1.0 }
+text = "When you fall, you're back on your feet 50% sooner."
+  [[item.effect]]
+  stats = { rise = 0.5 }
+
+[[item]]
+key = "wardens_chain"
+name = "Chain of the Wardens"
+slot = "neck"
+quality = "rare"
+display = 9657
+icon = "INV_Jewelry_Necklace_11"
+stats = { stamina = 0.5, main = 0.5 }
+text = "Treants, springs and defenders within 20 yd of you deal 30% more damage."
+  [[item.effect]]
+  stats = { defence_aura = 0.30 }
+
+[[item]]
+key = "kings_choker"
+name = "Choker of the Fallen King"
+slot = "neck"
+quality = "legendary"
+display = 31603
+icon = "INV_Jewelry_Necklace_16"
+from_wave = 10
+stats = { stamina = 0.5, main = 0.5 }
+text = "Once a wave, a killing blow leaves you at 30% health. Your damage grows 1.5% for every wave reached."
+  [[item.effect]]
+  stats = { undying = 1, per_wave = 0.015 }
+
+# --- rings ----------------------------------------------------------------------------------------
+
+[[item]]
+key = "band_of_thorns"
+name = "Band of Thorns"
+slot = "finger"
+quality = "uncommon"
+display = 9832
+icon = "INV_Jewelry_Ring_10"
+stats = { stamina = 1.0 }
+text = "Enemies that strike you take 0.4 times your hit each time."
+  [[item.effect]]
+  stats = { thorns = 0.4 }
+
+[[item]]
+key = "vampire_signet"
+name = "Signet of the Vampire"
+slot = "finger"
+quality = "rare"
+display = 9847
+icon = "INV_Jewelry_Ring_08"
+stats = { main = 0.6, stamina = 0.4 }
+text = "All your damage heals you for 5% of it."
+  [[item.effect]]
+  stats = { leech = 0.05 }
+
+[[item]]
+key = "gamblers_ring"
+name = "The Gambler's Ring"
+slot = "finger"
+quality = "rare"
+display = 9840
+icon = "INV_Jewelry_Ring_15"
+stats = { agility = 1.0 }
+text = "12% more critical strikes, and each one heals you for 2% of your max health."
+  [[item.effect]]
+  stats = { crit = 0.12, bloodthirst = 0.02 }
+
+[[item]]
+key = "quick_hands"
+name = "Loop of Quick Hands"
+slot = "finger"
+quality = "uncommon"
+display = 9836
+icon = "INV_Jewelry_Ring_14"
+stats = { main = 1.0 }
+text = "You attack 8% faster."
+  [[item.effect]]
+  stats = { haste = 0.08 }
+
+[[item]]
+key = "misers_band"
+name = "Miser's Band"
+slot = "finger"
+quality = "uncommon"
+display = 9823
+icon = "INV_Jewelry_Ring_13"
+stats = { stamina = 1.0 }
+text = "You pick up 30% more gold."
+  [[item.effect]]
+  stats = { gold_find = 0.30 }
+
+[[item]]
+key = "executioners_ring"
+name = "Ring of the Executioner"
+slot = "finger"
+quality = "rare"
+display = 23608
+icon = "INV_Jewelry_Ring_18"
+stats = { main = 1.0 }
+text = "You deal 40% more damage to enemies below 25% health."
+  [[item.effect]]
+  stats = { execute = 0.40 }
+
+[[item]]
+key = "ring_of_echoes"
+name = "Ring of Echoes"
+slot = "finger"
+quality = "epic"
+display = 31616
+icon = "INV_Jewelry_Ring_35"
+from_wave = 5
+stats = { main = 0.6, stamina = 0.4 }
+text = "Your spells have a 12% chance to cast twice."
+  [[item.effect]]
+  stats = { echo = 0.12 }
+
+[[item]]
+key = "seal_of_the_dawn"
+name = "Seal of the Dawn"
+slot = "finger"
+quality = "rare"
+display = 24022
+icon = "INV_Jewelry_Ring_16"
+stats = { stamina = 0.5, spirit = 0.5 }
+text = "You and allies within 30 yd regain 0.6% of max health every second."
+  [[item.effect]]
+  team = { regen = 0.006 }
+
+# --- trinkets -------------------------------------------------------------------------------------
+
+[[item]]
+key = "phylactery"
+name = "Cracked Phylactery"
+slot = "trinket"
+quality = "epic"
+display = 2853
+icon = "INV_Misc_Bone_HumanSkull_01"
+from_wave = 4
+stats = { intellect = 0.5, stamina = 0.5 }
+text = "Enemies you kill have a 20% chance to rise as a skeleton that fights for you for 20 sec."
+  [[item.effect]]
+  stats = { raise_dead = 0.20 }
+
+[[item]]
+key = "lightning_capacitor"
+name = "Lightning Capacitor"
+slot = "trinket"
+quality = "rare"
+display = 20628
+icon = "INV_Gizmo_05"
+stats = { stamina = 1.0 }
+text = "The first 3 enemies to hit you each wave take 1 times your hit in lightning."
+  [[item.effect]]
+  stats = { lightning = 1.0 }
+
+[[item]]
+key = "soul_jar"
+name = "Jar of Harvested Souls"
+slot = "trinket"
+quality = "epic"
+display = 3109
+icon = "INV_Misc_Orb_01"
+from_wave = 3
+stats = { main = 1.0 }
+text = "Every 10 kills this run (up to 2,000) you deal 0.12% more damage."
+  [[item.effect]]
+  stats = { soul_harvest = 0.0012 }
+
+[[item]]
+key = "shield_generator"
+name = "Gnomish Shield Generator"
+slot = "trinket"
+quality = "rare"
+display = 7839
+icon = "INV_Gizmo_03"
+stats = { stamina = 1.0 }
+text = "A shield absorbs damage up to 12% of your max health. It renews 10 sec after breaking."
+  [[item.effect]]
+  stats = { shield = 0.12 }
+
+[[item]]
+key = "rocket_boots"
+name = "Goblin Rocket Thrusters"
+slot = "trinket"
+quality = "uncommon"
+display = 20622
+icon = "INV_Gizmo_RocketBoot_01"
+stats = { agility = 1.0 }
+text = "You run 15% faster."
+  [[item.effect]]
+  stats = { speed = 0.15 }
+
+[[item]]
+key = "crusaders_shard"
+name = "Shard of the Crusader"
+slot = "trinket"
+quality = "epic"
+display = 2516
+icon = "INV_Misc_Gem_Diamond_02"
+from_wave = 4
+stats = { stamina = 1.0 }
+text = "When you drop below 35% health you're immune to damage for 3 sec. Once a minute."
+  [[item.effect]]
+  stats = { divine = 3.0 }
+
+[[item]]
+key = "war_horn"
+name = "War Horn of the Basin"
+slot = "trinket"
+quality = "rare"
+display = 956
+icon = "INV_Misc_Horn_03"
+stats = { strength = 0.5, stamina = 0.5 }
+text = "You and allies within 30 yd deal 8% more damage."
+  [[item.effect]]
+  team = { damage = 0.08 }
+
+[[item]]
+key = "heart_of_the_swarm"
+name = "Ancient Scarab Idol"
+slot = "trinket"
+quality = "legendary"
+display = 33849
+icon = "INV_Misc_AhnQirajTrinket_02"
+from_wave = 10
+stats = { main = 1.0 }
+text = "Your auto attacks strike again at once 20% of the time, and also hit another enemy nearby for half."
+  [[item.effect]]
+  stats = { windfury = 0.20, cleave = 0.5 }
+
+# --- cloaks ---------------------------------------------------------------------------------------
+
+[[item]]
+key = "vanguard_cloak"
+name = "Cloak of the Vanguard"
+slot = "back"
+quality = "uncommon"
+display = 25875
+icon = "INV_Misc_Cape_10"
+stats = { stamina = 1.0 }
+text = "10% more max health, and you take 5% less damage."
+  [[item.effect]]
+  stats = { health = 0.10, taken = 0.05 }
+
+[[item]]
+key = "shroud_of_haste"
+name = "Shroud of the Swift"
+slot = "back"
+quality = "uncommon"
+display = 15029
+icon = "INV_Misc_Cape_01"
+stats = { agility = 1.0 }
+text = "You run 10% faster and your spells recharge 6% faster."
+  [[item.effect]]
+  stats = { speed = 0.10, cdr = 0.06 }
+
+[[item]]
+key = "mantle_of_reach"
+name = "Mantle of Far Reaches"
+slot = "back"
+quality = "rare"
+display = 23095
+icon = "INV_Misc_Cape_15"
+stats = { intellect = 0.5, stamina = 0.5 }
+text = "Your area spells cover 30% more ground."
+  [[item.effect]]
+  stats = { radius = 0.30 }
+
+[[item]]
+key = "splitting_cape"
+name = "Cape of Shattering"
+slot = "back"
+quality = "rare"
+display = 26137
+icon = "INV_Misc_Cape_20"
+from_wave = 3
+stats = { main = 1.0 }
+text = "Your missiles burst on impact, hitting 2 more enemies nearby for 35% of the damage."
+  [[item.effect]]
+  stats = { split = 0.35 }
+
+# --- for one class --------------------------------------------------------------------------------
+
+[[item]]
+key = "pyromaniacs_brooch"
+name = "Pyromaniac's Brooch"
+slot = "trinket"
+quality = "epic"
+class = "mage"
+display = 23713
+icon = "INV_Jewelry_Talisman_09"
+from_wave = 3
+stats = { intellect = 1.0 }
+text = "Your fire spells deal 20% more damage and crit 10% more often."
+  [[item.effect]]
+  spells = "school:fire"
+  add = { power = 0.20, crit = 0.10 }
+
+[[item]]
+key = "frozen_heart"
+name = "Frozen Heart Pendant"
+slot = "neck"
+quality = "rare"
+class = "mage"
+display = 9853
+icon = "INV_Jewelry_Necklace_03"
+stats = { intellect = 0.5, stamina = 0.5 }
+text = "Your frost spells deal 15% more damage and cover 2 yd more ground."
+  [[item.effect]]
+  spells = "school:frost"
+  add = { power = 0.15, radius = 2 }
+
+[[item]]
+key = "beastmasters_whistle"
+name = "Beastmaster's Whistle"
+slot = "trinket"
+quality = "rare"
+class = "hunter"
+display = 1040
+icon = "INV_Misc_Idol_03"
+stats = { agility = 0.5, stamina = 0.5 }
+text = "Your pet deals 30% more damage and has 30% more health."
+  [[item.effect]]
+  stats = { pet_damage = 0.30, pet_health = 0.30 }
+
+[[item]]
+key = "trappers_kit"
+name = "Trapper's Kit"
+slot = "trinket"
+quality = "rare"
+class = "hunter"
+display = 7624
+icon = "INV_Misc_Bomb_01"
+stats = { agility = 1.0 }
+text = "Your traps are 3 yd wider and recharge 30% faster."
+  [[item.effect]]
+  spells = "kind:trap"
+  add = { radius = 3 }
+  pct = { cooldown = -0.30 }
+
+[[item]]
+key = "berserkers_collar"
+name = "Berserker's Collar"
+slot = "neck"
+quality = "epic"
+class = "warrior"
+display = 32008
+icon = "INV_Jewelry_Necklace_14"
+from_wave = 3
+stats = { strength = 1.0 }
+text = "Whirlwind and Thunder Clap reach 3 yd further and deal 20% more damage."
+  [[item.effect]]
+  spells = "whirlwind, thunder_clap"
+  add = { power = 0.20, radius = 3 }
+
+[[item]]
+key = "bulwark_band"
+name = "Bulwark Band"
+slot = "finger"
+quality = "rare"
+class = "warrior"
+display = 31905
+icon = "INV_Jewelry_Ring_43"
+stats = { stamina = 1.0 }
+text = "You take 8% less damage and enemies that strike you take 0.3 times your hit."
+  [[item.effect]]
+  stats = { taken = 0.08, thorns = 0.3 }
+
+[[item]]
+key = "relic_of_light"
+name = "Relic of the Dawn"
+slot = "trinket"
+quality = "rare"
+class = "priest"
+display = 31768
+icon = "INV_Misc_Ticket_Tarot_Heroism_01"
+stats = { spirit = 0.5, intellect = 0.5 }
+text = "Your heals and shields are 20% stronger."
+  [[item.effect]]
+  stats = { heal = 0.20 }
+
+[[item]]
+key = "shadow_pendant"
+name = "Pendant of the Void"
+slot = "neck"
+quality = "epic"
+class = "priest"
+display = 32073
+icon = "INV_Jewelry_Necklace_13"
+from_wave = 3
+stats = { intellect = 1.0 }
+text = "Your shadow spells deal 20% more damage, and all your damage heals you for 3% of it."
+  [[item.effect]]
+  spells = "school:shadow"
+  add = { power = 0.20 }
+  [[item.effect]]
+  stats = { leech = 0.03 }
+
+# --- helms: a look and an effect in place of the set's helm (and its share of the set bonus) -----
+
+[[item]]
+key = "gnomish_goggles"
+name = "Gnomish Battle Goggles"
+slot = "head"
+quality = "epic"
+display = 4651
+icon = "INV_Misc_Spyglass_03"
+from_wave = 5
+stats = { main = 0.6, stamina = 0.4 }
+text = "Your critical strikes deal 30% more, and you crit 5% more often."
+  [[item.effect]]
+  spells = "all"
+  add = { crit_mult = 0.3 }
+  [[item.effect]]
+  stats = { crit = 0.05 }
+
+[[item]]
+key = "stormwind_greathelm"
+name = "Stormwind Greathelm"
+slot = "head"
+quality = "rare"
+display = 7712
+icon = "INV_Helmet_03"
+class = "warrior"
+stats = { stamina = 0.6, strength = 0.4 }
+text = "You take 10% less damage and have 5% more max health."
+  [[item.effect]]
+  stats = { taken = 0.10, health = 0.05 }
+
+[[item]]
+key = "crusaders_helm"
+name = "Crusader's Helm"
+slot = "head"
+quality = "epic"
+display = 4415
+icon = "INV_Helmet_04"
+from_wave = 8
+stats = { stamina = 0.5, main = 0.5 }
+text = "Below 35% health you're immune to damage for 3 sec (once a minute), and you regenerate 1% of your health a second."
+  [[item.effect]]
+  stats = { divine = 3, regen = 0.01 }
+
+[[item]]
+key = "ironforge_guard_helm"
+name = "Ironforge Guard's Helm"
+slot = "head"
+quality = "rare"
+display = 10492
+icon = "INV_Helmet_01"
+stats = { stamina = 1.0 }
+text = "Treants, springs and defenders within 20 yd of you deal 25% more damage, and you take 5% less."
+  [[item.effect]]
+  stats = { defence_aura = 0.25, taken = 0.05 }
+
+[[item]]
+key = "wizards_hat"
+name = "Hat of the Dalaran Magi"
+slot = "head"
+quality = "rare"
+display = 3960
+icon = "INV_Helmet_04"
+class = "mage"
+stats = { intellect = 1.0 }
+text = "Your spells recharge 10% faster and your area spells cover 20% more ground."
+  [[item.effect]]
+  stats = { cdr = 0.10, radius = 0.20 }
+
+[[item]]
+key = "scoundrels_eyepatch"
+name = "Scoundrel's Eyepatch"
+slot = "head"
+quality = "uncommon"
+display = 1166
+icon = "INV_Misc_Bandana_01"
+stats = { main = 0.5, stamina = 0.5 }
+text = "You pick up 40% more gold and run 5% faster."
+  [[item.effect]]
+  stats = { gold_find = 0.40, speed = 0.05 }
+
+[[item]]
+key = "circlet_of_the_tides"
+name = "Circlet of the Tides"
+slot = "head"
+quality = "rare"
+display = 5767
+icon = "INV_Crown_01"
+class = "priest"
+stats = { intellect = 0.6, spirit = 0.4 }
+text = "Your heals and shields are 15% stronger, and you regenerate 0.5% of your health a second."
+  [[item.effect]]
+  stats = { heal = 0.15, regen = 0.005 }
+
+[[item]]
+key = "sentinels_helm"
+name = "Sentinel's Helm"
+slot = "head"
+quality = "epic"
+display = 8380
+icon = "INV_Helmet_06"
+class = "hunter"
+from_wave = 6
+stats = { agility = 0.6, stamina = 0.4 }
+text = "Your pet deals 25% more damage and you crit 8% more often."
+  [[item.effect]]
+  stats = { pet_damage = 0.25, crit = 0.08 }
+
+[[item]]
+key = "defias_mask"
+name = "Defias Mask"
+slot = "head"
+quality = "uncommon"
+display = 8021
+icon = "INV_Misc_Eye_01"
+stats = { main = 0.6, stamina = 0.4 }
+text = "8% more critical strike chance."
+  [[item.effect]]
+  stats = { crit = 0.08 }
+
+# --- tabards: worn over your armour, for the party ----------------------------------------------
+
+[[item]]
+key = "alliance_tabard"
+name = "Tabard of the Basin League"
+slot = "tabard"
+quality = "uncommon"
+display = 31254
+icon = "INV_Misc_TabardPVP_01"
+stats = { stamina = 1.0 }
+text = "You and allies within 30 yd take 5% less damage."
+  [[item.effect]]
+  team = { taken = 0.05 }
+
+[[item]]
+key = "officers_tabard"
+name = "Officer's Tabard"
+slot = "tabard"
+quality = "rare"
+display = 31253
+icon = "INV_Misc_TabardPVP_03"
+stats = { main = 1.0 }
+text = "You and allies within 30 yd deal 6% more damage."
+  [[item.effect]]
+  team = { damage = 0.06 }
+
+[[item]]
+key = "fireskull_tabard"
+name = "Fireskull Tabard"
+slot = "tabard"
+quality = "epic"
+display = 38283
+icon = "INV_Misc_TabardPVP_02"
+from_wave = 10
+stats = { main = 1.0 }
+text = "Enemies you kill have a 15% chance to rise as a skeleton that fights for you for 20 sec."
+  [[item.effect]]
+  stats = { raise_dead = 0.15 }
+
+[[item]]
+key = "frostskull_tabard"
+name = "Frostskull Tabard"
+slot = "tabard"
+quality = "epic"
+display = 38284
+icon = "INV_Misc_TabardPVP_04"
+from_wave = 10
+stats = { main = 1.0 }
+text = "Your spells have an 8% chance to cast twice."
+  [[item.effect]]
+  stats = { echo = 0.08 }
+
+# --- more cloaks -----------------------------------------------------------------------------------
+
+[[item]]
+key = "cloak_of_the_ancient"
+name = "Cloak of the Ancient"
+slot = "back"
+quality = "rare"
+display = 23132
+icon = "INV_Misc_Cape_10"
+stats = { stamina = 0.5, main = 0.5 }
+text = "8% of all your damage heals the Ancient of the Basin."
+  [[item.effect]]
+  stats = { hub_leech = 0.08 }
+
+[[item]]
+key = "bloodsoaked_cape"
+name = "Bloodsoaked Cape"
+slot = "back"
+quality = "epic"
+display = 28659
+icon = "INV_Misc_Cape_08"
+from_wave = 6
+stats = { main = 1.0 }
+text = "All your damage heals you for 6% of it, and you deal 8% more."
+  [[item.effect]]
+  stats = { leech = 0.06, damage = 0.08 }
+
+[[item]]
+key = "drape_of_the_wind"
+name = "Drape of the Wind"
+slot = "back"
+quality = "rare"
+display = 23139
+icon = "INV_Misc_Cape_05"
+stats = { agility = 0.5, stamina = 0.5 }
+text = "You run 15% faster, and after falling you're back on your feet 30% sooner."
+  [[item.effect]]
+  stats = { speed = 0.15, rise = 0.30 }
+
+[[item]]
+key = "royal_cloak"
+name = "Mantle of the Basin's Champion"
+slot = "back"
+quality = "legendary"
+display = 24946
+icon = "INV_Misc_Cape_18"
+from_wave = 15
+stats = { main = 0.6, stamina = 0.4 }
+text = "You deal 15% more damage and take 10% less."
+  [[item.effect]]
+  stats = { damage = 0.15, taken = 0.10 }
+
+[[item]]
+key = "thornweave_shroud"
+name = "Thornweave Shroud"
+slot = "back"
+quality = "rare"
+display = 30695
+icon = "INV_Misc_Cape_21"
+stats = { stamina = 1.0 }
+text = "Enemies that strike you in melee take 0.5 times your hit, and you take 5% less damage."
+  [[item.effect]]
+  stats = { thorns = 0.5, taken = 0.05 }
+
+# --- more rings, trinkets and necks ------------------------------------------------------------------
+
+[[item]]
+key = "warlords_band"
+name = "Band of the Warlord"
+slot = "finger"
+quality = "epic"
+display = 31905
+icon = "INV_Jewelry_Ring_15"
+class = "warrior"
+stats = { strength = 0.6, stamina = 0.4 }
+text = "Heroic Strike, Mortal Strike and Bloodthirst deal 20% more."
+  [[item.effect]]
+  spells = "heroic_strike,mortal_strike,bloodthirst"
+  add = { power = 0.2 }
+
+[[item]]
+key = "arcanists_loop"
+name = "Arcanist's Loop"
+slot = "finger"
+quality = "rare"
+display = 9832
+icon = "INV_Jewelry_Ring_14"
+class = "mage"
+stats = { intellect = 1.0 }
+text = "Arcane Missiles and Arcane Explosion deal 25% more."
+  [[item.effect]]
+  spells = "arcane_missiles,arcane_explosion"
+  add = { power = 0.25 }
+
+[[item]]
+key = "marksmans_signet"
+name = "Marksman's Signet"
+slot = "finger"
+quality = "rare"
+display = 9840
+icon = "INV_Jewelry_Ring_04"
+class = "hunter"
+stats = { agility = 1.0 }
+text = "You and your pet crit 10% more often."
+  [[item.effect]]
+  stats = { crit = 0.10, pet_crit = 0.10 }
+
+[[item]]
+key = "idol_of_the_basin"
+name = "Idol of the Basin"
+slot = "trinket"
+quality = "legendary"
+display = 33849
+icon = "INV_Misc_Idol_03"
+from_wave = 12
+stats = { main = 0.6, stamina = 0.4 }
+text = "You deal 1.5% more damage for every wave reached."
+  [[item.effect]]
+  stats = { per_wave = 0.015 }
+
+[[item]]
+key = "war_drum"
+name = "Basin War Drum"
+slot = "trinket"
+quality = "epic"
+display = 956
+icon = "INV_Misc_Drum_01"
+stats = { stamina = 1.0 }
+text = "You and allies within 30 yd attack and cast 8% faster."
+  [[item.effect]]
+  team = { haste = 0.08 }
+
+[[item]]
+key = "talisman_of_vigor"
+name = "Talisman of Vigor"
+slot = "neck"
+quality = "rare"
+display = 9657
+icon = "INV_Jewelry_Necklace_04"
+stats = { stamina = 1.0 }
+text = "8% more max health, and you regenerate 1% of it every second."
+  [[item.effect]]
+  stats = { health = 0.08, regen = 0.01 }

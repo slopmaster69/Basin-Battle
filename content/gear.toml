@@ -1,0 +1,149 @@
+# Basin Battle gear: the looks and names of every class's sets, tier by tier.
+#
+# Stats are worked out from the tier, quality and slot, so every piece of the same name always has
+# the same numbers (the client remembers items by number between sessions).
+#
+# Tiers: 0 Militia (greens, cycle 0), 1 Sentinel (cycle 1), 2 Vanguard (cycle 2), 3 Warlord (cycle 3),
+# 4 Conqueror (cycle 4), 5+ Ascended (recoloured sets, cycle 5 onwards).
+# Slots: head, shoulders, chest, waist, legs, feet, wrists, hands. A 0 display falls back to the
+# tier before.
+
+[budget]
+# Stat points on a quality-1.0 chest at tier 0; x tier_mult per tier. A tier (an Escalation) must
+# lift a hero by less than it lifts the enemies (x1.6 health), or the run gets easier as it goes.
+base = 8.0
+tier_mult = 1.3
+# Quality factors: poor/common (white), uncommon (green), rare (blue), epic (purple), legendary.
+quality = [1.0, 1.0, 1.1, 1.2, 1.35]
+# Slot weights: head, shoulders, chest, waist, legs, feet, wrists, hands.
+slot_weight = [0.8, 0.8, 1.0, 0.6, 1.0, 0.6, 0.6, 0.8]
+# Required level by tier.
+# (Heroes gain about a level a wave, plus bonus levels for bosses and bases.)
+required_level = [1, 10, 18, 26, 34, 42, 50, 56, 60]
+# Item level by tier (sets the tooltip's ordering only).
+item_level = [10, 30, 50, 66, 76, 83, 88, 92, 96]
+# What one point of each stat does.
+stamina_health = 0.006      # +0.6% max health per Stamina
+main_stat_damage = 0.008    # +0.8% damage per Strength / Agility / Intellect
+spirit_regen = 0.0004       # +0.04% health per second per Spirit
+# Armour by armour type for a weight-1.0 piece at tier 0, and damage reduction per armour point
+# (armour / (armour + armor_k)).
+armor = { plate = 120, mail = 80, cloth = 30 }
+# armor_k grows by armor_k_per_level for each level of the enemies striking (the 1.12 rule,
+# 400 + 85 a level), so new gear's armour keeps its worth without running away with the game.
+# A starting plate set against level-2 enemies: about 40% of every blow; late, about a third.
+armor_k = 400.0
+armor_k_per_level = 85.0
+
+[[set]]
+class = "warrior"
+names = ["Militia", "Sentinel", "Vanguard", "Warlord", "Conqueror", "Ascended", "Exalted", "Eternal"]
+slots = ["Helm", "Pauldrons", "Breastplate", "Girdle", "Legplates", "Sabatons", "Bracers", "Gauntlets"]
+# Display ids by tier, in slot order.
+displays = [
+    [0, 15890, 3413, 3418, 3414, 18576, 4448, 0],
+    [31284, 29964, 29958, 29959, 29963, 29960, 29961, 29962],
+    [31259, 31024, 31021, 31019, 31023, 31025, 31020, 31022],
+    [34215, 34253, 33983, 33990, 33986, 33989, 33982, 33984],
+    [35060, 35059, 35049, 33990, 35786, 33989, 33982, 33984],
+    [34614, 34616, 34617, 34610, 34615, 34611, 34612, 34613],
+    [33741, 33679, 33628, 33632, 33630, 33631, 33627, 33629],
+]
+weapon_names = ["Militia Greatsword", "Sentinel Claymore", "Vanguard Greatblade", "Warlord's Executioner", "Conqueror's Edge", "Ashen Verdict"]
+weapons = [21554, 26676, 26676, 35575, 35575, 29991]
+weapon_glow = [0, 0, 1897, 1898, 803, 803]
+legendary_weapon = 29992
+legendary_name = "The Ashbringer"
+
+# The weapon paths (a talent commits a warrior to one): sword and shield, or a sword and an axe.
+[set.path_gear]
+one_hand_names = ["Militia Longsword", "Sentinel Blade", "Vanguard Broadsword", "Warlord's Edge", "Conqueror's Fang", "Ashen Oath"]
+one_hands = [2434, 862, 1928, 2806, 25053, 35150]
+shield_names = ["Militia Shield", "Sentinel Crest", "Vanguard Bulwark", "Warlord's Aegis", "Conqueror's Wall", "Ashen Bastion"]
+shields = [2331, 1705, 18533, 31733, 30992, 35261]
+off_hand_names = ["Militia Hatchet", "Sentinel Cleaver", "Vanguard Axe", "Warlord's Reaver", "Conqueror's Talon", "Ashen Fury"]
+off_hands = [1386, 1392, 1455, 1932, 31956, 35258]
+legendary = [35575, 35573, 33556]
+legendary_names = ["Quel'Serrar, Oath of the Basin", "Aegis of the Ancient", "Gorehowl's Echo"]
+
+[[set]]
+class = "priest"
+names = ["Militia", "Sentinel", "Vanguard", "Warlord", "Conqueror", "Ascended", "Exalted", "Eternal"]
+slots = ["Cowl", "Mantle", "Robes", "Cord", "Leggings", "Slippers", "Bindings", "Gloves"]
+displays = [
+    [4372, 5494, 1869, 4849, 3050, 0, 0, 3052],
+    [31104, 31103, 30422, 30425, 30423, 30429, 30426, 30427],
+    [31206, 30623, 30612, 30621, 34049, 30622, 30617, 30619],
+    [34054, 34048, 34047, 34053, 34049, 34055, 34052, 34051],
+    [35155, 35149, 35142, 34053, 34049, 34055, 34052, 34051],
+    [34630, 34632, 34633, 34628, 34635, 34634, 34629, 34631],
+    [34054, 34048, 34047, 34053, 34049, 34055, 34052, 34051],
+]
+weapon_names = ["Militia Staff", "Sentinel Staff", "Vanguard Crozier", "Warlord's Benediction", "Conqueror's Halo", "Staff of the Dawn"]
+weapons = [18395, 18395, 31347, 31347, 24445, 24445]
+weapon_glow = [0, 0, 1900, 1900, 1900, 1900]
+legendary_weapon = 35634
+legendary_name = "Atiesh, Light of the Basin"
+
+[[set]]
+class = "mage"
+names = ["Militia", "Sentinel", "Vanguard", "Warlord", "Conqueror", "Ascended", "Exalted", "Eternal"]
+slots = ["Hood", "Mantle", "Robes", "Sash", "Leggings", "Boots", "Cuffs", "Gloves"]
+displays = [
+    [3356, 0, 3526, 0, 3527, 0, 0, 3528],
+    [31087, 30211, 29591, 29596, 34619, 29594, 29595, 29593],
+    [31512, 30586, 30581, 30583, 30582, 30587, 30584, 30585],
+    [34218, 34254, 34038, 34046, 34039, 34043, 34045, 34041],
+    [35331, 35326, 35523, 34046, 34039, 34043, 34045, 34041],
+    [34602, 34597, 34596, 34599, 34598, 34593, 34601, 34600],
+    [34218, 34254, 34038, 34046, 34039, 34043, 34045, 34041],
+]
+weapon_names = ["Militia Staff", "Sentinel Staff", "Vanguard Spellstaff", "Warlord's Arcanum", "Conqueror's Pinion", "Staff of the Storm"]
+weapons = [18396, 18396, 24394, 24394, 24481, 24481]
+weapon_glow = [0, 0, 2504, 1894, 803, 1894]
+legendary_weapon = 35631
+legendary_name = "Atiesh, Frost of the Basin"
+
+[[set]]
+class = "hunter"
+names = ["Militia", "Sentinel", "Vanguard", "Warlord", "Conqueror", "Ascended", "Exalted", "Eternal"]
+slots = ["Coif", "Spaulders", "Hauberk", "Belt", "Legguards", "Boots", "Bracers", "Grips"]
+displays = [
+    [0, 0, 1019, 0, 697, 1020, 0, 510],
+    [31410, 31409, 31402, 31404, 31403, 31407, 31405, 31406],
+    [32017, 32030, 32022, 32019, 32023, 32020, 32018, 32024],
+    [34085, 34091, 33667, 33665, 33672, 33669, 33666, 33668],
+    [35601, 35611, 35415, 33665, 33672, 33669, 33666, 33668],
+    [34649, 34651, 34645, 34646, 34652, 34648, 34647, 34650],
+    [34085, 34091, 33667, 33665, 33672, 33669, 33666, 33668],
+]
+weapon_names = ["Militia Longbow", "Sentinel Longbow", "Vanguard Recurve", "Warlord's Warbow", "Conqueror's Greatbow", "Bow of the Hunt"]
+weapons = [18341, 18341, 20716, 20716, 32519, 32519]
+weapon_glow = [0, 0, 2564, 2564, 1894, 803]
+legendary_weapon = 32519
+legendary_name = "Thori'dal's Echo"
+
+# Set bonuses, for wearing pieces of your class's set (Sentinel tier and up; tiers mix).
+[[bonus]]
+class = "warrior"
+two = "+10% damage."
+four = "Thunder Clap and Whirlwind reach 40% further."
+six = "Every 4th auto-attack is a free Whirlwind."
+
+[[bonus]]
+class = "priest"
+two = "Your healing is 20% stronger."
+four = "Holy Nova heals 50% more."
+six = "Smite and Mind Blast have a 20% chance to strike twice."
+
+[[bonus]]
+class = "mage"
+two = "Fire and Frost spells recharge 10% faster."
+four = "Fire and Frost spells deal 25% more damage."
+six = "Fire and Frost spells have a 25% chance to fire twice."
+
+[[bonus]]
+class = "hunter"
+two = "Multi-Shot hits 1 more target, and your pet deals 20% more damage."
+four = "Serpent Sting and Arcane Shot deal 25% more damage."
+six = "Every 10th Auto Shot is an Aimed Shot for 400%."

@@ -1,0 +1,1816 @@
+diff --git a/crates/benilla-app/src/bowstring.rs b/crates/benilla-app/src/bowstring.rs
+index 432069aa..b19faab9 100644
+--- a/crates/benilla-app/src/bowstring.rs
++++ b/crates/benilla-app/src/bowstring.rs
+@@ -15,6 +15,9 @@ use crate::entities::BoneAttach;
+ /// The HandArrow attach id (35, `0x6121b8`): the string's middle point while nocked.
+ const HAND_ARROW: u16 = 0x23;
+ 
++/// No bow's string, drawn or not, is longer than this (yards).
++const MAX_STRING: f32 = 2.5;
++
+ /// Marks a bow prop root whose model authors the `$WTT`/`$WTB` anchors; despawned with the prop.
+ #[derive(Component)]
+ pub(crate) struct Bowstring {
+@@ -64,6 +67,16 @@ fn draw_bowstrings(
+                 pose.posed_point(joints.get(pose.joints_root).ok()?, bone, offset)
+             })
+             .unwrap_or_else(|| (top + bottom) / 2.0);
++        // Basin Battle: a pose caught mid-change (a tumble, a swap) can put a tip or the nocking
++        // hand yards off for a frame; a string longer than a bow is never drawn as one.
++        if top.distance(bottom) > MAX_STRING {
++            continue;
++        }
++        let middle = if top.distance(middle) > MAX_STRING || bottom.distance(middle) > MAX_STRING {
++            (top + bottom) / 2.0
++        } else {
++            middle
++        };
+         gizmos.line(top, middle, STRING_COLOR);
+         gizmos.line(middle, bottom, STRING_COLOR);
+     }
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index 0a94f0f9..e18e556b 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -32,7 +32,7 @@ mod lod;
+ /// Basin Battle's action animation: timed clips, trails, hit-stop, shake, the roll, the aim pitch
+ /// and the camera's unit collision, all driven by an add-on.
+ mod action;
+-pub(crate) use action::unit_hit;
++pub(crate) use action::{lock_point, unit_hit};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+ /// paperdoll shows); behaviour reads `armed_main`/`armed_off`, which apply the disarm ladder.
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 097c4de8..652bf5bb 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1,38 +1,55 @@
+ //! Basin Battle's action animation (not in 1.12.1), driven by an add-on through
+-//! [`benilla_ui::action_combat`]: any clip as a one-shot timed to land its impact keyframe when
+-//! the server's blow does, a weapon trail over it, hit-stop (the animation held a moment as a blow
+-//! lands), camera shake, a procedural roll over a dodge's dash, the upper body following the aim,
+-//! and a camera that stops short of other units instead of entering them. Nothing here runs until
+-//! an add-on calls in, so the stock client is unchanged.
++//! [`benilla_ui::action_combat`]. Nothing here runs until an add-on calls in, so the stock client is
++//! unchanged.
++//!
++//! - **The action layer**: an add-on's clip ([`ActionClip`]) plays on a node of its own, over
++//!   whatever 1.12's driver picks, on its own clock: its impact keyframe lands when the server's
++//!   blow does and the rest takes the recovery's time, faded in and out, on the whole body standing
++//!   and the upper body while the legs run. The driver keeps choosing the gait underneath and is
++//!   never asked to play it, so none of its rules (the combat fast path, a re-pick on a movement
++//!   edge) cut it short.
++//! - **Tilts**: a dodge's tumble and a struck body thrown back, turning the skeleton's root bones
++//!   about a pivot after the clips are posed. Each part of a bone (where it is, how it turns, its
++//!   size) is kept and given back on its own: the clips key a root's rotation but rarely its
++//!   position, so a whole-transform compare took a fresh rotation as a new pose and kept the roll's
++//!   shifted position for good (the body left floating over its shadow).
++//! - Hit-stop (the clocks held a moment as a blow lands), camera shake, weapon trails, the upper
++//!   body following the aim, a lock-on target for the camera and the body, and a camera that stops
++//!   short of other units instead of entering them.
+ 
+ use std::f32::consts::TAU;
+ use std::sync::Mutex;
+ 
+ use benilla_assets::ModelAnimations;
+-use benilla_ui::action_combat::{self, ActionCall};
++use benilla_ui::action_combat::{self, ActionBody, ActionCall};
+ use benilla_world::rig_anim::RigPose;
+-use bevy::animation::transition::AnimationTransitions;
++use bevy::animation::graph::AnimationNodeIndex;
+ use bevy::prelude::*;
+ 
+-use super::select::Mode;
+-use super::{find_resolved, AnimData, AnimDriver, BodyTwist, EmoteAnim, PlaySeq};
++use super::{find_resolved, AnimData, BodyTwist};
+ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+ 
+ /// The impact keyframes an attack clip authors (`$AH0`..`$AH3`, `$CAH`), what a blow's timing
+ /// is fitted to.
+ const IMPACT_TAGS: [&[u8; 4]; 5] = [b"$AH0", b"$AH1", b"$AH2", b"$AH3", b"$CAH"];
+-/// A clip with no impact keyframe lands about here.
+-const IMPACT_SHARE: f32 = 0.4;
+ /// How far a clip's speed is bent to fit its timing.
+-const RATE_RANGE: (f32, f32) = (0.35, 3.0);
+-/// How long a timed rate waits for its clip to start (a combat clip already playing defers it).
+-const RATE_WAIT: f32 = 1.5;
+-/// The roll's pivot above the feet, as a share of the unit's height (about the hips).
+-const ROLL_PIVOT: f32 = 0.9;
+-/// How far the body must have moved before the roll knows which way it tumbles.
+-const ROLL_DIRECTION_AFTER: f32 = 0.15;
++const RATE_RANGE: (f32, f32) = (0.25, 4.0);
++/// An action clip fades in and out over these.
++const FADE_IN: f32 = 0.08;
++const FADE_OUT: f32 = 0.16;
++/// Faster than this (yd/s) the legs are the gait's and the clip takes the upper body; slower than
++/// the second, the whole body again.
++const MOVING_ABOVE: f32 = 1.2;
++const STILL_BELOW: f32 = 0.6;
++/// How far the body must have moved before a roll knows which way it tumbles, and how long it
++/// waits for that before giving up on the tumble (a dodge into a wall).
++const ROLL_DIRECTION_AFTER: f32 = 0.12;
++const ROLL_WAIT: f32 = 0.35;
+ /// A roll asked for again this soon after the last began is the same dodge.
+ const ROLL_ECHO: f32 = 0.25;
++/// A struck body's lean: out fast, back slow, over this long; pivoting this high.
++const LEAN_SECS: f32 = 0.45;
++const LEAN_PIVOT: f32 = 0.2;
+ /// The upper body follows the aim this much, up to this far.
+ const AIM_PITCH_SHARE: f32 = 0.8;
+ const AIM_PITCH_MAX: f32 = 0.7;
+@@ -42,13 +59,46 @@ const BODY_HEIGHT: f32 = 2.1;
+ const BODY_CLEARANCE: f32 = 0.3;
+ /// Units within this of the hero can block the camera.
+ const OCCLUDER_RANGE: f32 = 20.0;
++/// The lock-on point: this far up a locked unit (scaled), and how far off it lets go.
++const LOCK_HEIGHT: f32 = 1.3;
++const LOCK_RANGE: f32 = 45.0;
+ 
+-/// A clip timed to its fit: this rate while it plays, for a little while.
++/// An add-on's clip, playing on a node of its own over the driver's choice.
+ #[derive(Component)]
+-pub(crate) struct ActionRate {
+-    anim: u16,
+-    rate: f32,
+-    until: f32,
++pub(crate) struct ActionClip {
++    /// The requested id, for a reaction replacing a swing and the inspector.
++    id: u16,
++    /// The whole-body node (the clip's second node where it has one, so the driver's own play of
++    /// the same clip never shares its clock) and the upper-body one.
++    full: AnimationNodeIndex,
++    upper: Option<AnimationNodeIndex>,
++    body: ActionBody,
++    on_upper: bool,
++    /// The clip clock (seconds into the clip), its length and its impact keyframe (0: none).
++    t: f32,
++    len: f32,
++    key: f32,
++    /// Real seconds to the impact keyframe (the whole clip when it has none) and after it; 0 plays
++    /// that part at its own speed.
++    windup: f32,
++    recovery: f32,
++    /// Held this long past its end (looping a looping clip), a reaction's stagger.
++    hold: f32,
++    held: f32,
++    looping: bool,
++    /// The blend in: 0 to 1, then back to 0 when it ends or is let go.
++    lambda: f32,
++    stopping: Option<f32>,
++    last_pos: Option<Vec3>,
++    /// Seconds the body has been moving (positive) or still (negative), for the body switch.
++    moving_for: f32,
++}
++
++impl ActionClip {
++    /// The id it plays, for the inspector.
++    pub(crate) fn anim_id(&self) -> u16 {
++        self.id
++    }
+ }
+ 
+ /// The animation held still until then.
+@@ -58,26 +108,52 @@ pub(crate) struct HitStopped {
+     paused: bool,
+ }
+ 
+-/// A roll in progress: when it started, how long it lasts, where the body was, and once it has
+-/// moved, the world axis it tumbles about. Each root bone keeps its animated pose (`base`) and
+-/// what the roll last wrote over it.
++/// How a tilt turns the body.
++#[derive(Clone, Copy, PartialEq)]
++enum TiltKind {
++    /// Head over heels once, about this pivot, along the way the body moves.
++    Roll { pivot: f32 },
++    /// Thrown back this far (radians) and settling, along a fixed direction.
++    Lean { amount: f32 },
++}
++
++/// A tilt of the whole body about a pivot over its feet: a roll or a struck lean. Each root bone
++/// keeps its animated pose part by part (`base`) and what the tilt last wrote (`last`).
+ #[derive(Component)]
+-pub(crate) struct ActionRoll {
+-    start: f32,
++pub(crate) struct ActionTilt {
++    kind: TiltKind,
++    asked: f32,
++    /// The clock starts once the roll's body moves (a lean's at once).
++    start: Option<f32>,
+     secs: f32,
+     from: Vec3,
+     axis: Option<Vec3>,
+     bones: Vec<(usize, Transform, Transform)>,
+ }
+ 
++/// The unit the camera and the body keep facing.
++#[derive(Resource, Default)]
++pub(crate) struct LockOn(Option<Entity>);
++
++/// Nodes of a replaced clip, to stop before the new one plays.
++#[derive(Component, Default)]
++pub(crate) struct ReleaseNodes(Vec<AnimationNodeIndex>);
++
+ /// Other units near the hero, as (feet, radius, height), for the camera's unit collision.
+ static OCCLUDERS: Mutex<Vec<(Vec3, f32, f32)>> = Mutex::new(Vec::new());
++/// The lock-on point this frame (Bevy space), for the camera and the mover.
++static LOCK_POINT: Mutex<Option<Vec3>> = Mutex::new(None);
+ 
+ /// The units that could block the camera this frame.
+ pub(crate) fn occluders() -> Vec<(Vec3, f32, f32)> {
+     OCCLUDERS.lock().map(|v| v.clone()).unwrap_or_default()
+ }
+ 
++/// Where the locked-on unit is (its chest), if anything is locked.
++pub(crate) fn lock_point() -> Option<Vec3> {
++    LOCK_POINT.lock().ok().and_then(|p| *p)
++}
++
+ /// How far along a camera boom from `head` (direction `dir`, length `len`) another unit's body
+ /// starts, so the camera can stop short of it; `None` when the way is clear. A body the head is
+ /// already inside (a clinch) is passed through.
+@@ -116,18 +192,148 @@ fn resolve(name: &str, me: Option<Entity>, index: &GuidIndex) -> Option<Entity>
+     index.0.get(&guid).copied()
+ }
+ 
+-/// When a clip's blow lands: its first impact keyframe, else a share of its length.
++/// When a clip's blow lands: its first impact keyframe, else 0 (none).
+ fn impact_time(clip: &benilla_assets::AnimClip) -> f32 {
+     clip.events
+         .iter()
+         .find(|e| IMPACT_TAGS.iter().any(|t| **t == e.ident))
+         .map(|e| e.time)
+-        .filter(|t| *t > 0.0)
+-        .unwrap_or(clip.duration * IMPACT_SHARE)
++        .filter(|t| *t > 0.0 && *t < clip.duration)
++        .unwrap_or(0.0)
++}
++
++/// The `variation`th take of the clip a requested id resolves to on this model (the first when
++/// it has fewer).
++fn take_of<'a>(
++    anims: &'a ModelAnimations,
++    anim: u16,
++    variation: Option<usize>,
++    catalog: Option<&benilla_formats::AnimDataCatalog>,
++) -> Option<&'a benilla_assets::AnimClip> {
++    let head = find_resolved(anims, anim, catalog)?;
++    let n = variation.unwrap_or(0);
++    anims
++        .clips
++        .iter()
++        .filter(|c| c.anim_id == head.anim_id)
++        .nth(n)
++        .or(Some(head))
++}
++
++impl ActionClip {
++    fn new(clip: &benilla_assets::AnimClip, body: ActionBody) -> Self {
++        Self {
++            id: clip.anim_id,
++            full: clip.blend_node.unwrap_or(clip.node),
++            upper: clip.upper_node,
++            body,
++            on_upper: body == ActionBody::Upper,
++            t: 0.0,
++            len: clip.duration.max(0.05),
++            key: impact_time(clip),
++            windup: 0.0,
++            recovery: 0.0,
++            hold: 0.0,
++            held: 0.0,
++            looping: clip.looping,
++            lambda: 0.0,
++            stopping: None,
++            last_pos: None,
++            moving_for: 0.0,
++        }
++    }
++
++    /// This instant's clip speed.
++    fn rate(&self) -> f32 {
++        let r = if self.key > 0.0 {
++            if self.t < self.key {
++                if self.windup > 0.0 {
++                    self.key / self.windup
++                } else {
++                    1.0
++                }
++            } else if self.recovery > 0.0 {
++                (self.len - self.key) / self.recovery
++            } else {
++                1.0
++            }
++        } else if self.windup > 0.0 {
++            self.len / self.windup
++        } else {
++            1.0
++        };
++        r.clamp(RATE_RANGE.0, RATE_RANGE.1)
++    }
++
++    /// Advance the clip clock by `dt` real seconds: to the impact at the wind-up's pace, then the
++    /// recovery's; past the end it loops (a held looping clip) or holds the last pose.
++    fn advance(&mut self, dt: f32) {
++        let mut left = dt;
++        for _ in 0..2 {
++            let rate = self.rate();
++            let to_key = if self.key > 0.0 && self.t < self.key {
++                (self.key - self.t) / rate
++            } else {
++                f32::INFINITY
++            };
++            let step = left.min(to_key);
++            self.t += step * rate;
++            left -= step;
++            if left <= 0.0 {
++                break;
++            }
++        }
++        if self.looping {
++            // A looping clip plays for its hold (one pass without one), then lets go.
++            self.t %= self.len;
++            self.held += dt;
++            let total = if self.hold > 0.0 { self.hold } else { self.len };
++            if self.held >= total && self.stopping.is_none() {
++                self.stopping = Some(FADE_OUT);
++            }
++        } else if self.t >= self.len - 2.0e-3 {
++            // A one-shot holds its last pose for its hold, then lets go.
++            self.t = self.t.min(self.len - 1.0e-3);
++            self.held += dt;
++            if self.held >= self.hold && self.stopping.is_none() {
++                self.stopping = Some(FADE_OUT);
++            }
++        }
++    }
++
++    fn nodes(&self) -> impl Iterator<Item = AnimationNodeIndex> {
++        std::iter::once(self.full).chain(self.upper)
++    }
++}
++
++/// A new clip on a unit: one playing gives way, keeping its blend so a quick chain never flashes
++/// the pose under it.
++fn start_clip(
++    commands: &mut Commands,
++    clips: &mut Query<&mut ActionClip>,
++    entity: Entity,
++    clip: ActionClip,
++) {
++    if let Ok(mut old) = clips.get_mut(entity) {
++        let lambda = if old.stopping.is_some() {
++            0.0
++        } else {
++            old.lambda
++        };
++        let stale: Vec<AnimationNodeIndex> = old
++            .nodes()
++            .filter(|n| *n != clip.full && Some(*n) != clip.upper)
++            .collect();
++        *old = ActionClip { lambda, ..clip };
++        if !stale.is_empty() {
++            commands.entity(entity).try_insert(ReleaseNodes(stale));
++        }
++    } else {
++        commands.entity(entity).try_insert(clip);
++    }
+ }
+ 
+-/// Apply the scripts' calls: clips (with their rate and trail), hit-stops, shakes and rolls.
+-/// Before the driver, so a clip asked for this frame plays this frame.
++/// Apply the scripts' calls: clips, stops, reactions, hit-stops, shakes, rolls, the lock-on.
+ #[allow(clippy::too_many_arguments)]
+ pub(super) fn drain_action_calls(
+     mut commands: Commands,
+@@ -136,11 +342,12 @@ pub(super) fn drain_action_calls(
+     me: Query<Entity, With<SelfPlayer>>,
+     units: Query<(&ModelAnimations, &Transform)>,
+     anim_data: Option<Res<AnimData>>,
+-    mut play_seq: ResMut<PlaySeq>,
+-    mut emotes: MessageWriter<EmoteAnim>,
+-    mut trails: MessageWriter<crate::weapon_trail::TrailArm>,
++    held: Query<&crate::entities::HeldAttached>,
++    mut trails: Query<&mut crate::weapon_trail::WeaponTrail>,
+     mut shakes: ResMut<crate::camera_shake::CameraShakes>,
+-    mut rolling: Query<&mut ActionRoll>,
++    mut clips: Query<&mut ActionClip>,
++    mut tilts: Query<&mut ActionTilt>,
++    mut lock: ResMut<LockOn>,
+ ) {
+     let calls = action_combat::take_calls();
+     if calls.is_empty() {
+@@ -153,29 +360,113 @@ pub(super) fn drain_action_calls(
+     let catalog = anim_data.as_deref().map(|d| &d.0);
+     for call in calls {
+         match call {
+-            ActionCall::Anim { unit, anim, impact, trail } => {
+-                let Some(entity) = resolve(&unit, me, index) else { continue };
+-                let Ok((anims, _)) = units.get(entity) else { continue };
+-                let Some(clip) = find_resolved(anims, anim, catalog) else { continue };
+-                emotes.write(EmoteAnim { entity, anim_id: anim, seq: play_seq.next(), via_player: false });
+-                if impact > 0.0 {
+-                    let rate = (impact_time(clip) / impact).clamp(RATE_RANGE.0, RATE_RANGE.1);
+-                    commands.entity(entity).try_insert(ActionRate { anim, rate, until: now + RATE_WAIT });
+-                }
++            ActionCall::Anim {
++                unit,
++                anim,
++                impact,
++                trail,
++                variation,
++                recovery,
++                body,
++            } => {
++                let Some(entity) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                let Ok((anims, _)) = units.get(entity) else {
++                    continue;
++                };
++                let Some(take) = take_of(anims, anim, variation, catalog) else {
++                    continue;
++                };
++                let mut clip = ActionClip::new(take, body);
++                clip.windup = impact;
++                clip.recovery = recovery;
++                clip.looping = false;
++                start_clip(&mut commands, &mut clips, entity, clip);
++                // The trail starts with the swing, on each hand's weapon.
+                 if let Some((packed, duration_ms)) = trail {
+-                    trails.write(crate::weapon_trail::TrailArm {
+-                        entity,
+-                        trail: benilla_formats::TrailProc { packed, duration_ms },
+-                    });
++                    let proc = benilla_formats::TrailProc {
++                        packed,
++                        duration_ms,
++                    };
++                    let now_ms = time.elapsed().as_millis() as u32;
++                    if let Ok(h) = held.get(entity) {
++                        for root in h.spawned_slots().iter().take(2).flatten() {
++                            if let Ok(mut t) = trails.get_mut(*root) {
++                                t.arm(proc, now_ms);
++                            }
++                        }
++                    }
++                }
++            }
++            ActionCall::Stop { unit, fade } => {
++                let Some(entity) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                if let Ok(mut c) = clips.get_mut(entity) {
++                    c.stopping = Some(fade.max(0.01));
++                }
++            }
++            ActionCall::React {
++                unit,
++                anim,
++                from,
++                lean,
++                hold,
++            } => {
++                let Some(entity) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                let Ok((anims, t)) = units.get(entity) else {
++                    continue;
++                };
++                if let Some(take) = take_of(anims, anim, None, catalog) {
++                    let mut clip = ActionClip::new(take, ActionBody::Auto);
++                    clip.hold = hold;
++                    start_clip(&mut commands, &mut clips, entity, clip);
++                }
++                // Thrown back along the blow (WoW axes in, Bevy out), flat.
++                let dir = benilla_assets::coords::wow_to_bevy([from.0, from.1, 0.0]);
++                let dir = Vec3::new(dir.x, 0.0, dir.z);
++                if lean > 0.0 && dir.length_squared() > 1.0e-6 {
++                    let tilt = ActionTilt {
++                        kind: TiltKind::Lean { amount: lean },
++                        asked: now,
++                        start: Some(now),
++                        secs: LEAN_SECS,
++                        from: t.translation,
++                        axis: Some(Vec3::Y.cross(dir.normalize())),
++                        bones: Vec::new(),
++                    };
++                    match tilts.get_mut(entity) {
++                        // A roll in progress keeps its tumble.
++                        Ok(cur) if matches!(cur.kind, TiltKind::Roll { .. }) => {}
++                        Ok(mut cur) => {
++                            let bones = std::mem::take(&mut cur.bones);
++                            *cur = ActionTilt { bones, ..tilt };
++                        }
++                        Err(_) => {
++                            commands.entity(entity).try_insert(tilt);
++                        }
++                    }
+                 }
+             }
+             ActionCall::HitStop { unit, secs } => {
+                 if let Some(entity) = resolve(&unit, me, index) {
+-                    commands.entity(entity).try_insert(HitStopped { until: now + secs, paused: false });
++                    commands.entity(entity).try_insert(HitStopped {
++                        until: now + secs,
++                        paused: false,
++                    });
+                 }
+             }
+-            ActionCall::Shake { inches, secs, frequency } => {
+-                let at = me.and_then(|e| units.get(e).ok()).map_or(Vec3::ZERO, |(_, t)| t.translation);
++            ActionCall::Shake {
++                inches,
++                secs,
++                frequency,
++            } => {
++                let at = me
++                    .and_then(|e| units.get(e).ok())
++                    .map_or(Vec3::ZERO, |(_, t)| t.translation);
+                 // Up and down, and a little side to side, dying away.
+                 for (direction, share) in [(2, 1.0), (1, 0.45)] {
+                     shakes.add_custom(
+@@ -194,82 +485,197 @@ pub(super) fn drain_action_calls(
+                     );
+                 }
+             }
+-            ActionCall::Roll { unit, secs } => {
+-                let Some(entity) = resolve(&unit, me, index) else { continue };
+-                let Ok((_, t)) = units.get(entity) else { continue };
+-                if let Ok(mut roll) = rolling.get_mut(entity) {
++            ActionCall::Roll {
++                unit,
++                secs,
++                step,
++                pivot,
++                tuck,
++            } => {
++                let Some(entity) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                let Ok((anims, t)) = units.get(entity) else {
++                    continue;
++                };
++                if step {
++                    continue;
++                }
++                let roll = ActionTilt {
++                    kind: TiltKind::Roll { pivot },
++                    asked: now,
++                    start: None,
++                    secs,
++                    from: t.translation,
++                    axis: None,
++                    bones: Vec::new(),
++                };
++                if let Ok(mut cur) = tilts.get_mut(entity) {
+                     // The same dodge told twice (the prediction, then the server): one tumble.
+-                    if now - roll.start < ROLL_ECHO {
++                    if matches!(cur.kind, TiltKind::Roll { .. }) && now - cur.asked < ROLL_ECHO {
+                         continue;
+                     }
+-                    // A new dodge before the last one finished starts over, keeping the bones'
+-                    // animated poses: taking the half-turned body as the pose would leave it
+-                    // turned, hanging in the air, once the roll ended.
+-                    roll.start = now;
+-                    roll.secs = secs;
+-                    roll.from = t.translation;
+-                    roll.axis = None;
+-                    continue;
++                    let bones = std::mem::take(&mut cur.bones);
++                    *cur = ActionTilt { bones, ..roll };
++                } else {
++                    commands.entity(entity).try_insert(roll);
+                 }
+-                commands.entity(entity).try_insert(ActionRoll { start: now, secs, from: t.translation, axis: None, bones: Vec::new() });
++                // The tucked shape over the tumble.
++                if tuck != 0 {
++                    if let Some(take) = take_of(anims, tuck, None, catalog) {
++                        let mut clip = ActionClip::new(take, ActionBody::Full);
++                        clip.looping = true;
++                        // Over the tumble, which waits for the body to move off.
++                        clip.hold = secs + 0.1;
++                        start_clip(&mut commands, &mut clips, entity, clip);
++                    }
++                }
++            }
++            ActionCall::Lock { unit } => {
++                lock.0 = unit
++                    .and_then(|u| resolve(&u, me, index))
++                    .filter(|e| Some(*e) != me);
+             }
+         }
+     }
+ }
+ 
+-/// After the driver: a timed clip runs at its fitted rate, and a hit-stop holds the clocks.
+-pub(super) fn apply_action_rates(
++/// After the clocks advance and before the poses are taken: every action clip's clock, blend and
++/// body.
++#[allow(clippy::type_complexity)]
++pub(super) fn apply_action_clips(
+     mut commands: Commands,
+     time: Res<Time>,
+     mut units: Query<(
+         Entity,
+-        &AnimDriver,
++        &mut ActionClip,
+         &mut AnimationPlayer,
+-        &AnimationTransitions,
+-        Option<&ActionRate>,
+-        Option<&mut HitStopped>,
+-        Has<crate::aura_visual::AnimRateFreeze>,
++        &ModelAnimations,
++        &Transform,
++        Option<&HitStopped>,
++        Option<&ReleaseNodes>,
+     )>,
+ ) {
++    let dt = time.delta_secs();
+     let now = time.elapsed_secs();
+-    for (entity, drv, mut player, tr, rate, stop, aura_frozen) in &mut units {
+-        if let Some(r) = rate {
+-            let node = match drv.overlay {
+-                Some(ov) if ov.id == r.anim => Some(ov.node),
+-                _ if matches!(drv.mode, Mode::Swing { id, .. } if id == r.anim) => tr.get_main_animation(),
+-                _ => None,
+-            };
+-            if let Some(active) = node.and_then(|n| player.animation_mut(n)) {
+-                if active.speed() != r.rate && active.speed() != 0.0 {
+-                    active.set_speed(r.rate);
+-                }
++    for (entity, mut clip, mut player, anims, t, stop, release) in &mut units {
++        let clip = &mut *clip;
++        if let Some(r) = release {
++            for n in &r.0 {
++                player.stop(*n);
++            }
++            commands.entity(entity).try_remove::<ReleaseNodes>();
++        }
++        let frozen = stop.is_some_and(|s| now < s.until);
++        if !frozen && dt > 0.0 {
++            clip.advance(dt);
++        }
++        // The blend.
++        match clip.stopping {
++            Some(fade) => clip.lambda -= dt / fade.max(0.01),
++            None => clip.lambda = (clip.lambda + dt / FADE_IN).min(1.0),
++        }
++        if clip.lambda <= 0.0 && clip.stopping.is_some() {
++            for n in clip.nodes() {
++                player.stop(n);
+             }
+-            if now >= r.until {
+-                commands.entity(entity).try_remove::<ActionRate>();
++            commands.entity(entity).try_remove::<ActionClip>();
++            continue;
++        }
++        let lambda = clip.lambda.clamp(0.0, 1.0);
++        // The body: the legs go to the gait once the unit is really moving, and come back once it
++        // has really stopped.
++        if dt > 0.0 {
++            let speed = clip.last_pos.map_or(0.0, |p| {
++                Vec2::new(t.translation.x - p.x, t.translation.z - p.z).length() / dt
++            });
++            if speed > MOVING_ABOVE {
++                clip.moving_for = clip.moving_for.max(0.0) + dt;
++            } else if speed < STILL_BELOW {
++                clip.moving_for = clip.moving_for.min(0.0) - dt;
+             }
+         }
+-        if let Some(mut stop) = stop {
+-            if now < stop.until {
+-                for (_, anim) in player.playing_animations_mut() {
+-                    anim.pause();
+-                }
+-                stop.paused = true;
+-            } else {
+-                // The aura freeze owns the clocks while it holds them.
+-                if stop.paused && !aura_frozen {
+-                    for (_, anim) in player.playing_animations_mut() {
+-                        anim.resume();
++        clip.last_pos = Some(t.translation);
++        clip.on_upper = match clip.body {
++            ActionBody::Full => false,
++            ActionBody::Upper => clip.upper.is_some(),
++            ActionBody::Auto => {
++                clip.upper.is_some()
++                    && if clip.on_upper {
++                        clip.moving_for > -0.15
++                    } else {
++                        clip.moving_for > 0.08
+                     }
++            }
++        };
++        let (on, off) = match (clip.on_upper, clip.upper) {
++            (true, Some(u)) => (u, Some(clip.full)),
++            _ => (clip.full, clip.upper),
++        };
++        if let Some(off) = off {
++            if player.animation(off).is_some() {
++                player.stop(off);
++            }
++        }
++        // Its weight against everything else playing (the gait, the driver's one-shots), the
++        // hands' grip overlays apart, so the share it takes is `lambda`.
++        let others: f32 = player
++            .playing_animations()
++            .filter(|(n, _)| **n != on && !anims.hand_close.contains(&Some(**n)))
++            .map(|(_, a)| a.weight())
++            .sum();
++        let others = if others > 1.0e-3 { others } else { 1.0 };
++        let weight = if lambda >= 0.999 {
++            others * 999.0
++        } else {
++            others * lambda / (1.0 - lambda)
++        };
++        if player.animation(on).is_none() {
++            player.start(on);
++        }
++        if let Some(a) = player.animation_mut(on) {
++            a.set_speed(0.0);
++            a.seek_to(clip.t);
++            a.set_weight(weight.max(1.0e-4));
++        }
++    }
++}
++
++/// After the driver: a hit-stop holds the clocks.
++pub(super) fn apply_hit_stops(
++    mut commands: Commands,
++    time: Res<Time>,
++    mut units: Query<(
++        Entity,
++        &mut AnimationPlayer,
++        &mut HitStopped,
++        Has<crate::aura_visual::AnimRateFreeze>,
++    )>,
++) {
++    let now = time.elapsed_secs();
++    for (entity, mut player, mut stop, aura_frozen) in &mut units {
++        if now < stop.until {
++            for (_, anim) in player.playing_animations_mut() {
++                anim.pause();
++            }
++            stop.paused = true;
++        } else {
++            // The aura freeze owns the clocks while it holds them.
++            if stop.paused && !aura_frozen {
++                for (_, anim) in player.playing_animations_mut() {
++                    anim.resume();
+                 }
+-                commands.entity(entity).try_remove::<HitStopped>();
+             }
++            commands.entity(entity).try_remove::<HitStopped>();
+         }
+     }
+ }
+ 
+ /// The upper body follows the aiming camera's pitch (our own hero, while aiming).
+ pub(super) fn aim_pitch(time: Res<Time>, mut me: Query<&mut BodyTwist, With<SelfPlayer>>) {
+-    let Ok(mut twist) = me.single_mut() else { return };
++    let Ok(mut twist) = me.single_mut() else {
++        return;
++    };
+     let want = if action_combat::aim_camera() {
+         (action_combat::view_elevation() * AIM_PITCH_SHARE).clamp(-AIM_PITCH_MAX, AIM_PITCH_MAX)
+     } else {
+@@ -277,90 +683,156 @@ pub(super) fn aim_pitch(time: Res<Time>, mut me: Query<&mut BodyTwist, With<Self
+     };
+     let k = 1.0 - (-14.0 * time.delta_secs()).exp();
+     let next = twist.pitch + (want - twist.pitch) * k;
+-    twist.pitch = if (next - want).abs() < 1.0e-3 { want } else { next };
++    twist.pitch = if (next - want).abs() < 1.0e-3 {
++        want
++    } else {
++        next
++    };
++}
++
++/// A bone's tilted pose, given back part by part: whatever still holds what the tilt wrote returns
++/// to the pose under it.
++fn restore(cur: &mut Transform, base: &Transform, last: &Transform) -> bool {
++    let mut changed = false;
++    if cur.translation == last.translation && cur.translation != base.translation {
++        cur.translation = base.translation;
++        changed = true;
++    }
++    if cur.rotation == last.rotation && cur.rotation != base.rotation {
++        cur.rotation = base.rotation;
++        changed = true;
++    }
++    if cur.scale == last.scale && cur.scale != base.scale {
++        cur.scale = base.scale;
++        changed = true;
++    }
++    changed
++}
++
++/// The pose a part keeps under a tilt: what the animation wrote this frame, where it wrote, else
++/// the old base, so the turn never compounds and nothing it moved is left behind.
++fn rebase(base: &mut Transform, cur: &Transform, last: &Transform) {
++    if cur.translation != last.translation {
++        base.translation = cur.translation;
++    }
++    if cur.rotation != last.rotation {
++        base.rotation = cur.rotation;
++    }
++    if cur.scale != last.scale {
++        base.scale = cur.scale;
++    }
+ }
+ 
+-/// The roll, in the pose post-pass: every root bone turns head over heels about the hips, along
+-/// the way the body is moving, over the roll's time.
+-pub(super) fn apply_action_roll(
++/// The tilts, in the pose post-pass: every root bone turns about the pivot, the animated pose
++/// under it kept part by part.
++pub(super) fn apply_action_tilts(
+     mut commands: Commands,
+     time: Res<Time>,
+-    mut units: Query<(Entity, &mut ActionRoll, &Transform, Option<&NetEntity>)>,
++    mut units: Query<(Entity, &mut ActionTilt, &Transform, Option<&NetEntity>)>,
+     mut rigs: Query<&mut RigPose>,
+     globals: Query<&GlobalTransform>,
+ ) {
+     let now = time.elapsed_secs();
+-    for (entity, mut roll, t, net) in &mut units {
++    for (entity, mut tilt, t, net) in &mut units {
+         let Ok(mut rig) = rigs.get_mut(entity) else {
+-            commands.entity(entity).try_remove::<ActionRoll>();
++            commands.entity(entity).try_remove::<ActionTilt>();
+             continue;
+         };
+-        let roll = &mut *roll;
+-        let done = (now - roll.start) / roll.secs.max(0.05);
+-        if done >= 1.0 {
+-            // Back to the animated pose.
+-            for (b, base, last) in roll.bones.drain(..) {
+-                if let Some(cur) = rig.locals.get_mut(b) {
+-                    if *cur == last {
+-                        *cur = base;
+-                        rig.pose_dirty = true;
+-                    }
+-                }
+-            }
+-            commands.entity(entity).try_remove::<ActionRoll>();
+-            continue;
+-        }
+-        if roll.axis.is_none() {
+-            let moved = Vec3::new(t.translation.x - roll.from.x, 0.0, t.translation.z - roll.from.z);
++        let tilt = &mut *tilt;
++        // A roll's clock starts as the body moves, and its axis is the way it goes.
++        if tilt.start.is_none() {
++            let moved = Vec3::new(
++                t.translation.x - tilt.from.x,
++                0.0,
++                t.translation.z - tilt.from.z,
++            );
+             if moved.length() >= ROLL_DIRECTION_AFTER {
+-                roll.axis = Some(Vec3::Y.cross(moved.normalize()));
++                tilt.axis = Some(Vec3::Y.cross(moved.normalize()));
++                tilt.start = Some(now);
++            } else if now - tilt.asked > ROLL_WAIT {
++                // It never went anywhere: no tumble.
++                tilt.secs = 0.0;
++                tilt.start = Some(now);
+             }
+         }
+-        let Some(axis) = roll.axis else {
+-            // Not moving (yet): upright, the animated pose back on any bone still turned.
+-            for (b, base, last) in roll.bones.iter_mut() {
++        let u = tilt
++            .start
++            .map_or(0.0, |s| (now - s) / tilt.secs.max(1.0e-3));
++        let done = tilt.start.is_some() && u >= 1.0;
++        if done || tilt.axis.is_none() {
++            // Done, or not turning yet: the animated pose back on every part we touched.
++            let mut dirty = false;
++            for (b, base, last) in tilt.bones.iter_mut() {
+                 if let Some(cur) = rig.locals.get_mut(*b) {
+-                    if *cur == *last && *cur != *base {
+-                        *cur = *base;
+-                        *last = *base;
+-                        rig.pose_dirty = true;
+-                    }
++                    dirty |= restore(cur, base, last);
++                    rebase(base, cur, last);
++                    *last = *cur;
+                 }
+             }
++            if dirty {
++                rig.pose_dirty = true;
++            }
++            if done {
++                commands.entity(entity).try_remove::<ActionTilt>();
++            }
++            continue;
++        }
++        let Some(axis) = tilt.axis else { continue };
++        let (angle, pivot) = match tilt.kind {
++            // Eased: slow in, fast through the tumble, slow out.
++            TiltKind::Roll { pivot } => (TAU * (u * u * (3.0 - 2.0 * u)).clamp(0.0, 1.0), pivot),
++            // Out in the first fifth, settling over the rest.
++            TiltKind::Lean { amount } => {
++                let shape = if u < 0.2 {
++                    u / 0.2
++                } else {
++                    (1.0 - (u - 0.2) / 0.8).max(0.0).powi(2)
++                };
++                (amount * shape, LEAN_PIVOT)
++            }
++        };
++        let Ok(frame) = globals.get(rig.joints_root) else {
+             continue;
+         };
+-        let Ok(frame) = globals.get(rig.joints_root) else { continue };
+-        // Eased: slow in, fast through the tumble, slow out.
+-        let e = done * done * (3.0 - 2.0 * done);
+-        let angle = TAU * e;
+         let scale = net.map_or(1.0, |n| n.scale.max(0.1));
+         // The pivot from the model frame itself (its feet), so the frame and the pivot agree even
+-        // as the dash carries the body several inches a frame.
+-        let pivot = frame.translation() + Vec3::Y * ROLL_PIVOT * scale;
++        // as a dash carries the body several inches a frame.
++        let pivot = frame.translation() + Vec3::Y * pivot * scale;
+         let frame = frame.affine();
+         let turn = frame.inverse()
+             * bevy::math::Affine3A::from_translation(pivot)
+             * bevy::math::Affine3A::from_quat(Quat::from_axis_angle(axis, angle))
+             * bevy::math::Affine3A::from_translation(-pivot)
+             * frame;
+-        let roots: Vec<usize> = (0..rig.locals.len()).filter(|b| rig.parents.get(*b).copied().unwrap_or(0) < 0).collect();
++        let roots: Vec<usize> = (0..rig.locals.len())
++            .filter(|b| rig.parents.get(*b).copied().unwrap_or(0) < 0)
++            .collect();
+         for b in roots {
+-            let Some(cur) = rig.locals.get(b).copied() else { continue };
+-            let slot = match roll.bones.iter().position(|(x, ..)| *x == b) {
++            let Some(cur) = rig.locals.get(b).copied() else {
++                continue;
++            };
++            let slot = match tilt.bones.iter().position(|(x, ..)| *x == b) {
+                 Some(i) => i,
+                 None => {
+-                    roll.bones.push((b, cur, cur));
+-                    roll.bones.len() - 1
++                    tilt.bones.push((b, cur, cur));
++                    tilt.bones.len() - 1
+                 }
+             };
+-            // A bone the animation re-keyed this frame is a new base; one still holding our write
+-            // keeps the old, so the turn never compounds.
+-            let (_, base, last) = roll.bones[slot];
+-            let base = if cur == last { base } else { cur };
+-            let (_, rot, pos) = (turn * bevy::math::Affine3A::from_scale_rotation_translation(base.scale, base.rotation, base.translation))
+-                .to_scale_rotation_translation();
+-            let out = Transform { translation: pos, rotation: rot.normalize(), scale: base.scale };
+-            roll.bones[slot] = (b, base, out);
++            let (_, mut base, last) = tilt.bones[slot];
++            rebase(&mut base, &cur, &last);
++            let (_, rot, pos) = (turn
++                * bevy::math::Affine3A::from_scale_rotation_translation(
++                    base.scale,
++                    base.rotation,
++                    base.translation,
++                ))
++            .to_scale_rotation_translation();
++            let out = Transform {
++                translation: pos,
++                rotation: rot.normalize(),
++                scale: base.scale,
++            };
++            tilt.bones[slot] = (b, base, out);
+             if out != cur {
+                 rig.locals[b] = out;
+                 rig.pose_dirty = true;
+@@ -369,6 +841,38 @@ pub(super) fn apply_action_roll(
+     }
+ }
+ 
++/// The lock-on point, and letting go of a unit that's gone, dead or too far.
++pub(super) fn track_lock_on(
++    mut lock: ResMut<LockOn>,
++    me: Query<&Transform, With<SelfPlayer>>,
++    units: Query<(
++        &Transform,
++        Option<&NetEntity>,
++        Option<&crate::net::ObjectStore>,
++    )>,
++) {
++    let mut point = None;
++    if let Some(e) = lock.0 {
++        let here = me.single().ok().map(|t| t.translation);
++        match units.get(e) {
++            Ok((t, net, store)) => {
++                let dead = store.is_some_and(|s| s.0.unit_is_dead());
++                let far = here.is_some_and(|h| h.distance(t.translation) > LOCK_RANGE);
++                if dead || far {
++                    lock.0 = None;
++                } else {
++                    let scale = net.map_or(1.0, |n| n.scale.max(0.2));
++                    point = Some(t.translation + Vec3::Y * LOCK_HEIGHT * scale);
++                }
++            }
++            Err(_) => lock.0 = None,
++        }
++    }
++    if let Ok(mut p) = LOCK_POINT.lock() {
++        *p = point;
++    }
++}
++
+ /// Gather the units that could block the camera (only while an add-on asks for it).
+ pub(super) fn collect_occluders(
+     me: Query<&Transform, With<SelfPlayer>>,
+@@ -379,10 +883,15 @@ pub(super) fn collect_occluders(
+         if let Ok(here) = me.single() {
+             for (t, n) in &units {
+                 let kind = n.kind;
+-                if !matches!(kind, benilla_protocol::EntityKind::Unit | benilla_protocol::EntityKind::Player) {
++                if !matches!(
++                    kind,
++                    benilla_protocol::EntityKind::Unit | benilla_protocol::EntityKind::Player
++                ) {
+                     continue;
+                 }
+-                if t.translation.distance_squared(here.translation) > OCCLUDER_RANGE * OCCLUDER_RANGE {
++                if t.translation.distance_squared(here.translation)
++                    > OCCLUDER_RANGE * OCCLUDER_RANGE
++                {
+                     continue;
+                 }
+                 let s = n.scale.max(0.2);
+@@ -396,27 +905,35 @@ pub(super) fn collect_occluders(
+ }
+ 
+ pub(super) fn plugin(app: &mut App) {
+-    app.add_systems(
+-        Update,
+-        (
+-            drain_action_calls
+-                .before(super::drive_animations)
+-                .after(benilla_world::schedule::WorldStage::Net)
+-                .after(crate::vm_pass::VmPass::End)
+-                .before(crate::weapon_trail::fire_weapon_trails),
+-            apply_action_rates
+-                .after(super::drive_animations)
+-                .after(crate::aura_visual::apply_aura_anim_rate),
+-            aim_pitch,
+-            collect_occluders,
+-        ),
+-    )
+-    .add_systems(
+-        PostUpdate,
+-        apply_action_roll
+-            .in_set(benilla_world::rig_anim::PosePost)
+-            .after(super::twist::apply_body_twist),
+-    );
++    app.init_resource::<LockOn>()
++        .add_systems(
++            Update,
++            (
++                drain_action_calls
++                    .before(super::drive_animations)
++                    .after(benilla_world::schedule::WorldStage::Net)
++                    .after(crate::vm_pass::VmPass::End)
++                    .before(crate::weapon_trail::fire_weapon_trails),
++                apply_hit_stops
++                    .after(super::drive_animations)
++                    .after(crate::aura_visual::apply_aura_anim_rate),
++                aim_pitch,
++                collect_occluders,
++                track_lock_on,
++            ),
++        )
++        .add_systems(
++            PostUpdate,
++            (
++                apply_action_clips
++                    .after(bevy::animation::advance_animations)
++                    .after(bevy::animation::transition::advance_transitions)
++                    .before(benilla_world::rig_anim::PoseEval),
++                apply_action_tilts
++                    .in_set(benilla_world::rig_anim::PosePost)
++                    .after(super::twist::apply_body_twist),
++            ),
++        );
+ }
+ 
+ #[cfg(test)]
+@@ -450,4 +967,104 @@ mod tests {
+         assert_eq!(resolve("0xf130000000000025", Some(me), &index), Some(e));
+         assert_eq!(resolve("nonsense", Some(me), &index), None);
+     }
++
++    /// The bug that left bodies floating: a clip keys a root bone's rotation each frame but not its
++    /// position, so the tilt must give the position back when it ends.
++    #[test]
++    fn a_tilt_gives_back_each_part_it_moved_even_when_the_clip_rekeys_another() {
++        let base = Transform {
++            translation: Vec3::new(0.0, 1.0, 0.0),
++            ..Default::default()
++        };
++        // What the tilt wrote: moved and turned.
++        let last = Transform {
++            translation: Vec3::new(0.0, 1.6, 0.4),
++            rotation: Quat::from_rotation_x(1.0),
++            ..Default::default()
++        };
++        // The clip has written a fresh rotation since; the position is still the tilt's.
++        let mut cur = Transform {
++            translation: last.translation,
++            rotation: Quat::from_rotation_y(0.2),
++            ..Default::default()
++        };
++        assert!(restore(&mut cur, &base, &last));
++        assert_eq!(cur.translation, base.translation, "the position comes back");
++        assert_eq!(
++            cur.rotation,
++            Quat::from_rotation_y(0.2),
++            "the clip's fresh rotation stays"
++        );
++        // And the rebase keeps the clip's fresh rotation but not the tilt's position.
++        let mut b = base;
++        let cur = Transform {
++            translation: last.translation,
++            rotation: Quat::from_rotation_y(0.3),
++            ..Default::default()
++        };
++        rebase(&mut b, &cur, &last);
++        assert_eq!(b.translation, base.translation);
++        assert_eq!(b.rotation, Quat::from_rotation_y(0.3));
++    }
++
++    fn clip(key: f32, windup: f32, recovery: f32) -> ActionClip {
++        ActionClip {
++            id: 17,
++            full: AnimationNodeIndex::new(1),
++            upper: None,
++            body: ActionBody::Auto,
++            on_upper: false,
++            t: 0.0,
++            len: 1.0,
++            key,
++            windup,
++            recovery,
++            hold: 0.0,
++            held: 0.0,
++            looping: false,
++            lambda: 0.0,
++            stopping: None,
++            last_pos: None,
++            moving_for: 0.0,
++        }
++    }
++
++    #[test]
++    fn a_clip_lands_its_impact_on_time_and_takes_the_recovery_after() {
++        let mut c = clip(0.4, 0.2, 1.2);
++        // To the impact twice as fast; after it, 0.6 s of clip over 1.2 s.
++        assert!((c.rate() - 2.0).abs() < 1.0e-5);
++        let mut real = 0.0_f32;
++        while c.t < 0.4 - 1.0e-4 {
++            c.advance(0.01);
++            real += 0.01;
++        }
++        assert!(
++            (real - 0.2).abs() < 0.011,
++            "the impact keyframe at 0.2 s: {real}"
++        );
++        assert!((c.rate() - 0.5).abs() < 1.0e-5);
++        // One step across the keyframe is split at it.
++        let mut c = clip(0.4, 0.2, 1.2);
++        c.advance(0.25);
++        assert!((c.t - (0.4 + 0.05 * 0.5)).abs() < 1.0e-4, "{}", c.t);
++        // The end holds the last pose and lets go.
++        c.advance(5.0);
++        assert!(c.t < 1.0 && c.stopping.is_some());
++    }
++
++    #[test]
++    fn a_held_looping_reaction_loops_until_its_hold_is_spent() {
++        let mut c = clip(0.0, 0.0, 0.0);
++        c.looping = true;
++        c.hold = 2.5;
++        for _ in 0..240 {
++            c.advance(0.01);
++        }
++        assert!(c.stopping.is_none(), "still held at 2.4 s");
++        for _ in 0..20 {
++            c.advance(0.01);
++        }
++        assert!(c.stopping.is_some(), "let go after its hold");
++    }
+ }
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index 596b298c..d10d2672 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -598,6 +598,9 @@ pub(crate) struct CameraControl {
+     /// Basin Battle's aiming camera, 0 (off) to 1 (in close over the shoulder), eased toward
+     /// what [`benilla_ui::action_combat::aim_camera`] asks for.
+     pub(super) aim_blend: f32,
++    /// Basin Battle's lock-on framing, 0 to 1: the hero a little left of centre, so the locked
++    /// unit stands clear past the right shoulder.
++    pub(super) lock_blend: f32,
+ }
+ 
+ impl CameraControl {
+@@ -656,6 +659,11 @@ impl LookButton {
+ /// How fast the aiming camera eases in and out (per second, exponential): most of the way in a
+ /// fifth of a second.
+ const AIM_EASE_RATE: f32 = 14.0;
++/// How fast the lock-on swings the view round (per second, exponential), and the pitch it holds.
++const LOCK_EASE_RATE: f32 = 8.0;
++const LOCK_PITCH: f32 = -0.3;
++/// The lock-on's framing: this far right of the hero and up, and this much farther back.
++const LOCK_SHOULDER: (f32, f32, f32) = (0.55, 0.15, 0.8);
+ /// The look slows by this share at full aim, for a steadier hand.
+ const AIM_LOOK_DAMPING: f32 = 0.3;
+ 
+@@ -1289,6 +1297,20 @@ pub(super) fn seat_camera(
+     if let Some(yaw) = rig.follow.advance(follow, cam.yaw, dt, look_held) {
+         cam.yaw = yaw;
+     }
++    // Basin Battle's lock-on: the view swings round behind us onto the locked unit, looking a
++    // little down over both, whatever the mouse does.
++    if let Some(target) = crate::creature_anim::lock_point() {
++        let to = target - player_pos;
++        let flat = Vec2::new(to.x, to.z).length();
++        if flat > 0.3 {
++            let k = 1.0 - (-LOCK_EASE_RATE * dt).exp();
++            let want_yaw = f32::atan2(-to.x, -to.z);
++            cam.yaw += crate::creature_anim::wrap_pi(want_yaw - cam.yaw) * k;
++            let rise = (to.y - cam_pivot_height).atan2(flat).clamp(-0.5, 0.5);
++            let want_pitch = (LOCK_PITCH + rise * 0.5).clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
++            cam.pitch += (want_pitch - cam.pitch) * k;
++        }
++    }
+     // The framing pivot is `feet + cam_pivot_height`; at zoom 0 the camera sits on it. One sweep
+     // runs from the head (the capsule's top hemisphere centre) to `pivot - fwd·zoom`, and body
+     // collision keeps the head inside the room, so the camera never ends up past a wall or ceiling.
+@@ -1312,15 +1334,39 @@ pub(super) fn seat_camera(
+     let cam_fwd = arm_rotation * Vec3::NEG_Z;
+     // Basin Battle's aiming camera: in close over the right shoulder while an add-on asks, eased
+     // both ways. First person stays first person.
+-    let want = if benilla_ui::action_combat::aim_camera() { 1.0 } else { 0.0 };
++    let want = if benilla_ui::action_combat::aim_camera() {
++        1.0
++    } else {
++        0.0
++    };
+     rig.aim_blend += (want - rig.aim_blend) * (1.0 - (-AIM_EASE_RATE * dt).exp());
+     if (want - rig.aim_blend).abs() < 1.0e-3 {
+         rig.aim_blend = want;
+     }
+-    let blend = if rig.distance < 0.75 { 0.0 } else { rig.aim_blend };
++    let blend = if rig.distance < 0.75 {
++        0.0
++    } else {
++        rig.aim_blend
++    };
+     let (aim_back, aim_right, aim_up) = benilla_ui::action_combat::aim_shape();
+     let distance = rig.distance + (aim_back - rig.distance) * blend;
+-    let shoulder = (arm_rotation * Vec3::X) * (aim_right * blend) + Vec3::Y * (aim_up * blend);
++    let want_lock = if crate::creature_anim::lock_point().is_some() {
++        1.0
++    } else {
++        0.0
++    };
++    rig.lock_blend += (want_lock - rig.lock_blend) * (1.0 - (-LOCK_EASE_RATE * dt).exp());
++    let lock = if rig.distance < 0.75 {
++        0.0
++    } else {
++        rig.lock_blend * (1.0 - blend)
++    };
++    let (lock_right, lock_up, lock_back) = LOCK_SHOULDER;
++    let distance = distance + lock_back * lock;
++    // A heavy blow's punch in.
++    let distance = distance * (1.0 - benilla_ui::action_combat::camera_kick(dt));
++    let shoulder = (arm_rotation * Vec3::X) * (aim_right * blend + lock_right * lock)
++        + Vec3::Y * (aim_up * blend + lock_up * lock);
+     let pivot = player_pos + Vec3::Y * cam_pivot_height + shoulder;
+     let seat = pivot - cam_fwd * distance;
+     let boom = seat - head;
+diff --git a/crates/benilla-app/src/player/controller.rs b/crates/benilla-app/src/player/controller.rs
+index 050e0c18..f5e28ef1 100644
+--- a/crates/benilla-app/src/player/controller.rs
++++ b/crates/benilla-app/src/player/controller.rs
+@@ -293,6 +293,18 @@ pub(super) fn control(
+         && mouse_turns_body
+         && !player.control_lost
+         && !player.reseat;
++    // Basin Battle's lock-on: the body turns to face the locked unit, quickly but not at once.
++    if let Some(target) = crate::creature_anim::lock_point() {
++        if mouse_turns_body && !player.control_lost && !player.reseat {
++            let to = target - player.pos;
++            if to.x * to.x + to.z * to.z > 0.04 {
++                let want = f32::atan2(-to.x, -to.z);
++                let gap = crate::creature_anim::wrap_pi(want - player.face_yaw);
++                let step = LOCK_TURN_RATE * dt;
++                player.face_yaw += gap.clamp(-step, step);
++            }
++        }
++    }
+     {
+         let cur = cursor_opts.bypass_change_detection();
+         if cur.visible != opts_shadow.visible
+@@ -441,7 +453,7 @@ pub(super) fn control(
+         }
+         // `0x514560`, after `apply_server_moves`, so this frame's root edge is already in `modes`.
+         let may_translate = mover.may_translate(player.modes.rooted);
+-        let axes = input::move_axes(
++        let mut axes = input::move_axes(
+             binds,
+             &buttons,
+             &mut player,
+@@ -450,6 +462,9 @@ pub(super) fn control(
+             may_translate,
+             may_turn,
+         );
++        // Basin Battle's action dash: while it runs, our body holds its keys (the way it set off)
++        // at its speed, whatever is pressed, so a dodge or a lunge goes at once and commits.
++        action_dash(&mut player, &mut axes, time.elapsed_secs(), may_translate);
+         let input::MoveAxes {
+             fwd: fwd_axis,
+             side: side_axis,
+@@ -563,6 +578,16 @@ pub(super) fn control(
+                 ..Default::default()
+             },
+         };
++        // A dash runs at its own speed, forward, back or aside.
++        let speeds = match player.action_dash {
++            Some(d) => benilla_protocol::MoveSpeeds {
++                walk: d.speed,
++                run: d.speed,
++                run_back: d.speed,
++                ..speeds
++            },
++            None => speeds,
++        };
+         // `GetCurrentSpeed` (`0x7c4c90`), shared with the remote extrapolator: the walk arm comes
+         // before the backward min, so walking backwards is walk speed. It takes this frame's gait
+         // intent, since the wire word is built after the mover.
+@@ -939,3 +964,51 @@ fn self_seat(
+         deck: *q.2.get(entity).ok()?,
+     })
+ }
++
++/// How fast the body turns to a locked-on unit, radians a second.
++const LOCK_TURN_RATE: f32 = 9.0;
++
++/// Basin Battle's action dash ([`benilla_ui::action_combat::take_dashes`]): the new ones queued, a
++/// due one started (with the keys held now when it named none, a step back with none held), and
++/// while one runs, its keys in place of the player's.
++fn action_dash(player: &mut Player, axes: &mut input::MoveAxes, now: f32, may_translate: bool) {
++    for d in benilla_ui::action_combat::take_dashes() {
++        let (fwd, side) = d.keys.unwrap_or((0, 0));
++        let dash = super::state::ActionDash {
++            fwd,
++            side,
++            speed: d.speed,
++            until: 0.0,
++            secs: d.secs,
++            keys_now: d.keys.is_none(),
++        };
++        player.pending_dashes.push((now + d.delay, dash));
++    }
++    let mut i = 0;
++    while i < player.pending_dashes.len() {
++        if player.pending_dashes[i].0 > now {
++            i += 1;
++            continue;
++        }
++        let (_, mut d) = player.pending_dashes.remove(i);
++        if d.keys_now {
++            let (f, s) = (axes.fwd.signum(), axes.side.signum());
++            (d.fwd, d.side) = if f == 0 && s == 0 { (-1, 0) } else { (f, s) };
++        }
++        d.until = now + d.secs;
++        player.action_dash = Some(d);
++    }
++    let Some(d) = player.action_dash else { return };
++    if now >= d.until || !may_translate || player.swimming {
++        player.action_dash = None;
++        return;
++    }
++    axes.fwd = d.fwd;
++    axes.side = d.side;
++    axes.translating = d.fwd != 0 || d.side != 0;
++    axes.strafe_left = d.side < 0;
++    axes.strafe_right = d.side > 0;
++    axes.turning = false;
++    axes.turn_left = false;
++    axes.turn_right = false;
++}
+diff --git a/crates/benilla-app/src/player/state.rs b/crates/benilla-app/src/player/state.rs
+index 950ae310..de5e48f7 100644
+--- a/crates/benilla-app/src/player/state.rs
++++ b/crates/benilla-app/src/player/state.rs
+@@ -309,6 +309,20 @@ impl StandPending {
+     }
+ }
+ 
++/// A dash an add-on asked of our body (`ActionDash`): `(forward, right)` keys held for it, run at
++/// `speed` until `until` (`Time::elapsed_secs`).
++#[derive(Clone, Copy, Debug, Default, PartialEq)]
++pub(crate) struct ActionDash {
++    pub(crate) fwd: i32,
++    pub(crate) side: i32,
++    pub(crate) speed: f32,
++    pub(crate) until: f32,
++    /// The length, for a dash that starts later.
++    pub(crate) secs: f32,
++    /// The keys still to be read at its start (`None` asked for the ones held).
++    pub(crate) keys_now: bool,
++}
++
+ /// Our avatar: until `active` the camera free-flies, then we drive the body the server placed.
+ /// `PartialEq` serves the test that the session end resets the whole of it to `Player::default()`.
+ #[derive(Resource, Default, PartialEq)]
+@@ -498,6 +512,10 @@ pub(crate) struct Player {
+     /// [`crate::transport::Transport`] support, kept through deck jumps, detached on world ground,
+     /// in water or when the transport despawns.
+     pub(super) ride: Option<PlayerRide>,
++    /// Basin Battle's action dash, running now: our body runs its keys at its speed until then.
++    pub(crate) action_dash: Option<ActionDash>,
++    /// Dashes asked for that start later (an attack's lunge at its wind-up's end).
++    pub(crate) pending_dashes: Vec<(f32, ActionDash)>,
+ }
+ 
+ /// The player's attachment to a transport's frame ([`Player::ride`]).
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 07b5e324..a35d5f08 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -20,9 +20,29 @@
+ //!   (its own speed when absent), with a weapon trail (`"AARRGGBB"`) over its swing.
+ //! - `HitStop(unit, ms)`: freeze the unit's animation for a moment, the weight of a blow landing.
+ //! - `ShakeCamera(inches, seconds[, frequency])`: shake the view.
+-//! - `RollUnit(unit, seconds)`: tumble the body head over heels along the way it's moving, over
+-//!   a dodge's dash.
++//! - `RollUnit(unit, seconds[, style[, pivot[, tuckAnim]]])`: a dodge's tumble. `"roll"` (the
++//!   default) turns the body head over heels about `pivot` yards up (a share of its height is not
++//!   known here), along the way it moves, from the moment it moves, with `tuckAnim` (Jump, 38) held
++//!   over it for the tucked shape; `"step"` plays no tumble, only the clip.
+ //! - `SetCameraUnitCollision(on)`: the camera stops short of a unit instead of entering it.
++//!
++//! The action layer (`HasActionCombat() >= 3`):
++//!
++//! - `PlayUnitAnimation(unit, animId, impact, trail, trailMs, variation, recovery, body)`: the clip
++//!   plays over whatever the unit is doing, on a clock of its own: its impact keyframe lands
++//!   `impact` seconds in, the rest of it takes `recovery` seconds (each its own speed when 0), on
++//!   the whole body standing and the upper body moving (`body` `"full"` or `"upper"` to choose),
++//!   fading in and out. `variation` picks one of the model's takes on the clip (0 first).
++//! - `StopUnitAnimation(unit[, fadeSecs])`: let go of it early (a cancel).
++//! - `ReactUnit(unit, animId, fromX, fromY, lean, holdSecs)`: a struck unit's reaction: the clip
++//!   (held, looping, for `holdSecs` when given), and the body thrown back away from the blow's
++//!   world direction `(fromX, fromY)` (WoW axes) by `lean` radians, settling back.
++//! - `ActionDash(seconds, speed[, keys[, delay]])`: our own body runs `speed` yards a second for
++//!   `seconds` along the ground, at once, the way `keys` say (`"f"`, `"b"`, `"l"`, `"r"`, `"fl"`...;
++//!   the movement keys held now when absent, else a step back), starting `delay` seconds from now.
++//! - `SetLockOn(unit)`: the camera and the body keep facing that unit (`nil` lets go).
++//! - `CameraKick(share, seconds)`: the camera punches in by that share of its distance and eases
++//!   back.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -37,20 +57,112 @@ static UNIT_COLLISION: AtomicBool = AtomicBool::new(false);
+ /// The view's elevation (radians, up positive), written by the camera each frame.
+ static VIEW_ELEVATION: AtomicU32 = AtomicU32::new(0);
+ 
++/// Which part of the body an action clip plays on.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum ActionBody {
++    /// The whole body standing still, the upper body while the legs move.
++    Auto,
++    Full,
++    Upper,
++}
++
+ /// One action-animation call from a script, for the app to apply.
+ #[derive(Clone, Debug, PartialEq)]
+ pub enum ActionCall {
+-    Anim { unit: String, anim: u16, impact: f32, trail: Option<(u32, u32)> },
+-    HitStop { unit: String, secs: f32 },
+-    Shake { inches: f32, secs: f32, frequency: f32 },
+-    Roll { unit: String, secs: f32 },
++    Anim {
++        unit: String,
++        anim: u16,
++        impact: f32,
++        trail: Option<(u32, u32)>,
++        variation: Option<usize>,
++        recovery: f32,
++        body: ActionBody,
++    },
++    Stop {
++        unit: String,
++        fade: f32,
++    },
++    React {
++        unit: String,
++        anim: u16,
++        from: (f32, f32),
++        lean: f32,
++        hold: f32,
++    },
++    HitStop {
++        unit: String,
++        secs: f32,
++    },
++    Shake {
++        inches: f32,
++        secs: f32,
++        frequency: f32,
++    },
++    Roll {
++        unit: String,
++        secs: f32,
++        step: bool,
++        pivot: f32,
++        tuck: u16,
++    },
++    Lock {
++        unit: Option<String>,
++    },
++}
++
++/// A dash our own body runs: how long, how fast, which way (`(forward, right)` in -1..=1, `None`
++/// for the keys held), and how long from the call it starts.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct Dash {
++    pub secs: f32,
++    pub speed: f32,
++    pub keys: Option<(i32, i32)>,
++    pub delay: f32,
++}
++
++static DASHES: std::sync::Mutex<Vec<Dash>> = std::sync::Mutex::new(Vec::new());
++
++/// The dashes asked for since the last take.
++pub fn take_dashes() -> Vec<Dash> {
++    DASHES
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
++}
++
++/// A camera kick: the share of the distance and how long it lasts, and how far in it is.
++static KICK: std::sync::Mutex<Option<(f32, f32, f32)>> = std::sync::Mutex::new(None);
++
++/// This frame's camera kick, a share of the distance to take off it (0 for none), advancing it by
++/// `dt`: in fast, out eased.
++pub fn camera_kick(dt: f32) -> f32 {
++    let Ok(mut k) = KICK.lock() else { return 0.0 };
++    let Some((share, secs, t)) = k.as_mut() else {
++        return 0.0;
++    };
++    *t += dt;
++    let u = *t / secs.max(0.01);
++    if u >= 1.0 {
++        *k = None;
++        return 0.0;
++    }
++    // A quick punch in (the first fifth), then a long ease back.
++    let shape = if u < 0.2 {
++        u / 0.2
++    } else {
++        1.0 - ((u - 0.2) / 0.8).powi(2)
++    };
++    *share * shape.clamp(0.0, 1.0)
+ }
+ 
+ static CALLS: std::sync::Mutex<Vec<ActionCall>> = std::sync::Mutex::new(Vec::new());
+ 
+ /// The calls made since the last take, in call order.
+ pub fn take_calls() -> Vec<ActionCall> {
+-    CALLS.lock().map(|mut v| std::mem::take(&mut *v)).unwrap_or_default()
++    CALLS
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
+ }
+ 
+ fn push(call: ActionCall) {
+@@ -96,6 +208,23 @@ pub fn reset() {
+     ACTION_MOUSE.store(false, Ordering::Relaxed);
+     AIM_CAMERA.store(false, Ordering::Relaxed);
+     UNIT_COLLISION.store(false, Ordering::Relaxed);
++    push(ActionCall::Lock { unit: None });
++}
++
++/// The keys of a dash: `"f"`, `"b"`, `"l"`, `"r"` and their pairs, as `(forward, right)`.
++fn dash_keys(v: Option<&Value>) -> Option<(i32, i32)> {
++    let s = text(v)?.to_ascii_lowercase();
++    let (mut f, mut r) = (0, 0);
++    for ch in s.chars() {
++        match ch {
++            'f' => f = 1,
++            'b' => f = -1,
++            'l' => r = -1,
++            'r' => r = 1,
++            _ => {}
++        }
++    }
++    (f != 0 || r != 0).then_some((f, r))
+ }
+ 
+ fn text(v: Option<&Value>) -> Option<String> {
+@@ -170,7 +299,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(2))?,
++        lua.create_function(|_, _: MultiValue| Ok(3))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -191,7 +320,22 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 let ms = number(v.get(4), 50.0, 3000.0).unwrap_or(600.0) as u32;
+                 (c, ms)
+             });
+-            push(ActionCall::Anim { unit, anim: anim as u16, impact, trail });
++            let variation = number(v.get(5), 0.0, 16.0).map(|n| n as usize);
++            let recovery = number(v.get(6), 0.0, 10.0).unwrap_or(0.0);
++            let body = match text(v.get(7)).as_deref() {
++                Some("full") => ActionBody::Full,
++                Some("upper") => ActionBody::Upper,
++                _ => ActionBody::Auto,
++            };
++            push(ActionCall::Anim {
++                unit,
++                anim: anim as u16,
++                impact,
++                trail,
++                variation,
++                recovery,
++                body,
++            });
+             Ok(())
+         })?,
+     )?;
+@@ -200,7 +344,10 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+         lua.create_function(|_, args: MultiValue| {
+             let v: Vec<Value> = args.into_iter().collect();
+             if let (Some(unit), Some(ms)) = (text(v.first()), number(v.get(1), 0.0, 500.0)) {
+-                push(ActionCall::HitStop { unit, secs: ms / 1000.0 });
++                push(ActionCall::HitStop {
++                    unit,
++                    secs: ms / 1000.0,
++                });
+             }
+             Ok(())
+         })?,
+@@ -209,9 +356,15 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+         "ShakeCamera",
+         lua.create_function(|_, args: MultiValue| {
+             let v: Vec<Value> = args.into_iter().collect();
+-            if let (Some(inches), Some(secs)) = (number(v.first(), 0.0, 40.0), number(v.get(1), 0.0, 3.0)) {
++            if let (Some(inches), Some(secs)) =
++                (number(v.first(), 0.0, 40.0), number(v.get(1), 0.0, 3.0))
++            {
+                 let frequency = number(v.get(2), 1.0, 60.0).unwrap_or(18.0);
+-                push(ActionCall::Shake { inches, secs, frequency });
++                push(ActionCall::Shake {
++                    inches,
++                    secs,
++                    frequency,
++                });
+             }
+             Ok(())
+         })?,
+@@ -222,7 +375,95 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             let v: Vec<Value> = args.into_iter().collect();
+             if let Some(unit) = text(v.first()) {
+                 let secs = number(v.get(1), 0.15, 2.0).unwrap_or(0.5);
+-                push(ActionCall::Roll { unit, secs });
++                let step = text(v.get(2)).is_some_and(|s| s.eq_ignore_ascii_case("step"));
++                let pivot = number(v.get(3), 0.2, 2.0).unwrap_or(0.75);
++                let tuck = number(v.get(4), 0.0, 1000.0).map_or(38, |n| n as u16);
++                push(ActionCall::Roll {
++                    unit,
++                    secs,
++                    step,
++                    pivot,
++                    tuck,
++                });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "StopUnitAnimation",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(unit) = text(v.first()) {
++                let fade = number(v.get(1), 0.0, 2.0).unwrap_or(0.12);
++                push(ActionCall::Stop { unit, fade });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ReactUnit",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(unit), Some(anim)) = (text(v.first()), number(v.get(1), 0.0, 1000.0)) {
++                let from = (
++                    number(v.get(2), -1.0e6, 1.0e6).unwrap_or(0.0),
++                    number(v.get(3), -1.0e6, 1.0e6).unwrap_or(0.0),
++                );
++                let lean = number(v.get(4), 0.0, 1.5).unwrap_or(0.0);
++                let hold = number(v.get(5), 0.0, 10.0).unwrap_or(0.0);
++                push(ActionCall::React {
++                    unit,
++                    anim: anim as u16,
++                    from,
++                    lean,
++                    hold,
++                });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ActionDash",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(secs), Some(speed)) =
++                (number(v.first(), 0.02, 2.0), number(v.get(1), 0.0, 60.0))
++            {
++                let keys = dash_keys(v.get(2));
++                let delay = number(v.get(3), 0.0, 3.0).unwrap_or(0.0);
++                if let Ok(mut d) = DASHES.lock() {
++                    if d.len() < 16 {
++                        d.push(Dash {
++                            secs,
++                            speed,
++                            keys,
++                            delay,
++                        });
++                    }
++                }
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "SetLockOn",
++        lua.create_function(|_, args: MultiValue| {
++            push(ActionCall::Lock {
++                unit: text(args.front()).filter(|s| !s.is_empty()),
++            });
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "CameraKick",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(share), Some(secs)) =
++                (number(v.first(), 0.0, 0.6), number(v.get(1), 0.02, 2.0))
++            {
++                if let Ok(mut k) = KICK.lock() {
++                    *k = Some((share, secs, 0.0));
++                }
+             }
+             Ok(())
+         })?,
+diff --git a/crates/benilla-world/src/rig_anim.rs b/crates/benilla-world/src/rig_anim.rs
+index 725ad6ff..6eaebf02 100644
+--- a/crates/benilla-world/src/rig_anim.rs
++++ b/crates/benilla-world/src/rig_anim.rs
+@@ -12,7 +12,7 @@ mod pose;
+ pub(crate) use compose::seed_rig_rows;
+ pub use compose::{finalize_rig_worlds, PosePost};
+ pub use global_seq::GlobalSeqDrive;
+-pub use pose::{RigAnchor, RigFrame, RigPose};
++pub use pose::{PoseEval, RigAnchor, RigFrame, RigPose};
+ 
+ /// A scene's own clock in seconds, on each model root that stands in a scene that keeps one: a
+ /// `<Model>` widget's private `CM2Scene` (`CSimpleModel+0x314`, `0x76cfc0`), zeroed by its
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index d41a7f4c..65c30717 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -302,11 +302,17 @@ fn fold<T: Animatable>(register: &mut Option<(T, f32)>, sample: Option<T>, weigh
+     });
+ }
+ 
++/// The pose evaluator's own set, so a writer of the players' clocks and weights (an add-on's action
++/// layer) can run after the advance and before the poses are taken.
++#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
++pub struct PoseEval;
++
+ /// Register the evaluator in `animate_targets`' window, before the pose post-passes.
+ pub fn plugin(app: &mut App) {
+     app.add_systems(
+         PostUpdate,
+         evaluate_rig_poses
++            .in_set(PoseEval)
+             .in_set(AnimationSystems)
+             .after(bevy::animation::advance_animations)
+             .before(TransformSystems::Propagate),

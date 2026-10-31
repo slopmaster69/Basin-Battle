@@ -1,0 +1,135 @@
+From 8dc733d909c7dd9adee688e9679ead068bf0d72d Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Thu, 29 Oct 2026 23:57:27 -0600
+Subject: [PATCH] Hold a raised guard's shield up instead of looping the block
+
+UNIT_NPC_EMOTESTATE 43 idles on ShieldBlock (24), a one-shot authored as a
+whole block: looped, the shield went up again every second. Played once,
+it now stops with the shield up, and on a unit on the move (where the
+locomotion has the base) it is held the same way on the upper body.
+---
+ .../benilla-app/src/creature_anim/driver.rs   | 29 ++++++++++++++++++-
+ .../src/creature_anim/driver/mode.rs          |  7 ++++-
+ .../src/creature_anim/driver/play.rs          | 16 ++++++++++
+ .../benilla-app/src/creature_anim/select.rs   |  6 ++++
+ 4 files changed, 56 insertions(+), 2 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/driver.rs b/crates/benilla-app/src/creature_anim/driver.rs
+index 4e9c61ae..64d0a101 100644
+--- a/crates/benilla-app/src/creature_anim/driver.rs
++++ b/crates/benilla-app/src/creature_anim/driver.rs
+@@ -43,6 +43,9 @@ pub(super) use grip::drive_hand_grip;
+ use play::{holds_own_clip, oneshot_finished, play_clip, roll_loop, roll_oneshot};
+ use wound::{wound_evict, wound_trigger, wound_upkeep, WoundEdge};
+ 
++/// `UNIT_NPC_EMOTESTATE` for a raised shield (`Emotes.dbc` 43, its idle ShieldBlock 24).
++const GUARD_EMOTE_STATE: u32 = 43;
++
+ /// The masked overlay's weight over the base clip on the SpineLow subtree, where the unmasked base
+ /// still blends: the overlay dominates about 8:1, the sheath ceremony overlay's value too.
+ const ONESHOT_OVERLAY_WEIGHT: f32 = 8.0;
+@@ -1256,7 +1259,19 @@ pub(super) fn drive_animations(
+                         .map(|node| (h.anim_id, node, c.blend_time.max(0.0)))
+                 })
+             });
+-        match (masked_hold, drv.overlay) {
++        // A raised guard (`UNIT_NPC_EMOTESTATE` 43, the ShieldBlock idle) on a unit on the move:
++        // the locomotion has the base, so the shield goes up on the upper body instead and is
++        // held there as the standing pose holds it (`sync_base_rate`). A cast's masked hold wins.
++        let guard_hold = (mv.flags & move_flags::CAST_PIN_MOVE != 0
++            && store.is_some_and(|s| s.0.unit_emote_state() == GUARD_EMOTE_STATE))
++        .then(|| find_resolved(anims, super::select::SHIELD_BLOCK, catalog))
++        .flatten()
++        .and_then(|c| {
++            c.upper_node
++                .map(|node| (c.anim_id, node, c.blend_time.max(0.0), c.duration))
++        });
++        let wanted = masked_hold.or(guard_hold.map(|(id, node, blend, _)| (id, node, blend)));
++        match (wanted, drv.overlay) {
+             (Some((id, node, blend)), prior)
+                 if prior.is_none_or(|ov| ov.looping && ov.id != id) =>
+             {
+@@ -1280,6 +1295,18 @@ pub(super) fn drive_animations(
+             }
+             _ => {}
+         }
++        // The guard's shield, once up, stays up.
++        if let (None, Some((_, node, _, len)), Some(ov)) = (masked_hold, guard_hold, drv.overlay) {
++            if ov.node == node {
++                if let Some(active) = player.animation_mut(node) {
++                    let at = len * super::select::SHIELD_HOLD;
++                    if active.seek_time() >= at {
++                        active.seek_to(at);
++                        active.set_speed(0.0);
++                    }
++                }
++            }
++        }
+         // The cross-fade advances last, after every arm and release, as the reference's kernel
+         // runs λ after the frame's PlayAnimation calls.
+         overlay_fade_upkeep(&mut drv, &mut player, dt);
+diff --git a/crates/benilla-app/src/creature_anim/driver/mode.rs b/crates/benilla-app/src/creature_anim/driver/mode.rs
+index 5e268b09..1513a08f 100644
+--- a/crates/benilla-app/src/creature_anim/driver/mode.rs
++++ b/crates/benilla-app/src/creature_anim/driver/mode.rs
+@@ -446,7 +446,12 @@ pub(super) fn run(
+                         }
+                         // The ranged Load and Loot 50 are authored clamp: played once, they hold
+                         // their last frame (full draw, the rummage pose), where a loop would wrap.
+-                        let repeat = if select::is_ranged_load(target) || target == select::LOOT {
++                        // A raised guard's ShieldBlock plays once too, held with the shield up
++                        // (`sync_base_rate`).
++                        let repeat = if select::is_ranged_load(target)
++                            || target == select::LOOT
++                            || target == select::SHIELD_BLOCK
++                        {
+                             // No watchdog window either, so nothing re-arms them.
+                             drv.loop_window = None;
+                             bevy::animation::RepeatAnimation::Never
+diff --git a/crates/benilla-app/src/creature_anim/driver/play.rs b/crates/benilla-app/src/creature_anim/driver/play.rs
+index 11a9a236..d059e245 100644
+--- a/crates/benilla-app/src/creature_anim/driver/play.rs
++++ b/crates/benilla-app/src/creature_anim/driver/play.rs
+@@ -234,6 +234,22 @@ pub(super) fn sync_base_rate(
+             }
+         }
+     }
++    // A raised guard's ShieldBlock: stopped with the shield up, until the guard comes down.
++    if drv.gait == Some(select::SHIELD_BLOCK) {
++        if let Some(c) = anims
++            .clips
++            .iter()
++            .find(|c| c.node == node && c.anim_id == select::SHIELD_BLOCK)
++        {
++            let at = c.duration * select::SHIELD_HOLD;
++            if let Some(active) = player.animation_mut(node) {
++                if active.seek_time() >= at {
++                    active.seek_to(at);
++                    active.set_speed(0.0);
++                }
++            }
++        }
++    }
+     drv.gait_rate = player.animation(node).map_or(1.0, |a| a.speed());
+ }
+ 
+diff --git a/crates/benilla-app/src/creature_anim/select.rs b/crates/benilla-app/src/creature_anim/select.rs
+index 64771b8e..76ad0620 100644
+--- a/crates/benilla-app/src/creature_anim/select.rs
++++ b/crates/benilla-app/src/creature_anim/select.rs
+@@ -453,6 +453,12 @@ pub(super) fn ranged_load_anim(ranged: Option<(u8, u8)>) -> u16 {
+     }
+ }
+ 
++/// ShieldBlock (24), a one-shot authored as a whole block (the shield up, held, lowered), as a
++/// state-emote idle (`UNIT_NPC_EMOTESTATE` 43, a raised guard): looped, the shield goes up again
++/// every second. Played once it rises and stays up, held at this share of the clip.
++pub(super) const SHIELD_BLOCK: u16 = 24;
++pub(super) const SHIELD_HOLD: f32 = 0.38;
++
+ /// Whether `id` is a ranged Load clip, played once to full draw rather than looped.
+ pub(super) fn is_ranged_load(id: u16) -> bool {
+     matches!(id, 105 | 106 | 112)
+-- 
+2.43.0
+

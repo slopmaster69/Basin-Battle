@@ -1,0 +1,14 @@
+[package]
+name = "htl-survival"
+description = "Elwynn Survival's rules: action combat, gathering, building and the settlement. No networking, no I/O."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+toml.workspace = true
+toml_edit.workspace = true
+rand = { workspace = true, features = ["small_rng"] }
+anyhow.workspace = true
+htl-sim = { path = "../htl-sim" }

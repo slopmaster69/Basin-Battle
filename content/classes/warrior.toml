@@ -1,0 +1,1126 @@
+# The Warrior: Rage. Your swings and the blows you take fill it (up to 100); every ability
+# spends it. Between fights it fades.
+#   Arms       - bleeds and big hits: Rend, Deep Wounds, Mortal Strike, Sweeping Strikes.
+#   Fury       - rage and crits: Enrage, Flurry, Execute, Death Wish, Bloodthirst.
+#   Protection - hold the line: blocks, Thunder Clap, Sunder Armor, Defiance pulls enemies off the
+#                Ancient, Last Stand, Shield Slam, Shield Wall.
+# The core spells feed each other: Heroic Strike hits bleeding enemies harder (Rend), and every
+# Sunder Armor stack makes all your physical damage hit harder.
+# See mage.toml for how this file works.
+
+[[tree]]
+key = "arms"
+name = "Arms"
+text = "Bleeds and big hits: Rend, Deep Wounds, Mortal Strike."
+icon = 12294
+background = "WarriorArms"
+
+[[tree]]
+key = "fury"
+name = "Fury"
+text = "Rage and crits: Enrage, Flurry, Execute, Death Wish, Bloodthirst."
+icon = 1680
+background = "WarriorFury"
+
+[[tree]]
+key = "protection"
+name = "Protection"
+text = "Hold the line: blocks, Thunder Clap, Defiance pulls enemies to you, Shield Slam."
+icon = 71
+background = "WarriorProtection"
+
+# --- spells --------------------------------------------------------------------------------------
+
+[[spell]]
+key = "heroic_strike"
+name = "Heroic Strike"
+tree = "arms"
+core = true
+kind = "bolt"
+school = "physical"
+icon = 78
+cooldown = 2.5
+cost = 15
+damage = 1.25
+range = 6
+vs_bleeding = 0.3
+note = ""
+  [[spell.perk]]
+  key = "improved_heroic_strike"
+  name = "Improved Heroic Strike"
+  text = "Costs 5 less rage."
+  add = { cost = -5 }
+  [[spell.perk]]
+  key = "cleave"
+  name = "Cleave"
+  rarity = "uncommon"
+  text = "Also strikes a second enemy."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "bloody_strike"
+  name = "Bloody Strike"
+  rarity = "uncommon"
+  text = "Opens a wound that bleeds for 0.6 times your hit over 6 sec."
+  set = { dot = 0.6, dot_secs = 6 }
+  [[spell.perk]]
+  key = "overpower"
+  name = "Overpower"
+  rarity = "uncommon"
+  text = "8% more damage per Sunder Armor stack on the target."
+  add = { vs_sunder = 0.08 }
+  [[spell.perk]]
+  key = "battle_trance"
+  name = "Battle Trance"
+  rarity = "rare"
+  text = "10% more critical strike chance, and its crits refund 10 rage."
+  add = { crit = 0.1, refund = 10 }
+
+[[spell]]
+key = "rend"
+name = "Rend"
+tree = "arms"
+core = true
+kind = "bolt"
+school = "physical"
+icon = 772
+cooldown = 4
+cost = 10
+damage = 0.2
+range = 6
+dot = 1.6
+dot_secs = 12
+note = "The target Bleeds: Heroic Strike deals more to it."
+  [[spell.perk]]
+  key = "improved_rend"
+  name = "Improved Rend"
+  text = "Bleeds 40% more."
+  pct = { dot = 0.4 }
+  [[spell.perk]]
+  key = "quick_rend"
+  name = "Quick Rend"
+  text = "Costs 5 less rage."
+  add = { cost = -5 }
+  [[spell.perk]]
+  key = "tearing"
+  name = "Tearing Strike"
+  rarity = "uncommon"
+  text = "Rends 2 more enemies next to your target."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "deep_cuts"
+  name = "Deep Cuts"
+  rarity = "uncommon"
+  text = "The bleed stacks up to 3 times."
+  set = { dot_stack = 1 }
+  [[spell.perk]]
+  key = "hemorrhage"
+  name = "Hemorrhage"
+  rarity = "rare"
+  text = "When a rended enemy dies, the bleed jumps to 2 enemies nearby."
+  set = { spread_on_death = 2 }
+
+[[spell]]
+key = "thunder_clap"
+name = "Thunder Clap"
+tree = "protection"
+core = true
+kind = "nova"
+school = "physical"
+icon = 6343
+cooldown = 6
+cost = 20
+damage = 0.6
+radius = 8
+slow = 0.3
+slow_secs = 6
+  [[spell.perk]]
+  key = "thunderous_roar"
+  name = "Improved Thunder Clap"
+  text = "Reaches 3 yd further."
+  add = { radius = 3 }
+  [[spell.perk]]
+  key = "echoing_thunder"
+  name = "Echoing Thunder"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "demoralizing_clap"
+  name = "Demoralizing Shout"
+  rarity = "uncommon"
+  text = "Enemies hit deal 20% less damage for 10 sec."
+  set = { demoralize = 0.2, demoralize_secs = 10 }
+  [[spell.perk]]
+  key = "thunderous_blows"
+  name = "Thunderous Blows"
+  rarity = "uncommon"
+  text = "Deals 50% more to enemies already slowed."
+  add = { vs_chilled = 0.5 }
+  [[spell.perk]]
+  key = "concussive_clap"
+  name = "Concussion Blow"
+  rarity = "rare"
+  text = "30% chance to stun each enemy hit for 2 sec."
+  set = { stun_chance = 0.3, stun_secs = 2 }
+
+[[spell]]
+key = "whirlwind"
+name = "Whirlwind"
+tree = "fury"
+core = true
+kind = "nova"
+school = "physical"
+icon = 1680
+cooldown = 8
+cost = 25
+damage = 0.9
+radius = 8
+note = ""
+  [[spell.perk]]
+  key = "improved_whirlwind"
+  name = "Improved Whirlwind"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "wide_spin"
+  name = "Wide Spin"
+  text = "Reaches 3 yd further."
+  add = { radius = 3 }
+  [[spell.perk]]
+  key = "bloodbath"
+  name = "Bloodbath"
+  rarity = "uncommon"
+  text = "Heals you 1.5% of your max health for each enemy hit."
+  set = { heal_per_hit = 0.015 }
+  [[spell.perk]]
+  key = "sweeping_fury"
+  name = "Sweeping Fury"
+  rarity = "uncommon"
+  text = "15% more critical strike chance, and its crits deal 25% more."
+  add = { crit = 0.15, crit_mult = 0.25 }
+  [[spell.perk]]
+  key = "cyclone"
+  name = "Cyclone"
+  rarity = "rare"
+  text = "35% chance to spin a second time at once, for free."
+  add = { echo = 0.35 }
+
+[[spell]]
+key = "sunder_armor"
+name = "Sunder Armor"
+tree = "protection"
+kind = "bolt"
+school = "physical"
+icon = 7386
+cooldown = 1.5
+cost = 10
+damage = 0.35
+range = 6
+vuln_sunder = 1
+note = ""
+  [[spell.perk]]
+  key = "improved_sunder_armor"
+  name = "Improved Sunder Armor"
+  text = "Applies 2 stacks."
+  add = { vuln_sunder = 1 }
+  [[spell.perk]]
+  key = "free_sunder"
+  name = "Focused Rage"
+  text = "Costs 5 less rage."
+  add = { cost = -5 }
+  [[spell.perk]]
+  key = "sunder_wave"
+  name = "Sundering Wave"
+  rarity = "uncommon"
+  text = "Also sunders 2 more enemies next to your target."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "armor_crush"
+  name = "Armor Crush"
+  rarity = "uncommon"
+  text = "Deals 25% more per Sunder Armor stack already on the target."
+  add = { vs_sunder = 0.25 }
+  [[spell.perk]]
+  key = "crippling_sunder"
+  name = "Crippling Sunder"
+  rarity = "rare"
+  text = "Sundered enemies deal 15% less damage for 15 sec."
+  set = { demoralize = 0.15, demoralize_secs = 15 }
+
+[[spell]]
+key = "execute"
+name = "Execute"
+tree = "fury"
+rarity = "uncommon"
+kind = "bolt"
+school = "physical"
+icon = 5308
+cooldown = 3
+cost = 15
+damage = 2.6
+range = 6
+only_below = 0.2
+note = ""
+  [[spell.perk]]
+  key = "improved_execute"
+  name = "Improved Execute"
+  text = "Costs 5 less rage."
+  add = { cost = -5 }
+  [[spell.perk]]
+  key = "executioner"
+  name = "Executioner"
+  rarity = "uncommon"
+  text = "Works below 30% health."
+  set = { only_below = 0.3 }
+  [[spell.perk]]
+  key = "decapitate"
+  name = "Decapitate"
+  rarity = "uncommon"
+  text = "30% more critical strike chance."
+  add = { crit = 0.3 }
+  [[spell.perk]]
+  key = "momentum"
+  name = "Momentum"
+  rarity = "rare"
+  text = "A kill refunds 20 rage and finishes Execute's cooldown."
+  set = { rage_on_kill = 20, reset_on_kill = 1 }
+  [[spell.perk]]
+  key = "sweeping_execute"
+  name = "Sweeping Execute"
+  rarity = "rare"
+  text = "Also executes a second wounded enemy next to your target."
+  add = { targets = 1 }
+
+[[spell]]
+key = "charge"
+name = "Charge"
+tree = "arms"
+rarity = "uncommon"
+kind = "charge"
+school = "physical"
+icon = 100
+cooldown = 14
+range = 25
+min_range = 8
+damage = 0.3
+rage = 15
+stun_chance = 1
+stun_secs = 1.5
+note = "Defenders in reach rally to your target: they turn on it and hit it 20% harder."
+  [[spell.perk]]
+  key = "improved_charge"
+  name = "Improved Charge"
+  text = "Gain 10 more rage."
+  add = { rage = 10 }
+  [[spell.perk]]
+  key = "quick_charge"
+  name = "Juggernaut"
+  text = "Cooldown 5 sec shorter."
+  add = { cooldown = -5 }
+  [[spell.perk]]
+  key = "intercept"
+  name = "Intercept"
+  rarity = "uncommon"
+  text = "Stuns for 3 sec."
+  set = { stun_secs = 3 }
+  [[spell.perk]]
+  key = "trample"
+  name = "Trample"
+  rarity = "uncommon"
+  text = "Lands with a shockwave: 0.6 times your hit to every enemy within 6 yd, all stunned."
+  set = { damage = 0.6, radius = 6 }
+  [[spell.perk]]
+  key = "warbringer"
+  name = "Warbringer"
+  rarity = "rare"
+  text = "Reaches 10 yd further, and works from any distance."
+  add = { range = 10 }
+  set = { min_range = 0 }
+
+[[spell]]
+key = "challenging_shout"
+name = "Challenging Shout"
+tree = "protection"
+rarity = "uncommon"
+kind = "nova"
+school = "physical"
+icon = 1161
+cooldown = 20
+cost = 10
+radius = 12
+taunt_secs = 6
+note = "Use it to pull them off the Ancient."
+  [[spell.perk]]
+  key = "improved_challenging_shout"
+  name = "Booming Voice"
+  text = "Reaches 6 yd further."
+  add = { radius = 6 }
+  [[spell.perk]]
+  key = "quick_shout"
+  name = "Commanding Presence"
+  text = "Cooldown 6 sec shorter."
+  add = { cooldown = -6 }
+  [[spell.perk]]
+  key = "demoralizing_shout"
+  name = "Demoralizing Shout"
+  rarity = "uncommon"
+  text = "Enemies that answer deal 25% less damage for 12 sec."
+  set = { demoralize = 0.25, demoralize_secs = 12 }
+  [[spell.perk]]
+  key = "rallying_cry"
+  name = "Rallying Cry"
+  rarity = "uncommon"
+  text = "Heals you 3% of your max health for each enemy that answers."
+  set = { heal_per_hit = 0.03 }
+  [[spell.perk]]
+  key = "battle_cry"
+  name = "Battle Cry"
+  rarity = "rare"
+  text = "Gain 3 rage for each enemy that answers."
+  set = { refund = 3 }
+
+[[spell]]
+key = "hamstring"
+name = "Hamstring"
+tree = "arms"
+kind = "bolt"
+school = "physical"
+icon = 1715
+cooldown = 4
+cost = 10
+damage = 0.45
+range = 6
+slow = 0.6
+slow_secs = 8
+  [[spell.perk]]
+  key = "improved_hamstring"
+  name = "Improved Hamstring"
+  text = "25% chance to root the target for 4 sec."
+  set = { root_secs = 4, root_chance = 0.25 }
+  [[spell.perk]]
+  key = "quick_hamstring"
+  name = "Quick Hamstring"
+  text = "Costs 5 less rage."
+  add = { cost = -5 }
+  [[spell.perk]]
+  key = "crippling_blow"
+  name = "Crippling Blow"
+  rarity = "uncommon"
+  text = "Deals 60% more to enemies already slowed."
+  add = { vs_chilled = 0.6 }
+  [[spell.perk]]
+  key = "hamstring_cleave"
+  name = "Piercing Howl"
+  rarity = "uncommon"
+  text = "Also cripples 2 more enemies next to your target."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "garrote"
+  name = "Lacerate"
+  rarity = "rare"
+  text = "Leaves a bleed for 1 times your hit over 8 sec."
+  set = { dot = 1.0, dot_secs = 8 }
+
+[[spell]]
+key = "revenge"
+name = "Revenge"
+tree = "protection"
+rarity = "uncommon"
+kind = "bolt"
+school = "physical"
+icon = 6572
+cooldown = 5
+cost = 5
+damage = 1.3
+range = 6
+targets = 2
+after_hit = 1
+note = ""
+  [[spell.perk]]
+  key = "improved_revenge_perk"
+  name = "Vengeance"
+  text = "30% more damage."
+  add = { power = 0.3 }
+  [[spell.perk]]
+  key = "quick_revenge"
+  name = "Quick Revenge"
+  text = "Cooldown 2 sec shorter."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "revenge_stun"
+  name = "Revenge Stun"
+  rarity = "uncommon"
+  text = "30% chance to stun each enemy hit for 2 sec."
+  set = { stun_chance = 0.3, stun_secs = 2 }
+  [[spell.perk]]
+  key = "retaliation"
+  name = "Retaliation"
+  rarity = "uncommon"
+  text = "Heals you 2% of your max health for each enemy hit."
+  set = { heal_per_hit = 0.02 }
+  [[spell.perk]]
+  key = "shield_bash"
+  name = "Shield Bash"
+  rarity = "rare"
+  text = "Strikes 2 more enemies and sunders them."
+  add = { targets = 2, vuln_sunder = 1 }
+
+[[spell]]
+key = "bloodrage"
+name = "Bloodrage"
+tree = "fury"
+kind = "buff"
+school = "physical"
+icon = 2687
+effect = "bloodrage"
+cooldown = 30
+duration = 5
+buff_value = 30
+heal_self = -0.05
+note = "Costs 5% of your health: gain 30 rage over 5 sec."
+  [[spell.perk]]
+  key = "improved_bloodrage"
+  name = "Improved Bloodrage"
+  text = "Gain 15 more rage."
+  add = { buff_value = 15 }
+  [[spell.perk]]
+  key = "berserker_rage"
+  name = "Berserker Rage"
+  text = "Cooldown 10 sec shorter."
+  add = { cooldown = -10 }
+  [[spell.perk]]
+  key = "unbridled"
+  name = "Unbridled"
+  rarity = "uncommon"
+  text = "Costs no health."
+  set = { heal_self = 0 }
+  [[spell.perk]]
+  key = "blood_fury"
+  name = "Blood Fury"
+  rarity = "rare"
+  text = "You also deal 20% more damage while it lasts, for 10 sec."
+  set = { buff_value2 = 0.2, duration = 10 }
+
+# --- spells learned from talents ---------------------------------------------------------------
+
+[[spell]]
+key = "sweeping_strikes"
+name = "Sweeping Strikes"
+tree = "arms"
+talent = true
+kind = "buff"
+school = "physical"
+icon = 12292
+effect = "sweeping_strikes"
+cooldown = 30
+duration = 20
+charges = 5
+note = "Your next 5 strikes and swings also hit an enemy next to your target."
+
+[[spell]]
+key = "mortal_strike"
+name = "Mortal Strike"
+tree = "arms"
+talent = true
+kind = "bolt"
+school = "physical"
+icon = 12294
+cooldown = 6
+cost = 30
+damage = 2.2
+range = 6
+crit = 0.1
+
+[[spell]]
+key = "death_wish"
+name = "Death Wish"
+tree = "fury"
+talent = true
+kind = "buff"
+school = "physical"
+icon = 12328
+effect = "death_wish"
+cooldown = 60
+duration = 20
+buff_value = 0.25
+note = "For 20 sec you deal 25% more damage."
+
+[[spell]]
+key = "bloodthirst"
+name = "Bloodthirst"
+tree = "fury"
+talent = true
+kind = "bolt"
+school = "physical"
+icon = 23881
+cooldown = 6
+cost = 30
+damage = 1.7
+range = 6
+heal_self = 0.05
+note = ""
+
+[[spell]]
+key = "last_stand"
+name = "Last Stand"
+tree = "protection"
+talent = true
+kind = "buff"
+school = "physical"
+icon = 12975
+effect = "last_stand"
+cooldown = 90
+duration = 20
+buff_value = 0.3
+note = "For 20 sec your max health is 30% higher (and you're healed for it)."
+
+[[spell]]
+key = "shield_slam"
+name = "Shield Slam"
+tree = "protection"
+talent = true
+kind = "bolt"
+school = "physical"
+icon = 23922
+cooldown = 6
+cost = 20
+damage = 1.8
+range = 6
+vuln_sunder = 2
+stun_chance = 0.3
+stun_secs = 2
+note = ""
+
+[[spell]]
+key = "shield_wall"
+name = "Shield Wall"
+tree = "protection"
+talent = true
+kind = "buff"
+school = "physical"
+icon = 871
+effect = "shield_wall"
+cooldown = 120
+duration = 10
+buff_value = 0.6
+note = "For 10 sec you take 60% less damage."
+
+# --- talents --------------------------------------------------------------------------------------
+
+# Arms
+
+[[talent]]
+key = "improved_heroic_strike"
+name = "Improved Heroic Strike"
+tree = "arms"
+tier = 1
+col = 1
+ranks = 3
+icon = 12282
+text = "Heroic Strike costs {0} less rage."
+values = [2]
+  [[talent.effect]]
+  spells = "heroic_strike"
+  add = { cost = -2 }
+
+[[talent]]
+key = "improved_rend"
+name = "Improved Rend"
+tree = "arms"
+tier = 1
+col = 2
+ranks = 3
+icon = 12286
+text = "Your bleeds deal {0%} more damage."
+values = [0.15]
+  [[talent.effect]]
+  spells = "school:physical"
+  pct = { dot = 0.15 }
+
+[[talent]]
+key = "tactical_mastery"
+name = "Tactical Mastery"
+tree = "arms"
+tier = 1
+col = 3
+ranks = 2
+icon = 12295
+text = "You keep {0} rage between fights, and start every wave with it."
+values = [10]
+  [[talent.effect]]
+  stats = { rage_keep = 10 }
+
+[[talent]]
+key = "deep_wounds"
+name = "Deep Wounds"
+tree = "arms"
+tier = 2
+col = 1
+ranks = 3
+icon = 12834
+text = "Your critical strikes make the target bleed for {0%} of your hit over 6 sec."
+values = [0.2]
+  [[talent.effect]]
+  proc = "deep_wounds"
+  amount = 0.2
+
+[[talent]]
+key = "anger_management"
+name = "Anger Management"
+tree = "arms"
+tier = 2
+col = 2
+icon = 12296
+text = "You gain 1.5 rage every second while fighting."
+  [[talent.effect]]
+  stats = { rage_regen = 1.5 }
+
+[[talent]]
+key = "two_handed_weapon_specialization"
+name = "Two-Handed Weapon Specialization"
+tree = "arms"
+tier = 3
+col = 1
+ranks = 3
+icon = 12163
+text = "Your physical attacks and abilities deal {0%} more damage."
+values = [0.03]
+  [[talent.effect]]
+  spells = "school:physical"
+  add = { power = 0.03 }
+  [[talent.effect]]
+  stats = { auto = 0.03 }
+
+[[talent]]
+key = "impale"
+name = "Impale"
+tree = "arms"
+tier = 3
+col = 2
+ranks = 2
+icon = 16493
+text = "Your abilities' critical strikes deal {0%} more damage."
+values = [0.15]
+  [[talent.effect]]
+  spells = "school:physical"
+  add = { crit_mult = 0.15 }
+
+[[talent]]
+key = "sweeping_strikes"
+name = "Sweeping Strikes"
+tree = "arms"
+tier = 4
+col = 1
+icon = 12292
+text = "Learn Sweeping Strikes: your next 5 strikes and swings also hit an enemy next to your target."
+grants = "sweeping_strikes"
+
+[[talent]]
+key = "sword_specialization"
+name = "Sword Specialization"
+tree = "arms"
+tier = 4
+col = 2
+ranks = 3
+icon = 12281
+text = "Your swings have a {0%} chance to give you an extra swing at once."
+values = [0.04]
+  [[talent.effect]]
+  proc = "extra_attack"
+  amount = 0.04
+
+[[talent]]
+key = "mortal_strike"
+name = "Mortal Strike"
+tree = "arms"
+tier = 5
+col = 2
+icon = 12294
+text = "Learn Mortal Strike: a vicious strike for 2.2 times your hit."
+grants = "mortal_strike"
+
+# Fury
+
+[[talent]]
+key = "cruelty"
+name = "Cruelty"
+tree = "fury"
+tier = 1
+col = 1
+ranks = 3
+icon = 12320
+text = "{0%} more critical strike chance."
+values = [0.02]
+  [[talent.effect]]
+  stats = { crit = 0.02 }
+
+[[talent]]
+key = "unbridled_wrath"
+name = "Unbridled Wrath"
+tree = "fury"
+tier = 1
+col = 2
+ranks = 3
+icon = 12322
+text = "Your swings give {0%} more rage."
+values = [0.12]
+  [[talent.effect]]
+  stats = { rage_auto = 0.12 }
+
+[[talent]]
+key = "improved_battle_shout"
+name = "Improved Battle Shout"
+tree = "fury"
+tier = 2
+col = 1
+ranks = 2
+icon = 12318
+text = "Your battle cry carries: you and allies within 30 yd deal {0%} more damage."
+values = [0.04]
+  [[talent.effect]]
+  team = { damage = 0.04 }
+
+[[talent]]
+key = "blood_craze"
+name = "Blood Craze"
+tree = "fury"
+tier = 2
+col = 2
+ranks = 2
+icon = 16487
+text = "After a critical strike you regenerate {0%} of your max health every second for 6 sec."
+values = [0.01]
+  [[talent.effect]]
+  proc = "blood_craze"
+  amount = 0.01
+
+[[talent]]
+key = "enrage"
+name = "Enrage"
+tree = "fury"
+tier = 3
+col = 1
+ranks = 3
+icon = 12317
+text = "After a critical strike you deal {0%} more damage for 8 sec."
+values = [0.05]
+  [[talent.effect]]
+  proc = "enrage"
+  amount = 0.05
+
+[[talent]]
+key = "improved_execute"
+name = "Improved Execute"
+tree = "fury"
+tier = 3
+col = 2
+ranks = 2
+icon = 20502
+text = "Execute costs {0} less rage and works {1%} higher."
+values = [3, 0.05]
+  [[talent.effect]]
+  spells = "execute"
+  add = { cost = -3, only_below = 0.05 }
+
+[[talent]]
+key = "death_wish"
+name = "Death Wish"
+tree = "fury"
+tier = 4
+col = 1
+icon = 12328
+text = "Learn Death Wish: for 20 sec you deal 25% more damage."
+grants = "death_wish"
+
+[[talent]]
+key = "flurry"
+name = "Flurry"
+tree = "fury"
+tier = 4
+col = 2
+ranks = 3
+icon = 12319
+text = "After a critical strike your next 3 swings come {0%} faster."
+values = [0.1]
+  [[talent.effect]]
+  proc = "flurry"
+  amount = 0.1
+
+[[talent]]
+key = "bloodthirst"
+name = "Bloodthirst"
+tree = "fury"
+tier = 5
+col = 2
+icon = 23881
+text = "Learn Bloodthirst: a strike for 1.7 times your hit that heals you 5% of your max health."
+grants = "bloodthirst"
+
+# Protection
+
+[[talent]]
+key = "shield_specialization"
+name = "Shield Specialization"
+tree = "protection"
+tier = 1
+col = 1
+ranks = 3
+icon = 12298
+text = "A {0%} chance to block a blow: it does half damage and gives you 5 rage."
+values = [0.05]
+  [[talent.effect]]
+  proc = "block"
+  amount = 0.05
+
+[[talent]]
+key = "toughness"
+name = "Toughness"
+tree = "protection"
+tier = 1
+col = 2
+ranks = 3
+icon = 12299
+text = "You take {0%} less damage."
+values = [0.03]
+  [[talent.effect]]
+  stats = { taken = 0.03 }
+
+[[talent]]
+key = "defiance"
+name = "Defiance"
+tree = "protection"
+tier = 2
+col = 1
+ranks = 2
+icon = 12303
+text = "Enemies that come within {0yd} of you turn on you, leaving the Ancient and your allies alone."
+values = [5]
+  [[talent.effect]]
+  stats = { reach = 5 }
+
+[[talent]]
+key = "last_stand"
+name = "Last Stand"
+tree = "protection"
+tier = 2
+col = 2
+icon = 12975
+text = "Learn Last Stand: for 20 sec your max health is 30% higher."
+grants = "last_stand"
+
+[[talent]]
+key = "improved_thunder_clap"
+name = "Improved Thunder Clap"
+tree = "protection"
+tier = 2
+col = 3
+ranks = 2
+icon = 12287
+text = "Thunder Clap costs {0} less rage and reaches {1yd} further."
+values = [3, 1]
+  [[talent.effect]]
+  spells = "thunder_clap"
+  add = { cost = -3, radius = 1 }
+
+[[talent]]
+key = "improved_sunder_armor"
+name = "Improved Sunder Armor"
+tree = "protection"
+tier = 3
+col = 1
+ranks = 2
+icon = 12308
+text = "Sunder Armor has a {0%} chance to apply an extra stack."
+values = [0.5]
+  [[talent.effect]]
+  spells = "sunder_armor"
+  add = { vuln_sunder = 0.5 }
+
+[[talent]]
+key = "anticipation"
+name = "Anticipation"
+tree = "protection"
+tier = 3
+col = 2
+ranks = 3
+icon = 12297
+text = "{0%} more max health."
+values = [0.04]
+  [[talent.effect]]
+  stats = { health = 0.04 }
+
+[[talent]]
+key = "improved_revenge"
+name = "Improved Revenge"
+tree = "protection"
+tier = 4
+col = 1
+ranks = 2
+icon = 12797
+text = "Revenge has a {0%} chance to stun what it hits for 2 sec, and your blocks heal you {1%} of your max health."
+values = [0.25, 0.02]
+  [[talent.effect]]
+  spells = "revenge"
+  add = { stun_chance = 0.25 }
+  [[talent.effect]]
+  stats = { block_heal = 0.02 }
+
+[[talent]]
+key = "one_handed_weapon_specialization"
+name = "One-Handed Weapon Specialization"
+tree = "protection"
+tier = 4
+col = 2
+ranks = 3
+icon = 16538
+text = "You deal {0%} more damage."
+values = [0.04]
+  [[talent.effect]]
+  stats = { damage = 0.04 }
+
+[[talent]]
+key = "shield_slam"
+name = "Shield Slam"
+tree = "protection"
+tier = 5
+col = 1
+icon = 23922
+text = "Learn Shield Slam: a slam for 1.8 times your hit that applies 2 Sunder Armor stacks."
+grants = "shield_slam"
+
+[[talent]]
+key = "shield_wall"
+name = "Shield Wall"
+tree = "protection"
+tier = 5
+col = 3
+icon = 871
+text = "Learn Shield Wall: for 10 sec you take 60% less damage."
+grants = "shield_wall"
+
+
+# --- weapon paths: one a run, from the second tier of a tree (it re-arms you) -----------------------
+
+[[talent]]
+key = "path_of_the_greatsword"
+name = "Path of the Greatsword"
+tree = "arms"
+tier = 2
+col = 4
+icon = 2457
+text = "Commit to the greatsword: your crits deal 25% more and you crit 5% more often. One weapon path a run."
+path = "greatsword"
+  [[talent.effect]]
+  stats = { crit = 0.05 }
+  [[talent.effect]]
+  spells = "school:physical"
+  add = { crit_mult = 0.25 }
+
+[[talent]]
+key = "path_of_the_shieldbearer"
+name = "Path of the Shieldbearer"
+tree = "protection"
+tier = 2
+col = 4
+icon = 71
+text = "Take up sword and shield: a one-handed sword and a shield in place of your greatsword, 12% less damage taken, 10% more health and a 15% chance to block. One weapon path a run."
+path = "shield"
+  [[talent.effect]]
+  stats = { taken = 0.12, health = 0.10 }
+  [[talent.effect]]
+  proc = "block"
+  amount = 0.15
+
+[[talent]]
+key = "path_of_the_berserker"
+name = "Path of the Berserker"
+tree = "fury"
+tier = 2
+col = 4
+icon = 2458
+text = "Two weapons: a sword and an axe in place of your greatsword, 12% faster attacks, and a 20% chance for an extra swing at once. One weapon path a run."
+path = "dual"
+  [[talent.effect]]
+  stats = { haste = 0.12 }
+  [[talent.effect]]
+  proc = "extra_attack"
+  amount = 0.20
+
+# --- combinations: offered only to a warrior holding both spells -------------------------------------
+
+[[talent]]
+key = "shattering_strikes"
+name = "Shattering Strikes"
+tree = "arms"
+tier = 3
+col = 4
+icon = 7386
+text = "With Heroic Strike and Sunder Armor: Heroic Strike also sunders, and deals 10% more per stack."
+requires = ["heroic_strike", "sunder_armor"]
+  [[talent.effect]]
+  spells = "heroic_strike"
+  add = { vuln_sunder = 1, vs_sunder = 0.10 }
+
+[[talent]]
+key = "mortal_wounds"
+name = "Mortal Wounds"
+tree = "arms"
+tier = 4
+col = 4
+icon = 12294
+text = "With Mortal Strike and Rend: Mortal Strike deals 50% more to bleeding enemies."
+requires = ["mortal_strike", "rend"]
+  [[talent.effect]]
+  spells = "mortal_strike"
+  add = { vs_bleeding = 0.5 }
+
+[[talent]]
+key = "rending_whirl"
+name = "Rending Whirl"
+tree = "fury"
+tier = 3
+col = 4
+icon = 1680
+text = "With Whirlwind and Rend: every enemy Whirlwind hits bleeds for 0.8 times your hit over 12 sec."
+requires = ["whirlwind", "rend"]
+  [[talent.effect]]
+  spells = "whirlwind"
+  set = { dot = 0.8, dot_secs = 12 }
+
+[[talent]]
+key = "blood_frenzy"
+name = "Blood Frenzy"
+tree = "fury"
+tier = 4
+col = 4
+icon = 23881
+text = "With Whirlwind and Bloodthirst: Whirlwind heals you 2% of your max health for each enemy it hits."
+requires = ["whirlwind", "bloodthirst"]
+  [[talent.effect]]
+  spells = "whirlwind"
+  add = { heal_per_hit = 0.02 }
+
+[[talent]]
+key = "thunderous_rend"
+name = "Thunderous Rend"
+tree = "protection"
+tier = 3
+col = 4
+icon = 6343
+text = "With Thunder Clap and Rend: Thunder Clap deals 60% more to bleeding enemies."
+requires = ["thunder_clap", "rend"]
+  [[talent.effect]]
+  spells = "thunder_clap"
+  add = { vs_bleeding = 0.6 }
+
+[[talent]]
+key = "thunderous_arrival"
+name = "Thunderous Arrival"
+tree = "protection"
+tier = 4
+col = 4
+icon = 100
+text = "With Charge and Thunder Clap: Charge lands with a thunderclap, 0.8 times your hit to every enemy within 8 yd, slowing them 30% for 6 sec."
+requires = ["charge", "thunder_clap"]
+  [[talent.effect]]
+  spells = "charge"
+  set = { radius = 8, damage = 0.8, slow = 0.3, slow_secs = 6 }

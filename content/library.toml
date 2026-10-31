@@ -1,0 +1,551 @@
+# The Scarlet Monastery's Library: the Crusade's books and the men who guard them, Houndmaster
+# Loksey and Arcanist Doan. A dungeon of its own beside the Deadmines (read like deadmines.toml:
+# its lists join the rest; [dungeon] is its world).
+#
+# Places are WoW coordinates on map 189 (MonasteryInstances: x north, y west, z up), only the
+# Library wing's part of it read. In by the hall; through the halls to the Houndmaster's kennel
+# corridor; the reading rooms (the second lamp); and the library's far chamber, where Doan keeps
+# the books nobody else may read. Out by the hall.
+
+[dungeon]
+key = "library"
+name = "Scarlet Monastery: Library"
+map = 189
+map_dir = "MonasteryInstances"
+area = 796
+window = [[90.0, -470.0], [310.0, -110.0]]
+icon = "INV_Misc_Book_07"
+blurb = "The Crusade's books, its hounds, and its Arcanist"
+first_page = "The Library's hall. Somewhere ahead, dogs are barking."
+welcome = "The Scarlet Monastery's Library. Houndmaster Loksey's dogs have your scent already, and Arcanist Doan guards the books nobody else may read. Two lamps: the hall, and the reading rooms. Rest at a lamp to heal, fill your Draughts (T) and send the Crusade back to its shelves. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+gate_raids = 0
+draught = "draught"
+draughts = 3
+draughts_max = 6
+flask = "draught_flask"
+plunder = "scarlet_insignia"
+hero_health = 0.7
+exit = [245.7, -186.6, 18.7]
+exit_radius = 5.0
+exit_boss = "doan"
+weapon_chance = 0.08
+armor_chance = 0.06
+boss_extra_chance = 0.25
+reset_minutes = 30.0
+
+[dungeon.trade]
+whetstone = 6
+tonic = 4
+
+# --- lamps: only two ---------------------------------------------------------------------------------
+
+[[dungeon.lamp]]
+key = "library_hall"
+name = "The Library's Hall"
+at = [245.7, -186.6, 18.7]
+facing = 3.9
+
+[[dungeon.lamp]]
+key = "library_reading"
+name = "The Reading Rooms"
+at = [257.9, -330.0, 18.5]
+facing = 4.7
+
+# --- secrets -----------------------------------------------------------------------------------------
+
+# A shelf in the far chamber that isn't a shelf: the Forbidden Tome.
+[[dungeon.door]]
+key = "forbidden_tome"
+name = "The Forbidden Tome"
+kind = "hidden"
+at = [137.5, -426.5, 18.5]
+find = 4.0
+reveals = ["tome_cache", "doan_warning"]
+text = "behind the last shelf in the far chamber: a book chained shut, and the chain has rusted through. You open it. Something on the page opens its eyes."
+
+[[dungeon.box]]
+key = "tome_cache"
+at = [138.5, -428.5, 18.5]
+facing = 1.5
+loot = { draught_flask = 1, scarlet_insignia = 14 }
+
+[[dungeon.note]]
+key = "doan_warning"
+name = "Doan's Note in the Margin"
+at = [136.5, -424.5, 18.5]
+facing = 1.5
+text = "\"The Tome binds what it holds only while it is shut and I live. Should a stranger open it and I fall, the thing on its pages will step off them.\""
+
+# The kennel's back: Loksey's private store.
+[[dungeon.door]]
+key = "kennel_store"
+name = "The Kennel's Back Room"
+kind = "hidden"
+at = [185.6, -270.6, 18.6]
+find = 4.0
+reveals = ["kennel_box"]
+text = "behind the kennels, a store room: the Houndmaster's own, and a good deal of the Crusade's silver."
+
+[[dungeon.box]]
+key = "kennel_box"
+at = [185.0, -273.0, 18.6]
+facing = 0.0
+loot = { scarlet_insignia = 16, tonic = 1, whetstone = 1 }
+
+# --- notes -------------------------------------------------------------------------------------------
+
+[[dungeon.note]]
+key = "library_rules"
+name = "The Library's Rules"
+at = [233.4, -162.5, 18.7]
+facing = 3.9
+text = "\"No novice past the reading rooms. No one at all near the last shelf of the far chamber, by order of the Arcanist. The dogs are not to be fed by hand.\""
+
+# --- the Crusade -------------------------------------------------------------------------------------
+
+[[dungeon.pack]]
+mob = "sc_gallant"
+at = [221.7, -186.7]
+z = 18.7
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_wizard"
+at = [209.4, -162.6]
+z = 18.7
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sl_hound"
+at = [201.8, -228.2]
+z = 18.5
+radius = 3.0
+count = 3
+link = 12.0
+
+# The kennel corridor: Houndmaster Loksey.
+[[dungeon.pack]]
+mob = "sl_loksey"
+key = "loksey"
+at = [185.6, -258.4]
+z = 18.6
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sl_hound"
+at = [173.5, -282.5]
+z = 19.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_monk"
+at = [173.5, -306.7]
+z = 18.5
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_chaplain"
+at = [209.4, -306.9]
+z = 18.5
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sc_centurion"
+at = [221.5, -306.6]
+z = 18.5
+radius = 2.5
+count = 2
+link = 12.0
+
+# The reading rooms and on.
+[[dungeon.pack]]
+mob = "sc_wizard"
+at = [257.2, -354.1]
+z = 20.3
+radius = 2.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_myrmidon"
+at = [257.1, -390.0]
+z = 20.3
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sl_diviner"
+at = [269.2, -426.9]
+z = 18.6
+radius = 0.0
+count = 1
+
+[[dungeon.pack]]
+mob = "sc_gallant"
+at = [233.8, -427.5]
+z = 18.5
+radius = 2.5
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sl_diviner"
+at = [197.2, -426.5]
+z = 18.6
+radius = 2.0
+count = 2
+link = 12.0
+
+# The far chamber: Arcanist Doan.
+[[dungeon.pack]]
+mob = "sl_doan"
+key = "doan"
+at = [149.6, -438.3]
+z = 18.5
+radius = 0.0
+count = 1
+
+[[dungeon.hazard]]
+name = "arcane fire"
+at = [149.3, -415.3, 18.6]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 2.0
+warn = 1.4
+spell = 10604
+boss = "doan"
+
+[[dungeon.hazard]]
+name = "arcane fire"
+at = [140.0, -432.0, 18.5]
+radius = 3.5
+damage = 22
+every = 7.0
+phase = 4.5
+warn = 1.4
+spell = 10604
+boss = "doan"
+
+# --- items --------------------------------------------------------------------------------------------
+
+[[item]]
+key = "loksey_legs"
+name = "Houndmaster's Leggings"
+display = 12388
+icon = "INV_Pants_06"
+kind = "armor"
+slot = "legs"
+reduce = 0.11
+text = "Loksey's: torn at the shins where the dogs jumped up."
+
+[[item]]
+key = "doan_robe"
+name = "Robe of Doan"
+display = 12694
+icon = "INV_Chest_Cloth_38"
+kind = "armor"
+slot = "chest"
+reduce = 0.1
+text = "The Arcanist's: embroidered with wards that didn't keep him safe."
+
+[[item]]
+key = "tome_mantle"
+name = "Mantle of the Tome"
+display = 3119
+icon = "INV_Shoulder_05"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.14
+weight = 0.02
+text = "Torn from the thing that stepped off the page. The writing on it moves."
+
+# --- the Library's own -------------------------------------------------------------------------------------
+
+[[mob]]
+key = "sl_hound"
+name = "Scarlet Tracking Hound"
+subname = "The Scarlet Crusade"
+display = 380
+health = 90
+run_speed = 8.5
+walk_speed = 2.4
+aggro = 18.0
+leash = 30.0
+drops = { scarlet_insignia = [1, 3] }
+respawn = 0.0
+  [mob.attack]
+  windup = 0.42
+  damage = 11
+  range = 2.5
+  arc = 90.0
+  recovery = 0.65
+  cooldown = 0.9
+  turn_rate = 270.0
+  lock = 0.2
+  blockable = true
+  [[mob.pattern]]
+  name = "bites"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 10, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.34, damage = 11, recovery = 0.8 } ]
+  [[mob.pattern]]
+  name = "pounce"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 12.0
+  steps = [ { clip = 17, take = 1, windup = 0.5, lunge = 7.0, damage = 14, recovery = 0.85 } ]
+
+[[mob]]
+key = "sl_diviner"
+name = "Scarlet Diviner"
+subname = "The Scarlet Crusade"
+display = 2434
+health = 90
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+keep_away = 8.0
+drops = { scarlet_insignia = [2, 4] }
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.2
+  damage = 17
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 22.0
+  spell = 116
+  recovery = 1.0
+  cooldown = 1.5
+  turn_rate = 220.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "frostbolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 17, range = 26.0, radius = 1.5, speed = 22.0, spell = 116, blockable = true, recovery = 1.0 } ]
+  [[mob.pattern]]
+  name = "arcane burst"
+  weight = 2.0
+  max_range = 3.5
+  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 13, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+
+# Houndmaster Loksey: "Release the hounds!"
+[[mob]]
+key = "sl_loksey"
+name = "Houndmaster Loksey"
+subname = "The Scarlet Crusade"
+display = 2052
+scale = 1.2
+health = 950
+run_speed = 7.5
+walk_speed = 2.2
+aggro = 18.0
+leash = 30.0
+weapon = 1161
+grip = "1h"
+boss = true
+posture = 240
+drops = { scarlet_insignia = [16, 22] }
+trophy = { loksey_legs = 1 }
+gear = ["loksey_legs"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.55
+  damage = 24
+  range = 2.9
+  arc = 110.0
+  recovery = 0.8
+  cooldown = 1.1
+  turn_rate = 230.0
+  lock = 0.25
+  blockable = true
+  [[mob.pattern]]
+  name = "mace"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.12 }, { clip = 57, windup = 0.8, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
+  [[mob.pattern]]
+  name = "bloodlust charge"
+  weight = 2.0
+  min_range = 4.0
+  max_range = 14.0
+  steps = [ { clip = 17, take = 1, windup = 0.7, lunge = 9.0, damage = 28, heavy = true, recovery = 1.0, kit = 379 } ]
+  [[mob.pattern]]
+  name = "whistle"
+  weight = 1.5
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 1.0, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.1, kit = 389 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "whistle"
+  text = "\"Release the hounds!\""
+  summon = ["sl_hound", "sl_hound"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.76
+  might = 1.15
+  pattern = "bloodlust charge"
+  text = "Loksey bellows for the rest of the kennel."
+  summon = ["sl_hound", "sl_hound"]
+  shove = 5.0
+
+# Arcanist Doan: the Crusade's mage, and the keeper of the Forbidden Tome.
+[[mob]]
+key = "sl_doan"
+name = "Arcanist Doan"
+subname = "The Scarlet Crusade"
+display = 2070
+scale = 1.15
+health = 1300
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 20.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 240
+keep_away = 8.0
+drops = { scarlet_insignia = [26, 34] }
+trophy = { doan_robe = 1 }
+gear = ["doan_robe"]
+respawn = 0.0
+# Whoever opened the Forbidden Tome finds out what Doan kept bound in it.
+then = "sl_fiend"
+then_after = 3.5
+then_needs = "forbidden_tome"
+then_text = "Doan falls, and across the chamber the open Tome's pages flutter by themselves. Something heavy steps off them."
+then_kit = 218
+then_look = 27812
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 24
+  range = 28.0
+  arc = 360.0
+  radius = 1.5
+  speed = 22.0
+  spell = 116
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 230.0
+  lock = 0.3
+  blockable = true
+  [[mob.pattern]]
+  name = "frostbolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 28.0
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 28.0, radius = 1.5, speed = 22.0, spell = 116, blockable = true, recovery = 0.9 } ]
+  [[mob.pattern]]
+  name = "arcane explosion"
+  weight = 2.0
+  max_range = 4.5
+  steps = [ { clip = 54, windup = 0.9, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  [[mob.pattern]]
+  name = "detonation"
+  weight = 2.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.4, damage = 30, range = 26.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
+  [[mob.pattern]]
+  name = "polymorph's end"
+  weight = 2.0
+  below = 0.5
+  min_range = 3.0
+  max_range = 28.0
+  steps = [ { ranged = true, windup = 0.9, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 1.2 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "arcane explosion"
+  text = "\"You will not defile these mysteries!\""
+  summon = ["sl_diviner"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.78
+  might = 1.1
+  pattern = "detonation"
+  text = "\"Burn in righteous fire!\""
+  shove = 5.5
+  look = 27808
+  [[mob.phase]]
+  at = 0.1
+  speed = 0.7
+  might = 1.2
+  pattern = "polymorph's end"
+  text = "Doan's wards flicker and go out."
+
+# The thing from the Forbidden Tome.
+[[mob]]
+key = "sl_fiend"
+name = "The Thing in the Tome"
+subname = "Unbound"
+display = 9016
+scale = 1.0
+health = 1300
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 30.0
+leash = 40.0
+boss = true
+posture = 320
+drops = { scarlet_insignia = [50, 60] }
+gear = ["tome_mantle"]
+respawn = 0.0
+  [mob.attack]
+  windup = 0.75
+  damage = 32
+  range = 3.6
+  arc = 140.0
+  recovery = 1.0
+  cooldown = 1.3
+  turn_rate = 200.0
+  lock = 0.3
+  blockable = true
+  heavy = true
+  [[mob.pattern]]
+  name = "cleave"
+  weight = 3.0
+  steps = [ { clip = 17, take = 0, windup = 0.7, damage = 28, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.55, damage = 28, recovery = 0.15 }, { clip = 57, windup = 0.85, damage = 38, heavy = true, recovery = 1.1, kit = 379 } ]
+  [[mob.pattern]]
+  name = "page storm"
+  weight = 2.0
+  max_range = 6.0
+  steps = [ { clip = 54, windup = 1.2, range = 7.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 27812 } ]
+  [[mob.pattern]]
+  name = "word of binding"
+  weight = 2.0
+  min_range = 5.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.2, damage = 28, range = 26.0, radius = 4.0, speed = 14.0, spell = 27812, look = 27812, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 28, range = 26.0, radius = 4.0, speed = 14.0, spell = 27812, look = 27812, blockable = false, recovery = 1.3 } ]
+  [[mob.phase]]
+  at = 0.5
+  speed = 0.82
+  pattern = "page storm"
+  text = "The Thing tears pages from the air; each one that lands burns."
+  summon = ["imp", "imp"]
+  [[mob.phase]]
+  at = 0.2
+  speed = 0.72
+  might = 1.2
+  pattern = "word of binding"
+  text = "It speaks a word from the Tome, and the shelves catch fire."
+  shove = 6.5
+  look = 27812

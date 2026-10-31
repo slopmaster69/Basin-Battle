@@ -1,0 +1,296 @@
+From 759e9c39e3f4851f4205fdb37e8b871ef66203e8 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Thu, 29 Oct 2026 19:34:28 -0600
+Subject: [PATCH] Weapons that glow red for a blow no guard stops; the hero's
+ weapon back in hand after a spell; a gentler coil
+
+SetUnitWeaponGlow(unit, "RRGGBB", seconds) tints the unit's hand models that colour, pulsing,
+for that long (a unit holding none: its whole body), over any aura's tint; nil ends it.
+HasActionCombat() is 6.
+
+While an add-on drives the action layer our own body takes the server's sheath byte, as a
+remote one does: a spell clip's stow or a throw's ranged draw used to leave the melee weapon
+put away for good, since no auto-attack draws it here.
+
+A creature's coiled wind-up spreads its extra time between the way into the coil (40%) and the
+creep through it, so the held pose never looks like time stopped.
+---
+ crates/benilla-app/src/aura_visual.rs         | 47 ++++++++++++--
+ crates/benilla-app/src/creature_anim.rs       |  2 +-
+ .../benilla-app/src/creature_anim/action.rs   | 63 +++++++++++++++----
+ .../benilla-app/src/creature_anim/driver.rs   |  6 +-
+ crates/benilla-ui/src/action_combat.rs        | 31 ++++++++-
+ 5 files changed, 131 insertions(+), 18 deletions(-)
+
+diff --git a/crates/benilla-app/src/aura_visual.rs b/crates/benilla-app/src/aura_visual.rs
+index 7ae57ab1..1e02d23d 100644
+--- a/crates/benilla-app/src/aura_visual.rs
++++ b/crates/benilla-app/src/aura_visual.rs
+@@ -140,14 +140,53 @@ pub(crate) fn apply_aura_tint(
+     )>,
+     mut tints: ResMut<benilla_world::instance_tint::InstanceTints>,
+     mut probe_logged: Local<bool>,
++    (glows, time): (
++        Query<(
++            Entity,
++            &crate::creature_anim::WeaponGlow,
++            Option<&crate::entities::HeldAttached>,
++        )>,
++        Option<Res<Time>>,
++    ),
+ ) {
+     let probe = tint_probe();
++    // Basin Battle's weapon glow: the hand slots' models (none held: the body), pulsing.
++    let now = time.map_or(0.0, |t| t.elapsed_secs());
++    let mut glowing: Vec<(Entity, [u8; 3])> = Vec::new();
++    for (unit, glow, held) in &glows {
++        if glow.until <= now {
++            continue;
++        }
++        let beat = 0.8 + 0.2 * (now * 12.0).sin();
++        let rgb = glow.rgb.map(|c| (f32::from(c) * beat).round() as u8);
++        let hands: Vec<Entity> = held
++            .map(|h| {
++                h.spawned_slots()[..2]
++                    .iter()
++                    .flatten()
++                    .copied()
++                    .filter(|e| rigs.get(*e).is_ok())
++                    .collect()
++            })
++            .unwrap_or_default();
++        if hands.is_empty() {
++            glowing.push((unit, rgb));
++        }
++        glowing.extend(hands.into_iter().map(|e| (e, rgb)));
++    }
+     let mut painted = 0usize;
+     for (root, rig) in &rigs {
+-        let word = probe.or_else(|| chained_tint(&chain, root)).map_or(
+-            benilla_world::instance_tint::IDENTITY,
+-            benilla_world::instance_tint::pack,
+-        );
++        let glow = glowing
++            .iter()
++            .find(|(e, _)| *e == root)
++            .map(|(_, rgb)| *rgb);
++        let word = probe
++            .or(glow)
++            .or_else(|| chained_tint(&chain, root))
++            .map_or(
++                benilla_world::instance_tint::IDENTITY,
++                benilla_world::instance_tint::pack,
++            );
+         tints.set(rig.slot, word);
+         painted += 1;
+     }
+diff --git a/crates/benilla-app/src/creature_anim.rs b/crates/benilla-app/src/creature_anim.rs
+index e18e556b..6d843c7e 100644
+--- a/crates/benilla-app/src/creature_anim.rs
++++ b/crates/benilla-app/src/creature_anim.rs
+@@ -32,7 +32,7 @@ mod lod;
+ /// Basin Battle's action animation: timed clips, trails, hit-stop, shake, the roll, the aim pitch
+ /// and the camera's unit collision, all driven by an add-on.
+ mod action;
+-pub(crate) use action::{lock_point, unit_hit};
++pub(crate) use action::{lock_point, unit_hit, WeaponGlow};
+ 
+ /// Wielded `(item class, subclass)` per hand as worn (`GetWeapon(slot, 1)`, `0x605e30`, what the
+ /// paperdoll shows); behaviour reads `armed_main`/`armed_off`, which apply the disarm ladder.
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 950ddbed..71aa2f86 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -38,12 +38,14 @@ const IMPACT_TAGS: [&[u8; 4]; 5] = [b"$AH0", b"$AH1", b"$AH2", b"$AH3", b"$CAH"]
+ /// How far a clip's speed is bent to fit its timing.
+ const RATE_RANGE: (f32, f32) = (0.25, 4.0);
+ /// A creature's wind-up slowed past this share of its clip's own plays as a coil and a snap:
+-/// the clip at its own pace to `COIL_AT` of the way to its impact, a slow creep `COIL_CREEP`
+-/// further for as long as the wind-up has left, and the rest at `COIL_SNAP_RATE` times its own
+-/// speed, so a heavy is read in the held pose and lands fast.
++/// the clip into the coil (`COIL_AT` of the way to its impact) taking `COIL_APPROACH` of the time
++/// the wind-up has over the clip's own, a creep `COIL_CREEP` further over the rest, and the
++/// strike at `COIL_SNAP_RATE` times its own speed, so a heavy is read in the gathering pose and
++/// lands fast without the body ever looking stopped.
+ const COIL_SLOW: f32 = 1.35;
+-const COIL_AT: f32 = 0.62;
+-const COIL_CREEP: f32 = 0.08;
++const COIL_AT: f32 = 0.55;
++const COIL_CREEP: f32 = 0.2;
++const COIL_APPROACH: f32 = 0.4;
+ const COIL_SNAP_RATE: f32 = 1.8;
+ /// An action clip fades in and out over these.
+ const FADE_IN: f32 = 0.08;
+@@ -176,6 +178,14 @@ pub(crate) struct ActionTilt {
+     bones: Vec<(usize, Transform, Transform)>,
+ }
+ 
++/// A unit's weapons tinted (an unblockable blow winding up), until then (app seconds); read by
++/// `crate::aura_visual::apply_aura_tint`, over any aura's tint.
++#[derive(Component, Clone, Copy, Debug)]
++pub(crate) struct WeaponGlow {
++    pub(crate) rgb: [u8; 3],
++    pub(crate) until: f32,
++}
++
+ /// The unit the camera and the body keep facing.
+ #[derive(Resource, Default)]
+ pub(crate) struct LockOn(Option<Entity>);
+@@ -314,6 +324,17 @@ impl ActionClip {
+         (self.key * COIL_AT, b, snap)
+     }
+ 
++    /// The real seconds into the coil and over the creep: the wind-up's time over the clip's own
++    /// shared between them.
++    fn coil_spans(&self) -> (f32, f32) {
++        let (a, b, snap) = self.coil_marks();
++        let extra = (self.windup - b - snap).max(0.0);
++        (
++            a + COIL_APPROACH * extra,
++            (b - a) + (1.0 - COIL_APPROACH) * extra,
++        )
++    }
++
+     /// The next point on the clip clock where the speed changes (infinity: none ahead).
+     fn next_mark(&self) -> f32 {
+         if self.key <= 0.0 || self.t >= self.key {
+@@ -335,12 +356,11 @@ impl ActionClip {
+     fn rate(&self) -> f32 {
+         if self.coil && self.key > 0.0 && self.t < self.key {
+             let (a, b, snap) = self.coil_marks();
++            let (approach, hold) = self.coil_spans();
+             return if self.t < a {
+-                1.0
++                a / approach.max(0.01)
+             } else if self.t < b {
+-                // Held: whatever the wind-up has left after the pace in and the snap.
+-                let hold = (self.windup - snap - a).max(0.05);
+-                ((b - a) / hold).max(0.01)
++                ((b - a) / hold.max(0.05)).max(0.01)
+             } else {
+                 (self.key - b) / snap
+             };
+@@ -707,6 +727,22 @@ pub(super) fn drain_action_calls(
+                     }
+                 }
+             }
++            ActionCall::WeaponGlow { unit, rgb, secs } => {
++                let Some(entity) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                match rgb {
++                    Some(rgb) => {
++                        commands.entity(entity).try_insert(WeaponGlow {
++                            rgb,
++                            until: now + secs,
++                        });
++                    }
++                    None => {
++                        commands.entity(entity).try_remove::<WeaponGlow>();
++                    }
++                }
++            }
+             ActionCall::Kit { unit, kit } => {
+                 let Some(entity) = resolve(&unit, me, index) else {
+                     continue;
+@@ -1391,9 +1427,14 @@ mod tests {
+             "the impact still at 1.2 s: {real}"
+         );
+         let (at_coil, at_snap) = (at_coil.unwrap(), at_snap.unwrap());
++        let (approach, _) = c.coil_spans();
++        assert!(
++            (at_coil - approach).abs() < 0.021,
++            "the coil reached in its share: {at_coil} of {approach}"
++        );
+         assert!(
+-            (at_coil - a).abs() < 0.021,
+-            "the coil reached at its own pace: {at_coil}"
++            approach > a,
++            "slower into the coil than the clip's own pace"
+         );
+         assert!(
+             (real - at_snap - snap).abs() < 0.021,
+diff --git a/crates/benilla-app/src/creature_anim/driver.rs b/crates/benilla-app/src/creature_anim/driver.rs
+index bb7ecedb..4e9c61ae 100644
+--- a/crates/benilla-app/src/creature_anim/driver.rs
++++ b/crates/benilla-app/src/creature_anim/driver.rs
+@@ -1385,8 +1385,12 @@ pub(super) fn drive_animations(
+                 .or_else(|| drv.active_anim())
+                 .unwrap_or(STAND);
+             let flags = catalog.map_or(0, |cat| cat.weapon_flags(anim));
++            // Basin Battle's action layer: our own body takes the server's sheath byte too, as a
++            // remote one does, so a spell's stow or a throw's ranged draw gives the weapon back
++            // to the hand once the cast's clip is done (no auto-attack draws it here).
++            let local = is_self && !benilla_ui::action_combat::layer_live();
+             if let Some(forced) =
+-                select::reconcile_sheath(cur, anim, flags, engaged, is_self, sheath_byte, mounted)
++                select::reconcile_sheath(cur, anim, flags, engaged, local, sheath_byte, mounted)
+             {
+                 // The reference brackets every ranged kit play with ranged snaps (`0x60f34c`
+                 // before, `SetSheatheState(2,1,1)` after), so ReadyThrown 108's stow (outside the
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index a29b94ec..3ec8afb3 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -71,6 +71,14 @@
+ //! - `SetGroundMarker(key, x, y, z, radius, seconds[, hostile])`: a circle on the ground there for
+ //!   that long (red when `hostile`, else green); the same key again moves it.
+ //! - `ClearGroundMarker([key])`: take one away (all of them with no key).
++//!
++//! The sixth (`HasActionCombat() >= 6`):
++//!
++//! - `SetUnitWeaponGlow(unit, "RRGGBB", seconds)`: the unit's weapons (a unit holding none: its
++//!   whole body) tinted that colour, pulsing, for that long; `SetUnitWeaponGlow(unit, nil)` ends
++//!   it. A creature's blow that no guard stops shows this way.
++//! - Our own body takes the server's sheath byte (as others' do) while an add-on drives the action
++//!   layer, so a spell's stow or a throw's ranged draw hands the weapon back once its clip is done.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -146,6 +154,12 @@ pub enum ActionCall {
+         /// `None`: the hard-landing dust.
+         kit: Option<u32>,
+     },
++    /// The unit's weapons tinted this colour for `secs` (`None`: back to their own).
++    WeaponGlow {
++        unit: String,
++        rgb: Option<[u8; 3]>,
++        secs: f32,
++    },
+ }
+ 
+ /// Our body and the units near it this frame (Bevy space: `(x, z)` on the ground, `y` up), for
+@@ -525,7 +539,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(5))?,
++        lua.create_function(|_, _: MultiValue| Ok(6))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -724,6 +738,21 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetUnitWeaponGlow",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(unit) = text(v.first()) {
++                let rgb = text(v.get(1)).and_then(|h| {
++                    let n = u32::from_str_radix(h.trim_start_matches('#'), 16).ok()?;
++                    Some([(n >> 16) as u8, (n >> 8) as u8, n as u8])
++                });
++                let secs = number(v.get(2), 0.0, 30.0).unwrap_or(1.0);
++                push(ActionCall::WeaponGlow { unit, rgb, secs });
++            }
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "PlayUnitVocal",
+         lua.create_function(|_, args: MultiValue| {
+-- 
+2.43.0
+

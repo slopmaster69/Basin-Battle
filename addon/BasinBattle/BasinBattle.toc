@@ -1,0 +1,7 @@
+## Interface: 11200
+## Title: Basin Battle
+## Notes: The card picker, wave tracker and banners for Basin Battle.
+## Author: Basin Battle
+## Version: 1
+BasinBattle.lua
+Chat.lua
