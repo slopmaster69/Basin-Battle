@@ -50,6 +50,22 @@ gh pr list                              # what others are working on right now
 - Open a **draft** pull request early to show what you're on; mark it ready when the checks pass.
 - In the pull request say what you tested and how (which checks, what you played), and what you
   didn't.
+- Once it's ready, turn on **auto-merge** (`gh pr merge --auto --squash`, or the button on the
+  pull request): it merges by itself when the required checks pass, so nobody has to watch it.
+
+## Reviews
+
+Every pull request gets two automatic looks besides CI:
+
+- **PR rules** (`scripts/check-pr.sh`, seconds): fails on a game file, save, log, build output,
+  settings file, zip, executable or secret in the branch, or two client patches with the same
+  number; notes on the files flag an edited patch, an add-on line-format change without the
+  add-on, and Lua the 1.12 client can't run. Run it yourself before you push.
+- **Claude review**, once the pull request is out of draft and after each push to it: comments on
+  bugs and on breaking other people's work, nothing else. It never approves or merges.
+
+Read the review comments and either fix what they point at or answer why it's fine, in a reply on
+the comment. A reviewer can be wrong; a comment nobody answered is the one that gets missed.
 
 ## Checks before every push
 
@@ -61,6 +77,7 @@ Run what covers the files you changed. A pull request isn't ready until these pa
 | An add-on (`addon/`) | `scripts/check-addon.sh` (no Lua errors) |
 | A client patch (`patches/benilla/`) | Apply the whole series on a clean benilla checkout (`scripts/play.sh` does it) and build the client |
 | A script (`scripts/`, `*.command`, `*.bat`) | Run it on the system it's for |
+| Anything | `scripts/check-pr.sh` (the repository rules, against `origin/main`) |
 
 Tests that need the WoW 1.12.1 data are marked `#[ignore]`; run them locally when you touch what
 they cover. CI runs the rest on every pull request.

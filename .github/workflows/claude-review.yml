@@ -1,0 +1,97 @@
+# Claude reads each pull request once it's ready for review (not while it's a draft), and again
+# after every push to it, and leaves comments: a summary on the pull request and notes on the
+# lines that need them. It never approves, merges or pushes; CI and the merge rules on main decide
+# what merges. Its comments are advice for the author, human or agent, to act on or answer.
+#
+# It needs one repository secret (Settings > Secrets and variables > Actions):
+#   ANTHROPIC_API_KEY        an API key from console.anthropic.com, or
+#   CLAUDE_CODE_OAUTH_TOKEN  from `claude setup-token` on a Claude subscription.
+# Without either it skips itself, as it does on pull requests from forks and from Dependabot,
+# which aren't given the repository's secrets.
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Claude review
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    env:
+      HAS_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' || secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+    steps:
+      - name: No key yet
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret here, so no Claude review (see the top of this workflow)."
+
+      - uses: actions/checkout@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        if: env.HAS_KEY == 'true'
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+            BASE: origin/${{ github.base_ref }}
+            EVENT: ${{ github.event.action }}
+
+            You are reviewing a pull request to Basin Battle and Elwynn Survival: a Rust game
+            server (crates/), content tuning (content/*.toml), WoW 1.12 add-ons in Lua 5.0
+            (addon/), and patches to the benilla client (patches/benilla/). The pull request
+            branch is checked out in the working directory. Several people and AI agents work
+            here at once; AGENTS.md has the rules they agreed on. Read AGENTS.md first, then the
+            pull request (`gh pr view`, `gh pr diff`) and whatever files you need around it.
+
+            Look for, most important first:
+            1. Bugs: logic errors, panics, wrong units or ids, state that isn't saved or reset,
+               races in the server, Lua that errors at runtime.
+            2. Breaking other people: a change to the add-on line formats in
+               crates/htl-server/src/survival/ui.rs (or Basin Battle's equivalent) without the
+               add-on changing with it, or without old fields still working; saves that older
+               save files can no longer load; an edit to someone else's client patch instead of
+               a new patch with the next free number.
+            3. Lua the 1.12 client can't run: Lua 5.0 has no # operator (table.getn,
+               string.len), no % (math.mod), no ... in a function body (arg), no goto, no
+               integer division. The main chunk of ElwynnSurvival.lua is near the 200-locals
+               limit: new top-level locals there should go in a table or a new file in the .toc.
+               Protected functions (Jump, CastSpellByName from untrusted paths, and so on) can't
+               be called from add-on code.
+            4. Content tuning (content/*.toml) without a comment beside the changed number
+               saying why.
+            5. Anything that must never be committed (game files, saves, logs, build output,
+               settings files, zips, executables, secrets). The "PR rules" check fails on most
+               of these; mention any it would miss.
+            6. Whether the description says what was tested and how, as AGENTS.md asks. If the
+               change touches what a test could cover and none was added, say so.
+
+            Don't comment on style or taste the code already follows elsewhere, and don't repeat
+            what CI checks already report. If EVENT is "synchronize", earlier review comments
+            are on the pull request (`gh pr view --comments`): review what changed since, and
+            don't repeat a point already made unless it's still unaddressed.
+
+            How to post:
+            - Use `mcp__github_inline_comment__create_inline_comment` with `confirmed: true`
+              for a problem on a specific line: what's wrong, why it matters, and the fix.
+            - Then one top-level comment with `gh pr comment`: a two- or three-line summary,
+              the problems by importance (each with file:line), and "Nothing blocking from me" if
+              that's so. Keep it short; skip praise.
+            - Only post GitHub comments. Never approve, request changes, push, or merge.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
