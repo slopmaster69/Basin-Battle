@@ -42,6 +42,7 @@ jobs:
           fetch-depth: 0
 
       - uses: anthropics/claude-code-action@v1
+        id: review
         if: env.HAS_KEY == 'true'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -95,3 +96,18 @@ jobs:
             - Only post GitHub comments. Never approve, request changes, push, or merge.
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Grep,Glob"
+
+      # The action hides Claude's output; when it fails, show only its last message (a sign-in
+      # or quota error, usually) so the cause is readable without rerunning in debug mode.
+      - name: Why the review failed
+        if: failure() && steps.review.outcome == 'failure'
+        env:
+          OUT: ${{ steps.review.outputs.execution_file }}
+        run: |
+          f="${OUT:-$RUNNER_TEMP/claude-execution-output.json}"
+          if [ -f "$f" ]; then
+            msg=$(jq -r '[.[] | select(.type == "result")] | last | (.result // .error // "no message") | tostring' "$f" | head -c 400)
+            echo "::error::Claude said: $msg"
+          else
+            echo "::error::No output file from the review step."
+          fi
