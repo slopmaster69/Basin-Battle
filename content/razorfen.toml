@@ -351,8 +351,8 @@ text = "A bone and thorn charm every quillboar carries. The lamps' quartermaster
 [[item]]
 key = "roogug_mantle"
 name = "Roogug's Earthen Mantle"
-display = 5282
-icon = "INV_Shoulder_04"
+display = 4483
+icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.09
@@ -367,6 +367,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.1
 text = "Aggem's: thorns woven into the leather, points out."
+set = "thornweave"
 
 [[item]]
 key = "jargba_robe"
@@ -381,13 +382,14 @@ text = "Jargba's: it whispers in quillboar when the wind is right."
 [[item]]
 key = "ramtusk_helm"
 name = "Ramtusk's Tusked Helm"
-display = 4180
+display = 15286
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "The Overlord's: two great tusks bolted to a mail cap."
+set = "thornweave"
 
 [[item]]
 key = "agathelos_hide"
@@ -399,38 +401,42 @@ slot = "chest"
 reduce = 0.14
 weight = 0.02
 text = "The Raging boar's hide: bristles still on it, and they still bristle."
+set = "thornweave"
 
 [[item]]
 key = "charlga_mantle"
 name = "Charlga's Thornweave Mantle"
-display = 2539
-icon = "INV_Shoulder_06"
+display = 5003
+icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.12
 weight = 0.01
 text = "Woven of Agamaggan's own thorns. Charlga wore it to speak for him."
+set = "thornweave"
 
 [[item]]
 key = "agamaggan_tusk_helm"
 name = "Helm of the Great Boar"
-display = 4145
+display = 15340
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.15
 weight = 0.04
 text = "Hammered round a shard of Agamaggan's own tusk. It is heavy with something more than its weight."
+perks = [{ kind = "might", amount = 0.06 }]
 
 [[item]]
 key = "halmgar_mantle"
 name = "Earthcaller's Mantle"
-display = 5944
-icon = "INV_Shoulder_01"
+display = 4593
+icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
 text = "Halmgar's: stones sewn on in circles."
+perks = [{ kind = "regen", amount = 0.003 }]
 
 # --- the quillboar ----------------------------------------------------------------------------------------
 
@@ -866,7 +872,7 @@ boss = true
 posture = 300
 drops = { thorn_fetish = [22, 28] }
 trophy = { ramtusk_helm = 1 }
-gear = ["ramtusk_helm"]
+gear = ["ramtusk_helm", "corpsemaker"]
 respawn = 0.0
   [mob.attack]
   windup = 0.85
@@ -981,7 +987,7 @@ posture = 260
 keep_away = 6.0
 drops = { thorn_fetish = [30, 40] }
 trophy = { charlga_mantle = 1 }
-gear = ["charlga_mantle"]
+gear = ["charlga_mantle", "thornspike"]
 respawn = 0.0
 # Whoever touched Agamaggan's shrine finds the Great Boar speaking for himself.
 then = "rk_avatar"
@@ -1157,3 +1163,57 @@ respawn = 0.0
   text = "The circles on the floor flare white."
   shove = 5.0
   look = 26271
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "thornweave"
+name = "Thornweave"
+bonus = [ { pieces = 2, kind = "ward", amount = 0.03 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
+
+[[weapon]]
+key = "thornspike"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [12, 16]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 3.6
+
+[[item]]
+key = "thornspike"
+name = "Thornspike"
+display = 2694
+icon = "INV_Weapon_ShortBlade_05"
+kind = "weapon"
+text = "Charlga's: a thorn of Agamaggan himself, filed to a point."
+perks = [{ kind = "stamina", amount = 0.06 }]
+
+[[weapon]]
+key = "corpsemaker"
+windup = 0.5
+active = 0.16
+recovery = 0.55
+stamina = 22.0
+damage = [46, 57]
+range = 3.6
+arc = 140.0
+targets = 3
+stagger = 1.0
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 1
+
+[[item]]
+key = "corpsemaker"
+name = "Corpsemaker"
+display = 8499
+icon = "INV_Axe_10"
+kind = "weapon"
+text = "Ramtusk's: the quillboar named it, and meant it."
+perks = [{ kind = "might", amount = 0.03 }]

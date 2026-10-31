@@ -425,13 +425,14 @@ text = "A red stone the Searing Blade carry as their mark. The lamps' quartermas
 [[item]]
 key = "oggleflint_mantle"
 name = "Oggleflint's Stone Mantle"
-display = 5944
-icon = "INV_Shoulder_01"
+display = 3871
+icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.09
 weight = 0.02
 text = "The trogg chief's: chips of the chasm's rock, lashed on with gut."
+set = "searing"
 
 [[item]]
 key = "bazzalan_legs"
@@ -442,6 +443,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.1
 text = "Cut from something with hooves. Don't ask what."
+set = "searing"
 
 [[item]]
 key = "jergosh_robe"
@@ -452,17 +454,19 @@ kind = "armor"
 slot = "chest"
 reduce = 0.09
 text = "Jergosh's: the hem scorched where the Heart answered him."
+set = "searing"
 
 [[item]]
 key = "taragaman_helm"
 name = "The Hungerer's Horned Helm"
-display = 4180
+display = 15276
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "A mail cap with a demon's horn bolted to it. Taragaman wore it as a joke. It isn't funny."
+set = "searing"
 
 [[item]]
 key = "ember_breastplate"
@@ -474,17 +478,19 @@ slot = "chest"
 reduce = 0.2
 weight = 0.05
 text = "Mail forged in the Heart of Ragefire's own fire: still warm, and harder than it looks."
+perks = [{ kind = "regen", amount = 0.004 }]
 
 [[item]]
 key = "maur_mantle"
 name = "Maur's Grimtotem Mantle"
-display = 5282
-icon = "INV_Shoulder_04"
+display = 4942
+icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.11
 weight = 0.01
 text = "Painted Grimtotem colours. Maur came down here hunting the cult; the fire got him first."
+perks = [{ kind = "stamina", amount = 0.08 }]
 
 # --- the cave's dwellers --------------------------------------------------------------------------------
 
@@ -831,7 +837,7 @@ boss = true
 posture = 200
 drops = { searing_token = [18, 24] }
 trophy = { bazzalan_legs = 1 }
-gear = ["bazzalan_legs"]
+gear = ["bazzalan_legs", "bloodlust_edge"]
 respawn = 0.0
   [mob.attack]
   windup = 0.42
@@ -1041,7 +1047,7 @@ boss = true
 posture = 320
 drops = { searing_token = [30, 40] }
 trophy = { taragaman_helm = 1 }
-gear = ["taragaman_helm"]
+gear = ["taragaman_helm", "cursed_felblade"]
 respawn = 0.0
   [mob.attack]
   windup = 0.8
@@ -1162,3 +1168,51 @@ respawn = 0.0
   text = "\"Earthmother forgive me!\""
   shove = 6.0
   look = 26271
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "searing"
+name = "The Searing Blade's Regalia"
+bonus = [ { pieces = 2, kind = "focus", amount = 0.06 }, { pieces = 4, kind = "might", amount = 0.05 } ]
+
+[[weapon]]
+key = "cursed_felblade"
+windup = 0.26
+active = 0.1
+recovery = 0.32
+stamina = 11.0
+damage = [17, 23]
+range = 3.1
+arc = 95.0
+targets = 1
+subclass = 7
+
+[[item]]
+key = "cursed_felblade"
+name = "Cursed Felblade"
+display = 5158
+icon = "INV_Sword_19"
+kind = "weapon"
+text = "Taragaman's: a demon's blade, and it wants blood."
+perks = [{ kind = "might", amount = 0.05 }]
+
+[[weapon]]
+key = "bloodlust_edge"
+windup = 0.32
+active = 0.12
+recovery = 0.42
+stamina = 14.0
+damage = [19, 25]
+range = 3.2
+arc = 110.0
+targets = 3
+subclass = 0
+
+[[item]]
+key = "bloodlust_edge"
+name = "Bloodlust Edge"
+display = 1455
+icon = "INV_Axe_03"
+kind = "weapon"
+text = "Bazzalan's: wide and hungry, three at a swing."

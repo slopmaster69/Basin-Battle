@@ -296,44 +296,48 @@ slot = "chest"
 reduce = 0.24
 weight = 0.08
 text = "Mograine's: red plate, and it's been through more deaths than yours will."
+set = "crusader"
 
 [[item]]
 key = "whitemane_mantle"
 name = "Whitemane's Mantle"
-display = 2539
-icon = "INV_Shoulder_06"
+display = 22867
+icon = "INV_Shoulder_30"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
 text = "The High Inquisitor's: you feel, faintly, that someone wants you to get up again."
+set = "crusader"
 
 [[item]]
 key = "fairbanks_helm"
 name = "Fairbanks's Crusader Helm"
-display = 4180
+display = 15393
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.13
 weight = 0.03
 text = "The Inquisitor's helm, worn over what's left of him."
+set = "crusader"
 
 [[item]]
 key = "ashen_legs"
 name = "Ashen Legplates"
-display = 3414
+display = 24163
 icon = "INV_Pants_04"
 kind = "armor"
 slot = "legs"
 reduce = 0.14
 weight = 0.03
 text = "Scorched by the Ashbringer's shadow. They smell of a great fire, long ago."
+perks = [{ kind = "regen", amount = 0.004 }, { kind = "ward", amount = 0.02 }]
 
 [[item]]
 key = "abbot_robe"
 name = "Abbot's Robe"
-display = 12645
-icon = "INV_Chest_Cloth_24"
+display = 3562
+icon = "INV_Shirt_01"
 kind = "armor"
 slot = "chest"
 reduce = 0.09
@@ -625,7 +629,7 @@ boss = true
 posture = 200
 keep_away = 6.0
 drops = { scarlet_insignia = [14, 20] }
-gear = ["abbot_robe"]
+gear = ["abbot_robe", "sc_crusader_greaves"]
 respawn = 0.0
   [mob.attack]
   ranged = true
@@ -688,7 +692,7 @@ boss = true
 posture = 300
 drops = { scarlet_insignia = [20, 26] }
 trophy = { mograine_breastplate = 1 }
-gear = ["mograine_breastplate"]
+gear = ["mograine_breastplate", "mograines_might"]
 respawn = 0.0
 then = "sc_whitemane"
 then_after = 2.5
@@ -759,7 +763,7 @@ posture = 240
 keep_away = 6.0
 drops = { scarlet_insignia = [24, 30] }
 trophy = { whitemane_mantle = 1 }
-gear = ["whitemane_mantle"]
+gear = ["whitemane_mantle", "hand_of_righteousness"]
 respawn = 0.0
 # Whoever brought the memory of the Ashbringer from the reliquary sees Mograine rise a last time.
 then = "sc_ashen"
@@ -959,3 +963,68 @@ respawn = 0.0
   text = "Fairbanks laughs, and the laugh goes on too long."
   shove = 5.0
   look = 24050
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "crusader"
+name = "The Crusader's Raiment"
+bonus = [ { pieces = 2, kind = "ward", amount = 0.03 }, { pieces = 4, kind = "might", amount = 0.06 } ]
+
+[[item]]
+key = "sc_crusader_greaves"
+name = "Crusader's Greaves"
+display = 3441
+icon = "INV_Pants_03"
+kind = "armor"
+slot = "legs"
+reduce = 0.12
+weight = 0.02
+text = "The Abbot's: blessed, polished, and never once knelt in."
+set = "crusader"
+
+[[weapon]]
+key = "mograines_might"
+windup = 0.68
+active = 0.16
+recovery = 0.78
+stamina = 29.0
+damage = [52, 64]
+range = 3.4
+arc = 120.0
+targets = 3
+stagger = 1.3
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 5
+
+[[item]]
+key = "mograines_might"
+name = "Mograine's Might"
+display = 1726
+icon = "INV_Hammer_03"
+kind = "weapon"
+text = "Scarlet Commander Mograine's: the Crusade's hammer, and it falls like judgement."
+
+[[weapon]]
+key = "hand_of_righteousness"
+windup = 0.36
+active = 0.12
+recovery = 0.44
+stamina = 15.0
+damage = [18, 24]
+range = 3.0
+arc = 100.0
+targets = 1
+stagger = 0.85
+subclass = 4
+
+[[item]]
+key = "hand_of_righteousness"
+name = "Hand of Righteousness"
+display = 1461
+icon = "INV_Hammer_04"
+kind = "weapon"
+text = "Whitemane's: it mends the hand that holds it."
+perks = [{ kind = "regen", amount = 0.003 }]

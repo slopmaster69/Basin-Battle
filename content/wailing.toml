@@ -405,49 +405,53 @@ text = "A fang from one of the deviate things. The lamps' quartermaster in the W
 
 [[item]]
 key = "anacondra_mantle"
-name = "Anacondra's Serpent Mantle"
-display = 2539
-icon = "INV_Shoulder_06"
+name = "Anacondra's Circlet"
+display = 15321
+icon = "INV_Helmet_26"
 kind = "armor"
-slot = "shoulders"
+slot = "head"
 reduce = 0.09
-text = "Lady Anacondra's: shed skins, stitched in rows."
+text = "Lady Anacondra's: a band of woven vine and shed skin, the Fanglords' mark."
+set = "fanglord"
 
 [[item]]
 key = "cobrahn_helm"
-name = "Cobrahn's Hood"
-display = 3862
-icon = "INV_Helmet_04"
+name = "Cobrahn's Mantle"
+display = 22865
+icon = "INV_Shoulder_30"
 kind = "armor"
-slot = "head"
+slot = "shoulders"
 reduce = 0.08
 text = "Lord Cobrahn's: it smells of the low tunnel, and of snake."
+set = "fanglord"
 
 [[item]]
 key = "pythas_vest"
-name = "Pythas's Fang-Studded Vest"
-display = 10076
-icon = "INV_Chest_Leather_01"
+name = "Pythas's Leggings"
+display = 7182
+icon = "INV_Pants_03"
 kind = "armor"
-slot = "chest"
+slot = "legs"
 reduce = 0.12
 weight = 0.01
-text = "Lord Pythas's: leather studded with the fangs of the things he made."
+text = "Lord Pythas's: soft leggings for a druid who never stopped walking the Nightmare."
+set = "fanglord"
 
 [[item]]
 key = "serpentis_legs"
-name = "Serpentis's Scaled Leggings"
-display = 3414
-icon = "INV_Pants_04"
+name = "Serpentis's Fur Vest"
+display = 4100
+icon = "INV_Chest_Fur"
 kind = "armor"
-slot = "legs"
+slot = "chest"
 reduce = 0.11
-text = "Lord Serpentis's: scales that shift colour when you aren't looking."
+text = "Lord Serpentis's: green fur over scales that shift colour when you aren't looking."
+set = "fanglord"
 
 [[item]]
 key = "kresh_helm"
 name = "Kresh's Shell-Helm"
-display = 4417
+display = 15318
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
@@ -475,17 +479,19 @@ slot = "chest"
 reduce = 0.18
 weight = 0.03
 text = "Roots grown into the shape of a breastplate. It is still growing."
+perks = [{ kind = "regen", amount = 0.003 }]
 
 [[item]]
 key = "mutanus_mantle"
 name = "Mutanus's Scale Mantle"
-display = 3119
-icon = "INV_Shoulder_05"
+display = 9422
+icon = "INV_Shoulder_09"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.13
 weight = 0.02
 text = "Scales from the thing Naralex dreamed. They are cold, and they don't smell of anything at all."
+perks = [{ kind = "focus", amount = 0.08 }, { kind = "regen", amount = 0.002 }]
 
 [[item]]
 key = "faerie_mantle"
@@ -496,6 +502,7 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.08
 text = "Dusted with something that glitters. Now and then you see a flicker at the edge of your eye."
+perks = [{ kind = "focus", amount = 0.05 }]
 
 # --- the deviates ---------------------------------------------------------------------------------------
 
@@ -885,7 +892,7 @@ boss = true
 posture = 220
 drops = { deviate_fang = [16, 22] }
 trophy = { cobrahn_helm = 1 }
-gear = ["cobrahn_helm"]
+gear = ["cobrahn_helm", "cobrahn_fang"]
 respawn = 0.0
   [mob.attack]
   windup = 0.6
@@ -1186,7 +1193,7 @@ boss = true
 posture = 340
 drops = { deviate_fang = [30, 40] }
 trophy = { verdan_breastplate = 1 }
-gear = ["verdan_breastplate"]
+gear = ["verdan_breastplate", "thornroot_maul"]
 respawn = 0.0
 # Whoever read the disciple's journal meets what Naralex truly dreams.
 then = "wc_mutanus"
@@ -1346,3 +1353,56 @@ respawn = 0.0
   text = "The faerie dragon blinks out of sight and back, laughing."
   shove = 4.5
   look = 27808
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "fanglord"
+name = "The Fanglords' Vestments"
+bonus = [ { pieces = 2, kind = "regen", amount = 0.003 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
+
+[[weapon]]
+key = "cobrahn_fang"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [11, 15]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 3.4
+
+[[item]]
+key = "cobrahn_fang"
+name = "Cobrahn's Fang"
+display = 2709
+icon = "INV_Weapon_ShortBlade_03"
+kind = "weapon"
+text = "Lord Cobrahn's: a serpent's tooth on a hilt. Strike from behind."
+perks = [{ kind = "might", amount = 0.03 }]
+
+[[weapon]]
+key = "thornroot_maul"
+windup = 0.68
+active = 0.16
+recovery = 0.78
+stamina = 29.0
+damage = [50, 62]
+range = 3.4
+arc = 120.0
+targets = 3
+stagger = 1.25
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 5
+
+[[item]]
+key = "thornroot_maul"
+name = "Thornroot Maul"
+display = 1206
+icon = "INV_Hammer_03"
+kind = "weapon"
+text = "Verdan's: a root as thick as a man, and as hard as stone."

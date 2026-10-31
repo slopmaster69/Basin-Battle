@@ -893,3 +893,31 @@ fn a_lobbed_throw_is_marked_from_its_wind_up_and_takes_its_time_even_point_blank
     assert!(s.missiles.is_empty(), "down by now");
     assert_eq!(s.players[&id].health, full, "missed: the hero stepped out of the ring");
 }
+
+#[test]
+fn gear_gives_its_perks_while_on_and_a_set_more_for_its_pieces() {
+    use crate::content::{PerkDef, SetBonusDef, SetDef};
+    let mut c = content();
+    let jerkin = c.item("defias_jerkin").unwrap();
+    let legs = c.item("defias_leggings").unwrap();
+    c.items[jerkin].perks = vec![PerkDef { kind: "might".into(), amount: 0.05 }];
+    // (The content's own sets and perks off these two, a set of the test's own on them.)
+    c.items[jerkin].set = "test_set".into();
+    c.items[legs].set = "test_set".into();
+    c.items[legs].perks.clear();
+    c.sets.push(SetDef { key: "test_set".into(), name: "The Brotherhood's Garb".into(), bonus: vec![SetBonusDef { pieces: 2, kind: "stamina".into(), amount: 0.1 }] });
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    let fx = |s: &Survival, k: &str| s.effect_of(&s.players[&id], k);
+    assert_eq!(fx(&s, "might"), 0.0);
+    s.players.get_mut(&id).unwrap().armor.insert("chest".into(), jerkin);
+    assert!((fx(&s, "might") - 0.05).abs() < 1e-6, "the jerkin's perk, worn");
+    assert_eq!(fx(&s, "stamina"), 0.0, "one piece of the set: no bonus");
+    s.players.get_mut(&id).unwrap().armor.insert("legs".into(), legs);
+    assert!((fx(&s, "stamina") - 0.1).abs() < 1e-6, "two pieces: the set's bonus");
+    let words = s.gear_words(jerkin);
+    assert!(words.contains("+5% damage") && words.contains("The Brotherhood's Garb") && words.contains("2 pieces"), "{words}");
+    s.players.get_mut(&id).unwrap().armor.remove("chest");
+    assert_eq!(fx(&s, "might"), 0.0, "taken off: gone");
+    assert_eq!(fx(&s, "stamina"), 0.0);
+}

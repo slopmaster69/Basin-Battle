@@ -242,12 +242,13 @@ boss = "doan"
 [[item]]
 key = "loksey_legs"
 name = "Houndmaster's Leggings"
-display = 12388
-icon = "INV_Pants_06"
+display = 11619
+icon = "INV_Pants_02"
 kind = "armor"
 slot = "legs"
 reduce = 0.11
 text = "Loksey's: torn at the shins where the dogs jumped up."
+set = "arcanist"
 
 [[item]]
 key = "doan_robe"
@@ -258,17 +259,19 @@ kind = "armor"
 slot = "chest"
 reduce = 0.1
 text = "The Arcanist's: embroidered with wards that didn't keep him safe."
+set = "arcanist"
 
 [[item]]
 key = "tome_mantle"
 name = "Mantle of the Tome"
-display = 3119
-icon = "INV_Shoulder_05"
+display = 13672
+icon = "INV_Shoulder_23"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.14
 weight = 0.02
 text = "Torn from the thing that stepped off the page. The writing on it moves."
+perks = [{ kind = "might", amount = 0.07 }]
 
 # --- the Library's own -------------------------------------------------------------------------------------
 
@@ -364,7 +367,7 @@ boss = true
 posture = 240
 drops = { scarlet_insignia = [16, 22] }
 trophy = { loksey_legs = 1 }
-gear = ["loksey_legs"]
+gear = ["loksey_legs", "loksey_boar_spear"]
 respawn = 0.0
   [mob.attack]
   windup = 0.55
@@ -425,7 +428,7 @@ posture = 240
 keep_away = 8.0
 drops = { scarlet_insignia = [26, 34] }
 trophy = { doan_robe = 1 }
-gear = ["doan_robe"]
+gear = ["doan_robe", "sl_cowl", "hypnotic_blade"]
 respawn = 0.0
 # Whoever opened the Forbidden Tome finds out what Doan kept bound in it.
 then = "sl_fiend"
@@ -549,3 +552,77 @@ respawn = 0.0
   text = "It speaks a word from the Tome, and the shelves catch fire."
   shove = 6.5
   look = 27812
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "arcanist"
+name = "The Arcanist's Regalia"
+bonus = [ { pieces = 2, kind = "focus", amount = 0.06 }, { pieces = 4, kind = "focus", amount = 0.08 } ]
+
+[[item]]
+key = "sl_cowl"
+name = "Arcanist's Cowl"
+display = 14903
+icon = "INV_Helmet_04"
+kind = "armor"
+slot = "head"
+reduce = 0.07
+text = "Doan's: the wards stitched into it hum when a spell is near."
+set = "arcanist"
+
+[[item]]
+key = "sl_scholar_mantle"
+name = "Scholar's Mantle"
+display = 27759
+icon = "INV_Shoulder_08"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.08
+text = "The Crusade's scholars wore these to the last shelf. Few came back."
+set = "arcanist"
+
+[[weapon]]
+key = "hypnotic_blade"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [12, 16]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 3.5
+
+[[item]]
+key = "hypnotic_blade"
+name = "Hypnotic Blade"
+display = 2711
+icon = "INV_Weapon_ShortBlade_05"
+kind = "weapon"
+text = "Doan's: the light in it moves when you aren't looking."
+perks = [{ kind = "focus", amount = 0.06 }]
+
+[[weapon]]
+key = "loksey_boar_spear"
+windup = 0.42
+active = 0.12
+recovery = 0.55
+stamina = 20.0
+damage = [28, 36]
+range = 5.0
+arc = 50.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 38
+subclass = 6
+
+[[item]]
+key = "loksey_boar_spear"
+name = "Loksey's Boar Spear"
+display = 5636
+icon = "INV_Spear_06"
+kind = "weapon"
+text = "The Houndmaster's: long enough to keep a dog off, or a hero."

@@ -326,8 +326,8 @@ text = "Old Gilnean silver, struck with a moon. The lamps' quartermaster in Shad
 [[item]]
 key = "rethilgore_mantle"
 name = "Rethilgore's Pelt Mantle"
-display = 2539
-icon = "INV_Shoulder_06"
+display = 16079
+icon = "INV_Shoulder_23"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.09
@@ -346,13 +346,14 @@ text = "Razorclaw's: stained beyond saving, and stiff with it."
 [[item]]
 key = "silverlaine_helm"
 name = "Silverlaine's Family Helm"
-display = 4145
+display = 15334
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.13
 weight = 0.03
 text = "The Silverlaines' own, polished by a ghost every night for a hundred years."
+set = "shadowfang"
 
 [[item]]
 key = "springvale_breastplate"
@@ -368,8 +369,8 @@ text = "Commander Springvale's: a paladin's plate, tarnished black by what he se
 [[item]]
 key = "odo_hood"
 name = "Odo's Blindfold Hood"
-display = 3862
-icon = "INV_Helmet_04"
+display = 14958
+icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.08
@@ -384,49 +385,54 @@ kind = "armor"
 slot = "legs"
 reduce = 0.12
 text = "The Devourer's hide: thick enough to turn a blade."
+set = "shadowfang"
 
 [[item]]
 key = "nandos_mantle"
 name = "Wolf Master's Mantle"
-display = 5944
-icon = "INV_Shoulder_01"
+display = 14677
+icon = "INV_Shoulder_25"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.11
 weight = 0.01
 text = "Nandos's: wolf skulls stitched to the shoulders, for the pack to know him."
+set = "shadowfang"
 
 [[item]]
 key = "arugal_robe"
 name = "Arugal's Robe"
-display = 12694
-icon = "INV_Chest_Cloth_38"
+display = 21214
+icon = "INV_Shirt_01"
 kind = "armor"
 slot = "chest"
 reduce = 0.1
 text = "The Archmage's: Dalaran's violet, gone dark at the hem."
+set = "shadowfang"
 
 [[item]]
 key = "cursed_mantle"
 name = "Cursed Worgen Mantle"
-display = 3119
+display = 31124
 icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.14
 weight = 0.02
 text = "Torn from what Arugal became. It's warm, and it itches at the full moon."
+perks = [{ kind = "might", amount = 0.06 }]
 
 [[item]]
 key = "deathsworn_helm"
 name = "Deathsworn Captain's Helm"
-display = 4417
+display = 15299
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "The dead captain's helm. It is very cold."
+perks = [{ kind = "ward", amount = 0.03 }]
 
 # --- the keep's dwellers --------------------------------------------------------------------------------
 
@@ -765,7 +771,7 @@ boss = true
 posture = 260
 drops = { moonsilver = [20, 26] }
 trophy = { silverlaine_helm = 1 }
-gear = ["silverlaine_helm"]
+gear = ["silverlaine_helm", "barons_scepter"]
 respawn = 0.0
   [mob.attack]
   windup = 0.55
@@ -1131,7 +1137,7 @@ leash = 40.0
 boss = true
 posture = 300
 drops = { moonsilver = [50, 60] }
-gear = ["cursed_mantle"]
+gear = ["cursed_mantle", "meteor_shard"]
 respawn = 0.0
   [mob.attack]
   windup = 0.5
@@ -1191,7 +1197,7 @@ block = 0.45
 boss = true
 posture = 260
 drops = { moonsilver = [22, 28] }
-gear = ["deathsworn_helm"]
+gear = ["deathsworn_helm", "guillotine_axe"]
 respawn = 0.0
   [mob.attack]
   windup = 0.6
@@ -1226,3 +1232,79 @@ respawn = 0.0
   text = "The dead captain's sword glows cold blue."
   shove = 5.0
   look = 27808
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "shadowfang"
+name = "Shadowfang Regalia"
+bonus = [ { pieces = 2, kind = "might", amount = 0.04 }, { pieces = 4, kind = "regen", amount = 0.004 } ]
+
+[[weapon]]
+key = "barons_scepter"
+windup = 0.36
+active = 0.12
+recovery = 0.44
+stamina = 15.0
+damage = [19, 25]
+range = 3.0
+arc = 100.0
+targets = 1
+stagger = 0.95
+subclass = 4
+parry = 0.08
+
+[[item]]
+key = "barons_scepter"
+name = "Baron's Scepter"
+display = 1774
+icon = "INV_Mace_01"
+kind = "weapon"
+text = "Silverlaine's: a nobleman's mace, and a nobleman's guard."
+perks = [{ kind = "ward", amount = 0.02 }]
+
+[[weapon]]
+key = "guillotine_axe"
+windup = 0.5
+active = 0.16
+recovery = 0.55
+stamina = 22.0
+damage = [44, 55]
+range = 3.6
+arc = 140.0
+targets = 3
+stagger = 1.0
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 1
+
+[[item]]
+key = "guillotine_axe"
+name = "Guillotine Axe"
+display = 8502
+icon = "INV_Axe_17"
+kind = "weapon"
+text = "The Deathsworn Captain's: it has taken heads, and it remembers each one."
+
+[[weapon]]
+key = "meteor_shard"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [13, 17]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 4.0
+
+[[item]]
+key = "meteor_shard"
+name = "Meteor Shard"
+display = 2707
+icon = "INV_Weapon_ShortBlade_05"
+kind = "weapon"
+text = "Torn from cursed Arugal: still warm from wherever it fell."
+perks = [{ kind = "focus", amount = 0.08 }]

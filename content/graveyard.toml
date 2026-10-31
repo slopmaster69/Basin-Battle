@@ -284,44 +284,48 @@ text = "Dust from the Crusade's graves. The lamps' quartermaster in the Graveyar
 [[item]]
 key = "vishas_hood"
 name = "The Interrogator's Hood"
-display = 3862
+display = 14903
 icon = "INV_Helmet_04"
 kind = "armor"
 slot = "head"
 reduce = 0.08
 text = "Vishas's: it's seen a great deal it shouldn't have."
+set = "gravewarden"
 
 [[item]]
 key = "ironspine_mantle"
 name = "Ironspine's Bone Mantle"
-display = 3119
-icon = "INV_Shoulder_05"
+display = 1060
+icon = "INV_Shoulder_02"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.11
 weight = 0.02
 text = "Vertebrae bound with iron wire. They creak when you turn your head."
+set = "gravewarden"
 
 [[item]]
 key = "thalnos_robe"
 name = "Bloodmage's Robe"
-display = 12654
-icon = "INV_Chest_Cloth_40"
+display = 7905
+icon = "INV_Shirt_Black_01"
 kind = "armor"
 slot = "chest"
 reduce = 0.1
 text = "Thalnos's: dyed with something that isn't dye."
+set = "gravewarden"
 
 [[item]]
 key = "champion_legs"
 name = "Fallen Champion's Legguards"
-display = 3414
-icon = "INV_Pants_04"
+display = 4617
+icon = "INV_Pants_01"
 kind = "armor"
 slot = "legs"
 reduce = 0.12
 weight = 0.02
 text = "The champion's: they remember a better death than his."
+set = "gravewarden"
 
 [[item]]
 key = "azshir_mantle"
@@ -332,17 +336,19 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.1
 text = "Azshir's: you won't sleep well in it either."
+perks = [{ kind = "focus", amount = 0.05 }]
 
 [[item]]
 key = "rider_helm"
 name = "The Rider's Hollow Helm"
-display = 4145
-icon = "INV_Helmet_03"
+display = 15508
+icon = "INV_Helmet_16"
 kind = "armor"
 slot = "head"
 reduce = 0.15
 weight = 0.03
 text = "There was never a head in it. On Hallow's End you can hear it laugh."
+perks = [{ kind = "might", amount = 0.07 }]
 
 # --- the dead and their keepers -----------------------------------------------------------------------
 
@@ -637,7 +643,7 @@ boss = true
 posture = 320
 drops = { grave_dust = [18, 24] }
 trophy = { ironspine_mantle = 1 }
-gear = ["ironspine_mantle"]
+gear = ["ironspine_mantle", "ironspine_fist"]
 respawn = 0.0
   [mob.attack]
   windup = 0.95
@@ -783,7 +789,7 @@ grip = "1h"
 boss = true
 posture = 320
 drops = { grave_dust = [50, 60] }
-gear = ["rider_helm"]
+gear = ["rider_helm", "horsemans_scythe"]
 respawn = 0.0
   [mob.attack]
   windup = 0.55
@@ -844,7 +850,7 @@ grip = "2h"
 boss = true
 posture = 280
 drops = { grave_dust = [22, 28] }
-gear = ["champion_legs"]
+gear = ["champion_legs", "champions_greatsword"]
 respawn = 0.0
   [mob.attack]
   windup = 0.9
@@ -936,3 +942,78 @@ respawn = 0.0
   text = "\"Sleep... I want to SLEEP!\""
   shove = 5.0
   look = 27812
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "gravewarden"
+name = "The Gravewarden's Shroud"
+bonus = [ { pieces = 2, kind = "regen", amount = 0.003 }, { pieces = 4, kind = "ward", amount = 0.04 } ]
+
+[[weapon]]
+key = "ironspine_fist"
+windup = 0.36
+active = 0.12
+recovery = 0.44
+stamina = 15.0
+damage = [20, 26]
+range = 3.0
+arc = 100.0
+targets = 1
+stagger = 1.0
+subclass = 4
+
+[[item]]
+key = "ironspine_fist"
+name = "Ironspine's Fist"
+display = 2047
+icon = "INV_Mace_01"
+kind = "weapon"
+text = "Ironspine's: bone grown around iron. It breaks guards."
+
+[[weapon]]
+key = "horsemans_scythe"
+windup = 0.42
+active = 0.12
+recovery = 0.55
+stamina = 20.0
+damage = [30, 38]
+range = 5.0
+arc = 80.0
+targets = 3
+two_handed = true
+guard = "haft_guard"
+emote = 38
+subclass = 6
+
+[[item]]
+key = "horsemans_scythe"
+name = "The Horseman's Scythe"
+display = 5637
+icon = "INV_Spear_06"
+kind = "weapon"
+text = "The Headless Rider's: long, cruel, and it never stops swinging."
+perks = [{ kind = "might", amount = 0.05 }]
+
+[[weapon]]
+key = "champions_greatsword"
+windup = 0.5
+active = 0.18
+recovery = 0.6
+stamina = 24.0
+damage = [36, 46]
+range = 3.8
+arc = 160.0
+targets = 4
+two_handed = true
+guard = "blade_guard"
+emote = 37
+subclass = 8
+
+[[item]]
+key = "champions_greatsword"
+name = "Fallen Champion's Greatsword"
+display = 5176
+icon = "INV_Sword_15"
+kind = "weapon"
+text = "The Fallen Champion's: it fought for the Crusade once."
