@@ -67,7 +67,9 @@ they cover. CI runs the rest on every pull request.
 
 The end-to-end tests (`crates/htl-server/tests/`) play against the server in real time, so on a
 busy machine a timing test can fail on its own (a parry window missed, a flash not seen in time).
-Rerun that test alone before deciding your change broke it.
+Rerun that test alone before deciding your change broke it. In CI they run in their own job,
+"End-to-end, real time", which retries a failure twice and doesn't block a merge by itself; if
+it lists a test as flaky or failing, open an issue for it rather than ignoring it.
 
 ## Areas that need extra care
 
