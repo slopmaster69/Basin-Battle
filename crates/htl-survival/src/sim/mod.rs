@@ -202,6 +202,10 @@ pub enum Event {
     Announce { text: String },
     /// A big banner for everyone (or one hero).
     Banner { player: Option<Id>, title: String, sub: String },
+    /// A page for one hero to read at leisure (a note, a secret found, the book's record of a
+    /// dungeon): stays up till closed. `kind` is note, secret or lore; `text`'s paragraphs are
+    /// split by blank lines; `links` are (command, label) to read on.
+    Letter { player: Id, kind: String, title: String, place: String, text: String, clue: String, links: Vec<(String, String)> },
     /// A blow coming at a hero that no guard stops (dodge it): warned for its wind-up.
     /// A blow no guard stops on its way to `player` for `secs`; `from` the creature winding it up
     /// (its weapon goes red), none for a hazard or a spell's ground.
@@ -1636,10 +1640,13 @@ impl Survival {
             ObjKind::Door { key } => {
                 let d = c.dungeon.as_ref().and_then(|d| d.doors.iter().find(|x| &x.key == key))?;
                 match d.kind.as_str() {
-                    // A fog or a gate is only its veil; a hidden spot is nothing to see.
-                    "fog" | "gate" | "hidden" => return None,
-                    // A false wall stands till it gives way.
-                    "illusory" if self.door_is_open(key) => return None,
+                    // A fog or a gate is only its veil.
+                    "fog" | "gate" => return None,
+                    // A hidden spot is its marker, searched till it gives its secret up (then cleared
+                    // aside for what it kept, as a false wall gives way).
+                    "hidden" | "illusory" if self.door_is_open(key) => return None,
+                    // A secret looks like what it hides behind.
+                    "hidden" | "illusory" if !d.look.is_empty() => (d.display, d.scale, d.look.clone(), true),
                     "lift" => (if d.display != 0 { d.display } else { LEVER_DISPLAY }, d.scale, d.name.clone(), true),
                     _ => (d.display, d.scale, d.name.clone(), true),
                 }
@@ -1655,7 +1662,10 @@ impl Survival {
                 let d = c.dungeon.as_ref().and_then(|d| d.doors.iter().find(|x| &x.key == key))?;
                 (if d.display != 0 { d.display } else { LEVER_DISPLAY }, d.scale, d.name.clone(), true)
             }
-            ObjKind::Strongbox { .. } => (STRONGBOX_DISPLAY, 1.0, "Defias Strongbox".to_string(), true),
+            ObjKind::Strongbox { key } => {
+                let name = c.dungeon.as_ref().and_then(|d| d.boxes.iter().find(|b| &b.key == key)).map_or(String::new(), |b| b.name.clone());
+                (STRONGBOX_DISPLAY, 1.0, if name.is_empty() { "Defias Strongbox".to_string() } else { name }, true)
+            }
             ObjKind::Chest { def, spent } => {
                 let d = &c.chests[*def];
                 (d.display, d.scale, d.name.clone(), !spent)

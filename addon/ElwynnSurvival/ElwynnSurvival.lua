@@ -155,6 +155,8 @@ local function Say(text)
     SendChatMessage(text, "SAY")
   end
 end
+-- (For the add-on's other files.)
+ES.Say, ES.Split, ES.Play = Say, Split, Play
 
 local function Tex(parent, layer, file, w, h)
   local t = parent:CreateTexture(nil, layer)
@@ -1381,6 +1383,7 @@ local function WindowMode()
     ES.SetMode("cursor")
   end
 end
+ES.WindowMode = WindowMode
 
 -- The windows that want the cursor: while any is up the mouse doesn't steer.
 local CURSOR_FRAMES = {
@@ -1390,6 +1393,7 @@ local CURSOR_FRAMES = {
   "SpellBookFrame", "LootFrame", "MerchantFrame", "GossipFrame", "QuestFrame", "TradeFrame",
   "KeyBindingFrame", "OptionsFrame", "SoundOptionsFrame", "UIOptionsFrame", "HelpFrame",
   "StaticPopup1", "StaticPopup2", "ItemTextFrame", "MailFrame", "BankFrame", "TaxiFrame",
+  "ElwynnSurvivalLetter",
 }
 
 local function CursorWanted()
@@ -3390,11 +3394,12 @@ local msg = Fader("ElwynnSurvivalMessage", 640, 24, 0.5)
 msg:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 236)
 msg.text = Text(msg, FONT_BODY, 14, "OUTLINE")
 msg.text:SetPoint("CENTER", msg, "CENTER", 0, 0)
+msg.text:SetWidth(620)
 msg.text:SetTextColor(1, 0.9, 0.65)
 
 function ES.Message(text)
   msg.text:SetText(ES.Keyed and ES.Keyed(text) or text)
-  msg.untilT = GetTime() + 2.6
+  msg.untilT = GetTime() + 2.6 + math.min(4, string.len(text or "") / 40)
   msg:SetAlpha(1)
   msg:Show()
 end
@@ -3855,6 +3860,7 @@ function ES.CloseWindows()
   if win:IsShown() then
     win:Hide()
   end
+  if ES.letter and ES.letter:IsShown() then ES.letter:Hide() end
   if ES.tree then ES.tree:Hide() end
   ES.confirm:Hide()
 end
@@ -4293,18 +4299,34 @@ function ES.BookDraw()
       return
     end
     Rest(info[2] or "?", info[9] or "", "")
+    -- (A server that keeps the book's record of secrets and notes sends their tallies.)
+    local top = 1
+    if info[11] then
+      top = 2
+      local found, all, read, notes = tonumber(info[10]) or 0, tonumber(info[11]) or 0, tonumber(info[12]) or 0, tonumber(info[13]) or 0
+      Row(2, {
+        icon = "INV_Misc_Note_02",
+        lit = found > 0 or read > 0,
+        name = "Secrets and Notes",
+        tag = found .. " of " .. all .. " secrets",
+        sub = read .. " of " .. notes .. " notes read",
+        go = "Read",
+        cmd = ".es lore " .. pick,
+        detail = "What's been found down there, the rumours of what hasn't (from the notes read), and every note, to read again.",
+      })
+    end
     local pages = {}
     local items = Items(d[2])
     for i = 1, table.getn(items) do
       local f = Split(items[i], "~")
       if (f[3] or "deadmines") == pick then table.insert(pages, f) end
     end
-    local first = PageOf("book", table.getn(pages), LIST_ROWS - 1)
-    for i = 1, LIST_ROWS - 1 do
+    local first = PageOf("book", table.getn(pages), LIST_ROWS - top)
+    for i = 1, LIST_ROWS - top do
       local f = pages[first + i]
       if not f then break end
       local n = first + i
-      Row(i + 1, {
+      Row(i + top, {
         icon = n == 1 and "INV_Misc_Map_01" or "Spell_Fire_Fire",
         name = f[2] or "?",
         tag = "Page " .. n,
@@ -5827,6 +5849,8 @@ function ES.Line(line)
     if ActionDash then ActionDash(tonumber(f[2]) or 0.3, tonumber(f[3]) or 20, "f") end
   elseif verb == "T" then
     ES.Message(f[2] or "")
+  elseif verb == "NT" then
+    if ES.Letter then ES.Letter(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "WD" then

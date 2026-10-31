@@ -56,6 +56,9 @@ facing = 4.7
 # A shelf in the far chamber that isn't a shelf: the Forbidden Tome.
 [[dungeon.door]]
 key = "forbidden_tome"
+display = 255
+look = "A Book in Rusted Chains"
+scale = 1.3
 name = "The Forbidden Tome"
 kind = "hidden"
 at = [137.5, -426.5, 18.5]
@@ -65,12 +68,15 @@ text = "behind the last shelf in the far chamber: a book chained shut, and the c
 
 [[dungeon.box]]
 key = "tome_cache"
+name = "Scarlet Coffer"
 at = [138.5, -428.5, 18.5]
 facing = 1.5
 loot = { draught_flask = 1, scarlet_insignia = 14 }
 
 [[dungeon.note]]
 key = "doan_warning"
+display = 220
+scale = 1.3
 name = "Doan's Note in the Margin"
 at = [136.5, -424.5, 18.5]
 facing = 1.5
@@ -79,6 +85,8 @@ text = "\"The Tome binds what it holds only while it is shut and I live. Should 
 # The kennel's back: Loksey's private store.
 [[dungeon.door]]
 key = "kennel_store"
+display = 696
+look = "Sacks of Hound Feed"
 name = "The Kennel's Back Room"
 kind = "hidden"
 at = [185.6, -270.6, 18.6]
@@ -88,6 +96,7 @@ text = "behind the kennels, a store room: the Houndmaster's own, and a good deal
 
 [[dungeon.box]]
 key = "kennel_box"
+name = "Scarlet Coffer"
 at = [185.0, -273.0, 18.6]
 facing = 0.0
 loot = { scarlet_insignia = 16, tonic = 1, whetstone = 1 }
@@ -96,10 +105,14 @@ loot = { scarlet_insignia = 16, tonic = 1, whetstone = 1 }
 
 [[dungeon.note]]
 key = "library_rules"
+hints = ["forbidden_tome", "kennel_store"]
+clue = "No one goes near the last shelf of the far chamber; the Houndmaster keeps a store room behind the kennels."
+display = 220
+scale = 1.3
 name = "The Library's Rules"
 at = [233.4, -162.5, 18.7]
 facing = 3.9
-text = "\"No novice past the reading rooms. No one at all near the last shelf of the far chamber, by order of the Arcanist. The dogs are not to be fed by hand.\""
+text = "\"No novice past the reading rooms. No one at all near the last shelf of the far chamber, by order of the Arcanist. The dogs are not to be fed by hand, and the store room behind the kennels is the Houndmaster's own: keep out of it.\""
 
 # --- the Crusade -------------------------------------------------------------------------------------
 
@@ -727,6 +740,9 @@ wake = "kennel_box"
 # still keeps it, and two wardens wait by his strongbox for anyone who'd open it.
 [[dungeon.door]]
 key = "restricted_section"
+display = 107
+look = "A Stack of Overdue Books"
+scale = 1.3
 name = "The Restricted Section"
 kind = "hidden"
 at = [127.0, -257.0, 18.6]
@@ -736,12 +752,17 @@ text = "the west wing, past a rope across the door: the Restricted Section. Some
 
 [[dungeon.box]]
 key = "restricted_cache"
+name = "Scarlet Coffer"
 at = [122.0, -252.0, 18.5]
 facing = 0.8
 loot = { draught_flask = 1, scarlet_insignia = 18, whetstone = 1 }
 
 [[dungeon.note]]
 key = "late_returns"
+hints = ["restricted_section"]
+clue = "The Archivist keeps the west wing, past the rope across its door."
+display = 164
+scale = 1.3
 name = "A Torn Requisition"
 at = [254.5, -330.5, 18.5]
 facing = 4.7
