@@ -678,7 +678,11 @@ impl SurvivalGame {
                     Some(ItemKind::Armor | ItemKind::Pack) => 2,
                     _ => 0,
                 };
-                let text = item.map_or("", |i| i.text.as_str());
+                let text = c.item(&key).map_or(String::new(), |i| {
+                    let extra = self.sim.gear_words(i);
+                    if extra.is_empty() { c.items[i].text.clone() } else { format!("{} {extra}", c.items[i].text) }
+                });
+                let text = text.as_str();
                 let icon = item.map_or("", |i| i.icon.as_str());
                 if k > 0 {
                     line.push('^');

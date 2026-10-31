@@ -814,7 +814,7 @@ text = "Takes a tenth off every blow that lands, and weighs nothing to speak of.
 [[item]]
 key = "leather_cap"
 name = "Leather Cap"
-display = 1123
+display = 15289
 icon = "INV_Helmet_04"
 kind = "armor"
 slot = "head"
@@ -870,7 +870,7 @@ text = "The Warlord's helm: takes a tenth off every blow, and hardly slows the s
 [[item]]
 key = "bronze_helm"
 name = "Bronze Helm"
-display = 1132
+display = 15282
 icon = "INV_Helmet_02"
 kind = "armor"
 slot = "head"
@@ -7071,7 +7071,7 @@ text = "Wool and leather: a little off every blow."
 [[item]]
 key = "silver_helm"
 name = "Silver-Inlaid Helm"
-display = 3128
+display = 15285
 icon = "INV_Helmet_08"
 kind = "armor"
 slot = "head"

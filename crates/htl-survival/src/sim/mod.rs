@@ -1278,9 +1278,51 @@ impl Survival {
         p.armor.values().map(|i| self.content.items[*i].weight).sum::<f32>().clamp(0.0, 0.5)
     }
 
-    /// The strength of a lasting effect on a hero now (0: none).
+    /// The strength of a lasting effect on a hero now (0: none): what they drank or were given,
+    /// and what their gear gives (its perks, and its sets').
     pub fn effect_of(&self, p: &Player, kind: &str) -> f32 {
-        p.effects.iter().filter(|e| e.kind == kind && e.until > self.clock).map(|e| e.amount).sum()
+        p.effects.iter().filter(|e| e.kind == kind && e.until > self.clock).map(|e| e.amount).sum::<f32>() + self.gear_effect(p, kind)
+    }
+
+    /// What a hero's gear gives of one kind: each piece's perks (armor worn, the weapon or bow of
+    /// the kit in hand) and each set's bonuses for as many of its pieces as they have on.
+    pub fn gear_effect(&self, p: &Player, kind: &str) -> f32 {
+        let gear = self.gear_on(p);
+        let mut total: f32 = gear.iter().flat_map(|i| self.content.items[*i].perks.iter()).filter(|k| k.kind == kind).map(|k| k.amount).sum();
+        for s in &self.content.sets {
+            let n = gear.iter().filter(|i| self.content.items[**i].set == s.key).count();
+            total += s.bonus.iter().filter(|b| b.kind == kind && n >= b.pieces).map(|b| b.amount).sum::<f32>();
+        }
+        total
+    }
+
+    /// An item's perks and set in words (empty: none), for its tooltip after its own text.
+    pub fn gear_words(&self, item: usize) -> String {
+        let c = &self.content;
+        let d = &c.items[item];
+        let mut out = String::new();
+        if !d.perks.is_empty() {
+            let words: Vec<String> = d.perks.iter().map(|p| crate::content::perk_words(&p.kind, p.amount)).collect();
+            out.push_str(&format!("{}: {}.", if d.kind == ItemKind::Armor { "Worn" } else { "In hand" }, words.join(", ")));
+        }
+        if let Some(s) = c.sets.iter().find(|s| s.key == d.set) {
+            let n = c.items.iter().filter(|i| i.set == s.key).count();
+            let bonus: Vec<String> = s.bonus.iter().map(|b| format!("{} pieces: {}", b.pieces, crate::content::perk_words(&b.kind, b.amount))).collect();
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push_str(&format!("{} ({n} pieces). {}.", s.name, bonus.join("; ")));
+        }
+        out
+    }
+
+    /// The gear a hero has on: their armor, and the weapon of the kit in hand.
+    pub fn gear_on(&self, p: &Player) -> Vec<usize> {
+        let mut g: Vec<usize> = p.armor.values().copied().collect();
+        g.push(if p.kit == Kit::Bow { p.bow } else { p.weapon });
+        g.sort_unstable();
+        g.dedup();
+        g
     }
 
     /// The items a hero can use from the bags, in bag order.

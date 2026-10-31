@@ -326,8 +326,8 @@ text = "Old Gilnean silver, struck with a moon. The lamps' quartermaster in Shad
 [[item]]
 key = "rethilgore_mantle"
 name = "Rethilgore's Pelt Mantle"
-display = 2539
-icon = "INV_Shoulder_06"
+display = 16079
+icon = "INV_Shoulder_23"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.09
@@ -346,13 +346,14 @@ text = "Razorclaw's: stained beyond saving, and stiff with it."
 [[item]]
 key = "silverlaine_helm"
 name = "Silverlaine's Family Helm"
-display = 4145
+display = 15334
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.13
 weight = 0.03
 text = "The Silverlaines' own, polished by a ghost every night for a hundred years."
+set = "shadowfang"
 
 [[item]]
 key = "springvale_breastplate"
@@ -368,8 +369,8 @@ text = "Commander Springvale's: a paladin's plate, tarnished black by what he se
 [[item]]
 key = "odo_hood"
 name = "Odo's Blindfold Hood"
-display = 3862
-icon = "INV_Helmet_04"
+display = 14958
+icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.08
@@ -384,49 +385,54 @@ kind = "armor"
 slot = "legs"
 reduce = 0.12
 text = "The Devourer's hide: thick enough to turn a blade."
+set = "shadowfang"
 
 [[item]]
 key = "nandos_mantle"
 name = "Wolf Master's Mantle"
-display = 5944
-icon = "INV_Shoulder_01"
+display = 14677
+icon = "INV_Shoulder_25"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.11
 weight = 0.01
 text = "Nandos's: wolf skulls stitched to the shoulders, for the pack to know him."
+set = "shadowfang"
 
 [[item]]
 key = "arugal_robe"
 name = "Arugal's Robe"
-display = 12694
-icon = "INV_Chest_Cloth_38"
+display = 21214
+icon = "INV_Shirt_01"
 kind = "armor"
 slot = "chest"
 reduce = 0.1
 text = "The Archmage's: Dalaran's violet, gone dark at the hem."
+set = "shadowfang"
 
 [[item]]
 key = "cursed_mantle"
 name = "Cursed Worgen Mantle"
-display = 3119
+display = 31124
 icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.14
 weight = 0.02
 text = "Torn from what Arugal became. It's warm, and it itches at the full moon."
+perks = [{ kind = "might", amount = 0.06 }]
 
 [[item]]
 key = "deathsworn_helm"
 name = "Deathsworn Captain's Helm"
-display = 4417
+display = 15299
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "The dead captain's helm. It is very cold."
+perks = [{ kind = "ward", amount = 0.03 }]
 
 # --- the keep's dwellers --------------------------------------------------------------------------------
 
@@ -694,6 +700,19 @@ respawn = 0.0
   text = "Rethilgore howls, and the courtyard howls back."
   shove = 5.0
   look = 27812
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 24, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
 
 [[mob]]
 key = "sf_razorclaw"
@@ -747,6 +766,27 @@ respawn = 0.0
   text = "\"Fresh meat! Fresh MEAT!\""
   shove = 5.0
   look = 26271
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 31, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_silverlaine"
@@ -765,7 +805,7 @@ boss = true
 posture = 260
 drops = { moonsilver = [20, 26] }
 trophy = { silverlaine_helm = 1 }
-gear = ["silverlaine_helm"]
+gear = ["silverlaine_helm", "barons_scepter"]
 respawn = 0.0
   [mob.attack]
   windup = 0.55
@@ -808,6 +848,20 @@ respawn = 0.0
   text = "\"This keep was ours before the wolves. It will be ours after.\""
   shove = 5.0
   look = 27808
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_springvale"
@@ -868,6 +922,26 @@ respawn = 0.0
   text = "\"Judgement! JUDGEMENT!\""
   shove = 5.5
   look = 24050
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 27, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 27, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 42, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 32, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_odo"
@@ -924,6 +998,19 @@ respawn = 0.0
   text = "Odo's howl rises higher; worgen answer from all over the keep."
   summon = ["sf_darksoul", "sf_darksoul"]
   shove = 6.0
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 34, kit = 379, heavy = true, recovery = 1.1 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_fenrus"
@@ -980,6 +1067,27 @@ respawn = 0.0
   pattern = "devour"
   text = "Fenrus goes for your throat in a frenzy."
   shove = 5.0
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 26, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_nandos"
@@ -1030,6 +1138,27 @@ respawn = 0.0
   text = "\"More! Come to your master!\""
   summon = ["sf_wolfguard", "sf_worg"]
   shove = 5.5
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 29, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_arugal"
@@ -1131,7 +1260,7 @@ leash = 40.0
 boss = true
 posture = 300
 drops = { moonsilver = [50, 60] }
-gear = ["cursed_mantle"]
+gear = ["cursed_mantle", "meteor_shard"]
 respawn = 0.0
   [mob.attack]
   windup = 0.5
@@ -1172,6 +1301,14 @@ respawn = 0.0
   text = "It stops, for a moment, and looks at you with Arugal's eyes. Then it springs."
   shove = 6.0
   look = 27812
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 28, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_deathsworn"
@@ -1191,7 +1328,7 @@ block = 0.45
 boss = true
 posture = 260
 drops = { moonsilver = [22, 28] }
-gear = ["deathsworn_helm"]
+gear = ["deathsworn_helm", "guillotine_axe"]
 respawn = 0.0
   [mob.attack]
   windup = 0.6
@@ -1226,3 +1363,181 @@ respawn = 0.0
   text = "The dead captain's sword glows cold blue."
   shove = 5.0
   look = 27808
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 29, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 24, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "shadowfang"
+name = "Shadowfang Regalia"
+bonus = [ { pieces = 2, kind = "might", amount = 0.04 }, { pieces = 4, kind = "regen", amount = 0.004 } ]
+
+[[weapon]]
+key = "barons_scepter"
+windup = 0.36
+active = 0.12
+recovery = 0.44
+stamina = 15.0
+damage = [19, 25]
+range = 3.0
+arc = 100.0
+targets = 1
+stagger = 0.95
+subclass = 4
+parry = 0.08
+
+[[item]]
+key = "barons_scepter"
+name = "Baron's Scepter"
+display = 1774
+icon = "INV_Mace_01"
+kind = "weapon"
+text = "Silverlaine's: a nobleman's mace, and a nobleman's guard."
+perks = [{ kind = "ward", amount = 0.02 }]
+
+[[weapon]]
+key = "guillotine_axe"
+windup = 0.5
+active = 0.16
+recovery = 0.55
+stamina = 22.0
+damage = [44, 55]
+range = 3.6
+arc = 140.0
+targets = 3
+stagger = 1.0
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 1
+
+[[item]]
+key = "guillotine_axe"
+name = "Guillotine Axe"
+display = 8502
+icon = "INV_Axe_17"
+kind = "weapon"
+text = "The Deathsworn Captain's: it has taken heads, and it remembers each one."
+
+[[weapon]]
+key = "meteor_shard"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [13, 17]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 4.0
+
+[[item]]
+key = "meteor_shard"
+name = "Meteor Shard"
+display = 2707
+icon = "INV_Weapon_ShortBlade_05"
+kind = "weapon"
+text = "Torn from cursed Arugal: still warm from wherever it fell."
+perks = [{ kind = "focus", amount = 0.08 }]
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "sf_wolfguard"
+at = [-224.2, 2198.0]
+z = 77.0
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-222.8, 2214.0], [-221.5, 2228.0] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "sf_darksoul"
+at = [-240.0, 2270.0]
+z = 73.8
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-261.0, 2283.0], [-282.0, 2292.0] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "sf_darksoul"
+at = [-282.0, 2321.8]
+z = 95.9
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "sf_worg"
+at = [-211.8, 2258.4]
+z = 74.3
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "sf_moonwalker"
+at = [-229.9, 2134.0]
+z = 77.2
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "sf_moonwalker"
+at = [-286.0, 2296.0]
+z = 87.1
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "sf_moonwalker"
+at = [-187.0, 2130.0]
+z = 97.4
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "sf_darksoul"
+at = [-209.4, 2272.0]
+z = 73.9
+radius = 1.5
+count = 2
+link = 10.0
+wake = "larder_cache"

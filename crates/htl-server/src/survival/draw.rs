@@ -301,6 +301,12 @@ impl SurvivalGame {
             Some(stats) => format!("{} {stats}", d.text),
             None => d.text.clone(),
         };
+        // Its perks, and its set's bonuses, after its words.
+        let extra = self.sim.gear_words(i);
+        if !extra.is_empty() {
+            t.description.push(' ');
+            t.description.push_str(&extra);
+        }
         let mut stack = 1;
         match d.kind {
             ItemKind::Resource => {
@@ -347,7 +353,7 @@ impl SurvivalGame {
                 t.slot = slot;
                 t.material = if d.weight > 0.0 { 5 } else { 8 };
                 t.armor = (d.reduce * 1000.0).round() as u32;
-                t.quality = if d.reduce >= 0.15 { 2 } else { 1 };
+                t.quality = if d.reduce >= 0.15 || !d.perks.is_empty() { 2 } else { 1 };
             }
             ItemKind::Pack => {
                 t.item_class = 15;
@@ -365,6 +371,12 @@ impl SurvivalGame {
                 t.damage = Some((b.damage[0] as f32, b.damage[1] as f32));
                 t.delay_ms = ((b.draw_secs + b.recovery) * 1000.0) as u32;
             }
+        }
+        // A set's piece is rare (blue); a piece with a perk at least uncommon (green).
+        if !d.set.is_empty() {
+            t.quality = t.quality.max(3);
+        } else if !d.perks.is_empty() {
+            t.quality = t.quality.max(2);
         }
         Some((t, stack))
     }

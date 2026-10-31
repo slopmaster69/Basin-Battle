@@ -158,6 +158,77 @@ impl Assets {
         format!("display {id} icon {icon}{} model {model}", if ok { "" } else { " (ICON MISSING)" })
     }
 
+    /// What an NPC creature display wears, by body slot (head, shoulder, shirt, chest, belt,
+    /// pants, boots, wrist, gloves, tabard): item display ids, 0 empty. None: not a dressed NPC.
+    pub fn npc_gear(&self, creature_display: u32) -> Option<[u32; 10]> {
+        self.creatures.model(creature_display)?.npc_appearance.as_ref().map(|a| a.equipment)
+    }
+
+    /// Whether a helm display hides the hair under it for both men and women (its
+    /// `HelmetGeosetVisData` pair, read only when it has a model): else hair pokes through.
+    pub fn helm_hides_hair(&self, display: u32) -> bool {
+        self.items.get(display).and_then(|d| d.worn_helm_vis()).is_some_and(|v| v[0] != 0 && v[1] != 0)
+    }
+
+    /// A display's look in a few words: its model (shoulders, helms) or its textures (chest, legs).
+    pub fn display_look(&self, display: u32) -> String {
+        let Some(d) = self.items.get(display) else { return format!("{display}: NO ROW") };
+        let mut parts: Vec<String> = d.model.iter().flatten().take(1).map(|m| m.rsplit(['\\', '/']).next().unwrap_or(m).to_string()).collect();
+        parts.extend(d.region_textures.iter().flatten().take(2).cloned());
+        format!("{display} [{}]", parts.join(", "))
+    }
+
+    /// Helm displays built on the same model as `display` that hide the hair (both sexes), the
+    /// nearest id first: what to wear instead of an NPC's own helm, which may let hair through.
+    pub fn helms_like(&self, display: u32) -> Vec<u32> {
+        let Some(model) = self.items.get(display).and_then(|d| d.model[0].clone()) else { return Vec::new() };
+        let model = model.to_ascii_lowercase();
+        let mut v: Vec<u32> = self
+            .items
+            .iter()
+            .filter(|(id, d)| d.model[0].as_ref().is_some_and(|m| m.to_ascii_lowercase() == model) && self.helm_hides_hair(*id) && d.icon.as_ref().is_some_and(|i| self.icon_exists(i)))
+            .map(|(id, _)| id)
+            .collect();
+        v.sort_by_key(|id| (*id as i64 - display as i64).abs());
+        v
+    }
+
+    /// Item displays for a body slot whose model or textures hold `part` (cap 40): each with its
+    /// look, its icon, and (a helm) whether it hides the hair.
+    pub fn displays_wearing(&self, part: &str) -> Vec<String> {
+        let want = part.to_ascii_lowercase();
+        let mut out: Vec<(u32, String)> = self
+            .items
+            .iter()
+            .filter(|(_, d)| d.model.iter().flatten().chain(d.region_textures.iter().flatten()).any(|t| t.to_ascii_lowercase().contains(&want)))
+            .map(|(id, d)| {
+                let icon = d.icon.clone().unwrap_or_default();
+                let ok = self.icon_exists(&icon);
+                (id, format!("{} icon {}{}{}", self.display_look(id), icon.rsplit(['\\', '/']).next().unwrap_or(&icon), if ok { "" } else { " (ICON MISSING)" }, if d.model[0].as_ref().is_some_and(|m| m.to_ascii_lowercase().contains("helm")) { if self.helm_hides_hair(id) { " hides hair" } else { " HAIR SHOWS" } } else { "" }))
+            })
+            .collect();
+        out.sort();
+        out.into_iter().take(40).map(|(_, l)| l).collect()
+    }
+
+    /// Displays that look the same as `display` (the same model, or the same body textures) and
+    /// have an icon that's there: the one to give an item, so the bags show a picture.
+    pub fn twins(&self, display: u32) -> Vec<u32> {
+        let Some(d) = self.items.get(display) else { return Vec::new() };
+        let key = |x: &benilla_formats::ItemDisplay| -> (Option<String>, Vec<String>) {
+            (x.model[0].as_ref().map(|m| m.to_ascii_lowercase()), x.region_textures.iter().flatten().map(|t| t.to_ascii_lowercase()).collect())
+        };
+        let want = key(d);
+        let mut v: Vec<u32> = self
+            .items
+            .iter()
+            .filter(|(id, x)| *id != display && key(x) == want && x.icon.as_ref().is_some_and(|i| self.icon_exists(i)) && (d.model[0].is_none() || !d.model[0].as_ref().unwrap().to_ascii_lowercase().contains("helm") || self.helm_hides_hair(*id)))
+            .map(|(id, _)| id)
+            .collect();
+        v.sort_by_key(|id| (*id as i64 - display as i64).abs());
+        v
+    }
+
     /// The display's icon, if it has one that's there.
     pub fn display_icon(&self, id: u32) -> Option<String> {
         self.items.get(id).and_then(|d| d.icon.clone()).filter(|i| self.icon_exists(i))

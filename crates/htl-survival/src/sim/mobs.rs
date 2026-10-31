@@ -304,7 +304,7 @@ impl Survival {
             },
         );
         // An ambusher lies unseen until a hero comes near (or its chest is opened).
-        let hidden = pack.is_some_and(|k| self.content.packs[k].hidden > 0.0 || (!self.is_below() && !self.content.packs[k].wake.is_empty()));
+        let hidden = pack.is_some_and(|k| self.content.packs[k].hidden > 0.0 || !self.content.packs[k].wake.is_empty());
         if hidden {
             self.mobs.get_mut(&id).unwrap().hidden = true;
         } else {
