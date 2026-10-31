@@ -27,8 +27,13 @@ jobs:
             tools/addon-harness
       - name: Build the server
         run: cargo build --release -p htl-server
+      # The end-to-end tests (crates/htl-server/tests) play against a live server in real time:
+      # run in parallel on a small runner they starve each other and miss their timing windows, so
+      # those run one at a time; everything else runs in parallel as usual.
       - name: Tests
-        run: cargo test --release
+        run: |
+          cargo test --release --workspace --lib --bins
+          cargo test --release -p htl-server --tests -- --test-threads=1
       - name: Add-ons load and run without Lua errors
         run: |
           scripts/check-addon.sh | tee addon-check.txt
