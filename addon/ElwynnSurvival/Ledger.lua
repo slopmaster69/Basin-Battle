@@ -498,13 +498,19 @@ local function PocketSlot(s, inset)
   s.icon:ClearAllPoints()
   s.icon:SetPoint("TOPLEFT", s, "TOPLEFT", inset, -inset)
   s.icon:SetPoint("BOTTOMRIGHT", s, "BOTTOMRIGHT", -inset, inset)
+  -- The frame's outer edge trimmed off: its rim (px 2-9 of 64) then takes about 3 px of a 34 px
+  -- slot instead of 5, so it no longer hides the icon's edges.
+  local CROP = 0.06
   s.frame:SetTexture(A .. "micro_frame")
+  s.frame:SetTexCoord(CROP, 1 - CROP, CROP, 1 - CROP)
   Recolor(s.frame, function(r, g, b, a, t)
     if r and r > 0.95 then
       t:SetTexture(A .. "micro_frame_hover")
+      t:SetTexCoord(CROP, 1 - CROP, CROP, 1 - CROP)
       return 1, 1, 1, 1
     end
     t:SetTexture(A .. "micro_frame")
+    t:SetTexCoord(CROP, 1 - CROP, CROP, 1 - CROP)
     return 1, 1, 1, math.min(1, (a or 1) + 0.1)
   end)
   if type(s.key) == "table" then
@@ -971,18 +977,6 @@ local function SkinHud()
     end
   end
 
-  local gear = ElwynnSurvivalGear
-  if gear and not gear.ledger then
-    gear.ledger = true
-    gear.hub:SetTexture(A .. "seal_grey")
-    gear.hub:SetWidth(20)
-    gear.hub:SetHeight(20)
-    Recolor(gear.hub, function() return 1, 1, 1, 0.95 end)
-    for _, k in ipairs({ "up", "left", "right", "down" }) do PocketSlot(gear[k], 6) end
-    Cream(gear.weaponName, SERIF, 14)
-    Cream(gear.quickName, SERIF, 12)
-  end
-
   local bar = ElwynnSurvivalBar
   if bar and not bar.ledger then
     bar.ledger = true
@@ -1223,7 +1217,9 @@ L.SkinHud = SkinHud
 -- seal under it, its cooldown an ink wash; a seal at its shoulder while there's Valor for its
 -- charged-up version (grey while there isn't). Valor itself a gold brush stroke.
 
-local ROUNDEL, KEY_ICON = 56, 34
+-- The roundel sits behind the icon, so the whole icon shows (over it, its ring hid the corners),
+-- and at 50 it no longer runs into the next key's (keys are 50 apart).
+local ROUNDEL, KEY_ICON = 50, 34
 
 local function SkinKey(b)
   if not b or b.ledger then return end
@@ -1255,7 +1251,7 @@ local function SkinKey(b)
   b.well:SetWidth(KEY_ICON)
   b.well:SetHeight(KEY_ICON)
   b.well:SetPoint("CENTER", b, "CENTER", 0, 0)
-  b.roundel = Tex(b, "OVERLAY", "ability_roundel")
+  b.roundel = Tex(b, "BACKGROUND", "ability_roundel")
   b.roundel:SetWidth(ROUNDEL)
   b.roundel:SetHeight(ROUNDEL)
   b.roundel:SetPoint("CENTER", b, "CENTER", 0, 0)

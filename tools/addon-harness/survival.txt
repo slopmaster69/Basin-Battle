@@ -55,7 +55,7 @@ CF	raid	Ring the bell? 6 kobolds will march on the camp from the south-west road
 !table.insert(SAID, "confirm: " .. tostring(ElwynnSurvivalConfirm:IsShown()) .. " mode " .. ElwynnSurvival.mode)
 !ElwynnSurvivalConfirm.yes:GetScript("OnClick")()
 H	150	200	40	100	melee	Footman's Axe	5	16	34	-90	warning	12	6	0	2
-!table.insert(SAID, "reach icon " .. string.format("%.2f", ElwynnSurvivalVitals.reach:GetAlpha()) .. " health " .. ElwynnSurvivalVitals.healthText:GetText() .. " gear shown " .. tostring(ElwynnSurvivalGear:IsShown()))
+!table.insert(SAID, "reach icon " .. string.format("%.2f", ElwynnSurvivalVitals.reach:GetAlpha()) .. " health " .. ElwynnSurvivalVitals.healthText:GetText() .. " gear cross gone " .. tostring(ElwynnSurvivalGear == nil))
 H	150	200	40	100	melee	Footman's Axe	5	16	-1	0	active	0	4	1	0
 # The ability bar: five keys (defense and the ultimate empty), a cooldown, an EX version each.
 AB	ranged~aimed_throw~Aimed Throw~INV_ThrowingAxe_01~projectile~line~0.00~0.70~0.0~6.0~1~2~34.0~0.4~0~0~fan_of_axes~Fan of Axes~INV_ThrowingAxe_01~25~projectile~line~30.0~0.4~0~Throw a hand axe along the reticle. Charged, it flies farther and hits harder.~14–22 damage · 24–34 yd · charge up to 0.7 s · 6 s cooldown · 2 charges~Three axes at once in a spread.~3 × 12–18 damage · 24–30 yd · 25 Valor~1~warrior^close~sundering_blow~Sundering Blow~Ability_Warrior_Sunder~art~self~0.00~0.00~3.0~9.0~0~1~0.0~0.0~0~0~unstoppable_blow~Unstoppable Blow~Ability_Warrior_SavageBlow~25~art~self~0.0~0.0~150~A slow overhead that staggers.~220% weapon damage · 0.75 s wind-up · 28 stamina · 9 s cooldown~No guard stops it and no parry turns it.~240% weapon damage · 0.75 s wind-up · 28 stamina · 25 Valor~0~warrior^utility~charge~Charge~Ability_Warrior_Charge~dash~line~0.00~0.00~0.0~12.0~2~2~20.0~0.0~0~0~intercept~Intercept~Ability_Rogue_Sprint~25~dash~line~20.0~0.0~0~Dash along the reticle.~10 damage · 20 yd · 12 s cooldown~The Charge, and it stuns.~12 damage · 20 yd · 25 Valor~1~warrior^defense~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^ultimate~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -111,7 +111,7 @@ TR	1	Dev build: every card	aimed_throw~Aimed Throw~ranged~warrior~INV_ThrowingAx
 !ElwynnSurvival.Tree()
 !ElwynnSurvival.SetMode("action")
 H	120	200	5	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2	Kobold Brute	150	220	bow
-!table.insert(SAID, "foe: " .. tostring(ElwynnSurvivalFoe:IsShown()) .. " " .. tostring(ElwynnSurvivalFoe.name:GetText()) .. ", hurt edge " .. tostring(ElwynnSurvivalHurt:IsShown()) .. ", meals " .. tostring(ElwynnSurvivalGear.down.count:GetText()))
+!table.insert(SAID, "foe: " .. tostring(ElwynnSurvivalFoe:IsShown()) .. " " .. tostring(ElwynnSurvivalFoe.name:GetText()) .. ", hurt edge " .. tostring(ElwynnSurvivalHurt:IsShown()))
 WD
 HT	31	heavy	hit
 !table.insert(SAID, "hit marker " .. tostring(ElwynnSurvivalHit:IsShown()))
