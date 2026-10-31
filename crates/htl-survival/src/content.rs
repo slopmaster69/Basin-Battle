@@ -1010,6 +1010,10 @@ pub struct DoorDef {
     /// What a secret lays out once found: packs and strongboxes (by key), kept back till then.
     #[serde(default)]
     pub reveals: Vec<String>,
+    /// A `hidden` secret's marker, as it looks before anyone knows what it is (its `display` at
+    /// `at`): "A Heap of Sacks". Searched, it gives the secret up.
+    #[serde(default)]
+    pub look: String,
 }
 
 impl DoorDef {
@@ -1036,12 +1040,21 @@ pub struct NoteDef {
     #[serde(default = "one_f")]
     pub scale: f32,
     pub text: String,
+    /// The secrets (door keys) it points to, and a line of where, kept in the book's rumours
+    /// till they're found.
+    #[serde(default)]
+    pub hints: Vec<String>,
+    #[serde(default)]
+    pub clue: String,
 }
 
 /// A strongbox off the path: what it holds, once.
 #[derive(Debug, Clone, Deserialize)]
 pub struct BoxDef {
     pub key: String,
+    /// What it's called ("Defias Strongbox" by default).
+    #[serde(default)]
+    pub name: String,
     pub at: [f32; 3],
     #[serde(default)]
     pub facing: f32,
@@ -2602,7 +2615,10 @@ impl Content {
                     bail!("dungeon door {}: a shortcut needs `from`", dr.key);
                 }
                 if dr.kind == "hidden" && dr.find <= 0.0 {
-                    bail!("dungeon door {}: a hidden secret is found within `find` yards (above 0)", dr.key);
+                    bail!("dungeon door {}: a hidden secret is noticed within `find` yards (above 0)", dr.key);
+                }
+                if dr.kind == "hidden" && (dr.display == 0 || dr.look.is_empty()) {
+                    bail!("dungeon door {}: a hidden secret needs a marker to search (`display` and `look`)", dr.key);
                 }
                 for r in &dr.reveals {
                     if !pack_keys.contains(&r.as_str()) && !d.boxes.iter().any(|b| &b.key == r) && !d.notes.iter().any(|n| &n.key == r) {
@@ -2615,6 +2631,16 @@ impl Content {
                         dr.key,
                         dr.boss
                     );
+                }
+            }
+            for n in &d.notes {
+                for h in &n.hints {
+                    if !d.doors.iter().any(|dr| &dr.key == h && dr.secret()) {
+                        bail!("dungeon note {}: it hints at {h:?}, no secret of that key", n.key);
+                    }
+                }
+                if n.hints.is_empty() != n.clue.is_empty() {
+                    bail!("dungeon note {}: `hints` and `clue` go together", n.key);
                 }
             }
             if !d.exit_boss.is_empty() && !pack_keys.contains(&d.exit_boss.as_str()) {

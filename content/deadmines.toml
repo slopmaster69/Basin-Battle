@@ -2038,6 +2038,10 @@ reward = { roast = 4, linen = 4 }
 
 [[dungeon.note]]
 key = "smugglers_tally"
+hints = ["cookie_pantry"]
+clue = "Cookie's jar is kept in the little tent at the south end of the cove."
+display = 190
+scale = 1.3
 name = "A Smuggler's Tally"
 at = [-84.0, -939.0, 40.0]
 facing = 2.0
@@ -2045,6 +2049,10 @@ text = "\"Two crates salt pork, one keg rum, one jar of something for the cook. 
 
 [[dungeon.note]]
 key = "smite_orders"
+hints = ["vancleef_quarters"]
+clue = "VanCleef keeps quarters aft of the Juggernaut's mast, under the stern."
+display = 183
+scale = 1.3
 name = "Orders, Sealed in Red"
 at = [-8.0, -772.0, 9.5]
 facing = 1.0
@@ -2052,6 +2060,10 @@ text = "\"Smite: the Juggernaut is yours to guard. My quarters at the stern are 
 
 [[dungeon.note]]
 key = "gilnid_ledger"
+hints = ["johnson_seam"]
+clue = "Johnson went after a silver seam at the very back of the east lobe, past the pond."
+display = 105
+scale = 1.4
 name = "Gilnid's Ledger"
 at = [-247.0, -575.0, 51.1]
 facing = 3.0
@@ -2059,6 +2071,10 @@ text = "\"Silver out of the east lobe: none since the cave-in. Johnson swears th
 
 [[dungeon.note]]
 key = "miners_diary"
+hints = ["noble_cell"]
+clue = "Someone is kept at the back of the goblins' workshop, past the last of the sawhorses."
+display = 387
+scale = 1.4
 name = "A Miner's Diary"
 at = [-116.0, -402.0, 59.9]
 facing = 4.0
@@ -2066,6 +2082,10 @@ text = "\"They keep a man in the back of the goblins' workshop, past the last of
 
 [[dungeon.note]]
 key = "frosted_letter"
+hints = ["marisa_alcove"]
+clue = "The powder crates in the gallery's alcove are only stacked against a gap."
+display = 164
+scale = 1.3
 name = "A Frost-Rimed Letter"
 at = [-151.4, -587.1, 19.3]
 facing = 0.5
@@ -2077,12 +2097,14 @@ text = "\"Marisa -- if the Kingpin's men come for you, the powder crates in the 
 # him (in from the landing, down the beach and south).
 [[dungeon.door]]
 key = "cookie_pantry"
+display = 2890
+look = "A Heap of Sacks"
 name = "Cookie's Pantry"
 kind = "hidden"
 at = [-159.0, -908.0, 8.8]
 find = 4.0
 reveals = ["pantry"]
-text = "inside the little tent at the south end of the cove, under a heap of nets: Cookie's pantry, and a jar that wriggles."
+text = "inside the little tent at the south end of the cove, under a heap of sacks: Cookie's pantry, and a jar that wriggles."
 
 [[dungeon.box]]
 key = "pantry"
@@ -2093,15 +2115,19 @@ loot = { secret_ingredient = 1, plunder = 8 }
 # VanCleef's quarters, aft of the Juggernaut's mast: a letter, and his strongbox.
 [[dungeon.door]]
 key = "vancleef_quarters"
+display = 32
+look = "A Barrel Stencilled 'E. V.'"
 name = "VanCleef's Quarters"
 kind = "hidden"
 at = [-105.0, -818.0, 37.9]
 find = 4.0
 reveals = ["quarters", "vancleef_letter"]
-text = "aft of the mast, under the stern: VanCleef's quarters, and a letter he never sent."
+text = "aft of the mast, under the stern, a barrel stencilled E. V. rolls aside from a hatch: VanCleef's quarters, and a letter he never sent."
 
 [[dungeon.note]]
 key = "vancleef_letter"
+display = 164
+scale = 1.3
 name = "A Letter, Never Sent"
 at = [-106.0, -815.0, 37.8]
 facing = 1.5
@@ -2116,6 +2142,8 @@ loot = { draught_flask = 1, plunder = 20 }
 # The east lobe's back wall: a seam of silver, and Miner Johnson, who sealed himself in with it.
 [[dungeon.door]]
 key = "johnson_seam"
+display = 48
+look = "A Glint of Silver in the Rock"
 name = "Johnson's Seam"
 kind = "hidden"
 at = [-118.0, -450.0, 55.6]
@@ -2126,7 +2154,8 @@ text = "in the east lobe's back wall, a seam of silver dug out by hand, and the 
 # The powder crates across the cannon gallery's alcove.
 [[dungeon.door]]
 key = "marisa_alcove"
-name = "Stacked Powder Crates"
+name = "Marisa's Alcove"
+look = "Stacked Powder Crates"
 kind = "illusory"
 display = 31
 at = [-110.0, -615.0, 14.2]
@@ -2139,6 +2168,9 @@ text = "the crates are empty, and stacked across a gap: behind them, the alcove,
 # The back of the goblins' workshop, past the sawhorses: the noble they keep.
 [[dungeon.door]]
 key = "noble_cell"
+display = 181
+look = "A Chain Bolted to the Floor"
+scale = 1.2
 name = "The Back of the Workshop"
 kind = "hidden"
 at = [-300.0, -611.0, 47.6]

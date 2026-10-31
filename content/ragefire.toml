@@ -55,6 +55,9 @@ facing = 1.3
 # The deep chamber's far corner, up a slope nobody climbs: Jergosh's grimoire, hidden from his own.
 [[dungeon.door]]
 key = "jergosh_grimoire"
+display = 184
+look = "A Black Book, Warm to the Touch"
+scale = 1.4
 name = "The Invoker's Grimoire"
 kind = "hidden"
 at = [-306.0, -6.3, -52.5]
@@ -64,12 +67,15 @@ text = "up the slope in the deep chamber's corner: Jergosh's grimoire, its bindi
 
 [[dungeon.box]]
 key = "grimoire_cache"
+name = "Searing Blade Coffer"
 at = [-306.0, -8.0, -52.5]
 facing = 1.5
 loot = { draught_flask = 1, searing_token = 14 }
 
 [[dungeon.note]]
 key = "grimoire_page"
+display = 220
+scale = 1.3
 name = "A Torn Page, Still Warm"
 at = [-305.0, -4.5, -52.5]
 facing = 1.5
@@ -78,6 +84,8 @@ text = "\"...the Heart of Ragefire answers the Invoker while the grimoire holds 
 # A ledge above the cult's camp, reached by the rocks at its back.
 [[dungeon.door]]
 key = "camp_ledge"
+display = 457
+look = "A Barrel Wedged on the Ledge"
 name = "A Ledge Above the Camp"
 kind = "hidden"
 at = [-77.4, 90.4, -7.3]
@@ -87,6 +95,7 @@ text = "up on the ledge over the camp: the cult's tithes, hidden from its own co
 
 [[dungeon.box]]
 key = "ledge_cache"
+name = "Searing Blade Coffer"
 at = [-78.5, 91.5, -7.3]
 facing = 3.0
 loot = { searing_token = 16, tonic = 1 }
@@ -94,6 +103,9 @@ loot = { searing_token = 16, tonic = 1 }
 # The west cave's high ledge: a tauren who came for the cult, and stayed.
 [[dungeon.door]]
 key = "maur_ledge"
+display = 4718
+look = "A Grimtotem Totem"
+scale = 0.8
 name = "Maur's Ledge"
 kind = "hidden"
 at = [-341.9, 257.6, -8.1]
@@ -105,6 +117,10 @@ text = "on the west cave's high ledge: a tauren in Grimtotem paint, who turns fr
 
 [[dungeon.note]]
 key = "korkron_report"
+hints = ["jergosh_grimoire"]
+clue = "The Invoker hid his grimoire in the deep chamber, up the slope in its corner."
+display = 183
+scale = 1.3
 name = "A Kor'kron Report"
 at = [-5.9, -42.0, -21.7]
 facing = 3.6
@@ -112,17 +128,25 @@ text = "\"The Searing Blade are in the chasm, under the Cleft. Their Invoker kee
 
 [[dungeon.note]]
 key = "ritual_notes"
+hints = ["camp_ledge"]
+clue = "Someone hides the cult's tithes on the ledge over the camp."
+display = 190
+scale = 1.3
 name = "Jergosh's Ritual Notes"
 at = [-101.8, 42.0, -17.8]
 facing = 1.0
-text = "\"The pit is ready. The Heart stirs under the lava when I call it, and the grimoire keeps it from turning on me. Nobody touches the grimoire. NOBODY.\""
+text = "\"The pit is ready. The Heart stirs under the lava when I call it, and the grimoire keeps it from turning on me. Nobody touches the grimoire. NOBODY. And the tithes come up short again: the collectors swear the ledge over the camp is bare. I say look again.\""
 
 [[dungeon.note]]
 key = "grimtotem_feather"
+hints = ["maur_ledge"]
+clue = "A Grimtotem arrow scratched in the rock, pointing up the west cave's high ledge."
+display = 163
+scale = 1.0
 name = "A Grimtotem Feather"
 at = [-305.6, 246.2, -12.5]
 facing = 0.5
-text = "A painted feather, Grimtotem colours, tucked in a crack in the rock. Above it, scratched with a knife: an arrow, pointing up and east."
+text = "A painted feather, Grimtotem colours, tucked in a crack in the rock. Above it, scratched with a knife: an arrow, pointing up, at the ledge above."
 
 # --- the cave's dwellers -----------------------------------------------------------------------------
 

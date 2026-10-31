@@ -564,6 +564,28 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Letter { player, kind, title, place, text, clue, links } => {
+                if let Some(c) = self.conn_of(player) {
+                    if self.has_addon(c) {
+                        let page = |t: &str| clean(&t.replace('\n', "{n}"));
+                        let links: Vec<String> = links.iter().map(|(cmd, label)| format!("{}~{}", clean(cmd), clean(label))).collect();
+                        self.ui_line(c, &format!("NT\t{kind}\t{}\t{}\t{}\t{}\t{}", clean(&title), clean(&place), page(&text), page(&clue), links.join("^")));
+                    } else {
+                        // In chat, a line a paragraph: the title, the page, the clue.
+                        self.say_to(c, &format!("{title} ({place})"));
+                        for p in text.split('\n').filter(|p| !p.trim().is_empty()) {
+                            self.say_to(c, p);
+                        }
+                        if !clue.is_empty() {
+                            self.say_to(c, &format!("A clue: {clue}"));
+                        }
+                        if !links.is_empty() {
+                            let more: Vec<String> = links.iter().map(|(cmd, label)| format!("{cmd} ({label})")).collect();
+                            self.say_to(c, &format!("Read on: {}", more.join(", ")));
+                        }
+                    }
+                }
+            }
             Event::StationOpen { player, station } => {
                 if let Some(c) = self.conn_of(player) {
                     if let Some(w) = self.world_mut(c) {

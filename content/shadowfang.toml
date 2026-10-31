@@ -58,6 +58,9 @@ facing = 3.14
 # Arugal's study, high in the west wing: his journal, and what he did to himself.
 [[dungeon.door]]
 key = "arugal_journal"
+display = 254
+look = "Torn Pages on the Floor"
+scale = 1.4
 name = "Arugal's Study"
 kind = "hidden"
 at = [-247.4, 2319.5, 97.0]
@@ -67,12 +70,15 @@ text = "a study high in the west wing, its desk under a drift of torn pages: Aru
 
 [[dungeon.box]]
 key = "study_cache"
+name = "Silverlaine Strongbox"
 at = [-246.6, 2317.5, 96.5]
 facing = 0.0
 loot = { draught_flask = 1, moonsilver = 14 }
 
 [[dungeon.note]]
 key = "arugal_last_entry"
+display = 254
+scale = 1.4
 name = "Arugal's Journal, the Last Page"
 at = [-248.5, 2321.0, 97.0]
 facing = 0.0
@@ -81,6 +87,9 @@ text = "\"My children. My beautiful children. The curse that made them is in my 
 # The kitchen yard's cellar, behind Razorclaw's block: the butcher's own larder.
 [[dungeon.door]]
 key = "butcher_larder"
+display = 4351
+look = "A Rack of Meat Nobody Touched"
+scale = 0.8
 name = "The Butcher's Larder"
 kind = "hidden"
 at = [-210.0, 2273.0, 73.6]
@@ -90,6 +99,7 @@ text = "behind the butcher's block, a larder nobody wanted to open. Under the me
 
 [[dungeon.box]]
 key = "larder_cache"
+name = "Silverlaine Strongbox"
 at = [-209.0, 2275.0, 73.6]
 facing = 1.57
 loot = { moonsilver = 16, tonic = 1 }
@@ -97,6 +107,8 @@ loot = { moonsilver = 16, tonic = 1 }
 # A corner of the courtyard where the dead stand watch.
 [[dungeon.door]]
 key = "deathsworn_corner"
+display = 19
+look = "A Frosted Soldier's Marker"
 name = "The Deathsworn's Corner"
 kind = "hidden"
 at = [-162.2, 2237.8, 77.1]
@@ -108,6 +120,10 @@ text = "in the courtyard's far corner the air goes cold. A captain of the dead t
 
 [[dungeon.note]]
 key = "dalaran_report"
+hints = ["arugal_journal"]
+clue = "Arugal wrote everything down in his study, high in the west wing."
+display = 183
+scale = 1.3
 name = "A Kirin Tor Report"
 at = [-222.7, 2117.8, 77.7]
 facing = 1.57
@@ -115,10 +131,14 @@ text = "\"Arugal summoned the worgen to fight the Scourge. He calls them his chi
 
 [[dungeon.note]]
 key = "servants_gossip"
+hints = ["butcher_larder", "deathsworn_corner"]
+clue = "The butcher keeps something behind his block; the dead keep their watch in the courtyard's far corner."
+display = 164
+scale = 1.3
 name = "A Servant's Note"
 at = [-233.8, 2177.5, 77.7]
 facing = 0.0
-text = "\"The butcher keeps more than meat behind his block. And don't go in the courtyard's north-east corner after dark: the dead Deathsworn still keep their watch there.\""
+text = "\"The butcher keeps more than meat behind his block. And don't go in the courtyard's far corner after dark: the dead Deathsworn still keep their watch there.\""
 
 # --- the keep's dwellers -----------------------------------------------------------------------------
 

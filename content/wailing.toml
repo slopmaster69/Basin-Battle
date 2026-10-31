@@ -57,6 +57,8 @@ facing = 4.7
 # journal. Whoever reads it carries the dream's true shape with them.
 [[dungeon.door]]
 key = "naralex_dream"
+display = 278
+look = "A Sleeper's Bones in the Moss"
 name = "The Disciple's Rest"
 kind = "hidden"
 at = [-202.4, -338.0, -71.0]
@@ -66,12 +68,15 @@ text = "in the warren's far bulge: a disciple of Naralex, long dead in his sleep
 
 [[dungeon.box]]
 key = "disciple_cache"
+name = "Druid of the Fang Cache"
 at = [-203.5, -336.0, -71.0]
 facing = 1.0
 loot = { draught_flask = 1, deviate_fang = 14 }
 
 [[dungeon.note]]
 key = "disciple_journal"
+display = 254
+scale = 1.4
 name = "A Disciple's Journal"
 at = [-201.0, -339.5, -71.0]
 facing = 1.0
@@ -80,6 +85,8 @@ text = "\"Verdan is not the nightmare. Verdan is only what grows over it. When t
 # A ledge off the low south tunnel: the Fang's cache.
 [[dungeon.door]]
 key = "fang_cache"
+display = 323
+look = "A Bundle of Shed Skins"
 name = "The Fang's Cache"
 kind = "hidden"
 at = [-337.0, 37.4, -99.0]
@@ -89,6 +96,7 @@ text = "past the end of the low tunnel: the Druids of the Fang's cache, wrapped 
 
 [[dungeon.box]]
 key = "fang_stash"
+name = "Druid of the Fang Cache"
 at = [-337.2, 22.0, -102.0]
 facing = 1.6
 loot = { deviate_fang = 16, tonic = 1, whetstone = 1 }
@@ -96,6 +104,9 @@ loot = { deviate_fang = 16, tonic = 1, whetstone = 1 }
 # A nook at the far end of the east caves: something small and quick lives there.
 [[dungeon.door]]
 key = "faerie_nook"
+display = 2090
+look = "Glittering Mushrooms"
+scale = 0.7
 name = "A Glittering Nook"
 kind = "hidden"
 at = [-97.1, 457.2, -71.6]
@@ -107,17 +118,25 @@ text = "the nook glitters with dust that wasn't there a moment ago; something bl
 
 [[dungeon.note]]
 key = "ebru_warning"
+hints = ["naralex_dream"]
+clue = "One of Naralex's first disciples hid at the far eastern end of the caverns."
+display = 164
+scale = 1.3
 name = "A Cenarion Warning"
 at = [-139.0, 131.0, -77.0]
 facing = 1.0
-text = "\"Naralex went down to heal the Barrens by dreaming. His disciples followed; they call themselves the Druids of the Fang now. One of his first disciples hid from them in the far south of the western warren, they say, and wrote down what Naralex truly dreams. Find him.\""
+text = "\"Naralex went down to heal the Barrens by dreaming. His disciples followed; they call themselves the Druids of the Fang now. One of his first disciples hid from them at the far eastern end of the caverns, they say, and wrote down what Naralex truly dreams. Find him.\""
 
 [[dungeon.note]]
 key = "fang_orders"
+hints = ["fang_cache", "faerie_nook"]
+clue = "The Fang's cache is past the end of the low tunnel; something glitters in a nook at the far west of the caverns."
+display = 190
+scale = 1.3
 name = "The Fanglords' Orders"
 at = [7.9, 277.2, -86.1]
 facing = 0.0
-text = "\"Anacondra holds the pit. Cobrahn, the low south tunnel. Pythas, the east caves. Serpentis, the western warren. None passes to the Everliving.\" Underneath, smaller: \"Our cache is past the end of the low tunnel. Tell no one.\""
+text = "\"Anacondra holds the pit. Cobrahn, the low south tunnel. Pythas, the east caves. Serpentis, the western warren. None passes to the Everliving.\" Underneath, smaller: \"Our cache is past the end of the low tunnel. Tell no one. And stay out of the glittering nook at the far west of the caverns: what lives there is not ours.\""
 
 # --- the dreamers and their deviates -----------------------------------------------------------------
 

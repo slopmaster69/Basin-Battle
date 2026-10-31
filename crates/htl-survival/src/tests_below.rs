@@ -96,7 +96,7 @@ fn content() -> Content {
     d.exit_boss = "boss".into();
     d.exit = [120.0, 0.0, 0.0];
     d.hazards.clear();
-    d.boxes = vec![crate::content::BoxDef {
+    d.boxes = vec![crate::content::BoxDef { name: String::new(),
         key: "box".into(),
         at: [5.0, 5.0, 0.0],
         facing: 0.0,
@@ -720,11 +720,11 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
     let mut c = content();
     let d = c.dungeon.as_mut().unwrap();
     d.packs.push(pack("grunt", "rare", [10.0, 20.0], true));
-    d.boxes.push(crate::content::BoxDef { key: "stash".into(), at: [12.0, 20.0, 0.0], facing: 0.0, loot: BTreeMap::from([("plunder".to_string(), 5)]) });
+    d.boxes.push(crate::content::BoxDef { name: String::new(), key: "stash".into(), at: [12.0, 20.0, 0.0], facing: 0.0, loot: BTreeMap::from([("plunder".to_string(), 5)]) });
     d.doors.push(DoorDef { key: "wall".into(), name: "A hollow wall".into(), kind: "illusory".into(), display: 1, at: [10.0, 15.0, 0.0], scale: 1.0, bars: Some([[5.0, 15.0], [15.0, 15.0]]), reveals: vec!["stash".into()], ..Default::default() });
-    d.doors.push(DoorDef { key: "nook".into(), name: "A nook".into(), kind: "hidden".into(), at: [-20.0, -20.0, 0.0], find: 3.0, reveals: vec!["rare".into(), "confession".into()], ..Default::default() });
-    d.notes.push(crate::content::NoteDef { key: "confession".into(), name: "A confession".into(), at: [-21.0, -20.0, 0.0], facing: 0.0, display: 0, scale: 1.0, text: "It was me.".into() });
-    d.notes.push(crate::content::NoteDef { key: "diary".into(), name: "A diary".into(), at: [2.0, 0.0, 0.0], facing: 0.0, display: 0, scale: 1.0, text: "The wall by the stash sounds hollow.".into() });
+    d.doors.push(DoorDef { key: "nook".into(), name: "A nook".into(), kind: "hidden".into(), at: [-20.0, -20.0, 0.0], find: 3.0, display: 2890, look: "A Heap of Sacks".into(), reveals: vec!["rare".into(), "confession".into()], ..Default::default() });
+    d.notes.push(crate::content::NoteDef { hints: vec![], clue: String::new(), key: "confession".into(), name: "A confession".into(), at: [-21.0, -20.0, 0.0], facing: 0.0, display: 0, scale: 1.0, text: "It was me.".into() });
+    d.notes.push(crate::content::NoteDef { hints: vec!["wall".into()], clue: "The wall by the stash.".into(), key: "diary".into(), name: "A diary".into(), at: [2.0, 0.0, 0.0], facing: 0.0, display: 0, scale: 1.0, text: "The wall by the stash sounds hollow.".into() });
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);
     let has = |s: &Survival, f: &dyn Fn(&ObjKind) -> bool| s.objs.values().any(|o| f(&o.kind));
@@ -737,7 +737,19 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
     s.move_player(id, [1.0, 0.0, 0.0], 0.0, Moving::default());
     s.interact(id, Some(note));
     let ev = s.step(DT);
-    assert!(ev.iter().any(|e| matches!(e, Event::Tell { text, .. } if text.contains("hollow"))));
+    // A page to read at leisure, with its clue while the wall still stands.
+    assert!(ev.iter().any(|e| matches!(e, Event::Letter { kind, text, clue, .. } if kind == "note" && text.contains("hollow") && clue == "The wall by the stash.")), "{ev:?}");
+    assert!(s.ever("read", "diary"), "the camp remembers it read");
+    let lore = |s: &mut Survival| {
+        s.lore_page(id, "").unwrap();
+        s.step(DT).into_iter().find_map(|e| match e {
+            Event::Letter { kind, text, links, place, .. } if kind == "lore" => Some((text, links, place)),
+            _ => None,
+        })
+    };
+    let (text, links, place) = lore(&mut s).expect("the book's page");
+    assert!(text.contains("The wall by the stash. (A diary)") && place.starts_with("0 of ") && place.contains(" secrets found, 1 of "), "{text} / {place}");
+    assert_eq!(links, vec![(".es note diary".to_string(), "A diary".to_string())]);
     // The wall, used: it's gone, and the stash is there.
     let wall = obj(&s, |k| matches!(k, ObjKind::Door { key } if key == "wall"));
     assert!(s.object(wall).is_some(), "a wall to see");
@@ -748,10 +760,23 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
     assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "A secret!")));
     assert!(s.object(wall).is_none() && !s.through_shut_door([10.0, 10.0, 0.0], [10.0, 20.0, 0.0]));
     assert!(has(&s, &|k| matches!(k, ObjKind::Strongbox { key } if key == "stash")));
-    // The nook, walked into: the rare one steps out of it.
+    // Found, the clue is spent; read again, the note has none.
+    assert!(s.reread(id, "diary").is_ok());
+    assert!(s.step(DT).iter().any(|e| matches!(e, Event::Letter { clue, place, .. } if clue.is_empty() && place.starts_with("From the book"))));
+    assert!(s.reread(id, "confession").is_err(), "not read yet");
+    // The nook: walked up to, its marker catches the eye; searched, the rare one steps out of it.
+    let sacks = obj(&s, |k| matches!(k, ObjKind::Door { key } if key == "nook"));
+    assert_eq!(s.object(sacks).map(|v| (v.display, v.name, v.usable)), Some((2890, "A Heap of Sacks".to_string(), true)));
     s.move_player(id, [-19.0, -19.0, 0.0], 0.0, Moving::default());
-    run(&mut s, 0.2);
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Tell { text, .. } if text.contains("heap of sacks"))), "{ev:?}");
+    assert!(!s.below.as_ref().unwrap().open.contains("nook"), "noticed, not found");
+    assert_eq!(s.use_prompt(id).map(|(_, n, v)| (n, v)), Some(("A Heap of Sacks".to_string(), "Search")));
+    s.interact(id, Some(sacks));
+    let ev = s.step(DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Letter { kind, title, place, .. } if kind == "secret" && title == "A nook" && place.contains(": 2 of "))), "{ev:?}");
     assert!(s.below.as_ref().unwrap().open.contains("nook") && rare(&s));
+    assert!(s.object(sacks).is_none(), "the sacks pulled aside");
     assert!(has(&s, &|k| matches!(k, ObjKind::Note { key } if key == "confession")), "and its note with it");
 }
 
@@ -926,7 +951,7 @@ fn gear_gives_its_perks_while_on_and_a_set_more_for_its_pieces() {
 fn a_strongbox_can_have_guards_waiting_unseen_for_whoever_opens_it() {
     let mut c = content();
     let d = c.dungeon.as_mut().unwrap();
-    d.boxes.push(crate::content::BoxDef { key: "bait".into(), at: [30.0, 30.0, 0.0], facing: 0.0, loot: BTreeMap::from([("plunder".to_string(), 5)]) });
+    d.boxes.push(crate::content::BoxDef { name: String::new(), key: "bait".into(), at: [30.0, 30.0, 0.0], facing: 0.0, loot: BTreeMap::from([("plunder".to_string(), 5)]) });
     let mut guards = pack("grunt", "", [33.0, 30.0], false);
     guards.count = 2;
     guards.radius = 1.5;

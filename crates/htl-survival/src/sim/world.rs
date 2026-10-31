@@ -394,6 +394,7 @@ impl Survival {
             ObjKind::SiegeLedger { .. } => "Open",
             ObjKind::SiegeTrainer { .. } => "Learn from",
             ObjKind::Lamp { .. } => "Light",
+            ObjKind::Door { key } if self.door_def(key).is_some_and(|d| d.secret()) => "Search",
             ObjKind::Door { .. } | ObjKind::LiftEnd { .. } => "Open",
             ObjKind::Strongbox { .. } => "Open",
             ObjKind::Note { .. } => "Read",

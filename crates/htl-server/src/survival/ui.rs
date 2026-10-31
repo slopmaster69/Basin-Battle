@@ -716,7 +716,22 @@ impl SurvivalGame {
                     .collect();
                 let dungeons: Vec<String> = books
                     .iter()
-                    .map(|b| format!("{}~{}~{}~{}~{}~{}~{}~{}~{}", clean(&b.key), clean(&b.name), clean(&b.icon), u8::from(b.open), b.gate, b.lamps, b.pages.len(), clean(&b.blurb), clean(&b.first_page)))
+                    .map(|b| format!(
+                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
+                            clean(&b.key),
+                            clean(&b.name),
+                            clean(&b.icon),
+                            u8::from(b.open),
+                            b.gate,
+                            b.lamps,
+                            b.pages.len(),
+                            clean(&b.blurb),
+                            clean(&b.first_page),
+                            b.secrets.0,
+                            b.secrets.1,
+                            b.notes.0,
+                            b.notes.1
+                        ))
                     .collect();
                 let ring = arena.map_or_else(String::new, |(k, n, best)| format!("{}~{}~{best}", clean(&k), clean(&n)));
                 let siege = siege.map_or_else(String::new, |(k, n, t)| format!("{}~{}~{}", clean(&k), clean(&n), clean(&t)));
@@ -740,6 +755,7 @@ impl SurvivalGame {
                     conn,
                     &format!("The Smuggler's Logbook: {}", list.join("; ")),
                 );
+                self.say_to(conn, "Each dungeon's secrets and notes: .es lore <dungeon> (deadmines, stockade, ...); a note again: .es note <note>.");
             }
             return;
         }
@@ -1149,6 +1165,9 @@ impl SurvivalGame {
                 Ok(())
             }
             "equip" => self.sim.equip_from_chest(me, &arg),
+            // The pages kept: a note read before, and a dungeon's secrets, rumours and notes.
+            "note" | "reread" => self.sim.reread(me, &arg),
+            "lore" | "secrets" => self.sim.lore_page(me, &arg),
             // The book at camp, and the lamps below.
             "travel" | "go" => {
                 let to = if arg.is_empty() {

@@ -21,3 +21,9 @@ TR	1	Dev build: every card	aimed_throw~Aimed Throw~ranged~warrior~INV_ThrowingAx
 %SNAP {OUT}/tree.json
 !ElwynnSurvival.tree:Hide() ElwynnSurvival.ToggleKeys()
 %SNAP {OUT}/card.json
+# A note read below, and the book's record of a dungeon.
+!ElwynnSurvival.CloseWindows()
+NT	note	A Smuggler's Tally	Found in The Deadmines	"Two crates salt pork, one keg rum, one jar of something for the cook. He says it's his secret ingredient and he keeps it in the little tent at the south end of the cove, where the pirates won't drink it. Whatever's in that jar MOVES. Don't open it."	Cookie's jar is kept in the little tent at the south end of the cove.	.es lore deadmines~All found in the Deadmines
+%SNAP {OUT}/letter.json
+NT	lore	The Deadmines	1 of 5 secrets found, 2 of 6 notes read	Secrets found: Cookie's Pantry.{n}{n}Rumours:{n}- VanCleef keeps quarters aft of the Juggernaut's mast, under the stern. (Orders, Sealed in Red){n}{n}3 more secrets are down there that no note you've read speaks of.		.es note smugglers_tally~A Smuggler's Tally^.es note smite_orders~Orders, Sealed in Red
+%SNAP {OUT}/lore.json
