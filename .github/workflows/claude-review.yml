@@ -36,7 +36,7 @@ jobs:
         if: env.HAS_KEY != 'true'
         run: echo "::notice::No ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret here, so no Claude review (see the top of this workflow)."
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: env.HAS_KEY == 'true'
         with:
           fetch-depth: 0
