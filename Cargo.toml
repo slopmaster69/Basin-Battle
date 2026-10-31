@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
-toml_edit = "0.22"
+toml_edit = "0.25"
 rand = "0.8"
 crossbeam-channel = "0.5"
 # benilla, pinned: the client we target. Its protocol crate gives us opcode numbers and a real
