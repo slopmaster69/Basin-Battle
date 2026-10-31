@@ -348,7 +348,7 @@ impl Survival {
             self.unfound.remove(&def);
             self.set_chest(def, false);
             self.count("secret", "any", 1);
-            self.events.push(Event::Banner { player: Some(by), title: "A secret!".into(), sub: name.clone() });
+            // Quietly: a line to the finder (no banner and horn, which are for what's coming).
             self.tell(by, format!("You've come upon something hidden: {name}."));
             self.events.push(Event::Dirty);
         }
