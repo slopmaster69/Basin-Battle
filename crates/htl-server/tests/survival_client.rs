@@ -528,11 +528,16 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     // Each sees the other.
     assert!(a.wait(2.0, |p| creates_guid(p, bg)).is_some(), "ann sees ben");
     assert!(b.until(0.5, |c| placed(c).iter().any(|(g, ..)| *g == ag)), "ben sees ann");
-    // What a hero's been told lately and their bar, for a failure to say what went on.
+    // For a failure to say what went on: who felled whom (the kill feed) and their falls and
+    // gettings-up from the start, then what a hero's been told lately and their bar. (Issue #2:
+    // both heroes have been seen to fall right after entering, before the camp's pile.)
     let story = |c: &Client| {
-        let mut l: Vec<String> = addon_lines(c, "ES").into_iter().filter(|l| l.starts_with("T\t") || l.starts_with("H\t")).collect();
-        let last = l.len().saturating_sub(8);
-        l.split_off(last)
+        let lines = addon_lines(c, "ES");
+        let mut l: Vec<String> = lines.iter().filter(|l| l.starts_with("KF\t") || l.starts_with("DE\t")).cloned().collect();
+        let mut recent: Vec<String> = lines.into_iter().filter(|l| l.starts_with("T\t") || l.starts_with("H\t")).collect();
+        let last = recent.len().saturating_sub(6);
+        l.append(&mut recent.split_off(last));
+        l
     };
 
     // Both at the same timber pile, both using it at once: two uses between them, then it's gone
