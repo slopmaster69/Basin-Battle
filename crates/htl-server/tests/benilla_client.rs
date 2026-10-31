@@ -159,7 +159,7 @@ fn two_players_enter_see_each_other_and_fight_a_wave() {
     alice.send(op::CMSG_ATTACKSWING, &enemy.to_le_bytes());
     let mut last_pos = None;
     while Instant::now() < end {
-        if let Some(p) = alice.wait(0.3, |p| matches!(p, ServerPacket::MonsterMove { guid, .. } if *guid == enemy)) {
+        if let Some(p) = alice.wait_exactly(0.3, |p| matches!(p, ServerPacket::MonsterMove { guid, .. } if *guid == enemy)) {
             if let ServerPacket::MonsterMove { path, start, .. } = p {
                 last_pos = Some(path.last().copied().unwrap_or(start));
             }
@@ -323,5 +323,5 @@ fn a_long_fall_hurts() {
     let n = b2.len();
     b2[n - 4..].copy_from_slice(&700u32.to_le_bytes());
     c.send(op::MSG_MOVE_FALL_LAND, &b2);
-    assert!(c.wait(1.0, |p| p.name() == "SMSG_ENVIRONMENTALDAMAGELOG").is_none(), "a hop is free");
+    assert!(c.wait_exactly(1.0, |p| p.name() == "SMSG_ENVIRONMENTALDAMAGELOG").is_none(), "a hop is free");
 }
