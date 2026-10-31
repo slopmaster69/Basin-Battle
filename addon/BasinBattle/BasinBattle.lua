@@ -3431,6 +3431,9 @@ if mapCanvas then
   mapLegend = Text(mapLayer, FONT_BODY, 12, "OUTLINE")
   mapLegend:SetPoint("BOTTOM", mapLayer, "BOTTOM", 0, 8)
   mapLegend:SetText("|cffff3326o|r enemies   |cffff8c1ao|r elites   |cffcc33ffo|r boss   |cff4dff4do|r treants   |cff4dd9ffo|r springs   |cffffd94do|r bridges   |cff99ff66o|r the Ancient   |cffffffffo|r heroes   |cffff1a1aO|r help!")
+  -- Only on a Basin Battle realm (shown when its server answers): the add-on loads everywhere,
+  -- and its legend has no place on Elwynn Survival's map.
+  mapLayer:Hide()
 end
 
 function BB.MapLine(f)
@@ -3635,6 +3638,7 @@ function BB.Line(msg)
     if not BB.connected then
       BB.connected = true
       BB.ApplyKeys()
+      if mapLayer then mapLayer:Show() end
     end
   end
 end
@@ -3798,6 +3802,7 @@ events:SetScript("OnEvent", function()
     end
   elseif event == "PLAYER_ENTERING_WORLD" then
     BB.connected = false
+    if mapLayer then mapLayer:Hide() end
     -- Health bars over your side (treants, springs, defenders, the party): the game turns them
     -- off on every entry. V shows the enemies' too.
     if ShowFriendNameplates then pcall(ShowFriendNameplates) end
