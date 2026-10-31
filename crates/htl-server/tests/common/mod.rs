@@ -10,6 +10,11 @@ use std::time::{Duration, Instant};
 use benilla_protocol::messages::{self, opcode as op, ServerPacket};
 use benilla_srp::{HeaderCrypto, NormalizedString, ProofSeed};
 
+// Each test is its own executable, so it needs the binary's _get_timezone shim on windows-gnu.
+#[cfg(all(windows, target_env = "gnu"))]
+#[path = "../../src/mingw_tz.rs"]
+mod mingw_tz;
+
 fn locale() -> u32 {
     u32::from_be_bytes(*b"enUS")
 }
