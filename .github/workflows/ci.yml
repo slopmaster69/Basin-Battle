@@ -1,0 +1,49 @@
+# Every pull request and every push to main: the server builds (on Linux and Windows), the tests
+# pass and the add-ons load without a Lua error. Tests that need the WoW 1.12.1 data are #[ignore]d
+# and don't run here.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests and add-ons (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            tools/addon-harness
+      - name: Build the server
+        run: cargo build --release -p htl-server
+      - name: Tests
+        run: cargo test --release
+      - name: Add-ons load and run without Lua errors
+        run: |
+          scripts/check-addon.sh | tee addon-check.txt
+          if grep -E "^[0-9]+x |LOAD ERROR|BINDINGS ERROR" addon-check.txt; then
+            echo "The add-ons raised Lua errors (above)." >&2
+            exit 1
+          fi
+
+  windows-server:
+    name: Server builds on Windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the server
+        run: cargo build --release -p htl-server

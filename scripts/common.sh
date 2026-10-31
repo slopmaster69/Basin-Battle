@@ -19,7 +19,8 @@ save_setting() { # name value
 
 find_wow_data() {
     if [ -n "${WOW_DATA:-}" ] && [ -f "$WOW_DATA/dbc.MPQ" ]; then return 0; fi
-    for c in "$ROOT/../WoW Classic/WoW-1.12.1/Data" "$ROOT/WoW/Data" "$HOME/WoW-1.12.1/Data" "/Applications/World of Warcraft/Data"; do
+    for c in "$ROOT/../WoW Classic/WoW-1.12.1/Data" "$ROOT/WoW/Data" "$HOME/WoW-1.12.1/Data" "/Applications/World of Warcraft/Data" \
+        "$HOME/Games/WoW-1.12.1/Data" "$HOME/Games/World of Warcraft/Data" "/opt/wow/Data" "/srv/wow/Data"; do
         if [ -f "$c/dbc.MPQ" ]; then WOW_DATA="$(cd "$c" && pwd)"; save_setting WOW_DATA "$WOW_DATA"; return 0; fi
     done
     echo "Where is the Data folder of your WoW 1.12.1 install? (drag the folder in here and press Return)"

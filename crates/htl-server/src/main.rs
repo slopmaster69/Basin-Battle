@@ -4,6 +4,9 @@
 //! htl-server --data "/path/to/WoW-1.12.1/Data" [--password hold] [--public-host my.ip.or.name]
 //! ```
 
+#[cfg(all(windows, target_env = "gnu"))]
+mod mingw_tz;
+
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
