@@ -58,6 +58,9 @@ facing = 1.2
 # power. Whoever touches it, Agamaggan notices.
 [[dungeon.door]]
 key = "agamaggan_shrine"
+display = 6328
+look = "A Heap of Tusks and Bones"
+scale = 0.8
 name = "Agamaggan's Shrine"
 kind = "hidden"
 at = [2077.0, 2002.0, 63.2]
@@ -67,12 +70,15 @@ text = "under the thorns: a shrine of bones and tusks to Agamaggan, still warm w
 
 [[dungeon.box]]
 key = "shrine_cache"
+name = "Quillboar Hoard"
 at = [2078.6, 1999.0, 63.0]
 facing = 3.0
 loot = { draught_flask = 1, thorn_fetish = 14 }
 
 [[dungeon.note]]
 key = "charlga_vow"
+display = 758
+scale = 1.0
 name = "A Thornweaver's Vow, Carved in Bone"
 at = [2075.7, 2004.0, 63.3]
 facing = 3.0
@@ -81,6 +87,9 @@ text = "Carved small, in quillboar script someone has glossed in Common: \"Charl
 # The far end of the east loop, past the Death Speaker: his cache.
 [[dungeon.door]]
 key = "jargba_cache"
+display = 6329
+look = "Bones Behind the Altar"
+scale = 0.8
 name = "The Death Speaker's Cache"
 kind = "hidden"
 at = [2153.3, 1430.8, 74.4]
@@ -90,6 +99,7 @@ text = "behind the Death Speaker's altar: what the dead were given to keep."
 
 [[dungeon.box]]
 key = "bone_cache"
+name = "Quillboar Hoard"
 at = [2152.0, 1428.0, 74.2]
 facing = 0.0
 loot = { thorn_fetish = 16, tonic = 1, whetstone = 1 }
@@ -97,6 +107,9 @@ loot = { thorn_fetish = 16, tonic = 1, whetstone = 1 }
 # A side burrow off the tunnels west of the heart: an earthcaller who never came out.
 [[dungeon.door]]
 key = "halmgar_burrow"
+display = 248
+look = "A Stone Scored With Circles"
+scale = 0.5
 name = "A Side Burrow"
 kind = "hidden"
 at = [2032.7, 1761.6, 60.6]
@@ -108,13 +121,21 @@ text = "a burrow off the tunnel, its floor scored with circles: an earthcaller l
 
 [[dungeon.note]]
 key = "tauren_warning"
+hints = ["agamaggan_shrine", "jargba_cache"]
+clue = "Agamaggan's shrine is deep in the north-west of the warren, under the thorns; the Death Speaker hoards behind his altar."
+display = 164
+scale = 1.3
 name = "A Tauren Scout's Warning"
 at = [1946.0, 1548.0, 82.0]
 facing = 0.8
-text = "\"Charlga Razorflank leads the quillboar here; she says she speaks for Agamaggan, who died on these thorns. Her people say she keeps his shrine somewhere deep in the south-west of the warren. Do not touch it.\""
+text = "\"Charlga Razorflank leads the quillboar here; she says she speaks for Agamaggan, who died on these thorns. Her people say she keeps his shrine somewhere deep in the north-west of the warren, under the thorns. Do not touch it. And whatever the dead are given, the Death Speaker keeps behind his own altar.\""
 
 [[dungeon.note]]
 key = "scratched_hide"
+hints = ["halmgar_burrow"]
+clue = "A side burrow west of the warren's heart, marked HALMGAR."
+display = 222
+scale = 1.3
 name = "A Scratched Hide"
 at = [2062.0, 1612.0, 62.8]
 facing = 0.0
@@ -351,8 +372,8 @@ text = "A bone and thorn charm every quillboar carries. The lamps' quartermaster
 [[item]]
 key = "roogug_mantle"
 name = "Roogug's Earthen Mantle"
-display = 5282
-icon = "INV_Shoulder_04"
+display = 4483
+icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.09
@@ -367,6 +388,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.1
 text = "Aggem's: thorns woven into the leather, points out."
+set = "thornweave"
 
 [[item]]
 key = "jargba_robe"
@@ -381,13 +403,14 @@ text = "Jargba's: it whispers in quillboar when the wind is right."
 [[item]]
 key = "ramtusk_helm"
 name = "Ramtusk's Tusked Helm"
-display = 4180
+display = 15286
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "The Overlord's: two great tusks bolted to a mail cap."
+set = "thornweave"
 
 [[item]]
 key = "agathelos_hide"
@@ -399,38 +422,42 @@ slot = "chest"
 reduce = 0.14
 weight = 0.02
 text = "The Raging boar's hide: bristles still on it, and they still bristle."
+set = "thornweave"
 
 [[item]]
 key = "charlga_mantle"
 name = "Charlga's Thornweave Mantle"
-display = 2539
-icon = "INV_Shoulder_06"
+display = 5003
+icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.12
 weight = 0.01
 text = "Woven of Agamaggan's own thorns. Charlga wore it to speak for him."
+set = "thornweave"
 
 [[item]]
 key = "agamaggan_tusk_helm"
 name = "Helm of the Great Boar"
-display = 4145
+display = 15340
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.15
 weight = 0.04
 text = "Hammered round a shard of Agamaggan's own tusk. It is heavy with something more than its weight."
+perks = [{ kind = "might", amount = 0.06 }]
 
 [[item]]
 key = "halmgar_mantle"
 name = "Earthcaller's Mantle"
-display = 5944
-icon = "INV_Shoulder_01"
+display = 4593
+icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
 text = "Halmgar's: stones sewn on in circles."
+perks = [{ kind = "regen", amount = 0.003 }]
 
 # --- the quillboar ----------------------------------------------------------------------------------------
 
@@ -731,6 +758,14 @@ respawn = 0.0
   text = "Roogug squeals for the earth to swallow you."
   shove = 5.0
   look = 26271
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 1.3 } ]
 
 [[mob]]
 key = "rk_aggem"
@@ -790,6 +825,20 @@ respawn = 0.0
   text = "Aggem shrieks, and thorns burst up all round him."
   shove = 5.0
   look = 26271
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 1.3 } ]
+  # Too close: a burst all round it.
+  [[mob.pattern]]
+  name = "nova"
+  weight = 2
+  max_range = 4
+  steps = [ { clip = 54, windup = 0.9, damage = 22, range = 5.5, arc = 360, look = 26271, kit = 356, heavy = true, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "rk_jargba"
@@ -849,6 +898,21 @@ respawn = 0.0
   text = "\"Jargba... will speak... for you... too...\""
   shove = 5.0
   look = 24050
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 1.3 } ]
+  # Stone lobbed where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "stone"
+  weight = 1.5
+  min_range = 5
+  max_range = 24
+  steps = [ { ranged = true, windup = 1.2, damage = 24, range = 24, radius = 3.5, speed = 12, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
 
 [[mob]]
 key = "rk_ramtusk"
@@ -866,7 +930,7 @@ boss = true
 posture = 300
 drops = { thorn_fetish = [22, 28] }
 trophy = { ramtusk_helm = 1 }
-gear = ["ramtusk_helm"]
+gear = ["ramtusk_helm", "corpsemaker"]
 respawn = 0.0
   [mob.attack]
   windup = 0.85
@@ -906,6 +970,26 @@ respawn = 0.0
   text = "Ramtusk froths at the tusks."
   shove = 6.0
   look = 26271
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 29, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 29, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 41, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: stone thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "stone"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 34, range = 22, radius = 3, speed = 12, spell = 9483, look = 26271, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "rk_agathelos"
@@ -963,6 +1047,20 @@ respawn = 0.0
   text = "Agathelos goes berserk, smashing into the thorns and back."
   summon = ["rk_boar", "rk_boar"]
   shove = 6.0
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 22, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 42, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: stone thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "stone"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 28, range = 22, radius = 3, speed = 12, spell = 9483, look = 26271, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "rk_charlga"
@@ -981,7 +1079,7 @@ posture = 260
 keep_away = 6.0
 drops = { thorn_fetish = [30, 40] }
 trophy = { charlga_mantle = 1 }
-gear = ["charlga_mantle"]
+gear = ["charlga_mantle", "thornspike"]
 respawn = 0.0
 # Whoever touched Agamaggan's shrine finds the Great Boar speaking for himself.
 then = "rk_avatar"
@@ -1099,6 +1197,14 @@ respawn = 0.0
   text = "The thorns round the Avatar wither; it fights like something dying for the second time."
   shove = 7.0
   look = 26271
+  # Nearer its end, from range: stone thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "stone"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 34, range = 22, radius = 3, speed = 12, spell = 9483, look = 26271, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "rk_halmgar"
@@ -1157,3 +1263,144 @@ respawn = 0.0
   text = "The circles on the floor flare white."
   shove = 5.0
   look = 26271
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 1.3 } ]
+  # Too close: a burst all round it.
+  [[mob.pattern]]
+  name = "nova"
+  weight = 2
+  max_range = 4
+  steps = [ { clip = 54, windup = 0.9, damage = 22, range = 5.5, arc = 360, look = 26271, kit = 356, heavy = true, blockable = false, recovery = 1 } ]
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "thornweave"
+name = "Thornweave"
+bonus = [ { pieces = 2, kind = "ward", amount = 0.03 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
+
+[[weapon]]
+key = "thornspike"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [12, 16]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 3.6
+
+[[item]]
+key = "thornspike"
+name = "Thornspike"
+display = 2694
+icon = "INV_Weapon_ShortBlade_05"
+kind = "weapon"
+text = "Charlga's: a thorn of Agamaggan himself, filed to a point."
+perks = [{ kind = "stamina", amount = 0.06 }]
+
+[[weapon]]
+key = "corpsemaker"
+windup = 0.5
+active = 0.16
+recovery = 0.55
+stamina = 22.0
+damage = [46, 57]
+range = 3.6
+arc = 140.0
+targets = 3
+stagger = 1.0
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 1
+
+[[item]]
+key = "corpsemaker"
+name = "Corpsemaker"
+display = 8499
+icon = "INV_Axe_10"
+kind = "weapon"
+text = "Ramtusk's: the quillboar named it, and meant it."
+perks = [{ kind = "might", amount = 0.03 }]
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rk_quilguard"
+at = [1947.8, 1573.0]
+z = 81.4
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [1963.8, 1596.6], [1987.0, 1598.0] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2007.0, 1554.0]
+z = 80.1
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [2022.6, 1511.6], [2044.0, 1478.0] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2057.0, 1557.0]
+z = 69.5
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2085.2, 1980.0]
+z = 63.9
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rk_acolyte"
+at = [2161.0, 1631.8]
+z = 81.7
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2162.0, 1967.0]
+z = 60.2
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2151.8, 1431.0]
+z = 74.6
+radius = 1.5
+count = 2
+link = 10.0
+wake = "bone_cache"

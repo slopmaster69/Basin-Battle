@@ -163,6 +163,16 @@ fn main() -> anyhow::Result<()> {
             Some((x as f32 + SC as f32 / 2.0, y as f32 + SC as f32 / 2.0))
         };
         let mut rows = Vec::new();
+        // Every walk, point by point (for laying out patrols and ambushes on walked ground):
+        // the way to each marker, and to each pack.
+        let mut paths: Vec<String> = Vec::new();
+        for (k, p) in d.packs.iter().enumerate() {
+            let z = p.z.unwrap_or_else(|| land_height(&land, p.at));
+            if let Some(w) = land.walk(start, [p.at[0], p.at[1], z]) {
+                let pts: Vec<String> = w.iter().map(|q| format!("{:.1},{:.1},{:.1}", q[0], q[1], q[2])).collect();
+                paths.push(format!("pack{k}\t{}\t{}", p.mob, pts.join(" ")));
+            }
+        }
         for (n, (kind, name, at)) in marks.iter().enumerate() {
             let walked = if kind == "lamp" && n == 0 {
                 "start".to_string()
@@ -171,6 +181,7 @@ fn main() -> anyhow::Result<()> {
                     Some(p) => {
                         let end = p.last().copied().unwrap_or(start);
                         let short = dist2d(end, *at);
+                        paths.push(format!("mark{}\t{kind}: {name}\t{}", n + 1, p.iter().map(|q| format!("{:.1},{:.1},{:.1}", q[0], q[1], q[2])).collect::<Vec<_>>().join(" ")));
                         // The route, yellow.
                         let mut prev = to_px(start);
                         for q in &p {
@@ -201,6 +212,7 @@ fn main() -> anyhow::Result<()> {
             rows.push(format!("{}\t{kind}\t{name}\t{:.1}\t{:.1}\t{:.1}\t{x:.0}\t{y:.0}\t{walked}", n + 1, at[0], at[1], at[2]));
         }
         img.save(out.join(format!("{}.png", d.key)))?;
+        std::fs::write(out.join(format!("{}-paths.tsv", d.key)), paths.join("\n") + "\n")?;
         std::fs::write(out.join(format!("{}.tsv", d.key)), format!("# {}\n{}\n", d.name, rows.join("\n")))?;
         println!("{}: {} markers, {}x{} px", d.name, rows.len(), iw, ih);
     }

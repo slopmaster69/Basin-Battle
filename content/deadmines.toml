@@ -229,12 +229,13 @@ text = "A Defias Pirate's cutlass: quick, with a long reach for a one-handed bla
 [[item]]
 key = "red_bandana"
 name = "Red Defias Mask"
-display = 8266
+display = 15308
 icon = "INV_Misc_Bandana_03"
 kind = "armor"
 slot = "head"
 reduce = 0.04
 text = "The Brotherhood's red mask: a little off every blow, and no weight at all."
+set = "brotherhood"
 
 # The Squallshaper's staff: two-handed, a long reach, guards with the haft.
 [[weapon]]
@@ -350,6 +351,7 @@ display = 1928
 icon = "INV_Sword_27"
 kind = "weapon"
 text = "Edwin VanCleef's sword: quick, and a parry comes easier with it (a wider moment for the timed guard)."
+perks = [{ kind = "might", amount = 0.04 }]
 
 [[item]]
 key = "blackened_armor"
@@ -361,6 +363,7 @@ slot = "chest"
 reduce = 0.2
 weight = 0.03
 text = "VanCleef's own: the protection of mail at the weight of leather."
+perks = [{ kind = "ward", amount = 0.04 }]
 
 # --- the Brotherhood below --------------------------------------------------------------------------
 
@@ -1689,6 +1692,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.12
 text = "The Brotherhood's leathers: a little better than hide, and no weight at all."
+set = "brotherhood"
 
 [[item]]
 key = "defias_shoulders"
@@ -1699,6 +1703,7 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.05
 text = "The Brotherhood's shoulderpads: a little off every blow."
+set = "brotherhood"
 
 [[item]]
 key = "defias_leggings"
@@ -1710,6 +1715,7 @@ slot = "legs"
 reduce = 0.08
 weight = 0.01
 text = "The Brotherhood's leggings."
+set = "brotherhood"
 
 # --- the captains' armour -----------------------------------------------------------------------
 # Each boss wears a piece of its own: one of a boss's pieces (its weapon or its armour) falls
@@ -1739,7 +1745,7 @@ text = "Mr. Smite's: heavy plate, a fifth off every blow and more, and you'll fe
 [[item]]
 key = "greenskin_tricorne"
 name = "Greenskin's Tricorne"
-display = 13805
+display = 15329
 icon = "INV_Helmet_30"
 kind = "armor"
 slot = "head"
@@ -1749,7 +1755,7 @@ text = "The goblin captain's hat, a size too small."
 [[item]]
 key = "vancleef_pauldrons"
 name = "VanCleef's Pauldrons"
-display = 1057
+display = 10174
 icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
@@ -1770,8 +1776,8 @@ text = "The smelter's mail shoulders, scorched black."
 [[item]]
 key = "sneed_leggings"
 name = "Sneed's Grease-Stained Leggings"
-display = 1353
-icon = "INV_Pants_05"
+display = 4312
+icon = "INV_Pants_Wolf"
 kind = "armor"
 slot = "legs"
 reduce = 0.11
@@ -1781,7 +1787,7 @@ text = "The lumberjack's own, oiled against the shredder's spray."
 [[item]]
 key = "rhahkzor_helm"
 name = "Rhahk'Zor's Helm"
-display = 1126
+display = 15275
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
@@ -2032,6 +2038,10 @@ reward = { roast = 4, linen = 4 }
 
 [[dungeon.note]]
 key = "smugglers_tally"
+hints = ["cookie_pantry"]
+clue = "Cookie's jar is kept in the little tent at the south end of the cove."
+display = 190
+scale = 1.3
 name = "A Smuggler's Tally"
 at = [-84.0, -939.0, 40.0]
 facing = 2.0
@@ -2039,6 +2049,10 @@ text = "\"Two crates salt pork, one keg rum, one jar of something for the cook. 
 
 [[dungeon.note]]
 key = "smite_orders"
+hints = ["vancleef_quarters"]
+clue = "VanCleef keeps quarters aft of the Juggernaut's mast, under the stern."
+display = 183
+scale = 1.3
 name = "Orders, Sealed in Red"
 at = [-8.0, -772.0, 9.5]
 facing = 1.0
@@ -2046,6 +2060,10 @@ text = "\"Smite: the Juggernaut is yours to guard. My quarters at the stern are 
 
 [[dungeon.note]]
 key = "gilnid_ledger"
+hints = ["johnson_seam"]
+clue = "Johnson went after a silver seam at the very back of the east lobe, past the pond."
+display = 105
+scale = 1.4
 name = "Gilnid's Ledger"
 at = [-247.0, -575.0, 51.1]
 facing = 3.0
@@ -2053,6 +2071,10 @@ text = "\"Silver out of the east lobe: none since the cave-in. Johnson swears th
 
 [[dungeon.note]]
 key = "miners_diary"
+hints = ["noble_cell"]
+clue = "Someone is kept at the back of the goblins' workshop, past the last of the sawhorses."
+display = 387
+scale = 1.4
 name = "A Miner's Diary"
 at = [-116.0, -402.0, 59.9]
 facing = 4.0
@@ -2060,6 +2082,10 @@ text = "\"They keep a man in the back of the goblins' workshop, past the last of
 
 [[dungeon.note]]
 key = "frosted_letter"
+hints = ["marisa_alcove"]
+clue = "The powder crates in the gallery's alcove are only stacked against a gap."
+display = 164
+scale = 1.3
 name = "A Frost-Rimed Letter"
 at = [-151.4, -587.1, 19.3]
 facing = 0.5
@@ -2071,12 +2097,14 @@ text = "\"Marisa -- if the Kingpin's men come for you, the powder crates in the 
 # him (in from the landing, down the beach and south).
 [[dungeon.door]]
 key = "cookie_pantry"
+display = 2890
+look = "A Heap of Sacks"
 name = "Cookie's Pantry"
 kind = "hidden"
 at = [-159.0, -908.0, 8.8]
 find = 4.0
 reveals = ["pantry"]
-text = "inside the little tent at the south end of the cove, under a heap of nets: Cookie's pantry, and a jar that wriggles."
+text = "inside the little tent at the south end of the cove, under a heap of sacks: Cookie's pantry, and a jar that wriggles."
 
 [[dungeon.box]]
 key = "pantry"
@@ -2087,15 +2115,19 @@ loot = { secret_ingredient = 1, plunder = 8 }
 # VanCleef's quarters, aft of the Juggernaut's mast: a letter, and his strongbox.
 [[dungeon.door]]
 key = "vancleef_quarters"
+display = 32
+look = "A Barrel Stencilled 'E. V.'"
 name = "VanCleef's Quarters"
 kind = "hidden"
 at = [-105.0, -818.0, 37.9]
 find = 4.0
 reveals = ["quarters", "vancleef_letter"]
-text = "aft of the mast, under the stern: VanCleef's quarters, and a letter he never sent."
+text = "aft of the mast, under the stern, a barrel stencilled E. V. rolls aside from a hatch: VanCleef's quarters, and a letter he never sent."
 
 [[dungeon.note]]
 key = "vancleef_letter"
+display = 164
+scale = 1.3
 name = "A Letter, Never Sent"
 at = [-106.0, -815.0, 37.8]
 facing = 1.5
@@ -2110,6 +2142,8 @@ loot = { draught_flask = 1, plunder = 20 }
 # The east lobe's back wall: a seam of silver, and Miner Johnson, who sealed himself in with it.
 [[dungeon.door]]
 key = "johnson_seam"
+display = 48
+look = "A Glint of Silver in the Rock"
 name = "Johnson's Seam"
 kind = "hidden"
 at = [-118.0, -450.0, 55.6]
@@ -2120,7 +2154,8 @@ text = "in the east lobe's back wall, a seam of silver dug out by hand, and the 
 # The powder crates across the cannon gallery's alcove.
 [[dungeon.door]]
 key = "marisa_alcove"
-name = "Stacked Powder Crates"
+name = "Marisa's Alcove"
+look = "Stacked Powder Crates"
 kind = "illusory"
 display = 31
 at = [-110.0, -615.0, 14.2]
@@ -2133,6 +2168,9 @@ text = "the crates are empty, and stacked across a gap: behind them, the alcove,
 # The back of the goblins' workshop, past the sawhorses: the noble they keep.
 [[dungeon.door]]
 key = "noble_cell"
+display = 181
+look = "A Chain Bolted to the Floor"
+scale = 1.2
 name = "The Back of the Workshop"
 kind = "hidden"
 at = [-300.0, -611.0, 47.6]
@@ -2241,47 +2279,52 @@ slot = "chest"
 reduce = 0.14
 weight = 0.02
 text = "Stained past saving and stretched past its seams. Whatever was in that jar, it's soaked in."
+perks = [{ kind = "regen", amount = 0.004 }]
 
 [[item]]
 key = "vancleef_mask"
 name = "VanCleef's Mask"
-display = 3086
-icon = "INV_Helmet_03"
+display = 15308
+icon = "INV_Misc_Bandana_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 text = "The Kingpin's own, cut from the Brotherhood's red. He wouldn't bow in it, even dead."
+perks = [{ kind = "focus", amount = 0.1 }, { kind = "might", amount = 0.04 }]
 
 [[item]]
 key = "johnson_helm"
 name = "Miner Johnson's Lamp-Cap"
-display = 1200
-icon = "INV_Helmet_02"
+display = 15914
+icon = "INV_Helmet_04"
 kind = "armor"
 slot = "head"
 reduce = 0.09
 weight = 0.01
 text = "A mail cap with a lamp's soot on the brim. Johnson found the silver; the silver didn't save him."
+perks = [{ kind = "stamina", amount = 0.08 }]
 
 [[item]]
 key = "marisa_mantle"
 name = "Marisa's Frosted Mantle"
-display = 4109
-icon = "INV_Shoulder_03"
+display = 5000
+icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
 text = "Rimed with frost that never melts. Marisa du'Paige hid from the Brotherhood; then she joined it."
+perks = [{ kind = "focus", amount = 0.06 }]
 
 [[item]]
 key = "noble_doublet"
 name = "Brainwashed Noble's Doublet"
-display = 12645
-icon = "INV_Chest_Cloth_24"
+display = 9545
+icon = "INV_Chest_Leather_08"
 kind = "armor"
 slot = "chest"
 reduce = 0.1
 text = "Fine cloth gone to rags. The voice that spoke through him is quiet now."
+perks = [{ kind = "regen", amount = 0.003 }]
 
 # --- Cookie, gorged: what his secret ingredient does to him ----------------------------------------
 
@@ -2808,3 +2851,10 @@ respawn = 0.0
   name = "two picks"
   weight = 1.5
   steps = [ { clip = 17, take = 0, windup = 0.6, damage = 10, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.5, damage = 10, recovery = 0.9 } ]
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "brotherhood"
+name = "The Brotherhood's Garb"
+bonus = [ { pieces = 2, kind = "stamina", amount = 0.1 }, { pieces = 4, kind = "might", amount = 0.06 } ]

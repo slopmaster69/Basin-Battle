@@ -56,6 +56,9 @@ facing = 4.7
 # A shelf in the far chamber that isn't a shelf: the Forbidden Tome.
 [[dungeon.door]]
 key = "forbidden_tome"
+display = 255
+look = "A Book in Rusted Chains"
+scale = 1.3
 name = "The Forbidden Tome"
 kind = "hidden"
 at = [137.5, -426.5, 18.5]
@@ -65,12 +68,15 @@ text = "behind the last shelf in the far chamber: a book chained shut, and the c
 
 [[dungeon.box]]
 key = "tome_cache"
+name = "Scarlet Coffer"
 at = [138.5, -428.5, 18.5]
 facing = 1.5
 loot = { draught_flask = 1, scarlet_insignia = 14 }
 
 [[dungeon.note]]
 key = "doan_warning"
+display = 220
+scale = 1.3
 name = "Doan's Note in the Margin"
 at = [136.5, -424.5, 18.5]
 facing = 1.5
@@ -79,6 +85,8 @@ text = "\"The Tome binds what it holds only while it is shut and I live. Should 
 # The kennel's back: Loksey's private store.
 [[dungeon.door]]
 key = "kennel_store"
+display = 696
+look = "Sacks of Hound Feed"
 name = "The Kennel's Back Room"
 kind = "hidden"
 at = [185.6, -270.6, 18.6]
@@ -88,6 +96,7 @@ text = "behind the kennels, a store room: the Houndmaster's own, and a good deal
 
 [[dungeon.box]]
 key = "kennel_box"
+name = "Scarlet Coffer"
 at = [185.0, -273.0, 18.6]
 facing = 0.0
 loot = { scarlet_insignia = 16, tonic = 1, whetstone = 1 }
@@ -96,10 +105,14 @@ loot = { scarlet_insignia = 16, tonic = 1, whetstone = 1 }
 
 [[dungeon.note]]
 key = "library_rules"
+hints = ["forbidden_tome", "kennel_store"]
+clue = "No one goes near the last shelf of the far chamber; the Houndmaster keeps a store room behind the kennels."
+display = 220
+scale = 1.3
 name = "The Library's Rules"
 at = [233.4, -162.5, 18.7]
 facing = 3.9
-text = "\"No novice past the reading rooms. No one at all near the last shelf of the far chamber, by order of the Arcanist. The dogs are not to be fed by hand.\""
+text = "\"No novice past the reading rooms. No one at all near the last shelf of the far chamber, by order of the Arcanist. The dogs are not to be fed by hand, and the store room behind the kennels is the Houndmaster's own: keep out of it.\""
 
 # --- the Crusade -------------------------------------------------------------------------------------
 
@@ -242,12 +255,13 @@ boss = "doan"
 [[item]]
 key = "loksey_legs"
 name = "Houndmaster's Leggings"
-display = 12388
-icon = "INV_Pants_06"
+display = 11619
+icon = "INV_Pants_02"
 kind = "armor"
 slot = "legs"
 reduce = 0.11
 text = "Loksey's: torn at the shins where the dogs jumped up."
+set = "arcanist"
 
 [[item]]
 key = "doan_robe"
@@ -258,17 +272,19 @@ kind = "armor"
 slot = "chest"
 reduce = 0.1
 text = "The Arcanist's: embroidered with wards that didn't keep him safe."
+set = "arcanist"
 
 [[item]]
 key = "tome_mantle"
 name = "Mantle of the Tome"
-display = 3119
-icon = "INV_Shoulder_05"
+display = 13672
+icon = "INV_Shoulder_23"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.14
 weight = 0.02
 text = "Torn from the thing that stepped off the page. The writing on it moves."
+perks = [{ kind = "might", amount = 0.07 }]
 
 # --- the Library's own -------------------------------------------------------------------------------------
 
@@ -364,7 +380,7 @@ boss = true
 posture = 240
 drops = { scarlet_insignia = [16, 22] }
 trophy = { loksey_legs = 1 }
-gear = ["loksey_legs"]
+gear = ["loksey_legs", "loksey_boar_spear"]
 respawn = 0.0
   [mob.attack]
   windup = 0.55
@@ -407,6 +423,21 @@ respawn = 0.0
   shove = 5.0
 
 # Arcanist Doan: the Crusade's mage, and the keeper of the Forbidden Tome.
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: arcane fire thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "arcane fire"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 22, radius = 3, speed = 12, spell = 133, look = 10604, blockable = false, recovery = 1 } ]
+
 [[mob]]
 key = "sl_doan"
 name = "Arcanist Doan"
@@ -425,7 +456,7 @@ posture = 240
 keep_away = 8.0
 drops = { scarlet_insignia = [26, 34] }
 trophy = { doan_robe = 1 }
-gear = ["doan_robe"]
+gear = ["doan_robe", "sl_cowl", "hypnotic_blade"]
 respawn = 0.0
 # Whoever opened the Forbidden Tome finds out what Doan kept bound in it.
 then = "sl_fiend"
@@ -549,3 +580,286 @@ respawn = 0.0
   text = "It speaks a word from the Tome, and the shelves catch fire."
   shove = 6.5
   look = 27812
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "arcanist"
+name = "The Arcanist's Regalia"
+bonus = [ { pieces = 2, kind = "focus", amount = 0.06 }, { pieces = 4, kind = "focus", amount = 0.08 } ]
+
+[[item]]
+key = "sl_cowl"
+name = "Arcanist's Cowl"
+display = 14903
+icon = "INV_Helmet_04"
+kind = "armor"
+slot = "head"
+reduce = 0.07
+text = "Doan's: the wards stitched into it hum when a spell is near."
+set = "arcanist"
+
+[[item]]
+key = "sl_scholar_mantle"
+name = "Archivist's Mantle"
+display = 27759
+icon = "INV_Shoulder_08"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.08
+text = "Archivist Corwin's: the Crusade's scholars wore these to the last shelf. Few came back."
+set = "arcanist"
+perks = [{ kind = "focus", amount = 0.05 }]
+
+[[weapon]]
+key = "hypnotic_blade"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [12, 16]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 3.5
+
+[[item]]
+key = "hypnotic_blade"
+name = "Hypnotic Blade"
+display = 2711
+icon = "INV_Weapon_ShortBlade_05"
+kind = "weapon"
+text = "Doan's: the light in it moves when you aren't looking."
+perks = [{ kind = "focus", amount = 0.06 }]
+
+[[weapon]]
+key = "loksey_boar_spear"
+windup = 0.42
+active = 0.12
+recovery = 0.55
+stamina = 20.0
+damage = [28, 36]
+range = 5.0
+arc = 50.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 38
+subclass = 6
+
+[[item]]
+key = "loksey_boar_spear"
+name = "Loksey's Boar Spear"
+display = 5636
+icon = "INV_Spear_06"
+kind = "weapon"
+text = "The Houndmaster's: long enough to keep a dog off, or a hero."
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "sc_gallant"
+at = [253.5, -204.0]
+z = 18.7
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [258.1, -227.6], [217.0, -232.4] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "sl_hound"
+at = [228.0, -325.0]
+z = 18.5
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [234.0, -331.0], [242.0, -331.4] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "sl_hound"
+at = [234.2, -172.0]
+z = 18.7
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "sc_wizard"
+at = [183.5, -275.7]
+z = 18.7
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "sl_diviner"
+at = [176.8, -297.0]
+z = 18.6
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "sc_chaplain"
+at = [211.0, -310.7]
+z = 18.5
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "sl_hound"
+at = [188.0, -272.5]
+z = 18.6
+radius = 1.5
+count = 2
+link = 10.0
+wake = "kennel_box"
+
+# --- the Restricted Section: the west wing nobody's sent to ---------------------------------------
+# A whole room off every way through, where the Crusade shelved what it feared; its Archivist
+# still keeps it, and two wardens wait by his strongbox for anyone who'd open it.
+[[dungeon.door]]
+key = "restricted_section"
+display = 107
+look = "A Stack of Overdue Books"
+scale = 1.3
+name = "The Restricted Section"
+kind = "hidden"
+at = [127.0, -257.0, 18.6]
+find = 6.0
+reveals = ["archivist", "restricted_cache"]
+text = "the west wing, past a rope across the door: the Restricted Section. Someone is still reading in here."
+
+[[dungeon.box]]
+key = "restricted_cache"
+name = "Scarlet Coffer"
+at = [122.0, -252.0, 18.5]
+facing = 0.8
+loot = { draught_flask = 1, scarlet_insignia = 18, whetstone = 1 }
+
+[[dungeon.note]]
+key = "late_returns"
+hints = ["restricted_section"]
+clue = "The Archivist keeps the west wing, past the rope across its door."
+display = 164
+scale = 1.3
+name = "A Torn Requisition"
+at = [254.5, -330.5, 18.5]
+facing = 4.7
+text = "\"Volumes borrowed from the west wing are to be returned to the Archivist in person. He does not forgive late returns. He does not forgive anything.\""
+
+[[dungeon.pack]]
+mob = "sl_archivist"
+key = "archivist"
+at = [130.0, -260.0]
+z = 18.8
+radius = 0.0
+count = 1
+rare = true
+
+# Waiting by the Archivist's strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "sc_myrmidon"
+at = [124.0, -254.0]
+z = 18.5
+radius = 1.5
+count = 2
+link = 10.0
+wake = "restricted_cache"
+
+# The Archivist: a scholar of what the Crusade burned, and he kept a copy of all of it.
+[[mob]]
+key = "sl_archivist"
+name = "Archivist Corwin"
+subname = "Keeper of the Restricted Section"
+display = 2434
+scale = 1.15
+health = 820
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 200
+keep_away = 7.0
+drops = { scarlet_insignia = [22, 28] }
+gear = ["sl_scholar_mantle"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 20
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 22.0
+  spell = 116
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 230.0
+  lock = 0.3
+  blockable = true
+  # A frostbolt, read off the page.
+  [[mob.pattern]]
+  name = "frostbolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 20, range = 26.0, radius = 1.5, speed = 22.0, spell = 116, blockable = true, recovery = 0.9 } ]
+  # Too close: the books burst round him.
+  [[mob.pattern]]
+  name = "burst"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  # A page of fire lobbed where you stand (marked as he reads it).
+  [[mob.pattern]]
+  name = "burning page"
+  weight = 1.5
+  min_range = 5.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.2, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.1 } ]
+  # Nearer his end: three bolts quick on each other.
+  [[mob.pattern]]
+  name = "recital"
+  weight = 2.0
+  below = 0.5
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 0.9, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 1.3 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "burning page"
+  text = "\"Late. You are LATE.\""
+  summon = ["sl_diviner"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.78
+  might = 1.15
+  pattern = "recital"
+  text = "Corwin opens a book he swore he'd never read."
+  shove = 5.0
+  look = 10604

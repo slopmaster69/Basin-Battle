@@ -202,6 +202,10 @@ pub enum Event {
     Announce { text: String },
     /// A big banner for everyone (or one hero).
     Banner { player: Option<Id>, title: String, sub: String },
+    /// A page for one hero to read at leisure (a note, a secret found, the book's record of a
+    /// dungeon): stays up till closed. `kind` is note, secret or lore; `text`'s paragraphs are
+    /// split by blank lines; `links` are (command, label) to read on.
+    Letter { player: Id, kind: String, title: String, place: String, text: String, clue: String, links: Vec<(String, String)> },
     /// A blow coming at a hero that no guard stops (dodge it): warned for its wind-up.
     /// A blow no guard stops on its way to `player` for `secs`; `from` the creature winding it up
     /// (its weapon goes red), none for a hazard or a spell's ground.
@@ -1278,9 +1282,51 @@ impl Survival {
         p.armor.values().map(|i| self.content.items[*i].weight).sum::<f32>().clamp(0.0, 0.5)
     }
 
-    /// The strength of a lasting effect on a hero now (0: none).
+    /// The strength of a lasting effect on a hero now (0: none): what they drank or were given,
+    /// and what their gear gives (its perks, and its sets').
     pub fn effect_of(&self, p: &Player, kind: &str) -> f32 {
-        p.effects.iter().filter(|e| e.kind == kind && e.until > self.clock).map(|e| e.amount).sum()
+        p.effects.iter().filter(|e| e.kind == kind && e.until > self.clock).map(|e| e.amount).sum::<f32>() + self.gear_effect(p, kind)
+    }
+
+    /// What a hero's gear gives of one kind: each piece's perks (armor worn, the weapon or bow of
+    /// the kit in hand) and each set's bonuses for as many of its pieces as they have on.
+    pub fn gear_effect(&self, p: &Player, kind: &str) -> f32 {
+        let gear = self.gear_on(p);
+        let mut total: f32 = gear.iter().flat_map(|i| self.content.items[*i].perks.iter()).filter(|k| k.kind == kind).map(|k| k.amount).sum();
+        for s in &self.content.sets {
+            let n = gear.iter().filter(|i| self.content.items[**i].set == s.key).count();
+            total += s.bonus.iter().filter(|b| b.kind == kind && n >= b.pieces).map(|b| b.amount).sum::<f32>();
+        }
+        total
+    }
+
+    /// An item's perks and set in words (empty: none), for its tooltip after its own text.
+    pub fn gear_words(&self, item: usize) -> String {
+        let c = &self.content;
+        let d = &c.items[item];
+        let mut out = String::new();
+        if !d.perks.is_empty() {
+            let words: Vec<String> = d.perks.iter().map(|p| crate::content::perk_words(&p.kind, p.amount)).collect();
+            out.push_str(&format!("{}: {}.", if d.kind == ItemKind::Armor { "Worn" } else { "In hand" }, words.join(", ")));
+        }
+        if let Some(s) = c.sets.iter().find(|s| s.key == d.set) {
+            let n = c.items.iter().filter(|i| i.set == s.key).count();
+            let bonus: Vec<String> = s.bonus.iter().map(|b| format!("{} pieces: {}", b.pieces, crate::content::perk_words(&b.kind, b.amount))).collect();
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push_str(&format!("{} ({n} pieces). {}.", s.name, bonus.join("; ")));
+        }
+        out
+    }
+
+    /// The gear a hero has on: their armor, and the weapon of the kit in hand.
+    pub fn gear_on(&self, p: &Player) -> Vec<usize> {
+        let mut g: Vec<usize> = p.armor.values().copied().collect();
+        g.push(if p.kit == Kit::Bow { p.bow } else { p.weapon });
+        g.sort_unstable();
+        g.dedup();
+        g
     }
 
     /// The items a hero can use from the bags, in bag order.
@@ -1594,10 +1640,13 @@ impl Survival {
             ObjKind::Door { key } => {
                 let d = c.dungeon.as_ref().and_then(|d| d.doors.iter().find(|x| &x.key == key))?;
                 match d.kind.as_str() {
-                    // A fog or a gate is only its veil; a hidden spot is nothing to see.
-                    "fog" | "gate" | "hidden" => return None,
-                    // A false wall stands till it gives way.
-                    "illusory" if self.door_is_open(key) => return None,
+                    // A fog or a gate is only its veil.
+                    "fog" | "gate" => return None,
+                    // A hidden spot is its marker, searched till it gives its secret up (then cleared
+                    // aside for what it kept, as a false wall gives way).
+                    "hidden" | "illusory" if self.door_is_open(key) => return None,
+                    // A secret looks like what it hides behind.
+                    "hidden" | "illusory" if !d.look.is_empty() => (d.display, d.scale, d.look.clone(), true),
                     "lift" => (if d.display != 0 { d.display } else { LEVER_DISPLAY }, d.scale, d.name.clone(), true),
                     _ => (d.display, d.scale, d.name.clone(), true),
                 }
@@ -1613,7 +1662,10 @@ impl Survival {
                 let d = c.dungeon.as_ref().and_then(|d| d.doors.iter().find(|x| &x.key == key))?;
                 (if d.display != 0 { d.display } else { LEVER_DISPLAY }, d.scale, d.name.clone(), true)
             }
-            ObjKind::Strongbox { .. } => (STRONGBOX_DISPLAY, 1.0, "Defias Strongbox".to_string(), true),
+            ObjKind::Strongbox { key } => {
+                let name = c.dungeon.as_ref().and_then(|d| d.boxes.iter().find(|b| &b.key == key)).map_or(String::new(), |b| b.name.clone());
+                (STRONGBOX_DISPLAY, 1.0, if name.is_empty() { "Defias Strongbox".to_string() } else { name }, true)
+            }
             ObjKind::Chest { def, spent } => {
                 let d = &c.chests[*def];
                 (d.display, d.scale, d.name.clone(), !spent)

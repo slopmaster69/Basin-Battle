@@ -86,7 +86,8 @@ bars = [[106.0, -89.0], [125.0, -89.0]]
 # A cell off the west hall, bricked up: the bricks only stacked dry across its mouth.
 [[dungeon.door]]
 key = "bricked_cell"
-name = "A Bricked-Up Cell"
+name = "Cell Four's Stash"
+look = "A Bricked-Up Cell"
 kind = "illusory"
 display = 134
 at = [137.0, 61.5, -34.9]
@@ -98,6 +99,7 @@ text = "the bricks across the cell are only stacked dry: they tumble, and inside
 
 [[dungeon.box]]
 key = "stash"
+name = "Guard's Lockbox"
 at = [160.0, 61.0, -34.9]
 facing = 3.14
 loot = { plunder = 14, tonic = 1, whetstone = 1 }
@@ -105,6 +107,8 @@ loot = { plunder = 14, tonic = 1, whetstone = 1 }
 # The far end of the west hub's long wing: the warden's ledger, hidden where he kept his bribes.
 [[dungeon.door]]
 key = "warden_ledger"
+display = 9
+look = "A Broken Barrel on a Loose Flagstone"
 name = "The Warden's Hiding Place"
 kind = "hidden"
 at = [175.0, 145.0, -33.9]
@@ -114,12 +118,15 @@ text = "at the far end of the wing, under a loose flagstone: the warden's ledger
 
 [[dungeon.box]]
 key = "bribes"
+name = "Guard's Lockbox"
 at = [176.0, 144.0, -33.9]
 facing = 2.4
 loot = { draught_flask = 1, plunder = 16 }
 
 [[dungeon.note]]
 key = "warden_ledger_note"
+display = 387
+scale = 1.4
 name = "The Warden's Ledger"
 at = [173.5, 143.0, -33.9]
 facing = 2.4
@@ -128,6 +135,9 @@ text = "\"From E. V., for the keys to the east block: 200 gold. For looking the 
 # The end of the east hub's south wing: a cell nobody opens.
 [[dungeon.door]]
 key = "bruegal_cell"
+display = 181
+look = "A Chain on an Unlocked Cell"
+scale = 1.2
 name = "Bruegal's Cell"
 kind = "hidden"
 at = [66.0, -92.0, -33.9]
@@ -139,13 +149,21 @@ text = "the last cell of the south wing: its door was never locked. The dwarf in
 
 [[dungeon.note]]
 key = "guard_report"
+hints = ["warden_ledger"]
+clue = "The warden was prising at the floor at the far end of the wing, past the bricked-up cell."
+display = 183
+scale = 1.3
 name = "A Guard's Report"
 at = [59.9, 3.7, -20.5]
 facing = 0.0
-text = "\"The east block went first; Thredd had keys. We held the guard room until Deepfury broke out of solitary. The warden was nowhere. Nowhere. Somebody ought to ask where he was.\""
+text = "\"The east block went first; Thredd had keys. We held the guard room until Deepfury broke out of solitary. The warden was nowhere. Nowhere. Somebody ought to ask where he was. His orderly says on his knees at the far end of the wing, past the bricked-up cell, prising at the floor.\""
 
 [[dungeon.note]]
 key = "scratched_tally"
+hints = ["bruegal_cell"]
+clue = "Bruegal sleeps in the last cell of the south wing, to the east."
+display = 163
+scale = 1.0
 name = "Scratches on a Cell Wall"
 at = [147.0, 42.0, -34.9]
 facing = 4.7
@@ -153,6 +171,10 @@ text = "Hundreds of tally marks, and over them, scratched deep: \"BRUEGAL'S. LAS
 
 [[dungeon.note]]
 key = "dry_bricks"
+hints = ["bricked_cell"]
+clue = "A cell bricked up without mortar, to be opened again quietly."
+display = 164
+scale = 1.3
 name = "A Mason's Complaint"
 at = [131.0, 52.0, -34.9]
 facing = 1.57
@@ -459,17 +481,19 @@ display = 2699
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
 text = "Bazil Thredd's: quick, and a blow from behind does three and a half times its damage."
+perks = [{ kind = "might", amount = 0.03 }]
 
 [[item]]
 key = "kam_helm"
 name = "Deepfury's Helm"
-display = 1123
+display = 15289
 icon = "INV_Helmet_04"
 kind = "armor"
 slot = "head"
 reduce = 0.1
 weight = 0.02
 text = "Kam Deepfury's: dented from the inside, they say."
+set = "riot_breaker"
 
 [[item]]
 key = "hamhock_vest"
@@ -481,12 +505,13 @@ slot = "chest"
 reduce = 0.13
 weight = 0.02
 text = "Hamhock's: it smells of the cells, and of Hamhock."
+set = "riot_breaker"
 
 [[item]]
 key = "dextren_robe"
 name = "Dextren's Ritual Robe"
-display = 12654
-icon = "INV_Chest_Cloth_40"
+display = 3686
+icon = "INV_Chest_Cloth_31"
 kind = "armor"
 slot = "chest"
 reduce = 0.08
@@ -495,8 +520,8 @@ text = "Dextren Ward's: the stitching at the hem is in a script nobody in Stormw
 [[item]]
 key = "bazil_hood"
 name = "Thredd's Hood"
-display = 3589
-icon = "INV_Helmet_04"
+display = 15308
+icon = "INV_Misc_Bandana_03"
 kind = "armor"
 slot = "head"
 reduce = 0.09
@@ -512,17 +537,19 @@ slot = "chest"
 reduce = 0.24
 weight = 0.08
 text = "Stormwind's plate, bought and paid for: a quarter off every blow, and you'll feel its weight."
+perks = [{ kind = "ward", amount = 0.05 }]
 
 [[item]]
 key = "bruegal_helm"
 name = "Ironknuckle's Helm"
-display = 4145
+display = 15305
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "Bruegal Ironknuckle's plate helm: he wore it in his cell, every day, waiting."
+perks = [{ kind = "might", amount = 0.05 }]
 
 # --- the inmates --------------------------------------------------------------------------------------
 
@@ -813,6 +840,20 @@ respawn = 0.0
   look = 10604
 
 # Targorr the Dread: an orc in chains no longer, two hands on his axe.
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 26, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+
 [[mob]]
 key = "st_targorr"
 name = "Targorr the Dread"
@@ -830,7 +871,7 @@ boss = true
 posture = 280
 drops = { plunder = [24, 30] }
 trophy = { targorr_axe = 1 }
-gear = ["targorr_axe"]
+gear = ["targorr_axe", "st_riot_pauldrons"]
 respawn = 0.0
   [mob.attack]
   windup = 0.85
@@ -1116,6 +1157,15 @@ respawn = 0.0
   look = 26271
 
 # Bruegal Ironknuckle: the dwarf in the last cell, who never wanted out until now.
+  # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 22, radius = 3, speed = 12, spell = 7978, look = 3204, blockable = false, recovery = 1 } ]
+
 [[mob]]
 key = "st_bruegal"
 name = "Bruegal Ironknuckle"
@@ -1132,7 +1182,7 @@ grip = "2h"
 boss = true
 posture = 300
 drops = { plunder = [26, 32] }
-gear = ["bruegal_helm"]
+gear = ["bruegal_helm", "st_riot_greaves"]
 respawn = 0.0
   [mob.attack]
   windup = 0.95
@@ -1167,5 +1217,100 @@ respawn = 0.0
   text = "\"Ironknuckle doesnae go back in!\""
   shove = 6.0
   look = 26271
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 32, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 32, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 49, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 46, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 38, range = 22, radius = 3, speed = 12, spell = 7978, look = 3204, blockable = false, recovery = 1 } ]
 
 # --- the journal (outside the camp's goals for now) ---------------------------------------------------
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "riot_breaker"
+name = "The Riot-Breaker's Kit"
+bonus = [ { pieces = 2, kind = "ward", amount = 0.03 }, { pieces = 4, kind = "might", amount = 0.05 } ]
+
+[[item]]
+key = "st_riot_pauldrons"
+name = "Riot-Breaker Pauldrons"
+display = 15890
+icon = "INV_Shoulder_13"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.1
+weight = 0.02
+text = "Targorr tore them off a guard and wore them for spite."
+set = "riot_breaker"
+
+[[item]]
+key = "st_riot_greaves"
+name = "Riot-Breaker Greaves"
+display = 3414
+icon = "INV_Pants_04"
+kind = "armor"
+slot = "legs"
+reduce = 0.11
+weight = 0.02
+text = "Bruegal's own: plate a guard won't be needing, from the cell they never open."
+set = "riot_breaker"
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "st_prisoner"
+at = [125.9, -10.3]
+z = -26.5
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [125.9, -22.3], [125.9, -32.3] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "st_convict"
+at = [132.6, 39.7]
+z = -33.4
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "st_inmate"
+at = [127.9, 11.7]
+z = -25.6
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "st_prisoner"
+at = [156.9, 60.3]
+z = -34.9
+radius = 1.5
+count = 2
+link = 10.0
+wake = "stash"

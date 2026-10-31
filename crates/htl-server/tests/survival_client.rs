@@ -1396,6 +1396,17 @@ fn the_book_lists_every_dungeon_and_a_page_of_another_takes_a_hero_to_its_own_wo
         assert!(dungeons.contains(&format!("{}~{}~", d.key, d.name)), "{} in the book: {dungeons}", d.name);
     }
     assert!(m.text.contains("stockade_gate~The Stockade's Gate~stockade"), "its first page, with its dungeon");
+    // Each dungeon's record of secrets and notes: its tallies in the book, its page on asking.
+    let dm = c.dungeons().find(|d| d.key == "deadmines").unwrap();
+    let (secrets, notes) = (dm.doors.iter().filter(|d| d.secret()).count(), dm.notes.len());
+    let entry = dungeons.split('^').find(|e| e.starts_with("deadmines~")).unwrap_or("");
+    assert!(entry.ends_with(&format!("~0~{secrets}~0~{notes}")), "none found yet: {entry}");
+    a.chat(".es lore deadmines");
+    let nt = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tNT\tlore\t")));
+    let ServerPacket::MessageChat(m) = nt.expect("the record's page") else { unreachable!() };
+    assert!(m.text.contains(&format!("0 of {secrets} secrets found, 0 of {notes} notes read")) && m.text.contains("Secrets found: none yet.{n}{n}"), "{}", m.text);
+    a.chat(".es note smugglers_tally");
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You haven't read that one yet"))).is_some(), "not read: not in the book");
     a.chat(".es travel stockade_gate");
     assert!(a.wait(2.0, |p| p.name() == "SMSG_TRANSFER_PENDING").is_some(), "the far teleport starts");
     assert!(a.wait(2.0, |p| p.name() == "SMSG_NEW_WORLD").is_some(), "onto the Stockade's map");
