@@ -1004,9 +1004,13 @@ pub struct DoorDef {
     /// The line it bars while shut, end to end (nobody walks through it).
     #[serde(default)]
     pub bars: Option<[[f32; 2]; 2]>,
-    /// Said when it opens.
+    /// Said when it opens (a secret's, to everyone in chat after the finder's name: keep it a line).
     #[serde(default)]
     pub text: String,
+    /// A secret's page, the finder's to read (the letter that opens): what they find and read
+    /// there, `{n}` between lines. Without one, the page is `text`.
+    #[serde(default)]
+    pub page: String,
     /// A `hidden` secret: found by a hero this near `at`.
     #[serde(default)]
     pub find: f32,
@@ -2619,6 +2623,13 @@ impl Content {
                 }
                 if dr.kind == "hidden" && dr.find <= 0.0 {
                     bail!("dungeon door {}: a hidden secret is noticed within `find` yards (above 0)", dr.key);
+                }
+                // A page travels to the add-on in one tab-separated line: `{n}` for its breaks.
+                if !dr.page.is_empty() && !dr.secret() {
+                    bail!("dungeon door {}: only a secret has a `page`", dr.key);
+                }
+                if dr.page.contains(['\t', '\n', '\r']) {
+                    bail!("dungeon door {}: its `page` breaks lines with {{n}}, not tabs or newlines", dr.key);
                 }
                 if dr.kind == "hidden" && (dr.display == 0 || dr.look.is_empty()) {
                     bail!("dungeon door {}: a hidden secret needs a marker to search (`display` and `look`)", dr.key);

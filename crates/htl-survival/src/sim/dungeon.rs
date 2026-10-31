@@ -248,7 +248,14 @@ impl Survival {
             let all = dg.doors.iter().filter(|x| x.secret()).count();
             let found = dg.doors.iter().filter(|x| x.secret() && self.ever("secret", &x.key)).count();
             let place = format!("A secret of {}: {found} of {all} found", dg.name);
-            let body = if d.text.is_empty() { format!("You have found something hidden: {}.", d.name) } else { sentence(&d.text) };
+            // Its page, if it has one (the chat line stays the short `text`).
+            let body = if !d.page.is_empty() {
+                d.page.clone()
+            } else if d.text.is_empty() {
+                format!("You have found something hidden: {}.", d.name)
+            } else {
+                sentence(&d.text)
+            };
             let kept: Vec<String> = dg.notes.iter().filter(|n| reveals.contains(&n.key)).map(|n| n.name.clone()).collect();
             let clue = if kept.is_empty() { String::new() } else { format!("Something was left here to read: {}.", kept.join(", ")) };
             self.events.push(Event::Letter { player: by, kind: "secret".into(), title: d.name.clone(), place, text: body, clue, links: Vec::new() });
