@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 # and its download progress bar slows Invoke-WebRequest to a crawl.
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = "SilentlyContinue"
-$Root =Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 $Host.UI.RawUI.WindowTitle = "Basin Battle server (close this window to stop it)"
 $Settings = Join-Path $Root "settings-windows.txt"
@@ -20,17 +20,7 @@ $Settings = Join-Path $Root "settings-windows.txt"
 function Say($text) { Write-Host $text -ForegroundColor Cyan }
 
 # --- Rust ----------------------------------------------------------------------------------------
-# The GNU toolchain links with its own bundled linker, so no Visual Studio is needed.
-$cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
-if (Test-Path $cargoBin) { $env:PATH = "$cargoBin;$env:PATH" }
-if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-    Say "Installing Rust (once; a few minutes)..."
-    $installer = Join-Path $env:TEMP "rustup-init.exe"
-    Invoke-WebRequest -UseBasicParsing -Uri "https://win.rustup.rs/x86_64" -OutFile $installer
-    & $installer -y --profile minimal --default-host x86_64-pc-windows-gnu --default-toolchain stable
-    if ($LASTEXITCODE -ne 0) { throw "The Rust installer failed (exit $LASTEXITCODE)." }
-    $env:PATH = "$cargoBin;$env:PATH"
-}
+. (Join-Path $PSScriptRoot "windows-rust.ps1")
 
 # --- the WoW 1.12.1 Data folder ------------------------------------------------------------------
 # A folder counts if it is the Data folder itself or the WoW folder that holds it.
@@ -70,7 +60,7 @@ Say "Game data: $data"
 
 # --- build ---------------------------------------------------------------------------------------
 Say "Building the server (only what changed since last time)..."
-& cargo build --release -q -p htl-server
+& cargo build --release -p htl-server
 if ($LASTEXITCODE -ne 0) { throw "The server didn't build (exit $LASTEXITCODE): see the errors above." }
 $exe = Join-Path $Root "target\release\htl-server.exe"
 
