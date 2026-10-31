@@ -453,10 +453,8 @@ pub struct Player {
     pub guard_at: f32,
     pub prev_guard_at: f32,
     pub sprint_held: bool,
-    /// Sprinting now (held, moving, not committed to anything, stamina left).
+    /// Sprinting now (held, moving, not walking, not committed to anything, stamina left).
     pub sprinting: bool,
-    /// When Sprint's look and sound last played (not again for every short stop and start).
-    pub sprint_look_at: f32,
     /// Reeling from a parried blow until then: every blow on them lands harder.
     pub riposte_until: f32,
     /// Who struck them last (a fall to another hero is announced).
@@ -987,7 +985,6 @@ impl Survival {
             prev_guard_at: -100.0,
             sprint_held: false,
             sprinting: false,
-            sprint_look_at: f32::NEG_INFINITY,
             riposte_until: -100.0,
             last_hit_by: None,
             buffered: None,
@@ -1239,7 +1236,14 @@ impl Survival {
             if len < 0.01 {
                 continue;
             }
-            let speed = if m.back && !m.forward { self.back_speed_for(p) } else { self.speed_for(id) };
+            // Walking (X) is the client's own pace: no slower than whatever else holds them back.
+            let speed = if m.back && !m.forward {
+                self.back_speed_for(p)
+            } else if m.walk {
+                self.speed_for(id).min(WALK_SPEED)
+            } else {
+                self.speed_for(id)
+            };
             let rel = fy.atan2(fx);
             let dir = p.facing + rel;
             let step = speed * dt;
@@ -1462,6 +1466,8 @@ impl Survival {
             .join(", ")
     }
 
+    /// The hero's run speed, as the client is told it. Walking (X) isn't in it: the client walks
+    /// at its own walk speed, and a run speed of a walk's pace would stay after X back to running.
     pub(crate) fn speed_for(&self, id: Id) -> f32 {
         let Some(p) = self.players.get(&id) else { return 0.0 };
         let c = &self.content.player;
@@ -1475,7 +1481,6 @@ impl Survival {
             Action::Eat { .. } => c.use_speed,
             Action::Gather { .. } | Action::Work { .. } | Action::Stagger { .. } => c.use_speed,
             _ if p.sprinting => c.sprint_speed,
-            _ if p.moving.walk => WALK_SPEED,
             _ => c.run_speed,
         };
         base * self.speed_share(id)
