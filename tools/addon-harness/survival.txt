@@ -211,7 +211,7 @@ GL	3	17	Provisions	Hunt boars for meat and cook three roasts at the fire.	1	3
 # Effects, the quick item and armor.
 H	150	200	100	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2		0	0	bow	17	0.38	0.86	57	0.56	1.13	14	22	22	Hearty Stew	2	14
 EF	Well Fed~171~stamina^Honed~95~might
-!table.insert(SAID, "effects: " .. tostring(ElwynnSurvival.vitals.effects:GetText()) .. " | quick " .. tostring(ElwynnSurvival.gear.quickName:GetText()))
+!table.insert(SAID, "effects: " .. tostring(ElwynnSurvival.vitals.effects:GetText()))
 !ElwynnSurvival.Cycle()
 # The fourth round: our own blow's weight as it connects, a dodge aside, a knockdown, others'
 # dodges and a creature's wound-up swing.
