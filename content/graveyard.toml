@@ -1017,3 +1017,66 @@ display = 5176
 icon = "INV_Sword_15"
 kind = "weapon"
 text = "The Fallen Champion's: it fought for the Crusade once."
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "gy_torturer"
+at = [1690.0, 1052.0]
+z = 18.7
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [1702.8, 1066.0], [1705.0, 1091.0] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "gy_phantasm"
+at = [1772.6, 1146.6]
+z = 7.5
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [1796.0, 1175.0], [1796.0, 1211.0] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "gy_phantasm"
+at = [1840.3, 1277.7]
+z = 18.2
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "gy_zombie"
+at = [1807.0, 1379.0]
+z = 18.9
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "gy_spirit"
+at = [1708.0, 1093.0]
+z = 6.8
+radius = 0.0
+count = 1
+link = 10.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "gy_scryer"
+at = [1760.0, 1121.0]
+z = 7.5
+radius = 0.0
+count = 1
+link = 12.0

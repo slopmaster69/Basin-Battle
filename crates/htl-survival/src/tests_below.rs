@@ -921,3 +921,31 @@ fn gear_gives_its_perks_while_on_and_a_set_more_for_its_pieces() {
     assert_eq!(fx(&s, "might"), 0.0, "taken off: gone");
     assert_eq!(fx(&s, "stamina"), 0.0);
 }
+
+#[test]
+fn a_strongbox_can_have_guards_waiting_unseen_for_whoever_opens_it() {
+    let mut c = content();
+    let d = c.dungeon.as_mut().unwrap();
+    d.boxes.push(crate::content::BoxDef { key: "bait".into(), at: [30.0, 30.0, 0.0], facing: 0.0, loot: BTreeMap::from([("plunder".to_string(), 5)]) });
+    let mut guards = pack("grunt", "", [33.0, 30.0], false);
+    guards.count = 2;
+    guards.radius = 1.5;
+    guards.wake = "bait".into();
+    d.packs.push(guards);
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    let at_box = |s: &Survival| s.mobs.values().filter(|m| m.health > 0 && dist2d(m.pos, [33.0, 30.0, 0.0]) < 4.0).collect::<Vec<_>>().len();
+    let shown = |s: &Survival| s.mobs.values().filter(|m| m.health > 0 && !m.hidden && dist2d(m.pos, [33.0, 30.0, 0.0]) < 4.0).count();
+    assert_eq!(at_box(&s), 2, "laid out");
+    assert_eq!(shown(&s), 0, "but unseen");
+    // Standing by them wakes nothing: only the box does.
+    s.move_player(id, [31.0, 30.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.5);
+    assert_eq!(shown(&s), 0, "still unseen beside them");
+    let bx = obj(&s, |k| matches!(k, ObjKind::Strongbox { key } if key == "bait"));
+    s.interact(id, Some(bx));
+    let ev = s.step(DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "Ambush!")));
+    assert_eq!(shown(&s), 2, "out of the dark");
+    assert!(s.mobs.values().filter(|m| dist2d(m.pos, [33.0, 30.0, 0.0]) < 4.0).all(|m| m.state.target() == Some(id)), "on the opener");
+}

@@ -825,6 +825,22 @@ impl Survival {
         }
         self.tell(id, format!("In the strongbox: {}.", words.join(", ")));
         self.events.push(Event::Bags { player: id });
+        // Its guards, waiting unseen for whoever opens it: on them at once.
+        let guards: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.hidden && m.health > 0 && m.pack.is_some_and(|k| self.content.packs[k].wake == key))
+            .map(|(mid, _)| *mid)
+            .collect();
+        if !guards.is_empty() {
+            self.events.push(Event::Banner { player: Some(id), title: "Ambush!".into(), sub: String::new() });
+        }
+        for mid in guards {
+            self.mobs.get_mut(&mid).unwrap().hidden = false;
+            self.events.push(Event::MobSpawned { id: mid });
+            self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
+            self.engage(mid, mobs::Foe::Hero(id));
+        }
         self.events.push(Event::Dirty);
     }
 
@@ -1199,7 +1215,8 @@ impl Survival {
             .collect();
         for mid in hidden {
             let m = &self.mobs[&mid];
-            let wake = m.pack.map_or(0.0, |k| self.content.packs[k].hidden);
+            // (One its strongbox wakes waits for that; see `open_box`.)
+            let wake = m.pack.filter(|k| self.content.packs[*k].wake.is_empty()).map_or(0.0, |k| self.content.packs[k].hidden);
             let near = self
                 .players
                 .iter()

@@ -1217,3 +1217,76 @@ icon = "INV_Axe_10"
 kind = "weapon"
 text = "Ramtusk's: the quillboar named it, and meant it."
 perks = [{ kind = "might", amount = 0.03 }]
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rk_quilguard"
+at = [1947.8, 1573.0]
+z = 81.4
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [1963.8, 1596.6], [1987.0, 1598.0] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2007.0, 1554.0]
+z = 80.1
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [2022.6, 1511.6], [2044.0, 1478.0] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2057.0, 1557.0]
+z = 69.5
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2085.2, 1980.0]
+z = 63.9
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rk_acolyte"
+at = [2161.0, 1631.8]
+z = 81.7
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2162.0, 1967.0]
+z = 60.2
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2151.8, 1431.0]
+z = 74.6
+radius = 1.5
+count = 2
+link = 10.0
+wake = "bone_cache"

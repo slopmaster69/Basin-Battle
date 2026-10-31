@@ -2582,6 +2582,9 @@ impl Content {
                 if self.mob(&p.mob).is_some_and(|m| self.mobs[m].boss) && p.key.is_empty() {
                     bail!("dungeon pack of {}: a boss's pack needs a key", p.mob);
                 }
+                if !p.wake.is_empty() && !d.boxes.iter().any(|b| b.key == p.wake) {
+                    bail!("dungeon pack of {}: it wakes on strongbox {}, and there's none", p.mob, p.wake);
+                }
             }
             for dr in &d.doors {
                 if !DoorDef::KINDS.contains(&dr.kind.as_str()) {

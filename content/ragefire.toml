@@ -1216,3 +1216,85 @@ display = 1455
 icon = "INV_Axe_03"
 kind = "weapon"
 text = "Bazzalan's: wide and hungry, three at a swing."
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rf_enforcer"
+at = [-65.3, -37.5]
+z = -17.6
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-77.3, -37.0], [-87.3, -35.5] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-290.3, 2.5]
+z = -46.1
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-264.3, 2.2], [-238.3, 4.5] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-104.5, 39.0]
+z = -18.0
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rf_earthborer"
+at = [-115.3, 100.9]
+z = -16.3
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-19.3, -40.3]
+z = -21.7
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rf_warlock"
+at = [-93.3, -34.5]
+z = -25.4
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rf_shaman"
+at = [-225.3, -38.5]
+z = -55.8
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-81.1, 93.1]
+z = -7.5
+radius = 1.5
+count = 2
+link = 10.0
+wake = "ledge_cache"

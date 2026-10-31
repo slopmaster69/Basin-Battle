@@ -1406,3 +1406,67 @@ display = 1206
 icon = "INV_Hammer_03"
 kind = "weapon"
 text = "Verdan's: a root as thick as a man, and as hard as stone."
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-110.1, 161.2]
+z = -80.0
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-109.3, 173.2], [-108.5, 185.2] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [-95.1, 227.2]
+z = -90.8
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-52.7, 107.8], [-191.1, 35.2] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [-43.9, 296.8]
+z = -90.8
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "wc_shambler"
+at = [-203.1, -287.8]
+z = -65.3
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-157.1, -40.8]
+z = -79.9
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-334.4, 21.0]
+z = -102.2
+radius = 1.5
+count = 2
+link = 10.0
+wake = "fang_stash"
