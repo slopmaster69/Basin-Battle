@@ -1,0 +1,29 @@
+# Every pull request: the repository rules no test would notice (scripts/check-pr.sh). Fails on a
+# game file, save, log, build output, settings file, zip, executable or secret in the branch, or
+# on two client patches sharing a number; warns (as notes on the files) when an existing patch is
+# edited, when the add-on line formats change without the add-on, and on Lua the 1.12 client
+# can't run. It takes seconds, so it can be a required check.
+name: PR rules
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-rules-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rules:
+    name: Repository rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check the branch against AGENTS.md
+        run: scripts/check-pr.sh "origin/${{ github.base_ref }}"

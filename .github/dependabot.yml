@@ -1,0 +1,25 @@
+# Pull requests that keep the dependencies current, grouped so they arrive as one or two a month
+# rather than one per crate. They go through CI like any other pull request; merge one when its
+# checks pass. The pinned benilla client revision (scripts/common.sh) is updated by hand, not here.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "Dependencies:"
+    groups:
+      rust-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "CI:"
+    groups:
+      actions:
+        patterns: ["*"]
