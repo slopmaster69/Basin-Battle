@@ -494,7 +494,7 @@ fn blows_land_on_a_boar_and_the_shield_blocks_its_charge() {
         face(&mut c);
         c.drain(0.1);
         c.chat(".es in a");
-        if c.wait(1.0, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == me && s.victim == boar && s.damage > 0)).is_some() {
+        if c.wait_exactly(1.0, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == me && s.victim == boar && s.damage > 0)).is_some() {
             hit = true;
             break;
         }
@@ -507,7 +507,7 @@ fn blows_land_on_a_boar_and_the_shield_blocks_its_charge() {
     let mut blocked = false;
     while Instant::now() < end {
         face(&mut c);
-        if c.wait(0.3, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == boar && s.victim == me && s.victim_state == 5)).is_some() {
+        if c.wait_exactly(0.3, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == boar && s.victim == me && s.victim_state == 5)).is_some() {
             blocked = true;
             break;
         }
@@ -518,7 +518,15 @@ fn blows_land_on_a_boar_and_the_shield_blocks_its_charge() {
 
 #[test]
 fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
-    let server = start_with(None, false);
+    // No wild creatures (as a Siege world has none): timber lies at random in three spots, one
+    // of them on a Darkspear Berserker patrol, and heroes sent to a pile there fell before they
+    // could use it (#2). The raid brings its own.
+    let mut rules = content();
+    rules.packs.clear();
+    rules.roams.clear();
+    rules.camps.clear();
+    let spawn = rules.world.spawn;
+    let server = start_content(None, false, rules);
     let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
     let ag = enter(&mut a);
     let mut b = Client::connect(server.login, "ben", "hold", REALM).unwrap();
@@ -527,23 +535,42 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     b.chat(".es hello 1");
     // Each sees the other.
     assert!(a.wait(2.0, |p| creates_guid(p, bg)).is_some(), "ann sees ben");
-    b.drain(0.5);
-    assert!(placed(&b).iter().any(|(g, ..)| *g == ag), "ben sees ann");
+    assert!(b.until(0.5, |c| placed(c).iter().any(|(g, ..)| *g == ag)), "ben sees ann");
+    // For a failure to say what went on: who felled whom (the kill feed) and their falls and
+    // gettings-up from the start, then what a hero's been told lately and their bar.
+    let story = |c: &Client| {
+        let lines = addon_lines(c, "ES");
+        let mut l: Vec<String> = lines.iter().filter(|l| l.starts_with("KF\t") || l.starts_with("DE\t")).cloned().collect();
+        let mut recent: Vec<String> = lines.into_iter().filter(|l| l.starts_with("T\t") || l.starts_with("H\t")).collect();
+        let last = recent.len().saturating_sub(6);
+        l.append(&mut recent.split_off(last));
+        l
+    };
 
     // Both at the same timber pile, both using it at once: two uses between them, then it's gone
-    // for both, and nobody gets a third.
-    let (node, at) = objects_with(&a, 1248)[0];
+    // for both, and nobody gets a third. The pile nearest them, not whichever was sent first.
+    let near = |p: &[f32; 3]| (p[0] - spawn[0]).powi(2) + (p[1] - spawn[1]).powi(2);
+    let (node, at) = objects_with(&a, 1248).into_iter().min_by(|x, y| near(&x.1).total_cmp(&near(&y.1))).expect("a timber pile");
     for c in [&mut a, &mut b] {
         stand(c, [at[0] + 1.5, at[1], at[2]], std::f32::consts::PI);
     }
     a.drain(0.2);
     a.send(op::CMSG_GAMEOBJ_USE, &node.to_le_bytes());
     b.send(op::CMSG_GAMEOBJ_USE, &node.to_le_bytes());
-    assert!(a.wait(6.0, |p| matches!(p, ServerPacket::DestroyObject { guid } if *guid == node)).is_some(), "the pile is spent for ann");
+    assert!(
+        a.wait(6.0, |p| matches!(p, ServerPacket::DestroyObject { guid } if *guid == node)).is_some(),
+        "the pile is spent for ann.\nann: {:?}\nben: {:?}",
+        story(&a),
+        story(&b)
+    );
     assert!(b.wait(1.0, |p| matches!(p, ServerPacket::DestroyObject { guid } if *guid == node)).is_some() || b.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if *guid == node)), "and for ben");
-    a.drain(0.3);
-    b.drain(0.3);
     let got = |c: &Client| c.seen.iter().filter(|p| matches!(p, ServerPacket::MessageChat(m) if m.text.trim_start_matches("ES\tT\t").starts_with('+') && m.text.contains("Timber"))).count();
+    // Each hero's "+Timber" can come a little after the pile goes.
+    let end = Instant::now() + Duration::from_secs_f32(0.6 * common::SLACK);
+    while got(&a) + got(&b) < 2 && Instant::now() < end {
+        a.drain(0.05);
+        b.drain(0.05);
+    }
     assert_eq!(got(&a) + got(&b), 2, "two gathers from a two-use pile");
     a.send(op::CMSG_GAMEOBJ_USE, &node.to_le_bytes());
     a.drain(2.0);
@@ -574,7 +601,8 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     b.chat(".es place");
     b.drain(0.5);
     assert!(a.wait(1.5, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("builds a Smithing Anvil"))).is_some() || said(&a, "builds a Smithing Anvil"), "the smithy: {:?}", addon_lines(&b, "ES").iter().filter(|l| l.starts_with("BP") || l.starts_with("T")).collect::<Vec<_>>());
-    b.drain(0.3);
+    b.until(0.3, |c| !objects_with(c, 192).is_empty());
+    a.until(0.3, |c| !objects_with(c, 166).is_empty());
     assert_eq!(objects_with(&b, 192).len(), 1, "ben sees ann's fire");
     assert_eq!(objects_with(&a, 166).len(), 1, "ann sees ben's anvil");
 
@@ -586,13 +614,11 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tCF\traid\t"))).is_some(), "asked first");
     a.chat(".es raid yes");
     assert!(b.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tBN\tWarsong Raid"))).is_some(), "ben is warned");
-    assert!(objects_with(&b, 5812).len() >= 4, "the way they come is marked");
+    assert!(b.until(0.5, |c| objects_with(c, 5812).len() >= 4), "the way they come is marked");
     let raider = b.wait(4.0, |p| matches!(p, ServerPacket::UpdateObject { .. }) && placed_in(p).iter().any(|(_, t)| *t == ObjectType::Unit));
     assert!(raider.is_some(), "raiders arrive");
-    let h = {
-        b.drain(0.4);
-        hud(&b).unwrap()
-    };
+    b.until(0.4, |c| hud(c).is_some_and(|h| h.get(11).is_some_and(|s| s == "active")));
+    let h = hud(&b).unwrap();
     assert_eq!(h[11], "active", "{h:?}");
 }
 
@@ -687,7 +713,7 @@ fn the_guard_shows_its_pose_the_rack_arms_and_a_timed_guard_parries() {
         c.chat(".es in gu");
         c.drain(0.1);
         c.chat(".es in g");
-        parried = c.wait(0.65, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == wolf && s.victim == me && s.victim_state == 3)).is_some();
+        parried = c.wait_exactly(0.65, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == wolf && s.victim == me && s.victim_state == 3)).is_some();
     }
     assert!(parried, "a parry: {:?}", c.seen.iter().filter_map(|p| if let ServerPacket::AttackerState(s) = p { Some((s.attacker == me, s.victim_state, s.damage)) } else { None }).collect::<Vec<_>>());
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "ES\tFL\tParry!")).is_some() || addon_lines(&c, "ES").iter().any(|l| l == "FL\tParry!"), "the flash");
@@ -723,7 +749,7 @@ fn with_friendly_fire_heroes_strike_and_parry_each_other_and_get_up_at_once() {
         a.chat(".es in au");
         std::thread::sleep(Duration::from_millis(180));
         b.chat(".es in g");
-        parried = a.wait(1.2, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == ag && s.victim == bg && s.victim_state == 3)).is_some();
+        parried = a.wait_exactly(1.2, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == ag && s.victim == bg && s.victim_state == 3)).is_some();
         a.drain(0.8);
     }
     assert!(parried, "a parry between heroes");
@@ -737,7 +763,7 @@ fn with_friendly_fire_heroes_strike_and_parry_each_other_and_get_up_at_once() {
     while Instant::now() < end && !felled {
         b.chat(".es in a");
         b.chat(".es in au");
-        felled = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if { let t = m.text.to_lowercase(); t.contains("ben fells ann") || t == "es\tkf\tben\tann" })).is_some();
+        felled = a.wait_exactly(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if { let t = m.text.to_lowercase(); t.contains("ben fells ann") || t == "es\tkf\tben\tann" })).is_some();
     }
     assert!(felled, "the fall is announced: {:?}", a.seen.iter().filter_map(|p| if let ServerPacket::MessageChat(m) = p { Some(m.text.clone()) } else { None }).collect::<Vec<_>>());
     let t0 = Instant::now();
@@ -810,6 +836,10 @@ fn the_third_round_client_gets_its_blows_reactions_lock_on_and_runs_its_own_dodg
     a.drain(0.5);
     b.drain(0.3);
     // Her blows, for her own instant play, and a ping to time her round trip.
+    a.until(1.0, |c| {
+        let l = addon_lines(c, "ES");
+        l.iter().any(|l| l.starts_with("MV\t")) && l.iter().any(|l| l.starts_with("PI\t"))
+    });
     let lines = addon_lines(&a, "ES");
     let mv = lines.iter().find(|l| l.starts_with("MV\t")).cloned().expect("the moves line");
     let f: Vec<&str> = mv.split('\t').collect();
@@ -823,15 +853,23 @@ fn the_third_round_client_gets_its_blows_reactions_lock_on_and_runs_its_own_dodg
     a.chat(".es in au");
     a.drain(1.2);
     b.drain(0.3);
+    let swung = format!("AN\t{ag:#X}\t17\t");
+    let re = format!("RE\t{bg:#X}\t9\t");
+    let flinch = |c: &Client, own: &str| addon_lines(c, "ES").iter().any(|l| l.starts_with(&re) && l.ends_with(own));
+    // On a busy machine the swing and flinch lines can come after the drains above.
+    a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with(&swung)) && flinch(c, "\t0\t0.00"));
     let lines = addon_lines(&a, "ES");
-    let swing = lines.iter().find(|l| l.starts_with(&format!("AN\t{ag:#X}\t17\t"))).cloned().expect("ann's swing");
+    let swing = lines.iter().find(|l| l.starts_with(&swung)).cloned().expect("ann's swing");
     let f: Vec<&str> = swing.split('\t').collect();
     assert_eq!((f[6], f[7], f[10], f[11]), ("1", "0", "light", "0"), "{swing}");
     assert!(f[9].parse::<f32>().unwrap() > 0.0, "a lunge");
     // Ben flinches back from it, on both screens; his own marked his.
-    let re = format!("RE\t{bg:#X}\t9\t");
-    assert!(addon_lines(&a, "ES").iter().any(|l| l.starts_with(&re) && l.ends_with("\t0\t0.00")), "ann sees ben flinch");
-    assert!(addon_lines(&b, "ES").iter().any(|l| l.starts_with(&re) && l.ends_with("\t1\t0.00")), "ben's own");
+    assert!(flinch(&a, "\t0\t0.00"), "ann sees ben flinch: {:?}", lines.iter().filter(|l| l.starts_with("RE\t")).collect::<Vec<_>>());
+    assert!(
+        b.until(1.0, |c| flinch(c, "\t1\t0.00")),
+        "ben's own: {:?}",
+        addon_lines(&b, "ES").iter().filter(|l| l.starts_with("RE\t")).collect::<Vec<_>>()
+    );
     // A heavy attack's flash on him.
     a.drain(1.0);
     a.chat(".es in h");
@@ -881,6 +919,7 @@ fn the_fourth_round_client_flashes_its_own_blows_and_others_see_the_flash_and_it
     a.drain(0.5);
     b.drain(0.3);
     // Her blows carry their reach, and friendly fire.
+    a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("MV\t")));
     let mv = addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("MV\t")).expect("the moves line");
     let f: Vec<&str> = mv.split('\t').collect();
     assert_eq!(f.len(), 16, "{mv}");
@@ -1328,8 +1367,7 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
         c.chat(".es travel siege");
         assert!(c.wait(3.0, |p| p.name() == "SMSG_NEW_WORLD").is_some(), "onto Arathi Basin's map");
         c.send(op::MSG_MOVE_WORLDPORT_ACK, &[]);
-        c.drain(1.0);
-        assert!(addon_lines(c, "ES").iter().any(|l| l == "WR\tsiege"), "the add-on knows it's Siege");
+        assert!(c.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l == "WR\tsiege")), "the add-on knows it's Siege");
     }
     // The muster banner in the hall, and a way to play.
     let banner_at = {
@@ -1340,10 +1378,16 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
     a.seen.clear();
     a.chat(".es e");
     assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tSL\t1\t"))).is_some(), "the muster's window");
+    // Ann first: the first in the queue holds the first base (the Stables), and two chats sent
+    // at once can reach the server in either order (#2).
     a.chat(".siege join 1v1");
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You wait for"))).is_some(), "ann waits for a match");
     b.chat(".siege join 1v1");
     b.seen.clear();
-    b.drain(sg.countdown + 1.5);
+    b.drain(sg.countdown);
+    b.until(1.5, |c| {
+        addon_lines(c, "ES").iter().rev().find(|l| l.starts_with("SG\trunning\t")).is_some_and(|l| l.contains("the Stables") && l.contains("the Farm"))
+    });
     let lines = addon_lines(&b, "ES");
     let sgl = lines.iter().rev().find(|l| l.starts_with("SG\trunning\t"));
     assert!(sgl.is_some_and(|l| l.contains("the Stables") && l.contains("the Farm")), "the match in the corner: {:?}", lines.iter().filter(|l| l.starts_with("SG")).collect::<Vec<_>>());
@@ -1366,12 +1410,11 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
     a.chat(".es travel camp");
     assert!(a.wait(8.0, |p| p.name() == "SMSG_NEW_WORLD").is_some(), "home again");
     a.send(op::MSG_MOVE_WORLDPORT_ACK, &[]);
-    a.drain(1.0);
-    assert!(addon_lines(&a, "ES").iter().any(|l| l == "WR\tcamp"));
+    assert!(a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l == "WR\tcamp")), "the add-on knows it's home");
     let tr = {
         a.seen.clear();
         a.chat(".es tree");
-        a.drain(0.5);
+        a.until(0.5, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("TR\t")));
         addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("TR\t"))
     };
     assert!(tr.is_some_and(|l| l.matches("~1~").count() > 4), "every card of her dev-world hero, not Siege's two");

@@ -23,7 +23,17 @@ pub struct Client {
     pub events: Vec<String>,
     /// The account logged in as.
     pub user: String,
+    /// Bytes read but not yet made into a packet, and the decrypted header of the packet they
+    /// begin, if it's been read: a read that times out mid-packet keeps what it got, so the next
+    /// one carries on from there instead of losing the stream's place.
+    buf: Vec<u8>,
+    head: Option<(usize, u16)>,
 }
+
+/// How much longer than its own figure a `wait` may take to see what it's waiting for. It costs
+/// nothing when the packet comes in time, and a busy CI runner can be several times slower than
+/// the machine a test's figure was picked on.
+pub const SLACK: f32 = 3.0;
 
 
 impl Client {
@@ -62,6 +72,8 @@ impl Client {
             seen: Vec::new(),
             events: Vec::new(),
             user: user.to_string(),
+            buf: Vec::new(),
+            head: None,
         };
         match c.recv()? {
             ServerPacket::AuthResponse { result, .. } => assert_eq!(result, messages::AUTH_OK),
@@ -79,14 +91,36 @@ impl Client {
         self.s.write_all(&head).unwrap();
     }
 
+    /// Read until at least `n` bytes are buffered. A timeout keeps what arrived (unlike
+    /// `read_exact`, which drops a partly read packet on the floor).
+    fn fill(&mut self, n: usize) -> anyhow::Result<()> {
+        let mut chunk = [0u8; 4096];
+        while self.buf.len() < n {
+            let got = self.s.read(&mut chunk)?;
+            if got == 0 {
+                anyhow::bail!("the server closed the connection");
+            }
+            self.buf.extend_from_slice(&chunk[..got]);
+        }
+        Ok(())
+    }
+
     pub fn recv(&mut self) -> anyhow::Result<ServerPacket> {
-        let mut head = [0u8; 4];
-        self.s.read_exact(&mut head)?;
-        self.crypto.decrypter().decrypt(&mut head);
-        let size = u16::from_be_bytes([head[0], head[1]]) as usize;
-        let opcode = u16::from_le_bytes([head[2], head[3]]);
-        let mut body = vec![0u8; size - 2];
-        self.s.read_exact(&mut body)?;
+        if self.head.is_none() {
+            self.fill(4)?;
+            let mut head = [0u8; 4];
+            head.copy_from_slice(&self.buf[..4]);
+            self.buf.drain(..4);
+            // Decrypted once only: the header cipher's state moves on with every header.
+            self.crypto.decrypter().decrypt(&mut head);
+            let size = u16::from_be_bytes([head[0], head[1]]) as usize;
+            let opcode = u16::from_le_bytes([head[2], head[3]]);
+            self.head = Some((size, opcode));
+        }
+        let (size, opcode) = self.head.unwrap();
+        self.fill(size - 2)?;
+        let body: Vec<u8> = self.buf.drain(..size - 2).collect();
+        self.head = None;
         let (packet, tail) = messages::parse_server_with_tail(opcode, &body)
             .unwrap_or_else(|e| panic!("benilla can't parse {opcode:#06x}: {e}"));
         assert_eq!(tail, 0, "{} left {tail} bytes unread", packet.name());
@@ -98,8 +132,14 @@ impl Client {
         Ok(packet)
     }
 
-    /// Read until `want` matches or `secs` pass.
-    pub fn wait(&mut self, secs: f32, mut want: impl FnMut(&ServerPacket) -> bool) -> Option<ServerPacket> {
+    /// Read until `want` matches, or `secs` (times `SLACK`) pass.
+    pub fn wait(&mut self, secs: f32, want: impl FnMut(&ServerPacket) -> bool) -> Option<ServerPacket> {
+        self.wait_exactly(secs * SLACK, want)
+    }
+
+    /// Read until `want` matches or exactly `secs` pass: for making sure something *doesn't*
+    /// come, where a longer wait only slows the test.
+    pub fn wait_exactly(&mut self, secs: f32, mut want: impl FnMut(&ServerPacket) -> bool) -> Option<ServerPacket> {
         let end = Instant::now() + Duration::from_secs_f32(secs);
         while Instant::now() < end {
             self.s.set_read_timeout(Some(Duration::from_millis(200))).unwrap();
@@ -115,7 +155,28 @@ impl Client {
 
     /// Read whatever arrives over `secs`.
     pub fn drain(&mut self, secs: f32) {
-        let _ = self.wait(secs, |_| false);
+        let _ = self.wait_exactly(secs, |_| false);
+    }
+
+    /// Read until `done` holds for what's been seen, or `secs` (times `SLACK`) pass; whether it
+    /// came true. Use it instead of a `drain` followed by a look at `seen`: it moves on the
+    /// moment the server has said it, and a slow machine gets the time it needs.
+    pub fn until(&mut self, secs: f32, mut done: impl FnMut(&Client) -> bool) -> bool {
+        let end = Instant::now() + Duration::from_secs_f32(secs * SLACK);
+        loop {
+            if done(self) {
+                return true;
+            }
+            if Instant::now() >= end {
+                return false;
+            }
+            self.s.set_read_timeout(Some(Duration::from_millis(50))).unwrap();
+            match self.recv() {
+                Ok(_) => {}
+                Err(e) if is_timeout(&e) => {}
+                Err(e) => panic!("connection failed: {e:#}"),
+            }
+        }
     }
 
     /// The character list, then into the world as the character `pick` chooses; our guid.
