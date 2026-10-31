@@ -595,14 +595,15 @@ set = "arcanist"
 
 [[item]]
 key = "sl_scholar_mantle"
-name = "Scholar's Mantle"
+name = "Archivist's Mantle"
 display = 27759
 icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.08
-text = "The Crusade's scholars wore these to the last shelf. Few came back."
+text = "Archivist Corwin's: the Crusade's scholars wore these to the last shelf. Few came back."
 set = "arcanist"
+perks = [{ kind = "focus", amount = 0.05 }]
 
 [[weapon]]
 key = "hypnotic_blade"
@@ -720,3 +721,124 @@ radius = 1.5
 count = 2
 link = 10.0
 wake = "kennel_box"
+
+# --- the Restricted Section: the west wing nobody's sent to ---------------------------------------
+# A whole room off every way through, where the Crusade shelved what it feared; its Archivist
+# still keeps it, and two wardens wait by his strongbox for anyone who'd open it.
+[[dungeon.door]]
+key = "restricted_section"
+name = "The Restricted Section"
+kind = "hidden"
+at = [127.0, -257.0, 18.6]
+find = 6.0
+reveals = ["archivist", "restricted_cache"]
+text = "the west wing, past a rope across the door: the Restricted Section. Someone is still reading in here."
+
+[[dungeon.box]]
+key = "restricted_cache"
+at = [122.0, -252.0, 18.5]
+facing = 0.8
+loot = { draught_flask = 1, scarlet_insignia = 18, whetstone = 1 }
+
+[[dungeon.note]]
+key = "late_returns"
+name = "A Torn Requisition"
+at = [254.5, -330.5, 18.5]
+facing = 4.7
+text = "\"Volumes borrowed from the west wing are to be returned to the Archivist in person. He does not forgive late returns. He does not forgive anything.\""
+
+[[dungeon.pack]]
+mob = "sl_archivist"
+key = "archivist"
+at = [130.0, -260.0]
+z = 18.8
+radius = 0.0
+count = 1
+rare = true
+
+# Waiting by the Archivist's strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "sc_myrmidon"
+at = [124.0, -254.0]
+z = 18.5
+radius = 1.5
+count = 2
+link = 10.0
+wake = "restricted_cache"
+
+# The Archivist: a scholar of what the Crusade burned, and he kept a copy of all of it.
+[[mob]]
+key = "sl_archivist"
+name = "Archivist Corwin"
+subname = "Keeper of the Restricted Section"
+display = 2434
+scale = 1.15
+health = 820
+run_speed = 7.0
+walk_speed = 2.0
+aggro = 18.0
+leash = 30.0
+weapon = 472
+grip = "staff"
+boss = true
+posture = 200
+keep_away = 7.0
+drops = { scarlet_insignia = [22, 28] }
+gear = ["sl_scholar_mantle"]
+respawn = 0.0
+  [mob.attack]
+  ranged = true
+  windup = 1.1
+  damage = 20
+  range = 26.0
+  arc = 360.0
+  radius = 1.5
+  speed = 22.0
+  spell = 116
+  recovery = 0.9
+  cooldown = 1.3
+  turn_rate = 230.0
+  lock = 0.3
+  blockable = true
+  # A frostbolt, read off the page.
+  [[mob.pattern]]
+  name = "frostbolt"
+  weight = 3.0
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 1.1, damage = 20, range = 26.0, radius = 1.5, speed = 22.0, spell = 116, blockable = true, recovery = 0.9 } ]
+  # Too close: the books burst round him.
+  [[mob.pattern]]
+  name = "burst"
+  weight = 2.0
+  max_range = 4.0
+  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  # A page of fire lobbed where you stand (marked as he reads it).
+  [[mob.pattern]]
+  name = "burning page"
+  weight = 1.5
+  min_range = 5.0
+  max_range = 24.0
+  steps = [ { ranged = true, windup = 1.2, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.1 } ]
+  # Nearer his end: three bolts quick on each other.
+  [[mob.pattern]]
+  name = "recital"
+  weight = 2.0
+  below = 0.5
+  min_range = 3.0
+  max_range = 26.0
+  steps = [ { ranged = true, windup = 0.9, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 1.3 } ]
+  [[mob.phase]]
+  at = 0.66
+  speed = 0.88
+  pattern = "burning page"
+  text = "\"Late. You are LATE.\""
+  summon = ["sl_diviner"]
+  [[mob.phase]]
+  at = 0.33
+  speed = 0.78
+  might = 1.15
+  pattern = "recital"
+  text = "Corwin opens a book he swore he'd never read."
+  shove = 5.0
+  look = 10604
