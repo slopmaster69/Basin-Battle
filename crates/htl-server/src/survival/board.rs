@@ -178,11 +178,7 @@ pub type Shared = Arc<Mutex<Board>>;
 impl Board {
     /// `host`: this server's name on the board (a made-up camp's, kept, when empty).
     pub fn new(path: Option<PathBuf>, host: &str, remote: Option<String>, dungeons: Vec<String>) -> Self {
-        let mut store = path
-            .as_ref()
-            .and_then(|p| std::fs::read_to_string(p).ok())
-            .and_then(|t| toml::from_str::<Store>(&t).ok())
-            .unwrap_or_default();
+        let mut store = path.as_deref().map(load).unwrap_or_default();
         if !host.is_empty() {
             store.name = name_only(host, 32).replace(':', "");
         }
@@ -366,6 +362,32 @@ impl Board {
     }
 }
 
+/// The board as kept in its file: empty if there's none yet. A file that can't be read (a hand
+/// edit, a newer format, cut short) is moved aside to `<name>.bad` first, never written over:
+/// on the board host it's everyone's runs.
+fn load(path: &std::path::Path) -> Store {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Store::default(),
+        Err(e) => return set_aside(path, &e.to_string()),
+    };
+    match toml::from_str::<Store>(&text) {
+        Ok(s) => s,
+        Err(e) => set_aside(path, &e.to_string()),
+    }
+}
+
+fn set_aside(path: &std::path::Path, why: &str) -> Store {
+    let mut bad = path.as_os_str().to_owned();
+    bad.push(".bad");
+    let bad = PathBuf::from(bad);
+    match std::fs::rename(path, &bad) {
+        Ok(()) => eprintln!("[survival] the wager board {} couldn't be read ({why}); kept as {}, starting a new one", path.display(), bad.display()),
+        Err(e) => eprintln!("[survival] the wager board {} couldn't be read ({why}) or moved aside ({e})", path.display()),
+    }
+    Store::default()
+}
+
 /// The board's order: highest level first, then quickest, then earliest.
 fn rank(a: &Run, b: &Run) -> std::cmp::Ordering {
     b.level.cmp(&a.level).then(a.ms.cmp(&b.ms)).then(a.at.cmp(&b.at))
@@ -493,6 +515,25 @@ mod tests {
         let mut slow = r.clone();
         slow.ms = 1_600_000;
         assert!(!Run::parse(&slow.line(), &dungeons).unwrap().timed);
+    }
+
+    #[test]
+    fn a_board_file_that_cant_be_read_is_kept_aside_not_written_over() {
+        let dir = std::env::temp_dir().join(format!("board-bad-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wager-board.toml");
+        std::fs::write(&path, "runs = [ this is not toml").unwrap();
+        let b = Board::new(Some(path.clone()), "here", None, vec!["stockade".into()]);
+        assert!(b.store.runs.is_empty());
+        assert_eq!(std::fs::read_to_string(dir.join("wager-board.toml.bad")).unwrap(), "runs = [ this is not toml", "kept as it was");
+        assert!(std::fs::read_to_string(&path).unwrap().contains("name = \"here\""), "a new one beside it");
+        // A good file is read back, its runs and all.
+        let mut b = b;
+        b.record(&run());
+        let again = Board::new(Some(path.clone()), "", None, vec!["stockade".into()]);
+        assert_eq!(again.store.runs.len(), 1);
+        assert_eq!(again.host, "here");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
