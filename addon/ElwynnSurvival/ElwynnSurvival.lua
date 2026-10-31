@@ -3458,6 +3458,12 @@ banner.sub = Text(banner, FONT_BODY, 14, "OUTLINE")
 banner.sub:SetPoint("TOP", banner.title, "BOTTOM", 0, -6)
 
 function ES.Banner(title, sub)
+  -- A place found or a journal step done is quiet news: a line low over the middle, no banner,
+  -- no sound (the banner and its horn are for what's coming at you).
+  if string.find(title or "", "^Discovered") or string.find(title or "", "^Done") then
+    ES.Message(title .. ((sub and sub ~= "") and ("  ·  " .. sub) or ""))
+    return
+  end
   banner.title:SetText(title)
   banner.sub:SetText(ES.Keyed(sub or ""))
   banner.untilT = GetTime() + 4.5
@@ -4812,8 +4818,6 @@ local function Open(what)
     elseif GameMenuFrame then
       if GameMenuFrame:IsShown() then HideUIPanel(GameMenuFrame) else ShowUIPanel(GameMenuFrame) end
     end
-  elseif what == "help" then
-    if ToggleHelpFrame then ToggleHelpFrame() end
   elseif what == "keys" then
     ES.ToggleKeys()
   end
@@ -4828,7 +4832,6 @@ local BAR = {
   { "map", "Map", "INV_Misc_Map_01", "M" },
   { "keys", "Controls", "INV_Misc_Key_03", "" },
   { "menu", "Game Menu", "INV_Misc_Gear_01", "Esc" },
-  { "help", "Help", "INV_Misc_QuestionMark", "" },
 }
 local bar = CreateFrame("Frame", "ElwynnSurvivalBar", UIParent)
 bar:SetWidth(table.getn(BAR) * (BAR_ICON + 6))
