@@ -60,7 +60,32 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      # The toolchain "Host Basin Battle.bat" installs on a player's PC: GNU, not MSVC, so no
+      # Visual Studio is needed (and crates/htl-server/src/mingw_tz.rs is linked in).
+      - name: Rust with the GNU toolchain, as the host script installs it
+        run: |
+          rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+          rustup default stable-x86_64-pc-windows-gnu
+          rustc -vV
+      # A player's PC has no MinGW, but the runner has several (mingw64, Strawberry Perl, MSYS2);
+      # take their gcc and dlltool off the PATH so the build can only work the way it will at
+      # home (without dlltool, windows-sys's raw-dylib links fail unless windows-rust.ps1 copes).
+      - name: No MinGW on the PATH, as on a player's PC
+        run: |
+          $keep = $env:PATH -split ';' | Where-Object {
+            $_ -and -not (Test-Path (Join-Path $_ 'gcc.exe')) -and -not (Test-Path (Join-Path $_ 'dlltool.exe'))
+          }
+          "PATH=$($keep -join ';')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - uses: Swatinem/rust-cache@v2
-      - name: Build the server
-        run: cargo build --release -p htl-server
+      - name: Build the server, set up as "Host Basin Battle.bat" does
+        run: |
+          foreach ($tool in 'gcc', 'dlltool') {
+            if (Get-Command $tool -ErrorAction SilentlyContinue) { throw "$tool is still on the PATH" }
+          }
+          . scripts\windows-rust.ps1
+          cargo build --release -p htl-server
+      # It starts at all: every DLL it imports is found, _get_timezone included.
+      - name: The server starts
+        run: |
+          target\release\htl-server.exe --help
+          if ($LASTEXITCODE -ne 0) { throw "htl-server.exe --help failed (exit $LASTEXITCODE)" }

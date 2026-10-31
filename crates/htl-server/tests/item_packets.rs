@@ -1,6 +1,11 @@
 //! Every gear piece's item packet reads back whole through the client's own parser, with the
 //! display the template names: a piece that doesn't parse is drawn bare on the character.
 use benilla_protocol::messages::ServerPacket;
+
+// Each test is its own executable, so it needs the binary's _get_timezone shim on windows-gnu.
+#[cfg(all(windows, target_env = "gnu"))]
+#[path = "../src/mingw_tz.rs"]
+mod mingw_tz;
 use htl_sim::items::{template, GearKey, ARCHETYPES, MAX_TIER, WEAPON_PIECE};
 use htl_sim::Content;
 

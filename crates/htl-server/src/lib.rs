@@ -9,6 +9,10 @@ pub mod survival;
 pub mod wire;
 pub mod world;
 
+// The binary has its own copy (main.rs); the library's unit tests link benilla's login code too.
+#[cfg(all(test, windows, target_env = "gnu"))]
+mod mingw_tz;
+
 use std::net::{SocketAddr, TcpListener};
 use std::sync::OnceLock;
 use std::time::Instant;

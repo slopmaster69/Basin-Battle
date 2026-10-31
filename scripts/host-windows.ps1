@@ -8,6 +8,10 @@
 # once (remembered in settings-windows.txt) and builds the server (5-10 minutes); later runs
 # rebuild only what changed. Every argument goes to the server as given.
 $ErrorActionPreference = "Stop"
+# Windows PowerShell 5.1 can default to TLS 1.0/1.1, which rustup's and ipify's servers refuse,
+# and its download progress bar slows Invoke-WebRequest to a crawl.
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = "SilentlyContinue"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 $Host.UI.RawUI.WindowTitle = "Basin Battle server (close this window to stop it)"
@@ -16,17 +20,7 @@ $Settings = Join-Path $Root "settings-windows.txt"
 function Say($text) { Write-Host $text -ForegroundColor Cyan }
 
 # --- Rust ----------------------------------------------------------------------------------------
-# The GNU toolchain links with its own bundled linker, so no Visual Studio is needed.
-$cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
-if (Test-Path $cargoBin) { $env:PATH = "$cargoBin;$env:PATH" }
-if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-    Say "Installing Rust (once; a few minutes)..."
-    $installer = Join-Path $env:TEMP "rustup-init.exe"
-    Invoke-WebRequest -UseBasicParsing -Uri "https://win.rustup.rs/x86_64" -OutFile $installer
-    & $installer -y --profile minimal --default-host x86_64-pc-windows-gnu --default-toolchain stable
-    if ($LASTEXITCODE -ne 0) { throw "The Rust installer failed (exit $LASTEXITCODE)." }
-    $env:PATH = "$cargoBin;$env:PATH"
-}
+. (Join-Path $PSScriptRoot "windows-rust.ps1")
 
 # --- the WoW 1.12.1 Data folder ------------------------------------------------------------------
 # A folder counts if it is the Data folder itself or the WoW folder that holds it.
@@ -66,7 +60,7 @@ Say "Game data: $data"
 
 # --- build ---------------------------------------------------------------------------------------
 Say "Building the server (only what changed since last time)..."
-& cargo build --release -q -p htl-server
+& cargo build --release -p htl-server
 if ($LASTEXITCODE -ne 0) { throw "The server didn't build (exit $LASTEXITCODE): see the errors above." }
 $exe = Join-Path $Root "target\release\htl-server.exe"
 
@@ -84,9 +78,18 @@ if (-not ($args -contains "--public-host")) {
     }
 }
 try {
-    $lan = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
-        Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" -and $_.InterfaceAlias -notlike "*Loopback*" } |
-        Select-Object -First 1 -ExpandProperty IPAddress
+    # The adapter with a default gateway is the one on the home network; WSL's and Hyper-V's
+    # virtual adapters (vEthernet) have none, so they no longer come up first.
+    $lan = Get-NetIPConfiguration -ErrorAction Stop |
+        Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq "Up" } |
+        ForEach-Object { $_.IPv4Address.IPAddress } |
+        Select-Object -First 1
+    if (-not $lan) {
+        $lan = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+            Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" -and
+                $_.InterfaceAlias -notlike "*Loopback*" -and $_.InterfaceAlias -notlike "vEthernet*" } |
+            Select-Object -First 1 -ExpandProperty IPAddress
+    }
     if ($lan) { Say "Friends on your own network join with: $lan" }
 } catch { }
 Say "If Windows asks whether htl-server may use the network, allow it (Private networks at least)."
@@ -97,4 +100,14 @@ $log = Join-Path $Root ("logs\host-" + (Get-Date -Format "yyyy-MM-dd-HHmmss") + 
 Say "This session's log: $log"
 # Through cmd so the server's own error stream reaches the log as plain lines.
 $quoted = ($serverArgs + $args | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join " "
-& cmd /c "`"$exe`" $quoted 2>&1" | Tee-Object -FilePath $log
+# Windows PowerShell 5.1's Tee-Object writes UTF-16, which grep and most editors read as
+# gibberish, so the log is written as UTF-8 here; each line is flushed as it comes, so closing
+# the window keeps everything up to then.
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$writer = New-Object System.IO.StreamWriter($log, $false, (New-Object System.Text.UTF8Encoding($false)))
+$writer.AutoFlush = $true
+try {
+    & cmd /c "`"$exe`" $quoted 2>&1" | ForEach-Object { Write-Host $_; $writer.WriteLine($_) }
+} finally {
+    $writer.Close()
+}
