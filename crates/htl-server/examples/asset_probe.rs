@@ -29,6 +29,91 @@ fn main() -> anyhow::Result<()> {
         }
         return Ok(());
     }
+    // `--outfit <creature display>...`: what each dressed NPC wears, slot by slot, with icons.
+    if args[2] == "--outfit" {
+        const SLOTS: [&str; 10] = ["head", "shoulders", "shirt", "chest", "belt", "legs", "boots", "wrist", "gloves", "tabard"];
+        for d in args[3..].iter().filter_map(|x| x.parse::<u32>().ok()) {
+            match a.npc_gear(d) {
+                None => println!("{d}: not dressed"),
+                Some(g) => {
+                    println!("{d}:");
+                    for (k, id) in g.iter().enumerate().filter(|(_, id)| **id != 0) {
+                        let hair = if k == 0 { if a.helm_hides_hair(*id) { " hides hair".to_string() } else { format!(" HAIR SHOWS (like it that hide: {:?})", a.helms_like(*id).into_iter().take(3).collect::<Vec<_>>()) } } else { String::new() };
+                        println!("    {:<9} {}{hair}", SLOTS[k], a.item_display(*id));
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
+    // `--items <display>...`: item displays, each with its icon and look (helms: hair).
+    if args[2] == "--items" {
+        for d in args[3..].iter().filter_map(|x| x.parse::<u32>().ok()) {
+            println!("{} | {}{}", a.item_display(d), a.display_look(d), if a.helm_hides_hair(d) { " | hides hair" } else { "" });
+        }
+        return Ok(());
+    }
+    // `--twins <display>...`: the same look with an icon.
+    if args[2] == "--twins" {
+        for d in args[3..].iter().filter_map(|x| x.parse::<u32>().ok()) {
+            let t = a.twins(d);
+            println!("{d}: {}", t.iter().take(4).map(|x| a.item_display(*x)).collect::<Vec<_>>().join(" || "));
+        }
+        return Ok(());
+    }
+    // `--wearing <part>`: item displays whose model or textures hold it (helms: whether hair shows).
+    if args[2] == "--wearing" {
+        for l in a.displays_wearing(&args[3]) {
+            println!("{l}");
+        }
+        return Ok(());
+    }
+    // `--gear <survival.toml>`: every piece of armor a creature leaves, beside what that creature
+    // wears in the slot (its NPC display's own item), and every helm checked for hair showing
+    // through; a line ends "USE <display>" where the creature's own look (or a helm like it that
+    // hides the hair) should be the piece's.
+    if args[2] == "--gear" {
+        let c = htl_survival::Content::load(std::path::Path::new(&args[3]))?;
+        let slot_of = |s: &str| match s {
+            "head" => Some(0usize),
+            "shoulders" => Some(1),
+            "chest" => Some(3),
+            "legs" => Some(5),
+            _ => None,
+        };
+        for m in c.mobs.iter().filter(|m| !m.gear.is_empty()) {
+            let worn = a.npc_gear(m.display);
+            println!("{} ({}), display {}: {}", m.key, m.name, m.display, if worn.is_some() { "dressed" } else { "not a dressed NPC" });
+            for g in &m.gear {
+                let Some(i) = c.item(g) else { continue };
+                let it = &c.items[i];
+                if it.kind != htl_survival::content::ItemKind::Armor {
+                    continue;
+                }
+                let k = slot_of(&it.slot);
+                let own = k.and_then(|k| worn.map(|w| w[k])).filter(|d| *d != 0);
+                let hair = if it.slot == "head" { if a.helm_hides_hair(it.display) { "" } else { " HAIR SHOWS" } } else { "" };
+                let mut line = format!("    {} ({}) is {}{hair}", it.key, it.slot, a.display_look(it.display));
+                if let Some(d) = own {
+                    line.push_str(&format!("; it wears {}", a.display_look(d)));
+                    let pick = if it.slot == "head" && !a.helm_hides_hair(d) { a.helms_like(d).first().copied() } else { Some(d) };
+                    match pick {
+                        Some(p) if p != it.display => line.push_str(&format!(" -> USE {p}")),
+                        Some(_) => line.push_str(" (the same)"),
+                        None => line.push_str(" (its helm lets hair through; no like one that doesn't)"),
+                    }
+                }
+                println!("{line}");
+            }
+        }
+        // Every helm in the rules, worn by anyone.
+        for it in c.items.iter().filter(|i| i.slot == "head") {
+            if !a.helm_hides_hair(it.display) {
+                println!("helm {} ({}) display {}: HAIR SHOWS; like it that don't: {:?}", it.key, it.name, it.display, a.helms_like(it.display).into_iter().take(5).collect::<Vec<_>>());
+            }
+        }
+        return Ok(());
+    }
     if args[2] == "--find" {
         for l in a.find(&args[3]) {
             println!("{l}");

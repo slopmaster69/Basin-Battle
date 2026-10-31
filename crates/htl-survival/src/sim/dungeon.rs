@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::*;
-use crate::content::{DoorDef, DungeonDef, LampDef};
+use crate::content::{DoorDef, DungeonDef, LampDef, NoteDef};
 
 /// The world below: what the group has done there, and each hero's lamp and Draughts.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -23,6 +23,8 @@ pub struct Below {
     pub heroes: BTreeMap<String, BelowHero>,
     /// Fog doors barred now, while their boss fights (not kept).
     pub fog: BTreeSet<String>,
+    /// Hidden spots a hero has been nudged toward this run (not kept).
+    pub noticed: BTreeSet<String>,
     /// Foes down since the last rest: (kind, home, pack), back at the next.
     pub fallen: Vec<(usize, Vec3, Option<usize>)>,
     /// The hazards' next beat, by their place in the list.
@@ -56,6 +58,9 @@ pub struct BookDungeon {
     /// How many lamps it has, and its pages: (lamp key, lamp name), its first lamp's first.
     pub lamps: usize,
     pub pages: Vec<(String, String)>,
+    /// Its secrets found of all, and its notes read of all (the camp's, for good).
+    pub secrets: (usize, usize),
+    pub notes: (usize, usize),
 }
 
 /// A door's state as it's drawn: open, or shut.
@@ -234,6 +239,16 @@ impl Survival {
         let text = if d.text.is_empty() { format!("{who} has found something hidden: {}.", d.name) } else { format!("{who}: {}", d.text) };
         self.announce(text);
         self.forward_count("secret", key, 1);
+        // The finder's to read at leisure: what it was, and how many of the place's are found.
+        if let Some(dg) = self.dungeon_def() {
+            let all = dg.doors.iter().filter(|x| x.secret()).count();
+            let found = dg.doors.iter().filter(|x| x.secret() && self.ever("secret", &x.key)).count();
+            let place = format!("A secret of {}: {found} of {all} found", dg.name);
+            let body = if d.text.is_empty() { format!("You have found something hidden: {}.", d.name) } else { sentence(&d.text) };
+            let kept: Vec<String> = dg.notes.iter().filter(|n| reveals.contains(&n.key)).map(|n| n.name.clone()).collect();
+            let clue = if kept.is_empty() { String::new() } else { format!("Something was left here to read: {}.", kept.join(", ")) };
+            self.events.push(Event::Letter { player: by, kind: "secret".into(), title: d.name.clone(), place, text: body, clue, links: Vec::new() });
+        }
         self.door_changed(key);
         let dd = self.dungeon_def().cloned().unwrap();
         let looted = self.below.as_ref().map(|b| b.looted.clone()).unwrap_or_default();
@@ -370,6 +385,8 @@ impl Survival {
                 gate: d.gate_raids,
                 lamps: d.lamps.len(),
                 pages: d.lamps.iter().enumerate().filter(|(k, l)| *k == 0 || self.pages.contains(&l.key)).map(|(_, l)| (l.key.clone(), l.name.clone())).collect(),
+                secrets: (d.doors.iter().filter(|dr| dr.secret() && self.ever("secret", &dr.key)).count(), d.doors.iter().filter(|dr| dr.secret()).count()),
+                notes: (d.notes.iter().filter(|n| self.ever("read", &n.key)).count(), d.notes.len()),
             })
             .collect()
     }
@@ -762,8 +779,7 @@ impl Survival {
                 self.door_changed(key);
                 self.events.push(Event::Dirty);
             }
-            "illusory" => self.find_secret(id, key),
-            "hidden" => {}
+            "illusory" | "hidden" => self.find_secret(id, key),
             "fog" => self.tell(id, "The way is barred while the fight goes on."),
             _ => self.tell(
                 id,
@@ -774,10 +790,71 @@ impl Survival {
 
     /// A note, read.
     pub(crate) fn read_note(&mut self, id: Id, key: &str) {
-        let Some(n) = self.dungeon_def().and_then(|d| d.notes.iter().find(|n| n.key == key)).cloned() else { return };
-        self.events.push(Event::Banner { player: Some(id), title: n.name.clone(), sub: String::new() });
-        self.tell(id, format!("{}: {}", n.name, n.text));
-        self.count("read", key, 1);
+        if self.dungeon_def().is_none_or(|d| !d.notes.iter().any(|n| n.key == key)) {
+            return;
+        }
+        self.forward_count("read", key, 1);
+        self.note_letter(id, key, false);
+    }
+
+    /// Whether the camp has ever done `what` to `key` (read a note, found a secret).
+    pub fn ever(&self, what: &str, key: &str) -> bool {
+        self.camp.counts.get(&format!("{what}:{key}")).is_some_and(|n| *n > 0)
+    }
+
+    /// A note's page for a hero: its text, and its clue while what it points to is still hidden.
+    fn note_letter(&mut self, id: Id, key: &str, again: bool) {
+        let Some((d, n)) = self.content.dungeons().find_map(|d| d.notes.iter().find(|n| n.key == key).map(|n| (d.clone(), n.clone()))) else { return };
+        let hidden = n.hints.iter().any(|h| !self.ever("secret", h));
+        let clue = if hidden && !n.clue.is_empty() { n.clue.clone() } else { String::new() };
+        let place = if again { format!("From the book: read in {}", d.name) } else { format!("Found in {}", d.name) };
+        let links = vec![(format!(".es lore {}", d.key), format!("All found in {}", short_name(&d.name)))];
+        self.events.push(Event::Letter { player: id, kind: "note".into(), title: n.name.clone(), place, text: n.text.clone(), clue, links });
+    }
+
+    /// A note read before, read again (from the book).
+    pub fn reread(&mut self, id: Id, key: &str) -> Result<(), String> {
+        if !self.content.dungeons().any(|d| d.notes.iter().any(|n| n.key == key)) || !self.ever("read", key) {
+            return Err("You haven't read that one yet.".into());
+        }
+        self.note_letter(id, key, true);
+        Ok(())
+    }
+
+    /// The book's record of a dungeon: the secrets found, the rumours of the rest (the clues of
+    /// the notes read), and every note read, to read again.
+    pub fn lore_page(&mut self, id: Id, key: &str) -> Result<(), String> {
+        let d = self.content.dungeons().find(|d| d.key == key || (key.is_empty() && self.content.dungeon.as_ref().is_some_and(|x| x.key == d.key))).cloned().ok_or("No such dungeon in the book.")?;
+        let secrets: Vec<&DoorDef> = d.doors.iter().filter(|dr| dr.secret()).collect();
+        let found: Vec<String> = secrets.iter().filter(|dr| self.ever("secret", &dr.key)).map(|dr| dr.name.clone()).collect();
+        let read: Vec<&NoteDef> = d.notes.iter().filter(|n| self.ever("read", &n.key)).collect();
+        let mut paras = Vec::new();
+        paras.push(if found.is_empty() { "Secrets found: none yet.".to_string() } else { format!("Secrets found: {}.", found.join("; ")) });
+        // A rumour for each secret still hidden that a note read speaks of.
+        let mut rumours = Vec::new();
+        let mut spoken = BTreeSet::new();
+        for n in &read {
+            if n.hints.iter().any(|h| !self.ever("secret", h)) && !n.clue.is_empty() {
+                rumours.push(format!("- {} ({})", n.clue, n.name));
+                spoken.extend(n.hints.iter().filter(|h| !self.ever("secret", h)).cloned());
+            }
+        }
+        if !rumours.is_empty() {
+            paras.push(format!("Rumours:\n{}", rumours.join("\n")));
+        }
+        let unheard = secrets.iter().filter(|dr| !self.ever("secret", &dr.key) && !spoken.contains(&dr.key)).count();
+        if unheard > 0 {
+            paras.push(format!("{} more {} that no note you've read speaks of.", unheard, if unheard == 1 { "secret is down there" } else { "secrets are down there" }));
+        } else if found.len() == secrets.len() && !secrets.is_empty() {
+            paras.push("Every secret it keeps is found.".to_string());
+        }
+        if read.is_empty() {
+            paras.push("No notes read yet: they lie where they were dropped, waiting.".to_string());
+        }
+        let place = format!("{} of {} secrets found, {} of {} notes read", found.len(), secrets.len(), read.len(), d.notes.len());
+        let links = read.iter().map(|n| (format!(".es note {}", n.key), n.name.clone())).collect();
+        self.events.push(Event::Letter { player: id, kind: "lore".into(), title: d.name.clone(), place, text: paras.join("\n\n"), clue: String::new(), links });
+        Ok(())
     }
 
     /// A strongbox: what it holds into the bags, once.
@@ -825,6 +902,22 @@ impl Survival {
         }
         self.tell(id, format!("In the strongbox: {}.", words.join(", ")));
         self.events.push(Event::Bags { player: id });
+        // Its guards, waiting unseen for whoever opens it: on them at once.
+        let guards: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.hidden && m.health > 0 && m.pack.is_some_and(|k| self.content.packs[k].wake == key))
+            .map(|(mid, _)| *mid)
+            .collect();
+        if !guards.is_empty() {
+            self.events.push(Event::Banner { player: Some(id), title: "Ambush!".into(), sub: String::new() });
+        }
+        for mid in guards {
+            self.mobs.get_mut(&mid).unwrap().hidden = false;
+            self.events.push(Event::MobSpawned { id: mid });
+            self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
+            self.engage(mid, mobs::Foe::Hero(id));
+        }
         self.events.push(Event::Dirty);
     }
 
@@ -1185,9 +1278,16 @@ impl Survival {
             if self.below.as_ref().is_some_and(|b| b.open.contains(&dr.key)) {
                 continue;
             }
+            // A hero coming near its marker is nudged once a run; searching it finds it.
+            if self.below.as_ref().is_some_and(|b| b.noticed.contains(&dr.key)) {
+                continue;
+            }
             let by = self.players.iter().find(|(_, p)| p.health > 0 && dist2d(p.pos, dr.at) <= dr.find && (p.pos[2] - dr.at[2]).abs() < 5.0).map(|(h, _)| *h);
             if let Some(h) = by {
-                self.find_secret(h, &dr.key);
+                self.below.as_mut().unwrap().noticed.insert(dr.key.clone());
+                let look = dr.look.to_lowercase();
+                let look = look.strip_prefix("a ").or_else(|| look.strip_prefix("an ")).or_else(|| look.strip_prefix("the ")).unwrap_or(&look).to_string();
+                self.tell(h, format!("Something about the {look} isn't right. Search it."));
             }
         }
         // Ambushers step out of the dark when a hero comes near.
@@ -1199,7 +1299,8 @@ impl Survival {
             .collect();
         for mid in hidden {
             let m = &self.mobs[&mid];
-            let wake = m.pack.map_or(0.0, |k| self.content.packs[k].hidden);
+            // (One its strongbox wakes waits for that; see `open_box`.)
+            let wake = m.pack.filter(|k| self.content.packs[*k].wake.is_empty()).map_or(0.0, |k| self.content.packs[k].hidden);
             let near = self
                 .players
                 .iter()
@@ -1388,3 +1489,18 @@ impl Survival {
 
 /// The look of resting at a lamp (a soft glow).
 pub const REST_SPELL: u32 = 2061;
+
+/// A secret's text as a page's sentence (they're written to follow "Name: ").
+fn sentence(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        None => String::new(),
+    }
+}
+
+/// A dungeon's name without its region ("Scarlet Monastery: Library" is the Library).
+fn short_name(name: &str) -> String {
+    let n = name.rsplit(": ").next().unwrap_or(name);
+    format!("the {}", n.strip_prefix("The ").unwrap_or(n))
+}

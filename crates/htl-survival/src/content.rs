@@ -81,6 +81,9 @@ pub struct Content {
     /// The Horde's camps, which heroes can take for a while by killing everyone in them.
     #[serde(rename = "camp", default)]
     pub camps: Vec<CampDef>,
+    /// Sets of gear (`[[set]]`): pieces worn together give more.
+    #[serde(rename = "set", default)]
+    pub sets: Vec<SetDef>,
     /// Elwynn's places: found by walking there, marked on the world map.
     #[serde(rename = "site", default)]
     pub sites: Vec<SiteDef>,
@@ -802,6 +805,51 @@ pub struct ItemDef {
     /// Usable in the Deadmines, where food isn't (a draught, a whetstone).
     #[serde(default)]
     pub below: bool,
+    /// What it gives while worn (armor) or in hand (a weapon or bow, in its kit): lasting
+    /// effects of the kinds a potion gives (`might`, `stamina`, `regen`, `focus`, `ward`).
+    #[serde(default)]
+    pub perks: Vec<PerkDef>,
+    /// The set it's a piece of (`[[set]]`, by key), if any.
+    #[serde(default)]
+    pub set: String,
+}
+
+/// A lasting effect gear gives: its kind (as [`EffectDef::KINDS`]) and how much.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct PerkDef {
+    pub kind: String,
+    pub amount: f32,
+}
+
+/// A perk in words, for a tooltip: "+5% damage", "+1% health a second"...
+pub fn perk_words(kind: &str, amount: f32) -> String {
+    let pc = |v: f32| {
+        let p = v * 100.0;
+        if (p - p.round()).abs() < 0.05 { format!("{:.0}", p) } else { format!("{p:.1}") }
+    };
+    match kind {
+        "might" => format!("+{}% damage", pc(amount)),
+        "stamina" => format!("+{}% stamina recovery", pc(amount)),
+        "regen" => format!("heals {}% of your health a second", pc(amount)),
+        "focus" => format!("{}% shorter cooldowns", pc(amount)),
+        "ward" => format!("+{}% toughness (past armor's limit)", pc(amount)),
+        _ => format!("{kind} {amount}"),
+    }
+}
+
+/// A set of gear (`[[set]]`): with this many of its pieces worn or in hand, more perks.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SetDef {
+    pub key: String,
+    pub name: String,
+    pub bonus: Vec<SetBonusDef>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SetBonusDef {
+    pub pieces: usize,
+    pub kind: String,
+    pub amount: f32,
 }
 
 /// Where armor is worn.
@@ -962,6 +1010,10 @@ pub struct DoorDef {
     /// What a secret lays out once found: packs and strongboxes (by key), kept back till then.
     #[serde(default)]
     pub reveals: Vec<String>,
+    /// A `hidden` secret's marker, as it looks before anyone knows what it is (its `display` at
+    /// `at`): "A Heap of Sacks". Searched, it gives the secret up.
+    #[serde(default)]
+    pub look: String,
 }
 
 impl DoorDef {
@@ -988,12 +1040,21 @@ pub struct NoteDef {
     #[serde(default = "one_f")]
     pub scale: f32,
     pub text: String,
+    /// The secrets (door keys) it points to, and a line of where, kept in the book's rumours
+    /// till they're found.
+    #[serde(default)]
+    pub hints: Vec<String>,
+    #[serde(default)]
+    pub clue: String,
 }
 
 /// A strongbox off the path: what it holds, once.
 #[derive(Debug, Clone, Deserialize)]
 pub struct BoxDef {
     pub key: String,
+    /// What it's called ("Defias Strongbox" by default).
+    #[serde(default)]
+    pub name: String,
     pub at: [f32; 3],
     #[serde(default)]
     pub facing: f32,
@@ -2196,6 +2257,27 @@ impl Content {
     }
 
     fn validate(&self) -> Result<()> {
+        // Gear's perks and sets.
+        for i in &self.items {
+            for p in &i.perks {
+                if !EffectDef::KINDS.contains(&p.kind.as_str()) {
+                    bail!("item {}: a perk of kind {:?} (one of {:?})", i.key, p.kind, EffectDef::KINDS);
+                }
+            }
+            if !i.set.is_empty() && !self.sets.iter().any(|s| s.key == i.set) {
+                bail!("item {}: no set {:?}", i.key, i.set);
+            }
+        }
+        for s in &self.sets {
+            if !self.items.iter().any(|i| i.set == s.key) {
+                bail!("set {}: no pieces", s.key);
+            }
+            for b in &s.bonus {
+                if !EffectDef::KINDS.contains(&b.kind.as_str()) || b.pieces < 2 {
+                    bail!("set {}: a bonus of kind {:?} at {} pieces", s.key, b.kind, b.pieces);
+                }
+            }
+        }
         if let Some(sg) = &self.siege {
             for f in sg.roster.iter().map(|f| &f.mob).chain(sg.sends.iter().map(|x| &x.mob)) {
                 if self.mob(f).is_none() {
@@ -2513,6 +2595,9 @@ impl Content {
                 if self.mob(&p.mob).is_some_and(|m| self.mobs[m].boss) && p.key.is_empty() {
                     bail!("dungeon pack of {}: a boss's pack needs a key", p.mob);
                 }
+                if !p.wake.is_empty() && !d.boxes.iter().any(|b| b.key == p.wake) {
+                    bail!("dungeon pack of {}: it wakes on strongbox {}, and there's none", p.mob, p.wake);
+                }
             }
             for dr in &d.doors {
                 if !DoorDef::KINDS.contains(&dr.kind.as_str()) {
@@ -2530,7 +2615,10 @@ impl Content {
                     bail!("dungeon door {}: a shortcut needs `from`", dr.key);
                 }
                 if dr.kind == "hidden" && dr.find <= 0.0 {
-                    bail!("dungeon door {}: a hidden secret is found within `find` yards (above 0)", dr.key);
+                    bail!("dungeon door {}: a hidden secret is noticed within `find` yards (above 0)", dr.key);
+                }
+                if dr.kind == "hidden" && (dr.display == 0 || dr.look.is_empty()) {
+                    bail!("dungeon door {}: a hidden secret needs a marker to search (`display` and `look`)", dr.key);
                 }
                 for r in &dr.reveals {
                     if !pack_keys.contains(&r.as_str()) && !d.boxes.iter().any(|b| &b.key == r) && !d.notes.iter().any(|n| &n.key == r) {
@@ -2543,6 +2631,16 @@ impl Content {
                         dr.key,
                         dr.boss
                     );
+                }
+            }
+            for n in &d.notes {
+                for h in &n.hints {
+                    if !d.doors.iter().any(|dr| &dr.key == h && dr.secret()) {
+                        bail!("dungeon note {}: it hints at {h:?}, no secret of that key", n.key);
+                    }
+                }
+                if n.hints.is_empty() != n.clue.is_empty() {
+                    bail!("dungeon note {}: `hints` and `clue` go together", n.key);
                 }
             }
             if !d.exit_boss.is_empty() && !pack_keys.contains(&d.exit_boss.as_str()) {

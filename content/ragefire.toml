@@ -55,6 +55,9 @@ facing = 1.3
 # The deep chamber's far corner, up a slope nobody climbs: Jergosh's grimoire, hidden from his own.
 [[dungeon.door]]
 key = "jergosh_grimoire"
+display = 184
+look = "A Black Book, Warm to the Touch"
+scale = 1.4
 name = "The Invoker's Grimoire"
 kind = "hidden"
 at = [-306.0, -6.3, -52.5]
@@ -64,12 +67,15 @@ text = "up the slope in the deep chamber's corner: Jergosh's grimoire, its bindi
 
 [[dungeon.box]]
 key = "grimoire_cache"
+name = "Searing Blade Coffer"
 at = [-306.0, -8.0, -52.5]
 facing = 1.5
 loot = { draught_flask = 1, searing_token = 14 }
 
 [[dungeon.note]]
 key = "grimoire_page"
+display = 220
+scale = 1.3
 name = "A Torn Page, Still Warm"
 at = [-305.0, -4.5, -52.5]
 facing = 1.5
@@ -78,6 +84,8 @@ text = "\"...the Heart of Ragefire answers the Invoker while the grimoire holds 
 # A ledge above the cult's camp, reached by the rocks at its back.
 [[dungeon.door]]
 key = "camp_ledge"
+display = 457
+look = "A Barrel Wedged on the Ledge"
 name = "A Ledge Above the Camp"
 kind = "hidden"
 at = [-77.4, 90.4, -7.3]
@@ -87,6 +95,7 @@ text = "up on the ledge over the camp: the cult's tithes, hidden from its own co
 
 [[dungeon.box]]
 key = "ledge_cache"
+name = "Searing Blade Coffer"
 at = [-78.5, 91.5, -7.3]
 facing = 3.0
 loot = { searing_token = 16, tonic = 1 }
@@ -94,6 +103,9 @@ loot = { searing_token = 16, tonic = 1 }
 # The west cave's high ledge: a tauren who came for the cult, and stayed.
 [[dungeon.door]]
 key = "maur_ledge"
+display = 4718
+look = "A Grimtotem Totem"
+scale = 0.8
 name = "Maur's Ledge"
 kind = "hidden"
 at = [-341.9, 257.6, -8.1]
@@ -105,6 +117,10 @@ text = "on the west cave's high ledge: a tauren in Grimtotem paint, who turns fr
 
 [[dungeon.note]]
 key = "korkron_report"
+hints = ["jergosh_grimoire"]
+clue = "The Invoker hid his grimoire in the deep chamber, up the slope in its corner."
+display = 183
+scale = 1.3
 name = "A Kor'kron Report"
 at = [-5.9, -42.0, -21.7]
 facing = 3.6
@@ -112,17 +128,25 @@ text = "\"The Searing Blade are in the chasm, under the Cleft. Their Invoker kee
 
 [[dungeon.note]]
 key = "ritual_notes"
+hints = ["camp_ledge"]
+clue = "Someone hides the cult's tithes on the ledge over the camp."
+display = 190
+scale = 1.3
 name = "Jergosh's Ritual Notes"
 at = [-101.8, 42.0, -17.8]
 facing = 1.0
-text = "\"The pit is ready. The Heart stirs under the lava when I call it, and the grimoire keeps it from turning on me. Nobody touches the grimoire. NOBODY.\""
+text = "\"The pit is ready. The Heart stirs under the lava when I call it, and the grimoire keeps it from turning on me. Nobody touches the grimoire. NOBODY. And the tithes come up short again: the collectors swear the ledge over the camp is bare. I say look again.\""
 
 [[dungeon.note]]
 key = "grimtotem_feather"
+hints = ["maur_ledge"]
+clue = "A Grimtotem arrow scratched in the rock, pointing up the west cave's high ledge."
+display = 163
+scale = 1.0
 name = "A Grimtotem Feather"
 at = [-305.6, 246.2, -12.5]
 facing = 0.5
-text = "A painted feather, Grimtotem colours, tucked in a crack in the rock. Above it, scratched with a knife: an arrow, pointing up and east."
+text = "A painted feather, Grimtotem colours, tucked in a crack in the rock. Above it, scratched with a knife: an arrow, pointing up, at the ledge above."
 
 # --- the cave's dwellers -----------------------------------------------------------------------------
 
@@ -425,13 +449,14 @@ text = "A red stone the Searing Blade carry as their mark. The lamps' quartermas
 [[item]]
 key = "oggleflint_mantle"
 name = "Oggleflint's Stone Mantle"
-display = 5944
-icon = "INV_Shoulder_01"
+display = 3871
+icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.09
 weight = 0.02
 text = "The trogg chief's: chips of the chasm's rock, lashed on with gut."
+set = "searing"
 
 [[item]]
 key = "bazzalan_legs"
@@ -442,6 +467,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.1
 text = "Cut from something with hooves. Don't ask what."
+set = "searing"
 
 [[item]]
 key = "jergosh_robe"
@@ -452,17 +478,19 @@ kind = "armor"
 slot = "chest"
 reduce = 0.09
 text = "Jergosh's: the hem scorched where the Heart answered him."
+set = "searing"
 
 [[item]]
 key = "taragaman_helm"
 name = "The Hungerer's Horned Helm"
-display = 4180
+display = 15276
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "A mail cap with a demon's horn bolted to it. Taragaman wore it as a joke. It isn't funny."
+set = "searing"
 
 [[item]]
 key = "ember_breastplate"
@@ -474,17 +502,19 @@ slot = "chest"
 reduce = 0.2
 weight = 0.05
 text = "Mail forged in the Heart of Ragefire's own fire: still warm, and harder than it looks."
+perks = [{ kind = "regen", amount = 0.004 }]
 
 [[item]]
 key = "maur_mantle"
 name = "Maur's Grimtotem Mantle"
-display = 5282
-icon = "INV_Shoulder_04"
+display = 4942
+icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.11
 weight = 0.01
 text = "Painted Grimtotem colours. Maur came down here hunting the cult; the fire got him first."
+perks = [{ kind = "stamina", amount = 0.08 }]
 
 # --- the cave's dwellers --------------------------------------------------------------------------------
 
@@ -815,6 +845,25 @@ respawn = 0.0
   look = 26271
 
 # Bazzalan: a satyr in the cult's service, quick and poisonous.
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 34, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 31, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+
 [[mob]]
 key = "rf_bazzalan"
 name = "Bazzalan"
@@ -831,7 +880,7 @@ boss = true
 posture = 200
 drops = { searing_token = [18, 24] }
 trophy = { bazzalan_legs = 1 }
-gear = ["bazzalan_legs"]
+gear = ["bazzalan_legs", "bloodlust_edge"]
 respawn = 0.0
   [mob.attack]
   windup = 0.42
@@ -881,6 +930,20 @@ respawn = 0.0
   look = 8245
 
 # Jergosh the Invoker: the cult's master, at his ritual in the lava pit.
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 14, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 27, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 18, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "rf_jergosh"
 name = "Jergosh the Invoker"
@@ -1026,6 +1089,19 @@ respawn = 0.0
   look = 10604
 
 # Taragaman the Hungerer: a demon at the bottom of the chasm, feeding.
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 26, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 26, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 39, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 36, kit = 379, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "rf_taragaman"
 name = "Taragaman the Hungerer"
@@ -1041,7 +1117,7 @@ boss = true
 posture = 320
 drops = { searing_token = [30, 40] }
 trophy = { taragaman_helm = 1 }
-gear = ["taragaman_helm"]
+gear = ["taragaman_helm", "cursed_felblade"]
 respawn = 0.0
   [mob.attack]
   windup = 0.8
@@ -1162,3 +1238,152 @@ respawn = 0.0
   text = "\"Earthmother forgive me!\""
   shove = 6.0
   look = 26271
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 29, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 29, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 27, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 51, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: fire thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "fire"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 34, range = 22, radius = 3, speed = 12, spell = 133, look = 10604, blockable = false, recovery = 1 } ]
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "searing"
+name = "The Searing Blade's Regalia"
+bonus = [ { pieces = 2, kind = "focus", amount = 0.06 }, { pieces = 4, kind = "might", amount = 0.05 } ]
+
+[[weapon]]
+key = "cursed_felblade"
+windup = 0.26
+active = 0.1
+recovery = 0.32
+stamina = 11.0
+damage = [17, 23]
+range = 3.1
+arc = 95.0
+targets = 1
+subclass = 7
+
+[[item]]
+key = "cursed_felblade"
+name = "Cursed Felblade"
+display = 5158
+icon = "INV_Sword_19"
+kind = "weapon"
+text = "Taragaman's: a demon's blade, and it wants blood."
+perks = [{ kind = "might", amount = 0.05 }]
+
+[[weapon]]
+key = "bloodlust_edge"
+windup = 0.32
+active = 0.12
+recovery = 0.42
+stamina = 14.0
+damage = [19, 25]
+range = 3.2
+arc = 110.0
+targets = 3
+subclass = 0
+
+[[item]]
+key = "bloodlust_edge"
+name = "Bloodlust Edge"
+display = 1455
+icon = "INV_Axe_03"
+kind = "weapon"
+text = "Bazzalan's: wide and hungry, three at a swing."
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rf_enforcer"
+at = [-65.3, -37.5]
+z = -17.6
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-77.3, -37.0], [-87.3, -35.5] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-290.3, 2.5]
+z = -46.1
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-264.3, 2.2], [-238.3, 4.5] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-104.5, 39.0]
+z = -18.0
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "rf_earthborer"
+at = [-115.3, 100.9]
+z = -16.3
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-19.3, -40.3]
+z = -21.7
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rf_warlock"
+at = [-93.3, -34.5]
+z = -25.4
+radius = 0.0
+count = 1
+link = 12.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "rf_shaman"
+at = [-225.3, -38.5]
+z = -55.8
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-81.1, 93.1]
+z = -7.5
+radius = 1.5
+count = 2
+link = 10.0
+wake = "ledge_cache"
