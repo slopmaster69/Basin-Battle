@@ -700,6 +700,19 @@ respawn = 0.0
   text = "Rethilgore howls, and the courtyard howls back."
   shove = 5.0
   look = 27812
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 24, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
 
 [[mob]]
 key = "sf_razorclaw"
@@ -753,6 +766,27 @@ respawn = 0.0
   text = "\"Fresh meat! Fresh MEAT!\""
   shove = 5.0
   look = 26271
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 31, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_silverlaine"
@@ -814,6 +848,20 @@ respawn = 0.0
   text = "\"This keep was ours before the wolves. It will be ours after.\""
   shove = 5.0
   look = 27808
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 22, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_springvale"
@@ -874,6 +922,26 @@ respawn = 0.0
   text = "\"Judgement! JUDGEMENT!\""
   shove = 5.5
   look = 24050
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 27, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 27, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 42, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 32, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_odo"
@@ -930,6 +998,19 @@ respawn = 0.0
   text = "Odo's howl rises higher; worgen answer from all over the keep."
   summon = ["sf_darksoul", "sf_darksoul"]
   shove = 6.0
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 34, kit = 379, heavy = true, recovery = 1.1 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_fenrus"
@@ -986,6 +1067,27 @@ respawn = 0.0
   pattern = "devour"
   text = "Fenrus goes for your throat in a frenzy."
   shove = 5.0
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 26, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_nandos"
@@ -1036,6 +1138,27 @@ respawn = 0.0
   text = "\"More! Come to your master!\""
   summon = ["sf_wolfguard", "sf_worg"]
   shove = 5.5
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 29, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_arugal"
@@ -1178,6 +1301,14 @@ respawn = 0.0
   text = "It stops, for a moment, and looks at you with Arugal's eyes. Then it springs."
   shove = 6.0
   look = 27812
+  # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "shadow"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 28, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "sf_deathsworn"
@@ -1232,6 +1363,26 @@ respawn = 0.0
   text = "The dead captain's sword glows cold blue."
   shove = 5.0
   look = 27808
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 29, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 24, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
 
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 

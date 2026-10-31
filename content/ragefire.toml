@@ -821,6 +821,25 @@ respawn = 0.0
   look = 26271
 
 # Bazzalan: a satyr in the cult's service, quick and poisonous.
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 34, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 31, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+
 [[mob]]
 key = "rf_bazzalan"
 name = "Bazzalan"
@@ -887,6 +906,20 @@ respawn = 0.0
   look = 8245
 
 # Jergosh the Invoker: the cult's master, at his ritual in the lava pit.
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 14, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 27, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 18, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "rf_jergosh"
 name = "Jergosh the Invoker"
@@ -1032,6 +1065,19 @@ respawn = 0.0
   look = 10604
 
 # Taragaman the Hungerer: a demon at the bottom of the chasm, feeding.
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 26, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 26, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 39, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 36, kit = 379, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "rf_taragaman"
 name = "Taragaman the Hungerer"
@@ -1168,6 +1214,25 @@ respawn = 0.0
   text = "\"Earthmother forgive me!\""
   shove = 6.0
   look = 26271
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 29, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 29, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 27, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 51, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end, from range: fire thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "fire"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 34, range = 22, radius = 3, speed = 12, spell = 133, look = 10604, blockable = false, recovery = 1 } ]
 
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 

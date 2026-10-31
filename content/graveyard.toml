@@ -625,6 +625,26 @@ respawn = 0.0
   text = "\"Naughty secrets!\""
   shove = 5.0
   look = 27812
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 24, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 30, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 20, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
 
 [[mob]]
 key = "gy_ironspine"
@@ -686,6 +706,24 @@ respawn = 0.0
   text = "Ironspine's ribs crack open, and something green pours out of them."
   shove = 6.0
   look = 22786
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 31, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 31, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 47, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 43, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 29, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 54, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
 
 [[mob]]
 key = "gy_thalnos"
@@ -833,6 +871,12 @@ respawn = 0.0
   text = "\"Your head... will do nicely!\""
   shove = 6.5
   look = 10604
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 22, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 42, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
 
 [[mob]]
 key = "gy_champion"
@@ -885,6 +929,26 @@ respawn = 0.0
   text = "The champion's eyes burn cold."
   shove = 5.5
   look = 26271
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 29, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 29, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 41, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: grave thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "grave"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 34, range = 22, radius = 3, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "gy_azshir"
@@ -942,6 +1006,21 @@ respawn = 0.0
   text = "\"Sleep... I want to SLEEP!\""
   shove = 5.0
   look = 27812
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 1.3 } ]
+  # Grave lobbed where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "grave"
+  weight = 1.5
+  min_range = 5
+  max_range = 24
+  steps = [ { ranged = true, windup = 1.2, damage = 24, range = 24, radius = 3.5, speed = 12, spell = 686, look = 27812, blockable = false, recovery = 1.1 } ]
 
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 

@@ -818,6 +818,20 @@ respawn = 0.0
   look = 10604
 
 # Targorr the Dread: an orc in chains no longer, two hands on his axe.
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 26, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+
 [[mob]]
 key = "st_targorr"
 name = "Targorr the Dread"
@@ -1121,6 +1135,15 @@ respawn = 0.0
   look = 26271
 
 # Bruegal Ironknuckle: the dwarf in the last cell, who never wanted out until now.
+  # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 22, radius = 3, speed = 12, spell = 7978, look = 3204, blockable = false, recovery = 1 } ]
+
 [[mob]]
 key = "st_bruegal"
 name = "Bruegal Ironknuckle"
@@ -1172,6 +1195,26 @@ respawn = 0.0
   text = "\"Ironknuckle doesnae go back in!\""
   shove = 6.0
   look = 26271
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 32, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 32, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 49, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 46, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 38, range = 22, radius = 3, speed = 12, spell = 7978, look = 3204, blockable = false, recovery = 1 } ]
 
 # --- the journal (outside the camp's goals for now) ---------------------------------------------------
 

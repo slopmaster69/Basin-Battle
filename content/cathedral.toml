@@ -673,6 +673,15 @@ respawn = 0.0
   look = 24171
 
 # Scarlet Commander Mograine: the Crusade's sword. When he falls, Whitemane comes.
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 133, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 133, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 133, blockable = true, recovery = 1.3 } ]
+
 [[mob]]
 key = "sc_mograine"
 name = "Scarlet Commander Mograine"
@@ -745,6 +754,15 @@ then_look = 24171
   look = 24171
 
 # High Inquisitor Whitemane: she won't let him stay dead.
+  # Nearer its end, from range: holy fire thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "holy fire"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 133, look = 24171, blockable = false, recovery = 1 } ]
+
 [[mob]]
 key = "sc_whitemane"
 name = "High Inquisitor Whitemane"
@@ -820,6 +838,15 @@ then_look = 24171
   look = 24171
 
 # Mograine, raised by Whitemane: no shield now, only fury.
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 19, range = 26, radius = 1.5, speed = 24, spell = 133, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 19, range = 26, radius = 1.5, speed = 24, spell = 133, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 19, range = 26, radius = 1.5, speed = 24, spell = 133, blockable = true, recovery = 1.3 } ]
+
 [[mob]]
 key = "sc_mograine_risen"
 name = "Scarlet Commander Mograine"
@@ -912,6 +939,14 @@ respawn = 0.0
   look = 24171
 
 # High Inquisitor Fairbanks: what the Crusade locked behind the altar.
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 41, kit = 379, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "sc_fairbanks"
 name = "High Inquisitor Fairbanks"
@@ -963,6 +998,26 @@ respawn = 0.0
   text = "Fairbanks laughs, and the laugh goes on too long."
   shove = 5.0
   look = 24050
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 29, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 24, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
 
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 
