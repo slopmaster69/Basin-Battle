@@ -459,17 +459,19 @@ display = 2699
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
 text = "Bazil Thredd's: quick, and a blow from behind does three and a half times its damage."
+perks = [{ kind = "might", amount = 0.03 }]
 
 [[item]]
 key = "kam_helm"
 name = "Deepfury's Helm"
-display = 1123
+display = 15289
 icon = "INV_Helmet_04"
 kind = "armor"
 slot = "head"
 reduce = 0.1
 weight = 0.02
 text = "Kam Deepfury's: dented from the inside, they say."
+set = "riot_breaker"
 
 [[item]]
 key = "hamhock_vest"
@@ -481,12 +483,13 @@ slot = "chest"
 reduce = 0.13
 weight = 0.02
 text = "Hamhock's: it smells of the cells, and of Hamhock."
+set = "riot_breaker"
 
 [[item]]
 key = "dextren_robe"
 name = "Dextren's Ritual Robe"
-display = 12654
-icon = "INV_Chest_Cloth_40"
+display = 3686
+icon = "INV_Chest_Cloth_31"
 kind = "armor"
 slot = "chest"
 reduce = 0.08
@@ -495,8 +498,8 @@ text = "Dextren Ward's: the stitching at the hem is in a script nobody in Stormw
 [[item]]
 key = "bazil_hood"
 name = "Thredd's Hood"
-display = 3589
-icon = "INV_Helmet_04"
+display = 15308
+icon = "INV_Misc_Bandana_03"
 kind = "armor"
 slot = "head"
 reduce = 0.09
@@ -512,17 +515,19 @@ slot = "chest"
 reduce = 0.24
 weight = 0.08
 text = "Stormwind's plate, bought and paid for: a quarter off every blow, and you'll feel its weight."
+perks = [{ kind = "ward", amount = 0.05 }]
 
 [[item]]
 key = "bruegal_helm"
 name = "Ironknuckle's Helm"
-display = 4145
+display = 15305
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
 text = "Bruegal Ironknuckle's plate helm: he wore it in his cell, every day, waiting."
+perks = [{ kind = "might", amount = 0.05 }]
 
 # --- the inmates --------------------------------------------------------------------------------------
 
@@ -813,6 +818,20 @@ respawn = 0.0
   look = 10604
 
 # Targorr the Dread: an orc in chains no longer, two hands on his axe.
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 26, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+
 [[mob]]
 key = "st_targorr"
 name = "Targorr the Dread"
@@ -830,7 +849,7 @@ boss = true
 posture = 280
 drops = { plunder = [24, 30] }
 trophy = { targorr_axe = 1 }
-gear = ["targorr_axe"]
+gear = ["targorr_axe", "st_riot_pauldrons"]
 respawn = 0.0
   [mob.attack]
   windup = 0.85
@@ -1116,6 +1135,15 @@ respawn = 0.0
   look = 26271
 
 # Bruegal Ironknuckle: the dwarf in the last cell, who never wanted out until now.
+  # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 24, range = 22, radius = 3, speed = 12, spell = 7978, look = 3204, blockable = false, recovery = 1 } ]
+
 [[mob]]
 key = "st_bruegal"
 name = "Bruegal Ironknuckle"
@@ -1132,7 +1160,7 @@ grip = "2h"
 boss = true
 posture = 300
 drops = { plunder = [26, 32] }
-gear = ["bruegal_helm"]
+gear = ["bruegal_helm", "st_riot_greaves"]
 respawn = 0.0
   [mob.attack]
   windup = 0.95
@@ -1167,5 +1195,100 @@ respawn = 0.0
   text = "\"Ironknuckle doesnae go back in!\""
   shove = 6.0
   look = 26271
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 32, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 32, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 49, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 46, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "dynamite"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 38, range = 22, radius = 3, speed = 12, spell = 7978, look = 3204, blockable = false, recovery = 1 } ]
 
 # --- the journal (outside the camp's goals for now) ---------------------------------------------------
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "riot_breaker"
+name = "The Riot-Breaker's Kit"
+bonus = [ { pieces = 2, kind = "ward", amount = 0.03 }, { pieces = 4, kind = "might", amount = 0.05 } ]
+
+[[item]]
+key = "st_riot_pauldrons"
+name = "Riot-Breaker Pauldrons"
+display = 15890
+icon = "INV_Shoulder_13"
+kind = "armor"
+slot = "shoulders"
+reduce = 0.1
+weight = 0.02
+text = "Targorr tore them off a guard and wore them for spite."
+set = "riot_breaker"
+
+[[item]]
+key = "st_riot_greaves"
+name = "Riot-Breaker Greaves"
+display = 3414
+icon = "INV_Pants_04"
+kind = "armor"
+slot = "legs"
+reduce = 0.11
+weight = 0.02
+text = "Bruegal's own: plate a guard won't be needing, from the cell they never open."
+set = "riot_breaker"
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "st_prisoner"
+at = [125.9, -10.3]
+z = -26.5
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [125.9, -22.3], [125.9, -32.3] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "st_convict"
+at = [132.6, 39.7]
+z = -33.4
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "st_inmate"
+at = [127.9, 11.7]
+z = -25.6
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "st_prisoner"
+at = [156.9, 60.3]
+z = -34.9
+radius = 1.5
+count = 2
+link = 10.0
+wake = "stash"

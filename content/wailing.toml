@@ -405,49 +405,53 @@ text = "A fang from one of the deviate things. The lamps' quartermaster in the W
 
 [[item]]
 key = "anacondra_mantle"
-name = "Anacondra's Serpent Mantle"
-display = 2539
-icon = "INV_Shoulder_06"
+name = "Anacondra's Circlet"
+display = 15321
+icon = "INV_Helmet_26"
 kind = "armor"
-slot = "shoulders"
+slot = "head"
 reduce = 0.09
-text = "Lady Anacondra's: shed skins, stitched in rows."
+text = "Lady Anacondra's: a band of woven vine and shed skin, the Fanglords' mark."
+set = "fanglord"
 
 [[item]]
 key = "cobrahn_helm"
-name = "Cobrahn's Hood"
-display = 3862
-icon = "INV_Helmet_04"
+name = "Cobrahn's Mantle"
+display = 22865
+icon = "INV_Shoulder_30"
 kind = "armor"
-slot = "head"
+slot = "shoulders"
 reduce = 0.08
 text = "Lord Cobrahn's: it smells of the low tunnel, and of snake."
+set = "fanglord"
 
 [[item]]
 key = "pythas_vest"
-name = "Pythas's Fang-Studded Vest"
-display = 10076
-icon = "INV_Chest_Leather_01"
+name = "Pythas's Leggings"
+display = 7182
+icon = "INV_Pants_03"
 kind = "armor"
-slot = "chest"
+slot = "legs"
 reduce = 0.12
 weight = 0.01
-text = "Lord Pythas's: leather studded with the fangs of the things he made."
+text = "Lord Pythas's: soft leggings for a druid who never stopped walking the Nightmare."
+set = "fanglord"
 
 [[item]]
 key = "serpentis_legs"
-name = "Serpentis's Scaled Leggings"
-display = 3414
-icon = "INV_Pants_04"
+name = "Serpentis's Fur Vest"
+display = 4100
+icon = "INV_Chest_Fur"
 kind = "armor"
-slot = "legs"
+slot = "chest"
 reduce = 0.11
-text = "Lord Serpentis's: scales that shift colour when you aren't looking."
+text = "Lord Serpentis's: green fur over scales that shift colour when you aren't looking."
+set = "fanglord"
 
 [[item]]
 key = "kresh_helm"
 name = "Kresh's Shell-Helm"
-display = 4417
+display = 15318
 icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
@@ -475,17 +479,19 @@ slot = "chest"
 reduce = 0.18
 weight = 0.03
 text = "Roots grown into the shape of a breastplate. It is still growing."
+perks = [{ kind = "regen", amount = 0.003 }]
 
 [[item]]
 key = "mutanus_mantle"
 name = "Mutanus's Scale Mantle"
-display = 3119
-icon = "INV_Shoulder_05"
+display = 9422
+icon = "INV_Shoulder_09"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.13
 weight = 0.02
 text = "Scales from the thing Naralex dreamed. They are cold, and they don't smell of anything at all."
+perks = [{ kind = "focus", amount = 0.08 }, { kind = "regen", amount = 0.002 }]
 
 [[item]]
 key = "faerie_mantle"
@@ -496,6 +502,7 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.08
 text = "Dusted with something that glitters. Now and then you see a flicker at the edge of your eye."
+perks = [{ kind = "focus", amount = 0.05 }]
 
 # --- the deviates ---------------------------------------------------------------------------------------
 
@@ -885,7 +892,7 @@ boss = true
 posture = 220
 drops = { deviate_fang = [16, 22] }
 trophy = { cobrahn_helm = 1 }
-gear = ["cobrahn_helm"]
+gear = ["cobrahn_helm", "cobrahn_fang"]
 respawn = 0.0
   [mob.attack]
   windup = 0.6
@@ -934,6 +941,20 @@ respawn = 0.0
   shove = 5.0
 
 # Lord Pythas: lightning and a thunderclap, over the east caves.
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 24, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 30, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+
 [[mob]]
 key = "wc_pythas"
 name = "Lord Pythas"
@@ -1001,6 +1022,15 @@ respawn = 0.0
   look = 10604
 
 # Lord Serpentis: the last of the Fanglords, deep in the warren.
+  # Three bolts, quick on each other: keep moving.
+  [[mob.pattern]]
+  name = "volley"
+  weight = 2
+  below = 0.66
+  min_range = 3
+  max_range = 26
+  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 403, blockable = true, recovery = 1.3 } ]
+
 [[mob]]
 key = "wc_serpentis"
 name = "Lord Serpentis"
@@ -1074,6 +1104,20 @@ respawn = 0.0
   look = 27812
 
 # Kresh: the old turtle of the north pool, slow and very hard to hurt.
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 22, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "wc_kresh"
 name = "Kresh"
@@ -1119,6 +1163,27 @@ respawn = 0.0
   look = 10987
 
 # Skum: a thunder lizard in the low east pool, lightning off its back.
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 34, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 31, kit = 379, heavy = true, recovery = 1.2 } ]
+  # Nearer its end, from range: venom thrown where you stand (marked as it winds up).
+  [[mob.pattern]]
+  name = "venom"
+  weight = 1.5
+  below = 0.5
+  min_range = 6
+  max_range = 22
+  steps = [ { ranged = true, windup = 1.1, damage = 26, range = 22, radius = 3, speed = 12, spell = 6917, look = 8245, blockable = false, recovery = 1 } ]
+
 [[mob]]
 key = "wc_skum"
 name = "Skum"
@@ -1171,6 +1236,25 @@ respawn = 0.0
   look = 10604
 
 # Verdan the Everliving: what grows over Naralex's dream.
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 20, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 31, kit = 379, heavy = true, recovery = 1.1 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 24, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "wc_verdan"
 name = "Verdan the Everliving"
@@ -1186,7 +1270,7 @@ boss = true
 posture = 340
 drops = { deviate_fang = [30, 40] }
 trophy = { verdan_breastplate = 1 }
-gear = ["verdan_breastplate"]
+gear = ["verdan_breastplate", "thornroot_maul"]
 respawn = 0.0
 # Whoever read the disciple's journal meets what Naralex truly dreams.
 then = "wc_mutanus"
@@ -1244,6 +1328,14 @@ then_look = 27812
   look = 26271
 
 # Mutanus the Devourer: what Naralex truly dreams.
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "wc_mutanus"
 name = "Mutanus the Devourer"
@@ -1302,6 +1394,14 @@ respawn = 0.0
   look = 27812
 
 # The Deviate Faerie Dragon: small, quick, and it blinks.
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 34, kit = 379, heavy = true, recovery = 1.2 } ]
+
 [[mob]]
 key = "wc_faerie"
 name = "Deviate Faerie Dragon"
@@ -1346,3 +1446,145 @@ respawn = 0.0
   text = "The faerie dragon blinks out of sight and back, laughing."
   shove = 4.5
   look = 27808
+  # Three in a row: two quick, then the heavy one (dodge the third).
+  [[mob.pattern]]
+  name = "string"
+  weight = 3
+  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 14, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 14, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 21, kit = 379, heavy = true, recovery = 1.1 } ]
+  # From range: it closes the gap in one blow.
+  [[mob.pattern]]
+  name = "lunge"
+  weight = 2
+  min_range = 5
+  max_range = 13
+  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 19, kit = 379, heavy = true, recovery = 1.2 } ]
+  # A quick one, then a heavy blow held back to catch an early dodge.
+  [[mob.pattern]]
+  name = "held blow"
+  weight = 1.5
+  below = 0.66
+  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 13, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 24, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  # Nearer its end: a blow all the way round.
+  [[mob.pattern]]
+  name = "sweep"
+  weight = 1.5
+  below = 0.5
+  max_range = 4
+  steps = [ { clip = 126, windup = 0.9, damage = 16, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+
+# --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
+
+[[set]]
+key = "fanglord"
+name = "The Fanglords' Vestments"
+bonus = [ { pieces = 2, kind = "regen", amount = 0.003 }, { pieces = 4, kind = "stamina", amount = 0.12 } ]
+
+[[weapon]]
+key = "cobrahn_fang"
+windup = 0.18
+active = 0.08
+recovery = 0.24
+stamina = 8.0
+damage = [11, 15]
+range = 2.5
+arc = 75.0
+targets = 1
+subclass = 15
+backstab = 3.4
+
+[[item]]
+key = "cobrahn_fang"
+name = "Cobrahn's Fang"
+display = 2709
+icon = "INV_Weapon_ShortBlade_03"
+kind = "weapon"
+text = "Lord Cobrahn's: a serpent's tooth on a hilt. Strike from behind."
+perks = [{ kind = "might", amount = 0.03 }]
+
+[[weapon]]
+key = "thornroot_maul"
+windup = 0.68
+active = 0.16
+recovery = 0.78
+stamina = 29.0
+damage = [50, 62]
+range = 3.4
+arc = 120.0
+targets = 3
+stagger = 1.25
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 5
+
+[[item]]
+key = "thornroot_maul"
+name = "Thornroot Maul"
+display = 1206
+icon = "INV_Hammer_03"
+kind = "weapon"
+text = "Verdan's: a root as thick as a man, and as hard as stone."
+
+# --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
+# strongbox's guards, casters behind the fighters -------------------------------------------
+
+# A patrol.
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-110.1, 161.2]
+z = -80.0
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-109.3, 173.2], [-108.5, 185.2] ]
+wait = 6.0
+
+# A patrol.
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [-95.1, 227.2]
+z = -90.8
+radius = 2.0
+count = 2
+link = 12.0
+route = [ [-52.7, 107.8], [-191.1, 35.2] ]
+wait = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [-43.9, 296.8]
+z = -90.8
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# Asleep in the dark until a hero comes near.
+[[dungeon.pack]]
+mob = "wc_shambler"
+at = [-203.1, -287.8]
+z = -65.3
+radius = 1.5
+count = 2
+link = 10.0
+hidden = 6.0
+
+# A caster behind the fighters.
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-157.1, -40.8]
+z = -79.9
+radius = 0.0
+count = 1
+link = 12.0
+
+# Waiting by the strongbox, unseen, for whoever opens it.
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-334.4, 21.0]
+z = -102.2
+radius = 1.5
+count = 2
+link = 10.0
+wake = "fang_stash"
