@@ -31,6 +31,7 @@
 !ElwynnSurvival.ToggleKeys()
 !local t = {} for i = 1, table.getn(ElwynnSurvival.CONTROLS) do table.insert(t, ElwynnSurvival.CONTROLS[i][1] .. " = " .. ElwynnSurvival.ControlKey(i)) end table.insert(SAID, "card: " .. table.concat(t, "; "))
 !table.insert(SAID, "card profile: " .. ElwynnSurvivalKeys.profile:GetText())
+!table.insert(SAID, "card hint: " .. ElwynnSurvivalKeys.hint:GetText() .. "; nothing to put back: " .. tostring(not ElwynnSurvivalKeys.reset:IsShown()) .. " " .. ElwynnSurvivalKeys.resetNone:GetText() .. "; look-around row fixed: " .. tostring(ElwynnSurvivalKeys.rows[5][3].fixed) .. ", attack row fixed: " .. tostring(ElwynnSurvivalKeys.rows[6][3].fixed))
 !this = ElwynnSurvivalKeys.switch; ElwynnSurvivalKeys.switch:GetScript("OnClick")()
 !table.insert(SAID, "own keys: S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. "; " .. ElwynnSurvivalKeys.profile:GetText())
 !this = ElwynnSurvivalKeys.switch; ElwynnSurvivalKeys.switch:GetScript("OnClick")()

@@ -805,24 +805,31 @@ local function SkinCard()
   if not c or c.ledger then return end
   c.ledger = true
   Sheet(c)
-  -- Room for the two notes under the keys, which the larger type would push into the last row.
-  c:SetHeight((c:GetHeight() or 400) + 26)
   Face(c.title, TITLE, 26)
   c.title:SetTextColor(1, 1, 1)
+  if c.setHead then Face(c.setHead, TITLE, 18) end
   for i = 1, table.getn(c.rows) do
     local row = c.rows[i]
-    -- The key on the right in wax, as a stamp.
-    row[2]:SetTextColor(1, 0.3, 0.3)
     if row[3] and row[3].band then
       row[3].band:SetTexture("Interface\\AddOns\\ElwynnSurvival\\art\\bar")
       Recolor(row[3].band, function(r, g, b, a) return 0.6, 0.42, 0.16, math.min(0.3, (a or 0) * 1.6) end)
     end
   end
-  for _, k in ipairs({ "switch", "reset", "middle", "where", "size", "close" }) do
+  -- Every button the same wooden plate (the floor markers and the mouse's - and + kept the old
+  -- dark one, and inked on it they read as switched off).
+  for _, k in ipairs({ "switch", "reset", "middle", "where", "size", "marks", "slower", "faster", "close" }) do
     Button(c[k], true)
   end
   InkAll(c)
-  for i = 1, table.getn(c.rows) do c.rows[i][2]:SetTextColor(1, 0.3, 0.3) end
+  -- A key that a click changes in wax, as a stamp; one that follows from others in plain sepia.
+  for i = 1, table.getn(c.rows) do
+    local row = c.rows[i]
+    if row[3] and row[3].fixed then
+      row[2]:SetTextColor(SEPIA[1], SEPIA[2], SEPIA[3])
+    else
+      row[2]:SetTextColor(1, 0.3, 0.3)
+    end
+  end
   local cap = ElwynnSurvivalCapture
   if cap then
     if cap.bg then
