@@ -67,6 +67,7 @@ at = [2077.0, 2002.0, 63.2]
 find = 4.0
 reveals = ["shrine_cache", "charlga_vow"]
 text = "under the thorns: a shrine of bones and tusks to Agamaggan, still warm with blood. Something vast, long dead, takes notice of you."
+page = "The shrine is a heap of tusks, hundreds of them, bound with thorn-vine round a single great tusk longer than a man. The stones at its foot are dark and wet. Trodden into the bloody earth is a leaf torn from a tauren scout's journal, the ink run, the hand hurried.{n}{n}The quillboar say Agamaggan fell here, fighting the demons in the oldest days, and where his blood soaked into the ground the thorns grew. They say he is not quite gone. Charlga feeds this shrine every night, and every night the thorns lean a little closer to it, the way a herd leans towards its leader.{n}{n}I touched one tusk. Only one. The ground beneath me breathed out.{n}{n}Beside the tusks, a vow has been carved small into a slab of bone."
 
 [[dungeon.box]]
 key = "shrine_cache"
@@ -96,6 +97,7 @@ at = [2153.3, 1430.8, 74.4]
 find = 4.0
 reveals = ["bone_cache"]
 text = "behind the Death Speaker's altar: what the dead were given to keep."
+page = "Behind the altar the bones are laid out with care: a quillboar skull for every bundle, and every bundle tied with a knot of red thread. Each holds what one of the dead was sent off with -- a charm, a bottle, a whetted stone, a handful of thorn fetishes for the road.{n}{n}On the altar's back the Death Speaker's marks run in rows, and someone has glossed them in Common, small, in charcoal:{n}{n}These are given to the dead, to keep. The Death Speaker keeps them for the dead, until the dead ask for them back. When the dead ask, Jargba answers. Jargba always answers.{n}{n}Then one last line, newer, the charcoal smudged by a hurrying thumb: The dead never ask. He only says they do."
 
 [[dungeon.box]]
 key = "bone_cache"
@@ -116,6 +118,7 @@ at = [2032.7, 1761.6, 60.6]
 find = 4.0
 reveals = ["halmgar"]
 text = "a burrow off the tunnel, its floor scored with circles: an earthcaller looks up from his work."
+page = "The circles on the floor are scored deep, one inside another, and the grooves are packed with earth of different colours: red clay, grey ash, black loam. Where the lines cross, small stones have been set upright like teeth. Round the rim of the largest runs a chant in quillboar marks, and over it a gloss in Common, scratched small:{n}{n}Earth under thorn, wake. Stone under earth, wake. Halmgar calls you up. Halmgar gives you legs.{n}{n}Beside it, in another hand: He has been down here since the last moon. He doesn't eat. The circles keep getting bigger.{n}{n}In the middle of the circles, a quillboar muddy to the elbows lifts his head."
 
 # --- notes -------------------------------------------------------------------------------------------
 

@@ -65,6 +65,7 @@ at = [137.5, -426.5, 18.5]
 find = 4.0
 reveals = ["tome_cache", "doan_warning"]
 text = "behind the last shelf in the far chamber: a book chained shut, and the chain has rusted through. You open it. Something on the page opens its eyes."
+page = "Inside the cover is a Crusade catalogue slip, in the Arcanist's tidy hand.{n}{n}Taken from a necromancer's house in Andorhal. Chained and blessed by three priests. Not to be read. Not to be burned either: burning would only let it out. Kept shut, and kept here, where I can watch it. -- D.{n}{n}The first page is not writing at all but a drawing crowded into the margins: a shape all limbs and lettering, like a word that has grown arms. It was not looking at you when you turned the page. It is now. Under your fingers the ink is warm and moving very slightly, the way skin moves over breath.{n}{n}In the margin beside it, Doan has written something more."
 
 [[dungeon.box]]
 key = "tome_cache"
@@ -93,6 +94,7 @@ at = [185.6, -270.6, 18.6]
 find = 4.0
 reveals = ["kennel_box"]
 text = "behind the kennels, a store room: the Houndmaster's own, and a good deal of the Crusade's silver."
+page = "The store room smells of wet dog and lamp-oil. On a peg by the door hangs the Houndmaster's feed book, every page signed at the foot with a big L and paid from the Crusade's purse.{n}{n}Feed for forty hounds, one month: twenty gold. Collars, forty: four gold. Physic for hounds hurt in the Light's service: six gold.{n}{n}The kennel holds twelve dogs. You counted them on your way in, and they counted you.{n}{n}On the last page is the sum of it all, and beneath, in the same big hand: The Arcanist reads his books and the Commander reads his scripture, and nobody reads mine. When the dead come over the wall I'll be gone with the dogs and the silver, and they can pray at the gate."
 
 [[dungeon.box]]
 key = "kennel_box"
@@ -749,6 +751,7 @@ at = [127.0, -257.0, 18.6]
 find = 6.0
 reveals = ["archivist", "restricted_cache"]
 text = "the west wing, past a rope across the door: the Restricted Section. Someone is still reading in here."
+page = "A card hangs from the rope: CLOSED TO ALL BUT THE ARCHIVIST. Past it, the shelves hold what the Crusade burned everywhere else: necromancers' notes, demon names, histories of Lordaeron the Crusade would rather were told another way. On a high desk lies the register, kept in a small, exact hand.{n}{n}Brother Aldric. Borrowed: On the Binding of the Dead. Returned three days late. Not forgiven.{n}{n}Sister Merin. Borrowed: The Burning of Darrowshire. Not returned. Sister Merin has been reminded.{n}{n}Interrogator Vishas. Borrowed: A Treatise on Pain. Returned with notes in the margins. Not forgiven.{n}{n}The next line is blank, the ink in the pen beside it still wet. Somewhere among the shelves a page turns, and a dry voice clears its throat."
 
 [[dungeon.box]]
 key = "restricted_cache"

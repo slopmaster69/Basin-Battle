@@ -75,6 +75,7 @@ at = [1205.5, 1397.5, 29.0]
 find = 4.0
 reveals = ["fairbanks"]
 text = "the door behind the altar was never locked from the outside. The thing behind it stands up."
+page = "The black candles have burned down to stubs and been lit again, many times, by someone on this side of the door. Words have been scratched into the flagstone at its foot, as if pushed out through the gap beneath it with a nail.{n}{n}I saw what stands in the Grand Crusader's shadow. It is not a man. Whitemane knows. Mograine does not.{n}{n}They shut the door on me and told me to pray. I have prayed. My candle has gone out. It is dark in here now.{n}{n}It is not so bad, the dark. It listens.{n}{n}Beyond the door, something rises, slowly, the way a man gets up after kneeling a very long while."
 
 # The courtyard's west chapel: the Crusade's reliquary, and a shard of something that burned.
 [[dungeon.door]]
@@ -88,6 +89,7 @@ at = [785.5, 1289.4, 18.7]
 find = 4.0
 reveals = ["reliquary_cache", "reliquary_inscription"]
 text = "in the courtyard's west chapel: the Crusade's reliquary, and in it a shard of a blade that still smoulders. It knows the name Mograine."
+page = "The reliquary is a little chest of red gold, set on the chapel altar under a cloth stitched with flames. Tucked beneath the cloth is the keeper's register, in the careful hand of a chaplain who has written the same words many times.{n}{n}Received from the Commander's own hand, on his return from the north: one shard of the Ashbringer, wrapped in his cloak. The Commander would not say how it came to be broken. He would not look at it.{n}{n}Note: the shard is warm. It has never once been cold, not in the deepest winter. On the nights the Commander prays in the cathedral it smoulders, and the chapel smells of smoke.{n}{n}Note: by order of High Inquisitor Whitemane, it is never to be brought near him. Never.{n}{n}Words are cut into the reliquary's lid."
 
 [[dungeon.box]]
 key = "reliquary_cache"
@@ -116,6 +118,7 @@ at = [892.7, 1434.2, 18.7]
 find = 4.0
 reveals = ["tithe_box"]
 text = "behind a statue in the courtyard: the tithes a chaplain kept for himself."
+page = "Wedged behind the statue's heel is a sack of the Crusade's insignia, and folded among them a page torn from a confessor's book, filled in by the confessor himself.{n}{n}I confess I have kept back the tithes, a little at every collection, since the winter. I confess I meant to buy passage to Theramore with them, and a new name, and a life where no one asks me to bless the fires.{n}{n}I confess I have seen what is done in the Inquisitor's rooms, and said the words over it, and gone in to supper.{n}{n}I confess I will not be forgiven. I only ask the Light to let me be gone before the next burning.{n}{n}It is not signed. Above it the statue looks down with stone eyes and an expression that, in this light, might be disappointment."
 
 [[dungeon.box]]
 key = "tithe_box"

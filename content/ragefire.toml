@@ -64,6 +64,7 @@ at = [-306.0, -6.3, -52.5]
 find = 4.5
 reveals = ["grimoire_cache", "grimoire_page"]
 text = "up the slope in the deep chamber's corner: Jergosh's grimoire, its binding-ward still warm. Whatever it keeps bound, it isn't now."
+page = "The book is bound in something that was once skin, and it is warm through your gloves, like a hearthstone an hour after the fire. The flyleaf is in the Invoker's own hand.{n}{n}This is the binding of the Heart of Ragefire, and it is mine. Not the Searing Blade's. Not Bazzalan's, who asks to read it and will not. The Heart answers me while this book holds it, and I do not mean to be eaten by my own fire.{n}{n}The pages after are columns of words in the demon tongue, each with a mark in red where the reader must draw breath. Near the back one page has been torn out, its edge still curling, as if it had come away from a flame.{n}{n}Far beneath the chasm, something shifts its weight."
 
 [[dungeon.box]]
 key = "grimoire_cache"
@@ -92,6 +93,7 @@ at = [-77.4, 90.4, -7.3]
 find = 4.0
 reveals = ["ledge_cache"]
 text = "up on the ledge over the camp: the cult's tithes, hidden from its own collectors."
+page = "The barrel is wedged so tight into the rock that it must have been carried up empty and filled a handful at a time. Inside, under the red stones, is a strip of hide marked in Orcish with a collector's careful tallies.{n}{n}Tithes, the Cleft, this moon. From the trogg-hunters: forty. From the new blood down from Orgrimmar: sixty. To the Invoker: eighty. To the ledge: twenty.{n}{n}Underneath, in the same hand: The Invoker counts the tithes twice and never counts his own people at all. When the Kor'kron come down, and they will, the ones with stones of their own walk out the back way. The rest burn with him.{n}{n}Every moon is the same. Eighty to the Invoker. Twenty to the ledge."
 
 [[dungeon.box]]
 key = "ledge_cache"
@@ -112,6 +114,7 @@ at = [-341.9, 257.6, -8.1]
 find = 4.0
 reveals = ["maur"]
 text = "on the west cave's high ledge: a tauren in Grimtotem paint, who turns from the fire to look at you."
+page = "A small fire burns on the ledge, fed with nothing you can see. Beside it stands a Grimtotem totem, and wound round its post is a strip of hide marked in Taur-ahe, with the same words below in big, careful Orcish, as if the writer wanted someone to understand.{n}{n}First sun: the burning ones are in the Cleft. I follow them down. Second: I kill two. They do not scream; they laugh. Fifth: the fire under the chasm says my name. Not my name. My mother's. Eighth: I do not hunt them now. I keep the fire. The fire keeps me.{n}{n}The last mark is only a handprint, pressed into the hide in ash.{n}{n}By the fire, a tauren in Grimtotem paint has not moved since you climbed up. Now he does."
 
 # --- notes -------------------------------------------------------------------------------------------
 

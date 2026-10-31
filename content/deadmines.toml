@@ -2105,6 +2105,7 @@ at = [-159.0, -908.0, 8.8]
 find = 4.0
 reveals = ["pantry"]
 text = "inside the little tent at the south end of the cove, under a heap of sacks: Cookie's pantry, and a jar that wriggles."
+page = "The tent smells of fish and old onions. Pinned to the pole with a filleting knife is a greasy card, written out in a pirate's hand, as if someone had stood over the pot and taken it down word for word.{n}{n}COOKIE'S STEW, as he gargled it to me. Salt pork, two fists. Rum, a good glug, and one for the cook. Whatever the lads caught that morning, scales and all. Boil till it fights back.{n}{n}Then the jar. Not before the pot boils, he says, and never all of it. And never let him see it once he's hurt, or he'll eat the lot, and there's no telling what comes up out of him after. The last mate who tried to take it off him is in the stew.{n}{n}Among the sacks, the jar knocks against your boot. It is knocking from the inside."
 
 [[dungeon.box]]
 key = "pantry"
@@ -2123,6 +2124,7 @@ at = [-105.0, -818.0, 37.9]
 find = 4.0
 reveals = ["quarters", "vancleef_letter"]
 text = "aft of the mast, under the stern, a barrel stencilled E. V. rolls aside from a hatch: VanCleef's quarters, and a letter he never sent."
+page = "Below the hatch is a cabin no bigger than a cell, kept as neat as a mason's yard: a hammock, a sea-chest, a chart of the Westfall coast pinned flat with four chisels. On the table lies a sheet of Stonemasons' Guild paper, ruled in red, in a hand that pressed hard enough to score the wood beneath.{n}{n}OWED BY THE HOUSE OF NOBLES, for the rebuilding of the city after the orcs burned it. Walls, gates, the Cathedral, the Keep. Wages, two years. Paid: nothing.{n}{n}Beneath the sum are the names of every noble who voted against paying it, and beside each a small red mark. Most of the marks are crosses. A few are still only dots.{n}{n}Folded under the chisels is a letter in the same hand, addressed to Vanessa. It was never sealed."
 
 [[dungeon.note]]
 key = "vancleef_letter"
@@ -2150,6 +2152,7 @@ at = [-118.0, -450.0, 55.6]
 find = 4.0
 reveals = ["johnson"]
 text = "in the east lobe's back wall, a seam of silver dug out by hand, and the man who dug it turns round."
+page = "Someone has cut a ledge into the wall with a pick and a great deal of patience, and the silver in it runs bright as a stream. Scratched beside it, the letters gouged deep enough to hold the lamp-soot:{n}{n}THIS SEAM IS JOHNSON'S. Not the foreman's. Not the Kingpin's. Not Gilnid's for his smelter. I found it before the cave-in and I dug it out after. Mine by right.{n}{n}Under that runs a tally of days, and beside each a weight in ounces. The weights climb. The hand gets worse. The last lines are only the word MINE, over and over, until the scratches turn to gouges and stop.{n}{n}A lantern burns on the ledge, freshly trimmed. At the end of it, a man in a battered miner's helm stops digging."
 
 # The powder crates across the cannon gallery's alcove.
 [[dungeon.door]]
@@ -2164,6 +2167,7 @@ scale = 1.8
 bars = [[-110.0, -607.0], [-110.0, -623.0]]
 reveals = ["marisa", "gallery"]
 text = "the crates are empty, and stacked across a gap: behind them, the alcove, and Marisa du'Paige."
+page = "A blanket, a stub of candle, and a skin of frost on everything. Loose pages are tucked into a crack in the rock, written small to save paper.{n}{n}First night behind the crates. I heard them in the gallery, the Kingpin's men, asking after the mage who saw too much at Moonbrook. I held my breath until it froze on my lips.{n}{n}Fourth night. One of them sat down on the other side of the crates and talked to me as if he knew. He said Stormwind still has a warrant with my name on it, and the Brotherhood never asked what for. He said VanCleef pays his people, which is more than the Crown ever did.{n}{n}Ninth night. I have stopped hiding.{n}{n}The candle is still warm. Close by, frost crackles across the stone."
 
 # The back of the goblins' workshop, past the sawhorses: the noble they keep.
 [[dungeon.door]]
@@ -2177,6 +2181,7 @@ at = [-300.0, -611.0, 47.6]
 find = 4.0
 reveals = ["noble"]
 text = "in the back of the workshop: a man in the rags of fine clothes, talking to the dark. He turns."
+page = "A chain runs from a bolt in the floor to an open cuff. The wall above it is covered in writing, scratched with a nail by someone who was taught a fine hand and has lost it.{n}{n}I am a lord of the House of Nobles. I sat in the chamber when the masons came for their wages, and I voted no. I would vote no again. Tell my wife they want gold for me. Tell her to pay it.{n}{n}Lower down, the letters grow larger and lean the other way. They have stopped asking for gold. He comes in the dark and asks me whom I serve. I tell him the King.{n}{n}Lowest of all, in a hand that is not the first one: WE SERVE. WE SERVE. AS HE SERVES.{n}{n}Deeper in the dark, the muttering stops."
 
 # --- the rares the secrets keep ---------------------------------------------------------------------
 
