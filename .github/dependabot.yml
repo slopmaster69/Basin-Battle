@@ -13,6 +13,11 @@ updates:
     groups:
       rust-minor-and-patch:
         update-types: [minor, patch]
+    # A major version changes the crate's API (rand 0.10 dropped the small_rng feature htl-sim
+    # uses), so it needs code changes: done by hand on a branch, not proposed here.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
