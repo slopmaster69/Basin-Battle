@@ -928,6 +928,9 @@ pub struct DungeonDef {
     /// stand again and the strongboxes fill: the Deadmines run again for their loot. 0: never.
     #[serde(default)]
     pub reset_minutes: f32,
+    /// The Bookmaker's Wager: the time to beat (minutes; by the dungeon's size when not given).
+    #[serde(default)]
+    pub wager_minutes: f32,
     #[serde(rename = "lamp", default)]
     pub lamps: Vec<LampDef>,
     #[serde(rename = "door", default)]

@@ -808,6 +808,50 @@ whoever's below set down at the first lamp; their save is kept aside as well).
 (mirrored every tick; the journal moves on only at camp). After the Logbook, the next goal is to
 kill Cookie once.
 
+## Secrets and notes
+
+Notes lie where they were dropped below; read one (the use key) and it opens on a parchment page
+that stays till you close it, with a clue in red ink while the secret it speaks of is still
+hidden. Every hidden spot has a marker to search (a heap of sacks, a pumpkin on a grave, a book
+in rusted chains): come near it and you're nudged once a run, search it and it gives up what it
+kept. The camp remembers every note read and secret found; the book's page for each dungeon has
+a **Secrets and Notes** row (`.es lore <dungeon>`): what's found, the rumours of the rest, and
+every note to read again (`.es note <note>`).
+
+## The Bookmaker's Wager (timed runs) and the Bookmaker's Board
+
+Each dungeon's page in the book has **The Bookmaker's Wager** (`.es wager <dungeon>`): a run
+against the clock at a level, as a mythic keystone's. Taking one (`.es wager stockade 3`, or click
+a level) starts the dungeon fresh for whoever takes it: bosses up, secrets hidden, shortcuts
+shut (given back as they were once everyone's out). The clock starts when the first hero leaves
+the first lamp and stops when the dungeon's last boss falls (every boss that stands from the
+start; secrets' bosses and rares are extra); each fall adds 10 seconds. Lamps only take you home
+during a wager. Friends join it by taking the same level from the book while it runs.
+
+- **Levels.** Every camp starts open to +1 on each dungeon. Won in time, the next level opens;
+  in four fifths of the time, two levels; in three fifths, three (up to +20).
+- **Tougher every level.** Foes have 9% more health and hit 6% harder each level (compounding).
+  From +2 *Hardened* (foes that aren't bosses: a fifth more health, a sixth harder), +4
+  *Rallying* (a foe's fall heals its pack a little and makes it hit harder), +6 *Smouldering*
+  (fallen foes leave burning ground), +8 *The Kingpin's Due* (bosses: a third more health, a fifth
+  harder).
+- **Better pay.** Plunder for every hero there (6 + 3 a level; half when over time), and in time
+  the dungeon's own gear into the camp's chest: one piece and one more every three levels, the
+  finer pieces (a perk, a set's) from +3, one for certain from +6.
+- **Times to beat.** By the dungeon's size (8 minutes, 0.4 a pack, 1.5 a boss, rounded to 2:30),
+  or `wager_minutes` in its file: the Deadmines 35:00, the Stockade and Ragefire 27:30, ..., the
+  Library and the Cathedral 20:00. First guesses: tune them from the board.
+
+**The board.** Every wager won is kept in `saves/wager-board.toml`; `.es board <dungeon>` shows the
+runs in time, highest level first, then quickest. One server keeps the board for everyone (the
+one friends join: it runs without `--board`). Anyone hosting their own sets `HTL_BOARD` in
+`settings.sh` (or `--board`) to that server's address and login port (`1.2.3.4:3724`); theirs
+then sends its runs there every minute and fetches everyone's back. Runs go over plain HTTP on
+the login port (no new port to forward); the keeper takes short requests only, a few a minute from
+one address, checks every run (a known dungeon, a sane level and time, names that are only names,
+the game's signature) and keeps the best 200 of each dungeon. `HTL_BOARD_NAME` (`--board-name`)
+names your camp on it (a made-up "Camp 3F2A" otherwise).
+
 ## The Proving Ring
 
 The Smuggler's Logbook has a page that's open from the start: the Proving Ring, a ring of

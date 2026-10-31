@@ -566,24 +566,7 @@ impl SurvivalGame {
             }
             Event::Letter { player, kind, title, place, text, clue, links } => {
                 if let Some(c) = self.conn_of(player) {
-                    if self.has_addon(c) {
-                        let page = |t: &str| clean(&t.replace('\n', "{n}"));
-                        let links: Vec<String> = links.iter().map(|(cmd, label)| format!("{}~{}", clean(cmd), clean(label))).collect();
-                        self.ui_line(c, &format!("NT\t{kind}\t{}\t{}\t{}\t{}\t{}", clean(&title), clean(&place), page(&text), page(&clue), links.join("^")));
-                    } else {
-                        // In chat, a line a paragraph: the title, the page, the clue.
-                        self.say_to(c, &format!("{title} ({place})"));
-                        for p in text.split('\n').filter(|p| !p.trim().is_empty()) {
-                            self.say_to(c, p);
-                        }
-                        if !clue.is_empty() {
-                            self.say_to(c, &format!("A clue: {clue}"));
-                        }
-                        if !links.is_empty() {
-                            let more: Vec<String> = links.iter().map(|(cmd, label)| format!("{cmd} ({label})")).collect();
-                            self.say_to(c, &format!("Read on: {}", more.join(", ")));
-                        }
-                    }
+                    self.letter(c, &kind, &title, &place, &text, &clue, &links);
                 }
             }
             Event::StationOpen { player, station } => {
@@ -609,6 +592,7 @@ impl SurvivalGame {
                 }
             }
             Event::ToCamp { counts, items } => self.to_camp.push((counts, items)),
+            Event::WagerDone(run) => self.wagers.push(run),
             Event::Arena { player } => {
                 if let Some(c) = self.conn_of(player) {
                     self.ui_arena(c, player);
@@ -743,6 +727,30 @@ impl SurvivalGame {
 }
 
 /// Text safe inside an add-on line (no tabs, line breaks or the add-on's own separators).
+impl SurvivalGame {
+    /// A page for one hero to read at leisure (`NT` with the add-on, a few chat lines without).
+    pub(crate) fn letter(&self, c: ConnId, kind: &str, title: &str, place: &str, text: &str, clue: &str, links: &[(String, String)]) {
+        if self.has_addon(c) {
+            let page = |t: &str| clean(&t.replace('\n', "{n}"));
+            let links: Vec<String> = links.iter().map(|(cmd, label)| format!("{}~{}", clean(cmd), clean(label))).collect();
+            self.ui_line(c, &format!("NT\t{kind}\t{}\t{}\t{}\t{}\t{}", clean(title), clean(place), page(text), page(clue), links.join("^")));
+        } else {
+            // In chat, a line a paragraph: the title, the page, the clue.
+            self.say_to(c, &format!("{title} ({place})"));
+            for p in text.split('\n').filter(|p| !p.trim().is_empty()) {
+                self.say_to(c, p);
+            }
+            if !clue.is_empty() {
+                self.say_to(c, &format!("A clue: {clue}"));
+            }
+            if !links.is_empty() {
+                let more: Vec<String> = links.iter().map(|(cmd, label)| format!("{cmd} ({label})")).collect();
+                self.say_to(c, &format!("Read on: {}", more.join(", ")));
+            }
+        }
+    }
+}
+
 pub(crate) fn clean(s: &str) -> String {
     s.replace(['\t', '\n', '\r', '|', '~', '^'], " ")
 }

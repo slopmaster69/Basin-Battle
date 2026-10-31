@@ -1736,6 +1736,9 @@ impl Survival {
         for i in dropped.keys() {
             p.bag.remove(i);
         }
+        if below {
+            self.wager_fall();
+        }
         let dropped = if below { self.below_drops(id) } else { dropped };
         let Some(p) = self.players.get(&id) else {
             return;

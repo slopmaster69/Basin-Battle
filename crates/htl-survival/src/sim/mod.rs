@@ -22,6 +22,7 @@ pub(crate) mod explore;
 pub(crate) mod heroes;
 mod raid;
 pub mod siege;
+pub mod wager;
 mod tactics;
 mod world;
 
@@ -205,6 +206,8 @@ pub enum Event {
     /// A page for one hero to read at leisure (a note, a secret found, the book's record of a
     /// dungeon): stays up till closed. `kind` is note, secret or lore; `text`'s paragraphs are
     /// split by blank lines; `links` are (command, label) to read on.
+    /// A wager won (in time or not), for the camp and the Bookmaker's Board.
+    WagerDone(wager::WagerRun),
     Letter { player: Id, kind: String, title: String, place: String, text: String, clue: String, links: Vec<(String, String)> },
     /// A blow coming at a hero that no guard stops (dodge it): warned for its wind-up.
     /// A blow no guard stops on its way to `player` for `secs`; `from` the creature winding it up
@@ -586,6 +589,8 @@ pub struct Effect {
 
 pub struct Mob {
     pub def: usize,
+    /// A wager's Rallying: packmates fallen, each a tenth harder.
+    pub rally: u32,
     pub pos: Vec3,
     pub facing: f32,
     pub home: Vec3,

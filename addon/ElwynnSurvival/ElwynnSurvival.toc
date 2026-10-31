@@ -7,3 +7,4 @@
 ElwynnSurvival.lua
 Ledger.lua
 Letter.lua
+Wager.lua

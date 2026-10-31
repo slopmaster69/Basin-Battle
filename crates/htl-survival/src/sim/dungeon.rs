@@ -25,6 +25,8 @@ pub struct Below {
     pub fog: BTreeSet<String>,
     /// Hidden spots a hero has been nudged toward this run (not kept).
     pub noticed: BTreeSet<String>,
+    /// The Bookmaker's Wager under way, if any (not kept).
+    pub wager: Option<super::wager::Wager>,
     /// Foes down since the last rest: (kind, home, pack), back at the next.
     pub fallen: Vec<(usize, Vec3, Option<usize>)>,
     /// The hazards' next beat, by their place in the list.
@@ -61,6 +63,8 @@ pub struct BookDungeon {
     /// Its secrets found of all, and its notes read of all (the camp's, for good).
     pub secrets: (usize, usize),
     pub notes: (usize, usize),
+    /// The highest wager the camp may take on it, and its time to beat (seconds).
+    pub wager: (u32, f32),
 }
 
 /// A door's state as it's drawn: open, or shut.
@@ -303,6 +307,8 @@ impl Survival {
                 p.bag.insert(draught, hero.draughts);
             }
             p.quick = Some(draught);
+        }        if self.wager().is_some() {
+            self.wager_join(id);
         }
     }
 
@@ -387,6 +393,7 @@ impl Survival {
                 pages: d.lamps.iter().enumerate().filter(|(k, l)| *k == 0 || self.pages.contains(&l.key)).map(|(_, l)| (l.key.clone(), l.name.clone())).collect(),
                 secrets: (d.doors.iter().filter(|dr| dr.secret() && self.ever("secret", &dr.key)).count(), d.doors.iter().filter(|dr| dr.secret()).count()),
                 notes: (d.notes.iter().filter(|n| self.ever("read", &n.key)).count(), d.notes.len()),
+                wager: (self.wager_unlocked(&d.key), super::wager::wager_limit(d, &self.content)),
             })
             .collect()
     }
@@ -477,6 +484,28 @@ impl Survival {
         Ok(())
     }
 
+    /// Read the book at camp for a wager: down to a dungeon's first lamp at `level`, fresh (the
+    /// world below decides whether it can start one now).
+    pub fn travel_wager(&mut self, id: Id, dungeon: &str, level: u32) -> Result<(), String> {
+        let d = self.content.dungeons().find(|d| d.key == dungeon).cloned().ok_or("No such dungeon in the book.")?;
+        let first = d.lamps.first().map(|l| l.key.clone()).ok_or("That dungeon has no way in.")?;
+        let most = self.wager_unlocked(&d.key);
+        if level == 0 || level > most {
+            return Err(format!("The Bookmaker won't take +{level} on {} yet: up to +{most} (win one in time to raise it).", d.name));
+        }
+        if !self.book_pages().iter().any(|(k, _)| *k == first) {
+            return Err(format!("{}'s pages are still in cipher.", d.name));
+        }
+        let p = self.players.get(&id).ok_or("No hero.")?;
+        let book = self.objs.get(&self.book_id()).map(|o| o.pos).ok_or("There's no book here.")?;
+        if dist2d(p.pos, book) > INTERACT_RANGE + 2.0 {
+            return Err("Go to the Smuggler's Logbook by the camp's chest.".into());
+        }
+        self.cancel_preview(id);
+        self.events.push(Event::Travel { player: id, to: Some(format!("{first}@{level}")) });
+        Ok(())
+    }
+
     /// Below, at a lamp: on to another lit lamp, or (`camp`) home.
     fn travel_below(&mut self, id: Id, to: &str) -> Result<(), String> {
         let p = &self.players[&id];
@@ -486,6 +515,9 @@ impl Survival {
         }
         if self.in_fight(id) {
             return Err("Not with foes on you!".into());
+        }
+        if to != "camp" && self.wager_running() {
+            return Err("Not during a wager: the lamps only take you home (and the wager goes on without you).".into());
         }
         if to == "camp" {
             self.events.push(Event::Travel {
@@ -1049,6 +1081,7 @@ impl Survival {
         if raider || pack.is_none() {
             return;
         }
+        self.wager_kill(def, at, pack);
         let k = pack.unwrap();
         let lasting = self.lasting_pack(k);
         // (A second form, a druid's serpent or a split ooze, comes back as its first: that one is
@@ -1246,6 +1279,13 @@ impl Survival {
         let Some(d) = self.dungeon_def().cloned() else {
             return;
         };
+        // The Bookmaker's Wager, if one's on.
+        if self.wager().is_some() {
+            self.step_wager();
+            if self.wager().is_none() {
+                return;
+            }
+        }
         // A run beaten a while ago, and nobody below: the bosses stand again for the next.
         if let Some(at) = self.below.as_ref().and_then(|b| b.run_at) {
             if d.reset_minutes > 0.0 && self.players.is_empty() && self.wall() >= at + d.reset_minutes as f64 * 60.0 {

@@ -28,6 +28,8 @@ pub struct Realms {
     pub(crate) in_siege: HashSet<ConnId>,
     /// The lamps the camp's book was last told of.
     pages: Vec<String>,
+    /// The Bookmaker's Board.
+    pub(crate) board: Option<super::board::Shared>,
 }
 
 impl Realms {
@@ -43,6 +45,7 @@ impl Realms {
             in_below: HashMap::new(),
             in_siege: HashSet::new(),
             pages: Vec::new(),
+            board: None,
         };
         // An account kept in two saves (a restart mid-crossing): it's below.
         for b in &r.below {
@@ -53,6 +56,12 @@ impl Realms {
         }
         r.sync_pages();
         r
+    }
+
+    /// The Bookmaker's Board, for the camp's pages and the wagers won below.
+    pub fn set_board(&mut self, board: Option<super::board::Shared>) {
+        self.camp.board = board.clone();
+        self.board = board;
     }
 
     pub fn run(mut self, inbound: Receiver<Inbound>) {
@@ -170,12 +179,39 @@ impl Realms {
             if self.in_below.contains_key(&conn) {
                 continue;
             }
+            // A wager: `lamp@level`.
+            let (lamp, level) = match lamp.split_once('@') {
+                Some((l, n)) => (l.to_string(), n.parse::<u32>().ok()),
+                None => (lamp, None),
+            };
             // The dungeon whose page it is.
             let Some(k) = self.below.iter().position(|b| b.sim.content.dungeon.as_ref().is_some_and(|d| d.lamps.iter().any(|l| l.key == lamp))) else {
                 self.camp.say_to(conn, "That place couldn't be read from the game data on this server.");
                 continue;
             };
             let below = &mut self.below[k];
+            let name = below.sim.content.dungeon.as_ref().map_or(String::new(), |d| d.name.clone());
+            let busy = !below.sim.players.is_empty();
+            let wager = below.sim.wager().map(|w| (w.level, w.done.is_some()));
+            match (level, wager) {
+                // A wager on an empty dungeon starts it fresh; one under way at that level takes
+                // whoever joins.
+                (Some(n), Some((at, false))) if busy && at == n => {}
+                (Some(n), _) if !busy => below.sim.start_wager(n),
+                (Some(_), Some((at, false))) => {
+                    self.camp.say_to(conn, &format!("A wager is under way in {name} at +{at}: join that one, or wait for it to end."));
+                    continue;
+                }
+                (Some(_), _) => {
+                    self.camp.say_to(conn, &format!("Heroes are down in {name} already: a wager starts on an empty dungeon."));
+                    continue;
+                }
+                (None, Some((at, _))) if busy => {
+                    self.camp.say_to(conn, &format!("{name} is the Bookmaker's for now: a wager at +{at} is on. Join it from the book's wager page."));
+                    continue;
+                }
+                (None, _) => {}
+            }
             self.camp.send(conn, packets::transfer_pending(below.realm.map));
             if let Some((session, save, carry)) = self.camp.depart(conn) {
                 below.arrive(conn, session, save, carry, Some(&lamp));
@@ -193,6 +229,14 @@ impl Realms {
                 if let Some((session, save, carry)) = below.depart(conn) {
                     self.camp.arrive(conn, session, save, carry, None);
                     self.in_below.remove(&conn);
+                }
+            }
+            // Wagers won, onto the board (and to the board host, from a server that isn't it).
+            let won = std::mem::take(&mut self.below[k].wagers);
+            if let Some(b) = &self.board {
+                for w in &won {
+                    let run = b.lock().unwrap().record(w);
+                    println!("[survival] wager: {} +{} in {} ms ({} falls, {}) by {}", w.name, w.level, w.ms, w.deaths, if w.timed { "in time" } else { "over time" }, run.heroes());
                 }
             }
             let news = std::mem::take(&mut self.below[k].to_camp);

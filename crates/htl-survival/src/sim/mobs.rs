@@ -146,7 +146,9 @@ impl Survival {
     pub(crate) fn base_health(&self, def: usize) -> u32 {
         let d = &self.content.mobs[def];
         let share = if d.critter || d.inert() { 1.0 } else { self.content.combat.foe_health };
-        (d.health as f32 * share).round().max(1.0) as u32
+        // A wager's level, below.
+        let wager = if d.critter || d.inert() { 1.0 } else { self.wager_scale(def).0 };
+        (d.health as f32 * share * wager).round().max(1.0) as u32
     }
 
     /// Whether a creature grows with the heroes in its fight: not below (every hero in the mines
@@ -262,6 +264,7 @@ impl Survival {
             id,
             Mob {
                 def,
+                rally: 0,
                 pos: at,
                 facing,
                 home: at,
@@ -1598,6 +1601,11 @@ impl Survival {
             a.recovery *= e.speed;
             a.cooldown *= e.speed;
             a.damage = (a.damage as f32 * e.might).round() as u32;
+        }
+        // A wager's level, and its pack's rally.
+        let w = self.wager_scale(m.def).1 * (1.0 + 0.1 * m.rally as f32);
+        if w != 1.0 {
+            a.damage = (a.damage as f32 * w).round() as u32;
         }
         a
     }

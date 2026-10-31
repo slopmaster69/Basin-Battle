@@ -29,12 +29,14 @@ local SEPIA = { 0.353, 0.275, 0.188 }
 local WAX = { 0.604, 0.169, 0.125 }
 local FROST = { 0.184, 0.373, 0.47 }
 -- The seal on each kind of page.
-local SEALS = { note = "seal_red", secret = "seal_check", lore = "seal_blue" }
+local SEALS = { note = "seal_red", secret = "seal_check", lore = "seal_blue", wager = "seal_grey", board = "seal_grey" }
 -- And the line at its foot.
 local FOOT = {
   note = "Kept in the logbook, under Secrets and Notes.",
   secret = "Written into the logbook, under Secrets and Notes.",
   lore = "Click a note to read it again.",
+  wager = "Click a wager to take it: down you go, fresh.",
+  board = "Every server's runs, through the board's keeper.",
 }
 
 local ledger = ES.ledger

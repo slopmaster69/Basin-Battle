@@ -974,3 +974,64 @@ fn a_strongbox_can_have_guards_waiting_unseen_for_whoever_opens_it() {
     assert_eq!(shown(&s), 2, "out of the dark");
     assert!(s.mobs.values().filter(|m| dist2d(m.pos, [33.0, 30.0, 0.0]) < 4.0).all(|m| m.state.target() == Some(id)), "on the opener");
 }
+
+#[test]
+fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back() {
+    use crate::sim::wager::{WAGER_DAMAGE, WAGER_HEALTH};
+    let mut s = below();
+    let grunt = |s: &Survival| *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].mob == "grunt")).unwrap().0;
+    let plain = s.mobs[&grunt(&s)].max_health as f32;
+    s.below.as_mut().unwrap().open.insert("short".into());
+    assert_eq!(s.wager_unlocked("deadmines"), 1);
+    s.start_wager(3);
+    // Fresh, and tougher: the shortcut shut, the grunt a level's worth (and Hardened) stronger.
+    assert!(!s.door_is_open("short"), "shut for the wager");
+    let tough = s.mobs[&grunt(&s)].max_health as f32;
+    let want = plain * (1.0 + WAGER_HEALTH).powi(2) * 1.2;
+    assert!((tough - want).abs() <= want * 0.02 + 1.0, "{tough} vs {want}");
+    let g = grunt(&s);
+    let hit = s.attack_now(g).damage as f32;
+    let def = s.mobs[&g].def;
+    let base = s.content.mobs[def].attack.damage as f32;
+    assert!((hit - base * (1.0 + WAGER_DAMAGE).powi(2) * 1.16).abs() <= 1.0, "{hit} vs {base}");
+    // A hero comes down: the slip, and the clock waits till they leave the lamp.
+    let id = s.join("ayla", "Ayla", None);
+    let ev = run(&mut s, 1.0);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "The Bookmaker's Wager: +3")), "{ev:?}");
+    assert!(s.wager().unwrap().started.is_none());
+    s.wager_fall();
+    assert_eq!(s.wager().unwrap().deaths, 0, "a fall before the clock costs nothing");
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.contains("clock is running"))));
+    s.wager_fall();
+    assert_eq!(s.wager().unwrap().deaths, 1);
+    assert!(s.wager_elapsed() >= 10.0, "a fall's ten seconds");
+    // Its boss down, quickly: won in time, three levels up.
+    let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
+    s.hurt_mob(boss, id, 10_000_000);
+    let ev = run(&mut s, 0.2);
+    let done = ev.iter().find_map(|e| if let Event::WagerDone(r) = e { Some(r.clone()) } else { None }).expect("won");
+    assert!(done.timed && done.level == 3 && done.deaths == 1 && done.party == vec![("Ayla".to_string(), s.players[&id].class.clone())], "{done:?}");
+    assert_eq!(s.wager_unlocked("deadmines"), 6, "three up for a quick one");
+    assert!(ev.iter().any(|e| matches!(e, Event::ToCamp { counts, .. } if counts.iter().any(|(k, n)| k == "wager:deadmines" && *n == 5))), "the camp told");
+    let plunder = s.content.item("plunder").unwrap();
+    assert!(s.players[&id].bag.get(&plunder).copied().unwrap_or(0) >= 15, "paid");
+    // Everyone gone: the dungeon as it was, the shortcut open again.
+    s.leave(id);
+    run(&mut s, 0.2);
+    assert!(s.wager().is_none());
+    assert!(s.door_is_open("short"), "given back");
+}
+
+#[test]
+fn a_wager_above_what_the_camp_has_won_is_refused() {
+    let mut c = content();
+    c.dungeon.as_mut().unwrap().book = [0.0, 0.0];
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    s.debug = true;
+    let id = s.join("ayla", "Ayla", None);
+    let err = s.travel_wager(id, "deadmines", 2).unwrap_err();
+    assert!(err.contains("up to +1"), "{err}");
+    assert!(s.travel_wager(id, "nowhere", 1).is_err());
+}
