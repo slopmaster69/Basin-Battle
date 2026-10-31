@@ -389,6 +389,7 @@ dependencies = [
  "image",
  "rand",
  "serde",
+ "sha1",
  "toml",
  "wow_srp",
 ]

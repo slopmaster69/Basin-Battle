@@ -36,6 +36,11 @@ pub struct Config {
     pub icons: std::collections::HashMap<u32, String>,
     /// Elwynn Survival, on its own realm, if it's running too.
     pub survival: Option<SurvivalSetup>,
+    /// The Bookmaker's Board host (`host:port`) this server sends its wagers to; none: this
+    /// server is the board host, and takes everyone's on its login port.
+    pub board: Option<String>,
+    /// This server's name on the board (a made-up camp's when empty).
+    pub board_name: String,
 }
 
 /// Elwynn Survival's realm: its world port, name, save file, rules and land.
@@ -69,6 +74,8 @@ impl Default for Config {
             saves: None,
             icons: Default::default(),
             survival: None,
+            board: None,
+            board_name: String::new(),
         }
     }
 }
@@ -123,7 +130,14 @@ pub fn start_games(mut config: Config, basin: Option<Basin>) -> Result<Running> 
             .spawn(move || game::Game::new(sim, saves, icons).run(rx))?;
     }
     let mut survival_world = None;
+    let mut board = None;
     if let Some(sv) = config.survival.take() {
+        // The Bookmaker's Board, kept beside the survival save.
+        let dungeons: Vec<String> = sv.content.dungeons().map(|d| d.key.clone()).collect();
+        let path = sv.save.as_ref().map(|p| p.with_file_name("wager-board.toml"));
+        let shared: survival::board::Shared = std::sync::Arc::new(std::sync::Mutex::new(survival::board::Board::new(path, &config.board_name, config.board.clone(), dungeons)));
+        survival::board::Board::spawn_sync(shared.clone());
+        board = Some(shared);
         let world = TcpListener::bind((config.bind.as_str(), sv.world_port))
             .with_context(|| format!("listening for the survival world on port {}", sv.world_port))?;
         let addr = world.local_addr()?;
@@ -144,7 +158,8 @@ pub fn start_games(mut config: Config, basin: Option<Basin>) -> Result<Running> 
         }
         let siege = sv.siege.map(|land| survival::SurvivalGame::new_in(survival::Realm::SIEGE, sv.content.clone(), land, None, seed ^ 0x5e1e));
         let game = survival::SurvivalGame::new(sv.content, sv.land, sv.save, seed ^ 0x5eed);
-        let realms = survival::realms::Realms::with_siege(game, below, siege);
+        let mut realms = survival::realms::Realms::with_siege(game, below, siege);
+        realms.set_board(board.clone());
         std::thread::Builder::new().name("survival".into()).spawn(move || realms.run(rx))?;
     }
     let Some(world) = bb_world.or(survival_world) else {
@@ -153,7 +168,7 @@ pub fn start_games(mut config: Config, basin: Option<Basin>) -> Result<Running> 
     let running = Running { login: login.local_addr()?, world, survival: survival_world };
     realmd::spawn(
         login,
-        realmd::RealmConfig { realms, password: config.password, public_host: config.public_host },
+        realmd::RealmConfig { realms, password: config.password, public_host: config.public_host, board },
         keys,
     );
     Ok(running)

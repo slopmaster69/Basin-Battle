@@ -4315,6 +4315,21 @@ function ES.BookDraw()
         detail = "What's been found down there, the rumours of what hasn't (from the notes read), and every note, to read again.",
       })
     end
+    -- (And of the Bookmaker's Wager: the level open, the time to beat.)
+    if info[14] then
+      top = 3
+      local most, limit = tonumber(info[14]) or 1, tonumber(info[15]) or 0
+      Row(3, {
+        icon = "INV_Misc_Coin_02",
+        lit = most > 1,
+        name = "The Bookmaker's Wager",
+        tag = "Open to +" .. most,
+        sub = string.format("%d:%02d to beat, the stakes rising", math.floor(limit / 60), math.mod(limit, 60)),
+        go = "Wager",
+        cmd = ".es wager " .. pick,
+        detail = "A run against the clock, the dungeon fresh: win in time to raise the stakes (tougher foes, better pay), and get your names on the Bookmaker's Board.",
+      })
+    end
     local pages = {}
     local items = Items(d[2])
     for i = 1, table.getn(items) do
@@ -5851,6 +5866,8 @@ function ES.Line(line)
     ES.Message(f[2] or "")
   elseif verb == "NT" then
     if ES.Letter then ES.Letter(f) end
+  elseif verb == "WT" then
+    if ES.WagerLine then ES.WagerLine(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "WD" then
@@ -5893,6 +5910,8 @@ function ES.Line(line)
   elseif verb == "WR" then
     ES.below = f[2] == "below"
     ES.siege = f[2] == "siege"
+    -- The Bookmaker's clock is only below.
+    if not ES.below and ES.WagerLine then ES.WagerLine({}) end
   elseif verb == "SG" then
     ES.SiegeLine(f)
   elseif verb == "SL" then

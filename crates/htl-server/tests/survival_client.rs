@@ -1443,7 +1443,7 @@ fn the_book_lists_every_dungeon_and_a_page_of_another_takes_a_hero_to_its_own_wo
     let dm = c.dungeons().find(|d| d.key == "deadmines").unwrap();
     let (secrets, notes) = (dm.doors.iter().filter(|d| d.secret()).count(), dm.notes.len());
     let entry = dungeons.split('^').find(|e| e.starts_with("deadmines~")).unwrap_or("");
-    assert!(entry.ends_with(&format!("~0~{secrets}~0~{notes}")), "none found yet: {entry}");
+    assert!(entry.contains(&format!("~0~{secrets}~0~{notes}~1~")), "none found yet, and wagers open to +1: {entry}");
     a.chat(".es lore deadmines");
     let nt = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tNT\tlore\t")));
     let ServerPacket::MessageChat(m) = nt.expect("the record's page") else { unreachable!() };
@@ -1473,4 +1473,46 @@ fn the_book_lists_every_dungeon_and_a_page_of_another_takes_a_hero_to_its_own_wo
     a.seen.clear();
     a.chat(".es travel ragefire_top");
     assert!(a.wait(1.5, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("couldn't be read"))).is_some(), "a dungeon with no ground says so");
+}
+
+#[test]
+fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server() {
+    use std::io::{Read, Write};
+    let server = start_below(None, false, content(), &["deadmines", "stockade"]);
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut a);
+    a.chat(".es hello 5 ac4");
+    a.drain(0.6);
+    let c = htl_survival::Content::builtin();
+    let book = c.dungeon.as_ref().unwrap().book;
+    stand(&mut a, [book[0], book[1], 0.0], 0.0);
+    a.chat(".es debug");
+    // Its page: open to +1, the time to beat, the levels to take, the board.
+    a.chat(".es wager stockade");
+    let nt = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tNT\twager\t")));
+    let ServerPacket::MessageChat(m) = nt.expect("the wager's page") else { unreachable!() };
+    assert!(m.text.contains("Open to +1,") && m.text.contains(".es wager stockade 1~Wager +1") && m.text.contains(".es board stockade~"), "{}", m.text);
+    a.chat(".es wager stockade 2");
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("up to +1"))).is_some(), "not won yet");
+    // Taken: down, fresh, and the clock waiting at the lamp.
+    a.chat(".es wager stockade 1");
+    assert!(a.wait(2.0, |p| p.name() == "SMSG_NEW_WORLD").is_some(), "down to the Stockade");
+    a.seen.clear();
+    a.send(op::MSG_MOVE_WORLDPORT_ACK, &[]);
+    let wt = a.wait(3.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tWT\tThe Stockade\t1\t")));
+    let ServerPacket::MessageChat(m) = wt.expect("the Bookmaker's clock") else { unreachable!() };
+    assert!(m.text.contains("\twait\t"), "{}", m.text);
+    // Another server's run, sent to this one (the board host) on its login port, comes back on
+    // the board; a forged one doesn't.
+    let w = htl_survival::sim::wager::WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 6, ms: 1_000_000, limit_ms: 1_800_000, deaths: 1, timed: true, party: vec![("Zed".into(), "mage".into())] };
+    let line = htl_server::survival::board::Run::from_wager(&w, "Far Camp").line();
+    let forged = line.replace("|6|", "|9|");
+    let body = format!("{line}\n{forged}\n");
+    let mut s = std::net::TcpStream::connect(server.login).unwrap();
+    write!(s, "POST /wagers HTTP/1.0\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+    let mut reply = String::new();
+    s.read_to_string(&mut reply).unwrap();
+    assert!(reply.starts_with("HTTP/1.0 200") && reply.contains("|Far Camp|stockade|6|") && !reply.contains("|9|"), "{reply}");
+    // And the login port still logs in.
+    assert!(Client::connect(server.login, "bob", "hold", REALM).is_ok());
 }

@@ -17,6 +17,7 @@ use crate::packets::{self, Packet};
 use crate::wire::{Body, Reader};
 use crate::world::{ConnId, Inbound};
 
+pub mod board;
 mod draw;
 mod heroes;
 pub mod land;
@@ -24,6 +25,7 @@ mod play;
 pub mod realms;
 mod siege_ui;
 mod ui;
+mod wager_ui;
 
 pub(crate) const TICK: Duration = Duration::from_millis(50);
 /// Saves at most this often (and when a hero leaves).
@@ -243,6 +245,10 @@ pub struct SurvivalGame {
     pub(crate) siege_dirty: BTreeSet<Id>,
     /// Done below, for the camp: journal counts and trophies.
     pub(crate) to_camp: Vec<(Vec<(String, u32)>, BTreeMap<usize, u32>)>,
+    /// Wagers won below, for the Bookmaker's Board.
+    pub(crate) wagers: Vec<htl_survival::sim::wager::WagerRun>,
+    /// The Bookmaker's Board (shared with the login port, which serves it as the board host).
+    pub(crate) board: Option<board::Shared>,
     dirty: bool,
     saved_at: Instant,
 }
@@ -334,6 +340,8 @@ impl SurvivalGame {
             reset_below: false,
             siege_dirty: BTreeSet::new(),
             to_camp: Vec::new(),
+            wagers: Vec::new(),
+            board: None,
             dirty: true,
             saved_at: Instant::now(),
         };

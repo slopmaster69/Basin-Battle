@@ -67,6 +67,8 @@ pub struct RealmConfig {
     /// The address players on the internet use to reach this machine. Players on this machine or
     /// the same network are sent the address they connected to instead.
     pub public_host: Option<String>,
+    /// The Bookmaker's Board, served over HTTP on this port (as the board host).
+    pub board: Option<crate::survival::board::Shared>,
 }
 
 pub fn spawn(listener: TcpListener, config: RealmConfig, keys: SessionKeys) {
@@ -95,6 +97,17 @@ fn read_exact<const N: usize>(s: &mut TcpStream) -> Result<[u8; N]> {
 }
 
 fn serve(mut s: TcpStream, config: &RealmConfig, keys: &SessionKeys) -> Result<()> {
+    // An HTTP request (another server's wagers for the board): no login command starts with a
+    // letter.
+    s.set_read_timeout(Some(Duration::from_secs(10)))?;
+    let mut first = [0u8; 4];
+    let n = s.peek(&mut first)?;
+    if n > 0 && matches!(first[0], b'G' | b'P') {
+        if let (true, Some(b)) = (crate::survival::board::is_http(&first[..n]) || n < 4, &config.board) {
+            crate::survival::board::Board::serve(b, s);
+        }
+        return Ok(());
+    }
     s.set_read_timeout(Some(Duration::from_secs(300)))?;
     s.set_nodelay(true)?;
     let mut account: Option<String> = None;

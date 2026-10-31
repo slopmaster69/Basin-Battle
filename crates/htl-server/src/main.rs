@@ -34,6 +34,9 @@ OPTIONS:
     --survival-port <p>   Elwynn Survival's world port (default 8086)
     --survival-save <f>   Where the survival world is kept (default saves/elwynn-survival.toml)
     --survival-content <f> A survival.toml to use instead of the built-in one
+    --board <host:port>   The Bookmaker's Board host to send wagers to (a friend's address and
+                          login port); without it this server is the board host
+    --board-name <name>   This server's name on the board (a made-up camp's otherwise)
     --help                This text
 ";
 
@@ -61,6 +64,8 @@ fn main() -> Result<()> {
             "--survival-port" => survival_port = value("--survival-port")?.parse()?,
             "--survival-save" => survival_save = value("--survival-save")?.into(),
             "--survival-content" => survival_content = Some(value("--survival-content")?.into()),
+            "--board" => config.board = Some(value("--board")?).filter(|b| !b.is_empty()),
+            "--board-name" => config.board_name = value("--board-name")?,
             "--help" | "-h" => {
                 print!("{HELP}");
                 return Ok(());

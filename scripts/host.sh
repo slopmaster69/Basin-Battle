@@ -5,6 +5,8 @@
 #   scripts/host.sh --game basin            only Basin Battle (or --game survival)
 #   scripts/host.sh --password secret       pick the password everyone uses
 #   scripts/host.sh --public-host 1.2.3.4   your internet address (found automatically otherwise)
+#   scripts/host.sh --board 1.2.3.4:3724    send wagers to a friend's Bookmaker's Board (or set
+#                                           HTL_BOARD in settings.sh); without it, you keep it
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 cd "$ROOT"
@@ -26,6 +28,10 @@ if [[ " $* " != *" --public-host "* ]]; then
         [ -n "$ts" ] && echo "Friends on your Tailscale network join with: $ts"
     fi
 fi
+# The Bookmaker's Board: this server keeps it for everyone unless HTL_BOARD (in settings.sh)
+# names the friend's server that does ("1.2.3.4:3724"); HTL_BOARD_NAME is this camp's name on it.
+[ -n "${HTL_BOARD:-}" ] && args+=(--board "$HTL_BOARD")
+[ -n "${HTL_BOARD_NAME:-}" ] && args+=(--board-name "$HTL_BOARD_NAME")
 # Everything the server says also goes to a log file, for looking back at a session.
 mkdir -p logs
 log="logs/host-$(date +%Y-%m-%d-%H%M%S).log"

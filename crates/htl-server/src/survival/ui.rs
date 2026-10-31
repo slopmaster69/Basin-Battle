@@ -588,6 +588,10 @@ impl SurvivalGame {
                 self.ui_line_changed(conn, "GL", gl);
                 let gj = self.journal_line();
                 self.ui_line_changed(conn, "GJ", gj);
+                if self.realm.below {
+                    let wt = self.wager_line();
+                    self.ui_line_changed(conn, "WT", wt);
+                }
                 if !self.realm.below {
                     if !self.realm.siege {
                         let pm = self.pins_line();
@@ -717,7 +721,7 @@ impl SurvivalGame {
                 let dungeons: Vec<String> = books
                     .iter()
                     .map(|b| format!(
-                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
+                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
                             clean(&b.key),
                             clean(&b.name),
                             clean(&b.icon),
@@ -730,7 +734,9 @@ impl SurvivalGame {
                             b.secrets.0,
                             b.secrets.1,
                             b.notes.0,
-                            b.notes.1
+                            b.notes.1,
+                            b.wager.0,
+                            b.wager.1.round()
                         ))
                     .collect();
                 let ring = arena.map_or_else(String::new, |(k, n, best)| format!("{}~{}~{best}", clean(&k), clean(&n)));
@@ -1168,6 +1174,13 @@ impl SurvivalGame {
             // The pages kept: a note read before, and a dungeon's secrets, rumours and notes.
             "note" | "reread" => self.sim.reread(me, &arg),
             "lore" | "secrets" => self.sim.lore_page(me, &arg),
+            // The Bookmaker's Wager: its page, a level taken (from the book), its board.
+            "wager" if arg2.is_empty() => self.ui_wager_page(conn, me, &arg),
+            "wager" => match arg2.trim_start_matches('+').parse::<u32>() {
+                Ok(level) => self.sim.travel_wager(me, &arg, level),
+                Err(_) => Err("Try .es wager <dungeon> <level>, as .es wager deadmines 3.".into()),
+            },
+            "board" => self.ui_board_page(conn, &arg),
             // The book at camp, and the lamps below.
             "travel" | "go" => {
                 let to = if arg.is_empty() {
