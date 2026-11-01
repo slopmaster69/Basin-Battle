@@ -247,6 +247,21 @@ impl SurvivalGame {
                 }
                 self.broadcast(&packets::spell_go(c, spell, aim, &hits, ammo));
             }
+            Event::MissileFrom { anchor, caster: _, spell, from, target } => {
+                // A missile from a spot (a boomerang turning back): an unseen object stands there
+                // and flies it, until the rules say it's gone (`ObjGone`).
+                let (aim, hits) = match target {
+                    Target::Unit(t) => match self.guid_of(t) {
+                        Some(g) => (Aim::Unit(g), vec![g]),
+                        None => return,
+                    },
+                    Target::Point(p) => (Aim::Point(p), Vec::new()),
+                };
+                let (g, made) = self.anchor_create(anchor, from);
+                self.broadcast(&made);
+                let ammo = self.sim.content.ranged.iter().any(|r| r.spell == spell).then_some(ARROW_DISPLAY);
+                self.broadcast(&packets::spell_go(g, spell, aim, &hits, ammo));
+            }
             Event::Cast { caster, spell, ms } => {
                 let Some(c) = self.guid_of(caster) else { return };
                 let ranged = self.sim.content.ranged.iter().any(|r| r.spell == spell);

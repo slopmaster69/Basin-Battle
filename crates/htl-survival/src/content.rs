@@ -2726,7 +2726,7 @@ impl Content {
         Ok(())
     }
 
-    fn validate_abilities(&self) -> Result<()> {
+    pub(crate) fn validate_abilities(&self) -> Result<()> {
         let mut keys = std::collections::BTreeSet::new();
         let effect_ok = |e: &AbilityEffect, what: &str| -> Result<()> {
             if !CC_KINDS.contains(&e.kind.as_str()) && !OTHER_EFFECTS.contains(&e.kind.as_str()) {
@@ -2783,6 +2783,15 @@ impl Content {
             }
             if matches!(a.kind.as_str(), "projectile") && a.speed <= 0.0 {
                 bail!("{what}: a projectile needs a speed");
+            }
+            if (a.returns || a.lob || a.fuse > 0.0) && a.kind != "projectile" {
+                bail!("{what}: only a projectile comes back (`returns`), is lobbed (`lob`) or sticks (`fuse`)");
+            }
+            if u8::from(a.returns) + u8::from(a.lob) + u8::from(a.fuse > 0.0) > 1 {
+                bail!("{what}: a projectile comes back, is lobbed or sticks: one of `returns`, `lob` and `fuse`");
+            }
+            if (a.lob || a.fuse > 0.0) && a.splash <= 0.0 {
+                bail!("{what}: a lobbed or sticky projectile bursts where it goes off: it needs `splash`");
             }
             if a.kind == "place" && a.totem.is_none() {
                 bail!("{what}: a placed ability needs a [ability.totem]");

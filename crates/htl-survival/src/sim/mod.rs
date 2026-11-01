@@ -143,6 +143,10 @@ pub enum Event {
     Swing { attacker: Id, victim: Option<Id>, damage: u32, outcome: Outcome, anim: bool, style: Blow },
     /// A missile or a spell's look from `caster` to `target`.
     Missile { caster: Id, spell: u32, target: Target },
+    /// A missile's look from a spot, not from a unit (a boomerang turning back to its thrower):
+    /// `anchor` names an unseen object standing at `from` to fly it, until an
+    /// [`Event::ObjGone`] of that id. `caster` is whose it is.
+    MissileFrom { anchor: Id, caster: Id, spell: u32, from: Vec3, target: Target },
     /// A cast begins (its look and the caster's cast pose) or is cut short.
     Cast { caster: Id, spell: u32, ms: u32 },
     CastEnd { caster: Id },

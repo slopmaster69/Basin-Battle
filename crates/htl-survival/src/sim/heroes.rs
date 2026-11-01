@@ -140,7 +140,7 @@ impl Survival {
         }
         self.respawns.clear();
         self.patrols.clear();
-        self.projectiles.clear();
+        self.drop_projectiles();
         self.grounds.clear();
         self.burnings.clear();
         self.totems.clear();

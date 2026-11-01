@@ -342,6 +342,27 @@ pub struct AbilityDef {
     /// on whatever key) fires its EX version for no Valor; the proc is spent then.
     #[serde(default)]
     pub empower: Option<EmpowerDef>,
+    /// A projectile that comes back (a boomerang): out to its full range (or a wall), then back to
+    /// where the caster is now, striking every foe it passes once each way. It ends at the caster.
+    /// The way back strikes at `return_damage` of the way out (1: the same).
+    #[serde(default)]
+    pub returns: bool,
+    #[serde(default = "full_share")]
+    pub return_damage: f32,
+    /// A projectile lobbed in an arc to the reticle's point on the ground (within its range): it
+    /// flies over bodies, its landing ring shown to everyone meanwhile, and lands after its flight
+    /// (distance / `speed`) to burst `splash` wide there (then `linger`). Needs `splash`.
+    #[serde(default)]
+    pub lob: bool,
+    /// A sticky projectile: what it strikes, it sticks to (or the ground or wall it meets, or where
+    /// its range ends), and it goes off this many seconds later, a `splash` burst round the unit
+    /// where it is then (where it fell, if it died). Needs `splash`. While it's stuck the unit
+    /// shows `fuse_aura` (a spell's state look; 0: none), and for the last second a ring follows
+    /// them for everyone.
+    #[serde(default)]
+    pub fuse: f32,
+    #[serde(default)]
+    pub fuse_aura: u32,
 }
 
 /// What an ability empowers as it goes: the base card (`ability`, one with an EX version) whose
@@ -354,6 +375,10 @@ pub struct EmpowerDef {
 
 fn falloff() -> f32 {
     0.75
+}
+
+fn full_share() -> f32 {
+    1.0
 }
 
 fn core() -> String {
