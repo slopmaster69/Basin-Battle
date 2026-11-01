@@ -977,9 +977,17 @@ impl Survival {
         let from = self.hands(id, yaw);
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
-        // A thrown axe that comes back skims out level at hand height: aimed down at the ground
-        // it would bury itself a few yards out and turn there.
-        let base = if d.returns && base[2] < 0.0 { norm([base[0], base[1], 0.0]) } else { base };
+        // A thrown axe that comes back skims the ground along the aim's line, at hand height over
+        // where its range ends (up a hill, down one): aimed at the ground it would bury itself a
+        // few yards out and turn there.
+        let base = if d.returns {
+            let flat = norm([base[0], base[1], 0.0]);
+            let far = [from[0] + flat[0] * range, from[1] + flat[1] * range];
+            let floor = self.ground_near(far[0], far[1], from[2]);
+            norm([far[0] - from[0], far[1] - from[1], floor[2] + HAND_UP - from[2]])
+        } else {
+            base
+        };
         let n = d.count.max(1);
         // A lob arcs to the ground at the reticle (within its range), over whatever is between.
         let lob_at = d.lob.then(|| self.aim_point(id, range));

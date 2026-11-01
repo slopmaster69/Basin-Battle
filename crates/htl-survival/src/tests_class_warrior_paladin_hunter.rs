@@ -658,3 +658,31 @@ fn disengage_goes_off_in_the_middle_of_a_jump() {
     ev.extend(run(&mut s, 0.2));
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, dir, .. } if *player == a && dir.cos() < -0.9)), "it leaps her back from the air");
 }
+
+#[test]
+fn hurled_axe_follows_a_slope_up_at_hand_height() {
+    // Ground rising 1.5 yd every ten: the axe climbs with it instead of flying level into it.
+    let mut c = Content::dev();
+    c.pvp = Default::default();
+    struct Rise;
+    impl crate::land::Land for Rise {
+        fn height(&self, x: f32, _y: f32) -> f32 {
+            (x * 0.15).max(0.0)
+        }
+    }
+    let mut s = Survival::new(c, Box::new(Rise), 7, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    press(&mut s, a, "hurled_axe", false);
+    s.set_aim_line(a, 0.0, -0.6);
+    click(&mut s, a);
+    let mut far: f32 = 0.0;
+    for _ in 0..(1.2 / DT).round() as usize {
+        s.step(DT);
+        for p in &s.projectiles {
+            far = far.max(p.pos[0]);
+        }
+    }
+    assert!(far > 18.0, "up the slope its whole way, not {far:.1}");
+}
