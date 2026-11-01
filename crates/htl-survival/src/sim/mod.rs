@@ -1237,9 +1237,16 @@ impl Survival {
                 continue;
             }
             // Walking (X) is the client's own pace: no slower than whatever else holds them back.
+            // A roll's burst or a Charge keeps its own pace, walking or not: the client runs those
+            // itself at full speed, and the server's hero mustn't trail it while hits are judged.
+            let burst = match p.action {
+                Action::Dodge { t, dash: true, .. } => t < self.content.dodge.dash_secs,
+                Action::Dash { .. } => true,
+                _ => false,
+            };
             let speed = if m.back && !m.forward {
                 self.back_speed_for(p)
-            } else if m.walk {
+            } else if m.walk && !burst {
                 self.speed_for(id).min(WALK_SPEED)
             } else {
                 self.speed_for(id)

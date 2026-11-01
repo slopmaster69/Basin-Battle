@@ -1374,6 +1374,21 @@ fn the_server_reckons_a_walking_hero_at_a_walk() {
     assert!(went > 0.5 && went <= WALK_SPEED + 0.3, "a walk's pace, not a run's: {went}");
 }
 
+#[test]
+fn a_roll_made_while_walking_keeps_its_burst() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, walk: true, ..Default::default() });
+    let from = s.players[&p].pos;
+    s.input(p, Input::Dodge);
+    // Within the dash: the roll's pace (16 yd/s), not a walk's (2.5). The client runs it at full
+    // speed, so the server's hero mustn't trail it while blows are judged.
+    run(&mut s, 0.2);
+    let to = s.players[&p].pos;
+    let went = ((to[0] - from[0]).powi(2) + (to[1] - from[1]).powi(2)).sqrt();
+    assert!(went > WALK_SPEED, "the dash's pace while walking: {went}");
+}
+
 
 // --- move sets, cancels, shoves, the lock-on and lag --------------------------------------------
 
