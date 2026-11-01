@@ -91,6 +91,13 @@ A	cast	0.00	0.40	frostbolt
 A	aim	0.00	0.00	flamestrike
 !function SetAimMarker(shape, range, radius) table.insert(SAID, "marker " .. tostring(shape) .. " " .. tostring(range) .. " " .. tostring(radius)) end ElwynnSurvival.DrawAim()
 !ElwynnSurvival.Guard("down") ElwynnSurvival.Guard("up")
+# On the eighth round a projectile's (a beam's) path is drawn as a strip: its range, its radius.
+!HasActionCombat = function() return 8 end
+A	aim	0.00	0.00	aimed_throw
+!table.insert(SAID, "path marker: " .. tostring(SAID[table.getn(SAID)]))
+A	aim	0.00	0.00	charge
+!table.insert(SAID, "dash, no marker: " .. tostring(SAID[table.getn(SAID)]))
+!HasActionCombat = nil
 A	ready	0.00	0.00
 !SetAimMarker = nil
 CC	root~2.5~0^grace~3.0~0
