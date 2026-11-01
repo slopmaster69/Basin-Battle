@@ -206,6 +206,11 @@ jitter = 0.25
 # step on), and `leap` one pressed in the air out of a Corey roll (a jump taken in the dodge's
 # dash, which carries the dash's speed): it strikes as the hero lands, long and heavy, with a
 # long recovery for it. Without `roll`, the running attack; without `leap`, `roll`.
+# `from` plays another character model's take on the clip on the hero's own
+# body (`from = "ScourgeFemale"`: Undead female's; <Race><Gender>, the races Human, Orc, Dwarf,
+# NightElf, Scourge, Tauren, Gnome, Troll, Goblin), on a client that can (ac10; the rest play their
+# own). A creature on a character model takes `clips_from` for all its blows, or a step's own
+# `from`. scripts/race-clips.sh lists every model's clips, and /esclip tries one in game.
 [[moveset]]
 key = "one_hand"
 light = [
@@ -2740,7 +2745,7 @@ petrify_shield = 40.0
 panic_speed = 5.0
 
 [loadout]
-ranged = "aimed_throw"
+ranged = "hurled_axe"
 close = "sundering_blow"
 utility = "charge"
 defense = "retaliation"
@@ -2748,85 +2753,94 @@ ultimate = "onslaught"
 
 # === Q: ranged ======================================================================================
 
-# Steel: the bow's replacement, a hand axe along the reticle, two in hand.
+# Steel: an axe that comes back. Out through everything to its full reach, then home to wherever
+# the warrior stands now: walk so its way back crosses the fight.
 [[ability]]
-key = "aimed_throw"
-name = "Aimed Throw"
-text = "Throw a hand axe along the reticle. Charged, it flies farther, hits 60% harder and staggers what it hits for a moment; at full charge it flies twice as fast."
+key = "hurled_axe"
+name = "Hurled Axe"
+text = "Throw your axe along the reticle: it flies out 22 yards through every foe, then comes back to you, striking each one again. It comes back to where you are now: walk so its way back crosses the fight."
 icon = "INV_ThrowingAxe_01"
 school = "warrior"
 slot = "ranged"
 kind = "projectile"
 free = true
-charge = [0.0, 0.7]
-damage = [14.0, 22.0]
-range = [24.0, 34.0]
+returns = true
+damage = [12.0, 12.0]
+range = [22.0, 22.0]
 radius = [0.35, 0.35]
+# Throw Axe's own speed, so the axe you see keeps pace with the one that strikes.
 speed = 20.0
-cooldown = 6.0
-charges = 2
+cooldown = 3.5
 spell = 16075
-full_spell = 24020
-full_speed = 40.0
 clip = 107
 valor_hit = 4.0
-effects = [{ kind = "stagger", secs = [0.0, 0.5] }]
 
 [[ability]]
-key = "fan_of_axes"
-name = "Fan of Axes"
-ex_of = "aimed_throw"
-text = "Three axes at once in a spread, faster: hard to step out of up close."
-icon = "INV_ThrowingAxe_01"
+key = "rending_axe"
+name = "Rending Axe"
+ex_of = "hurled_axe"
+text = "A faster axe that drags: every foe it strikes, going out and coming back, is pulled 3 yards toward you and staggered. Haul a pack into your Sundering Blow."
+icon = "INV_Axe_04"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-charge = [0.0, 0.7]
-damage = [12.0, 18.0]
-range = [24.0, 30.0]
+returns = true
+damage = [14.0, 14.0]
+range = [22.0, 22.0]
 radius = [0.35, 0.35]
+# Axe Flurry's spinning axe, at its own speed.
 speed = 40.0
-count = 3
-spread = 12.0
 spell = 24020
 clip = 107
+effects = [{ kind = "pull", amount = 3.0, from_caster = true }, { kind = "stagger", secs = [0.5, 0.5] }]
 
-# Shadow: the hunter's mark.
+# Shadow: rot that spreads. A seed planted in one foe goes off round them: 20 to each within 5 yd
+# and a 16 rot after (36 a foe, every 6 s). Its fuse is 2 s, not the design's 2.5: long enough to
+# see coming and step away from the one it's in, short enough that the pack is still there.
 [[ability]]
-key = "shadow_bolt"
-name = "Shadow Bolt"
-text = "A bolt that Marks what it strikes for 8 s: the next hit on it from anyone does 15% more (and a Backstab crits)."
-icon = "Spell_Shadow_ShadowBolt"
+key = "seed_of_corruption"
+name = "Seed of Corruption"
+text = "Plant a seed in a foe: 2 s later it bursts, 20 to everyone within 5 yards of them, and leaves each of them rotting, 4 a second for 4 s. Plant it in the one in the middle of the pack."
+icon = "Spell_Shadow_AbominationExplosion"
 school = "warlock"
 slot = "ranged"
 kind = "projectile"
-charge = [0.5, 1.0]
-damage = [16.0, 26.0]
-range = [32.0, 32.0]
+damage = [20.0, 20.0]
+range = [30.0, 30.0]
 radius = [0.4, 0.4]
 speed = 20.0
-cooldown = 2.5
+cooldown = 6.0
+fuse = 2.0
+splash = 5.0
+clip = 53
+# A shadow bolt flies; a purple corruption pulses on whoever carries it (Seething Plague's look:
+# played, Corruption's own showed nothing), Corruption's on the rot, Spirit Burst's shadow where it
+# goes off.
 spell = 686
-full_spell = 26006
-full_speed = 35.0
-charge_spell = 686
-effects = [{ kind = "mark", secs = [8.0, 8.0], amount = 0.15 }]
+fuse_aura = 23072
+burst_spell = 24050
+effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0, aura = 172 }]
 
+# Held a whole second, so it can't be thrown off the hip; through every foe in its line.
 [[ability]]
-key = "shadowburn"
-name = "Shadowburn"
-ex_of = "shadow_bolt"
-text = "Instant and fast, no charge; a kill with it gives the Valor back."
-icon = "Spell_Shadow_ScourgeBuild"
+key = "chaos_bolt"
+name = "Chaos Bolt"
+ex_of = "seed_of_corruption"
+text = "Hold 1 s, then let fly a bolt of chaos that tears through every foe in its line for 36. Let go early and it's lost; a heavy blow on you while you hold it breaks it."
+icon = "Spell_Fire_SoulBurn"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-damage = [24.0, 24.0]
-range = [20.0, 20.0]
-radius = [0.4, 0.4]
-speed = 70.0
-refund_kill = true
-spell = 17877
+charge = [1.0, 1.0]
+hold = 1.0
+fragile = true
+damage = [36.0, 36.0]
+range = [34.0, 34.0]
+radius = [0.45, 0.45]
+speed = 35.0
+pierce = 8
+spell = 26006
+charge_spell = 686
 impact_kit = 2709
 
 # Elements: the charge that grows.
@@ -2851,55 +2865,64 @@ full_speed = 40.0
 charge_spell = 133
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 
+# The cash-in: Frost Nova makes the next one free. 48 a hit, half again on a frozen foe; the
+# whole 1.5 s held, so it can't be fired off the hip.
 [[ability]]
-key = "scorch"
-name = "Scorch"
+key = "pyroblast"
+name = "Pyroblast"
 ex_of = "fireball"
-text = "Instant, no charge, a short reach and a hard hit; it burns and shatters too."
-icon = "Spell_Fire_SoulBurn"
+text = "Hold 1.5 s to hurl a huge, slow fireball that burns for 6 s and shatters a frozen foe. Let go early and it's lost; a heavy blow on you while you hold it snuffs it."
+icon = "Spell_Fire_Fireball02"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-damage = [26.0, 26.0]
-range = [14.0, 14.0]
-radius = [0.4, 0.4]
-speed = 70.0
+charge = [1.5, 1.5]
+hold = 1.0
+fragile = true
+damage = [48.0, 48.0]
+range = [36.0, 36.0]
+radius = [0.8, 0.8]
+speed = 24.0
 shatter = true
-spell = 2948
-impact_kit = 2609
-effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
+spell = 11366
+charge_spell = 11366
+effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 5.0 }]
 
-# The Warden: light that harms a foe and mends a friend.
+# The Warden: the shield that hunts casters, and the heal on a friend.
 [[ability]]
-key = "holy_shock"
-name = "Holy Shock"
-text = "An instant bolt of light: it strikes a foe, or heals a friend it touches for 12% of their health (with friendly fire on, every hero is a foe)."
-icon = "Spell_Holy_SearingLight"
+key = "avengers_shield"
+name = "Avenger's Shield"
+text = "Hurl your shield along the reticle: it strikes the first foe and ricochets to two more within 9 yd, each blow weaker, silencing what it strikes for 1.5 s (0.75 s on heroes). Shut a caster up."
+icon = "Spell_Holy_BlessingOfProtection"
 school = "paladin"
 slot = "ranged"
 kind = "projectile"
-damage = [14.0, 14.0]
+damage = [15.0, 15.0]
 range = [28.0, 28.0]
 radius = [0.45, 0.45]
-speed = 30.0
+chain = 2
+chain_range = 9.0
+chain_falloff = 0.7
+# Hammer of Wrath's spinning holy hammer (its own speed), thrown and bouncing on.
+speed = 35.0
 cooldown = 5.0
-ally_heal = 0.12
-spell = 2812
+spell = 24275
+clip = 107
 valor_hit = 4.0
+effects = [{ kind = "silence", secs = [1.5, 1.5] }]
 
+# The heal moves to the EX, as a true ally spell. (`holy_shock` was the Q card before: a save
+# naming it gets Avenger's Shield, the card in its place.)
 [[ability]]
-key = "purifying_shock"
-name = "Purifying Shock"
-ex_of = "holy_shock"
-text = "Strikes harder; on a friend it heals twice as much and ends their roots, slows, stuns, burns and fears."
-icon = "Spell_Holy_HolyNova"
+key = "holy_shock"
+name = "Holy Shock"
+ex_of = "avengers_shield"
+text = "At once, on the friend under your reticle (or on you): a quarter of their health back, and every root, slow, stun, burn and fear on them ends."
+icon = "Spell_Holy_SearingLight"
 slot = "ranged"
-kind = "projectile"
+kind = "ally"
 valor = 25
-damage = [20.0, 20.0]
 range = [30.0, 30.0]
-radius = [0.5, 0.5]
-speed = 40.0
 ally_heal = 0.25
 cleanse = true
 spell = 2812
@@ -2953,7 +2976,7 @@ effects = [{ kind = "stagger", secs = [1.5, 1.5] }]
 [[ability]]
 key = "backstab"
 name = "Backstab"
-text = "A quick stab (0.25 s) for 120% of your weapon's damage, three times that from behind; it uses up a Mark for a critical hit, half again."
+text = "A quick stab (0.25 s) for 120% of your weapon's damage, three times that from behind; on a foe Marked by your Fan of Knives it crits for half again."
 icon = "Ability_BackStab"
 school = "rogue"
 slot = "close"
@@ -2994,7 +3017,9 @@ icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
 kind = "cone"
-damage = [10.0, 10.0]
+# 18 (was 10): the solo sim had the mage near three times slower than the warrior at clearing
+# a pack; Fireball is already at the poke's budget, so the brawl key carries more.
+damage = [18.0, 18.0]
 range = [10.0, 10.0]
 arc = 60.0
 cooldown = 10.0
@@ -3005,7 +3030,7 @@ effects = [{ kind = "snare", secs = [4.0, 4.0], amount = 0.5, freeze_if_snared =
 key = "frost_nova"
 name = "Frost Nova"
 ex_of = "cone_of_cold"
-text = "Freezes everything within 8 yards of you for 3 s (1.5 s on heroes): set them up for a shatter."
+text = "Freezes everything within 8 yards of you for 3 s (1.5 s on heroes), and for 5 s your Fireball key throws a Pyroblast for free. Freeze them, then shatter them."
 icon = "Spell_Frost_FrostNova"
 slot = "close"
 kind = "nova"
@@ -3014,6 +3039,8 @@ damage = [6.0, 6.0]
 radius = [8.0, 8.0]
 spell = 122
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
+# The mage's combo, alone: freeze, then a free Pyroblast to shatter it.
+empower = { ability = "fireball", secs = 5.0 }
 
 # The Warden: holy ground underfoot.
 [[ability]]
@@ -3054,34 +3081,51 @@ spell = 26573
 
 # === 1: utility ====================================================================================
 
-# Steel: engage.
+# Steel: bulldoze.
 [[ability]]
 key = "charge"
 name = "Charge"
-text = "Dash up to 20 yards along the reticle, untouchable on the way; the first thing you run into is staggered for 1 s."
+text = "Charge up to 20 yards along the reticle, untouchable on the way, and bowl through everyone in your path: each takes 10 and is staggered for 0.6 s."
 icon = "Ability_Warrior_Charge"
 school = "warrior"
 slot = "utility"
 kind = "dash"
 free = true
+through = true
 damage = [10.0, 10.0]
 range = [20.0, 20.0]
 cooldown = 12.0
 invulnerable = true
 spell = 100
-effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
+effects = [{ kind = "stagger", secs = [0.6, 0.6] }]
 
-# Shadow: escape.
+# Shadow: in and out.
 [[ability]]
 key = "shadowstep"
 name = "Shadowstep"
-text = "Step through the shadows to the reticle, up to 20 yards; it breaks roots and slows."
+text = "Step through the shadows to the reticle, up to 20 yards, out of roots and slows. Press it again within 3 s to step straight back to where you were: dive, stab, gone."
 icon = "Ability_Vanish"
 school = "rogue"
 slot = "utility"
 kind = "blink"
 range = [20.0, 20.0]
 cooldown = 12.0
+cleanse = true
+spell = 1856
+recast = "shadowstep_back"
+recast_secs = 3.0
+
+# Shadowstep's way home (and Blinding Step's): the key again within 3 s, free.
+[[ability]]
+key = "shadowstep_back"
+name = "Step Back"
+text = "Back to where your Shadowstep began."
+icon = "Ability_Rogue_Sprint"
+inner = true
+school = "rogue"
+slot = "utility"
+kind = "blink"
+recast_to_start = true
 cleanse = true
 spell = 1856
 
@@ -3126,42 +3170,55 @@ cleanse = true
 leaves = "frost_nova"
 spell = 1953
 
-# The Warden: control.
+# The Warden: ride in, then punish.
+[[ability]]
+key = "divine_steed"
+name = "Divine Steed"
+text = "A burst of holy speed: 60% faster for 3 s, and whatever holds you (roots, slows) falls away. Press again within 3 s to throw Hammer of Justice, stunning what it strikes for 2 s (1 s on heroes). Ride in, then punish."
+icon = "Spell_Nature_Swiftness"
+school = "paladin"
+slot = "utility"
+kind = "buff"
+cleanse = true
+cooldown = 14.0
+# Summon Warhorse's flash of light.
+spell = 13819
+effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.6 }]
+recast = "hammer_of_justice"
+recast_secs = 3.0
+
+# Divine Steed's second press. (`hammer_of_justice` was the 1 card before: a save naming it gets
+# Divine Steed, the card in its place.)
 [[ability]]
 key = "hammer_of_justice"
 name = "Hammer of Justice"
-text = "A slow thrown hammer: what it strikes is stunned for 2 s (1 s on heroes)."
+text = "Divine Steed's second press: a thrown hammer that stuns what it strikes for 2 s (1 s on heroes)."
 icon = "Spell_Holy_SealOfMight"
-school = "paladin"
+inner = true
 slot = "utility"
 kind = "projectile"
 damage = [8.0, 8.0]
 range = [26.0, 26.0]
 radius = [0.45, 0.45]
 speed = 20.0
-cooldown = 15.0
 spell = 20685
 clip = 107
 impact_kit = 485
 effects = [{ kind = "stun", secs = [2.0, 2.0] }]
 
 [[ability]]
-key = "hammer_of_wrath"
-name = "Hammer of Wrath"
-ex_of = "hammer_of_justice"
-text = "A fast, heavy hammer that stuns for 1 s, and kills outright anything under 20% of its health."
-icon = "Ability_ThunderClap"
+key = "blessing_of_freedom"
+name = "Blessing of Freedom"
+ex_of = "divine_steed"
+text = "On the friend under your reticle (or on you): whatever holds them falls away, and for 4 s they run 40% faster and nothing staggers them."
+icon = "Spell_Holy_SealOfValor"
 slot = "utility"
-kind = "projectile"
+kind = "ally"
 valor = 25
-damage = [30.0, 30.0]
 range = [30.0, 30.0]
-radius = [0.45, 0.45]
-speed = 35.0
-execute = 0.2
-spell = 24275
-clip = 107
-effects = [{ kind = "stun", secs = [1.0, 1.0] }]
+cleanse = true
+spell = 1044
+effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }, { kind = "steadfast", secs = [4.0, 4.0], amount = 1.0 }]
 
 # === 2: defense ====================================================================================
 # Staying alive: alone, the answer to a pack or a champion's big blow; in a duel, a read (each
@@ -3197,34 +3254,40 @@ spell = 871
 aura = 871
 counter = { block = true }
 
-# Shadow: punish whoever strikes.
+# Shadow: outlast them. 12 a second for 3 s, every point of it back to you; a miss costs nothing.
 [[ability]]
-key = "shadow_ward"
-name = "Shadow Ward"
-text = "A 1.5 s stance: the first blow or projectile is absorbed and its attacker panics for 1.5 s."
-icon = "Spell_Shadow_AntiShadow"
+key = "drain_life"
+name = "Drain Life"
+text = "Tether the first foe along the reticle for 3 s and drain them, 12 a second, every point of it healing you, while you walk. Outlast what's hitting you. It snaps past 20 yards or out of sight."
+icon = "Spell_Shadow_LifeDrain02"
 school = "warlock"
 slot = "defense"
-kind = "stance"
-secs = 1.5
+kind = "channel"
+damage = [12.0, 12.0]
+range = [20.0, 20.0]
+secs = 3.0
+tick = 0.5
+drain = 1.0
 cooldown = 14.0
-spell = 6229
-aura = 6229
-counter = { once = true, any_attacker = true, attacker = [{ kind = "panic", secs = [1.5, 1.5] }] }
+spell = 689
+aura = 689
 
 [[ability]]
-key = "dread_ward"
-name = "Dread Ward"
-ex_of = "shadow_ward"
-text = "Three seconds of shadow: every blow and projectile is swallowed and whoever sent it panics for 1.5 s."
-icon = "Spell_Shadow_Possession"
+key = "death_coil"
+name = "Death Coil"
+ex_of = "drain_life"
+text = "Hurl a coil of shadow: the foe it strikes flees in terror for 3 s (1.5 s on heroes), and you heal 15% of your health. Your way out of a corner."
+icon = "Spell_Shadow_DeathCoil"
 slot = "defense"
-kind = "stance"
+kind = "projectile"
 valor = 25
-secs = 3.0
-spell = 6229
-aura = 6229
-counter = { block = true, any_attacker = true, attacker = [{ kind = "panic", secs = [1.5, 1.5] }] }
+damage = [14.0, 14.0]
+range = [26.0, 26.0]
+radius = [0.45, 0.45]
+speed = 24.0
+heal = 0.15
+spell = 6789
+effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 
 # Elements: nothing reaches you.
 [[ability]]
@@ -3256,33 +3319,34 @@ aura = 11958
 leaves = "frost_nova"
 counter = { immune = true }
 
-# The Warden: the heal.
+# The Warden: the defense you give away.
 [[ability]]
-key = "divine_protection"
-name = "Divine Protection"
-text = "A 1 s stance: every melee blow or projectile is absorbed and heals you a little instead."
-icon = "Spell_Holy_Restoration"
+key = "blessing_of_protection"
+name = "Blessing of Protection"
+text = "On the friend under your reticle (or on you): for 3 s they take half damage and nothing staggers them. The one defense you can give away."
+icon = "Spell_Holy_SealOfProtection"
 school = "paladin"
 slot = "defense"
-kind = "stance"
-secs = 1.0
-cooldown = 14.0
-spell = 498
-aura = 498
-counter = { absorb_heal = 0.05 }
+kind = "ally"
+range = [30.0, 30.0]
+cooldown = 16.0
+spell = 1022
+# Divine Protection's golden bubble on them while it lasts.
+effects = [{ kind = "hallowed", secs = [3.0, 3.0], amount = 0.5, aura = 498 }, { kind = "steadfast", secs = [3.0, 3.0], amount = 1.0 }]
 
 [[ability]]
 key = "lay_on_hands"
 name = "Lay on Hands"
-ex_of = "divine_protection"
-text = "At once: a third of your health back, and every snare, root, stun and mark on you ends."
+ex_of = "blessing_of_protection"
+text = "On the friend under your reticle (or on you): 40% of their health back at once, and every snare, root, stun and mark on them ends."
 icon = "Spell_Holy_LayOnHands"
 slot = "defense"
-kind = "buff"
+kind = "ally"
 valor = 25
+range = [30.0, 30.0]
+ally_heal = 0.4
 cleanse = true
 spell = 633
-effects = [{ kind = "heal", amount = 0.33 }]
 
 # === 3: ultimate ===================================================================================
 
@@ -3319,30 +3383,6 @@ cooldown = 40.0
 spell = 686
 impact_kit = 2709
 effects = [{ kind = "deathmark", secs = [8.0, 8.0], amount = 0.3 }]
-
-# Elements: the great fireball.
-[[ability]]
-key = "pyroblast"
-name = "Pyroblast"
-text = "A 2.5 s charge for a huge, slow fireball that burns for 6 s and shatters a frozen foe; any heavy blow on you while you charge breaks it."
-icon = "Spell_Fire_Fireball02"
-school = "mage"
-slot = "ultimate"
-kind = "projectile"
-bench = true
-valor = 100
-charge = [2.5, 2.5]
-hold = 1.0
-fragile = true
-damage = [90.0, 90.0]
-range = [40.0, 40.0]
-radius = [0.9, 0.9]
-speed = 24.0
-cooldown = 40.0
-shatter = true
-spell = 11366
-charge_spell = 11366
-effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 5.0 }]
 
 # The Warden: sanctuary.
 [[ability]]
@@ -3454,6 +3494,9 @@ linger = 6.0
 linger_damage = 6.0
 cooldown = 12.0
 spell = 2120
+# The ground after burns as the Explosive Trap's fire: Flamestrike's own pillar, replayed, filled
+# far more than its circle.
+linger_spell = 13812
 
 [[ability]]
 key = "flash_flamestrike"
@@ -3470,41 +3513,9 @@ radius = [2.0, 2.0]
 linger = 4.0
 linger_damage = 6.0
 spell = 2120
-
-[[ability]]
-key = "drain_life"
-name = "Drain Life"
-text = "A tether to the first foe along the reticle for 5 s that steals its health while you walk; it snaps past 20 yards or out of sight."
-icon = "Spell_Shadow_LifeDrain02"
-school = "warlock"
-slot = "ranged"
-kind = "channel"
-bench = true
-damage = [8.0, 8.0]
-range = [20.0, 20.0]
-secs = 5.0
-tick = 0.5
-drain = 1.0
-cooldown = 15.0
-spell = 689
-aura = 689
-
-[[ability]]
-key = "death_coil"
-name = "Death Coil"
-ex_of = "drain_life"
-text = "Instant: what it strikes panics for 3 s, and you heal."
-icon = "Spell_Shadow_DeathCoil"
-slot = "ranged"
-kind = "projectile"
-valor = 50
-damage = [14.0, 14.0]
-range = [26.0, 26.0]
-radius = [0.45, 0.45]
-speed = 24.0
-heal = 0.15
-spell = 6789
-effects = [{ kind = "panic", secs = [3.0, 3.0] }]
+# The ground after burns as the Explosive Trap's fire: Flamestrike's own pillar, replayed, filled
+# far more than its circle.
+linger_spell = 13812
 
 [[ability]]
 key = "entangling_roots"
@@ -3514,7 +3525,7 @@ icon = "Spell_Nature_StrangleVines"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-ex_of = "wrath"
+ex_of = "living_seed"
 damage = [4.0, 4.0]
 range = [26.0, 26.0]
 radius = [0.4, 0.4]
@@ -3676,39 +3687,54 @@ effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 
 
 # ----------------------------------------------------------------------------------- Hunter --
 
+# The sniper's shot: hold the click to draw. (Its key isn't `aimed_shot`: that's the bow's shot on
+# the bench.)
 [[ability]]
-key = "arcane_shot"
-name = "Arcane Shot"
-text = "A fast arcane arrow along the reticle: 16 damage. Two in the quiver, back quickly: the hunter's steady poke."
-icon = "Ability_ImpalingBolt"
+key = "aimed_arrow"
+name = "Aimed Shot"
+text = "Hold the click to draw, up to 1.4 s: the longer the draw, the harder, farther and faster the arrow. Fully drawn it glows and goes through every foe in its line. A heavy blow on you spoils the draw."
+icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
 kind = "projectile"
-damage = [16.0, 16.0]
-range = [34.0, 34.0]
+charge = [0.0, 1.4]
+fragile = true
+damage = [14.0, 36.0]
+range = [26.0, 40.0]
 radius = [0.3, 0.3]
+# A plain arrow (the bow's look) while drawing; fully drawn, Arcane Shot's glowing one, faster,
+# through everything in the line.
 speed = 40.0
-cooldown = 4.0
-charges = 2
-spell = 3044
+# Aimed Shot's own arcane arrow (Auto Shot, 75, draws only the bow's ammo, and a hero casting
+# this needn't hold a bow: nothing flew); fully drawn, a burning arrow (Fire Shot).
+spell = 19434
+full_spell = 3011
+full_speed = 60.0
+full_pierce = 9
+cooldown = 3.0
 clip = 53
+valor_hit = 5.0
 
 [[ability]]
-key = "concussive_shot"
-name = "Concussive Shot"
-ex_of = "arcane_shot"
-text = "A heavy arrow: 20 damage, knocks the foe back 4 yd and slows them 50% for 3 s. Kite them into a trap."
-icon = "Spell_Frost_Stun"
+key = "multi_shot"
+name = "Multi-Shot"
+ex_of = "aimed_arrow"
+text = "Five arrows at once in a wide fan, no draw: clear a pack, or catch a foe who dodges. Frozen foes shatter. Free right after a Freezing Trap."
+icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-damage = [20.0, 20.0]
-range = [34.0, 34.0]
-radius = [0.35, 0.35]
+damage = [10.0, 10.0]
+range = [30.0, 30.0]
+radius = [0.3, 0.3]
 speed = 40.0
-spell = 5116
+count = 5
+# 10° apart: a 40° fan.
+spread = 10.0
+shatter = true
+# Frost-tipped arrows (Frost Shot): the volley that shatters the frozen.
+spell = 6984
 clip = 53
-effects = [{ kind = "knockback", amount = 4.0 }, { kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
 
 [[ability]]
 key = "explosive_trap"
@@ -3740,7 +3766,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "A trap that freezes everyone within 3 yd of whoever sets it off for 3 s (1.5 s on heroes): no moving, no acting, and fire or a Sundering Blow shatters them."
+text = "A trap that freezes everyone within 3 yd of whoever sets it off for 3 s (1.5 s on heroes): no moving, no acting, and fire or a Sundering Blow shatters them. Setting it readies your bow: the next Aimed Shot within 8 s is a free Multi-Shot, and the frozen shatter."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "close"
 kind = "trap"
@@ -3755,6 +3781,9 @@ object = 3071
 burst_spell = 13810
 clip = 75
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
+# The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
+# springs: 8 s, room to kite them onto it.)
+empower = { ability = "aimed_arrow", secs = 8.0 }
 
 [[ability]]
 key = "disengage"
@@ -3803,24 +3832,30 @@ speed = 40.0
 spell = 6533
 effects = [{ kind = "root", secs = [3.0, 3.0] }]
 
+# Peel without hiding: a flare lobbed onto whoever's coming.
 [[ability]]
-key = "deterrence"
-name = "Deterrence"
-text = "For 3 s every projectile that reaches you is deflected. Melee blows still land: a read against casters and archers, not against blades."
-icon = "Ability_Whirlwind"
+key = "flare"
+name = "Flare"
+text = "Lob a flare at the reticle. Where it lands, every foe within 4 yd is blinded for 2 s (1 s on heroes): they can't act until something hits them. Throw it on the pack that's on you, then step away."
+icon = "Spell_Fire_Flare"
 school = "hunter"
 slot = "defense"
-kind = "stance"
-secs = 3.0
+kind = "projectile"
+lob = true
+splash = 4.0
+range = [24.0, 24.0]
+radius = [0.3, 0.3]
+# The flight matches its look's (Holy Wrath's bright orb, which bursts in light where it lands).
+speed = 20.0
 cooldown = 14.0
-spell = 19263
-aura = 19263
-counter = { block = true, ranged_only = true }
+spell = 2812
+clip = 53
+effects = [{ kind = "incapacitate", secs = [2.0, 2.0] }]
 
 [[ability]]
 key = "feign_death"
 name = "Feign Death"
-ex_of = "deterrence"
+ex_of = "flare"
 text = "Drop as if dead for up to 2 s: nothing reaches you, creatures lose you and locks on you let go, and you stay hidden 5 s after (until you strike). Press it again to get up early."
 icon = "Ability_Rogue_FeignDeath"
 slot = "defense"
@@ -3832,52 +3867,62 @@ clip = 1
 counter = { immune = true }
 self_effects = [{ kind = "veil", secs = [7.0, 7.0] }]
 
+# The finisher you line up.
 [[ability]]
-key = "volley"
-name = "Volley"
-text = "Arrows rain on a 8 yd circle at the reticle (up to 32 yd) after 1 s, drawn for everyone: 16 damage, then 10 a second for 4 s, and everyone in it is slowed 35%."
+key = "kill_shot"
+name = "Kill Shot"
+text = "Draw for 1 s, then loose an arrow that goes through everything in a 40 yd line for 60, and kills outright any foe under a quarter of its health. Line them up."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
-kind = "ground"
+kind = "projectile"
 valor = 100
-range = [32.0, 32.0]
-radius = [8.0, 8.0]
-delay = 1.0
-damage = [16.0, 16.0]
-linger = 4.0
-linger_damage = 10.0
+charge = [1.0, 1.0]
+hold = 1.0
+damage = [60.0, 60.0]
+range = [40.0, 40.0]
+radius = [0.4, 0.4]
+pierce = 9
+execute = 0.25
+speed = 50.0
 cooldown = 40.0
-spell = 1510
-tick_spell = 1510
+# Arcane Shot's glowing arrow, as Aimed Shot's full draw.
+spell = 3044
 clip = 53
-tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.35 }]
 
 # ------------------------------------------------------------------------------------ Rogue --
 
+# A shotgun, not a sniper: point blank all three knives land, at range one does.
 [[ability]]
-key = "deadly_throw"
-name = "Deadly Throw"
-text = "A poisoned blade along the reticle: 12 damage and Deadly Poison, 3 a second for 4 s. Two in hand."
+key = "fan_of_knives"
+name = "Fan of Knives"
+text = "Flick three poisoned knives in a fan. Up close all three hit, each poisoning and Marking: a Backstab on a Marked foe crits. From farther off only one lands, so get in their face first. Two in hand."
 icon = "INV_ThrowingKnife_04"
 school = "rogue"
 slot = "ranged"
 kind = "projectile"
-damage = [12.0, 12.0]
-range = [26.0, 26.0]
+damage = [8.0, 8.0]
+range = [16.0, 16.0]
 radius = [0.3, 0.3]
 speed = 30.0
-cooldown = 6.0
+count = 3
+# 10° between knives: a 20° fan, all three on a body within about 4 yd.
+spread = 10.0
+# 8 cooldown over 2 charges: 3 × 8 + the poison's 12 is 36 a cycle, 9 a second (the budget's 9.5).
+cooldown = 8.0
 charges = 2
 spell = 25748
 clip = 107
-effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }]
+# Per knife, so all three in one foe is the 6 of any other ability.
+valor_hit = 2.0
+# Each knife also Marks (6 s): a Backstab on a Marked foe crits, the rogue's opener.
+effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }, { kind = "mark", secs = [6.0, 6.0], amount = 0.1 }]
 
 [[ability]]
 key = "crippling_throw"
 name = "Crippling Throw"
-ex_of = "deadly_throw"
-text = "A blade that goes through two foes and on: 16 each, slowed 50% for 3 s and poisoned (3 a second for 4 s)."
+ex_of = "fan_of_knives"
+text = "One long throw instead of the fan: a blade through two foes and on, 16 each, slowing them 50% for 3 s and poisoning them. Catch the one running away."
 icon = "Ability_PoisonSting"
 slot = "ranged"
 kind = "projectile"
@@ -3895,7 +3940,7 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }, { kind = "burn",
 key = "blinding_step"
 name = "Blinding Step"
 ex_of = "shadowstep"
-text = "The Shadowstep, and where you come out a cloud of blinding powder incapacitates everyone within 4 yd for 3 s (1.5 s on heroes); any damage ends it. Step in, Backstab the one you meant."
+text = "The Shadowstep, and where you come out a cloud of blinding powder incapacitates everyone within 4 yd for 3 s (1.5 s on heroes); any damage ends it. Backstab the one you meant, then press it again to step back out."
 icon = "Ability_Gouge"
 slot = "utility"
 kind = "blink"
@@ -3904,6 +3949,8 @@ range = [20.0, 20.0]
 cleanse = true
 spell = 1856
 also = "blinding_powder"
+recast = "shadowstep_back"
+recast_secs = 3.0
 
 [[ability]]
 key = "blinding_powder"
@@ -3917,24 +3964,32 @@ radius = [4.0, 4.0]
 spell = 2094
 effects = [{ kind = "incapacitate", secs = [3.0, 3.0] }]
 
+# A cloud to fight in or slip out of: every second it hides you and friends in it again (a blow
+# or a cast shows you till then) and slows the foes in it. You're hidden the moment it goes.
 [[ability]]
-key = "evasion"
-name = "Evasion"
-text = "For 2 s you dodge every melee blow and projectile. Ground, cones and beams still reach you."
-icon = "Spell_Shadow_ShadowWard"
+key = "smoke_bomb"
+name = "Smoke Bomb"
+text = "Smash a bomb at your feet: a 5 yd cloud of smoke for 4 s. Inside it you and your friends are hidden (creatures lose you, locks let go) and foes are slowed 30%. Strike from it, or slip away."
+icon = "INV_Misc_Bomb_01"
 school = "rogue"
 slot = "defense"
-kind = "stance"
-secs = 2.0
+kind = "ground"
+at_self = true
+radius = [5.0, 5.0]
+linger = 4.0
 cooldown = 16.0
-spell = 5277
-aura = 5277
-counter = { dodge = true }
+# A puff of smoke on you as it bursts (Vanish's), and a cloud of dust on the ground while it lasts.
+spell = 1856
+linger_spell = 7272
+boon = "veil"
+boon_amount = 1.0
+self_effects = [{ kind = "veil", secs = [1.5, 1.5] }]
+effects = [{ kind = "snare", secs = [1.5, 1.5], amount = 0.3 }]
 
 [[ability]]
 key = "vanish"
 name = "Vanish"
-ex_of = "evasion"
+ex_of = "smoke_bomb"
 text = "Vanish at once: roots and slows fall off, creatures lose you, locks on you let go, and you run 30% faster for 2 s. Hidden 5 s or until you strike; that first blow counts as from behind (a Backstab's triple)."
 icon = "Ability_Vanish"
 slot = "defense"
@@ -3946,29 +4001,41 @@ effects = [{ kind = "veil", secs = [5.0, 5.0] }, { kind = "haste", secs = [2.0, 
 
 # ----------------------------------------------------------------------------------- Priest --
 
+# Light steered by hand: one lance that burns foes and mends friends, swept as you turn.
+[[ability]]
+key = "penance"
+name = "Penance"
+text = "Hold a lance of light out from you for 1.5 s and sweep it as you turn: foes in it burn, friends in it heal. Rake it across a pack, or across a friend in trouble."
+icon = "Spell_Holy_HolySmite"
+school = "priest"
+slot = "ranged"
+kind = "beam"
+range = [22.0, 22.0]
+# Half its width: a lance 2 yd wide.
+radius = [1.0, 1.0]
+secs = 1.5
+tick = 0.25
+# A second in it: 24 over its 1.5 s on each foe it holds.
+# 20 a second (was 16): the solo sim had the priest the slowest class at clearing a pack, its
+# heals going to friends a lone priest hasn't got. 30 a cast, 6 a second over its cooldown.
+damage = [20.0, 20.0]
+ally_heal = 0.04
+cooldown = 5.0
+# A golden glow on you while you hold it (Power Infusion), and bolts of holy light streaming down
+# it to the first foe in it (a holy missile with no cast pose of its own, so each tick doesn't
+# jerk the priest).
+spell = 10060
+aura = 10060
+tick_spell = 6685
+clip = 53
+
+# The old Mind Blast's bigger, terrifying version, now Penance's EX.
 [[ability]]
 key = "mind_blast"
 name = "Mind Blast"
-text = "A dark star bursts at the reticle (up to 30 yd) 0.6 s later, drawn for everyone: 26 to all within 2.5 yd. Lead your target, or land it on a root."
+ex_of = "penance"
+text = "A dark star bursts at the reticle (up to 30 yd) 0.6 s later, drawn for everyone: 28 to all within 3.5 yd, and they flee in terror for 2 s (1 s on heroes). Lead your target."
 icon = "Spell_Shadow_UnholyFrenzy"
-school = "priest"
-slot = "ranged"
-kind = "ground"
-range = [30.0, 30.0]
-radius = [2.5, 2.5]
-delay = 0.6
-damage = [26.0, 26.0]
-cooldown = 5.0
-# A burst of void out of the ground where it lands (Void Blast).
-spell = 27812
-clip = 54
-
-[[ability]]
-key = "psychic_blast"
-name = "Psychic Blast"
-ex_of = "mind_blast"
-text = "A wider Mind Blast (3.5 yd): 28 damage, and whoever it catches flees in terror for 2 s (1 s on heroes)."
-icon = "Spell_Shadow_DeathScream"
 slot = "ranged"
 kind = "ground"
 valor = 25
@@ -4042,29 +4109,41 @@ spell = 23394
 clip = 54
 effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "root", secs = [2.0, 2.0] }, { kind = "shield", secs = [5.0, 5.0], amount = 30.0 }]
 
+# A place to hold: friends under the dome take less and stand their ground. Each second it gives
+# them both (its boon, and the boon among its tick effects) for 1.5 s; you have both at once.
+[[ability]]
+key = "power_word_barrier"
+name = "Power Word: Barrier"
+text = "Raise a 6 yd dome of light around you for 5 s: you and every friend under it take 25% less and can't be staggered. Hold the line inside it."
+icon = "Spell_Holy_PowerInfusion"
+school = "priest"
+slot = "defense"
+kind = "ground"
+at_self = true
+radius = [6.0, 6.0]
+linger = 5.0
+cooldown = 18.0
+# A column of light on you as it rises (Sanctuary's), and holy light on the ground while it lasts.
+spell = 24171
+linger_spell = 20116
+boon = "hallowed"
+boon_amount = 0.25
+tick_effects = [{ kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
+self_effects = [{ kind = "hallowed", secs = [1.5, 1.5], amount = 0.25 }, { kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
+
+# Now given away: on the friend under the reticle, else on you.
 [[ability]]
 key = "power_word_shield"
 name = "Power Word: Shield"
-text = "A shield on you that soaks 45 damage for 6 s."
+ex_of = "power_word_barrier"
+text = "Shield the friend under your reticle (or yourself): it soaks 45 damage for 6 s, and they run 20% faster while it holds."
 icon = "Spell_Holy_PowerWordShield"
-school = "priest"
 slot = "defense"
-kind = "buff"
-cooldown = 15.0
-spell = 17
-effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }]
-
-[[ability]]
-key = "pain_suppression"
-name = "Pain Suppression"
-text = "For 4 s you take 40% less from everything, and a shield soaks the first 30."
-ex_of = "power_word_shield"
-icon = "Spell_Holy_PowerInfusion"
-slot = "defense"
-kind = "buff"
+kind = "ally"
 valor = 25
-spell = 10060
-effects = [{ kind = "hallowed", secs = [4.0, 4.0], amount = 0.4, aura = 10060 }, { kind = "shield", secs = [4.0, 4.0], amount = 30.0 }]
+range = [30.0, 30.0]
+spell = 17
+effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }, { kind = "haste", secs = [6.0, 6.0], amount = 0.2 }]
 
 [[ability]]
 key = "void_rift"
@@ -4090,30 +4169,38 @@ tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
 
 # ----------------------------------------------------------------------------------- Shaman --
 
+# Shape the field: a lob over whoever's in the way, landing late, leaving the ground on fire.
 [[ability]]
-key = "lightning_bolt"
-name = "Lightning Bolt"
-text = "Charge up to 0.6 s: 14 to 26 damage along the reticle. At full charge it streaks out more than twice as fast."
-icon = "Spell_Nature_Lightning"
+key = "lava_burst"
+name = "Lava Burst"
+text = "Lob molten rock at the reticle, over anyone in the way. It lands a moment later where the ring shows, bursting 3 yd wide, and the ground there burns for 3 s. Lead your target."
+icon = "Spell_Fire_Incinerate"
 school = "shaman"
 slot = "ranged"
 kind = "projectile"
-charge = [0.0, 0.6]
-damage = [14.0, 26.0]
-range = [34.0, 34.0]
-radius = [0.35, 0.45]
-speed = 20.0
-cooldown = 3.0
-spell = 403
-charge_spell = 403
-full_spell = 8435
-full_speed = 50.0
+lob = true
+damage = [22.0, 22.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+splash = 3.0
+# The rock's own missile speed: about 1 s in the air at the far end, a third of that at 10 yd.
+speed = 30.0
+linger = 3.0
+linger_damage = 5.0
+# 22 + half the burn's 15 is 29.5 a cast, 7.4 a second.
+cooldown = 4.0
+# A boulder hurled (its throw pose comes with it), a fiery burst where it lands and the ground
+# burning after (the Explosive Trap's own fire: played, Flamestrike's pillar and Heated Ground were
+# each many times the burst's 3 yd and hid the fight).
+spell = 9483
+burst_spell = 5162
+linger_spell = 13812
 
 [[ability]]
 key = "chain_lightning"
 name = "Chain Lightning"
-ex_of = "lightning_bolt"
-text = "A bolt that leaps from what it strikes to the nearest other foe within 9 yd, twice: 20, then 14, then 10."
+ex_of = "lava_burst"
+text = "Lightning instead of the rock: a fast bolt along the reticle that leaps from what it strikes to the nearest other foe within 9 yd, twice: 20, then 14, then 10."
 icon = "Spell_Nature_ChainLightning"
 slot = "ranged"
 kind = "projectile"
@@ -4341,22 +4428,27 @@ tick_effects = [{ kind = "burn", secs = [1.5, 1.5], amount = 6.0 }]
 
 # ------------------------------------------------------------------------------------ Druid --
 
+# Seeds for friends: a bolt for a foe, or four seconds of mending for the friend it settles on
+# (a foe gets none of the mending). Two at hand.
 [[ability]]
-key = "wrath"
-name = "Wrath"
-text = "A bolt of nature along the reticle: 18 damage. Two at hand."
-icon = "Spell_Nature_AbolishMagic"
+key = "living_seed"
+name = "Living Seed"
+text = "Throw a seed along the reticle: it strikes a foe for 16, or settles on a friend and heals them 4% of their health a second for 4 s. Two at hand."
+icon = "Spell_Nature_Rejuvenation"
 school = "druid"
 slot = "ranged"
 kind = "projectile"
-damage = [18.0, 18.0]
+damage = [16.0, 16.0]
 range = [32.0, 32.0]
 radius = [0.35, 0.35]
 speed = 20.0
 cooldown = 4.5
 charges = 2
+friendly = true
+# Wrath's green bolt; Rejuvenation's glow on a friend it settles on (the mending's own look).
 spell = 5176
 clip = 53
+effects = [{ kind = "regen", secs = [4.0, 4.0], amount = 0.04 }]
 
 [[ability]]
 key = "swipe"
@@ -4435,17 +4527,19 @@ cooldown = 18.0
 spell = 22812
 effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 }, { kind = "steadfast", secs = [5.0, 5.0], amount = 1.0, aura = 22812 }]
 
+# Barkskin given away: on the friend under the reticle, else on yourself.
 [[ability]]
-key = "frenzied_regeneration"
-name = "Frenzied Regeneration"
+key = "ironbark"
+name = "Ironbark"
 ex_of = "barkskin"
-text = "The Barkskin, and you heal 5% of your health a second while it lasts (a quarter of it in all)."
-icon = "Ability_BullRush"
+text = "Wrap the friend under your reticle in bark (no one there: yourself): for 5 s they take 30% less from everything and heal 5% of their health a second."
+icon = "Spell_Nature_Regeneration"
 slot = "defense"
-kind = "buff"
+kind = "ally"
 valor = 25
-spell = 22842
-effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 }, { kind = "steadfast", secs = [5.0, 5.0], amount = 1.0, aura = 22812 }, { kind = "regen", secs = [5.0, 5.0], amount = 0.05, aura = 22842 }]
+range = [30.0, 30.0]
+spell = 22812
+effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 }, { kind = "regen", secs = [5.0, 5.0], amount = 0.05 }]
 
 [[ability]]
 key = "hurricane"
@@ -4467,6 +4561,770 @@ spell = 16914
 tick_spell = 16914
 clip = 54
 tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }, { kind = "knockback", amount = 3.0, lift = 2.0 }]
+
+# -------------------------------------------------------------------------------- Beta page --
+# The board's second page (`school = "beta"`): cards any class can put on its row's key, free to
+# take from the board, there to be tried out. Battlerite's skill shots, Supervive's movement toys,
+# WoW's "oh no" moments: each does one thing no class card does. Siege leaves them out. They keep
+# to their row's damage and crowd-control budgets like any card (tests_classes.rs), but count
+# toward no class. Eight of them stand on engine pieces of their own (the hook's yank, the orb's
+# swap, the wall stun, the echo, the pad, cheating death, the mirror, the chain), and a Bubble pops
+# and a Black Hole collapses as they end.
+
+# Q: a spike that bounces, harder each time.
+[[ability]]
+key = "ricochet"
+name = "Ricochet"
+text = "A spike shot along the reticle that bounces from what it strikes to the nearest other foe within 8 yd, three times, and every bounce hits harder: 7, then 9, 11, 14. Weak on one, vicious in a crowd."
+icon = "Spell_Nature_Thorns"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [7.0, 7.0]
+range = [26.0, 26.0]
+radius = [0.4, 0.4]
+# (The thorn spike's own speed.)
+speed = 40.0
+chain = 3
+chain_range = 8.0
+# Each bounce ×1.25: 7 + 8.75 + 10.9 + 13.7 = 40 into a crowd, under the poke's 45.
+chain_falloff = 1.25
+cooldown = 5.0
+spell = 28614
+clip = 107
+
+[[ability]]
+key = "pinball"
+name = "Pinball"
+ex_of = "ricochet"
+text = "Five bounces, each harder than the last, and everything it strikes is stunned for a moment (0.75 s, less on heroes). Into a pack it ends at 21 a hit."
+icon = "Spell_Nature_StarFall"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [7.0, 7.0]
+range = [26.0, 26.0]
+radius = [0.4, 0.4]
+speed = 40.0
+chain = 5
+chain_range = 8.0
+chain_falloff = 1.25
+spell = 28615
+clip = 107
+# (Every bounce stuns: the engine can't single out the last one.)
+effects = [{ kind = "stun", secs = [0.75, 0.75] }]
+
+# Q: a heavy bolt that drags the crowd onto the one it strikes.
+[[ability]]
+key = "gravity_lance"
+name = "Gravity Lance"
+text = "A heavy bolt of shadow along the reticle (up to 24 yd). Where it strikes, every other foe within 5 yd is dragged into the one it hit, and all of them take 14. Bunch them up for any area card."
+icon = "Spell_Arcane_StarFire"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [14.0, 14.0]
+range = [24.0, 24.0]
+radius = [0.5, 0.5]
+# (The shadow missile's own speed.)
+speed = 50.0
+splash = 5.0
+cooldown = 8.0
+spell = 21064
+impact_kit = 2709
+clip = 107
+effects = [{ kind = "pull", amount = 5.0, lift = 3.0 }]
+
+[[ability]]
+key = "collapse"
+name = "Collapse"
+ex_of = "gravity_lance"
+text = "A wider pull (6 yd) that hits 16, and everything it drags in is slowed 70% for 2 s: they stay in the heap."
+icon = "Spell_Shadow_BlackPlague"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [16.0, 16.0]
+range = [24.0, 24.0]
+radius = [0.5, 0.5]
+speed = 50.0
+splash = 6.0
+spell = 21064
+impact_kit = 2709
+clip = 107
+# A slow, not a root: a root (or a stun) after the pull would stop a creature where it stands,
+# and one before it would hold it there; slowed first, it's dragged in all the same.
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.7 }, { kind = "pull", amount = 6.0, lift = 3.0 }]
+
+# Q: a hook that hauls you to whatever it bites.
+[[ability]]
+key = "grappling_hook"
+name = "Grappling Hook"
+text = "Fire a hook along the reticle (up to 24 yd). Whatever it bites, a wall, the ground or a foe, you're hauled to it; a foe also takes 10 and staggers. Miss and nothing happens. Your way up a cliff, across a gap, or into their face."
+icon = "Ability_Hunter_Pathfinding"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [10.0, 10.0]
+range = [24.0, 24.0]
+radius = [0.35, 0.35]
+speed = 60.0
+yank = true
+cooldown = 8.0
+spell = 6533
+clip = 107
+effects = [{ kind = "stagger", secs = [0.4, 0.4] }]
+
+[[ability]]
+key = "harpoon"
+name = "Harpoon"
+ex_of = "grappling_hook"
+text = "The other way round: the foe it bites is dragged all the way to you, takes 12 and is slowed 40% for 2 s."
+icon = "INV_Spear_04"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [12.0, 12.0]
+range = [24.0, 24.0]
+radius = [0.35, 0.35]
+speed = 60.0
+spell = 6533
+clip = 107
+effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
+
+# Q: a slow orb that trades places.
+[[ability]]
+key = "displacer_orb"
+name = "Displacer Orb"
+text = "A slow, glowing orb along the reticle (up to 22 yd). Whatever it touches, foe or friend, trades places with you: 6 damage to a foe. Pull a friend out of trouble, put a foe where your friends are, or hop past a wall of them. Bosses and the unstoppable hold their ground."
+icon = "INV_Misc_Orb_02"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [6.0, 6.0]
+range = [22.0, 22.0]
+radius = [0.5, 0.5]
+# (The arcane bolt's own speed: slow enough to see coming.)
+speed = 24.0
+swap = true
+cooldown = 10.0
+spell = 13748
+burst_spell = 1953
+clip = 54
+
+[[ability]]
+key = "displacer_pulse"
+name = "Displacer Pulse"
+ex_of = "displacer_orb"
+text = "The same swap, and a foe you trade places with is left slowed 40% for 2 s, stranded where you were."
+icon = "INV_Misc_Orb_05"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [8.0, 8.0]
+range = [22.0, 22.0]
+radius = [0.5, 0.5]
+speed = 24.0
+swap = true
+spell = 13748
+burst_spell = 1953
+clip = 54
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
+
+# E: spin and keep walking.
+[[ability]]
+key = "whirlwind"
+name = "Whirlwind"
+text = "Spin for 2 s, still on the move: everything within 4 yd in front of you and to your sides takes 5 every half second. Turn to carve through a pack; press it again to stop."
+icon = "Ability_Whirlwind"
+school = "beta"
+slot = "close"
+kind = "beam"
+# 10 a second, a tick each half second, 4 yd out and 4 yd to either side.
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+radius = [4.0, 4.0]
+secs = 2.0
+tick = 0.5
+cooldown = 9.0
+spell = 1680
+aura = 9632
+tick_spell = 779
+# A beam walks at the aiming pace; the spin's haste brings it near a run (70%).
+self_effects = [{ kind = "haste", secs = [2.0, 2.0], amount = 0.6 }]
+
+[[ability]]
+key = "bladestorm"
+name = "Bladestorm"
+ex_of = "whirlwind"
+text = "Three seconds of it, and nothing staggers you while you spin: walk it through their swings."
+icon = "Ability_Warrior_Cleave"
+slot = "close"
+kind = "beam"
+valor = 25
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+radius = [4.0, 4.0]
+secs = 3.0
+tick = 0.5
+spell = 1680
+aura = 9632
+tick_spell = 779
+self_effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.6 }, { kind = "steadfast", secs = [3.0, 3.0], amount = 1.0 }]
+
+# E: up they go, and down you come.
+[[ability]]
+key = "launcher"
+name = "Launcher"
+text = "An uppercut (4 yd in front): 10 damage and the foe is thrown up, stunned 0.8 s (less on heroes). Press it again within 1.5 s to Slam: leap onto them, 14 to all within 3 yd."
+icon = "Ability_Warrior_Revenge"
+school = "beta"
+slot = "close"
+kind = "cone"
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+arc = 70.0
+cooldown = 8.0
+spell = 12294
+impact_kit = 83
+# Stunned, then thrown straight up (a yard of ground, a long air time).
+effects = [{ kind = "stun", secs = [0.8, 0.8] }, { kind = "knockback", amount = 1.0, lift = 9.0 }]
+recast = "launcher_slam"
+recast_secs = 1.5
+
+[[ability]]
+key = "launcher_slam"
+name = "Slam"
+text = "Launcher's follow-up: leap onto them."
+inner = true
+slot = "close"
+kind = "leap"
+damage = [14.0, 14.0]
+range = [10.0, 10.0]
+radius = [3.0, 3.0]
+lift = 7.0
+spell = 16979
+impact_kit = 1666
+
+[[ability]]
+key = "juggle"
+name = "Juggle"
+ex_of = "launcher"
+text = "A harder uppercut (14) that keeps them up longer (stunned 1.2 s, less on heroes); then within 2 s the Slam hits 18 and throws them 4 yd."
+icon = "Ability_Druid_Bash"
+slot = "close"
+kind = "cone"
+valor = 25
+damage = [14.0, 14.0]
+range = [4.0, 4.0]
+arc = 70.0
+spell = 12294
+impact_kit = 83
+effects = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "knockback", amount = 1.0, lift = 11.0 }]
+recast = "juggle_slam"
+recast_secs = 2.0
+
+[[ability]]
+key = "juggle_slam"
+name = "Slam"
+text = "Juggle's follow-up: leap onto them and throw them."
+inner = true
+slot = "close"
+kind = "leap"
+damage = [18.0, 18.0]
+range = [12.0, 12.0]
+radius = [3.5, 3.5]
+lift = 8.0
+spell = 16979
+impact_kit = 1666
+effects = [{ kind = "knockback", amount = 4.0 }]
+
+# E: a slash that drinks.
+[[ability]]
+key = "siphon_blade"
+name = "Siphon Blade"
+text = "A dark slash in a 4 yd arc in front of you: 12 to every foe in it, and you heal 60% of all it deals. Three foes, a potion's worth."
+icon = "Spell_Shadow_SiphonMana"
+school = "beta"
+slot = "close"
+kind = "cone"
+damage = [12.0, 12.0]
+range = [4.0, 4.0]
+arc = 100.0
+cooldown = 7.0
+drain = 0.6
+spell = 53
+impact_kit = 2709
+
+[[ability]]
+key = "soul_rend"
+name = "Soul Rend"
+ex_of = "siphon_blade"
+text = "A wider, deeper slash (5 yd, 140°): 16 to each, and every point of it comes back to you as health."
+icon = "Spell_Shadow_UnholyStrength"
+slot = "close"
+kind = "cone"
+valor = 25
+damage = [16.0, 16.0]
+range = [5.0, 5.0]
+arc = 140.0
+drain = 1.0
+spell = 53
+impact_kit = 2709
+
+# E: put them into the wall.
+[[ability]]
+key = "wall_slam"
+name = "Wall Slam"
+text = "A shoulder shove (4 yd in front): 8 damage and thrown back 6 yd. Anything that hits a wall or a rock face on the way is stunned 1.5 s (less on heroes). Line it up first."
+icon = "Ability_Warrior_PunishingBlow"
+school = "beta"
+slot = "close"
+kind = "cone"
+damage = [8.0, 8.0]
+range = [4.0, 4.0]
+arc = 70.0
+cooldown = 7.0
+spell = 6343
+impact_kit = 83
+effects = [{ kind = "knockback", amount = 6.0, wall_stun = 1.5 }]
+
+[[ability]]
+key = "haymaker"
+name = "Haymaker"
+ex_of = "wall_slam"
+text = "A full swing: 10 damage, thrown back 10 yd, and a wall stuns 2 s."
+icon = "Ability_Warrior_DecisiveStrike"
+slot = "close"
+kind = "cone"
+valor = 25
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+arc = 70.0
+spell = 6343
+impact_kit = 83
+effects = [{ kind = "knockback", amount = 10.0, wall_stun = 2.0 }]
+
+# 1: two blinks.
+[[ability]]
+key = "blink_dagger"
+name = "Blink Dagger"
+text = "Blink 12 yd to the reticle; press it again within 3 s to blink again. The most mobile card on the board, and nothing else."
+icon = "INV_Weapon_ShortBlade_05"
+school = "beta"
+slot = "utility"
+kind = "blink"
+range = [12.0, 12.0]
+cooldown = 12.0
+spell = 1856
+recast = "blink_dagger_again"
+recast_secs = 3.0
+
+[[ability]]
+key = "blink_dagger_again"
+name = "Blink Dagger"
+text = "The second blink."
+inner = true
+slot = "utility"
+kind = "blink"
+range = [12.0, 12.0]
+spell = 1856
+
+[[ability]]
+key = "phase_strike"
+name = "Phase Strike"
+ex_of = "blink_dagger"
+text = "Both blinks, and each lands with a strike: 8 to every foe within 3 yd of where you come out."
+icon = "Spell_Shadow_Twilight"
+slot = "utility"
+kind = "blink"
+valor = 25
+range = [12.0, 12.0]
+spell = 1856
+also = "phase_strike_hit"
+recast = "phase_strike_again"
+recast_secs = 3.0
+
+[[ability]]
+key = "phase_strike_again"
+name = "Phase Strike"
+text = "The second blink, and its strike."
+inner = true
+slot = "utility"
+kind = "blink"
+range = [12.0, 12.0]
+spell = 1856
+also = "phase_strike_hit"
+
+[[ability]]
+key = "phase_strike_hit"
+name = "Phase Strike"
+text = "Where a Phase Strike comes out."
+inner = true
+slot = "utility"
+kind = "ground"
+at_self = true
+damage = [8.0, 8.0]
+radius = [3.0, 3.0]
+spell = 6343
+
+# 1: through them, leaving them burning.
+[[ability]]
+key = "phase_dash"
+name = "Phase Dash"
+text = "Dash 10 yd along the reticle straight through foes, untouchable on the way: each one you pass through takes 4 and burns, 4 a second for 3 s."
+icon = "Ability_Rogue_Sprint"
+school = "beta"
+slot = "utility"
+kind = "dash"
+damage = [4.0, 4.0]
+range = [10.0, 10.0]
+cooldown = 12.0
+through = true
+invulnerable = true
+spell = 1953
+# (The burn on each foe passed stands in for a trail of fire on the ground.)
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
+
+[[ability]]
+key = "searing_dash"
+name = "Searing Dash"
+ex_of = "phase_dash"
+text = "A longer dash (14 yd), and everyone you pass through is slowed 40% for 2 s as well as burning."
+icon = "Spell_Fire_FlameShock"
+slot = "utility"
+kind = "dash"
+valor = 25
+damage = [4.0, 4.0]
+range = [14.0, 14.0]
+through = true
+invulnerable = true
+spell = 1953
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
+
+# 1: an echo to come back to.
+[[ability]]
+key = "rewind"
+name = "Rewind"
+text = "Leave an echo where you stand. Within 4 s, press it again: you snap back to the echo with the health you had when you left it (never less than now). Dive in, take the hit, undo it."
+icon = "Spell_Nature_TimeStop"
+school = "beta"
+slot = "utility"
+kind = "buff"
+rewind = true
+recast = "rewind_back"
+recast_secs = 4.0
+cooldown = 14.0
+spell = 1953
+burst_spell = 1953
+
+[[ability]]
+key = "rewind_back"
+name = "Rewind"
+text = "Back to the echo."
+inner = true
+slot = "utility"
+kind = "buff"
+spell = 1953
+
+[[ability]]
+key = "paradox"
+name = "Paradox"
+ex_of = "rewind"
+text = "The echo fights for you: when you snap back to it, everything within 4 yd of it takes 10."
+icon = "Spell_Arcane_ArcaneResilience"
+slot = "utility"
+kind = "buff"
+valor = 25
+rewind = true
+recast = "paradox_back"
+recast_secs = 4.0
+spell = 1953
+burst_spell = 1953
+
+[[ability]]
+key = "paradox_back"
+name = "Paradox"
+text = "Back to the echo, and it bursts."
+inner = true
+slot = "utility"
+kind = "nova"
+damage = [10.0, 10.0]
+radius = [4.0, 4.0]
+spell = 1449
+
+# 1: a pad for the whole party.
+[[ability]]
+key = "jump_pad"
+name = "Jump Pad"
+text = "Throw down a pad at the reticle (up to 8 yd; it lasts 8 s, two at once). You or any friend who steps on it is launched 14 yd the way they're facing. Foes can't use it."
+icon = "INV_Gizmo_RocketBoot_01"
+school = "beta"
+slot = "utility"
+kind = "trap"
+range = [8.0, 8.0]
+radius = [1.5, 1.5]
+secs = 8.0
+launch = 14.0
+cooldown = 12.0
+spell = 1953
+burst_spell = 1953
+
+[[ability]]
+key = "launch_rig"
+name = "Launch Rig"
+ex_of = "jump_pad"
+text = "A stronger pad: 20 yd, and whoever it throws lands with a shove, 6 damage and foes within 1.5 yd thrown back 3 yd."
+icon = "INV_Gizmo_02"
+slot = "utility"
+kind = "trap"
+valor = 25
+range = [8.0, 8.0]
+radius = [1.5, 1.5]
+secs = 8.0
+launch = 20.0
+damage = [6.0, 6.0]
+spell = 1953
+burst_spell = 1953
+effects = [{ kind = "knockback", amount = 3.0 }]
+
+# 2: turn the blow aside and cut back.
+[[ability]]
+key = "riposte"
+name = "Riposte"
+text = "A 0.8 s parry: the first melee blow or projectile is turned aside, and an attacker within 6 yd reels (staggered 1 s) and bleeds, 7 a second for 4 s. Caught, it's back in half the time. Read the swing."
+icon = "Ability_Parry"
+school = "beta"
+slot = "defense"
+kind = "stance"
+secs = 0.8
+cooldown = 12.0
+spell = 5277
+aura = 5277
+# (The cut is a bleed on them, 14 on a hero, whose effects run half as long: the engine has no
+# step behind a foe outside a weapon art.)
+counter = { block = true, once = true, attacker = [{ kind = "stagger", secs = [1.0, 1.0] }, { kind = "burn", secs = [4.0, 4.0], amount = 7.0, aura = 1079 }] }
+
+[[ability]]
+key = "counterstrike"
+name = "Counterstrike"
+ex_of = "riposte"
+text = "A longer parry (1.2 s), and the attacker it catches is stunned 1.2 s (less on heroes) as well as cut."
+icon = "Ability_Warrior_Riposte"
+slot = "defense"
+kind = "stance"
+valor = 25
+secs = 1.2
+spell = 5277
+aura = 5277
+counter = { block = true, once = true, attacker = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "burn", secs = [4.0, 4.0], amount = 7.0, aura = 1079 }] }
+
+# 2: not today.
+[[ability]]
+key = "cheat_death"
+name = "Cheat Death"
+text = "For 6 s, a blow that would kill you leaves you at 1 health instead, and you heal a quarter of your health over the next 3 s. Spent once it saves you."
+icon = "Spell_Shadow_RitualOfSacrifice"
+school = "beta"
+slot = "defense"
+kind = "buff"
+cooldown = 30.0
+# A dark shield round you while death is held off (Unholy Shield's; Fear Ward's showed nothing).
+spell = 6346
+effects = [{ kind = "cheat_death", secs = [6.0, 6.0], amount = 0.25, aura = 8909 }]
+
+[[ability]]
+key = "undying"
+name = "Undying"
+ex_of = "cheat_death"
+text = "Ten seconds of it, and the save heals 40%."
+icon = "Spell_Shadow_DarkRitual"
+slot = "defense"
+kind = "buff"
+valor = 25
+spell = 6346
+effects = [{ kind = "cheat_death", secs = [10.0, 10.0], amount = 0.4, aura = 8909 }]
+
+# 2: send it back.
+[[ability]]
+key = "reflect"
+name = "Reflect"
+text = "Raise a mirror for 1 s: bolts, arrows and spells that would hit you fly back at whoever threw them, at full damage. Blades still land. Time it on the cast."
+icon = "Spell_Nature_WispSplode"
+school = "beta"
+slot = "defense"
+kind = "stance"
+secs = 1.0
+cooldown = 12.0
+# Magic Reflection's mirror on the chest while it's held (Fire Ward showed nothing).
+spell = 20223
+aura = 20223
+counter = { mirror = true }
+
+[[ability]]
+key = "prism"
+name = "Prism"
+ex_of = "reflect"
+text = "A longer mirror (1.5 s), and nothing staggers you while you hold it."
+icon = "Spell_Nature_AstralRecal"
+slot = "defense"
+kind = "stance"
+valor = 25
+secs = 1.5
+# Magic Reflection's mirror on the chest while it's held (Fire Ward showed nothing).
+spell = 20223
+aura = 20223
+counter = { mirror = true }
+self_effects = [{ kind = "steadfast", secs = [1.5, 1.5] }]
+
+# 2: a bubble on a friend, or yourself.
+[[ability]]
+key = "bubble"
+name = "Bubble"
+text = "Wrap a friend along the reticle (up to 30 yd), or yourself, in a bubble that soaks 40 damage for 4 s. When it breaks or runs out it pops, throwing foes within 4 yd back."
+icon = "INV_Misc_Orb_04"
+school = "beta"
+slot = "defense"
+kind = "ally"
+range = [30.0, 30.0]
+cooldown = 14.0
+spell = 498
+effects = [{ kind = "shield", secs = [4.0, 4.0], amount = 40.0, aura = 498, pop = "bubble_pop" }]
+
+[[ability]]
+key = "bubble_pop"
+name = "Bubble"
+text = "The bubble pops: foes within 4 yd are thrown back."
+inner = true
+slot = "defense"
+kind = "nova"
+damage = [4.0, 4.0]
+radius = [4.0, 4.0]
+# A golden burst as it pops (Holy Nova).
+spell = 15237
+effects = [{ kind = "knockback", amount = 5.0 }]
+
+[[ability]]
+key = "hard_bubble"
+name = "Hard Bubble"
+ex_of = "bubble"
+text = "A thicker bubble: it soaks 70, and its pop stuns 1 s as well."
+icon = "INV_Misc_Orb_01"
+slot = "defense"
+kind = "ally"
+valor = 25
+range = [30.0, 30.0]
+spell = 498
+effects = [{ kind = "shield", secs = [4.0, 4.0], amount = 70.0, aura = 498 , pop = "hard_bubble_pop" }]
+
+[[ability]]
+key = "hard_bubble_pop"
+name = "Hard Bubble"
+text = "The bubble pops: foes within 4 yd are thrown back and stunned 1 s."
+inner = true
+slot = "defense"
+kind = "nova"
+damage = [6.0, 6.0]
+radius = [4.0, 4.0]
+# A golden burst as it pops (Holy Nova).
+spell = 15237
+effects = [{ kind = "stun", secs = [1.0, 1.0] }, { kind = "knockback", amount = 5.0 }]
+
+# 3: a singularity.
+[[ability]]
+key = "black_hole"
+name = "Black Hole"
+text = "Lob a singularity to the reticle (up to 26 yd), its landing drawn for everyone: for 3 s it drags every foe within 7 yd 3 yd toward its middle each second, 6 a second. Then it collapses: 30 damage and everything in it thrown 6 yd out. Feed it to your area cards first."
+icon = "Spell_Arcane_PortalUndercity"
+school = "beta"
+slot = "ultimate"
+kind = "projectile"
+valor = 100
+range = [26.0, 26.0]
+radius = [0.5, 0.5]
+# (The shadow orb's own speed: a slow, readable arc.)
+speed = 15.0
+lob = true
+splash = 7.0
+linger = 3.0
+linger_damage = 6.0
+cooldown = 40.0
+spell = 142
+burst_spell = 24050
+linger_spell = 27810
+clip = 54
+tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
+end_burst = "black_hole_collapse"
+
+[[ability]]
+key = "black_hole_collapse"
+name = "Black Hole"
+text = "It collapses: 30 damage and everything in it thrown 6 yd out."
+inner = true
+slot = "ultimate"
+kind = "nova"
+damage = [30.0, 30.0]
+spell = 24050
+effects = [{ kind = "knockback", amount = 6.0 }]
+
+# 3: the ground splits.
+[[ability]]
+key = "earthsplitter"
+name = "Earthsplitter"
+text = "Split the earth along your aim: a 30 yd fissure, 3 yd wide and drawn for everyone, bursts 0.8 s later with a hurled boulder. 30 damage and stunned 1.5 s (0.75 s on heroes) to all it crosses."
+icon = "Spell_Nature_EarthShock"
+school = "beta"
+slot = "ultimate"
+kind = "line"
+valor = 100
+damage = [30.0, 30.0]
+range = [30.0, 30.0]
+radius = [1.5, 1.5]
+delay = 0.8
+cooldown = 40.0
+spell = 26616
+effects = [{ kind = "stun", secs = [1.5, 1.5] }]
+
+# 3: grow into it.
+[[ability]]
+key = "avatar"
+name = "Avatar"
+text = "For 8 s you're a titan: nothing staggers you, your attacks and guard cost no stamina, your heavy attacks can't be blocked, you run 20% faster and take 20% less from everything."
+icon = "Ability_Racial_BloodRage"
+school = "beta"
+slot = "ultimate"
+kind = "buff"
+valor = 100
+cooldown = 40.0
+spell = 8913
+# (No boon adds damage yet: Onslaught's unblockable heavies and a hide of 20% stand in for it.)
+effects = [{ kind = "onslaught", secs = [8.0, 8.0] }, { kind = "haste", secs = [8.0, 8.0], amount = 0.2 }, { kind = "hallowed", secs = [8.0, 8.0], amount = 0.2 }]
+
+# 3: bound to you.
+[[ability]]
+key = "soul_chain"
+name = "Soul Chain"
+text = "Throw a chain along the reticle (up to 20 yd): it binds the foe it strikes, and up to two more within 6 yd of them, to you for 5 s, 14 damage each. Any of them who gets more than 8 yd away is yanked back to you and stunned 1.5 s (less on heroes). Then that chain breaks."
+icon = "Spell_Shadow_ShadowWordDominate"
+school = "beta"
+slot = "ultimate"
+kind = "projectile"
+valor = 100
+damage = [14.0, 14.0]
+range = [20.0, 20.0]
+radius = [0.4, 0.4]
+speed = 40.0
+chain = 2
+chain_range = 6.0
+chain_falloff = 1.0
+tether_secs = 5.0
+tether_range = 8.0
+tether_effects = [{ kind = "stun", secs = [1.5, 1.5] }]
+cooldown = 40.0
+spell = 23394
+tick_spell = 689
+clip = 54
+
 
 # --------------------------------------------------------------------------- their totems --
 
@@ -6233,7 +7091,7 @@ respawn = 240.0
   steps = [ { clip = 16, take = 1, windup = 1.0, lunge = 5.5, damage = 32, recovery = 1.4 } ]
 
 # Old Blackfang, the prowlers' leader, out of the den by Ridgepoint. He is the hunter's trial:
-# the camp learns Volley when he falls. At half his health he howls and two prowlers come.
+# the camp learns Kill Shot when he falls. At half his health he howls and two prowlers come.
 [[mob]]
 key = "blackfang"
 name = "Old Blackfang"
@@ -6249,7 +7107,7 @@ boss = true
 posture = 150
 drops = { meat = [3, 4], hide = [3, 4] }
 trophy = { hide = 6, leather = 4 }
-teaches = ["volley"]
+teaches = ["kill_shot"]
 respawn = 1200.0
   [mob.attack]
   windup = 0.55
@@ -8495,7 +9353,7 @@ name = "The Garrison's Banner"
 at = [-9674.0, 704.0]
 display = 631
 scale = 1.0
-teaches = ["aimed_throw", "sundering_blow"]
+teaches = ["hurled_axe", "sundering_blow"]
 keep = true
 secs = 3.0
 text = "Westbrook's banner, and the drill the garrison's footmen learned under it: the throw, and the blow that breaks a guard."
@@ -8507,7 +9365,7 @@ name = "Altar of the Abbey"
 at = [-8935.0, -165.0]
 display = 1527
 scale = 0.45
-teaches = ["mind_blast", "holy_nova"]
+teaches = ["penance", "holy_nova"]
 keep = true
 secs = 3.0
 text = "The Abbey's altar remembers its priests: the Light, and the shadow behind it."
@@ -8519,7 +9377,7 @@ name = "The Vigil's Shrine"
 at = [-9125.0, -1030.0]
 display = 6873
 scale = 0.8
-teaches = ["holy_shock", "consecration"]
+teaches = ["avengers_shield", "consecration"]
 keep = true
 secs = 3.0
 text = "The heroes of Elwynn are remembered here, and their Light with them."
@@ -8543,7 +9401,7 @@ name = "The Stone Cairn"
 at = [-8855.0, -945.0]
 display = 235
 scale = 1.2
-teaches = ["lightning_bolt", "thunderstorm"]
+teaches = ["lava_burst", "thunderstorm"]
 keep = true
 secs = 3.0
 text = "The cairn's stones speak, if you listen: of lightning and of thunder."
@@ -8555,7 +9413,7 @@ name = "The Cult's Altar"
 at = [-8915.0, -722.0]
 display = 328
 scale = 0.6
-teaches = ["shadow_bolt", "shadowfury"]
+teaches = ["seed_of_corruption", "shadowfury"]
 keep = true
 secs = 3.0
 text = "The cult's altar is still warm. What it taught them, it teaches you."
@@ -8567,7 +9425,7 @@ name = "The Brotherhood's Dead Drop"
 at = [-9782.0, -888.0]
 display = 18
 scale = 1.0
-teaches = ["deadly_throw", "backstab"]
+teaches = ["fan_of_knives", "backstab"]
 keep = true
 secs = 3.0
 text = "Under the crate: a Defias training ledger. Throwing knives, and where to put a blade."
@@ -8579,7 +9437,7 @@ name = "The Hunter's Lodge Banner"
 at = [-9460.0, -1380.0]
 display = 4313
 scale = 1.0
-teaches = ["arcane_shot", "explosive_trap"]
+teaches = ["aimed_arrow", "explosive_trap"]
 keep = true
 secs = 3.0
 text = "The old lodge's banner, and a hunter's notes nailed to its pole: a shot, and a snare for the road."
@@ -8591,10 +9449,10 @@ name = "The Moonwell at Mirror Lake"
 at = [-9455.0, 450.0]
 display = 2048
 scale = 0.7
-teaches = ["wrath", "swipe"]
+teaches = ["living_seed", "swipe"]
 keep = true
 secs = 3.0
-text = "The moonwell's water is still and bright: nature's wrath, and the bear's swipe."
+text = "The moonwell's water is still and bright: a seed that grows where it lands, and the bear's swipe."
 trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 
 [[chest]]
@@ -8613,7 +9471,7 @@ trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 key = "relic_priest"
 name = "The Abbey Reliquary"
 at = [-8865.0, -150.0]
-teaches = ["leap_of_faith", "power_word_shield"]
+teaches = ["leap_of_faith", "power_word_barrier"]
 loot = { linen = 3 }
 display = 259
 secret = 7.0
@@ -8625,7 +9483,7 @@ trial = ["trial_relic_priest_0", "trial_relic_priest_1"]
 key = "relic_paladin"
 name = "The Lightbringer's Charge"
 at = [-9640.0, 696.0]
-teaches = ["hammer_of_justice", "divine_protection"]
+teaches = ["divine_steed", "blessing_of_protection"]
 loot = { bronze = 2 }
 display = 259
 secret = 7.0
@@ -8662,7 +9520,7 @@ key = "relic_warlock"
 name = "The Black Grimoire"
 at = [-9075.0, -598.0]
 z = 62.0
-teaches = ["demonic_circle", "shadow_ward"]
+teaches = ["demonic_circle", "drain_life"]
 loot = { silk = 3 }
 display = 259
 secret = 7.0
@@ -8674,7 +9532,7 @@ trial = ["trial_relic_warlock_0"]
 key = "relic_rogue"
 name = "Morgan's Stash"
 at = [-9968.0, -150.0]
-teaches = ["shadowstep", "evasion"]
+teaches = ["shadowstep", "smoke_bomb"]
 loot = { wool = 3, bronze = 1 }
 display = 259
 secret = 7.0
@@ -8686,7 +9544,7 @@ trial = ["trial_relic_rogue_0", "trial_relic_rogue_1"]
 key = "relic_hunter"
 name = "A Lost Hunter's Pack"
 at = [-8797.0, -1056.0]
-teaches = ["disengage", "deterrence"]
+teaches = ["disengage", "flare"]
 loot = { hide = 3, leather = 2 }
 display = 259
 secret = 7.0
@@ -9030,7 +9888,7 @@ at = [-8905.0, -175.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Holy_PowerWordShield"
-text = "The priest's shrine at the Abbey (Mind Blast, Holy Nova). Something hidden behind it."
+text = "The priest's shrine at the Abbey (Penance, Holy Nova). Something hidden behind it."
 reward = { linen = 3 }
 
 [[site]]
@@ -9086,7 +9944,7 @@ at = [-9128.0, -1046.0]
 radius = 40.0
 kind = "sanctum"
 icon = "Spell_Holy_HolyBolt"
-text = "The paladin's shrine (Holy Shock, Consecration). Forsaken defile the memorial; Defiler Morvane, the paladin's trial, leads them."
+text = "The paladin's shrine (Avenger's Shield, Consecration). Forsaken defile the memorial; Defiler Morvane, the paladin's trial, leads them."
 reward = { bronze = 1 }
 
 [[site]]
@@ -9096,7 +9954,7 @@ at = [-8855.0, -950.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Nature_LightningShield"
-text = "The shaman's shrine (Lightning Bolt, Thunderstorm). The stones are awake: Rumbler, the shaman's trial."
+text = "The shaman's shrine (Lava Burst, Thunderstorm). The stones are awake: Rumbler, the shaman's trial."
 reward = { stone = 3 }
 
 [[site]]
@@ -9125,7 +9983,7 @@ at = [-9800.0, -900.0]
 radius = 55.0
 kind = "sanctum"
 icon = "Ability_BackStab"
-text = "The rogue's shrine (Deadly Throw, Backstab) in the Brotherhood's camp; Morgan the Collector, the rogue's trial; Princess; pumpkins."
+text = "The rogue's shrine (Fan of Knives, Backstab) in the Brotherhood's camp; Morgan the Collector, the rogue's trial; Princess; pumpkins."
 reward = { pumpkin = 2 }
 
 [[site]]
@@ -9135,7 +9993,7 @@ at = [-9454.0, -1380.0]
 radius = 55.0
 kind = "sanctum"
 icon = "Ability_Hunter_SniperShot"
-text = "The hunter's shrine (Arcane Shot, Explosive Trap) at the old lodge; prowlers and bears in the woods; timber."
+text = "The hunter's shrine (Aimed Shot, Explosive Trap) at the old lodge; prowlers and bears in the woods; timber."
 reward = { wood = 4 }
 
 [[site]]
@@ -9198,7 +10056,7 @@ at = [-9660.0, 690.0]
 radius = 35.0
 kind = "sanctum"
 icon = "INV_Sword_27"
-text = "The warrior's shrine (Aimed Throw, Sundering Blow) at the garrison's banner; its armory opens once Hogger falls."
+text = "The warrior's shrine (Hurled Axe, Sundering Blow) at the garrison's banner; its armory opens once Hogger falls."
 reward = { bronze = 1 }
 
 [[site]]

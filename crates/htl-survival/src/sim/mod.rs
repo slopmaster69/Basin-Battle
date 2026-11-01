@@ -12,12 +12,15 @@ use crate::land::Land;
 
 pub mod abilities;
 pub mod arena;
+pub(crate) mod beta;
 pub mod cc;
 mod combat;
 pub mod dungeon;
 mod journal;
+pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
+pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 mod raid;
@@ -105,6 +108,8 @@ pub struct Strike {
     pub stamina: f32,
     /// A weapon art's blow: the ability it is.
     pub art: Option<usize>,
+    /// Another character model whose take on the clip the clients play (`MoveDef::from`).
+    pub from: Option<String>,
 }
 
 impl Strike {
@@ -142,6 +147,10 @@ pub enum Event {
     Swing { attacker: Id, victim: Option<Id>, damage: u32, outcome: Outcome, anim: bool, style: Blow },
     /// A missile or a spell's look from `caster` to `target`.
     Missile { caster: Id, spell: u32, target: Target },
+    /// A missile's look from a spot, not from a unit (a boomerang turning back to its thrower):
+    /// `anchor` names an unseen object standing at `from` to fly it, until an
+    /// [`Event::ObjGone`] of that id. `caster` is whose it is.
+    MissileFrom { anchor: Id, caster: Id, spell: u32, from: Vec3, target: Target },
     /// A cast begins (its look and the caster's cast pose) or is cut short.
     Cast { caster: Id, spell: u32, ms: u32 },
     CastEnd { caster: Id },
@@ -164,8 +173,9 @@ pub enum Event {
     React { id: Id, anim: u16, from: Vec3, lean: f32, hold: f32, fit: f32 },
     /// A creature winds up a blow: the clip and take it swings with, timed to land `windup`
     /// seconds from now, and the recovery after (for the clients that play clips themselves);
-    /// `blockable`: a guard stops it (its swing's trail says which).
-    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32, blockable: bool },
+    /// `blockable`: a guard stops it (its swing's trail says which); `from`: another character
+    /// model's take on the clip.
+    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32, blockable: bool, from: Option<String> },
     /// A spell visual kit plays on a unit (an impact's flash and sound); `by`: the hero whose blow
     /// it is (whose own client may already have played it).
     Visual { id: Id, kit: u32, by: Option<Id> },
@@ -561,6 +571,8 @@ pub struct Player {
     pub rooted: bool,
     /// A panic's last stride.
     pub panic_stride: f32,
+    /// Keys armed for a recast, cards empowered, a dash going through bodies.
+    pub combos: recasts::Combos,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -791,6 +803,8 @@ pub struct Survival {
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
     pub(crate) cc_log: BTreeMap<Id, std::collections::VecDeque<String>>,
+    /// Each hero's damage meter (see [`meter`]).
+    pub(crate) meters: BTreeMap<Id, meter::Meter>,
     /// Blows on heroes waiting out their round trip (a dodge or guard already on its way).
     pub(crate) pending: Vec<combat::PendingStrike>,
     /// Where everyone has been lately, for judging a swing as its striker saw it.
@@ -824,6 +838,8 @@ pub struct Survival {
     /// Shrines' and relics' trials under way, by chest: where it stands, who called it, when a
     /// hero was last near.
     pub(crate) trials: BTreeMap<usize, Trial>,
+    /// The beta page's mechanics in play: yanks, echoes, tethers, shields that burst, pads.
+    pub(crate) beta: beta::Beta,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -880,6 +896,7 @@ impl Survival {
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),
+            meters: BTreeMap::new(),
             pending: Vec::new(),
             trails: BTreeMap::new(),
             marks: Vec::new(),
@@ -897,6 +914,7 @@ impl Survival {
             unfound: BTreeSet::new(),
             chests_looked: 0.0,
             trials: BTreeMap::new(),
+            beta: beta::Beta::default(),
         }
     }
 
@@ -941,6 +959,8 @@ impl Survival {
         self.step_grounds();
         self.step_totems();
         self.step_stances();
+        self.step_combos();
+        self.step_beta();
         self.step_cc();
         self.step_holds();
         self.step_dummies();
@@ -1056,6 +1076,7 @@ impl Survival {
             sheathed: false,
             rooted: false,
             panic_stride: 0.0,
+            combos: recasts::Combos::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];
@@ -1111,6 +1132,7 @@ impl Survival {
         let p = self.players.get_mut(&id)?;
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
+        self.meters.remove(&id);
         // Creatures fighting them go home.
         for m in self.mobs.values_mut() {
             if m.state.target() == Some(id) {

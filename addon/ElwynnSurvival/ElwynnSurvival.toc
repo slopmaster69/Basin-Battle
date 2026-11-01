@@ -5,6 +5,9 @@
 ## Author: Basin Battle
 ## Version: 8
 ElwynnSurvival.lua
+BetaBoard.lua
 Ledger.lua
 Letter.lua
 Wager.lua
+Clips.lua
+Meter.lua

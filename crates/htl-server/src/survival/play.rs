@@ -118,7 +118,8 @@ impl SurvivalGame {
                                 htl_survival::StrikeKind::Bash => "bash",
                                 htl_survival::StrikeKind::Kick => "kick",
                             };
-                            Some((strike.clip, strike.take, impact, strike.total() - impact, strike.lunge, strike.step, trail, ms, kind))
+                            let from = strike.from.as_deref().map(clean).unwrap_or_default();
+                            Some((strike.clip, strike.take, impact, strike.total() - impact, strike.lunge, strike.step, trail, ms, kind, from))
                         }
                         _ => None,
                     });
@@ -130,12 +131,12 @@ impl SurvivalGame {
                         if creature && anim_client {
                             continue;
                         }
-                        match clip {
-                            Some((clip, take, impact, recovery, lunge, step, trail, ms, kind)) if anim_client => {
+                        match &clip {
+                            Some((clip, take, impact, recovery, lunge, step, trail, ms, kind, from)) if anim_client => {
                                 let me = u8::from(mine == Some(c));
                                 self.ui_line(
                                     c,
-                                    &format!("AN\t{a:#X}\t{clip}\t{impact:.3}\t{trail}\t{ms}\t{me}\t{take}\t{recovery:.3}\t{lunge:.2}\t{kind}\t{step}"),
+                                    &format!("AN\t{a:#X}\t{clip}\t{impact:.3}\t{trail}\t{ms}\t{me}\t{take}\t{recovery:.3}\t{lunge:.2}\t{kind}\t{step}\t{from}"),
                                 );
                             }
                             _ => self.send(c, p.clone()),
@@ -247,6 +248,21 @@ impl SurvivalGame {
                 }
                 self.broadcast(&packets::spell_go(c, spell, aim, &hits, ammo));
             }
+            Event::MissileFrom { anchor, caster: _, spell, from, target } => {
+                // A missile from a spot (a boomerang turning back): an unseen object stands there
+                // and flies it, until the rules say it's gone (`ObjGone`).
+                let (aim, hits) = match target {
+                    Target::Unit(t) => match self.guid_of(t) {
+                        Some(g) => (Aim::Unit(g), vec![g]),
+                        None => return,
+                    },
+                    Target::Point(p) => (Aim::Point(p), Vec::new()),
+                };
+                let (g, made) = self.anchor_create(anchor, from);
+                self.broadcast(&made);
+                let ammo = self.sim.content.ranged.iter().any(|r| r.spell == spell).then_some(ARROW_DISPLAY);
+                self.broadcast(&packets::spell_go(g, spell, aim, &hits, ammo));
+            }
             Event::Cast { caster, spell, ms } => {
                 let Some(c) = self.guid_of(caster) else { return };
                 let ranged = self.sim.content.ranged.iter().any(|r| r.spell == spell);
@@ -308,13 +324,15 @@ impl SurvivalGame {
                     self.send(c, p);
                 }
             }
-            Event::MobWindup { id, clip, take, windup, recovery, blockable } => {
+            Event::MobWindup { id, clip, take, windup, recovery, blockable, from } => {
                 let Some(g) = self.guid_of(id) else { return };
                 // The swing's trail only to a client that starts a creature's late (`ac9`): an
                 // older one would draw it from the start of the wind-up and be done before the blow.
                 let trail = if blockable { FOE_TRAIL } else { FOE_TRAIL_UNBLOCKABLE };
-                let with = format!("AN\t{g:#X}\t{clip}\t{windup:.3}\t{trail}\t{FOE_TRAIL_MS}\t0\t{take}\t{recovery:.3}\t0\tmob\t0");
-                let without = format!("AN\t{g:#X}\t{clip}\t{windup:.3}\t-\t0\t0\t{take}\t{recovery:.3}\t0\tmob\t0");
+                // The last field: another character model's take on the clip (`ac10`), or none.
+                let from = from.as_deref().map(clean).unwrap_or_default();
+                let with = format!("AN\t{g:#X}\t{clip}\t{windup:.3}\t{trail}\t{FOE_TRAIL_MS}\t0\t{take}\t{recovery:.3}\t0\tmob\t0\t{from}");
+                let without = format!("AN\t{g:#X}\t{clip}\t{windup:.3}\t-\t0\t0\t{take}\t{recovery:.3}\t0\tmob\t0\t{from}");
                 let conns: Vec<(ConnId, u8)> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, w)| (*c, w.level)).collect();
                 for (c, level) in conns {
                     self.ui_line(c, if level >= FOE_TRAILS_LEVEL { &with } else { &without });

@@ -382,6 +382,10 @@ pub struct MoveDef {
     pub lunge: f32,
     #[serde(default = "one_share")]
     pub range: f32,
+    /// Another character model's take on the clip (`"ScourgeFemale"`, `"OrcMale"`…), played on
+    /// the hero's own body by a client that can (`ac10`); without one, the hero's own.
+    #[serde(default)]
+    pub from: Option<String>,
 }
 
 fn one_share() -> f32 {
@@ -390,8 +394,21 @@ fn one_share() -> f32 {
 
 impl MoveDef {
     fn of(clip: u16, take: u32, windup: f32, recovery: f32, damage: f32, lunge: f32) -> Self {
-        Self { clip, take, windup, recovery, damage, stamina: 1.0, lunge, range: 1.0 }
+        Self { clip, take, windup, recovery, damage, stamina: 1.0, lunge, range: 1.0, from: None }
     }
+}
+
+/// The character models a clip can be borrowed from, as `<Race><Gender>`.
+pub const CLIP_RACES: [&str; 9] = ["Human", "Orc", "Dwarf", "NightElf", "Scourge", "Tauren", "Gnome", "Troll", "Goblin"];
+
+/// Whether `name` is a character model a clip can come from (`"ScourgeFemale"`), or a model's path.
+pub fn clip_source_ok(name: &str) -> bool {
+    if name.contains('\\') || name.to_ascii_lowercase().ends_with(".m2") {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    let race = lower.strip_suffix("female").or_else(|| lower.strip_suffix("male"));
+    race.is_some_and(|r| CLIP_RACES.iter().any(|x| x.eq_ignore_ascii_case(r)))
 }
 
 /// A grip's blows (`one_hand`, `dagger`, `two_hand`, `polearm`).
@@ -1403,6 +1420,10 @@ pub struct SpecialDef {
     /// The clip it swings with (`AnimationData`; the creature's usual attack when not given).
     #[serde(default)]
     pub clip: Option<u16>,
+    /// Another character model's take on it (as a hero's move's `from`); else the creature's
+    /// `clips_from`, else its own.
+    #[serde(default)]
+    pub from: Option<String>,
     /// How far it steps into the blow as it lands (yards).
     #[serde(default)]
     pub lunge: f32,
@@ -1465,6 +1486,10 @@ pub struct MobDef {
     pub key: String,
     pub name: String,
     pub display: u32,
+    /// A creature on a character model (an orc, a Defias): every blow of its from this character
+    /// model's clips (`"ScourgeFemale"`…) where the step names none, on a client that can.
+    #[serde(default)]
+    pub clips_from: Option<String>,
     #[serde(default = "one_f")]
     pub scale: f32,
     pub health: u32,
@@ -2123,7 +2148,12 @@ impl Content {
     /// The built-in rules as a dev world has them (every card owned), for tests.
     #[cfg(test)]
     pub fn dev() -> Self {
-        let mut c = Self::builtin();
+        Self::into_dev(Self::builtin())
+    }
+
+    /// Any rules (the solo sim's tuned ones) as a dev world has them.
+    #[cfg(test)]
+    pub fn into_dev(mut c: Self) -> Self {
         c.dev.full_tree = true;
         c.work = WorkDef::instant();
         c.combat.foe_health = 1.0;
@@ -2629,6 +2659,22 @@ impl Content {
             if m.light.is_empty() {
                 bail!("moveset {}: no light blows", m.key);
             }
+            // A borrowed clip names a character model the clients can find.
+            let moves = m.light.iter().chain([&m.heavy, &m.running]).chain(m.roll.iter()).chain(m.leap.iter());
+            for d in moves {
+                if let Some(f) = d.from.as_deref().filter(|f| !clip_source_ok(f)) {
+                    bail!("moveset {}: from {f:?} is no character model (<Race><Gender>, as ScourgeFemale)", m.key);
+                }
+            }
+        }
+        for m in &self.mobs {
+            let steps = m.special.iter().chain(m.patterns.iter().flat_map(|p| p.steps.iter()));
+            let named = steps.filter_map(|s| s.from.as_deref()).chain(m.clips_from.as_deref());
+            for f in named {
+                if !clip_source_ok(f) {
+                    bail!("mob {}: clips from {f:?}, which is no character model (<Race><Gender>, as ScourgeFemale)", m.key);
+                }
+            }
         }
         for w in &self.weapons {
             if !w.moveset.is_empty() && !self.movesets.iter().any(|m| m.key == w.moveset) {
@@ -2822,11 +2868,20 @@ impl Content {
         Ok(())
     }
 
-    fn validate_abilities(&self) -> Result<()> {
+    pub(crate) fn validate_abilities(&self) -> Result<()> {
         let mut keys = std::collections::BTreeSet::new();
         let effect_ok = |e: &AbilityEffect, what: &str| -> Result<()> {
             if !CC_KINDS.contains(&e.kind.as_str()) && !OTHER_EFFECTS.contains(&e.kind.as_str()) {
                 bail!("{what}: no effect {:?} (one of {CC_KINDS:?} or {OTHER_EFFECTS:?})", e.kind);
+            }
+            if e.wall_stun < 0.0 || (e.wall_stun > 0.0 && e.kind != "knockback") {
+                bail!("{what}: only a knockback stuns against a wall (`wall_stun`)");
+            }
+            if !e.pop.is_empty() && e.kind != "shield" {
+                bail!("{what}: only a shield bursts as it ends (`pop`)");
+            }
+            if e.kind == "cheat_death" && !(0.0..=1.0).contains(&e.amount) {
+                bail!("{what}: cheat_death mends a share of their health (`amount`, 0 to 1)");
             }
             Ok(())
         };
@@ -2841,11 +2896,11 @@ impl Content {
             if !SLOTS.contains(&a.slot.as_str()) {
                 bail!("{what}: slot {:?} (one of {SLOTS:?})", a.slot);
             }
-            if a.school != "core" && !SCHOOLS.contains(&a.school.as_str()) {
-                bail!("{what}: school {:?} (core or one of {SCHOOLS:?})", a.school);
+            if a.school != "core" && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
+                bail!("{what}: school {:?} (core, {BETA} or one of {SCHOOLS:?})", a.school);
             }
-            if !a.is_ex() && !a.inner && !SCHOOLS.contains(&a.school.as_str()) {
-                bail!("{what}: a card needs its column, `school` (one of {SCHOOLS:?})");
+            if !a.is_ex() && !a.inner && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
+                bail!("{what}: a card needs its column, `school` (one of {SCHOOLS:?}, or {BETA} for the beta page)");
             }
             if a.kind == "art" && a.weapon <= 0.0 {
                 bail!("{what}: a weapon art needs its share of the weapon's damage (`weapon`)");
@@ -2859,10 +2914,16 @@ impl Content {
             if a.kind == "line" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0) {
                 bail!("{what}: a strip needs its length (`range`) and half-width (`radius`)");
             }
+            if a.kind == "ally" && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
+                bail!("{what}: an ally ability helps whoever it lands on: no `damage`");
+            }
+            if a.kind == "beam" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0 || a.secs <= 0.0) {
+                bail!("{what}: a beam needs its length (`range`), half-width (`radius`) and how long it's held (`secs`)");
+            }
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
                 bail!("{what}: only a cone, a nova or a strip winds up (`cast`)");
             }
-            if (a.pierce > 0 || a.chain > 0 || a.splash > 0.0) && a.kind != "projectile" && a.kind != "trap" {
+            if (a.pierce > 0 || a.full_pierce > 0 || a.chain > 0 || a.splash > 0.0) && a.kind != "projectile" && a.kind != "trap" {
                 bail!("{what}: pierce, chain and splash are a projectile's");
             }
             if !a.boon.is_empty() && !BOONS.contains(&a.boon.as_str()) {
@@ -2874,13 +2935,80 @@ impl Content {
             if matches!(a.kind.as_str(), "projectile") && a.speed <= 0.0 {
                 bail!("{what}: a projectile needs a speed");
             }
+            if (a.returns || a.lob || a.fuse > 0.0) && a.kind != "projectile" {
+                bail!("{what}: only a projectile comes back (`returns`), is lobbed (`lob`) or sticks (`fuse`)");
+            }
+            if u8::from(a.returns) + u8::from(a.lob) + u8::from(a.fuse > 0.0) > 1 {
+                bail!("{what}: a projectile comes back, is lobbed or sticks: one of `returns`, `lob` and `fuse`");
+            }
+            if (a.lob || a.fuse > 0.0) && a.splash <= 0.0 {
+                bail!("{what}: a lobbed or sticky projectile bursts where it goes off: it needs `splash`");
+            }
             if a.kind == "place" && a.totem.is_none() {
                 bail!("{what}: a placed ability needs a [ability.totem]");
             }
             if a.kind == "stance" && a.counter.is_none() {
                 bail!("{what}: a stance needs a [ability.counter]");
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects) {
+            if !a.recast.is_empty() && a.recast_secs <= 0.0 {
+                bail!("{what}: a recast needs its window (`recast_secs`)");
+            }
+            if a.recast.is_empty() && a.recast_secs > 0.0 {
+                bail!("{what}: `recast_secs` with no `recast`");
+            }
+            if a.recast_to_start && !matches!(a.kind.as_str(), "blink" | "leap") {
+                bail!("{what}: only a blink or a leap goes back to the start (`recast_to_start`)");
+            }
+            if a.through && a.kind != "dash" {
+                bail!("{what}: only a dash goes `through`");
+            }
+            if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
+                bail!("{what}: an empower needs its `secs`");
+            }
+            // The beta page's mechanics.
+            let tether = a.tether_secs > 0.0;
+            if a.yank && !matches!(a.kind.as_str(), "projectile" | "shot") {
+                bail!("{what}: only a projectile or a shot pulls its caster after it (`yank`)");
+            }
+            if (a.swap || tether) && a.kind != "projectile" {
+                bail!("{what}: only a projectile swaps places (`swap`) or binds (`tether_secs`)");
+            }
+            if u8::from(a.yank) + u8::from(a.swap) + u8::from(tether) > 1 {
+                bail!("{what}: a projectile yanks, swaps or binds: one of `yank`, `swap` and `tether_secs`");
+            }
+            if (a.yank || a.swap || tether) && (a.returns || a.lob || a.fuse > 0.0 || a.pierce > 0 || a.count > 1) {
+                bail!("{what}: a yank, a swap or a tether is one projectile that stops at what it strikes (no `returns`, `lob`, `fuse`, `pierce` or `count`)");
+            }
+            if a.swap && a.chain > 0 {
+                bail!("{what}: a swap goes with one (no `chain`)");
+            }
+            if tether != (a.tether_range > 0.0) || a.tether_secs < 0.0 {
+                bail!("{what}: a tether needs how long it binds (`tether_secs`) and how far it lets them go (`tether_range`)");
+            }
+            if !tether && !a.tether_effects.is_empty() {
+                bail!("{what}: `tether_effects` with no tether (`tether_secs`)");
+            }
+            if a.rewind && a.kind != "buff" {
+                bail!("{what}: only a buff leaves an echo to come back to (`rewind`)");
+            }
+            if a.rewind && a.recast.is_empty() == (a.rewind_secs <= 0.0) {
+                bail!("{what}: an echo is come back to by its recast (`recast`) or after a while (`rewind_secs`): one of them");
+            }
+            if !a.rewind && a.rewind_secs > 0.0 {
+                bail!("{what}: `rewind_secs` with no echo (`rewind`)");
+            }
+            if a.launch < 0.0 || (a.launch > 0.0 && a.kind != "trap") {
+                bail!("{what}: only a trap launches (`launch`)");
+            }
+            if !a.end_burst.is_empty() && a.linger <= 0.0 {
+                bail!("{what}: only lingering ground bursts as it ends (`end_burst` needs `linger`)");
+            }
+            if let Some(c) = a.counter.as_ref().filter(|c| c.mirror) {
+                if c.block || c.dodge || c.immune || c.absorb_heal > 0.0 || !c.reflect.is_empty() || c.melee_only {
+                    bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
+                }
+            }
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {
@@ -2902,12 +3030,46 @@ impl Content {
                     bail!("{what}: no ability {k}");
                 }
             }
+            // A recast is an inner ability, fired only by the key again; it arms nothing itself.
+            if !a.recast.is_empty() {
+                let Some(r) = self.ability(&a.recast) else { bail!("{what}: recast {}, no such ability", a.recast) };
+                let r = &self.abilities[r];
+                if !r.inner || r.key == a.key {
+                    bail!("{what}: its recast {} must be an `inner` ability of its own", a.recast);
+                }
+                if !r.recast.is_empty() {
+                    bail!("{what}: its recast {} can't have a recast of its own", a.recast);
+                }
+            }
+            // A burst as ground ends, or as a shield does, is a nova (a shield's with its own reach).
+            let pops = a.effects.iter().chain(&a.self_effects).filter(|e| !e.pop.is_empty()).map(|e| (&e.pop, true));
+            for (k, own) in std::iter::once((&a.end_burst, false)).filter(|(k, _)| !k.is_empty()).chain(pops) {
+                let Some(b) = self.ability(k) else { bail!("{what}: bursts as {k}, no such ability") };
+                let b = &self.abilities[b];
+                if b.kind != "nova" || (own && b.radius[1] <= 0.0) {
+                    bail!("{what}: bursts as {k}, which must be a `nova`{}", if own { " with its `radius`" } else { "" });
+                }
+            }
+            // An empower names a base card with an EX version (the one it makes free).
+            if let Some(e) = &a.empower {
+                let Some(b) = self.ability(&e.ability) else { bail!("{what}: empowers {}, no such ability", e.ability) };
+                if self.abilities[b].is_ex() || self.abilities[b].inner || self.ex_of(b).is_none() {
+                    bail!("{what}: empowers {}, which must be a base card with an EX version", e.ability);
+                }
+                // An empowered key fires at once; an ultimate's waits for its hold, so none is.
+                if self.abilities[b].slot == "ultimate" {
+                    bail!("{what}: empowers {}, an ultimate (its key waits for a hold)", e.ability);
+                }
+            }
         }
-        // The board: four cards a row at most, one a column.
+        // The board: a card a column at most in each row; the beta page, four a row.
         for row in SLOTS {
-            let cards: Vec<&AbilityDef> = self.abilities.iter().filter(|a| a.on_board() && a.slot == row).collect();
+            let (beta, cards): (Vec<&AbilityDef>, Vec<&AbilityDef>) = self.abilities.iter().filter(|a| a.on_board() && a.slot == row).partition(|a| a.is_beta());
             if cards.len() > SCHOOLS.len() {
                 bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len());
+            }
+            if beta.len() > BETA_ROW {
+                bail!("the beta page's {row} row: {} cards, at most {BETA_ROW}", beta.len());
             }
             for col in SCHOOLS {
                 if cards.iter().filter(|a| a.school == col).count() > 1 {
@@ -2980,6 +3142,33 @@ mod tests {
         let c = super::Content::builtin();
         assert!(c.items.len() >= 5);
         assert!(c.mob("grunt").is_some());
+    }
+
+    /// The built-in rules with one more ability (TOML, an `[[ability]]` table's fields), checked.
+    fn with(extra: &str) -> anyhow::Result<()> {
+        let mut c = super::Content::dev();
+        let a: super::AbilityDef = toml::from_str(extra).expect("a test ability");
+        c.abilities.push(a);
+        c.validate_abilities()
+    }
+
+    #[test]
+    fn recasts_dashes_through_and_empowers_are_checked_as_they_load() {
+        let base = "key = \"t_a\"\nname = \"A\"\nschool = \"mage\"\nslot = \"ranged\"\nbench = true\nspell = 1\n";
+        // A recast must be an inner ability, with its window.
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"fire_blast\"\nrecast_secs = 3.0")).is_ok());
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"fire_blast\"")).is_err(), "no window");
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"fireball\"\nrecast_secs = 3.0")).is_err(), "a card, not inner");
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"nothing\"\nrecast_secs = 3.0")).is_err(), "no such ability");
+        assert!(with(&format!("{base}kind = \"nova\"\nrecast_to_start = true")).is_err(), "only a blink or a leap goes back");
+        // Only a dash goes through.
+        assert!(with(&format!("{base}kind = \"dash\"\nthrough = true")).is_ok());
+        assert!(with(&format!("{base}kind = \"leap\"\nthrough = true")).is_err());
+        // An empower names a base card with an EX version.
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"fireball\", secs = 4.0 }}")).is_ok());
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"pyroblast\", secs = 4.0 }}")).is_err(), "an EX version");
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"meteor\", secs = 4.0 }}")).is_err(), "no EX version");
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"fireball\", secs = 0.0 }}")).is_err(), "no time");
     }
 }
 

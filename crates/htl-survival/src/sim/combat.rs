@@ -442,6 +442,7 @@ impl Survival {
             lunge: m.lunge,
             stamina: w.stamina * m.stamina * if heavy { h.stamina } else { 1.0 },
             art: None,
+            from: m.from.clone(),
         }
     }
 
@@ -492,6 +493,7 @@ impl Survival {
             lunge: d.lunge,
             stamina: d.stamina,
             art: None,
+            from: None,
         };
         if let Some(p) = self.players.get_mut(&id) {
             p.combo_next = 0;
@@ -1195,7 +1197,12 @@ impl Survival {
             // stagger doesn't undo it.
             let before = self.mobs.get(&mid).map(|m| (m.phase, m.stagger_until));
             if damage > 0 {
-                self.hurt_mob(mid, id, damage);
+                let label = match strike.kind {
+                    StrikeKind::Bash => "Shield Bash",
+                    StrikeKind::Kick => "Kick",
+                    _ => "Melee",
+                };
+                self.hurt_mob_as(mid, id, damage, label);
             }
             if damage > 0 && !self.content.mobs[self.mobs[&mid].def].totem {
                 let v = if strike.heavy() { self.content.valor.heavy } else { self.content.valor.light };
@@ -1283,7 +1290,7 @@ impl Survival {
         self.events.push(Event::Swing { attacker: id, victim: Some(victim), damage: landed, outcome, anim: false, style: Blow::Light });
         self.trade_blows(id, victim);
         if landed > 0 {
-            self.hurt_player(victim, landed);
+            self.hurt_player_by(victim, landed, id, if strike.kind == StrikeKind::Kick { "Kick" } else { "Shield Bash" });
         }
         if !self.players.get(&victim).is_some_and(|p| p.health > 0) {
             return;
@@ -1418,7 +1425,17 @@ impl Survival {
                 return;
             }
         }
+        let before = self.players.get(&s.victim).map_or(0, |p| p.health);
         let out = self.strike_player(s.attacker, s.victim, s.damage, s.from, s.blockable, s.heavy, s.parryable, s.style);
+        // What landed, on a hero striker's meter.
+        let after = self.players.get(&s.victim).map_or(0, |p| p.health);
+        if self.players.contains_key(&s.attacker) {
+            let label = match s.follow {
+                Follow::Ability { ability, .. } => self.content.abilities[ability].name.clone(),
+                _ => "Melee".to_string(),
+            };
+            self.meter_dealt(s.attacker, s.victim, before.saturating_sub(after), &label);
+        }
         // A guard that blocked a crushing blow (Sundering Blow) pays for it many times over.
         if let (Outcome::Blocked, Follow::Ability { ability, .. }) = (out, &s.follow) {
             let ability = *ability;
@@ -1728,9 +1745,13 @@ impl Survival {
     pub(crate) fn hurt_player(&mut self, id: Id, damage: u32) {
         // A frozen hero's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(id, damage);
+        // Cheating death: a blow that would fell them leaves them at 1 health (the boon spent).
+        let damage = self.cheat_death(id, damage);
         let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
+        let before = p.health;
         p.health = p.health.saturating_sub(damage);
+        let lost = before - p.health;
         // Hurt is in the fight: no healing in the field for a while.
         if damage > 0 {
             p.combat_at = now;
@@ -1739,6 +1760,7 @@ impl Survival {
         // A hit spoils a meal or a gather.
         let interrupted = matches!(p.action, Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
         self.events.push(Event::Health { id, health: h, max: m });
+        self.meter_taken(id, lost);
         if h == 0 {
             self.die(id);
         } else if interrupted {
@@ -1756,6 +1778,10 @@ impl Survival {
             self.unmark(m.mark);
             // A grounding totem near where it lands takes it.
             if self.grounded_at(m.at) {
+                continue;
+            }
+            // A hero in a mirror's stance where it comes down turns it back at the creature.
+            if self.mirror_missile(&m) {
                 continue;
             }
             // Its splash or burst where it comes down.
