@@ -461,6 +461,8 @@ fn grappling_hook_hauls_you_to_the_foe_it_bites_and_harpoon_drags_the_foe_to_you
     let at = s.players[&p].pos;
     assert!(at[0] > 7.0 && at[0] < 10.0, "hauled up to it: {at:?}");
     // The EX the other way round: it comes to her.
+    // (The first one out of the way.)
+    s.mobs.get_mut(&g).unwrap().pos = [at[0], 20.0, 0.0];
     let h = mob(&mut s, [at[0] + 7.0, 0.0, 0.0]);
     run(&mut s, 1.0);
     let mut ev = cast(&mut s, p, "ranged", true);
@@ -569,8 +571,8 @@ fn soul_chain_binds_up_to_three_foes() {
     let mut s = world(true, false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let a = mob(&mut s, [8.0, 0.0, 0.0]);
-    let b = mob(&mut s, [8.0, 4.0, 0.0]);
-    let c = mob(&mut s, [8.0, -4.0, 0.0]);
+    let b = mob(&mut s, [8.0, 2.5, 0.0]);
+    let c = mob(&mut s, [8.0, -2.5, 0.0]);
     ready(&mut s, p, "soul_chain");
     let mut ev = cast(&mut s, p, "ultimate", false);
     ev.extend(run(&mut s, 0.6));
