@@ -2754,11 +2754,11 @@ impl Content {
             if !SLOTS.contains(&a.slot.as_str()) {
                 bail!("{what}: slot {:?} (one of {SLOTS:?})", a.slot);
             }
-            if a.school != "core" && !SCHOOLS.contains(&a.school.as_str()) {
-                bail!("{what}: school {:?} (core or one of {SCHOOLS:?})", a.school);
+            if a.school != "core" && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
+                bail!("{what}: school {:?} (core, {BETA} or one of {SCHOOLS:?})", a.school);
             }
-            if !a.is_ex() && !a.inner && !SCHOOLS.contains(&a.school.as_str()) {
-                bail!("{what}: a card needs its column, `school` (one of {SCHOOLS:?})");
+            if !a.is_ex() && !a.inner && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
+                bail!("{what}: a card needs its column, `school` (one of {SCHOOLS:?}, or {BETA} for the beta page)");
             }
             if a.kind == "art" && a.weapon <= 0.0 {
                 bail!("{what}: a weapon art needs its share of the weapon's damage (`weapon`)");
@@ -2916,11 +2916,14 @@ impl Content {
                 }
             }
         }
-        // The board: four cards a row at most, one a column.
+        // The board: a card a column at most in each row; the beta page, four a row.
         for row in SLOTS {
-            let cards: Vec<&AbilityDef> = self.abilities.iter().filter(|a| a.on_board() && a.slot == row).collect();
+            let (beta, cards): (Vec<&AbilityDef>, Vec<&AbilityDef>) = self.abilities.iter().filter(|a| a.on_board() && a.slot == row).partition(|a| a.is_beta());
             if cards.len() > SCHOOLS.len() {
                 bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len());
+            }
+            if beta.len() > BETA_ROW {
+                bail!("the beta page's {row} row: {} cards, at most {BETA_ROW}", beta.len());
             }
             for col in SCHOOLS {
                 if cards.iter().filter(|a| a.school == col).count() > 1 {

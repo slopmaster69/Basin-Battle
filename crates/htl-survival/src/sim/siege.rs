@@ -724,7 +724,9 @@ impl Survival {
     pub(crate) fn fresh_kit(&mut self, id: Id) {
         let Some(p) = self.players.get(&id) else { return };
         let class = p.class.clone();
-        let (loadout, owned) = self.fresh_abilities(&class);
+        let (loadout, mut owned) = self.fresh_abilities(&class);
+        // Siege leaves the beta page out (a dev build owns it elsewhere).
+        owned.retain(|k| !self.content.ability(k).is_some_and(|a| self.content.abilities[a].is_beta()));
         let c = self.content.clone();
         let item = |k: &str| c.item(k).unwrap_or(0);
         self.cancel_preview(id);
@@ -1360,10 +1362,10 @@ impl Survival {
         }
     }
 
-    /// What a board card costs here (in a match), by its row.
+    /// What a board card costs here (in a match), by its row (a beta card: none, it isn't sold).
     pub(crate) fn card_price(&self, key: &str) -> Option<u32> {
         let d = self.siege_def()?;
-        let a = self.content.ability(key)?;
+        let a = self.content.ability(key).filter(|a| !self.content.abilities[*a].is_beta())?;
         d.cards.get(&self.content.abilities[a].slot).copied()
     }
 
