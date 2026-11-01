@@ -2732,6 +2732,15 @@ impl Content {
             if !CC_KINDS.contains(&e.kind.as_str()) && !OTHER_EFFECTS.contains(&e.kind.as_str()) {
                 bail!("{what}: no effect {:?} (one of {CC_KINDS:?} or {OTHER_EFFECTS:?})", e.kind);
             }
+            if e.wall_stun < 0.0 || (e.wall_stun > 0.0 && e.kind != "knockback") {
+                bail!("{what}: only a knockback stuns against a wall (`wall_stun`)");
+            }
+            if !e.pop.is_empty() && e.kind != "shield" {
+                bail!("{what}: only a shield bursts as it ends (`pop`)");
+            }
+            if e.kind == "cheat_death" && !(0.0..=1.0).contains(&e.amount) {
+                bail!("{what}: cheat_death mends a share of their health (`amount`, 0 to 1)");
+            }
             Ok(())
         };
         for a in &self.abilities {
@@ -2814,7 +2823,50 @@ impl Content {
             if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
                 bail!("{what}: an empower needs its `secs`");
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects) {
+            // The beta page's mechanics.
+            let tether = a.tether_secs > 0.0;
+            if a.yank && !matches!(a.kind.as_str(), "projectile" | "shot") {
+                bail!("{what}: only a projectile or a shot pulls its caster after it (`yank`)");
+            }
+            if (a.swap || tether) && a.kind != "projectile" {
+                bail!("{what}: only a projectile swaps places (`swap`) or binds (`tether_secs`)");
+            }
+            if u8::from(a.yank) + u8::from(a.swap) + u8::from(tether) > 1 {
+                bail!("{what}: a projectile yanks, swaps or binds: one of `yank`, `swap` and `tether_secs`");
+            }
+            if (a.yank || a.swap || tether) && (a.returns || a.lob || a.fuse > 0.0 || a.pierce > 0 || a.count > 1) {
+                bail!("{what}: a yank, a swap or a tether is one projectile that stops at what it strikes (no `returns`, `lob`, `fuse`, `pierce` or `count`)");
+            }
+            if a.swap && a.chain > 0 {
+                bail!("{what}: a swap goes with one (no `chain`)");
+            }
+            if tether != (a.tether_range > 0.0) || a.tether_secs < 0.0 {
+                bail!("{what}: a tether needs how long it binds (`tether_secs`) and how far it lets them go (`tether_range`)");
+            }
+            if !tether && !a.tether_effects.is_empty() {
+                bail!("{what}: `tether_effects` with no tether (`tether_secs`)");
+            }
+            if a.rewind && a.kind != "buff" {
+                bail!("{what}: only a buff leaves an echo to come back to (`rewind`)");
+            }
+            if a.rewind && a.recast.is_empty() == (a.rewind_secs <= 0.0) {
+                bail!("{what}: an echo is come back to by its recast (`recast`) or after a while (`rewind_secs`): one of them");
+            }
+            if !a.rewind && a.rewind_secs > 0.0 {
+                bail!("{what}: `rewind_secs` with no echo (`rewind`)");
+            }
+            if a.launch < 0.0 || (a.launch > 0.0 && a.kind != "trap") {
+                bail!("{what}: only a trap launches (`launch`)");
+            }
+            if !a.end_burst.is_empty() && a.linger <= 0.0 {
+                bail!("{what}: only lingering ground bursts as it ends (`end_burst` needs `linger`)");
+            }
+            if let Some(c) = a.counter.as_ref().filter(|c| c.mirror) {
+                if c.block || c.dodge || c.immune || c.absorb_heal > 0.0 || !c.reflect.is_empty() || c.melee_only {
+                    bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
+                }
+            }
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {
@@ -2845,6 +2897,15 @@ impl Content {
                 }
                 if !r.recast.is_empty() {
                     bail!("{what}: its recast {} can't have a recast of its own", a.recast);
+                }
+            }
+            // A burst as ground ends, or as a shield does, is a nova (a shield's with its own reach).
+            let pops = a.effects.iter().chain(&a.self_effects).filter(|e| !e.pop.is_empty()).map(|e| (&e.pop, true));
+            for (k, own) in std::iter::once((&a.end_burst, false)).filter(|(k, _)| !k.is_empty()).chain(pops) {
+                let Some(b) = self.ability(k) else { bail!("{what}: bursts as {k}, no such ability") };
+                let b = &self.abilities[b];
+                if b.kind != "nova" || (own && b.radius[1] <= 0.0) {
+                    bail!("{what}: bursts as {k}, which must be a `nova`{}", if own { " with its `radius`" } else { "" });
                 }
             }
             // An empower names a base card with an EX version (the one it makes free).
