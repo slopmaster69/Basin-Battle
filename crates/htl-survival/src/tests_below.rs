@@ -1196,6 +1196,9 @@ fn a_harder_dungeons_foes_are_tougher_by_its_tier_and_the_book_lists_the_easiest
     let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let tiers: Vec<u32> = s.book_dungeons().iter().map(|b| b.tier).collect();
     assert!(tiers.windows(2).all(|w| w[0] <= w[1]) && tiers.first() == Some(&1) && tiers.last() == Some(&3), "{tiers:?}");
+}
+
+#[test]
 fn a_sets_words_count_its_pieces_not_their_honed_copies() {
     let c = Content::builtin();
     let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
