@@ -2970,7 +2970,7 @@ effects = [{ kind = "stagger", secs = [1.5, 1.5] }]
 [[ability]]
 key = "backstab"
 name = "Backstab"
-text = "A quick stab (0.25 s) for 120% of your weapon's damage, three times that from behind; it uses up a Mark for a critical hit, half again."
+text = "A quick stab (0.25 s) for 120% of your weapon's damage, three times that from behind; on a foe Marked by your Fan of Knives it crits for half again."
 icon = "Ability_BackStab"
 school = "rogue"
 slot = "close"
@@ -3879,7 +3879,7 @@ clip = 53
 [[ability]]
 key = "fan_of_knives"
 name = "Fan of Knives"
-text = "Flick three poisoned knives in a fan. Up close all three hit, each poisoning; from farther off only one does, so get in their face first. Two in hand."
+text = "Flick three poisoned knives in a fan. Up close all three hit, each poisoning and Marking: a Backstab on a Marked foe crits. From farther off only one lands, so get in their face first. Two in hand."
 icon = "INV_ThrowingKnife_04"
 school = "rogue"
 slot = "ranged"
@@ -3898,7 +3898,8 @@ spell = 25748
 clip = 107
 # Per knife, so all three in one foe is the 6 of any other ability.
 valor_hit = 2.0
-effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }]
+# Each knife also Marks (6 s): a Backstab on a Marked foe crits, the rogue's opener.
+effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }, { kind = "mark", secs = [6.0, 6.0], amount = 0.1 }]
 
 [[ability]]
 key = "crippling_throw"
