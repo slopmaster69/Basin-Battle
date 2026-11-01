@@ -125,6 +125,18 @@ const BACK_OFF: f32 = 3.0;
 const THINK: f32 = 0.25;
 /// A creature this near home after a chase is back.
 const HOME: f32 = 2.0;
+/// ...and on home's own floor: not this far above or below it with a floor between (a deck over a
+/// hold is another floor).
+const HOME_RISE: f32 = 3.0;
+/// The steepest a creature's walk goes up or down (rise over run), as the land's own walks.
+const WALK_SLOPE: f32 = 1.2;
+/// And a body thrown or pulled along the ground (a stair at a time: `slide_end`'s steps).
+const SLIDE_SLOPE: f32 = 3.75;
+/// A drop this much more than a walk makes over the ground it covered is a fall off its floor
+/// (through a gap in a deck, over its edge, to the hold below).
+const FALL: f32 = 1.5;
+/// Below, a creature that drops more than this at once has fallen through its floor.
+const FELL_THROUGH: f32 = 4.0;
 /// A chase goes this far past the leash after a foe still in it (the leash is how far from home
 /// the foe may be, so a hero shooting from just past it still draws the fight to them), and the
 /// creature itself never more than twice that past.
@@ -142,6 +154,20 @@ const SPREAD_STEP: f32 = 0.6;
 const TOP: f32 = 1.0e4;
 
 impl Survival {
+    /// Whether a creature at `pos` is on another floor than its home's: well above or below it,
+    /// with a floor between them (under the deck its home is on, or up on one over it). Ground
+    /// with no floors over floors has none.
+    fn off_home_floor(&self, pos: Vec3, home: Vec3) -> bool {
+        let (lo, hi) = if pos[2] < home[2] { (pos[2], home[2]) } else { (home[2], pos[2]) };
+        // (The higher one's own floor counts as between.)
+        hi - lo > HOME_RISE && (self.land.slab_between(pos[0], pos[1], lo, hi + 0.1) || self.land.slab_between(home[0], home[1], lo, hi + 0.1))
+    }
+
+    /// A creature at `pos` is home: near it, on its floor.
+    fn at_home(&self, pos: Vec3, home: Vec3) -> bool {
+        dist2d(pos, home) <= HOME && !self.off_home_floor(pos, home)
+    }
+
     /// A foe's health: its own times `combat.foe_health` (a critter, a dummy or a totem as it is).
     pub(crate) fn base_health(&self, def: usize) -> u32 {
         let d = &self.content.mobs[def];
@@ -993,10 +1019,12 @@ impl Survival {
 
     /// Move along the current path.
     fn walk(&mut self, id: Id, dt: f32) {
+        let below = self.is_below();
         let Some(m) = self.mobs.get_mut(&id) else { return };
         if m.path.is_empty() || m.speed <= 0.0 {
             return;
         }
+        let start = m.pos;
         let mut left = m.speed * dt;
         while left > 0.0 && !m.path.is_empty() {
             let next = m.path[0];
@@ -1012,8 +1040,17 @@ impl Survival {
                 left = 0.0;
             }
         }
+        let walked = m.speed * dt - left;
         let (x, y, was) = (m.pos[0], m.pos[1], m.pos[2]);
-        let z = self.land.height_near(x, y, was);
+        let leg_end = m.path.first().map(|p| p[2]);
+        let mut z = self.land.height_near(x, y, was);
+        // Below, partway along a leg that ends on the floor it's on, it doesn't drop to the floor
+        // under it: the way was looked over every half yard and found whole, and a gap between two
+        // of those looks (a slit in a deck's planks, a corner of its edge) is stepped over, not
+        // fallen through to the hold, where it would stand under its foe with no way back up.
+        if below && leg_end.is_some_and(|e| e - z > FALL) && was - z > FALL + WALK_SLOPE * walked {
+            z = was;
+        }
         // Stepping round a foe: turned to them, not the way it goes.
         let face = m.sidle.and_then(|h| self.players.get(&h)).map(|p| p.pos);
         let m = self.mobs.get_mut(&id).unwrap();
@@ -1024,6 +1061,44 @@ impl Survival {
         if m.path.is_empty() {
             m.sidle = None;
         }
+        // Below, fallen through its floor however it came to (more of a drop at once than any walk
+        // or slide makes): back where it stood, in whatever fight it was in; on its way home, home.
+        if below && start[2] - z > FELL_THROUGH.max(FALL + SLIDE_SLOPE * walked) {
+            let to = if matches!(m.state, MobState::Return) { m.home } else { start };
+            self.set_back(id, to, "fell through the floor");
+        }
+    }
+
+    /// Below: a creature fallen through its floor, or cut off from its foe and its home alike, set
+    /// down at `at` at once (everyone sees it there), its walk dropped and its fight kept. The log
+    /// says so, so that the next time can be looked into.
+    fn set_back(&mut self, id: Id, at: Vec3, why: &str) {
+        let Some(m) = self.mobs.get_mut(&id) else { return };
+        let was = m.pos;
+        m.pos = at;
+        m.path.clear();
+        m.speed = 0.0;
+        m.sidle = None;
+        m.plan_to = None;
+        m.lost_at = None;
+        let (face, def) = (m.facing, m.def);
+        self.events.push(Event::MobStop { id, pos: at, facing: face });
+        let line = format!(
+            "{} {why} at ({:.1}, {:.1}, {:.1}): put back at ({:.1}, {:.1}, {:.1})",
+            self.content.mobs[def].name, was[0], was[1], was[2], at[0], at[1], at[2]
+        );
+        self.events.push(Event::Log(line));
+    }
+
+    /// Whether a creature can't get home from where it stands: not there (on home's floor), no
+    /// straight walk and no way round. Only a land that searches can tell.
+    fn cut_off(&self, id: Id) -> bool {
+        let Some(m) = self.mobs.get(&id) else { return false };
+        let (pos, home) = (m.pos, m.home);
+        if !self.land.plans() || self.at_home(pos, home) {
+            return false;
+        }
+        !self.land.walk_clear(pos, home) && self.land.path(pos, home).is_none_or(|p| p.is_empty())
     }
 
     fn go(&mut self, id: Id, to: Vec3, speed: f32) {
@@ -1033,7 +1108,9 @@ impl Survival {
         let from = m.pos;
         // Straight only where a walker could: nothing solid in the way (a trunk, a wall) and no
         // slope too steep (a cliff); else round by the land's own way.
-        let straight = self.land.walk_clear(from, to) || dist2d(from, to) < 0.8;
+        // (A step away is straight too, but only on its own floor: a spot under the deck it stands
+        // on, a step off, is no step down.)
+        let straight = self.land.walk_clear(from, to) || (dist2d(from, to) < 0.8 && (to[2] - from[2]).abs() < FALL);
         // On a searched way to about the same place, at the same pace: it keeps to it (a search
         // is dear; a chase asks again every quarter second).
         if !straight && !m.path.is_empty() && (m.speed - speed).abs() < 0.01 && m.plan_to.is_some_and(|p| dist2d(p, to) <= (0.08 * dist2d(from, to)).max(1.5)) {
@@ -1044,6 +1121,12 @@ impl Survival {
         } else {
             match self.land.path(from, to) {
                 Some(p) if !p.is_empty() => p,
+                // Below, on its way home with no way there (under its floor, cut off): put back
+                // home, not walked through the rock to it (nor stopped under it, short of it).
+                _ if matches!(m.state, MobState::Return) && self.is_below() && self.land.plans() => {
+                    self.set_back(id, to, "found no way home");
+                    return;
+                }
                 // No way there: a chase stands rather than walking through the wall or up the cliff
                 // (and gives up if it stays like this); a raider on its march, one on its way
                 // home, or on a land that doesn't search, goes straight.
@@ -1292,6 +1375,13 @@ impl Survival {
                     self.raider_next(id);
                     return;
                 }
+                // Below, at rest on another floor than its home's (under the deck it lives on,
+                // where no hero sees it and it sees none): it goes home, by a way there or put back.
+                if self.is_below() && self.mobs[&id].path.is_empty() && self.off_home_floor(pos, home) {
+                    self.mobs.get_mut(&id).unwrap().state = MobState::Return;
+                    self.go(id, home, d.run_speed);
+                    return;
+                }
                 // Notice a hero in sight.
                 if d.aggro > 0.0 {
                     let seen = self
@@ -1318,7 +1408,8 @@ impl Survival {
                 }
             }
             MobState::Return => {
-                if dist2d(pos, home) <= HOME {
+                // (Home on its own floor: not stopped short under the deck it lives on.)
+                if self.at_home(pos, home) {
                     self.halt(id);
                     // Its fight is over: back to its own health.
                     let own = (self.grows_with_fight(id) && self.mobs[&id].fighters > 1).then(|| self.base_health(self.mobs[&id].def));
@@ -1376,6 +1467,12 @@ impl Survival {
                     return;
                 };
                 let lost = self.mobs[&id].lost_at.is_some_and(|t| now - t > LOST_SECS);
+                // Below, with no way to its foe nor home (fallen under its floor): put back home,
+                // still in the fight, not given up and left where nobody can reach it.
+                if lost && !raider && self.is_below() && self.cut_off(id) {
+                    self.set_back(id, home, "found no way to its foe nor home");
+                    return;
+                }
                 if !raider && (lost || self.leashed(home, pos, to, d.leash)) {
                     self.give_up(id);
                     return;
