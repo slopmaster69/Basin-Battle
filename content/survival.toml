@@ -4727,8 +4727,8 @@ radius = [4.0, 4.0]
 secs = 2.0
 tick = 0.5
 cooldown = 9.0
-spell = 20230
-aura = 20230
+spell = 1680
+aura = 9632
 tick_spell = 779
 # A beam walks at the aiming pace; the spin's haste brings it near a run (70%).
 self_effects = [{ kind = "haste", secs = [2.0, 2.0], amount = 0.6 }]
@@ -4747,8 +4747,8 @@ range = [4.0, 4.0]
 radius = [4.0, 4.0]
 secs = 3.0
 tick = 0.5
-spell = 20230
-aura = 20230
+spell = 1680
+aura = 9632
 tick_spell = 779
 self_effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.6 }, { kind = "steadfast", secs = [3.0, 3.0], amount = 1.0 }]
 
