@@ -1544,6 +1544,9 @@ local function SkinBoard()
         crest:SetPoint("RIGHT", r, "LEFT", -3, 1)
         local cr, cg, cb = r:GetTextColor()
         crest:SetVertexColor(cr, cg, cb, 0.95)
+        -- (Put away with the class heads while the beta page is up.)
+        tree.crests = tree.crests or {}
+        table.insert(tree.crests, crest)
       elseif t == "Reach the foe" or t == "In the brawl" or t == "Move, control" or t == "Stay alive, punish"
         or t == "The whole Valor bar" then
         -- A row's line: kept clear of the first card.

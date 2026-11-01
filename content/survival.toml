@@ -4553,6 +4553,770 @@ tick_spell = 16914
 clip = 54
 tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }, { kind = "knockback", amount = 3.0, lift = 2.0 }]
 
+# -------------------------------------------------------------------------------- Beta page --
+# The board's second page (`school = "beta"`): cards any class can put on its row's key, free to
+# take from the board, there to be tried out. Battlerite's skill shots, Supervive's movement toys,
+# WoW's "oh no" moments: each does one thing no class card does. Siege leaves them out. They keep
+# to their row's damage and crowd-control budgets like any card (tests_classes.rs), but count
+# toward no class. Eight of them stand on engine pieces of their own (the hook's yank, the orb's
+# swap, the wall stun, the echo, the pad, cheating death, the mirror, the chain), and a Bubble pops
+# and a Black Hole collapses as they end.
+
+# Q: a spike that bounces, harder each time.
+[[ability]]
+key = "ricochet"
+name = "Ricochet"
+text = "A spike shot along the reticle that bounces from what it strikes to the nearest other foe within 8 yd, three times, and every bounce hits harder: 7, then 9, 11, 14. Weak on one, vicious in a crowd."
+icon = "Spell_Nature_Thorns"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [7.0, 7.0]
+range = [26.0, 26.0]
+radius = [0.4, 0.4]
+# (The thorn spike's own speed.)
+speed = 40.0
+chain = 3
+chain_range = 8.0
+# Each bounce ×1.25: 7 + 8.75 + 10.9 + 13.7 = 40 into a crowd, under the poke's 45.
+chain_falloff = 1.25
+cooldown = 5.0
+spell = 28614
+clip = 107
+
+[[ability]]
+key = "pinball"
+name = "Pinball"
+ex_of = "ricochet"
+text = "Five bounces, each harder than the last, and everything it strikes is stunned for a moment (0.75 s, less on heroes). Into a pack it ends at 21 a hit."
+icon = "Spell_Nature_StarFall"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [7.0, 7.0]
+range = [26.0, 26.0]
+radius = [0.4, 0.4]
+speed = 40.0
+chain = 5
+chain_range = 8.0
+chain_falloff = 1.25
+spell = 28615
+clip = 107
+# (Every bounce stuns: the engine can't single out the last one.)
+effects = [{ kind = "stun", secs = [0.75, 0.75] }]
+
+# Q: a heavy bolt that drags the crowd onto the one it strikes.
+[[ability]]
+key = "gravity_lance"
+name = "Gravity Lance"
+text = "A heavy bolt of shadow along the reticle (up to 24 yd). Where it strikes, every other foe within 5 yd is dragged into the one it hit, and all of them take 14. Bunch them up for any area card."
+icon = "Spell_Arcane_StarFire"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [14.0, 14.0]
+range = [24.0, 24.0]
+radius = [0.5, 0.5]
+# (The shadow missile's own speed.)
+speed = 50.0
+splash = 5.0
+cooldown = 8.0
+spell = 21064
+impact_kit = 2709
+clip = 107
+effects = [{ kind = "pull", amount = 5.0, lift = 3.0 }]
+
+[[ability]]
+key = "collapse"
+name = "Collapse"
+ex_of = "gravity_lance"
+text = "A wider pull (6 yd) that hits 16, and everything it drags in is slowed 70% for 2 s: they stay in the heap."
+icon = "Spell_Shadow_BlackPlague"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [16.0, 16.0]
+range = [24.0, 24.0]
+radius = [0.5, 0.5]
+speed = 50.0
+splash = 6.0
+spell = 21064
+impact_kit = 2709
+clip = 107
+# A slow, not a root: a root (or a stun) after the pull would stop a creature where it stands,
+# and one before it would hold it there; slowed first, it's dragged in all the same.
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.7 }, { kind = "pull", amount = 6.0, lift = 3.0 }]
+
+# Q: a hook that hauls you to whatever it bites.
+[[ability]]
+key = "grappling_hook"
+name = "Grappling Hook"
+text = "Fire a hook along the reticle (up to 24 yd). Whatever it bites, a wall, the ground or a foe, you're hauled to it; a foe also takes 10 and staggers. Miss and nothing happens. Your way up a cliff, across a gap, or into their face."
+icon = "Ability_Hunter_Pathfinding"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [10.0, 10.0]
+range = [24.0, 24.0]
+radius = [0.35, 0.35]
+speed = 60.0
+yank = true
+cooldown = 8.0
+spell = 6533
+clip = 107
+effects = [{ kind = "stagger", secs = [0.4, 0.4] }]
+
+[[ability]]
+key = "harpoon"
+name = "Harpoon"
+ex_of = "grappling_hook"
+text = "The other way round: the foe it bites is dragged all the way to you, takes 12 and is slowed 40% for 2 s."
+icon = "INV_Spear_04"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [12.0, 12.0]
+range = [24.0, 24.0]
+radius = [0.35, 0.35]
+speed = 60.0
+spell = 6533
+clip = 107
+effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
+
+# Q: a slow orb that trades places.
+[[ability]]
+key = "displacer_orb"
+name = "Displacer Orb"
+text = "A slow, glowing orb along the reticle (up to 22 yd). Whatever it touches, foe or friend, trades places with you: 6 damage to a foe. Pull a friend out of trouble, put a foe where your friends are, or hop past a wall of them. Bosses and the unstoppable hold their ground."
+icon = "INV_Misc_Orb_02"
+school = "beta"
+slot = "ranged"
+kind = "projectile"
+damage = [6.0, 6.0]
+range = [22.0, 22.0]
+radius = [0.5, 0.5]
+# (The arcane bolt's own speed: slow enough to see coming.)
+speed = 24.0
+swap = true
+cooldown = 10.0
+spell = 13748
+burst_spell = 1953
+clip = 54
+
+[[ability]]
+key = "displacer_pulse"
+name = "Displacer Pulse"
+ex_of = "displacer_orb"
+text = "The same swap, and a foe you trade places with is left slowed 40% for 2 s, stranded where you were."
+icon = "INV_Misc_Orb_05"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [8.0, 8.0]
+range = [22.0, 22.0]
+radius = [0.5, 0.5]
+speed = 24.0
+swap = true
+spell = 13748
+burst_spell = 1953
+clip = 54
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
+
+# E: spin and keep walking.
+[[ability]]
+key = "whirlwind"
+name = "Whirlwind"
+text = "Spin for 2 s, still on the move: everything within 4 yd in front of you and to your sides takes 5 every half second. Turn to carve through a pack; press it again to stop."
+icon = "Ability_Whirlwind"
+school = "beta"
+slot = "close"
+kind = "beam"
+# 10 a second, a tick each half second, 4 yd out and 4 yd to either side.
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+radius = [4.0, 4.0]
+secs = 2.0
+tick = 0.5
+cooldown = 9.0
+spell = 1680
+aura = 9632
+tick_spell = 779
+# A beam walks at the aiming pace; the spin's haste brings it near a run (70%).
+self_effects = [{ kind = "haste", secs = [2.0, 2.0], amount = 0.6 }]
+
+[[ability]]
+key = "bladestorm"
+name = "Bladestorm"
+ex_of = "whirlwind"
+text = "Three seconds of it, and nothing staggers you while you spin: walk it through their swings."
+icon = "Ability_Warrior_Cleave"
+slot = "close"
+kind = "beam"
+valor = 25
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+radius = [4.0, 4.0]
+secs = 3.0
+tick = 0.5
+spell = 1680
+aura = 9632
+tick_spell = 779
+self_effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.6 }, { kind = "steadfast", secs = [3.0, 3.0], amount = 1.0 }]
+
+# E: up they go, and down you come.
+[[ability]]
+key = "launcher"
+name = "Launcher"
+text = "An uppercut (4 yd in front): 10 damage and the foe is thrown up, stunned 0.8 s (less on heroes). Press it again within 1.5 s to Slam: leap onto them, 14 to all within 3 yd."
+icon = "Ability_Warrior_Revenge"
+school = "beta"
+slot = "close"
+kind = "cone"
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+arc = 70.0
+cooldown = 8.0
+spell = 12294
+impact_kit = 83
+# Stunned, then thrown straight up (a yard of ground, a long air time).
+effects = [{ kind = "stun", secs = [0.8, 0.8] }, { kind = "knockback", amount = 1.0, lift = 9.0 }]
+recast = "launcher_slam"
+recast_secs = 1.5
+
+[[ability]]
+key = "launcher_slam"
+name = "Slam"
+text = "Launcher's follow-up: leap onto them."
+inner = true
+slot = "close"
+kind = "leap"
+damage = [14.0, 14.0]
+range = [10.0, 10.0]
+radius = [3.0, 3.0]
+lift = 7.0
+spell = 16979
+impact_kit = 1666
+
+[[ability]]
+key = "juggle"
+name = "Juggle"
+ex_of = "launcher"
+text = "A harder uppercut (14) that keeps them up longer (stunned 1.2 s, less on heroes); then within 2 s the Slam hits 18 and throws them 4 yd."
+icon = "Ability_Druid_Bash"
+slot = "close"
+kind = "cone"
+valor = 25
+damage = [14.0, 14.0]
+range = [4.0, 4.0]
+arc = 70.0
+spell = 12294
+impact_kit = 83
+effects = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "knockback", amount = 1.0, lift = 11.0 }]
+recast = "juggle_slam"
+recast_secs = 2.0
+
+[[ability]]
+key = "juggle_slam"
+name = "Slam"
+text = "Juggle's follow-up: leap onto them and throw them."
+inner = true
+slot = "close"
+kind = "leap"
+damage = [18.0, 18.0]
+range = [12.0, 12.0]
+radius = [3.5, 3.5]
+lift = 8.0
+spell = 16979
+impact_kit = 1666
+effects = [{ kind = "knockback", amount = 4.0 }]
+
+# E: a slash that drinks.
+[[ability]]
+key = "siphon_blade"
+name = "Siphon Blade"
+text = "A dark slash in a 4 yd arc in front of you: 12 to every foe in it, and you heal 60% of all it deals. Three foes, a potion's worth."
+icon = "Spell_Shadow_SiphonMana"
+school = "beta"
+slot = "close"
+kind = "cone"
+damage = [12.0, 12.0]
+range = [4.0, 4.0]
+arc = 100.0
+cooldown = 7.0
+drain = 0.6
+spell = 53
+impact_kit = 2709
+
+[[ability]]
+key = "soul_rend"
+name = "Soul Rend"
+ex_of = "siphon_blade"
+text = "A wider, deeper slash (5 yd, 140°): 16 to each, and every point of it comes back to you as health."
+icon = "Spell_Shadow_UnholyStrength"
+slot = "close"
+kind = "cone"
+valor = 25
+damage = [16.0, 16.0]
+range = [5.0, 5.0]
+arc = 140.0
+drain = 1.0
+spell = 53
+impact_kit = 2709
+
+# E: put them into the wall.
+[[ability]]
+key = "wall_slam"
+name = "Wall Slam"
+text = "A shoulder shove (4 yd in front): 8 damage and thrown back 6 yd. Anything that hits a wall or a rock face on the way is stunned 1.5 s (less on heroes). Line it up first."
+icon = "Ability_Warrior_PunishingBlow"
+school = "beta"
+slot = "close"
+kind = "cone"
+damage = [8.0, 8.0]
+range = [4.0, 4.0]
+arc = 70.0
+cooldown = 7.0
+spell = 6343
+impact_kit = 83
+effects = [{ kind = "knockback", amount = 6.0, wall_stun = 1.5 }]
+
+[[ability]]
+key = "haymaker"
+name = "Haymaker"
+ex_of = "wall_slam"
+text = "A full swing: 10 damage, thrown back 10 yd, and a wall stuns 2 s."
+icon = "Ability_Warrior_DecisiveStrike"
+slot = "close"
+kind = "cone"
+valor = 25
+damage = [10.0, 10.0]
+range = [4.0, 4.0]
+arc = 70.0
+spell = 6343
+impact_kit = 83
+effects = [{ kind = "knockback", amount = 10.0, wall_stun = 2.0 }]
+
+# 1: two blinks.
+[[ability]]
+key = "blink_dagger"
+name = "Blink Dagger"
+text = "Blink 12 yd to the reticle; press it again within 3 s to blink again. The most mobile card on the board, and nothing else."
+icon = "INV_Weapon_ShortBlade_05"
+school = "beta"
+slot = "utility"
+kind = "blink"
+range = [12.0, 12.0]
+cooldown = 12.0
+spell = 1856
+recast = "blink_dagger_again"
+recast_secs = 3.0
+
+[[ability]]
+key = "blink_dagger_again"
+name = "Blink Dagger"
+text = "The second blink."
+inner = true
+slot = "utility"
+kind = "blink"
+range = [12.0, 12.0]
+spell = 1856
+
+[[ability]]
+key = "phase_strike"
+name = "Phase Strike"
+ex_of = "blink_dagger"
+text = "Both blinks, and each lands with a strike: 8 to every foe within 3 yd of where you come out."
+icon = "Spell_Shadow_Twilight"
+slot = "utility"
+kind = "blink"
+valor = 25
+range = [12.0, 12.0]
+spell = 1856
+also = "phase_strike_hit"
+recast = "phase_strike_again"
+recast_secs = 3.0
+
+[[ability]]
+key = "phase_strike_again"
+name = "Phase Strike"
+text = "The second blink, and its strike."
+inner = true
+slot = "utility"
+kind = "blink"
+range = [12.0, 12.0]
+spell = 1856
+also = "phase_strike_hit"
+
+[[ability]]
+key = "phase_strike_hit"
+name = "Phase Strike"
+text = "Where a Phase Strike comes out."
+inner = true
+slot = "utility"
+kind = "ground"
+at_self = true
+damage = [8.0, 8.0]
+radius = [3.0, 3.0]
+spell = 6343
+
+# 1: through them, leaving them burning.
+[[ability]]
+key = "phase_dash"
+name = "Phase Dash"
+text = "Dash 10 yd along the reticle straight through foes, untouchable on the way: each one you pass through takes 4 and burns, 4 a second for 3 s."
+icon = "Ability_Rogue_Sprint"
+school = "beta"
+slot = "utility"
+kind = "dash"
+damage = [4.0, 4.0]
+range = [10.0, 10.0]
+cooldown = 12.0
+through = true
+invulnerable = true
+spell = 1953
+# (The burn on each foe passed stands in for a trail of fire on the ground.)
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
+
+[[ability]]
+key = "searing_dash"
+name = "Searing Dash"
+ex_of = "phase_dash"
+text = "A longer dash (14 yd), and everyone you pass through is slowed 40% for 2 s as well as burning."
+icon = "Spell_Fire_FlameShock"
+slot = "utility"
+kind = "dash"
+valor = 25
+damage = [4.0, 4.0]
+range = [14.0, 14.0]
+through = true
+invulnerable = true
+spell = 1953
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
+
+# 1: an echo to come back to.
+[[ability]]
+key = "rewind"
+name = "Rewind"
+text = "Leave an echo where you stand. Within 4 s, press it again: you snap back to the echo with the health you had when you left it (never less than now). Dive in, take the hit, undo it."
+icon = "Spell_Nature_TimeStop"
+school = "beta"
+slot = "utility"
+kind = "buff"
+rewind = true
+recast = "rewind_back"
+recast_secs = 4.0
+cooldown = 14.0
+spell = 1953
+burst_spell = 1953
+
+[[ability]]
+key = "rewind_back"
+name = "Rewind"
+text = "Back to the echo."
+inner = true
+slot = "utility"
+kind = "buff"
+spell = 1953
+
+[[ability]]
+key = "paradox"
+name = "Paradox"
+ex_of = "rewind"
+text = "The echo fights for you: when you snap back to it, everything within 4 yd of it takes 10."
+icon = "Spell_Arcane_ArcaneResilience"
+slot = "utility"
+kind = "buff"
+valor = 25
+rewind = true
+recast = "paradox_back"
+recast_secs = 4.0
+spell = 1953
+burst_spell = 1953
+
+[[ability]]
+key = "paradox_back"
+name = "Paradox"
+text = "Back to the echo, and it bursts."
+inner = true
+slot = "utility"
+kind = "nova"
+damage = [10.0, 10.0]
+radius = [4.0, 4.0]
+spell = 1449
+
+# 1: a pad for the whole party.
+[[ability]]
+key = "jump_pad"
+name = "Jump Pad"
+text = "Throw down a pad at the reticle (up to 8 yd; it lasts 8 s, two at once). You or any friend who steps on it is launched 14 yd the way they're facing. Foes can't use it."
+icon = "INV_Gizmo_RocketBoot_01"
+school = "beta"
+slot = "utility"
+kind = "trap"
+range = [8.0, 8.0]
+radius = [1.5, 1.5]
+secs = 8.0
+launch = 14.0
+cooldown = 12.0
+spell = 1953
+burst_spell = 1953
+
+[[ability]]
+key = "launch_rig"
+name = "Launch Rig"
+ex_of = "jump_pad"
+text = "A stronger pad: 20 yd, and whoever it throws lands with a shove, 6 damage and foes within 1.5 yd thrown back 3 yd."
+icon = "INV_Gizmo_02"
+slot = "utility"
+kind = "trap"
+valor = 25
+range = [8.0, 8.0]
+radius = [1.5, 1.5]
+secs = 8.0
+launch = 20.0
+damage = [6.0, 6.0]
+spell = 1953
+burst_spell = 1953
+effects = [{ kind = "knockback", amount = 3.0 }]
+
+# 2: turn the blow aside and cut back.
+[[ability]]
+key = "riposte"
+name = "Riposte"
+text = "A 0.8 s parry: the first melee blow or projectile is turned aside, and an attacker within 6 yd reels (staggered 1 s) and bleeds, 7 a second for 4 s. Caught, it's back in half the time. Read the swing."
+icon = "Ability_Parry"
+school = "beta"
+slot = "defense"
+kind = "stance"
+secs = 0.8
+cooldown = 12.0
+spell = 5277
+aura = 5277
+# (The cut is a bleed on them, 14 on a hero, whose effects run half as long: the engine has no
+# step behind a foe outside a weapon art.)
+counter = { block = true, once = true, attacker = [{ kind = "stagger", secs = [1.0, 1.0] }, { kind = "burn", secs = [4.0, 4.0], amount = 7.0, aura = 1079 }] }
+
+[[ability]]
+key = "counterstrike"
+name = "Counterstrike"
+ex_of = "riposte"
+text = "A longer parry (1.2 s), and the attacker it catches is stunned 1.2 s (less on heroes) as well as cut."
+icon = "Ability_Warrior_Riposte"
+slot = "defense"
+kind = "stance"
+valor = 25
+secs = 1.2
+spell = 5277
+aura = 5277
+counter = { block = true, once = true, attacker = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "burn", secs = [4.0, 4.0], amount = 7.0, aura = 1079 }] }
+
+# 2: not today.
+[[ability]]
+key = "cheat_death"
+name = "Cheat Death"
+text = "For 6 s, a blow that would kill you leaves you at 1 health instead, and you heal a quarter of your health over the next 3 s. Spent once it saves you."
+icon = "Spell_Shadow_RitualOfSacrifice"
+school = "beta"
+slot = "defense"
+kind = "buff"
+cooldown = 30.0
+# A dark shield round you while death is held off (Unholy Shield's; Fear Ward's showed nothing).
+spell = 6346
+effects = [{ kind = "cheat_death", secs = [6.0, 6.0], amount = 0.25, aura = 8909 }]
+
+[[ability]]
+key = "undying"
+name = "Undying"
+ex_of = "cheat_death"
+text = "Ten seconds of it, and the save heals 40%."
+icon = "Spell_Shadow_DarkRitual"
+slot = "defense"
+kind = "buff"
+valor = 25
+spell = 6346
+effects = [{ kind = "cheat_death", secs = [10.0, 10.0], amount = 0.4, aura = 8909 }]
+
+# 2: send it back.
+[[ability]]
+key = "reflect"
+name = "Reflect"
+text = "Raise a mirror for 1 s: bolts, arrows and spells that would hit you fly back at whoever threw them, at full damage. Blades still land. Time it on the cast."
+icon = "Spell_Nature_WispSplode"
+school = "beta"
+slot = "defense"
+kind = "stance"
+secs = 1.0
+cooldown = 12.0
+# Magic Reflection's mirror on the chest while it's held (Fire Ward showed nothing).
+spell = 20223
+aura = 20223
+counter = { mirror = true }
+
+[[ability]]
+key = "prism"
+name = "Prism"
+ex_of = "reflect"
+text = "A longer mirror (1.5 s), and nothing staggers you while you hold it."
+icon = "Spell_Nature_AstralRecal"
+slot = "defense"
+kind = "stance"
+valor = 25
+secs = 1.5
+# Magic Reflection's mirror on the chest while it's held (Fire Ward showed nothing).
+spell = 20223
+aura = 20223
+counter = { mirror = true }
+self_effects = [{ kind = "steadfast", secs = [1.5, 1.5] }]
+
+# 2: a bubble on a friend, or yourself.
+[[ability]]
+key = "bubble"
+name = "Bubble"
+text = "Wrap a friend along the reticle (up to 30 yd), or yourself, in a bubble that soaks 40 damage for 4 s. When it breaks or runs out it pops, throwing foes within 4 yd back."
+icon = "INV_Misc_Orb_04"
+school = "beta"
+slot = "defense"
+kind = "ally"
+range = [30.0, 30.0]
+cooldown = 14.0
+spell = 498
+effects = [{ kind = "shield", secs = [4.0, 4.0], amount = 40.0, aura = 498, pop = "bubble_pop" }]
+
+[[ability]]
+key = "bubble_pop"
+name = "Bubble"
+text = "The bubble pops: foes within 4 yd are thrown back."
+inner = true
+slot = "defense"
+kind = "nova"
+damage = [4.0, 4.0]
+radius = [4.0, 4.0]
+# A golden burst as it pops (Holy Nova).
+spell = 15237
+effects = [{ kind = "knockback", amount = 5.0 }]
+
+[[ability]]
+key = "hard_bubble"
+name = "Hard Bubble"
+ex_of = "bubble"
+text = "A thicker bubble: it soaks 70, and its pop stuns 1 s as well."
+icon = "INV_Misc_Orb_01"
+slot = "defense"
+kind = "ally"
+valor = 25
+range = [30.0, 30.0]
+spell = 498
+effects = [{ kind = "shield", secs = [4.0, 4.0], amount = 70.0, aura = 498 , pop = "hard_bubble_pop" }]
+
+[[ability]]
+key = "hard_bubble_pop"
+name = "Hard Bubble"
+text = "The bubble pops: foes within 4 yd are thrown back and stunned 1 s."
+inner = true
+slot = "defense"
+kind = "nova"
+damage = [6.0, 6.0]
+radius = [4.0, 4.0]
+# A golden burst as it pops (Holy Nova).
+spell = 15237
+effects = [{ kind = "stun", secs = [1.0, 1.0] }, { kind = "knockback", amount = 5.0 }]
+
+# 3: a singularity.
+[[ability]]
+key = "black_hole"
+name = "Black Hole"
+text = "Lob a singularity to the reticle (up to 26 yd), its landing drawn for everyone: for 3 s it drags every foe within 7 yd 3 yd toward its middle each second, 6 a second. Then it collapses: 30 damage and everything in it thrown 6 yd out. Feed it to your area cards first."
+icon = "Spell_Arcane_PortalUndercity"
+school = "beta"
+slot = "ultimate"
+kind = "projectile"
+valor = 100
+range = [26.0, 26.0]
+radius = [0.5, 0.5]
+# (The shadow orb's own speed: a slow, readable arc.)
+speed = 15.0
+lob = true
+splash = 7.0
+linger = 3.0
+linger_damage = 6.0
+cooldown = 40.0
+spell = 142
+burst_spell = 24050
+linger_spell = 27810
+clip = 54
+tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
+end_burst = "black_hole_collapse"
+
+[[ability]]
+key = "black_hole_collapse"
+name = "Black Hole"
+text = "It collapses: 30 damage and everything in it thrown 6 yd out."
+inner = true
+slot = "ultimate"
+kind = "nova"
+damage = [30.0, 30.0]
+spell = 24050
+effects = [{ kind = "knockback", amount = 6.0 }]
+
+# 3: the ground splits.
+[[ability]]
+key = "earthsplitter"
+name = "Earthsplitter"
+text = "Split the earth along your aim: a 30 yd fissure, 3 yd wide and drawn for everyone, bursts 0.8 s later with a hurled boulder. 30 damage and stunned 1.5 s (0.75 s on heroes) to all it crosses."
+icon = "Spell_Nature_EarthShock"
+school = "beta"
+slot = "ultimate"
+kind = "line"
+valor = 100
+damage = [30.0, 30.0]
+range = [30.0, 30.0]
+radius = [1.5, 1.5]
+delay = 0.8
+cooldown = 40.0
+spell = 26616
+effects = [{ kind = "stun", secs = [1.5, 1.5] }]
+
+# 3: grow into it.
+[[ability]]
+key = "avatar"
+name = "Avatar"
+text = "For 8 s you're a titan: nothing staggers you, your attacks and guard cost no stamina, your heavy attacks can't be blocked, you run 20% faster and take 20% less from everything."
+icon = "Ability_Racial_BloodRage"
+school = "beta"
+slot = "ultimate"
+kind = "buff"
+valor = 100
+cooldown = 40.0
+spell = 8913
+# (No boon adds damage yet: Onslaught's unblockable heavies and a hide of 20% stand in for it.)
+effects = [{ kind = "onslaught", secs = [8.0, 8.0] }, { kind = "haste", secs = [8.0, 8.0], amount = 0.2 }, { kind = "hallowed", secs = [8.0, 8.0], amount = 0.2 }]
+
+# 3: bound to you.
+[[ability]]
+key = "soul_chain"
+name = "Soul Chain"
+text = "Throw a chain along the reticle (up to 20 yd): it binds the foe it strikes, and up to two more within 6 yd of them, to you for 5 s, 14 damage each. Any of them who gets more than 8 yd away is yanked back to you and stunned 1.5 s (less on heroes). Then that chain breaks."
+icon = "Spell_Shadow_ShadowWordDominate"
+school = "beta"
+slot = "ultimate"
+kind = "projectile"
+valor = 100
+damage = [14.0, 14.0]
+range = [20.0, 20.0]
+radius = [0.4, 0.4]
+speed = 40.0
+chain = 2
+chain_range = 6.0
+chain_falloff = 1.0
+tether_secs = 5.0
+tether_range = 8.0
+tether_effects = [{ kind = "stun", secs = [1.5, 1.5] }]
+cooldown = 40.0
+spell = 23394
+tick_spell = 689
+clip = 54
+
+
 # --------------------------------------------------------------------------- their totems --
 
 [[mob]]
