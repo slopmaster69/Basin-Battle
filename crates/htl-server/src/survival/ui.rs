@@ -1733,6 +1733,19 @@ impl SurvivalGame {
         }
     }
 
+    /// A banner to every hero in the world (a line in chat for one without the add-on): a
+    /// restart coming.
+    pub(crate) fn warn_all(&self, title: &str, sub: &str) {
+        let conns: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
+        for c in conns {
+            if self.has_addon(c) {
+                self.ui_line(c, &format!("BN\t{}\t{}", clean(title), clean(sub)));
+            } else {
+                self.say_to(c, &format!("{title}. {sub}"));
+            }
+        }
+    }
+
     /// A word to every hero in the world.
     fn announce(&self, text: &str) {
         let conns: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();

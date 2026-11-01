@@ -5,6 +5,7 @@ pub mod fields;
 pub mod game;
 pub mod packets;
 pub mod realmd;
+pub mod restart;
 pub mod survival;
 pub mod wire;
 pub mod world;

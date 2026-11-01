@@ -32,8 +32,18 @@ fi
 # names the friend's server that does ("1.2.3.4:3724"); HTL_BOARD_NAME is this camp's name on it.
 [ -n "${HTL_BOARD:-}" ] && args+=(--board "$HTL_BOARD")
 [ -n "${HTL_BOARD_NAME:-}" ] && args+=(--board-name "$HTL_BOARD_NAME")
-# Everything the server says also goes to a log file, for looking back at a session.
+# Everything the server says also goes to a log file, for looking back at a session. A warned
+# restart (Restart Basin Battle.command) ends the server with code 75: then it's built again from
+# what's in the folder now and started again, with a new log.
 mkdir -p logs
-log="logs/host-$(date +%Y-%m-%d-%H%M%S).log"
-echo "This session's log: $log"
-target/release/htl-server "${args[@]}" "$@" 2>&1 | tee "$log"
+while true; do
+    log="logs/host-$(date +%Y-%m-%d-%H%M%S).log"
+    echo "This session's log: $log"
+    set +e
+    target/release/htl-server "${args[@]}" "$@" 2>&1 | tee -a "$log"
+    code=${PIPESTATUS[0]}
+    set -e
+    [ "$code" -eq 75 ] || exit "$code"
+    echo "Restarting on the newest build..."
+    cargo build --release -q -p htl-server || echo "The build failed: starting the last version that built."
+done

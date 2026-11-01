@@ -48,6 +48,10 @@ scripts. Windows players who only want to play can take the ready-made zip from 
    scripts/host.sh --password ember   # or choose one
    ```
 
+   To restart it after an update without dropping anyone unwarned, double-click **Restart Basin
+   Battle.command** (or run it with a number of minutes, or `cancel`): everyone playing sees a
+   countdown, the worlds are saved, and this window builds the newest version and starts it again.
+
    The server's log goes to `logs/host-<date>.log`. After each wave it writes `[balance]` lines:
    the enemies' level, health and swing, and for each hero their health, armour, the damage they
    took (hits, average, biggest and from what), falls and damage dealt.

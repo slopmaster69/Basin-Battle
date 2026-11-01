@@ -151,6 +151,8 @@ fn main() -> Result<()> {
     let password = config.password.clone();
     let public = config.public_host.clone();
     let running = htl_server::start_games(config, basin)?;
+    // The games running, each to save before a warned restart.
+    let games = basin_on as u32 + running.survival.is_some() as u32;
     println!();
     match (basin_on, running.survival) {
         (true, Some(sv)) => {
@@ -171,8 +173,19 @@ fn main() -> Result<()> {
         Some(host) => println!("  Friends on the internet connect to: {host}"),
         None => println!("  Friends outside your network: start with --public-host <your address>"),
     }
-    println!("Press Ctrl+C to stop.");
+    println!("Press Ctrl+C to stop, or double-click Restart Basin Battle to restart with a warning.");
+    // A warned restart: asked for by a file in this folder; once every game has warned its
+    // players and saved, out with the code that has the host script start it again.
+    let here = std::env::current_dir().unwrap_or_default();
+    let _ = std::fs::remove_file(here.join(htl_server::restart::REQUEST_FILE));
     loop {
-        std::thread::park();
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        if let Some(said) = htl_server::restart::poll_request(&here) {
+            println!("{said}");
+        }
+        if htl_server::restart::ready_to_exit(games) {
+            println!("[restart] restarting now");
+            std::process::exit(htl_server::restart::EXIT_RESTART);
+        }
     }
 }
