@@ -295,7 +295,8 @@ impl Board {
             .into_iter()
             .map(|((name, host), (class, ds))| Rank { name, class, host, rating: ds.values().sum::<f32>().round() as u32, dungeons: ds.len() })
             .collect();
-        out.sort_by(|a, b| b.rating.cmp(&a.rating).then(a.name.cmp(&b.name)));
+        // (Ties by name, then camp: the same every time, whatever order the map gives.)
+        out.sort_by(|a, b| b.rating.cmp(&a.rating).then(a.name.cmp(&b.name)).then(a.host.cmp(&b.host)));
         out
     }
 
@@ -618,6 +619,16 @@ mod tests {
         let ladder = b.ladder();
         assert_eq!(ladder.iter().map(|r| (r.name.as_str(), r.rating, r.dungeons)).collect::<Vec<_>>(), vec![("Ann", 278, 2), ("Bobx", 173, 1)]);
         assert_eq!(ladder[0].class, "warrior");
+        // Two Anns on two camps, alike in all else, stay apart and in the same order every time.
+        let mut twin = Run::from_wager(&solo, "Zed Camp");
+        twin.dungeon = "cathedral".into();
+        let mut b2 = Board::new(None, "here", None, vec!["stockade".into(), "cathedral".into()]);
+        b2.set_tiers(HashMap::from([("cathedral".to_string(), 3)]));
+        b2.add(Run::from_wager(&solo, "Abbey Camp"));
+        b2.add(twin);
+        for _ in 0..5 {
+            assert_eq!(b2.ladder().iter().map(|r| r.host.as_str()).collect::<Vec<_>>(), vec!["Abbey Camp", "Zed Camp"]);
+        }
         let (place, me) = b.place_of("Bobx").unwrap();
         assert_eq!((place, me.rating), (2, 173));
         assert!(b.place_of("Nobody").is_none());
