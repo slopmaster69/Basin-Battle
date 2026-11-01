@@ -5292,10 +5292,10 @@ end
 -- grey words), then the settings, each a line saying what it is with its value on a button.
 local card = CreateFrame("Frame", "ElwynnSurvivalKeys", UIParent)
 card.M, card.ROW_H, card.KEY_W = 40, 20, 190
-card.KEYS_TOP, card.SET_ROW_H = 84, 30
+card.KEYS_TOP, card.SET_ROW_H = 108, 30
 card.SET_COL = (2 * CARD_COL + 20) / 3
 card:SetWidth(2 * CARD_COL + 20 + 2 * card.M)
-card:SetHeight(card.KEYS_TOP + CARD_ROWS * card.ROW_H + 52 + 3 * card.SET_ROW_H + 70 + card.M)
+card:SetHeight(card.KEYS_TOP + CARD_ROWS * card.ROW_H + 52 + 3 * card.SET_ROW_H + 54 + card.M)
 card:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 card:SetFrameStrata("DIALOG")
 card:EnableMouse(true)
@@ -5304,7 +5304,8 @@ card.bg = card.panel
 card.bg:SetAllPoints(card)
 card.bg:SetVertexColor(0.12, 0.1, 0.08, 0.96)
 card.title = Text(card, FONT_TITLE, 22, "OUTLINE")
-card.title:SetPoint("TOP", card, "TOP", 0, -card.M + 14)
+-- Below the frame's inner rim, not on it.
+card.title:SetPoint("TOP", card, "TOP", 0, -card.M - 10)
 card.title:SetTextColor(1, 0.82, 0.45)
 card.title:SetText("Controls")
 card.hint = Text(card, FONT_BODY, 11)
@@ -5588,7 +5589,7 @@ function ES.DrawKeys()
     card.profile:SetText("The Elwynn keys fill in whatever yours leave free." .. gap)
     card.switch.label:SetText("Your own")
   else
-    card.hint:SetText("Click a key to change it. The grey ones follow from other keys.")
+    card.hint:SetText("Click a key to change it. The plain ones follow from other keys.")
     card.profile:SetText("Keys you change are kept for next time. Your own saved bindings come back when you leave Elwynn.")
     card.switch.label:SetText("Elwynn layout")
   end
