@@ -1305,6 +1305,7 @@ impl SurvivalGame {
             "board" => self.ui_board_page(conn, &arg, arg2),
             "ladder" | "rating" => self.ui_ladder_page(conn, me),
             "news" | "week" => self.ui_week_page(conn),
+            "record" | "fights" => self.ui_record_page(conn),
             "ready" => self.sim.wager_ready(me),
             "meter" => self.meter_command(conn, me, &arg),
             // The book at camp, and the lamps below.
