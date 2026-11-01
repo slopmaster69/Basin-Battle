@@ -813,7 +813,8 @@ end
 -- struck one's view (inches, seconds); a heavy one punches the camera in a little.
 local STOP = { light = 60, heavy = 115, arrow = 40 }
 local SHAKE_STRIKER = { light = { 1.0, 0.14 }, heavy = { 3.0, 0.26 }, arrow = { 0, 0 } }
-local SHAKE_STRUCK = { light = { 2.6, 0.22 }, heavy = { 6.0, 0.34 }, arrow = { 2.0, 0.2 } }
+-- Being struck shakes harder and longer than striking (play-test: it was liked, and wanted bigger).
+local SHAKE_STRUCK = { light = { 4.0, 0.3 }, heavy = { 8.5, 0.42 }, arrow = { 3.2, 0.26 } }
 local KICK = { heavy = { 0.07, 0.3 }, parry = { 0.05, 0.25 }, struck = { 0.06, 0.3 } }
 -- Our own blow's hit-stop and shake by what it is: a bash thuds, a kick shoves, a running attack
 -- lands with its weight behind it.
