@@ -20,11 +20,15 @@ EXTRACT="$ROOT/benilla/target/release/benilla-extract"
 ONLY="${1:-}"
 shift || true
 # The clips worth reading as blows, with their AnimationData names.
-declare -A NAME=(
-    [16]=AttackUnarmed [17]=Attack1H [18]=Attack2H [19]=Attack2HL [30]=Dodge [37]=JumpStart
-    [38]=Jump [39]=JumpEnd [55]=BattleRoar [57]=Special1H [58]=Special2H [59]=ShieldBash
-    [85]=Pierce [118]=SpecialUnarmed [143]=Sprint
-)
+# (A function, not an associative array: macOS's bash 3.2 has none.)
+clip_name() {
+    case "$1" in
+        16) echo AttackUnarmed ;; 17) echo Attack1H ;; 18) echo Attack2H ;; 19) echo Attack2HL ;;
+        30) echo Dodge ;; 37) echo JumpStart ;; 38) echo Jump ;; 39) echo JumpEnd ;;
+        55) echo BattleRoar ;; 57) echo Special1H ;; 58) echo Special2H ;; 59) echo ShieldBash ;;
+        85) echo Pierce ;; 118) echo SpecialUnarmed ;; 143) echo Sprint ;;
+    esac
+}
 IDS=("$@")
 [ ${#IDS[@]} -eq 0 ] && IDS=(16 17 18 19 57 58 59 85 88 118 55 30 37 38 39 143)
 
@@ -42,8 +46,8 @@ for race in Human Orc Dwarf NightElf Scourge Tauren Gnome Troll Goblin; do
         ' > /tmp/race-clips.$$ || true
         "$EXTRACT" "$WOW_DATA" m2events "$path" 2>/dev/null > /tmp/race-clips-ev.$$ || true
         while read -r m idx id tk dur; do
-            impact=$(awk -v idx="$idx" '$1 == idx { for (i = 1; i <= NF; i++) if ($i ~ /^\$AH[0-3]$|^\$CAH$/) { sub(/s$/, "", $(i-1)); print $(i-1); exit } }' /tmp/race-clips-ev.$$)
-            printf '| %s | %s %s | %s | %s | %s |\n' "$m" "$id" "${NAME[$id]:-}" "$tk" "$dur" "${impact:--}"
+            impact=$(awk -v idx="$idx" '$1 == idx { for (i = 1; i <= NF; i++) if ($i ~ /^\$C?AH[0-3]?(\(|$)/) { sub(/s$/, "", $(i-1)); print $(i-1); exit } }' /tmp/race-clips-ev.$$)
+            printf '| %s | %s %s | %s | %s | %s |\n' "$m" "$id" "$(clip_name "$id")" "$tk" "$dur" "${impact:--}"
         done < /tmp/race-clips.$$
         rm -f /tmp/race-clips.$$ /tmp/race-clips-ev.$$
     done

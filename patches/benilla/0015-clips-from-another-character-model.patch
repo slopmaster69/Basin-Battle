@@ -1,4 +1,4 @@
-From 742c7031d2dd0267fa3fe063ea14af04723d7524 Mon Sep 17 00:00:00 2001
+From 7b1a37515732416b5dec77b788b4eec5f4b24a62 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 1 Nov 2026 05:48:54 +0000
 Subject: [PATCH] A clip can come from another character model, retargeted onto
@@ -21,8 +21,8 @@ early. HasActionCombat() is 10.
  crates/benilla-ui/src/action_combat.rs        |  28 +-
  crates/benilla-world/src/rig_anim.rs          |   4 +-
  crates/benilla-world/src/rig_anim/bones.rs    | 291 +++++++++++++++++-
- crates/benilla-world/src/rig_anim/pose.rs     | 183 +++++++----
- 8 files changed, 667 insertions(+), 80 deletions(-)
+ crates/benilla-world/src/rig_anim/pose.rs     | 187 +++++++----
+ 8 files changed, 671 insertions(+), 80 deletions(-)
  create mode 100644 crates/benilla-app/src/creature_anim/action/donor.rs
 
 diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
@@ -782,7 +782,7 @@ index d49a4cb0..4663bc08 100644
 +    }
  }
 diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
-index 37b26f00..a8722307 100644
+index 37b26f00..75094ca5 100644
 --- a/crates/benilla-world/src/rig_anim/pose.rs
 +++ b/crates/benilla-world/src/rig_anim/pose.rs
 @@ -169,10 +169,29 @@ pub struct RigAnchor {
@@ -815,7 +815,7 @@ index 37b26f00..a8722307 100644
      clip: usize,
      mask: u64,
      weight: f32,
-@@ -183,77 +202,119 @@ struct Active {
+@@ -183,77 +202,123 @@ struct Active {
  
  /// Pose every live rig where `animate_targets` runs, after `advance_animations`.
  fn evaluate_rig_poses(
@@ -963,6 +963,9 @@ index 37b26f00..a8722307 100644
 -    });
 +}
 +
++/// A clip that keys nothing, standing in for one that can't be found.
++static NO_CLIP: benilla_assets::PoseClip = benilla_assets::PoseClip { bones: Vec::new() };
++
 +/// A clip of the model's own, or of the rig's [`ExtraClips`].
 +fn clip_in<'a>(
 +    src: &'a PoseSource,
@@ -985,7 +988,8 @@ index 37b26f00..a8722307 100644
 +    active: &mut [Active],
 +    rig: &mut RigPose,
 +) {
-+    let clip = |a: &Active| clip_in(src, extra, a.extra, a.clip).expect("checked when gathered");
++    // Every clip here was found when gathered; one gone since poses nothing rather than panicking.
++    let clip = |a: &Active| clip_in(src, extra, a.extra, a.clip).unwrap_or(&NO_CLIP);
      while let Some(bone) = active
          .iter()
 -        .filter_map(|a| src.clips[a.clip].bones.get(a.cursor).map(|b| b.bone))
@@ -993,7 +997,7 @@ index 37b26f00..a8722307 100644
          .min()
      {
          let bone_mask = src.bone_masks.get(bone as usize).copied().unwrap_or(0);
-@@ -261,11 +322,7 @@ fn blend_rig(src: &PoseSource, active: &mut [Active], rig: &mut RigPose) {
+@@ -261,11 +326,7 @@ fn blend_rig(src: &PoseSource, active: &mut [Active], rig: &mut RigPose) {
          let mut rotation: Option<(Quat, f32)> = None;
          let mut scale: Option<(Vec3, f32)> = None;
          for a in active.iter_mut() {
