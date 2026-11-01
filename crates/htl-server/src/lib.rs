@@ -10,6 +10,17 @@ pub mod survival;
 pub mod wire;
 pub mod world;
 
+/// How to update, for the word to a hero on something older.
+pub(crate) const HOW_TO_UPDATE: &str = "To update: on Windows, download the newest \"Basin Battle for Windows.zip\" from github.com/slopmaster69/Basin-Battle/releases; on a Mac, update the folder and open Play Basin Battle again.";
+
+/// True the first time a login is told that this add-on and client (a key naming the game, the
+/// account and what it runs) are out of date: the hello comes again on every reload and every
+/// world entered, and the word is said once a server run.
+pub(crate) fn first_told(key: String) -> bool {
+    static TOLD: std::sync::Mutex<std::collections::BTreeSet<String>> = std::sync::Mutex::new(std::collections::BTreeSet::new());
+    TOLD.lock().unwrap().insert(key)
+}
+
 // The binary has its own copy (main.rs); the library's unit tests link benilla's login code too.
 #[cfg(all(test, windows, target_env = "gnu"))]
 mod mingw_tz;
