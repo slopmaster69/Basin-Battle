@@ -761,7 +761,7 @@ impl SurvivalGame {
                     conn,
                     &format!("The Smuggler's Logbook: {}", list.join("; ")),
                 );
-                self.say_to(conn, "Each dungeon's secrets and notes: .es lore <dungeon> (deadmines, stockade, ...); a note again: .es note <note>.");
+                self.say_to(conn, "Each dungeon's notes: .es lore <dungeon> (deadmines, stockade, ...); a note again: .es note <note>.");
             }
             return;
         }
