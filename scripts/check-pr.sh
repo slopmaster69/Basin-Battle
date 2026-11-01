@@ -135,6 +135,19 @@ while IFS=$'\t' read -r where what; do
 done </tmp/check-pr-lua.$$
 rm -f /tmp/check-pr-lua.$$
 
+# --- the tools pin the same client revision as the scripts ----------------------------------------
+# The add-on harness and the clip census read benilla's own code; a different revision from
+# scripts/common.sh's would test or measure against another client than the one people play.
+pinned=$(sed -n 's/^BENILLA_REV="\([0-9a-f]*\)"/\1/p' scripts/common.sh)
+for toml in tools/*/Cargo.toml; do
+    [ -f "$toml" ] || continue
+    for rev in $(sed -n 's/.*samwhosung\/benilla", rev = "\([0-9a-f]*\)".*/\1/p' "$toml"); do
+        if [ -n "$pinned" ] && [ "$rev" != "$pinned" ]; then
+            fail "$toml" "benilla rev $rev, but scripts/common.sh pins $pinned: bump them together"
+        fi
+    done
+done
+
 # --- summary ---------------------------------------------------------------------------------------
 n=$(printf '%s\n' "$changed" | grep -c . || true)
 echo "check-pr: $n files changed against $base; $failures failures, $warnings warnings."
