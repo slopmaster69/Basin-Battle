@@ -35,6 +35,8 @@ const DT: f32 = 0.05;
 const EYE: f32 = 1.9;
 /// The band: no class's mean time on the pack more than this many times the fastest's.
 const BAND: f32 = 3.0;
+/// Farther than this from the nearest foe, the bot walks back in.
+const APPROACH: f32 = 24.0;
 const PLANS: &str = include_str!("../../../content/sim.toml");
 
 /// A fight every class plays: its name, what it is, the foes and where, and how long it may run.
@@ -155,6 +157,29 @@ struct Bot {
     want: f32,
     away: bool,
     back_until: f32,
+    /// Keys that didn't go off when pressed, left alone until then.
+    refused: BTreeMap<usize, f32>,
+}
+
+/// Press a key (its EX version with `ex`): counted as used when it went off; when it didn't (out of
+/// reach, no target, refused), left alone for a second.
+fn press(s: &mut Survival, p: Id, slot: usize, ex: bool, bot: &mut Bot, out: &mut Fight) {
+    let bar = s.bar(p);
+    let before = (s.players[&p].action.clone(), bar[slot].3.charges, s.players[&p].valor);
+    let a = if ex { bar[slot].2 } else { bar[slot].1 };
+    s.input(p, Input::Ability(slot as u8, ex));
+    let after = (s.players[&p].action.clone(), s.bar(p)[slot].3.charges, s.players[&p].valor);
+    if after == before {
+        bot.refused.insert(slot, s.clock + 1.0);
+        return;
+    }
+    if let Some(a) = a {
+        *out.casts.entry(s.content.abilities[a].name.clone()).or_default() += 1;
+    }
+}
+
+fn refused(s: &Survival, bot: &Bot, slot: usize) -> bool {
+    bot.refused.get(&slot).is_some_and(|t| *t > s.clock)
 }
 
 fn fight(c: &Content, plan: &[Rule], class: &str, style: &Style, seed: u64) -> Fight {
@@ -165,7 +190,21 @@ fn fight(c: &Content, plan: &[Rule], class: &str, style: &Style, seed: u64) -> F
     let mut out = Fight::default();
     let mut last_hp = s.players[&p].health;
     let mut t = 0.0;
+    // SIM_TRACE=1: the fight a second at a time (where everyone is, what they're doing).
+    let trace = std::env::var("SIM_TRACE").is_ok_and(|v| v == "1");
+    let mut tick = 0usize;
     while t < style.cap {
+        if trace && tick % 20 == 0 {
+            let h = &s.players[&p];
+            let foes: Vec<String> = ids
+                .iter()
+                .filter_map(|m| s.mobs.get(m))
+                .map(|m| format!("{:.0}yd {}hp {:?}", dist2d(h.pos, m.pos), m.health, m.state).chars().take(60).collect())
+                .collect();
+            let doing: String = format!("{:?}", h.action).chars().take(40).collect();
+            println!("TRACE {t:5.1} {class} at [{:.0},{:.0}] {}hp {doing} valor {:.0} | {}", h.pos[0], h.pos[1], h.health, h.valor, foes.join(" | "));
+        }
+        tick += 1;
         if ids.iter().all(|m| !alive(&s, *m)) {
             out.won = true;
             break;
@@ -221,7 +260,7 @@ fn reaches(s: &Survival, a: usize, d: f32) -> bool {
 }
 
 /// The first rule of the plan that holds, as the key to press (`None`: none does).
-fn planned(s: &Survival, p: Id, foes: &[Id], target: Id, d: f32, plan: &[Rule]) -> Option<(Rule, Option<(usize, bool)>)> {
+fn planned(s: &Survival, p: Id, foes: &[Id], target: Id, d: f32, plan: &[Rule], bot: &Bot) -> Option<(Rule, Option<(usize, bool)>)> {
     let me = s.players[&p].pos;
     let hp = s.players[&p].health as f32 / s.players[&p].max_health as f32;
     let valor = s.players[&p].valor;
@@ -246,7 +285,7 @@ fn planned(s: &Survival, p: Id, foes: &[Id], target: Id, d: f32, plan: &[Rule]) 
         }
         let Some(card) = &r.card else { continue };
         let Some((slot, ex)) = key_for(s, p, card) else { continue };
-        let ready = bar[slot].1.is_some() && bar[slot].3.charges > 0;
+        let ready = bar[slot].1.is_some() && bar[slot].3.charges > 0 && !refused(s, bot, slot);
         let a = if ex { bar[slot].2 } else { bar[slot].1 };
         let Some(a) = a else { continue };
         let affords = !ex || valor >= s.content.abilities[a].valor as f32;
@@ -272,6 +311,13 @@ fn think(s: &mut Survival, p: Id, foes: &[Id], plan: &[Rule], bot: &mut Bot, out
         let step = speed * DT;
         let to = [me[0] - yaw.cos() * step, me[1] - yaw.sin() * step, me[2]];
         s.move_player(p, to, yaw, Moving { back: true, ..Moving::default() });
+    } else if free && d > APPROACH {
+        // Drifted far off (a leap out, a step back, foes gone home past their leash): back in, as a
+        // player would.
+        let speed = s.players[&p].sent_speed.max(3.0);
+        let step = speed * DT;
+        let to = [me[0] + yaw.cos() * step, me[1] + yaw.sin() * step, me[2]];
+        s.move_player(p, to, yaw, Moving { forward: true, ..Moving::default() });
     } else if free {
         // Face the foe whenever the hands are free (never mid-dash or leap: the rules move the hero).
         s.move_player(p, me, yaw, Moving::default());
@@ -310,7 +356,7 @@ fn think(s: &mut Survival, p: Id, foes: &[Id], plan: &[Rule], bot: &mut Bot, out
             }
             bot.away = false;
             // The class's plan first.
-            if let Some((rule, key)) = planned(s, p, foes, target, d, plan) {
+            if let Some((rule, key)) = planned(s, p, foes, target, d, plan, bot) {
                 if let Some(back) = rule.then_back {
                     bot.back_until = s.clock + back;
                 }
@@ -321,9 +367,7 @@ fn think(s: &mut Survival, p: Id, foes: &[Id], plan: &[Rule], bot: &mut Bot, out
                             let here = s.players[&p].pos;
                             s.move_player(p, here, yaw + std::f32::consts::PI, Moving::default());
                         }
-                        let name = s.content.abilities[s.content.ability(rule.card.as_deref().unwrap_or("")).unwrap()].name.clone();
-                        *out.casts.entry(name).or_default() += 1;
-                        s.input(p, Input::Ability(slot as u8, ex));
+                        press(s, p, slot, ex, bot, out);
                     }
                     None => {
                         s.input(p, Input::Attack);
@@ -345,7 +389,7 @@ fn plain(s: &mut Survival, p: Id, d: f32, bot: &mut Bot, out: &mut Fight) {
     let bar = s.bar(p);
     let valor = s.players[&p].valor;
     let hp = s.players[&p].health as f32 / s.players[&p].max_health as f32;
-    let ready = |slot: usize| bar[slot].1.is_some() && bar[slot].3.charges > 0;
+    let ready = |slot: usize| bar[slot].1.is_some() && bar[slot].3.charges > 0 && !refused(s, bot, slot);
     let mut pick: Option<(usize, bool)> = None;
     if hp < 0.5 && ready(3) {
         pick = Some((3, false));
@@ -369,12 +413,7 @@ fn plain(s: &mut Survival, p: Id, d: f32, bot: &mut Bot, out: &mut Fight) {
         }
     }
     if let Some((slot, ex)) = pick {
-        let key = match (ex, bar[slot].2) {
-            (true, Some(x)) => s.content.abilities[x].name.clone(),
-            _ => s.content.abilities[bar[slot].1.unwrap()].name.clone(),
-        };
-        *out.casts.entry(key).or_default() += 1;
-        s.input(p, Input::Ability(slot as u8, ex));
+        press(s, p, slot, ex, bot, out);
     } else if d <= 3.5 {
         s.input(p, Input::Attack);
         bot.held = Some(0.0);
@@ -510,7 +549,7 @@ fn the_class_plans_read_and_name_real_cards_of_their_class() {
             assert!(r.card.is_some() != r.weapon, "{class}: a rule presses a card or swings the weapon: {r:?}");
             if let Some(card) = &r.card {
                 let a = c.ability(card).unwrap_or_else(|| panic!("{class}: no card {card}"));
-                assert_eq!(c.abilities[a].school, *class, "{class}: {card} is another class's");
+                assert_eq!(c.abilities[c.base_of(a)].school, *class, "{class}: {card} is another class's");
             }
         }
     }
