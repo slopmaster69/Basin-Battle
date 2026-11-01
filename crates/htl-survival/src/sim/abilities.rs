@@ -1041,7 +1041,9 @@ impl Survival {
     /// is struck, or caught in its burst; a chaining one leaps on.
     fn projectile_hit(&mut self, p: &Projectile, victim: Id, from: Vec3) {
         // A friend touched by light: healed, not struck.
-        if p.allies && self.players.contains_key(&victim) && !self.hostile(p.owner, victim) {
+        // (Outside Siege that's any other hero, friendly fire or not: a bolt that would both heal
+        // and hurt them heals them, as the caster meant.)
+        if p.allies && self.players.contains_key(&victim) && self.helpable(p.owner, victim) {
             self.friend_hit(p, victim);
             return;
         }
@@ -1272,7 +1274,7 @@ impl Survival {
     pub(crate) fn ally_target(&self, id: Id, range: f32, radius: f32) -> Id {
         let Some(me) = self.players.get(&id) else { return id };
         let pos = me.pos;
-        let friends: Vec<(Id, Vec3)> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && !self.hostile(id, **h)).map(|(h, p)| (*h, p.pos)).collect();
+        let friends: Vec<(Id, Vec3)> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.helpable(id, **h)).map(|(h, p)| (*h, p.pos)).collect();
         if friends.is_empty() {
             return id;
         }
@@ -1807,16 +1809,20 @@ impl Survival {
         let half = AbilityDef::at(d.radius, share);
         let (c, s) = (yaw.cos(), yaw.sin());
         let along = |at: Vec3| (at[0] - pos[0]) * c + (at[1] - pos[1]) * s;
+        // A hero it can help is a friend in it (a healing beam heals a co-op hero, friendly fire
+        // or not, and doesn't burn them); one it can't, if friendly fire lets it, a foe.
+        let heals = d.ally_heal > 0.0;
+        let friend = |h: Id| self.helpable(id, h) && (heals || !self.hostile(id, h));
         // Foes in it, nearest first: creatures (not the caster's own totems) and rival heroes.
         let mut foes: Vec<(Id, f32)> = self
             .mobs
             .iter()
             .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && combat::in_strip(pos, yaw, len, half + 0.5 * self.content.mobs[m.def].scale, m.pos))
             .map(|(mid, m)| (*mid, along(m.pos)))
-            .chain(self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.hostile(id, **h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, p)| (*h, along(p.pos))))
+            .chain(self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.hostile(id, **h) && !friend(**h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, p)| (*h, along(p.pos))))
             .collect();
         foes.sort_by(|a, b| a.1.total_cmp(&b.1));
-        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && !self.hostile(id, **h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, _)| *h).collect();
+        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && friend(**h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, _)| *h).collect();
         // Its look: to the first foe in it, else to its far end.
         if d.tick_spell != 0 {
             let to = match foes.first() {

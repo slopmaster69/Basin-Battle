@@ -268,6 +268,21 @@ impl Survival {
         self.content.pvp.friendly_fire
     }
 
+    /// Whether `a` can help hero `b` (a heal, a shield, a boon, a pull to safety): in Siege,
+    /// teammates only; elsewhere every hero, as friendly fire decides only who can be harmed.
+    pub(crate) fn helpable(&self, a: Id, b: Id) -> bool {
+        if a == b {
+            return true;
+        }
+        if !self.players.contains_key(&b) {
+            return false;
+        }
+        if self.is_siege() {
+            return !self.siege_foes(a, b);
+        }
+        true
+    }
+
     /// A hero's gold in the match.
     pub fn gold_of(&self, id: Id) -> u32 {
         self.siege.as_ref().and_then(|s| s.gold.get(&id)).copied().unwrap_or(0)

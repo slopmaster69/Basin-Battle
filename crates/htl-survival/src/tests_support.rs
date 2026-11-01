@@ -1,7 +1,9 @@
 //! Help for friends, one rule each, on abilities made for the test: an `ally` spell picks the
 //! friend on the reticle (or near it, or the caster) and gives them its heal and its boons but none
 //! of its harm; a `beam` sweeps a strip from the caster as they turn, striking every foe in it and
-//! mending every friend, until its time is up, a stun, a silence or its key again.
+//! mending every friend, until its time is up, a stun, a silence or its key again. Help reaches
+//! every other hero outside Siege, friendly fire or not (a bolt that would heal and hurt a co-op
+//! friend heals them); in Siege, partners only.
 
 use crate::content::{AbilityDef, Content};
 use crate::land::FlatLand;
@@ -17,6 +19,16 @@ fn world(pvp: bool, extra: &str) -> Survival {
     if !pvp {
         c.pvp = Default::default();
     }
+    add_abilities(&mut c, extra);
+    c.dev.full_tree = true;
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    s
+}
+
+/// Abilities (TOML `[[ability]]` tables) added to the rules, off the board.
+fn add_abilities(c: &mut Content, extra: &str) {
     #[derive(serde::Deserialize)]
     struct Extra {
         ability: Vec<AbilityDef>,
@@ -26,11 +38,6 @@ fn world(pvp: bool, extra: &str) -> Survival {
         a.bench = true;
         c.abilities.push(a);
     }
-    c.dev.full_tree = true;
-    let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
-    s.mobs.clear();
-    s.respawns.clear();
-    s
 }
 
 fn hero(s: &mut Survival, name: &str, pos: Vec3, facing: f32) -> Id {
@@ -162,15 +169,97 @@ fn help_aimed_at_nothing_finds_a_friend_near_the_reticle_or_lands_on_the_caster(
     let ev = cast(&mut s, a, "t_mend");
     assert!(looked_at(&ev, a, 2061, b), "on him");
     assert!(s.players[&b].health > hb && s.has_cc(b, "shield"));
-    // With friendly fire on the other hero is a rival: help never reaches him.
+}
+
+#[test]
+fn with_friendly_fire_on_help_still_reaches_a_co_op_friend() {
+    // Friendly fire decides only who can be harmed: outside Siege every other hero can be helped.
     let mut s = world(true, MEND);
+    assert!(s.content.pvp.friendly_fire);
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
-    let hb = halve(&mut s, b);
+    let (ha, hb) = (halve(&mut s, a), halve(&mut s, b));
     let ev = cast(&mut s, a, "t_mend");
-    assert!(looked_at(&ev, a, 2061, a), "a rival isn't helped: hers");
-    assert_eq!(s.players[&b].health, hb);
-    assert!(!s.has_cc(b, "shield"));
+    assert!(looked_at(&ev, a, 2061, b), "on him");
+    assert!(s.players[&b].health > hb && s.has_cc(b, "shield"), "healed and shielded");
+    assert_eq!(s.players[&a].health, ha, "not her");
+    assert!(!s.has_cc(b, "stun"), "and none of its harm");
+}
+
+/// A Siege world (the built-in rules' hall and match) with these abilities added.
+fn siege_world(extra: &str) -> Survival {
+    let mut c = Content::dev();
+    c.dev.full_tree = false;
+    add_abilities(&mut c, extra);
+    let mut s = Survival::new_siege(c, Box::new(FlatLand::default()), 1, 1_000_000.0);
+    s.events.clear();
+    s
+}
+
+#[test]
+fn in_siege_help_reaches_a_partner_but_never_a_rival() {
+    let mut s = siege_world(MEND);
+    let mut ids = Vec::new();
+    for n in ["Ayla", "Bren", "Cass", "Dorn"] {
+        let id = s.join(&n.to_lowercase(), n, None);
+        s.siege_arrive(id);
+        ids.push(id);
+    }
+    for id in &ids {
+        s.siege_join(*id, "2v2").unwrap();
+    }
+    let countdown = Content::dev().siege.unwrap().countdown;
+    run_still(&mut s, &[], countdown + 0.2);
+    let sg = s.siege.as_ref().unwrap();
+    let (x, y, z, w) = (sg.camps[0].heroes[0], sg.camps[0].heroes[1], sg.camps[1].heroes[0], sg.camps[1].heroes[1]);
+    assert!(s.hostile(x, z) && !s.hostile(x, y), "rivals and partners");
+    // Her partner ahead of her: him.
+    let at = s.players[&x].pos;
+    let away = |k: f32| [at[0] - 60.0, at[1] + k * 5.0, at[2]];
+    s.move_player(x, at, 0.0, Moving::default());
+    s.move_player(y, [at[0] + 10.0, at[1], at[2]], 0.0, Moving::default());
+    s.move_player(z, away(1.0), 0.0, Moving::default());
+    s.move_player(w, away(2.0), 0.0, Moving::default());
+    let hy = halve(&mut s, y);
+    let ev = cast(&mut s, x, "t_mend");
+    assert!(looked_at(&ev, x, 2061, y), "her partner");
+    assert!(s.players[&y].health > hy && s.has_cc(y, "shield"));
+    // A rival there instead: never him, hers.
+    s.move_player(y, away(3.0), 0.0, Moving::default());
+    s.move_player(z, [at[0] + 10.0, at[1], at[2]], 0.0, Moving::default());
+    let hz = halve(&mut s, z);
+    let ev = cast(&mut s, x, "t_mend");
+    assert!(looked_at(&ev, x, 2061, x), "a rival isn't helped: hers");
+    assert_eq!(s.players[&z].health, hz);
+    assert!(!s.has_cc(z, "shield"));
+}
+
+const SHOCK: &str = r#"
+[[ability]]
+key = "t_shock"
+name = "Shock"
+school = "paladin"
+slot = "ranged"
+kind = "projectile"
+damage = [14.0, 14.0]
+range = [28.0, 28.0]
+radius = [0.45, 0.45]
+speed = 30.0
+ally_heal = 0.12
+spell = 2812
+"#;
+
+#[test]
+fn with_friendly_fire_on_a_bolt_that_heals_and_hurts_heals_a_co_op_friend() {
+    let mut s = world(true, SHOCK);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [8.0, 0.0, 0.0], 0.0);
+    let hb = halve(&mut s, b);
+    let mut ev = cast(&mut s, a, "t_shock");
+    ev.extend(run_still(&mut s, &[], 1.0));
+    let max = s.players[&b].max_health;
+    assert_eq!(s.players[&b].health, hb + (max as f32 * 0.12).round() as u32, "healed, not struck");
+    assert_eq!(hits_on(&ev, b), 0, "no blow on him");
 }
 
 #[test]
@@ -235,6 +324,20 @@ fn a_beam_strikes_every_foe_in_its_strip_mends_a_friend_follows_the_turn_and_end
     assert!(!s.auras_of(p).contains(&10060), "its aura gone");
     let ev = run_still(&mut s, &all, 0.5);
     assert_eq!(hits_on(&ev, north), 0, "nothing more");
+}
+
+#[test]
+fn with_friendly_fire_on_a_healing_beam_mends_a_co_op_friend_and_never_burns_them() {
+    let mut s = world(true, BEAM);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let f = hero(&mut s, "Bren", [8.0, 0.0, 0.0], 0.0);
+    let m = mob(&mut s, "grunt", [12.0, 0.0, 0.0]);
+    let hf = halve(&mut s, f);
+    let mut ev = cast(&mut s, p, "t_beam");
+    ev.extend(run_still(&mut s, &[m], 1.0));
+    assert!(s.players[&f].health > hf, "mended");
+    assert_eq!(hits_on(&ev, f), 0, "never burned");
+    assert!(hits_on(&ev, m) >= 3, "the foe beyond him still is: {}", hits_on(&ev, m));
 }
 
 #[test]
