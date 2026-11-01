@@ -418,6 +418,13 @@ client you're on.
   feed (who felled whom).
 - **Bottom right**: icon buttons for the bag (with how many of its 80 slots are used), character,
   map, controls, game menu and help; hover one for its name and key.
+- **Right, above those**: the damage meter, from your first fight on. **Fight** shows you and the
+  heroes fighting near you in this fight (or the last one: a lull of five seconds ends one), the
+  most damage first, with how long it has run; **You** shows your own damage by card since you
+  last reset it, your per-second over your time in fights and what you took. **Healing** turns
+  both to healing (a friend you mend carries you into their fight). Only what landed counts: not
+  overkill, not a heal past full. Drag it to move it, click it to fold it, `/esmeter` hides it,
+  **Reset** (or `.es meter reset`) starts your own count over.
 - **Falling**: "You have fallen" across a dark band, and when you'll be up again.
 
 Health bars float over creatures' and other heroes' heads. Messages show briefly on screen

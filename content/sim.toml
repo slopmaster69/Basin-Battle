@@ -1,0 +1,115 @@
+# How the solo balance sim (crates/htl-survival/src/tests_sim.rs) plays each class.
+#
+# Each class's rules are tried in order every time the hero's hands are free; the first whose
+# conditions all hold is done. When none does, the sim's plain bot plays: the defense when hurt,
+# the ultimate on a full Valor bar, an EX version when there's Valor to spare, otherwise whatever
+# ranged, close or striking utility card is ready and in reach, and the weapon up close.
+#
+# A rule does one of:
+#   card = "<key>"       press the key that card is on (an EX card's key: its base card's key with
+#                        Ctrl, only with the Valor for it). Skipped when it's cooling down or out
+#                        of reach.
+#   weapon = true        swing the weapon (a foe within 3.5 yd).
+# Its conditions (all optional, all must hold):
+#   foes_within = [yd, n]   at least n foes standing within yd of the hero
+#   target_within = yd      the nearest foe within yd;  target_beyond = yd: farther than that
+#   health_below = 0.5      the hero below that share of their health
+#   valor_at_least = 50
+#   target_has = "petrify"  the nearest foe under that crowd control (stun, root, petrify,
+#                           snare, panic, incapacitate...);  target_lacks = "...": not
+# And how the hero moves for it:
+#   away = true             turn from the nearest foe to press it (a blink or a leap out)
+#   then_back = 1.5         afterwards, back away from the nearest foe for that many seconds
+#                           (still facing it), the hands free for the next card
+#
+# These are a player's simplest tactics for the class's fantasy, not the best play there is.
+# Change them freely: they're read only by the sim.
+
+# Freeze, then shatter: Frost Nova's ring when something's in reach, step back out of its blows,
+# and the next Fireball press is a free Pyroblast on the frozen.
+[[class.mage]]
+card = "frost_nova"
+foes_within = [6.0, 1]
+then_back = 1.6
+
+[[class.mage]]
+card = "blink"
+target_within = 3.0
+health_below = 0.8
+away = true
+
+[[class.mage]]
+card = "cone_of_cold"
+target_within = 9.0
+
+# Stun the pack with Shadowfury, back off while it lasts and tear through it with Chaos Bolt's
+# held line; Drain Life when hurt.
+[[class.warlock]]
+card = "drain_life"
+health_below = 0.55
+
+[[class.warlock]]
+card = "shadowfury"
+foes_within = [6.0, 1]
+then_back = 1.5
+
+[[class.warlock]]
+card = "chaos_bolt"
+target_has = "stun"
+
+[[class.warlock]]
+card = "seed_of_corruption"
+target_lacks = "burn"
+
+# Set up, then snipe: a trap at the feet of whatever comes close, out with Disengage, then the
+# draw from range.
+[[class.hunter]]
+card = "freezing_trap"
+target_within = 6.0
+
+[[class.hunter]]
+card = "explosive_trap"
+target_within = 6.0
+
+# (Disengage leaps back from where the hunter faces: facing the foe, it's out.)
+[[class.hunter]]
+card = "disengage"
+target_within = 3.5
+
+# In and out: Shadowstep in from afar, Backstab, and the knives up close.
+[[class.rogue]]
+card = "shadowstep"
+target_beyond = 7.0
+
+[[class.rogue]]
+card = "backstab"
+target_within = 3.0
+
+# The warrior closes the gap first.
+[[class.warrior]]
+card = "charge"
+target_beyond = 8.0
+
+# Holy Nova once two are on the priest.
+[[class.priest]]
+card = "holy_nova"
+foes_within = [6.5, 2]
+
+# Thunderstorm throws off whoever reaches the shaman.
+[[class.shaman]]
+card = "thunderstorm"
+foes_within = [6.5, 1]
+
+# Consecration under a pack at the paladin's feet.
+[[class.paladin]]
+card = "consecration"
+foes_within = [5.5, 2]
+
+# The druid bounds onto a foe from afar and swipes up close.
+[[class.druid]]
+card = "feral_leap"
+target_beyond = 7.0
+
+[[class.druid]]
+card = "swipe"
+foes_within = [5.5, 1]

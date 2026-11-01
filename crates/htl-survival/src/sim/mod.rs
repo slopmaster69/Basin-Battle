@@ -17,6 +17,7 @@ pub mod cc;
 mod combat;
 pub mod dungeon;
 mod journal;
+pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
 pub mod recasts;
@@ -802,6 +803,8 @@ pub struct Survival {
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
     pub(crate) cc_log: BTreeMap<Id, std::collections::VecDeque<String>>,
+    /// Each hero's damage meter (see [`meter`]).
+    pub(crate) meters: BTreeMap<Id, meter::Meter>,
     /// Blows on heroes waiting out their round trip (a dodge or guard already on its way).
     pub(crate) pending: Vec<combat::PendingStrike>,
     /// Where everyone has been lately, for judging a swing as its striker saw it.
@@ -893,6 +896,7 @@ impl Survival {
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),
+            meters: BTreeMap::new(),
             pending: Vec::new(),
             trails: BTreeMap::new(),
             marks: Vec::new(),
@@ -1128,6 +1132,7 @@ impl Survival {
         let p = self.players.get_mut(&id)?;
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
+        self.meters.remove(&id);
         // Creatures fighting them go home.
         for m in self.mobs.values_mut() {
             if m.state.target() == Some(id) {

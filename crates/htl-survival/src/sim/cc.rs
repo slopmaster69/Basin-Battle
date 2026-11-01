@@ -347,11 +347,11 @@ impl Survival {
                         .collect()
                 })
                 .unwrap_or_default();
-            for (from, amount, _) in ticks {
-                self.dot_tick(id, from, amount);
+            for (from, amount, source) in ticks {
+                self.dot_tick(id, from, amount, &source);
             }
             // Mending: its share of their health a second.
-            let mends: Vec<f32> = self
+            let mends: Vec<(Id, f32, String)> = self
                 .cc
                 .get_mut(&id)
                 .map(|l| {
@@ -359,14 +359,14 @@ impl Survival {
                         .filter(|c| c.kind == "regen" && c.next_tick <= now && c.since < c.until)
                         .map(|c| {
                             c.next_tick += 1.0;
-                            c.amount
+                            (c.from, c.amount, c.source.clone())
                         })
                         .collect()
                 })
                 .unwrap_or_default();
-            for share in mends {
+            for (from, share, source) in mends {
                 let amount = self.players.get(&id).map_or(0, |p| (p.max_health as f32 * share).round() as u32);
-                self.heal_hero(id, amount);
+                self.heal_hero_by(id, amount, from, &source);
             }
             let Some(list) = self.cc.get_mut(&id) else { continue };
             let gone: Vec<String> = list.iter().filter(|c| c.until <= now).map(|c| c.kind.clone()).collect();
@@ -407,8 +407,8 @@ impl Survival {
         }
     }
 
-    /// A burn's tick on a unit.
-    fn dot_tick(&mut self, id: Id, from: Id, amount: f32) {
+    /// A burn's tick on a unit (`source`: what set it, for the striker's meter).
+    fn dot_tick(&mut self, id: Id, from: Id, amount: f32, source: &str) {
         // A creature's burn on a hero, as hard as its blows.
         let amount = if self.mobs.contains_key(&from) && self.players.contains_key(&id) { amount * self.foe_blow_share(from) } else { amount };
         let damage = amount.round().max(1.0) as u32;
@@ -419,11 +419,11 @@ impl Survival {
             let damage = damage.min(p.health.saturating_sub(1));
             if damage > 0 {
                 self.events.push(Event::Swing { attacker: from, victim: Some(id), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
-                self.hurt_player(id, damage);
+                self.hurt_player_by(id, damage, from, source);
             }
         } else if self.mobs.get(&id).is_some_and(|m| m.health > 0) {
             self.events.push(Event::Swing { attacker: from, victim: Some(id), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
-            self.hurt_mob(id, from, damage);
+            self.hurt_mob_as(id, from, damage, source);
         }
     }
 

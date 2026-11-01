@@ -488,7 +488,13 @@ impl Survival {
         }
     }
 
+    /// A hero's weapon (or a raid's tower, the spikes) hurts a creature.
     pub(crate) fn hurt_mob(&mut self, mid: Id, by: Id, damage: u32) {
+        self.hurt_mob_as(mid, by, damage, "Melee");
+    }
+
+    /// A creature hurt by `by`: what took it (`label`) for a hero's damage meter.
+    pub(crate) fn hurt_mob_as(&mut self, mid: Id, by: Id, damage: u32, label: &str) {
         let now = self.clock;
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
@@ -496,9 +502,11 @@ impl Survival {
         if m.health == 0 {
             return;
         }
+        let before = m.health;
         m.health = m.health.saturating_sub(damage);
         let (h, max) = (m.health, m.max_health);
         self.events.push(Event::Health { id: mid, health: h, max });
+        self.meter_dealt(by, mid, before - h, label);
         self.note_threat(mid, by, damage);
         if let Some(p) = self.players.get_mut(&by) {
             p.combat_at = now;
