@@ -1475,7 +1475,7 @@ impl Survival {
         // Holy Nova: friends in it mended.
         let heal = self.content.abilities[ability].area_heal;
         if heal > 0.0 {
-            let friends: Vec<Id> = self.players.iter().filter(|(h, p)| (**h == owner || !self.hostile(owner, **h)) && p.health > 0 && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
+            let friends: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
             for f in friends {
                 let amount = self.players.get(&f).map_or(0, |p| (p.max_health as f32 * heal * self.weakened(owner)).round() as u32);
                 self.heal_hero(f, amount);
@@ -1496,7 +1496,8 @@ impl Survival {
         };
         let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner)).map(|(id, _)| *id).collect();
         let heroes: Vec<Id> = if self.content.pvp.friendly_fire {
-            self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
+            // (Not one it mends: a healing area spares a hero it can help.)
+            self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
         } else {
             Vec::new()
         };
@@ -1549,8 +1550,9 @@ impl Survival {
         }
         // Friends: the caster, and every other hero unless they're all foes.
         let inside = |p: &Player| p.health > 0 && dist2d(p.pos, at) <= radius && (p.pos[2] - at[2]).abs() < 4.0;
-        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| (**h == owner || !self.hostile(owner, **h)) && inside(p)).map(|(h, _)| *h).collect();
-        let foes: Vec<Id> = if ff { self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && inside(p)).map(|(h, _)| *h).collect() } else { Vec::new() };
+        // (Holy ground mends any hero it can help, friendly fire or not, and never burns them.)
+        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(owner, **h) && inside(p)).map(|(h, _)| *h).collect();
+        let foes: Vec<Id> = if ff { self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && inside(p)).map(|(h, _)| *h).collect() } else { Vec::new() };
         for h in friends {
             if d.linger_heal > 0.0 {
                 let amount = self.players.get(&h).map_or(0, |p| (p.max_health as f32 * d.linger_heal * self.weakened(owner)).round() as u32);
@@ -1667,7 +1669,7 @@ impl Survival {
             let at = self.mobs[&t.mob].pos;
             // A healing totem mends its owner and their friends near it.
             if d.linger_heal > 0.0 {
-                let near: Vec<Id> = self.players.iter().filter(|(h, p)| (**h == t.owner || !self.hostile(t.owner, **h)) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h).collect();
+                let near: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(t.owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h).collect();
                 for h in near {
                     let amount = self.players.get(&h).map_or(0, |p| (p.max_health as f32 * d.linger_heal).round() as u32);
                     self.heal_hero(h, amount);
@@ -1689,7 +1691,7 @@ impl Survival {
                     .iter()
                     .filter(|(mid, m)| **mid != t.mob && m.health > 0 && !self.content.mobs[m.def].inert() && dist2d(m.pos, at) <= radius)
                     .map(|(id, _)| *id)
-                    .chain(self.players.iter().filter(|(h, p)| self.hostile(t.owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h))
+                    .chain(self.players.iter().filter(|(h, p)| self.hostile(t.owner, **h) && !self.spared(t.owner, **h, t.ability) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h))
                     .collect();
                 for f in foes {
                     self.apply_effects(t.owner, f, &hostile, 1.0, &d.name);
@@ -1811,8 +1813,7 @@ impl Survival {
         let along = |at: Vec3| (at[0] - pos[0]) * c + (at[1] - pos[1]) * s;
         // A hero it can help is a friend in it (a healing beam heals a co-op hero, friendly fire
         // or not, and doesn't burn them); one it can't, if friendly fire lets it, a foe.
-        let heals = d.ally_heal > 0.0;
-        let friend = |h: Id| self.helpable(id, h) && (heals || !self.hostile(id, h));
+        let friend = |h: Id| self.helpable(id, h) && (d.heals() || !self.hostile(id, h));
         // Foes in it, nearest first: creatures (not the caster's own totems) and rival heroes.
         let mut foes: Vec<(Id, f32)> = self
             .mobs

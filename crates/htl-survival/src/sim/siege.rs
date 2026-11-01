@@ -283,6 +283,12 @@ impl Survival {
         true
     }
 
+    /// Whether hero `b` is spared `a`'s ability: one that mends friends (`heals`) neither strikes
+    /// nor hinders a hero it can help, friendly fire or not.
+    pub(crate) fn spared(&self, a: Id, b: Id, ability: usize) -> bool {
+        self.content.abilities[ability].heals() && self.helpable(a, b)
+    }
+
     /// A hero's gold in the match.
     pub fn gold_of(&self, id: Id) -> u32 {
         self.siege.as_ref().and_then(|s| s.gold.get(&id)).copied().unwrap_or(0)

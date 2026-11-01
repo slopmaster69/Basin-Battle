@@ -357,6 +357,11 @@ impl AbilityDef {
     pub fn friends(&self) -> bool {
         self.ally_heal > 0.0 || self.friendly
     }
+    /// It mends friends (a heal on whoever it reaches, a nova's, holy ground's mending or boon):
+    /// a hero it can help is never harmed by it, friendly fire or not.
+    pub fn heals(&self) -> bool {
+        self.ally_heal > 0.0 || self.area_heal > 0.0 || self.linger_heal > 0.0 || !self.boon.is_empty()
+    }
     pub fn is_ex(&self) -> bool {
         !self.ex_of.is_empty()
     }

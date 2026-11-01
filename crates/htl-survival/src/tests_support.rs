@@ -340,6 +340,46 @@ fn with_friendly_fire_on_a_healing_beam_mends_a_co_op_friend_and_never_burns_the
     assert!(hits_on(&ev, m) >= 3, "the foe beyond him still is: {}", hits_on(&ev, m));
 }
 
+const BLAST: &str = r#"
+[[ability]]
+key = "t_blast"
+name = "Blast"
+school = "priest"
+slot = "close"
+kind = "nova"
+damage = [10.0, 10.0]
+radius = [7.0, 7.0]
+spell = 15237
+"#;
+
+#[test]
+fn with_friendly_fire_on_holy_nova_heals_a_co_op_friend_and_never_strikes_them() {
+    let mut s = world(true, BLAST);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
+    let hb = halve(&mut s, b);
+    let ev = cast(&mut s, a, "holy_nova");
+    let max = s.players[&b].max_health;
+    assert_eq!(s.players[&b].health, hb + (max as f32 * 0.06).round() as u32, "mended, not struck");
+    assert_eq!(hits_on(&ev, b), 0, "no blow on him");
+    // A nova that mends nobody still strikes whoever friendly fire allows.
+    run_still(&mut s, &[], 1.0);
+    let ev = cast(&mut s, a, "t_blast");
+    assert!(hits_on(&ev, b) >= 1, "friendly fire: struck");
+}
+
+#[test]
+fn with_friendly_fire_on_consecration_mends_a_co_op_friend_and_never_burns_them() {
+    let mut s = world(true, "ability = []");
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
+    let hb = halve(&mut s, b);
+    let mut ev = cast(&mut s, a, "consecration");
+    ev.extend(run_still(&mut s, &[], 3.0));
+    assert!(s.players[&b].health > hb, "mended");
+    assert_eq!(hits_on(&ev, b), 0, "never burned");
+}
+
 #[test]
 fn a_stun_on_the_caster_ends_a_beam() {
     let mut s = world(false, BEAM);
