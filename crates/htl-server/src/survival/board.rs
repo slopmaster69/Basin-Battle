@@ -668,6 +668,15 @@ mod tests {
         b.record(&a);
         assert_eq!(b.best_splits("stockade", 4), Some(vec![("Kam".to_string(), 280_000), ("Bazil".to_string(), 760_000)]));
         assert!(b.best_splits("stockade", 7).is_none());
+        // And they survive a save and a load.
+        let dir = std::env::temp_dir().join(format!("board-splits-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wager-board.toml");
+        let mut kept = Board::new(Some(path.clone()), "here", None, vec!["stockade".into()]);
+        kept.record(&a);
+        let again = Board::new(Some(path), "", None, vec!["stockade".into()]);
+        assert_eq!(again.best_splits("stockade", 5), Some(vec![("Kam".to_string(), 280_000), ("Bazil".to_string(), 760_000)]));
+        let _ = std::fs::remove_dir_all(&dir);
         // Splits stay here: the line sent to the board host is as it was.
         let r = Run::from_wager(&a, "here");
         assert_eq!(Run::parse(&r.line(), &["stockade".to_string()]).unwrap().splits, Vec::new());

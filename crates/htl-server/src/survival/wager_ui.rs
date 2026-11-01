@@ -160,13 +160,14 @@ impl SurvivalGame {
         let bosses: Vec<String> = self.sim.wager_progress().iter().map(|(n, down)| format!("{}~{}", clean(n), u8::from(*down))).collect();
         let forces = self.sim.wager_forces().map_or(String::new(), |(f, n, t)| format!("{f}~{n}~{t}"));
         let best = self.board.as_ref().and_then(|b| b.lock().unwrap().best_splits(self.sim.content.dungeon.as_ref().map_or("", |d| d.key.as_str()), w.level));
+        // Each boss's best by its name (a dungeon's bosses may change between versions).
         let splits: Vec<String> = self
             .sim
-            .wager_splits()
+            .wager_progress()
             .iter()
-            .enumerate()
-            .map(|(k, s)| {
-                let b = best.as_ref().and_then(|b| b.get(k)).map_or(String::new(), |(_, ms)| format!("{}", ms / 1000));
+            .zip(self.sim.wager_splits())
+            .map(|((name, _), s)| {
+                let b = best.as_ref().and_then(|b| b.iter().find(|(n, _)| n == name)).map_or(String::new(), |(_, ms)| format!("{}", ms / 1000));
                 format!("{}~{b}", s.map_or(String::new(), |s| format!("{}", s.floor())))
             })
             .collect();
