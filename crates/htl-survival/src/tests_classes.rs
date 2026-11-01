@@ -50,9 +50,11 @@ fn use_card(s: &mut Survival, p: Id, card: &AbilityDef, ex: bool) -> Vec<Event> 
     s.set_valor(p, 100.0);
     s.input(p, Input::Ability(slot, ex));
     let mut ev = s.step(DT);
-    if matches!(s.players[&p].action, Action::Aim { .. }) {
+    if let Action::Aim { ability } = s.players[&p].action {
         s.input(p, Input::Attack);
-        ev.extend(run(s, card.charge[1] + 0.1));
+        // The charge of what's aimed: an EX version may be held longer than its card.
+        let full = s.content.abilities[ability].charge[1];
+        ev.extend(run(s, full + 0.1));
         s.input(p, Input::AttackUp);
     }
     // An anchor's second press steps back to it.

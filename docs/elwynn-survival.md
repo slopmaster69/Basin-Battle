@@ -136,10 +136,10 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Pyroblast* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Frenzied Regeneration* |
 | 3 | **Ultimate** | Onslaught | Sanctuary | Volley | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
@@ -169,9 +169,12 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   1.5 s hold for a huge one; Cone of Cold slows (and freezes the already slowed), Frost Nova
   freezes all round you and makes your next Fireball a free Pyroblast for 5 s; Blink; Ice Block;
   Meteor falls 1.5 s after you call it on a 7 yd circle: 70 damage.
-- **Warlock**: fear and fel. Shadow Bolt marks; Shadowfury stuns a spot a moment later, its EX
-  breathes shadowflame; Demonic Circle draws a way out at your feet and the key again steps back
-  to it (its EX screams where you left); Summon Infernal crashes down and stands burning.
+- **Warlock**: rot. Seed of Corruption sticks in a foe and bursts round them 2 s later, leaving
+  everyone near rotting (its EX, Chaos Bolt, is a 1 s hold that tears through every foe in a
+  line); Shadowfury stuns a spot a moment later, its EX breathes shadowflame; Demonic Circle draws
+  a way out at your feet and the key again steps back to it (its EX screams where you left); Drain
+  Life outlasts them, every point it drains healing you, and Death Coil sends a foe fleeing as it
+  heals you; Summon Infernal crashes down and stands burning.
 - **Druid**: the wild shapes. Wrath's two bolts (its EX roots); Swipe, and Typhoon throws a cone
   of foes back; Feral Leap bounds onto them (Pounce stuns); Barkskin; Hurricane hurls everyone in
   it out from its middle every second.
@@ -183,8 +186,9 @@ Nothing moves a body in Ice Block, Onslaught, Sanctuary or Barkskin. A **leap** 
 air to the reticle's point (or straight back, a Disengage) and strikes what's there as it lands;
 Demonic Circle sets an **anchor** to step back to; **traps** arm, wait (two at once) and spring on
 the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a moment and is lost to
-a stun. Projectiles may **pierce** (Crippling Throw), **leap on** (Chain Lightning) or
-**burst**; ground may linger, pull, throw out or slow every second. A dash may run **through**
+a stun. Projectiles may **pierce** (Crippling Throw, Chaos Bolt), **leap on** (Chain Lightning),
+**burst**, or **stick** and go off a moment later round whoever carries them (Seed of
+Corruption); ground may linger, pull, throw out or slow every second. A dash may run **through**
 every foe in its way, striking each as it passes. Help aimed at a **friend**
 lands on the friend under the reticle (or the one nearest it, within 15°), else on you, and gives
 them only its heal, cleanse and boons; a **beam** is held a few seconds as a strip from you along
@@ -216,8 +220,8 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
   stun (Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind Blast and
   Meteor land.
-- **From behind**: Vanish, Blinding Step and Shadowstep set up Backstab; Shadow Bolt's Mark makes
-  it crit; a kill under Death Mark readies everything again.
+- **From behind**: Vanish, Blinding Step and Shadowstep set up Backstab; a kill under Death Mark
+  readies everything again.
 - **Stay alive**: Power Word: Shield, Barkskin and Healing Stream stack with Holy Nova and
   Consecration; Grounding Totem eats the big projectile (a Pyroblast, a hammer, a Death Mark).
 
@@ -234,18 +238,18 @@ duration creatures do.
   guard and a parry answer them (the Unstoppable Blow aside: no guard stops it, no parry turns it,
   and its target sees the weapon go red).
 - **Defense** is a read and a bait in a duel: Retaliation blocks melee (not bolts), Deterrence
-  bolts (not melee), Evasion dodges both for 2 s, Shadow Ward swallows the first, Ice Block lets
+  bolts (not melee), Evasion dodges both for 2 s, Drain Life out-heals them, Ice Block lets
   nothing in but you can't act.
 - **Full charge**: a charged spell held to the top flares on you (everyone sees it: the class's
   flash and sound), the reticle bursts and the screen's edge flares in its colour, and Aimed
-  Throw, Shadow Bolt, Fireball, Frostbolt and Lightning Bolt fly much faster.
+  Throw, Fireball, Frostbolt and Lightning Bolt fly much faster.
 
 Hover a key with the mouse free (or a card on the board) for what it does in words and numbers:
 how it's used, its damage, reach, charge, wind-up, stamina and cooldown, and the same for its
 charged-up version with its Valor. This build has every card from the start (`[dev] full_tree =
 true`), the Warrior's cards on the keys (`[loadout]`); without it a hero has the Warrior's and
-unlocks the rest. Abilities off the board (the bow's Aimed Shot, Frostbolt, Flamestrike, Drain
-Life, Nature's Grasp, Fire Ward) keep their rules (`bench = true`) for putting back on
+unlocks the rest. Abilities off the board (the bow's Aimed Shot, Frostbolt, Flamestrike,
+Nature's Grasp, Fire Ward) keep their rules (`bench = true`) for putting back on
 it.
 
 **Aiming**: an aimed ability comes up on its key (the camera over the shoulder, the reticle in the
@@ -1154,7 +1158,7 @@ target warned), Backstab from behind and on a Mark, Ambush's step, Holy Shock he
 Purifying Shock freeing them, holy ground burning foes and healing friends (and Hallowed Ground's
 softened blows), Onslaught, the Death Mark and its reset, Sanctuary, Cold Snap and the shatter,
 Dread Step, an old save's keys put on the board's rows, the five rows of four, Lay on Hands,
-Shield Wall and Dread Ward, and a full charge's flare and faster axe. `tests.rs` has Tab switching
+Shield Wall, and a full charge's flare and faster axe. `tests.rs` has Tab switching
 round the foes in view and held letting go, a jump's stamina and a roll's least stamina.
 
 `crates/htl-survival/src/tests_moves.rs` covers the moving mechanics on abilities made for the

@@ -212,6 +212,8 @@ const RENAMED: &[(&str, &str)] = &[
     // Shaman
     // Mage
     // Warlock
+    ("shadow_bolt", "seed_of_corruption"),
+    ("shadow_ward", "drain_life"),
     // Druid
 ];
 

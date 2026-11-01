@@ -1,8 +1,8 @@
 //! The board's new cards, one rule each: the weapon arts (Sundering Blow and its crushed guard,
 //! the Unstoppable Blow no guard stops, Backstab from behind and on a Mark, Ambush), light that
 //! heals a friend, holy ground, Onslaught, the Death Mark, Sanctuary, Cold Snap, Dread Step, the
-//! shatter, an old save's keys put on the board's rows, the defense row (Lay on Hands, Shield Wall,
-//! Dread Ward) and a full charge's flare and faster missile.
+//! shatter, an old save's keys put on the board's rows, the defense row (Lay on Hands, Shield Wall)
+//! and a full charge's flare and faster missile.
 
 use std::collections::BTreeMap;
 
@@ -445,7 +445,7 @@ fn lay_on_hands_heals_a_third_and_ends_what_is_on_you() {
 }
 
 #[test]
-fn shield_wall_blocks_bolts_and_dread_ward_catches_every_blow() {
+fn shield_wall_blocks_bolts() {
     let mut s = world_with(true);
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [12.0, 0.0, 0.0], std::f32::consts::PI);
@@ -457,24 +457,6 @@ fn shield_wall_blocks_bolts_and_dread_ward_catches_every_blow() {
     let hits: Vec<_> = ev.iter().filter_map(|e| match e { Event::Swing { victim: Some(v), outcome, anim: false, .. } if *v == b => Some(*outcome), _ => None }).collect();
     assert_eq!(hits, vec![Outcome::Blocked], "the wall takes the axe");
     run(&mut s, 3.0);
-    // Dread Ward: two blows, both swallowed, and the striker panics (the second time the grace
-    // that follows a hard crowd control stops it).
-    s.set_cooldowns(b, true);
-    s.set_valor(b, 25.0);
-    s.move_player(a, [10.5, 0.0, 0.0], 0.0, Moving::default());
-    cast(&mut s, b, "defense", "shadow_ward", true);
-    let mut caught = 0;
-    for _ in 0..2 {
-        s.input(a, Input::Attack);
-        s.input(a, Input::AttackUp);
-        let ev = run(&mut s, 0.9);
-        caught += ev.iter().filter(|e| matches!(e, Event::Swing { victim: Some(v), outcome: Outcome::Blocked, anim: false, .. } if *v == b)).count();
-        s.cleanse(a, &["panic"]);
-        s.move_player(a, [10.5, 0.0, 0.0], 0.0, Moving::default());
-        s.set_action(a, Action::Ready);
-    }
-    assert_eq!(caught, 2, "every blow, not just the first");
-    assert!(s.cc_log_of(a).iter().any(|l| l.contains("Dread Ward: panic") && !l.contains("grace")), "the striker panicked");
 }
 
 #[test]

@@ -1,8 +1,11 @@
 //! The redesigned mage, warlock and druid cards (#40), each cast from the real content: the thing that makes it
 //! play differently.
 
+use std::collections::BTreeMap;
+
 use crate::content::Content;
 use crate::land::FlatLand;
+use crate::sim::abilities::Stage;
 use crate::sim::mobs::MobState;
 use crate::sim::*;
 
@@ -147,4 +150,115 @@ fn frost_nova_makes_the_next_fireball_a_free_pyroblast_that_shatters_the_frozen(
     // Then the key is Fireball again.
     press(&mut s, p, "ranged", false);
     assert_eq!(aiming(&s, p), Some(idx(&s, "fireball")));
+}
+
+// --- Warlock: rot ---------------------------------------------------------------------------------
+
+#[test]
+fn a_seed_of_corruption_sticks_then_bursts_round_its_carrier_and_leaves_them_rotting() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "seed_of_corruption");
+    let carrier = boar(&mut s, [8.0, 0.0, 0.0]);
+    let beside = boar(&mut s, [10.0, 2.5, 0.0]);
+    let away = boar(&mut s, [8.0, -9.0, 0.0]);
+    let pins = [(carrier, [8.0, 0.0, 0.0]), (beside, [10.0, 2.5, 0.0]), (away, [8.0, -9.0, 0.0])];
+    let (hc, hb, ha) = (s.mobs[&carrier].health, s.mobs[&beside].health, s.mobs[&away].health);
+    press(&mut s, p, "ranged", false);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "seed_of_corruption")));
+    let mut ev = hold(&mut s, p, 0.0, &pins);
+    ev.extend(run_pinned(&mut s, 0.8, &pins));
+    // Planted: nothing yet, but it's in the boar and shows on it.
+    assert!(hits(&ev, p, carrier).is_empty() && s.mobs[&carrier].health == hc, "nothing yet");
+    assert!(s.projectiles.iter().any(|x| matches!(x.stage, Stage::Stuck { on: Some(u), .. } if u == carrier)), "stuck in it");
+    assert!(s.auras_of(carrier).contains(&172), "Corruption's look on it");
+    // Two seconds on, it bursts round the boar: the one beside it struck too, both rotting.
+    ev.extend(run_pinned(&mut s, 1.8, &pins));
+    assert!(s.mobs[&carrier].health < hc && s.mobs[&beside].health < hb, "it went off round its carrier");
+    assert_eq!(s.mobs[&away].health, ha, "not past its 5 yd");
+    assert!(s.has_cc(carrier, "burn") && s.has_cc(beside, "burn"), "each left rotting");
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Missile { spell: 24050, target: Target::Point(at), .. } if dist2d(*at, [8.0, 0.0, 0.0]) < 1.0)),
+        "its burst there"
+    );
+    assert!(s.projectiles.is_empty());
+}
+
+#[test]
+fn chaos_bolt_held_a_second_tears_through_every_foe_in_its_line_and_let_go_early_is_lost() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "seed_of_corruption");
+    s.set_cooldowns(p, true);
+    let at = [[6.0, 0.0, 0.0], [10.0, 0.0, 0.0], [14.0, 0.0, 0.0]];
+    let foes: Vec<Id> = at.iter().map(|a| boar(&mut s, *a)).collect();
+    let pins: Vec<(Id, Vec3)> = foes.iter().copied().zip(at).collect();
+    // Let go after half a second: lost, and nothing paid.
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "ranged", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "chaos_bolt")), "Ctrl: the EX version");
+    let ev = hold(&mut s, p, 0.5, &pins);
+    assert!(!missile(&ev, 26006) && s.players[&p].action == Action::Ready, "lost");
+    assert_eq!(s.players[&p].valor, 25.0, "nothing paid");
+    // Held its second: through all three.
+    press(&mut s, p, "ranged", true);
+    let mut ev = hold(&mut s, p, 1.1, &pins);
+    assert!(missile(&ev, 26006), "it flies");
+    ev.extend(run_pinned(&mut s, 1.0, &pins));
+    for m in &foes {
+        assert_eq!(hits(&ev, p, *m), vec![36], "each struck once, for 36");
+    }
+}
+
+#[test]
+fn drain_life_on_the_defense_key_heals_the_warlock_all_it_drains() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "drain_life");
+    s.players.get_mut(&p).unwrap().health = 100;
+    let k = boar(&mut s, [8.0, 0.0, 0.0]);
+    let pins = [(k, [8.0, 0.0, 0.0])];
+    press(&mut s, p, "defense", false);
+    let mut ev = hold(&mut s, p, 0.0, &pins);
+    assert!(matches!(s.players[&p].action, Action::Channel { .. }), "tethered");
+    ev.extend(run_pinned(&mut s, 3.5, &pins));
+    let drained: u32 = hits(&ev, p, k).iter().sum();
+    assert!(drained >= 24, "about 12 a second for 3 s: {drained}");
+    assert_eq!(s.players[&p].health, 100 + drained, "every point of it back");
+    assert!(!matches!(s.players[&p].action, Action::Channel { .. }), "over after 3 s");
+}
+
+#[test]
+fn death_coil_sends_its_target_fleeing_and_heals_the_warlock() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "drain_life");
+    s.players.get_mut(&p).unwrap().health = 100;
+    s.set_valor(p, 25.0);
+    let k = boar(&mut s, [8.0, 0.0, 0.0]);
+    press(&mut s, p, "defense", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "death_coil")), "Ctrl: the EX version");
+    let mut ev = hold(&mut s, p, 0.0, &[]);
+    ev.extend(run_pinned(&mut s, 0.6, &[]));
+    assert!(missile(&ev, 6789), "the coil flies");
+    assert!(s.has_cc(k, "panic"), "the boar flees");
+    let max = s.players[&p].max_health;
+    assert_eq!(s.players[&p].health, 100 + (max as f32 * 0.15).round() as u32, "15% of the warlock's health back");
+}
+
+#[test]
+fn an_old_save_with_shadow_bolt_and_shadow_ward_loads_with_their_successors() {
+    let mut s = world(false);
+    s.content.dev.full_tree = false;
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut save = s.leave(p).unwrap();
+    save.class = "warlock".into();
+    save.owned = ["shadow_bolt", "shadowfury", "demonic_circle", "shadow_ward"].map(String::from).to_vec();
+    save.loadout = BTreeMap::from([("ranged".to_string(), "shadow_bolt".to_string()), ("defense".to_string(), "shadow_ward".to_string())]);
+    let q = s.join("ayla", "Ayla", Some(&save));
+    let h = &s.players[&q];
+    assert!(h.owned.contains("seed_of_corruption") && h.owned.contains("drain_life"), "{:?}", h.owned);
+    assert!(!h.owned.contains("shadow_bolt") && !h.owned.contains("shadow_ward"));
+    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("seed_of_corruption"));
+    assert_eq!(h.loadout.get("defense").map(String::as_str), Some("drain_life"));
 }
