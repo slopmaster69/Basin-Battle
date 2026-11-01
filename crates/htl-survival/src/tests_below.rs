@@ -1214,3 +1214,46 @@ fn a_sets_words_count_its_pieces_not_their_honed_copies() {
     assert!(seen > 0, "some set pieces, honed copies among them");
     assert!(s.content.items.iter().any(|i| !i.set.is_empty() && i.hone > 0), "a honed set piece");
 }
+
+#[test]
+fn a_hero_who_never_readies_holds_the_count_only_so_long() {
+    use crate::sim::wager::WAGER_READY_WAIT;
+    let mut s = below();
+    s.start_wager(1);
+    let a = s.join("ayla", "Ayla", None);
+    let _away = s.join("bren", "Bren", None);
+    run(&mut s, 0.5);
+    assert!(s.wager_ready(a).is_ok());
+    run(&mut s, 5.0);
+    assert!(s.wager_readiness().unwrap().2.is_none(), "waiting on Bren a while");
+    s.wall_start += WAGER_READY_WAIT;
+    run(&mut s, 0.2);
+    assert!(s.wager_readiness().unwrap().2.is_some(), "then the count starts anyway");
+}
+
+#[test]
+fn a_harder_dungeons_won_wager_pays_more_plunder_by_its_tier() {
+    use crate::content::TIER_PLUNDER;
+    use crate::sim::wager::{wager_bosses, wager_forces_needed};
+    let paid = |key: &str| -> u32 {
+        let c = Content::builtin().for_dungeon_of(key);
+        let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+        s.start_wager(1);
+        let id = s.join("ayla", "Ayla", None);
+        run(&mut s, 0.2);
+        let d = s.content.dungeon.clone().unwrap();
+        let plunder = s.content.item(&d.plunder).unwrap();
+        let before = s.players[&id].bag.get(&plunder).copied().unwrap_or(0);
+        let (needed, bosses, wall) = (wager_forces_needed(&d, &s.content), wager_bosses(&d, &s.content), s.wall());
+        let b = s.below.as_mut().unwrap();
+        b.slain.extend(bosses);
+        let w = b.wager.as_mut().unwrap();
+        w.started = Some(wall);
+        w.forces = needed;
+        run(&mut s, 0.2);
+        s.players[&id].bag.get(&plunder).copied().unwrap_or(0) - before
+    };
+    let (first, third) = (paid("ragefire"), paid("cathedral"));
+    assert_eq!(first, 9, "6 + 3 at +1");
+    assert_eq!(third, (9.0 * (1.0 + 2.0 * TIER_PLUNDER)).round() as u32, "a tier-3 dungeon pays half again");
+}
