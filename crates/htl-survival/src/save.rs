@@ -207,6 +207,9 @@ const RENAMED: &[(&str, &str)] = &[
     // Warrior
     // Paladin
     // Hunter
+    ("arcane_shot", "aimed_arrow"),
+    ("deterrence", "flare"),
+    ("volley", "kill_shot"),
     // Rogue
     // Priest
     // Shaman

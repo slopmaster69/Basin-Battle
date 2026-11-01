@@ -3676,39 +3676,51 @@ effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 
 
 # ----------------------------------------------------------------------------------- Hunter --
 
+# The sniper's shot: hold the click to draw. (Its key isn't `aimed_shot`: that's the bow's shot on
+# the bench.)
 [[ability]]
-key = "arcane_shot"
-name = "Arcane Shot"
-text = "A fast arcane arrow along the reticle: 16 damage. Two in the quiver, back quickly: the hunter's steady poke."
-icon = "Ability_ImpalingBolt"
+key = "aimed_arrow"
+name = "Aimed Shot"
+text = "Hold the click to draw, up to 1.4 s: the longer the draw, the harder, farther and faster the arrow. Fully drawn it glows and goes through every foe in its line. A heavy blow on you spoils the draw."
+icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
 kind = "projectile"
-damage = [16.0, 16.0]
-range = [34.0, 34.0]
+charge = [0.0, 1.4]
+fragile = true
+damage = [14.0, 36.0]
+range = [26.0, 40.0]
 radius = [0.3, 0.3]
+# A plain arrow (the bow's look) while drawing; fully drawn, Arcane Shot's glowing one, faster,
+# through everything in the line.
 speed = 40.0
-cooldown = 4.0
-charges = 2
-spell = 3044
+spell = 75
+full_spell = 3044
+full_speed = 60.0
+full_pierce = 9
+cooldown = 3.0
 clip = 53
+valor_hit = 5.0
 
 [[ability]]
-key = "concussive_shot"
-name = "Concussive Shot"
-ex_of = "arcane_shot"
-text = "A heavy arrow: 20 damage, knocks the foe back 4 yd and slows them 50% for 3 s. Kite them into a trap."
-icon = "Spell_Frost_Stun"
+key = "multi_shot"
+name = "Multi-Shot"
+ex_of = "aimed_arrow"
+text = "Five arrows at once in a wide fan, no draw: clear a pack, or catch a foe who dodges. Frozen foes shatter. Free right after a Freezing Trap."
+icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-damage = [20.0, 20.0]
-range = [34.0, 34.0]
-radius = [0.35, 0.35]
+damage = [10.0, 10.0]
+range = [30.0, 30.0]
+radius = [0.3, 0.3]
 speed = 40.0
-spell = 5116
+count = 5
+# 10° apart: a 40° fan.
+spread = 10.0
+shatter = true
+spell = 75
 clip = 53
-effects = [{ kind = "knockback", amount = 4.0 }, { kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
 
 [[ability]]
 key = "explosive_trap"
@@ -3740,7 +3752,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "A trap that freezes everyone within 3 yd of whoever sets it off for 3 s (1.5 s on heroes): no moving, no acting, and fire or a Sundering Blow shatters them."
+text = "A trap that freezes everyone within 3 yd of whoever sets it off for 3 s (1.5 s on heroes): no moving, no acting, and fire or a Sundering Blow shatters them. Setting it readies your bow: the next Aimed Shot within 8 s is a free Multi-Shot, and the frozen shatter."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "close"
 kind = "trap"
@@ -3755,6 +3767,9 @@ object = 3071
 burst_spell = 13810
 clip = 75
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
+# The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
+# springs: 8 s, room to kite them onto it.)
+empower = { ability = "aimed_arrow", secs = 8.0 }
 
 [[ability]]
 key = "disengage"
@@ -3803,24 +3818,30 @@ speed = 40.0
 spell = 6533
 effects = [{ kind = "root", secs = [3.0, 3.0] }]
 
+# Peel without hiding: a flare lobbed onto whoever's coming.
 [[ability]]
-key = "deterrence"
-name = "Deterrence"
-text = "For 3 s every projectile that reaches you is deflected. Melee blows still land: a read against casters and archers, not against blades."
-icon = "Ability_Whirlwind"
+key = "flare"
+name = "Flare"
+text = "Lob a flare at the reticle. Where it lands, every foe within 4 yd is blinded for 2 s (1 s on heroes): they can't act until something hits them. Throw it on the pack that's on you, then step away."
+icon = "Spell_Fire_Flare"
 school = "hunter"
 slot = "defense"
-kind = "stance"
-secs = 3.0
+kind = "projectile"
+lob = true
+splash = 4.0
+range = [24.0, 24.0]
+radius = [0.3, 0.3]
+# The flight matches its look's (Holy Wrath's bright orb, which bursts in light where it lands).
+speed = 20.0
 cooldown = 14.0
-spell = 19263
-aura = 19263
-counter = { block = true, ranged_only = true }
+spell = 2812
+clip = 53
+effects = [{ kind = "incapacitate", secs = [2.0, 2.0] }]
 
 [[ability]]
 key = "feign_death"
 name = "Feign Death"
-ex_of = "deterrence"
+ex_of = "flare"
 text = "Drop as if dead for up to 2 s: nothing reaches you, creatures lose you and locks on you let go, and you stay hidden 5 s after (until you strike). Press it again to get up early."
 icon = "Ability_Rogue_FeignDeath"
 slot = "defense"
@@ -3832,26 +3853,28 @@ clip = 1
 counter = { immune = true }
 self_effects = [{ kind = "veil", secs = [7.0, 7.0] }]
 
+# The finisher you line up.
 [[ability]]
-key = "volley"
-name = "Volley"
-text = "Arrows rain on a 8 yd circle at the reticle (up to 32 yd) after 1 s, drawn for everyone: 16 damage, then 10 a second for 4 s, and everyone in it is slowed 35%."
+key = "kill_shot"
+name = "Kill Shot"
+text = "Draw for 1 s, then loose an arrow that goes through everything in a 40 yd line for 60, and kills outright any foe under a quarter of its health. Line them up."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
-kind = "ground"
+kind = "projectile"
 valor = 100
-range = [32.0, 32.0]
-radius = [8.0, 8.0]
-delay = 1.0
-damage = [16.0, 16.0]
-linger = 4.0
-linger_damage = 10.0
+charge = [1.0, 1.0]
+hold = 1.0
+damage = [60.0, 60.0]
+range = [40.0, 40.0]
+radius = [0.4, 0.4]
+pierce = 9
+execute = 0.25
+speed = 50.0
 cooldown = 40.0
-spell = 1510
-tick_spell = 1510
+# Arcane Shot's glowing arrow, as Aimed Shot's full draw.
+spell = 3044
 clip = 53
-tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.35 }]
 
 # ------------------------------------------------------------------------------------ Rogue --
 
@@ -6233,7 +6256,7 @@ respawn = 240.0
   steps = [ { clip = 16, take = 1, windup = 1.0, lunge = 5.5, damage = 32, recovery = 1.4 } ]
 
 # Old Blackfang, the prowlers' leader, out of the den by Ridgepoint. He is the hunter's trial:
-# the camp learns Volley when he falls. At half his health he howls and two prowlers come.
+# the camp learns Kill Shot when he falls. At half his health he howls and two prowlers come.
 [[mob]]
 key = "blackfang"
 name = "Old Blackfang"
@@ -6249,7 +6272,7 @@ boss = true
 posture = 150
 drops = { meat = [3, 4], hide = [3, 4] }
 trophy = { hide = 6, leather = 4 }
-teaches = ["volley"]
+teaches = ["kill_shot"]
 respawn = 1200.0
   [mob.attack]
   windup = 0.55
@@ -8579,7 +8602,7 @@ name = "The Hunter's Lodge Banner"
 at = [-9460.0, -1380.0]
 display = 4313
 scale = 1.0
-teaches = ["arcane_shot", "explosive_trap"]
+teaches = ["aimed_arrow", "explosive_trap"]
 keep = true
 secs = 3.0
 text = "The old lodge's banner, and a hunter's notes nailed to its pole: a shot, and a snare for the road."
@@ -8686,7 +8709,7 @@ trial = ["trial_relic_rogue_0", "trial_relic_rogue_1"]
 key = "relic_hunter"
 name = "A Lost Hunter's Pack"
 at = [-8797.0, -1056.0]
-teaches = ["disengage", "deterrence"]
+teaches = ["disengage", "flare"]
 loot = { hide = 3, leather = 2 }
 display = 259
 secret = 7.0
@@ -9135,7 +9158,7 @@ at = [-9454.0, -1380.0]
 radius = 55.0
 kind = "sanctum"
 icon = "Ability_Hunter_SniperShot"
-text = "The hunter's shrine (Arcane Shot, Explosive Trap) at the old lodge; prowlers and bears in the woods; timber."
+text = "The hunter's shrine (Aimed Shot, Explosive Trap) at the old lodge; prowlers and bears in the woods; timber."
 reward = { wood = 4 }
 
 [[site]]

@@ -2772,7 +2772,7 @@ impl Content {
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
                 bail!("{what}: only a cone, a nova or a strip winds up (`cast`)");
             }
-            if (a.pierce > 0 || a.chain > 0 || a.splash > 0.0) && a.kind != "projectile" && a.kind != "trap" {
+            if (a.pierce > 0 || a.full_pierce > 0 || a.chain > 0 || a.splash > 0.0) && a.kind != "projectile" && a.kind != "trap" {
                 bail!("{what}: pierce, chain and splash are a projectile's");
             }
             if !a.boon.is_empty() && !BOONS.contains(&a.boon.as_str()) {

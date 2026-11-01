@@ -136,11 +136,11 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Aimed Shot · *Multi-Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
-| 3 | **Ultimate** | Onslaught | Sanctuary | Volley | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Flare · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
+| 3 | **Ultimate** | Onslaught | Sanctuary | Kill Shot | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
 it) to cast that for Valor instead. An ultimate has none: it is the bar's whole worth.
@@ -151,11 +151,14 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   throws everyone back), Sundering Blow, an axe to throw, Retaliation against blades, Onslaught.
 - **Paladin**: the holy guardian. Holy Shock heals a friend it touches; Consecration and Sanctuary
   lay healing ground; Hammer of Justice stuns; Lay on Hands is a third of your health at once.
-- **Hunter**: keep them at range and make them walk into it. Arcane Shot's two quick arrows;
-  traps that arm and wait (Explosive: a burst that throws back and burns; Freezing: a freeze);
-  Disengage leaps you straight back (its EX nets the foe in front); Deterrence deflects every
-  projectile but not a blade, Feign Death drops you as if dead and every creature and lock lets
-  go; Volley rains on a circle for 4 s.
+- **Hunter**: set up, then snipe. Aimed Shot is a draw: the longer you hold it, the harder,
+  farther and faster the arrow, and fully drawn it goes through the whole line (a heavy blow on you
+  spoils it); Multi-Shot is five arrows in a fan. Traps arm and wait (Explosive: a burst that throws
+  back and burns; Freezing: a freeze, and setting it makes your next Aimed Shot a free Multi-Shot
+  that shatters the frozen). Disengage leaps you straight back (its EX nets the foe in front);
+  Flare is lobbed onto a pack and blinds them till they're struck, Feign Death drops you as if dead
+  and every creature and lock lets go; Kill Shot is a 1 s draw that goes through a 40 yd line and
+  finishes anything under a quarter of its health.
 - **Rogue**: in from the shadows. Poisoned blades to throw (the EX goes through two); Shadowstep
   (its EX blinds everyone where you come out); Backstab, three times from behind; Evasion dodges
   everything for 2 s, Vanish hides you (your next blow counts as from behind); Death Mark.
@@ -197,7 +200,7 @@ left. A card that **empowers** another makes that card's next press its EX versi
 
 **Seeing it coming** (the action-combat client, eighth round): everything that lands later is
 drawn on the ground where it will land, red when it's a foe's, blue when it's yours or a
-friend's, filling as it comes: a sky-fall's ring (Mind Blast, Meteor, Volley, Earthquake, Void
+friend's, filling as it comes: a sky-fall's ring (Mind Blast, Meteor, Earthquake, Void
 Rift, Hurricane, Shadowfury, Summon Infernal), a leap's landing, a wind-up's cone. While you aim,
 your own ability's shape lies under you along the view: a projectile's path, a cone, a ring round
 you, or the circle where it will land. Traps and anchors show as green circles.
@@ -205,11 +208,11 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 **Combos**, inside a class and across them:
 
 - **Freeze, then shatter**: Frost Nova, Freezing Trap, Cold Snap, Frost Blink or a Cone of Cold on
-  a slowed foe freeze; fire (Fireball, Scorch, Meteor) or a Sundering Blow on them shatters for
-  half again.
+  a slowed foe freeze; fire (Fireball, Scorch, Meteor), a Sundering Blow or a Multi-Shot on them
+  shatters for half again.
 - **Pull into the pain**: Void Rift, Leap of Faith or Mind Grip drag foes onto a trap, into
-  Consecration, a Volley, an Earthquake or under a Meteor.
-- **Push into the trap**: Thunderstorm, Typhoon, Concussive Shot or Heroic Leap throw a foe onto
+  Consecration, an Earthquake or under a Meteor.
+- **Push into the trap**: Thunderstorm, Typhoon or Heroic Leap throw a foe onto
   an Explosive or Freezing Trap; Hurricane keeps them off a point.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
   stun (Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind Blast and
@@ -231,9 +234,9 @@ duration creatures do.
   rules as any swing: their own wind-up and reach, a share of the weapon's damage, stamina, and a
   guard and a parry answer them (the Unstoppable Blow aside: no guard stops it, no parry turns it,
   and its target sees the weapon go red).
-- **Defense** is a read and a bait in a duel: Retaliation blocks melee (not bolts), Deterrence
-  bolts (not melee), Evasion dodges both for 2 s, Shadow Ward swallows the first, Ice Block lets
-  nothing in but you can't act.
+- **Defense** is a read and a bait in a duel: Retaliation blocks melee (not bolts), Flare
+  blinds whoever is coming till they're struck, Evasion dodges melee and bolts for 2 s, Shadow
+  Ward swallows the first, Ice Block lets nothing in but you can't act.
 - **Full charge**: a charged spell held to the top flares on you (everyone sees it: the class's
   flash and sound), the reticle bursts and the screen's edge flares in its colour, and Aimed
   Throw, Shadow Bolt, Fireball, Frostbolt and Lightning Bolt fly much faster.
@@ -1152,7 +1155,7 @@ target warned), Backstab from behind and on a Mark, Ambush's step, Holy Shock he
 Purifying Shock freeing them, holy ground burning foes and healing friends (and Hallowed Ground's
 softened blows), Onslaught, the Death Mark and its reset, Sanctuary, Cold Snap and the shatter,
 Dread Step, an old save's keys put on the board's rows, the five rows of four, Lay on Hands,
-Shield Wall and Dread Ward, and a full charge's flare and faster axe. `tests.rs` has Tab switching
+Shield Wall and Dread Ward, and a full charge's flare and faster arrow (Aimed Shot). `tests.rs` has Tab switching
 round the foes in view and held letting go, a jump's stamina and a roll's least stamina.
 
 `crates/htl-survival/src/tests_moves.rs` covers the moving mechanics on abilities made for the
