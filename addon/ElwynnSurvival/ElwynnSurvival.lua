@@ -6029,7 +6029,10 @@ events:SetScript("OnEvent", function()
     end
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
-    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
+    -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up).
+    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
+      Say(".es hello " .. VERSION .. " ac9")
+    elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
       Say(".es hello " .. VERSION .. " ac8")
     elseif LocalHits() and SetTelegraph and (tonumber(HasActionCombat()) or 0) >= 7 then
       Say(".es hello " .. VERSION .. " ac7")
