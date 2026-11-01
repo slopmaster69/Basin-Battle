@@ -1191,12 +1191,13 @@ fn an_eighth_round_client_sees_a_sky_fall_laid_at_its_spot_and_an_older_one_its_
     b.chat(".es hello 5 ac5");
     a.drain(0.6);
     b.drain(0.3);
-    // Mind Blast (a dark star at the reticle 0.6 s later) on Q.
-    a.chat(".es slot q mind_blast");
+    // Mind Blast (a dark star at the reticle 0.6 s later): Penance's EX version, on Q with Ctrl.
+    a.chat(".es slot q penance");
+    a.chat(".es valor full");
     a.drain(0.2);
     a.seen.clear();
     b.seen.clear();
-    a.chat(".es in ab 0 0");
+    a.chat(".es in ab 0 1");
     a.chat(".es in a");
     a.chat(".es in au 0.0 -0.3");
     let ta = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tTA\t")));

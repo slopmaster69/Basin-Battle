@@ -91,7 +91,7 @@ fn every_card_and_its_charged_up_version_goes_off_on_creatures() {
             let touched = foes.iter().zip(&health).zip(&at).any(|((m, h), was)| {
                 s.mobs.get(m).is_none_or(|x| x.health < *h || dist2d(x.pos, *was) > 0.5) || !s.cc_of(*m).is_empty()
             });
-            let for_self = matches!(d.kind.as_str(), "stance" | "buff" | "blink" | "place") || (d.kind == "leap" && d.back) || d.damage[1] <= 0.0 && d.effects.is_empty();
+            let for_self = matches!(d.kind.as_str(), "stance" | "buff" | "blink" | "place" | "ally") || (d.kind == "leap" && d.back) || d.damage[1] <= 0.0 && d.effects.is_empty();
             assert!(touched || for_self, "{}: it reached no foe", d.key);
             s.leave(p);
             s.traps.clear();
@@ -126,6 +126,8 @@ fn every_card_goes_off_in_a_duel() {
 /// half of what burns after (it can be walked out of).
 fn worth(d: &AbilityDef) -> f32 {
     let hit = (d.damage[0] + d.damage[1]) / 2.0 * d.count.max(1) as f32;
+    // A beam's damage is a second's, on each foe it holds: all of it held.
+    let hit = if d.kind == "beam" { hit * d.secs } else { hit };
     let chain: f32 = (1..=d.chain).map(|k| hit * d.chain_falloff.powi(k as i32)).sum();
     let burn: f32 = d.effects.iter().filter(|e| e.kind == "burn").map(|e| e.amount * e.secs[1]).sum();
     let linger = d.linger_damage * d.linger;

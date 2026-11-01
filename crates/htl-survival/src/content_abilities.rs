@@ -301,7 +301,8 @@ pub struct AbilityDef {
     /// Effects on the caster as it goes (a leap's haste, a cast that shields you).
     #[serde(default)]
     pub self_effects: Vec<AbilityEffect>,
-    /// Lingering ground's effects on each foe inside, every tick (a vortex's pull, a storm's snare).
+    /// Lingering ground's effects on each foe inside, every tick (a vortex's pull, a storm's snare);
+    /// the boons among them go to each friend inside instead, held as its `boon` is.
     #[serde(default)]
     pub tick_effects: Vec<AbilityEffect>,
     /// A cone's, a nova's or a line's wind-up (seconds): drawn on the ground for everyone, then it

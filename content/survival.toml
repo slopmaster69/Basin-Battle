@@ -3979,29 +3979,39 @@ effects = [{ kind = "veil", secs = [5.0, 5.0] }, { kind = "haste", secs = [2.0, 
 
 # ----------------------------------------------------------------------------------- Priest --
 
+# Light steered by hand: one lance that burns foes and mends friends, swept as you turn.
+[[ability]]
+key = "penance"
+name = "Penance"
+text = "Hold a lance of light out from you for 1.5 s and sweep it as you turn: foes in it burn, friends in it heal. Rake it across a pack, or across a friend in trouble."
+icon = "Spell_Holy_HolySmite"
+school = "priest"
+slot = "ranged"
+kind = "beam"
+range = [22.0, 22.0]
+# Half its width: a lance 2 yd wide.
+radius = [1.0, 1.0]
+secs = 1.5
+tick = 0.25
+# A second in it: 24 over its 1.5 s on each foe it holds.
+damage = [16.0, 16.0]
+ally_heal = 0.04
+cooldown = 5.0
+# A golden glow on you while you hold it (Power Infusion), and bolts of holy light streaming down
+# it to the first foe in it (a holy missile with no cast pose of its own, so each tick doesn't
+# jerk the priest).
+spell = 10060
+aura = 10060
+tick_spell = 6685
+clip = 53
+
+# The old Mind Blast's bigger, terrifying version, now Penance's EX.
 [[ability]]
 key = "mind_blast"
 name = "Mind Blast"
-text = "A dark star bursts at the reticle (up to 30 yd) 0.6 s later, drawn for everyone: 26 to all within 2.5 yd. Lead your target, or land it on a root."
+ex_of = "penance"
+text = "A dark star bursts at the reticle (up to 30 yd) 0.6 s later, drawn for everyone: 28 to all within 3.5 yd, and they flee in terror for 2 s (1 s on heroes). Lead your target."
 icon = "Spell_Shadow_UnholyFrenzy"
-school = "priest"
-slot = "ranged"
-kind = "ground"
-range = [30.0, 30.0]
-radius = [2.5, 2.5]
-delay = 0.6
-damage = [26.0, 26.0]
-cooldown = 5.0
-# A burst of void out of the ground where it lands (Void Blast).
-spell = 27812
-clip = 54
-
-[[ability]]
-key = "psychic_blast"
-name = "Psychic Blast"
-ex_of = "mind_blast"
-text = "A wider Mind Blast (3.5 yd): 28 damage, and whoever it catches flees in terror for 2 s (1 s on heroes)."
-icon = "Spell_Shadow_DeathScream"
 slot = "ranged"
 kind = "ground"
 valor = 25
@@ -4075,29 +4085,41 @@ spell = 23394
 clip = 54
 effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "root", secs = [2.0, 2.0] }, { kind = "shield", secs = [5.0, 5.0], amount = 30.0 }]
 
+# A place to hold: friends under the dome take less and stand their ground. Each second it gives
+# them both (its boon, and the boon among its tick effects) for 1.5 s; you have both at once.
+[[ability]]
+key = "power_word_barrier"
+name = "Power Word: Barrier"
+text = "Raise a 6 yd dome of light around you for 5 s: you and every friend under it take 25% less and can't be staggered. Hold the line inside it."
+icon = "Spell_Holy_PowerInfusion"
+school = "priest"
+slot = "defense"
+kind = "ground"
+at_self = true
+radius = [6.0, 6.0]
+linger = 5.0
+cooldown = 18.0
+# A column of light on you as it rises (Sanctuary's), and holy light on the ground while it lasts.
+spell = 24171
+linger_spell = 20116
+boon = "hallowed"
+boon_amount = 0.25
+tick_effects = [{ kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
+self_effects = [{ kind = "hallowed", secs = [1.5, 1.5], amount = 0.25 }, { kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
+
+# Now given away: on the friend under the reticle, else on you.
 [[ability]]
 key = "power_word_shield"
 name = "Power Word: Shield"
-text = "A shield on you that soaks 45 damage for 6 s."
+ex_of = "power_word_barrier"
+text = "Shield the friend under your reticle (or yourself): it soaks 45 damage for 6 s, and they run 20% faster while it holds."
 icon = "Spell_Holy_PowerWordShield"
-school = "priest"
 slot = "defense"
-kind = "buff"
-cooldown = 15.0
-spell = 17
-effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }]
-
-[[ability]]
-key = "pain_suppression"
-name = "Pain Suppression"
-text = "For 4 s you take 40% less from everything, and a shield soaks the first 30."
-ex_of = "power_word_shield"
-icon = "Spell_Holy_PowerInfusion"
-slot = "defense"
-kind = "buff"
+kind = "ally"
 valor = 25
-spell = 10060
-effects = [{ kind = "hallowed", secs = [4.0, 4.0], amount = 0.4, aura = 10060 }, { kind = "shield", secs = [4.0, 4.0], amount = 30.0 }]
+range = [30.0, 30.0]
+spell = 17
+effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }, { kind = "haste", secs = [6.0, 6.0], amount = 0.2 }]
 
 [[ability]]
 key = "void_rift"
@@ -8540,7 +8562,7 @@ name = "Altar of the Abbey"
 at = [-8935.0, -165.0]
 display = 1527
 scale = 0.45
-teaches = ["mind_blast", "holy_nova"]
+teaches = ["penance", "holy_nova"]
 keep = true
 secs = 3.0
 text = "The Abbey's altar remembers its priests: the Light, and the shadow behind it."
@@ -8646,7 +8668,7 @@ trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 key = "relic_priest"
 name = "The Abbey Reliquary"
 at = [-8865.0, -150.0]
-teaches = ["leap_of_faith", "power_word_shield"]
+teaches = ["leap_of_faith", "power_word_barrier"]
 loot = { linen = 3 }
 display = 259
 secret = 7.0
@@ -9063,7 +9085,7 @@ at = [-8905.0, -175.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Holy_PowerWordShield"
-text = "The priest's shrine at the Abbey (Mind Blast, Holy Nova). Something hidden behind it."
+text = "The priest's shrine at the Abbey (Penance, Holy Nova). Something hidden behind it."
 reward = { linen = 3 }
 
 [[site]]

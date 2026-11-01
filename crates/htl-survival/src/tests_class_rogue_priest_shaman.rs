@@ -252,3 +252,144 @@ fn an_old_save_with_the_rogues_old_cards_loads_with_their_successors() {
     assert_eq!(h.loadout.get("defense").map(String::as_str), Some("smoke_bomb"));
     assert_eq!(h.loadout.get("utility").map(String::as_str), Some("shadowstep"));
 }
+
+// --- Priest -------------------------------------------------------------------------------------
+
+fn channelling(s: &Survival, p: Id) -> bool {
+    matches!(s.players[&p].action, Action::Channel { .. })
+}
+
+fn halve(s: &mut Survival, p: Id) -> u32 {
+    let h = s.players.get_mut(&p).unwrap();
+    h.health = h.max_health / 2;
+    h.health
+}
+
+#[test]
+fn penance_burns_the_foes_in_its_lance_heals_the_friend_it_crosses_and_sweeps_as_she_turns() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let f = hero(&mut s, "Bren", [6.0, -0.5, 0.0], 0.0);
+    let near = grunt(&mut s, [10.0, 0.0, 0.0]);
+    let far = grunt(&mut s, [20.0, 0.5, 0.0]);
+    let beyond = grunt(&mut s, [26.0, 0.0, 0.0]);
+    let north = grunt(&mut s, [0.0, 10.0, 0.0]);
+    let pins: Vec<(Id, Vec3)> = [near, far, beyond, north].iter().map(|m| (*m, s.mobs[m].pos)).collect();
+    let hf = halve(&mut s, f);
+    let mut ev = cast(&mut s, p, "penance", false);
+    assert!(channelling(&s, p), "held");
+    assert!(s.auras_of(p).contains(&10060), "its glow on her while she holds it");
+    ev.extend(run_pinned(&mut s, 0.9, &pins));
+    assert!(hits(&ev, p, near) >= 3, "the near one burns each tick: {}", hits(&ev, p, near));
+    assert!(hits(&ev, p, far) >= 3, "and the far one in the same lance: {}", hits(&ev, p, far));
+    assert_eq!(hits(&ev, p, beyond), 0, "not past its 22 yd");
+    assert_eq!(hits(&ev, p, north), 0, "nor off to the side, yet");
+    assert!(s.players[&f].health > hf, "the friend it crosses mended");
+    assert_eq!(hits(&ev, p, f), 0, "and never burned");
+    assert!(
+        ev.iter()
+            .any(|e| matches!(e, Event::Missile { caster, spell: 6685, target: Target::Unit(t) } if *caster == p && *t == near)),
+        "its light streams to the first foe in it"
+    );
+    // She turns north: the lance sweeps with her.
+    s.move_player(p, ORIGIN, std::f32::consts::FRAC_PI_2, Moving::default());
+    let ev = run_pinned(&mut s, 0.5, &pins);
+    assert!(hits(&ev, p, north) >= 1, "now the north one");
+    assert_eq!(hits(&ev, p, near), 0, "no longer the ones it left");
+    run_pinned(&mut s, 0.5, &pins);
+    assert!(!channelling(&s, p), "over after 1.5 s");
+}
+
+#[test]
+fn mind_blast_is_penances_ex_a_dark_star_that_lands_late_and_terrifies() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = grunt(&mut s, [12.0, 0.0, 0.0]);
+    let pins = [(m, [12.0, 0.0, 0.0])];
+    let before = hp(&s, m);
+    let ev = cast(&mut s, p, "penance", true);
+    assert!(!channelling(&s, p), "not the beam");
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Mark { radius, tele: Some(_), .. } if (*radius - 3.5).abs() < 0.01)),
+        "its ring, for everyone"
+    );
+    assert!((s.players[&p].valor - 75.0).abs() < 0.01, "a segment of Valor");
+    run_pinned(&mut s, 0.3, &pins);
+    assert_eq!(hp(&s, m), before, "not yet");
+    run_pinned(&mut s, 0.5, &pins);
+    assert!(hp(&s, m) < before, "it landed");
+    assert!(s.has_cc(m, "panic"), "and terrifies");
+}
+
+#[test]
+fn power_word_barrier_wards_and_steadies_whoever_stands_under_it() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let f = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
+    let away = hero(&mut s, "Cara", [12.0, 0.0, 0.0], 0.0);
+    let m = grunt(&mut s, [4.0, 2.0, 0.0]);
+    let pins = [(m, [4.0, 2.0, 0.0])];
+    let ev = cast(&mut s, p, "power_word_barrier", false);
+    assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { spell: 20116, .. })), "its light on the ground");
+    assert!(s.has_cc(p, "hallowed") && s.unstaggerable(p), "her own at once");
+    assert!((s.taken_share(p) - 0.75).abs() < 0.01, "a quarter less: {}", s.taken_share(p));
+    run_pinned(&mut s, 1.1, &pins);
+    assert!(s.has_cc(f, "hallowed") && s.has_cc(f, "steadfast"), "the friend under it, both");
+    assert!((s.taken_share(f) - 0.75).abs() < 0.01);
+    assert!(!s.has_cc(away, "hallowed") && !s.has_cc(away, "steadfast"), "not one outside it");
+    assert!(!s.has_cc(m, "steadfast") && !s.has_cc(m, "hallowed"), "never a foe in it");
+    // Out from under it, it wears off.
+    s.move_player(f, [12.0, 2.0, 0.0], 0.0, Moving::default());
+    run_pinned(&mut s, 1.6, &pins);
+    assert!(!s.has_cc(f, "hallowed") && !s.has_cc(f, "steadfast"), "gone once he left it");
+    assert!(s.has_cc(p, "hallowed"), "still on her inside it");
+    run_pinned(&mut s, 4.0, &pins);
+    assert!(!s.has_cc(p, "hallowed"), "the dome gone, so is the ward");
+}
+
+#[test]
+fn power_word_shield_is_the_barriers_ex_and_goes_on_the_friend_under_the_reticle_else_on_you() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let f = hero(&mut s, "Bren", [8.0, 0.0, 0.0], 0.0);
+    let ev = cast(&mut s, p, "power_word_barrier", true);
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 17, target: Target::Unit(t) } if *caster == p && *t == f)),
+        "its look on him"
+    );
+    assert!(s.has_cc(f, "shield") && s.has_cc(f, "haste"), "shielded and quick");
+    assert!(!s.has_cc(p, "shield") && !s.has_cc(p, "haste"), "not her");
+    let v = s.players[&p].valor;
+    assert!(v > 74.9 && v < 90.0, "a segment of Valor spent (a little back for helping): {v}");
+    assert!(s.grounds.is_empty() && s.burnings.is_empty(), "no dome with it");
+
+    // Alone, it's her own.
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    cast(&mut s, p, "power_word_barrier", true);
+    assert!(s.has_cc(p, "shield") && s.has_cc(p, "haste"), "on herself");
+}
+
+#[test]
+fn an_old_save_with_the_priests_old_cards_loads_with_their_successors() {
+    let mut s = world(false);
+    s.content.dev.full_tree = false;
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut save = s.leave(p).unwrap();
+    save.owned = ["mind_blast", "holy_nova", "leap_of_faith", "power_word_shield"].into_iter().map(String::from).collect();
+    save.loadout = [("ranged", "mind_blast"), ("close", "holy_nova"), ("defense", "power_word_shield")]
+        .into_iter()
+        .map(|(a, b)| (a.to_string(), b.to_string()))
+        .collect();
+    let q = s.join("ayla", "Ayla", Some(&save));
+    let h = &s.players[&q];
+    for k in ["penance", "holy_nova", "leap_of_faith", "power_word_barrier"] {
+        assert!(h.owned.contains(k), "owns {k}: {:?}", h.owned);
+    }
+    assert!(
+        !h.owned.contains("mind_blast") && !h.owned.contains("power_word_shield"),
+        "not the EX versions: they come with their cards"
+    );
+    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("penance"));
+    assert_eq!(h.loadout.get("defense").map(String::as_str), Some("power_word_barrier"));
+}

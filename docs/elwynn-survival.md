@@ -136,10 +136,10 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Fan of Knives · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
 | 3 | **Ultimate** | Onslaught | Sanctuary | Volley | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
@@ -161,9 +161,12 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
   Smoke Bomb, a cloud at your feet that hides you and your friends in it and slows foes, Vanish
   hides you at once (your next blow counts as from behind); Death Mark.
-- **Priest**: light and the void. Mind Blast bursts at the reticle 0.6 s later (lead the target);
-  Holy Nova heals you and your friends as it burns foes; Leap of Faith pulls the first body it
-  touches to you, friend or foe; Power Word: Shield; Void Rift drags everyone in it to its middle.
+- **Priest**: steer the light. Penance, a lance of light held 1.5 s and swept as you turn, burns
+  the foes in it and heals the friends in it (its EX, Mind Blast, bursts at the reticle 0.6 s later
+  and terrifies); Holy Nova heals you and your friends as it burns foes; Leap of Faith pulls the
+  first body it touches to you, friend or foe; Power Word: Barrier, a dome where you and your
+  friends take a quarter less and can't be staggered (its EX shields a friend, or you); Void Rift
+  drags everyone in it to its middle.
 - **Shaman**: storm and totem. Lightning Bolt (full charge streaks out at 2.5 times the speed),
   Chain Lightning leaps on twice; Thunderstorm throws everyone round you 8 yd away; totems to slow
   or root, to heal, or to swallow a projectile (Grounding); Earthquake stuns and slows a field.
@@ -218,7 +221,7 @@ you, or the circle where it will land. Traps and anchors show as green circles.
   Meteor land.
 - **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab; Shadow Bolt's Mark makes
   it crit; a kill under Death Mark readies everything again.
-- **Stay alive**: Power Word: Shield, Barkskin and Healing Stream stack with Holy Nova and
+- **Stay alive**: Power Word: Barrier, Barkskin and Healing Stream stack with Holy Nova and
   Consecration; Grounding Totem eats the big projectile (a Pyroblast, a hammer, a Death Mark).
 
 **PvP**: every card keeps to a budget a test holds it to (`tests_classes.rs`): a ranged poke does

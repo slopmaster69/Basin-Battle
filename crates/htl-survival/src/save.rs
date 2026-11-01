@@ -210,7 +210,10 @@ const RENAMED: &[(&str, &str)] = &[
     // Rogue
     ("deadly_throw", "fan_of_knives"),
     ("evasion", "smoke_bomb"),
-    // Priest
+    // Priest (Mind Blast and Power Word: Shield are now EX versions, never saved: a saved one is
+    // the old card)
+    ("mind_blast", "penance"),
+    ("power_word_shield", "power_word_barrier"),
     // Shaman
     // Mage
     // Warlock
