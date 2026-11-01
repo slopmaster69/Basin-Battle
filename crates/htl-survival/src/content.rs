@@ -2930,8 +2930,8 @@ impl Content {
             if a.kind == "line" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0) {
                 bail!("{what}: a strip needs its length (`range`) and half-width (`radius`)");
             }
-            if a.kind == "ally" && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
-                bail!("{what}: an ally ability helps whoever it lands on: no `damage`");
+            if a.kind == "ally" && !a.foe_damage && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
+                bail!("{what}: an ally ability helps whoever it lands on: no `damage` (unless `foe_damage`: a foe on the line takes it)");
             }
             if a.kind == "beam" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0 || a.secs <= 0.0) {
                 bail!("{what}: a beam needs its length (`range`), half-width (`radius`) and how long it's held (`secs`)");
@@ -2942,8 +2942,9 @@ impl Content {
             if (a.pierce > 0 || a.full_pierce > 0 || a.chain > 0 || a.splash > 0.0) && a.kind != "projectile" && a.kind != "trap" {
                 bail!("{what}: pierce, chain and splash are a projectile's");
             }
-            if !a.boon.is_empty() && !BOONS.contains(&a.boon.as_str()) {
-                bail!("{what}: boon {:?} (one of {BOONS:?})", a.boon);
+            // One boon, or several joined with `+` (Hallowed Ground's `hallowed+steadfast`).
+            if !a.boon.is_empty() && !a.boon.split('+').all(|b| BOONS.contains(&b)) {
+                bail!("{what}: boon {:?} (one of {BOONS:?}, or several joined with +)", a.boon);
             }
             if a.charge[1] < a.charge[0] {
                 bail!("{what}: its full charge comes before its least");

@@ -220,32 +220,30 @@ fn heroes_get_half_the_duration_and_the_grace_stops_a_second_stun() {
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], std::f32::consts::PI);
     s.set_cooldowns(a, true);
-    slot(&mut s, a, "utility", "divine_steed");
-    // Divine Steed, then its key again: Hammer of Justice, thrown.
-    let hammer = |s: &mut Survival| {
-        cast(s, a, "utility", false, 0.0);
-        run(s, 0.4);
-        cast(s, a, "utility", false, 0.0)
-    };
+    // A two-hander on Avenger's Shield's key throws Hammer of Justice.
+    let maul = s.content.item("maul").unwrap();
+    s.players.get_mut(&a).unwrap().weapon = maul;
+    slot(&mut s, a, "ranged", "avengers_shield");
+    let hammer = |s: &mut Survival| cast(s, a, "ranged", false, 0.0);
     let mut ev = hammer(&mut s);
-    ev.extend(run(&mut s, 0.6));
+    ev.extend(run(&mut s, 0.8));
     assert!(s.has_cc(b, "stun"), "Hammer of Justice stuns");
     assert!(s.disabled(b));
     let c = s.cc_of(b).iter().find(|c| c.kind == "stun").unwrap().clone();
-    assert!((c.until - c.since - 1.0).abs() < 0.05, "1 s on a hero, not 2");
+    assert!((c.until - c.since - 0.75).abs() < 0.05, "0.75 s on a hero, not 1.5");
     run(&mut s, 1.2);
     assert!(!s.has_cc(b, "stun"));
     hammer(&mut s);
-    run(&mut s, 0.6);
+    run(&mut s, 0.8);
     assert!(!s.has_cc(b, "stun"), "the grace");
     assert!(s.cc_log_of(b).iter().any(|l| l.contains("grace")), "{:?}", s.cc_log_of(b));
-    // On a creature, the whole 2 s.
+    // On a creature, the whole 1.5 s.
     let k = mob(&mut s, "grunt", [10.0, 0.0, 0.0]);
     s.players.get_mut(&b).unwrap().pos = [10.0, 20.0, 0.0];
     hammer(&mut s);
-    run(&mut s, 0.6);
+    run(&mut s, 0.8);
     let c = s.cc_of(k).iter().find(|c| c.kind == "stun").unwrap().clone();
-    assert!((c.until - c.since - 2.0).abs() < 0.05);
+    assert!((c.until - c.since - 1.5).abs() < 0.05);
 }
 
 #[test]

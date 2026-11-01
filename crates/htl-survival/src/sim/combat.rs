@@ -149,6 +149,10 @@ impl Survival {
         if self.immune(id) && !matches!(input, Input::Ability(..) | Input::GuardUp | Input::AttackUp) {
             return true;
         }
+        // On the charger: an attack or an ability puts them back on foot.
+        if matches!(input, Input::Attack | Input::Heavy | Input::Ability(..)) && self.has_cc(id, "steed") {
+            self.cleanse(id, &["steed"]);
+        }
         // A brace that ends the moment the hero does anything else (Retaliation, Shield Wall):
         // it ends, and what they pressed goes on; its own key again only lowers it.
         if matches!(input, Input::Attack | Input::Heavy | Input::Guard | Input::Dodge | Input::Ability(..)) && self.ends_on_action(id) {
@@ -466,6 +470,10 @@ impl Survival {
     }
 
     fn start_swing(&mut self, id: Id, kind: StrikeKind) {
+        // Avenging Wrath: every heavy attack sends a wave of light along the hero's facing.
+        if kind == StrikeKind::Heavy && self.has_cc(id, "wrath") {
+            self.avenging_wave(id);
+        }
         let weapon = self.players[&id].weapon;
         let wdef = self.content.weapon(&self.content.items[weapon].key).cloned().expect("a melee weapon");
         let windex = self.content.weapons.iter().position(|w| w.key == wdef.key).unwrap();

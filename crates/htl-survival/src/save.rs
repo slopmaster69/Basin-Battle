@@ -215,6 +215,7 @@ const RENAMED: &[(&str, &str)] = &[
     ("holy_shock", "avengers_shield"),
     ("hammer_of_justice", "divine_steed"),
     ("divine_protection", "blessing_of_protection"),
+    ("sanctuary", "avenging_wrath"),
     // Hunter
     ("arcane_shot", "aimed_arrow"),
     ("deterrence", "flare"),

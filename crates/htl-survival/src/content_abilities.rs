@@ -236,6 +236,19 @@ pub struct AbilityDef {
     /// Every hero has it from the start (the rest are unlocked later; all in a dev build).
     #[serde(default)]
     pub free: bool,
+    /// With a two-handed weapon (no shield to throw), its key fires this ability instead.
+    #[serde(default)]
+    pub two_hand: String,
+    /// An ally spell that strikes a foe instead (its `damage`) when one is on the reticle's line
+    /// (Holy Shock).
+    #[serde(default)]
+    pub foe_damage: bool,
+    /// Once given, the same hero can't have it again for this long (Lay on Hands).
+    #[serde(default)]
+    pub lockout: f32,
+    /// Its leaps go to a foe that's casting first (Avenger's Shield), else the nearest.
+    #[serde(default)]
+    pub chain_casters: bool,
     /// A returning projectile: its key again while it flies out calls it back from where it is.
     #[serde(default)]
     pub recall: bool,
@@ -567,11 +580,11 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// go; their next blow counts as from behind) until they strike or cast; `cheat_death` keeps a hero
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
-pub const OTHER_EFFECTS: [&str; 16] =
-    ["burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
+pub const OTHER_EFFECTS: [&str; 19] =
+    ["burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 8] = ["onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death"];
+pub const BOONS: [&str; 11] = ["freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
