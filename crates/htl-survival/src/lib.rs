@@ -35,6 +35,8 @@ mod tests_classes;
 #[cfg(test)]
 mod tests_explore;
 #[cfg(test)]
+mod tests_floors;
+#[cfg(test)]
 mod tests_siege;
 #[cfg(test)]
 mod tests_tactics;

@@ -1449,7 +1449,8 @@ fn the_book_lists_every_dungeon_and_a_page_of_another_takes_a_hero_to_its_own_wo
     a.chat(".es lore deadmines");
     let nt = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tNT\tlore\t")));
     let ServerPacket::MessageChat(m) = nt.expect("the record's page") else { unreachable!() };
-    assert!(m.text.contains(&format!("0 of {secrets} secrets found, 0 of {notes} notes read")) && m.text.contains("Secrets found: none yet.{n}{n}"), "{}", m.text);
+    // Notes only: the secrets aren't listed or counted on the page.
+    assert!(m.text.contains(&format!("\t0 of {notes} notes read\t")) && !m.text.contains("Secrets found") && !m.text.contains("secrets found"), "{}", m.text);
     a.chat(".es note smugglers_tally");
     assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You haven't read that one yet"))).is_some(), "not read: not in the book");
     a.chat(".es travel stockade_gate");

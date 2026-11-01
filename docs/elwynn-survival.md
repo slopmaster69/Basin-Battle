@@ -279,6 +279,11 @@ Some of this needs a change to the client itself, which this folder carries as p
   Red: no guard stops it, dodge. Orange: it can be blocked, and the whole shape turns gold for
   your parry's window (raise the guard then). No stroke round it: soft fills whose edges fade
   out. A blow meant for someone else is fainter, and has no growing fill;
+- a blow meant for you tells you when to answer it, with the floor markers on or off: the
+  striker glows over its wind-up (amber: a guard stops it, red: it doesn't), and a reaction's
+  time before your window opens the glow flashes bright: raise the guard now to parry (with a
+  blade's ring), or roll now for a red one. The stroke into the blow wooshes, heavier for a slower
+  wind-up;
 - a raised guard's ShieldBlock goes up once and holds there (on the upper body while moving),
   where it used to loop;
 - heroes' abilities are drawn the same way (`SetTelegraph` strips and a friend's blue,
@@ -814,9 +819,10 @@ Notes lie where they were dropped below; read one (the use key) and it opens on 
 that stays till you close it, with a clue in red ink while the secret it speaks of is still
 hidden. Every hidden spot has a marker to search (a heap of sacks, a pumpkin on a grave, a book
 in rusted chains): come near it and you're nudged once a run, search it and it gives up what it
-kept. The camp remembers every note read and secret found; the book's page for each dungeon has
-a **Secrets and Notes** row (`.es lore <dungeon>`): what's found, the rumours of the rest, and
-every note to read again (`.es note <note>`).
+kept. The camp remembers every note read and secret found, but the book doesn't list or count
+secrets: they're found down there, not ticked off. Its page for each dungeon has a **Notes** row
+(`.es lore <dungeon>`): the rumours the notes read give of what's still hidden, and every note
+to read again (`.es note <note>`).
 
 ## The Bookmaker's Wager (timed runs) and the Bookmaker's Board
 

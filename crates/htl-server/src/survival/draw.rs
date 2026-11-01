@@ -758,9 +758,11 @@ impl SurvivalGame {
     }
 
     /// A creature's blow (or a hero's wind-up) for a client that draws it under the unit:
-    /// `TG\t<key>\t<guid>\t<wedge|ring|line>\t<reach>\t<arc>\t<seconds to the blow>\t<block|unblockable|friendly>\t<the parry's window>\t<meant for this hero>\t<a line's width>`
+    /// `TG\t<key>\t<guid>\t<wedge|ring|line>\t<reach>\t<arc>\t<seconds to the blow>\t<block|unblockable|friendly>\t<the parry's window>\t<meant for this hero>\t<a line's width>\t<the roll's window>`
     /// (`TG\t<key>` once it's gone). The window is this hero's own (their weapon's share in it). A
-    /// client before the eighth round gets no lines, and no `friendly`.
+    /// client before the eighth round gets no lines, and no `friendly`. The roll's window: a dodge
+    /// started up to this long before the blow lands evades it (`[dodge] evade_to`), which the
+    /// add-on's tells cue an unblockable blow by.
     pub(crate) fn telegraph_line(&self, key: Id, t: &htl_survival::Telegraph, hero: Id, level: u8) -> Option<String> {
         let g = self.guid_of(t.mob)?;
         let c = &self.sim.content;
@@ -786,12 +788,13 @@ impl SurvivalGame {
             (if t.blockable { "block" } else { "unblockable" }, t.foe == Some(hero) || (ring && near) || p.is_some_and(|p| p.lock == Some(t.mob)))
         };
         Some(format!(
-            "TG\t{key}\t{g:#X}\t{shape}\t{:.2}\t{:.0}\t{:.2}\t{kind}\t{parry:.2}\t{}\t{:.2}",
+            "TG\t{key}\t{g:#X}\t{shape}\t{:.2}\t{:.0}\t{:.2}\t{kind}\t{parry:.2}\t{}\t{:.2}\t{:.2}",
             t.reach,
             t.arc.min(360.0),
             t.secs,
             u8::from(focus),
-            t.width
+            t.width,
+            c.dodge.evade_to
         ))
     }
 

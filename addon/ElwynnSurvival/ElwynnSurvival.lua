@@ -3390,6 +3390,36 @@ function ES.WeaponGlow(guid, secs)
   return true
 end
 
+-- Tells: a blow coming at you reads on the striker itself, with the floor markers on or off. Its
+-- wind-up glows (amber: a guard stops it, red: nothing does, from the TG line); a moment before
+-- the window to answer it opens, the glow flashes bright: raise the guard now for a parry, with a
+-- blade's ring, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
+-- a longer wind-up. ES.tells[key] is the wind-up's number, so a blow called off (its TG gone
+-- before it lands, or a new one for the same key) plays nothing more.
+ES.tells, ES.tellN = {}, 0
+-- The flash comes this long before the window opens: about a reaction's time, so the press lands
+-- inside the window, not after it.
+ES.TELL_LEAD = 0.12
+ES.TELL_FLASH = "FFF6D8"
+ES.TELL_RING = "Sound\\Item\\Weapons\\Parry\\ParryMetalHitMetal.wav"
+function ES.Tell(key, guid, secs, kind, parry, roll)
+  ES.tellN = ES.tellN + 1
+  local n = ES.tellN
+  ES.tells[key] = n
+  secs = secs or 0.8
+  local window = (kind == "block") and (parry or 0.25) or (roll or 0.32)
+  local flashAt = math.max(0, secs - window - ES.TELL_LEAD)
+  After(flashAt, function()
+    if ES.tells[key] ~= n then return end
+    if SetUnitWeaponGlow then SetUnitWeaponGlow(guid, ES.TELL_FLASH, math.max(0.15, secs - flashAt + 0.05)) end
+    if kind == "block" then PlaySoundFile(ES.TELL_RING) end
+  end)
+  After(math.max(0, secs - 0.22), function()
+    if ES.tells[key] ~= n then return end
+    Woosh((secs >= 1.0 and "large") or (secs >= 0.5 and "medium") or "small")
+  end)
+end
+
 function ES.Danger(secs)
   danger.untilT = GetTime() + math.max(0.3, secs or 0.8)
   danger:SetAlpha(1)
@@ -4018,7 +4048,8 @@ function ES.DrawPins()
   if ES.pinText then
     local t = ES.pinTally or {}
     if shown and t[2] then
-      ES.pinText:SetText(string.format("Elwynn: %s of %s places found   %s of %s chests opened   %s of %s secrets", t[1] or 0, t[2] or 0, t[3] or 0, t[4] or 0, t[5] or 0, t[6] or 0))
+      -- (Secrets aren't counted here: they're found, not ticked off.)
+      ES.pinText:SetText(string.format("Elwynn: %s of %s places found   %s of %s chests opened", t[1] or 0, t[2] or 0, t[3] or 0, t[4] or 0))
       ES.pinText:Show()
     else
       ES.pinText:Hide()
@@ -4277,20 +4308,21 @@ function ES.BookDraw()
       return
     end
     Rest(info[2] or "?", info[9] or "", "")
-    -- (A server that keeps the book's record of secrets and notes sends their tallies.)
+    -- (A server that keeps the book's record of notes sends their tallies. It sends the secrets'
+    -- too, but they aren't shown: a secret is found down there, not ticked off in the book.)
     local top = 1
     if info[11] then
       top = 2
-      local found, all, read, notes = tonumber(info[10]) or 0, tonumber(info[11]) or 0, tonumber(info[12]) or 0, tonumber(info[13]) or 0
+      local read, notes = tonumber(info[12]) or 0, tonumber(info[13]) or 0
       Row(2, {
         icon = "INV_Misc_Note_02",
-        lit = found > 0 or read > 0,
-        name = "Secrets and Notes",
-        tag = found .. " of " .. all .. " secrets",
-        sub = read .. " of " .. notes .. " notes read",
+        lit = read > 0,
+        name = "Notes",
+        tag = read .. " of " .. notes .. " read",
+        sub = "The pages you've found down there",
         go = "Read",
         cmd = ".es lore " .. pick,
-        detail = "What's been found down there, the rumours of what hasn't (from the notes read), and every note, to read again.",
+        detail = "Every note you've found here, to read again, and what they hint at.",
       })
     end
     -- (And of the Bookmaker's Wager: the level open, the time to beat.)
@@ -5860,6 +5892,13 @@ function ES.Line(line)
     if f[3] and f[3] ~= "" and SetUnitWeaponGlow and (f[8] == "block" or f[8] == "unblockable") then
       local secs = tonumber(f[7]) or 0.8
       SetUnitWeaponGlow(f[3], (f[8] == "block") and "FFB030" or DANGER_RED, math.max(0.3, secs + 0.05))
+    end
+    -- Its tells, for a blow meant for us (the flash to answer it, the woosh); gone, none.
+    if f[3] and f[3] ~= "" and f[10] == "1" and (f[8] == "block" or f[8] == "unblockable") then
+      ES.Tell(key, f[3], tonumber(f[7]), f[8], tonumber(f[9]), tonumber(f[12]))
+    else
+      -- Gone, or no longer meant for us: nothing more from it.
+      ES.tells[key] = nil
     end
     if f[3] and SetTelegraph and ES.MarksOn() then
       SetTelegraph(key, f[3], f[4] or "wedge", tonumber(f[5]) or 2, tonumber(f[6]) or 90,

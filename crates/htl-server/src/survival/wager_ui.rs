@@ -15,13 +15,22 @@ impl SurvivalGame {
         let d = c.dungeons().find(|d| d.key == dungeon).cloned().ok_or("No such dungeon in the book: .es wager deadmines (or stockade, ...).")?;
         let most = self.sim.wager_unlocked(&d.key);
         let limit = wager_limit(&d, c);
-        let mut paras = vec![format!(
-            "The Bookmaker takes your wager on a run against the clock. It starts {} fresh: its bosses up, its secrets hidden, its shortcuts shut. The clock starts when the first of you leaves the first lamp and stops when its last boss falls; each fall adds {}. Win in time and the stakes go up (two levels for a run in four-fifths of the time, three in three-fifths). The higher the wager, the tougher the foes, and the more it pays: plunder for all of you, and the dungeon's gear into the camp's chest, the finer pieces from +3.",
-            d.name,
-            clock_words(WAGER_DEATH)
-        )];
+        // Plain words, a line a thought (play-test: the page didn't say how to open +2).
+        let mut paras = vec![
+            format!("The Bookmaker bets you can't clear {} before the sand runs out.", d.name),
+            format!(
+                "Take a wager below and the dungeon starts fresh for your run: every boss up again, every secret hidden, every shortcut shut. The clock starts when you step away from the first lamp and stops when the last boss falls. Each death costs {}.",
+                clock_words(WAGER_DEATH)
+            ),
+            "Beat the clock at your highest open wager and the next one opens. Finish with a fifth of the time to spare and you skip a level; with two-fifths to spare, two.".to_string(),
+            "Going home through a lamp takes you out of the run. Once everyone is out, the run is over and the dungeon is back as you left it.".to_string(),
+            "The higher the wager, the tougher the foes and the better the pay: plunder for everyone, and from +3 the dungeon's gear in the camp's chest.".to_string(),
+        ];
+        if most <= 1 {
+            paras.push("Only +1 is open for now. Beat it in time to open +2.".to_string());
+        }
         let terms: Vec<String> = TERMS.iter().map(|t| format!("+{} {}: {}", t.level, t.name, t.text)).collect();
-        paras.push(format!("The terms, as the stakes rise:\n{}", terms.join("\n")));
+        paras.push(format!("As the stakes rise:\n{}", terms.join("\n")));
         let (bests, top) = self.board.as_ref().map_or((Vec::new(), Vec::new()), |b| {
             let b = b.lock().unwrap();
             (b.bests_here(&d.key), b.top(&d.key, 1))
@@ -76,7 +85,8 @@ impl SurvivalGame {
         Ok(())
     }
 
-    /// The clock below (`WT name level elapsed limit falls state terms`), or `WT` with none.
+    /// The clock below (`WT name level elapsed limit falls state terms bosses`), or `WT` with none.
+    /// `bosses`: `name~down^...`, each boss the run has to beat and whether it's down (1) yet.
     pub(crate) fn wager_line(&self) -> String {
         let Some(w) = self.sim.wager() else { return "WT".to_string() };
         let name = self.sim.content.dungeon.as_ref().map_or(String::new(), |d| d.name.clone());
@@ -87,6 +97,7 @@ impl SurvivalGame {
             (None, None) => "wait",
         };
         let terms: Vec<&str> = terms_at(w.level).iter().map(|t| t.name).collect();
-        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")))
+        let bosses: Vec<String> = self.sim.wager_progress().iter().map(|(n, down)| format!("{}~{}", clean(n), u8::from(*down))).collect();
+        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"))
     }
 }
