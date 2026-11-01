@@ -1194,6 +1194,7 @@ impl SurvivalGame {
                 Err(_) => Err("Try .es wager <dungeon> <level>, as .es wager deadmines 3.".into()),
             },
             "board" => self.ui_board_page(conn, &arg),
+            "ladder" | "rating" => self.ui_ladder_page(conn, me),
             "ready" => self.sim.wager_ready(me),
             // The book at camp, and the lamps below.
             "travel" | "go" => {

@@ -61,6 +61,10 @@ impl Realms {
     /// The Bookmaker's Board, for the camp's pages and the wagers won below.
     pub fn set_board(&mut self, board: Option<super::board::Shared>) {
         self.camp.board = board.clone();
+        // (Below too, for the board's and the ladder's pages.)
+        for b in &mut self.below {
+            b.board = board.clone();
+        }
         self.board = board;
     }
 

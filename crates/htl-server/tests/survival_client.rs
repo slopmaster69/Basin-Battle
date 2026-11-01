@@ -1525,6 +1525,11 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
     let mut reply = String::new();
     s.read_to_string(&mut reply).unwrap();
     assert!(reply.starts_with("HTTP/1.0 200") && reply.contains("|Far Camp|stockade|6|") && !reply.contains("|9|"), "{reply}");
+    // The ladder: Zed, from that run, rated across the dungeons.
+    a.chat(".es ladder");
+    let nt = a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tNT\tboard\tThe Bookmaker's Ladder\t")));
+    let ServerPacket::MessageChat(m) = nt.expect("the ladder's page") else { unreachable!() };
+    assert!(m.text.contains("1. Zed (Mage) of Far Camp: ") && m.text.contains("Win a wager in time to get on it"), "{}", m.text);
     // And the login port still logs in.
     assert!(Client::connect(server.login, "bob", "hold", REALM).is_ok());
 }

@@ -140,6 +140,7 @@ pub fn start_games(mut config: Config, basin: Option<Basin>) -> Result<Running> 
         let dungeons: Vec<String> = sv.content.dungeons().map(|d| d.key.clone()).collect();
         let path = sv.save.as_ref().map(|p| p.with_file_name("wager-board.toml"));
         let shared: survival::board::Shared = std::sync::Arc::new(std::sync::Mutex::new(survival::board::Board::new(path, &config.board_name, config.board.clone(), dungeons)));
+        shared.lock().unwrap().set_tiers(sv.content.dungeons().map(|d| (d.key.clone(), d.tier)).collect());
         survival::board::Board::spawn_sync(shared.clone());
         board = Some(shared);
         let world = TcpListener::bind((config.bind.as_str(), sv.world_port))
