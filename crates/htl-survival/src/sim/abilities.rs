@@ -1589,25 +1589,33 @@ impl Survival {
     pub(crate) fn apply_effects(&mut self, owner: Id, victim: Id, effects: &[crate::content::AbilityEffect], share: f32, source: &str) {
         for e in effects {
             let secs = AbilityDef::at(e.secs, share);
-            match e.kind.as_str() {
-                "heal" => {
-                    let heal = self.players.get(&owner).map_or(0, |p| (p.max_health as f32 * e.amount).round() as u32);
-                    self.heal_hero_by(owner, heal, owner, source);
-                }
-                "cleanse_panic" => self.cleanse(victim, &["panic"]),
-                "knockback" | "pull" => self.displace(owner, victim, e),
-                "burn" | "mark" => {
-                    self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
-                }
-                "snare" if e.freeze_if_snared && self.has_cc(victim, "snare") => {
-                    self.apply_cc(victim, owner, "petrify", secs.min(2.0).max(1.0), 0.0, 0.0, source);
-                }
-                kind => {
-                    let took = self.apply_cc_look(victim, owner, kind, secs, e.amount, e.break_after, source, e.aura);
-                    // A shield that bursts as it ends: its burst waits on whoever holds it.
-                    if took && !e.pop.is_empty() {
-                        self.hold_pop(victim, &e.pop);
-                    }
+            // An ultimate's take on bosses too: said to `apply_cc` for this effect alone.
+            let was = std::mem::replace(&mut self.fx_vs_bosses, e.vs_bosses);
+            self.apply_effect(owner, victim, e, secs, source);
+            self.fx_vs_bosses = was;
+        }
+    }
+
+    /// One of an ability's effects on someone, `secs` long.
+    fn apply_effect(&mut self, owner: Id, victim: Id, e: &crate::content::AbilityEffect, secs: f32, source: &str) {
+        match e.kind.as_str() {
+            "heal" => {
+                let heal = self.players.get(&owner).map_or(0, |p| (p.max_health as f32 * e.amount).round() as u32);
+                self.heal_hero_by(owner, heal, owner, source);
+            }
+            "cleanse_panic" => self.cleanse(victim, &["panic"]),
+            "knockback" | "pull" => self.displace(owner, victim, e),
+            "burn" | "mark" => {
+                self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
+            }
+            "snare" if e.freeze_if_snared && self.has_cc(victim, "snare") => {
+                self.apply_cc(victim, owner, "petrify", secs.min(2.0).max(1.0), 0.0, 0.0, source);
+            }
+            kind => {
+                let took = self.apply_cc_look(victim, owner, kind, secs, e.amount, e.break_after, source, e.aura);
+                // A shield that bursts as it ends: its burst waits on whoever holds it.
+                if took && !e.pop.is_empty() {
+                    self.hold_pop(victim, &e.pop);
                 }
             }
         }

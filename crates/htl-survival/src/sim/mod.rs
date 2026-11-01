@@ -800,6 +800,10 @@ pub struct Survival {
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
+    /// The effect being given takes on a foe that holds its ground (an ultimate's).
+    pub(crate) fx_vs_bosses: bool,
+    /// When a hero may next be told this foe shrugged their control off (hero, foe).
+    pub(crate) told_immune: BTreeMap<(Id, Id), f32>,
     /// Counters' stances (a hero's, a dummy's), by unit.
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
@@ -893,6 +897,8 @@ impl Survival {
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             fx_from: None,
+            fx_vs_bosses: false,
+            told_immune: BTreeMap::new(),
             grounds: Vec::new(),
             burnings: Vec::new(),
             totems: Vec::new(),

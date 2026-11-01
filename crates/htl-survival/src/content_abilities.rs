@@ -544,7 +544,16 @@ pub struct AbilityEffect {
     /// whoever held it, as theirs.
     #[serde(default)]
     pub pop: String,
+    /// Takes on a foe that holds its ground (a champion, a totem, a creature winding up a blow no
+    /// guard stops): an ultimate's effects do, set as the rules load; nothing else's.
+    #[serde(default)]
+    pub vs_bosses: bool,
 }
+
+/// Crowd control and forced movement a foe that holds its ground shrugs off (an ultimate's
+/// aside): what takes away its control of itself or its place. A snare, a weakness, a burn and a
+/// mark still take.
+pub const CONTROL: [&str; 7] = ["stun", "incapacitate", "petrify", "panic", "root", "silence", "stagger"];
 
 /// The crowd control there is (Battlerite's rules, WoW's names): `stun` (nothing, damage doesn't
 /// break it), `incapacitate` (nothing, damage breaks it), `petrify` (nothing, shielded: a frozen
