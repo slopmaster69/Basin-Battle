@@ -498,14 +498,11 @@ local function PocketSlot(s, inset)
   s.icon:ClearAllPoints()
   s.icon:SetPoint("TOPLEFT", s, "TOPLEFT", inset, -inset)
   s.icon:SetPoint("BOTTOMRIGHT", s, "BOTTOMRIGHT", -inset, inset)
-  s.frame:SetTexture(A .. "micro_frame")
-  Recolor(s.frame, function(r, g, b, a, t)
-    if r and r > 0.95 then
-      t:SetTexture(A .. "micro_frame_hover")
-      return 1, 1, 1, 1
-    end
-    t:SetTexture(A .. "micro_frame")
-    return 1, 1, 1, math.min(1, (a or 1) + 0.1)
+  -- A thin inked rim in brass, not the thick brass-cornered frame: the icon shows whole.
+  s.frame:SetTexture(A .. "icon_frame_ink")
+  Recolor(s.frame, function(r, g, b, a)
+    if r and r > 0.95 then return CREAM[1], CREAM[2], CREAM[3], 1 end
+    return BRASS[1], BRASS[2], BRASS[3], math.min(1, (a or 1) + 0.1)
   end)
   if type(s.key) == "table" then
     Refont(s.key)
@@ -971,18 +968,6 @@ local function SkinHud()
     end
   end
 
-  local gear = ElwynnSurvivalGear
-  if gear and not gear.ledger then
-    gear.ledger = true
-    gear.hub:SetTexture(A .. "seal_grey")
-    gear.hub:SetWidth(20)
-    gear.hub:SetHeight(20)
-    Recolor(gear.hub, function() return 1, 1, 1, 0.95 end)
-    for _, k in ipairs({ "up", "left", "right", "down" }) do PocketSlot(gear[k], 6) end
-    Cream(gear.weaponName, SERIF, 14)
-    Cream(gear.quickName, SERIF, 12)
-  end
-
   local bar = ElwynnSurvivalBar
   if bar and not bar.ledger then
     bar.ledger = true
@@ -1306,6 +1291,20 @@ local function SkinDock()
   local dock, abar = ElwynnSurvivalDock, ElwynnSurvivalAbilities
   if not dock or not abar or dock.ledger then return end
   dock.ledger = true
+  -- The quick item beside the keys: a pocket like the buttons at the bottom right.
+  if dock.quick then
+    PocketSlot(dock.quick, 4)
+    -- How many are left, big enough to read over the icon (the stock face came out as two dots).
+    local n = dock.quick.count
+    n:ClearAllPoints()
+    n:SetPoint("BOTTOMRIGHT", dock.quick, "BOTTOMRIGHT", -3, 3)
+    n:SetWidth(40)
+    n:SetJustifyH("RIGHT")
+    n.ledgerKeep = true
+    Face(n, BODY, 17, "OUTLINE")
+    n:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
+    if n.SetDrawLayer then n:SetDrawLayer("OVERLAY") end
+  end
   -- The leather strap behind the keys alone (the bars above sit on the world).
   if dock.plate then Retire(dock.plate) end
   local strap = CreateFrame("Frame", nil, dock)
