@@ -224,7 +224,8 @@ fn in_siege_help_reaches_a_partner_but_never_a_rival() {
     let ev = cast(&mut s, x, "t_mend");
     assert!(looked_at(&ev, x, 2061, y), "her partner");
     assert!(s.players[&y].health > hy && s.has_cc(y, "shield"));
-    // A rival there instead: never him, hers.
+    // A rival there instead: never him, hers (once her first cast is over).
+    run_still(&mut s, &[], 1.5);
     s.move_player(y, away(3.0), 0.0, Moving::default());
     s.move_player(z, [at[0] + 10.0, at[1], at[2]], 0.0, Moving::default());
     let hz = halve(&mut s, z);
