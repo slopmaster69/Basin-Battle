@@ -1300,7 +1300,7 @@ fn sprinting_is_faster_drains_stamina_and_stops_for_anything_else() {
     s.input(p, Input::Sprint);
     let ev = run(&mut s, 1.0);
     assert!(ev.iter().any(|e| matches!(e, Event::Speed { player, speed, .. } if *player == p && *speed > 9.0)), "faster");
-    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: SPRINT_SPELL, .. } if *caster == p)), "its look and sound, once");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: SPRINT_SPELL, .. })), "no look or sound of its own");
     assert!(s.players[&p].stamina < 99.0 && s.players[&p].stamina > 90.0, "it costs a little stamina");
     // A swing ends the sprint; standing still too.
     s.input(p, Input::Attack);
@@ -1323,10 +1323,70 @@ fn sprinting_is_faster_drains_stamina_and_stops_for_anything_else() {
     s.players.get_mut(&p).unwrap().stamina = 50.0;
     let ev = run(&mut s, 0.1);
     assert!(s.players[&p].sprinting, "with enough back");
-    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: SPRINT_SPELL, .. })), "its look not replayed for every stop and start");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: SPRINT_SPELL, .. })), "nor when it starts again");
     s.input(p, Input::SprintUp);
     run(&mut s, 0.1);
     assert!(!s.players[&p].sprinting, "let go");
+}
+
+#[test]
+fn walking_is_the_clients_own_pace_and_back_to_running_runs() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let run_speed = s.content.player.run_speed;
+    let speeds = |ev: &[Event]| -> Vec<f32> {
+        ev.iter().filter_map(|e| if let Event::Speed { player, speed, .. } = e { (*player == p).then_some(*speed) } else { None }).collect()
+    };
+    // Walking (X), the guard up and down: the run speed the client is told comes back to a run,
+    // never a walk's pace (which it would keep after X back to running).
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, walk: true, ..Default::default() });
+    s.input(p, Input::Guard);
+    let mut ev = run(&mut s, 0.3);
+    s.input(p, Input::GuardUp);
+    ev.extend(run(&mut s, 0.3));
+    let told = speeds(&ev);
+    assert!(!told.is_empty(), "the guard changes the pace");
+    assert!(told.iter().all(|v| *v > WALK_SPEED + 0.1), "never a walk's pace as the run speed: {told:?}");
+    assert!((told.last().unwrap() - run_speed).abs() < 0.01, "back to a run: {told:?}");
+    // Shift while walking: no sprint, and no stamina spent on one.
+    let before = s.players[&p].stamina;
+    s.input(p, Input::Sprint);
+    let ev = run(&mut s, 1.0);
+    assert!(!s.players[&p].sprinting, "no sprint at a walk");
+    assert!(s.players[&p].stamina >= before, "nothing spent");
+    assert!(speeds(&ev).is_empty(), "nor a sprint's pace sent");
+    // X back to running, Shift still held: now it sprints.
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    run(&mut s, 0.1);
+    assert!(s.players[&p].sprinting, "running again, it sprints");
+}
+
+#[test]
+fn the_server_reckons_a_walking_hero_at_a_walk() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, walk: true, ..Default::default() });
+    let from = s.players[&p].pos;
+    run(&mut s, 1.0);
+    let to = s.players[&p].pos;
+    let went = ((to[0] - from[0]).powi(2) + (to[1] - from[1]).powi(2)).sqrt();
+    // (Reckoned for RECKON_FOR, 0.6 s: about 1.5 yards at a walk, 4.2 at a run.)
+    assert!(went > 0.5 && went <= WALK_SPEED + 0.3, "a walk's pace, not a run's: {went}");
+}
+
+#[test]
+fn a_roll_made_while_walking_keeps_its_burst() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, walk: true, ..Default::default() });
+    let from = s.players[&p].pos;
+    s.input(p, Input::Dodge);
+    // Within the dash: the roll's pace (16 yd/s), not a walk's (2.5). The client runs it at full
+    // speed, so the server's hero mustn't trail it while blows are judged.
+    run(&mut s, 0.2);
+    let to = s.players[&p].pos;
+    let went = ((to[0] - from[0]).powi(2) + (to[1] - from[1]).powi(2)).sqrt();
+    assert!(went > WALK_SPEED, "the dash's pace while walking: {went}");
 }
 
 
