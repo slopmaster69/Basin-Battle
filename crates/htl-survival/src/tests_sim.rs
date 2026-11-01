@@ -139,7 +139,10 @@ fn think(s: &mut Survival, p: Id, foes: &[Id], bot: &mut Bot, out: &mut Fight) {
             let a = &s.content.abilities[ability];
             // On the ground at the foe for what lands there, at its middle for what flies.
             let ground = matches!(a.kind.as_str(), "ground" | "trap" | "place") || a.lob;
-            let want = a.charge[1];
+            // Up close a charge would only be broken by the blows: a quick release there, unless the
+            // card must be held to its end to go off at all (Pyroblast, Chaos Bolt: they wait).
+            let fixed = a.charge[0] >= a.charge[1] && a.charge[1] > 0.0;
+            let want = if d < 6.0 && !fixed { a.charge[0] + 0.1 } else { a.charge[1] };
             let elev = if ground { -(EYE / d.max(1.0)).atan() } else { ((1.0 - EYE) / d.max(1.0)).atan() };
             s.set_aim_line(p, yaw, elev);
             bot.want = want;
