@@ -48,6 +48,10 @@ scripts. Windows players who only want to play can take the ready-made zip from 
    scripts/host.sh --password ember   # or choose one
    ```
 
+   To restart it after an update without dropping anyone unwarned, double-click **Restart Basin
+   Battle.command** (or run it with a number of minutes, or `cancel`): everyone playing sees a
+   countdown, the worlds are saved, and this window builds the newest version and starts it again.
+
    The server's log goes to `logs/host-<date>.log`. After each wave it writes `[balance]` lines:
    the enemies' level, health and swing, and for each hero their health, armour, the damage they
    took (hits, average, biggest and from what), falls and damage dealt.
@@ -97,6 +101,18 @@ the server, so it works on a headless machine or a VPS.
    `scripts/host.sh --public-host 203.0.113.7`
 3. Friends play with that address. If macOS asks whether `htl-server` may accept incoming
    connections, allow it.
+
+**Over the internet, without touching your router (Tailscale):** a private network between your
+computers, free for a few friends. Nothing to forward, and nobody outside it can reach the server.
+
+1. You and each friend install [Tailscale](https://tailscale.com/download) and sign in.
+2. Invite them: in Tailscale's admin console, **Share** your Mac with each friend's account (or
+   invite them to your network).
+3. Host as usual (`scripts/host.sh`, or **Host Basin Battle.command**): it prints "Friends on your
+   Tailscale network join with: 100.x.y.z".
+4. Friends play with that 100.x.y.z address (on Windows, type it in the launcher). The server
+   sends Tailscale players to the same address for the worlds, so `--public-host` isn't needed for
+   them, and friends who forward ports can still join the usual way at the same time.
 
 **Friends on Windows:** share `Basin Battle for Windows.zip` (in this folder once it's built) with
 them, e.g. through a Dropbox link or the repository's Releases page. It holds the ready-made client, a launcher and a README. They
@@ -364,6 +380,8 @@ panics and stuck enemies.
 - **Login says incorrect password**: everyone uses the host's password; the name can be anything.
 - **Friends time out**: check the ports are forwarded (3724, 8085, 8086) and that you hosted with
   `--public-host`.
+  Or skip the router entirely and play over Tailscale (above, under "Over the internet, without
+  touching your router").
 
 ## Working on it together
 

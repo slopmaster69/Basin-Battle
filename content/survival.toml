@@ -206,6 +206,11 @@ jitter = 0.25
 # step on), and `leap` one pressed in the air out of a Corey roll (a jump taken in the dodge's
 # dash, which carries the dash's speed): it strikes as the hero lands, long and heavy, with a
 # long recovery for it. Without `roll`, the running attack; without `leap`, `roll`.
+# `from` plays another character model's take on the clip on the hero's own
+# body (`from = "ScourgeFemale"`: Undead female's; <Race><Gender>, the races Human, Orc, Dwarf,
+# NightElf, Scourge, Tauren, Gnome, Troll, Goblin), on a client that can (ac10; the rest play their
+# own). A creature on a character model takes `clips_from` for all its blows, or a step's own
+# `from`. scripts/race-clips.sh lists every model's clips, and /esclip tries one in game.
 [[moveset]]
 key = "one_hand"
 light = [
@@ -3012,7 +3017,9 @@ icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
 kind = "cone"
-damage = [10.0, 10.0]
+# 18 (was 10): the solo sim had the mage near three times slower than the warrior at clearing
+# a pack; Fireball is already at the poke's budget, so the brawl key carries more.
+damage = [18.0, 18.0]
 range = [10.0, 10.0]
 arc = 60.0
 cooldown = 10.0
@@ -4009,7 +4016,9 @@ radius = [1.0, 1.0]
 secs = 1.5
 tick = 0.25
 # A second in it: 24 over its 1.5 s on each foe it holds.
-damage = [16.0, 16.0]
+# 20 a second (was 16): the solo sim had the priest the slowest class at clearing a pack, its
+# heals going to friends a lone priest hasn't got. 30 a cast, 6 a second over its cooldown.
+damage = [20.0, 20.0]
 ally_heal = 0.04
 cooldown = 5.0
 # A golden glow on you while you hold it (Power Infusion), and bolts of holy light streaming down

@@ -19,6 +19,11 @@ blurb = "The Crusade's heart: Mograine at the altar, and Whitemane who won't let
 first_page = "The Cathedral's courtyard gate. The Crusade sings inside; they've heard you coming."
 welcome = "The Scarlet Monastery's Cathedral. Commander Mograine guards the altar, and High Inquisitor Whitemane will not let him stay dead. Two lamps: the courtyard gate, and the nave. Rest at a lamp to heal, fill your Draughts (T) and send the Crusade back to its prayers. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): the Cathedral: the hardest (35 to 45).
+tier = 3
+# The camp's first clear of it (every boss down in one run): into the chest. Scaled by tier
+# (silver and bronze for a first dungeon, then pearl, then silk); tune freely.
+first_clear = { silver = 4, pearl = 2, silk = 4 }
 draught = "draught"
 draughts = 3
 draughts_max = 6
@@ -74,7 +79,8 @@ kind = "hidden"
 at = [1205.5, 1397.5, 29.0]
 find = 4.0
 reveals = ["fairbanks"]
-text = "the door behind the altar was never locked from the outside. The thing behind it stands up."
+# #27: the Crusade barred him in (his own lines and the page say so).
+text = "the door behind the altar was barred from this side, and the bar comes away in your hands. The thing behind it stands up."
 page = "The black candles have burned down to stubs and been lit again, many times, by someone on this side of the door. Words have been scratched into the flagstone at its foot, as if pushed out through the gap beneath it with a nail.{n}{n}I saw what stands in the Grand Crusader's shadow. It is not a man. Whitemane knows. Mograine does not.{n}{n}They shut the door on me and told me to pray. I have prayed. My candle has gone out. It is dark in here now.{n}{n}It is not so bad, the dark. It listens.{n}{n}Beyond the door, something rises, slowly, the way a man gets up after kneeling a very long while."
 
 # The courtyard's west chapel: the Crusade's reliquary, and a shard of something that burned.

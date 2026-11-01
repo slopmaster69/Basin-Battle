@@ -56,7 +56,7 @@ jobs:
 
       # Every run keeps the folder as an artifact (a week), so a branch can be tried before a tag.
       - name: Keep the folder as the run's artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Basin Battle for Windows
           path: dist-out/Basin Battle for Windows

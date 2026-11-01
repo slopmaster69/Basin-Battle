@@ -19,6 +19,11 @@ blurb = "The Crusade's books, its hounds, and its Arcanist"
 first_page = "The Library's hall. Somewhere ahead, dogs are barking."
 welcome = "The Scarlet Monastery's Library. Houndmaster Loksey's dogs have your scent already, and Arcanist Doan guards the books nobody else may read. Two lamps: the hall, and the reading rooms. Rest at a lamp to heal, fill your Draughts (T) and send the Crusade back to its shelves. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): the Library: among the hardest (29 to 39).
+tier = 3
+# The camp's first clear of it (every boss down in one run): into the chest. Scaled by tier
+# (silver and bronze for a first dungeon, then pearl, then silk); tune freely.
+first_clear = { silver = 4, pearl = 2, silk = 4 }
 draught = "draught"
 draughts = 3
 draughts_max = 6

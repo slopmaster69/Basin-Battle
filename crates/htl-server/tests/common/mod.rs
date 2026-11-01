@@ -33,6 +33,8 @@ pub struct Client {
     /// one carries on from there instead of losing the stream's place.
     buf: Vec<u8>,
     head: Option<(usize, u16)>,
+    /// The deciphered bytes of a header not yet whole (a read can time out partway through one).
+    head_bytes: Vec<u8>,
 }
 
 /// How much longer than its own figure a `wait` may take to see what it's waiting for. It costs
@@ -79,6 +81,7 @@ impl Client {
             user: user.to_string(),
             buf: Vec::new(),
             head: None,
+            head_bytes: Vec::new(),
         };
         match c.recv()? {
             ServerPacket::AuthResponse { result, .. } => assert_eq!(result, messages::AUTH_OK),
@@ -111,16 +114,28 @@ impl Client {
     }
 
     pub fn recv(&mut self) -> anyhow::Result<ServerPacket> {
-        if self.head.is_none() {
-            self.fill(4)?;
-            let mut head = [0u8; 4];
-            head.copy_from_slice(&self.buf[..4]);
-            self.buf.drain(..4);
-            // Decrypted once only: the header cipher's state moves on with every header.
-            self.crypto.decrypter().decrypt(&mut head);
-            let size = u16::from_be_bytes([head[0], head[1]]) as usize;
-            let opcode = u16::from_le_bytes([head[2], head[3]]);
-            self.head = Some((size, opcode));
+        // The header as the 1.12 client reads it: the size in two bytes while the first one's top
+        // bit is clear, else in three (`(b0 & 0x7f) << 16 | b1 << 8 | b2`), then the opcode. The
+        // cipher runs a byte at a time, so each byte is deciphered once, as it's taken off the
+        // buffer, and kept in `head_bytes` until the header is whole.
+        while self.head.is_none() {
+            let long = self.head_bytes.first().is_some_and(|b| b & 0x80 != 0);
+            let need = if long { 5 } else { 4 };
+            if self.head_bytes.len() == need {
+                let h = std::mem::take(&mut self.head_bytes);
+                let size = if long {
+                    usize::from(h[0] & 0x7f) << 16 | usize::from(h[1]) << 8 | usize::from(h[2])
+                } else {
+                    usize::from(h[0]) << 8 | usize::from(h[1])
+                };
+                let opcode = u16::from_le_bytes([h[need - 2], h[need - 1]]);
+                self.head = Some((size, opcode));
+                break;
+            }
+            self.fill(1)?;
+            let mut b = [self.buf.remove(0)];
+            self.crypto.decrypter().decrypt(&mut b);
+            self.head_bytes.push(b[0]);
         }
         let (size, opcode) = self.head.unwrap();
         self.fill(size - 2)?;

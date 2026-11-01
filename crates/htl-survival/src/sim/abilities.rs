@@ -1533,7 +1533,8 @@ impl Survival {
         }
         self.trade_blows(owner, mid);
         if damage > 0 {
-            self.hurt_mob(mid, owner, damage);
+            let name = self.content.abilities[ability].name.clone();
+            self.hurt_mob_as(mid, owner, damage, &name);
         }
         let killed = !self.mobs.get(&mid).is_some_and(|m| m.health > 0);
         let was = self.fx_from.replace(from);
@@ -1567,11 +1568,11 @@ impl Survival {
         }
         if d.drain > 0.0 && damage > 0 {
             let heal = (damage as f32 * d.drain * self.weakened(owner)).round() as u32;
-            self.heal_hero(owner, heal);
+            self.heal_hero_by(owner, heal, owner, &d.name);
         }
         if d.heal > 0.0 {
             let heal = self.players.get(&owner).map_or(0, |p| (p.max_health as f32 * d.heal * self.weakened(owner)).round() as u32);
-            self.heal_hero(owner, heal);
+            self.heal_hero_by(owner, heal, owner, &d.name);
         }
         let inert = self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].totem);
         if !inert {
@@ -1591,7 +1592,7 @@ impl Survival {
             match e.kind.as_str() {
                 "heal" => {
                     let heal = self.players.get(&owner).map_or(0, |p| (p.max_health as f32 * e.amount).round() as u32);
-                    self.heal_hero(owner, heal);
+                    self.heal_hero_by(owner, heal, owner, source);
                 }
                 "cleanse_panic" => self.cleanse(victim, &["panic"]),
                 "knockback" | "pull" => self.displace(owner, victim, e),
@@ -1619,7 +1620,7 @@ impl Survival {
         let Some(f) = self.players.get(&friend).filter(|f| f.health > 0) else { return };
         let (max, name) = (f.max_health, f.name.clone());
         let amount = (max as f32 * d.ally_heal * self.weakened(owner)).round() as u32;
-        self.heal_hero(friend, amount);
+        self.heal_hero_by(friend, amount, owner, &d.name);
         if d.cleanse {
             self.cleanse(friend, &crate::content::HARMFUL);
         }
@@ -1683,7 +1684,7 @@ impl Survival {
         }
         if d.ally_heal > 0.0 {
             let amount = self.players.get(&target).map_or(0, |p| (p.max_health as f32 * d.ally_heal * self.weakened(id)).round() as u32);
-            self.heal_hero(target, amount);
+            self.heal_hero_by(target, amount, id, &d.name);
         }
         if d.cleanse {
             self.cleanse(target, &crate::content::HARMFUL);
@@ -1702,10 +1703,11 @@ impl Survival {
         }
     }
 
-    pub(crate) fn heal_hero(&mut self, id: Id, amount: u32) {
-        let Some(p) = self.players.get_mut(&id) else { return };
+    /// Heal a hero (on nobody's meter: [`Self::heal_hero_by`] counts it); what it mended.
+    pub(crate) fn heal_hero(&mut self, id: Id, amount: u32) -> u32 {
+        let Some(p) = self.players.get_mut(&id) else { return 0 };
         if p.health == 0 || amount == 0 {
-            return;
+            return 0;
         }
         let before = p.health;
         p.health = (p.health + amount).min(p.max_health);
@@ -1714,6 +1716,7 @@ impl Survival {
             self.events.push(Event::Health { id, health: h, max: m });
             self.events.push(Event::Healed { id, amount: h - before });
         }
+        h - before
     }
 
     // --- ground, totems, cones, novas ----------------------------------------------------------------
@@ -1841,9 +1844,10 @@ impl Survival {
         let heal = self.content.abilities[ability].area_heal;
         if heal > 0.0 {
             let friends: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
+            let name = self.content.abilities[ability].name.clone();
             for f in friends {
                 let amount = self.players.get(&f).map_or(0, |p| (p.max_health as f32 * heal * self.weakened(owner)).round() as u32);
-                self.heal_hero(f, amount);
+                self.heal_hero_by(f, amount, owner, &name);
             }
         }
         let inside = |pos: Vec3, size: f32| -> bool {
@@ -1900,7 +1904,7 @@ impl Survival {
         for m in &mobs {
             if dps > 0.0 {
                 self.events.push(Event::Swing { attacker: owner, victim: Some(*m), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
-                self.hurt_mob(*m, owner, damage);
+                self.hurt_mob_as(*m, owner, damage, &d.name);
             }
             if d.at_self && !d.effects.is_empty() {
                 self.apply_effects(owner, *m, &d.effects, 1.0, &d.name);
@@ -1923,7 +1927,7 @@ impl Survival {
         for h in friends {
             if d.linger_heal > 0.0 {
                 let amount = self.players.get(&h).map_or(0, |p| (p.max_health as f32 * d.linger_heal * self.weakened(owner)).round() as u32);
-                self.heal_hero(h, amount);
+                self.heal_hero_by(h, amount, owner, &d.name);
             }
             if !d.boon.is_empty() {
                 self.apply_cc(h, owner, &d.boon, BOON_HOLD, d.boon_amount, 0.0, &d.name);
@@ -1938,7 +1942,7 @@ impl Survival {
             let damage = damage.min(hp.saturating_sub(1));
             if dps > 0.0 && damage > 0 && !self.immune(h) {
                 self.events.push(Event::Swing { attacker: owner, victim: Some(h), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
-                self.hurt_player(h, damage);
+                self.hurt_player_by(h, damage, owner, &d.name);
             }
             if d.at_self && !d.effects.is_empty() {
                 self.apply_effects(owner, h, &d.effects, 1.0, &d.name);
@@ -2042,7 +2046,7 @@ impl Survival {
                 let near: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(t.owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h).collect();
                 for h in near {
                     let amount = self.players.get(&h).map_or(0, |p| (p.max_health as f32 * d.linger_heal).round() as u32);
-                    self.heal_hero(h, amount);
+                    self.heal_hero_by(h, amount, t.owner, &d.name);
                 }
             }
             // A totem an ability calls down pulses its `tick_effects` (its landing had `effects`).
@@ -2126,17 +2130,18 @@ impl Survival {
     /// what follows a blow of it (its effects, the drain, `valor` of its Valor).
     fn channel_hit(&mut self, id: Id, target: Id, ability: usize, share: f32, per: f32, valor: f32) {
         let damage = self.ability_damage(id, target, ability, per);
+        let name = self.content.abilities[ability].name.clone();
         if self.players.contains_key(&target) {
             if self.immune(target) {
                 return;
             }
             self.events.push(Event::Swing { attacker: id, victim: Some(target), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
             self.trade_blows(id, target);
-            self.hurt_player(target, damage);
+            self.hurt_player_by(target, damage, id, &name);
         } else {
             self.events.push(Event::Swing { attacker: id, victim: Some(target), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
             self.trade_blows(id, target);
-            self.hurt_mob(target, id, damage);
+            self.hurt_mob_as(target, id, damage, &name);
         }
         let killed = !self.alive(target);
         self.ability_after_at(id, target, ability, share, damage, killed, valor);
@@ -2213,7 +2218,7 @@ impl Survival {
         if d.ally_heal > 0.0 {
             for f in friends {
                 let amount = self.players.get(&f).map_or(0, |p| (p.max_health as f32 * d.ally_heal * tick * self.weakened(id)).round() as u32);
-                self.heal_hero(f, amount);
+                self.heal_hero_by(f, amount, id, &d.name);
             }
         }
         if self.debug {
@@ -2391,7 +2396,7 @@ impl Survival {
             Outcome::Blocked
         } else if c.absorb_heal > 0.0 {
             let heal = self.max_hp(victim) as f32 * c.absorb_heal;
-            self.heal_hero(victim, heal.round() as u32);
+            self.heal_hero_by(victim, heal.round() as u32, victim, &d.name);
             Outcome::Blocked
         } else if !c.reflect.is_empty() && how == HitKind::Projectile {
             if let Some(r) = self.content.ability(&c.reflect) {

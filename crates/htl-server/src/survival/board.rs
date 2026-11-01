@@ -8,6 +8,10 @@
 //! a minute from one address, each run checked (a known dungeon, a sane level and time, names
 //! that are only names) and signed with the game's key; only the best runs of each dungeon are
 //! kept. It runs no command and reads or writes nothing but its own file.
+//!
+//! The ladder ranks heroes across every dungeon by one rating (as Fellowship's dungeon rating): for
+//! each dungeon, the hero's best run in time, worth its level, a little for its speed, and more in a
+//! harder dungeon ([`run_points`]); the rating is those summed.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -47,6 +51,10 @@ pub struct Run {
     pub party: Vec<String>,
     /// When (unix seconds).
     pub at: u64,
+    /// Each boss as it fell (name, milliseconds): kept here, for the clock's splits and for
+    /// tuning the times; not sent to the board host (the line stays as it was).
+    #[serde(default)]
+    pub splits: Vec<(String, u64)>,
 }
 
 impl Run {
@@ -62,6 +70,7 @@ impl Run {
             timed: w.timed,
             party: w.party.iter().map(|(n, c)| format!("{}:{}", name_only(n, 24).replace(':', ""), name_only(c, 12).replace(':', ""))).collect(),
             at: now(),
+            splits: w.splits.clone(),
         }
     }
 
@@ -130,6 +139,7 @@ impl Run {
             timed: ms <= limit_ms,
             party,
             at: f[10].parse().ok()?,
+            splits: Vec::new(),
         })
     }
 
@@ -171,9 +181,41 @@ pub struct Board {
     asks: HashMap<IpAddr, (Instant, u32)>,
     /// When it last heard from the board host, and whether that went well.
     pub synced: Option<(Instant, bool)>,
+    /// Each dungeon's tier (1 to 3), for the ladder's points.
+    tiers: HashMap<String, u32>,
+}
+
+/// A hero on the ladder: their name, class and camp, their rating, and the dungeons it's from.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Rank {
+    pub name: String,
+    pub class: String,
+    pub host: String,
+    pub rating: u32,
+    pub dungeons: usize,
+}
+
+/// What a run in time is worth on the ladder: 50, and 20 a level, and up to 20 more the quicker
+/// it beat its time (none for exactly on it); a quarter more a dungeon tier past the first. (A
+/// first pass: a level is worth more than any speed, a harder dungeon more than an easier.)
+pub fn run_points(run: &Run, tier: u32) -> f32 {
+    if !run.timed || run.limit_ms == 0 {
+        return 0.0;
+    }
+    let spare = (1.0 - run.ms as f32 / run.limit_ms as f32).clamp(0.0, 1.0);
+    (50.0 + 20.0 * run.level as f32 + 20.0 * spare) * (1.0 + 0.25 * tier.saturating_sub(1) as f32)
 }
 
 pub type Shared = Arc<Mutex<Board>>;
+
+/// A party's kind on the board, by its size: a duo's time and four heroes' are different feats.
+pub fn party_kind(heroes: usize) -> &'static str {
+    match heroes {
+        0 | 1 => "solo",
+        2 => "duo",
+        _ => "group",
+    }
+}
 
 impl Board {
     /// `host`: this server's name on the board (a made-up camp's, kept, when empty).
@@ -186,7 +228,7 @@ impl Board {
             store.name = format!("Camp {:04X}", rand::random::<u16>());
         }
         let host = store.name.clone();
-        let b = Board { store, path, host, remote, dungeons, asks: HashMap::new(), synced: None };
+        let b = Board { store, path, host, remote, dungeons, asks: HashMap::new(), synced: None, tiers: HashMap::new() };
         b.save();
         b
     }
@@ -230,7 +272,12 @@ impl Board {
 
     /// A dungeon's board: its runs in time, highest level first, then quickest.
     pub fn top(&self, dungeon: &str, n: usize) -> Vec<Run> {
-        let mut runs: Vec<Run> = self.store.runs.iter().filter(|r| r.dungeon == dungeon && r.timed).cloned().collect();
+        self.top_of(dungeon, None, n)
+    }
+
+    /// The same, of runs by a party of this kind only ("solo", "duo", "group": three or four).
+    pub fn top_of(&self, dungeon: &str, kind: Option<&str>, n: usize) -> Vec<Run> {
+        let mut runs: Vec<Run> = self.store.runs.iter().filter(|r| r.dungeon == dungeon && r.timed && kind.is_none_or(|k| party_kind(r.party.len()) == k)).cloned().collect();
         runs.sort_by(rank);
         runs.truncate(n);
         runs
@@ -244,6 +291,68 @@ impl Board {
             *e = (*e).min(r.ms);
         }
         best.into_iter().rev().collect()
+    }
+
+    /// Each dungeon's tier, for the ladder.
+    pub fn set_tiers(&mut self, tiers: HashMap<String, u32>) {
+        self.tiers = tiers;
+    }
+
+    /// The ladder: every hero with a run in time, by rating, highest first.
+    pub fn ladder(&self) -> Vec<Rank> {
+        // Each hero's best points in each dungeon (a hero is their name and camp).
+        let mut best: HashMap<(String, String), (String, HashMap<String, f32>)> = HashMap::new();
+        for r in self.store.runs.iter().filter(|r| r.timed) {
+            let pts = run_points(r, self.tiers.get(&r.dungeon).copied().unwrap_or(1));
+            for p in &r.party {
+                let (name, class) = p.split_once(':').unwrap_or((p.as_str(), ""));
+                let e = best.entry((name.to_string(), r.host.clone())).or_insert_with(|| (class.to_string(), HashMap::new()));
+                let d = e.1.entry(r.dungeon.clone()).or_insert(0.0);
+                *d = d.max(pts);
+            }
+        }
+        let mut out: Vec<Rank> = best
+            .into_iter()
+            .map(|((name, host), (class, ds))| Rank { name, class, host, rating: ds.values().sum::<f32>().round() as u32, dungeons: ds.len() })
+            .collect();
+        // (Ties by name, then camp: the same every time, whatever order the map gives.)
+        out.sort_by(|a, b| b.rating.cmp(&a.rating).then(a.name.cmp(&b.name)).then(a.host.cmp(&b.host)));
+        out
+    }
+
+    /// A hero's place (from 1) and rank in a ladder already built, by name on this server.
+    pub fn place_in(&self, ladder: &[Rank], name: &str) -> Option<(usize, Rank)> {
+        ladder.iter().enumerate().find(|(_, r)| r.name == name && r.host == self.host).map(|(k, r)| (k + 1, r.clone()))
+    }
+
+    /// A hero's place on the ladder (from 1) and their rank, by name on this server.
+    pub fn place_of(&self, name: &str) -> Option<(usize, Rank)> {
+        self.place_in(&self.ladder(), name)
+    }
+
+    /// The week's best runs in time on the board (weeks as the wagers' terms turn, from Monday),
+    /// by their ladder points, highest first (then quickest, then by camp), at most `n`.
+    pub fn week_best(&self, week: u64, n: usize) -> Vec<(Run, f32)> {
+        let mut runs: Vec<(Run, f32)> = self
+            .store
+            .runs
+            .iter()
+            .filter(|r| r.timed && htl_survival::sim::wager::week_of(r.at as f64) == week)
+            .map(|r| (r.clone(), run_points(r, self.tiers.get(&r.dungeon).copied().unwrap_or(1))))
+            .collect();
+        runs.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.ms.cmp(&b.0.ms)).then(a.0.host.cmp(&b.0.host)));
+        runs.truncate(n);
+        runs
+    }
+
+    /// The splits of this server's quickest run in time on a dungeon at a level, if it kept them.
+    pub fn best_splits(&self, dungeon: &str, level: u32) -> Option<Vec<(String, u64)>> {
+        self.store
+            .runs
+            .iter()
+            .filter(|r| r.dungeon == dungeon && r.level == level && r.timed && r.host == self.host && !r.splits.is_empty())
+            .min_by_key(|r| r.ms)
+            .map(|r| r.splits.clone())
     }
 
     /// How many servers' runs are on the board.
@@ -494,7 +603,7 @@ mod tests {
     use super::*;
 
     fn run() -> WagerRun {
-        WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 4, ms: 900_000, limit_ms: 1_500_000, deaths: 2, timed: true, party: vec![("Ann".into(), "warrior".into()), ("Bob|x".into(), "mage".into())] }
+        WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 4, ms: 900_000, limit_ms: 1_500_000, deaths: 2, timed: true, party: vec![("Ann".into(), "warrior".into()), ("Bob|x".into(), "mage".into())], splits: Vec::new() }
     }
 
     #[test]
@@ -534,6 +643,117 @@ mod tests {
         assert_eq!(again.store.runs.len(), 1);
         assert_eq!(again.host, "here");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_ladder_sums_each_heros_best_in_each_dungeon_worth_more_in_a_harder_one() {
+        let mut b = Board::new(None, "here", None, vec!["stockade".into(), "cathedral".into()]);
+        b.set_tiers(HashMap::from([("stockade".to_string(), 2), ("cathedral".to_string(), 3)]));
+        let mut a = run();
+        // Ann and Bob at +4 in the Stockade with 40% to spare: (50 + 80 + 8) x 1.25.
+        a.level = 4;
+        a.ms = 900_000;
+        let r = b.record(&a);
+        assert!((run_points(&r, 2) - 172.5).abs() < 0.01, "{}", run_points(&r, 2));
+        // A slower +2 there doesn't count over it; over time counts for nothing.
+        a.level = 2;
+        a.ms = 1_400_000;
+        b.record(&a);
+        a.level = 9;
+        a.ms = 1_600_000;
+        a.timed = false;
+        b.record(&a);
+        // Ann alone at +1 in the Cathedral, right on time: 70 x 1.5.
+        let solo = WagerRun { dungeon: "cathedral".into(), name: "The Cathedral".into(), level: 1, ms: 1_200_000, limit_ms: 1_200_000, deaths: 0, timed: true, party: vec![("Ann".into(), "warrior".into())], splits: Vec::new() };
+        b.record(&solo);
+        let ladder = b.ladder();
+        assert_eq!(ladder.iter().map(|r| (r.name.as_str(), r.rating, r.dungeons)).collect::<Vec<_>>(), vec![("Ann", 278, 2), ("Bobx", 173, 1)]);
+        assert_eq!(ladder[0].class, "warrior");
+        // Two Anns on two camps, alike in all else, stay apart and in the same order every time.
+        let mut twin = Run::from_wager(&solo, "Zed Camp");
+        twin.dungeon = "cathedral".into();
+        let mut b2 = Board::new(None, "here", None, vec!["stockade".into(), "cathedral".into()]);
+        b2.set_tiers(HashMap::from([("cathedral".to_string(), 3)]));
+        b2.add(Run::from_wager(&solo, "Abbey Camp"));
+        b2.add(twin);
+        for _ in 0..5 {
+            assert_eq!(b2.ladder().iter().map(|r| r.host.as_str()).collect::<Vec<_>>(), vec!["Abbey Camp", "Zed Camp"]);
+        }
+        let (place, me) = b.place_of("Bobx").unwrap();
+        assert_eq!((place, me.rating), (2, 173));
+        assert!(b.place_of("Nobody").is_none());
+    }
+
+    #[test]
+    fn the_weeks_best_are_its_runs_in_time_by_points_and_none_from_other_weeks() {
+        use htl_survival::sim::wager::week_of;
+        let mut b = Board::new(None, "here", None, vec!["stockade".into()]);
+        let monday = 4 * 86_400 + 7 * 86_400 * 2900;
+        let week = week_of(monday as f64);
+        let mut add = |level: u32, ms: u64, timed: bool, at: u64| {
+            let mut r = Run::from_wager(&run(), "Camp");
+            r.level = level;
+            r.ms = ms;
+            r.timed = timed;
+            r.at = at;
+            b.add(r);
+        };
+        add(4, 900_000, true, monday + 3600);
+        add(6, 1_400_000, true, monday + 86_400);
+        add(9, 600_000, false, monday + 7200);
+        add(12, 600_000, true, monday - 3600);
+        let best = b.week_best(week, 3);
+        assert_eq!(best.iter().map(|(r, _)| r.level).collect::<Vec<_>>(), vec![6, 4], "in time, this week only, by points");
+        assert!(b.week_best(week + 1, 3).is_empty());
+        assert_eq!(b.week_best(week - 1, 3).len(), 1, "last week's own");
+    }
+
+    #[test]
+    fn the_board_ranks_solo_duo_and_group_runs_apart() {
+        let mut b = Board::new(None, "here", None, vec!["stockade".into()]);
+        let mut add = |heroes: usize, level: u32| {
+            let mut w = run();
+            w.party = (0..heroes).map(|k| (format!("H{k}"), "warrior".to_string())).collect();
+            w.level = level;
+            b.record(&w);
+        };
+        add(1, 3);
+        add(2, 5);
+        add(4, 7);
+        add(3, 6);
+        let levels = |k: Option<&str>| b.top_of("stockade", k, 10).iter().map(|r| r.level).collect::<Vec<_>>();
+        assert_eq!(levels(None), vec![7, 6, 5, 3]);
+        assert_eq!(levels(Some("solo")), vec![3]);
+        assert_eq!(levels(Some("duo")), vec![5]);
+        assert_eq!(levels(Some("group")), vec![7, 6], "three and four together");
+        assert_eq!((party_kind(1), party_kind(2), party_kind(4)), ("solo", "duo", "group"));
+    }
+
+    #[test]
+    fn the_best_splits_are_the_quickest_run_in_time_at_that_level_kept_here() {
+        let mut b = Board::new(None, "here", None, vec!["stockade".into()]);
+        let mut a = run();
+        a.splits = vec![("Kam".into(), 300_000), ("Bazil".into(), 800_000)];
+        b.record(&a);
+        a.ms = 850_000;
+        a.splits = vec![("Kam".into(), 280_000), ("Bazil".into(), 760_000)];
+        b.record(&a);
+        a.level = 5;
+        b.record(&a);
+        assert_eq!(b.best_splits("stockade", 4), Some(vec![("Kam".to_string(), 280_000), ("Bazil".to_string(), 760_000)]));
+        assert!(b.best_splits("stockade", 7).is_none());
+        // And they survive a save and a load.
+        let dir = std::env::temp_dir().join(format!("board-splits-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wager-board.toml");
+        let mut kept = Board::new(Some(path.clone()), "here", None, vec!["stockade".into()]);
+        kept.record(&a);
+        let again = Board::new(Some(path), "", None, vec!["stockade".into()]);
+        assert_eq!(again.best_splits("stockade", 5), Some(vec![("Kam".to_string(), 280_000), ("Bazil".to_string(), 760_000)]));
+        let _ = std::fs::remove_dir_all(&dir);
+        // Splits stay here: the line sent to the board host is as it was.
+        let r = Run::from_wager(&a, "here");
+        assert_eq!(Run::parse(&r.line(), &["stockade".to_string()]).unwrap().splits, Vec::new());
     }
 
     #[test]

@@ -17,8 +17,10 @@ pub mod cc;
 mod combat;
 pub mod dungeon;
 mod journal;
+pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
+pub mod recap;
 pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
@@ -107,6 +109,8 @@ pub struct Strike {
     pub stamina: f32,
     /// A weapon art's blow: the ability it is.
     pub art: Option<usize>,
+    /// Another character model whose take on the clip the clients play (`MoveDef::from`).
+    pub from: Option<String>,
 }
 
 impl Strike {
@@ -170,8 +174,9 @@ pub enum Event {
     React { id: Id, anim: u16, from: Vec3, lean: f32, hold: f32, fit: f32 },
     /// A creature winds up a blow: the clip and take it swings with, timed to land `windup`
     /// seconds from now, and the recovery after (for the clients that play clips themselves);
-    /// `blockable`: a guard stops it (its swing's trail says which).
-    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32, blockable: bool },
+    /// `blockable`: a guard stops it (its swing's trail says which); `from`: another character
+    /// model's take on the clip.
+    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32, blockable: bool, from: Option<String> },
     /// A spell visual kit plays on a unit (an impact's flash and sound); `by`: the hero whose blow
     /// it is (whose own client may already have played it).
     Visual { id: Id, kit: u32, by: Option<Id> },
@@ -491,6 +496,10 @@ pub struct Player {
     pub riposte_until: f32,
     /// Who struck them last (a fall to another hero is announced).
     pub last_hit_by: Option<Id>,
+    /// What the next hurt on them is (set by the blow about to land), and the hurts of the last
+    /// few seconds: read back as the recap when they fall.
+    pub cause: Option<recap::Cause>,
+    pub wounds: Vec<recap::Wound>,
     /// One input waiting for the end of a commitment, and when it was pressed.
     pub buffered: Option<(Input, f32)>,
     /// The bow's drawn pose is shown (the draw's cast is out): not while they walk, when the legs
@@ -799,6 +808,8 @@ pub struct Survival {
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
     pub(crate) cc_log: BTreeMap<Id, std::collections::VecDeque<String>>,
+    /// Each hero's damage meter (see [`meter`]).
+    pub(crate) meters: BTreeMap<Id, meter::Meter>,
     /// Blows on heroes waiting out their round trip (a dodge or guard already on its way).
     pub(crate) pending: Vec<combat::PendingStrike>,
     /// Where everyone has been lately, for judging a swing as its striker saw it.
@@ -890,6 +901,7 @@ impl Survival {
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),
+            meters: BTreeMap::new(),
             pending: Vec::new(),
             trails: BTreeMap::new(),
             marks: Vec::new(),
@@ -1029,6 +1041,8 @@ impl Survival {
             landing_attack: None,
             riposte_until: -100.0,
             last_hit_by: None,
+            cause: None,
+            wounds: Vec::new(),
             buffered: None,
             draw_shown: false,
             foe: None,
@@ -1125,6 +1139,7 @@ impl Survival {
         let p = self.players.get_mut(&id)?;
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
+        self.meters.remove(&id);
         // Creatures fighting them go home.
         for m in self.mobs.values_mut() {
             if m.state.target() == Some(id) {
@@ -1369,7 +1384,8 @@ impl Survival {
             out.push_str(&format!("{}: {}.", if d.kind == ItemKind::Armor { "Worn" } else { "In hand" }, words.join(", ")));
         }
         if let Some(s) = c.sets.iter().find(|s| s.key == d.set) {
-            let n = c.items.iter().filter(|i| i.set == s.key).count();
+            // (Its pieces, not their honed copies.)
+            let n = c.items.iter().filter(|i| i.set == s.key && i.hone == 0).count();
             let bonus: Vec<String> = s.bonus.iter().map(|b| format!("{} pieces: {}", b.pieces, crate::content::perk_words(&b.kind, b.amount))).collect();
             if !out.is_empty() {
                 out.push(' ');

@@ -382,6 +382,10 @@ Some of this needs a change to the client itself, which this folder carries as p
 - heroes' abilities are drawn the same way (`SetTelegraph` strips and a friend's blue,
   `SetTelegraphAt` for a shape laid at a spot), and an aimed ability's shape lies under the hero
   along the view (`SetAimMarker` `line`, `cone`, `self`): the eighth round.
+- a clip can come from another character model (`PlayUnitAnimation`'s `from`): a move's or a
+  creature's `from` in the content (`"ScourgeFemale"`) plays that model's take on the unit's own
+  body, retargeted by its key bones: the tenth round. `/esclip <clip> [take] [Model]` tries one on
+  your hero, and `scripts/race-clips.sh` lists every model's attack clips from your game data.
 
 On a stock benilla the add-on falls back to a click-catcher over the world: the same keys, right
 mouse guards and looks around, and aiming keeps the normal camera. The Controls card says which
@@ -414,6 +418,13 @@ client you're on.
   feed (who felled whom).
 - **Bottom right**: icon buttons for the bag (with how many of its 80 slots are used), character,
   map, controls, game menu and help; hover one for its name and key.
+- **Right, above those**: the damage meter, from your first fight on. **Fight** shows you and the
+  heroes fighting near you in this fight (or the last one: a lull of five seconds ends one), the
+  most damage first, with how long it has run; **You** shows your own damage by card since you
+  last reset it, your per-second over your time in fights and what you took. **Healing** turns
+  both to healing (a friend you mend carries you into their fight). Only what landed counts: not
+  overkill, not a heal past full. Drag it to move it, click it to fold it, `/esmeter` hides it,
+  **Reset** (or `.es meter reset`) starts your own count over.
 - **Falling**: "You have fallen" across a dark band, and when you'll be up again.
 
 Health bars float over creatures' and other heroes' heads. Messages show briefly on screen
@@ -930,10 +941,13 @@ during a wager. Friends join it by taking the same level from the book while it 
 - **Levels.** Every camp starts open to +1 on each dungeon. Won in time, the next level opens;
   in four fifths of the time, two levels; in three fifths, three (up to +20).
 - **Tougher every level.** Foes have 9% more health and hit 6% harder each level (compounding).
-  From +2 *Hardened* (foes that aren't bosses: a fifth more health, a sixth harder), +4
-  *Rallying* (a foe's fall heals its pack a little and makes it hit harder), +6 *Smouldering*
-  (fallen foes leave burning ground), +8 *The Kingpin's Due* (bosses: a third more health, a fifth
-  harder).
+  From +2, +4 and +7 the week's three terms come in, one each, and they change how a fight is
+  fought: *The Call* (a pack still fighting after five seconds calls the nearest pack at rest) or
+  *Quickening* (bosses hit a tenth harder for every twenty seconds a fight lasts); *Rallying* (a
+  foe's fall heals its pack a little and makes it hit harder) or *Frenzied* (foes below a third
+  of their health hit a third harder); *Smouldering* (fallen foes leave burning ground) or
+  *Eruptions* (the ground under one of you erupts now and then). Four weeks round, starting
+  Mondays.
 - **Better pay.** Plunder for every hero there (6 + 3 a level; half when over time), and in time
   the dungeon's own gear into the camp's chest: one piece and one more every three levels, the
   finer pieces (a perk, a set's) from +3, one for certain from +6.
@@ -941,8 +955,16 @@ during a wager. Friends join it by taking the same level from the book while it 
   or `wager_minutes` in its file: the Deadmines 35:00, the Stockade and Ragefire 27:30, ..., the
   Library and the Cathedral 20:00. First guesses: tune them from the board.
 
+**The week's news.** The first time a hero comes in each week (once the camp has the book), a page
+says the week's three terms and last week's three best runs on the board; `.es news` shows it again.
+
+**The fighting record.** Every time a hero fells another (the Proving Ring, friendly fire, a fight
+below; not Siege, whose heroes are made for the match), the camp keeps it: `.es record` lists the
+heroes by how many they've felled, and their falls to heroes.
+
 **The board.** Every wager won is kept in `saves/wager-board.toml`; `.es board <dungeon>` shows the
-runs in time, highest level first, then quickest. One server keeps the board for everyone (the
+runs in time, highest level first, then quickest (`.es board <dungeon> solo`, `duo` or `group`: that
+size of party only, a link on the page). One server keeps the board for everyone (the
 one friends join: it runs without `--board`). Anyone hosting their own sets `HTL_BOARD` in
 `settings.sh` (or `--board`) to that server's address and login port (`1.2.3.4:3724`); theirs
 then sends its runs there every minute and fetches everyone's back. Runs go over plain HTTP on

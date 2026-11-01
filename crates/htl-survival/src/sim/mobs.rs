@@ -172,9 +172,9 @@ impl Survival {
     pub(crate) fn base_health(&self, def: usize) -> u32 {
         let d = &self.content.mobs[def];
         let share = if d.critter || d.inert() { 1.0 } else { self.content.combat.foe_health };
-        // A wager's level, below.
-        let wager = if d.critter || d.inert() { 1.0 } else { self.wager_scale(def).0 };
-        (d.health as f32 * share * wager).round().max(1.0) as u32
+        // A wager's level, and the dungeon's tier, below.
+        let below = if d.critter || d.inert() { 1.0 } else { self.wager_scale(def).0 * self.tier_scale().0 };
+        (d.health as f32 * share * below).round().max(1.0) as u32
     }
 
     /// Whether a creature grows with the heroes in its fight: not below (every hero in the mines
@@ -488,7 +488,13 @@ impl Survival {
         }
     }
 
+    /// A hero's weapon (or a raid's tower, the spikes) hurts a creature.
     pub(crate) fn hurt_mob(&mut self, mid: Id, by: Id, damage: u32) {
+        self.hurt_mob_as(mid, by, damage, "Melee");
+    }
+
+    /// A creature hurt by `by`: what took it (`label`) for a hero's damage meter.
+    pub(crate) fn hurt_mob_as(&mut self, mid: Id, by: Id, damage: u32, label: &str) {
         let now = self.clock;
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
@@ -496,9 +502,11 @@ impl Survival {
         if m.health == 0 {
             return;
         }
+        let before = m.health;
         m.health = m.health.saturating_sub(damage);
         let (h, max) = (m.health, m.max_health);
         self.events.push(Event::Health { id: mid, health: h, max });
+        self.meter_dealt(by, mid, before - h, label);
         self.note_threat(mid, by, damage);
         if let Some(p) = self.players.get_mut(&by) {
             p.combat_at = now;
@@ -1360,7 +1368,7 @@ impl Survival {
     /// find nothing (it evades, as 1.12's do) until it's home or they come back within it.
     pub(crate) fn evading(&self, mid: Id, by: Id) -> bool {
         let (Some(m), Some(p)) = (self.mobs.get(&mid), self.players.get(&by)) else { return false };
-        !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.content.mobs[m.def].leash + LEASH_SLACK
+        !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK
     }
 
     fn think(&mut self, id: Id, dt: f32) {
@@ -1478,7 +1486,7 @@ impl Survival {
                     self.set_back(id, home, "found no way to its foe nor home");
                     return;
                 }
-                if !raider && (lost || self.leashed(home, pos, to, d.leash)) {
+                if !raider && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     self.give_up(id);
                     return;
                 }
@@ -1704,8 +1712,9 @@ impl Survival {
             a.cooldown *= e.speed;
             a.damage = (a.damage as f32 * e.might).round() as u32;
         }
-        // A wager's level, and its pack's rally.
-        let w = self.wager_scale(m.def).1 * (1.0 + 0.1 * m.rally as f32);
+        // A wager's level, its pack's rally, and the dungeon's tier.
+        let frenzy = if self.wager_has("frenzied") && (m.health as f32) < m.max_health as f32 * super::wager::FRENZY_BELOW { super::wager::FRENZY_MIGHT } else { 1.0 };
+        let w = self.wager_scale(m.def).1 * (1.0 + 0.1 * m.rally as f32) * self.tier_scale().1 * frenzy * self.quickening(id);
         if w != 1.0 {
             a.damage = (a.damage as f32 * w).round() as u32;
         }
@@ -1858,7 +1867,8 @@ impl Survival {
                 Some(s) => s.take,
                 None => self.rng.gen_range(0..2),
             };
-            self.events.push(Event::MobWindup { id, clip, take, windup: a.windup, recovery: a.recovery, blockable: a.blockable });
+            let from = special.as_ref().and_then(|s| s.from.clone()).or_else(|| self.content.mobs[def].clips_from.clone());
+            self.events.push(Event::MobWindup { id, clip, take, windup: a.windup, recovery: a.recovery, blockable: a.blockable, from });
         }
         self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: 0.0, mark, shown: false };
     }

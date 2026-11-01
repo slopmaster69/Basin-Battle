@@ -442,6 +442,7 @@ impl Survival {
             lunge: m.lunge,
             stamina: w.stamina * m.stamina * if heavy { h.stamina } else { 1.0 },
             art: None,
+            from: m.from.clone(),
         }
     }
 
@@ -492,6 +493,7 @@ impl Survival {
             lunge: d.lunge,
             stamina: d.stamina,
             art: None,
+            from: None,
         };
         if let Some(p) = self.players.get_mut(&id) {
             p.combo_next = 0;
@@ -1195,7 +1197,12 @@ impl Survival {
             // stagger doesn't undo it.
             let before = self.mobs.get(&mid).map(|m| (m.phase, m.stagger_until));
             if damage > 0 {
-                self.hurt_mob(mid, id, damage);
+                let label = match strike.kind {
+                    StrikeKind::Bash => "Shield Bash",
+                    StrikeKind::Kick => "Kick",
+                    _ => "Melee",
+                };
+                self.hurt_mob_as(mid, id, damage, label);
             }
             if damage > 0 && !self.content.mobs[self.mobs[&mid].def].totem {
                 let v = if strike.heavy() { self.content.valor.heavy } else { self.content.valor.light };
@@ -1283,7 +1290,7 @@ impl Survival {
         self.events.push(Event::Swing { attacker: id, victim: Some(victim), damage: landed, outcome, anim: false, style: Blow::Light });
         self.trade_blows(id, victim);
         if landed > 0 {
-            self.hurt_player(victim, landed);
+            self.hurt_player_by(victim, landed, id, if strike.kind == StrikeKind::Kick { "Kick" } else { "Shield Bash" });
         }
         if !self.players.get(&victim).is_some_and(|p| p.health > 0) {
             return;
@@ -1418,7 +1425,17 @@ impl Survival {
                 return;
             }
         }
+        let before = self.players.get(&s.victim).map_or(0, |p| p.health);
         let out = self.strike_player(s.attacker, s.victim, s.damage, s.from, s.blockable, s.heavy, s.parryable, s.style);
+        // What landed, on a hero striker's meter.
+        let after = self.players.get(&s.victim).map_or(0, |p| p.health);
+        if self.players.contains_key(&s.attacker) {
+            let label = match s.follow {
+                Follow::Ability { ability, .. } => self.content.abilities[ability].name.clone(),
+                _ => "Melee".to_string(),
+            };
+            self.meter_dealt(s.attacker, s.victim, before.saturating_sub(after), &label);
+        }
         // A guard that blocked a crushing blow (Sundering Blow) pays for it many times over.
         if let (Outcome::Blocked, Follow::Ability { ability, .. }) = (out, &s.follow) {
             let ability = *ability;
@@ -1531,6 +1548,8 @@ impl Survival {
             return Outcome::Miss;
         }
         let guard = self.guard_of(p).clone();
+        // What they were doing as it came, for the recap if it fells them.
+        let doing = p.action.clone();
         let cost = (guard.cost + damage as f32 * guard.cost_per_damage) * if heavy { 2.0 } else { 1.0 };
         // A blow heavy enough to put a hero down when it breaks their guard: a heavy attack, or a
         // heavy creature's.
@@ -1599,6 +1618,7 @@ impl Survival {
             Outcome::Dodged if !dashing && damage > 0 => self.gain_valor(victim, c.valor.roll),
             _ => {}
         }
+        self.honed_tricks(attacker, victim, outcome, damage > 0 && !dashing);
         // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
@@ -1658,9 +1678,34 @@ impl Survival {
             p.combat_at = now;
         }
         if landed > 0 {
+            let caught = recap::caught_word(&doing, outcome, blockable);
+            self.set_cause(victim, recap::Cause::blow(attacker, recap::blow_word(style, heavy), caught));
             self.hurt_player(victim, landed);
         }
         outcome
+    }
+
+    /// Honed gear's tricks on a blow just answered: Keen pieces give back breath on a parry,
+    /// a Peerless piece throws a creature off balance when its blow is dodged.
+    fn honed_tricks(&mut self, attacker: Id, victim: Id, outcome: Outcome, real: bool) {
+        use crate::content::{KEEN_BREATH, KEEN_BREATH_MOST, PEERLESS_STAGGER};
+        let Some(p) = self.players.get(&victim) else { return };
+        let gear = self.gear_on(p);
+        let keen = gear.iter().filter(|i| self.content.items[**i].hone >= 2).count() as f32;
+        let peerless = gear.iter().any(|i| self.content.items[*i].hone >= 3);
+        match outcome {
+            Outcome::Parried if keen > 0.0 => {
+                let most = self.content.player.stamina;
+                let p = self.players.get_mut(&victim).unwrap();
+                p.stamina = (p.stamina + (KEEN_BREATH * keen).min(KEEN_BREATH_MOST)).min(most);
+                self.events.push(Event::Stamina { player: victim });
+            }
+            Outcome::Dodged if peerless && real && self.mobs.get(&attacker).is_some_and(|m| m.health > 0) => {
+                self.stagger_mob(attacker, PEERLESS_STAGGER, true);
+                self.events.push(Event::Flash { player: victim, text: "Off balance!".into() });
+            }
+            _ => {}
+        }
     }
 
     /// Their client jumped: it costs stamina (the add-on won't jump without enough). Taken in a
@@ -1721,6 +1766,7 @@ impl Survival {
 
     pub fn fall_damage(&mut self, id: Id, damage: u32) {
         if self.players.get(&id).is_some_and(|p| p.health > 0) {
+            self.set_cause(id, recap::Cause::world("fall"));
             self.hurt_player(id, damage);
         }
     }
@@ -1732,7 +1778,9 @@ impl Survival {
         let damage = self.cheat_death(id, damage);
         let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
+        let before = p.health;
         p.health = p.health.saturating_sub(damage);
+        let lost = before - p.health;
         // Hurt is in the fight: no healing in the field for a while.
         if damage > 0 {
             p.combat_at = now;
@@ -1741,6 +1789,8 @@ impl Survival {
         // A hit spoils a meal or a gather.
         let interrupted = matches!(p.action, Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
         self.events.push(Event::Health { id, health: h, max: m });
+        self.meter_taken(id, lost);
+        self.keep_wound(id, lost);
         if h == 0 {
             self.die(id);
         } else if interrupted {
@@ -1865,9 +1915,17 @@ impl Survival {
                 self.events.push(Event::Sound { id: k, sound });
             }
         }
+        // The log says what felled them too (the recap's last blow), for tuning the fights.
+        let why = self.death_recap(id).lines.into_iter().next().map_or(String::new(), |l| format!(": {l}"));
+        // The camp's fighting record: who felled whom, hero against hero (not in Siege, whose
+        // heroes are made for the match).
+        if let Some(k) = hero.as_ref().filter(|_| !self.is_siege()) {
+            self.forward_count("fells", k, 1);
+            self.forward_count("felled", &name, 1);
+        }
         match &hero {
-            Some(k) => self.events.push(Event::Log(format!("{k} fells {name}."))),
-            None => self.events.push(Event::Log(format!("{name} fell"))),
+            Some(k) => self.events.push(Event::Log(format!("{k} fells {name}{why}."))),
+            None => self.events.push(Event::Log(format!("{name} fell{why}"))),
         }
         self.events.push(Event::Kill { killer: hero.or(creature), victim: name });
         self.events.push(Event::Dirty);
@@ -1904,6 +1962,8 @@ impl Survival {
         };
         p.health = ((p.max_health as f32 * share).round() as u32).max(1);
         p.last_hit_by = None;
+        p.cause = None;
+        p.wounds.clear();
         p.foe = None;
         p.riposte_until = -100.0;
         p.stamina = c.player.stamina;

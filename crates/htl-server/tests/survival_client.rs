@@ -172,6 +172,33 @@ fn hud(c: &Client) -> Option<Vec<String>> {
     addon_lines(c, "ES").into_iter().rev().find(|l| l.starts_with("H\t")).map(|l| l.split('\t').map(str::to_string).collect())
 }
 
+/// The board (N) for a hero who hasn't learned the cards is over 32 KB, as every card it lacks
+/// says where it's learned: more than a two-byte header holds. It must come in the client's
+/// three-byte form, and the stream stay in step after it. (Sent with two bytes, the client read
+/// one byte too many and garbage from then on: the game stopped answering anything after N.)
+#[test]
+fn a_board_too_big_for_a_short_header_arrives_and_what_follows_still_reads() {
+    let server = start_content(None, false, {
+        let mut c = content();
+        c.dev.full_tree = false;
+        c
+    });
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut a);
+    a.chat(".es hello 1");
+    assert!(a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("V\t"))), "the add-on is greeted");
+    a.seen.clear();
+    a.chat(".es tree");
+    assert!(a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("TR\t"))), "the board comes");
+    let tr = addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("TR\t")).unwrap();
+    assert!(tr.len() > 0x7fff, "a board over 32 KB, as a new hero's is: {} bytes", tr.len());
+    assert!(tr.matches("~0~").count() > 4, "most cards not learned yet");
+    // What comes after it reads too: the server's answer to another hello.
+    a.seen.clear();
+    a.chat(".es hello 1");
+    assert!(a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("V\t"))), "the next line reads");
+}
+
 #[test]
 fn both_realms_are_listed_and_basin_battle_still_plays() {
     let server = start_with(None, true);
@@ -379,7 +406,13 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     b.extend_from_slice(&6000u32.to_le_bytes());
     c.send(op::MSG_MOVE_FALL_LAND, &b);
     assert!(c.wait(1.0, |p| p.name() == "SMSG_ENVIRONMENTALDAMAGELOG").is_some(), "the fall");
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tDE\t"))).is_some(), "down");
+    let down = c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tDE\t")));
+    // And the recap says what felled us: the fall, and a word on it.
+    let down = match down {
+        Some(ServerPacket::MessageChat(m)) => m.text,
+        _ => panic!("down"),
+    };
+    assert!(down.contains("\tFall (") && down.ends_with("\tMind the drop."), "the recap: {down:?}");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("waits where you fell"))).is_some(), "supplies left");
     assert_eq!(objects_with(&c, 2890).len(), 1, "the sack where we fell");
     assert!(c.wait(3.0, |p| p.name() == "MSG_MOVE_TELEPORT_ACK").is_some(), "up at the camp");
@@ -924,9 +957,11 @@ fn the_fourth_round_client_flashes_its_own_blows_and_others_see_the_flash_and_it
     a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("MV\t")));
     let mv = addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("MV\t")).expect("the moves line");
     let f: Vec<&str> = mv.split('\t').collect();
-    assert_eq!(f.len(), 16, "{mv}");
+    assert_eq!(f.len(), 18, "{mv}");
     assert_eq!(f[15], "1", "friendly fire");
-    assert_eq!(f[10].split('^').next().unwrap().split('~').count(), 8, "range and arc: {mv}");
+    // (Each blow: clip, take, impact, recovery, lunge, stamina, range, arc, and the model its
+    // clip comes from, empty for her own.)
+    assert_eq!(f[10].split('^').next().unwrap().split('~').count(), 9, "range and arc: {mv}");
     // Her heavy blow's flash: on Ben's screen, not hers (she played her own).
     let mark = a.seen.len();
     a.chat(".es in h");
@@ -1513,9 +1548,18 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
     let wt = a.wait(3.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tWT\tThe Stockade\t1\t")));
     let ServerPacket::MessageChat(m) = wt.expect("the Bookmaker's clock") else { unreachable!() };
     assert!(m.text.contains("\twait\t"), "{}", m.text);
+    // Its count of foes last: none felled yet, of those it needs and those standing.
+    let fields: Vec<&str> = m.text.split('\t').collect();
+    let forces: Vec<u32> = fields.get(10).unwrap_or(&"").split('~').filter_map(|n| n.parse().ok()).collect();
+    assert!(forces.len() == 3 && forces[0] == 0 && forces[1] > 0 && forces[1] < forces[2], "{}", m.text);
+    // And who's ready: nobody yet, of one hero, no count.
+    assert_eq!(fields.get(11).copied(), Some("0~1~"), "{}", m.text);
+    // Ready: alone, the count starts at once.
+    a.chat(".es ready");
+    assert!(a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tWT\t") && m.text.contains(&format!("\t1~1~{}\t", htl_survival::sim::wager::WAGER_COUNTDOWN as u32)))).is_some(), "the count on the slip");
     // Another server's run, sent to this one (the board host) on its login port, comes back on
     // the board; a forged one doesn't.
-    let w = htl_survival::sim::wager::WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 6, ms: 1_000_000, limit_ms: 1_800_000, deaths: 1, timed: true, party: vec![("Zed".into(), "mage".into())] };
+    let w = htl_survival::sim::wager::WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 6, ms: 1_000_000, limit_ms: 1_800_000, deaths: 1, timed: true, party: vec![("Zed".into(), "mage".into())], splits: Vec::new() };
     let line = htl_server::survival::board::Run::from_wager(&w, "Far Camp").line();
     let forged = line.replace("|6|", "|9|");
     let body = format!("{line}\n{forged}\n");
@@ -1524,6 +1568,11 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
     let mut reply = String::new();
     s.read_to_string(&mut reply).unwrap();
     assert!(reply.starts_with("HTTP/1.0 200") && reply.contains("|Far Camp|stockade|6|") && !reply.contains("|9|"), "{reply}");
+    // The ladder: Zed, from that run, rated across the dungeons.
+    a.chat(".es ladder");
+    let nt = a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tNT\tboard\tThe Bookmaker's Ladder\t")));
+    let ServerPacket::MessageChat(m) = nt.expect("the ladder's page") else { unreachable!() };
+    assert!(m.text.contains("1. Zed (Mage) of Far Camp: ") && m.text.contains("Win a wager in time to get on it"), "{}", m.text);
     // And the login port still logs in.
     assert!(Client::connect(server.login, "bob", "hold", REALM).is_ok());
 }
@@ -1628,4 +1677,71 @@ fn a_creatures_swing_trails_its_last_stroke_on_a_client_that_draws_it_so() {
     let theirs: Vec<String> = addon_lines(&b, "ES").into_iter().filter(|l| mob_swing(l)).collect();
     assert!(!theirs.is_empty(), "ben sees it wind up too");
     assert!(theirs.iter().all(|l| l.split('\t').nth(4) == Some("-")), "with no trail on the older client: {theirs:?}");
+}
+
+#[test]
+fn a_blow_borrowing_another_models_clip_names_it_to_the_clients() {
+    let mut content = content();
+    for m in &mut content.movesets {
+        for l in &mut m.light {
+            l.from = Some("ScourgeFemale".into());
+        }
+    }
+    let server = start_content(None, false, content);
+    let mut c = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut c);
+    c.chat(".es hello 5 ac10");
+    c.drain(0.5);
+    stand(&mut c, [-9500.0, 0.0, 0.0], 0.0);
+    c.chat(".es in a");
+    c.chat(".es in au");
+    c.drain(0.6);
+    let lines = addon_lines(&c, "ES");
+    let swing = lines.iter().find(|l| l.starts_with("AN\t") && l.split('\t').nth(10) == Some("light")).unwrap_or_else(|| panic!("the swing: {lines:?}"));
+    assert_eq!(swing.split('\t').nth(12), Some("ScourgeFemale"), "{swing}");
+    // And the moves the add-on plays itself carry it too.
+    let mv = lines.iter().rfind(|l| l.starts_with("MV\t")).expect("the moves");
+    let first = mv.split('\t').nth(10).unwrap().split('^').next().unwrap();
+    assert!(first.ends_with("~ScourgeFemale"), "{first}");
+}
+
+#[test]
+fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing() {
+    let server = start_with(None, false);
+    let mut c = Client::connect(server.login, "vera", "hold", REALM).unwrap();
+    enter(&mut c);
+    let told = |c: &Client| addon_lines(c, "ES").iter().any(|l| l.starts_with("T\t") && l.contains("older than this server's"));
+    // An old add-on on a plain client: told, on screen.
+    c.chat(".es hello 1");
+    assert!(c.until(2.0, told), "told: {:?}", addon_lines(&c, "ES"));
+    // Said once: a reload's hello again isn't told again.
+    c.chat(".es hello 1");
+    c.drain(0.6);
+    let times = addon_lines(&c, "ES").iter().filter(|l| l.starts_with("T\t") && l.contains("older than this server's")).count();
+    assert_eq!(times, 1, "once a run");
+    // The newest add-on on the newest client: not a word.
+    let mut d = Client::connect(server.login, "wren", "hold", REALM).unwrap();
+    enter(&mut d);
+    d.chat(".es hello 8 ac10");
+    assert!(d.until(2.0, |d| addon_lines(d, "ES").iter().any(|l| l.starts_with("V\t"))), "awake");
+    d.drain(0.5);
+    assert!(!told(&d), "nothing to update");
+}
+
+#[test]
+fn the_bookmakers_week_is_shown_once_as_a_hero_comes_in_and_again_on_asking() {
+    let server = start_with(None, false);
+    let mut c = Client::connect(server.login, "yara", "hold", REALM).unwrap();
+    enter(&mut c);
+    let weeks = |c: &Client| addon_lines(c, "ES").iter().filter(|l| l.starts_with("NT\twager\tThe Bookmaker's Week\t")).count();
+    c.chat(".es hello 8 ac10");
+    assert!(c.until(2.0, |c| weeks(c) == 1), "shown as they come in: {:?}", addon_lines(&c, "ES").iter().filter(|l| l.starts_with("NT")).collect::<Vec<_>>());
+    let page = addon_lines(&c, "ES").into_iter().find(|l| l.starts_with("NT\twager\tThe Bookmaker's Week\t")).unwrap();
+    assert!(page.contains("This week, as the stakes rise") && page.contains("+2 "), "{page}");
+    // A reload's hello: not again. Asked for: again.
+    c.chat(".es hello 8 ac10");
+    c.drain(0.6);
+    assert_eq!(weeks(&c), 1, "once a week");
+    c.chat(".es news");
+    assert!(c.until(2.0, |c| weeks(c) == 2), "on asking");
 }

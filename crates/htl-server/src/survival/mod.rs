@@ -21,6 +21,7 @@ pub mod board;
 mod draw;
 mod heroes;
 pub mod land;
+mod meter_ui;
 mod play;
 pub mod realms;
 mod siege_ui;
@@ -219,6 +220,8 @@ pub struct SurvivalGame {
     pub(crate) warned_glow: HashMap<Id, f32>,
     /// The add-on's lines waiting for the next flush.
     pub(crate) hud_at: Instant,
+    /// When the damage meters last went out.
+    pub(crate) meter_at: Instant,
     /// Who's casting what (to stop it cleanly).
     pub(crate) casting: HashMap<Id, u32>,
     /// The chest changed: tell whoever has it open.
@@ -326,6 +329,7 @@ impl SurvivalGame {
             mark_at: HashMap::new(),
             warned_glow: HashMap::new(),
             hud_at: Instant::now(),
+            meter_at: Instant::now(),
             casting: HashMap::new(),
             storage_dirty: false,
             abilities_dirty: BTreeSet::new(),

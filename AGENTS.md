@@ -98,6 +98,8 @@ it lists a test as flaky or failing, open an issue for it rather than ignoring i
   `crates/htl-server/src/survival/ui.rs` (and Basin Battle's equivalent). Change the server and
   the add-on in the same pull request, and keep old fields working where you can: players may run
   an older add-on against a newer server for a while.
+  When an add-on change matters to players, bump the add-on's `VERSION` and the server's
+  `ADDON_NEWEST` (`survival/ui.rs`) together: a hero on an older add-on is then told how to update.
 - **Saves.** Changes to what's saved must still load older save files. Never commit `saves/`.
 - **Content tuning** (`content/*.toml`) is the easiest place to collide. Keep tuning changes in
   their own small pull requests, with the reason in a comment beside the number.

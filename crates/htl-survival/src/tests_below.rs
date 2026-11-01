@@ -366,10 +366,12 @@ fn the_book_at_camp_opens_after_the_first_raid_and_sends_a_hero_down() {
         |e| matches!(e, Event::Travel { player, to: Some(k) } if *player == id && k == "first")
     ));
     s.set_pages(vec!["first".into(), "second".into()]);
-    // Both of this dungeon's, and each other dungeon's first page after them.
+    // Both of this dungeon's, and each other dungeon's first page after them, the easiest first.
     let pages: Vec<String> = s.book_pages().into_iter().map(|(k, _)| k).collect();
-    assert_eq!(&pages[..3], &["first", "second", "stockade_gate"]);
-    let firsts: Vec<String> = s.content.more_dungeons.iter().map(|d| d.lamps[0].key.clone()).collect();
+    assert_eq!(&pages[..2], &["first", "second"]);
+    let mut more: Vec<&crate::content::DungeonDef> = s.content.more_dungeons.iter().collect();
+    more.sort_by_key(|d| d.tier);
+    let firsts: Vec<String> = more.iter().map(|d| d.lamps[0].key.clone()).collect();
     assert_eq!(pages[2..].to_vec(), firsts);
     let books = s.book_dungeons();
     assert_eq!(books[0].key, "deadmines");
@@ -994,19 +996,20 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     s.below.as_mut().unwrap().open.insert("short".into());
     assert_eq!(s.wager_unlocked("deadmines"), 1);
     s.start_wager(3);
-    // Fresh, and tougher: the shortcut shut, the grunt a level's worth (and Hardened) stronger.
+    // Fresh, and tougher: the shortcut shut, the grunt two levels' worth stronger (the week's
+    // terms change the fight, not its numbers).
     assert!(!s.door_is_open("short"), "shut for the wager");
     // What it has to beat, for the tracker: the boss, by name, still up.
     let boss_name = s.content.mobs.iter().find(|m| m.key == s.content.dungeon.as_ref().unwrap().packs.iter().find(|p| p.key == "boss").unwrap().mob).unwrap().name.clone();
     assert_eq!(s.wager_progress(), vec![(boss_name.clone(), false)]);
     let tough = s.mobs[&grunt(&s)].max_health as f32;
-    let want = plain * (1.0 + WAGER_HEALTH).powi(2) * 1.2;
+    let want = plain * (1.0 + WAGER_HEALTH).powi(2);
     assert!((tough - want).abs() <= want * 0.02 + 1.0, "{tough} vs {want}");
     let g = grunt(&s);
     let hit = s.attack_now(g).damage as f32;
     let def = s.mobs[&g].def;
     let base = s.content.mobs[def].attack.damage as f32;
-    assert!((hit - base * (1.0 + WAGER_DAMAGE).powi(2) * 1.16).abs() <= 1.0, "{hit} vs {base}");
+    assert!((hit - base * (1.0 + WAGER_DAMAGE).powi(2)).abs() <= 1.0, "{hit} vs {base}");
     // A hero comes down: the slip, and the clock waits till they leave the lamp.
     let id = s.join("ayla", "Ayla", None);
     let ev = run(&mut s, 1.0);
@@ -1020,10 +1023,21 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     s.wager_fall();
     assert_eq!(s.wager().unwrap().deaths, 1);
     assert!(s.wager_elapsed() >= 10.0, "a fall's ten seconds");
-    // Its boss down, quickly: won in time, three levels up.
+    // Foes chase farther during a wager.
+    use crate::sim::wager::WAGER_LEASH;
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * WAGER_LEASH);
+    // Its boss down first: not won till enough of its foes are down too.
+    assert_eq!(s.wager_forces(), Some((0, 1, 1)), "one grunt standing, one needed");
     let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
     s.hurt_mob(boss, id, 10_000_000);
     let ev = run(&mut s, 0.2);
+    assert!(!ev.iter().any(|e| matches!(e, Event::WagerDone(_))), "the count isn't made");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title == "The bosses are down" && sub.contains("1 more foe"))), "{ev:?}");
+    // The grunt down, quickly: won in time, three levels up.
+    let g = grunt(&s);
+    s.hurt_mob(g, id, 10_000_000);
+    let ev = run(&mut s, 0.2);
+    assert_eq!(s.wager_forces().map(|f| f.0), Some(1));
     let done = ev.iter().find_map(|e| if let Event::WagerDone(r) = e { Some(r.clone()) } else { None }).expect("won");
     assert_eq!(s.wager_progress(), vec![(boss_name, true)], "down");
     assert!(done.timed && done.level == 3 && done.deaths == 1 && done.party == vec![("Ayla".to_string(), s.players[&id].class.clone())], "{done:?}");
@@ -1031,11 +1045,12 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     assert!(ev.iter().any(|e| matches!(e, Event::ToCamp { counts, .. } if counts.iter().any(|(k, n)| k == "wager:deadmines" && *n == 5))), "the camp told");
     let plunder = s.content.item("plunder").unwrap();
     assert!(s.players[&id].bag.get(&plunder).copied().unwrap_or(0) >= 15, "paid");
-    // Everyone gone: the dungeon as it was, the shortcut open again.
+    // Everyone gone: the dungeon as it was, the shortcut open again, the leash its own.
     s.leave(id);
     run(&mut s, 0.2);
     assert!(s.wager().is_none());
     assert!(s.door_is_open("short"), "given back");
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash);
 }
 
 #[test]
@@ -1060,4 +1075,378 @@ fn a_ground_look_is_only_laid_for_an_area_as_big_as_it_looks() {
     let marks: Vec<(f32, u32)> = s.events.iter().filter_map(|e| if let Event::Mark { radius, ground, .. } = e { Some((*radius, *ground)) } else { None }).collect();
     assert!(marks.iter().any(|(r, g)| *r < crate::sim::GROUND_LOOK_MIN && *g == 0), "{marks:?}");
     assert!(marks.iter().any(|(r, g)| *r >= crate::sim::GROUND_LOOK_MIN && *g == 22191), "{marks:?}");
+}
+
+#[test]
+fn every_dungeon_has_a_count_of_foes_for_its_wager() {
+    use crate::sim::wager::{wager_forces_needed, wager_forces_total, WAGER_FORCES};
+    let c = Content::builtin();
+    for d in c.dungeons() {
+        let (total, needed) = (wager_forces_total(d, &c), wager_forces_needed(d, &c));
+        assert!(total >= 20, "{}: {total} foes to count", d.key);
+        assert!(needed < total && needed as f32 >= total as f32 * WAGER_FORCES, "{}: {needed} of {total}", d.key);
+    }
+}
+
+#[test]
+fn a_wagers_clock_waits_till_everyone_is_ready_then_counts_down() {
+    use crate::sim::wager::WAGER_COUNTDOWN;
+    let mut s = below();
+    s.start_wager(1);
+    let a = s.join("ayla", "Ayla", None);
+    let b = s.join("bren", "Bren", None);
+    run(&mut s, 1.0);
+    assert_eq!(s.wager_readiness(), Some((0, 2, None)));
+    assert!(s.wager_ready(a).is_ok());
+    assert!(s.wager_ready(a).is_err(), "once");
+    assert_eq!(s.wager_readiness(), Some((1, 2, None)), "waiting on Bren");
+    run(&mut s, 2.0);
+    assert!(s.wager().unwrap().started.is_none(), "no clock without everyone");
+    assert!(s.wager_ready(b).is_ok());
+    assert!(s.wager_readiness().unwrap().2.is_some(), "the count runs");
+    // Someone arriving mid-count stops it till they're ready too.
+    let c = s.join("cael", "Cael", None);
+    assert_eq!(s.wager_readiness(), Some((2, 3, None)), "stopped for Cael");
+    assert!(s.wager_ready(c).is_ok());
+    let ev = run(&mut s, WAGER_COUNTDOWN as f32 + 0.3);
+    let called: Vec<String> = ev.iter().filter_map(|e| if let Event::Banner { title, .. } = e { Some(title.clone()) } else { None }).collect();
+    assert!(["3", "2", "1"].iter().all(|n| called.iter().any(|t| t == n)) && called.iter().any(|t| t.contains("clock is running")), "{called:?}");
+    assert!(s.wager().unwrap().started.is_some());
+    assert!(s.wager_readiness().is_none(), "past it");
+    assert!(s.wager_ready(a).is_err(), "too late");
+}
+
+#[test]
+fn stepping_off_from_the_lamp_before_everyone_is_ready_starts_the_clock_at_once() {
+    let mut s = below();
+    s.start_wager(1);
+    let a = s.join("ayla", "Ayla", None);
+    let _b = s.join("bren", "Bren", None);
+    run(&mut s, 1.0);
+    s.move_player(a, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title.contains("clock is running") && sub.contains("Ayla stepped off"))), "{ev:?}");
+    assert!(s.wager().unwrap().started.is_some(), "no head start for free");
+}
+
+#[test]
+fn every_piece_the_dungeons_foes_carry_has_honed_copies_better_by_their_tier() {
+    use crate::content::{hone_tier, HONE_TIERS};
+    let c = Content::builtin();
+    assert_eq!((hone_tier(3), hone_tier(4), hone_tier(8), hone_tier(11), hone_tier(12), hone_tier(20)), (0, 1, 2, 2, 3, 3));
+    let honed: Vec<&crate::content::ItemDef> = c.items.iter().filter(|i| i.hone > 0).collect();
+    assert!(honed.len() >= 60 * HONE_TIERS.len(), "{} honed", honed.len());
+    for h in &honed {
+        let base = &c.items[c.item(&h.honed_from).unwrap()];
+        let by = HONE_TIERS[h.hone as usize - 1].2;
+        assert_eq!(c.honed(c.item(&base.key).unwrap(), h.hone), c.item(&h.key).unwrap());
+        assert!(h.name.starts_with(&base.name) && h.display == base.display && h.icon == base.icon, "{}", h.key);
+        if base.reduce > 0.0 {
+            assert!(h.reduce > base.reduce, "{}: armour better", h.key);
+        }
+        for (p, q) in base.perks.iter().zip(&h.perks) {
+            assert!((q.amount - p.amount * by).abs() < 1e-4, "{}: perk", h.key);
+        }
+        if let (Some(w), Some(hw)) = (c.weapon(&base.key), c.weapon(&h.key)) {
+            assert!(hw.damage[1] > w.damage[1] && hw.two_handed == w.two_handed, "{}: damage", h.key);
+        }
+    }
+}
+
+#[test]
+fn a_wager_won_at_eight_pays_keen_gear_into_the_camps_chest() {
+    use crate::sim::wager::{wager_bosses, wager_forces_needed};
+    let c = Content::builtin().for_dungeon_of("stockade");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    s.start_wager(8);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let d = s.content.dungeon.clone().unwrap();
+    let needed = wager_forces_needed(&d, &s.content);
+    let wall = s.wall();
+    let bosses = wager_bosses(&d, &s.content);
+    let b = s.below.as_mut().unwrap();
+    b.slain.extend(bosses);
+    let w = b.wager.as_mut().unwrap();
+    w.started = Some(wall);
+    w.forces = needed;
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::WagerDone(r) if r.timed && r.level == 8)), "won");
+    let paid: Vec<usize> = ev.iter().filter_map(|e| if let Event::ToCamp { items, .. } = e { Some(items.keys().copied().collect::<Vec<_>>()) } else { None }).flatten().collect();
+    let gear: Vec<&crate::content::ItemDef> = paid.iter().map(|i| &s.content.items[*i]).filter(|i| i.kind != crate::content::ItemKind::Resource).collect();
+    assert!(!gear.is_empty() && gear.iter().all(|i| i.hone == 2), "keen: {:?}", gear.iter().map(|i| &i.key).collect::<Vec<_>>());
+    let _ = id;
+}
+
+#[test]
+fn a_harder_dungeons_foes_are_tougher_by_its_tier_and_the_book_lists_the_easiest_first() {
+    use crate::content::{TIER_DAMAGE, TIER_HEALTH};
+    let c = Content::builtin();
+    for (key, tier) in [("ragefire", 1u32), ("stockade", 2), ("cathedral", 3)] {
+        assert_eq!(c.dungeons().find(|d| d.key == key).unwrap().tier, tier);
+        let s = Survival::new_dungeon(c.for_dungeon_of(key), Box::new(FlatLand::default()), 3, 1_000_000.0);
+        let (id, m) = s.mobs.iter().find(|(_, m)| !s.content.mobs[m.def].boss && !s.content.mobs[m.def].critter).map(|(id, m)| (*id, m)).unwrap();
+        let d = &s.content.mobs[m.def];
+        let past = (tier - 1) as f32;
+        let want = (d.health as f32 * s.content.combat.foe_health * (1.0 + TIER_HEALTH * past)).round();
+        assert!((m.max_health as f32 - want).abs() <= 1.0, "{key}: {} vs {want}", m.max_health);
+        let base = s.attack_now(id).damage as f32;
+        let plain = d.attack.damage as f32 * (1.0 + TIER_DAMAGE * past);
+        assert!((base - plain.round()).abs() <= 1.0, "{key}: {base} vs {plain}");
+    }
+    let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let tiers: Vec<u32> = s.book_dungeons().iter().map(|b| b.tier).collect();
+    assert!(tiers.windows(2).all(|w| w[0] <= w[1]) && tiers.first() == Some(&1) && tiers.last() == Some(&3), "{tiers:?}");
+}
+
+#[test]
+fn a_sets_words_count_its_pieces_not_their_honed_copies() {
+    let c = Content::builtin();
+    let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let mut seen = 0;
+    for set in &s.content.sets {
+        let pieces = s.content.items.iter().filter(|i| i.set == set.key && i.hone == 0).count();
+        for (k, i) in s.content.items.iter().enumerate().filter(|(_, i)| i.set == set.key) {
+            let words = s.gear_words(k);
+            assert!(words.contains(&format!("({pieces} pieces)")), "{}: {words}", i.key);
+            seen += 1;
+        }
+    }
+    assert!(seen > 0, "some set pieces, honed copies among them");
+    assert!(s.content.items.iter().any(|i| !i.set.is_empty() && i.hone > 0), "a honed set piece");
+}
+
+#[test]
+fn a_wager_keeps_each_bosses_split_as_it_falls() {
+    let mut s = below();
+    s.start_wager(1);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.2);
+    assert_eq!(s.wager_splits(), vec![None], "the boss still up");
+    run(&mut s, 2.0);
+    let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
+    s.hurt_mob(boss, id, 10_000_000);
+    run(&mut s, 0.2);
+    let split = s.wager_splits()[0].expect("its split");
+    assert!((2.0..4.0).contains(&split), "{split}");
+    // On with the count: the run's splits go with it.
+    let g = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].mob == "grunt")).unwrap().0;
+    run(&mut s, 1.0);
+    s.hurt_mob(g, id, 10_000_000);
+    let ev = run(&mut s, 0.2);
+    let done = ev.iter().find_map(|e| if let Event::WagerDone(r) = e { Some(r.clone()) } else { None }).expect("won");
+    assert_eq!(done.splits.len(), 1);
+    assert_eq!(done.splits[0].1, (split * 1000.0).round() as u64, "the split as it fell, not the end");
+    assert!(done.ms > done.splits[0].1);
+}
+
+#[test]
+fn the_wagers_terms_turn_weekly_and_a_run_keeps_the_ones_it_was_taken_with() {
+    use crate::sim::wager::{terms_at, week_of, week_terms, ALL_TERMS, FRENZY_MIGHT, ROTATION};
+    // Weeks start on Monday: 1970-01-05 was one.
+    assert_eq!((week_of(4.0 * 86_400.0 - 1.0), week_of(4.0 * 86_400.0)), (0, 1));
+    // Four weeks round, every term in them.
+    for t in &ALL_TERMS {
+        assert!(ROTATION.iter().any(|w| w.contains(&t.key)), "{} is never on", t.key);
+    }
+    let day = 86_400.0;
+    let monday = 4.0 * day;
+    let names = |wall: f64| week_terms(wall).iter().map(|t| t.key).collect::<Vec<_>>();
+    assert_eq!(names(monday), ROTATION[1].to_vec());
+    assert_eq!(names(monday + 7.0 * day), ROTATION[2].to_vec());
+    assert_eq!(terms_at(3, monday).len(), 1);
+    assert_eq!(terms_at(7, monday).len(), 3);
+    // A +7 taken in week 1: Quickening, Frenzied, Eruptions.
+    let mut s = Survival::new_dungeon(content(), Box::new(FlatLand::default()), 3, monday + day);
+    s.start_wager(7);
+    assert!(s.wager_has("quickening") && s.wager_has("frenzied") && s.wager_has("eruptions") && !s.wager_has("calling"));
+    let keep = s.wager().unwrap().terms.clone();
+    // A foe low on health hits a third harder.
+    let g = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].mob == "grunt")).unwrap().0;
+    let full = s.attack_now(g).damage as f32;
+    let m = s.mobs.get_mut(&g).unwrap();
+    m.health = m.max_health / 4;
+    let low = s.attack_now(g).damage as f32;
+    assert!((low - (full * FRENZY_MIGHT).round()).abs() <= 1.0, "{full} -> {low}");
+    // In a fight, the ground under a hero erupts: marked first, then it burns.
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [28.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 1.0);
+    assert!(s.wager().unwrap().started.is_some(), "stepped off: the clock runs");
+    let w = s.wager().unwrap();
+    let e = w.embers.first().expect("an eruption under the hero");
+    assert!(dist2d(e.0, s.players[&id].pos) < 1.0 && e.2 - s.clock > 0.0 && e.2 - s.clock <= 1.5, "marked first, burning {:.1} s on", e.2 - s.clock);
+    assert!(w.next_eruption > s.clock + 10.0, "not again for a while");
+    // The week turns: the run keeps its terms.
+    s.wall_start += 7.0 * day;
+    run(&mut s, 0.1);
+    assert_eq!(s.wager().unwrap().terms, keep);
+}
+
+#[test]
+fn a_hero_who_never_readies_holds_the_count_only_so_long() {
+    use crate::sim::wager::WAGER_READY_WAIT;
+    let mut s = below();
+    s.start_wager(1);
+    let a = s.join("ayla", "Ayla", None);
+    let _away = s.join("bren", "Bren", None);
+    run(&mut s, 0.5);
+    assert!(s.wager_ready(a).is_ok());
+    run(&mut s, 5.0);
+    assert!(s.wager_readiness().unwrap().2.is_none(), "waiting on Bren a while");
+    s.wall_start += WAGER_READY_WAIT;
+    run(&mut s, 0.2);
+    assert!(s.wager_readiness().unwrap().2.is_some(), "then the count starts anyway");
+}
+
+#[test]
+fn a_harder_dungeons_won_wager_pays_more_plunder_by_its_tier() {
+    use crate::content::TIER_PLUNDER;
+    use crate::sim::wager::{wager_bosses, wager_forces_needed};
+    let paid = |key: &str| -> u32 {
+        let c = Content::builtin().for_dungeon_of(key);
+        let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+        s.start_wager(1);
+        let id = s.join("ayla", "Ayla", None);
+        run(&mut s, 0.2);
+        let d = s.content.dungeon.clone().unwrap();
+        let plunder = s.content.item(&d.plunder).unwrap();
+        let before = s.players[&id].bag.get(&plunder).copied().unwrap_or(0);
+        let (needed, bosses, wall) = (wager_forces_needed(&d, &s.content), wager_bosses(&d, &s.content), s.wall());
+        let b = s.below.as_mut().unwrap();
+        b.slain.extend(bosses);
+        let w = b.wager.as_mut().unwrap();
+        w.started = Some(wall);
+        w.forces = needed;
+        run(&mut s, 0.2);
+        s.players[&id].bag.get(&plunder).copied().unwrap_or(0) - before
+    };
+    let (first, third) = (paid("ragefire"), paid("cathedral"));
+    assert_eq!(first, 9, "6 + 3 at +1");
+    assert_eq!(third, (9.0 * (1.0 + 2.0 * TIER_PLUNDER)).round() as u32, "a tier-3 dungeon pays half again");
+}
+
+#[test]
+fn a_first_clear_below_gifts_the_camp_turns_the_books_page_and_only_once() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "warlord").unwrap();
+    s.engage(boss, mobs::Foe::Hero(id));
+    s.hurt_mob(boss, id, 1_000_000);
+    let ev = s.step(DT);
+    // Below: every boss down, so the camp hears it's cleared (with the kill).
+    let up: Vec<(String, u32)> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::ToCamp { counts, .. } => Some(counts.clone()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert!(up.iter().any(|(k, n)| k == "cleared:deadmines" && *n == 1), "{up:?}");
+
+    // At camp: a gift in the chest, a banner, and the book points onward.
+    let mut c = content();
+    c.dungeon.as_mut().unwrap().first_clear = BTreeMap::from([("plunder".to_string(), 3)]);
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 0.0);
+    let plunder = camp.content.item("plunder").unwrap();
+    let before = camp.storage.get(&plunder).copied().unwrap_or(0);
+    let next_before = camp.next_dungeon().map(|d| d.key.clone());
+    assert_eq!(next_before.as_deref(), Some("deadmines"), "the easiest uncleared first");
+    camp.from_below(&up, &BTreeMap::new());
+    let ev = camp.step(DT);
+    assert_eq!(camp.storage.get(&plunder).copied().unwrap_or(0), before + 3, "the first clear's gift");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { player: None, title, .. } if title.contains("Cleared"))), "a banner at camp");
+    let books = camp.book_dungeons();
+    let dm = books.iter().find(|b| b.key == "deadmines").unwrap();
+    assert!(dm.cleared && !dm.next, "cleared, and the book has turned its page");
+    assert!(books.iter().filter(|b| b.next).count() <= 1, "one next page at most");
+    // A second clear: no second gift.
+    camp.from_below(&up, &BTreeMap::new());
+    camp.step(DT);
+    assert_eq!(camp.storage.get(&plunder).copied().unwrap_or(0), before + 3, "only the first");
+}
+
+#[test]
+fn the_call_brings_the_nearest_pack_at_rest_after_a_few_seconds_and_only_once() {
+    use crate::sim::wager::CALL_AFTER;
+    let mut c = content();
+    c.dungeon.as_mut().unwrap().packs.push(pack("grunt", "", [50.0, 0.0], false));
+    // Week 0 of the rotation: The Call.
+    let day = 86_400.0;
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, day);
+    s.start_wager(2);
+    assert!(s.wager_has("calling"));
+    s.below.as_mut().unwrap().wager.as_mut().unwrap().started = Some(day);
+    let id = s.join("ayla", "Ayla", None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.max_health = 1_000_000;
+    p.health = 1_000_000;
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let grunt_at = |s: &Survival, x: f32| *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "grunt" && (m.home[0] - x).abs() < 1.0).unwrap().0;
+    let (a, b) = (grunt_at(&s, 30.0), grunt_at(&s, 50.0));
+    let resting = |s: &Survival, m: Id| matches!(s.mobs[&m].state, mobs::MobState::Idle { .. });
+    s.engage(a, mobs::Foe::Hero(id));
+    run(&mut s, CALL_AFTER - 1.0);
+    assert!(resting(&s, b), "not yet");
+    let ev = run(&mut s, 1.5);
+    assert!(!resting(&s, b), "called");
+    let _ = ev;
+    let w = s.wager().unwrap();
+    assert!(w.called_packs.len() == 2, "the caller and the called, each once: {:?}", w.called_packs);
+}
+
+#[test]
+fn quickening_makes_a_boss_hit_harder_the_longer_its_fight_lasts() {
+    use crate::sim::wager::{QUICKEN_MIGHT, QUICKEN_STEP};
+    // Week 1 of the rotation: Quickening.
+    let day = 86_400.0;
+    let mut s = Survival::new_dungeon(content(), Box::new(FlatLand::default()), 3, 4.0 * day + day);
+    s.start_wager(2);
+    assert!(s.wager_has("quickening"));
+    s.below.as_mut().unwrap().wager.as_mut().unwrap().started = Some(5.0 * day);
+    let id = s.join("ayla", "Ayla", None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.max_health = 10_000_000;
+    p.health = 10_000_000;
+    s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "warlord").unwrap();
+    assert_eq!(s.quickening(boss), 1.0, "at rest");
+    s.engage(boss, mobs::Foe::Hero(id));
+    run(&mut s, QUICKEN_STEP * 2.0 + 0.5);
+    assert!((s.quickening(boss) - (1.0 + 2.0 * QUICKEN_MIGHT)).abs() < 1e-4, "two steps in: {}", s.quickening(boss));
+    // A boss that goes home starts over.
+    s.mobs.get_mut(&boss).unwrap().state = mobs::MobState::Return;
+    run(&mut s, 0.2);
+    assert_eq!(s.quickening(boss), 1.0, "home again");
+}
+
+#[test]
+fn the_call_wakes_only_the_called_pack_not_what_rests_beside_it() {
+    use crate::sim::wager::CALL_AFTER;
+    let mut c = content();
+    // The pack it calls is linked to a third that rests right beside it.
+    let mut called = pack("grunt", "", [50.0, 0.0], false);
+    called.link = 15.0;
+    c.dungeon.as_mut().unwrap().packs.push(called);
+    c.dungeon.as_mut().unwrap().packs.push(pack("grunt", "", [58.0, 0.0], false));
+    let day = 86_400.0;
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, day);
+    s.start_wager(2);
+    s.below.as_mut().unwrap().wager.as_mut().unwrap().started = Some(day);
+    let id = s.join("ayla", "Ayla", None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.max_health = 1_000_000;
+    p.health = 1_000_000;
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let grunt_at = |s: &Survival, x: f32| *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "grunt" && (m.home[0] - x).abs() < 1.0).unwrap().0;
+    let (a, b, third) = (grunt_at(&s, 30.0), grunt_at(&s, 50.0), grunt_at(&s, 58.0));
+    let resting = |s: &Survival, m: Id| matches!(s.mobs[&m].state, mobs::MobState::Idle { .. });
+    s.engage(a, mobs::Foe::Hero(id));
+    run(&mut s, CALL_AFTER + 0.5);
+    assert!(!resting(&s, b), "the nearest pack comes");
+    assert!(resting(&s, third), "and nothing it's linked to");
 }

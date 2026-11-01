@@ -20,6 +20,11 @@ blurb = "The quillboar's warren of thorns, where Charlga speaks for Agamaggan"
 first_page = "The thorn gate at the top of the warren. Mind the spines."
 welcome = "Razorfen Kraul. The quillboar dig their warren under Agamaggan's thorns, and Charlga Razorflank speaks for the dead demigod. Two lamps: one at the thorn gate, one in the warren's heart. Rest at a lamp to heal, fill your Draughts (T) and send the quillboar back to their burrows. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): Razorfen Kraul: the middle (25 to 35).
+tier = 2
+# The camp's first clear of it (every boss down in one run): into the chest. Scaled by tier
+# (silver and bronze for a first dungeon, then pearl, then silk); tune freely.
+first_clear = { silver = 3, bronze = 4, pearl = 1 }
 draught = "draught"
 draughts = 3
 draughts_max = 6
@@ -54,8 +59,8 @@ facing = 1.2
 
 # --- secrets -----------------------------------------------------------------------------------------
 
-# A shrine to Agamaggan under the thorns at the warren's south-west, where Charlga takes her
-# power. Whoever touches it, Agamaggan notices.
+# A shrine to Agamaggan under the thorns at the warren's far end, past its heart and Agathelos,
+# where Charlga takes her power. Whoever touches it, Agamaggan notices.
 [[dungeon.door]]
 key = "agamaggan_shrine"
 display = 6328
@@ -125,13 +130,14 @@ page = "The circles on the floor are scored deep, one inside another, and the gr
 [[dungeon.note]]
 key = "tauren_warning"
 hints = ["agamaggan_shrine", "jargba_cache"]
-clue = "Agamaggan's shrine is deep in the north-west of the warren, under the thorns; the Death Speaker hoards behind his altar."
+# #27: past the heart, at the far end (the note said north-west, this comment south-west).
+clue = "Agamaggan's shrine is deep past the warren's heart, at its far end under the thorns; the Death Speaker hoards behind his altar."
 display = 164
 scale = 1.3
 name = "A Tauren Scout's Warning"
 at = [1946.0, 1548.0, 82.0]
 facing = 0.8
-text = "\"Charlga Razorflank leads the quillboar here; she says she speaks for Agamaggan, who died on these thorns. Her people say she keeps his shrine somewhere deep in the north-west of the warren, under the thorns. Do not touch it. And whatever the dead are given, the Death Speaker keeps behind his own altar.\""
+text = "\"Charlga Razorflank leads the quillboar here; she says she speaks for Agamaggan, who died on these thorns. Her people say she keeps his shrine somewhere deep past the warren's heart, at its far end, under the thorns. Do not touch it. And whatever the dead are given, the Death Speaker keeps behind his own altar.\""
 
 [[dungeon.note]]
 key = "scratched_hide"

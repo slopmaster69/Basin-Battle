@@ -401,10 +401,11 @@ impl Survival {
         if spell != 0 {
             self.events.push(Event::Missile { caster: id, spell, target: Target::Unit(id) });
         }
+        let name = self.content.abilities[e.ability].name.clone();
         if e.health > health {
-            self.heal_hero(id, e.health - health);
+            self.heal_hero_by(id, e.health - health, id, &name);
         }
-        let line = format!("{}: back to the echo", self.content.abilities[e.ability].name);
+        let line = format!("{name}: back to the echo");
         self.cc_note(id, line);
     }
 

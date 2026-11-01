@@ -382,6 +382,10 @@ pub struct MoveDef {
     pub lunge: f32,
     #[serde(default = "one_share")]
     pub range: f32,
+    /// Another character model's take on the clip (`"ScourgeFemale"`, `"OrcMale"`…), played on
+    /// the hero's own body by a client that can (`ac10`); without one, the hero's own.
+    #[serde(default)]
+    pub from: Option<String>,
 }
 
 fn one_share() -> f32 {
@@ -390,8 +394,21 @@ fn one_share() -> f32 {
 
 impl MoveDef {
     fn of(clip: u16, take: u32, windup: f32, recovery: f32, damage: f32, lunge: f32) -> Self {
-        Self { clip, take, windup, recovery, damage, stamina: 1.0, lunge, range: 1.0 }
+        Self { clip, take, windup, recovery, damage, stamina: 1.0, lunge, range: 1.0, from: None }
     }
+}
+
+/// The character models a clip can be borrowed from, as `<Race><Gender>`.
+pub const CLIP_RACES: [&str; 9] = ["Human", "Orc", "Dwarf", "NightElf", "Scourge", "Tauren", "Gnome", "Troll", "Goblin"];
+
+/// Whether `name` is a character model a clip can come from (`"ScourgeFemale"`), or a model's path.
+pub fn clip_source_ok(name: &str) -> bool {
+    if name.contains('\\') || name.to_ascii_lowercase().ends_with(".m2") {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    let race = lower.strip_suffix("female").or_else(|| lower.strip_suffix("male"));
+    race.is_some_and(|r| CLIP_RACES.iter().any(|x| x.eq_ignore_ascii_case(r)))
 }
 
 /// A grip's blows (`one_hand`, `dagger`, `two_hand`, `polearm`).
@@ -841,6 +858,44 @@ pub struct ItemDef {
     /// The set it's a piece of (`[[set]]`, by key), if any.
     #[serde(default)]
     pub set: String,
+    /// A honed piece (made by the rules, not written in a file): its tier, 1 to [`HONE_TIERS`]'s
+    /// length, and the piece it was honed from (by key). 0: an ordinary piece.
+    #[serde(default)]
+    pub hone: u8,
+    #[serde(default)]
+    pub honed_from: String,
+}
+
+/// Gear a won wager pays out from +4 up comes honed, better the higher the wager: (the least
+/// wager, its name, how much better: weapons' damage, armour's share off a blow, perks).
+/// Every piece the dungeons' foes carry has a honed copy of each tier.
+pub const HONE_TIERS: [(u32, &str, f32); 3] = [(4, "Honed", 1.12), (8, "Keen", 1.25), (12, "Peerless", 1.4)];
+/// What a honed tier adds besides its share (from Keen on, each worn piece of that tier or finer
+/// counts): a parry gives back this much breath for each Keen piece (up to the most), and a
+/// dodge through a creature's blow throws it off balance this long (open to a riposte) with any
+/// Peerless piece on. First guesses, to try in play.
+pub const KEEN_BREATH: f32 = 8.0;
+pub const KEEN_BREATH_MOST: f32 = 24.0;
+pub const PEERLESS_STAGGER: f32 = 0.8;
+/// The trick a tier adds, said on the piece (none for the first).
+pub const HONE_TRICKS: [&str; 3] = ["", " Keen: a parry gives back breath.", " Peerless: a parry gives back breath, and a dodge through a blow throws the foe off balance."];
+
+/// A dungeon tier's foes past the first: this much more health, and their blows this much harder,
+/// a tier. (Ragefire's trash and the Cathedral's were all but alike; a first pass to try in play.)
+pub const TIER_HEALTH: f32 = 0.25;
+pub const TIER_DAMAGE: f32 = 0.15;
+/// And a won wager's plunder there: this much more a tier (a harder dungeon pays more).
+pub const TIER_PLUNDER: f32 = 0.25;
+/// The tiers' names, for the book.
+pub const TIER_NAMES: [&str; 3] = ["a first dungeon", "a harder one", "among the hardest"];
+
+fn first_tier() -> u32 {
+    1
+}
+
+/// The honing tier a wager at `level` pays out (0: plain).
+pub fn hone_tier(level: u32) -> u8 {
+    HONE_TIERS.iter().filter(|(at, ..)| level >= *at).count() as u8
 }
 
 /// A lasting effect gear gives: its kind (as [`EffectDef::KINDS`]) and how much.
@@ -964,6 +1019,15 @@ pub struct DungeonDef {
     /// The Bookmaker's Wager: the time to beat (minutes; by the dungeon's size when not given).
     #[serde(default)]
     pub wager_minutes: f32,
+    /// How hard it is next to the others: 1 (a first dungeon) to 3 (the hardest). Its foes are
+    /// tougher by [`TIER_HEALTH`] and [`TIER_DAMAGE`] a tier past the first; the book lists the
+    /// dungeons by it, the easiest first.
+    #[serde(default = "first_tier")]
+    pub tier: u32,
+    /// What the camp's chest gets the first time the camp clears it (every boss down in a run):
+    /// item key to count. Empty: a banner, and the book's next page, but nothing in the chest.
+    #[serde(default)]
+    pub first_clear: BTreeMap<String, u32>,
     #[serde(rename = "lamp", default)]
     pub lamps: Vec<LampDef>,
     #[serde(rename = "door", default)]
@@ -1369,6 +1433,10 @@ pub struct SpecialDef {
     /// The clip it swings with (`AnimationData`; the creature's usual attack when not given).
     #[serde(default)]
     pub clip: Option<u16>,
+    /// Another character model's take on it (as a hero's move's `from`); else the creature's
+    /// `clips_from`, else its own.
+    #[serde(default)]
+    pub from: Option<String>,
     /// How far it steps into the blow as it lands (yards).
     #[serde(default)]
     pub lunge: f32,
@@ -1431,6 +1499,10 @@ pub struct MobDef {
     pub key: String,
     pub name: String,
     pub display: u32,
+    /// A creature on a character model (an orc, a Defias): every blow of its from this character
+    /// model's clips (`"ScourgeFemale"`…) where the step names none, on a client that can.
+    #[serde(default)]
+    pub clips_from: Option<String>,
     #[serde(default = "one_f")]
     pub scale: f32,
     pub health: u32,
@@ -2089,7 +2161,12 @@ impl Content {
     /// The built-in rules as a dev world has them (every card owned), for tests.
     #[cfg(test)]
     pub fn dev() -> Self {
-        let mut c = Self::builtin();
+        Self::into_dev(Self::builtin())
+    }
+
+    /// Any rules (the solo sim's tuned ones) as a dev world has them.
+    #[cfg(test)]
+    pub fn into_dev(mut c: Self) -> Self {
         c.dev.full_tree = true;
         c.work = WorkDef::instant();
         c.combat.foe_health = 1.0;
@@ -2161,6 +2238,7 @@ impl Content {
             .try_into()
             .context("reading the rules")?;
         c.settle();
+        c.hone();
         c.validate()?;
         c.source = text.to_string();
         c.dungeon_source = dungeon.to_string();
@@ -2294,6 +2372,64 @@ impl Content {
             }
             m.phases.sort_by(|a, b| b.at.total_cmp(&a.at));
         }
+    }
+
+    /// Honed copies of every piece the dungeons' foes carry (weapons and armour), a tier each:
+    /// the same look, better by the tier's share, its name and words saying so.
+    fn hone(&mut self) {
+        let mut pool: Vec<String> = Vec::new();
+        for d in self.dungeon.iter().chain(self.more_dungeons.iter()) {
+            for p in &d.packs {
+                if let Some(m) = self.mobs.iter().find(|m| m.key == p.mob) {
+                    for g in &m.gear {
+                        if !pool.contains(g) {
+                            pool.push(g.clone());
+                        }
+                    }
+                }
+            }
+        }
+        for key in pool {
+            let Some(item) = self.items.iter().find(|i| i.key == key && i.hone == 0).cloned() else { continue };
+            let weapon = self.weapons.iter().find(|w| w.key == key).cloned();
+            if !(item.kind == ItemKind::Armor || (item.kind == ItemKind::Weapon && weapon.is_some())) {
+                continue;
+            }
+            for (t, (at, name, by)) in HONE_TIERS.iter().enumerate() {
+                let tier = t as u8 + 1;
+                let k = format!("{key}_honed{tier}");
+                if self.items.iter().any(|i| i.key == k) {
+                    continue;
+                }
+                let mut h = item.clone();
+                h.key = k.clone();
+                h.name = format!("{}, {name}", item.name);
+                h.hone = tier;
+                h.honed_from = key.clone();
+                // (Capped, but never below the piece it was honed from.)
+                h.reduce = (item.reduce * by).min(0.6).max(item.reduce);
+                for p in &mut h.perks {
+                    p.amount *= by;
+                }
+                h.text = format!("{} {name} by the Bookmaker (a wager won at +{at} or higher): {}% better.{}", item.text, ((by - 1.0) * 100.0).round(), HONE_TRICKS[t]);
+                self.items.push(h);
+                if let Some(w) = &weapon {
+                    let mut hw = w.clone();
+                    hw.key = k;
+                    hw.damage = [(w.damage[0] as f32 * by).round() as u32, (w.damage[1] as f32 * by).round() as u32];
+                    self.weapons.push(hw);
+                }
+            }
+        }
+    }
+
+    /// A piece's honed copy at `tier` (itself at 0, or if it has none).
+    pub fn honed(&self, item: usize, tier: u8) -> usize {
+        if tier == 0 {
+            return item;
+        }
+        let k = format!("{}_honed{tier}", self.items[item].key);
+        self.item(&k).unwrap_or(item)
     }
 
     fn validate(&self) -> Result<()> {
@@ -2536,6 +2672,22 @@ impl Content {
             if m.light.is_empty() {
                 bail!("moveset {}: no light blows", m.key);
             }
+            // A borrowed clip names a character model the clients can find.
+            let moves = m.light.iter().chain([&m.heavy, &m.running]).chain(m.roll.iter()).chain(m.leap.iter());
+            for d in moves {
+                if let Some(f) = d.from.as_deref().filter(|f| !clip_source_ok(f)) {
+                    bail!("moveset {}: from {f:?} is no character model (<Race><Gender>, as ScourgeFemale)", m.key);
+                }
+            }
+        }
+        for m in &self.mobs {
+            let steps = m.special.iter().chain(m.patterns.iter().flat_map(|p| p.steps.iter()));
+            let named = steps.filter_map(|s| s.from.as_deref()).chain(m.clips_from.as_deref());
+            for f in named {
+                if !clip_source_ok(f) {
+                    bail!("mob {}: clips from {f:?}, which is no character model (<Race><Gender>, as ScourgeFemale)", m.key);
+                }
+            }
         }
         for w in &self.weapons {
             if !w.moveset.is_empty() && !self.movesets.iter().any(|m| m.key == w.moveset) {
@@ -2612,6 +2764,9 @@ impl Content {
             }
             for k in d.trade.keys() {
                 item(k, "dungeon trade")?;
+            }
+            for k in d.first_clear.keys() {
+                item(k, "dungeon first_clear")?;
             }
             if d.lamps.is_empty() {
                 bail!("dungeon: no [[dungeon.lamp]]");
@@ -2697,6 +2852,9 @@ impl Content {
                 if n.hints.is_empty() != n.clue.is_empty() {
                     bail!("dungeon note {}: `hints` and `clue` go together", n.key);
                 }
+            }
+            if !(1..=TIER_NAMES.len() as u32).contains(&d.tier) {
+                bail!("dungeon {}: tier {} (1 to {})", d.key, d.tier, TIER_NAMES.len());
             }
             if !d.exit_boss.is_empty() && !pack_keys.contains(&d.exit_boss.as_str()) {
                 bail!(

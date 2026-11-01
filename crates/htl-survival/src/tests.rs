@@ -2968,3 +2968,149 @@ fn a_leap_whose_landing_went_unheard_takes_its_attack_with_it() {
     s.hurt_player(p, hp);
     assert_eq!(s.players[&p].landing_attack, None, "fallen");
 }
+
+// --- clips borrowed from another character model ---------------------------------------------------
+
+#[test]
+fn a_blow_can_borrow_another_character_models_clip() {
+    use crate::content::clip_source_ok;
+    assert!(clip_source_ok("ScourgeFemale") && clip_source_ok("nightelfmale") && clip_source_ok("Character\\Orc\\Male\\OrcMale.m2"));
+    assert!(!clip_source_ok("Murloc") && !clip_source_ok("ScourgeQueen") && !clip_source_ok("Female"));
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let key = s.content.moveset_of(s.weapon_of(&s.players[&p])).key.clone();
+    let set = s.content.movesets.iter_mut().find(|m| m.key == key).unwrap();
+    set.light[0].from = Some("ScourgeFemale".into());
+    s.input(p, Input::Attack);
+    match &s.players[&p].action {
+        Action::Swing { strike, .. } => assert_eq!(strike.from.as_deref(), Some("ScourgeFemale")),
+        a => panic!("a swing: {a:?}"),
+    }
+    // A creature on a character model takes every blow from the one it names.
+    let g = s.content.mob("grunt").unwrap();
+    s.content.mobs[g].clips_from = Some("OrcFemale".into());
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.engage(k, Foe::Hero(p));
+    let mut ev = Vec::new();
+    for _ in 0..200 {
+        ev.extend(s.step(DT));
+        if ev.iter().any(|e| matches!(e, Event::MobWindup { id, .. } if *id == k)) {
+            break;
+        }
+    }
+    assert!(ev.iter().any(|e| matches!(e, Event::MobWindup { id, from, .. } if *id == k && from.as_deref() == Some("OrcFemale"))), "its swing, borrowed");
+}
+
+// --- the death recap -------------------------------------------------------------------------------
+
+#[test]
+fn a_fall_is_recapped_with_who_struck_how_each_blow_caught_them_and_a_tip() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    let grunt = s.content.mobs[s.mobs[&k].def].name.clone();
+    // A blow taken unguarded, one round the back of the guard, then a heavy blow through a guard
+    // with no breath left to hold it.
+    s.strike_player(k, p, 10, [2.0, 0.0, 0.0], true, false, false, Blow::Light);
+    s.input(p, Input::Guard);
+    assert_eq!(s.strike_player(k, p, 10, [-2.0, 0.0, 0.0], true, false, false, Blow::Light), Outcome::Hit);
+    s.players.get_mut(&p).unwrap().stamina = 0.0;
+    let hp = s.players[&p].health;
+    assert_eq!(s.strike_player(k, p, hp * 10, [2.0, 0.0, 0.0], true, true, false, Blow::Light), Outcome::GuardBroken);
+    assert_eq!(s.players[&p].health, 0, "felled");
+    let r = s.death_recap(p);
+    assert_eq!(r.lines.len(), 3, "{:?}", r.lines);
+    assert!(r.lines[0].starts_with(&format!("{grunt}'s heavy blow, through your guard (")), "the last blow first: {:?}", r.lines);
+    assert!(r.lines[1].starts_with(&format!("{grunt}'s blow, around your guard (")), "{:?}", r.lines);
+    assert!(r.lines[2].starts_with(&format!("{grunt}'s blow, unguarded (")), "{:?}", r.lines);
+    assert!(r.tip.contains("dodge"), "how to answer a broken guard: {}", r.tip);
+}
+
+#[test]
+fn a_recap_forgets_old_blows_names_a_fall_and_starts_clean_on_waking() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.strike_player(k, p, 10, [2.0, 0.0, 0.0], true, false, false, Blow::Light);
+    s.mobs.remove(&k);
+    run(&mut s, recap::RECAP_SECS + 1.0);
+    let hp = s.players[&p].health;
+    s.fall_damage(p, hp + 5);
+    let r = s.death_recap(p);
+    assert_eq!(r.lines, vec![format!("Fall ({hp})")], "the old blow is forgotten");
+    assert_eq!(r.tip, "Mind the drop.");
+    // Up again: nothing carried over.
+    let up = s.content.player.respawn_secs + 1.0;
+    run(&mut s, up);
+    assert!(s.players[&p].health > 0, "back on their feet");
+    assert!(s.death_recap(p).lines.is_empty());
+}
+
+// --- honed gear's tricks ---------------------------------------------------------------------------
+
+#[test]
+fn keen_gear_gives_back_breath_on_a_parry_and_peerless_gear_throws_a_dodged_foe_off_balance() {
+    use crate::content::{ItemKind, KEEN_BREATH, PEERLESS_STAGGER};
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    let piece = |s: &Survival, tier: u8| s.content.items.iter().position(|i| i.hone == tier && i.kind == ItemKind::Armor).unwrap();
+    // A Keen piece worn: a parry gives back breath.
+    let keen = piece(&s, 2);
+    let slot = s.content.items[keen].slot.clone();
+    s.players.get_mut(&p).unwrap().armor.insert(slot.clone(), keen);
+    s.players.get_mut(&p).unwrap().stamina = 50.0;
+    s.input(p, Input::Guard);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
+    let st = s.players[&p].stamina;
+    assert!((st - (50.0 + KEEN_BREATH)).abs() < 0.5, "breath back: {st}");
+    s.input(p, Input::GuardUp);
+    run(&mut s, 2.0);
+    // Without one, a dodge through the grunt's blow doesn't throw it; with a Peerless piece, it does.
+    let mut dodge = |s: &mut Survival| {
+        s.mobs.get_mut(&k).unwrap().stagger_until = 0.0;
+        s.input(p, Input::Dodge);
+        run(s, 0.1);
+        let out = s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, false, Blow::Light);
+        run(s, 1.0);
+        out
+    };
+    s.players.get_mut(&p).unwrap().armor.remove(&slot);
+    assert_eq!(dodge(&mut s), Outcome::Dodged);
+    assert!(s.mobs[&k].stagger_until <= s.clock, "plain gear: no trick");
+    let peerless = piece(&s, 3);
+    let slot = s.content.items[peerless].slot.clone();
+    s.players.get_mut(&p).unwrap().armor.insert(slot, peerless);
+    s.mobs.get_mut(&k).unwrap().stagger_until = 0.0;
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, false, Blow::Light), Outcome::Dodged);
+    let m = &s.mobs[&k];
+    assert!(m.stagger_until > s.clock + PEERLESS_STAGGER * 0.5 && m.riposte, "off balance, open to a riposte");
+}
+
+// --- the fighting record ---------------------------------------------------------------------------
+
+#[test]
+fn heroes_felling_heroes_go_on_the_camps_fighting_record() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
+    let fell = |s: &mut Survival, by: Id, who: Id| {
+        let hp = s.players[&who].health;
+        s.strike_player(by, who, hp * 10, s.players[&by].pos, false, false, false, Blow::Light);
+        assert_eq!(s.players[&who].health, 0);
+        let up = s.content.player.respawn_secs + 1.0;
+        run(s, up);
+    };
+    fell(&mut s, a, b);
+    fell(&mut s, a, b);
+    fell(&mut s, b, a);
+    assert_eq!(s.fighting_record(), vec![("Ayla".to_string(), 2, 1), ("Bren".to_string(), 1, 2)]);
+    // A creature's kill isn't a fight between heroes.
+    let k = mob(&mut s, "grunt", [4.0, 0.0, 0.0]);
+    let hp = s.players[&a].health;
+    s.strike_player(k, a, hp * 10, [4.0, 0.0, 0.0], false, false, false, Blow::Light);
+    assert_eq!(s.fighting_record()[0], ("Ayla".to_string(), 2, 1));
+}

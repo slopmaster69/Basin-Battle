@@ -15,7 +15,10 @@
 //! - `BP\t<name>\t<cost>\t<problem>\t<x~y~z~yards>`: the station being placed and where its ghost stands (`BP`
 //!   alone: none).
 //! - `CF\t<what>\t<text>`: confirm something (ringing the bell).
-//! - `BN\t<title>\t<sub>`: a big banner. `T\t<text>`: a short message. `DE\t<secs>`: down, up in.
+//! - `BN\t<title>\t<sub>`: a big banner. `T\t<text>`: a short message. `DE\t<secs>\t<blows>\t<tip>`: down, up in;
+//!   `blows` is what felled them, the last first, with `^` between ("Targorr's heavy blow, through
+//!   your guard (212)"), `tip` a word on answering it (both may be empty; an older add-on reads
+//!   only `secs`).
 //! - `WD`: too winded for what was tried (the stamina bar flashes).
 //! - `KF\t<killer>\t<victim>`: the kill feed (the killer empty when nobody struck them).
 //! - `HT\t<damage>\t<light|heavy|arrow>\t<hit|block|parry|dodge|miss>`: a blow of yours landed.
@@ -23,13 +26,22 @@
 //! - `BK\t<open>\t<key~name~dungeon^...>\t<arena key~name~best wave>\t<siege>\t<dungeons>`: the
 //!   Smuggler's Logbook at camp, its pages (lamps below, each with its dungeon's key), the Proving
 //!   Ring's and Siege's (there from the start), then each dungeon
-//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page`, joined by `^`).
+//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page~secrets found~secrets~notes read~notes~wager open~wager secs~tier~cleared~next`,
+//!   joined by `^`; the fields after `first page` from newer servers), the easiest first.
 //! - `AA\t<wave>\t<foes standing>\t<secs to the next, or -1 in a wave>\t<the camp's best>`: the
 //!   Proving Ring as a hero in it sees it (`AA` alone: not in it).
 //! - `AW\t<wave>\t<in a wave>\t<secs to the next>\t<the camp's best>\t<heroes in it>`: the ring's
 //!   banner, used.
 //! - `LP\t<key>\t<name>\t<draughts>\t<most>\t<key~name^...>\t<key~name~price~can~icon^...>\t<plunder>`:
 //!   a lamp below: the hero's Draughts, the other lit lamps, the quartermaster's wares.
+//! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: a page to read and keep
+//!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board); `{n}`
+//!   breaks a line.
+//! - `WT\t<dungeon>\t<level>\t<elapsed>\t<limit>\t<falls>\t<state>\t<terms>\t<name~down^...>\t<felled~needed~total>`:
+//!   a wager's clock below (state `wait`, `run`, `won` or `over`; the bosses it must beat, and its
+//!   count of foes), then `\t<ready~heroes~count secs>` before the clock (empty after), then
+//!   `\t<split~best^...>` in seconds for each boss (when it fell, and in the camp's quickest run
+//!   in time at this level). `WT` alone: no wager.
 //!
 //! To the action-combat client that plays clips itself (`ac2`), in place of emotes:
 //! - `AN\t<guid>\t<clip>\t<impact secs>\t<trail AARRGGBB>\t<trail ms>\t<mine>`: a hero swings.
@@ -40,9 +52,11 @@
 //! - `RO\t<guid>\t<secs>\t<mine>`: a hero rolls (a dodge).
 //!
 //! And to the third round (`ac3`), which runs its own dashes and lunges:
-//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<friendly fire>`:
+//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<friendly fire>\t<out of a dodge>\t<out of a Corey roll>`:
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
-//! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>`.
+//! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
+//!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
+//!   (a creature's line carries it too). Each `MV` blow goes on `~<from>` the same way.
 //!   The kind: `light`, `heavy`, `running`, `bash`, `kick`, `cast`, a creature's `mob`, and the
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
@@ -67,6 +81,7 @@
 //! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
 //!   the key in that slot (0 Q to 4 the ultimate) is armed for its recast for `secs` more: pressed
 //!   again it fires that ability (its icon, its name, its aim and charge); `RC\t<slot>`: closed.
+//! - `DP`, `DM`: the damage meters (see `meter_ui.rs`).
 //! - `EM\t<slot>\t<secs>`: the key in that slot is empowered (a combo) for `secs` more: its next
 //!   press is its EX version, for no Valor; `EM\t<slot>`: spent or gone.
 
@@ -271,6 +286,25 @@ pub(crate) const CONTROLS_TEXT: &str = "WASD moves. Left click attacks (hold it,
 
 pub(crate) const PREFIX: &str = "ES";
 pub(crate) const VERSION: u32 = 2;
+/// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
+/// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
+/// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
+pub(crate) const ADDON_NEWEST: u32 = 8;
+pub(crate) const CLIENT_NEWEST: u8 = 10;
+
+/// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
+/// hero, or none when both are current.
+pub(crate) fn out_of_date(version: u32, level: u8) -> Option<String> {
+    let addon = version < ADDON_NEWEST;
+    let client = level < CLIENT_NEWEST;
+    let what = match (addon, client) {
+        (false, false) => return None,
+        (true, false) => format!("Your Elwynn Survival add-on is older than this server's (v{version}; the server has v{ADDON_NEWEST}): some screens may be missing."),
+        (false, true) => "Your game client is older than this server's: some effects won't show.".to_string(),
+        (true, true) => format!("Your game client and add-on (v{version}) are older than this server's: some screens and effects won't show."),
+    };
+    Some(format!("{what} {}", crate::HOW_TO_UPDATE))
+}
 const HUD_EVERY: Duration = Duration::from_millis(150);
 /// A champion's bar shows to the heroes this near it while it fights.
 const BOSS_BAR_RANGE: f32 = 60.0;
@@ -559,18 +593,21 @@ impl SurvivalGame {
         let set = c.moveset_of(w);
         let mv = |m: &htl_survival::Strike| {
             let impact = m.windup + m.active * 0.5;
-            format!("{}~{}~{impact:.3}~{:.3}~{:.2}~{:.1}~{:.2}~{:.0}", m.clip, m.take, m.total() - impact, m.lunge, m.stamina, m.range, m.arc)
+            let from = m.from.as_deref().map(clean).unwrap_or_default();
+            format!("{}~{}~{impact:.3}~{:.3}~{:.2}~{:.1}~{:.2}~{:.0}~{from}", m.clip, m.take, m.total() - impact, m.lunge, m.stamina, m.range, m.arc)
         };
         let light: Vec<String> = (0..set.light.len()).map(|k| mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Light, k))).collect();
         let heavy = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Heavy, 0));
         let running = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Running, 0));
+        let roll = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Roll, 0));
+        let leap = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Leap, 0));
         let shove = |d: &htl_survival::content::ShoveDef| {
             let impact = d.windup + d.active * 0.5;
             format!("{}~0~{impact:.3}~{:.3}~{:.2}~{:.1}~{:.2}~{:.0}", d.clip, d.windup + d.active + d.recovery - impact, d.lunge, d.stamina, d.range, d.arc)
         };
         let k = &c.combat;
         Some(format!(
-            "MV\t{}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.1}\t{:.2}\t{}\t{heavy}\t{running}\t{}\t{}\t{}",
+            "MV\t{}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.1}\t{:.2}\t{}\t{heavy}\t{running}\t{}\t{}\t{}\t{roll}\t{leap}",
             u8::from(w.two_handed),
             k.chain_after,
             k.cancel_after,
@@ -605,6 +642,7 @@ impl SurvivalGame {
         if hud_due {
             self.hud_at = Instant::now();
         }
+        let meters_due = self.meters_due();
         let storage = std::mem::take(&mut self.storage_dirty);
         let chest = self.sim.storage_id();
         let conns: Vec<(ConnId, Id, Option<Id>)> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, w)| (*c, w.id, w.station)).collect();
@@ -721,6 +759,9 @@ impl SurvivalGame {
                 self.ui_line_changed(conn, "SG", sg);
             }
             self.ui_line_changed(conn, "WR", wr);
+            if meters_due {
+                self.ui_meters(conn, id);
+            }
             self.abilities_dirty.remove(&id);
             if storage && station == Some(chest) {
                 self.ui_station(conn, id, chest);
@@ -784,7 +825,7 @@ impl SurvivalGame {
                 let dungeons: Vec<String> = books
                     .iter()
                     .map(|b| format!(
-                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
+                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
                             clean(&b.key),
                             clean(&b.name),
                             clean(&b.icon),
@@ -799,7 +840,10 @@ impl SurvivalGame {
                             b.notes.0,
                             b.notes.1,
                             b.wager.0,
-                            b.wager.1.round()
+                            b.wager.1.round(),
+                            b.tier,
+                            u8::from(b.cleared),
+                            u8::from(b.next)
                         ))
                     .collect();
                 let ring = arena.map_or_else(String::new, |(k, n, best)| format!("{}~{}~{best}", clean(&k), clean(&n)));
@@ -1052,6 +1096,20 @@ impl SurvivalGame {
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));
+                // An older add-on or client: say so, and how to update (on screen and in chat).
+                let version: u32 = arg.parse().unwrap_or(0);
+                let name = self.world_of(conn).map_or(String::new(), |w| w.name.clone());
+                println!("[survival] {name} runs add-on v{version}, client ac{level}");
+                let account = self.sessions.get(&conn).map_or(String::new(), |s| s.account.clone());
+                if let Some(word) = out_of_date(version, level).filter(|_| crate::first_told(format!("es:{account}:{version}:{level}"))) {
+                    self.tell(conn, &word);
+                    self.say_to(conn, &word);
+                }
+                // The Bookmaker's week, once a week a hero comes in, once the camp has the book.
+                let week = htl_survival::sim::wager::week_of(self.sim.wall());
+                if self.board.is_some() && self.sim.book_open() && crate::first_told(format!("week:{account}:{week}")) {
+                    let _ = self.ui_week_page(conn);
+                }
                 Ok(())
             }
             "in" => {
@@ -1244,7 +1302,12 @@ impl SurvivalGame {
                 Ok(level) => self.sim.travel_wager(me, &arg, level),
                 Err(_) => Err("Try .es wager <dungeon> <level>, as .es wager deadmines 3.".into()),
             },
-            "board" => self.ui_board_page(conn, &arg),
+            "board" => self.ui_board_page(conn, &arg, arg2),
+            "ladder" | "rating" => self.ui_ladder_page(conn, me),
+            "news" | "week" => self.ui_week_page(conn),
+            "record" | "fights" => self.ui_record_page(conn),
+            "ready" => self.sim.wager_ready(me),
+            "meter" => self.meter_command(conn, me, &arg),
             // The book at camp, and the lamps below.
             "travel" | "go" => {
                 let to = if arg.is_empty() {
@@ -1707,6 +1770,19 @@ impl SurvivalGame {
         }
     }
 
+    /// A banner to every hero in the world (a line in chat for one without the add-on): a
+    /// restart coming.
+    pub(crate) fn warn_all(&self, title: &str, sub: &str) {
+        let conns: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
+        for c in conns {
+            if self.has_addon(c) {
+                self.ui_line(c, &format!("BN\t{}\t{}", clean(title), clean(sub)));
+            } else {
+                self.say_to(c, &format!("{title}. {sub}"));
+            }
+        }
+    }
+
     /// A word to every hero in the world.
     fn announce(&self, text: &str) {
         let conns: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
@@ -1728,5 +1804,32 @@ impl SurvivalGame {
             .filter(|(_, d)| *d <= htl_survival::INTERACT_RANGE + 2.0)
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(id, _)| id)
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+
+    #[test]
+    fn an_older_add_on_or_client_is_told_how_to_update_and_a_current_one_is_left_alone() {
+        assert_eq!(out_of_date(ADDON_NEWEST, CLIENT_NEWEST), None);
+        assert_eq!(out_of_date(ADDON_NEWEST + 1, CLIENT_NEWEST + 1), None, "newer than the server: nothing to say");
+        let addon = out_of_date(ADDON_NEWEST - 1, CLIENT_NEWEST).unwrap();
+        assert!(addon.contains("add-on is older") && addon.contains("releases"), "{addon}");
+        let client = out_of_date(ADDON_NEWEST, CLIENT_NEWEST - 1).unwrap();
+        assert!(client.starts_with("Your game client is older"), "{client}");
+        assert!(out_of_date(1, 0).unwrap().contains("client and add-on (v1)"));
+    }
+
+    /// The add-on's own `VERSION` and the newest client level it asks for, read from its source:
+    /// the server's numbers must keep up with them.
+    #[test]
+    fn the_newest_add_on_and_client_are_the_ones_the_add_on_says() {
+        let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../addon/ElwynnSurvival/ElwynnSurvival.lua")).unwrap();
+        let version: u32 = src.lines().find_map(|l| l.strip_prefix("local VERSION = ")).and_then(|v| v.trim().parse().ok()).expect("local VERSION = N");
+        assert_eq!(version, ADDON_NEWEST, "bump ADDON_NEWEST with the add-on's VERSION");
+        let level: u8 = src.match_indices("\" ac").filter_map(|(i, _)| src[i + 4..].split('"').next()?.parse().ok()).max().expect("the hello's acN");
+        assert_eq!(level, CLIENT_NEWEST, "the newest client the add-on asks for");
     }
 }

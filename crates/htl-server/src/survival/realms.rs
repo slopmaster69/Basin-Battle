@@ -30,6 +30,8 @@ pub struct Realms {
     pages: Vec<String>,
     /// The Bookmaker's Board.
     pub(crate) board: Option<super::board::Shared>,
+    /// A warned restart: what's been said of it.
+    warner: crate::restart::Warner,
 }
 
 impl Realms {
@@ -46,6 +48,7 @@ impl Realms {
             in_siege: HashSet::new(),
             pages: Vec::new(),
             board: None,
+            warner: Default::default(),
         };
         // An account kept in two saves (a restart mid-crossing): it's below.
         for b in &r.below {
@@ -61,6 +64,10 @@ impl Realms {
     /// The Bookmaker's Board, for the camp's pages and the wagers won below.
     pub fn set_board(&mut self, board: Option<super::board::Shared>) {
         self.camp.board = board.clone();
+        // (Below too, for the board's and the ladder's pages.)
+        for b in &mut self.below {
+            b.board = board.clone();
+        }
         self.board = board;
     }
 
@@ -77,6 +84,7 @@ impl Realms {
                     s.tick();
                 }
                 self.exchange();
+                self.restart_step();
                 next += TICK;
                 if next < now {
                     next = now + TICK;
@@ -94,6 +102,29 @@ impl Realms {
                     return;
                 }
             }
+        }
+    }
+
+    /// A warned restart coming: a banner to every hero in every world as each warning comes, and
+    /// at the time, everything saved.
+    fn restart_step(&mut self) {
+        use crate::restart::Step;
+        let Some(step) = self.warner.step() else { return };
+        let (Step::Warn(title, sub) | Step::Now(title, sub) | Step::Off(title, sub)) = &step;
+        self.camp.warn_all(title, sub);
+        for b in &self.below {
+            b.warn_all(title, sub);
+        }
+        if let Some(s) = self.siege.as_ref() {
+            s.warn_all(title, sub);
+        }
+        if matches!(step, Step::Now(..)) {
+            self.camp.save();
+            for b in &mut self.below {
+                b.save();
+            }
+            println!("[restart] Elwynn Survival saved");
+            crate::restart::saved();
         }
     }
 
@@ -236,7 +267,8 @@ impl Realms {
             if let Some(b) = &self.board {
                 for w in &won {
                     let run = b.lock().unwrap().record(w);
-                    println!("[survival] wager: {} +{} in {} ms ({} falls, {}) by {}", w.name, w.level, w.ms, w.deaths, if w.timed { "in time" } else { "over time" }, run.heroes());
+                    let splits: Vec<String> = w.splits.iter().map(|(n, ms)| format!("{n} {}s", ms / 1000)).collect();
+                    println!("[survival] wager: {} +{} in {} ms ({} falls, {}) by {}; splits: {}", w.name, w.level, w.ms, w.deaths, if w.timed { "in time" } else { "over time" }, run.heroes(), splits.join(", "));
                 }
             }
             let news = std::mem::take(&mut self.below[k].to_camp);
