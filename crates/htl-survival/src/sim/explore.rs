@@ -419,6 +419,7 @@ impl Survival {
         let n = self.camp.found.len();
         let of = self.content.sites.len();
         let reward = if site.reward.is_empty() { String::new() } else { format!(" Into the chest: {}.", self.cost_text(&site.reward)) };
+        // The add-on tells this one quietly by its "Discovered: " start (ES.Banner): keep the words.
         self.events.push(Event::Banner { player: None, title: format!("Discovered: {}", site.name), sub: format!("{n} of {of} places in Elwynn") });
         self.announce(format!("{name} has found {}.{reward}", site.name));
         if !site.reward.is_empty() {
