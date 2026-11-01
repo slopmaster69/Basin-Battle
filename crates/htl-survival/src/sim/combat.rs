@@ -2034,7 +2034,11 @@ impl Survival {
         let (range, arc) = (strike.range, strike.arc);
         self.set_action(id, Action::Swing { t: 0.0, struck: Vec::new(), weapon: windex, strike });
         self.events.push(Event::Swing { attacker: id, victim: None, damage: 0, outcome: Outcome::Miss, anim: true, style: Blow::Heavy });
-        // No guard stops it: whoever it's coming for sees the weapon go red.
+        // No guard stops it: the weapon goes red for everyone, the striker too (so they know it's
+        // the unstoppable one), and a hero it's coming for is warned.
+        if d.unblockable {
+            self.events.push(Event::Glow { id, secs: windup });
+        }
         if d.unblockable && self.content.pvp.friendly_fire {
             let p = &self.players[&id];
             let (pos, f) = (p.pos, p.facing);

@@ -137,6 +137,11 @@ pub struct AbilityDef {
     /// much a second.
     #[serde(default)]
     pub delay: f32,
+    /// Ground: how long its look takes to come down (a meteor's fall is in the effect's own
+    /// model, from the moment it's shown): shown that much before it lands, so the blow and the
+    /// look land together.
+    #[serde(default)]
+    pub look_lead: f32,
     #[serde(default)]
     pub linger: f32,
     #[serde(default)]

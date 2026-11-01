@@ -603,3 +603,16 @@ fn bubble_pops_and_black_hole_collapses_as_they_end() {
     ev.extend(run(&mut s, 5.0));
     assert!(blows(&ev, g).contains(&30), "it collapses on them: {:?}", blows(&ev, g));
 }
+
+#[test]
+fn harpoon_leaves_the_creature_standing_beside_you_not_where_it_was() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let h = mob(&mut s, [12.0, 0.0, 0.0]);
+    ready(&mut s, p, "grappling_hook");
+    s.set_valor(p, 25.0);
+    cast(&mut s, p, "ranged", true);
+    run(&mut s, 0.6);
+    let d = dist2d(s.mobs[&h].pos, s.players[&p].pos);
+    assert!(d < 4.0, "it stands beside her, not {d:.1} yd off at {:?}", s.mobs[&h].pos);
+}

@@ -65,6 +65,8 @@ pub(crate) struct GroundCast {
     pub share: f32,
     pub land_at: f32,
     pub mark: Option<Id>,
+    /// Its look already on its way down (`look_lead`).
+    pub shown: bool,
 }
 
 /// Ground left burning: whoever stands in it takes `dps` a second until then.
@@ -975,6 +977,9 @@ impl Survival {
         let from = self.hands(id, yaw);
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
+        // A thrown axe that comes back skims out level at hand height: aimed down at the ground
+        // it would bury itself a few yards out and turn there.
+        let base = if d.returns && base[2] < 0.0 { norm([base[0], base[1], 0.0]) } else { base };
         let n = d.count.max(1);
         // A lob arcs to the ground at the reticle (within its range), over whatever is between.
         let lob_at = d.lob.then(|| self.aim_point(id, range));
@@ -1776,7 +1781,7 @@ impl Survival {
         if d.delay > 0.0 {
             self.events.push(Event::Cast { caster: id, spell: d.spell, ms: (d.delay * 1000.0) as u32 });
         }
-        self.grounds.push(GroundCast { owner: id, ability, at, radius, share, land_at, mark });
+        self.grounds.push(GroundCast { owner: id, ability, at, radius, share, land_at, mark, shown: false });
         if d.delay <= 0.0 {
             self.step_grounds();
         }
@@ -1785,6 +1790,17 @@ impl Survival {
     /// Ground marked for an ability lands; burning ground burns.
     pub(crate) fn step_grounds(&mut self) {
         let now = self.clock;
+        // A look that takes its time to come down starts that much early.
+        for k in 0..self.grounds.len() {
+            let g = &self.grounds[k];
+            let d = &self.content.abilities[g.ability];
+            if !g.shown && d.look_lead > 0.0 && g.land_at - d.look_lead <= now {
+                let target = if d.at_self { Target::Unit(g.owner) } else { Target::Point(g.at) };
+                let (owner, spell) = (g.owner, d.spell);
+                self.grounds[k].shown = true;
+                self.events.push(Event::Missile { caster: owner, spell, target });
+            }
+        }
         let (due, keep): (Vec<GroundCast>, Vec<GroundCast>) = std::mem::take(&mut self.grounds).into_iter().partition(|g| g.land_at <= now);
         self.grounds = keep;
         for g in due {
@@ -1793,7 +1809,9 @@ impl Survival {
             }
             let d = self.content.abilities[g.ability].clone();
             let target = if d.at_self { Target::Unit(g.owner) } else { Target::Point(g.at) };
-            self.events.push(Event::Missile { caster: g.owner, spell: d.spell, target });
+            if !g.shown {
+                self.events.push(Event::Missile { caster: g.owner, spell: d.spell, target });
+            }
             let damage = AbilityDef::at(d.damage, g.share);
             self.area(g.owner, g.ability, g.at, g.radius, g.share, damage, None);
             self.linger_at(g.owner, g.ability, g.at, g.radius);

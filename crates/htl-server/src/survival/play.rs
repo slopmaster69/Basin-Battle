@@ -428,6 +428,16 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Glow { id, secs } => {
+                // `WG\t<guid>\t<secs>` to every add-on here, the striker's own included; a
+                // warning for the same wind-up then glows nothing more.
+                let Some(g) = self.guid_of(id) else { return };
+                self.warned_glow.insert(id, self.sim.clock + secs);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &format!("WG\t{g:#X}\t{secs:.2}"));
+                }
+            }
             Event::Flash { player, text } => {
                 if let Some(c) = self.conn_of(player) {
                     if self.has_addon(c) {

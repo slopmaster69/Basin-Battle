@@ -527,3 +527,32 @@ fn a_creatures_blow_all_round_lays_its_look_at_its_feet() {
         "the slam's shockwave where it stands"
     );
 }
+
+#[test]
+fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().owned.insert("meteor".into());
+    slot(&mut s, p, "ultimate", "meteor");
+    s.set_valor(p, 100.0);
+    let meteor = s.content.ability("meteor").unwrap();
+    let d = s.content.abilities[meteor].clone();
+    assert!(d.look_lead > 0.0 && d.look_lead < d.delay);
+    let mut ev = cast(&mut s, p, "ultimate", false, 0.0);
+    let start = s.clock;
+    let mut look_at = None;
+    let mut looks = 0;
+    for _ in 0..(2.5 / DT).round() as usize {
+        for e in s.step(DT) {
+            if matches!(e, Event::Missile { spell, .. } if spell == d.spell) {
+                looks += 1;
+                look_at.get_or_insert(s.clock - start);
+            }
+            ev.push(e);
+        }
+    }
+    assert_eq!(looks, 1, "shown once");
+    let t = look_at.expect("its look");
+    let want = d.delay - d.look_lead;
+    assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
+}

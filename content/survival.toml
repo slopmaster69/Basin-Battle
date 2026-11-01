@@ -4328,6 +4328,9 @@ valor = 100
 range = [34.0, 34.0]
 radius = [7.0, 7.0]
 delay = 1.5
+# Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
+# moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
+look_lead = 0.8
 damage = [70.0, 70.0]
 linger = 4.0
 linger_damage = 8.0

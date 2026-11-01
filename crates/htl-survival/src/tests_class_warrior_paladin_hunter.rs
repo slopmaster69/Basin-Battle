@@ -595,3 +595,66 @@ fn an_old_hunters_save_comes_back_with_the_new_cards() {
     has_on_keys(&s, p, &[("ranged", "aimed_arrow"), ("close", "explosive_trap"), ("utility", "disengage"), ("defense", "flare"), ("ultimate", "kill_shot")]);
     assert_eq!(crate::save::renamed("volley"), "kill_shot");
 }
+
+#[test]
+fn rending_axe_really_moves_a_creature_toward_you() {
+    let mut s = world_with(true);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let w = mob(&mut s, "wolf", [12.0, 0.0, 0.0]);
+    s.set_valor(a, 25.0);
+    press(&mut s, a, "hurled_axe", true);
+    s.set_aim_line(a, 0.0, 0.0);
+    click(&mut s, a);
+    run(&mut s, 0.45);
+    let x = s.mobs[&w].pos[0];
+    assert!(x < 10.5, "dragged toward her from 12 yd: at {x:.1}");
+}
+
+#[test]
+fn hurled_axe_aimed_at_the_ground_skims_out_its_whole_range_instead_of_burying_itself() {
+    let mut s = world_with(true);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.set_aim_line(a, 0.0, -0.6);
+    press(&mut s, a, "hurled_axe", false);
+    s.set_aim_line(a, 0.0, -0.6);
+    click(&mut s, a);
+    let mut far: f32 = 0.0;
+    for _ in 0..(1.2 / DT).round() as usize {
+        s.step(DT);
+        for p in &s.projectiles {
+            far = far.max(p.pos[0]);
+        }
+    }
+    assert!(far > 18.0, "out about 22 yd before it turns, not {far:.1}");
+}
+
+#[test]
+fn unstoppable_blow_turns_the_strikers_own_weapon_red_against_creatures_too() {
+    let mut s = world_with(false);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    mob(&mut s, "wolf", [2.0, 0.0, 0.0]);
+    s.set_valor(a, 25.0);
+    let mut ev = press(&mut s, a, "sundering_blow", true);
+    if matches!(s.players[&a].action, Action::Aim { .. }) {
+        ev.extend(click(&mut s, a));
+    }
+    ev.extend(run(&mut s, 0.3));
+    assert!(ev.iter().any(|e| matches!(e, Event::Glow { id, .. } if *id == a)), "her weapon glows red");
+    // The plain Sundering Blow, which a guard does stop, doesn't.
+    let b = hero(&mut s, "Bren", [0.0, 10.0, 0.0], 0.0);
+    let mut ev = press(&mut s, b, "sundering_blow", false);
+    ev.extend(run(&mut s, 0.3));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Glow { id, .. } if *id == b)));
+}
+
+#[test]
+fn disengage_goes_off_in_the_middle_of_a_jump() {
+    let mut s = world_with(false);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.jumped(a);
+    s.move_player(a, [0.0, 0.0, 1.5], 0.0, Moving::default());
+    s.step(DT);
+    let mut ev = press(&mut s, a, "disengage", false);
+    ev.extend(run(&mut s, 0.2));
+    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, dir, .. } if *player == a && dir.cos() < -0.9)), "it leaps her back from the air");
+}
