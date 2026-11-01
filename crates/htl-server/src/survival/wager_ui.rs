@@ -1,7 +1,7 @@
 //! The Bookmaker's Wager on screen: its page in the book (the levels open, its terms, the camp's
 //! best, a level to take), the Bookmaker's Board, and the clock below while one's on.
 
-use htl_survival::sim::wager::{clock_words, terms_at, wager_forces_needed, wager_forces_total, wager_limit, TERMS, WAGER_DEATH};
+use htl_survival::sim::wager::{clock_words, terms_at, wager_forces_needed, wager_forces_total, wager_limit, week_terms, TERM_LEVELS, WAGER_DEATH};
 use htl_survival::sim::Id;
 
 use super::play::clean;
@@ -31,8 +31,11 @@ impl SurvivalGame {
         if most <= 1 {
             paras.push("Only +1 is open for now. Beat it in time to open +2.".to_string());
         }
-        let terms: Vec<String> = TERMS.iter().map(|t| format!("+{} {}: {}", t.level, t.name, t.text)).collect();
-        paras.push(format!("As the stakes rise:\n{}", terms.join("\n")));
+        // The week's terms, and next week's (they turn on Mondays).
+        let wall = self.sim.wall();
+        let terms: Vec<String> = TERM_LEVELS.iter().zip(week_terms(wall)).map(|(at, t)| format!("+{at} {}: {}", t.name, t.text)).collect();
+        let next: Vec<String> = TERM_LEVELS.iter().zip(week_terms(wall + 7.0 * 86_400.0)).map(|(at, t)| format!("+{at} {}", t.name)).collect();
+        paras.push(format!("This week, as the stakes rise:\n{}\nNext week's (they change every Monday): {}.", terms.join("\n"), next.join(", ")));
         let (bests, top) = self.board.as_ref().map_or((Vec::new(), Vec::new()), |b| {
             let b = b.lock().unwrap();
             (b.bests_here(&d.key), b.top(&d.key, 1))
@@ -50,7 +53,7 @@ impl SurvivalGame {
         let mut links: Vec<(String, String)> = (most.saturating_sub(4).max(1)..=most)
             .rev()
             .map(|l| {
-                let named: Vec<&str> = terms_at(l).iter().map(|t| t.name).collect();
+                let named: Vec<&str> = terms_at(l, wall).iter().map(|(_, t)| t.name).collect();
                 let label = if named.is_empty() { format!("Wager +{l}") } else { format!("Wager +{l} ({})", named.join(", ")) };
                 (format!(".es wager {} {l}", d.key), label)
             })
@@ -79,6 +82,8 @@ impl SurvivalGame {
             })
             .collect();
         let text = if lines.is_empty() { "No wager won in time here yet. Be the first on the board.".to_string() } else { lines.join("\n") };
+        let week: Vec<String> = TERM_LEVELS.iter().zip(week_terms(self.sim.wall())).map(|(at, t)| format!("+{at} {}", t.name)).collect();
+        let text = format!("{text}\n\nThis week's terms: {}.", week.join(", "));
         let reach = match (&remote, synced) {
             (None, _) => "this server keeps the board for everyone".to_string(),
             (Some(_), Some((at, true))) => format!("last word from the board's keeper {} ago", clock_words(at.elapsed().as_secs_f32())),
@@ -149,7 +154,7 @@ impl SurvivalGame {
             (None, Some(_)) => "run",
             (None, None) => "wait",
         };
-        let terms: Vec<&str> = terms_at(w.level).iter().map(|t| t.name).collect();
+        let terms: Vec<&str> = self.sim.wager_terms().iter().map(|t| t.name).collect();
         let bosses: Vec<String> = self.sim.wager_progress().iter().map(|(n, down)| format!("{}~{}", clean(n), u8::from(*down))).collect();
         let forces = self.sim.wager_forces().map_or(String::new(), |(f, n, t)| format!("{f}~{n}~{t}"));
         let best = self.board.as_ref().and_then(|b| b.lock().unwrap().best_splits(self.sim.content.dungeon.as_ref().map_or("", |d| d.key.as_str()), w.level));

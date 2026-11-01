@@ -1240,3 +1240,46 @@ fn a_wager_keeps_each_bosses_split_as_it_falls() {
     assert_eq!(done.splits[0].1, (split * 1000.0).round() as u64, "the split as it fell, not the end");
     assert!(done.ms > done.splits[0].1);
 }
+
+#[test]
+fn the_wagers_terms_turn_weekly_and_a_run_keeps_the_ones_it_was_taken_with() {
+    use crate::sim::wager::{terms_at, week_of, week_terms, ALL_TERMS, FRENZY_MIGHT, ROTATION};
+    // Weeks start on Monday: 1970-01-05 was one.
+    assert_eq!((week_of(4.0 * 86_400.0 - 1.0), week_of(4.0 * 86_400.0)), (0, 1));
+    // Four weeks round, every term in them.
+    for t in &ALL_TERMS {
+        assert!(ROTATION.iter().any(|w| w.contains(&t.key)), "{} is never on", t.key);
+    }
+    let day = 86_400.0;
+    let monday = 4.0 * day;
+    let names = |wall: f64| week_terms(wall).iter().map(|t| t.key).collect::<Vec<_>>();
+    assert_eq!(names(monday), ROTATION[1].to_vec());
+    assert_eq!(names(monday + 7.0 * day), ROTATION[2].to_vec());
+    assert_eq!(terms_at(3, monday).len(), 1);
+    assert_eq!(terms_at(7, monday).len(), 3);
+    // A +7 taken in week 1: the Kingpin's Due, Frenzied, Eruptions.
+    let mut s = Survival::new_dungeon(content(), Box::new(FlatLand::default()), 3, monday + day);
+    s.start_wager(7);
+    assert!(s.wager_has("tyrant") && s.wager_has("frenzied") && s.wager_has("eruptions") && !s.wager_has("hardened"));
+    let keep = s.wager().unwrap().terms.clone();
+    // A foe low on health hits a third harder.
+    let g = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].mob == "grunt")).unwrap().0;
+    let full = s.attack_now(g).damage as f32;
+    let m = s.mobs.get_mut(&g).unwrap();
+    m.health = m.max_health / 4;
+    let low = s.attack_now(g).damage as f32;
+    assert!((low - (full * FRENZY_MIGHT).round()).abs() <= 1.0, "{full} -> {low}");
+    // In a fight, the ground under a hero erupts: marked first, then it burns.
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [28.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 1.0);
+    assert!(s.wager().unwrap().started.is_some(), "stepped off: the clock runs");
+    let w = s.wager().unwrap();
+    let e = w.embers.first().expect("an eruption under the hero");
+    assert!(dist2d(e.0, s.players[&id].pos) < 1.0 && e.2 - s.clock > 0.0 && e.2 - s.clock <= 1.5, "marked first, burning {:.1} s on", e.2 - s.clock);
+    assert!(w.next_eruption > s.clock + 10.0, "not again for a while");
+    // The week turns: the run keeps its terms.
+    s.wall_start += 7.0 * day;
+    run(&mut s, 0.1);
+    assert_eq!(s.wager().unwrap().terms, keep);
+}

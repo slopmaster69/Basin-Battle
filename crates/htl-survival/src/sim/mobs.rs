@@ -1701,7 +1701,8 @@ impl Survival {
             a.damage = (a.damage as f32 * e.might).round() as u32;
         }
         // A wager's level, its pack's rally, and the dungeon's tier.
-        let w = self.wager_scale(m.def).1 * (1.0 + 0.1 * m.rally as f32) * self.tier_scale().1;
+        let frenzy = if self.wager_has("frenzied") && (m.health as f32) < m.max_health as f32 * super::wager::FRENZY_BELOW { super::wager::FRENZY_MIGHT } else { 1.0 };
+        let w = self.wager_scale(m.def).1 * (1.0 + 0.1 * m.rally as f32) * self.tier_scale().1 * frenzy;
         if w != 1.0 {
             a.damage = (a.damage as f32 * w).round() as u32;
         }
