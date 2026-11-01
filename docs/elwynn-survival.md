@@ -257,8 +257,8 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
   stun (Divine Steed's Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind
   Blast and Meteor land.
-- **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab; a kill under
-  Death Mark readies everything again.
+- **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab, and Fan of
+  Knives Marks them so it crits; a kill under Death Mark readies everything again.
 - **Stay alive**: Power Word: Barrier, Barkskin and Healing Stream stack with Holy Nova and
   Consecration; Grounding Totem eats the big projectile (a Pyroblast, a hammer, a Death Mark).
 
