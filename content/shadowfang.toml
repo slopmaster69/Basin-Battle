@@ -23,6 +23,9 @@ welcome = "Shadowfang Keep. Arugal's worgen hold the halls, and the keep's old l
 gate_raids = 0
 # How hard next to the others (1 to 3): Shadowfang Keep: the middle (22 to 30).
 tier = 2
+# The camp's first clear of it (every boss down in one run): into the chest. Scaled by tier
+# (silver and bronze for a first dungeon, then pearl, then silk); tune freely.
+first_clear = { silver = 3, bronze = 4, pearl = 1 }
 draught = "draught"
 draughts = 3
 draughts_max = 6

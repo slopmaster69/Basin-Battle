@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 7
+local VERSION = 8
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -4524,8 +4524,8 @@ function ES.BookDraw()
       icon = (f[3] and f[3] ~= "") and f[3] or "INV_Misc_Map_01",
       lit = opened,
       name = f[2] or "?",
-      tag = opened and (lit .. " of " .. lamps .. " lamps") or "In cipher",
-      sub = ((ES.TierWords and ES.TierWords(f[16])) and (ES.TierWords(f[16]) .. ". ") or "") .. (f[8] or ""),
+      tag = opened and (((f[17] == "1") and "Cleared. " or "") .. lit .. " of " .. lamps .. " lamps") or "In cipher",
+      sub = ((f[18] == "1") and "Next, by the book. " or "") .. ((ES.TierWords and ES.TierWords(f[16])) and (ES.TierWords(f[16]) .. ". ") or "") .. (f[8] or ""),
       go = "Open",
       cmd = function() ES.BookOpen(key) end,
       detail = opened and ((f[8] or "") .. " Its pages: the way in, and every lamp you've lit.") or ("Hold the camp against " .. (f[5] or "1") .. " raid(s) and the scouts will have read it."),

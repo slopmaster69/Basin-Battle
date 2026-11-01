@@ -1326,3 +1326,45 @@ fn a_harder_dungeons_won_wager_pays_more_plunder_by_its_tier() {
     assert_eq!(first, 9, "6 + 3 at +1");
     assert_eq!(third, (9.0 * (1.0 + 2.0 * TIER_PLUNDER)).round() as u32, "a tier-3 dungeon pays half again");
 }
+
+#[test]
+fn a_first_clear_below_gifts_the_camp_turns_the_books_page_and_only_once() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "warlord").unwrap();
+    s.engage(boss, mobs::Foe::Hero(id));
+    s.hurt_mob(boss, id, 1_000_000);
+    let ev = s.step(DT);
+    // Below: every boss down, so the camp hears it's cleared (with the kill).
+    let up: Vec<(String, u32)> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::ToCamp { counts, .. } => Some(counts.clone()),
+            _ => None,
+        })
+        .flatten()
+        .collect();
+    assert!(up.iter().any(|(k, n)| k == "cleared:deadmines" && *n == 1), "{up:?}");
+
+    // At camp: a gift in the chest, a banner, and the book points onward.
+    let mut c = content();
+    c.dungeon.as_mut().unwrap().first_clear = BTreeMap::from([("plunder".to_string(), 3)]);
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 0.0);
+    let plunder = camp.content.item("plunder").unwrap();
+    let before = camp.storage.get(&plunder).copied().unwrap_or(0);
+    let next_before = camp.next_dungeon().map(|d| d.key.clone());
+    assert_eq!(next_before.as_deref(), Some("deadmines"), "the easiest uncleared first");
+    camp.from_below(&up, &BTreeMap::new());
+    let ev = camp.step(DT);
+    assert_eq!(camp.storage.get(&plunder).copied().unwrap_or(0), before + 3, "the first clear's gift");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { player: None, title, .. } if title.contains("Cleared"))), "a banner at camp");
+    let books = camp.book_dungeons();
+    let dm = books.iter().find(|b| b.key == "deadmines").unwrap();
+    assert!(dm.cleared && !dm.next, "cleared, and the book has turned its page");
+    assert!(books.iter().filter(|b| b.next).count() <= 1, "one next page at most");
+    // A second clear: no second gift.
+    camp.from_below(&up, &BTreeMap::new());
+    camp.step(DT);
+    assert_eq!(camp.storage.get(&plunder).copied().unwrap_or(0), before + 3, "only the first");
+}

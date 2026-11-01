@@ -26,7 +26,7 @@
 //! - `BK\t<open>\t<key~name~dungeon^...>\t<arena key~name~best wave>\t<siege>\t<dungeons>`: the
 //!   Smuggler's Logbook at camp, its pages (lamps below, each with its dungeon's key), the Proving
 //!   Ring's and Siege's (there from the start), then each dungeon
-//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page~secrets found~secrets~notes read~notes~wager open~wager secs~tier`,
+//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page~secrets found~secrets~notes read~notes~wager open~wager secs~tier~cleared~next`,
 //!   joined by `^`; the fields after `first page` from newer servers), the easiest first.
 //! - `AA\t<wave>\t<foes standing>\t<secs to the next, or -1 in a wave>\t<the camp's best>`: the
 //!   Proving Ring as a hero in it sees it (`AA` alone: not in it).
@@ -289,7 +289,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 7;
+pub(crate) const ADDON_NEWEST: u32 = 8;
 pub(crate) const CLIENT_NEWEST: u8 = 10;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
@@ -825,7 +825,7 @@ impl SurvivalGame {
                 let dungeons: Vec<String> = books
                     .iter()
                     .map(|b| format!(
-                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
+                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
                             clean(&b.key),
                             clean(&b.name),
                             clean(&b.icon),
@@ -841,7 +841,9 @@ impl SurvivalGame {
                             b.notes.1,
                             b.wager.0,
                             b.wager.1.round(),
-                            b.tier
+                            b.tier,
+                            u8::from(b.cleared),
+                            u8::from(b.next)
                         ))
                     .collect();
                 let ring = arena.map_or_else(String::new, |(k, n, best)| format!("{}~{}~{best}", clean(&k), clean(&n)));
