@@ -1302,7 +1302,7 @@ impl SurvivalGame {
                 Ok(level) => self.sim.travel_wager(me, &arg, level),
                 Err(_) => Err("Try .es wager <dungeon> <level>, as .es wager deadmines 3.".into()),
             },
-            "board" => self.ui_board_page(conn, &arg),
+            "board" => self.ui_board_page(conn, &arg, arg2),
             "ladder" | "rating" => self.ui_ladder_page(conn, me),
             "news" | "week" => self.ui_week_page(conn),
             "ready" => self.sim.wager_ready(me),

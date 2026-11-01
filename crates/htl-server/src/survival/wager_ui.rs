@@ -65,13 +65,21 @@ impl SurvivalGame {
         Ok(())
     }
 
-    /// The Bookmaker's Board for a dungeon: its runs in time, highest first, then quickest.
-    pub(crate) fn ui_board_page(&mut self, conn: ConnId, dungeon: &str) -> Result<(), String> {
+    /// The Bookmaker's Board for a dungeon: its runs in time, highest first, then quickest; of
+    /// one kind of party only when `kind` says (solo, duo, group).
+    pub(crate) fn ui_board_page(&mut self, conn: ConnId, dungeon: &str, kind: &str) -> Result<(), String> {
         let d = self.sim.content.dungeons().find(|d| d.key == dungeon).cloned().ok_or("No such dungeon in the book.")?;
         let board = self.board.clone().ok_or("This server keeps no board.")?;
+        let kind = match kind.to_ascii_lowercase().as_str() {
+            "" | "all" => None,
+            "solo" => Some("solo"),
+            "duo" | "duos" => Some("duo"),
+            "group" | "groups" => Some("group"),
+            _ => return Err("A board for solo, duo or group: .es board deadmines duo".into()),
+        };
         let (top, hosts, remote, synced, here) = {
             let b = board.lock().unwrap();
-            (b.top(&d.key, 15), b.hosts(), b.remote.clone(), b.synced, b.host.clone())
+            (b.top_of(&d.key, kind, 15), b.hosts(), b.remote.clone(), b.synced, b.host.clone())
         };
         let lines: Vec<String> = top
             .iter()
@@ -81,7 +89,11 @@ impl SurvivalGame {
                 format!("{}. +{}  {}  {}, of {}{mine}{}", k + 1, r.level, clock_words(r.ms as f32 / 1000.0), r.heroes(), r.host, if r.deaths > 0 { format!(", {} fall{}", r.deaths, if r.deaths == 1 { "" } else { "s" }) } else { String::new() })
             })
             .collect();
-        let text = if lines.is_empty() { "No wager won in time here yet. Be the first on the board.".to_string() } else { lines.join("\n") };
+        let text = match (lines.is_empty(), kind) {
+            (true, None) => "No wager won in time here yet. Be the first on the board.".to_string(),
+            (true, Some(k)) => format!("No {k} run in time here yet. Be the first."),
+            (false, _) => lines.join("\n"),
+        };
         let week: Vec<String> = TERM_LEVELS.iter().zip(week_terms(self.sim.wall())).map(|(at, t)| format!("+{at} {}", t.name)).collect();
         let text = format!("{text}\n\nThis week's terms: {}.", week.join(", "));
         let reach = match (&remote, synced) {
@@ -91,8 +103,21 @@ impl SurvivalGame {
             (Some(_), None) => "asking the board's keeper".to_string(),
         };
         let place = format!("In time only, highest first, then quickest: {hosts} camp{} on it, {reach}", if hosts == 1 { "" } else { "s" });
-        let links = vec![(format!(".es wager {}", d.key), "The Bookmaker's Wager".to_string()), (".es ladder".to_string(), "The Bookmaker's Ladder".to_string())];
-        self.letter(conn, "board", &format!("The Bookmaker's Board: {}", d.name), &place, &text, "", &links);
+        // The board by party size: a duo's time and four heroes' are different feats.
+        let mut links: Vec<(String, String)> = [(None, "Every party"), (Some("solo"), "Solo"), (Some("duo"), "Duos"), (Some("group"), "Groups of three or four")]
+            .into_iter()
+            .filter(|(k, _)| *k != kind)
+            .map(|(k, label)| (format!(".es board {} {}", d.key, k.unwrap_or("all")), label.to_string()))
+            .collect();
+        links.push((format!(".es wager {}", d.key), "The Bookmaker's Wager".to_string()));
+        links.push((".es ladder".to_string(), "The Bookmaker's Ladder".to_string()));
+        let title = match kind {
+            Some("solo") => format!("The Bookmaker's Board: {}, solo", d.name),
+            Some("duo") => format!("The Bookmaker's Board: {}, duos", d.name),
+            Some(_) => format!("The Bookmaker's Board: {}, groups", d.name),
+            None => format!("The Bookmaker's Board: {}", d.name),
+        };
+        self.letter(conn, "board", &title, &place, &text, "", &links);
         Ok(())
     }
 

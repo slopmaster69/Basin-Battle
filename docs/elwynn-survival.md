@@ -959,7 +959,8 @@ during a wager. Friends join it by taking the same level from the book while it 
 says the week's three terms and last week's three best runs on the board; `.es news` shows it again.
 
 **The board.** Every wager won is kept in `saves/wager-board.toml`; `.es board <dungeon>` shows the
-runs in time, highest level first, then quickest. One server keeps the board for everyone (the
+runs in time, highest level first, then quickest (`.es board <dungeon> solo`, `duo` or `group`: that
+size of party only, a link on the page). One server keeps the board for everyone (the
 one friends join: it runs without `--board`). Anyone hosting their own sets `HTL_BOARD` in
 `settings.sh` (or `--board`) to that server's address and login port (`1.2.3.4:3724`); theirs
 then sends its runs there every minute and fetches everyone's back. Runs go over plain HTTP on
