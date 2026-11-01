@@ -496,6 +496,10 @@ impl Survival {
     /// A creature hurt by `by`: what took it (`label`) for a hero's damage meter.
     pub(crate) fn hurt_mob_as(&mut self, mid: Id, by: Id, damage: u32, label: &str) {
         let now = self.clock;
+        // A hero's own totem or summon, or a friend's, takes nothing from them.
+        if self.own_totem(mid, by) {
+            return;
+        }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
