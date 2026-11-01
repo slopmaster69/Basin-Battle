@@ -403,6 +403,27 @@ pub struct MovesetDef {
     pub heavy: MoveDef,
     /// An attack while sprinting.
     pub running: MoveDef,
+    /// An attack out of a dodge: pressed during the roll, it comes as the roll ends (without one,
+    /// the running attack).
+    #[serde(default)]
+    pub roll: Option<MoveDef>,
+    /// An attack out of a Corey roll (a jump taken in the dodge's dash, which carries the dash's
+    /// speed through the air): pressed in the air, it strikes as the hero lands (without one, the
+    /// attack out of a dodge).
+    #[serde(default)]
+    pub leap: Option<MoveDef>,
+}
+
+impl MovesetDef {
+    /// The attack out of a dodge.
+    pub fn roll_move(&self) -> &MoveDef {
+        self.roll.as_ref().unwrap_or(&self.running)
+    }
+
+    /// The attack out of a Corey roll, on landing.
+    pub fn leap_move(&self) -> &MoveDef {
+        self.leap.as_ref().unwrap_or_else(|| self.roll_move())
+    }
 }
 
 fn default_movesets() -> Vec<MovesetDef> {
@@ -413,24 +434,32 @@ fn default_movesets() -> Vec<MovesetDef> {
             light: vec![m(17, 0, 1.0, 1.0, 1.0, 0.7), m(17, 1, 1.0, 1.05, 1.0, 0.7), m(57, 0, 1.2, 1.25, 1.35, 1.0)],
             heavy: m(57, 0, 1.0, 1.0, 1.0, 1.0),
             running: m(17, 1, 1.0, 1.1, 1.2, 2.4),
+            roll: None,
+            leap: None,
         },
         MovesetDef {
             key: "dagger".into(),
             light: vec![m(85, 0, 1.0, 1.0, 1.0, 0.6), m(88, 0, 1.0, 1.0, 1.0, 0.6), m(85, 0, 0.9, 1.0, 1.0, 0.6), m(57, 0, 1.2, 1.2, 1.5, 1.0)],
             heavy: m(57, 0, 1.0, 1.0, 1.0, 1.0),
             running: m(85, 0, 1.0, 1.1, 1.3, 2.4),
+            roll: None,
+            leap: None,
         },
         MovesetDef {
             key: "two_hand".into(),
             light: vec![m(18, 0, 1.0, 1.0, 1.0, 0.8), m(18, 1, 1.0, 1.05, 1.05, 0.8)],
             heavy: m(58, 0, 1.0, 1.0, 1.0, 1.2),
             running: m(18, 1, 1.0, 1.1, 1.2, 2.6),
+            roll: None,
+            leap: None,
         },
         MovesetDef {
             key: "polearm".into(),
             light: vec![m(19, 0, 1.0, 1.0, 1.0, 0.8), m(19, 1, 1.0, 1.05, 1.05, 0.8), m(19, 2, 1.1, 1.1, 1.15, 0.9)],
             heavy: m(58, 0, 1.0, 1.0, 1.0, 1.2),
             running: m(19, 0, 1.0, 1.1, 1.2, 2.8),
+            roll: None,
+            leap: None,
         },
     ]
 }

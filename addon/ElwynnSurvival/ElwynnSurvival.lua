@@ -575,7 +575,7 @@ end
 -- Play a blow of ours: the clip (its impact and recovery the server's), the trail, the lunge, the
 -- whoosh.
 local function PlayMine(kind, step, move)
-  local heavy = kind == "heavy" or kind == "bash" or kind == "kick"
+  local heavy = kind == "heavy" or kind == "bash" or kind == "kick" or kind == "leap"
   local trail = heavy and HEAVY_TRAIL or LIGHT_TRAIL
   PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery)
   local mv = ES.moves
@@ -641,7 +641,9 @@ function ES.PredictSwing(kind)
     if n == 0 then return end
     if MineBusy() then
       -- Late in a light blow: the next of the chain, at once; earlier, the server waits for it.
-      if not (ES.mine.kind == "light" or ES.mine.kind == "running") or not MineAt(mv.chainAfter) then return end
+      -- (Out of a dodge or a Corey roll's landing, as out of a sprint, the chain starts after.)
+      local k = ES.mine.kind
+      if not (k == "light" or k == "running" or k == "roll" or k == "leap") or not MineAt(mv.chainAfter) then return end
       step = math.mod(ES.mine.step + 1, n)
     else
       if not Free() then return end

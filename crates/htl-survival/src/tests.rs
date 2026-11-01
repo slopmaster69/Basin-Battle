@@ -2808,3 +2808,135 @@ fn the_building_ground_is_wide_ringed_by_torches_and_says_which_way_it_is() {
     let why = s.site_problem(fire, out, None).unwrap();
     assert!(why.contains("ringed by torches") && why.contains("south of here") && why.contains("yd"), "{why}");
 }
+
+// --- attacks out of a dodge and out of a Corey roll ----------------------------------------------
+
+/// The kind and clip of the hero's swing now, if they're swinging.
+fn swing_of(s: &Survival, p: Id) -> Option<(StrikeKind, u16, f32)> {
+    match &s.players[&p].action {
+        Action::Swing { strike, .. } => Some((strike.kind, strike.clip, strike.lunge)),
+        _ => None,
+    }
+}
+
+#[test]
+fn an_attack_pressed_in_a_dodge_comes_as_the_roll_ends() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let set = s.content.moveset_of(s.weapon_of(&s.players[&p])).clone();
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.1);
+    // Early in the roll (not only in its last moment, as a buffered press).
+    s.input(p, Input::Attack);
+    s.input(p, Input::AttackUp);
+    assert_eq!(s.players[&p].action.name(), "dodge", "the roll goes on");
+    let secs = s.content.dodge.secs;
+    run(&mut s, secs - 0.05);
+    let (kind, clip, lunge) = swing_of(&s, p).expect("the attack out of the dodge");
+    assert_eq!(kind, StrikeKind::Roll);
+    assert_eq!((clip, lunge), (set.roll_move().clip, set.roll_move().lunge));
+    // A dodge with no attack in it ends in nothing.
+    run(&mut s, 3.0);
+    s.input(p, Input::Dodge);
+    run(&mut s, secs + 0.05);
+    assert_eq!(s.players[&p].action, Action::Ready, "no attack nobody pressed");
+}
+
+#[test]
+fn a_jump_in_a_dodges_dash_is_a_corey_roll_and_its_attack_strikes_on_landing() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let set = s.content.moveset_of(s.weapon_of(&s.players[&p])).clone();
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.2);
+    s.jumped(p);
+    assert!(s.in_corey(p), "a jump 0.2 s into the dash");
+    // The roll ends in the air; an attack pressed now waits for the ground.
+    let secs = s.content.dodge.secs;
+    run(&mut s, secs);
+    assert_eq!(s.players[&p].action, Action::Ready);
+    s.input(p, Input::Attack);
+    s.input(p, Input::AttackUp);
+    run(&mut s, 0.2);
+    assert!(swing_of(&s, p).is_none(), "nothing in the air");
+    s.landed(p);
+    let (kind, clip, lunge) = swing_of(&s, p).expect("the leap strikes as the hero lands");
+    assert_eq!(kind, StrikeKind::Leap);
+    assert_eq!((clip, lunge), (set.leap_move().clip, set.leap_move().lunge));
+    assert!(lunge > set.roll_move().lunge, "carrying the leap's speed into it");
+    assert!(!s.in_corey(p), "on the ground again");
+}
+
+#[test]
+fn an_attack_pressed_in_a_corey_rolls_dodge_strikes_on_landing_too() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.2);
+    s.jumped(p);
+    s.input(p, Input::Attack);
+    s.input(p, Input::AttackUp);
+    let secs = s.content.dodge.secs;
+    run(&mut s, secs);
+    assert!(swing_of(&s, p).is_none(), "the roll ended in the air: it waits");
+    s.landed(p);
+    assert_eq!(swing_of(&s, p).map(|w| w.0), Some(StrikeKind::Leap));
+}
+
+#[test]
+fn a_jump_after_the_dash_is_only_a_jump() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    s.input(p, Input::Dodge);
+    let dash = s.content.dodge.dash_secs;
+    run(&mut s, dash + 0.1);
+    s.jumped(p);
+    assert!(!s.in_corey(p), "too late to carry the dash");
+    // Nor is a jump standing about.
+    run(&mut s, 1.0);
+    s.landed(p);
+    s.jumped(p);
+    assert!(!s.in_corey(p));
+    // An attack in an ordinary jump swings at once, as it always has.
+    s.input(p, Input::Attack);
+    assert_eq!(swing_of(&s, p).map(|w| w.0), Some(StrikeKind::Light));
+}
+
+#[test]
+fn corey_rolls_chain_one_into_the_next() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    for hop in 0..3 {
+        s.input(p, Input::Dodge);
+        assert_eq!(s.players[&p].action.name(), "dodge", "hop {hop}: the roll starts");
+        run(&mut s, 0.2);
+        s.jumped(p);
+        assert!(s.in_corey(p), "hop {hop}: a Corey roll");
+        // The leap is longer than the roll: it lands after the roll is over, free to roll again.
+        run(&mut s, 0.5);
+        s.landed(p);
+        assert_eq!(s.players[&p].action, Action::Ready, "hop {hop}: landed free");
+    }
+    // Each one costs a roll's and a jump's stamina.
+    let per = s.content.dodge.stamina + s.content.player.jump_stamina;
+    assert!(s.players[&p].stamina < s.content.player.stamina - 2.0 * per, "{}", s.players[&p].stamina);
+}
+
+#[test]
+fn a_landing_that_never_comes_puts_the_hero_back_on_the_ground() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.2);
+    s.jumped(p);
+    run(&mut s, 3.5);
+    assert!(s.airborne(p).is_none(), "no landing heard: on the ground after a while");
+    s.input(p, Input::Attack);
+    assert_eq!(swing_of(&s, p).map(|w| w.0), Some(StrikeKind::Light), "and an attack swings at once");
+}

@@ -177,7 +177,7 @@ impl Survival {
                 // Late in a light blow's recovery, the next of the chain comes at once.
                 if let Action::Swing { t, strike, .. } = &p.action {
                     let chain = input == Input::Attack
-                        && matches!(strike.kind, StrikeKind::Light | StrikeKind::Running)
+                        && matches!(strike.kind, StrikeKind::Light | StrikeKind::Running | StrikeKind::Roll | StrikeKind::Leap)
                         && *t >= strike.windup + strike.active + strike.recovery * c.combat.chain_after;
                     if !chain {
                         return false;
@@ -187,6 +187,18 @@ impl Survival {
                         return true;
                     }
                     self.start_swing(id, StrikeKind::Light);
+                    return true;
+                }
+                // Pressed during a dodge: the attack out of it, as the roll ends (or, if it ends in
+                // the air, as the hero lands).
+                if input == Input::Attack && matches!(p.action, Action::Dodge { .. }) {
+                    self.players.get_mut(&id).unwrap().dodge_attack = true;
+                    return true;
+                }
+                // In the air out of a Corey roll: it strikes as the hero lands, with the speed
+                // the leap carried.
+                if input == Input::Attack && (free || busy_soft) && self.in_corey(id) {
+                    self.players.get_mut(&id).unwrap().landing_attack = Some(StrikeKind::Leap);
                     return true;
                 }
                 if !(free || busy_soft) {
@@ -410,6 +422,8 @@ impl Survival {
         let (m, windup, recovery) = match kind {
             StrikeKind::Heavy => (&set.heavy, w.windup * h.windup, w.recovery * h.recovery),
             StrikeKind::Running => (&set.running, w.windup, w.recovery),
+            StrikeKind::Roll => (set.roll_move(), w.windup, w.recovery),
+            StrikeKind::Leap => (set.leap_move(), w.windup, w.recovery),
             _ => (&set.light[step], w.windup, w.recovery),
         };
         let heavy = kind == StrikeKind::Heavy;
@@ -649,6 +663,9 @@ impl Survival {
     }
 
     fn start_dodge(&mut self, id: Id) {
+        if let Some(p) = self.players.get_mut(&id) {
+            p.dodge_attack = false;
+        }
         let c = self.content.dodge.clone();
         let p = &self.players[&id];
         let m = p.moving;
@@ -986,6 +1003,19 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return };
         let next = if p.guard_held { Action::Guard } else { Action::Ready };
         let buffered = p.buffered;
+        // A dodge with an attack pressed in it: the attack out of it, now, or as the hero lands.
+        if matches!(p.action, Action::Dodge { .. }) && p.dodge_attack {
+            let air = self.airborne(id);
+            self.set_action(id, next);
+            let p = self.players.get_mut(&id).unwrap();
+            p.dodge_attack = false;
+            p.buffered = None;
+            match air {
+                Some(a) => p.landing_attack = Some(if a.corey { StrikeKind::Leap } else { StrikeKind::Roll }),
+                None => self.attack_out_of(id, StrikeKind::Roll),
+            }
+            return;
+        }
         // The light chain waits a moment for its next blow.
         let grace = self.content.combat.combo_grace;
         self.set_action(id, next);
@@ -1187,7 +1217,7 @@ impl Survival {
             }
             // The chain's last blow and a running attack cleave.
             let last = self.content.moveset_of(w).light.len().saturating_sub(1);
-            let finisher = strike.kind == StrikeKind::Running || (strike.kind == StrikeKind::Light && strike.step as usize == last && last > 0);
+            let finisher = matches!(strike.kind, StrikeKind::Running | StrikeKind::Leap) || (strike.kind == StrikeKind::Light && strike.step as usize == last && last > 0);
             if strike.shove() {
                 self.events.push(Event::Visual { id: mid, kit: KIT_BASH, by: Some(id) });
             } else if reeling || behind {
@@ -1633,12 +1663,57 @@ impl Survival {
         outcome
     }
 
-    /// Their client jumped: it costs stamina (the add-on won't jump without enough).
+    /// Their client jumped: it costs stamina (the add-on won't jump without enough). Taken in a
+    /// dodge's dash, it's a Corey roll: the client carries the dash's speed through the air, and
+    /// an attack in it strikes as the hero lands.
     pub fn jumped(&mut self, id: Id) {
         let cost = self.content.player.jump_stamina;
-        if cost > 0.0 && self.players.get(&id).is_some_and(|p| p.health > 0) {
+        let now = self.clock;
+        let dash = self.content.dodge.dash_secs + COREY_GRACE;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        if p.health == 0 {
+            return;
+        }
+        let corey = matches!(p.action, Action::Dodge { t, dash: true, .. } if t < dash);
+        p.air = Some(Air { since: now, corey });
+        p.landing_attack = None;
+        if cost > 0.0 {
             self.spend(id, cost);
         }
+    }
+
+    /// Their client landed: an attack pressed in the air (out of a Corey roll, or out of a dodge
+    /// that ended in it) strikes now.
+    pub fn landed(&mut self, id: Id) {
+        let Some(p) = self.players.get_mut(&id) else { return };
+        p.air = None;
+        if let Some(kind) = p.landing_attack.take() {
+            self.attack_out_of(id, kind);
+        }
+    }
+
+    /// In the air, and how (a landing that never came counts after [`AIR_MOST`]).
+    pub fn airborne(&self, id: Id) -> Option<Air> {
+        self.players.get(&id)?.air.filter(|a| self.clock - a.since < AIR_MOST)
+    }
+
+    /// In the air out of a Corey roll.
+    pub fn in_corey(&self, id: Id) -> bool {
+        self.airborne(id).is_some_and(|a| a.corey)
+    }
+
+    /// An attack out of a dodge or a Corey roll, if the hero is free for it and has the breath.
+    fn attack_out_of(&mut self, id: Id, kind: StrikeKind) {
+        let Some(p) = self.players.get(&id) else { return };
+        if p.health == 0 || !matches!(p.action, Action::Ready | Action::Guard) || self.disabled(id) {
+            return;
+        }
+        if p.stamina < self.content.player.exhausted_below {
+            self.winded(id);
+            return;
+        }
+        self.unsheathe(id);
+        self.start_swing(id, kind);
     }
 
     pub fn fall_damage(&mut self, id: Id, damage: u32) {
