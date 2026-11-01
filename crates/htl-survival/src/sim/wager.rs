@@ -42,6 +42,9 @@ pub const WAGER_LEASH: f32 = 1.75;
 const WAGER_START_YARDS: f32 = 12.0;
 /// The count from everyone ready to the clock (seconds).
 pub const WAGER_COUNTDOWN: f64 = 5.0;
+/// How long the ready wait for a hero who never says so, once someone has (seconds): then the
+/// count starts anyway, so one hero away from the keys can't hold the rest forever.
+pub const WAGER_READY_WAIT: f64 = 90.0;
 /// Smouldering ground: how wide, how long, how often it burns and how hard (share of health).
 const EMBER_RADIUS: f32 = 2.6;
 const EMBER_SECS: f32 = 6.0;
@@ -93,6 +96,8 @@ pub struct Wager {
     /// Who has said they're ready (accounts), and when the count ends (wall seconds) once all
     /// have; the last whole second it called.
     pub ready: BTreeSet<String>,
+    /// When the first hero said they're ready (wall seconds).
+    pub first_ready: Option<f64>,
     pub countdown: Option<f64>,
     pub called: i64,
 }
@@ -278,6 +283,7 @@ impl Survival {
         if w.started.is_some() {
             return Err("The clock is already running.".into());
         }
+        w.first_ready.get_or_insert(wall);
         if !w.ready.insert(account) {
             return Err("You're ready; waiting on the rest.".into());
         }
@@ -396,7 +402,9 @@ impl Survival {
             let away = self.players.values().find(|p| p.health > 0 && dist2d(p.pos, lamp) > WAGER_START_YARDS).map(|p| p.name.clone());
             // Someone gone home before the count: are the rest all ready now?
             let accounts: BTreeSet<String> = self.players.values().map(|p| p.account.clone()).collect();
-            if w.countdown.is_none() && !accounts.is_empty() && accounts.iter().all(|a| w.ready.contains(a)) {
+            // (Or someone has been ready long enough: the rest can't be held up for ever.)
+            let waited = w.first_ready.is_some_and(|t| wall >= t + WAGER_READY_WAIT);
+            if w.countdown.is_none() && !accounts.is_empty() && (accounts.iter().all(|a| w.ready.contains(a)) || waited) {
                 if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
                     wm.countdown = Some(wall + WAGER_COUNTDOWN);
                     wm.called = WAGER_COUNTDOWN as i64 + 1;
