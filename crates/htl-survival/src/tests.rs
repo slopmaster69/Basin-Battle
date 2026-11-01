@@ -3045,3 +3045,47 @@ fn a_recap_forgets_old_blows_names_a_fall_and_starts_clean_on_waking() {
     assert!(s.players[&p].health > 0, "back on their feet");
     assert!(s.death_recap(p).lines.is_empty());
 }
+
+// --- honed gear's tricks ---------------------------------------------------------------------------
+
+#[test]
+fn keen_gear_gives_back_breath_on_a_parry_and_peerless_gear_throws_a_dodged_foe_off_balance() {
+    use crate::content::{ItemKind, KEEN_BREATH, PEERLESS_STAGGER};
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    let piece = |s: &Survival, tier: u8| s.content.items.iter().position(|i| i.hone == tier && i.kind == ItemKind::Armor).unwrap();
+    // A Keen piece worn: a parry gives back breath.
+    let keen = piece(&s, 2);
+    let slot = s.content.items[keen].slot.clone();
+    s.players.get_mut(&p).unwrap().armor.insert(slot.clone(), keen);
+    s.players.get_mut(&p).unwrap().stamina = 50.0;
+    s.input(p, Input::Guard);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
+    let st = s.players[&p].stamina;
+    assert!((st - (50.0 + KEEN_BREATH)).abs() < 0.5, "breath back: {st}");
+    s.input(p, Input::GuardUp);
+    run(&mut s, 2.0);
+    // Without one, a dodge through the grunt's blow doesn't throw it; with a Peerless piece, it does.
+    let mut dodge = |s: &mut Survival| {
+        s.mobs.get_mut(&k).unwrap().stagger_until = 0.0;
+        s.input(p, Input::Dodge);
+        run(s, 0.1);
+        let out = s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, false, Blow::Light);
+        run(s, 1.0);
+        out
+    };
+    s.players.get_mut(&p).unwrap().armor.remove(&slot);
+    assert_eq!(dodge(&mut s), Outcome::Dodged);
+    assert!(s.mobs[&k].stagger_until <= s.clock, "plain gear: no trick");
+    let peerless = piece(&s, 3);
+    let slot = s.content.items[peerless].slot.clone();
+    s.players.get_mut(&p).unwrap().armor.insert(slot, peerless);
+    s.mobs.get_mut(&k).unwrap().stagger_until = 0.0;
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, false, Blow::Light), Outcome::Dodged);
+    let m = &s.mobs[&k];
+    assert!(m.stagger_until > s.clock + PEERLESS_STAGGER * 0.5 && m.riposte, "off balance, open to a riposte");
+}
