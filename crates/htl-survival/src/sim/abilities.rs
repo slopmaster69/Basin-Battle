@@ -1076,6 +1076,10 @@ impl Survival {
     /// at its way back's share of the damage.
     fn turn_back(&mut self, p: &mut Projectile) {
         let share = self.content.abilities[p.ability].return_damage;
+        // It turns at hand height over the ground there: thrown high, it doesn't come back over
+        // everyone's heads.
+        let floor = self.ground_near(p.pos[0], p.pos[1], p.pos[2]);
+        p.pos[2] = p.pos[2].min(floor[2] + HAND_UP);
         let anchor = self.alloc();
         self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: p.spell, from: p.pos, target: Target::Unit(p.owner) });
         p.hits.clear();
