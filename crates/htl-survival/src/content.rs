@@ -841,6 +841,35 @@ pub struct ItemDef {
     /// The set it's a piece of (`[[set]]`, by key), if any.
     #[serde(default)]
     pub set: String,
+    /// A honed piece (made by the rules, not written in a file): its tier, 1 to [`HONE_TIERS`]'s
+    /// length, and the piece it was honed from (by key). 0: an ordinary piece.
+    #[serde(default)]
+    pub hone: u8,
+    #[serde(default)]
+    pub honed_from: String,
+}
+
+/// Gear a won wager pays out from +4 up comes honed, better the higher the wager: (the least
+/// wager, its name, how much better: weapons' damage, armour's share off a blow, perks).
+/// Every piece the dungeons' foes carry has a honed copy of each tier.
+pub const HONE_TIERS: [(u32, &str, f32); 3] = [(4, "Honed", 1.12), (8, "Keen", 1.25), (12, "Peerless", 1.4)];
+
+/// A dungeon tier's foes past the first: this much more health, and their blows this much harder,
+/// a tier. (Ragefire's trash and the Cathedral's were all but alike; a first pass to try in play.)
+pub const TIER_HEALTH: f32 = 0.25;
+pub const TIER_DAMAGE: f32 = 0.15;
+/// And a won wager's plunder there: this much more a tier (a harder dungeon pays more).
+pub const TIER_PLUNDER: f32 = 0.25;
+/// The tiers' names, for the book.
+pub const TIER_NAMES: [&str; 3] = ["a first dungeon", "a harder one", "among the hardest"];
+
+fn first_tier() -> u32 {
+    1
+}
+
+/// The honing tier a wager at `level` pays out (0: plain).
+pub fn hone_tier(level: u32) -> u8 {
+    HONE_TIERS.iter().filter(|(at, ..)| level >= *at).count() as u8
 }
 
 /// A lasting effect gear gives: its kind (as [`EffectDef::KINDS`]) and how much.
@@ -964,6 +993,11 @@ pub struct DungeonDef {
     /// The Bookmaker's Wager: the time to beat (minutes; by the dungeon's size when not given).
     #[serde(default)]
     pub wager_minutes: f32,
+    /// How hard it is next to the others: 1 (a first dungeon) to 3 (the hardest). Its foes are
+    /// tougher by [`TIER_HEALTH`] and [`TIER_DAMAGE`] a tier past the first; the book lists the
+    /// dungeons by it, the easiest first.
+    #[serde(default = "first_tier")]
+    pub tier: u32,
     #[serde(rename = "lamp", default)]
     pub lamps: Vec<LampDef>,
     #[serde(rename = "door", default)]
@@ -2161,6 +2195,7 @@ impl Content {
             .try_into()
             .context("reading the rules")?;
         c.settle();
+        c.hone();
         c.validate()?;
         c.source = text.to_string();
         c.dungeon_source = dungeon.to_string();
@@ -2294,6 +2329,64 @@ impl Content {
             }
             m.phases.sort_by(|a, b| b.at.total_cmp(&a.at));
         }
+    }
+
+    /// Honed copies of every piece the dungeons' foes carry (weapons and armour), a tier each:
+    /// the same look, better by the tier's share, its name and words saying so.
+    fn hone(&mut self) {
+        let mut pool: Vec<String> = Vec::new();
+        for d in self.dungeon.iter().chain(self.more_dungeons.iter()) {
+            for p in &d.packs {
+                if let Some(m) = self.mobs.iter().find(|m| m.key == p.mob) {
+                    for g in &m.gear {
+                        if !pool.contains(g) {
+                            pool.push(g.clone());
+                        }
+                    }
+                }
+            }
+        }
+        for key in pool {
+            let Some(item) = self.items.iter().find(|i| i.key == key && i.hone == 0).cloned() else { continue };
+            let weapon = self.weapons.iter().find(|w| w.key == key).cloned();
+            if !(item.kind == ItemKind::Armor || (item.kind == ItemKind::Weapon && weapon.is_some())) {
+                continue;
+            }
+            for (t, (at, name, by)) in HONE_TIERS.iter().enumerate() {
+                let tier = t as u8 + 1;
+                let k = format!("{key}_honed{tier}");
+                if self.items.iter().any(|i| i.key == k) {
+                    continue;
+                }
+                let mut h = item.clone();
+                h.key = k.clone();
+                h.name = format!("{}, {name}", item.name);
+                h.hone = tier;
+                h.honed_from = key.clone();
+                // (Capped, but never below the piece it was honed from.)
+                h.reduce = (item.reduce * by).min(0.6).max(item.reduce);
+                for p in &mut h.perks {
+                    p.amount *= by;
+                }
+                h.text = format!("{} {name} by the Bookmaker (a wager won at +{at} or higher): {}% better.", item.text, ((by - 1.0) * 100.0).round());
+                self.items.push(h);
+                if let Some(w) = &weapon {
+                    let mut hw = w.clone();
+                    hw.key = k;
+                    hw.damage = [(w.damage[0] as f32 * by).round() as u32, (w.damage[1] as f32 * by).round() as u32];
+                    self.weapons.push(hw);
+                }
+            }
+        }
+    }
+
+    /// A piece's honed copy at `tier` (itself at 0, or if it has none).
+    pub fn honed(&self, item: usize, tier: u8) -> usize {
+        if tier == 0 {
+            return item;
+        }
+        let k = format!("{}_honed{tier}", self.items[item].key);
+        self.item(&k).unwrap_or(item)
     }
 
     fn validate(&self) -> Result<()> {
@@ -2697,6 +2790,9 @@ impl Content {
                 if n.hints.is_empty() != n.clue.is_empty() {
                     bail!("dungeon note {}: `hints` and `clue` go together", n.key);
                 }
+            }
+            if !(1..=TIER_NAMES.len() as u32).contains(&d.tier) {
+                bail!("dungeon {}: tier {} (1 to {})", d.key, d.tier, TIER_NAMES.len());
             }
             if !d.exit_boss.is_empty() && !pack_keys.contains(&d.exit_boss.as_str()) {
                 bail!(

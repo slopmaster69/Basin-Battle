@@ -19,6 +19,8 @@ blurb = "Naralex's dream gone bad, under the Barrens"
 first_page = "The caverns' mouth, where the wailing starts. Every way from here winds down."
 welcome = "The Wailing Caverns. The Druids of the Fang dream Naralex's nightmare and make it flesh; their deviate things fill every cave. Two lamps: one at the mouth, one at the western crossing. Rest at a lamp to heal, fill your Draughts (T) and send the dreamers back to their dreaming. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): the Wailing Caverns: an early one (17 to 24).
+tier = 1
 draught = "draught"
 draughts = 3
 draughts_max = 6

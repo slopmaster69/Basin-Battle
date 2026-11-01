@@ -1355,7 +1355,8 @@ impl Survival {
             out.push_str(&format!("{}: {}.", if d.kind == ItemKind::Armor { "Worn" } else { "In hand" }, words.join(", ")));
         }
         if let Some(s) = c.sets.iter().find(|s| s.key == d.set) {
-            let n = c.items.iter().filter(|i| i.set == s.key).count();
+            // (Its pieces, not their honed copies.)
+            let n = c.items.iter().filter(|i| i.set == s.key && i.hone == 0).count();
             let bonus: Vec<String> = s.bonus.iter().map(|b| format!("{} pieces: {}", b.pieces, crate::content::perk_words(&b.kind, b.amount))).collect();
             if !out.is_empty() {
                 out.push(' ');
