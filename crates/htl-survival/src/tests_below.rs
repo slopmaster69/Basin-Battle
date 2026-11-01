@@ -901,7 +901,8 @@ fn a_lobbed_throw_is_marked_from_its_wind_up_and_takes_its_time_even_point_blank
     a.range = 24.0;
     a.damage = 30;
     a.blockable = false;
-    // A fireball: warned by Heated Ground, not a drawn circle.
+    // A fireball: a 3-yard splash, so warned by the drawn circle at its true size, not Heated
+    // Ground (which covers far more than 3 yards).
     a.spell = 133;
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let id = s.join("ayla", "Ayla", None);
@@ -913,7 +914,8 @@ fn a_lobbed_throw_is_marked_from_its_wind_up_and_takes_its_time_even_point_blank
     s.windup(boss, mobs::Foe::Hero(id), here);
     let marked = s.events.iter().any(|e| matches!(e, Event::Mark { pos, radius, .. } if dist2d(*pos, here) < 0.5 && (*radius - 3.0).abs() < 0.01));
     assert!(marked, "its ring is on the ground where the hero stood, from the wind-up's start");
-    assert!(s.events.iter().any(|e| matches!(e, Event::Mark { ground: 22191, .. })), "laid as Heated Ground");
+    assert!(s.events.iter().any(|e| matches!(e, Event::Mark { ground: 0, radius, .. } if (*radius - 3.0).abs() < 0.01)), "drawn as its circle");
+    assert!(!s.events.iter().any(|e| matches!(e, Event::Mark { ground: 22191, .. })), "not laid as Heated Ground");
     let mark = s.mobs[&boss].lob.expect("the lob remembered").1;
     // Still there at the moment it's let go (the wind-up done), and a while after.
     run(&mut s, 1.05);
