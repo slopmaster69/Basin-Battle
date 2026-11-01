@@ -133,10 +133,11 @@ fn a_longer_charge_lands_harder_and_a_capstone_waits_for_its_whole_charge() {
     ev.extend(run(&mut s, 1.0));
     let late = hits_on(&ev, k)[0].0;
     assert!(late > early, "{early} then {late}");
-    // Pyroblast let go before its 2.5 s is lost.
-    slot(&mut s, p, "ultimate", "pyroblast");
+    // Pyroblast (Fireball's EX) let go before its 1.5 s is lost.
+    slot(&mut s, p, "ranged", "fireball");
     s.set_valor(p, 100.0);
-    cast(&mut s, p, "ultimate", false, 1.0);
+    cast(&mut s, p, "ranged", true, 1.0);
+    assert!(s.players[&p].last_cast.is_none_or(|(a, _)| s.content.abilities[a].key != "pyroblast"), "never cast");
     assert_eq!(s.players[&p].action, Action::Ready, "dropped");
     assert_eq!(s.players[&p].valor, 100.0, "and nothing spent");
 }
@@ -147,14 +148,15 @@ fn valor_fills_from_fighting_and_pays_for_ex_versions() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     assert_eq!(s.players[&p].valor, s.content.valor.start, "each life starts with some");
     s.set_valor(p, 10.0);
-    // Ctrl with Aimed Throw's key: Fan of Axes, for 25.
+    // Ctrl with Hurled Axe's key: Rending Axe, for 25.
     let ev = cast(&mut s, p, "ranged", true, 0.0);
     assert!(ev.is_empty() && matches!(s.players[&p].action, Action::Ready), "not enough Valor");
     let k = mob(&mut s, "boar", [8.0, 0.0, 0.0]);
     s.set_valor(p, 30.0);
     let mut ev = cast(&mut s, p, "ranged", true, 0.7);
     ev.extend(run(&mut s, 1.0));
-    assert_eq!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)).count(), 3, "three axes");
+    assert_eq!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)).count(), 1, "one axe");
+    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "and back");
     let v = s.players[&p].valor;
     assert!(v > 5.0 && v < 30.0, "25 spent, some earned back by the hit: {v}");
     // A light blow and a kill earn more.
@@ -218,8 +220,14 @@ fn heroes_get_half_the_duration_and_the_grace_stops_a_second_stun() {
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], std::f32::consts::PI);
     s.set_cooldowns(a, true);
-    slot(&mut s, a, "utility", "hammer_of_justice");
-    let mut ev = cast(&mut s, a, "utility", false, 0.0);
+    slot(&mut s, a, "utility", "divine_steed");
+    // Divine Steed, then its key again: Hammer of Justice, thrown.
+    let hammer = |s: &mut Survival| {
+        cast(s, a, "utility", false, 0.0);
+        run(s, 0.4);
+        cast(s, a, "utility", false, 0.0)
+    };
+    let mut ev = hammer(&mut s);
     ev.extend(run(&mut s, 0.6));
     assert!(s.has_cc(b, "stun"), "Hammer of Justice stuns");
     assert!(s.disabled(b));
@@ -227,14 +235,14 @@ fn heroes_get_half_the_duration_and_the_grace_stops_a_second_stun() {
     assert!((c.until - c.since - 1.0).abs() < 0.05, "1 s on a hero, not 2");
     run(&mut s, 1.2);
     assert!(!s.has_cc(b, "stun"));
-    cast(&mut s, a, "utility", false, 0.0);
+    hammer(&mut s);
     run(&mut s, 0.6);
     assert!(!s.has_cc(b, "stun"), "the grace");
     assert!(s.cc_log_of(b).iter().any(|l| l.contains("grace")), "{:?}", s.cc_log_of(b));
     // On a creature, the whole 2 s.
     let k = mob(&mut s, "grunt", [10.0, 0.0, 0.0]);
     s.players.get_mut(&b).unwrap().pos = [10.0, 20.0, 0.0];
-    cast(&mut s, a, "utility", false, 0.0);
+    hammer(&mut s);
     run(&mut s, 0.6);
     let c = s.cc_of(k).iter().find(|c| c.kind == "stun").unwrap().clone();
     assert!((c.until - c.since - 2.0).abs() < 0.05);
@@ -288,10 +296,10 @@ fn a_drain_holds_while_in_sight_and_snaps_behind_a_wall() {
     let land = FlatLand { walls: vec![([8.0, 6.0], 1.0)], ..Default::default() };
     let mut s = world_with(land, false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    slot(&mut s, p, "ranged", "drain_life");
+    slot(&mut s, p, "defense", "drain_life");
     s.players.get_mut(&p).unwrap().health = 100;
     let k = mob(&mut s, "boar", [12.0, 0.0, 0.0]);
-    cast(&mut s, p, "ranged", false, 0.0);
+    cast(&mut s, p, "defense", false, 0.0);
     assert!(matches!(s.players[&p].action, Action::Channel { .. }));
     let ev = run(&mut s, 1.2);
     assert!(hits_on(&ev, k).len() >= 2, "ticking");
@@ -389,16 +397,16 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     // learned out in Elwynn, and the board says where (taken from it only in a debug world).
     s.set_tree(p, false);
     let owned: Vec<&str> = s.players[&p].owned.iter().map(String::as_str).collect();
-    assert_eq!(owned, ["aimed_throw", "sundering_blow"], "Q and E are free");
-    assert!(s.slot_ability(p, "ranged", "shadow_bolt").is_err(), "not unlocked");
-    let why = s.take_node(p, "shadow_bolt").unwrap_err();
+    assert_eq!(owned, ["hurled_axe", "sundering_blow"], "Q and E are free");
+    assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_err(), "not unlocked");
+    let why = s.take_node(p, "seed_of_corruption").unwrap_err();
     assert!(why.contains("The Cult's Altar"), "{why}");
     s.debug = true;
-    s.take_node(p, "shadow_bolt").unwrap();
+    s.take_node(p, "seed_of_corruption").unwrap();
     assert!(s.take_node(p, "frostbolt").is_err(), "the bench isn't on the board");
     // A card only goes on its own row's key.
-    assert!(s.slot_ability(p, "close", "shadow_bolt").is_err());
-    assert!(s.slot_ability(p, "ranged", "shadow_bolt").is_ok());
+    assert!(s.slot_ability(p, "close", "seed_of_corruption").is_err());
+    assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_ok());
 }
 
 #[test]
@@ -406,9 +414,9 @@ fn a_heavy_blow_breaks_a_pyroblast_charge() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
-    slot(&mut s, a, "ultimate", "pyroblast");
+    slot(&mut s, a, "ranged", "fireball");
     s.set_valor(a, 100.0);
-    s.input(a, Input::Ability(key_of("ultimate"), false));
+    s.input(a, Input::Ability(key_of("ranged"), true));
     s.input(a, Input::Attack);
     run(&mut s, 0.5);
     assert!(matches!(s.players[&a].action, Action::Charge { .. }));

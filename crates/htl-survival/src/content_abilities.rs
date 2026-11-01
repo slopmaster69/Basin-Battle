@@ -273,6 +273,9 @@ pub struct AbilityDef {
     /// A projectile goes on through this many bodies past the first.
     #[serde(default)]
     pub pierce: u32,
+    /// Let go at full charge, it goes on through this many instead (Aimed Shot's full draw).
+    #[serde(default)]
+    pub full_pierce: u32,
     /// A projectile's hit leaps on to the nearest other foe within `chain_range`, this many times,
     /// each doing `chain_falloff` of the last.
     #[serde(default)]
@@ -301,7 +304,8 @@ pub struct AbilityDef {
     /// Effects on the caster as it goes (a leap's haste, a cast that shields you).
     #[serde(default)]
     pub self_effects: Vec<AbilityEffect>,
-    /// Lingering ground's effects on each foe inside, every tick (a vortex's pull, a storm's snare).
+    /// Lingering ground's effects on each foe inside, every tick (a vortex's pull, a storm's snare);
+    /// the boons among them go to each friend inside instead, held as its `boon` is.
     #[serde(default)]
     pub tick_effects: Vec<AbilityEffect>,
     /// A cone's, a nova's or a line's wind-up (seconds): drawn on the ground for everyone, then it
