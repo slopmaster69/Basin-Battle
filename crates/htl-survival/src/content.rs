@@ -2345,7 +2345,8 @@ impl Content {
                 h.name = format!("{}, {name}", item.name);
                 h.hone = tier;
                 h.honed_from = key.clone();
-                h.reduce = (item.reduce * by).min(0.6);
+                // (Capped, but never below the piece it was honed from.)
+                h.reduce = (item.reduce * by).min(0.6).max(item.reduce);
                 for p in &mut h.perks {
                     p.amount *= by;
                 }
