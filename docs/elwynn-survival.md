@@ -292,6 +292,10 @@ Some of this needs a change to the client itself, which this folder carries as p
 - heroes' abilities are drawn the same way (`SetTelegraph` strips and a friend's blue,
   `SetTelegraphAt` for a shape laid at a spot), and an aimed ability's shape lies under the hero
   along the view (`SetAimMarker` `line`, `cone`, `self`): the eighth round.
+- a clip can come from another character model (`PlayUnitAnimation`'s `from`): a move's or a
+  creature's `from` in the content (`"ScourgeFemale"`) plays that model's take on the unit's own
+  body, retargeted by its key bones: the tenth round. `/esclip <clip> [take] [Model]` tries one on
+  your hero, and `scripts/race-clips.sh` lists every model's attack clips from your game data.
 
 On a stock benilla the add-on falls back to a click-catcher over the world: the same keys, right
 mouse guards and looks around, and aiming keeps the normal camera. The Controls card says which
