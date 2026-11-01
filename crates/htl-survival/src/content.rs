@@ -854,6 +854,17 @@ pub struct ItemDef {
 /// Every piece the dungeons' foes carry has a honed copy of each tier.
 pub const HONE_TIERS: [(u32, &str, f32); 3] = [(4, "Honed", 1.12), (8, "Keen", 1.25), (12, "Peerless", 1.4)];
 
+/// A dungeon tier's foes past the first: this much more health, and their blows this much harder,
+/// a tier. (Ragefire's trash and the Cathedral's were all but alike; a first pass to try in play.)
+pub const TIER_HEALTH: f32 = 0.25;
+pub const TIER_DAMAGE: f32 = 0.15;
+/// The tiers' names, for the book.
+pub const TIER_NAMES: [&str; 3] = ["a first dungeon", "a harder one", "among the hardest"];
+
+fn first_tier() -> u32 {
+    1
+}
+
 /// The honing tier a wager at `level` pays out (0: plain).
 pub fn hone_tier(level: u32) -> u8 {
     HONE_TIERS.iter().filter(|(at, ..)| level >= *at).count() as u8
@@ -980,6 +991,11 @@ pub struct DungeonDef {
     /// The Bookmaker's Wager: the time to beat (minutes; by the dungeon's size when not given).
     #[serde(default)]
     pub wager_minutes: f32,
+    /// How hard it is next to the others: 1 (a first dungeon) to 3 (the hardest). Its foes are
+    /// tougher by [`TIER_HEALTH`] and [`TIER_DAMAGE`] a tier past the first; the book lists the
+    /// dungeons by it, the easiest first.
+    #[serde(default = "first_tier")]
+    pub tier: u32,
     #[serde(rename = "lamp", default)]
     pub lamps: Vec<LampDef>,
     #[serde(rename = "door", default)]
@@ -2771,6 +2787,9 @@ impl Content {
                 if n.hints.is_empty() != n.clue.is_empty() {
                     bail!("dungeon note {}: `hints` and `clue` go together", n.key);
                 }
+            }
+            if !(1..=TIER_NAMES.len() as u32).contains(&d.tier) {
+                bail!("dungeon {}: tier {} (1 to {})", d.key, d.tier, TIER_NAMES.len());
             }
             if !d.exit_boss.is_empty() && !pack_keys.contains(&d.exit_boss.as_str()) {
                 bail!(

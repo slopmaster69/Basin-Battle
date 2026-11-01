@@ -366,10 +366,12 @@ fn the_book_at_camp_opens_after_the_first_raid_and_sends_a_hero_down() {
         |e| matches!(e, Event::Travel { player, to: Some(k) } if *player == id && k == "first")
     ));
     s.set_pages(vec!["first".into(), "second".into()]);
-    // Both of this dungeon's, and each other dungeon's first page after them.
+    // Both of this dungeon's, and each other dungeon's first page after them, the easiest first.
     let pages: Vec<String> = s.book_pages().into_iter().map(|(k, _)| k).collect();
-    assert_eq!(&pages[..3], &["first", "second", "stockade_gate"]);
-    let firsts: Vec<String> = s.content.more_dungeons.iter().map(|d| d.lamps[0].key.clone()).collect();
+    assert_eq!(&pages[..2], &["first", "second"]);
+    let mut more: Vec<&crate::content::DungeonDef> = s.content.more_dungeons.iter().collect();
+    more.sort_by_key(|d| d.tier);
+    let firsts: Vec<String> = more.iter().map(|d| d.lamps[0].key.clone()).collect();
     assert_eq!(pages[2..].to_vec(), firsts);
     let books = s.book_dungeons();
     assert_eq!(books[0].key, "deadmines");
@@ -1173,4 +1175,25 @@ fn a_wager_won_at_eight_pays_keen_gear_into_the_camps_chest() {
     let gear: Vec<&crate::content::ItemDef> = paid.iter().map(|i| &s.content.items[*i]).filter(|i| i.kind != crate::content::ItemKind::Resource).collect();
     assert!(!gear.is_empty() && gear.iter().all(|i| i.hone == 2), "keen: {:?}", gear.iter().map(|i| &i.key).collect::<Vec<_>>());
     let _ = id;
+}
+
+#[test]
+fn a_harder_dungeons_foes_are_tougher_by_its_tier_and_the_book_lists_the_easiest_first() {
+    use crate::content::{TIER_DAMAGE, TIER_HEALTH};
+    let c = Content::builtin();
+    for (key, tier) in [("ragefire", 1u32), ("stockade", 2), ("cathedral", 3)] {
+        assert_eq!(c.dungeons().find(|d| d.key == key).unwrap().tier, tier);
+        let s = Survival::new_dungeon(c.for_dungeon_of(key), Box::new(FlatLand::default()), 3, 1_000_000.0);
+        let (id, m) = s.mobs.iter().find(|(_, m)| !s.content.mobs[m.def].boss && !s.content.mobs[m.def].critter).map(|(id, m)| (*id, m)).unwrap();
+        let d = &s.content.mobs[m.def];
+        let past = (tier - 1) as f32;
+        let want = (d.health as f32 * s.content.combat.foe_health * (1.0 + TIER_HEALTH * past)).round();
+        assert!((m.max_health as f32 - want).abs() <= 1.0, "{key}: {} vs {want}", m.max_health);
+        let base = s.attack_now(id).damage as f32;
+        let plain = d.attack.damage as f32 * (1.0 + TIER_DAMAGE * past);
+        assert!((base - plain.round()).abs() <= 1.0, "{key}: {base} vs {plain}");
+    }
+    let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let tiers: Vec<u32> = s.book_dungeons().iter().map(|b| b.tier).collect();
+    assert!(tiers.windows(2).all(|w| w[0] <= w[1]) && tiers.first() == Some(&1) && tiers.last() == Some(&3), "{tiers:?}");
 }

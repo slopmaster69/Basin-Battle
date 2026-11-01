@@ -303,6 +303,14 @@ impl Survival {
         Some((ready, accounts.len(), w.countdown.map(|t| (t - self.wall()).max(0.0) as f32)))
     }
 
+    /// The dungeon's tier on its foes: their health, and the weight of their blows (1 up top, and
+    /// in a first dungeon).
+    pub(crate) fn tier_scale(&self) -> (f32, f32) {
+        let Some(d) = self.dungeon_def().filter(|_| self.is_below()) else { return (1.0, 1.0) };
+        let past = d.tier.saturating_sub(1) as f32;
+        (1.0 + crate::content::TIER_HEALTH * past, 1.0 + crate::content::TIER_DAMAGE * past)
+    }
+
     /// A foe's health and the weight of its blows at this wager (1 with none).
     pub(crate) fn wager_scale(&self, def: usize) -> (f32, f32) {
         let Some(w) = self.wager() else { return (1.0, 1.0) };
@@ -523,7 +531,9 @@ impl Survival {
     /// What a won wager pays: plunder to everyone down here, and gear into the camp's chest.
     fn pay_wager(&mut self, d: &DungeonDef, level: u32, timed: bool) {
         if let Some(plunder) = self.content.item(&d.plunder) {
-            let n = ((6 + 3 * level) as f32 * if timed { 1.0 } else { 0.5 }).round() as u32;
+            // (A harder dungeon pays a quarter more a tier.)
+            let tier = 1.0 + 0.25 * d.tier.saturating_sub(1) as f32;
+            let n = ((6 + 3 * level) as f32 * tier * if timed { 1.0 } else { 0.5 }).round() as u32;
             let heroes: Vec<Id> = self.players.keys().copied().collect();
             for id in heroes {
                 let left = self.give(id, plunder, n);

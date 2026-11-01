@@ -19,6 +19,8 @@ blurb = "The Crusade's heart: Mograine at the altar, and Whitemane who won't let
 first_page = "The Cathedral's courtyard gate. The Crusade sings inside; they've heard you coming."
 welcome = "The Scarlet Monastery's Cathedral. Commander Mograine guards the altar, and High Inquisitor Whitemane will not let him stay dead. Two lamps: the courtyard gate, and the nave. Rest at a lamp to heal, fill your Draughts (T) and send the Crusade back to its prayers. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): the Cathedral: the hardest (35 to 45).
+tier = 3
 draught = "draught"
 draughts = 3
 draughts_max = 6

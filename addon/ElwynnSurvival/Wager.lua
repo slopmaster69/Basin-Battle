@@ -22,6 +22,12 @@ local TITLE = FONTS .. "IMFellEnglishSC-Regular.ttf"
 local BODY = FONTS .. "CrimsonPro-Regular.ttf"
 local DEATH = 10
 
+-- A dungeon's tier in words, for the book's list (BK's last field; nil when it's not there).
+local TIERS = { "Tier I, a first dungeon", "Tier II, a harder one", "Tier III, among the hardest" }
+function ES.TierWords(t)
+  return TIERS[tonumber(t or "") or 0]
+end
+
 local f = CreateFrame("Frame", "ElwynnSurvivalWager", UIParent)
 f:SetWidth(250)
 f:SetHeight(96)
