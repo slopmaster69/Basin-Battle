@@ -31,6 +31,8 @@ mod tests_board;
 #[cfg(test)]
 mod tests_moves;
 #[cfg(test)]
+mod tests_recast;
+#[cfg(test)]
 mod tests_classes;
 #[cfg(test)]
 mod tests_explore;
@@ -39,4 +41,20 @@ mod tests_floors;
 #[cfg(test)]
 mod tests_siege;
 #[cfg(test)]
+mod tests_support;
+#[cfg(test)]
 mod tests_tactics;
+#[cfg(test)]
+mod tests_projectiles;
+#[cfg(test)]
+mod tests_class_warrior_paladin_hunter;
+#[cfg(test)]
+mod tests_class_rogue_priest_shaman;
+#[cfg(test)]
+mod tests_class_mage_warlock_druid;
+#[cfg(test)]
+mod tests_beta_mechanics;
+#[cfg(test)]
+mod tests_beta;
+#[cfg(test)]
+mod tests_sim;

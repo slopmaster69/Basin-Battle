@@ -159,7 +159,7 @@ fn a_new_character_knows_its_own_classs_q_and_e_on_those_keys() {
     let back = s.leave(p).unwrap();
     assert_eq!((back.class.as_str(), back.look, back.name.as_str(), back.owner.as_str()), ("druid", Some(look), "Thalia", "ayla"));
     let q = s.join("ayla/thalia", "Thalia", Some(&back));
-    assert!(s.players[&q].owned.contains("wrath"));
+    assert!(s.players[&q].owned.contains("living_seed"));
 }
 
 #[test]
@@ -217,7 +217,7 @@ count = 1
     // The hero: back to the first day, still Ayla the Warrior.
     s.reset_hero(p).unwrap();
     let h = &s.players[&p];
-    assert!(!h.owned.contains("fireball") && h.owned.contains("aimed_throw"));
+    assert!(!h.owned.contains("fireball") && h.owned.contains("hurled_axe"));
     assert_eq!(h.bag.get(&wood), None);
     assert_eq!(h.name, "Ayla");
     assert!(h.valor < 80.0);

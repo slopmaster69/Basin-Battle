@@ -51,6 +51,8 @@ const GO_FLAGS_INERT: u32 = 0x10 | 0x20;
 /// green rune ring for a spot that's good.
 const DANGER_DISPLAY: u32 = 5812;
 const DANGER_MODEL_RADIUS: f32 = 6.48;
+/// A missile's anchor (see [`SurvivalGame::anchor_create`]) is that circle shrunk to nothing.
+const ANCHOR_SCALE: f32 = 0.001;
 const GOOD_RING_DISPLAY: u32 = 674;
 
 /// Equipment slots, as the client numbers them.
@@ -694,6 +696,16 @@ impl SurvivalGame {
         if let Some(r) = self.rings.remove(&id) {
             self.broadcast(&packets::destroy_object(r));
         }
+    }
+
+    /// An unseen object standing at `pos` to fly a missile from there, not from a unit (a
+    /// boomerang turning back): its guid, and the packet that makes it. It's gone with the
+    /// rules' `ObjGone` of `id`.
+    pub(crate) fn anchor_create(&mut self, id: Id, pos: [f32; 3]) -> (u64, Packet) {
+        let entry = self.go_entry(DANGER_DISPLAY, "", GO_TYPE_GENERIC);
+        let guid = object_guid(entry, id);
+        self.bind(id, guid);
+        (guid, Self::go_packet(guid, entry, DANGER_DISPLAY, GO_TYPE_GENERIC, GO_FLAGS_INERT, ANCHOR_SCALE, pos, 0.0))
     }
 
     /// A danger circle drawn to `radius`.

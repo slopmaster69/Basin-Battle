@@ -59,13 +59,18 @@
 //! The abilities:
 //! - `AB\t...`: the ability bar, one entry per key (see [`SurvivalGame::bar_line`]).
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
-//! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), four rows of four cards (see
-//!   [`SurvivalGame::tree_line`]).
+//! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
+//!   beta page's cards, each with its page (see [`SurvivalGame::tree_line`]).
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
 //!   friend's), `MK\t<id>` gone.
 //! - `DA\t<secs>\t<speed>\t<facing>`: run the dash of an ability (Charge) along the facing.
 //! - `HL\t<amount>`: healed (a green number). `NP\t<verb>\t<name>`: what the use key would use.
 //! - `A` goes on `\t<ability key>` (what's aimed, charged, cast or channelled).
+//! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
+//!   the key in that slot (0 Q to 4 the ultimate) is armed for its recast for `secs` more: pressed
+//!   again it fires that ability (its icon, its name, its aim and charge); `RC\t<slot>`: closed.
+//! - `EM\t<slot>\t<secs>`: the key in that slot is empowered (a combo) for `secs` more: its next
+//!   press is its EX version, for no Valor; `EM\t<slot>`: spent or gone.
 
 use std::fmt::Write as _;
 
@@ -112,14 +117,18 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         }
     } else if d.damage[1] > 0.0 {
         let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
-        out.push(format!("{count}{} damage", span(d.damage, "")));
+        // A beam's is a second in it.
+        let per = if d.kind == "beam" { " a second" } else { "" };
+        out.push(format!("{count}{} damage{per}", span(d.damage, "")));
     }
     if d.linger > 0.0 && d.linger_damage > 0.0 {
         out.push(format!("{} a second for {} s", n(d.linger_damage), n(d.linger)));
     } else if d.linger > 0.0 {
         out.push(format!("{} s", n(d.linger)));
     }
-    if d.ally_heal > 0.0 {
+    if d.ally_heal > 0.0 && d.kind == "beam" {
+        out.push(format!("heals friends in it {}% a second", n(d.ally_heal * 100.0)));
+    } else if d.ally_heal > 0.0 {
         out.push(format!("heals {}%", n(d.ally_heal * 100.0)));
     }
     if d.linger_heal > 0.0 {
@@ -134,8 +143,11 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "ground" => out.push(format!("{} yd away, {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
         "cone" => out.push(format!("{} yd cone", n(d.range[1]))),
         "line" => out.push(format!("{} yd strip, {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "beam" => out.push(format!("{} yd beam, {} yd wide, held {} s", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
+        "ally" => out.push("on an ally, or yourself".to_string()),
         "leap" if d.back => out.push(format!("{} yd back", n(d.range[1]))),
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap, lands {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "trap" if d.launch > 0.0 => out.push(format!("{} yd away, launches you or a friend {} yd, lasts {} s", n(d.range[1]), n(d.launch), n(d.secs))),
         "trap" => out.push(format!("{} yd away, springs within {} yd, lasts {} s", n(d.range[1]), n(d.radius[1]), n(d.secs))),
         "place" => out.push(format!("totem {} s, {} yd", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "blink" if d.anchor > 0.0 => out.push(format!("circle lasts {} s", n(d.anchor))),
@@ -159,9 +171,39 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.splash > 0.0 && d.kind != "trap" {
         out.push(format!("{} yd burst", n(d.splash)));
     }
+    if d.returns {
+        out.push("comes back".to_string());
+    }
+    if d.lob {
+        out.push("lobbed over foes".to_string());
+    }
+    if d.fuse > 0.0 {
+        out.push(format!("sticks, goes off after {} s", n(d.fuse)));
+    }
+    if d.yank {
+        out.push("pulls you to what it strikes".to_string());
+    }
+    if d.swap {
+        out.push("swaps places with what it strikes".to_string());
+    }
+    if d.tether_secs > 0.0 {
+        out.push(format!("binds for {} s, drags back past {} yd", n(d.tether_secs), n(d.tether_range)));
+    }
+    if d.rewind {
+        out.push(if d.recast.is_empty() { format!("back where you were after {} s", n(d.rewind_secs)) } else { "leaves an echo to come back to".to_string() });
+    }
+    if !d.end_burst.is_empty() {
+        out.push("bursts as it ends".to_string());
+    }
+    if d.counter.as_ref().is_some_and(|c| c.mirror) {
+        out.push("turns projectiles back".to_string());
+    }
     for e in d.effects.iter().chain(&d.tick_effects) {
         match e.kind.as_str() {
+            "knockback" if e.wall_stun > 0.0 => out.push(format!("knocks back {} yd, stuns {} s against a wall", n(e.amount), n(e.wall_stun))),
             "knockback" => out.push(format!("knocks back {} yd", n(e.amount))),
+            "cheat_death" => out.push(format!("a killing blow leaves you at 1 health, then heals {}%", n(e.amount * 100.0))),
+            "shield" if !e.pop.is_empty() => out.push("bursts as the shield ends".to_string()),
             "pull" => out.push(if e.from_caster { "pulls to you".to_string() } else { format!("pulls {} yd in", n(e.amount)) }),
             _ => {}
         }
@@ -169,7 +211,7 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.kind == "stance" && d.secs > 0.0 {
         out.push(format!("{} s", n(d.secs)));
     }
-    if d.kind == "buff" {
+    if d.kind == "buff" || d.kind == "ally" {
         if let Some(e) = d.effects.first() {
             out.push(format!("{} s", n(e.secs[1])));
         }
@@ -189,6 +231,15 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     }
     if d.stamina > 0.0 {
         out.push(format!("{} stamina", n(d.stamina)));
+    }
+    if d.through {
+        out.push("runs through foes".to_string());
+    }
+    if !d.recast.is_empty() && d.recast_secs > 0.0 {
+        out.push(format!("press again within {} s", n(d.recast_secs)));
+    }
+    if let Some(e) = &d.empower {
+        out.push(format!("empowers for {} s", n(e.secs)));
     }
     // An EX version runs on its base's cooldown.
     let cd = base.map_or(d.cooldown, |b| b.cooldown);
@@ -226,6 +277,9 @@ const HUD_EVERY: Duration = Duration::from_millis(150);
 /// A champion's bar shows to the heroes this near it while it fights.
 const BOSS_BAR_RANGE: f32 = 60.0;
 const PING_EVERY: Duration = Duration::from_secs(2);
+/// What was last sent of each key's recast window and empower (see [`SurvivalGame::combo_lines`]).
+const RC_SENT: [&str; 5] = ["RC0", "RC1", "RC2", "RC3", "RC4"];
+const EM_SENT: [&str; 5] = ["EM0", "EM1", "EM2", "EM3", "EM4"];
 /// The corner's arrow points to a place not yet found this near (yards), when there are no
 /// supplies to point to.
 const UNFOUND_HINT: f32 = 600.0;
@@ -654,6 +708,11 @@ impl SurvivalGame {
                         w.sent.insert("AB", ab);
                     }
                 }
+            }
+            // Keys armed for a recast, keys empowered: as they open and close.
+            for (n, (rc, em)) in self.combo_lines(id).into_iter().enumerate() {
+                self.ui_line_stamped(conn, RC_SENT[n], rc);
+                self.ui_line_stamped(conn, EM_SENT[n], em);
             }
             let bp = self.placement_line(id);
             self.ui_line_changed(conn, "BP", bp);
@@ -1429,7 +1488,9 @@ impl SurvivalGame {
     }
 
     /// The board (N): `TR\t<dev>\t<what the count says>\t<card>^...`, each card
-    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts`.
+    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts~where learned~page`.
+    /// `page` is 1 for a class's card (`column` its class) and 2 for the beta page's (`column`
+    /// `beta`): an add-on from before the beta page knows no `beta` column and leaves those out.
     fn tree_line(&self, id: Id) -> Option<String> {
         let p = self.sim.players.get(&id)?;
         let c = &self.sim.content;
@@ -1449,7 +1510,7 @@ impl SurvivalGame {
                 });
                 let at = if owned { String::new() } else { clean(&self.sim.learned_where(&a.key)) };
                 format!(
-                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}",
+                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}~{}",
                     a.key,
                     clean(&a.name),
                     a.slot,
@@ -1464,11 +1525,23 @@ impl SurvivalGame {
                     a.charge[1],
                     clean(&a.text),
                     clean(&ability_facts(a, None, c.valor.max)),
+                    a.page(),
                 )
             })
             .collect();
-        let owned = c.abilities.iter().filter(|a| a.on_board() && p.owned.contains(&a.key)).count();
-        let points = if dev { "Dev build: every card".to_string() } else { format!("{owned} of {} cards", cards.len()) };
+        // The classes' cards counted, and the beta page's apart (free to take, there to try).
+        let count = |beta: bool| {
+            let page = c.abilities.iter().filter(|a| a.on_board() && a.is_beta() == beta);
+            (page.clone().filter(|a| p.owned.contains(&a.key)).count(), page.count())
+        };
+        let ((owned, all), (beta_owned, beta_all)) = (count(false), count(true));
+        let points = if dev {
+            "Dev build: every card".to_string()
+        } else if beta_all > 0 {
+            format!("{owned} of {all} cards · beta page {beta_owned} of {beta_all}")
+        } else {
+            format!("{owned} of {all} cards")
+        };
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 
@@ -1479,12 +1552,16 @@ impl SurvivalGame {
         let now = self.sim.clock;
         let p = self.sim.players.get(&id)?;
         let shape = |d: &htl_survival::content::AbilityDef| match d.kind.as_str() {
+            // A lob is aimed at the ground, as ground is.
+            "projectile" if d.lob => "circle",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
             "nova" | "stance" | "art" | "buff" => "self",
             _ => "line",
         };
         let shape = |d: &htl_survival::content::AbilityDef| if d.at_self { "self" } else { shape(d) };
+        // The circle drawn where it's aimed: a lob's is its burst.
+        let reach = |d: &htl_survival::content::AbilityDef| if d.lob { d.splash } else { htl_survival::content::AbilityDef::at(d.radius, 1.0) };
         let charge = |d: &htl_survival::content::AbilityDef| -> (f32, f32) {
             if d.kind == "shot" {
                 let r = self.sim.ranged_of(p);
@@ -1505,7 +1582,7 @@ impl SurvivalGame {
                 let base_cd = d.cooldown;
                 let range = htl_survival::content::AbilityDef::at(d.range, 1.0);
                 // A blink's landing (no area) still shows where it goes.
-                let radius = htl_survival::content::AbilityDef::at(d.radius, 1.0).max(if d.kind == "blink" { 1.0 } else { 0.0 });
+                let radius = reach(d).max(if d.kind == "blink" { 1.0 } else { 0.0 });
                 let exs = match ex.map(|x| &c.abilities[x]) {
                     Some(x) => format!(
                         "{}~{}~{}~{}~{}~{}~{:.1}~{:.1}~{:.0}",
@@ -1516,7 +1593,7 @@ impl SurvivalGame {
                         x.kind,
                         shape(x),
                         htl_survival::content::AbilityDef::at(x.range, 1.0),
-                        htl_survival::content::AbilityDef::at(x.radius, 1.0),
+                        reach(x),
                         x.arc
                     ),
                     None => "~~~~~~~~".to_string(),
@@ -1541,6 +1618,66 @@ impl SurvivalGame {
             })
             .collect();
         Some(format!("AB\t{}", slots.join("^")))
+    }
+
+    /// Each key's recast window (`RC`) and empower (`EM`) as it stands, with a stamp that changes
+    /// only as one opens or closes (not as its seconds run down), and a closed one's stamp empty.
+    fn combo_lines(&self, id: Id) -> Vec<((String, String), (String, String))> {
+        let c = &self.sim.content;
+        let now = self.sim.clock;
+        let recasts = self.sim.recast_keys(id);
+        let empowered = self.sim.empowered_keys(id);
+        (0..RC_SENT.len())
+            .map(|n| {
+                let rc = match recasts.iter().find(|(k, ..)| *k == n) {
+                    Some(&(_, a, until)) => {
+                        let d = &c.abilities[a];
+                        let shape = match d.kind.as_str() {
+                            "ground" | "place" | "trap" | "leap" | "blink" => "circle",
+                            "cone" => "cone",
+                            "nova" | "stance" | "art" | "buff" => "self",
+                            _ => "line",
+                        };
+                        let shape = if d.at_self || !d.aimed() { "self" } else { shape };
+                        let radius = htl_survival::content::AbilityDef::at(d.radius, 1.0).max(if d.kind == "blink" { 1.0 } else { 0.0 });
+                        (
+                            format!("{}@{until:.2}", d.key),
+                            format!(
+                                "RC\t{n}\t{:.1}\t{}\t{}\t{}\t{shape}\t{:.1}\t{radius:.1}\t{:.0}\t{}\t{:.2}\t{:.2}",
+                                (until - now).max(0.0),
+                                clean(&d.icon),
+                                d.key,
+                                clean(&d.name),
+                                htl_survival::content::AbilityDef::at(d.range, 1.0),
+                                d.arc,
+                                u8::from(d.aimed()),
+                                d.charge[0],
+                                d.charge[1]
+                            ),
+                        )
+                    }
+                    None => (String::new(), format!("RC\t{n}")),
+                };
+                let em = match empowered.iter().find(|(k, _)| *k == n) {
+                    Some(&(_, until)) => (format!("{until:.2}"), format!("EM\t{n}\t{:.1}", (until - now).max(0.0))),
+                    None => (String::new(), format!("EM\t{n}")),
+                };
+                (rc, em)
+            })
+            .collect()
+    }
+
+    /// Send a line kept under `verb` when its stamp changed (and once to a fresh world, closed or
+    /// not, so nothing from the world before stays on the bar).
+    fn ui_line_stamped(&mut self, conn: ConnId, verb: &'static str, (stamp, line): (String, String)) {
+        let same = self.world_of(conn).is_some_and(|w| w.sent.get(verb) == Some(&stamp));
+        if same {
+            return;
+        }
+        self.ui_line(conn, &line);
+        if let Some(w) = self.world_mut(conn) {
+            w.sent.insert(verb, stamp);
+        }
     }
 
     /// Valor: `VA\t<now>\t<most>\t<a segment>`.

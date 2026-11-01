@@ -292,7 +292,7 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     c.drain(0.5);
     // The ability bar arrives; Aimed Shot (off the bench, on Q) draws the bow for one shot, and
     // it's put away.
-    assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~aimed_throw~"))), "the bar");
+    assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~hurled_axe~"))), "the bar");
     c.chat(".es slot q aimed_shot");
     c.drain(0.2);
     c.chat(".es in ab 0 0");
@@ -1193,12 +1193,13 @@ fn an_eighth_round_client_sees_a_sky_fall_laid_at_its_spot_and_an_older_one_its_
     b.chat(".es hello 5 ac5");
     a.drain(0.6);
     b.drain(0.3);
-    // Mind Blast (a dark star at the reticle 0.6 s later) on Q.
-    a.chat(".es slot q mind_blast");
+    // Mind Blast (a dark star at the reticle 0.6 s later): Penance's EX version, on Q with Ctrl.
+    a.chat(".es slot q penance");
+    a.chat(".es valor full");
     a.drain(0.2);
     a.seen.clear();
     b.seen.clear();
-    a.chat(".es in ab 0 0");
+    a.chat(".es in ab 0 1");
     a.chat(".es in a");
     a.chat(".es in au 0.0 -0.3");
     let ta = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tTA\t")));
@@ -1421,7 +1422,14 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
         a.until(0.5, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("TR\t")));
         addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("TR\t"))
     };
-    assert!(tr.is_some_and(|l| l.matches("~1~").count() > 4), "every card of her dev-world hero, not Siege's two");
+    let tr = tr.unwrap_or_default();
+    assert!(tr.matches("~1~").count() > 4, "every card of her dev-world hero, not Siege's two");
+    // Each card ends with its page: 1 a class's, 2 the beta page's (its column `beta`).
+    let cards: Vec<&str> = tr.splitn(4, '\t').nth(3).unwrap_or("").split('^').collect();
+    let beta = |c: &&str| c.split('~').nth(3) == Some("beta");
+    assert!(cards.iter().any(beta), "the beta page's cards are sent: {tr}");
+    assert!(cards.iter().filter(|c| beta(*c)).all(|c| c.ends_with("~2")), "on page 2: {tr}");
+    assert!(cards.iter().filter(|c| !beta(*c)).all(|c| c.ends_with("~1")), "the classes' on page 1: {tr}");
 }
 
 #[test]

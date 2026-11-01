@@ -50,9 +50,11 @@ fn use_card(s: &mut Survival, p: Id, card: &AbilityDef, ex: bool) -> Vec<Event> 
     s.set_valor(p, 100.0);
     s.input(p, Input::Ability(slot, ex));
     let mut ev = s.step(DT);
-    if matches!(s.players[&p].action, Action::Aim { .. }) {
+    if let Action::Aim { ability } = s.players[&p].action {
         s.input(p, Input::Attack);
-        ev.extend(run(s, card.charge[1] + 0.1));
+        // The charge of what's aimed: an EX version may be held longer than its card.
+        let full = s.content.abilities[ability].charge[1];
+        ev.extend(run(s, full + 0.1));
         s.input(p, Input::AttackUp);
     }
     // An anchor's second press steps back to it.
@@ -91,7 +93,7 @@ fn every_card_and_its_charged_up_version_goes_off_on_creatures() {
             let touched = foes.iter().zip(&health).zip(&at).any(|((m, h), was)| {
                 s.mobs.get(m).is_none_or(|x| x.health < *h || dist2d(x.pos, *was) > 0.5) || !s.cc_of(*m).is_empty()
             });
-            let for_self = matches!(d.kind.as_str(), "stance" | "buff" | "blink" | "place") || (d.kind == "leap" && d.back) || d.damage[1] <= 0.0 && d.effects.is_empty();
+            let for_self = matches!(d.kind.as_str(), "stance" | "buff" | "blink" | "place" | "ally") || (d.kind == "leap" && d.back) || d.damage[1] <= 0.0 && d.effects.is_empty();
             assert!(touched || for_self, "{}: it reached no foe", d.key);
             s.leave(p);
             s.traps.clear();
@@ -126,6 +128,10 @@ fn every_card_goes_off_in_a_duel() {
 /// half of what burns after (it can be walked out of).
 fn worth(d: &AbilityDef) -> f32 {
     let hit = (d.damage[0] + d.damage[1]) / 2.0 * d.count.max(1) as f32;
+    // A beam's damage is a second's, on each foe it holds: all of it held.
+    let hit = if d.kind == "beam" { hit * d.secs } else { hit };
+    // A boomerang strikes each foe going out and again coming back (at its share).
+    let hit = if d.returns { hit * (1.0 + d.return_damage) } else { hit };
     let chain: f32 = (1..=d.chain).map(|k| hit * d.chain_falloff.powi(k as i32)).sum();
     let burn: f32 = d.effects.iter().filter(|e| e.kind == "burn").map(|e| e.amount * e.secs[1]).sum();
     let linger = d.linger_damage * d.linger;
@@ -147,7 +153,8 @@ fn the_board_keeps_to_its_budgets() {
     let s = world(true);
     let c = &s.content;
     for row in SLOTS {
-        let cards: Vec<&AbilityDef> = c.abilities.iter().filter(|a| a.on_board() && a.slot == row).collect();
+        // A card a class (the beta page's count toward no class, but keep to the budgets below).
+        let cards: Vec<&AbilityDef> = c.abilities.iter().filter(|a| a.on_board() && !a.is_beta() && a.slot == row).collect();
         assert_eq!(cards.len(), 9, "{row}");
     }
     for (k, ex) in board(c) {

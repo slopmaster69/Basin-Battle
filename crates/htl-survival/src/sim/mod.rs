@@ -12,12 +12,14 @@ use crate::land::Land;
 
 pub mod abilities;
 pub mod arena;
+pub(crate) mod beta;
 pub mod cc;
 mod combat;
 pub mod dungeon;
 mod journal;
 pub mod mobs;
 pub(crate) mod moves;
+pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 mod raid;
@@ -144,6 +146,10 @@ pub enum Event {
     Swing { attacker: Id, victim: Option<Id>, damage: u32, outcome: Outcome, anim: bool, style: Blow },
     /// A missile or a spell's look from `caster` to `target`.
     Missile { caster: Id, spell: u32, target: Target },
+    /// A missile's look from a spot, not from a unit (a boomerang turning back to its thrower):
+    /// `anchor` names an unseen object standing at `from` to fly it, until an
+    /// [`Event::ObjGone`] of that id. `caster` is whose it is.
+    MissileFrom { anchor: Id, caster: Id, spell: u32, from: Vec3, target: Target },
     /// A cast begins (its look and the caster's cast pose) or is cut short.
     Cast { caster: Id, spell: u32, ms: u32 },
     CastEnd { caster: Id },
@@ -564,6 +570,8 @@ pub struct Player {
     pub rooted: bool,
     /// A panic's last stride.
     pub panic_stride: f32,
+    /// Keys armed for a recast, cards empowered, a dash going through bodies.
+    pub combos: recasts::Combos,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -827,6 +835,8 @@ pub struct Survival {
     /// Shrines' and relics' trials under way, by chest: where it stands, who called it, when a
     /// hero was last near.
     pub(crate) trials: BTreeMap<usize, Trial>,
+    /// The beta page's mechanics in play: yanks, echoes, tethers, shields that burst, pads.
+    pub(crate) beta: beta::Beta,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -900,6 +910,7 @@ impl Survival {
             unfound: BTreeSet::new(),
             chests_looked: 0.0,
             trials: BTreeMap::new(),
+            beta: beta::Beta::default(),
         }
     }
 
@@ -944,6 +955,8 @@ impl Survival {
         self.step_grounds();
         self.step_totems();
         self.step_stances();
+        self.step_combos();
+        self.step_beta();
         self.step_cc();
         self.step_holds();
         self.step_dummies();
@@ -1059,6 +1072,7 @@ impl Survival {
             sheathed: false,
             rooted: false,
             panic_stride: 0.0,
+            combos: recasts::Combos::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];

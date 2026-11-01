@@ -1730,6 +1730,8 @@ impl Survival {
     pub(crate) fn hurt_player(&mut self, id: Id, damage: u32) {
         // A frozen hero's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(id, damage);
+        // Cheating death: a blow that would fell them leaves them at 1 health (the boon spent).
+        let damage = self.cheat_death(id, damage);
         let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
         p.health = p.health.saturating_sub(damage);
@@ -1758,6 +1760,10 @@ impl Survival {
             self.unmark(m.mark);
             // A grounding totem near where it lands takes it.
             if self.grounded_at(m.at) {
+                continue;
+            }
+            // A hero in a mirror's stance where it comes down turns it back at the creature.
+            if self.mirror_missile(&m) {
                 continue;
             }
             // Its splash or burst where it comes down.

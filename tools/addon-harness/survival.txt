@@ -80,6 +80,22 @@ BP
 !table.insert(SAID, "held: " .. SAID[table.getn(SAID)])
 !local h = ElwynnSurvival.exHold h.at = h.at - 0.3 ElwynnSurvival.StepExHold() table.insert(SAID, "after the hold: " .. SAID[table.getn(SAID)])
 !ElwynnSurvival.Ability(1, nil, "up") table.insert(SAID, "let go: " .. tostring(ElwynnSurvival.exHold))
+# A key armed for its recast (Charge's on 1): the recast's look and the window's seconds on it,
+# glowing; pressed, it goes at once (no hold), and closed, the key is Charge again.
+RC	2	3.0	Spell_Arcane_Blink	t_back	Step Back	self	0.0	1.0	0	0	0.00	0.00
+!table.insert(SAID, "recast: " .. tostring(ElwynnSurvival.recasts[3] and ElwynnSurvival.recasts[3].name) .. " secs " .. tostring(ElwynnSurvivalAbilities.slots[3].cd:GetText()) .. " glow " .. tostring(ElwynnSurvivalAbilities.slots[3].glow:IsShown()) .. " info " .. tostring(ElwynnSurvival.AbilityInfo("t_back") ~= nil))
+!ElwynnSurvival.Ability(3, nil, "down") table.insert(SAID, "recast pressed: " .. SAID[table.getn(SAID)] .. " waits " .. tostring(ElwynnSurvival.exHold ~= nil))
+!ElwynnSurvival.Ability(3, nil, "up")
+RC	2
+!table.insert(SAID, "recast closed: " .. tostring(ElwynnSurvival.recasts[3]) .. " secs " .. tostring(ElwynnSurvivalAbilities.slots[3].cd:GetText()) .. " glow " .. tostring(ElwynnSurvivalAbilities.slots[3].glow:IsShown()))
+# An empowered key (Q): glowing, its seconds in the corner; pressed, it goes at once as itself
+# (the server fires the EX version, free); spent, it's a plain key again.
+EM	0	4.0
+!table.insert(SAID, "empowered: glow " .. tostring(ElwynnSurvivalAbilities.slots[1].glow:IsShown()) .. " timer " .. tostring(ElwynnSurvivalAbilities.slots[1].timer:GetText()))
+!ElwynnSurvival.Ability(1, nil, "down") table.insert(SAID, "empowered press: " .. SAID[table.getn(SAID)] .. " waits " .. tostring(ElwynnSurvival.exHold ~= nil))
+!ElwynnSurvival.Ability(1, nil, "up")
+EM	0
+!table.insert(SAID, "empower spent: " .. tostring(ElwynnSurvival.empowers[1]) .. " glow " .. tostring(ElwynnSurvivalAbilities.slots[1].glow:IsShown()) .. " timer [" .. tostring(ElwynnSurvivalAbilities.slots[1].timer:GetText()) .. "]")
 A	aim	0.00	0.00	frostbolt
 !table.insert(SAID, "aiming: reticle " .. tostring(ElwynnSurvivalAim:IsShown()) .. " " .. tostring(ElwynnSurvivalAim.name:GetText()) .. " camera " .. tostring(ElwynnSurvival.aimCam))
 !ElwynnSurvival.Attack("down")
@@ -91,6 +107,13 @@ A	cast	0.00	0.40	frostbolt
 A	aim	0.00	0.00	flamestrike
 !function SetAimMarker(shape, range, radius) table.insert(SAID, "marker " .. tostring(shape) .. " " .. tostring(range) .. " " .. tostring(radius)) end ElwynnSurvival.DrawAim()
 !ElwynnSurvival.Guard("down") ElwynnSurvival.Guard("up")
+# On the eighth round a projectile's (a beam's) path is drawn as a strip: its range, its radius.
+!HasActionCombat = function() return 8 end
+A	aim	0.00	0.00	aimed_throw
+!table.insert(SAID, "path marker: " .. tostring(SAID[table.getn(SAID)]))
+A	aim	0.00	0.00	charge
+!table.insert(SAID, "dash, no marker: " .. tostring(SAID[table.getn(SAID)]))
+!HasActionCombat = nil
 A	ready	0.00	0.00
 !SetAimMarker = nil
 CC	root~2.5~0^grace~3.0~0
@@ -105,12 +128,24 @@ HL	12
 HL	5
 !table.insert(SAID, "healed: " .. tostring(ElwynnSurvivalHeal.text:GetText()))
 DA	0.40	30.0	1.5700
-# The board: an owned card on its key, another owned, one to unlock, a locked ultimate.
-TR	1	Dev build: every card	aimed_throw~Aimed Throw~ranged~warrior~INV_ThrowingAxe_01~1~0~ranged~projectile~1~0.00~0.70~Throw a hand axe.~14–22 damage · 6 s cooldown~fan_of_axes~Fan of Axes~INV_ThrowingAxe_01~25~Three axes at once.~3 × 12–18 damage · 25 Valor^shadow_bolt~Shadow Bolt~ranged~warlock~Spell_Shadow_ShadowBolt~1~0~~projectile~1~0.50~1.00~A bolt that Marks.~16–26 damage · 2.5 s cooldown~shadowburn~Shadowburn~Spell_Shadow_ScourgeBuild~25~Instant and fast.~24 damage · 25 Valor^backstab~Backstab~close~rogue~Ability_BackStab~0~1~~art~0~0.00~0.00~A quick stab.~120% weapon damage · ×3 from behind~ambush~Ambush~Ability_Rogue_Ambush~50~Steps behind first.~140% weapon damage · 50 Valor^sanctuary~Sanctuary~ultimate~paladin~Spell_Holy_DivineIntervention~0~0~~ground~0~0.00~0.00~An 8 yard ring.~heals 4% a second · the whole Valor bar~~~~~~
+# The board: an owned card on its key, another owned, one to unlock, a locked ultimate; and the beta
+# page's cards (column beta, page 2): one to take, one owned on its key, an ultimate.
+TR	1	Dev build: every card	aimed_throw~Aimed Throw~ranged~warrior~INV_ThrowingAxe_01~1~0~ranged~projectile~1~0.00~0.70~Throw a hand axe.~14–22 damage · 6 s cooldown~fan_of_axes~Fan of Axes~INV_ThrowingAxe_01~25~Three axes at once.~3 × 12–18 damage · 25 Valor~~1^shadow_bolt~Shadow Bolt~ranged~warlock~Spell_Shadow_ShadowBolt~1~0~~projectile~1~0.50~1.00~A bolt that Marks.~16–26 damage · 2.5 s cooldown~shadowburn~Shadowburn~Spell_Shadow_ScourgeBuild~25~Instant and fast.~24 damage · 25 Valor~~1^backstab~Backstab~close~rogue~Ability_BackStab~0~1~~art~0~0.00~0.00~A quick stab.~120% weapon damage · ×3 from behind~ambush~Ambush~Ability_Rogue_Ambush~50~Steps behind first.~140% weapon damage · 50 Valor~~1^sanctuary~Sanctuary~ultimate~paladin~Spell_Holy_DivineIntervention~0~0~~ground~0~0.00~0.00~An 8 yard ring.~heals 4% a second · the whole Valor bar~~~~~~~~1^ricochet~Ricochet~ranged~beta~Ability_UpgradeMoonGlaive~0~1~~projectile~1~0.00~0.00~A spike that bounces, harder each time.~7 damage · 5 s cooldown~pinball~Pinball~Spell_Nature_Thorns~25~Five bounces, each stuns.~25 Valor~~2^bubble~Bubble~defense~beta~Spell_Holy_SealOfProtection~1~0~defense~ally~1~0.00~0.00~A bubble on a friend, or you.~soaks 40 · 14 s cooldown~hard_bubble~Hard Bubble~Spell_Holy_DivineIntervention~25~Soaks 70.~25 Valor~~2^avatar~Avatar~ultimate~beta~Ability_Racial_BloodRage~1~0~~buff~0~0.00~0.00~For 8 s, a titan.~the whole Valor bar~~~~~~~~2
 !table.insert(SAID, "board: " .. tostring(ElwynnSurvivalTree:IsShown()) .. " card 1 " .. tostring(ElwynnSurvival.tree.cards[1].name:GetText()) .. " [" .. tostring(ElwynnSurvival.tree.cards[1].state:GetText()) .. "] card 13 " .. tostring(ElwynnSurvival.tree.cards[13].state:GetText()) .. " card 38 " .. tostring(ElwynnSurvival.tree.cards[38].state:GetText()) .. " detail " .. tostring(ElwynnSurvival.tree.regular.title:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.charged.title:GetText()) .. " dev " .. tostring(ElwynnSurvival.tree.full:IsShown()))
 !this = ElwynnSurvival.tree.cards[8]; ElwynnSurvival.tree.cards[8]:GetScript("OnClick")()
 !this = ElwynnSurvival.tree.cards[13]; ElwynnSurvival.tree.cards[13]:GetScript("OnClick")()
 !this = ElwynnSurvival.tree.cards[13]; ElwynnSurvival.tree.cards[13]:GetScript("OnEnter")() table.insert(SAID, "hover: " .. tostring(ElwynnSurvival.tree.regular.how:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.charged.how:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.charged.facts:GetText()))
+!table.insert(SAID, "classes page: beta card 101 shown " .. tostring(ElwynnSurvival.tree.cards[101]:IsShown()) .. ", class card 1 shown " .. tostring(ElwynnSurvival.tree.cards[1]:IsShown()))
+!this = ElwynnSurvival.beta.tabs[2]; ElwynnSurvival.beta.tabs[2]:GetScript("OnClick")()
+!table.insert(SAID, "beta page " .. tostring(ElwynnSurvival.beta.page) .. ": card 101 " .. tostring(ElwynnSurvival.tree.cards[101].name:GetText()) .. " [" .. tostring(ElwynnSurvival.tree.cards[101].state:GetText()) .. "] shown " .. tostring(ElwynnSurvival.tree.cards[101]:IsShown()) .. ", card 113 [" .. tostring(ElwynnSurvival.tree.cards[113].state:GetText()) .. "], card 117 " .. tostring(ElwynnSurvival.tree.cards[117].ex:GetText()) .. ", class card 1 shown " .. tostring(ElwynnSurvival.tree.cards[1]:IsShown()) .. ", heads shown " .. tostring(ElwynnSurvival.tree.heads[1]:IsShown()) .. ", line " .. tostring(ElwynnSurvival.beta.sub:GetText()) .. ", detail " .. tostring(ElwynnSurvival.tree.regular.title:GetText()))
+!this = ElwynnSurvival.tree.cards[101]; ElwynnSurvival.tree.cards[101]:GetScript("OnClick")()
+!table.insert(SAID, "beta click said: " .. tostring(SAID[table.getn(SAID) - 1]) .. " / " .. tostring(SAID[table.getn(SAID)]))
+!this = ElwynnSurvival.tree.cards[113]; ElwynnSurvival.tree.cards[113]:GetScript("OnClick")()
+!this = ElwynnSurvival.tree.cards[117]; ElwynnSurvival.tree.cards[117]:GetScript("OnEnter")() table.insert(SAID, "beta hover: " .. tostring(ElwynnSurvival.tree.regular.title:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.regular.tag:GetText()) .. " / " .. tostring(ElwynnSurvival.tree.charged.title:GetText()))
+!this = ElwynnSurvival.tree.cards[117]; ElwynnSurvival.tree.cards[117]:GetScript("OnLeave")()
+!table.insert(SAID, "beta resting: " .. tostring(ElwynnSurvival.tree.regular.title:GetText()))
+!this = ElwynnSurvival.beta.tabs[1]; ElwynnSurvival.beta.tabs[1]:GetScript("OnClick")()
+!table.insert(SAID, "classes again: card 1 shown " .. tostring(ElwynnSurvival.tree.cards[1]:IsShown()) .. ", beta card 101 shown " .. tostring(ElwynnSurvival.tree.cards[101]:IsShown()) .. ", heads shown " .. tostring(ElwynnSurvival.tree.heads[1]:IsShown()))
 !ElwynnSurvival.Tree()
 !table.insert(SAID, "tree closed: " .. tostring(ElwynnSurvivalTree:IsShown()))
 !ElwynnSurvival.Tree()
