@@ -200,7 +200,8 @@ local function Draw()
   else
     f.clock:SetTextColor(0.55, 0.38, 0.08)
   end
-  local words = { wait = "Ready up: the clock starts when everyone is", run = "", won = "Won in time", over = "Over time" }
+  -- (An older server sends no ready field: its clock starts when someone leaves the lamp.)
+  local words = { wait = "The clock starts when you leave the lamp", run = "", won = "Won in time", over = "Over time" }
   local rd = last.ready
   if last.state == "wait" and rd then
     if rd.count then

@@ -858,6 +858,8 @@ pub const HONE_TIERS: [(u32, &str, f32); 3] = [(4, "Honed", 1.12), (8, "Keen", 1
 /// a tier. (Ragefire's trash and the Cathedral's were all but alike; a first pass to try in play.)
 pub const TIER_HEALTH: f32 = 0.25;
 pub const TIER_DAMAGE: f32 = 0.15;
+/// And a won wager's plunder there: this much more a tier (a harder dungeon pays more).
+pub const TIER_PLUNDER: f32 = 0.25;
 /// The tiers' names, for the book.
 pub const TIER_NAMES: [&str; 3] = ["a first dungeon", "a harder one", "among the hardest"];
 
@@ -2361,7 +2363,8 @@ impl Content {
                 h.name = format!("{}, {name}", item.name);
                 h.hone = tier;
                 h.honed_from = key.clone();
-                h.reduce = (item.reduce * by).min(0.6);
+                // (Capped, but never below the piece it was honed from.)
+                h.reduce = (item.reduce * by).min(0.6).max(item.reduce);
                 for p in &mut h.perks {
                     p.amount *= by;
                 }

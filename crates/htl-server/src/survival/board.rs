@@ -306,9 +306,14 @@ impl Board {
         out
     }
 
+    /// A hero's place (from 1) and rank in a ladder already built, by name on this server.
+    pub fn place_in(&self, ladder: &[Rank], name: &str) -> Option<(usize, Rank)> {
+        ladder.iter().enumerate().find(|(_, r)| r.name == name && r.host == self.host).map(|(k, r)| (k + 1, r.clone()))
+    }
+
     /// A hero's place on the ladder (from 1) and their rank, by name on this server.
     pub fn place_of(&self, name: &str) -> Option<(usize, Rank)> {
-        self.ladder().into_iter().enumerate().find(|(_, r)| r.name == name && r.host == self.host).map(|(k, r)| (k + 1, r))
+        self.place_in(&self.ladder(), name)
     }
 
     /// The splits of this server's quickest run in time on a dungeon at a level, if it kept them.
