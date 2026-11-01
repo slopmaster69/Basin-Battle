@@ -1,0 +1,1011 @@
+From 742c7031d2dd0267fa3fe063ea14af04723d7524 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 05:48:54 +0000
+Subject: [PATCH] A clip can come from another character model, retargeted onto
+ the unit's own skeleton
+
+PlayUnitAnimation's ninth argument names a character model ("ScourgeFemale", "OrcMale"...) or
+a model's path: its take on the clip is retargeted onto the unit's skeleton once per model and
+played like one of its own. The bones pair by their KeyBoneID, then outward and inward from
+those along the tree by the way each points at rest; each paired bone's turns carry over as
+they are (a vanilla M2's rest pose is unrotated), the hips' travel is scaled to the unit's
+height, and every other bone keeps its own length. The borrowed clips live in the rig's
+ExtraClips (PoseExtra), which the pose evaluator reads beside the model's own; the model loads
+on first use (its own clip plays until it has), and PreloadAnimationSource(name) loads it
+early. HasActionCombat() is 10.
+---
+ .../benilla-app/src/creature_anim/action.rs   |  51 ++-
+ .../src/creature_anim/action/donor.rs         | 181 +++++++++++
+ crates/benilla-assets/src/m2.rs               |   1 +
+ crates/benilla-assets/src/model/pose.rs       |   8 +
+ crates/benilla-ui/src/action_combat.rs        |  28 +-
+ crates/benilla-world/src/rig_anim.rs          |   4 +-
+ crates/benilla-world/src/rig_anim/bones.rs    | 291 +++++++++++++++++-
+ crates/benilla-world/src/rig_anim/pose.rs     | 183 +++++++----
+ 8 files changed, 667 insertions(+), 80 deletions(-)
+ create mode 100644 crates/benilla-app/src/creature_anim/action/donor.rs
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index c7415af3..9ce92dc9 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -31,6 +31,7 @@ use bevy::prelude::*;
+ 
+ use super::{find_resolved, AnimData, BodyTwist};
+ 
++mod donor;
+ mod strike_trail;
+ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+ 
+@@ -153,7 +154,10 @@ pub(crate) struct HitStopped {
+ 
+ impl HitStopped {
+     fn new(until: f32) -> Self {
+-        Self { until, held: Vec::new() }
++        Self {
++            until,
++            held: Vec::new(),
++        }
+     }
+ }
+ 
+@@ -492,6 +496,12 @@ pub(super) fn drain_action_calls(
+         Query<&mut HitStopped>,
+         ResMut<strike_trail::StrikeTrails>,
+     ),
++    (mut donors, assets, models, rigs): (
++        ResMut<donor::Donors>,
++        Res<AssetServer>,
++        Res<Assets<benilla_assets::M2Model>>,
++        Query<(&RigPose, Option<&benilla_world::rig_anim::PoseExtra>)>,
++    ),
+ ) {
+     let calls = action_combat::take_calls();
+     if calls.is_empty() {
+@@ -512,6 +522,7 @@ pub(super) fn drain_action_calls(
+                 variation,
+                 recovery,
+                 body,
++                from,
+             } => {
+                 let Some(entity) = resolve(&unit, me, index) else {
+                     continue;
+@@ -519,7 +530,26 @@ pub(super) fn drain_action_calls(
+                 let Ok((anims, _)) = units.get(entity) else {
+                     continue;
+                 };
+-                let Some(take) = take_of(anims, anim, variation, catalog) else {
++                // Another model's take on it (donor.rs), once that model is in; else its own.
++                let borrowed = from.as_deref().and_then(|name| {
++                    let (rig, has) = rigs.get(entity).ok()?;
++                    donors.take(
++                        &assets,
++                        &models,
++                        &mut commands,
++                        name,
++                        anim,
++                        variation,
++                        entity,
++                        anims,
++                        rig,
++                        has,
++                    )
++                });
++                let Some(take) = borrowed
++                    .as_ref()
++                    .or_else(|| take_of(anims, anim, variation, catalog))
++                else {
+                     continue;
+                 };
+                 let mut clip = ActionClip::new(take, body);
+@@ -569,6 +599,9 @@ pub(super) fn drain_action_calls(
+                     }
+                 }
+             }
++            ActionCall::Preload { from } => {
++                donors.load(&assets, &from);
++            }
+             ActionCall::Stop { unit, fade } => {
+                 let Some(entity) = resolve(&unit, me, index) else {
+                     continue;
+@@ -663,7 +696,9 @@ pub(super) fn drain_action_calls(
+                     match stops.get_mut(entity) {
+                         Ok(mut s) => s.until = s.until.max(now + secs),
+                         Err(_) => {
+-                            commands.entity(entity).try_insert(HitStopped::new(now + secs));
++                            commands
++                                .entity(entity)
++                                .try_insert(HitStopped::new(now + secs));
+                         }
+                     }
+                 }
+@@ -1161,14 +1196,7 @@ pub(super) fn track_lock_on(
+ /// Gather the units that could block the camera (only while an add-on asks for it).
+ pub(super) fn collect_occluders(
+     me: Query<&Transform, With<SelfPlayer>>,
+-    units: Query<
+-        (
+-            &Transform,
+-            &NetEntity,
+-            Option<&crate::net::ObjectStore>,
+-        ),
+-        Without<SelfPlayer>,
+-    >,
++    units: Query<(&Transform, &NetEntity, Option<&crate::net::ObjectStore>), Without<SelfPlayer>>,
+ ) {
+     let mut out = Vec::new();
+     if action_combat::unit_collision() {
+@@ -1308,6 +1336,7 @@ pub(super) fn shuffle_on_lock_turn(
+ pub(super) fn plugin(app: &mut App) {
+     app.init_resource::<LockOn>()
+         .init_resource::<strike_trail::StrikeTrails>()
++        .init_resource::<donor::Donors>()
+         .add_systems(
+             Update,
+             (
+diff --git a/crates/benilla-app/src/creature_anim/action/donor.rs b/crates/benilla-app/src/creature_anim/action/donor.rs
+new file mode 100644
+index 00000000..49023130
+--- /dev/null
++++ b/crates/benilla-app/src/creature_anim/action/donor.rs
+@@ -0,0 +1,181 @@
++//! Basin Battle: a clip from another character model, played on this one.
++//!
++//! `PlayUnitAnimation`'s `from` names a character model (`"ScourgeFemale"`, `"OrcMale"`…). Its
++//! take on the clip is retargeted onto the unit's own skeleton once per model, and played from
++//! the rig's [`ExtraClips`] like any of its own. A vanilla M2's rest pose is unrotated (each bone
++//! is a pivot), so a bone's turns carry over as they are once the bones are paired: by their
++//! `KeyBoneID` first (the arms, shoulders, spine, head, fingers…), then outward and inward from
++//! those along the hierarchy, child to child by the direction each points at rest. The hips'
++//! travel is scaled to the unit's height; every other bone keeps its own rest length, so the clip
++//! takes the unit's proportions. The pairing and the retargeting are
++//! `benilla_world::rig_anim::bones`.
++
++use std::collections::HashMap;
++use std::sync::{Arc, RwLock};
++
++use bevy::animation::graph::AnimationNodeIndex;
++use bevy::prelude::*;
++
++use benilla_assets::{AnimClip, M2Model, ModelAnimations, PoseNode};
++use benilla_world::rig_anim::{ExtraClips, PoseExtra, RigPose};
++
++/// Borrowed clips' graph nodes start here, clear of any model's own.
++const EXTRA_NODE_BASE: usize = 60_000;
++/// The races whose models can lend a clip, as their folders name them.
++const RACES: [&str; 9] = [
++    "Human", "Orc", "Dwarf", "NightElf", "Scourge", "Tauren", "Gnome", "Troll", "Goblin",
++];
++
++/// The models lending clips, and what's been built from them.
++#[derive(Resource, Default)]
++pub(crate) struct Donors {
++    handles: HashMap<String, Handle<M2Model>>,
++    /// Per unit model (its pose source's address), donor, clip and take: the take to play.
++    built: HashMap<(usize, String, u16, usize), AnimClip>,
++    /// Per unit model, its borrowed clips, shared by its instances.
++    extras: HashMap<usize, Arc<RwLock<ExtraClips>>>,
++}
++
++/// A character model's path from its name: `"ScourgeFemale"` is
++/// `Character\Scourge\Female\ScourgeFemale.m2`; a path is taken as it is.
++pub(crate) fn model_path(name: &str) -> Option<String> {
++    if name.contains('\\') || name.contains('/') || name.to_ascii_lowercase().ends_with(".m2") {
++        return Some(name.to_string());
++    }
++    let lower = name.to_ascii_lowercase();
++    let (race, gender) = if let Some(r) = lower.strip_suffix("female") {
++        (r, "Female")
++    } else if let Some(r) = lower.strip_suffix("male") {
++        (r, "Male")
++    } else {
++        return None;
++    };
++    let race = RACES.iter().find(|r| r.eq_ignore_ascii_case(race))?;
++    Some(format!("Character\\{race}\\{gender}\\{race}{gender}.m2"))
++}
++
++impl Donors {
++    /// Start loading a donor (`PreloadAnimationSource`, or a first use).
++    pub(crate) fn load(&mut self, assets: &AssetServer, name: &str) -> Option<Handle<M2Model>> {
++        if let Some(h) = self.handles.get(name) {
++            return Some(h.clone());
++        }
++        let path = model_path(name)?;
++        let h: Handle<M2Model> = assets.load(benilla_assets::m2_url(&path));
++        self.handles.insert(name.to_string(), h.clone());
++        Some(h)
++    }
++
++    /// The donor's take on `anim`, ready to play on the unit `entity` (its model `anims`, its rig
++    /// `rig`), or `None` while the donor loads or when it has no such clip (the unit's own plays).
++    #[allow(clippy::too_many_arguments)]
++    pub(crate) fn take(
++        &mut self,
++        assets: &AssetServer,
++        models: &Assets<M2Model>,
++        commands: &mut Commands,
++        name: &str,
++        anim: u16,
++        variation: Option<usize>,
++        entity: Entity,
++        anims: &ModelAnimations,
++        rig: &RigPose,
++        has: Option<&PoseExtra>,
++    ) -> Option<AnimClip> {
++        let handle = self.load(assets, name)?;
++        let model = Arc::as_ptr(&anims.pose) as usize;
++        let n = variation.unwrap_or(0);
++        let extra = self.extras.entry(model).or_default().clone();
++        // The unit carries this model's borrowed clips.
++        if has.is_none_or(|e| e.model != model || !Arc::ptr_eq(&e.clips, &extra)) {
++            commands.entity(entity).try_insert(PoseExtra {
++                model,
++                clips: extra.clone(),
++            });
++        }
++        let key = (model, name.to_string(), anim, n);
++        if let Some(c) = self.built.get(&key) {
++            return Some(c.clone());
++        }
++        let donor = models.get(&handle)?;
++        let danims = donor.animations.as_ref()?;
++        let mut takes = danims.clips.iter().filter(|c| c.anim_id == anim);
++        let first = takes.clone().next()?;
++        let dtake = takes.nth(n).unwrap_or(first);
++        let dclip = danims
++            .pose
++            .node(dtake.node)
++            .and_then(|p| danims.pose.clips.get(p.clip as usize))?;
++        let dparents: Vec<i16> = donor.skeleton.joints.iter().map(|j| j.parent).collect();
++        let dbinds: Vec<Vec3> = donor
++            .skeleton
++            .joints
++            .iter()
++            .map(|j| j.local_translation)
++            .collect();
++        let target = benilla_world::rig_anim::Bones {
++            parents: &rig.parents,
++            binds: rig.binds(),
++            keys: &anims.pose.key_bones,
++        };
++        let from = benilla_world::rig_anim::Bones {
++            parents: &dparents,
++            binds: &dbinds,
++            keys: &danims.pose.key_bones,
++        };
++        let map = benilla_world::rig_anim::map_bones(&target, &from);
++        let scale = target.height() / from.height().max(0.1);
++        let clip = benilla_world::rig_anim::retarget(dclip, &map, &rig.parents, scale);
++        // Into the model's borrowed clips: a whole-body node, and an upper-body one where the
++        // model has the mask for it.
++        let upper_mask = anims
++            .clips
++            .iter()
++            .find_map(|c| c.upper_node)
++            .and_then(|u| anims.pose.node(u))
++            .map(|p| p.mask);
++        let (full, upper) = {
++            let mut x = extra.write().ok()?;
++            let at = x.clips.len() as u32;
++            x.clips.push(clip);
++            let full = EXTRA_NODE_BASE + 2 * at as usize;
++            x.nodes.insert(full, PoseNode { clip: at, mask: 0 });
++            let upper = upper_mask.map(|mask| {
++                x.nodes.insert(full + 1, PoseNode { clip: at, mask });
++                full + 1
++            });
++            (full, upper)
++        };
++        let mut take = dtake.clone();
++        take.node = AnimationNodeIndex::new(full);
++        take.blend_node = None;
++        take.upper_node = upper.map(AnimationNodeIndex::new);
++        take.arm_nodes = None;
++        take.seq_index = usize::MAX;
++        info!("action: {name}'s clip {anim} (take {n}) borrowed for a unit's model");
++        self.built.insert(key, take.clone());
++        Some(take)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn a_character_models_name_is_its_path() {
++        assert_eq!(
++            model_path("ScourgeFemale").as_deref(),
++            Some("Character\\Scourge\\Female\\ScourgeFemale.m2")
++        );
++        assert_eq!(
++            model_path("nightelfmale").as_deref(),
++            Some("Character\\NightElf\\Male\\NightElfMale.m2")
++        );
++        assert_eq!(
++            model_path("Creature\\Bear\\Bear.m2").as_deref(),
++            Some("Creature\\Bear\\Bear.m2")
++        );
++        assert_eq!(model_path("Murloc"), None);
++    }
++}
+diff --git a/crates/benilla-assets/src/m2.rs b/crates/benilla-assets/src/m2.rs
+index 3613a41b..88482c62 100644
+--- a/crates/benilla-assets/src/m2.rs
++++ b/crates/benilla-assets/src/m2.rs
+@@ -426,6 +426,7 @@ impl AssetLoader for M2ModelLoader {
+             // The pose bake mirrors the graph: update it beside every mask group and `add_clip*`.
+             let mut pose = crate::model::PoseSource {
+                 bone_masks: vec![0u64; skeleton_raw.bones.len()],
++                key_bones: skeleton_raw.bones.iter().map(|b| b.key_bone).collect(),
+                 ..Default::default()
+             };
+             // Groups 0 and 1 hold every joint outside the right and the left arm, so a node masked
+diff --git a/crates/benilla-assets/src/model/pose.rs b/crates/benilla-assets/src/model/pose.rs
+index 692cd318..55abd1ce 100644
+--- a/crates/benilla-assets/src/model/pose.rs
++++ b/crates/benilla-assets/src/model/pose.rs
+@@ -72,6 +72,11 @@ impl<T: Animatable + Clone> PoseTrack<T> {
+     pub fn is_empty(&self) -> bool {
+         self.times.is_empty()
+     }
++
++    /// The keys as `(time, value)`, in time order.
++    pub fn keys(&self) -> impl Iterator<Item = (f32, &T)> {
++        self.times.iter().copied().zip(self.values.iter())
++    }
+ }
+ 
+ /// One bone's channels in one clip; a bone with no channel is left out.
+@@ -117,6 +122,9 @@ pub struct PoseSource {
+     pub nodes: Vec<Option<PoseNode>>,
+     /// Per bone: the mask-group bits it belongs to (the `add_target_to_mask_group` calls).
+     pub bone_masks: Vec<u64>,
++    /// Per bone: its `KeyBoneID` (`-1` none), by which another model's clips find their bones
++    /// here (Basin Battle's borrowed clips).
++    pub key_bones: Vec<i16>,
+ }
+ 
+ impl PoseSource {
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index aad4154e..81801210 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -91,6 +91,13 @@
+ //! into the blow: it starts `trailMs` before the impact (not with the wind-up) and fades just after,
+ //! on the weapons it holds or, with none, along the part of it that strikes (a paw, the head).
+ //!
++//! The tenth (`HasActionCombat() >= 10`): `PlayUnitAnimation`'s ninth argument names another
++//! character model to take the clip from, `"<Race><Gender>"` (`"ScourgeFemale"`, `"OrcMale"`,
++//! `"NightElfFemale"`…) or a model's path, retargeted onto the unit's own skeleton by its key
++//! bones (the turns of each bone; the hips' travel scaled to the unit's height). The model loads
++//! on first use, and until it has, the unit's own clip plays. `PreloadAnimationSource(name)`
++//! starts that load early.
++//!
+ //! The seventh (`HasActionCombat() >= 7`), a creature's blow drawn under it:
+ //!
+ //! - `SetTelegraph(key, unit, shape, reach, arcDegrees, seconds, kind, parrySeconds, focus)`: a
+@@ -134,11 +141,18 @@ pub enum ActionCall {
+         variation: Option<usize>,
+         recovery: f32,
+         body: ActionBody,
++        /// Another character model to take the clip from (`"ScourgeFemale"`, or a model's path),
++        /// retargeted onto this unit's skeleton; `None` the unit's own.
++        from: Option<String>,
+     },
+     Stop {
+         unit: String,
+         fade: f32,
+     },
++    /// Start loading another model's clips (`PreloadAnimationSource`).
++    Preload {
++        from: String,
++    },
+     React {
+         unit: String,
+         anim: u16,
+@@ -654,7 +668,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(9))?,
++        lua.create_function(|_, _: MultiValue| Ok(10))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -682,6 +696,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 Some("upper") => ActionBody::Upper,
+                 _ => ActionBody::Auto,
+             };
++            let from = text(v.get(8)).filter(|f| !f.is_empty());
+             push(ActionCall::Anim {
+                 unit,
+                 anim: anim as u16,
+@@ -690,10 +705,21 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 variation,
+                 recovery,
+                 body,
++                from,
+             });
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "PreloadAnimationSource",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(from) = text(v.first()).filter(|f| !f.is_empty()) {
++                push(ActionCall::Preload { from });
++            }
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "HitStop",
+         lua.create_function(|_, args: MultiValue| {
+diff --git a/crates/benilla-world/src/rig_anim.rs b/crates/benilla-world/src/rig_anim.rs
+index 82e7d7ad..63972ede 100644
+--- a/crates/benilla-world/src/rig_anim.rs
++++ b/crates/benilla-world/src/rig_anim.rs
+@@ -11,10 +11,10 @@ mod bones;
+ mod pose;
+ 
+ pub(crate) use compose::seed_rig_rows;
+-pub use bones::striking_link;
++pub use bones::{map_bones, retarget, striking_link, Bones};
+ pub use compose::{finalize_rig_worlds, PosePost};
+ pub use global_seq::GlobalSeqDrive;
+-pub use pose::{PoseEval, RigAnchor, RigFrame, RigPose};
++pub use pose::{ExtraClips, PoseEval, PoseExtra, RigAnchor, RigFrame, RigPose};
+ 
+ /// A scene's own clock in seconds, on each model root that stands in a scene that keeps one: a
+ /// `<Model>` widget's private `CM2Scene` (`CSimpleModel+0x314`, `0x76cfc0`), zeroed by its
+diff --git a/crates/benilla-world/src/rig_anim/bones.rs b/crates/benilla-world/src/rig_anim/bones.rs
+index d49a4cb0..4663bc08 100644
+--- a/crates/benilla-world/src/rig_anim/bones.rs
++++ b/crates/benilla-world/src/rig_anim/bones.rs
+@@ -1,11 +1,17 @@
+ //! Basin Battle: arithmetic on a vanilla M2 skeleton and its clips, outside the evaluator: which
+-//! part of a body strikes in a clip (a creature's swing trail follows it). A vanilla M2's rest pose
++//! part of a body strikes in a clip (a creature's swing trail follows it), and another model's
++//! clip on this skeleton (its bones paired, its turns carried over). A vanilla M2's rest pose
+ //! is unrotated (each bone a pivot), so a bone's place is its chain's rest links turned by its
+ //! ancestors' rotations.
+ 
+ use bevy::prelude::*;
+ 
+-use benilla_assets::PoseClip;
++use benilla_assets::{PoseBone, PoseClip, PoseTrack};
++
++/// Two children pair only if they point this much the same way at rest (cosine).
++const SAME_WAY: f32 = 0.6;
++/// A link shorter than this (yards) points nowhere in particular: such children pair in order.
++const NO_WAY: f32 = 0.01;
+ 
+ /// The bone that strikes over `[t0, t1]` of `clip`: the one whose pivot moves farthest against
+ /// its skeleton's root, with a link from its parent at least `shortest` yards long (a toe, a claw's tip are too
+@@ -101,10 +107,184 @@ fn pivots(clip: &PoseClip, parents: &[i16], binds: &[Vec3], t: f32) -> Vec<Vec3>
+     pos
+ }
+ 
++/// A skeleton as the pairing reads it: each bone's parent, rest link from it and `KeyBoneID`.
++pub struct Bones<'a> {
++    pub parents: &'a [i16],
++    pub binds: &'a [Vec3],
++    pub keys: &'a [i16],
++}
++
++impl Bones<'_> {
++    fn len(&self) -> usize {
++        self.parents.len().min(self.binds.len())
++    }
++
++    fn parent(&self, i: usize) -> Option<usize> {
++        usize::try_from(*self.parents.get(i)?)
++            .ok()
++            .filter(|&p| p < self.len() && p != i)
++    }
++
++    fn children(&self) -> Vec<Vec<usize>> {
++        let mut c = vec![Vec::new(); self.len()];
++        for i in 0..self.len() {
++            if let Some(p) = self.parent(i) {
++                c[p].push(i);
++            }
++        }
++        c
++    }
++}
++
++impl Bones<'_> {
++    /// How tall a skeleton stands at rest: its highest pivot (Bevy Y is up).
++    pub fn height(&self) -> f32 {
++        height(self)
++    }
++}
++
++fn height(b: &Bones) -> f32 {
++    let n = b.len();
++    let mut pos: Vec<Option<Vec3>> = vec![None; n];
++    fn at(i: usize, b: &Bones, pos: &mut Vec<Option<Vec3>>, depth: u32) -> Vec3 {
++        if let Some(p) = pos[i] {
++            return p;
++        }
++        let up = match b.parent(i) {
++            Some(p) if depth < 256 => at(p, b, pos, depth + 1),
++            _ => Vec3::ZERO,
++        };
++        let p = up + b.binds[i];
++        pos[i] = Some(p);
++        p
++    }
++    (0..n).map(|i| at(i, b, &mut pos, 0).y).fold(0.0, f32::max)
++}
++
++/// For each of the unit's bones, the donor's bone that drives it.
++pub fn map_bones(unit: &Bones, donor: &Bones) -> Vec<Option<u16>> {
++    let (n, m) = (unit.len(), donor.len());
++    let mut map: Vec<Option<usize>> = vec![None; n];
++    let mut used = vec![false; m];
++    let pair = |map: &mut Vec<Option<usize>>, used: &mut Vec<bool>, u: usize, d: usize| {
++        if map[u].is_none() && !used[d] {
++            map[u] = Some(d);
++            used[d] = true;
++        }
++    };
++    // The key bones.
++    for u in 0..n {
++        let k = unit.keys.get(u).copied().unwrap_or(-1);
++        if k < 0 {
++            continue;
++        }
++        if let Some(d) = (0..m).find(|&d| donor.keys.get(d).copied() == Some(k)) {
++            pair(&mut map, &mut used, u, d);
++        }
++    }
++    // The roots, in order.
++    let uroots: Vec<usize> = (0..n).filter(|&u| unit.parent(u).is_none()).collect();
++    let droots: Vec<usize> = (0..m).filter(|&d| donor.parent(d).is_none()).collect();
++    for (&u, &d) in uroots.iter().zip(&droots) {
++        pair(&mut map, &mut used, u, d);
++    }
++    let (uc, dc) = (unit.children(), donor.children());
++    // Outward and inward from every pair until nothing more pairs.
++    loop {
++        let mut more = false;
++        for u in 0..n {
++            let Some(d) = map[u] else { continue };
++            // Inward: the parents.
++            if let (Some(up), Some(dp)) = (unit.parent(u), donor.parent(d)) {
++                if map[up].is_none() && !used[dp] {
++                    pair(&mut map, &mut used, up, dp);
++                    more = true;
++                }
++            }
++            // Outward: the children, by the way they point at rest.
++            let free_u: Vec<usize> = uc[u]
++                .iter()
++                .copied()
++                .filter(|&c| map[c].is_none())
++                .collect();
++            let mut free_d: Vec<usize> = dc[d].iter().copied().filter(|&c| !used[c]).collect();
++            for cu in free_u {
++                let bu = unit.binds[cu];
++                let best = free_d
++                    .iter()
++                    .enumerate()
++                    .map(|(k, &cd)| (k, cd, likeness(bu, donor.binds[cd])))
++                    .filter(|(_, _, s)| *s >= SAME_WAY)
++                    .max_by(|a, b| a.2.total_cmp(&b.2));
++                if let Some((k, cd, _)) = best {
++                    pair(&mut map, &mut used, cu, cd);
++                    free_d.remove(k);
++                    more = true;
++                }
++            }
++        }
++        if !more {
++            break;
++        }
++    }
++    map.into_iter().map(|d| d.map(|d| d as u16)).collect()
++}
++
++/// How much two rest links point the same way (1: exactly), short ones counting as alike.
++fn likeness(a: Vec3, b: Vec3) -> f32 {
++    if a.length() < NO_WAY && b.length() < NO_WAY {
++        return 1.0;
++    }
++    if a.length() < NO_WAY || b.length() < NO_WAY {
++        return 0.0;
++    }
++    a.normalize().dot(b.normalize())
++}
++
++/// The donor's clip on the unit's bones: each paired bone's turns as they are, and the travel of
++/// the bones at the top of the unit's tree (the root and the hips) scaled by `scale`.
++pub fn retarget(clip: &PoseClip, map: &[Option<u16>], parents: &[i16], scale: f32) -> PoseClip {
++    let depth = |mut i: usize| {
++        let mut d = 0;
++        while let Some(p) = parents.get(i).and_then(|&p| usize::try_from(p).ok()) {
++            if p == i || d > 256 {
++                break;
++            }
++            i = p;
++            d += 1;
++        }
++        d
++    };
++    let mut out = PoseClip::default();
++    for (u, d) in map.iter().enumerate() {
++        let Some(d) = d else { continue };
++        let Ok(at) = clip.bones.binary_search_by_key(d, |b| b.bone) else {
++            continue;
++        };
++        let src = &clip.bones[at];
++        let translation = if depth(u) <= 1 {
++            let keys: Vec<(f32, Vec3)> = src
++                .translation
++                .keys()
++                .map(|(t, v)| (t, *v * scale))
++                .collect();
++            PoseTrack::new(&keys)
++        } else {
++            PoseTrack::default()
++        };
++        out.push(PoseBone {
++            bone: u as u16,
++            translation,
++            rotation: src.rotation.clone(),
++            scale: PoseTrack::default(),
++        });
++    }
++    out
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+-    use benilla_assets::{PoseBone, PoseTrack};
+ 
+     #[test]
+     fn the_part_that_strikes_is_what_moves_farthest_against_the_body() {
+@@ -160,4 +340,109 @@ mod tests {
+             None
+         );
+     }
++
++    /// A root, hips, a spine with a head, and two arms whose shoulders are key bones.
++    fn body(shoulder_y: f32, arm: f32) -> (Vec<i16>, Vec<Vec3>, Vec<i16>) {
++        let parents = vec![-1, 0, 1, 2, 2, 4, 2, 6];
++        let binds = vec![
++            Vec3::ZERO,
++            Vec3::new(0.0, 1.0, 0.0),
++            Vec3::new(0.0, shoulder_y, 0.0),
++            Vec3::new(0.0, 0.3, 0.0),
++            Vec3::new(0.2, 0.0, 0.0),
++            Vec3::new(arm, 0.0, 0.0),
++            Vec3::new(-0.2, 0.0, 0.0),
++            Vec3::new(-arm, 0.0, 0.0),
++        ];
++        // 6 head, 2/3 the shoulders, 5 waist.
++        let keys = vec![-1, 5, -1, 6, 3, -1, 2, -1];
++        (parents, binds, keys)
++    }
++
++    #[test]
++    fn bones_pair_by_their_key_bones_then_along_the_tree() {
++        let (up, ub, uk) = body(0.5, 0.4);
++        // The donor lists its bones in another order: the arms first, then the rest.
++        let (dp0, db0, dk0) = body(0.4, 0.3);
++        let order = [0usize, 4, 5, 6, 7, 1, 2, 3];
++        let pos = |i: usize| order.iter().position(|&o| o == i).unwrap();
++        let dp: Vec<i16> = order
++            .iter()
++            .map(|&o| {
++                if dp0[o] < 0 {
++                    -1
++                } else {
++                    pos(dp0[o] as usize) as i16
++                }
++            })
++            .collect();
++        let db: Vec<Vec3> = order.iter().map(|&o| db0[o]).collect();
++        let dk: Vec<i16> = order.iter().map(|&o| dk0[o]).collect();
++        let map = map_bones(
++            &Bones {
++                parents: &up,
++                binds: &ub,
++                keys: &uk,
++            },
++            &Bones {
++                parents: &dp,
++                binds: &db,
++                keys: &dk,
++            },
++        );
++        let want: Vec<Option<u16>> = (0..8).map(|i| Some(pos(i) as u16)).collect();
++        assert_eq!(map, want, "every bone found its twin");
++    }
++
++    #[test]
++    fn a_clip_keeps_its_turns_and_takes_the_units_size() {
++        let (p, b, k) = body(0.5, 0.4);
++        let map = map_bones(
++            &Bones {
++                parents: &p,
++                binds: &b,
++                keys: &k,
++            },
++            &Bones {
++                parents: &p,
++                binds: &b,
++                keys: &k,
++            },
++        );
++        let mut clip = PoseClip::default();
++        let turn = Quat::from_rotation_z(1.0);
++        clip.push(PoseBone {
++            bone: 1,
++            translation: PoseTrack::new(&[
++                (0.0, Vec3::new(0.0, 1.0, 0.0)),
++                (1.0, Vec3::new(0.5, 1.0, 0.0)),
++            ]),
++            rotation: PoseTrack::default(),
++            scale: PoseTrack::default(),
++        });
++        clip.push(PoseBone {
++            bone: 5,
++            translation: PoseTrack::new(&[
++                (0.0, Vec3::new(0.4, 0.0, 0.0)),
++                (1.0, Vec3::new(0.9, 0.0, 0.0)),
++            ]),
++            rotation: PoseTrack::new(&[(0.0, Quat::IDENTITY), (1.0, turn)]),
++            scale: PoseTrack::new(&[(0.0, Vec3::ONE), (1.0, Vec3::splat(2.0))]),
++        });
++        let out = retarget(&clip, &map, &p, 1.5);
++        let hips = out.bones.iter().find(|x| x.bone == 1).unwrap();
++        assert!(
++            (hips.translation.sample(1.0).unwrap() - Vec3::new(0.75, 1.5, 0.0)).length() < 1e-5,
++            "the hips' travel, scaled"
++        );
++        let arm = out.bones.iter().find(|x| x.bone == 5).unwrap();
++        assert!(
++            arm.translation.is_empty() && arm.scale.is_empty(),
++            "an arm keeps its own length"
++        );
++        assert!(
++            arm.rotation.sample(1.0).unwrap().angle_between(turn) < 1e-5,
++            "and turns as the donor's"
++        );
++    }
+ }
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index 37b26f00..a8722307 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -169,10 +169,29 @@ pub struct RigAnchor {
+ #[derive(Component)]
+ pub struct RigFrame(pub Entity);
+ 
++/// Basin Battle: clips a rig plays that its own model doesn't have (another model's, retargeted
++/// onto this skeleton), by graph node index outside the model's own graph. Shared by every
++/// instance of a model; the bone masks are the model's own.
++#[derive(Default)]
++pub struct ExtraClips {
++    pub clips: Vec<benilla_assets::PoseClip>,
++    pub nodes: std::collections::HashMap<usize, benilla_assets::PoseNode>,
++}
++
++/// A rig's [`ExtraClips`], on the [`RigPose`]'s entity, and the model they were built for (its
++/// [`PoseSource`]'s address: a unit given another model needs them built again).
++#[derive(Component, Clone)]
++pub struct PoseExtra {
++    pub model: usize,
++    pub clips: std::sync::Arc<std::sync::RwLock<ExtraClips>>,
++}
++
+ /// One active animation's evaluation inputs, resolved against the rig's [`PoseSource`].
+ struct Active {
+     /// `AnimationNodeIndex::index()`, the sort key that reproduces Bevy's blend order.
+     node: usize,
++    /// In [`ExtraClips`], not the model's own.
++    extra: bool,
+     clip: usize,
+     mask: u64,
+     weight: f32,
+@@ -183,77 +202,119 @@ struct Active {
+ 
+ /// Pose every live rig where `animate_targets` runs, after `advance_animations`.
+ fn evaluate_rig_poses(
+-    mut rigs: Query<(&AnimationPlayer, &ModelAnimations, &mut RigPose), Without<AnimParked>>,
++    mut rigs: Query<
++        (
++            &AnimationPlayer,
++            &ModelAnimations,
++            &mut RigPose,
++            Option<&PoseExtra>,
++        ),
++        Without<AnimParked>,
++    >,
+ ) {
+     // Parallel: a rig reads shared clips and writes only its own pose.
+-    rigs.par_iter_mut().for_each(|(player, anims, mut rig)| {
+-        let src = &anims.pose;
+-        // The contributing animations in node order, in one scratch per worker thread.
+-        thread_local! {
+-            static ACTIVE: std::cell::RefCell<Vec<Active>> =
+-                const { std::cell::RefCell::new(Vec::new()) };
+-        }
+-        ACTIVE.with(|cell| {
+-            let mut active = cell.borrow_mut();
+-            active.clear();
+-            for (&node, anim) in player.playing_animations() {
+-                // Bevy's exact gate: a weight of literal 0.0 skips the node (paused does not).
+-                if anim.weight() == 0.0 {
+-                    continue;
+-                }
+-                let Some(pn) = src.node(node) else { continue };
+-                if src.clips.get(pn.clip as usize).is_none() {
+-                    continue;
+-                }
+-                active.push(Active {
+-                    node: node.index(),
+-                    clip: pn.clip as usize,
+-                    mask: pn.mask,
+-                    weight: anim.weight(),
+-                    seek: anim.seek_time(),
+-                    cursor: 0,
+-                });
++    rigs.par_iter_mut()
++        .for_each(|(player, anims, mut rig, extra)| {
++            let src = &anims.pose;
++            let mine = extra.filter(|e| e.model == std::sync::Arc::as_ptr(src) as usize);
++            let extra_guard = mine.and_then(|e| e.clips.read().ok());
++            let extra = extra_guard.as_deref();
++            // The contributing animations in node order, in one scratch per worker thread.
++            thread_local! {
++                static ACTIVE: std::cell::RefCell<Vec<Active>> =
++                    const { std::cell::RefCell::new(Vec::new()) };
+             }
+-            active.sort_unstable_by_key(|a| a.node);
+-            match active.as_mut_slice() {
+-                [] => {}
+-                [one] => {
+-                    // One contribution commits at full value whatever its weight.
+-                    rig.pose_dirty = true;
+-                    for pb in &src.clips[one.clip].bones {
+-                        if src.bone_masks.get(pb.bone as usize).copied().unwrap_or(0) & one.mask
+-                            != 0
+-                        {
+-                            continue;
+-                        }
+-                        let Some(tf) = rig.locals.get_mut(pb.bone as usize) else {
+-                            continue;
++            ACTIVE.with(|cell| {
++                let mut active = cell.borrow_mut();
++                active.clear();
++                for (&node, anim) in player.playing_animations() {
++                    // Bevy's exact gate: a weight of literal 0.0 skips the node (paused does not).
++                    if anim.weight() == 0.0 {
++                        continue;
++                    }
++                    let (pn, from_extra) = match src.node(node) {
++                        Some(pn) => (pn, false),
++                        None => match extra.and_then(|x| x.nodes.get(&node.index())) {
++                            Some(pn) => (*pn, true),
++                            None => continue,
++                        },
++                    };
++                    if clip_in(src, extra, from_extra, pn.clip as usize).is_none() {
++                        continue;
++                    }
++                    active.push(Active {
++                        node: node.index(),
++                        extra: from_extra,
++                        clip: pn.clip as usize,
++                        mask: pn.mask,
++                        weight: anim.weight(),
++                        seek: anim.seek_time(),
++                        cursor: 0,
++                    });
++                }
++                active.sort_unstable_by_key(|a| a.node);
++                match active.as_mut_slice() {
++                    [] => {}
++                    [one] => {
++                        // One contribution commits at full value whatever its weight.
++                        rig.pose_dirty = true;
++                        let Some(one_clip) = clip_in(src, extra, one.extra, one.clip) else {
++                            return;
+                         };
+-                        if let Some(v) = pb.translation.sample(one.seek) {
+-                            tf.translation = v;
+-                        }
+-                        if let Some(v) = pb.rotation.sample(one.seek) {
+-                            tf.rotation = v;
+-                        }
+-                        if let Some(v) = pb.scale.sample(one.seek) {
+-                            tf.scale = v;
++                        for pb in &one_clip.bones {
++                            if src.bone_masks.get(pb.bone as usize).copied().unwrap_or(0) & one.mask
++                                != 0
++                            {
++                                continue;
++                            }
++                            let Some(tf) = rig.locals.get_mut(pb.bone as usize) else {
++                                continue;
++                            };
++                            if let Some(v) = pb.translation.sample(one.seek) {
++                                tf.translation = v;
++                            }
++                            if let Some(v) = pb.rotation.sample(one.seek) {
++                                tf.rotation = v;
++                            }
++                            if let Some(v) = pb.scale.sample(one.seek) {
++                                tf.scale = v;
++                            }
+                         }
+                     }
++                    many => {
++                        rig.pose_dirty = true;
++                        blend_rig(src, extra, many, &mut rig);
++                    }
+                 }
+-                many => {
+-                    rig.pose_dirty = true;
+-                    blend_rig(src, many, &mut rig);
+-                }
+-            }
++            });
+         });
+-    });
++}
++
++/// A clip of the model's own, or of the rig's [`ExtraClips`].
++fn clip_in<'a>(
++    src: &'a PoseSource,
++    extra: Option<&'a ExtraClips>,
++    from_extra: bool,
++    clip: usize,
++) -> Option<&'a benilla_assets::PoseClip> {
++    if from_extra {
++        extra?.clips.get(clip)
++    } else {
++        src.clips.get(clip)
++    }
+ }
+ 
+ /// Several animations: merge-walk the bone-sorted clips, folding each property in node order.
+-fn blend_rig(src: &PoseSource, active: &mut [Active], rig: &mut RigPose) {
++fn blend_rig(
++    src: &PoseSource,
++    extra: Option<&ExtraClips>,
++    active: &mut [Active],
++    rig: &mut RigPose,
++) {
++    let clip = |a: &Active| clip_in(src, extra, a.extra, a.clip).expect("checked when gathered");
+     while let Some(bone) = active
+         .iter()
+-        .filter_map(|a| src.clips[a.clip].bones.get(a.cursor).map(|b| b.bone))
++        .filter_map(|a| clip(a).bones.get(a.cursor).map(|b| b.bone))
+         .min()
+     {
+         let bone_mask = src.bone_masks.get(bone as usize).copied().unwrap_or(0);
+@@ -261,11 +322,7 @@ fn blend_rig(src: &PoseSource, active: &mut [Active], rig: &mut RigPose) {
+         let mut rotation: Option<(Quat, f32)> = None;
+         let mut scale: Option<(Vec3, f32)> = None;
+         for a in active.iter_mut() {
+-            let Some(pb) = src.clips[a.clip]
+-                .bones
+-                .get(a.cursor)
+-                .filter(|b| b.bone == bone)
+-            else {
++            let Some(pb) = clip(a).bones.get(a.cursor).filter(|b| b.bone == bone) else {
+                 continue;
+             };
+             a.cursor += 1;
+-- 
+2.43.0
+
