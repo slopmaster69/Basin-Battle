@@ -280,11 +280,13 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
         "and the speeds come back"
     );
     moving(&mut c, [spawn[0], spawn[1], spawn[2]], 0.0, 0);
-    // Sprinting (Shift held) while running: faster, its look once.
+    // Sprinting (Shift held) while running: faster, with no look or sound of its own.
     let here = [spawn[0], spawn[1], spawn[2]];
     moving(&mut c, here, 0.0, 0x1);
+    let mark = c.seen.len();
     c.chat(".es in sp");
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::SpellGo(g) if g.spell_id == 2983)).is_some(), "sprint's look");
+    assert!(c.wait(1.0, |p| fast(p, messages::SpeedKind::Run)).is_some(), "sprint's pace");
+    assert!(!c.seen[mark..].iter().any(|p| matches!(p, ServerPacket::SpellGo(g) if g.spell_id == 2983)), "no sprint look");
     c.chat(".es in spu");
     stand(&mut c, here, 0.0);
     c.drain(0.5);
@@ -1515,4 +1517,28 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
     assert!(reply.starts_with("HTTP/1.0 200") && reply.contains("|Far Camp|stockade|6|") && !reply.contains("|9|"), "{reply}");
     // And the login port still logs in.
     assert!(Client::connect(server.login, "bob", "hold", REALM).is_ok());
+}
+
+#[test]
+fn a_client_running_its_own_dodge_is_told_its_run_again_after_a_sprinting_roll() {
+    let server = start_with(None, false);
+    let mut c = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut c);
+    // A client that runs its own dodge (ac3): the dash's burst isn't sent to it.
+    c.chat(".es hello 5 ac3");
+    c.drain(0.5);
+    let here = [-9500.0, 0.0, 0.0];
+    moving(&mut c, here, 0.0, 0x1);
+    let run = |p: &ServerPacket, lo: f32, hi: f32| matches!(p, ServerPacket::ForceSpeedChange { kind: messages::SpeedKind::Run, speed, .. } if *speed > lo && *speed < hi);
+    c.chat(".es in sp");
+    assert!(c.wait(1.0, |p| run(p, 10.0, 14.0)).is_some(), "sprinting");
+    // A roll mid-sprint, Shift let go during it: once the burst is spent, the client is told it
+    // runs again. (It wasn't, and kept sprinting while the server charged it nothing.)
+    let mark = c.seen.len();
+    c.chat(".es in d");
+    c.chat(".es in spu");
+    let told = c.wait(1.5, |p| run(p, 5.0, 9.0));
+    let speeds: Vec<String> = c.seen[mark..].iter().filter_map(|p| if let ServerPacket::ForceSpeedChange { speed, .. } = p { Some(format!("{speed}")) } else { None }).collect();
+    assert!(told.is_some(), "told it runs again: {speeds:?}");
+    assert!(!c.seen[mark..].iter().any(|p| run(p, 14.0, 100.0)), "the burst itself is the client's: {speeds:?}");
 }
