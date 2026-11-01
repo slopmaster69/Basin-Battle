@@ -363,6 +363,9 @@ local function MakeSlot(parent, size, key)
   s.key:SetText(key or "")
   s.count = Text(s, FONT_NUM, 13, "OUTLINE")
   s.count:SetPoint("BOTTOMRIGHT", s, "BOTTOMRIGHT", -4, 4)
+  -- A width of its own: left to size itself, a count can come out as "..".
+  s.count:SetWidth(size)
+  s.count:SetJustifyH("RIGHT")
   function s:Set(icon, lit, count)
     if icon then
       self.icon:SetTexture(icon)
@@ -1827,6 +1830,9 @@ local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
+-- Room for "1000 / 1000" at any bar size (left to size itself, it was cut to "200 / 2...").
+vit.healthText:SetWidth(120)
+vit.healthText:SetJustifyH("RIGHT")
 vit.healthText:SetTextColor(1, 0.92, 0.85)
 vit.stamina = MakeLagBar(vit, 100 / ST_PER_PX, VIT_STAMINA, { r = 0.26, g = 0.66, b = 0.27 }, { r = 0.85, g = 0.95, b = 0.7 })
 

@@ -1313,6 +1313,8 @@ local function SkinDock()
     local n = dock.quick.count
     n:ClearAllPoints()
     n:SetPoint("BOTTOMRIGHT", dock.quick, "BOTTOMRIGHT", -3, 3)
+    n:SetWidth(40)
+    n:SetJustifyH("RIGHT")
     n.ledgerKeep = true
     Face(n, BODY, 17, "OUTLINE")
     n:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
