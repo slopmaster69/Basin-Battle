@@ -239,7 +239,7 @@ impl Survival {
         let reveals: Vec<String> = d.reveals.clone();
         self.below.as_mut().unwrap().open.insert(key.to_string());
         let who = self.players.get(&by).map_or(String::from("Someone"), |p| p.name.clone());
-        self.events.push(Event::Banner { player: None, title: "A secret!".into(), sub: d.name.clone() });
+        // No banner and horn for everyone: the finder's page opens below, the rest read a line.
         let text = if d.text.is_empty() { format!("{who} has found something hidden: {}.", d.name) } else { format!("{who}: {}", d.text) };
         self.announce(text);
         self.forward_count("secret", key, 1);

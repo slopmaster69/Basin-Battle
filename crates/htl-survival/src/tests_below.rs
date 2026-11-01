@@ -757,7 +757,8 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
     s.move_player(id, [10.0, 13.0, 0.0], 0.0, Moving::default());
     s.interact(id, Some(wall));
     let ev = s.step(DT);
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "A secret!")));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Banner { .. })), "no banner and horn for everyone");
+    assert!(ev.iter().any(|e| matches!(e, Event::Letter { player, kind, .. } if *player == id && kind == "secret")), "the finder's page opens");
     assert!(s.object(wall).is_none() && !s.through_shut_door([10.0, 10.0, 0.0], [10.0, 20.0, 0.0]));
     assert!(has(&s, &|k| matches!(k, ObjKind::Strongbox { key } if key == "stash")));
     // Found, the clue is spent; read again, the note has none.

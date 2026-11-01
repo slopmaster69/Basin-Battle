@@ -847,10 +847,11 @@ impl Survival {
                     ItemKind::Weapon if self.content.weapon(&d.key).is_some_and(|w| w.two_handed) => "two-handed",
                     ItemKind::Weapon => "one-handed",
                     ItemKind::Shield => "shield",
-                    ItemKind::Bow => "ranged",
+                    // Bows and crossbows aren't fought with any more (no shot on the board), so
+                    // they're off the rack; their [[ranged]] stays for the towers and saves.
                     _ => return None,
                 };
-                let held = i == p.weapon || i == p.shield || i == p.bow;
+                let held = i == p.weapon || i == p.shield;
                 let text = match self.weapon_stats(&d.key) {
                     Some(stats) => format!("{} {stats}", d.text),
                     None => d.text.clone(),
@@ -903,7 +904,7 @@ impl Survival {
         })
     }
 
-    /// Take up a weapon, shield or bow from the rack (free while the armory is open).
+    /// Take up a weapon or shield from the rack (free while the armory is open).
     pub fn arm(&mut self, id: Id, key: &str) -> Result<String, String> {
         if !self.content.world.armory {
             return Err("The rack is empty.".into());
@@ -913,6 +914,9 @@ impl Survival {
             return Err("That one's won from its owner, not taken from the rack.".into());
         }
         let kind = self.content.items[item].kind;
+        if kind == ItemKind::Bow {
+            return Err("The rack holds weapons for the fight at hand: no bows.".into());
+        }
         let p = self.players.get(&id).ok_or("No such hero.")?;
         // The nearest rack (a Siege camp has its own).
         let rack = self.objs.values().filter(|o| o.kind == ObjKind::Rack).map(|o| o.pos).min_by(|a, b| dist2d(*a, p.pos).total_cmp(&dist2d(*b, p.pos))).ok_or("No rack.")?;
@@ -926,7 +930,6 @@ impl Survival {
         match kind {
             ItemKind::Weapon => p.weapon = item,
             ItemKind::Shield => p.shield = item,
-            ItemKind::Bow => p.bow = item,
             _ => return Err("That isn't a weapon.".into()),
         }
         // Whatever is up comes down with the swap.
