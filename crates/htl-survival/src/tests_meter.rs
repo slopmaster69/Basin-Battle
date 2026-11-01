@@ -63,6 +63,14 @@ fn cast(s: &mut Survival, p: Id, key: &str) {
     let n = crate::content::SLOTS.iter().position(|x| *x == slot).unwrap() as u8;
     s.input(p, Input::Ability(n, false));
     s.step(DT);
+    // An aimed one goes on a tap of the click.
+    if matches!(s.players[&p].action, Action::Aim { .. }) {
+        s.input(p, Input::Attack);
+        s.step(DT);
+        s.input(p, Input::AttackUp);
+        s.step(DT);
+    }
+    assert!(!matches!(s.players[&p].action, Action::Ready), "{key} went off");
 }
 
 fn row<'a>(m: &'a meter::OwnMeter, label: &str) -> Option<&'a (String, u64, u64)> {
