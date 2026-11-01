@@ -3089,3 +3089,28 @@ fn keen_gear_gives_back_breath_on_a_parry_and_peerless_gear_throws_a_dodged_foe_
     let m = &s.mobs[&k];
     assert!(m.stagger_until > s.clock + PEERLESS_STAGGER * 0.5 && m.riposte, "off balance, open to a riposte");
 }
+
+// --- the fighting record ---------------------------------------------------------------------------
+
+#[test]
+fn heroes_felling_heroes_go_on_the_camps_fighting_record() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
+    let fell = |s: &mut Survival, by: Id, who: Id| {
+        let hp = s.players[&who].health;
+        s.strike_player(by, who, hp * 10, s.players[&by].pos, false, false, false, Blow::Light);
+        assert_eq!(s.players[&who].health, 0);
+        let up = s.content.player.respawn_secs + 1.0;
+        run(s, up);
+    };
+    fell(&mut s, a, b);
+    fell(&mut s, a, b);
+    fell(&mut s, b, a);
+    assert_eq!(s.fighting_record(), vec![("Ayla".to_string(), 2, 1), ("Bren".to_string(), 1, 2)]);
+    // A creature's kill isn't a fight between heroes.
+    let k = mob(&mut s, "grunt", [4.0, 0.0, 0.0]);
+    let hp = s.players[&a].health;
+    s.strike_player(k, a, hp * 10, [4.0, 0.0, 0.0], false, false, false, Blow::Light);
+    assert_eq!(s.fighting_record()[0], ("Ayla".to_string(), 2, 1));
+}

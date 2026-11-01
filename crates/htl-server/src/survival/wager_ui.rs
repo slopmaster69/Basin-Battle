@@ -170,6 +170,24 @@ impl SurvivalGame {
         Ok(())
     }
 
+    /// The camp's fighting record: heroes against heroes (the Proving Ring, friendly fire, a
+    /// fight below), most felled first.
+    pub(crate) fn ui_record_page(&mut self, conn: ConnId) -> Result<(), String> {
+        let record = self.sim.fighting_record();
+        let lines: Vec<String> = record
+            .iter()
+            .take(20)
+            .enumerate()
+            .map(|(k, (name, won, lost))| format!("{}. {name}: {won} felled, {lost} fall{} to heroes", k + 1, if *lost == 1 { "" } else { "s" }))
+            .collect();
+        let text = if lines.is_empty() { "No hero has felled another here yet.".to_string() } else { lines.join("\n") };
+        let fights: u32 = record.iter().map(|r| r.1).sum();
+        let place = format!("{fights} fight{} between heroes at this camp", if fights == 1 { "" } else { "s" });
+        let links = vec![(".es ladder".to_string(), "The Bookmaker's Ladder".to_string())];
+        self.letter(conn, "board", "The Fighting Record", &place, &text, "", &links);
+        Ok(())
+    }
+
     /// The Bookmaker's Ladder: every hero across every dungeon by their rating.
     pub(crate) fn ui_ladder_page(&mut self, conn: ConnId, id: Id) -> Result<(), String> {
         let board = self.board.clone().ok_or("This server keeps no board.")?;
@@ -202,7 +220,8 @@ impl SurvivalGame {
             Some(w) => w,
             None => "Win a wager in time to get on it".to_string(),
         };
-        self.letter(conn, "board", "The Bookmaker's Ladder", &place, &text, "", &[]);
+        let links = vec![(".es record".to_string(), "The Fighting Record".to_string())];
+        self.letter(conn, "board", "The Bookmaker's Ladder", &place, &text, "", &links);
         Ok(())
     }
 

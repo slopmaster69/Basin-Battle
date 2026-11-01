@@ -958,6 +958,10 @@ during a wager. Friends join it by taking the same level from the book while it 
 **The week's news.** The first time a hero comes in each week (once the camp has the book), a page
 says the week's three terms and last week's three best runs on the board; `.es news` shows it again.
 
+**The fighting record.** Every time a hero fells another (the Proving Ring, friendly fire, a fight
+below; not Siege, whose heroes are made for the match), the camp keeps it: `.es record` lists the
+heroes by how many they've felled, and their falls to heroes.
+
 **The board.** Every wager won is kept in `saves/wager-board.toml`; `.es board <dungeon>` shows the
 runs in time, highest level first, then quickest (`.es board <dungeon> solo`, `duo` or `group`: that
 size of party only, a link on the page). One server keeps the board for everyone (the
