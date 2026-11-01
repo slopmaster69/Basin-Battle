@@ -1121,9 +1121,10 @@ impl Survival {
         } else {
             match self.land.path(from, to) {
                 Some(p) if !p.is_empty() => p,
-                // Below, on its way home with no way there (under its floor, cut off): put back
-                // home, not walked through the rock to it (nor stopped under it, short of it).
-                _ if matches!(m.state, MobState::Return) && self.is_below() && self.land.plans() => {
+                // Below, on its way home with no way there from another floor (under its floor,
+                // cut off): put back home, not walked through the rock to it (nor stopped under it,
+                // short of it). On home's floor a failed search walks on as before.
+                _ if matches!(m.state, MobState::Return) && self.is_below() && self.land.plans() && self.off_home_floor(from, to) => {
                     self.set_back(id, to, "found no way home");
                     return;
                 }
