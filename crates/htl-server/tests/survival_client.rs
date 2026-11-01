@@ -172,6 +172,33 @@ fn hud(c: &Client) -> Option<Vec<String>> {
     addon_lines(c, "ES").into_iter().rev().find(|l| l.starts_with("H\t")).map(|l| l.split('\t').map(str::to_string).collect())
 }
 
+/// The board (N) for a hero who hasn't learned the cards is over 32 KB, as every card it lacks
+/// says where it's learned: more than a two-byte header holds. It must come in the client's
+/// three-byte form, and the stream stay in step after it. (Sent with two bytes, the client read
+/// one byte too many and garbage from then on: the game stopped answering anything after N.)
+#[test]
+fn a_board_too_big_for_a_short_header_arrives_and_what_follows_still_reads() {
+    let server = start_content(None, false, {
+        let mut c = content();
+        c.dev.full_tree = false;
+        c
+    });
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut a);
+    a.chat(".es hello 1");
+    assert!(a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("V\t"))), "the add-on is greeted");
+    a.seen.clear();
+    a.chat(".es tree");
+    assert!(a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("TR\t"))), "the board comes");
+    let tr = addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("TR\t")).unwrap();
+    assert!(tr.len() > 0x7fff, "a board over 32 KB, as a new hero's is: {} bytes", tr.len());
+    assert!(tr.matches("~0~").count() > 4, "most cards not learned yet");
+    // What comes after it reads too: the server's answer to another hello.
+    a.seen.clear();
+    a.chat(".es hello 1");
+    assert!(a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("V\t"))), "the next line reads");
+}
+
 #[test]
 fn both_realms_are_listed_and_basin_battle_still_plays() {
     let server = start_with(None, true);
