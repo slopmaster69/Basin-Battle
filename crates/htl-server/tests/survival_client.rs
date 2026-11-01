@@ -292,7 +292,7 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     c.drain(0.5);
     // The ability bar arrives; Aimed Shot (off the bench, on Q) draws the bow for one shot, and
     // it's put away.
-    assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~aimed_throw~"))), "the bar");
+    assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~hurled_axe~"))), "the bar");
     c.chat(".es slot q aimed_shot");
     c.drain(0.2);
     c.chat(".es in ab 0 0");

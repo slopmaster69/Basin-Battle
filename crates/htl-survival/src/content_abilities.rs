@@ -273,6 +273,9 @@ pub struct AbilityDef {
     /// A projectile goes on through this many bodies past the first.
     #[serde(default)]
     pub pierce: u32,
+    /// Let go at full charge, it goes on through this many instead (Aimed Shot's full draw).
+    #[serde(default)]
+    pub full_pierce: u32,
     /// A projectile's hit leaps on to the nearest other foe within `chain_range`, this many times,
     /// each doing `chain_falloff` of the last.
     #[serde(default)]

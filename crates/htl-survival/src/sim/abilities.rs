@@ -997,7 +997,8 @@ impl Survival {
                 spell,
                 allies: d.friends(),
                 hits: Vec::new(),
-                pierce: d.pierce,
+                // A full draw can go through more (Aimed Shot's).
+                pierce: if AbilityDef::full(share) { d.pierce.max(d.full_pierce) } else { d.pierce },
                 stage: Stage::Out,
                 born,
             });

@@ -72,7 +72,7 @@ effect.
 | Right + left mouse | **Shield bash** (with a two-hander, a kick); with Shift, the **kick**: breaks a guard harder |
 | Mouse button 4 | Tap: **dodge** as you let go, the way you're moving (15 stamina, and it takes at least 18 to start one). Hold: sprint. It works with the mouse freed (Z) too |
 | Shift (hold) | Sprint too: 12 against 7 (over the 11 the hero's own Sprint clip needs, so a strafe doesn't flicker between it and Run), only 3 stamina a second: a way across the world, not a fight's cost |
-| Q | The **ranged** ability (Aimed Throw to begin with) |
+| Q | The **ranged** ability (Hurled Axe to begin with) |
 | E | The **close** ability (Sundering Blow) |
 | 1 | The **utility** ability (Charge) |
 | 2 | The **defense** ability (Retaliation) |
@@ -136,26 +136,36 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
+| Q | **Ranged** | Hurled Axe · *Rending Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
-| 3 | **Ultimate** | Onslaught | Sanctuary | Volley | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
+| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Flare · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
+| 3 | **Ultimate** | Onslaught | Sanctuary | Kill Shot | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
 it) to cast that for Valor instead. An ultimate has none: it is the bar's whole worth.
 
 **The classes**, in a line each:
 
-- **Warrior**: close the gap and break the guard. Charge (or Heroic Leap, landing in a burst that
-  throws everyone back), Sundering Blow, an axe to throw, Retaliation against blades, Onslaught.
-- **Paladin**: the holy guardian. Holy Shock heals a friend it touches; Consecration and Sanctuary
-  lay healing ground; Hammer of Justice stuns; Lay on Hands is a third of your health at once.
-- **Hunter**: keep them at range and make them walk into it. Arcane Shot's two quick arrows;
-  traps that arm and wait (Explosive: a burst that throws back and burns; Freezing: a freeze);
-  Disengage leaps you straight back (its EX nets the foe in front); Deterrence deflects every
-  projectile but not a blade, Feign Death drops you as if dead and every creature and lock lets
-  go; Volley rains on a circle for 4 s.
+- **Warrior**: bulldoze: close the gap, smash through, break guards. Hurled Axe flies out through
+  every foe and comes back to wherever you stand, striking each again (walk so its way back crosses
+  the fight; its EX, Rending Axe, drags what it strikes toward you). Charge bowls through everyone
+  in its line, staggering each (or Heroic Leap, landing in a burst that throws everyone back);
+  Sundering Blow; Retaliation against blades; Onslaught.
+- **Paladin**: shield your friends, punish who touches them. Avenger's Shield ricochets to two
+  more foes and silences them; its EX, Holy Shock, heals the friend under your reticle (or you) and
+  frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a burst of speed out of
+  roots, and its key again within 3 s throws Hammer of Justice, a stun: ride in, then punish
+  (its EX, Blessing of Freedom, frees and speeds a friend). Blessing of Protection halves what a
+  friend takes for 3 s, the one defense you give away; Lay on Hands is 40% of their health at once.
+- **Hunter**: set up, then snipe. Aimed Shot is a draw: the longer you hold it, the harder,
+  farther and faster the arrow, and fully drawn it goes through the whole line (a heavy blow on you
+  spoils it); Multi-Shot is five arrows in a fan. Traps arm and wait (Explosive: a burst that throws
+  back and burns; Freezing: a freeze, and setting it makes your next Aimed Shot a free Multi-Shot
+  that shatters the frozen). Disengage leaps you straight back (its EX nets the foe in front);
+  Flare is lobbed onto a pack and blinds them till they're struck, Feign Death drops you as if dead
+  and every creature and lock lets go; Kill Shot is a 1 s draw that goes through a 40 yd line and
+  finishes anything under a quarter of its health.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
@@ -197,7 +207,7 @@ the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a mom
 a stun. Projectiles may **pierce** (Crippling Throw, Chaos Bolt), **leap on** (Chain Lightning),
 **burst**, or **stick** and go off a moment later round whoever carries them (Seed of
 Corruption); ground may linger, pull, throw out or slow every second. A dash may run **through**
-every foe in its way, striking each as it passes. Help aimed at a **friend**
+every foe in its way, striking each as it passes (Charge). Help aimed at a **friend**
 lands on the friend under the reticle (or the one nearest it, within 15°), else on you, and gives
 them only its heal, cleanse and boons; a **beam** is held a few seconds as a strip from you along
 your aim, sweeping as you turn: every foe in it takes its damage each tick and every friend in it
@@ -211,7 +221,7 @@ left. A card that **empowers** another makes that card's next press its EX versi
 
 **Seeing it coming** (the action-combat client, eighth round): everything that lands later is
 drawn on the ground where it will land, red when it's a foe's, blue when it's yours or a
-friend's, filling as it comes: a sky-fall's ring (Mind Blast, Meteor, Volley, Earthquake, Void
+friend's, filling as it comes: a sky-fall's ring (Mind Blast, Meteor, Earthquake, Void
 Rift, Hurricane, Shadowfury, Summon Infernal), a leap's landing, a wind-up's cone. While you aim,
 your own ability's shape lies under you along the view: a projectile's path, a cone, a ring round
 you, or the circle where it will land. Traps and anchors show as green circles.
@@ -219,15 +229,15 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 **Combos**, inside a class and across them:
 
 - **Freeze, then shatter**: Frost Nova, Freezing Trap, Cold Snap, Frost Blink or a Cone of Cold on
-  a slowed foe freeze; fire (Fireball, Pyroblast, Meteor) or a Sundering Blow on them shatters for
-  half again.
+  a slowed foe freeze; fire (Fireball, Pyroblast, Meteor), a Sundering Blow or a Multi-Shot on them
+  shatters for half again.
 - **Pull into the pain**: Void Rift, Leap of Faith or Mind Grip drag foes onto a trap, into
-  Consecration, a Volley, an Earthquake or under a Meteor.
-- **Push into the trap**: Thunderstorm, Typhoon, Concussive Shot or Heroic Leap throw a foe onto
+  Consecration, an Earthquake or under a Meteor.
+- **Push into the trap**: Thunderstorm, Typhoon or Heroic Leap throw a foe onto
   an Explosive or Freezing Trap; Hurricane keeps them off a point.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
-  stun (Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind Blast and
-  Meteor land.
+  stun (Divine Steed's Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind
+  Blast and Meteor land.
 - **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab; a kill under
   Death Mark readies everything again.
 - **Stay alive**: Power Word: Barrier, Barkskin and Healing Stream stack with Holy Nova and
@@ -245,12 +255,12 @@ duration creatures do.
   rules as any swing: their own wind-up and reach, a share of the weapon's damage, stamina, and a
   guard and a parry answer them (the Unstoppable Blow aside: no guard stops it, no parry turns it,
   and its target sees the weapon go red).
-- **Defense** is a read and a bait in a duel: Retaliation blocks melee (not bolts), Deterrence
-  bolts (not melee), Smoke Bomb hides you (a creature loses you, a lock lets go), Drain Life
-  out-heals them, Ice Block lets nothing in but you can't act.
+- **Defense** is a read and a bait in a duel: Retaliation blocks melee (not bolts), Flare
+  blinds whoever is coming till they're struck, Smoke Bomb hides you (a creature loses you, a lock
+  lets go), Drain Life out-heals them, Ice Block lets nothing in but you can't act.
 - **Full charge**: a charged spell held to the top flares on you (everyone sees it: the class's
   flash and sound), the reticle bursts and the screen's edge flares in its colour, and Aimed
-  Throw, Fireball and Frostbolt fly much faster.
+  Shot, Fireball and Frostbolt fly much faster.
 
 Hover a key with the mouse free (or a card on the board) for what it does in words and numbers:
 how it's used, its damage, reach, charge, wind-up, stamina and cooldown, and the same for its
@@ -1163,10 +1173,10 @@ code logs in to the survival realm and every packet the server sends must parse:
 `crates/htl-survival/src/tests_board.rs` covers the board's new cards: Sundering Blow's wind-up,
 share of the weapon and stagger, the guard it crushes and the Unstoppable Blow no guard stops (its
 target warned), Backstab from behind and on a Mark, Ambush's step, Holy Shock healing a friend and
-Purifying Shock freeing them, holy ground burning foes and healing friends (and Hallowed Ground's
+freeing them (and Avenger's Shield striking a foe), holy ground burning foes and healing friends (and Hallowed Ground's
 softened blows), Onslaught, the Death Mark and its reset, Sanctuary, Cold Snap and the shatter,
 Dread Step, an old save's keys put on the board's rows, the five rows of four, Lay on Hands,
-Shield Wall, and a full charge's flare and faster axe. `tests.rs` has Tab switching
+Shield Wall, and a full charge's flare and faster arrow (Aimed Shot). `tests.rs` has Tab switching
 round the foes in view and held letting go, a jump's stamina and a roll's least stamina.
 
 `crates/htl-survival/src/tests_moves.rs` covers the moving mechanics on abilities made for the
