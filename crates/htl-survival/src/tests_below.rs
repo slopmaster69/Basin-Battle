@@ -1045,3 +1045,15 @@ fn a_wager_above_what_the_camp_has_won_is_refused() {
     assert!(err.contains("up to +1"), "{err}");
     assert!(s.travel_wager(id, "nowhere", 1).is_err());
 }
+
+#[test]
+fn a_ground_look_is_only_laid_for_an_area_as_big_as_it_looks() {
+    let mut s = below();
+    // Under the threshold: the drawn circle, at its true size.
+    s.mark_ground([0.0, 0.0, 0.0], crate::sim::GROUND_LOOK_MIN - 0.1, 1.0, 22191);
+    // At it or over: the spell's own look.
+    s.mark_ground([5.0, 0.0, 0.0], crate::sim::GROUND_LOOK_MIN, 1.0, 22191);
+    let marks: Vec<(f32, u32)> = s.events.iter().filter_map(|e| if let Event::Mark { radius, ground, .. } = e { Some((*radius, *ground)) } else { None }).collect();
+    assert!(marks.iter().any(|(r, g)| *r < crate::sim::GROUND_LOOK_MIN && *g == 0), "{marks:?}");
+    assert!(marks.iter().any(|(r, g)| *r >= crate::sim::GROUND_LOOK_MIN && *g == 22191), "{marks:?}");
+}
