@@ -5892,7 +5892,8 @@ function ES.Line(line)
     -- Its tells, for a blow meant for us (the flash to answer it, the woosh); gone, none.
     if f[3] and f[3] ~= "" and f[10] == "1" and (f[8] == "block" or f[8] == "unblockable") then
       ES.Tell(key, f[3], tonumber(f[7]), f[8], tonumber(f[9]), tonumber(f[12]))
-    elseif not f[3] then
+    else
+      -- Gone, or no longer meant for us: nothing more from it.
       ES.tells[key] = nil
     end
     if f[3] and SetTelegraph and ES.MarksOn() then
