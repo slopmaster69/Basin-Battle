@@ -979,6 +979,10 @@ impl Survival {
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         let heroes: Vec<Vec3> = self.players.values().map(|p| p.pos).collect();
         for id in ids {
+            // Gone already this step (a totem broken, a creature another one's turn removed).
+            if !self.mobs.contains_key(&id) {
+                continue;
+            }
             // Bodies go.
             if let Some(MobState::Dead { gone_at }) = self.mobs.get(&id).map(|m| m.state.clone()) {
                 if now >= gone_at {
