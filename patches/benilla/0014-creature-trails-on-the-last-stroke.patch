@@ -1,0 +1,485 @@
+From f2c300fc46d34deab44cecb3274fd22efe580454 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 02:46:04 +0000
+Subject: [PATCH] A creature's swing trails its last stroke, and a beast trails
+ what strikes
+
+A creature's PlayUnitAnimation trail now starts trailMs before the impact and fades just
+after it, instead of starting with the wind-up (a coiled wind-up's hold drew a smear, and a
+long one was over before the blow). A creature holding a weapon trails it, as a hero does;
+one holding none (a boar, a wolf, a bear) trails the part of it that strikes: the bone whose
+pivot moves farthest against the body over the clip's last stroke, along the link from its
+parent. A blow called off before its stroke draws nothing. HasActionCombat() is 9.
+---
+ .../benilla-app/src/creature_anim/action.rs   |  31 +++-
+ .../src/creature_anim/action/strike_trail.rs  | 155 +++++++++++++++++
+ crates/benilla-ui/src/action_combat.rs        |   6 +-
+ crates/benilla-world/src/rig_anim.rs          |   2 +
+ crates/benilla-world/src/rig_anim/bones.rs    | 163 ++++++++++++++++++
+ crates/benilla-world/src/rig_anim/pose.rs     |   5 +
+ 6 files changed, 360 insertions(+), 2 deletions(-)
+ create mode 100644 crates/benilla-app/src/creature_anim/action/strike_trail.rs
+ create mode 100644 crates/benilla-world/src/rig_anim/bones.rs
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index e6b22dad..c7415af3 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -30,6 +30,8 @@ use bevy::animation::graph::AnimationNodeIndex;
+ use bevy::prelude::*;
+ 
+ use super::{find_resolved, AnimData, BodyTwist};
++
++mod strike_trail;
+ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+ 
+ /// The impact keyframes an attack clip authors (`$AH0`..`$AH3`, `$CAH`), what a blow's timing
+@@ -485,9 +487,10 @@ pub(super) fn drain_action_calls(
+     mut lock: ResMut<LockOn>,
+     mut kits: MessageWriter<super::spell_visual::KitPush>,
+     mut play_seq: ResMut<super::PlaySeq>,
+-    (env, mut stops): (
++    (env, mut stops, mut strikes): (
+         Option<Res<super::EnvDamageTable>>,
+         Query<&mut HitStopped>,
++        ResMut<strike_trail::StrikeTrails>,
+     ),
+ ) {
+     let calls = action_combat::take_calls();
+@@ -527,7 +530,29 @@ pub(super) fn drain_action_calls(
+                 clip.coil = guid_of(&unit).is_some_and(|g| g >> 48 == 0xF130 || g >> 48 == 0xF150)
+                     && clip.key > 0.0
+                     && impact > clip.key * COIL_SLOW;
++                let creature = clip.coil
++                    || guid_of(&unit).is_some_and(|g| g >> 48 == 0xF130 || g >> 48 == 0xF150);
++                let (clip_id, clip_key, clip_node) = (clip.id, clip.key, clip.full);
+                 start_clip(&mut commands, &mut clips, entity, clip);
++                // A creature's trail waits for its last stroke into the blow (`ac9`), and one
++                // with nothing in its hands trails whatever strikes (strike_trail.rs).
++                if let (Some((packed, lead_ms)), true) = (trail, creature) {
++                    let now_ms = time.elapsed().as_millis() as u32;
++                    let (due_ms, duration_ms) = strike_trail::schedule(now_ms, impact, lead_ms);
++                    strikes.pending.retain(|p| p.unit != entity);
++                    strikes.pending.push(strike_trail::Pending {
++                        unit: entity,
++                        anim: clip_id,
++                        node: clip_node,
++                        key: clip_key,
++                        due_ms,
++                        trail: benilla_formats::TrailProc {
++                            packed,
++                            duration_ms,
++                        },
++                    });
++                    continue;
++                }
+                 // The trail starts with the swing, on each hand's weapon.
+                 if let Some((packed, duration_ms)) = trail {
+                     let proc = benilla_formats::TrailProc {
+@@ -1282,6 +1307,7 @@ pub(super) fn shuffle_on_lock_turn(
+ 
+ pub(super) fn plugin(app: &mut App) {
+     app.init_resource::<LockOn>()
++        .init_resource::<strike_trail::StrikeTrails>()
+         .add_systems(
+             Update,
+             (
+@@ -1298,6 +1324,9 @@ pub(super) fn plugin(app: &mut App) {
+                 collect_nearby,
+                 track_lock_on,
+                 shuffle_on_lock_turn.after(drain_action_calls),
++                strike_trail::fire_strike_trails
++                    .after(drain_action_calls)
++                    .before(crate::weapon_trail::fire_weapon_trails),
+                 reset_action_on_new_vm,
+             ),
+         )
+diff --git a/crates/benilla-app/src/creature_anim/action/strike_trail.rs b/crates/benilla-app/src/creature_anim/action/strike_trail.rs
+new file mode 100644
+index 00000000..d06a4ef0
+--- /dev/null
++++ b/crates/benilla-app/src/creature_anim/action/strike_trail.rs
+@@ -0,0 +1,155 @@
++//! Basin Battle: a creature's swing trails its last stroke into the blow, not its whole wind-up.
++//!
++//! A creature's clip from `PlayUnitAnimation` with a trail is held here until `trailMs` before
++//! its impact (a coiled wind-up's hold draws nothing), then armed for `trailMs` and a short fade.
++//! A creature holding a weapon trails the weapon, as a hero does. One with none (a boar, a wolf,
++//! a bear) trails the part of it that strikes: the bone whose pivot moves farthest against the
++//! body over the clip's last stroke (a paw, the head), drawn along the link from its parent.
++
++use bevy::prelude::*;
++use std::collections::HashMap;
++
++use benilla_assets::ModelAnimations;
++use benilla_formats::TrailProc;
++use benilla_world::rig_anim::RigPose;
++
++use super::ActionClip;
++use crate::weapon_trail::WeaponTrail;
++
++/// The trail keeps drawing this long past the impact (milliseconds), then fades as a weapon's.
++const PAST_IMPACT_MS: u32 = 150;
++/// The clip's last stroke, for finding what strikes: from this share of the way to its impact.
++const STROKE_FROM: f32 = 0.55;
++/// A link shorter than this (yards) is too small to read as a streak (a toe, a claw's tip).
++const SHORTEST_LINK: f32 = 0.12;
++/// The streak along a striking link: from this share of the way out to past its end.
++const STREAK: (f32, f32) = (0.3, 1.3);
++
++/// A creature's trail waiting for its stroke.
++pub(crate) struct Pending {
++    pub(crate) unit: Entity,
++    /// The clip it belongs to (dropped if that's no longer what plays: a cancel, a knock aside).
++    pub(crate) anim: u16,
++    /// The clip's graph node, for finding its striking bone.
++    pub(crate) node: bevy::animation::graph::AnimationNodeIndex,
++    /// The clip clock's impact and the start of its last stroke (seconds on the clip).
++    pub(crate) key: f32,
++    /// When to arm it (`Time::elapsed` milliseconds).
++    pub(crate) due_ms: u32,
++    pub(crate) trail: TrailProc,
++}
++
++#[derive(Resource, Default)]
++pub(crate) struct StrikeTrails {
++    pub(crate) pending: Vec<Pending>,
++    /// Per unit and clip: the striking link `(parent, bone)`, or none worth a streak.
++    links: HashMap<(Entity, usize), Option<(u16, u16)>>,
++    /// Per unit and parent bone: the anchor carrying its streak.
++    anchors: HashMap<(Entity, u16), Entity>,
++}
++
++/// When a creature's trail arms, after `now_ms`: `trail_ms` before an impact `impact` seconds
++/// away (at once, when the wind-up is shorter than that), and how long it draws from there.
++pub(crate) fn schedule(now_ms: u32, impact: f32, trail_ms: u32) -> (u32, u32) {
++    let impact_ms = (impact.max(0.0) * 1000.0).round() as u32;
++    let lead = trail_ms.min(impact_ms);
++    (now_ms + impact_ms - lead, lead + PAST_IMPACT_MS)
++}
++
++/// Arm what's due: the weapons a creature holds, else a streak on the part of it that strikes.
++#[allow(clippy::too_many_arguments)]
++pub(crate) fn fire_strike_trails(
++    mut commands: Commands,
++    time: Res<Time>,
++    mut state: ResMut<StrikeTrails>,
++    clips: Query<&ActionClip>,
++    held: Query<&crate::entities::HeldAttached>,
++    mut trails: Query<&mut WeaponTrail>,
++    anims: Query<&ModelAnimations>,
++    mut poses: Query<&mut RigPose>,
++) {
++    if state.pending.is_empty() {
++        return;
++    }
++    let now_ms = time.elapsed().as_millis() as u32;
++    let due: Vec<Pending> = {
++        let (due, wait): (Vec<Pending>, Vec<Pending>) =
++            state.pending.drain(..).partition(|p| p.due_ms <= now_ms);
++        state.pending = wait;
++        due
++    };
++    for p in due {
++        // Still the blow it was for.
++        if !clips
++            .get(p.unit)
++            .is_ok_and(|c| c.id == p.anim && c.stopping.is_none())
++        {
++            continue;
++        }
++        let mut armed = false;
++        if let Ok(h) = held.get(p.unit) {
++            for root in h.spawned_slots().iter().take(2).flatten() {
++                if let Ok(mut t) = trails.get_mut(*root) {
++                    t.arm(p.trail, now_ms);
++                    armed = true;
++                }
++            }
++        }
++        if armed {
++            continue;
++        }
++        // Nothing in its hands: what strikes.
++        let Ok(a) = anims.get(p.unit) else { continue };
++        let Ok(mut pose) = poses.get_mut(p.unit) else {
++            continue;
++        };
++        let key = (p.unit, p.node.index());
++        let link = *state.links.entry(key).or_insert_with(|| {
++            let clip = a
++                .pose
++                .node(p.node)
++                .and_then(|n| a.pose.clips.get(n.clip as usize))?;
++            benilla_world::rig_anim::striking_link(
++                clip,
++                &pose.parents,
++                pose.binds(),
++                p.key * STROKE_FROM,
++                p.key,
++                SHORTEST_LINK,
++            )
++        });
++        let Some((parent, bone)) = link else { continue };
++        if let Some(&anchor) = state.anchors.get(&(p.unit, parent)) {
++            if let Ok(mut t) = trails.get_mut(anchor) {
++                t.arm(p.trail, now_ms);
++                continue;
++            }
++        }
++        let Some(anchor) = pose.anchor_for(&mut commands, p.unit, parent) else {
++            continue;
++        };
++        let out = pose.binds()[bone as usize];
++        let mut t = WeaponTrail::new(out * STREAK.1, out * STREAK.0);
++        t.arm(p.trail, now_ms);
++        commands
++            .entity(anchor)
++            .try_insert((t, benilla_world::model_fade::ParentModel(p.unit)));
++        state.anchors.insert((p.unit, parent), anchor);
++    }
++    // A unit gone takes its links and anchors with it.
++    state.links.retain(|(e, _), _| anims.contains(*e));
++    state.anchors.retain(|(e, _), _| anims.contains(*e));
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn a_creatures_trail_waits_for_its_last_stroke() {
++        // A 1.2 s wind-up, its trail 320 ms ahead of the impact: armed at 880 ms, for 470.
++        assert_eq!(schedule(1000, 1.2, 320), (1880, 470));
++        // A wind-up quicker than the lead: at once, for the swing and the fade.
++        assert_eq!(schedule(1000, 0.2, 320), (1000, 350));
++    }
++}
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 92e97f38..aad4154e 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -87,6 +87,10 @@
+ //! `SetTelegraphAt(key, x, y, z, facing, shape, reach, arc, seconds, kind, width, focus)` lays one
+ //! on the ground at a spot (a sky-fall's ring, a strip), facing that way; the aim marker's shapes.
+ //!
++//! The ninth (`HasActionCombat() >= 9`): a creature's `PlayUnitAnimation` trail is its last stroke
++//! into the blow: it starts `trailMs` before the impact (not with the wind-up) and fades just after,
++//! on the weapons it holds or, with none, along the part of it that strikes (a paw, the head).
++//!
+ //! The seventh (`HasActionCombat() >= 7`), a creature's blow drawn under it:
+ //!
+ //! - `SetTelegraph(key, unit, shape, reach, arcDegrees, seconds, kind, parrySeconds, focus)`: a
+@@ -650,7 +654,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(8))?,
++        lua.create_function(|_, _: MultiValue| Ok(9))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+diff --git a/crates/benilla-world/src/rig_anim.rs b/crates/benilla-world/src/rig_anim.rs
+index 6eaebf02..82e7d7ad 100644
+--- a/crates/benilla-world/src/rig_anim.rs
++++ b/crates/benilla-world/src/rig_anim.rs
+@@ -7,9 +7,11 @@ use bevy::prelude::*;
+ 
+ mod compose;
+ mod global_seq;
++mod bones;
+ mod pose;
+ 
+ pub(crate) use compose::seed_rig_rows;
++pub use bones::striking_link;
+ pub use compose::{finalize_rig_worlds, PosePost};
+ pub use global_seq::GlobalSeqDrive;
+ pub use pose::{PoseEval, RigAnchor, RigFrame, RigPose};
+diff --git a/crates/benilla-world/src/rig_anim/bones.rs b/crates/benilla-world/src/rig_anim/bones.rs
+new file mode 100644
+index 00000000..d49a4cb0
+--- /dev/null
++++ b/crates/benilla-world/src/rig_anim/bones.rs
+@@ -0,0 +1,163 @@
++//! Basin Battle: arithmetic on a vanilla M2 skeleton and its clips, outside the evaluator: which
++//! part of a body strikes in a clip (a creature's swing trail follows it). A vanilla M2's rest pose
++//! is unrotated (each bone a pivot), so a bone's place is its chain's rest links turned by its
++//! ancestors' rotations.
++
++use bevy::prelude::*;
++
++use benilla_assets::PoseClip;
++
++/// The bone that strikes over `[t0, t1]` of `clip`: the one whose pivot moves farthest against
++/// its skeleton's root, with a link from its parent at least `shortest` yards long (a toe, a claw's tip are too
++/// small to read as a streak). Rest poses are
++/// unrotated (a vanilla M2's), so a pivot is its chain's translations turned by its ancestors'.
++pub fn striking_link(
++    clip: &PoseClip,
++    parents: &[i16],
++    binds: &[Vec3],
++    t0: f32,
++    t1: f32,
++    shortest: f32,
++) -> Option<(u16, u16)> {
++    let a = pivots(clip, parents, binds, t0);
++    let b = pivots(clip, parents, binds, t1);
++    let root_of = |mut i: usize| {
++        while let Some(p) = parents.get(i).and_then(|&p| usize::try_from(p).ok()) {
++            i = p;
++        }
++        i
++    };
++    let mut best: Option<(f32, u16, u16)> = None;
++    for (i, &parent) in parents.iter().enumerate() {
++        let Ok(p) = usize::try_from(parent) else {
++            continue;
++        };
++        if binds[i].length() < shortest {
++            continue;
++        }
++        let r = root_of(i);
++        let moved = ((b[i] - b[r]) - (a[i] - a[r])).length();
++        if best.is_none_or(|(m, ..)| moved > m) {
++            best = Some((moved, p as u16, i as u16));
++        }
++    }
++    best.filter(|(m, ..)| *m > 0.05).map(|(_, p, i)| (p, i))
++}
++
++/// Every bone's pivot in model space at clip time `t`.
++fn pivots(clip: &PoseClip, parents: &[i16], binds: &[Vec3], t: f32) -> Vec<Vec3> {
++    let n = parents.len();
++    let mut local_t: Vec<Vec3> = binds.to_vec();
++    let mut local_r = vec![Quat::IDENTITY; n];
++    for b in &clip.bones {
++        let i = b.bone as usize;
++        if i >= n {
++            continue;
++        }
++        if let Some(v) = b.translation.sample(t) {
++            local_t[i] = v;
++        }
++        if let Some(q) = b.rotation.sample(t) {
++            local_r[i] = q;
++        }
++    }
++    let mut pos = vec![Vec3::ZERO; n];
++    let mut rot = vec![Quat::IDENTITY; n];
++    let mut done = vec![false; n];
++    fn walk(
++        i: usize,
++        parents: &[i16],
++        lt: &[Vec3],
++        lr: &[Quat],
++        pos: &mut [Vec3],
++        rot: &mut [Quat],
++        done: &mut [bool],
++        depth: u32,
++    ) {
++        if done[i] || depth > 256 {
++            return;
++        }
++        match usize::try_from(parents[i])
++            .ok()
++            .filter(|&p| p < parents.len() && p != i)
++        {
++            Some(p) => {
++                walk(p, parents, lt, lr, pos, rot, done, depth + 1);
++                pos[i] = pos[p] + rot[p] * lt[i];
++                rot[i] = rot[p] * lr[i];
++            }
++            None => {
++                pos[i] = lt[i];
++                rot[i] = lr[i];
++            }
++        }
++        done[i] = true;
++    }
++    for i in 0..n {
++        walk(
++            i, parents, &local_t, &local_r, &mut pos, &mut rot, &mut done, 0,
++        );
++    }
++    pos
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use benilla_assets::{PoseBone, PoseTrack};
++
++    #[test]
++    fn the_part_that_strikes_is_what_moves_farthest_against_the_body() {
++        // A root, a body and a leg off it, the leg's paw on the end, and a tail.
++        let parents = vec![-1, 0, 1, 2, 1];
++        let binds = vec![
++            Vec3::ZERO,
++            Vec3::new(0.0, 1.0, 0.0),
++            Vec3::new(0.5, 0.0, 0.0),
++            Vec3::new(0.0, -0.6, 0.0),
++            Vec3::new(-0.8, 0.0, 0.0),
++        ];
++        let mut clip = PoseClip::default();
++        // The whole body lunges forward 2 yards (the root moves: not a strike).
++        clip.push(PoseBone {
++            bone: 0,
++            translation: PoseTrack::new(&[(0.0, Vec3::ZERO), (1.0, Vec3::new(2.0, 0.0, 0.0))]),
++            rotation: PoseTrack::default(),
++            scale: PoseTrack::default(),
++        });
++        // The leg swings up a quarter turn about its hip: the paw sweeps.
++        clip.push(PoseBone {
++            bone: 2,
++            translation: PoseTrack::default(),
++            rotation: PoseTrack::new(&[
++                (0.0, Quat::IDENTITY),
++                (1.0, Quat::from_rotation_z(std::f32::consts::FRAC_PI_2)),
++            ]),
++            scale: PoseTrack::default(),
++        });
++        // The tail barely stirs.
++        clip.push(PoseBone {
++            bone: 4,
++            translation: PoseTrack::default(),
++            rotation: PoseTrack::new(&[(0.0, Quat::IDENTITY), (1.0, Quat::from_rotation_z(0.02))]),
++            scale: PoseTrack::default(),
++        });
++        assert_eq!(
++            striking_link(&clip, &parents, &binds, 0.0, 1.0, 0.12),
++            Some((2, 3)),
++            "the paw, along the leg"
++        );
++        // Nothing moves but the root: no streak.
++        let mut still = PoseClip::default();
++        still.push(PoseBone {
++            bone: 0,
++            translation: PoseTrack::new(&[(0.0, Vec3::ZERO), (1.0, Vec3::new(2.0, 0.0, 0.0))]),
++            rotation: PoseTrack::default(),
++            scale: PoseTrack::default(),
++        });
++        assert_eq!(
++            striking_link(&still, &parents, &binds, 0.0, 1.0, 0.12),
++            None
++        );
++    }
++}
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index 65c30717..37b26f00 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -102,6 +102,11 @@ impl RigPose {
+         self
+     }
+ 
++    /// Bind-pose local translations, per bone in skeleton order (the rest pose's links).
++    pub fn binds(&self) -> &[Vec3] {
++        &self.binds
++    }
++
+     /// The anchor entity for `bone`, spawned on first demand at the current composed pose under
+     /// [`Self::joints_root`]; `rig` is the [`RigPose`] holder.
+     pub fn anchor_for(
+-- 
+2.43.0
+

@@ -33,6 +33,8 @@
 //!
 //! To the action-combat client that plays clips itself (`ac2`), in place of emotes:
 //! - `AN\t<guid>\t<clip>\t<impact secs>\t<trail AARRGGBB>\t<trail ms>\t<mine>`: a hero swings.
+//!   A creature's wind-up is the same line with kind `mob`; to `ac9` it carries a trail (amber: a
+//!   guard stops it, red: it doesn't) that the client starts `trail ms` before the impact.
 //! - `IM\t<attacker>\t<victim>\t<light|heavy|arrow>\t<outcome>\t<you struck>\t<you were struck>`:
 //!   a blow lands (hit-stop, shake).
 //! - `RO\t<guid>\t<secs>\t<mine>`: a hero rolls (a dodge).
@@ -1031,7 +1033,8 @@ impl SurvivalGame {
                 }
                 // `.es hello <version> ac`: the action-combat client, aiming over the shoulder;
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
-                // lunges too; `ac4` plays its own blows' weight the moment they connect.
+                // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
+                // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`).
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,
