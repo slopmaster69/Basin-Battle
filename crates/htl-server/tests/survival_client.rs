@@ -1588,3 +1588,37 @@ fn a_corey_roll_out_of_the_clients_own_jump_strikes_as_it_lands() {
     let leap = lines.iter().find(|l| l.split('\t').nth(10) == Some("leap")).unwrap_or_else(|| panic!("the leap on landing: {lines:?}"));
     assert_eq!(leap.split('\t').nth(4), Some("78FF9A3C"), "with a heavy blow's trail: {leap}");
 }
+
+#[test]
+fn a_creatures_swing_trails_its_last_stroke_on_a_client_that_draws_it_so() {
+    let server = start_content(None, false, content());
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut a);
+    let mut b = Client::connect(server.login, "ben", "hold", REALM).unwrap();
+    let _ = enter(&mut b);
+    // Ann's client starts a creature's trail late (ac9); Ben's is the round before.
+    a.chat(".es hello 5 ac9");
+    b.chat(".es hello 5 ac8");
+    a.drain(0.6);
+    b.drain(0.2);
+    a.chat(".es debug");
+    a.chat(".es spawn grunt");
+    let mob_swing = |l: &String| l.starts_with("AN\t") && l.split('\t').nth(10) == Some("mob");
+    let mut seen = None;
+    for _ in 0..20 {
+        a.drain(0.5);
+        if let Some(l) = addon_lines(&a, "ES").into_iter().find(|l| mob_swing(l)) {
+            seen = Some(l);
+            break;
+        }
+    }
+    let line = seen.expect("the grunt winds up a blow at ann");
+    let f: Vec<&str> = line.split('\t').collect();
+    // Amber for a blow a guard stops, red for one it doesn't, started 320 ms before it lands.
+    assert!(f[4] == "70FFC24A" || f[4] == "A0FF2A1A", "{line}");
+    assert_eq!(f[5], "320", "{line}");
+    b.drain(0.5);
+    let theirs: Vec<String> = addon_lines(&b, "ES").into_iter().filter(|l| mob_swing(l)).collect();
+    assert!(!theirs.is_empty(), "ben sees it wind up too");
+    assert!(theirs.iter().all(|l| l.split('\t').nth(4) == Some("-")), "with no trail on the older client: {theirs:?}");
+}
