@@ -1423,3 +1423,30 @@ fn quickening_makes_a_boss_hit_harder_the_longer_its_fight_lasts() {
     run(&mut s, 0.2);
     assert_eq!(s.quickening(boss), 1.0, "home again");
 }
+
+#[test]
+fn the_call_wakes_only_the_called_pack_not_what_rests_beside_it() {
+    use crate::sim::wager::CALL_AFTER;
+    let mut c = content();
+    // The pack it calls is linked to a third that rests right beside it.
+    let mut called = pack("grunt", "", [50.0, 0.0], false);
+    called.link = 15.0;
+    c.dungeon.as_mut().unwrap().packs.push(called);
+    c.dungeon.as_mut().unwrap().packs.push(pack("grunt", "", [58.0, 0.0], false));
+    let day = 86_400.0;
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, day);
+    s.start_wager(2);
+    s.below.as_mut().unwrap().wager.as_mut().unwrap().started = Some(day);
+    let id = s.join("ayla", "Ayla", None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.max_health = 1_000_000;
+    p.health = 1_000_000;
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let grunt_at = |s: &Survival, x: f32| *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "grunt" && (m.home[0] - x).abs() < 1.0).unwrap().0;
+    let (a, b, third) = (grunt_at(&s, 30.0), grunt_at(&s, 50.0), grunt_at(&s, 58.0));
+    let resting = |s: &Survival, m: Id| matches!(s.mobs[&m].state, mobs::MobState::Idle { .. });
+    s.engage(a, mobs::Foe::Hero(id));
+    run(&mut s, CALL_AFTER + 0.5);
+    assert!(!resting(&s, b), "the nearest pack comes");
+    assert!(resting(&s, third), "and nothing it's linked to");
+}

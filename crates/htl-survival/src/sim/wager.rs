@@ -512,9 +512,11 @@ impl Survival {
                 wm.called_packs.insert(j);
             }
             let name = caller.first().map_or(String::new(), |(id, _)| self.unit_name(*id));
-            let members: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack == Some(j) && m.health > 0).map(|(id, _)| *id).collect();
-            for id in members {
-                self.engage(id, foe);
+            // Only the called pack comes: not through its link to whatever else rests nearby (as
+            // `engage` would), so no boss and no third pack.
+            for m in self.mobs.values_mut().filter(|m| m.pack == Some(j) && m.health > 0 && resting(m)) {
+                m.state = MobState::Chase { foe };
+                m.think = 0.0;
             }
             self.announce(format!("The {name} calls for help: another pack comes!"));
         }

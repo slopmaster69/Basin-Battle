@@ -446,20 +446,20 @@ BK	0	dm_landing~The Landing~deadmines	arena~The Proving Ring~0	siege~The Siege~C
 !ElwynnSurvival.CloseWindows()
 # The Bookmaker's clock below: up while a wager's on, gone back at camp.
 WR	below
-WT	The Deadmines	5	754	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin VanCleef~0
+WT	The Deadmines	5	754	1950	2	run	The Call, Rallying	Rhahk'Zor~1^Sneed~0^Edwin VanCleef~0
 !table.insert(SAID, "wager bosses: " .. tostring(ElwynnSurvivalWager.bossHead:GetText()) .. " / " .. tostring(ElwynnSurvivalWager.bosses[1]:GetText()) .. " / " .. tostring(ElwynnSurvivalWager.bosses[2]:GetText()))
 !local w = ElwynnSurvival.wagerShown table.insert(SAID, "wager clock: " .. tostring(ElwynnSurvivalWager:IsShown()) .. " " .. ElwynnSurvivalWager.title:GetText() .. " / " .. ElwynnSurvivalWager.clock:GetText() .. " / " .. ElwynnSurvivalWager.falls:GetText() .. " / " .. ElwynnSurvivalWager.terms:GetText())
 # With the count of foes (a newer server): the word and the bar under the bosses.
-WT	The Deadmines	5	760	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin VanCleef~0	31~40~50
+WT	The Deadmines	5	760	1950	2	run	The Call, Rallying	Rhahk'Zor~1^Sneed~0^Edwin VanCleef~0	31~40~50
 !local fc = ElwynnSurvival.wagerShown.forces table.insert(SAID, "wager foes: " .. tostring(ElwynnSurvivalWager.forces:GetText()) .. " bar shown " .. tostring(ElwynnSurvivalWager.forceBar:IsShown()) .. " needed " .. tostring(fc and fc.needed))
 # Splits: each slain boss's time against the camp's best at this level (ahead green, behind red).
-WT	The Deadmines	5	900	1950	0	run	Hardened	Rhahk'Zor~1^Sneed~1^Edwin VanCleef~0	31~40~50		200~230^500~450^~
+WT	The Deadmines	5	900	1950	0	run	The Call	Rhahk'Zor~1^Sneed~1^Edwin VanCleef~0	31~40~50		200~230^500~450^~
 !table.insert(SAID, "wager splits: " .. tostring(ElwynnSurvivalWager.bosses[1]:GetText()) .. " | " .. tostring(ElwynnSurvivalWager.bosses[2]:GetText()) .. " | " .. tostring(ElwynnSurvivalWager.bosses[3]:GetText()))
 # Before the clock: who's ready, the Ready button (it says .es ready), then the count.
-WT	The Deadmines	5	0	1950	0	wait	Hardened, Rallying	Rhahk'Zor~0	0~40~50	1~2~
+WT	The Deadmines	5	0	1950	0	wait	The Call, Rallying	Rhahk'Zor~0	0~40~50	1~2~
 !table.insert(SAID, "wager ready: " .. tostring(ElwynnSurvivalWager.falls:GetText()) .. " button " .. tostring(ElwynnSurvivalWagerReady:IsShown()))
 !this = ElwynnSurvivalWagerReady; ElwynnSurvivalWagerReady:GetScript("OnClick")()
-WT	The Deadmines	5	0	1950	0	wait	Hardened, Rallying	Rhahk'Zor~0	0~40~50	2~2~4
+WT	The Deadmines	5	0	1950	0	wait	The Call, Rallying	Rhahk'Zor~0	0~40~50	2~2~4
 !table.insert(SAID, "wager count: " .. tostring(ElwynnSurvivalWager.falls:GetText()) .. " button " .. tostring(ElwynnSurvivalWagerReady:IsShown()))
 WR	camp
 !table.insert(SAID, "wager clock at camp: " .. tostring(ElwynnSurvivalWager:IsShown()))
