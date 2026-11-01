@@ -926,7 +926,9 @@ fn the_fourth_round_client_flashes_its_own_blows_and_others_see_the_flash_and_it
     let f: Vec<&str> = mv.split('\t').collect();
     assert_eq!(f.len(), 16, "{mv}");
     assert_eq!(f[15], "1", "friendly fire");
-    assert_eq!(f[10].split('^').next().unwrap().split('~').count(), 8, "range and arc: {mv}");
+    // (Each blow: clip, take, impact, recovery, lunge, stamina, range, arc, and the model its
+    // clip comes from, empty for her own.)
+    assert_eq!(f[10].split('^').next().unwrap().split('~').count(), 9, "range and arc: {mv}");
     // Her heavy blow's flash: on Ben's screen, not hers (she played her own).
     let mark = a.seen.len();
     a.chat(".es in h");
