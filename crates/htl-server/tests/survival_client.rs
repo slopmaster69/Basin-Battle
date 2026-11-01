@@ -1714,6 +1714,11 @@ fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing
     // An old add-on on a plain client: told, on screen.
     c.chat(".es hello 1");
     assert!(c.until(2.0, told), "told: {:?}", addon_lines(&c, "ES"));
+    // Said once: a reload's hello again isn't told again.
+    c.chat(".es hello 1");
+    c.drain(0.6);
+    let times = addon_lines(&c, "ES").iter().filter(|l| l.starts_with("T\t") && l.contains("older than this server's")).count();
+    assert_eq!(times, 1, "once a run");
     // The newest add-on on the newest client: not a word.
     let mut d = Client::connect(server.login, "wren", "hold", REALM).unwrap();
     enter(&mut d);

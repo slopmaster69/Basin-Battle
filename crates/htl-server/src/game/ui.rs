@@ -166,7 +166,8 @@ impl Game {
                 }
                 self.ui_line(conn, &format!("V~{VERSION}"));
                 // An add-on older than this server's: say so, and how to update.
-                if (n.max(1) as u32) < VERSION {
+                let account = self.sessions.get(&conn).map_or(String::new(), |s| s.account.clone());
+                if (n.max(1) as u32) < VERSION && crate::first_told(format!("bb:{account}:{n}")) {
                     self.say_to(conn, &format!("Your Basin Battle add-on is older than this server's (v{n}; the server has v{VERSION}): some screens may be missing. {}", crate::HOW_TO_UPDATE));
                 }
                 if n >= 3 {
@@ -820,5 +821,16 @@ impl Game {
         }
         self.hud.sent = Some((s, Instant::now()));
         self.hud.pending = None;
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    /// The add-on's own `VERSION`, read from its source: the server's must keep up with it.
+    #[test]
+    fn the_server_knows_the_add_ons_version() {
+        let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../addon/BasinBattle/BasinBattle.lua")).unwrap();
+        let version: u32 = src.lines().find_map(|l| l.strip_prefix("local VERSION = ")).and_then(|v| v.trim().parse().ok()).expect("local VERSION = N");
+        assert_eq!(version, super::VERSION);
     }
 }

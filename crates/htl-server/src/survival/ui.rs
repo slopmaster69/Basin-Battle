@@ -1098,7 +1098,8 @@ impl SurvivalGame {
                 let version: u32 = arg.parse().unwrap_or(0);
                 let name = self.world_of(conn).map_or(String::new(), |w| w.name.clone());
                 println!("[survival] {name} runs add-on v{version}, client ac{level}");
-                if let Some(word) = out_of_date(version, level) {
+                let account = self.sessions.get(&conn).map_or(String::new(), |s| s.account.clone());
+                if let Some(word) = out_of_date(version, level).filter(|_| crate::first_told(format!("es:{account}:{version}:{level}"))) {
                     self.tell(conn, &word);
                     self.say_to(conn, &word);
                 }
@@ -1810,5 +1811,16 @@ mod version_tests {
         let client = out_of_date(ADDON_NEWEST, CLIENT_NEWEST - 1).unwrap();
         assert!(client.starts_with("Your game client is older"), "{client}");
         assert!(out_of_date(1, 0).unwrap().contains("client and add-on (v1)"));
+    }
+
+    /// The add-on's own `VERSION` and the newest client level it asks for, read from its source:
+    /// the server's numbers must keep up with them.
+    #[test]
+    fn the_newest_add_on_and_client_are_the_ones_the_add_on_says() {
+        let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../addon/ElwynnSurvival/ElwynnSurvival.lua")).unwrap();
+        let version: u32 = src.lines().find_map(|l| l.strip_prefix("local VERSION = ")).and_then(|v| v.trim().parse().ok()).expect("local VERSION = N");
+        assert_eq!(version, ADDON_NEWEST, "bump ADDON_NEWEST with the add-on's VERSION");
+        let level: u8 = src.match_indices("\" ac").filter_map(|(i, _)| src[i + 4..].split('"').next()?.parse().ok()).max().expect("the hello's acN");
+        assert_eq!(level, CLIENT_NEWEST, "the newest client the add-on asks for");
     }
 }
