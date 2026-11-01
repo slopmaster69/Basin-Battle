@@ -393,7 +393,8 @@ BK	0	dm_landing~The Landing~deadmines	arena~The Proving Ring~0	siege~The Siege~C
 !ElwynnSurvival.BookOpen(nil) ElwynnSurvival.CloseWindows()
 # The Bookmaker's clock below: up while a wager's on, gone back at camp.
 WR	below
-WT	The Deadmines	5	754	1950	2	run	Hardened, Rallying
+WT	The Deadmines	5	754	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin VanCleef~0
+!table.insert(SAID, "wager bosses: " .. tostring(ElwynnSurvivalWager.bossHead:GetText()) .. " / " .. tostring(ElwynnSurvivalWager.bosses[1]:GetText()) .. " / " .. tostring(ElwynnSurvivalWager.bosses[2]:GetText()))
 !local w = ElwynnSurvival.wagerShown table.insert(SAID, "wager clock: " .. tostring(ElwynnSurvivalWager:IsShown()) .. " " .. ElwynnSurvivalWager.title:GetText() .. " / " .. ElwynnSurvivalWager.clock:GetText() .. " / " .. ElwynnSurvivalWager.falls:GetText() .. " / " .. ElwynnSurvivalWager.terms:GetText())
 WR	camp
 !table.insert(SAID, "wager clock at camp: " .. tostring(ElwynnSurvivalWager:IsShown()))
