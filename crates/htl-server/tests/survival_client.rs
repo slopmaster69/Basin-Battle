@@ -1621,3 +1621,29 @@ fn a_creatures_swing_trails_its_last_stroke_on_a_client_that_draws_it_so() {
     assert!(!theirs.is_empty(), "ben sees it wind up too");
     assert!(theirs.iter().all(|l| l.split('\t').nth(4) == Some("-")), "with no trail on the older client: {theirs:?}");
 }
+
+#[test]
+fn a_blow_borrowing_another_models_clip_names_it_to_the_clients() {
+    let mut content = content();
+    for m in &mut content.movesets {
+        for l in &mut m.light {
+            l.from = Some("ScourgeFemale".into());
+        }
+    }
+    let server = start_content(None, false, content);
+    let mut c = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut c);
+    c.chat(".es hello 5 ac10");
+    c.drain(0.5);
+    stand(&mut c, [-9500.0, 0.0, 0.0], 0.0);
+    c.chat(".es in a");
+    c.chat(".es in au");
+    c.drain(0.6);
+    let lines = addon_lines(&c, "ES");
+    let swing = lines.iter().find(|l| l.starts_with("AN\t") && l.split('\t').nth(10) == Some("light")).unwrap_or_else(|| panic!("the swing: {lines:?}"));
+    assert_eq!(swing.split('\t').nth(12), Some("ScourgeFemale"), "{swing}");
+    // And the moves the add-on plays itself carry it too.
+    let mv = lines.iter().rfind(|l| l.starts_with("MV\t")).expect("the moves");
+    let first = mv.split('\t').nth(10).unwrap().split('^').next().unwrap();
+    assert!(first.ends_with("~ScourgeFemale"), "{first}");
+}

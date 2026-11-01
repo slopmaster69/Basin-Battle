@@ -442,6 +442,7 @@ impl Survival {
             lunge: m.lunge,
             stamina: w.stamina * m.stamina * if heavy { h.stamina } else { 1.0 },
             art: None,
+            from: m.from.clone(),
         }
     }
 
@@ -492,6 +493,7 @@ impl Survival {
             lunge: d.lunge,
             stamina: d.stamina,
             art: None,
+            from: None,
         };
         if let Some(p) = self.players.get_mut(&id) {
             p.combo_next = 0;

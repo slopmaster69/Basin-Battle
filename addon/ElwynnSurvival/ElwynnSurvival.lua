@@ -527,6 +527,8 @@ local function Move(text)
     stamina = tonumber(f[6]) or 0,
     range = tonumber(f[7]) or 2.5,
     arc = tonumber(f[8]) or 90,
+    -- Another character model's take on the clip (ac10), none for our own.
+    from = (f[9] and f[9] ~= "") and f[9] or nil,
   }
 end
 
@@ -536,6 +538,14 @@ function ES.MovesLine(f)
   for i = 1, table.getn(parts) do
     local m = Move(parts[i])
     if m then table.insert(light, m) end
+  end
+  -- Another model's clips start loading now, so the first blow already has them.
+  if PreloadAnimationSource then
+    local all = { Move(f[12]), Move(f[13]) }
+    for i = 1, table.getn(light) do table.insert(all, light[i]) end
+    for i = 1, table.getn(all) do
+      if all[i] and all[i].from then PreloadAnimationSource(all[i].from) end
+    end
   end
   ES.moves = {
     twoHanded = f[2] == "1",
@@ -577,7 +587,7 @@ end
 local function PlayMine(kind, step, move)
   local heavy = kind == "heavy" or kind == "bash" or kind == "kick" or kind == "leap"
   local trail = heavy and HEAVY_TRAIL or LIGHT_TRAIL
-  PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery)
+  PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery, nil, move.from)
   local mv = ES.moves
   if move.lunge > 0 and ActionDash and mv then
     local secs = mv.lungeSecs
@@ -728,6 +738,8 @@ end
 function ES.SwingLine(f)
   local guid, clip, impact, trail, ms, mine = f[2], tonumber(f[3]), tonumber(f[4]), f[5], tonumber(f[6]), f[7] == "1"
   local take, recovery, lunge, kind, step = tonumber(f[8]) or 0, tonumber(f[9]) or 0, tonumber(f[10]) or 0, f[11] or "light", tonumber(f[12]) or 0
+  -- Another character model's take on the clip (ac10): an empty field is the unit's own.
+  local from = (f[13] and f[13] ~= "") and f[13] or nil
   if not clip or not PlayUnitAnimation then return end
   -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track).
   if kind == "cast" then
@@ -741,13 +753,13 @@ function ES.SwingLine(f)
     if same then return end
     -- The server's blow, not the one we guessed: it plays now.
     if ActionLayer() and ES.moves then
-      PlayMine(kind, step, { clip = clip, take = take, impact = impact, recovery = recovery, lunge = lunge, stamina = 0 })
+      PlayMine(kind, step, { clip = clip, take = take, impact = impact, recovery = recovery, lunge = lunge, stamina = 0, from = from })
       ES.predicted = nil
       return
     end
     guid = "player"
   end
-  PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery)
+  PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery, nil, from)
 end
 
 -- RO: a hero dodges: the tumble (or a step aside or back).
@@ -6029,8 +6041,11 @@ events:SetScript("OnEvent", function()
     end
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
-    -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up).
-    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
+    -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
+    -- ac10: a clip can come from another character model.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 10 then
+      Say(".es hello " .. VERSION .. " ac10")
+    elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
       Say(".es hello " .. VERSION .. " ac9")
     elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
       Say(".es hello " .. VERSION .. " ac8")

@@ -42,7 +42,9 @@
 //! And to the third round (`ac3`), which runs its own dashes and lunges:
 //! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<friendly fire>`:
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
-//! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>`.
+//! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
+//!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
+//!   (a creature's line carries it too). Each `MV` blow goes on `~<from>` the same way.
 //!   The kind: `light`, `heavy`, `running`, `bash`, `kick`, `cast`, a creature's `mob`, and the
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
@@ -505,7 +507,8 @@ impl SurvivalGame {
         let set = c.moveset_of(w);
         let mv = |m: &htl_survival::Strike| {
             let impact = m.windup + m.active * 0.5;
-            format!("{}~{}~{impact:.3}~{:.3}~{:.2}~{:.1}~{:.2}~{:.0}", m.clip, m.take, m.total() - impact, m.lunge, m.stamina, m.range, m.arc)
+            let from = m.from.as_deref().map(clean).unwrap_or_default();
+            format!("{}~{}~{impact:.3}~{:.3}~{:.2}~{:.1}~{:.2}~{:.0}~{from}", m.clip, m.take, m.total() - impact, m.lunge, m.stamina, m.range, m.arc)
         };
         let light: Vec<String> = (0..set.light.len()).map(|k| mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Light, k))).collect();
         let heavy = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Heavy, 0));

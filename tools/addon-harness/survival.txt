@@ -427,3 +427,6 @@ WR	camp
 @PLAYER_LEAVING_WORLD
 !table.insert(SAID, "asleep: " .. tostring(ElwynnSurvival.awake) .. ", S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. ", catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()) .. ", action bar back " .. tostring(MainMenuBar:IsVisible()) .. ", bar " .. tostring(ElwynnSurvivalBar:IsVisible()))
 !table.insert(SAID, "after leaving: action bar visible " .. tostring(MainMenuBar:IsVisible()) .. ", player frame " .. tostring(PlayerFrame:IsVisible()))
+# Trying a clip on our own hero: its own take, or another character model's.
+!local a = {} for _, m in ipairs({"17", "17 1", "17 ScourgeFemale", "57 0 OrcMale 0.5"}) do local c, t, f, i = ElwynnSurvival.ClipArgs(m) table.insert(a, c .. "/" .. t .. "/" .. tostring(f) .. "/" .. i) end table.insert(SAID, "clip args: " .. table.concat(a, ", "))
+!OLDPUA, OLDPRE = PlayUnitAnimation, PreloadAnimationSource function PreloadAnimationSource(f) table.insert(SAID, "preload " .. f) end function PlayUnitAnimation(u, c, i, tr, ms, t, r, b, f) table.insert(SAID, "esclip plays " .. u .. " " .. c .. " take " .. t .. " from " .. tostring(f)) end ElwynnSurvival.TryClip("17 0 ScourgeFemale") PlayUnitAnimation, PreloadAnimationSource = OLDPUA, OLDPRE
