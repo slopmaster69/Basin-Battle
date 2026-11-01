@@ -484,11 +484,11 @@ The **Weapon Rack** beside the camp chest hands out every weapon for free while 
 | Footman's Claymore | two | Slow, wide sweeps that strike up to four; guards with the blade |
 | Goldshire Halberd | two | Long, narrow reach; guards with the haft |
 | Quarry Maul | two | Very slow, very heavy; breaks wind-ups; guards with the haft |
-| Hunting Bow | ranged | Aimed Shot's bow: the longer the draw (up to 0.7 s), the harder it hits |
-| Militia Crossbow | ranged | No draw: full power at once, then a long reload |
 | Militia Buckler / Reinforced Shield | shield | The reinforced one covers more and blocks for half the stamina |
 
 Two-handed weapons have no shield: their guard is narrower and dearer, but parries work the same.
+
+Bows and crossbows aren't on the rack: ranged fighting is off the board (Aimed Shot is benched), though the Hunting Bow and Militia Crossbow are still defined for the camp's towers and older saves.
 
 ## Enemies near the camp
 
