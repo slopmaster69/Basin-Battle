@@ -2838,6 +2838,10 @@ impl Content {
                 if self.abilities[b].is_ex() || self.abilities[b].inner || self.ex_of(b).is_none() {
                     bail!("{what}: empowers {}, which must be a base card with an EX version", e.ability);
                 }
+                // An empowered key fires at once; an ultimate's waits for its hold, so none is.
+                if self.abilities[b].slot == "ultimate" {
+                    bail!("{what}: empowers {}, an ultimate (its key waits for a hold)", e.ability);
+                }
             }
         }
         // The board: four cards a row at most, one a column.
