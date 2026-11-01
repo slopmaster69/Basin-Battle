@@ -2808,10 +2808,11 @@ cooldown = 6.0
 fuse = 2.0
 splash = 5.0
 clip = 53
-# A shadow bolt flies; Corruption's look on whoever carries it (and on the rot), Spirit Burst's
-# shadow where it goes off.
+# A shadow bolt flies; a purple corruption pulses on whoever carries it (Seething Plague's look:
+# played, Corruption's own showed nothing), Corruption's on the rot, Spirit Burst's shadow where it
+# goes off.
 spell = 686
-fuse_aura = 172
+fuse_aura = 23072
 burst_spell = 24050
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0, aura = 172 }]
 
