@@ -1015,6 +1015,10 @@ pub struct DungeonDef {
     /// dungeons by it, the easiest first.
     #[serde(default = "first_tier")]
     pub tier: u32,
+    /// What the camp's chest gets the first time the camp clears it (every boss down in a run):
+    /// item key to count. Empty: a banner, and the book's next page, but nothing in the chest.
+    #[serde(default)]
+    pub first_clear: BTreeMap<String, u32>,
     #[serde(rename = "lamp", default)]
     pub lamps: Vec<LampDef>,
     #[serde(rename = "door", default)]
@@ -2751,6 +2755,9 @@ impl Content {
             }
             for k in d.trade.keys() {
                 item(k, "dungeon trade")?;
+            }
+            for k in d.first_clear.keys() {
+                item(k, "dungeon first_clear")?;
             }
             if d.lamps.is_empty() {
                 bail!("dungeon: no [[dungeon.lamp]]");

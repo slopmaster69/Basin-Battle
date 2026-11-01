@@ -67,6 +67,10 @@ pub struct BookDungeon {
     pub wager: (u32, f32),
     /// How hard it is next to the others (1 to 3).
     pub tier: u32,
+    /// The camp has cleared it (every boss down in one run), and it's the one the book points
+    /// to next (the easiest open dungeon not yet cleared).
+    pub cleared: bool,
+    pub next: bool,
 }
 
 /// A door's state as it's drawn: open, or shut.
@@ -391,6 +395,7 @@ impl Survival {
     pub fn book_dungeons(&self) -> Vec<BookDungeon> {
         let mut list: Vec<&DungeonDef> = self.content.dungeons().collect();
         list.sort_by_key(|d| d.tier);
+        let next = self.next_dungeon().map(|d| d.key.clone());
         list.into_iter()
             .map(|d| BookDungeon {
                 key: d.key.clone(),
@@ -406,8 +411,18 @@ impl Survival {
                 notes: (d.notes.iter().filter(|n| self.ever("read", &n.key)).count(), d.notes.len()),
                 wager: (self.wager_unlocked(&d.key), super::wager::wager_limit(d, &self.content)),
                 tier: d.tier,
+                cleared: self.ever("cleared", &d.key),
+                next: next.as_deref() == Some(d.key.as_str()),
             })
             .collect()
+    }
+
+    /// The dungeon the book points to next: the easiest open one the camp hasn't cleared (the
+    /// book's own order among the same tier).
+    pub fn next_dungeon(&self) -> Option<&DungeonDef> {
+        let mut list: Vec<&DungeonDef> = self.content.dungeons().filter(|d| (self.debug || self.camp.raids_won >= d.gate_raids) && !self.ever("cleared", &d.key)).collect();
+        list.sort_by_key(|d| d.tier);
+        list.into_iter().next()
     }
 
     /// The lamps lit below, as the world below last said (for the book at camp).
@@ -1169,15 +1184,24 @@ impl Survival {
             self.events.push(Event::Banner {
                 player: None,
                 title: "The Way Out".into(),
-                sub: "The front door stands open: walk out into Moonbrook".into(),
+                sub: if d.key == "deadmines" { "The front door stands open: walk out into Moonbrook".into() } else { "The way out stands open".into() },
             });
+        }
+        // Every boss down in this run: the dungeon is cleared, and the camp hears of it.
+        let bosses = super::wager::wager_bosses(&d, &self.content);
+        if bosses.iter().any(|b| b == key) && bosses.iter().all(|b| self.slain(b)) {
+            self.forward_count("cleared", &d.key, 1);
         }
     }
 
     /// At camp: what was done below (the journal's counts), and trophies into the chest.
     pub fn from_below(&mut self, counts: &[(String, u32)], items: &BTreeMap<usize, u32>) {
         for (k, n) in counts {
+            let first = self.camp.counts.get(k).copied().unwrap_or(0) == 0;
             *self.camp.counts.entry(k.clone()).or_default() += n;
+            if let Some(d) = k.strip_prefix("cleared:").filter(|_| first && *n > 0) {
+                self.first_clear(d);
+            }
         }
         if !items.is_empty() {
             let mut names = Vec::new();
@@ -1189,6 +1213,36 @@ impl Survival {
             let place = self.dungeon_def().map_or_else(|| "below".to_string(), |d| d.name.clone());
             self.announce(format!("From {place}, by the book: into the camp's chest, {}.", names.join(", ")));
         }
+        self.events.push(Event::Dirty);
+    }
+
+    /// A dungeon cleared for the first time: its gift to the camp's chest, a banner for every hero
+    /// at camp, and the book's next page.
+    pub(crate) fn first_clear(&mut self, key: &str) {
+        let Some(d) = self.content.dungeons().find(|d| d.key == key).cloned() else { return };
+        let mut gift = Vec::new();
+        for (k, n) in &d.first_clear {
+            if let Some(i) = self.content.item(k) {
+                *self.storage.entry(i).or_default() += n;
+                gift.push(format!("{n} {}", self.content.items[i].name));
+            }
+        }
+        if !gift.is_empty() {
+            self.events.push(Event::Storage);
+        }
+        let next = self.next_dungeon().map(|n| (n.name.clone(), n.blurb.clone()));
+        let sub = match &next {
+            Some((name, _)) => format!("A first for the camp. The book turns a page: next, {name}"),
+            None => "A first for the camp: every dungeon in the book is cleared".to_string(),
+        };
+        self.events.push(Event::Banner { player: None, title: format!("{} Cleared", d.name), sub });
+        if !gift.is_empty() {
+            self.announce(format!("{} cleared for the first time: into the camp's chest, {}.", d.name, gift.join(", ")));
+        }
+        if let Some((name, blurb)) = next {
+            self.announce(format!("The book turns a page: next, {name}. {blurb}."));
+        }
+        self.events.push(Event::Log(format!("{} cleared for the first time", d.name)));
         self.events.push(Event::Dirty);
     }
 
