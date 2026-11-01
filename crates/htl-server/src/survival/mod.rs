@@ -873,6 +873,7 @@ impl SurvivalGame {
         }
         // Long falls hurt, as in Basin Battle.
         if opcode == op::MSG_MOVE_FALL_LAND {
+            self.sim.landed(id);
             let fall_ms = crate::game::fall_time(&mut r, flags).unwrap_or(0);
             if let Some(w) = self.world_mut(conn) {
                 let top = w.fall_top.take().unwrap_or(w.ground_z).max(pos[2]);

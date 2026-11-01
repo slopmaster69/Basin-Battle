@@ -1269,6 +1269,13 @@ local function SkinKey(b)
     b.count:SetPoint("BOTTOMRIGHT", b.icon, "BOTTOMRIGHT", 2, -1)
     Face(b.count, BODY, 13, "OUTLINE")
   end
+  -- An empower's seconds: in the icon's top corner, clear of the seal at the key's shoulder.
+  if b.timer then
+    b.timer:ClearAllPoints()
+    b.timer:SetPoint("TOPLEFT", b.icon, "TOPLEFT", -1, 1)
+    Face(b.timer, BODY, 13, "OUTLINE")
+    b.timer:SetTextColor(1, 0.86, 0.5)
+  end
   if b.pip then
     b.pip:SetTexture(A .. "seal_red")
     b.pip:SetWidth(16)

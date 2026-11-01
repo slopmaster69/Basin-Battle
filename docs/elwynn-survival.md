@@ -66,7 +66,7 @@ effect.
 | --- | --- |
 | W A S D | Move and strafe |
 | The mouse | In action mode, it steers: the view turns the hero. A window up (the bags, a chest, the board, the card, the map) frees the cursor until it closes; Z frees it on purpose |
-| Left mouse | Attack. Blows **chain**: press again during one's follow-through and the next of the weapon's set comes at once, each with a short **lunge** into it. Attacking while sprinting is a **running attack** that lunges much farther. While an ability is aimed: **cast** it (held: charge it) |
+| Left mouse | Attack. Blows **chain**: press again during one's follow-through and the next of the weapon's set comes at once, each with a short **lunge** into it. Attacking while sprinting is a **running attack** that lunges much farther. Pressed during a dodge, the **attack out of the dodge** comes as the roll ends. Jump while a dodge still dashes (about 0.2 s in) for a **Corey roll**: the leap carries the dash's speed, and an attack pressed in the air strikes as you land, a long heavy **leap attack**. Corey rolls chain: land, roll, jump again. While an ability is aimed: **cast** it (held: charge it) |
 | Shift + left mouse | **Heavy attack**: slower, 1.7 times the damage and 1.6 times the stamina. It doesn't stop a creature's wind-up (hitting first only trades blows); landed just after the creature's own blow, it staggers it (never a boss) |
 | Right mouse (hold) | Raise your **guard**. Raise it just as a blow lands to **parry**: nothing gets through, no stamina, and the attacker reels. Raised while your own blow still winds up, it **feints**: the blow is called off and its stamina comes back (once it has landed, no). Late in a swing's follow-through it cuts the rest short. While an ability is aimed: call it off |
 | Right + left mouse | **Shield bash** (with a two-hander, a kick); with Shift, the **kick**: breaks a guard harder |
@@ -182,7 +182,18 @@ air to the reticle's point (or straight back, a Disengage) and strikes what's th
 Demonic Circle sets an **anchor** to step back to; **traps** arm, wait (two at once) and spring on
 the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a moment and is lost to
 a stun. Projectiles may **pierce** (Crippling Throw), **leap on** (Chain Lightning) or
-**burst**; ground may linger, pull, throw out or slow every second.
+**burst**; ground may linger, pull, throw out or slow every second. A dash may run **through**
+every foe in its way, striking each as it passes. Help aimed at a **friend**
+lands on the friend under the reticle (or the one nearest it, within 15°), else on you, and gives
+them only its heal, cleanse and boons; a **beam** is held a few seconds as a strip from you along
+your aim, sweeping as you turn: every foe in it takes its damage each tick and every friend in it
+is mended (a stun, silence, stagger or roll ends it, and so does its key again).
+
+**Combos** (engine support; the cards that use them come with the class redesign): a card with a
+**recast** arms its key for a few seconds after it goes, and the key again fires its second
+part for free (a blink there and back, a throw after a slam); the key glows green with the seconds
+left. A card that **empowers** another makes that card's next press its EX version for no Valor
+(Frost Nova on E making Fireball on Q its EX); the empowered key glows, its seconds in the corner.
 
 **Seeing it coming** (the action-combat client, eighth round): everything that lands later is
 drawn on the ground where it will land, red when it's a foe's, blue when it's yours or a
@@ -273,6 +284,9 @@ Some of this needs a change to the client itself, which this folder carries as p
 - a ground ability's circle lies on the ground where it will land (`SetAimMarker`), and a blow
   coming down lays a red circle where it will fall (`SetGroundMarker`), following the ground;
 - a creature's slow heavy blow holds its coil and snaps onto its impact;
+- a creature's swing trails its last stroke into the blow (amber: a guard stops it, red: it
+  doesn't), not its whole wind-up; a beast with nothing in its hands trails the part of it that
+  strikes, a paw or its head: the ninth round;
 - a creature's blow is drawn on the ground under it as it winds up (`SetTelegraph`): its own
   shape (a wedge of its arc, or a ring all round) out to the reach it lands at, turning and
   moving with it, and a fill growing from the creature to the rim, meeting it as the blow lands.
@@ -282,7 +296,7 @@ Some of this needs a change to the client itself, which this folder carries as p
 - a blow meant for you tells you when to answer it, with the floor markers on or off: the
   striker glows over its wind-up (amber: a guard stops it, red: it doesn't), and a reaction's
   time before your window opens the glow flashes bright: raise the guard now to parry (with a
-  blade's ring), or roll now for a red one. The stroke into the blow wooshes, heavier for a slower
+  ping), or roll now for a red one. The stroke into the blow wooshes, heavier for a slower
   wind-up;
 - a raised guard's ShieldBlock goes up once and holds there (on the upper body while moving),
   where it used to loop;
@@ -1149,7 +1163,9 @@ test: a knockback from a burst's middle (creatures and heroes), a pull to the ca
 too, unhurt), a leap landing where it was aimed and a Disengage back with its net forward, a strip
 after its drawn wind-up (and lost to a stun), a trap arming and springing, a Demonic Circle's
 anchor, piercing, chaining and bursting projectiles, shields, mending and haste, a veil, a
-Grounding Totem eating a bolt, Evasion and a vortex. `tests_classes.rs` casts every card of the
+Grounding Totem eating a bolt, Evasion and a vortex; `tests_recast.rs` covers recasts (a blink
+there and back, an aimed recast, the window running out, no cooldown for the recast), a dash
+through two foes and an empowered EX version. `tests_classes.rs` casts every card of the
 nine classes and its EX version on creatures and in a duel, and holds the board to its PvP
 budgets.
 

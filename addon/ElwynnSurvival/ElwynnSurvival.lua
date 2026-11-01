@@ -575,7 +575,7 @@ end
 -- Play a blow of ours: the clip (its impact and recovery the server's), the trail, the lunge, the
 -- whoosh.
 local function PlayMine(kind, step, move)
-  local heavy = kind == "heavy" or kind == "bash" or kind == "kick"
+  local heavy = kind == "heavy" or kind == "bash" or kind == "kick" or kind == "leap"
   local trail = heavy and HEAVY_TRAIL or LIGHT_TRAIL
   PlayUnitAnimation("player", move.clip, move.impact, trail, math.floor((move.impact + 0.2) * 1000), move.take, move.recovery)
   local mv = ES.moves
@@ -641,7 +641,9 @@ function ES.PredictSwing(kind)
     if n == 0 then return end
     if MineBusy() then
       -- Late in a light blow: the next of the chain, at once; earlier, the server waits for it.
-      if not (ES.mine.kind == "light" or ES.mine.kind == "running") or not MineAt(mv.chainAfter) then return end
+      -- (Out of a dodge or a Corey roll's landing, as out of a sprint, the chain starts after.)
+      local k = ES.mine.kind
+      if not (k == "light" or k == "running" or k == "roll" or k == "leap") or not MineAt(mv.chainAfter) then return end
       step = math.mod(ES.mine.step + 1, n)
     else
       if not Free() then return end
@@ -1571,6 +1573,12 @@ function ES.Ability(n, ex, state)
   -- A key held down repeats nothing.
   if h and h.n == n then return end
   local s = ES.slots and ES.slots[n]
+  -- A key armed for its recast, or empowered (its EX version, free): pressed, it goes at once
+  -- (the server knows which it fires), with no hold to wait for.
+  if ES.recasts[n] or ES.empowers[n] then
+    SendAbility(n, false)
+    return
+  end
   if n == ULT and s and s.key ~= "" and not ex then
     ES.exHold = { n = n, at = GetTime(), wait = true, ult = true, sent = false }
     return
@@ -2075,8 +2083,8 @@ end)
 -- While an ability is aimed the camera comes in over the shoulder, and the middle of the screen
 -- is where it goes (the server traces the reticle's line, as the client sends it). The ring
 -- closes as a charge builds, and turns gold once it's past the least; grey while it can't go.
--- A ground ability's circle (and a cone's wedge) lies on the ground where the line meets it, on
--- the clients that draw it (`SetAimMarker`).
+-- A ground ability's circle (and a cone's wedge) lies on the ground where the line meets it, and
+-- a projectile's or a beam's path along it, on the clients that draw them (`SetAimMarker`).
 
 local aim = CreateFrame("Frame", "ElwynnSurvivalAim", UIParent)
 aim:SetWidth(64)
@@ -2151,16 +2159,29 @@ function ES.DrawAim()
   ES.DrawAimMarker()
 end
 
+-- The marker an aimed ability gets: a ground ability's circle, a cone's wedge, and (on the eighth
+-- round, which draws a strip) a projectile's or a beam's path from the feet along the view, its
+-- range long and its radius either side. Nil: none (a dash, a tether, help for a friend).
+function ES.AimMarkerShape(d)
+  if not d then return nil end
+  if d.shape == "circle" or d.shape == "cone" then return d.shape end
+  if (d.kind == "projectile" or d.kind == "beam") and HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8 then
+    return "line"
+  end
+  return nil
+end
+
 -- The ground marker under the reticle (the client patch's `SetAimMarker(shape, range, radius,
 -- arc)`), off when nothing's aimed.
 function ES.DrawAimMarker()
   if not SetAimMarker then return end
   local d = aim.info
-  local want = d and (d.shape == "circle" or d.shape == "cone") and (d.shape .. d.range .. d.radius .. d.arc) or nil
+  local shape = ES.AimMarkerShape(d)
+  local want = shape and (shape .. d.range .. d.radius .. d.arc) or nil
   if want == ES.aimMarker then return end
   ES.aimMarker = want
   if want then
-    SetAimMarker(d.shape, d.range, d.radius, d.arc)
+    SetAimMarker(shape, d.range, d.radius, d.arc)
   else
     SetAimMarker(nil)
   end
@@ -2267,6 +2288,12 @@ ES.abar = abar
 abar.slots = {}
 ES.slots = {}
 ES.abilities = {}
+-- Keys armed for a recast (by key: the recast's look and aim, and when it closes) and keys
+-- empowered (by key: when it ends), from the RC and EM lines; the recasts by their own key too,
+-- for the reticle while one is aimed.
+ES.recasts = {}
+ES.empowers = {}
+ES.recastInfo = {}
 
 -- The quick item (T uses it, G picks the next) beside the keys: its icon from the bags and how
 -- many are left (meals, when no item is picked).
@@ -2324,6 +2351,10 @@ local function MakeKey(parent, size)
   b.cd:SetTextColor(1, 0.95, 0.8)
   b.count = Text(b, FONT_NUM, 11, "OUTLINE")
   b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 6)
+  -- An empower's seconds left, small in the corner.
+  b.timer = Text(b, FONT_NUM, 11, "OUTLINE")
+  b.timer:SetPoint("TOPLEFT", b.icon, "TOPLEFT", 1, -1)
+  b.timer:SetTextColor(1, 0.85, 0.4)
   -- The EX pip: a small gold diamond, lit with Valor enough.
   b.pip = Tex(b, "OVERLAY", "diamond", 9, 9)
   b.pip:SetPoint("TOPRIGHT", b, "TOPRIGHT", -3, -3)
@@ -2446,7 +2477,7 @@ end)
 
 -- What an ability is, by its key (the bar's and the EX versions').
 function ES.AbilityInfo(key)
-  return key and ES.abilities[key]
+  return key and (ES.abilities[key] or ES.recastInfo[key])
 end
 
 -- The key (1 to 4) an ability is on, if it is.
@@ -2506,6 +2537,41 @@ function ES.AbilitiesLine(f)
   ES.DrawAim()
 end
 
+-- RC: the key in a slot (0 to 4) armed for its recast, for so many seconds: the recast's icon,
+-- key, name, aim (shape, range, radius, arc, aimed) and charge; RC and the slot alone: closed.
+function ES.RecastLine(f)
+  local n = (tonumber(f[2] or "") or -1) + 1
+  if n < 1 or n > AB_N then return end
+  local secs = tonumber(f[3] or "")
+  if secs then
+    local r = {
+      n = n, icon = f[4] or "", key = f[5] or "", name = f[6] or "", shape = f[7] or "line",
+      range = tonumber(f[8] or "") or 0, radius = tonumber(f[9] or "") or 0, arc = tonumber(f[10] or "") or 0,
+      aimed = f[11] == "1", lo = tonumber(f[12] or "") or 0, hi = tonumber(f[13] or "") or 0, valor = 0,
+      ends = GetTime() + secs, isRecast = true,
+    }
+    ES.recasts[n] = r
+    if r.key ~= "" then ES.recastInfo[r.key] = r end
+  else
+    ES.recasts[n] = nil
+  end
+  ES.DrawAbilities()
+end
+
+-- EM: the key in a slot (0 to 4) empowered for so many seconds (its next press is its EX version,
+-- for no Valor); EM and the slot alone: spent or gone.
+function ES.EmpowerLine(f)
+  local n = (tonumber(f[2] or "") or -1) + 1
+  if n < 1 or n > AB_N then return end
+  local secs = tonumber(f[3] or "")
+  if secs then
+    ES.empowers[n] = GetTime() + secs
+  else
+    ES.empowers[n] = nil
+  end
+  ES.DrawAbilities()
+end
+
 local function Ctrl()
   return IsControlKeyDown and IsControlKeyDown() and true or false
 end
@@ -2531,9 +2597,17 @@ function ES.DrawAbilities()
         b.accent:SetVertexColor(0.6, 0.6, 0.6, 0.6)
       end
       local held = ES.exHold and ES.exHold.n == n and ES.exHold.sent and not ES.exHold.ult
-      local d = ((ctrl or held) and s.ex) or s
+      local rc, em = ES.recasts[n], ES.empowers[n]
+      local d = ((ctrl or held or em) and s.ex) or s
       local ready = ES.AbilityReady(d)
-      b:Set(ICONS .. d.icon, ready, (s.most > 1) and tostring(s.charges) or "")
+      -- Empowered: its EX version, free (only its cooldown counts).
+      if em and s.ex then ready = CooldownLeft(s) <= 0 end
+      if rc then
+        -- Armed for its recast: the recast's icon, lit (it costs nothing).
+        b:Set(ICONS .. rc.icon, true, "")
+      else
+        b:Set(ICONS .. d.icon, ready, (s.most > 1) and tostring(s.charges) or "")
+      end
       if s.ex and (valor.now or 0) + 0.001 >= s.ex.valor then
         b.pip:SetVertexColor(1, 0.8, 0.3, 1)
         b.pip:Show()
@@ -2544,12 +2618,22 @@ function ES.DrawAbilities()
         b.pip:Hide()
       end
       -- The ultimate with the bar full: it glows.
+      b.glow:SetVertexColor(1, 0.78, 0.35, 0.45)
       if n == ULT and ready then
+        b.glow:Show()
+      end
+      -- Empowered: it glows (and pulses, its seconds in the corner); armed for its recast, it
+      -- glows green.
+      if em then
+        b.glow:Show()
+      end
+      if rc then
+        b.glow:SetVertexColor(0.45, 1, 0.7, 0.6)
         b.glow:Show()
       end
       -- An aimed one up: its rim lit.
       local up = Aiming()
-      if up and (up == s.key or (s.ex and up == s.ex.key)) then
+      if up and (up == s.key or (s.ex and up == s.ex.key) or (rc and up == rc.key)) then
         b.rim:SetVertexColor(1, 0.95, 0.6, 1)
         b.glow:Show()
       end
@@ -2565,7 +2649,18 @@ abar:SetScript("OnUpdate", function()
     local b = this.slots[n]
     local s = ES.slots[n]
     local left = CooldownLeft(s)
-    if left > 0 and s.cdTotal > 0 then
+    local rc, em = ES.recasts[n], ES.empowers[n]
+    if rc then
+      -- Armed for its recast: the seconds till it closes, no cooldown.
+      local w = math.max(0, rc.ends - now)
+      b.shade:Hide()
+      if w >= 1 then
+        b.cd:SetText(string.format("%d", math.ceil(w)))
+      else
+        b.cd:SetText(string.format("%.1f", w))
+      end
+      b.wasCooling = true
+    elseif left > 0 and s.cdTotal > 0 then
       b.shade:SetHeight(math.max(1, (AB_SIZE - 6) * Clamp(left / s.cdTotal, 0, 1)))
       b.shade:Show()
       if left >= 1 then
@@ -2582,6 +2677,11 @@ abar:SetScript("OnUpdate", function()
         b.wasCooling = nil
         ES.DrawAbilities()
       end
+    end
+    if em then
+      b.timer:SetText(string.format("%d", math.ceil(math.max(0, em - now))))
+    else
+      b.timer:SetText("")
     end
     -- A key held toward its EX version: the line along its foot fills.
     if h and h.n == n and not h.sent and (s and (s.ex or n == ULT)) then
@@ -2601,6 +2701,8 @@ abar:SetScript("OnUpdate", function()
         b.glow:Show()
         b.glow:SetAlpha(1 - t)
       end
+    elseif (rc or em) and b.glow:IsShown() then
+      b.glow:SetAlpha(0.6 + 0.35 * math.sin(now * (em and 6 or 3)))
     elseif n == ULT and b.glow:IsShown() and not Aiming() then
       b.glow:SetAlpha(0.55 + 0.35 * math.sin(now * 3))
     end
@@ -3391,7 +3493,7 @@ end
 -- Tells: a blow coming at you reads on the striker itself, with the floor markers on or off. Its
 -- wind-up glows (amber: a guard stops it, red: nothing does, from the TG line); a moment before
 -- the window to answer it opens, the glow flashes bright: raise the guard now for a parry, with a
--- blade's ring, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
+-- ping, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
 -- a longer wind-up. ES.tells[key] is the wind-up's number, so a blow called off (its TG gone
 -- before it lands, or a new one for the same key) plays nothing more.
 ES.tells, ES.tellN = {}, 0
@@ -3399,7 +3501,9 @@ ES.tells, ES.tellN = {}, 0
 -- inside the window, not after it.
 ES.TELL_LEAD = 0.12
 ES.TELL_FLASH = "FFF6D8"
-ES.TELL_RING = "Sound\\Item\\Weapons\\Parry\\ParryMetalHitMetal.wav"
+-- The cue to raise the guard: a ping, not a weapon's sound. It used to be a blade's ring, the very
+-- sound of a guard meeting a blow, so the warning sounded like a parry had already happened.
+ES.TELL_RING = "Sound\\Interface\\MapPing.wav"
 function ES.Tell(key, guid, secs, kind, parry, roll)
   ES.tellN = ES.tellN + 1
   local n = ES.tellN
@@ -5860,6 +5964,10 @@ function ES.Line(line)
     ES.DrawAbilities()
   elseif verb == "AB" then
     ES.AbilitiesLine(f)
+  elseif verb == "RC" then
+    ES.RecastLine(f)
+  elseif verb == "EM" then
+    ES.EmpowerLine(f)
   elseif verb == "VA" then
     ES.ValorLine(f)
   elseif verb == "CC" then
@@ -6027,7 +6135,10 @@ events:SetScript("OnEvent", function()
     end
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
-    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
+    -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up).
+    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
+      Say(".es hello " .. VERSION .. " ac9")
+    elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
       Say(".es hello " .. VERSION .. " ac8")
     elseif LocalHits() and SetTelegraph and (tonumber(HasActionCombat()) or 0) >= 7 then
       Say(".es hello " .. VERSION .. " ac7")

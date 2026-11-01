@@ -31,6 +31,8 @@ mod tests_board;
 #[cfg(test)]
 mod tests_moves;
 #[cfg(test)]
+mod tests_recast;
+#[cfg(test)]
 mod tests_classes;
 #[cfg(test)]
 mod tests_explore;
@@ -38,6 +40,8 @@ mod tests_explore;
 mod tests_floors;
 #[cfg(test)]
 mod tests_siege;
+#[cfg(test)]
+mod tests_support;
 #[cfg(test)]
 mod tests_tactics;
 #[cfg(test)]

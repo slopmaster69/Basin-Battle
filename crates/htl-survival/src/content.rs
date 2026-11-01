@@ -403,6 +403,27 @@ pub struct MovesetDef {
     pub heavy: MoveDef,
     /// An attack while sprinting.
     pub running: MoveDef,
+    /// An attack out of a dodge: pressed during the roll, it comes as the roll ends (without one,
+    /// the running attack).
+    #[serde(default)]
+    pub roll: Option<MoveDef>,
+    /// An attack out of a Corey roll (a jump taken in the dodge's dash, which carries the dash's
+    /// speed through the air): pressed in the air, it strikes as the hero lands (without one, the
+    /// attack out of a dodge).
+    #[serde(default)]
+    pub leap: Option<MoveDef>,
+}
+
+impl MovesetDef {
+    /// The attack out of a dodge.
+    pub fn roll_move(&self) -> &MoveDef {
+        self.roll.as_ref().unwrap_or(&self.running)
+    }
+
+    /// The attack out of a Corey roll, on landing.
+    pub fn leap_move(&self) -> &MoveDef {
+        self.leap.as_ref().unwrap_or_else(|| self.roll_move())
+    }
 }
 
 fn default_movesets() -> Vec<MovesetDef> {
@@ -413,24 +434,32 @@ fn default_movesets() -> Vec<MovesetDef> {
             light: vec![m(17, 0, 1.0, 1.0, 1.0, 0.7), m(17, 1, 1.0, 1.05, 1.0, 0.7), m(57, 0, 1.2, 1.25, 1.35, 1.0)],
             heavy: m(57, 0, 1.0, 1.0, 1.0, 1.0),
             running: m(17, 1, 1.0, 1.1, 1.2, 2.4),
+            roll: None,
+            leap: None,
         },
         MovesetDef {
             key: "dagger".into(),
             light: vec![m(85, 0, 1.0, 1.0, 1.0, 0.6), m(88, 0, 1.0, 1.0, 1.0, 0.6), m(85, 0, 0.9, 1.0, 1.0, 0.6), m(57, 0, 1.2, 1.2, 1.5, 1.0)],
             heavy: m(57, 0, 1.0, 1.0, 1.0, 1.0),
             running: m(85, 0, 1.0, 1.1, 1.3, 2.4),
+            roll: None,
+            leap: None,
         },
         MovesetDef {
             key: "two_hand".into(),
             light: vec![m(18, 0, 1.0, 1.0, 1.0, 0.8), m(18, 1, 1.0, 1.05, 1.05, 0.8)],
             heavy: m(58, 0, 1.0, 1.0, 1.0, 1.2),
             running: m(18, 1, 1.0, 1.1, 1.2, 2.6),
+            roll: None,
+            leap: None,
         },
         MovesetDef {
             key: "polearm".into(),
             light: vec![m(19, 0, 1.0, 1.0, 1.0, 0.8), m(19, 1, 1.0, 1.05, 1.05, 0.8), m(19, 2, 1.1, 1.1, 1.15, 0.9)],
             heavy: m(58, 0, 1.0, 1.0, 1.0, 1.2),
             running: m(19, 0, 1.0, 1.1, 1.2, 2.8),
+            roll: None,
+            leap: None,
         },
     ]
 }
@@ -2734,6 +2763,12 @@ impl Content {
             if a.kind == "line" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0) {
                 bail!("{what}: a strip needs its length (`range`) and half-width (`radius`)");
             }
+            if a.kind == "ally" && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
+                bail!("{what}: an ally ability helps whoever it lands on: no `damage`");
+            }
+            if a.kind == "beam" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0 || a.secs <= 0.0) {
+                bail!("{what}: a beam needs its length (`range`), half-width (`radius`) and how long it's held (`secs`)");
+            }
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
                 bail!("{what}: only a cone, a nova or a strip winds up (`cast`)");
             }
@@ -2764,6 +2799,21 @@ impl Content {
             if a.kind == "stance" && a.counter.is_none() {
                 bail!("{what}: a stance needs a [ability.counter]");
             }
+            if !a.recast.is_empty() && a.recast_secs <= 0.0 {
+                bail!("{what}: a recast needs its window (`recast_secs`)");
+            }
+            if a.recast.is_empty() && a.recast_secs > 0.0 {
+                bail!("{what}: `recast_secs` with no `recast`");
+            }
+            if a.recast_to_start && !matches!(a.kind.as_str(), "blink" | "leap") {
+                bail!("{what}: only a blink or a leap goes back to the start (`recast_to_start`)");
+            }
+            if a.through && a.kind != "dash" {
+                bail!("{what}: only a dash goes `through`");
+            }
+            if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
+                bail!("{what}: an empower needs its `secs`");
+            }
             for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects) {
                 effect_ok(e, &what)?;
             }
@@ -2784,6 +2834,28 @@ impl Content {
             for k in [&a.leaves, &a.also].into_iter().chain(a.counter.as_ref().map(|c| &c.reflect)) {
                 if !k.is_empty() && self.ability(k).is_none() {
                     bail!("{what}: no ability {k}");
+                }
+            }
+            // A recast is an inner ability, fired only by the key again; it arms nothing itself.
+            if !a.recast.is_empty() {
+                let Some(r) = self.ability(&a.recast) else { bail!("{what}: recast {}, no such ability", a.recast) };
+                let r = &self.abilities[r];
+                if !r.inner || r.key == a.key {
+                    bail!("{what}: its recast {} must be an `inner` ability of its own", a.recast);
+                }
+                if !r.recast.is_empty() {
+                    bail!("{what}: its recast {} can't have a recast of its own", a.recast);
+                }
+            }
+            // An empower names a base card with an EX version (the one it makes free).
+            if let Some(e) = &a.empower {
+                let Some(b) = self.ability(&e.ability) else { bail!("{what}: empowers {}, no such ability", e.ability) };
+                if self.abilities[b].is_ex() || self.abilities[b].inner || self.ex_of(b).is_none() {
+                    bail!("{what}: empowers {}, which must be a base card with an EX version", e.ability);
+                }
+                // An empowered key fires at once; an ultimate's waits for its hold, so none is.
+                if self.abilities[b].slot == "ultimate" {
+                    bail!("{what}: empowers {}, an ultimate (its key waits for a hold)", e.ability);
                 }
             }
         }
@@ -2864,6 +2936,33 @@ mod tests {
         let c = super::Content::builtin();
         assert!(c.items.len() >= 5);
         assert!(c.mob("grunt").is_some());
+    }
+
+    /// The built-in rules with one more ability (TOML, an `[[ability]]` table's fields), checked.
+    fn with(extra: &str) -> anyhow::Result<()> {
+        let mut c = super::Content::dev();
+        let a: super::AbilityDef = toml::from_str(extra).expect("a test ability");
+        c.abilities.push(a);
+        c.validate_abilities()
+    }
+
+    #[test]
+    fn recasts_dashes_through_and_empowers_are_checked_as_they_load() {
+        let base = "key = \"t_a\"\nname = \"A\"\nschool = \"mage\"\nslot = \"ranged\"\nbench = true\nspell = 1\n";
+        // A recast must be an inner ability, with its window.
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"fire_blast\"\nrecast_secs = 3.0")).is_ok());
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"fire_blast\"")).is_err(), "no window");
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"fireball\"\nrecast_secs = 3.0")).is_err(), "a card, not inner");
+        assert!(with(&format!("{base}kind = \"blink\"\nrecast = \"nothing\"\nrecast_secs = 3.0")).is_err(), "no such ability");
+        assert!(with(&format!("{base}kind = \"nova\"\nrecast_to_start = true")).is_err(), "only a blink or a leap goes back");
+        // Only a dash goes through.
+        assert!(with(&format!("{base}kind = \"dash\"\nthrough = true")).is_ok());
+        assert!(with(&format!("{base}kind = \"leap\"\nthrough = true")).is_err());
+        // An empower names a base card with an EX version.
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"fireball\", secs = 4.0 }}")).is_ok());
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"scorch\", secs = 4.0 }}")).is_err(), "an EX version");
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"meteor\", secs = 4.0 }}")).is_err(), "no EX version");
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"fireball\", secs = 0.0 }}")).is_err(), "no time");
     }
 }
 

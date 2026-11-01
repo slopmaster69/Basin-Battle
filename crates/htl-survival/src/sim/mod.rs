@@ -18,6 +18,7 @@ pub mod dungeon;
 mod journal;
 pub mod mobs;
 pub(crate) mod moves;
+pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 mod raid;
@@ -75,6 +76,10 @@ pub enum StrikeKind {
     Heavy,
     /// An attack while sprinting.
     Running,
+    /// An attack out of a dodge, as the roll ends.
+    Roll,
+    /// An attack out of a Corey roll (a jump taken in a dodge's dash), as the hero lands.
+    Leap,
     /// A guard breaker: the shield bash, the kick.
     Bash,
     Kick,
@@ -163,8 +168,9 @@ pub enum Event {
     /// `fit`: the clip's whole length fitted to that many seconds (a knockdown), 0 its own.
     React { id: Id, anim: u16, from: Vec3, lean: f32, hold: f32, fit: f32 },
     /// A creature winds up a blow: the clip and take it swings with, timed to land `windup`
-    /// seconds from now, and the recovery after (for the clients that play clips themselves).
-    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32 },
+    /// seconds from now, and the recovery after (for the clients that play clips themselves);
+    /// `blockable`: a guard stops it (its swing's trail says which).
+    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32, blockable: bool },
     /// A spell visual kit plays on a unit (an impact's flash and sound); `by`: the hero whose blow
     /// it is (whose own client may already have played it).
     Visual { id: Id, kit: u32, by: Option<Id> },
@@ -290,6 +296,20 @@ impl Telegraph {
     }
 }
 
+/// A hero in the air: since when, and whether the jump was a Corey roll's (taken in a dodge's
+/// dash, so it carries the dash's speed).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Air {
+    pub since: f32,
+    pub corey: bool,
+}
+
+/// A jump this late after a dodge's dash still counts as taken in it (a frame or two of the
+/// client's word on its way).
+pub(crate) const COREY_GRACE: f32 = 0.06;
+/// A hero whose landing never came (a teleport, a lost packet) is back on the ground after this.
+pub(crate) const AIR_MOST: f32 = 3.0;
+
 /// A hero this far under the last firm ground they stood on has fallen through the world.
 const FELL_THROUGH: f32 = 60.0;
 /// Just arrived somewhere far (a lamp, the world below, put back): for this long a drop of
@@ -355,7 +375,7 @@ impl Action {
                 StrikeKind::Heavy => "heavy",
                 StrikeKind::Bash => "bash",
                 StrikeKind::Kick => "kick",
-                StrikeKind::Light | StrikeKind::Running => "swing",
+                StrikeKind::Light | StrikeKind::Running | StrikeKind::Roll | StrikeKind::Leap => "swing",
             },
             Action::Guard => "guard",
             Action::Dodge { .. } => "dodge",
@@ -459,6 +479,13 @@ pub struct Player {
     pub sprint_held: bool,
     /// Sprinting now (held, moving, not walking, not committed to anything, stamina left).
     pub sprinting: bool,
+    /// In the air since a jump (their client's word) until it lands.
+    pub air: Option<Air>,
+    /// An attack pressed during a dodge, for as it ends (in the air: as the hero lands).
+    pub dodge_attack: bool,
+    /// An attack waiting for the hero to land: the leap out of a Corey roll, or the attack out of
+    /// a dodge that ended in the air.
+    pub landing_attack: Option<StrikeKind>,
     /// Reeling from a parried blow until then: every blow on them lands harder.
     pub riposte_until: f32,
     /// Who struck them last (a fall to another hero is announced).
@@ -539,6 +566,8 @@ pub struct Player {
     pub rooted: bool,
     /// A panic's last stride.
     pub panic_stride: f32,
+    /// Keys armed for a recast, cards empowered, a dash going through bodies.
+    pub combos: recasts::Combos,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -919,6 +948,7 @@ impl Survival {
         self.step_grounds();
         self.step_totems();
         self.step_stances();
+        self.step_combos();
         self.step_cc();
         self.step_holds();
         self.step_dummies();
@@ -989,6 +1019,9 @@ impl Survival {
             prev_guard_at: -100.0,
             sprint_held: false,
             sprinting: false,
+            air: None,
+            dodge_attack: false,
+            landing_attack: None,
             riposte_until: -100.0,
             last_hit_by: None,
             buffered: None,
@@ -1031,6 +1064,7 @@ impl Survival {
             sheathed: false,
             rooted: false,
             panic_stride: 0.0,
+            combos: recasts::Combos::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];

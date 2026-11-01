@@ -20,6 +20,14 @@ const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// The swings' trails (`AARRGGBB`): a faint pale streak, a heavy blow's ember.
 const LIGHT_TRAIL: &str = "50F2EEE4";
 const HEAVY_TRAIL: &str = "78FF9A3C";
+/// A creature's swing, its last stroke into the blow (`ac9`): amber for a blow a guard stops, red
+/// for one it doesn't (as its blow's telegraph). The client starts it this long before the impact
+/// (milliseconds) and lets it fade just after.
+const FOE_TRAIL: &str = "70FFC24A";
+const FOE_TRAIL_UNBLOCKABLE: &str = "A0FF2A1A";
+pub(crate) const FOE_TRAIL_MS: u32 = 320;
+/// The client level (`.es hello … acN`) that draws creature trails that way.
+pub(crate) const FOE_TRAILS_LEVEL: u8 = 9;
 /// `SpellMissInfo`: how a shot came out when it didn't land.
 const MISS_MISS: u8 = 1;
 const MISS_DODGE: u8 = 3;
@@ -96,7 +104,8 @@ impl SurvivalGame {
                     // moment) and the recovery after, how far it lunges, and its kind.
                     let clip = self.sim.players.get(&attacker).and_then(|p| match &p.action {
                         htl_survival::Action::Swing { strike, .. } => {
-                            let heavy = strike.heavy() || strike.shove();
+                            // A leap out of a Corey roll lands as heavily as a heavy attack looks.
+                            let heavy = strike.heavy() || strike.shove() || strike.kind == htl_survival::StrikeKind::Leap;
                             let trail = if heavy { HEAVY_TRAIL } else { LIGHT_TRAIL };
                             let impact = strike.windup + strike.active * 0.5;
                             let ms = ((strike.windup + strike.active + 0.15) * 1000.0) as u32;
@@ -104,6 +113,8 @@ impl SurvivalGame {
                                 htl_survival::StrikeKind::Light => "light",
                                 htl_survival::StrikeKind::Heavy => "heavy",
                                 htl_survival::StrikeKind::Running => "running",
+                                htl_survival::StrikeKind::Roll => "roll",
+                                htl_survival::StrikeKind::Leap => "leap",
                                 htl_survival::StrikeKind::Bash => "bash",
                                 htl_survival::StrikeKind::Kick => "kick",
                             };
@@ -312,12 +323,16 @@ impl SurvivalGame {
                     self.send(c, p);
                 }
             }
-            Event::MobWindup { id, clip, take, windup, recovery } => {
+            Event::MobWindup { id, clip, take, windup, recovery, blockable } => {
                 let Some(g) = self.guid_of(id) else { return };
-                let line = format!("AN\t{g:#X}\t{clip}\t{windup:.3}\t-\t0\t0\t{take}\t{recovery:.3}\t0\tmob\t0");
-                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
-                for c in conns {
-                    self.ui_line(c, &line);
+                // The swing's trail only to a client that starts a creature's late (`ac9`): an
+                // older one would draw it from the start of the wind-up and be done before the blow.
+                let trail = if blockable { FOE_TRAIL } else { FOE_TRAIL_UNBLOCKABLE };
+                let with = format!("AN\t{g:#X}\t{clip}\t{windup:.3}\t{trail}\t{FOE_TRAIL_MS}\t0\t{take}\t{recovery:.3}\t0\tmob\t0");
+                let without = format!("AN\t{g:#X}\t{clip}\t{windup:.3}\t-\t0\t0\t{take}\t{recovery:.3}\t0\tmob\t0");
+                let conns: Vec<(ConnId, u8)> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, w)| (*c, w.level)).collect();
+                for (c, level) in conns {
+                    self.ui_line(c, if level >= FOE_TRAILS_LEVEL { &with } else { &without });
                 }
             }
             Event::React { id, anim, from, lean, hold, fit } => {

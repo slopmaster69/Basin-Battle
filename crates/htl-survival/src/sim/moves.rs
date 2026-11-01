@@ -190,12 +190,20 @@ impl Survival {
     /// A leap: to the reticle's point (or the range back from the facing), through the air; where
     /// it lands is drawn for everyone, and it strikes what's there as it does.
     pub(crate) fn start_leap(&mut self, id: Id, ability: usize, share: f32) {
+        self.leap_to(id, ability, share, None);
+    }
+
+    /// [`Self::start_leap`], to a spot of its own when `to` names one (a recast's leap back to
+    /// where the first cast began).
+    pub(crate) fn leap_to(&mut self, id: Id, ability: usize, share: f32, to: Option<Vec3>) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);
         let pos = self.players[&id].pos;
         let f = self.players[&id].facing;
-        let target = if d.back {
+        let target = if let Some(at) = to {
+            at
+        } else if d.back {
             self.slide_end(pos, f + PI, range)
         } else {
             let at = self.aim_point(id, range);
@@ -406,18 +414,24 @@ impl Survival {
         let Some(a) = self.anchor_of(id, base).cloned() else { return false };
         self.anchors.remove(&id);
         self.unmark(a.mark);
+        self.step_back_to(id, ability, a.at);
+        true
+    }
+
+    /// A blink back to a spot it left (an anchor; where the cast a recast follows began): its
+    /// look, out of roots and snares with `cleanse`, and what it `leaves` where it went from.
+    pub(crate) fn step_back_to(&mut self, id: Id, ability: usize, at: Vec3) {
         let d = self.content.abilities[ability].clone();
         let start = self.players[&id].pos;
         let f = self.players[&id].facing;
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
-        self.set_down(id, a.at, f);
+        self.set_down(id, at, f);
         if d.cleanse {
             self.cleanse(id, &["root", "snare"]);
         }
         if let Some(l) = self.content.ability(&d.leaves) {
             self.leave_at(id, l, start, f);
         }
-        true
     }
 
     // --- a grounding totem ----------------------------------------------------------------------------
