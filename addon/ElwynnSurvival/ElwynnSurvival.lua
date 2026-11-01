@@ -3405,6 +3405,17 @@ banner.title:SetTextColor(1, 0.82, 0.45)
 banner.sub = Text(banner, FONT_BODY, 14, "OUTLINE")
 banner.sub:SetPoint("TOP", banner.title, "BOTTOM", 0, -6)
 
+-- The game's own sting for a place found, in the hero's race's voice (the Human one by default,
+-- as in Elwynn): Sound\Interface\<Race>Exploration.wav.
+ES.EXPLORE_RACES = { Human = 1, Orc = 1, Undead = 1, Tauren = 1, Troll = 1, NightElf = 1, Gnome = 1, Dwarf = 1 }
+function ES.ExploreSound()
+  local _, race = nil, nil
+  if UnitRace then _, race = UnitRace("player") end
+  if race == "Scourge" then race = "Undead" end
+  if not race or not ES.EXPLORE_RACES[race] then race = "Human" end
+  PlaySoundFile("Sound\\Interface\\" .. race .. "Exploration.wav")
+end
+
 function ES.Banner(title, sub)
   -- A place found or a journal goal done is quiet news, told the way the game tells it: a yellow
   -- line at the top in its own font, like a quest's progress. No banner, no horn (those are for
@@ -3416,7 +3427,9 @@ function ES.Banner(title, sub)
     if string.find(t, "^Done: ") then
       line = string.sub(t, 7) .. " completed."
     else
-      line = t .. ((sub and sub ~= "") and (" (" .. sub .. ")") or "")
+      -- Just the place: how many are found is for the journal, not the moment.
+      line = t
+      ES.ExploreSound()
     end
     if UIErrorsFrame then
       UIErrorsFrame:AddMessage(line, 1.0, 0.82, 0.0)
