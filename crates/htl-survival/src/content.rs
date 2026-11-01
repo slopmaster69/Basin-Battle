@@ -2089,7 +2089,12 @@ impl Content {
     /// The built-in rules as a dev world has them (every card owned), for tests.
     #[cfg(test)]
     pub fn dev() -> Self {
-        let mut c = Self::builtin();
+        Self::into_dev(Self::builtin())
+    }
+
+    /// Any rules (the solo sim's tuned ones) as a dev world has them.
+    #[cfg(test)]
+    pub fn into_dev(mut c: Self) -> Self {
         c.dev.full_tree = true;
         c.work = WorkDef::instant();
         c.combat.foe_health = 1.0;
