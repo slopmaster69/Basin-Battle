@@ -36,7 +36,9 @@
 //!   breaks a line.
 //! - `WT\t<dungeon>\t<level>\t<elapsed>\t<limit>\t<falls>\t<state>\t<terms>\t<name~down^...>\t<felled~needed~total>`:
 //!   a wager's clock below (state `wait`, `run`, `won` or `over`; the bosses it must beat, and its
-//!   count of foes), then `\t<ready~heroes~count secs>` before the clock. `WT` alone: no wager.
+//!   count of foes), then `\t<ready~heroes~count secs>` before the clock (empty after), then
+//!   `\t<split~best^...>` in seconds for each boss (when it fell, and in the camp's quickest run
+//!   in time at this level). `WT` alone: no wager.
 //!
 //! To the action-combat client that plays clips itself (`ac2`), in place of emotes:
 //! - `AN\t<guid>\t<clip>\t<impact secs>\t<trail AARRGGBB>\t<trail ms>\t<mine>`: a hero swings.

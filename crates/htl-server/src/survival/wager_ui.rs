@@ -145,6 +145,8 @@ impl SurvivalGame {
     /// with none. `bosses`: `name~down^...`, each boss the run has to beat and whether it's down
     /// (1) yet. `forces`: `felled~needed~total`, the foes counted toward the run. `ready`, before
     /// the clock: `ready~heroes~count` (the count's seconds left, empty till everyone's ready).
+    /// `splits`: for each boss in `bosses`' order, `split~best` in seconds, the clock when it fell
+    /// and when it fell in this server's quickest run in time at this level (either empty).
     pub(crate) fn wager_line(&self) -> String {
         let Some(w) = self.sim.wager() else { return "WT".to_string() };
         let name = self.sim.content.dungeon.as_ref().map_or(String::new(), |d| d.name.clone());
@@ -157,8 +159,20 @@ impl SurvivalGame {
         let terms: Vec<&str> = terms_at(w.level).iter().map(|t| t.name).collect();
         let bosses: Vec<String> = self.sim.wager_progress().iter().map(|(n, down)| format!("{}~{}", clean(n), u8::from(*down))).collect();
         let forces = self.sim.wager_forces().map_or(String::new(), |(f, n, t)| format!("{f}~{n}~{t}"));
+        let best = self.board.as_ref().and_then(|b| b.lock().unwrap().best_splits(self.sim.content.dungeon.as_ref().map_or("", |d| d.key.as_str()), w.level));
+        // Each boss's best by its name (a dungeon's bosses may change between versions).
+        let splits: Vec<String> = self
+            .sim
+            .wager_progress()
+            .iter()
+            .zip(self.sim.wager_splits())
+            .map(|((name, _), s)| {
+                let b = best.as_ref().and_then(|b| b.iter().find(|(n, _)| n == name)).map_or(String::new(), |(_, ms)| format!("{}", ms / 1000));
+                format!("{}~{b}", s.map_or(String::new(), |s| format!("{}", s.floor())))
+            })
+            .collect();
         let ready = self.sim.wager_readiness().map_or(String::new(), |(r, n, c)| format!("{r}~{n}~{}", c.map_or(String::new(), |c| format!("{}", c.ceil()))));
-        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}\t{forces}\t{ready}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"))
+        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}\t{forces}\t{ready}\t{}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"), splits.join("^"))
     }
 }
 

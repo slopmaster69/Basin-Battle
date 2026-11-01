@@ -417,6 +417,9 @@ WT	The Deadmines	5	754	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin V
 # With the count of foes (a newer server): the word and the bar under the bosses.
 WT	The Deadmines	5	760	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin VanCleef~0	31~40~50
 !local fc = ElwynnSurvival.wagerShown.forces table.insert(SAID, "wager foes: " .. tostring(ElwynnSurvivalWager.forces:GetText()) .. " bar shown " .. tostring(ElwynnSurvivalWager.forceBar:IsShown()) .. " needed " .. tostring(fc and fc.needed))
+# Splits: each slain boss's time against the camp's best at this level (ahead green, behind red).
+WT	The Deadmines	5	900	1950	0	run	Hardened	Rhahk'Zor~1^Sneed~1^Edwin VanCleef~0	31~40~50		200~230^500~450^~
+!table.insert(SAID, "wager splits: " .. tostring(ElwynnSurvivalWager.bosses[1]:GetText()) .. " | " .. tostring(ElwynnSurvivalWager.bosses[2]:GetText()) .. " | " .. tostring(ElwynnSurvivalWager.bosses[3]:GetText()))
 # Before the clock: who's ready, the Ready button (it says .es ready), then the count.
 WT	The Deadmines	5	0	1950	0	wait	Hardened, Rallying	Rhahk'Zor~0	0~40~50	1~2~
 !table.insert(SAID, "wager ready: " .. tostring(ElwynnSurvivalWager.falls:GetText()) .. " button " .. tostring(ElwynnSurvivalWagerReady:IsShown()))

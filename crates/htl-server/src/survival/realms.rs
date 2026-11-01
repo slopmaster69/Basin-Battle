@@ -240,7 +240,8 @@ impl Realms {
             if let Some(b) = &self.board {
                 for w in &won {
                     let run = b.lock().unwrap().record(w);
-                    println!("[survival] wager: {} +{} in {} ms ({} falls, {}) by {}", w.name, w.level, w.ms, w.deaths, if w.timed { "in time" } else { "over time" }, run.heroes());
+                    let splits: Vec<String> = w.splits.iter().map(|(n, ms)| format!("{n} {}s", ms / 1000)).collect();
+                    println!("[survival] wager: {} +{} in {} ms ({} falls, {}) by {}; splits: {}", w.name, w.level, w.ms, w.deaths, if w.timed { "in time" } else { "over time" }, run.heroes(), splits.join(", "));
                 }
             }
             let news = std::mem::take(&mut self.below[k].to_camp);
