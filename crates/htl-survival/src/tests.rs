@@ -2940,3 +2940,31 @@ fn a_landing_that_never_comes_puts_the_hero_back_on_the_ground() {
     s.input(p, Input::Attack);
     assert_eq!(swing_of(&s, p).map(|w| w.0), Some(StrikeKind::Light), "and an attack swings at once");
 }
+
+#[test]
+fn a_leap_whose_landing_went_unheard_takes_its_attack_with_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.2);
+    s.jumped(p);
+    let secs = s.content.dodge.secs;
+    run(&mut s, secs);
+    s.input(p, Input::Attack);
+    s.input(p, Input::AttackUp);
+    assert_eq!(s.players[&p].landing_attack, Some(StrikeKind::Leap));
+    // Its landing never comes; a while later the hero steps off a ledge and lands (no jump).
+    run(&mut s, 4.0);
+    s.landed(p);
+    assert!(swing_of(&s, p).is_none(), "no leap out of nowhere");
+    assert_eq!(s.players[&p].landing_attack, None);
+    // And a fall in the air takes it too.
+    s.input(p, Input::Dodge);
+    run(&mut s, 0.2);
+    s.jumped(p);
+    s.input(p, Input::Attack);
+    let hp = s.players[&p].health;
+    s.hurt_player(p, hp);
+    assert_eq!(s.players[&p].landing_attack, None, "fallen");
+}

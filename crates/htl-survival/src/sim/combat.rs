@@ -1685,9 +1685,12 @@ impl Survival {
     /// Their client landed: an attack pressed in the air (out of a Corey roll, or out of a dodge
     /// that ended in it) strikes now.
     pub fn landed(&mut self, id: Id) {
+        // Only the landing of the leap it was pressed in: one whose landing went unheard (a lost
+        // packet, a teleport) is over after [`AIR_MOST`], and its attack with it.
+        let current = self.airborne(id).is_some();
         let Some(p) = self.players.get_mut(&id) else { return };
         p.air = None;
-        if let Some(kind) = p.landing_attack.take() {
+        if let Some(kind) = p.landing_attack.take().filter(|_| current) {
             self.attack_out_of(id, kind);
         }
     }
@@ -1794,6 +1797,10 @@ impl Survival {
         }
         let Some(p) = self.players.get_mut(&id) else { return };
         p.action = Action::Dead { until: now + secs };
+        // A fall puts an end to a leap and the attack waiting for its landing.
+        p.air = None;
+        p.landing_attack = None;
+        p.dodge_attack = false;
         p.buffered = None;
         // What they carried for the camp stays where they fell; food and gear go with them. Below,
         // what they carried that's of the mine (plunder, gear found) waits in one sack.
@@ -1897,6 +1904,9 @@ impl Survival {
         p.pos = spawn;
         p.facing = spawn_facing;
         p.action = Action::Ready;
+        p.air = None;
+        p.landing_attack = None;
+        p.dodge_attack = false;
         p.kit = Kit::Melee;
         p.combat_at = self.clock;
         p.valor = c.valor.start;
