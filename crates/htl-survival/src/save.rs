@@ -204,8 +204,12 @@ pub fn save_player(c: &Content, p: &Player) -> PlayerSave {
 /// #40): a hero who had the old card owns, and keeps on its key, the card that took its place.
 /// One block per class, so changes to different classes don't collide.
 const RENAMED: &[(&str, &str)] = &[
-    // Warrior
+    // Warrior (Sundering Blow is now Shockwave's EX, never saved: a saved one is the old E card;
+    // Unstoppable Blow merged into it and Avatar into Onslaught)
     ("aimed_throw", "hurled_axe"),
+    ("sundering_blow", "shockwave"),
+    ("unstoppable_blow", "shockwave"),
+    ("avatar", "onslaught"),
     // Paladin (Holy Shock and Hammer of Justice live on, as Avenger's Shield's EX and Divine
     // Steed's recast: never a card of their own on a key or in a hero's tree)
     ("holy_shock", "avengers_shield"),

@@ -418,20 +418,6 @@ fn earthsplitter_breaks_open_along_your_aim_a_moment_later() {
     assert_eq!(dealt(&ev, aside), 0, "off the line");
 }
 
-#[test]
-fn avatar_makes_you_unstoppable_faster_and_harder_to_hurt() {
-    let mut s = world(true, false);
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    ready(&mut s, p, "avatar");
-    cast(&mut s, p, "ultimate", false);
-    for k in ["onslaught", "haste", "hallowed"] {
-        assert!(s.has_cc(p, k), "{k}");
-    }
-    assert!(s.unstaggerable(p));
-    run(&mut s, 8.2);
-    assert!(!s.has_cc(p, "onslaught"), "for 8 s");
-}
-
 // --- the cards on engine pieces of their own ------------------------------------------------------
 
 /// [`world`] with a wall of radius `r` at `at`.

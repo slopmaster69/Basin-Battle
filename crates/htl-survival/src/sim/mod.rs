@@ -232,6 +232,8 @@ pub enum Event {
     /// `id`'s weapon glows red for `secs`, for everyone who can see it (the striker too): a blow
     /// no guard stops is on its way.
     Glow { id: Id, secs: f32 },
+    /// `id`'s body drawn at `scale` (1: as it is): Onslaught's titan.
+    Grow { id: Id, scale: f32 },
     /// Open a station's work for a hero.
     StationOpen { player: Id, station: Id },
     /// Ask a hero to confirm something (ringing the bell).
