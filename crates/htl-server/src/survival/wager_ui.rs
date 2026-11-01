@@ -118,7 +118,9 @@ impl SurvivalGame {
         let terms: Vec<String> = TERM_LEVELS.iter().zip(week_terms(wall)).map(|(at, t)| format!("+{at} {}: {}", t.name, t.text)).collect();
         let best = self.board.as_ref().map_or(Vec::new(), |b| b.lock().unwrap().week_best(week.saturating_sub(1), 3));
         let names: std::collections::HashMap<String, String> = self.sim.content.dungeons().map(|d| (d.key.clone(), d.name.clone())).collect();
-        let last = if best.is_empty() {
+        let last = if self.board.is_none() {
+            "This server keeps no Bookmaker's Board, so there's no word of last week's best.".to_string()
+        } else if best.is_empty() {
             "Nobody won a wager in time last week. This week's best could be yours.".to_string()
         } else {
             let lines: Vec<String> = best
