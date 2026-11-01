@@ -133,10 +133,11 @@ fn a_longer_charge_lands_harder_and_a_capstone_waits_for_its_whole_charge() {
     ev.extend(run(&mut s, 1.0));
     let late = hits_on(&ev, k)[0].0;
     assert!(late > early, "{early} then {late}");
-    // Pyroblast let go before its 2.5 s is lost.
-    slot(&mut s, p, "ultimate", "pyroblast");
+    // Pyroblast (Fireball's EX) let go before its 1.5 s is lost.
+    slot(&mut s, p, "ranged", "fireball");
     s.set_valor(p, 100.0);
-    cast(&mut s, p, "ultimate", false, 1.0);
+    cast(&mut s, p, "ranged", true, 1.0);
+    assert!(s.players[&p].last_cast.is_none_or(|(a, _)| s.content.abilities[a].key != "pyroblast"), "never cast");
     assert_eq!(s.players[&p].action, Action::Ready, "dropped");
     assert_eq!(s.players[&p].valor, 100.0, "and nothing spent");
 }
@@ -288,10 +289,10 @@ fn a_drain_holds_while_in_sight_and_snaps_behind_a_wall() {
     let land = FlatLand { walls: vec![([8.0, 6.0], 1.0)], ..Default::default() };
     let mut s = world_with(land, false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    slot(&mut s, p, "ranged", "drain_life");
+    slot(&mut s, p, "defense", "drain_life");
     s.players.get_mut(&p).unwrap().health = 100;
     let k = mob(&mut s, "boar", [12.0, 0.0, 0.0]);
-    cast(&mut s, p, "ranged", false, 0.0);
+    cast(&mut s, p, "defense", false, 0.0);
     assert!(matches!(s.players[&p].action, Action::Channel { .. }));
     let ev = run(&mut s, 1.2);
     assert!(hits_on(&ev, k).len() >= 2, "ticking");
@@ -390,15 +391,15 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     s.set_tree(p, false);
     let owned: Vec<&str> = s.players[&p].owned.iter().map(String::as_str).collect();
     assert_eq!(owned, ["aimed_throw", "sundering_blow"], "Q and E are free");
-    assert!(s.slot_ability(p, "ranged", "shadow_bolt").is_err(), "not unlocked");
-    let why = s.take_node(p, "shadow_bolt").unwrap_err();
+    assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_err(), "not unlocked");
+    let why = s.take_node(p, "seed_of_corruption").unwrap_err();
     assert!(why.contains("The Cult's Altar"), "{why}");
     s.debug = true;
-    s.take_node(p, "shadow_bolt").unwrap();
+    s.take_node(p, "seed_of_corruption").unwrap();
     assert!(s.take_node(p, "frostbolt").is_err(), "the bench isn't on the board");
     // A card only goes on its own row's key.
-    assert!(s.slot_ability(p, "close", "shadow_bolt").is_err());
-    assert!(s.slot_ability(p, "ranged", "shadow_bolt").is_ok());
+    assert!(s.slot_ability(p, "close", "seed_of_corruption").is_err());
+    assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_ok());
 }
 
 #[test]
@@ -406,9 +407,9 @@ fn a_heavy_blow_breaks_a_pyroblast_charge() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
-    slot(&mut s, a, "ultimate", "pyroblast");
+    slot(&mut s, a, "ranged", "fireball");
     s.set_valor(a, 100.0);
-    s.input(a, Input::Ability(key_of("ultimate"), false));
+    s.input(a, Input::Ability(key_of("ranged"), true));
     s.input(a, Input::Attack);
     run(&mut s, 0.5);
     assert!(matches!(s.players[&a].action, Action::Charge { .. }));
