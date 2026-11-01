@@ -67,8 +67,9 @@ impl Survival {
             self.camp.goal += 1;
             let reward = if g.reward.is_empty() { String::new() } else { format!(" Into the chest: {}.", self.cost_text(&g.reward)) };
             let next = self.goal().map_or(" The journal is done: the camp stands. The raids come back, harder each time.".to_string(), |n| format!(" Next: {}.", n.title));
+            // The add-on tells this one quietly by its "Done: " start (ES.Banner): keep the words.
             self.events.push(Event::Banner { player: None, title: format!("Done: {}", g.title), sub: if g.reward.is_empty() { String::new() } else { format!("Into the chest: {}", self.cost_text(&g.reward)) } });
-            self.announce(format!("The camp's journal: {} done.{reward}{next}", g.title));
+            self.announce(format!("{} completed.{reward}{next}", g.title));
             self.events.push(Event::Storage);
             self.events.push(Event::Goal);
             self.events.push(Event::Dirty);

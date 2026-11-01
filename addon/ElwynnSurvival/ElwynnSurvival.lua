@@ -363,6 +363,9 @@ local function MakeSlot(parent, size, key)
   s.key:SetText(key or "")
   s.count = Text(s, FONT_NUM, 13, "OUTLINE")
   s.count:SetPoint("BOTTOMRIGHT", s, "BOTTOMRIGHT", -4, 4)
+  -- A width of its own: left to size itself, a count can come out as "..".
+  s.count:SetWidth(size)
+  s.count:SetJustifyH("RIGHT")
   function s:Set(icon, lit, count)
     if icon then
       self.icon:SetTexture(icon)
@@ -1827,6 +1830,9 @@ local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
+-- Room for "1000 / 1000" at any bar size (left to size itself, it was cut to "200 / 2...").
+vit.healthText:SetWidth(120)
+vit.healthText:SetJustifyH("RIGHT")
 vit.healthText:SetTextColor(1, 0.92, 0.85)
 vit.stamina = MakeLagBar(vit, 100 / ST_PER_PX, VIT_STAMINA, { r = 0.26, g = 0.66, b = 0.27 }, { r = 0.85, g = 0.95, b = 0.7 })
 
@@ -1929,67 +1935,6 @@ end
 
 ES.hud = vit
 
--- --- the equipment cross, left: above the chat --------------------------------------------------------
--- What the mouse buttons and T hold (the weapon, the guard, the quick item; the bow when it's on
--- a key), kept above the chat wherever the chat is, so the two never overlap.
-
-local SLOT = 40
-local gear = CreateFrame("Frame", "ElwynnSurvivalGear", UIParent)
-gear:SetWidth(SLOT * 3 + 16)
-gear:SetHeight(SLOT * 3 + 16)
-gear:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 26, 250)
-gear:Hide()
-ES.gear = gear
-
--- Above the chat's top (its tabs too), or low in the corner when there's no chat to keep clear of.
-local GEAR_OVER_CHAT = 34
-function ES.PlaceGear()
-  local y = 34
-  local chat = ChatFrame1
-  if chat and chat.GetTop and chat.IsShown and chat:IsShown() then
-    local ok, top = pcall(chat.GetTop, chat)
-    if ok and top then
-      local k = 1
-      if chat.GetEffectiveScale and UIParent.GetEffectiveScale then
-        local a, b = chat:GetEffectiveScale(), UIParent:GetEffectiveScale()
-        if a and b and b > 0 then k = a / b end
-      end
-      y = math.max(y, top * k + GEAR_OVER_CHAT)
-    end
-  end
-  local most = (UIParent.GetHeight and UIParent:GetHeight() or 768) - gear:GetHeight() - 120
-  y = math.min(y, most)
-  if gear.placedAt and math.abs(gear.placedAt - y) < 1 then return end
-  gear.placedAt = y
-  gear:ClearAllPoints()
-  gear:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 26, y)
-end
-gear.t = 0
-gear:SetScript("OnUpdate", function()
-  this.t = this.t + (arg1 or 0)
-  if this.t < 1 then return end
-  this.t = 0
-  ES.PlaceGear()
-end)
-gear.hub = Tex(gear, "BACKGROUND", "diamond", 18, 18)
-gear.hub:SetPoint("CENTER", gear, "CENTER", 0, 0)
-gear.hub:SetVertexColor(FRAME.r, FRAME.g, FRAME.b, 0.7)
-gear.up = MakeSlot(gear, SLOT, "")
-gear.up:SetPoint("CENTER", gear, "CENTER", 0, SLOT + 6)
-gear.right = MakeSlot(gear, SLOT, "LMB")
-gear.right:SetPoint("CENTER", gear, "CENTER", SLOT + 6, 0)
-gear.left = MakeSlot(gear, SLOT, "RMB")
-gear.left:SetPoint("CENTER", gear, "CENTER", -(SLOT + 6), 0)
-gear.down = MakeSlot(gear, SLOT, "T")
-gear.down:SetPoint("CENTER", gear, "CENTER", 0, -(SLOT + 6))
-gear.weaponName = Text(gear, FONT_BODY, 11, "OUTLINE")
-gear.weaponName:SetPoint("LEFT", gear.right, "RIGHT", 8, 0)
-gear.weaponName:SetJustifyH("LEFT")
-gear.weaponName:SetTextColor(1, 0.9, 0.7)
-gear.quickName = Text(gear, FONT_BODY, 10, "OUTLINE")
-gear.quickName:SetPoint("TOP", gear.down, "BOTTOM", 0, -3)
-gear.quickName:SetTextColor(0.9, 0.9, 0.8)
-
 -- The texture of the item called `name` in the backpack or the satchels, if it's there.
 function ES.BagTexture(name)
   if not GetContainerItemLink or not GetContainerItemInfo then return nil end
@@ -2007,11 +1952,6 @@ function ES.BagTexture(name)
   return nil
 end
 
-local function Worn(slot, fallback)
-  local t = GetInventoryItemTexture and GetInventoryItemTexture("player", slot)
-  return t or (ICONS .. fallback)
-end
-
 -- Short for a key on a slot: "LMB", "RMB", "MMB", else as written.
 local function ShortKey(action)
   local k = KeyName(action)
@@ -2022,39 +1962,6 @@ local function ShortKey(action)
   return k
 end
 ES.ShortKey = ShortKey
-
-function ES.DrawGear()
-  local h = ES.h
-  local sheathed = h and h[35] == "1"
-  local ranged = h and h[21] or "bow"
-  gear.right:Set(Worn(16, "INV_Axe_01"), not sheathed)
-  local offhand = GetInventoryItemTexture and GetInventoryItemTexture("player", 17)
-  -- A two-handed weapon guards with itself.
-  gear.left:Set(offhand or (ICONS .. "Ability_Defend"), not sheathed)
-  -- The bow: Aimed Shot's key, if it's on one.
-  local shot = ES.SlotOf and ES.SlotOf("aimed_shot")
-  gear.up:Set(Worn(18, ranged == "crossbow" and "INV_Weapon_ShortBlade_01" or "INV_Weapon_Bow_02"), shot ~= nil)
-  gear.up.key:SetText(shot and ShortKey("ES_AB" .. shot) or "")
-  -- The bow only shows while it's on a key.
-  if shot then gear.up:Show() else gear.up:Hide() end
-  -- The quick item (T uses it, G picks the next): its own icon from the bags.
-  local quick, quickN = h and h[31] or "", tonumber(h and h[32]) or 0
-  if quick == "" then
-    local meals = tonumber(h and h[17]) or 0
-    gear.down:Set(ICONS .. "INV_Misc_Food_16", meals > 0, meals > 0 and tostring(meals) or "0")
-  else
-    gear.down:Set(ES.BagTexture(quick) or (ICONS .. "INV_Misc_Food_16"), quickN > 0, tostring(quickN))
-  end
-  gear.quickName:SetText(quick)
-  gear.right.key:SetText(ShortKey("ES_ATTACK"))
-  gear.left.key:SetText(ShortKey("ES_GUARD"))
-  gear.down.key:SetText(ShortKey("ES_EAT"))
-  if sheathed then
-    gear.weaponName:SetText(((h and h[7]) or "") .. "  |cff999999(sheathed: " .. (KeyName("ES_SHEATHE") or "R") .. ")|r")
-  else
-    gear.weaponName:SetText((h and h[7]) or "")
-  end
-end
 
 -- --- doing something: a meal, a gather, a stagger ---------------------------------------------------
 
@@ -2358,6 +2265,22 @@ abar.slots = {}
 ES.slots = {}
 ES.abilities = {}
 
+-- The quick item (T uses it, G picks the next) beside the keys: its icon from the bags and how
+-- many are left (meals, when no item is picked).
+dock.quick = MakeSlot(dock, 40, "T")
+dock.quick:SetPoint("LEFT", abar, "RIGHT", 34, 0)
+function ES.DrawQuick()
+  local h, q = ES.h, dock.quick
+  local quick, quickN = h and h[31] or "", tonumber(h and h[32]) or 0
+  if quick == "" then
+    local meals = tonumber(h and h[17]) or 0
+    q:Set(ICONS .. "INV_Misc_Food_16", meals > 0, tostring(meals))
+  else
+    q:Set(ES.BagTexture(quick) or (ICONS .. "INV_Misc_Food_16"), quickN > 0, tostring(quickN))
+  end
+  q.key:SetText(ES.ShortKey("ES_EAT"))
+end
+
 -- One key's tile: a dark well, the icon, a fine rim, its column's colour along its foot, the
 -- cooldown's shade, the key on a little cap under it.
 local function MakeKey(parent, size)
@@ -2577,7 +2500,6 @@ function ES.AbilitiesLine(f)
     if s.key ~= "" then ES.abilities[s.key] = s end
   end
   ES.DrawAbilities()
-  ES.DrawGear()
   ES.DrawAim()
 end
 
@@ -2957,11 +2879,32 @@ end)
 
 local hurt = CreateFrame("Frame", "ElwynnSurvivalHurt", UIParent)
 hurt:SetAllPoints(UIParent)
-hurt:SetFrameStrata("BACKGROUND")
+-- Over the world and the background frames (it was under all of them), under the HUD's MEDIUM
+-- strata so the bars stay readable.
+hurt:SetFrameStrata("LOW")
 hurt:SetFrameLevel(1)
-hurt.edge = Tex(hurt, "ARTWORK", "vignette")
-hurt.edge:SetAllPoints(hurt)
-hurt.edge:SetVertexColor(0.7, 0.02, 0.02, 1)
+-- The vignette's red band (its outer 40 of 256 px) in eight pieces at a fixed 150 px, so it's as
+-- deep at the top and bottom as at the sides (stretched whole, the sides got 213 px and the top
+-- 120 on a wide screen); no middle.
+hurt.pieces = {}
+do
+  local E, c = 150, 40 / 256
+  local cut = { { 0, c }, { c, 1 - c }, { 1 - c, 1 } }
+  local X = { { "LEFT", 0, "LEFT", E }, { "LEFT", E, "RIGHT", -E }, { "RIGHT", -E, "RIGHT", 0 } }
+  local Y = { { "TOP", 0, "TOP", -E }, { "TOP", -E, "BOTTOM", E }, { "BOTTOM", E, "BOTTOM", 0 } }
+  for row = 1, 3 do
+    for col = 1, 3 do
+      if row ~= 2 or col ~= 2 then
+        local t = Tex(hurt, "ARTWORK", "vignette")
+        t:SetTexCoord(cut[col][1], cut[col][2], cut[row][1], cut[row][2])
+        t:SetPoint("TOPLEFT", hurt, Y[row][1] .. X[col][1], X[col][2], Y[row][2])
+        t:SetPoint("BOTTOMRIGHT", hurt, Y[row][3] .. X[col][3], X[col][4], Y[row][4])
+        t:SetVertexColor(0.7, 0.02, 0.02, 1)
+        table.insert(hurt.pieces, t)
+      end
+    end
+  end
+end
 hurt:SetAlpha(0)
 hurt:Hide()
 hurt.flash = 0
@@ -2975,13 +2918,15 @@ end
 
 hurt:SetScript("OnUpdate", function()
   this.flash = math.max(0, this.flash - arg1 * 1.6)
-  -- Low on health: a slow pulse that stays.
+  -- Low on health: a pulse that stays, deeper the nearer the end (it was a faint 0.06-0.18 shimmer
+  -- at any share under 30%).
   local low = 0
   local h = ES.h
   if h then
     local share = (tonumber(h[2]) or 0) / math.max(1, tonumber(h[3]) or 1)
     if share > 0 and share < 0.3 then
-      low = 0.12 + 0.06 * math.sin(GetTime() * 4)
+      local k = 1 - share / 0.3
+      low = (0.3 + 0.35 * k) * (0.75 + 0.25 * math.sin(GetTime() * 5))
     end
   end
   this:SetAlpha(math.max(this.flash, low))
@@ -3207,9 +3152,9 @@ function ES.DrawHud()
   end
   info.bags:SetText("")
   ES.bar.bag.count:SetText((h[8] or "?") .. "/" .. (h[9] or "?"))
+  ES.DrawQuick()
   ES.DrawAimCamera()
   ES.DrawAim()
-  ES.DrawGear()
   ES.DrawFoe()
   local cd = tonumber(h[10]) or -1
   -- Your supplies first; else the nearest of Elwynn's places not yet found.
@@ -3458,16 +3403,31 @@ banner.sub = Text(banner, FONT_BODY, 14, "OUTLINE")
 banner.sub:SetPoint("TOP", banner.title, "BOTTOM", 0, -6)
 
 function ES.Banner(title, sub)
+  -- A place found or a journal goal done is quiet news, told the way the game tells it: a yellow
+  -- line at the top in its own font, like a quest's progress. No banner, no horn (those are for
+  -- what's coming at you). The server's titles start "Discovered: " and "Done: " (explore.rs,
+  -- journal.rs).
+  local t = title or ""
+  if string.find(t, "^Discovered") or string.find(t, "^Done: ") then
+    local line
+    if string.find(t, "^Done: ") then
+      line = string.sub(t, 7) .. " completed."
+    else
+      line = t .. ((sub and sub ~= "") and (" (" .. sub .. ")") or "")
+    end
+    if UIErrorsFrame then
+      UIErrorsFrame:AddMessage(line, 1.0, 0.82, 0.0)
+    else
+      ES.Message(line)
+    end
+    return
+  end
   banner.title:SetText(title)
   banner.sub:SetText(ES.Keyed(sub or ""))
   banner.untilT = GetTime() + 4.5
   banner:SetAlpha(1)
   banner:Show()
-  -- The horn for what's coming at you; a place found or a goal done is quieter news.
-  local t = title or ""
-  if string.find(t, "^Discovered") then
-    Play("open")
-  elseif string.find(t, "^Done") or string.find(t, "^Everyone Ready") or string.find(t, "^Victory") then
+  if string.find(t, "^Everyone Ready") or string.find(t, "^Victory") then
     Play("done")
   else
     Play("raid")
@@ -4769,12 +4729,11 @@ function ES.HideChrome()
     if ShowNameplates then pcall(ShowNameplates) end
     if ShowFriendNameplates then pcall(ShowFriendNameplates) end
   end
-  -- The chat stays where it is, for talking, and fades between lines; the gear cross keeps
-  -- above it (the client lays the chat out again as it likes, so it isn't moved).
+  -- The chat stays where it is, for talking, and fades between lines (the client lays it out
+  -- again as it likes, so it isn't moved).
   if ChatFrame1 and ChatFrame1.SetTimeVisible then
     pcall(ChatFrame1.SetTimeVisible, ChatFrame1, 15)
   end
-  if ES.PlaceGear then ES.PlaceGear() end
 end
 
 function ES.RestoreChrome()
@@ -4812,8 +4771,6 @@ local function Open(what)
     elseif GameMenuFrame then
       if GameMenuFrame:IsShown() then HideUIPanel(GameMenuFrame) else ShowUIPanel(GameMenuFrame) end
     end
-  elseif what == "help" then
-    if ToggleHelpFrame then ToggleHelpFrame() end
   elseif what == "keys" then
     ES.ToggleKeys()
   end
@@ -4828,7 +4785,6 @@ local BAR = {
   { "map", "Map", "INV_Misc_Map_01", "M" },
   { "keys", "Controls", "INV_Misc_Key_03", "" },
   { "menu", "Game Menu", "INV_Misc_Gear_01", "Esc" },
-  { "help", "Help", "INV_Misc_QuestionMark", "" },
 }
 local bar = CreateFrame("Frame", "ElwynnSurvivalBar", UIParent)
 bar:SetWidth(table.getn(BAR) * (BAR_ICON + 6))
@@ -5410,7 +5366,7 @@ card.switch = MakeButton(card, 170, 24, "", GOLD, function()
   ES.Rebind()
   ES.DrawKeys()
   ES.DrawAbilities()
-  ES.DrawGear()
+  ES.DrawQuick()
 end)
 card.switch:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 42)
 card.reset = MakeButton(card, 120, 24, "Elwynn keys again", GOLD, function()
@@ -5418,7 +5374,7 @@ card.reset = MakeButton(card, 120, 24, "Elwynn keys again", GOLD, function()
   ES.Rebind()
   ES.DrawKeys()
   ES.DrawAbilities()
-  ES.DrawGear()
+  ES.DrawQuick()
 end)
 card.reset:SetPoint("LEFT", card.switch, "RIGHT", 8, 0)
 card.middle = MakeButton(card, 190, 24, "", GOLD, function()
@@ -5536,7 +5492,7 @@ function ES.SetKey(action, chord)
   ES.Rebind()
   ES.DrawKeys()
   ES.DrawAbilities()
-  ES.DrawGear()
+  ES.DrawQuick()
   if taken then
     local name = getglobal("BINDING_NAME_" .. taken) or taken
     ES.Message(Pretty(chord) .. " was " .. name .. "'s: that has no key now.")
@@ -5682,7 +5638,6 @@ function ES.Wake()
   if m and m > 0 then ES.SetMouseSpeed(m) end
   ES.HideChrome()
   vit:Show()
-  gear:Show()
   info:Show()
   feed:Show()
   if ES.boss.who then ES.boss:Show() end
@@ -5691,7 +5646,6 @@ function ES.Wake()
   dock:Show()
   ES.PlaceVitals()
   ES.DrawAction()
-  ES.DrawGear()
   ES.DrawAbilities()
   ES.SetMode("action")
   -- The camera stops short of other bodies instead of entering them.
@@ -5737,7 +5691,6 @@ function ES.Sleep()
   ES.h = nil
   catcher:Hide()
   vit:Hide()
-  gear:Hide()
   act:Hide()
   info:Hide()
   feed:Hide()
@@ -5951,7 +5904,6 @@ events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("PLAYER_LEAVING_WORLD")
 events:RegisterEvent("PLAYER_LOGOUT")
 events:RegisterEvent("PLAYER_DEAD")
-events:RegisterEvent("UNIT_INVENTORY_CHANGED")
 events:SetScript("OnEvent", function()
   if event == "CHAT_MSG_ADDON" then
     if arg1 == "ES" and arg2 then
@@ -5986,10 +5938,6 @@ events:SetScript("OnEvent", function()
     -- Getting up is the server's: no release button.
     if ES.awake and StaticPopup_Hide then
       StaticPopup_Hide("DEATH")
-    end
-  elseif event == "UNIT_INVENTORY_CHANGED" then
-    if ES.awake and arg1 == "player" then
-      ES.DrawGear()
     end
   end
 end)

@@ -671,7 +671,7 @@ name = "Hunting Bow"
 display = 18341
 icon = "INV_Weapon_Bow_08"
 kind = "bow"
-text = "Hold right mouse to aim (the string draws as you hold), click to loose. X swaps to it."
+text = "Hold right mouse to aim (the string draws as you hold), click to loose."
 
 [[item]]
 key = "crossbow"
