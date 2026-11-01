@@ -1084,3 +1084,44 @@ fn every_dungeon_has_a_count_of_foes_for_its_wager() {
         assert!(needed < total && needed as f32 >= total as f32 * WAGER_FORCES, "{}: {needed} of {total}", d.key);
     }
 }
+
+#[test]
+fn a_wagers_clock_waits_till_everyone_is_ready_then_counts_down() {
+    use crate::sim::wager::WAGER_COUNTDOWN;
+    let mut s = below();
+    s.start_wager(1);
+    let a = s.join("ayla", "Ayla", None);
+    let b = s.join("bren", "Bren", None);
+    run(&mut s, 1.0);
+    assert_eq!(s.wager_readiness(), Some((0, 2, None)));
+    assert!(s.wager_ready(a).is_ok());
+    assert!(s.wager_ready(a).is_err(), "once");
+    assert_eq!(s.wager_readiness(), Some((1, 2, None)), "waiting on Bren");
+    run(&mut s, 2.0);
+    assert!(s.wager().unwrap().started.is_none(), "no clock without everyone");
+    assert!(s.wager_ready(b).is_ok());
+    assert!(s.wager_readiness().unwrap().2.is_some(), "the count runs");
+    // Someone arriving mid-count stops it till they're ready too.
+    let c = s.join("cael", "Cael", None);
+    assert_eq!(s.wager_readiness(), Some((2, 3, None)), "stopped for Cael");
+    assert!(s.wager_ready(c).is_ok());
+    let ev = run(&mut s, WAGER_COUNTDOWN as f32 + 0.3);
+    let called: Vec<String> = ev.iter().filter_map(|e| if let Event::Banner { title, .. } = e { Some(title.clone()) } else { None }).collect();
+    assert!(["3", "2", "1"].iter().all(|n| called.iter().any(|t| t == n)) && called.iter().any(|t| t.contains("clock is running")), "{called:?}");
+    assert!(s.wager().unwrap().started.is_some());
+    assert!(s.wager_readiness().is_none(), "past it");
+    assert!(s.wager_ready(a).is_err(), "too late");
+}
+
+#[test]
+fn stepping_off_from_the_lamp_before_everyone_is_ready_starts_the_clock_at_once() {
+    let mut s = below();
+    s.start_wager(1);
+    let a = s.join("ayla", "Ayla", None);
+    let _b = s.join("bren", "Bren", None);
+    run(&mut s, 1.0);
+    s.move_player(a, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title.contains("clock is running") && sub.contains("Ayla stepped off"))), "{ev:?}");
+    assert!(s.wager().unwrap().started.is_some(), "no head start for free");
+}

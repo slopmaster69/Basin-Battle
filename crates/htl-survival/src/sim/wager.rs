@@ -12,6 +12,11 @@
 //! and enough of them must fall ([`WAGER_FORCES`] of those that stand from the start). Foes chase
 //! farther in a wager ([`WAGER_LEASH`]), so a pack can be drawn into the next and both fought at
 //! once: pulling big is the quick way to fill the count.
+//!
+//! The clock waits for the group: each hero at the first lamp says they're ready (`.es ready`, or
+//! the slip's button), and once everyone down there is, a short count runs and the clock starts.
+//! A hero who steps off from the lamp before then starts it at once (no head start for free); one
+//! arriving mid-count stops it till they're ready too.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -33,10 +38,10 @@ pub const WAGER_FORCES: f32 = 0.8;
 /// How much farther foes chase in a wager than in a run of their own (their leash times this),
 /// so packs can be pulled together. (A first guess, to try in play: about a room and a half.)
 pub const WAGER_LEASH: f32 = 1.75;
-/// How far from the first lamp a hero goes to start the clock (yards), and how long it waits for
-/// the rest if nobody does (seconds).
+/// How far from the first lamp a hero goes to start the clock at once (yards).
 const WAGER_START_YARDS: f32 = 12.0;
-const WAGER_START_WAIT: f64 = 45.0;
+/// The count from everyone ready to the clock (seconds).
+pub const WAGER_COUNTDOWN: f64 = 5.0;
 /// Smouldering ground: how wide, how long, how often it burns and how hard (share of health).
 const EMBER_RADIUS: f32 = 2.6;
 const EMBER_SECS: f32 = 6.0;
@@ -85,6 +90,11 @@ pub struct Wager {
     pub forces: u32,
     /// The bosses are down but the count isn't, and the heroes have been told.
     pub short_told: bool,
+    /// Who has said they're ready (accounts), and when the count ends (wall seconds) once all
+    /// have; the last whole second it called.
+    pub ready: BTreeSet<String>,
+    pub countdown: Option<f64>,
+    pub called: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -242,12 +252,55 @@ impl Survival {
         if !w.party.iter().any(|(a, ..)| *a == account) {
             w.party.push((account, name, class));
         }
+        // Arriving before the clock: the count (if one's running) waits for them too.
+        let waiting = w.started.is_none();
+        let stopped = waiting && w.countdown.take().is_some();
         let (level, limit) = (w.level, w.limit);
+        if stopped {
+            let name = self.players.get(&id).map_or(String::new(), |p| p.name.clone());
+            self.announce(format!("{name} arrives: the count waits till everyone's ready."));
+        }
         let terms: Vec<String> = terms_at(level).iter().map(|t| format!("{}: {}", t.name, t.text)).collect();
-        self.events.push(Event::Banner { player: Some(id), title: format!("The Bookmaker's Wager: +{level}"), sub: format!("{} to beat; the clock starts when you leave the lamp", clock_words(limit)) });
+        let how = if waiting { "say you're ready (.es ready) and the clock starts when everyone is" } else { "the clock is already running" };
+        self.events.push(Event::Banner { player: Some(id), title: format!("The Bookmaker's Wager: +{level}"), sub: format!("{} to beat; {how}", clock_words(limit)) });
         if !terms.is_empty() {
             self.tell(id, terms.join(" "));
         }
+    }
+
+    /// A hero says they're ready for the clock; once everyone below is, the count starts.
+    pub fn wager_ready(&mut self, id: Id) -> Result<(), String> {
+        let Some(p) = self.players.get(&id) else { return Err("No hero.".into()) };
+        let (account, name) = (p.account.clone(), p.name.clone());
+        let wall = self.wall();
+        let accounts: BTreeSet<String> = self.players.values().map(|p| p.account.clone()).collect();
+        let w = self.below.as_mut().and_then(|b| b.wager.as_mut()).ok_or("There's no wager on down here.")?;
+        if w.started.is_some() {
+            return Err("The clock is already running.".into());
+        }
+        if !w.ready.insert(account) {
+            return Err("You're ready; waiting on the rest.".into());
+        }
+        let ready = w.ready.intersection(&accounts).count();
+        let all = ready == accounts.len();
+        if all {
+            w.countdown = Some(wall + WAGER_COUNTDOWN);
+            w.called = WAGER_COUNTDOWN as i64 + 1;
+        }
+        if all {
+            self.announce(format!("{name} is ready. Everyone is: the clock starts in {}.", WAGER_COUNTDOWN as i64));
+        } else {
+            self.announce(format!("{name} is ready ({ready} of {}).", accounts.len()));
+        }
+        Ok(())
+    }
+
+    /// Before the clock: (heroes ready, heroes below, seconds left of the count if it's running).
+    pub fn wager_readiness(&self) -> Option<(usize, usize, Option<f32>)> {
+        let w = self.wager().filter(|w| w.started.is_none())?;
+        let accounts: BTreeSet<&String> = self.players.values().map(|p| &p.account).collect();
+        let ready = w.ready.iter().filter(|a| accounts.contains(a)).count();
+        Some((ready, accounts.len(), w.countdown.map(|t| (t - self.wall()).max(0.0) as f32)))
     }
 
     /// A foe's health and the weight of its blows at this wager (1 with none).
@@ -336,15 +389,40 @@ impl Survival {
         if w.done.is_some() {
             return;
         }
-        // The clock starts as the first hero leaves the first lamp (or after a wait).
+        // The clock starts when the count runs out, once everyone has said they're ready; or at
+        // once if a hero steps off from the first lamp first.
         if w.started.is_none() {
             let lamp = d.lamps.first().map_or([0.0; 3], |l| l.at);
-            let away = self.players.values().any(|p| p.health > 0 && dist2d(p.pos, lamp) > WAGER_START_YARDS);
-            if away || wall >= w.opened + WAGER_START_WAIT {
-                if let Some(w) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
-                    w.started = Some(wall);
+            let away = self.players.values().find(|p| p.health > 0 && dist2d(p.pos, lamp) > WAGER_START_YARDS).map(|p| p.name.clone());
+            // Someone gone home before the count: are the rest all ready now?
+            let accounts: BTreeSet<String> = self.players.values().map(|p| p.account.clone()).collect();
+            if w.countdown.is_none() && !accounts.is_empty() && accounts.iter().all(|a| w.ready.contains(a)) {
+                if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                    wm.countdown = Some(wall + WAGER_COUNTDOWN);
+                    wm.called = WAGER_COUNTDOWN as i64 + 1;
                 }
-                self.events.push(Event::Banner { player: None, title: format!("+{}: the clock is running", w.level), sub: format!("{} to beat", clock_words(w.limit)) });
+            }
+            let w = self.wager().cloned().unwrap();
+            let done = w.countdown.is_some_and(|t| wall >= t);
+            if away.is_some() || done {
+                if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                    wm.started = Some(wall);
+                    wm.countdown = None;
+                }
+                let sub = match (&away, done) {
+                    (Some(name), false) => format!("{name} stepped off from the lamp; {} to beat", clock_words(w.limit)),
+                    _ => format!("{} to beat", clock_words(w.limit)),
+                };
+                self.events.push(Event::Banner { player: None, title: format!("+{}: the clock is running", w.level), sub });
+            } else if let Some(t) = w.countdown {
+                // The count, a banner a second.
+                let left = (t - wall).ceil() as i64;
+                if left < w.called && left > 0 {
+                    if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                        wm.called = left;
+                    }
+                    self.events.push(Event::Banner { player: None, title: format!("{left}"), sub: format!("+{}: the clock starts", w.level) });
+                }
             }
             return;
         }

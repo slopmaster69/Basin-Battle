@@ -413,6 +413,12 @@ WT	The Deadmines	5	754	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin V
 # With the count of foes (a newer server): the word and the bar under the bosses.
 WT	The Deadmines	5	760	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin VanCleef~0	31~40~50
 !local fc = ElwynnSurvival.wagerShown.forces table.insert(SAID, "wager foes: " .. tostring(ElwynnSurvivalWager.forces:GetText()) .. " bar shown " .. tostring(ElwynnSurvivalWager.forceBar:IsShown()) .. " needed " .. tostring(fc and fc.needed))
+# Before the clock: who's ready, the Ready button (it says .es ready), then the count.
+WT	The Deadmines	5	0	1950	0	wait	Hardened, Rallying	Rhahk'Zor~0	0~40~50	1~2~
+!table.insert(SAID, "wager ready: " .. tostring(ElwynnSurvivalWager.falls:GetText()) .. " button " .. tostring(ElwynnSurvivalWagerReady:IsShown()))
+!this = ElwynnSurvivalWagerReady; ElwynnSurvivalWagerReady:GetScript("OnClick")()
+WT	The Deadmines	5	0	1950	0	wait	Hardened, Rallying	Rhahk'Zor~0	0~40~50	2~2~4
+!table.insert(SAID, "wager count: " .. tostring(ElwynnSurvivalWager.falls:GetText()) .. " button " .. tostring(ElwynnSurvivalWagerReady:IsShown()))
 WR	camp
 !table.insert(SAID, "wager clock at camp: " .. tostring(ElwynnSurvivalWager:IsShown()))
 # A note, read: a page that stays, its clue under it; a link reads on; Escape's list closes it.

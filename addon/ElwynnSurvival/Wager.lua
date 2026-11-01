@@ -8,7 +8,9 @@
 --
 -- The server sends `WT name level elapsed limit falls state terms bosses forces` (state: wait, run,
 -- won, over; bosses `name~down^...` and forces `felled~needed~total`, missing from older servers),
--- and a bare `WT` when there's no wager.
+-- and a bare `WT` when there's no wager. Before the clock, a last field `ready~heroes~count`: who's
+-- said they're ready, how many are down there, the count's seconds left once everyone has; the
+-- slip shows it and a Ready button (`.es ready`).
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
 local ES = ElwynnSurvival
@@ -68,6 +70,26 @@ f.forceBar.fill:SetPoint("BOTTOMLEFT", f.forceBar, "BOTTOMLEFT", 0, 0)
 f.forceBar.fill:SetTexture(1, 1, 1, 1)
 f.forces:Hide()
 f.forceBar:Hide()
+
+-- Before the clock: a Ready button (`.es ready`) under the title.
+f.ready = CreateFrame("Button", "ElwynnSurvivalWagerReady", f)
+f.ready:SetWidth(110)
+f.ready:SetHeight(22)
+f.ready.back = f.ready:CreateTexture(nil, "BACKGROUND")
+f.ready.back:SetAllPoints(f.ready)
+f.ready.back:SetTexture(A .. "button_normal")
+f.ready.label = f.ready:CreateFontString(nil, "ARTWORK")
+f.ready.label:SetFont(TITLE, 13, "")
+f.ready.label:SetPoint("CENTER", f.ready, "CENTER", 0, 0)
+f.ready.label:SetTextColor(0.953, 0.902, 0.784)
+f.ready.label:SetText("Ready")
+f.ready:SetScript("OnEnter", function() this.back:SetTexture(A .. "button_hover") end)
+f.ready:SetScript("OnLeave", function() this.back:SetTexture(A .. "button_normal") end)
+f.ready:SetScript("OnClick", function()
+  if ES.Play then ES.Play("click") end
+  if ES.Say then ES.Say(".es ready") end
+end)
+f.ready:Hide()
 
 -- The count under the bosses: "Foes 42 / 60", the bar full at the count needed. Its height.
 local function DrawForces(fc, below)
@@ -155,7 +177,15 @@ local function Draw()
   else
     f.clock:SetTextColor(0.55, 0.38, 0.08)
   end
-  local words = { wait = "The clock starts when you leave the lamp", run = "", won = "Won in time", over = "Over time" }
+  local words = { wait = "Ready up: the clock starts when everyone is", run = "", won = "Won in time", over = "Over time" }
+  local rd = last.ready
+  if last.state == "wait" and rd then
+    if rd.count then
+      words.wait = "Everyone's ready: the clock starts in " .. math.max(0, math.ceil(rd.count - (GetTime() - last.at)))
+    else
+      words.wait = "Ready " .. rd.ready .. " of " .. rd.heroes .. ", or step off from the lamp to start"
+    end
+  end
   local falls = ""
   if last.falls > 0 then falls = last.falls .. " fall" .. (last.falls == 1 and "" or "s") .. " (+" .. Clock(last.falls * DEATH) .. ")" end
   local w = words[last.state] or ""
@@ -204,6 +234,19 @@ function ES.WagerLine(fields)
     if felled then fc = { felled = tonumber(felled), needed = tonumber(needed), total = tonumber(total) } end
   end
   last.forces = fc
+  local rd
+  if fields[11] and fields[11] ~= "" then
+    local _, _, r, n, c = string.find(fields[11], "^(%d+)~(%d+)~(%d*)$")
+    if r then rd = { ready = tonumber(r), heroes = tonumber(n), count = tonumber(c) } end
+  end
+  last.ready = rd
+  if last.state == "wait" and rd and not rd.count then
+    f.ready:ClearAllPoints()
+    f.ready:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+    f.ready:Show()
+  else
+    f.ready:Hide()
+  end
   f.title:SetText("+" .. last.level .. "  " .. last.name)
   f.terms:SetText(last.terms)
   local above = last.terms ~= "" and f.terms or f.falls
