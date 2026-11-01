@@ -165,6 +165,10 @@ impl Game {
                     w.guide.clear();
                 }
                 self.ui_line(conn, &format!("V~{VERSION}"));
+                // An add-on older than this server's: say so, and how to update.
+                if (n.max(1) as u32) < VERSION {
+                    self.say_to(conn, &format!("Your Basin Battle add-on is older than this server's (v{n}; the server has v{VERSION}): some screens may be missing. {}", crate::HOW_TO_UPDATE));
+                }
                 if n >= 3 {
                     self.ui_talent_defs(conn, me);
                 } else {

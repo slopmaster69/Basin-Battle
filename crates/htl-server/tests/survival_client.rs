@@ -1704,3 +1704,21 @@ fn a_blow_borrowing_another_models_clip_names_it_to_the_clients() {
     let first = mv.split('\t').nth(10).unwrap().split('^').next().unwrap();
     assert!(first.ends_with("~ScourgeFemale"), "{first}");
 }
+
+#[test]
+fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing() {
+    let server = start_with(None, false);
+    let mut c = Client::connect(server.login, "vera", "hold", REALM).unwrap();
+    enter(&mut c);
+    let told = |c: &Client| addon_lines(c, "ES").iter().any(|l| l.starts_with("T\t") && l.contains("older than this server's"));
+    // An old add-on on a plain client: told, on screen.
+    c.chat(".es hello 1");
+    assert!(c.until(2.0, told), "told: {:?}", addon_lines(&c, "ES"));
+    // The newest add-on on the newest client: not a word.
+    let mut d = Client::connect(server.login, "wren", "hold", REALM).unwrap();
+    enter(&mut d);
+    d.chat(".es hello 7 ac10");
+    assert!(d.until(2.0, |d| addon_lines(d, "ES").iter().any(|l| l.starts_with("V\t"))), "awake");
+    d.drain(0.5);
+    assert!(!told(&d), "nothing to update");
+}

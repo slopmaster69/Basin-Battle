@@ -10,6 +10,9 @@ pub mod survival;
 pub mod wire;
 pub mod world;
 
+/// How to update, for the word to a hero on something older.
+pub(crate) const HOW_TO_UPDATE: &str = "To update: on Windows, download the newest \"Basin Battle for Windows.zip\" from github.com/slopmaster69/Basin-Battle/releases; on a Mac, update the folder and open Play Basin Battle again.";
+
 // The binary has its own copy (main.rs); the library's unit tests link benilla's login code too.
 #[cfg(all(test, windows, target_env = "gnu"))]
 mod mingw_tz;

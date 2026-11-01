@@ -286,6 +286,25 @@ pub(crate) const CONTROLS_TEXT: &str = "WASD moves. Left click attacks (hold it,
 
 pub(crate) const PREFIX: &str = "ES";
 pub(crate) const VERSION: u32 = 2;
+/// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
+/// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
+/// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
+pub(crate) const ADDON_NEWEST: u32 = 7;
+pub(crate) const CLIENT_NEWEST: u8 = 10;
+
+/// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
+/// hero, or none when both are current.
+pub(crate) fn out_of_date(version: u32, level: u8) -> Option<String> {
+    let addon = version < ADDON_NEWEST;
+    let client = level < CLIENT_NEWEST;
+    let what = match (addon, client) {
+        (false, false) => return None,
+        (true, false) => format!("Your Elwynn Survival add-on is older than this server's (v{version}; the server has v{ADDON_NEWEST}): some screens may be missing."),
+        (false, true) => "Your game client is older than this server's: some effects won't show.".to_string(),
+        (true, true) => format!("Your game client and add-on (v{version}) are older than this server's: some screens and effects won't show."),
+    };
+    Some(format!("{what} {}", crate::HOW_TO_UPDATE))
+}
 const HUD_EVERY: Duration = Duration::from_millis(150);
 /// A champion's bar shows to the heroes this near it while it fights.
 const BOSS_BAR_RANGE: f32 = 60.0;
@@ -1075,6 +1094,14 @@ impl SurvivalGame {
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));
+                // An older add-on or client: say so, and how to update (on screen and in chat).
+                let version: u32 = arg.parse().unwrap_or(0);
+                let name = self.world_of(conn).map_or(String::new(), |w| w.name.clone());
+                println!("[survival] {name} runs add-on v{version}, client ac{level}");
+                if let Some(word) = out_of_date(version, level) {
+                    self.tell(conn, &word);
+                    self.say_to(conn, &word);
+                }
                 Ok(())
             }
             "in" => {
@@ -1767,5 +1794,21 @@ impl SurvivalGame {
             .filter(|(_, d)| *d <= htl_survival::INTERACT_RANGE + 2.0)
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(id, _)| id)
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+
+    #[test]
+    fn an_older_add_on_or_client_is_told_how_to_update_and_a_current_one_is_left_alone() {
+        assert_eq!(out_of_date(ADDON_NEWEST, CLIENT_NEWEST), None);
+        assert_eq!(out_of_date(ADDON_NEWEST + 1, CLIENT_NEWEST + 1), None, "newer than the server: nothing to say");
+        let addon = out_of_date(ADDON_NEWEST - 1, CLIENT_NEWEST).unwrap();
+        assert!(addon.contains("add-on is older") && addon.contains("releases"), "{addon}");
+        let client = out_of_date(ADDON_NEWEST, CLIENT_NEWEST - 1).unwrap();
+        assert!(client.starts_with("Your game client is older"), "{client}");
+        assert!(out_of_date(1, 0).unwrap().contains("client and add-on (v1)"));
     }
 }
