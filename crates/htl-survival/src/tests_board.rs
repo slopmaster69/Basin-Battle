@@ -311,8 +311,8 @@ fn a_death_mark_makes_everything_land_harder_and_a_kill_under_it_readies_every_c
     assert!((s.taken_share(k) - 1.3).abs() < 1.0e-3);
     calm(&mut s, k);
     // A cooldown spent, then the kill.
-    cast(&mut s, p, "ranged", "aimed_throw", false);
-    assert!(s.cooldown(p, s.content.ability("aimed_throw").unwrap()).charges < 2);
+    cast(&mut s, p, "ranged", "hurled_axe", false);
+    assert_eq!(s.cooldown(p, s.content.ability("hurled_axe").unwrap()).charges, 0);
     s.mobs.get_mut(&k).unwrap().health = 1;
     let ev = run(&mut s, 1.0);
     assert!(!s.alive(k));
@@ -453,10 +453,10 @@ fn shield_wall_blocks_bolts_and_dread_ward_catches_every_blow() {
     // Retaliation lets a bolt by; its Shield Wall doesn't.
     s.set_valor(b, 25.0);
     cast(&mut s, b, "defense", "retaliation", true);
-    let mut ev = cast(&mut s, a, "ranged", "aimed_throw", false);
+    let mut ev = cast(&mut s, a, "ranged", "hurled_axe", false);
     ev.extend(run(&mut s, 1.0));
     let hits: Vec<_> = ev.iter().filter_map(|e| match e { Event::Swing { victim: Some(v), outcome, anim: false, .. } if *v == b => Some(*outcome), _ => None }).collect();
-    assert_eq!(hits, vec![Outcome::Blocked], "the wall takes the axe");
+    assert!(!hits.is_empty() && hits.iter().all(|o| *o == Outcome::Blocked), "the wall takes the axe: {hits:?}");
     run(&mut s, 3.0);
     // Dread Ward: two blows, both swallowed, and the striker panics (the second time the grace
     // that follows a hard crowd control stops it).

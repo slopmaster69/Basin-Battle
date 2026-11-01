@@ -147,14 +147,15 @@ fn valor_fills_from_fighting_and_pays_for_ex_versions() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     assert_eq!(s.players[&p].valor, s.content.valor.start, "each life starts with some");
     s.set_valor(p, 10.0);
-    // Ctrl with Aimed Throw's key: Fan of Axes, for 25.
+    // Ctrl with Hurled Axe's key: Rending Axe, for 25.
     let ev = cast(&mut s, p, "ranged", true, 0.0);
     assert!(ev.is_empty() && matches!(s.players[&p].action, Action::Ready), "not enough Valor");
     let k = mob(&mut s, "boar", [8.0, 0.0, 0.0]);
     s.set_valor(p, 30.0);
     let mut ev = cast(&mut s, p, "ranged", true, 0.7);
     ev.extend(run(&mut s, 1.0));
-    assert_eq!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)).count(), 3, "three axes");
+    assert_eq!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)).count(), 1, "one axe");
+    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "and back");
     let v = s.players[&p].valor;
     assert!(v > 5.0 && v < 30.0, "25 spent, some earned back by the hit: {v}");
     // A light blow and a kill earn more.
@@ -395,7 +396,7 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     // learned out in Elwynn, and the board says where (taken from it only in a debug world).
     s.set_tree(p, false);
     let owned: Vec<&str> = s.players[&p].owned.iter().map(String::as_str).collect();
-    assert_eq!(owned, ["aimed_throw", "sundering_blow"], "Q and E are free");
+    assert_eq!(owned, ["hurled_axe", "sundering_blow"], "Q and E are free");
     assert!(s.slot_ability(p, "ranged", "shadow_bolt").is_err(), "not unlocked");
     let why = s.take_node(p, "shadow_bolt").unwrap_err();
     assert!(why.contains("The Cult's Altar"), "{why}");

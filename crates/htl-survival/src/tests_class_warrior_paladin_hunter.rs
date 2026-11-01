@@ -175,6 +175,105 @@ fn has_on_keys(s: &Survival, p: Id, cards: &[(&str, &str)]) {
     assert!(h.owned.iter().all(|k| s.content.ability(k).is_some()), "nothing unknown: {:?}", h.owned);
 }
 
+// --- Warrior: bulldoze ----------------------------------------------------------------------------
+
+#[test]
+fn hurled_axe_strikes_each_foe_going_out_and_again_coming_back() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let near = mob(&mut s, "brave", [6.0, 0.0, 0.0]);
+    // (A little left of the line: the axe drifts left as it flies, from the right hand.)
+    let far = mob(&mut s, "brave", [16.0, 0.4, 0.0]);
+    let aside = mob(&mut s, "brave", [10.0, 6.0, 0.0]);
+    let pins = [near, far, aside];
+    press(&mut s, p, "hurled_axe", false);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "hurled_axe")));
+    s.set_aim_line(p, 0.0, down_to(24.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 3.0, &pins));
+    let turn = ev.iter().position(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)).expect("it turns and comes back");
+    let (out, back) = ev.split_at(turn);
+    for m in [near, far] {
+        assert_eq!(hits(out, p, m).len(), 1, "struck going out, the far one too: it flies through");
+        assert_eq!(hits(back, p, m).len(), 1, "and again coming back");
+    }
+    assert!(hits(&ev, p, aside).is_empty(), "not the one aside");
+    assert!(s.projectiles.is_empty(), "caught");
+}
+
+#[test]
+fn hurled_axe_comes_back_to_where_you_stand_now_so_a_step_lays_its_way_back_across_a_foe() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    // Well to the side of the throw.
+    let side = mob(&mut s, "brave", [11.0, 5.0, 0.0]);
+    press(&mut s, p, "hurled_axe", false);
+    s.set_aim_line(p, 0.0, 0.0);
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 0.6, &[side]));
+    assert!(hits(&ev, p, side).is_empty(), "out along the reticle, past it");
+    // She steps across before it turns: it comes back to her through the foe.
+    s.players.get_mut(&p).unwrap().pos = [0.0, 10.0, 0.0];
+    ev.extend(run_pinned(&mut s, 2.5, &[side]));
+    assert_eq!(hits(&ev, p, side).len(), 1, "struck on its way back to her");
+    assert!(s.projectiles.is_empty(), "caught");
+}
+
+#[test]
+fn rending_axe_drags_what_it_strikes_toward_you_going_and_coming_and_staggers_it() {
+    let mut s = world_with(true);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [12.0, 0.0, 0.0], std::f32::consts::PI);
+    s.set_valor(a, 25.0);
+    press(&mut s, a, "hurled_axe", true);
+    assert_eq!(aiming(&s, a), Some(idx(&s, "rending_axe")), "Ctrl: Rending Axe");
+    s.set_aim_line(a, 0.0, 0.0);
+    let mut ev = click(&mut s, a);
+    ev.extend(run(&mut s, 2.0));
+    let hops: Vec<f32> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::Hop { player, dir, .. } if *player == b => Some(*dir),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(hops.len(), 2, "pulled going out and coming back: {hops:?}");
+    assert!(hops.iter().all(|d| d.cos() < -0.95), "toward her (along -x): {hops:?}");
+    assert!(s.cc_log_of(b).iter().any(|l| l.contains("Rending Axe: stagger")), "staggered: {:?}", s.cc_log_of(b));
+}
+
+#[test]
+fn charge_bowls_through_every_foe_in_its_line_staggering_each() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let first = mob(&mut s, "brave", [5.0, 0.0, 0.0]);
+    let second = mob(&mut s, "brave", [12.0, 0.0, 0.0]);
+    let (h1, h2) = (s.mobs[&first].health, s.mobs[&second].health);
+    press(&mut s, p, "charge", false);
+    s.set_aim_line(p, 0.0, 0.0);
+    let mut ev = click(&mut s, p);
+    let len = ev
+        .iter()
+        .find_map(|e| match e {
+            Event::Dash { player, speed, secs, .. } if *player == p => Some(speed * secs),
+            _ => None,
+        })
+        .expect("she charges");
+    assert!(len > 15.0, "on past both, not stopped at the first: {len}");
+    ev.extend(run(&mut s, 1.0));
+    assert!(s.mobs[&first].health < h1 && s.mobs[&second].health < h2, "both struck");
+    assert_eq!(hits(&ev, p, first).len() + hits(&ev, p, second).len(), 2, "each once");
+    let staggers = s.cc_log_of(p).iter().filter(|l| l.contains("Charge: stagger 0.6")).count();
+    assert_eq!(staggers, 2, "each staggered: {:?}", s.cc_log_of(p));
+}
+
+#[test]
+fn an_old_warriors_save_comes_back_with_the_new_cards() {
+    let (s, p) = load_old_save("warrior", &[("ranged", "aimed_throw"), ("close", "sundering_blow"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
+    has_on_keys(&s, p, &[("ranged", "hurled_axe"), ("close", "sundering_blow"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
+    assert_eq!(crate::save::renamed("aimed_throw"), "hurled_axe");
+}
+
 // --- Paladin: shield your friends, punish who touches them ----------------------------------------
 
 #[test]

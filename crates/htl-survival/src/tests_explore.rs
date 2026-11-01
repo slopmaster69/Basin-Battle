@@ -217,7 +217,7 @@ count = 1
     // The hero: back to the first day, still Ayla the Warrior.
     s.reset_hero(p).unwrap();
     let h = &s.players[&p];
-    assert!(!h.owned.contains("fireball") && h.owned.contains("aimed_throw"));
+    assert!(!h.owned.contains("fireball") && h.owned.contains("hurled_axe"));
     assert_eq!(h.bag.get(&wood), None);
     assert_eq!(h.name, "Ayla");
     assert!(h.valor < 80.0);

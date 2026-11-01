@@ -2740,7 +2740,7 @@ petrify_shield = 40.0
 panic_speed = 5.0
 
 [loadout]
-ranged = "aimed_throw"
+ranged = "hurled_axe"
 close = "sundering_blow"
 utility = "charge"
 defense = "retaliation"
@@ -2748,48 +2748,46 @@ ultimate = "onslaught"
 
 # === Q: ranged ======================================================================================
 
-# Steel: the bow's replacement, a hand axe along the reticle, two in hand.
+# Steel: an axe that comes back. Out through everything to its full reach, then home to wherever
+# the warrior stands now: walk so its way back crosses the fight.
 [[ability]]
-key = "aimed_throw"
-name = "Aimed Throw"
-text = "Throw a hand axe along the reticle. Charged, it flies farther, hits 60% harder and staggers what it hits for a moment; at full charge it flies twice as fast."
+key = "hurled_axe"
+name = "Hurled Axe"
+text = "Throw your axe along the reticle: it flies out 22 yards through every foe, then comes back to you, striking each one again. It comes back to where you are now: walk so its way back crosses the fight."
 icon = "INV_ThrowingAxe_01"
 school = "warrior"
 slot = "ranged"
 kind = "projectile"
 free = true
-charge = [0.0, 0.7]
-damage = [14.0, 22.0]
-range = [24.0, 34.0]
+returns = true
+damage = [12.0, 12.0]
+range = [22.0, 22.0]
 radius = [0.35, 0.35]
+# Throw Axe's own speed, so the axe you see keeps pace with the one that strikes.
 speed = 20.0
-cooldown = 6.0
-charges = 2
+cooldown = 3.5
 spell = 16075
-full_spell = 24020
-full_speed = 40.0
 clip = 107
 valor_hit = 4.0
-effects = [{ kind = "stagger", secs = [0.0, 0.5] }]
 
 [[ability]]
-key = "fan_of_axes"
-name = "Fan of Axes"
-ex_of = "aimed_throw"
-text = "Three axes at once in a spread, faster: hard to step out of up close."
-icon = "INV_ThrowingAxe_01"
+key = "rending_axe"
+name = "Rending Axe"
+ex_of = "hurled_axe"
+text = "A faster axe that drags: every foe it strikes, going out and coming back, is pulled 3 yards toward you and staggered. Haul a pack into your Sundering Blow."
+icon = "INV_Axe_04"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-charge = [0.0, 0.7]
-damage = [12.0, 18.0]
-range = [24.0, 30.0]
+returns = true
+damage = [14.0, 14.0]
+range = [22.0, 22.0]
 radius = [0.35, 0.35]
+# Axe Flurry's spinning axe, at its own speed.
 speed = 40.0
-count = 3
-spread = 12.0
 spell = 24020
 clip = 107
+effects = [{ kind = "pull", amount = 3.0, from_caster = true }, { kind = "stagger", secs = [0.5, 0.5] }]
 
 # Shadow: the hunter's mark.
 [[ability]]
@@ -3058,22 +3056,23 @@ spell = 26573
 
 # === 1: utility ====================================================================================
 
-# Steel: engage.
+# Steel: bulldoze.
 [[ability]]
 key = "charge"
 name = "Charge"
-text = "Dash up to 20 yards along the reticle, untouchable on the way; the first thing you run into is staggered for 1 s."
+text = "Charge up to 20 yards along the reticle, untouchable on the way, and bowl through everyone in your path: each takes 10 and is staggered for 0.6 s."
 icon = "Ability_Warrior_Charge"
 school = "warrior"
 slot = "utility"
 kind = "dash"
 free = true
+through = true
 damage = [10.0, 10.0]
 range = [20.0, 20.0]
 cooldown = 12.0
 invulnerable = true
 spell = 100
-effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
+effects = [{ kind = "stagger", secs = [0.6, 0.6] }]
 
 # Shadow: escape.
 [[ability]]
@@ -8536,7 +8535,7 @@ name = "The Garrison's Banner"
 at = [-9674.0, 704.0]
 display = 631
 scale = 1.0
-teaches = ["aimed_throw", "sundering_blow"]
+teaches = ["hurled_axe", "sundering_blow"]
 keep = true
 secs = 3.0
 text = "Westbrook's banner, and the drill the garrison's footmen learned under it: the throw, and the blow that breaks a guard."
@@ -9239,7 +9238,7 @@ at = [-9660.0, 690.0]
 radius = 35.0
 kind = "sanctum"
 icon = "INV_Sword_27"
-text = "The warrior's shrine (Aimed Throw, Sundering Blow) at the garrison's banner; its armory opens once Hogger falls."
+text = "The warrior's shrine (Hurled Axe, Sundering Blow) at the garrison's banner; its armory opens once Hogger falls."
 reward = { bronze = 1 }
 
 [[site]]

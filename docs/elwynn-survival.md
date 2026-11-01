@@ -72,7 +72,7 @@ effect.
 | Right + left mouse | **Shield bash** (with a two-hander, a kick); with Shift, the **kick**: breaks a guard harder |
 | Mouse button 4 | Tap: **dodge** as you let go, the way you're moving (15 stamina, and it takes at least 18 to start one). Hold: sprint. It works with the mouse freed (Z) too |
 | Shift (hold) | Sprint too: 12 against 7 (over the 11 the hero's own Sprint clip needs, so a strafe doesn't flicker between it and Run), only 3 stamina a second: a way across the world, not a fight's cost |
-| Q | The **ranged** ability (Aimed Throw to begin with) |
+| Q | The **ranged** ability (Hurled Axe to begin with) |
 | E | The **close** ability (Sundering Blow) |
 | 1 | The **utility** ability (Charge) |
 | 2 | The **defense** ability (Retaliation) |
@@ -136,7 +136,7 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Hurled Axe · *Rending Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Flare · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
@@ -147,8 +147,11 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
 
 **The classes**, in a line each:
 
-- **Warrior**: close the gap and break the guard. Charge (or Heroic Leap, landing in a burst that
-  throws everyone back), Sundering Blow, an axe to throw, Retaliation against blades, Onslaught.
+- **Warrior**: bulldoze: close the gap, smash through, break guards. Hurled Axe flies out through
+  every foe and comes back to wherever you stand, striking each again (walk so its way back crosses
+  the fight; its EX, Rending Axe, drags what it strikes toward you). Charge bowls through everyone
+  in its line, staggering each (or Heroic Leap, landing in a burst that throws everyone back);
+  Sundering Blow; Retaliation against blades; Onslaught.
 - **Paladin**: shield your friends, punish who touches them. Avenger's Shield ricochets to two
   more foes and silences them; its EX, Holy Shock, heals the friend under your reticle (or you) and
   frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a burst of speed out of
@@ -190,7 +193,7 @@ Demonic Circle sets an **anchor** to step back to; **traps** arm, wait (two at o
 the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a moment and is lost to
 a stun. Projectiles may **pierce** (Crippling Throw), **leap on** (Chain Lightning) or
 **burst**; ground may linger, pull, throw out or slow every second. A dash may run **through**
-every foe in its way, striking each as it passes. Help aimed at a **friend**
+every foe in its way, striking each as it passes (Charge). Help aimed at a **friend**
 lands on the friend under the reticle (or the one nearest it, within 15°), else on you, and gives
 them only its heal, cleanse and boons; a **beam** is held a few seconds as a strip from you along
 your aim, sweeping as you turn: every foe in it takes its damage each tick and every friend in it
@@ -243,7 +246,7 @@ duration creatures do.
   Ward swallows the first, Ice Block lets nothing in but you can't act.
 - **Full charge**: a charged spell held to the top flares on you (everyone sees it: the class's
   flash and sound), the reticle bursts and the screen's edge flares in its colour, and Aimed
-  Throw, Shadow Bolt, Fireball, Frostbolt and Lightning Bolt fly much faster.
+  Shot, Shadow Bolt, Fireball, Frostbolt and Lightning Bolt fly much faster.
 
 Hover a key with the mouse free (or a card on the board) for what it does in words and numbers:
 how it's used, its damage, reach, charge, wind-up, stamina and cooldown, and the same for its
