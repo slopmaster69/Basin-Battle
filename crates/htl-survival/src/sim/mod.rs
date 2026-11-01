@@ -1544,8 +1544,11 @@ impl Survival {
     }
 
     /// A warning laid on the ground as a real spell's look (`ground`, see [`mobs::ground_look`]):
-    /// a creature's splash coming down, a hazard about to go off. 0: the drawn circle.
+    /// a creature's splash coming down, a hazard about to go off. 0: the drawn circle. A spell's
+    /// ground look keeps its own size whatever the radius (Heated Ground covers a whole room), so
+    /// below [`GROUND_LOOK_MIN`] the circle is drawn instead: it shows where the blow lands.
     pub(crate) fn mark_ground(&mut self, pos: Vec3, radius: f32, secs: f32, ground: u32) -> Id {
+        let ground = if radius < GROUND_LOOK_MIN { 0 } else { ground };
         let id = self.alloc();
         self.marks.push((id, self.clock + secs));
         self.events.push(Event::Mark { id, pos, radius, tele: None, ground });
@@ -1792,6 +1795,11 @@ const FOE_SHOWN_SECS: f32 = 8.0;
 /// 1.12's run-back speed (yards a second), its walk, and an ability's dash.
 pub const BACK_SPEED: f32 = 4.5;
 pub const WALK_SPEED: f32 = 2.5;
+
+/// The smallest marked area (yards) shown as a spell's look on the ground rather than the drawn
+/// circle. The looks are as big as they are (play-test: the Deadmines' dynamite, 2.6 yards, laid
+/// fire over the whole floor), so a splash smaller than this gets its true size drawn.
+pub const GROUND_LOOK_MIN: f32 = 6.0;
 pub const DASH_SPEED: f32 = 30.0;
 
 /// The smallest angle between two facings, in degrees.
