@@ -2760,6 +2760,7 @@ local CC_WORDS = {
   onslaught = { "Onslaught", 1, 0.55, 0.3 },
   hallowed = { "Hallowed", 1, 0.9, 0.55 },
   steadfast = { "Steadfast", 1, 0.85, 0.45 },
+  cheat_death = { "Cheating death", 1, 0.9, 0.5 },
   grace = { "Unshaken", 0.85, 0.85, 0.85 },
   stance = { "Countering melee blows", 1, 0.9, 0.5 },
 }

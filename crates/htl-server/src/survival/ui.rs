@@ -143,6 +143,7 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "ally" => out.push("on an ally, or yourself".to_string()),
         "leap" if d.back => out.push(format!("{} yd back", n(d.range[1]))),
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap, lands {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "trap" if d.launch > 0.0 => out.push(format!("{} yd away, launches you or a friend {} yd, lasts {} s", n(d.range[1]), n(d.launch), n(d.secs))),
         "trap" => out.push(format!("{} yd away, springs within {} yd, lasts {} s", n(d.range[1]), n(d.radius[1]), n(d.secs))),
         "place" => out.push(format!("totem {} s, {} yd", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "blink" if d.anchor > 0.0 => out.push(format!("circle lasts {} s", n(d.anchor))),
@@ -175,9 +176,30 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.fuse > 0.0 {
         out.push(format!("sticks, goes off after {} s", n(d.fuse)));
     }
+    if d.yank {
+        out.push("pulls you to what it strikes".to_string());
+    }
+    if d.swap {
+        out.push("swaps places with what it strikes".to_string());
+    }
+    if d.tether_secs > 0.0 {
+        out.push(format!("binds for {} s, drags back past {} yd", n(d.tether_secs), n(d.tether_range)));
+    }
+    if d.rewind {
+        out.push(if d.recast.is_empty() { format!("back where you were after {} s", n(d.rewind_secs)) } else { "leaves an echo to come back to".to_string() });
+    }
+    if !d.end_burst.is_empty() {
+        out.push("bursts as it ends".to_string());
+    }
+    if d.counter.as_ref().is_some_and(|c| c.mirror) {
+        out.push("turns projectiles back".to_string());
+    }
     for e in d.effects.iter().chain(&d.tick_effects) {
         match e.kind.as_str() {
+            "knockback" if e.wall_stun > 0.0 => out.push(format!("knocks back {} yd, stuns {} s against a wall", n(e.amount), n(e.wall_stun))),
             "knockback" => out.push(format!("knocks back {} yd", n(e.amount))),
+            "cheat_death" => out.push(format!("a killing blow leaves you at 1 health, then heals {}%", n(e.amount * 100.0))),
+            "shield" if !e.pop.is_empty() => out.push("bursts as the shield ends".to_string()),
             "pull" => out.push(if e.from_caster { "pulls to you".to_string() } else { format!("pulls {} yd in", n(e.amount)) }),
             _ => {}
         }

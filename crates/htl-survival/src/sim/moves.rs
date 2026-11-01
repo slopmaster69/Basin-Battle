@@ -126,6 +126,11 @@ impl Survival {
         }
         let to = self.slide_end(v, dir, dist);
         let moved = dist2d(v, to);
+        // Thrown into a wall (or up against a steep step): stunned as it hits.
+        if !pull && e.wall_stun > 0.0 && moved + 0.3 < dist && self.walled(to, dir) {
+            let air = if moved < 0.3 { 0.0 } else { airtime(if e.lift > 0.0 { e.lift } else { KNOCK_LIFT }) };
+            self.wall_slam(owner, victim, e.wall_stun, air);
+        }
         if moved < 0.3 {
             return;
         }
@@ -522,6 +527,14 @@ impl Survival {
         for t in traps {
             if now >= t.until || !self.players.contains_key(&t.owner) {
                 self.clear_trap(&t);
+                continue;
+            }
+            // A jump pad: it launches the caster and friends on it, and stays.
+            if self.content.abilities[t.ability].launch > 0.0 {
+                if now >= t.armed_at {
+                    self.pad_launches(&t);
+                }
+                keep.push(t);
                 continue;
             }
             if now >= t.armed_at && self.trap_victim(&t).is_some() {

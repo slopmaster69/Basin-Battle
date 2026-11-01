@@ -12,6 +12,7 @@ use crate::land::Land;
 
 pub mod abilities;
 pub mod arena;
+pub(crate) mod beta;
 pub mod cc;
 mod combat;
 pub mod dungeon;
@@ -830,6 +831,8 @@ pub struct Survival {
     /// Shrines' and relics' trials under way, by chest: where it stands, who called it, when a
     /// hero was last near.
     pub(crate) trials: BTreeMap<usize, Trial>,
+    /// The beta page's mechanics in play: yanks, echoes, tethers, shields that burst, pads.
+    pub(crate) beta: beta::Beta,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -903,6 +906,7 @@ impl Survival {
             unfound: BTreeSet::new(),
             chests_looked: 0.0,
             trials: BTreeMap::new(),
+            beta: beta::Beta::default(),
         }
     }
 
@@ -948,6 +952,7 @@ impl Survival {
         self.step_totems();
         self.step_stances();
         self.step_combos();
+        self.step_beta();
         self.step_cc();
         self.step_holds();
         self.step_dummies();

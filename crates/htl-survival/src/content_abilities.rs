@@ -367,6 +367,48 @@ pub struct AbilityDef {
     pub fuse: f32,
     #[serde(default)]
     pub fuse_aura: u32,
+    /// A projectile (or a shot) that pulls its caster after it (a grappling hook): what it strikes
+    /// (a foe, or a wall or the ground it meets) yanks them there in a fast dash along the ground,
+    /// stopped short by a wall, ending beside a foe (not in them). Gone its full range without
+    /// meeting anything, it does nothing.
+    #[serde(default)]
+    pub yank: bool,
+    /// A projectile that swaps its caster and what it strikes (a foe, a creature, a friend): each
+    /// is set down where the other stood. A champion, and anything steadfast or untouchable, holds
+    /// its ground (it's only struck).
+    #[serde(default)]
+    pub swap: bool,
+    /// A projectile that binds the foe it strikes to the caster for `tether_secs`, a link drawn
+    /// between them (`tick_spell`, a channelled spell's look): once the foe is farther than
+    /// `tether_range` from them, it's pulled back to the caster and given `tether_effects` (a
+    /// stun) as it lands, and the link ends. With `chain`, the foes within `chain_range` of the
+    /// first are bound too (as many as `chain`).
+    #[serde(default)]
+    pub tether_secs: f32,
+    #[serde(default)]
+    pub tether_range: f32,
+    #[serde(default)]
+    pub tether_effects: Vec<AbilityEffect>,
+    /// A buff that leaves an echo where the caster stands, holding their health then (its look:
+    /// `burst_spell` there once, `linger_spell` on the ground while it lasts): its recast (with
+    /// `recast`, whose ability then goes off from the echo), or else `rewind_secs` after the cast,
+    /// snaps them back to it, with the health it holds if that's more than they have now (never
+    /// less). Unused, a recast's echo fades with its window.
+    #[serde(default)]
+    pub rewind: bool,
+    #[serde(default)]
+    pub rewind_secs: f32,
+    /// A trap that launches instead of springing (a jump pad): the caster or a friend who steps on
+    /// it is thrown this many yards the way they face, as a leap (`lift`), landing with `damage`
+    /// and `effects` within its `radius`. Foes don't set it off; it stays its whole life, each
+    /// hero launched at most once a second.
+    #[serde(default)]
+    pub launch: f32,
+    /// Lingering ground that bursts as it ends (a black hole's collapse): this ability (a `nova`:
+    /// its damage, effects and look) goes off over it, as wide as the ground (or the nova's own
+    /// `radius`, if it has one).
+    #[serde(default)]
+    pub end_burst: String,
 }
 
 /// What an ability empowers as it goes: the base card (`ability`, one with an EX version) whose
@@ -414,9 +456,9 @@ impl AbilityDef {
     pub fn on_board(&self) -> bool {
         !self.is_ex() && !self.inner && !self.bench
     }
-    /// A projectile that meets friends too (to heal them, or to pull them to safety).
+    /// A projectile that meets friends too (to heal them, to pull them to safety, to swap places).
     pub fn friends(&self) -> bool {
-        self.ally_heal > 0.0 || self.friendly
+        self.ally_heal > 0.0 || self.friendly || self.swap
     }
     /// It mends friends (a heal on whoever it reaches, a nova's, holy ground's mending or boon):
     /// a hero it can help is never harmed by it, friendly fire or not.
@@ -452,7 +494,7 @@ pub fn full_kit_of(school: &str) -> u32 {
 /// What an ability does to what it strikes: `kind` one of [`CC_KINDS`] or `burn` (damage a second),
 /// `mark` (the next hit on it does `amount` more), `heal` (the caster), `cleanse_panic`; for
 /// `secs` (at the least and the full charge).
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
 pub struct AbilityEffect {
     pub kind: String,
     #[serde(default)]
@@ -475,6 +517,15 @@ pub struct AbilityEffect {
     /// Its look on whoever has it, in place of the kind's own (a spell whose state look plays).
     #[serde(default)]
     pub aura: u32,
+    /// A knockback that throws them into a wall (or up against a steep step) stuns them this long
+    /// as they hit it (a creature's duration: a hero's is shortened, and kept from them by the
+    /// grace, as any stun's).
+    #[serde(default)]
+    pub wall_stun: f32,
+    /// A shield that bursts as it ends (broken or run out): this ability (a `nova`) goes off round
+    /// whoever held it, as theirs.
+    #[serde(default)]
+    pub pop: String,
 }
 
 /// The crowd control there is (Battlerite's rules, WoW's names): `stun` (nothing, damage doesn't
@@ -487,12 +538,14 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// `knockback` throws them `amount` yards away from where it came from (`pull`: up to `amount`
 /// yards toward it); `shield` soaks `amount` damage; `regen` heals `amount` of their health a
 /// second; `haste` makes them `amount` faster; `veil` hides them (creatures lose them, locks let
-/// go; their next blow counts as from behind) until they strike or cast.
-pub const OTHER_EFFECTS: [&str; 14] =
-    ["burn", "mark", "heal", "cleanse_panic", "deathmark", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil"];
+/// go; their next blow counts as from behind) until they strike or cast; `cheat_death` keeps a hero
+/// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
+/// `amount` of their health over the next 3 s.
+pub const OTHER_EFFECTS: [&str; 15] =
+    ["burn", "mark", "heal", "cleanse_panic", "deathmark", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 7] = ["onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil"];
+pub const BOONS: [&str; 8] = ["onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
@@ -540,6 +593,11 @@ pub struct CounterDef {
     /// Every melee blow and projectile is dodged (Evasion).
     #[serde(default)]
     pub dodge: bool,
+    /// A mirror: a foe's projectile that would strike them (a hero's, or a creature's bolt) flies
+    /// back at whoever threw it, as hard as it was and with what it does; melee blows and ground go
+    /// through as ever. Nothing else (no block, dodge, ward or `reflect` with it).
+    #[serde(default)]
+    pub mirror: bool,
     /// A counter that catches something comes back this much sooner (a share of its cooldown).
     #[serde(default = "half")]
     pub caught_cooldown: f32,
