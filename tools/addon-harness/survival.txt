@@ -261,6 +261,20 @@ MK	77
 TG	91	0XF130000000000025	wedge	3.40	120	1.20	block	0.25	1
 TG	91
 !SetTelegraph, ClearTelegraph = nil, nil
+# Its tells with the floor markers off: the glow, then the flash to answer it and the woosh; a blow
+# called off before it lands (its TG gone) plays neither.
+!ElwynnSurvivalSettings.noMarks = 1 SOUNDS = {} OLDPSF = PlaySoundFile function PlaySoundFile(f) table.insert(SOUNDS, f) end function SetUnitWeaponGlow(u, c, s) table.insert(SAID, "tell glow " .. u .. " " .. c .. " " .. string.format("%.2f", s)) end
+TG	92	0XF130000000000025	wedge	3.40	120	1.00	block	0.25	1	0	0.32
+TG	93	0XF130000000000026	wedge	3.40	120	1.00	unblockable	0.25	1	0	0.32
+TG	93
+!for i = 1, table.getn(ElwynnSurvival.timers) do ElwynnSurvival.timers[i].at = 0 end ElwynnSurvival.RunTimers() table.insert(SAID, "tell sounds: " .. table.concat(SOUNDS, ", "))
+# A red blow that does land: its flash (roll now), and no ring; one turned on someone else: none.
+!SOUNDS = {}
+TG	94	0XF130000000000027	wedge	3.40	120	0.80	unblockable	0.25	1	0	0.32
+TG	95	0XF130000000000028	wedge	3.40	120	0.80	block	0.25	1	0	0.32
+TG	95	0XF130000000000028	wedge	3.40	120	0.80	block	0.25	0	0	0.32
+!for i = 1, table.getn(ElwynnSurvival.timers) do ElwynnSurvival.timers[i].at = 0 end ElwynnSurvival.RunTimers() table.insert(SAID, "red tell sounds: " .. table.concat(SOUNDS, ", "))
+!ElwynnSurvivalSettings.noMarks = nil SetUnitWeaponGlow = nil PlaySoundFile = OLDPSF
 # The steering mouse: held in action mode, let go while a window is up.
 !OLDML = { MouselookStart, MouselookStop, IsMouselooking } LOOKING = false function MouselookStart() LOOKING = true end function MouselookStop() LOOKING = false end function IsMouselooking() return LOOKING end ElwynnSurvival.SetMode("action")
 !table.insert(SAID, "steering: " .. tostring(LOOKING))
