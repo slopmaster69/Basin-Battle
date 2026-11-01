@@ -464,7 +464,9 @@ impl SurvivalGame {
                 if self.is_player(id) {
                     if let Some(c) = self.conn_of(id) {
                         let secs = self.sim.content.pvp.respawn_secs.unwrap_or(self.sim.content.player.respawn_secs);
-                        self.ui_line(c, &format!("DE\t{secs:.0}"));
+                        // And what felled them: the blows (the last first) and a word on answering it.
+                        let recap = self.sim.death_recap(id);
+                        self.ui_line(c, &format!("DE\t{secs:.0}\t{}\t{}", recap.lines.join("^"), recap.tip));
                     }
                 }
             }

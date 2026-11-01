@@ -6148,7 +6148,9 @@ function ES.Line(line)
       ES.upAt = GetTime() + secs
       ES.CloseWindows()
       Play("fall")
+      if ES.Recap then ES.Recap(f[3], f[4]) end
     else
+      if ES.RecapClear then ES.RecapClear() end
       ES.upAt = nil
       ES.lastHp = nil
       if StaticPopup_Hide then StaticPopup_Hide("DEATH") end

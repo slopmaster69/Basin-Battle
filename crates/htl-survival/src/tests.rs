@@ -3000,3 +3000,48 @@ fn a_blow_can_borrow_another_character_models_clip() {
     }
     assert!(ev.iter().any(|e| matches!(e, Event::MobWindup { id, from, .. } if *id == k && from.as_deref() == Some("OrcFemale"))), "its swing, borrowed");
 }
+
+// --- the death recap -------------------------------------------------------------------------------
+
+#[test]
+fn a_fall_is_recapped_with_who_struck_how_each_blow_caught_them_and_a_tip() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    let grunt = s.content.mobs[s.mobs[&k].def].name.clone();
+    // A blow taken unguarded, one round the back of the guard, then a heavy blow through a guard
+    // with no breath left to hold it.
+    s.strike_player(k, p, 10, [2.0, 0.0, 0.0], true, false, false, Blow::Light);
+    s.input(p, Input::Guard);
+    assert_eq!(s.strike_player(k, p, 10, [-2.0, 0.0, 0.0], true, false, false, Blow::Light), Outcome::Hit);
+    s.players.get_mut(&p).unwrap().stamina = 0.0;
+    let hp = s.players[&p].health;
+    assert_eq!(s.strike_player(k, p, hp * 10, [2.0, 0.0, 0.0], true, true, false, Blow::Light), Outcome::GuardBroken);
+    assert_eq!(s.players[&p].health, 0, "felled");
+    let r = s.death_recap(p);
+    assert_eq!(r.lines.len(), 3, "{:?}", r.lines);
+    assert!(r.lines[0].starts_with(&format!("{grunt}'s heavy blow, through your guard (")), "the last blow first: {:?}", r.lines);
+    assert!(r.lines[1].starts_with(&format!("{grunt}'s blow, around your guard (")), "{:?}", r.lines);
+    assert!(r.lines[2].starts_with(&format!("{grunt}'s blow, unguarded (")), "{:?}", r.lines);
+    assert!(r.tip.contains("dodge"), "how to answer a broken guard: {}", r.tip);
+}
+
+#[test]
+fn a_recap_forgets_old_blows_names_a_fall_and_starts_clean_on_waking() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.strike_player(k, p, 10, [2.0, 0.0, 0.0], true, false, false, Blow::Light);
+    s.mobs.remove(&k);
+    run(&mut s, recap::RECAP_SECS + 1.0);
+    let hp = s.players[&p].health;
+    s.fall_damage(p, hp + 5);
+    let r = s.death_recap(p);
+    assert_eq!(r.lines, vec![format!("Fall ({hp})")], "the old blow is forgotten");
+    assert_eq!(r.tip, "Mind the drop.");
+    // Up again: nothing carried over.
+    let up = s.content.player.respawn_secs + 1.0;
+    run(&mut s, up);
+    assert!(s.players[&p].health > 0, "back on their feet");
+    assert!(s.death_recap(p).lines.is_empty());
+}

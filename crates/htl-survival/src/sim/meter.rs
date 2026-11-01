@@ -174,6 +174,11 @@ impl Survival {
     /// Hurt a hero, counting what it took on `by`'s meter as `label` (when `by` is a hero).
     pub(crate) fn hurt_player_by(&mut self, id: Id, damage: u32, by: Id, label: &str) {
         let before = self.players.get(&id).map_or(0, |p| p.health);
+        // For the recap: this spell (or bash) of theirs, unless a blow already said what it is.
+        if self.players.get(&id).is_some_and(|p| p.cause.is_none()) {
+            let caught = self.players.get(&id).map_or("", |p| super::recap::caught_word(&p.action, super::Outcome::Hit, true));
+            self.set_cause(id, super::recap::Cause::blow(by, label, caught));
+        }
         self.hurt_player(id, damage);
         let after = self.players.get(&id).map_or(0, |p| p.health);
         self.meter_dealt(by, id, before.saturating_sub(after), label);

@@ -1548,6 +1548,8 @@ impl Survival {
             return Outcome::Miss;
         }
         let guard = self.guard_of(p).clone();
+        // What they were doing as it came, for the recap if it fells them.
+        let doing = p.action.clone();
         let cost = (guard.cost + damage as f32 * guard.cost_per_damage) * if heavy { 2.0 } else { 1.0 };
         // A blow heavy enough to put a hero down when it breaks their guard: a heavy attack, or a
         // heavy creature's.
@@ -1675,6 +1677,8 @@ impl Survival {
             p.combat_at = now;
         }
         if landed > 0 {
+            let caught = recap::caught_word(&doing, outcome, blockable);
+            self.set_cause(victim, recap::Cause::blow(attacker, recap::blow_word(style, heavy), caught));
             self.hurt_player(victim, landed);
         }
         outcome
@@ -1738,6 +1742,7 @@ impl Survival {
 
     pub fn fall_damage(&mut self, id: Id, damage: u32) {
         if self.players.get(&id).is_some_and(|p| p.health > 0) {
+            self.set_cause(id, recap::Cause::world("fall"));
             self.hurt_player(id, damage);
         }
     }
@@ -1761,6 +1766,7 @@ impl Survival {
         let interrupted = matches!(p.action, Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
         self.events.push(Event::Health { id, health: h, max: m });
         self.meter_taken(id, lost);
+        self.keep_wound(id, lost);
         if h == 0 {
             self.die(id);
         } else if interrupted {
@@ -1885,9 +1891,11 @@ impl Survival {
                 self.events.push(Event::Sound { id: k, sound });
             }
         }
+        // The log says what felled them too (the recap's last blow), for tuning the fights.
+        let why = self.death_recap(id).lines.into_iter().next().map_or(String::new(), |l| format!(": {l}"));
         match &hero {
-            Some(k) => self.events.push(Event::Log(format!("{k} fells {name}."))),
-            None => self.events.push(Event::Log(format!("{name} fell"))),
+            Some(k) => self.events.push(Event::Log(format!("{k} fells {name}{why}."))),
+            None => self.events.push(Event::Log(format!("{name} fell{why}"))),
         }
         self.events.push(Event::Kill { killer: hero.or(creature), victim: name });
         self.events.push(Event::Dirty);
@@ -1924,6 +1932,8 @@ impl Survival {
         };
         p.health = ((p.max_health as f32 * share).round() as u32).max(1);
         p.last_hit_by = None;
+        p.cause = None;
+        p.wounds.clear();
         p.foe = None;
         p.riposte_until = -100.0;
         p.stamina = c.player.stamina;
