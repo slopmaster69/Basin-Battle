@@ -220,6 +220,7 @@ fn holy_shock_heals_the_friend_under_the_reticle_and_ends_what_holds_them_and_th
     // A foe takes the shield as a blow.
     let k = mob(&mut s, "grunt", [8.0, 6.0, 0.0], 0.0);
     s.players.get_mut(&b).unwrap().pos = [0.0, -20.0, 0.0];
+    run(&mut s, 1.0);
     s.set_aim_line(a, (6.0f32).atan2(8.0), 0.0);
     let mut ev = cast(&mut s, a, "ranged", "avengers_shield", false);
     ev.extend(run(&mut s, 1.0));
