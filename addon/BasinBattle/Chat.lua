@@ -23,7 +23,8 @@ end
 
 local placing = false
 local function PlaceChat()
-  if placing or not ChatFrame1 then return end
+  -- (The stock frame, with its methods: a stand-in without them is left alone.)
+  if placing or not ChatFrame1 or not ChatFrame1.ClearAllPoints then return end
   if not InBasin() then return end
   placing = true
   -- Above the stock bar and the Auto/Manual and Talents switches that sit on top of it.
@@ -187,11 +188,13 @@ if ChatFrame_OnEvent then
 end
 
 SLASH_BBCHAT1 = "/bbchat"
-SlashCmdList["BBCHAT"] = function()
-  showAll = not showAll
-  if showAll then
-    DEFAULT_CHAT_FRAME:AddMessage("Basin Battle: every game line shows in chat again. /bbchat to tidy it.", 1, 0.82, 0.2)
-  else
-    DEFAULT_CHAT_FRAME:AddMessage("Basin Battle: game news goes under the wave tracker again. /bbchat to see it all in chat.", 1, 0.82, 0.2)
+if SlashCmdList then
+  SlashCmdList["BBCHAT"] = function()
+    showAll = not showAll
+    if showAll then
+      DEFAULT_CHAT_FRAME:AddMessage("Basin Battle: every game line shows in chat again. /bbchat to tidy it.", 1, 0.82, 0.2)
+    else
+      DEFAULT_CHAT_FRAME:AddMessage("Basin Battle: game news goes under the wave tracker again. /bbchat to see it all in chat.", 1, 0.82, 0.2)
+    end
   end
 end
