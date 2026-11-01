@@ -55,25 +55,57 @@ pub fn spawn(listener: TcpListener, keys: SessionKeys, game: Sender<Inbound>) {
         .expect("spawn world accept thread");
 }
 
-fn write_plain(s: &mut TcpStream, p: &Packet) -> std::io::Result<()> {
-    let size = (p.body.len() + 2) as u16;
-    let mut out = Vec::with_capacity(4 + p.body.len());
-    out.extend_from_slice(&size.to_be_bytes());
-    out.extend_from_slice(&p.opcode.to_le_bytes());
+/// The largest size a two-byte server header holds. The 1.12 client reads the first size byte's
+/// top bit as "a third size byte follows", so a size of `0x8000` or more must be sent in three
+/// bytes, or the client reads one byte too many and every packet after it is garbage (the game
+/// stops answering anything, logging out included).
+const SHORT_SIZE_MAX: usize = 0x7fff;
+/// The largest size the three-byte form holds: the first byte's low seven bits and two more.
+const LONG_SIZE_MAX: usize = 0x7f_ffff;
+
+/// A server packet's header, in the clear: the size (the 2-byte opcode plus the body) big-endian
+/// in two bytes up to [`SHORT_SIZE_MAX`], else in three with the first byte's top bit set, then
+/// the opcode little-endian. `None` past [`LONG_SIZE_MAX`].
+fn server_header(p: &Packet) -> Option<Vec<u8>> {
+    let size = p.body.len() + 2;
+    let mut header = if size <= SHORT_SIZE_MAX {
+        (size as u16).to_be_bytes().to_vec()
+    } else if size <= LONG_SIZE_MAX {
+        (size as u32 | 0x80_0000).to_be_bytes()[1..].to_vec()
+    } else {
+        return None;
+    };
+    header.extend_from_slice(&p.opcode.to_le_bytes());
+    Some(header)
+}
+
+/// Header and body as one buffer, the header passed through `encrypt` first; `None` (and a line
+/// in the log) for a packet too big for any header.
+fn frame(p: &Packet, encrypt: impl FnOnce(&mut [u8])) -> Option<Vec<u8>> {
+    let Some(mut header) = server_header(p) else {
+        eprintln!("[world] dropping an oversized {:#06x} packet ({} bytes)", p.opcode, p.body.len());
+        return None;
+    };
+    encrypt(&mut header);
+    let mut out = Vec::with_capacity(header.len() + p.body.len());
+    out.extend_from_slice(&header);
     out.extend_from_slice(&p.body);
-    s.write_all(&out)
+    Some(out)
+}
+
+fn write_plain(s: &mut TcpStream, p: &Packet) -> std::io::Result<()> {
+    match frame(p, |_| {}) {
+        Some(out) => s.write_all(&out),
+        None => Ok(()),
+    }
 }
 
 fn write_encrypted(s: &mut TcpStream, e: &mut EncrypterHalf, p: &Packet) -> std::io::Result<()> {
-    if p.body.len() + 2 > u16::MAX as usize {
-        eprintln!("[world] dropping an oversized {:#06x} packet", p.opcode);
-        return Ok(());
+    // The cipher runs a byte at a time over the whole header, three size bytes or two.
+    match frame(p, |h| e.encrypt(h)) {
+        Some(out) => s.write_all(&out),
+        None => Ok(()),
     }
-    let header = e.encrypt_server_header((p.body.len() + 2) as u16, p.opcode);
-    let mut out = Vec::with_capacity(4 + p.body.len());
-    out.extend_from_slice(&header);
-    out.extend_from_slice(&p.body);
-    s.write_all(&out)
 }
 
 fn serve(mut s: TcpStream, keys: &SessionKeys, game: &Sender<Inbound>) -> Result<()> {
@@ -158,5 +190,43 @@ fn serve(mut s: TcpStream, keys: &SessionKeys, game: &Sender<Inbound>) -> Result
             Ok(())
         }
         other => other,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn packet(body_len: usize) -> Packet {
+        Packet { opcode: 0x0096, body: vec![0; body_len] }
+    }
+
+    /// The size the 1.12 client reads back from a header, as it reads it: two bytes while the
+    /// first one's top bit is clear, else three; then the opcode.
+    fn client_reads(h: &[u8]) -> (usize, u16, usize) {
+        if h[0] & 0x80 == 0 {
+            (usize::from(h[0]) << 8 | usize::from(h[1]), u16::from_le_bytes([h[2], h[3]]), 4)
+        } else {
+            let size = usize::from(h[0] & 0x7f) << 16 | usize::from(h[1]) << 8 | usize::from(h[2]);
+            (size, u16::from_le_bytes([h[3], h[4]]), 5)
+        }
+    }
+
+    #[test]
+    fn a_header_reads_back_as_the_client_reads_it_on_both_sides_of_0x7fff() {
+        for body in [0, 100, 0x7ffd, 0x7ffe, 0x8000, 34_200, 0xfffd, 0xfffe, 0x12343, LONG_SIZE_MAX - 2] {
+            let h = server_header(&packet(body)).unwrap();
+            let (size, opcode, len) = client_reads(&h);
+            assert_eq!((size, opcode, len), (body + 2, 0x0096, h.len()), "a {body}-byte body");
+        }
+        // The largest two-byte size stays two bytes; one more takes three.
+        assert_eq!(server_header(&packet(0x7ffd)).unwrap()[..2], [0x7f, 0xff]);
+        assert_eq!(server_header(&packet(0x7ffe)).unwrap()[..3], [0x80, 0x80, 0x00]);
+    }
+
+    #[test]
+    fn a_packet_too_big_for_any_header_is_dropped() {
+        assert!(server_header(&packet(LONG_SIZE_MAX - 1)).is_none());
+        assert!(frame(&packet(LONG_SIZE_MAX - 1), |_| {}).is_none());
     }
 }
