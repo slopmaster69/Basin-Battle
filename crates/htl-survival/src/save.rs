@@ -200,6 +200,43 @@ pub fn save_player(c: &Content, p: &Player) -> PlayerSave {
     }
 }
 
+/// Cards renamed or replaced since a save was written, old key to new (the class spell redesign,
+/// #40): a hero who had the old card owns, and keeps on its key, the card that took its place.
+/// One block per class, so changes to different classes don't collide.
+const RENAMED: &[(&str, &str)] = &[
+    // Warrior
+    ("aimed_throw", "hurled_axe"),
+    // Paladin (Holy Shock and Hammer of Justice live on, as Avenger's Shield's EX and Divine
+    // Steed's recast: never a card of their own on a key or in a hero's tree)
+    ("holy_shock", "avengers_shield"),
+    ("hammer_of_justice", "divine_steed"),
+    ("divine_protection", "blessing_of_protection"),
+    // Hunter
+    ("arcane_shot", "aimed_arrow"),
+    ("deterrence", "flare"),
+    ("volley", "kill_shot"),
+    // Rogue
+    ("deadly_throw", "fan_of_knives"),
+    ("evasion", "smoke_bomb"),
+    // Priest (Mind Blast and Power Word: Shield are now EX versions, never saved: a saved one is
+    // the old card)
+    ("mind_blast", "penance"),
+    ("power_word_shield", "power_word_barrier"),
+    // Shaman
+    ("lightning_bolt", "lava_burst"),
+    // Mage
+    // Warlock
+    ("shadow_bolt", "seed_of_corruption"),
+    ("shadow_ward", "drain_life"),
+    // Druid
+    ("wrath", "living_seed"),
+];
+
+/// A saved card's key as it is now.
+pub fn renamed(k: &str) -> &str {
+    RENAMED.iter().find(|(old, _)| *old == k).map_or(k, |(_, new)| new)
+}
+
 /// A returning hero is where they left, as hurt as they were: no heal and no trip home for
 /// logging out (only a fall sends them to the camp).
 pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl Fn(f32, f32) -> f32) {
@@ -218,7 +255,8 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
     p.last_safe = p.pos;
     // The tree as they left it (a dev build owns it all whatever was saved), and their keys where
     // the abilities still exist and are theirs.
-    let saved: std::collections::BTreeSet<String> = s.owned.iter().filter(|k| c.ability(k).is_some()).cloned().collect();
+    // A card since renamed or replaced (the class redesign) comes back as its successor.
+    let saved: std::collections::BTreeSet<String> = s.owned.iter().map(|k| renamed(k).to_string()).filter(|k| c.ability(k).is_some()).collect();
     if !c.dev.full_tree && !s.owned.is_empty() {
         p.owned = saved;
     }
@@ -231,13 +269,14 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
         let fits = |k: &str| c.ability(k).filter(|a| !c.abilities[*a].is_ex() && p.owned.contains(k));
         let mut keys = p.loadout.clone();
         let mut set = std::collections::BTreeSet::new();
-        for (slot, k) in &s.loadout {
+        let loadout: BTreeMap<String, String> = s.loadout.iter().map(|(slot, k)| (slot.clone(), renamed(k).to_string())).collect();
+        for (slot, k) in &loadout {
             if crate::content::SLOTS.contains(&slot.as_str()) && fits(k).is_some_and(|a| c.abilities[a].slot == *slot) {
                 keys.insert(slot.clone(), k.clone());
                 set.insert(slot.clone());
             }
         }
-        for (slot, k) in &s.loadout {
+        for (slot, k) in &loadout {
             if crate::content::SLOTS.contains(&slot.as_str()) && fits(k).is_some_and(|a| c.abilities[a].slot == *slot) {
                 continue;
             }
