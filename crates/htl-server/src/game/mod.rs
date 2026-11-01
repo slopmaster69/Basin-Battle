@@ -164,6 +164,8 @@ pub struct Game {
     guide_at: Option<std::time::Instant>,
     /// Recent calls for help, shown on the world map for a while: when, and where.
     pub(crate) pings: Vec<(std::time::Instant, [f32; 3])>,
+    /// A warned restart: what's been said of it.
+    warner: crate::restart::Warner,
 }
 
 pub fn display_name(account: &str) -> String {
@@ -194,6 +196,7 @@ impl Game {
             offer_seq: 0,
             guide_at: None,
             pings: Vec::new(),
+            warner: Default::default(),
         };
         let hub = g.sim.hub_id();
         g.bind(hub, creature_guid(HUB_ENTRY, hub));
@@ -212,6 +215,7 @@ impl Game {
                 self.ui_flush_hud(false);
                 self.ui_guides();
                 self.ui_meters(false);
+                self.restart_step();
                 next += TICK;
                 if next < now {
                     next = now + TICK; // fell behind: don't try to catch up
@@ -285,6 +289,23 @@ impl Game {
 
     pub(crate) fn say_to(&self, conn: ConnId, text: &str) {
         self.send(conn, packets::chat(packets::CHAT_SYSTEM, packets::LANG_UNIVERSAL, 0, text));
+    }
+
+    /// A warned restart coming: a line to everyone as each warning comes. Basin Battle keeps
+    /// what it saves as it goes, so at the time there's nothing more to write.
+    fn restart_step(&mut self) {
+        use crate::restart::Step;
+        let Some(step) = self.warner.step() else { return };
+        let (Step::Warn(title, sub) | Step::Now(title, sub) | Step::Off(title, sub)) = &step;
+        let line = format!("{title}. {sub}");
+        let conns: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
+        for c in conns {
+            self.say_to(c, &line);
+        }
+        if matches!(step, Step::Now(..)) {
+            println!("[restart] Basin Battle saved");
+            crate::restart::saved();
+        }
     }
 
     // --- inbound ------------------------------------------------------------------------------
