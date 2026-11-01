@@ -2763,6 +2763,12 @@ impl Content {
             if a.kind == "line" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0) {
                 bail!("{what}: a strip needs its length (`range`) and half-width (`radius`)");
             }
+            if a.kind == "ally" && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
+                bail!("{what}: an ally ability helps whoever it lands on: no `damage`");
+            }
+            if a.kind == "beam" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0 || a.secs <= 0.0) {
+                bail!("{what}: a beam needs its length (`range`), half-width (`radius`) and how long it's held (`secs`)");
+            }
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
                 bail!("{what}: only a cone, a nova or a strip winds up (`cast`)");
             }

@@ -2083,8 +2083,8 @@ end)
 -- While an ability is aimed the camera comes in over the shoulder, and the middle of the screen
 -- is where it goes (the server traces the reticle's line, as the client sends it). The ring
 -- closes as a charge builds, and turns gold once it's past the least; grey while it can't go.
--- A ground ability's circle (and a cone's wedge) lies on the ground where the line meets it, on
--- the clients that draw it (`SetAimMarker`).
+-- A ground ability's circle (and a cone's wedge) lies on the ground where the line meets it, and
+-- a projectile's or a beam's path along it, on the clients that draw them (`SetAimMarker`).
 
 local aim = CreateFrame("Frame", "ElwynnSurvivalAim", UIParent)
 aim:SetWidth(64)
@@ -2159,16 +2159,29 @@ function ES.DrawAim()
   ES.DrawAimMarker()
 end
 
+-- The marker an aimed ability gets: a ground ability's circle, a cone's wedge, and (on the eighth
+-- round, which draws a strip) a projectile's or a beam's path from the feet along the view, its
+-- range long and its radius either side. Nil: none (a dash, a tether, help for a friend).
+function ES.AimMarkerShape(d)
+  if not d then return nil end
+  if d.shape == "circle" or d.shape == "cone" then return d.shape end
+  if (d.kind == "projectile" or d.kind == "beam") and HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8 then
+    return "line"
+  end
+  return nil
+end
+
 -- The ground marker under the reticle (the client patch's `SetAimMarker(shape, range, radius,
 -- arc)`), off when nothing's aimed.
 function ES.DrawAimMarker()
   if not SetAimMarker then return end
   local d = aim.info
-  local want = d and (d.shape == "circle" or d.shape == "cone") and (d.shape .. d.range .. d.radius .. d.arc) or nil
+  local shape = ES.AimMarkerShape(d)
+  local want = shape and (shape .. d.range .. d.radius .. d.arc) or nil
   if want == ES.aimMarker then return end
   ES.aimMarker = want
   if want then
-    SetAimMarker(d.shape, d.range, d.radius, d.arc)
+    SetAimMarker(shape, d.range, d.radius, d.arc)
   else
     SetAimMarker(nil)
   end
@@ -3480,7 +3493,7 @@ end
 -- Tells: a blow coming at you reads on the striker itself, with the floor markers on or off. Its
 -- wind-up glows (amber: a guard stops it, red: nothing does, from the TG line); a moment before
 -- the window to answer it opens, the glow flashes bright: raise the guard now for a parry, with a
--- blade's ring, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
+-- ping, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
 -- a longer wind-up. ES.tells[key] is the wind-up's number, so a blow called off (its TG gone
 -- before it lands, or a new one for the same key) plays nothing more.
 ES.tells, ES.tellN = {}, 0
@@ -3488,7 +3501,9 @@ ES.tells, ES.tellN = {}, 0
 -- inside the window, not after it.
 ES.TELL_LEAD = 0.12
 ES.TELL_FLASH = "FFF6D8"
-ES.TELL_RING = "Sound\\Item\\Weapons\\Parry\\ParryMetalHitMetal.wav"
+-- The cue to raise the guard: a ping, not a weapon's sound. It used to be a blade's ring, the very
+-- sound of a guard meeting a blow, so the warning sounded like a parry had already happened.
+ES.TELL_RING = "Sound\\Interface\\MapPing.wav"
 function ES.Tell(key, guid, secs, kind, parry, roll)
   ES.tellN = ES.tellN + 1
   local n = ES.tellN
@@ -6120,7 +6135,10 @@ events:SetScript("OnEvent", function()
     end
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
-    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
+    -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up).
+    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
+      Say(".es hello " .. VERSION .. " ac9")
+    elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
       Say(".es hello " .. VERSION .. " ac8")
     elseif LocalHits() and SetTelegraph and (tonumber(HasActionCombat()) or 0) >= 7 then
       Say(".es hello " .. VERSION .. " ac7")

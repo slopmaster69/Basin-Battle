@@ -41,4 +41,6 @@ mod tests_floors;
 #[cfg(test)]
 mod tests_siege;
 #[cfg(test)]
+mod tests_support;
+#[cfg(test)]
 mod tests_tactics;

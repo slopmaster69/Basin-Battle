@@ -1,10 +1,12 @@
 //! A hero's abilities: the keys they're on (the loadout), the ring tree they're taken from,
 //! aiming along the reticle, charging, letting go, and what each kind does when it goes:
 //! projectiles that fly and strike the first thing they touch, ground that's marked and then
-//! lands, totems, cones, novas, tethers, dashes and blinks, and the counters' stances. Valor is
-//! earned by fighting well and spent on the EX versions and the ultimate.
+//! lands, totems, cones, novas, tethers, sweeping beams, help aimed at a friend, dashes and blinks,
+//! and the counters' stances. Valor is earned by fighting well and spent on the EX versions and
+//! the ultimate.
 //!
-//! Nothing here finds its target for the hero: every aimed ability goes where the reticle points.
+//! Nothing here finds a foe for the hero: every aimed ability goes where the reticle points. Only
+//! help aimed at a friend (`ally`) leans toward the friend nearest the reticle, else the caster.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -134,6 +136,10 @@ const HOLD_THROWN: u16 = 111;
 const BOON_HOLD: f32 = 1.5;
 /// A friend healed: Flash of Light's look on them.
 const HEAL_LOOK: u32 = 19750;
+/// Help aimed at a friend that misses them along the reticle still finds the friend nearest it
+/// within this many degrees of it (and an ally's trace is this wide, unless it says).
+const ALLY_CONE: f32 = 15.0;
+const ALLY_TRACE: f32 = 1.0;
 /// A frozen foe struck by a shattering ability takes this many times the damage.
 const SHATTER: f32 = 1.5;
 /// A dash runs this fast; a blink's landing must be this near the ground the line meets.
@@ -493,6 +499,14 @@ impl Survival {
         if let Action::Stance { ability, .. } = p.action {
             if self.content.abilities[ability].counter.as_ref().is_some_and(|c| c.immune) && self.content.base_of(ability) == base {
                 self.end_stance(id);
+                return true;
+            }
+        }
+        // A beam: its key again ends it early.
+        if let Action::Channel { ability, .. } = p.action {
+            if self.content.abilities[ability].kind == "beam" && self.content.base_of(ability) == base {
+                self.end_ability_action(id);
+                self.set_action(id, Action::Ready);
                 return true;
             }
         }
@@ -867,6 +881,11 @@ impl Survival {
                 self.set_action(id, next);
             }
             "channel" => self.start_channel(id, ability, share),
+            "beam" => self.start_beam(id, ability, share),
+            "ally" => {
+                self.ally(id, ability, share);
+                self.set_action(id, next);
+            }
             "dash" => self.start_dash(id, ability, yaw, share),
             "blink" if d.anchor > 0.0 => {
                 self.return_to_anchor(id, ability);
@@ -1052,7 +1071,9 @@ impl Survival {
     /// is struck, or caught in its burst; a chaining one leaps on.
     fn projectile_hit(&mut self, p: &Projectile, victim: Id, from: Vec3) {
         // A friend touched by light: healed, not struck.
-        if p.allies && self.players.contains_key(&victim) && !self.hostile(p.owner, victim) {
+        // (Outside Siege that's any other hero, friendly fire or not: a bolt that would both heal
+        // and hurt them heals them, as the caster meant.)
+        if p.allies && self.players.contains_key(&victim) && self.helpable(p.owner, victim) {
             self.friend_hit(p, victim);
             return;
         }
@@ -1198,6 +1219,13 @@ impl Survival {
     /// What follows an ability that landed: its effects on the struck, the drain and heal for the
     /// caster, Valor, the refund on a kill.
     pub(crate) fn ability_after(&mut self, owner: Id, victim: Id, ability: usize, share: f32, damage: u32, killed: bool) {
+        self.ability_after_at(owner, victim, ability, share, damage, killed, 1.0);
+    }
+
+    /// [`Self::ability_after`], with `valor` of the Valor it gives for the foe (a beam's tick: its
+    /// share of a second, so a beam gives its Valor a second in it).
+    #[allow(clippy::too_many_arguments)]
+    fn ability_after_at(&mut self, owner: Id, victim: Id, ability: usize, share: f32, damage: u32, killed: bool, valor: f32) {
         let d = self.content.abilities[ability].clone();
         if !killed {
             // One that's for friends too gives a foe none of what helps.
@@ -1219,7 +1247,7 @@ impl Survival {
         let inert = self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].totem);
         if !inert {
             let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
-            self.gain_valor(owner, v);
+            self.gain_valor(owner, v * valor);
         }
         if killed && d.refund_kill && d.valor > 0 {
             self.gain_valor(owner, d.valor as f32);
@@ -1266,6 +1294,79 @@ impl Survival {
         self.events.push(Event::Flash { player: owner, text: format!("Healed {name}") });
         let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
         self.gain_valor(owner, v);
+    }
+
+    // --- help aimed at a friend ------------------------------------------------------------------------
+
+    /// Who help aimed at a friend (`ally`) lands on: the first friendly hero along the reticle
+    /// within `range` (traced `radius` wide), else the friend nearest the reticle's line within
+    /// [`ALLY_CONE`] of it and `range` (in sight), else the caster (alone, it's their own).
+    pub(crate) fn ally_target(&self, id: Id, range: f32, radius: f32) -> Id {
+        let Some(me) = self.players.get(&id) else { return id };
+        let pos = me.pos;
+        let friends: Vec<(Id, Vec3)> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.helpable(id, **h)).map(|(h, p)| (*h, p.pos)).collect();
+        if friends.is_empty() {
+            return id;
+        }
+        // Along the reticle (from the camera, so a little past the range from the hero), to the
+        // ground or a wall it meets.
+        let (o, dir) = self.reticle(id);
+        let reach = range + 3.0;
+        let mut d = 0.0f32;
+        while d < reach {
+            let next = (d + STEP).min(reach);
+            let q = add(o, dir, next);
+            if let Some((f, _)) = friends.iter().find(|(_, feet)| to_body(q, *feet, HERO_TALL) <= HERO_SIZE + radius && dist2d(*feet, pos) <= range + 1.0) {
+                return *f;
+            }
+            let ground = self.land.height_near(q[0], q[1], q[2] + 0.6);
+            if q[2] < ground - 0.05 || self.land.blocked_near(q[0], q[1], q[2]) {
+                break;
+            }
+            d = next;
+        }
+        // Near it: the friend closest to the line, within the cone and the range, in sight.
+        let (yaw, _) = self.aim_of(id);
+        let (c, s) = (yaw.cos(), yaw.sin());
+        let off = |at: Vec3| (-(at[0] - pos[0]) * s + (at[1] - pos[1]) * c).abs();
+        friends
+            .iter()
+            .filter(|(_, at)| dist2d(pos, *at) <= range && angle_between(yaw, facing(pos, *at)) <= ALLY_CONE && clear_line(self.land.as_ref(), pos, *at))
+            .min_by(|a, b| off(a.1).total_cmp(&off(b.1)))
+            .map_or(id, |(f, _)| *f)
+    }
+
+    /// Help aimed at a friend goes: on whoever [`Self::ally_target`] picks, its heal, its cleanse
+    /// and the boons among its effects (what would harm or move them is left out), with its look
+    /// from the caster to them.
+    fn ally(&mut self, id: Id, ability: usize, share: f32) {
+        let d = self.content.abilities[ability].clone();
+        let range = AbilityDef::at(d.range, share);
+        let radius = AbilityDef::at(d.radius, share);
+        let target = self.ally_target(id, range, if radius > 0.0 { radius } else { ALLY_TRACE });
+        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(target) });
+        if d.impact_kit != 0 {
+            self.events.push(Event::Visual { id: target, kit: d.impact_kit, by: None });
+        }
+        if d.ally_heal > 0.0 {
+            let amount = self.players.get(&target).map_or(0, |p| (p.max_health as f32 * d.ally_heal * self.weakened(id)).round() as u32);
+            self.heal_hero(target, amount);
+        }
+        if d.cleanse {
+            self.cleanse(target, &crate::content::HARMFUL);
+        }
+        let boons: Vec<_> = d.effects.iter().filter(|e| crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
+        if !boons.is_empty() {
+            self.apply_effects(id, target, &boons, share, &d.name);
+        }
+        // On another hero: said to the caster, and Valor for it (not for helping yourself).
+        if target != id {
+            let name = self.players.get(&target).map_or_else(String::new, |p| p.name.clone());
+            let text = if d.ally_heal > 0.0 { format!("Healed {name}") } else { format!("{} on {name}", d.name) };
+            self.events.push(Event::Flash { player: id, text });
+            let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
+            self.gain_valor(id, v);
+        }
     }
 
     pub(crate) fn heal_hero(&mut self, id: Id, amount: u32) {
@@ -1404,7 +1505,7 @@ impl Survival {
         // Holy Nova: friends in it mended.
         let heal = self.content.abilities[ability].area_heal;
         if heal > 0.0 {
-            let friends: Vec<Id> = self.players.iter().filter(|(h, p)| (**h == owner || !self.hostile(owner, **h)) && p.health > 0 && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
+            let friends: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
             for f in friends {
                 let amount = self.players.get(&f).map_or(0, |p| (p.max_health as f32 * heal * self.weakened(owner)).round() as u32);
                 self.heal_hero(f, amount);
@@ -1425,7 +1526,8 @@ impl Survival {
         };
         let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner)).map(|(id, _)| *id).collect();
         let heroes: Vec<Id> = if self.content.pvp.friendly_fire {
-            self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
+            // (Not one it mends: a healing area spares a hero it can help.)
+            self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
         } else {
             Vec::new()
         };
@@ -1478,8 +1580,9 @@ impl Survival {
         }
         // Friends: the caster, and every other hero unless they're all foes.
         let inside = |p: &Player| p.health > 0 && dist2d(p.pos, at) <= radius && (p.pos[2] - at[2]).abs() < 4.0;
-        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| (**h == owner || !self.hostile(owner, **h)) && inside(p)).map(|(h, _)| *h).collect();
-        let foes: Vec<Id> = if ff { self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && inside(p)).map(|(h, _)| *h).collect() } else { Vec::new() };
+        // (Holy ground mends any hero it can help, friendly fire or not, and never burns them.)
+        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(owner, **h) && inside(p)).map(|(h, _)| *h).collect();
+        let foes: Vec<Id> = if ff { self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && inside(p)).map(|(h, _)| *h).collect() } else { Vec::new() };
         for h in friends {
             if d.linger_heal > 0.0 {
                 let amount = self.players.get(&h).map_or(0, |p| (p.max_health as f32 * d.linger_heal * self.weakened(owner)).round() as u32);
@@ -1596,7 +1699,7 @@ impl Survival {
             let at = self.mobs[&t.mob].pos;
             // A healing totem mends its owner and their friends near it.
             if d.linger_heal > 0.0 {
-                let near: Vec<Id> = self.players.iter().filter(|(h, p)| (**h == t.owner || !self.hostile(t.owner, **h)) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h).collect();
+                let near: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(t.owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h).collect();
                 for h in near {
                     let amount = self.players.get(&h).map_or(0, |p| (p.max_health as f32 * d.linger_heal).round() as u32);
                     self.heal_hero(h, amount);
@@ -1618,7 +1721,7 @@ impl Survival {
                     .iter()
                     .filter(|(mid, m)| **mid != t.mob && m.health > 0 && !self.content.mobs[m.def].inert() && dist2d(m.pos, at) <= radius)
                     .map(|(id, _)| *id)
-                    .chain(self.players.iter().filter(|(h, p)| self.hostile(t.owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h))
+                    .chain(self.players.iter().filter(|(h, p)| self.hostile(t.owner, **h) && !self.spared(t.owner, **h, t.ability) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h))
                     .collect();
                 for f in foes {
                     self.apply_effects(t.owner, f, &hostile, 1.0, &d.name);
@@ -1676,6 +1779,12 @@ impl Survival {
             p.action = Action::Channel { ability, target, until, next: next + d.tick.max(0.2), share };
         }
         let per = AbilityDef::at(d.damage, share) * d.tick.max(0.2);
+        self.channel_hit(id, target, ability, share, per, 1.0);
+    }
+
+    /// A tether's or a beam's tick on one foe: `per` damage (none on a hero in Ice Block), then
+    /// what follows a blow of it (its effects, the drain, `valor` of its Valor).
+    fn channel_hit(&mut self, id: Id, target: Id, ability: usize, share: f32, per: f32, valor: f32) {
         let damage = self.ability_damage(id, target, ability, per);
         if self.players.contains_key(&target) {
             if self.immune(target) {
@@ -1684,14 +1793,92 @@ impl Survival {
             self.events.push(Event::Swing { attacker: id, victim: Some(target), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
             self.trade_blows(id, target);
             self.hurt_player(target, damage);
-            let killed = !self.alive(target);
-            self.ability_after(id, target, ability, share, damage, killed);
         } else {
             self.events.push(Event::Swing { attacker: id, victim: Some(target), damage, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
             self.trade_blows(id, target);
             self.hurt_mob(target, id, damage);
-            let killed = !self.alive(target);
-            self.ability_after(id, target, ability, share, damage, killed);
+        }
+        let killed = !self.alive(target);
+        self.ability_after_at(id, target, ability, share, damage, killed, valor);
+    }
+
+    // --- beams ------------------------------------------------------------------------------------------
+
+    /// A beam begins: held as a channel (its `target` the caster itself, as there's no one
+    /// unit), its aura on the caster, its look on them as it starts.
+    fn start_beam(&mut self, id: Id, ability: usize, share: f32) {
+        let now = self.clock;
+        let d = self.content.abilities[ability].clone();
+        self.set_action(id, Action::Channel { ability, target: id, until: now + d.secs, next: now + d.tick.max(0.2), share });
+        if d.spell != 0 {
+            self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        }
+        self.events.push(Event::Auras { id });
+    }
+
+    /// A beam's tick: the strip from the caster along their aim as it is now (they turn to sweep
+    /// it) strikes every foe in it and heals every friend in it. A silence ends it (a stun, a
+    /// stagger or a roll already has); so does its time.
+    pub(crate) fn step_beam(&mut self, id: Id) {
+        let now = self.clock;
+        let Some(Action::Channel { ability, target, until, next, share }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
+        if now >= until || self.silenced(id) {
+            self.end_ability_action(id);
+            self.set_action(id, Action::Ready);
+            return;
+        }
+        if now < next {
+            return;
+        }
+        let d = self.content.abilities[ability].clone();
+        let tick = d.tick.max(0.2);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.action = Action::Channel { ability, target, until, next: next + tick, share };
+        }
+        let pos = self.players[&id].pos;
+        let (yaw, _) = self.aim_of(id);
+        let len = AbilityDef::at(d.range, share);
+        let half = AbilityDef::at(d.radius, share);
+        let (c, s) = (yaw.cos(), yaw.sin());
+        let along = |at: Vec3| (at[0] - pos[0]) * c + (at[1] - pos[1]) * s;
+        // A hero it can help is a friend in it (a healing beam heals a co-op hero, friendly fire
+        // or not, and doesn't burn them); one it can't, if friendly fire lets it, a foe.
+        let friend = |h: Id| self.helpable(id, h) && (d.heals() || !self.hostile(id, h));
+        // Foes in it, nearest first: creatures (not the caster's own totems) and rival heroes.
+        let mut foes: Vec<(Id, f32)> = self
+            .mobs
+            .iter()
+            .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && combat::in_strip(pos, yaw, len, half + 0.5 * self.content.mobs[m.def].scale, m.pos))
+            .map(|(mid, m)| (*mid, along(m.pos)))
+            .chain(self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.hostile(id, **h) && !friend(**h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, p)| (*h, along(p.pos))))
+            .collect();
+        foes.sort_by(|a, b| a.1.total_cmp(&b.1));
+        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && friend(**h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, _)| *h).collect();
+        // Its look: to the first foe in it, else to its far end.
+        if d.tick_spell != 0 {
+            let to = match foes.first() {
+                Some((f, _)) => Target::Unit(*f),
+                None => Target::Point(self.slide_end(pos, yaw, len)),
+            };
+            self.events.push(Event::Missile { caster: id, spell: d.tick_spell, target: to });
+        }
+        let per = AbilityDef::at(d.damage, share) * tick;
+        if per > 0.0 || !d.effects.is_empty() {
+            for (f, _) in foes {
+                if self.alive(f) {
+                    self.channel_hit(id, f, ability, share, per, tick);
+                }
+            }
+        }
+        if d.ally_heal > 0.0 {
+            for f in friends {
+                let amount = self.players.get(&f).map_or(0, |p| (p.max_health as f32 * d.ally_heal * tick * self.weakened(id)).round() as u32);
+                self.heal_hero(f, amount);
+            }
+        }
+        if self.debug {
+            let end = self.slide_end(pos, yaw, len);
+            self.mark(end, half.max(0.3), tick);
         }
     }
 
@@ -1933,6 +2120,7 @@ impl Survival {
                     p.action = Action::Cast { t: t + dt, total, ability };
                 }
             }
+            Action::Channel { ability, .. } if self.content.abilities[ability].kind == "beam" => self.step_beam(id),
             Action::Channel { .. } => self.step_channel(id),
             Action::Dash { t, secs, ability, target, share } => {
                 // Going through: each body passed by now takes its blow (and an answer to one, a

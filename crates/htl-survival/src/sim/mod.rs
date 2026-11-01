@@ -164,8 +164,9 @@ pub enum Event {
     /// `fit`: the clip's whole length fitted to that many seconds (a knockdown), 0 its own.
     React { id: Id, anim: u16, from: Vec3, lean: f32, hold: f32, fit: f32 },
     /// A creature winds up a blow: the clip and take it swings with, timed to land `windup`
-    /// seconds from now, and the recovery after (for the clients that play clips themselves).
-    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32 },
+    /// seconds from now, and the recovery after (for the clients that play clips themselves);
+    /// `blockable`: a guard stops it (its swing's trail says which).
+    MobWindup { id: Id, clip: u16, take: u32, windup: f32, recovery: f32, blockable: bool },
     /// A spell visual kit plays on a unit (an impact's flash and sound); `by`: the hero whose blow
     /// it is (whose own client may already have played it).
     Visual { id: Id, kit: u32, by: Option<Id> },

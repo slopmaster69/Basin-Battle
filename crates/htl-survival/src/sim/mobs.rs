@@ -1854,7 +1854,7 @@ impl Survival {
                 Some(s) => s.take,
                 None => self.rng.gen_range(0..2),
             };
-            self.events.push(Event::MobWindup { id, clip, take, windup: a.windup, recovery: a.recovery });
+            self.events.push(Event::MobWindup { id, clip, take, windup: a.windup, recovery: a.recovery, blockable: a.blockable });
         }
         self.mobs.get_mut(&id).unwrap().state = MobState::Windup { foe, t: 0.0, mark, shown: false };
     }
