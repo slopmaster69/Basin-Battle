@@ -311,6 +311,34 @@ pub struct AbilityDef {
     /// Lingering ground's look each tick (a spell shown at its middle: arrows, lightning).
     #[serde(default)]
     pub tick_spell: u32,
+    /// A second activation (Battlerite's recast): once this goes, its key is armed for
+    /// `recast_secs`, and pressed again meanwhile it fires this `inner` ability from the hero's
+    /// aim, for no Valor and no cooldown (the cooldown was spent by the first cast). An EX
+    /// version can have its own. Unused, the window just closes.
+    #[serde(default)]
+    pub recast: String,
+    #[serde(default)]
+    pub recast_secs: f32,
+    /// A blink or a leap fired as a recast that goes back to where the cast that armed it began
+    /// (a Shadowstep there and back), not to the reticle.
+    #[serde(default)]
+    pub recast_to_start: bool,
+    /// A dash that goes through bodies: it strikes every foe it passes once, as it passes, and
+    /// stops only at a wall, a step or its range.
+    #[serde(default)]
+    pub through: bool,
+    /// A combo: once this goes, for `secs` the next press of that base card's key (the same hero's,
+    /// on whatever key) fires its EX version for no Valor; the proc is spent then.
+    #[serde(default)]
+    pub empower: Option<EmpowerDef>,
+}
+
+/// What an ability empowers as it goes: the base card (`ability`, one with an EX version) whose
+/// next press is its EX version for free, within `secs`.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct EmpowerDef {
+    pub ability: String,
+    pub secs: f32,
 }
 
 fn falloff() -> f32 {
@@ -336,7 +364,11 @@ impl AbilityDef {
     }
     /// It's aimed with the reticle (the shoulder camera comes up for it).
     pub fn aimed(&self) -> bool {
-        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff") && !self.at_self && !(self.kind == "leap" && self.back) && self.anchor <= 0.0
+        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff")
+            && !self.at_self
+            && !(self.kind == "leap" && self.back)
+            && self.anchor <= 0.0
+            && !(self.recast_to_start && matches!(self.kind.as_str(), "blink" | "leap"))
     }
     /// On the board (a card to choose), not off it or only fired by something else.
     pub fn on_board(&self) -> bool {

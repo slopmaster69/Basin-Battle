@@ -62,6 +62,11 @@
 //! - `DA\t<secs>\t<speed>\t<facing>`: run the dash of an ability (Charge) along the facing.
 //! - `HL\t<amount>`: healed (a green number). `NP\t<verb>\t<name>`: what the use key would use.
 //! - `A` goes on `\t<ability key>` (what's aimed, charged, cast or channelled).
+//! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
+//!   the key in that slot (0 Q to 4 the ultimate) is armed for its recast for `secs` more: pressed
+//!   again it fires that ability (its icon, its name, its aim and charge); `RC\t<slot>`: closed.
+//! - `EM\t<slot>\t<secs>`: the key in that slot is empowered (a combo) for `secs` more: its next
+//!   press is its EX version, for no Valor; `EM\t<slot>`: spent or gone.
 
 use std::fmt::Write as _;
 
@@ -186,6 +191,15 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.stamina > 0.0 {
         out.push(format!("{} stamina", n(d.stamina)));
     }
+    if d.through {
+        out.push("runs through foes".to_string());
+    }
+    if !d.recast.is_empty() && d.recast_secs > 0.0 {
+        out.push(format!("press again within {} s", n(d.recast_secs)));
+    }
+    if let Some(e) = &d.empower {
+        out.push(format!("empowers for {} s", n(e.secs)));
+    }
     // An EX version runs on its base's cooldown.
     let cd = base.map_or(d.cooldown, |b| b.cooldown);
     if base.is_none() && cd > 0.0 {
@@ -222,6 +236,9 @@ const HUD_EVERY: Duration = Duration::from_millis(150);
 /// A champion's bar shows to the heroes this near it while it fights.
 const BOSS_BAR_RANGE: f32 = 60.0;
 const PING_EVERY: Duration = Duration::from_secs(2);
+/// What was last sent of each key's recast window and empower (see [`SurvivalGame::combo_lines`]).
+const RC_SENT: [&str; 5] = ["RC0", "RC1", "RC2", "RC3", "RC4"];
+const EM_SENT: [&str; 5] = ["EM0", "EM1", "EM2", "EM3", "EM4"];
 /// The corner's arrow points to a place not yet found this near (yards), when there are no
 /// supplies to point to.
 const UNFOUND_HINT: f32 = 600.0;
@@ -647,6 +664,11 @@ impl SurvivalGame {
                         w.sent.insert("AB", ab);
                     }
                 }
+            }
+            // Keys armed for a recast, keys empowered: as they open and close.
+            for (n, (rc, em)) in self.combo_lines(id).into_iter().enumerate() {
+                self.ui_line_stamped(conn, RC_SENT[n], rc);
+                self.ui_line_stamped(conn, EM_SENT[n], em);
             }
             let bp = self.placement_line(id);
             self.ui_line_changed(conn, "BP", bp);
@@ -1533,6 +1555,66 @@ impl SurvivalGame {
             })
             .collect();
         Some(format!("AB\t{}", slots.join("^")))
+    }
+
+    /// Each key's recast window (`RC`) and empower (`EM`) as it stands, with a stamp that changes
+    /// only as one opens or closes (not as its seconds run down), and a closed one's stamp empty.
+    fn combo_lines(&self, id: Id) -> Vec<((String, String), (String, String))> {
+        let c = &self.sim.content;
+        let now = self.sim.clock;
+        let recasts = self.sim.recast_keys(id);
+        let empowered = self.sim.empowered_keys(id);
+        (0..RC_SENT.len())
+            .map(|n| {
+                let rc = match recasts.iter().find(|(k, ..)| *k == n) {
+                    Some(&(_, a, until)) => {
+                        let d = &c.abilities[a];
+                        let shape = match d.kind.as_str() {
+                            "ground" | "place" | "trap" | "leap" | "blink" => "circle",
+                            "cone" => "cone",
+                            "nova" | "stance" | "art" | "buff" => "self",
+                            _ => "line",
+                        };
+                        let shape = if d.at_self || !d.aimed() { "self" } else { shape };
+                        let radius = htl_survival::content::AbilityDef::at(d.radius, 1.0).max(if d.kind == "blink" { 1.0 } else { 0.0 });
+                        (
+                            format!("{}@{until:.2}", d.key),
+                            format!(
+                                "RC\t{n}\t{:.1}\t{}\t{}\t{}\t{shape}\t{:.1}\t{radius:.1}\t{:.0}\t{}\t{:.2}\t{:.2}",
+                                (until - now).max(0.0),
+                                clean(&d.icon),
+                                d.key,
+                                clean(&d.name),
+                                htl_survival::content::AbilityDef::at(d.range, 1.0),
+                                d.arc,
+                                u8::from(d.aimed()),
+                                d.charge[0],
+                                d.charge[1]
+                            ),
+                        )
+                    }
+                    None => (String::new(), format!("RC\t{n}")),
+                };
+                let em = match empowered.iter().find(|(k, _)| *k == n) {
+                    Some(&(_, until)) => (format!("{until:.2}"), format!("EM\t{n}\t{:.1}", (until - now).max(0.0))),
+                    None => (String::new(), format!("EM\t{n}")),
+                };
+                (rc, em)
+            })
+            .collect()
+    }
+
+    /// Send a line kept under `verb` when its stamp changed (and once to a fresh world, closed or
+    /// not, so nothing from the world before stays on the bar).
+    fn ui_line_stamped(&mut self, conn: ConnId, verb: &'static str, (stamp, line): (String, String)) {
+        let same = self.world_of(conn).is_some_and(|w| w.sent.get(verb) == Some(&stamp));
+        if same {
+            return;
+        }
+        self.ui_line(conn, &line);
+        if let Some(w) = self.world_mut(conn) {
+            w.sent.insert(verb, stamp);
+        }
     }
 
     /// Valor: `VA\t<now>\t<most>\t<a segment>`.

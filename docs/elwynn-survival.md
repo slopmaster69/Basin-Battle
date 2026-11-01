@@ -182,7 +182,14 @@ air to the reticle's point (or straight back, a Disengage) and strikes what's th
 Demonic Circle sets an **anchor** to step back to; **traps** arm, wait (two at once) and spring on
 the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a moment and is lost to
 a stun. Projectiles may **pierce** (Crippling Throw), **leap on** (Chain Lightning) or
-**burst**; ground may linger, pull, throw out or slow every second.
+**burst**; ground may linger, pull, throw out or slow every second. A dash may run **through**
+every foe in its way, striking each as it passes.
+
+**Combos** (engine support; the cards that use them come with the class redesign): a card with a
+**recast** arms its key for a few seconds after it goes, and the key again fires its second
+part for free (a blink there and back, a throw after a slam); the key glows green with the seconds
+left. A card that **empowers** another makes that card's next press its EX version for no Valor
+(Frost Nova on E making Fireball on Q its EX); the empowered key glows, its seconds in the corner.
 
 **Seeing it coming** (the action-combat client, eighth round): everything that lands later is
 drawn on the ground where it will land, red when it's a foe's, blue when it's yours or a
@@ -1149,7 +1156,9 @@ test: a knockback from a burst's middle (creatures and heroes), a pull to the ca
 too, unhurt), a leap landing where it was aimed and a Disengage back with its net forward, a strip
 after its drawn wind-up (and lost to a stun), a trap arming and springing, a Demonic Circle's
 anchor, piercing, chaining and bursting projectiles, shields, mending and haste, a veil, a
-Grounding Totem eating a bolt, Evasion and a vortex. `tests_classes.rs` casts every card of the
+Grounding Totem eating a bolt, Evasion and a vortex; `tests_recast.rs` covers recasts (a blink
+there and back, an aimed recast, the window running out, no cooldown for the recast), a dash
+through two foes and an empowered EX version. `tests_classes.rs` casts every card of the
 nine classes and its EX version on creatures and in a duel, and holds the board to its PvP
 budgets.
 

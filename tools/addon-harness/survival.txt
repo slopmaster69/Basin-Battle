@@ -80,6 +80,22 @@ BP
 !table.insert(SAID, "held: " .. SAID[table.getn(SAID)])
 !local h = ElwynnSurvival.exHold h.at = h.at - 0.3 ElwynnSurvival.StepExHold() table.insert(SAID, "after the hold: " .. SAID[table.getn(SAID)])
 !ElwynnSurvival.Ability(1, nil, "up") table.insert(SAID, "let go: " .. tostring(ElwynnSurvival.exHold))
+# A key armed for its recast (Charge's on 1): the recast's look and the window's seconds on it,
+# glowing; pressed, it goes at once (no hold), and closed, the key is Charge again.
+RC	2	3.0	Spell_Arcane_Blink	t_back	Step Back	self	0.0	1.0	0	0	0.00	0.00
+!table.insert(SAID, "recast: " .. tostring(ElwynnSurvival.recasts[3] and ElwynnSurvival.recasts[3].name) .. " secs " .. tostring(ElwynnSurvivalAbilities.slots[3].cd:GetText()) .. " glow " .. tostring(ElwynnSurvivalAbilities.slots[3].glow:IsShown()) .. " info " .. tostring(ElwynnSurvival.AbilityInfo("t_back") ~= nil))
+!ElwynnSurvival.Ability(3, nil, "down") table.insert(SAID, "recast pressed: " .. SAID[table.getn(SAID)] .. " waits " .. tostring(ElwynnSurvival.exHold ~= nil))
+!ElwynnSurvival.Ability(3, nil, "up")
+RC	2
+!table.insert(SAID, "recast closed: " .. tostring(ElwynnSurvival.recasts[3]) .. " secs " .. tostring(ElwynnSurvivalAbilities.slots[3].cd:GetText()) .. " glow " .. tostring(ElwynnSurvivalAbilities.slots[3].glow:IsShown()))
+# An empowered key (Q): glowing, its seconds in the corner; pressed, it goes at once as itself
+# (the server fires the EX version, free); spent, it's a plain key again.
+EM	0	4.0
+!table.insert(SAID, "empowered: glow " .. tostring(ElwynnSurvivalAbilities.slots[1].glow:IsShown()) .. " timer " .. tostring(ElwynnSurvivalAbilities.slots[1].timer:GetText()))
+!ElwynnSurvival.Ability(1, nil, "down") table.insert(SAID, "empowered press: " .. SAID[table.getn(SAID)] .. " waits " .. tostring(ElwynnSurvival.exHold ~= nil))
+!ElwynnSurvival.Ability(1, nil, "up")
+EM	0
+!table.insert(SAID, "empower spent: " .. tostring(ElwynnSurvival.empowers[1]) .. " glow " .. tostring(ElwynnSurvivalAbilities.slots[1].glow:IsShown()) .. " timer [" .. tostring(ElwynnSurvivalAbilities.slots[1].timer:GetText()) .. "]")
 A	aim	0.00	0.00	frostbolt
 !table.insert(SAID, "aiming: reticle " .. tostring(ElwynnSurvivalAim:IsShown()) .. " " .. tostring(ElwynnSurvivalAim.name:GetText()) .. " camera " .. tostring(ElwynnSurvival.aimCam))
 !ElwynnSurvival.Attack("down")
