@@ -229,7 +229,7 @@ impl Survival {
         self.events.push(Event::Hop { player: id, dir, speed: dist / air, lift, roll: false, style: "" });
         self.set_action(id, Action::Dash { t: 0.0, secs: air, ability, target: None, share });
         let radius = AbilityDef::at(d.radius, share);
-        let mark = (radius > 0.0).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))))));
+        let mark = (radius > 0.0).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));
         // A rival where it comes down hears it coming too (the warning over them), not only the
         // mark on the ground, which they may have turned off or not be looking at.
         if radius > 0.0 {

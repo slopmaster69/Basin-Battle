@@ -293,12 +293,15 @@ pub struct Telegraph {
     pub at: Option<(Vec3, f32)>,
     /// A hero's own (their friends see it as a friend's, their foes as a warning).
     pub hero: bool,
+    /// Not drawn for the hero it's theirs (a leap's landing: they know where they aimed; others
+    /// still see it coming).
+    pub own_hidden: bool,
 }
 
 impl Telegraph {
     /// A hero's ability on the ground: a ring (`arc` 360), a wedge or a strip.
     pub fn hero_shape(owner: Id, reach: f32, arc: f32, width: f32, secs: f32, at: Option<(Vec3, f32)>) -> Self {
-        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true }
+        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true, own_hidden: false }
     }
 }
 

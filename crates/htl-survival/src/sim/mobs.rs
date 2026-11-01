@@ -1808,7 +1808,7 @@ impl Survival {
             Foe::Hero(h) => Some(h),
             _ => None,
         };
-        let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false };
+        let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
         let mark = if a.ranged {
             self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
             // A lobbed throw that splashes: where it will come down is chosen now and marked
