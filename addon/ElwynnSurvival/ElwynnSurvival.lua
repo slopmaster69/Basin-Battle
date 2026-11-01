@@ -3406,7 +3406,7 @@ end
 -- Tells: a blow coming at you reads on the striker itself, with the floor markers on or off. Its
 -- wind-up glows (amber: a guard stops it, red: nothing does, from the TG line); a moment before
 -- the window to answer it opens, the glow flashes bright: raise the guard now for a parry, with a
--- blade's ring, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
+-- ping, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
 -- a longer wind-up. ES.tells[key] is the wind-up's number, so a blow called off (its TG gone
 -- before it lands, or a new one for the same key) plays nothing more.
 ES.tells, ES.tellN = {}, 0
@@ -3414,7 +3414,9 @@ ES.tells, ES.tellN = {}, 0
 -- inside the window, not after it.
 ES.TELL_LEAD = 0.12
 ES.TELL_FLASH = "FFF6D8"
-ES.TELL_RING = "Sound\\Item\\Weapons\\Parry\\ParryMetalHitMetal.wav"
+-- The cue to raise the guard: a ping, not a weapon's sound. It used to be a blade's ring, the very
+-- sound of a guard meeting a blow, so the warning sounded like a parry had already happened.
+ES.TELL_RING = "Sound\\Interface\\MapPing.wav"
 function ES.Tell(key, guid, secs, kind, parry, roll)
   ES.tellN = ES.tellN + 1
   local n = ES.tellN
@@ -6042,7 +6044,10 @@ events:SetScript("OnEvent", function()
     end
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
-    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
+    -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up).
+    if LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
+      Say(".es hello " .. VERSION .. " ac9")
+    elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 8 then
       Say(".es hello " .. VERSION .. " ac8")
     elseif LocalHits() and SetTelegraph and (tonumber(HasActionCombat()) or 0) >= 7 then
       Say(".es hello " .. VERSION .. " ac7")
