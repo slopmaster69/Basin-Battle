@@ -431,3 +431,171 @@ fn avatar_makes_you_unstoppable_faster_and_harder_to_hurt() {
     run(&mut s, 8.2);
     assert!(!s.has_cc(p, "onslaught"), "for 8 s");
 }
+
+// --- the cards on engine pieces of their own ------------------------------------------------------
+
+/// [`world`] with a wall of radius `r` at `at`.
+fn walled(at: [f32; 2], r: f32) -> Survival {
+    let mut c = Content::dev();
+    c.dev.full_tree = true;
+    c.pvp = Default::default();
+    if let Some(k) = c.mob("grunt") {
+        c.mobs[k].aggro = 0.0;
+    }
+    let land = FlatLand { walls: vec![(at, r)], ..Default::default() };
+    let mut s = Survival::new(c, Box::new(land), 7, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    s
+}
+
+#[test]
+fn grappling_hook_hauls_you_to_the_foe_it_bites_and_harpoon_drags_the_foe_to_you() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = mob(&mut s, [10.0, 0.0, 0.0]);
+    ready(&mut s, p, "grappling_hook");
+    let mut ev = cast(&mut s, p, "ranged", false);
+    ev.extend(run(&mut s, 1.0));
+    assert_eq!(dealt(&ev, g), 10);
+    let at = s.players[&p].pos;
+    assert!(at[0] > 7.0 && at[0] < 10.0, "hauled up to it: {at:?}");
+    // The EX the other way round: it comes to her.
+    let h = mob(&mut s, [at[0] + 12.0, 0.0, 0.0]);
+    run(&mut s, 1.0);
+    let mut ev = cast(&mut s, p, "ranged", true);
+    ev.extend(run(&mut s, 1.0));
+    assert!(dealt(&ev, h) > 0, "the harpoon bites");
+    assert!(dist2d(s.mobs[&h].pos, s.players[&p].pos) < 4.0, "and drags it to her: {:?}", s.mobs[&h].pos);
+    assert!(s.has_cc(h, "snare"));
+}
+
+#[test]
+fn displacer_orb_trades_places_with_what_it_touches() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = mob(&mut s, [8.0, 0.0, 0.0]);
+    ready(&mut s, p, "displacer_orb");
+    let mut ev = cast(&mut s, p, "ranged", false);
+    ev.extend(run(&mut s, 1.0));
+    assert!(dealt(&ev, g) > 0);
+    assert!(s.players[&p].pos[0] > 6.0, "she's where it stood: {:?}", s.players[&p].pos);
+    assert!(s.mobs[&g].pos[0] < 2.0, "it's where she stood: {:?}", s.mobs[&g].pos);
+}
+
+#[test]
+fn wall_slam_stuns_what_it_throws_into_a_wall_and_not_what_it_throws_clear() {
+    let mut s = walled([6.0, 0.0], 1.0);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = mob(&mut s, [2.5, 0.0, 0.0]);
+    ready(&mut s, p, "wall_slam");
+    let mut ev = cast(&mut s, p, "close", false);
+    ev.extend(run(&mut s, 1.0));
+    assert_eq!(dealt(&ev, g), 8);
+    assert!(s.has_cc(g, "stun"), "into the wall: stunned");
+    // Thrown clear (the wall off to the side): no stun.
+    let mut s = walled([0.0, 20.0], 1.0);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = mob(&mut s, [2.5, 0.0, 0.0]);
+    ready(&mut s, p, "wall_slam");
+    cast(&mut s, p, "close", false);
+    run(&mut s, 1.0);
+    assert!(!s.has_cc(g, "stun"), "nothing to hit");
+}
+
+#[test]
+fn rewind_snaps_you_back_to_the_echo_with_the_health_it_held() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    ready(&mut s, p, "rewind");
+    let full = s.players[&p].health;
+    cast(&mut s, p, "utility", false);
+    run(&mut s, 0.6);
+    s.move_player(p, [10.0, 0.0, 0.0], 0.0, Moving::default());
+    s.players.get_mut(&p).unwrap().health = full / 3;
+    run(&mut s, 0.2);
+    cast(&mut s, p, "utility", false);
+    run(&mut s, 0.3);
+    assert!(dist2d(s.players[&p].pos, ORIGIN) < 1.0, "back at the echo: {:?}", s.players[&p].pos);
+    assert_eq!(s.players[&p].health, full, "with the health she left there");
+}
+
+#[test]
+fn jump_pad_launches_you_from_where_it_lands_and_stays() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    ready(&mut s, p, "jump_pad");
+    cast(&mut s, p, "utility", false);
+    run(&mut s, 0.6);
+    assert_eq!(s.traps.len(), 1, "a pad down");
+    let at = s.traps[0].at;
+    assert!(dist2d(at, ORIGIN) <= 8.5, "within 8 yd: {at:?}");
+    s.move_player(p, at, 0.0, Moving::default());
+    let ev = run(&mut s, 1.5);
+    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)), "launched");
+    assert!(s.players[&p].pos[0] > at[0] + 10.0, "a long way the way she faces: {:?}", s.players[&p].pos);
+    assert_eq!(s.traps.len(), 1, "the pad stays");
+}
+
+#[test]
+fn cheat_death_leaves_you_at_one_health_then_mends_you() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    ready(&mut s, p, "cheat_death");
+    cast(&mut s, p, "defense", false);
+    assert!(s.has_cc(p, "cheat_death"));
+    s.hurt_player(p, 9999);
+    assert_eq!(s.players[&p].health, 1, "still standing, at 1");
+    assert!(!s.has_cc(p, "cheat_death"), "spent");
+    run(&mut s, 3.2);
+    assert!(s.players[&p].health > 1, "mended after");
+}
+
+#[test]
+fn reflect_and_prism_hold_a_mirror() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    ready(&mut s, p, "reflect");
+    cast(&mut s, p, "defense", false);
+    assert!(matches!(s.players[&p].action, Action::Stance { .. }), "the mirror up");
+    run(&mut s, 1.2);
+    assert!(!matches!(s.players[&p].action, Action::Stance { .. }), "for a second");
+    cast(&mut s, p, "defense", true);
+    assert!(s.unstaggerable(p), "Prism: steadfast while it's held");
+}
+
+#[test]
+fn soul_chain_binds_up_to_three_foes() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let a = mob(&mut s, [8.0, 0.0, 0.0]);
+    let b = mob(&mut s, [8.0, 4.0, 0.0]);
+    let c = mob(&mut s, [8.0, -4.0, 0.0]);
+    ready(&mut s, p, "soul_chain");
+    let mut ev = cast(&mut s, p, "ultimate", false);
+    ev.extend(run(&mut s, 0.6));
+    for m in [a, b, c] {
+        assert_eq!(dealt(&ev, m), 14, "each struck");
+    }
+    assert_eq!(s.beta.tethers.len(), 3, "and bound");
+}
+
+#[test]
+fn bubble_pops_and_black_hole_collapses_as_they_end() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = mob(&mut s, [2.0, 0.0, 0.0]);
+    ready(&mut s, p, "bubble");
+    cast(&mut s, p, "defense", false);
+    assert!(s.has_cc(p, "shield"));
+    let ev = run(&mut s, 4.5);
+    assert!(dealt(&ev, g) > 0, "the pop strikes the foe beside her");
+    // The black hole: a pull for 3 s, then the collapse.
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = mob(&mut s, [12.0, 0.0, 0.0]);
+    ready(&mut s, p, "black_hole");
+    let mut ev = cast(&mut s, p, "ultimate", false);
+    ev.extend(run(&mut s, 5.0));
+    assert!(blows(&ev, g).contains(&30), "it collapses on them: {:?}", blows(&ev, g));
+}
