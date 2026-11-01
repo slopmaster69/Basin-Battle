@@ -168,7 +168,7 @@ impl Game {
                 // An add-on older than this server's: say so, and how to update.
                 let account = self.sessions.get(&conn).map_or(String::new(), |s| s.account.clone());
                 if (n.max(1) as u32) < VERSION && crate::first_told(format!("bb:{account}:{n}")) {
-                    self.say_to(conn, &format!("Your Basin Battle add-on is older than this server's (v{n}; the server has v{VERSION}): some screens may be missing. {}", crate::HOW_TO_UPDATE));
+                    self.say_to(conn, &format!("Your Basin Battle add-on is older than this server's (v{}; the server has v{VERSION}): some screens may be missing. {}", n.max(1), crate::HOW_TO_UPDATE));
                 }
                 if n >= 3 {
                     self.ui_talent_defs(conn, me);
