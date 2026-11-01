@@ -479,6 +479,11 @@ NT	note	A Smuggler's Tally	Found in The Deadmines	"Two crates salt pork, one keg
 NT	lore	The Deadmines	1 of 5 secrets found, 2 of 6 notes read	Secrets found: Cookie's Pantry.{n}{n}Rumours:{n}- VanCleef keeps quarters aft of the mast. (Orders, Sealed in Red)		.es note smugglers_tally~A Smuggler's Tally^.es note smite_orders~Orders, Sealed in Red
 !local L = ElwynnSurvival.letterShown table.insert(SAID, "lore page: " .. L.kind .. " " .. L.title .. " / clue " .. tostring(ElwynnSurvivalLetter.clue:IsShown()) .. " / links " .. L.links .. " " .. tostring(ElwynnSurvivalLetter.links[2].cmd) .. " / third link " .. tostring(ElwynnSurvivalLetter.links[3]:IsShown()))
 !ElwynnSurvival.CloseWindows() table.insert(SAID, "letter after closing windows: " .. tostring(ElwynnSurvivalLetter:IsShown()) .. ", on Escape's list " .. tostring(UISpecialFrames[table.getn(UISpecialFrames)]))
+# A fall with its recap: three blows, the last first, and a tip; the band grows to hold it; up again clears it.
+DE	10	Targorr the Dread's heavy blow, through your guard (212)^Targorr the Dread's blow, around your guard (40)^Burning ground (12)	A guard breaks when your stamina runs out: dodge the heavy ones.
+!local r = ElwynnSurvival.recapShown table.insert(SAID, "recap: " .. tostring(r.lines) .. " lines, tip " .. tostring(r.tip ~= "") .. ", band " .. tostring(ElwynnSurvivalDown:GetHeight()))
+DE	0
+!table.insert(SAID, "recap after getting up: " .. tostring(ElwynnSurvival.recapShown) .. ", band " .. tostring(ElwynnSurvivalDown:GetHeight()))
 # Below, with nothing else to point at: the corner's arrow points north.
 WR	below
 H	200	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90

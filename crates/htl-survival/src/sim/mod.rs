@@ -20,6 +20,7 @@ mod journal;
 pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
+pub mod recap;
 pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
@@ -495,6 +496,10 @@ pub struct Player {
     pub riposte_until: f32,
     /// Who struck them last (a fall to another hero is announced).
     pub last_hit_by: Option<Id>,
+    /// What the next hurt on them is (set by the blow about to land), and the hurts of the last
+    /// few seconds: read back as the recap when they fall.
+    pub cause: Option<recap::Cause>,
+    pub wounds: Vec<recap::Wound>,
     /// One input waiting for the end of a commitment, and when it was pressed.
     pub buffered: Option<(Input, f32)>,
     /// The bow's drawn pose is shown (the draw's cast is out): not while they walk, when the legs
@@ -1036,6 +1041,8 @@ impl Survival {
             landing_attack: None,
             riposte_until: -100.0,
             last_hit_by: None,
+            cause: None,
+            wounds: Vec::new(),
             buffered: None,
             draw_shown: false,
             foe: None,

@@ -406,7 +406,13 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     b.extend_from_slice(&6000u32.to_le_bytes());
     c.send(op::MSG_MOVE_FALL_LAND, &b);
     assert!(c.wait(1.0, |p| p.name() == "SMSG_ENVIRONMENTALDAMAGELOG").is_some(), "the fall");
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tDE\t"))).is_some(), "down");
+    let down = c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tDE\t")));
+    // And the recap says what felled us: the fall, and a word on it.
+    let down = match down {
+        Some(ServerPacket::MessageChat(m)) => m.text,
+        _ => panic!("down"),
+    };
+    assert!(down.contains("\tFall (") && down.ends_with("\tMind the drop."), "the recap: {down:?}");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("waits where you fell"))).is_some(), "supplies left");
     assert_eq!(objects_with(&c, 2890).len(), 1, "the sack where we fell");
     assert!(c.wait(3.0, |p| p.name() == "MSG_MOVE_TELEPORT_ACK").is_some(), "up at the camp");

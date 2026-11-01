@@ -15,7 +15,10 @@
 //! - `BP\t<name>\t<cost>\t<problem>\t<x~y~z~yards>`: the station being placed and where its ghost stands (`BP`
 //!   alone: none).
 //! - `CF\t<what>\t<text>`: confirm something (ringing the bell).
-//! - `BN\t<title>\t<sub>`: a big banner. `T\t<text>`: a short message. `DE\t<secs>`: down, up in.
+//! - `BN\t<title>\t<sub>`: a big banner. `T\t<text>`: a short message. `DE\t<secs>\t<blows>\t<tip>`: down, up in;
+//!   `blows` is what felled them, the last first, with `^` between ("Targorr's heavy blow, through
+//!   your guard (212)"), `tip` a word on answering it (both may be empty; an older add-on reads
+//!   only `secs`).
 //! - `WD`: too winded for what was tried (the stamina bar flashes).
 //! - `KF\t<killer>\t<victim>`: the kill feed (the killer empty when nobody struck them).
 //! - `HT\t<damage>\t<light|heavy|arrow>\t<hit|block|parry|dodge|miss>`: a blow of yours landed.

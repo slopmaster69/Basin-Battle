@@ -532,6 +532,7 @@ impl Survival {
         for at in burns {
             let hit: Vec<(Id, u32)> = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, at) <= EMBER_RADIUS && (p.pos[2] - at[2]).abs() < 4.0).map(|(id, p)| (*id, ((p.max_health as f32) * EMBER_SHARE).round().max(1.0) as u32)).collect();
             for (id, dmg) in hit {
+                self.set_cause(id, super::recap::Cause::world("burning ground"));
                 self.hurt_player(id, dmg);
             }
         }
