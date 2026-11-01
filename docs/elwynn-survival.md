@@ -955,6 +955,9 @@ during a wager. Friends join it by taking the same level from the book while it 
   or `wager_minutes` in its file: the Deadmines 35:00, the Stockade and Ragefire 27:30, ..., the
   Library and the Cathedral 20:00. First guesses: tune them from the board.
 
+**The week's news.** The first time a hero comes in each week (once the camp has the book), a page
+says the week's three terms and last week's three best runs on the board; `.es news` shows it again.
+
 **The board.** Every wager won is kept in `saves/wager-board.toml`; `.es board <dungeon>` shows the
 runs in time, highest level first, then quickest. One server keeps the board for everyone (the
 one friends join: it runs without `--board`). Anyone hosting their own sets `HTL_BOARD` in

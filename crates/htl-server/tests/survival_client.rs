@@ -1727,3 +1727,21 @@ fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing
     d.drain(0.5);
     assert!(!told(&d), "nothing to update");
 }
+
+#[test]
+fn the_bookmakers_week_is_shown_once_as_a_hero_comes_in_and_again_on_asking() {
+    let server = start_with(None, false);
+    let mut c = Client::connect(server.login, "yara", "hold", REALM).unwrap();
+    enter(&mut c);
+    let weeks = |c: &Client| addon_lines(c, "ES").iter().filter(|l| l.starts_with("NT\twager\tThe Bookmaker's Week\t")).count();
+    c.chat(".es hello 8 ac10");
+    assert!(c.until(2.0, |c| weeks(c) == 1), "shown as they come in: {:?}", addon_lines(&c, "ES").iter().filter(|l| l.starts_with("NT")).collect::<Vec<_>>());
+    let page = addon_lines(&c, "ES").into_iter().find(|l| l.starts_with("NT\twager\tThe Bookmaker's Week\t")).unwrap();
+    assert!(page.contains("This week, as the stakes rise") && page.contains("+2 "), "{page}");
+    // A reload's hello: not again. Asked for: again.
+    c.chat(".es hello 8 ac10");
+    c.drain(0.6);
+    assert_eq!(weeks(&c), 1, "once a week");
+    c.chat(".es news");
+    assert!(c.until(2.0, |c| weeks(c) == 2), "on asking");
+}
