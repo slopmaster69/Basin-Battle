@@ -123,7 +123,8 @@ fn damage_taken_counts_and_a_lull_ends_the_fight_but_not_the_running_totals() {
     assert!(fight.live);
     assert_eq!((fight.rows[0].dealt, fight.rows[0].taken), (20, 15));
     // A lull longer than a fight's: it's over, its clock stopped.
-    run_pinned(&mut s, s.content.player.combat_secs + 1.0, &[g]);
+    let lull = s.content.player.combat_secs + 1.0;
+    run_pinned(&mut s, lull, &[g]);
     let over = s.fight_meter(p).unwrap();
     assert!(!over.live, "over after a lull");
     assert_eq!(over.rows[0].dealt, 20, "still shown till the next one");
