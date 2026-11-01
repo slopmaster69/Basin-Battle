@@ -3478,7 +3478,7 @@ icon = "Spell_Nature_StrangleVines"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-ex_of = "wrath"
+ex_of = "living_seed"
 damage = [4.0, 4.0]
 range = [26.0, 26.0]
 radius = [0.4, 0.4]
@@ -4305,22 +4305,27 @@ tick_effects = [{ kind = "burn", secs = [1.5, 1.5], amount = 6.0 }]
 
 # ------------------------------------------------------------------------------------ Druid --
 
+# Seeds for friends: a bolt for a foe, or four seconds of mending for the friend it settles on
+# (a foe gets none of the mending). Two at hand.
 [[ability]]
-key = "wrath"
-name = "Wrath"
-text = "A bolt of nature along the reticle: 18 damage. Two at hand."
-icon = "Spell_Nature_AbolishMagic"
+key = "living_seed"
+name = "Living Seed"
+text = "Throw a seed along the reticle: it strikes a foe for 16, or settles on a friend and heals them 4% of their health a second for 4 s. Two at hand."
+icon = "Spell_Nature_Rejuvenation"
 school = "druid"
 slot = "ranged"
 kind = "projectile"
-damage = [18.0, 18.0]
+damage = [16.0, 16.0]
 range = [32.0, 32.0]
 radius = [0.35, 0.35]
 speed = 20.0
 cooldown = 4.5
 charges = 2
+friendly = true
+# Wrath's green bolt; Rejuvenation's glow on a friend it settles on (the mending's own look).
 spell = 5176
 clip = 53
+effects = [{ kind = "regen", secs = [4.0, 4.0], amount = 0.04 }]
 
 [[ability]]
 key = "swipe"
@@ -4399,17 +4404,19 @@ cooldown = 18.0
 spell = 22812
 effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 }, { kind = "steadfast", secs = [5.0, 5.0], amount = 1.0, aura = 22812 }]
 
+# Barkskin given away: on the friend under the reticle, else on yourself.
 [[ability]]
-key = "frenzied_regeneration"
-name = "Frenzied Regeneration"
+key = "ironbark"
+name = "Ironbark"
 ex_of = "barkskin"
-text = "The Barkskin, and you heal 5% of your health a second while it lasts (a quarter of it in all)."
-icon = "Ability_BullRush"
+text = "Wrap the friend under your reticle in bark (no one there: yourself): for 5 s they take 30% less from everything and heal 5% of their health a second."
+icon = "Spell_Nature_Regeneration"
 slot = "defense"
-kind = "buff"
+kind = "ally"
 valor = 25
-spell = 22842
-effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 }, { kind = "steadfast", secs = [5.0, 5.0], amount = 1.0, aura = 22812 }, { kind = "regen", secs = [5.0, 5.0], amount = 0.05, aura = 22842 }]
+range = [30.0, 30.0]
+spell = 22812
+effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 }, { kind = "regen", secs = [5.0, 5.0], amount = 0.05 }]
 
 [[ability]]
 key = "hurricane"
@@ -8555,10 +8562,10 @@ name = "The Moonwell at Mirror Lake"
 at = [-9455.0, 450.0]
 display = 2048
 scale = 0.7
-teaches = ["wrath", "swipe"]
+teaches = ["living_seed", "swipe"]
 keep = true
 secs = 3.0
-text = "The moonwell's water is still and bright: nature's wrath, and the bear's swipe."
+text = "The moonwell's water is still and bright: a seed that grows where it lands, and the bear's swipe."
 trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 
 [[chest]]

@@ -215,6 +215,7 @@ const RENAMED: &[(&str, &str)] = &[
     ("shadow_bolt", "seed_of_corruption"),
     ("shadow_ward", "drain_life"),
     // Druid
+    ("wrath", "living_seed"),
 ];
 
 /// A saved card's key as it is now.

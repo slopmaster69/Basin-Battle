@@ -93,7 +93,7 @@ fn every_card_and_its_charged_up_version_goes_off_on_creatures() {
             let touched = foes.iter().zip(&health).zip(&at).any(|((m, h), was)| {
                 s.mobs.get(m).is_none_or(|x| x.health < *h || dist2d(x.pos, *was) > 0.5) || !s.cc_of(*m).is_empty()
             });
-            let for_self = matches!(d.kind.as_str(), "stance" | "buff" | "blink" | "place") || (d.kind == "leap" && d.back) || d.damage[1] <= 0.0 && d.effects.is_empty();
+            let for_self = matches!(d.kind.as_str(), "stance" | "buff" | "blink" | "place" | "ally") || (d.kind == "leap" && d.back) || d.damage[1] <= 0.0 && d.effects.is_empty();
             assert!(touched || for_self, "{}: it reached no foe", d.key);
             s.leave(p);
             s.traps.clear();

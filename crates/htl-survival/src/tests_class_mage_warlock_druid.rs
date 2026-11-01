@@ -262,3 +262,84 @@ fn an_old_save_with_shadow_bolt_and_shadow_ward_loads_with_their_successors() {
     assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("seed_of_corruption"));
     assert_eq!(h.loadout.get("defense").map(String::as_str), Some("drain_life"));
 }
+
+// --- Druid: seeds for friends, claws for foes -------------------------------------------------------
+
+#[test]
+fn a_living_seed_strikes_a_foe_and_settles_on_a_friend_to_mend_them_friendly_fire_or_not() {
+    // On a co-op friend, with friendly fire on: mended over 4 s, never struck.
+    let mut s = world(true);
+    assert!(s.content.pvp.friendly_fire);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    learn(&mut s, a, "living_seed");
+    s.players.get_mut(&b).unwrap().health = 100;
+    press(&mut s, a, "ranged", false);
+    assert_eq!(aiming(&s, a), Some(idx(&s, "living_seed")));
+    let mut ev = hold(&mut s, a, 0.0, &[]);
+    ev.extend(run_pinned(&mut s, 0.8, &[]));
+    assert!(hits(&ev, a, b).is_empty(), "not struck");
+    assert!(s.has_cc(b, "regen"), "the seed settled on him");
+    ev.extend(run_pinned(&mut s, 3.5, &[]));
+    let max = s.players[&b].max_health as f32;
+    assert!(s.players[&b].health as f32 >= 100.0 + max * 0.04 * 3.0, "about 4% a second: {}", s.players[&b].health);
+    assert!(!s.has_cc(a, "regen"), "not on her");
+    // On a foe: struck for 16, and none of the mending.
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "living_seed");
+    let k = boar(&mut s, [8.0, 0.0, 0.0]);
+    let pins = [(k, [8.0, 0.0, 0.0])];
+    press(&mut s, p, "ranged", false);
+    let mut ev = hold(&mut s, p, 0.0, &pins);
+    ev.extend(run_pinned(&mut s, 0.8, &pins));
+    assert_eq!(hits(&ev, p, k), vec![16], "struck for 16");
+    assert!(!s.has_cc(k, "regen"), "a foe isn't mended");
+    // Two at hand: a second at once, then the key waits.
+    press(&mut s, p, "ranged", false);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "living_seed")), "the second seed");
+    hold(&mut s, p, 0.0, &pins);
+    run_pinned(&mut s, 0.5, &pins);
+    press(&mut s, p, "ranged", false);
+    assert_eq!(aiming(&s, p), None, "both spent");
+}
+
+#[test]
+fn ironbark_wraps_the_friend_under_the_reticle_or_else_the_druid() {
+    // A friend ahead: his, not hers.
+    let mut s = world(true);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    learn(&mut s, a, "barkskin");
+    s.set_valor(a, 25.0);
+    press(&mut s, a, "defense", true);
+    assert_eq!(aiming(&s, a), Some(idx(&s, "ironbark")), "Ctrl: the EX version, aimed at a friend");
+    let ev = hold(&mut s, a, 0.0, &[]);
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 22812, target: Target::Unit(t) } if *caster == a && *t == b)), "its look on him");
+    assert!(s.has_cc(b, "hallowed") && s.has_cc(b, "regen"), "his bark and mending");
+    assert!(!s.has_cc(a, "hallowed") && !s.has_cc(a, "regen"), "not hers");
+    // Alone: her own.
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    learn(&mut s, p, "barkskin");
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "defense", true);
+    hold(&mut s, p, 0.0, &[]);
+    assert!(s.has_cc(p, "hallowed") && s.has_cc(p, "regen"), "solo, on herself");
+}
+
+#[test]
+fn an_old_save_with_wrath_loads_with_living_seed() {
+    let mut s = world(false);
+    s.content.dev.full_tree = false;
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut save = s.leave(p).unwrap();
+    save.class = "druid".into();
+    save.owned = ["wrath", "swipe", "feral_leap"].map(String::from).to_vec();
+    save.loadout = BTreeMap::from([("ranged".to_string(), "wrath".to_string()), ("utility".to_string(), "feral_leap".to_string())]);
+    let q = s.join("ayla", "Ayla", Some(&save));
+    let h = &s.players[&q];
+    assert!(h.owned.contains("living_seed") && !h.owned.contains("wrath"), "{:?}", h.owned);
+    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("living_seed"));
+    assert_eq!(h.loadout.get("utility").map(String::as_str), Some("feral_leap"));
+}

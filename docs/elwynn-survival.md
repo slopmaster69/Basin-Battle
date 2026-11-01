@@ -136,10 +136,10 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Frenzied Regeneration* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
 | 3 | **Ultimate** | Onslaught | Sanctuary | Volley | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
@@ -175,9 +175,11 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   a way out at your feet and the key again steps back to it (its EX screams where you left); Drain
   Life outlasts them, every point it drains healing you, and Death Coil sends a foe fleeing as it
   heals you; Summon Infernal crashes down and stands burning.
-- **Druid**: the wild shapes. Wrath's two bolts (its EX roots); Swipe, and Typhoon throws a cone
-  of foes back; Feral Leap bounds onto them (Pounce stuns); Barkskin; Hurricane hurls everyone in
-  it out from its middle every second.
+- **Druid**: grow and pounce. Living Seed's two seeds strike a foe or settle on a friend and mend
+  them for 4 s (its EX roots); Swipe, and Typhoon throws a cone of foes back; Feral Leap bounds
+  onto them (Pounce stuns); Barkskin, and Ironbark gives it away, to the friend under your reticle
+  with a heal besides (no one there: you); Hurricane hurls everyone in it out from its middle
+  every second.
 
 **How they move bodies**: a **knockback** throws someone away from where it came from (a burst's
 middle, a projectile's flight, the caster), a **pull** draws them toward it (Leap of Faith, Mind

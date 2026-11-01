@@ -159,7 +159,7 @@ fn a_new_character_knows_its_own_classs_q_and_e_on_those_keys() {
     let back = s.leave(p).unwrap();
     assert_eq!((back.class.as_str(), back.look, back.name.as_str(), back.owner.as_str()), ("druid", Some(look), "Thalia", "ayla"));
     let q = s.join("ayla/thalia", "Thalia", Some(&back));
-    assert!(s.players[&q].owned.contains("wrath"));
+    assert!(s.players[&q].owned.contains("living_seed"));
 }
 
 #[test]
