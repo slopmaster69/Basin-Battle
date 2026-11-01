@@ -378,9 +378,9 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     assert!(s.content.dev.full_tree);
     assert_eq!(s.players[&p].owned, s.all_nodes(), "dev: every card");
-    // Nine cards to a row, one a class.
+    // Nine cards to a row, one a class (the beta page apart).
     for row in crate::content::SLOTS {
-        let cards: Vec<&str> = s.content.abilities.iter().filter(|a| a.on_board() && a.slot == row).map(|a| a.school.as_str()).collect();
+        let cards: Vec<&str> = s.content.abilities.iter().filter(|a| a.on_board() && !a.is_beta() && a.slot == row).map(|a| a.school.as_str()).collect();
         assert_eq!(cards.len(), 9, "{row}: {cards:?}");
         for col in crate::content::SCHOOLS {
             assert!(cards.contains(&col), "{row} has a {col} card");

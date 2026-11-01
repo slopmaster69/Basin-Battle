@@ -151,7 +151,8 @@ fn the_board_keeps_to_its_budgets() {
     let s = world(true);
     let c = &s.content;
     for row in SLOTS {
-        let cards: Vec<&AbilityDef> = c.abilities.iter().filter(|a| a.on_board() && a.slot == row).collect();
+        // A card a class (the beta page's count toward no class, but keep to the budgets below).
+        let cards: Vec<&AbilityDef> = c.abilities.iter().filter(|a| a.on_board() && !a.is_beta() && a.slot == row).collect();
         assert_eq!(cards.len(), 9, "{row}");
     }
     for (k, ex) in board(c) {

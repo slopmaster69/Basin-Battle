@@ -55,8 +55,8 @@
 //! The abilities:
 //! - `AB\t...`: the ability bar, one entry per key (see [`SurvivalGame::bar_line`]).
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
-//! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), four rows of four cards (see
-//!   [`SurvivalGame::tree_line`]).
+//! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
+//!   beta page's cards, each with its page (see [`SurvivalGame::tree_line`]).
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
 //!   friend's), `MK\t<id>` gone.
 //! - `DA\t<secs>\t<speed>\t<facing>`: run the dash of an ability (Charge) along the facing.
@@ -1458,7 +1458,9 @@ impl SurvivalGame {
     }
 
     /// The board (N): `TR\t<dev>\t<what the count says>\t<card>^...`, each card
-    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts`.
+    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts~where learned~page`.
+    /// `page` is 1 for a class's card (`column` its class) and 2 for the beta page's (`column`
+    /// `beta`): an add-on from before the beta page knows no `beta` column and leaves those out.
     fn tree_line(&self, id: Id) -> Option<String> {
         let p = self.sim.players.get(&id)?;
         let c = &self.sim.content;
@@ -1478,7 +1480,7 @@ impl SurvivalGame {
                 });
                 let at = if owned { String::new() } else { clean(&self.sim.learned_where(&a.key)) };
                 format!(
-                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}",
+                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}~{}",
                     a.key,
                     clean(&a.name),
                     a.slot,
@@ -1493,11 +1495,23 @@ impl SurvivalGame {
                     a.charge[1],
                     clean(&a.text),
                     clean(&ability_facts(a, None, c.valor.max)),
+                    a.page(),
                 )
             })
             .collect();
-        let owned = c.abilities.iter().filter(|a| a.on_board() && p.owned.contains(&a.key)).count();
-        let points = if dev { "Dev build: every card".to_string() } else { format!("{owned} of {} cards", cards.len()) };
+        // The classes' cards counted, and the beta page's apart (free to take, there to try).
+        let count = |beta: bool| {
+            let page = c.abilities.iter().filter(|a| a.on_board() && a.is_beta() == beta);
+            (page.clone().filter(|a| p.owned.contains(&a.key)).count(), page.count())
+        };
+        let ((owned, all), (beta_owned, beta_all)) = (count(false), count(true));
+        let points = if dev {
+            "Dev build: every card".to_string()
+        } else if beta_all > 0 {
+            format!("{owned} of {all} cards · beta page {beta_owned} of {beta_all}")
+        } else {
+            format!("{owned} of {all} cards")
+        };
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 

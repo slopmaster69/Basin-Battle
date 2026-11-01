@@ -1,7 +1,8 @@
 //! The abilities (`[[ability]]` in `survival.toml`): every aimed, charged, placed or timed thing a
 //! hero can do past the sword and shield, their EX versions (held a moment, or Ctrl, for Valor),
 //! the crowd control rules (`[cc]`) and Valor itself (`[valor]`), and the board they're chosen on:
-//! five rows (one per key), four cards in each.
+//! five rows (one per key), a card of each class in each, and a second page of beta cards (up to
+//! four a row) that any class can use.
 
 use std::collections::BTreeMap;
 
@@ -18,6 +19,11 @@ pub fn slot_role(slot: &str) -> &str {
 
 /// The board's columns: the nine classes.
 pub const SCHOOLS: [&str; 9] = ["warrior", "paladin", "hunter", "rogue", "priest", "shaman", "mage", "warlock", "druid"];
+/// The board's second page: generic cards any class can own and slot (each on its own row's key),
+/// free to take from the board, there to be tried out. Not a class's column: a card's `school`.
+pub const BETA: &str = "beta";
+/// At most this many beta cards to a row (the page is five rows of four).
+pub const BETA_ROW: usize = 4;
 /// Each class's `ChrClasses.dbc` id, in the order of [`SCHOOLS`] (the creation screen's class).
 pub const CLASS_IDS: [u8; 9] = [1, 2, 3, 4, 5, 7, 8, 9, 11];
 
@@ -410,6 +416,18 @@ impl AbilityDef {
     /// On the board (a card to choose), not off it or only fired by something else.
     pub fn on_board(&self) -> bool {
         !self.is_ex() && !self.inner && !self.bench
+    }
+    /// A card of the beta page ([`BETA`]): any class's, not one class's column.
+    pub fn is_beta(&self) -> bool {
+        self.school == BETA
+    }
+    /// The board's page it's on: 1 the classes' columns, 2 the beta page.
+    pub fn page(&self) -> u8 {
+        if self.is_beta() {
+            2
+        } else {
+            1
+        }
     }
     /// A projectile that meets friends too (to heal them, or to pull them to safety).
     pub fn friends(&self) -> bool {

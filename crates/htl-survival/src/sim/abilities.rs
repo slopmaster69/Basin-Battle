@@ -229,11 +229,15 @@ impl Survival {
     }
 
     /// Whether a card can be taken from the board as it stands: in a dev world (debug on), any on
-    /// it; otherwise none, since cards are learned out in Elwynn (`learned_where`).
+    /// it; a beta card, anywhere but Siege (they're there to be tried); otherwise none, since
+    /// cards are learned out in Elwynn (`learned_where`).
     pub fn reachable(&self, _owned: &BTreeSet<String>, key: &str) -> bool {
-        let on = self.content.ability(key).is_some_and(|k| self.content.abilities[k].on_board());
+        let Some(d) = self.content.ability(key).map(|k| &self.content.abilities[k]).filter(|d| d.on_board()) else { return false };
+        if d.is_beta() {
+            return self.debug || !self.is_siege();
+        }
         // In a Siege match, any card is bought with gold.
-        on && (self.debug || (self.is_siege() && self.card_price(key).is_some()))
+        self.debug || (self.is_siege() && self.card_price(key).is_some())
     }
 
     /// Unlock a card of the board (`.es tree take`).
@@ -248,6 +252,9 @@ impl Survival {
             return Ok(def.name);
         }
         if !self.reachable(&owned, key) {
+            if def.is_beta() && def.on_board() && self.is_siege() {
+                return Err(format!("{} is a beta card: Siege leaves those out.", def.name));
+            }
             let at = self.learned_where(key);
             return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("{} is learned out in Elwynn: {at}.", def.name) });
         }
