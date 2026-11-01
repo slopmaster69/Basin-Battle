@@ -1307,7 +1307,17 @@ local function SkinDock()
   if not dock or not abar or dock.ledger then return end
   dock.ledger = true
   -- The quick item beside the keys: a pocket like the buttons at the bottom right.
-  if dock.quick then PocketSlot(dock.quick, 4) end
+  if dock.quick then
+    PocketSlot(dock.quick, 4)
+    -- How many are left, big enough to read over the icon (the stock face came out as two dots).
+    local n = dock.quick.count
+    n:ClearAllPoints()
+    n:SetPoint("BOTTOMRIGHT", dock.quick, "BOTTOMRIGHT", -3, 3)
+    n.ledgerKeep = true
+    Face(n, BODY, 17, "OUTLINE")
+    n:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
+    if n.SetDrawLayer then n:SetDrawLayer("OVERLAY") end
+  end
   -- The leather strap behind the keys alone (the bars above sit on the world).
   if dock.plate then Retire(dock.plate) end
   local strap = CreateFrame("Frame", nil, dock)
