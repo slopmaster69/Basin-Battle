@@ -2956,7 +2956,7 @@ mod tests {
         assert!(with(&format!("{base}kind = \"leap\"\nthrough = true")).is_err());
         // An empower names a base card with an EX version.
         assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"fireball\", secs = 4.0 }}")).is_ok());
-        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"scorch\", secs = 4.0 }}")).is_err(), "an EX version");
+        assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"pyroblast\", secs = 4.0 }}")).is_err(), "an EX version");
         assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"meteor\", secs = 4.0 }}")).is_err(), "no EX version");
         assert!(with(&format!("{base}kind = \"nova\"\nempower = {{ ability = \"fireball\", secs = 0.0 }}")).is_err(), "no time");
     }

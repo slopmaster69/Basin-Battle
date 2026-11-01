@@ -136,7 +136,7 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Pyroblast* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
@@ -165,8 +165,10 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
 - **Shaman**: storm and totem. Lightning Bolt (full charge streaks out at 2.5 times the speed),
   Chain Lightning leaps on twice; Thunderstorm throws everyone round you 8 yd away; totems to slow
   or root, to heal, or to swallow a projectile (Grounding); Earthquake stuns and slows a field.
-- **Mage**: fire and frost. Fireball grows with its charge; Cone of Cold and Frost Nova freeze;
-  Blink; Ice Block; Meteor falls 1.5 s after you call it on a 7 yd circle: 70 damage.
+- **Mage**: freeze, then shatter. Fireball grows with its charge, and its EX, Pyroblast, is a
+  1.5 s hold for a huge one; Cone of Cold slows (and freezes the already slowed), Frost Nova
+  freezes all round you and makes your next Fireball a free Pyroblast for 5 s; Blink; Ice Block;
+  Meteor falls 1.5 s after you call it on a 7 yd circle: 70 damage.
 - **Warlock**: fear and fel. Shadow Bolt marks; Shadowfury stuns a spot a moment later, its EX
   breathes shadowflame; Demonic Circle draws a way out at your feet and the key again steps back
   to it (its EX screams where you left); Summon Infernal crashes down and stands burning.
@@ -205,7 +207,7 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 **Combos**, inside a class and across them:
 
 - **Freeze, then shatter**: Frost Nova, Freezing Trap, Cold Snap, Frost Blink or a Cone of Cold on
-  a slowed foe freeze; fire (Fireball, Scorch, Meteor) or a Sundering Blow on them shatters for
+  a slowed foe freeze; fire (Fireball, Pyroblast, Meteor) or a Sundering Blow on them shatters for
   half again.
 - **Pull into the pain**: Void Rift, Leap of Faith or Mind Grip drag foes onto a trap, into
   Consecration, a Volley, an Earthquake or under a Meteor.
@@ -243,7 +245,7 @@ how it's used, its damage, reach, charge, wind-up, stamina and cooldown, and the
 charged-up version with its Valor. This build has every card from the start (`[dev] full_tree =
 true`), the Warrior's cards on the keys (`[loadout]`); without it a hero has the Warrior's and
 unlocks the rest. Abilities off the board (the bow's Aimed Shot, Frostbolt, Flamestrike, Drain
-Life, Pyroblast, Nature's Grasp, Fire Ward) keep their rules (`bench = true`) for putting back on
+Life, Nature's Grasp, Fire Ward) keep their rules (`bench = true`) for putting back on
 it.
 
 **Aiming**: an aimed ability comes up on its key (the camera over the shoulder, the reticle in the

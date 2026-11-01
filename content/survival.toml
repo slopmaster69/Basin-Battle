@@ -2851,23 +2851,28 @@ full_speed = 40.0
 charge_spell = 133
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 
+# The cash-in: Frost Nova makes the next one free. 48 a hit, half again on a frozen foe; the
+# whole 1.5 s held, so it can't be fired off the hip.
 [[ability]]
-key = "scorch"
-name = "Scorch"
+key = "pyroblast"
+name = "Pyroblast"
 ex_of = "fireball"
-text = "Instant, no charge, a short reach and a hard hit; it burns and shatters too."
-icon = "Spell_Fire_SoulBurn"
+text = "Hold 1.5 s to hurl a huge, slow fireball that burns for 6 s and shatters a frozen foe. Let go early and it's lost; a heavy blow on you while you hold it snuffs it."
+icon = "Spell_Fire_Fireball02"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-damage = [26.0, 26.0]
-range = [14.0, 14.0]
-radius = [0.4, 0.4]
-speed = 70.0
+charge = [1.5, 1.5]
+hold = 1.0
+fragile = true
+damage = [48.0, 48.0]
+range = [36.0, 36.0]
+radius = [0.8, 0.8]
+speed = 24.0
 shatter = true
-spell = 2948
-impact_kit = 2609
-effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
+spell = 11366
+charge_spell = 11366
+effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 5.0 }]
 
 # The Warden: light that harms a foe and mends a friend.
 [[ability]]
@@ -3005,7 +3010,7 @@ effects = [{ kind = "snare", secs = [4.0, 4.0], amount = 0.5, freeze_if_snared =
 key = "frost_nova"
 name = "Frost Nova"
 ex_of = "cone_of_cold"
-text = "Freezes everything within 8 yards of you for 3 s (1.5 s on heroes): set them up for a shatter."
+text = "Freezes everything within 8 yards of you for 3 s (1.5 s on heroes), and for 5 s your Fireball key throws a Pyroblast for free. Freeze them, then shatter them."
 icon = "Spell_Frost_FrostNova"
 slot = "close"
 kind = "nova"
@@ -3014,6 +3019,8 @@ damage = [6.0, 6.0]
 radius = [8.0, 8.0]
 spell = 122
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
+# The mage's combo, alone: freeze, then a free Pyroblast to shatter it.
+empower = { ability = "fireball", secs = 5.0 }
 
 # The Warden: holy ground underfoot.
 [[ability]]
@@ -3319,30 +3326,6 @@ cooldown = 40.0
 spell = 686
 impact_kit = 2709
 effects = [{ kind = "deathmark", secs = [8.0, 8.0], amount = 0.3 }]
-
-# Elements: the great fireball.
-[[ability]]
-key = "pyroblast"
-name = "Pyroblast"
-text = "A 2.5 s charge for a huge, slow fireball that burns for 6 s and shatters a frozen foe; any heavy blow on you while you charge breaks it."
-icon = "Spell_Fire_Fireball02"
-school = "mage"
-slot = "ultimate"
-kind = "projectile"
-bench = true
-valor = 100
-charge = [2.5, 2.5]
-hold = 1.0
-fragile = true
-damage = [90.0, 90.0]
-range = [40.0, 40.0]
-radius = [0.9, 0.9]
-speed = 24.0
-cooldown = 40.0
-shatter = true
-spell = 11366
-charge_spell = 11366
-effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 5.0 }]
 
 # The Warden: sanctuary.
 [[ability]]

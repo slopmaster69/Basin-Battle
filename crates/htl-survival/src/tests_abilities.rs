@@ -133,10 +133,11 @@ fn a_longer_charge_lands_harder_and_a_capstone_waits_for_its_whole_charge() {
     ev.extend(run(&mut s, 1.0));
     let late = hits_on(&ev, k)[0].0;
     assert!(late > early, "{early} then {late}");
-    // Pyroblast let go before its 2.5 s is lost.
-    slot(&mut s, p, "ultimate", "pyroblast");
+    // Pyroblast (Fireball's EX) let go before its 1.5 s is lost.
+    slot(&mut s, p, "ranged", "fireball");
     s.set_valor(p, 100.0);
-    cast(&mut s, p, "ultimate", false, 1.0);
+    cast(&mut s, p, "ranged", true, 1.0);
+    assert!(s.players[&p].last_cast.is_none_or(|(a, _)| s.content.abilities[a].key != "pyroblast"), "never cast");
     assert_eq!(s.players[&p].action, Action::Ready, "dropped");
     assert_eq!(s.players[&p].valor, 100.0, "and nothing spent");
 }
@@ -406,9 +407,9 @@ fn a_heavy_blow_breaks_a_pyroblast_charge() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
-    slot(&mut s, a, "ultimate", "pyroblast");
+    slot(&mut s, a, "ranged", "fireball");
     s.set_valor(a, 100.0);
-    s.input(a, Input::Ability(key_of("ultimate"), false));
+    s.input(a, Input::Ability(key_of("ranged"), true));
     s.input(a, Input::Attack);
     run(&mut s, 0.5);
     assert!(matches!(s.players[&a].action, Action::Charge { .. }));
