@@ -5,6 +5,8 @@
 # upswing) and what kind of blow it fits (flurry, cut, heavy, wide, gap closer, boss special).
 #   scripts/clip-census.sh            the table, written to logs/clip-census.md
 #   scripts/clip-census.sh --json     one JSON line a clip, to logs/clip-census.jsonl
+# A model the Data folder lacks or can't be measured (the Goblin models may be missing from 1.12.1) is
+# named on the terminal and skipped; the rest are measured.
 # It's numbers about the clips, not the clips themselves; still, keep it out of the repository
 # (logs/ is ignored) and share it where it's needed.
 set -euo pipefail
