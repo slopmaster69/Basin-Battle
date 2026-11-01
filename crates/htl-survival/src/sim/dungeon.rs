@@ -1080,7 +1080,7 @@ impl Survival {
         if raider || pack.is_none() {
             return;
         }
-        self.wager_kill(def, at, pack);
+        self.wager_kill(def, at, pack, form);
         let k = pack.unwrap();
         let lasting = self.lasting_pack(k);
         // (A second form, a druid's serpent or a split ooze, comes back as its first: that one is

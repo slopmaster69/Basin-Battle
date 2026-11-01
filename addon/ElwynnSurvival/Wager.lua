@@ -3,10 +3,12 @@
 -- red once it's over), the falls and what they've cost, and the wager's terms.
 --
 -- Under them, the bosses the run has to beat, each crossed off as it falls, so you know what's
--- left and when it ends.
+-- left and when it ends; then the count of foes felled against what the run needs (a bar, filled
+-- gold, green once there are enough).
 --
--- The server sends `WT name level elapsed limit falls state terms bosses` (state: wait, run, won,
--- over; bosses `name~down^...`, missing from older servers), and a bare `WT` when there's no wager.
+-- The server sends `WT name level elapsed limit falls state terms bosses forces` (state: wait, run,
+-- won, over; bosses `name~down^...` and forces `felled~needed~total`, missing from older servers),
+-- and a bare `WT` when there's no wager.
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
 local ES = ElwynnSurvival
@@ -52,6 +54,45 @@ f.terms:SetPoint("TOP", f.falls, "BOTTOM", 0, -1)
 f.bossHead = Text(TITLE, 13, 0.165, 0.13, 0.094)
 f.bosses = {}
 local ROW = 16
+-- The count of foes: a word and a bar (an ink trough, a gold fill, green once it's enough).
+f.forces = Text(TITLE, 13, 0.165, 0.13, 0.094)
+f.forceBar = CreateFrame("Frame", nil, f)
+f.forceBar:SetWidth(180)
+f.forceBar:SetHeight(8)
+f.forceBar.back = f.forceBar:CreateTexture(nil, "BACKGROUND")
+f.forceBar.back:SetAllPoints(f.forceBar)
+f.forceBar.back:SetTexture(0.25, 0.2, 0.14, 0.35)
+f.forceBar.fill = f.forceBar:CreateTexture(nil, "ARTWORK")
+f.forceBar.fill:SetPoint("TOPLEFT", f.forceBar, "TOPLEFT", 0, 0)
+f.forceBar.fill:SetPoint("BOTTOMLEFT", f.forceBar, "BOTTOMLEFT", 0, 0)
+f.forceBar.fill:SetTexture(1, 1, 1, 1)
+f.forces:Hide()
+f.forceBar:Hide()
+
+-- The count under the bosses: "Foes 42 / 60", the bar full at the count needed. Its height.
+local function DrawForces(fc, below)
+  if not fc then
+    f.forces:Hide()
+    f.forceBar:Hide()
+    return 0
+  end
+  f.forces:ClearAllPoints()
+  f.forces:SetPoint("TOP", below, "BOTTOM", 0, -6)
+  f.forces:SetText("Foes  " .. fc.felled .. " / " .. fc.needed)
+  f.forces:Show()
+  f.forceBar:ClearAllPoints()
+  f.forceBar:SetPoint("TOP", f.forces, "BOTTOM", 0, -3)
+  local share = 1
+  if fc.needed > 0 then share = math.min(1, fc.felled / fc.needed) end
+  f.forceBar.fill:SetWidth(math.max(1, 180 * share))
+  if share >= 1 then
+    f.forceBar.fill:SetVertexColor(0.3, 0.5, 0.18, 0.95)
+  else
+    f.forceBar.fill:SetVertexColor(0.72, 0.537, 0.184, 0.95)
+  end
+  f.forceBar:Show()
+  return 34
+end
 
 -- The boss list under the rest: "Bosses 1 / 3", then each name, a slain one greyed and marked.
 local function DrawBosses(list, below)
@@ -157,9 +198,18 @@ function ES.WagerLine(fields)
     end
   end
   last.bosses = list
+  local fc
+  if fields[10] and fields[10] ~= "" then
+    local _, _, felled, needed, total = string.find(fields[10], "^(%d+)~(%d+)~(%d+)$")
+    if felled then fc = { felled = tonumber(felled), needed = tonumber(needed), total = tonumber(total) } end
+  end
+  last.forces = fc
   f.title:SetText("+" .. last.level .. "  " .. last.name)
   f.terms:SetText(last.terms)
-  local extra = DrawBosses(list, last.terms ~= "" and f.terms or f.falls)
+  local above = last.terms ~= "" and f.terms or f.falls
+  local extra = DrawBosses(list, above)
+  local lastBoss = list[table.getn(list)] and f.bosses[table.getn(list)] or above
+  extra = extra + DrawForces(fc, lastBoss)
   f:SetHeight((last.terms ~= "" and 96 or 80) + extra)
   Draw()
   f:Show()

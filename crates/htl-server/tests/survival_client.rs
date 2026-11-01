@@ -1505,6 +1505,9 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
     let wt = a.wait(3.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tWT\tThe Stockade\t1\t")));
     let ServerPacket::MessageChat(m) = wt.expect("the Bookmaker's clock") else { unreachable!() };
     assert!(m.text.contains("\twait\t"), "{}", m.text);
+    // Its count of foes last: none felled yet, of those it needs and those standing.
+    let forces: Vec<u32> = m.text.rsplit('\t').next().unwrap_or("").split('~').filter_map(|n| n.parse().ok()).collect();
+    assert!(forces.len() == 3 && forces[0] == 0 && forces[1] > 0 && forces[1] < forces[2], "{}", m.text);
     // Another server's run, sent to this one (the board host) on its login port, comes back on
     // the board; a forged one doesn't.
     let w = htl_survival::sim::wager::WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 6, ms: 1_000_000, limit_ms: 1_800_000, deaths: 1, timed: true, party: vec![("Zed".into(), "mage".into())] };

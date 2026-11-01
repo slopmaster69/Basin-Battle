@@ -7,6 +7,11 @@
 //! (hardened packs, rallying, smouldering ground, a tyrant's bosses). What it pays grows with the
 //! level: plunder for everyone there, and the dungeon's gear into the camp's chest, the better
 //! pieces from +3 on. Every run is the server's to put on the Bookmaker's Board.
+//!
+//! The bosses aren't all a run must beat: its foes are counted too (the forces, as a keystone's),
+//! and enough of them must fall ([`WAGER_FORCES`] of those that stand from the start). Foes chase
+//! farther in a wager ([`WAGER_LEASH`]), so a pack can be drawn into the next and both fought at
+//! once: pulling big is the quick way to fill the count.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -22,6 +27,12 @@ pub const WAGER_HEALTH: f32 = 0.09;
 pub const WAGER_DAMAGE: f32 = 0.06;
 /// What a fall costs on the clock (seconds).
 pub const WAGER_DEATH: f32 = 10.0;
+/// The share of a dungeon's foes (those standing from the start, bosses aside) a run must fell.
+/// (A first guess: a run skips a pack or two, not half the dungeon.)
+pub const WAGER_FORCES: f32 = 0.8;
+/// How much farther foes chase in a wager than in a run of their own (their leash times this),
+/// so packs can be pulled together. (A first guess, to try in play: about a room and a half.)
+pub const WAGER_LEASH: f32 = 1.75;
 /// How far from the first lamp a hero goes to start the clock (yards), and how long it waits for
 /// the rest if nobody does (seconds).
 const WAGER_START_YARDS: f32 = 12.0;
@@ -70,6 +81,10 @@ pub struct Wager {
     pub kept_open: BTreeSet<String>,
     /// Smouldering ground: where, until when, when it burns next, its mark.
     pub embers: Vec<(Vec3, f32, f32, Id)>,
+    /// Foes felled so far (bosses aside), toward the count it needs.
+    pub forces: u32,
+    /// The bosses are down but the count isn't, and the heroes have been told.
+    pub short_told: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -117,7 +132,42 @@ pub fn wager_bosses(d: &DungeonDef, content: &crate::content::Content) -> Vec<St
         .collect()
 }
 
+/// The foes a wager counts: those standing from the start that aren't bosses (not a secret's, a
+/// strongbox's guards, a rare, a totem or a dummy). Others felled count as well; these make the
+/// total.
+pub fn wager_forces_total(d: &DungeonDef, content: &crate::content::Content) -> u32 {
+    let kept: BTreeSet<&String> = d.doors.iter().flat_map(|dr| dr.reveals.iter()).collect();
+    d.packs
+        .iter()
+        .filter(|p| !p.rare && p.wake.is_empty() && !kept.contains(&p.key))
+        .filter(|p| content.mobs.iter().any(|m| m.key == p.mob && !m.boss && !m.inert() && !m.critter))
+        .map(|p| p.count.max(1) as u32)
+        .sum()
+}
+
+/// How many of them a run must fell.
+pub fn wager_forces_needed(d: &DungeonDef, content: &crate::content::Content) -> u32 {
+    (wager_forces_total(d, content) as f32 * WAGER_FORCES).ceil() as u32
+}
+
 impl Survival {
+    /// A foe's leash: how far from home it chases (farther during a wager).
+    pub(crate) fn leash_of(&self, def: usize) -> f32 {
+        let leash = self.content.mobs[def].leash;
+        if self.wager_running() {
+            leash * WAGER_LEASH
+        } else {
+            leash
+        }
+    }
+
+    /// A wager's count of foes: (felled, needed, standing from the start).
+    pub fn wager_forces(&self) -> Option<(u32, u32, u32)> {
+        let w = self.wager()?;
+        let d = self.dungeon_def()?;
+        Some((w.forces, wager_forces_needed(d, &self.content), wager_forces_total(d, &self.content)))
+    }
+
     /// The wager under way here, if any.
     pub fn wager(&self) -> Option<&Wager> {
         self.below.as_ref()?.wager.as_ref()
@@ -242,9 +292,16 @@ impl Survival {
         }
     }
 
-    /// A foe fell during a wager: its pack rallies, its ground smoulders.
-    pub(crate) fn wager_kill(&mut self, def: usize, at: Vec3, pack: Option<usize>) {
+    /// A foe fell during a wager: counted (if it's not a boss, nor a form coming back as its first),
+    /// its pack rallies, its ground smoulders.
+    pub(crate) fn wager_kill(&mut self, def: usize, at: Vec3, pack: Option<usize>, form: bool) {
         let Some(level) = self.wager().filter(|w| w.done.is_none()).map(|w| w.level) else { return };
+        let d = &self.content.mobs[def];
+        if !form && !d.boss && !d.inert() && !d.critter {
+            if let Some(w) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                w.forces += 1;
+            }
+        }
         if level >= 4 {
             if let Some(k) = pack {
                 let mates: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && m.pack == Some(k)).map(|(id, _)| *id).collect();
@@ -307,10 +364,19 @@ impl Survival {
                 self.hurt_player(id, dmg);
             }
         }
-        // Its last boss down: won, in time or not.
+        // Its last boss down and enough of its foes: won, in time or not.
         let bosses = wager_bosses(&d, &self.content);
         if !bosses.is_empty() && bosses.iter().all(|k| self.slain(k)) {
-            self.win_wager(&d);
+            let needed = wager_forces_needed(&d, &self.content);
+            if w.forces >= needed {
+                self.win_wager(&d);
+            } else if !w.short_told {
+                if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                    wm.short_told = true;
+                }
+                let left = needed - w.forces;
+                self.events.push(Event::Banner { player: None, title: "The bosses are down".into(), sub: format!("The Bookmaker wants {left} more foe{} felled: the clock runs on", if left == 1 { "" } else { "s" }) });
+            }
         }
     }
 

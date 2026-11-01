@@ -1356,7 +1356,7 @@ impl Survival {
     /// find nothing (it evades, as 1.12's do) until it's home or they come back within it.
     pub(crate) fn evading(&self, mid: Id, by: Id) -> bool {
         let (Some(m), Some(p)) = (self.mobs.get(&mid), self.players.get(&by)) else { return false };
-        !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.content.mobs[m.def].leash + LEASH_SLACK
+        !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK
     }
 
     fn think(&mut self, id: Id, dt: f32) {
@@ -1474,7 +1474,7 @@ impl Survival {
                     self.set_back(id, home, "found no way to its foe nor home");
                     return;
                 }
-                if !raider && (lost || self.leashed(home, pos, to, d.leash)) {
+                if !raider && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
                     self.give_up(id);
                     return;
                 }

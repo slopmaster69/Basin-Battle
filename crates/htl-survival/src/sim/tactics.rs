@@ -100,7 +100,7 @@ impl Survival {
                 continue;
             }
             // Out of a leash a raider ignores; a pack's creature only within its own reach.
-            if !raider && self.leashed(m.home, pos, p.pos, self.content.mobs[m.def].leash) {
+            if !raider && self.leashed(m.home, pos, p.pos, self.leash_of(m.def)) {
                 continue;
             }
             let mut score = ai.threat * self.threat_of(m, *h) - ai.distance * d / 10.0;

@@ -1020,10 +1020,21 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     s.wager_fall();
     assert_eq!(s.wager().unwrap().deaths, 1);
     assert!(s.wager_elapsed() >= 10.0, "a fall's ten seconds");
-    // Its boss down, quickly: won in time, three levels up.
+    // Foes chase farther during a wager.
+    use crate::sim::wager::WAGER_LEASH;
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * WAGER_LEASH);
+    // Its boss down first: not won till enough of its foes are down too.
+    assert_eq!(s.wager_forces(), Some((0, 1, 1)), "one grunt standing, one needed");
     let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
     s.hurt_mob(boss, id, 10_000_000);
     let ev = run(&mut s, 0.2);
+    assert!(!ev.iter().any(|e| matches!(e, Event::WagerDone(_))), "the count isn't made");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title == "The bosses are down" && sub.contains("1 more foe"))), "{ev:?}");
+    // The grunt down, quickly: won in time, three levels up.
+    let g = grunt(&s);
+    s.hurt_mob(g, id, 10_000_000);
+    let ev = run(&mut s, 0.2);
+    assert_eq!(s.wager_forces().map(|f| f.0), Some(1));
     let done = ev.iter().find_map(|e| if let Event::WagerDone(r) = e { Some(r.clone()) } else { None }).expect("won");
     assert_eq!(s.wager_progress(), vec![(boss_name, true)], "down");
     assert!(done.timed && done.level == 3 && done.deaths == 1 && done.party == vec![("Ayla".to_string(), s.players[&id].class.clone())], "{done:?}");
@@ -1031,11 +1042,12 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     assert!(ev.iter().any(|e| matches!(e, Event::ToCamp { counts, .. } if counts.iter().any(|(k, n)| k == "wager:deadmines" && *n == 5))), "the camp told");
     let plunder = s.content.item("plunder").unwrap();
     assert!(s.players[&id].bag.get(&plunder).copied().unwrap_or(0) >= 15, "paid");
-    // Everyone gone: the dungeon as it was, the shortcut open again.
+    // Everyone gone: the dungeon as it was, the shortcut open again, the leash its own.
     s.leave(id);
     run(&mut s, 0.2);
     assert!(s.wager().is_none());
     assert!(s.door_is_open("short"), "given back");
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash);
 }
 
 #[test]
@@ -1060,4 +1072,15 @@ fn a_ground_look_is_only_laid_for_an_area_as_big_as_it_looks() {
     let marks: Vec<(f32, u32)> = s.events.iter().filter_map(|e| if let Event::Mark { radius, ground, .. } = e { Some((*radius, *ground)) } else { None }).collect();
     assert!(marks.iter().any(|(r, g)| *r < crate::sim::GROUND_LOOK_MIN && *g == 0), "{marks:?}");
     assert!(marks.iter().any(|(r, g)| *r >= crate::sim::GROUND_LOOK_MIN && *g == 22191), "{marks:?}");
+}
+
+#[test]
+fn every_dungeon_has_a_count_of_foes_for_its_wager() {
+    use crate::sim::wager::{wager_forces_needed, wager_forces_total, WAGER_FORCES};
+    let c = Content::builtin();
+    for d in c.dungeons() {
+        let (total, needed) = (wager_forces_total(d, &c), wager_forces_needed(d, &c));
+        assert!(total >= 20, "{}: {total} foes to count", d.key);
+        assert!(needed < total && needed as f32 >= total as f32 * WAGER_FORCES, "{}: {needed} of {total}", d.key);
+    }
 }

@@ -1,7 +1,7 @@
 //! The Bookmaker's Wager on screen: its page in the book (the levels open, its terms, the camp's
 //! best, a level to take), the Bookmaker's Board, and the clock below while one's on.
 
-use htl_survival::sim::wager::{clock_words, terms_at, wager_limit, TERMS, WAGER_DEATH};
+use htl_survival::sim::wager::{clock_words, terms_at, wager_forces_needed, wager_forces_total, wager_limit, TERMS, WAGER_DEATH};
 use htl_survival::sim::Id;
 
 use super::play::clean;
@@ -15,13 +15,15 @@ impl SurvivalGame {
         let d = c.dungeons().find(|d| d.key == dungeon).cloned().ok_or("No such dungeon in the book: .es wager deadmines (or stockade, ...).")?;
         let most = self.sim.wager_unlocked(&d.key);
         let limit = wager_limit(&d, c);
+        let (needed, total) = (wager_forces_needed(&d, c), wager_forces_total(&d, c));
         // Plain words, a line a thought (play-test: the page didn't say how to open +2).
         let mut paras = vec![
             format!("The Bookmaker bets you can't clear {} before the sand runs out.", d.name),
             format!(
-                "Take a wager below and the dungeon starts fresh for your run: every boss up again, every secret hidden, every shortcut shut. The clock starts when you step away from the first lamp and stops when the last boss falls. Each death costs {}.",
+                "Take a wager below and the dungeon starts fresh for your run: every boss up again, every secret hidden, every shortcut shut. The clock starts when you step away from the first lamp. It stops when the last boss falls and enough of the dungeon's foes are down too: {needed} of its {total}. Each death costs {}.",
                 clock_words(WAGER_DEATH)
             ),
+            "Foes chase much farther during a wager, so you can pull one pack into the next and fight them together. Big pulls are the quick way to the count.".to_string(),
             "Beat the clock at your highest open wager and the next one opens. Finish with a fifth of the time to spare and you skip a level; with two-fifths to spare, two.".to_string(),
             "Going home through a lamp takes you out of the run. Once everyone is out, the run is over and the dungeon is back as you left it.".to_string(),
             "The higher the wager, the tougher the foes and the better the pay: plunder for everyone, and from +3 the dungeon's gear in the camp's chest.".to_string(),
@@ -85,8 +87,9 @@ impl SurvivalGame {
         Ok(())
     }
 
-    /// The clock below (`WT name level elapsed limit falls state terms bosses`), or `WT` with none.
-    /// `bosses`: `name~down^...`, each boss the run has to beat and whether it's down (1) yet.
+    /// The clock below (`WT name level elapsed limit falls state terms bosses forces`), or `WT`
+    /// with none. `bosses`: `name~down^...`, each boss the run has to beat and whether it's down
+    /// (1) yet. `forces`: `felled~needed~total`, the foes counted toward the run.
     pub(crate) fn wager_line(&self) -> String {
         let Some(w) = self.sim.wager() else { return "WT".to_string() };
         let name = self.sim.content.dungeon.as_ref().map_or(String::new(), |d| d.name.clone());
@@ -98,6 +101,7 @@ impl SurvivalGame {
         };
         let terms: Vec<&str> = terms_at(w.level).iter().map(|t| t.name).collect();
         let bosses: Vec<String> = self.sim.wager_progress().iter().map(|(n, down)| format!("{}~{}", clean(n), u8::from(*down))).collect();
-        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"))
+        let forces = self.sim.wager_forces().map_or(String::new(), |(f, n, t)| format!("{f}~{n}~{t}"));
+        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}\t{forces}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"))
     }
 }
