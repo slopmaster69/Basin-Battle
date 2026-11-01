@@ -285,7 +285,7 @@ Some of this needs a change to the client itself, which this folder carries as p
 - a blow meant for you tells you when to answer it, with the floor markers on or off: the
   striker glows over its wind-up (amber: a guard stops it, red: it doesn't), and a reaction's
   time before your window opens the glow flashes bright: raise the guard now to parry (with a
-  blade's ring), or roll now for a red one. The stroke into the blow wooshes, heavier for a slower
+  ping), or roll now for a red one. The stroke into the blow wooshes, heavier for a slower
   wind-up;
 - a raised guard's ShieldBlock goes up once and holds there (on the upper body while moving),
   where it used to loop;
