@@ -44,3 +44,5 @@ mod tests_siege;
 mod tests_support;
 #[cfg(test)]
 mod tests_tactics;
+#[cfg(test)]
+mod tests_projectiles;

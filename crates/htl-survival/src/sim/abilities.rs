@@ -36,6 +36,23 @@ pub(crate) struct Projectile {
     /// Who it has gone through already, and how many more it can.
     pub hits: Vec<Id>,
     pub pierce: u32,
+    /// Where it is in its flight (going out, as most only ever do).
+    pub stage: Stage,
+    /// When it left the hands.
+    pub born: f32,
+}
+
+/// Where a projectile is in its flight: going out (every projectile, at first); coming back to
+/// its thrower (a boomerang, its look flown from where it turned by the unseen `anchor`); arcing
+/// to the spot `at`, landing at `land_at` (a lob, its ring `mark` shown till then); or stuck to a
+/// unit (`on`; none: to the ground or a wall), at `at`, going off at `until` (a fuse, its ring
+/// `mark` shown for the last second).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum Stage {
+    Out,
+    Back { anchor: Id },
+    Lob { at: Vec3, land_at: f32, mark: Option<Id> },
+    Stuck { on: Option<Id>, at: Vec3, until: f32, mark: Option<Id> },
 }
 
 /// Ground marked for an ability, landing at `land_at`.
@@ -162,6 +179,15 @@ fn add(a: Vec3, b: Vec3, k: f32) -> Vec3 {
 fn norm(v: Vec3) -> Vec3 {
     let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1.0e-5);
     [v[0] / l, v[1] / l, v[2] / l]
+}
+
+/// From `a` to `b`, and how far that is.
+fn sub(b: Vec3, a: Vec3) -> Vec3 {
+    [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+}
+
+fn len(v: Vec3) -> f32 {
+    (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt()
 }
 
 /// How far a point is from a body standing at `feet`, `tall` high.
@@ -937,16 +963,44 @@ impl Survival {
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
         let n = d.count.max(1);
+        // A lob arcs to the ground at the reticle (within its range), over whatever is between.
+        let lob_at = d.lob.then(|| self.aim_point(id, range));
+        let feet = self.players[&id].pos;
         for k in 0..n {
             let off = (k as f32 - (n - 1) as f32 / 2.0) * d.spread.to_radians();
             let (c, s) = (off.cos(), off.sin());
             let flat = (base[0] * base[0] + base[1] * base[1]).sqrt();
             let b = [base[0] * c - base[1] * s, base[0] * s + base[1] * c, base[2]];
             let dir = if flat > 1.0e-4 { norm(b) } else { base };
-            // The look: flown to where it would end if nothing moved, never after a unit.
-            let end = self.trace_with(from, dir, range, radius, id, d.friends()).point;
+            if let Some(spot) = lob_at {
+                // A fan of lobs lands its spread round the caster.
+                let (dx, dy) = (spot[0] - feet[0], spot[1] - feet[1]);
+                let at = self.ground_near(feet[0] + dx * c - dy * s, feet[1] + dx * s + dy * c, spot[2] + 1.0);
+                self.lob(id, ability, from, at, (speed, radius, share, damage, spell));
+                continue;
+            }
+            // The look: flown to where it would end if nothing moved, never after a unit (a
+            // boomerang's to where it turns, as it flies on through bodies).
+            let end = if d.returns { self.wall_trace(from, dir, range, id).point } else { self.trace_with(from, dir, range, radius, id, d.friends()).point };
             self.events.push(Event::Missile { caster: id, spell, target: Target::Point(end) });
-            self.projectiles.push(Projectile { owner: id, ability, pos: from, dir, speed, radius, left: range, share, damage, spell, allies: d.friends(), hits: Vec::new(), pierce: d.pierce });
+            let born = self.clock;
+            self.projectiles.push(Projectile {
+                owner: id,
+                ability,
+                pos: from,
+                dir,
+                speed,
+                radius,
+                left: range,
+                share,
+                damage,
+                spell,
+                allies: d.friends(),
+                hits: Vec::new(),
+                pierce: d.pierce,
+                stage: Stage::Out,
+                born,
+            });
         }
         if self.debug {
             let end = add(from, base, range);
@@ -960,15 +1014,49 @@ impl Survival {
         let list = std::mem::take(&mut self.projectiles);
         let mut keep = Vec::new();
         for mut p in list {
+            // Coming back, arcing over, or stuck: each goes its own way.
+            let going = match p.stage {
+                Stage::Out => true,
+                Stage::Back { .. } => self.fly_back(&mut p, dt),
+                Stage::Lob { .. } => !self.lob_lands(&p),
+                Stage::Stuck { .. } => self.fuse_burns(&mut p),
+            };
+            if p.stage != Stage::Out {
+                if going {
+                    keep.push(p);
+                }
+                continue;
+            }
             if self.grounded(&p) {
                 continue;
             }
+            let (returns, sticks) = {
+                let d = &self.content.abilities[p.ability];
+                (d.returns, d.fuse > 0.0)
+            };
             let go = (p.speed * dt).min(p.left);
             let t = self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &p.hits);
             if let Some(v) = t.unit {
                 let from = p.pos;
                 p.pos = t.point;
+                // A sticky one sticks to what it strikes (a friend it's for is met as ever).
+                let friend = p.allies && self.players.contains_key(&v) && !self.hostile(p.owner, v);
+                if sticks && !friend {
+                    self.stick(&mut p, Some(v));
+                    keep.push(p);
+                    continue;
+                }
                 self.projectile_hit(&p, v, from);
+                if returns {
+                    // A boomerang goes on through everything it meets, each once a way.
+                    p.hits.push(v);
+                    p.left -= t.dist;
+                    if p.left <= 0.01 {
+                        self.turn_back(&mut p);
+                    }
+                    keep.push(p);
+                    continue;
+                }
                 if p.pierce > 0 {
                     p.pierce -= 1;
                     p.hits.push(v);
@@ -980,6 +1068,17 @@ impl Survival {
                 continue;
             }
             if t.solid {
+                // A boomerang turns at a wall; a sticky one sits on it (or on the ground).
+                if returns || sticks {
+                    p.pos = t.point;
+                    if returns {
+                        self.turn_back(&mut p);
+                    } else {
+                        self.stick(&mut p, None);
+                    }
+                    keep.push(p);
+                    continue;
+                }
                 let d = &self.content.abilities[p.ability];
                 let (kit, splash) = (d.impact_kit, d.splash);
                 if kit != 0 && self.debug {
@@ -998,10 +1097,203 @@ impl Survival {
             p.left -= go;
             if p.left > 0.01 {
                 keep.push(p);
+            } else if returns {
+                self.turn_back(&mut p);
+                keep.push(p);
+            } else if sticks {
+                // Its range spent in the air: it drops there and sits on the ground.
+                p.pos = self.ground_near(p.pos[0], p.pos[1], p.pos[2]);
+                self.stick(&mut p, None);
+                keep.push(p);
             }
         }
         keep.extend(std::mem::take(&mut self.projectiles));
         self.projectiles = keep;
+    }
+
+    /// The line `from` along `dir` for `range` to the first ground or wall, through every body.
+    fn wall_trace(&self, from: Vec3, dir: Vec3, range: f32, owner: Id) -> Trace {
+        let all: Vec<Id> = self.bodies_with(owner, true).into_iter().map(|b| b.0).collect();
+        if all.is_empty() {
+            return self.trace(from, dir, range, 0.0, owner);
+        }
+        self.trace_skipping(from, dir, range, 0.0, owner, true, &all)
+    }
+
+    /// A boomerang at its turn: its look flown back from there to its thrower (by an unseen
+    /// anchor standing there), and a fresh pass (what it struck going out it can strike again),
+    /// at its way back's share of the damage.
+    fn turn_back(&mut self, p: &mut Projectile) {
+        let share = self.content.abilities[p.ability].return_damage;
+        let anchor = self.alloc();
+        self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: p.spell, from: p.pos, target: Target::Unit(p.owner) });
+        p.hits.clear();
+        p.damage *= share;
+        p.stage = Stage::Back { anchor };
+    }
+
+    /// A boomerang flies back toward where its thrower is now, striking each foe it passes once.
+    /// It ends in their hands, at a wall, swallowed by a grounding totem, or when its time is up
+    /// (false: it's done, and its look's anchor goes).
+    fn fly_back(&mut self, p: &mut Projectile, dt: f32) -> bool {
+        let Stage::Back { anchor } = p.stage else { return false };
+        let range = AbilityDef::at(self.content.abilities[p.ability].range, p.share);
+        let late = self.clock - p.born > 2.0 * range / p.speed.max(1.0) + 2.0;
+        let home = self.unit_pos(p.owner).map(|o| [o[0], o[1], o[2] + HAND_UP]);
+        let to = home.map(|h| sub(h, p.pos)).filter(|_| !late);
+        let to = if to.is_some() && self.grounded(p) { None } else { to };
+        let gone = match to {
+            Some(to) => {
+                let dist = len(to);
+                let step = (p.speed * dt).min(dist);
+                p.dir = norm(to);
+                let t = self.trace_skipping(p.pos, p.dir, step, p.radius, p.owner, p.allies, &p.hits);
+                if let Some(v) = t.unit {
+                    let from = p.pos;
+                    p.pos = t.point;
+                    self.projectile_hit(p, v, from);
+                    p.hits.push(v);
+                    false
+                } else if t.solid {
+                    if self.content.abilities[p.ability].splash > 0.0 {
+                        self.burst(p, t.point, None);
+                    }
+                    true
+                } else {
+                    p.pos = t.point;
+                    // Caught.
+                    dist - step <= HERO_SIZE
+                }
+            }
+            _ => true,
+        };
+        if gone {
+            self.events.push(Event::ObjGone { id: anchor });
+        }
+        !gone
+    }
+
+    /// A lob's flight: its look flown to `at`, the ring everyone sees there until it lands
+    /// (distance / speed from now), and a warning for the foes near it. `(speed, radius, share,
+    /// damage, spell)` as [`Self::launch`] reckoned them.
+    fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
+        let splash = self.content.abilities[ability].splash;
+        let dist = len(sub(at, from));
+        let flight = dist / speed.max(1.0);
+        let tele = Telegraph::hero_shape(id, splash, 360.0, 0.0, flight, Some((at, 0.0)));
+        let mark = Some(self.mark_as(at, splash, flight + 0.1, Some(tele)));
+        let foes: Vec<Id> = self.players.iter().filter(|(h, x)| self.hostile(id, **h) && x.health > 0 && dist2d(x.pos, at) <= splash + 4.0).map(|(h, _)| *h).collect();
+        for h in foes {
+            self.events.push(Event::Danger { player: h, secs: flight, from: None });
+        }
+        self.events.push(Event::Missile { caster: id, spell, target: Target::Point(at) });
+        let (dir, land_at, born) = (norm(sub(at, from)), self.clock + flight, self.clock);
+        self.projectiles.push(Projectile {
+            owner: id,
+            ability,
+            pos: from,
+            dir,
+            speed,
+            radius,
+            left: dist,
+            share,
+            damage,
+            spell,
+            allies: false,
+            hits: Vec::new(),
+            pierce: 0,
+            stage: Stage::Lob { at, land_at, mark },
+            born,
+        });
+    }
+
+    /// A lob lands when its flight is over (true): its ring gone, it bursts there, showing its
+    /// `burst_spell` at the spot (none: the missile's own impact is the look).
+    fn lob_lands(&mut self, p: &Projectile) -> bool {
+        let Stage::Lob { at, land_at, mark } = p.stage else { return true };
+        if self.clock < land_at {
+            return false;
+        }
+        if let Some(m) = mark {
+            self.unmark(m);
+        }
+        let look = self.content.abilities[p.ability].burst_spell;
+        self.burst_look(p, at, (look != 0).then_some(look));
+        true
+    }
+
+    /// A sticky projectile sticks to the unit it struck (and follows it), or where it is (the
+    /// ground, a wall), until its fuse runs out; the unit shows its aura meanwhile.
+    fn stick(&mut self, p: &mut Projectile, on: Option<Id>) {
+        let fuse = self.content.abilities[p.ability].fuse;
+        let at = on.and_then(|u| self.unit_pos(u)).unwrap_or(p.pos);
+        p.stage = Stage::Stuck { on, at, until: self.clock + fuse, mark: None };
+        if let Some(u) = on {
+            self.events.push(Event::Auras { id: u });
+        }
+    }
+
+    /// A stuck fuse burns down (false once it's gone off): it follows its unit while that lives
+    /// (and stays where it fell), a ring round it for everyone for its last second, then it bursts
+    /// there, showing its `burst_spell` at the spot (none: its own spell, as any burst).
+    fn fuse_burns(&mut self, p: &mut Projectile) -> bool {
+        let Stage::Stuck { on, mut at, until, mut mark } = p.stage else { return false };
+        let now = self.clock;
+        let alive = on.filter(|u| self.players.get(u).map(|x| x.health > 0).or_else(|| self.mobs.get(u).map(|m| m.health > 0)).unwrap_or(false));
+        if let Some(pos) = alive.and_then(|u| self.unit_pos(u)) {
+            at = pos;
+        }
+        let splash = self.content.abilities[p.ability].splash;
+        if mark.is_none() && until - now <= 1.0 {
+            let secs = (until - now).max(0.0);
+            // Under a living unit the ring goes with them (a warning to all); else it's laid where
+            // it lies, as the caster's ground.
+            let tele = match alive {
+                Some(u) => Telegraph { mob: u, reach: splash, arc: 360.0, secs, blockable: false, foe: self.players.contains_key(&u).then_some(u), width: 0.0, at: None, hero: false },
+                None => Telegraph::hero_shape(p.owner, splash, 360.0, 0.0, secs, Some((at, 0.0))),
+            };
+            mark = Some(self.mark_as(at, splash, secs + 0.1, Some(tele)));
+            let owner = p.owner;
+            let foes: Vec<Id> = self.players.iter().filter(|(h, x)| self.hostile(owner, **h) && x.health > 0 && dist2d(x.pos, at) <= splash + 3.0).map(|(h, _)| *h).collect();
+            for h in foes {
+                self.events.push(Event::Danger { player: h, secs, from: None });
+            }
+        }
+        p.pos = at;
+        if now < until {
+            p.stage = Stage::Stuck { on, at, until, mark };
+            return true;
+        }
+        if let Some(m) = mark {
+            self.unmark(m);
+        }
+        // Gone off: off them too (it's no longer among the projectiles once this step is done).
+        if let Some(u) = on {
+            self.events.push(Event::Auras { id: u });
+        }
+        let d = &self.content.abilities[p.ability];
+        let look = if d.burst_spell != 0 { d.burst_spell } else { d.spell };
+        self.burst_look(p, at, Some(look));
+        false
+    }
+
+    /// The looks of the sticky projectiles stuck on a unit (their `fuse_aura`s).
+    pub(crate) fn fuse_auras(&self, id: Id) -> Vec<u32> {
+        self.projectiles
+            .iter()
+            .filter(|p| matches!(p.stage, Stage::Stuck { on: Some(u), .. } if u == id))
+            .map(|p| self.content.abilities[p.ability].fuse_aura)
+            .filter(|a| *a != 0)
+            .collect()
+    }
+
+    /// Everything in flight gone (the world cleared): the looks' anchors with it.
+    pub(crate) fn drop_projectiles(&mut self) {
+        for p in std::mem::take(&mut self.projectiles) {
+            if let Stage::Back { anchor } = p.stage {
+                self.events.push(Event::ObjGone { id: anchor });
+            }
+        }
     }
 
     /// [`Self::trace_with`], past the bodies in `skip` too.
@@ -1032,10 +1324,18 @@ impl Survival {
     /// A bursting projectile goes off at `at`: everyone in its burst struck (and its effects from
     /// there).
     fn burst(&mut self, p: &Projectile, at: Vec3, _direct: Option<Id>) {
+        let spell = self.content.abilities[p.ability].spell;
+        self.burst_look(p, at, Some(spell));
+    }
+
+    /// [`Self::burst`], showing `look` at the spot (none: nothing of its own).
+    fn burst_look(&mut self, p: &Projectile, at: Vec3, look: Option<u32>) {
         let d = self.content.abilities[p.ability].clone();
         let ground = self.ground_near(at[0], at[1], at[2] + 0.5);
         let at = if (at[2] - ground[2]).abs() < 2.5 { ground } else { at };
-        self.events.push(Event::Missile { caster: p.owner, spell: d.spell, target: Target::Point(at) });
+        if let Some(spell) = look {
+            self.events.push(Event::Missile { caster: p.owner, spell, target: Target::Point(at) });
+        }
         self.area(p.owner, p.ability, at, d.splash, p.share, p.damage, None);
         self.linger_at(p.owner, p.ability, at, d.splash);
     }
@@ -2080,7 +2380,24 @@ impl Survival {
         let dir = norm([end[0] - start[0], end[1] - start[1], end[2] - start[2]]);
         let range = AbilityDef::at(d.range, share).max(dist2d(start, end) + 4.0);
         self.events.push(Event::Missile { caster: from, spell: d.spell, target: Target::Point(end) });
-        self.projectiles.push(Projectile { owner: from, ability, pos: start, dir, speed: d.speed.max(10.0), radius: AbilityDef::at(d.radius, share), left: range, share, damage: AbilityDef::at(d.damage, share), spell: d.spell, allies: false, hits: Vec::new(), pierce: 0 });
+        let born = self.clock;
+        self.projectiles.push(Projectile {
+            owner: from,
+            ability,
+            pos: start,
+            dir,
+            speed: d.speed.max(10.0),
+            radius: AbilityDef::at(d.radius, share),
+            left: range,
+            share,
+            damage: AbilityDef::at(d.damage, share),
+            spell: d.spell,
+            allies: false,
+            hits: Vec::new(),
+            pierce: 0,
+            stage: Stage::Out,
+            born,
+        });
     }
 
     // --- every tick, for heroes -----------------------------------------------------------------------
