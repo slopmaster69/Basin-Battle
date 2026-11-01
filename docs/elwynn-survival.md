@@ -284,6 +284,42 @@ ability too, on its row's key), `.es valor <n|full>`,
 of you), `.es cc log` and `.es pvp on|off`. `.es debug` also draws projectiles' bodies and every
 ground area on the ground.
 
+### The beta page
+
+The board has two tabs: **Classes** (the nine columns above) and **Beta**, five rows (the same
+keys) of up to four generic cards any class can use, there to be tried out. Click one: it's yours
+for free and goes on its row's key in place of your class's card there (`.es tree take <card>`
+works for them anywhere, no debug needed). Their EX versions work as any card's; a dev build owns
+them all; a save keeps them; Siege leaves them out (its fresh kit, its prices, its trainer). They
+keep to their row's damage and crowd-control budgets but count toward no class. In content they're
+`school = "beta"`, at the end of the `[[ability]]` list; the board's `TR` line gives each card its
+page last (1 or 2), so an add-on from before them simply doesn't show them.
+
+| Key | Card · *EX* | What it does |
+| --- | --- | --- |
+| Q | Ricochet · *Pinball* | A spike that bounces to three more foes within 8 yd, each bounce ×1.25 (7, 9, 11, 14). EX: five bounces, each stunning 0.75 s. |
+| Q | Gravity Lance · *Collapse* | A heavy bolt: every foe within 5 yd of the one it strikes is dragged into it, all take 14. EX: 6 yd, 16, and they're slowed 70% for 2 s. |
+| E | Whirlwind · *Bladestorm* | Spin 2 s, still moving at about 70%: 5 every half second to everything within 4 yd in front and to your sides. EX: 3 s, and nothing staggers you. |
+| E | Launcher · *Juggle* | An uppercut: 10, stunned 0.8 s and thrown up; E again within 1.5 s leaps you onto them for 14 in 3 yd (Slam). EX: 14, 1.2 s, a Slam of 18 that throws them 4 yd. |
+| E | Siphon Blade · *Soul Rend* | A 4 yd slash, 12 to each foe, and you heal 60% of all it deals. EX: wider, 16, and you heal all of it. |
+| 1 | Blink Dagger · *Phase Strike* | Blink 12 yd, and again within 3 s. EX: each blink lands with 8 to everyone within 3 yd. |
+| 1 | Phase Dash · *Searing Dash* | Dash 10 yd through foes, untouchable: each takes 4 and burns 4 a second for 3 s. EX: 14 yd, and they're slowed 40% too. |
+| 2 | Riposte · *Counterstrike* | A 0.8 s parry: the first blow or bolt is turned aside, and an attacker within 6 yd is staggered and bleeds 7 a second for 4 s. EX: 1.2 s, and it stuns them 1.2 s. |
+| 2 | Bubble · *Hard Bubble* | A shield on the friend under the reticle, or on you: soaks 40 for 4 s. EX: 70. |
+| 3 | Black Hole | Lobbed 26 yd: for 3 s it drags every foe within 7 yd 3 yd to its middle each second, 6 a second. |
+| 3 | Earthsplitter | A 30 yd fissure along your aim, drawn for everyone, bursts 0.8 s later: 30 and stunned 1.5 s. |
+| 3 | Avatar | 8 s of Onslaught, 20% faster and 20% less damage taken. |
+
+Where the engine can't do what the design asked yet, a card does the closest thing and says so in
+its comment: Ricochet's EX stuns on every bounce, not just the last; Collapse slows instead of
+rooting (a root or stun after a pull stops a creature where it stands); Whirlwind is a beam, so it
+reaches round your front and sides but not right behind you; Siphon Blade steals no boons; Phase
+Dash burns the foes it passes instead of leaving a trail; Riposte's cut is a bleed and there's no
+step behind the attacker; Avatar's extra damage is Onslaught's unblockable heavies (no boon adds
+damage). Ultimates have no EX version (no key for one, and the bar is spent). Bubble's pop and
+Black Hole's collapse, and the cards that need new engine pieces (Grappling Hook, Displacer Orb,
+Wall Slam, Rewind, Jump Pad, Cheat Death, Reflect, Soul Chain), come with them.
+
 ### The action-combat client
 
 Some of this needs a change to the client itself, which this folder carries as patches
