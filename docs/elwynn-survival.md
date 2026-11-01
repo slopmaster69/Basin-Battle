@@ -195,6 +195,25 @@ part for free (a blink there and back, a throw after a slam); the key glows gree
 left. A card that **empowers** another makes that card's next press its EX version for no Valor
 (Frost Nova on E making Fireball on Q its EX); the empowered key glows, its seconds in the corner.
 
+**Beta mechanics** (engine support for the beta page's generic cards): a projectile may **yank**
+its caster after it (a grappling hook: to the wall or the ground it meets, or beside the foe it
+strikes, in a fast dash a wall stops short; a miss does nothing) or **swap** places with what it
+strikes (a foe, a creature or a friend; never a champion, a totem, or anything steadfast or
+untouchable, which is only struck). A knockback may **stun against a wall** (`wall_stun`): a body
+thrown into a wall or up against a steep step is stunned as it hits, as long as any stun (half on
+a hero, kept off by the grace). A buff may leave an **echo** (`rewind`): its recast, or a few
+seconds, brings you back to it with the health you had then if that's more than now. A trap may
+**launch** instead of springing (a jump pad: you or a friend who steps on it is thrown that far
+the way you face; foes don't set it off, and it lasts its life, once a second a hero). The boon
+**cheat death** turns a blow that would fell you into one that leaves you at 1 health, ends, and
+mends a share of your health over 3 s. A stance with a **mirror** turns a foe's projectile (a
+hero's, or a creature's arrow or bolt) back at whoever threw it, as hard as it was; blows and
+ground go through. A projectile may **tether** the foe it strikes for a while, a link drawn
+between you: once it strays past the tether's reach it's dragged back to you and stunned, and the
+tether ends. A shield may **pop** as it breaks or runs out (a burst round whoever held it), and
+lingering ground may **burst as it ends** (a black hole's collapse), each the burst of a small
+nova of its own.
+
 **Seeing it coming** (the action-combat client, eighth round): everything that lands later is
 drawn on the ground where it will land, red when it's a foe's, blue when it's yours or a
 friend's, filling as it comes: a sky-fall's ring (Mind Blast, Meteor, Volley, Earthquake, Void
@@ -1162,7 +1181,11 @@ after its drawn wind-up (and lost to a stun), a trap arming and springing, a Dem
 anchor, piercing, chaining and bursting projectiles, shields, mending and haste, a veil, a
 Grounding Totem eating a bolt, Evasion and a vortex; `tests_recast.rs` covers recasts (a blink
 there and back, an aimed recast, the window running out, no cooldown for the recast), a dash
-through two foes and an empowered EX version. `tests_classes.rs` casts every card of the
+through two foes and an empowered EX version; `tests_beta_mechanics.rs` covers the beta mechanics
+(a hook to a wall and to a foe, and its miss; an orb swapping with a creature and a friend, not a
+champion or a steadfast foe; a wall stun; an echo with its recast and by itself; a jump pad; a
+cheated death; a mirror on a rival's bolt and a creature's arrow; a tether dragging a foe back; a
+shield's and a black hole's bursts; and what the rules turn away). `tests_classes.rs` casts every card of the
 nine classes and its EX version on creatures and in a duel, and holds the board to its PvP
 budgets.
 
