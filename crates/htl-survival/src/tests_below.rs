@@ -1196,4 +1196,18 @@ fn a_harder_dungeons_foes_are_tougher_by_its_tier_and_the_book_lists_the_easiest
     let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     let tiers: Vec<u32> = s.book_dungeons().iter().map(|b| b.tier).collect();
     assert!(tiers.windows(2).all(|w| w[0] <= w[1]) && tiers.first() == Some(&1) && tiers.last() == Some(&3), "{tiers:?}");
+fn a_sets_words_count_its_pieces_not_their_honed_copies() {
+    let c = Content::builtin();
+    let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let mut seen = 0;
+    for set in &s.content.sets {
+        let pieces = s.content.items.iter().filter(|i| i.set == set.key && i.hone == 0).count();
+        for (k, i) in s.content.items.iter().enumerate().filter(|(_, i)| i.set == set.key) {
+            let words = s.gear_words(k);
+            assert!(words.contains(&format!("({pieces} pieces)")), "{}: {words}", i.key);
+            seen += 1;
+        }
+    }
+    assert!(seen > 0, "some set pieces, honed copies among them");
+    assert!(s.content.items.iter().any(|i| !i.set.is_empty() && i.hone > 0), "a honed set piece");
 }
