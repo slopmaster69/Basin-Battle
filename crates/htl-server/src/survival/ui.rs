@@ -57,8 +57,8 @@
 //! The abilities:
 //! - `AB\t...`: the ability bar, one entry per key (see [`SurvivalGame::bar_line`]).
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
-//! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), four rows of four cards (see
-//!   [`SurvivalGame::tree_line`]).
+//! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
+//!   beta page's cards, each with its page (see [`SurvivalGame::tree_line`]).
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
 //!   friend's), `MK\t<id>` gone.
 //! - `DA\t<secs>\t<speed>\t<facing>`: run the dash of an ability (Charge) along the facing.
@@ -145,6 +145,7 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "ally" => out.push("on an ally, or yourself".to_string()),
         "leap" if d.back => out.push(format!("{} yd back", n(d.range[1]))),
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap, lands {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "trap" if d.launch > 0.0 => out.push(format!("{} yd away, launches you or a friend {} yd, lasts {} s", n(d.range[1]), n(d.launch), n(d.secs))),
         "trap" => out.push(format!("{} yd away, springs within {} yd, lasts {} s", n(d.range[1]), n(d.radius[1]), n(d.secs))),
         "place" => out.push(format!("totem {} s, {} yd", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "blink" if d.anchor > 0.0 => out.push(format!("circle lasts {} s", n(d.anchor))),
@@ -177,9 +178,30 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.fuse > 0.0 {
         out.push(format!("sticks, goes off after {} s", n(d.fuse)));
     }
+    if d.yank {
+        out.push("pulls you to what it strikes".to_string());
+    }
+    if d.swap {
+        out.push("swaps places with what it strikes".to_string());
+    }
+    if d.tether_secs > 0.0 {
+        out.push(format!("binds for {} s, drags back past {} yd", n(d.tether_secs), n(d.tether_range)));
+    }
+    if d.rewind {
+        out.push(if d.recast.is_empty() { format!("back where you were after {} s", n(d.rewind_secs)) } else { "leaves an echo to come back to".to_string() });
+    }
+    if !d.end_burst.is_empty() {
+        out.push("bursts as it ends".to_string());
+    }
+    if d.counter.as_ref().is_some_and(|c| c.mirror) {
+        out.push("turns projectiles back".to_string());
+    }
     for e in d.effects.iter().chain(&d.tick_effects) {
         match e.kind.as_str() {
+            "knockback" if e.wall_stun > 0.0 => out.push(format!("knocks back {} yd, stuns {} s against a wall", n(e.amount), n(e.wall_stun))),
             "knockback" => out.push(format!("knocks back {} yd", n(e.amount))),
+            "cheat_death" => out.push(format!("a killing blow leaves you at 1 health, then heals {}%", n(e.amount * 100.0))),
+            "shield" if !e.pop.is_empty() => out.push("bursts as the shield ends".to_string()),
             "pull" => out.push(if e.from_caster { "pulls to you".to_string() } else { format!("pulls {} yd in", n(e.amount)) }),
             _ => {}
         }
@@ -1461,7 +1483,9 @@ impl SurvivalGame {
     }
 
     /// The board (N): `TR\t<dev>\t<what the count says>\t<card>^...`, each card
-    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts`.
+    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts~where learned~page`.
+    /// `page` is 1 for a class's card (`column` its class) and 2 for the beta page's (`column`
+    /// `beta`): an add-on from before the beta page knows no `beta` column and leaves those out.
     fn tree_line(&self, id: Id) -> Option<String> {
         let p = self.sim.players.get(&id)?;
         let c = &self.sim.content;
@@ -1481,7 +1505,7 @@ impl SurvivalGame {
                 });
                 let at = if owned { String::new() } else { clean(&self.sim.learned_where(&a.key)) };
                 format!(
-                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}",
+                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}~{}",
                     a.key,
                     clean(&a.name),
                     a.slot,
@@ -1496,11 +1520,23 @@ impl SurvivalGame {
                     a.charge[1],
                     clean(&a.text),
                     clean(&ability_facts(a, None, c.valor.max)),
+                    a.page(),
                 )
             })
             .collect();
-        let owned = c.abilities.iter().filter(|a| a.on_board() && p.owned.contains(&a.key)).count();
-        let points = if dev { "Dev build: every card".to_string() } else { format!("{owned} of {} cards", cards.len()) };
+        // The classes' cards counted, and the beta page's apart (free to take, there to try).
+        let count = |beta: bool| {
+            let page = c.abilities.iter().filter(|a| a.on_board() && a.is_beta() == beta);
+            (page.clone().filter(|a| p.owned.contains(&a.key)).count(), page.count())
+        };
+        let ((owned, all), (beta_owned, beta_all)) = (count(false), count(true));
+        let points = if dev {
+            "Dev build: every card".to_string()
+        } else if beta_all > 0 {
+            format!("{owned} of {all} cards · beta page {beta_owned} of {beta_all}")
+        } else {
+            format!("{owned} of {all} cards")
+        };
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 

@@ -100,6 +100,8 @@ local COLUMN_LOOK = {
   mage = { "Mage", 0.41, 0.8, 0.94, "Fire and frost" },
   warlock = { "Warlock", 0.58, 0.51, 0.79, "Fear and fel" },
   druid = { "Druid", 1, 0.49, 0.04, "The wild shapes" },
+  -- The board's second page (BetaBoard.lua): any class's.
+  beta = { "Beta", 0.35, 0.95, 0.8, "Any class: try these" },
 }
 local ROW_WORDS = {
   ranged = { "Ranged", "Reach the foe" },
@@ -2760,6 +2762,7 @@ local CC_WORDS = {
   onslaught = { "Onslaught", 1, 0.55, 0.3 },
   hallowed = { "Hallowed", 1, 0.9, 0.55 },
   steadfast = { "Steadfast", 1, 0.85, 0.45 },
+  cheat_death = { "Cheating death", 1, 0.9, 0.5 },
   grace = { "Unshaken", 0.85, 0.85, 0.85 },
   stance = { "Countering melee blows", 1, 0.9, 0.5 },
 }
@@ -5048,6 +5051,8 @@ end
 local function RowY(r)
   return BOARD_TOP + (r - 1) * (CARD_H + CARD_GAP)
 end
+-- (Kept in `tree.heads`, so the beta page can put them away while it's up.)
+tree.heads = {}
 for c = 1, BOARD_N do
   local look = COLUMN_LOOK[BOARD_COLS[c]]
   local head = Text(tree, FONT_TITLE, 13, "OUTLINE")
@@ -5058,6 +5063,8 @@ for c = 1, BOARD_N do
   sub:SetPoint("CENTER", tree, "TOPLEFT", ColX(c) + CARD_W / 2, -BOARD_TOP + 12)
   sub:SetTextColor(look[2] * 0.75, look[3] * 0.75, look[4] * 0.75)
   sub:SetText(look[5])
+  table.insert(tree.heads, head)
+  table.insert(tree.heads, sub)
 end
 -- The row heads: the key and what the row is for.
 tree.rowKeys = {}
@@ -5228,6 +5235,12 @@ end
 
 local ROW_N = { ranged = 1, close = 2, utility = 3, defense = 4, ultimate = 5 }
 
+-- What the board's other page (BetaBoard.lua) builds its cards and its tabs with.
+ES.boardKit = {
+  Card = BoardCard, ColX = ColX, RowY = RowY, ROW_N = ROW_N, N = BOARD_N, W = CARD_W, H = CARD_H, GAP = CARD_GAP,
+  Button = MakeButton, Text = Text, TITLE = FONT_TITLE, BODY = FONT_BODY, ICONS = ICONS, GOLD = GOLD, WHITE = WHITE,
+}
+
 function ES.BoardDetail(d)
   local r, c = tree.regular, tree.charged
   if not d then
@@ -5283,7 +5296,8 @@ end
 
 -- TR: the board: dev, what the count says, then per card key~name~row~column~icon~owned~can
 -- unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX
--- text~EX facts.
+-- text~EX facts~where learned~page. Page 2's cards (column `beta`) are BetaBoard.lua's: no class
+-- column here, so they're left to it.
 function ES.TreeLine(f)
   local dev = f[2] == "1"
   tree.points:SetText(f[3] or "")

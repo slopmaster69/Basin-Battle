@@ -229,11 +229,15 @@ impl Survival {
     }
 
     /// Whether a card can be taken from the board as it stands: in a dev world (debug on), any on
-    /// it; otherwise none, since cards are learned out in Elwynn (`learned_where`).
+    /// it; a beta card, anywhere but Siege (they're there to be tried); otherwise none, since
+    /// cards are learned out in Elwynn (`learned_where`).
     pub fn reachable(&self, _owned: &BTreeSet<String>, key: &str) -> bool {
-        let on = self.content.ability(key).is_some_and(|k| self.content.abilities[k].on_board());
+        let Some(d) = self.content.ability(key).map(|k| &self.content.abilities[k]).filter(|d| d.on_board()) else { return false };
+        if d.is_beta() {
+            return self.debug || !self.is_siege();
+        }
         // In a Siege match, any card is bought with gold.
-        on && (self.debug || (self.is_siege() && self.card_price(key).is_some()))
+        self.debug || (self.is_siege() && self.card_price(key).is_some())
     }
 
     /// Unlock a card of the board (`.es tree take`).
@@ -248,6 +252,9 @@ impl Survival {
             return Ok(def.name);
         }
         if !self.reachable(&owned, key) {
+            if def.is_beta() && def.on_board() && self.is_siege() {
+                return Err(format!("{} is a beta card: Siege leaves those out.", def.name));
+            }
             let at = self.learned_where(key);
             return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("{} is learned out in Elwynn: {at}.", def.name) });
         }
@@ -802,6 +809,10 @@ impl Survival {
         let began = self.players[&id].pos;
         // A recast, or an empowered EX version: free (what made it so is used up).
         let free = self.take_free(id, ability);
+        // The recast an echo waits for: back to the echo first (Rewind), then it goes.
+        if matches!(free, Some(Free::Recast { .. })) {
+            self.rewind_recast(id, ability);
+        }
         // A cast brings them out of a veil.
         self.end_veil(id);
         let cost = if free.is_some() { 0.0 } else { self.valor_cost(&d) };
@@ -935,7 +946,9 @@ impl Survival {
         if let Some(also) = self.content.ability(&d.also) {
             self.fire_also(id, also, yaw, share);
         }
-        // Its key armed for its recast, the card it empowers empowered.
+        // An echo left where it began (Rewind); its key armed for its recast, the card it empowers
+        // empowered.
+        self.leave_echo(id, ability, began);
         self.arm_combos(id, ability, began, free);
         self.events.push(Event::Abilities { player: id });
         self.events.push(Event::Log(format!("{} casts {} at {:.0}%", self.players[&id].name, d.name, share * 100.0)));
@@ -1040,6 +1053,11 @@ impl Survival {
             if let Some(v) = t.unit {
                 let from = p.pos;
                 p.pos = t.point;
+                // A mirror's stance turns a foe's projectile back at whoever threw it.
+                if self.mirrors(&mut p, v) {
+                    keep.push(p);
+                    continue;
+                }
                 // A sticky one sticks to what it strikes (a friend it's for is met as ever).
                 let friend = p.allies && self.players.contains_key(&v) && !self.hostile(p.owner, v);
                 if sticks && !friend {
@@ -1048,6 +1066,8 @@ impl Survival {
                     continue;
                 }
                 self.projectile_hit(&p, v, from);
+                // A hook yanks its caster to it, an orb swaps them, a chain binds the foe.
+                self.beta_hit(&p, Some(v), t.point);
                 if returns {
                     // A boomerang goes on through everything it meets, each once a way.
                     p.hits.push(v);
@@ -1082,6 +1102,8 @@ impl Survival {
                     keep.push(p);
                     continue;
                 }
+                // A hook that meets a wall or the ground yanks its caster there.
+                self.beta_hit(&p, None, t.point);
                 let d = &self.content.abilities[p.ability];
                 let (kit, splash) = (d.impact_kit, d.splash);
                 if kit != 0 && self.debug {
@@ -1580,7 +1602,11 @@ impl Survival {
                     self.apply_cc(victim, owner, "petrify", secs.min(2.0).max(1.0), 0.0, 0.0, source);
                 }
                 kind => {
-                    self.apply_cc_look(victim, owner, kind, secs, e.amount, e.break_after, source, e.aura);
+                    let took = self.apply_cc_look(victim, owner, kind, secs, e.amount, e.break_after, source, e.aura);
+                    // A shield that bursts as it ends: its burst waits on whoever holds it.
+                    if took && !e.pop.is_empty() {
+                        self.hold_pop(victim, &e.pop);
+                    }
                 }
             }
         }
@@ -1778,6 +1804,8 @@ impl Survival {
             if let Some(m) = b.mark {
                 self.unmark(m);
             }
+            // Ground that bursts as it ends (a black hole's collapse).
+            self.end_burst(&b);
         }
         self.burnings = live;
         for k in 0..self.burnings.len() {
@@ -2340,7 +2368,8 @@ impl Survival {
         let s = self.stances.get(&victim).filter(|s| s.until > now)?.clone();
         let d = self.content.abilities[s.ability].clone();
         let c = d.counter.clone()?;
-        if (c.melee_only && how != HitKind::Melee) || (c.ranged_only && how != HitKind::Projectile) {
+        // A mirror turns projectiles back as they reach the hero (see `mirrors`); blows pass it.
+        if c.mirror || (c.melee_only && how != HitKind::Melee) || (c.ranged_only && how != HitKind::Projectile) {
             return None;
         }
         if let Some(st) = self.stances.get_mut(&victim) {
