@@ -333,7 +333,7 @@ key = "sl_diviner"
 name = "Scarlet Diviner"
 subname = "The Scarlet Crusade"
 display = 2434
-clips_from = "GnomeMale"
+clips_from = "TaurenFemale"
 health = 90
 run_speed = 7.0
 walk_speed = 2.0
@@ -376,7 +376,7 @@ key = "sl_loksey"
 name = "Houndmaster Loksey"
 subname = "The Scarlet Crusade"
 display = 2052
-clips_from = "TrollMale"
+clips_from = "DwarfFemale"
 scale = 1.2
 health = 950
 run_speed = 7.5
@@ -404,13 +404,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "mace"
   weight = 3.0
-  steps = [ { from = "TrollMale", clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.12 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.12 }, { from = "GnomeMale", clip = 57, windup = 0.8, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
+  steps = [ { from = "GnomeFemale", clip = 17, take = 2, windup = 0.5, damage = 22, recovery = 0.12 }, { from = "OrcFemale", clip = 17, take = 0, windup = 0.42, damage = 22, recovery = 0.12 }, { from = "GnomeMale", clip = 57, take = 0, windup = 0.8, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
   [[mob.pattern]]
   name = "bloodlust charge"
   weight = 2.0
   min_range = 4.0
   max_range = 14.0
-  steps = [ { from = "HumanFemale", clip = 17, take = 1, windup = 0.7, lunge = 9.0, damage = 28, heavy = true, recovery = 1.0, kit = 379 } ]
+  steps = [ { from = "NightElfMale", clip = 17, take = 0, windup = 0.7, lunge = 9.0, damage = 28, heavy = true, recovery = 1.0, kit = 379 } ]
   [[mob.pattern]]
   name = "whistle"
   weight = 1.5
@@ -437,7 +437,7 @@ respawn = 0.0
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { from = "DwarfFemale", clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { from = "TaurenMale", clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { from = "OrcMale", clip = 17, take = 1, windup = 0.45, damage = 19, recovery = 0.1 }, { from = "NightElfFemale", clip = 57, take = 0, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
   # Nearer its end, from range: arcane fire thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "arcane fire"
@@ -452,7 +452,7 @@ key = "sl_doan"
 name = "Arcanist Doan"
 subname = "The Scarlet Crusade"
 display = 2070
-clips_from = "ScourgeFemale"
+clips_from = "TrollMale"
 scale = 1.15
 health = 1300
 run_speed = 7.0

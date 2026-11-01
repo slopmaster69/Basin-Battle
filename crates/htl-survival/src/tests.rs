@@ -1911,9 +1911,9 @@ fn a_horde_grunt_strings_its_blows_and_each_can_be_met() {
     ev.extend(run(&mut s, 2.5));
     let hits = hits_on(&ev, p);
     assert_eq!(hits.iter().filter(|(_, o)| *o == Outcome::Hit).count(), 2, "both cuts land: {hits:?}");
-    // Each with its own take of the swing, for the clients that play clips.
-    let takes: Vec<u32> = ev.iter().filter_map(|e| match e { Event::MobWindup { id, take, .. } if *id == k => Some(*take), _ => None }).collect();
-    assert_eq!(takes[..2], [0, 1]);
+    // Each with its own swing, for the clients that play clips: another take, or another model's.
+    let takes: Vec<(u32, Option<String>)> = ev.iter().filter_map(|e| match e { Event::MobWindup { id, take, from, .. } if *id == k => Some((*take, from.clone())), _ => None }).collect();
+    assert!(takes.len() >= 2 && takes[0] != takes[1], "{takes:?}");
 }
 
 #[test]
