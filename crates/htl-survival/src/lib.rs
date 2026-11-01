@@ -46,3 +46,5 @@ mod tests_support;
 mod tests_tactics;
 #[cfg(test)]
 mod tests_projectiles;
+#[cfg(test)]
+mod tests_sim;
