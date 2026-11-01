@@ -65,6 +65,8 @@ pub struct BookDungeon {
     pub notes: (usize, usize),
     /// The highest wager the camp may take on it, and its time to beat (seconds).
     pub wager: (u32, f32),
+    /// How hard it is next to the others (1 to 3).
+    pub tier: u32,
 }
 
 /// A door's state as it's drawn: open, or shut.
@@ -384,11 +386,12 @@ impl Survival {
         self.book_dungeons().into_iter().filter(|b| b.open).flat_map(|b| b.pages).collect()
     }
 
-    /// The book's dungeons at camp, in order: each one's name, look, whether the camp has earned
-    /// it, and its pages (its first lamp, then those lit).
+    /// The book's dungeons at camp, the easiest first: each one's name, look, whether the camp has
+    /// earned it, and its pages (its first lamp, then those lit).
     pub fn book_dungeons(&self) -> Vec<BookDungeon> {
-        self.content
-            .dungeons()
+        let mut list: Vec<&DungeonDef> = self.content.dungeons().collect();
+        list.sort_by_key(|d| d.tier);
+        list.into_iter()
             .map(|d| BookDungeon {
                 key: d.key.clone(),
                 name: d.name.clone(),
@@ -402,6 +405,7 @@ impl Survival {
                 secrets: (d.doors.iter().filter(|dr| dr.secret() && self.ever("secret", &dr.key)).count(), d.doors.iter().filter(|dr| dr.secret()).count()),
                 notes: (d.notes.iter().filter(|n| self.ever("read", &n.key)).count(), d.notes.len()),
                 wager: (self.wager_unlocked(&d.key), super::wager::wager_limit(d, &self.content)),
+                tier: d.tier,
             })
             .collect()
     }

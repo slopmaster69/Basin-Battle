@@ -10,7 +10,7 @@ use crate::world::ConnId;
 
 impl SurvivalGame {
     /// A dungeon's wager page: what it is, the levels open, the camp's best, the board's.
-    pub(crate) fn ui_wager_page(&mut self, conn: ConnId, _id: Id, dungeon: &str) -> Result<(), String> {
+    pub(crate) fn ui_wager_page(&mut self, conn: ConnId, id: Id, dungeon: &str) -> Result<(), String> {
         let c = &self.sim.content;
         let d = c.dungeons().find(|d| d.key == dungeon).cloned().ok_or("No such dungeon in the book: .es wager deadmines (or stockade, ...).")?;
         let most = self.sim.wager_unlocked(&d.key);
@@ -44,6 +44,9 @@ impl SurvivalGame {
         if let Some(r) = top.first() {
             paras.push(format!("The board's best: +{} in {}, by {} of {}.", r.level, clock_words(r.ms as f32 / 1000.0), r.heroes(), r.host));
         }
+        if let Some(line) = self.rating_words(id) {
+            paras.push(line);
+        }
         let mut links: Vec<(String, String)> = (most.saturating_sub(4).max(1)..=most)
             .rev()
             .map(|l| {
@@ -53,6 +56,7 @@ impl SurvivalGame {
             })
             .collect();
         links.push((format!(".es board {}", d.key), "The Bookmaker's Board".to_string()));
+        links.push((".es ladder".to_string(), "The Bookmaker's Ladder".to_string()));
         let place = format!("Open to +{most}, {} to beat", clock_words(limit));
         self.letter(conn, "wager", &format!("The Bookmaker's Wager: {}", d.name), &place, &paras.join("\n\n"), "", &links);
         Ok(())
@@ -82,8 +86,58 @@ impl SurvivalGame {
             (Some(_), None) => "asking the board's keeper".to_string(),
         };
         let place = format!("In time only, highest first, then quickest: {hosts} camp{} on it, {reach}", if hosts == 1 { "" } else { "s" });
-        let links = vec![(format!(".es wager {}", d.key), "The Bookmaker's Wager".to_string())];
+        let links = vec![(format!(".es wager {}", d.key), "The Bookmaker's Wager".to_string()), (".es ladder".to_string(), "The Bookmaker's Ladder".to_string())];
         self.letter(conn, "board", &format!("The Bookmaker's Board: {}", d.name), &place, &text, "", &links);
+        Ok(())
+    }
+
+    /// A hero's rating in words, for the wager's page ("Your rating: 412, 3rd of 9"), if they have
+    /// one.
+    fn rating_words(&self, id: Id) -> Option<String> {
+        let b = self.board.as_ref()?.lock().unwrap();
+        self.rating_words_in(id, &b.ladder(), &b)
+    }
+
+    /// The same, from a ladder already built (it's sorted afresh each time otherwise).
+    fn rating_words_in(&self, id: Id, ladder: &[super::board::Rank], b: &super::board::Board) -> Option<String> {
+        let name = self.sim.players.get(&id)?.name.clone();
+        let (place, r) = b.place_in(ladder, &name)?;
+        Some(format!("Your rating on the Bookmaker's Ladder: {}, {} of {} (from {} dungeon{}).", r.rating, ordinal(place), ladder.len(), r.dungeons, if r.dungeons == 1 { "" } else { "s" }))
+    }
+
+    /// The Bookmaker's Ladder: every hero across every dungeon by their rating.
+    pub(crate) fn ui_ladder_page(&mut self, conn: ConnId, id: Id) -> Result<(), String> {
+        let board = self.board.clone().ok_or("This server keeps no board.")?;
+        // (The ladder built once for the page.)
+        let (ladder, here, mine) = {
+            let b = board.lock().unwrap();
+            let ladder = b.ladder();
+            let mine = self.rating_words_in(id, &ladder, &b);
+            (ladder, b.host.clone(), mine)
+        };
+        let me = self.sim.players.get(&id).map(|p| p.name.clone()).unwrap_or_default();
+        let mut lines: Vec<String> = ladder
+            .iter()
+            .take(20)
+            .enumerate()
+            .map(|(k, r)| {
+                let you = if r.name == me && r.host == here { "  (you)" } else { "" };
+                let class = if r.class.is_empty() { String::new() } else { format!(" ({})", title_case(&r.class)) };
+                format!("{}. {}{class} of {}: {} from {} dungeon{}{you}", k + 1, r.name, r.host, r.rating, r.dungeons, if r.dungeons == 1 { "" } else { "s" })
+            })
+            .collect();
+        if lines.is_empty() {
+            lines.push("Nobody has won a wager in time yet. The first to do it tops the ladder.".to_string());
+        }
+        let text = format!(
+            "{}\n\nA rating is each dungeon's best run in time, summed: 50, and 20 for each level, and up to 20 more for time to spare. A harder dungeon is worth a quarter more for each tier.",
+            lines.join("\n")
+        );
+        let place = match mine {
+            Some(w) => w,
+            None => "Win a wager in time to get on it".to_string(),
+        };
+        self.letter(conn, "board", "The Bookmaker's Ladder", &place, &text, "", &[]);
         Ok(())
     }
 
@@ -91,6 +145,8 @@ impl SurvivalGame {
     /// with none. `bosses`: `name~down^...`, each boss the run has to beat and whether it's down
     /// (1) yet. `forces`: `felled~needed~total`, the foes counted toward the run. `ready`, before
     /// the clock: `ready~heroes~count` (the count's seconds left, empty till everyone's ready).
+    /// `splits`: for each boss in `bosses`' order, `split~best` in seconds, the clock when it fell
+    /// and when it fell in this server's quickest run in time at this level (either empty).
     pub(crate) fn wager_line(&self) -> String {
         let Some(w) = self.sim.wager() else { return "WT".to_string() };
         let name = self.sim.content.dungeon.as_ref().map_or(String::new(), |d| d.name.clone());
@@ -103,7 +159,35 @@ impl SurvivalGame {
         let terms: Vec<&str> = terms_at(w.level).iter().map(|t| t.name).collect();
         let bosses: Vec<String> = self.sim.wager_progress().iter().map(|(n, down)| format!("{}~{}", clean(n), u8::from(*down))).collect();
         let forces = self.sim.wager_forces().map_or(String::new(), |(f, n, t)| format!("{f}~{n}~{t}"));
+        let best = self.board.as_ref().and_then(|b| b.lock().unwrap().best_splits(self.sim.content.dungeon.as_ref().map_or("", |d| d.key.as_str()), w.level));
+        // Each boss's best by its name (a dungeon's bosses may change between versions).
+        let splits: Vec<String> = self
+            .sim
+            .wager_progress()
+            .iter()
+            .zip(self.sim.wager_splits())
+            .map(|((name, _), s)| {
+                let b = best.as_ref().and_then(|b| b.iter().find(|(n, _)| n == name)).map_or(String::new(), |(_, ms)| format!("{}", ms / 1000));
+                format!("{}~{b}", s.map_or(String::new(), |s| format!("{}", s.floor())))
+            })
+            .collect();
         let ready = self.sim.wager_readiness().map_or(String::new(), |(r, n, c)| format!("{r}~{n}~{}", c.map_or(String::new(), |c| format!("{}", c.ceil()))));
-        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}\t{forces}\t{ready}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"))
+        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}\t{forces}\t{ready}\t{}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"), splits.join("^"))
     }
+}
+
+/// 1st, 2nd, 3rd, 4th...
+fn ordinal(n: usize) -> String {
+    let suffix = match (n % 10, n % 100) {
+        (1, x) if x != 11 => "st",
+        (2, x) if x != 12 => "nd",
+        (3, x) if x != 13 => "rd",
+        _ => "th",
+    };
+    format!("{n}{suffix}")
+}
+
+fn title_case(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map_or(String::new(), |f| f.to_uppercase().collect::<String>() + c.as_str())
 }

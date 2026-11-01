@@ -18,6 +18,8 @@ blurb = "Stormwind's prison, in the hands of its inmates"
 first_page = "The Stockade's gate, at the foot of the stairs from the canals. The riot is on the other side."
 welcome = "The Stockade. The inmates hold it now, Bazil Thredd at their head. Two lamps in the whole place: one at the gate, one in the guard room past Kam Deepfury. Rest at a lamp to heal, fill your Draughts (T) and send the inmates back to their cells. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): the Stockade: the middle (22 to 30).
+tier = 2
 draught = "draught"
 draughts = 3
 draughts_max = 6

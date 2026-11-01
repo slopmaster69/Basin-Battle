@@ -13,6 +13,8 @@ book = [-9511.0, 110.0]
 book_facing = 5.5
 # The camp holds its first raid before the book can be read.
 gate_raids = 0
+# How hard next to the others (1 to 3): the Deadmines: an early one (17 to 26).
+tier = 1
 draught = "draught"
 draughts = 3
 draughts_max = 6

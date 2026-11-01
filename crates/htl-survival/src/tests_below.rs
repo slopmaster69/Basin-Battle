@@ -366,10 +366,12 @@ fn the_book_at_camp_opens_after_the_first_raid_and_sends_a_hero_down() {
         |e| matches!(e, Event::Travel { player, to: Some(k) } if *player == id && k == "first")
     ));
     s.set_pages(vec!["first".into(), "second".into()]);
-    // Both of this dungeon's, and each other dungeon's first page after them.
+    // Both of this dungeon's, and each other dungeon's first page after them, the easiest first.
     let pages: Vec<String> = s.book_pages().into_iter().map(|(k, _)| k).collect();
-    assert_eq!(&pages[..3], &["first", "second", "stockade_gate"]);
-    let firsts: Vec<String> = s.content.more_dungeons.iter().map(|d| d.lamps[0].key.clone()).collect();
+    assert_eq!(&pages[..2], &["first", "second"]);
+    let mut more: Vec<&crate::content::DungeonDef> = s.content.more_dungeons.iter().collect();
+    more.sort_by_key(|d| d.tier);
+    let firsts: Vec<String> = more.iter().map(|d| d.lamps[0].key.clone()).collect();
     assert_eq!(pages[2..].to_vec(), firsts);
     let books = s.book_dungeons();
     assert_eq!(books[0].key, "deadmines");
@@ -1176,6 +1178,27 @@ fn a_wager_won_at_eight_pays_keen_gear_into_the_camps_chest() {
 }
 
 #[test]
+fn a_harder_dungeons_foes_are_tougher_by_its_tier_and_the_book_lists_the_easiest_first() {
+    use crate::content::{TIER_DAMAGE, TIER_HEALTH};
+    let c = Content::builtin();
+    for (key, tier) in [("ragefire", 1u32), ("stockade", 2), ("cathedral", 3)] {
+        assert_eq!(c.dungeons().find(|d| d.key == key).unwrap().tier, tier);
+        let s = Survival::new_dungeon(c.for_dungeon_of(key), Box::new(FlatLand::default()), 3, 1_000_000.0);
+        let (id, m) = s.mobs.iter().find(|(_, m)| !s.content.mobs[m.def].boss && !s.content.mobs[m.def].critter).map(|(id, m)| (*id, m)).unwrap();
+        let d = &s.content.mobs[m.def];
+        let past = (tier - 1) as f32;
+        let want = (d.health as f32 * s.content.combat.foe_health * (1.0 + TIER_HEALTH * past)).round();
+        assert!((m.max_health as f32 - want).abs() <= 1.0, "{key}: {} vs {want}", m.max_health);
+        let base = s.attack_now(id).damage as f32;
+        let plain = d.attack.damage as f32 * (1.0 + TIER_DAMAGE * past);
+        assert!((base - plain.round()).abs() <= 1.0, "{key}: {base} vs {plain}");
+    }
+    let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let tiers: Vec<u32> = s.book_dungeons().iter().map(|b| b.tier).collect();
+    assert!(tiers.windows(2).all(|w| w[0] <= w[1]) && tiers.first() == Some(&1) && tiers.last() == Some(&3), "{tiers:?}");
+}
+
+#[test]
 fn a_sets_words_count_its_pieces_not_their_honed_copies() {
     let c = Content::builtin();
     let s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
@@ -1193,6 +1216,32 @@ fn a_sets_words_count_its_pieces_not_their_honed_copies() {
 }
 
 #[test]
+fn a_wager_keeps_each_bosses_split_as_it_falls() {
+    let mut s = below();
+    s.start_wager(1);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.2);
+    assert_eq!(s.wager_splits(), vec![None], "the boss still up");
+    run(&mut s, 2.0);
+    let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
+    s.hurt_mob(boss, id, 10_000_000);
+    run(&mut s, 0.2);
+    let split = s.wager_splits()[0].expect("its split");
+    assert!((2.0..4.0).contains(&split), "{split}");
+    // On with the count: the run's splits go with it.
+    let g = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].mob == "grunt")).unwrap().0;
+    run(&mut s, 1.0);
+    s.hurt_mob(g, id, 10_000_000);
+    let ev = run(&mut s, 0.2);
+    let done = ev.iter().find_map(|e| if let Event::WagerDone(r) = e { Some(r.clone()) } else { None }).expect("won");
+    assert_eq!(done.splits.len(), 1);
+    assert_eq!(done.splits[0].1, (split * 1000.0).round() as u64, "the split as it fell, not the end");
+    assert!(done.ms > done.splits[0].1);
+}
+
+#[test]
 fn a_hero_who_never_readies_holds_the_count_only_so_long() {
     use crate::sim::wager::WAGER_READY_WAIT;
     let mut s = below();
@@ -1206,4 +1255,31 @@ fn a_hero_who_never_readies_holds_the_count_only_so_long() {
     s.wall_start += WAGER_READY_WAIT;
     run(&mut s, 0.2);
     assert!(s.wager_readiness().unwrap().2.is_some(), "then the count starts anyway");
+}
+
+#[test]
+fn a_harder_dungeons_won_wager_pays_more_plunder_by_its_tier() {
+    use crate::content::TIER_PLUNDER;
+    use crate::sim::wager::{wager_bosses, wager_forces_needed};
+    let paid = |key: &str| -> u32 {
+        let c = Content::builtin().for_dungeon_of(key);
+        let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+        s.start_wager(1);
+        let id = s.join("ayla", "Ayla", None);
+        run(&mut s, 0.2);
+        let d = s.content.dungeon.clone().unwrap();
+        let plunder = s.content.item(&d.plunder).unwrap();
+        let before = s.players[&id].bag.get(&plunder).copied().unwrap_or(0);
+        let (needed, bosses, wall) = (wager_forces_needed(&d, &s.content), wager_bosses(&d, &s.content), s.wall());
+        let b = s.below.as_mut().unwrap();
+        b.slain.extend(bosses);
+        let w = b.wager.as_mut().unwrap();
+        w.started = Some(wall);
+        w.forces = needed;
+        run(&mut s, 0.2);
+        s.players[&id].bag.get(&plunder).copied().unwrap_or(0) - before
+    };
+    let (first, third) = (paid("ragefire"), paid("cathedral"));
+    assert_eq!(first, 9, "6 + 3 at +1");
+    assert_eq!(third, (9.0 * (1.0 + 2.0 * TIER_PLUNDER)).round() as u32, "a tier-3 dungeon pays half again");
 }
