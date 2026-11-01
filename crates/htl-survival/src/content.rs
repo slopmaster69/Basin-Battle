@@ -870,6 +870,15 @@ pub struct ItemDef {
 /// wager, its name, how much better: weapons' damage, armour's share off a blow, perks).
 /// Every piece the dungeons' foes carry has a honed copy of each tier.
 pub const HONE_TIERS: [(u32, &str, f32); 3] = [(4, "Honed", 1.12), (8, "Keen", 1.25), (12, "Peerless", 1.4)];
+/// What a honed tier adds besides its share (from Keen on, each worn piece of that tier or finer
+/// counts): a parry gives back this much breath for each Keen piece (up to the most), and a
+/// dodge through a creature's blow throws it off balance this long (open to a riposte) with any
+/// Peerless piece on. First guesses, to try in play.
+pub const KEEN_BREATH: f32 = 8.0;
+pub const KEEN_BREATH_MOST: f32 = 24.0;
+pub const PEERLESS_STAGGER: f32 = 0.8;
+/// The trick a tier adds, said on the piece (none for the first).
+pub const HONE_TRICKS: [&str; 3] = ["", " Keen: a parry gives back breath.", " Peerless: a parry gives back breath, and a dodge through a blow throws the foe off balance."];
 
 /// A dungeon tier's foes past the first: this much more health, and their blows this much harder,
 /// a tier. (Ragefire's trash and the Cathedral's were all but alike; a first pass to try in play.)
@@ -2402,7 +2411,7 @@ impl Content {
                 for p in &mut h.perks {
                     p.amount *= by;
                 }
-                h.text = format!("{} {name} by the Bookmaker (a wager won at +{at} or higher): {}% better.", item.text, ((by - 1.0) * 100.0).round());
+                h.text = format!("{} {name} by the Bookmaker (a wager won at +{at} or higher): {}% better.{}", item.text, ((by - 1.0) * 100.0).round(), HONE_TRICKS[t]);
                 self.items.push(h);
                 if let Some(w) = &weapon {
                     let mut hw = w.clone();

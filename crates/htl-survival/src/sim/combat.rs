@@ -1618,6 +1618,7 @@ impl Survival {
             Outcome::Dodged if !dashing && damage > 0 => self.gain_valor(victim, c.valor.roll),
             _ => {}
         }
+        self.honed_tricks(attacker, victim, outcome, damage > 0 && !dashing);
         // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
@@ -1682,6 +1683,29 @@ impl Survival {
             self.hurt_player(victim, landed);
         }
         outcome
+    }
+
+    /// Honed gear's tricks on a blow just answered: Keen pieces give back breath on a parry,
+    /// a Peerless piece throws a creature off balance when its blow is dodged.
+    fn honed_tricks(&mut self, attacker: Id, victim: Id, outcome: Outcome, real: bool) {
+        use crate::content::{KEEN_BREATH, KEEN_BREATH_MOST, PEERLESS_STAGGER};
+        let Some(p) = self.players.get(&victim) else { return };
+        let gear = self.gear_on(p);
+        let keen = gear.iter().filter(|i| self.content.items[**i].hone >= 2).count() as f32;
+        let peerless = gear.iter().any(|i| self.content.items[*i].hone >= 3);
+        match outcome {
+            Outcome::Parried if keen > 0.0 => {
+                let most = self.content.player.stamina;
+                let p = self.players.get_mut(&victim).unwrap();
+                p.stamina = (p.stamina + (KEEN_BREATH * keen).min(KEEN_BREATH_MOST)).min(most);
+                self.events.push(Event::Stamina { player: victim });
+            }
+            Outcome::Dodged if peerless && real && self.mobs.get(&attacker).is_some_and(|m| m.health > 0) => {
+                self.stagger_mob(attacker, PEERLESS_STAGGER, true);
+                self.events.push(Event::Flash { player: victim, text: "Off balance!".into() });
+            }
+            _ => {}
+        }
     }
 
     /// Their client jumped: it costs stamina (the add-on won't jump without enough). Taken in a
