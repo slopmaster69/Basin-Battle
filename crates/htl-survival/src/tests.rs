@@ -1196,7 +1196,9 @@ fn two_handed_weapons_guard_with_themselves_and_sweep_wider() {
 fn a_crossbow_shoots_at_once_and_reloads_long() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    take_up(&mut s, p, "crossbow");
+    // (Not from the rack any more: bows are off it.)
+    let crossbow = s.content.item("crossbow").unwrap();
+    s.players.get_mut(&p).unwrap().bow = crossbow;
     let k = mob(&mut s, "boar", [12.0, 0.0, 0.0]);
     let _ = s.slot_ability(p, "ranged", "aimed_shot");
     s.input(p, SHOT);
@@ -1217,7 +1219,13 @@ fn the_rack_arms_heroes_only_at_the_rack() {
     assert_eq!(c.items[s.players[&p].weapon].key, "halberd");
     let view = s.rack_view(p);
     assert!(view.iter().any(|(k, _, kind, held, _)| k == "halberd" && *kind == "two-handed" && *held));
-    assert!(view.iter().any(|(k, _, kind, _, _)| k == "crossbow" && *kind == "ranged"));
+    assert!(view.iter().any(|(_, _, kind, _, _)| *kind == "shield"), "shields are there");
+    // No bows or crossbows: ranged fighting is off the board.
+    let ranged = |k: &str| c.item(k).is_some_and(|i| c.items[i].kind == crate::content::ItemKind::Bow);
+    assert!(!view.iter().any(|(k, ..)| ranged(k)), "no bows on the rack: {:?}", view.iter().map(|v| &v.0).collect::<Vec<_>>());
+    assert!(!view.iter().any(|(_, _, kind, _, _)| *kind == "ranged"));
+    assert!(s.arm(p, "crossbow").is_err(), "nor taken from it by name");
+    assert!(s.arm(p, "bow").is_err());
 }
 
 // --- heroes against heroes, sprinting -----------------------------------------------------------------
