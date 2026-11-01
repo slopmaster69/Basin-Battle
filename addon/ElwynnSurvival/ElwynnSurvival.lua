@@ -3403,16 +3403,31 @@ banner.sub = Text(banner, FONT_BODY, 14, "OUTLINE")
 banner.sub:SetPoint("TOP", banner.title, "BOTTOM", 0, -6)
 
 function ES.Banner(title, sub)
+  -- A place found or a journal goal done is quiet news, told the way the game tells it: a yellow
+  -- line at the top in its own font, like a quest's progress. No banner, no horn (those are for
+  -- what's coming at you). The server's titles start "Discovered: " and "Done: " (explore.rs,
+  -- journal.rs).
+  local t = title or ""
+  if string.find(t, "^Discovered") or string.find(t, "^Done: ") then
+    local line
+    if string.find(t, "^Done: ") then
+      line = string.sub(t, 7) .. " completed."
+    else
+      line = t .. ((sub and sub ~= "") and (" (" .. sub .. ")") or "")
+    end
+    if UIErrorsFrame then
+      UIErrorsFrame:AddMessage(line, 1.0, 0.82, 0.0)
+    else
+      ES.Message(line)
+    end
+    return
+  end
   banner.title:SetText(title)
   banner.sub:SetText(ES.Keyed(sub or ""))
   banner.untilT = GetTime() + 4.5
   banner:SetAlpha(1)
   banner:Show()
-  -- The horn for what's coming at you; a place found or a goal done is quieter news.
-  local t = title or ""
-  if string.find(t, "^Discovered") then
-    Play("open")
-  elseif string.find(t, "^Done") or string.find(t, "^Everyone Ready") or string.find(t, "^Victory") then
+  if string.find(t, "^Everyone Ready") or string.find(t, "^Victory") then
     Play("done")
   else
     Play("raid")
@@ -4756,8 +4771,6 @@ local function Open(what)
     elseif GameMenuFrame then
       if GameMenuFrame:IsShown() then HideUIPanel(GameMenuFrame) else ShowUIPanel(GameMenuFrame) end
     end
-  elseif what == "help" then
-    if ToggleHelpFrame then ToggleHelpFrame() end
   elseif what == "keys" then
     ES.ToggleKeys()
   end
@@ -4772,7 +4785,6 @@ local BAR = {
   { "map", "Map", "INV_Misc_Map_01", "M" },
   { "keys", "Controls", "INV_Misc_Key_03", "" },
   { "menu", "Game Menu", "INV_Misc_Gear_01", "Esc" },
-  { "help", "Help", "INV_Misc_QuestionMark", "" },
 }
 local bar = CreateFrame("Frame", "ElwynnSurvivalBar", UIParent)
 bar:SetWidth(table.getn(BAR) * (BAR_ICON + 6))

@@ -279,9 +279,12 @@ impl SurvivalGame {
                 // Everyone else sees them at their new pace (a sprint, a dash).
                 self.broadcast_except(c, &packets::spline_speed(g, false, speed));
                 self.broadcast_except(c, &packets::spline_speed(g, true, back));
-                // A client running its own dodge needs no burst for it.
+                // A client running its own dodge needs no burst for it, but only the burst: the
+                // speed after it (a run where a sprint was) must reach it, or it keeps sprinting
+                // while the sim, sure it was told, stops charging stamina for it.
                 let local = self.world_of(c).is_some_and(|w| w.local);
-                let dashing = matches!(self.sim.players.get(&player).map(|p| &p.action), Some(htl_survival::Action::Dodge { dash: true, .. }));
+                let dash_secs = self.sim.content.dodge.dash_secs;
+                let dashing = matches!(self.sim.players.get(&player).map(|p| &p.action), Some(htl_survival::Action::Dodge { t, dash: true, .. }) if *t < dash_secs);
                 if local && dashing {
                     return;
                 }
