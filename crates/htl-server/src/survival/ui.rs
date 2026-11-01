@@ -40,7 +40,7 @@
 //! - `RO\t<guid>\t<secs>\t<mine>`: a hero rolls (a dodge).
 //!
 //! And to the third round (`ac3`), which runs its own dashes and lunges:
-//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<friendly fire>`:
+//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<friendly fire>\t<out of a dodge>\t<out of a Corey roll>`:
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
 //! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
 //!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
@@ -513,13 +513,15 @@ impl SurvivalGame {
         let light: Vec<String> = (0..set.light.len()).map(|k| mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Light, k))).collect();
         let heavy = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Heavy, 0));
         let running = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Running, 0));
+        let roll = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Roll, 0));
+        let leap = mv(&self.sim.strike_at(id, htl_survival::StrikeKind::Leap, 0));
         let shove = |d: &htl_survival::content::ShoveDef| {
             let impact = d.windup + d.active * 0.5;
             format!("{}~0~{impact:.3}~{:.3}~{:.2}~{:.1}~{:.2}~{:.0}", d.clip, d.windup + d.active + d.recovery - impact, d.lunge, d.stamina, d.range, d.arc)
         };
         let k = &c.combat;
         Some(format!(
-            "MV\t{}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.1}\t{:.2}\t{}\t{heavy}\t{running}\t{}\t{}\t{}",
+            "MV\t{}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.1}\t{:.2}\t{}\t{heavy}\t{running}\t{}\t{}\t{}\t{roll}\t{leap}",
             u8::from(w.two_handed),
             k.chain_after,
             k.cancel_after,

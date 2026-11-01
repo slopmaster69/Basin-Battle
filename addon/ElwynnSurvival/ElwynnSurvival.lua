@@ -541,7 +541,12 @@ function ES.MovesLine(f)
   end
   -- Another model's clips start loading now, so the first blow already has them.
   if PreloadAnimationSource then
-    local all = { Move(f[12]), Move(f[13]) }
+    -- (The heavy, running, bash and kick blows, then those out of a dodge and a Corey roll.)
+    local all = {}
+    for _, k in ipairs({ 12, 13, 14, 15, 17, 18 }) do
+      local m = Move(f[k])
+      if m then table.insert(all, m) end
+    end
     for i = 1, table.getn(light) do table.insert(all, light[i]) end
     for i = 1, table.getn(all) do
       if all[i] and all[i].from then PreloadAnimationSource(all[i].from) end
@@ -563,6 +568,8 @@ function ES.MovesLine(f)
     bash = Move(f[14]),
     kick = Move(f[15]),
     pvp = f[16] == "1",
+    roll = Move(f[17]),
+    leap = Move(f[18]),
   }
 end
 

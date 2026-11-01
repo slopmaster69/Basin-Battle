@@ -924,7 +924,7 @@ fn the_fourth_round_client_flashes_its_own_blows_and_others_see_the_flash_and_it
     a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("MV\t")));
     let mv = addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("MV\t")).expect("the moves line");
     let f: Vec<&str> = mv.split('\t').collect();
-    assert_eq!(f.len(), 16, "{mv}");
+    assert_eq!(f.len(), 18, "{mv}");
     assert_eq!(f[15], "1", "friendly fire");
     // (Each blow: clip, take, impact, recovery, lunge, stamina, range, arc, and the model its
     // clip comes from, empty for her own.)
