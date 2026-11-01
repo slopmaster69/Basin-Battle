@@ -736,20 +736,17 @@ impl Survival {
             }
             return;
         }
-        // Sprinting: Shift held, moving, nothing else in hand, stamina to spend.
+        // Sprinting: Shift held, moving (and not walking), nothing else in hand, stamina to spend.
+        // No look or sound of its own: the pace and the run animation say it (as with the dodge).
         {
             let p = &self.players[&id];
             let moving = p.moving.forward || p.moving.back || p.moving.left || p.moving.right;
             // Run dry, it stops; it starts again only with some stamina back.
             let enough = if p.sprinting { p.stamina > c.player.exhausted_below } else { p.stamina >= c.player.sprint_restart.max(c.player.exhausted_below) };
-            let want = p.sprint_held && moving && matches!(p.action, Action::Ready) && enough;
+            let want = p.sprint_held && moving && !p.moving.walk && matches!(p.action, Action::Ready) && enough;
             if want != p.sprinting {
                 let p = self.players.get_mut(&id).unwrap();
                 p.sprinting = want;
-                if want && now - p.sprint_look_at >= SPRINT_LOOK_EVERY {
-                    p.sprint_look_at = now;
-                    self.events.push(Event::Missile { caster: id, spell: SPRINT_SPELL, target: Target::Unit(id) });
-                }
                 self.update_speed(id);
             }
             if want {
@@ -2114,10 +2111,9 @@ const SWITCH_ARC: f32 = 110.0;
 /// A lock holds until its target is this many times the lock's reach away.
 const LOCK_HOLD: f32 = 1.3;
 
-/// Sprint's look and sound, as it starts.
+/// The Rogue's Sprint (its whoosh and trail), which a sprint no longer casts: kept so the tests
+/// can say it doesn't.
 pub const SPRINT_SPELL: u32 = 2983;
-/// Sprint's look and sound play at most this often (seconds).
-const SPRINT_LOOK_EVERY: f32 = 4.0;
 
 /// The meal's cast look (eating), and the burst when it's done.
 pub const EAT_SPELL: u32 = 433;

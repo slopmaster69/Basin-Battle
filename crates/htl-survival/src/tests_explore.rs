@@ -259,7 +259,7 @@ loot = { silver = 2 }
     s.move_player(p, [45.0, 0.0, 0.0], 0.0, Moving::default());
     let ev = run(&mut s, 0.2);
     assert!(chest_obj(&s, "stash").is_some(), "come upon");
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "A secret!")));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Banner { .. })), "quietly: no banner and horn");
     assert_eq!(s.camp.counts.get("secret:any"), Some(&1));
     open(&mut s, p, "stash");
     assert_eq!(s.players[&p].bag.get(&silver), Some(&2));

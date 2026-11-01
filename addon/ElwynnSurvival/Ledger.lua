@@ -498,14 +498,11 @@ local function PocketSlot(s, inset)
   s.icon:ClearAllPoints()
   s.icon:SetPoint("TOPLEFT", s, "TOPLEFT", inset, -inset)
   s.icon:SetPoint("BOTTOMRIGHT", s, "BOTTOMRIGHT", -inset, inset)
-  s.frame:SetTexture(A .. "micro_frame")
-  Recolor(s.frame, function(r, g, b, a, t)
-    if r and r > 0.95 then
-      t:SetTexture(A .. "micro_frame_hover")
-      return 1, 1, 1, 1
-    end
-    t:SetTexture(A .. "micro_frame")
-    return 1, 1, 1, math.min(1, (a or 1) + 0.1)
+  -- A thin inked rim in brass, not the thick brass-cornered frame: the icon shows whole.
+  s.frame:SetTexture(A .. "icon_frame_ink")
+  Recolor(s.frame, function(r, g, b, a)
+    if r and r > 0.95 then return CREAM[1], CREAM[2], CREAM[3], 1 end
+    return BRASS[1], BRASS[2], BRASS[3], math.min(1, (a or 1) + 0.1)
   end)
   if type(s.key) == "table" then
     Refont(s.key)
@@ -971,22 +968,10 @@ local function SkinHud()
     end
   end
 
-  local gear = ElwynnSurvivalGear
-  if gear and not gear.ledger then
-    gear.ledger = true
-    gear.hub:SetTexture(A .. "seal_grey")
-    gear.hub:SetWidth(20)
-    gear.hub:SetHeight(20)
-    Recolor(gear.hub, function() return 1, 1, 1, 0.95 end)
-    for _, k in ipairs({ "up", "left", "right", "down" }) do PocketSlot(gear[k], 6) end
-    Cream(gear.weaponName, SERIF, 14)
-    Cream(gear.quickName, SERIF, 12)
-  end
-
   local bar = ElwynnSurvivalBar
   if bar and not bar.ledger then
     bar.ledger = true
-    for _, k in ipairs({ "bag", "character", "map", "keys", "menu", "help" }) do
+    for _, k in ipairs({ "bag", "character", "map", "keys", "menu" }) do
       local b = bar[k]
       if b then PocketSlot(b, 3) end
     end
@@ -1045,14 +1030,11 @@ local function SkinHud()
   local np = ElwynnSurvivalPrompt
   if np and not np.ledger then
     np.ledger = true
-    np.band:SetTexture(A .. "scrap_note_c")
-    np.band:ClearAllPoints()
-    np.band:SetPoint("TOPLEFT", np, "TOPLEFT", -12, 4)
-    np.band:SetPoint("BOTTOMRIGHT", np, "BOTTOMRIGHT", 12, -4)
-    Recolor(np.band, function() return 1, 1, 1, 0.85 end)
-    Ink(np.text)
-    Face(np.text, SERIF, 16)
-    np.text:SetTextColor(1, 1, 1)
+    -- No paper behind it (it's up whenever anything is in reach): the words straight over the
+    -- world, cream with a dark outline, beside the key's seal.
+    Retire(np.band)
+    Cream(np.text, SERIF, 16)
+    np.text:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
     local k = np.key
     Retire(k.well)
     k.frame:SetTexture(A .. "seal_red")
@@ -1134,17 +1116,12 @@ local function SkinHud()
   local feed = ElwynnSurvivalFeed
   if feed and not feed.ledger then
     feed.ledger = true
+    -- No paper strip under every kill: the names straight over the world.
     for i = 1, table.getn(feed.rows) do
       local r = feed.rows[i]
-      r.bg:SetTexture(A .. "feed_strip")
-      r.bg:ClearAllPoints()
-      r.bg:SetPoint("TOPLEFT", r, "TOPLEFT", 60, 3)
-      r.bg:SetPoint("BOTTOMRIGHT", r, "BOTTOMRIGHT", 14, -3)
-      Recolor(r.bg, function() return 1, 1, 1, 0.95 end)
-      Ink(r.killer)
-      Face(r.killer, SERIF, 14)
-      Ink(r.victim)
-      Face(r.victim, SERIF, 14)
+      Retire(r.bg)
+      Cream(r.killer, SERIF, 14)
+      Cream(r.victim, SERIF, 14)
     end
   end
 
@@ -1193,27 +1170,20 @@ local function SkinHud()
   local death = ElwynnSurvivalDown
   if death and death.bg and not death.ledger then
     death.ledger = true
-    death.bg:SetTexture(A .. "torn_banner")
-    death.bg:ClearAllPoints()
-    death.bg:SetPoint("CENTER", death, "CENTER", 0, 0)
-    death.bg:SetWidth(900)
-    death.bg:SetHeight(210)
-    Recolor(death.bg, function() return 0.92, 0.85, 0.75, 1 end)
-    death.shade = Tex(death, "BACKGROUND", "paper_vignette")
-    death.shade:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
-    death.shade:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", 0, 0)
-    death.shade:SetVertexColor(0.12, 0.05, 0.03, 0.95)
-    death.shade:SetDrawLayer("BACKGROUND")
+    -- No banner and no paper over the screen: the words and the blood over the world.
+    Retire(death.bg)
     death.splat = Tex(death, "BORDER", "ink_splat_b")
     death.splat:SetWidth(260)
     death.splat:SetHeight(260)
     death.splat:SetPoint("CENTER", death, "CENTER", -260, 6)
-    death.splat:SetVertexColor(0.5, 0.05, 0.03, 0.38)
-    Ink(death.title)
-    Face(death.title, TITLE, 50)
-    death.title:SetTextColor(1, 0.2, 0.2)
-    Ink(death.sub)
-    Face(death.sub, SERIF, 17)
+    death.splat:SetVertexColor(0.5, 0.05, 0.03, 0.55)
+    Refont(death.title)
+    Face(death.title, TITLE, 50, "OUTLINE")
+    death.title:SetShadowColor(0, 0, 0, 0.9)
+    death.title:SetShadowOffset(2, -2)
+    death.title:SetTextColor(0.85, 0.12, 0.1)
+    Cream(death.sub, SERIF, 17)
+    death.sub:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
   end
 end
 L.SkinHud = SkinHud
@@ -1321,6 +1291,20 @@ local function SkinDock()
   local dock, abar = ElwynnSurvivalDock, ElwynnSurvivalAbilities
   if not dock or not abar or dock.ledger then return end
   dock.ledger = true
+  -- The quick item beside the keys: a pocket like the buttons at the bottom right.
+  if dock.quick then
+    PocketSlot(dock.quick, 4)
+    -- How many are left, big enough to read over the icon (the stock face came out as two dots).
+    local n = dock.quick.count
+    n:ClearAllPoints()
+    n:SetPoint("BOTTOMRIGHT", dock.quick, "BOTTOMRIGHT", -3, 3)
+    n:SetWidth(40)
+    n:SetJustifyH("RIGHT")
+    n.ledgerKeep = true
+    Face(n, BODY, 17, "OUTLINE")
+    n:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
+    if n.SetDrawLayer then n:SetDrawLayer("OVERLAY") end
+  end
   -- The leather strap behind the keys alone (the bars above sit on the world).
   if dock.plate then Retire(dock.plate) end
   local strap = CreateFrame("Frame", nil, dock)
