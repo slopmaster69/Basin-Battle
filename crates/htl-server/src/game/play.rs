@@ -353,6 +353,14 @@ impl Game {
                     }
                 }
             }
+            Event::Proc { player, name, icon } => {
+                if let Some(conn) = self.conn_of(player) {
+                    if self.has_addon(conn) {
+                        let line = format!("PR~{}~{}", name.replace(['~', '\n'], " "), self.spell_icon(icon));
+                        self.ui_line(conn, &line);
+                    }
+                }
+            }
             Event::Bar { player } => {
                 if let Some(conn) = self.conn_of(player) {
                     if self.has_addon(conn) {
@@ -360,11 +368,19 @@ impl Game {
                     }
                 }
             }
-            Event::EnemyCast { caster, name, spell, ms, warn, endangered, big } => {
+            Event::EnemyCast { caster, name, spell, ms, warn, endangered, big, interruptible } => {
                 if let Some(guid) = self.guid(caster) {
                     self.broadcast(&packets::spell_start(guid, spell, ms, Aim::Caster));
                 }
-                self.ui_enemy_cast(caster, &name, ms, &warn, &endangered, big);
+                self.ui_enemy_cast(caster, &name, ms, &warn, &endangered, big, interruptible);
+            }
+            Event::CastInterrupted { caster, spell } => {
+                if let Some(guid) = self.guid(caster) {
+                    self.broadcast(&packets::spell_failed_other(guid, spell));
+                }
+                for c in self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect::<Vec<_>>() {
+                    self.ui_line(c, "XI~");
+                }
             }
             Event::Tell { player, text } => {
                 self.to_player(player, packets::chat(packets::CHAT_SYSTEM, packets::LANG_UNIVERSAL, 0, &text));

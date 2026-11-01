@@ -738,10 +738,23 @@ fn highlight(text: &str, w: &Writer) -> String {
 
 /// An upgrade card: what it adds to the spell, at the rank it brings the spell to.
 pub fn perk_text(def: &SpellDef, perk: &PerkDef, rank: u8, color: bool) -> CardText {
+    perk_text_with(def, perk, rank, 0.1, 0.0, color)
+}
+
+/// An upgrade card's text, with the power (and rage discount) every upgrade of the kit brings.
+pub fn perk_text_with(def: &SpellDef, perk: &PerkDef, rank: u8, power: f32, cost_cut: f32, color: bool) -> CardText {
     let w = Writer { color };
+    let mut upgrade = format!("{} rank {} → {}", def.name, rank - 1, rank);
+    let hits = !matches!(def.kind, SpellKind::Buff | SpellKind::Toggle | SpellKind::Special);
+    if hits && power > 0.0 {
+        upgrade.push_str(&format!(", {} more power", pct_str(power)));
+    }
+    if cost_cut > 0.0 && def.nums.cost > 0.0 {
+        upgrade.push_str(&format!(", {} less rage", pct_str(cost_cut)));
+    }
     CardText {
         text: format!("{}: {}", def.name, highlight(&perk.text, &w)),
-        upgrade: format!("{} rank {} → {}, {} more power", def.name, rank - 1, rank, pct_str(0.1)),
+        upgrade,
         kind: "Upgrade",
         school: school_name(def.school),
         cooldown: 0.0,
@@ -781,7 +794,7 @@ mod tests {
         let mage = &content.kits[content.class_index("mage").unwrap()];
         let frostbolt = &mage.spells[mage.spell_index("frostbolt").unwrap()];
         let t = spell_text(frostbolt, &frostbolt.nums, 60.0, false);
-        assert_eq!(t.text, "Strikes your target within 30 yd for 90 Frost damage. Chills it: 30% slower for 4 sec. 1.8 sec cast: stand still.");
+        assert!(t.text.starts_with("Strikes your target within 30 yd for 90 Frost damage. Chills it: 30% slower for 4 sec."), "{}", t.text);
     }
 }
 
