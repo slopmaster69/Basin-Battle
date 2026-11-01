@@ -76,7 +76,8 @@ kind = "hidden"
 at = [1205.5, 1397.5, 29.0]
 find = 4.0
 reveals = ["fairbanks"]
-text = "the door behind the altar was never locked from the outside. The thing behind it stands up."
+# #27: the Crusade barred him in (his own lines and the page say so).
+text = "the door behind the altar was barred from this side, and the bar comes away in your hands. The thing behind it stands up."
 page = "The black candles have burned down to stubs and been lit again, many times, by someone on this side of the door. Words have been scratched into the flagstone at its foot, as if pushed out through the gap beneath it with a nail.{n}{n}I saw what stands in the Grand Crusader's shadow. It is not a man. Whitemane knows. Mograine does not.{n}{n}They shut the door on me and told me to pray. I have prayed. My candle has gone out. It is dark in here now.{n}{n}It is not so bad, the dark. It listens.{n}{n}Beyond the door, something rises, slowly, the way a man gets up after kneeling a very long while."
 
 # The courtyard's west chapel: the Crusade's reliquary, and a shard of something that burned.
