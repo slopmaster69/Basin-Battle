@@ -96,7 +96,8 @@ impl SurvivalGame {
                     // moment) and the recovery after, how far it lunges, and its kind.
                     let clip = self.sim.players.get(&attacker).and_then(|p| match &p.action {
                         htl_survival::Action::Swing { strike, .. } => {
-                            let heavy = strike.heavy() || strike.shove();
+                            // A leap out of a Corey roll lands as heavily as a heavy attack looks.
+                            let heavy = strike.heavy() || strike.shove() || strike.kind == htl_survival::StrikeKind::Leap;
                             let trail = if heavy { HEAVY_TRAIL } else { LIGHT_TRAIL };
                             let impact = strike.windup + strike.active * 0.5;
                             let ms = ((strike.windup + strike.active + 0.15) * 1000.0) as u32;
@@ -104,6 +105,8 @@ impl SurvivalGame {
                                 htl_survival::StrikeKind::Light => "light",
                                 htl_survival::StrikeKind::Heavy => "heavy",
                                 htl_survival::StrikeKind::Running => "running",
+                                htl_survival::StrikeKind::Roll => "roll",
+                                htl_survival::StrikeKind::Leap => "leap",
                                 htl_survival::StrikeKind::Bash => "bash",
                                 htl_survival::StrikeKind::Kick => "kick",
                             };

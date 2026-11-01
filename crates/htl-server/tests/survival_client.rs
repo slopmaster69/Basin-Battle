@@ -1543,3 +1543,47 @@ fn a_client_running_its_own_dodge_is_told_its_run_again_after_a_sprinting_roll()
     assert!(told.is_some(), "told it runs again: {speeds:?}");
     assert!(!c.seen[mark..].iter().any(|p| run(p, 14.0, 100.0)), "the burst itself is the client's: {speeds:?}");
 }
+
+#[test]
+fn a_corey_roll_out_of_the_clients_own_jump_strikes_as_it_lands() {
+    let server = start_with(None, false);
+    let mut c = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut c);
+    c.chat(".es hello 5 ac3");
+    c.drain(0.5);
+    let here = [-9500.0, 0.0, 0.0];
+    moving(&mut c, here, 0.0, 0x1);
+    // A roll forward, and the jump taken in its dash (the client's own: its JUMP and its landing).
+    c.chat(".es in d");
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    let mut jump = Vec::new();
+    jump.extend_from_slice(&0x2001u32.to_le_bytes());
+    jump.extend_from_slice(&0u32.to_le_bytes());
+    for v in here {
+        jump.extend_from_slice(&v.to_le_bytes());
+    }
+    jump.extend_from_slice(&0f32.to_le_bytes());
+    jump.extend_from_slice(&0u32.to_le_bytes());
+    c.send(op::MSG_MOVE_JUMP, &jump);
+    c.drain(0.5);
+    // An attack in the air: nothing yet.
+    c.chat(".es in a");
+    c.chat(".es in au");
+    c.drain(0.3);
+    let swung = |c: &Client| addon_lines(c, "ES").into_iter().filter(|l| l.starts_with("AN\t") && l.split('\t').nth(10) != Some("mob")).collect::<Vec<_>>();
+    assert!(swung(&c).is_empty(), "nothing swings in the air: {:?}", swung(&c));
+    // Down: the leap strikes, heavy.
+    let mut land = Vec::new();
+    land.extend_from_slice(&0x1u32.to_le_bytes());
+    land.extend_from_slice(&0u32.to_le_bytes());
+    for v in [here[0] + 9.0, here[1], here[2]] {
+        land.extend_from_slice(&v.to_le_bytes());
+    }
+    land.extend_from_slice(&0f32.to_le_bytes());
+    land.extend_from_slice(&700u32.to_le_bytes());
+    c.send(op::MSG_MOVE_FALL_LAND, &land);
+    c.drain(0.4);
+    let lines = swung(&c);
+    let leap = lines.iter().find(|l| l.split('\t').nth(10) == Some("leap")).unwrap_or_else(|| panic!("the leap on landing: {lines:?}"));
+    assert_eq!(leap.split('\t').nth(4), Some("78FF9A3C"), "with a heavy blow's trail: {leap}");
+}
