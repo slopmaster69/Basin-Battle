@@ -1093,6 +1093,8 @@ impl Survival {
                 if returns || sticks {
                     p.pos = t.point;
                     if returns {
+                        // Off the wall a little first, so its way back doesn't start in it.
+                        p.pos = add(t.point, p.dir, -0.6);
                         self.turn_back(&mut p);
                     } else {
                         self.stick(&mut p, None);

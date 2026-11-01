@@ -4169,11 +4169,12 @@ linger = 3.0
 linger_damage = 5.0
 # 22 + half the burn's 15 is 29.5 a cast, 7.4 a second.
 cooldown = 4.0
-# A boulder hurled (its throw pose comes with it), a pillar of fire where it lands (Flamestrike)
-# and the ground glowing hot after (Heated Ground, as Meteor's crater).
+# A boulder hurled (its throw pose comes with it), a fiery burst where it lands and the ground
+# burning after (the Explosive Trap's own fire: played, Flamestrike's pillar and Heated Ground were
+# each many times the burst's 3 yd and hid the fight).
 spell = 9483
-burst_spell = 2120
-linger_spell = 22191
+burst_spell = 5162
+linger_spell = 13812
 
 [[ability]]
 key = "chain_lightning"
