@@ -2,8 +2,11 @@
 -- screen: the level and the dungeon, the time against the time to beat (gold while there's room,
 -- red once it's over), the falls and what they've cost, and the wager's terms.
 --
--- The server sends `WT name level elapsed limit falls state terms` (state: wait, run, won, over),
--- and a bare `WT` when there's no wager.
+-- Under them, the bosses the run has to beat, each crossed off as it falls, so you know what's
+-- left and when it ends.
+--
+-- The server sends `WT name level elapsed limit falls state terms bosses` (state: wait, run, won,
+-- over; bosses `name~down^...`, missing from older servers), and a bare `WT` when there's no wager.
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
 local ES = ElwynnSurvival
@@ -46,6 +49,48 @@ f.falls = Text(BODY, 13, 0.353, 0.275, 0.188)
 f.falls:SetPoint("TOP", f.clock, "BOTTOM", 0, -1)
 f.terms = Text(BODY, 12, 0.604, 0.169, 0.125)
 f.terms:SetPoint("TOP", f.falls, "BOTTOM", 0, -1)
+f.bossHead = Text(TITLE, 13, 0.165, 0.13, 0.094)
+f.bosses = {}
+local ROW = 16
+
+-- The boss list under the rest: "Bosses 1 / 3", then each name, a slain one greyed and marked.
+local function DrawBosses(list, below)
+  local n, down = table.getn(list), 0
+  for i = 1, n do if list[i].down then down = down + 1 end end
+  if n == 0 then
+    f.bossHead:Hide()
+  else
+    f.bossHead:ClearAllPoints()
+    f.bossHead:SetPoint("TOP", below, "BOTTOM", 0, -6)
+    f.bossHead:SetText("Bosses  " .. down .. " / " .. n)
+    f.bossHead:Show()
+  end
+  for i = 1, math.max(n, table.getn(f.bosses)) do
+    local row = f.bosses[i]
+    if not row and i <= n then
+      row = Text(BODY, 13, 0.165, 0.13, 0.094)
+      f.bosses[i] = row
+    end
+    if row then
+      if i <= n then
+        row:ClearAllPoints()
+        row:SetPoint("TOP", f.bossHead, "BOTTOM", 0, -2 - (i - 1) * ROW)
+        if list[i].down then
+          row:SetText(list[i].name .. "  - slain")
+          row:SetTextColor(0.5, 0.45, 0.38)
+        else
+          row:SetText(list[i].name)
+          row:SetTextColor(0.165, 0.13, 0.094)
+        end
+        row:Show()
+      else
+        row:Hide()
+      end
+    end
+  end
+  if n == 0 then return 0 end
+  return 24 + n * ROW
+end
 
 local function Clock(secs)
   secs = math.max(0, math.floor(secs or 0))
@@ -100,9 +145,22 @@ function ES.WagerLine(fields)
     terms = fields[8] or "",
     at = GetTime(),
   }
+  local list = {}
+  if fields[9] and fields[9] ~= "" then
+    local rest = fields[9]
+    while rest and rest ~= "" do
+      local i = string.find(rest, "^", 1, true)
+      local part = i and string.sub(rest, 1, i - 1) or rest
+      rest = i and string.sub(rest, i + 1) or nil
+      local _, _, name, down = string.find(part, "^(.-)~(%d)$")
+      if name then table.insert(list, { name = name, down = down == "1" }) end
+    end
+  end
+  last.bosses = list
   f.title:SetText("+" .. last.level .. "  " .. last.name)
   f.terms:SetText(last.terms)
-  f:SetHeight(last.terms ~= "" and 96 or 80)
+  local extra = DrawBosses(list, last.terms ~= "" and f.terms or f.falls)
+  f:SetHeight((last.terms ~= "" and 96 or 80) + extra)
   Draw()
   f:Show()
   ES.wagerShown = last

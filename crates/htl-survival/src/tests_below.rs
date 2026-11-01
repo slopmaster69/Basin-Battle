@@ -996,6 +996,9 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     s.start_wager(3);
     // Fresh, and tougher: the shortcut shut, the grunt a level's worth (and Hardened) stronger.
     assert!(!s.door_is_open("short"), "shut for the wager");
+    // What it has to beat, for the tracker: the boss, by name, still up.
+    let boss_name = s.content.mobs.iter().find(|m| m.key == s.content.dungeon.as_ref().unwrap().packs.iter().find(|p| p.key == "boss").unwrap().mob).unwrap().name.clone();
+    assert_eq!(s.wager_progress(), vec![(boss_name.clone(), false)]);
     let tough = s.mobs[&grunt(&s)].max_health as f32;
     let want = plain * (1.0 + WAGER_HEALTH).powi(2) * 1.2;
     assert!((tough - want).abs() <= want * 0.02 + 1.0, "{tough} vs {want}");
@@ -1022,6 +1025,7 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     s.hurt_mob(boss, id, 10_000_000);
     let ev = run(&mut s, 0.2);
     let done = ev.iter().find_map(|e| if let Event::WagerDone(r) = e { Some(r.clone()) } else { None }).expect("won");
+    assert_eq!(s.wager_progress(), vec![(boss_name, true)], "down");
     assert!(done.timed && done.level == 3 && done.deaths == 1 && done.party == vec![("Ayla".to_string(), s.players[&id].class.clone())], "{done:?}");
     assert_eq!(s.wager_unlocked("deadmines"), 6, "three up for a quick one");
     assert!(ev.iter().any(|e| matches!(e, Event::ToCamp { counts, .. } if counts.iter().any(|(k, n)| k == "wager:deadmines" && *n == 5))), "the camp told");

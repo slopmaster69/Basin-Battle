@@ -85,7 +85,8 @@ impl SurvivalGame {
         Ok(())
     }
 
-    /// The clock below (`WT name level elapsed limit falls state terms`), or `WT` with none.
+    /// The clock below (`WT name level elapsed limit falls state terms bosses`), or `WT` with none.
+    /// `bosses`: `name~down^...`, each boss the run has to beat and whether it's down (1) yet.
     pub(crate) fn wager_line(&self) -> String {
         let Some(w) = self.sim.wager() else { return "WT".to_string() };
         let name = self.sim.content.dungeon.as_ref().map_or(String::new(), |d| d.name.clone());
@@ -96,6 +97,7 @@ impl SurvivalGame {
             (None, None) => "wait",
         };
         let terms: Vec<&str> = terms_at(w.level).iter().map(|t| t.name).collect();
-        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")))
+        let bosses: Vec<String> = self.sim.wager_progress().iter().map(|(n, down)| format!("{}~{}", clean(n), u8::from(*down))).collect();
+        format!("WT\t{}\t{}\t{:.0}\t{:.0}\t{}\t{state}\t{}\t{}", clean(&name), w.level, self.sim.wager_elapsed().floor(), w.limit, w.deaths, clean(&terms.join(", ")), bosses.join("^"))
     }
 }
