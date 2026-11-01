@@ -5120,8 +5120,9 @@ school = "beta"
 slot = "defense"
 kind = "buff"
 cooldown = 30.0
+# A dark shield round you while death is held off (Unholy Shield's; Fear Ward's showed nothing).
 spell = 6346
-effects = [{ kind = "cheat_death", secs = [6.0, 6.0], amount = 0.25, aura = 6346 }]
+effects = [{ kind = "cheat_death", secs = [6.0, 6.0], amount = 0.25, aura = 8909 }]
 
 [[ability]]
 key = "undying"
@@ -5133,7 +5134,7 @@ slot = "defense"
 kind = "buff"
 valor = 25
 spell = 6346
-effects = [{ kind = "cheat_death", secs = [10.0, 10.0], amount = 0.4, aura = 6346 }]
+effects = [{ kind = "cheat_death", secs = [10.0, 10.0], amount = 0.4, aura = 8909 }]
 
 # 2: send it back.
 [[ability]]
@@ -5146,8 +5147,9 @@ slot = "defense"
 kind = "stance"
 secs = 1.0
 cooldown = 12.0
-spell = 543
-aura = 543
+# Magic Reflection's mirror on the chest while it's held (Fire Ward showed nothing).
+spell = 20223
+aura = 20223
 counter = { mirror = true }
 
 [[ability]]
@@ -5160,8 +5162,9 @@ slot = "defense"
 kind = "stance"
 valor = 25
 secs = 1.5
-spell = 543
-aura = 543
+# Magic Reflection's mirror on the chest while it's held (Fire Ward showed nothing).
+spell = 20223
+aura = 20223
 counter = { mirror = true }
 self_effects = [{ kind = "steadfast", secs = [1.5, 1.5] }]
 
@@ -5188,7 +5191,8 @@ slot = "defense"
 kind = "nova"
 damage = [4.0, 4.0]
 radius = [4.0, 4.0]
-spell = 10187
+# A golden burst as it pops (Holy Nova).
+spell = 15237
 effects = [{ kind = "knockback", amount = 5.0 }]
 
 [[ability]]
@@ -5213,7 +5217,8 @@ slot = "defense"
 kind = "nova"
 damage = [6.0, 6.0]
 radius = [4.0, 4.0]
-spell = 10187
+# A golden burst as it pops (Holy Nova).
+spell = 15237
 effects = [{ kind = "stun", secs = [1.0, 1.0] }, { kind = "knockback", amount = 5.0 }]
 
 # 3: a singularity.
