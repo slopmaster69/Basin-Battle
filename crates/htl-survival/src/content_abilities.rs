@@ -32,7 +32,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 15] = [
+pub const KINDS: [&str; 17] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -65,6 +65,15 @@ pub const KINDS: [&str; 15] = [
     "stance",
     // The bow: a projectile whose numbers are the hero's bow's own.
     "shot",
+    // Help on a friend, at once: the first friendly hero along the reticle within `range` (traced
+    // `radius` wide, 1 yd if none), else the one nearest the reticle within 15° of it, else the
+    // caster. It gets `ally_heal`, `cleanse` and the boons among `effects` (nothing else of them).
+    "ally",
+    // A sweeping channel: a strip from the caster along their aim, `range` long and `radius`
+    // either side, held `secs` and moving as they turn; every `tick` it deals `damage` a second
+    // (times the tick) to each foe in it, with `effects`, and heals each friend in it `ally_heal`
+    // a second.
+    "beam",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -126,8 +135,8 @@ pub struct AbilityDef {
     pub linger: f32,
     #[serde(default)]
     pub linger_damage: f32,
-    /// A channel's or a stance's length, a totem's life; a channel ticks (a totem pulses) every
-    /// `tick`.
+    /// A channel's (a beam's) or a stance's length, a totem's life; a channel or a beam ticks (a
+    /// totem pulses) every `tick`.
     #[serde(default)]
     pub secs: f32,
     #[serde(default)]
@@ -246,7 +255,8 @@ pub struct AbilityDef {
     #[serde(default)]
     pub shatter: bool,
     /// A projectile that touches a friend heals them this share of their health (and, with
-    /// `cleanse`, ends what's on them).
+    /// `cleanse`, ends what's on them); so does an `ally` on whoever it picks. A `beam` heals each
+    /// friend in it this share a second.
     #[serde(default)]
     pub ally_heal: f32,
     /// Ground laid around the caster at once, not at the reticle.
@@ -308,7 +318,8 @@ pub struct AbilityDef {
     /// Friends in its area (the caster too) heal this share of their health as it goes off.
     #[serde(default)]
     pub area_heal: f32,
-    /// Lingering ground's look each tick (a spell shown at its middle: arrows, lightning).
+    /// Lingering ground's look each tick (a spell shown at its middle: arrows, lightning); a
+    /// beam's, from the caster to the first foe in it or its far end.
     #[serde(default)]
     pub tick_spell: u32,
 }
