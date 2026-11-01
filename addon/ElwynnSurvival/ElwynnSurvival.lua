@@ -1834,6 +1834,10 @@ vit.stamina = MakeLagBar(vit, 100 / ST_PER_PX, VIT_STAMINA, { r = 0.26, g = 0.66
 vit.guard = Icon(vit, "ARTWORK", "INV_Shield_09", 14)
 vit.reach = Icon(vit, "ARTWORK", "Ability_DualWield", 14)
 vit.state = Text(vit, FONT_BODY, 11, "OUTLINE")
+-- While the guard is up, a shield where the word would be (the word was cut short at that size).
+vit.guardUp = Icon(vit, "ARTWORK", "INV_Shield_09", 26)
+vit.guardUp:SetPoint("BOTTOM", vit.state, "BOTTOM", 0, 0)
+vit.guardUp:Hide()
 -- What a meal, a salve, a tonic or a stone is still doing, and the armor worn.
 vit.effects = Text(vit, FONT_BODY, 10, "OUTLINE")
 vit.effects:SetJustifyH("LEFT")
@@ -2074,7 +2078,7 @@ local LOOK = {
   ready = { 1, 1, 1, "" },
   swing = { 1, 0.55, 0.3, "" },
   heavy = { 1, 0.45, 0.2, "" },
-  guard = { 0.45, 0.75, 1, "Guard" },
+  guard = { 0.45, 0.75, 1, "" },
   dodge = { 0.6, 1, 0.9, "" },
   aim = { 1, 0.9, 0.4, "" },
   charge = { 1, 0.8, 0.3, "" },
@@ -2130,8 +2134,10 @@ function ES.DrawAction()
   end
   if a.name == "guard" then
     vit.guard:SetAlpha(1)
+    vit.guardUp:Show()
   else
     vit.guard:SetAlpha(0.25)
+    vit.guardUp:Hide()
   end
   ES.DrawAimCamera()
   ES.DrawAim()
