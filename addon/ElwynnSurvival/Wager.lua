@@ -10,7 +10,9 @@
 -- won, over; bosses `name~down^...` and forces `felled~needed~total`, missing from older servers),
 -- and a bare `WT` when there's no wager. Before the clock, a last field `ready~heroes~count`: who's
 -- said they're ready, how many are down there, the count's seconds left once everyone has; the
--- slip shows it and a Ready button (`.es ready`).
+-- slip shows it and a Ready button (`.es ready`). Then `split~best^...`, in seconds, for each boss:
+-- when it fell this run, and in the camp's quickest run in time at this level; a slain boss's row
+-- shows its split and how far ahead (green) or behind (red) that best it is.
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
 local ES = ElwynnSurvival
@@ -144,7 +146,21 @@ local function DrawBosses(list, below)
       if i <= n then
         row:ClearAllPoints()
         row:SetPoint("TOP", f.bossHead, "BOTTOM", 0, -2 - (i - 1) * ROW)
-        if list[i].down then
+        if list[i].down and list[i].split then
+          local text, r, g, b = list[i].name .. "  " .. ES.WagerClock(list[i].split), 0.5, 0.45, 0.38
+          if list[i].best then
+            local d = list[i].split - list[i].best
+            if d <= 0 then
+              text = text .. "  (-" .. ES.WagerClock(-d) .. ")"
+              r, g, b = 0.24, 0.42, 0.14
+            else
+              text = text .. "  (+" .. ES.WagerClock(d) .. ")"
+              r, g, b = 0.62, 0.18, 0.1
+            end
+          end
+          row:SetText(text)
+          row:SetTextColor(r, g, b)
+        elseif list[i].down then
           row:SetText(list[i].name .. "  - slain")
           row:SetTextColor(0.5, 0.45, 0.38)
         else
@@ -165,6 +181,7 @@ local function Clock(secs)
   secs = math.max(0, math.floor(secs or 0))
   return string.format("%d:%02d", math.floor(secs / 60), math.mod(secs, 60))
 end
+ES.WagerClock = Clock
 
 -- The last line, and when it came (the clock runs on between lines).
 local last
@@ -232,6 +249,19 @@ function ES.WagerLine(fields)
       rest = i and string.sub(rest, i + 1) or nil
       local _, _, name, down = string.find(part, "^(.-)~(%d)$")
       if name then table.insert(list, { name = name, down = down == "1" }) end
+    end
+  end
+  -- Each boss's split and the best to beat, in the bosses' order.
+  if fields[12] and fields[12] ~= "" then
+    local k, rest = 1, fields[12]
+    while rest and k <= table.getn(list) do
+      local i = string.find(rest, "^", 1, true)
+      local part = i and string.sub(rest, 1, i - 1) or rest
+      rest = i and string.sub(rest, i + 1) or nil
+      local _, _, split, best = string.find(part, "^(%d*)~(%d*)$")
+      list[k].split = tonumber(split or "")
+      list[k].best = tonumber(best or "")
+      k = k + 1
     end
   end
   last.bosses = list

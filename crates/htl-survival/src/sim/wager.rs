@@ -100,6 +100,8 @@ pub struct Wager {
     pub first_ready: Option<f64>,
     pub countdown: Option<f64>,
     pub called: i64,
+    /// Each boss's split: the clock (with falls) when it fell, by its pack's key.
+    pub splits: BTreeMap<String, f32>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -123,6 +125,9 @@ pub struct WagerRun {
     pub timed: bool,
     /// (name, class) of each hero in it.
     pub party: Vec<(String, String)>,
+    /// Each boss as it fell: its name and the clock then (milliseconds, falls counted), in the
+    /// order the run has to beat them.
+    pub splits: Vec<(String, u64)>,
 }
 
 /// The time to beat in a dungeon (seconds): its own, else by its size.
@@ -210,6 +215,12 @@ impl Survival {
                 Some((m.name.clone(), self.slain(k)))
             })
             .collect()
+    }
+
+    /// Each boss's split so far, in the order of [`Self::wager_progress`] (none for one still up).
+    pub fn wager_splits(&self) -> Vec<Option<f32>> {
+        let (Some(w), Some(d)) = (self.wager(), self.dungeon_def()) else { return Vec::new() };
+        wager_bosses(d, &self.content).iter().map(|k| w.splits.get(k).copied()).collect()
     }
 
     /// A wager running (not yet won or lost).
@@ -458,8 +469,19 @@ impl Survival {
                 self.hurt_player(id, dmg);
             }
         }
-        // Its last boss down and enough of its foes: won, in time or not.
+        // Each boss's split, as it falls.
         let bosses = wager_bosses(&d, &self.content);
+        let now_secs = self.wager_elapsed();
+        let fell: Vec<String> = bosses.iter().filter(|k| self.slain(k) && !w.splits.contains_key(*k)).cloned().collect();
+        if !fell.is_empty() {
+            if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                for k in fell {
+                    wm.splits.insert(k, now_secs);
+                }
+            }
+        }
+        let w = self.wager().cloned().unwrap();
+        // Its last boss down and enough of its foes: won, in time or not.
         if !bosses.is_empty() && bosses.iter().all(|k| self.slain(k)) {
             let needed = wager_forces_needed(&d, &self.content);
             if w.forces >= needed {
@@ -508,6 +530,7 @@ impl Survival {
             self.forward_count("wager", &d.key, up);
         }
         let party: Vec<(String, String)> = w.party.iter().map(|(_, n, c)| (n.clone(), c.clone())).collect();
+        let splits: Vec<(String, u64)> = self.wager_progress().into_iter().zip(self.wager_splits()).map(|((name, _), s)| (name, (s.unwrap_or(secs) * 1000.0).round() as u64)).collect();
         self.events.push(Event::WagerDone(WagerRun {
             dungeon: d.key.clone(),
             name: d.name.clone(),
@@ -517,6 +540,7 @@ impl Survival {
             deaths: w.deaths,
             timed,
             party,
+            splits,
         }));
         let (title, sub) = if timed {
             (format!("Wager Won: +{}", w.level), format!("{} of {}{}", clock_words(secs), clock_words(w.limit), if up > 0 { format!(": +{reach} is open now") } else { String::new() }))
