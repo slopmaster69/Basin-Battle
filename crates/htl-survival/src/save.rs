@@ -215,6 +215,7 @@ const RENAMED: &[(&str, &str)] = &[
     ("mind_blast", "penance"),
     ("power_word_shield", "power_word_barrier"),
     // Shaman
+    ("lightning_bolt", "lava_burst"),
     // Mage
     // Warlock
     // Druid

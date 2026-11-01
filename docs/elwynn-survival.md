@@ -136,7 +136,7 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
@@ -167,9 +167,10 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   first body it touches to you, friend or foe; Power Word: Barrier, a dome where you and your
   friends take a quarter less and can't be staggered (its EX shields a friend, or you); Void Rift
   drags everyone in it to its middle.
-- **Shaman**: storm and totem. Lightning Bolt (full charge streaks out at 2.5 times the speed),
-  Chain Lightning leaps on twice; Thunderstorm throws everyone round you 8 yd away; totems to slow
-  or root, to heal, or to swallow a projectile (Grounding); Earthquake stuns and slows a field.
+- **Shaman**: shape the field. Lava Burst, molten rock lobbed over everyone in the way to land
+  where its ring shows and leave the ground burning (its EX, Chain Lightning, leaps on twice);
+  Thunderstorm throws everyone round you 8 yd away; totems to slow or root, to heal, or to
+  swallow a projectile (Grounding); Earthquake stuns and slows a field.
 - **Mage**: fire and frost. Fireball grows with its charge; Cone of Cold and Frost Nova freeze;
   Blink; Ice Block; Meteor falls 1.5 s after you call it on a 7 yd circle: 70 damage.
 - **Warlock**: fear and fel. Shadow Bolt marks; Shadowfury stuns a spot a moment later, its EX
@@ -241,7 +242,7 @@ duration creatures do.
   swallows the first, Ice Block lets nothing in but you can't act.
 - **Full charge**: a charged spell held to the top flares on you (everyone sees it: the class's
   flash and sound), the reticle bursts and the screen's edge flares in its colour, and Aimed
-  Throw, Shadow Bolt, Fireball, Frostbolt and Lightning Bolt fly much faster.
+  Throw, Shadow Bolt, Fireball and Frostbolt fly much faster.
 
 Hover a key with the mouse free (or a card on the board) for what it does in words and numbers:
 how it's used, its damage, reach, charge, wind-up, stamina and cooldown, and the same for its

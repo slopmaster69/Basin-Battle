@@ -4145,30 +4145,37 @@ tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
 
 # ----------------------------------------------------------------------------------- Shaman --
 
+# Shape the field: a lob over whoever's in the way, landing late, leaving the ground on fire.
 [[ability]]
-key = "lightning_bolt"
-name = "Lightning Bolt"
-text = "Charge up to 0.6 s: 14 to 26 damage along the reticle. At full charge it streaks out more than twice as fast."
-icon = "Spell_Nature_Lightning"
+key = "lava_burst"
+name = "Lava Burst"
+text = "Lob molten rock at the reticle, over anyone in the way. It lands a moment later where the ring shows, bursting 3 yd wide, and the ground there burns for 3 s. Lead your target."
+icon = "Spell_Fire_Incinerate"
 school = "shaman"
 slot = "ranged"
 kind = "projectile"
-charge = [0.0, 0.6]
-damage = [14.0, 26.0]
-range = [34.0, 34.0]
-radius = [0.35, 0.45]
-speed = 20.0
-cooldown = 3.0
-spell = 403
-charge_spell = 403
-full_spell = 8435
-full_speed = 50.0
+lob = true
+damage = [22.0, 22.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+splash = 3.0
+# The rock's own missile speed: about 1 s in the air at the far end, a third of that at 10 yd.
+speed = 30.0
+linger = 3.0
+linger_damage = 5.0
+# 22 + half the burn's 15 is 29.5 a cast, 7.4 a second.
+cooldown = 4.0
+# A boulder hurled (its throw pose comes with it), a pillar of fire where it lands (Flamestrike)
+# and the ground glowing hot after (Heated Ground, as Meteor's crater).
+spell = 9483
+burst_spell = 2120
+linger_spell = 22191
 
 [[ability]]
 key = "chain_lightning"
 name = "Chain Lightning"
-ex_of = "lightning_bolt"
-text = "A bolt that leaps from what it strikes to the nearest other foe within 9 yd, twice: 20, then 14, then 10."
+ex_of = "lava_burst"
+text = "Lightning instead of the rock: a fast bolt along the reticle that leaps from what it strikes to the nearest other foe within 9 yd, twice: 20, then 14, then 10."
 icon = "Spell_Nature_ChainLightning"
 slot = "ranged"
 kind = "projectile"
@@ -8598,7 +8605,7 @@ name = "The Stone Cairn"
 at = [-8855.0, -945.0]
 display = 235
 scale = 1.2
-teaches = ["lightning_bolt", "thunderstorm"]
+teaches = ["lava_burst", "thunderstorm"]
 keep = true
 secs = 3.0
 text = "The cairn's stones speak, if you listen: of lightning and of thunder."
@@ -9151,7 +9158,7 @@ at = [-8855.0, -950.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Nature_LightningShield"
-text = "The shaman's shrine (Lightning Bolt, Thunderstorm). The stones are awake: Rumbler, the shaman's trial."
+text = "The shaman's shrine (Lava Burst, Thunderstorm). The stones are awake: Rumbler, the shaman's trial."
 reward = { stone = 3 }
 
 [[site]]

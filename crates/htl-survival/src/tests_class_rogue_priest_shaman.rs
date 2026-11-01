@@ -393,3 +393,71 @@ fn an_old_save_with_the_priests_old_cards_loads_with_their_successors() {
     assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("penance"));
     assert_eq!(h.loadout.get("defense").map(String::as_str), Some("power_word_barrier"));
 }
+
+// --- Shaman -------------------------------------------------------------------------------------
+
+#[test]
+fn lava_burst_is_lobbed_lands_late_where_its_ring_shows_and_leaves_the_ground_burning() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    // (Those it's aimed at stand past a grunt's 14 yd notice, so none walks in before it's thrown.)
+    let by_path = grunt(&mut s, [8.0, 1.0, 0.0]);
+    let there = grunt(&mut s, [18.0, 0.0, 0.0]);
+    let beside = grunt(&mut s, [18.0, 2.0, 0.0]);
+    let outside = grunt(&mut s, [18.0, 5.0, 0.0]);
+    let pins: Vec<(Id, Vec3)> = [by_path, there, beside, outside].iter().map(|m| (*m, s.mobs[m].pos)).collect();
+    let (hp_path, hp_there, hp_beside, hp_out) = (hp(&s, by_path), hp(&s, there), hp(&s, beside), hp(&s, outside));
+    // Aimed at the ground 18 yd ahead: about 0.6 s in the air.
+    s.set_aim_line(p, 0.0, -(1.9f32).atan2(18.0));
+    let mut ev = cast(&mut s, p, "lava_burst", false);
+    let ring = ev
+        .iter()
+        .find_map(|e| match e {
+            Event::Mark { pos, radius, tele: Some(t), .. } if t.at.is_some() && (*radius - 3.0).abs() < 0.01 => Some(*pos),
+            _ => None,
+        })
+        .expect("where it will land, ringed for everyone");
+    assert!(dist2d(ring, [18.0, 0.0, 0.0]) < 1.5, "at the spot aimed at: {ring:?}");
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 9483, target: Target::Point(_) } if *caster == p)),
+        "the rock hurled there"
+    );
+    ev.extend(run_pinned(&mut s, 0.2, &pins));
+    assert_eq!(hp(&s, there), hp_there, "still in the air");
+    ev.extend(run_pinned(&mut s, 0.6, &pins));
+    assert!(hp(&s, there) < hp_there && hp(&s, beside) < hp_beside, "it burst where it landed, 3 yd wide");
+    assert_eq!(hp(&s, outside), hp_out, "not 5 yd off");
+    assert_eq!(hp(&s, by_path), hp_path, "nor the one it flew past");
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Missile { spell: 2120, target: Target::Point(at), .. } if dist2d(*at, ring) < 0.5)),
+        "its fire bursting there"
+    );
+    assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { spell: 22191, .. })), "the ground glowing hot");
+    // The ground burns on for 3 s.
+    let landed = hp(&s, there);
+    run_pinned(&mut s, 1.1, &pins);
+    assert!(hp(&s, there) < landed, "burning in it");
+    run_pinned(&mut s, 2.5, &pins);
+    let cooled = hp(&s, there);
+    run_pinned(&mut s, 1.5, &pins);
+    assert_eq!(hp(&s, there), cooled, "cooled after 3 s");
+}
+
+#[test]
+fn an_old_save_with_the_shamans_lightning_bolt_loads_with_lava_burst() {
+    let mut s = world(false);
+    s.content.dev.full_tree = false;
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut save = s.leave(p).unwrap();
+    save.owned = ["lightning_bolt", "thunderstorm"].into_iter().map(String::from).collect();
+    save.loadout = [("ranged", "lightning_bolt"), ("close", "thunderstorm")]
+        .into_iter()
+        .map(|(a, b)| (a.to_string(), b.to_string()))
+        .collect();
+    let q = s.join("ayla", "Ayla", Some(&save));
+    let h = &s.players[&q];
+    assert!(h.owned.contains("lava_burst") && h.owned.contains("thunderstorm"), "{:?}", h.owned);
+    assert!(!h.owned.contains("lightning_bolt"));
+    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("lava_burst"));
+    assert_eq!(h.loadout.get("close").map(String::as_str), Some("thunderstorm"));
+}
