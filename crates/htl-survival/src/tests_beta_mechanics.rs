@@ -191,7 +191,7 @@ fn a_hook_into_a_wall_yanks_its_caster_up_to_it() {
     ev.extend(run(&mut s, 1.0));
     let d = dashes(&ev, p);
     assert_eq!(d.len(), 1, "one dash to the wall: {d:?}");
-    assert!(d[0].0.abs() < 0.15 && d[0].1 > 8.5 && d[0].1 < 11.0, "along +x, short of the wall: {d:?}");
+    assert!(d[0].0.sin().abs() < 0.15 && d[0].0.cos() > 0.0 && d[0].1 > 8.5 && d[0].1 < 11.0, "along +x, short of the wall: {d:?}");
     let at = s.players[&p].pos;
     assert!(at[0] > 8.5 && at[0] < 11.0 && at[1].abs() < 0.6, "she stands at the wall's foot, not in it: {at:?}");
 }
