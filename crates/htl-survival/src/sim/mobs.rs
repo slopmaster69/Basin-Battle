@@ -1400,7 +1400,7 @@ impl Survival {
                     let seen = self
                         .players
                         .iter()
-                        .filter(|(h, p)| p.health > 0 && dist2d(p.pos, pos) <= d.aggro && !self.unseen(**h))
+                        .filter(|(h, p)| p.health > 0 && dist2d(p.pos, pos) <= d.aggro && !self.unseen_by(id, **h))
                         .filter(|(_, p)| clear_line(self.land.as_ref(), pos, p.pos))
                         .min_by(|a, b| dist2d(a.1.pos, pos).total_cmp(&dist2d(b.1.pos, pos)))
                         .map(|(id, _)| *id);
