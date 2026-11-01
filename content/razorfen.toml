@@ -20,6 +20,8 @@ blurb = "The quillboar's warren of thorns, where Charlga speaks for Agamaggan"
 first_page = "The thorn gate at the top of the warren. Mind the spines."
 welcome = "Razorfen Kraul. The quillboar dig their warren under Agamaggan's thorns, and Charlga Razorflank speaks for the dead demigod. Two lamps: one at the thorn gate, one in the warren's heart. Rest at a lamp to heal, fill your Draughts (T) and send the quillboar back to their burrows. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): Razorfen Kraul: the middle (25 to 35).
+tier = 2
 draught = "draught"
 draughts = 3
 draughts_max = 6

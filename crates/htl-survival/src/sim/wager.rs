@@ -100,6 +100,8 @@ pub struct Wager {
     pub first_ready: Option<f64>,
     pub countdown: Option<f64>,
     pub called: i64,
+    /// Each boss's split: the clock (with falls) when it fell, by its pack's key.
+    pub splits: BTreeMap<String, f32>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -123,6 +125,9 @@ pub struct WagerRun {
     pub timed: bool,
     /// (name, class) of each hero in it.
     pub party: Vec<(String, String)>,
+    /// Each boss as it fell: its name and the clock then (milliseconds, falls counted), in the
+    /// order the run has to beat them.
+    pub splits: Vec<(String, u64)>,
 }
 
 /// The time to beat in a dungeon (seconds): its own, else by its size.
@@ -210,6 +215,12 @@ impl Survival {
                 Some((m.name.clone(), self.slain(k)))
             })
             .collect()
+    }
+
+    /// Each boss's split so far, in the order of [`Self::wager_progress`] (none for one still up).
+    pub fn wager_splits(&self) -> Vec<Option<f32>> {
+        let (Some(w), Some(d)) = (self.wager(), self.dungeon_def()) else { return Vec::new() };
+        wager_bosses(d, &self.content).iter().map(|k| w.splits.get(k).copied()).collect()
     }
 
     /// A wager running (not yet won or lost).
@@ -307,6 +318,14 @@ impl Survival {
         let accounts: BTreeSet<&String> = self.players.values().map(|p| &p.account).collect();
         let ready = w.ready.iter().filter(|a| accounts.contains(a)).count();
         Some((ready, accounts.len(), w.countdown.map(|t| (t - self.wall()).max(0.0) as f32)))
+    }
+
+    /// The dungeon's tier on its foes: their health, and the weight of their blows (1 up top, and
+    /// in a first dungeon).
+    pub(crate) fn tier_scale(&self) -> (f32, f32) {
+        let Some(d) = self.dungeon_def().filter(|_| self.is_below()) else { return (1.0, 1.0) };
+        let past = d.tier.saturating_sub(1) as f32;
+        (1.0 + crate::content::TIER_HEALTH * past, 1.0 + crate::content::TIER_DAMAGE * past)
     }
 
     /// A foe's health and the weight of its blows at this wager (1 with none).
@@ -450,8 +469,19 @@ impl Survival {
                 self.hurt_player(id, dmg);
             }
         }
-        // Its last boss down and enough of its foes: won, in time or not.
+        // Each boss's split, as it falls.
         let bosses = wager_bosses(&d, &self.content);
+        let now_secs = self.wager_elapsed();
+        let fell: Vec<String> = bosses.iter().filter(|k| self.slain(k) && !w.splits.contains_key(*k)).cloned().collect();
+        if !fell.is_empty() {
+            if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                for k in fell {
+                    wm.splits.insert(k, now_secs);
+                }
+            }
+        }
+        let w = self.wager().cloned().unwrap();
+        // Its last boss down and enough of its foes: won, in time or not.
         if !bosses.is_empty() && bosses.iter().all(|k| self.slain(k)) {
             let needed = wager_forces_needed(&d, &self.content);
             if w.forces >= needed {
@@ -500,6 +530,7 @@ impl Survival {
             self.forward_count("wager", &d.key, up);
         }
         let party: Vec<(String, String)> = w.party.iter().map(|(_, n, c)| (n.clone(), c.clone())).collect();
+        let splits: Vec<(String, u64)> = self.wager_progress().into_iter().zip(self.wager_splits()).map(|((name, _), s)| (name, (s.unwrap_or(secs) * 1000.0).round() as u64)).collect();
         self.events.push(Event::WagerDone(WagerRun {
             dungeon: d.key.clone(),
             name: d.name.clone(),
@@ -509,6 +540,7 @@ impl Survival {
             deaths: w.deaths,
             timed,
             party,
+            splits,
         }));
         let (title, sub) = if timed {
             (format!("Wager Won: +{}", w.level), format!("{} of {}{}", clock_words(secs), clock_words(w.limit), if up > 0 { format!(": +{reach} is open now") } else { String::new() }))
@@ -531,7 +563,9 @@ impl Survival {
     /// What a won wager pays: plunder to everyone down here, and gear into the camp's chest.
     fn pay_wager(&mut self, d: &DungeonDef, level: u32, timed: bool) {
         if let Some(plunder) = self.content.item(&d.plunder) {
-            let n = ((6 + 3 * level) as f32 * if timed { 1.0 } else { 0.5 }).round() as u32;
+            // (A harder dungeon pays more a tier.)
+            let tier = 1.0 + crate::content::TIER_PLUNDER * d.tier.saturating_sub(1) as f32;
+            let n = ((6 + 3 * level) as f32 * tier * if timed { 1.0 } else { 0.5 }).round() as u32;
             let heroes: Vec<Id> = self.players.keys().copied().collect();
             for id in heroes {
                 let left = self.give(id, plunder, n);
@@ -563,6 +597,8 @@ impl Survival {
         let better: Vec<usize> = pool.iter().copied().filter(|i| fine(&self.content, *i)).collect();
         let rolls = 1 + level / 3;
         let mut won: BTreeMap<usize, u32> = BTreeMap::new();
+        // From +4, honed: better the higher the wager.
+        let tier = crate::content::hone_tier(level);
         for k in 0..rolls {
             let sure = level >= 6 && k == 0;
             let from = if (sure || (level >= 3 && self.rng.gen::<f32>() < 0.25 + 0.05 * level as f32)) && !better.is_empty() { &better } else { &plain };
@@ -570,7 +606,7 @@ impl Survival {
                 continue;
             }
             let i = from[self.rng.gen_range(0..from.len())];
-            *won.entry(i).or_default() += 1;
+            *won.entry(self.content.honed(i, tier)).or_default() += 1;
         }
         if !won.is_empty() {
             self.events.push(Event::ToCamp { counts: Vec::new(), items: won });

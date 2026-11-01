@@ -840,8 +840,8 @@ impl Survival {
             .items
             .iter()
             .enumerate()
-            // A champion's trophy is won, not taken from the rack.
-            .filter(|(_, d)| !self.content.is_trophy(&d.key))
+            // A champion's trophy is won, not taken from the rack; nor is honed gear.
+            .filter(|(_, d)| !self.content.is_trophy(&d.key) && d.hone == 0)
             .filter_map(|(i, d)| {
                 let kind = match d.kind {
                     ItemKind::Weapon if self.content.weapon(&d.key).is_some_and(|w| w.two_handed) => "two-handed",
