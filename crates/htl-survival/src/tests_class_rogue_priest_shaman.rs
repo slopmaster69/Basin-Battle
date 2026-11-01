@@ -429,10 +429,10 @@ fn lava_burst_is_lobbed_lands_late_where_its_ring_shows_and_leaves_the_ground_bu
     assert_eq!(hp(&s, outside), hp_out, "not 5 yd off");
     assert_eq!(hp(&s, by_path), hp_path, "nor the one it flew past");
     assert!(
-        ev.iter().any(|e| matches!(e, Event::Missile { spell: 2120, target: Target::Point(at), .. } if dist2d(*at, ring) < 0.5)),
+        ev.iter().any(|e| matches!(e, Event::Missile { spell: 5162, target: Target::Point(at), .. } if dist2d(*at, ring) < 0.5)),
         "its fire bursting there"
     );
-    assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { spell: 22191, .. })), "the ground glowing hot");
+    assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { spell: 13812, .. })), "the ground glowing hot");
     // The ground burns on for 3 s.
     let landed = hp(&s, there);
     run_pinned(&mut s, 1.1, &pins);
