@@ -50,6 +50,7 @@ A	repair	1.00	3.00	Smithing Anvil
 A	ready	0.00	0.00
 FL	Parry!
 !table.insert(SAID, "flash: " .. tostring(ElwynnSurvivalFlash:IsShown()))
+!table.insert(SAID, "quick item: key " .. tostring(ElwynnSurvivalDock.quick.key:GetText()) .. " count " .. tostring(ElwynnSurvivalDock.quick.count:GetText()))
 BN	Kobold Raid	From the south-west road in 25 seconds
 CF	raid	Ring the bell? 6 kobolds will march on the camp from the south-west road in 25 seconds.
 !table.insert(SAID, "confirm: " .. tostring(ElwynnSurvivalConfirm:IsShown()) .. " mode " .. ElwynnSurvival.mode)

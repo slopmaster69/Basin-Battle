@@ -2259,6 +2259,22 @@ abar.slots = {}
 ES.slots = {}
 ES.abilities = {}
 
+-- The quick item (T uses it, G picks the next) beside the keys: its icon from the bags and how
+-- many are left (meals, when no item is picked).
+dock.quick = MakeSlot(dock, 40, "T")
+dock.quick:SetPoint("LEFT", abar, "RIGHT", 34, 0)
+function ES.DrawQuick()
+  local h, q = ES.h, dock.quick
+  local quick, quickN = h and h[31] or "", tonumber(h and h[32]) or 0
+  if quick == "" then
+    local meals = tonumber(h and h[17]) or 0
+    q:Set(ICONS .. "INV_Misc_Food_16", meals > 0, tostring(meals))
+  else
+    q:Set(ES.BagTexture(quick) or (ICONS .. "INV_Misc_Food_16"), quickN > 0, tostring(quickN))
+  end
+  q.key:SetText(ES.ShortKey("ES_EAT"))
+end
+
 -- One key's tile: a dark well, the icon, a fine rim, its column's colour along its foot, the
 -- cooldown's shade, the key on a little cap under it.
 local function MakeKey(parent, size)
@@ -3130,6 +3146,7 @@ function ES.DrawHud()
   end
   info.bags:SetText("")
   ES.bar.bag.count:SetText((h[8] or "?") .. "/" .. (h[9] or "?"))
+  ES.DrawQuick()
   ES.DrawAimCamera()
   ES.DrawAim()
   ES.DrawFoe()
@@ -5455,6 +5472,7 @@ function ES.SetKey(action, chord)
   ES.Rebind()
   ES.DrawKeys()
   ES.DrawAbilities()
+  ES.DrawQuick()
   if taken then
     local name = getglobal("BINDING_NAME_" .. taken) or taken
     ES.Message(Pretty(chord) .. " was " .. name .. "'s: that has no key now.")

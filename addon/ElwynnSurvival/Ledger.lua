@@ -1306,6 +1306,8 @@ local function SkinDock()
   local dock, abar = ElwynnSurvivalDock, ElwynnSurvivalAbilities
   if not dock or not abar or dock.ledger then return end
   dock.ledger = true
+  -- The quick item beside the keys: a pocket like the buttons at the bottom right.
+  if dock.quick then PocketSlot(dock.quick, 4) end
   -- The leather strap behind the keys alone (the bars above sit on the world).
   if dock.plate then Retire(dock.plate) end
   local strap = CreateFrame("Frame", nil, dock)
