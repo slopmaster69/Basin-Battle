@@ -190,7 +190,8 @@ fn chaos_bolt_held_a_second_tears_through_every_foe_in_its_line_and_let_go_early
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     learn(&mut s, p, "seed_of_corruption");
     s.set_cooldowns(p, true);
-    let at = [[6.0, 0.0, 0.0], [10.0, 0.0, 0.0], [14.0, 0.0, 0.0]];
+    // Close enough that the bolt, rising a little toward the reticle, is still at their height.
+    let at = [[5.0, 0.0, 0.0], [8.0, 0.0, 0.0], [11.0, 0.0, 0.0]];
     let foes: Vec<Id> = at.iter().map(|a| boar(&mut s, *a)).collect();
     let pins: Vec<(Id, Vec3)> = foes.iter().copied().zip(at).collect();
     // Let go after half a second: lost, and nothing paid.
