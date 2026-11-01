@@ -316,6 +316,21 @@ impl Board {
         self.place_in(&self.ladder(), name)
     }
 
+    /// The week's best runs in time on the board (weeks as the wagers' terms turn, from Monday),
+    /// by their ladder points, highest first (then quickest, then by camp), at most `n`.
+    pub fn week_best(&self, week: u64, n: usize) -> Vec<(Run, f32)> {
+        let mut runs: Vec<(Run, f32)> = self
+            .store
+            .runs
+            .iter()
+            .filter(|r| r.timed && htl_survival::sim::wager::week_of(r.at as f64) == week)
+            .map(|r| (r.clone(), run_points(r, self.tiers.get(&r.dungeon).copied().unwrap_or(1))))
+            .collect();
+        runs.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.ms.cmp(&b.0.ms)).then(a.0.host.cmp(&b.0.host)));
+        runs.truncate(n);
+        runs
+    }
+
     /// The splits of this server's quickest run in time on a dungeon at a level, if it kept them.
     pub fn best_splits(&self, dungeon: &str, level: u32) -> Option<Vec<(String, u64)>> {
         self.store
@@ -653,6 +668,30 @@ mod tests {
         let (place, me) = b.place_of("Bobx").unwrap();
         assert_eq!((place, me.rating), (2, 173));
         assert!(b.place_of("Nobody").is_none());
+    }
+
+    #[test]
+    fn the_weeks_best_are_its_runs_in_time_by_points_and_none_from_other_weeks() {
+        use htl_survival::sim::wager::week_of;
+        let mut b = Board::new(None, "here", None, vec!["stockade".into()]);
+        let monday = 4 * 86_400 + 7 * 86_400 * 2900;
+        let week = week_of(monday as f64);
+        let mut add = |level: u32, ms: u64, timed: bool, at: u64| {
+            let mut r = Run::from_wager(&run(), "Camp");
+            r.level = level;
+            r.ms = ms;
+            r.timed = timed;
+            r.at = at;
+            b.add(r);
+        };
+        add(4, 900_000, true, monday + 3600);
+        add(6, 1_400_000, true, monday + 86_400);
+        add(9, 600_000, false, monday + 7200);
+        add(12, 600_000, true, monday - 3600);
+        let best = b.week_best(week, 3);
+        assert_eq!(best.iter().map(|(r, _)| r.level).collect::<Vec<_>>(), vec![6, 4], "in time, this week only, by points");
+        assert!(b.week_best(week + 1, 3).is_empty());
+        assert_eq!(b.week_best(week - 1, 3).len(), 1, "last week's own");
     }
 
     #[test]

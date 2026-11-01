@@ -1,7 +1,7 @@
 //! The Bookmaker's Wager on screen: its page in the book (the levels open, its terms, the camp's
 //! best, a level to take), the Bookmaker's Board, and the clock below while one's on.
 
-use htl_survival::sim::wager::{clock_words, terms_at, wager_forces_needed, wager_forces_total, wager_limit, week_terms, TERM_LEVELS, WAGER_DEATH};
+use htl_survival::sim::wager::{clock_words, terms_at, wager_forces_needed, wager_forces_total, wager_limit, week_of, week_terms, TERM_LEVELS, WAGER_DEATH};
 use htl_survival::sim::Id;
 
 use super::play::clean;
@@ -108,6 +108,39 @@ impl SurvivalGame {
         let name = self.sim.players.get(&id)?.name.clone();
         let (place, r) = b.place_in(ladder, &name)?;
         Some(format!("Your rating on the Bookmaker's Ladder: {}, {} of {} (from {} dungeon{}).", r.rating, ordinal(place), ladder.len(), r.dungeons, if r.dungeons == 1 { "" } else { "s" }))
+    }
+
+    /// The Bookmaker's week: this week's terms, and last week's best runs on the board. Shown
+    /// once a week as a hero comes in (`.es news` again any time).
+    pub(crate) fn ui_week_page(&mut self, conn: ConnId) -> Result<(), String> {
+        let wall = self.sim.wall();
+        let week = week_of(wall);
+        let terms: Vec<String> = TERM_LEVELS.iter().zip(week_terms(wall)).map(|(at, t)| format!("+{at} {}: {}", t.name, t.text)).collect();
+        let best = self.board.as_ref().map_or(Vec::new(), |b| b.lock().unwrap().week_best(week.saturating_sub(1), 3));
+        let names: std::collections::HashMap<String, String> = self.sim.content.dungeons().map(|d| (d.key.clone(), d.name.clone())).collect();
+        let last = if best.is_empty() {
+            "Nobody won a wager in time last week. This week's best could be yours.".to_string()
+        } else {
+            let lines: Vec<String> = best
+                .iter()
+                .enumerate()
+                .map(|(k, (r, _))| format!("{}. +{} {} in {}, by {} of {}", k + 1, r.level, names.get(&r.dungeon).unwrap_or(&r.dungeon), clock_words(r.ms as f32 / 1000.0), r.heroes(), r.host))
+                .collect();
+            format!("Last week's best on the board:
+{}", lines.join("
+"))
+        };
+        let text = format!("The terms turned on Monday. This week, as the stakes rise:
+{}
+
+{last}", terms.join("
+"));
+        let mut links = vec![(".es ladder".to_string(), "The Bookmaker's Ladder".to_string())];
+        if let Some(d) = self.sim.next_dungeon().or_else(|| self.sim.content.dungeons().next()) {
+            links.insert(0, (format!(".es wager {}", d.key), format!("A wager in {}", d.name)));
+        }
+        self.letter(conn, "wager", "The Bookmaker's Week", "The terms change every Monday", &text, "", &links);
+        Ok(())
     }
 
     /// The Bookmaker's Ladder: every hero across every dungeon by their rating.

@@ -1105,6 +1105,11 @@ impl SurvivalGame {
                     self.tell(conn, &word);
                     self.say_to(conn, &word);
                 }
+                // The Bookmaker's week, once a week a hero comes in, once the camp has the book.
+                let week = htl_survival::sim::wager::week_of(self.sim.wall());
+                if self.board.is_some() && self.sim.book_open() && crate::first_told(format!("week:{account}:{week}")) {
+                    let _ = self.ui_week_page(conn);
+                }
                 Ok(())
             }
             "in" => {
@@ -1299,6 +1304,7 @@ impl SurvivalGame {
             },
             "board" => self.ui_board_page(conn, &arg),
             "ladder" | "rating" => self.ui_ladder_page(conn, me),
+            "news" | "week" => self.ui_week_page(conn),
             "ready" => self.sim.wager_ready(me),
             "meter" => self.meter_command(conn, me, &arg),
             // The book at camp, and the lamps below.
