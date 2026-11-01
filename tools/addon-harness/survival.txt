@@ -27,7 +27,7 @@
 !ChatFrameEditBox:Show()
 !table.insert(SAID, "typing: guard held " .. tostring(ElwynnSurvival.guardHeld))
 !ChatFrameEditBox:Hide()
-!for _, w in ipairs({"bag","character","map","menu","help"}) do ElwynnSurvival.Open(w) end table.insert(SAID, "opened: " .. table.concat(OPENED, ", "))
+!for _, w in ipairs({"bag","character","map","menu"}) do ElwynnSurvival.Open(w) end table.insert(SAID, "opened: " .. table.concat(OPENED, ", "))
 !ElwynnSurvival.ToggleKeys()
 !local t = {} for i = 1, table.getn(ElwynnSurvival.CONTROLS) do table.insert(t, ElwynnSurvival.CONTROLS[i][1] .. " = " .. ElwynnSurvival.ControlKey(i)) end table.insert(SAID, "card: " .. table.concat(t, "; "))
 !table.insert(SAID, "card profile: " .. ElwynnSurvivalKeys.profile:GetText())
@@ -53,6 +53,9 @@ FL	Parry!
 !table.insert(SAID, "flash: " .. tostring(ElwynnSurvivalFlash:IsShown()))
 !table.insert(SAID, "quick item: key " .. tostring(ElwynnSurvivalDock.quick.key:GetText()) .. " count " .. tostring(ElwynnSurvivalDock.quick.count:GetText()))
 BN	Kobold Raid	From the south-west road in 25 seconds
+BN	Discovered: Fargodeep Mine	4 of 35 places in Elwynn
+!table.insert(SAID, "discovered: banner still " .. tostring(ElwynnSurvivalBanner.title:GetText()))
+BN	Done: Copper from Fargodeep	Into the chest: 2 timber
 CF	raid	Ring the bell? 6 kobolds will march on the camp from the south-west road in 25 seconds.
 !table.insert(SAID, "confirm: " .. tostring(ElwynnSurvivalConfirm:IsShown()) .. " mode " .. ElwynnSurvival.mode)
 !ElwynnSurvivalConfirm.yes:GetScript("OnClick")()
