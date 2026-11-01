@@ -208,6 +208,15 @@ pub fn run_points(run: &Run, tier: u32) -> f32 {
 
 pub type Shared = Arc<Mutex<Board>>;
 
+/// A party's kind on the board, by its size: a duo's time and four heroes' are different feats.
+pub fn party_kind(heroes: usize) -> &'static str {
+    match heroes {
+        0 | 1 => "solo",
+        2 => "duo",
+        _ => "group",
+    }
+}
+
 impl Board {
     /// `host`: this server's name on the board (a made-up camp's, kept, when empty).
     pub fn new(path: Option<PathBuf>, host: &str, remote: Option<String>, dungeons: Vec<String>) -> Self {
@@ -263,7 +272,12 @@ impl Board {
 
     /// A dungeon's board: its runs in time, highest level first, then quickest.
     pub fn top(&self, dungeon: &str, n: usize) -> Vec<Run> {
-        let mut runs: Vec<Run> = self.store.runs.iter().filter(|r| r.dungeon == dungeon && r.timed).cloned().collect();
+        self.top_of(dungeon, None, n)
+    }
+
+    /// The same, of runs by a party of this kind only ("solo", "duo", "group": three or four).
+    pub fn top_of(&self, dungeon: &str, kind: Option<&str>, n: usize) -> Vec<Run> {
+        let mut runs: Vec<Run> = self.store.runs.iter().filter(|r| r.dungeon == dungeon && r.timed && kind.is_none_or(|k| party_kind(r.party.len()) == k)).cloned().collect();
         runs.sort_by(rank);
         runs.truncate(n);
         runs
@@ -692,6 +706,27 @@ mod tests {
         assert_eq!(best.iter().map(|(r, _)| r.level).collect::<Vec<_>>(), vec![6, 4], "in time, this week only, by points");
         assert!(b.week_best(week + 1, 3).is_empty());
         assert_eq!(b.week_best(week - 1, 3).len(), 1, "last week's own");
+    }
+
+    #[test]
+    fn the_board_ranks_solo_duo_and_group_runs_apart() {
+        let mut b = Board::new(None, "here", None, vec!["stockade".into()]);
+        let mut add = |heroes: usize, level: u32| {
+            let mut w = run();
+            w.party = (0..heroes).map(|k| (format!("H{k}"), "warrior".to_string())).collect();
+            w.level = level;
+            b.record(&w);
+        };
+        add(1, 3);
+        add(2, 5);
+        add(4, 7);
+        add(3, 6);
+        let levels = |k: Option<&str>| b.top_of("stockade", k, 10).iter().map(|r| r.level).collect::<Vec<_>>();
+        assert_eq!(levels(None), vec![7, 6, 5, 3]);
+        assert_eq!(levels(Some("solo")), vec![3]);
+        assert_eq!(levels(Some("duo")), vec![5]);
+        assert_eq!(levels(Some("group")), vec![7, 6], "three and four together");
+        assert_eq!((party_kind(1), party_kind(2), party_kind(4)), ("solo", "duo", "group"));
     }
 
     #[test]
