@@ -171,7 +171,7 @@ fn a_seed_of_corruption_sticks_then_bursts_round_its_carrier_and_leaves_them_rot
     // Planted: nothing yet, but it's in the boar and shows on it.
     assert!(hits(&ev, p, carrier).is_empty() && s.mobs[&carrier].health == hc, "nothing yet");
     assert!(s.projectiles.iter().any(|x| matches!(x.stage, Stage::Stuck { on: Some(u), .. } if u == carrier)), "stuck in it");
-    assert!(s.auras_of(carrier).contains(&172), "Corruption's look on it");
+    assert!(s.auras_of(carrier).contains(&23072), "the corruption pulsing on it");
     // Two seconds on, it bursts round the boar: the one beside it struck too, both rotting.
     ev.extend(run_pinned(&mut s, 1.8, &pins));
     assert!(s.mobs[&carrier].health < hc && s.mobs[&beside].health < hb, "it went off round its carrier");
