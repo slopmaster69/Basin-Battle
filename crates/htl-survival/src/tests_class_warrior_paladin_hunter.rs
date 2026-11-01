@@ -175,6 +175,150 @@ fn has_on_keys(s: &Survival, p: Id, cards: &[(&str, &str)]) {
     assert!(h.owned.iter().all(|k| s.content.ability(k).is_some()), "nothing unknown: {:?}", h.owned);
 }
 
+// --- Paladin: shield your friends, punish who touches them ----------------------------------------
+
+#[test]
+fn avengers_shield_ricochets_to_two_more_foes_each_blow_weaker_and_silences_them() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let first = mob(&mut s, "brave", [10.0, 0.0, 0.0]);
+    let second = mob(&mut s, "brave", [14.0, 3.0, 0.0]);
+    let third = mob(&mut s, "brave", [18.0, 6.0, 0.0]);
+    let beyond = mob(&mut s, "brave", [30.0, -6.0, 0.0]);
+    let pins = [first, second, third, beyond];
+    press(&mut s, p, "avengers_shield", false);
+    s.set_aim_line(p, 0.0, down_to(12.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 1.0, &pins));
+    assert!(missiles(&ev, p, 24275) >= 1, "the shield thrown");
+    let (a, b, c) = (hits(&ev, p, first), hits(&ev, p, second), hits(&ev, p, third));
+    assert_eq!((a.len(), b.len(), c.len()), (1, 1, 1), "three struck, once each");
+    assert!(a[0] > b[0] && b[0] > c[0], "each blow weaker: {a:?} {b:?} {c:?}");
+    assert!(hits(&ev, p, beyond).is_empty(), "two leaps, no more");
+    for m in [first, second, third] {
+        assert!(s.has_cc(m, "silence"), "silenced");
+    }
+}
+
+#[test]
+fn holy_shock_alone_heals_and_frees_yourself() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let max = s.players[&p].max_health;
+    s.players.get_mut(&p).unwrap().health = max / 2;
+    s.apply_cc(p, p, "root", 4.0, 0.0, 0.0, "test");
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "avengers_shield", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "holy_shock")), "Ctrl: Holy Shock");
+    let ev = click(&mut s, p);
+    let (got, want) = (s.players[&p].health - max / 2, (max as f32 * 0.25).round() as u32);
+    assert!(got >= want && got <= want + 2, "a quarter of her health: {got}");
+    assert!(!s.has_cc(p, "root"), "and free");
+    assert_eq!(missiles(&ev, p, 24275), 0, "no shield thrown");
+}
+
+#[test]
+fn divine_steed_rides_free_of_roots_and_its_key_again_throws_hammer_of_justice() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [10.0, 0.0, 0.0]);
+    s.apply_cc(p, p, "root", 4.0, 0.0, 0.0, "test");
+    s.apply_cc(p, p, "snare", 4.0, 0.5, 0.0, "test");
+    let ev = press(&mut s, p, "divine_steed", false);
+    assert!(missiles(&ev, p, 13819) >= 1, "its look");
+    assert!(!s.has_cc(p, "root") && !s.has_cc(p, "snare"), "free of what held her");
+    assert!(s.has_cc(p, "haste"), "and away at speed");
+    let keys = s.recast_keys(p);
+    assert_eq!(keys.len(), 1, "the key armed: {keys:?}");
+    assert_eq!((keys[0].0, keys[0].1), (key_of("utility") as usize, idx(&s, "hammer_of_justice")));
+    // The key again: the hammer comes up, and goes on the click.
+    run(&mut s, 0.4);
+    press_again(&mut s, p, "utility");
+    assert_eq!(aiming(&s, p), Some(idx(&s, "hammer_of_justice")), "the hammer, aimed");
+    s.set_aim_line(p, 0.0, down_to(12.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 0.8, &[k]));
+    assert!(missiles(&ev, p, 20685) >= 1, "thrown");
+    assert!(s.has_cc(k, "stun"), "and it stuns");
+    assert!(s.recast_keys(p).is_empty(), "spent");
+    // Left unused, the window closes and the key is the Steed again.
+    run(&mut s, 2.0);
+    press(&mut s, p, "divine_steed", false);
+    run(&mut s, 3.2);
+    assert!(s.recast_keys(p).is_empty(), "the window closed");
+    let ev = press_again(&mut s, p, "utility");
+    assert_eq!(aiming(&s, p), None, "no hammer");
+    assert!(missiles(&ev, p, 13819) >= 1, "the Steed again");
+}
+
+#[test]
+fn blessing_of_freedom_frees_a_friend_and_speeds_them_and_arms_no_hammer() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    s.apply_cc(b, b, "root", 4.0, 0.0, 0.0, "test");
+    s.set_valor(a, 25.0);
+    press(&mut s, a, "divine_steed", true);
+    assert_eq!(aiming(&s, a), Some(idx(&s, "blessing_of_freedom")), "aimed at a friend");
+    s.set_aim_line(a, 0.0, 0.0);
+    let ev = click(&mut s, a);
+    assert!(flashed(&ev, a, "Bren"), "on him");
+    assert!(!s.has_cc(b, "root"), "free");
+    assert!(s.has_cc(b, "haste") && s.has_cc(b, "steadfast"), "faster and steady");
+    assert!(!s.has_cc(a, "haste"), "not her");
+    assert!(s.recast_keys(a).is_empty(), "the EX arms no hammer");
+}
+
+#[test]
+fn blessing_of_protection_halves_what_a_friend_takes_and_alone_it_is_yours() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    press(&mut s, a, "blessing_of_protection", false);
+    assert_eq!(aiming(&s, a), Some(idx(&s, "blessing_of_protection")), "aimed at a friend, not a stance");
+    s.set_aim_line(a, 0.0, 0.0);
+    let ev = click(&mut s, a);
+    assert!(missiles(&ev, a, 1022) >= 1);
+    assert!((s.taken_share(b) - 0.5).abs() < 1.0e-3, "half of every blow on him");
+    assert!(s.unstaggerable(b), "and nothing staggers him");
+    assert!((s.taken_share(a) - 1.0).abs() < 1.0e-3, "not on her");
+    run(&mut s, 3.2);
+    assert!((s.taken_share(b) - 1.0).abs() < 1.0e-3, "for 3 s");
+    // Alone, it's hers.
+    let _ = s.leave(b);
+    press(&mut s, a, "blessing_of_protection", false);
+    click(&mut s, a);
+    assert!((s.taken_share(a) - 0.5).abs() < 1.0e-3, "on herself");
+}
+
+#[test]
+fn lay_on_hands_on_a_friend_heals_two_fifths_and_ends_what_is_on_them() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    let max = s.players[&b].max_health;
+    s.players.get_mut(&b).unwrap().health = max / 4;
+    s.apply_cc(b, b, "snare", 5.0, 0.5, 0.0, "test");
+    s.set_valor(a, 25.0);
+    press(&mut s, a, "blessing_of_protection", true);
+    assert_eq!(aiming(&s, a), Some(idx(&s, "lay_on_hands")));
+    s.set_aim_line(a, 0.0, 0.0);
+    let ev = click(&mut s, a);
+    let (got, want) = (s.players[&b].health - max / 4, (max as f32 * 0.4).round() as u32);
+    assert!(got >= want && got <= want + 2, "two fifths of his health: {got}");
+    assert!(!s.has_cc(b, "snare"), "cleansed");
+    assert!(flashed(&ev, a, "Healed Bren"));
+}
+
+#[test]
+fn an_old_paladins_save_comes_back_with_the_new_cards() {
+    let (s, p) = load_old_save("paladin", &[("ranged", "holy_shock"), ("close", "consecration"), ("utility", "hammer_of_justice"), ("defense", "divine_protection"), ("ultimate", "sanctuary")]);
+    has_on_keys(&s, p, &[("ranged", "avengers_shield"), ("close", "consecration"), ("utility", "divine_steed"), ("defense", "blessing_of_protection"), ("ultimate", "sanctuary")]);
+    // The old keys that still name something (an EX version, a recast) never come back as cards.
+    let h = &s.players[&p];
+    assert!(!h.owned.contains("holy_shock") && !h.owned.contains("hammer_of_justice"), "{:?}", h.owned);
+}
+
 // --- Hunter: set up, then snipe -------------------------------------------------------------------
 
 #[test]

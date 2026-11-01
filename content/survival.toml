@@ -2869,37 +2869,41 @@ spell = 2948
 impact_kit = 2609
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 
-# The Warden: light that harms a foe and mends a friend.
+# The Warden: the shield that hunts casters, and the heal on a friend.
 [[ability]]
-key = "holy_shock"
-name = "Holy Shock"
-text = "An instant bolt of light: it strikes a foe, or heals a friend it touches for 12% of their health (with friendly fire on, every hero is a foe)."
-icon = "Spell_Holy_SearingLight"
+key = "avengers_shield"
+name = "Avenger's Shield"
+text = "Hurl your shield along the reticle: it strikes the first foe and ricochets to two more within 9 yd, each blow weaker, silencing what it strikes for 1.5 s (0.75 s on heroes). Shut a caster up."
+icon = "Spell_Holy_BlessingOfProtection"
 school = "paladin"
 slot = "ranged"
 kind = "projectile"
-damage = [14.0, 14.0]
+damage = [15.0, 15.0]
 range = [28.0, 28.0]
 radius = [0.45, 0.45]
-speed = 30.0
+chain = 2
+chain_range = 9.0
+chain_falloff = 0.7
+# Hammer of Wrath's spinning holy hammer (its own speed), thrown and bouncing on.
+speed = 35.0
 cooldown = 5.0
-ally_heal = 0.12
-spell = 2812
+spell = 24275
+clip = 107
 valor_hit = 4.0
+effects = [{ kind = "silence", secs = [1.5, 1.5] }]
 
+# The heal moves to the EX, as a true ally spell. (`holy_shock` was the Q card before: a save
+# naming it gets Avenger's Shield, the card in its place.)
 [[ability]]
-key = "purifying_shock"
-name = "Purifying Shock"
-ex_of = "holy_shock"
-text = "Strikes harder; on a friend it heals twice as much and ends their roots, slows, stuns, burns and fears."
-icon = "Spell_Holy_HolyNova"
+key = "holy_shock"
+name = "Holy Shock"
+ex_of = "avengers_shield"
+text = "At once, on the friend under your reticle (or on you): a quarter of their health back, and every root, slow, stun, burn and fear on them ends."
+icon = "Spell_Holy_SearingLight"
 slot = "ranged"
-kind = "projectile"
+kind = "ally"
 valor = 25
-damage = [20.0, 20.0]
 range = [30.0, 30.0]
-radius = [0.5, 0.5]
-speed = 40.0
 ally_heal = 0.25
 cleanse = true
 spell = 2812
@@ -3126,42 +3130,55 @@ cleanse = true
 leaves = "frost_nova"
 spell = 1953
 
-# The Warden: control.
+# The Warden: ride in, then punish.
+[[ability]]
+key = "divine_steed"
+name = "Divine Steed"
+text = "A burst of holy speed: 60% faster for 3 s, and whatever holds you (roots, slows) falls away. Press again within 3 s to throw Hammer of Justice, stunning what it strikes for 2 s (1 s on heroes). Ride in, then punish."
+icon = "Spell_Nature_Swiftness"
+school = "paladin"
+slot = "utility"
+kind = "buff"
+cleanse = true
+cooldown = 14.0
+# Summon Warhorse's flash of light.
+spell = 13819
+effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.6 }]
+recast = "hammer_of_justice"
+recast_secs = 3.0
+
+# Divine Steed's second press. (`hammer_of_justice` was the 1 card before: a save naming it gets
+# Divine Steed, the card in its place.)
 [[ability]]
 key = "hammer_of_justice"
 name = "Hammer of Justice"
-text = "A slow thrown hammer: what it strikes is stunned for 2 s (1 s on heroes)."
+text = "Divine Steed's second press: a thrown hammer that stuns what it strikes for 2 s (1 s on heroes)."
 icon = "Spell_Holy_SealOfMight"
-school = "paladin"
+inner = true
 slot = "utility"
 kind = "projectile"
 damage = [8.0, 8.0]
 range = [26.0, 26.0]
 radius = [0.45, 0.45]
 speed = 20.0
-cooldown = 15.0
 spell = 20685
 clip = 107
 impact_kit = 485
 effects = [{ kind = "stun", secs = [2.0, 2.0] }]
 
 [[ability]]
-key = "hammer_of_wrath"
-name = "Hammer of Wrath"
-ex_of = "hammer_of_justice"
-text = "A fast, heavy hammer that stuns for 1 s, and kills outright anything under 20% of its health."
-icon = "Ability_ThunderClap"
+key = "blessing_of_freedom"
+name = "Blessing of Freedom"
+ex_of = "divine_steed"
+text = "On the friend under your reticle (or on you): whatever holds them falls away, and for 4 s they run 40% faster and nothing staggers them."
+icon = "Spell_Holy_SealOfValor"
 slot = "utility"
-kind = "projectile"
+kind = "ally"
 valor = 25
-damage = [30.0, 30.0]
 range = [30.0, 30.0]
-radius = [0.45, 0.45]
-speed = 35.0
-execute = 0.2
-spell = 24275
-clip = 107
-effects = [{ kind = "stun", secs = [1.0, 1.0] }]
+cleanse = true
+spell = 1044
+effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }, { kind = "steadfast", secs = [4.0, 4.0], amount = 1.0 }]
 
 # === 2: defense ====================================================================================
 # Staying alive: alone, the answer to a pack or a champion's big blow; in a duel, a read (each
@@ -3256,33 +3273,34 @@ aura = 11958
 leaves = "frost_nova"
 counter = { immune = true }
 
-# The Warden: the heal.
+# The Warden: the defense you give away.
 [[ability]]
-key = "divine_protection"
-name = "Divine Protection"
-text = "A 1 s stance: every melee blow or projectile is absorbed and heals you a little instead."
-icon = "Spell_Holy_Restoration"
+key = "blessing_of_protection"
+name = "Blessing of Protection"
+text = "On the friend under your reticle (or on you): for 3 s they take half damage and nothing staggers them. The one defense you can give away."
+icon = "Spell_Holy_SealOfProtection"
 school = "paladin"
 slot = "defense"
-kind = "stance"
-secs = 1.0
-cooldown = 14.0
-spell = 498
-aura = 498
-counter = { absorb_heal = 0.05 }
+kind = "ally"
+range = [30.0, 30.0]
+cooldown = 16.0
+spell = 1022
+# Divine Protection's golden bubble on them while it lasts.
+effects = [{ kind = "hallowed", secs = [3.0, 3.0], amount = 0.5, aura = 498 }, { kind = "steadfast", secs = [3.0, 3.0], amount = 1.0 }]
 
 [[ability]]
 key = "lay_on_hands"
 name = "Lay on Hands"
-ex_of = "divine_protection"
-text = "At once: a third of your health back, and every snare, root, stun and mark on you ends."
+ex_of = "blessing_of_protection"
+text = "On the friend under your reticle (or on you): 40% of their health back at once, and every snare, root, stun and mark on them ends."
 icon = "Spell_Holy_LayOnHands"
 slot = "defense"
-kind = "buff"
+kind = "ally"
 valor = 25
+range = [30.0, 30.0]
+ally_heal = 0.4
 cleanse = true
 spell = 633
-effects = [{ kind = "heal", amount = 0.33 }]
 
 # === 3: ultimate ===================================================================================
 
@@ -8542,7 +8560,7 @@ name = "The Vigil's Shrine"
 at = [-9125.0, -1030.0]
 display = 6873
 scale = 0.8
-teaches = ["holy_shock", "consecration"]
+teaches = ["avengers_shield", "consecration"]
 keep = true
 secs = 3.0
 text = "The heroes of Elwynn are remembered here, and their Light with them."
@@ -8648,7 +8666,7 @@ trial = ["trial_relic_priest_0", "trial_relic_priest_1"]
 key = "relic_paladin"
 name = "The Lightbringer's Charge"
 at = [-9640.0, 696.0]
-teaches = ["hammer_of_justice", "divine_protection"]
+teaches = ["divine_steed", "blessing_of_protection"]
 loot = { bronze = 2 }
 display = 259
 secret = 7.0
@@ -9109,7 +9127,7 @@ at = [-9128.0, -1046.0]
 radius = 40.0
 kind = "sanctum"
 icon = "Spell_Holy_HolyBolt"
-text = "The paladin's shrine (Holy Shock, Consecration). Forsaken defile the memorial; Defiler Morvane, the paladin's trial, leads them."
+text = "The paladin's shrine (Avenger's Shield, Consecration). Forsaken defile the memorial; Defiler Morvane, the paladin's trial, leads them."
 reward = { bronze = 1 }
 
 [[site]]

@@ -136,10 +136,10 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Aimed Shot · *Multi-Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Flare · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
+| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Flare · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
 | 3 | **Ultimate** | Onslaught | Sanctuary | Kill Shot | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
@@ -149,8 +149,12 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
 
 - **Warrior**: close the gap and break the guard. Charge (or Heroic Leap, landing in a burst that
   throws everyone back), Sundering Blow, an axe to throw, Retaliation against blades, Onslaught.
-- **Paladin**: the holy guardian. Holy Shock heals a friend it touches; Consecration and Sanctuary
-  lay healing ground; Hammer of Justice stuns; Lay on Hands is a third of your health at once.
+- **Paladin**: shield your friends, punish who touches them. Avenger's Shield ricochets to two
+  more foes and silences them; its EX, Holy Shock, heals the friend under your reticle (or you) and
+  frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a burst of speed out of
+  roots, and its key again within 3 s throws Hammer of Justice, a stun: ride in, then punish
+  (its EX, Blessing of Freedom, frees and speeds a friend). Blessing of Protection halves what a
+  friend takes for 3 s, the one defense you give away; Lay on Hands is 40% of their health at once.
 - **Hunter**: set up, then snipe. Aimed Shot is a draw: the longer you hold it, the harder,
   farther and faster the arrow, and fully drawn it goes through the whole line (a heavy blow on you
   spoils it); Multi-Shot is five arrows in a fan. Traps arm and wait (Explosive: a burst that throws
@@ -215,8 +219,8 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 - **Push into the trap**: Thunderstorm, Typhoon or Heroic Leap throw a foe onto
   an Explosive or Freezing Trap; Hurricane keeps them off a point.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
-  stun (Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind Blast and
-  Meteor land.
+  stun (Divine Steed's Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind
+  Blast and Meteor land.
 - **From behind**: Vanish, Blinding Step and Shadowstep set up Backstab; Shadow Bolt's Mark makes
   it crit; a kill under Death Mark readies everything again.
 - **Stay alive**: Power Word: Shield, Barkskin and Healing Stream stack with Holy Nova and
@@ -1152,7 +1156,7 @@ code logs in to the survival realm and every packet the server sends must parse:
 `crates/htl-survival/src/tests_board.rs` covers the board's new cards: Sundering Blow's wind-up,
 share of the weapon and stagger, the guard it crushes and the Unstoppable Blow no guard stops (its
 target warned), Backstab from behind and on a Mark, Ambush's step, Holy Shock healing a friend and
-Purifying Shock freeing them, holy ground burning foes and healing friends (and Hallowed Ground's
+freeing them (and Avenger's Shield striking a foe), holy ground burning foes and healing friends (and Hallowed Ground's
 softened blows), Onslaught, the Death Mark and its reset, Sanctuary, Cold Snap and the shatter,
 Dread Step, an old save's keys put on the board's rows, the five rows of four, Lay on Hands,
 Shield Wall and Dread Ward, and a full charge's flare and faster arrow (Aimed Shot). `tests.rs` has Tab switching

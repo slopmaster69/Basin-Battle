@@ -204,26 +204,27 @@ fn backstab_does_three_times_from_behind_and_crits_on_a_mark_and_ambush_steps_be
 }
 
 #[test]
-fn holy_shock_heals_a_friend_it_touches_and_purifying_shock_ends_what_holds_them() {
+fn holy_shock_heals_the_friend_under_the_reticle_and_ends_what_holds_them_and_the_shield_strikes_a_foe() {
     let mut s = world_with(false);
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [8.0, 0.0, 0.0], 0.0);
     s.set_cooldowns(a, true);
     let max = s.players[&b].max_health;
     s.players.get_mut(&b).unwrap().health = max / 2;
+    // Avenger's Shield's EX, Holy Shock: on the friend under the reticle, at once.
+    s.set_valor(a, 50.0);
     s.set_aim_line(a, 0.0, 0.0);
-    cast(&mut s, a, "ranged", "holy_shock", false);
-    run(&mut s, 1.0);
+    cast(&mut s, a, "ranged", "avengers_shield", true);
     let healed = s.players[&b].health - max / 2;
-    assert_eq!(healed, (max as f32 * 0.12).round() as u32, "12% of his health");
-    // A foe takes it as a blow.
+    assert_eq!(healed, (max as f32 * 0.25).round() as u32, "a quarter of his health");
+    // A foe takes the shield as a blow.
     let k = mob(&mut s, "grunt", [8.0, 6.0, 0.0], 0.0);
     s.players.get_mut(&b).unwrap().pos = [0.0, -20.0, 0.0];
     s.set_aim_line(a, (6.0f32).atan2(8.0), 0.0);
-    let mut ev = cast(&mut s, a, "ranged", "holy_shock", false);
+    let mut ev = cast(&mut s, a, "ranged", "avengers_shield", false);
     ev.extend(run(&mut s, 1.0));
     assert!(hits_on(&ev, k).iter().any(|h| h.0 > 0));
-    // The purifying one ends a root on a friend.
+    // Holy Shock ends a root on a friend.
     calm(&mut s, k);
     s.mobs.get_mut(&k).unwrap().pos = [0.0, 30.0, 0.0];
     s.players.get_mut(&b).unwrap().pos = [8.0, 0.0, 0.0];
@@ -231,8 +232,8 @@ fn holy_shock_heals_a_friend_it_touches_and_purifying_shock_ends_what_holds_them
     assert!(s.has_cc(b, "root"));
     s.set_valor(a, 50.0);
     s.set_aim_line(a, 0.0, 0.0);
-    cast(&mut s, a, "ranged", "holy_shock", true);
-    run(&mut s, 1.0);
+    cast(&mut s, a, "ranged", "avengers_shield", true);
+    run(&mut s, 0.2);
     assert!(!s.has_cc(b, "root"), "set free");
 }
 
@@ -402,7 +403,7 @@ fn an_old_saves_keys_go_on_the_boards_rows() {
     let q = s.join("ayla", "Ayla", Some(&save));
     let l = &s.players[&q].loadout;
     assert_eq!(l.get("ranged").map(String::as_str), Some("fireball"));
-    assert_eq!(l.get("utility").map(String::as_str), Some("hammer_of_justice"), "the first card for the row");
+    assert_eq!(l.get("utility").map(String::as_str), Some("divine_steed"), "the first card for the row (the old Hammer of Justice's place)");
     assert_eq!(l.get("ultimate").map(String::as_str), Some("meteor"));
     assert_eq!(l.get("defense").map(String::as_str), Some("retaliation"), "the old counter, on its own row now");
     assert_eq!(l.get("close").map(String::as_str), Some("sundering_blow"), "a row it had nothing for keeps the default");
@@ -431,16 +432,16 @@ fn the_board_has_five_rows_of_nine() {
 }
 
 #[test]
-fn lay_on_hands_heals_a_third_and_ends_what_is_on_you() {
+fn lay_on_hands_alone_heals_two_fifths_and_ends_what_is_on_you() {
     let mut s = world_with(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.players.get_mut(&p).unwrap().health = 50;
     s.apply_cc(p, p, "snare", 5.0, 0.5, 0.0, "test");
     assert!(s.has_cc(p, "snare"));
     s.set_valor(p, 25.0);
-    cast(&mut s, p, "defense", "divine_protection", true);
+    cast(&mut s, p, "defense", "blessing_of_protection", true);
     let p_ = &s.players[&p];
-    assert_eq!(p_.health, 50 + (p_.max_health as f32 * 0.33).round() as u32);
+    assert_eq!(p_.health, 50 + (p_.max_health as f32 * 0.4).round() as u32);
     assert!(!s.has_cc(p, "snare"), "cleansed");
 }
 

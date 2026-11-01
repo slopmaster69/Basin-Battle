@@ -205,7 +205,11 @@ pub fn save_player(c: &Content, p: &Player) -> PlayerSave {
 /// One block per class, so changes to different classes don't collide.
 const RENAMED: &[(&str, &str)] = &[
     // Warrior
-    // Paladin
+    // Paladin (Holy Shock and Hammer of Justice live on, as Avenger's Shield's EX and Divine
+    // Steed's recast: never a card of their own on a key or in a hero's tree)
+    ("holy_shock", "avengers_shield"),
+    ("hammer_of_justice", "divine_steed"),
+    ("divine_protection", "blessing_of_protection"),
     // Hunter
     ("arcane_shot", "aimed_arrow"),
     ("deterrence", "flare"),
