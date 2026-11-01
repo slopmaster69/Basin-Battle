@@ -273,6 +273,9 @@ Some of this needs a change to the client itself, which this folder carries as p
 - a ground ability's circle lies on the ground where it will land (`SetAimMarker`), and a blow
   coming down lays a red circle where it will fall (`SetGroundMarker`), following the ground;
 - a creature's slow heavy blow holds its coil and snaps onto its impact;
+- a creature's swing trails its last stroke into the blow (amber: a guard stops it, red: it
+  doesn't), not its whole wind-up; a beast with nothing in its hands trails the part of it that
+  strikes, a paw or its head: the ninth round;
 - a creature's blow is drawn on the ground under it as it winds up (`SetTelegraph`): its own
   shape (a wedge of its arc, or a ring all round) out to the reach it lands at, turning and
   moving with it, and a fill growing from the creature to the rim, meeting it as the blow lands.
