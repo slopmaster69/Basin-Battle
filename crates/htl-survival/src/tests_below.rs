@@ -996,19 +996,20 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     s.below.as_mut().unwrap().open.insert("short".into());
     assert_eq!(s.wager_unlocked("deadmines"), 1);
     s.start_wager(3);
-    // Fresh, and tougher: the shortcut shut, the grunt a level's worth (and Hardened) stronger.
+    // Fresh, and tougher: the shortcut shut, the grunt two levels' worth stronger (the week's
+    // terms change the fight, not its numbers).
     assert!(!s.door_is_open("short"), "shut for the wager");
     // What it has to beat, for the tracker: the boss, by name, still up.
     let boss_name = s.content.mobs.iter().find(|m| m.key == s.content.dungeon.as_ref().unwrap().packs.iter().find(|p| p.key == "boss").unwrap().mob).unwrap().name.clone();
     assert_eq!(s.wager_progress(), vec![(boss_name.clone(), false)]);
     let tough = s.mobs[&grunt(&s)].max_health as f32;
-    let want = plain * (1.0 + WAGER_HEALTH).powi(2) * 1.2;
+    let want = plain * (1.0 + WAGER_HEALTH).powi(2);
     assert!((tough - want).abs() <= want * 0.02 + 1.0, "{tough} vs {want}");
     let g = grunt(&s);
     let hit = s.attack_now(g).damage as f32;
     let def = s.mobs[&g].def;
     let base = s.content.mobs[def].attack.damage as f32;
-    assert!((hit - base * (1.0 + WAGER_DAMAGE).powi(2) * 1.16).abs() <= 1.0, "{hit} vs {base}");
+    assert!((hit - base * (1.0 + WAGER_DAMAGE).powi(2)).abs() <= 1.0, "{hit} vs {base}");
     // A hero comes down: the slip, and the clock waits till they leave the lamp.
     let id = s.join("ayla", "Ayla", None);
     let ev = run(&mut s, 1.0);
@@ -1257,10 +1258,10 @@ fn the_wagers_terms_turn_weekly_and_a_run_keeps_the_ones_it_was_taken_with() {
     assert_eq!(names(monday + 7.0 * day), ROTATION[2].to_vec());
     assert_eq!(terms_at(3, monday).len(), 1);
     assert_eq!(terms_at(7, monday).len(), 3);
-    // A +7 taken in week 1: the Kingpin's Due, Frenzied, Eruptions.
+    // A +7 taken in week 1: Quickening, Frenzied, Eruptions.
     let mut s = Survival::new_dungeon(content(), Box::new(FlatLand::default()), 3, monday + day);
     s.start_wager(7);
-    assert!(s.wager_has("tyrant") && s.wager_has("frenzied") && s.wager_has("eruptions") && !s.wager_has("hardened"));
+    assert!(s.wager_has("quickening") && s.wager_has("frenzied") && s.wager_has("eruptions") && !s.wager_has("calling"));
     let keep = s.wager().unwrap().terms.clone();
     // A foe low on health hits a third harder.
     let g = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].mob == "grunt")).unwrap().0;
@@ -1367,4 +1368,85 @@ fn a_first_clear_below_gifts_the_camp_turns_the_books_page_and_only_once() {
     camp.from_below(&up, &BTreeMap::new());
     camp.step(DT);
     assert_eq!(camp.storage.get(&plunder).copied().unwrap_or(0), before + 3, "only the first");
+}
+
+#[test]
+fn the_call_brings_the_nearest_pack_at_rest_after_a_few_seconds_and_only_once() {
+    use crate::sim::wager::CALL_AFTER;
+    let mut c = content();
+    c.dungeon.as_mut().unwrap().packs.push(pack("grunt", "", [50.0, 0.0], false));
+    // Week 0 of the rotation: The Call.
+    let day = 86_400.0;
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, day);
+    s.start_wager(2);
+    assert!(s.wager_has("calling"));
+    s.below.as_mut().unwrap().wager.as_mut().unwrap().started = Some(day);
+    let id = s.join("ayla", "Ayla", None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.max_health = 1_000_000;
+    p.health = 1_000_000;
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let grunt_at = |s: &Survival, x: f32| *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "grunt" && (m.home[0] - x).abs() < 1.0).unwrap().0;
+    let (a, b) = (grunt_at(&s, 30.0), grunt_at(&s, 50.0));
+    let resting = |s: &Survival, m: Id| matches!(s.mobs[&m].state, mobs::MobState::Idle { .. });
+    s.engage(a, mobs::Foe::Hero(id));
+    run(&mut s, CALL_AFTER - 1.0);
+    assert!(resting(&s, b), "not yet");
+    let ev = run(&mut s, 1.5);
+    assert!(!resting(&s, b), "called");
+    let _ = ev;
+    let w = s.wager().unwrap();
+    assert!(w.called_packs.len() == 2, "the caller and the called, each once: {:?}", w.called_packs);
+}
+
+#[test]
+fn quickening_makes_a_boss_hit_harder_the_longer_its_fight_lasts() {
+    use crate::sim::wager::{QUICKEN_MIGHT, QUICKEN_STEP};
+    // Week 1 of the rotation: Quickening.
+    let day = 86_400.0;
+    let mut s = Survival::new_dungeon(content(), Box::new(FlatLand::default()), 3, 4.0 * day + day);
+    s.start_wager(2);
+    assert!(s.wager_has("quickening"));
+    s.below.as_mut().unwrap().wager.as_mut().unwrap().started = Some(5.0 * day);
+    let id = s.join("ayla", "Ayla", None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.max_health = 10_000_000;
+    p.health = 10_000_000;
+    s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+    let boss = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "warlord").unwrap();
+    assert_eq!(s.quickening(boss), 1.0, "at rest");
+    s.engage(boss, mobs::Foe::Hero(id));
+    run(&mut s, QUICKEN_STEP * 2.0 + 0.5);
+    assert!((s.quickening(boss) - (1.0 + 2.0 * QUICKEN_MIGHT)).abs() < 1e-4, "two steps in: {}", s.quickening(boss));
+    // A boss that goes home starts over.
+    s.mobs.get_mut(&boss).unwrap().state = mobs::MobState::Return;
+    run(&mut s, 0.2);
+    assert_eq!(s.quickening(boss), 1.0, "home again");
+}
+
+#[test]
+fn the_call_wakes_only_the_called_pack_not_what_rests_beside_it() {
+    use crate::sim::wager::CALL_AFTER;
+    let mut c = content();
+    // The pack it calls is linked to a third that rests right beside it.
+    let mut called = pack("grunt", "", [50.0, 0.0], false);
+    called.link = 15.0;
+    c.dungeon.as_mut().unwrap().packs.push(called);
+    c.dungeon.as_mut().unwrap().packs.push(pack("grunt", "", [58.0, 0.0], false));
+    let day = 86_400.0;
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, day);
+    s.start_wager(2);
+    s.below.as_mut().unwrap().wager.as_mut().unwrap().started = Some(day);
+    let id = s.join("ayla", "Ayla", None);
+    let p = s.players.get_mut(&id).unwrap();
+    p.max_health = 1_000_000;
+    p.health = 1_000_000;
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    let grunt_at = |s: &Survival, x: f32| *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "grunt" && (m.home[0] - x).abs() < 1.0).unwrap().0;
+    let (a, b, third) = (grunt_at(&s, 30.0), grunt_at(&s, 50.0), grunt_at(&s, 58.0));
+    let resting = |s: &Survival, m: Id| matches!(s.mobs[&m].state, mobs::MobState::Idle { .. });
+    s.engage(a, mobs::Foe::Hero(id));
+    run(&mut s, CALL_AFTER + 0.5);
+    assert!(!resting(&s, b), "the nearest pack comes");
+    assert!(resting(&s, third), "and nothing it's linked to");
 }
