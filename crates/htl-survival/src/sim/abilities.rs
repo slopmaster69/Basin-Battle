@@ -10,6 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::recasts::Free;
 use super::*;
 use crate::content::{slot_role, AbilityDef, SLOTS};
 use crate::land::clear_line;
@@ -509,6 +510,16 @@ impl Survival {
                 return true;
             }
         }
+        // Its recast aimed: the key again calls it off (the window stays open while it lasts).
+        if let Some(r) = self.recast_armed(id, base) {
+            if matches!(p.action, Action::Aim { ability } if ability == r.ability) {
+                if !ex {
+                    self.end_ability_action(id);
+                    self.set_action(id, Action::Ready);
+                }
+                return true;
+            }
+        }
         if let Action::Aim { ability } = p.action {
             if self.content.base_of(ability) == base {
                 // Its key held (or Ctrl with it) while it's aimed: the aim becomes its EX
@@ -536,7 +547,13 @@ impl Survival {
             self.tell(id, format!("{} isn't yours yet.", self.content.abilities[base].name));
             return true;
         }
-        let ability = if ex {
+        // The key armed for its recast: pressed again (Ctrl or not), the recast goes, for nothing
+        // (the first cast spent the cooldown). Empowered (a combo), it's the EX version, free.
+        let recast = self.recast_armed(id, base).map(|r| r.ability);
+        let empowered = recast.is_none() && self.empowered(id, base);
+        let ability = if let Some(r) = recast {
+            r
+        } else if ex || empowered {
             match self.content.ex_of(base) {
                 Some(x) => x,
                 None => {
@@ -558,13 +575,13 @@ impl Survival {
         if !free && !self.cancelable_now(id) {
             return false;
         }
-        if !self.ready(id, ability) {
+        if recast.is_none() && !self.ready(id, ability) {
             let left = (self.cooldown(id, ability).next_at - self.clock).max(0.0);
             let text = if left > 0.05 { format!("{}: ready in {:.0} s", d.name, left.ceil()) } else { format!("{}: not ready", d.name) };
             self.events.push(Event::Flash { player: id, text });
             return true;
         }
-        let cost = self.valor_cost(&d);
+        let cost = if recast.is_some() || empowered { 0.0 } else { self.valor_cost(&d) };
         let valor = self.players[&id].valor;
         if valor + 0.001 < cost {
             self.events.push(Event::Flash { player: id, text: format!("{} needs {} Valor (you have {})", d.name, cost.round(), valor.floor()) });
@@ -585,7 +602,7 @@ impl Survival {
         self.unsheathe(id);
         self.end_ability_action(id);
         // Demonic Circle: the first press sets the anchor, costing nothing.
-        if d.kind == "blink" && d.anchor > 0.0 && self.anchor_of(id, base).is_none() {
+        if recast.is_none() && d.kind == "blink" && d.anchor > 0.0 && self.anchor_of(id, base).is_none() {
             self.set_anchor(id, base);
             return true;
         }
@@ -756,9 +773,12 @@ impl Survival {
     pub(crate) fn fire(&mut self, id: Id, ability: usize, share: f32) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
+        let began = self.players[&id].pos;
+        // A recast, or an empowered EX version: free (what made it so is used up).
+        let free = self.take_free(id, ability);
         // A cast brings them out of a veil.
         self.end_veil(id);
-        let cost = self.valor_cost(&d);
+        let cost = if free.is_some() { 0.0 } else { self.valor_cost(&d) };
         if let Some(p) = self.players.get_mut(&id) {
             p.valor = (p.valor - cost).max(0.0);
             p.release_at_least = false;
@@ -772,7 +792,7 @@ impl Survival {
         if matches!(self.players[&id].action, Action::Charge { .. }) {
             self.events.push(Event::CastDone { caster: id, spell: 0 });
         }
-        if d.counter.is_none() {
+        if d.counter.is_none() && !matches!(free, Some(Free::Recast { .. })) {
             self.spend_charge(id, ability, 1.0);
         }
         let (yaw, _) = self.aim_of(id);
@@ -851,7 +871,11 @@ impl Survival {
                     self.set_action(id, next);
                 }
             }
-            "leap" => self.start_leap(id, ability, share),
+            "leap" => match free {
+                // A leap back to where the cast before it began.
+                Some(Free::Recast { start }) if d.recast_to_start => self.leap_to(id, ability, share, Some(start)),
+                _ => self.start_leap(id, ability, share),
+            },
             "trap" => {
                 self.place_trap(id, ability, share);
                 self.set_action(id, next);
@@ -868,7 +892,11 @@ impl Survival {
                 self.set_action(id, next);
             }
             "blink" => {
-                self.blink(id, ability, share);
+                match free {
+                    // A blink back to where the cast before it began (there and back).
+                    Some(Free::Recast { start }) if d.recast_to_start => self.step_back_to(id, ability, start),
+                    _ => self.blink(id, ability, share),
+                }
                 self.set_action(id, next);
             }
             "stance" => self.start_stance(id, ability),
@@ -881,6 +909,8 @@ impl Survival {
         if let Some(also) = self.content.ability(&d.also) {
             self.fire_also(id, also, yaw, share);
         }
+        // Its key armed for its recast, the card it empowers empowered.
+        self.arm_combos(id, ability, began, free);
         self.events.push(Event::Abilities { player: id });
         self.events.push(Event::Log(format!("{} casts {} at {:.0}%", self.players[&id].name, d.name, share * 100.0)));
     }
@@ -1859,11 +1889,13 @@ impl Survival {
         let range = AbilityDef::at(d.range, share);
         let pos = self.players[&id].pos;
         let dir = [yaw.cos(), yaw.sin(), 0.0];
-        // Along the ground: as far as the range, a wall, a drop or a climb, or the first body.
+        // Along the ground: as far as the range, a wall, a drop or a climb, or the first body
+        // (going `through`, past every body, each struck as it's passed).
         let bodies = self.bodies(id);
         let mut dist = 0.0f32;
         let mut z = pos[2];
         let mut target = None;
+        let mut passed: Vec<(f32, Id, Vec3)> = Vec::new();
         while dist < range {
             let next = (dist + STEP).min(range);
             let p = add(pos, dir, next);
@@ -1872,7 +1904,14 @@ impl Survival {
                 break;
             }
             let at = [p[0], p[1], g];
-            if let Some((b, ..)) = bodies.iter().find(|(_, feet, _, size)| dist2d(*feet, at) <= size + 0.9 && (feet[2] - g).abs() < 2.5) {
+            let near = |feet: &Vec3, size: f32| dist2d(*feet, at) <= size + 0.9 && (feet[2] - g).abs() < 2.5;
+            if d.through {
+                for (b, feet, _, size) in &bodies {
+                    if near(feet, *size) && !passed.iter().any(|(_, x, _)| x == b) {
+                        passed.push(((next / DASH_SPEED).max(0.0), *b, at));
+                    }
+                }
+            } else if let Some((b, ..)) = bodies.iter().find(|(_, feet, _, size)| near(feet, *size)) {
                 target = Some(*b);
                 break;
             }
@@ -1880,25 +1919,22 @@ impl Survival {
             dist = next;
         }
         let secs = (dist / DASH_SPEED).max(0.08);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.combos.through = passed.into_iter().map(|(t, b, at)| (t.min(secs), b, at)).collect();
+        }
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target, share });
         self.events.push(Event::Dash { player: id, dir: yaw, speed: dist / secs, secs });
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
     }
 
-    /// A dash ends: who it ran into takes its blow.
+    /// A dash ends: who it ran into takes its blow (going through, whoever's left to pass).
     pub(crate) fn end_dash(&mut self, id: Id) {
-        let Some(Action::Dash { ability, target, share, .. }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
+        let Some(Action::Dash { ability, target, share, secs, .. }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
         self.set_action(id, Action::Ready);
+        self.dash_through(id, ability, share, secs + 1.0);
         let Some(v) = target.filter(|v| self.alive(*v)) else { return };
-        let d = self.content.abilities[ability].clone();
         let from = self.players[&id].pos;
-        let damage = AbilityDef::at(d.damage, share);
-        if self.players.contains_key(&v) {
-            let dmg = self.ability_damage(id, v, ability, damage);
-            self.strike_fair_as(id, v, dmg, from, true, true, false, Blow::Heavy, None, combat::Follow::Ability { ability, share }, HitKind::Melee);
-        } else {
-            self.ability_on_mob(id, v, ability, share, damage, from, HitKind::Melee, d.spell);
-        }
+        self.dash_strike(id, v, ability, share, from);
     }
 
     fn blink(&mut self, id: Id, ability: usize, share: f32) {
@@ -2087,6 +2123,12 @@ impl Survival {
             Action::Channel { ability, .. } if self.content.abilities[ability].kind == "beam" => self.step_beam(id),
             Action::Channel { .. } => self.step_channel(id),
             Action::Dash { t, secs, ability, target, share } => {
+                // Going through: each body passed by now takes its blow (and an answer to one, a
+                // counter's stagger, ends the dash).
+                self.dash_through(id, ability, share, t + dt);
+                if !matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Dash { .. })) {
+                    return;
+                }
                 if t + dt >= secs {
                     self.end_dash(id);
                 } else if let Some(p) = self.players.get_mut(&id) {

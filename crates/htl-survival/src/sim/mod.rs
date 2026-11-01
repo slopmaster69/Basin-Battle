@@ -18,6 +18,7 @@ pub mod dungeon;
 mod journal;
 pub mod mobs;
 pub(crate) mod moves;
+pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 mod raid;
@@ -561,6 +562,8 @@ pub struct Player {
     pub rooted: bool,
     /// A panic's last stride.
     pub panic_stride: f32,
+    /// Keys armed for a recast, cards empowered, a dash going through bodies.
+    pub combos: recasts::Combos,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -941,6 +944,7 @@ impl Survival {
         self.step_grounds();
         self.step_totems();
         self.step_stances();
+        self.step_combos();
         self.step_cc();
         self.step_holds();
         self.step_dummies();
@@ -1056,6 +1060,7 @@ impl Survival {
             sheathed: false,
             rooted: false,
             panic_stride: 0.0,
+            combos: recasts::Combos::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];
