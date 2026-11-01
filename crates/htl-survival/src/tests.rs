@@ -2989,6 +2989,15 @@ fn a_blow_can_borrow_another_character_models_clip() {
     // A creature on a character model takes every blow from the one it names.
     let g = s.content.mob("grunt").unwrap();
     s.content.mobs[g].clips_from = Some("OrcFemale".into());
+    // (Its blows' own `from` would win: none here, so the creature's holds.)
+    for pat in &mut s.content.mobs[g].patterns {
+        for st in &mut pat.steps {
+            st.from = None;
+        }
+    }
+    if let Some(sp) = s.content.mobs[g].special.as_mut() {
+        sp.from = None;
+    }
     let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
     s.engage(k, Foe::Hero(p));
     let mut ev = Vec::new();

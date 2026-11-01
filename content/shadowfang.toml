@@ -896,6 +896,7 @@ key = "sf_springvale"
 name = "Commander Springvale"
 subname = "Fallen Paladin"
 display = 1583
+clips_from = "TaurenMale"
 scale = 1.2
 health = 1050
 run_speed = 6.8
@@ -924,18 +925,18 @@ respawn = 0.0
   [[mob.pattern]]
   name = "hammer"
   weight = 3.0
-  steps = [ { clip = 18, take = 0, windup = 0.8, damage = 28, recovery = 0.25 }, { clip = 58, windup = 1.0, damage = 40, arc = 80.0, recovery = 1.3, kit = 379 } ]
+  steps = [ { from = "TaurenMale", clip = 18, take = 0, windup = 0.8, damage = 28, recovery = 0.25 }, { from = "ScourgeMale", clip = 58, windup = 1.0, damage = 40, arc = 80.0, recovery = 1.3, kit = 379 } ]
   # Unholy consecration: the ground round him burns.
   [[mob.pattern]]
   name = "desecration"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 1.1, range = 6.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 24050 } ]
+  steps = [ { from = "TrollFemale", clip = 54, windup = 1.1, range = 6.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 24050 } ]
   [[mob.pattern]]
   name = "judgement"
   weight = 2.0
   below = 0.5
-  steps = [ { clip = 58, windup = 1.2, range = 4.0, arc = 90.0, damage = 48, heavy = true, recovery = 0.3, kit = 379 }, { clip = 54, windup = 0.6, range = 5.5, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.5, look = 24050 } ]
+  steps = [ { from = "NightElfFemale", clip = 58, windup = 1.2, range = 4.0, arc = 90.0, damage = 48, heavy = true, recovery = 0.3, kit = 379 }, { from = "GnomeFemale", clip = 54, windup = 0.6, range = 5.5, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.5, look = 24050 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.82
@@ -954,14 +955,14 @@ respawn = 0.0
   [[mob.pattern]]
   name = "string"
   weight = 3
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 27, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 27, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 42, kit = 379, heavy = true, recovery = 1.1 } ]
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.5, damage = 27, recovery = 0.15 }, { from = "OrcMale", clip = 17, take = 1, windup = 0.42, damage = 27, recovery = 0.15 }, { from = "DwarfMale", clip = 57, windup = 0.8, damage = 42, kit = 379, heavy = true, recovery = 1.1 } ]
   # From range: it closes the gap in one blow.
   [[mob.pattern]]
   name = "lunge"
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "TaurenFemale", clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
   # Nearer its end, from range: shadow thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "shadow"
@@ -1193,6 +1194,7 @@ key = "sf_arugal"
 name = "Archmage Arugal"
 subname = "Master of Shadowfang"
 display = 2353
+clips_from = "HumanFemale"
 scale = 1.0
 health = 1500
 run_speed = 7.0
@@ -1239,7 +1241,7 @@ then_look = 27812
   name = "thunder shock"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  steps = [ { from = "HumanFemale", clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
   [[mob.pattern]]
   name = "arugal's curse"
   weight = 2.0

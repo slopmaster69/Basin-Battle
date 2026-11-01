@@ -333,6 +333,7 @@ key = "sl_diviner"
 name = "Scarlet Diviner"
 subname = "The Scarlet Crusade"
 display = 2434
+clips_from = "GnomeMale"
 health = 90
 run_speed = 7.0
 walk_speed = 2.0
@@ -367,7 +368,7 @@ respawn = 0.0
   name = "arcane burst"
   weight = 2.0
   max_range = 3.5
-  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 13, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  steps = [ { from = "HumanFemale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 13, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
 
 # Houndmaster Loksey: "Release the hounds!"
 [[mob]]
@@ -375,6 +376,7 @@ key = "sl_loksey"
 name = "Houndmaster Loksey"
 subname = "The Scarlet Crusade"
 display = 2052
+clips_from = "TrollMale"
 scale = 1.2
 health = 950
 run_speed = 7.5
@@ -402,18 +404,18 @@ respawn = 0.0
   [[mob.pattern]]
   name = "mace"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.12 }, { clip = 57, windup = 0.8, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
+  steps = [ { from = "TrollMale", clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.12 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.12 }, { from = "GnomeMale", clip = 57, windup = 0.8, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
   [[mob.pattern]]
   name = "bloodlust charge"
   weight = 2.0
   min_range = 4.0
   max_range = 14.0
-  steps = [ { clip = 17, take = 1, windup = 0.7, lunge = 9.0, damage = 28, heavy = true, recovery = 1.0, kit = 379 } ]
+  steps = [ { from = "HumanFemale", clip = 17, take = 1, windup = 0.7, lunge = 9.0, damage = 28, heavy = true, recovery = 1.0, kit = 379 } ]
   [[mob.pattern]]
   name = "whistle"
   weight = 1.5
   max_range = 4.0
-  steps = [ { clip = 54, windup = 1.0, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.1, kit = 389 } ]
+  steps = [ { from = "OrcFemale", clip = 54, windup = 1.0, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.1, kit = 389 } ]
   [[mob.phase]]
   at = 0.66
   speed = 0.88
@@ -435,7 +437,7 @@ respawn = 0.0
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { from = "DwarfFemale", clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { from = "TaurenMale", clip = 57, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
   # Nearer its end, from range: arcane fire thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "arcane fire"
@@ -450,6 +452,7 @@ key = "sl_doan"
 name = "Arcanist Doan"
 subname = "The Scarlet Crusade"
 display = 2070
+clips_from = "ScourgeFemale"
 scale = 1.15
 health = 1300
 run_speed = 7.0
@@ -496,7 +499,7 @@ then_look = 27812
   name = "arcane explosion"
   weight = 2.0
   max_range = 4.5
-  steps = [ { clip = 54, windup = 0.9, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  steps = [ { from = "ScourgeFemale", clip = 54, windup = 0.9, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
   [[mob.pattern]]
   name = "detonation"
   weight = 2.0
@@ -801,6 +804,7 @@ key = "sl_archivist"
 name = "Archivist Corwin"
 subname = "Keeper of the Restricted Section"
 display = 2434
+clips_from = "TaurenFemale"
 scale = 1.15
 health = 820
 run_speed = 7.0
@@ -841,7 +845,7 @@ respawn = 0.0
   name = "burst"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  steps = [ { from = "TaurenFemale", clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
   # A page of fire lobbed where you stand (marked as he reads it).
   [[mob.pattern]]
   name = "burning page"

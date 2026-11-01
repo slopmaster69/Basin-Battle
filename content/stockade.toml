@@ -567,6 +567,7 @@ key = "st_prisoner"
 name = "Defias Prisoner"
 subname = "The Stockade"
 display = 2335
+clips_from = "ScourgeMale"
 health = 90
 run_speed = 7.5
 walk_speed = 2.0
@@ -591,13 +592,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "stabs"
   weight = 3.0
-  steps = [ { clip = 85, take = 0, windup = 0.38, damage = 8, recovery = 0.12 }, { clip = 88, take = 0, windup = 0.32, damage = 8, recovery = 0.12 }, { clip = 85, take = 0, windup = 0.45, damage = 11, recovery = 0.9 } ]
+  steps = [ { from = "ScourgeMale", clip = 85, take = 0, windup = 0.38, damage = 8, recovery = 0.12 }, { from = "ScourgeMale", clip = 88, take = 0, windup = 0.32, damage = 8, recovery = 0.12 }, { from = "ScourgeMale", clip = 85, take = 0, windup = 0.45, damage = 11, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
   min_range = 3.5
   max_range = 8.0
-  steps = [ { clip = 85, take = 0, windup = 0.5, lunge = 4.5, damage = 13, recovery = 0.8 } ]
+  steps = [ { from = "TrollFemale", clip = 85, take = 0, windup = 0.5, lunge = 4.5, damage = 13, recovery = 0.8 } ]
 
 # Convicts: a club and nothing to lose, one big swing at the end.
 [[mob]]
@@ -605,6 +606,7 @@ key = "st_convict"
 name = "Defias Convict"
 subname = "The Stockade"
 display = 2337
+clips_from = "HumanMale"
 health = 140
 run_speed = 7.0
 walk_speed = 2.0
@@ -629,11 +631,11 @@ respawn = 0.0
   [[mob.pattern]]
   name = "two swings"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "haymaker"
   weight = 1.5
-  steps = [ { clip = 57, windup = 1.05, damage = 26, heavy = true, recovery = 1.2, kit = 379 } ]
+  steps = [ { from = "OrcMale", clip = 57, windup = 1.05, damage = 26, heavy = true, recovery = 1.2, kit = 379 } ]
 
 # Inmates: a stolen axe and a guard's shield.
 [[mob]]
@@ -641,6 +643,7 @@ key = "st_inmate"
 name = "Defias Inmate"
 subname = "The Stockade"
 display = 2343
+clips_from = "HumanFemale"
 health = 125
 run_speed = 7.0
 walk_speed = 2.0
@@ -667,12 +670,12 @@ respawn = 0.0
   [[mob.pattern]]
   name = "chops"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.85 } ]
+  steps = [ { from = "HumanFemale", clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.2 }, { from = "HumanFemale", clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.85 } ]
   [[mob.pattern]]
   name = "shield bash"
   weight = 1.5
   max_range = 2.6
-  steps = [ { clip = 95, windup = 0.4, damage = 8, range = 2.8, arc = 90.0, heavy = true, recovery = 0.8 } ]
+  steps = [ { from = "OrcFemale", clip = 95, windup = 0.4, damage = 8, range = 2.8, arc = 90.0, heavy = true, recovery = 0.8 } ]
 
 # Insurgents: fire from the back of the cell, a ring of it if you close in.
 [[mob]]
@@ -680,6 +683,7 @@ key = "st_insurgent"
 name = "Defias Insurgent"
 subname = "The Stockade"
 display = 2360
+clips_from = "TrollMale"
 health = 80
 run_speed = 7.0
 walk_speed = 2.0
@@ -715,7 +719,7 @@ respawn = 0.0
   name = "fire ring"
   weight = 2.0
   max_range = 3.5
-  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  steps = [ { from = "NightElfMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
 
 # --- the Stockade's bosses ----------------------------------------------------------------------------
 
@@ -725,6 +729,7 @@ key = "st_kam"
 name = "Kam Deepfury"
 subname = "Out of Solitary"
 display = 1406
+clips_from = "GnomeMale"
 scale = 1.2
 health = 950
 run_speed = 6.5
@@ -754,32 +759,32 @@ respawn = 0.0
   [[mob.pattern]]
   name = "chops"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 20, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.45, damage = 20, recovery = 0.15 }, { clip = 57, windup = 0.85, damage = 30, heavy = true, recovery = 1.1 } ]
+  steps = [ { from = "GnomeMale", clip = 17, take = 0, windup = 0.55, damage = 20, recovery = 0.15 }, { from = "HumanFemale", clip = 17, take = 1, windup = 0.45, damage = 20, recovery = 0.15 }, { from = "OrcFemale", clip = 57, windup = 0.85, damage = 30, heavy = true, recovery = 1.1 } ]
   # The shield in your face: it knocks a wind-up out of you.
   [[mob.pattern]]
   name = "shield slam"
   weight = 2.0
   max_range = 2.8
-  steps = [ { clip = 95, windup = 0.45, damage = 12, range = 3.0, arc = 90.0, heavy = true, recovery = 0.8, kit = 379 } ]
+  steps = [ { from = "DwarfFemale", clip = 95, windup = 0.45, damage = 12, range = 3.0, arc = 90.0, heavy = true, recovery = 0.8, kit = 379 } ]
   # A dwarf's charge, shield first.
   [[mob.pattern]]
   name = "charge"
   weight = 1.5
   min_range = 5.0
   max_range = 13.0
-  steps = [ { clip = 95, windup = 0.9, lunge = 8.0, damage = 26, heavy = true, recovery = 1.3, kit = 379 } ]
+  steps = [ { from = "TaurenMale", clip = 95, windup = 0.9, lunge = 8.0, damage = 26, heavy = true, recovery = 1.3, kit = 379 } ]
   # From his first turn: his head, then the axe overhead.
   [[mob.pattern]]
   name = "headbutt"
   weight = 2.0
   below = 0.6
-  steps = [ { clip = 54, windup = 0.5, damage = 14, range = 2.6, arc = 80.0, heavy = true, recovery = 0.2 }, { clip = 57, windup = 0.8, damage = 34, heavy = true, recovery = 1.3, kit = 379 } ]
+  steps = [ { from = "ScourgeMale", clip = 54, windup = 0.5, damage = 14, range = 2.6, arc = 80.0, heavy = true, recovery = 0.2 }, { from = "TrollFemale", clip = 57, windup = 0.8, damage = 34, heavy = true, recovery = 1.3, kit = 379 } ]
   # At the last: the axe round him, again and again.
   [[mob.pattern]]
   name = "deepfury"
   weight = 2.0
   below = 0.25
-  steps = [ { clip = 126, windup = 0.8, range = 4.2, arc = 360.0, damage = 20, recovery = 0.1, kit = 369 }, { clip = 126, windup = 0.45, range = 4.2, arc = 360.0, damage = 22, recovery = 0.1 }, { clip = 126, windup = 0.45, range = 4.2, arc = 360.0, damage = 26, heavy = true, recovery = 1.5 } ]
+  steps = [ { from = "NightElfFemale", clip = 126, windup = 0.8, range = 4.2, arc = 360.0, damage = 20, recovery = 0.1, kit = 369 }, { from = "GnomeFemale", clip = 126, windup = 0.45, range = 4.2, arc = 360.0, damage = 22, recovery = 0.1 }, { from = "HumanMale", clip = 126, windup = 0.45, range = 4.2, arc = 360.0, damage = 26, heavy = true, recovery = 1.5 } ]
   [[mob.phase]]
   at = 0.6
   speed = 0.88
@@ -800,6 +805,7 @@ key = "st_hamhock"
 name = "Hamhock"
 subname = "The Stockade"
 display = 2340
+clips_from = "OrcMale"
 scale = 1.35
 health = 800
 run_speed = 6.5
@@ -826,7 +832,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "pummel"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.6, damage = 18, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.5, damage = 18, recovery = 0.15 }, { clip = 57, windup = 0.9, damage = 28, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "OrcMale", clip = 17, take = 0, windup = 0.6, damage = 18, recovery = 0.15 }, { from = "DwarfMale", clip = 17, take = 1, windup = 0.5, damage = 18, recovery = 0.15 }, { from = "TaurenFemale", clip = 57, windup = 0.9, damage = 28, heavy = true, recovery = 1.2 } ]
   # Lightning from his hands, jumping to where you stand.
   [[mob.pattern]]
   name = "chain lightning"
@@ -838,7 +844,7 @@ respawn = 0.0
   name = "stomp"
   weight = 1.5
   max_range = 3.2
-  steps = [ { clip = 54, windup = 0.85, range = 4.6, arc = 360.0, damage = 20, heavy = true, recovery = 1.1, kit = 356 } ]
+  steps = [ { from = "ScourgeFemale", clip = 54, windup = 0.85, range = 4.6, arc = 360.0, damage = 20, heavy = true, recovery = 1.1, kit = 356 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.75
@@ -854,19 +860,20 @@ respawn = 0.0
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 26, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "TrollMale", clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 26, kit = 379, heavy = true, recovery = 1.2 } ]
   # A quick one, then a heavy blow held back to catch an early dodge.
   [[mob.pattern]]
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { from = "NightElfMale", clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { from = "GnomeMale", clip = 57, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
 
 [[mob]]
 key = "st_targorr"
 name = "Targorr the Dread"
 subname = "The Stockade"
 display = 1139
+clips_from = "GnomeFemale"
 scale = 1.25
 health = 1150
 run_speed = 6.8
@@ -895,31 +902,31 @@ respawn = 0.0
   [[mob.pattern]]
   name = "two chops"
   weight = 3.0
-  steps = [ { clip = 18, take = 0, windup = 0.8, damage = 30, arc = 140.0, recovery = 0.25 }, { clip = 18, take = 1, windup = 0.65, damage = 32, arc = 140.0, recovery = 1.2 } ]
+  steps = [ { from = "GnomeFemale", clip = 18, take = 0, windup = 0.8, damage = 30, arc = 140.0, recovery = 0.25 }, { from = "HumanMale", clip = 18, take = 1, windup = 0.65, damage = 32, arc = 140.0, recovery = 1.2 } ]
   # The axe held high: it waits out a panicked dodge.
   [[mob.pattern]]
   name = "dread overhead"
   weight = 2.0
-  steps = [ { clip = 58, windup = 1.4, damage = 52, arc = 70.0, heavy = true, recovery = 1.5, kit = 379 } ]
+  steps = [ { from = "OrcMale", clip = 58, windup = 1.4, damage = 52, arc = 70.0, heavy = true, recovery = 1.5, kit = 379 } ]
   [[mob.pattern]]
   name = "leap"
   weight = 1.5
   min_range = 6.0
   max_range = 15.0
-  steps = [ { clip = 58, windup = 1.1, lunge = 9.0, range = 4.0, arc = 360.0, damage = 40, heavy = true, recovery = 1.5, kit = 379, look = 26271 } ]
+  steps = [ { from = "DwarfMale", clip = 58, windup = 1.1, lunge = 9.0, range = 4.0, arc = 360.0, damage = 40, heavy = true, recovery = 1.5, kit = 379, look = 26271 } ]
   # From his first turn: the axe whirled round him.
   [[mob.pattern]]
   name = "thrash"
   weight = 2.0
   below = 0.6
   max_range = 4.0
-  steps = [ { clip = 126, windup = 0.9, range = 4.6, arc = 360.0, damage = 26, heavy = true, recovery = 0.2, kit = 369 }, { clip = 126, windup = 0.55, range = 4.6, arc = 360.0, damage = 28, heavy = true, recovery = 1.4 } ]
+  steps = [ { from = "TaurenFemale", clip = 126, windup = 0.9, range = 4.6, arc = 360.0, damage = 26, heavy = true, recovery = 0.2, kit = 369 }, { from = "ScourgeFemale", clip = 126, windup = 0.55, range = 4.6, arc = 360.0, damage = 28, heavy = true, recovery = 1.4 } ]
   # At the last: chop after chop, and the floor cracks under the last.
   [[mob.pattern]]
   name = "the dread"
   weight = 2.5
   below = 0.3
-  steps = [ { clip = 18, take = 0, windup = 0.55, damage = 28, heavy = false, recovery = 0.1 }, { clip = 18, take = 1, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { clip = 18, take = 0, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { clip = 58, windup = 0.85, range = 5.0, arc = 360.0, damage = 46, heavy = true, recovery = 1.8, look = 26271 } ]
+  steps = [ { from = "TrollMale", clip = 18, take = 0, windup = 0.55, damage = 28, heavy = false, recovery = 0.1 }, { from = "NightElfMale", clip = 18, take = 1, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { from = "GnomeMale", clip = 18, take = 0, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { from = "HumanFemale", clip = 58, windup = 0.85, range = 5.0, arc = 360.0, damage = 46, heavy = true, recovery = 1.8, look = 26271 } ]
   [[mob.phase]]
   at = 0.6
   speed = 0.85
@@ -941,6 +948,7 @@ key = "st_dextren"
 name = "Dextren Ward"
 subname = "The Stockade"
 display = 2322
+clips_from = "ScourgeFemale"
 scale = 1.1
 health = 760
 run_speed = 7.0
@@ -980,7 +988,7 @@ respawn = 0.0
   name = "terror"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27812 } ]
+  steps = [ { from = "ScourgeFemale", clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27812 } ]
   [[mob.pattern]]
   name = "void"
   weight = 1.5
@@ -1015,6 +1023,7 @@ key = "st_bazil"
 name = "Bazil Thredd"
 subname = "The Riot's Leader"
 display = 2324
+clips_from = "ScourgeMale"
 scale = 1.15
 health = 1300
 run_speed = 7.5
@@ -1050,13 +1059,13 @@ then_kit = 379
   [[mob.pattern]]
   name = "shivs"
   weight = 3.0
-  steps = [ { clip = 85, take = 0, windup = 0.4, damage = 16, recovery = 0.1 }, { clip = 88, take = 0, windup = 0.32, damage = 16, recovery = 0.1 }, { clip = 85, take = 0, windup = 0.32, damage = 16, recovery = 0.1 }, { clip = 88, take = 0, windup = 0.5, damage = 22, heavy = true, recovery = 0.9 } ]
+  steps = [ { from = "ScourgeMale", clip = 85, take = 0, windup = 0.4, damage = 16, recovery = 0.1 }, { from = "TrollFemale", clip = 88, take = 0, windup = 0.32, damage = 16, recovery = 0.1 }, { from = "NightElfFemale", clip = 85, take = 0, windup = 0.32, damage = 16, recovery = 0.1 }, { from = "GnomeFemale", clip = 88, take = 0, windup = 0.5, damage = 22, heavy = true, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
   min_range = 3.5
   max_range = 10.0
-  steps = [ { clip = 85, take = 0, windup = 0.5, lunge = 6.0, damage = 24, recovery = 0.9 } ]
+  steps = [ { from = "HumanMale", clip = 85, take = 0, windup = 0.5, lunge = 6.0, damage = 24, recovery = 0.9 } ]
   # A smoke bomb lobbed where you stand.
   [[mob.pattern]]
   name = "smoke bomb"
@@ -1070,12 +1079,12 @@ then_kit = 379
   weight = 2.0
   below = 0.7
   max_range = 4.0
-  steps = [ { clip = 54, windup = 0.8, range = 5.0, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 0.3, kit = 356, look = 3204 }, { clip = 85, take = 0, windup = 0.5, lunge = 5.0, damage = 22, recovery = 1.0 } ]
+  steps = [ { from = "OrcMale", clip = 54, windup = 0.8, range = 5.0, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 0.3, kit = 356, look = 3204 }, { from = "DwarfMale", clip = 85, take = 0, windup = 0.5, lunge = 5.0, damage = 22, recovery = 1.0 } ]
   [[mob.pattern]]
   name = "riot"
   weight = 2.0
   below = 0.15
-  steps = [ { clip = 85, take = 0, windup = 0.45, damage = 15, recovery = 0.06 }, { clip = 88, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { clip = 85, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { clip = 88, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { clip = 85, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { clip = 88, take = 0, windup = 0.55, damage = 26, heavy = true, recovery = 1.6 } ]
+  steps = [ { from = "TaurenFemale", clip = 85, take = 0, windup = 0.45, damage = 15, recovery = 0.06 }, { from = "ScourgeFemale", clip = 88, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { from = "TrollMale", clip = 85, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { from = "NightElfMale", clip = 88, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { from = "GnomeMale", clip = 85, take = 0, windup = 0.26, damage = 15, recovery = 0.06 }, { from = "HumanFemale", clip = 88, take = 0, windup = 0.55, damage = 26, heavy = true, recovery = 1.6 } ]
   [[mob.phase]]
   at = 0.7
   speed = 0.9
@@ -1104,6 +1113,7 @@ key = "st_warden"
 name = "Warden Thelwater"
 subname = "Bought and Paid For"
 display = 3167
+clips_from = "GnomeFemale"
 scale = 1.15
 health = 1100
 run_speed = 7.0
@@ -1132,24 +1142,24 @@ respawn = 0.0
   [[mob.pattern]]
   name = "drill"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 22, recovery = 0.12 }, { clip = 57, windup = 0.75, damage = 32, heavy = true, recovery = 1.0 } ]
+  steps = [ { from = "GnomeFemale", clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.12 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.4, damage = 22, recovery = 0.12 }, { from = "OrcMale", clip = 57, windup = 0.75, damage = 32, heavy = true, recovery = 1.0 } ]
   [[mob.pattern]]
   name = "shield bash"
   weight = 2.0
   max_range = 2.8
-  steps = [ { clip = 95, windup = 0.4, damage = 12, range = 3.0, arc = 90.0, heavy = true, recovery = 0.7, kit = 379 } ]
+  steps = [ { from = "DwarfMale", clip = 95, windup = 0.4, damage = 12, range = 3.0, arc = 90.0, heavy = true, recovery = 0.7, kit = 379 } ]
   # "You're under arrest": he closes the distance, shield first.
   [[mob.pattern]]
   name = "arrest"
   weight = 2.0
   min_range = 5.0
   max_range = 14.0
-  steps = [ { clip = 95, windup = 0.8, lunge = 9.0, damage = 28, heavy = true, recovery = 1.1, kit = 379 } ]
+  steps = [ { from = "TaurenFemale", clip = 95, windup = 0.8, lunge = 9.0, damage = 28, heavy = true, recovery = 1.1, kit = 379 } ]
   [[mob.pattern]]
   name = "judgement"
   weight = 2.0
   below = 0.5
-  steps = [ { clip = 57, windup = 1.2, range = 4.0, arc = 120.0, damage = 46, heavy = true, recovery = 0.3, kit = 379 }, { clip = 54, windup = 0.6, range = 5.5, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.4, look = 26271 } ]
+  steps = [ { from = "ScourgeFemale", clip = 57, windup = 1.2, range = 4.0, arc = 120.0, damage = 46, heavy = true, recovery = 0.3, kit = 379 }, { from = "TrollMale", clip = 54, windup = 0.6, range = 5.5, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.4, look = 26271 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.82
@@ -1179,6 +1189,7 @@ key = "st_bruegal"
 name = "Bruegal Ironknuckle"
 subname = "The Last Cell"
 display = 1411
+clips_from = "ScourgeMale"
 scale = 1.25
 health = 900
 run_speed = 6.0
@@ -1206,12 +1217,12 @@ respawn = 0.0
   [[mob.pattern]]
   name = "hammer"
   weight = 3.0
-  steps = [ { clip = 18, take = 0, windup = 0.9, damage = 34, arc = 140.0, recovery = 0.3 }, { clip = 58, windup = 1.0, damage = 46, arc = 80.0, recovery = 1.4, kit = 379 } ]
+  steps = [ { from = "ScourgeMale", clip = 18, take = 0, windup = 0.9, damage = 34, arc = 140.0, recovery = 0.3 }, { from = "TrollFemale", clip = 58, windup = 1.0, damage = 46, arc = 80.0, recovery = 1.4, kit = 379 } ]
   [[mob.pattern]]
   name = "earthshaker"
   weight = 1.5
   max_range = 4.0
-  steps = [ { clip = 54, windup = 1.1, range = 6.0, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.3, kit = 356, look = 26271 } ]
+  steps = [ { from = "NightElfFemale", clip = 54, windup = 1.1, range = 6.0, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.3, kit = 356, look = 26271 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.8
@@ -1229,14 +1240,14 @@ respawn = 0.0
   [[mob.pattern]]
   name = "string"
   weight = 3
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 32, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 32, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 49, kit = 379, heavy = true, recovery = 1.1 } ]
+  steps = [ { from = "GnomeFemale", clip = 17, take = 0, windup = 0.5, damage = 32, recovery = 0.15 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.42, damage = 32, recovery = 0.15 }, { from = "OrcMale", clip = 57, windup = 0.8, damage = 49, kit = 379, heavy = true, recovery = 1.1 } ]
   # From range: it closes the gap in one blow.
   [[mob.pattern]]
   name = "lunge"
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 46, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "DwarfMale", clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 46, kit = 379, heavy = true, recovery = 1.2 } ]
   # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "dynamite"
