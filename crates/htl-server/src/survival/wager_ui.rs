@@ -22,7 +22,7 @@ impl SurvivalGame {
                 "Take a wager below and the dungeon starts fresh for your run: every boss up again, every secret hidden, every shortcut shut. The clock starts when you step away from the first lamp and stops when the last boss falls. Each death costs {}.",
                 clock_words(WAGER_DEATH)
             ),
-            "Beat the clock and the next wager opens. Finish with a fifth of the time to spare and you skip a level; with two-fifths to spare, two.".to_string(),
+            "Beat the clock at your highest open wager and the next one opens. Finish with a fifth of the time to spare and you skip a level; with two-fifths to spare, two.".to_string(),
             "Going home through a lamp takes you out of the run. Once everyone is out, the run is over and the dungeon is back as you left it.".to_string(),
             "The higher the wager, the tougher the foes and the better the pay: plunder for everyone, and from +3 the dungeon's gear in the camp's chest.".to_string(),
         ];
