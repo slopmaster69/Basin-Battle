@@ -153,6 +153,15 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.splash > 0.0 && d.kind != "trap" {
         out.push(format!("{} yd burst", n(d.splash)));
     }
+    if d.returns {
+        out.push("comes back".to_string());
+    }
+    if d.lob {
+        out.push("lobbed over foes".to_string());
+    }
+    if d.fuse > 0.0 {
+        out.push(format!("sticks, goes off after {} s", n(d.fuse)));
+    }
     for e in d.effects.iter().chain(&d.tick_effects) {
         match e.kind.as_str() {
             "knockback" => out.push(format!("knocks back {} yd", n(e.amount))),
@@ -1469,12 +1478,16 @@ impl SurvivalGame {
         let now = self.sim.clock;
         let p = self.sim.players.get(&id)?;
         let shape = |d: &htl_survival::content::AbilityDef| match d.kind.as_str() {
+            // A lob is aimed at the ground, as ground is.
+            "projectile" if d.lob => "circle",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
             "nova" | "stance" | "art" | "buff" => "self",
             _ => "line",
         };
         let shape = |d: &htl_survival::content::AbilityDef| if d.at_self { "self" } else { shape(d) };
+        // The circle drawn where it's aimed: a lob's is its burst.
+        let reach = |d: &htl_survival::content::AbilityDef| if d.lob { d.splash } else { htl_survival::content::AbilityDef::at(d.radius, 1.0) };
         let charge = |d: &htl_survival::content::AbilityDef| -> (f32, f32) {
             if d.kind == "shot" {
                 let r = self.sim.ranged_of(p);
@@ -1495,7 +1508,7 @@ impl SurvivalGame {
                 let base_cd = d.cooldown;
                 let range = htl_survival::content::AbilityDef::at(d.range, 1.0);
                 // A blink's landing (no area) still shows where it goes.
-                let radius = htl_survival::content::AbilityDef::at(d.radius, 1.0).max(if d.kind == "blink" { 1.0 } else { 0.0 });
+                let radius = reach(d).max(if d.kind == "blink" { 1.0 } else { 0.0 });
                 let exs = match ex.map(|x| &c.abilities[x]) {
                     Some(x) => format!(
                         "{}~{}~{}~{}~{}~{}~{:.1}~{:.1}~{:.0}",
@@ -1506,7 +1519,7 @@ impl SurvivalGame {
                         x.kind,
                         shape(x),
                         htl_survival::content::AbilityDef::at(x.range, 1.0),
-                        htl_survival::content::AbilityDef::at(x.radius, 1.0),
+                        reach(x),
                         x.arc
                     ),
                     None => "~~~~~~~~".to_string(),

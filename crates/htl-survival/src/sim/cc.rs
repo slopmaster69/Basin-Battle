@@ -523,6 +523,8 @@ impl Survival {
                 }
             }
         }
+        // A sticky projectile's fuse burning on them.
+        out.extend(self.fuse_auras(id));
         out.sort_unstable();
         out.dedup();
         out

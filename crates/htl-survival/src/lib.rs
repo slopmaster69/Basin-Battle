@@ -40,3 +40,5 @@ mod tests_floors;
 mod tests_siege;
 #[cfg(test)]
 mod tests_tactics;
+#[cfg(test)]
+mod tests_projectiles;
