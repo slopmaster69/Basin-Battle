@@ -748,7 +748,7 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
         })
     };
     let (text, links, place) = lore(&mut s).expect("the book's page");
-    assert!(text.contains("The wall by the stash. (A diary)") && place.starts_with("0 of ") && place.contains(" secrets found, 1 of "), "{text} / {place}");
+    assert!(text.contains("The wall by the stash. (A diary)") && place.starts_with("1 of ") && place.ends_with(" notes read") && !text.contains("Secrets found") && !place.contains("secret"), "{text} / {place}");
     assert_eq!(links, vec![(".es note diary".to_string(), "A diary".to_string())]);
     // The wall, used: it's gone, and the stash is there.
     let wall = obj(&s, |k| matches!(k, ObjKind::Door { key } if key == "wall"));
@@ -782,7 +782,7 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
     assert_eq!(s.use_prompt(id).map(|(_, n, v)| (n, v)), Some(("A Heap of Sacks".to_string(), "Search")));
     s.interact(id, Some(sacks));
     let ev = s.step(DT);
-    assert!(ev.iter().any(|e| matches!(e, Event::Letter { kind, title, place, .. } if kind == "secret" && title == "A nook" && place.contains(": 2 of "))), "{ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Letter { kind, title, place, .. } if kind == "secret" && title == "A nook" && place.starts_with("A secret of ") && !place.contains("found"))), "no tally: {ev:?}");
     assert!(s.below.as_ref().unwrap().open.contains("nook") && rare(&s));
     assert!(s.object(sacks).is_none(), "the sacks pulled aside");
     assert!(has(&s, &|k| matches!(k, ObjKind::Note { key } if key == "confession")), "and its note with it");
