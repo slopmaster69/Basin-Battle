@@ -61,6 +61,10 @@ impl Realms {
     /// The Bookmaker's Board, for the camp's pages and the wagers won below.
     pub fn set_board(&mut self, board: Option<super::board::Shared>) {
         self.camp.board = board.clone();
+        // (Below too, for the board's and the ladder's pages.)
+        for b in &mut self.below {
+            b.board = board.clone();
+        }
         self.board = board;
     }
 
@@ -236,7 +240,8 @@ impl Realms {
             if let Some(b) = &self.board {
                 for w in &won {
                     let run = b.lock().unwrap().record(w);
-                    println!("[survival] wager: {} +{} in {} ms ({} falls, {}) by {}", w.name, w.level, w.ms, w.deaths, if w.timed { "in time" } else { "over time" }, run.heroes());
+                    let splits: Vec<String> = w.splits.iter().map(|(n, ms)| format!("{n} {}s", ms / 1000)).collect();
+                    println!("[survival] wager: {} +{} in {} ms ({} falls, {}) by {}; splits: {}", w.name, w.level, w.ms, w.deaths, if w.timed { "in time" } else { "over time" }, run.heroes(), splits.join(", "));
                 }
             }
             let news = std::mem::take(&mut self.below[k].to_camp);

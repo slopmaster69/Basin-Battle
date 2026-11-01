@@ -4525,7 +4525,7 @@ function ES.BookDraw()
       lit = opened,
       name = f[2] or "?",
       tag = opened and (lit .. " of " .. lamps .. " lamps") or "In cipher",
-      sub = f[8] or "",
+      sub = ((ES.TierWords and ES.TierWords(f[16])) and (ES.TierWords(f[16]) .. ". ") or "") .. (f[8] or ""),
       go = "Open",
       cmd = function() ES.BookOpen(key) end,
       detail = opened and ((f[8] or "") .. " Its pages: the way in, and every lamp you've lit.") or ("Hold the camp against " .. (f[5] or "1") .. " raid(s) and the scouts will have read it."),

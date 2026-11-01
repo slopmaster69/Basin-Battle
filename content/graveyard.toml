@@ -20,6 +20,8 @@ blurb = "The Crusade's dead, who won't stay buried, and their torturers"
 first_page = "The Graveyard's chapel door. The bells have stopped; the digging hasn't."
 welcome = "The Scarlet Monastery's Graveyard. The Crusade buries its dead here, and they don't stay buried; the Interrogator keeps the living busy. Two lamps: the chapel door, and the mausoleum steps. Rest at a lamp to heal, fill your Draughts (T) and send the dead back to their graves for a while. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): the Scarlet Monastery's Graveyard: among the hardest (26 to 36).
+tier = 3
 draught = "draught"
 draughts = 3
 draughts_max = 6

@@ -21,6 +21,8 @@ blurb = "Arugal's keep in Silverpine, full of his worgen and its old lords' ghos
 first_page = "The keep's gate, under the broken portcullis. The howling starts past the courtyard."
 welcome = "Shadowfang Keep. Arugal's worgen hold the halls, and the keep's old lords haven't left either. Two lamps: one at the gate, one at the far end of the great hall. Rest at a lamp to heal, fill your Draughts (T) and send the keep's dwellers back to their posts. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
+# How hard next to the others (1 to 3): Shadowfang Keep: the middle (22 to 30).
+tier = 2
 draught = "draught"
 draughts = 3
 draughts_max = 6
