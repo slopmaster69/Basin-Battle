@@ -4,7 +4,8 @@
 //! them leaves the first lamp and stops when the last of its bosses falls. Each fall costs time.
 //! Beaten in time, the camp may wager higher on that dungeon (two or three levels higher for a
 //! quick one); the foes are tougher every level and take on the wager's terms as it climbs
-//! (hardened packs, rallying, smouldering ground, a tyrant's bosses). What it pays grows with the
+//! (three a week, in turn: tougher packs or bosses, a pack's fall rallying or a frenzy at low
+//! health, burning ground where foes fall or eruptions under the heroes). What it pays grows with the
 //! level: plunder for everyone there, and the dungeon's gear into the camp's chest, the better
 //! pieces from +3 on. Every run is the server's to put on the Bookmaker's Board.
 //!
@@ -50,25 +51,58 @@ const EMBER_RADIUS: f32 = 2.6;
 const EMBER_SECS: f32 = 6.0;
 const EMBER_SHARE: f32 = 0.05;
 const EMBER_LOOK: u32 = 22191;
+/// Eruptions: how wide, the warning before the ground burns, and how often in a fight (seconds).
+const ERUPTION_RADIUS: f32 = 3.0;
+const ERUPTION_WARN: f32 = 1.5;
+const ERUPTION_EVERY: f32 = 18.0;
+/// Frenzied: below this share of their health, foes hit this much harder.
+pub const FRENZY_BELOW: f32 = 1.0 / 3.0;
+pub const FRENZY_MIGHT: f32 = 1.33;
 
-/// One of a wager's terms, from its level up.
+/// One of a wager's terms.
 pub struct Term {
-    pub level: u32,
     pub key: &'static str,
     pub name: &'static str,
     pub text: &'static str,
 }
 
-pub const TERMS: [Term; 4] = [
-    Term { level: 2, key: "hardened", name: "Hardened", text: "Foes that aren't bosses have a fifth more health and hit a sixth harder." },
-    Term { level: 4, key: "rallying", name: "Rallying", text: "When a foe falls, the rest of its pack heal a little and hit harder." },
-    Term { level: 6, key: "smouldering", name: "Smouldering", text: "Fallen foes leave burning ground behind for a few seconds." },
-    Term { level: 8, key: "tyrant", name: "The Kingpin's Due", text: "Bosses have a third more health and hit a fifth harder." },
+/// Every term there is. Which three are on rotates weekly ([`ROTATION`]); a wager takes on the
+/// first from [`TERM_LEVELS`]'s first level, the second from its second, the third from its third.
+pub const ALL_TERMS: [Term; 6] = [
+    Term { key: "hardened", name: "Hardened", text: "Foes that aren't bosses have a fifth more health and hit a sixth harder." },
+    Term { key: "tyrant", name: "The Kingpin's Due", text: "Bosses have a third more health and hit a fifth harder." },
+    Term { key: "rallying", name: "Rallying", text: "When a foe falls, the rest of its pack heal a little and hit harder." },
+    Term { key: "frenzied", name: "Frenzied", text: "Foes below a third of their health hit a third harder: finish them quickly." },
+    Term { key: "smouldering", name: "Smouldering", text: "Fallen foes leave burning ground behind for a few seconds." },
+    Term { key: "eruptions", name: "Eruptions", text: "In a fight, the ground under one of you erupts now and then: step off the mark." },
 ];
 
-/// The terms at a level.
-pub fn terms_at(level: u32) -> Vec<&'static Term> {
-    TERMS.iter().filter(|t| level >= t.level).collect()
+/// The wager levels the week's three terms come in at.
+pub const TERM_LEVELS: [u32; 3] = [2, 4, 7];
+
+/// The weeks' terms, in turn: (packs or bosses, a pack's fall, the ground). Four weeks round.
+pub const ROTATION: [[&str; 3]; 4] = [
+    ["hardened", "rallying", "smouldering"],
+    ["tyrant", "frenzied", "eruptions"],
+    ["hardened", "frenzied", "eruptions"],
+    ["tyrant", "rallying", "smouldering"],
+];
+
+/// The week a moment falls in (unix seconds), weeks starting on Monday.
+pub fn week_of(wall: f64) -> u64 {
+    // (The first of January 1970 was a Thursday.)
+    ((wall / 86_400.0).floor() as i64 + 3).div_euclid(7).max(0) as u64
+}
+
+/// The week's three terms, in the order they come in.
+pub fn week_terms(wall: f64) -> [&'static Term; 3] {
+    let keys = ROTATION[(week_of(wall) % ROTATION.len() as u64) as usize];
+    keys.map(|k| ALL_TERMS.iter().find(|t| t.key == k).expect("a term"))
+}
+
+/// The terms a wager at `level` takes on this week: (the level it comes in at, the term).
+pub fn terms_at(level: u32, wall: f64) -> Vec<(u32, &'static Term)> {
+    TERM_LEVELS.iter().zip(week_terms(wall)).filter(|(at, _)| level >= **at).map(|(at, t)| (*at, t)).collect()
 }
 
 /// A wager under way below.
@@ -102,6 +136,10 @@ pub struct Wager {
     pub called: i64,
     /// Each boss's split: the clock (with falls) when it fell, by its pack's key.
     pub splits: BTreeMap<String, f32>,
+    /// Its terms (keys), as the week was when it was taken: a run keeps them if the week turns.
+    pub terms: Vec<String>,
+    /// When the next eruption may come (the sim's clock).
+    pub next_eruption: f32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -188,6 +226,16 @@ impl Survival {
         Some((w.forces, wager_forces_needed(d, &self.content), wager_forces_total(d, &self.content)))
     }
 
+    /// Whether the wager under way has a term (by key).
+    pub fn wager_has(&self, key: &str) -> bool {
+        self.wager().is_some_and(|w| w.terms.iter().any(|t| t == key))
+    }
+
+    /// The wager under way's terms, as players read them.
+    pub fn wager_terms(&self) -> Vec<&'static Term> {
+        self.wager().map_or(Vec::new(), |w| w.terms.iter().filter_map(|k| ALL_TERMS.iter().find(|t| t.key == k)).collect())
+    }
+
     /// The wager under way here, if any.
     pub fn wager(&self) -> Option<&Wager> {
         self.below.as_ref()?.wager.as_ref()
@@ -246,7 +294,9 @@ impl Survival {
         }
         let kept_open = std::mem::take(&mut b.open);
         b.noticed.clear();
-        b.wager = Some(Wager { level: level.clamp(1, WAGER_MAX), limit, opened: wall, kept_open, ..Default::default() });
+        let level = level.clamp(1, WAGER_MAX);
+        let terms = terms_at(level, wall).into_iter().map(|(_, t)| t.key.to_string()).collect();
+        b.wager = Some(Wager { level, limit, opened: wall, kept_open, terms, ..Default::default() });
         // Every hero's lamp is the first again, with a full hand of Draughts.
         let first = d.lamps.first().map(|l| l.key.clone()).unwrap_or_default();
         for h in b.heroes.values_mut() {
@@ -255,7 +305,7 @@ impl Survival {
         }
         self.reset_below(false);
         self.scale_wager_foes();
-        let names: Vec<&str> = terms_at(level).iter().map(|t| t.name).collect();
+        let names: Vec<&str> = self.wager_terms().iter().map(|t| t.name).collect();
         let terms = if names.is_empty() { String::new() } else { format!(" Its terms: {}.", names.join(", ")) };
         self.announce(format!("The Bookmaker takes a wager on {} at +{level}: {} to beat.{terms}", d.name, clock_words(limit)));
     }
@@ -276,7 +326,7 @@ impl Survival {
             let name = self.players.get(&id).map_or(String::new(), |p| p.name.clone());
             self.announce(format!("{name} arrives: the count waits till everyone's ready."));
         }
-        let terms: Vec<String> = terms_at(level).iter().map(|t| format!("{}: {}", t.name, t.text)).collect();
+        let terms: Vec<String> = self.wager_terms().iter().map(|t| format!("{}: {}", t.name, t.text)).collect();
         let how = if waiting { "say you're ready (.es ready) and the clock starts when everyone is" } else { "the clock is already running" };
         self.events.push(Event::Banner { player: Some(id), title: format!("The Bookmaker's Wager: +{level}"), sub: format!("{} to beat; {how}", clock_words(limit)) });
         if !terms.is_empty() {
@@ -334,11 +384,12 @@ impl Survival {
         let l = w.level.saturating_sub(1) as i32;
         let (mut h, mut d) = ((1.0 + WAGER_HEALTH).powi(l), (1.0 + WAGER_DAMAGE).powi(l));
         let boss = self.content.mobs[def].boss;
-        if !boss && w.level >= 2 {
+        let has = |k: &str| w.terms.iter().any(|t| t == k);
+        if !boss && has("hardened") {
             h *= 1.2;
             d *= 1.16;
         }
-        if boss && w.level >= 8 {
+        if boss && has("tyrant") {
             h *= 1.33;
             d *= 1.2;
         }
@@ -373,14 +424,16 @@ impl Survival {
     /// A foe fell during a wager: counted (if it's not a boss, nor a form coming back as its first),
     /// its pack rallies, its ground smoulders.
     pub(crate) fn wager_kill(&mut self, def: usize, at: Vec3, pack: Option<usize>, form: bool) {
-        let Some(level) = self.wager().filter(|w| w.done.is_none()).map(|w| w.level) else { return };
+        if !self.wager().is_some_and(|w| w.done.is_none()) {
+            return;
+        }
         let d = &self.content.mobs[def];
         if !form && !d.boss && !d.inert() && !d.critter {
             if let Some(w) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
                 w.forces += 1;
             }
         }
-        if level >= 4 {
+        if self.wager_has("rallying") {
             if let Some(k) = pack {
                 let mates: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && m.pack == Some(k)).map(|(id, _)| *id).collect();
                 for id in mates {
@@ -392,7 +445,7 @@ impl Survival {
                 }
             }
         }
-        if level >= 6 && !self.content.mobs[def].boss {
+        if self.wager_has("smouldering") && !self.content.mobs[def].boss {
             let until = self.clock + EMBER_SECS;
             let mark = self.mark_ground(at, EMBER_RADIUS, EMBER_SECS, EMBER_LOOK);
             if let Some(w) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
@@ -453,8 +506,21 @@ impl Survival {
             }
             return;
         }
-        // Smouldering ground burns whoever stands in it.
+        // Eruptions: in a fight, now and then, the ground under a hero (marked first).
         let now = self.clock;
+        if w.terms.iter().any(|t| t == "eruptions") && now >= w.next_eruption {
+            let fighting = self.mobs.values().any(|m| m.health > 0 && !m.raider && !matches!(m.state, super::mobs::MobState::Idle { .. } | super::mobs::MobState::Return));
+            let alive: Vec<Vec3> = self.players.values().filter(|p| p.health > 0).map(|p| p.pos).collect();
+            if fighting && !alive.is_empty() {
+                let at = alive[self.rng.gen_range(0..alive.len())];
+                let mark = self.mark_ground(at, ERUPTION_RADIUS, ERUPTION_WARN + EMBER_SECS, EMBER_LOOK);
+                if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                    wm.embers.push((at, now + ERUPTION_WARN + EMBER_SECS, now + ERUPTION_WARN, mark));
+                    wm.next_eruption = now + ERUPTION_EVERY;
+                }
+            }
+        }
+        // Smouldering ground burns whoever stands in it.
         let mut burns = Vec::new();
         if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
             wm.embers.retain(|e| e.1 > now);
