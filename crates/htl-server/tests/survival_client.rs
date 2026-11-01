@@ -1513,10 +1513,10 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
     assert_eq!(fields.get(11).copied(), Some("0~1~"), "{}", m.text);
     // Ready: alone, the count starts at once.
     a.chat(".es ready");
-    assert!(a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tWT\t") && m.text.ends_with(&format!("\t1~1~{}", htl_survival::sim::wager::WAGER_COUNTDOWN as u32)))).is_some(), "the count on the slip");
+    assert!(a.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tWT\t") && m.text.contains(&format!("\t1~1~{}\t", htl_survival::sim::wager::WAGER_COUNTDOWN as u32)))).is_some(), "the count on the slip");
     // Another server's run, sent to this one (the board host) on its login port, comes back on
     // the board; a forged one doesn't.
-    let w = htl_survival::sim::wager::WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 6, ms: 1_000_000, limit_ms: 1_800_000, deaths: 1, timed: true, party: vec![("Zed".into(), "mage".into())] };
+    let w = htl_survival::sim::wager::WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 6, ms: 1_000_000, limit_ms: 1_800_000, deaths: 1, timed: true, party: vec![("Zed".into(), "mage".into())], splits: Vec::new() };
     let line = htl_server::survival::board::Run::from_wager(&w, "Far Camp").line();
     let forged = line.replace("|6|", "|9|");
     let body = format!("{line}\n{forged}\n");

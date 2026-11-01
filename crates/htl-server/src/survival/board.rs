@@ -51,6 +51,10 @@ pub struct Run {
     pub party: Vec<String>,
     /// When (unix seconds).
     pub at: u64,
+    /// Each boss as it fell (name, milliseconds): kept here, for the clock's splits and for
+    /// tuning the times; not sent to the board host (the line stays as it was).
+    #[serde(default)]
+    pub splits: Vec<(String, u64)>,
 }
 
 impl Run {
@@ -66,6 +70,7 @@ impl Run {
             timed: w.timed,
             party: w.party.iter().map(|(n, c)| format!("{}:{}", name_only(n, 24).replace(':', ""), name_only(c, 12).replace(':', ""))).collect(),
             at: now(),
+            splits: w.splits.clone(),
         }
     }
 
@@ -134,6 +139,7 @@ impl Run {
             timed: ms <= limit_ms,
             party,
             at: f[10].parse().ok()?,
+            splits: Vec::new(),
         })
     }
 
@@ -302,6 +308,16 @@ impl Board {
     /// A hero's place on the ladder (from 1) and their rank, by name on this server.
     pub fn place_of(&self, name: &str) -> Option<(usize, Rank)> {
         self.ladder().into_iter().enumerate().find(|(_, r)| r.name == name && r.host == self.host).map(|(k, r)| (k + 1, r))
+    }
+
+    /// The splits of this server's quickest run in time on a dungeon at a level, if it kept them.
+    pub fn best_splits(&self, dungeon: &str, level: u32) -> Option<Vec<(String, u64)>> {
+        self.store
+            .runs
+            .iter()
+            .filter(|r| r.dungeon == dungeon && r.level == level && r.timed && r.host == self.host && !r.splits.is_empty())
+            .min_by_key(|r| r.ms)
+            .map(|r| r.splits.clone())
     }
 
     /// How many servers' runs are on the board.
@@ -552,7 +568,7 @@ mod tests {
     use super::*;
 
     fn run() -> WagerRun {
-        WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 4, ms: 900_000, limit_ms: 1_500_000, deaths: 2, timed: true, party: vec![("Ann".into(), "warrior".into()), ("Bob|x".into(), "mage".into())] }
+        WagerRun { dungeon: "stockade".into(), name: "The Stockade".into(), level: 4, ms: 900_000, limit_ms: 1_500_000, deaths: 2, timed: true, party: vec![("Ann".into(), "warrior".into()), ("Bob|x".into(), "mage".into())], splits: Vec::new() }
     }
 
     #[test]
@@ -613,7 +629,7 @@ mod tests {
         a.timed = false;
         b.record(&a);
         // Ann alone at +1 in the Cathedral, right on time: 70 x 1.5.
-        let solo = WagerRun { dungeon: "cathedral".into(), name: "The Cathedral".into(), level: 1, ms: 1_200_000, limit_ms: 1_200_000, deaths: 0, timed: true, party: vec![("Ann".into(), "warrior".into())] };
+        let solo = WagerRun { dungeon: "cathedral".into(), name: "The Cathedral".into(), level: 1, ms: 1_200_000, limit_ms: 1_200_000, deaths: 0, timed: true, party: vec![("Ann".into(), "warrior".into())], splits: Vec::new() };
         b.record(&solo);
         let ladder = b.ladder();
         assert_eq!(ladder.iter().map(|r| (r.name.as_str(), r.rating, r.dungeons)).collect::<Vec<_>>(), vec![("Ann", 278, 2), ("Bobx", 173, 1)]);
@@ -621,6 +637,24 @@ mod tests {
         let (place, me) = b.place_of("Bobx").unwrap();
         assert_eq!((place, me.rating), (2, 173));
         assert!(b.place_of("Nobody").is_none());
+    }
+
+    #[test]
+    fn the_best_splits_are_the_quickest_run_in_time_at_that_level_kept_here() {
+        let mut b = Board::new(None, "here", None, vec!["stockade".into()]);
+        let mut a = run();
+        a.splits = vec![("Kam".into(), 300_000), ("Bazil".into(), 800_000)];
+        b.record(&a);
+        a.ms = 850_000;
+        a.splits = vec![("Kam".into(), 280_000), ("Bazil".into(), 760_000)];
+        b.record(&a);
+        a.level = 5;
+        b.record(&a);
+        assert_eq!(b.best_splits("stockade", 4), Some(vec![("Kam".to_string(), 280_000), ("Bazil".to_string(), 760_000)]));
+        assert!(b.best_splits("stockade", 7).is_none());
+        // Splits stay here: the line sent to the board host is as it was.
+        let r = Run::from_wager(&a, "here");
+        assert_eq!(Run::parse(&r.line(), &["stockade".to_string()]).unwrap().splits, Vec::new());
     }
 
     #[test]

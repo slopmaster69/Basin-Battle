@@ -1214,3 +1214,29 @@ fn a_sets_words_count_its_pieces_not_their_honed_copies() {
     assert!(seen > 0, "some set pieces, honed copies among them");
     assert!(s.content.items.iter().any(|i| !i.set.is_empty() && i.hone > 0), "a honed set piece");
 }
+
+#[test]
+fn a_wager_keeps_each_bosses_split_as_it_falls() {
+    let mut s = below();
+    s.start_wager(1);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.2);
+    assert_eq!(s.wager_splits(), vec![None], "the boss still up");
+    run(&mut s, 2.0);
+    let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
+    s.hurt_mob(boss, id, 10_000_000);
+    run(&mut s, 0.2);
+    let split = s.wager_splits()[0].expect("its split");
+    assert!((2.0..4.0).contains(&split), "{split}");
+    // On with the count: the run's splits go with it.
+    let g = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].mob == "grunt")).unwrap().0;
+    run(&mut s, 1.0);
+    s.hurt_mob(g, id, 10_000_000);
+    let ev = run(&mut s, 0.2);
+    let done = ev.iter().find_map(|e| if let Event::WagerDone(r) = e { Some(r.clone()) } else { None }).expect("won");
+    assert_eq!(done.splits.len(), 1);
+    assert_eq!(done.splits[0].1, (split * 1000.0).round() as u64, "the split as it fell, not the end");
+    assert!(done.ms > done.splits[0].1);
+}
