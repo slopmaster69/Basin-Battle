@@ -93,7 +93,7 @@ impl Survival {
 
     /// Count `amount` on hero `id`'s meter. `begins`: it may begin a fight (a blow; a heal only
     /// carries one on).
-    fn count(&mut self, id: Id, kind: Kind, amount: u32, label: &str, begins: bool) {
+    fn meter_count(&mut self, id: Id, kind: Kind, amount: u32, label: &str, begins: bool) {
         if amount == 0 || !self.players.contains_key(&id) {
             return;
         }
@@ -146,13 +146,13 @@ impl Survival {
     /// A hero's blow (a card, a burn, their weapon: `label`) took `amount` from someone else.
     pub(crate) fn meter_dealt(&mut self, by: Id, victim: Id, amount: u32, label: &str) {
         if by != victim {
-            self.count(by, Kind::Dealt, amount, label, true);
+            self.meter_count(by, Kind::Dealt, amount, label, true);
         }
     }
 
     /// A hero lost `amount` of health.
     pub(crate) fn meter_taken(&mut self, id: Id, amount: u32) {
-        self.count(id, Kind::Taken, amount, "", true);
+        self.meter_count(id, Kind::Taken, amount, "", true);
     }
 
     /// A hero's card mended `target` (themselves too) by `amount`: it counts in the healer's
@@ -162,7 +162,7 @@ impl Survival {
         let now = self.clock;
         let in_fight = |s: &Self, h: Id| s.meters.get(&h).is_some_and(|m| m.fight.seen && now - m.fight.last <= gap);
         let begins = in_fight(self, target) && !in_fight(self, healer);
-        self.count(healer, Kind::Healed, amount, label, begins);
+        self.meter_count(healer, Kind::Healed, amount, label, begins);
     }
 
     /// Heal a hero, counting it on `healer`'s meter as `label`.
