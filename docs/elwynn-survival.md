@@ -941,10 +941,13 @@ during a wager. Friends join it by taking the same level from the book while it 
 - **Levels.** Every camp starts open to +1 on each dungeon. Won in time, the next level opens;
   in four fifths of the time, two levels; in three fifths, three (up to +20).
 - **Tougher every level.** Foes have 9% more health and hit 6% harder each level (compounding).
-  From +2 *Hardened* (foes that aren't bosses: a fifth more health, a sixth harder), +4
-  *Rallying* (a foe's fall heals its pack a little and makes it hit harder), +6 *Smouldering*
-  (fallen foes leave burning ground), +8 *The Kingpin's Due* (bosses: a third more health, a fifth
-  harder).
+  From +2, +4 and +7 the week's three terms come in, one each, and they change how a fight is
+  fought: *The Call* (a pack still fighting after five seconds calls the nearest pack at rest) or
+  *Quickening* (bosses hit a tenth harder for every twenty seconds a fight lasts); *Rallying* (a
+  foe's fall heals its pack a little and makes it hit harder) or *Frenzied* (foes below a third
+  of their health hit a third harder); *Smouldering* (fallen foes leave burning ground) or
+  *Eruptions* (the ground under one of you erupts now and then). Four weeks round, starting
+  Mondays.
 - **Better pay.** Plunder for every hero there (6 + 3 a level; half when over time), and in time
   the dungeon's own gear into the camp's chest: one piece and one more every three levels, the
   finer pieces (a perk, a set's) from +3, one for certain from +6.

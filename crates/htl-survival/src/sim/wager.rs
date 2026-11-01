@@ -58,6 +58,15 @@ const ERUPTION_EVERY: f32 = 18.0;
 /// Frenzied: below this share of their health, foes hit this much harder.
 pub const FRENZY_BELOW: f32 = 1.0 / 3.0;
 pub const FRENZY_MIGHT: f32 = 1.33;
+/// The Call: a pack still fighting this long after it began calls the nearest pack at rest
+/// this near it (seconds, yards). A first guess, to try in play.
+pub const CALL_AFTER: f32 = 5.0;
+pub const CALL_RANGE: f32 = 30.0;
+/// Quickening: a boss hits this much harder for every step this long its fight has lasted, up
+/// to the most (a first guess, to try in play).
+pub const QUICKEN_STEP: f32 = 20.0;
+pub const QUICKEN_MIGHT: f32 = 0.1;
+pub const QUICKEN_MOST: f32 = 2.0;
 
 /// One of a wager's terms.
 pub struct Term {
@@ -69,8 +78,8 @@ pub struct Term {
 /// Every term there is. Which three are on rotates weekly ([`ROTATION`]); a wager takes on the
 /// first from [`TERM_LEVELS`]'s first level, the second from its second, the third from its third.
 pub const ALL_TERMS: [Term; 6] = [
-    Term { key: "hardened", name: "Hardened", text: "Foes that aren't bosses have a fifth more health and hit a sixth harder." },
-    Term { key: "tyrant", name: "The Kingpin's Due", text: "Bosses have a third more health and hit a fifth harder." },
+    Term { key: "calling", name: "The Call", text: "A pack still fighting after five seconds calls the nearest pack at rest: kill quickly, or pull with care." },
+    Term { key: "quickening", name: "Quickening", text: "Bosses hit a tenth harder for every twenty seconds the fight lasts: bring them down fast." },
     Term { key: "rallying", name: "Rallying", text: "When a foe falls, the rest of its pack heal a little and hit harder." },
     Term { key: "frenzied", name: "Frenzied", text: "Foes below a third of their health hit a third harder: finish them quickly." },
     Term { key: "smouldering", name: "Smouldering", text: "Fallen foes leave burning ground behind for a few seconds." },
@@ -82,10 +91,10 @@ pub const TERM_LEVELS: [u32; 3] = [2, 4, 7];
 
 /// The weeks' terms, in turn: (packs or bosses, a pack's fall, the ground). Four weeks round.
 pub const ROTATION: [[&str; 3]; 4] = [
-    ["hardened", "rallying", "smouldering"],
-    ["tyrant", "frenzied", "eruptions"],
-    ["hardened", "frenzied", "eruptions"],
-    ["tyrant", "rallying", "smouldering"],
+    ["calling", "rallying", "smouldering"],
+    ["quickening", "frenzied", "eruptions"],
+    ["calling", "frenzied", "eruptions"],
+    ["quickening", "rallying", "smouldering"],
 ];
 
 /// The week a moment falls in (unix seconds), weeks starting on Monday.
@@ -140,6 +149,12 @@ pub struct Wager {
     pub terms: Vec<String>,
     /// When the next eruption may come (the sim's clock).
     pub next_eruption: f32,
+    /// The Call: since when each pack has been fighting (the sim's clock), and the packs that
+    /// have called or been called (each only once a run).
+    pub fighting: BTreeMap<usize, f32>,
+    pub called_packs: BTreeSet<usize>,
+    /// Quickening: since when each boss has been fighting (the sim's clock).
+    pub boss_since: BTreeMap<Id, f32>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -379,21 +394,11 @@ impl Survival {
     }
 
     /// A foe's health and the weight of its blows at this wager (1 with none).
-    pub(crate) fn wager_scale(&self, def: usize) -> (f32, f32) {
+    pub(crate) fn wager_scale(&self, _def: usize) -> (f32, f32) {
         let Some(w) = self.wager() else { return (1.0, 1.0) };
         let l = w.level.saturating_sub(1) as i32;
-        let (mut h, mut d) = ((1.0 + WAGER_HEALTH).powi(l), (1.0 + WAGER_DAMAGE).powi(l));
-        let boss = self.content.mobs[def].boss;
-        let has = |k: &str| w.terms.iter().any(|t| t == k);
-        if !boss && has("hardened") {
-            h *= 1.2;
-            d *= 1.16;
-        }
-        if boss && has("tyrant") {
-            h *= 1.33;
-            d *= 1.2;
-        }
-        (h, d)
+        // (Only the level: the week's terms change how a fight is fought, not its numbers.)
+        ((1.0 + WAGER_HEALTH).powi(l), (1.0 + WAGER_DAMAGE).powi(l))
     }
 
     /// Every foe unhurt set to the wager's health.
@@ -452,6 +457,91 @@ impl Survival {
                 w.embers.push((at, until, self.clock + 1.0, mark));
             }
         }
+    }
+
+    /// The Call: a pack fighting [`CALL_AFTER`] seconds calls the nearest pack at rest within
+    /// [`CALL_RANGE`] yards onto whoever the caller fights. Bosses neither call nor come.
+    fn step_calling(&mut self, now: f32) {
+        use super::mobs::MobState;
+        let resting = |m: &Mob| matches!(m.state, MobState::Idle { .. });
+        // The packs in a fight now, and a foe each is on.
+        let mut fights: BTreeMap<usize, super::mobs::Foe> = BTreeMap::new();
+        for m in self.mobs.values() {
+            let Some(k) = m.pack else { continue };
+            if m.health == 0 || m.raider || m.hidden || self.content.mobs[m.def].boss {
+                continue;
+            }
+            // In a fight: chasing, winding up or recovering, on someone.
+            if let Some(foe) = m.state.foe() {
+                fights.entry(k).or_insert(foe);
+            }
+        }
+        let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) else { return };
+        wm.fighting.retain(|k, _| fights.contains_key(k));
+        for k in fights.keys() {
+            wm.fighting.entry(*k).or_insert(now);
+        }
+        let due: Vec<(usize, super::mobs::Foe)> = wm
+            .fighting
+            .iter()
+            .filter(|(k, since)| now - **since >= CALL_AFTER && !wm.called_packs.contains(k))
+            .map(|(k, _)| (*k, fights[k]))
+            .collect();
+        for (k, foe) in due {
+            let caller: Vec<(Id, Vec3)> = self.mobs.iter().filter(|(_, m)| m.pack == Some(k) && m.health > 0).map(|(id, m)| (*id, m.pos)).collect();
+            let called = self.below.as_ref().and_then(|b| b.wager.as_ref()).map(|w| w.called_packs.clone()).unwrap_or_default();
+            // The nearest member of a pack at rest, near any of the caller's.
+            let near = self
+                .mobs
+                .iter()
+                .filter(|(_, m)| m.health > 0 && !m.raider && !m.hidden && resting(m) && !self.content.mobs[m.def].boss)
+                .filter_map(|(id, m)| {
+                    let j = m.pack?;
+                    if j == k || called.contains(&j) {
+                        return None;
+                    }
+                    let d = caller.iter().map(|(_, at)| dist2d(*at, m.pos)).fold(f32::MAX, f32::min);
+                    (d <= CALL_RANGE).then_some((*id, j, d))
+                })
+                .min_by(|a, b| a.2.total_cmp(&b.2));
+            if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                wm.called_packs.insert(k);
+            }
+            let Some((_, j, _)) = near else { continue };
+            if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
+                wm.called_packs.insert(j);
+            }
+            let name = caller.first().map_or(String::new(), |(id, _)| self.unit_name(*id));
+            let members: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack == Some(j) && m.health > 0).map(|(id, _)| *id).collect();
+            for id in members {
+                self.engage(id, foe);
+            }
+            self.announce(format!("The {name} calls for help: another pack comes!"));
+        }
+    }
+
+    /// Quickening: when each boss's fight began (a boss at rest or gone home starts over).
+    fn step_quickening(&mut self, now: f32) {
+        use super::mobs::MobState;
+        let fighting: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.health > 0 && self.content.mobs[m.def].boss && !matches!(m.state, MobState::Idle { .. } | MobState::Return))
+            .map(|(id, _)| *id)
+            .collect();
+        let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) else { return };
+        wm.boss_since.retain(|id, _| fighting.contains(id));
+        for id in fighting {
+            wm.boss_since.entry(id).or_insert(now);
+        }
+    }
+
+    /// Quickening's share for a creature's blow now: more the longer a boss's fight has lasted.
+    pub(crate) fn quickening(&self, id: Id) -> f32 {
+        let Some(w) = self.wager().filter(|w| w.terms.iter().any(|t| t == "quickening")) else { return 1.0 };
+        let Some(since) = w.boss_since.get(&id) else { return 1.0 };
+        let steps = ((self.clock - since) / QUICKEN_STEP).floor().max(0.0);
+        (1.0 + QUICKEN_MIGHT * steps).min(QUICKEN_MOST)
     }
 
     /// Each tick below: the clock, the smouldering ground, the end of the wager.
@@ -519,6 +609,12 @@ impl Survival {
                     wm.next_eruption = now + ERUPTION_EVERY;
                 }
             }
+        }
+        if w.terms.iter().any(|t| t == "calling") {
+            self.step_calling(now);
+        }
+        if w.terms.iter().any(|t| t == "quickening") {
+            self.step_quickening(now);
         }
         // Smouldering ground burns whoever stands in it.
         let mut burns = Vec::new();
