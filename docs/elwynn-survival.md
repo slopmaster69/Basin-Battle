@@ -136,10 +136,10 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Deadly Throw · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
+| Q | **Ranged** | Aimed Throw · *Fan of Axes* | Holy Shock · *Purifying Shock* | Arcane Shot · *Concussive Shot* | Fan of Knives · *Crippling Throw* | Mind Blast · *Psychic Blast* | Lightning Bolt · *Chain Lightning* | Fireball · *Scorch* | Shadow Bolt · *Shadowburn* | Wrath · *Entangling Roots* |
 | E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Hammer of Justice · *Hammer of Wrath* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Evasion · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Divine Protection · *Lay on Hands* | Deterrence · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Shield · *Pain Suppression* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Shadow Ward · *Dread Ward* | Barkskin · *Frenzied Regeneration* |
 | 3 | **Ultimate** | Onslaught | Sanctuary | Volley | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
@@ -156,9 +156,11 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   Disengage leaps you straight back (its EX nets the foe in front); Deterrence deflects every
   projectile but not a blade, Feign Death drops you as if dead and every creature and lock lets
   go; Volley rains on a circle for 4 s.
-- **Rogue**: in from the shadows. Poisoned blades to throw (the EX goes through two); Shadowstep
-  (its EX blinds everyone where you come out); Backstab, three times from behind; Evasion dodges
-  everything for 2 s, Vanish hides you (your next blow counts as from behind); Death Mark.
+- **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
+  up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
+  you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
+  Smoke Bomb, a cloud at your feet that hides you and your friends in it and slows foes, Vanish
+  hides you at once (your next blow counts as from behind); Death Mark.
 - **Priest**: light and the void. Mind Blast bursts at the reticle 0.6 s later (lead the target);
   Holy Nova heals you and your friends as it burns foes; Leap of Faith pulls the first body it
   touches to you, friend or foe; Power Word: Shield; Void Rift drags everyone in it to its middle.
@@ -214,7 +216,7 @@ you, or the circle where it will land. Traps and anchors show as green circles.
 - **Hold them for the slow ones**: a root (Entangling Roots, the Net, Earthgrab, Mind Grip), a
   stun (Hammer of Justice, Shadowfury, Pounce, Earthquake) or a freeze makes Mind Blast and
   Meteor land.
-- **From behind**: Vanish, Blinding Step and Shadowstep set up Backstab; Shadow Bolt's Mark makes
+- **From behind**: Vanish, Smoke Bomb, Blinding Step and Shadowstep set up Backstab; Shadow Bolt's Mark makes
   it crit; a kill under Death Mark readies everything again.
 - **Stay alive**: Power Word: Shield, Barkskin and Healing Stream stack with Holy Nova and
   Consecration; Grounding Totem eats the big projectile (a Pyroblast, a hammer, a Death Mark).
@@ -232,8 +234,8 @@ duration creatures do.
   guard and a parry answer them (the Unstoppable Blow aside: no guard stops it, no parry turns it,
   and its target sees the weapon go red).
 - **Defense** is a read and a bait in a duel: Retaliation blocks melee (not bolts), Deterrence
-  bolts (not melee), Evasion dodges both for 2 s, Shadow Ward swallows the first, Ice Block lets
-  nothing in but you can't act.
+  bolts (not melee), Smoke Bomb hides you (a creature loses you, a lock lets go), Shadow Ward
+  swallows the first, Ice Block lets nothing in but you can't act.
 - **Full charge**: a charged spell held to the top flares on you (everyone sees it: the class's
   flash and sound), the reticle bursts and the screen's edge flares in its colour, and Aimed
   Throw, Shadow Bolt, Fireball, Frostbolt and Lightning Bolt fly much faster.

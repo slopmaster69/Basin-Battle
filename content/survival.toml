@@ -3071,17 +3071,33 @@ invulnerable = true
 spell = 100
 effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 
-# Shadow: escape.
+# Shadow: in and out.
 [[ability]]
 key = "shadowstep"
 name = "Shadowstep"
-text = "Step through the shadows to the reticle, up to 20 yards; it breaks roots and slows."
+text = "Step through the shadows to the reticle, up to 20 yards, out of roots and slows. Press it again within 3 s to step straight back to where you were: dive, stab, gone."
 icon = "Ability_Vanish"
 school = "rogue"
 slot = "utility"
 kind = "blink"
 range = [20.0, 20.0]
 cooldown = 12.0
+cleanse = true
+spell = 1856
+recast = "shadowstep_back"
+recast_secs = 3.0
+
+# Shadowstep's way home (and Blinding Step's): the key again within 3 s, free.
+[[ability]]
+key = "shadowstep_back"
+name = "Step Back"
+text = "Back to where your Shadowstep began."
+icon = "Ability_Rogue_Sprint"
+inner = true
+school = "rogue"
+slot = "utility"
+kind = "blink"
+recast_to_start = true
 cleanse = true
 spell = 1856
 
@@ -3855,29 +3871,36 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.35 }]
 
 # ------------------------------------------------------------------------------------ Rogue --
 
+# A shotgun, not a sniper: point blank all three knives land, at range one does.
 [[ability]]
-key = "deadly_throw"
-name = "Deadly Throw"
-text = "A poisoned blade along the reticle: 12 damage and Deadly Poison, 3 a second for 4 s. Two in hand."
+key = "fan_of_knives"
+name = "Fan of Knives"
+text = "Flick three poisoned knives in a fan. Up close all three hit, each poisoning; from farther off only one does, so get in their face first. Two in hand."
 icon = "INV_ThrowingKnife_04"
 school = "rogue"
 slot = "ranged"
 kind = "projectile"
-damage = [12.0, 12.0]
-range = [26.0, 26.0]
+damage = [8.0, 8.0]
+range = [16.0, 16.0]
 radius = [0.3, 0.3]
 speed = 30.0
-cooldown = 6.0
+count = 3
+# 10° between knives: a 20° fan, all three on a body within about 4 yd.
+spread = 10.0
+# 8 cooldown over 2 charges: 3 × 8 + the poison's 12 is 36 a cycle, 9 a second (the budget's 9.5).
+cooldown = 8.0
 charges = 2
 spell = 25748
 clip = 107
+# Per knife, so all three in one foe is the 6 of any other ability.
+valor_hit = 2.0
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }]
 
 [[ability]]
 key = "crippling_throw"
 name = "Crippling Throw"
-ex_of = "deadly_throw"
-text = "A blade that goes through two foes and on: 16 each, slowed 50% for 3 s and poisoned (3 a second for 4 s)."
+ex_of = "fan_of_knives"
+text = "One long throw instead of the fan: a blade through two foes and on, 16 each, slowing them 50% for 3 s and poisoning them. Catch the one running away."
 icon = "Ability_PoisonSting"
 slot = "ranged"
 kind = "projectile"
@@ -3895,7 +3918,7 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }, { kind = "burn",
 key = "blinding_step"
 name = "Blinding Step"
 ex_of = "shadowstep"
-text = "The Shadowstep, and where you come out a cloud of blinding powder incapacitates everyone within 4 yd for 3 s (1.5 s on heroes); any damage ends it. Step in, Backstab the one you meant."
+text = "The Shadowstep, and where you come out a cloud of blinding powder incapacitates everyone within 4 yd for 3 s (1.5 s on heroes); any damage ends it. Backstab the one you meant, then press it again to step back out."
 icon = "Ability_Gouge"
 slot = "utility"
 kind = "blink"
@@ -3904,6 +3927,8 @@ range = [20.0, 20.0]
 cleanse = true
 spell = 1856
 also = "blinding_powder"
+recast = "shadowstep_back"
+recast_secs = 3.0
 
 [[ability]]
 key = "blinding_powder"
@@ -3917,24 +3942,32 @@ radius = [4.0, 4.0]
 spell = 2094
 effects = [{ kind = "incapacitate", secs = [3.0, 3.0] }]
 
+# A cloud to fight in or slip out of: every second it hides you and friends in it again (a blow
+# or a cast shows you till then) and slows the foes in it. You're hidden the moment it goes.
 [[ability]]
-key = "evasion"
-name = "Evasion"
-text = "For 2 s you dodge every melee blow and projectile. Ground, cones and beams still reach you."
-icon = "Spell_Shadow_ShadowWard"
+key = "smoke_bomb"
+name = "Smoke Bomb"
+text = "Smash a bomb at your feet: a 5 yd cloud of smoke for 4 s. Inside it you and your friends are hidden (creatures lose you, locks let go) and foes are slowed 30%. Strike from it, or slip away."
+icon = "INV_Misc_Bomb_01"
 school = "rogue"
 slot = "defense"
-kind = "stance"
-secs = 2.0
+kind = "ground"
+at_self = true
+radius = [5.0, 5.0]
+linger = 4.0
 cooldown = 16.0
-spell = 5277
-aura = 5277
-counter = { dodge = true }
+# A puff of smoke on you as it bursts (Vanish's), and a cloud of dust on the ground while it lasts.
+spell = 1856
+linger_spell = 7272
+boon = "veil"
+boon_amount = 1.0
+self_effects = [{ kind = "veil", secs = [1.5, 1.5] }]
+effects = [{ kind = "snare", secs = [1.5, 1.5], amount = 0.3 }]
 
 [[ability]]
 key = "vanish"
 name = "Vanish"
-ex_of = "evasion"
+ex_of = "smoke_bomb"
 text = "Vanish at once: roots and slows fall off, creatures lose you, locks on you let go, and you run 30% faster for 2 s. Hidden 5 s or until you strike; that first blow counts as from behind (a Backstab's triple)."
 icon = "Ability_Vanish"
 slot = "defense"
@@ -8567,7 +8600,7 @@ name = "The Brotherhood's Dead Drop"
 at = [-9782.0, -888.0]
 display = 18
 scale = 1.0
-teaches = ["deadly_throw", "backstab"]
+teaches = ["fan_of_knives", "backstab"]
 keep = true
 secs = 3.0
 text = "Under the crate: a Defias training ledger. Throwing knives, and where to put a blade."
@@ -8674,7 +8707,7 @@ trial = ["trial_relic_warlock_0"]
 key = "relic_rogue"
 name = "Morgan's Stash"
 at = [-9968.0, -150.0]
-teaches = ["shadowstep", "evasion"]
+teaches = ["shadowstep", "smoke_bomb"]
 loot = { wool = 3, bronze = 1 }
 display = 259
 secret = 7.0
@@ -9125,7 +9158,7 @@ at = [-9800.0, -900.0]
 radius = 55.0
 kind = "sanctum"
 icon = "Ability_BackStab"
-text = "The rogue's shrine (Deadly Throw, Backstab) in the Brotherhood's camp; Morgan the Collector, the rogue's trial; Princess; pumpkins."
+text = "The rogue's shrine (Fan of Knives, Backstab) in the Brotherhood's camp; Morgan the Collector, the rogue's trial; Princess; pumpkins."
 reward = { pumpkin = 2 }
 
 [[site]]
