@@ -1840,6 +1840,8 @@ vit.stamina = MakeLagBar(vit, 100 / ST_PER_PX, VIT_STAMINA, { r = 0.26, g = 0.66
 -- Lit while the guard is up, and when a swing would reach someone.
 vit.guard = Icon(vit, "ARTWORK", "INV_Shield_09", 14)
 vit.reach = Icon(vit, "ARTWORK", "Ability_DualWield", 14)
+-- Not shown: a light for "a swing would land now" judged the distance for the player.
+vit.reach:Hide()
 vit.state = Text(vit, FONT_BODY, 11, "OUTLINE")
 -- What a meal, a salve, a tonic or a stone is still doing, and the armor worn.
 vit.effects = Text(vit, FONT_BODY, 10, "OUTLINE")
@@ -1873,7 +1875,7 @@ function ES.PlaceVitals()
     vit.stamina:SetPoint("TOPLEFT", vit.health, "BOTTOMLEFT", 0, -7)
     vit.guard:SetPoint("TOPLEFT", vit.stamina, "BOTTOMLEFT", 0, -7)
     vit.reach:SetPoint("LEFT", vit.guard, "RIGHT", 5, 0)
-    vit.state:SetPoint("LEFT", vit.reach, "RIGHT", 8, 0)
+    vit.state:SetPoint("LEFT", vit.guard, "RIGHT", 8, 0)
     vit.effects:SetPoint("TOPLEFT", vit.guard, "BOTTOMLEFT", 0, -5)
   else
     -- On the dock, over Valor and the keys, as wide as they are: health, then stamina; the guard
@@ -1888,7 +1890,7 @@ function ES.PlaceVitals()
     vit.health:SetPoint("TOPLEFT", vit, "TOPLEFT", 0, 0)
     vit.stamina:SetPoint("TOPLEFT", vit.health, "BOTTOMLEFT", 0, -4)
     vit.reach:SetPoint("RIGHT", vit.health, "LEFT", -7, -3)
-    vit.guard:SetPoint("RIGHT", vit.reach, "LEFT", -3, 0)
+    vit.guard:SetPoint("RIGHT", vit.health, "LEFT", -7, -3)
     vit.state:SetPoint("BOTTOM", vit.health, "TOP", 0, 16)
     vit.effects:SetPoint("BOTTOMLEFT", vit.health, "TOPLEFT", 0, 4)
   end
@@ -1982,7 +1984,7 @@ local LOOK = {
   ready = { 1, 1, 1, "" },
   swing = { 1, 0.55, 0.3, "" },
   heavy = { 1, 0.45, 0.2, "" },
-  guard = { 0.45, 0.75, 1, "Guard" },
+  guard = { 0.45, 0.75, 1, "" },
   dodge = { 0.6, 1, 0.9, "" },
   aim = { 1, 0.9, 0.4, "" },
   charge = { 1, 0.8, 0.3, "" },
