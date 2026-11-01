@@ -12,7 +12,9 @@
 //!   fights once for each value, so a number can be picked from the curve.
 //! - **A band** ([`classes_clear_a_pack_within_a_band`], a real test): every class clears the pack,
 //!   none more than [`BAND`] times slower than the fastest, so a tuning change can't quietly leave
-//!   a class behind.
+//!   a class behind. It's deterministic (fixed seeds) and takes a few seconds. When it trips, the
+//!   pull request that tripped it owns it: retune, or widen the band in the same pull request and
+//!   say why.
 //!
 //! The hero has ten times their health, so every fight runs to its end: what's measured is how fast
 //! each class kills and how much it takes doing it, not whether a bot that never guards or dodges
@@ -521,10 +523,7 @@ fn solo_sim() {
     if let Ok(tune) = std::env::var("SIM_TUNE") {
         let (path, values) = tune.split_once('=').expect("SIM_TUNE=path=value|value|...");
         for v in values.split('|') {
-            let (text, _) = crate::tune::set(crate::content::DEFAULT, path, v).expect("a path survival.toml has");
-            let c = Content::parse_with(&text, crate::content::DEFAULT_DUNGEON).expect("the tuned rules read");
-            let mut c = dev(c);
-            c.dev.full_tree = true;
+            let c = tuned(path, v);
             println!();
             println!("SIM ######## {path} = {v}");
             report(&c, &plans, runs, &classes, &styles);
@@ -534,16 +533,22 @@ fn solo_sim() {
     report(&Content::dev(), &plans, runs, &classes, &styles);
 }
 
-/// The dev rules' changes from the built-in ones, on rules read some other way.
-fn dev(mut c: Content) -> Content {
+/// The dev rules with one number of `survival.toml` changed (`SIM_TUNE`'s sweep).
+fn tuned(path: &str, value: &str) -> Content {
+    let (text, _) = crate::tune::set(crate::content::DEFAULT, path, value).unwrap_or_else(|e| panic!("{path}: {e}"));
+    Content::into_dev(Content::parse_with(&text, crate::content::DEFAULT_DUNGEON).expect("the tuned rules read"))
+}
+
+#[test]
+fn a_sweep_changes_only_the_number_it_names() {
+    let c = tuned("ability.penance.damage", "[24, 24]");
     let d = Content::dev();
-    c.dev = d.dev.clone();
-    c.work = d.work.clone();
-    c.combat.foe_health = d.combat.foe_health;
-    c.combat.foe_damage = d.combat.foe_damage;
-    c.combat.hero_health = d.combat.hero_health;
-    c.combat.hero_damage = d.combat.hero_damage;
-    c
+    let penance = d.ability("penance").unwrap();
+    assert_eq!(c.abilities[penance].damage, [24.0, 24.0], "the swept number");
+    assert_ne!(d.abilities[penance].damage, [24.0, 24.0], "not what it was");
+    let fireball = d.ability("fireball").unwrap();
+    assert_eq!(c.abilities[fireball].damage, d.abilities[fireball].damage, "another card as it was");
+    assert_eq!((c.dev.full_tree, c.combat.foe_health, c.combat.hero_health), (d.dev.full_tree, d.combat.foe_health, d.combat.hero_health), "the dev world's rules");
 }
 
 #[test]
@@ -573,6 +578,11 @@ fn classes_clear_a_pack_within_a_band() {
     let best = times.iter().map(|t| t.1.mean).fold(f32::MAX, f32::min);
     for (class, t) in &times {
         assert_eq!(t.won, t.runs, "{class} didn't clear the pack every time ({:.1} s on average)", t.mean);
-        assert!(t.mean <= best * BAND, "{class} took {:.1} s on the pack, more than {BAND} times the fastest class's {best:.1} s", t.mean);
+        assert!(
+            t.mean <= best * BAND,
+            "{class} took {:.1} s on the pack, more than {BAND} times the fastest class's {best:.1} s. A tuning change left it behind \
+             (or sped another class far ahead): see the whole picture with SIM_CLASS={class} cargo test --release -p htl-survival --lib solo_sim -- --ignored --nocapture",
+            t.mean
+        );
     }
 }
