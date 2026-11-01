@@ -1420,7 +1420,14 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
         a.until(0.5, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("TR\t")));
         addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("TR\t"))
     };
-    assert!(tr.is_some_and(|l| l.matches("~1~").count() > 4), "every card of her dev-world hero, not Siege's two");
+    let tr = tr.unwrap_or_default();
+    assert!(tr.matches("~1~").count() > 4, "every card of her dev-world hero, not Siege's two");
+    // Each card ends with its page: 1 a class's, 2 the beta page's (its column `beta`).
+    let cards: Vec<&str> = tr.splitn(4, '\t').nth(3).unwrap_or("").split('^').collect();
+    let beta = |c: &&str| c.split('~').nth(3) == Some("beta");
+    assert!(cards.iter().any(beta), "the beta page's cards are sent: {tr}");
+    assert!(cards.iter().filter(|c| beta(*c)).all(|c| c.ends_with("~2")), "on page 2: {tr}");
+    assert!(cards.iter().filter(|c| !beta(*c)).all(|c| c.ends_with("~1")), "the classes' on page 1: {tr}");
 }
 
 #[test]
