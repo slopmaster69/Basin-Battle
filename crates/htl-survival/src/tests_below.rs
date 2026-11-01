@@ -1125,3 +1125,19 @@ fn stepping_off_from_the_lamp_before_everyone_is_ready_starts_the_clock_at_once(
     assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title.contains("clock is running") && sub.contains("Ayla stepped off"))), "{ev:?}");
     assert!(s.wager().unwrap().started.is_some(), "no head start for free");
 }
+
+#[test]
+fn a_hero_who_never_readies_holds_the_count_only_so_long() {
+    use crate::sim::wager::WAGER_READY_WAIT;
+    let mut s = below();
+    s.start_wager(1);
+    let a = s.join("ayla", "Ayla", None);
+    let _away = s.join("bren", "Bren", None);
+    run(&mut s, 0.5);
+    assert!(s.wager_ready(a).is_ok());
+    run(&mut s, 5.0);
+    assert!(s.wager_readiness().unwrap().2.is_none(), "waiting on Bren a while");
+    s.wall_start += WAGER_READY_WAIT;
+    run(&mut s, 0.2);
+    assert!(s.wager_readiness().unwrap().2.is_some(), "then the count starts anyway");
+}
