@@ -128,6 +128,8 @@ fn every_card_goes_off_in_a_duel() {
 /// half of what burns after (it can be walked out of).
 fn worth(d: &AbilityDef) -> f32 {
     let hit = (d.damage[0] + d.damage[1]) / 2.0 * d.count.max(1) as f32;
+    // A beam's damage is a second's, on each foe it holds: all of it held.
+    let hit = if d.kind == "beam" { hit * d.secs } else { hit };
     let chain: f32 = (1..=d.chain).map(|k| hit * d.chain_falloff.powi(k as i32)).sum();
     let burn: f32 = d.effects.iter().filter(|e| e.kind == "burn").map(|e| e.amount * e.secs[1]).sum();
     let linger = d.linger_damage * d.linger;

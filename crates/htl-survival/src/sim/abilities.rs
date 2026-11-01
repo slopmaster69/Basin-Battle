@@ -1875,11 +1875,13 @@ impl Survival {
                 self.apply_effects(owner, *m, &d.effects, 1.0, &d.name);
             }
         }
-        // What the ground does to every foe in it each tick (a vortex's pull to its middle).
+        // What the ground does to every foe in it each tick (a vortex's pull to its middle); the
+        // boons among it go to friends instead, as its `boon` does (a barrier's footing).
+        let (gifts, harm): (Vec<_>, Vec<_>) = d.tick_effects.iter().cloned().partition(|e| crate::content::BOONS.contains(&e.kind.as_str()));
         let was = self.fx_from.replace(at);
-        if !d.tick_effects.is_empty() {
+        if !harm.is_empty() {
             for m in &mobs {
-                self.apply_effects(owner, *m, &d.tick_effects, 1.0, &d.name);
+                self.apply_effects(owner, *m, &harm, 1.0, &d.name);
             }
         }
         // Friends: the caster, and every other hero unless they're all foes.
@@ -1895,6 +1897,9 @@ impl Survival {
             if !d.boon.is_empty() {
                 self.apply_cc(h, owner, &d.boon, BOON_HOLD, d.boon_amount, 0.0, &d.name);
             }
+            for e in &gifts {
+                self.apply_cc(h, owner, &e.kind, BOON_HOLD, e.amount, 0.0, &d.name);
+            }
         }
         for h in foes {
             // Burning ground never lands the killing blow on a hero.
@@ -1907,8 +1912,8 @@ impl Survival {
             if d.at_self && !d.effects.is_empty() {
                 self.apply_effects(owner, h, &d.effects, 1.0, &d.name);
             }
-            if !d.tick_effects.is_empty() {
-                self.apply_effects(owner, h, &d.tick_effects, 1.0, &d.name);
+            if !harm.is_empty() {
+                self.apply_effects(owner, h, &harm, 1.0, &d.name);
             }
         }
         self.fx_from = was;

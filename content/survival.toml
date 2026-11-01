@@ -3088,17 +3088,33 @@ invulnerable = true
 spell = 100
 effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 
-# Shadow: escape.
+# Shadow: in and out.
 [[ability]]
 key = "shadowstep"
 name = "Shadowstep"
-text = "Step through the shadows to the reticle, up to 20 yards; it breaks roots and slows."
+text = "Step through the shadows to the reticle, up to 20 yards, out of roots and slows. Press it again within 3 s to step straight back to where you were: dive, stab, gone."
 icon = "Ability_Vanish"
 school = "rogue"
 slot = "utility"
 kind = "blink"
 range = [20.0, 20.0]
 cooldown = 12.0
+cleanse = true
+spell = 1856
+recast = "shadowstep_back"
+recast_secs = 3.0
+
+# Shadowstep's way home (and Blinding Step's): the key again within 3 s, free.
+[[ability]]
+key = "shadowstep_back"
+name = "Step Back"
+text = "Back to where your Shadowstep began."
+icon = "Ability_Rogue_Sprint"
+inner = true
+school = "rogue"
+slot = "utility"
+kind = "blink"
+recast_to_start = true
 cleanse = true
 spell = 1856
 
@@ -3819,29 +3835,36 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.35 }]
 
 # ------------------------------------------------------------------------------------ Rogue --
 
+# A shotgun, not a sniper: point blank all three knives land, at range one does.
 [[ability]]
-key = "deadly_throw"
-name = "Deadly Throw"
-text = "A poisoned blade along the reticle: 12 damage and Deadly Poison, 3 a second for 4 s. Two in hand."
+key = "fan_of_knives"
+name = "Fan of Knives"
+text = "Flick three poisoned knives in a fan. Up close all three hit, each poisoning; from farther off only one does, so get in their face first. Two in hand."
 icon = "INV_ThrowingKnife_04"
 school = "rogue"
 slot = "ranged"
 kind = "projectile"
-damage = [12.0, 12.0]
-range = [26.0, 26.0]
+damage = [8.0, 8.0]
+range = [16.0, 16.0]
 radius = [0.3, 0.3]
 speed = 30.0
-cooldown = 6.0
+count = 3
+# 10° between knives: a 20° fan, all three on a body within about 4 yd.
+spread = 10.0
+# 8 cooldown over 2 charges: 3 × 8 + the poison's 12 is 36 a cycle, 9 a second (the budget's 9.5).
+cooldown = 8.0
 charges = 2
 spell = 25748
 clip = 107
+# Per knife, so all three in one foe is the 6 of any other ability.
+valor_hit = 2.0
 effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }]
 
 [[ability]]
 key = "crippling_throw"
 name = "Crippling Throw"
-ex_of = "deadly_throw"
-text = "A blade that goes through two foes and on: 16 each, slowed 50% for 3 s and poisoned (3 a second for 4 s)."
+ex_of = "fan_of_knives"
+text = "One long throw instead of the fan: a blade through two foes and on, 16 each, slowing them 50% for 3 s and poisoning them. Catch the one running away."
 icon = "Ability_PoisonSting"
 slot = "ranged"
 kind = "projectile"
@@ -3859,7 +3882,7 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }, { kind = "burn",
 key = "blinding_step"
 name = "Blinding Step"
 ex_of = "shadowstep"
-text = "The Shadowstep, and where you come out a cloud of blinding powder incapacitates everyone within 4 yd for 3 s (1.5 s on heroes); any damage ends it. Step in, Backstab the one you meant."
+text = "The Shadowstep, and where you come out a cloud of blinding powder incapacitates everyone within 4 yd for 3 s (1.5 s on heroes); any damage ends it. Backstab the one you meant, then press it again to step back out."
 icon = "Ability_Gouge"
 slot = "utility"
 kind = "blink"
@@ -3868,6 +3891,8 @@ range = [20.0, 20.0]
 cleanse = true
 spell = 1856
 also = "blinding_powder"
+recast = "shadowstep_back"
+recast_secs = 3.0
 
 [[ability]]
 key = "blinding_powder"
@@ -3881,24 +3906,32 @@ radius = [4.0, 4.0]
 spell = 2094
 effects = [{ kind = "incapacitate", secs = [3.0, 3.0] }]
 
+# A cloud to fight in or slip out of: every second it hides you and friends in it again (a blow
+# or a cast shows you till then) and slows the foes in it. You're hidden the moment it goes.
 [[ability]]
-key = "evasion"
-name = "Evasion"
-text = "For 2 s you dodge every melee blow and projectile. Ground, cones and beams still reach you."
-icon = "Spell_Shadow_ShadowWard"
+key = "smoke_bomb"
+name = "Smoke Bomb"
+text = "Smash a bomb at your feet: a 5 yd cloud of smoke for 4 s. Inside it you and your friends are hidden (creatures lose you, locks let go) and foes are slowed 30%. Strike from it, or slip away."
+icon = "INV_Misc_Bomb_01"
 school = "rogue"
 slot = "defense"
-kind = "stance"
-secs = 2.0
+kind = "ground"
+at_self = true
+radius = [5.0, 5.0]
+linger = 4.0
 cooldown = 16.0
-spell = 5277
-aura = 5277
-counter = { dodge = true }
+# A puff of smoke on you as it bursts (Vanish's), and a cloud of dust on the ground while it lasts.
+spell = 1856
+linger_spell = 7272
+boon = "veil"
+boon_amount = 1.0
+self_effects = [{ kind = "veil", secs = [1.5, 1.5] }]
+effects = [{ kind = "snare", secs = [1.5, 1.5], amount = 0.3 }]
 
 [[ability]]
 key = "vanish"
 name = "Vanish"
-ex_of = "evasion"
+ex_of = "smoke_bomb"
 text = "Vanish at once: roots and slows fall off, creatures lose you, locks on you let go, and you run 30% faster for 2 s. Hidden 5 s or until you strike; that first blow counts as from behind (a Backstab's triple)."
 icon = "Ability_Vanish"
 slot = "defense"
@@ -3910,29 +3943,39 @@ effects = [{ kind = "veil", secs = [5.0, 5.0] }, { kind = "haste", secs = [2.0, 
 
 # ----------------------------------------------------------------------------------- Priest --
 
+# Light steered by hand: one lance that burns foes and mends friends, swept as you turn.
+[[ability]]
+key = "penance"
+name = "Penance"
+text = "Hold a lance of light out from you for 1.5 s and sweep it as you turn: foes in it burn, friends in it heal. Rake it across a pack, or across a friend in trouble."
+icon = "Spell_Holy_HolySmite"
+school = "priest"
+slot = "ranged"
+kind = "beam"
+range = [22.0, 22.0]
+# Half its width: a lance 2 yd wide.
+radius = [1.0, 1.0]
+secs = 1.5
+tick = 0.25
+# A second in it: 24 over its 1.5 s on each foe it holds.
+damage = [16.0, 16.0]
+ally_heal = 0.04
+cooldown = 5.0
+# A golden glow on you while you hold it (Power Infusion), and bolts of holy light streaming down
+# it to the first foe in it (a holy missile with no cast pose of its own, so each tick doesn't
+# jerk the priest).
+spell = 10060
+aura = 10060
+tick_spell = 6685
+clip = 53
+
+# The old Mind Blast's bigger, terrifying version, now Penance's EX.
 [[ability]]
 key = "mind_blast"
 name = "Mind Blast"
-text = "A dark star bursts at the reticle (up to 30 yd) 0.6 s later, drawn for everyone: 26 to all within 2.5 yd. Lead your target, or land it on a root."
+ex_of = "penance"
+text = "A dark star bursts at the reticle (up to 30 yd) 0.6 s later, drawn for everyone: 28 to all within 3.5 yd, and they flee in terror for 2 s (1 s on heroes). Lead your target."
 icon = "Spell_Shadow_UnholyFrenzy"
-school = "priest"
-slot = "ranged"
-kind = "ground"
-range = [30.0, 30.0]
-radius = [2.5, 2.5]
-delay = 0.6
-damage = [26.0, 26.0]
-cooldown = 5.0
-# A burst of void out of the ground where it lands (Void Blast).
-spell = 27812
-clip = 54
-
-[[ability]]
-key = "psychic_blast"
-name = "Psychic Blast"
-ex_of = "mind_blast"
-text = "A wider Mind Blast (3.5 yd): 28 damage, and whoever it catches flees in terror for 2 s (1 s on heroes)."
-icon = "Spell_Shadow_DeathScream"
 slot = "ranged"
 kind = "ground"
 valor = 25
@@ -4006,29 +4049,41 @@ spell = 23394
 clip = 54
 effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "root", secs = [2.0, 2.0] }, { kind = "shield", secs = [5.0, 5.0], amount = 30.0 }]
 
+# A place to hold: friends under the dome take less and stand their ground. Each second it gives
+# them both (its boon, and the boon among its tick effects) for 1.5 s; you have both at once.
+[[ability]]
+key = "power_word_barrier"
+name = "Power Word: Barrier"
+text = "Raise a 6 yd dome of light around you for 5 s: you and every friend under it take 25% less and can't be staggered. Hold the line inside it."
+icon = "Spell_Holy_PowerInfusion"
+school = "priest"
+slot = "defense"
+kind = "ground"
+at_self = true
+radius = [6.0, 6.0]
+linger = 5.0
+cooldown = 18.0
+# A column of light on you as it rises (Sanctuary's), and holy light on the ground while it lasts.
+spell = 24171
+linger_spell = 20116
+boon = "hallowed"
+boon_amount = 0.25
+tick_effects = [{ kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
+self_effects = [{ kind = "hallowed", secs = [1.5, 1.5], amount = 0.25 }, { kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
+
+# Now given away: on the friend under the reticle, else on you.
 [[ability]]
 key = "power_word_shield"
 name = "Power Word: Shield"
-text = "A shield on you that soaks 45 damage for 6 s."
+ex_of = "power_word_barrier"
+text = "Shield the friend under your reticle (or yourself): it soaks 45 damage for 6 s, and they run 20% faster while it holds."
 icon = "Spell_Holy_PowerWordShield"
-school = "priest"
 slot = "defense"
-kind = "buff"
-cooldown = 15.0
-spell = 17
-effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }]
-
-[[ability]]
-key = "pain_suppression"
-name = "Pain Suppression"
-text = "For 4 s you take 40% less from everything, and a shield soaks the first 30."
-ex_of = "power_word_shield"
-icon = "Spell_Holy_PowerInfusion"
-slot = "defense"
-kind = "buff"
+kind = "ally"
 valor = 25
-spell = 10060
-effects = [{ kind = "hallowed", secs = [4.0, 4.0], amount = 0.4, aura = 10060 }, { kind = "shield", secs = [4.0, 4.0], amount = 30.0 }]
+range = [30.0, 30.0]
+spell = 17
+effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }, { kind = "haste", secs = [6.0, 6.0], amount = 0.2 }]
 
 [[ability]]
 key = "void_rift"
@@ -4054,30 +4109,37 @@ tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
 
 # ----------------------------------------------------------------------------------- Shaman --
 
+# Shape the field: a lob over whoever's in the way, landing late, leaving the ground on fire.
 [[ability]]
-key = "lightning_bolt"
-name = "Lightning Bolt"
-text = "Charge up to 0.6 s: 14 to 26 damage along the reticle. At full charge it streaks out more than twice as fast."
-icon = "Spell_Nature_Lightning"
+key = "lava_burst"
+name = "Lava Burst"
+text = "Lob molten rock at the reticle, over anyone in the way. It lands a moment later where the ring shows, bursting 3 yd wide, and the ground there burns for 3 s. Lead your target."
+icon = "Spell_Fire_Incinerate"
 school = "shaman"
 slot = "ranged"
 kind = "projectile"
-charge = [0.0, 0.6]
-damage = [14.0, 26.0]
-range = [34.0, 34.0]
-radius = [0.35, 0.45]
-speed = 20.0
-cooldown = 3.0
-spell = 403
-charge_spell = 403
-full_spell = 8435
-full_speed = 50.0
+lob = true
+damage = [22.0, 22.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+splash = 3.0
+# The rock's own missile speed: about 1 s in the air at the far end, a third of that at 10 yd.
+speed = 30.0
+linger = 3.0
+linger_damage = 5.0
+# 22 + half the burn's 15 is 29.5 a cast, 7.4 a second.
+cooldown = 4.0
+# A boulder hurled (its throw pose comes with it), a pillar of fire where it lands (Flamestrike)
+# and the ground glowing hot after (Heated Ground, as Meteor's crater).
+spell = 9483
+burst_spell = 2120
+linger_spell = 22191
 
 [[ability]]
 key = "chain_lightning"
 name = "Chain Lightning"
-ex_of = "lightning_bolt"
-text = "A bolt that leaps from what it strikes to the nearest other foe within 9 yd, twice: 20, then 14, then 10."
+ex_of = "lava_burst"
+text = "Lightning instead of the rock: a fast bolt along the reticle that leaps from what it strikes to the nearest other foe within 9 yd, twice: 20, then 14, then 10."
 icon = "Spell_Nature_ChainLightning"
 slot = "ranged"
 kind = "projectile"
@@ -8478,7 +8540,7 @@ name = "Altar of the Abbey"
 at = [-8935.0, -165.0]
 display = 1527
 scale = 0.45
-teaches = ["mind_blast", "holy_nova"]
+teaches = ["penance", "holy_nova"]
 keep = true
 secs = 3.0
 text = "The Abbey's altar remembers its priests: the Light, and the shadow behind it."
@@ -8514,7 +8576,7 @@ name = "The Stone Cairn"
 at = [-8855.0, -945.0]
 display = 235
 scale = 1.2
-teaches = ["lightning_bolt", "thunderstorm"]
+teaches = ["lava_burst", "thunderstorm"]
 keep = true
 secs = 3.0
 text = "The cairn's stones speak, if you listen: of lightning and of thunder."
@@ -8538,7 +8600,7 @@ name = "The Brotherhood's Dead Drop"
 at = [-9782.0, -888.0]
 display = 18
 scale = 1.0
-teaches = ["deadly_throw", "backstab"]
+teaches = ["fan_of_knives", "backstab"]
 keep = true
 secs = 3.0
 text = "Under the crate: a Defias training ledger. Throwing knives, and where to put a blade."
@@ -8584,7 +8646,7 @@ trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 key = "relic_priest"
 name = "The Abbey Reliquary"
 at = [-8865.0, -150.0]
-teaches = ["leap_of_faith", "power_word_shield"]
+teaches = ["leap_of_faith", "power_word_barrier"]
 loot = { linen = 3 }
 display = 259
 secret = 7.0
@@ -8645,7 +8707,7 @@ trial = ["trial_relic_warlock_0"]
 key = "relic_rogue"
 name = "Morgan's Stash"
 at = [-9968.0, -150.0]
-teaches = ["shadowstep", "evasion"]
+teaches = ["shadowstep", "smoke_bomb"]
 loot = { wool = 3, bronze = 1 }
 display = 259
 secret = 7.0
@@ -9001,7 +9063,7 @@ at = [-8905.0, -175.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Holy_PowerWordShield"
-text = "The priest's shrine at the Abbey (Mind Blast, Holy Nova). Something hidden behind it."
+text = "The priest's shrine at the Abbey (Penance, Holy Nova). Something hidden behind it."
 reward = { linen = 3 }
 
 [[site]]
@@ -9067,7 +9129,7 @@ at = [-8855.0, -950.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Nature_LightningShield"
-text = "The shaman's shrine (Lightning Bolt, Thunderstorm). The stones are awake: Rumbler, the shaman's trial."
+text = "The shaman's shrine (Lava Burst, Thunderstorm). The stones are awake: Rumbler, the shaman's trial."
 reward = { stone = 3 }
 
 [[site]]
@@ -9096,7 +9158,7 @@ at = [-9800.0, -900.0]
 radius = 55.0
 kind = "sanctum"
 icon = "Ability_BackStab"
-text = "The rogue's shrine (Deadly Throw, Backstab) in the Brotherhood's camp; Morgan the Collector, the rogue's trial; Princess; pumpkins."
+text = "The rogue's shrine (Fan of Knives, Backstab) in the Brotherhood's camp; Morgan the Collector, the rogue's trial; Princess; pumpkins."
 reward = { pumpkin = 2 }
 
 [[site]]
