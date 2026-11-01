@@ -447,6 +447,15 @@ WT	The Deadmines	5	754	1950	2	run	Hardened, Rallying	Rhahk'Zor~1^Sneed~0^Edwin V
 !local w = ElwynnSurvival.wagerShown table.insert(SAID, "wager clock: " .. tostring(ElwynnSurvivalWager:IsShown()) .. " " .. ElwynnSurvivalWager.title:GetText() .. " / " .. ElwynnSurvivalWager.clock:GetText() .. " / " .. ElwynnSurvivalWager.falls:GetText() .. " / " .. ElwynnSurvivalWager.terms:GetText())
 WR	camp
 !table.insert(SAID, "wager clock at camp: " .. tostring(ElwynnSurvivalWager:IsShown()))
+# The damage meter: the fight's heroes most damage first, then your own healing by card; Reset
+# asks the server; /esmeter hides it.
+!table.insert(SAID, "meter before a fight: " .. tostring(ElwynnSurvivalMeter:IsShown()))
+DP	42	1234	300	500	Penance~800~300^Melee~434~0
+DM	12	1	Ayla~priest~1234~300~500~1^Bren~warrior~2000~0~900~0^Cass~mage~0~0~40~0
+!local f = ElwynnSurvivalMeter table.insert(SAID, "meter: " .. tostring(f:IsShown()) .. " " .. f.title:GetText() .. " / " .. f.sub:GetText() .. " / " .. f.rows[1].name:GetText() .. " " .. f.rows[1].value:GetText() .. " / " .. f.rows[2].name:GetText() .. " / row 3 " .. tostring(f.rows[3]:IsShown()))
+!ElwynnSurvival.meter.tab = "own" ElwynnSurvival.meter.heal = true ElwynnSurvival.DrawMeter() local f = ElwynnSurvivalMeter table.insert(SAID, "meter, your healing: " .. f.sub:GetText() .. " / " .. f.rows[1].name:GetText() .. " / row 2 " .. tostring(f.rows[2]:IsShown()) .. " / reset " .. tostring(f.reset:IsShown()))
+!this = ElwynnSurvivalMeter.reset ElwynnSurvivalMeter.reset:GetScript("OnClick")()
+!ElwynnSurvival.ToggleMeter() table.insert(SAID, "meter hidden: " .. tostring(not ElwynnSurvivalMeter:IsShown())) ElwynnSurvival.ToggleMeter() ElwynnSurvival.meter.tab = "fight" ElwynnSurvival.meter.heal = false
 # A note, read: a page that stays, its clue under it; a link reads on; Escape's list closes it.
 NT	note	A Smuggler's Tally	Found in The Deadmines	"Two crates salt pork, one keg rum, one jar of something for the cook."{n}{n}Whatever's in that jar MOVES.	Cookie's jar is kept in the little tent at the south end of the cove.	.es lore deadmines~All found in the Deadmines
 !local L = ElwynnSurvival.letterShown table.insert(SAID, "letter: " .. tostring(ElwynnSurvivalLetter:IsShown()) .. " " .. L.kind .. " " .. L.title .. " / clue " .. tostring(ElwynnSurvivalLetter.clue:IsShown()) .. " / body has its break " .. tostring(string.find(ElwynnSurvivalLetter.body:GetText(), "\n\nWhatever", 1, true) ~= nil) .. " / links " .. L.links .. " / tall " .. tostring(L.height > 200))

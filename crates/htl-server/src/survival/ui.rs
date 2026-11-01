@@ -67,6 +67,7 @@
 //! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
 //!   the key in that slot (0 Q to 4 the ultimate) is armed for its recast for `secs` more: pressed
 //!   again it fires that ability (its icon, its name, its aim and charge); `RC\t<slot>`: closed.
+//! - `DP`, `DM`: the damage meters (see `meter_ui.rs`).
 //! - `EM\t<slot>\t<secs>`: the key in that slot is empowered (a combo) for `secs` more: its next
 //!   press is its EX version, for no Valor; `EM\t<slot>`: spent or gone.
 
@@ -605,6 +606,7 @@ impl SurvivalGame {
         if hud_due {
             self.hud_at = Instant::now();
         }
+        let meters_due = self.meters_due();
         let storage = std::mem::take(&mut self.storage_dirty);
         let chest = self.sim.storage_id();
         let conns: Vec<(ConnId, Id, Option<Id>)> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, w)| (*c, w.id, w.station)).collect();
@@ -721,6 +723,9 @@ impl SurvivalGame {
                 self.ui_line_changed(conn, "SG", sg);
             }
             self.ui_line_changed(conn, "WR", wr);
+            if meters_due {
+                self.ui_meters(conn, id);
+            }
             self.abilities_dirty.remove(&id);
             if storage && station == Some(chest) {
                 self.ui_station(conn, id, chest);
@@ -1245,6 +1250,7 @@ impl SurvivalGame {
                 Err(_) => Err("Try .es wager <dungeon> <level>, as .es wager deadmines 3.".into()),
             },
             "board" => self.ui_board_page(conn, &arg),
+            "meter" => self.meter_command(conn, me, &arg),
             // The book at camp, and the lamps below.
             "travel" | "go" => {
                 let to = if arg.is_empty() {
