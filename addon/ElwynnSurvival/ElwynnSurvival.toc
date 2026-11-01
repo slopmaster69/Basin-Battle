@@ -9,4 +9,5 @@ BetaBoard.lua
 Ledger.lua
 Letter.lua
 Wager.lua
+Clips.lua
 Meter.lua

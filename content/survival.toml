@@ -206,6 +206,11 @@ jitter = 0.25
 # step on), and `leap` one pressed in the air out of a Corey roll (a jump taken in the dodge's
 # dash, which carries the dash's speed): it strikes as the hero lands, long and heavy, with a
 # long recovery for it. Without `roll`, the running attack; without `leap`, `roll`.
+# `from` plays another character model's take on the clip on the hero's own
+# body (`from = "ScourgeFemale"`: Undead female's; <Race><Gender>, the races Human, Orc, Dwarf,
+# NightElf, Scourge, Tauren, Gnome, Troll, Goblin), on a client that can (ac10; the rest play their
+# own). A creature on a character model takes `clips_from` for all its blows, or a step's own
+# `from`. scripts/race-clips.sh lists every model's clips, and /esclip tries one in game.
 [[moveset]]
 key = "one_hand"
 light = [

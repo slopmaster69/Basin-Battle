@@ -382,6 +382,10 @@ pub struct MoveDef {
     pub lunge: f32,
     #[serde(default = "one_share")]
     pub range: f32,
+    /// Another character model's take on the clip (`"ScourgeFemale"`, `"OrcMale"`…), played on
+    /// the hero's own body by a client that can (`ac10`); without one, the hero's own.
+    #[serde(default)]
+    pub from: Option<String>,
 }
 
 fn one_share() -> f32 {
@@ -390,8 +394,21 @@ fn one_share() -> f32 {
 
 impl MoveDef {
     fn of(clip: u16, take: u32, windup: f32, recovery: f32, damage: f32, lunge: f32) -> Self {
-        Self { clip, take, windup, recovery, damage, stamina: 1.0, lunge, range: 1.0 }
+        Self { clip, take, windup, recovery, damage, stamina: 1.0, lunge, range: 1.0, from: None }
     }
+}
+
+/// The character models a clip can be borrowed from, as `<Race><Gender>`.
+pub const CLIP_RACES: [&str; 9] = ["Human", "Orc", "Dwarf", "NightElf", "Scourge", "Tauren", "Gnome", "Troll", "Goblin"];
+
+/// Whether `name` is a character model a clip can come from (`"ScourgeFemale"`), or a model's path.
+pub fn clip_source_ok(name: &str) -> bool {
+    if name.contains('\\') || name.to_ascii_lowercase().ends_with(".m2") {
+        return true;
+    }
+    let lower = name.to_ascii_lowercase();
+    let race = lower.strip_suffix("female").or_else(|| lower.strip_suffix("male"));
+    race.is_some_and(|r| CLIP_RACES.iter().any(|x| x.eq_ignore_ascii_case(r)))
 }
 
 /// A grip's blows (`one_hand`, `dagger`, `two_hand`, `polearm`).
@@ -1369,6 +1386,10 @@ pub struct SpecialDef {
     /// The clip it swings with (`AnimationData`; the creature's usual attack when not given).
     #[serde(default)]
     pub clip: Option<u16>,
+    /// Another character model's take on it (as a hero's move's `from`); else the creature's
+    /// `clips_from`, else its own.
+    #[serde(default)]
+    pub from: Option<String>,
     /// How far it steps into the blow as it lands (yards).
     #[serde(default)]
     pub lunge: f32,
@@ -1431,6 +1452,10 @@ pub struct MobDef {
     pub key: String,
     pub name: String,
     pub display: u32,
+    /// A creature on a character model (an orc, a Defias): every blow of its from this character
+    /// model's clips (`"ScourgeFemale"`…) where the step names none, on a client that can.
+    #[serde(default)]
+    pub clips_from: Option<String>,
     #[serde(default = "one_f")]
     pub scale: f32,
     pub health: u32,
@@ -2540,6 +2565,22 @@ impl Content {
         for m in &self.movesets {
             if m.light.is_empty() {
                 bail!("moveset {}: no light blows", m.key);
+            }
+            // A borrowed clip names a character model the clients can find.
+            let moves = m.light.iter().chain([&m.heavy, &m.running]).chain(m.roll.iter()).chain(m.leap.iter());
+            for d in moves {
+                if let Some(f) = d.from.as_deref().filter(|f| !clip_source_ok(f)) {
+                    bail!("moveset {}: from {f:?} is no character model (<Race><Gender>, as ScourgeFemale)", m.key);
+                }
+            }
+        }
+        for m in &self.mobs {
+            let steps = m.special.iter().chain(m.patterns.iter().flat_map(|p| p.steps.iter()));
+            let named = steps.filter_map(|s| s.from.as_deref()).chain(m.clips_from.as_deref());
+            for f in named {
+                if !clip_source_ok(f) {
+                    bail!("mob {}: clips from {f:?}, which is no character model (<Race><Gender>, as ScourgeFemale)", m.key);
+                }
             }
         }
         for w in &self.weapons {

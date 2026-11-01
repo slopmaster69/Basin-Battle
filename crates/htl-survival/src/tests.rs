@@ -2968,3 +2968,35 @@ fn a_leap_whose_landing_went_unheard_takes_its_attack_with_it() {
     s.hurt_player(p, hp);
     assert_eq!(s.players[&p].landing_attack, None, "fallen");
 }
+
+// --- clips borrowed from another character model ---------------------------------------------------
+
+#[test]
+fn a_blow_can_borrow_another_character_models_clip() {
+    use crate::content::clip_source_ok;
+    assert!(clip_source_ok("ScourgeFemale") && clip_source_ok("nightelfmale") && clip_source_ok("Character\\Orc\\Male\\OrcMale.m2"));
+    assert!(!clip_source_ok("Murloc") && !clip_source_ok("ScourgeQueen") && !clip_source_ok("Female"));
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let key = s.content.moveset_of(s.weapon_of(&s.players[&p])).key.clone();
+    let set = s.content.movesets.iter_mut().find(|m| m.key == key).unwrap();
+    set.light[0].from = Some("ScourgeFemale".into());
+    s.input(p, Input::Attack);
+    match &s.players[&p].action {
+        Action::Swing { strike, .. } => assert_eq!(strike.from.as_deref(), Some("ScourgeFemale")),
+        a => panic!("a swing: {a:?}"),
+    }
+    // A creature on a character model takes every blow from the one it names.
+    let g = s.content.mob("grunt").unwrap();
+    s.content.mobs[g].clips_from = Some("OrcFemale".into());
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.engage(k, Foe::Hero(p));
+    let mut ev = Vec::new();
+    for _ in 0..200 {
+        ev.extend(s.step(DT));
+        if ev.iter().any(|e| matches!(e, Event::MobWindup { id, .. } if *id == k)) {
+            break;
+        }
+    }
+    assert!(ev.iter().any(|e| matches!(e, Event::MobWindup { id, from, .. } if *id == k && from.as_deref() == Some("OrcFemale"))), "its swing, borrowed");
+}

@@ -924,9 +924,11 @@ fn the_fourth_round_client_flashes_its_own_blows_and_others_see_the_flash_and_it
     a.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("MV\t")));
     let mv = addon_lines(&a, "ES").into_iter().find(|l| l.starts_with("MV\t")).expect("the moves line");
     let f: Vec<&str> = mv.split('\t').collect();
-    assert_eq!(f.len(), 16, "{mv}");
+    assert_eq!(f.len(), 18, "{mv}");
     assert_eq!(f[15], "1", "friendly fire");
-    assert_eq!(f[10].split('^').next().unwrap().split('~').count(), 8, "range and arc: {mv}");
+    // (Each blow: clip, take, impact, recovery, lunge, stamina, range, arc, and the model its
+    // clip comes from, empty for her own.)
+    assert_eq!(f[10].split('^').next().unwrap().split('~').count(), 9, "range and arc: {mv}");
     // Her heavy blow's flash: on Ben's screen, not hers (she played her own).
     let mark = a.seen.len();
     a.chat(".es in h");
@@ -1628,4 +1630,30 @@ fn a_creatures_swing_trails_its_last_stroke_on_a_client_that_draws_it_so() {
     let theirs: Vec<String> = addon_lines(&b, "ES").into_iter().filter(|l| mob_swing(l)).collect();
     assert!(!theirs.is_empty(), "ben sees it wind up too");
     assert!(theirs.iter().all(|l| l.split('\t').nth(4) == Some("-")), "with no trail on the older client: {theirs:?}");
+}
+
+#[test]
+fn a_blow_borrowing_another_models_clip_names_it_to_the_clients() {
+    let mut content = content();
+    for m in &mut content.movesets {
+        for l in &mut m.light {
+            l.from = Some("ScourgeFemale".into());
+        }
+    }
+    let server = start_content(None, false, content);
+    let mut c = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let _ = enter(&mut c);
+    c.chat(".es hello 5 ac10");
+    c.drain(0.5);
+    stand(&mut c, [-9500.0, 0.0, 0.0], 0.0);
+    c.chat(".es in a");
+    c.chat(".es in au");
+    c.drain(0.6);
+    let lines = addon_lines(&c, "ES");
+    let swing = lines.iter().find(|l| l.starts_with("AN\t") && l.split('\t').nth(10) == Some("light")).unwrap_or_else(|| panic!("the swing: {lines:?}"));
+    assert_eq!(swing.split('\t').nth(12), Some("ScourgeFemale"), "{swing}");
+    // And the moves the add-on plays itself carry it too.
+    let mv = lines.iter().rfind(|l| l.starts_with("MV\t")).expect("the moves");
+    let first = mv.split('\t').nth(10).unwrap().split('^').next().unwrap();
+    assert!(first.ends_with("~ScourgeFemale"), "{first}");
 }
