@@ -454,7 +454,7 @@ fn aimed_shot_drawn_longer_flies_farther_and_harder_and_a_full_draw_goes_through
     press(&mut s, p, "aimed_arrow", false);
     let mut ev = draw(&mut s, p, 1.5, aim, &pins);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
-    assert_eq!(missiles(&ev, p, 3044), 1, "fully drawn: the glowing arrow");
+    assert_eq!(missiles(&ev, p, 3011), 1, "fully drawn: the glowing arrow");
     let full = hits(&ev, p, near);
     assert_eq!(full.len(), 1);
     assert!(full[0] > short[0], "harder: {short:?} then {full:?}");
@@ -473,7 +473,7 @@ fn a_heavy_blow_spoils_the_aimed_shot_draw() {
     s.strike_player(b, a, 20, [2.0, 0.0, 0.0], true, true, true, Blow::Heavy);
     assert!(!matches!(s.players[&a].action, Action::Charge { .. }), "the draw is spoiled");
     let ev = run(&mut s, 1.0);
-    assert_eq!(missiles(&ev, a, 75) + missiles(&ev, a, 3044), 0, "no arrow");
+    assert_eq!(missiles(&ev, a, 19434) + missiles(&ev, a, 3011), 0, "no arrow");
 }
 
 #[test]
@@ -491,7 +491,7 @@ fn multi_shot_looses_five_arrows_in_a_fan() {
     s.set_aim_line(p, 0.0, down_to(14.0));
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
-    assert_eq!(missiles(&ev, p, 75), 5, "five arrows, no draw");
+    assert_eq!(missiles(&ev, p, 6984), 5, "five arrows, no draw");
     for m in &fan {
         assert_eq!(hits(&ev, p, *m).len(), 1, "each arrow its own foe");
     }
@@ -523,7 +523,7 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     s.set_aim_line(p, 0.0, down_to(14.0));
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.0, &[k]));
-    assert_eq!(missiles(&ev, p, 75), 5, "five arrows");
+    assert_eq!(missiles(&ev, p, 6984), 5, "five arrows");
     assert!(s.players[&p].valor + 0.01 >= valor, "no Valor spent: {valor} then {}", s.players[&p].valor);
     assert!(flashed(&ev, p, "Shatter!"), "the ice shatters");
     assert!(!s.has_cc(k, "petrify"));

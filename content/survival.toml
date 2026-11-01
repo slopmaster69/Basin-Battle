@@ -3487,6 +3487,9 @@ linger = 6.0
 linger_damage = 6.0
 cooldown = 12.0
 spell = 2120
+# The ground after burns as the Explosive Trap's fire: Flamestrike's own pillar, replayed, filled
+# far more than its circle.
+linger_spell = 13812
 
 [[ability]]
 key = "flash_flamestrike"
@@ -3503,6 +3506,9 @@ radius = [2.0, 2.0]
 linger = 4.0
 linger_damage = 6.0
 spell = 2120
+# The ground after burns as the Explosive Trap's fire: Flamestrike's own pillar, replayed, filled
+# far more than its circle.
+linger_spell = 13812
 
 [[ability]]
 key = "entangling_roots"
@@ -3692,8 +3698,10 @@ radius = [0.3, 0.3]
 # A plain arrow (the bow's look) while drawing; fully drawn, Arcane Shot's glowing one, faster,
 # through everything in the line.
 speed = 40.0
-spell = 75
-full_spell = 3044
+# Aimed Shot's own arcane arrow (Auto Shot, 75, draws only the bow's ammo, and a hero casting
+# this needn't hold a bow: nothing flew); fully drawn, a burning arrow (Fire Shot).
+spell = 19434
+full_spell = 3011
 full_speed = 60.0
 full_pierce = 9
 cooldown = 3.0
@@ -3717,7 +3725,8 @@ count = 5
 # 10° apart: a 40° fan.
 spread = 10.0
 shatter = true
-spell = 75
+# Frost-tipped arrows (Frost Shot): the volley that shatters the frozen.
+spell = 6984
 clip = 53
 
 [[ability]]

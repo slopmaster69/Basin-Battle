@@ -476,13 +476,13 @@ fn a_full_charge_flares_and_the_arrow_flies_half_again_as_fast() {
         ev
     };
     let ev = shoot(&mut s, 0.2);
-    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 75, .. })), "a short draw: the plain arrow");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 19434, .. })), "a short draw: the plain arrow");
     assert!(!ev.iter().any(|e| matches!(e, Event::Visual { kit: 353, .. })));
     assert!((s.projectiles[0].speed - 40.0).abs() < 0.01);
     run(&mut s, 2.0);
     s.set_cooldowns(p, true);
     let ev = shoot(&mut s, 1.5);
     assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 353, .. } if *id == p)), "the flare as it tops out");
-    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 3044, .. })), "full: the glowing arrow");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 3011, .. })), "full: the glowing arrow");
     assert!((s.projectiles[0].speed - 60.0).abs() < 0.01);
 }
