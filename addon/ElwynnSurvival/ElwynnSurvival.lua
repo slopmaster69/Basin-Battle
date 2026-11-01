@@ -6059,6 +6059,10 @@ function ES.Line(line)
     if ES.Letter then ES.Letter(f) end
   elseif verb == "WT" then
     if ES.WagerLine then ES.WagerLine(f) end
+  elseif verb == "DP" then
+    if ES.OwnMeter then ES.OwnMeter(f) end
+  elseif verb == "DM" then
+    if ES.FightMeter then ES.FightMeter(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "WD" then
