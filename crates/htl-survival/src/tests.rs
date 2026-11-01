@@ -1911,9 +1911,9 @@ fn a_horde_grunt_strings_its_blows_and_each_can_be_met() {
     ev.extend(run(&mut s, 2.5));
     let hits = hits_on(&ev, p);
     assert_eq!(hits.iter().filter(|(_, o)| *o == Outcome::Hit).count(), 2, "both cuts land: {hits:?}");
-    // Each with its own take of the swing, for the clients that play clips.
-    let takes: Vec<u32> = ev.iter().filter_map(|e| match e { Event::MobWindup { id, take, .. } if *id == k => Some(*take), _ => None }).collect();
-    assert_eq!(takes[..2], [0, 1]);
+    // Each with its own swing, for the clients that play clips: another take, or another model's.
+    let takes: Vec<(u32, Option<String>)> = ev.iter().filter_map(|e| match e { Event::MobWindup { id, take, from, .. } if *id == k => Some((*take, from.clone())), _ => None }).collect();
+    assert!(takes.len() >= 2 && takes[0] != takes[1], "{takes:?}");
 }
 
 #[test]
@@ -2989,6 +2989,15 @@ fn a_blow_can_borrow_another_character_models_clip() {
     // A creature on a character model takes every blow from the one it names.
     let g = s.content.mob("grunt").unwrap();
     s.content.mobs[g].clips_from = Some("OrcFemale".into());
+    // (Its blows' own `from` would win: none here, so the creature's holds.)
+    for pat in &mut s.content.mobs[g].patterns {
+        for st in &mut pat.steps {
+            st.from = None;
+        }
+    }
+    if let Some(sp) = s.content.mobs[g].special.as_mut() {
+        sp.from = None;
+    }
     let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
     s.engage(k, Foe::Hero(p));
     let mut ev = Vec::new();

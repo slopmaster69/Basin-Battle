@@ -3,7 +3,7 @@
 ## Notes: Soulslike controls and combat HUD, camp windows and banners for Elwynn Survival. Asleep on any other realm.
 ## SavedVariables: ElwynnSurvivalSettings
 ## Author: Basin Battle
-## Version: 8
+## Version: 9
 ElwynnSurvival.lua
 BetaBoard.lua
 Ledger.lua
