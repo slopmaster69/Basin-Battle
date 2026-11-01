@@ -36,7 +36,10 @@ const EYE: f32 = 1.9;
 /// The band: no class's mean time on the pack more than this many times the fastest's.
 const BAND: f32 = 3.0;
 /// Farther than this from the nearest foe, the bot walks back in.
-const APPROACH: f32 = 24.0;
+const APPROACH: f32 = 16.0;
+/// The ground the bot keeps to: it steps back, blinks or leaps out only within this of where the
+/// fight began, so it never drags a foe past its leash (home again, it's whole again).
+const ROOM: f32 = 8.0;
 const PLANS: &str = include_str!("../../../content/sim.toml");
 
 /// A fight every class plays: its name, what it is, the foes and where, and how long it may run.
@@ -285,8 +288,12 @@ fn planned(s: &Survival, p: Id, foes: &[Id], target: Id, d: f32, plan: &[Rule], 
         }
         let Some(card) = &r.card else { continue };
         let Some((slot, ex)) = key_for(s, p, card) else { continue };
-        let ready = bar[slot].1.is_some() && bar[slot].3.charges > 0 && !refused(s, bot, slot);
         let a = if ex { bar[slot].2 } else { bar[slot].1 };
+        let outward = r.away || r.then_back.is_some() || a.is_some_and(|a| matches!(s.content.abilities[a].kind.as_str(), "leap" | "blink") && s.content.abilities[a].back);
+        if outward && dist2d(me, [0.0, 0.0, 0.0]) > ROOM {
+            continue;
+        }
+        let ready = bar[slot].1.is_some() && bar[slot].3.charges > 0 && !refused(s, bot, slot);
         let Some(a) = a else { continue };
         let affords = !ex || valor >= s.content.abilities[a].valor as f32;
         if ready && affords && reaches(s, a, d) {
@@ -306,7 +313,7 @@ fn think(s: &mut Survival, p: Id, foes: &[Id], plan: &[Rule], bot: &mut Bot, out
     let action = s.players[&p].action.clone();
     let free = matches!(action, Action::Ready | Action::Aim { .. } | Action::Charge { .. } | Action::Channel { .. });
     // Backing off: a stride away from the foe, still facing it.
-    if bot.back_until > s.clock && free {
+    if bot.back_until > s.clock && free && dist2d(me, [0.0, 0.0, 0.0]) < ROOM + 6.0 {
         let speed = s.players[&p].sent_speed.max(3.0);
         let step = speed * DT;
         let to = [me[0] - yaw.cos() * step, me[1] - yaw.sin() * step, me[2]];
