@@ -182,7 +182,11 @@ air to the reticle's point (or straight back, a Disengage) and strikes what's th
 Demonic Circle sets an **anchor** to step back to; **traps** arm, wait (two at once) and spring on
 the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a moment and is lost to
 a stun. Projectiles may **pierce** (Crippling Throw), **leap on** (Chain Lightning) or
-**burst**; ground may linger, pull, throw out or slow every second.
+**burst**; ground may linger, pull, throw out or slow every second. Help aimed at a **friend**
+lands on the friend under the reticle (or the one nearest it, within 15°), else on you, and gives
+them only its heal, cleanse and boons; a **beam** is held a few seconds as a strip from you along
+your aim, sweeping as you turn: every foe in it takes its damage each tick and every friend in it
+is mended (a stun, silence, stagger or roll ends it, and so does its key again).
 
 **Seeing it coming** (the action-combat client, eighth round): everything that lands later is
 drawn on the ground where it will land, red when it's a foe's, blue when it's yours or a

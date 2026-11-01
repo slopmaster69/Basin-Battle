@@ -110,14 +110,18 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         }
     } else if d.damage[1] > 0.0 {
         let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
-        out.push(format!("{count}{} damage", span(d.damage, "")));
+        // A beam's is a second in it.
+        let per = if d.kind == "beam" { " a second" } else { "" };
+        out.push(format!("{count}{} damage{per}", span(d.damage, "")));
     }
     if d.linger > 0.0 && d.linger_damage > 0.0 {
         out.push(format!("{} a second for {} s", n(d.linger_damage), n(d.linger)));
     } else if d.linger > 0.0 {
         out.push(format!("{} s", n(d.linger)));
     }
-    if d.ally_heal > 0.0 {
+    if d.ally_heal > 0.0 && d.kind == "beam" {
+        out.push(format!("heals friends in it {}% a second", n(d.ally_heal * 100.0)));
+    } else if d.ally_heal > 0.0 {
         out.push(format!("heals {}%", n(d.ally_heal * 100.0)));
     }
     if d.linger_heal > 0.0 {
@@ -132,6 +136,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "ground" => out.push(format!("{} yd away, {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
         "cone" => out.push(format!("{} yd cone", n(d.range[1]))),
         "line" => out.push(format!("{} yd strip, {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "beam" => out.push(format!("{} yd beam, {} yd wide, held {} s", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
+        "ally" => out.push("on an ally, or yourself".to_string()),
         "leap" if d.back => out.push(format!("{} yd back", n(d.range[1]))),
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap, lands {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
         "trap" => out.push(format!("{} yd away, springs within {} yd, lasts {} s", n(d.range[1]), n(d.radius[1]), n(d.secs))),
@@ -167,7 +173,7 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.kind == "stance" && d.secs > 0.0 {
         out.push(format!("{} s", n(d.secs)));
     }
-    if d.kind == "buff" {
+    if d.kind == "buff" || d.kind == "ally" {
         if let Some(e) = d.effects.first() {
             out.push(format!("{} s", n(e.secs[1])));
         }
