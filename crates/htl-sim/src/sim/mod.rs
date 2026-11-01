@@ -32,6 +32,7 @@ pub use fronts::{FrontView, Ping};
 pub use shop::{ShopItem, SiteView, SHOP_ICONS};
 mod spells;
 mod synergy;
+mod triggers;
 mod waves;
 pub use spells::talent_points_at;
 
@@ -335,6 +336,19 @@ pub enum Event {
         endangered: Vec<EntityId>,
         /// A strike everyone should see coming (a share-of-health cleave): a cast bar like a boss's.
         big: bool,
+        /// It can be interrupted (Shield Slam).
+        interruptible: bool,
+    },
+    /// An enemy's cast was interrupted: its cast bar breaks.
+    CastInterrupted {
+        caster: EntityId,
+        spell: u32,
+    },
+    /// One of a player's upgrades or talents went off: call it out (its name, its icon).
+    Proc {
+        player: EntityId,
+        name: String,
+        icon: u32,
     },
     /// A player's spell bar changed (a spell was cast, learned or lost, or casting switched
     /// between by hand and automatic): read it again with `Sim::spell_bar`.
@@ -617,6 +631,8 @@ pub struct BarSlot {
     pub talent: bool,
     /// A toggle that is on.
     pub on: bool,
+    /// Its next cast is empowered: the key lights up.
+    pub lit: bool,
 }
 
 impl BarSlot {
@@ -633,8 +649,23 @@ impl BarSlot {
             cost: 0,
             talent: false,
             on: false,
+            lit: false,
         }
     }
+}
+
+/// One held skill in the build window: the upgrades taken (name, text, times), how many of how
+/// many, and how many could still come.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SkillBuild {
+    pub key: String,
+    pub name: String,
+    pub icon_spell: u32,
+    pub taken: Vec<(String, String, u8)>,
+    pub count: usize,
+    pub cap: usize,
+    pub open: usize,
+    pub deck: usize,
 }
 
 /// The spell bar: what's on each of the six keys (an empty key between spells shows blank).
@@ -1189,6 +1220,7 @@ impl Sim {
         self.step_casts();
         self.step_spells(dt);
         self.step_buffs(dt);
+        self.step_tbuffs();
         self.step_rage(dt);
         self.step_pets();
         self.step_traps();

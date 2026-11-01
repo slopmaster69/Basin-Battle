@@ -1917,6 +1917,12 @@ impl Survival {
         }
         // The log says what felled them too (the recap's last blow), for tuning the fights.
         let why = self.death_recap(id).lines.into_iter().next().map_or(String::new(), |l| format!(": {l}"));
+        // The camp's fighting record: who felled whom, hero against hero (not in Siege, whose
+        // heroes are made for the match).
+        if let Some(k) = hero.as_ref().filter(|_| !self.is_siege()) {
+            self.forward_count("fells", k, 1);
+            self.forward_count("felled", &name, 1);
+        }
         match &hero {
             Some(k) => self.events.push(Event::Log(format!("{k} fells {name}{why}."))),
             None => self.events.push(Event::Log(format!("{name} fell{why}"))),

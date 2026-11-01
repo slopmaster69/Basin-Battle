@@ -390,6 +390,9 @@ impl Sim {
         self.run.gold_per_weight = self.content.game.gold_per_kill
             * (1.0 + self.content.game.gold_per_kill_per_wave * (n - 1) as f32 * 0.2);
         self.phase = Phase::Wave { pending };
+        for pid in self.player_ids() {
+            self.fire(pid, crate::kit::On::Wave, None, None, 0.0);
+        }
         let from: Vec<&str> = self.arena.lanes[..lanes].iter().map(|l| l.name.as_str()).collect();
         let mut text = format!("Wave {n}: enemies from {}!", join_names(&from));
         if let Some(e) = plan.event {

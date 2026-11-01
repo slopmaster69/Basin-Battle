@@ -240,7 +240,7 @@ fn the_addon_gets_the_card_picker_and_the_hearthstone_works() {
     let bar = addon_lines(&c).into_iter().rev().find(|l| l.starts_with("Q~")).expect("a spell bar line");
     let f: Vec<&str> = bar.split('~').collect();
     assert_eq!(f[1], "1", "cast by hand: {bar}");
-    assert_eq!(f[4].split('^').count(), 10, "{bar}");
+    assert_eq!(f[4].split('^').count(), 11, "{bar}");
     // The talent window: three trees and their talents, and the player's points.
     let lines = addon_lines(&c);
     assert_eq!(lines.iter().filter(|l| l.starts_with("TT~")).count(), 3);

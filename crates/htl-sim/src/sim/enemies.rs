@@ -51,6 +51,8 @@ pub(super) struct Dot {
     pub stacks: u8,
     pub leech: f32,
     pub spread: f32,
+    /// Share of each tick that mends the most hurt ally near the caster.
+    pub mend: f32,
 }
 
 #[derive(Debug)]
@@ -83,6 +85,8 @@ pub(super) struct Enemy {
     pub sent_speed: f32,
     /// Who hit it last: the kill's owner.
     pub last_hit_by: Option<EntityId>,
+    /// The spell (as the client is shown it) that last hurt it; 0 for a swing.
+    pub last_spell: u32,
     /// Abilities it casts (indices into the content's abilities), and when each is ready.
     pub abilities: Vec<usize>,
     pub ready_at: Vec<f32>,
@@ -231,6 +235,7 @@ impl Sim {
                     dots: Vec::new(),
                     sent_speed: speed,
                     last_hit_by: None,
+                    last_spell: 0,
                     abilities,
                     ready_at,
                     casting: None,
@@ -394,7 +399,7 @@ impl Sim {
 
     fn tick_dots(&mut self, id: EntityId) {
         let now = self.clock;
-        let due: Vec<(EntityId, u32, u8, u32, f32)> = {
+        let due: Vec<(EntityId, u32, u8, u32, f32, f32)> = {
             let Some(en) = self.entities.get_mut(&id).and_then(|e| e.enemy_mut()) else {
                 return;
             };
@@ -404,7 +409,7 @@ impl Sim {
                 if d.ticks_left > 0 && d.next <= now {
                     d.ticks_left -= 1;
                     d.next += 1.0;
-                    due.push((d.caster, d.spell, d.school, d.per_tick.round().max(1.0) as u32, d.leech));
+                    due.push((d.caster, d.spell, d.school, d.per_tick.round().max(1.0) as u32, d.leech, d.mend));
                 }
             }
             en.dots.retain(|d| d.ticks_left > 0);
@@ -413,7 +418,7 @@ impl Sim {
             }
             due
         };
-        for (caster, spell, school, dmg, leech) in due {
+        for (caster, spell, school, dmg, leech, mend) in due {
             if !self.entities.get(&id).is_some_and(|e| e.alive()) {
                 break;
             }
@@ -425,6 +430,12 @@ impl Sim {
             if alive_caster {
                 if leech > 0.0 {
                     self.heal(caster, caster, spell, (dmg as f32 * leech).round() as u32, false);
+                }
+                if mend > 0.0 {
+                    let pos = self.entities[&caster].pos;
+                    if let Some(a) = self.most_hurt(caster, pos, super::spells::ALLY_RANGE, 1.0) {
+                        self.heal(caster, a, 15290, (dmg as f32 * mend).round().max(1.0) as u32, false);
+                    }
                 }
                 let ve = self.entities[&caster].player().map_or(0.0, |p| p.stats.procs.vampiric_embrace);
                 if school == 5 && ve > 0.0 {
@@ -445,7 +456,7 @@ impl Sim {
     /// Put a damage-over-time effect on an enemy; the same spell from the same caster refreshes
     /// (or, with `stack`, adds up to three times over).
     pub(super) fn add_dot(&mut self, caster: EntityId, victim: EntityId, spell: u32, school: u8, total: f32, secs: f32, stack: bool) {
-        self.add_dot_full(caster, victim, spell, school, total, secs, stack, 0.0, 0.0);
+        self.add_dot_full(caster, victim, spell, school, total, secs, stack, 0.0, 0.0, 0.0);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -460,6 +471,7 @@ impl Sim {
         stack: bool,
         leech: f32,
         spread: f32,
+        mend: f32,
     ) {
         let now = self.clock;
         let Some(en) = self.entities.get_mut(&victim).and_then(|e| e.enemy_mut()) else {
@@ -481,8 +493,9 @@ impl Sim {
             d.ticks_left = ticks;
             d.leech = d.leech.max(leech);
             d.spread = d.spread.max(spread);
+            d.mend = d.mend.max(mend);
         } else {
-            en.dots.push(Dot { caster, spell, school, per_tick, ticks_left: ticks, next: now + 1.0, stacks: 1, leech, spread });
+            en.dots.push(Dot { caster, spell, school, per_tick, ticks_left: ticks, next: now + 1.0, stacks: 1, leech, spread, mend });
         }
         en.debuffs_dirty = true;
     }
@@ -909,6 +922,8 @@ impl Sim {
             .entities
             .iter()
             .filter(|(_, e)| e.alive() && e.enemy().is_some() && e.health * 100 < e.max_health * 85 && dist2d(e.pos, pos) <= HEAL_REACH)
+            // Mortal Wound: it can't be healed.
+            .filter(|(_, e)| e.enemy().is_some_and(|en| en.aff.wound_until <= self.clock))
             .min_by(|a, b| {
                 let ra = a.1.health as f32 / a.1.max_health.max(1) as f32;
                 let rb = b.1.health as f32 / b.1.max_health.max(1) as f32;
@@ -931,7 +946,9 @@ impl Sim {
     fn swing_enemy(&mut self, id: EntityId, dt: f32, def: &EnemyDef) {
         let (victim, ready, mut mult, modifier) = {
             let en = self.entities.get_mut(&id).unwrap().enemy_mut().unwrap();
-            en.swing += dt;
+            // Thunder Clapped: its attacks come slower.
+            let weak = if en.aff.weaken_until > self.clock { en.aff.weaken } else { 0.0 };
+            en.swing += dt * (1.0 - weak);
             let every = if en.modifier == FRENZIED { def.attack_secs * 0.6 } else { def.attack_secs };
             let ready = en.swing >= every;
             if ready {
@@ -1501,6 +1518,33 @@ impl Sim {
         if self.entities[&victim].is_enemy() && self.is_defense(attacker) {
             damage = (damage as f32 * self.defence_bonus(attacker, victim)).round() as u32;
         }
+        // Hamstrung (crippled) enemies take more from everyone.
+        if let Some(en) = self.entities.get(&victim).and_then(|e| e.enemy()) {
+            if en.aff.exposed_until > self.clock && en.aff.exposed > 0.0 {
+                damage = (damage as f32 * (1.0 + en.aff.exposed)).round() as u32;
+            }
+        }
+        // Armor: elites and bosses shrug off part of every physical blow from heroes and their
+        // pets, until Sunder Armor strips it (each stack takes ARMOR_PER_SUNDER off).
+        let physical = match via {
+            Via::Melee => true,
+            Via::Spell { school, .. } => school == 0,
+        };
+        if physical && !self.is_defense(attacker) {
+            let hero = matches!(self.entities.get(&attacker).map(|a| &a.body), Some(Body::Player(_)) | Some(Body::Ally(_)));
+            if hero {
+                if let Some(en) = self.entities.get(&victim).and_then(|e| e.enemy()) {
+                    let sc = &self.content.scaling;
+                    let base = if en.kind.boss { sc.boss_armor } else if en.elite { sc.elite_armor } else { 0.0 };
+                    if base > 0.0 {
+                        let s = en.aff.vulns[super::spells::Vuln::Sunder as usize];
+                        let stacks = if s.until > self.clock { s.n as f32 } else { 0.0 };
+                        let armor = (base - stacks * sc.armor_per_sunder).max(0.0).min(0.8);
+                        damage = (damage as f32 * (1.0 - armor)).round().max(1.0) as u32;
+                    }
+                }
+            }
+        }
         // Frozen enemies take more from a frost-resonant build.
         if self.entities[&victim].is_enemy() && self.frozen(victim) && self.resonant_any(attacker, "frost") {
             damage = (damage as f32 * 1.3) as u32;
@@ -1537,6 +1581,10 @@ impl Sim {
         let (health, max_health) = (v.health, v.max_health);
         if let (Some(en), Some(owner)) = (v.enemy_mut(), owner) {
             en.last_hit_by = Some(owner);
+            en.last_spell = match via {
+                Via::Spell { spell, .. } => spell,
+                Via::Melee => 0,
+            };
         }
         if let (true, Some(owner)) = (on_enemy, owner) {
             if let Some(p) = self.entities.get_mut(&owner).and_then(|e| e.player_mut()) {
@@ -1784,7 +1832,7 @@ impl Sim {
         for (caster, spell, school, total, ticks, n) in spreads {
             let others: Vec<EntityId> = self.enemies_near(pos, 12.0).into_iter().map(|(o, _)| o).filter(|o| *o != id).take(n as usize).collect();
             for o in others {
-                self.add_dot_full(caster, o, spell, school, total, ticks as f32, false, 0.0, n);
+                self.add_dot_full(caster, o, spell, school, total, ticks as f32, false, 0.0, n, 0.0);
                 self.events.push(Event::SpellGo { caster, spell, target: SpellTarget::Unit(o), hits: vec![o] });
             }
         }
@@ -1887,6 +1935,9 @@ impl Sim {
             if let Some(p) = self.entities.get_mut(&k).and_then(|e| e.player_mut()) {
                 p.kills += 1;
             }
+            let last = self.entities.get(&id).and_then(|e| e.enemy()).map_or(0, |en| en.last_spell);
+            let spell = if last != 0 { self.spell_of_visual(k, last) } else { None };
+            self.fire(k, crate::kit::On::Kill, spell, Some(id), 0.0);
             self.on_kill_triggers(k, id, pos);
         }
         // Affixes.
