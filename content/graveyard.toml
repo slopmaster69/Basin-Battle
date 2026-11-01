@@ -66,6 +66,7 @@ at = [1851.7, 1327.3, 18.0]
 find = 4.0
 reveals = ["grave_goods", "grave_rhyme"]
 text = "a grave with no headstone, freshly turned, a carved pumpkin grinning on top of it. Something under the earth laughs. It's Hallow's End; the dead remember."
+page = "Under the pumpkin, someone has driven a stake with a slip of parchment nailed to it, the way the sexton marks a grave until its stone comes. This one's stone never came.{n}{n}Name: not given. Taken on Hallow's End at the crossroads, riding without a head and laughing all the same. Put down by the Bloodmage, who would not say how. Buried without rites, face down, by the Bloodmage's order, and no stone, so that none should know where.{n}{n}Beneath it, in the sexton's hand: Somebody brings the pumpkin every year. I have never seen who. I took it away the first time. In the morning it was back, and lit.{n}{n}The candle in the pumpkin is burning now. Nobody here lit it. Under your feet the turned earth settles, like a sleeper rolling over."
 
 [[dungeon.box]]
 key = "grave_goods"
@@ -94,6 +95,7 @@ at = [1852.0, 1415.0, 22.7]
 find = 4.0
 reveals = ["azshir"]
 text = "the seal on the crypt has cracked from the inside. Something comes out of it, wailing."
+page = "The lid of the crypt is cut with the Crusade's flame and a name: SISTER AZSHIR. Beneath it is the inscription the Crusade gives its own.{n}{n}She kept the night vigil in the chapel nine years and never once closed her eyes. When the plague came she would not sleep, for fear of what sleep would bring. Rest now, Sister. You have earned it.{n}{n}Below that, cut by a less careful chisel: Sealed by order of the Bloodmage, with silver. Do not open, whatever is heard.{n}{n}The silver in the seal has gone black, and the crack in it runs outward, from within. Through it, very faintly, comes a woman's voice counting the hours, and losing count, and starting again."
 
 # Among the graves, one with a champion's arms carved on it.
 [[dungeon.door]]
@@ -106,6 +108,7 @@ at = [1820.9, 1281.8, 17.7]
 find = 4.0
 reveals = ["champion"]
 text = "a grave carved with a champion's arms: the earth over it heaves, and its champion climbs out."
+page = "The stone is carved with a Scarlet champion's arms, a sword upright through a flame. The epitaph is long, and someone has scored half of it away.{n}{n}Here lies a champion of the Scarlet Crusade, who held the Brill road for the Light and fell at the last with his face to the dead. He asked to be laid among his brothers, and not...{n}{n}The rest is gouged out. In its place, in red paint gone brown: QUESTIONED. -- V.{n}{n}Along the foot of the stone run many small scratches, as if fingers had worked at it from below. The newest are fresh. The earth over the grave lifts, and settles, and lifts again."
 
 # --- notes -------------------------------------------------------------------------------------------
 

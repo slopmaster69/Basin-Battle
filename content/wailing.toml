@@ -65,6 +65,7 @@ at = [-202.4, -338.0, -71.0]
 find = 4.5
 reveals = ["disciple_cache", "disciple_journal"]
 text = "in the warren's far bulge: a disciple of Naralex, long dead in his sleep, his journal open on his chest. You read the last page, and the dream reads you back."
+page = "The disciple lies on his back as if he had only lain down to rest, and the moss has grown over him like a blanket. The journal on his chest is swollen with damp; most of it will not open. The pages that will are written in a careful, sleepy hand.{n}{n}We came down with Naralex to heal the Barrens. He would dream the land green again, and we would keep him while he slept. The others have begun to wear fangs. They say the dream has changed them, and they are glad of it.{n}{n}I hid from them today. One of the Fanglords passed so close I could have touched his robe.{n}{n}I am so tired. I will write down what he truly dreams, and then I will sleep.{n}{n}One page is left, the last, and it has fallen open towards you."
 
 [[dungeon.box]]
 key = "disciple_cache"
@@ -93,6 +94,7 @@ at = [-337.0, 37.4, -99.0]
 find = 4.0
 reveals = ["fang_stash"]
 text = "past the end of the low tunnel: the Druids of the Fang's cache, wrapped in shed skins."
+page = "Inside the bundle, each shed skin has been rolled round something and tied with a strip of green cloth. The outermost skin, the largest, has been written on in sap, in the curling hand the Druids of the Fang use for their oaths.{n}{n}We are the Fang. We keep the Dreamer's sleep. What we take from the deviate things is ours to keep, against the day the Dreamer wakes and the Barrens come green under our feet.{n}{n}Lord Cobrahn holds the low tunnel. None but a Fanglord unwraps this cache. Any who do: let the serpents have them.{n}{n}Someone has drawn a line through \"the day the Dreamer wakes\", and written above it, smaller: if."
 
 [[dungeon.box]]
 key = "fang_stash"
@@ -113,6 +115,7 @@ at = [-97.1, 457.2, -71.6]
 find = 4.0
 reveals = ["faerie"]
 text = "the nook glitters with dust that wasn't there a moment ago; something blinks out of the air."
+page = "Tucked under the glittering caps is a waxed notebook, the kind the Cenarion Circle's surveyors carry, its last pages smeared with the same shining dust.{n}{n}A faerie dragon, I am almost sure. Smaller than the ones in Feralas and quicker, and its scales have gone the strange colours of everything else that drinks this water. It does not mind me. It takes things: my pencil, my spare socks, the buttons off my coat. It brings some of them back.{n}{n}Today it would not let me leave the nook. Every time I turned for the tunnel it was there first, laughing. I think it is lonely. I think it is playing. I am no longer sure those are different things down here.{n}{n}The dust settles on your sleeve. Very close, something giggles."
 
 # --- notes -------------------------------------------------------------------------------------------
 

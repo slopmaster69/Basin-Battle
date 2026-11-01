@@ -96,6 +96,7 @@ scale = 1.6
 bars = [[138.5, 70.0], [138.5, 53.5]]
 reveals = ["stash"]
 text = "the bricks across the cell are only stacked dry: they tumble, and inside is someone's stash."
+page = "The dry bricks lie in a heap. Behind them, in a sack under the cot, is the sort of stock no prisoner should have, and on the inside of the cell wall someone has kept accounts in chalk, where no inspector would think to look.{n}{n}Sold to the east block, for the warden: three files, eight silver each. Two bottles of tonic, in a laundry basket. One whetstone, to a big lad called Hamhock, who did not say what for.{n}{n}Balance to the warden, less my share: forty silver.{n}{n}At the bottom, in a hurried hand: He's having the cell bricked up with me out of it. Says it's for safe keeping. If I'm not back for this by the bells, I'm not coming back."
 
 [[dungeon.box]]
 key = "stash"
@@ -115,6 +116,7 @@ at = [175.0, 145.0, -33.9]
 find = 4.0
 reveals = ["bribes", "warden_ledger_note"]
 text = "at the far end of the wing, under a loose flagstone: the warden's ledger, and his bribes."
+page = "The flagstone lifts on a hollow lined with straw. In it lie a fat purse, a ledger bound in good leather, and a scrap of paper folded very small, as if it had been passed through bars.{n}{n}Warden -- two hundred, as agreed, for the keys to the east block. Leave them on the hook outside the guard room the night the bells ring. Thredd is not to know where they came from; let him think he's clever. The rest when it's done and the right men are out.{n}{n}Burn this. The Brotherhood remembers its friends. It remembers the others too.{n}{n}The paper was not burned. Across the top, in the warden's hand, is written: For when they turn on me."
 
 [[dungeon.box]]
 key = "bribes"
@@ -144,6 +146,7 @@ at = [66.0, -92.0, -33.9]
 find = 4.0
 reveals = ["bruegal"]
 text = "the last cell of the south wing: its door was never locked. The dwarf inside didn't want to leave. Until now."
+page = "It is the tidiest cell in the Stockade: a swept floor, a folded blanket, twelve years of tally marks in neat rows of seven. On a shelf of loose brick sits a stack of letters, all addressed to Ironforge, none of them sent. The top one is new.{n}{n}Dear Brother, the door's still not locked. It hasn't been since the second year, when the turnkey lost the key and nobody looked for it. I could walk out to the gryphons any day I liked. I don't. Out there, someone would ask what I did in Thelsamar, and in here nobody asks.{n}{n}There's a riot on. Bells, shouting, men running past my door. Somebody's bound to try it, thinking it's locked. Then we'll see about leaving. -- B.{n}{n}On the cot, a very large dwarf opens his eyes."
 
 # --- notes -------------------------------------------------------------------------------------------
 

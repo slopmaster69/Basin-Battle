@@ -721,7 +721,7 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
     let d = c.dungeon.as_mut().unwrap();
     d.packs.push(pack("grunt", "rare", [10.0, 20.0], true));
     d.boxes.push(crate::content::BoxDef { name: String::new(), key: "stash".into(), at: [12.0, 20.0, 0.0], facing: 0.0, loot: BTreeMap::from([("plunder".to_string(), 5)]) });
-    d.doors.push(DoorDef { key: "wall".into(), name: "A hollow wall".into(), kind: "illusory".into(), display: 1, at: [10.0, 15.0, 0.0], scale: 1.0, bars: Some([[5.0, 15.0], [15.0, 15.0]]), reveals: vec!["stash".into()], ..Default::default() });
+    d.doors.push(DoorDef { key: "wall".into(), name: "A hollow wall".into(), kind: "illusory".into(), display: 1, at: [10.0, 15.0, 0.0], scale: 1.0, bars: Some([[5.0, 15.0], [15.0, 15.0]]), reveals: vec!["stash".into()], page: "Behind the wall, a stash and a page of sums.{n}{n}Someone counted twice.".into(), ..Default::default() });
     d.doors.push(DoorDef { key: "nook".into(), name: "A nook".into(), kind: "hidden".into(), at: [-20.0, -20.0, 0.0], find: 3.0, display: 2890, look: "A Heap of Sacks".into(), reveals: vec!["rare".into(), "confession".into()], ..Default::default() });
     d.notes.push(crate::content::NoteDef { hints: vec![], clue: String::new(), key: "confession".into(), name: "A confession".into(), at: [-21.0, -20.0, 0.0], facing: 0.0, display: 0, scale: 1.0, text: "It was me.".into() });
     d.notes.push(crate::content::NoteDef { hints: vec!["wall".into()], clue: "The wall by the stash.".into(), key: "diary".into(), name: "A diary".into(), at: [2.0, 0.0, 0.0], facing: 0.0, display: 0, scale: 1.0, text: "The wall by the stash sounds hollow.".into() });
@@ -758,7 +758,14 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
     s.interact(id, Some(wall));
     let ev = s.step(DT);
     assert!(!ev.iter().any(|e| matches!(e, Event::Banner { .. })), "no banner and horn for everyone");
-    assert!(ev.iter().any(|e| matches!(e, Event::Letter { player, kind, .. } if *player == id && kind == "secret")), "the finder's page opens");
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Letter { player, kind, text, .. } if *player == id && kind == "secret" && text.starts_with("Behind the wall, a stash"))),
+        "the finder's page opens, with the secret's page"
+    );
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Letter { kind, text, .. } if kind == "secret" && !text.contains("{n}") && text.contains("sums.\n\nSomeone"))),
+        "its breaks are real newlines, for chat without the add-on as much as for the add-on"
+    );
     assert!(s.object(wall).is_none() && !s.through_shut_door([10.0, 10.0, 0.0], [10.0, 20.0, 0.0]));
     assert!(has(&s, &|k| matches!(k, ObjKind::Strongbox { key } if key == "stash")));
     // Found, the clue is spent; read again, the note has none.
