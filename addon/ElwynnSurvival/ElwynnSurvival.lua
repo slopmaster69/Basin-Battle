@@ -4016,7 +4016,8 @@ function ES.DrawPins()
   if ES.pinText then
     local t = ES.pinTally or {}
     if shown and t[2] then
-      ES.pinText:SetText(string.format("Elwynn: %s of %s places found   %s of %s chests opened   %s of %s secrets", t[1] or 0, t[2] or 0, t[3] or 0, t[4] or 0, t[5] or 0, t[6] or 0))
+      -- (Secrets aren't counted here: they're found, not ticked off.)
+      ES.pinText:SetText(string.format("Elwynn: %s of %s places found   %s of %s chests opened", t[1] or 0, t[2] or 0, t[3] or 0, t[4] or 0))
       ES.pinText:Show()
     else
       ES.pinText:Hide()
@@ -4275,20 +4276,21 @@ function ES.BookDraw()
       return
     end
     Rest(info[2] or "?", info[9] or "", "")
-    -- (A server that keeps the book's record of secrets and notes sends their tallies.)
+    -- (A server that keeps the book's record of notes sends their tallies. It sends the secrets'
+    -- too, but they aren't shown: a secret is found down there, not ticked off in the book.)
     local top = 1
     if info[11] then
       top = 2
-      local found, all, read, notes = tonumber(info[10]) or 0, tonumber(info[11]) or 0, tonumber(info[12]) or 0, tonumber(info[13]) or 0
+      local read, notes = tonumber(info[12]) or 0, tonumber(info[13]) or 0
       Row(2, {
         icon = "INV_Misc_Note_02",
-        lit = found > 0 or read > 0,
-        name = "Secrets and Notes",
-        tag = found .. " of " .. all .. " secrets",
-        sub = read .. " of " .. notes .. " notes read",
+        lit = read > 0,
+        name = "Notes",
+        tag = read .. " of " .. notes .. " read",
+        sub = "The pages you've found down there",
         go = "Read",
         cmd = ".es lore " .. pick,
-        detail = "What's been found down there, the rumours of what hasn't (from the notes read), and every note, to read again.",
+        detail = "Every note you've found here, to read again, and what they hint at.",
       })
     end
     -- (And of the Bookmaker's Wager: the level open, the time to beat.)

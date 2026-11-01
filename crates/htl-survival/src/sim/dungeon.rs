@@ -243,11 +243,10 @@ impl Survival {
         let text = if d.text.is_empty() { format!("{who} has found something hidden: {}.", d.name) } else { format!("{who}: {}", d.text) };
         self.announce(text);
         self.forward_count("secret", key, 1);
-        // The finder's to read at leisure: what it was, and how many of the place's are found.
+        // The finder's to read at leisure: what it was.
         if let Some(dg) = self.dungeon_def() {
-            let all = dg.doors.iter().filter(|x| x.secret()).count();
-            let found = dg.doors.iter().filter(|x| x.secret() && self.ever("secret", &x.key)).count();
-            let place = format!("A secret of {}: {found} of {all} found", dg.name);
+            // No tally: a secret is found, not ticked off.
+            let place = format!("A secret of {}", dg.name);
             // Its page, if it has one (the chat line stays the short `text`). Content writes its
             // breaks as `{n}`; a letter's are real newlines (`letter` turns them back for the add-on,
             // and makes them paragraphs in chat without it).
@@ -866,33 +865,24 @@ impl Survival {
     /// the notes read), and every note read, to read again.
     pub fn lore_page(&mut self, id: Id, key: &str) -> Result<(), String> {
         let d = self.content.dungeons().find(|d| d.key == key || (key.is_empty() && self.content.dungeon.as_ref().is_some_and(|x| x.key == d.key))).cloned().ok_or("No such dungeon in the book.")?;
-        let secrets: Vec<&DoorDef> = d.doors.iter().filter(|dr| dr.secret()).collect();
-        let found: Vec<String> = secrets.iter().filter(|dr| self.ever("secret", &dr.key)).map(|dr| dr.name.clone()).collect();
         let read: Vec<&NoteDef> = d.notes.iter().filter(|n| self.ever("read", &n.key)).collect();
+        // Secrets aren't listed or counted here: they're found down there, not ticked off a page.
+        // What the notes read say of those still hidden is kept, as rumours.
         let mut paras = Vec::new();
-        paras.push(if found.is_empty() { "Secrets found: none yet.".to_string() } else { format!("Secrets found: {}.", found.join("; ")) });
         // A rumour for each secret still hidden that a note read speaks of.
         let mut rumours = Vec::new();
-        let mut spoken = BTreeSet::new();
         for n in &read {
             if n.hints.iter().any(|h| !self.ever("secret", h)) && !n.clue.is_empty() {
                 rumours.push(format!("- {} ({})", n.clue, n.name));
-                spoken.extend(n.hints.iter().filter(|h| !self.ever("secret", h)).cloned());
             }
         }
         if !rumours.is_empty() {
             paras.push(format!("Rumours:\n{}", rumours.join("\n")));
         }
-        let unheard = secrets.iter().filter(|dr| !self.ever("secret", &dr.key) && !spoken.contains(&dr.key)).count();
-        if unheard > 0 {
-            paras.push(format!("{} more {} that no note you've read speaks of.", unheard, if unheard == 1 { "secret is down there" } else { "secrets are down there" }));
-        } else if found.len() == secrets.len() && !secrets.is_empty() {
-            paras.push("Every secret it keeps is found.".to_string());
-        }
         if read.is_empty() {
             paras.push("No notes read yet: they lie where they were dropped, waiting.".to_string());
         }
-        let place = format!("{} of {} secrets found, {} of {} notes read", found.len(), secrets.len(), read.len(), d.notes.len());
+        let place = format!("{} of {} notes read", read.len(), d.notes.len());
         let links = read.iter().map(|n| (format!(".es note {}", n.key), n.name.clone())).collect();
         self.events.push(Event::Letter { player: id, kind: "lore".into(), title: d.name.clone(), place, text: paras.join("\n\n"), clue: String::new(), links });
         Ok(())

@@ -383,7 +383,7 @@ MK	t1	1	2	3	2	1	0
 WR	camp
 BK	0		arena~The Proving Ring~0	siege~The Siege~Camps.	deadmines~The Deadmines~~1~1~3~1~~^stockade~The Stockade~INV_Misc_Key_04~0~1~2~1~A prison~The gate
 !local t = {} for i = 1, 8 do local r = ElwynnSurvival.win.rows[i] if r and r:IsShown() then table.insert(t, tostring(r.name:GetText())) end end table.insert(SAID, "book with dungeons: " .. table.concat(t, " | "))
-# A dungeon's page with its record of secrets and notes (a server that keeps one), its row reading it.
+# A dungeon's page with its record of notes (a server that keeps one; the secrets' tally it sends isn't shown), its row reading it.
 BK	0	dm_landing~The Landing~deadmines	arena~The Proving Ring~0	siege~The Siege~Camps.	deadmines~The Deadmines~~1~1~3~1~~~2~5~3~6
 !ElwynnSurvival.BookOpen("deadmines") local r = ElwynnSurvival.win.rows[2] table.insert(SAID, "book's record: " .. tostring(r.name:GetText()) .. " [" .. tostring(r.tag:GetText()) .. "] " .. tostring(r.go.cmd) .. ", the way in on row " .. (ElwynnSurvival.win.rows[3]:IsShown() and "3" or "?"))
 !ElwynnSurvival.BookOpen(nil) ElwynnSurvival.CloseWindows()
