@@ -39,6 +39,8 @@ mod tests_explore;
 #[cfg(test)]
 mod tests_floors;
 #[cfg(test)]
+mod tests_meter;
+#[cfg(test)]
 mod tests_siege;
 #[cfg(test)]
 mod tests_support;
@@ -53,4 +55,6 @@ mod tests_class_rogue_priest_shaman;
 #[cfg(test)]
 mod tests_class_mage_warlock_druid;
 #[cfg(test)]
-mod tests_meter;
+mod tests_beta_mechanics;
+#[cfg(test)]
+mod tests_beta;

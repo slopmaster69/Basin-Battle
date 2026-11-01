@@ -219,6 +219,25 @@ part for free (a blink there and back, a throw after a slam); the key glows gree
 left. A card that **empowers** another makes that card's next press its EX version for no Valor
 (Frost Nova on E making Fireball on Q its EX); the empowered key glows, its seconds in the corner.
 
+**Beta mechanics** (engine support for the beta page's generic cards): a projectile may **yank**
+its caster after it (a grappling hook: to the wall or the ground it meets, or beside the foe it
+strikes, in a fast dash a wall stops short; a miss does nothing) or **swap** places with what it
+strikes (a foe, a creature or a friend; never a champion, a totem, or anything steadfast or
+untouchable, which is only struck). A knockback may **stun against a wall** (`wall_stun`): a body
+thrown into a wall or up against a steep step is stunned as it hits, as long as any stun (half on
+a hero, kept off by the grace). A buff may leave an **echo** (`rewind`): its recast, or a few
+seconds, brings you back to it with the health you had then if that's more than now. A trap may
+**launch** instead of springing (a jump pad: you or a friend who steps on it is thrown that far
+the way you face; foes don't set it off, and it lasts its life, once a second a hero). The boon
+**cheat death** turns a blow that would fell you into one that leaves you at 1 health, ends, and
+mends a share of your health over 3 s. A stance with a **mirror** turns a foe's projectile (a
+hero's, or a creature's arrow or bolt) back at whoever threw it, as hard as it was; blows and
+ground go through. A projectile may **tether** the foe it strikes for a while, a link drawn
+between you: once it strays past the tether's reach it's dragged back to you and stunned, and the
+tether ends. A shield may **pop** as it breaks or runs out (a burst round whoever held it), and
+lingering ground may **burst as it ends** (a black hole's collapse), each the burst of a small
+nova of its own.
+
 **Seeing it coming** (the action-combat client, eighth round): everything that lands later is
 drawn on the ground where it will land, red when it's a foe's, blue when it's yours or a
 friend's, filling as it comes: a sky-fall's ring (Mind Blast, Meteor, Earthquake, Void
@@ -293,6 +312,42 @@ ability too, on its row's key), `.es valor <n|full>`,
 `.es cd off|on`, `.es heal`, `.es dummy [guard|roll|counter <school>]` (a training dummy in front
 of you), `.es cc log` and `.es pvp on|off`. `.es debug` also draws projectiles' bodies and every
 ground area on the ground.
+
+### The beta page
+
+The board has two tabs: **Classes** (the nine columns above) and **Beta**, five rows (the same
+keys) of up to four generic cards any class can use, there to be tried out. Click one: it's yours
+for free and goes on its row's key in place of your class's card there (`.es tree take <card>`
+works for them anywhere, no debug needed). Their EX versions work as any card's; a dev build owns
+them all; a save keeps them; Siege leaves them out (its fresh kit, its prices, its trainer). They
+keep to their row's damage and crowd-control budgets but count toward no class. In content they're
+`school = "beta"`, at the end of the `[[ability]]` list; the board's `TR` line gives each card its
+page last (1 or 2), so an add-on from before them simply doesn't show them.
+
+| Key | Card · *EX* | What it does |
+| --- | --- | --- |
+| Q | Ricochet · *Pinball* | A spike that bounces to three more foes within 8 yd, each bounce ×1.25 (7, 9, 11, 14). EX: five bounces, each stunning 0.75 s. |
+| Q | Gravity Lance · *Collapse* | A heavy bolt: every foe within 5 yd of the one it strikes is dragged into it, all take 14. EX: 6 yd, 16, and they're slowed 70% for 2 s. |
+| E | Whirlwind · *Bladestorm* | Spin 2 s, still moving at about 70%: 5 every half second to everything within 4 yd in front and to your sides. EX: 3 s, and nothing staggers you. |
+| E | Launcher · *Juggle* | An uppercut: 10, stunned 0.8 s and thrown up; E again within 1.5 s leaps you onto them for 14 in 3 yd (Slam). EX: 14, 1.2 s, a Slam of 18 that throws them 4 yd. |
+| E | Siphon Blade · *Soul Rend* | A 4 yd slash, 12 to each foe, and you heal 60% of all it deals. EX: wider, 16, and you heal all of it. |
+| 1 | Blink Dagger · *Phase Strike* | Blink 12 yd, and again within 3 s. EX: each blink lands with 8 to everyone within 3 yd. |
+| 1 | Phase Dash · *Searing Dash* | Dash 10 yd through foes, untouchable: each takes 4 and burns 4 a second for 3 s. EX: 14 yd, and they're slowed 40% too. |
+| 2 | Riposte · *Counterstrike* | A 0.8 s parry: the first blow or bolt is turned aside, and an attacker within 6 yd is staggered and bleeds 7 a second for 4 s. EX: 1.2 s, and it stuns them 1.2 s. |
+| 2 | Bubble · *Hard Bubble* | A shield on the friend under the reticle, or on you: soaks 40 for 4 s. EX: 70. |
+| 3 | Black Hole | Lobbed 26 yd: for 3 s it drags every foe within 7 yd 3 yd to its middle each second, 6 a second. |
+| 3 | Earthsplitter | A 30 yd fissure along your aim, drawn for everyone, bursts 0.8 s later: 30 and stunned 1.5 s. |
+| 3 | Avatar | 8 s of Onslaught, 20% faster and 20% less damage taken. |
+
+Where the engine can't do what the design asked yet, a card does the closest thing and says so in
+its comment: Ricochet's EX stuns on every bounce, not just the last; Collapse slows instead of
+rooting (a root or stun after a pull stops a creature where it stands); Whirlwind is a beam, so it
+reaches round your front and sides but not right behind you; Siphon Blade steals no boons; Phase
+Dash burns the foes it passes instead of leaving a trail; Riposte's cut is a bleed and there's no
+step behind the attacker; Avatar's extra damage is Onslaught's unblockable heavies (no boon adds
+damage). Ultimates have no EX version (no key for one, and the bar is spent). Bubble's pop and
+Black Hole's collapse, and the cards that need new engine pieces (Grappling Hook, Displacer Orb,
+Wall Slam, Rewind, Jump Pad, Cheat Death, Reflect, Soul Chain), come with them.
 
 ### The action-combat client
 
@@ -1196,7 +1251,11 @@ after its drawn wind-up (and lost to a stun), a trap arming and springing, a Dem
 anchor, piercing, chaining and bursting projectiles, shields, mending and haste, a veil, a
 Grounding Totem eating a bolt, Evasion and a vortex; `tests_recast.rs` covers recasts (a blink
 there and back, an aimed recast, the window running out, no cooldown for the recast), a dash
-through two foes and an empowered EX version. `tests_classes.rs` casts every card of the
+through two foes and an empowered EX version; `tests_beta_mechanics.rs` covers the beta mechanics
+(a hook to a wall and to a foe, and its miss; an orb swapping with a creature and a friend, not a
+champion or a steadfast foe; a wall stun; an echo with its recast and by itself; a jump pad; a
+cheated death; a mirror on a rival's bolt and a creature's arrow; a tether dragging a foe back; a
+shield's and a black hole's bursts; and what the rules turn away). `tests_classes.rs` casts every card of the
 nine classes and its EX version on creatures and in a duel, and holds the board to its PvP
 budgets.
 
