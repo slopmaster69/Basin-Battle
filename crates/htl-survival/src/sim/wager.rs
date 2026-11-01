@@ -555,6 +555,8 @@ impl Survival {
         let better: Vec<usize> = pool.iter().copied().filter(|i| fine(&self.content, *i)).collect();
         let rolls = 1 + level / 3;
         let mut won: BTreeMap<usize, u32> = BTreeMap::new();
+        // From +4, honed: better the higher the wager.
+        let tier = crate::content::hone_tier(level);
         for k in 0..rolls {
             let sure = level >= 6 && k == 0;
             let from = if (sure || (level >= 3 && self.rng.gen::<f32>() < 0.25 + 0.05 * level as f32)) && !better.is_empty() { &better } else { &plain };
@@ -562,7 +564,7 @@ impl Survival {
                 continue;
             }
             let i = from[self.rng.gen_range(0..from.len())];
-            *won.entry(i).or_default() += 1;
+            *won.entry(self.content.honed(i, tier)).or_default() += 1;
         }
         if !won.is_empty() {
             self.events.push(Event::ToCamp { counts: Vec::new(), items: won });

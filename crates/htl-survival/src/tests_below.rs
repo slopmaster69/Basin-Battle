@@ -1125,3 +1125,52 @@ fn stepping_off_from_the_lamp_before_everyone_is_ready_starts_the_clock_at_once(
     assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title.contains("clock is running") && sub.contains("Ayla stepped off"))), "{ev:?}");
     assert!(s.wager().unwrap().started.is_some(), "no head start for free");
 }
+
+#[test]
+fn every_piece_the_dungeons_foes_carry_has_honed_copies_better_by_their_tier() {
+    use crate::content::{hone_tier, HONE_TIERS};
+    let c = Content::builtin();
+    assert_eq!((hone_tier(3), hone_tier(4), hone_tier(8), hone_tier(11), hone_tier(12), hone_tier(20)), (0, 1, 2, 2, 3, 3));
+    let honed: Vec<&crate::content::ItemDef> = c.items.iter().filter(|i| i.hone > 0).collect();
+    assert!(honed.len() >= 60 * HONE_TIERS.len(), "{} honed", honed.len());
+    for h in &honed {
+        let base = &c.items[c.item(&h.honed_from).unwrap()];
+        let by = HONE_TIERS[h.hone as usize - 1].2;
+        assert_eq!(c.honed(c.item(&base.key).unwrap(), h.hone), c.item(&h.key).unwrap());
+        assert!(h.name.starts_with(&base.name) && h.display == base.display && h.icon == base.icon, "{}", h.key);
+        if base.reduce > 0.0 {
+            assert!(h.reduce > base.reduce, "{}: armour better", h.key);
+        }
+        for (p, q) in base.perks.iter().zip(&h.perks) {
+            assert!((q.amount - p.amount * by).abs() < 1e-4, "{}: perk", h.key);
+        }
+        if let (Some(w), Some(hw)) = (c.weapon(&base.key), c.weapon(&h.key)) {
+            assert!(hw.damage[1] > w.damage[1] && hw.two_handed == w.two_handed, "{}: damage", h.key);
+        }
+    }
+}
+
+#[test]
+fn a_wager_won_at_eight_pays_keen_gear_into_the_camps_chest() {
+    use crate::sim::wager::{wager_bosses, wager_forces_needed};
+    let c = Content::builtin().for_dungeon_of("stockade");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    s.start_wager(8);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let d = s.content.dungeon.clone().unwrap();
+    let needed = wager_forces_needed(&d, &s.content);
+    let wall = s.wall();
+    let bosses = wager_bosses(&d, &s.content);
+    let b = s.below.as_mut().unwrap();
+    b.slain.extend(bosses);
+    let w = b.wager.as_mut().unwrap();
+    w.started = Some(wall);
+    w.forces = needed;
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::WagerDone(r) if r.timed && r.level == 8)), "won");
+    let paid: Vec<usize> = ev.iter().filter_map(|e| if let Event::ToCamp { items, .. } = e { Some(items.keys().copied().collect::<Vec<_>>()) } else { None }).flatten().collect();
+    let gear: Vec<&crate::content::ItemDef> = paid.iter().map(|i| &s.content.items[*i]).filter(|i| i.kind != crate::content::ItemKind::Resource).collect();
+    assert!(!gear.is_empty() && gear.iter().all(|i| i.hone == 2), "keen: {:?}", gear.iter().map(|i| &i.key).collect::<Vec<_>>());
+    let _ = id;
+}

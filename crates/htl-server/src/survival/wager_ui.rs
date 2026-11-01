@@ -26,7 +26,7 @@ impl SurvivalGame {
             "Foes chase much farther during a wager, so you can pull one pack into the next and fight them together. Big pulls are the quick way to the count.".to_string(),
             "Beat the clock at your highest open wager and the next one opens. Finish with a fifth of the time to spare and you skip a level; with two-fifths to spare, two.".to_string(),
             "Going home through a lamp takes you out of the run. Once everyone is out, the run is over and the dungeon is back as you left it.".to_string(),
-            "The higher the wager, the tougher the foes and the better the pay: plunder for everyone, and from +3 the dungeon's gear in the camp's chest.".to_string(),
+            "The higher the wager, the tougher the foes and the better the pay: plunder for everyone, and the dungeon's gear in the camp's chest, the finer pieces from +3. From +4 that gear comes honed, better than any foe's own: Honed at +4, Keen at +8, Peerless at +12.".to_string(),
         ];
         if most <= 1 {
             paras.push("Only +1 is open for now. Beat it in time to open +2.".to_string());

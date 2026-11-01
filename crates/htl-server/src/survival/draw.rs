@@ -372,11 +372,15 @@ impl SurvivalGame {
                 t.delay_ms = ((b.draw_secs + b.recovery) * 1000.0) as u32;
             }
         }
-        // A set's piece is rare (blue); a piece with a perk at least uncommon (green).
+        // A set's piece is rare (blue); a piece with a perk at least uncommon (green). Honed, a
+        // step better for each tier, up to epic (purple).
         if !d.set.is_empty() {
             t.quality = t.quality.max(3);
         } else if !d.perks.is_empty() {
             t.quality = t.quality.max(2);
+        }
+        if d.hone > 0 {
+            t.quality = (t.quality + d.hone).min(4);
         }
         Some((t, stack))
     }
