@@ -461,7 +461,7 @@ fn grappling_hook_hauls_you_to_the_foe_it_bites_and_harpoon_drags_the_foe_to_you
     let at = s.players[&p].pos;
     assert!(at[0] > 7.0 && at[0] < 10.0, "hauled up to it: {at:?}");
     // The EX the other way round: it comes to her.
-    let h = mob(&mut s, [at[0] + 12.0, 0.0, 0.0]);
+    let h = mob(&mut s, [at[0] + 7.0, 0.0, 0.0]);
     run(&mut s, 1.0);
     let mut ev = cast(&mut s, p, "ranged", true);
     ev.extend(run(&mut s, 1.0));
@@ -477,7 +477,7 @@ fn displacer_orb_trades_places_with_what_it_touches() {
     let g = mob(&mut s, [8.0, 0.0, 0.0]);
     ready(&mut s, p, "displacer_orb");
     let mut ev = cast(&mut s, p, "ranged", false);
-    ev.extend(run(&mut s, 1.0));
+    ev.extend(run(&mut s, 0.4));
     assert!(dealt(&ev, g) > 0);
     assert!(s.players[&p].pos[0] > 6.0, "she's where it stood: {:?}", s.players[&p].pos);
     assert!(s.mobs[&g].pos[0] < 2.0, "it's where she stood: {:?}", s.mobs[&g].pos);

@@ -5133,7 +5133,7 @@ school = "beta"
 slot = "defense"
 kind = "stance"
 secs = 1.0
-cooldown = 10.0
+cooldown = 12.0
 spell = 543
 aura = 543
 counter = { mirror = true }
@@ -5290,6 +5290,7 @@ radius = [0.4, 0.4]
 speed = 40.0
 chain = 2
 chain_range = 6.0
+chain_falloff = 1.0
 tether_secs = 5.0
 tether_range = 8.0
 tether_effects = [{ kind = "stun", secs = [1.5, 1.5] }]
