@@ -50,7 +50,9 @@ impl Sim {
             return true;
         }
         let near = self.nearest_player(pos, WAKE_RANGE);
-        if near.is_none() {
+        // A healer wakes for its hurt allies too, players or not.
+        let mends = abilities.iter().any(|&a| self.content.abilities[a].kind == "heal") && self.hurt_enemy_near(id, pos, 15.0);
+        if near.is_none() && !mends {
             return false;
         }
         // First contact: the abilities wake up after a moment.
@@ -77,13 +79,29 @@ impl Sim {
                 "line" => def.length,
                 _ => POOL_RANGE,
             };
-            let in_reach = if ordinary { self.strikable(pos, reach).is_some() } else { self.nearest_player(pos, reach).is_some() };
+            let in_reach = if def.kind == "heal" {
+                self.hurt_enemy_near(id, pos, def.radius)
+            } else if def.kind == "bolt" {
+                self.nearest_player(pos, reach).is_some()
+            } else if ordinary {
+                self.strikable(pos, reach).is_some()
+            } else {
+                self.nearest_player(pos, reach).is_some()
+            };
             if in_reach {
                 self.cast_ability(id, k, a);
                 return true;
             }
         }
         false
+    }
+
+    /// Whether an enemy within `radius` of `pos` (the caster too) is hurt enough to mend.
+    fn hurt_enemy_near(&self, _caster: EntityId, pos: Vec3, radius: f32) -> bool {
+        let now = self.clock;
+        self.entities.values().any(|e| {
+            e.alive() && e.enemy().is_some_and(|en| en.aff.wound_until <= now) && e.health * 100 < e.max_health * 85 && dist2d(e.pos, pos) <= radius
+        })
     }
 
     /// The nearest player within `radius` that an ordinary strike may aim at now.
@@ -110,6 +128,10 @@ impl Sim {
             (d.damage[0] + d.damage[1]) as f32 / 2.0 * en.damage_mult
         };
         self.halt_enemy(id);
+        if matches!(def.kind.as_str(), "bolt" | "heal") {
+            self.cast_spell_ability(id, k, def, hit);
+            return;
+        }
         let centers: Vec<Vec3> = match def.kind.as_str() {
             "slam" => vec![pos],
             "line" => {
@@ -238,7 +260,11 @@ impl Sim {
             warn: def.warn.clone(),
             endangered: endangered.clone(),
             big: def.health_share > 0.0,
+            interruptible: def.interruptible,
         });
+        if def.interruptible {
+            self.cue_interrupts(id, def.cast_secs);
+        }
         // When it lands: the caster's cast ends, the impact shows.
         self.landings.push(Landing {
             at: lands,
@@ -250,7 +276,133 @@ impl Sim {
             endangered,
             radius: def.radius,
             name: def.name.clone(),
+            effect: LandEffect::Zones,
+            bound: Vec::new(),
         });
+    }
+
+    /// A spell an enemy casts at someone (a bolt) or for its own (a mass heal): no marks on the
+    /// ground to dodge, a cast bar to break. It lands unless the caster is interrupted or killed.
+    fn cast_spell_ability(&mut self, id: EntityId, k: usize, def: crate::content::AbilityDef, hit: f32) {
+        let now = self.clock;
+        let lands = now + def.cast_secs;
+        let pos = self.entities[&id].pos;
+        let (effect, endangered) = match def.kind.as_str() {
+            "bolt" => {
+                let Some(target) = self.nearest_player(pos, POOL_RANGE) else { return };
+                if let Some(t) = self.entities.get(&target).map(|e| e.pos) {
+                    if let Some(e) = self.entities.get_mut(&id) {
+                        e.facing = facing(pos, t);
+                    }
+                }
+                (LandEffect::Bolt { target, damage: hit * def.damage, share: def.health_share, school: def.school }, vec![target])
+            }
+            _ => {
+                // Whoever is in reach as the cast begins: the spell is bound to them.
+                let now = self.clock;
+                let bound: Vec<EntityId> = self
+                    .entities
+                    .iter()
+                    .filter(|(_, e)| e.alive() && e.enemy().is_some_and(|en| en.aff.wound_until <= now) && dist2d(e.pos, pos) <= def.radius)
+                    .map(|(&i, _)| i)
+                    .collect();
+                (LandEffect::Heal { share: def.heal }, bound)
+            }
+        };
+        let (endangered, bound) = if def.kind == "heal" { (Vec::new(), endangered) } else { (endangered, Vec::new()) };
+        if let Some(en) = self.entities.get_mut(&id).and_then(|e| e.enemy_mut()) {
+            en.casting = Some((k, lands));
+            en.ready_at[k] = lands + def.cooldown;
+        }
+        self.events.push(Event::EnemyCast {
+            caster: id,
+            name: def.name.clone(),
+            spell: def.spell,
+            ms: (def.cast_secs * 1000.0) as u32,
+            warn: def.warn.clone(),
+            endangered: endangered.clone(),
+            big: true,
+            interruptible: def.interruptible,
+        });
+        if def.interruptible {
+            self.cue_interrupts(id, def.cast_secs);
+        }
+        self.landings.push(Landing {
+            at: lands,
+            caster: id,
+            spell: def.spell,
+            impact: def.impact,
+            centers: vec![pos],
+            suicide: false,
+            endangered: Vec::new(),
+            radius: def.radius,
+            name: def.name.clone(),
+            effect,
+            bound,
+        });
+    }
+
+    /// An interruptible cast began: every hero who holds an interrupt and can reach the caster
+    /// sees it light up for as long as the cast lasts.
+    fn cue_interrupts(&mut self, caster: EntityId, secs: f32) {
+        let Some(at) = self.entities.get(&caster).map(|e| e.pos) else { return };
+        for p in self.player_ids() {
+            let found = {
+                let Some(e) = self.entities.get(&p) else { continue };
+                let Some(pl) = e.player() else { continue };
+                if !e.alive() {
+                    continue;
+                }
+                let kit = self.content.kit(pl.class);
+                pl.spells.iter().find(|o| o.nums.interrupt > 0.0 && dist2d(e.pos, at) <= o.nums.interrupt).map(|o| kit.spells[o.spell].key.clone())
+            };
+            if let Some(key) = found {
+                let cue = crate::kit::BuffDef { key: "interrupt_cue".into(), secs, stacks: 1, next: vec![key], hold: true, ..Default::default() };
+                self.give_tbuff(p, &cue);
+            }
+        }
+    }
+
+    /// Break an enemy's cast, if it is casting something that can be broken: its marks vanish,
+    /// it never lands, the caster reels (stunned 2 sec). True if a cast was broken.
+    pub(super) fn interrupt_enemy(&mut self, by: EntityId, victim: EntityId) -> bool {
+        let Some((a, lands)) = self.entities.get(&victim).and_then(|e| e.enemy()).and_then(|en| en.casting) else { return false };
+        let Some(&ability) = self.entities.get(&victim).and_then(|e| e.enemy()).and_then(|en| en.abilities.get(a)) else { return false };
+        let def = self.content.abilities[ability].clone();
+        if !def.interruptible || lands <= self.clock {
+            return false;
+        }
+        if let Some(en) = self.entities.get_mut(&victim).and_then(|e| e.enemy_mut()) {
+            en.casting = None;
+        }
+        self.landings.retain(|l| l.caster != victim);
+        let zones: Vec<EntityId> = self
+            .entities
+            .iter()
+            .filter(|(_, e)| matches!(&e.body, Body::Zone(z) if z.caster == victim && z.hostile))
+            .map(|(&z, _)| z)
+            .collect();
+        for z in zones {
+            self.entities.remove(&z);
+            self.events.push(Event::ZoneEnd { id: z });
+        }
+        self.events.push(Event::CastInterrupted { caster: victim, spell: def.spell });
+        self.stun_enemy(victim, 2.0);
+        self.events.push(Event::Proc { player: by, name: format!("Interrupted: {}", def.name), icon: 72 });
+        true
+    }
+
+    /// Whether a player holds an interrupt that reaches `caster`.
+    pub fn can_interrupt(&self, player: EntityId, caster: EntityId) -> bool {
+        let (Some(e), Some(c)) = (self.entities.get(&player), self.entities.get(&caster)) else { return false };
+        e.alive() && e.player().is_some_and(|p| p.spells.iter().any(|o| o.nums.interrupt > 0.0 && dist2d(e.pos, c.pos) <= o.nums.interrupt))
+    }
+
+    /// Whether an enemy is casting something that can be interrupted.
+    pub(super) fn casting_breakable(&self, id: EntityId) -> bool {
+        let Some(en) = self.entities.get(&id).and_then(|e| e.enemy()) else { return false };
+        let Some((a, lands)) = en.casting else { return false };
+        lands > self.clock && en.abilities.get(a).is_some_and(|&ab| self.content.abilities[ab].interruptible)
     }
 
     /// Show casts landing.
@@ -274,6 +426,33 @@ impl Sim {
                         pl.dodges += 1;
                     }
                     self.events.push(Event::Dodged { player: p, name: l.name.clone() });
+                }
+            }
+            match l.effect {
+                LandEffect::Zones => {}
+                LandEffect::Bolt { target, damage, share, school } => {
+                    if self.entities.get(&target).is_some_and(|e| e.alive()) {
+                        self.events.push(Event::SpellGo { caster: l.caster, spell: l.spell, target: SpellTarget::Unit(target), hits: vec![target] });
+                        let dmg = if share > 0.0 { self.entities[&target].max_health as f32 * share } else { damage };
+                        self.deal(l.caster, target, dmg.round().max(1.0) as u32, false, Via::Spell { spell: l.spell, school, periodic: false });
+                    }
+                    continue;
+                }
+                LandEffect::Heal { share } => {
+                    let now = self.clock;
+                    let healed: Vec<(EntityId, u32, u32)> = l
+                        .bound
+                        .iter()
+                        .filter_map(|i| self.entities.get(i).map(|e| (*i, e)))
+                        .filter(|(_, e)| e.alive() && e.enemy().is_some_and(|en| en.aff.wound_until <= now))
+                        .map(|(i, e)| (i, e.health, e.max_health))
+                        .collect();
+                    let hits: Vec<EntityId> = healed.iter().map(|h| h.0).collect();
+                    self.events.push(Event::SpellGo { caster: l.caster, spell: l.spell, target: SpellTarget::Unit(l.caster), hits });
+                    for (i, h, m) in healed {
+                        self.set_health(i, (h + (m as f32 * share).round() as u32).min(m));
+                    }
+                    continue;
                 }
             }
             self.events.push(Event::SpellGo { caster: l.caster, spell: l.spell, target: SpellTarget::Point(first), hits: vec![] });
@@ -455,4 +634,20 @@ pub(super) struct Landing {
     pub endangered: Vec<EntityId>,
     pub radius: f32,
     pub name: String,
+    /// What happens as it lands, besides its marks.
+    pub effect: LandEffect,
+    /// A heal's targets, bound as the cast began.
+    pub bound: Vec<EntityId>,
+}
+
+/// A cast's effect as it lands.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum LandEffect {
+    /// Its marks on the ground do the work.
+    Zones,
+    /// A bolt at one hero: `damage`, or `share` of their max health.
+    Bolt { target: EntityId, damage: f32, share: f32, school: u8 },
+    /// Every enemy within its radius of the caster heals `share` of its max health (not the
+    /// Mortally Wounded).
+    Heal { share: f32 },
 }

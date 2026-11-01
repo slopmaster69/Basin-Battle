@@ -209,6 +209,14 @@ pub struct Scaling {
     /// What elites cast, when the enemy has no abilities of its own.
     #[serde(default)]
     pub elite_abilities: Vec<String>,
+    /// Armor: the share of every physical blow from heroes and pets elites and bosses shrug off,
+    /// and how much of it each Sunder Armor stack strips.
+    #[serde(default)]
+    pub elite_armor: f32,
+    #[serde(default)]
+    pub boss_armor: f32,
+    #[serde(default)]
+    pub armor_per_sunder: f32,
     /// Wave elites carry a twist: vampiric, frenzied, swift or thorned.
     #[serde(default = "yes")]
     pub elite_modifiers: bool,
@@ -517,6 +525,12 @@ pub struct AbilityDef {
     /// level (`damage` still sets what it does to anything else).
     #[serde(default)]
     pub health_share: f32,
+    /// A warrior's Shield Slam (any interrupt) can stop it mid-cast.
+    #[serde(default)]
+    pub interruptible: bool,
+    /// "heal": the share of max health it heals every enemy within `radius` of the caster.
+    #[serde(default)]
+    pub heal: f32,
 }
 
 fn line_length() -> f32 {
@@ -1267,7 +1281,7 @@ impl Content {
             }
         }
         for a in &self.abilities {
-            if !matches!(a.kind.as_str(), "slam" | "pool" | "line" | "ring") || a.cast_secs <= 0.0 || a.cooldown <= 0.0 {
+            if !matches!(a.kind.as_str(), "slam" | "pool" | "line" | "ring" | "bolt" | "heal") || a.cast_secs <= 0.0 || a.cooldown <= 0.0 {
                 bail!("ability {} has a bad kind or numbers", a.key);
             }
             if a.warn.contains('~') {

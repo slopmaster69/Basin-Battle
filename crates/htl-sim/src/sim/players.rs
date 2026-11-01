@@ -172,6 +172,15 @@ pub(super) struct Player {
     pub hand_casts: u32,
     /// The site this player said they'd hold (a ping).
     pub holds: Option<usize>,
+    /// Triggers: their timed buffs, when each can go off again, and how deep a chain of them
+    /// runs now.
+    pub tbuffs: Vec<super::triggers::TBuff>,
+    pub trig_ready: Vec<((u8, u16, u16, u8), f32)>,
+    /// Level-up offers since the last Rare-or-better card (the safety net).
+    pub since_rare: u8,
+    /// When each trigger may next be called out on screen.
+    pub shout_ready: Vec<((u8, u16, u16, u8), f32)>,
+    pub trig_depth: u8,
 }
 
 /// Derived numbers: recomputed whenever level, cards or gear change.
@@ -475,6 +484,11 @@ impl Sim {
             gcd_until: 0.0,
             hand_casts: 0,
             holds: None,
+            tbuffs: Vec::new(),
+            trig_ready: Vec::new(),
+            shout_ready: Vec::new(),
+            since_rare: 0,
+            trig_depth: 0,
         };
         self.entities.insert(
             id,
@@ -1300,6 +1314,8 @@ impl Sim {
         if let Some(b) = p.buffs.iter().find(|b| b.kind == BuffKind::Accelerated && b.until > now) {
             speed *= 1.0 + b.value;
         }
+        let tspeed: f32 = p.tbuffs.iter().filter(|b| b.until > now).map(|b| b.def.speed * b.stacks as f32).sum();
+        speed *= (1.0 + tspeed).max(0.3);
         if (speed - p.sent_speed).abs() > 0.01 {
             p.sent_speed = speed;
             self.events.push(Event::Stats { player: id });
@@ -1460,7 +1476,7 @@ impl Sim {
             };
             let auto = self.entities[&id].player().unwrap().stats.auto;
             let mut damage = self.rng.gen_range(lo..=hi.max(lo)) * damage_mult * self.dynamic_damage(id) * (1.0 + auto) * self.buff_damage(id, None);
-            let crit = self.rng.gen::<f32>() < crit_chance;
+            let crit = self.rng.gen::<f32>() < crit_chance + self.tbuff(id, |b| b.crit);
             if crit {
                 damage *= 2.0;
             }
@@ -1502,6 +1518,10 @@ impl Sim {
                 self.deal(id, target, damage.round() as u32, crit, Via::Melee);
                 self.rage_from_swing(id, attack_secs);
                 self.after_auto_hit(id, target, damage, crit);
+                self.fire(id, crate::kit::On::Swing, None, Some(target), 0.0);
+                if crit {
+                    self.fire(id, crate::kit::On::SwingCrit, None, Some(target), 0.0);
+                }
                 // Sweeping Strikes: the swing also hits one more.
                 if let Some(b) = self.buff(id, BuffKind::SweepingStrikes) {
                     let near: Option<EntityId> = self.enemies_near(tpos, 8.0).into_iter().map(|(o, _)| o).find(|o| *o != target);
@@ -1568,6 +1588,10 @@ impl Sim {
             self.heal(id, id, 23881, heal, false);
         }
         // Windfury: a free extra attack (never chaining into another).
+        let leech = self.tbuff(id, |b| b.leech);
+        if leech > 0.0 {
+            self.heal(id, id, 0, (damage * leech).round() as u32, false);
+        }
         if s.windfury > 0.0 && self.rng.gen::<f32>() < s.windfury.min(0.9) && self.entities.get(&target).is_some_and(|t| t.alive()) {
             self.events.push(Event::SpellGo { caster: id, spell: 8516, target: SpellTarget::Unit(target), hits: vec![target] });
             self.deal(id, target, damage.round().max(1.0) as u32, false, Via::Spell { spell: 8516, school: 0, periodic: false });
@@ -1707,8 +1731,12 @@ impl Sim {
             if block_heal > 0.0 {
                 self.heal(id, id, 2565, (max as f32 * block_heal).round() as u32, false);
             }
+            let by = self.entities.get(&attacker).filter(|a| a.is_enemy()).map(|_| attacker);
+            self.fire(id, crate::kit::On::Block, None, by, 0.0);
         }
         if left > 0 {
+            let by = self.entities.get(&attacker).filter(|a| a.is_enemy()).map(|_| attacker);
+            self.fire(id, crate::kit::On::Hurt, None, by, left as f32 / max.max(1) as f32);
             self.rage_from_hit(id, left);
             if martyrdom > 0.0 && left as f32 > max as f32 * 0.08 && self.rng.gen::<f32>() < martyrdom {
                 self.give_buff(id, BuffKind::FocusedCasting, 6.0, 0.3, 1);

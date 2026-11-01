@@ -20,11 +20,15 @@
 //! | `H~wave~cycle~phase~secs~hub~hubMax~enemies~claimed~bases~best` | the wave tracker |
 //! | `S~style~title~subtitle` | a banner |
 //! | `A~text` | an announcement |
-//! | `X~caster~ability~ms~danger~warning~boss` | a boss or elite casts something to dodge; `danger` 1 if it's on you |
-//! | `Q~manual~gcd~rage~key^icon^name^rank^rarity^cooldown^remaining^cost^talent^on;...` | the spell bar, six keys at most (cards' spells and talents' alike); `rage` -1 for non-warriors |
+//! | `X~caster~ability~ms~danger~warning~boss~interrupt` | a boss or elite casts something to dodge, or a caster casts a spell; `danger` 1 if it's on you, `interrupt` 1 if you can break it (Shield Slam) |
+//! | `XI~` | a cast was interrupted |
+//! | `Q~manual~gcd~rage~key^icon^name^rank^rarity^cooldown^remaining^cost^talent^on^lit;...` | the spell bar, six keys at most (cards' spells and talents' alike); `rage` -1 for non-warriors; `lit` 1 when the spell's next cast is empowered |
+//! | `PR~name~icon` | one of your upgrades or talents just went off: call it out |
+//! | `TS~style` | how the class's talents come: `trees` (three trees) or `class` (class talents, combinations and weapon paths, and each skill's own upgrades) |
 //! | `TT~i~name~text~icon~background` | talent tree `i` (0-2) of the player's class |
-//! | `TD~i~tree~tier~col~ranks~icon~name~text1|text2|...~grants` | talent `i` and what each rank says |
+//! | `TD~i~tree~tier~col~ranks~icon~name~text1|text2|...~grants~kind~requires` | talent `i` and what each rank says; `kind` is `tree`, `class`, `combo`, `path` or `pathcard`, `requires` the skills a combination links (names joined by `+`) |
 //! | `TR~points~spent0,spent1,spent2~rank,rank,...` | the player's talents |
+//! | `UP~key^icon^name^count^cap^open^deck^upgrade,upgrade,...;...` | the player's skills and their upgrades (`upgrade` is `name:times:text`), in bar order |
 //! | `E~text` | a cast didn't go off, and why |
 //! | `DP~secs~total~source^damage;...` | your damage meter since you reset it (`.bb meter reset`) |
 //! | `DM~wave~name^class^damage;...` | the party's damage this wave, most first |
@@ -143,6 +147,11 @@ impl Game {
 
     fn icon(&self, spell: u32) -> String {
         self.icons.get(&spell).cloned().unwrap_or_else(|| "INV_Misc_QuestionMark".into())
+    }
+
+    /// A spell's icon texture name, for lines sent from elsewhere.
+    pub(crate) fn spell_icon(&self, spell: u32) -> String {
+        self.icon(spell)
     }
 
     /// `.bb <verb> ...` from the add-on.
@@ -446,7 +455,7 @@ impl Game {
             .iter()
             .map(|s| {
                 format!(
-                    "{}^{}^{}^{}^{}^{:.1}^{:.1}^{}^{}^{}",
+                    "{}^{}^{}^{}^{}^{:.1}^{:.1}^{}^{}^{}^{}",
                     f(&s.key),
                     self.icon(s.icon_spell),
                     f(&s.name),
@@ -456,7 +465,8 @@ impl Game {
                     s.remaining,
                     s.cost,
                     u8::from(s.talent),
-                    u8::from(s.on)
+                    u8::from(s.on),
+                    u8::from(s.lit)
                 )
             })
             .collect();
@@ -468,15 +478,28 @@ impl Game {
     pub(crate) fn ui_talent_defs(&self, conn: ConnId, player: EntityId) {
         let Some(class) = self.sim.player_view(player).map(|v| v.class) else { return };
         let kit = self.sim.content().kit(class);
+        self.ui_line(conn, &format!("TS~{}", if kit.class_talents { "class" } else { "trees" }));
         for (i, t) in kit.trees.iter().enumerate() {
             self.ui_line(conn, &format!("TT~{i}~{}~{}~{}~{}", clean(&t.name), clean(&t.text), self.icon(t.icon), clean(&t.background)));
         }
         for (i, t) in kit.talents.iter().enumerate() {
             let texts: Vec<String> = (1..=t.ranks).map(|r| clean(&t.text_at(r)).replace('|', "/")).collect();
+            let kind = if !kit.class_talents {
+                "tree"
+            } else if t.path.is_some() {
+                "path"
+            } else if t.path_only.is_some() {
+                "pathcard"
+            } else if t.requires.len() >= 2 {
+                "combo"
+            } else {
+                "class"
+            };
+            let requires: Vec<String> = t.requires.iter().map(|&r| clean(&kit.spells[r].name).replace('+', " ")).collect();
             self.ui_line(
                 conn,
                 &format!(
-                    "TD~{i}~{}~{}~{}~{}~{}~{}~{}~{}",
+                    "TD~{i}~{}~{}~{}~{}~{}~{}~{}~{}~{kind}~{}",
                     t.tree,
                     t.tier,
                     t.col,
@@ -484,7 +507,8 @@ impl Game {
                     self.icon(t.icon),
                     clean(&t.name),
                     texts.join("|"),
-                    u8::from(t.grants.is_some())
+                    u8::from(t.grants.is_some()),
+                    requires.join("+")
                 ),
             );
         }
@@ -496,6 +520,18 @@ impl Game {
         let spent = self.sim.tree_points(player);
         let ranks: Vec<String> = self.sim.talent_ranks(player).iter().map(|r| r.to_string()).collect();
         self.ui_line(conn, &format!("TR~{points}~{},{},{}~{}", spent[0], spent[1], spent[2], ranks.join(",")));
+        // Each skill's upgrades, for the build window.
+        let f = |s: &str| clean(s).replace([';', '^', ',', ':'], " ");
+        let skills: Vec<String> = self
+            .sim
+            .build_view(player)
+            .iter()
+            .map(|b| {
+                let ups: Vec<String> = b.taken.iter().map(|(n, t, x)| format!("{}:{x}:{}", f(n), f(t))).collect();
+                format!("{}^{}^{}^{}^{}^{}^{}^{}", f(&b.key), self.icon(b.icon_spell), f(&b.name), b.count, b.cap, b.open, b.deck, ups.join(","))
+            })
+            .collect();
+        self.ui_line(conn, &format!("UP~{}", skills.join(";")));
     }
 
     /// Everything worth a dot on the world map.
@@ -703,7 +739,8 @@ impl Game {
 
     /// An enemy casts something to dodge: add-on players get a cast bar for bosses and elites. No
     /// warning text: the spell and the marks on the ground are the warning.
-    pub(crate) fn ui_enemy_cast(&self, caster: EntityId, name: &str, ms: u32, warn: &str, endangered: &[EntityId], big: bool) {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn ui_enemy_cast(&self, caster: EntityId, name: &str, ms: u32, warn: &str, endangered: &[EntityId], big: bool, interruptible: bool) {
         let who = self
             .sim
             .entities()
@@ -714,13 +751,19 @@ impl Game {
                 _ => None,
             });
         let Some((who, boss, elite)) = who else { return };
-        if !(boss || elite || big) {
+        if !(boss || elite || big || interruptible) {
             return;
         }
         for (c, _, w) in self.in_world() {
             if w.addon {
                 let danger = endangered.contains(&w.entity);
-                self.ui_line(*c, &format!("X~{}~{}~{ms}~{}~{}~1", clean(&who), clean(name), u8::from(danger), clean(warn)));
+                // Who can break it is told so; an ordinary caster's spell is shown only to them and
+                // to whoever it's aimed at (no nagging the rest).
+                let can = interruptible && self.sim.can_interrupt(w.entity, caster);
+                if !(boss || elite) && !danger && !can {
+                    continue;
+                }
+                self.ui_line(*c, &format!("X~{}~{}~{ms}~{}~{}~{}~{}", clean(&who), clean(name), u8::from(danger), clean(warn), u8::from(boss || elite), u8::from(can)));
             }
         }
     }

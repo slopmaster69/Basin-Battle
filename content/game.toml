@@ -79,6 +79,13 @@ base_bonus = 1
 [scaling]
 # What elites (and the Stitched Horrors guarding bases) cast; see [[ability]] below.
 elite_abilities = ["crushing_slam"]
+# Armor: elites and bosses shrug off this share of every physical blow from heroes and pets
+# (spells of other schools pass through) until a warrior's Sunder Armor strips it, each stack
+# taking armor_per_sunder off. A party without a warrior feels it on bosses; one with a
+# warrior sunders for everyone.
+elite_armor = 0.1
+boss_armor = 0.2
+armor_per_sunder = 0.04
 # Enemy health: health_base x (1 + health_per_wave x (wave-1)) x health_early per wave up to
 # wave late_from, then x health_late per wave. The levels' growth is matched by health_early and
 # health_late; health_per_wave keeps up with upgrades, talents and gear. Fewer, tougher enemies:
@@ -550,7 +557,7 @@ xp = 1.2
 role = "archer"
 range = 22.0
 shot_spell = 686
-abilities = ["shadow_volley"]
+abilities = ["shadow_volley", "soul_bolt"]
 
 [[enemy]]
 key = "dark_mender"
@@ -570,9 +577,11 @@ first_wave = 7
 weight = 0.25
 xp = 1.8
 role = "healer"
-heal = 0.1
+# It heals by casting Dark Mending (see the ability): break the cast, or kill it first.
+heal = 0.0
 heal_secs = 3.5
 heal_spell = 16588
+abilities = ["dark_mending"]
 
 [[enemy]]
 key = "ghoul_runner"
@@ -768,7 +777,7 @@ hub_damage = 3.0
 first_wave = 5
 weight = 1.0
 xp = 15.0
-abilities = ["bone_storm", "grave_spikes", "bone_spears"]
+abilities = ["bone_storm", "grave_spikes", "bone_spears", "dark_ritual"]
 phase_adds = "skeleton"
 phase_add_count = 4
 add_health = 1.0
@@ -789,7 +798,7 @@ hub_damage = 3.0
 first_wave = 10
 weight = 1.0
 xp = 15.0
-abilities = ["bile", "crushing_slam", "bile_spew"]
+abilities = ["bile", "crushing_slam", "bile_spew", "dark_ritual"]
 phase_adds = "plague_bloat"
 phase_add_count = 2
 add_health = 1.0
@@ -810,7 +819,7 @@ hub_damage = 4.0
 first_wave = 15
 weight = 1.0
 xp = 15.0
-abilities = ["stone_rain", "wing_slam", "dive_bomb"]
+abilities = ["stone_rain", "wing_slam", "dive_bomb", "dark_ritual"]
 phase_adds = "gargoyle"
 phase_add_count = 4
 add_health = 1.0
@@ -831,7 +840,7 @@ hub_damage = 5.0
 first_wave = 20
 weight = 1.0
 xp = 15.0
-abilities = ["frost_tomb", "death_nova", "frost_ring"]
+abilities = ["frost_tomb", "death_nova", "frost_ring", "dark_ritual"]
 phase_adds = "bonecaster"
 phase_add_count = 3
 add_health = 1.0
@@ -974,7 +983,8 @@ spell = 16914
 telegraph = 16914
 impact = 6343
 school = 5
-warn = "Death Nova: run from the Archlich!"
+interruptible = true
+warn = "Death Nova: run from the Archlich, or break its cast!"
 
 # Lines and rings: a row of marks to step out of sideways, and a ring of marks that is safe
 # only inside, by the boss's feet. With a slam (run out) a ring (run in) makes a boss a dance.
@@ -1196,6 +1206,55 @@ spell = 5740
 telegraph = 5740
 school = 5
 warn = "Shadow bolts are falling on you: move!"
+
+# Spells to break: no marks on the ground, a cast bar and a warning. A hero with an interrupt
+# (a warrior's Shield Slam) sees them light up; the rest of the party sees only the ones aimed
+# at them. "bolt" strikes one hero hard; "heal" mends every enemy near the caster.
+[[ability]]
+key = "dark_mending"
+name = "Dark Mending"
+kind = "heal"
+cast_secs = 2.5
+radius = 15.0
+damage = 0.0
+heal = 0.12
+cooldown = 9.0
+first_after = 2.0
+spell = 16588
+telegraph = 0
+interruptible = true
+warn = "Dark Mending: break the cast or kill the Mender!"
+
+[[ability]]
+key = "soul_bolt"
+name = "Soul Bolt"
+kind = "bolt"
+cast_secs = 2.5
+radius = 1.0
+damage = 4.0
+health_share = 0.1
+cooldown = 12.0
+first_after = 6.0
+spell = 686
+telegraph = 0
+school = 5
+interruptible = true
+warn = "Soul Bolt aimed at you!"
+
+[[ability]]
+key = "dark_ritual"
+name = "Dark Ritual"
+kind = "heal"
+cast_secs = 3.0
+radius = 20.0
+damage = 0.0
+heal = 0.08
+cooldown = 24.0
+first_after = 14.0
+spell = 16588
+telegraph = 0
+interruptible = true
+warn = "The boss mends itself and its dead: break the cast!"
 
 [[ability]]
 key = "quake"

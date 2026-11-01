@@ -13,7 +13,7 @@ pub mod wares;
 pub use content::Content;
 pub use geom::{Flat, Ground, Vec3};
 pub use sim::{
-    Arena, BarSlot, Objective, BaseSite, BaseState, CardView, CastError, SpellBar, EnemyKind, EntityId, EntityView, Event, HeldCard, Lane, Luck, Menu, Post, MenuKind,
+    Arena, BarSlot, Objective, BaseSite, BaseState, CardView, CastError, SkillBuild, SpellBar, EnemyKind, EntityId, EntityView, Event, HeldCard, Lane, Luck, Menu, Post, MenuKind,
     MenuOption, NpcKind, OfferKind, OfferView, PhaseName, PlayerResult, PlayerView, RerollCost, RunResult, Sim, Splash,
     SpellTarget, Status, StatsView, What, ShopItem, SiteView, SHOP_ICONS, FrontView, Ping, MODIFIERS, Hazard, GroundMark,
     SoldierKind,

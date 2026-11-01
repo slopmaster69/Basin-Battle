@@ -4,7 +4,7 @@
 use rand::Rng;
 
 use super::enemies::Via;
-use super::spells::{BuffKind, MAX_PERKS};
+use super::spells::BuffKind;
 use super::*;
 use crate::content::Rarity;
 use crate::kit::{Nums, SpellKind};
@@ -122,6 +122,8 @@ pub(super) struct HitInfo {
     pub force_crit: bool,
     pub from_pet: bool,
     pub key_kind: SpellKind,
+    /// The spell (kit index) it came from, for its upgrades' triggers.
+    pub src: Option<usize>,
 }
 
 /// A missile on its way.
@@ -151,7 +153,32 @@ impl HitFx {
     }
 }
 
-/// Which rarities a source rolls.
+/// Class-style kits: the odds climb with level, and Epic cards turn up from level 10.
+fn class_rarity_roll(source: OfferSource, level: u32, r: f32) -> Rarity {
+    let table: [f32; 4] = match source {
+        OfferSource::Wave | OfferSource::Level => match level {
+            0..=9 => [0.70, 0.25, 0.05, 0.0],
+            10..=24 => [0.58, 0.30, 0.10, 0.02],
+            25..=39 => [0.50, 0.30, 0.15, 0.05],
+            _ => [0.45, 0.30, 0.18, 0.07],
+        },
+        OfferSource::Boss(_) => [0.0, 0.30, 0.55, 0.15],
+        OfferSource::Relic => [0.0, 0.30, 0.55, 0.15],
+        _ => return rarity_roll(source, r),
+    };
+    let mut acc = 0.0;
+    for (k, rar) in [Rarity::Common, Rarity::Uncommon, Rarity::Rare, Rarity::Epic].into_iter().enumerate() {
+        acc += table[k];
+        if r < acc {
+            return rar;
+        }
+    }
+    Rarity::Epic
+}
+
+/// Offers in a row without a Rare or better before the next one is sure to have one.
+const RARE_PITY: u8 = 6;
+
 fn rarity_roll(source: OfferSource, r: f32) -> Rarity {
     match source {
         OfferSource::Wave | OfferSource::Level => {
@@ -285,13 +312,13 @@ impl Sim {
         match pick {
             Pick::Spell(s) => {
                 let def = &kit.spells[s];
-                !def.talent && !p.spells.iter().any(|o| o.spell == s) && self.card_spells(id) < self.content.game.spell_slots
+                // A path's skills come only to warriors on that path.
+                let path_ok = def.path.as_ref().is_none_or(|need| p.path.as_ref() == Some(need));
+                // They ride on extra keys, so a full bar never shuts them out.
+                let room = if def.path.is_some() { p.spells.len() < 12 } else { self.card_spells(id) < self.content.game.spell_slots };
+                path_ok && !def.talent && !p.spells.iter().any(|o| o.spell == s) && room
             }
-            Pick::Perk(s, k) => p
-                .spells
-                .iter()
-                .find(|o| o.spell == s)
-                .is_some_and(|o| !o.perks.contains(&k) && o.perks.len() < MAX_PERKS && kit.spells[s].perks.len() > k),
+            Pick::Perk(s, k) => p.spells.iter().find(|o| o.spell == s).is_some_and(|o| !o.talent && kit.spells[s].perk_open(&o.perks, k, kit.upgrades_per_spell)),
             Pick::Card(c) => {
                 let max = self.content.cards[c].max_rank();
                 !p.cards.iter().any(|o| o.card == c && o.rank >= max)
@@ -313,10 +340,29 @@ impl Sim {
                 // (no Thunder Clap talents without Thunder Clap).
                 let relevant = def.grants.is_some()
                     || !def.only_patches_spells()
-                    || p.spells.iter().any(|o| def.effects.iter().any(|e| e.filter.as_ref().is_some_and(|f| f.matches(&kit.spells[o.spell]))));
+                    || p.spells.iter().any(|o| def.spell_filters().iter().any(|f| f.matches(&kit.spells[o.spell])));
                 // One weapon path a run.
                 let path_open = def.path.is_none() || p.path.is_none();
-                room && combo && relevant && path_open && rank < def.ranks && self.tree_points(id)[def.tree.min(2)] >= crate::kit::tier_points(def.tier)
+                // Class talents open whatever's been taken; tree talents tier by tier.
+                let tier_open = kit.class_talents || self.tree_points(id)[def.tree.min(2)] >= crate::kit::tier_points(def.tier);
+                // Path cards: on that path only; a fork closes its siblings; a follow-up waits for
+                // its first step; a capstone for enough of the path's cards.
+                let has = |i: usize| p.talents.get(i).copied().unwrap_or(0) > 0;
+                let on_path = def.path_only.as_ref().is_none_or(|need| p.path.as_ref() == Some(need));
+                let fork_open = def.fork.as_ref().is_none_or(|f| {
+                    !kit.talents.iter().enumerate().any(|(i, o)| i != t && has(i) && o.fork.as_ref() == Some(f))
+                });
+                let after_ok = def.after.is_none_or(has);
+                let needs_ok = def.needs == 0
+                    || kit
+                        .talents
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, o)| o.path_only.is_some() && o.path_only == def.path_only)
+                        .map(|(i, _)| p.talents.get(i).copied().unwrap_or(0) as usize)
+                        .sum::<usize>()
+                        >= def.needs as usize;
+                room && combo && relevant && path_open && rank < def.ranks && tier_open && on_path && fork_open && after_ok && needs_ok
             }
         }
     }
@@ -329,6 +375,14 @@ impl Sim {
             Pick::Perk(s, k) => kit.spells[s].perks[k].rarity,
             Pick::Card(c) => self.content.cards[c].rarity,
             Pick::Power(k) => self.content.powers[k].rarity,
+            Pick::Talent(t) if kit.talents[t].rarity.is_some() => kit.talents[t].rarity.unwrap(),
+            Pick::Talent(t) if kit.class_talents => {
+                if kit.talents[t].requires.len() >= 2 || kit.talents[t].path.is_some() {
+                    Rarity::Rare
+                } else {
+                    Rarity::Uncommon
+                }
+            }
             Pick::Talent(t) => match kit.talents[t].tier {
                 0..=2 => Rarity::Common,
                 3 => Rarity::Uncommon,
@@ -421,6 +475,10 @@ impl Sim {
                 return picks;
             }
             // Every power taken: an ordinary rare card, as before.
+        }
+        if kit.class_talents {
+            self.roll_class_offer(id, source, &kit, &mut picks, n);
+            return picks;
         }
         let main = self.main_tree(id);
         let held = self.card_spells(id);
@@ -538,6 +596,126 @@ impl Sim {
         picks
     }
 
+    /// A class-talent kit's offer: new spells while there's room, upgrades for the spells held
+    /// (most of the cards), class talents, and combinations when two spells that go together are
+    /// held. At most one upgrade per spell and one talent of each kind in an offer.
+    fn roll_class_offer(&mut self, id: EntityId, source: OfferSource, kit: &crate::kit::Kit, picks: &mut Vec<Pick>, n: usize) {
+        let held = self.card_spells(id);
+        let slots = self.content.game.spell_slots;
+        let level = self.entities.get(&id).and_then(|e| e.player()).map_or(1, |p| p.level);
+        let mut candidates: Vec<Pick> = Vec::new();
+        for s in 0..kit.spells.len() {
+            if self.pick_available(id, Pick::Spell(s)) {
+                candidates.push(Pick::Spell(s));
+            }
+            for k in 0..kit.spells[s].perks.len() {
+                if self.pick_available(id, Pick::Perk(s, k)) {
+                    candidates.push(Pick::Perk(s, k));
+                }
+            }
+        }
+        for t in 0..kit.talents.len() {
+            if self.pick_available(id, Pick::Talent(t)) {
+                candidates.push(Pick::Talent(t));
+            }
+        }
+        let is_combo = |p: &Pick| matches!(p, Pick::Talent(t) if kit.talents[*t].requires.len() >= 2 || kit.talents[*t].path.is_some());
+        let is_class = |p: &Pick| matches!(p, Pick::Talent(t) if kit.talents[*t].requires.len() < 2 && kit.talents[*t].path.is_none());
+        let mut guard = 0;
+        while picks.len() < n && guard < 80 {
+            guard += 1;
+            let mut want = class_rarity_roll(source, level, self.rng.gen::<f32>());
+            // The safety net: a long dry run of commons ends with a Rare (or better) for sure.
+            let dry = self.entities.get(&id).and_then(|e| e.player()).map_or(0, |p| p.since_rare);
+            if picks.is_empty() && dry >= RARE_PITY && want < Rarity::Rare && matches!(source, OfferSource::Level | OfferSource::Wave) {
+                want = Rarity::Rare;
+            }
+            let open: Vec<Pick> = candidates
+                .iter()
+                .copied()
+                .filter(|c| !picks.contains(c))
+                // One upgrade per spell, one class talent and one combination per offer.
+                .filter(|c| match c {
+                    Pick::Perk(s, _) => !picks.iter().any(|x| matches!(x, Pick::Perk(t, _) if t == s)),
+                    _ if is_combo(c) => !picks.iter().any(&is_combo),
+                    _ if is_class(c) => !picks.iter().any(&is_class),
+                    _ => true,
+                })
+                .collect();
+            if open.is_empty() {
+                break;
+            }
+            // Skills come by what the bar needs, not by luck: rarity filters the rest.
+            let rarity_pool: Vec<Pick> = open
+                .iter()
+                .copied()
+                .filter(|c| {
+                    // A weapon path shows as a Legendary but comes as often as a Rare.
+                    let r = match c {
+                        Pick::Talent(t) if kit.talents[*t].path.is_some() => Rarity::Rare,
+                        _ => self.pick_rarity(id, *c),
+                    };
+                    matches!(c, Pick::Spell(_)) || r == want || (want == Rarity::Rare && dry >= RARE_PITY && r > Rarity::Rare)
+                })
+                .collect();
+            let pool = if rarity_pool.is_empty() { open } else { rarity_pool };
+            let first = picks.is_empty();
+            let weights: Vec<f32> = pool
+                .iter()
+                .map(|c| match c {
+                    // A path's own skills come soon after the path.
+                    Pick::Spell(s) if kit.spells[*s].path.is_some() => 4.0,
+                    Pick::Spell(_) => {
+                        if held < 3 {
+                            if first { 8.0 } else { 2.5 }
+                        } else if held < slots {
+                            // The bar should fill by the mid-teens.
+                            if level >= 12 { 2.0 } else { 1.0 }
+                        } else {
+                            0.0
+                        }
+                    }
+                    Pick::Perk(s, k) => {
+                        let perk = &kit.spells[*s].perks[*k];
+                        let plain = perk.triggers.is_empty() && perk.repeat > 1;
+                        let chained = perk.after.is_some();
+                        // Each held spell gets about the same share of the cards, however many
+                        // upgrades it has: spread over the spell's open upgrades.
+                        let open_here = candidates.iter().filter(|x| matches!(x, Pick::Perk(t, _) if t == s)).count().max(1) as f32;
+                        let share = 6.0 / open_here;
+                        share * if plain { 0.5 } else if chained { 1.4 } else { 1.0 }
+                    }
+                    _ if is_combo(c) => 5.0,
+                    // The path's own deck: about as often as a held skill's.
+                    Pick::Talent(t) if kit.talents[*t].path_only.is_some() => 2.0,
+                    Pick::Talent(_) => 1.0,
+                    Pick::Card(_) | Pick::Power(_) => 1.0,
+                })
+                .collect();
+            let total: f32 = weights.iter().sum();
+            if total <= 0.0 {
+                break;
+            }
+            let mut roll = self.rng.gen::<f32>() * total;
+            let mut pick = pool[0];
+            for (c, w) in pool.iter().zip(&weights) {
+                if roll < *w {
+                    pick = *c;
+                    break;
+                }
+                roll -= w;
+            }
+            picks.push(pick);
+        }
+        // The safety net's count: offers since the last Rare or better.
+        if matches!(source, OfferSource::Level | OfferSource::Wave) {
+            let rare = picks.iter().any(|c| !matches!(c, Pick::Spell(_)) && self.pick_rarity(id, *c) >= Rarity::Rare);
+            if let Some(p) = self.entities.get_mut(&id).and_then(|e| e.player_mut()) {
+                p.since_rare = if rare { 0 } else { p.since_rare.saturating_add(1) };
+            }
+        }
+    }
+
     /// Show the player's next queued offer, or close the menu if there's none.
     pub(super) fn show_next_offer(&mut self, id: EntityId) {
         let Some(p) = self.entities.get(&id).and_then(|e| e.player()) else { return };
@@ -605,7 +783,7 @@ impl Sim {
                     icon_spell: def.icon,
                     rarity: def.rarity,
                     rank: 1,
-                    max_rank: (MAX_PERKS + 1) as u8,
+                    max_rank: (kit.upgrades_per_spell + 1) as u8,
                     text: crate::describe::spell_text(def, &nums, hit, color),
                     tags: vec![kit.trees[def.tree].name.clone()],
                     slot: self.slot_line(id, pick),
@@ -622,9 +800,40 @@ impl Sim {
                     icon_spell: def.icon,
                     rarity: perk.rarity,
                     rank,
-                    max_rank: (MAX_PERKS + 1) as u8,
-                    text: crate::describe::perk_text(def, perk, rank, color),
+                    max_rank: (kit.upgrades_per_spell + 1) as u8,
+                    text: crate::describe::perk_text_with(def, perk, rank, kit.upgrade_power, kit.upgrade_cost_cut, color),
                     tags: vec![kit.trees[def.tree].name.clone()],
+                    slot: self.slot_line(id, pick),
+                }
+            }
+            Pick::Talent(t) if kit.class_talents => {
+                let def = &kit.talents[t];
+                // (The card's kind is a fixed word: the two a class may call its paths.)
+                let label = match (def.path.is_some(), kit.path_label.as_str()) {
+                    (true, "Specialization") => "Specialization",
+                    (true, _) => "Weapon Path",
+                    _ => def.kind_label(),
+                };
+                let mut tags: Vec<String> = def.requires.iter().map(|&s| kit.spells[s].name.clone()).collect();
+                if tags.is_empty() {
+                    tags.push(super::shop::capitalize(&kit.class));
+                }
+                CardView {
+                    key: format!("talent:{}", def.key),
+                    name: def.name.clone(),
+                    icon_spell: def.icon,
+                    rarity: self.pick_rarity(id, pick),
+                    // Class talents come back a rank at a time.
+                    rank: p.talents.get(t).copied().unwrap_or(0) + 1,
+                    max_rank: def.ranks,
+                    text: crate::describe::CardText {
+                        text: def.text_at(p.talents.get(t).copied().unwrap_or(0) + 1),
+                        upgrade: String::new(),
+                        kind: label,
+                        school: "",
+                        cooldown: 0.0,
+                    },
+                    tags,
                     slot: self.slot_line(id, pick),
                 }
             }
@@ -787,7 +996,7 @@ impl Sim {
                 let next = if o.talent {
                     "Learned from a talent.".to_string()
                 } else if perks.is_empty() {
-                    format!("No upgrades yet: cards can upgrade it {MAX_PERKS} times.")
+                    format!("No upgrades yet: cards can upgrade it {} times.", kit.upgrades_per_spell)
                 } else {
                     format!("Upgrades: {}", perks.join(", "))
                 };
@@ -798,7 +1007,7 @@ impl Sim {
                     aura_spell: def.icon,
                     rarity: def.rarity,
                     rank: o.perks.len() as u8 + 1,
-                    max_rank: if o.talent { 1 } else { (MAX_PERKS + 1) as u8 },
+                    max_rank: if o.talent { 1 } else { (kit.upgrades_per_spell + 1) as u8 },
                     text: crate::describe::spell_text(def, &o.nums, hit, true),
                     next,
                 }
@@ -846,10 +1055,13 @@ impl Sim {
         let Some(p) = self.entities.get(&id).and_then(|e| e.player()) else { return String::new() };
         let kit = self.content.kit(p.class);
         match pick {
+            Pick::Spell(s) if kit.spells[s].path.is_some() => {
+                format!("{} skill · its own key", kit.path_name(kit.spells[s].path.as_deref().unwrap_or("")))
+            }
             Pick::Spell(_) => format!("Takes a spell slot · {}/{}", self.card_spells(id) + 1, self.content.game.spell_slots),
             Pick::Perk(s, _) => {
                 let n = p.spells.iter().find(|o| o.spell == s).map_or(0, |o| o.perks.len()) + 1;
-                format!("Upgrade {n} of {MAX_PERKS} for {}", kit.spells[s].name)
+                format!("Upgrade {n} of {} for {}", kit.upgrades_per_spell, kit.spells[s].name)
             }
             Pick::Card(_) => "Legendary".into(),
             Pick::Power(k) => match self.content.powers[k].source {
@@ -862,6 +1074,22 @@ impl Sim {
                 self.card_spells(id) + 1,
                 self.content.game.spell_slots
             ),
+            Pick::Talent(t) if kit.class_talents => {
+                let def = &kit.talents[t];
+                if def.requires.len() >= 2 {
+                    let names: Vec<&str> = def.requires.iter().map(|&s| kit.spells[s].name.as_str()).collect();
+                    format!("Combination · {}", names.join(" + "))
+                } else if def.path.is_some() {
+                    format!("{} · one a run", kit.path_label)
+                } else if let Some(path) = &def.path_only {
+                    format!("{} · path card", kit.path_name(path))
+                } else if def.ranks > 1 {
+                    let have = self.entities[&id].player().and_then(|p| p.talents.get(t).copied()).unwrap_or(0);
+                    format!("{} Talent · rank {} of {}", super::shop::capitalize(&kit.class), have + 1, def.ranks)
+                } else {
+                    format!("{} Talent · lasts the run", super::shop::capitalize(&kit.class))
+                }
+            }
             Pick::Talent(t) => format!("Talent · {} tree", kit.trees[kit.talents[t].tree.min(2)].name),
         }
     }
@@ -1138,7 +1366,9 @@ impl Sim {
             Pick::Talent(t) => {
                 self.grant_talent(id, t);
                 let def = &kit.talents[t];
-                (format!("talent:{}", def.key), 1, format!("You learn the talent |cffffd060{}|r: {}", def.name, def.text_at(def.ranks)))
+                let rank = self.entities[&id].player().and_then(|p| p.talents.get(t).copied()).unwrap_or(def.ranks).max(1);
+                let label = if def.ranks > 1 { format!(" (rank {rank} of {})", def.ranks) } else { String::new() };
+                (format!("talent:{}", def.key), rank, format!("You learn the talent |cffffd060{}|r{label}: {}", def.name, def.text_at(rank)))
             }
             Pick::Card(c) => {
                 let Some(p) = self.entities.get_mut(&id).and_then(|e| e.player_mut()) else { return };
@@ -1203,6 +1433,12 @@ impl Sim {
         for o in &p.spells {
             if o.on {
                 want.push((kit.spells[o.spell].icon, 1));
+            }
+        }
+        // Buffs from upgrades' and talents' triggers.
+        for (icon, stacks) in self.tbuff_auras(id) {
+            if !want.iter().any(|(s, _)| *s == icon) {
+                want.push((icon, stacks));
             }
         }
         // Passive talents that are auras.
@@ -1427,6 +1663,40 @@ impl Sim {
         for k in 0..(perks as usize).min(count) {
             self.take_perk(id, s, k);
         }
+    }
+
+    /// One level-up: roll a level offer (a start offer while the bar is empty), show it as
+    /// cards, take the one `choose` picks. Empty when the build is complete.
+    pub fn level_up_for_test(&mut self, id: EntityId, choose: &mut dyn FnMut(&[CardView]) -> usize) -> (Vec<CardView>, usize) {
+        let empty = self.card_spells(id) == 0;
+        let picks = self.roll_offer(id, if empty { OfferSource::Start } else { OfferSource::Level });
+        let views: Vec<CardView> = picks.iter().map(|&c| self.pick_view(id, c, false)).collect();
+        if picks.is_empty() {
+            return (views, 0);
+        }
+        let k = choose(&views).min(picks.len() - 1);
+        self.take_pick(id, picks[k]);
+        (views, k)
+    }
+
+    /// Whether a spell's card could be offered now (its path taken, a slot free, not held).
+    pub fn spell_open_for_test(&self, id: EntityId, key: &str) -> bool {
+        let class = self.entities[&id].player().unwrap().class;
+        let s = self.content.kit(class).spell_index(key).unwrap_or_else(|| panic!("no spell {key}"));
+        self.pick_available(id, Pick::Spell(s))
+    }
+
+    /// Take one upgrade of a held spell by key, as a card would (if it's open).
+    pub fn perk_for_test(&mut self, id: EntityId, spell: &str, perk: &str) -> Result<(), &'static str> {
+        let class = self.entities[&id].player().unwrap().class;
+        let kit = self.content.kit(class);
+        let s = kit.spell_index(spell).ok_or("no such spell")?;
+        let k = kit.spells[s].perks.iter().position(|p| p.key == perk).ok_or("no such upgrade")?;
+        if !self.pick_available(id, Pick::Perk(s, k)) {
+            return Err("not open");
+        }
+        self.take_perk(id, s, k);
+        Ok(())
     }
 
     /// Offer a hero what boss `boss` (an index into the bosses) leaves.
