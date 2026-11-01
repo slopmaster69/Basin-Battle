@@ -5233,10 +5233,10 @@ local CONTROLS = {
   { "Move back", "MOVEBACKWARD" },
   { "Strafe left", "STRAFELEFT" },
   { "Strafe right", "STRAFERIGHT" },
-  { "Look around (turns the hero)", nil, "The mouse (middle held: look only)" },
-  { "Attack (late in a blow: the next)", "ES_ATTACK" },
+  { "Look around (turns the hero)", nil, "The mouse" },
+  { "Attack (again: the next blow)", "ES_ATTACK" },
   { "Heavy attack", "ES_HEAVY" },
-  { "Guard (as a blow lands: parry)", "ES_GUARD" },
+  { "Guard (just in time: parry)", "ES_GUARD" },
   { "Shield bash / kick", nil, "guardbash" },
   { "Running attack", nil, "running" },
   { "Dodge (hold: sprint)", "ES_DODGE" },
@@ -5251,7 +5251,7 @@ local CONTROLS = {
   { "Defense ability", "ES_AB4" },
   { "Ultimate (hold)", "ES_AB5" },
   { "Charged-up version (Valor)", nil, "ex" },
-  { "Aimed: cast (hold: charge) / call off", nil, "cast" },
+  { "Aimed ability: cast / cancel", nil, "cast" },
   { "Use / place", "ES_USE" },
   { "Sheathe / draw", "ES_SHEATHE" },
   { "Quick item", "ES_EAT" },
@@ -5269,7 +5269,7 @@ local CONTROLS = {
 }
 ES.CONTROLS = CONTROLS
 local CARD_ROWS = 19
-local CARD_COL = 380
+local CARD_COL = 400
 
 -- What a row's fixed words are, from the keys in effect.
 local function FixedText(what)
@@ -5302,64 +5302,95 @@ function ES.ControlKey(i)
   return a
 end
 
+-- The card: a margin all round (clear of the frame's border), the keys in two columns (a label,
+-- and on the right the key, which a click changes; the few that follow from others are plain
+-- grey words), then the settings, each a line saying what it is with its value on a button.
 local card = CreateFrame("Frame", "ElwynnSurvivalKeys", UIParent)
-card:SetWidth(2 * CARD_COL + 20)
-card:SetHeight(150 + CARD_ROWS * 21)
-card:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
+card.M, card.ROW_H, card.KEY_W = 40, 20, 190
+card.KEYS_TOP, card.SET_ROW_H = 108, 30
+card.SET_COL = (2 * CARD_COL + 20) / 3
+card:SetWidth(2 * CARD_COL + 20 + 2 * card.M)
+card:SetHeight(card.KEYS_TOP + CARD_ROWS * card.ROW_H + 52 + 3 * card.SET_ROW_H + 54 + card.M)
+card:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 card:SetFrameStrata("DIALOG")
 card:EnableMouse(true)
 Panel(card)
 card.bg = card.panel
 card.bg:SetAllPoints(card)
 card.bg:SetVertexColor(0.12, 0.1, 0.08, 0.96)
-card.icon = Icon(card, "ARTWORK", "INV_Misc_Key_03", 28)
-card.icon:SetPoint("TOPLEFT", card, "TOPLEFT", 16, -12)
 card.title = Text(card, FONT_TITLE, 22, "OUTLINE")
-card.title:SetPoint("TOP", card, "TOP", 0, -14)
+-- Below the frame's inner rim, not on it.
+card.title:SetPoint("TOP", card, "TOP", 0, -card.M - 10)
 card.title:SetTextColor(1, 0.82, 0.45)
 card.title:SetText("Controls")
+card.hint = Text(card, FONT_BODY, 11)
+card.hint:SetPoint("TOP", card.title, "BOTTOM", 0, -6)
+card.hint:SetTextColor(0.75, 0.75, 0.75)
 card.rows = {}
 for i = 1, table.getn(CONTROLS) do
   local col = (i > CARD_ROWS) and 1 or 0
   local row = i - col * CARD_ROWS
-  local x = 22 + col * CARD_COL
-  local y = -48 - (row - 1) * 21
+  local x = card.M + col * (CARD_COL + 20)
+  local y = -card.KEYS_TOP - (row - 1) * card.ROW_H
+  local changeable = CONTROLS[i][2] and not CONTROLS[i][4]
   local l = Text(card, FONT_BODY, 12)
-  l:SetPoint("LEFT", card, "TOPLEFT", x, y - 9.5)
+  l:SetPoint("LEFT", card, "TOPLEFT", x, y - card.ROW_H / 2)
+  l:SetWidth(CARD_COL - card.KEY_W - 10)
+  l:SetHeight(card.ROW_H)
   l:SetJustifyH("LEFT")
   l:SetTextColor(0.85, 0.85, 0.85)
   local b = CreateFrame("Button", nil, card)
-  b:SetWidth(150)
-  b:SetHeight(19)
-  b:SetPoint("TOPRIGHT", card, "TOPLEFT", x + CARD_COL - 34, y)
+  b:SetWidth(card.KEY_W)
+  b:SetHeight(card.ROW_H - 2)
+  b:SetPoint("TOPRIGHT", card, "TOPLEFT", x + CARD_COL, y)
   b.text = Text(b, FONT_BODY, 12)
   b.text:SetPoint("RIGHT", b, "RIGHT", -4, 0)
+  b.text:SetWidth(card.KEY_W - 8)
   b.text:SetJustifyH("RIGHT")
-  b.text:SetTextColor(1, 0.82, 0.45)
   b.band = Tex(b, "BACKGROUND", "rowband")
   b.band:SetAllPoints(b)
   b.band:SetVertexColor(1, 0.85, 0.5, 0)
   b.i = i
-  if CONTROLS[i][2] and not CONTROLS[i][4] then
+  b.fixed = not changeable
+  if changeable then
+    b.text:SetTextColor(1, 0.82, 0.45)
     b:EnableMouse(true)
     b:RegisterForClicks("LeftButtonUp")
     b:SetScript("OnEnter", function() if not OwnKeys() then this.band:SetVertexColor(1, 0.85, 0.5, 0.18) end end)
     b:SetScript("OnLeave", function() this.band:SetVertexColor(1, 0.85, 0.5, 0) end)
     b:SetScript("OnClick", function() ES.CaptureKey(this.i) end)
+  else
+    -- Follows from other keys (or is the mouse itself): words, not a key to click.
+    b.text:SetTextColor(0.6, 0.6, 0.6)
   end
   card.rows[i] = { l, b.text, b }
 end
-card.client = Text(card, FONT_BODY, 11)
-card.client:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 22, 92)
-card.client:SetWidth(2 * CARD_COL - 30)
-card.client:SetJustifyH("LEFT")
-card.client:SetTextColor(0.75, 0.75, 0.75)
-card.profile = Text(card, FONT_BODY, 11)
-card.profile:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 22, 74)
-card.profile:SetWidth(2 * CARD_COL - 30)
-card.profile:SetJustifyH("LEFT")
-card.profile:SetTextColor(0.75, 0.75, 0.75)
-card.switch = MakeButton(card, 170, 24, "", GOLD, function()
+
+-- The settings: three columns of lines, each its name and its value (a click changes it).
+card.setTop = card.KEYS_TOP + CARD_ROWS * card.ROW_H + 18
+card.setHead = Text(card, FONT_TITLE, 16, "OUTLINE")
+card.setHead:SetPoint("TOPLEFT", card, "TOPLEFT", card.M, -card.setTop)
+card.setHead:SetTextColor(1, 0.82, 0.45)
+card.setHead:SetText("Settings")
+card.setNames = {}
+-- A setting's line at column `col` (1-3), row `row` (1-3): its name, and where its value goes.
+function card.Setting(col, row, name)
+  local x = card.M + (col - 1) * card.SET_COL
+  local y = -card.setTop - 30 - (row - 1) * card.SET_ROW_H
+  local t = Text(card, FONT_BODY, 12)
+  t:SetPoint("LEFT", card, "TOPLEFT", x, y - 12)
+  t:SetJustifyH("LEFT")
+  t:SetTextColor(0.85, 0.85, 0.85)
+  t:SetText(name)
+  table.insert(card.setNames, t)
+  return x + card.SET_COL - 16, y
+end
+function card.Place(b, rightX, y)
+  b:ClearAllPoints()
+  b:SetPoint("TOPRIGHT", card, "TOPLEFT", rightX, y)
+end
+
+card.switch = MakeButton(card, 130, 24, "", GOLD, function()
   local set = Settings()
   if OwnKeys() then
     set.ownKeys = nil
@@ -5371,30 +5402,62 @@ card.switch = MakeButton(card, 170, 24, "", GOLD, function()
   ES.DrawAbilities()
   ES.DrawQuick()
 end)
-card.switch:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 42)
-card.reset = MakeButton(card, 120, 24, "Elwynn keys again", GOLD, function()
+card.Place(card.switch, card.Setting(1, 1, "Key layout"))
+-- Only while there are changed keys to put back (and the Elwynn layout is the one in use).
+card.reset = MakeButton(card, 130, 24, "Put them back", GOLD, function()
+  if OwnKeys() or not (ElwynnSurvivalSettings and ElwynnSurvivalSettings.custom and next(ElwynnSurvivalSettings.custom)) then return end
   Settings().custom = nil
   ES.Rebind()
   ES.DrawKeys()
   ES.DrawAbilities()
   ES.DrawQuick()
 end)
-card.reset:SetPoint("LEFT", card.switch, "RIGHT", 8, 0)
-card.middle = MakeButton(card, 190, 24, "", GOLD, function()
+card.resetRight, card.resetY = card.Setting(1, 2, "Keys you changed")
+card.Place(card.reset, card.resetRight, card.resetY)
+card.resetNone = Text(card, FONT_BODY, 12)
+card.resetNone:SetPoint("RIGHT", card, "TOPLEFT", card.resetRight - 4, card.resetY - 12)
+card.resetNone:SetTextColor(0.6, 0.6, 0.6)
+card.middle = MakeButton(card, 130, 24, "", GOLD, function()
   local set = Settings()
   if set.middleLock then set.middleLock = nil else set.middleLock = 1 end
   ES.Rebind()
   ES.DrawKeys()
 end)
-card.middle:SetPoint("LEFT", card.reset, "RIGHT", 8, 0)
-card.where = MakeButton(card, 150, 24, "", GOLD, function()
+card.Place(card.middle, card.Setting(1, 3, "Middle mouse"))
+-- The mouse's speed: its value between slower and faster.
+card.mouseRight, card.mouseY = card.Setting(2, 1, "Mouse speed")
+card.faster = MakeButton(card, 26, 24, "+", GOLD, function()
+  ES.StepMouse(1)
+  ES.DrawKeys()
+end)
+card.Place(card.faster, card.mouseRight, card.mouseY)
+card.mouseText = Text(card, FONT_BODY, 12)
+card.mouseText:SetPoint("RIGHT", card.faster, "LEFT", -6, 0)
+card.mouseText:SetWidth(46)
+card.mouseText:SetJustifyH("CENTER")
+card.mouseText:SetTextColor(1, 0.82, 0.45)
+card.slower = MakeButton(card, 26, 24, "-", GOLD, function()
+  ES.StepMouse(-1)
+  ES.DrawKeys()
+end)
+card.slower:SetPoint("RIGHT", card.mouseText, "LEFT", -6, 0)
+-- The floor markers: a creature's blow coming (its wedge or ring), ground about to burn, holy
+-- ground. Off, none are drawn (those up now go at once).
+card.marks = MakeButton(card, 130, 24, "", GOLD, function()
+  local set = Settings()
+  if set.noMarks then set.noMarks = nil else set.noMarks = 1 end
+  if set.noMarks then ES.ClearMarks() end
+  ES.DrawKeys()
+end)
+card.Place(card.marks, card.Setting(2, 2, "Floor markers"))
+card.where = MakeButton(card, 130, 24, "", GOLD, function()
   local set = Settings()
   if ES.VitalsWhere() == "corner" then set.vitals = "hero" else set.vitals = "corner" end
   ES.PlaceVitals()
   ES.DrawKeys()
 end)
-card.where:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", 14, 12)
-card.size = MakeButton(card, 150, 24, "", GOLD, function()
+card.Place(card.where, card.Setting(3, 1, "Health bar"))
+card.size = MakeButton(card, 130, 24, "", GOLD, function()
   local set = Settings()
   local now, nextSize = ES.VitalsScale(), VITALS_SIZES[1]
   for i = 1, table.getn(VITALS_SIZES) do
@@ -5404,33 +5467,21 @@ card.size = MakeButton(card, 150, 24, "", GOLD, function()
   ES.PlaceVitals()
   ES.DrawKeys()
 end)
-card.size:SetPoint("LEFT", card.where, "RIGHT", 8, 0)
--- The floor markers: a creature's blow coming (its wedge or ring), ground about to burn, holy
--- ground. Off, none are drawn (those up now go at once).
-card.marks = MakeButton(card, 170, 24, "", GOLD, function()
-  local set = Settings()
-  if set.noMarks then set.noMarks = nil else set.noMarks = 1 end
-  if set.noMarks then ES.ClearMarks() end
-  ES.DrawKeys()
-end)
-card.marks:SetPoint("LEFT", card.size, "RIGHT", 8, 0)
--- The mouse's speed: slower and faster, with what it is now between.
-card.slower = MakeButton(card, 28, 24, "-", GOLD, function()
-  ES.StepMouse(-1)
-  ES.DrawKeys()
-end)
-card.slower:SetPoint("LEFT", card.middle, "RIGHT", 14, 0)
-card.mouseText = Text(card, FONT_BODY, 12)
-card.mouseText:SetPoint("LEFT", card.slower, "RIGHT", 6, 0)
-card.mouseText:SetWidth(150)
-card.mouseText:SetTextColor(1, 0.82, 0.45)
-card.faster = MakeButton(card, 28, 24, "+", GOLD, function()
-  ES.StepMouse(1)
-  ES.DrawKeys()
-end)
-card.faster:SetPoint("LEFT", card.mouseText, "RIGHT", 6, 0)
-card.close = MakeButton(card, 90, 24, "Close", WHITE, function() card:Hide() end)
-card.close:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -14, 12)
+card.Place(card.size, card.Setting(3, 2, "Health bar size"))
+
+-- Under the settings: how the keys work now (and, on a stock client, what it's missing).
+card.profile = Text(card, FONT_BODY, 11)
+card.profile:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", card.M, card.M + 34)
+card.profile:SetWidth(2 * CARD_COL + 20 - 110)
+card.profile:SetJustifyH("LEFT")
+card.profile:SetTextColor(0.75, 0.75, 0.75)
+card.client = Text(card, FONT_BODY, 11)
+card.client:SetPoint("BOTTOMLEFT", card, "BOTTOMLEFT", card.M, card.M)
+card.client:SetWidth(2 * CARD_COL + 20 - 110)
+card.client:SetJustifyH("LEFT")
+card.client:SetTextColor(0.75, 0.75, 0.75)
+card.close = MakeButton(card, 90, 26, "Close", WHITE, function() card:Hide() end)
+card.close:SetPoint("BOTTOMRIGHT", card, "BOTTOMRIGHT", -card.M, card.M)
 card:Hide()
 ES.card = card
 if UISpecialFrames then
@@ -5534,14 +5585,14 @@ function ES.DrawKeys()
     card.rows[i][1]:SetText(CONTROLS[i][1])
     card.rows[i][2]:SetText(ES.ControlKey(i))
   end
-  if AnimClient() then
-    card.client:SetText("Action-combat client: the mouse steers, instant swings and dodge rolls, hit-stop and shake, the over-the-shoulder aim; the left button never moves the camera.")
-  elseif ActionClient() then
-    card.client:SetText("Action-combat client: the mouse steers, the left button never moves the camera, and aiming brings it in over the shoulder.")
+  -- Only a stock client needs telling what it's missing.
+  if AnimClient() or ActionClient() then
+    card.client:SetText("")
   else
     card.client:SetText("Stock client: run scripts/play-survival.sh (or update the Windows folder) for the steering mouse and the over-the-shoulder aim.")
   end
-  if OwnKeys() then
+  local own = OwnKeys()
+  if own then
     -- What has no key at all (its Elwynn key was taken by one of yours): bind it in Key Bindings.
     local none = 0
     for i = 1, table.getn(CONTROLS) do
@@ -5549,18 +5600,28 @@ function ES.DrawKeys()
       if action and string.sub(action, 1, 3) == "ES_" and not (GetBindingKey and GetBindingKey(action)) then none = none + 1 end
     end
     local gap = (none > 0) and string.format(" %d of its actions have no key yet.", none) or ""
-    card.profile:SetText("Your own saved key bindings, the Elwynn keys filling in what yours leave free (its actions are under its heading in Key Bindings)." .. gap .. " " .. (KeyName("ES_KEYS") or "K") .. " opens this card, " .. (KeyName("ES_MODE") or "Z") .. " frees the mouse.")
-    card.switch.label:SetText("Use the Elwynn keys")
+    card.hint:SetText("Your own key bindings: change them in the game's Key Bindings (Elwynn Survival's are under its heading).")
+    card.profile:SetText("The Elwynn keys fill in whatever yours leave free." .. gap)
+    card.switch.label:SetText("Your own")
   else
-    card.profile:SetText("The Elwynn layout: click a key to change it (kept for next time). Your own saved bindings come back when you leave Elwynn.")
-    card.switch.label:SetText("Use my own keys")
+    card.hint:SetText("Click a key to change it. The plain ones follow from other keys.")
+    card.profile:SetText("Keys you change are kept for next time. Your own saved bindings come back when you leave Elwynn.")
+    card.switch.label:SetText("Elwynn layout")
   end
-  card.reset:SetEnabledLook(not OwnKeys() and (ElwynnSurvivalSettings and ElwynnSurvivalSettings.custom and next(ElwynnSurvivalSettings.custom) ~= nil) and true or false)
-  card.middle.label:SetText((ElwynnSurvivalSettings and ElwynnSurvivalSettings.middleLock) and "Middle mouse locks on: on" or "Middle mouse locks on: off")
-  card.where.label:SetText((ES.VitalsWhere() == "corner") and "Health: top left" or "Health: by the hero")
-  card.size.label:SetText(string.format("Health size: %d%%", math.floor(ES.VitalsScale() * 100 + 0.5)))
-  card.marks.label:SetText(ES.MarksOn() and "Floor markers: on" or "Floor markers: off")
-  card.mouseText:SetText(string.format("Mouse speed: %d%%", math.floor(ES.MouseSpeed() * 100 + 0.5)))
+  -- Putting changed keys back: only when there are some, in the Elwynn layout.
+  local changed = ElwynnSurvivalSettings and ElwynnSurvivalSettings.custom and next(ElwynnSurvivalSettings.custom) ~= nil
+  if changed and not own then
+    card.reset:Show()
+    card.resetNone:SetText("")
+  else
+    card.reset:Hide()
+    card.resetNone:SetText(own and "(Elwynn layout only)" or "None")
+  end
+  card.middle.label:SetText((ElwynnSurvivalSettings and ElwynnSurvivalSettings.middleLock) and "Locks on" or "Hold to look")
+  card.where.label:SetText((ES.VitalsWhere() == "corner") and "Top left" or "By the hero")
+  card.size.label:SetText(string.format("%d%%", math.floor(ES.VitalsScale() * 100 + 0.5)))
+  card.marks.label:SetText(ES.MarksOn() and "Shown" or "Hidden")
+  card.mouseText:SetText(string.format("%d%%", math.floor(ES.MouseSpeed() * 100 + 0.5)))
 end
 
 function ES.ToggleKeys()
