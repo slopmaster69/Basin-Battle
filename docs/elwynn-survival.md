@@ -814,9 +814,10 @@ Notes lie where they were dropped below; read one (the use key) and it opens on 
 that stays till you close it, with a clue in red ink while the secret it speaks of is still
 hidden. Every hidden spot has a marker to search (a heap of sacks, a pumpkin on a grave, a book
 in rusted chains): come near it and you're nudged once a run, search it and it gives up what it
-kept. The camp remembers every note read and secret found; the book's page for each dungeon has
-a **Secrets and Notes** row (`.es lore <dungeon>`): what's found, the rumours of the rest, and
-every note to read again (`.es note <note>`).
+kept. The camp remembers every note read and secret found, but the book doesn't list or count
+secrets: they're found down there, not ticked off. Its page for each dungeon has a **Notes** row
+(`.es lore <dungeon>`): the rumours the notes read give of what's still hidden, and every note
+to read again (`.es note <note>`).
 
 ## The Bookmaker's Wager (timed runs) and the Bookmaker's Board
 

@@ -123,6 +123,30 @@ impl Survival {
         self.below.as_ref()?.wager.as_ref()
     }
 
+    /// The bosses a wager has to beat, as players know them (the last form one becomes, as the
+    /// shredder's driver; never a secret form), and whether each is down yet.
+    pub fn wager_progress(&self) -> Vec<(String, bool)> {
+        let Some(d) = self.dungeon_def() else { return Vec::new() };
+        let c = &self.content;
+        wager_bosses(d, c)
+            .iter()
+            .filter_map(|k| {
+                let p = d.packs.iter().find(|p| &p.key == k)?;
+                let mut m = c.mobs.iter().find(|m| m.key == p.mob)?;
+                for _ in 0..4 {
+                    if m.then.is_empty() || m.then_after > 0.0 || !m.then_needs.is_empty() {
+                        break;
+                    }
+                    match c.mobs.iter().find(|x| x.key == m.then) {
+                        Some(next) => m = next,
+                        None => break,
+                    }
+                }
+                Some((m.name.clone(), self.slain(k)))
+            })
+            .collect()
+    }
+
     /// A wager running (not yet won or lost).
     pub fn wager_running(&self) -> bool {
         self.wager().is_some_and(|w| w.done.is_none())
