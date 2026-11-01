@@ -762,6 +762,10 @@ fn a_false_wall_gives_way_and_a_hidden_spot_is_found_each_laying_out_what_it_kep
         ev.iter().any(|e| matches!(e, Event::Letter { player, kind, text, .. } if *player == id && kind == "secret" && text.starts_with("Behind the wall, a stash"))),
         "the finder's page opens, with the secret's page"
     );
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Letter { kind, text, .. } if kind == "secret" && !text.contains("{n}") && text.contains("sums.\n\nSomeone"))),
+        "its breaks are real newlines, for chat without the add-on as much as for the add-on"
+    );
     assert!(s.object(wall).is_none() && !s.through_shut_door([10.0, 10.0, 0.0], [10.0, 20.0, 0.0]));
     assert!(has(&s, &|k| matches!(k, ObjKind::Strongbox { key } if key == "stash")));
     // Found, the clue is spent; read again, the note has none.

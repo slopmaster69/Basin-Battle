@@ -248,9 +248,11 @@ impl Survival {
             let all = dg.doors.iter().filter(|x| x.secret()).count();
             let found = dg.doors.iter().filter(|x| x.secret() && self.ever("secret", &x.key)).count();
             let place = format!("A secret of {}: {found} of {all} found", dg.name);
-            // Its page, if it has one (the chat line stays the short `text`).
+            // Its page, if it has one (the chat line stays the short `text`). Content writes its
+            // breaks as `{n}`; a letter's are real newlines (`letter` turns them back for the add-on,
+            // and makes them paragraphs in chat without it).
             let body = if !d.page.is_empty() {
-                d.page.clone()
+                d.page.replace("{n}", "\n")
             } else if d.text.is_empty() {
                 format!("You have found something hidden: {}.", d.name)
             } else {

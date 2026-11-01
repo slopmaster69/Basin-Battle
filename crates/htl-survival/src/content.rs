@@ -853,6 +853,10 @@ pub struct SetBonusDef {
 }
 
 /// Where armor is worn.
+/// The longest a secret's `page` may be, in characters: the whole page goes to the add-on in one
+/// line. Not a client limit we know of, a guard against a runaway page.
+const PAGE_MAX: usize = 1000;
+
 pub const ARMOR_SLOTS: [&str; 4] = ["chest", "head", "shoulders", "legs"];
 
 /// The Deadmines (`[dungeon]` in `deadmines.toml`): a souls-like run from Ironclad Cove to the
@@ -2630,6 +2634,14 @@ impl Content {
                 }
                 if dr.page.contains(['\t', '\n', '\r']) {
                     bail!("dungeon door {}: its `page` breaks lines with {{n}}, not tabs or newlines", dr.key);
+                }
+                // `|`, `~` and `^` separate fields in the add-on's lines, so the server blanks them.
+                if dr.page.contains(['|', '~', '^']) {
+                    bail!("dungeon door {}: its `page` can't use |, ~ or ^ (the add-on's line uses them)", dr.key);
+                }
+                // One line to the add-on carries the whole page; the longest written is about 830.
+                if dr.page.chars().count() > PAGE_MAX {
+                    bail!("dungeon door {}: its `page` is {} characters, over {PAGE_MAX}", dr.key, dr.page.chars().count());
                 }
                 if dr.kind == "hidden" && (dr.display == 0 || dr.look.is_empty()) {
                     bail!("dungeon door {}: a hidden secret needs a marker to search (`display` and `look`)", dr.key);
