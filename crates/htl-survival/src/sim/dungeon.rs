@@ -959,8 +959,8 @@ impl Survival {
         Ok(())
     }
 
-    /// The book's record of a dungeon: the secrets found, the rumours of the rest (the clues of
-    /// the notes read), and every note read, to read again.
+    /// The book's record of a dungeon: the rumours of the secrets still hidden (the clues of the
+    /// notes read), its bosses and their gear, and every note read, to read again.
     pub fn lore_page(&mut self, id: Id, key: &str) -> Result<(), String> {
         let d = self.content.dungeons().find(|d| d.key == key || (key.is_empty() && self.content.dungeon.as_ref().is_some_and(|x| x.key == d.key))).cloned().ok_or("No such dungeon in the book.")?;
         let read: Vec<&NoteDef> = d.notes.iter().filter(|n| self.ever("read", &n.key)).collect();
@@ -979,6 +979,32 @@ impl Survival {
         }
         if read.is_empty() {
             paras.push("No notes read yet: they lie where they were dropped, waiting.".to_string());
+        }
+        // Its bosses, in the order a run meets them in the book: each one's gear (what may fall
+        // from them; their trophy the camp's the first time), and how often the camp has felled them.
+        let mut bosses = Vec::new();
+        for k in super::wager::wager_bosses(&d, &self.content) {
+            let Some(m) = d.packs.iter().find(|p| p.key == k).and_then(|p| self.content.mob(&p.mob)) else { continue };
+            let m = &self.content.mobs[m];
+            let gear: Vec<String> = m.gear.iter().filter_map(|g| self.content.item(g)).map(|i| self.content.items[i].name.clone()).collect();
+            let trophy: Vec<String> = m.trophy.keys().filter_map(|g| self.content.item(g)).map(|i| self.content.items[i].name.clone()).collect();
+            let felled = self.camp.counts.get(&format!("kill:{}", m.key)).copied().unwrap_or(0);
+            let mut line = format!("- {}: {}", m.name, match felled {
+                0 => "not felled yet".to_string(),
+                1 => "felled once".to_string(),
+                n => format!("felled {n} times"),
+            });
+            if !gear.is_empty() {
+                line.push_str(&format!(". Carries {}", gear.join(", ")));
+            }
+            if !trophy.is_empty() {
+                line.push_str(&format!(". {} {}", if felled == 0 { "Its trophy, the camp's the first time:" } else { "Its trophy, in the camp's chest:" }, trophy.join(", ")));
+            }
+            line.push('.');
+            bosses.push(line);
+        }
+        if !bosses.is_empty() {
+            paras.push(format!("Its bosses (every one down in one run clears it):\n{}", bosses.join("\n")));
         }
         let place = format!("{} of {} notes read", read.len(), d.notes.len());
         let links = read.iter().map(|n| (format!(".es note {}", n.key), n.name.clone())).collect();
