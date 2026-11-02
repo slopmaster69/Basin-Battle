@@ -1961,8 +1961,10 @@ impl Survival {
             self.events.push(Event::Visual { id, kit, by: None });
         }
         // The swing itself, for the clients that play clips: wound up over the whole wind-up (the
-        // blade lands as the blow does), with one of the model's takes on its attack.
-        if !a.ranged {
+        // blade lands as the blow does), with one of the model's takes on its attack. A cast plays
+        // its spell's own (the client's), unless its step names a clip of its own: a volley
+        // thrown up with both hands, say, not the bolt's.
+        if !a.ranged || special.as_ref().is_some_and(|s| s.clip.is_some()) {
             let clip = special.as_ref().and_then(|s| s.clip).unwrap_or_else(|| self.attack_clip(def));
             let take = match &special {
                 Some(s) => s.take,

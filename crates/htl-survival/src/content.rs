@@ -1434,7 +1434,8 @@ pub struct SpecialDef {
     /// The chance of it each time the creature attacks.
     #[serde(default)]
     pub chance: f32,
-    /// The clip it swings with (`AnimationData`; the creature's usual attack when not given).
+    /// The clip it swings with (`AnimationData`; the creature's usual attack when not given). A
+    /// cast (`ranged`) plays its spell's own cast unless given one.
     #[serde(default)]
     pub clip: Option<u16>,
     /// Another character model's take on it (as a hero's move's `from`); else the creature's
