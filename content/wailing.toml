@@ -1177,6 +1177,8 @@ walk_speed = 1.6
 aggro = 14.0
 leash = 24.0
 boss = true
+# Too big to parry (a paw, a stomp, a slab, not a blade): a timed guard only blocks it.
+unparryable = true
 posture = 360
 drops = { deviate_fang = [14, 20] }
 trophy = { kresh_helm = 1 }
@@ -1243,6 +1245,7 @@ walk_speed = 2.0
 aggro = 16.0
 leash = 26.0
 boss = true
+unparryable = true
 posture = 260
 drops = { deviate_fang = [14, 20] }
 trophy = { skum_legs = 1 }
@@ -1315,6 +1318,7 @@ walk_speed = 1.8
 aggro = 18.0
 leash = 30.0
 boss = true
+unparryable = true
 posture = 340
 drops = { deviate_fang = [30, 40] }
 trophy = { verdan_breastplate = 1 }

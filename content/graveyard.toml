@@ -693,6 +693,8 @@ leash = 30.0
 weapon = 2056
 grip = "2h"
 boss = true
+# Too big to parry (a paw, a stomp, a slab, not a blade): a timed guard only blocks it.
+unparryable = true
 posture = 320
 drops = { grave_dust = [18, 24] }
 trophy = { ironspine_mantle = 1 }

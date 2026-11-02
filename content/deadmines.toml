@@ -1414,6 +1414,8 @@ walk_speed = 2.0
 aggro = 18.0
 leash = 30.0
 boss = true
+# Too big to parry (a paw, a stomp, a slab, not a blade): a timed guard only blocks it.
+unparryable = true
 posture = 320
 drops = { plunder = [10, 14] }
 respawn = 0.0

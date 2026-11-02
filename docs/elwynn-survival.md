@@ -109,6 +109,12 @@ you behind for a moment.
 a light blow. A body reeling from any stagger you caused (a bash, a kick, a wind-up knocked aside,
 a heavy blow in its recovery, a knockdown) takes a riposte: half again damage.
 
+**Giants can't be parried**: a boss that's a giant beast, an elemental or a construct (Old
+Blackfang, Rumbler, Fenrus, the Avatar of Agamaggan, Sneed's Shredder and the like: `unparryable`
+on the creature) swings a paw, a stomp or a slab of stone, not a blade. A guard still blocks it,
+but a guard raised just in time only blocks it too ("Too heavy to parry!"): dodge those instead.
+Humanoid bosses can be parried as ever.
+
 **Attack windows**: a creature's wind-up goes through your blows, a heavy one too, so getting your
 swing in first only trades blows with it. Dodge it or guard it (or parry it), then strike in the
 window after it, while it recovers: a heavy blow there staggers an ordinary creature, and every

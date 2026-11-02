@@ -1060,6 +1060,8 @@ walk_speed = 2.2
 aggro = 18.0
 leash = 30.0
 boss = true
+# Too big to parry (a paw, a stomp, a slab, not a blade): a timed guard only blocks it.
+unparryable = true
 posture = 280
 drops = { moonsilver = [20, 26] }
 trophy = { fenrus_legs = 1 }

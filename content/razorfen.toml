@@ -1015,6 +1015,8 @@ walk_speed = 2.2
 aggro = 18.0
 leash = 30.0
 boss = true
+# Too big to parry (a paw, a stomp, a slab, not a blade): a timed guard only blocks it.
+unparryable = true
 posture = 300
 drops = { thorn_fetish = [20, 26] }
 trophy = { agathelos_hide = 1 }
@@ -1166,6 +1168,7 @@ walk_speed = 2.2
 aggro = 30.0
 leash = 40.0
 boss = true
+unparryable = true
 posture = 340
 drops = { thorn_fetish = [50, 60] }
 gear = ["agamaggan_tusk_helm"]
