@@ -41,10 +41,62 @@ pub struct Region {
     pub skip: &'static [&'static str],
     pub road_texture: &'static str,
     pub max_floor: f32,
+    /// The map as Elwynn Survival changes it (buildings taken away, their ground closed).
+    pub edits: &'static [WorldEdit],
+}
+
+/// A change to the map's own placements, made as its tiles are read: buildings (MODF uniqueId)
+/// and doodads (MDDF uniqueId) taken away, and the terrain's holes closed over a circle (a
+/// building's cellar or doorway cut into the ground), so its own heights stand there.
+///
+/// The client draws the same map: patch `0019-world-edits` in `patches/benilla` carries the same
+/// table, and the two change together.
+#[derive(Debug, Clone, Copy)]
+pub struct WorldEdit {
+    pub what: &'static str,
+    pub wmos: &'static [u32],
+    pub doodads: &'static [u32],
+    /// Close the holes of every chunk that reaches into this circle (x, y, radius; 0: none).
+    pub fill: [f32; 3],
+}
+
+/// Westbrook Garrison taken down for the camp: the barracks (Human_Barracks.wmo), the barrels,
+/// crates, jars and bucket of its yard and porch, and the hole its floor stood in. The lion
+/// statues at its gate, the fences, the ballistas and the trees stay.
+pub const WESTBROOK_EDITS: WorldEdit = WorldEdit {
+    what: "Westbrook Garrison",
+    wmos: &[71670],
+    doodads: &[71666, 71667, 71668, 71669, 17030, 17031, 17032, 17033, 17034, 17035, 17036, 17037],
+    fill: [-9620.0, 690.0, 45.0],
+};
+
+const EDITS: [WorldEdit; 1] = [WESTBROOK_EDITS];
+
+/// Apply `edits` to a tile as it's read.
+pub fn apply_edits(t: &mut TileMesh, edits: &[WorldEdit]) {
+    for e in edits {
+        t.wmos.retain(|w| !e.wmos.contains(&w.unique_id));
+        t.doodads.retain(|d| !e.doodads.contains(&d.unique_id));
+        let [cx, cy, r] = e.fill;
+        if r <= 0.0 {
+            continue;
+        }
+        for c in &mut t.chunks {
+            let Some(nw) = c.positions.first() else { continue };
+            // A chunk runs south and east of its north-west corner (x and y fall), a sixteenth of
+            // a tile each way.
+            let side = TILE / 16.0;
+            let nx = cx.clamp(nw[0] - side, nw[0]);
+            let ny = cy.clamp(nw[1] - side, nw[1]);
+            if (nx - cx).hypot(ny - cy) <= r {
+                c.holes = 0;
+            }
+        }
+    }
 }
 
 /// Elwynn Forest.
-pub const ELWYNN: Region = Region { map_dir: MAP_DIR, min: MIN, max: MAX, zone_id: ZONE_ID, skip: &SKIP, road_texture: ROAD_TEXTURE, max_floor: MAX_FLOOR };
+pub const ELWYNN: Region = Region { map_dir: MAP_DIR, min: MIN, max: MAX, zone_id: ZONE_ID, skip: &SKIP, road_texture: ROAD_TEXTURE, max_floor: MAX_FLOOR, edits: &EDITS };
 
 /// A tree trunk: where, and how wide.
 #[derive(Debug, Clone, Copy)]
@@ -115,7 +167,8 @@ fn tiles_at(chain: &mut Chain, r: &Region) -> Result<Vec<((u32, u32), TileMesh)>
     let mut out = Vec::new();
     for tx in tx0..=tx1 {
         for ty in ty0..=ty1 {
-            if let Ok(t) = load_tile_mesh(chain, r.map_dir, tx, ty) {
+            if let Ok(mut t) = load_tile_mesh(chain, r.map_dir, tx, ty) {
+                apply_edits(&mut t, r.edits);
                 out.push(((tx, ty), t));
             }
         }

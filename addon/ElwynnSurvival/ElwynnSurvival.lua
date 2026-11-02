@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 15
+local VERSION = 16
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -4510,7 +4510,7 @@ function ES.BuildMenu(list)
   if ES.siege then
     OpenWindow("build", "Build", "Defences stand on your camp's ground round its Hearth, paid for in gold.")
   else
-    OpenWindow("build", "Build", "Stations and defences stand in the meadow by the camp. Materials come out of your bags first, then the camp's chest.")
+    OpenWindow("build", "Build", "Stations and defences stand in the yards round the camp's fire. Materials come out of your bags first, then the camp's chest.")
   end
   ES.buildList = list
   local items = Items(list)
@@ -6299,6 +6299,14 @@ function ES.Line(line)
     ES.ArenaBanner(f)
   elseif verb == "LP" then
     ES.Lamp(f)
+  elseif verb == "FG" then
+    -- The night's fog (client patch 0018); a client without it keeps Elwynn's own.
+    if f[2] and SetWorldFog then
+      SetWorldFog(tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 120,
+        tonumber(f[6]) or 0.25, tonumber(f[7]) or 1, tonumber(f[9]) or 6, tonumber(f[8]) or 0)
+    elseif ClearWorldFog then
+      ClearWorldFog(4)
+    end
   elseif verb == "WR" then
     ES.below = f[2] == "below"
     ES.siege = f[2] == "siege"
@@ -6353,8 +6361,11 @@ events:SetScript("OnEvent", function()
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
-    -- ac10: a clip can come from another character model; ac11: its turns go back to rest after.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
+    -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
+    -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
+      Say(".es hello " .. VERSION .. " ac12")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
       Say(".es hello " .. VERSION .. " ac11")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 10 then
       Say(".es hello " .. VERSION .. " ac10")

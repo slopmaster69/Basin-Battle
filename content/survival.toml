@@ -9,26 +9,57 @@
 # --- the settlement -------------------------------------------------------------------------------
 
 [world]
-# Where heroes arrive and get back up: by the camp, south-west of Goldshire's blacksmith.
-spawn = [-9500.0, 96.0]
-spawn_facing = 3.6
-# The camp's heart: the storage chest stands here, and resting near it heals.
-heart = [-9506.0, 104.0]
-rest_radius = 14.0
-# The alarm bell: ring it to call the settlement attack.
-alarm = [-9500.0, 112.0]
-# Where stations may be built: the meadow by the camp, south and west of the chest, ringed by
-# torches (`build_marker`, one about every `build_marker_every` yards); while placing one, the
-# add-on lays the whole ground out in green.
-build_center = [-9548.0, 118.0]
-build_radius = 46.0
+# The camp is Westbrook, on Elwynn's western road: the garrison is gone (its barracks taken out of
+# the land, `WESTBROOK_EDITS` in crates/htl-map/src/elwynn.rs and client patch 0019), and the
+# survivors camp on its level yard, the lion statues at the old gate to the south, the road from
+# the gate down to the Westfall road. The camp's things stand in their places round the fire
+# (`[[prop]]` below, "the camp as it grows"); stations go up in the yards round them.
+#
+# Where heroes arrive and get back up: just inside the gate, facing the fire.
+spawn = [-9640.0, 688.0]
+spawn_facing = 0.0
+# The camp's heart: the storage chest stands here, among the camp's stores north-west of the
+# fire, and resting near it heals.
+heart = [-9617.0, 698.0]
+rest_radius = 16.0
+# The alarm bell, on its frame inside the gate: ring it to call the settlement attack.
+alarm = [-9647.0, 676.0]
+# Where stations may be built: the old garrison yard round the camp's fire, ringed by torches
+# (`build_marker`, one about every `build_marker_every` yards); while placing one, the add-on lays
+# the whole ground out in green. The camp's own things keep their ground (`clear`).
+build_center = [-9624.0, 688.0]
+build_radius = 42.0
 build_marker = 4094
 build_marker_every = 14.0
 # Nothing is built on a road, on the arrival spot, the chest, the bell, or within this of them.
 keep_clear = 4.0
-# The weapon rack by the chest: take up any weapon to try it (free while `armory` is on).
-rack = [-9510.0, 92.0]
+# The weapon rack in the muster yard by the gate: take up any weapon to try it (free while
+# `armory` is on).
+rack = [-9640.0, 671.0]
 armory = true
+# Their looks, a size a hero reads from across the camp: the chest (Chest01, twice its size), the
+# bell on its frame (the ship's bell), the rack a third bigger, and the Logbook on a table (its top
+# a yard up).
+storage_display = 10
+storage_scale = 2.0
+alarm_display = 4052
+alarm_scale = 0.75
+rack_display = 130
+rack_scale = 1.3
+book_stand_display = 234
+book_stand_scale = 0.8
+book_stand_height = 1.05
+# Elwynn is always night: the game clock pinned at half past eleven (hour, minute) and set again
+# every `clock_every` seconds, so it never runs on to the dawn. Elwynn's own Light.dbc night is
+# moonlit blue, dark enough to feel it and light enough to read a fight. Take the line out for the
+# time it is now. Not below (a dungeon has its own light) nor in Siege.
+clock = [23, 30]
+clock_every = 300.0
+# Duskwood's mist over the night, asked of the client by the add-on (a client without patch 0018
+# keeps Elwynn's own): a grey-blue fog closing in at 120 yards, a third of the way from the eye,
+# laid fully over Elwynn's and the light a quarter darker. Thicker while a raid is called.
+fog = { color = [0.20, 0.23, 0.30], end = 120.0, start = 0.25, weight = 1.0, darken = 0.25, secs = 8.0 }
+raid_fog = { color = [0.24, 0.18, 0.18], end = 80.0, start = 0.15, weight = 1.0, darken = 0.35, secs = 12.0 }
 
 # --- the hero -------------------------------------------------------------------------------------
 
@@ -1034,24 +1065,29 @@ text = "Grinds sharpening stones and sews a leather rucksack."
 
 [[station]]
 key = "palisade"
-name = "Palisade"
-display = 6151
+name = "Crate Bulwark"
+# A block of stacked cargo crates (DeadMineCargoBoxes, 2.6 by 2.3 yards, 1.8 high, a third
+# bigger): near enough square that it stands the same whichever way it's turned, and blocks
+# set side by side make a wall. It was Elwynn's long fence, which had to be lined up.
+display = 36
 icon = "Ability_Defend"
-scale = 1.0
-footprint = 2.2
+scale = 1.3
+footprint = 2.0
 cost = { wood = 10, stone = 2 }
 health = 700
 repair = { wood = 4 }
 # Raiders go for a defence first when they pass near it.
 defense = true
-text = "A stout wooden wall. Raiders break it before they reach what it guards."
+text = "Stacked crates, braced and roped: raiders break it before they reach what it guards. Set blocks side by side for a wall."
 
 [[station]]
 key = "barricade"
-name = "Spiked Barricade"
-display = 6150
+name = "Thorn Hedge"
+# Duskwood's thorn bush grown wide (1.4 by 1.5 yards, more than twice over): round, so it stands
+# the same whichever way it's turned. It was Elwynn's simple fence, a long thin rail.
+display = 301
 icon = "Spell_Nature_Thorns"
-scale = 1.0
+scale = 2.2
 footprint = 1.8
 cost = { wood = 6, ore = 2 }
 health = 350
@@ -1059,7 +1095,7 @@ repair = { wood = 3, ore = 1 }
 defense = true
 # Raiders at it take this much a second.
 spikes = 6
-text = "Sharpened stakes: raiders go for it first, and bleed for it."
+text = "A hedge of thorns, staked and grown thick: raiders go for it first, and bleed for it."
 
 [[station]]
 key = "watchtower"
@@ -1067,8 +1103,9 @@ work = 1.5
 name = "Watchtower"
 display = 664
 icon = "Ability_Marksmanship"
-scale = 0.28
-footprint = 3.0
+# Elwynn's own watchtower at a third of its size: a lookout over the yard, 14 yards high.
+scale = 0.33
+footprint = 3.2
 cost = { wood = 12, stone = 6, bronze = 2 }
 health = 500
 repair = { wood = 4, stone = 2 }
@@ -1200,7 +1237,7 @@ yield = [2, 3]
 uses = 2
 respawn = 150.0
 # Where: near trees inside these circles, no closer than `spacing` to each other.
-areas = [ { at = [-9592.0, 98.0], radius = 30.0 }, { at = [-9614.0, 184.0], radius = 22.0 }, { at = [-9526.0, 154.0], radius = 12.0 } ]
+areas = [ { at = [-9568.0, 700.0], radius = 14.0 }, { at = [-9608.0, 628.0], radius = 14.0 }, { at = [-9676.0, 742.0], radius = 12.0 } ]
 count = 9
 spacing = 10.0
 
@@ -1230,7 +1267,7 @@ yield = [1, 2]
 uses = 1
 respawn = 120.0
 # A few in the meadows around the camp (most grow out over the whole forest: peacebloom_wild).
-areas = [ { at = [-9566.0, 60.0], radius = 26.0 }, { at = [-9640.0, 120.0], radius = 26.0 }, { at = [-9700.0, 40.0], radius = 30.0 }, { at = [-9560.0, 210.0], radius = 22.0 } ]
+areas = [ { at = [-9700.0, 640.0], radius = 24.0 }, { at = [-9585.0, 630.0], radius = 18.0 }, { at = [-9560.0, 730.0], radius = 20.0 }, { at = [-9690.0, 760.0], radius = 16.0 } ]
 count = 5
 spacing = 14.0
 
@@ -1245,8 +1282,8 @@ gather_spell = 2366
 yield = [1, 2]
 uses = 1
 respawn = 180.0
-# A few in the shade of the trees by the camp, where the wolves run (most: silverleaf_wild).
-areas = [ { at = [-9600.0, 100.0], radius = 32.0 }, { at = [-9620.0, 190.0], radius = 24.0 }, { at = [-9548.0, 52.0], radius = 16.0 } ]
+# A few in the shade of the trees round the camp (most: silverleaf_wild).
+areas = [ { at = [-9572.0, 655.0], radius = 14.0 }, { at = [-9665.0, 765.0], radius = 16.0 }, { at = [-9705.0, 625.0], radius = 16.0 } ]
 count = 3
 spacing = 14.0
 
@@ -1261,8 +1298,8 @@ gather_secs = 2.8
 yield = [2, 3]
 uses = 2
 respawn = 240.0
-# Along the mine road, by the hills.
-areas = [ { at = [-9720.0, 160.0], radius = 30.0 }, { at = [-9800.0, 240.0], radius = 26.0 }, { at = [-9660.0, 220.0], radius = 22.0 } ]
+# Round the camp: by the Westfall road below the gate, and in the woods to either side.
+areas = [ { at = [-9722.0, 700.0], radius = 20.0 }, { at = [-9600.0, 765.0], radius = 18.0 }, { at = [-9640.0, 618.0], radius = 16.0 } ]
 count = 10
 spacing = 10.0
 
@@ -2372,13 +2409,14 @@ reward = { leather = 3, silverleaf = 3, peacebloom = 3 }
 # The first raid; once it's beaten the bell calls the next (`[[raid.tier]]`), and once the last is
 # beaten it comes again with a raider more of each kind every time.
 title = "Warsong Raid"
-road = "the south-west road"
+road = "the Goldshire road from the east"
 # The camp must have these stations before the bell can be rung.
 needs = ["cooking", "smithy"]
 # Seconds of warning between ringing the bell and the first raider.
 warning = 25.0
 # Where they come from, and who.
-from = [-9640.0, 255.0]
+# Up the Westfall road from the mine yard, then in through the gate.
+from = [-9742.0, 520.0]
 raiders = [ { mob = "grunt", count = 4 }, { mob = "shaman", count = 1 }, { mob = "overseer", count = 1 }, { mob = "captain", count = 1 } ]
 # Raiders walk in this many at a time, this far apart.
 wave_size = 2
@@ -2392,8 +2430,9 @@ reward = { ore = 6, wood = 6 }
 title = "Darkspear Raid"
 # The Darkspear come once the camp tans hides and brews salves: they want both.
 needs = ["tanning", "cauldron"]
-from = [-9556.0, 296.0]
-road = "the Darkspear camp to the west"
+# Through the woods to the north-east, from their camp by the Goldshire road.
+from = [-9575.0, 560.0]
+road = "the woods to the north-east"
 raiders = [ { mob = "berserker", count = 3 }, { mob = "spearman", count = 2 }, { mob = "witchdoctor", count = 2 }, { mob = "wolf", count = 2 }, { mob = "brave", count = 1 }, { mob = "shadowhunter", count = 1 } ]
 reward = { leather = 4, linen = 6, peacebloom = 4, silverleaf = 3 }
 
@@ -2401,8 +2440,9 @@ reward = { leather = 4, linen = 6, peacebloom = 4, silverleaf = 3 }
 title = "Horde Warband"
 # The whole Horde camp comes up the road once the camp has a workbench and a palisade to break.
 needs = ["workbench", "palisade"]
-from = [-9640.0, 255.0]
-road = "the south-west road"
+# Over the Westfall bridge, the warband's road in from the west.
+from = [-9792.0, 812.0]
+road = "the Westfall bridge to the west"
 # Warlord Gorzak comes with the last of them.
 raiders = [ { mob = "grunt", count = 4 }, { mob = "archer", count = 2 }, { mob = "shaman", count = 2 }, { mob = "overseer", count = 2 }, { mob = "deathguard", count = 2 }, { mob = "cutthroat", count = 1 }, { mob = "brave", count = 1 }, { mob = "warlord", count = 1 } ]
 wave_size = 3
@@ -2414,8 +2454,8 @@ title = "Blackrock Assault"
 # The Blackrock come down the east road from Ridgepoint once the warband is broken and the camp
 # keeps its archers on the wall: Rak'gash the Herald at their back.
 needs = ["watchtower", "palisade"]
-from = [-9590.0, -160.0]
-road = "the east road"
+from = [-9690.0, 420.0]
+road = "the Goldshire road from the east"
 raiders = [ { mob = "blackrock_grunt", count = 5 }, { mob = "blackrock_caster", count = 2 }, { mob = "prowler", count = 3 }, { mob = "kobold_tunneler", count = 2 }, { mob = "rakgash", count = 1 } ]
 wave_size = 3
 warning = 35.0
@@ -2482,7 +2522,7 @@ reward = { linen = 2, leather = 2, ore = 2 }
 
 [[goal]]
 title = "Timber for the camp"
-text = "Gather fallen timber by the trees west of the camp, then bring it to the Camp Storage chest and use it (right-click) to bank it. Only timber in the chest counts, not what you carry."
+text = "Gather fallen timber under the trees round the camp, then bring it to the Camp Storage chest and use it (right-click) to bank it. Only timber in the chest counts, not what you carry."
 kind = "bank"
 what = "wood"
 count = 10
@@ -2490,7 +2530,7 @@ reward = { roast = 2 }
 
 [[goal]]
 title = "A fire to cook on"
-text = "Build a Cooking Fire on the meadow by the camp (H)."
+text = "Build a Cooking Fire in the camp's yard by the fire (H)."
 kind = "build"
 what = "cooking"
 reward = { meat = 4 }
@@ -2513,7 +2553,7 @@ reward = { linen = 2, wood = 4 }
 
 [[goal]]
 title = "Copper from Fargodeep"
-text = "The Warsong hold the mine yard down the south-west road. Bring back copper and bank it at the Camp Storage chest (what you carry doesn't count until it's banked)."
+text = "The Warsong hold the Fargodeep mine yard, south-east down the Goldshire road. Bring back copper and bank it at the Camp Storage chest (what you carry doesn't count until it's banked)."
 kind = "bank"
 what = "ore"
 count = 6
@@ -2661,7 +2701,7 @@ reward = { stone = 4 }
 
 [[goal]]
 title = "A wall"
-text = "Raise a Palisade: raiders break it before they reach what it guards."
+text = "Raise a Crate Bulwark: raiders break it before they reach what it guards."
 kind = "build"
 what = "palisade"
 reward = { wood = 10 }
@@ -2690,7 +2730,7 @@ reward = { fish = 4, meat = 4 }
 
 [[goal]]
 title = "Archers on the wall"
-text = "Raise a Watchtower by the palisade (timber, stone and bronze): its archers shoot raiders in reach."
+text = "Raise a Watchtower by the bulwark (timber, stone and bronze): its archers shoot raiders in reach."
 kind = "build"
 what = "watchtower"
 reward = { stone = 4, wood = 6 }
@@ -2719,7 +2759,7 @@ reward = { bronze = 4, silver = 2 }
 
 [[goal]]
 title = "The Blackrock Assault"
-text = "With the warband broken the Blackrock come down the east road with Rak'gash at their back: ring the bell and hold."
+text = "With the warband broken the Blackrock come along the Goldshire road with Rak'gash at their back: ring the bell and hold."
 kind = "raid"
 what = "3"
 reward = { silver = 3, bronze = 4 }
@@ -9431,13 +9471,14 @@ link = 0.0
 [[chest]]
 key = "shrine_warrior"
 name = "The Garrison's Banner"
-at = [-9674.0, 704.0]
+# Carried off from Westbrook to the Riverpaw camp at Forest's Edge.
+at = [-9885.0, 675.0]
 display = 631
 scale = 1.0
 teaches = ["hurled_axe", "shockwave"]
 keep = true
 secs = 3.0
-text = "Westbrook's banner, and the drill the garrison's footmen learned under it: the throw, and the slam that drives a line back."
+text = "Westbrook's banner, carried off by the Riverpaw, and the drill the garrison's footmen learned under it: the throw, and the slam that drives a line back."
 trial = ["trial_shrine_warrior_0", "trial_shrine_warrior_1"]
 
 [[chest]]
@@ -9563,7 +9604,8 @@ trial = ["trial_relic_priest_0", "trial_relic_priest_1"]
 [[chest]]
 key = "relic_paladin"
 name = "The Lightbringer's Charge"
-at = [-9640.0, 696.0]
+# Under the old garrison's north ballista, past the camp's back fence.
+at = [-9668.0, 751.0]
 teaches = ["divine_steed", "blessing_of_protection"]
 loot = { bronze = 2 }
 display = 259
@@ -9913,11 +9955,11 @@ text = "Bones, and a fisherman's things."
 
 [[site]]
 key = "camp"
-name = "The Camp"
-at = [-9506.0, 104.0]
-radius = 20.0
+name = "The Camp at Westbrook"
+at = [-9624.0, 688.0]
+radius = 30.0
 kind = "camp"
-text = "Your camp in Goldshire's meadow: the chest, the stations, the alarm bell, the Smuggler's Logbook."
+text = "Your camp in the old Westbrook garrison's yard: the chest, the stations, the alarm bell, the Smuggler's Logbook."
 
 [[site]]
 key = "goldshire"
@@ -10131,16 +10173,6 @@ text = "The Riverpaw gnolls' camps, and Hogger wandering between them. Briarthor
 reward = { hide = 2 }
 
 [[site]]
-key = "westbrook"
-name = "Westbrook Garrison"
-at = [-9660.0, 690.0]
-radius = 35.0
-kind = "sanctum"
-icon = "INV_Sword_27"
-text = "The warrior's shrine (Hurled Axe, Sundering Blow) at the garrison's banner; its armory opens once Hogger falls."
-reward = { bronze = 1 }
-
-[[site]]
 key = "thunder_falls"
 name = "Thunder Falls"
 at = [-9337.0, 800.0]
@@ -10221,6 +10253,342 @@ at = [-8795.0, -1058.0]
 radius = 20.0
 kind = "lair"
 text = "A den in the hills north of the lake."
+
+# --- the camp as it grows -------------------------------------------------------------------------
+# Westbrook's camp, each thing in its place round the fire (-9624, 688): the stores and the chest
+# to the north-west, the survivors' shelter to the north, the muster yard by the gate to the
+# south-east, the Logbook's table to the east, the forge yard to the west; the gate to the south,
+# between the old garrison's lion statues, where the road goes down to the Westfall road. What
+# has an `after` stands once the camp has come that far (see `PropDef`), and says so as it
+# does; `npc` is one of the camp's people at their post (a creature display). `clear` is the
+# ground each keeps: stations go up in the yards between.
+
+# The camp's fire (a forge bonfire), its middle.
+[[prop]]
+display = 667
+at = [-9624.0, 688.0]
+scale = 1.3
+facing = 0.0
+clear = 3.5
+
+[[prop]]
+display = 199
+at = [-9620.5, 682.5]
+scale = 1.2
+facing = 2.14
+clear = 1.0
+
+[[prop]]
+display = 289
+at = [-9628.0, 693.5]
+facing = 5.34
+clear = 1.0
+
+# The stores round the chest: crates, barrels, grain.
+[[prop]]
+display = 31
+at = [-9613.5, 702.5]
+scale = 1.2
+facing = 4.09
+clear = 1.2
+
+[[prop]]
+display = 32
+at = [-9612.5, 699.0]
+scale = 1.2
+facing = 3.9
+clear = 1.0
+
+[[prop]]
+display = 32
+at = [-9614.0, 695.8]
+scale = 1.1
+facing = 3.8
+clear = 1.0
+
+[[prop]]
+display = 347
+at = [-9618.5, 703.5]
+scale = 1.2
+facing = 4.37
+clear = 1.2
+
+# The survivors' shelter: a pavilion, square and open, its straw beds under it.
+[[prop]]
+display = 6738
+at = [-9602.0, 688.0]
+scale = 0.9
+facing = 3.14
+clear = 5.5
+
+[[prop]]
+display = 2129
+at = [-9601.0, 694.5]
+scale = 0.7
+facing = 3.42
+
+[[prop]]
+display = 2129
+at = [-9601.0, 681.5]
+scale = 0.7
+facing = 2.87
+
+# The muster yard by the gate: the rack (`[world] rack`), a dummy, a target.
+[[prop]]
+display = 518
+at = [-9635.0, 664.5]
+scale = 1.2
+facing = 1.13
+clear = 1.5
+
+[[prop]]
+display = 232
+at = [-9627.5, 660.0]
+scale = 0.8
+facing = 1.57
+clear = 1.8
+
+# Lamps on the gate, between the old lion statues.
+[[prop]]
+display = 5671
+at = [-9652.0, 682.0]
+facing = 3.141592653589793
+clear = 1.0
+
+[[prop]]
+display = 5671
+at = [-9652.0, 694.0]
+facing = 3.141592653589793
+clear = 1.0
+
+# Once there's a cooking fire: supplies, and the people who keep them.
+[[prop]]
+display = 3678
+at = [-9604.0, 716.0]
+scale = 0.8
+facing = 0.4
+after = "built:cooking"
+clear = 5.0
+say = "Word of a fire at Westbrook gets round: a quartermaster rides in from Goldshire with a wagon of supplies, and a cook comes with him."
+
+[[prop]]
+display = 288
+at = [-9611.5, 723.0]
+scale = 1.1
+facing = 4.37
+after = "built:cooking"
+clear = 1.0
+
+[[prop]]
+display = 1299
+at = [-9612.0, 693.0]
+facing = 2.36
+after = "built:cooking"
+clear = 1.2
+npc = true
+name = "Quartermaster Hale"
+subname = "Camp Stores"
+
+[[prop]]
+display = 1357
+at = [-9619.0, 679.5]
+facing = 2.1
+after = "built:cooking"
+clear = 1.2
+npc = true
+name = "Tobin"
+subname = "Camp Cook"
+
+# Once there's an anvil: the west yard's forge and its smith.
+[[prop]]
+display = 233
+at = [-9634.0, 713.0]
+scale = 0.8
+facing = 5.09
+after = "built:smithy"
+clear = 3.0
+say = "A smith walks in off the Westfall road and lights a forge in the west yard."
+
+[[prop]]
+display = 1109
+at = [-9641.0, 718.0]
+facing = 1.2
+after = "built:smithy"
+clear = 2.5
+
+[[prop]]
+display = 1500
+at = [-9630.0, 709.5]
+facing = 4.98
+after = "built:smithy"
+clear = 1.2
+npc = true
+name = "Garrick Stone"
+subname = "Blacksmith"
+
+# Once there's a tanning rack: a trapper's racks by the shelter.
+[[prop]]
+display = 409
+at = [-9612.0, 668.0]
+scale = 0.8
+facing = 2.11
+after = "built:tanning"
+clear = 2.5
+say = "A trapper from Forest's Edge hangs her racks by the shelter: the camp's hides are worth her while."
+
+[[prop]]
+display = 1439
+at = [-9608.0, 672.5]
+facing = 2.37
+after = "built:tanning"
+clear = 1.2
+npc = true
+name = "Wren Ashby"
+subname = "Trapper"
+
+# Once there's a cauldron: the herbalist and her sacks.
+[[prop]]
+display = 252
+at = [-9607.0, 704.0]
+scale = 1.1
+facing = 3.9
+after = "built:cauldron"
+clear = 1.0
+say = "An herbalist off the Goldshire road finds the camp's cauldron, and stays."
+
+[[prop]]
+display = 1295
+at = [-9606.5, 700.0]
+facing = 3.74
+after = "built:cauldron"
+clear = 1.2
+npc = true
+name = "Sister Maren"
+subname = "Herbalist"
+
+# The first raid beaten: the camp keeps a watch.
+[[prop]]
+display = 625
+at = [-9609.5, 688.0]
+scale = 0.8
+facing = 3.141592653589793
+after = "raids:1"
+clear = 1.0
+say = "The Warsong are beaten. The camp digs in: sentries on the gate, and Stormwind's flag over the shelter."
+
+[[prop]]
+display = 624
+at = [-9653.5, 678.5]
+scale = 0.6
+facing = 3.141592653589793
+after = "raids:1"
+clear = 1.0
+
+[[prop]]
+display = 624
+at = [-9653.5, 697.5]
+scale = 0.6
+facing = 3.141592653589793
+after = "raids:1"
+clear = 1.0
+
+[[prop]]
+display = 1499
+at = [-9655.5, 681.0]
+facing = 3.141592653589793
+after = "raids:1"
+clear = 1.2
+npc = true
+name = "Westbrook Sentry"
+subname = "Camp Watch"
+
+[[prop]]
+display = 1499
+at = [-9655.5, 695.0]
+facing = 3.141592653589793
+after = "raids:1"
+clear = 1.2
+npc = true
+name = "Westbrook Sentry"
+subname = "Camp Watch"
+
+# The second raid beaten: a guard tower (Elwynn's own, half size) and its scout.
+[[prop]]
+display = 661
+at = [-9593.0, 665.0]
+scale = 0.5
+facing = 2.5
+after = "raids:2"
+clear = 6.0
+say = "With the Darkspear driven off, the camp raises a guard tower over its north-east corner, and a scout keeps it."
+
+[[prop]]
+display = 1364
+at = [-9600.0, 670.5]
+facing = 2.51
+after = "raids:2"
+clear = 1.2
+npc = true
+name = "Scout Marten"
+subname = "Westbrook Watch"
+
+# The warband beaten: Westbrook stands again.
+[[prop]]
+display = 661
+at = [-9593.0, 711.0]
+scale = 0.5
+facing = 3.78
+after = "raids:3"
+clear = 6.0
+say = "The Horde warband is broken. Westbrook stands again: a second tower over the west wall, and a marshal from Stormwind takes command of the camp."
+
+[[prop]]
+display = 1276
+at = [-9631.0, 683.0]
+facing = 0.62
+after = "raids:3"
+clear = 1.2
+npc = true
+name = "Marshal Wyle"
+subname = "Westbrook Garrison"
+
+[[prop]]
+display = 624
+at = [-9633.5, 679.0]
+scale = 0.6
+facing = 0.76
+after = "raids:3"
+clear = 1.0
+
+# The Blackrock beaten: the garrison's footmen.
+[[prop]]
+display = 1499
+at = [-9586.0, 688.0]
+facing = 0.0
+after = "raids:4"
+clear = 1.2
+npc = true
+name = "Westbrook Footman"
+subname = "Westbrook Garrison"
+say = "The Blackrock break at Westbrook's gate. Stormwind sends footmen: the camp is a garrison again."
+
+[[prop]]
+display = 1500
+at = [-9646.0, 705.0]
+facing = 1.5707963267948966
+after = "raids:4"
+clear = 1.2
+npc = true
+name = "Westbrook Footman"
+subname = "Westbrook Garrison"
+
+[[prop]]
+display = 130
+at = [-9643.0, 666.0]
+scale = 1.3
+facing = 0.86
+after = "raids:4"
+clear = 1.5
 
 # --- what makes a camp look lived in --------------------------------------------------------------
 
@@ -10818,7 +11186,7 @@ clear_of_camp = 60.0
 
 [[pack]]
 mob = "gnoll_brute"
-at = [-9674.0, 704.0]
+at = [-9885.0, 675.0]
 radius = 4.0
 count = 2
 link = 8.0
@@ -10827,7 +11195,7 @@ wake = "shrine_warrior"
 
 [[pack]]
 mob = "gnoll_runt"
-at = [-9674.0, 704.0]
+at = [-9885.0, 675.0]
 radius = 4.0
 count = 1
 link = 8.0
@@ -10998,7 +11366,7 @@ wake = "relic_priest"
 
 [[pack]]
 mob = "risen_skeleton"
-at = [-9646.0, 699.0]
+at = [-9672.0, 746.0]
 radius = 4.0
 count = 3
 link = 8.0

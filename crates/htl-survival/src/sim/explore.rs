@@ -45,13 +45,65 @@ impl Survival {
             return;
         }
         for k in 0..self.content.props.len() {
-            let d = self.content.props[k].clone();
-            let at = match d.z {
-                Some(z) => self.ground_near(d.at[0], d.at[1], z),
-                None => self.ground(d.at[0], d.at[1]),
-            };
-            let id = self.alloc();
-            self.objs.insert(id, Obj { kind: ObjKind::Prop { display: d.display, scale: d.scale }, pos: at, facing: d.facing });
+            if self.content.props[k].after.is_none() {
+                self.place_piece(k);
+            }
+        }
+        // The camp's own, as far as it has come.
+        self.grow_camp(false);
+    }
+
+    /// Set out `[[prop]]` `k`.
+    fn place_piece(&mut self, k: usize) -> Id {
+        let d = &self.content.props[k];
+        let (at, lift, facing) = (d.at, d.lift, d.facing);
+        let mut pos = match d.z {
+            Some(z) => self.ground_near(at[0], at[1], z),
+            None => self.ground(at[0], at[1]),
+        };
+        pos[2] += lift;
+        let id = self.alloc();
+        self.objs.insert(id, Obj { kind: ObjKind::Piece { def: k }, pos, facing });
+        id
+    }
+
+    /// Whether the camp has come as far as `after` says (`raids:N`, `built:<station>`,
+    /// `goal:N`, `found:<site>`); an unknown condition never holds.
+    pub fn camp_has(&self, after: &str) -> bool {
+        let (what, arg) = after.split_once(':').unwrap_or((after, ""));
+        match what.trim() {
+            "start" => true,
+            "raids" => arg.trim().parse::<u32>().is_ok_and(|n| self.camp.raids_won >= n),
+            "goal" => arg.trim().parse::<usize>().is_ok_and(|n| self.camp.goal >= n),
+            "built" => {
+                let key = arg.trim();
+                self.has_station(key) || self.camp.counts.get(&format!("build:{key}")).is_some_and(|n| *n > 0)
+            }
+            "found" => self.camp.found.contains(arg.trim()),
+            _ => false,
+        }
+    }
+
+    /// Set out every camp prop the camp has earned and doesn't have yet; with `tell`, the camp
+    /// hears how it grows (each new piece's `say`).
+    pub(crate) fn grow_camp(&mut self, tell: bool) {
+        if self.is_below() || self.is_siege() {
+            return;
+        }
+        let standing: BTreeSet<usize> = self.objs.values().filter_map(|o| match o.kind { ObjKind::Piece { def } => Some(def), _ => None }).collect();
+        let due: Vec<usize> = (0..self.content.props.len())
+            .filter(|k| !standing.contains(k))
+            .filter(|k| self.content.props[*k].after.as_deref().is_some_and(|a| self.camp_has(a)))
+            .collect();
+        for k in due {
+            let id = self.place_piece(k);
+            if tell {
+                self.events.push(Event::ObjSpawned { id });
+                let say = self.content.props[k].say.clone();
+                if !say.is_empty() {
+                    self.announce(say);
+                }
+            }
         }
     }
 
@@ -324,6 +376,11 @@ impl Survival {
     /// Each tick: places found, secrets come upon, ambushers who see a hero, chests full again.
     pub(crate) fn step_explore(&mut self) {
         self.step_trials();
+        // The camp grows as it gets further (looked at now and then, heroes there or not).
+        if self.clock - self.grown_at >= REFILL_EVERY {
+            self.grown_at = self.clock;
+            self.grow_camp(true);
+        }
         let heroes: Vec<(Id, Vec3)> = self.players.iter().filter(|(_, p)| p.health > 0).map(|(id, p)| (*id, p.pos)).collect();
         if heroes.is_empty() {
             return;

@@ -159,6 +159,94 @@ pub struct WorldDef {
     pub rack: [f32; 2],
     #[serde(default)]
     pub armory: bool,
+    /// The game clock pinned at this hour and minute (the sky, the light and the fog follow it):
+    /// set again every `clock_every` seconds, so it never runs on to another part of the day.
+    /// None: the clock runs on from the time it is now.
+    #[serde(default)]
+    pub clock: Option<[u32; 2]>,
+    #[serde(default = "clock_every")]
+    pub clock_every: f32,
+    /// The camp's own things' looks (`GameObjectDisplayInfo`) and sizes: the chest, the bell
+    /// (raised `alarm_lift` over the ground), the weapon rack, and what the Logbook lies on (its
+    /// top `book_stand_height` over the ground).
+    #[serde(default = "storage_display")]
+    pub storage_display: u32,
+    #[serde(default = "one_w")]
+    pub storage_scale: f32,
+    #[serde(default = "alarm_display")]
+    pub alarm_display: u32,
+    #[serde(default = "alarm_scale")]
+    pub alarm_scale: f32,
+    #[serde(default)]
+    pub alarm_lift: f32,
+    #[serde(default = "rack_display")]
+    pub rack_display: u32,
+    #[serde(default = "one_w")]
+    pub rack_scale: f32,
+    #[serde(default = "book_stand_display")]
+    pub book_stand_display: u32,
+    #[serde(default = "one_w")]
+    pub book_stand_scale: f32,
+    #[serde(default = "book_stand_height")]
+    pub book_stand_height: f32,
+    /// The night's fog over the land (the add-on asks the client for it; a stock client keeps its
+    /// own): its colour (0 to 1), how far it ends (yards), where it starts (a share of that), how
+    /// much of it is laid over Elwynn's own (0 to 1), and how much darker the light (0 to 1).
+    #[serde(default)]
+    pub fog: Option<FogDef>,
+    /// Thicker while a raid is called and under way.
+    #[serde(default)]
+    pub raid_fog: Option<FogDef>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub struct FogDef {
+    pub color: [f32; 3],
+    pub end: f32,
+    pub start: f32,
+    #[serde(default = "one_w")]
+    pub weight: f32,
+    #[serde(default)]
+    pub darken: f32,
+    /// Seconds to ease into it.
+    #[serde(default = "fog_secs")]
+    pub secs: f32,
+}
+
+fn fog_secs() -> f32 {
+    6.0
+}
+
+fn one_w() -> f32 {
+    1.0
+}
+
+fn storage_display() -> u32 {
+    10
+}
+
+fn alarm_display() -> u32 {
+    4571
+}
+
+fn alarm_scale() -> f32 {
+    0.6
+}
+
+fn rack_display() -> u32 {
+    130
+}
+
+fn book_stand_display() -> u32 {
+    18
+}
+
+fn book_stand_height() -> f32 {
+    0.5
+}
+
+fn clock_every() -> f32 {
+    300.0
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1877,17 +1965,44 @@ pub struct ChestDef {
     pub text: String,
 }
 
-/// A thing only to be seen (`[[prop]]`): a camp's fire, a cult's candles, a cage.
+/// A thing only to be seen (`[[prop]]`): a camp's fire, a cult's candles, a cage; or one of
+/// the camp's own people (`npc`), standing at their post.
+///
+/// The camp's own props grow with it: one with `after` stands only once the camp has got that
+/// far (`raids:1` one raid beaten, `built:smithy` a smithy built once, `goal:6` the journal at
+/// its seventh step, `found:<site>` a place found), and stays from then on.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PropDef {
+    /// Its look: a game object's (`GameObjectDisplayInfo`), or for an `npc` a creature's
+    /// (`CreatureDisplayInfo`).
     pub display: u32,
     pub at: [f32; 2],
     #[serde(default)]
     pub z: Option<f32>,
+    /// Raised this far over the ground it stands on (a bell on its post, a book on its table).
+    #[serde(default)]
+    pub lift: f32,
     #[serde(default = "one_f")]
     pub scale: f32,
     #[serde(default)]
     pub facing: f32,
+    /// How far the camp must have come for it to stand (see above); none: from the start.
+    #[serde(default)]
+    pub after: Option<String>,
+    /// Ground it keeps: nothing is built within this of it (0: none).
+    #[serde(default)]
+    pub clear: f32,
+    /// One of the camp's people: a creature that stands at its post (friendly, never fought).
+    #[serde(default)]
+    pub npc: bool,
+    #[serde(default)]
+    pub name: String,
+    /// Under an npc's name (their trade).
+    #[serde(default)]
+    pub subname: String,
+    /// What the camp hears when it first stands (the first of a tier says how the camp grows).
+    #[serde(default)]
+    pub say: String,
 }
 
 fn chest_display() -> u32 {

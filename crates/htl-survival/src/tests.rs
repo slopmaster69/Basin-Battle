@@ -537,9 +537,32 @@ fn give(s: &mut Survival, p: Id, key: &str, n: u32) {
 }
 
 fn build_spot(s: &Survival) -> (Vec3, f32) {
-    // Stand west of the building ground's middle, facing east into it.
+    // A yard of the building ground clear of the camp's own things (its fire, chest, shelter...)
+    // nearest its middle, room for a watchtower there and 7 yards south and 8 north; stand west
+    // of it, facing east into it.
     let c = s.content.world.build_center;
-    ([c[0], c[1] + BUILD_DISTANCE, 0.0], -std::f32::consts::FRAC_PI_2)
+    let tower = s.content.station("watchtower").unwrap();
+    let g = yard(s, tower, &[-7.0, 0.0, 8.0]).unwrap_or([c[0], c[1], 0.0]);
+    ([g[0], g[1] + BUILD_DISTANCE, 0.0], -std::f32::consts::FRAC_PI_2)
+}
+
+/// The spot nearest the building ground's middle where station `def` may stand, and as far
+/// north (x) as each of `along`.
+fn yard(s: &Survival, def: usize, along: &[f32]) -> Option<Vec3> {
+    let c = s.content.world.build_center;
+    let mut r = 0.0f32;
+    while r <= s.content.world.build_radius {
+        let n = ((std::f32::consts::TAU * r).ceil() as usize).max(1);
+        for k in 0..n {
+            let a = k as f32 / n as f32 * std::f32::consts::TAU;
+            let g = [c[0] + a.cos() * r, c[1] + a.sin() * r, 0.0];
+            if along.iter().all(|dx| s.site_problem(def, [g[0] + dx, g[1], 0.0], None).is_none()) {
+                return Some(g);
+            }
+        }
+        r += 1.0;
+    }
+    None
 }
 
 #[test]
@@ -585,9 +608,9 @@ fn placing_a_station_costs_once_and_only_where_it_may_stand() {
 #[test]
 fn the_road_and_the_camps_own_spots_stay_clear() {
     let mut s = world();
-    let c = s.content.world.build_center;
-    s.land = Box::new(FlatLand { roads: vec![([c[0], c[1]], 3.0)], ..Default::default() });
     let (at, f) = build_spot(&s);
+    // The road through the spot.
+    s.land = Box::new(FlatLand { roads: vec![([at[0], at[1] - BUILD_DISTANCE], 3.0)], ..Default::default() });
     let p = hero(&mut s, "Ayla", at, f);
     give(&mut s, p, "wood", 10);
     s.build_start(p, "cooking").unwrap();

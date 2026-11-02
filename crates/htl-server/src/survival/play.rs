@@ -537,8 +537,21 @@ impl SurvivalGame {
                     self.broadcast(&packets::update_object(&[], &[(g, &f)]));
                     return;
                 }
-                // A new look or name (damaged, a ghost moved): the client caches names by entry,
-                // so it's drawn afresh.
+                // A station being placed, moved or judged afresh: sent again under the same
+                // guids to its placer alone, which a patched client (0017) moves in place, never
+                // solid and never fading in and out as it follows the hero.
+                if let (Some(owner), true) = (self.ghost_owner(id), self.guid_of(id).is_some()) {
+                    // (An older client leaves a re-created object where it stood: drawn afresh.)
+                    let patched = |c: ConnId| self.world_of(c).is_some_and(|w| w.level >= 12);
+                    if let Some(c) = self.conn_of(owner).filter(|c| patched(*c)) {
+                        for p in self.obj_create(id) {
+                            self.send(c, p);
+                        }
+                        return;
+                    }
+                }
+                // A new look or name (damaged): the client caches names by entry, so it's drawn
+                // afresh.
                 self.obj_destroy(id);
                 if self.sim.objs.contains_key(&id) {
                     self.obj_show(id);

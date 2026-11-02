@@ -49,7 +49,8 @@ impl Survival {
     pub(crate) fn place_camp(&mut self) {
         let w = self.content.world.clone();
         let heart = self.ground(w.heart[0], w.heart[1]);
-        let alarm = self.ground(w.alarm[0], w.alarm[1]);
+        let mut alarm = self.ground(w.alarm[0], w.alarm[1]);
+        alarm[2] += w.alarm_lift;
         let id = self.alloc();
         self.objs.insert(id, Obj { kind: ObjKind::Storage, pos: heart, facing: w.spawn_facing });
         let id = self.alloc();
@@ -87,9 +88,9 @@ impl Survival {
             }
             let at = self.ground(spot[0], spot[1]);
             let id = self.alloc();
-            self.objs.insert(id, Obj { kind: ObjKind::Prop { display: BOOK_CRATE_DISPLAY, scale: 1.0 }, pos: at, facing: d.book_facing });
+            self.objs.insert(id, Obj { kind: ObjKind::Prop { display: w.book_stand_display, scale: w.book_stand_scale }, pos: at, facing: d.book_facing });
             let id = self.alloc();
-            let on = [at[0], at[1], at[2] + BOOK_CRATE_HEIGHT];
+            let on = [at[0], at[1], at[2] + w.book_stand_height];
             self.objs.insert(id, Obj { kind: ObjKind::Book, pos: on, facing: d.book_facing });
             // A lit brazier beside it, to find it by.
             let (sx, sy) = ((d.book_facing + std::f32::consts::FRAC_PI_2).cos() * 1.6, (d.book_facing + std::f32::consts::FRAC_PI_2).sin() * 1.6);
@@ -485,7 +486,7 @@ impl Survival {
             ObjKind::Chest { def, spent: false } => self.use_chest(id, def, t),
             ObjKind::Chest { .. } => {}
             ObjKind::Loot { item, n } => self.take_loot(id, item, n, t),
-            ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } => {}
+            ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } | ObjKind::Piece { .. } => {}
         }
     }
 
@@ -1225,7 +1226,7 @@ impl Survival {
             let center = [w.build_center[0], w.build_center[1], 0.0];
             let off = dist2d(pos, center) + r - w.build_radius;
             if off > 0.0 {
-                return Some(format!("Outside the camp's building ground (the meadow by the camp, ringed by torches): {:.0} yd {} of here.", off.ceil(), compass(facing(pos, center))));
+                return Some(format!("Outside the camp's building ground (the yard round the camp's fire, ringed by torches): {:.0} yd {} of here.", off.ceil(), compass(facing(pos, center))));
             }
         }
         // Sample the footprint.
@@ -1270,11 +1271,70 @@ impl Survival {
                 return Some("Too close to something else.".into());
             }
         }
+        // The camp's own things keep their ground, those still to come as well as those there.
+        if !self.is_siege() {
+            for d in self.content.props.iter().filter(|d| d.clear > 0.0) {
+                if dist2d([d.at[0], d.at[1], 0.0], pos) < r + d.clear + 0.5 {
+                    return Some(if d.after.is_some() && !d.name.is_empty() {
+                        format!("That ground is kept for {} (the camp's, as it grows).", d.name)
+                    } else if d.after.is_some() {
+                        "That ground is kept for the camp's own, as it grows.".into()
+                    } else {
+                        "Too close to something else.".into()
+                    });
+                }
+            }
+        }
         let spawn = [w.spawn[0], w.spawn[1], 0.0];
         if dist2d(spawn, pos) < r + w.keep_clear {
             return Some("That's where heroes arrive: keep it clear.".into());
         }
         None
+    }
+
+    /// Stations standing outside the camp's building ground (built where the camp stood before
+    /// it moved) carried over to it: each to the nearest good spot, kept as it was (its health,
+    /// whether it's damaged). One with no room left stays where it is.
+    pub(crate) fn resite_stations(&mut self) {
+        if self.is_siege() || self.is_below() {
+            return;
+        }
+        let w = self.content.world.clone();
+        let center = [w.build_center[0], w.build_center[1], 0.0];
+        let away: Vec<Id> = self
+            .objs
+            .iter()
+            .filter(|(_, o)| matches!(o.kind, ObjKind::Station { def, .. } if dist2d(o.pos, center) + self.content.stations[def].footprint > w.build_radius))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in away {
+            let Some(ObjKind::Station { def, .. }) = self.objs.get(&id).map(|o| o.kind.clone()) else { continue };
+            // Rings out from the middle, a spot every 3 yards round each.
+            let mut spot = None;
+            let mut r = 0.0f32;
+            'rings: while r <= w.build_radius {
+                let n = ((std::f32::consts::TAU * r / 3.0).ceil() as usize).max(1);
+                for k in 0..n {
+                    let a = k as f32 / n as f32 * std::f32::consts::TAU;
+                    let pos = self.ground(w.build_center[0] + a.cos() * r, w.build_center[1] + a.sin() * r);
+                    if self.site_problem(def, pos, Some(id)).is_none() {
+                        spot = Some(pos);
+                        break 'rings;
+                    }
+                }
+                r += 3.0;
+            }
+            let Some(pos) = spot else { continue };
+            if let Some(o) = self.objs.get_mut(&id) {
+                o.pos = pos;
+            }
+            // Its fire, if it burns, goes with it.
+            for f in self.objs.values_mut() {
+                if f.kind == (ObjKind::Fire { on: id }) {
+                    f.pos = pos;
+                }
+            }
+        }
     }
 
     /// The camp has what the next raid needs (standing).

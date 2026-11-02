@@ -62,3 +62,5 @@ mod tests_beta_mechanics;
 mod tests_beta;
 #[cfg(test)]
 mod tests_sim;
+#[cfg(test)]
+mod tests_camp;

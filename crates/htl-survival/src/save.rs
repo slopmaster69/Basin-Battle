@@ -464,6 +464,10 @@ impl Survival {
         };
         // What it opened stays open; what it found, found.
         s.replace_chests();
+        // The camp stands as far as it has grown; a station built where the camp stood before it
+        // moved (outside the building ground now) is carried over to it.
+        s.grow_camp(false);
+        s.resite_stations();
         s.events.clear();
         s
     }

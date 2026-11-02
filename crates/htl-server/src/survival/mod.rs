@@ -254,6 +254,8 @@ pub struct SurvivalGame {
     pub(crate) board: Option<board::Shared>,
     dirty: bool,
     saved_at: Instant,
+    /// When the pinned game clock (`[world] clock`) was last sent to everyone.
+    clock_at: Instant,
 }
 
 /// A hero's name: their save's (a character's own), else their account's (its first footman).
@@ -348,6 +350,7 @@ impl SurvivalGame {
             board: None,
             dirty: true,
             saved_at: Instant::now(),
+            clock_at: Instant::now(),
         };
         g.bind_world();
         g
@@ -363,9 +366,26 @@ impl SurvivalGame {
                 let events = self.sim.step(TICK.as_secs_f32());
                 self.play(events);
                 self.ui_flush();
+                self.hold_clock();
                 if self.dirty && self.saved_at.elapsed() >= SAVE_EVERY {
                     self.save();
         }
+    }
+
+    /// The game clock this world shows: pinned (`[world] clock`, Elwynn's night) above ground,
+    /// the time it is now below (a dungeon has its own light) and in Siege's Arathi.
+    pub(crate) fn clock(&self) -> Option<[u32; 2]> {
+        self.sim.content.world.clock.filter(|_| !self.realm.below && !self.realm.siege)
+    }
+
+    /// A pinned clock set again now and then, so it never runs on into the dawn.
+    fn hold_clock(&mut self) {
+        let Some(c) = self.clock() else { return };
+        if self.clock_at.elapsed().as_secs_f32() < self.sim.content.world.clock_every.max(10.0) {
+            return;
+        }
+        self.clock_at = Instant::now();
+        self.broadcast(&packets::login_set_time_speed_at(Some(c)));
     }
 
     pub(crate) fn save(&mut self) {
@@ -677,7 +697,7 @@ impl SurvivalGame {
         let spawn = self.spawn_point();
         self.send(conn, packets::tutorial_flags_all_seen());
         self.send(conn, packets::bindpoint(spawn, self.realm.map, self.realm.area));
-        self.send(conn, packets::login_set_time_speed());
+        self.send(conn, packets::login_set_time_speed_at(self.clock()));
         self.send(conn, packets::initial_spells(&[]));
         self.send(conn, packets::action_buttons_empty());
         self.send(conn, packets::initialize_factions_empty());

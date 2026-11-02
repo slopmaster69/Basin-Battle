@@ -8,9 +8,9 @@
 
 [dungeon]
 name = "The Deadmines"
-# The logbook lies on a lectern beside the camp's chest (Elwynn).
-book = [-9511.0, 110.0]
-book_facing = 5.5
+# The logbook lies open on a table east of the camp's fire, a brazier beside it (Elwynn).
+book = [-9624.0, 675.0]
+book_facing = 0.0
 # Raids the camp must hold before the book can be read (0: from the start).  The harder tiers
 # open by the ladder instead: see `LADDER_CLEARS` in sim/dungeon.rs.
 gate_raids = 0

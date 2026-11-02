@@ -245,7 +245,7 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     assert!(items >= 8 + 3, "worn gear and bag stacks: {items}");
     // The camp: its chest and bell; the land's creatures and timber.
     assert_eq!(objects_with(&c, 10).len(), 1, "the camp chest");
-    assert_eq!(objects_with(&c, 4571).len(), 1, "the alarm bell");
+    assert_eq!(objects_with(&c, 4052).len(), 1, "the alarm bell");
     assert!(objects_with(&c, 1248).len() >= 5, "timber");
     assert!(all.iter().filter(|(_, t, ..)| *t == ObjectType::Unit).count() >= 8, "Elwynn's creatures");
     // Templates come fresh: items, creatures, objects.
@@ -262,8 +262,9 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     // And which way north is, relative to the hero's heading (facing 0 is north).
     let north: i32 = h[39].parse().unwrap();
     assert!((-180..=180).contains(&north), "{h:?}");
-    // The corner points to the nearest place not yet found (Goldshire, next to the camp).
-    assert_eq!(h[36], "Goldshire", "{h:?}");
+    // The corner points to the nearest place not yet found (the Wolf Den, up the road from the
+    // camp at Westbrook).
+    assert_eq!(h[36], "The Wolf Den", "{h:?}");
     assert_eq!(h[1], "200");
     assert_eq!(h[3], "100");
     assert_eq!(h[5], "melee");
@@ -373,10 +374,10 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     c.chat(".es take wood 10");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tS\t"))).is_some(), "the chest's window refreshed");
 
-    // Build a cooking fire on the meadow: the menu, the ghost and its ring, then placed.
+    // Build a cooking fire in the camp's yard: the menu, the ghost and its ring, then placed.
     c.chat(".es bm");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tBM\tcooking~"))).is_some(), "the build menu");
-    let site = [-9534.0f32, 122.0, 0.0];
+    let site = [-9632.0f32, 700.0, 0.0];
     stand(&mut c, [site[0] - 4.0, site[1], 0.0], 0.0);
     c.drain(0.2);
     c.chat(".es build cooking");
@@ -445,7 +446,7 @@ fn the_world_is_kept_across_a_restart() {
         c.chat(".place");
         assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("Outside the camp's building ground"))).is_some(), "refused");
         c.chat(".cancel");
-        stand(&mut c, [-9538.0, 122.0, 0.0], 0.0);
+        stand(&mut c, [-9636.0, 700.0, 0.0], 0.0);
         c.drain(0.2);
         c.chat(".build cooking");
         c.drain(0.2);
@@ -626,8 +627,8 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     );
 
     // Ann builds the cooking fire and Ben the smithy: both see both.
-    stand(&mut a, [-9538.0, 112.0, 0.0], 0.0);
-    stand(&mut b, [-9538.0, 128.0, 0.0], 0.0);
+    stand(&mut a, [-9636.0, 700.0, 0.0], 0.0);
+    stand(&mut b, [-9618.0, 682.0, 0.0], 0.0);
     a.drain(0.2);
     a.chat(".es build cooking");
     b.chat(".es build smithy");
@@ -642,7 +643,7 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     assert_eq!(objects_with(&a, 166).len(), 1, "ann sees ben's anvil");
 
     // The bell: asked first, then warned, the road marked, and raiders come.
-    let (bell, bat) = objects_with(&a, 4571)[0];
+    let (bell, bat) = objects_with(&a, 4052)[0];
     stand(&mut a, [bat[0] + 2.0, bat[1], bat[2]], std::f32::consts::PI);
     a.drain(0.2);
     a.send(op::CMSG_GAMEOBJ_USE, &bell.to_le_bytes());
@@ -1358,7 +1359,7 @@ fn a_hero_and_the_camp_start_over_and_the_old_save_is_kept() {
     let mut c = Client::connect(server.login, "rhea", "hold", REALM).unwrap();
     enter(&mut c);
     // Something to start over from: a fire built at camp.
-    stand(&mut c, [-9538.0, 122.0, 0.0], 0.0);
+    stand(&mut c, [-9636.0, 700.0, 0.0], 0.0);
     c.drain(0.2);
     c.chat(".build cooking");
     c.drain(0.2);

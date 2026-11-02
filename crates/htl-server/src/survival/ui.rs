@@ -23,6 +23,9 @@
 //! - `KF\t<killer>\t<victim>`: the kill feed (the killer empty when nobody struck them).
 //! - `HT\t<damage>\t<light|heavy|arrow>\t<hit|block|parry|dodge|miss>`: a blow of yours landed.
 //! - `WR\t<camp|below>`: which world the hero is in (below: no building, Draughts for food).
+//! - `FG\t<r>\t<g>\t<b>\t<end yd>\t<start share>\t<weight>\t<darken>\t<secs>`: the fog to lay
+//!   over the land (`[world] fog`, `raid_fog` while a raid is called), which the add-on asks of a
+//!   client with patch 0018 (`SetWorldFog`); `FG` alone: Elwynn's own (below, in Siege).
 //! - `BK\t<open>\t<key~name~dungeon^...>\t<arena key~name~best wave>\t<siege>\t<dungeons>`: the
 //!   Smuggler's Logbook at camp, its pages (lamps below, each with its dungeon's key), the Proving
 //!   Ring's and Siege's (there from the start), then each dungeon
@@ -300,9 +303,10 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 15;
-/// 11: a borrowed clip's turns go back to rest (patch 0016), so a shield isn't left crooked.
-pub(crate) const CLIENT_NEWEST: u8 = 11;
+pub(crate) const ADDON_NEWEST: u32 = 16;
+/// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
+/// Westbrook's garrison taken out of the map for the camp (0019).
+pub(crate) const CLIENT_NEWEST: u8 = 12;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -782,6 +786,8 @@ impl SurvivalGame {
                 self.ui_line_changed(conn, "SG", sg);
             }
             self.ui_line_changed(conn, "WR", wr);
+            let fg = self.fog_line();
+            self.ui_line_changed(conn, "FG", fg);
             if meters_due {
                 self.ui_meters(conn, id);
             }
@@ -789,6 +795,22 @@ impl SurvivalGame {
             if storage && station == Some(chest) {
                 self.ui_station(conn, id, chest);
             }
+        }
+    }
+
+    /// The fog over the land as it is now (`FG`): the night's, thicker while a raid is called.
+    pub(crate) fn fog_line(&self) -> String {
+        if self.realm.below || self.realm.siege {
+            return "FG".to_string();
+        }
+        let w = &self.sim.content.world;
+        let fog = if self.sim.raid.active() { w.raid_fog.or(w.fog) } else { w.fog };
+        match fog {
+            Some(f) => format!(
+                "FG\t{:.3}\t{:.3}\t{:.3}\t{:.1}\t{:.3}\t{:.3}\t{:.3}\t{:.1}",
+                f.color[0], f.color[1], f.color[2], f.end, f.start, f.weight, f.darken, f.secs
+            ),
+            None => "FG".to_string(),
         }
     }
 

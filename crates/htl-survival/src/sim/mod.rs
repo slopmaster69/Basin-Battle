@@ -762,6 +762,9 @@ pub enum ObjKind {
     Loot { item: usize, n: u32 },
     /// Something only to be seen: a crate the book lies on.
     Prop { display: u32, scale: f32 },
+    /// A `[[prop]]`: a thing the land or the camp sets out (the camp's, as it grows), or one of
+    /// the camp's people standing at their post (`npc`: drawn as a creature, never fought).
+    Piece { def: usize },
     /// The Proving Ring's banner: the way home, and the call for the next wave.
     ArenaBanner,
     /// Siege's hall: the banner where heroes join a way to play (and the way home).
@@ -868,6 +871,8 @@ pub struct Survival {
     /// for chests filling again.
     pub(crate) unfound: BTreeSet<usize>,
     pub(crate) chests_looked: f32,
+    /// When the camp last looked at how far it has grown (`grow_camp`).
+    pub(crate) grown_at: f32,
     /// Shrines' and relics' trials under way, by chest: where it stands, who called it, when a
     /// hero was last near.
     pub(crate) trials: BTreeMap<usize, Trial>,
@@ -950,6 +955,7 @@ impl Survival {
             hazard_looks: Vec::new(),
             unfound: BTreeSet::new(),
             chests_looked: 0.0,
+            grown_at: 0.0,
             trials: BTreeMap::new(),
             beta: beta::Beta::default(),
         }
@@ -1689,8 +1695,8 @@ impl Survival {
         let o = self.objs.get(&id)?;
         let c = &self.content;
         let (display, scale, name, usable) = match &o.kind {
-            ObjKind::Storage => (10, 1.0, "Camp Storage".to_string(), true),
-            ObjKind::Alarm => (4571, 0.6, "Alarm Bell".to_string(), true),
+            ObjKind::Storage => (c.world.storage_display, c.world.storage_scale, "Camp Storage".to_string(), true),
+            ObjKind::Alarm => (c.world.alarm_display, c.world.alarm_scale, "Alarm Bell".to_string(), true),
             ObjKind::Node { def, ready, .. } => {
                 let n = &c.nodes[*def];
                 if !ready {
@@ -1709,9 +1715,13 @@ impl Survival {
                 (s.display, s.scale, format!("{} (placing)", s.name), false)
             }
             ObjKind::Fire { .. } => (397, 0.8, "Fire".to_string(), false),
-            ObjKind::Rack => (130, 1.0, "Weapon Rack".to_string(), true),
+            ObjKind::Rack => (c.world.rack_display, c.world.rack_scale, "Weapon Rack".to_string(), true),
             ObjKind::Book => (BOOK_DISPLAY, BOOK_SCALE, "The Smuggler's Logbook".to_string(), true),
             ObjKind::Prop { display, scale } => (*display, *scale, String::new(), false),
+            ObjKind::Piece { def } => {
+                let d = &c.props[*def];
+                (d.display, d.scale, d.name.clone(), false)
+            }
             ObjKind::ArenaBanner => (
                 arena::ARENA_BANNER_DISPLAY,
                 1.0,
