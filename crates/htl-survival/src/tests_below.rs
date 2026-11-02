@@ -1347,6 +1347,8 @@ fn a_first_clear_below_gifts_the_camp_turns_the_books_page_and_only_once() {
         .flatten()
         .collect();
     assert!(up.iter().any(|(k, n)| k == "cleared:deadmines" && *n == 1), "{up:?}");
+    // ...and the heroes below hear it's a first, there and then.
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { player: None, title, sub } if title.contains("Cleared") && sub.contains("first for the camp"))), "told below");
 
     // At camp: a gift in the chest, a banner, and the book points onward.
     let mut c = content();
@@ -1524,4 +1526,36 @@ fn every_dungeon_pack_is_a_foe_that_exists_and_every_dungeon_lays_out() {
         let s = Survival::new_dungeon(c.for_dungeon_of(&d.key), Box::new(FlatLand::default()), 5, 1_000_000.0);
         assert!(s.mobs.len() >= d.packs.iter().filter(|p| p.hidden <= 0.0 && p.wake.is_empty()).count() / 2, "{}: laid out", d.key);
     }
+}
+
+#[test]
+fn the_way_out_says_cleared_only_with_every_boss_down_and_counts_this_dungeons_exit() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.1);
+    // The way out open (its keeper down) but another boss still up: out, not cleared.
+    let mut c = content();
+    c.dungeon.as_mut().unwrap().packs.push(pack("warlord", "boss2", [200.0, 0.0], false));
+    let mut s2 = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id2 = s2.join("ayla", "Ayla", None);
+    s2.below.as_mut().unwrap().slain.insert("boss".into());
+    s2.move_player(id2, [120.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s2, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.starts_with("Out of"))), "out, not cleared: {:?}", ev.iter().filter(|e| matches!(e, Event::Banner { .. })).collect::<Vec<_>>());
+    let up: Vec<String> = ev.iter().filter_map(|e| if let Event::ToCamp { counts, .. } = e { Some(counts.iter().map(|c| c.0.clone()).collect::<Vec<_>>()) } else { None }).flatten().collect();
+    assert!(up.contains(&"delve:end:deadmines".to_string()) && up.contains(&"delve:end".to_string()), "{up:?}");
+    // Every boss down: cleared.
+    s.below.as_mut().unwrap().slain.insert("boss".into());
+    s.move_player(id, [120.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.ends_with("Cleared"))));
+}
+
+#[test]
+fn the_camp_hears_where_its_chests_news_comes_from() {
+    let mut camp = Survival::new(content(), Box::new(FlatLand::default()), 1, 0.0);
+    let plunder = camp.content.item("plunder").unwrap();
+    camp.from_below_at(Some("The Stockade"), &[], &BTreeMap::from([(plunder, 2)]));
+    let ev = camp.step(DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("From The Stockade"))), "{:?}", ev.iter().filter(|e| matches!(e, Event::Announce { .. })).collect::<Vec<_>>());
 }

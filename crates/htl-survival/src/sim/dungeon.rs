@@ -122,6 +122,11 @@ impl Survival {
         self.content.dungeon.as_ref()
     }
 
+    /// This world's dungeon by name (below; at camp, the book's own, the Deadmines).
+    pub fn dungeon_name(&self) -> Option<String> {
+        self.dungeon_def().map(|d| d.name.clone())
+    }
+
     fn lamp_def(&self, key: &str) -> Option<&LampDef> {
         self.dungeon_def()?.lamps.iter().find(|l| l.key == key)
     }
@@ -1056,7 +1061,7 @@ impl Survival {
         let item = self.content.item(key).ok_or("No such thing.")?;
         let plunder = self.content.item(&d.plunder).ok_or("No plunder.")?;
         if p.bag.get(&plunder).copied().unwrap_or(0) < price {
-            return Err(format!("That's {price} Defias Plunder."));
+            return Err(format!("That's {price} {}.", self.content.items[plunder].name));
         }
         if !self.bag_fits(id, &BTreeMap::from([(item, 1)])) {
             return Err("Your bags are full.".into());
@@ -1187,15 +1192,28 @@ impl Survival {
                 sub: if d.key == "deadmines" { "The front door stands open: walk out into Moonbrook".into() } else { "The way out stands open".into() },
             });
         }
-        // Every boss down in this run: the dungeon is cleared, and the camp hears of it.
+        // Every boss down in this run: the dungeon is cleared, and the camp hears of it. A first
+        // for the camp is told here too, to the heroes who did it (the gift goes in at camp).
         let bosses = super::wager::wager_bosses(&d, &self.content);
         if bosses.iter().any(|b| b == key) && bosses.iter().all(|b| self.slain(b)) {
+            let first = self.camp.counts.get(&format!("cleared:{}", d.key)).copied().unwrap_or(0) == 0;
             self.forward_count("cleared", &d.key, 1);
+            if first {
+                let gift = self.first_clear_gift(&d);
+                let sub = if gift.is_empty() { "A first for the camp".to_string() } else { format!("A first for the camp: into its chest, {}", gift.join(", ")) };
+                self.events.push(Event::Banner { player: None, title: format!("{} Cleared", d.name), sub });
+            }
         }
     }
 
     /// At camp: what was done below (the journal's counts), and trophies into the chest.
     pub fn from_below(&mut self, counts: &[(String, u32)], items: &BTreeMap<usize, u32>) {
+        self.from_below_at(None, counts, items);
+    }
+
+    /// ...from the dungeon of that name (the camp's own book is the Deadmines'; any other says
+    /// where its news comes from).
+    pub fn from_below_at(&mut self, place: Option<&str>, counts: &[(String, u32)], items: &BTreeMap<usize, u32>) {
         for (k, n) in counts {
             let first = self.camp.counts.get(k).copied().unwrap_or(0) == 0;
             *self.camp.counts.entry(k.clone()).or_default() += n;
@@ -1210,7 +1228,7 @@ impl Survival {
                 names.push(self.content.items[*i].name.clone());
             }
             self.events.push(Event::Storage);
-            let place = self.dungeon_def().map_or_else(|| "below".to_string(), |d| d.name.clone());
+            let place = place.map(str::to_string).or_else(|| self.dungeon_def().map(|d| d.name.clone())).unwrap_or_else(|| "below".to_string());
             self.announce(format!("From {place}, by the book: into the camp's chest, {}.", names.join(", ")));
         }
         self.events.push(Event::Dirty);
@@ -1232,15 +1250,19 @@ impl Survival {
         out
     }
 
+    /// What a dungeon's first clear gives the camp, as words ("2 Silver Bar").
+    pub(crate) fn first_clear_gift(&self, d: &DungeonDef) -> Vec<String> {
+        d.first_clear.iter().filter_map(|(k, n)| self.content.item(k).map(|i| format!("{n} {}", self.content.items[i].name))).collect()
+    }
+
     /// A dungeon cleared for the first time: its gift to the camp's chest, a banner for every hero
     /// at camp, and the book's next page.
     pub(crate) fn first_clear(&mut self, key: &str) {
         let Some(d) = self.content.dungeons().find(|d| d.key == key).cloned() else { return };
-        let mut gift = Vec::new();
+        let gift = self.first_clear_gift(&d);
         for (k, n) in &d.first_clear {
             if let Some(i) = self.content.item(k) {
                 *self.storage.entry(i).or_default() += n;
-                gift.push(format!("{n} {}", self.content.items[i].name));
             }
         }
         if !gift.is_empty() {
@@ -1538,12 +1560,17 @@ impl Survival {
                 })
                 .map(|(id, _)| *id)
                 .collect();
+            // (Cleared only with every boss down; the way out may open before.)
+            let bosses = super::wager::wager_bosses(&d, &self.content);
+            let cleared = bosses.iter().all(|b| self.slain(b));
             for id in out {
                 let name = self.players[&id].name.clone();
+                // Out of this dungeon (`end:<key>`), and out of any (`end`).
+                self.forward_count("delve", &format!("end:{}", d.key), 1);
                 self.forward_count("delve", "end", 1);
                 self.events.push(Event::Banner {
                     player: Some(id),
-                    title: format!("{} Cleared", d.name),
+                    title: if cleared { format!("{} Cleared", d.name) } else { format!("Out of {}", short_name(&d.name)) },
                     sub: if d.key == "deadmines" { "Out into Moonbrook, and home by the book".into() } else { "Out, and home by the book".into() },
                 });
                 if d.key == "deadmines" {

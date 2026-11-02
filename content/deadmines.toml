@@ -2043,7 +2043,8 @@ reward = { bronze = 6, leather = 4 }
 title = "Out into Moonbrook"
 text = "With Rhahk'Zor down the front door stands open. Walk out of the Deadmines."
 kind = "delve"
-what = "end"
+# (Out of the Deadmines: `end` alone is any dungeon's way out.)
+what = "end:deadmines"
 reward = { roast = 4, linen = 4 }
 
 # === secrets, rares and the Brotherhood's other hands ===============================================
