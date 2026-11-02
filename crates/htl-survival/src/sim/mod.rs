@@ -268,6 +268,8 @@ pub enum Event {
     Channel { caster: Id, target: Option<Id>, spell: u32, ms: u32 },
     /// A hero healed by this much (a green number).
     Healed { id: Id, amount: u32 },
+    /// `healer` mended another hero, `target`, by `amount` (shown to the healer).
+    HealedOther { healer: Id, target: Id, amount: u32 },
     /// A unit says something (`SoundEntries.dbc`): a creature's voice.
     Sound { id: Id, sound: u32 },
     /// How the Proving Ring stands changed for a hero (in it, or just out of it).
