@@ -168,6 +168,9 @@ impl Survival {
     /// Heal a hero, counting it on `healer`'s meter as `label`.
     pub(crate) fn heal_hero_by(&mut self, id: Id, amount: u32, healer: Id, label: &str) {
         let healed = self.heal_hero(id, amount);
+        if healed > 0 && healer != id && self.players.contains_key(&healer) {
+            self.events.push(super::Event::HealedOther { healer, target: id, amount: healed });
+        }
         self.meter_healed(healer, id, healed, label);
     }
 

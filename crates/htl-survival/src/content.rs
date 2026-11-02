@@ -327,6 +327,9 @@ pub struct CombatDef {
     pub recovery_stagger: bool,
     /// Blows in a creature's recovery count this many times towards breaking its posture.
     pub recovery_posture: f32,
+    /// Every boss is drawn (and struck) this much larger than its own scale: bigger than life,
+    /// to loom, and so its blows read from farther off.
+    pub boss_scale: f32,
     /// A bash or a kick knocks a boss's blow aside, not only its cast.
     pub shove_bosses: bool,
 }
@@ -357,6 +360,7 @@ impl Default for CombatDef {
             boss_knock_aside: true,
             recovery_stagger: false,
             recovery_posture: 1.0,
+            boss_scale: 1.0,
             shove_bosses: true,
         }
     }
@@ -2364,7 +2368,11 @@ impl Content {
     /// Put what's read in the order it's played: each creature's phases, its enrage among them,
     /// highest share of health first.
     fn settle(&mut self) {
+        let grow = self.combat.boss_scale.max(0.1);
         for m in &mut self.mobs {
+            if m.boss {
+                m.scale *= grow;
+            }
             if let Some(e) = m.enrage.clone() {
                 if !m.phases.iter().any(|p| p.at == e.at) {
                     m.phases.push(e);

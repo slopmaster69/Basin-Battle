@@ -755,6 +755,13 @@ impl SurvivalGame {
             Event::Healed { id, amount } => {
                 *self.healed.entry(id).or_default() += amount;
             }
+            Event::HealedOther { healer, target, amount } => {
+                // `HO\t<name>\t<amount>`: the healer sees what they mended on a friend.
+                let name = self.sim.players.get(&target).map(|p| p.name.clone()).unwrap_or_default();
+                if let Some(c) = self.conn_of(healer).filter(|c| self.has_addon(*c)) {
+                    self.ui_line(c, &format!("HO\t{name}\t{amount}"));
+                }
+            }
             Event::Log(text) => println!("[survival] {text}"),
             Event::Dirty => self.mark_dirty(),
         }
