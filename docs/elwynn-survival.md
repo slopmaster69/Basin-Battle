@@ -983,6 +983,12 @@ during a wager. Friends join it by taking the same level from the book while it 
   or `wager_minutes` in its file: the Deadmines 35:00, the Stockade and Ragefire 27:30, ..., the
   Library and the Cathedral 20:00. First guesses: tune them from the board.
 
+**The Bookmaker's chest.** Each week, the camp's best wager won in time pays a chest when the
+week turns (Monday): that dungeon's own gear into the camp's chest, one piece and one more every
+four levels (up to four), the finer pieces (a perk, a set's) from +3, honed as a wager of that
+level pays (Honed from +4, Keen from +8, Peerless from +12). The week's news says the camp's best
+so far.
+
 **The week's news.** The first time a hero comes in each week (once the camp has the book), a page
 says the week's three terms and last week's three best runs on the board; `.es news` shows it again.
 

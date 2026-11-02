@@ -1020,6 +1020,7 @@ impl Survival {
             self.step_arena(dt);
             self.step_explore();
             self.step_goals();
+            self.step_weekly_chest();
         }
         self.record_trails();
         std::mem::take(&mut self.events)

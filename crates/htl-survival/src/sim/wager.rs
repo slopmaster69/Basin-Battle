@@ -31,6 +31,12 @@ pub const WAGER_MAX: u32 = 20;
 /// What each level adds to the foes (compounding): health, and the weight of their blows.
 pub const WAGER_HEALTH: f32 = 0.09;
 pub const WAGER_DAMAGE: f32 = 0.06;
+/// The Bookmaker's weekly chest: for the camp's best wager won in time each week, this many
+/// pieces of that dungeon's gear, one more every [`CHEST_LEVELS`] levels (up to [`CHEST_MOST`]),
+/// honed as a wager of that level pays ([`crate::content::hone_tier`]). (First guesses.)
+pub const CHEST_LEVELS: u32 = 4;
+pub const CHEST_MOST: u32 = 4;
+
 /// What a fall costs on the clock (seconds).
 pub const WAGER_DEATH: f32 = 10.0;
 /// The share of a dungeon's foes (those standing from the start, bosses aside) a run must fell.
@@ -704,6 +710,11 @@ impl Survival {
         } else {
             1
         };
+        // A timed win counts toward the week's chest (at camp: the week's best pays when it turns).
+        if timed {
+            let week = week_of(self.wall());
+            self.forward_count("wagerweek", &format!("{week}:{}:{}", d.key, w.level), 1);
+        }
         let had = self.wager_unlocked(&d.key);
         let reach = (w.level + steps).min(WAGER_MAX);
         let up = reach.saturating_sub(had);
@@ -803,6 +814,92 @@ impl Survival {
             self.announce(format!("The Bookmaker's gear goes to the camp's chest: {}.", names.join(", ")));
             self.events.push(Event::ToCamp { counts: Vec::new(), items: won });
         }
+    }
+
+    /// At camp: a week gone by whose best wager hasn't paid yet pays its chest now, into the
+    /// camp's chest: the dungeon's own gear, more and finer the higher the level.
+    pub(crate) fn step_weekly_chest(&mut self) {
+        if self.is_below() || self.is_siege() {
+            return;
+        }
+        let now = week_of(self.wall());
+        // Each past week's best: (week, level, dungeon), from the wins counted.
+        let mut best: BTreeMap<u64, (u32, String)> = BTreeMap::new();
+        for k in self.camp.counts.keys() {
+            let Some(rest) = k.strip_prefix("wagerweek:") else { continue };
+            let mut it = rest.splitn(3, ':');
+            let (Some(week), Some(dungeon), Some(level)) = (it.next().and_then(|w| w.parse::<u64>().ok()), it.next(), it.next().and_then(|l| l.parse::<u32>().ok())) else { continue };
+            if week >= now || self.camp.counts.contains_key(&format!("weekchest:{week}")) {
+                continue;
+            }
+            let e = best.entry(week).or_insert((0, String::new()));
+            if level > e.0 {
+                *e = (level, dungeon.to_string());
+            }
+        }
+        for (week, (level, dungeon)) in best {
+            self.camp.counts.insert(format!("weekchest:{week}"), level);
+            let Some(d) = self.content.dungeons().find(|d| d.key == dungeon).cloned() else { continue };
+            let won = self.weekly_chest(&d, level);
+            if won.is_empty() {
+                continue;
+            }
+            let mut names = Vec::new();
+            for (i, n) in &won {
+                *self.storage.entry(*i).or_default() += n;
+                names.push(self.content.items[*i].name.clone());
+            }
+            self.events.push(Event::Storage);
+            self.events.push(Event::Banner { player: None, title: "The Bookmaker's Chest".into(), sub: format!("For last week's best, +{level} in {}: into the camp's chest", d.name) });
+            self.announce(format!("The Bookmaker's chest, for the week's best wager (+{level} in {}): {}.", d.name, names.join(", ")));
+            self.events.push(Event::Dirty);
+        }
+    }
+
+    /// The chest for a week's best at `level` in `d`: its gear, the finer pieces (a perk, a set's)
+    /// from +3, honed as that level's wager pays.
+    pub(crate) fn weekly_chest(&mut self, d: &DungeonDef, level: u32) -> BTreeMap<usize, u32> {
+        let mut pool: Vec<usize> = Vec::new();
+        for p in &d.packs {
+            if let Some(m) = self.content.mob(&p.mob) {
+                for g in &self.content.mobs[m].gear {
+                    if let Some(i) = self.content.item(g) {
+                        if !pool.contains(&i) {
+                            pool.push(i);
+                        }
+                    }
+                }
+            }
+        }
+        let fine = |c: &crate::content::Content, i: usize| !c.items[i].perks.is_empty() || !c.items[i].set.is_empty();
+        let better: Vec<usize> = pool.iter().copied().filter(|i| fine(&self.content, *i)).collect();
+        let from = if level >= 3 && !better.is_empty() { better } else { pool };
+        let mut won: BTreeMap<usize, u32> = BTreeMap::new();
+        if from.is_empty() {
+            return won;
+        }
+        let tier = crate::content::hone_tier(level);
+        let n = (1 + level / CHEST_LEVELS).min(CHEST_MOST);
+        for _ in 0..n {
+            let i = from[self.rng.gen_range(0..from.len())];
+            *won.entry(self.content.honed(i, tier)).or_default() += 1;
+        }
+        won
+    }
+
+    /// The camp's best wager won in time this week: (level, dungeon), if any.
+    pub fn week_best_here(&self) -> Option<(u32, String)> {
+        let now = week_of(self.wall());
+        self.camp
+            .counts
+            .keys()
+            .filter_map(|k| {
+                let rest = k.strip_prefix("wagerweek:")?;
+                let mut it = rest.splitn(3, ':');
+                let (week, dungeon, level) = (it.next()?.parse::<u64>().ok()?, it.next()?, it.next()?.parse::<u32>().ok()?);
+                (week == now).then(|| (level, dungeon.to_string()))
+            })
+            .max()
     }
 
     /// The wager over (won, lost or left): the dungeon as it was before it.
