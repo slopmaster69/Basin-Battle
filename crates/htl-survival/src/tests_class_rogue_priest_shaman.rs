@@ -232,6 +232,29 @@ fn smoke_bomb_hides_you_and_friends_in_it_slows_foes_and_hides_you_again_after_a
 }
 
 #[test]
+fn a_boss_sees_through_smoke_and_vanish_and_keeps_fighting() {
+    // A veil drops an ordinary creature's attention, but a champion in its fight keeps it: hiding
+    // never resets a boss (nor empties its fight).
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let def = s.content.mobs.iter().position(|m| m.boss && !m.inert()).expect("a boss");
+    let boss = s.spawn_mob(def, [5.0, 0.0, 0.0], None, false);
+    let hunter = grunt(&mut s, [0.0, 5.0, 0.0]);
+    s.engage(boss, Foe::Hero(p));
+    s.engage(hunter, Foe::Hero(p));
+    cast(&mut s, p, "smoke_bomb", false);
+    assert!(s.has_cc(p, "veil"), "hidden");
+    assert_ne!(s.mobs[&hunter].state.foe(), Some(Foe::Hero(p)), "the grunt lost her");
+    assert_eq!(s.mobs[&boss].state.foe(), Some(Foe::Hero(p)), "the boss did not");
+    // Nor does it lose her when it looks for whom to fight.
+    for _ in 0..20 {
+        s.step(DT);
+    }
+    assert!(s.mobs[&boss].state.foe() == Some(Foe::Hero(p)), "still after her: {:?}", s.mobs[&boss].state);
+    assert!(!matches!(s.mobs[&boss].state, MobState::Idle { .. } | MobState::Return), "no reset");
+}
+
+#[test]
 fn an_old_save_with_the_rogues_old_cards_loads_with_their_successors() {
     let mut s = world(false);
     s.content.dev.full_tree = false;

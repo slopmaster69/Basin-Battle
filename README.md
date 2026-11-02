@@ -165,30 +165,75 @@ address. Nothing to install or build. The zip contains no WoW files: each friend
   the bar, toggles that; without the add-on they always fire on their own). Right-click enemies to
   auto-attack as well. Mages, Priests and Hunters attack from range; Warriors build rage by
   fighting and spend it on their strikes.
-- **Spells and upgrades:** every level a window offers three cards: a new
-  spell of your class (up to six), or an **upgrade** for one you hold. Each spell has its own
-  upgrades, up to four, and each changes how it plays rather than just adding damage: Frostbolt
-  can freeze, Frost Nova can make the next Fire Blast hit frozen enemies harder, Rend can spread
-  when its target dies, Hunter's Mark can jump to a new target. Spells work together: Scorch makes
-  enemies weaker to fire, Shadow Word: Pain sets up Mind Blast, Serpent Sting sets up Arcane Shot,
-  Rend sets up Heroic Strike. Hover a card to see what it does now and after. Closed the window? Type `.cards`.
-- **Talents:** every other level-up offer includes a talent card at full rank, so you won't
-  have them all: choose. Press N (or the Talents button above the bar) to see what you hold in
-  your three trees, with the game's own artwork: Arcane, Fire and Frost; Arms, Fury and
-  Protection; Discipline, Holy and Shadow; Beast Mastery, Marksmanship and Survival. Talents reshape your
-  spells (Shatter makes frozen enemies take critical hits, Ignite makes fire crits burn, Deep
-  Wounds makes warrior crits bleed) and some teach new spells, which take one of your six keys (Presence of Mind,
-  Combustion, Mortal Strike, Shield Slam, Shadowform, Bestial Wrath...). A talent that only
-  reshapes a spell is offered only while you hold that spell (no Thunder Clap talents without
-  Thunder Clap), and **combinations** open when you hold two spells that go together: Whirlwind
-  and Rend make Rending Whirl (Whirlwind bleeds), Frostbolt and Fireball make Frostfire, Mind
-  Blast and Shadow Word: Pain make Mind Spike, Arcane Shot and Serpent Sting make Venom Shot, and
-  more: six for each class, in the fourth column of the trees.
-- **Warrior weapon paths:** three points into a tree opens its path, and a warrior takes one a
-  run. **Path of the Shieldbearer** (Protection) trades the greatsword for a one-handed sword
-  and a shield: tougher, and a chance to block. **Path of the Berserker** (Fury) for a sword and
-  an axe: faster, with extra swings. **Path of the Greatsword** (Arms) keeps it in both hands
-  for bigger crits. The weapons that drop afterwards follow your path.
+- **Spells, upgrades and talents:** every level a window offers three cards: a new spell of your
+  class (up to six), an **upgrade** for one you hold, a **class talent**, a **combination** (two
+  spells you hold that go together) or, now and then, a **path**. Every class levels the same
+  way: each spell has its own deck of about 15 upgrades and takes 10 of them in a run, and its
+  last card is an **Epic** that waits for 5 of them. Rarity means something: Common cards are
+  numbers, Uncommon change how you play, Rare light a key, reset or cast, Epic are capstones,
+  Legendary the paths. Press N for **Your Build**. Hover a card to see what it does now and
+  after. Closed the window? Type `.cards`. Every card of every class is listed in `docs/`
+  (warrior-cards.md, mage-cards.md, priest-cards.md, hunter-cards.md); each class's `-roles.md` says what every spell is for.
+- **The Warrior:** all
+  Warrior skills are cards, and each skill has its own deck of about 16 upgrades of which it
+  takes 10 in a run: chunky rank-ups, **choices** that close each other, follow-ups that open
+  after their first step, upgrades that change how the skill plays, and an **Epic** capstone
+  that comes only after 5 of its upgrades (Bladestorm, Spellbreaker, Avatar of Vengeance,
+  Rage Unbound...). Some light up a key: the skill is ready at once and its next cast is
+  empowered; the key pulses gold until you press it. When a card's effect goes off in a big way
+  its name pops over the bar. **Class talents** come whatever you hold, and **combinations**
+  come only while you hold both of their skills (Charge lands with a free Thunder Clap: 45 of
+  them). **Rarity means something:** Common cards are numbers, Uncommon change how you play,
+  Rare light a key, reset or cast, Epic are capstones; better cards get likelier as you level,
+  Rare and Epic cards glow and chime, and 6 offers without a Rare guarantee one. Press N for
+  **Your Build**. Every card is listed in [docs/warrior-cards.md](docs/warrior-cards.md)
+  (written from the game's files by `tools/card_catalog.py`).
+- **Every Warrior skill has one job, and the world asks for it** ([docs/warrior-roles.md](docs/warrior-roles.md)):
+  elites shrug off 10% of every physical blow and bosses 20% until **Sunder Armor** strips it
+  (for the whole team); **Thunder Clap** makes a pack attack 30% slower; **Hamstring** cripples
+  one enemy (it must fight you, can't run to the Ancient, and takes 20% more from everyone);
+  **Mortal Strike** wounds (no healing for 10 sec); **Heroic Strike** is off the global cooldown
+  and feeds on rage; **Execute** spends your spare rage; **Death Wish** is as in WoW (more
+  damage dealt, and taken).
+- **Enemy casts to break:** Bonecasters cast Soul Bolt, Dark Menders cast Dark Mending (heals
+  their pack), and every boss casts Dark Ritual. They come with a cast bar and a warning. A
+  warrior with **Shield Slam** (the interrupt) sees every breakable cast in reach: the bar
+  pulses **INTERRUPT!** and the Shield Slam key lights up; the slam breaks the cast
+  (**INTERRUPTED**) and the caster reels. Players without an interrupt see only the casts aimed
+  at them.
+- **Warrior weapon paths:** one a run, as a level-up card that comes at random. **Path of the
+  Shieldbearer** trades the greatsword for a one-handed sword and a shield (tougher, blocks),
+  **Path of the Berserker** for a sword and an axe (faster, extra swings), **Path of the
+  Greatsword** keeps it in both hands (bigger crits). A path teaches nothing by itself: it opens
+  its two skills to the skill cards (Shield Slam and Shield Wall; Bloodthirst and Death Wish;
+  Mortal Strike and Sweeping Strikes; only that path ever sees them, and they get keys of their
+  own so a full bar never shuts them out) and its own deck of path cards, with an Epic after 4.
+  The weapons that drop afterwards follow your path.
+- **The Mage levels the same way now** ([docs/mage-roles.md](docs/mage-roles.md), every card in
+  [docs/mage-cards.md](docs/mage-cards.md)): every spell is a card with its own deck and an Epic,
+  and every spell has one job (Frostbolt chills, Arcane Missiles melts elites, Frost Nova is your
+  escape, Fire Blast shatters the Frozen, Scorch leaves Fire Vulnerability, Blizzard holds a lane,
+  Cone of Cold peels...). New: **Counterspell**, the Mage's interrupt (no path needed). A
+  **Specialization** (Fire, Frost or Arcane) comes at random as a Legendary card and opens its
+  spells (Pyroblast and Combustion, Ice Barrier and Cold Snap, Arcane Power and Presence of Mind)
+  and its own path cards. Some lit keys make the next cast instant (Brain Freeze, Hot Streak).
+- **The Priest levels the same way now** ([docs/priest-roles.md](docs/priest-roles.md), every card in
+  [docs/priest-cards.md](docs/priest-cards.md)): Smite's damage mends the most hurt ally near you
+  (Atonement), Shadow Word: Pain spreads, Mind Blast bursts, Holy Nova heals and hurts all around
+  you, Power Word: Shield, Renew, Flash Heal and Prayer of Healing keep the team up, Psychic Scream
+  scatters, Devouring Plague drains. A **Specialization** comes at random as a Legendary card:
+  Holy (Lightwell and Greater Heal), Discipline (Power Infusion and Inner Focus) or Shadow
+  (**Silence**, the Priest's interrupt, and Vampiric Embrace, shadow that heals the team).
+- **The Hunter levels the same way now** ([docs/hunter-roles.md](docs/hunter-roles.md), every card in
+  [docs/hunter-cards.md](docs/hunter-cards.md)): Arcane Shot is the shot on the run, Serpent Sting
+  the poison, Claw your wolf's strike, Multi-Shot the spread, Concussive Shot the slow, Hunter's
+  Mark the team's call (the marked takes more from everyone), Volley the rain, the two traps the
+  ambush and the lockdown, Furious Howl the rally, Feign Death the escape, Scatter Shot the peel.
+  A **Specialization** comes at random as a Legendary card: Beast Mastery (Bestial Wrath and
+  Intimidation), Marksmanship (Aimed Shot and Rapid Fire) or Survival (Wyvern Sting and
+  Deterrence).
+- **Legendary cards** (the weapon paths and specializations, Escalation picks) stand in a turning
+  sunburst, land last with a flash and glow brighter than the rest.
 - **Shoulder to Shoulder:** heroes within 12 yards of each other deal 10% more damage and take
   10% less (the crown on your buff bar). Hold a bridge together, but spread out of marked ground.
 - **Pets:** Hunters fight with a wolf that holds enemies' attention and comes back after it falls.

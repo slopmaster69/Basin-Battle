@@ -32,6 +32,10 @@ impl Survival {
     }
 
     /// What a hero's done to this creature lately (a share of its health).
+    pub(crate) fn threat_on(&self, m: &Mob, hero: Id) -> f32 {
+        self.threat_of(m, hero)
+    }
+
     fn threat_of(&self, m: &Mob, hero: Id) -> f32 {
         let half = self.content.ai.threat_half.max(0.1);
         m.threat.iter().find(|t| t.0 == hero).map_or(0.0, |t| t.1 * 0.5f32.powf((self.clock - t.2) / half))
@@ -92,7 +96,7 @@ impl Survival {
         let m = &self.mobs[&id];
         let mut best: Option<(Id, f32)> = None;
         for (h, p) in &self.players {
-            if p.health == 0 || self.unseen(*h) {
+            if p.health == 0 || self.unseen_by(id, *h) {
                 continue;
             }
             let d = dist2d(p.pos, pos);

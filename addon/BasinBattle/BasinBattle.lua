@@ -36,6 +36,7 @@ local SOUND = {
   open = "Sound\\Interface\\iQuestActivate.wav",
   level = "Sound\\Interface\\LevelUp.wav",
   epic = "Sound\\Interface\\iQuestComplete.wav",
+  rare = "Sound\\Interface\\MapPing.wav",
   hover = "Sound\\Interface\\uChatScrollButton.wav",
   pick = "Sound\\Interface\\iQuestComplete.wav",
   reroll = "Sound\\Interface\\iAbilitiesTurnPageA.wav",
@@ -343,6 +344,12 @@ local function MakeCard(i)
     return t
   end
 
+  -- A Legendary card (a weapon path, an Escalation's pick) stands in its own turning sunburst.
+  holder.rays = Tex(holder, "BACKGROUND", "rays", 560, 560)
+  holder.rays:SetPoint("CENTER", holder, "CENTER", 0, 0)
+  holder.rays:SetBlendMode("ADD")
+  holder.rays:SetVertexColor(1.0, 0.55, 0.1, 0.9)
+  holder.rays:Hide()
   holder.glow = Layer(holder, "BACKGROUND", "cardglow")
   holder.glow:SetBlendMode("ADD")
 
@@ -572,6 +579,7 @@ BB.picking = false
 function BB.CardHover(c, on)
   local h = c.holder
   local col = c.color or RARITY[0]
+  h.hovered = on
   if on then
     Play("hover")
     c.border:SetVertexColor(col.r, col.g, col.b, 1)
@@ -652,11 +660,20 @@ local CATEGORIES = {
   upgrade = { key = "upgrade", label = "UPGRADE", sub = "", r = 0.35, g = 0.85, b = 1 },
   talent = { key = "talent", label = "TALENT", sub = "", r = 0.78, g = 0.58, b = 1 },
   legendary = { key = "legendary", label = "LEGENDARY", sub = "A power of its own", r = 1, g = 0.5, b = 0.15 },
+  -- Classes whose talents come with their skills: class talents, combinations, weapon paths.
+  classtalent = { key = "classtalent", label = "CLASS TALENT", sub = "", r = 0.78, g = 0.58, b = 1 },
+  combo = { key = "combo", label = "COMBINATION", sub = "", r = 0.35, g = 1, b = 0.6 },
+  path = { key = "path", label = "WEAPON PATH", sub = "", r = 1, g = 0.6, b = 0.3 },
+  pathcard = { key = "pathcard", label = "PATH CARD", sub = "", r = 1, g = 0.75, b = 0.4 },
 }
 function BB.CardCategory(card)
   if card.slot == "Legendary" then return CATEGORIES.legendary end
   if card.kind == "Upgrade" then return CATEGORIES.upgrade end
   if card.kind == "Talent" then return CATEGORIES.talent end
+  if card.kind == "Class Talent" then return CATEGORIES.classtalent end
+  if card.kind == "Combination" then return CATEGORIES.combo end
+  if card.kind == "Weapon Path" or card.kind == "Specialization" then return CATEGORIES.path end
+  if card.kind == "Path Card" then return CATEGORIES.pathcard end
   return CATEGORIES.spell
 end
 
@@ -666,6 +683,9 @@ local function FillCard(holder, card)
   local col = RARITY[card.rarity] or RARITY[0]
   c.color = col
   holder.glowBase = 0.25 + 0.12 * card.rarity
+  holder.legendary = card.rarity >= 4
+  if holder.legendary then holder.rays:Show() else holder.rays:Hide() end
+  c.flash:SetVertexColor(1, 1, 1)
   holder.glow:SetVertexColor(col.r, col.g, col.b, holder.glowBase)
   c.wash:SetVertexColor(col.r, col.g, col.b, 0.32 + 0.06 * card.rarity)
   c.border:SetVertexColor(col.r, col.g, col.b, 0.8)
@@ -682,8 +702,11 @@ local function FillCard(holder, card)
   local cat = BB.CardCategory(card)
   c.band:SetVertexColor(cat.r, cat.g, cat.b, 0.38)
   c.ribbon:SetVertexColor(cat.r, cat.g, cat.b, 1)
-  c.ribbonText:SetText(cat.label)
-  c.ribbon:SetWidth(string.len(cat.label) * 7 + 26)
+  local ribbon = cat.label
+  -- A path's ribbon names what the class calls it (WEAPON PATH, SPECIALIZATION).
+  if cat.key == "path" and card.kind and card.kind ~= "" then ribbon = string.upper(card.kind) end
+  c.ribbonText:SetText(ribbon)
+  c.ribbon:SetWidth(string.len(ribbon) * 7 + 26)
   c.iconRing:Hide()
   c.iconFrame:Show()
   c.plusBack:Hide()
@@ -709,6 +732,19 @@ local function FillCard(holder, card)
     c.iconFrame:Hide()
     c.iconRing:SetVertexColor(cat.r, cat.g, cat.b, 1)
     c.iconRing:Show()
+  elseif cat.key == "classtalent" or cat.key == "combo" or cat.key == "path" or cat.key == "pathcard" then
+    -- "Combination · Whirlwind + Rend", "Warrior Talent · rank 2 of 3", "Weapon Path · one a run".
+    c.sub:SetText(card.slot or "")
+    c.sub:SetTextColor(cat.r, cat.g, cat.b)
+    c.iconFrame:Hide()
+    c.iconRing:SetVertexColor(cat.r, cat.g, cat.b, 1)
+    c.iconRing:Show()
+    if cat.key == "classtalent" and card.maxRank > 1 then
+      c.tag:Show()
+      c.tag:SetVertexColor(cat.r, cat.g, cat.b, 1)
+      c.tagText:SetText("RANK " .. card.rank)
+      c.tag:SetWidth(62)
+    end
   elseif card.rank > 1 then
     c.sub:SetText("Rank " .. (card.rank - 1) .. "  >  " .. card.rank .. "  of " .. card.maxRank)
     c.sub:SetTextColor(0.62, 0.6, 0.56)
@@ -730,14 +766,15 @@ local function FillCard(holder, card)
     c.upgrade:Hide()
   end
   local foot = card.kind
-  if cat.key == "talent" then foot = "Always on" end
+  if cat.key == "talent" or cat.key == "classtalent" or cat.key == "combo" then foot = "Always on" end
+  if cat.key == "path" or cat.key == "pathcard" then foot = "Lasts the run" end
   if cat.key == "talent" and card.slot and string.find(card.slot, "spell slot") then foot = "Spell" end
-  if card.tags ~= "" and cat.key ~= "talent" then foot = foot .. "  ·  " .. card.tags end
+  if card.tags ~= "" and cat.key ~= "talent" and cat.key ~= "combo" then foot = foot .. "  ·  " .. card.tags end
   if card.school ~= "" and card.school ~= card.tags then foot = foot .. "  ·  " .. card.school end
   if card.cooldown ~= "" and card.cooldown ~= "0" then foot = foot .. "  ·  every " .. card.cooldown .. " sec" end
   c.foot:SetText(foot)
   local slotLine = card.slot or ""
-  if cat.key == "upgrade" then slotLine = "" end
+  if cat.key == "upgrade" or cat.key == "classtalent" or cat.key == "combo" or cat.key == "path" or cat.key == "pathcard" then slotLine = "" end
   if cat.key == "talent" then
     -- "Talent · Arcane tree · takes a spell slot 5/6": only the slot part.
     local _, _, n = string.find(slotLine, "(takes a spell slot.*)$")
@@ -806,6 +843,21 @@ function BB.ShowOffer(o)
       local delay = 0.1 + (i - 1) * 0.07
       if not was then delay = delay + 0.12 end
       local idx = i
+      if h.legendary then
+        -- A Legendary lands last and big: it drops in, flashes white-gold and settles.
+        delay = delay + 0.25
+        Tween(0.55, delay, OutBack, function(t)
+          local hh = picker.cards[idx]
+          hh:SetAlpha(math.min(1, t * 2))
+          hh.card:SetScale(1.35 - 0.3 * t)
+          hh.card:ClearAllPoints()
+          hh.card:SetPoint("CENTER", hh, "CENTER", 0, 0)
+        end, function()
+          local hh = picker.cards[idx]
+          hh.card.flash:SetVertexColor(1, 0.75, 0.3)
+          Tween(0.6, 0, OutCubic, function(t) hh.card.flash:SetAlpha(0.9 * (1 - t)) end, nil, "lflash" .. idx)
+        end, "card" .. idx)
+      else
       Tween(0.34, delay, OutBack, function(t)
         local hh = picker.cards[idx]
         hh:SetAlpha(math.min(1, t * 1.6))
@@ -813,6 +865,7 @@ function BB.ShowOffer(o)
         hh.card:ClearAllPoints()
         hh.card:SetPoint("CENTER", hh, "CENTER", 0, -36 * (1 - t))
       end, nil, "card" .. idx)
+      end
     else
       h:Hide()
       h.wantBanish = false
@@ -844,10 +897,13 @@ function BB.ShowOffer(o)
     end
     if o.kind == "level" then
       Play("level")
+      -- A Rare or Epic in the offer chimes as well.
+      if best >= 3 then Play("epic") elseif best == 2 then Play("rare") end
     elseif best >= 3 or o.kind == "legendary" then
       Play("epic")
     else
       Play("open")
+      if best == 2 then Play("rare") end
     end
   end
   BB.UpdatePending()
@@ -949,9 +1005,16 @@ picker:SetScript("OnUpdate", function()
     for i = 1, o.n do
       local h = picker.cards[i]
       local card = o.cards[i]
-      if card and card.rarity >= 2 and not h.card.hover then
+      if card and card.rarity >= 4 then
+        SetRotation(h.rays, now * 0.35 + i)
+        h.rays:SetAlpha(0.65 + 0.35 * math.sin(now * 2.2 + i))
+      end
+      if card and card.rarity >= 2 and not h.hovered then
         local col = RARITY[card.rarity]
-        local a = (h.glowBase or 0.35) + 0.25 * (0.5 + 0.5 * math.sin(now * 2.6 + i))
+        -- An Epic swells faster and brighter than a Rare.
+        local epic = card.rarity >= 3
+        local a = (h.glowBase or 0.35) + (epic and 0.45 or 0.28) * (0.5 + 0.5 * math.sin(now * (epic and 4.2 or 2.6) + i))
+        if card.rarity >= 4 then a = 0.8 + 0.2 * math.sin(now * 3 + i) end
         h.glow:SetVertexColor(col.r, col.g, col.b, a)
       end
     end
@@ -1745,14 +1808,48 @@ castbar.bar:SetStatusBarTexture(ART .. "bar")
 castbar.bar:SetMinMaxValues(0, 1)
 castbar.text = Text(castbar, FONT_BODY, 13, "OUTLINE")
 castbar.text:SetPoint("BOTTOM", castbar.back, "TOP", 0, 2)
+-- "INTERRUPT!" under the bar, for whoever holds an interrupt that reaches the caster.
+castbar.cue = Text(castbar, FONT_TITLE, 22, "OUTLINE")
+castbar.cue:SetPoint("TOP", castbar.back, "BOTTOM", 0, -4)
+castbar.cue:SetTextColor(0.45, 0.8, 1)
+castbar.glow = Tex(castbar, "BACKGROUND", "glow", 420, 90)
+castbar.glow:SetPoint("CENTER", castbar.back, "CENTER", 0, 0)
+castbar.glow:SetBlendMode("ADD")
+castbar.glow:SetVertexColor(0.3, 0.7, 1, 0)
 castbar:SetScript("OnUpdate", function()
+  if this.brokenAt then
+    -- Interrupted: the bar holds a moment, cracked, then goes.
+    if GetTime() - this.brokenAt > 0.9 then
+      this.brokenAt = nil
+      this:Hide()
+    end
+    return
+  end
   local left = this.ends - GetTime()
   if left <= 0 then
     this:Hide()
     return
   end
   this.bar:SetValue(1 - left / this.total)
+  if this.canInterrupt then
+    local a = 0.55 + 0.45 * math.sin(GetTime() * 10)
+    this.glow:SetVertexColor(0.3, 0.7, 1, 0.5 * a)
+    this.cue:SetAlpha(a)
+  end
 end)
+
+-- A cast was broken: the bar flashes INTERRUPTED and goes.
+function BB.CastBroken()
+  if not castbar:IsShown() then return end
+  castbar.canInterrupt = false
+  castbar.bar:SetStatusBarColor(0.5, 0.5, 0.5)
+  castbar.cue:SetText("INTERRUPTED")
+  castbar.cue:SetTextColor(1, 1, 1)
+  castbar.cue:SetAlpha(1)
+  castbar.glow:SetVertexColor(1, 1, 1, 0.4)
+  castbar.brokenAt = GetTime()
+  Play("hover")
+end
 
 -- Your own cast bar, for shots the game draws none for (Aimed Shot): in the stock bar's place.
 local mycast = CreateFrame("Frame", "BasinBattleMyCast", UIParent)
@@ -1797,18 +1894,31 @@ end
 
 -- Enemy casts: the marks on the ground and the caster's own spell say where to step, so there
 -- is no warning text. Bosses and elites get a cast bar (red when it's coming for you).
-function BB.EnemyCast(who, name, ms, danger, warn, boss)
-  if not boss then
+function BB.EnemyCast(who, name, ms, danger, warn, boss, canInterrupt)
+  -- Bosses and elites always get the bar; an ordinary caster's spell only when it's aimed at
+  -- you or you can break it (the server sends nothing otherwise).
+  if not boss and not danger and not canInterrupt then
     return
   end
   local secs = (tonumber(ms) or 2000) / 1000
+  castbar.brokenAt = nil
   castbar.total = secs
   castbar.ends = GetTime() + secs
   castbar.text:SetText(who .. ":  |cffffffff" .. name .. "|r")
-  if danger then
-    castbar.bar:SetStatusBarColor(1, 0.25, 0.15)
+  castbar.canInterrupt = canInterrupt
+  if canInterrupt then
+    castbar.bar:SetStatusBarColor(0.35, 0.7, 1)
+    castbar.cue:SetText("INTERRUPT!")
+    castbar.cue:SetTextColor(0.45, 0.8, 1)
+    Play("hover")
   else
-    castbar.bar:SetStatusBarColor(1, 0.7, 0.2)
+    castbar.cue:SetText("")
+    castbar.glow:SetVertexColor(0.3, 0.7, 1, 0)
+    if danger then
+      castbar.bar:SetStatusBarColor(1, 0.25, 0.15)
+    else
+      castbar.bar:SetStatusBarColor(1, 0.7, 0.2)
+    end
   end
   castbar:Show()
 end
@@ -1869,6 +1979,12 @@ local function MakeSpellButton(i)
   b.flash:SetPoint("CENTER", b, "CENTER", 0, 0)
   b.flash:SetBlendMode("ADD")
   b.flash:SetAlpha(0)
+  -- Lit: the spell's next cast is empowered (a proc): a golden pulse until it's used.
+  b.lit = Tex(b, "OVERLAY", "glow", 84, 84)
+  b.lit:SetPoint("CENTER", b, "CENTER", 0, 0)
+  b.lit:SetBlendMode("ADD")
+  b.lit:SetVertexColor(1, 0.8, 0.25, 1)
+  b.lit:Hide()
   b.on = Tex(b, "OVERLAY", "ring", 52, 52)
   b.on:SetPoint("CENTER", b, "CENTER", 0, 0)
   b.on:SetBlendMode("ADD")
@@ -2135,7 +2251,7 @@ function BB.SpellLine(f)
       local slot = p and {
         key = p[1], icon = p[2], name = p[3], rank = tonumber(p[4]) or 1, rarity = tonumber(p[5]) or 0,
         cd = tonumber(p[6]) or 0, readyAt = now + (tonumber(p[7]) or 0), cost = tonumber(p[8]) or 0,
-        talent = p[9] == "1", on = p[10] == "1",
+        talent = p[9] == "1", on = p[10] == "1", lit = p[11] == "1",
       }
       local old = slot and before[slot.key]
       local b = spellButtons[i]
@@ -2144,6 +2260,10 @@ function BB.SpellLine(f)
       elseif b and not old then
         -- A new spell: a flash on its key.
         Tween(0.9, 0, OutCubic, function(t) b.flash:SetAlpha(1 - t) end, nil, "spellnew" .. i)
+      elseif b and slot.lit and not old.lit then
+        -- Empowered: a burst, then the pulse (in the bar's ticker).
+        Tween(0.6, 0, OutCubic, function(t) b.flash:SetAlpha(1 - t) end, nil, "spelllit" .. i)
+        Play("hover")
       elseif b and old.readyAt <= now + 0.05 and slot.readyAt > now + 0.05 then
         -- Just cast: a pop.
         Tween(0.25, 0, OutCubic, function(t) b.flash:SetAlpha(0.8 * (1 - t)) end, nil, "spellcast" .. i)
@@ -2176,9 +2296,18 @@ barTicker:SetScript("OnUpdate", function()
     end
   end
   local rage = Rage()
+  local pulse = 0.55 + 0.45 * math.sin(GetTime() * 7)
   for i = 1, 12 do
     local slot = sb.slots[i]
     local b = spellButtons[i]
+    if b and b.lit then
+      if slot and slot.lit then
+        b.lit:SetAlpha(pulse)
+        b.lit:Show()
+      else
+        b.lit:Hide()
+      end
+    end
     if slot then
     local left = slot.readyAt - now
     local gcdLeft = sb.gcdEnd - now
@@ -2214,6 +2343,69 @@ barTicker:SetScript("OnUpdate", function()
     end
   end
 end)
+
+-- --- callouts: an upgrade or talent just went off -----------------------------------------------
+-- Its name and icon pop over the spell bar and drift up, so a proc is felt, not just counted.
+
+local callouts = {}
+local CALLOUT_RISE = 46
+for k = 1, 3 do
+  local c = CreateFrame("Frame", nil, UIParent)
+  c:SetWidth(320)
+  c:SetHeight(34)
+  c:SetFrameStrata("HIGH")
+  c.icon = c:CreateTexture(nil, "ARTWORK")
+  c.icon:SetWidth(30)
+  c.icon:SetHeight(30)
+  c.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  c.glow = Tex(c, "BACKGROUND", "glow", 80, 80)
+  c.glow:SetBlendMode("ADD")
+  c.glow:SetVertexColor(1, 0.75, 0.25, 0.8)
+  c.text = Text(c, FONT_TITLE, 22, "OUTLINE")
+  c.text:SetTextColor(1, 0.86, 0.4)
+  c.text:SetPoint("LEFT", c, "CENTER", -40, 0)
+  c.icon:SetPoint("RIGHT", c.text, "LEFT", -8, 0)
+  c.glow:SetPoint("CENTER", c.icon, "CENTER", 0, 0)
+  c:SetAlpha(0)
+  c:Hide()
+  c.born = 0
+  callouts[k] = c
+end
+local recentCallout = {}
+
+function BB.Callout(name, icon)
+  if not name or name == "" then return end
+  local now = GetTime()
+  if recentCallout[name] and now - recentCallout[name] < 1.2 then return end
+  recentCallout[name] = now
+  -- The oldest of the three takes it.
+  local c = callouts[1]
+  for k = 2, 3 do
+    if callouts[k].born < c.born then c = callouts[k] end
+  end
+  c.born = now
+  c.text:SetText(name)
+  c.icon:SetTexture("Interface\\Icons\\" .. (icon or "INV_Misc_QuestionMark"))
+  -- Centred over the bar: the text and icon together.
+  local w = (c.text:GetStringWidth() or 100) + 38
+  c.text:ClearAllPoints()
+  c.text:SetPoint("LEFT", c, "CENTER", 38 - w / 2, 0)
+  -- Stack over the ones still showing.
+  local live = 0
+  for k = 1, 3 do
+    if callouts[k] ~= c and callouts[k]:IsShown() then live = live + 1 end
+  end
+  local base = 150 + live * 30
+  c:Show()
+  Tween(1.6, 0, OutCubic, function(t)
+    c:ClearAllPoints()
+    c:SetPoint("CENTER", UIParent, "BOTTOM", 0, base + CALLOUT_RISE * t)
+    local a = 1
+    if t < 0.08 then a = t / 0.08 elseif t > 0.6 then a = math.max(0, 1 - (t - 0.6) / 0.4) end
+    c:SetAlpha(a)
+    c:SetScale(1 + 0.25 * math.max(0, 1 - t * 6))
+  end, function() c:Hide() end, "callout" .. tostring(c))
+end
 
 -- --- talents: three trees, a point a level -----------------------------------------------------
 
@@ -2430,6 +2622,9 @@ end
 
 function BB.ToggleTalents()
   if not BB.talents.ready then return false end
+  if BB.talents.style == "class" then
+    return BB.ToggleBuild()
+  end
   if talents:IsShown() then
     talents:Hide()
   else
@@ -2498,8 +2693,32 @@ function BB.TalentLine(f)
     tl.defs[i] = {
       tree = tonumber(f[3]) or 0, tier = tonumber(f[4]) or 1, col = tonumber(f[5]) or 1, ranks = tonumber(f[6]) or 1,
       icon = f[7] or "", name = f[8] or "", texts = Split(f[9] or "", "|"), grants = f[10] == "1",
+      kind = f[11] or "tree", requires = (f[12] and f[12] ~= "") and Split(f[12], "+") or {},
     }
     tl.ready = true
+  elseif verb == "TS" then
+    tl.style = f[2] or "trees"
+  elseif verb == "UP" then
+    tl.skills = {}
+    if f[2] and f[2] ~= "" then
+      local rows = Split(f[2], ";")
+      for k = 1, table.getn(rows) do
+        local x = Split(rows[k], "^")
+        local ups = {}
+        if x[8] and x[8] ~= "" then
+          local list = Split(x[8], ",")
+          for u = 1, table.getn(list) do
+            local y = Split(list[u], ":")
+            table.insert(ups, { name = y[1] or "", times = tonumber(y[2]) or 1, text = y[3] or "" })
+          end
+        end
+        table.insert(tl.skills, {
+          key = x[1] or "", icon = x[2] or "", name = x[3] or "", count = tonumber(x[4]) or 0, cap = tonumber(x[5]) or 10,
+          open = tonumber(x[6]) or 0, deck = tonumber(x[7]) or 0, ups = ups,
+        })
+      end
+    end
+    if BB.buildFrame and BB.buildFrame:IsShown() then BB.LayoutBuild() end
   elseif verb == "TR" then
     local before = tl.points
     tl.points = tonumber(f[2]) or 0
@@ -2512,7 +2731,270 @@ function BB.TalentLine(f)
     end
     BB.UpdateTalentButton()
     if talents:IsShown() then BB.LayoutTalents() end
+    if BB.buildFrame and BB.buildFrame:IsShown() then BB.LayoutBuild() end
   end
+end
+
+-- --- the build window (N), for classes whose talents come with their skills ------------------------
+-- Each skill you hold, with the upgrades it has taken (of the ten it can take this run), and the
+-- class talents, combinations and weapon path your cards have given you. Combinations your skills
+-- could still bring show dimmed.
+
+BB.talents.skills = {}
+local BLD_W, BLD_H = 900, 520
+local build = CreateFrame("Frame", "BasinBattleBuild", UIParent)
+BB.buildFrame = build
+build:SetWidth(BLD_W)
+build:SetHeight(BLD_H)
+build:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
+build:SetFrameStrata("DIALOG")
+build:EnableMouse(true)
+build:SetMovable(true)
+build:RegisterForDrag("LeftButton")
+build:SetScript("OnDragStart", function() this:StartMoving() end)
+build:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+build:Hide()
+build.bg = build:CreateTexture(nil, "BACKGROUND")
+build.bg:SetTexture(SOLID)
+build.bg:SetAllPoints(build)
+build.bg:SetVertexColor(0.03, 0.03, 0.04, 0.95)
+build.edge = Tex(build, "BORDER", "cardborder")
+build.edge:SetPoint("TOPLEFT", build, "TOPLEFT", -10, 10)
+build.edge:SetPoint("BOTTOMRIGHT", build, "BOTTOMRIGHT", 10, -10)
+build.edge:SetVertexColor(1, 0.82, 0.45, 0.8)
+build.title = Text(build, FONT_TITLE, 26, "OUTLINE")
+build.title:SetPoint("TOP", build, "TOP", 0, -12)
+build.title:SetTextColor(1, 0.84, 0.5)
+build.title:SetText("Your Build")
+build.hint = Text(build, FONT_BODY, 11)
+build.hint:SetPoint("BOTTOMLEFT", build, "BOTTOMLEFT", 22, 20)
+build.hint:SetWidth(BLD_W - 150)
+build.hint:SetJustifyH("LEFT")
+build.hint:SetTextColor(0.7, 0.68, 0.6)
+build.hint:SetText("Everything here comes as level-up cards. Each skill takes 10 upgrades a run out of its deck of about 20, so no two runs end alike. Class talents come whatever you hold. Combinations come only while you hold both their skills.")
+build.close = MakeButton(build, 80, 24, "Close", GOLD, function() build:Hide() end)
+build.close:SetPoint("BOTTOMRIGHT", build, "BOTTOMRIGHT", -18, 14)
+build.left = Text(build, FONT_TITLE, 18, "OUTLINE")
+build.left:SetPoint("TOPLEFT", build, "TOPLEFT", 22, -48)
+build.left:SetTextColor(1, 0.84, 0.5)
+build.left:SetText("Skills and their upgrades")
+build.right = Text(build, FONT_TITLE, 18, "OUTLINE")
+build.right:SetPoint("TOPLEFT", build, "TOPLEFT", 560, -48)
+build.right:SetTextColor(1, 0.84, 0.5)
+build.right:SetText("Talents")
+build.rows = {}
+build.icons = {}
+build.heads = {}
+
+local ROW_H = 62
+local function BuildRow(k)
+  local r = CreateFrame("Frame", nil, build)
+  r:SetWidth(520)
+  r:SetHeight(ROW_H - 4)
+  r:SetPoint("TOPLEFT", build, "TOPLEFT", 18, -74 - (k - 1) * ROW_H)
+  r.bg = r:CreateTexture(nil, "BACKGROUND")
+  r.bg:SetTexture(SOLID)
+  r.bg:SetAllPoints(r)
+  r.bg:SetVertexColor(1, 1, 1, 0.04)
+  r.icon = r:CreateTexture(nil, "ARTWORK")
+  r.icon:SetWidth(40)
+  r.icon:SetHeight(40)
+  r.icon:SetPoint("LEFT", r, "LEFT", 6, 0)
+  r.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  r.frame = Tex(r, "OVERLAY", "iconframe")
+  r.frame:SetPoint("TOPLEFT", r.icon, "TOPLEFT", -4, 4)
+  r.frame:SetPoint("BOTTOMRIGHT", r.icon, "BOTTOMRIGHT", 4, -4)
+  r.name = Text(r, FONT_BODY, 14, "OUTLINE")
+  r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 10, 2)
+  r.name:SetTextColor(1, 0.95, 0.8)
+  r.count = Text(r, FONT_NUM, 13, "OUTLINE")
+  r.count:SetPoint("TOPRIGHT", r, "TOPRIGHT", -8, -6)
+  r.ups = Text(r, FONT_BODY, 10)
+  r.ups:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -4)
+  r.ups:SetWidth(450)
+  r.ups:SetHeight(30)
+  r.ups:SetJustifyH("LEFT")
+  r.ups:SetJustifyV("TOP")
+  r.ups:SetTextColor(0.85, 0.83, 0.75)
+  r:EnableMouse(true)
+  r:SetScript("OnEnter", function()
+    local sk = this.skill
+    if not sk then return end
+    GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+    GameTooltip:SetText(sk.name, 1, 1, 1)
+    GameTooltip:AddLine(sk.count .. " of " .. sk.cap .. " upgrades taken. " .. sk.open .. " more of its " .. sk.deck .. " could still come.", 1, 0.82, 0, 1)
+    for u = 1, table.getn(sk.ups) do
+      local up = sk.ups[u]
+      local label = up.name
+      if up.times > 1 then label = label .. " x" .. up.times end
+      GameTooltip:AddLine(label, 0.4, 1, 0.4)
+      GameTooltip:AddLine(up.text, 0.9, 0.88, 0.8, 1)
+    end
+    GameTooltip:Show()
+  end)
+  r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return r
+end
+
+local function BuildIcon(n)
+  local b = CreateFrame("Button", nil, build)
+  b:SetWidth(30)
+  b:SetHeight(30)
+  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.icon:SetAllPoints(b)
+  b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  b.frame = Tex(b, "OVERLAY", "iconframe")
+  b.frame:SetPoint("TOPLEFT", b, "TOPLEFT", -3, 3)
+  b.frame:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 3, -3)
+  b.rank = Text(b, FONT_NUM, 10, "OUTLINE")
+  b.rank:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 3, -3)
+  b:EnableMouse(true)
+  b:SetScript("OnEnter", function()
+    local d = this.def
+    if not d then return end
+    GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+    GameTooltip:SetText(d.name, 1, 1, 1)
+    local kinds = { class = "Class Talent", combo = "Combination", path = "Path", pathcard = "Path Card", tree = "Talent" }
+    local line = kinds[d.kind] or "Talent"
+    if d.ranks > 1 then line = line .. " - rank " .. this.r .. " of " .. d.ranks end
+    GameTooltip:AddLine(line, 1, 0.82, 0)
+    if table.getn(d.requires) > 0 then
+      GameTooltip:AddLine("Links " .. table.concat(d.requires, " + "), 0.4, 0.8, 1, 1)
+    end
+    GameTooltip:AddLine(d.texts[math.max(1, math.min(this.r, d.ranks))] or "", 0.95, 0.9, 0.75, 1)
+    if this.r == 0 then
+      GameTooltip:AddLine("Not taken yet: you hold both skills, so it can come as a card.", 0.3, 1, 0.3, 1)
+    end
+    GameTooltip:Show()
+  end)
+  b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+  return b
+end
+
+local function BuildHead(n)
+  local h = Text(build, FONT_BODY, 12, "OUTLINE")
+  h:SetTextColor(1, 0.84, 0.5)
+  h:SetJustifyH("LEFT")
+  return h
+end
+
+function BB.LayoutBuild()
+  local tl = BB.talents
+  local skills = tl.skills or {}
+  for k = 1, 6 do
+    local r = build.rows[k]
+    if not r then
+      r = BuildRow(k)
+      build.rows[k] = r
+    end
+    local sk = skills[k]
+    r.skill = sk
+    if sk then
+      r.icon:SetTexture("Interface\\Icons\\" .. sk.icon)
+      r.icon:SetVertexColor(1, 1, 1)
+      r.name:SetText(sk.name)
+      r.count:SetText(sk.count .. "/" .. sk.cap)
+      if sk.count >= sk.cap then r.count:SetTextColor(1, 0.82, 0.3) else r.count:SetTextColor(0.3, 1, 0.3) end
+      local names = {}
+      for u = 1, table.getn(sk.ups) do
+        local up = sk.ups[u]
+        if up.times > 1 then
+          table.insert(names, up.name .. " x" .. up.times)
+        else
+          table.insert(names, up.name)
+        end
+      end
+      if table.getn(names) == 0 then
+        r.ups:SetText("|cff888888No upgrades yet: they come as level-up cards.|r")
+      else
+        r.ups:SetText(table.concat(names, ", "))
+      end
+    else
+      r.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+      r.icon:SetVertexColor(0.3, 0.3, 0.3)
+      r.name:SetText("|cff888888An empty key|r")
+      r.count:SetText("")
+      r.ups:SetText("|cff888888A new skill can still come as a card.|r")
+    end
+    r:Show()
+  end
+  -- Talents by kind: taken ones lit, combinations your skills could still bring dimmed.
+  local held = {}
+  for k = 1, table.getn(skills) do held[skills[k].name] = true end
+  local groups = { { kind = "class", title = "Class Talents" }, { kind = "combo", title = "Combinations" }, { kind = "path", title = "Path" }, { kind = "pathcard", title = "Path Cards" } }
+  local used, y, n = 0, -78, 0
+  for g = 1, 4 do
+    local grp = groups[g]
+    local list = {}
+    for i = 1, table.getn(tl.defs) do
+      local d = tl.defs[i]
+      if d.kind == grp.kind then
+        local r = tl.ranks[i] or 0
+        local reach = false
+        if r == 0 and d.kind == "combo" then
+          reach = true
+          for q = 1, table.getn(d.requires) do
+            if not held[d.requires[q]] then reach = false end
+          end
+        end
+        if r > 0 or reach then table.insert(list, { def = d, r = r }) end
+      end
+    end
+    n = n + 1
+    local h = build.heads[n]
+    if not h then
+      h = BuildHead(n)
+      build.heads[n] = h
+    end
+    h:ClearAllPoints()
+    h:SetPoint("TOPLEFT", build, "TOPLEFT", 560, y)
+    local taken = 0
+    for q = 1, table.getn(list) do if list[q].r > 0 then taken = taken + 1 end end
+    local label = grp.title .. " (" .. taken .. ")"
+    if table.getn(list) == 0 then label = label .. "  |cff888888none yet|r" end
+    h:SetText(label)
+    h:Show()
+    y = y - 18
+    for q = 1, table.getn(list) do
+      used = used + 1
+      local b = build.icons[used]
+      if not b then
+        b = BuildIcon(used)
+        build.icons[used] = b
+      end
+      local col = math.mod(q - 1, 9)
+      if q > 1 and col == 0 then y = y - 38 end
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", build, "TOPLEFT", 562 + col * 36, y)
+      b.def = list[q].def
+      b.r = list[q].r
+      b.icon:SetTexture("Interface\\Icons\\" .. list[q].def.icon)
+      if list[q].r > 0 then
+        b.icon:SetVertexColor(1, 1, 1)
+        b.frame:SetVertexColor(1, 0.82, 0.3, 1)
+        if list[q].def.ranks > 1 then b.rank:SetText(list[q].r) else b.rank:SetText("") end
+      else
+        b.icon:SetVertexColor(0.35, 0.35, 0.35)
+        b.frame:SetVertexColor(0.4, 0.4, 0.4, 1)
+        b.rank:SetText("")
+      end
+      b:Show()
+    end
+    if table.getn(list) > 0 then y = y - 40 end
+    y = y - 6
+  end
+  for q = used + 1, table.getn(build.icons) do build.icons[q]:Hide() end
+end
+
+function BB.ToggleBuild()
+  if build:IsShown() then
+    build:Hide()
+  else
+    BB.LayoutBuild()
+    build:Show()
+    Play("open")
+  end
+  return true
 end
 
 -- --- the Ancient's shop: defences and upgrades as cards -----------------------------------------
@@ -3601,10 +4083,14 @@ function BB.Line(msg)
       Play("danger")
     end
   elseif verb == "X" then
-    BB.EnemyCast(f[2], f[3], f[4], f[5] == "1", f[6] or "", f[7] ~= "0")
+    BB.EnemyCast(f[2], f[3], f[4], f[5] == "1", f[6] or "", f[7] ~= "0", f[8] == "1")
+  elseif verb == "XI" then
+    BB.CastBroken()
   elseif verb == "Q" then
     BB.SpellLine(f)
-  elseif verb == "TT" or verb == "TD" or verb == "TR" then
+  elseif verb == "PR" then
+    BB.Callout(f[2], f[3])
+  elseif verb == "TT" or verb == "TD" or verb == "TR" or verb == "TS" or verb == "UP" then
     BB.TalentLine(f)
   elseif verb == "MP" then
     BB.MapLine(f)
