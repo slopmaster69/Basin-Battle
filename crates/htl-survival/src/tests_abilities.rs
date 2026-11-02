@@ -195,7 +195,7 @@ fn a_counter_takes_melee_and_projectiles_but_not_ground_spells() {
 }
 
 #[test]
-fn a_counter_that_catches_nothing_goes_on_its_full_cooldown() {
+fn retaliation_that_catches_nothing_comes_back_in_half_its_cooldown_and_one_that_catches_takes_it_all() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], std::f32::consts::PI);
@@ -205,13 +205,13 @@ fn a_counter_that_catches_nothing_goes_on_its_full_cooldown() {
     cast(&mut s, b, "defense", false, 0.0);
     run(&mut s, 2.0);
     let left = s.cooldown(b, ret).next_at - s.clock;
-    assert!(left > full - 2.5, "baited: the whole cooldown ({left:.1})");
+    assert!(left < full * 0.5 + 0.1 && left > full * 0.5 - 2.5, "misread: half of it ({left:.1})");
     run(&mut s, full);
     cast(&mut s, b, "defense", false, 0.0);
     s.input(a, Input::Attack);
     run(&mut s, 2.0);
     let left = s.cooldown(b, ret).next_at - s.clock;
-    assert!(left < full * 0.5, "caught: half of it ({left:.1})");
+    assert!(left > full - 2.5, "caught: the whole of it ({left:.1})");
 }
 
 #[test]
@@ -397,7 +397,7 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     // learned out in Elwynn, and the board says where (taken from it only in a debug world).
     s.set_tree(p, false);
     let owned: Vec<&str> = s.players[&p].owned.iter().map(String::as_str).collect();
-    assert_eq!(owned, ["hurled_axe", "sundering_blow"], "Q and E are free");
+    assert_eq!(owned, ["hurled_axe", "shockwave"], "Q and E are free");
     assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_err(), "not unlocked");
     let why = s.take_node(p, "seed_of_corruption").unwrap_err();
     assert!(why.contains("The Cult's Altar"), "{why}");

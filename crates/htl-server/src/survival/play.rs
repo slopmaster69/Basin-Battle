@@ -428,6 +428,13 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Grow { id, scale } => {
+                // The body drawn larger (Onslaught), for everyone, its owner too.
+                let Some(g) = self.guid_of(id) else { return };
+                let mut f = Fields::new();
+                f.set_f32(idx::SCALE_X, scale);
+                self.broadcast(&packets::update_object(&[], &[(g, &f)]));
+            }
             Event::Glow { id, secs } => {
                 // `WG\t<guid>\t<secs>` to every add-on here, the striker's own included; a
                 // warning for the same wind-up then glows nothing more.

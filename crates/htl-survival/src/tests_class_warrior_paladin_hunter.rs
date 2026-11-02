@@ -239,11 +239,11 @@ fn rending_axe_drags_what_it_strikes_toward_you_going_and_coming_and_staggers_it
         .collect();
     assert_eq!(hops.len(), 2, "pulled going out and coming back: {hops:?}");
     assert!(hops.iter().all(|d| d.cos() < -0.95), "toward her (along -x): {hops:?}");
-    assert!(s.cc_log_of(b).iter().any(|l| l.contains("Rending Axe: stagger")), "staggered: {:?}", s.cc_log_of(b));
+    assert!(s.cc_log_of(b).iter().any(|l| l.contains("Grasping Axe: stagger")), "staggered: {:?}", s.cc_log_of(b));
 }
 
 #[test]
-fn charge_bowls_through_every_foe_in_its_line_staggering_each() {
+fn charge_stops_at_the_first_foe_in_its_line_and_staggers_it() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let first = mob(&mut s, "brave", [5.0, 0.0, 0.0]);
@@ -259,18 +259,17 @@ fn charge_bowls_through_every_foe_in_its_line_staggering_each() {
             _ => None,
         })
         .expect("she charges");
-    assert!(len > 15.0, "on past both, not stopped at the first: {len}");
+    assert!(len < 6.0, "stopped at the first, not on past it: {len}");
     ev.extend(run(&mut s, 1.0));
-    assert!(s.mobs[&first].health < h1 && s.mobs[&second].health < h2, "both struck");
-    assert_eq!(hits(&ev, p, first).len() + hits(&ev, p, second).len(), 2, "each once");
-    let staggers = s.cc_log_of(p).iter().filter(|l| l.contains("Charge: stagger 0.6")).count();
-    assert_eq!(staggers, 2, "each staggered: {:?}", s.cc_log_of(p));
+    assert!(s.mobs[&first].health < h1, "the first struck");
+    assert_eq!(s.mobs[&second].health, h2, "the one behind it untouched");
+    assert!(s.cc_log_of(p).iter().any(|l| l.contains("Charge: stagger 1.0")), "staggered: {:?}", s.cc_log_of(p));
 }
 
 #[test]
 fn an_old_warriors_save_comes_back_with_the_new_cards() {
     let (s, p) = load_old_save("warrior", &[("ranged", "aimed_throw"), ("close", "sundering_blow"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
-    has_on_keys(&s, p, &[("ranged", "hurled_axe"), ("close", "sundering_blow"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
+    has_on_keys(&s, p, &[("ranged", "hurled_axe"), ("close", "shockwave"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
     assert_eq!(crate::save::renamed("aimed_throw"), "hurled_axe");
 }
 
@@ -629,20 +628,20 @@ fn hurled_axe_aimed_at_the_ground_skims_out_its_whole_range_instead_of_burying_i
 }
 
 #[test]
-fn unstoppable_blow_turns_the_strikers_own_weapon_red_against_creatures_too() {
+fn sundering_blow_turns_the_strikers_own_weapon_red_against_creatures_too() {
     let mut s = world_with(false);
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     mob(&mut s, "wolf", [2.0, 0.0, 0.0]);
     s.set_valor(a, 25.0);
-    let mut ev = press(&mut s, a, "sundering_blow", true);
+    let mut ev = press(&mut s, a, "shockwave", true);
     if matches!(s.players[&a].action, Action::Aim { .. }) {
         ev.extend(click(&mut s, a));
     }
     ev.extend(run(&mut s, 0.3));
     assert!(ev.iter().any(|e| matches!(e, Event::Glow { id, .. } if *id == a)), "her weapon glows red");
-    // The plain Sundering Blow, which a guard does stop, doesn't.
+    // Shockwave, which no one blocks anyway, doesn't.
     let b = hero(&mut s, "Bren", [0.0, 10.0, 0.0], 0.0);
-    let mut ev = press(&mut s, b, "sundering_blow", false);
+    let mut ev = press(&mut s, b, "shockwave", false);
     ev.extend(run(&mut s, 0.3));
     assert!(!ev.iter().any(|e| matches!(e, Event::Glow { id, .. } if *id == b)));
 }
@@ -685,4 +684,109 @@ fn hurled_axe_follows_a_slope_up_at_hand_height() {
         }
     }
     assert!(far > 18.0, "up the slope its whole way, not {far:.1}");
+}
+
+#[test]
+fn axe_throw_recast_calls_the_axe_back_from_where_it_is() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    press(&mut s, p, "hurled_axe", false);
+    s.set_aim_line(p, 0.0, 0.0);
+    click(&mut s, p);
+    run(&mut s, 0.3);
+    let out = s.projectiles.iter().map(|q| q.pos[0]).fold(0.0f32, f32::max);
+    assert!(out > 3.0 && out < 12.0, "a few yards out: {out:.1}");
+    press_again(&mut s, p, "ranged");
+    assert_eq!(s.projectiles.len(), 1, "called back, not a second axe");
+    run(&mut s, 0.15);
+    let now = s.projectiles.iter().map(|q| q.pos[0]).fold(0.0f32, f32::max);
+    assert!(now < out, "on its way back from {out:.1}: {now:.1}");
+    run(&mut s, 1.5);
+    assert!(s.projectiles.is_empty(), "caught");
+}
+
+#[test]
+fn shockwave_throws_a_pack_back_and_stuns_only_the_one_it_drives_into_a_wall() {
+    let mut c = Content::dev();
+    c.pvp = Default::default();
+    let land = FlatLand { walls: vec![([5.6, 0.0], 0.8)], ..Default::default() };
+    let mut s = Survival::new(c, Box::new(land), 7, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let walled = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
+    let open = mob(&mut s, "brave", [3.0, 1.2, 0.0]);
+    let from = s.mobs[&open].pos;
+    press(&mut s, p, "shockwave", false);
+    s.set_aim_line(p, 0.0, 0.0);
+    let mut ev = click(&mut s, p);
+    ev.extend(run(&mut s, 1.2));
+    assert!(s.has_cc(walled, "stun"), "driven into the wall: stunned");
+    assert!(!s.has_cc(open, "stun"), "thrown clear: not stunned");
+    let thrown = ev.iter().any(|e| matches!(e, Event::MobMove { id, path, .. } if *id == open && path.last().is_some_and(|end| dist2d(*end, from) > 3.0)));
+    assert!(thrown, "thrown back 4 yd");
+}
+
+#[test]
+fn retaliation_blocks_the_first_blow_and_sweeps_everyone_in_front_then_ends_when_you_act() {
+    let mut s = world_with(true);
+    let pi = std::f32::consts::PI;
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], pi);
+    let c = hero(&mut s, "Cara", [0.5, 1.0, 0.0], 0.0);
+    press(&mut s, b, "retaliation", false);
+    let (ha, hb, hc) = (s.players[&a].health, s.players[&b].health, s.players[&c].health);
+    s.input(a, Input::Attack);
+    run(&mut s, 1.0);
+    assert_eq!(s.players[&b].health, hb, "Ayla's blow blocked");
+    assert!(s.players[&a].health < ha, "the sweep strikes the one who swung");
+    assert!(s.players[&c].health < hc, "and everyone else in front");
+    // Braced again, then a swing of his own ends it at once.
+    run(&mut s, 2.0);
+    press(&mut s, b, "retaliation", false);
+    assert!(matches!(s.players[&b].action, Action::Stance { .. }));
+    s.input(b, Input::Attack);
+    s.step(DT);
+    assert!(!matches!(s.players[&b].action, Action::Stance { .. }), "his attack ends the brace");
+}
+
+#[test]
+fn shield_wall_holds_the_shield_up_blocks_from_the_front_only_and_its_key_lowers_it() {
+    let mut s = world_with(true);
+    let pi = std::f32::consts::PI;
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let front = hero(&mut s, "Bren", [1.8, 0.0, 0.0], pi);
+    let behind = hero(&mut s, "Cara", [-1.8, 0.0, 0.0], 0.0);
+    s.set_valor(a, 25.0);
+    let ev = press(&mut s, a, "retaliation", true);
+    assert!(ev.iter().any(|e| matches!(e, Event::Guard { player, up: true } if *player == a)), "the shield up");
+    let h = s.players[&a].health;
+    s.input(front, Input::Attack);
+    run(&mut s, 1.0);
+    assert_eq!(s.players[&a].health, h, "from the front: blocked");
+    s.input(behind, Input::Attack);
+    run(&mut s, 1.0);
+    assert!(s.players[&a].health < h, "from behind: it gets round the shield");
+    assert!(matches!(s.players[&a].action, Action::Stance { .. }), "still up");
+    let ev = press_again(&mut s, a, "defense");
+    assert!(!matches!(s.players[&a].action, Action::Stance { .. }), "its key lowers it");
+    assert!(ev.iter().any(|e| matches!(e, Event::Guard { player, up: false } if *player == a)));
+}
+
+#[test]
+fn onslaught_grows_you_glows_red_and_quickens_your_blows_for_8_sec() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let before = s.strike_at(a, StrikeKind::Light, 0).windup;
+    s.set_valor(a, 100.0);
+    let mut ev = press(&mut s, a, "onslaught", false);
+    ev.extend(run(&mut s, 0.5));
+    assert!(s.has_cc(a, "onslaught"));
+    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && *scale > 1.2)), "larger");
+    assert!(ev.iter().any(|e| matches!(e, Event::Glow { id, secs } if *id == a && *secs > 7.0)), "red the whole time");
+    let quick = s.strike_at(a, StrikeKind::Light, 0).windup;
+    assert!(quick < before * 0.9, "quicker blows: {before:.3} to {quick:.3}");
+    let ev = run(&mut s, 8.0);
+    assert!(!s.has_cc(a, "onslaught"));
+    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && (*scale - 1.0).abs() < 0.01)), "back to size");
 }
