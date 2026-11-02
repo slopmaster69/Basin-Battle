@@ -2506,13 +2506,17 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
     let share = s.content.parry.posture;
     let wait = s.content.parry.cooldown + 0.05;
     // (Only the blows it's given here: its own would stop the hero's guard.)
+    let held = |s: &mut Survival, secs: f32| {
+        for _ in 0..(secs / DT).round() as usize {
+            s.mobs.get_mut(&w).unwrap().state = crate::sim::mobs::MobState::Idle { wander_at: 1e9 };
+            s.step(DT);
+        }
+    };
     let parry = |s: &mut Survival| {
-        s.mobs.get_mut(&w).unwrap().state = crate::sim::mobs::MobState::Idle { wander_at: 1e9 };
         s.input(p, Input::GuardUp);
-        run(s, wait);
-        s.mobs.get_mut(&w).unwrap().state = crate::sim::mobs::MobState::Idle { wander_at: 1e9 };
+        held(s, wait);
         s.input(p, Input::Guard);
-        run(s, 0.05);
+        held(s, 0.05);
         s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light)
     };
     assert_eq!(parry(&mut s), Outcome::Parried);
@@ -2564,9 +2568,9 @@ fn a_flow_below_a_champions_drain_never_breaks_it_and_one_above_does() {
             if s.build_posture(w, p, blow) {
                 return true;
             }
-            for _ in 0..9 {
+            for _ in 0..(0.9 / DT).round() as usize {
                 s.mobs.get_mut(&w).unwrap().state = crate::sim::mobs::MobState::Idle { wander_at: 1e9 };
-                run(&mut s, 0.1);
+                s.step(DT);
             }
         }
         false
