@@ -838,6 +838,9 @@ impl Survival {
             }
         }
         for (week, (level, dungeon)) in best {
+            // Paid once: the week's wins go (the camp's counts are mirrored below every tick, so
+            // they're kept small), and its best is kept as the week's mark.
+            self.camp.counts.retain(|k, _| !k.starts_with(&format!("wagerweek:{week}:")));
             self.camp.counts.insert(format!("weekchest:{week}"), level);
             let Some(d) = self.content.dungeons().find(|d| d.key == dungeon).cloned() else { continue };
             let won = self.weekly_chest(&d, level);

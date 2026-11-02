@@ -1106,9 +1106,11 @@ fn the_weeks_best_wager_pays_the_bookmakers_chest_when_the_week_turns() {
     assert_eq!(after - before, 2, "the best, +5: two pieces (one, and one more at +4)");
     assert!(camp.storage.keys().any(|i| camp.content.items[*i].hone == 1), "honed, as a +5 wager pays");
     assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title == "The Bookmaker's Chest" && sub.contains("+5") && sub.contains("Stockade"))));
-    // Once a week; this week's waits for it to turn.
+    // Once a week; this week's waits for it to turn. Last week's wins are gone, its mark kept.
     camp.step(DT);
     assert_eq!(camp.storage.values().sum::<u32>(), after);
+    assert!(!camp.camp.counts.keys().any(|k| k.starts_with(&format!("wagerweek:{}:", now - 1))));
+    assert_eq!(camp.camp.counts.get(&format!("weekchest:{}", now - 1)), Some(&5));
 }
 
 #[test]
