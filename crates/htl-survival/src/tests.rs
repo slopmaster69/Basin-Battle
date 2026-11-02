@@ -3180,3 +3180,42 @@ fn heroes_felling_heroes_go_on_the_camps_fighting_record() {
     s.strike_player(k, a, hp * 10, [4.0, 0.0, 0.0], false, false, false, Blow::Light);
     assert_eq!(s.fighting_record()[0], ("Ayla".to_string(), 2, 1));
 }
+
+#[test]
+fn a_dungeons_weapon_is_on_the_rack_only_once_the_camp_has_found_one() {
+    let mut s = world();
+    let rack = s.content.world.rack;
+    let p = hero(&mut s, "Ayla", [rack[0] + 1.0, rack[1], 0.0], 0.0);
+    let keys = |s: &Survival| s.rack_view(p).into_iter().map(|r| r.0).collect::<Vec<String>>();
+    assert!(s.content.is_dungeon_gear("mograines_might"));
+    assert!(!keys(&s).contains(&"mograines_might".to_string()), "earned below first");
+    assert!(s.arm(p, "mograines_might").is_err());
+    assert!(keys(&s).contains(&"maul".to_string()), "the camp's own are there");
+    // Found below (or sent home): on the rack.
+    s.camp.counts.insert("found:mograines_might".into(), 1);
+    assert!(keys(&s).contains(&"mograines_might".to_string()));
+    assert!(s.arm(p, "mograines_might").is_ok());
+}
+
+#[test]
+fn a_harder_dungeons_weapons_hit_harder_than_an_easier_ones() {
+    let c = Content::builtin();
+    // Each tier's weapons by grip, their damage a second over the swing, on average.
+    let mut by: std::collections::BTreeMap<(bool, u32), Vec<f32>> = Default::default();
+    for d in c.dungeons() {
+        for p in &d.packs {
+            let Some(m) = c.mob(&p.mob) else { continue };
+            for g in c.mobs[m].gear.iter().chain(c.mobs[m].trophy.keys()) {
+                if let Some(w) = c.weapon(g) {
+                    let power = (w.damage[0] + w.damage[1]) as f32 / 2.0 / (w.windup + w.active + w.recovery);
+                    by.entry((w.two_handed, d.tier)).or_default().push(power);
+                }
+            }
+        }
+    }
+    let mean = |v: &Vec<f32>| v.iter().sum::<f32>() / v.len() as f32;
+    for two in [false, true] {
+        let t: Vec<f32> = (1..=3).filter_map(|t| by.get(&(two, t)).map(mean)).collect();
+        assert!(t.windows(2).all(|w| w[1] > w[0]), "two-handed {two}: {t:?}");
+    }
+}
