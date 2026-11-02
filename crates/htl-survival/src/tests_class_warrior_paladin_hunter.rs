@@ -894,6 +894,40 @@ fn a_tripwire_knocks_down_the_first_creature_across_it() {
 }
 
 #[test]
+fn a_tripwires_arrows_outlast_its_cooldown_so_recall_on_the_same_key_brings_them_home() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [30.0, 0.0, 0.0]);
+    press(&mut s, p, "tripwire", false);
+    s.set_aim_line(p, 0.0, down_to(10.0));
+    click(&mut s, p);
+    run_pinned(&mut s, 0.2, &[k]);
+    if aiming(&s, p).is_some() {
+        click(&mut s, p);
+    }
+    assert_eq!(s.planted_of(p).len(), 2, "two anchors");
+    // A shot's arrow planted alongside fades on its usual clock...
+    s.plant_arrow(p, [12.0, 4.0, 0.0]);
+    // ...and a full ring of newer arrows past the cap pushes out the nearest to fading, not the
+    // anchors.
+    for n in 0..10 {
+        s.plant_arrow(p, [6.0, n as f32 - 5.0, 0.0]);
+    }
+    assert_eq!(s.planted_of(p).len(), 12);
+    s.plant_arrow(p, [5.0, 0.0, 0.0]);
+    assert_eq!(s.planted_of(p).len(), 12);
+    assert!(s.planted_of(p).iter().filter(|a| (a[0] - 10.0).abs() < 1.5).count() >= 2, "the anchors stay: {:?}", s.planted_of(p));
+    // The cooldown comes back with the wire still unsnapped; the shots' arrows are long gone but
+    // the anchors are there for Recall.
+    run_pinned(&mut s, 12.2, &[k]);
+    assert_eq!(s.planted_of(p).len(), 2, "only the anchors: {:?}", s.planted_of(p));
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "tripwire", true);
+    run_pinned(&mut s, 0.5, &[k]);
+    assert!(s.planted_of(p).is_empty(), "home");
+}
+
+#[test]
 fn call_of_the_wild_sends_a_beast_a_press_through_three_stages_for_stamina() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);

@@ -4302,7 +4302,7 @@ also = "hunter_net"
 [[ability]]
 key = "tripwire"
 name = "Tripwire"
-text = "Fires two arrows that plant 6 yd apart at the target spot, up to 20 yd away, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. Lasts 12 sec."
+text = "Fires two arrows that plant 6 yd apart at the target spot, up to 20 yd away, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec; its two arrows stay planted for 18 sec, snapped or not."
 icon = "Spell_Nature_Web"
 school = "hunter"
 slot = "defense"

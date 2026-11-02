@@ -22,6 +22,9 @@ const PLANT_SCALE: f32 = 0.45;
 /// A tripwire's arrows plant this far each side of its middle; it trips anything within this of
 /// the wire.
 const WIRE_REACH: f32 = 0.7;
+/// A tripwire's two arrows stay in the ground this long, snapped or not: past Tripwire's own
+/// cooldown, so Arrow Recall (the same key) can bring them home once it's back.
+pub const ANCHOR_SECS: f32 = 18.0;
 /// Call of the Wild: the chain falls back to its first stage after this long without a call.
 pub const WILD_SECS: f32 = 4.0;
 /// The stamina each stage costs (half when empowered), and the damage each stage's beast does.
@@ -149,18 +152,24 @@ impl Survival {
 
     /// An arrow of `owner`'s sticks in the ground at (over) `at`.
     pub(crate) fn plant_arrow(&mut self, owner: Id, at: Vec3) {
+        self.plant_arrow_for(owner, at, PLANT_SECS);
+    }
+
+    /// An arrow that stays `secs`. Past the cap, the one nearest fading makes way.
+    pub(crate) fn plant_arrow_for(&mut self, owner: Id, at: Vec3, secs: f32) {
         let now = self.clock;
         let pos = self.ground_near(at[0], at[1], at[2] + 1.0);
         let mine: Vec<usize> = self.hunt.planted.iter().enumerate().filter(|(_, a)| a.owner == owner).map(|(k, _)| k).collect();
         if mine.len() >= PLANT_MOST {
-            let old = self.hunt.planted.remove(mine[0]);
+            let soonest = mine.iter().copied().min_by(|x, y| self.hunt.planted[*x].until.total_cmp(&self.hunt.planted[*y].until)).unwrap_or(mine[0]);
+            let old = self.hunt.planted.remove(soonest);
             self.unplant(&old);
         }
         let obj = self.alloc();
         let facing = self.rng.gen::<f32>() * std::f32::consts::TAU;
         self.objs.insert(obj, Obj { kind: ObjKind::Prop { display: PLANT_LOOK, scale: PLANT_SCALE }, pos, facing });
         self.events.push(Event::ObjSpawned { id: obj });
-        self.hunt.planted.push(Planted { owner, pos, until: now + PLANT_SECS, obj });
+        self.hunt.planted.push(Planted { owner, pos, until: now + secs, obj });
     }
 
     fn unplant(&mut self, a: &Planted) {
@@ -277,7 +286,7 @@ impl Survival {
         }
         for end in [a, b] {
             self.events.push(Event::Missile { caster: id, spell: 19434, target: Target::Point(end) });
-            self.plant_arrow(id, end);
+            self.plant_arrow_for(id, end, ANCHOR_SECS);
         }
         let life = d.secs.max(1.0);
         let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, (a[2] + b[2]) / 2.0];
