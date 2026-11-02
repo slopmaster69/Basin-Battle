@@ -425,7 +425,7 @@ impl Survival {
         }
         let mark = self.mark_kind(pos, 1.5, d.anchor, true);
         self.events.push(Event::Missile { caster: id, spell: d.charge_spell.max(d.spell), target: Target::Point(pos) });
-        self.events.push(Event::Flash { player: id, text: format!("{}: press again to return", d.name) });
+        self.events.push(Event::Flash { player: id, text: format!("Cast {} again to return", d.name) });
         self.anchors.insert(id, Anchor { ability: base, at: pos, until: now + d.anchor, mark });
         self.events.push(Event::Abilities { player: id });
     }

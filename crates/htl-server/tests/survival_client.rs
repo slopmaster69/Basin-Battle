@@ -217,7 +217,7 @@ fn both_realms_are_listed_and_basin_battle_still_plays() {
     bb.chat(".es hello 1");
     bb.drain(0.5);
     assert!(!addon_lines(&bb, "ES").iter().any(|l| l.starts_with('V')), "Basin Battle doesn't answer the survival add-on");
-    assert!(!said(&bb, "Commands:"), "nor prints its help for it");
+    assert!(!said(&bb, "Commands are"), "nor prints its help for it");
     // And the Basin's add-on's hello is ignored in Elwynn.
     let mut sv = Client::connect(server.login, "erin", "hold", REALM).expect("into Elwynn");
     enter(&mut sv);
@@ -245,7 +245,7 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     assert!(items >= 8 + 3, "worn gear and bag stacks: {items}");
     // The camp: its chest and bell; the land's creatures and timber.
     assert_eq!(objects_with(&c, 10).len(), 1, "the camp chest");
-    assert_eq!(objects_with(&c, 4571).len(), 1, "the alarm bell");
+    assert_eq!(objects_with(&c, 4052).len(), 1, "the alarm bell");
     assert!(objects_with(&c, 1248).len() >= 5, "timber");
     assert!(all.iter().filter(|(_, t, ..)| *t == ObjectType::Unit).count() >= 8, "Elwynn's creatures");
     // Templates come fresh: items, creatures, objects.
@@ -262,8 +262,9 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     // And which way north is, relative to the hero's heading (facing 0 is north).
     let north: i32 = h[39].parse().unwrap();
     assert!((-180..=180).contains(&north), "{h:?}");
-    // The corner points to the nearest place not yet found (Goldshire, next to the camp).
-    assert_eq!(h[36], "Goldshire", "{h:?}");
+    // The corner points to the nearest place not yet found (the Wolf Den, up the road from the
+    // camp at Westbrook).
+    assert_eq!(h[36], "The Wolf Den", "{h:?}");
     assert_eq!(h[1], "200");
     assert_eq!(h[3], "100");
     assert_eq!(h[5], "melee");
@@ -363,7 +364,7 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     stand(&mut c, [chest_at[0] + 2.0, chest_at[1], chest_at[2]], std::f32::consts::PI);
     c.drain(0.2);
     c.send(op::CMSG_GAMEOBJ_USE, &chest.to_le_bytes());
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.trim_start_matches("ES\tT\t").starts_with("Banked:"))).is_some(), "banked");
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.trim_start_matches("ES\tT\t").starts_with("You banked"))).is_some(), "banked");
     let s = c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tS\t")));
     match s {
         Some(ServerPacket::MessageChat(m)) => assert!(m.text.contains("wood~Elwynn Timber~"), "{}", m.text),
@@ -373,17 +374,17 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     c.chat(".es take wood 10");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tS\t"))).is_some(), "the chest's window refreshed");
 
-    // Build a cooking fire on the meadow: the menu, the ghost and its ring, then placed.
+    // Build a cooking fire in the camp's yard: the menu, the ghost and its ring, then placed.
     c.chat(".es bm");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tBM\tcooking~"))).is_some(), "the build menu");
-    let site = [-9534.0f32, 122.0, 0.0];
+    let site = [-9632.0f32, 700.0, 0.0];
     stand(&mut c, [site[0] - 4.0, site[1], 0.0], 0.0);
     c.drain(0.2);
     c.chat(".es build cooking");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tBP\tCooking Fire\t") && m.text.split('\t').nth(4) == Some(""))).is_some(), "a good spot: {:?}", addon_lines(&c, "ES").last());
     assert!(!objects_with(&c, 674).is_empty(), "the green ring under it");
     c.chat(".es place");
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("builds a Cooking Fire"))).is_some(), "built");
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("built a Cooking Fire"))).is_some(), "built");
     c.drain(0.3);
     let fires = objects_with(&c, 192);
     assert_eq!(fires.len(), 1, "one fire (the ghost gone)");
@@ -392,7 +393,7 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     c.send(op::CMSG_GAMEOBJ_USE, &fires[0].0.to_le_bytes());
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tW\t") && m.text.contains("roast~"))).is_some(), "the fire's window");
     c.chat(".es craft roast");
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You make 1"))).is_some(), "a roast");
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You made 1"))).is_some(), "a roast");
 
     // A long fall: down, supplies left where they fell, up again at the camp.
     stand(&mut c, [-9560.0, 160.0, 120.0], 0.0);
@@ -445,12 +446,12 @@ fn the_world_is_kept_across_a_restart() {
         c.chat(".place");
         assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("Outside the camp's building ground"))).is_some(), "refused");
         c.chat(".cancel");
-        stand(&mut c, [-9538.0, 122.0, 0.0], 0.0);
+        stand(&mut c, [-9636.0, 700.0, 0.0], 0.0);
         c.drain(0.2);
         c.chat(".build cooking");
         c.drain(0.2);
         c.chat(".place");
-        assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("builds a Cooking Fire"))).is_some(), "built");
+        assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("built a Cooking Fire"))).is_some(), "built");
         stand(&mut c, [-9520.0, 110.0, 0.0], 1.0);
         c.send(op::CMSG_LOGOUT_REQUEST, &[]);
         assert!(c.wait(2.0, |p| p.name() == "SMSG_LOGOUT_COMPLETE").is_some());
@@ -626,8 +627,8 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     );
 
     // Ann builds the cooking fire and Ben the smithy: both see both.
-    stand(&mut a, [-9538.0, 112.0, 0.0], 0.0);
-    stand(&mut b, [-9538.0, 128.0, 0.0], 0.0);
+    stand(&mut a, [-9636.0, 700.0, 0.0], 0.0);
+    stand(&mut b, [-9618.0, 682.0, 0.0], 0.0);
     a.drain(0.2);
     a.chat(".es build cooking");
     b.chat(".es build smithy");
@@ -635,14 +636,14 @@ fn two_heroes_share_the_camp_race_for_a_node_and_ring_the_bell() {
     a.chat(".es place");
     b.chat(".es place");
     b.drain(0.5);
-    assert!(a.wait(1.5, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("builds a Smithing Anvil"))).is_some() || said(&a, "builds a Smithing Anvil"), "the smithy: {:?}", addon_lines(&b, "ES").iter().filter(|l| l.starts_with("BP") || l.starts_with("T")).collect::<Vec<_>>());
+    assert!(a.wait(1.5, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("built a Smithing Anvil"))).is_some() || said(&a, "built a Smithing Anvil"), "the smithy: {:?}", addon_lines(&b, "ES").iter().filter(|l| l.starts_with("BP") || l.starts_with("T")).collect::<Vec<_>>());
     b.until(0.3, |c| !objects_with(c, 192).is_empty());
     a.until(0.3, |c| !objects_with(c, 166).is_empty());
     assert_eq!(objects_with(&b, 192).len(), 1, "ben sees ann's fire");
     assert_eq!(objects_with(&a, 166).len(), 1, "ann sees ben's anvil");
 
     // The bell: asked first, then warned, the road marked, and raiders come.
-    let (bell, bat) = objects_with(&a, 4571)[0];
+    let (bell, bat) = objects_with(&a, 4052)[0];
     stand(&mut a, [bat[0] + 2.0, bat[1], bat[2]], std::f32::consts::PI);
     a.drain(0.2);
     a.send(op::CMSG_GAMEOBJ_USE, &bell.to_le_bytes());
@@ -722,7 +723,7 @@ fn the_guard_shows_its_pose_the_rack_arms_and_a_timed_guard_parries() {
     c.send(op::CMSG_GAMEOBJ_USE, &rack.to_le_bytes());
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAR\t") && m.text.contains("greatsword~"))).is_some(), "the rack's window");
     c.chat(".es arm greatsword");
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You take up the Footman's Claymore"))).is_some());
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You equipped the Footman's Claymore"))).is_some());
     c.drain(0.3);
     assert_eq!(value_of(&c, me, 260 + 12 * 16), Some(0), "the off hand is empty");
     assert!(value_of(&c, me, 260 + 12 * 15).is_some_and(|e| e > 0), "the claymore in hand");
@@ -798,7 +799,7 @@ fn with_friendly_fire_heroes_strike_and_parry_each_other_and_get_up_at_once() {
     while Instant::now() < end && !felled {
         b.chat(".es in a");
         b.chat(".es in au");
-        felled = a.wait_exactly(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if { let t = m.text.to_lowercase(); t.contains("ben fells ann") || t == "es\tkf\tben\tann" })).is_some();
+        felled = a.wait_exactly(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if { let t = m.text.to_lowercase(); t.contains("ben felled ann") || t == "es\tkf\tben\tann" })).is_some();
     }
     assert!(felled, "the fall is announced: {:?}", a.seen.iter().filter_map(|p| if let ServerPacket::MessageChat(m) = p { Some(m.text.clone()) } else { None }).collect::<Vec<_>>());
     let t0 = Instant::now();
@@ -1207,7 +1208,7 @@ fn gear_in_the_bags_is_put_on_with_a_right_click_or_a_drag() {
     a.send(op::CMSG_AUTOEQUIP_ITEM, &[255, 23 + at as u8]);
     a.drain(1.0);
     assert_eq!(worn(&a, 0), Some(entry("leather_cap")), "the cap is worn");
-    assert!(said(&a, "You put on the Leather Cap"));
+    assert!(said(&a, "You equipped the Leather Cap"));
     assert!(destroyed(&a, first) > before, "what the client held up is let go");
     // The jerkin: dragged from the backpack onto the chest slot (4).
     let at = carried(&a, "hide_jerkin");
@@ -1303,6 +1304,14 @@ fn characters_are_made_on_the_creation_screen_listed_played_and_deleted() {
     let t = &chars[1];
     assert_eq!((t.race, t.class, t.gender, t.facial_hair), (2, 7, 0, 5));
     assert_ne!(m.guid, t.guid);
+    // Dressed on the select screen as in the world, not bare: the survivor's jerkin, belt,
+    // trousers, boots and bracers (chest 4 .. wrists 8), and a weapon in hand (main hand 15).
+    for h in &chars {
+        let worn: Vec<(u32, u8)> = (4..9).map(|k| (h.equipment[k].display_id, h.equipment[k].inventory_type)).collect();
+        assert_eq!(worn, [(3413, 5), (3418, 6), (3414, 7), (18576, 8), (4448, 9)], "{} in the plain outfit", h.name);
+        assert_ne!(h.equipment[15].display_id, 0, "{} holds a weapon", h.name);
+        assert_eq!(h.equipment[0].display_id, 0, "{} bare-headed", h.name);
+    }
 
     // In as Morgana: drawn as she was made, and she knows the mage's Q and E (no more yet).
     let me = c.enter_with(|chars| chars.iter().position(|h| h.name == "Morgana").unwrap());
@@ -1358,21 +1367,21 @@ fn a_hero_and_the_camp_start_over_and_the_old_save_is_kept() {
     let mut c = Client::connect(server.login, "rhea", "hold", REALM).unwrap();
     enter(&mut c);
     // Something to start over from: a fire built at camp.
-    stand(&mut c, [-9538.0, 122.0, 0.0], 0.0);
+    stand(&mut c, [-9636.0, 700.0, 0.0], 0.0);
     c.drain(0.2);
     c.chat(".build cooking");
     c.drain(0.2);
     c.chat(".place");
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("builds a Cooking Fire"))).is_some(), "built");
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("built a Cooking Fire"))).is_some(), "built");
     c.drain(1.5);
     assert!(save.exists(), "saved");
     c.chat(".es reset camp");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("Turn debug on first"))).is_some(), "debug only");
     c.chat(".es debug");
     c.chat(".es reset me");
-    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You start over"))).is_some(), "the hero starts over");
+    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You started over"))).is_some(), "the hero starts over");
     c.chat(".es reset camp");
-    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("The camp starts over"))).is_some(), "and the camp");
+    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("The camp started over"))).is_some(), "and the camp");
     assert!(said(&c, "The old world is kept beside the save"));
     let kept: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).filter(|e| e.file_name().to_string_lossy().starts_with("world.toml.before-reset-")).collect();
     assert_eq!(kept.len(), 1, "the old save kept aside");
@@ -1422,7 +1431,7 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
     // Ann first: the first in the queue holds the first base (the Stables), and two chats sent
     // at once can reach the server in either order (#2).
     a.chat(".siege join 1v1");
-    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You wait for"))).is_some(), "ann waits for a match");
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("You're waiting for"))).is_some(), "ann waits for a match");
     b.chat(".siege join 1v1");
     b.seen.clear();
     b.drain(sg.countdown);
@@ -1460,12 +1469,14 @@ fn the_books_siege_page_takes_heroes_to_arathi_a_match_begins_and_home_their_own
     };
     let tr = tr.unwrap_or_default();
     assert!(tr.matches("~1~").count() > 4, "every card of her dev-world hero, not Siege's two");
-    // Each card ends with its page: 1 a class's, 2 the beta page's (its column `beta`).
+    // Each card ends with its page (1 a class's, 2 the beta page's, its column `beta`), then which
+    // of its key's two choices it is.
     let cards: Vec<&str> = tr.splitn(4, '\t').nth(3).unwrap_or("").split('^').collect();
     let beta = |c: &&str| c.split('~').nth(3) == Some("beta");
+    let page = |c: &&str| c.rsplit('~').nth(1).map(str::to_string);
     assert!(cards.iter().any(beta), "the beta page's cards are sent: {tr}");
-    assert!(cards.iter().filter(|c| beta(*c)).all(|c| c.ends_with("~2")), "on page 2: {tr}");
-    assert!(cards.iter().filter(|c| !beta(*c)).all(|c| c.ends_with("~1")), "the classes' on page 1: {tr}");
+    assert!(cards.iter().filter(|c| beta(*c)).all(|c| page(c).as_deref() == Some("2")), "on page 2: {tr}");
+    assert!(cards.iter().filter(|c| !beta(*c)).all(|c| page(c).as_deref() == Some("1")), "the classes' on page 1: {tr}");
 }
 
 #[test]
@@ -1544,7 +1555,7 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
     let ServerPacket::MessageChat(m) = nt.expect("the wager's page") else { unreachable!() };
     assert!(m.text.contains("Open to +1,") && m.text.contains(".es wager stockade 1~Wager +1") && m.text.contains(".es board stockade~"), "{}", m.text);
     a.chat(".es wager stockade 2");
-    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("up to +1"))).is_some(), "not won yet");
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.contains("highest open is +1"))).is_some(), "not won yet");
     // Taken: down, fresh, and the clock waiting at the lamp.
     a.chat(".es wager stockade 1");
     assert!(a.wait(2.0, |p| p.name() == "SMSG_NEW_WORLD").is_some(), "down to the Stockade");

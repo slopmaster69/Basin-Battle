@@ -677,6 +677,58 @@ fn a_boss_turns_at_each_of_its_phases_harder_and_quicker_each_time() {
 }
 
 #[test]
+fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_but_not_when_it_falls() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    let summon = vec!["grunt".to_string(), "grunt".to_string()];
+    c.mobs[w].phases = vec![EnrageDef { at: 0.75, speed: 1.0, pattern: String::new(), text: String::new(), summon, might: 1.0, kit: 0, look: 0, sound: 0, shove: 0.0 }];
+    // The boss at its first turn, its two adds called up on the hero.
+    let fight = |c: Content| {
+        let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+        let id = s.join("ayla", "Ayla", None);
+        s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+        let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+        s.engage(boss, mobs::Foe::Hero(id));
+        let max = s.mobs[&boss].max_health;
+        s.hurt_mob(boss, id, max - (0.7 * max as f32) as u32);
+        let adds: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.summoned_by == Some(boss)).map(|(a, _)| *a).collect();
+        assert_eq!(adds.len(), 2, "two called up");
+        (s, id, boss, adds)
+    };
+    let (mut s, id, boss, adds) = fight(c.clone());
+    let others: Vec<Id> = s.mobs.keys().copied().filter(|m| *m != boss && !adds.contains(m)).collect();
+    assert!(!others.is_empty(), "the grunt on the way in");
+    // The hero falls: the fight's over, and its adds go at once, not home to where the boss stood.
+    s.hurt_player(id, 10_000);
+    let ev = run(&mut s, 1.0);
+    for a in &adds {
+        assert!(!s.mobs.contains_key(a), "an add gone");
+        assert!(ev.iter().any(|e| matches!(e, Event::MobGone { id } if id == a)), "and gone from the client");
+    }
+    for o in &others {
+        assert!(s.mobs.contains_key(o), "the dungeon's own stay");
+    }
+    // The boss itself goes home and stands whole, its turn to come again.
+    run(&mut s, 30.0);
+    let b = &s.mobs[&boss];
+    assert!(matches!(b.state, MobState::Idle { .. }), "{:?}", b.state);
+    assert_eq!((b.health, b.phase), (b.max_health, 0));
+    assert!(!s.mobs.values().any(|m| m.summoned_by == Some(boss)), "none left");
+
+    // The boss felled with its adds still up: they fight on.
+    let (mut s, id, boss, adds) = fight(c);
+    s.hurt_mob(boss, id, 1_000_000);
+    run(&mut s, 1.0);
+    for a in &adds {
+        let m = &s.mobs[a];
+        assert!(m.health > 0 && m.state.target() == Some(id), "{:?}", m.state);
+    }
+}
+
+#[test]
 fn a_secret_form_rises_from_a_fallen_boss_only_once_its_secret_is_found() {
     let mut c = content();
     let w = c.mob("warlord").unwrap();
@@ -1014,13 +1066,13 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     // A hero comes down: the slip, and the clock waits till they leave the lamp.
     let id = s.join("ayla", "Ayla", None);
     let ev = run(&mut s, 1.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "The Bookmaker's Wager: +3")), "{ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "Bookmaker's Wager +3")), "{ev:?}");
     assert!(s.wager().unwrap().started.is_none());
     s.wager_fall();
     assert_eq!(s.wager().unwrap().deaths, 0, "a fall before the clock costs nothing");
     s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
     let ev = run(&mut s, 0.2);
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.contains("clock is running"))));
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.contains("Clock Running"))));
     s.wager_fall();
     assert_eq!(s.wager().unwrap().deaths, 1);
     assert!(s.wager_elapsed() >= 10.0, "a fall's ten seconds");
@@ -1033,7 +1085,7 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     s.hurt_mob(boss, id, 10_000_000);
     let ev = run(&mut s, 0.2);
     assert!(!ev.iter().any(|e| matches!(e, Event::WagerDone(_))), "the count isn't made");
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title == "The bosses are down" && sub.contains("1 more foe"))), "{ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title == "Bosses Down" && sub.contains("1 more enemy"))), "{ev:?}");
     // The grunt down, quickly: won in time, three levels up.
     let g = grunt(&s);
     s.hurt_mob(g, id, 10_000_000);
@@ -1062,7 +1114,7 @@ fn a_wager_above_what_the_camp_has_won_is_refused() {
     s.debug = true;
     let id = s.join("ayla", "Ayla", None);
     let err = s.travel_wager(id, "deadmines", 2).unwrap_err();
-    assert!(err.contains("up to +1"), "{err}");
+    assert!(err.contains("highest open is +1"), "{err}");
     assert!(s.travel_wager(id, "nowhere", 1).is_err());
 }
 
@@ -1167,7 +1219,7 @@ fn a_wagers_clock_waits_till_everyone_is_ready_then_counts_down() {
     assert!(s.wager_ready(c).is_ok());
     let ev = run(&mut s, WAGER_COUNTDOWN as f32 + 0.3);
     let called: Vec<String> = ev.iter().filter_map(|e| if let Event::Banner { title, .. } = e { Some(title.clone()) } else { None }).collect();
-    assert!(["3", "2", "1"].iter().all(|n| called.iter().any(|t| t == n)) && called.iter().any(|t| t.contains("clock is running")), "{called:?}");
+    assert!(["3", "2", "1"].iter().all(|n| called.iter().any(|t| t == n)) && called.iter().any(|t| t.contains("Clock Running")), "{called:?}");
     assert!(s.wager().unwrap().started.is_some());
     assert!(s.wager_readiness().is_none(), "past it");
     assert!(s.wager_ready(a).is_err(), "too late");
@@ -1182,7 +1234,7 @@ fn stepping_off_from_the_lamp_before_everyone_is_ready_starts_the_clock_at_once(
     run(&mut s, 1.0);
     s.move_player(a, [20.0, 0.0, 0.0], 0.0, Moving::default());
     let ev = run(&mut s, 0.2);
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title.contains("clock is running") && sub.contains("Ayla stepped off"))), "{ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title.contains("Clock Running") && sub.contains("Ayla left the lamp"))), "{ev:?}");
     assert!(s.wager().unwrap().started.is_some(), "no head start for free");
 }
 
@@ -1614,7 +1666,7 @@ fn the_camp_hears_where_its_chests_news_comes_from() {
     let plunder = camp.content.item("plunder").unwrap();
     camp.from_below_at(Some("The Stockade"), &[], &BTreeMap::from([(plunder, 2)]));
     let ev = camp.step(DT);
-    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("From The Stockade"))), "{:?}", ev.iter().filter(|e| matches!(e, Event::Announce { .. })).collect::<Vec<_>>());
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("from The Stockade"))), "{:?}", ev.iter().filter(|e| matches!(e, Event::Announce { .. })).collect::<Vec<_>>());
 }
 
 #[test]
@@ -1637,7 +1689,7 @@ fn a_hero_leaving_a_run_gets_its_tally() {
     let ev = run(&mut s, 0.05);
     let page = ev.iter().find_map(|e| if let Event::Letter { kind, place, text, .. } = e { (kind == "run").then(|| (place.clone(), text.clone())) } else { None }).expect("the run's page");
     assert_eq!(page.0, "Home by a lamp");
-    assert!(page.1.contains("Foes felled: 1") && page.1.contains("You fell once") && page.1.contains("7 "), "{}", page.1);
+    assert!(page.1.contains("Enemies killed: 1") && page.1.contains("You fell once") && page.1.contains("7 "), "{}", page.1);
     assert!(page.1.contains("Still standing") || page.1.contains("No boss down yet"), "{}", page.1);
 }
 
@@ -1676,7 +1728,7 @@ fn a_new_band_down_starts_its_own_tally_and_the_bosses_are_the_dungeons() {
     s.run_page(id, "Home by a lamp");
     let ev = run(&mut s, 0.05);
     let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
-    assert!(text.contains("Foes felled: 0") && text.contains("didn't fall") && !text.contains("A first") && !text.contains("Time below: 2"), "{text}");
+    assert!(text.contains("Enemies killed: 0") && text.contains("didn't fall") && !text.contains("A first") && !text.contains("Time below: 2"), "{text}");
     // A boss the dungeon has down (kept over a restart, as its slain are) is on the page.
     let d = s.dungeon_def().cloned().unwrap();
     let boss = crate::sim::wager::wager_bosses(&d, &s.content)[0].clone();
@@ -1791,7 +1843,7 @@ fn a_harder_tier_opens_once_two_of_the_tier_below_are_cleared() {
     let open = |s: &Survival, k: &str| s.book_dungeons().into_iter().find(|b| b.key == k).map(|b| (b.open, b.locked)).unwrap();
     assert!(open(&camp, "deadmines").0 && open(&camp, "ragefire").0, "the first tier from the start");
     let (shut, words) = open(&camp, "stockade");
-    assert!(!shut && words.contains("clear 2 more of the Tier I"), "{words}");
+    assert!(!shut && words.contains("clear 2 more Tier I"), "{words}");
     assert!(!open(&camp, "cathedral").0);
     assert!(!camp.book_pages().iter().any(|(_, n)| n.contains("Stockade")), "no page to go down by");
     // One cleared: one more to go. Two: the second tier reads.
@@ -1830,10 +1882,10 @@ fn the_books_record_of_a_dungeon_lists_its_bosses_their_gear_and_the_camps_kills
     camp.lore_page(id, "deadmines").unwrap();
     let ev = camp.step(DT);
     let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "lore").then(|| text.clone()) } else { None }).unwrap();
-    assert!(text.contains("Its bosses"), "{text}");
+    assert!(text.contains("Defeat every boss"), "{text}");
     assert!(text.contains("Mr. Smite: felled 2 times") && text.contains("Smite's Mighty Hammer"), "{text}");
     assert!(text.contains("Cookie: not felled yet"), "{text}");
     // A trophy is the camp's the first time; after, it's in the chest.
     let line = |who: &str| text.lines().find(|l| l.starts_with(&format!("- {who}:"))).unwrap_or("").to_string();
-    assert!(line("Mr. Smite").contains("in the camp's chest") && line("Cookie").contains("the camp's the first time"), "{text}");
+    assert!(line("Mr. Smite").contains("in storage") && line("Cookie").contains("sent to storage the first time"), "{text}");
 }

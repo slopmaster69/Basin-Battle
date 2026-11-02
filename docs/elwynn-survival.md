@@ -3,8 +3,8 @@
 A small survival and action-combat experiment beside Basin Battle, on the same benilla client and
 the same host. You are a footman of Goldshire: fight with aimed, committed blows, a shield and a
 dodge; gather timber, meat and Fargodeep copper; bank it at the camp; build a cooking fire
-and a smithing anvil in the meadow; and, when you're ready, ring the bell and hold the camp
-against the Horde's raids. Past the camp the whole of Elwynn Forest is open, from Northshire to
+and a smithing anvil in the old Westbrook garrison's yard; and, when you're ready, ring the bell
+and hold the camp against the Horde's raids. It is always night, under Duskwood's mist. Past the camp the whole of Elwynn Forest is open, from Northshire to
 the Westfall bridge and the Redridge road: its places are marked on the world map, and each has
 its foes, its goods, its chests and secrets, and the shrines and champions that teach the camp
 its cards.
@@ -87,7 +87,7 @@ effect.
 | Num Lock | Autorun (put it on a mouse button on the card if you like) |
 | V | The health bars over heads (foes' and friends') on or off |
 | B | The bags: the backpack and all four satchels |
-| H | Build: the menu, then the station stands in front of you with the mouse free, a ring on the ground where it goes (green: it can; red: it can't, and the banner says why); only you see it until it's built, so it never stands in a friend's way. F puts it down, R or T turns it, H cancels |
+| H | Build: the menu, then the station stands in front of you with the mouse free, see-through and light blue, a ring on the ground where it goes (green: it can; red: it can't, and the banner says why); only you see it until it's built, and it's never solid, so it never stands in your way or a friend's (client patch 0017; an older client draws it solid and fading). F puts it down, R or T turns it, H cancels |
 | N | The **board** of abilities |
 | J | The camp's journal |
 | Tab | **Lock on** to the foe in front of you (the one you've been trading blows with first, then a hero to fight, then a creature fighting someone; a creature minding its business last); Tab again lets go (middle mouse too, if the card says so) |
@@ -142,11 +142,11 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Flare · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
-| 3 | **Ultimate** | Onslaught | Avenging Wrath | Kill Shot | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
+| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Split Arrow* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
+| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
+| 3 | **Ultimate** | Onslaught | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
 it) to cast that for Valor instead. An ultimate has none: it is the bar's whole worth.
@@ -167,14 +167,20 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   roots, and its key again within 3 s throws Hammer of Justice, a stun: ride in, then punish
   (its EX, Blessing of Freedom, frees and speeds a friend). Blessing of Protection halves what a
   friend takes for 3 s, the one defense you give away; Lay on Hands is 40% of their health at once.
-- **Hunter**: set up, then snipe. Aimed Shot is a draw: the longer you hold it, the harder,
-  farther and faster the arrow, and fully drawn it goes through the whole line (a heavy blow on you
-  spoils it); Multi-Shot is five arrows in a fan. Traps arm and wait (Explosive: a burst that throws
-  back and burns; Freezing: a freeze, and setting it makes your next Aimed Shot a free Multi-Shot
-  that shatters the frozen). Disengage leaps you straight back (its EX nets the foe in front);
-  Flare is lobbed onto a pack and blinds them till they're struck, Feign Death drops you as if dead
-  and every creature and lock lets go; Kill Shot is a 1 s draw that goes through a 40 yd line and
-  finishes anything under a quarter of its health.
+- **Hunter**: the archer who owns the ground, with two choices on every key (the board shows the
+  second under the first). Every arrow that ends its flight sticks in the ground for 6 s (up to
+  12), and Arrow Recall (Tripwire's EX) brings them all home through the fight, each at full damage;
+  three or more in one foe Lacerate it. Q: Aimed Shot, a draw (its EX Multi-Shot a fan), or Bank
+  Shot, which ricochets off walls and trees harder each bounce (its EX Split Arrow a point-blank
+  spray that kicks you back). E: Call of the Wild, a chain of spirit beasts that builds from setup
+  to finisher (the key shows the beast coming; a hit, parry or perfect dodge since the last call
+  empowers the next), or Raptor Strike, a spear chain (thrust, sweep, an Uppercut that throws you
+  up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
+  foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
+  (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
+  Tripwire, two planted arrows and a wire that knocks down the first to cross, or the traps. 3:
+  Kill Shot, or Skyfall: a leap straight up, a slow fall over the fight, and a volley of 12 arrows
+  where you aim (they plant).
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
@@ -338,7 +344,6 @@ page last (1 or 2), so an add-on from before them simply doesn't show them.
 | Q | Ricochet · *Pinball* | A spike that bounces to three more foes within 8 yd, each bounce ×1.25 (7, 9, 11, 14). EX: five bounces, each stunning 0.75 s. |
 | Q | Gravity Lance · *Collapse* | A heavy bolt: every foe within 5 yd of the one it strikes is dragged into it, all take 14. EX: 6 yd, 16, and they're slowed 70% for 2 s. |
 | E | Whirlwind · *Bladestorm* | Spin 2 s, still moving at about 70%: 5 every half second to everything within 4 yd in front and to your sides. EX: 3 s, and nothing staggers you. |
-| E | Launcher · *Juggle* | An uppercut: 10, stunned 0.8 s and thrown up; E again within 1.5 s leaps you onto them for 14 in 3 yd (Slam). EX: 14, 1.2 s, a Slam of 18 that throws them 4 yd. |
 | E | Siphon Blade · *Soul Rend* | A 4 yd slash, 12 to each foe, and you heal 60% of all it deals. EX: wider, 16, and you heal all of it. |
 | 1 | Blink Dagger · *Phase Strike* | Blink 12 yd, and again within 3 s. EX: each blink lands with 8 to everyone within 3 yd. |
 | 1 | Phase Dash · *Searing Dash* | Dash 10 yd through foes, untouchable: each takes 4 and burns 4 a second for 3 s. EX: 14 yd, and they're slowed 40% too. |
@@ -826,7 +831,7 @@ yours to point to, the corner's arrow points the way to the nearest place not ye
 | Ridgepoint Tower and Blackfang's den | the Blackrock: outrunners, shadowcasters, Rak'gash the Herald and the tower's armory; Old Blackfang (the hunter's champion) |
 | Jerod's Landing | Defias smugglers and their crate (guarded); murlocs; fish; the rogue's relic under the dock |
 | The Maclure Vineyards and Stonefield | kobolds raiding the farms; Goldtooth (rare); cows, chickens, sheep (wool); Ma Stonefield's savings (secret) |
-| Forest's Edge and Westbrook | the Riverpaw gnolls and Hogger (rare, wandering between their camps); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic at the garrison |
+| Forest's Edge | the Riverpaw gnolls and Hogger (rare, wandering between their camps); the warrior's shrine (the garrison's banner, carried off to their camp); briarthorn; the Westbrook armory (once Hogger falls); the paladin's relic under the old garrison's north ballista |
 | Mirror Lake, its orchard and Thunder Falls | the druid's shrine; Moonfeather (the druid's champion); the druid's relic in the orchard, the shaman's behind the falls |
 
 **Characters.** Each login can have up to ten characters, made on the client's own creation
@@ -1131,10 +1136,46 @@ Commands, if you'd rather type: `.siege join 1v1` (or `2v2`, `1v1v1`, `1v1v1v1`)
 leave`, `.siege start`, `.siege send <kobolds|murlocs|wolves|footpads|spiders|brute|conjurers|
 berserkers|mystics|bear|brave|overseer|hogger|warlord>`, `.siege target [camp]`, `.siege`.
 
+## The camp at Westbrook
+
+The camp stands where the Westbrook garrison did, on Elwynn's western road: the barracks is gone
+from the land (`WESTBROOK_EDITS` in `crates/htl-map/src/elwynn.rs` for the server, client patch
+0019 for what's drawn, the two kept together), the hole its floor stood in closed, and the
+survivors camp on its level yard. The gate is to the south, between the old lion statues, where
+the road goes down to the Westfall road.
+
+Everything has its place round the camp's fire (`[[prop]]` under "the camp as it grows" in
+`content/survival.toml`): the chest among the stores to the north-west, the survivors' shelter to
+the north, the muster yard by the gate (the rack, a dummy, a target), the Logbook on its table to
+the east, the forge yard to the west. The camp grows as it goes (a `[[prop]]`'s `after`), and says
+so as it does:
+
+| When | What comes |
+| --- | --- |
+| A cooking fire built | A supply wagon; Quartermaster Hale by the stores, Tobin the cook by the fire |
+| An anvil built | A forge in the west yard, a lumber pile, Garrick Stone the smith |
+| A tanning rack built | A meat rack by the shelter; Wren Ashby, a trapper |
+| A cauldron built | Herb sacks; Sister Maren, an herbalist |
+| The Warsong Raid beaten | Stormwind's flag over the shelter, banners and two sentries on the gate |
+| The Darkspear Raid beaten | A guard tower over the north-east corner (Elwynn's own, half size), Scout Marten |
+| The Horde Warband beaten | A second tower over the west wall, Marshal Wyle by the fire |
+| The Blackrock Assault beaten | Westbrook's footmen, a second weapon rack |
+
+The camp's people are drawn as creatures (friendly, never fought, never in the way of a blow).
+A camp from before the move keeps its stations: each standing outside the new building ground is
+carried over to the nearest good spot in it as the save is read.
+
+**Night and fog.** The game clock is pinned at half past eleven at night (`[world] clock`), set
+again every five minutes so it never runs on to the dawn (not below, not in Siege). The add-on
+asks the client for Duskwood's mist over it (`[world] fog`; `raid_fog`, thicker and redder, from
+the bell until the raid is over), through client patch 0018's `SetWorldFog`; a client without it
+keeps Elwynn's own night.
+
 ## Resources, stations and what they make
 
-**Where to build.** The camp's building ground is the meadow south and west of the chest, 46
-yards across its middle each way (`build_center`, `build_radius`), ringed by torches. While you
+**Where to build.** The camp's building ground is the old garrison yard round the camp's fire, 42
+yards from the fire each way (`build_center`, `build_radius`), ringed by torches; the camp's own
+things keep their ground (a `[[prop]]`'s `clear`), and stations go up in the yards between. While you
 place a station the add-on lays the whole ground out in green on the ground, and a spot outside
 it says how far and which way the ground is. `elwynn_probe <Data> <rules> x build [x y r]...`
 maps a building ground on the real land (a cell every 3 yards: where a cooking fire goes, and
@@ -1172,6 +1213,38 @@ and it's back ten minutes later.
 | Herbalist's Cauldron | 4 stone, 2 copper | Healing Salve (quick: a tenth at once, 30% more over 10 s), Silverleaf Tonic (stamina back half again as fast for a minute) |
 | Workbench | 8 timber, 3 stone | Rough Sharpening Stones (every blow a tenth harder for 2 minutes), Leather Rucksack |
 
+**What's built, at its window.** Using a station (F) opens its window: its work, its health, and
+what else it offers. **Upgrade** turns it into what it becomes where it stands (paid for as the
+work's done, full health; it still does what it did, so a raid that needs a cooking fire finds a
+field kitchen). **Move** picks it up: its ghost follows you as when placing, F sets it down
+(nothing to pay, half the building's work), H leaves it where it was. **Tear down** asks first,
+then gives half of what it cost back to the chest. None of it during a raid, nor in Siege.
+
+| Upgrade | From | Costs more | Does |
+| --- | --- | --- | --- |
+| Field Kitchen | Cooking Fire | 8 timber, 4 stone, 2 copper | cooks a third faster, one more of every batch |
+| Forge | Smithing Anvil | 4 timber, 6 copper, 8 stone | smithing much faster (1.6 times) |
+| Iron-Bound Bulwark | Crate Bulwark | 4 stone, 1 bronze | 1300 health against 700 |
+| Thorn Wall | Thorn Hedge | 4 timber, 3 briarthorn | its spikes bite twice as hard |
+| Guard Tower | Watchtower | 6 timber, 8 stone, 3 bronze | shoots 22 within 28 yd every 1.6 s (14, 22 yd, 2 s) |
+
+**Walls.** The bulwark, the hedge and the **Banner Gate** (6 timber, 2 linen) sit on the camp's
+3-yard grid (`snap`), a quarter turn at a time, and stand cell to cell: lay blocks side by side
+and they make a wall, the gate a cell of it. Heroes walk through the gate (client patch 0017
+draws it with no collision); raiders go for it like any defence and must tear it down.
+
+**Buildings**, one of each (`most`), on a bigger footprint:
+
+| Building | Costs | Its job |
+| --- | --- | --- |
+| Barracks Tent | 20 timber, 6 linen, 4 leather | the fallen are up twice as soon, with a fifth more health |
+| Infirmary Tent | 12 timber, 8 linen, 6 peacebloom | resting within 9 yd heals two and a half times as fast |
+| Lumber Mill | 24 timber, 10 stone, 6 copper, 2 bronze | two timber into the chest every minute (not during a raid) |
+
+**Testing the building**: with `.es debug` on, `.es freebuild` makes stations, upgrades and
+mending free at the camp (again to stop), `.es mats [n]` puts n (50) of every building material
+in the chest, and `.es tune work.build 0` makes the work instant.
+
 **Armor** is worn on the chest and the head, over the plain outfit, and shows on the hero. It
 takes its share off every blow that lands (the HUD shows the total): Hide Jerkin 10%, Leather Cap
 4%, Bronze-Ringed Mail 20% (stamina back a tenth slower), Bronze Helm 7% (a little slower). Made
@@ -1193,30 +1266,32 @@ The camp's **journal** (top right; **J** opens the whole of it) gives the next s
 anvil, Warsong grunts felled, the first raid held, a tanning rack, armor worn, a cauldron, salves,
 the second raid, the Darkspear camp, the Overseer, the mine yard, bronze, a palisade, a workbench, a watchtower, the warband and its Warlord. The steps:
 
-1. You start by the camp chest on the east edge of Goldshire's meadow with an axe, a buckler, a
-   hunting bow and one roast. The weapon rack beside it has everything else to try.
-2. Timber lies beside the trees west of the camp: G at a pile (a short gather). Boars roam the
-   meadows south-west: they leave meat and hide. Peacebloom grows in the meadows, silverleaf in
+1. You start inside the camp's gate at Westbrook with an axe, a buckler, a hunting bow and one
+   roast. The weapon rack in the muster yard by the gate has everything else to try.
+2. Timber lies under the trees round the camp: G at a pile (a short gather). Boars roam the
+   meadows to the east, toward Goldshire: they leave meat and hide. Peacebloom grows in the meadows, silverleaf in
    the forest's shade.
 3. Bank what you carry at the camp chest (G). Your bags hold 80 stacks: the backpack's 16 and four 16-slot satchels. The chest's window is a grid
    of what's in it: click a thing to take one, Shift-click for five, right-click for all; click gear
    (the gold mark) to put it on. The build menu and each station list what they make with what it
    costs, red where you're short; hover over anything for what it does.
-4. Build a **Cooking Fire** (6 timber) in the meadow beside the camp; cook raw meat into roasts.
-5. The **Fargodeep mine yard** is south-west down the road, held by the Warsong: copper veins
+4. Build a **Cooking Fire** (6 timber) in the camp's yard; cook raw meat into roasts.
+5. The **Fargodeep mine yard** is south-east down the Goldshire road, held by the Warsong: copper veins
    among grunts, a shaman and the Overseer, tin at the back. Boulders along the road give stone.
 6. Build a **Smithing Anvil**, then a **Tanning Rack** and a **Herbalist's Cauldron**: armor,
    salves, tonics, bronze (see the tables above).
 7. The **Alarm Bell** (G) calls the next raid once the camp has what it needs: the **Warsong Raid**
-   (a cooking fire and an anvil), then the **Darkspear Raid** from the west (a tanning rack and a
-   cauldron), then the **Horde Warband** with **Warlord Gorzak** (a workbench and a palisade), then the
-   **Blackrock Assault** down the east road with **Rak'gash the Herald** (a watchtower and a
-   palisade); once all four are beaten the last comes back, a raider more of each kind every time. The road they'll come by is marked;
+   (a cooking fire and an anvil) up the Goldshire road, then the **Darkspear Raid** through the woods
+   to the north-east (a tanning rack and a cauldron), then the **Horde Warband** with **Warlord
+   Gorzak** over the Westfall bridge (a workbench and a crate bulwark), then the **Blackrock
+   Assault** along the Goldshire road with **Rak'gash the Herald** (a watchtower and a bulwark); once all four are beaten the last comes back, a raider more of each kind every time. The road they'll come by is marked;
    they come a few at a time and go for the stations, the defences first. Kill them all for the
    spoils; if everyone is down for long, the camp falls: the stations they reached burn and can be
    mended at the station.
-8. **Defences**: a **Palisade** (10 timber, 2 stone) that raiders break before they reach what it
-   guards, a **Spiked Barricade** (6 timber, 2 copper) that they go for too, and bleed at, and a
+8. **Defences**: a **Crate Bulwark** (10 timber, 2 stone; its key is still `palisade`) that
+   raiders break before they reach what it guards, a **Thorn Hedge** (6 timber, 2 copper; key
+   `barricade`) that they go for too, and bleed at, both near enough square that they stand the
+   same whichever way they're turned and set side by side make a wall, and a
    **Watchtower** (12 timber, 6 stone, 2 bronze) whose archers shoot the nearest raider within 22
    yards every two seconds (raiders go for it first, too).
 

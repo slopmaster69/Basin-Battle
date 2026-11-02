@@ -86,10 +86,12 @@ impl Survival {
     pub(crate) fn arm_combos(&mut self, id: Id, ability: usize, began: Vec3, free: Option<Free>) {
         let now = self.clock;
         let d = &self.content.abilities[ability];
-        let recast = self.content.ability(&d.recast).filter(|_| !matches!(free, Some(Free::Recast { .. })));
+        // A recast arms nothing, unless it chains on to one of its own (Raptor Strike's hits).
+        let recast = self.content.ability(&d.recast).filter(|_| !matches!(free, Some(Free::Recast { .. })) || d.inner);
         let window = d.recast_secs;
         let empower = d.empower.as_ref().and_then(|e| Some((self.content.ability(&e.ability)?, e.secs)));
-        let base = self.content.base_of(ability);
+        // A chain's later hit arms its next on the key it's on (Raptor Strike's).
+        let base = if d.inner { self.chain_key(id, ability).unwrap_or_else(|| self.content.base_of(ability)) } else { self.content.base_of(ability) };
         let start = self.standing_spot(began);
         let Some(p) = self.players.get_mut(&id) else { return };
         let mut changed = false;
@@ -104,6 +106,29 @@ impl Survival {
         if changed {
             self.events.push(Event::Abilities { player: id });
         }
+    }
+
+    /// The base ability on a key of the hero's whose chain of recasts (its own, or its EX
+    /// version's) reaches `ability`.
+    fn chain_key(&self, id: Id, ability: usize) -> Option<usize> {
+        let c = &self.content;
+        let key = &c.abilities[ability].key;
+        let p = self.players.get(&id)?;
+        p.loadout.values().filter_map(|k| c.ability(k)).find(|&b| {
+            std::iter::once(b).chain(c.ex_of(b)).any(|start| {
+                let mut next = c.abilities[start].recast.clone();
+                for _ in 0..8 {
+                    if next.is_empty() {
+                        return false;
+                    }
+                    if &next == key {
+                        return true;
+                    }
+                    next = c.ability(&next).map_or(String::new(), |n| c.abilities[n].recast.clone());
+                }
+                false
+            })
+        })
     }
 
     /// Every tick: recast windows and empowers whose time is up close (one aimed or charging

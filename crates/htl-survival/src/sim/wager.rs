@@ -84,12 +84,12 @@ pub struct Term {
 /// Every term there is. Which three are on rotates weekly ([`ROTATION`]); a wager takes on the
 /// first from [`TERM_LEVELS`]'s first level, the second from its second, the third from its third.
 pub const ALL_TERMS: [Term; 6] = [
-    Term { key: "calling", name: "The Call", text: "A pack still fighting after five seconds calls the nearest pack at rest: kill quickly, or pull with care." },
-    Term { key: "quickening", name: "Quickening", text: "Bosses hit a tenth harder for every twenty seconds the fight lasts: bring them down fast." },
-    Term { key: "rallying", name: "Rallying", text: "When a foe falls, the rest of its pack heal a little and hit harder." },
-    Term { key: "frenzied", name: "Frenzied", text: "Foes below a third of their health hit a third harder: finish them quickly." },
-    Term { key: "smouldering", name: "Smouldering", text: "Fallen foes leave burning ground behind for a few seconds." },
-    Term { key: "eruptions", name: "Eruptions", text: "In a fight, the ground under one of you erupts now and then: step off the mark." },
+    Term { key: "calling", name: "The Call", text: "A pack still fighting after 5 sec calls the nearest resting pack within 30 yd. Kill quickly or pull with care." },
+    Term { key: "quickening", name: "Quickening", text: "Bosses deal 10% more damage for every 20 sec the fight lasts, up to 100% more." },
+    Term { key: "rallying", name: "Rallying", text: "When an enemy dies, the rest of its pack heals a little and deals more damage." },
+    Term { key: "frenzied", name: "Frenzied", text: "Enemies below 33% health deal 33% more damage." },
+    Term { key: "smouldering", name: "Smoldering", text: "Enemies leave burning ground for 6 sec when they die." },
+    Term { key: "eruptions", name: "Eruptions", text: "During a fight, the ground under one of you erupts every 18 sec. Step off the mark." },
 ];
 
 /// The wager levels the week's three terms come in at.
@@ -346,8 +346,8 @@ impl Survival {
         self.reset_below(false);
         self.scale_wager_foes();
         let names: Vec<&str> = self.wager_terms().iter().map(|t| t.name).collect();
-        let terms = if names.is_empty() { String::new() } else { format!(" Its terms: {}.", names.join(", ")) };
-        self.announce(format!("The Bookmaker takes a wager on {} at +{level}: {} to beat.{terms}", d.name, clock_words(limit)));
+        let terms = if names.is_empty() { String::new() } else { format!(" Terms: {}.", names.join(", ")) };
+        self.announce(format!("The Bookmaker took a wager on {} at +{level}. Time to beat: {}.{terms}", d.name, clock_words(limit)));
     }
 
     /// Below: a hero arrives for a wager (their name and class on its slip).
@@ -364,11 +364,11 @@ impl Survival {
         let (level, limit) = (w.level, w.limit);
         if stopped {
             let name = self.players.get(&id).map_or(String::new(), |p| p.name.clone());
-            self.announce(format!("{name} arrives: the count waits till everyone's ready."));
+            self.announce(format!("{name} arrived. The countdown waits until everyone is ready."));
         }
         let terms: Vec<String> = self.wager_terms().iter().map(|t| format!("{}: {}", t.name, t.text)).collect();
-        let how = if waiting { "say you're ready (.es ready) and the clock starts when everyone is" } else { "the clock is already running" };
-        self.events.push(Event::Banner { player: Some(id), title: format!("The Bookmaker's Wager: +{level}"), sub: format!("{} to beat; {how}", clock_words(limit)) });
+        let how = if waiting { "Say you're ready with .es ready. The clock starts when everyone is" } else { "The clock is already running" };
+        self.events.push(Event::Banner { player: Some(id), title: format!("Bookmaker's Wager +{level}"), sub: format!("{} to beat. {how}", clock_words(limit)) });
         if !terms.is_empty() {
             self.tell(id, terms.join(" "));
         }
@@ -380,13 +380,13 @@ impl Survival {
         let (account, name) = (p.account.clone(), p.name.clone());
         let wall = self.wall();
         let accounts: BTreeSet<String> = self.players.values().map(|p| p.account.clone()).collect();
-        let w = self.below.as_mut().and_then(|b| b.wager.as_mut()).ok_or("There's no wager on down here.")?;
+        let w = self.below.as_mut().and_then(|b| b.wager.as_mut()).ok_or("There's no wager in this dungeon.")?;
         if w.started.is_some() {
             return Err("The clock is already running.".into());
         }
         w.first_ready.get_or_insert(wall);
         if !w.ready.insert(account) {
-            return Err("You're ready; waiting on the rest.".into());
+            return Err("You're ready. Waiting on the others.".into());
         }
         let ready = w.ready.intersection(&accounts).count();
         let all = ready == accounts.len();
@@ -395,7 +395,7 @@ impl Survival {
             w.called = WAGER_COUNTDOWN as i64 + 1;
         }
         if all {
-            self.announce(format!("{name} is ready. Everyone is: the clock starts in {}.", WAGER_COUNTDOWN as i64));
+            self.announce(format!("{name} is ready. Everyone is ready, and the clock starts in {} sec.", WAGER_COUNTDOWN as i64));
         } else {
             self.announce(format!("{name} is ready ({ready} of {}).", accounts.len()));
         }
@@ -447,7 +447,7 @@ impl Survival {
         if let Some(w) = self.below.as_mut().and_then(|b| b.wager.as_mut()).filter(|w| w.done.is_none() && w.started.is_some()) {
             w.deaths += 1;
             let n = w.deaths;
-            self.announce(format!("A fall: the Bookmaker adds {} to the clock ({n} so far).", clock_words(WAGER_DEATH)));
+            self.announce(format!("A hero fell. The Bookmaker added {} to the clock ({n} so far).", clock_words(WAGER_DEATH)));
         }
     }
 
@@ -543,7 +543,7 @@ impl Survival {
                 m.state = MobState::Chase { foe };
                 m.think = 0.0;
             }
-            self.announce(format!("The {name} calls for help: another pack comes!"));
+            self.announce(format!("The {name} called for help. Another pack is coming."));
         }
     }
 
@@ -607,10 +607,10 @@ impl Survival {
                     wm.countdown = None;
                 }
                 let sub = match (&away, done) {
-                    (Some(name), false) => format!("{name} stepped off from the lamp; {} to beat", clock_words(w.limit)),
+                    (Some(name), false) => format!("{name} left the lamp. {} to beat", clock_words(w.limit)),
                     _ => format!("{} to beat", clock_words(w.limit)),
                 };
-                self.events.push(Event::Banner { player: None, title: format!("+{}: the clock is running", w.level), sub });
+                self.events.push(Event::Banner { player: None, title: format!("+{} Clock Running", w.level), sub });
             } else if let Some(t) = w.countdown {
                 // The count, a banner a second.
                 let left = (t - wall).ceil() as i64;
@@ -618,7 +618,7 @@ impl Survival {
                     if let Some(wm) = self.below.as_mut().and_then(|b| b.wager.as_mut()) {
                         wm.called = left;
                     }
-                    self.events.push(Event::Banner { player: None, title: format!("{left}"), sub: format!("+{}: the clock starts", w.level) });
+                    self.events.push(Event::Banner { player: None, title: format!("{left}"), sub: format!("Wager +{} starts", w.level) });
                 }
             }
             return;
@@ -681,7 +681,7 @@ impl Survival {
                     wm.short_told = true;
                 }
                 let left = needed - w.forces;
-                self.events.push(Event::Banner { player: None, title: "The bosses are down".into(), sub: format!("The Bookmaker wants {left} more foe{} felled: the clock runs on", if left == 1 { "" } else { "s" }) });
+                self.events.push(Event::Banner { player: None, title: "Bosses Down".into(), sub: format!("Kill {left} more enem{}. The clock is still running", if left == 1 { "y" } else { "ies" }) });
             }
         }
     }
@@ -738,13 +738,13 @@ impl Survival {
             splits,
         }));
         let (title, sub) = if timed {
-            (format!("Wager Won: +{}", w.level), format!("{} of {}{}", clock_words(secs), clock_words(w.limit), if up > 0 { format!(": +{reach} is open now") } else { String::new() }))
+            (format!("Wager +{} Won", w.level), format!("{} of {}{}", clock_words(secs), clock_words(w.limit), if up > 0 { format!(". +{reach} is now open") } else { String::new() }))
         } else {
-            (format!("+{}: Over Time", w.level), format!("{} of {}: the Bookmaker pays half, and the stakes stay", clock_words(secs), clock_words(w.limit)))
+            (format!("Wager +{} Over Time", w.level), format!("{} of {}. The Bookmaker pays 50% and the stakes stay", clock_words(secs), clock_words(w.limit)))
         };
         self.events.push(Event::Banner { player: None, title, sub });
         self.announce(format!(
-            "{} at +{}: {} ({} fall{}), {}.",
+            "{} at +{} ended at {} with {} fall{}, {}.",
             d.name,
             w.level,
             clock_words(secs),
@@ -754,7 +754,7 @@ impl Survival {
         ));
         self.pay_wager(d, w.level, timed);
         // Each hero's tally of the run, with what it paid them.
-        let how = format!("Wager +{}, {}: {}", w.level, if timed { "in time" } else { "over time" }, clock_words(secs));
+        let how = format!("Wager +{}, {}, {}", w.level, if timed { "in time" } else { "over time" }, clock_words(secs));
         let heroes: Vec<Id> = self.players.keys().copied().collect();
         for id in heroes {
             self.run_page(id, &how);
@@ -770,7 +770,7 @@ impl Survival {
             let heroes: Vec<Id> = self.players.keys().copied().collect();
             for id in heroes {
                 let left = self.give(id, plunder, n);
-                self.tell(id, format!("The Bookmaker pays out: {} {}.", n - left, self.content.items[plunder].name));
+                self.tell(id, format!("The Bookmaker paid out {} {}.", n - left, self.content.items[plunder].name));
                 if left > 0 {
                     self.events.push(Event::ToCamp { counts: Vec::new(), items: BTreeMap::from([(plunder, left)]) });
                 }
@@ -811,7 +811,7 @@ impl Survival {
         }
         if !won.is_empty() {
             let names: Vec<String> = won.iter().map(|(i, n)| if *n > 1 { format!("{n} {}", self.content.items[*i].name) } else { self.content.items[*i].name.clone() }).collect();
-            self.announce(format!("The Bookmaker's gear goes to the camp's chest: {}.", names.join(", ")));
+            self.announce(format!("The Bookmaker's gear was sent to storage: {}.", names.join(", ")));
             self.events.push(Event::ToCamp { counts: Vec::new(), items: won });
         }
     }
@@ -864,8 +864,8 @@ impl Survival {
                 names.push(self.content.items[*i].name.clone());
             }
             self.events.push(Event::Storage);
-            self.events.push(Event::Banner { player: None, title: "The Bookmaker's Chest".into(), sub: format!("For last week's best, +{level} in {}: into the camp's chest", d.name) });
-            self.announce(format!("The Bookmaker's chest, for the week's best wager (+{level} in {}): {}.", d.name, names.join(", ")));
+            self.events.push(Event::Banner { player: None, title: "The Bookmaker's Chest".into(), sub: format!("Last week's best, +{level} in {}, sent to storage", d.name) });
+            self.announce(format!("The Bookmaker's chest for the week's best wager, +{level} in {}, was sent to storage: {}.", d.name, names.join(", ")));
             self.events.push(Event::Dirty);
         }
     }

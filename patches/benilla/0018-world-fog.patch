@@ -1,0 +1,567 @@
+From c59abd18dbe5c98e539649f66135b1b966860e48 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Mon, 2 Nov 2026 11:36:19 -0600
+Subject: [PATCH] SetWorldFog and ClearWorldFog: an add-on sets the outdoor fog
+ and gloom; HasActionCombat() is 12
+
+SetWorldFog(r, g, b, fogEnd, startFrac, weight, seconds[, darken]) blends the zone's outdoor
+scene fog toward that colour and distance by weight, eased over seconds, and darken dims the
+ambient light, the sun and the sky toward a Duskwood gloom; the sky dome leans toward the fog
+colour so the horizon meets it. ClearWorldFog([seconds]) eases back to the zone's own. A
+building's own fog still takes over inside it, water keeps its own, and leaving the world clears
+it. Elwynn Survival drives it from the server's tuning.
+---
+ .../benilla-app/src/creature_anim/action.rs   |  30 +++-
+ crates/benilla-app/src/target/mod.rs          |  10 +-
+ crates/benilla-app/src/target/world_fog.rs    |  66 +++++++
+ crates/benilla-ui/src/action_combat.rs        | 112 +++++++++++-
+ .../src/lighting/fog_override.rs              | 167 ++++++++++++++++++
+ crates/benilla-world/src/lighting/mod.rs      |   3 +
+ crates/benilla-world/src/lighting/resolve.rs  |  13 +-
+ 7 files changed, 396 insertions(+), 5 deletions(-)
+ create mode 100644 crates/benilla-app/src/target/world_fog.rs
+ create mode 100644 crates/benilla-world/src/lighting/fog_override.rs
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 9ce92dc9..0597b26a 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1139,10 +1139,17 @@ pub(super) fn apply_action_tilts(
+ }
+ 
+ /// Leaving the world (a logout, a disconnect): the add-on's action mouse, aim camera, lock-on and
+-/// markers all let go, so the next screen has its cursor whatever the add-on managed to undo.
+-pub(super) fn reset_action_on_world_exit(mut lock: ResMut<LockOn>) {
++/// markers all let go, so the next screen has its cursor whatever the add-on managed to undo. Its
++/// outdoor fog (`SetWorldFog`) goes at once too, so it never carries into the next world.
++pub(super) fn reset_action_on_world_exit(
++    mut lock: ResMut<LockOn>,
++    fog: Option<ResMut<benilla_world::lighting::FogOverride>>,
++) {
+     action_combat::reset();
+     lock.0 = None;
++    if let Some(mut fog) = fog {
++        *fog = benilla_world::lighting::FogOverride::default();
++    }
+ }
+ 
+ /// A new UI VM (a `ReloadUI`, an add-on turned off): what the old one's add-on held is let go, as
+@@ -1381,6 +1388,25 @@ pub(super) fn plugin(app: &mut App) {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn leaving_the_world_drops_the_add_ons_outdoor_fog_at_once() {
++        use benilla_world::lighting::{FogLook, FogOverride};
++        let mut app = App::new();
++        app.init_resource::<LockOn>();
++        let mut fog = FogOverride::default();
++        let look = FogLook {
++            color: [0.1, 0.1, 0.1],
++            end: 60.0,
++            start_frac: 0.0,
++            darken: 0.5,
++        };
++        fog.set(look, 1.0, 0.0, 0.0);
++        app.insert_resource(fog);
++        app.add_systems(Update, reset_action_on_world_exit);
++        app.update();
++        assert_eq!(app.world().resource::<FogOverride>().weight(0.0), 0.0);
++    }
++
+     #[test]
+     fn the_camera_stops_short_of_a_body_on_its_boom_and_passes_one_it_starts_in() {
+         let head = Vec3::new(0.0, 1.8, 0.0);
+diff --git a/crates/benilla-app/src/target/mod.rs b/crates/benilla-app/src/target/mod.rs
+index 233c3ca4..a25ae023 100644
+--- a/crates/benilla-app/src/target/mod.rs
++++ b/crates/benilla-app/src/target/mod.rs
+@@ -13,6 +13,7 @@ use benilla_world::schedule::WorldStage;
+ 
+ mod aim_marker;
+ mod by_name;
++mod world_fog;
+ // `pub(crate)` for the chest live probe, which drives the mouse's own `click::resolve_go_action`.
+ pub(crate) mod click;
+ // `pub(crate)` for the hover inspector, which runs the cursor's `cursor_mode::go_highlightable`.
+@@ -454,7 +455,14 @@ impl Plugin for TargetPlugin {
+             .init_resource::<telegraph::Telegraphs>()
+             .add_systems(
+                 Update,
+-                (aim_marker::update_aim_marker, telegraph::update_telegraphs).after(TargetUpdate),
++                (
++                    aim_marker::update_aim_marker,
++                    telegraph::update_telegraphs,
++                    // The add-on's outdoor fog, for the light resolve (a frame late at worst).
++                    world_fog::apply_world_fog
++                        .run_if(resource_exists::<benilla_world::lighting::FogOverride>),
++                )
++                    .after(TargetUpdate),
+             )
+             .add_systems(PostUpdate, highlight::apply_highlight)
+             // The ring's stream push, after the frame's stream clear.
+diff --git a/crates/benilla-app/src/target/world_fog.rs b/crates/benilla-app/src/target/world_fog.rs
+new file mode 100644
+index 00000000..d10c15ab
+--- /dev/null
++++ b/crates/benilla-app/src/target/world_fog.rs
+@@ -0,0 +1,66 @@
++//! Basin Battle's outdoor atmosphere: the add-on's `SetWorldFog` and `ClearWorldFog`
++//! (`benilla_ui::action_combat`) onto the world's [`FogOverride`], which the time-of-day resolve
++//! folds over the sampled scene fog.
++
++use benilla_ui::action_combat::{self, WorldFogCall};
++use benilla_world::lighting::{FogLook, FogOverride};
++use bevy::prelude::*;
++
++/// Apply the frame's fog calls in the order they came.
++pub(super) fn apply_world_fog(time: Res<Time>, mut fog: ResMut<FogOverride>) {
++    apply_calls(
++        &mut fog,
++        action_combat::take_world_fog(),
++        time.elapsed_secs(),
++    );
++}
++
++fn apply_calls(fog: &mut FogOverride, calls: Vec<WorldFogCall>, now: f32) {
++    for call in calls {
++        match call {
++            WorldFogCall::Set {
++                color,
++                end,
++                start_frac,
++                weight,
++                secs,
++                darken,
++            } => {
++                fog.set(
++                    FogLook {
++                        color,
++                        end,
++                        start_frac,
++                        darken,
++                    },
++                    weight,
++                    secs,
++                    now,
++                );
++            }
++            WorldFogCall::Clear { secs } => fog.clear(secs, now),
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn a_set_then_a_clear_eases_in_and_back_out() {
++        let mut fog = FogOverride::default();
++        let set = WorldFogCall::Set {
++            color: [0.1, 0.1, 0.1],
++            end: 60.0,
++            start_frac: 0.0,
++            weight: 1.0,
++            secs: 2.0,
++            darken: 0.0,
++        };
++        apply_calls(&mut fog, vec![set], 0.0);
++        assert!((fog.weight(2.0) - 1.0).abs() < 1e-5);
++        apply_calls(&mut fog, vec![WorldFogCall::Clear { secs: 0.0 }], 2.0);
++        assert!(fog.weight(2.0).abs() < 1e-5);
++    }
++}
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 8ddbfcf5..d9495ddd 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -110,6 +110,17 @@
+ //!   now; `kind` `"unblockable"` is red, else orange with its rim gold for the last
+ //!   `parrySeconds` (the parry's window); `focus` false draws only a faint outline.
+ //! - `ClearTelegraph([key])`: take one away (all with no key).
++//!
++//! The twelfth (`HasActionCombat() >= 12`), the outdoor atmosphere:
++//!
++//! - `SetWorldFog(r, g, b, fogEnd, startFrac, weight, seconds[, darken])`: the outdoor scene fog
++//!   blended toward that colour (each 0 to 1) and that distance (`fogEnd` yards, the far clip
++//!   still the limit; fog starts at `startFrac` of it, a negative share putting fog at the eye),
++//!   by `weight` (0 to 1), eased in over `seconds`. `darken` (0 to 1) dims the ambient light, the
++//!   sun and the sky with it, toward a Duskwood gloom. A building's own fog still takes over
++//!   inside it, and water keeps its own. Called again, it eases from where it is to the new look.
++//! - `ClearWorldFog([seconds])`: ease back to the zone's own fog (at once with no time).
++//!   Leaving the world clears it.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -555,6 +566,42 @@ fn unit_guid(v: Option<&Value>) -> Option<u64> {
+     }
+ }
+ 
++/// A script's outdoor fog asked for, or taken away (`SetWorldFog`, `ClearWorldFog`).
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub enum WorldFogCall {
++    Set {
++        color: [f32; 3],
++        end: f32,
++        start_frac: f32,
++        weight: f32,
++        secs: f32,
++        darken: f32,
++    },
++    Clear {
++        secs: f32,
++    },
++}
++
++static WORLD_FOG: std::sync::Mutex<Vec<WorldFogCall>> = std::sync::Mutex::new(Vec::new());
++
++/// The outdoor fog calls since the last call, oldest first.
++pub fn take_world_fog() -> Vec<WorldFogCall> {
++    WORLD_FOG
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
++}
++
++fn push_fog(call: WorldFogCall) {
++    if let Ok(mut v) = WORLD_FOG.lock() {
++        // Only the last few matter: each eases from where the one before left it.
++        if v.len() >= 16 {
++            v.remove(0);
++        }
++        v.push(call);
++    }
++}
++
+ /// The ground markers asked for since the last call.
+ pub fn take_ground_markers() -> Vec<GroundMarkerCall> {
+     GROUND_MARKERS
+@@ -582,6 +629,7 @@ pub fn reset() {
+     }
+     push_ground(GroundMarkerCall::Clear { key: None });
+     push_telegraph(TelegraphCall::Clear { key: None });
++    push_fog(WorldFogCall::Clear { secs: 0.0 });
+ }
+ 
+ /// The keys of a dash: `"f"`, `"b"`, `"l"`, `"r"` and their pairs, as `(forward, right)`.
+@@ -672,7 +720,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(11))?,
++        lua.create_function(|_, _: MultiValue| Ok(12))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1046,6 +1094,38 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetWorldFog",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let (Some(r), Some(gr), Some(b), Some(end), Some(start_frac), Some(weight)) = (
++                number(v.first(), 0.0, 1.0),
++                number(v.get(1), 0.0, 1.0),
++                number(v.get(2), 0.0, 1.0),
++                number(v.get(3), 1.0, 5000.0),
++                number(v.get(4), -2.0, 1.0),
++                number(v.get(5), 0.0, 1.0),
++            ) {
++                push_fog(WorldFogCall::Set {
++                    color: [r, gr, b],
++                    end,
++                    start_frac,
++                    weight,
++                    secs: number(v.get(6), 0.0, 600.0).unwrap_or(0.0),
++                    darken: number(v.get(7), 0.0, 1.0).unwrap_or(0.0),
++                });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ClearWorldFog",
++        lua.create_function(|_, args: MultiValue| {
++            let secs = number(args.front(), 0.0, 600.0).unwrap_or(0.0);
++            push_fog(WorldFogCall::Clear { secs });
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "ClearGroundMarker",
+         lua.create_function(|_, args: MultiValue| {
+@@ -1126,6 +1206,36 @@ mod tests {
+         assert_eq!(probe(3.0, 90.0, false), Some(2));
+     }
+ 
++    #[test]
++    fn world_fog_calls_queue_clamped_and_in_order() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        take_world_fog();
++        lua.load(
++            r#"SetWorldFog(0.1, 0.2, 2, 90, 0.1, 0.8, 6, 0.5) SetWorldFog(0.1, 0.2) ClearWorldFog(3) ClearWorldFog()
++               assert(HasActionCombat() >= 12)"#,
++        )
++        .exec()
++        .unwrap();
++        let calls = take_world_fog();
++        assert_eq!(
++            calls,
++            vec![
++                WorldFogCall::Set {
++                    color: [0.1, 0.2, 1.0],
++                    end: 90.0,
++                    start_frac: 0.1,
++                    weight: 0.8,
++                    secs: 6.0,
++                    darken: 0.5,
++                },
++                WorldFogCall::Clear { secs: 3.0 },
++                WorldFogCall::Clear { secs: 0.0 },
++            ],
++            "a call short of its weight is dropped; the colour is held to 1"
++        );
++    }
++
+     #[test]
+     fn ground_markers_queue_and_the_aim_marker_holds() {
+         let lua = Lua::new();
+diff --git a/crates/benilla-world/src/lighting/fog_override.rs b/crates/benilla-world/src/lighting/fog_override.rs
+new file mode 100644
+index 00000000..113c5fb6
+--- /dev/null
++++ b/crates/benilla-world/src/lighting/fog_override.rs
+@@ -0,0 +1,167 @@
++//! A scripted outdoor atmosphere, benilla's own (no reference behaviour): an add-on's
++//! `SetWorldFog` (benilla-ui `action_combat`) blends the sampled scene fog toward its own colour
++//! and distance, and can darken the light toward a Duskwood-like gloom, eased in and out over a
++//! given time. It acts on the outdoor sample only, so a WMO interior's MFOG crossfade still takes
++//! over indoors from the overridden scene fog, and the underwater param keeps its own fog.
++
++use benilla_formats::Atmosphere;
++use bevy::prelude::*;
++
++/// The look the override blends toward.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct FogLook {
++    /// sRGB 0..1, as the fog band's colour.
++    pub color: [f32; 3],
++    /// Fog end in yards (the consumer still takes `min(end, farclip)`).
++    pub end: f32,
++    /// Fog start as a fraction of the end (negative puts fog at the eye).
++    pub start_frac: f32,
++    /// 0..1: how much the ambient, the sun and the sky are dimmed at full weight.
++    pub darken: f32,
++}
++
++/// The scripted override and its ease: `weight` moves from `from` to `to` over `secs` from
++/// `started` (smoothstep). A weight of 0 leaves the atmosphere as sampled.
++#[derive(Resource, Clone, Debug, Default)]
++pub struct FogOverride {
++    look: Option<FogLook>,
++    from: f32,
++    to: f32,
++    started: f32,
++    secs: f32,
++}
++
++/// The dimmest a full `darken` takes the light to, as a share of the sample.
++const DARKEST: f32 = 0.35;
++/// How far the sky dome leans toward the fog colour at full weight.
++const SKY_LEAN: f32 = 0.6;
++
++impl FogOverride {
++    /// The weight at `now`.
++    pub fn weight(&self, now: f32) -> f32 {
++        let t = if self.secs > 0.0 {
++            ((now - self.started) / self.secs).clamp(0.0, 1.0)
++        } else {
++            1.0
++        };
++        let s = t * t * (3.0 - 2.0 * t);
++        self.from + (self.to - self.from) * s
++    }
++
++    /// Ease toward `look` at `weight` (0..1) over `secs` from `now`, from wherever it is.
++    pub fn set(&mut self, look: FogLook, weight: f32, secs: f32, now: f32) {
++        self.from = if self.look.is_some() {
++            self.weight(now)
++        } else {
++            0.0
++        };
++        self.look = Some(look);
++        self.to = weight.clamp(0.0, 1.0);
++        self.started = now;
++        self.secs = secs.max(0.0);
++    }
++
++    /// Ease back to the sampled atmosphere over `secs` (the look kept until it has).
++    pub fn clear(&mut self, secs: f32, now: f32) {
++        self.from = self.weight(now);
++        self.to = 0.0;
++        self.started = now;
++        self.secs = secs.max(0.0);
++    }
++
++    /// The sampled atmosphere with the override folded in at its weight at `now`.
++    pub fn apply(&self, atmo: Atmosphere, now: f32) -> Atmosphere {
++        let Some(look) = self.look else { return atmo };
++        let w = self.weight(now);
++        if w <= 0.0 {
++            return atmo;
++        }
++        let lerp = |a: f32, b: f32| a + (b - a) * w;
++        let mut out = atmo;
++        for k in 0..3 {
++            out.fog_color[k] = lerp(atmo.fog_color[k], look.color[k]);
++        }
++        out.fog_end = lerp(atmo.fog_end, look.end.max(1.0));
++        out.fog_start_frac = lerp(atmo.fog_start_frac, look.start_frac);
++        // The sky dome leans toward the fog, so the horizon meets it (not all the way: the
++        // zenith keeps some of the night).
++        let lean = SKY_LEAN * w;
++        let dim = 1.0 - look.darken.clamp(0.0, 1.0) * (1.0 - DARKEST) * w;
++        for (stop, sky) in out.sky.iter_mut().zip(atmo.sky) {
++            for k in 0..3 {
++                stop[k] = (sky[k] + (look.color[k] - sky[k]) * lean) * dim;
++            }
++        }
++        if dim < 1.0 {
++            let scale = |c: [f32; 3]| c.map(|v| v * dim);
++            out.ambient = scale(atmo.ambient);
++            out.sun_diffuse = scale(atmo.sun_diffuse);
++            out.sun_color = scale(atmo.sun_color);
++        }
++        out
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn look() -> FogLook {
++        FogLook {
++            color: [0.1, 0.15, 0.2],
++            end: 80.0,
++            start_frac: 0.0,
++            darken: 1.0,
++        }
++    }
++
++    #[test]
++    fn no_override_leaves_the_sample() {
++        let o = FogOverride::default();
++        let a = o.apply(Atmosphere::DEFAULT, 10.0);
++        assert_eq!(a.fog_end, Atmosphere::DEFAULT.fog_end);
++        assert_eq!(a.fog_color, Atmosphere::DEFAULT.fog_color);
++    }
++
++    #[test]
++    fn a_full_override_lands_on_its_look_after_its_ease() {
++        let mut o = FogOverride::default();
++        o.set(look(), 1.0, 4.0, 0.0);
++        let mid = o.apply(Atmosphere::DEFAULT, 2.0);
++        assert!(mid.fog_end < Atmosphere::DEFAULT.fog_end && mid.fog_end > 80.0);
++        let a = o.apply(Atmosphere::DEFAULT, 4.0);
++        assert!((a.fog_end - 80.0).abs() < 1e-3);
++        for (got, want) in a.fog_color.iter().zip([0.1, 0.15, 0.2]) {
++            assert!((got - want).abs() < 1e-5, "{:?}", a.fog_color);
++        }
++        assert!((a.ambient[0] - Atmosphere::DEFAULT.ambient[0] * DARKEST).abs() < 1e-4);
++    }
++
++    #[test]
++    fn a_clear_eases_back_from_where_it_is() {
++        let mut o = FogOverride::default();
++        o.set(look(), 1.0, 0.0, 0.0);
++        o.clear(2.0, 1.0);
++        assert!((o.weight(1.0) - 1.0).abs() < 1e-5);
++        assert!(o.weight(3.0).abs() < 1e-5);
++        let a = o.apply(Atmosphere::DEFAULT, 3.0);
++        assert_eq!(a.fog_end, Atmosphere::DEFAULT.fog_end);
++    }
++
++    #[test]
++    fn a_half_weight_lands_halfway() {
++        let mut o = FogOverride::default();
++        o.set(
++            FogLook {
++                darken: 0.0,
++                ..look()
++            },
++            0.5,
++            0.0,
++            0.0,
++        );
++        let a = o.apply(Atmosphere::DEFAULT, 0.0);
++        assert!((a.fog_end - (Atmosphere::DEFAULT.fog_end + 80.0) / 2.0).abs() < 1e-3);
++        assert_eq!(a.ambient, Atmosphere::DEFAULT.ambient, "no darken, no dim");
++    }
++}
+diff --git a/crates/benilla-world/src/lighting/mod.rs b/crates/benilla-world/src/lighting/mod.rs
+index 17800f52..1ee9da8c 100644
+--- a/crates/benilla-world/src/lighting/mod.rs
++++ b/crates/benilla-world/src/lighting/mod.rs
+@@ -8,6 +8,7 @@ use benilla_formats::{LightCatalog, LiquidKind};
+ 
+ mod blob; // off-world light blobs (portrait booths, body panes, glue scene)
+ mod daynight; // the sun, moon and day/night curves
++mod fog_override; // a scripted outdoor fog and gloom (benilla's own)
+ mod global_light; // the shared global-light storage buffer
+ mod prop_probes; // the interior-prop SH probe table
+ mod resolve; // the per-frame time-of-day resolve and the interior-fog crossfade
+@@ -17,6 +18,7 @@ pub use global_light::{new_shared_light_buffer, LightRooms, SharedLightBuffer, W
+ pub use prop_probes::{PropProbeSlot, PropProbes, MAX_PROP_PROBES};
+ // The std430 layout stays in the crate: off-world producers state values through `LightBlob`,
+ // never a row index.
++pub use fog_override::{FogLook, FogOverride};
+ pub(crate) use prop_probes::prop_probe_region_offset;
+ pub use resolve::WmoCrossfade;
+ use resolve::{apply_sky_backdrop, setup_lighting, update_time_lighting};
+@@ -214,6 +216,7 @@ impl Plugin for LightingPlugin {
+             .init_resource::<GameClock>()
+             .init_resource::<WorldTime>()
+             .init_resource::<WmoCrossfade>()
++            .init_resource::<FogOverride>()
+             .insert_resource(ClearColor(Color::BLACK))
+             .add_systems(Startup, setup_lighting.after(AssetSet::Open))
+             .add_systems(
+diff --git a/crates/benilla-world/src/lighting/resolve.rs b/crates/benilla-world/src/lighting/resolve.rs
+index 72e95217..36272b46 100644
+--- a/crates/benilla-world/src/lighting/resolve.rs
++++ b/crates/benilla-world/src/lighting/resolve.rs
+@@ -179,7 +179,12 @@ pub(super) fn update_time_lighting(
+     weather: Option<Res<crate::weather::WeatherState>>,
+     view: Res<crate::view::ViewDistance>,
+     time: Res<Time>,
+-    wmo_fog: Res<crate::wmo_portal::CameraWmoFog>,
++    // The camera's WMO fog, and a script's outdoor fog (`FogOverride`, benilla's own; absent
++    // reads as none).
++    (wmo_fog, fog_override): (
++        Res<crate::wmo_portal::CameraWmoFog>,
++        Option<Res<super::FogOverride>>,
++    ),
+     mut wmo_ramp: ResMut<WmoCrossfade>,
+     mut clock: ResMut<GameClock>,
+     mut lighting: ResMut<WowLighting>,
+@@ -245,6 +250,12 @@ pub(super) fn update_time_lighting(
+             }
+         })
+         .unwrap_or(Atmosphere::DEFAULT);
++    // A script's outdoor fog and gloom (`FogOverride`, benilla's own) over the sample; under water
++    // the underwater param keeps its own.
++    let atmo = match fog_override.as_ref() {
++        Some(o) if !submerged.any() => o.apply(atmo, time.elapsed_secs()),
++        _ => atmo,
++    };
+     let sun_dir = daynight::sun_direction(minute_f);
+     let celestial_dir = daynight::celestial_sun_direction(minute_f);
+ 
+-- 
+2.43.0
+

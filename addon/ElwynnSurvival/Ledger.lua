@@ -262,6 +262,7 @@ local FRAME_RECTS = {
 }
 L.FRAME_RECTS = FRAME_RECTS
 local CARD_RECTS = Even(256, 48)
+L.CARD_RECTS = CARD_RECTS
 
 -- A three-slice across: caps `capPx` wide in the art (`tw` wide), drawn `h` tall; the caps keep
 -- their shape at any height.
@@ -817,7 +818,7 @@ local function SkinCard()
   end
   -- Every button the same wooden plate (the floor markers and the mouse's - and + kept the old
   -- dark one, and inked on it they read as switched off).
-  for _, k in ipairs({ "switch", "reset", "middle", "where", "size", "marks", "slower", "faster", "close" }) do
+  for _, k in ipairs({ "switch", "reset", "middle", "where", "size", "marks", "topBars", "slower", "faster", "close" }) do
     Button(c[k], true)
   end
   InkAll(c)

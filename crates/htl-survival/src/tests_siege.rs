@@ -101,7 +101,7 @@ fn a_send_raises_income_and_marches_on_the_rival_with_its_next_wave() {
     assert_eq!(s.siege.as_ref().unwrap().income[&a], d.start_income + 1);
     // Warned before it comes.
     let ev = run(&mut s, d.first_gap - d.warn_secs + 0.2);
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { player: Some(p), title, .. } if *p == b && title == "Coming at you")));
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { player: Some(p), title, .. } if *p == b && title == "Coming at You")));
     assert!(s.siege_hud(b).unwrap().coming.iter().any(|(n, k)| n == "Kobold Laborer" && *k == 3));
     run(&mut s, d.warn_secs);
     assert_eq!(s.siege.as_ref().unwrap().wave, 1);

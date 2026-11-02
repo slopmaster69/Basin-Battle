@@ -143,10 +143,10 @@ fn main() -> Result<()> {
     pump(&mut s, me, &mut seen, 0.3)?;
     s.gameobj_use(chest)?;
     pump(&mut s, me, &mut seen, 0.5)?;
-    // Take timber back out and build a cooking fire on the meadow.
+    // Take timber back out and build a cooking fire in the camp's yard.
     s.send_chat(".es take wood 8")?;
     pump(&mut s, me, &mut seen, 0.3)?;
-    pos = [-9538.0, 122.0, pos[2]];
+    pos = [-9636.0, 700.0, pos[2]];
     s.heartbeat(pos, 0.0)?;
     pump(&mut s, me, &mut seen, 0.3)?;
     s.send_chat(".es build cooking")?;

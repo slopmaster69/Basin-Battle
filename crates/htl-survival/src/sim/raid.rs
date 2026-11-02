@@ -64,7 +64,7 @@ impl Survival {
         match self.raid.phase {
             RaidPhase::Warning | RaidPhase::Active => {
                 let left = self.raid.queue.len() + self.raid.raiders.iter().filter(|r| self.mobs.get(r).is_some_and(|m| m.health > 0)).count();
-                self.tell(id, format!("The camp is under attack: {left} raiders left."));
+                self.tell(id, format!("The camp is under attack. Raiders left: {left}."));
             }
             RaidPhase::Idle => {
                 let plan = self.next_raid();
@@ -75,7 +75,7 @@ impl Survival {
                         .filter(|k| !self.has_station(k))
                         .map(|k| self.content.stations[self.content.station(k).unwrap()].name.clone())
                         .collect();
-                    self.tell(id, format!("The bell calls the {} down on the camp. Build a {} first.", plan.title, need.join(" and a ")));
+                    self.tell(id, format!("Not ready for the {}. Build a {} first.", plan.title, need.join(" and a ")));
                     return;
                 }
                 if !self.raid.asked.contains(&id) {
@@ -86,9 +86,11 @@ impl Survival {
                     player: id,
                     what: "raid".into(),
                     text: format!(
-                        "Ring the bell for the {}? {who} will march on the camp from {} in {} seconds. They'll wreck the stations they reach.",
+                        "Ring the bell for the {}? {who} will raid the camp from {} in {} sec. Stations they reach will be damaged.",
                         plan.title, plan.road, plan.warning as u32
                     ),
+                    yes: "Ring It".into(),
+                    no: "Not Yet".into(),
                 });
             }
         }
@@ -100,10 +102,10 @@ impl Survival {
             return Err("Ring the bell at the camp first.".into());
         }
         if self.raid.phase != RaidPhase::Idle {
-            return Err("The raid's already coming.".into());
+            return Err("A raid is already coming.".into());
         }
         if !self.camp_ready() {
-            return Err("The camp isn't ready.".into());
+            return Err("The camp isn't ready for a raid.".into());
         }
         self.raid.asked.clear();
         let r = self.next_raid();
@@ -141,8 +143,8 @@ impl Survival {
         self.raid.marks = marks;
         let name = self.players.get(&id).map_or("Someone".to_string(), |p| p.name.clone());
         let road = r.road.clone();
-        self.events.push(Event::Banner { player: None, title: r.title.clone(), sub: format!("From {road} in {} seconds", r.warning as u32) });
-        self.announce(format!("{name} rings the alarm bell! The {} marches on the camp from {road}: {} seconds.", r.title, r.warning as u32));
+        self.events.push(Event::Banner { player: None, title: r.title.clone(), sub: format!("From {road} in {} sec", r.warning as u32) });
+        self.announce(format!("{name} rang the alarm bell. The {} comes from {road} in {} sec.", r.title, r.warning as u32));
         self.events.push(Event::Dirty);
         Ok(())
     }
@@ -181,8 +183,8 @@ impl Survival {
             self.raid.suspended = false;
             self.raid.timer = self.raid.timer.max(RESUME_GRACE);
             let title = self.current_raid().title;
-            self.events.push(Event::Banner { player: None, title: "The Raid Resumes".into(), sub: format!("The {title} at the camp in {} seconds", RESUME_GRACE as u32) });
-            self.announce(format!("The {title} goes on in {} seconds.", RESUME_GRACE as u32));
+            self.events.push(Event::Banner { player: None, title: "The Raid Resumes".into(), sub: format!("The {title} reaches the camp in {} sec", RESUME_GRACE as u32) });
+            self.announce(format!("The {title} resumes in {} sec.", RESUME_GRACE as u32));
             if self.raid.phase == RaidPhase::Active && !self.raid.raiders.is_empty() {
                 // Raiders that were here stand down for the grace, then come on.
                 self.raid.queue.extend(std::mem::take(&mut self.raid.raiders).into_iter().filter_map(|r| {
@@ -207,7 +209,7 @@ impl Survival {
                 for m in std::mem::take(&mut self.raid.marks) {
                     self.unmark(m);
                 }
-                self.announce(format!("The {} is here!", plan.title));
+                self.announce(format!("The {} is here.", plan.title));
             }
             return;
         }
@@ -254,7 +256,7 @@ impl Survival {
                     let d = &self.content.mobs[def];
                     let (name, sub) = (d.name.clone(), d.subname.clone());
                     self.events.push(Event::Banner { player: None, title: name.clone(), sub: if sub.is_empty() { format!("From {}", plan.road) } else { format!("{sub}, from {}", plan.road) } });
-                    self.announce(format!("{name} comes from {} with the last of them!", plan.road));
+                    self.announce(format!("{name} comes from {} with the last raiders.", plan.road));
                     break;
                 }
             }
@@ -386,15 +388,15 @@ impl Survival {
         self.camp.raids_won += 1;
         self.count("raid", &format!("{}", plan.tier), 1);
         self.events.push(Event::Storage);
-        self.events.push(Event::Banner { player: None, title: "The Camp Holds".into(), sub: format!("Spoils in the chest: {}", self.cost_text(&reward)) });
+        self.events.push(Event::Banner { player: None, title: "The Camp Holds".into(), sub: format!("Spoils sent to storage: {}", self.cost_text(&reward)) });
         let next = self.next_raid();
         let after = if next.tier > plan.tier {
             let need: Vec<String> = next.needs.iter().map(|k| self.content.stations[self.content.station(k).unwrap()].name.clone()).collect();
-            format!(" Word is the {} will come next: the bell calls them once the camp has a {}.", next.title, need.join(" and a "))
+            format!(" The {} comes next. Build a {} to ring the bell for it.", next.title, need.join(" and a "))
         } else {
-            format!(" They'll be back, more of them: the bell calls the {} when you're ready.", next.title)
+            format!(" Ring the bell for the {} when you're ready. More raiders will come.", next.title)
         };
-        self.announce(format!("The {} is beaten! The spoils go to the chest: {}.{after}", plan.title, self.cost_text(&reward)));
+        self.announce(format!("The {} is beaten. Spoils sent to storage: {}.{after}", plan.title, self.cost_text(&reward)));
         self.events.push(Event::Dirty);
     }
 
@@ -405,8 +407,8 @@ impl Survival {
             }
         }
         self.raid = Raid::default();
-        self.events.push(Event::Banner { player: None, title: "The Camp Falls".into(), sub: "The raiders burn what they reached and go".into() });
-        self.announce("The raiders burn what they reached and go. Mend the wrecked stations with timber; the chest is untouched.");
+        self.events.push(Event::Banner { player: None, title: "The Camp Falls".into(), sub: "The raiders damaged what they reached".into() });
+        self.announce("The raiders damaged what they reached and left. Repair damaged stations with timber. Storage is untouched.");
         self.events.push(Event::Dirty);
     }
 }

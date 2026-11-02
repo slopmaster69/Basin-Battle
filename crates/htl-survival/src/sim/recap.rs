@@ -69,7 +69,7 @@ pub fn caught_word(action: &Action, outcome: Outcome, blockable: bool) -> &'stat
         return "through your guard";
     }
     match action {
-        Action::Guard if !blockable => "past your guard (it can't be blocked)",
+        Action::Guard if !blockable => "past your guard, unblockable",
         Action::Guard => "around your guard",
         Action::Dodge { .. } => "outside your dodge",
         Action::Swing { .. } => "mid-swing",
@@ -89,14 +89,14 @@ fn tip_for(w: &Wound) -> &'static str {
     match (w.what.as_str(), w.caught) {
         ("fall", _) => "Mind the drop.",
         ("burning ground", _) => "Step off a red mark before it burns.",
-        (_, "through your guard") => "A guard breaks when your stamina runs out: dodge the heavy ones.",
-        (_, "past your guard (it can't be blocked)") => "That one can't be blocked: dodge it.",
-        (_, "around your guard") => "A guard only covers your front: turn to face them.",
-        (_, "outside your dodge") => "A dodge is safe only in its middle: roll as the blow comes down.",
-        (_, "mid-swing") => "A swing commits you: watch for the wind-up before you swing.",
-        (_, "mid-cast") => "Casting leaves you open: cast when the foe is busy.",
-        (_, "while reeling") => "Once you reel, the next blows come free: don't let the guard break.",
-        (_, "unguarded") => "Raise your guard or dodge when a blow winds up.",
+        (_, "through your guard") => "A guard breaks when your stamina runs out. Dodge heavy attacks.",
+        (_, "past your guard, unblockable") => "That attack can't be blocked. Dodge it.",
+        (_, "around your guard") => "A guard only covers your front. Turn to face the enemy.",
+        (_, "outside your dodge") => "A dodge is safe only in its middle. Roll as the attack lands.",
+        (_, "mid-swing") => "A swing commits you. Watch for the wind-up before you swing.",
+        (_, "mid-cast") => "Casting leaves you open. Cast when the enemy is busy.",
+        (_, "while reeling") => "Once you reel, the next attacks land freely. Don't let your guard break.",
+        (_, "unguarded") => "Raise your guard or dodge when an attack winds up.",
         _ => "",
     }
 }
@@ -171,7 +171,7 @@ mod tests {
     fn every_way_of_being_caught_has_a_tip() {
         for caught in [
             "through your guard",
-            "past your guard (it can't be blocked)",
+            "past your guard, unblockable",
             "around your guard",
             "outside your dodge",
             "mid-swing",
@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn a_broken_guard_wins_over_what_they_were_doing() {
         assert_eq!(caught_word(&Action::Guard, Outcome::GuardBroken, true), "through your guard");
-        assert_eq!(caught_word(&Action::Guard, Outcome::Hit, false), "past your guard (it can't be blocked)");
+        assert_eq!(caught_word(&Action::Guard, Outcome::Hit, false), "past your guard, unblockable");
         assert_eq!(caught_word(&Action::Ready, Outcome::Hit, true), "unguarded");
     }
 }

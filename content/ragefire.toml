@@ -16,7 +16,7 @@ area = 2437
 icon = "Spell_Fire_Incinerate"
 blurb = "The caves of fire under Orgrimmar, and the cult that hides in them"
 first_page = "The top of the chasm, where the troggs' tunnels start down into the fire."
-welcome = "Ragefire Chasm. The Searing Blade hides down here, and something older feeds at the bottom of it. Two lamps: one at the top of the chasm, one in the cult's own camp. Rest at a lamp to heal, fill your Draughts (T) and send the cave's dwellers back where they were. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+welcome = "Ragefire Chasm. The Searing Blade hides here, and something older feeds at the bottom. There are 2 lamps, at the top of the chasm and in the cult's own camp. Rest at a lamp to heal, refill your Draughts (T) and send the cave's dwellers back to their posts. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): Ragefire Chasm: the shallowest of them (levels 13 to 18 in the old game).
 tier = 1
@@ -72,7 +72,7 @@ kind = "hidden"
 at = [-306.0, -6.3, -52.5]
 find = 4.5
 reveals = ["grimoire_cache", "grimoire_page"]
-text = "up the slope in the deep chamber's corner: Jergosh's grimoire, its binding-ward still warm. Whatever it keeps bound, it isn't now."
+text = "found Jergosh's grimoire up the slope in the deep chamber's corner, its binding-ward still warm. Whatever it kept bound is loose now."
 page = "The book is bound in something that was once skin, and it is warm through your gloves, like a hearthstone an hour after the fire. The flyleaf is in the Invoker's own hand.{n}{n}This is the binding of the Heart of Ragefire, and it is mine. Not the Searing Blade's. Not Bazzalan's, who asks to read it and will not. The Heart answers me while this book holds it, and I do not mean to be eaten by my own fire.{n}{n}The pages after are columns of words in the demon tongue, each with a mark in red where the reader must draw breath. Near the back one page has been torn out, its edge still curling, as if it had come away from a flame.{n}{n}Far beneath the chasm, something shifts its weight."
 
 [[dungeon.box]]
@@ -101,7 +101,7 @@ kind = "hidden"
 at = [-77.4, 90.4, -7.3]
 find = 4.0
 reveals = ["ledge_cache"]
-text = "up on the ledge over the camp: the cult's tithes, hidden from its own collectors."
+text = "found the cult's tithes up on the ledge over the camp, hidden from its own collectors."
 page = "The barrel is wedged so tight into the rock that it must have been carried up empty and filled a handful at a time. Inside, under the red stones, is a strip of hide marked in Orcish with a collector's careful tallies.{n}{n}Tithes, the Cleft, this moon. From the trogg-hunters: forty. From the new blood down from Orgrimmar: sixty. To the Invoker: eighty. To the ledge: twenty.{n}{n}Underneath, in the same hand: The Invoker counts the tithes twice and never counts his own people at all. When the Kor'kron come down, and they will, the ones with stones of their own walk out the back way. The rest burn with him.{n}{n}Every moon is the same. Eighty to the Invoker. Twenty to the ledge."
 
 [[dungeon.box]]
@@ -122,8 +122,8 @@ kind = "hidden"
 at = [-341.9, 257.6, -8.1]
 find = 4.0
 reveals = ["maur"]
-text = "on the west cave's high ledge: a tauren in Grimtotem paint, who turns from the fire to look at you."
-page = "A small fire burns on the ledge, fed with nothing you can see. Beside it stands a Grimtotem totem, and wound round its post is a strip of hide marked in Taur-ahe, with the same words below in big, careful Orcish, as if the writer wanted someone to understand.{n}{n}First sun: the burning ones are in the Cleft. I follow them down. Second: I kill two. They do not scream; they laugh. Fifth: the fire under the chasm says my name. Not my name. My mother's. Eighth: I do not hunt them now. I keep the fire. The fire keeps me.{n}{n}The last mark is only a handprint, pressed into the hide in ash.{n}{n}By the fire, a tauren in Grimtotem paint has not moved since you climbed up. Now he does."
+text = "found a tauren in Grimtotem paint on the west cave's high ledge. He turned from the fire."
+page = "A small fire burns on the ledge, fed with nothing you can see. Beside it stands a Grimtotem totem, and wound around its post is a strip of hide marked in Taur-ahe, with the same words below in big, careful Orcish, as if the writer wanted someone to understand.{n}{n}First sun: the burning ones are in the Cleft. I follow them down. Second: I kill two. They do not scream. They laugh. Fifth: the fire under the chasm says my name. Not my name. My mother's. Eighth: I do not hunt them now. I keep the fire. The fire keeps me.{n}{n}The last mark is only a handprint, pressed into the hide in ash.{n}{n}By the fire, a tauren in Grimtotem paint has not moved since you climbed up. Now he does."
 
 # --- notes -------------------------------------------------------------------------------------------
 
@@ -147,7 +147,7 @@ scale = 1.3
 name = "Jergosh's Ritual Notes"
 at = [-101.8, 42.0, -17.8]
 facing = 1.0
-text = "\"The pit is ready. The Heart stirs under the lava when I call it, and the grimoire keeps it from turning on me. Nobody touches the grimoire. NOBODY. And the tithes come up short again: the collectors swear the ledge over the camp is bare. I say look again.\""
+text = "\"The pit is ready. The Heart stirs under the lava when I call it, and the grimoire keeps it from turning on me. Nobody touches the grimoire. NOBODY. And the tithes come up short again. The collectors swear the ledge over the camp is bare. I say look again.\""
 
 [[dungeon.note]]
 key = "grimtotem_feather"
@@ -158,7 +158,7 @@ scale = 1.0
 name = "A Grimtotem Feather"
 at = [-305.6, 246.2, -12.5]
 facing = 0.5
-text = "A painted feather, Grimtotem colours, tucked in a crack in the rock. Above it, scratched with a knife: an arrow, pointing up, at the ledge above."
+text = "A painted feather in Grimtotem colors, tucked in a crack in the rock. Above it, an arrow scratched with a knife points up at the ledge."
 
 # --- the cave's dwellers -----------------------------------------------------------------------------
 
@@ -456,7 +456,7 @@ display = 4006
 icon = "INV_Misc_Gem_Ruby_01"
 kind = "resource"
 stack = 50
-text = "A red stone the Searing Blade carry as their mark. The lamps' quartermaster in Ragefire trades it; you drop it all when you fall below."
+text = "Trade it to the quartermaster at any lamp in Ragefire. You drop all of it when you fall. \"The red stone the Searing Blade carry as their mark.\""
 
 [[item]]
 key = "oggleflint_mantle"
@@ -467,7 +467,7 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.09
 weight = 0.02
-text = "The trogg chief's: chips of the chasm's rock, lashed on with gut."
+text = "The trogg chief's. Chips of the chasm's rock, lashed on with gut."
 set = "searing"
 
 [[item]]
@@ -489,7 +489,7 @@ icon = "INV_Chest_Cloth_38"
 kind = "armor"
 slot = "chest"
 reduce = 0.09
-text = "Jergosh's: the hem scorched where the Heart answered him."
+text = "Jergosh's. The hem is scorched where the Heart answered him."
 set = "searing"
 
 [[item]]
@@ -513,7 +513,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.2
 weight = 0.05
-text = "Mail forged in the Heart of Ragefire's own fire: still warm, and harder than it looks."
+text = "Mail forged in the Heart of Ragefire's own fire. Still warm, and harder than it looks."
 perks = [{ kind = "regen", amount = 0.004 }]
 
 [[item]]
@@ -525,7 +525,7 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.11
 weight = 0.01
-text = "Painted Grimtotem colours. Maur came down here hunting the cult; the fire got him first."
+text = "Painted in Grimtotem colors. Maur came down here hunting the cult, but the fire got him first."
 perks = [{ kind = "stamina", amount = 0.08 }]
 
 # --- the cave's dwellers --------------------------------------------------------------------------------
@@ -848,7 +848,7 @@ respawn = 0.0
   at = 0.6
   speed = 0.85
   pattern = "stomp"
-  text = "Oggleflint bellows; troggs come running."
+  text = "Oggleflint bellows, and troggs come running."
   summon = ["rf_trogg", "rf_trogg"]
   [[mob.phase]]
   at = 0.25
@@ -1095,7 +1095,7 @@ respawn = 0.0
   at = 0.5
   speed = 0.82
   pattern = "eruption"
-  text = "The Heart flares white; molten things crawl up out of the pit."
+  text = "The Heart flares white. Molten things crawl up out of the pit."
   summon = ["rf_molten", "rf_molten"]
   [[mob.phase]]
   at = 0.2
@@ -1302,7 +1302,7 @@ name = "Cursed Felblade"
 display = 5158
 icon = "INV_Sword_19"
 kind = "weapon"
-text = "Taragaman's: a demon's blade, and it wants blood."
+text = "Taragaman's. A demon's blade, and it wants blood."
 perks = [{ kind = "might", amount = 0.05 }]
 
 [[weapon]]
@@ -1323,7 +1323,7 @@ name = "Bloodlust Edge"
 display = 1455
 icon = "INV_Axe_03"
 kind = "weapon"
-text = "Bazzalan's: wide and hungry, three at a swing."
+text = "Hits up to 3 enemies at a swing. \"Bazzalan's, wide and hungry.\""
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
 # strongbox's guards, casters behind the fighters -------------------------------------------

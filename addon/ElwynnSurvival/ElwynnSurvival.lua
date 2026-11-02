@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 15
+local VERSION = 17
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -54,34 +54,34 @@ ES.mode = "cursor"
 ES.sprintHeld = false
 
 BINDING_HEADER_ELWYNNSURVIVAL = "Elwynn Survival"
-BINDING_NAME_ES_ATTACK = "Attack (cast, while aiming)"
+BINDING_NAME_ES_ATTACK = "Attack, or cast while aiming"
 BINDING_NAME_ES_HEAVY = "Heavy attack"
-BINDING_NAME_ES_GUARD = "Raise the guard (hold); call off an aim"
-BINDING_NAME_ES_DODGE = "Dodge (hold to sprint)"
-BINDING_NAME_ES_AB1 = "Ability: ranged (Q)"
-BINDING_NAME_ES_AB2 = "Ability: close (E)"
-BINDING_NAME_ES_AB3 = "Ability: utility (1)"
-BINDING_NAME_ES_AB4 = "Ability: defense (2)"
-BINDING_NAME_ES_AB5 = "Ability: ultimate (3, hold)"
-BINDING_NAME_ES_EX1 = "Charged up: ranged"
-BINDING_NAME_ES_EX2 = "Charged up: close"
-BINDING_NAME_ES_EX3 = "Charged up: utility"
-BINDING_NAME_ES_EX4 = "Charged up: defense"
-BINDING_NAME_ES_USE = "Use what's in front of you (place, while building)"
-BINDING_NAME_ES_EAT = "Use the quick item: eat, a salve, a tonic (turn the station, while building)"
+BINDING_NAME_ES_GUARD = "Hold to guard, or cancel an aim"
+BINDING_NAME_ES_DODGE = "Dodge, hold to sprint"
+BINDING_NAME_ES_AB1 = "Ranged ability (Q)"
+BINDING_NAME_ES_AB2 = "Close ability (E)"
+BINDING_NAME_ES_AB3 = "Utility ability (1)"
+BINDING_NAME_ES_AB4 = "Defense ability (2)"
+BINDING_NAME_ES_AB5 = "Ultimate ability, hold (3)"
+BINDING_NAME_ES_EX1 = "EX ranged ability"
+BINDING_NAME_ES_EX2 = "EX close ability"
+BINDING_NAME_ES_EX3 = "EX utility ability"
+BINDING_NAME_ES_EX4 = "EX defense ability"
+BINDING_NAME_ES_USE = "Use, or place while building"
+BINDING_NAME_ES_EAT = "Use quick item, or turn while building"
 BINDING_NAME_ES_CYCLE = "Next quick item"
-BINDING_NAME_ES_SHEATHE = "Sheathe / draw your weapon"
-BINDING_NAME_ES_BAG = "Open the bags"
-BINDING_NAME_ES_TREE = "The board of abilities"
-BINDING_NAME_ES_JOURNAL = "The camp's journal"
+BINDING_NAME_ES_SHEATHE = "Sheathe / draw weapon"
+BINDING_NAME_ES_BAG = "Open bags"
+BINDING_NAME_ES_TREE = "Open ability board"
+BINDING_NAME_ES_JOURNAL = "Open journal"
 BINDING_NAME_ES_BUILD = "Build"
-BINDING_NAME_ES_ROTATE = "Turn the station you're placing"
-BINDING_NAME_ES_MODE = "Free the mouse / back to action"
-BINDING_NAME_ES_LOCK = "Lock on / let go"
-BINDING_NAME_ES_NEXT = "Next foe (locked on)"
-BINDING_NAME_ES_BARS = "Health bars over heads on / off"
-BINDING_NAME_ES_JUMP = "Jump (costs stamina)"
-BINDING_NAME_ES_KEYS = "Controls (this card)"
+BINDING_NAME_ES_ROTATE = "Rotate station while placing"
+BINDING_NAME_ES_MODE = "Free mouse / return to action"
+BINDING_NAME_ES_LOCK = "Lock on / off"
+BINDING_NAME_ES_NEXT = "Lock onto next enemy"
+BINDING_NAME_ES_BARS = "Show / hide health bars"
+BINDING_NAME_ES_JUMP = "Jump, uses stamina"
+BINDING_NAME_ES_KEYS = "Open controls"
 
 local GOLD = { r = 1.0, g = 0.82, b = 0.45 }
 local RED = { r = 1.0, g = 0.35, b = 0.3 }
@@ -1632,7 +1632,7 @@ function ES.Ability(n, ex, state)
   end
   if ex or not s or s.key == "" or not s.ex then
     if ex and s and s.ex and not ES.ExAffordable(s) then
-      ES.Flash(s.ex.name .. ": " .. (s.ex.valor or 0) .. " Valor")
+      ES.Flash(s.ex.name .. " needs " .. (s.ex.valor or 0) .. " Valor")
     end
     SendAbility(n, ex)
     return
@@ -1790,12 +1790,12 @@ function ES.Bars()
     set.noBars = nil
     if ShowNameplates then pcall(ShowNameplates) end
     if ShowFriendNameplates then pcall(ShowFriendNameplates) end
-    ES.Message("Health bars over heads: on")
+    ES.Message("Health bars shown.")
   else
     set.noBars = 1
     if HideNameplates then pcall(HideNameplates) end
     if HideFriendNameplates then pcall(HideFriendNameplates) end
-    ES.Message("Health bars over heads: off (" .. (KeyName("ES_BARS") or "V") .. " brings them back)")
+    ES.Message("Health bars hidden. Press " .. (KeyName("ES_BARS") or "V") .. " to show them.")
   end
 end
 
@@ -1843,7 +1843,7 @@ end
 function ES.Build()
   if not ES.awake then return end
   if ES.below then
-    ES.Message("Nothing is built down here.")
+    ES.Message("Can't build in a dungeon.")
     return
   end
   if ES.placing then
@@ -2053,7 +2053,7 @@ local LOOK = {
   gather = { 0.5, 1, 0.5, "Gathering" },
   craft = { 1, 0.85, 0.5, "Making" },
   build = { 1, 0.85, 0.5, "Building" },
-  repair = { 1, 0.85, 0.5, "Mending" },
+  repair = { 1, 0.85, 0.5, "Repairing" },
   stagger = { 0.8, 0.4, 1, "Staggered!" },
   dead = { 0.5, 0.5, 0.5, "" },
 }
@@ -2771,8 +2771,8 @@ function ES.AbilityTip(b)
   local s = ES.slots[b.n]
   GameTooltip:SetOwner(b, "ANCHOR_TOP")
   if not s or s.key == "" then
-    GameTooltip:SetText("Nothing on this key")
-    GameTooltip:AddLine("Open the board (" .. (KeyName("ES_TREE") or "N") .. ") and choose a card for it.", 0.8, 0.8, 0.8, 1)
+    GameTooltip:SetText("No card on this key")
+    GameTooltip:AddLine("Open the board (" .. (KeyName("ES_TREE") or "N") .. ") to choose a card for it.", 0.8, 0.8, 0.8, 1)
     GameTooltip:Show()
     return
   end
@@ -2784,11 +2784,11 @@ function ES.AbilityTip(b)
   if s.text ~= "" then GameTooltip:AddLine(s.text, 0.92, 0.9, 0.85, 1) end
   if s.facts ~= "" then GameTooltip:AddLine(s.facts, 1, 0.82, 0.5, 1) end
   local left = CooldownLeft(s)
-  if left > 0 then GameTooltip:AddLine(string.format("Ready in %.0f s", math.ceil(left)), 1, 0.45, 0.4) end
+  if left > 0 then GameTooltip:AddLine(string.format("Ready in %.0f sec", math.ceil(left)), 1, 0.45, 0.4) end
   if s.ex then
     GameTooltip:AddLine(" ")
     local enough = (valor.now or 0) + 0.001 >= s.ex.valor
-    GameTooltip:AddDoubleLine("Charged up: " .. s.ex.name, s.ex.valor .. " Valor", 1, 0.7, 0.35, enough and 0.5 or 1, enough and 1 or 0.45, enough and 0.5 or 0.4)
+    GameTooltip:AddDoubleLine("EX " .. s.ex.name, s.ex.valor .. " Valor", 1, 0.7, 0.35, enough and 0.5 or 1, enough and 1 or 0.45, enough and 0.5 or 0.4)
     GameTooltip:AddLine(ES.ExHowText(b.n, s.ex.valor), 0.62, 0.72, 0.8, 1)
     if s.ex.text ~= "" then GameTooltip:AddLine(s.ex.text, 0.92, 0.9, 0.85, 1) end
     if s.ex.facts ~= "" then GameTooltip:AddLine(s.ex.facts, 1, 0.82, 0.5, 1) end
@@ -2818,7 +2818,7 @@ local CC_WORDS = {
   steadfast = { "Steadfast", 1, 0.85, 0.45 },
   cheat_death = { "Cheating death", 1, 0.9, 0.5 },
   grace = { "Unshaken", 0.85, 0.85, 0.85 },
-  stance = { "Countering melee blows", 1, 0.9, 0.5 },
+  stance = { "Countering melee attacks", 1, 0.9, 0.5 },
 }
 
 local cc = CreateFrame("Frame", "ElwynnSurvivalCc", UIParent)
@@ -3000,7 +3000,17 @@ local function TopY()
   return (ES.VitalsWhere() == "corner") and -118 or -38
 end
 
-local foe = CreateFrame("Frame", "ElwynnSurvivalFoe", UIParent)
+-- The bars across the top (the locked-on foe's and a champion's) under one holder, so the menu
+-- can put them away for those who fight by the bars over heads (V) alone.
+ES.topBars = CreateFrame("Frame", "ElwynnSurvivalTopBars", UIParent)
+ES.topBars:SetAllPoints(UIParent)
+function ES.TopBarsOn()
+  return not (ElwynnSurvivalSettings and ElwynnSurvivalSettings.noTopBars)
+end
+function ES.PlaceTopBars()
+  if ES.TopBarsOn() then ES.topBars:Show() else ES.topBars:Hide() end
+end
+local foe = CreateFrame("Frame", "ElwynnSurvivalFoe", ES.topBars)
 foe:SetWidth(440)
 foe:SetHeight(30)
 foe:SetPoint("TOP", UIParent, "TOP", 0, -38)
@@ -3185,7 +3195,7 @@ info.goalText:SetTextColor(0.85, 0.85, 0.8)
 function ES.GoalLine(f)
   local n, total, title, text, have, need = tonumber(f[2]) or 0, tonumber(f[3]) or 0, f[4] or "", f[5] or "", tonumber(f[6]) or 0, tonumber(f[7]) or 0
   if title == "" then
-    info.goal:SetText(total > 0 and "Journal done: the camp stands" or "")
+    info.goal:SetText(total > 0 and "Journal complete" or "")
     info.goalText:SetText("")
     return
   end
@@ -3196,7 +3206,7 @@ end
 
 -- --- a champion's bar, across the top ---------------------------------------------------------
 
-local boss = CreateFrame("Frame", "ElwynnSurvivalBoss", UIParent)
+local boss = CreateFrame("Frame", "ElwynnSurvivalBoss", ES.topBars)
 boss:SetWidth(600)
 boss:SetHeight(40)
 boss:SetPoint("TOP", UIParent, "TOP", 0, -38)
@@ -3244,7 +3254,8 @@ boss.posture.mid:SetVertexColor(FRAME.r, FRAME.g, FRAME.b, 0.95)
 boss.posture.shown, boss.posture.goal, boss.posture.flash = 0, 0, 0
 function boss.posture:Draw()
   local share = Clamp(self.shown, 0, 1)
-  local w = math.max(0.5, 180 * share)
+  local half = self.half or 180
+  local w = math.max(0.5, half * share)
   self.left:SetWidth(w)
   self.right:SetWidth(w)
   local r, g, b = 1, 0.72, 0.22
@@ -3258,8 +3269,8 @@ function boss.posture:Draw()
   if self.flash > GetTime() then
     local k = (self.flash - GetTime()) / 0.9
     r, g, b = 1, 0.9, 0.45 + 0.4 * k
-    self.left:SetWidth(180)
-    self.right:SetWidth(180)
+    self.left:SetWidth(half)
+    self.right:SetWidth(half)
     self.left:SetAlpha(0.5 + 0.5 * k)
     self.right:SetAlpha(0.5 + 0.5 * k)
   else
@@ -3278,6 +3289,100 @@ boss.posture:SetScript("OnUpdate", function()
   self:Draw()
 end)
 
+-- The same posture under the champion's bar over its head (V's health bars), for those who fight
+-- by those: its plate found among the client's (anonymous WorldFrame children, the plate border
+-- their first region, the name their third, the health bar their one child), as plate add-ons
+-- find them, by the champion's name. Eased and drawn on its own, so it goes on with the bars at
+-- the top put away. (In `boss`'s table, for the locals.)
+boss.plate = CreateFrame("Frame", nil, UIParent)
+boss.plate:SetWidth(100)
+boss.plate:SetHeight(4)
+boss.plate:Hide()
+boss.plate.track = Tex(boss.plate, "BACKGROUND", "bar")
+boss.plate.track:SetAllPoints(boss.plate)
+boss.plate.track:SetVertexColor(0.03, 0.03, 0.03, 0.8)
+boss.plate.left = Tex(boss.plate, "ARTWORK", "bar")
+boss.plate.left:SetPoint("TOPRIGHT", boss.plate, "TOP", 0, 0)
+boss.plate.left:SetPoint("BOTTOMRIGHT", boss.plate, "BOTTOM", 0, 0)
+boss.plate.right = Tex(boss.plate, "ARTWORK", "bar")
+boss.plate.right:SetPoint("TOPLEFT", boss.plate, "TOP", 0, 0)
+boss.plate.right:SetPoint("BOTTOMLEFT", boss.plate, "BOTTOM", 0, 0)
+boss.plate.mid = Tex(boss.plate, "OVERLAY", "diamond", 7, 7)
+boss.plate.mid:SetPoint("CENTER", boss.plate, "CENTER", 0, 0)
+boss.plate.mid:SetVertexColor(FRAME.r, FRAME.g, FRAME.b, 0.95)
+boss.plate.shown, boss.plate.goal, boss.plate.flash, boss.plate.half = 0, 0, 0, 50
+boss.plate.Draw = boss.posture.Draw
+boss.PLATE_BORDER = "Interface\\Tooltips\\Nameplate-Border"
+-- A plate's name and health bar, if `f` is a plate up now.
+function boss.ReadPlate(f)
+  if not f or not f.GetRegions or f:GetName() or not f:IsShown() then return nil end
+  local border, _, name = f:GetRegions()
+  if not (border and border.GetTexture and border:GetTexture() == boss.PLATE_BORDER) then return nil end
+  if not (name and name.GetText) then return nil end
+  return name:GetText(), f:GetChildren()
+end
+-- The champion's plate (the one it's on, if that's still its), else nil.
+function boss.FindPlate()
+  local on = boss.plate.on
+  if on and boss.ReadPlate(on) == boss.who then return on end
+  if not WorldFrame or not WorldFrame.GetChildren then return nil end
+  local kids = { WorldFrame:GetChildren() }
+  for i = 1, table.getn(kids) do
+    if kids[i] ~= on and boss.ReadPlate(kids[i]) == boss.who then return kids[i] end
+  end
+  return nil
+end
+-- Under the plate's health bar, its width, or put away.
+function boss.HangPlate()
+  local pb, bar = boss.posture, boss.plate
+  local plate = boss.who and pb:IsShown() and boss.FindPlate()
+  if not plate then
+    bar.on = nil
+    bar:Hide()
+    return
+  end
+  if bar.on ~= plate then
+    bar.on = plate
+    local _, health = boss.ReadPlate(plate)
+    bar:SetParent(plate)
+    bar:SetFrameLevel(plate:GetFrameLevel() + 3)
+    bar:ClearAllPoints()
+    local w = (health and health:GetWidth() or 0)
+    if w < 8 then w = math.max(40, (plate:GetWidth() or 100) - 20) end
+    bar:SetWidth(w)
+    bar:SetHeight(math.max(3, math.min(6, ((health and health:GetHeight()) or 8) * 0.45)))
+    bar.half = w / 2
+    bar.shown = pb.goal
+    if health then
+      -- Lined up with the health bar, just under the plate's border (which wraps the health
+      -- bar a little way above the plate's foot), not on it.
+      local hb, pb2 = health:GetBottom(), plate:GetBottom()
+      local drop = (hb and pb2 and hb > pb2) and (hb - pb2) or 0
+      bar:SetPoint("TOPLEFT", health, "BOTTOMLEFT", 0, -drop - 1)
+    else
+      bar:SetPoint("TOP", plate, "BOTTOM", 0, 0)
+    end
+  end
+  bar:Show()
+end
+-- Always running (the bar itself, hidden, runs nothing): a look for the plate a few times a
+-- second, and the bar eased like the one at the top.
+boss.plateWatch = CreateFrame("Frame", nil, UIParent)
+boss.plateWatch:SetScript("OnUpdate", function()
+  this.t = (this.t or 0) + (arg1 or 0)
+  if this.t >= 0.1 then
+    this.t = 0
+    boss.HangPlate()
+  end
+  local bar, pb = boss.plate, boss.posture
+  if not bar:IsShown() then return end
+  bar.goal, bar.flash = pb.goal, pb.flash
+  local d = bar.goal - bar.shown
+  local rate = d > 0 and 6 or 2.5
+  bar.shown = bar.shown + d * math.min(1, (arg1 or 0) * rate)
+  bar:Draw()
+end)
+
 -- BS: the champion fighting near: its name, health, most health, and whether it's in its second
 -- wind; nothing, none.
 function ES.BossLine(f)
@@ -3285,6 +3390,7 @@ function ES.BossLine(f)
   if not name or name == "" or not hp or not maxhp then
     boss:Hide()
     boss.who, boss.most = nil, nil
+    boss.HangPlate()
     ES.DrawFoe()
     return
   end
@@ -3321,7 +3427,7 @@ function ES.DrawMode()
   if ES.mode == "action" then
     info.mode:SetText("")
   else
-    info.mode:SetText("Mouse free: Z to fight again")
+    info.mode:SetText("Mouse free. Press (Z) to fight.")
   end
 end
 
@@ -3462,13 +3568,13 @@ function ES.DrawHud()
   elseif ES.arena then
     ES.DrawArena()
   elseif phase == "warning" then
-    info.raid:SetText(((h[34] and h[34] ~= "") and h[34] or "The raid") .. " in " .. secs .. "s")
+    info.raid:SetText(((h[34] and h[34] ~= "") and h[34] or "The raid") .. " in " .. secs .. " sec")
     info.raid:SetTextColor(1, 0.4, 0.3)
   elseif phase == "active" then
     info.raid:SetText("Raiders left: " .. left)
     info.raid:SetTextColor(1, 0.4, 0.3)
   elseif h[15] == "1" then
-    info.raid:SetText("At the camp: resting")
+    info.raid:SetText("Resting at camp")
     info.raid:SetTextColor(0.5, 1, 0.5)
   else
     info.raid:SetText("")
@@ -3500,10 +3606,10 @@ function ES.DrawArena()
   if not a then return end
   if a.nextAt then
     local secs = math.max(0, math.ceil(a.nextAt - GetTime()))
-    info.raid:SetText("Wave " .. (a.wave + 1) .. " in " .. secs .. "s")
+    info.raid:SetText("Wave " .. (a.wave + 1) .. " in " .. secs .. " sec")
     info.raid:SetTextColor(1, 0.82, 0.3)
   else
-    info.raid:SetText("Wave " .. a.wave .. ": " .. a.left .. (a.left == 1 and " foe" or " foes") .. " left")
+    info.raid:SetText("Wave " .. a.wave .. ": " .. a.left .. (a.left == 1 and " enemy" or " enemies") .. " left")
     info.raid:SetTextColor(1, 0.4, 0.3)
   end
 end
@@ -3550,16 +3656,16 @@ function ES.DrawSiege()
   if not h then return end
   local secs = math.max(0, math.ceil(h.at - GetTime()))
   if h.phase == "countdown" then
-    info.raid:SetText("The siege begins in " .. secs .. "s")
+    info.raid:SetText("The siege begins in " .. secs .. " sec")
     info.raid:SetTextColor(1, 0.82, 0.3)
   elseif h.phase == "over" then
-    info.raid:SetText(h.result .. ": the hall in " .. secs .. "s")
+    info.raid:SetText(h.result .. ". Back to the hall in " .. secs .. " sec")
     info.raid:SetTextColor(1, 0.82, 0.3)
   elseif h.wave == 0 then
-    info.raid:SetText("Wave 1 in " .. secs .. "s")
+    info.raid:SetText("Wave 1 in " .. secs .. " sec")
     info.raid:SetTextColor(1, 0.82, 0.3)
   else
-    info.raid:SetText("Wave " .. h.wave .. " of " .. h.waves .. ": next in " .. secs .. "s")
+    info.raid:SetText("Wave " .. h.wave .. " of " .. h.waves .. ", next in " .. secs .. " sec")
     info.raid:SetTextColor(1, 0.4, 0.3)
   end
   local lines = { "|cffffd24a" .. h.gold .. " gold|r  |cffbfb6a4(+" .. h.income .. " a wave)|r" }
@@ -3592,9 +3698,9 @@ function ES.DrawSiege()
   local r = h.ready
   if h.phase == "running" and r and tonumber(r[2] or "") and tonumber(r[2]) > 0 then
     if r[3] == "1" then
-      table.insert(lines, "|cff7fff7fReady|r |cffbfb6a4(" .. (r[1] or "0") .. " of " .. r[2] .. "; F at the Hearth takes it back)|r")
+      table.insert(lines, "|cff7fff7fReady|r |cffbfb6a4(" .. (r[1] or "0") .. " of " .. r[2] .. "). Use the Hearth (F) to cancel.|r")
     else
-      table.insert(lines, "|cffbfb6a4Ready early? F at your Hearth (" .. (r[1] or "0") .. " of " .. r[2] .. " ready)|r")
+      table.insert(lines, "|cffbfb6a4Use your Hearth (F) to ready up (" .. (r[1] or "0") .. " of " .. r[2] .. " ready)|r")
     end
   end
   info.siege:SetText(table.concat(lines, "\n"))
@@ -3651,7 +3757,7 @@ danger.text:SetText("!")
 danger.sub = Text(danger, FONT_BODY, 11, "OUTLINE")
 danger.sub:SetPoint("TOP", danger.text, "BOTTOM", 0, 2)
 danger.sub:SetTextColor(1, 0.55, 0.45)
-danger.sub:SetText("no guard stops it")
+danger.sub:SetText("Can't be blocked")
 ES.danger = danger
 
 -- A creature winding up a blow no guard stops: its weapons red (and pulsing) for the wind-up.
@@ -3804,7 +3910,7 @@ function ES.DrawDeath()
   end
   -- Fading in over the first moments.
   death:SetAlpha(Clamp((GetTime() - (death.shownAt or 0)) / 0.7, 0, 1))
-  death.sub:SetText(string.format("Back on your feet in %d", math.max(0, math.ceil(left))))
+  death.sub:SetText(string.format("Respawn in %d sec", math.max(0, math.ceil(left))))
 end
 
 -- --- windows: the chest, a station's work, the build menu, the weapon rack, the journal -------------
@@ -4215,7 +4321,7 @@ Pins.icons = {
 }
 Pins.words = {
   camp = "Your camp", town = "A town", horde = "Held by the Horde", foes = "Hostile ground",
-  sanctum = "A sanctum: its trial teaches the camp new cards", lair = "A lair",
+  sanctum = "A sanctum whose trial teaches the camp new cards", lair = "A lair",
   landmark = "A landmark", arena = "The Proving Ring", dungeon = "A way below",
   fishing = "Fishing waters", mine = "A mine", herbs = "Herbs grow here",
 }
@@ -4280,7 +4386,7 @@ function Pins.Frame(i)
     if p.found then
       tip:AddLine("Found", 0.3, 1, 0.3)
     else
-      tip:AddLine("Not found yet: go there", 0.7, 0.7, 0.7)
+      tip:AddLine("Not found yet. Go there to discover it.", 0.7, 0.7, 0.7)
     end
     tip:Show()
   end)
@@ -4365,7 +4471,7 @@ function ES.Journal()
 end
 
 function ES.DrawJournal()
-  OpenWindow("journal", "The Camp's Journal", "What the camp has done and what comes next. Every step pays into the camp's chest.")
+  OpenWindow("journal", "The Camp's Journal", "What the camp has done and what comes next. Every goal pays into storage.")
   local items = ES.journal or {}
   local first = PageOf("journal", table.getn(items), LIST_ROWS)
   Rest("Nothing written yet.", "", "")
@@ -4374,7 +4480,7 @@ function ES.DrawJournal()
     local title, state, text, reward = f[1] or "?", f[2], f[3] or "", f[4] or ""
     local n = first + i
     local o = { icon = "INV_Misc_Note_01", plainName = n .. ". " .. title, detail = text }
-    o.sub = reward ~= "" and ("Into the chest: " .. reward) or ""
+    o.sub = reward ~= "" and ("Sent to storage: " .. reward) or ""
     if state == "0" then
       o.name = "|cff8fbf7f" .. n .. ". " .. title .. "|r"
       o.tag = "|cff8fbf7fDone|r"
@@ -4397,15 +4503,15 @@ ES.redraw.journal = function() ES.DrawJournal() end
 -- --- the chest (S: item~name~count~gear~text~icon, gear 1 held, 2 worn) -----------------------------
 
 function ES.Chest(list)
-  OpenWindow("chest", "Camp Storage", "What everyone banks for the camp. Click a thing to take one, Shift-click for five, right-click for all of it; click gear to put it on.", nil, true)
+  OpenWindow("chest", "Camp Storage", "Shared by the whole camp. Click to take 1, Shift-click for 5, right-click for all. Click gear to equip it.", nil, true)
   ES.chestList = list
   local items = Items(list)
   local per = GRID_COLS * GRID_ROWS
   local first = PageOf("chest", table.getn(items), per)
   if table.getn(items) == 0 then
-    Rest("The chest is empty.", "Bring timber, meat and copper back from the land and use the chest to bank them.", "")
+    Rest("Storage is empty.", "Gather timber, meat and copper, then bank them here.", "")
   else
-    Rest("Hover over something", "to see what it is and does.", "")
+    Rest("Hover over an item", "to see what it does.", "")
   end
   local shown = math.min(per, table.getn(items) - first)
   -- The room left: empty wells.
@@ -4433,38 +4539,62 @@ function ES.Chest(list)
     b.tip = text
     if gear == "1" then
       b.gear:Show()
-      b.hint = "Click: take it up (what you hold goes in the chest)"
+      b.hint = "Click to equip. Your current weapon goes to storage."
     elseif gear == "2" then
       b.gear:Show()
-      b.hint = "Click: wear it (what you wear goes in the chest)"
+      b.hint = "Click to equip. Your current armor goes to storage."
     else
       b.gear:Hide()
-      b.hint = "Click: 1   Shift-click: 5   Right-click: all"
+      b.hint = "Click to take 1. Shift-click for 5. Right-click for all."
     end
     b:Show()
   end
-  win.extra.label:SetText("Bank all you carry")
+  win.extra.label:SetText("Bank All")
   win.extra.cmd = ".es bank"
   win.extra:Show()
 end
 ES.redraw.chest = function() ES.Chest(ES.chestList) end
 
--- --- a station's work (W: station, name, then recipe~output~cost~can~text~icon; its icon) ---------
+-- --- a station's work (W: station, name, then recipe~output~cost~can~text~icon; its icon; what
+-- else it offers, key~label~text~can; its health and most) ------------------------------------------
 
-function ES.Station(name, list, icon)
-  local note = "What it needs comes out of your bags first, then the camp's chest."
+local ACTION_ICONS = { upgrade = "Spell_ChargePositive", move = "INV_Misc_Note_01", demolish = "INV_Hammer_20" }
+
+function ES.Station(name, list, icon, actions, health, most)
+  local note = "Materials come from your bags first, then storage."
   if ES.siege then
-    note = "Your class's other cards, for gold. A card bought goes on its key if that key is free; N swaps cards on the board."
+    note = "Buy your class's other cards with gold. A new card goes on its key if the key is free. Swap cards on the board (N)."
+  elseif health and most and most ~= "" then
+    note = "Health " .. health .. " of " .. most .. ". " .. note
   end
   OpenWindow("station", name, note, icon ~= "" and icon or nil)
   local items = Items(list)
-  if table.getn(items) == 0 then
+  local acts = Items(actions)
+  if table.getn(items) == 0 and table.getn(acts) == 0 then
     Rest(ES.siege and "You know every card of your class." or "Nothing to make here yet.", "", "")
   end
-  for i = 1, math.min(LIST_ROWS, table.getn(items)) do
+  -- Upgrading, moving and tearing down come first: room for them before the recipes.
+  local top = 0
+  for j = 1, math.min(LIST_ROWS, table.getn(acts)) do
+    local a = Split(acts[j], "~")
+    local can = a[4] == "1"
+    top = top + 1
+    Row(top, {
+      icon = ACTION_ICONS[a[1] or ""] or "INV_Misc_Gear_01",
+      name = a[2] or "?",
+      sub = a[3] or "",
+      go = a[1] == "upgrade" and "Upgrade" or (a[1] == "move" and "Move" or "Tear Down"),
+      cmd = ".es " .. (a[1] or ""),
+      can = can,
+      detail = a[3] or "",
+      hint = can and "" or "Not enough materials.",
+    })
+    if j == 1 and table.getn(items) == 0 then Rest(a[2] or "?", a[3] or "", "") end
+  end
+  for i = 1, math.min(LIST_ROWS - top, table.getn(items)) do
     local f = Split(items[i], "~")
     local can = f[4] == "1"
-    Row(i, {
+    Row(top + i, {
       icon = f[6],
       name = f[2] or "?",
       sub = CostText(f[3]),
@@ -4472,7 +4602,7 @@ function ES.Station(name, list, icon)
       cmd = ".es craft " .. (f[1] or ""),
       can = can,
       detail = f[5] or "",
-      hint = can and "" or (ES.siege and "Not enough gold yet" or "Short of something: see what's red"),
+      hint = can and "" or (ES.siege and "Not enough gold." or "Not enough materials. Costs in red are short."),
     })
     if i == 1 then Rest(f[2] or "?", f[5] or "", "") end
   end
@@ -4481,7 +4611,7 @@ end
 -- --- the weapon rack (AR: key~name~kind~held~text~icon) ----------------------------------------------
 
 function ES.Rack(list)
-  OpenWindow("rack", "Weapon Rack", "Take up anything to try it. Two-handed weapons guard with themselves, no shield.")
+  OpenWindow("rack", "Weapon Rack", "Equip any weapon to try it. Two-handed weapons guard without a shield.")
   ES.rackList = list
   local items = Items(list)
   local first = PageOf("rack", table.getn(items), LIST_ROWS)
@@ -4493,7 +4623,7 @@ function ES.Rack(list)
       name = f[2] or "?",
       tag = f[3] or "",
       sub = f[5] or "",
-      go = held and "In hand" or "Take up",
+      go = held and "Equipped" or "Equip",
       cmd = (not held) and (".es arm " .. (f[1] or "")) or nil,
       can = not held,
       chosen = held,
@@ -4508,9 +4638,9 @@ ES.redraw.rack = function() ES.Rack(ES.rackList) end
 
 function ES.BuildMenu(list)
   if ES.siege then
-    OpenWindow("build", "Build", "Defences stand on your camp's ground round its Hearth, paid for in gold.")
+    OpenWindow("build", "Build", "Build defenses around your camp's Hearth. They cost gold.")
   else
-    OpenWindow("build", "Build", "Stations and defences stand in the meadow by the camp. Materials come out of your bags first, then the camp's chest.")
+    OpenWindow("build", "Build", "Build stations and defenses in the yards around the campfire. Materials come from your bags first, then storage.")
   end
   ES.buildList = list
   local items = Items(list)
@@ -4528,7 +4658,7 @@ function ES.BuildMenu(list)
       cmd = ".es build " .. (f[1] or ""),
       can = can,
       detail = f[6] or "",
-      hint = can and "" or "Short of something: see what's red",
+      hint = can and "" or "Not enough materials. Costs in red are short.",
     })
     if i == 1 then Rest(f[2] or "?", f[6] or "", "") end
   end
@@ -4562,7 +4692,7 @@ function ES.BookDraw()
     ES.BookFlat(d[1], d[2], d[3], d[4])
     return
   end
-  OpenWindow("book", "The Smuggler's Logbook", "A smuggler's log of every dark place under Azeroth the Brotherhood ever sold a map of. Every page is a place: read one and you're there. What you carry goes with you; the camp's chest stays here.", "INV_Misc_Book_09")
+  OpenWindow("book", "The Smuggler's Logbook", "Pick a page to travel there. What you carry goes with you, but storage stays at camp.", "INV_Misc_Book_09")
   local pick = ES.bookDungeon
   if pick then
     local info
@@ -4584,7 +4714,7 @@ function ES.BookDraw()
       detail = "The logbook's first page.",
     })
     if info[4] ~= "1" then
-      Rest(info[2] or "?", (info[19] and info[19] ~= "") and ("Written in a cipher. To read these pages, " .. info[19] .. ".") or ("Written in a cipher: hold the camp against " .. (info[5] or "1") .. " raid(s) and the scouts will have read these pages."), "")
+      Rest(info[2] or "?", (info[19] and info[19] ~= "") and ("Written in a cipher. To read these pages, " .. info[19] .. ".") or ("Written in a cipher. Defend the camp from " .. (info[5] or "1") .. " raid(s) to read these pages."), "")
       return
     end
     Rest(info[2] or "?", info[9] or "", "")
@@ -4599,10 +4729,10 @@ function ES.BookDraw()
         lit = read > 0,
         name = "Notes",
         tag = read .. " of " .. notes .. " read",
-        sub = "The pages you've found down there",
+        sub = "Notes found in this dungeon",
         go = "Read",
         cmd = ".es lore " .. pick,
-        detail = "Every note you've found here, to read again, and what they hint at.",
+        detail = "Read the notes you've found here again, and see what they hint at.",
       })
     end
     -- (And of the Bookmaker's Wager: the level open, the time to beat.)
@@ -4614,10 +4744,10 @@ function ES.BookDraw()
         lit = most > 1,
         name = "The Bookmaker's Wager",
         tag = "Open to +" .. most,
-        sub = string.format("%d:%02d to beat, the stakes rising", math.floor(limit / 60), math.mod(limit, 60)),
+        sub = string.format("Beat %d:%02d to raise the stakes", math.floor(limit / 60), math.mod(limit, 60)),
         go = "Wager",
         cmd = ".es wager " .. pick,
-        detail = "A run against the clock, the dungeon fresh: win in time to raise the stakes (tougher foes, better pay), and get your names on the Bookmaker's Board.",
+        detail = "Run the dungeon fresh against the clock. Win in time to raise the stakes and get your names on the Bookmaker's Board. Higher stakes mean tougher enemies and better pay.",
       })
     end
     local pages = {}
@@ -4636,9 +4766,9 @@ function ES.BookDraw()
         name = f[2] or "?",
         tag = "Page " .. n,
         sub = n == 1 and "Where every run begins" or "A lamp you've lit below",
-        go = "Go down",
+        go = "Go Down",
         cmd = ".es travel " .. (f[1] or ""),
-        detail = n == 1 and (info[9] ~= "" and info[9] or "The way in.") or "Wake at this lamp, as you left it.",
+        detail = n == 1 and (info[9] ~= "" and info[9] or "The way in.") or "Start at this lamp, with the dungeon as you left it.",
       })
     end
     return
@@ -4652,10 +4782,10 @@ function ES.BookDraw()
       icon = "Ability_Warrior_BattleShout",
       name = r[2] or "The Proving Ring",
       tag = best > 0 and ("Best: wave " .. best) or "",
-      sub = "Endless waves, more and tougher every time",
+      sub = "Endless waves, each one tougher",
       go = "Go",
       cmd = ".es travel " .. (r[1] or "arena"),
-      detail = "A ring of braziers on the field south of Fargodeep: the Horde comes in waves that never end, a champion every fifth. Fall and you get up at the camp, nothing lost; the banner takes you home.",
+      detail = "Fight endless Horde waves on the field south of Fargodeep, with a champion every 5th wave. If you fall, you respawn at camp and lose nothing. Use the banner to go home.",
     })
   end
   if d[4] ~= "" then
@@ -4664,10 +4794,10 @@ function ES.BookDraw()
       icon = "INV_BannerPVP_02",
       name = g[2] or "The Siege",
       tag = "1v1 to 1v1v1v1",
-      sub = "Camps against camps in Arathi Basin",
+      sub = "Camp against camp in Arathi Basin",
       go = "Go",
       cmd = ".es travel " .. (g[1] or "siege"),
-      detail = (g[3] or "") .. " You play a fresh hero of your class there; your own waits here.",
+      detail = (g[3] or "") .. " You play a new hero of your class there. Your own hero waits here.",
     })
   end
   for i = 1, table.getn(dl) do
@@ -4684,10 +4814,10 @@ function ES.BookDraw()
       sub = ((f[18] == "1") and "Next, by the book. " or "") .. ((ES.TierWords and ES.TierWords(f[16])) and (ES.TierWords(f[16]) .. ". ") or "") .. (f[8] or ""),
       go = "Open",
       cmd = function() ES.BookOpen(key) end,
-      detail = opened and ((f[8] or "") .. " Its pages: the way in, and every lamp you've lit.") or ((f[19] and f[19] ~= "") and ("In cipher. To read it, " .. f[19] .. ".") or ("Hold the camp against " .. (f[5] or "1") .. " raid(s) and the scouts will have read it.")),
+      detail = opened and ((f[8] or "") .. " Its pages are the way in and every lamp you've lit.") or ((f[19] and f[19] ~= "") and ("In cipher. To read it, " .. f[19] .. ".") or ("Defend the camp from " .. (f[5] or "1") .. " raid(s) to read it.")),
     })
   end
-  Rest("The way in", "Every dungeon starts at its first page; light the lamps as you go and they're pages too. There aren't many lamps down there.", "")
+  Rest("The way in", "Every dungeon starts at its first page. Light lamps as you go to add pages. There aren't many lamps down there.", "")
   local first = PageOf("book", table.getn(rows), LIST_ROWS)
   for i = 1, LIST_ROWS do
     local o = rows[first + i]
@@ -4699,7 +4829,7 @@ end
 -- The Deadmines' pages alone (a server from before the other dungeons).
 
 function ES.BookFlat(open, list, ring, siege)
-  OpenWindow("book", "The Smuggler's Logbook", "A Defias smuggler's log of the Deadmines. Every page is a place: read one and you're there. What you carry goes with you; the camp's chest stays here.", "INV_Misc_Book_09")
+  OpenWindow("book", "The Smuggler's Logbook", "Pick a page to travel there. What you carry goes with you, but storage stays at camp.", "INV_Misc_Book_09")
   local items = Items(list)
   -- The Proving Ring's page, scrawled on the inside cover: there from the start.
   local n = 0
@@ -4711,10 +4841,10 @@ function ES.BookFlat(open, list, ring, siege)
       icon = "Ability_Warrior_BattleShout",
       name = r[2] or "The Proving Ring",
       tag = best > 0 and ("Best: wave " .. best) or "",
-      sub = "Endless waves, more and tougher every time",
+      sub = "Endless waves, each one tougher",
       go = "Go",
       cmd = ".es travel " .. (r[1] or "arena"),
-      detail = "A ring of braziers on the field south of Fargodeep: the Horde comes in waves that never end, a champion every fifth. Fall and you get up at the camp, nothing lost; the banner takes you home.",
+      detail = "Fight endless Horde waves on the field south of Fargodeep, with a champion every 5th wave. If you fall, you respawn at camp and lose nothing. Use the banner to go home.",
     })
   end
   -- Siege's page, beside it: there from the start too.
@@ -4725,27 +4855,27 @@ function ES.BookFlat(open, list, ring, siege)
       icon = "INV_BannerPVP_02",
       name = g[2] or "The Siege",
       tag = "1v1 to 1v1v1v1",
-      sub = "Camps against camps in Arathi Basin",
+      sub = "Camp against camp in Arathi Basin",
       go = "Go",
       cmd = ".es travel " .. (g[1] or "siege"),
-      detail = (g[3] or "") .. " You play a fresh hero of your class there; your own waits here.",
+      detail = (g[3] or "") .. " You play a new hero of your class there. Your own hero waits here.",
     })
   end
   if open ~= "1" then
-    Rest("Written in a cipher", "Hold the camp against its first raid and the scouts will have read the rest of it.", "")
+    Rest("Written in a cipher", "Defend the camp from its first raid to read the rest.", "")
     return
   end
-  Rest("The way in", "The first page is the smugglers' landing, at the back of the mine: in from the sea at Ironclad Cove, out through the front door. Light the lamps as you go and they're pages here.", "")
+  Rest("The way in", "The first page is the smugglers' landing at the back of the mine, in from the sea at Ironclad Cove. Light lamps as you go to add pages.", "")
   for i = 1, math.min(LIST_ROWS - n, table.getn(items)) do
     local f = Split(items[i], "~")
     Row(n + i, {
       icon = i == 1 and "INV_Misc_Map_01" or "Spell_Fire_Fire",
       name = f[2] or "?",
       tag = "Page " .. i,
-      sub = i == 1 and "In from the sea: where every run begins" or "A lamp you've lit below",
-      go = "Go down",
+      sub = i == 1 and "In from the sea, where every run begins" or "A lamp you've lit below",
+      go = "Go Down",
       cmd = ".es travel " .. (f[1] or ""),
-      detail = i == 1 and "The smugglers' landing in Ironclad Cove's sea tunnel." or "Wake at this lamp, as you left it.",
+      detail = i == 1 and "The smugglers' landing in Ironclad Cove's sea tunnel." or "Start at this lamp, with the dungeon as you left it.",
     })
   end
 end
@@ -4755,14 +4885,14 @@ end
 function ES.ArenaBanner(f)
   local wave, fighting, secs = tonumber(f[2] or "") or 0, f[3] == "1", tonumber(f[4] or "") or 0
   local best, heroes = tonumber(f[5] or "") or 0, tonumber(f[6] or "") or 1
-  OpenWindow("ring", "The Proving Ring", "They come in waves that never end. Beat one and you get your breath back; every fifth brings a champion, and his wave pays into the camp's chest.", "Ability_Warrior_BattleShout")
+  OpenWindow("ring", "The Proving Ring", "The waves never end. Beat one to catch your breath. Every 5th wave brings a champion and pays into storage.", "Ability_Warrior_BattleShout")
   local now
   if fighting then
     now = "Wave " .. wave .. " is on you"
   elseif wave == 0 then
-    now = "The first wave in " .. secs .. " seconds"
+    now = "First wave in " .. secs .. " sec"
   else
-    now = "Wave " .. wave .. " beaten: the next in " .. secs .. " seconds"
+    now = "Wave " .. wave .. " beaten. Next in " .. secs .. " sec"
   end
   Row(1, {
     icon = "Ability_Warrior_BattleShout",
@@ -4772,15 +4902,15 @@ function ES.ArenaBanner(f)
     go = "Call",
     cmd = ".es arena next",
     can = not fighting,
-    detail = "No waiting: the next wave comes in at once.",
+    detail = "Start the next wave now.",
   })
   Row(2, {
     icon = "INV_Misc_Book_09",
-    name = "Home to the camp",
-    sub = "Your run ends here",
-    go = "Go home",
+    name = "Return to camp",
+    sub = "Ends your run",
+    go = "Go Home",
     cmd = ".es travel camp",
-    detail = "Back by the book at camp, with all you carry.",
+    detail = "Return to camp with everything you carry.",
   })
   Rest(now, "The camp's best: " .. (best > 0 and ("wave " .. best) or "none yet") .. ". In the ring: " .. heroes .. (heroes == 1 and " hero." or " heroes."), "")
 end
@@ -4788,7 +4918,7 @@ end
 -- --- Siege's muster banner (SL: open, status, secs, then key~name~text~seats~heroes~mine) ----------
 
 function ES.Muster(f)
-  OpenWindow("muster", "The Siege Muster", "Join a way to play: once its seats are full it begins, or start it with whoever's waiting. Every match starts the same: your class's Q and E, the plain kit.", "INV_BannerPVP_02")
+  OpenWindow("muster", "The Siege Muster", "Join a mode. It begins when its seats are full, or start it early with whoever is waiting. Every match starts with your class's plain Q and E cards.", "INV_BannerPVP_02")
   local ways = Items(f[5])
   local mine = nil
   for i = 1, table.getn(ways) do
@@ -4813,23 +4943,23 @@ function ES.Muster(f)
   local n = table.getn(ways)
   Row(n + 1, {
     icon = "Ability_Warrior_Charge",
-    name = "Begin now",
-    sub = "With whoever's waiting with you (two at least)",
-    go = "Begin",
+    name = "Start now",
+    sub = "With everyone waiting, 2 or more",
+    go = "Start",
     cmd = ".siege start",
     can = mine ~= nil,
-    detail = "Camps with nobody in them aren't played.",
+    detail = "Empty camps sit out.",
   })
   Row(n + 2, {
     icon = "INV_Misc_Book_09",
-    name = "Home to the camp",
-    sub = "Back to Goldshire, your own hero again",
-    go = "Go home",
+    name = "Return to camp",
+    sub = "Return to Goldshire as your own hero",
+    go = "Go Home",
     cmd = ".es travel camp",
-    detail = "Leaving a match leaves your camp to hold without you.",
+    detail = "If you leave a match, your camp fights on without you.",
   })
   local secs = tonumber(f[4] or "") or 0
-  Rest(f[3] or "", secs > 0 and (secs .. " seconds") or "", "")
+  Rest(f[3] or "", secs > 0 and (secs .. " sec") or "", "")
 end
 
 -- --- a camp's Mercenary Ledger (SB: open, gold, income, sent to, wave, then sends) ------------------
@@ -4840,7 +4970,7 @@ function ES.LedgerSub(gold, income, capField)
   local cap = Split(capField or "", "~")
   local sub = "Gold " .. gold .. ", +" .. income .. " a wave"
   if cap[2] and tonumber(cap[2]) and tonumber(cap[2]) > 0 then
-    sub = sub .. "; sent " .. (cap[1] or "0") .. " of " .. cap[2] .. " for the next wave"
+    sub = sub .. ". Sent " .. (cap[1] or "0") .. " of " .. cap[2] .. " for the next wave"
   end
   return sub
 end
@@ -4848,14 +4978,14 @@ end
 function ES.Ledger(f)
   ES.ledgerF = f
   local gold, income, to, wave = f[3] or "0", f[4] or "0", f[5] or "", tonumber(f[6] or "") or 0
-  OpenWindow("ledger", "Mercenary Ledger", "Pay gold to send creatures at a rival: they join the rival's next wave, and each send raises your income (paid every wave) for the rest of the match. Only so many may go each wave.", "INV_Misc_Book_11")
+  OpenWindow("ledger", "Mercenary Ledger", "Pay gold to send enemies into a rival's next wave. Each send raises your income for the rest of the match. Only so many can go each wave.", "INV_Misc_Book_11")
   Row(1, {
     icon = "Ability_Hunter_SniperShot",
     name = "Sending to " .. (to ~= "" and to or "nobody"),
     sub = ES.LedgerSub(gold, income, f[8]),
     go = "Next",
     cmd = ".siege target",
-    detail = "Your sends march on this camp. Next: the next rival camp still standing.",
+    detail = "Your sends attack this camp. Click Next to pick the next rival still standing.",
   })
   local sends = Items(f[7])
   local per = LIST_ROWS - 1
@@ -4878,7 +5008,7 @@ function ES.Ledger(f)
       hint = (not can) and (x[7] or "") or "",
     })
   end
-  Rest("Gold " .. gold, "Income " .. income .. " a wave, paid as each wave begins. Felling foes and the Blacksmith's veins pay too; felling a rival takes a share of theirs.", "")
+  Rest("Gold " .. gold, "Income " .. income .. " a wave, paid as each wave begins. Kills and the Blacksmith's veins pay too. Defeating a rival takes a share of their gold.", "")
 end
 ES.redraw.ledger = function() if ES.ledgerF then ES.Ledger(ES.ledgerF) end end
 
@@ -4891,29 +5021,29 @@ function ES.Lamp(f)
   local lamps, wares, plunder = Items(f[6]), Items(f[7]), tonumber(f[8] or "") or 0
   -- (An older server sends neither the currency's name nor the hones.)
   local coin, hones = f[9] or "Defias Plunder", Items(f[10])
-  OpenWindow("lamp", name, "Resting heals you, fills your Draughts and brings the foes back to their posts (but never a boss). You wake here if you fall.", "Spell_Fire_Fire")
+  OpenWindow("lamp", name, "Rest to heal and refill your Draughts. Enemies respawn too, except bosses. You respawn here if you fall.", "Spell_Fire_Fire")
   -- Every row, then a page of them.
   local rows = {}
   table.insert(rows, {
     icon = "INV_Drink_04",
     name = "Rest at the lamp",
     tag = "Draughts " .. have .. " / " .. most,
-    sub = "Whole again, Draughts full; the foes stir",
+    sub = "Full health and Draughts. Enemies respawn.",
     go = "Rest",
     cmd = ".es rest",
-    detail = "Every foe you've beaten (but the bosses) is back at its post when you rest.",
+    detail = "Every enemy you've beaten respawns when you rest, except bosses.",
   })
   table.insert(rows, {
     icon = "INV_Misc_Book_09",
-    name = "Home to the camp",
-    sub = "Back down by the book whenever you like",
-    go = "Go home",
+    name = "Return to camp",
+    sub = "Come back by the book any time",
+    go = "Go Home",
     cmd = ".es travel camp",
     detail = "What you carry goes with you. Your Draughts stay below for next time.",
   })
   for i = 1, table.getn(lamps) do
     local l = Split(lamps[i], "~")
-    table.insert(rows, { icon = "Spell_Fire_Fire", name = l[2] or "?", sub = "A lamp you've lit", go = "Travel", cmd = ".es travel " .. (l[1] or ""), detail = "Make your way there by the paths you've opened." })
+    table.insert(rows, { icon = "Spell_Fire_Fire", name = l[2] or "?", sub = "A lamp you've lit", go = "Travel", cmd = ".es travel " .. (l[1] or ""), detail = "Travel there by the paths you've opened." })
   end
   for i = 1, table.getn(wares) do
     local w = Split(wares[i], "~")
@@ -4937,7 +5067,7 @@ function ES.Lamp(f)
       icon = h[6],
       name = "Hone " .. (h[2] or "?"),
       tag = (h[4] or "?") .. " " .. coin,
-      sub = "To " .. (h[3] or "?") .. ": it hits harder, guards better",
+      sub = "Raises it to " .. (h[3] or "?") .. ". Hits harder and guards better.",
       go = "Hone",
       cmd = ".es hone " .. (h[1] or ""),
       can = can,
@@ -4949,7 +5079,7 @@ function ES.Lamp(f)
   for i = 1, math.min(LIST_ROWS, table.getn(rows) - first) do
     Row(i, rows[first + i])
   end
-  Rest(name, coin .. ": " .. plunder .. ". It's lost if you fall twice before you win your sack back.", "")
+  Rest(name, coin .. ": " .. plunder .. ". Lost if you fall twice before you recover your sack.", "")
 end
 ES.redraw.lamp = function() if ES.lampLine then ES.Lamp(ES.lampLine) end end
 
@@ -4995,8 +5125,8 @@ function ES.Placing(f)
     return
   end
   -- The keys as they are now (the card may have moved them).
-  place.keys:SetText("It stands in front of you, inside the ring: hold right mouse to turn.   "
-    .. (KeyName("ES_USE") or "F") .. ": place   " .. (KeyName("ES_SHEATHE") or "R") .. ": rotate   " .. (KeyName("ES_BUILD") or "H") .. ": cancel")
+  place.keys:SetText("Face where it should go, inside the ring. Hold right mouse to turn.   ("
+    .. (KeyName("ES_USE") or "F") .. ") Place   (" .. (KeyName("ES_SHEATHE") or "R") .. ") Rotate   (" .. (KeyName("ES_BUILD") or "H") .. ") Cancel")
   -- A ring on the ground where it would go: green, it can; red, it can't.
   local at = Split(f[5] or "", "~")
   local x, y, z, r = tonumber(at[1] or ""), tonumber(at[2] or ""), tonumber(at[3] or ""), tonumber(at[4] or "")
@@ -5014,7 +5144,7 @@ function ES.Placing(f)
     place.state:SetTextColor(RED.r, RED.g, RED.b)
     place.ok:SetEnabledLook(false)
   else
-    place.state:SetText("It can go here.")
+    place.state:SetText("Ready to place.")
     place.state:SetTextColor(GREEN.r, GREEN.g, GREEN.b)
     place.ok:SetEnabledLook(true)
   end
@@ -5036,13 +5166,13 @@ confirm.bg:SetVertexColor(0.15, 0.08, 0.06, 0.96)
 confirm.text = Text(confirm, FONT_BODY, 13)
 confirm.text:SetPoint("TOP", confirm, "TOP", 0, -18)
 confirm.text:SetWidth(420)
-confirm.yes = MakeButton(confirm, 120, 26, "Ring it", RED, function()
+confirm.yes = MakeButton(confirm, 120, 26, "Ring It", RED, function()
   Say(".es " .. (confirm.what or "raid") .. " yes")
   confirm:Hide()
   ES.SetMode("action")
 end)
 confirm.yes:SetPoint("BOTTOMRIGHT", confirm, "BOTTOM", -8, 14)
-confirm.no = MakeButton(confirm, 120, 26, "Not yet", WHITE, function()
+confirm.no = MakeButton(confirm, 120, 26, "Not Yet", WHITE, function()
   Say(".es " .. (confirm.what or "raid") .. " no")
   confirm:Hide()
   ES.SetMode("action")
@@ -5071,6 +5201,8 @@ function ES.HideChrome()
       f:SetParent(holder)
     end
   end
+  -- The bars across the top as the menu has them.
+  if ES.PlaceTopBars then ES.PlaceTopBars() end
   -- Health bars over everyone's heads in place of the portraits (unless V has turned them off).
   if ElwynnSurvivalSettings and ElwynnSurvivalSettings.noBars then
     if HideNameplates then pcall(HideNameplates) end
@@ -5202,12 +5334,14 @@ end
 local BOARD_COLS = { "warrior", "paladin", "hunter", "rogue", "priest", "shaman", "mage", "warlock", "druid" }
 local BOARD_N = 9
 local BOARD_ROWS = { "ranged", "close", "utility", "defense", "ultimate" }
-local CARD_W, CARD_H, CARD_GAP = 112, 50, 5
+-- Each row holds a class's two choices, the second under the first: a row is two cards high
+-- (`CARD_H * 2 + 4`; no local of its own, the main chunk is near Lua's 200).
+local CARD_W, CARD_H, CARD_GAP = 112, 44, 5
 local BOARD_LABEL = 100
 local BOARD_W = 24 + BOARD_LABEL + BOARD_N * CARD_W + (BOARD_N - 1) * CARD_GAP + 24
 local BOARD_TOP = 84
 local BOARD_DETAIL = 128
-local BOARD_H = BOARD_TOP + AB_N * (CARD_H + CARD_GAP) + BOARD_DETAIL + 74
+local BOARD_H = BOARD_TOP + AB_N * ((CARD_H * 2 + 4) + CARD_GAP) + BOARD_DETAIL + 74
 
 local tree = CreateFrame("Frame", "ElwynnSurvivalTree", UIParent)
 tree:SetWidth(BOARD_W)
@@ -5244,7 +5378,7 @@ local function ColX(c)
   return 24 + BOARD_LABEL + (c - 1) * (CARD_W + CARD_GAP)
 end
 local function RowY(r)
-  return BOARD_TOP + (r - 1) * (CARD_H + CARD_GAP)
+  return BOARD_TOP + (r - 1) * ((CARD_H * 2 + 4) + CARD_GAP)
 end
 -- (Kept in `tree.heads`, so the beta page can put them away while it's up.)
 tree.heads = {}
@@ -5267,20 +5401,20 @@ for r = 1, AB_N do
   local words = ROW_WORDS[BOARD_ROWS[r]]
   local y = RowY(r)
   local cap = Tex(tree, "ARTWORK", "keycap", 30, 22)
-  cap:SetPoint("TOPLEFT", tree, "TOPLEFT", 24, -y - (CARD_H - 22) / 2)
+  cap:SetPoint("TOPLEFT", tree, "TOPLEFT", 24, -y - ((CARD_H * 2 + 4) - 22) / 2)
   cap:SetVertexColor(0.16, 0.14, 0.12, 0.95)
   local k = Text(tree, FONT_NUM, 13, "OUTLINE")
   k:SetPoint("CENTER", cap, "CENTER", 0, 0)
   k:SetTextColor(1, 0.88, 0.6)
   tree.rowKeys[r] = k
   local name = Text(tree, FONT_TITLE, 13, "OUTLINE")
-  name:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - CARD_H / 2 + 8)
+  name:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - (CARD_H * 2 + 4) / 2 + 8)
   name:SetWidth(BOARD_LABEL - 40)
   name:SetJustifyH("LEFT")
   name:SetTextColor(0.95, 0.9, 0.8)
   name:SetText(words[1])
   local sub = Text(tree, FONT_BODY, 8)
-  sub:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - CARD_H / 2 - 9)
+  sub:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - (CARD_H * 2 + 4) / 2 - 9)
   sub:SetWidth(BOARD_LABEL - 36)
   sub:SetJustifyH("LEFT")
   sub:SetTextColor(0.6, 0.58, 0.54)
@@ -5432,7 +5566,7 @@ local ROW_N = { ranged = 1, close = 2, utility = 3, defense = 4, ultimate = 5 }
 
 -- What the board's other page (BetaBoard.lua) builds its cards and its tabs with.
 ES.boardKit = {
-  Card = BoardCard, ColX = ColX, RowY = RowY, ROW_N = ROW_N, N = BOARD_N, W = CARD_W, H = CARD_H, GAP = CARD_GAP,
+  Card = BoardCard, ColX = ColX, RowY = RowY, ROW_N = ROW_N, N = BOARD_N, W = CARD_W, H = CARD_H, GAP = CARD_GAP, ROW_H = CARD_H * 2 + 4,
   Button = MakeButton, Text = Text, TITLE = FONT_TITLE, BODY = FONT_BODY, ICONS = ICONS, GOLD = GOLD, WHITE = WHITE,
 }
 
@@ -5516,11 +5650,13 @@ function ES.TreeLine(f)
         exKey = e[15] or "", exName = e[16] or "", exIcon = e[17] or "", exValor = tonumber(e[18] or "") or 0,
         exText = e[19] or "", exFacts = e[20] or "", where = e[21] or "",
       }
-      local slot = (r - 1) * BOARD_N + c
+      -- A class's second choice in the row sits under its first (older servers send none: 1).
+      local choice = (e[23] == "2") and 2 or 1
+      local slot = (r - 1) * BOARD_N * 2 + (choice - 1) * BOARD_N + c
       used[slot] = true
       local b = BoardCard(slot)
       b:ClearAllPoints()
-      b:SetPoint("TOPLEFT", tree, "TOPLEFT", ColX(c), -RowY(r))
+      b:SetPoint("TOPLEFT", tree, "TOPLEFT", ColX(c), -RowY(r) - (choice - 1) * (CARD_H + 4))
       b.d = d
       b.icon:SetTexture(ICONS .. d.icon)
       if d.owned then
@@ -5591,39 +5727,39 @@ local CONTROLS = {
   { "Move back", "MOVEBACKWARD" },
   { "Strafe left", "STRAFELEFT" },
   { "Strafe right", "STRAFERIGHT" },
-  { "Look around (turns the hero)", nil, "The mouse" },
-  { "Attack (again: the next blow)", "ES_ATTACK" },
+  { "Look around and turn", nil, "Mouse" },
+  { "Attack, press again to chain", "ES_ATTACK" },
   { "Heavy attack", "ES_HEAVY" },
-  { "Guard (just in time: parry)", "ES_GUARD" },
+  { "Guard, just in time to parry", "ES_GUARD" },
   { "Shield bash / kick", nil, "guardbash" },
   { "Running attack", nil, "running" },
-  { "Dodge (hold: sprint)", "ES_DODGE" },
-  { "Sprint", nil, "Shift (hold)" },
+  { "Dodge, hold to sprint", "ES_DODGE" },
+  { "Sprint", nil, "Hold Shift" },
   { "Jump", "JUMP" },
-  { "Lock on / let go", "ES_LOCK" },
-  { "Next foe (locked on)", "ES_NEXT" },
+  { "Lock on / off", "ES_LOCK" },
+  { "Lock onto next enemy", "ES_NEXT" },
   { "Free the mouse", "ES_MODE" },
   { "Ranged ability", "ES_AB1" },
   { "Close ability", "ES_AB2" },
   { "Utility ability", "ES_AB3" },
   { "Defense ability", "ES_AB4" },
-  { "Ultimate (hold)", "ES_AB5" },
-  { "Charged-up version (Valor)", nil, "ex" },
-  { "Aimed ability: cast / cancel", nil, "cast" },
+  { "Hold for ultimate", "ES_AB5" },
+  { "EX version, costs Valor", nil, "ex" },
+  { "Cast / cancel aimed ability", nil, "cast" },
   { "Use / place", "ES_USE" },
-  { "Sheathe / draw", "ES_SHEATHE" },
-  { "Quick item", "ES_EAT" },
+  { "Sheathe / draw weapon", "ES_SHEATHE" },
+  { "Use quick item", "ES_EAT" },
   { "Next quick item", "ES_CYCLE" },
   { "Walk / run", "TOGGLERUN" },
   { "Autorun", "TOGGLEAUTORUN" },
-  { "Bags", "ES_BAG" },
-  { "Ability board", "ES_TREE" },
-  { "Journal", "ES_JOURNAL" },
+  { "Open bags", "ES_BAG" },
+  { "Open ability board", "ES_TREE" },
+  { "Open journal", "ES_JOURNAL" },
   { "Build", "ES_BUILD" },
   { "Character", "TOGGLECHARACTER0" },
   { "Map", "TOGGLEWORLDMAP" },
-  { "Health bars over heads", "ES_BARS" },
-  { "Controls (this card)", "ES_KEYS" },
+  { "Show / hide health bars", "ES_BARS" },
+  { "Open controls", "ES_KEYS" },
 }
 ES.CONTROLS = CONTROLS
 local CARD_ROWS = 19
@@ -5642,7 +5778,7 @@ local function FixedText(what)
       local a, x = GetBindingKey and GetBindingKey("ES_AB" .. n), GetBindingKey and GetBindingKey("ES_EX" .. n)
       if not a or not x or x ~= "CTRL-" .. a then same = false end
     end
-    if same then return "Hold its key (or Ctrl + it)" end
+    if same then return "Hold its key, or Ctrl + key" end
     local t = {}
     for n = 1, AB_N - 1 do table.insert(t, KeyName("ES_EX" .. n) or "-") end
     return table.concat(t, " ")
@@ -5655,8 +5791,8 @@ end
 function ES.ControlKey(i)
   local c = CONTROLS[i]
   if c[3] then return FixedText(c[3]) end
-  local a = KeyName(c[2]) or "not bound"
-  if c[4] then return a .. " / " .. (KeyName(c[4]) or "not bound") end
+  local a = KeyName(c[2]) or "Not bound"
+  if c[4] then return a .. " / " .. (KeyName(c[4]) or "Not bound") end
   return a
 end
 
@@ -5762,7 +5898,7 @@ card.switch = MakeButton(card, 130, 24, "", GOLD, function()
 end)
 card.Place(card.switch, card.Setting(1, 1, "Key layout"))
 -- Only while there are changed keys to put back (and the Elwynn layout is the one in use).
-card.reset = MakeButton(card, 130, 24, "Put them back", GOLD, function()
+card.reset = MakeButton(card, 130, 24, "Reset Keys", GOLD, function()
   if OwnKeys() or not (ElwynnSurvivalSettings and ElwynnSurvivalSettings.custom and next(ElwynnSurvivalSettings.custom)) then return end
   Settings().custom = nil
   ES.Rebind()
@@ -5808,6 +5944,15 @@ card.marks = MakeButton(card, 130, 24, "", GOLD, function()
   ES.DrawKeys()
 end)
 card.Place(card.marks, card.Setting(2, 2, "Floor markers"))
+-- The foe's and a champion's bars across the top; hidden, the bars over heads (V) are the ones
+-- to go by (a champion's posture under its own).
+card.topBars = MakeButton(card, 130, 24, "", GOLD, function()
+  local set = Settings()
+  if set.noTopBars then set.noTopBars = nil else set.noTopBars = 1 end
+  ES.PlaceTopBars()
+  ES.DrawKeys()
+end)
+card.Place(card.topBars, card.Setting(2, 3, "Bars at the top"))
 card.where = MakeButton(card, 130, 24, "", GOLD, function()
   local set = Settings()
   if ES.VitalsWhere() == "corner" then set.vitals = "hero" else set.vitals = "corner" end
@@ -5861,7 +6006,7 @@ capture.text:SetTextColor(1, 0.85, 0.5)
 capture.sub = Text(capture, FONT_BODY, 12)
 capture.sub:SetPoint("TOP", capture.text, "BOTTOM", 0, -8)
 capture.sub:SetTextColor(0.8, 0.8, 0.8)
-capture.sub:SetText("Shift, Ctrl and Alt count as held. Esc: leave it. Backspace: back to the Elwynn key.")
+capture.sub:SetText("Hold Shift, Ctrl or Alt to add them. Press Esc to cancel, or Backspace to reset to the Elwynn key.")
 capture:Hide()
 ES.capture = capture
 
@@ -5878,7 +6023,7 @@ end
 
 function ES.CaptureKey(i)
   if OwnKeys() then
-    ES.Message("Your own keys are in use: change them in the game's Key Bindings, or switch back to the Elwynn keys.")
+    ES.Message("Your own keys are in use. Change them in Key Bindings, or switch to the Elwynn keys.")
     return
   end
   local c = CONTROLS[i]
@@ -5907,7 +6052,7 @@ function ES.SetKey(action, chord)
   ES.DrawQuick()
   if taken then
     local name = getglobal("BINDING_NAME_" .. taken) or taken
-    ES.Message(Pretty(chord) .. " was " .. name .. "'s: that has no key now.")
+    ES.Message(Pretty(chord) .. " was bound to " .. name .. ". It has no key now.")
   end
 end
 
@@ -5947,7 +6092,7 @@ function ES.DrawKeys()
   if AnimClient() or ActionClient() then
     card.client:SetText("")
   else
-    card.client:SetText("Stock client: run scripts/play-survival.sh (or update the Windows folder) for the steering mouse and the over-the-shoulder aim.")
+    card.client:SetText("Stock client. Run scripts/play-survival.sh, or update the Windows folder, for mouse steering and over-the-shoulder aim.")
   end
   local own = OwnKeys()
   if own then
@@ -5957,14 +6102,14 @@ function ES.DrawKeys()
       local action = CONTROLS[i][2]
       if action and string.sub(action, 1, 3) == "ES_" and not (GetBindingKey and GetBindingKey(action)) then none = none + 1 end
     end
-    local gap = (none > 0) and string.format(" %d of its actions have no key yet.", none) or ""
-    card.hint:SetText("Your own key bindings: change them in the game's Key Bindings (Elwynn Survival's are under its heading).")
+    local gap = (none > 0) and string.format(" %d Elwynn actions have no key.", none) or ""
+    card.hint:SetText("Using your own key bindings. Change them in Key Bindings, under Elwynn Survival.")
     card.profile:SetText("The Elwynn keys fill in whatever yours leave free." .. gap)
-    card.switch.label:SetText("Your own")
+    card.switch.label:SetText("Your Own")
   else
-    card.hint:SetText("Click a key to change it. The plain ones follow from other keys.")
-    card.profile:SetText("Keys you change are kept for next time. Your own saved bindings come back when you leave Elwynn.")
-    card.switch.label:SetText("Elwynn layout")
+    card.hint:SetText("Click a key to change it. Gray keys follow from others.")
+    card.profile:SetText("Changed keys are saved. Your own bindings return when you leave Elwynn.")
+    card.switch.label:SetText("Elwynn Layout")
   end
   -- Putting changed keys back: only when there are some, in the Elwynn layout.
   local changed = ElwynnSurvivalSettings and ElwynnSurvivalSettings.custom and next(ElwynnSurvivalSettings.custom) ~= nil
@@ -5973,12 +6118,13 @@ function ES.DrawKeys()
     card.resetNone:SetText("")
   else
     card.reset:Hide()
-    card.resetNone:SetText(own and "(Elwynn layout only)" or "None")
+    card.resetNone:SetText(own and "Elwynn layout only" or "None")
   end
-  card.middle.label:SetText((ElwynnSurvivalSettings and ElwynnSurvivalSettings.middleLock) and "Locks on" or "Hold to look")
-  card.where.label:SetText((ES.VitalsWhere() == "corner") and "Top left" or "By the hero")
+  card.middle.label:SetText((ElwynnSurvivalSettings and ElwynnSurvivalSettings.middleLock) and "Lock On" or "Hold to Look")
+  card.where.label:SetText((ES.VitalsWhere() == "corner") and "Top Left" or "By Hero")
   card.size.label:SetText(string.format("%d%%", math.floor(ES.VitalsScale() * 100 + 0.5)))
   card.marks.label:SetText(ES.MarksOn() and "Shown" or "Hidden")
+  card.topBars.label:SetText(ES.TopBarsOn() and "Shown" or "Hidden")
   card.mouseText:SetText(string.format("%d%%", math.floor(ES.MouseSpeed() * 100 + 0.5)))
 end
 
@@ -6072,13 +6218,13 @@ function ES.Wake()
   ES.SetMode("action")
   -- The camera stops short of other bodies instead of entering them.
   if AnimClient() and SetCameraUnitCollision then SetCameraUnitCollision(1) end
-  ES.Message(string.format("%s attacks, %s guards, %s dodges; abilities on %s %s %s %s, the ultimate on %s (hold it). %s lists every key.",
+  ES.Message(string.format("%s attacks, %s guards, %s dodges. Abilities are on %s %s %s %s. Hold %s for the ultimate. %s shows every key.",
     KeyName("ES_ATTACK") or "Left mouse", KeyName("ES_GUARD") or "right mouse", KeyName("ES_DODGE") or "Space",
     KeyName("ES_AB1") or "-", KeyName("ES_AB2") or "-", KeyName("ES_AB3") or "-", KeyName("ES_AB4") or "-", KeyName("ES_AB5") or "-",
     KeyName("ES_KEYS") or "The key icon"))
   if reset then
     if DEFAULT_CHAT_FRAME then
-      DEFAULT_CHAT_FRAME:AddMessage("|cffffd24aElwynn Survival:|r this version starts everyone on the Elwynn keys; " .. (KeyName("ES_KEYS") or "K") .. " shows and changes them.")
+      DEFAULT_CHAT_FRAME:AddMessage("|cffffd24aElwynn Survival:|r Keys are reset to the Elwynn layout. Press " .. (KeyName("ES_KEYS") or "K") .. " to see and change them.")
     end
   end
 end
@@ -6288,7 +6434,7 @@ function ES.Line(line)
   elseif verb == "S" then
     ES.Chest(f[2])
   elseif verb == "W" then
-    ES.Station(f[3] or "", f[4], f[5] or "")
+    ES.Station(f[3] or "", f[4], f[5] or "", f[6], f[7], f[8])
   elseif verb == "AR" then
     ES.Rack(f[2])
   elseif verb == "BK" then
@@ -6299,6 +6445,14 @@ function ES.Line(line)
     ES.ArenaBanner(f)
   elseif verb == "LP" then
     ES.Lamp(f)
+  elseif verb == "FG" then
+    -- The night's fog (client patch 0018); a client without it keeps Elwynn's own.
+    if f[2] and SetWorldFog then
+      SetWorldFog(tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 120,
+        tonumber(f[6]) or 0.25, tonumber(f[7]) or 1, tonumber(f[9]) or 6, tonumber(f[8]) or 0)
+    elseif ClearWorldFog then
+      ClearWorldFog(4)
+    end
   elseif verb == "WR" then
     ES.below = f[2] == "below"
     ES.siege = f[2] == "siege"
@@ -6314,11 +6468,15 @@ function ES.Line(line)
     ES.BuildMenu(f[2])
   elseif verb == "BP" then
     ES.Placing(f)
+  elseif verb == "CW" then
+    if win:IsShown() then win:Hide() end
   elseif verb == "CF" then
     confirm.what = f[2]
     confirm.text:SetText(f[3] or "")
+    confirm.yes.label:SetText((f[4] and f[4] ~= "") and f[4] or "Ring It")
+    confirm.no.label:SetText((f[5] and f[5] ~= "") and f[5] or "Not Yet")
     confirm:Show()
-    Play("raid")
+    if f[2] == "raid" then Play("raid") end
     WindowMode()
   elseif verb == "DE" then
     local secs = tonumber(f[2]) or 0
@@ -6353,8 +6511,11 @@ events:SetScript("OnEvent", function()
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
-    -- ac10: a clip can come from another character model; ac11: its turns go back to rest after.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
+    -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
+    -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
+      Say(".es hello " .. VERSION .. " ac12")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
       Say(".es hello " .. VERSION .. " ac11")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 10 then
       Say(".es hello " .. VERSION .. " ac10")

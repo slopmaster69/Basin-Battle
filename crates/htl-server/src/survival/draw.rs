@@ -14,6 +14,10 @@ const HIGH_ITEM: u64 = 0x4000;
 
 /// Template entries: creatures by kind, items by kind, the outfit, game objects as handed out.
 pub(crate) const CREATURE_ENTRY: u32 = 60_000;
+/// The camp's people (`[[prop]]` with `npc`): creature templates by prop.
+pub(crate) const RESIDENT_ENTRY: u32 = 65_000;
+/// Not to be attacked (`UNIT_FLAG_NON_ATTACKABLE`).
+const UNIT_FLAG_NON_ATTACKABLE: u32 = 0x02;
 pub(crate) const ITEM_ENTRY: u32 = 300_000;
 const OUTFIT_ENTRY: u32 = 300_900;
 /// The satchels every hero carries beside the backpack.
@@ -46,6 +50,11 @@ const GO_TYPE_DOOR: u32 = 0;
 const GO_TYPE_GENERIC: u32 = 5;
 /// Not selectable (0x10), and the client keeps it (0x20).
 const GO_FLAGS_INERT: u32 = 0x10 | 0x20;
+/// Ours, read by client patch 0017: a live preview, moved in place by a create sent again for
+/// the same guid, never solid and never faded in or out (`PREVIEW_MOVE`); and drawn see-through
+/// and tinted light blue (`PREVIEW_GHOST`): a station being placed, and its ring.
+pub(crate) const GO_FLAG_PREVIEW_MOVE: u32 = 0x1000_0000;
+pub(crate) const GO_FLAG_PREVIEW_GHOST: u32 = 0x2000_0000;
 
 /// Danger marks and the placing rings: the ritual circle (drawn 6.48 yd across at scale 1) and a
 /// green rune ring for a spot that's good.
@@ -77,6 +86,23 @@ pub(crate) fn armor_slot(slot: &str) -> (u32, u8) {
         "legs" => (7, 6),
         _ => (5, 4),
     }
+}
+
+/// What's worn, slot by slot (item entries): the plain outfit, with the armor in its place, then
+/// the weapon, the shield and the bow, the ones there are.
+fn worn_of(armor: &[(&str, usize)], weapon: Option<usize>, shield: Option<usize>, bow: Option<usize>) -> Vec<(u8, u32)> {
+    let mut v: Vec<(u8, u32)> = OUTFIT
+        .iter()
+        .enumerate()
+        .filter(|(_, (slot, ..))| !armor.iter().any(|(a, _)| armor_slot(a).1 == *slot))
+        .map(|(k, (slot, ..))| (*slot, OUTFIT_ENTRY + k as u32))
+        .collect();
+    for (slot, item) in armor {
+        v.push((armor_slot(slot).1, ITEM_ENTRY + *item as u32));
+    }
+    let hands = [(SLOT_MAIN_HAND, weapon), (SLOT_OFF_HAND, shield), (SLOT_RANGED, bow)];
+    v.extend(hands.into_iter().filter_map(|(slot, i)| i.map(|i| (slot, ITEM_ENTRY + i as u32))));
+    v
 }
 
 /// What every survivor wears: a plain jerkin, belt, trousers, boots and bracers (cosmetic).
@@ -172,10 +198,21 @@ impl SurvivalGame {
         entry
     }
 
+    fn obj_look_in(&self, v: &ObjView) -> (u32, u32) {
+        let (kind, flags) = Self::obj_look(v);
+        // A gate: walked through on a patched client (0017's no-hull flag), raiders still break it.
+        match v.kind {
+            ObjKind::Station { def, .. } if self.sim.content.stations.get(def).is_some_and(|s| s.passable) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            _ => (kind, flags),
+        }
+    }
+
     fn obj_look(v: &ObjView) -> (u32, u32) {
         // Usable things are right-clicked; the rest (ghosts, fires) are only seen.
         if matches!(v.kind, ObjKind::Door { .. }) {
             (GO_TYPE_DOOR, 0x20)
+        } else if matches!(v.kind, ObjKind::Ghost { .. }) {
+            (GO_TYPE_GENERIC, GO_FLAGS_INERT | GO_FLAG_PREVIEW_MOVE | GO_FLAG_PREVIEW_GHOST)
         } else if v.usable {
             (GO_TYPE_GOOBER, 0x20)
         } else {
@@ -183,7 +220,18 @@ impl SurvivalGame {
         }
     }
 
+    /// One of the camp's people (`[[prop]]` with `npc`): their prop.
+    pub(crate) fn resident(&self, v: &ObjView) -> Option<usize> {
+        match v.kind {
+            ObjKind::Piece { def } if self.sim.content.props.get(def).is_some_and(|d| d.npc) => Some(def),
+            _ => None,
+        }
+    }
+
     pub(crate) fn obj_guid_for(&mut self, v: &ObjView) -> u64 {
+        if let Some(def) = self.resident(v) {
+            return creature_guid(RESIDENT_ENTRY + def as u32, v.id);
+        }
         let (kind, _) = Self::obj_look(v);
         let entry = self.go_entry(v.display, &v.name, kind);
         object_guid(entry, v.id)
@@ -194,6 +242,11 @@ impl SurvivalGame {
     pub(crate) fn push_templates(&mut self, conn: ConnId) {
         for def in 0..self.sim.content.mobs.len() {
             self.creature_query(conn, CREATURE_ENTRY + def as u32);
+        }
+        for (k, d) in self.sim.content.props.iter().enumerate() {
+            if d.npc {
+                self.creature_query(conn, RESIDENT_ENTRY + k as u32);
+            }
         }
         let gos: Vec<((u32, String, u32), u32)> = self.go_entries.iter().map(|(k, v)| (k.clone(), *v)).collect();
         for ((display, name, kind), entry) in gos {
@@ -215,6 +268,12 @@ impl SurvivalGame {
     }
 
     pub(crate) fn creature_query(&self, conn: ConnId, entry: u32) {
+        // One of the camp's people: a humanoid with their trade under their name.
+        if let Some(d) = entry.checked_sub(RESIDENT_ENTRY).and_then(|k| self.sim.content.props.get(k as usize)).filter(|d| d.npc) {
+            let info = CreatureInfo { entry, name: &d.name, subname: &d.subname, creature_type: 7, rank: 0, display_id: d.display };
+            self.send(conn, packets::creature_query_response(&info));
+            return;
+        }
         let p = match entry.checked_sub(CREATURE_ENTRY).and_then(|d| self.sim.content.mobs.get(d as usize)) {
             Some(d) => {
                 // A beast, or one of the Horde (humanoid) with its clan under its name.
@@ -392,23 +451,31 @@ impl SurvivalGame {
     /// The gear a hero shows: (slot, item entry), the outfit included.
     pub(crate) fn worn(&self, id: Id) -> Vec<(u8, u32)> {
         let Some(p) = self.sim.players.get(&id) else { return Vec::new() };
-        // The plain outfit, with what armor they wear in its place.
-        let mut v: Vec<(u8, u32)> = OUTFIT
-            .iter()
-            .enumerate()
-            .filter(|(_, (slot, ..))| ! p.armor.keys().any(|a| armor_slot(a).1 == *slot))
-            .map(|(k, (slot, ..))| (*slot, OUTFIT_ENTRY + k as u32))
-            .collect();
-        for (slot, item) in &p.armor {
-            v.push((armor_slot(slot).1, ITEM_ENTRY + *item as u32));
-        }
-        v.push((SLOT_MAIN_HAND, ITEM_ENTRY + p.weapon as u32));
+        let armor: Vec<(&str, usize)> = p.armor.iter().map(|(s, i)| (s.as_str(), *i)).collect();
         // A two-handed grip leaves no hand for the shield.
-        if !self.sim.weapon_of(p).two_handed {
-            v.push((SLOT_OFF_HAND, ITEM_ENTRY + p.shield as u32));
+        let shield = Some(p.shield).filter(|_| !self.sim.weapon_of(p).two_handed);
+        worn_of(&armor, Some(p.weapon), shield, Some(p.bow))
+    }
+
+    /// What a hero out of the world wears, from its save: as `worn` would have it in the world
+    /// (a key the rules no longer have left off).
+    pub(crate) fn worn_saved(&self, s: &PlayerSave) -> Vec<(u8, u32)> {
+        let c = &self.sim.content;
+        let armor: Vec<(&str, usize)> = s.armor.iter().filter_map(|(slot, k)| c.item(k).map(|i| (slot.as_str(), i))).collect();
+        let two = c.weapon(&s.weapon).is_some_and(|w| w.two_handed);
+        let shield = c.item(&s.shield).filter(|_| !two);
+        worn_of(&armor, c.item(&s.weapon), shield, c.item(&s.bow))
+    }
+
+    /// The character screen's look of what's worn: each slot's display and inventory type.
+    pub(crate) fn dress(&self, worn: &[(u8, u32)]) -> [(u32, u8); 19] {
+        let mut out = [(0, 0); 19];
+        for (slot, entry) in worn {
+            if let (Some(o), Some((t, _))) = (out.get_mut(usize::from(*slot)), self.item_template(*entry)) {
+                *o = (t.display_id, t.inventory_type as u8);
+            }
         }
-        v.push((SLOT_RANGED, ITEM_ENTRY + p.bow as u32));
-        v
+        out
     }
 
     /// How many slots each of the four bags has: what the rules let a hero carry past the
@@ -645,7 +712,10 @@ impl SurvivalGame {
     /// (green where it can go, red where it can't).
     pub(crate) fn obj_create(&mut self, id: Id) -> Vec<Packet> {
         let Some(v) = self.sim.object(id) else { return Vec::new() };
-        let (kind, flags) = Self::obj_look(&v);
+        if let Some(def) = self.resident(&v) {
+            return vec![self.resident_create(def, &v)];
+        }
+        let (kind, flags) = self.obj_look_in(&v);
         let entry = self.go_entry(v.display, &v.name, kind);
         let guid = object_guid(entry, id);
         self.bind(id, guid);
@@ -657,11 +727,51 @@ impl SurvivalGame {
             let (display, name, scale) =
                 if ok { (GOOD_RING_DISPLAY, "Building Spot", (r / 1.5).max(0.4)) } else { (DANGER_DISPLAY, "Danger", (r / DANGER_MODEL_RADIUS).max(0.15)) };
             let e = self.go_entry(display, name, GO_TYPE_GENERIC);
-            let ring = object_guid(e, id) ^ (1 << 47);
+            // The same guid whichever ring it is, so a patched client swaps it in place as the
+            // ghost moves (green where it can go, red where it can't).
+            let good = self.go_entry(GOOD_RING_DISPLAY, "Building Spot", GO_TYPE_GENERIC);
+            let ring = object_guid(good, id) ^ (1 << 47);
             self.rings.insert(id, ring);
-            out.push(Self::go_packet(ring, e, display, GO_TYPE_GENERIC, GO_FLAGS_INERT, scale, v.pos, 0.0));
+            out.push(Self::go_packet(ring, e, display, GO_TYPE_GENERIC, GO_FLAGS_INERT | GO_FLAG_PREVIEW_MOVE, scale, v.pos, 0.0));
         }
         out
+    }
+
+    /// One of the camp's people, standing at their post: friendly, not to be attacked.
+    fn resident_create(&mut self, def: usize, v: &ObjView) -> Packet {
+        let guid = creature_guid(RESIDENT_ENTRY + def as u32, v.id);
+        self.bind(v.id, guid);
+        let d = &self.sim.content.props[def];
+        let look = UnitLook {
+            guid,
+            entry: RESIDENT_ENTRY + def as u32,
+            display_id: d.display,
+            scale: d.scale,
+            level: 10,
+            faction: fields::FACTION_FRIENDLY,
+            health: 100,
+            max_health: 100,
+            attack_ms: 2000,
+            damage: [1, 1],
+            run_speed: 7.0,
+            npc_flags: 0,
+            unit_flags: UNIT_FLAG_NON_ATTACKABLE,
+            main_hand: 0,
+            main_hand_info: 0,
+            off_hand: 0,
+            ranged: 0,
+        };
+        let f = fields::unit_fields(&look);
+        packets::update_object(
+            &[Create {
+                guid,
+                object_type: packets::TYPE_UNIT,
+                is_self: false,
+                placement: Placement::Living { pos: v.pos, facing: v.facing, speeds: packets::speeds(7.0) },
+                fields: &f,
+            }],
+            &[],
+        )
     }
 
     /// Whose a station being placed is (its ghost): only they see it, so it never stands in

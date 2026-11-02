@@ -19,7 +19,7 @@ window = [[-330.0, 2040.0], [-40.0, 2350.0]]
 icon = "Spell_Shadow_Charm"
 blurb = "Arugal's keep in Silverpine, full of his worgen and its old lords' ghosts"
 first_page = "The keep's gate, under the broken portcullis. The howling starts past the courtyard."
-welcome = "Shadowfang Keep. Arugal's worgen hold the halls, and the keep's old lords haven't left either. Two lamps: one at the gate, one at the far end of the great hall. Rest at a lamp to heal, fill your Draughts (T) and send the keep's dwellers back to their posts. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+welcome = "Shadowfang Keep. Arugal's worgen hold the halls, and the keep's old lords haven't left either. There are 2 lamps, at the gate and at the far end of the great hall. Rest at a lamp to heal, refill your Draughts (T) and send the keep's dwellers back to their posts. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): Shadowfang Keep: the middle (22 to 30).
 tier = 2
@@ -75,8 +75,8 @@ kind = "hidden"
 at = [-247.4, 2319.5, 97.0]
 find = 4.0
 reveals = ["study_cache", "arugal_last_entry"]
-text = "a study high in the west wing, its desk under a drift of torn pages: Arugal's journal. The last entries are in a hand that shakes, then claws."
-page = "The pages are everywhere: on the desk, under the chair, pinned to the floor by a fallen candlestick. Those still in the binding are in order, and they tell it plainly.{n}{n}The Kirin Tor will send no help. The Scourge are at Pyrewood and the Baron cannot hold his walls alone. Very well. There are other places, and other powers, and I know the way to them.{n}{n}They came through tonight. Wolves that walk like men. Silverlaine's guards ran from them; I did not. They knelt to me. My children.{n}{n}The Baron would not see reason. My children saw to the Baron.{n}{n}From there the hand slopes, then shakes. On the last bound pages the pen has been dropped and the lines are cut with something else, four at a time, deep into the paper. One leaf has been torn from the end and laid on top of the rest, as if left for a reader."
+text = "found Arugal's journal in a study high in the west wing, under a drift of torn pages. The last entries are in a hand that shakes, then claws."
+page = "The pages are everywhere. On the desk, under the chair, pinned to the floor by a fallen candlestick. Those still in the binding are in order, and they tell it plainly.{n}{n}The Kirin Tor will send no help. The Scourge are at Pyrewood and the Baron cannot hold his walls alone. Very well. There are other places, and other powers, and I know the way to them.{n}{n}They came through tonight. Wolves that walk like men. Silverlaine's guards ran from them. I did not. They knelt to me. My children.{n}{n}The Baron would not see reason. My children saw to the Baron.{n}{n}From there the hand slopes, then shakes. On the last bound pages the pen has been dropped and the lines are cut with something else, four at a time, deep into the paper. One leaf has been torn from the end and laid on top of the rest, as if left for a reader."
 
 [[dungeon.box]]
 key = "study_cache"
@@ -92,7 +92,7 @@ scale = 1.4
 name = "Arugal's Journal, the Last Page"
 at = [-248.5, 2321.0, 97.0]
 facing = 0.0
-text = "\"My children. My beautiful children. The curse that made them is in my blood now too; I have tasted it. When they come for me, and they will, let them see what their father truly is.\""
+text = "\"My children. My beautiful children. The curse that made them is in my blood now too. I have tasted it. When they come for me, and they will, let them see what their father truly is.\""
 
 # The kitchen yard's cellar, behind Razorclaw's block: the butcher's own larder.
 [[dungeon.door]]
@@ -105,8 +105,8 @@ kind = "hidden"
 at = [-210.0, 2273.0, 73.6]
 find = 3.5
 reveals = ["larder_cache"]
-text = "behind the butcher's block, a larder nobody wanted to open. Under the meat, someone's savings."
-page = "The meat on the hooks has hung so long it no longer smells of anything. Under the last rack, wrapped in oilcloth, are the butcher's savings and the butcher's book: orders for the Baron's kitchen, in a fat, steady hand.{n}{n}Venison, two haunches, for the Baron's table. Mutton for the guard. Pork for the harvest feast.{n}{n}Then the Archmage comes, and the orders change. No more venison. No more mutton. Only fresh. Fresh, for the Archmage's guests. Fresh, and not to ask from where.{n}{n}Inside the back cover, pressed hard: Enough here for passage south, and through the Greymane Wall, if Gilneas will open it for one of its own. Leaving at the new moon.{n}{n}He did not leave. Behind you, the empty hooks sway, though there is no wind in the larder."
+text = "found a larder behind the butcher's block that nobody wanted to open. Under the meat lay someone's savings."
+page = "The meat on the hooks has hung so long it no longer smells of anything. Under the last rack, wrapped in oilcloth, are the butcher's savings and the butcher's book of orders for the Baron's kitchen, in a fat, steady hand.{n}{n}Venison, two haunches, for the Baron's table. Mutton for the guard. Pork for the harvest feast.{n}{n}Then the Archmage comes, and the orders change. No more venison. No more mutton. Only fresh. Fresh, for the Archmage's guests. Fresh, and not to ask from where.{n}{n}Inside the back cover, pressed hard: Enough here for passage south, and through the Greymane Wall, if Gilneas will open it for one of its own. Leaving at the new moon.{n}{n}He did not leave. Behind you, the empty hooks sway, though there is no wind in the larder."
 
 [[dungeon.box]]
 key = "larder_cache"
@@ -125,8 +125,8 @@ kind = "hidden"
 at = [-162.2, 2237.8, 77.1]
 find = 4.0
 reveals = ["deathsworn"]
-text = "in the courtyard's far corner the air goes cold. A captain of the dead turns from his watch."
-page = "Frost has grown thick over a soldier's marker set into the courtyard wall, and when you scrape it away the letters underneath are sharp, as if cut yesterday.{n}{n}HERE STAND THE DEATHSWORN, the Baron's own watch. Sworn to Silverlaine, to hold this courtyard against all comers, living or dead, until relieved. A captain and eleven men.{n}{n}Below the oath runs a column of ticks, one for every night the watch changed. They run on long after the Baron fell. Long after the worgen came over the walls. Long after there was anyone left in the keep to come and relieve them.{n}{n}The last tick is fresh, the frost still white in it. Now the frost is spreading from the marker, across the stones, towards your boots."
+text = "felt the air go cold in the courtyard's far corner. A captain of the dead turned from his watch."
+page = "Frost has grown thick over a soldier's marker set into the courtyard wall, and when you scrape it away the letters underneath are sharp, as if cut yesterday.{n}{n}HERE STAND THE DEATHSWORN, the Baron's own watch. Sworn to Silverlaine, to hold this courtyard against all comers, living or dead, until relieved. A captain and eleven men.{n}{n}Below the oath runs a column of ticks, one for every night the watch changed. They run on long after the Baron fell. Long after the worgen came over the walls. Long after there was anyone left in the keep to come and relieve them.{n}{n}The last tick is fresh, the frost still white in it. Now the frost is spreading from the marker, across the stones, toward your boots."
 
 # --- notes -------------------------------------------------------------------------------------------
 
@@ -144,13 +144,13 @@ text = "\"Arugal summoned the worgen to fight the Scourge. He calls them his chi
 [[dungeon.note]]
 key = "servants_gossip"
 hints = ["butcher_larder", "deathsworn_corner"]
-clue = "The butcher keeps something behind his block; the dead keep their watch in the courtyard's far corner."
+clue = "The butcher keeps something behind his block. The dead keep their watch in the courtyard's far corner."
 display = 164
 scale = 1.3
 name = "A Servant's Note"
 at = [-233.8, 2177.5, 77.7]
 facing = 0.0
-text = "\"The butcher keeps more than meat behind his block. And don't go in the courtyard's far corner after dark: the dead Deathsworn still keep their watch there.\""
+text = "\"The butcher keeps more than meat behind his block. And don't go in the courtyard's far corner after dark. The dead Deathsworn still keep their watch there.\""
 
 # --- the keep's dwellers -----------------------------------------------------------------------------
 
@@ -353,7 +353,7 @@ display = 9649
 icon = "INV_Misc_Coin_03"
 kind = "resource"
 stack = 50
-text = "Old Gilnean silver, struck with a moon. The lamps' quartermaster in Shadowfang Keep trades it; you drop it all when you fall below."
+text = "Trade it to the quartermaster at any lamp in Shadowfang Keep. You drop all of it when you fall. \"Old Gilnean silver, struck with a moon.\""
 
 [[item]]
 key = "rethilgore_mantle"
@@ -373,7 +373,7 @@ icon = "INV_Chest_Cloth_21"
 kind = "armor"
 slot = "chest"
 reduce = 0.11
-text = "Razorclaw's: stained beyond saving, and stiff with it."
+text = "Razorclaw's. Stained beyond saving, and stiff with it."
 
 [[item]]
 key = "silverlaine_helm"
@@ -396,7 +396,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.22
 weight = 0.08
-text = "Commander Springvale's: a paladin's plate, tarnished black by what he served after."
+text = "Commander Springvale's. A paladin's plate, tarnished black by what he served after."
 
 [[item]]
 key = "odo_hood"
@@ -406,7 +406,7 @@ icon = "INV_Helmet_03"
 kind = "armor"
 slot = "head"
 reduce = 0.08
-text = "The Blindwatcher's: a hood with no eyeholes. He never needed them."
+text = "The Blindwatcher's. A hood with no eyeholes. He never needed them."
 
 [[item]]
 key = "fenrus_legs"
@@ -416,7 +416,7 @@ icon = "INV_Pants_06"
 kind = "armor"
 slot = "legs"
 reduce = 0.12
-text = "The Devourer's hide: thick enough to turn a blade."
+text = "The Devourer's hide, thick enough to turn a blade."
 set = "shadowfang"
 
 [[item]]
@@ -428,7 +428,7 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.11
 weight = 0.01
-text = "Nandos's: wolf skulls stitched to the shoulders, for the pack to know him."
+text = "Nandos's. Wolf skulls stitched to the shoulders, for the pack to know him."
 set = "shadowfang"
 
 [[item]]
@@ -439,7 +439,7 @@ icon = "INV_Shirt_01"
 kind = "armor"
 slot = "chest"
 reduce = 0.1
-text = "The Archmage's: Dalaran's violet, gone dark at the hem."
+text = "The Archmage's. Dalaran's violet, gone dark at the hem."
 set = "shadowfang"
 
 [[item]]
@@ -952,7 +952,7 @@ respawn = 0.0
   speed = 0.72
   might = 1.2
   pattern = "judgement"
-  text = "\"Judgement! JUDGEMENT!\""
+  text = "\"Judgment! JUDGMENT!\""
   shove = 5.5
   look = 24050
   # Three in a row: two quick, then the heavy one (dodge the third).
@@ -1028,7 +1028,7 @@ respawn = 0.0
   speed = 0.76
   might = 1.15
   pattern = "howling rage"
-  text = "Odo's howl rises higher; worgen answer from all over the keep."
+  text = "Odo's howl rises higher. Worgen answer from all over the keep."
   summon = ["sf_darksoul", "sf_darksoul"]
   shove = 6.0
   # Three in a row: two quick, then the heavy one (dodge the third).
@@ -1096,7 +1096,7 @@ respawn = 0.0
   at = 0.6
   speed = 0.85
   pattern = "leap"
-  text = "Fenrus snarls; his wolves come out of the shadows."
+  text = "Fenrus snarls, and his wolves come out of the shadows."
   summon = ["sf_worg", "sf_worg"]
   [[mob.phase]]
   at = 0.25
@@ -1223,7 +1223,7 @@ respawn = 0.0
 then = "sf_arugal_cursed"
 then_after = 4.0
 then_needs = "arugal_journal"
-then_text = "Arugal's body twists on the floor; it gets up on four legs, then on two, and it is not Arugal any more. \"Let my children see what their father truly is!\""
+then_text = "Arugal's body twists on the floor. It gets up on four legs, then on two, and it is not Arugal anymore. \"Let my children see what their father truly is!\""
 then_kit = 218
 then_look = 27812
   [mob.attack]
@@ -1330,7 +1330,7 @@ respawn = 0.0
   at = 0.5
   speed = 0.8
   pattern = "howl"
-  text = "The cursed thing that was Arugal howls; his children answer."
+  text = "The cursed thing that was Arugal howls, and his children answer."
   summon = ["sf_worg", "sf_worg"]
   [[mob.phase]]
   at = 0.2
@@ -1450,7 +1450,7 @@ name = "Baron's Scepter"
 display = 1774
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "Silverlaine's: a nobleman's mace, and a nobleman's guard."
+text = "Widens the parry window by 0.08 sec. \"Silverlaine's. A nobleman's mace.\""
 perks = [{ kind = "ward", amount = 0.02 }]
 
 [[weapon]]
@@ -1475,7 +1475,7 @@ name = "Guillotine Axe"
 display = 8502
 icon = "INV_Axe_17"
 kind = "weapon"
-text = "The Deathsworn Captain's: it has taken heads, and it remembers each one."
+text = "The Deathsworn Captain's. It has taken heads, and it remembers each one."
 
 [[weapon]]
 key = "meteor_shard"
@@ -1496,7 +1496,7 @@ name = "Meteor Shard"
 display = 2707
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Torn from cursed Arugal: still warm from wherever it fell."
+text = "Torn from cursed Arugal, still warm from wherever it fell."
 perks = [{ kind = "focus", amount = 0.08 }]
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a

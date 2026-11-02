@@ -18,7 +18,7 @@ window = [[1890.0, 1370.0], [2250.0, 2050.0]]
 icon = "INV_Misc_Root_02"
 blurb = "The quillboar's warren of thorns, where Charlga speaks for Agamaggan"
 first_page = "The thorn gate at the top of the warren. Mind the spines."
-welcome = "Razorfen Kraul. The quillboar dig their warren under Agamaggan's thorns, and Charlga Razorflank speaks for the dead demigod. Two lamps: one at the thorn gate, one in the warren's heart. Rest at a lamp to heal, fill your Draughts (T) and send the quillboar back to their burrows. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+welcome = "Razorfen Kraul. The quillboar dig their warren under Agamaggan's thorns, and Charlga Razorflank speaks for the dead demigod. There are 2 lamps, at the thorn gate and in the warren's heart. Rest at a lamp to heal, refill your Draughts (T) and send the quillboar back to their burrows. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): Razorfen Kraul: the middle (25 to 35).
 tier = 2
@@ -75,8 +75,8 @@ kind = "hidden"
 at = [2077.0, 2002.0, 63.2]
 find = 4.0
 reveals = ["shrine_cache", "charlga_vow"]
-text = "under the thorns: a shrine of bones and tusks to Agamaggan, still warm with blood. Something vast, long dead, takes notice of you."
-page = "The shrine is a heap of tusks, hundreds of them, bound with thorn-vine round a single great tusk longer than a man. The stones at its foot are dark and wet. Trodden into the bloody earth is a leaf torn from a tauren scout's journal, the ink run, the hand hurried.{n}{n}The quillboar say Agamaggan fell here, fighting the demons in the oldest days, and where his blood soaked into the ground the thorns grew. They say he is not quite gone. Charlga feeds this shrine every night, and every night the thorns lean a little closer to it, the way a herd leans towards its leader.{n}{n}I touched one tusk. Only one. The ground beneath me breathed out.{n}{n}Beside the tusks, a vow has been carved small into a slab of bone."
+text = "found a shrine of bones and tusks to Agamaggan under the thorns, still warm with blood. Something vast and long dead took notice."
+page = "The shrine is a heap of tusks, hundreds of them, bound with thorn-vine around a single great tusk longer than a man. The stones at its foot are dark and wet. Trodden into the bloody earth is a leaf torn from a tauren scout's journal, the ink run, the hand hurried.{n}{n}The quillboar say Agamaggan fell here, fighting the demons in the oldest days, and where his blood soaked into the ground the thorns grew. They say he is not quite gone. Charlga feeds this shrine every night, and every night the thorns lean a little closer to it, the way a herd leans toward its leader.{n}{n}I touched one tusk. Only one. The ground beneath me breathed out.{n}{n}Beside the tusks, a vow has been carved small into a slab of bone."
 
 [[dungeon.box]]
 key = "shrine_cache"
@@ -105,8 +105,8 @@ kind = "hidden"
 at = [2153.3, 1430.8, 74.4]
 find = 4.0
 reveals = ["bone_cache"]
-text = "behind the Death Speaker's altar: what the dead were given to keep."
-page = "Behind the altar the bones are laid out with care: a quillboar skull for every bundle, and every bundle tied with a knot of red thread. Each holds what one of the dead was sent off with -- a charm, a bottle, a whetted stone, a handful of thorn fetishes for the road.{n}{n}On the altar's back the Death Speaker's marks run in rows, and someone has glossed them in Common, small, in charcoal:{n}{n}These are given to the dead, to keep. The Death Speaker keeps them for the dead, until the dead ask for them back. When the dead ask, Jargba answers. Jargba always answers.{n}{n}Then one last line, newer, the charcoal smudged by a hurrying thumb: The dead never ask. He only says they do."
+text = "found what the dead were given to keep, behind the Death Speaker's altar."
+page = "Behind the altar the bones are laid out with care. There is a quillboar skull for every bundle, and every bundle tied with a knot of red thread. Each holds what one of the dead was sent off with -- a charm, a bottle, a whetted stone, a handful of thorn fetishes for the road.{n}{n}On the altar's back the Death Speaker's marks run in rows, and someone has glossed them in Common, small, in charcoal:{n}{n}These are given to the dead, to keep. The Death Speaker keeps them for the dead, until the dead ask for them back. When the dead ask, Jargba answers. Jargba always answers.{n}{n}Then one last line, newer, the charcoal smudged by a hurrying thumb: The dead never ask. He only says they do."
 
 [[dungeon.box]]
 key = "bone_cache"
@@ -126,8 +126,8 @@ kind = "hidden"
 at = [2032.7, 1761.6, 60.6]
 find = 4.0
 reveals = ["halmgar"]
-text = "a burrow off the tunnel, its floor scored with circles: an earthcaller looks up from his work."
-page = "The circles on the floor are scored deep, one inside another, and the grooves are packed with earth of different colours: red clay, grey ash, black loam. Where the lines cross, small stones have been set upright like teeth. Round the rim of the largest runs a chant in quillboar marks, and over it a gloss in Common, scratched small:{n}{n}Earth under thorn, wake. Stone under earth, wake. Halmgar calls you up. Halmgar gives you legs.{n}{n}Beside it, in another hand: He has been down here since the last moon. He doesn't eat. The circles keep getting bigger.{n}{n}In the middle of the circles, a quillboar muddy to the elbows lifts his head."
+text = "found an earthcaller at work in a burrow off the tunnel, its floor scored with circles. He looked up."
+page = "The circles on the floor are scored deep, one inside another, and the grooves are packed with earth of different colors, red clay, gray ash and black loam. Where the lines cross, small stones have been set upright like teeth. Around the rim of the largest runs a chant in quillboar marks, and over it a gloss in Common, scratched small:{n}{n}Earth under thorn, wake. Stone under earth, wake. Halmgar calls you up. Halmgar gives you legs.{n}{n}Beside it, in another hand: He has been down here since the last moon. He doesn't eat. The circles keep getting bigger.{n}{n}In the middle of the circles, a quillboar muddy to the elbows lifts his head."
 
 # --- notes -------------------------------------------------------------------------------------------
 
@@ -135,13 +135,13 @@ page = "The circles on the floor are scored deep, one inside another, and the gr
 key = "tauren_warning"
 hints = ["agamaggan_shrine", "jargba_cache"]
 # #27: past the heart, at the far end (the note said north-west, this comment south-west).
-clue = "Agamaggan's shrine is deep past the warren's heart, at its far end under the thorns; the Death Speaker hoards behind his altar."
+clue = "Agamaggan's shrine is deep past the warren's heart, at its far end under the thorns. The Death Speaker hoards behind his altar."
 display = 164
 scale = 1.3
 name = "A Tauren Scout's Warning"
 at = [1946.0, 1548.0, 82.0]
 facing = 0.8
-text = "\"Charlga Razorflank leads the quillboar here; she says she speaks for Agamaggan, who died on these thorns. Her people say she keeps his shrine somewhere deep past the warren's heart, at its far end, under the thorns. Do not touch it. And whatever the dead are given, the Death Speaker keeps behind his own altar.\""
+text = "\"Charlga Razorflank leads the quillboar here. She says she speaks for Agamaggan, who died on these thorns. Her people say she keeps his shrine somewhere deep past the warren's heart, at its far end, under the thorns. Do not touch it. And whatever the dead are given, the Death Speaker keeps behind his own altar.\""
 
 [[dungeon.note]]
 key = "scratched_hide"
@@ -152,7 +152,7 @@ scale = 1.3
 name = "A Scratched Hide"
 at = [2062.0, 1612.0, 62.8]
 facing = 0.0
-text = "A hide scratched with a map of tunnels. One side burrow, west of the warren's heart, is marked with circles and the word: HALMGAR."
+text = "A hide scratched with a map of tunnels. One side burrow, west of the warren's heart, is marked with circles and the word HALMGAR."
 
 # --- the quillboar -----------------------------------------------------------------------------------
 
@@ -380,7 +380,7 @@ display = 1503
 icon = "INV_Misc_Bone_03"
 kind = "resource"
 stack = 50
-text = "A bone and thorn charm every quillboar carries. The lamps' quartermaster in Razorfen Kraul trades them; you drop them all when you fall below."
+text = "Trade them to the quartermaster at any lamp in Razorfen Kraul. You drop all of them when you fall. \"A bone and thorn charm every quillboar carries.\""
 
 [[item]]
 key = "roogug_mantle"
@@ -390,7 +390,7 @@ icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.09
-text = "Packed earth and tusk: it hums when you stand still."
+text = "Packed earth and tusk. It hums when you stand still."
 
 [[item]]
 key = "aggem_legs"
@@ -400,7 +400,7 @@ icon = "INV_Pants_01"
 kind = "armor"
 slot = "legs"
 reduce = 0.1
-text = "Aggem's: thorns woven into the leather, points out."
+text = "Aggem's. Thorns woven into the leather, points out."
 set = "thornweave"
 
 [[item]]
@@ -411,7 +411,7 @@ icon = "INV_Chest_Cloth_24"
 kind = "armor"
 slot = "chest"
 reduce = 0.09
-text = "Jargba's: it whispers in quillboar when the wind is right."
+text = "Jargba's. It whispers in quillboar when the wind is right."
 
 [[item]]
 key = "ramtusk_helm"
@@ -422,7 +422,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
-text = "The Overlord's: two great tusks bolted to a mail cap."
+text = "The Overlord's. Two great tusks bolted to a mail cap."
 set = "thornweave"
 
 [[item]]
@@ -434,7 +434,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.14
 weight = 0.02
-text = "The Raging boar's hide: bristles still on it, and they still bristle."
+text = "The Raging boar's hide. The bristles are still on it, and they still bristle."
 set = "thornweave"
 
 [[item]]
@@ -458,7 +458,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.15
 weight = 0.04
-text = "Hammered round a shard of Agamaggan's own tusk. It is heavy with something more than its weight."
+text = "Hammered around a shard of Agamaggan's own tusk. It is heavy with something more than its weight."
 perks = [{ kind = "might", amount = 0.06 }]
 
 [[item]]
@@ -469,7 +469,7 @@ icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
-text = "Halmgar's: stones sewn on in circles."
+text = "Halmgar's. Stones sewn on in circles."
 perks = [{ kind = "regen", amount = 0.003 }]
 
 # --- the quillboar ----------------------------------------------------------------------------------------
@@ -761,7 +761,7 @@ respawn = 0.0
   at = 0.5
   speed = 0.85
   pattern = "earthquake"
-  text = "Roogug slams his staff down; the hollow's walls crack and spit stone."
+  text = "Roogug slams his staff down. The hollow's walls crack and spit stone."
   summon = ["rk_quilguard"]
   [[mob.phase]]
   at = 0.2
@@ -835,7 +835,7 @@ respawn = 0.0
   speed = 0.72
   might = 1.2
   pattern = "thorn bolt"
-  text = "Aggem shrieks, and thorns burst up all round him."
+  text = "Aggem shrieks, and thorns burst up all around him."
   shove = 5.0
   look = 26271
   # Three bolts, quick on each other: keep moving.
@@ -1100,7 +1100,7 @@ respawn = 0.0
 then = "rk_avatar"
 then_after = 4.0
 then_needs = "agamaggan_shrine"
-then_text = "Charlga's body is lifted off the ground by thorns that weren't there. A shape of thorn and bone and tusk stands up out of the warren: Agamaggan, speaking for himself."
+then_text = "Charlga's body is lifted off the ground by thorns that weren't there. A shape of thorn and bone and tusk stands up out of the warren. Agamaggan speaks for himself."
 then_kit = 356
 then_look = 26271
   [mob.attack]
@@ -1203,14 +1203,14 @@ respawn = 0.0
   at = 0.5
   speed = 0.82
   pattern = "thornstorm"
-  text = "The Avatar bellows; boars come running from every burrow in the Kraul."
+  text = "The Avatar bellows. Boars come running from every burrow in the Kraul."
   summon = ["rk_boar", "rk_boar", "rk_boar"]
   [[mob.phase]]
   at = 0.2
   speed = 0.72
   might = 1.2
   pattern = "great charge"
-  text = "The thorns round the Avatar wither; it fights like something dying for the second time."
+  text = "The thorns around the Avatar wither. It fights like something dying for the second time."
   shove = 7.0
   look = 26271
   # Nearer its end, from range: stone thrown where you stand (marked as it winds up).
@@ -1269,7 +1269,7 @@ respawn = 0.0
   at = 0.5
   speed = 0.82
   pattern = "earth spike"
-  text = "Halmgar calls; stone things climb out of his circles."
+  text = "Halmgar calls, and stone things climb out of his circles."
   summon = ["rockling", "rockling"]
   [[mob.phase]]
   at = 0.2
@@ -1320,7 +1320,7 @@ name = "Thornspike"
 display = 2694
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Charlga's: a thorn of Agamaggan himself, filed to a point."
+text = "Charlga's. A thorn of Agamaggan himself, filed to a point."
 perks = [{ kind = "stamina", amount = 0.06 }]
 
 [[weapon]]
@@ -1345,7 +1345,7 @@ name = "Corpsemaker"
 display = 8499
 icon = "INV_Axe_10"
 kind = "weapon"
-text = "Ramtusk's: the quillboar named it, and meant it."
+text = "Ramtusk's. The quillboar named it, and meant it."
 perks = [{ kind = "might", amount = 0.03 }]
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a

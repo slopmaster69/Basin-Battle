@@ -14,6 +14,8 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub mod cc;
+mod building;
+pub use building::StationActions;
 mod combat;
 pub mod dungeon;
 mod journal;
@@ -24,6 +26,7 @@ pub mod recap;
 pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
+pub mod hunter;
 mod raid;
 pub mod siege;
 pub mod wager;
@@ -240,6 +243,8 @@ pub enum Event {
     StationOpen { player: Id, station: Id },
     /// Ask a hero to confirm something (ringing the bell).
     Confirm { player: Id, what: String, text: String,
+        /// The answers' words (none: the bell's, "Ring it" and "Not yet").
+        yes: String, no: String,
     },
     /// A hero goes between the camp and the Deadmines: to a lamp below (its key), or (`None`)
     /// home to the camp.
@@ -256,6 +261,8 @@ pub enum Event {
     Auras { id: Id },
     /// A hero held still (a root, a stun) or let go: their client is told.
     Rooted { player: Id, on: bool },
+    /// A hero falls slowly (feather fall: Skyfall's hang over the fight), or as ever again.
+    FeatherFall { player: Id, on: bool },
     /// A hero's own dash along the ground: which way, how fast, how long.
     Dash { player: Id, dir: f32, speed: f32, secs: f32 },
     /// A hero's ability keys, cooldowns or tree changed.
@@ -406,7 +413,7 @@ impl Action {
             Action::Eat { .. } => "eat",
             Action::Gather { .. } => "gather",
             Action::Work { job: Job::Craft { .. }, .. } => "craft",
-            Action::Work { job: Job::Build, .. } => "build",
+            Action::Work { job: Job::Build | Job::Upgrade { .. }, .. } => "build",
             Action::Work { job: Job::Repair { .. }, .. } => "repair",
             Action::Stagger { .. } => "stagger",
             Action::Dead { .. } => "dead",
@@ -421,6 +428,8 @@ pub enum Job {
     Craft { station: Id, recipe: String },
     Build,
     Repair { station: Id },
+    /// Upgrading a station into what it becomes.
+    Upgrade { station: Id },
 }
 
 /// An input a hero sent: the mouse buttons and keys of the action layout.
@@ -545,6 +554,8 @@ pub struct Player {
     /// Until when they're held still where they landed (see [`ARRIVE_HOLD`]); 0 when not.
     pub hold_until: f32,
     pub preview: Option<world::Preview>,
+    /// The station this hero was asked to confirm tearing down.
+    pub demolish: Option<Id>,
     /// The run speed as last sent.
     pub sent_speed: f32,
     pub sent_back: f32,
@@ -724,6 +735,9 @@ pub struct Mob {
     pub retarget_at: f32,
     /// A raider at a station struck by this hero: it ends the string it's in and turns on them.
     pub drawn_off: Option<Id>,
+    /// Called up by this creature in its fight (a boss's adds, at a turn): it goes when that
+    /// fight ends, its own or the boss's, instead of standing where the boss stood.
+    pub summoned_by: Option<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -762,6 +776,9 @@ pub enum ObjKind {
     Loot { item: usize, n: u32 },
     /// Something only to be seen: a crate the book lies on.
     Prop { display: u32, scale: f32 },
+    /// A `[[prop]]`: a thing the land or the camp sets out (the camp's, as it grows), or one of
+    /// the camp's people standing at their post (`npc`: drawn as a creature, never fought).
+    Piece { def: usize },
     /// The Proving Ring's banner: the way home, and the call for the next wave.
     ArenaBanner,
     /// Siege's hall: the banner where heroes join a way to play (and the way home).
@@ -820,6 +837,8 @@ pub struct Survival {
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
     pub(crate) traps: Vec<moves::Trap>,
+    /// The Hunter's: planted arrows, tripwires, Call of the Wild's chains and beasts.
+    pub hunt: hunter::Hunt,
     pub(crate) windups: Vec<moves::Windup>,
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Where the blow whose effects are being given came from (a knockback's centre).
@@ -856,6 +875,8 @@ pub struct Survival {
     /// moves on.
     pub(crate) patrols: BTreeMap<usize, (usize, f32)>,
     pub debug: bool,
+    /// Testing: stations, upgrades and mending cost nothing at the camp (`.es freebuild`).
+    pub free_build: bool,
     /// The world below (the Deadmines), if this is it.
     pub below: Option<Below>,
     /// Siege's world (Arathi Basin), if this is it.
@@ -868,6 +889,10 @@ pub struct Survival {
     /// for chests filling again.
     pub(crate) unfound: BTreeSet<usize>,
     pub(crate) chests_looked: f32,
+    /// When the camp last looked at how far it has grown (`grow_camp`).
+    pub(crate) grown_at: f32,
+    /// When each mill last put what it makes into the chest (`[[station]]` `yields`).
+    pub(crate) yielded: BTreeMap<Id, f32>,
     /// Shrines' and relics' trials under way, by chest: where it stands, who called it, when a
     /// hero was last near.
     pub(crate) trials: BTreeMap<usize, Trial>,
@@ -918,6 +943,7 @@ impl Survival {
             projectiles: Vec::new(),
             landings: Vec::new(),
             traps: Vec::new(),
+            hunt: hunter::Hunt::default(),
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             fx_from: None,
@@ -944,12 +970,15 @@ impl Survival {
             respawns: Vec::new(),
             patrols: BTreeMap::new(),
             debug: false,
+            free_build: false,
         below: None,
             siege: None,
             pages: Vec::new(),
             hazard_looks: Vec::new(),
             unfound: BTreeSet::new(),
             chests_looked: 0.0,
+            grown_at: 0.0,
+            yielded: BTreeMap::new(),
             trials: BTreeMap::new(),
             beta: beta::Beta::default(),
         }
@@ -995,6 +1024,7 @@ impl Survival {
         self.step_moves();
         self.step_grounds();
         self.step_bounces();
+        self.step_hunt();
         self.step_totems();
         self.step_stances();
         self.step_combos();
@@ -1022,6 +1052,7 @@ impl Survival {
             self.step_raid(dt);
             self.step_arena(dt);
             self.step_explore();
+            self.step_mills();
             self.step_goals();
             self.step_weekly_chest();
         }
@@ -1094,6 +1125,7 @@ impl Survival {
             landing_until: 0.0,
             hold_until: 0.0,
             preview: None,
+            demolish: None,
             sent_speed: c.player.run_speed,
             sent_back: BACK_SPEED,
             combo_next: 0,
@@ -1200,7 +1232,7 @@ impl Survival {
             if let Some(p) = self.players.get_mut(&id) {
                 p.last_safe = safe;
             }
-            self.tell(id, "You fell through the world: back to the last firm ground.");
+            self.tell(id, "You fell through the world. You're back on the last firm ground.");
             return;
         }
         let Some(p) = self.players.get_mut(&id) else { return };
@@ -1271,7 +1303,7 @@ impl Survival {
     pub fn unstuck(&mut self, id: Id) -> Result<(), String> {
         let p = self.players.get(&id).ok_or("No hero.")?;
         if p.health == 0 {
-            return Err("You're down: you'll get up shortly.".into());
+            return Err("You're down. You'll respawn shortly.".into());
         }
         let account = p.account.clone();
         let (pos, f) = match self.lamp_of(&account).filter(|_| self.is_below()) {
@@ -1412,7 +1444,7 @@ impl Survival {
         let mut out = String::new();
         if !d.perks.is_empty() {
             let words: Vec<String> = d.perks.iter().map(|p| crate::content::perk_words(&p.kind, p.amount)).collect();
-            out.push_str(&format!("{}: {}.", if d.kind == ItemKind::Armor { "Worn" } else { "In hand" }, words.join(", ")));
+            out.push_str(&format!("Equipped: {}.", words.join(", ")));
         }
         if let Some(s) = c.sets.iter().find(|s| s.key == d.set) {
             // (Its pieces, not their honed copies.)
@@ -1421,7 +1453,7 @@ impl Survival {
             if !out.is_empty() {
                 out.push(' ');
             }
-            out.push_str(&format!("{} ({n} pieces). {}.", s.name, bonus.join("; ")));
+            out.push_str(&format!("{} ({n} pieces). {}.", s.name, bonus.join(". ")));
         }
         out
     }
@@ -1516,7 +1548,7 @@ impl Survival {
             let i = self.content.item(k).ok_or("Unknown material.")?;
             let have = self.available(id, i);
             if have < *n {
-                return Err(format!("Needs {} {} (you have {have} with the chest).", n, self.content.items[i].name));
+                return Err(format!("Not enough {} (need {}, have {have}).", self.content.items[i].name, n));
             }
             need.push((i, *n));
         }
@@ -1542,7 +1574,7 @@ impl Survival {
             }
             let rest = n - from_bag;
             if rest > 0 {
-                let s = self.storage.get_mut(&i).ok_or("The chest ran short.")?;
+                let s = self.storage.get_mut(&i).ok_or("Storage ran short.")?;
                 *s -= rest;
                 if *s == 0 {
                     self.storage.remove(&i);
@@ -1689,8 +1721,8 @@ impl Survival {
         let o = self.objs.get(&id)?;
         let c = &self.content;
         let (display, scale, name, usable) = match &o.kind {
-            ObjKind::Storage => (10, 1.0, "Camp Storage".to_string(), true),
-            ObjKind::Alarm => (4571, 0.6, "Alarm Bell".to_string(), true),
+            ObjKind::Storage => (c.world.storage_display, c.world.storage_scale, "Camp Storage".to_string(), true),
+            ObjKind::Alarm => (c.world.alarm_display, c.world.alarm_scale, "Alarm Bell".to_string(), true),
             ObjKind::Node { def, ready, .. } => {
                 let n = &c.nodes[*def];
                 if !ready {
@@ -1709,9 +1741,13 @@ impl Survival {
                 (s.display, s.scale, format!("{} (placing)", s.name), false)
             }
             ObjKind::Fire { .. } => (397, 0.8, "Fire".to_string(), false),
-            ObjKind::Rack => (130, 1.0, "Weapon Rack".to_string(), true),
+            ObjKind::Rack => (c.world.rack_display, c.world.rack_scale, "Weapon Rack".to_string(), true),
             ObjKind::Book => (BOOK_DISPLAY, BOOK_SCALE, "The Smuggler's Logbook".to_string(), true),
             ObjKind::Prop { display, scale } => (*display, *scale, String::new(), false),
+            ObjKind::Piece { def } => {
+                let d = &c.props[*def];
+                (d.display, d.scale, d.name.clone(), false)
+            }
             ObjKind::ArenaBanner => (
                 arena::ARENA_BANNER_DISPLAY,
                 1.0,

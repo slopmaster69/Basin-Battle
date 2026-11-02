@@ -1,0 +1,425 @@
+From fb52d74e6b8f7cb140a0b8ce7f9ec2e04e600789 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Mon, 2 Nov 2026 11:36:18 -0600
+Subject: [PATCH] Building previews move with you, never block you, and show as
+ a light-blue ghost
+
+A game object whose GAMEOBJECT_FLAGS carry 0x10000000 is a placement preview: a create of its
+guid again moves it in place (with its new rotation and size) instead of leaving it where it
+stood, a new look swaps in without the spawn fade, it builds no collision hull (so the hero never
+walks into the station they are placing), and it neither fades in nor out (destroyed, it goes at
+once). With 0x20000000 as well it draws as a ghost: half see-through and tinted light blue. An
+unrigged model reads the tint from one palette slot the previews share, claimed once and never
+skinned. Elwynn Survival's server sends the station being placed with both bits and the ring
+under it with the first.
+---
+ crates/benilla-app/src/aura_visual.rs         |  14 +++
+ crates/benilla-app/src/entities.rs            |   7 +-
+ .../benilla-app/src/entities/attach/dress.rs  |   3 +-
+ crates/benilla-app/src/entities/attach/mod.rs |  29 ++++-
+ crates/benilla-app/src/entities/preview.rs    | 108 ++++++++++++++++++
+ crates/benilla-app/src/net/objects.rs         |  20 +++-
+ .../src/net/objects/update_tests.rs           |  60 ++++++++++
+ crates/benilla-world/src/rig_palette.rs       |   6 +
+ 8 files changed, 240 insertions(+), 7 deletions(-)
+ create mode 100644 crates/benilla-app/src/entities/preview.rs
+
+diff --git a/crates/benilla-app/src/aura_visual.rs b/crates/benilla-app/src/aura_visual.rs
+index 1e02d23d..3987d85a 100644
+--- a/crates/benilla-app/src/aura_visual.rs
++++ b/crates/benilla-app/src/aura_visual.rs
+@@ -80,6 +80,20 @@ impl AuraNodes {
+         }
+     }
+ 
++    /// A building preview's ghost (`entities::preview`): held at `alpha` and tinted `tint` from
++    /// the first frame, with no ramp; spell id 0 is never an aura's, so no aura edge reaps them.
++    pub(crate) fn preview_ghost(alpha: f32, tint: [u8; 3]) -> Self {
++        Self {
++            alpha: vec![(0, alpha)],
++            tint: vec![(0, tint)],
++            base: 1.0,
++            current: alpha,
++            from: alpha,
++            to: alpha,
++            ..Default::default()
++        }
++    }
++
+     /// `0x60d180`: `baseAlpha` times the head alpha node's factor alone, never a product over the
+     /// list; an empty list leaves `baseAlpha` (`0x60d195`).
+     fn target(&self) -> f32 {
+diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
+index 02370e9e..343ffe7e 100644
+--- a/crates/benilla-app/src/entities.rs
++++ b/crates/benilla-app/src/entities.rs
+@@ -24,6 +24,9 @@ use display::{
+     DisplayModel, EntityPart, ModelHandle,
+ };
+ 
++/// Live building previews (benilla's own): moved in place, no hull, no fades, a ghost's look.
++pub(crate) mod preview;
++
+ /// Attaching a visual to each net entity: skeleton, animation, character geosets and skin, fade.
+ pub(crate) mod attach;
+ use attach::{attach_entity_visuals, build_dressup_preview, build_glue_pet, build_glue_preview};
+@@ -658,6 +661,7 @@ impl Plugin for EntitiesPlugin {
+                 .before(benilla_world::schedule::WorldStage::Input),
+         )
+         .init_resource::<SkinComposites>()
++        .init_resource::<preview::PreviewTint>()
+         .init_resource::<attach::MergedFormsCache>()
+         // The 16 bone-pile bodies, keyed by (race, sex): a skeleton has no display row.
+         .init_resource::<corpse::BonesModels>()
+@@ -722,7 +726,8 @@ impl Plugin for EntitiesPlugin {
+                 build_glue_pet,
+                 // The dressing room's preview, the same assembly and latch.
+                 build_dressup_preview,
+-                attach_entity_visuals,
++                // The ghosts' shared tint slot, before any ghost dresses its parts with it.
++                (preview::claim_preview_tint, attach_entity_visuals).chain(),
+                 // A WMO GameObject's doodad props, spawned as each M2 lands.
+                 resolve_wmo_gameobject_props,
+                 spawn_wmo_gameobject_props,
+diff --git a/crates/benilla-app/src/entities/attach/dress.rs b/crates/benilla-app/src/entities/attach/dress.rs
+index 42be7054..5ee08e52 100644
+--- a/crates/benilla-app/src/entities/attach/dress.rs
++++ b/crates/benilla-app/src/entities/attach/dress.rs
+@@ -288,7 +288,8 @@ pub(super) fn spawn_part(
+     let (init_mat, tag_alpha) = effective.seed(&set, dress.now);
+     // A part with a palette slot and a skinned twin draws the twin (`WOW_RIG_SKIN`); any other
+     // draws the static mesh.
+-    let skinned = dress.inst_slot != 0 && part.skinned_mesh.is_some();
++    // (`rigged`: a building preview's ghost carries a tint-only slot, never a palette.)
++    let skinned = dress.rigged && dress.inst_slot != 0 && part.skinned_mesh.is_some();
+     let mesh = match &part.skinned_mesh {
+         Some(sm) if skinned => sm.clone(),
+         _ => part.mesh.clone(),
+diff --git a/crates/benilla-app/src/entities/attach/mod.rs b/crates/benilla-app/src/entities/attach/mod.rs
+index 8dc4bd3b..521cc810 100644
+--- a/crates/benilla-app/src/entities/attach/mod.rs
++++ b/crates/benilla-app/src/entities/attach/mod.rs
+@@ -271,6 +271,8 @@ pub(super) fn attach_entity_visuals(
+         ResMut<benilla_world::mat_anim_table::MatAnimTable>,
+         // A forced composite's upload.
+         ResMut<Assets<Image>>,
++        // The building previews' shared tint slot (`super::preview`).
++        Res<super::preview::PreviewTint>,
+     ),
+     mut palettes: ResMut<benilla_world::rig_palette::RigPalettes>,
+     mut collider_epoch: ResMut<benilla_world::collision::ColliderEpoch>,
+@@ -287,6 +289,7 @@ pub(super) fn attach_entity_visuals(
+         mut tint_reg,
+         mut anim_table,
+         mut images,
++        preview_tint,
+     ) = skin_build;
+     let now = time.elapsed_secs();
+     for (
+@@ -332,6 +335,9 @@ pub(super) fn attach_entity_visuals(
+             }),
+         };
+         let worn = resolve_worn_equip(net, equipment, dm);
++        // A building preview (`super::preview`): steady, hull-less, and a ghost's look.
++        let preview = super::preview::entity_preview_bits(Some(net), stores.get(entity).ok());
++        let ghost = preview & super::preview::PREVIEW_GHOST != 0;
+         let equip = worn.bodyslots;
+         // An empty `parts` list is either a model that draws nothing (an answer) or no model at
+         // all (a gap of ours, which the cube shows).
+@@ -621,7 +627,13 @@ pub(super) fn attach_entity_visuals(
+             // Whether a part armed an appear-fade, mirrored onto the root so a held item that
+             // spawns later joins the ramp.
+             let mut unit_will_fade = false;
+-            let inst_slot = skin.as_ref().map_or(0, |rb| rb.slot);
++            // An unrigged ghost's parts carry the previews' tint slot, which is never skinned
++            // (`PartDress::rigged` gates the skinned twin).
++            let inst_slot = match skin.as_ref() {
++                Some(rb) => rb.slot,
++                None if ghost => preview_tint.slot.unwrap_or(0),
++                None => 0,
++            };
+             // The armed idle's authored CAaBox, the picker's volume for a skinned part: the bind
+             // box can miss the drawn model (`DuelingFlag.m2` is modelled 9 yd up and its Stand
+             // translates the root −9.124 to plant it).
+@@ -676,7 +688,7 @@ pub(super) fn attach_entity_visuals(
+                 now,
+                 // A fresh visual fades in; a rebuild (`Reattached`: a mount transition, a display
+                 // swap) spawns steady.
+-                fade: if reattached {
++                fade: if reattached || preview != 0 {
+                     JoinedFade::Steady
+                 } else {
+                     JoinedFade::Pending {
+@@ -830,7 +842,8 @@ pub(super) fn attach_entity_visuals(
+             }
+             // A GameObject with a hull collides; an anchored transport stays Kinematic, as its arm
+             // labelled it, since its body moves every frame.
+-            if matches!(net.kind, EntityKind::GameObject) {
++            // A building preview builds none: it stands where the hero is about to walk.
++            if matches!(net.kind, EntityKind::GameObject) && preview == 0 {
+                 if let Some(col) = dm.and_then(|d| d.collider.clone()) {
+                     let body = if anchored {
+                         RigidBody::Kinematic
+@@ -843,6 +856,16 @@ pub(super) fn attach_entity_visuals(
+                     collider_epoch.bump();
+                 }
+             }
++            // A ghost renders through the aura layer's nodes: held translucent and tinted (a rig
++            // takes the tint on its own slot, an unrigged model through the previews' slot).
++            if ghost {
++                commands.entity(entity).insert_if_new(
++                    crate::aura_visual::AuraNodes::preview_ghost(
++                        super::preview::GHOST_ALPHA,
++                        super::preview::GHOST_TINT,
++                    ),
++                );
++            }
+         } else {
+             // A debug cube (a player cyan, an NPC red, lifted onto the ground) for a display that
+             // named no model, a gap of ours. One that named a model draws what it built, maybe
+diff --git a/crates/benilla-app/src/entities/preview.rs b/crates/benilla-app/src/entities/preview.rs
+new file mode 100644
+index 00000000..b7b746e6
+--- /dev/null
++++ b/crates/benilla-app/src/entities/preview.rs
+@@ -0,0 +1,108 @@
++//! Live building previews, benilla's own (no reference behaviour): a GameObject whose
++//! `GAMEOBJECT_FLAGS` carry [`PREVIEW_MOVE`] is a placement preview the server moves as the hero
++//! turns and walks. A re-create of its guid moves it in place (`net::objects`), it builds no
++//! collision hull, and it neither fades in nor out. [`PREVIEW_GHOST`] also draws it as a ghost:
++//! translucent and tinted light blue, through the aura layer's alpha and tint nodes
++//! ([`crate::aura_visual::AuraNodes::preview_ghost`]). An unrigged model has no palette slot for
++//! the tint to read, so every unrigged ghost shares one slot of its own ([`PreviewTint`]),
++//! claimed once and never skinned.
++
++use benilla_protocol::EntityKind;
++use bevy::prelude::*;
++
++use crate::net::{NetEntity, ObjectStore};
++
++/// `GAMEOBJECT_FLAGS` bit: a placement preview that moves in place, with no hull and no fades.
++pub(crate) const PREVIEW_MOVE: u32 = 0x1000_0000;
++/// `GAMEOBJECT_FLAGS` bit: with [`PREVIEW_MOVE`], drawn as a translucent light-blue ghost.
++pub(crate) const PREVIEW_GHOST: u32 = 0x2000_0000;
++
++/// The ghost's render alpha.
++pub(crate) const GHOST_ALPHA: f32 = 0.5;
++/// The ghost's tint, a light blue (multiplies the lit colour).
++pub(crate) const GHOST_TINT: [u8; 3] = [150, 205, 255];
++
++/// The preview bits of a GameObject's flags; 0 for any other kind, whose field 9 is not flags.
++pub(crate) fn preview_bits(kind: EntityKind, flags: u32) -> u32 {
++    if kind != EntityKind::GameObject || flags & PREVIEW_MOVE == 0 {
++        return 0;
++    }
++    flags & (PREVIEW_MOVE | PREVIEW_GHOST)
++}
++
++/// The preview bits of a streamed entity, from its stored fields.
++pub(crate) fn entity_preview_bits(net: Option<&NetEntity>, store: Option<&ObjectStore>) -> u32 {
++    match (net, store) {
++        (Some(n), Some(s)) => preview_bits(n.kind, s.0.gameobject_flags()),
++        _ => 0,
++    }
++}
++
++/// The palette slot every unrigged ghost's parts carry, so the fragment stage's per-slot tint
++/// reads [`GHOST_TINT`] for them; `None` until claimed.
++#[derive(Resource, Default)]
++pub(crate) struct PreviewTint {
++    pub(crate) slot: Option<u16>,
++}
++
++/// Claim the ghosts' tint slot once (one bone of the palette, never posed: an unrigged part draws
++/// its static mesh) and paint it. A slot is only ever freed by `RigSkin`'s hook, which this one
++/// never has, and only rigs are repainted each frame (`aura_visual::apply_aura_tint`).
++pub(crate) fn claim_preview_tint(
++    mut res: ResMut<PreviewTint>,
++    mut palettes: ResMut<benilla_world::rig_palette::RigPalettes>,
++    mut tints: ResMut<benilla_world::instance_tint::InstanceTints>,
++) {
++    if res.slot.is_some() {
++        return;
++    }
++    if let Some(slot) = palettes.alloc_static_slot() {
++        tints.set(slot, benilla_world::instance_tint::pack(GHOST_TINT));
++        res.slot = Some(slot);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn only_a_game_object_with_the_move_bit_is_a_preview() {
++        assert_eq!(preview_bits(EntityKind::GameObject, 0x20), 0);
++        assert_eq!(
++            preview_bits(EntityKind::GameObject, PREVIEW_MOVE | 0x20),
++            PREVIEW_MOVE
++        );
++        assert_eq!(
++            preview_bits(EntityKind::GameObject, PREVIEW_MOVE | PREVIEW_GHOST),
++            PREVIEW_MOVE | PREVIEW_GHOST
++        );
++        // The ghost bit alone is no preview: it only qualifies a moving one.
++        assert_eq!(preview_bits(EntityKind::GameObject, PREVIEW_GHOST), 0);
++        // A unit's field 9 is not GameObject flags.
++        assert_eq!(
++            preview_bits(EntityKind::Unit, PREVIEW_MOVE | PREVIEW_GHOST),
++            0
++        );
++    }
++
++    #[test]
++    fn the_tint_slot_is_claimed_once_and_painted() {
++        let mut app = App::new();
++        app.init_resource::<PreviewTint>()
++            .init_resource::<benilla_world::rig_palette::RigPalettes>()
++            .init_resource::<benilla_world::instance_tint::InstanceTints>()
++            .add_systems(Update, claim_preview_tint);
++        app.update();
++        let slot = app.world().resource::<PreviewTint>().slot.expect("a slot");
++        assert_ne!(slot, 0, "slot 0 is the untinted sentinel");
++        assert_eq!(
++            app.world()
++                .resource::<benilla_world::instance_tint::InstanceTints>()
++                .get(slot),
++            benilla_world::instance_tint::pack(GHOST_TINT)
++        );
++        app.update();
++        assert_eq!(app.world().resource::<PreviewTint>().slot, Some(slot));
++    }
++}
+diff --git a/crates/benilla-app/src/net/objects.rs b/crates/benilla-app/src/net/objects.rs
+index 5cd88f11..5c2b6ae4 100644
+--- a/crates/benilla-app/src/net/objects.rs
++++ b/crates/benilla-app/src/net/objects.rs
+@@ -637,10 +637,17 @@ fn object_create(
+             }
+             // Only a unit takes the block's movement (type-mask bit 3, `0x46638c`); any other type
+             // reads the position and drops it (`0x4664c3`..`0x46656b`), so it stays where it
+-            // stands.
+-            if matches!(kind, EntityKind::Unit | EntityKind::Player) {
++            // stands. A building preview (benilla's own, `entities::preview`) is moved this way
++            // too, its size snapped to the block's: re-created where the hero now aims it.
++            let preview = crate::entities::preview::preview_bits(kind, fields.gameobject_flags());
++            if matches!(kind, EntityKind::Unit | EntityKind::Player) || preview != 0 {
+                 write_pose(commands, &mut sc.transforms, e, position, placement);
+             }
++            if preview != 0 {
++                if let Ok(mut t) = sc.transforms.get_mut(e) {
++                    t.scale = Vec3::splat(scale);
++                }
++            }
+             e
+         }
+         Landing::New {
+@@ -832,7 +839,16 @@ fn unit_move(
+ /// stays lying down). The caller has already removed the guid from the [`GuidIndex`], so a block
+ /// that brings the object back spawns a fresh entity beside the fading model.
+ fn tear_down(mut ent: EntityWorldMut) {
++    // A building preview (benilla's own, `entities::preview`) goes at once: it never fades.
++    let preview = crate::entities::preview::entity_preview_bits(
++        ent.get::<NetEntity>(),
++        ent.get::<ObjectStore>(),
++    );
+     ent.remove::<Guid>();
++    if preview != 0 {
++        ent.despawn();
++        return;
++    }
+     ent.insert(DespawnFade::default());
+ }
+ 
+diff --git a/crates/benilla-app/src/net/objects/update_tests.rs b/crates/benilla-app/src/net/objects/update_tests.rs
+index 1ba21bd8..c8021291 100644
+--- a/crates/benilla-app/src/net/objects/update_tests.rs
++++ b/crates/benilla-app/src/net/objects/update_tests.rs
+@@ -173,6 +173,66 @@ fn a_recreate_re_poses_units_only() {
+     assert_eq!(at(world, GO), first, "a GameObject stays where it stands");
+ }
+ 
++/// `GAMEOBJECT_FLAGS`, field 9.
++const GO_FLAGS_FIELD: u16 = 9;
++
++/// A building preview (benilla's own, `GAMEOBJECT_FLAGS` bit `0x1000_0000`) is the GameObject a
++/// re-create moves: the hero aims it, and the server re-creates it where it now stands.
++#[test]
++fn a_recreate_moves_a_building_preview_in_place() {
++    const GO: u64 = 0xF110_0000_0000_000A;
++    let mut app = client();
++    let (tx, _rx) = crossbeam_channel::unbounded();
++    app.insert_resource(NetCommands(tx));
++    let world = app.world_mut();
++    let preview = |position: [f32; 3]| {
++        let mut b = create(GO, EntityKind::GameObject, position);
++        if let SessionEvent::ObjectCreate { fields, scale, .. } = &mut b {
++            *fields = ObjectFields::from_pairs(&[(
++                GO_FLAGS_FIELD,
++                crate::entities::preview::PREVIEW_MOVE | crate::entities::preview::PREVIEW_GHOST,
++            )]);
++            *scale = 1.5;
++        }
++        b
++    };
++    super::super::handlers::dispatch(world, super::wire(vec![preview([1.0, 2.0, 3.0])]));
++    let e = world.resource::<GuidIndex>().0[&GO];
++    super::super::handlers::dispatch(world, super::wire(vec![preview([10.0, 20.0, 30.0])]));
++    assert_eq!(
++        world.resource::<GuidIndex>().0[&GO],
++        e,
++        "the same entity: nothing rebuilt"
++    );
++    let t = world.get::<Transform>(e).unwrap();
++    assert_eq!(
++        t.translation,
++        wow_to_bevy([10.0, 20.0, 30.0]),
++        "moved in place"
++    );
++    assert_eq!(t.scale, Vec3::splat(1.5), "sized as sent");
++}
++
++/// A destroyed building preview goes at once, with no fade-out model left standing.
++#[test]
++fn a_destroyed_building_preview_leaves_no_fading_model() {
++    const GO: u64 = 0xF110_0000_0000_000B;
++    let mut app = client();
++    let (tx, _rx) = crossbeam_channel::unbounded();
++    app.insert_resource(NetCommands(tx));
++    let world = app.world_mut();
++    let mut b = create(GO, EntityKind::GameObject, [1.0, 2.0, 3.0]);
++    if let SessionEvent::ObjectCreate { fields, .. } = &mut b {
++        *fields =
++            ObjectFields::from_pairs(&[(GO_FLAGS_FIELD, crate::entities::preview::PREVIEW_MOVE)]);
++    }
++    super::super::handlers::dispatch(world, super::wire(vec![b]));
++    let e = world.resource::<GuidIndex>().0[&GO];
++    super::super::handlers::dispatch(world, vec![SessionEvent::ObjectDestroyed(GO)]);
++    world.flush();
++    assert!(world.get_entity(e).is_err(), "despawned, not fading");
++}
++
+ // ── One packet's passes and the released table ──────────────────────────────────────────────────
+ 
+ const MATE: u64 = 0x0000_0000_0000_2001;
+diff --git a/crates/benilla-world/src/rig_palette.rs b/crates/benilla-world/src/rig_palette.rs
+index 36df4050..72c2ecab 100644
+--- a/crates/benilla-world/src/rig_palette.rs
++++ b/crates/benilla-world/src/rig_palette.rs
+@@ -234,6 +234,12 @@ impl RigPalettes {
+         Some((slot, base))
+     }
+ 
++    /// Claim a slot that is never posed (one bone, zeroed), for an instance whose parts only want
++    /// the slot's per-slot reads (its tint): benilla's own, for unrigged building previews.
++    pub fn alloc_static_slot(&mut self) -> Option<u16> {
++        self.alloc(1).map(|(slot, _)| slot)
++    }
++
+     /// Return a rig's slot and range. Its rows and origin are zeroed, so a part's stale tag in the
+     /// one-frame despawn skew reads a matrix collapsed at the origin, never another rig's pose.
+     pub fn free(&mut self, slot: u16) {
+-- 
+2.43.0
+

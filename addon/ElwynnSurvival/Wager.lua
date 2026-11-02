@@ -38,10 +38,21 @@ f:SetFrameStrata("MEDIUM")
 f:Hide()
 ES.wagerFrame = f
 
-f.paper = f:CreateTexture(nil, "BACKGROUND")
-f.paper:SetTexture(A .. "scrap_note_b")
-f.paper:SetPoint("TOPLEFT", f, "TOPLEFT", -14, 10)
-f.paper:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 14, -10)
+-- The slip: the goal note's parchment card, a nine-slice, so its torn rim keeps its width at any
+-- height (the old scrap, a wide 256 x 128, stretched tall with the boss list and its torn top ate
+-- the title). The scrap stays for a client without the Ledger.
+local ledger = ES.ledger
+if ledger and ledger.Slice and ledger.CARD_RECTS then
+  f.paper = ledger.Slice(f, "detail_card", "BACKGROUND", 256, 256, ledger.CARD_RECTS, 26, 4)
+  f.paper:SetVertexColor(1, 1, 1, 0.97)
+else
+  f.paper = f:CreateTexture(nil, "BACKGROUND")
+  f.paper:SetTexture(A .. "scrap_note_b")
+  f.paper:SetPoint("TOPLEFT", f, "TOPLEFT", -14, 10)
+  f.paper:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 14, -10)
+end
+-- The words clear of the rim: in from the sides, the title below the torn top.
+local PAD = 8
 
 local function Text(face, size, r, g, b)
   local t = f:CreateFontString(nil, "ARTWORK")
@@ -49,12 +60,12 @@ local function Text(face, size, r, g, b)
   t:SetTextColor(r, g, b)
   t:SetShadowOffset(0, 0)
   t:SetJustifyH("CENTER")
-  t:SetWidth(240)
+  t:SetWidth(250 - 2 * PAD - 4)
   return t
 end
 
 f.title = Text(TITLE, 14, 0.165, 0.13, 0.094)
-f.title:SetPoint("TOP", f, "TOP", 0, -8)
+f.title:SetPoint("TOP", f, "TOP", 0, -PAD - 4)
 f.clock = Text(TITLE, 24, 0.55, 0.38, 0.08)
 f.clock:SetPoint("TOP", f.title, "BOTTOM", 0, -2)
 f.falls = Text(BODY, 13, 0.353, 0.275, 0.188)
@@ -108,7 +119,7 @@ local function DrawForces(fc, below)
   end
   f.forces:ClearAllPoints()
   f.forces:SetPoint("TOP", below, "BOTTOM", 0, -6)
-  f.forces:SetText("Foes  " .. fc.felled .. " / " .. fc.needed)
+  f.forces:SetText("Enemies  " .. fc.felled .. " / " .. fc.needed)
   f.forces:Show()
   f.forceBar:ClearAllPoints()
   f.forceBar:SetPoint("TOP", f.forces, "BOTTOM", 0, -3)
@@ -205,9 +216,9 @@ local function Draw()
   local rd = last.ready
   if last.state == "wait" and rd then
     if rd.count then
-      words.wait = "Everyone's ready: the clock starts in " .. math.max(0, math.ceil(rd.count - (GetTime() - last.at)))
+      words.wait = "Everyone is ready. The clock starts in " .. math.max(0, math.ceil(rd.count - (GetTime() - last.at)))
     else
-      words.wait = "Ready " .. rd.ready .. " of " .. rd.heroes .. ", or step off from the lamp to start"
+      words.wait = "Ready " .. rd.ready .. " of " .. rd.heroes .. ". Step off the lamp to start"
     end
   end
   local falls = ""
@@ -279,7 +290,7 @@ function ES.WagerLine(fields)
   last.ready = rd
   if last.state == "wait" and rd and not rd.count then
     f.ready:ClearAllPoints()
-    f.ready:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+    f.ready:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD - 2, -PAD - 2)
     f.ready:Show()
   else
     f.ready:Hide()
@@ -290,7 +301,7 @@ function ES.WagerLine(fields)
   local extra = DrawBosses(list, above)
   local lastBoss = list[table.getn(list)] and f.bosses[table.getn(list)] or above
   extra = extra + DrawForces(fc, lastBoss)
-  f:SetHeight((last.terms ~= "" and 96 or 80) + extra)
+  f:SetHeight((last.terms ~= "" and 96 or 80) + extra + PAD)
   Draw()
   f:Show()
   ES.wagerShown = last

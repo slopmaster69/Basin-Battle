@@ -23,6 +23,12 @@ local W = 460
 local PAD = 36
 local INNER = W - 2 * PAD
 local MAX_LINKS = 10
+-- A page too tall for the screen is laid out wider first (a wager's rules ran off the top and
+-- the foot of a laptop's), then scaled down if it still doesn't fit.
+local WIDTHS = { 460, 600, 740 }
+-- The links: wood buttons, the logbook's, one under another, or two abreast past three.
+local LINK_H = 28
+local LINK_W = 280
 
 -- The inks: the page's, a faded one, the clue's red, the links' blue.
 local INK = { 0.165, 0.13, 0.094 }
@@ -36,7 +42,7 @@ local FOOT = {
   note = "Kept in the logbook, under Secrets and Notes.",
   secret = "Written into the logbook, under Secrets and Notes.",
   lore = "Click a note to read it again.",
-  wager = "Click a wager to take it: down you go, fresh.",
+  wager = "Click a wager to take it. The dungeon starts fresh.",
   board = "Every server's runs, through the board's keeper.",
   run = "The run's tally, as you leave it. The book at camp keeps the dungeon's page.",
 }
@@ -51,6 +57,7 @@ f:SetFrameStrata("DIALOG")
 f:SetToplevel(true)
 f:EnableMouse(true)
 f:SetMovable(true)
+if f.SetClampedToScreen then f:SetClampedToScreen(true) end
 f:RegisterForDrag("LeftButton")
 f:SetScript("OnDragStart", function() this:StartMoving() end)
 f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
@@ -119,20 +126,27 @@ f.x:SetScript("OnEnter", function() this.mark:SetTexture(A .. "close_ink_hover")
 f.x:SetScript("OnLeave", function() this.mark:SetTexture(A .. "close_ink") end)
 f.x:SetScript("OnClick", function() f:Hide() end)
 
--- The links: a line of blue ink each, read on by clicking.
+-- The links: the logbook's wood buttons (`Ledger.Button`), plain to see as something to press;
+-- a line of blue ink each without the Ledger.
+local wood = ledger and ledger.Button
 f.links = {}
 for i = 1, MAX_LINKS do
   local b = CreateFrame("Button", nil, f)
-  b:SetWidth(INNER)
-  b:SetHeight(18)
+  b:SetWidth(wood and LINK_W or INNER)
+  b:SetHeight(wood and LINK_H or 18)
   b.label = b:CreateFontString(nil, "ARTWORK")
   b.label:SetFont(SERIF, 14, "")
   b.label:SetShadowOffset(0, 0)
   b.label:SetPoint("CENTER", b, "CENTER", 0, 0)
   b.label:SetTextColor(FROST[1], FROST[2], FROST[3])
-  b.label.ledgerInk = true
-  b:SetScript("OnEnter", function() this.label:SetTextColor(WAX[1], WAX[2], WAX[3]) end)
-  b:SetScript("OnLeave", function() this.label:SetTextColor(FROST[1], FROST[2], FROST[3]) end)
+  if wood then
+    if b.label.SetWidth then b.label:SetWidth(LINK_W - 20) end
+    wood(b)
+  else
+    b.label.ledgerInk = true
+    b:SetScript("OnEnter", function() this.label:SetTextColor(WAX[1], WAX[2], WAX[3]) end)
+    b:SetScript("OnLeave", function() this.label:SetTextColor(FROST[1], FROST[2], FROST[3]) end)
+  end
   b:SetScript("OnClick", function()
     if this.cmd and ES.Say then
       if ES.Play then ES.Play("click") end
@@ -145,19 +159,25 @@ end
 
 -- How tall a string comes out at the page's width: the client measures it; a rough count of its
 -- lines where nothing does.
+local inner = INNER
 local function Tall(fs, size, text)
   local h = fs:GetHeight() or 0
   if h > 1 then return h end
   local lines = 0
   local rest = (text or "") .. "\n"
   for line in string.gfind(rest, "([^\n]*)\n") do
-    lines = lines + math.max(1, math.ceil(string.len(line) * size * 0.47 / INNER))
+    lines = lines + math.max(1, math.ceil(string.len(line) * size * 0.47 / inner))
   end
   return lines * (size + 4)
 end
 
--- The page, laid out top to bottom and sized to what's on it.
-local function Lay(kind, title, place, text, clue, links)
+-- The page, laid out top to bottom at `w` wide and sized to what's on it.
+local function Lay(kind, title, place, text, clue, links, w)
+  w = w or W
+  inner = w - 2 * PAD
+  f:SetWidth(w)
+  local words = { f.title, f.place, f.body, f.clueHead, f.clue, f.foot }
+  for i = 1, table.getn(words) do words[i]:SetWidth(inner) end
   f.seal:SetTexture(A .. (SEALS[kind] or "seal_red"))
   local y = 34
   local function put(region, h, gap)
@@ -193,23 +213,54 @@ local function Lay(kind, title, place, text, clue, links)
   end
   local n = 0
   for i = 1, MAX_LINKS do
+    if links[i] then n = n + 1 end
+  end
+  -- Two abreast past three (when the page is wide enough for two), else one under another.
+  local cols = (wood and n > 3 and inner >= 2 * 180 + 12) and 2 or 1
+  local bw = wood and math.min(cols == 2 and math.floor((inner - 12) / 2) or LINK_W, inner) or inner
+  local bh = wood and LINK_H or 18
+  local gap = wood and 6 or 2
+  local top = y
+  for i = 1, MAX_LINKS do
     local l = links[i]
     local b = f.links[i]
     if l then
-      n = n + 1
       b.cmd = l[1]
-      b.label:SetText("~ " .. l[2] .. " ~")
+      b:SetWidth(bw)
+      if b.plate and b.plate.Layout then b.plate:Layout(bh + 2) end
+      if b.label.SetWidth then b.label:SetWidth(bw - 20) end
+      b.label:SetText(wood and l[2] or ("~ " .. l[2] .. " ~"))
+      local row, col = math.floor((i - 1) / cols), math.mod(i - 1, cols)
+      local x = 0
+      -- (An odd last one under the middle.)
+      if cols == 2 and not (i == n and math.mod(n, 2) == 1) then x = (col == 0) and -(bw + 12) / 2 or (bw + 12) / 2 end
+      b:ClearAllPoints()
+      b:SetPoint("TOP", f, "TOP", x, -(top + row * (bh + gap)))
       b:Show()
-      put(b, 18, 2)
     else
       b:Hide()
     end
   end
-  if n > 0 then y = y + 8 end
+  if n > 0 then y = top + math.ceil(n / cols) * (bh + gap) + 8 end
   f.foot:SetText(FOOT[kind] or FOOT.note)
   put(f.foot, 14, 0)
   f:SetHeight(math.max(180, y + 30))
   if f.paper.Fit then f.paper.Fit() end
+end
+
+-- Laid out at the narrowest width that fits the screen's height; past the widest, scaled down.
+local function Fit(kind, title, place, text, clue, links)
+  local room = (UIParent and UIParent:GetHeight() or 768) - 60
+  local roomW = (UIParent and UIParent:GetWidth() or 1024) - 40
+  for i = 1, table.getn(WIDTHS) do
+    local w = WIDTHS[i]
+    if i == 1 or w <= roomW then
+      Lay(kind, title, place, text, clue, links, w)
+      if (f:GetHeight() or 0) <= room then break end
+    end
+  end
+  local h, w = f:GetHeight() or 1, f:GetWidth() or W
+  f:SetScale(math.max(0.5, math.min(1, room / math.max(1, h), roomW / math.max(1, w))))
 end
 
 -- A page from the server.
@@ -225,7 +276,7 @@ function ES.Letter(fields)
       if l[1] and l[1] ~= "" then table.insert(links, { l[1], l[2] or l[1] }) end
     end
   end
-  Lay(kind, fields[3] or "", fields[4] or "", text, clue, links)
+  Fit(kind, fields[3] or "", fields[4] or "", text, clue, links)
   if not f:IsShown() then
     PlaySound("igQuestListOpen")
     f.switched = ES.mode ~= "cursor"

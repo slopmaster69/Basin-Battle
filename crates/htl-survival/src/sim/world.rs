@@ -23,6 +23,8 @@ pub struct Preview {
     pub facing: f32,
     /// Why it can't go here, if it can't.
     pub problem: Option<String>,
+    /// A station already built that this is moving (none: a new one).
+    pub moving: Option<Id>,
 }
 
 /// Where a station would go and whether it can, for the hero's screen.
@@ -49,7 +51,8 @@ impl Survival {
     pub(crate) fn place_camp(&mut self) {
         let w = self.content.world.clone();
         let heart = self.ground(w.heart[0], w.heart[1]);
-        let alarm = self.ground(w.alarm[0], w.alarm[1]);
+        let mut alarm = self.ground(w.alarm[0], w.alarm[1]);
+        alarm[2] += w.alarm_lift;
         let id = self.alloc();
         self.objs.insert(id, Obj { kind: ObjKind::Storage, pos: heart, facing: w.spawn_facing });
         let id = self.alloc();
@@ -87,9 +90,9 @@ impl Survival {
             }
             let at = self.ground(spot[0], spot[1]);
             let id = self.alloc();
-            self.objs.insert(id, Obj { kind: ObjKind::Prop { display: BOOK_CRATE_DISPLAY, scale: 1.0 }, pos: at, facing: d.book_facing });
+            self.objs.insert(id, Obj { kind: ObjKind::Prop { display: w.book_stand_display, scale: w.book_stand_scale }, pos: at, facing: d.book_facing });
             let id = self.alloc();
-            let on = [at[0], at[1], at[2] + BOOK_CRATE_HEIGHT];
+            let on = [at[0], at[1], at[2] + w.book_stand_height];
             self.objs.insert(id, Obj { kind: ObjKind::Book, pos: on, facing: d.book_facing });
             // A lit brazier beside it, to find it by.
             let (sx, sy) = ((d.book_facing + std::f32::consts::FRAC_PI_2).cos() * 1.6, (d.book_facing + std::f32::consts::FRAC_PI_2).sin() * 1.6);
@@ -384,9 +387,9 @@ impl Survival {
             ObjKind::Storage => "Bank and open",
             ObjKind::Alarm => "Ring",
             ObjKind::Node { .. } => "Gather",
-            ObjKind::Station { damaged: true, .. } => "Mend",
+            ObjKind::Station { damaged: true, .. } => "Repair",
             ObjKind::Station { .. } => "Use",
-            ObjKind::Cache { .. } => "Take back",
+            ObjKind::Cache { .. } => "Recover",
             ObjKind::Rack => "Choose a weapon",
             ObjKind::Book => "Read",
             ObjKind::ArenaBanner => "Use",
@@ -459,17 +462,18 @@ impl Survival {
             }
             ObjKind::Node { .. } => {}
             ObjKind::Station { damaged: true, .. } => self.repair(id, t),
-            ObjKind::Station { def, health, .. } if self.content.stations[def].defense => {
+            // (A defence opens its window too, in Siege's match only its word.)
+            ObjKind::Station { def, health, .. } if self.content.stations[def].defense && self.is_siege() => {
                 let d = &self.content.stations[def];
-                let spikes = if d.spikes > 0 { " Its spikes bite whoever stands at it." } else { "" };
-                self.tell(id, format!("The {}: {health} of {}. Raiders go for it before what it guards.{spikes}", d.name, d.health));
+                let spikes = if d.spikes > 0 { " Its spikes damage anyone who stands at it." } else { "" };
+                self.tell(id, format!("The {} has {health} of {} health. Raiders attack it before what it guards.{spikes}", d.name, d.health));
             }
             ObjKind::Station { .. } => self.events.push(Event::StationOpen { player: id, station: t }),
             ObjKind::Cache { .. } => self.claim(id, t),
             ObjKind::Rack | ObjKind::ArenaBanner | ObjKind::SiegeBanner | ObjKind::SiegeLedger { .. } | ObjKind::SiegeTrainer { .. } => self.events.push(Event::StationOpen { player: id, station: t }),
             ObjKind::Book if !self.book_open() && self.arena_def().is_none() => {
                 let gate = self.dungeon_def().map_or(1, |d| d.gate_raids);
-                self.tell(id, format!("The Smuggler's Logbook: a Defias smuggler's, its pages in a cipher. Hold the camp against {gate} raid(s) and the camp's scouts will have read it."));
+                self.tell(id, format!("The Smuggler's Logbook is written in a Defias cipher. Beat {gate} raid(s) and the camp's scouts can read it."));
                 // (Only while no dungeon at all is open: the ladder's locks say theirs on each page.)
             }
             ObjKind::Book => self.events.push(Event::StationOpen {
@@ -485,7 +489,7 @@ impl Survival {
             ObjKind::Chest { def, spent: false } => self.use_chest(id, def, t),
             ObjKind::Chest { .. } => {}
             ObjKind::Loot { item, n } => self.take_loot(id, item, n, t),
-            ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } => {}
+            ObjKind::Ghost { .. } | ObjKind::Fire { .. } | ObjKind::Prop { .. } | ObjKind::Piece { .. } => {}
         }
     }
 
@@ -500,7 +504,7 @@ impl Survival {
         let left = if vein.is_some() { 0 } else { self.give(id, item, amount) };
         let got = amount - left;
         if got == 0 {
-            self.tell(id, "Your bags are full: bank what you carry at the camp's chest.");
+            self.tell(id, "Your bags are full. Bank what you carry at Camp Storage.");
             return;
         }
         let wall = self.wall();
@@ -566,7 +570,7 @@ impl Survival {
             let key = self.content.items[i].key.clone();
             self.count("bank", &key, n);
         }
-        self.tell(id, format!("Banked: {}.", words.join(", ")));
+        self.tell(id, format!("You banked {}.", words.join(", ")));
         self.events.push(Event::Bags { player: id });
         self.events.push(Event::Storage);
         self.events.push(Event::Dirty);
@@ -579,16 +583,16 @@ impl Survival {
 
     /// Take `n` of item `key` from the chest into the bags (at the chest).
     pub fn withdraw(&mut self, id: Id, key: &str, n: u32) -> Result<(), String> {
-        let item = self.content.item(key).ok_or("No such thing.")?;
-        let chest = self.objs.get(&self.storage_id()).map(|o| o.pos).ok_or("No chest.")?;
+        let item = self.content.item(key).ok_or("No such item.")?;
+        let chest = self.objs.get(&self.storage_id()).map(|o| o.pos).ok_or("No storage.")?;
         let p = self.players.get(&id).ok_or("No such hero.")?;
         if dist2d(p.pos, chest) > INTERACT_RANGE + 2.0 {
-            return Err("Go to the camp's chest to take things out.".into());
+            return Err("Go to Camp Storage to take items.".into());
         }
         let have = self.storage.get(&item).copied().unwrap_or(0);
         let n = n.min(have);
         if n == 0 {
-            return Err("The chest has none.".into());
+            return Err("Storage has none.".into());
         }
         if !self.bag_fits(id, &BTreeMap::from([(item, n)])) {
             return Err("Your bags are full.".into());
@@ -616,15 +620,17 @@ impl Survival {
     /// whether they have it all).
     pub fn recipes(&self, id: Id, station: Id) -> Vec<(String, String, String, bool)> {
         let Some(ObjKind::Station { def, .. }) = self.objs.get(&station).map(|o| &o.kind) else { return Vec::new() };
-        let key = &self.content.stations[*def].key;
+        let def = *def;
+        let bonus = self.content.stations[def].bonus;
         self.content
             .recipes
             .iter()
-            .filter(|r| &r.station == key)
+            .filter(|r| self.station_does(def, &r.station))
             .map(|r| {
                 let can = r.inputs.iter().all(|(k, n)| self.content.item(k).is_some_and(|i| self.available(id, i) >= *n));
                 let out = &self.content.items[self.content.item(&r.output).unwrap()];
-                let name = if r.count > 1 { format!("{} x{}", out.name, r.count) } else { out.name.clone() };
+                let n = r.count + if matches!(out.kind, ItemKind::Resource | ItemKind::Food) { bonus } else { 0 };
+                let name = if n > 1 { format!("{} x{n}", out.name) } else { out.name.clone() };
                 (r.key.clone(), name, self.cost_text(&r.inputs), can)
             })
             .collect()
@@ -658,11 +664,11 @@ impl Survival {
             Some(Obj { kind: ObjKind::Station { def, damaged, .. }, pos, .. }) => (*def, *damaged, *pos),
             _ => return Err("That's not a station.".into()),
         };
-        if c.stations[def].key != recipe.station {
+        if !self.station_does(def, &recipe.station) {
             return Err(format!("That's made at a {}.", c.stations[c.station(&recipe.station).unwrap()].name));
         }
         if damaged {
-            return Err("It's damaged: mend it first.".into());
+            return Err("It's damaged. Repair it first.".into());
         }
         let p = self.players.get(&id).ok_or("No such hero.")?;
         if p.health == 0 {
@@ -674,41 +680,44 @@ impl Survival {
         let out = c.item(&recipe.output).unwrap();
         let kind = c.items[out].kind;
         let stackable = matches!(kind, ItemKind::Resource | ItemKind::Food);
-        if stackable && !self.bag_fits(id, &BTreeMap::from([(out, recipe.count)])) {
+        let count = recipe.count + if stackable { c.stations[def].bonus } else { 0 };
+        if stackable && !self.bag_fits(id, &BTreeMap::from([(out, count)])) {
             return Err("Your bags are full.".into());
         }
         self.affords(id, &recipe.inputs)?;
         let gear = if stackable { 1.0 } else { c.work.gear };
-        Ok((c.items[out].name.clone(), c.work.craft * recipe.work * gear, def))
+        Ok((c.items[out].name.clone(), c.work.craft * recipe.work * gear / c.stations[def].work_speed.max(0.1), def))
     }
 
     /// The making done: paid for, and what it makes in the bags (gear put on).
     fn craft_done(&mut self, id: Id, station: Id, key: &str) -> Result<(), String> {
-        self.craft_check(id, station, key)?;
+        let (_, _, def) = self.craft_check(id, station, key)?;
         let c = self.content.clone();
         let recipe = c.recipes.iter().find(|r| r.key == key).ok_or("No such recipe.")?;
         let out = c.item(&recipe.output).unwrap();
         let kind = c.items[out].kind;
         self.pay(id, &recipe.inputs)?;
-        self.count("craft", &recipe.key, recipe.count);
         let name = c.items[out].name.clone();
         match kind {
             ItemKind::Resource | ItemKind::Food => {
-                self.give(id, out, recipe.count);
-                self.tell(id, format!("You make {} {name}.", recipe.count));
+                let n = recipe.count + c.stations[def].bonus;
+                self.count("craft", &recipe.key, n);
+                self.give(id, out, n);
+                self.tell(id, format!("You made {n} {name}."));
             }
             ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor | ItemKind::Pack => {
+                self.count("craft", &recipe.key, recipe.count);
                 let old = self.put_on(id, out);
                 self.events.push(Event::Gear { player: id });
                 let what = c.items[out].text.clone();
-                let verb = if matches!(kind, ItemKind::Armor | ItemKind::Pack) { "make the" } else { "forge the" };
+                let verb = if matches!(kind, ItemKind::Armor | ItemKind::Pack) { "made the" } else { "forged the" };
                 match old {
                     Some(old) => {
-                        self.tell(id, format!("You {verb} {name} and put it on: {what} (Your {} goes in the chest.)", c.items[old].name));
+                        self.tell(id, format!("You {verb} {name} and equipped it. {what} Your {} went to storage.", c.items[old].name));
                         *self.storage.entry(old).or_default() += 1;
                         self.events.push(Event::Storage);
                     }
-                    None => self.tell(id, format!("You {verb} {name} and put it on: {what}")),
+                    None => self.tell(id, format!("You {verb} {name} and equipped it. {what}")),
                 }
                 self.events.push(Event::Bags { player: id });
             }
@@ -724,6 +733,7 @@ impl Survival {
             Job::Craft { station, recipe } => self.craft_done(id, station, &recipe),
             Job::Build => self.build_done(id).map(|_| ()),
             Job::Repair { station } => self.repair_done(id, station),
+            Job::Upgrade { station } => self.upgrade_done(id, station),
         };
         if let Err(e) = result {
             self.tell(id, e);
@@ -746,23 +756,23 @@ impl Survival {
 
     /// Swap to gear kept in the chest (at the chest).
     pub fn equip_from_chest(&mut self, id: Id, key: &str) -> Result<(), String> {
-        let item = self.content.item(key).ok_or("No such thing.")?;
+        let item = self.content.item(key).ok_or("No such item.")?;
         let kind = self.content.items[item].kind;
         if !matches!(kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor | ItemKind::Pack) {
             return Err("That isn't gear.".into());
         }
         if self.storage.get(&item).copied().unwrap_or(0) == 0 {
-            return Err("The chest has none.".into());
+            return Err("Storage has none.".into());
         }
-        let chest = self.objs.get(&self.storage_id()).map(|o| o.pos).ok_or("No chest.")?;
+        let chest = self.objs.get(&self.storage_id()).map(|o| o.pos).ok_or("No storage.")?;
         if dist2d(self.players.get(&id).ok_or("No hero.")?.pos, chest) > INTERACT_RANGE + 2.0 {
-            return Err("Go to the camp's chest.".into());
+            return Err("Go to Camp Storage.".into());
         }
         // A smaller pack can't hold what's carried.
         if kind == ItemKind::Pack {
             let p = &self.players[&id];
             if self.bag_slots_with(&p.bag, Some(item)) > self.bag_capacity(p) {
-                return Err("Your bags hold more than that pack can: bank something first.".into());
+                return Err("Your bags hold more than that pack can. Bank something first.".into());
             }
         }
         let old = self.put_on(id, item);
@@ -783,7 +793,7 @@ impl Survival {
 
     /// Wear or wield gear carried in the bags (anywhere): what it replaces goes in the bags.
     pub fn wear_from_bag(&mut self, id: Id, item: usize) -> Result<String, String> {
-        let d = self.content.items.get(item).ok_or("No such thing.")?.clone();
+        let d = self.content.items.get(item).ok_or("No such item.")?.clone();
         if !matches!(d.kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor | ItemKind::Pack) {
             return Err("That isn't gear.".into());
         }
@@ -811,7 +821,7 @@ impl Survival {
         }
         let pack = if d.kind == ItemKind::Pack { Some(item) } else { p.pack };
         if self.bag_slots_with(&bag, pack) > self.bag_capacity(p) {
-            return Err("Your bags are too full to swap that: bank something first.".into());
+            return Err("Your bags are too full to swap that. Bank something first.".into());
         }
         bag.retain(|_, n| *n > 0);
         self.put_on(id, item);
@@ -819,8 +829,8 @@ impl Survival {
             p.bag = bag;
         }
         let said = match old {
-            Some(o) => format!("You put on the {}. (Your {} goes in your bags.)", d.name, self.content.items[o].name),
-            None => format!("You put on the {}.", d.name),
+            Some(o) => format!("You equipped the {}. Your {} went to your bags.", d.name, self.content.items[o].name),
+            None => format!("You equipped the {}.", d.name),
         };
         self.tell(id, said.clone());
         self.events.push(Event::Bags { player: id });
@@ -873,23 +883,23 @@ impl Survival {
             let avg = (w.damage[0] + w.damage[1]) as f32 / 2.0;
             let mut perks = Vec::new();
             if w.stagger > 0.0 {
-                perks.push(format!("knocks a wind-up aside for {:.1} s (not a boss's)", w.stagger));
+                perks.push(format!("Interrupts an enemy's wind-up for {:.1} sec, except a boss's", w.stagger));
             }
             if w.posture > 1.0 {
-                perks.push(format!("breaks a stance {:.0}% faster", (w.posture - 1.0) * 100.0));
+                perks.push(format!("Breaks stances {:.0}% faster", (w.posture - 1.0) * 100.0));
             }
             if w.parry > 0.0 {
-                perks.push(format!("a parry {:.0} ms easier", w.parry * 1000.0));
+                perks.push(format!("Parry window {:.0} ms longer", w.parry * 1000.0));
             }
             if w.backstab > 0.0 {
-                perks.push(format!("{:.0}x from behind", w.backstab));
+                perks.push(format!("{:.0}x damage from behind", w.backstab));
             }
             if w.targets > 1 {
-                perks.push(format!("strikes up to {}", w.targets));
+                perks.push(format!("Hits up to {} enemies", w.targets));
             }
-            let own = if perks.is_empty() { String::new() } else { format!(" Its own: {}.", perks.join(", ")) };
+            let own = if perks.is_empty() { String::new() } else { format!(" {}.", perks.join(". ")) };
             return Some(format!(
-                "{}-{} damage, a light blow every {light:.2} s ({:.0} a second), a heavy one {:.0}-{:.0} in {heavy:.2} s; reach {:.1} yd.{own}",
+                "{}-{} damage. Light attack every {light:.2} sec ({:.0} damage per sec). Heavy attack {:.0}-{:.0} damage in {heavy:.2} sec. Reach {:.1} yd.{own}",
                 w.damage[0],
                 w.damage[1],
                 avg / light.max(0.1),
@@ -900,9 +910,9 @@ impl Survival {
         }
         let r = c.ranged(key)?;
         Some(if r.draw_secs <= 0.0 {
-            format!("Aimed Shot: {}-{} damage at once, {:.1} s to reload; {:.0} yd.", r.damage[0], r.damage[1], r.recovery, r.range)
+            format!("Aimed Shot deals {}-{} damage. Reloads in {:.1} sec. Range {:.0} yd.", r.damage[0], r.damage[1], r.recovery, r.range)
         } else {
-            format!("Aimed Shot: {} damage drawn briefly, up to {} at a full {:.1} s draw; {:.0} yd.", r.damage[0], r.damage[1], r.draw_secs, r.range)
+            format!("Aimed Shot deals {} damage on a quick draw, up to {} at a full {:.1} sec draw. Range {:.0} yd.", r.damage[0], r.damage[1], r.draw_secs, r.range)
         })
     }
 
@@ -924,18 +934,18 @@ impl Survival {
         }
         let item = self.content.item(key).ok_or("No such weapon.")?;
         if self.content.is_trophy(key) {
-            return Err("That one's won from its owner, not taken from the rack.".into());
+            return Err("That weapon is won from its owner, not taken from the rack.".into());
         }
         // The rack holds weapons as they're found; a honed one is the lamp's work, and its own.
         if self.content.items[item].hone > 0 {
-            return Err("The rack holds weapons as they're found: a honed one is honed at the lamp.".into());
+            return Err("The rack holds weapons as they're found. Hone them at a lamp.".into());
         }
         if !self.rack_has(key) {
-            return Err("That one's found below first: the rack has it once the camp does.".into());
+            return Err("Find that weapon in a dungeon first. The rack has it once the camp does.".into());
         }
         let kind = self.content.items[item].kind;
         if kind == ItemKind::Bow {
-            return Err("The rack holds weapons for the fight at hand: no bows.".into());
+            return Err("The rack holds no bows.".into());
         }
         let p = self.players.get(&id).ok_or("No such hero.")?;
         // The nearest rack (a Siege camp has its own).
@@ -981,20 +991,20 @@ impl Survival {
         let pos = self.players[&id].pos;
         self.set_action(id, Action::Work { t: 0.0, total: secs, job: Job::Repair { station }, at: pos });
         self.events.push(Event::Cast { caster: id, spell: GATHER_SPELL, ms: (secs * 1000.0) as u32 });
-        self.tell(id, format!("You set to mending the {}.", s.name));
+        self.tell(id, format!("Repairing the {}.", s.name));
     }
 
     fn repair_check(&self, id: Id, station: Id) -> Result<(), String> {
-        let Some(ObjKind::Station { def, damaged: true, .. }) = self.objs.get(&station).map(|o| &o.kind) else { return Err("There's nothing to mend.".into()) };
+        let Some(ObjKind::Station { def, damaged: true, .. }) = self.objs.get(&station).map(|o| &o.kind) else { return Err("There's nothing to repair.".into()) };
         let s = &self.content.stations[*def];
         if self.is_siege() && !self.buildable(*def) {
-            return Err(format!("The {} can't be mended.", s.name));
+            return Err(format!("The {} can't be repaired.", s.name));
         }
         if self.raid.active() && self.raid.raiders_near(self, station) {
-            return Err("Not with raiders at it!".into());
+            return Err("Not while raiders are attacking it.".into());
         }
         let cost = self.station_repair(*def);
-        self.affords(id, &cost).map(|_| ()).map_err(|e| format!("The {} is damaged. To mend it: {} ({e})", s.name, self.cost_text(&cost)))
+        self.affords(id, &cost).map(|_| ()).map_err(|e| format!("The {} is damaged. Repairing it costs {}. {e}", s.name, self.cost_text(&cost)))
     }
 
     fn repair_done(&mut self, id: Id, station: Id) -> Result<(), String> {
@@ -1008,7 +1018,7 @@ impl Survival {
         }
         self.put_out(station);
         self.events.push(Event::ObjChanged { id: station });
-        self.tell(id, format!("You mend the {}.", s.name));
+        self.tell(id, format!("You repaired the {}.", s.name));
         self.events.push(Event::Dirty);
         Ok(())
     }
@@ -1028,12 +1038,12 @@ impl Survival {
             self.objs.insert(fire, Obj { kind: ObjKind::Fire { on: station }, pos, facing: 0.0 });
             self.events.push(Event::ObjSpawned { id: fire });
             self.events.push(Event::ObjChanged { id: station });
-            self.announce(format!("The {name} is wrecked! Mend it at the station with {mend}."));
+            self.announce(format!("The {name} was damaged. Repair it with {mend}."));
             self.events.push(Event::Dirty);
         }
     }
 
-    fn put_out(&mut self, station: Id) {
+    pub(crate) fn put_out(&mut self, station: Id) {
         let fires: Vec<Id> = self.objs.iter().filter(|(_, o)| o.kind == ObjKind::Fire { on: station }).map(|(id, _)| *id).collect();
         for f in fires {
             self.objs.remove(&f);
@@ -1067,10 +1077,14 @@ impl Survival {
             return Err("You're down.".into());
         }
         let (pos, f) = (p.pos, p.facing);
+        let s = &self.content.stations[def];
+        if s.most > 0 && !self.is_siege() && self.standing(&s.key) as u32 >= s.most {
+            return Err(if s.most == 1 { format!("The camp already has a {}.", s.name) } else { format!("The camp already has {} {}s, the most it can keep.", s.most, s.name) });
+        }
         self.cancel_preview(id);
         let ghost = self.alloc();
         self.objs.insert(ghost, Obj { kind: ObjKind::Ghost { player: id, def, ok: false }, pos, facing: f });
-        self.players.get_mut(&id).unwrap().preview = Some(Preview { ghost, def, turn: 0.0, pos, facing: f, problem: Some("…".into()) });
+        self.players.get_mut(&id).unwrap().preview = Some(Preview { ghost, def, turn: 0.0, pos, facing: f, problem: Some("…".into()), moving: None });
         self.place_preview(id, true);
         Ok(())
     }
@@ -1097,7 +1111,7 @@ impl Survival {
     /// building starts there (the ghost stays put), and it stands, paid for, as it's done.
     pub fn build_confirm(&mut self, id: Id) -> Result<String, String> {
         if matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Work { job: Job::Build, .. })) {
-            return Err("You're building it.".into());
+            return Err("You're already building it.".into());
         }
         self.place_preview(id, false);
         let pv = self.players.get(&id).and_then(|p| p.preview.clone()).ok_or("You aren't placing anything.")?;
@@ -1105,8 +1119,13 @@ impl Survival {
             return Err(problem.clone());
         }
         let s = self.content.stations[pv.def].clone();
-        self.affords(id, &self.station_cost(pv.def))?;
-        let secs = self.content.work.build * s.work;
+        let secs = match pv.moving {
+            Some(_) => self.move_secs(pv.def),
+            None => {
+                self.affords(id, &self.station_cost(pv.def))?;
+                self.content.work.build * s.work
+            }
+        };
         if secs <= 0.0 {
             return self.build_done(id);
         }
@@ -1119,6 +1138,9 @@ impl Survival {
     /// The building done: the station stands where its ghost did, paid for.
     fn build_done(&mut self, id: Id) -> Result<String, String> {
         let pv = self.players.get(&id).and_then(|p| p.preview.clone()).ok_or("You aren't placing anything.")?;
+        if let Some(station) = pv.moving {
+            return self.move_done(id, &pv, station);
+        }
         // Judged again where it stands (someone may have built there meanwhile).
         if let Some(problem) = self.site_problem(pv.def, pv.pos, Some(pv.ghost)) {
             return Err(problem);
@@ -1138,7 +1160,7 @@ impl Survival {
         self.events.push(Event::ObjSpawned { id: sid });
         self.events.push(Event::Missile { caster: id, spell: CRAFT_SPELL, target: Target::Point(pv.pos) });
         let name = self.players[&id].name.clone();
-        self.announce(format!("{name} builds a {}.", s.name));
+        self.announce(format!("{name} built a {}.", s.name));
         self.events.push(Event::Dirty);
         self.count("build", &s.key, 1);
         if self.raid.phase == RaidPhase::Idle && self.camp_ready() && self.next_raid().needs.contains(&s.key) {
@@ -1164,16 +1186,22 @@ impl Survival {
         }
     }
 
+    pub(crate) fn place_preview_now(&mut self, id: Id) {
+        self.place_preview(id, true);
+    }
+
     /// Move the ghost in front of the hero and judge the spot.
     fn place_preview(&mut self, id: Id, force: bool) {
         let Some(p) = self.players.get(&id) else { return };
         let Some(pv) = p.preview.clone() else { return };
         let f = p.facing;
         let at = [p.pos[0] + f.cos() * BUILD_DISTANCE, p.pos[1] + f.sin() * BUILD_DISTANCE];
-        let pos = self.ground(at[0], at[1]);
         let facing_ = (f + std::f32::consts::PI + pv.turn).rem_euclid(std::f32::consts::TAU);
-        let mut problem = self.site_problem(pv.def, pos, Some(pv.ghost));
-        if problem.is_none() {
+        // A block of wall on its grid, a quarter turn at a time.
+        let (at, facing_) = self.snapped(pv.def, at, facing_);
+        let pos = self.ground(at[0], at[1]);
+        let mut problem = self.site_problem_except(pv.def, pos, Some(pv.ghost), pv.moving);
+        if problem.is_none() && pv.moving.is_none() {
             let cost = self.station_cost(pv.def);
             let short: Vec<String> = cost
                 .iter()
@@ -1210,6 +1238,12 @@ impl Survival {
     /// Why station `def` can't stand at `pos`, if it can't: outside the camp, on the road, on
     /// steep or wet ground, too near another station or the camp's own spots.
     pub fn site_problem(&self, def: usize, pos: Vec3, ghost: Option<Id>) -> Option<String> {
+        self.site_problem_except(def, pos, ghost, None)
+    }
+
+    /// [`Self::site_problem`], not counting object `except` (the station being moved, or grown
+    /// into its upgrade).
+    pub fn site_problem_except(&self, def: usize, pos: Vec3, ghost: Option<Id>, except: Option<Id>) -> Option<String> {
         let w = &self.content.world;
         let s = &self.content.stations[def];
         let r = s.footprint;
@@ -1225,7 +1259,7 @@ impl Survival {
             let center = [w.build_center[0], w.build_center[1], 0.0];
             let off = dist2d(pos, center) + r - w.build_radius;
             if off > 0.0 {
-                return Some(format!("Outside the camp's building ground (the meadow by the camp, ringed by torches): {:.0} yd {} of here.", off.ceil(), compass(facing(pos, center))));
+                return Some(format!("Outside the camp's building ground, the torch-ringed yard around the campfire. It's {:.0} yd {} of here.", off.ceil(), compass(facing(pos, center))));
             }
         }
         // Sample the footprint.
@@ -1241,7 +1275,7 @@ impl Survival {
             let (x, y) = (pos[0] + dx, pos[1] + dy);
             // (Arathi's camps stand in their own rubble: Siege builds on it.)
             if self.land.road(x, y) > 0.3 && !self.is_siege() {
-                return Some("That's the road: keep it clear.".into());
+                return Some("Can't build on the road.".into());
             }
             if self.land.blocked(x, y) {
                 return Some("Something's in the way.".into());
@@ -1257,8 +1291,18 @@ impl Survival {
             return Some("The ground's too steep.".into());
         }
         for (oid, o) in &self.objs {
-            if Some(*oid) == ghost {
+            if Some(*oid) == ghost || Some(*oid) == except {
                 continue;
+            }
+            // Blocks of a wall stand cell to cell on their grid.
+            if let ObjKind::Station { def: d, .. } = &o.kind {
+                let (a, b) = (s.snap, self.content.stations[*d].snap);
+                if a > 0.0 && b > 0.0 {
+                    if dist2d(o.pos, pos) < a.max(b) * 0.95 {
+                        return Some("Too close to something else.".into());
+                    }
+                    continue;
+                }
             }
             let other = match &o.kind {
                 ObjKind::Station { def, .. } => self.content.stations[*def].footprint,
@@ -1270,11 +1314,70 @@ impl Survival {
                 return Some("Too close to something else.".into());
             }
         }
+        // The camp's own things keep their ground, those still to come as well as those there.
+        if !self.is_siege() {
+            for d in self.content.props.iter().filter(|d| d.clear > 0.0) {
+                if dist2d([d.at[0], d.at[1], 0.0], pos) < r + d.clear + 0.5 {
+                    return Some(if d.after.is_some() && !d.name.is_empty() {
+                        format!("That ground is kept for {} as the camp grows.", d.name)
+                    } else if d.after.is_some() {
+                        "That ground is kept for the camp as it grows.".into()
+                    } else {
+                        "Too close to something else.".into()
+                    });
+                }
+            }
+        }
         let spawn = [w.spawn[0], w.spawn[1], 0.0];
         if dist2d(spawn, pos) < r + w.keep_clear {
-            return Some("That's where heroes arrive: keep it clear.".into());
+            return Some("Heroes arrive here. Keep it clear.".into());
         }
         None
+    }
+
+    /// Stations standing outside the camp's building ground (built where the camp stood before
+    /// it moved) carried over to it: each to the nearest good spot, kept as it was (its health,
+    /// whether it's damaged). One with no room left stays where it is.
+    pub(crate) fn resite_stations(&mut self) {
+        if self.is_siege() || self.is_below() {
+            return;
+        }
+        let w = self.content.world.clone();
+        let center = [w.build_center[0], w.build_center[1], 0.0];
+        let away: Vec<Id> = self
+            .objs
+            .iter()
+            .filter(|(_, o)| matches!(o.kind, ObjKind::Station { def, .. } if dist2d(o.pos, center) + self.content.stations[def].footprint > w.build_radius))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in away {
+            let Some(ObjKind::Station { def, .. }) = self.objs.get(&id).map(|o| o.kind.clone()) else { continue };
+            // Rings out from the middle, a spot every 3 yards round each.
+            let mut spot = None;
+            let mut r = 0.0f32;
+            'rings: while r <= w.build_radius {
+                let n = ((std::f32::consts::TAU * r / 3.0).ceil() as usize).max(1);
+                for k in 0..n {
+                    let a = k as f32 / n as f32 * std::f32::consts::TAU;
+                    let pos = self.ground(w.build_center[0] + a.cos() * r, w.build_center[1] + a.sin() * r);
+                    if self.site_problem(def, pos, Some(id)).is_none() {
+                        spot = Some(pos);
+                        break 'rings;
+                    }
+                }
+                r += 3.0;
+            }
+            let Some(pos) = spot else { continue };
+            if let Some(o) = self.objs.get_mut(&id) {
+                o.pos = pos;
+            }
+            // Its fire, if it burns, goes with it.
+            for f in self.objs.values_mut() {
+                if f.kind == (ObjKind::Fire { on: id }) {
+                    f.pos = pos;
+                }
+            }
+        }
     }
 
     /// The camp has what the next raid needs (standing).
@@ -1284,7 +1387,7 @@ impl Survival {
 
     /// A standing station of kind `key` is up.
     pub fn has_station(&self, key: &str) -> bool {
-        self.objs.values().any(|o| matches!(o.kind, ObjKind::Station { def, damaged: false, .. } if self.content.stations[def].key == key))
+        self.objs.values().any(|o| matches!(o.kind, ObjKind::Station { def, damaged: false, .. } if self.station_does(def, key)))
     }
 
     /// One more towards a goal's count (`bank:wood`, `craft:roast`, `kill:kobold`...).
@@ -1303,7 +1406,7 @@ impl Survival {
             return;
         }
         if !self.bag_fits(id, &items) {
-            self.tell(id, "Your bags can't hold it all: bank or drop something first.");
+            self.tell(id, "Your bags can't hold it all. Bank or drop something first.");
             return;
         }
         self.objs.remove(&cache);
@@ -1313,7 +1416,7 @@ impl Survival {
             *p.bag.entry(*i).or_default() += n;
         }
         let words: Vec<String> = items.iter().map(|(i, n)| format!("{n} {}", self.content.items[*i].name)).collect();
-        self.tell(id, format!("You recover your supplies: {}.", words.join(", ")));
+        self.tell(id, format!("You recovered your supplies: {}.", words.join(", ")));
         self.events.push(Event::Bags { player: id });
         self.events.push(Event::Dirty);
     }

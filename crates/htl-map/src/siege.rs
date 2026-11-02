@@ -22,6 +22,7 @@ pub const REGION: Region = Region {
     skip: &[],
     road_texture: "RubbleBase",
     max_floor: 3.5,
+    edits: &[],
 };
 
 pub fn load(data_dir: &Path) -> Result<LoadedElwynn> {

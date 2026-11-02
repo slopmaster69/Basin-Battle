@@ -35,6 +35,8 @@ pub(crate) struct Hero {
     pub pos: [f32; 3],
     /// The dungeon whose world it's in (its place among them), if not the camp's.
     pub below: Option<usize>,
+    /// What it wears as the character screen shows it (`SurvivalGame::dress`).
+    pub gear: [(u32, u8); 19],
 }
 
 /// Whose a hero is: its save's owner, else (an account's first footman) its key.
@@ -60,11 +62,13 @@ impl Realms {
         let mut out: Vec<(String, Hero)> = Vec::new();
         for (g, below) in self.games() {
             for (key, s) in &g.offline {
-                out.push((owner_of(key, s).to_lowercase(), Hero { key: key.clone(), name: hero_name(key, Some(s)), class: s.class.clone(), look: s.look.unwrap_or_default(), pos: s.pos, below }));
+                let gear = g.dress(&g.worn_saved(s));
+                out.push((owner_of(key, s).to_lowercase(), Hero { key: key.clone(), name: hero_name(key, Some(s)), class: s.class.clone(), look: s.look.unwrap_or_default(), pos: s.pos, below, gear }));
             }
-            for p in g.sim.players.values() {
+            for (id, p) in &g.sim.players {
                 let owner = if p.owner.is_empty() { p.account.split('/').next().unwrap_or(&p.account).to_string() } else { p.owner.clone() };
-                out.push((owner.to_lowercase(), Hero { key: p.account.clone(), name: p.name.clone(), class: p.class.clone(), look: p.look, pos: p.pos, below }));
+                let gear = g.dress(&g.worn(*id));
+                out.push((owner.to_lowercase(), Hero { key: p.account.clone(), name: p.name.clone(), class: p.class.clone(), look: p.look, pos: p.pos, below, gear }));
             }
         }
         let mut seen = std::collections::BTreeSet::new();
@@ -103,6 +107,7 @@ impl Realms {
                     zone: realm.zone,
                     map: realm.map,
                     pos: h.pos,
+                    gear: h.gear,
                 }
             })
             .collect();

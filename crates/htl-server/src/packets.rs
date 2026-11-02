@@ -55,6 +55,9 @@ pub struct CharEntry<'a> {
     pub zone: u32,
     pub map: u32,
     pub pos: [f32; 3],
+    /// What it's seen wearing, by equipment slot (0 head .. 18 tabard): display id and
+    /// inventory type, `(0, 0)` for nothing.
+    pub gear: [(u32, u8); 19],
 }
 
 pub fn char_enum(chars: &[CharEntry]) -> Packet {
@@ -77,8 +80,8 @@ pub fn char_enum(chars: &[CharEntry]) -> Packet {
             .u32(0) // pet display
             .u32(0) // pet level
             .u32(0); // pet family
-        for _ in 0..19 {
-            b.u32(0).u8(0); // equipment: display id, inventory type
+        for (display, inv) in c.gear {
+            b.u32(display).u8(inv); // equipment: display id, inventory type
         }
         b.u32(0).u8(0); // first bag
     }
@@ -116,13 +119,21 @@ pub fn tutorial_flags_all_seen() -> Packet {
 
 /// The packed game-clock date the client shows: minute, hour, weekday, day, month, year.
 pub fn wow_time_now() -> u32 {
+    wow_time_at(None)
+}
+
+/// Today's packed game-clock date at `clock` (hour, minute), or at the time it is now.
+pub fn wow_time_at(clock: Option<[u32; 2]>) -> u32 {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let days = secs / 86_400;
     let rem = secs % 86_400;
-    let (hour, minute) = ((rem / 3600) as u32, ((rem % 3600) / 60) as u32);
+    let (hour, minute) = match clock {
+        Some([h, m]) => (h % 24, m % 60),
+        None => ((rem / 3600) as u32, ((rem % 3600) / 60) as u32),
+    };
     let weekday = ((days + 4) % 7) as u32; // 1970-01-01 was a Thursday; 0 = Sunday
     // Civil date from days since the epoch (Howard Hinnant's algorithm).
     let z = days as i64 + 719_468;
@@ -143,8 +154,14 @@ pub fn wow_time_now() -> u32 {
 }
 
 pub fn login_set_time_speed() -> Packet {
+    login_set_time_speed_at(None)
+}
+
+/// The game clock at `clock` (hour, minute) today, or at the time it is now; it runs on at real
+/// time (a minute a minute) from there.
+pub fn login_set_time_speed_at(clock: Option<[u32; 2]>) -> Packet {
     let mut b = Body::new();
-    b.u32(wow_time_now()).f32(1.0 / 60.0);
+    b.u32(wow_time_at(clock)).f32(1.0 / 60.0);
     Packet::new(op::SMSG_LOGIN_SETTIMESPEED, b)
 }
 
@@ -753,6 +770,13 @@ pub fn force_move_root(guid: u64, counter: u32, root: bool) -> Packet {
     Packet::new(if root { op::SMSG_FORCE_MOVE_ROOT } else { op::SMSG_FORCE_MOVE_UNROOT }, b)
 }
 
+/// Fall slowly (feather fall), or as ever.
+pub fn move_feather_fall(guid: u64, counter: u32, on: bool) -> Packet {
+    let mut b = Body::new();
+    b.packed_guid(guid).u32(counter);
+    Packet::new(if on { op::SMSG_MOVE_FEATHER_FALL } else { op::SMSG_MOVE_NORMAL_FALL }, b)
+}
+
 pub fn force_run_speed(guid: u64, counter: u32, speed: f32) -> Packet {
     let mut b = Body::new();
     b.packed_guid(guid).u32(counter).f32(speed);
@@ -997,4 +1021,20 @@ pub fn loot_release(corpse: u64) -> Packet {
     let mut b = Body::new();
     b.u64(corpse).u8(1);
     Packet::new(op::SMSG_LOOT_RELEASE_RESPONSE, b)
+}
+
+#[cfg(test)]
+mod clock_tests {
+    use super::*;
+
+    #[test]
+    fn a_pinned_clock_is_today_at_that_hour_and_minute() {
+        let t = wow_time_at(Some([23, 30]));
+        assert_eq!((t & 0x3f, (t >> 6) & 0x1f), (30, 23));
+        // The date is today's, as the clock that runs on from now gives it.
+        assert_eq!(t >> 11, wow_time_now() >> 11);
+        // Out of range wraps, never spills into the date.
+        let w = wow_time_at(Some([25, 61]));
+        assert_eq!((w & 0x3f, (w >> 6) & 0x1f), (1, 1));
+    }
 }

@@ -40,6 +40,9 @@ pub(crate) struct Projectile {
     pub stage: Stage,
     /// When it left the hands.
     pub born: f32,
+    /// How many times it has ricocheted (Bank Shot), and its look's anchor since the last.
+    pub bounced: u32,
+    pub look: Option<Id>,
 }
 
 /// Where a projectile is in its flight: going out (every projectile, at first); coming back to
@@ -225,8 +228,11 @@ impl Survival {
         let full = self.content.dev.full_tree;
         let owned = if full { self.all_nodes() } else { self.core_nodes(class) };
         let mut loadout = BTreeMap::new();
+        // (A row's first choice on its key; the second waits on the board.)
         for a in self.content.abilities.iter().filter(|a| a.on_board() && a.school == class && (full || owned.contains(&a.key))) {
-            loadout.insert(a.slot.clone(), a.key.clone());
+            if a.choice == 1 || !loadout.contains_key(&a.slot) {
+                loadout.insert(a.slot.clone(), a.key.clone());
+            }
         }
         (loadout, owned)
     }
@@ -267,15 +273,15 @@ impl Survival {
         }
         if !self.reachable(&owned, key) {
             if def.is_beta() && def.on_board() && self.is_siege() {
-                return Err(format!("{} is a beta card: Siege leaves those out.", def.name));
+                return Err(format!("{} is a beta card. Siege doesn't use beta cards.", def.name));
             }
             let at = self.learned_where(key);
-            return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("{} is learned out in Elwynn: {at}.", def.name) });
+            return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("Learn {} in Elwynn first. {at}.", def.name) });
         }
         // Siege: bought, in a match.
         if self.is_siege() && !self.debug {
             if self.camp_of(id).is_none() {
-                return Err("Cards are bought in a match.".into());
+                return Err("Buy cards during a match.".into());
             }
             let price = self.card_price(key).unwrap_or(0);
             self.spend_gold(id, price)?;
@@ -283,10 +289,10 @@ impl Survival {
             self.siege_slot_bought(id, key);
             let on = self.players[&id].loadout.iter().find(|(_, k)| *k == key).map(|(s, _)| s.clone());
             let tail = match on {
-                Some(s) => format!("it's on your {s} key"),
-                None => "put it on its key from the board (N)".to_string(),
+                Some(s) => format!("It's on your {s} key"),
+                None => "Put it on a key from the board (N)".to_string(),
             };
-            self.tell(id, format!("{} is yours for {price} gold: {tail}.", def.name));
+            self.tell(id, format!("You bought {} for {price} gold. {tail}.", def.name));
         }
         self.players.get_mut(&id).unwrap().owned.insert(key.to_string());
         self.events.push(Event::Abilities { player: id });
@@ -312,11 +318,11 @@ impl Survival {
     pub fn slot_ability(&mut self, id: Id, slot: &str, key: &str) -> Result<String, String> {
         let a = self.content.ability(key).ok_or_else(|| {
             let keys: Vec<&str> = self.content.abilities.iter().filter(|a| !a.is_ex() && !a.inner).map(|a| a.key.as_str()).collect();
-            format!("No ability {key}: try {}.", keys.join(", "))
+            format!("No ability called {key}. Try {}.", keys.join(", "))
         })?;
         let def = self.content.abilities[a].clone();
         if def.is_ex() {
-            return Err(format!("{} is an EX version: hold {}'s key.", def.name, self.content.ability(&def.ex_of).map_or("its ability", |b| self.content.abilities[b].name.as_str())));
+            return Err(format!("{} is an EX version. Hold {}'s key.", def.name, self.content.ability(&def.ex_of).map_or("its ability", |b| self.content.abilities[b].name.as_str())));
         }
         let p = self.players.get(&id).ok_or("No hero.")?;
         if !p.owned.contains(key) {
@@ -539,7 +545,7 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return true };
         let Some(slot_name) = SLOTS.get(slot) else { return true };
         let Some(base) = p.loadout.get(*slot_name).and_then(|k| self.content.ability(k)) else {
-            self.tell(id, format!("Nothing on that key yet: open the board (N) and choose a card for it ({}).", slot_role(slot_name)));
+            self.tell(id, format!("Nothing on that key. Open the board (N) and choose a card for the {} key.", slot_role(slot_name)));
             return true;
         };
         // Ice Block: its key again breaks out of it.
@@ -624,35 +630,46 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         if self.silenced(id) || self.immune(id) {
             // Why nothing happened, said where the hero is looking.
-            let why = if self.silenced(id) { "Silenced: no abilities for now" } else { "Can't cast now" };
+            let why = if self.silenced(id) { "Can't use abilities while silenced" } else { "Can't cast now" };
             self.events.push(Event::Flash { player: id, text: why.into() });
             return true;
         }
         let free = matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. } | Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
-        if !free && !self.cancelable_now(id) {
+        // A recast goes from the air too (the Stoop out of the Uppercut, Skyfall's volley).
+        let airborne_recast = recast.is_some() && matches!(p.action, Action::Dash { .. });
+        if !free && !self.cancelable_now(id) && !airborne_recast {
             return false;
         }
         if recast.is_none() && !self.ready(id, ability) {
             let left = (self.cooldown(id, ability).next_at - self.clock).max(0.0);
-            let text = if left > 0.05 { format!("{}: ready in {:.0} s", d.name, left.ceil()) } else { format!("{}: not ready", d.name) };
+            let text = if left > 0.05 { format!("{} ready in {:.0} sec", d.name, left.ceil()) } else { format!("{} isn't ready", d.name) };
             self.events.push(Event::Flash { player: id, text });
             return true;
         }
         let cost = if recast.is_some() || empowered { 0.0 } else { self.valor_cost(&d) };
         let valor = self.players[&id].valor;
         if valor + 0.001 < cost {
-            self.events.push(Event::Flash { player: id, text: format!("{} needs {} Valor (you have {})", d.name, cost.round(), valor.floor()) });
+            self.events.push(Event::Flash { player: id, text: format!("Not enough Valor for {} (need {}, have {})", d.name, cost.round(), valor.floor()) });
             return true;
+        }
+        // Any other ability that takes stamina (Raptor Strike's hits, Call of the Wild's beasts).
+        if d.kind != "art" {
+            let need = self.hunt_stamina(id, ability);
+            if need > 0.0 && self.players[&id].stamina + 0.001 < need && !self.has_cc(id, "onslaught") {
+                self.winded(id);
+                self.events.push(Event::Flash { player: id, text: format!("{} needs {:.0} stamina", d.name, need) });
+                return true;
+            }
         }
         // A weapon art takes its stamina; an Ambush, a foe to step behind.
         if d.kind == "art" {
             if self.players[&id].stamina + 0.001 < d.stamina && !self.has_cc(id, "onslaught") {
                 self.winded(id);
-                self.events.push(Event::Flash { player: id, text: format!("{} needs {:.0} stamina", d.name, d.stamina) });
+                self.events.push(Event::Flash { player: id, text: format!("Not enough stamina for {} (need {:.0})", d.name, d.stamina) });
                 return true;
             }
             if d.ambush > 0.0 && self.ambush_spot(id, d.ambush).is_none() {
-                self.events.push(Event::Flash { player: id, text: "No foe in reach to step behind: put the reticle on one, or lock on".into() });
+                self.events.push(Event::Flash { player: id, text: "No enemy in reach to step behind. Aim at one or lock on".into() });
                 return true;
             }
         }
@@ -729,7 +746,7 @@ impl Survival {
             // A fixed charge (Pyroblast) let go early is dropped; one with a range goes at its
             // least, as soon as it's reached.
             if (hi - lo).abs() < 1.0e-3 {
-                self.tell(id, "Let go too soon: the charge is lost.");
+                self.tell(id, "Released too soon. The charge is lost.");
                 self.end_ability_action(id);
                 self.set_action(id, Action::Ready);
             } else if let Some(p) = self.players.get_mut(&id) {
@@ -868,7 +885,20 @@ impl Survival {
         // The bow's own release before the sword comes back (a crossbow's long reload).
         let total = if d.kind == "shot" { self.ranged_of(&self.players[&id]).recovery.max(CAST_RECOVERY) } else { CAST_RECOVERY };
         let next = Action::Cast { t: 0.0, total, ability };
+        // A blow's stamina, for an ability that takes it (a weapon art takes its own as it swings;
+        // Call of the Wild's is its stage's, taken as its beast goes).
+        if d.kind != "art" && d.stamina > 0.0 && d.hunt.is_empty() {
+            self.spend(id, d.stamina);
+        }
         match d.kind.as_str() {
+            // The Hunter's own: Call of the Wild, the tripwire, Arrow Recall, Skyfall's volley.
+            _ if matches!(d.hunt.as_str(), "call" | "double_call" | "tripwire" | "recall" | "volley") => {
+                self.fire_hunt(id, ability, share);
+                // (Loosed in the air, the leap carries on.)
+                if !matches!(self.players[&id].action, Action::Dash { .. }) {
+                    self.set_action(id, next);
+                }
+            }
             "projectile" | "shot" => {
                 self.launch(id, ability, share);
                 self.set_action(id, next);
@@ -931,6 +961,11 @@ impl Survival {
                 if !self.start_line(id, ability, yaw, share) {
                     self.set_action(id, next);
                 }
+            }
+            // Skyfall: up, and a slow fall to aim from.
+            "leap" if d.hunt == "float" => {
+                self.start_leap(id, ability, share);
+                self.skyfall_float(id);
             }
             "leap" => match free {
                 // A leap back to where the cast before it began.
@@ -1049,6 +1084,8 @@ impl Survival {
                 pierce: if AbilityDef::full(share) { d.pierce.max(d.full_pierce) } else { d.pierce },
                 stage: Stage::Out,
                 born,
+                bounced: 0,
+                look: None,
             });
         }
         if self.debug {
@@ -1119,7 +1156,14 @@ impl Survival {
                     p.left -= t.dist;
                     if p.left > 0.01 {
                         keep.push(p);
+                    } else {
+                        self.plant_at_end(p.owner, p.ability, p.pos, p.dir, false);
+                        self.drop_look(&p);
                     }
+                } else {
+                    // A Hunter's arrow sticks in the ground a yard past whoever stopped it.
+                    self.plant_at_end(p.owner, p.ability, p.pos, p.dir, true);
+                    self.drop_look(&p);
                 }
                 continue;
             }
@@ -1137,6 +1181,13 @@ impl Survival {
                     keep.push(p);
                     continue;
                 }
+                // Bank Shot: off the wall, harder, on through the next foe it meets.
+                if self.ricochet(&mut p, t.point) {
+                    keep.push(p);
+                    continue;
+                }
+                self.plant_at_end(p.owner, p.ability, t.point, p.dir, false);
+                self.drop_look(&p);
                 // A hook that meets a wall or the ground yanks its caster there.
                 self.beta_hit(&p, None, t.point);
                 let d = &self.content.abilities[p.ability];
@@ -1165,10 +1216,70 @@ impl Survival {
                 p.pos = self.ground_near(p.pos[0], p.pos[1], p.pos[2]);
                 self.stick(&mut p, None);
                 keep.push(p);
+            } else {
+                // Its range spent: a Hunter's arrow comes down and sticks there.
+                self.plant_at_end(p.owner, p.ability, p.pos, p.dir, false);
+                self.drop_look(&p);
             }
         }
         keep.extend(std::mem::take(&mut self.projectiles));
         self.projectiles = keep;
+    }
+
+    /// A projectile that ricochets (Bank Shot) meets a wall, a trunk or a rock at `at`: with a
+    /// bounce left it comes off it (mirrored about the surface, flat), harder by its
+    /// `bounce_gain`, through the next foe it meets, its look flown on from there. False: no
+    /// bounce, it ends as ever.
+    fn ricochet(&mut self, p: &mut Projectile, at: Vec3) -> bool {
+        let d = &self.content.abilities[p.ability];
+        if p.bounced >= d.bounces || p.left < 1.0 {
+            return false;
+        }
+        let (gain, base) = (d.bounce_gain, AbilityDef::at(d.damage, p.share));
+        // The surface's way out: toward the open ground round where it struck.
+        let mut n = [0.0f32, 0.0];
+        for k in 0..16 {
+            let a = k as f32 / 16.0 * std::f32::consts::TAU;
+            let q = [at[0] + a.cos() * 0.9, at[1] + a.sin() * 0.9, at[2]];
+            if !self.land.blocked_near(q[0], q[1], q[2]) {
+                n[0] += a.cos();
+                n[1] += a.sin();
+            }
+        }
+        let l = (n[0] * n[0] + n[1] * n[1]).sqrt();
+        // Struck the ground, or a wall all round: no bounce.
+        let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
+        if l < 0.2 || at[2] < ground + 0.15 {
+            return false;
+        }
+        let n = [n[0] / l, n[1] / l];
+        let dot = p.dir[0] * n[0] + p.dir[1] * n[1];
+        if dot >= 0.0 {
+            return false;
+        }
+        p.dir = norm([p.dir[0] - 2.0 * dot * n[0], p.dir[1] - 2.0 * dot * n[1], 0.0]);
+        p.pos = [at[0] + n[0] * 0.5, at[1] + n[1] * 0.5, at[2]];
+        p.bounced += 1;
+        p.damage += base * gain;
+        p.pierce = p.pierce.max(1);
+        p.hits.clear();
+        // Its look: the arrow flown on from where it struck.
+        self.drop_look(p);
+        let anchor = self.alloc();
+        let end = self.wall_trace(p.pos, p.dir, p.left, p.owner).point;
+        self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: p.spell, from: p.pos, target: Target::Point(end) });
+        p.look = Some(anchor);
+        if self.players.contains_key(&p.owner) {
+            self.events.push(Event::Flash { player: p.owner, text: format!("Bank! x{}", p.bounced + 1) });
+        }
+        true
+    }
+
+    /// A ricocheted projectile's look's anchor goes with it.
+    fn drop_look(&mut self, p: &Projectile) {
+        if let Some(a) = p.look {
+            self.events.push(Event::ObjGone { id: a });
+        }
     }
 
     /// The line `from` along `dir` for `range` to the first ground or wall, through every body.
@@ -1279,6 +1390,8 @@ impl Survival {
             pierce: 0,
             stage: Stage::Lob { at, land_at, mark },
             born,
+            bounced: 0,
+            look: None,
         });
     }
 
@@ -1476,6 +1589,10 @@ impl Survival {
     /// A projectile reaches someone: a friend it's for is healed (and moved, with a pull); a foe
     /// is struck, or caught in its burst; a chaining one leaps on.
     fn projectile_hit(&mut self, p: &Projectile, victim: Id, from: Vec3) {
+        // An arrow (any ability's projectile) on a foe: the hunter's next beast comes empowered.
+        if !p.allies && self.players.contains_key(&p.owner) {
+            self.prime_wild(p.owner);
+        }
         // A friend touched by light: healed, not struck.
         // (Outside Siege that's any other hero, friendly fire or not: a bolt that would both heal
         // and hurt them heals them, as the caster meant.)
@@ -1658,7 +1775,7 @@ impl Survival {
         }
         if killed && d.refund_kill && d.valor > 0 {
             self.gain_valor(owner, d.valor as f32);
-            self.events.push(Event::Flash { player: owner, text: "Valor back".into() });
+            self.events.push(Event::Flash { player: owner, text: "Valor returned".into() });
         }
     }
 
@@ -1682,6 +1799,7 @@ impl Survival {
             }
             "cleanse_panic" => self.cleanse(victim, &["panic"]),
             "knockback" | "pull" => self.displace(owner, victim, e),
+            "knockdown" => self.knock_down(owner, victim, secs, source),
             "burn" | "mark" => {
                 self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
             }
@@ -1785,7 +1903,7 @@ impl Survival {
             let now = self.clock;
             if self.lockouts.get(&(target, ability)).is_some_and(|t| *t > now) {
                 let left = self.lockouts[&(target, ability)] - now;
-                self.events.push(Event::Flash { player: id, text: format!("{}: not again on them for {:.0} sec", d.name, left.ceil()) });
+                self.events.push(Event::Flash { player: id, text: format!("Can't use {} on them again for {:.0} sec", d.name, left.ceil()) });
                 let cost = self.valor_cost(&d);
                 self.gain_valor(id, cost);
                 return;
@@ -1881,6 +1999,8 @@ impl Survival {
             "cone" => self.cone_at(id, ability, pos, yaw, share),
             "line" => self.line_go(id, ability, pos, yaw, share),
             "trap" => self.place_trap(id, ability, share),
+            // (A leap that goes with a blow: the Uppercut's rise.)
+            "leap" => self.leap_to(id, ability, share, None),
             "ground" => {
                 let at = if d.at_self { pos } else { self.aim_point(id, AbilityDef::at(d.range, share)) };
                 self.ground_cast(id, ability, at, share);
@@ -2252,7 +2372,7 @@ impl Survival {
         let t = self.trace(o, dir, range + 3.0, 0.8, id);
         let target = t.unit.filter(|u| self.unit_pos(*u).is_some_and(|at| dist2d(at, self.players[&id].pos) <= range + 1.0));
         let Some(target) = target else {
-            self.tell(id, format!("{}: nothing there to drain.", d.name));
+            self.tell(id, format!("Nothing there for {} to drain.", d.name));
             // Nothing spent for a miss.
             if let Some(p) = self.players.get_mut(&id) {
                 p.cooldowns.remove(&self.content.base_of(ability));
@@ -2523,7 +2643,11 @@ impl Survival {
                 self.set_action(id, Action::Ready);
             }
             if !s.caught {
-                self.events.push(Event::Flash { player: id, text: format!("{}: caught nothing", d.name) });
+                // Caught nothing: what it does then (Trapper's Instinct leaves anyway).
+                match self.content.ability(d.counter.as_ref().map_or("", |c| c.expire_answer.as_str())) {
+                    Some(then) if self.players[&id].health > 0 => self.fire(id, then, 1.0),
+                    _ => self.events.push(Event::Flash { player: id, text: format!("{} caught nothing", d.name) }),
+                }
             }
             self.update_rooted(id);
         }
@@ -2577,11 +2701,18 @@ impl Survival {
         if !c.attacker.is_empty() && (how == HitKind::Melee || c.any_attacker || close) {
             self.apply_effects(victim, attacker, &c.attacker, 1.0, &d.name);
         }
-        // It strikes back: a sweep in front of the hero (Retaliation).
-        if how == HitKind::Melee {
-            if let (Some(sweep), Some(p)) = (self.content.ability(&c.answer), self.players.get(&victim)) {
-                let (at, yaw) = (p.pos, p.facing);
-                self.cone_at(victim, sweep, at, yaw, 1.0);
+        // It strikes back: a sweep in front of the hero (Retaliation); or it's away, the net on
+        // whoever struck (Trapper's Instinct, a leap: on any blow).
+        if let Some(answer) = self.content.ability(&c.answer) {
+            if self.content.abilities[answer].kind == "leap" {
+                if self.players.contains_key(&victim) {
+                    self.trappers_answer(victim, attacker, answer);
+                }
+            } else if how == HitKind::Melee {
+                if let Some(p) = self.players.get(&victim) {
+                    let (at, yaw) = (p.pos, p.facing);
+                    self.cone_at(victim, answer, at, yaw, 1.0);
+                }
             }
         }
         let out = if c.dodge {
@@ -2637,6 +2768,8 @@ impl Survival {
             pierce: 0,
             stage: Stage::Out,
             born,
+            bounced: 0,
+            look: None,
         });
     }
 

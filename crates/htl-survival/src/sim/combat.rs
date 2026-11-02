@@ -348,7 +348,7 @@ impl Survival {
                         self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (c.items[item].use_secs * 1000.0) as u32 });
                         self.punish_healing(id);
                     }
-                    None => self.tell(id, "Nothing to use: cook raw meat at a cooking fire, or brew at a cauldron."),
+                    None => self.tell(id, "Nothing to use. Cook raw meat at a Cooking Fire or brew at a cauldron."),
                 }
                 true
             }
@@ -929,12 +929,12 @@ impl Survival {
                             self.events.push(Event::Effects { player: id });
                             // Said plainly, so a slow effect isn't taken for nothing.
                             let what = match e.kind.as_str() {
-                                "regen" => format!("{name}: you heal {:.0}% of your health over {:.0} s.", e.amount * e.secs * 100.0, e.secs),
-                                "stamina" => format!("{name}: your stamina comes back {:.0}% faster for {:.0} s.", e.amount * 100.0, e.secs),
-                                "might" => format!("{name}: your blows land {:.0}% harder for {:.0} s.", e.amount * 100.0, e.secs),
-                                "ward" => format!("{name}: blows on you lose {:.0}% more for {:.0} s.", e.amount * 100.0, e.secs),
-                                "focus" => format!("{name}: your abilities come back {:.0}% sooner for {:.0} s.", e.amount * 100.0, e.secs),
-                                _ => format!("{name} for {:.0} s.", e.secs),
+                                "regen" => format!("{name} restores {:.0}% of your health over {:.0} sec.", e.amount * e.secs * 100.0, e.secs),
+                                "stamina" => format!("{name} increases stamina regeneration by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                                "might" => format!("{name} increases your damage by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                                "ward" => format!("{name} reduces damage taken by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                                "focus" => format!("{name} makes your abilities recover {:.0}% faster for {:.0} sec.", e.amount * 100.0, e.secs),
+                                _ => format!("{name} for {:.0} sec.", e.secs),
                             };
                             self.events.push(Event::Tell { player: id, text: what });
                         }
@@ -1005,9 +1005,12 @@ impl Survival {
         let p = &self.players[&id];
         if p.health > 0 && p.health < p.max_health {
             let heart = c.world.heart;
-            let home = dist2d(p.pos, [heart[0], heart[1], 0.0]) <= c.world.rest_radius && !self.raid.active();
+            // Resting at the chest, or (faster) at an infirmary.
+            let ward = self.infirmary_at(p.pos);
+            let home = (dist2d(p.pos, [heart[0], heart[1], 0.0]) <= c.world.rest_radius || ward.is_some()) && !self.raid.active();
             let calm = now - p.combat_at >= c.player.field_regen_after;
-            let rate = if home && now - p.combat_at >= 2.0 { c.player.rest_regen } else if calm { c.player.field_regen } else { 0.0 };
+            let rest = c.player.rest_regen * ward.unwrap_or(1.0).max(1.0);
+            let rate = if home && now - p.combat_at >= 2.0 { rest } else if calm { c.player.field_regen } else { 0.0 };
             if rate > 0.0 {
                 let p = self.players.get_mut(&id).unwrap();
                 p.heal_bank += p.max_health as f32 * rate * dt;
@@ -1267,6 +1270,10 @@ impl Survival {
             } else if finisher {
                 self.events.push(Event::Visual { id: mid, kit: KIT_CLEAVE, by: Some(id) });
             }
+        }
+        // A blow landed: the hunter's next beast comes empowered.
+        if !struck.is_empty() {
+            self.prime_wild(id);
         }
     }
 
@@ -1671,9 +1678,13 @@ impl Survival {
             p.last_hit_by = Some(attacker);
         }
         match outcome {
-            Outcome::Parried => self.gain_valor(victim, c.valor.parry),
+            Outcome::Parried => {
+                self.gain_valor(victim, c.valor.parry);
+                self.prime_wild(victim);
+            }
             Outcome::Dodged if !dashing && damage > 0 => {
                 self.gain_valor(victim, c.valor.roll);
+                self.prime_wild(victim);
                 // Rolled through it, not just away: a little breath back.
                 if c.dodge.refund > 0.0 {
                     if let Some(p) = self.players.get_mut(&victim) {
@@ -1688,7 +1699,7 @@ impl Survival {
         // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
-            self.tell(victim, "The heavy blow breaks your charge!");
+            self.tell(victim, "The heavy attack breaks your charge!");
             self.end_ability_action(victim);
             self.set_action(victim, Action::Ready);
         }
@@ -1920,7 +1931,8 @@ impl Survival {
     fn die(&mut self, id: Id) {
         let now = self.clock;
         let pvp = self.content.pvp.clone();
-        let secs = self.siege_respawn_secs(id).unwrap_or_else(|| pvp.respawn_secs.unwrap_or(self.content.player.respawn_secs));
+        // A barracks at the camp gets the fallen up sooner.
+        let secs = self.siege_respawn_secs(id).unwrap_or_else(|| pvp.respawn_secs.unwrap_or(self.content.player.respawn_secs) * self.barracks().0);
         self.cancel_preview(id);
         self.end_ability_action(id);
         self.stances.remove(&id);
@@ -1980,9 +1992,9 @@ impl Survival {
             self.objs.insert(cid, Obj { kind: ObjKind::Cache { uid, owner: account, items: dropped }, pos: at, facing: 0.0 });
             self.events.push(Event::ObjSpawned { id: cid });
             if below {
-                self.tell(id, format!("You fall. Your sack ({}) waits where you fell: win it back before you fall again, or it's lost.", what.join(", ")));
+                self.tell(id, format!("You fell. Your sack ({}) waits where you fell. Recover it before you fall again or it's lost.", what.join(", ")));
             } else {
-                self.tell(id, format!("You fall. What you carried ({}) waits where you fell: go back for it.", what.join(", ")));
+                self.tell(id, format!("You fell. What you carried ({}) waits where you fell. Go back for it.", what.join(", ")));
             }
         }
         // Who felled them, for everyone's kill feed: a hero, or a creature.
@@ -2028,12 +2040,14 @@ impl Survival {
                 c.world.spawn_facing,
             ),
         };
+        // (A barracks at the camp gets them up with more.)
+        let barracks = self.barracks().1;
         let Some(p) = self.players.get_mut(&id) else { return };
         // Below, a hero wakes at the lamp whole.
         let share = if self.below.is_some() || self.siege.is_some() {
             1.0
         } else {
-            c.pvp.respawn_health.unwrap_or(c.player.respawn_health)
+            (c.pvp.respawn_health.unwrap_or(c.player.respawn_health) + barracks).min(1.0)
         };
         p.health = ((p.max_health as f32 * share).round() as u32).max(1);
         p.last_hit_by = None;
@@ -2287,7 +2301,7 @@ impl Survival {
             if let Some(p) = self.players.get_mut(&o) {
                 p.cooldowns.clear();
                 self.events.push(Event::Abilities { player: o });
-                self.events.push(Event::Flash { player: o, text: "Death Mark: every cooldown ready".into() });
+                self.events.push(Event::Flash { player: o, text: "Death Mark readied every cooldown".into() });
             }
         }
     }

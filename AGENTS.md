@@ -88,6 +88,13 @@ Rerun that test alone before deciding your change broke it. In CI they run in th
 "End-to-end, real time", which retries a failure twice and doesn't block a merge by itself; if
 it lists a test as flaky or failing, open an issue for it rather than ignoring it.
 
+## Words the player reads
+
+Everything a player reads in Elwynn Survival (window text, buttons, hints, tooltips, chat
+messages, announcements, the journal, every `text` in `content/`) follows
+[docs/writing-style.md](docs/writing-style.md): WoW's interface grammar for what does something,
+short flavor for what has a story, numbers as numerals, and one word list.
+
 ## Areas that need extra care
 
 - **Client patches** (`patches/benilla/NNNN-*.patch`) apply in order on the pinned benilla

@@ -159,6 +159,94 @@ pub struct WorldDef {
     pub rack: [f32; 2],
     #[serde(default)]
     pub armory: bool,
+    /// The game clock pinned at this hour and minute (the sky, the light and the fog follow it):
+    /// set again every `clock_every` seconds, so it never runs on to another part of the day.
+    /// None: the clock runs on from the time it is now.
+    #[serde(default)]
+    pub clock: Option<[u32; 2]>,
+    #[serde(default = "clock_every")]
+    pub clock_every: f32,
+    /// The camp's own things' looks (`GameObjectDisplayInfo`) and sizes: the chest, the bell
+    /// (raised `alarm_lift` over the ground), the weapon rack, and what the Logbook lies on (its
+    /// top `book_stand_height` over the ground).
+    #[serde(default = "storage_display")]
+    pub storage_display: u32,
+    #[serde(default = "one_w")]
+    pub storage_scale: f32,
+    #[serde(default = "alarm_display")]
+    pub alarm_display: u32,
+    #[serde(default = "alarm_scale")]
+    pub alarm_scale: f32,
+    #[serde(default)]
+    pub alarm_lift: f32,
+    #[serde(default = "rack_display")]
+    pub rack_display: u32,
+    #[serde(default = "one_w")]
+    pub rack_scale: f32,
+    #[serde(default = "book_stand_display")]
+    pub book_stand_display: u32,
+    #[serde(default = "one_w")]
+    pub book_stand_scale: f32,
+    #[serde(default = "book_stand_height")]
+    pub book_stand_height: f32,
+    /// The night's fog over the land (the add-on asks the client for it; a stock client keeps its
+    /// own): its colour (0 to 1), how far it ends (yards), where it starts (a share of that), how
+    /// much of it is laid over Elwynn's own (0 to 1), and how much darker the light (0 to 1).
+    #[serde(default)]
+    pub fog: Option<FogDef>,
+    /// Thicker while a raid is called and under way.
+    #[serde(default)]
+    pub raid_fog: Option<FogDef>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub struct FogDef {
+    pub color: [f32; 3],
+    pub end: f32,
+    pub start: f32,
+    #[serde(default = "one_w")]
+    pub weight: f32,
+    #[serde(default)]
+    pub darken: f32,
+    /// Seconds to ease into it.
+    #[serde(default = "fog_secs")]
+    pub secs: f32,
+}
+
+fn fog_secs() -> f32 {
+    6.0
+}
+
+fn one_w() -> f32 {
+    1.0
+}
+
+fn storage_display() -> u32 {
+    10
+}
+
+fn alarm_display() -> u32 {
+    4571
+}
+
+fn alarm_scale() -> f32 {
+    0.6
+}
+
+fn rack_display() -> u32 {
+    130
+}
+
+fn book_stand_display() -> u32 {
+    18
+}
+
+fn book_stand_height() -> f32 {
+    0.5
+}
+
+fn clock_every() -> f32 {
+    300.0
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1281,9 +1369,69 @@ pub struct StationDef {
     /// The spell whose look making something at it wears (its cast on the maker; 0: a bandage's).
     #[serde(default)]
     pub work_spell: u32,
-    /// In the build menu (a Siege camp's Hearth is not).
+    /// In the build menu (a Siege camp's Hearth is not; nor what a station is upgraded into).
     #[serde(default = "yes")]
     pub menu: bool,
+    /// The most the camp may have standing (0: no limit): one of each building.
+    #[serde(default)]
+    pub most: u32,
+    /// Set on a grid this many yards a cell (and turned a quarter at a time), and blocks of it
+    /// stand cell to cell: a wall laid out by eye lines up. 0: anywhere, any way round.
+    #[serde(default)]
+    pub snap: f32,
+    /// Heroes walk through it (a gate): drawn with no collision on a patched client (0017);
+    /// raiders still have to break it.
+    #[serde(default)]
+    pub passable: bool,
+    /// What it can be upgraded into (another station's key), and what that costs: the station
+    /// stays where it stands, keeps its uid, and comes back to full health as the new one.
+    #[serde(default)]
+    pub upgrade: Option<UpgradeDef>,
+    /// The stations whose work it does as well as its own (an upgrade does what it was).
+    #[serde(default)]
+    pub makes_as: Vec<String>,
+    /// Its work goes this many times as fast (an upgraded workplace: 1.5 is a third less time).
+    #[serde(default = "one_f")]
+    pub work_speed: f32,
+    /// This many more of what it makes, for a meal or a material (not gear).
+    #[serde(default)]
+    pub bonus: u32,
+    /// A building's job. Barracks: heroes who fall get up this many times as soon, and with
+    /// this share of their health more.
+    #[serde(default)]
+    pub respawn: Option<RespawnDef>,
+    /// Infirmary: resting within `radius` of it heals this many times as fast (as at the chest).
+    #[serde(default)]
+    pub rest: Option<RestDef>,
+    /// A mill: what it adds to the camp's chest, every `every` seconds while it stands (not
+    /// damaged, not during a raid).
+    #[serde(default)]
+    pub yields: Option<YieldDef>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpgradeDef {
+    pub to: String,
+    pub cost: BTreeMap<String, u32>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct RespawnDef {
+    pub faster: f32,
+    #[serde(default)]
+    pub health: f32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct RestDef {
+    pub radius: f32,
+    pub faster: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct YieldDef {
+    pub items: BTreeMap<String, u32>,
+    pub every: f32,
 }
 
 fn one_f() -> f32 {
@@ -1877,17 +2025,44 @@ pub struct ChestDef {
     pub text: String,
 }
 
-/// A thing only to be seen (`[[prop]]`): a camp's fire, a cult's candles, a cage.
+/// A thing only to be seen (`[[prop]]`): a camp's fire, a cult's candles, a cage; or one of
+/// the camp's own people (`npc`), standing at their post.
+///
+/// The camp's own props grow with it: one with `after` stands only once the camp has got that
+/// far (`raids:1` one raid beaten, `built:smithy` a smithy built once, `goal:6` the journal at
+/// its seventh step, `found:<site>` a place found), and stays from then on.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PropDef {
+    /// Its look: a game object's (`GameObjectDisplayInfo`), or for an `npc` a creature's
+    /// (`CreatureDisplayInfo`).
     pub display: u32,
     pub at: [f32; 2],
     #[serde(default)]
     pub z: Option<f32>,
+    /// Raised this far over the ground it stands on (a bell on its post, a book on its table).
+    #[serde(default)]
+    pub lift: f32,
     #[serde(default = "one_f")]
     pub scale: f32,
     #[serde(default)]
     pub facing: f32,
+    /// How far the camp must have come for it to stand (see above); none: from the start.
+    #[serde(default)]
+    pub after: Option<String>,
+    /// Ground it keeps: nothing is built within this of it (0: none).
+    #[serde(default)]
+    pub clear: f32,
+    /// One of the camp's people: a creature that stands at its post (friendly, never fought).
+    #[serde(default)]
+    pub npc: bool,
+    #[serde(default)]
+    pub name: String,
+    /// Under an npc's name (their trade).
+    #[serde(default)]
+    pub subname: String,
+    /// What the camp hears when it first stands (the first of a tier says how the camp grows).
+    #[serde(default)]
+    pub say: String,
 }
 
 fn chest_display() -> u32 {
@@ -3040,6 +3215,15 @@ impl Content {
             if a.through && a.kind != "dash" {
                 bail!("{what}: only a dash goes `through`");
             }
+            if !a.hunt.is_empty() && !crate::content_abilities::HUNTS.contains(&a.hunt.as_str()) {
+                bail!("{what}: hunt {:?} (one of {:?})", a.hunt, crate::content_abilities::HUNTS);
+            }
+            if !(1..=2).contains(&a.choice) {
+                bail!("{what}: choice {} (1 or 2: a class has two a row)", a.choice);
+            }
+            if a.bounces > 0 && a.kind != "projectile" {
+                bail!("{what}: only a projectile ricochets (`bounces`)");
+            }
             if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
                 bail!("{what}: an empower needs its `secs`");
             }
@@ -3115,8 +3299,19 @@ impl Content {
                 if !r.inner || r.key == a.key {
                     bail!("{what}: its recast {} must be an `inner` ability of its own", a.recast);
                 }
-                if !r.recast.is_empty() {
-                    bail!("{what}: its recast {} can't have a recast of its own", a.recast);
+                // A chain (Raptor Strike): a recast may arm one of its own, never back round.
+                let mut seen = vec![a.key.clone()];
+                let mut next = r.recast.clone();
+                while !next.is_empty() {
+                    if seen.contains(&next) {
+                        bail!("{what}: its recasts come back round to {next}");
+                    }
+                    let Some(k) = self.ability(&next) else { bail!("{what}: recast {next}, no such ability") };
+                    if !self.abilities[k].inner {
+                        bail!("{what}: its chain's recast {next} must be an `inner` ability of its own");
+                    }
+                    seen.push(next.clone());
+                    next = self.abilities[k].recast.clone();
                 }
             }
             // A burst as ground ends, or as a shield does, is a nova (a shield's with its own reach).
@@ -3143,15 +3338,17 @@ impl Content {
         // The board: a card a column at most in each row; the beta page, four a row.
         for row in SLOTS {
             let (beta, cards): (Vec<&AbilityDef>, Vec<&AbilityDef>) = self.abilities.iter().filter(|a| a.on_board() && a.slot == row).partition(|a| a.is_beta());
-            if cards.len() > SCHOOLS.len() {
-                bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len());
+            if cards.len() > SCHOOLS.len() * 2 {
+                bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len() * 2);
             }
             if beta.len() > BETA_ROW {
                 bail!("the beta page's {row} row: {} cards, at most {BETA_ROW}", beta.len());
             }
             for col in SCHOOLS {
-                if cards.iter().filter(|a| a.school == col).count() > 1 {
-                    bail!("the board's {row} row: two {col} cards");
+                for choice in [1, 2] {
+                    if cards.iter().filter(|a| a.school == col && a.choice == choice).count() > 1 {
+                        bail!("the board's {row} row: two {col} cards as its choice {choice}");
+                    }
                 }
             }
         }

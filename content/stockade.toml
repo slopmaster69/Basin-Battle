@@ -16,7 +16,7 @@ area = 717
 icon = "INV_Misc_Key_04"
 blurb = "Stormwind's prison, in the hands of its inmates"
 first_page = "The Stockade's gate, at the foot of the stairs from the canals. The riot is on the other side."
-welcome = "The Stockade. The inmates hold it now, Bazil Thredd at their head. Two lamps in the whole place: one at the gate, one in the guard room past Kam Deepfury. Rest at a lamp to heal, fill your Draughts (T) and send the inmates back to their cells. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+welcome = "The Stockade. The inmates hold it now, led by Bazil Thredd. There are 2 lamps, at the gate and in the guard room past Kam Deepfury. Rest at a lamp to heal, refill your Draughts (T) and send the inmates back to their cells. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): the Stockade: the middle (22 to 30).
 tier = 2
@@ -71,7 +71,7 @@ at = [129.5, -31.0, -33.1]
 facing = 1.57
 boss = "targorr"
 bars = [[120.0, -31.0], [139.0, -31.0]]
-text = "With Targorr down, the inmates' chains on the east hall's gate fall slack: the way east is open."
+text = "Targorr is beaten. The chains on the east hall's gate fall slack, and the way east is open."
 
 # Fogs across the hubs while their bosses fight.
 [[dungeon.door]]
@@ -104,7 +104,7 @@ facing = 0.0
 scale = 1.6
 bars = [[138.5, 70.0], [138.5, 53.5]]
 reveals = ["stash"]
-text = "the bricks across the cell are only stacked dry: they tumble, and inside is someone's stash."
+text = "found someone's stash in a bricked-up cell. The bricks were only stacked dry, and they tumbled."
 page = "The dry bricks lie in a heap. Behind them, in a sack under the cot, is the sort of stock no prisoner should have, and on the inside of the cell wall someone has kept accounts in chalk, where no inspector would think to look.{n}{n}Sold to the east block, for the warden: three files, eight silver each. Two bottles of tonic, in a laundry basket. One whetstone, to a big lad called Hamhock, who did not say what for.{n}{n}Balance to the warden, less my share: forty silver.{n}{n}At the bottom, in a hurried hand: He's having the cell bricked up with me out of it. Says it's for safe keeping. If I'm not back for this by the bells, I'm not coming back."
 
 [[dungeon.box]]
@@ -124,8 +124,8 @@ kind = "hidden"
 at = [175.0, 145.0, -33.9]
 find = 4.0
 reveals = ["bribes", "warden_ledger_note"]
-text = "at the far end of the wing, under a loose flagstone: the warden's ledger, and his bribes."
-page = "The flagstone lifts on a hollow lined with straw. In it lie a fat purse, a ledger bound in good leather, and a scrap of paper folded very small, as if it had been passed through bars.{n}{n}Warden -- two hundred, as agreed, for the keys to the east block. Leave them on the hook outside the guard room the night the bells ring. Thredd is not to know where they came from; let him think he's clever. The rest when it's done and the right men are out.{n}{n}Burn this. The Brotherhood remembers its friends. It remembers the others too.{n}{n}The paper was not burned. Across the top, in the warden's hand, is written: For when they turn on me."
+text = "found the warden's ledger and his bribes under a loose flagstone at the far end of the wing."
+page = "The flagstone lifts on a hollow lined with straw. In it lie a fat purse, a ledger bound in good leather, and a scrap of paper folded very small, as if it had been passed through bars.{n}{n}Warden -- two hundred, as agreed, for the keys to the east block. Leave them on the hook outside the guard room the night the bells ring. Thredd is not to know where they came from. Let him think he's clever. The rest when it's done and the right men are out.{n}{n}Burn this. The Brotherhood remembers its friends. It remembers the others too.{n}{n}The paper was not burned. Across the top, in the warden's hand, is written: For when they turn on me."
 
 [[dungeon.box]]
 key = "bribes"
@@ -154,21 +154,21 @@ kind = "hidden"
 at = [66.0, -92.0, -33.9]
 find = 4.0
 reveals = ["bruegal"]
-text = "the last cell of the south wing: its door was never locked. The dwarf inside didn't want to leave. Until now."
-page = "It is the tidiest cell in the Stockade: a swept floor, a folded blanket, twelve years of tally marks in neat rows of seven. On a shelf of loose brick sits a stack of letters, all addressed to Ironforge, none of them sent. The top one is new.{n}{n}Dear Brother, the door's still not locked. It hasn't been since the second year, when the turnkey lost the key and nobody looked for it. I could walk out to the gryphons any day I liked. I don't. Out there, someone would ask what I did in Thelsamar, and in here nobody asks.{n}{n}There's a riot on. Bells, shouting, men running past my door. Somebody's bound to try it, thinking it's locked. Then we'll see about leaving. -- B.{n}{n}On the cot, a very large dwarf opens his eyes."
+text = "opened the last cell of the south wing. Its door was never locked, and the dwarf inside didn't want to leave. Until now."
+page = "It is the tidiest cell in the Stockade. A swept floor, a folded blanket, twelve years of tally marks in neat rows of seven. On a shelf of loose brick sits a stack of letters, all addressed to Ironforge, none of them sent. The top one is new.{n}{n}Dear Brother, the door's still not locked. It hasn't been since the second year, when the turnkey lost the key and nobody looked for it. I could walk out to the gryphons any day I liked. I don't. Out there, someone would ask what I did in Thelsamar, and in here nobody asks.{n}{n}There's a riot on. Bells, shouting, men running past my door. Somebody's bound to try it, thinking it's locked. Then we'll see about leaving. -- B.{n}{n}On the cot, a very large dwarf opens his eyes."
 
 # --- notes -------------------------------------------------------------------------------------------
 
 [[dungeon.note]]
 key = "guard_report"
 hints = ["warden_ledger"]
-clue = "The warden was prising at the floor at the far end of the wing, past the bricked-up cell."
+clue = "The warden was prying at the floor at the far end of the wing, past the bricked-up cell."
 display = 183
 scale = 1.3
 name = "A Guard's Report"
 at = [59.9, 3.7, -20.5]
 facing = 0.0
-text = "\"The east block went first; Thredd had keys. We held the guard room until Deepfury broke out of solitary. The warden was nowhere. Nowhere. Somebody ought to ask where he was. His orderly says on his knees at the far end of the wing, past the bricked-up cell, prising at the floor.\""
+text = "\"The east block went first. Thredd had keys. We held the guard room until Deepfury broke out of solitary. The warden was nowhere. Nowhere. Somebody ought to ask where he was. His orderly says on his knees at the far end of the wing, past the bricked-up cell, prying at the floor.\""
 
 [[dungeon.note]]
 key = "scratched_tally"
@@ -190,7 +190,7 @@ scale = 1.3
 name = "A Mason's Complaint"
 at = [131.0, 52.0, -34.9]
 facing = 1.57
-text = "\"Bricked up cell 4 on the warden's orders, no mortar, he said: he wants it opened again quiet. What's he keeping in there?\""
+text = "\"Bricked up cell 4 on the warden's orders. No mortar, he said. He wants it opened again quiet. What's he keeping in there?\""
 
 # --- the inmates -------------------------------------------------------------------------------------
 
@@ -470,7 +470,7 @@ name = "Targorr's Cleaver"
 display = 22598
 icon = "INV_Axe_04"
 kind = "weapon"
-text = "Targorr the Dread's: a wide two-handed chop that takes three, and breaks a stance faster."
+text = "Two-handed. Its wide chop hits up to 3 enemies. Breaks stances 30% faster. \"Targorr the Dread's.\""
 
 # Bazil's: a shiv, quick and cruel from behind.
 [[weapon]]
@@ -492,7 +492,7 @@ name = "Bazil's Shiv"
 display = 2699
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Bazil Thredd's: quick, and a blow from behind does three and a half times its damage."
+text = "Quick. Blows from behind deal 350% damage. \"Bazil Thredd's.\""
 perks = [{ kind = "might", amount = 0.03 }]
 
 [[item]]
@@ -504,7 +504,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.1
 weight = 0.02
-text = "Kam Deepfury's: dented from the inside, they say."
+text = "Kam Deepfury's. Dented from the inside, they say."
 set = "riot_breaker"
 
 [[item]]
@@ -516,7 +516,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.13
 weight = 0.02
-text = "Hamhock's: it smells of the cells, and of Hamhock."
+text = "Hamhock's. It smells of the cells, and of Hamhock."
 set = "riot_breaker"
 
 [[item]]
@@ -527,7 +527,7 @@ icon = "INV_Chest_Cloth_31"
 kind = "armor"
 slot = "chest"
 reduce = 0.08
-text = "Dextren Ward's: the stitching at the hem is in a script nobody in Stormwind reads."
+text = "Dextren Ward's. The stitching at the hem is in a script nobody in Stormwind reads."
 
 [[item]]
 key = "bazil_hood"
@@ -537,7 +537,7 @@ icon = "INV_Misc_Bandana_03"
 kind = "armor"
 slot = "head"
 reduce = 0.09
-text = "Bazil Thredd's: the riot's face, and VanCleef's man inside the walls."
+text = "Bazil Thredd's, the riot's face and VanCleef's man inside the walls."
 
 [[item]]
 key = "warden_breastplate"
@@ -548,7 +548,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.24
 weight = 0.08
-text = "Stormwind's plate, bought and paid for: a quarter off every blow, and you'll feel its weight."
+text = "Reduces damage taken by 24%. Slows stamina regeneration by 8%. \"Stormwind's plate, bought and paid for.\""
 perks = [{ kind = "ward", amount = 0.05 }]
 
 [[item]]
@@ -560,7 +560,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.12
 weight = 0.03
-text = "Bruegal Ironknuckle's plate helm: he wore it in his cell, every day, waiting."
+text = "Bruegal Ironknuckle's plate helm. He wore it in his cell every day, waiting."
 perks = [{ kind = "might", amount = 0.05 }]
 
 # --- the inmates --------------------------------------------------------------------------------------
@@ -854,7 +854,7 @@ respawn = 0.0
   speed = 0.75
   might = 1.15
   pattern = "stomp"
-  text = "Hamhock's eyes go red; he pounds his chest and roars."
+  text = "Hamhock's eyes go red. He pounds his chest and roars."
   look = 10604
 
 # Targorr the Dread: an orc in chains no longer, two hands on his axe.
@@ -1048,7 +1048,7 @@ respawn = 0.0
 then = "st_warden"
 then_after = 4.0
 then_needs = "warden_ledger"
-then_text = "\"Thredd always did talk too much. You've read my ledger, then. Pity: now I'll have to put down the riot AND you.\""
+then_text = "\"Thredd always did talk too much. You've read my ledger, then. Pity. Now I'll have to put down the riot AND you.\""
 then_kit = 379
   [mob.attack]
   windup = 0.42
@@ -1291,7 +1291,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.11
 weight = 0.02
-text = "Bruegal's own: plate a guard won't be needing, from the cell they never open."
+text = "Bruegal's own. Plate a guard won't be needing, from the cell they never open."
 set = "riot_breaker"
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a

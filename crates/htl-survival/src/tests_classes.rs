@@ -127,7 +127,9 @@ fn every_card_goes_off_in_a_duel() {
 /// What a card's hit is worth in damage: its blow (every projectile, every leap of a chain), and
 /// half of what burns after (it can be walked out of).
 fn worth(d: &AbilityDef) -> f32 {
-    let hit = (d.damage[0] + d.damage[1]) / 2.0 * d.count.max(1) as f32;
+    // A wide fan (10° or more between its arrows) puts at most three into one foe.
+    let n = if d.spread >= 10.0 { d.count.clamp(1, 3) } else { d.count.max(1) };
+    let hit = (d.damage[0] + d.damage[1]) / 2.0 * n as f32;
     // A beam's damage is a second's, on each foe it holds: all of it held.
     let hit = if d.kind == "beam" { hit * d.secs } else { hit };
     // A boomerang strikes each foe going out and again coming back (at its share).
@@ -154,7 +156,7 @@ fn the_board_keeps_to_its_budgets() {
     let c = &s.content;
     for row in SLOTS {
         // A card a class (the beta page's count toward no class, but keep to the budgets below).
-        let cards: Vec<&AbilityDef> = c.abilities.iter().filter(|a| a.on_board() && !a.is_beta() && a.slot == row).collect();
+        let cards: Vec<&AbilityDef> = c.abilities.iter().filter(|a| a.on_board() && !a.is_beta() && a.slot == row && a.choice == 1).collect();
         assert_eq!(cards.len(), 9, "{row}");
     }
     for (k, ex) in board(c) {

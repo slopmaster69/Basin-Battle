@@ -297,7 +297,7 @@ impl Survival {
     pub(crate) fn spend_gold(&mut self, id: Id, n: u32) -> Result<(), String> {
         let have = self.gold_of(id);
         if have < n {
-            return Err(format!("That costs {n} gold; you have {have}."));
+            return Err(format!("Not enough gold (need {n}, have {have})."));
         }
         if let Some(s) = self.siege.as_mut() {
             s.gold.insert(id, have - n);
@@ -322,6 +322,9 @@ impl Survival {
     /// own materials.
     pub(crate) fn station_cost(&self, def: usize) -> BTreeMap<String, u32> {
         let s = &self.content.stations[def];
+        if self.free_build && !self.is_siege() {
+            return BTreeMap::new();
+        }
         match self.siege_def() {
             Some(d) if self.is_siege() => d.build.get(&s.key).map(|n| BTreeMap::from([("gold".to_string(), *n)])).unwrap_or_default(),
             _ => s.cost.clone(),
@@ -331,6 +334,9 @@ impl Survival {
     /// What mending a wrecked station costs here: half its gold, in a match.
     pub(crate) fn station_repair(&self, def: usize) -> BTreeMap<String, u32> {
         let s = &self.content.stations[def];
+        if self.free_build && !self.is_siege() {
+            return BTreeMap::new();
+        }
         match self.siege_def() {
             Some(d) if self.is_siege() => d.build.get(&s.key).map(|n| BTreeMap::from([("gold".to_string(), n.div_ceil(2))])).unwrap_or_default(),
             _ => s.repair.clone(),
@@ -368,17 +374,17 @@ impl Survival {
     pub(crate) fn siege_site_problem(&self, builder: Option<Id>, pos: Vec3) -> Option<String> {
         let d = self.siege_def()?;
         let Some(camp) = builder.and_then(|b| self.camp_of(b)) else {
-            return Some("Only in a match, on your own camp's ground.".into());
+            return Some("Only during a match, on your own camp's ground.".into());
         };
         let s = self.siege.as_ref()?;
         let c = &s.camps[camp];
         let hearth = self.objs.get(&c.hearth).map_or(d.bases[c.def].at, |o| o.pos);
         let off = dist2d(pos, hearth) - d.build_radius;
         if off > 0.0 {
-            return Some(format!("Outside your camp's ground ({:.0} yd round the Hearth): {:.0} yd {} of here.", d.build_radius, off.ceil(), compass(facing(pos, hearth))));
+            return Some(format!("Outside your camp's ground, {:.0} yd around the Hearth. It's {:.0} yd {} of here.", d.build_radius, off.ceil(), compass(facing(pos, hearth))));
         }
         if dist2d(pos, c.gate) < 6.0 {
-            return Some("That's the camp's gate: keep it clear.".into());
+            return Some("Can't build on the camp's gate.".into());
         }
         None
     }
@@ -390,14 +396,14 @@ impl Survival {
         let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
         let m = d.modes.iter().position(|m| m.key == key || m.name.eq_ignore_ascii_case(key)).ok_or_else(|| {
             let keys: Vec<&str> = d.modes.iter().map(|m| m.key.as_str()).collect();
-            format!("No way to play called {key}: {}.", keys.join(", "))
+            format!("No way to play called {key}. Try {}.", keys.join(", "))
         })?;
         let s = self.siege.as_ref().ok_or("There's no Siege here.")?;
         if self.camp_of(id).is_some() {
             return Err("You're in the match.".into());
         }
         if matches!(s.phase, SiegePhase::Countdown { .. }) && s.mode != Some(m) {
-            return Err("A match is about to begin: wait for the next.".into());
+            return Err("A match is about to begin. Wait for the next one.".into());
         }
         let seats = d.modes[m].bases.len() * d.modes[m].per_base;
         if s.queues[m].len() >= seats && !s.queues[m].contains(&id) {
@@ -412,7 +418,7 @@ impl Survival {
         let name = self.players.get(&id).map_or(String::new(), |p| p.name.clone());
         for h in self.players.keys().copied().collect::<Vec<_>>() {
             if h != id {
-                self.tell(h, format!("{name} waits for {} ({filled} of {seats}).", d.modes[m].name.to_lowercase()));
+                self.tell(h, format!("{name} is waiting for {} ({filled} of {seats}).", d.modes[m].name.to_lowercase()));
             }
         }
         // Full and nothing under way: it begins.
@@ -420,7 +426,7 @@ impl Survival {
             self.siege_countdown(m);
         }
         self.siege_news();
-        Ok(format!("You wait for {} ({filled} of {seats}).", d.modes[m].name.to_lowercase()))
+        Ok(format!("You're waiting for {} ({filled} of {seats}).", d.modes[m].name.to_lowercase()))
     }
 
     /// Stop waiting.
@@ -438,7 +444,7 @@ impl Survival {
             }
         }
         self.siege_news();
-        Ok(if was { "You stop waiting.".into() } else { "You weren't waiting.".into() })
+        Ok(if was { "You stopped waiting.".into() } else { "You weren't waiting.".into() })
     }
 
     /// Begin the way a hero waits for now, with whoever's waiting (two at least), its empty seats
@@ -446,11 +452,11 @@ impl Survival {
     pub fn siege_start_now(&mut self, id: Id) -> Result<String, String> {
         let s = self.siege.as_ref().ok_or("There's no Siege here.")?;
         if !matches!(s.phase, SiegePhase::Lobby) {
-            return Err("A match is under way: wait for it to end.".into());
+            return Err("A match is under way. Wait for it to end.".into());
         }
         let m = s.queues.iter().position(|q| q.contains(&id)).ok_or("Join a way to play first.")?;
         if s.queues[m].len() < 2 {
-            return Err("It takes two at least.".into());
+            return Err("A match needs at least 2 heroes.".into());
         }
         self.siege_countdown(m);
         self.siege_news();
@@ -470,8 +476,8 @@ impl Survival {
         for (k, h) in heroes.iter().enumerate() {
             let base = d.bases.iter().find(|b| b.key == mode.bases[k % n]);
             let sub = match base {
-                Some(b) => format!("You'll hold {} ({}). It begins in {} seconds", b.name, self.base_side(b.at), d.countdown as u32),
-                None => format!("It begins in {} seconds", d.countdown as u32),
+                Some(b) => format!("You'll hold {}, to the {}. It begins in {} sec", b.name, self.base_side(b.at), d.countdown as u32),
+                None => format!("It begins in {} sec", d.countdown as u32),
             };
             self.events.push(Event::Banner { player: Some(*h), title: mode.name.clone(), sub });
         }
@@ -635,12 +641,12 @@ impl Survival {
                 let partner = c.heroes.iter().filter(|o| **o != h).filter_map(|o| self.players.get(o).map(|p| p.name.clone())).next();
                 let with = partner.map_or(String::new(), |p| format!(" with {p}"));
                 let gate = compass(facing(self.players.get(&h).map_or(c.gate, |p| p.pos), c.gate));
-                self.events.push(Event::Banner { player: Some(h), title: format!("Hold {}", names[k]), sub: format!("Keep your Hearth standing. Wave 1 in {} s, from the {gate}", d.first_gap as u32) });
+                self.events.push(Event::Banner { player: Some(h), title: format!("Hold {}", names[k]), sub: format!("Keep your Hearth standing. Wave 1 in {} sec, from the {gate}", d.first_gap as u32) });
                 // A few short lines, one thing each, rather than one long one.
-                self.tell(h, format!("{}: you hold {}{with} against {}.", mode.name, names[k], rivals.join(" and ")));
-                self.tell(h, format!("Waves come in at your gate, {gate} of your Hearth (marked red on the ground), every {} seconds; your rivals' sends come with them.", d.wave_secs as u32));
-                self.tell(h, "Gold: build defences (H), send creatures at a rival from the Mercenary Ledger (F at it: each raises your income), learn cards at the Battle Trainer.");
-                self.tell(h, "Food and salves come with every wave (T eats). Ready early? F at your Hearth: when everyone is, the next wave comes at once.");
+                self.tell(h, format!("{} has begun. You hold {}{with} against {}.", mode.name, names[k], rivals.join(" and ")));
+                self.tell(h, format!("Waves arrive every {} sec at your gate, {gate} of your Hearth and marked red on the ground. Your rivals' sends come with them.", d.wave_secs as u32));
+                self.tell(h, "Spend gold to build defenses (H), send enemies at a rival from the Mercenary Ledger (F) and learn cards at the Battle Trainer. Each send raises your income.");
+                self.tell(h, "Food and salves arrive with every wave. Eat with (T). Ready early? Use your Hearth (F). When everyone is ready, the next wave comes at once.");
             }
         }
         self.events.push(Event::Log(format!("siege: {} begins ({})", mode.name, names.join(", "))));
@@ -876,7 +882,7 @@ impl Survival {
         }
         for (h, n) in paid {
             let more = given.get(&h).map_or(String::new(), |g| format!(" Supplies: {}.", g.join(", ")));
-            self.tell(h, format!("Wave {wave}: your income, {n} gold, is paid.{more}"));
+            self.tell(h, format!("Wave {wave} paid your income of {n} gold.{more}"));
         }
         self.events.push(Event::Log(format!("siege wave {wave}")));
         self.siege_news();
@@ -961,7 +967,7 @@ impl Survival {
             let from: BTreeSet<String> = c.coming.iter().filter_map(|(_, h)| self.players.get(h).map(|p| p.name.clone())).collect();
             let from: Vec<String> = from.into_iter().collect();
             for h in &c.heroes {
-                self.events.push(Event::Banner { player: Some(*h), title: "Coming at you".into(), sub: format!("{list}, from {} (in {} s)", from.join(" and "), d.warn_secs as u32) });
+                self.events.push(Event::Banner { player: Some(*h), title: "Coming at You".into(), sub: format!("{list} from {} in {} sec", from.join(" and "), d.warn_secs as u32) });
             }
         }
         self.siege_news();
@@ -1050,8 +1056,8 @@ impl Survival {
         *s.gold.entry(id).or_default() -= take;
         *s.gold.entry(k).or_default() += take;
         let (a, b) = (self.players.get(&k).map_or(String::new(), |p| p.name.clone()), self.players.get(&id).map_or(String::new(), |p| p.name.clone()));
-        self.tell(k, format!("You take {take} gold from {b}."));
-        self.tell(id, format!("{a} takes {take} of your gold."));
+        self.tell(k, format!("You took {take} gold from {b}."));
+        self.tell(id, format!("{a} took {take} of your gold."));
         self.events.push(Event::Siege { player: k });
         self.events.push(Event::Siege { player: id });
     }
@@ -1086,7 +1092,7 @@ impl Survival {
             }
             let name = d.bases[c.def].name.clone();
             self.siege.as_mut().unwrap().camps[k].out = true;
-            self.announce(format!("The Hearth at {name} has fallen: {} is out.", upper(&name)));
+            self.announce(format!("The Hearth at {name} fell. {} is out of the match.", upper(&name)));
             for h in &c.heroes {
                 self.events.push(Event::Banner { player: Some(*h), title: "Your Hearth Falls".into(), sub: "You're out of the match".into() });
             }
@@ -1151,8 +1157,8 @@ impl Survival {
             n.join(" and ")
         };
         let text = match winner {
-            Some(k) => format!("{} holds {} and wins the siege!", names(&camps[k], self), d.bases[camps[k].def].name),
-            None => "The siege ends in a draw.".to_string(),
+            Some(k) => format!("{} held {} and won the siege.", names(&camps[k], self), d.bases[camps[k].def].name),
+            None => "The siege ended in a draw.".to_string(),
         };
         self.announce(text.clone());
         for (k, c) in camps.iter().enumerate() {
@@ -1162,7 +1168,7 @@ impl Survival {
                     Some(_) => "Defeat",
                     None => "A Draw",
                 };
-                self.events.push(Event::Banner { player: Some(*h), title: title.into(), sub: format!("Back to the hall in {} seconds", d.over_secs as u32) });
+                self.events.push(Event::Banner { player: Some(*h), title: title.into(), sub: format!("Back to the hall in {} sec", d.over_secs as u32) });
             }
         }
         // Their creatures stand down.
@@ -1223,7 +1229,7 @@ impl Survival {
         let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
         let k = d.sends.iter().position(|s| s.key == key).ok_or_else(|| {
             let keys: Vec<&str> = d.sends.iter().map(|s| s.key.as_str()).collect();
-            format!("No send called {key}: {}.", keys.join(", "))
+            format!("No send called {key}. Try {}.", keys.join(", "))
         })?;
         let sd = d.sends[k].clone();
         if let Some(why) = self.send_problem(id, k, &sd) {
@@ -1242,13 +1248,13 @@ impl Survival {
         let mob = self.content.mob(&sd.mob).map_or(sd.mob.clone(), |m| self.content.mobs[m].name.clone());
         let what = if sd.count == 1 { mob } else { format!("{} {mob}", sd.count) };
         self.siege_news();
-        Ok(format!("{what} will march on {to} with its next wave; your income is up {} a wave.", sd.income))
+        Ok(format!("{what} will march on {to} with its next wave. Your income rose by {} a wave.", sd.income))
     }
 
     fn send_problem(&self, id: Id, k: usize, sd: &SendDef) -> Option<String> {
         let s = self.siege.as_ref()?;
         if s.phase != SiegePhase::Running {
-            return Some("Only in a match.".into());
+            return Some("Only during a match.".into());
         }
         let mine = self.camp_of(id)?;
         if s.camps[mine].out {
@@ -1263,18 +1269,18 @@ impl Survival {
             return Some(format!("From wave {}.", sd.from));
         }
         if sd.once && s.bought_once.contains(&(id, k)) {
-            return Some("Once a match, and you've sent it.".into());
+            return Some("Only once a match, and you've sent it.".into());
         }
         // Only so many for one wave.
         let d = self.siege_def()?;
         let cap = d.send_cap.saturating_add(d.send_cap_growth.saturating_mul(s.wave));
         let sent = s.sent.get(&id).copied().unwrap_or(0);
         if sent + sd.count > cap {
-            let what = if sd.count == 1 { "it's 1".to_string() } else { format!("this is {}", sd.count) };
-            return Some(format!("Wave {}'s limit: {sent} of {cap} creatures sent, {what}. {} more each wave", s.wave + 1, d.send_cap_growth));
+            let what = if sd.count == 1 { "1".to_string() } else { format!("{}", sd.count) };
+            return Some(format!("Wave {} allows {cap} sends. {sent} are sent and this one adds {what}. The limit grows by {} each wave", s.wave + 1, d.send_cap_growth));
         }
         if self.gold_of(id) < sd.cost {
-            return Some(format!("Needs {} gold (you have {})", sd.cost, self.gold_of(id)));
+            return Some(format!("Not enough gold (need {}, have {})", sd.cost, self.gold_of(id)));
         }
         None
     }
@@ -1287,7 +1293,7 @@ impl Survival {
     /// Send at the next rival camp round (or a named one).
     pub fn siege_target(&mut self, id: Id, to: Option<&str>) -> Result<String, String> {
         let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
-        let mine = self.camp_of(id).ok_or("Only in a match.")?;
+        let mine = self.camp_of(id).ok_or("Only during a match.")?;
         let s = self.siege.as_ref().unwrap();
         let n = s.camps.len();
         let now = s.target.get(&id).copied().unwrap_or((mine + 1) % n);
@@ -1384,7 +1390,7 @@ impl Survival {
     /// `ready_secs`.
     pub fn siege_ready(&mut self, id: Id) -> Result<String, String> {
         let d = self.siege_def().cloned().ok_or("There's no Siege here.")?;
-        let mine = self.camp_of(id).ok_or("Only in a match.")?;
+        let mine = self.camp_of(id).ok_or("Only during a match.")?;
         let s = self.siege.as_mut().ok_or("There's no Siege here.")?;
         if s.phase != SiegePhase::Running {
             return Err("Only while a match is under way.".into());
@@ -1408,20 +1414,20 @@ impl Survival {
             s.timer = d.ready_secs;
             let name = self.players.get(&id).map_or(String::new(), |p| p.name.clone());
             for h in &need {
-                self.events.push(Event::Banner { player: Some(*h), title: "Everyone Ready".into(), sub: format!("Wave {next} in {} s", d.ready_secs as u32) });
+                self.events.push(Event::Banner { player: Some(*h), title: "Everyone Ready".into(), sub: format!("Wave {next} in {} sec", d.ready_secs as u32) });
                 if *h != id {
-                    self.tell(*h, format!("{name} is ready too: wave {next} comes in {} seconds.", d.ready_secs as u32));
+                    self.tell(*h, format!("{name} is ready too. Wave {next} comes in {} sec.", d.ready_secs as u32));
                 }
             }
-            format!("Everyone's ready: wave {next} comes in {} seconds.", d.ready_secs as u32)
+            format!("Everyone is ready. Wave {next} comes in {} sec.", d.ready_secs as u32)
         } else if have == need.len() {
-            format!("Ready: wave {next} is on its way.")
+            format!("You're ready. Wave {next} is on its way.")
         } else {
             let name = self.players.get(&id).map_or(String::new(), |p| p.name.clone());
             for h in need.iter().filter(|h| **h != id) {
-                self.tell(*h, format!("{name} is ready for wave {next} ({have} of {}): F at your Hearth when you are.", need.len()));
+                self.tell(*h, format!("{name} is ready for wave {next} ({have} of {}). Use your Hearth (F) when you are.", need.len()));
             }
-            format!("Ready for wave {next} ({have} of {}): it comes early once everyone is. F again to take it back.", need.len())
+            format!("You're ready for wave {next} ({have} of {}). It comes early once everyone is. Use the Hearth (F) again to cancel.", need.len())
         };
         self.siege_news();
         Ok(said)
@@ -1459,7 +1465,7 @@ impl Survival {
         match s.phase {
             SiegePhase::Lobby => ("No match under way".into(), 0.0),
             SiegePhase::Countdown { left } => (format!("{mode} begins"), left),
-            SiegePhase::Running => (format!("{mode}: wave {} of {}", s.wave, d.waves), s.timer.max(0.0)),
+            SiegePhase::Running => (format!("{mode}, wave {} of {}", s.wave, d.waves), s.timer.max(0.0)),
             SiegePhase::Over { left, .. } => (format!("{mode} is over"), left),
         }
     }

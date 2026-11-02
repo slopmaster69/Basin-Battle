@@ -280,7 +280,7 @@ impl Survival {
         self.below.as_mut().unwrap().open.insert(key.to_string());
         let who = self.players.get(&by).map_or(String::from("Someone"), |p| p.name.clone());
         // No banner and horn for everyone: the finder's page opens below, the rest read a line.
-        let text = if d.text.is_empty() { format!("{who} has found something hidden: {}.", d.name) } else { format!("{who}: {}", d.text) };
+        let text = if d.text.is_empty() { format!("{who} found something hidden: {}.", d.name) } else { format!("{who} found a secret. {}", d.text) };
         self.announce(text);
         self.forward_count("secret", key, 1);
         // The finder's to read at leisure: what it was.
@@ -293,7 +293,7 @@ impl Survival {
             let body = if !d.page.is_empty() {
                 d.page.replace("{n}", "\n")
             } else if d.text.is_empty() {
-                format!("You have found something hidden: {}.", d.name)
+                format!("You found something hidden: {}.", d.name)
             } else {
                 sentence(&d.text)
             };
@@ -496,11 +496,11 @@ impl Survival {
     /// What reads a locked dungeon's pages, in words ("clear 1 more of the Tier I dungeons").
     pub fn gate_words(&self, d: &DungeonDef) -> String {
         if self.camp.raids_won < d.gate_raids {
-            return format!("hold the camp against {} raid(s) first", d.gate_raids);
+            return format!("beat {} raid(s) first", d.gate_raids);
         }
         let short = self.ladder_short(d);
         let tier = ["Tier I", "Tier II", "Tier III"].get(d.tier.saturating_sub(2) as usize).copied().unwrap_or("easier");
-        format!("clear {short} more of the {tier} dungeons first (every boss down in one run)")
+        format!("clear {short} more {tier} dungeons first, with every boss down in one run")
     }
 
     /// The dungeon the book points to next: the easiest open one the camp hasn't cleared (the
@@ -540,10 +540,10 @@ impl Survival {
         // Siege's world: home from the hall (out of the match, if in one).
         if self.is_siege() {
             if to != "camp" {
-                return Err("The muster banner in the hall is the way home: .es travel camp.".into());
+                return Err("Use the muster banner in the hall to go home, or .es travel camp.".into());
             }
             if self.camp_of(id).is_some() && self.siege.as_ref().is_some_and(|s| s.phase == super::siege::SiegePhase::Running) {
-                self.tell(id, "You leave the match: your camp holds without you.");
+                self.tell(id, "You left the match. Your camp holds without you.");
             }
             self.siege_depart(id);
             self.events.push(Event::Travel { player: id, to: None });
@@ -552,7 +552,7 @@ impl Survival {
         // In the ring: home by its banner.
         if self.in_arena(id) {
             if to != "camp" {
-                return Err("Leave the ring first: the banner takes you home.".into());
+                return Err("Leave the ring first. The banner takes you home.".into());
             }
             self.leave_arena(id, super::arena::Exit::Home);
             return Ok(());
@@ -563,7 +563,7 @@ impl Survival {
             .map(|o| o.pos)
             .ok_or("There's no book here.")?;
         if dist2d(p.pos, book) > INTERACT_RANGE + 2.0 {
-            return Err("Go to the Smuggler's Logbook by the camp's chest.".into());
+            return Err("Go to the Smuggler's Logbook by Camp Storage.".into());
         }
         // The Proving Ring's page is open from the start, and Siege's.
         if to == "arena" && self.arena_def().is_some() {
@@ -578,14 +578,14 @@ impl Survival {
         }
         if !self.book_open() {
             return Err(
-                "The logbook's pages mean nothing yet: hold the camp against its first raid."
+                "The logbook is still in cipher. Beat the camp's first raid to read it."
                     .into(),
             );
         }
         if !self.book_pages().iter().any(|(k, _)| k == to) {
             return match self.content.dungeon_of_lamp(to) {
-                Some(d) if !self.dungeon_open(d) => Err(format!("{}'s pages are still in cipher: {}.", d.name, self.gate_words(d))),
-                _ => Err("That page is blank: light its lamp below first.".into()),
+                Some(d) if !self.dungeon_open(d) => Err(format!("{}'s pages are still in cipher. To read them, {}.", d.name, self.gate_words(d))),
+                _ => Err("That page is blank. Light its lamp in the dungeon first.".into()),
             };
         }
         self.cancel_preview(id);
@@ -604,7 +604,7 @@ impl Survival {
         let first = d.lamps.first().map(|l| l.key.clone()).ok_or("That dungeon has no way in.")?;
         let most = self.wager_unlocked(&d.key);
         if level == 0 || level > most {
-            return Err(format!("The Bookmaker won't take +{level} on {} yet: up to +{most} (win one in time to raise it).", d.name));
+            return Err(format!("The Bookmaker won't take +{level} on {} yet. The highest open is +{most}. Win one in time to raise it.", d.name));
         }
         if !self.book_pages().iter().any(|(k, _)| *k == first) {
             return Err(format!("{}'s pages are still in cipher.", d.name));
@@ -612,7 +612,7 @@ impl Survival {
         let p = self.players.get(&id).ok_or("No hero.")?;
         let book = self.objs.get(&self.book_id()).map(|o| o.pos).ok_or("There's no book here.")?;
         if dist2d(p.pos, book) > INTERACT_RANGE + 2.0 {
-            return Err("Go to the Smuggler's Logbook by the camp's chest.".into());
+            return Err("Go to the Smuggler's Logbook by Camp Storage.".into());
         }
         self.cancel_preview(id);
         self.events.push(Event::Travel { player: id, to: Some(format!("{first}@{level}")) });
@@ -627,10 +627,10 @@ impl Survival {
             return Err("Light the lamp first.".into());
         }
         if self.in_fight(id) {
-            return Err("Not with foes on you!".into());
+            return Err("Not while enemies are on you.".into());
         }
         if to != "camp" && self.wager_running() {
-            return Err("Not during a wager: the lamps only take you home (and the wager goes on without you).".into());
+            return Err("Not during a wager. Lamps only take you home, and the wager goes on without you.".into());
         }
         if to == "camp" {
             self.run_page(id, "Home by a lamp");
@@ -651,7 +651,7 @@ impl Survival {
             pos,
             facing: l.facing,
         });
-        self.tell(id, format!("You make your way to {}.", l.name));
+        self.tell(id, format!("You traveled to {}.", l.name));
         self.events.push(Event::Dirty);
         Ok(())
     }
@@ -691,7 +691,7 @@ impl Survival {
                 title: "Lamp Lit".into(),
                 sub: name.clone(),
             });
-            self.announce(format!("{hero} lights the lamp at {name}. It's a page in the book now, and a place to wake."));
+            self.announce(format!("{hero} lit the lamp at {name}. It's now a page in the book and a place to respawn."));
             self.events.push(Event::ObjChanged { id: lamp });
             self.forward_count("delve", key, 1);
             self.events.push(Event::Dirty);
@@ -715,7 +715,7 @@ impl Survival {
             return Err("Light the lamp first.".into());
         }
         if self.in_fight(id) {
-            return Err("Not with foes on you!".into());
+            return Err("Not while enemies are on you.".into());
         }
         let account = p.account.clone();
         if let Some(h) = self.below.as_mut().and_then(|b| b.heroes.get_mut(&account)) {
@@ -725,7 +725,7 @@ impl Survival {
         self.stir();
         let name = self.players[&id].name.clone();
         let place = self.dungeon_def().map_or_else(|| "the dungeon".to_string(), |d| d.name.clone());
-        self.announce(format!("{name} rests at the lamp. {place} stirs: its foes are back where they stood."));
+        self.announce(format!("{name} rested at the lamp. {place} stirs, and its enemies are back at their posts."));
         self.events.push(Event::Missile {
             caster: id,
             spell: REST_SPELL,
@@ -860,16 +860,16 @@ impl Survival {
         let Some(far) = d.from else { return };
         let open = self.door_is_open(key);
         if !open && from_near {
-            self.tell(id, format!("The {} is at its other end: set it going from there.", d.name));
+            self.tell(id, format!("The {} is at its other end. Start it from there.", d.name));
             return;
         }
         if self.in_fight(id) {
-            self.tell(id, "Not with foes on you!");
+            self.tell(id, "Not while enemies are on you.");
             return;
         }
         if !open {
             self.below.as_mut().unwrap().open.insert(key.to_string());
-            let text = if d.text.is_empty() { format!("The {} works again: a way back.", d.name) } else { d.text.clone() };
+            let text = if d.text.is_empty() { format!("The {} works again. It's a way back.", d.name) } else { d.text.clone() };
             self.events.push(Event::Banner { player: None, title: "Shortcut Opened".into(), sub: d.name.clone() });
             self.announce(text);
             self.door_changed(key);
@@ -885,7 +885,7 @@ impl Survival {
             p.last_safe = spot;
         }
         self.events.push(Event::Teleport { player: id, pos: spot, facing: away });
-        self.tell(id, format!("You ride the {}.", d.name));
+        self.tell(id, format!("You rode the {}.", d.name));
     }
 
     /// A door, used: a shortcut opens from its far side; the others say why they're shut.
@@ -911,7 +911,7 @@ impl Survival {
                 }
                 self.below.as_mut().unwrap().open.insert(key.to_string());
                 let text = if d.text.is_empty() {
-                    format!("The {} opens: a way back.", d.name)
+                    format!("The {} opens. It's a way back.", d.name)
                 } else {
                     d.text.clone()
                 };
@@ -953,7 +953,7 @@ impl Survival {
         let Some((d, n)) = self.content.dungeons().find_map(|d| d.notes.iter().find(|n| n.key == key).map(|n| (d.clone(), n.clone()))) else { return };
         let hidden = n.hints.iter().any(|h| !self.ever("secret", h));
         let clue = if hidden && !n.clue.is_empty() { n.clue.clone() } else { String::new() };
-        let place = if again { format!("From the book: read in {}", d.name) } else { format!("Found in {}", d.name) };
+        let place = if again { format!("From the book, read in {}", d.name) } else { format!("Found in {}", d.name) };
         let links = vec![(format!(".es lore {}", d.key), format!("All found in {}", short_name(&d.name)))];
         self.events.push(Event::Letter { player: id, kind: "note".into(), title: n.name.clone(), place, text: n.text.clone(), clue, links });
     }
@@ -983,10 +983,10 @@ impl Survival {
             }
         }
         if !rumours.is_empty() {
-            paras.push(format!("Rumours:\n{}", rumours.join("\n")));
+            paras.push(format!("Rumors:\n{}", rumours.join("\n")));
         }
         if read.is_empty() {
-            paras.push("No notes read yet: they lie where they were dropped, waiting.".to_string());
+            paras.push("No notes read yet. They lie where they were dropped.".to_string());
         }
         // Its bosses, in the order a run meets them in the book: each one's gear (what may fall
         // from them; their trophy the camp's the first time), and how often the camp has felled them.
@@ -1006,13 +1006,13 @@ impl Survival {
                 line.push_str(&format!(". Carries {}", gear.join(", ")));
             }
             if !trophy.is_empty() {
-                line.push_str(&format!(". {} {}", if felled == 0 { "Its trophy, the camp's the first time:" } else { "Its trophy, in the camp's chest:" }, trophy.join(", ")));
+                line.push_str(&format!(". {} {}", if felled == 0 { "Trophy, sent to storage the first time:" } else { "Trophy, in storage:" }, trophy.join(", ")));
             }
             line.push('.');
             bosses.push(line);
         }
         if !bosses.is_empty() {
-            paras.push(format!("Its bosses (every one down in one run clears it):\n{}", bosses.join("\n")));
+            paras.push(format!("Defeat every boss in one run to clear it:\n{}", bosses.join("\n")));
         }
         let place = format!("{} of {} notes read", read.len(), d.notes.len());
         let links = read.iter().map(|n| (format!(".es note {}", n.key), n.name.clone())).collect();
@@ -1061,9 +1061,9 @@ impl Survival {
         }
         if flasks > 0 {
             self.add_flasks(id, flasks);
-            words.push("a Draught Flask (a Draught more at every rest)".into());
+            words.push("a Draught Flask, +1 Draught at every rest".into());
         }
-        self.tell(id, format!("In the strongbox: {}.", words.join(", ")));
+        self.tell(id, format!("The strongbox held {}.", words.join(", ")));
         self.events.push(Event::Bags { player: id });
         // Its guards, waiting unseen for whoever opens it: on them at once.
         let guards: Vec<Id> = self
@@ -1131,11 +1131,11 @@ impl Survival {
             d.kind,
             ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor
         ) {
-            " Right-click it in your bags to wear it."
+            " Right-click it in your bags to equip it."
         } else {
             ""
         };
-        self.tell(id, format!("You take the {}.{how}", d.name));
+        self.tell(id, format!("You took the {}.{how}", d.name));
         self.events.push(Event::Bags { player: id });
         self.events.push(Event::Dirty);
     }
@@ -1252,19 +1252,19 @@ impl Survival {
     pub fn hone(&mut self, id: Id, key: &str) -> Result<String, String> {
         let p = self.players.get(&id).ok_or("No hero.")?;
         if self.lamp_near(p.pos).is_none() {
-            return Err("The quartermaster keeps to the lamps.".into());
+            return Err("Go to a lamp to find the quartermaster.".into());
         }
         if self.in_fight(id) {
-            return Err("Not with foes on you!".into());
+            return Err("Not while enemies are on you.".into());
         }
-        let (_, name, tier, price, can) = self.hone_offers(id).into_iter().find(|o| o.0 == key).ok_or("The quartermaster can't hone that: only this dungeon's own gear, a tier at a time, up to Peerless.")?;
+        let (_, name, tier, price, can) = self.hone_offers(id).into_iter().find(|o| o.0 == key).ok_or("The quartermaster can't hone that. Only this dungeon's own gear can be honed, one tier at a time, up to Peerless.")?;
         if !can {
             return Err(format!("That's {price} {}.", self.currency_name()));
         }
         let d = self.dungeon_def().cloned().ok_or("Nobody hones here.")?;
-        let item = self.content.item(key).ok_or("No such thing.")?;
+        let item = self.content.item(key).ok_or("No such item.")?;
         let it = &self.content.items[item];
-        let base = self.content.item(if it.honed_from.is_empty() { &it.key } else { &it.honed_from }).ok_or("No such thing.")?;
+        let base = self.content.item(if it.honed_from.is_empty() { &it.key } else { &it.honed_from }).ok_or("No such item.")?;
         let next = self.content.honed(base, it.hone + 1);
         let coin = self.content.item(&d.plunder).ok_or("No currency.")?;
         let p = self.players.get_mut(&id).unwrap();
@@ -1300,7 +1300,7 @@ impl Survival {
             let price = self.flask_price(id).ok_or("You carry all the Draughts there are room for.")?;
             let p = self.players.get(&id).ok_or("No hero.")?;
             if self.lamp_near(p.pos).is_none() {
-                return Err("The quartermaster keeps to the lamps.".into());
+                return Err("Go to a lamp to find the quartermaster.".into());
             }
             if self.currency_of(id) < price {
                 return Err(format!("That's {price} {}.", self.currency_name()));
@@ -1323,9 +1323,9 @@ impl Survival {
             .ok_or("The quartermaster doesn't have that.")?;
         let p = self.players.get(&id).ok_or("No hero.")?;
         if self.lamp_near(p.pos).is_none() {
-            return Err("The quartermaster keeps to the lamps.".into());
+            return Err("Go to a lamp to find the quartermaster.".into());
         }
-        let item = self.content.item(key).ok_or("No such thing.")?;
+        let item = self.content.item(key).ok_or("No such item.")?;
         let plunder = self.content.item(&d.plunder).ok_or("No plunder.")?;
         if p.bag.get(&plunder).copied().unwrap_or(0) < price {
             return Err(format!("That's {price} {}.", self.content.items[plunder].name));
@@ -1463,7 +1463,7 @@ impl Survival {
             self.events.push(Event::Banner {
                 player: None,
                 title: "The Way Out".into(),
-                sub: if d.key == "deadmines" { "The front door stands open: walk out into Moonbrook".into() } else { "The way out stands open".into() },
+                sub: if d.key == "deadmines" { "The front door is open. Walk out into Moonbrook".into() } else { "The way out is open".into() },
             });
         }
         // Every boss down in this run: the dungeon is cleared, and the camp hears of it. A first
@@ -1477,7 +1477,7 @@ impl Survival {
                     b.log.first = true;
                 }
                 let gift = self.first_clear_gift(&d);
-                let sub = if gift.is_empty() { "A first for the camp".to_string() } else { format!("A first for the camp: into its chest, {}", gift.join(", ")) };
+                let sub = if gift.is_empty() { "A first for the camp".to_string() } else { format!("A first for the camp. Sent to storage: {}", gift.join(", ")) };
                 self.events.push(Event::Banner { player: None, title: format!("{} Cleared", d.name), sub });
             }
         }
@@ -1511,7 +1511,7 @@ impl Survival {
             }
             self.events.push(Event::Storage);
             let place = place.map(str::to_string).or_else(|| self.dungeon_def().map(|d| d.name.clone())).unwrap_or_else(|| "below".to_string());
-            self.announce(format!("From {place}, by the book: into the camp's chest, {}.", names.join(", ")));
+            self.announce(format!("Sent to storage from {place}: {}.", names.join(", ")));
         }
         self.events.push(Event::Dirty);
     }
@@ -1552,15 +1552,15 @@ impl Survival {
         }
         let next = self.next_dungeon().map(|n| (n.name.clone(), n.blurb.clone()));
         let sub = match &next {
-            Some((name, _)) => format!("A first for the camp. The book turns a page: next, {name}"),
-            None => "A first for the camp: every dungeon in the book is cleared".to_string(),
+            Some((name, _)) => format!("A first for the camp. The book's next page is {name}"),
+            None => "A first for the camp. Every dungeon in the book is cleared".to_string(),
         };
         self.events.push(Event::Banner { player: None, title: format!("{} Cleared", d.name), sub });
         if !gift.is_empty() {
-            self.announce(format!("{} cleared for the first time: into the camp's chest, {}.", d.name, gift.join(", ")));
+            self.announce(format!("{} was cleared for the first time. Sent to storage: {}.", d.name, gift.join(", ")));
         }
         if let Some((name, blurb)) = next {
-            self.announce(format!("The book turns a page: next, {name}. {blurb}."));
+            self.announce(format!("The book's next page is {name}. {blurb}."));
         }
         self.events.push(Event::Log(format!("{} cleared for the first time", d.name)));
         self.events.push(Event::Dirty);
@@ -1856,9 +1856,9 @@ impl Survival {
                     sub: if d.key == "deadmines" { "Out into Moonbrook, and home by the book".into() } else { "Out, and home by the book".into() },
                 });
                 if d.key == "deadmines" {
-                    self.announce(format!("{name} walks out of the Deadmines' front door into Moonbrook."));
+                    self.announce(format!("{name} walked out of the Deadmines' front door into Moonbrook."));
                 } else {
-                    self.announce(format!("{name} walks out of {} and home.", d.name));
+                    self.announce(format!("{name} walked out of {} and went home.", d.name));
                 }
                 self.run_page(id, if cleared { "Cleared" } else { "Out by the way out" });
                 self.events.push(Event::Travel {
@@ -2020,10 +2020,10 @@ impl Survival {
         let standing: Vec<String> = up.iter().filter_map(name_of).collect();
         match (felled.is_empty(), standing.is_empty()) {
             (true, _) => lines.push("No boss down yet.".to_string()),
-            (false, true) => lines.push(format!("Bosses down: {}. Every one of them.", felled.join(", "))),
+            (false, true) => lines.push(format!("Bosses down: {}. That's all of them.", felled.join(", "))),
             (false, false) => lines.push(format!("Bosses down: {}. Still standing: {}.", felled.join(", "), standing.join(", "))),
         }
-        lines.push(format!("Foes felled: {}.{}", log.foes, if log.secrets > 0 { format!(" Secrets found: {}.", log.secrets) } else { String::new() }));
+        lines.push(format!("Enemies killed: {}.{}", log.foes, if log.secrets > 0 { format!(" Secrets found: {}.", log.secrets) } else { String::new() }));
         let falls = log.falls.get(&account).copied().unwrap_or(0);
         lines.push(match falls {
             0 => "You didn't fall once.".to_string(),
@@ -2057,17 +2057,17 @@ impl Survival {
                 gains.push(self.content.items[j].name.clone());
             }
         }
-        lines.push(if gains.is_empty() { "You carry nothing new out.".to_string() } else { format!("You carry out: {}.", gains.join(", ")) });
+        lines.push(if gains.is_empty() { "You carry nothing new out.".to_string() } else { format!("You carried out {}.", gains.join(", ")) });
         if log.first {
             let gift = self.first_clear_gift(&d);
-            lines.push(if gift.is_empty() { "A first for the camp.".to_string() } else { format!("A first for the camp: into its chest, {}.", gift.join(", ")) });
+            lines.push(if gift.is_empty() { "A first for the camp.".to_string() } else { format!("A first for the camp. Sent to storage: {}.", gift.join(", ")) });
         }
         // What's next: the book's next page, or this one's wager.
         let cleared = standing.is_empty() && !felled.is_empty();
         let next = self.next_dungeon().map(|n| n.name.clone()).filter(|n| *n != d.name);
         lines.push(match (cleared, next) {
-            (true, Some(n)) => format!("Next, by the book: {n}. Or the Bookmaker's Wager here, against the clock."),
-            (true, None) => "Next: the Bookmaker's Wager here, against the clock.".to_string(),
+            (true, Some(n)) => format!("Next in the book is {n}. Or try the Bookmaker's Wager here, against the clock."),
+            (true, None) => "Next, try the Bookmaker's Wager here, against the clock.".to_string(),
             (false, _) => format!("{} more to beat before it's cleared.", standing.len()),
         });
         let links = vec![(format!(".es wager {}", d.key), "The Bookmaker's Wager".to_string())];

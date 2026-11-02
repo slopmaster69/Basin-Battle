@@ -407,7 +407,7 @@ fn the_board_has_five_rows_of_nine() {
     let s = world_with(false);
     for row in crate::content::SLOTS {
         // (The class cards: the beta page's are counted apart.)
-        let cards: Vec<_> = s.content.abilities.iter().filter(|a| a.on_board() && !a.is_beta() && a.slot == row).collect();
+        let cards: Vec<_> = s.content.abilities.iter().filter(|a| a.on_board() && !a.is_beta() && a.slot == row && a.choice == 1).collect();
         assert_eq!(cards.len(), 9, "{row}");
         for col in crate::content::SCHOOLS {
             assert_eq!(cards.iter().filter(|a| a.school == col).count(), 1, "{row} {col}");

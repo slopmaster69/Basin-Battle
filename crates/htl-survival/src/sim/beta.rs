@@ -136,11 +136,16 @@ impl Survival {
     /// swaps them with the one struck, or binds that one to them.
     pub(crate) fn beta_hit(&mut self, p: &Projectile, unit: Option<Id>, at: Vec3) {
         let d = &self.content.abilities[p.ability];
-        let (yank, swap, tether) = (d.yank, d.swap, d.tether_secs > 0.0);
+        let (yank, swap, tether, haul) = (d.yank, d.swap, d.tether_secs > 0.0, d.hunt == "haul");
         if yank {
             self.yank_to(p.owner, p.ability, p.share, at, unit);
         }
         let Some(v) = unit else { return };
+        // A haul (Reverse Grapple) on what won't move: its caster goes to it instead.
+        if haul && self.haul_reverses(v) {
+            self.yank_to(p.owner, p.ability, p.share, at, Some(v));
+            return;
+        }
         if swap {
             self.swap_with(p.owner, v, p.ability);
         } else if tether {
@@ -331,7 +336,7 @@ impl Survival {
             self.beta.later.push(Later { at: self.clock + airtime(TETHER_LIFT), owner: t.owner, victim: t.foe, effects: d.tether_effects.clone(), source: d.name.clone() });
         }
         if self.players.contains_key(&t.owner) {
-            self.events.push(Event::Flash { player: t.owner, text: format!("{}: dragged back", d.name) });
+            self.events.push(Event::Flash { player: t.owner, text: format!("{} pulled them back", d.name) });
         }
     }
 
@@ -566,6 +571,8 @@ impl Survival {
             pierce: 0,
             stage: Stage::Out,
             born,
+            bounced: 0,
+            look: None,
         });
         self.mirror_caught(h, stance, m.owner);
         true

@@ -1,0 +1,283 @@
+From 9fa5abe69e0e25487cba5e16892ac9ed37186df0 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Mon, 2 Nov 2026 12:01:34 -0600
+Subject: [PATCH] Westbrook Garrison is gone: the barracks and its clutter
+ hidden, the ground under it filled
+
+A small table of world edits (benilla-formats `world_edits`, map 0 only; it mirrors htl-map's
+WESTBROOK_EDITS, which the Elwynn Survival server builds its land from, and must change with it)
+is applied where an ADT tile is parsed into chunks and placements, so the terrain mesh, its
+collider, the ground clutter, every height query and the WMO and doodad streams agree: the
+barracks WMO (MODF 71670) and the twelve barrels, crates, jars and bucket round it (MDDF 71666-71669,
+17030-17037) are not there (not drawn, no collision, no interior light), and every chunk touching
+the 45 yd circle round (-9620, 690) has its terrain holes cleared, its own heights drawn and
+walked. The streamed tile (AdtLoader) takes its map from its path; load_tile_mesh from its map.
+---
+ crates/benilla-assets/src/adt.rs          |   8 +-
+ crates/benilla-formats/src/lib.rs         |   3 +-
+ crates/benilla-formats/src/terrain.rs     |  57 ++++++++++-
+ crates/benilla-formats/src/world_edits.rs | 114 ++++++++++++++++++++++
+ 4 files changed, 176 insertions(+), 6 deletions(-)
+ create mode 100644 crates/benilla-formats/src/world_edits.rs
+
+diff --git a/crates/benilla-assets/src/adt.rs b/crates/benilla-assets/src/adt.rs
+index 249228c7..a0399cfa 100644
+--- a/crates/benilla-assets/src/adt.rs
++++ b/crates/benilla-assets/src/adt.rs
+@@ -143,7 +143,13 @@ impl AssetLoader for AdtLoader {
+         let mut bytes = Vec::new();
+         reader.read_to_end(&mut bytes).await?;
+         let to_io = |e: anyhow::Error| std::io::Error::other(format!("{e:#}"));
+-        let tile = adt_to_tile_mesh(&bytes).map_err(to_io)?;
++        // The map the path names takes its world edits (`benilla_formats::world_edits`).
++        let path = ctx.path().path().to_string_lossy().into_owned();
++        let tile = match benilla_formats::world_edits::map_of_adt_path(&path) {
++            Some(map) => benilla_formats::adt_to_tile_mesh_on(map, &bytes),
++            None => adt_to_tile_mesh(&bytes),
++        }
++        .map_err(to_io)?;
+ 
+         // Layer array: a solid-green fallback at index 0, then each unique layer texture, packed
+         // once the whole tile is read.
+diff --git a/crates/benilla-formats/src/lib.rs b/crates/benilla-formats/src/lib.rs
+index a97fd5b7..f1b032f4 100644
+--- a/crates/benilla-formats/src/lib.rs
++++ b/crates/benilla-formats/src/lib.rs
+@@ -300,8 +300,9 @@ pub use models::{
+     WmoPortals, WmoRoot, DEGENERATE_RING_FOOTPRINT, NO_GROUP_LIQUID, OWNER_RUNG_BUCKETS,
+ };
+ mod terrain;
++pub mod world_edits;
+ pub use terrain::{
+-    adt_to_tile_mesh, area_id_at, find_tile_near, ground_effect_at, impassable_at, load_tile_mesh,
++    adt_to_tile_mesh, adt_to_tile_mesh_on, area_id_at, find_tile_near, ground_effect_at, impassable_at, load_tile_mesh,
+     load_tiles_around, mcsh_shadowed_at, terrain_height_at, triangle_z_at, ChunkMesh, Doodad,
+     MapTiles, TileMesh, WmoInstance, ALPHA_MAP_SIZE, CHUNK_SIZE, SHADOW_MAP_SIZE, STORMWIND_XY,
+     TERRAIN_LAYER_TILES, TILE_SIZE,
+diff --git a/crates/benilla-formats/src/terrain.rs b/crates/benilla-formats/src/terrain.rs
+index 9848743d..a88a0f86 100644
+--- a/crates/benilla-formats/src/terrain.rs
++++ b/crates/benilla-formats/src/terrain.rs
+@@ -292,8 +292,22 @@ pub(crate) fn snap_to_lattice(coord: f32) -> f32 {
+     (map_center - idx * unit) as f32
+ }
+ 
+-/// Build per-chunk meshes from one vanilla (monolithic) ADT file's bytes.
++/// Build per-chunk meshes from one vanilla (monolithic) ADT file's bytes, as authored.
+ pub fn adt_to_tile_mesh(adt_bytes: &[u8]) -> Result<TileMesh> {
++    adt_to_tile_mesh_edited(adt_bytes, None)
++}
++
++/// [`adt_to_tile_mesh`] for a tile of `map` (its `World\Maps` directory), with that map's
++/// [`crate::world_edits`] applied: hidden placements dropped and filled chunks' holes cleared,
++/// here, so every consumer of the tile sees the same edited world.
++pub fn adt_to_tile_mesh_on(map: &str, adt_bytes: &[u8]) -> Result<TileMesh> {
++    adt_to_tile_mesh_edited(adt_bytes, crate::world_edits::edits_for(map))
++}
++
++fn adt_to_tile_mesh_edited(
++    adt_bytes: &[u8],
++    edits: Option<&crate::world_edits::MapEdits>,
++) -> Result<TileMesh> {
+     let mut cursor = Cursor::new(adt_bytes);
+     let parsed = parse_adt(&mut cursor).map_err(|e| anyhow::anyhow!("parsing ADT: {e}"))?;
+     // A vanilla ADT is always one monolithic root.
+@@ -352,8 +366,13 @@ pub fn adt_to_tile_mesh(adt_bytes: &[u8]) -> Result<TileMesh> {
+         }
+ 
+         // Four fan triangles per cell, CCW from above (front face up in Bevy under the det +1
+-        // transform); a set hole bit drops its 2×2 block, and 1.12 has no high-res holes.
+-        let holes = mcnk.header.holes_low_res;
++        // transform); a set hole bit drops its 2×2 block, and 1.12 has no high-res holes. A
++        // world edit fills a chunk's holes ([`crate::world_edits`]).
++        let holes = if edits.is_some_and(|e| e.fills_chunk([wx, wy])) {
++            0
++        } else {
++            mcnk.header.holes_low_res
++        };
+         let mut indices = Vec::with_capacity(8 * 8 * 12);
+         for row in 0..8u32 {
+             for col in 0..8u32 {
+@@ -466,6 +485,7 @@ pub fn adt_to_tile_mesh(adt_bytes: &[u8]) -> Result<TileMesh> {
+     let doodads = root
+         .doodad_placements
+         .iter()
++        .filter(|d| !edits.is_some_and(|e| e.hides_doodad(d.unique_id)))
+         .filter_map(|d| {
+             let model = root.models.get(d.name_id as usize)?.clone();
+             Some(Doodad {
+@@ -486,6 +506,7 @@ pub fn adt_to_tile_mesh(adt_bytes: &[u8]) -> Result<TileMesh> {
+     let wmos = root
+         .wmo_placements
+         .iter()
++        .filter(|w| !edits.is_some_and(|e| e.hides_wmo(w.unique_id)))
+         .filter_map(|w| {
+             let model = root.wmos.get(w.name_id as usize)?.clone();
+             Some(WmoInstance {
+@@ -607,7 +628,7 @@ pub fn load_tile_mesh(chain: &mut Chain, map: &str, tile_x: u32, tile_y: u32) ->
+     let bytes = chain
+         .read_file(&path)
+         .with_context(|| format!("reading {path}"))?;
+-    adt_to_tile_mesh(&bytes)
++    adt_to_tile_mesh_on(map, &bytes)
+ }
+ 
+ /// Load every existing ADT tile within `radius` tiles of the world (x, y) on `map`.
+@@ -688,6 +709,34 @@ mod tests {
+         chunk(b"KNCM", &[h, mcvt, mcnr].concat())
+     }
+ 
++    /// One flat chunk with its north-west corner at `nw` and these hole bits.
++    fn holed_tile(nw: [f32; 2], holes: u16) -> Vec<u8> {
++        let mut t = flat_tile([0, 0, 127]);
++        // Past the MCNK magic and size: the header.
++        t[8 + 0x3C..8 + 0x3E].copy_from_slice(&holes.to_le_bytes());
++        t[8 + 0x68..8 + 0x6C].copy_from_slice(&nw[0].to_le_bytes());
++        t[8 + 0x6C..8 + 0x70].copy_from_slice(&nw[1].to_le_bytes());
++        t
++    }
++
++    /// Map 0's world edits fill the garrison's holes where the tile is parsed, so the mesh, the
++    /// collider and every height query built on the chunk see ground there; elsewhere, and on
++    /// another map, the holes stay.
++    #[test]
++    fn a_world_edit_fills_a_chunks_holes_on_its_own_map_only() {
++        let full = 8 * 8 * 12;
++        let garrison = holed_tile([-9600.0, 700.0], 0xfeee);
++        let authored = adt_to_tile_mesh(&garrison).unwrap();
++        assert!(authored.chunks[0].indices.len() < full);
++        let edited = adt_to_tile_mesh_on("Azeroth", &garrison).unwrap();
++        assert_eq!(edited.chunks[0].holes, 0);
++        assert_eq!(edited.chunks[0].indices.len(), full);
++        let elsewhere = adt_to_tile_mesh_on("Kalimdor", &garrison).unwrap();
++        assert_eq!(elsewhere.chunks[0].holes, 0xfeee);
++        let far = adt_to_tile_mesh_on("Azeroth", &holed_tile([-9000.0, 700.0], 0xfeee)).unwrap();
++        assert_eq!(far.chunks[0].holes, 0xfeee);
++    }
++
+     /// `CMapChunk::LoadNormals` (`0x6aff10`) keeps the MCNR bytes in file order, X, Y, Z, so the
+     /// mesh's normal is the bytes over 127 with no swap.
+     #[test]
+diff --git a/crates/benilla-formats/src/world_edits.rs b/crates/benilla-formats/src/world_edits.rs
+new file mode 100644
+index 00000000..a1e80288
+--- /dev/null
++++ b/crates/benilla-formats/src/world_edits.rs
+@@ -0,0 +1,114 @@
++//! Basin Battle's edits to the world as the ADTs author it, benilla's own (no reference
++//! behaviour): placements hidden and terrain holes filled, applied once where a tile is parsed
++//! ([`crate::adt_to_tile_mesh_on`]), so the terrain mesh, its collider, its ground clutter, every
++//! height query and the WMO and doodad streams all see the same edited world.
++//!
++//! The table mirrors htl-map's `WESTBROOK_EDITS` (`crates/htl-map/src/elwynn.rs` in the Hold the
++//! Line repository), which the Elwynn Survival server builds its land from: the two must change
++//! together, or the client draws (and collides with) a world the server does not walk.
++
++use crate::terrain::CHUNK_SIZE;
++
++/// One map's edits.
++#[derive(Debug, Clone, Copy)]
++pub struct MapEdits {
++    /// The map's directory under `World\Maps` (map 0 is `Azeroth`).
++    pub map: &'static str,
++    /// MODF `uniqueId`s of WMO placements that are not there: not drawn, no collision, no portal
++    /// or interior lighting from them.
++    pub hidden_wmos: &'static [u32],
++    /// MDDF `uniqueId`s of doodad placements that are not there: not drawn, no collision.
++    pub hidden_doodads: &'static [u32],
++    /// Circles (WoW `[x north, y west]`, radius in yards): every MCNK chunk whose area overlaps
++    /// one has its terrain holes cleared, so its own MCVT heights are drawn and walked there.
++    pub filled_ground: &'static [([f32; 2], f32)],
++}
++
++/// Westbrook Garrison (Elwynn), taken down for the Elwynn Survival camp: the barracks, the
++/// barrels, crates, jars and bucket round it, and the holes its floor stood in.
++pub const WESTBROOK_EDITS: MapEdits = MapEdits {
++    map: "Azeroth",
++    // world\wmo\azeroth\buildings\human_barracks\human_barracks.wmo at (-9656.0, 684.4, 40.6).
++    hidden_wmos: &[71670],
++    hidden_doodads: &[
++        71666, 71667, 71668, 71669, 17030, 17031, 17032, 17033, 17034, 17035, 17036, 17037,
++    ],
++    filled_ground: &[([-9620.0, 690.0], 45.0)],
++};
++
++/// Every map's edits.
++pub const WORLD_EDITS: &[MapEdits] = &[WESTBROOK_EDITS];
++
++/// The edits for the map with this directory name (case-insensitive), if any.
++pub fn edits_for(map: &str) -> Option<&'static MapEdits> {
++    WORLD_EDITS.iter().find(|e| e.map.eq_ignore_ascii_case(map))
++}
++
++/// The map directory an ADT path names (`World\Maps\Azeroth\Azeroth_32_48.adt`, either slash):
++/// its file stem without the `_<x>_<y>` tile suffix.
++pub fn map_of_adt_path(path: &str) -> Option<&str> {
++    let file = path.rsplit(['\\', '/']).next()?;
++    let stem = file
++        .strip_suffix(".adt")
++        .or_else(|| file.strip_suffix(".ADT"))?;
++    let mut parts = stem.rsplitn(3, '_');
++    let (y, x, map) = (parts.next()?, parts.next()?, parts.next()?);
++    (x.parse::<u32>().is_ok() && y.parse::<u32>().is_ok() && !map.is_empty()).then_some(map)
++}
++
++impl MapEdits {
++    pub fn hides_wmo(&self, unique_id: u32) -> bool {
++        self.hidden_wmos.contains(&unique_id)
++    }
++
++    pub fn hides_doodad(&self, unique_id: u32) -> bool {
++        self.hidden_doodads.contains(&unique_id)
++    }
++
++    /// Whether the chunk whose north-west corner is `corner` (its header position: it spans
++    /// `CHUNK_SIZE` south in x and east in y) has its holes filled.
++    pub fn fills_chunk(&self, corner: [f32; 2]) -> bool {
++        self.filled_ground.iter().any(|&([cx, cy], r)| {
++            let nx = cx.clamp(corner[0] - CHUNK_SIZE, corner[0]);
++            let ny = cy.clamp(corner[1] - CHUNK_SIZE, corner[1]);
++            (cx - nx).hypot(cy - ny) <= r
++        })
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_garrison_chunks_seen_with_holes_are_filled_and_far_ones_not() {
++        let e = edits_for("azeroth").expect("map 0's edits");
++        for corner in [
++            [-9566.7, 700.0],
++            [-9600.0, 700.0],
++            [-9600.0, 666.7],
++            [-9633.3, 700.0],
++            [-9633.3, 666.7],
++        ] {
++            assert!(e.fills_chunk(corner), "{corner:?}");
++        }
++        assert!(!e.fills_chunk([-9500.0, 700.0]));
++        assert!(!e.fills_chunk([-9620.0, 800.0]));
++        assert!(e.hides_wmo(71670) && !e.hides_wmo(71671));
++        assert!(e.hides_doodad(17037) && !e.hides_doodad(17038));
++        assert!(edits_for("Kalimdor").is_none());
++    }
++
++    #[test]
++    fn an_adt_path_names_its_map() {
++        assert_eq!(
++            map_of_adt_path("World\\Maps\\Azeroth\\Azeroth_32_48.adt"),
++            Some("Azeroth")
++        );
++        assert_eq!(
++            map_of_adt_path("world/maps/DeadminesInstance/DeadminesInstance_31_32.adt"),
++            Some("DeadminesInstance")
++        );
++        assert_eq!(map_of_adt_path("World\\Maps\\Azeroth\\Azeroth.wdt"), None);
++    }
++}
+-- 
+2.43.0
+
