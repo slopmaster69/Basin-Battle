@@ -1692,6 +1692,6 @@ fn the_books_record_of_a_dungeon_lists_its_bosses_their_gear_and_the_camps_kills
     assert!(text.contains("Mr. Smite: felled 2 times") && text.contains("Smite's Mighty Hammer"), "{text}");
     assert!(text.contains("Cookie: not felled yet"), "{text}");
     // A trophy is the camp's the first time; after, it's in the chest.
-    let line = |who: &str| text.lines().find(|l| l.contains(who)).unwrap_or("").to_string();
+    let line = |who: &str| text.lines().find(|l| l.starts_with(&format!("- {who}:"))).unwrap_or("").to_string();
     assert!(line("Mr. Smite").contains("in the camp's chest") && line("Cookie").contains("the camp's the first time"), "{text}");
 }
