@@ -557,6 +557,10 @@ impl SurvivalGame {
                 let line = self.mark_line(id, pos, radius);
                 let conns: Vec<(ConnId, Id, u8)> = self.in_world().map(|(c, _, w)| (*c, w.id, if w.addon { w.level } else { 0 })).collect();
                 for (c, hero, level) in conns {
+                    // A leap's landing isn't drawn for the hero leaping (others still see it).
+                    if tele.is_some_and(|t| t.own_hidden && t.mob == hero) {
+                        continue;
+                    }
                     match tele {
                         // A shape on the ground at a spot (a sky-fall, a strip), on the clients
                         // that lay one there; the rest the circle.

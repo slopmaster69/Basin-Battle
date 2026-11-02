@@ -2372,6 +2372,12 @@ impl Content {
             }
             m.phases.sort_by(|a, b| b.at.total_cmp(&a.at));
         }
+        // An ultimate's control and movement take on bosses too (everything else's don't).
+        for a in self.abilities.iter_mut().filter(|a| a.slot == "ultimate") {
+            for e in a.effects.iter_mut().chain(a.tick_effects.iter_mut()).chain(a.tether_effects.iter_mut()) {
+                e.vs_bosses = true;
+            }
+        }
     }
 
     /// Honed copies of every piece the dungeons' foes carry (weapons and armour), a tier each:

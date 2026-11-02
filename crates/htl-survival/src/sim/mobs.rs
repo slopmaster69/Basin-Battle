@@ -501,6 +501,10 @@ impl Survival {
     /// A creature hurt by `by`: what took it (`label`) for a hero's damage meter.
     pub(crate) fn hurt_mob_as(&mut self, mid: Id, by: Id, damage: u32, label: &str) {
         let now = self.clock;
+        // A hero's own totem or summon, or a friend's, takes nothing from them.
+        if self.own_totem(mid, by) {
+            return;
+        }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
@@ -1480,7 +1484,7 @@ impl Survival {
                     let seen = self
                         .players
                         .iter()
-                        .filter(|(h, p)| p.health > 0 && dist2d(p.pos, pos) <= d.aggro && !self.unseen(**h))
+                        .filter(|(h, p)| p.health > 0 && dist2d(p.pos, pos) <= d.aggro && !self.unseen_by(id, **h))
                         .filter(|(_, p)| clear_line(self.land.as_ref(), pos, p.pos))
                         .min_by(|a, b| dist2d(a.1.pos, pos).total_cmp(&dist2d(b.1.pos, pos)))
                         .map(|(id, _)| *id);
@@ -1895,7 +1899,7 @@ impl Survival {
             Foe::Hero(h) => Some(h),
             _ => None,
         };
-        let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false };
+        let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
         let mark = if a.ranged {
             self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
             // A lobbed throw that splashes: where it will come down is chosen now and marked

@@ -477,7 +477,7 @@ impl Survival {
         let mut out: Vec<(Id, Vec3, f32, f32)> = self
             .mobs
             .iter()
-            .filter(|(id, m)| **id != skip && m.health > 0 && !m.hidden)
+            .filter(|(id, m)| **id != skip && m.health > 0 && !m.hidden && !self.own_totem(**id, skip))
             .map(|(id, m)| {
                 let s = self.content.mobs[m.def].scale;
                 (*id, m.pos, HERO_TALL * s, 0.5 * s)
@@ -1324,7 +1324,7 @@ impl Survival {
             // Under a living unit the ring goes with them (a warning to all); else it's laid where
             // it lies, as the caster's ground.
             let tele = match alive {
-                Some(u) => Telegraph { mob: u, reach: splash, arc: 360.0, secs, blockable: false, foe: self.players.contains_key(&u).then_some(u), width: 0.0, at: None, hero: false },
+                Some(u) => Telegraph { mob: u, reach: splash, arc: 360.0, secs, blockable: false, foe: self.players.contains_key(&u).then_some(u), width: 0.0, at: None, hero: false, own_hidden: false },
                 None => Telegraph::hero_shape(p.owner, splash, 360.0, 0.0, secs, Some((at, 0.0))),
             };
             mark = Some(self.mark_as(at, splash, secs + 0.1, Some(tele)));
@@ -1573,7 +1573,7 @@ impl Survival {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ability_on_mob(&mut self, owner: Id, mid: Id, ability: usize, share: f32, base: f32, from: Vec3, how: HitKind, spell: u32) {
         let now = self.clock;
-        if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) {
+        if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) || self.own_totem(mid, owner) {
             return;
         }
         if self.players.contains_key(&owner) && self.evading(mid, owner) {
@@ -1666,25 +1666,33 @@ impl Survival {
     pub(crate) fn apply_effects(&mut self, owner: Id, victim: Id, effects: &[crate::content::AbilityEffect], share: f32, source: &str) {
         for e in effects {
             let secs = AbilityDef::at(e.secs, share);
-            match e.kind.as_str() {
-                "heal" => {
-                    let heal = self.players.get(&owner).map_or(0, |p| (p.max_health as f32 * e.amount).round() as u32);
-                    self.heal_hero_by(owner, heal, owner, source);
-                }
-                "cleanse_panic" => self.cleanse(victim, &["panic"]),
-                "knockback" | "pull" => self.displace(owner, victim, e),
-                "burn" | "mark" => {
-                    self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
-                }
-                "snare" if e.freeze_if_snared && self.has_cc(victim, "snare") => {
-                    self.apply_cc(victim, owner, "petrify", secs.min(2.0).max(1.0), 0.0, 0.0, source);
-                }
-                kind => {
-                    let took = self.apply_cc_look(victim, owner, kind, secs, e.amount, e.break_after, source, e.aura);
-                    // A shield that bursts as it ends: its burst waits on whoever holds it.
-                    if took && !e.pop.is_empty() {
-                        self.hold_pop(victim, &e.pop);
-                    }
+            // An ultimate's take on bosses too: said to `apply_cc` for this effect alone.
+            let was = std::mem::replace(&mut self.fx_vs_bosses, e.vs_bosses);
+            self.apply_effect(owner, victim, e, secs, source);
+            self.fx_vs_bosses = was;
+        }
+    }
+
+    /// One of an ability's effects on someone, `secs` long.
+    fn apply_effect(&mut self, owner: Id, victim: Id, e: &crate::content::AbilityEffect, secs: f32, source: &str) {
+        match e.kind.as_str() {
+            "heal" => {
+                let heal = self.players.get(&owner).map_or(0, |p| (p.max_health as f32 * e.amount).round() as u32);
+                self.heal_hero_by(owner, heal, owner, source);
+            }
+            "cleanse_panic" => self.cleanse(victim, &["panic"]),
+            "knockback" | "pull" => self.displace(owner, victim, e),
+            "burn" | "mark" => {
+                self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
+            }
+            "snare" if e.freeze_if_snared && self.has_cc(victim, "snare") => {
+                self.apply_cc(victim, owner, "petrify", secs.min(2.0).max(1.0), 0.0, 0.0, source);
+            }
+            kind => {
+                let took = self.apply_cc_look(victim, owner, kind, secs, e.amount, e.break_after, source, e.aura);
+                // A shield that bursts as it ends: its burst waits on whoever holds it.
+                if took && !e.pop.is_empty() {
+                    self.hold_pop(victim, &e.pop);
                 }
             }
         }
@@ -2105,8 +2113,11 @@ impl Survival {
         self.fx_from = was;
     }
 
-    fn own_totem(&self, mid: Id, owner: Id) -> bool {
-        self.totems.iter().any(|t| t.mob == mid && t.owner == owner)
+    /// A hero's totem or summon (Summon Infernal's demon) that `by` mustn't hurt: their own, or a
+    /// friend's (a hero they can't harm: always in co-op, only a Siege partner in Siege). With
+    /// friendly fire on in the open world, another hero's is fair game; your own never is.
+    pub(crate) fn own_totem(&self, mid: Id, by: Id) -> bool {
+        self.totems.iter().any(|t| t.mob == mid && (t.owner == by || (self.players.contains_key(&by) && !self.hostile(by, t.owner))))
     }
 
     fn cone(&mut self, id: Id, ability: usize, yaw: f32, share: f32) {

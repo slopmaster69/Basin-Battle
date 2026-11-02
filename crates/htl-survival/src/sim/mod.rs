@@ -300,12 +300,15 @@ pub struct Telegraph {
     pub at: Option<(Vec3, f32)>,
     /// A hero's own (their friends see it as a friend's, their foes as a warning).
     pub hero: bool,
+    /// Not drawn for the hero it's theirs (a leap's landing: they know where they aimed; others
+    /// still see it coming).
+    pub own_hidden: bool,
 }
 
 impl Telegraph {
     /// A hero's ability on the ground: a ring (`arc` 360), a wedge or a strip.
     pub fn hero_shape(owner: Id, reach: f32, arc: f32, width: f32, secs: f32, at: Option<(Vec3, f32)>) -> Self {
-        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true }
+        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true, own_hidden: false }
     }
 }
 
@@ -816,6 +819,10 @@ pub struct Survival {
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
+    /// The effect being given takes on a foe that holds its ground (an ultimate's).
+    pub(crate) fx_vs_bosses: bool,
+    /// When a hero may next be told this foe shrugged their control off (hero, foe).
+    pub(crate) told_immune: BTreeMap<(Id, Id), f32>,
     /// Counters' stances (a hero's, a dummy's), by unit.
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
@@ -909,6 +916,8 @@ impl Survival {
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             fx_from: None,
+            fx_vs_bosses: false,
+            told_immune: BTreeMap::new(),
             grounds: Vec::new(),
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),

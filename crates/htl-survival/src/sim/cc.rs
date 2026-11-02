@@ -36,6 +36,8 @@ const DISABLED: [&str; 4] = ["stun", "incapacitate", "petrify", "panic"];
 const PANIC_STRIDE: f32 = 0.5;
 /// How many lines of the crowd-control log a hero keeps.
 const LOG_KEEP: usize = 40;
+/// A hero is told a foe shrugged their control off at most this often, per foe.
+const IMMUNE_TOLD_EVERY: f32 = 1.5;
 
 
 /// How much larger Onslaught draws a hero.
@@ -136,6 +138,12 @@ impl Survival {
         }
         // Freed (Blessing of Freedom): no root, slow or stun takes hold.
         if FREEDOM.contains(&kind) && self.has_cc(target, "freedom") {
+            return false;
+        }
+        // A boss, a totem, a creature winding up a blow no guard stops: it shrugs control off
+        // (an ultimate's aside).
+        if !boon && from != target && crate::content::CONTROL.contains(&kind) && !self.fx_vs_bosses && self.holds_ground(target) {
+            self.shrugged_off(from, target);
             return false;
         }
         let secs = if hero && !boon { secs * self.content.cc.player_share } else { secs };
@@ -514,6 +522,33 @@ impl Survival {
     }
 
     /// A unit nothing reaches (in Ice Block).
+    /// A creature that holds its ground: a champion (a boss), a totem, or one winding up a blow no
+    /// guard stops (unstoppable). Crowd control and forced movement don't take on it, except an
+    /// ultimate's. Heroes are never this (Ice Block and Onslaught keep their own rules).
+    pub fn holds_ground(&self, id: Id) -> bool {
+        let Some(m) = self.mobs.get(&id) else { return false };
+        let d = &self.content.mobs[m.def];
+        d.boss || d.totem || (matches!(m.state, super::mobs::MobState::Windup { .. }) && !self.attack_now(id).blockable)
+    }
+
+    /// The hero whose control a foe shrugged off is told so (as WoW says it: Immune), once a
+    /// moment per foe so a burst over a crowd doesn't flood the screen.
+    pub(crate) fn shrugged_off(&mut self, from: Id, target: Id) {
+        if !self.players.contains_key(&from) {
+            return;
+        }
+        let now = self.clock;
+        let key = (from, target);
+        if self.told_immune.get(&key).is_some_and(|t| now < *t) {
+            return;
+        }
+        if self.told_immune.len() > 256 {
+            self.told_immune.retain(|_, t| now < *t);
+        }
+        self.told_immune.insert(key, now + IMMUNE_TOLD_EVERY);
+        self.events.push(Event::Flash { player: from, text: format!("{}: Immune", self.unit_name(target)) });
+    }
+
     pub fn immune(&self, id: Id) -> bool {
         self.stances.get(&id).is_some_and(|s| s.until > self.clock && self.content.abilities[s.ability].counter.as_ref().is_some_and(|c| c.immune))
     }
