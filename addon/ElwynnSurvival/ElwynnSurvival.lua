@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 8
+local VERSION = 9
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -541,7 +541,16 @@ function ES.MovesLine(f)
     local m = Move(parts[i])
     if m then table.insert(light, m) end
   end
-  -- Another model's clips start loading now, so the first blow already has them.
+  -- Another model's clips start loading now, so the first blow already has them: every
+  -- character model a foe's blows may come from (once), and those our own moves name.
+  if PreloadAnimationSource and not ES.donorsLoading then
+    ES.donorsLoading = true
+    local races = { "Human", "Orc", "Dwarf", "NightElf", "Scourge", "Tauren", "Gnome", "Troll" }
+    for i = 1, table.getn(races) do
+      PreloadAnimationSource(races[i] .. "Male")
+      PreloadAnimationSource(races[i] .. "Female")
+    end
+  end
   if PreloadAnimationSource then
     -- (The heavy, running, bash and kick blows, then those out of a dodge and a Corey roll.)
     local all = {}
