@@ -91,7 +91,13 @@ pub struct BookDungeon {
     /// to next (the easiest open dungeon not yet cleared).
     pub cleared: bool,
     pub next: bool,
+    /// What reads its pages while they're in cipher, in words (empty when open).
+    pub locked: String,
 }
+
+/// A tier past the first opens once the camp has cleared this many dungeons of the tier below
+/// (every boss down in one run): two of the three, so a camp stuck on one can go round it.
+pub const LADDER_CLEARS: u32 = 2;
 
 /// A door's state as it's drawn: open, or shut.
 pub fn door_open(below: &Below, d: &DoorDef) -> bool {
@@ -437,8 +443,9 @@ impl Survival {
                 icon: d.icon.clone(),
                 blurb: d.blurb.clone(),
                 first_page: d.first_page.clone(),
-                open: self.debug || self.camp.raids_won >= d.gate_raids,
+                open: self.dungeon_open(d),
                 gate: d.gate_raids,
+                locked: if self.dungeon_open(d) { String::new() } else { self.gate_words(d) },
                 lamps: d.lamps.len(),
                 pages: d.lamps.iter().enumerate().filter(|(k, l)| *k == 0 || self.pages.contains(&l.key)).map(|(_, l)| (l.key.clone(), l.name.clone())).collect(),
                 secrets: (d.doors.iter().filter(|dr| dr.secret() && self.ever("secret", &dr.key)).count(), d.doors.iter().filter(|dr| dr.secret()).count()),
@@ -451,10 +458,47 @@ impl Survival {
             .collect()
     }
 
+    /// Whether the camp can read a dungeon's pages: past its raids (`gate_raids`), and for a tier
+    /// past the first, with [`LADDER_CLEARS`] of the tier below cleared (or all of them, if it
+    /// has fewer). A dungeon the camp has been in already (a lamp lit, a boss felled) stays open.
+    pub fn dungeon_open(&self, d: &DungeonDef) -> bool {
+        if self.debug {
+            return true;
+        }
+        let reached = self.ever("cleared", &d.key)
+            || d.lamps.iter().skip(1).any(|l| self.ever("delve", &l.key))
+            || d.packs.iter().any(|p| self.content.mob(&p.mob).is_some_and(|m| self.content.mobs[m].boss) && self.ever("kill", &p.mob));
+        if reached {
+            return true;
+        }
+        self.camp.raids_won >= d.gate_raids && self.ladder_short(d) == 0
+    }
+
+    /// How many more of the tier below a dungeon the camp must clear to read it (0: none).
+    fn ladder_short(&self, d: &DungeonDef) -> u32 {
+        if d.tier <= 1 {
+            return 0;
+        }
+        let below: Vec<&DungeonDef> = self.content.dungeons().filter(|o| o.tier + 1 == d.tier).collect();
+        let need = (LADDER_CLEARS as usize).min(below.len()) as u32;
+        let have = below.iter().filter(|o| self.ever("cleared", &o.key)).count() as u32;
+        need.saturating_sub(have)
+    }
+
+    /// What reads a locked dungeon's pages, in words ("clear 1 more of the Tier I dungeons").
+    pub fn gate_words(&self, d: &DungeonDef) -> String {
+        if self.camp.raids_won < d.gate_raids {
+            return format!("hold the camp against {} raid(s) first", d.gate_raids);
+        }
+        let short = self.ladder_short(d);
+        let tier = ["Tier I", "Tier II", "Tier III"].get(d.tier.saturating_sub(2) as usize).copied().unwrap_or("easier");
+        format!("clear {short} more of the {tier} dungeons first (every boss down in one run)")
+    }
+
     /// The dungeon the book points to next: the easiest open one the camp hasn't cleared (the
     /// book's own order among the same tier).
     pub fn next_dungeon(&self) -> Option<&DungeonDef> {
-        let mut list: Vec<&DungeonDef> = self.content.dungeons().filter(|d| (self.debug || self.camp.raids_won >= d.gate_raids) && !self.ever("cleared", &d.key)).collect();
+        let mut list: Vec<&DungeonDef> = self.content.dungeons().filter(|d| self.dungeon_open(d) && !self.ever("cleared", &d.key)).collect();
         list.sort_by_key(|d| d.tier);
         list.into_iter().next()
     }
@@ -466,7 +510,7 @@ impl Survival {
 
     /// Whether the camp has earned the book (any of its dungeons).
     pub fn book_open(&self) -> bool {
-        self.debug || self.content.dungeons().any(|d| self.camp.raids_won >= d.gate_raids)
+        self.debug || self.content.dungeons().any(|d| self.dungeon_open(d))
     }
 
     pub fn book_id(&self) -> Id {
@@ -532,7 +576,7 @@ impl Survival {
         }
         if !self.book_pages().iter().any(|(k, _)| k == to) {
             return match self.content.dungeon_of_lamp(to) {
-                Some(d) if !(self.debug || self.camp.raids_won >= d.gate_raids) => Err(format!("{}'s pages are still in cipher: hold the camp against {} raid(s) first.", d.name, d.gate_raids)),
+                Some(d) if !self.dungeon_open(d) => Err(format!("{}'s pages are still in cipher: {}.", d.name, self.gate_words(d))),
                 _ => Err("That page is blank: light its lamp below first.".into()),
             };
         }

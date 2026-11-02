@@ -1683,7 +1683,7 @@ pub struct GoalDef {
 }
 
 impl GoalDef {
-    pub const KINDS: [&'static str; 13] = ["bank", "build", "craft", "kill", "gather", "raid", "wear", "clear", "delve", "explore", "open", "secret", "learn"];
+    pub const KINDS: [&'static str; 14] = ["bank", "build", "craft", "kill", "gather", "raid", "wear", "clear", "delve", "explore", "open", "secret", "learn", "cleared"];
 }
 
 /// A string of blows a creature commits to: each a step (its clip, wind-up, reach, damage...)
@@ -2760,6 +2760,8 @@ impl Content {
                 "explore" => g.what == "any" || self.sites.iter().any(|x| x.key == g.what || x.kind == g.what),
                 "open" => g.what == "any" || self.chests.iter().any(|c| c.key == g.what),
                 "secret" | "learn" => g.what == "any",
+                // A dungeon cleared (every boss down in one run), by its key.
+                "cleared" => self.dungeons().any(|d| d.key == g.what),
                 // Below: the book read, a lamp lit (by its key), out of any dungeon's way out
                 // (`end`) or one's (`end:<dungeon>`).
                 "delve" => {

@@ -470,6 +470,7 @@ impl Survival {
             ObjKind::Book if !self.book_open() && self.arena_def().is_none() => {
                 let gate = self.dungeon_def().map_or(1, |d| d.gate_raids);
                 self.tell(id, format!("The Smuggler's Logbook: a Defias smuggler's, its pages in a cipher. Hold the camp against {gate} raid(s) and the camp's scouts will have read it."));
+                // (Only while no dungeon at all is open: the ladder's locks say theirs on each page.)
             }
             ObjKind::Book => self.events.push(Event::StationOpen {
                 player: id,

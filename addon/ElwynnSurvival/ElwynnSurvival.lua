@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 13
+local VERSION = 14
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -4509,7 +4509,7 @@ function ES.BookDraw()
       detail = "The logbook's first page.",
     })
     if info[4] ~= "1" then
-      Rest(info[2] or "?", "Written in a cipher: hold the camp against " .. (info[5] or "1") .. " raid(s) and the scouts will have read these pages.", "")
+      Rest(info[2] or "?", (info[19] and info[19] ~= "") and ("Written in a cipher. To read these pages, " .. info[19] .. ".") or ("Written in a cipher: hold the camp against " .. (info[5] or "1") .. " raid(s) and the scouts will have read these pages."), "")
       return
     end
     Rest(info[2] or "?", info[9] or "", "")
@@ -4609,7 +4609,7 @@ function ES.BookDraw()
       sub = ((f[18] == "1") and "Next, by the book. " or "") .. ((ES.TierWords and ES.TierWords(f[16])) and (ES.TierWords(f[16]) .. ". ") or "") .. (f[8] or ""),
       go = "Open",
       cmd = function() ES.BookOpen(key) end,
-      detail = opened and ((f[8] or "") .. " Its pages: the way in, and every lamp you've lit.") or ("Hold the camp against " .. (f[5] or "1") .. " raid(s) and the scouts will have read it."),
+      detail = opened and ((f[8] or "") .. " Its pages: the way in, and every lamp you've lit.") or ((f[19] and f[19] ~= "") and ("In cipher. To read it, " .. f[19] .. ".") or ("Hold the camp against " .. (f[5] or "1") .. " raid(s) and the scouts will have read it.")),
     })
   end
   Rest("The way in", "Every dungeon starts at its first page; light the lamps as you go and they're pages too. There aren't many lamps down there.", "")

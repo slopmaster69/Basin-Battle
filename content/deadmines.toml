@@ -11,7 +11,8 @@ name = "The Deadmines"
 # The logbook lies on a lectern beside the camp's chest (Elwynn).
 book = [-9511.0, 110.0]
 book_facing = 5.5
-# The camp holds its first raid before the book can be read.
+# Raids the camp must hold before the book can be read (0: from the start).  The harder tiers
+# open by the ladder instead: see `LADDER_CLEARS` in sim/dungeon.rs.
 gate_raids = 0
 # How hard next to the others (1 to 3): the Deadmines: an early one (17 to 26).
 tier = 1
@@ -2046,6 +2047,68 @@ kind = "delve"
 # (Out of the Deadmines: `end` alone is any dungeon's way out.)
 what = "end:deadmines"
 reward = { roast = 4, linen = 4 }
+
+# --- the ladder: every dungeon of the book, easiest first -------------------------------------------
+# After the Deadmines, the journal walks the camp through the book: the other two of the first
+# tier, then the second (open once two of the first are cleared: `LADDER_CLEARS`), then the third.
+# Each asks for a clear (`cleared`: every boss down in one run), and pays a little more each tier
+# on top of the dungeon's own first-clear gift. (First guesses at the pay, to tune.)
+
+[[goal]]
+title = "Into the fire"
+text = "The book's next pages: Ragefire Chasm, the caves under Orgrimmar where the Searing Blade hides. Clear it: every boss down in one run."
+kind = "cleared"
+what = "ragefire"
+reward = { bronze = 4, leather = 4 }
+
+[[goal]]
+title = "Naralex's nightmare"
+text = "The Wailing Caverns under the Barrens, where the Druids of the Fang dream. Clear it, every Fanglord and Verdan with them."
+kind = "cleared"
+what = "wailing"
+reward = { bronze = 4, linen = 6 }
+
+[[goal]]
+title = "The Stockade"
+text = "Two of the first dungeons cleared: the book reads on. Stormwind's prison is in its inmates' hands. Clear it."
+kind = "cleared"
+what = "stockade"
+reward = { silver = 1, bronze = 6 }
+
+[[goal]]
+title = "Arugal's keep"
+text = "Shadowfang Keep in Silverpine, Arugal's worgen and its old lords' ghosts. Clear it."
+kind = "cleared"
+what = "shadowfang"
+reward = { silver = 2, leather = 6 }
+
+[[goal]]
+title = "The warren of thorns"
+text = "Razorfen Kraul, where Charlga Razorflank speaks for Agamaggan. Clear it."
+kind = "cleared"
+what = "razorfen"
+reward = { silver = 2, linen = 8 }
+
+[[goal]]
+title = "The Crusade's dead"
+text = "The book's last pages: the Scarlet Monastery. Its Graveyard first, where the dead won't stay buried. Clear it."
+kind = "cleared"
+what = "graveyard"
+reward = { silver = 2, pearl = 1 }
+
+[[goal]]
+title = "The Crusade's books"
+text = "The Library: its hounds, its Arcanist, and whatever he keeps bound in his tomes. Clear it."
+kind = "cleared"
+what = "library"
+reward = { silver = 3, pearl = 1 }
+
+[[goal]]
+title = "The Crusade's heart"
+text = "The Cathedral: Mograine at the altar, and Whitemane who won't let him die. Clear it, and the book is done."
+kind = "cleared"
+what = "cathedral"
+reward = { silver = 4, pearl = 2 }
 
 # === secrets, rares and the Brotherhood's other hands ===============================================
 # What isn't on the way through: a hidden pantry, a captain's quarters, a cave-in that isn't one,

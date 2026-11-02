@@ -369,14 +369,15 @@ fn the_book_at_camp_opens_after_the_first_raid_and_sends_a_hero_down() {
     // Both of this dungeon's, and each other dungeon's first page after them, the easiest first.
     let pages: Vec<String> = s.book_pages().into_iter().map(|(k, _)| k).collect();
     assert_eq!(&pages[..2], &["first", "second"]);
-    let mut more: Vec<&crate::content::DungeonDef> = s.content.more_dungeons.iter().collect();
+    // (The first tier's: the harder ones open as the camp clears the easier, the ladder.)
+    let mut more: Vec<&crate::content::DungeonDef> = s.content.more_dungeons.iter().filter(|d| d.tier <= 1).collect();
     more.sort_by_key(|d| d.tier);
     let firsts: Vec<String> = more.iter().map(|d| d.lamps[0].key.clone()).collect();
     assert_eq!(pages[2..].to_vec(), firsts);
     let books = s.book_dungeons();
     assert_eq!(books[0].key, "deadmines");
     assert_eq!(books.len(), 1 + s.content.more_dungeons.len());
-    assert!(books.iter().all(|b| b.open));
+    assert!(books.iter().all(|b| b.open == (b.tier <= 1)));
 }
 
 #[test]
@@ -1639,4 +1640,41 @@ fn the_quartermaster_hones_the_dungeons_own_gear_and_sells_a_flask_for_its_curre
     s.players.get_mut(&id).unwrap().bag.insert(plunder, price);
     s.buy(id, &d.flask).unwrap();
     assert_eq!(s.below.as_ref().unwrap().heroes["ayla"].flasks, 1);
+}
+
+#[test]
+fn a_harder_tier_opens_once_two_of_the_tier_below_are_cleared() {
+    let c = Content::builtin();
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 0.0);
+    let open = |s: &Survival, k: &str| s.book_dungeons().into_iter().find(|b| b.key == k).map(|b| (b.open, b.locked)).unwrap();
+    assert!(open(&camp, "deadmines").0 && open(&camp, "ragefire").0, "the first tier from the start");
+    let (shut, words) = open(&camp, "stockade");
+    assert!(!shut && words.contains("clear 2 more of the Tier I"), "{words}");
+    assert!(!open(&camp, "cathedral").0);
+    assert!(!camp.book_pages().iter().any(|(_, n)| n.contains("Stockade")), "no page to go down by");
+    // One cleared: one more to go. Two: the second tier reads.
+    camp.camp.counts.insert("cleared:deadmines".into(), 1);
+    assert!(open(&camp, "stockade").1.contains("clear 1 more"));
+    camp.camp.counts.insert("cleared:wailing".into(), 1);
+    assert!(open(&camp, "stockade").0 && open(&camp, "razorfen").0);
+    assert!(!open(&camp, "graveyard").0, "the third waits on the second");
+    // A dungeon the camp has been in already stays open (an old camp isn't locked out).
+    camp.camp.counts.insert("kill:gy_vishas".into(), 1);
+    assert!(open(&camp, "graveyard").0);
+}
+
+#[test]
+fn the_journal_walks_the_camp_through_every_dungeon_by_their_clears() {
+    let c = Content::builtin();
+    let keys: Vec<String> = c.dungeons().map(|d| d.key.clone()).collect();
+    for k in keys.iter().filter(|k| *k != "deadmines") {
+        assert!(c.goals.iter().any(|g| g.kind == "cleared" && &g.what == k), "a journal step for {k}");
+    }
+    // In the book's order: no step for a harder tier before every one of an easier tier's.
+    let tier = |k: &str| c.dungeons().find(|d| d.key == k).unwrap().tier;
+    let steps: Vec<u32> = c.goals.iter().filter(|g| g.kind == "cleared").map(|g| tier(&g.what)).collect();
+    assert!(steps.windows(2).all(|w| w[0] <= w[1]), "{steps:?}");
+    let camp = Survival::new(c.clone(), Box::new(FlatLand::default()), 1, 0.0);
+    let g = c.goals.iter().find(|g| g.kind == "cleared" && g.what == "ragefire").unwrap();
+    assert_eq!(camp.goal_progress(g), (0, 1));
 }
