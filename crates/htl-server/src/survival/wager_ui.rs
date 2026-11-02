@@ -20,7 +20,7 @@ impl SurvivalGame {
         let mut paras = vec![
             format!("The Bookmaker bets you can't clear {} before the sand runs out.", d.name),
             format!(
-                "Take a wager below and the dungeon starts fresh for your run: every boss up again, every secret hidden, every shortcut shut. At the first lamp, each of you says you're ready (the button on the clock, or .es ready). When everyone has, the clock starts after a short count, or at once if someone steps away from the lamp first. It stops when the last boss falls and enough of the dungeon's foes are down too: {needed} of its {total}. Each death costs {}.",
+                "Take a wager below and the dungeon starts fresh for your run: every boss up again, every secret hidden, every shortcut shut. At the first lamp, each of you says you're ready (the button on the clock, or .es ready). When everyone has, the clock starts after a short count, or at once if someone steps away from the lamp first. It stops when the last boss falls and enough of the dungeon's foes are down too: {needed} of its {total} for one hero, more for a band (every pack grows with the heroes below). Each death costs {}.",
                 clock_words(WAGER_DEATH)
             ),
             "Foes chase much farther during a wager, so you can pull one pack into the next and fight them together. Big pulls are the quick way to the count.".to_string(),
@@ -157,10 +157,17 @@ impl SurvivalGame {
 {}", lines.join("
 "))
         };
+        // The camp's own best this week, and what the Bookmaker's chest will pay for it.
+        let mine = match self.sim.week_best_here() {
+            Some((level, d)) => format!("Your camp's best this week: +{level} in {}. When the week turns, the Bookmaker's chest pays it: that dungeon's gear, more and finer the higher the level.", names.get(&d).unwrap_or(&d)),
+            None => "Win a wager in time this week and the Bookmaker's chest pays your camp's best when the week turns: that dungeon's gear, more and finer the higher the level.".to_string(),
+        };
         let text = format!("The terms turned on Monday. This week, as the stakes rise:
 {}
 
-{last}", terms.join("
+{last}
+
+{mine}", terms.join("
 "));
         let mut links = vec![(".es ladder".to_string(), "The Bookmaker's Ladder".to_string())];
         if let Some(d) = self.sim.next_dungeon().or_else(|| self.sim.content.dungeons().next()) {

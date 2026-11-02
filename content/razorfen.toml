@@ -31,6 +31,10 @@ draughts_max = 6
 flask = "draught_flask"
 plunder = "thorn_fetish"
 hero_health = 0.7
+# Each hero past the first: this share more foes in every pack of two or more (not a boss's nor
+# an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
+# same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
+hero_foes = 0.35
 exit = [1943.0, 1544.6, 82.0]
 exit_radius = 5.0
 exit_boss = "charlga"
@@ -498,7 +502,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "chops"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  steps = [ { clip = 17, take = 1, windup = 0.55, damage = 14, recovery = 0.2 }, { clip = 17, take = 0, windup = 0.45, damage = 14, recovery = 0.9 } ]
   # Quills shot out all round him.
   [[mob.pattern]]
   name = "quills"
@@ -537,12 +541,12 @@ respawn = 0.0
   [[mob.pattern]]
   name = "chops"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  steps = [ { clip = 17, take = 1, windup = 0.55, damage = 14, recovery = 0.2 }, { clip = 17, take = 0, windup = 0.45, damage = 14, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "shield bash"
   weight = 1.5
   max_range = 2.6
-  steps = [ { clip = 95, windup = 0.4, damage = 9, range = 2.8, arc = 90.0, heavy = true, recovery = 0.8 } ]
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 9, range = 2.8, arc = 90.0, heavy = true, recovery = 0.8 } ]
 
 [[mob]]
 key = "rk_geomancer"
@@ -585,7 +589,7 @@ respawn = 0.0
   name = "earth spike"
   weight = 2.0
   max_range = 22.0
-  steps = [ { ranged = true, windup = 1.3, damage = 18, range = 22.0, radius = 3.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
+  steps = [ { clip = 54, take = 0, ranged = true, windup = 1.3, damage = 18, range = 22.0, radius = 3.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
 
 [[mob]]
 key = "rk_dustweaver"
@@ -667,7 +671,7 @@ respawn = 0.0
   name = "bone burst"
   weight = 1.5
   max_range = 22.0
-  steps = [ { ranged = true, windup = 1.4, damage = 20, range = 22.0, radius = 3.5, speed = 12.0, spell = 27812, look = 24050, blockable = false, recovery = 1.2 } ]
+  steps = [ { clip = 54, take = 0, ranged = true, windup = 1.4, damage = 20, range = 22.0, radius = 3.5, speed = 12.0, spell = 27812, look = 24050, blockable = false, recovery = 1.2 } ]
 
 [[mob]]
 key = "rk_boar"
@@ -694,13 +698,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "gores"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.48, damage = 12, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 13, recovery = 0.85 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.48, damage = 12, recovery = 0.12 }, { clip = 16, take = 1, windup = 0.4, damage = 13, recovery = 0.85 } ]
   [[mob.pattern]]
   name = "charge"
   weight = 2.0
   min_range = 5.0
   max_range = 13.0
-  steps = [ { clip = 17, take = 1, windup = 0.8, lunge = 8.0, damage = 18, heavy = true, recovery = 1.0, kit = 379 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.8, lunge = 8.0, damage = 18, heavy = true, recovery = 1.0, kit = 379 } ]
 
 # --- Razorfen's bosses -----------------------------------------------------------------------------------
 
@@ -747,7 +751,7 @@ respawn = 0.0
   name = "earthquake"
   weight = 2.0
   max_range = 24.0
-  steps = [ { ranged = true, windup = 1.3, damage = 24, range = 24.0, radius = 4.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 1.3, damage = 24, range = 24.0, radius = 4.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
   [[mob.pattern]]
   name = "staff"
   weight = 1.5
@@ -819,7 +823,7 @@ respawn = 0.0
   name = "thorn curse"
   weight = 2.0
   max_range = 24.0
-  steps = [ { ranged = true, windup = 1.3, damage = 26, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 26271, blockable = false, recovery = 1.1 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 1.3, damage = 26, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 26271, blockable = false, recovery = 1.1 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.85
@@ -914,7 +918,7 @@ respawn = 0.0
   below = 0.66
   min_range = 3
   max_range = 26
-  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 1.3 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 0.9, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26, radius = 1.5, speed = 24, spell = 686, blockable = true, recovery = 1.3 } ]
   # Stone lobbed where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "stone"
@@ -955,11 +959,11 @@ respawn = 0.0
   [[mob.pattern]]
   name = "two chops"
   weight = 3.0
-  steps = [ { clip = 18, take = 0, windup = 0.8, damage = 30, recovery = 0.25 }, { clip = 18, take = 1, windup = 0.65, damage = 32, recovery = 1.2 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.8, damage = 30, recovery = 0.25 }, { clip = 16, take = 1, windup = 0.65, damage = 32, recovery = 1.2 } ]
   [[mob.pattern]]
   name = "overhead"
   weight = 2.0
-  steps = [ { clip = 58, windup = 1.4, damage = 50, arc = 70.0, heavy = true, recovery = 1.5, kit = 379 } ]
+  steps = [ { clip = 16, take = 2, windup = 1.4, damage = 50, arc = 70.0, heavy = true, recovery = 1.5, kit = 379 } ]
   [[mob.pattern]]
   name = "war stomp"
   weight = 1.5
@@ -983,14 +987,14 @@ respawn = 0.0
   [[mob.pattern]]
   name = "string"
   weight = 3
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 29, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 29, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
+  steps = [ { clip = 17, take = 1, windup = 0.5, damage = 29, recovery = 0.15 }, { clip = 16, take = 1, windup = 0.42, damage = 29, recovery = 0.15 }, { clip = 16, take = 2, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
   # From range: it closes the gap in one blow.
   [[mob.pattern]]
   name = "lunge"
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 41, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.75, lunge = 8, damage = 41, kit = 379, heavy = true, recovery = 1.2 } ]
   # Nearer its end, from range: stone thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "stone"
@@ -1030,18 +1034,18 @@ respawn = 0.0
   [[mob.pattern]]
   name = "gores"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 24, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.45, damage = 24, recovery = 0.12 }, { clip = 17, take = 0, windup = 0.6, damage = 32, recovery = 1.0 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.55, damage = 24, recovery = 0.12 }, { clip = 16, take = 1, windup = 0.45, damage = 24, recovery = 0.12 }, { clip = 16, take = 0, windup = 0.6, damage = 32, recovery = 1.0 } ]
   [[mob.pattern]]
   name = "trample"
   weight = 2.0
   min_range = 5.0
   max_range = 15.0
-  steps = [ { clip = 17, take = 1, windup = 0.9, lunge = 10.0, range = 3.5, arc = 360.0, damage = 34, heavy = true, recovery = 1.2, kit = 379, look = 26271 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.9, lunge = 10.0, range = 3.5, arc = 360.0, damage = 34, heavy = true, recovery = 1.2, kit = 379, look = 26271 } ]
   [[mob.pattern]]
   name = "rage"
   weight = 2.0
   below = 0.3
-  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 20, recovery = 0.05 }, { clip = 17, take = 1, windup = 0.3, damage = 20, recovery = 0.05 }, { clip = 17, take = 0, windup = 0.3, damage = 20, recovery = 0.05 }, { clip = 17, take = 1, windup = 0.7, lunge = 4.0, damage = 34, recovery = 1.5 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.4, damage = 20, recovery = 0.05 }, { clip = 16, take = 0, windup = 0.3, damage = 20, recovery = 0.05 }, { clip = 16, take = 1, windup = 0.3, damage = 20, recovery = 0.05 }, { clip = 16, take = 0, windup = 0.7, lunge = 4.0, damage = 34, recovery = 1.5 } ]
   [[mob.phase]]
   at = 0.6
   speed = 0.85
@@ -1061,7 +1065,7 @@ respawn = 0.0
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 22, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 42, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.45, damage = 22, recovery = 0.1 }, { clip = 16, take = 1, windup = 1.25, damage = 42, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
   # Nearer its end, from range: stone thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "stone"
@@ -1127,7 +1131,7 @@ then_look = 26271
   weight = 2.0
   below = 0.5
   max_range = 26.0
-  steps = [ { ranged = true, windup = 0.9, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.3 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 0.9, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.3 } ]
   [[mob.phase]]
   at = 0.66
   speed = 0.88
@@ -1180,13 +1184,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "tusks"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.7, damage = 30, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.55, damage = 30, recovery = 0.15 }, { clip = 17, take = 0, windup = 0.8, damage = 40, recovery = 1.1, kit = 379 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.7, damage = 30, recovery = 0.15 }, { clip = 16, take = 1, windup = 0.55, damage = 30, recovery = 0.15 }, { clip = 16, take = 0, windup = 0.8, damage = 40, recovery = 1.1, kit = 379 } ]
   [[mob.pattern]]
   name = "great charge"
   weight = 2.0
   min_range = 5.0
   max_range = 18.0
-  steps = [ { clip = 17, take = 1, windup = 1.0, lunge = 12.0, range = 4.0, arc = 360.0, damage = 40, heavy = true, blockable = false, recovery = 1.3, kit = 379, look = 26271 } ]
+  steps = [ { clip = 16, take = 1, windup = 1.0, lunge = 12.0, range = 4.0, arc = 360.0, damage = 40, heavy = true, blockable = false, recovery = 1.3, kit = 379, look = 26271 } ]
   [[mob.pattern]]
   name = "thornstorm"
   weight = 2.0
@@ -1257,7 +1261,7 @@ respawn = 0.0
   name = "earth spike"
   weight = 2.0
   max_range = 24.0
-  steps = [ { ranged = true, windup = 1.3, damage = 24, range = 24.0, radius = 4.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 1.3, damage = 24, range = 24.0, radius = 4.0, speed = 12.0, spell = 9483, look = 26271, blockable = false, recovery = 1.1 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.82
@@ -1300,7 +1304,7 @@ windup = 0.18
 active = 0.08
 recovery = 0.24
 stamina = 8.0
-damage = [12, 16]
+damage = [15, 20]
 range = 2.5
 arc = 75.0
 targets = 1
@@ -1322,7 +1326,7 @@ windup = 0.5
 active = 0.16
 recovery = 0.55
 stamina = 22.0
-damage = [46, 57]
+damage = [45, 55]
 range = 3.6
 arc = 140.0
 targets = 3
@@ -1413,3 +1417,80 @@ radius = 1.5
 count = 2
 link = 10.0
 wake = "bone_cache"
+
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2116.0, 1834.0]
+z = 79.6
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2104.0, 1726.0]
+z = 78.2
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2104.0, 1726.0]
+z = 78.2
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_dustweaver"
+at = [2102.0, 1900.0]
+z = 75.1
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2126.0, 1748.0]
+z = 52.4
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2016.0, 1492.0]
+z = 77.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_acolyte"
+at = [2202.0, 1590.0]
+z = 82.3
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2090.0, 1782.0]
+z = 78.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2144.0, 1914.0]
+z = 66.6
+radius = 3.0
+count = 2
+link = 12.0

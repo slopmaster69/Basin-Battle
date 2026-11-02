@@ -687,7 +687,7 @@ pub struct Mob {
     /// wind-up's start until it lands.
     pub lob: Option<(Vec3, Id)>,
     /// Damage towards breaking its posture as of `posture_from`, when it last grew: it drains
-    /// away after a moment without more (`Sim::posture_of` has it now).
+    /// away steadily from then (`Sim::posture_of` has it now).
     pub posture: u32,
     pub posture_from: f32,
     /// Its stance can't be broken again before then (a break, then time to stand back up).
@@ -1023,6 +1023,7 @@ impl Survival {
             self.step_arena(dt);
             self.step_explore();
             self.step_goals();
+            self.step_weekly_chest();
         }
         self.record_trails();
         std::mem::take(&mut self.events)

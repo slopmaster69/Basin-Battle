@@ -447,6 +447,10 @@ impl Survival {
         let title = save.goal_title.clone().or_else(|| FIRST_JOURNAL.get(save.goal).map(|t| t.to_string()));
         let goal = match title {
             Some(t) => s.content.goals.iter().position(|g| g.title == t).unwrap_or(save.goal),
+            // Done with a journal that's grown since (steps added at its end, as the book's ladder
+            // was): on at the first of the new ones. (Past the first journal, a save has a title
+            // unless it was done, so its place is that journal's end.)
+            None if save.goal > FIRST_JOURNAL.len() && save.goal < s.content.goals.len() => save.goal,
             // Past the end of the first journal: done with it, so at the end of this one.
             None if save.goal >= FIRST_JOURNAL.len() => s.content.goals.len(),
             None => save.goal,

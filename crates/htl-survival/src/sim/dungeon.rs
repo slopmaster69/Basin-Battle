@@ -36,6 +36,26 @@ pub struct Below {
     /// When this run's first boss fell or first strongbox was emptied (unix seconds): the run
     /// starts over `reset_minutes` after, once no hero is below.
     pub run_at: Option<f64>,
+    /// What this run has done so far, for its page at the end (not kept).
+    pub log: RunLog,
+}
+
+/// A run's tally, since the dungeon last started over: for the page each hero gets as they leave.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct RunLog {
+    /// When the first hero came down (the sim's clock).
+    pub began: Option<f32>,
+    pub foes: u32,
+    /// Each hero's falls (by account), the gear they took from the ground, and their bags as
+    /// they came down (what they carry out is what's more).
+    pub falls: BTreeMap<String, u32>,
+    pub gear: BTreeMap<String, Vec<usize>>,
+    pub bags: BTreeMap<String, BTreeMap<usize, u32>>,
+    pub secrets: u32,
+    /// This run cleared the dungeon for the camp the first time.
+    pub first: bool,
+    /// Those who've had this trip's page (a won wager's), not paged again on the way home.
+    pub paged: BTreeSet<String>,
 }
 
 /// A hero below: the lamp they wake at, their Draughts, and the flasks they've found.
@@ -71,7 +91,13 @@ pub struct BookDungeon {
     /// to next (the easiest open dungeon not yet cleared).
     pub cleared: bool,
     pub next: bool,
+    /// What reads its pages while they're in cipher, in words (empty when open).
+    pub locked: String,
 }
+
+/// A tier past the first opens once the camp has cleared this many dungeons of the tier below
+/// (every boss down in one run): two of the three, so a camp stuck on one can go round it.
+pub const LADDER_CLEARS: u32 = 2;
 
 /// A door's state as it's drawn: open, or shut.
 pub fn door_open(below: &Below, d: &DoorDef) -> bool {
@@ -120,6 +146,11 @@ impl Survival {
 
     pub(crate) fn dungeon_def(&self) -> Option<&DungeonDef> {
         self.content.dungeon.as_ref()
+    }
+
+    /// This world's dungeon by name (below; at camp, the book's own, the Deadmines).
+    pub fn dungeon_name(&self) -> Option<String> {
+        self.dungeon_def().map(|d| d.name.clone())
     }
 
     fn lamp_def(&self, key: &str) -> Option<&LampDef> {
@@ -243,6 +274,9 @@ impl Survival {
         }
         // What it keeps, before it's open (after, nothing is kept).
         let reveals: Vec<String> = d.reveals.clone();
+        if let Some(b) = self.below.as_mut() {
+            b.log.secrets += 1;
+        }
         self.below.as_mut().unwrap().open.insert(key.to_string());
         let who = self.players.get(&by).map_or(String::from("Someone"), |p| p.name.clone());
         // No banner and horn for everyone: the finder's page opens below, the rest read a line.
@@ -295,7 +329,21 @@ impl Survival {
         let Some(account) = self.players.get(&id).map(|p| p.account.clone()) else {
             return;
         };
+        let clock = self.clock;
+        let bag = self.players[&id].bag.clone();
+        // The first down of a band (nobody else below): a new trip, its tally from nothing. The
+        // dungeon itself may stand as the last band left it (its bosses down until it resets).
+        let alone = self.players.len() <= 1;
         let b = self.below.as_mut().unwrap();
+        if alone {
+            b.log = RunLog { began: Some(clock), ..Default::default() };
+        }
+        b.log.began.get_or_insert(clock);
+        // (Each trip down counts from here: what they carried home before is home.)
+        b.log.bags.insert(account.clone(), bag);
+        b.log.gear.remove(&account);
+        b.log.falls.remove(&account);
+        b.log.paged.remove(&account);
         let first = d.lamps.first().map(|l| l.key.clone()).unwrap_or_default();
         let hero = b
             .heroes
@@ -403,8 +451,9 @@ impl Survival {
                 icon: d.icon.clone(),
                 blurb: d.blurb.clone(),
                 first_page: d.first_page.clone(),
-                open: self.debug || self.camp.raids_won >= d.gate_raids,
+                open: self.dungeon_open(d),
                 gate: d.gate_raids,
+                locked: if self.dungeon_open(d) { String::new() } else { self.gate_words(d) },
                 lamps: d.lamps.len(),
                 pages: d.lamps.iter().enumerate().filter(|(k, l)| *k == 0 || self.pages.contains(&l.key)).map(|(_, l)| (l.key.clone(), l.name.clone())).collect(),
                 secrets: (d.doors.iter().filter(|dr| dr.secret() && self.ever("secret", &dr.key)).count(), d.doors.iter().filter(|dr| dr.secret()).count()),
@@ -417,10 +466,47 @@ impl Survival {
             .collect()
     }
 
+    /// Whether the camp can read a dungeon's pages: past its raids (`gate_raids`), and for a tier
+    /// past the first, with [`LADDER_CLEARS`] of the tier below cleared (or all of them, if it
+    /// has fewer). A dungeon the camp has been in already (a lamp lit, a boss felled) stays open.
+    pub fn dungeon_open(&self, d: &DungeonDef) -> bool {
+        if self.debug {
+            return true;
+        }
+        let reached = self.ever("cleared", &d.key)
+            || d.lamps.iter().skip(1).any(|l| self.ever("delve", &l.key))
+            || d.packs.iter().any(|p| self.content.mob(&p.mob).is_some_and(|m| self.content.mobs[m].boss) && self.ever("kill", &p.mob));
+        if reached {
+            return true;
+        }
+        self.camp.raids_won >= d.gate_raids && self.ladder_short(d) == 0
+    }
+
+    /// How many more of the tier below a dungeon the camp must clear to read it (0: none).
+    fn ladder_short(&self, d: &DungeonDef) -> u32 {
+        if d.tier <= 1 {
+            return 0;
+        }
+        let below: Vec<&DungeonDef> = self.content.ladder().filter(|o| o.tier + 1 == d.tier).collect();
+        let need = (LADDER_CLEARS as usize).min(below.len()) as u32;
+        let have = below.iter().filter(|o| self.ever("cleared", &o.key)).count() as u32;
+        need.saturating_sub(have)
+    }
+
+    /// What reads a locked dungeon's pages, in words ("clear 1 more of the Tier I dungeons").
+    pub fn gate_words(&self, d: &DungeonDef) -> String {
+        if self.camp.raids_won < d.gate_raids {
+            return format!("hold the camp against {} raid(s) first", d.gate_raids);
+        }
+        let short = self.ladder_short(d);
+        let tier = ["Tier I", "Tier II", "Tier III"].get(d.tier.saturating_sub(2) as usize).copied().unwrap_or("easier");
+        format!("clear {short} more of the {tier} dungeons first (every boss down in one run)")
+    }
+
     /// The dungeon the book points to next: the easiest open one the camp hasn't cleared (the
     /// book's own order among the same tier).
     pub fn next_dungeon(&self) -> Option<&DungeonDef> {
-        let mut list: Vec<&DungeonDef> = self.content.dungeons().filter(|d| (self.debug || self.camp.raids_won >= d.gate_raids) && !self.ever("cleared", &d.key)).collect();
+        let mut list: Vec<&DungeonDef> = self.content.ladder().filter(|d| self.dungeon_open(d) && !self.ever("cleared", &d.key)).collect();
         list.sort_by_key(|d| d.tier);
         list.into_iter().next()
     }
@@ -432,7 +518,7 @@ impl Survival {
 
     /// Whether the camp has earned the book (any of its dungeons).
     pub fn book_open(&self) -> bool {
-        self.debug || self.content.dungeons().any(|d| self.camp.raids_won >= d.gate_raids)
+        self.debug || self.content.dungeons().any(|d| self.dungeon_open(d))
     }
 
     pub fn book_id(&self) -> Id {
@@ -498,7 +584,7 @@ impl Survival {
         }
         if !self.book_pages().iter().any(|(k, _)| k == to) {
             return match self.content.dungeon_of_lamp(to) {
-                Some(d) if !(self.debug || self.camp.raids_won >= d.gate_raids) => Err(format!("{}'s pages are still in cipher: hold the camp against {} raid(s) first.", d.name, d.gate_raids)),
+                Some(d) if !self.dungeon_open(d) => Err(format!("{}'s pages are still in cipher: {}.", d.name, self.gate_words(d))),
                 _ => Err("That page is blank: light its lamp below first.".into()),
             };
         }
@@ -547,6 +633,7 @@ impl Survival {
             return Err("Not during a wager: the lamps only take you home (and the wager goes on without you).".into());
         }
         if to == "camp" {
+            self.run_page(id, "Home by a lamp");
             self.events.push(Event::Travel {
                 player: id,
                 to: None,
@@ -880,8 +967,8 @@ impl Survival {
         Ok(())
     }
 
-    /// The book's record of a dungeon: the secrets found, the rumours of the rest (the clues of
-    /// the notes read), and every note read, to read again.
+    /// The book's record of a dungeon: the rumours of the secrets still hidden (the clues of the
+    /// notes read), its bosses and their gear, and every note read, to read again.
     pub fn lore_page(&mut self, id: Id, key: &str) -> Result<(), String> {
         let d = self.content.dungeons().find(|d| d.key == key || (key.is_empty() && self.content.dungeon.as_ref().is_some_and(|x| x.key == d.key))).cloned().ok_or("No such dungeon in the book.")?;
         let read: Vec<&NoteDef> = d.notes.iter().filter(|n| self.ever("read", &n.key)).collect();
@@ -900,6 +987,32 @@ impl Survival {
         }
         if read.is_empty() {
             paras.push("No notes read yet: they lie where they were dropped, waiting.".to_string());
+        }
+        // Its bosses, in the order a run meets them in the book: each one's gear (what may fall
+        // from them; their trophy the camp's the first time), and how often the camp has felled them.
+        let mut bosses = Vec::new();
+        for k in super::wager::wager_bosses(&d, &self.content) {
+            let Some(m) = d.packs.iter().find(|p| p.key == k).and_then(|p| self.content.mob(&p.mob)) else { continue };
+            let m = &self.content.mobs[m];
+            let gear: Vec<String> = m.gear.iter().filter_map(|g| self.content.item(g)).map(|i| self.content.items[i].name.clone()).collect();
+            let trophy: Vec<String> = m.trophy.keys().filter_map(|g| self.content.item(g)).map(|i| self.content.items[i].name.clone()).collect();
+            let felled = self.camp.counts.get(&format!("kill:{}", m.key)).copied().unwrap_or(0);
+            let mut line = format!("- {}: {}", m.name, match felled {
+                0 => "not felled yet".to_string(),
+                1 => "felled once".to_string(),
+                n => format!("felled {n} times"),
+            });
+            if !gear.is_empty() {
+                line.push_str(&format!(". Carries {}", gear.join(", ")));
+            }
+            if !trophy.is_empty() {
+                line.push_str(&format!(". {} {}", if felled == 0 { "Its trophy, the camp's the first time:" } else { "Its trophy, in the camp's chest:" }, trophy.join(", ")));
+            }
+            line.push('.');
+            bosses.push(line);
+        }
+        if !bosses.is_empty() {
+            paras.push(format!("Its bosses (every one down in one run clears it):\n{}", bosses.join("\n")));
         }
         let place = format!("{} of {} notes read", read.len(), d.notes.len());
         let links = read.iter().map(|n| (format!(".es note {}", n.key), n.name.clone())).collect();
@@ -1005,6 +1118,14 @@ impl Survival {
             .bag
             .entry(item)
             .or_default() += n;
+        if let (Some(account), Some(b)) = (self.players.get(&id).map(|p| p.account.clone()), self.below.as_mut()) {
+            b.log.gear.entry(account).or_default().push(item);
+        }
+        // Found once, the camp's rack has it.
+        if matches!(self.content.items[item].kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) {
+            let key = self.content.base_key(item).to_string();
+            self.forward_count("found", &key, 1);
+        }
         let d = &self.content.items[item];
         let how = if matches!(
             d.kind,
@@ -1024,13 +1145,9 @@ impl Survival {
         let Some(d) = self.dungeon_def() else {
             return Vec::new();
         };
-        let have = self
-            .content
-            .item(&d.plunder)
-            .and_then(|i| self.players.get(&id).and_then(|p| p.bag.get(&i)))
-            .copied()
-            .unwrap_or(0);
-        d.trade
+        let have = self.currency_of(id);
+        let mut out: Vec<(String, String, u32, bool)> = d
+            .trade
             .iter()
             .filter_map(|(k, n)| {
                 Some((
@@ -1040,11 +1157,166 @@ impl Survival {
                     have >= *n,
                 ))
             })
+            .collect();
+        // A flask for good (one more Draught at every rest), while there's room for one.
+        if let (Some(i), Some(price)) = (self.content.item(&d.flask), self.flask_price(id)) {
+            out.push((d.flask.clone(), self.content.items[i].name.clone(), price, have >= price));
+        }
+        out
+    }
+
+    /// The dungeon's currency in a hero's bags.
+    pub fn currency_of(&self, id: Id) -> u32 {
+        let Some(d) = self.dungeon_def() else { return 0 };
+        self.content.item(&d.plunder).and_then(|i| self.players.get(&id).and_then(|p| p.bag.get(&i))).copied().unwrap_or(0)
+    }
+
+    /// The dungeon's currency by name ("Deviate Fang").
+    pub fn currency_name(&self) -> String {
+        self.dungeon_def().and_then(|d| self.content.item(&d.plunder)).map_or_else(|| "plunder".to_string(), |i| self.content.items[i].name.clone())
+    }
+
+    /// What a whole run through the dungeon drops of its currency, about (every pack's foes'
+    /// drops on average, and its strongboxes'): the measure of what the quartermaster asks.
+    pub fn run_worth(&self) -> u32 {
+        let Some(d) = self.dungeon_def() else { return 0 };
+        let mut n = 0.0;
+        for p in &d.packs {
+            if let Some(m) = self.content.mob(&p.mob) {
+                if let Some(r) = self.content.mobs[m].drops.get(&d.plunder) {
+                    n += (r[0] + r[1]) as f32 / 2.0 * p.count.max(1) as f32;
+                }
+            }
+        }
+        n += d.boxes.iter().filter_map(|b| b.loot.get(&d.plunder)).sum::<u32>() as f32;
+        n.round() as u32
+    }
+
+    /// What one more flask costs (three-quarters of a run), while the hero has room for one.
+    fn flask_price(&self, id: Id) -> Option<u32> {
+        let d = self.dungeon_def()?;
+        let account = &self.players.get(&id)?.account;
+        let flasks = self.below.as_ref()?.heroes.get(account).map_or(0, |h| h.flasks);
+        // (A dungeon whose foes drop no currency sells none: it would be all but free.)
+        let worth = self.run_worth();
+        (worth > 0 && d.draughts + flasks < d.draughts_max).then(|| round5(worth as f32 * FLASK_SHARE))
+    }
+
+    /// What honing a piece to `tier` costs: a share of a run's currency, more each tier.
+    pub fn hone_price(&self, tier: u8) -> u32 {
+        let share = HONE_SHARE.get(tier.saturating_sub(1) as usize).copied().unwrap_or(f32::MAX);
+        round5(self.run_worth() as f32 * share)
+    }
+
+    /// The hero's pieces of this dungeon's own gear the quartermaster can hone a tier further
+    /// (in their bags or worn): (item key, name, the tier it becomes by name, price, can pay).
+    pub fn hone_offers(&self, id: Id) -> Vec<(String, String, String, u32, bool)> {
+        let Some(p) = self.players.get(&id) else { return Vec::new() };
+        // (A dungeon whose foes drop no currency hones nothing: it would be all but free.)
+        if self.run_worth() == 0 {
+            return Vec::new();
+        }
+        let have = self.currency_of(id);
+        let mut pieces: Vec<usize> = p.bag.iter().filter(|(_, n)| **n > 0).map(|(i, _)| *i).collect();
+        pieces.extend(p.armor.values().copied());
+        pieces.extend([p.weapon, p.shield]);
+        pieces.sort();
+        pieces.dedup();
+        pieces
+            .into_iter()
+            .filter_map(|i| {
+                let it = self.content.items.get(i)?;
+                let base = if it.honed_from.is_empty() { it.key.clone() } else { it.honed_from.clone() };
+                if !self.own_gear(&base) || it.hone as usize >= crate::content::HONE_TIERS.len() {
+                    return None;
+                }
+                let to = it.hone + 1;
+                let next = self.content.honed(self.content.item(&base)?, to);
+                if next == i {
+                    return None;
+                }
+                let price = self.hone_price(to);
+                Some((it.key.clone(), it.name.clone(), crate::content::HONE_TIERS[to as usize - 1].1.to_string(), price, have >= price))
+            })
             .collect()
+    }
+
+    /// Whether a piece (by its unhoned key) is this dungeon's own gear: a foe of its packs
+    /// carries it.
+    fn own_gear(&self, key: &str) -> bool {
+        self.dungeon_def().is_some_and(|d| d.packs.iter().any(|p| self.content.mob(&p.mob).is_some_and(|m| self.content.mobs[m].gear.iter().any(|g| g == key))))
+    }
+
+    /// The quartermaster hones a piece of the dungeon's own gear a tier further, for its
+    /// currency: the piece in the hero's bags (or worn) becomes its honed copy.
+    pub fn hone(&mut self, id: Id, key: &str) -> Result<String, String> {
+        let p = self.players.get(&id).ok_or("No hero.")?;
+        if self.lamp_near(p.pos).is_none() {
+            return Err("The quartermaster keeps to the lamps.".into());
+        }
+        if self.in_fight(id) {
+            return Err("Not with foes on you!".into());
+        }
+        let (_, name, tier, price, can) = self.hone_offers(id).into_iter().find(|o| o.0 == key).ok_or("The quartermaster can't hone that: only this dungeon's own gear, a tier at a time, up to Peerless.")?;
+        if !can {
+            return Err(format!("That's {price} {}.", self.currency_name()));
+        }
+        let d = self.dungeon_def().cloned().ok_or("Nobody hones here.")?;
+        let item = self.content.item(key).ok_or("No such thing.")?;
+        let it = &self.content.items[item];
+        let base = self.content.item(if it.honed_from.is_empty() { &it.key } else { &it.honed_from }).ok_or("No such thing.")?;
+        let next = self.content.honed(base, it.hone + 1);
+        let coin = self.content.item(&d.plunder).ok_or("No currency.")?;
+        let p = self.players.get_mut(&id).unwrap();
+        let c = p.bag.get_mut(&coin).unwrap();
+        *c -= price;
+        if *c == 0 {
+            p.bag.remove(&coin);
+        }
+        // In the bags, else worn: the one piece becomes its honed copy.
+        if let Some(n) = p.bag.get_mut(&item).filter(|n| **n > 0) {
+            *n -= 1;
+            if *n == 0 {
+                p.bag.remove(&item);
+            }
+            *p.bag.entry(next).or_default() += 1;
+        } else if p.weapon == item {
+            p.weapon = next;
+        } else if p.shield == item {
+            p.shield = next;
+        } else if let Some(slot) = p.armor.iter().find(|(_, v)| **v == item).map(|(k, _)| k.clone()) {
+            p.armor.insert(slot, next);
+        }
+        self.events.push(Event::Bags { player: id });
+        self.events.push(Event::Gear { player: id });
+        self.events.push(Event::Dirty);
+        Ok(format!("{name}, {tier}"))
     }
 
     pub fn buy(&mut self, id: Id, key: &str) -> Result<String, String> {
         let d = self.dungeon_def().cloned().ok_or("Nobody trades here.")?;
+        // A flask: one more Draught for good (as one found in a strongbox).
+        if key == d.flask && d.trade.get(key).is_none() {
+            let price = self.flask_price(id).ok_or("You carry all the Draughts there are room for.")?;
+            let p = self.players.get(&id).ok_or("No hero.")?;
+            if self.lamp_near(p.pos).is_none() {
+                return Err("The quartermaster keeps to the lamps.".into());
+            }
+            if self.currency_of(id) < price {
+                return Err(format!("That's {price} {}.", self.currency_name()));
+            }
+            let coin = self.content.item(&d.plunder).ok_or("No currency.")?;
+            let p = self.players.get_mut(&id).unwrap();
+            let c = p.bag.get_mut(&coin).unwrap();
+            *c -= price;
+            if *c == 0 {
+                p.bag.remove(&coin);
+            }
+            self.add_flasks(id, 1);
+            self.events.push(Event::Bags { player: id });
+            self.events.push(Event::Dirty);
+            return Ok(self.content.item(key).map_or_else(|| "flask".to_string(), |i| self.content.items[i].name.clone()));
+        }
         let price = *d
             .trade
             .get(key)
@@ -1056,7 +1328,7 @@ impl Survival {
         let item = self.content.item(key).ok_or("No such thing.")?;
         let plunder = self.content.item(&d.plunder).ok_or("No plunder.")?;
         if p.bag.get(&plunder).copied().unwrap_or(0) < price {
-            return Err(format!("That's {price} Defias Plunder."));
+            return Err(format!("That's {price} {}.", self.content.items[plunder].name));
         }
         if !self.bag_fits(id, &BTreeMap::from([(item, 1)])) {
             return Err("Your bags are full.".into());
@@ -1100,6 +1372,13 @@ impl Survival {
             return;
         }
         self.wager_kill(def, at, pack, form);
+        let m = &self.content.mobs[def];
+        let (boss, counted) = (m.boss, !m.critter && !m.inert() && !form);
+        if let Some(b) = self.below.as_mut() {
+            if counted && !boss {
+                b.log.foes += 1;
+            }
+        }
         let k = pack.unwrap();
         let lasting = self.lasting_pack(k);
         // (A second form, a druid's serpent or a split ooze, comes back as its first: that one is
@@ -1187,15 +1466,31 @@ impl Survival {
                 sub: if d.key == "deadmines" { "The front door stands open: walk out into Moonbrook".into() } else { "The way out stands open".into() },
             });
         }
-        // Every boss down in this run: the dungeon is cleared, and the camp hears of it.
+        // Every boss down in this run: the dungeon is cleared, and the camp hears of it. A first
+        // for the camp is told here too, to the heroes who did it (the gift goes in at camp).
         let bosses = super::wager::wager_bosses(&d, &self.content);
         if bosses.iter().any(|b| b == key) && bosses.iter().all(|b| self.slain(b)) {
+            let first = self.camp.counts.get(&format!("cleared:{}", d.key)).copied().unwrap_or(0) == 0;
             self.forward_count("cleared", &d.key, 1);
+            if first {
+                if let Some(b) = self.below.as_mut() {
+                    b.log.first = true;
+                }
+                let gift = self.first_clear_gift(&d);
+                let sub = if gift.is_empty() { "A first for the camp".to_string() } else { format!("A first for the camp: into its chest, {}", gift.join(", ")) };
+                self.events.push(Event::Banner { player: None, title: format!("{} Cleared", d.name), sub });
+            }
         }
     }
 
     /// At camp: what was done below (the journal's counts), and trophies into the chest.
     pub fn from_below(&mut self, counts: &[(String, u32)], items: &BTreeMap<usize, u32>) {
+        self.from_below_at(None, counts, items);
+    }
+
+    /// ...from the dungeon of that name (the camp's own book is the Deadmines'; any other says
+    /// where its news comes from).
+    pub fn from_below_at(&mut self, place: Option<&str>, counts: &[(String, u32)], items: &BTreeMap<usize, u32>) {
         for (k, n) in counts {
             let first = self.camp.counts.get(k).copied().unwrap_or(0) == 0;
             *self.camp.counts.entry(k.clone()).or_default() += n;
@@ -1208,9 +1503,14 @@ impl Survival {
             for (i, n) in items {
                 *self.storage.entry(*i).or_default() += n;
                 names.push(self.content.items[*i].name.clone());
+                // Gear sent home is found, too (a wager's, a trophy): the rack has it after.
+                if matches!(self.content.items[*i].kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) {
+                    let key = self.content.base_key(*i).to_string();
+                    *self.camp.counts.entry(format!("found:{key}")).or_default() += 1;
+                }
             }
             self.events.push(Event::Storage);
-            let place = self.dungeon_def().map_or_else(|| "below".to_string(), |d| d.name.clone());
+            let place = place.map(str::to_string).or_else(|| self.dungeon_def().map(|d| d.name.clone())).unwrap_or_else(|| "below".to_string());
             self.announce(format!("From {place}, by the book: into the camp's chest, {}.", names.join(", ")));
         }
         self.events.push(Event::Dirty);
@@ -1232,15 +1532,19 @@ impl Survival {
         out
     }
 
+    /// What a dungeon's first clear gives the camp, as words ("2 Silver Bar").
+    pub(crate) fn first_clear_gift(&self, d: &DungeonDef) -> Vec<String> {
+        d.first_clear.iter().filter_map(|(k, n)| self.content.item(k).map(|i| format!("{n} {}", self.content.items[i].name))).collect()
+    }
+
     /// A dungeon cleared for the first time: its gift to the camp's chest, a banner for every hero
     /// at camp, and the book's next page.
     pub(crate) fn first_clear(&mut self, key: &str) {
         let Some(d) = self.content.dungeons().find(|d| d.key == key).cloned() else { return };
-        let mut gift = Vec::new();
+        let gift = self.first_clear_gift(&d);
         for (k, n) in &d.first_clear {
             if let Some(i) = self.content.item(k) {
                 *self.storage.entry(i).or_default() += n;
-                gift.push(format!("{n} {}", self.content.items[i].name));
             }
         }
         if !gift.is_empty() {
@@ -1538,12 +1842,17 @@ impl Survival {
                 })
                 .map(|(id, _)| *id)
                 .collect();
+            // (Cleared only with every boss down; the way out may open before.)
+            let bosses = super::wager::wager_bosses(&d, &self.content);
+            let cleared = bosses.iter().all(|b| self.slain(b));
             for id in out {
                 let name = self.players[&id].name.clone();
+                // Out of this dungeon (`end:<key>`), and out of any (`end`).
+                self.forward_count("delve", &format!("end:{}", d.key), 1);
                 self.forward_count("delve", "end", 1);
                 self.events.push(Event::Banner {
                     player: Some(id),
-                    title: format!("{} Cleared", d.name),
+                    title: if cleared { format!("{} Cleared", d.name) } else { format!("Out of {}", short_name(&d.name)) },
                     sub: if d.key == "deadmines" { "Out into Moonbrook, and home by the book".into() } else { "Out, and home by the book".into() },
                 });
                 if d.key == "deadmines" {
@@ -1551,6 +1860,7 @@ impl Survival {
                 } else {
                     self.announce(format!("{name} walks out of {} and home.", d.name));
                 }
+                self.run_page(id, if cleared { "Cleared" } else { "Out by the way out" });
                 self.events.push(Event::Travel {
                     player: id,
                     to: None,
@@ -1559,35 +1869,46 @@ impl Survival {
         }
     }
 
-    /// Foes take more health for each hero below: a foe unhurt is set to it.
-    /// A foe's health for the heroes below now (`hero_health` more for each past the first).
-    pub(crate) fn foe_health(&self, def: usize) -> u32 {
+    /// A foe's health for the heroes below now (`hero_health` more for each past the first); in a
+    /// pack grown for them ([`pack_count`]), the pack's whole health shared over the bodies it
+    /// has (those standing and those fallen since the last rest): a pack left ungrown (in a fight
+    /// as a hero came) keeps its whole share in each.
+    pub(crate) fn foe_health(&self, def: usize, pack: Option<usize>) -> u32 {
         let base = self.base_health(def);
-        let Some(share) = self.dungeon_def().map(|d| d.hero_health) else {
+        let Some(d) = self.dungeon_def() else {
             return base;
         };
         let n = self.players.len().max(1);
-        (base as f32 * (1.0 + share * (n - 1) as f32)).round() as u32
+        let grown = pack.filter(|_| d.hero_foes > 0.0).map_or(1.0, |k| {
+            let own = self.content.packs[k].count.max(1);
+            let standing = self.mobs.values().filter(|m| m.pack == Some(k) && m.health > 0 && m.form_of.is_none()).count();
+            let fallen = self.below.as_ref().map_or(0, |b| b.fallen.iter().filter(|f| f.2 == Some(k)).count());
+            (standing + fallen).max(own) as f32 / own as f32
+        });
+        let max = base as f32 * (1.0 + d.hero_health * (n - 1) as f32) / grown;
+        (max.round() as u32).max(base)
     }
 
+    /// Foes take more health for each hero below, and packs at rest take more foes (or give back
+    /// those grown for heroes gone): a foe unhurt is set to its health.
     fn scale_foes(&mut self, force: bool) {
-        let Some(share) = self.dungeon_def().map(|d| d.hero_health) else {
+        if self.dungeon_def().is_none() {
             return;
-        };
+        }
         let n = self.players.len().max(1);
         let b = self.below.as_mut().unwrap();
         if !force && b.heroes_seen == n {
             return;
         }
         b.heroes_seen = n;
+        self.grow_packs(n);
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         for id in ids {
             let m = &self.mobs[&id];
             if m.health == 0 || m.health < m.max_health {
                 continue;
             }
-            let base = self.base_health(m.def) as f32;
-            let max = (base * (1.0 + share * (n - 1) as f32)).round() as u32;
+            let max = self.foe_health(m.def, m.pack);
             let m = self.mobs.get_mut(&id).unwrap();
             m.max_health = max;
             m.health = max;
@@ -1598,6 +1919,182 @@ impl Survival {
             });
         }
     }
+}
+
+impl Survival {
+    /// Each pack at rest (every foe of it standing idle and whole, none in a fight) brought to its
+    /// size for `n` heroes ([`pack_count`]): those it lacks laid out round its others, those past
+    /// it (grown for heroes since gone) taken away. A pack in a fight, beaten or kept by a secret
+    /// is left as it is; those of it fallen since the last rest count as there (they're back at
+    /// the next).
+    fn grow_packs(&mut self, n: usize) {
+        let Some(d) = self.dungeon_def().cloned() else { return };
+        if d.hero_foes <= 0.0 {
+            return;
+        }
+        for k in 0..self.content.packs.len() {
+            if self.content.packs[k].count < 2 {
+                continue; // (a lone foe never grows)
+            }
+            let want = pack_count(&self.content.packs[k], &d, &self.content, n);
+            if !self.pack_wanted(k) || self.lasting_pack(k) {
+                continue;
+            }
+            let members: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack == Some(k) && m.health > 0 && m.form_of.is_none()).map(|(id, _)| *id).collect();
+            let at_rest = members.iter().all(|id| {
+                let m = &self.mobs[id];
+                matches!(m.state, mobs::MobState::Idle { .. }) && m.health >= m.max_health && !m.hidden
+            });
+            if members.is_empty() || !at_rest {
+                continue;
+            }
+            let fallen = self.below.as_ref().unwrap().fallen.iter().filter(|f| f.2 == Some(k)).count();
+            let have = members.len() + fallen;
+            if have < want {
+                let Some(def) = self.content.mob(&self.content.packs[k].mob) else { continue };
+                // Round where the others stand (a wanderer's at the spot it took this time).
+                let mid = members.iter().fold([0.0f32; 3], |a, id| {
+                    let p = self.mobs[id].home;
+                    [a[0] + p[0], a[1] + p[1], a[2] + p[2]]
+                });
+                let c = members.len() as f32;
+                let mid = [mid[0] / c, mid[1] / c];
+                for i in have..want {
+                    let at = self.member_spot(k, mid, i, want);
+                    self.spawn_mob(def, at, Some(k), false);
+                }
+            } else if have > want {
+                let mut extra = have - want;
+                // The fallen first (they'd only come back at the rest), then the farthest out.
+                let b = self.below.as_mut().unwrap();
+                while extra > 0 {
+                    let Some(i) = b.fallen.iter().rposition(|f| f.2 == Some(k)) else { break };
+                    b.fallen.remove(i);
+                    extra -= 1;
+                }
+                for id in members.into_iter().rev().take(extra) {
+                    self.mobs.remove(&id);
+                    self.events.push(Event::MobGone { id });
+                }
+            }
+        }
+    }
+}
+
+/// How many foes a pack has for `heroes` below: `hero_foes` more for each past the first, in a
+/// pack of two or more that's neither a boss's nor an elite's (rounded); any other as it is.
+pub fn pack_count(p: &crate::content::PackDef, d: &DungeonDef, content: &crate::content::Content, heroes: usize) -> usize {
+    if p.count < 2 || p.elite || d.hero_foes <= 0.0 || p.rare {
+        return p.count;
+    }
+    if content.mob(&p.mob).is_none_or(|m| {
+        let m = &content.mobs[m];
+        m.boss || m.critter || m.inert()
+    }) {
+        return p.count;
+    }
+    (p.count as f32 * (1.0 + d.hero_foes * heroes.saturating_sub(1) as f32)).round() as usize
+}
+
+impl Survival {
+    /// A hero's page as they leave a run (out of the way out, home by a lamp, a wager won): how
+    /// long the run has gone, the bosses down and still up, the foes felled, their own falls,
+    /// what they carry out, a first for the camp, and what's next.
+    pub(crate) fn run_page(&mut self, id: Id, how: &str) {
+        let (Some(d), Some(b)) = (self.dungeon_def().cloned(), self.below.as_ref()) else { return };
+        let Some(p) = self.players.get(&id) else { return };
+        let log = b.log.clone();
+        let account = p.account.clone();
+        // One page a trip: a won wager's is theirs, not one more on the way home after it.
+        if log.paged.contains(&account) {
+            return;
+        }
+        let mut lines = Vec::new();
+        if let Some(t) = log.began {
+            lines.push(format!("Time below: {}.", super::wager::clock_words(self.clock - t)));
+        }
+        // The bosses as the dungeon stands (kept over a restart, as its slain are).
+        let name_of = |k: &String| d.packs.iter().find(|p| &p.key == k).and_then(|p| self.content.mob(&p.mob)).map(|m| self.content.mobs[m].name.clone());
+        let (down, up): (Vec<String>, Vec<String>) = super::wager::wager_bosses(&d, &self.content).into_iter().partition(|k| self.slain(k));
+        let felled: Vec<String> = down.iter().filter_map(name_of).collect();
+        let standing: Vec<String> = up.iter().filter_map(name_of).collect();
+        match (felled.is_empty(), standing.is_empty()) {
+            (true, _) => lines.push("No boss down yet.".to_string()),
+            (false, true) => lines.push(format!("Bosses down: {}. Every one of them.", felled.join(", "))),
+            (false, false) => lines.push(format!("Bosses down: {}. Still standing: {}.", felled.join(", "), standing.join(", "))),
+        }
+        lines.push(format!("Foes felled: {}.{}", log.foes, if log.secrets > 0 { format!(" Secrets found: {}.", log.secrets) } else { String::new() }));
+        let falls = log.falls.get(&account).copied().unwrap_or(0);
+        lines.push(match falls {
+            0 => "You didn't fall once.".to_string(),
+            1 => "You fell once.".to_string(),
+            n => format!("You fell {n} times."),
+        });
+        // What they carry out: their bags now against as they came down, and the gear they took.
+        let before = log.bags.get(&account).cloned().unwrap_or_default();
+        let mut gains: Vec<String> = p
+            .bag
+            .iter()
+            .filter_map(|(i, n)| {
+                let more = n.saturating_sub(before.get(i).copied().unwrap_or(0));
+                let it = &self.content.items[*i];
+                (more > 0 && !matches!(it.kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) && it.key != d.draught).then(|| format!("{more} {}", it.name))
+            })
+            .collect();
+        // (Only what they still have: gear lost in a fall lies in their sack. Honed at the lamp
+        // since, it's the honed piece they carry.)
+        for i in log.gear.get(&account).into_iter().flatten() {
+            let base = &self.content.items[*i].key;
+            let held = p
+                .bag
+                .iter()
+                .filter(|(_, n)| **n > 0)
+                .map(|(j, _)| *j)
+                .chain([p.weapon, p.shield])
+                .chain(p.armor.values().copied())
+                .find(|j| self.content.base_key(*j) == base);
+            if let Some(j) = held {
+                gains.push(self.content.items[j].name.clone());
+            }
+        }
+        lines.push(if gains.is_empty() { "You carry nothing new out.".to_string() } else { format!("You carry out: {}.", gains.join(", ")) });
+        if log.first {
+            let gift = self.first_clear_gift(&d);
+            lines.push(if gift.is_empty() { "A first for the camp.".to_string() } else { format!("A first for the camp: into its chest, {}.", gift.join(", ")) });
+        }
+        // What's next: the book's next page, or this one's wager.
+        let cleared = standing.is_empty() && !felled.is_empty();
+        let next = self.next_dungeon().map(|n| n.name.clone()).filter(|n| *n != d.name);
+        lines.push(match (cleared, next) {
+            (true, Some(n)) => format!("Next, by the book: {n}. Or the Bookmaker's Wager here, against the clock."),
+            (true, None) => "Next: the Bookmaker's Wager here, against the clock.".to_string(),
+            (false, _) => format!("{} more to beat before it's cleared.", standing.len()),
+        });
+        let links = vec![(format!(".es wager {}", d.key), "The Bookmaker's Wager".to_string())];
+        if let Some(b) = self.below.as_mut() {
+            b.log.paged.insert(account);
+        }
+        self.events.push(Event::Letter { player: id, kind: "run".into(), title: d.name.clone(), place: how.to_string(), text: lines.join("\n"), clue: String::new(), links });
+    }
+
+    /// A hero fell below: counted for the run's page.
+    pub(crate) fn run_fall(&mut self, id: Id) {
+        let Some(account) = self.players.get(&id).map(|p| p.account.clone()) else { return };
+        if let Some(b) = self.below.as_mut() {
+            *b.log.falls.entry(account).or_default() += 1;
+        }
+    }
+}
+
+/// What the quartermaster asks, as shares of what a whole run drops of the dungeon's currency: to
+/// hone a piece of its gear to Honed, Keen and Peerless, and for one more flask. (First guesses:
+/// a piece Honed for under half a run, Peerless for two; to try in play.)
+const HONE_SHARE: [f32; 3] = [0.4, 1.0, 2.0];
+const FLASK_SHARE: f32 = 0.75;
+
+/// A price, to the nearest 5 (and at least 5).
+fn round5(n: f32) -> u32 {
+    ((n / 5.0).round() as u32 * 5).max(5)
 }
 
 /// The look of resting at a lamp (a soft glow).

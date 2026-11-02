@@ -45,21 +45,30 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
 #[test]
 fn a_hero_shooting_from_just_past_the_leash_still_draws_the_fight() {
     let mut s = world_on(Box::new(FlatLand::default()));
-    let leash = s.content.mobs[s.content.mob("grunt").unwrap()].leash;
+    let leash = s.leash_of(s.content.mob("grunt").unwrap());
     // The hero stands a little past the leash from where the grunt lives.
     let at = leash + 3.0;
     let p = hero(&mut s, "Ayla", [at, 0.0, 0.0]);
     let g = mob(&mut s, "grunt", [0.0, 0.0, 0.0]);
     s.hurt_mob(g, p, 1);
-    run(&mut s, 6.0);
+    // (As long as its run there takes, and a little: it reaches them, still in the fight.)
+    let secs = at / s.content.mobs[s.mobs[&g].def].run_speed + 4.0;
+    let mut reached = false;
+    for _ in 0..(secs / DT) as usize {
+        let _ = s.step(DT);
+        reached |= dist2d(s.mobs[&g].pos, [at, 0.0, 0.0]) < 4.0;
+        if reached {
+            break;
+        }
+    }
     assert!(matches!(s.mobs[&g].state, MobState::Chase { .. } | MobState::Windup { .. } | MobState::Recover { .. }), "it came: {:?}", s.mobs[&g].state);
-    assert!(dist2d(s.mobs[&g].pos, [at, 0.0, 0.0]) < 4.0, "and reached the hero: {:?}", s.mobs[&g].pos);
+    assert!(reached, "and reached the hero: {:?}", s.mobs[&g].pos);
 }
 
 #[test]
 fn a_creature_gone_home_past_its_leash_evades_until_its_foe_comes_back() {
     let mut s = world_on(Box::new(FlatLand::default()));
-    let leash = s.content.mobs[s.content.mob("grunt").unwrap()].leash;
+    let leash = s.leash_of(s.content.mob("grunt").unwrap());
     let p = hero(&mut s, "Ayla", [3.0, 0.0, 0.0]);
     let g = mob(&mut s, "grunt", [0.0, 0.0, 0.0]);
     // Drawn a way from home already.

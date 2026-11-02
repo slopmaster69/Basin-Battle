@@ -11,7 +11,8 @@ name = "The Deadmines"
 # The logbook lies on a lectern beside the camp's chest (Elwynn).
 book = [-9511.0, 110.0]
 book_facing = 5.5
-# The camp holds its first raid before the book can be read.
+# Raids the camp must hold before the book can be read (0: from the start).  The harder tiers
+# open by the ladder instead: see `LADDER_CLEARS` in sim/dungeon.rs.
 gate_raids = 0
 # How hard next to the others (1 to 3): the Deadmines: an early one (17 to 26).
 tier = 1
@@ -26,6 +27,10 @@ plunder = "plunder"
 # Each hero below past the first: foes take this share more health (and their blows
 # `combat.hero_damage` more), as on the surface.
 hero_health = 0.7
+# Each hero past the first: this share more foes in every pack of two or more (not a boss's nor
+# an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
+# same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
+hero_foes = 0.35
 # Out the front door (the mine's mouth), once Rhahk'Zor is down.
 exit = [-16.4, -383.1, 61.8]
 exit_radius = 5.0
@@ -217,7 +222,7 @@ windup = 0.27
 active = 0.11
 recovery = 0.36
 stamina = 12.0
-damage = [15, 20]
+damage = [18, 25]
 range = 3.4
 arc = 100.0
 targets = 1
@@ -249,7 +254,7 @@ windup = 0.40
 active = 0.12
 recovery = 0.52
 stamina = 18.0
-damage = [22, 28]
+damage = [28, 35]
 range = 4.6
 arc = 70.0
 targets = 2
@@ -294,7 +299,7 @@ windup = 0.34
 active = 0.12
 recovery = 0.42
 stamina = 14.0
-damage = [17, 23]
+damage = [21, 29]
 range = 3.0
 arc = 100.0
 targets = 1
@@ -316,7 +321,7 @@ windup = 0.78
 active = 0.16
 recovery = 0.90
 stamina = 32.0
-damage = [56, 70]
+damage = [59, 74]
 range = 3.6
 arc = 130.0
 targets = 3
@@ -342,7 +347,7 @@ windup = 0.25
 active = 0.10
 recovery = 0.32
 stamina = 11.0
-damage = [18, 24]
+damage = [19, 26]
 range = 3.1
 arc = 95.0
 targets = 1
@@ -405,14 +410,14 @@ respawn = 0.0
   [[mob.pattern]]
   name = "two slashes"
   weight = 3.0
-  steps = [ { from = "HumanFemale", clip = 17, take = 1, windup = 0.5, damage = 12, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 1, windup = 0.4, damage = 12, recovery = 0.8 } ]
+  steps = [ { from = "HumanFemale", clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 1, windup = 0.4, damage = 12, recovery = 0.8 } ]
   # In from a few strides off.
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
   min_range = 3.5
   max_range = 8.0
-  steps = [ { from = "HumanMale", clip = 17, take = 1, windup = 0.6, lunge = 4.0, damage = 15, recovery = 0.9 } ]
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.6, lunge = 4.0, damage = 15, recovery = 0.9 } ]
   # The cutlass held back, glowing: it catches a panicked dodge.
   [[mob.pattern]]
   name = "feint"
@@ -460,7 +465,7 @@ respawn = 0.0
   name = "two bolts"
   weight = 1.5
   min_range = 6.0
-  steps = [ { from = "HumanFemale", clip = 18, take = 0, windup = 1.1, recovery = 0.2 }, { from = "ScourgeFemale", clip = 18, take = 0, windup = 0.6, recovery = 1.2 } ]
+  steps = [ { from = "HumanFemale", clip = 18, take = 0, windup = 1.1, recovery = 0.2 }, { from = "ScourgeFemale", clip = 18, take = 1, windup = 0.6, recovery = 1.2 } ]
   # Crowded, a squall all round that throws you down, and then it backs off.
   [[mob.pattern]]
   name = "squall"
@@ -506,7 +511,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "kick"
   weight = 4.0
-  steps = [ { ranged = false, clip = 95, take = 0, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6 } ]
+  steps = [ { clip = 17, take = 1, ranged = false, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6 } ]
 
 # Cookie, the Brotherhood's cook: an early lesson in reading a wind-up and a ring on the ground.
 [[mob]]
@@ -577,7 +582,7 @@ then_look = 10987
   [[mob.pattern]]
   name = "ladle"
   weight = 2.0
-  steps = [ { clip = 57, windup = 1.1, damage = 26, arc = 170.0, heavy = true, recovery = 1.2, kit = 379 } ]
+  steps = [ { clip = 57, take = 0, windup = 1.1, damage = 26, arc = 170.0, heavy = true, recovery = 1.2, kit = 379 } ]
   # A pot of stew thrown to where you stand: its ring is on the ground from the moment he
   # raises it (his hand smoking), and it lobs, so near or far there's time to step out.
   [[mob.pattern]]
@@ -597,14 +602,14 @@ then_look = 10987
   weight = 1.5
   below = 0.75
   max_range = 3.5
-  steps = [ { clip = 126, windup = 0.9, range = 4.2, arc = 360.0, damage = 22, heavy = true, recovery = 1.2, kit = 369 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.9, range = 4.2, arc = 360.0, damage = 22, heavy = true, recovery = 1.2, kit = 369 } ]
   # At the last: stew splashed in rings about him, two at once, then one more where you stand.
   [[mob.pattern]]
   name = "boil over"
   weight = 1.0
   below = 0.2
   max_range = 30.0
-  steps = [ { clip = 126, windup = 1.1, range = 5.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 0.2, kit = 356, look = 10987 }, { ranged = true, windup = 0.9, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.4 } ]
+  steps = [ { clip = 58, take = 0, windup = 1.1, range = 5.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 0.2, kit = 356, look = 10987 }, { ranged = true, windup = 0.9, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.4 } ]
   [[mob.pattern]]
   name = "pots"
   weight = 1.5
@@ -678,24 +683,24 @@ enrage_sound = 5778
   name = "stomp"
   weight = 1.5
   max_range = 3.2
-  steps = [ { from = "HumanMale", clip = 181, windup = 0.8, range = 4.8, arc = 360.0, damage = 22, heavy = true, recovery = 1.0, kit = 356 } ]
+  steps = [ { from = "HumanMale", clip = 57, take = 0, windup = 0.8, range = 4.8, arc = 360.0, damage = 22, heavy = true, recovery = 1.0, kit = 356 } ]
   [[mob.pattern]]
   name = "stamp"
   weight = 0.0
   max_range = 40.0
-  steps = [ { from = "OrcMale", clip = 181, windup = 1.3, range = 6.5, arc = 360.0, damage = 26, heavy = true, blockable = false, poise = true, recovery = 0.6, kit = 389 } ]
+  steps = [ { from = "OrcMale", clip = 16, take = 0, windup = 1.3, range = 6.5, arc = 360.0, damage = 26, heavy = true, blockable = false, poise = true, recovery = 0.6, kit = 389 } ]
   # Then: a flurry of four.
   # At the last: the hammer brought down two-handed, and the floor cracks where it lands.
   [[mob.pattern]]
   name = "maul"
   weight = 2.5
   below = 0.33
-  steps = [ { from = "HumanMale", clip = 58, take = 0, windup = 1.25, range = 4.5, arc = 90.0, damage = 52, heavy = true, recovery = 0.4, kit = 379 }, { from = "TaurenFemale", clip = 181, windup = 0.7, range = 5.5, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.6, look = 26271 } ]
+  steps = [ { from = "HumanMale", clip = 58, take = 0, windup = 1.25, range = 4.5, arc = 90.0, damage = 52, heavy = true, recovery = 0.4, kit = 379 }, { from = "TaurenFemale", clip = 57, take = 0, windup = 0.7, range = 5.5, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.6, look = 26271 } ]
   [[mob.pattern]]
   name = "flurry"
   weight = 3.0
   below = 0.66
-  steps = [ { from = "GnomeMale", clip = 18, take = 1, windup = 0.55, damage = 28, heavy = false, recovery = 0.12 }, { from = "OrcFemale", clip = 18, take = 1, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { from = "NightElfFemale", clip = 18, take = 0, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { from = "OrcMale", clip = 58, take = 0, windup = 0.75, damage = 44, recovery = 1.6 } ]
+  steps = [ { from = "GnomeMale", clip = 18, take = 0, windup = 0.55, damage = 28, heavy = false, recovery = 0.12 }, { from = "OrcFemale", clip = 18, take = 1, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { from = "NightElfFemale", clip = 18, take = 0, windup = 0.4, damage = 28, heavy = false, recovery = 0.12 }, { from = "OrcMale", clip = 58, take = 0, windup = 0.75, damage = 44, recovery = 1.6 } ]
   [[mob.pattern]]
   name = "charge"
   weight = 1.5
@@ -736,7 +741,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "three cuts"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 16, recovery = 0.12 }, { clip = 57, windup = 0.72, damage = 24, heavy = true, recovery = 1.0 } ]
+  steps = [ { clip = 57, take = 0, windup = 0.45, damage = 16, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 16, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.72, damage = 24, heavy = true, recovery = 1.0 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
@@ -748,7 +753,7 @@ respawn = 0.0
   name = "cleave"
   weight = 1.5
   max_range = 3.0
-  steps = [ { clip = 126, windup = 0.75, range = 4.0, arc = 360.0, damage = 18, recovery = 1.1, kit = 369 } ]
+  steps = [ { clip = 59, take = 0, windup = 0.75, range = 4.0, arc = 360.0, damage = 18, recovery = 1.1, kit = 369 } ]
   # At half: all hands on deck; then a harpoon thrown at whoever keeps their distance.
   [[mob.phase]]
   at = 0.5
@@ -842,14 +847,14 @@ slay_sound = 5781
   [[mob.pattern]]
   name = "string"
   weight = 3.0
-  steps = [ { from = "DwarfMale", clip = 17, take = 1, windup = 0.42, damage = 20, recovery = 0.12 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.34, damage = 20, recovery = 0.12 }, { from = "TrollMale", clip = 17, take = 1, windup = 0.34, damage = 20, recovery = 0.12 }, { from = "ScourgeFemale", clip = 57, take = 0, windup = 0.62, damage = 30, heavy = true, recovery = 1.0 } ]
+  steps = [ { from = "DwarfMale", clip = 17, take = 0, windup = 0.42, damage = 20, recovery = 0.12 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.34, damage = 20, recovery = 0.12 }, { from = "TrollMale", clip = 17, take = 0, windup = 0.34, damage = 20, recovery = 0.12 }, { from = "ScourgeFemale", clip = 57, take = 0, windup = 0.62, damage = 30, heavy = true, recovery = 1.0 } ]
   # A lunge from far off.
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
   min_range = 3.5
   max_range = 10.0
-  steps = [ { from = "OrcMale", clip = 17, take = 1, windup = 0.5, lunge = 6.0, damage = 28, recovery = 0.9 } ]
+  steps = [ { from = "OrcMale", clip = 17, take = 0, windup = 0.5, lunge = 6.0, damage = 28, recovery = 0.9 } ]
   # A blade held back, glowing: dodge early and it finds you.
   [[mob.pattern]]
   name = "riposte stance"
@@ -859,18 +864,18 @@ slay_sound = 5781
   name = "blade storm"
   weight = 0.0
   max_range = 40.0
-  steps = [ { from = "NightElfFemale", clip = 126, windup = 1.0, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "GnomeFemale", clip = 126, windup = 0.45, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1 }, { from = "HumanMale", clip = 126, windup = 0.45, range = 4.5, arc = 360.0, damage = 26, recovery = 1.6 } ]
+  steps = [ { from = "NightElfFemale", clip = 16, take = 1, windup = 1.0, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "GnomeFemale", clip = 16, take = 0, windup = 0.45, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1 }, { from = "HumanMale", clip = 16, take = 1, windup = 0.45, range = 4.5, arc = 360.0, damage = 26, recovery = 1.6 } ]
   # At the very last: a string that doesn't stop.
   [[mob.pattern]]
   name = "thousand cuts"
   weight = 1.5
   below = 0.12
-  steps = [ { from = "NightElfFemale", clip = 17, take = 0, windup = 0.5, damage = 18, recovery = 0.08 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "GnomeFemale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "OrcFemale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "GnomeMale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "HumanFemale", clip = 57, take = 0, windup = 0.7, damage = 34, heavy = true, recovery = 1.8 } ]
+  steps = [ { from = "NightElfFemale", clip = 17, take = 0, windup = 0.5, damage = 18, recovery = 0.08 }, { from = "NightElfMale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "GnomeFemale", clip = 17, take = 0, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "OrcFemale", clip = 17, take = 1, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "GnomeMale", clip = 17, take = 0, windup = 0.28, damage = 18, recovery = 0.08 }, { from = "HumanFemale", clip = 57, take = 0, windup = 0.7, damage = 34, heavy = true, recovery = 1.8 } ]
   [[mob.pattern]]
   name = "storm"
   weight = 1.5
   below = 0.33
-  steps = [ { from = "GnomeMale", clip = 126, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "HumanFemale", clip = 126, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, recovery = 1.4 } ]
+  steps = [ { from = "GnomeMale", clip = 16, take = 0, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "HumanFemale", clip = 16, take = 1, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, recovery = 1.4 } ]
 
 # VanCleef's Blackguards: unseen until close, two daggers, a stab from behind.
 [[mob]]
@@ -1143,7 +1148,7 @@ windup = 0.30
 active = 0.11
 recovery = 0.40
 stamina = 13.0
-damage = [16, 22]
+damage = [20, 27]
 range = 3.1
 arc = 115.0
 targets = 2
@@ -1164,7 +1169,7 @@ windup = 0.32
 active = 0.12
 recovery = 0.40
 stamina = 13.0
-damage = [14, 19]
+damage = [19, 26]
 range = 2.9
 arc = 100.0
 targets = 1
@@ -1186,7 +1191,7 @@ windup = 0.34
 active = 0.12
 recovery = 0.42
 stamina = 15.0
-damage = [22, 28]
+damage = [25, 31]
 range = 3.0
 arc = 105.0
 targets = 1
@@ -1209,7 +1214,7 @@ windup = 0.24
 active = 0.10
 recovery = 0.30
 stamina = 11.0
-damage = [17, 23]
+damage = [18, 25]
 range = 3.0
 arc = 95.0
 targets = 1
@@ -1267,12 +1272,12 @@ respawn = 0.0
   name = "two sticks"
   weight = 1.5
   min_range = 6.0
-  steps = [ { windup = 1.1, recovery = 0.2 }, { windup = 0.6, recovery = 1.3 } ]
+  steps = [ { clip = 57, take = 0, windup = 1.1, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.6, recovery = 1.3 } ]
   # Crowded, a wrench to the knee.
   [[mob.pattern]]
   name = "wrench"
   weight = 4.0
-  steps = [ { ranged = false, clip = 17, take = 0, windup = 0.45, damage = 8, range = 2.6, arc = 90.0, blockable = true, recovery = 0.6 } ]
+  steps = [ { clip = 59, take = 0, ranged = false, windup = 0.45, damage = 8, range = 2.6, arc = 90.0, blockable = true, recovery = 0.6 } ]
 
 # Woodcutters: two chops, then a slow one overhead.
 [[mob]]
@@ -1304,11 +1309,11 @@ respawn = 0.0
   [[mob.pattern]]
   name = "two chops"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 13, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 13, recovery = 0.9 } ]
+  steps = [ { clip = 57, take = 0, windup = 0.55, damage = 13, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 13, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "felling chop"
   weight = 1.5
-  steps = [ { clip = 57, windup = 1.0, damage = 22, heavy = true, recovery = 1.1 } ]
+  steps = [ { clip = 17, take = 1, windup = 1.0, damage = 22, heavy = true, recovery = 1.1 } ]
 
 # Gilnid, the Smelter: a wrench up close, molten iron thrown far, and the channels overflowing.
 [[mob]]
@@ -1361,7 +1366,7 @@ respawn = 0.0
   weight = 1.5
   below = 0.33
   max_range = 30.0
-  steps = [ { clip = 126, windup = 1.2, range = 5.5, arc = 360.0, damage = 28, heavy = true, blockable = false, recovery = 0.3, kit = 356, look = 3204 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 1.4 } ]
+  steps = [ { clip = 57, take = 0, windup = 1.2, range = 5.5, arc = 360.0, damage = 28, heavy = true, blockable = false, recovery = 0.3, kit = 356, look = 3204 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.0, speed = 18.0, spell = 3110, blockable = false, recovery = 1.4 } ]
   [[mob.pattern]]
   name = "two knocks"
   weight = 3.0
@@ -1370,13 +1375,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "overhead"
   weight = 2.0
-  steps = [ { clip = 57, windup = 1.3, damage = 44, arc = 80.0, heavy = true, recovery = 1.3, kit = 379 } ]
+  steps = [ { clip = 17, take = 1, windup = 1.3, damage = 44, arc = 80.0, heavy = true, recovery = 1.3, kit = 379 } ]
   # Crowded, a kick that clears room.
   [[mob.pattern]]
   name = "kick"
   weight = 1.5
   max_range = 2.6
-  steps = [ { clip = 95, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
+  steps = [ { clip = 59, take = 0, windup = 0.35, damage = 10, range = 2.8, arc = 90.0, heavy = true, recovery = 0.7 } ]
   # A ladle of molten iron to where you stand.
   [[mob.pattern]]
   name = "ladle"
@@ -1388,13 +1393,13 @@ respawn = 0.0
   name = "pour"
   weight = 0.0
   max_range = 30.0
-  steps = [ { ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.5 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 0.2 }, { ranged = true, windup = 0.6, damage = 22, range = 26.0, radius = 3.0, speed = 16.0, spell = 3110, blockable = false, recovery = 1.5 } ]
   # Then: three knocks and the overhead, quicker.
   [[mob.pattern]]
   name = "hammering"
   weight = 3.0
   below = 0.66
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 17, take = 0, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 57, windup = 0.8, damage = 36, heavy = true, recovery = 1.5 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.5, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.4, damage = 20, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.8, damage = 36, heavy = true, recovery = 1.5 } ]
 
 # Sneed's Shredder: slow and heavy, its saws unstoppable; Sneed climbs out of the wreck.
 [[mob]]
@@ -1435,20 +1440,20 @@ then_text = "\"My shredder! Oh, you'll pay for that, you will!\""
   [[mob.pattern]]
   name = "saws"
   weight = 3.0
-  steps = [ { clip = 16, take = 0, windup = 0.85, damage = 30, recovery = 0.25 }, { clip = 16, take = 1, windup = 0.6, damage = 32, recovery = 1.2 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.85, damage = 30, recovery = 0.25 }, { clip = 130, take = 0, windup = 0.6, damage = 32, recovery = 1.2 } ]
   # The saws ground into the floor all round it: it throws you down.
   [[mob.pattern]]
   name = "grind"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 130, windup = 1.3, range = 4.8, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.4, kit = 356 } ]
+  steps = [ { clip = 130, take = 0, windup = 1.3, range = 4.8, arc = 360.0, damage = 26, heavy = true, blockable = false, recovery = 1.4, kit = 356 } ]
   # From far off it comes at you, saws first.
   [[mob.pattern]]
   name = "charge"
   weight = 2.0
   min_range = 5.0
   max_range = 14.0
-  steps = [ { clip = 16, take = 1, windup = 1.0, lunge = 8.0, damage = 38, recovery = 1.6, kit = 379 } ]
+  steps = [ { clip = 16, take = 0, windup = 1.0, lunge = 8.0, damage = 38, recovery = 1.6, kit = 379 } ]
 
 # Sneed: out of the wreck, quick and dodging, the machete in strings.
 [[mob]]
@@ -1483,7 +1488,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "three cuts"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 18, recovery = 0.12 }, { clip = 57, windup = 0.7, damage = 28, heavy = true, recovery = 1.0 } ]
+  steps = [ { clip = 59, take = 0, windup = 0.45, damage = 18, recovery = 0.12 }, { clip = 17, take = 1, windup = 0.38, damage = 18, recovery = 0.12 }, { clip = 57, take = 0, windup = 0.7, damage = 28, heavy = true, recovery = 1.0 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 2.0
@@ -1494,12 +1499,12 @@ respawn = 0.0
   name = "kick"
   weight = 1.5
   max_range = 2.6
-  steps = [ { clip = 95, windup = 0.3, damage = 8, range = 2.8, arc = 90.0, recovery = 0.5 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.3, damage = 8, range = 2.8, arc = 90.0, recovery = 0.5 } ]
   # The machete held back, glowing: dodge early and it finds you.
   [[mob.pattern]]
   name = "feint"
   weight = 1.0
-  steps = [ { clip = 17, take = 0, windup = 1.1, damage = 26, recovery = 0.7, kit = 379 } ]
+  steps = [ { clip = 57, take = 0, windup = 1.1, damage = 26, recovery = 0.7, kit = 379 } ]
   # At half: a bomb from his belt at his feet, and he goes for you like a mad thing.
   [[mob.phase]]
   at = 0.5
@@ -1513,7 +1518,7 @@ respawn = 0.0
   name = "frenzy"
   weight = 2.5
   below = 0.5
-  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 16, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 57, windup = 0.6, lunge = 3.0, damage = 26, heavy = true, recovery = 1.3 } ]
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 16, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 57, take = 0, windup = 0.3, damage = 16, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.6, lunge = 3.0, damage = 26, heavy = true, recovery = 1.3 } ]
 
 [[goal]]
 title = "The Smelter"
@@ -1650,7 +1655,7 @@ windup = 0.34
 active = 0.12
 recovery = 0.44
 stamina = 14.0
-damage = [17, 23]
+damage = [22, 29]
 range = 3.0
 arc = 90.0
 targets = 1
@@ -1672,7 +1677,7 @@ windup = 0.70
 active = 0.15
 recovery = 0.80
 stamina = 28.0
-damage = [48, 60]
+damage = [52, 65]
 range = 3.7
 arc = 150.0
 targets = 3
@@ -1838,7 +1843,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "two strikes"
   weight = 3.0
-  steps = [ { from = "DwarfFemale", clip = 17, take = 0, windup = 0.55, damage = 13, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 2, windup = 0.45, damage = 13, recovery = 0.9 } ]
+  steps = [ { from = "DwarfFemale", clip = 17, take = 0, windup = 0.55, damage = 13, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 1, windup = 0.45, damage = 13, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "pick held high"
   weight = 1.5
@@ -1933,11 +1938,11 @@ respawn = 0.0
   name = "three sticks"
   weight = 2.0
   min_range = 7.0
-  steps = [ { from = "TaurenFemale", clip = 17, take = 0, windup = 1.0, recovery = 0.2 }, { from = "TaurenMale", clip = 17, take = 0, windup = 0.55, recovery = 0.2 }, { from = "HumanFemale", clip = 17, take = 1, windup = 0.55, recovery = 1.6 } ]
+  steps = [ { from = "TaurenFemale", clip = 17, take = 0, windup = 1.0, recovery = 0.2 }, { from = "TaurenMale", clip = 57, take = 0, windup = 0.55, recovery = 0.2 }, { from = "HumanFemale", clip = 17, take = 0, windup = 0.55, recovery = 1.6 } ]
   [[mob.pattern]]
   name = "kick"
   weight = 4.0
-  steps = [ { from = "NightElfFemale", ranged = false, clip = 95, take = 0, windup = 0.35, damage = 7, range = 2.6, arc = 80.0, blockable = true, recovery = 0.6 } ]
+  steps = [ { from = "NightElfFemale", clip = 95, take = 0, ranged = false, windup = 0.35, damage = 7, range = 2.6, arc = 80.0, blockable = true, recovery = 0.6 } ]
 
 # Rhahk'Zor, the Brotherhood's foreman: huge, slow, wide; at the last, a roar that throws all down.
 [[mob]]
@@ -2000,12 +2005,12 @@ aggro_sound = 5774
   [[mob.pattern]]
   name = "two swings"
   weight = 3.0
-  steps = [ { clip = 18, take = 0, windup = 0.9, damage = 38, arc = 150.0, recovery = 0.3 }, { clip = 18, take = 1, windup = 0.7, damage = 40, arc = 150.0, recovery = 1.3 } ]
+  steps = [ { clip = 18, take = 1, windup = 0.9, damage = 38, arc = 150.0, recovery = 0.3 }, { clip = 17, take = 1, windup = 0.7, damage = 40, arc = 150.0, recovery = 1.3 } ]
   # The maul held high: it waits out a panicked dodge.
   [[mob.pattern]]
   name = "slam"
   weight = 2.0
-  steps = [ { clip = 58, windup = 1.45, damage = 60, arc = 70.0, recovery = 1.6, kit = 379 } ]
+  steps = [ { clip = 58, take = 0, windup = 1.45, damage = 60, arc = 70.0, recovery = 1.6, kit = 379 } ]
   [[mob.pattern]]
   name = "stomp"
   weight = 1.5
@@ -2016,7 +2021,7 @@ aggro_sound = 5774
   weight = 1.5
   min_range = 6.0
   max_range = 16.0
-  steps = [ { clip = 18, take = 1, windup = 1.1, lunge = 9.0, damage = 44, recovery = 1.6, kit = 379 } ]
+  steps = [ { clip = 18, take = 0, windup = 1.1, lunge = 9.0, damage = 44, recovery = 1.6, kit = 379 } ]
   [[mob.pattern]]
   name = "roar"
   weight = 0.0
@@ -2026,7 +2031,7 @@ aggro_sound = 5774
   name = "fury"
   weight = 3.0
   below = 0.4
-  steps = [ { clip = 18, take = 0, windup = 0.6, damage = 34, heavy = false, recovery = 0.15 }, { clip = 18, take = 1, windup = 0.5, damage = 34, heavy = false, recovery = 0.15 }, { clip = 58, windup = 0.9, damage = 52, recovery = 1.8 } ]
+  steps = [ { clip = 17, take = 1, windup = 0.6, damage = 34, heavy = false, recovery = 0.15 }, { clip = 59, take = 0, windup = 0.5, damage = 34, heavy = false, recovery = 0.15 }, { clip = 18, take = 1, windup = 0.9, damage = 52, recovery = 1.8 } ]
 
 [[goal]]
 title = "The foreman"
@@ -2039,8 +2044,71 @@ reward = { bronze = 6, leather = 4 }
 title = "Out into Moonbrook"
 text = "With Rhahk'Zor down the front door stands open. Walk out of the Deadmines."
 kind = "delve"
-what = "end"
+# (Out of the Deadmines: `end` alone is any dungeon's way out.)
+what = "end:deadmines"
 reward = { roast = 4, linen = 4 }
+
+# --- the ladder: every dungeon of the book, easiest first -------------------------------------------
+# After the Deadmines, the journal walks the camp through the book: the other two of the first
+# tier, then the second (open once two of the first are cleared: `LADDER_CLEARS`), then the third.
+# Each asks for a clear (`cleared`: every boss down in one run), and pays a little more each tier
+# on top of the dungeon's own first-clear gift. (First guesses at the pay, to tune.)
+
+[[goal]]
+title = "Into the fire"
+text = "The book's next pages: Ragefire Chasm, the caves under Orgrimmar where the Searing Blade hides. Clear it: every boss down in one run."
+kind = "cleared"
+what = "ragefire"
+reward = { bronze = 4, leather = 4 }
+
+[[goal]]
+title = "Naralex's nightmare"
+text = "The Wailing Caverns under the Barrens, where the Druids of the Fang dream. Clear it, every Fanglord and Verdan with them."
+kind = "cleared"
+what = "wailing"
+reward = { bronze = 4, linen = 6 }
+
+[[goal]]
+title = "The Stockade"
+text = "Two of the first dungeons cleared: the book reads on. Stormwind's prison is in its inmates' hands. Clear it."
+kind = "cleared"
+what = "stockade"
+reward = { silver = 1, bronze = 6 }
+
+[[goal]]
+title = "Arugal's keep"
+text = "Shadowfang Keep in Silverpine, Arugal's worgen and its old lords' ghosts. Clear it."
+kind = "cleared"
+what = "shadowfang"
+reward = { silver = 2, leather = 6 }
+
+[[goal]]
+title = "The warren of thorns"
+text = "Razorfen Kraul, where Charlga Razorflank speaks for Agamaggan. Clear it."
+kind = "cleared"
+what = "razorfen"
+reward = { silver = 2, linen = 8 }
+
+[[goal]]
+title = "The Crusade's dead"
+text = "The book's last pages: the Scarlet Monastery. Its Graveyard first, where the dead won't stay buried. Clear it."
+kind = "cleared"
+what = "graveyard"
+reward = { silver = 2, pearl = 1 }
+
+[[goal]]
+title = "The Crusade's books"
+text = "The Library: its hounds, its Arcanist, and whatever he keeps bound in his tomes. Clear it."
+kind = "cleared"
+what = "library"
+reward = { silver = 3, pearl = 1 }
+
+[[goal]]
+title = "The Crusade's heart"
+text = "The Cathedral: Mograine at the altar, and Whitemane who won't let him die. Clear it, and the book is done."
+kind = "cleared"
+what = "cathedral"
+reward = { silver = 4, pearl = 2 }
 
 # === secrets, rares and the Brotherhood's other hands ===============================================
 # What isn't on the way through: a hidden pantry, a captain's quarters, a cave-in that isn't one,
@@ -2275,6 +2343,75 @@ z = 55.0
 radius = 0.0
 count = 1
 
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
+
+[[dungeon.pack]]
+mob = "dm_blackguard"
+at = [-206.4, -612.1]
+z = 29.0
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_evoker"
+at = [-206.4, -612.1]
+z = 29.0
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_wizard"
+at = [-132.4, -786.1]
+z = 17.5
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_evoker"
+at = [-132.4, -786.1]
+z = 17.5
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-92.4, -746.1]
+z = 2.8
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_squallshaper"
+at = [-66.4, -778.1]
+z = 17.7
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-38.4, -720.1]
+z = 8.4
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "dm_pirate"
+at = [-120.4, -702.1]
+z = 8.6
+radius = 3.0
+count = 2
+link = 12.0
+
 # --- items -------------------------------------------------------------------------------------------
 
 [[item]]
@@ -2377,7 +2514,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "slaps"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.7, damage = 24, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.55, damage = 24, recovery = 0.2 }, { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 30, heavy = true, recovery = 1.3, kit = 356, look = 10987 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.7, damage = 24, recovery = 0.2 }, { clip = 17, take = 0, windup = 0.55, damage = 24, recovery = 0.2 }, { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 30, heavy = true, recovery = 1.3, kit = 356, look = 10987 } ]
   # From far off: the belly-flop, and a splash where he lands.
   [[mob.pattern]]
   name = "belly-flop"
@@ -2454,7 +2591,7 @@ slay_sound = 5781
   weight = 2.5
   min_range = 4.0
   max_range = 14.0
-  steps = [ { from = "ScourgeFemale", clip = 17, take = 1, windup = 0.6, lunge = 9.0, range = 3.5, arc = 360.0, damage = 30, heavy = true, recovery = 0.9, kit = 218, look = 24050 } ]
+  steps = [ { from = "ScourgeFemale", clip = 57, take = 0, windup = 0.6, lunge = 9.0, range = 3.5, arc = 360.0, damage = 30, heavy = true, recovery = 0.9, kit = 218, look = 24050 } ]
   [[mob.pattern]]
   name = "riposte stance"
   weight = 1.5
@@ -2463,7 +2600,7 @@ slay_sound = 5781
   name = "blade storm"
   weight = 1.5
   max_range = 4.0
-  steps = [ { from = "TrollMale", clip = 126, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "NightElfMale", clip = 126, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, heavy = false, recovery = 0.1 }, { from = "GnomeMale", clip = 126, windup = 0.4, range = 4.5, arc = 360.0, damage = 28, recovery = 1.4, look = 24050 } ]
+  steps = [ { from = "TrollMale", clip = 16, take = 0, windup = 0.8, range = 4.5, arc = 360.0, damage = 22, heavy = false, recovery = 0.1, kit = 369 }, { from = "NightElfMale", clip = 16, take = 1, windup = 0.4, range = 4.5, arc = 360.0, damage = 24, heavy = false, recovery = 0.1 }, { from = "GnomeMale", clip = 16, take = 0, windup = 0.4, range = 4.5, arc = 360.0, damage = 28, recovery = 1.4, look = 24050 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.8
@@ -2515,7 +2652,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "picks"
   weight = 3.0
-  steps = [ { from = "HumanMale", clip = 17, take = 1, windup = 0.55, damage = 20, recovery = 0.15 }, { from = "ScourgeFemale", clip = 17, take = 0, windup = 0.45, damage = 20, recovery = 0.15 }, { from = "OrcFemale", clip = 57, take = 0, windup = 0.9, damage = 32, heavy = true, recovery = 1.1, kit = 379 } ]
+  steps = [ { from = "HumanMale", clip = 17, take = 0, windup = 0.55, damage = 20, recovery = 0.15 }, { from = "ScourgeFemale", clip = 17, take = 1, windup = 0.45, damage = 20, recovery = 0.15 }, { from = "OrcFemale", clip = 57, take = 0, windup = 0.9, damage = 32, heavy = true, recovery = 1.1, kit = 379 } ]
   # A stick of blasting powder at his feet: he steps back from it, you don't.
   [[mob.pattern]]
   name = "blasting powder"
@@ -2648,12 +2785,12 @@ respawn = 0.0
   name = "the voice"
   weight = 2.0
   max_range = 24.0
-  steps = [ { ranged = true, windup = 1.4, damage = 30, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.2 } ]
+  steps = [ { clip = 54, take = 0, ranged = true, windup = 1.4, damage = 30, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.2 } ]
   [[mob.pattern]]
   name = "staff"
   weight = 1.5
   max_range = 3.0
-  steps = [ { from = "TaurenMale", ranged = false, clip = 17, take = 1, windup = 0.6, damage = 16, range = 2.8, arc = 100.0, recovery = 0.8 } ]
+  steps = [ { from = "TaurenMale", clip = 57, take = 0, ranged = false, windup = 0.6, damage = 16, range = 2.8, arc = 100.0, recovery = 0.8 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.85
@@ -2758,7 +2895,7 @@ respawn = 0.0
   name = "void burst"
   weight = 1.5
   max_range = 22.0
-  steps = [ { ranged = true, windup = 1.5, damage = 22, range = 22.0, radius = 3.5, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.3 } ]
+  steps = [ { clip = 54, take = 0, ranged = true, windup = 1.5, damage = 22, range = 22.0, radius = 3.5, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.3 } ]
 
 # A goblin craftsman: bombs from up high, and a wrench if you reach him.
 [[mob]]
@@ -2796,7 +2933,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "wrench"
   weight = 2.0
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.8 } ]
+  steps = [ { clip = 17, take = 1, windup = 0.5, damage = 12, recovery = 0.15 }, { clip = 57, take = 0, windup = 0.45, damage = 12, recovery = 0.8 } ]
 
 # A taskmaster: a whip with a long reach, and miners who work harder when he's hurt.
 [[mob]]
@@ -2872,11 +3009,11 @@ respawn = 0.0
   [[mob.pattern]]
   name = "pick"
   weight = 3.0
-  steps = [ { from = "ScourgeFemale", clip = 17, take = 1, windup = 0.65, damage = 11, recovery = 0.9 } ]
+  steps = [ { from = "ScourgeFemale", clip = 17, take = 0, windup = 0.65, damage = 11, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "two picks"
   weight = 1.5
-  steps = [ { from = "TrollFemale", clip = 17, take = 1, windup = 0.6, damage = 10, recovery = 0.2 }, { from = "DwarfFemale", clip = 17, take = 0, windup = 0.5, damage = 10, recovery = 0.9 } ]
+  steps = [ { from = "TrollFemale", clip = 17, take = 0, windup = 0.6, damage = 10, recovery = 0.2 }, { from = "DwarfFemale", clip = 17, take = 1, windup = 0.5, damage = 10, recovery = 0.9 } ]
 
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 

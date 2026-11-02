@@ -610,6 +610,12 @@ Two-handed weapons have no shield: their guard is narrower and dearer, but parri
 
 Bows and crossbows aren't on the rack: ranged fighting is off the board (Aimed Shot is benched), though the Hunting Bow and Militia Crossbow are still defined for the camp's towers and older saves.
 
+A dungeon's own weapons (what its foes carry or yield) aren't on the rack until the camp has
+found one: taken it from the ground below, or had it sent to the chest (a wager's gear). Then
+the rack has it for everyone. A harder dungeon's weapons hit harder: each tier's, taken
+together, 15% more damage a second than the rack's own per tier (`tools/gear-tiers.py` sets
+them), so the Cathedral's two-handers beat the Deadmines'.
+
 ## Enemies near the camp
 
 Every foe has `combat.foe_health` (1.6) times the health its own entry gives (critters, dummies
@@ -898,7 +904,7 @@ little: a tick with a hero at any of the places takes about a quarter of a milli
 
 ## The Deadmines
 
-Read the Smuggler's Logbook by the camp's chest (after the first raid) to go down (its Proving
+Read the Smuggler's Logbook by the camp's chest to go down (its Proving
 Ring page is open from the start: see below). The run goes
 backwards through the instance, lamp to lamp (`content/deadmines.toml`); resting at a lamp fills
 your Miner's Draughts and puts every foe but the bosses back at their posts.
@@ -931,6 +937,17 @@ whoever's below set down at the first lamp; their save is kept aside as well).
 **The journal below** is the camp's: the goal shown there, and its count, are the camp's
 (mirrored every tick; the journal moves on only at camp). After the Logbook, the next goal is to
 kill Cookie once.
+
+## The book's ladder
+
+The book holds nine dungeons in three tiers. The first tier (the Deadmines, Ragefire Chasm, the
+Wailing Caverns) is open from the start. A tier past the first opens once the camp has cleared
+two dungeons of the tier below (every boss down in one run; `LADDER_CLEARS`): the Stockade,
+Shadowfang Keep and Razorfen Kraul after two of the first, the Scarlet Monastery's three after
+two of those. A locked dungeon's page says what opens it. A dungeon the camp has already been in
+(a lamp lit past the first, a boss felled) stays open. The journal walks the camp through them in
+that order after the Deadmines' own steps (`kind = "cleared"`), each paying into the chest on top
+of the dungeon's first-clear gift.
 
 ## Secrets and notes
 
@@ -969,6 +986,12 @@ during a wager. Friends join it by taking the same level from the book while it 
 - **Times to beat.** By the dungeon's size (8 minutes, 0.4 a pack, 1.5 a boss, rounded to 2:30),
   or `wager_minutes` in its file: the Deadmines 35:00, the Stockade and Ragefire 27:30, ..., the
   Library and the Cathedral 20:00. First guesses: tune them from the board.
+
+**The Bookmaker's chest.** Each week, the camp's best wager won in time pays a chest when the
+week turns (Monday): that dungeon's own gear into the camp's chest, one piece and one more every
+four levels (up to four), the finer pieces (a perk, a set's) from +3, honed as a wager of that
+level pays (Honed from +4, Keen from +8, Peerless from +12). The week's news says the camp's best
+so far.
 
 **The week's news.** The first time a hero comes in each week (once the camp has the book), a page
 says the week's three terms and last week's three best runs on the board; `.es news` shows it again.

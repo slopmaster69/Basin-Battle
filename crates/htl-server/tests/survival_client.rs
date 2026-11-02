@@ -1492,6 +1492,8 @@ fn the_book_lists_every_dungeon_and_a_page_of_another_takes_a_hero_to_its_own_wo
     let (secrets, notes) = (dm.doors.iter().filter(|d| d.secret()).count(), dm.notes.len());
     let entry = dungeons.split('^').find(|e| e.starts_with("deadmines~")).unwrap_or("");
     assert!(entry.contains(&format!("~0~{secrets}~0~{notes}~1~")), "none found yet, and wagers open to +1: {entry}");
+    // Each entry's fields, the last what opens a locked one (empty: debug opens every page).
+    assert_eq!(entry.split('~').count(), 19, "{entry}");
     a.chat(".es lore deadmines");
     let nt = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tNT\tlore\t")));
     let ServerPacket::MessageChat(m) = nt.expect("the record's page") else { unreachable!() };
@@ -1722,11 +1724,15 @@ fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing
     c.drain(0.6);
     let times = addon_lines(&c, "ES").iter().filter(|l| l.starts_with("T\t") && l.contains("older than this server's")).count();
     assert_eq!(times, 1, "once a run");
-    // The newest add-on on the newest client: not a word. (`ADDON_NEWEST` and `CLIENT_NEWEST` in
-    // survival/ui.rs: raise these with them.)
+    // The newest add-on on the newest client: not a word. Its version and the client level its
+    // hello asks for are read from the add-on's own source, so a bump doesn't need this test too
+    // (a unit test in survival/ui.rs holds `ADDON_NEWEST` and `CLIENT_NEWEST` to the same).
+    let src = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../addon/ElwynnSurvival/ElwynnSurvival.lua")).unwrap();
+    let version: u32 = src.lines().find_map(|l| l.strip_prefix("local VERSION = ")).and_then(|v| v.trim().parse().ok()).expect("local VERSION = N");
+    let level: u8 = src.match_indices("\" ac").filter_map(|(i, _)| src[i + 4..].split('"').next()?.parse().ok()).max().expect("the hello's acN");
     let mut d = Client::connect(server.login, "wren", "hold", REALM).unwrap();
     enter(&mut d);
-    d.chat(".es hello 10 ac10");
+    d.chat(&format!(".es hello {version} ac{level}"));
     assert!(d.until(2.0, |d| addon_lines(d, "ES").iter().any(|l| l.starts_with("V\t"))), "awake");
     d.drain(0.5);
     assert!(!told(&d), "nothing to update");

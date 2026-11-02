@@ -30,6 +30,10 @@ draughts_max = 6
 flask = "draught_flask"
 plunder = "scarlet_insignia"
 hero_health = 0.7
+# Each hero past the first: this share more foes in every pack of two or more (not a boss's nor
+# an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
+# same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
+hero_foes = 0.35
 exit = [245.7, -186.6, 18.7]
 exit_radius = 5.0
 exit_boss = "doan"
@@ -320,13 +324,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "bites"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 10, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.34, damage = 11, recovery = 0.8 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.4, damage = 10, recovery = 0.08 }, { clip = 118, take = 0, windup = 0.34, damage = 11, recovery = 0.8 } ]
   [[mob.pattern]]
   name = "pounce"
   weight = 2.0
   min_range = 4.0
   max_range = 12.0
-  steps = [ { clip = 17, take = 1, windup = 0.5, lunge = 7.0, damage = 14, recovery = 0.85 } ]
+  steps = [ { clip = 118, take = 0, windup = 0.5, lunge = 7.0, damage = 14, recovery = 0.85 } ]
 
 [[mob]]
 key = "sl_diviner"
@@ -404,7 +408,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "mace"
   weight = 3.0
-  steps = [ { from = "GnomeFemale", clip = 17, take = 2, windup = 0.5, damage = 22, recovery = 0.12 }, { from = "OrcFemale", clip = 17, take = 0, windup = 0.42, damage = 22, recovery = 0.12 }, { from = "GnomeMale", clip = 57, take = 0, windup = 0.8, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
+  steps = [ { from = "GnomeFemale", clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.12 }, { from = "OrcFemale", clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.12 }, { from = "GnomeMale", clip = 57, take = 0, windup = 0.8, damage = 30, heavy = true, recovery = 1.0, kit = 379 } ]
   [[mob.pattern]]
   name = "bloodlust charge"
   weight = 2.0
@@ -437,7 +441,7 @@ respawn = 0.0
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { from = "OrcMale", clip = 17, take = 1, windup = 0.45, damage = 19, recovery = 0.1 }, { from = "NightElfFemale", clip = 57, take = 0, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { from = "OrcMale", clip = 17, take = 0, windup = 0.45, damage = 19, recovery = 0.1 }, { from = "NightElfFemale", clip = 57, take = 0, windup = 1.25, damage = 36, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
   # Nearer its end, from range: arcane fire thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "arcane fire"
@@ -504,14 +508,14 @@ then_look = 27812
   name = "detonation"
   weight = 2.0
   max_range = 26.0
-  steps = [ { ranged = true, windup = 1.4, damage = 30, range = 26.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
+  steps = [ { clip = 55, take = 0, ranged = true, windup = 1.4, damage = 30, range = 26.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
   [[mob.pattern]]
   name = "polymorph's end"
   weight = 2.0
   below = 0.5
   min_range = 3.0
   max_range = 28.0
-  steps = [ { ranged = true, windup = 0.9, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 1.2 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 0.9, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 20, range = 28.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 1.2 } ]
   [[mob.phase]]
   at = 0.66
   speed = 0.88
@@ -564,7 +568,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "cleave"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.7, damage = 28, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.55, damage = 28, recovery = 0.15 }, { clip = 57, windup = 0.85, damage = 38, heavy = true, recovery = 1.1, kit = 379 } ]
+  steps = [ { clip = 87, take = 0, windup = 0.7, damage = 28, recovery = 0.15 }, { clip = 16, take = 2, windup = 0.55, damage = 28, recovery = 0.15 }, { clip = 87, take = 0, windup = 0.85, damage = 38, heavy = true, recovery = 1.1, kit = 379 } ]
   [[mob.pattern]]
   name = "page storm"
   weight = 2.0
@@ -596,7 +600,7 @@ respawn = 0.0
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { clip = 16, take = 2, windup = 0.75, lunge = 8, damage = 38, kit = 379, heavy = true, recovery = 1.2 } ]
 
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 
@@ -634,7 +638,7 @@ windup = 0.18
 active = 0.08
 recovery = 0.24
 stamina = 8.0
-damage = [12, 16]
+damage = [17, 23]
 range = 2.5
 arc = 75.0
 targets = 1
@@ -656,7 +660,7 @@ windup = 0.42
 active = 0.12
 recovery = 0.55
 stamina = 20.0
-damage = [28, 36]
+damage = [40, 51]
 range = 5.0
 arc = 50.0
 targets = 2
@@ -798,6 +802,19 @@ count = 2
 link = 10.0
 wake = "restricted_cache"
 
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
+
+[[dungeon.pack]]
+mob = "sc_gallant"
+at = [278.0, -232.0]
+z = 18.5
+radius = 3.0
+count = 2
+link = 12.0
+
 # The Archivist: a scholar of what the Crusade burned, and he kept a copy of all of it.
 [[mob]]
 key = "sl_archivist"
@@ -852,7 +869,7 @@ respawn = 0.0
   weight = 1.5
   min_range = 5.0
   max_range = 24.0
-  steps = [ { ranged = true, windup = 1.2, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.1 } ]
+  steps = [ { clip = 55, take = 0, ranged = true, windup = 1.2, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.1 } ]
   # Nearer his end: three bolts quick on each other.
   [[mob.pattern]]
   name = "recital"
@@ -860,7 +877,7 @@ respawn = 0.0
   below = 0.5
   min_range = 3.0
   max_range = 26.0
-  steps = [ { ranged = true, windup = 0.9, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 1.3 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 0.9, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 16, range = 26.0, radius = 1.5, speed = 24.0, spell = 116, blockable = true, recovery = 1.3 } ]
   [[mob.phase]]
   at = 0.66
   speed = 0.88

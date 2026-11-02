@@ -470,6 +470,7 @@ impl Survival {
             ObjKind::Book if !self.book_open() && self.arena_def().is_none() => {
                 let gate = self.dungeon_def().map_or(1, |d| d.gate_raids);
                 self.tell(id, format!("The Smuggler's Logbook: a Defias smuggler's, its pages in a cipher. Hold the camp against {gate} raid(s) and the camp's scouts will have read it."));
+                // (Only while no dungeon at all is open: the ladder's locks say theirs on each page.)
             }
             ObjKind::Book => self.events.push(Event::StationOpen {
                 player: id,
@@ -840,8 +841,9 @@ impl Survival {
             .items
             .iter()
             .enumerate()
-            // A champion's trophy is won, not taken from the rack; nor is honed gear.
-            .filter(|(_, d)| !self.content.is_trophy(&d.key) && d.hone == 0)
+            // A champion's trophy is won, not taken from the rack; nor is honed gear; nor a
+            // dungeon's own until the camp has found one ([`Self::rack_has`]).
+            .filter(|(_, d)| !self.content.is_trophy(&d.key) && d.hone == 0 && self.rack_has(&d.key))
             .filter_map(|(i, d)| {
                 let kind = match d.kind {
                     ItemKind::Weapon if self.content.weapon(&d.key).is_some_and(|w| w.two_handed) => "two-handed",
@@ -904,6 +906,17 @@ impl Survival {
         })
     }
 
+    /// Whether the rack offers this piece: anything but a dungeon's own, and that once the camp
+    /// has found one (taken it from the ground below, or had it sent to the chest; or one, or a
+    /// honed copy, already lies in the chest, from before finds were counted). In Siege, whose
+    /// heroes are made for the match, everything.
+    pub(crate) fn rack_has(&self, key: &str) -> bool {
+        self.is_siege()
+            || !self.content.is_dungeon_gear(key)
+            || self.ever("found", key)
+            || self.storage.iter().any(|(i, n)| *n > 0 && self.content.base_key(*i) == key)
+    }
+
     /// Take up a weapon or shield from the rack (free while the armory is open).
     pub fn arm(&mut self, id: Id, key: &str) -> Result<String, String> {
         if !self.content.world.armory {
@@ -912,6 +925,13 @@ impl Survival {
         let item = self.content.item(key).ok_or("No such weapon.")?;
         if self.content.is_trophy(key) {
             return Err("That one's won from its owner, not taken from the rack.".into());
+        }
+        // The rack holds weapons as they're found; a honed one is the lamp's work, and its own.
+        if self.content.items[item].hone > 0 {
+            return Err("The rack holds weapons as they're found: a honed one is honed at the lamp.".into());
+        }
+        if !self.rack_has(key) {
+            return Err("That one's found below first: the rack has it once the camp does.".into());
         }
         let kind = self.content.items[item].kind;
         if kind == ItemKind::Bow {

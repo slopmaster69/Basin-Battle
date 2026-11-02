@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 11
+local VERSION = 15
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -4584,7 +4584,7 @@ function ES.BookDraw()
       detail = "The logbook's first page.",
     })
     if info[4] ~= "1" then
-      Rest(info[2] or "?", "Written in a cipher: hold the camp against " .. (info[5] or "1") .. " raid(s) and the scouts will have read these pages.", "")
+      Rest(info[2] or "?", (info[19] and info[19] ~= "") and ("Written in a cipher. To read these pages, " .. info[19] .. ".") or ("Written in a cipher: hold the camp against " .. (info[5] or "1") .. " raid(s) and the scouts will have read these pages."), "")
       return
     end
     Rest(info[2] or "?", info[9] or "", "")
@@ -4684,7 +4684,7 @@ function ES.BookDraw()
       sub = ((f[18] == "1") and "Next, by the book. " or "") .. ((ES.TierWords and ES.TierWords(f[16])) and (ES.TierWords(f[16]) .. ". ") or "") .. (f[8] or ""),
       go = "Open",
       cmd = function() ES.BookOpen(key) end,
-      detail = opened and ((f[8] or "") .. " Its pages: the way in, and every lamp you've lit.") or ("Hold the camp against " .. (f[5] or "1") .. " raid(s) and the scouts will have read it."),
+      detail = opened and ((f[8] or "") .. " Its pages: the way in, and every lamp you've lit.") or ((f[19] and f[19] ~= "") and ("In cipher. To read it, " .. f[19] .. ".") or ("Hold the camp against " .. (f[5] or "1") .. " raid(s) and the scouts will have read it.")),
     })
   end
   Rest("The way in", "Every dungeon starts at its first page; light the lamps as you go and they're pages too. There aren't many lamps down there.", "")
@@ -4882,56 +4882,76 @@ function ES.Ledger(f)
 end
 ES.redraw.ledger = function() if ES.ledgerF then ES.Ledger(ES.ledgerF) end end
 
--- --- a lamp below (LP: key, name, draughts, most, the lamps lit, the wares, plunder) -----------------
+-- --- a lamp below (LP: key, name, draughts, most, the lamps lit, the wares, plunder, its name, ---
+-- --- the pieces the quartermaster can hone) ---------------------------------------------------------
 
 function ES.Lamp(f)
+  ES.lampLine = f
   local name, have, most = f[3] or "Lamp", tonumber(f[4] or "") or 0, tonumber(f[5] or "") or 0
   local lamps, wares, plunder = Items(f[6]), Items(f[7]), tonumber(f[8] or "") or 0
-  OpenWindow("lamp", name, "Resting heals you, fills your Draughts and brings the Brotherhood back to their posts (but never a boss). You wake here if you fall.", "Spell_Fire_Fire")
-  local n = 1
-  Row(n, {
+  -- (An older server sends neither the currency's name nor the hones.)
+  local coin, hones = f[9] or "Defias Plunder", Items(f[10])
+  OpenWindow("lamp", name, "Resting heals you, fills your Draughts and brings the foes back to their posts (but never a boss). You wake here if you fall.", "Spell_Fire_Fire")
+  -- Every row, then a page of them.
+  local rows = {}
+  table.insert(rows, {
     icon = "INV_Drink_04",
     name = "Rest at the lamp",
     tag = "Draughts " .. have .. " / " .. most,
-    sub = "Whole again, Draughts full; the mine stirs",
+    sub = "Whole again, Draughts full; the foes stir",
     go = "Rest",
     cmd = ".es rest",
     detail = "Every foe you've beaten (but the bosses) is back at its post when you rest.",
   })
-  n = n + 1
-  Row(n, {
+  table.insert(rows, {
     icon = "INV_Misc_Book_09",
     name = "Home to the camp",
-    sub = "By the smugglers' way: you'll be back by the book",
+    sub = "Back down by the book whenever you like",
     go = "Go home",
     cmd = ".es travel camp",
     detail = "What you carry goes with you. Your Draughts stay below for next time.",
   })
   for i = 1, table.getn(lamps) do
-    if n >= LIST_ROWS then break end
     local l = Split(lamps[i], "~")
-    n = n + 1
-    Row(n, { icon = "Spell_Fire_Fire", name = l[2] or "?", sub = "A lamp you've lit", go = "Travel", cmd = ".es travel " .. (l[1] or ""), detail = "Make your way there by the paths you've opened." })
+    table.insert(rows, { icon = "Spell_Fire_Fire", name = l[2] or "?", sub = "A lamp you've lit", go = "Travel", cmd = ".es travel " .. (l[1] or ""), detail = "Make your way there by the paths you've opened." })
   end
   for i = 1, table.getn(wares) do
-    if n >= LIST_ROWS then break end
     local w = Split(wares[i], "~")
     local can = w[4] == "1"
-    n = n + 1
-    Row(n, {
+    table.insert(rows, {
       icon = w[5],
       name = w[2] or "?",
-      tag = (w[3] or "?") .. " Plunder",
+      tag = (w[3] or "?") .. " " .. coin,
       sub = "From the lamp's quartermaster",
       go = "Buy",
       cmd = ".es buy " .. (w[1] or ""),
       can = can,
-      detail = "Paid in Defias Plunder (you have " .. plunder .. ").",
-      hint = can and "" or "Not enough plunder",
+      detail = "Paid in " .. coin .. " (you have " .. plunder .. ").",
+      hint = can and "" or ("Not enough " .. coin),
     })
   end
-  Rest(name, "Defias Plunder: " .. plunder .. ". It's lost if you fall twice before you win your sack back.", "")
+  for i = 1, table.getn(hones) do
+    local h = Split(hones[i], "~")
+    local can = h[5] == "1"
+    table.insert(rows, {
+      icon = h[6],
+      name = "Hone " .. (h[2] or "?"),
+      tag = (h[4] or "?") .. " " .. coin,
+      sub = "To " .. (h[3] or "?") .. ": it hits harder, guards better",
+      go = "Hone",
+      cmd = ".es hone " .. (h[1] or ""),
+      can = can,
+      detail = "The quartermaster hones this dungeon's own gear a tier at a time, up to Peerless. Paid in " .. coin .. " (you have " .. plunder .. ").",
+      hint = can and "" or ("Not enough " .. coin),
+    })
+  end
+  local first = PageOf("lamp", table.getn(rows), LIST_ROWS)
+  for i = 1, math.min(LIST_ROWS, table.getn(rows) - first) do
+    Row(i, rows[first + i])
+  end
+  Rest(name, coin .. ": " .. plunder .. ". It's lost if you fall twice before you win your sack back.", "")
 end
+ES.redraw.lamp = function() if ES.lampLine then ES.Lamp(ES.lampLine) end end
 
 -- --- placing a station --------------------------------------------------------------------------------
 -- While placing, the mouse is free (turn and look around to choose the spot); the station stands
@@ -6333,8 +6353,10 @@ events:SetScript("OnEvent", function()
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
-    -- ac10: a clip can come from another character model.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 10 then
+    -- ac10: a clip can come from another character model; ac11: its turns go back to rest after.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
+      Say(".es hello " .. VERSION .. " ac11")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 10 then
       Say(".es hello " .. VERSION .. " ac10")
     elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
       Say(".es hello " .. VERSION .. " ac9")

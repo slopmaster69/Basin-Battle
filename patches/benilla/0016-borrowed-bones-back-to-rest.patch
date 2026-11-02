@@ -1,0 +1,275 @@
+From 0714d33d1e6a5e9372410a029c938cfd241fdeec Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 1 Nov 2026 22:40:15 -0600
+Subject: [PATCH] A borrowed clip's turns go back to rest once no clip writes
+ them
+
+A clip from another character model (Basin Battle's borrowed swings) keys bones the unit's
+own clips may leave unkeyed: a wrist, the shield's. An unkeyed property keeps its value, so
+the borrowed swing's last turn of such a bone stayed for good, and a night elf woman's or a
+tauren's shield was left crooked after the first swing. The evaluator now remembers, per
+bone, which properties another model's clip wrote last; once no clip writes one, it goes back
+to rest (the bind translation, no turn, unit scale: a vanilla M2's rest pose). What the unit's
+own clips write is theirs as before, and a rig that never plays a borrowed clip is untouched.
+
+HasActionCombat() is now 11, so the server can tell a client without this to update.
+---
+ crates/benilla-ui/src/action_combat.rs    |   6 +-
+ crates/benilla-world/src/rig_anim/pose.rs | 144 +++++++++++++++++++++-
+ 2 files changed, 144 insertions(+), 6 deletions(-)
+
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 81801210..8ddbfcf5 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -98,6 +98,10 @@
+ //! on first use, and until it has, the unit's own clip plays. `PreloadAnimationSource(name)`
+ //! starts that load early.
+ //!
++//! The eleventh (`HasActionCombat() >= 11`): a bone another model's clip turned goes back to rest
++//! once no clip playing writes it, so a hand or a shield the unit's own stand leaves unkeyed
++//! doesn't stay where the borrowed swing left it.
++//!
+ //! The seventh (`HasActionCombat() >= 7`), a creature's blow drawn under it:
+ //!
+ //! - `SetTelegraph(key, unit, shape, reach, arcDegrees, seconds, kind, parrySeconds, focus)`: a
+@@ -668,7 +672,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(10))?,
++        lua.create_function(|_, _: MultiValue| Ok(11))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+diff --git a/crates/benilla-world/src/rig_anim/pose.rs b/crates/benilla-world/src/rig_anim/pose.rs
+index 75094ca5..b1388f84 100644
+--- a/crates/benilla-world/src/rig_anim/pose.rs
++++ b/crates/benilla-world/src/rig_anim/pose.rs
+@@ -37,8 +37,19 @@ pub struct RigPose {
+     pub anchors: Vec<(u16, Entity)>,
+     /// `locals` changed since the last world pass; starts raised so the bind pose is written.
+     pub pose_dirty: bool,
++    /// Basin Battle: per bone, the properties ([`BORROWED_T`], [`BORROWED_R`], [`BORROWED_S`]) an
++    /// [`ExtraClips`] clip (another model's) wrote last. A model's own clips often leave a bone
++    /// unkeyed (a wrist, the shield's), and an unkeyed property keeps its value, so a borrowed
++    /// swing's last turn of it would stay for good (a shield left crooked after the swing): once
++    /// no clip writes such a property, it goes back to rest. Empty until a borrowed clip plays.
++    pub(crate) borrowed: Vec<u8>,
+ }
+ 
++/// [`RigPose::borrowed`]'s bits: translation, rotation, scale.
++pub(crate) const BORROWED_T: u8 = 1;
++pub(crate) const BORROWED_R: u8 = 2;
++pub(crate) const BORROWED_S: u8 = 4;
++
+ impl RigPose {
+     /// The rig at bind pose, composed; anchors come from [`Self::anchor_for`].
+     pub fn new(joints_root: Entity, skeleton: &ModelSkeleton) -> Self {
+@@ -66,6 +77,7 @@ impl RigPose {
+                 .any(|j| j.billboard.is_some() || j.parent_arm.is_some()),
+             anchors: Vec::new(),
+             pose_dirty: true,
++            borrowed: Vec::new(),
+         };
+         rig.compose();
+         rig
+@@ -253,6 +265,21 @@ fn evaluate_rig_poses(
+                     });
+                 }
+                 active.sort_unstable_by_key(|a| a.node);
++                // Which properties a clip writes this frame (`written`), and of those, which another
++                // model's clip had a hand in (`ext`), for the borrowed bones' return to rest.
++                thread_local! {
++                    static MARKS: std::cell::RefCell<(Vec<u8>, Vec<u8>)> =
++                        const { std::cell::RefCell::new((Vec::new(), Vec::new())) };
++                }
++                let track = active.iter().any(|a| a.extra) || !rig.borrowed.is_empty();
++                MARKS.with(|marks| {
++                let (written, ext) = &mut *marks.borrow_mut();
++                written.clear();
++                ext.clear();
++                if track {
++                    written.resize(rig.locals.len(), 0);
++                    ext.resize(rig.locals.len(), 0);
++                }
+                 match active.as_mut_slice() {
+                     [] => {}
+                     [one] => {
+@@ -267,25 +294,40 @@ fn evaluate_rig_poses(
+                             {
+                                 continue;
+                             }
+-                            let Some(tf) = rig.locals.get_mut(pb.bone as usize) else {
++                            let b = pb.bone as usize;
++                            let Some(tf) = rig.locals.get_mut(b) else {
+                                 continue;
+                             };
++                            let mut bits = 0;
+                             if let Some(v) = pb.translation.sample(one.seek) {
+                                 tf.translation = v;
++                                bits |= BORROWED_T;
+                             }
+                             if let Some(v) = pb.rotation.sample(one.seek) {
+                                 tf.rotation = v;
++                                bits |= BORROWED_R;
+                             }
+                             if let Some(v) = pb.scale.sample(one.seek) {
+                                 tf.scale = v;
++                                bits |= BORROWED_S;
++                            }
++                            if track {
++                                written[b] |= bits;
++                                if one.extra {
++                                    ext[b] |= bits;
++                                }
+                             }
+                         }
+                     }
+                     many => {
+                         rig.pose_dirty = true;
+-                        blend_rig(src, extra, many, &mut rig);
++                        blend_rig(src, extra, many, &mut rig, track.then_some((&mut *written, &mut *ext)));
+                     }
+                 }
++                if track {
++                    settle_borrowed(&mut rig, written, ext);
++                }
++                });
+             });
+         });
+ }
+@@ -313,6 +355,7 @@ fn blend_rig(
+     extra: Option<&ExtraClips>,
+     active: &mut [Active],
+     rig: &mut RigPose,
++    mut marks: Option<(&mut Vec<u8>, &mut Vec<u8>)>,
+ ) {
+     // Every clip here was found when gathered; one gone since poses nothing rather than panicking.
+     let clip = |a: &Active| clip_in(src, extra, a.extra, a.clip).unwrap_or(&NO_CLIP);
+@@ -325,6 +368,8 @@ fn blend_rig(
+         let mut translation: Option<(Vec3, f32)> = None;
+         let mut rotation: Option<(Quat, f32)> = None;
+         let mut scale: Option<(Vec3, f32)> = None;
++        // The properties another model's clip contributes to here.
++        let mut from_extra = 0u8;
+         for a in active.iter_mut() {
+             let Some(pb) = clip(a).bones.get(a.cursor).filter(|b| b.bone == bone) else {
+                 continue;
+@@ -333,9 +378,13 @@ fn blend_rig(
+             if bone_mask & a.mask != 0 {
+                 continue; // masked out: no contribution, but the cursor advanced
+             }
+-            fold(&mut translation, pb.translation.sample(a.seek), a.weight);
+-            fold(&mut rotation, pb.rotation.sample(a.seek), a.weight);
+-            fold(&mut scale, pb.scale.sample(a.seek), a.weight);
++            let (t, r, sc) = (pb.translation.sample(a.seek), pb.rotation.sample(a.seek), pb.scale.sample(a.seek));
++            if a.extra {
++                from_extra |= if t.is_some() { BORROWED_T } else { 0 } | if r.is_some() { BORROWED_R } else { 0 } | if sc.is_some() { BORROWED_S } else { 0 };
++            }
++            fold(&mut translation, t, a.weight);
++            fold(&mut rotation, r, a.weight);
++            fold(&mut scale, sc, a.weight);
+         }
+         if translation.is_none() && rotation.is_none() && scale.is_none() {
+             continue;
+@@ -352,6 +401,49 @@ fn blend_rig(
+         if let Some((v, _)) = scale {
+             tf.scale = v;
+         }
++        if let Some((written, ext)) = marks.as_mut() {
++            let b = bone as usize;
++            let bits = if translation.is_some() { BORROWED_T } else { 0 } | if rotation.is_some() { BORROWED_R } else { 0 } | if scale.is_some() { BORROWED_S } else { 0 };
++            if let (Some(w), Some(e)) = (written.get_mut(b), ext.get_mut(b)) {
++                *w |= bits;
++                *e |= from_extra & bits;
++            }
++        }
++    }
++}
++
++/// Basin Battle: a borrowed clip's mark on the bones once this frame's clips have written. A
++/// property another model's clip wrote last that no clip writes now goes back to rest (the bind
++/// translation, no turn, unit scale: a vanilla M2's rest pose); what another model's clip wrote
++/// this frame is borrowed from now on, and what the unit's own clips wrote isn't.
++fn settle_borrowed(rig: &mut RigPose, written: &[u8], ext: &[u8]) {
++    let n = rig.locals.len();
++    if rig.borrowed.len() != n {
++        rig.borrowed.resize(n, 0);
++    }
++    let mut any = false;
++    for b in 0..n {
++        let stale = rig.borrowed[b] & !written.get(b).copied().unwrap_or(0);
++        if stale != 0 {
++            let bind = rig.binds.get(b).copied().unwrap_or(Vec3::ZERO);
++            let tf = &mut rig.locals[b];
++            if stale & BORROWED_T != 0 {
++                tf.translation = bind;
++            }
++            if stale & BORROWED_R != 0 {
++                tf.rotation = Quat::IDENTITY;
++            }
++            if stale & BORROWED_S != 0 {
++                tf.scale = Vec3::ONE;
++            }
++            rig.pose_dirty = true;
++        }
++        rig.borrowed[b] = ext.get(b).copied().unwrap_or(0);
++        any |= rig.borrowed[b] != 0;
++    }
++    // Nothing borrowed left: the rig is its own again, and the marks stop being kept.
++    if !any {
++        rig.borrowed.clear();
+     }
+ }
+ 
+@@ -884,4 +976,46 @@ mod tests {
+         step(&mut app, 0.1);
+         assert_twins_equal(&mut app, &oj, ours);
+     }
++
++    /// Basin Battle: a bone another model's clip turned, that the unit's own clips leave unkeyed,
++    /// goes back to rest once that clip is done; one the own clips write keeps their value.
++    #[test]
++    fn a_borrowed_clips_turn_goes_back_to_rest_once_no_clip_writes_it() {
++        let skeleton = ModelSkeleton {
++            joints: (0..3)
++                .map(|i| benilla_assets::ModelJoint {
++                    parent: i as i16 - 1,
++                    local_translation: Vec3::new(0.0, 0.0, i as f32),
++                    billboard: None,
++                    parent_arm: None,
++                })
++                .collect(),
++            spine_bone: None,
++            head_bone: None,
++        };
++        let mut rig = RigPose::new(Entity::PLACEHOLDER, &skeleton);
++        let turned = Quat::from_rotation_z(1.2);
++        // A borrowed swing turns bones 1 and 2, and moves bone 2.
++        for b in [1, 2] {
++            rig.locals[b].rotation = turned;
++        }
++        rig.locals[2].translation = Vec3::new(0.5, 0.0, 2.0);
++        settle_borrowed(&mut rig, &[0, BORROWED_R, BORROWED_R | BORROWED_T], &[0, BORROWED_R, BORROWED_R | BORROWED_T]);
++        assert_eq!(rig.borrowed, vec![0, BORROWED_R, BORROWED_R | BORROWED_T]);
++        // Its own stand next: it keys bone 1's turn (its value stands), not bone 2 at all.
++        let own = Quat::from_rotation_x(0.3);
++        rig.locals[1].rotation = own;
++        rig.pose_dirty = false;
++        settle_borrowed(&mut rig, &[0, BORROWED_R, 0], &[0, 0, 0]);
++        assert_eq!(rig.locals[1].rotation, own, "the own clip's turn stands");
++        assert_eq!(rig.locals[2].rotation, Quat::IDENTITY, "the left-behind turn is back to rest");
++        assert_eq!(rig.locals[2].translation, Vec3::new(0.0, 0.0, 2.0), "and its pivot to the bind");
++        assert!(rig.pose_dirty, "redrawn");
++        assert!(rig.borrowed.is_empty(), "nothing borrowed left: no more marks kept");
++        // A rig that never borrowed is left alone.
++        rig.locals[2].rotation = turned;
++        settle_borrowed(&mut rig, &[0, 0, 0], &[0, 0, 0]);
++        assert_eq!(rig.locals[2].rotation, turned);
++    }
++
+ }
+-- 
+2.43.0
+

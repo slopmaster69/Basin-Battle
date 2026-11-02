@@ -175,6 +175,7 @@ impl Survival {
             b.fallen.clear();
             b.fog.clear();
             b.run_at = None;
+            b.log = Default::default();
             b.heroes_seen = 0;
             if full {
                 b.lit.clear();

@@ -369,14 +369,15 @@ fn the_book_at_camp_opens_after_the_first_raid_and_sends_a_hero_down() {
     // Both of this dungeon's, and each other dungeon's first page after them, the easiest first.
     let pages: Vec<String> = s.book_pages().into_iter().map(|(k, _)| k).collect();
     assert_eq!(&pages[..2], &["first", "second"]);
-    let mut more: Vec<&crate::content::DungeonDef> = s.content.more_dungeons.iter().collect();
+    // (The first tier's: the harder ones open as the camp clears the easier, the ladder.)
+    let mut more: Vec<&crate::content::DungeonDef> = s.content.more_dungeons.iter().filter(|d| d.tier <= 1).collect();
     more.sort_by_key(|d| d.tier);
     let firsts: Vec<String> = more.iter().map(|d| d.lamps[0].key.clone()).collect();
     assert_eq!(pages[2..].to_vec(), firsts);
     let books = s.book_dungeons();
     assert_eq!(books[0].key, "deadmines");
     assert_eq!(books.len(), 1 + s.content.more_dungeons.len());
-    assert!(books.iter().all(|b| b.open));
+    assert!(books.iter().all(|b| b.open == (b.tier <= 1)));
 }
 
 #[test]
@@ -841,16 +842,16 @@ fn a_common_foe_with_a_second_form_comes_back_once_at_a_rest() {
     s.engage(druid, mobs::Foe::Hero(id));
     s.hurt_mob(druid, id, 1_000_000);
     s.step(DT);
-    assert_eq!(count(&s, "wc_fang_serpent"), 1, "the serpent crawls out");
-    let serpent = *s.mobs.iter().find(|(_, m)| m.health > 0 && s.content.mobs[m.def].key == "wc_fang_serpent").unwrap().0;
-    s.hurt_mob(serpent, id, 1_000_000);
+    assert_eq!(count(&s, "wc_fang_serpent"), 1, "the dream raptor tears out");
+    let raptor = *s.mobs.iter().find(|(_, m)| m.health > 0 && s.content.mobs[m.def].key == "wc_fang_serpent").unwrap().0;
+    s.hurt_mob(raptor, id, 1_000_000);
     run(&mut s, 5.0);
     let lamp = obj(&s, |k| matches!(k, ObjKind::Lamp { key } if key == "first"));
     s.move_player(id, [0.0, 0.0, 0.0], 0.0, Moving::default());
     s.interact(id, Some(lamp));
     run(&mut s, 5.0);
     s.rest(id).unwrap();
-    assert_eq!((count(&s, "wc_druid"), count(&s, "wc_fang_serpent")), (1, 0), "the druid is back, once; no serpent of its own");
+    assert_eq!((count(&s, "wc_druid"), count(&s, "wc_fang_serpent")), (1, 0), "the druid is back, once; no raptor of its own");
 }
 
 #[test]
@@ -1025,7 +1026,7 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     assert!(s.wager_elapsed() >= 10.0, "a fall's ten seconds");
     // Foes chase farther during a wager.
     use crate::sim::wager::WAGER_LEASH;
-    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * WAGER_LEASH);
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * WAGER_LEASH.max(s.content.ai.leash_scale));
     // Its boss down first: not won till enough of its foes are down too.
     assert_eq!(s.wager_forces(), Some((0, 1, 1)), "one grunt standing, one needed");
     let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
@@ -1050,7 +1051,7 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     run(&mut s, 0.2);
     assert!(s.wager().is_none());
     assert!(s.door_is_open("short"), "given back");
-    assert_eq!(s.leash_of(def), s.content.mobs[def].leash);
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * s.content.ai.leash_scale);
 }
 
 #[test]
@@ -1078,6 +1079,30 @@ fn a_ground_look_is_only_laid_for_an_area_as_big_as_it_looks() {
 }
 
 #[test]
+fn below_a_foes_currency_goes_to_every_hero_in_the_fight() {
+    let c = Content::builtin().for_dungeon_of("deadmines");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let a = s.join("ayla", "Ayla", None);
+    let b = s.join("bren", "Bren", None);
+    let far = s.join("cass", "Cass", None);
+    run(&mut s, 0.2);
+    let pirate = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "dm_pirate").unwrap().0;
+    let at = s.mobs[&pirate].pos;
+    s.players.get_mut(&a).unwrap().pos = [at[0] + 2.0, at[1], at[2]];
+    s.players.get_mut(&b).unwrap().pos = [at[0] - 6.0, at[1], at[2]];
+    s.players.get_mut(&far).unwrap().pos = [at[0] + 200.0, at[1], at[2]];
+    run(&mut s, 0.05);
+    let plunder = s.content.item("plunder").unwrap();
+    let have = |s: &Survival, h: Id| s.players[&h].bag.get(&plunder).copied().unwrap_or(0);
+    let (a0, b0, f0) = (have(&s, a), have(&s, b), have(&s, far));
+    s.hurt_mob(pirate, a, 1_000_000);
+    run(&mut s, 0.05);
+    assert!(have(&s, a) > a0, "the killer's");
+    assert!(have(&s, b) > b0, "and the hero beside them, their own share");
+    assert_eq!(have(&s, far), f0, "not one far off, out of the fight");
+}
+
+#[test]
 fn every_dungeon_has_a_count_of_foes_for_its_wager() {
     use crate::sim::wager::{wager_forces_needed, wager_forces_total, WAGER_FORCES};
     let c = Content::builtin();
@@ -1086,6 +1111,38 @@ fn every_dungeon_has_a_count_of_foes_for_its_wager() {
         assert!(total >= 20, "{}: {total} foes to count", d.key);
         assert!(needed < total && needed as f32 >= total as f32 * WAGER_FORCES, "{}: {needed} of {total}", d.key);
     }
+}
+
+#[test]
+fn the_weeks_best_wager_pays_the_bookmakers_chest_when_the_week_turns() {
+    use crate::sim::wager::week_of;
+    let c = Content::builtin();
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 1_800_000_000.0);
+    let now = week_of(camp.wall());
+    // Last week: +5 in the Stockade and +3 in the Deadmines; this week, +2 in Ragefire.
+    camp.camp.counts.insert(format!("wagerweek:{}:stockade:5", now - 1), 1);
+    camp.camp.counts.insert(format!("wagerweek:{}:deadmines:3", now - 1), 1);
+    camp.camp.counts.insert(format!("wagerweek:{now}:ragefire:2"), 1);
+    assert_eq!(camp.week_best_here(), Some((2, "ragefire".to_string())));
+    let before: u32 = camp.storage.values().sum();
+    let ev = camp.step(DT);
+    let after: u32 = camp.storage.values().sum();
+    assert_eq!(after - before, 2, "the best, +5: two pieces (one, and one more at +4)");
+    assert!(camp.storage.keys().any(|i| camp.content.items[*i].hone == 1), "honed, as a +5 wager pays");
+    for i in camp.storage.keys().filter(|i| camp.content.items[**i].hone > 0) {
+        assert!(camp.ever("found", camp.content.base_key(*i)), "found, so the rack keeps it once it's out of the chest");
+    }
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title == "The Bookmaker's Chest" && sub.contains("+5") && sub.contains("Stockade"))));
+    // Once a week; this week's waits for it to turn. Last week's wins are gone, its mark kept.
+    camp.step(DT);
+    assert_eq!(camp.storage.values().sum::<u32>(), after);
+    assert!(!camp.camp.counts.keys().any(|k| k.starts_with(&format!("wagerweek:{}:", now - 1))));
+    assert_eq!(camp.camp.counts.get(&format!("weekchest:{}", now - 1)), Some(&5));
+    // A win for that week arriving late: not paid again, and let go.
+    camp.camp.counts.insert(format!("wagerweek:{}:stockade:9", now - 1), 1);
+    camp.step(DT);
+    assert_eq!(camp.storage.values().sum::<u32>(), after);
+    assert!(!camp.camp.counts.contains_key(&format!("wagerweek:{}:stockade:9", now - 1)));
 }
 
 #[test]
@@ -1347,6 +1404,8 @@ fn a_first_clear_below_gifts_the_camp_turns_the_books_page_and_only_once() {
         .flatten()
         .collect();
     assert!(up.iter().any(|(k, n)| k == "cleared:deadmines" && *n == 1), "{up:?}");
+    // ...and the heroes below hear it's a first, there and then.
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { player: None, title, sub } if title.contains("Cleared") && sub.contains("first for the camp"))), "told below");
 
     // At camp: a gift in the chest, a banner, and the book points onward.
     let mut c = content();
@@ -1449,4 +1508,332 @@ fn the_call_wakes_only_the_called_pack_not_what_rests_beside_it() {
     run(&mut s, CALL_AFTER + 0.5);
     assert!(!resting(&s, b), "the nearest pack comes");
     assert!(resting(&s, third), "and nothing it's linked to");
+}
+
+#[test]
+fn a_pack_grows_with_the_heroes_below_and_shares_its_health_over_them() {
+    let mut c = content();
+    let d = c.dungeon.as_mut().unwrap();
+    d.hero_foes = 0.5;
+    d.hero_health = 0.6;
+    let mut two = pack("grunt", "", [30.0, 10.0], false);
+    two.count = 2;
+    two.radius = 3.0;
+    d.packs.push(two);
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let k = s.content.packs.iter().position(|p| p.count == 2).unwrap();
+    let def = s.content.mob("grunt").unwrap();
+    let in_pack = |s: &Survival| s.mobs.values().filter(|m| m.pack == Some(k) && m.health > 0).count();
+    let names = ["ayla", "bren", "cass"];
+    let ids: Vec<Id> = names.iter().map(|n| s.join(n, n, None)).collect();
+    run(&mut s, 0.2);
+    // Three heroes: two more foes' worth (2 x (1 + 0.5 x 2) = 4), the pack's health (2 x 2.2)
+    // over the four of them.
+    assert_eq!(in_pack(&s), 4, "grown for three");
+    let base = s.base_health(def) as f32;
+    let each = s.mobs.values().find(|m| m.pack == Some(k)).unwrap().max_health as f32;
+    assert!((each - base * 2.2 * 2.0 / 4.0).abs() <= 1.0, "{each} of {base}");
+    // A lone grunt doesn't grow; it takes the whole health.
+    let lone = s.mobs.values().filter(|m| m.pack.is_some_and(|p| s.content.packs[p].count == 1 && s.content.packs[p].mob == "grunt")).count();
+    assert_eq!(lone, 1);
+    // Two go home: the pack at rest gives back what it grew for them.
+    s.leave(ids[1]);
+    s.leave(ids[2]);
+    run(&mut s, 0.2);
+    assert_eq!(in_pack(&s), 2, "back to its own two");
+    // A pack in a fight isn't changed under it.
+    let b = s.join("bren", "Bren", None);
+    run(&mut s, 0.2);
+    assert_eq!(in_pack(&s), 3, "grown for two");
+    let one = *s.mobs.iter().find(|(_, m)| m.pack == Some(k)).unwrap().0;
+    s.engage(one, mobs::Foe::Hero(b));
+    let _c = s.join("cass", "Cass", None);
+    run(&mut s, 0.1);
+    assert_eq!(in_pack(&s), 3, "left as it is mid-fight");
+    // ...and its unhurt foes keep the whole share for three heroes (3 bodies of its own 2: the
+    // pack's 2 x 2.2 over 3), not the share of a pack grown to four.
+    let other = s.mobs.iter().find(|(id, m)| **id != one && m.pack == Some(k) && m.health == m.max_health).map(|(_, m)| m.max_health as f32).unwrap();
+    assert!((other - base * 2.2 * 2.0 / 3.0).abs() <= 1.0, "{other} of {base}");
+}
+
+#[test]
+fn a_wagers_count_of_foes_grows_with_the_band() {
+    use crate::sim::dungeon::pack_count;
+    use crate::sim::wager::{wager_forces_total, wager_forces_total_for};
+    let c = Content::builtin();
+    for d in c.dungeons() {
+        let (one, four) = (wager_forces_total(d, &c), wager_forces_total_for(d, &c, 4));
+        assert!(four as f32 >= one as f32 * 1.5, "{}: {one} alone, {four} for four", d.key);
+        // Bosses and elites stay alone.
+        for p in &d.packs {
+            if p.elite || c.mob(&p.mob).is_some_and(|m| c.mobs[m].boss) {
+                assert_eq!(pack_count(p, d, &c, 4), p.count, "{}: {}", d.key, p.mob);
+            }
+        }
+    }
+}
+
+#[test]
+fn every_dungeon_pack_is_a_foe_that_exists_and_every_dungeon_lays_out() {
+    let c = Content::builtin();
+    for d in c.dungeons() {
+        for p in &d.packs {
+            assert!(c.mob(&p.mob).is_some(), "{}: no foe {}", d.key, p.mob);
+        }
+        let s = Survival::new_dungeon(c.for_dungeon_of(&d.key), Box::new(FlatLand::default()), 5, 1_000_000.0);
+        assert!(s.mobs.len() >= d.packs.iter().filter(|p| p.hidden <= 0.0 && p.wake.is_empty()).count() / 2, "{}: laid out", d.key);
+    }
+}
+
+#[test]
+fn the_way_out_says_cleared_only_with_every_boss_down_and_counts_this_dungeons_exit() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.1);
+    // The way out open (its keeper down) but another boss still up: out, not cleared.
+    let mut c = content();
+    c.dungeon.as_mut().unwrap().packs.push(pack("warlord", "boss2", [200.0, 0.0], false));
+    let mut s2 = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id2 = s2.join("ayla", "Ayla", None);
+    s2.below.as_mut().unwrap().slain.insert("boss".into());
+    s2.move_player(id2, [120.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s2, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.starts_with("Out of"))), "out, not cleared: {:?}", ev.iter().filter(|e| matches!(e, Event::Banner { .. })).collect::<Vec<_>>());
+    let up: Vec<String> = ev.iter().filter_map(|e| if let Event::ToCamp { counts, .. } = e { Some(counts.iter().map(|c| c.0.clone()).collect::<Vec<_>>()) } else { None }).flatten().collect();
+    assert!(up.contains(&"delve:end:deadmines".to_string()) && up.contains(&"delve:end".to_string()), "{up:?}");
+    // Every boss down: cleared.
+    s.below.as_mut().unwrap().slain.insert("boss".into());
+    s.move_player(id, [120.0, 0.0, 0.0], 0.0, Moving::default());
+    let ev = run(&mut s, 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title.ends_with("Cleared"))));
+}
+
+#[test]
+fn the_camp_hears_where_its_chests_news_comes_from() {
+    let mut camp = Survival::new(content(), Box::new(FlatLand::default()), 1, 0.0);
+    let plunder = camp.content.item("plunder").unwrap();
+    camp.from_below_at(Some("The Stockade"), &[], &BTreeMap::from([(plunder, 2)]));
+    let ev = camp.step(DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("From The Stockade"))), "{:?}", ev.iter().filter(|e| matches!(e, Event::Announce { .. })).collect::<Vec<_>>());
+}
+
+#[test]
+fn a_hero_leaving_a_run_gets_its_tally() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    // Plunder picked up below, a foe felled, a fall.
+    let plunder = s.content.item("plunder").unwrap();
+    *s.players.get_mut(&id).unwrap().bag.entry(plunder).or_default() += 7;
+    let grunt = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "grunt").unwrap();
+    s.hurt_mob(grunt, id, 1_000_000);
+    s.run_fall(id);
+    // Home by a lamp: the page, with what they did.
+    let lamp = obj(&s, |k| matches!(k, ObjKind::Lamp { key } if key == "first"));
+    s.move_player(id, [0.0, 0.0, 0.0], 0.0, Moving::default());
+    s.interact(id, Some(lamp));
+    run(&mut s, 0.1);
+    s.travel(id, "camp").unwrap();
+    let ev = run(&mut s, 0.05);
+    let page = ev.iter().find_map(|e| if let Event::Letter { kind, place, text, .. } = e { (kind == "run").then(|| (place.clone(), text.clone())) } else { None }).expect("the run's page");
+    assert_eq!(page.0, "Home by a lamp");
+    assert!(page.1.contains("Foes felled: 1") && page.1.contains("You fell once") && page.1.contains("7 "), "{}", page.1);
+    assert!(page.1.contains("Still standing") || page.1.contains("No boss down yet"), "{}", page.1);
+}
+
+#[test]
+fn a_second_trip_down_tallies_only_itself() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let sword = s.content.item("sword").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(sword, 1);
+    s.below.as_mut().unwrap().log.gear.entry("ayla".into()).or_default().push(sword);
+    // Home, and down again: the sword went home on the first trip.
+    s.leave(id);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(!text.contains(&s.content.items[sword].name), "{text}");
+}
+
+#[test]
+fn a_new_band_down_starts_its_own_tally_and_the_bosses_are_the_dungeons() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let grunt = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "grunt").unwrap();
+    s.hurt_mob(grunt, id, 1_000_000);
+    s.run_fall(id);
+    s.below.as_mut().unwrap().log.first = true;
+    s.leave(id);
+    run(&mut s, 120.0);
+    // Back down alone, and home at once: none of the last trip's.
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains("Foes felled: 0") && text.contains("didn't fall") && !text.contains("A first") && !text.contains("Time below: 2"), "{text}");
+    // A boss the dungeon has down (kept over a restart, as its slain are) is on the page.
+    let d = s.dungeon_def().cloned().unwrap();
+    let boss = crate::sim::wager::wager_bosses(&d, &s.content)[0].clone();
+    s.below.as_mut().unwrap().slain.insert(boss);
+    s.below.as_mut().unwrap().log.paged.clear();
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains("Bosses down: "), "{text}");
+}
+
+#[test]
+fn a_run_page_comes_once_a_trip_and_its_wager_link_is_a_command() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.run_page(id, "Wager +2, in time: 9:00");
+    let ev = run(&mut s, 0.05);
+    let links = ev.iter().find_map(|e| if let Event::Letter { kind, links, .. } = e { (kind == "run").then(|| links.clone()) } else { None }).unwrap();
+    assert!(links.iter().all(|(cmd, _)| cmd.starts_with(".es ")), "{links:?}");
+    // Home by a lamp after the won wager: no second page over the first.
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Letter { kind, .. } if kind == "run")));
+}
+
+#[test]
+fn a_run_page_names_the_gear_carried_out_honed() {
+    let c = Content::builtin().for_dungeon_of("deadmines");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let base = (0..s.content.items.len()).find(|i| s.content.honed(*i, 1) != *i && s.content.is_dungeon_gear(&s.content.items[*i].key)).expect("a dungeon piece with a honed copy");
+    let honed = s.content.honed(base, 1);
+    s.below.as_mut().unwrap().log.gear.entry("ayla".into()).or_default().push(base);
+    s.players.get_mut(&id).unwrap().bag.insert(honed, 1);
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains(&s.content.items[honed].name), "{text}");
+}
+
+#[test]
+fn a_dungeons_own_world_knows_the_book_s_next_dungeon() {
+    let all = Content::builtin();
+    let c = all.for_dungeon_of("ragefire");
+    assert_eq!(c.ladder().count(), all.dungeons().count());
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    s.camp.counts.insert("cleared:ragefire".into(), 1);
+    let next = s.next_dungeon().map(|d| d.key.clone());
+    assert!(next.as_deref().is_some_and(|k| k != "ragefire"), "{next:?}");
+}
+
+#[test]
+fn the_quartermaster_hones_the_dungeons_own_gear_and_sells_a_flask_for_its_currency() {
+    let c = Content::builtin().for_dungeon_of("deadmines");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let cutlass = s.content.item("pirate_cutlass").unwrap();
+    let plunder = s.content.item("plunder").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(cutlass, 1);
+    let worth = s.run_worth();
+    assert!(worth > 100, "a run's worth of plunder: {worth}");
+    // Offered, a tier on, at a share of a run; too dear with none.
+    let offer = s.hone_offers(id).into_iter().find(|o| o.0 == "pirate_cutlass").expect("offered");
+    assert_eq!(offer.2, "Honed");
+    assert!(!offer.4, "can't pay yet");
+    assert!(s.hone(id, "pirate_cutlass").unwrap_err().contains("Defias Plunder"));
+    assert!(s.buy(id, "whetstone").unwrap_err().contains("Defias Plunder"), "the ware's price in the dungeon's own currency");
+    // Paid: the cutlass in the bags is its Honed copy, the price gone.
+    s.players.get_mut(&id).unwrap().bag.insert(plunder, offer.3 + 5);
+    s.hone(id, "pirate_cutlass").unwrap();
+    let honed = s.content.honed(cutlass, 1);
+    assert_ne!(honed, cutlass);
+    assert_eq!(s.players[&id].bag.get(&honed), Some(&1));
+    assert!(!s.players[&id].bag.contains_key(&cutlass));
+    assert_eq!(s.players[&id].bag.get(&plunder), Some(&5));
+    // Next it offers Keen, dearer; a camp's own piece is never offered.
+    let next = s.hone_offers(id).into_iter().find(|o| o.0 == s.content.items[honed].key).expect("again");
+    assert!(next.2 == "Keen" && next.3 > offer.3);
+    let sword = s.content.item("sword").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(sword, 1);
+    assert!(!s.hone_offers(id).iter().any(|o| o.0 == "sword"));
+    // A flask: one more Draught for good.
+    let d = s.dungeon_def().unwrap().clone();
+    let price = s.trades(id).into_iter().find(|t| t.0 == d.flask).expect("a flask on offer").2;
+    s.players.get_mut(&id).unwrap().bag.insert(plunder, price);
+    s.buy(id, &d.flask).unwrap();
+    assert_eq!(s.below.as_ref().unwrap().heroes["ayla"].flasks, 1);
+    // A dungeon whose foes drop none of its currency: nothing honed, no flask, at any price.
+    let mut c = Content::builtin().for_dungeon_of("deadmines");
+    for m in &mut c.mobs {
+        m.drops.clear();
+    }
+    c.dungeon.as_mut().unwrap().boxes.clear();
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let cutlass = s.content.item("pirate_cutlass").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(cutlass, 1);
+    assert_eq!(s.run_worth(), 0);
+    assert!(s.hone_offers(id).is_empty());
+    let flask = s.dungeon_def().unwrap().flask.clone();
+    assert!(!s.trades(id).iter().any(|t| t.0 == flask));
+}
+
+#[test]
+fn a_harder_tier_opens_once_two_of_the_tier_below_are_cleared() {
+    let c = Content::builtin();
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 0.0);
+    let open = |s: &Survival, k: &str| s.book_dungeons().into_iter().find(|b| b.key == k).map(|b| (b.open, b.locked)).unwrap();
+    assert!(open(&camp, "deadmines").0 && open(&camp, "ragefire").0, "the first tier from the start");
+    let (shut, words) = open(&camp, "stockade");
+    assert!(!shut && words.contains("clear 2 more of the Tier I"), "{words}");
+    assert!(!open(&camp, "cathedral").0);
+    assert!(!camp.book_pages().iter().any(|(_, n)| n.contains("Stockade")), "no page to go down by");
+    // One cleared: one more to go. Two: the second tier reads.
+    camp.camp.counts.insert("cleared:deadmines".into(), 1);
+    assert!(open(&camp, "stockade").1.contains("clear 1 more"));
+    camp.camp.counts.insert("cleared:wailing".into(), 1);
+    assert!(open(&camp, "stockade").0 && open(&camp, "razorfen").0);
+    assert!(!open(&camp, "graveyard").0, "the third waits on the second");
+    // A dungeon the camp has been in already stays open (an old camp isn't locked out).
+    camp.camp.counts.insert("kill:gy_vishas".into(), 1);
+    assert!(open(&camp, "graveyard").0);
+}
+
+#[test]
+fn the_journal_walks_the_camp_through_every_dungeon_by_their_clears() {
+    let c = Content::builtin();
+    let keys: Vec<String> = c.dungeons().map(|d| d.key.clone()).collect();
+    for k in keys.iter().filter(|k| *k != "deadmines") {
+        assert!(c.goals.iter().any(|g| g.kind == "cleared" && &g.what == k), "a journal step for {k}");
+    }
+    // In the book's order: no step for a harder tier before every one of an easier tier's.
+    let tier = |k: &str| c.dungeons().find(|d| d.key == k).unwrap().tier;
+    let steps: Vec<u32> = c.goals.iter().filter(|g| g.kind == "cleared").map(|g| tier(&g.what)).collect();
+    assert!(steps.windows(2).all(|w| w[0] <= w[1]), "{steps:?}");
+    let camp = Survival::new(c.clone(), Box::new(FlatLand::default()), 1, 0.0);
+    let g = c.goals.iter().find(|g| g.kind == "cleared" && g.what == "ragefire").unwrap();
+    assert_eq!(camp.goal_progress(g), (0, 1));
+}
+
+#[test]
+fn the_books_record_of_a_dungeon_lists_its_bosses_their_gear_and_the_camps_kills() {
+    let c = Content::builtin();
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 0.0);
+    let id = camp.join("ayla", "Ayla", None);
+    camp.camp.counts.insert("kill:dm_smite".into(), 2);
+    camp.lore_page(id, "deadmines").unwrap();
+    let ev = camp.step(DT);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "lore").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains("Its bosses"), "{text}");
+    assert!(text.contains("Mr. Smite: felled 2 times") && text.contains("Smite's Mighty Hammer"), "{text}");
+    assert!(text.contains("Cookie: not felled yet"), "{text}");
+    // A trophy is the camp's the first time; after, it's in the chest.
+    let line = |who: &str| text.lines().find(|l| l.starts_with(&format!("- {who}:"))).unwrap_or("").to_string();
+    assert!(line("Mr. Smite").contains("in the camp's chest") && line("Cookie").contains("the camp's the first time"), "{text}");
 }

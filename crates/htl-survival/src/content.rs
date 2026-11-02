@@ -101,6 +101,10 @@ pub struct Content {
     /// each a world of its own and a page of the same book.
     #[serde(rename = "more_dungeon", default)]
     pub more_dungeons: Vec<DungeonDef>,
+    /// In a dungeon's own world, the book's other dungeons: not this world's, but on its ladder
+    /// (what the run's page says is next).
+    #[serde(skip)]
+    pub elsewhere: Vec<DungeonDef>,
     /// The Proving Ring: endless waves, a page of the same book.
     #[serde(default)]
     pub arena: Option<ArenaDef>,
@@ -565,7 +569,7 @@ pub struct AiDef {
     /// Whom it goes for: the damage a hero has done it lately (as a share of its health) times
     /// `threat`, `opening` more for a hero with their guard down (healing, working, mid-swing,
     /// drawing a spell, reeling), `wounded` times how hurt they are; less `distance` for every
-    /// 10 yards off and `crowd` for every other creature already on them past the first; its
+    /// 10 yards off and `crowd` for every other creature already on them; its
     /// foe now counts `stick` more, so it doesn't turn every second.
     pub threat: f32,
     pub opening: f32,
@@ -588,6 +592,10 @@ pub struct AiDef {
     pub flank: bool,
     /// Its cooldown between strings, give or take this share.
     pub jitter: f32,
+    /// Every creature's leash (how far from home it chases) times this: one knob for how far
+    /// foes follow, in the open and below. A wager's own farther chase isn't stacked on it
+    /// (the farther of the two).
+    pub leash_scale: f32,
 }
 
 impl Default for AiDef {
@@ -598,7 +606,7 @@ impl Default for AiDef {
             opening: 1.0,
             wounded: 0.8,
             distance: 1.0,
-            crowd: 0.6,
+            crowd: 1.0,
             stick: 0.8,
             threat_half: 8.0,
             press_early: 1.2,
@@ -607,6 +615,7 @@ impl Default for AiDef {
             retreat_yards: 4.0,
             flank: true,
             jitter: 0.25,
+            leash_scale: 1.0,
         }
     }
 }
@@ -1011,6 +1020,11 @@ pub struct DungeonDef {
     /// Each hero past the first gives every foe this share more health.
     #[serde(default)]
     pub hero_health: f32,
+    /// Each hero past the first brings this share more foes into every pack of two or more
+    /// (rounded; a boss's, an elite's or a lone foe's stays as it is). The pack's whole health
+    /// is what `hero_health` would have made it, shared over its bodies (each at least its own).
+    #[serde(default)]
+    pub hero_foes: f32,
     /// Where the run ends: past the front door, and how near counts.
     pub exit: [f32; 3],
     #[serde(default = "exit_radius")]
@@ -1447,7 +1461,8 @@ pub struct SpecialDef {
     /// The chance of it each time the creature attacks.
     #[serde(default)]
     pub chance: f32,
-    /// The clip it swings with (`AnimationData`; the creature's usual attack when not given).
+    /// The clip it swings with (`AnimationData`; the creature's usual attack when not given). A
+    /// cast (`ranged`) plays its spell's own cast unless given one.
     #[serde(default)]
     pub clip: Option<u16>,
     /// Another character model's take on it (as a hero's move's `from`); else the creature's
@@ -1685,7 +1700,7 @@ pub struct GoalDef {
 }
 
 impl GoalDef {
-    pub const KINDS: [&'static str; 13] = ["bank", "build", "craft", "kill", "gather", "raid", "wear", "clear", "delve", "explore", "open", "secret", "learn"];
+    pub const KINDS: [&'static str; 14] = ["bank", "build", "craft", "kill", "gather", "raid", "wear", "clear", "delve", "explore", "open", "secret", "learn", "cleared"];
 }
 
 /// A string of blows a creature commits to: each a step (its clip, wind-up, reach, damage...)
@@ -2352,6 +2367,7 @@ impl Content {
     pub fn for_dungeon_of(&self, key: &str) -> Self {
         let mut c = self.clone();
         c.dungeon = self.dungeons().find(|d| d.key == key).cloned();
+        c.elsewhere = self.ladder().filter(|d| d.key != key).cloned().collect();
         c.more_dungeons.clear();
         if let Some(d) = &c.dungeon {
             c.packs = d.packs.clone();
@@ -2371,6 +2387,12 @@ impl Content {
     /// Every dungeon in these rules (the Deadmines', and those beside it).
     pub fn dungeons(&self) -> impl Iterator<Item = &DungeonDef> {
         self.dungeon.iter().chain(self.more_dungeons.iter())
+    }
+
+    /// Every dungeon on the book's ladder, in a dungeon's own world too (where the others are
+    /// `elsewhere`).
+    pub fn ladder(&self) -> impl Iterator<Item = &DungeonDef> {
+        self.dungeons().chain(self.elsewhere.iter())
     }
 
     /// The dungeon (by key) a lamp is in.
@@ -2762,8 +2784,16 @@ impl Content {
                 "explore" => g.what == "any" || self.sites.iter().any(|x| x.key == g.what || x.kind == g.what),
                 "open" => g.what == "any" || self.chests.iter().any(|c| c.key == g.what),
                 "secret" | "learn" => g.what == "any",
-                // Below: the book read, a lamp lit (by its key), or out the front door.
-                "delve" => g.what == "book" || g.what == "end" || self.dungeon.as_ref().is_some_and(|d| d.lamps.iter().any(|l| l.key == g.what)),
+                // A dungeon cleared (every boss down in one run), by its key.
+                "cleared" => self.dungeons().any(|d| d.key == g.what),
+                // Below: the book read, a lamp lit (by its key), out of any dungeon's way out
+                // (`end`) or one's (`end:<dungeon>`).
+                "delve" => {
+                    g.what == "book"
+                        || g.what == "end"
+                        || g.what.strip_prefix("end:").is_some_and(|k| self.dungeons().any(|d| d.key == k))
+                        || self.dungeons().any(|d| d.lamps.iter().any(|l| l.key == g.what))
+                }
                 _ => ARMOR_SLOTS.contains(&g.what.as_str()),
             };
             if !known {
@@ -3142,6 +3172,20 @@ impl Content {
     pub fn mob(&self, key: &str) -> Option<usize> {
         self.mobs.iter().position(|m| m.key == key)
     }
+    /// A dungeon's own gear: what a foe of one of its packs carries (`gear`) or yields
+    /// (`trophy`). It's earned down there: the rack at camp offers it once the camp has found one.
+    pub fn is_dungeon_gear(&self, key: &str) -> bool {
+        self.dungeons().any(|d| {
+            d.packs.iter().any(|p| self.mob(&p.mob).is_some_and(|m| self.mobs[m].gear.iter().any(|g| g == key) || self.mobs[m].trophy.contains_key(key)))
+        })
+    }
+
+    /// A piece's own key, a honed copy's that of the piece it was honed from.
+    pub fn base_key(&self, item: usize) -> &str {
+        let it = &self.items[item];
+        if it.honed_from.is_empty() { &it.key } else { &it.honed_from }
+    }
+
     /// Whether an item is some champion's trophy (won, never on the rack).
     pub fn is_trophy(&self, key: &str) -> bool {
         self.mobs.iter().any(|m| m.trophy.contains_key(key)) || self.chests.iter().any(|c| c.loot.contains_key(key) || c.roll.contains_key(key))

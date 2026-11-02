@@ -26,16 +26,21 @@
 //! - `BK\t<open>\t<key~name~dungeon^...>\t<arena key~name~best wave>\t<siege>\t<dungeons>`: the
 //!   Smuggler's Logbook at camp, its pages (lamps below, each with its dungeon's key), the Proving
 //!   Ring's and Siege's (there from the start), then each dungeon
-//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page~secrets found~secrets~notes read~notes~wager open~wager secs~tier~cleared~next`,
-//!   joined by `^`; the fields after `first page` from newer servers), the easiest first.
+//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page~secrets found~secrets~notes read~notes~wager open~wager secs~tier~cleared~next~locked`,
+//!   joined by `^`; the fields after `first page` from newer servers; `locked`, what opens a
+//!   locked one in words), the easiest first.
 //! - `AA\t<wave>\t<foes standing>\t<secs to the next, or -1 in a wave>\t<the camp's best>`: the
 //!   Proving Ring as a hero in it sees it (`AA` alone: not in it).
 //! - `AW\t<wave>\t<in a wave>\t<secs to the next>\t<the camp's best>\t<heroes in it>`: the ring's
 //!   banner, used.
-//! - `LP\t<key>\t<name>\t<draughts>\t<most>\t<key~name^...>\t<key~name~price~can~icon^...>\t<plunder>`:
-//!   a lamp below: the hero's Draughts, the other lit lamps, the quartermaster's wares.
+//! - `LP\t<key>\t<name>\t<draughts>\t<most>\t<key~name^...>\t<key~name~price~can~icon^...>\t<plunder>`
+//!   `\t<currency name>\t<key~name~tier~price~can~icon^...>`: a lamp below: the hero's Draughts,
+//!   the other lit lamps, the quartermaster's wares (a flask among them while there's room for
+//!   one), the dungeon's currency the hero carries and its name, and the pieces of the dungeon's
+//!   gear the quartermaster can hone a tier further (to `tier`).
 //! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: a page to read and keep
-//!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board); `{n}`
+//!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board, a
+//!   run's tally as a hero leaves it: kind `run`); `{n}`
 //!   breaks a line.
 //! - `WT\t<dungeon>\t<level>\t<elapsed>\t<limit>\t<falls>\t<state>\t<terms>\t<name~down^...>\t<felled~needed~total>`:
 //!   a wager's clock below (state `wait`, `run`, `won` or `over`; the bosses it must beat, and its
@@ -295,8 +300,9 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 11;
-pub(crate) const CLIENT_NEWEST: u8 = 10;
+pub(crate) const ADDON_NEWEST: u32 = 15;
+/// 11: a borrowed clip's turns go back to rest (patch 0016), so a shield isn't left crooked.
+pub(crate) const CLIENT_NEWEST: u8 = 11;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -842,7 +848,7 @@ impl SurvivalGame {
                 let dungeons: Vec<String> = books
                     .iter()
                     .map(|b| format!(
-                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
+                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
                             clean(&b.key),
                             clean(&b.name),
                             clean(&b.icon),
@@ -860,7 +866,8 @@ impl SurvivalGame {
                             b.wager.1.round(),
                             b.tier,
                             u8::from(b.cleared),
-                            u8::from(b.next)
+                            u8::from(b.next),
+                            clean(&b.locked)
                         ))
                     .collect();
                 let ring = arena.map_or_else(String::new, |(k, n, best)| format!("{}~{}~{best}", clean(&k), clean(&n)));
@@ -1026,17 +1033,30 @@ impl SurvivalGame {
                 )
             })
             .collect();
+        // What the quartermaster can hone a tier further: the hero's pieces of this dungeon's gear.
+        let hones: Vec<String> = self
+            .sim
+            .hone_offers(id)
+            .into_iter()
+            .map(|(k, n, tier, price, can)| {
+                let icon = c.item(&k).map_or("", |i| c.items[i].icon.as_str());
+                format!("{}~{}~{}~{price}~{}~{}", clean(&k), clean(&n), clean(&tier), u8::from(can), clean(icon))
+            })
+            .collect();
+        let currency = self.sim.currency_name();
         if self.has_addon(conn) {
             let line = format!(
-                "LP\t{}\t{}\t{have}\t{most}\t{}\t{}\t{plunder}",
+                "LP\t{}\t{}\t{have}\t{most}\t{}\t{}\t{plunder}\t{}\t{}",
                 clean(key),
                 clean(&name),
                 lamps.join("^"),
-                trades.join("^")
+                trades.join("^"),
+                clean(&currency),
+                hones.join("^")
             );
             self.ui_line(conn, &line);
         } else {
-            self.say_to(conn, &format!("{name}: .rest to rest here (whole again, Draughts filled, the Brotherhood back at their posts); .travel <lamp> to go to another lit lamp; .travel camp to go home; .buy <ware> for plunder."));
+            self.say_to(conn, &format!("{name}: .rest to rest here (whole again, Draughts filled, the foes back at their posts); .travel <lamp> to go to another lit lamp; .travel camp to go home; .buy <ware> for {currency}; .hone <piece> to hone this dungeon's gear a tier further."));
         }
     }
 
@@ -1095,7 +1115,8 @@ impl SurvivalGame {
                 // `.es hello <version> ac`: the action-combat client, aiming over the shoulder;
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
-                // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`).
+                // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
+                // another model's clips; `ac11` puts their bones back to rest after.
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,
@@ -1349,6 +1370,10 @@ impl SurvivalGame {
             "rest" => self.sim.rest(me).map(|_| self.refresh_lamp(conn, me)),
             "buy" => self.sim.buy(me, &arg).map(|name| {
                 self.tell(conn, &format!("The quartermaster hands you a {name}."));
+                self.refresh_lamp(conn, me);
+            }),
+            "hone" => self.sim.hone(me, &arg).map(|what| {
+                self.tell(conn, &format!("The quartermaster hands it back: {what}."));
                 self.refresh_lamp(conn, me);
             }),
             "arm" => self.sim.arm(me, &arg).map(|name| {

@@ -493,7 +493,8 @@ fn creatures_call_their_neighbours_and_give_up_past_their_leash() {
     assert!(matches!(s.mobs[&b].state, MobState::Chase { .. }), "the neighbour joins in");
     assert!(matches!(s.mobs[&far].state, MobState::Idle { .. }), "one far off doesn't");
     // Run off: past its leash it turns back.
-    for k in 0..200 {
+    let steps = ((s.leash_of(def) + 60.0) * 2.0) as usize;
+    for k in 0..steps {
         s.move_player(p, [-(k as f32) * 0.5, 0.0, 0.0], 0.0, Moving::default());
         let _ = s.step(DT);
     }
@@ -2530,7 +2531,7 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
 }
 
 #[test]
-fn a_champions_posture_holds_a_moment_then_drains_smoothly() {
+fn a_champions_posture_drains_smoothly_from_its_last_blow() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let w = mob(&mut s, "warlord", [3.0, 0.0, 0.0]);
@@ -2538,13 +2539,53 @@ fn a_champions_posture_holds_a_moment_then_drains_smoothly() {
     let limit = s.posture_limit(w);
     assert!(s.build_posture(w, p, limit / 2) == false);
     let full = s.posture_of(w);
-    run(&mut s, 0.8);
-    assert_eq!(s.posture_of(w), full, "it holds a moment");
-    run(&mut s, 1.5);
+    run(&mut s, 1.0);
     let some = s.posture_of(w);
-    assert!(some < full && some > 0, "then drains, not all at once: {some} of {full}");
+    assert!(some < full && some > 0, "drains, not all at once: {some} of {full}");
     run(&mut s, 6.0);
     assert_eq!(s.posture_of(w), 0, "and is gone");
+}
+
+/// A group's blows land close together: a flow under the drain must never break a stance however
+/// often it comes, and a flow over it must.
+#[test]
+fn only_a_flow_faster_than_the_drain_breaks_a_champions_stance() {
+    let flow = |share: f32, every: f32| -> bool {
+        let mut s = world();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let w = mob(&mut s, "warlord", [3.0, 0.0, 0.0]);
+        s.engage(w, Foe::Hero(p));
+        let per_sec = s.posture_limit(w) as f32 / s.content.mobs[s.mobs[&w].def].posture_secs;
+        let chunk = (per_sec * share * every).round() as u32;
+        for _ in 0..(60.0 / every) as usize {
+            if s.build_posture(w, p, chunk) {
+                return true;
+            }
+            run(&mut s, every);
+            // Held still, not fighting back, for the count's sake.
+            s.mobs.get_mut(&w).unwrap().state = MobState::Idle { wander_at: 1e9 };
+        }
+        false
+    };
+    assert!(!flow(0.8, 0.3), "four-fifths of the drain, in quick blows, a whole minute: never");
+    assert!(!flow(0.8, 0.9), "nor in slower ones");
+    assert!(flow(1.5, 0.3), "half again the drain breaks it");
+}
+
+#[test]
+fn a_parried_lesser_champion_still_reels_only_a_boss_fills_its_posture_instead() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let o = mob(&mut s, "overseer", [2.0, 0.0, 0.0]);
+    assert!(!s.content.mobs[s.mobs[&o].def].boss && s.posture_limit(o) > 0, "a champion, not a boss");
+    s.engage(o, Foe::Hero(p));
+    s.input(p, Input::GuardUp);
+    run(&mut s, s.content.parry.cooldown + 0.05);
+    s.input(p, Input::Guard);
+    run(&mut s, 0.05);
+    assert_eq!(s.strike_player(o, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
+    assert!(s.mobs[&o].stagger_until > s.clock, "it reels, open to a riposte");
+    assert_eq!(s.posture_of(o), 0, "its posture isn't filled instead");
 }
 
 #[test]
@@ -2731,6 +2772,22 @@ fn a_save_keeps_its_journal_goal_by_title_and_an_older_one_is_read_through_the_f
     save.goal = 12;
     let back = Survival::load(Content::dev(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
     assert_eq!(back.content.goals[back.camp.goal].title, "The Overseer");
+}
+
+#[test]
+fn a_camp_done_with_its_journal_goes_on_to_steps_added_since() {
+    let mut s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
+    // Done with the journal as it was before the book's ladder: its steps end where the ladder's begin.
+    let ladder = s.content.goals.iter().position(|g| g.kind == "cleared").expect("the ladder's steps");
+    s.camp.goal = ladder;
+    let mut save = s.save(&BTreeMap::new());
+    save.goal_title = None;
+    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
+    assert_eq!(back.camp.goal, ladder, "on to the ladder's first step");
+    // Done with this one: still done.
+    save.goal = s.content.goals.len();
+    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
+    assert_eq!(back.camp.goal, back.content.goals.len());
 }
 
 #[test]
@@ -3273,4 +3330,60 @@ fn heroes_felling_heroes_go_on_the_camps_fighting_record() {
     let hp = s.players[&a].health;
     s.strike_player(k, a, hp * 10, [4.0, 0.0, 0.0], false, false, false, Blow::Light);
     assert_eq!(s.fighting_record()[0], ("Ayla".to_string(), 2, 1));
+}
+
+#[test]
+fn a_dungeons_weapon_is_on_the_rack_only_once_the_camp_has_found_one() {
+    let mut s = world();
+    let rack = s.content.world.rack;
+    let p = hero(&mut s, "Ayla", [rack[0] + 1.0, rack[1], 0.0], 0.0);
+    let keys = |s: &Survival| s.rack_view(p).into_iter().map(|r| r.0).collect::<Vec<String>>();
+    assert!(s.content.is_dungeon_gear("mograines_might"));
+    assert!(!keys(&s).contains(&"mograines_might".to_string()), "earned below first");
+    assert!(s.arm(p, "mograines_might").is_err());
+    assert!(s.arm(p, "mograines_might_honed3").is_err(), "nor its honed copy, by name");
+    assert!(keys(&s).contains(&"maul".to_string()), "the camp's own are there");
+    // Found below (or sent home): on the rack.
+    s.camp.counts.insert("found:mograines_might".into(), 1);
+    assert!(keys(&s).contains(&"mograines_might".to_string()));
+    assert!(s.arm(p, "mograines_might").is_ok());
+    assert!(s.arm(p, "mograines_might_honed3").is_err(), "a honed one is the lamp's, never the rack's");
+}
+
+#[test]
+fn a_harder_dungeons_weapons_hit_harder_than_an_easier_ones() {
+    let c = Content::builtin();
+    // Each tier's weapons by grip, their damage a second over the swing, on average.
+    let mut by: std::collections::BTreeMap<(bool, u32), Vec<f32>> = Default::default();
+    for d in c.dungeons() {
+        for p in &d.packs {
+            let Some(m) = c.mob(&p.mob) else { continue };
+            for g in c.mobs[m].gear.iter().chain(c.mobs[m].trophy.keys()) {
+                if let Some(w) = c.weapon(g) {
+                    let power = (w.damage[0] + w.damage[1]) as f32 / 2.0 / (w.windup + w.active + w.recovery);
+                    by.entry((w.two_handed, d.tier)).or_default().push(power);
+                }
+            }
+        }
+    }
+    let mean = |v: &Vec<f32>| v.iter().sum::<f32>() / v.len() as f32;
+    for two in [false, true] {
+        let t: Vec<f32> = (1..=3).filter_map(|t| by.get(&(two, t)).map(mean)).collect();
+        assert!(t.windows(2).all(|w| w[1] > w[0]), "two-handed {two}: {t:?}");
+    }
+}
+
+#[test]
+fn a_honed_copy_found_or_one_already_in_the_chest_puts_its_piece_on_the_rack() {
+    let mut s = world();
+    let rack = s.content.world.rack;
+    let p = hero(&mut s, "Ayla", [rack[0] + 1.0, rack[1], 0.0], 0.0);
+    let keys = |s: &Survival| s.rack_view(p).into_iter().map(|r| r.0).collect::<Vec<String>>();
+    // A camp from before finds were counted, with a dungeon's weapon (honed) in its chest.
+    let piece = s.content.dungeons().flat_map(|d| d.packs.iter()).filter_map(|pk| s.content.mob(&pk.mob)).flat_map(|m| s.content.mobs[m].gear.clone()).find(|g| s.content.weapon(g).is_some() && !s.content.is_trophy(g)).unwrap();
+    assert!(!keys(&s).contains(&piece));
+    let honed = s.content.honed(s.content.item(&piece).unwrap(), 2);
+    s.storage.insert(honed, 1);
+    assert!(keys(&s).contains(&piece), "{piece}: one honed copy in the chest");
+    assert_eq!(s.content.base_key(honed), piece);
 }

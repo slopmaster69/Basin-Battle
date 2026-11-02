@@ -31,6 +31,12 @@ pub const WAGER_MAX: u32 = 20;
 /// What each level adds to the foes (compounding): health, and the weight of their blows.
 pub const WAGER_HEALTH: f32 = 0.09;
 pub const WAGER_DAMAGE: f32 = 0.06;
+/// The Bookmaker's weekly chest: for the camp's best wager won in time each week, this many
+/// pieces of that dungeon's gear, one more every [`CHEST_LEVELS`] levels (up to [`CHEST_MOST`]),
+/// honed as a wager of that level pays ([`crate::content::hone_tier`]). (First guesses.)
+pub const CHEST_LEVELS: u32 = 4;
+pub const CHEST_MOST: u32 = 4;
+
 /// What a fall costs on the clock (seconds).
 pub const WAGER_DEATH: f32 = 10.0;
 /// The share of a dungeon's foes (those standing from the start, bosses aside) a run must fell.
@@ -205,40 +211,59 @@ pub fn wager_bosses(d: &DungeonDef, content: &crate::content::Content) -> Vec<St
         .collect()
 }
 
-/// The foes a wager counts: those standing from the start that aren't bosses (not a secret's, a
-/// strongbox's guards, a rare, a totem or a dummy). Others felled count as well; these make the
-/// total.
+/// The foes a wager counts for one hero: those standing from the start that aren't bosses (not a
+/// secret's, a strongbox's guards, a rare, a totem or a dummy). Others felled count as well;
+/// these make the total.
 pub fn wager_forces_total(d: &DungeonDef, content: &crate::content::Content) -> u32 {
+    wager_forces_total_for(d, content, 1)
+}
+
+/// ...and for a band of `heroes`, its packs grown for them ([`super::dungeon::pack_count`]).
+pub fn wager_forces_total_for(d: &DungeonDef, content: &crate::content::Content, heroes: usize) -> u32 {
     let kept: BTreeSet<&String> = d.doors.iter().flat_map(|dr| dr.reveals.iter()).collect();
     d.packs
         .iter()
         .filter(|p| !p.rare && p.wake.is_empty() && !kept.contains(&p.key))
         .filter(|p| content.mobs.iter().any(|m| m.key == p.mob && !m.boss && !m.inert() && !m.critter))
-        .map(|p| p.count.max(1) as u32)
+        .map(|p| super::dungeon::pack_count(p, d, content, heroes).max(1) as u32)
         .sum()
 }
 
-/// How many of them a run must fell.
+/// How many of them a run must fell, for one hero.
 pub fn wager_forces_needed(d: &DungeonDef, content: &crate::content::Content) -> u32 {
-    (wager_forces_total(d, content) as f32 * WAGER_FORCES).ceil() as u32
+    wager_forces_needed_for(d, content, 1)
+}
+
+/// ...and for a band of `heroes`.
+pub fn wager_forces_needed_for(d: &DungeonDef, content: &crate::content::Content, heroes: usize) -> u32 {
+    (wager_forces_total_for(d, content, heroes) as f32 * WAGER_FORCES).ceil() as u32
 }
 
 impl Survival {
-    /// A foe's leash: how far from home it chases (farther during a wager).
+    /// A foe's leash: how far from home it chases (`ai.leash_scale` times its own; farther
+    /// during a wager).
     pub(crate) fn leash_of(&self, def: usize) -> f32 {
         let leash = self.content.mobs[def].leash;
+        let scale = self.content.ai.leash_scale.max(0.1);
         if self.wager_running() {
-            leash * WAGER_LEASH
+            leash * scale.max(WAGER_LEASH)
         } else {
-            leash
+            leash * scale
         }
     }
 
-    /// A wager's count of foes: (felled, needed, standing from the start).
+    /// A wager's count of foes: (felled, needed, standing from the start), for the heroes below
+    /// now, as its packs at rest are grown for them.
     pub fn wager_forces(&self) -> Option<(u32, u32, u32)> {
         let w = self.wager()?;
         let d = self.dungeon_def()?;
-        Some((w.forces, wager_forces_needed(d, &self.content), wager_forces_total(d, &self.content)))
+        let n = self.wager_band();
+        Some((w.forces, wager_forces_needed_for(d, &self.content, n), wager_forces_total_for(d, &self.content, n)))
+    }
+
+    /// How many heroes a wager's count is for: those below now (the band the packs are grown for).
+    pub(crate) fn wager_band(&self) -> usize {
+        self.players.len().max(1)
     }
 
     /// Whether the wager under way has a term (by key).
@@ -409,7 +434,7 @@ impl Survival {
             if m.health == 0 || m.health < m.max_health {
                 continue;
             }
-            let max = self.foe_health(m.def);
+            let max = self.foe_health(m.def, m.pack);
             let m = self.mobs.get_mut(&id).unwrap();
             m.max_health = max;
             m.health = max;
@@ -648,7 +673,7 @@ impl Survival {
         let w = self.wager().cloned().unwrap();
         // Its last boss down and enough of its foes: won, in time or not.
         if !bosses.is_empty() && bosses.iter().all(|k| self.slain(k)) {
-            let needed = wager_forces_needed(&d, &self.content);
+            let needed = wager_forces_needed_for(&d, &self.content, self.wager_band());
             if w.forces >= needed {
                 self.win_wager(&d);
             } else if !w.short_told {
@@ -685,6 +710,11 @@ impl Survival {
         } else {
             1
         };
+        // A timed win counts toward the week's chest (at camp: the week's best pays when it turns).
+        if timed {
+            let week = week_of(self.wall());
+            self.forward_count("wagerweek", &format!("{week}:{}:{}", d.key, w.level), 1);
+        }
         let had = self.wager_unlocked(&d.key);
         let reach = (w.level + steps).min(WAGER_MAX);
         let up = reach.saturating_sub(had);
@@ -723,6 +753,12 @@ impl Survival {
             if timed { "in time" } else { "over time" }
         ));
         self.pay_wager(d, w.level, timed);
+        // Each hero's tally of the run, with what it paid them.
+        let how = format!("Wager +{}, {}: {}", w.level, if timed { "in time" } else { "over time" }, clock_words(secs));
+        let heroes: Vec<Id> = self.players.keys().copied().collect();
+        for id in heroes {
+            self.run_page(id, &how);
+        }
     }
 
     /// What a won wager pays: plunder to everyone down here, and gear into the camp's chest.
@@ -774,8 +810,110 @@ impl Survival {
             *won.entry(self.content.honed(i, tier)).or_default() += 1;
         }
         if !won.is_empty() {
+            let names: Vec<String> = won.iter().map(|(i, n)| if *n > 1 { format!("{n} {}", self.content.items[*i].name) } else { self.content.items[*i].name.clone() }).collect();
+            self.announce(format!("The Bookmaker's gear goes to the camp's chest: {}.", names.join(", ")));
             self.events.push(Event::ToCamp { counts: Vec::new(), items: won });
         }
+    }
+
+    /// At camp: a week gone by whose best wager hasn't paid yet pays its chest now, into the
+    /// camp's chest: the dungeon's own gear, more and finer the higher the level.
+    pub(crate) fn step_weekly_chest(&mut self) {
+        if self.is_below() || self.is_siege() {
+            return;
+        }
+        let now = week_of(self.wall());
+        // Each past week's best: (week, level, dungeon), from the wins counted.
+        let mut best: BTreeMap<u64, (u32, String)> = BTreeMap::new();
+        let mut late: Vec<String> = Vec::new();
+        for k in self.camp.counts.keys() {
+            let Some(rest) = k.strip_prefix("wagerweek:") else { continue };
+            let mut it = rest.splitn(3, ':');
+            let (Some(week), Some(dungeon), Some(level)) = (it.next().and_then(|w| w.parse::<u64>().ok()), it.next(), it.next().and_then(|l| l.parse::<u32>().ok())) else { continue };
+            if week >= now {
+                continue;
+            }
+            // (A win that reached the camp after its week paid: too late for it; let go.)
+            if self.camp.counts.contains_key(&format!("weekchest:{week}")) {
+                late.push(k.clone());
+                continue;
+            }
+            let e = best.entry(week).or_insert((0, String::new()));
+            if level > e.0 {
+                *e = (level, dungeon.to_string());
+            }
+        }
+        for k in late {
+            self.camp.counts.remove(&k);
+        }
+        for (week, (level, dungeon)) in best {
+            // Paid once: the week's wins go (the camp's counts are mirrored below every tick, so
+            // they're kept small), and its best is kept as the week's mark.
+            self.camp.counts.retain(|k, _| !k.starts_with(&format!("wagerweek:{week}:")));
+            self.camp.counts.insert(format!("weekchest:{week}"), level);
+            let Some(d) = self.content.dungeons().find(|d| d.key == dungeon).cloned() else { continue };
+            let won = self.weekly_chest(&d, level);
+            if won.is_empty() {
+                continue;
+            }
+            let mut names = Vec::new();
+            for (i, n) in &won {
+                *self.storage.entry(*i).or_default() += n;
+                // Found, as gear carried home is: the rack keeps it once it's taken from the chest.
+                *self.camp.counts.entry(format!("found:{}", self.content.base_key(*i))).or_default() += 1;
+                names.push(self.content.items[*i].name.clone());
+            }
+            self.events.push(Event::Storage);
+            self.events.push(Event::Banner { player: None, title: "The Bookmaker's Chest".into(), sub: format!("For last week's best, +{level} in {}: into the camp's chest", d.name) });
+            self.announce(format!("The Bookmaker's chest, for the week's best wager (+{level} in {}): {}.", d.name, names.join(", ")));
+            self.events.push(Event::Dirty);
+        }
+    }
+
+    /// The chest for a week's best at `level` in `d`: its gear, the finer pieces (a perk, a set's)
+    /// from +3, honed as that level's wager pays.
+    pub(crate) fn weekly_chest(&mut self, d: &DungeonDef, level: u32) -> BTreeMap<usize, u32> {
+        let mut pool: Vec<usize> = Vec::new();
+        for p in &d.packs {
+            if let Some(m) = self.content.mob(&p.mob) {
+                for g in &self.content.mobs[m].gear {
+                    if let Some(i) = self.content.item(g) {
+                        if !pool.contains(&i) {
+                            pool.push(i);
+                        }
+                    }
+                }
+            }
+        }
+        let fine = |c: &crate::content::Content, i: usize| !c.items[i].perks.is_empty() || !c.items[i].set.is_empty();
+        let better: Vec<usize> = pool.iter().copied().filter(|i| fine(&self.content, *i)).collect();
+        let from = if level >= 3 && !better.is_empty() { better } else { pool };
+        let mut won: BTreeMap<usize, u32> = BTreeMap::new();
+        if from.is_empty() {
+            return won;
+        }
+        let tier = crate::content::hone_tier(level);
+        let n = (1 + level / CHEST_LEVELS).min(CHEST_MOST);
+        for _ in 0..n {
+            let i = from[self.rng.gen_range(0..from.len())];
+            *won.entry(self.content.honed(i, tier)).or_default() += 1;
+        }
+        won
+    }
+
+    /// The camp's best wager won in time this week: (level, dungeon), if any.
+    pub fn week_best_here(&self) -> Option<(u32, String)> {
+        let now = week_of(self.wall());
+        self.camp
+            .counts
+            .keys()
+            .filter_map(|k| {
+                let rest = k.strip_prefix("wagerweek:")?;
+                let mut it = rest.splitn(3, ':');
+                let (week, dungeon, level) = (it.next()?.parse::<u64>().ok()?, it.next()?, it.next()?.parse::<u32>().ok()?);
+                (week == now).then(|| (level, dungeon.to_string()))
+            })
+            .max()
     }
 
     /// The wager over (won, lost or left): the dungeon as it was before it.
