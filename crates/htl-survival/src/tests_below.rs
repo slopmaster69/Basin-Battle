@@ -1693,3 +1693,20 @@ fn the_journal_walks_the_camp_through_every_dungeon_by_their_clears() {
     let g = c.goals.iter().find(|g| g.kind == "cleared" && g.what == "ragefire").unwrap();
     assert_eq!(camp.goal_progress(g), (0, 1));
 }
+
+#[test]
+fn the_books_record_of_a_dungeon_lists_its_bosses_their_gear_and_the_camps_kills() {
+    let c = Content::builtin();
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 0.0);
+    let id = camp.join("ayla", "Ayla", None);
+    camp.camp.counts.insert("kill:dm_smite".into(), 2);
+    camp.lore_page(id, "deadmines").unwrap();
+    let ev = camp.step(DT);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "lore").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains("Its bosses"), "{text}");
+    assert!(text.contains("Mr. Smite: felled 2 times") && text.contains("Smite's Mighty Hammer"), "{text}");
+    assert!(text.contains("Cookie: not felled yet"), "{text}");
+    // A trophy is the camp's the first time; after, it's in the chest.
+    let line = |who: &str| text.lines().find(|l| l.starts_with(&format!("- {who}:"))).unwrap_or("").to_string();
+    assert!(line("Mr. Smite").contains("in the camp's chest") && line("Cookie").contains("the camp's the first time"), "{text}");
+}
