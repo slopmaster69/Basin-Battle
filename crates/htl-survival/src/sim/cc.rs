@@ -39,6 +39,10 @@ const LOG_KEEP: usize = 40;
 /// A hero is told a foe shrugged their control off at most this often, per foe.
 const IMMUNE_TOLD_EVERY: f32 = 1.5;
 
+
+/// How much larger Onslaught draws a hero.
+pub(crate) const ONSLAUGHT_SCALE: f32 = 1.3;
+
 impl Survival {
     /// The effects on a unit now.
     pub fn cc_of(&self, id: Id) -> &[Cc] {
@@ -207,6 +211,11 @@ impl Survival {
             }
             if kind == "panic" {
                 self.players.get_mut(&id).unwrap().panic_stride = self.clock;
+            }
+            // Onslaught: larger, and red for everyone to see, while it lasts.
+            if kind == "onslaught" {
+                self.events.push(Event::Grow { id, scale: ONSLAUGHT_SCALE });
+                self.events.push(Event::Glow { id, secs });
             }
             self.update_rooted(id);
             self.update_speed(id);
@@ -396,6 +405,9 @@ impl Survival {
             list.retain(|c| c.until > now);
         }
         self.events.push(Event::Auras { id });
+        if self.players.contains_key(&id) && kinds.iter().any(|k| k == "onslaught") && !self.has_cc(id, "onslaught") {
+            self.events.push(Event::Grow { id, scale: 1.0 });
+        }
         if self.players.contains_key(&id) {
             // The grace, once the last of the three is over.
             if kinds.iter().any(|k| HARD.contains(&k.as_str())) && !self.cc_of(id).iter().any(|c| HARD.contains(&c.kind.as_str())) {

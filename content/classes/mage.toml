@@ -1,40 +1,53 @@
-# The Mage: a glass cannon who controls the field. Three ways to play, as in the old trees:
-#   Arcane - speed and spell-chaining: Clearcasting, Presence of Mind, Arcane Power.
-#   Fire   - crits that set everything burning: Scorch's vulnerability, Ignite, Pyroblast, Combustion.
-#   Frost  - slow, freeze, shatter: Chill and Frozen enemies, crits against the frozen, Ice Barrier.
-# The schools meet: Fire Blast is stronger against Frozen enemies, and Arcane Explosion fills the
-# gaps of a Frost Nova.
+# The Mage: a glass cannon who controls the field. No mana: every spell is a cooldown.
 #
-# How this file works (see crates/htl-sim/src/kit.rs for every number a spell can have):
-# - A [[spell]] is a card. `core` spells can be a run's first pick. Damage is a multiple of your
-#   "hit" (weapon damage per second x 2); `dot` is a total over `dot_secs`.
-# - Each [[spell.perk]] is an upgrade card for a spell you hold: up to 4 per spell. Every perk also
-#   adds 10% to the spell's power.
-# - [[talent]]s cost a point each rank (a point every level from 2). Tier n opens after 3*(n-1)
-#   points in that tree. `values` are per rank: "{0%}" in the text is values[0] x rank.
+# How the Mage levels up (talent_style = "class", as the Warrior):
+#   - Every spell is a card; you hold up to 6 on your bar. Each spell has its own deck of about
+#     15 upgrades and takes 10 of them in a run; the last of each deck is an Epic, offered once
+#     5 of its upgrades are taken.
+#   - Every spell has one job:
+#       Frostbolt the chill · Fireball the big hit · Arcane Missiles the elite melter ·
+#       Arcane Explosion the panic button · Frost Nova the freeze (your escape) ·
+#       Fire Blast the instant shatter · Scorch Fire Vulnerability · Blizzard holds a lane ·
+#       Flamestrike the clump killer · Cone of Cold the peel · Blink the way out ·
+#       Counterspell the interrupt.
+#   - A Specialization (Fire, Frost or Arcane) turns up at random as a Legendary card, one a
+#     run: it opens its two spells to the spell cards (Pyroblast and Combustion, Ice Barrier and
+#     Cold Snap, Arcane Power and Presence of Mind; on keys of their own) and its own path cards.
+#   - Class talents come whatever you hold; combinations only while you hold both spells.
+#   - Rarity: Common numbers, Uncommon changes how you play, Rare lights a key / resets / casts,
+#     Epic the capstones, Legendary the specializations.
+# See warrior.toml for how upgrades, triggers and lit keys are written.
+
+talent_style = "class"
+path_label = "Specialization"
+
+[upgrades]
+per_spell = 10
+power = 0.03
+cost = 0.0
 
 [[tree]]
 key = "arcane"
 name = "Arcane"
-text = "Speed and spell-chaining: Clearcasting, Presence of Mind, Arcane Power."
+text = "Speed and spell-chaining: Arcane Missiles, Arcane Explosion, Blink, Counterspell."
 icon = 1449
 background = "MageArcane"
 
 [[tree]]
 key = "fire"
 name = "Fire"
-text = "Crits that set everything burning: Ignite, Scorch, Pyroblast, Combustion."
+text = "Crits that set everything burning: Fireball, Fire Blast, Scorch, Flamestrike."
 icon = 133
 background = "MageFire"
 
 [[tree]]
 key = "frost"
 name = "Frost"
-text = "Slow, freeze and shatter: crits against Frozen enemies, Ice Barrier."
+text = "Slow, freeze and shatter: Frostbolt, Frost Nova, Blizzard, Cone of Cold."
 icon = 116
 background = "MageFrost"
 
-# --- spells --------------------------------------------------------------------------------------
+# --- spells ---------------------------------------------------------------------------------------
 
 [[spell]]
 key = "frostbolt"
@@ -51,37 +64,102 @@ speed = 28
 slow = 0.3
 slow_secs = 4
 cast = 1.8
-
+note = "The chill: frost hits harder on the chilled and the Frozen."
   [[spell.perk]]
-  key = "permafrost"
-  name = "Permafrost"
-  text = "Chills harder: slows by 50% for 6 sec."
-  set = { slow = 0.5, slow_secs = 6 }
+  key = "ice_edge"
+  name = "Ice Edge"
+  repeat = 2
+  text = "Deals 25% more damage. Can be taken twice."
+  pct = { damage = 0.25 }
   [[spell.perk]]
   key = "frost_channeling"
   name = "Frost Channeling"
-  text = "Cooldown 1 sec shorter."
-  add = { cooldown = -1.0 }
+  repeat = 2
+  text = "Casts 0.4 sec faster: 1.4, then 1.0 sec. Can be taken twice."
+  add = { cast = -0.4 }
   [[spell.perk]]
-  key = "frostbite"
-  name = "Frostbite"
-  rarity = "uncommon"
-  text = "25% chance to Freeze the target for 3 sec."
-  add = { freeze_chance = 0.25 }
-  set = { freeze_secs = 3 }
+  key = "permafrost"
+  name = "Permafrost"
+  text = "Chills harder: 50% slower, for 6 sec."
+  set = { slow = 0.5, slow_secs = 6 }
   [[spell.perk]]
   key = "piercing_ice"
   name = "Piercing Ice"
   rarity = "uncommon"
-  text = "Deals 35% more to enemies that are already Chilled."
-  add = { vs_chilled = 0.35 }
+  text = "Deals 40% more to enemies already Chilled: the second bolt hits harder than the first."
+  add = { vs_chilled = 0.4 }
+  [[spell.perk]]
+  key = "frostbite"
+  name = "Frostbite"
+  rarity = "uncommon"
+  text = "30% chance to Freeze the target for 3 sec."
+  set = { freeze_secs = 3 }
+  add = { freeze_chance = 0.3 }
   [[spell.perk]]
   key = "splintering_ice"
   name = "Splintering Ice"
-  rarity = "rare"
-  text = "Shatters on impact: 50% of its damage also hits enemies within 8 yd of the target."
-  add = { splash = 0.5 }
+  rarity = "uncommon"
+  fork = "bolt"
+  text = "Shatters on impact: 50% of its damage hits enemies within 8 yd of the target, and Chills them."
   set = { splash_radius = 8 }
+  add = { splash = 0.5 }
+  [[spell.perk]]
+  key = "twin_bolts"
+  name = "Twin Bolts"
+  rarity = "uncommon"
+  fork = "bolt"
+  text = "Fires a second bolt at another enemy."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "ice_lance"
+  name = "Ice Lance"
+  rarity = "uncommon"
+  fork = "bolt"
+  text = "Instant: no cast, a little less damage (25% less). Cast it on the run."
+  set = { cast = 0 }
+  pct = { damage = -0.25 }
+  [[spell.perk]]
+  key = "brain_freeze"
+  name = "Brain Freeze"
+  rarity = "rare"
+  text = "Its critical strikes light up Frostbolt: ready at once, instant, 50% more damage."
+  trigger = [{ on = "crit", icd = 2, buff = { key = "brain_freeze", secs = 8, next = "self", instant = true, power = 0.5, icon = 116 } }]
+  [[spell.perk]]
+  key = "fingers_of_frost"
+  name = "Fingers of Frost"
+  rarity = "rare"
+  text = "Hitting a Frozen enemy finishes its cooldown."
+  trigger = [{ on = "hit", target = "frozen", reset = true, icd = 1 }]
+  [[spell.perk]]
+  key = "winters_bite"
+  name = "Winter's Bite"
+  rarity = "uncommon"
+  text = "Leaves Winter's Chill: frost spells have 2% more critical strike chance against the target per stack (up to 5)."
+  add = { vuln_frost = 1 }
+  [[spell.perk]]
+  key = "ice_shards_fb"
+  name = "Ice Shards"
+  text = "Its critical strikes deal 50% more."
+  add = { crit_mult = 0.5 }
+  [[spell.perk]]
+  key = "cold_blood_fb"
+  name = "Cold Precision"
+  text = "20% more critical strike chance."
+  add = { crit = 0.2 }
+  [[spell.perk]]
+  key = "frozen_core"
+  name = "Frozen Core"
+  rarity = "uncommon"
+  text = "Each Frostbolt shields you for 3% of your max health."
+  trigger = [{ on = "cast", shield = 0.03, shout = false }]
+  [[spell.perk]]
+  key = "glacial_spike"
+  name = "Glacial Spike"
+  rarity = "epic"
+  needs = 5
+  text = "Every Frostbolt Freezes its target for 3 sec and deals 50% more to it."
+  set = { freeze_chance = 1, freeze_secs = 3 }
+  add = { vs_frozen = 0.5 }
 
 [[spell]]
 key = "fireball"
@@ -98,39 +176,103 @@ speed = 24
 dot = 0.3
 dot_secs = 6
 cast = 2.5
-
+note = "The big hit: the hardest of your basic spells."
   [[spell.perk]]
-  key = "improved_fireball"
-  name = "Quickened Flame"
-  text = "Cooldown 1 sec shorter."
-  add = { cooldown = -1.0 }
+  key = "fire_power_fb"
+  name = "Searing Fire"
+  repeat = 2
+  text = "Deals 25% more damage. Can be taken twice."
+  pct = { damage = 0.25 }
+  [[spell.perk]]
+  key = "quickened_flame"
+  name = "Improved Fireball"
+  repeat = 2
+  text = "Casts 0.5 sec faster: 2.0, then 1.5 sec. Can be taken twice."
+  add = { cast = -0.5 }
+  [[spell.perk]]
+  key = "searing_burn"
+  name = "Searing Burn"
+  text = "Its burn is twice as hot, and stacks 3 times."
+  set = { dot_stack = 1 }
+  pct = { dot = 1.0 }
   [[spell.perk]]
   key = "blast_radius"
   name = "Blast Radius"
   rarity = "uncommon"
-  text = "Explodes: 40% of its damage also hits enemies within 8 yd of the target."
-  add = { splash = 0.4 }
+  fork = "ball"
+  text = "Explodes: 40% of its damage hits enemies within 8 yd of the target."
   set = { splash_radius = 8 }
+  add = { splash = 0.4 }
   [[spell.perk]]
-  key = "searing_burn"
-  name = "Searing Burn"
+  key = "twin_fireballs"
+  name = "Twin Fireballs"
   rarity = "uncommon"
-  text = "Its burn is twice as hot and stacks up to 3 times."
-  pct = { dot = 1.0 }
-  set = { dot_stack = 1 }
+  fork = "ball"
+  text = "Hurls a second Fireball at another enemy."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "great_fireball"
+  name = "Great Fireball"
+  rarity = "uncommon"
+  fork = "ball"
+  text = "One target, 60% more damage, 0.5 sec more to cast: the biggest ball of all."
+  add = { cast = 0.5 }
+  pct = { damage = 0.6 }
   [[spell.perk]]
   key = "impact"
   name = "Impact"
   rarity = "uncommon"
   text = "25% chance to stun the target for 2 sec."
-  add = { stun_chance = 0.25 }
   set = { stun_secs = 2 }
+  add = { stun_chance = 0.25 }
   [[spell.perk]]
   key = "critical_mass"
   name = "Critical Mass"
+  text = "20% more critical strike chance."
+  add = { crit = 0.2 }
+  [[spell.perk]]
+  key = "molten_fury"
+  name = "Molten Fury"
+  rarity = "uncommon"
+  text = "Deals 40% more to enemies below 20% health."
+  set = { execute_at = 0.2 }
+  add = { execute = 0.4 }
+  [[spell.perk]]
+  key = "kindling"
+  name = "Kindling"
+  rarity = "uncommon"
+  text = "Its critical strikes take 2 sec off your other cooldowns."
+  trigger = [{ on = "crit", cdr = 2, shout = true }]
+  [[spell.perk]]
+  key = "heating_up"
+  name = "Heating Up"
   rarity = "rare"
-  text = "20% more critical strike chance, and its crits deal 25% more."
-  add = { crit = 0.2, crit_mult = 0.25 }
+  text = "Its critical strikes light up the next Fireball: ready at once, instant."
+  trigger = [{ on = "crit", icd = 3, buff = { key = "heating_up", secs = 8, next = "self", instant = true, icon = 133 } }]
+  [[spell.perk]]
+  key = "burning_soul"
+  name = "Burning Soul"
+  text = "Deals 30% more to elites and bosses."
+  add = { vs_elite = 0.3 }
+  [[spell.perk]]
+  key = "fire_vuln_fb"
+  name = "Scorching Ball"
+  rarity = "uncommon"
+  text = "Leaves a stack of Fire Vulnerability."
+  add = { vuln_fire = 1 }
+  [[spell.perk]]
+  key = "pyroclasm_fb"
+  name = "Pyroclasm"
+  rarity = "uncommon"
+  text = "Its kills set enemies within 8 yd burning for 1 times your hit."
+  trigger = [{ on = "kill", burn = 1.0, radius = 8, visual = 2120 }]
+  [[spell.perk]]
+  key = "meteor"
+  name = "Meteor"
+  rarity = "epic"
+  needs = 5
+  text = "Each Fireball has a 30% chance to call down a Meteor: 3 times your hit to every enemy within 8 yd of the target, stunned 2 sec."
+  trigger = [{ on = "hit", chance = 0.3, icd = 2, damage = 3.0, radius = 8, stun = 2, school = "fire", visual = 11366 }]
 
 [[spell]]
 key = "arcane_missiles"
@@ -147,35 +289,101 @@ damage = 0.42
 projectiles = 5
 range = 30
 speed = 22
+vs_elite = 0.3
+note = "The elite melter: a volley that can't miss, 30% stronger against elites and bosses. Magic ignores armor."
   [[spell.perk]]
-  key = "improved_arcane_missiles"
-  name = "Improved Arcane Missiles"
-  text = "Fires 2 more missiles."
-  add = { projectiles = 2 }
+  key = "arcane_potency"
+  name = "Arcane Potency"
+  repeat = 2
+  text = "Deals 25% more damage. Can be taken twice."
+  pct = { damage = 0.25 }
   [[spell.perk]]
   key = "rapid_missiles"
   name = "Rapid Missiles"
-  text = "Cooldown 1.5 sec shorter."
+  repeat = 2
+  text = "Cooldown 1.5 sec shorter: every 3.5, then every 2 sec. Can be taken twice."
   add = { cooldown = -1.5 }
+  [[spell.perk]]
+  key = "more_missiles"
+  name = "Improved Arcane Missiles"
+  repeat = 2
+  text = "Fires 2 more missiles. Can be taken twice."
+  add = { projectiles = 2 }
+  [[spell.perk]]
+  key = "giant_slayer"
+  name = "Giant Slayer"
+  rarity = "uncommon"
+  text = "Deals 40% more to elites and bosses (70% in all)."
+  add = { vs_elite = 0.4 }
   [[spell.perk]]
   key = "arcane_splinters"
   name = "Arcane Splinters"
   rarity = "uncommon"
-  text = "Each missile also arcs to enemies within 6 yd of the target for 35% of its damage."
-  add = { splash = 0.35 }
+  fork = "weave"
+  text = "Each missile arcs to enemies within 6 yd of the target for 35% of its damage."
   set = { splash_radius = 6 }
+  add = { splash = 0.35 }
   [[spell.perk]]
-  key = "arcane_instability"
-  name = "Unstable Missiles"
+  key = "split_missiles"
+  name = "Split Volley"
   rarity = "uncommon"
-  text = "15% more critical strike chance."
-  add = { crit = 0.15 }
+  fork = "weave"
+  text = "The missiles split between your target and 2 more enemies."
+  add = { targets = 2 }
+  [[spell.perk]]
+  key = "focused_beam"
+  name = "Focused Beam"
+  rarity = "uncommon"
+  fork = "weave"
+  text = "Every missile into one target: 40% more damage."
+  pct = { damage = 0.4 }
   [[spell.perk]]
   key = "missile_barrage"
   name = "Missile Barrage"
   rarity = "rare"
-  text = "25% chance to fire a second volley at once."
-  add = { echo = 0.25 }
+  text = "30% chance to fire a second volley at once."
+  add = { echo = 0.3 }
+  [[spell.perk]]
+  key = "arcane_instability_am"
+  name = "Unstable Missiles"
+  text = "15% more critical strike chance."
+  add = { crit = 0.15 }
+  [[spell.perk]]
+  key = "slow_am"
+  name = "Arcane Drag"
+  rarity = "uncommon"
+  text = "Its target is slowed 40% for 4 sec."
+  set = { slow = 0.4, slow_secs = 4 }
+  [[spell.perk]]
+  key = "arcane_charge"
+  name = "Arcane Charge"
+  rarity = "uncommon"
+  text = "Each volley: 4% more damage for your spells for 10 sec, stacking 4 times."
+  trigger = [{ on = "cast", buff = { key = "arcane_charge", secs = 10, stacks = 4, damage = 0.04, icon = 5143 }, shout = false }]
+  [[spell.perk]]
+  key = "clearcasting_am"
+  name = "Arcane Concentration"
+  rarity = "rare"
+  text = "Each volley has a 20% chance to finish all your other cooldowns (once every 8 sec)."
+  trigger = [{ on = "cast", chance = 0.2, icd = 8, resets = "all", shout = true }]
+  [[spell.perk]]
+  key = "exposed_magic"
+  name = "Arcane Exposure"
+  rarity = "uncommon"
+  text = "Its target takes 10% more damage from everyone for 8 sec."
+  set = { expose = 0.1, expose_secs = 8 }
+  [[spell.perk]]
+  key = "full_power_am"
+  name = "Opening Volley"
+  text = "Deals 40% more to enemies above 80% health."
+  add = { vs_full = 0.4 }
+  [[spell.perk]]
+  key = "arcane_torrent"
+  name = "Arcane Torrent"
+  rarity = "epic"
+  needs = 5
+  text = "Fires at 3 more enemies, and each volley has a 50% chance to fire again."
+  add = { targets = 3, echo = 0.5 }
 
 [[spell]]
 key = "arcane_explosion"
@@ -188,34 +396,99 @@ icon = 1449
 cooldown = 4.0
 damage = 0.5
 radius = 10
-  [[spell.perk]]
-  key = "improved_arcane_explosion"
-  name = "Improved Arcane Explosion"
-  text = "20% more critical strike chance."
-  add = { crit = 0.2 }
+note = "Instant, all around you: the one blast you can cast on the run."
   [[spell.perk]]
   key = "arcane_reach"
   name = "Arcane Reach"
-  text = "Reaches 4 yd further."
-  add = { radius = 4 }
+  repeat = 2
+  text = "Reaches 3 yd further. Can be taken twice."
+  add = { radius = 3 }
   [[spell.perk]]
   key = "rapid_detonation"
   name = "Rapid Detonation"
-  rarity = "uncommon"
-  text = "Cooldown 1.5 sec shorter."
-  add = { cooldown = -1.5 }
+  repeat = 2
+  text = "Cooldown 1 sec shorter: every 3, then every 2 sec. Can be taken twice."
+  add = { cooldown = -1 }
+  [[spell.perk]]
+  key = "improved_ae"
+  name = "Improved Arcane Explosion"
+  text = "Deals 30% more damage."
+  pct = { damage = 0.3 }
   [[spell.perk]]
   key = "mana_burst"
   name = "Mana Burst"
   rarity = "uncommon"
-  text = "Dazes: enemies hit are slowed by 35% for 3 sec."
-  set = { slow = 0.35, slow_secs = 3 }
+  text = "Dazes: enemies hit are slowed 40% for 3 sec."
+  set = { slow = 0.4, slow_secs = 3 }
   [[spell.perk]]
   key = "arcane_surge"
   name = "Arcane Surge"
+  rarity = "uncommon"
+  text = "Each enemy hit takes 0.3 sec off your other cooldowns (up to 2 sec a cast)."
+  set = { cdr_per_hit = 0.3, cdr_cap = 2 }
+  [[spell.perk]]
+  key = "warding_blast"
+  name = "Warding Blast"
+  rarity = "uncommon"
+  text = "Each enemy hit shields you for 2% of your max health."
+  set = { ward = 0.02 }
+  [[spell.perk]]
+  key = "arcane_crush"
+  name = "Critical Mass"
+  text = "20% more critical strike chance."
+  add = { crit = 0.2 }
+  [[spell.perk]]
+  key = "stunning_blast"
+  name = "Concussive Blast"
+  rarity = "uncommon"
+  fork = "burst"
+  text = "Stuns enemies hit for 1 sec."
+  set = { stun_chance = 1, stun_secs = 1 }
+  [[spell.perk]]
+  key = "crowded"
+  name = "Crowded Room"
+  rarity = "uncommon"
+  fork = "burst"
+  text = "5% more damage for every enemy caught after the first."
+  add = { per_enemy = 0.05 }
+  [[spell.perk]]
+  key = "arcane_echo_ae"
+  name = "Resonance"
+  rarity = "uncommon"
+  fork = "burst"
+  text = "30% chance to go off twice."
+  add = { echo = 0.3 }
+  [[spell.perk]]
+  key = "blink_blast"
+  name = "Displacement Charge"
+  rarity = "uncommon"
+  text = "After each explosion you run 30% faster for 3 sec: blast and step away."
+  trigger = [{ on = "cast", buff = { key = "displacement_charge", secs = 3, speed = 0.3, icon = 1449 }, shout = false }]
+  [[spell.perk]]
+  key = "arcane_vigor"
+  name = "Arcane Vigor"
+  text = "Heals you 2% of your max health for each enemy hit."
+  set = { heal_per_hit = 0.02 }
+  [[spell.perk]]
+  key = "clearcast_ae"
+  name = "Arcane Spark"
   rarity = "rare"
-  text = "Each enemy hit takes 0.25 sec off your other spells' cooldowns (up to 1.5 sec a cast)."
-  set = { cdr_per_hit = 0.25, cdr_cap = 1.5 }
+  text = "Hitting 4 or more enemies finishes all your cooldowns (once every 6 sec)."
+  trigger = [{ on = "cast", enemies = 4, icd = 6, resets = "all" }]
+  [[spell.perk]]
+  key = "nova_ae"
+  name = "Arcane Nova"
+  rarity = "uncommon"
+  text = "Exposes what it hits: 10% more damage from everyone for 5 sec."
+  set = { expose = 0.1, expose_secs = 5 }
+  [[spell.perk]]
+  key = "supernova"
+  name = "Supernova"
+  rarity = "epic"
+  needs = 5
+  text = "Reaches 6 yd further, knocks the wind out of them (stunned 1.5 sec), and has a 50% chance to go off twice."
+  set = { stun_chance = 1, stun_secs = 1.5 }
+  add = { radius = 6, echo = 0.5 }
 
 [[spell]]
 key = "frost_nova"
@@ -230,35 +503,97 @@ damage = 0.4
 radius = 10
 freeze_chance = 1
 freeze_secs = 4
-note = "Frozen enemies can't move or attack. The Ancient's defences hit frozen enemies 30% harder."
+note = "Frozen enemies can't move or attack, and the Ancient's defences hit them 30% harder. Your escape."
   [[spell.perk]]
   key = "improved_frost_nova"
   name = "Improved Frost Nova"
-  text = "Cooldown 4 sec shorter."
-  add = { cooldown = -4 }
+  repeat = 2
+  text = "Cooldown 3 sec shorter: every 12, then every 9 sec. Can be taken twice."
+  add = { cooldown = -3 }
   [[spell.perk]]
-  key = "frost_ring"
+  key = "ring_of_frost"
   name = "Ring of Frost"
   text = "Reaches 4 yd further."
   add = { radius = 4 }
   [[spell.perk]]
-  key = "shattering_nova"
-  name = "Shattering Nova"
-  rarity = "uncommon"
-  text = "Deals triple damage to enemies already Chilled."
-  add = { vs_chilled = 2.0 }
-  [[spell.perk]]
-  key = "deep_freeze"
+  key = "deep_freeze_nova"
   name = "Deep Freeze"
-  rarity = "uncommon"
   text = "Freezes 2 sec longer."
   add = { freeze_secs = 2 }
   [[spell.perk]]
+  key = "shattering_nova"
+  name = "Shattering Nova"
+  rarity = "uncommon"
+  text = "Deals 3 times its damage to enemies already Chilled."
+  add = { vs_chilled = 2.0 }
+  [[spell.perk]]
   key = "frost_warding"
   name = "Frost Warding"
-  rarity = "rare"
-  text = "Each enemy frozen wraps you in ice that absorbs 4% of your max health (up to 40%)."
+  rarity = "uncommon"
+  text = "Each enemy frozen wraps you in ice: a shield of 4% of your max health."
   set = { ward = 0.04 }
+  [[spell.perk]]
+  key = "brittle"
+  name = "Brittle"
+  rarity = "uncommon"
+  text = "Frozen enemies take 20% more damage from everyone while frozen."
+  set = { expose = 0.2, expose_secs = 4 }
+  [[spell.perk]]
+  key = "guardians_frost"
+  name = "Guardian's Frost"
+  rarity = "uncommon"
+  text = "Cast within 25 yd of the Ancient, it freezes everything within 10 yd of the Ancient too."
+  trigger = [{ on = "cast", near_ancient = 25, freeze = 4, radius = 10, at_self = true, visual = 122 }]
+  [[spell.perk]]
+  key = "ice_block_nova"
+  name = "Cold Shell"
+  rarity = "uncommon"
+  fork = "nova"
+  text = "You take 30% less damage for 4 sec."
+  trigger = [{ on = "cast", buff = { key = "cold_shell", secs = 4, taken = 0.3, icon = 122 } }]
+  [[spell.perk]]
+  key = "frozen_flight"
+  name = "Frozen Flight"
+  rarity = "uncommon"
+  fork = "nova"
+  text = "You run 50% faster for 3 sec: freeze and go."
+  trigger = [{ on = "cast", buff = { key = "frozen_flight", secs = 3, speed = 0.5, icon = 122 } }]
+  [[spell.perk]]
+  key = "icy_veins_nova"
+  name = "Icy Veins"
+  rarity = "uncommon"
+  fork = "nova"
+  text = "Your spells cast 20% faster for 6 sec."
+  trigger = [{ on = "cast", buff = { key = "icy_veins", secs = 6, haste = 0.2, icon = 12472 } }]
+  [[spell.perk]]
+  key = "shatter_nova"
+  name = "Shatter Setup"
+  rarity = "rare"
+  text = "Lights up Fire Blast and Frostbolt: ready at once."
+  trigger = [{ on = "cast", buff = { key = "shatter_setup", secs = 6, next = "fire_blast,frostbolt", instant = true, icon = 122 } }]
+  [[spell.perk]]
+  key = "winter_nova"
+  name = "Winter's Touch"
+  text = "Leaves 2 stacks of Winter's Chill."
+  add = { vuln_frost = 2 }
+  [[spell.perk]]
+  key = "chilling_nova"
+  name = "Lingering Cold"
+  text = "Enemies it froze stay 50% slower for 4 sec after."
+  set = { slow = 0.5, slow_secs = 4 }
+  [[spell.perk]]
+  key = "nova_power"
+  name = "Biting Cold"
+  text = "Deals 3 times as much damage."
+  pct = { damage = 2.0 }
+  [[spell.perk]]
+  key = "absolute_zero"
+  name = "Absolute Zero"
+  rarity = "epic"
+  needs = 5
+  text = "Freezes 4 sec longer, and frozen enemies take 40% more damage from everyone for 8 sec."
+  set = { expose = 0.4, expose_secs = 8 }
+  add = { freeze_secs = 4 }
 
 [[spell]]
 key = "fire_blast"
@@ -268,38 +603,101 @@ kind = "bolt"
 school = "fire"
 icon = 2136
 cooldown = 7.0
-damage = 1.4
+damage = 1.2
 range = 20
-vs_frozen = 0.5
-note = ""
+vs_frozen = 1.0
+note = "Fire's only instant: Frost Nova, then Fire Blast."
   [[spell.perk]]
   key = "improved_fire_blast"
   name = "Improved Fire Blast"
-  text = "Cooldown 2 sec shorter."
-  add = { cooldown = -2 }
+  repeat = 2
+  text = "Cooldown 1.5 sec shorter: every 4.5, then every 3 sec. Can be taken twice."
+  add = { cooldown = -1.5 }
   [[spell.perk]]
   key = "incinerate"
   name = "Incinerate"
   text = "25% more critical strike chance."
   add = { crit = 0.25 }
   [[spell.perk]]
-  key = "blast_impact"
+  key = "hot_hands_fb"
+  name = "Searing Blast"
+  text = "Deals 30% more damage."
+  pct = { damage = 0.3 }
+  [[spell.perk]]
+  key = "frostfire"
+  name = "Frostfire"
+  rarity = "uncommon"
+  text = "Against Frozen enemies: another 50% more damage, and 50% more crit chance."
+  add = { vs_frozen = 0.5, crit_vs_frozen = 0.5 }
+  [[spell.perk]]
+  key = "flame_propagation"
+  name = "Flame Propagation"
+  rarity = "uncommon"
+  text = "Spreads the target's burns to 3 enemies within 10 yd."
+  set = { spread = 3 }
+  [[spell.perk]]
+  key = "impact_blast"
   name = "Impact"
   rarity = "uncommon"
   text = "Stuns the target for 2 sec."
   set = { stun_chance = 1, stun_secs = 2 }
   [[spell.perk]]
-  key = "frostfire"
-  name = "Frostfire"
-  rarity = "uncommon"
-  text = "Against Frozen enemies: 50% more damage again, and 50% more crit chance."
-  add = { vs_frozen = 0.5, crit_vs_frozen = 0.5 }
+  key = "blast_reach"
+  name = "Long Blast"
+  text = "Reaches 10 yd further."
+  add = { range = 10 }
   [[spell.perk]]
-  key = "flame_propagation"
-  name = "Flame Propagation"
+  key = "ignition"
+  name = "Ignition"
+  rarity = "uncommon"
+  text = "Sets the target burning for 1 times your hit over 6 sec."
+  set = { dot = 1.0, dot_secs = 6 }
+  [[spell.perk]]
+  key = "hot_streak"
+  name = "Hot Streak"
   rarity = "rare"
-  text = "Spreads the target's burns to 3 enemies within 10 yd."
-  set = { spread = 3 }
+  fork = "streak"
+  text = "Its critical strikes finish its cooldown."
+  trigger = [{ on = "crit", reset = true }]
+  [[spell.perk]]
+  key = "fiery_chain"
+  name = "Chain Blast"
+  rarity = "uncommon"
+  fork = "streak"
+  text = "Leaps to a second enemy."
+  add = { targets = 1 }
+  [[spell.perk]]
+  key = "blast_wave_fb"
+  name = "Blast Wave"
+  rarity = "uncommon"
+  fork = "streak"
+  text = "Its kills send a wave of flame: 1 times your hit to enemies within 8 yd of you, slowed 50%."
+  trigger = [{ on = "kill", damage = 1.0, radius = 8, at_self = true, slow = 0.5, slow_secs = 3, school = "fire", visual = 11113 }]
+  [[spell.perk]]
+  key = "scorching_blast"
+  name = "Fire Vulnerability"
+  rarity = "uncommon"
+  text = "Leaves 2 stacks of Fire Vulnerability."
+  add = { vuln_fire = 2 }
+  [[spell.perk]]
+  key = "fire_finisher"
+  name = "Fiery Finish"
+  text = "Deals 50% more to enemies below 20% health."
+  set = { execute_at = 0.2 }
+  add = { execute = 0.5 }
+  [[spell.perk]]
+  key = "blast_elite"
+  name = "Searing Brand"
+  text = "Deals 40% more to elites and bosses."
+  add = { vs_elite = 0.4 }
+  [[spell.perk]]
+  key = "flame_lance"
+  name = "Flame Lance"
+  rarity = "epic"
+  needs = 5
+  text = "Always a critical strike against Frozen enemies, and every critical strike finishes its cooldown and lights up Fireball."
+  add = { crit_vs_frozen = 1.0 }
+  trigger = [{ on = "crit", reset = true, buff = { key = "flame_lance", secs = 8, next = "fireball", instant = true, icon = 2136 } }]
 
 [[spell]]
 key = "scorch"
@@ -312,37 +710,98 @@ cooldown = 1.5
 damage = 0.7
 range = 30
 vuln_fire = 1
-note = ""
 cast = 1.0
-
+note = "Anyone's fire spells, not just yours: the more Scorch, the hotter every fire on it."
   [[spell.perk]]
   key = "improved_scorch"
   name = "Improved Scorch"
-  text = "Applies 2 stacks of Fire Vulnerability."
+  repeat = 2
+  text = "Applies 2 stacks of Fire Vulnerability. Can be taken twice."
   add = { vuln_fire = 1 }
   [[spell.perk]]
   key = "quick_scorch"
   name = "Quick Scorch"
-  text = "Cooldown 0.7 sec shorter."
-  add = { cooldown = -0.7 }
+  text = "Casts 0.4 sec faster: 0.6 sec."
+  add = { cast = -0.4 }
+  [[spell.perk]]
+  key = "scorch_power"
+  name = "Searing Scorch"
+  text = "Deals 30% more damage."
+  pct = { damage = 0.3 }
   [[spell.perk]]
   key = "scorched_earth"
   name = "Scorched Earth"
   rarity = "uncommon"
+  fork = "scorch"
   text = "Also scorches 2 more enemies near your target."
   add = { targets = 2 }
   [[spell.perk]]
-  key = "incinerating_scorch"
-  name = "Incinerate"
+  key = "living_scorch"
+  name = "Living Scorch"
   rarity = "uncommon"
-  text = "20% more critical strike chance."
-  add = { crit = 0.2 }
+  fork = "scorch"
+  text = "Leaves a burn of 1 times your hit, stacking 3 times."
+  set = { dot = 1.0, dot_secs = 8, dot_stack = 1 }
+  [[spell.perk]]
+  key = "instant_scorch"
+  name = "Scorch on the Run"
+  rarity = "uncommon"
+  fork = "scorch"
+  text = "Instant: no cast time."
+  set = { cast = 0 }
   [[spell.perk]]
   key = "searing_heat"
   name = "Searing Heat"
-  rarity = "rare"
+  rarity = "uncommon"
   text = "Deals 60% more to burning enemies."
   add = { vs_burning = 0.6 }
+  [[spell.perk]]
+  key = "incinerate_scorch"
+  name = "Incinerate"
+  text = "20% more critical strike chance."
+  add = { crit = 0.2 }
+  [[spell.perk]]
+  key = "scorch_spread"
+  name = "Firestarter"
+  rarity = "uncommon"
+  text = "Spreads the target's burns to 2 enemies within 10 yd."
+  set = { spread = 2 }
+  [[spell.perk]]
+  key = "molten_armor_s"
+  name = "Molten Shields"
+  rarity = "uncommon"
+  text = "Each Scorch shields you for 2% of your max health."
+  trigger = [{ on = "cast", shield = 0.02, shout = false }]
+  [[spell.perk]]
+  key = "hot_scorch"
+  name = "Kindled Flames"
+  rarity = "rare"
+  text = "Its critical strikes light up Fire Blast: ready at once, 50% more damage."
+  trigger = [{ on = "crit", icd = 3, buff = { key = "kindled", secs = 8, next = "fire_blast", power = 0.5, icon = 2948 } }]
+  [[spell.perk]]
+  key = "scorch_cdr"
+  name = "Fanning Flames"
+  text = "Each Scorch takes 0.5 sec off your other cooldowns."
+  trigger = [{ on = "cast", cdr = 0.5, shout = false }]
+  [[spell.perk]]
+  key = "scorch_elite"
+  name = "Brand of Fire"
+  text = "Deals 40% more to elites and bosses."
+  add = { vs_elite = 0.4 }
+  [[spell.perk]]
+  key = "scorch_slow"
+  name = "Molten Ground"
+  rarity = "uncommon"
+  text = "Its target is slowed 40% for 4 sec."
+  set = { slow = 0.4, slow_secs = 4 }
+  [[spell.perk]]
+  key = "inferno_scorch"
+  name = "Inferno"
+  rarity = "epic"
+  needs = 5
+  text = "Every Scorch applies 5 stacks and spreads the target's burns to 4 enemies."
+  set = { spread = 4 }
+  add = { vuln_fire = 3 }
 
 [[spell]]
 key = "blizzard"
@@ -360,34 +819,98 @@ tick = 0.22
 range = 30
 slow = 0.4
 slow_secs = 2
+note = "Holds a lane: park it on a bridge or a choke."
   [[spell.perk]]
   key = "improved_blizzard"
   name = "Improved Blizzard"
-  text = "Chills harder: slows by 65%."
+  text = "Chills harder: 65% slower."
   set = { slow = 0.65 }
   [[spell.perk]]
-  key = "blizzard_reach"
+  key = "arctic_reach"
   name = "Arctic Reach"
-  text = "3 yd wider."
+  repeat = 2
+  text = "3 yd wider. Can be taken twice."
   add = { radius = 3 }
   [[spell.perk]]
   key = "deep_winter"
   name = "Deep Winter"
-  rarity = "uncommon"
-  text = "Lasts 4 sec longer."
+  repeat = 2
+  text = "Lasts 4 sec longer. Can be taken twice."
   add = { duration = 4 }
   [[spell.perk]]
   key = "hailstorm"
   name = "Hailstorm"
-  rarity = "uncommon"
-  text = "35% more damage each second."
-  pct = { tick = 0.35 }
+  text = "40% more damage each second."
+  pct = { tick = 0.4 }
+  [[spell.perk]]
+  key = "quick_storm"
+  name = "Gathering Storm"
+  text = "Cooldown 4 sec shorter."
+  add = { cooldown = -4 }
   [[spell.perk]]
   key = "frozen_ground"
   name = "Frozen Ground"
-  rarity = "rare"
-  text = "Each second, 12% chance to Freeze each enemy in it for 2 sec."
+  rarity = "uncommon"
+  fork = "storm"
+  text = "Each second, a 12% chance to Freeze each enemy in it for 2 sec."
   set = { freeze_chance = 0.12, freeze_secs = 2 }
+  [[spell.perk]]
+  key = "winters_grasp"
+  name = "Winter's Grasp"
+  rarity = "uncommon"
+  fork = "storm"
+  text = "Enemies in it gain a stack of Winter's Chill each second."
+  set = { vuln_frost = 1 }
+  [[spell.perk]]
+  key = "bitter_cold"
+  name = "Bitter Cold"
+  rarity = "uncommon"
+  fork = "storm"
+  text = "Enemies in it attack 30% slower too."
+  set = { weaken = 0.3, weaken_secs = 2 }
+  [[spell.perk]]
+  key = "icy_ward"
+  name = "Icy Ward"
+  rarity = "uncommon"
+  text = "Each Blizzard shields you for 12% of your max health."
+  trigger = [{ on = "cast", shield = 0.12 }]
+  [[spell.perk]]
+  key = "instant_blizzard"
+  name = "Swift Storm"
+  rarity = "uncommon"
+  text = "Instant cast."
+  set = { cast = 0 }
+  [[spell.perk]]
+  key = "blizzard_refresh"
+  name = "Cold Front"
+  rarity = "rare"
+  text = "Each Blizzard has a 25% chance to finish Frost Nova's cooldown."
+  trigger = [{ on = "cast", chance = 0.25, resets = "frost_nova" }]
+  [[spell.perk]]
+  key = "ancient_storm"
+  name = "Guardian Storm"
+  rarity = "uncommon"
+  text = "Within 25 yd of the Ancient it deals 40% more."
+  add = { ancient_power = 0.4 }
+  [[spell.perk]]
+  key = "chilled_to_bone"
+  name = "Chilled to the Bone"
+  rarity = "uncommon"
+  text = "Enemies it slows take 10% more damage from everyone."
+  set = { expose = 0.1, expose_secs = 2 }
+  [[spell.perk]]
+  key = "blizzard_crit"
+  name = "Ice Shards"
+  text = "25% more critical strike chance."
+  add = { crit = 0.25 }
+  [[spell.perk]]
+  key = "eternal_winter"
+  name = "Eternal Winter"
+  rarity = "epic"
+  needs = 5
+  text = "Lasts 8 sec longer, and each second a 20% chance to Freeze each enemy in it."
+  set = { freeze_chance = 0.2, freeze_secs = 2 }
+  add = { duration = 8 }
 
 [[spell]]
 key = "flamestrike"
@@ -405,35 +928,96 @@ duration = 6
 tick = 0.15
 range = 30
 cast = 2.0
-
+note = "The clump killer: a pillar of flame, then burning ground. Best on enemies that can't walk out of it."
   [[spell.perk]]
   key = "improved_flamestrike"
   name = "Improved Flamestrike"
   text = "20% more critical strike chance."
   add = { crit = 0.2 }
   [[spell.perk]]
+  key = "pillar_of_flame"
+  name = "Pillar of Flame"
+  repeat = 2
+  text = "The first blast deals 50% more. Can be taken twice."
+  pct = { damage = 0.5 }
+  [[spell.perk]]
   key = "firestorm"
   name = "Firestorm"
   text = "The flames last 4 sec longer."
   add = { duration = 4 }
   [[spell.perk]]
-  key = "pillar_of_flame"
-  name = "Pillar of Flame"
-  rarity = "uncommon"
-  text = "The first blast deals 60% more."
-  pct = { damage = 0.6 }
+  key = "quick_strike_fs"
+  name = "Quick Flames"
+  text = "Casts 0.7 sec faster: 1.3 sec."
+  add = { cast = -0.7 }
   [[spell.perk]]
-  key = "flamestrike_impact"
+  key = "wide_fs"
+  name = "Wide Pillar"
+  text = "3 yd wider."
+  add = { radius = 3 }
+  [[spell.perk]]
+  key = "impact_fs"
   name = "Impact"
   rarity = "uncommon"
+  fork = "pillar"
   text = "The first blast stuns everything in it for 1.5 sec."
   set = { stun_chance = 1, stun_secs = 1.5 }
   [[spell.perk]]
   key = "burning_ground"
   name = "Burning Ground"
-  rarity = "rare"
-  text = "Enemies standing in the flames gain a stack of Fire Vulnerability each second."
+  rarity = "uncommon"
+  fork = "pillar"
+  text = "Enemies in the flames gain a stack of Fire Vulnerability each second."
   set = { vuln_fire = 1 }
+  [[spell.perk]]
+  key = "roaring_flames"
+  name = "Roaring Flames"
+  rarity = "uncommon"
+  fork = "pillar"
+  text = "40% more damage each second."
+  pct = { tick = 0.4 }
+  [[spell.perk]]
+  key = "frozen_kindling"
+  name = "Frozen Kindling"
+  rarity = "uncommon"
+  text = "Deals 60% more to Frozen and Chilled enemies."
+  add = { vs_frozen = 0.6, vs_chilled = 0.3 }
+  [[spell.perk]]
+  key = "fs_instant"
+  name = "Flash Fire"
+  rarity = "uncommon"
+  text = "Instant cast."
+  set = { cast = 0 }
+  [[spell.perk]]
+  key = "fs_burnout"
+  name = "Burnout"
+  rarity = "uncommon"
+  text = "Its kills take 3 sec off your other cooldowns."
+  trigger = [{ on = "kill", cdr = 3, icd = 1 }]
+  [[spell.perk]]
+  key = "fs_echo"
+  name = "Twin Pillars"
+  rarity = "rare"
+  text = "30% chance to call a second pillar at once."
+  add = { echo = 0.3 }
+  [[spell.perk]]
+  key = "fs_elite"
+  name = "Searing Pillar"
+  text = "Deals 30% more to elites and bosses."
+  add = { vs_elite = 0.3 }
+  [[spell.perk]]
+  key = "fs_stun_vs"
+  name = "Flame Ward"
+  rarity = "uncommon"
+  text = "Each Flamestrike shields you for 8% of your max health."
+  trigger = [{ on = "cast", shield = 0.08, shout = false }]
+  [[spell.perk]]
+  key = "rain_of_fire"
+  name = "Rain of Fire"
+  rarity = "epic"
+  needs = 5
+  text = "Calls a second pillar half the time, and the flames burn 4 sec longer."
+  add = { echo = 0.5, duration = 4 }
 
 [[spell]]
 key = "cone_of_cold"
@@ -449,35 +1033,302 @@ radius = 12
 angle = 100
 slow = 0.5
 slow_secs = 6
-note = ""
+note = "The peel: get them off your allies, then walk away."
   [[spell.perk]]
-  key = "improved_cone_of_cold"
+  key = "improved_coc"
   name = "Improved Cone of Cold"
-  text = "35% more damage."
-  add = { power = 0.35 }
+  repeat = 2
+  text = "Deals 35% more damage. Can be taken twice."
+  pct = { damage = 0.35 }
   [[spell.perk]]
   key = "arctic_winds"
   name = "Arctic Winds"
   text = "Reaches 5 yd further."
   add = { radius = 5 }
   [[spell.perk]]
-  key = "cone_frostbite"
+  key = "quick_freeze"
+  name = "Quick Freeze"
+  repeat = 2
+  text = "Cooldown 2 sec shorter: every 7, then every 5 sec. Can be taken twice."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "wide_cone"
+  name = "Wide Cone"
+  text = "A wider cone: 160 degrees."
+  set = { angle = 160 }
+  [[spell.perk]]
+  key = "frostbite_cone"
   name = "Frostbite"
   rarity = "uncommon"
+  fork = "cone"
   text = "35% chance to Freeze each enemy hit for 3 sec."
   set = { freeze_chance = 0.35, freeze_secs = 3 }
   [[spell.perk]]
-  key = "quick_freeze"
-  name = "Quick Freeze"
+  key = "numbing_cone"
+  name = "Numbing Cold"
   rarity = "uncommon"
-  text = "Cooldown 3 sec shorter."
-  add = { cooldown = -3 }
+  fork = "cone"
+  text = "Enemies hit attack 40% slower for 6 sec."
+  set = { weaken = 0.4, weaken_secs = 6 }
+  [[spell.perk]]
+  key = "crippling_cone"
+  name = "Crippling Cold"
+  rarity = "uncommon"
+  fork = "cone"
+  text = "Slows 80%, for 8 sec."
+  set = { slow = 0.8, slow_secs = 8 }
   [[spell.perk]]
   key = "shattering_cone"
   name = "Shattering Cone"
-  rarity = "rare"
+  rarity = "uncommon"
   text = "Deals double damage to Frozen enemies."
   add = { vs_frozen = 1.0 }
+  [[spell.perk]]
+  key = "cone_ward"
+  name = "Icy Retreat"
+  rarity = "uncommon"
+  text = "You run 40% faster for 3 sec: blast and back off."
+  trigger = [{ on = "cast", buff = { key = "icy_retreat", secs = 3, speed = 0.4, icon = 120 }, shout = false }]
+  [[spell.perk]]
+  key = "cone_chill"
+  name = "Winter's Breath"
+  text = "Leaves a stack of Winter's Chill."
+  add = { vuln_frost = 1 }
+  [[spell.perk]]
+  key = "cone_crowd"
+  name = "Blast of Winter"
+  rarity = "uncommon"
+  text = "5% more damage for every enemy caught after the first."
+  add = { per_enemy = 0.05 }
+  [[spell.perk]]
+  key = "cone_reset"
+  name = "Cold Reflexes"
+  rarity = "rare"
+  text = "Hitting 4 or more enemies finishes Frost Nova's cooldown."
+  trigger = [{ on = "cast", enemies = 4, icd = 5, resets = "frost_nova" }]
+  [[spell.perk]]
+  key = "cone_shield"
+  name = "Frost Armor"
+  text = "Each enemy hit shields you for 2% of your max health."
+  set = { ward = 0.02 }
+  [[spell.perk]]
+  key = "cone_crit"
+  name = "Ice Shards"
+  text = "25% more critical strike chance."
+  add = { crit = 0.25 }
+  [[spell.perk]]
+  key = "frozen_wastes"
+  name = "Frozen Wastes"
+  rarity = "epic"
+  needs = 5
+  text = "Freezes everything it hits for 3 sec."
+  set = { freeze_chance = 1, freeze_secs = 3 }
+
+[[spell]]
+key = "blink"
+name = "Blink"
+tree = "arcane"
+rarity = "uncommon"
+kind = "blink"
+school = "arcane"
+icon = 1953
+cooldown = 12
+range = 18
+note = "Your way out."
+  [[spell.perk]]
+  key = "improved_blink"
+  name = "Improved Blink"
+  repeat = 2
+  text = "Cooldown 3 sec shorter: every 9, then every 6 sec. Can be taken twice."
+  add = { cooldown = -3 }
+  [[spell.perk]]
+  key = "long_blink"
+  name = "Far Blink"
+  text = "Blinks 8 yd further."
+  add = { range = 8 }
+  [[spell.perk]]
+  key = "arcane_wake"
+  name = "Arcane Wake"
+  rarity = "uncommon"
+  fork = "wake"
+  text = "Leaves an explosion where you stood: 1 times your hit to enemies within 8 yd."
+  set = { damage = 1.0, radius = 8 }
+  [[spell.perk]]
+  key = "frost_wake"
+  name = "Frost Wake"
+  rarity = "uncommon"
+  fork = "wake"
+  text = "Freezes enemies within 8 yd of where you stood for 3 sec."
+  set = { freeze_chance = 1, freeze_secs = 3, radius = 8 }
+  [[spell.perk]]
+  key = "fire_wake"
+  name = "Fire Wake"
+  rarity = "uncommon"
+  fork = "wake"
+  text = "Leaves flames where you stood: enemies within 8 yd burn for 1.5 times your hit."
+  trigger = [{ on = "cast", burn = 1.5, radius = 8, at_self = true, visual = 2120 }]
+  [[spell.perk]]
+  key = "accelerated"
+  name = "Accelerated"
+  text = "You run 40% faster for 4 sec after."
+  set = { speed_buff = 0.4, speed_secs = 4 }
+  [[spell.perk]]
+  key = "displacement"
+  name = "Displacement"
+  rarity = "rare"
+  text = "Gives you Clearcasting: your next spell is instant and doesn't trigger its cooldown."
+  set = { clearcast = 1 }
+  [[spell.perk]]
+  key = "blink_shield"
+  name = "Prismatic Cloak"
+  rarity = "uncommon"
+  text = "You take 40% less damage for 3 sec after."
+  trigger = [{ on = "cast", buff = { key = "prismatic_cloak", secs = 3, taken = 0.4, icon = 1953 } }]
+  [[spell.perk]]
+  key = "blink_heal"
+  name = "Arcane Restoration"
+  text = "Heals you 8% of your max health."
+  trigger = [{ on = "cast", heal = 0.08 }]
+  [[spell.perk]]
+  key = "blink_cdr"
+  name = "Temporal Shift"
+  rarity = "uncommon"
+  text = "Takes 3 sec off your other cooldowns."
+  trigger = [{ on = "cast", cdr = 3, shout = true }]
+  [[spell.perk]]
+  key = "blink_power"
+  name = "Arcane Momentum"
+  rarity = "uncommon"
+  text = "Your spells deal 20% more damage for 5 sec after."
+  trigger = [{ on = "cast", buff = { key = "arcane_momentum", secs = 5, damage = 0.2, icon = 1953 } }]
+  [[spell.perk]]
+  key = "blink_auto"
+  name = "Instinct"
+  rarity = "rare"
+  text = "A blow that leaves you below 40% health finishes its cooldown (once every 20 sec)."
+  trigger = [{ on = "hurt", self_below = 0.4, reset = true, icd = 20 }]
+  [[spell.perk]]
+  key = "blink_ward"
+  name = "Mirror Shield"
+  text = "Shields you for 10% of your max health."
+  trigger = [{ on = "cast", shield = 0.1 }]
+  [[spell.perk]]
+  key = "blink_frost_armor"
+  name = "Blink Strike"
+  rarity = "uncommon"
+  text = "Lights up Arcane Explosion: ready at once, 50% more damage."
+  trigger = [{ on = "cast", buff = { key = "blink_strike", secs = 5, next = "arcane_explosion", power = 0.5, icon = 1449 } }]
+  [[spell.perk]]
+  key = "shimmer"
+  name = "Shimmer"
+  rarity = "epic"
+  needs = 5
+  text = "Each Blink lights up the next: ready at once."
+  trigger = [{ on = "cast", icd = 8, buff = { key = "shimmer", secs = 6, next = "self", icon = 1953 } }]
+
+[[spell]]
+key = "counterspell"
+name = "Counterspell"
+tree = "arcane"
+rarity = "uncommon"
+kind = "bolt"
+school = "arcane"
+icon = 2139
+cooldown = 12
+damage = 0.4
+range = 30
+interrupt = 30
+note = "The interrupt: if an enemy within 30 yd is casting something you can break, the cast is broken and the caster reels (2 sec). Its key lights up while a cast can be broken. Otherwise it lashes your target."
+  [[spell.perk]]
+  key = "improved_counterspell"
+  name = "Improved Counterspell"
+  repeat = 2
+  text = "Cooldown 2 sec shorter: every 10, then every 8 sec. Can be taken twice."
+  add = { cooldown = -2 }
+  [[spell.perk]]
+  key = "long_counter"
+  name = "Long Reach"
+  text = "Breaks casts up to 40 yd away."
+  add = { interrupt = 10, range = 10 }
+  [[spell.perk]]
+  key = "counter_power"
+  name = "Arcane Lash"
+  text = "Its strike deals 3 times as much."
+  pct = { damage = 2.0 }
+  [[spell.perk]]
+  key = "silencing_counter"
+  name = "Silenced"
+  rarity = "uncommon"
+  fork = "counter"
+  text = "Breaking a cast stuns the caster 4 sec instead of 2."
+  trigger = [{ on = "interrupt", stun = 4, shout = false }]
+  [[spell.perk]]
+  key = "spell_reflection_c"
+  name = "Backlash"
+  rarity = "uncommon"
+  fork = "counter"
+  text = "Breaking a cast throws it back: the caster takes 3 times your hit."
+  trigger = [{ on = "interrupt", damage = 3.0, school = "arcane", visual = 5143 }]
+  [[spell.perk]]
+  key = "arcane_shatter"
+  name = "Arcane Shatter"
+  rarity = "uncommon"
+  fork = "counter"
+  text = "Breaking a cast blasts everything within 8 yd of the caster for 1.5 times your hit."
+  trigger = [{ on = "interrupt", damage = 1.5, radius = 8, school = "arcane", visual = 1449 }]
+  [[spell.perk]]
+  key = "disrupting_counter"
+  name = "Quick Wit"
+  rarity = "rare"
+  text = "Breaking a cast finishes its cooldown: ready for the next caster."
+  trigger = [{ on = "interrupt", reset = true }]
+  [[spell.perk]]
+  key = "counter_clear"
+  name = "Arcane Insight"
+  rarity = "uncommon"
+  text = "Breaking a cast finishes your other cooldowns."
+  trigger = [{ on = "interrupt", resets = "all", shout = true }]
+  [[spell.perk]]
+  key = "counter_ward"
+  name = "Spell Ward"
+  rarity = "uncommon"
+  text = "Breaking a cast shields you for 15% of your max health."
+  trigger = [{ on = "interrupt", shield = 0.15 }]
+  [[spell.perk]]
+  key = "counter_team"
+  name = "Rallying Silence"
+  rarity = "uncommon"
+  text = "Breaking a cast: you and allies within 15 yd deal 15% more damage for 8 sec."
+  trigger = [{ on = "interrupt", buff = { key = "rallying_silence", secs = 8, damage = 0.15, team = true, icon = 2139 } }]
+  [[spell.perk]]
+  key = "counter_expose"
+  name = "Exposed Mind"
+  rarity = "uncommon"
+  text = "Its target takes 20% more damage from everyone for 8 sec."
+  set = { expose = 0.2, expose_secs = 8 }
+  [[spell.perk]]
+  key = "counter_slow"
+  name = "Arcane Bind"
+  text = "Its target is slowed 60% for 5 sec."
+  set = { slow = 0.6, slow_secs = 5 }
+  [[spell.perk]]
+  key = "counter_elite"
+  name = "Spellbreaker's Mark"
+  text = "Deals 60% more to elites and bosses."
+  add = { vs_elite = 0.6 }
+  [[spell.perk]]
+  key = "counter_quick"
+  name = "Mind Lash"
+  rarity = "uncommon"
+  text = "Its strike stuns the target for 2 sec even when nothing is cast."
+  set = { stun_chance = 1, stun_secs = 2 }
+  [[spell.perk]]
+  key = "spellsteal"
+  name = "Spellsteal"
+  rarity = "epic"
+  needs = 5
+  text = "Breaking a cast steals its power: 30% more damage and 20% faster casts for 10 sec, and the cooldown comes back."
+  trigger = [{ on = "interrupt", buff = { key = "spellsteal", secs = 10, damage = 0.3, haste = 0.2, icon = 2479 } }, { on = "interrupt", reset = true, shout = false }]
 
 [[spell]]
 key = "pyroblast"
@@ -494,127 +1345,105 @@ speed = 18
 dot = 1.0
 dot_secs = 12
 cast = 4.0
-
+path = "fire"
+note = "The sniper's shot: the biggest single hit a mage has."
   [[spell.perk]]
   key = "hot_hands"
   name = "Hot Hands"
-  text = "Cooldown 5 sec shorter."
-  add = { cooldown = -5 }
+  repeat = 2
+  text = "Cooldown 3 sec shorter: every 11, then every 8 sec. Can be taken twice."
+  add = { cooldown = -3 }
   [[spell.perk]]
   key = "searing_pyre"
   name = "Searing Pyre"
-  rarity = "uncommon"
   text = "Its burn is twice as hot."
   pct = { dot = 1.0 }
   [[spell.perk]]
-  key = "inferno"
+  key = "pyro_power"
+  name = "Pyromaniac"
+  repeat = 2
+  text = "Deals 25% more damage. Can be taken twice."
+  pct = { damage = 0.25 }
+  [[spell.perk]]
+  key = "quick_pyro"
+  name = "Quick Pyre"
+  text = "Casts 1 sec faster: 3 sec."
+  add = { cast = -1.0 }
+  [[spell.perk]]
+  key = "inferno_pyro"
   name = "Inferno"
   rarity = "uncommon"
-  text = "Explodes: 50% of its damage also hits enemies within 8 yd of the target."
-  add = { splash = 0.5 }
+  fork = "pyro"
+  text = "Explodes: 50% of its damage hits enemies within 8 yd of the target."
   set = { splash_radius = 8 }
-  [[spell.perk]]
-  key = "molten_core"
-  name = "Molten Core"
-  rarity = "rare"
-  text = "25% more critical strike chance, and its crits deal 50% more."
-  add = { crit = 0.25, crit_mult = 0.5 }
+  add = { splash = 0.5 }
   [[spell.perk]]
   key = "pyroclasm"
   name = "Pyroclasm"
-  rarity = "rare"
-  text = "Stuns the target and enemies near it for 3 sec."
+  rarity = "uncommon"
+  fork = "pyro"
+  text = "Stuns the target for 3 sec."
   set = { stun_chance = 1, stun_secs = 3 }
-
-[[spell]]
-key = "blink"
-name = "Blink"
-tree = "arcane"
-rarity = "uncommon"
-kind = "blink"
-school = "arcane"
-icon = 1953
-cooldown = 12
-range = 18
-note = "Use it to get out of trouble."
   [[spell.perk]]
-  key = "improved_blink"
-  name = "Improved Blink"
-  text = "Cooldown 4 sec shorter."
-  add = { cooldown = -4 }
-  [[spell.perk]]
-  key = "arcane_wake"
-  name = "Arcane Wake"
+  key = "molten_core"
+  name = "Molten Core"
   rarity = "uncommon"
-  text = "Leaves an Arcane Explosion where you stood, for 0.8 times your hit to enemies within 8 yd."
-  set = { damage = 0.8, radius = 8 }
+  fork = "pyro"
+  text = "25% more critical strike chance, and its crits deal 50% more."
+  add = { crit = 0.25, crit_mult = 0.5 }
   [[spell.perk]]
-  key = "frost_wake"
-  name = "Frost Wake"
+  key = "pyro_opener"
+  name = "Pyro Opener"
   rarity = "uncommon"
-  text = "Freezes enemies within 8 yd of where you stood for 3 sec."
-  set = { freeze_chance = 1, freeze_secs = 3, radius = 8 }
+  text = "Deals 50% more to enemies above 80% health."
+  add = { vs_full = 0.5 }
   [[spell.perk]]
-  key = "accelerated"
-  name = "Accelerated"
-  text = "You run 40% faster for 4 sec after blinking."
-  set = { speed_buff = 0.4, speed_secs = 4 }
-  [[spell.perk]]
-  key = "displacement"
-  name = "Displacement"
+  key = "hot_streak_pyro"
+  name = "Hot Streak"
   rarity = "rare"
-  text = "Blinks 8 yd further, and Blinking gives you Clearcasting: your next spell is instant and doesn't trigger its cooldown."
-  add = { range = 8 }
-  set = { clearcast = 1 }
-
-# --- spells learned from talents ---------------------------------------------------------------
-
-[[spell]]
-key = "presence_of_mind"
-name = "Presence of Mind"
-tree = "arcane"
-talent = true
-kind = "buff"
-school = "arcane"
-icon = 12043
-effect = "presence_of_mind"
-cooldown = 45
-duration = 30
-note = "Your next spell is instant, doesn't trigger its cooldown and deals 20% more."
-
-[[spell]]
-key = "arcane_power"
-name = "Arcane Power"
-tree = "arcane"
-talent = true
-kind = "buff"
-school = "arcane"
-icon = 12042
-effect = "arcane_power"
-cooldown = 90
-duration = 15
-buff_value = 0.3
-note = "For 15 sec: 30% more damage, and your cooldowns recover 30% faster."
-
-[[spell]]
-key = "blast_wave"
-name = "Blast Wave"
-tree = "fire"
-talent = true
-kind = "nova"
-school = "fire"
-icon = 11113
-cooldown = 20
-damage = 1.1
-radius = 10
-slow = 0.5
-slow_secs = 3
+  text = "Each Pyroblast has a 35% chance to light up the next: ready at once and instant."
+  trigger = [{ on = "cast", chance = 0.35, icd = 4, buff = { key = "hot_streak", secs = 10, next = "self", instant = true, icon = 11366 } }]
+  [[spell.perk]]
+  key = "pyro_kill"
+  name = "Fuel the Fire"
+  rarity = "uncommon"
+  text = "Its kills finish its cooldown."
+  trigger = [{ on = "kill", reset = true }]
+  [[spell.perk]]
+  key = "pyro_vuln"
+  name = "Searing Brand"
+  text = "Leaves 3 stacks of Fire Vulnerability."
+  add = { vuln_fire = 3 }
+  [[spell.perk]]
+  key = "pyro_spread"
+  name = "Wildfire"
+  rarity = "uncommon"
+  text = "Spreads the target's burns to 4 enemies within 10 yd."
+  set = { spread = 4 }
+  [[spell.perk]]
+  key = "pyro_elite"
+  name = "Dragonslayer"
+  text = "Deals 40% more to elites and bosses."
+  add = { vs_elite = 0.4 }
+  [[spell.perk]]
+  key = "pyro_cdr"
+  name = "Fiery Momentum"
+  rarity = "uncommon"
+  text = "Its critical strikes take 4 sec off your other cooldowns."
+  trigger = [{ on = "crit", cdr = 4, shout = true }]
+  [[spell.perk]]
+  key = "pyro_sun"
+  name = "Living Sun"
+  rarity = "epic"
+  needs = 5
+  text = "Its burn is 3 times as hot and spreads to every enemy within 10 yd when the target dies."
+  set = { spread_on_death = 6 }
+  pct = { dot = 2.0 }
 
 [[spell]]
 key = "combustion"
 name = "Combustion"
 tree = "fire"
-talent = true
 kind = "buff"
 school = "fire"
 icon = 11129
@@ -622,25 +1451,104 @@ effect = "combustion"
 cooldown = 60
 duration = 20
 buff_value = 0.1
+path = "fire"
 note = "Each fire spell you cast adds 10% critical strike chance to your fire spells, until 3 of them crit."
-
-[[spell]]
-key = "cold_snap"
-name = "Cold Snap"
-tree = "frost"
-talent = true
-kind = "special"
-school = "frost"
-icon = 12472
-effect = "cold_snap"
-cooldown = 60
-note = "Finishes the cooldowns of all your frost spells."
+  [[spell.perk]]
+  key = "improved_combustion"
+  name = "Improved Combustion"
+  repeat = 2
+  text = "Each fire spell adds 5% more critical strike chance (15%). Can be taken twice."
+  add = { buff_value = 0.05 }
+  [[spell.perk]]
+  key = "quick_combust"
+  name = "Quick Combustion"
+  repeat = 2
+  text = "Cooldown 15 sec shorter: every 45, then every 30 sec. Can be taken twice."
+  add = { cooldown = -15 }
+  [[spell.perk]]
+  key = "combust_power"
+  name = "Firestorm Heart"
+  rarity = "uncommon"
+  text = "You deal 20% more damage for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "firestorm_heart", secs = 10, damage = 0.2, icon = 11129 } }]
+  [[spell.perk]]
+  key = "combust_pyro"
+  name = "Ignition Point"
+  rarity = "rare"
+  fork = "combust"
+  text = "Lights up Pyroblast: ready at once and instant."
+  trigger = [{ on = "cast", buff = { key = "ignition_point", secs = 10, next = "pyroblast", instant = true, icon = 11366 } }]
+  [[spell.perk]]
+  key = "combust_blast"
+  name = "Combustion Wave"
+  rarity = "uncommon"
+  fork = "combust"
+  text = "Sends a wave of flame: 2 times your hit to enemies within 10 yd of you."
+  trigger = [{ on = "cast", damage = 2.0, radius = 10, at_self = true, school = "fire", visual = 11113 }]
+  [[spell.perk]]
+  key = "combust_spread"
+  name = "Conflagration"
+  rarity = "uncommon"
+  fork = "combust"
+  text = "Sets every enemy within 15 yd burning for 2 times your hit."
+  trigger = [{ on = "cast", burn = 2.0, radius = 15, at_self = true, visual = 2120 }]
+  [[spell.perk]]
+  key = "combust_reset"
+  name = "Fire Starter"
+  rarity = "uncommon"
+  text = "Finishes Fire Blast's and Scorch's cooldowns."
+  trigger = [{ on = "cast", resets = "fire_blast, scorch" }]
+  [[spell.perk]]
+  key = "combust_haste"
+  name = "Blazing Speed"
+  text = "Your spells cast 20% faster for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "blazing_speed", secs = 10, haste = 0.2, icon = 11129 } }]
+  [[spell.perk]]
+  key = "combust_vuln"
+  name = "Searing Heat"
+  rarity = "uncommon"
+  text = "Every enemy within 15 yd gains 3 stacks of Fire Vulnerability."
+  trigger = [{ on = "cast", vuln_fire = 3, radius = 15, at_self = true }]
+  [[spell.perk]]
+  key = "combust_shield"
+  name = "Molten Armor"
+  text = "Shields you for 15% of your max health."
+  trigger = [{ on = "cast", shield = 0.15 }]
+  [[spell.perk]]
+  key = "combust_team"
+  name = "Kindle the Pyre"
+  rarity = "uncommon"
+  text = "You and allies within 15 yd deal 10% more damage for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "kindle_pyre", secs = 10, damage = 0.1, team = true, icon = 11129 } }]
+  [[spell.perk]]
+  key = "combust_crit"
+  name = "Critical Mass"
+  text = "15% more critical strike chance for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "crit_mass_c", secs = 10, crit = 0.15, icon = 11129 } }]
+  [[spell.perk]]
+  key = "combust_long"
+  name = "Slow Burn"
+  text = "Lasts 10 sec longer."
+  add = { duration = 10 }
+  [[spell.perk]]
+  key = "combust_wave_reset"
+  name = "Burning Waves"
+  rarity = "uncommon"
+  text = "Every wave has a 25% chance to begin with Combustion ready."
+  trigger = [{ on = "wave", chance = 0.25, reset = true }]
+  [[spell.perk]]
+  key = "phoenix"
+  name = "Phoenix Flames"
+  rarity = "epic"
+  needs = 5
+  text = "Your spells crit 50% more often for 8 sec, and Combustion comes back 20 sec sooner."
+  add = { cooldown = -20 }
+  trigger = [{ on = "cast", buff = { key = "phoenix", secs = 8, crit = 0.5, icon = 11129 } }]
 
 [[spell]]
 key = "ice_barrier"
 name = "Ice Barrier"
 tree = "frost"
-talent = true
 kind = "shield"
 school = "frost"
 icon = 11426
@@ -648,497 +1556,823 @@ target = "self"
 cooldown = 25
 absorb = 0.35
 duration = 30
+path = "frost"
+note = "Stand in it a little longer."
+  [[spell.perk]]
+  key = "thick_ice"
+  name = "Thick Ice"
+  repeat = 2
+  text = "Absorbs 10% more of your max health. Can be taken twice."
+  add = { absorb = 0.1 }
+  [[spell.perk]]
+  key = "quick_barrier"
+  name = "Quick Barrier"
+  repeat = 2
+  text = "Cooldown 5 sec shorter: every 20, then every 15 sec. Can be taken twice."
+  add = { cooldown = -5 }
+  [[spell.perk]]
+  key = "frost_reflect"
+  name = "Reflective Ice"
+  rarity = "uncommon"
+  fork = "barrier"
+  text = "30% of what it absorbs strikes back at the attacker."
+  add = { reflect = 0.3 }
+  [[spell.perk]]
+  key = "shattering_barrier"
+  name = "Shattering Barrier"
+  rarity = "uncommon"
+  fork = "barrier"
+  text = "Explodes when it breaks: 2 times your hit to enemies within 8 yd."
+  add = { burst = 2.0 }
+  [[spell.perk]]
+  key = "barrier_haste"
+  name = "Icy Veins"
+  rarity = "uncommon"
+  fork = "barrier"
+  text = "Your spells cast 25% faster for 8 sec."
+  trigger = [{ on = "cast", buff = { key = "icy_veins_ib", secs = 8, haste = 0.25, icon = 12472 } }]
+  [[spell.perk]]
+  key = "barrier_nova"
+  name = "Frost Armor"
+  rarity = "uncommon"
+  text = "Freezes enemies within 8 yd of you for 3 sec."
+  trigger = [{ on = "cast", freeze = 3, radius = 8, at_self = true, visual = 122 }]
+  [[spell.perk]]
+  key = "barrier_power"
+  name = "Cold Confidence"
+  text = "You deal 15% more damage for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "cold_confidence", secs = 10, damage = 0.15, icon = 11426 } }]
+  [[spell.perk]]
+  key = "barrier_chill"
+  name = "Chilling Armor"
+  text = "Enemies within 10 yd are slowed 50% for 5 sec."
+  trigger = [{ on = "cast", slow = 0.5, slow_secs = 5, radius = 10, at_self = true }]
+  [[spell.perk]]
+  key = "barrier_team"
+  name = "Glacial Embrace"
+  rarity = "uncommon"
+  text = "You and allies within 15 yd take 15% less damage for 8 sec."
+  trigger = [{ on = "cast", buff = { key = "glacial_embrace", secs = 8, taken = 0.15, team = true, icon = 11426 } }]
+  [[spell.perk]]
+  key = "barrier_reset"
+  name = "Glacial Instinct"
+  rarity = "rare"
+  text = "A blow that leaves you below 35% health finishes its cooldown (once every 30 sec)."
+  trigger = [{ on = "hurt", self_below = 0.35, reset = true, icd = 30 }]
+  [[spell.perk]]
+  key = "barrier_cdr"
+  name = "Winter's Patience"
+  text = "Takes 3 sec off your other cooldowns."
+  trigger = [{ on = "cast", cdr = 3 }]
+  [[spell.perk]]
+  key = "barrier_frostbolt"
+  name = "Fingers of Frost"
+  rarity = "rare"
+  text = "Lights up Frostbolt: ready at once, instant, 50% more damage."
+  trigger = [{ on = "cast", buff = { key = "fingers_ib", secs = 8, next = "frostbolt", instant = true, power = 0.5, icon = 116 } }]
+  [[spell.perk]]
+  key = "barrier_long"
+  name = "Lasting Ice"
+  text = "Lasts 15 sec longer."
+  add = { duration = 15 }
+  [[spell.perk]]
+  key = "barrier_wave"
+  name = "Winter's Watch"
+  text = "Every wave begins with Ice Barrier ready."
+  trigger = [{ on = "wave", reset = true }]
+  [[spell.perk]]
+  key = "ice_block"
+  name = "Ice Block"
+  rarity = "epic"
+  needs = 5
+  text = "Absorbs 40% more of your max health and comes back 10 sec sooner."
+  add = { absorb = 0.4, cooldown = -10 }
 
-# --- talents --------------------------------------------------------------------------------------
+[[spell]]
+key = "cold_snap"
+name = "Cold Snap"
+tree = "frost"
+kind = "special"
+school = "frost"
+icon = 12472
+effect = "cold_snap"
+cooldown = 60
+path = "frost"
+note = "Finishes the cooldowns of all your frost spells."
+  [[spell.perk]]
+  key = "quick_snap"
+  name = "Quick Snap"
+  repeat = 2
+  text = "Cooldown 12 sec shorter: every 48, then every 36 sec. Can be taken twice."
+  add = { cooldown = -12 }
+  [[spell.perk]]
+  key = "snap_shield"
+  name = "Snap Barrier"
+  text = "Shields you for 12% of your max health."
+  trigger = [{ on = "cast", shield = 0.12 }]
+  [[spell.perk]]
+  key = "snap_nova"
+  name = "Snap Freeze"
+  rarity = "uncommon"
+  text = "Freezes enemies within 10 yd of you for 3 sec."
+  trigger = [{ on = "cast", freeze = 3, radius = 10, at_self = true, visual = 122 }]
+  [[spell.perk]]
+  key = "snap_haste"
+  name = "Icy Veins"
+  rarity = "uncommon"
+  fork = "snap"
+  text = "Your spells cast 30% faster for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "icy_veins_cs", secs = 10, haste = 0.3, icon = 12472 } }]
+  [[spell.perk]]
+  key = "snap_power"
+  name = "Deep Cold"
+  rarity = "uncommon"
+  fork = "snap"
+  text = "Your frost spells deal 25% more for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "deep_cold", secs = 10, damage = 0.25, icon = 12472 } }]
+  [[spell.perk]]
+  key = "snap_crit"
+  name = "Shatter Point"
+  rarity = "uncommon"
+  fork = "snap"
+  text = "30% more critical strike chance for 10 sec."
+  trigger = [{ on = "cast", buff = { key = "shatter_point", secs = 10, crit = 0.3, icon = 12472 } }]
+  [[spell.perk]]
+  key = "snap_all"
+  name = "Arctic Snap"
+  rarity = "rare"
+  text = "Finishes Blink's and Counterspell's cooldowns too."
+  trigger = [{ on = "cast", resets = "blink, counterspell" }]
+  [[spell.perk]]
+  key = "snap_heal"
+  name = "Frozen Restoration"
+  text = "Heals you 12% of your max health."
+  trigger = [{ on = "cast", heal = 0.12 }]
+  [[spell.perk]]
+  key = "snap_chill"
+  name = "Bitter Snap"
+  text = "Enemies within 12 yd gain 3 stacks of Winter's Chill."
+  trigger = [{ on = "cast", vuln_frost = 3, radius = 12, at_self = true }]
+  [[spell.perk]]
+  key = "snap_team"
+  name = "Winter's Embrace"
+  rarity = "uncommon"
+  text = "Allies within 15 yd take 15% less damage for 8 sec."
+  trigger = [{ on = "cast", buff = { key = "winters_embrace", secs = 8, taken = 0.15, team = true, icon = 12472 } }]
+  [[spell.perk]]
+  key = "snap_wave"
+  name = "Snap Wave"
+  rarity = "uncommon"
+  text = "Every wave has a 30% chance to begin with Cold Snap ready."
+  trigger = [{ on = "wave", chance = 0.3, reset = true }]
+  [[spell.perk]]
+  key = "snap_emergency"
+  name = "Emergency Snap"
+  rarity = "rare"
+  text = "A blow that leaves you below 30% health finishes its cooldown (once a minute)."
+  trigger = [{ on = "hurt", self_below = 0.3, reset = true, icd = 60 }]
+  [[spell.perk]]
+  key = "snap_bolt"
+  name = "Snap Bolt"
+  rarity = "uncommon"
+  text = "Lights up Frostbolt: ready at once, instant."
+  trigger = [{ on = "cast", buff = { key = "snap_bolt", secs = 8, next = "frostbolt", instant = true, icon = 116 } }]
+  [[spell.perk]]
+  key = "snap_cdr"
+  name = "Frozen Time"
+  text = "Takes 5 sec off your other cooldowns too."
+  trigger = [{ on = "cast", cdr = 5 }]
+  [[spell.perk]]
+  key = "deep_freeze_cs"
+  name = "Deep Freeze"
+  rarity = "epic"
+  needs = 5
+  text = "Comes back 20 sec sooner, and freezes every enemy within 15 yd for 4 sec."
+  add = { cooldown = -20 }
+  trigger = [{ on = "cast", freeze = 4, radius = 15, at_self = true, visual = 122 }]
 
-# Arcane
+[[spell]]
+key = "arcane_power"
+name = "Arcane Power"
+tree = "arcane"
+kind = "buff"
+school = "arcane"
+icon = 12042
+effect = "arcane_power"
+cooldown = 90
+duration = 15
+buff_value = 0.3
+path = "arcane"
+note = "For 15 sec: 30% more damage, and your cooldowns recover 30% faster."
+  [[spell.perk]]
+  key = "greater_power"
+  name = "Greater Arcane Power"
+  repeat = 2
+  text = "10% more damage while it lasts. Can be taken twice."
+  add = { buff_value = 0.1 }
+  [[spell.perk]]
+  key = "quick_power"
+  name = "Quick Power"
+  repeat = 2
+  text = "Cooldown 20 sec shorter: every 70, then every 50 sec. Can be taken twice."
+  add = { cooldown = -20 }
+  [[spell.perk]]
+  key = "long_power"
+  name = "Lasting Power"
+  text = "Lasts 5 sec longer."
+  add = { duration = 5 }
+  [[spell.perk]]
+  key = "power_reset"
+  name = "Arcane Surge"
+  rarity = "rare"
+  fork = "ap"
+  text = "Finishes your other cooldowns."
+  trigger = [{ on = "cast", resets = "all" }]
+  [[spell.perk]]
+  key = "power_haste"
+  name = "Arcane Celerity"
+  rarity = "uncommon"
+  fork = "ap"
+  text = "Your spells cast 25% faster while it lasts."
+  trigger = [{ on = "cast", buff = { key = "arcane_celerity", secs = 15, haste = 0.25, icon = 12042 } }]
+  [[spell.perk]]
+  key = "power_crit"
+  name = "Arcane Brilliance"
+  rarity = "uncommon"
+  fork = "ap"
+  text = "20% more critical strike chance while it lasts."
+  trigger = [{ on = "cast", buff = { key = "arcane_brilliance", secs = 15, crit = 0.2, icon = 12042 } }]
+  [[spell.perk]]
+  key = "power_team"
+  name = "Arcane Empowerment"
+  rarity = "uncommon"
+  text = "You and allies within 15 yd deal 12% more damage for 15 sec."
+  trigger = [{ on = "cast", buff = { key = "arcane_empowerment", secs = 15, damage = 0.12, team = true, icon = 12042 } }]
+  [[spell.perk]]
+  key = "power_missiles"
+  name = "Missile Rush"
+  rarity = "uncommon"
+  text = "Lights up Arcane Missiles: ready at once, 50% more damage."
+  trigger = [{ on = "cast", buff = { key = "missile_rush", secs = 10, next = "arcane_missiles", power = 0.5, icon = 5143 } }]
+  [[spell.perk]]
+  key = "power_blast"
+  name = "Arcane Blast"
+  rarity = "uncommon"
+  text = "Bursts out: 2 times your hit to enemies within 10 yd."
+  trigger = [{ on = "cast", damage = 2.0, radius = 10, at_self = true, school = "arcane", visual = 1449 }]
+  [[spell.perk]]
+  key = "power_shield"
+  name = "Mana Shield"
+  text = "Shields you for 15% of your max health."
+  trigger = [{ on = "cast", shield = 0.15 }]
+  [[spell.perk]]
+  key = "power_speed"
+  name = "Arcane Swiftness"
+  text = "You run 30% faster while it lasts."
+  trigger = [{ on = "cast", buff = { key = "arcane_swiftness", secs = 15, speed = 0.3, icon = 12042 } }]
+  [[spell.perk]]
+  key = "power_wave"
+  name = "Arcane Tide"
+  rarity = "uncommon"
+  text = "Every wave has a 25% chance to begin with Arcane Power ready."
+  trigger = [{ on = "wave", chance = 0.25, reset = true }]
+  [[spell.perk]]
+  key = "power_mind"
+  name = "Presence of Power"
+  rarity = "uncommon"
+  text = "Finishes Presence of Mind's cooldown."
+  trigger = [{ on = "cast", resets = "presence_of_mind" }]
+  [[spell.perk]]
+  key = "power_heal"
+  name = "Arcane Fortitude"
+  text = "Heals you 10% of your max health."
+  trigger = [{ on = "cast", heal = 0.1 }]
+  [[spell.perk]]
+  key = "arcane_ascendance"
+  name = "Arcane Ascendance"
+  rarity = "epic"
+  needs = 5
+  text = "40% more damage while it lasts, and it lasts 10 sec longer."
+  add = { buff_value = 0.4, duration = 10 }
+
+[[spell]]
+key = "presence_of_mind"
+name = "Presence of Mind"
+tree = "arcane"
+kind = "buff"
+school = "arcane"
+icon = 12043
+effect = "presence_of_mind"
+cooldown = 45
+duration = 30
+path = "arcane"
+note = "Your next spell is instant, doesn't trigger its cooldown and deals 20% more."
+  [[spell.perk]]
+  key = "quick_mind"
+  name = "Quick Mind"
+  repeat = 2
+  text = "Cooldown 10 sec shorter: every 35, then every 25 sec. Can be taken twice."
+  add = { cooldown = -10 }
+  [[spell.perk]]
+  key = "mind_power"
+  name = "Focused Mind"
+  rarity = "uncommon"
+  text = "You deal 20% more damage for 8 sec."
+  trigger = [{ on = "cast", buff = { key = "focused_mind", secs = 8, damage = 0.2, icon = 12043 } }]
+  [[spell.perk]]
+  key = "mind_pyro"
+  name = "Mind of Fire"
+  rarity = "rare"
+  fork = "mind"
+  text = "Lights up Pyroblast and Fireball: ready at once, instant, 30% more damage."
+  trigger = [{ on = "cast", buff = { key = "mind_of_fire", secs = 10, next = "pyroblast, fireball", instant = true, power = 0.3, icon = 11366 } }]
+  [[spell.perk]]
+  key = "mind_frost"
+  name = "Mind of Frost"
+  rarity = "rare"
+  fork = "mind"
+  text = "Lights up Frostbolt and Cone of Cold: ready at once, instant, 30% more damage."
+  trigger = [{ on = "cast", buff = { key = "mind_of_frost", secs = 10, next = "frostbolt, cone_of_cold", instant = true, power = 0.3, icon = 116 } }]
+  [[spell.perk]]
+  key = "mind_arcane"
+  name = "Mind of Arcana"
+  rarity = "rare"
+  fork = "mind"
+  text = "Lights up Arcane Missiles and Arcane Explosion: ready at once, 30% more damage."
+  trigger = [{ on = "cast", buff = { key = "mind_of_arcana", secs = 10, next = "arcane_missiles, arcane_explosion", power = 0.3, icon = 5143 } }]
+  [[spell.perk]]
+  key = "mind_cdr"
+  name = "Temporal Mind"
+  rarity = "uncommon"
+  text = "Takes 5 sec off your other cooldowns."
+  trigger = [{ on = "cast", cdr = 5, shout = true }]
+  [[spell.perk]]
+  key = "mind_blink"
+  name = "Mind Over Matter"
+  text = "Finishes Blink's cooldown."
+  trigger = [{ on = "cast", resets = "blink" }]
+  [[spell.perk]]
+  key = "mind_shield"
+  name = "Mental Barrier"
+  text = "Shields you for 10% of your max health."
+  trigger = [{ on = "cast", shield = 0.1 }]
+  [[spell.perk]]
+  key = "mind_crit"
+  name = "Clarity"
+  text = "25% more critical strike chance for 8 sec."
+  trigger = [{ on = "cast", buff = { key = "clarity", secs = 8, crit = 0.25, icon = 12043 } }]
+  [[spell.perk]]
+  key = "mind_haste"
+  name = "Quickened Thought"
+  rarity = "uncommon"
+  text = "Your spells cast 30% faster for 8 sec."
+  trigger = [{ on = "cast", buff = { key = "quick_thought", secs = 8, haste = 0.3, icon = 12043 } }]
+  [[spell.perk]]
+  key = "mind_wave"
+  name = "Prepared Mind"
+  rarity = "uncommon"
+  text = "Every wave begins with Presence of Mind ready."
+  trigger = [{ on = "wave", reset = true }]
+  [[spell.perk]]
+  key = "mind_heal"
+  name = "Calm Mind"
+  text = "Heals you 8% of your max health."
+  trigger = [{ on = "cast", heal = 0.08 }]
+  [[spell.perk]]
+  key = "mind_team"
+  name = "Shared Insight"
+  rarity = "uncommon"
+  text = "Allies within 15 yd attack 15% faster for 8 sec."
+  trigger = [{ on = "cast", buff = { key = "shared_insight", secs = 8, haste = 0.15, team = true, icon = 12043 } }]
+  [[spell.perk]]
+  key = "mind_slow"
+  name = "Slow Time"
+  rarity = "uncommon"
+  text = "Enemies within 12 yd are slowed 50% for 5 sec."
+  trigger = [{ on = "cast", slow = 0.5, slow_secs = 5, radius = 12, at_self = true, visual = 246 }]
+  [[spell.perk]]
+  key = "mind_twice"
+  name = "Time Warp"
+  rarity = "epic"
+  needs = 5
+  text = "Lights up every spell you hold: all ready at once, instant, 20% more damage."
+  trigger = [{ on = "cast", buff = { key = "time_warp", secs = 10, stacks = 3, next = "frostbolt, fireball, arcane_missiles, arcane_explosion, frost_nova, fire_blast, scorch, blizzard, flamestrike, cone_of_cold, blink, counterspell, pyroblast, combustion, ice_barrier, cold_snap, arcane_power, presence_of_mind", instant = true, power = 0.2, icon = 12043 } }]
+
+# === class talents: offered whatever spells you hold (a few need one spell) =====================
 
 [[talent]]
 key = "arcane_focus"
 name = "Arcane Focus"
-tree = "arcane"
-tier = 1
-col = 1
-ranks = 3
-icon = 11222
+rarity = "common"
+ranks = 2
+icon = 12840
 text = "Your arcane spells deal {0%} more damage."
-values = [0.05]
+values = [0.06]
   [[talent.effect]]
   spells = "school:arcane"
-  add = { power = 0.05 }
-
-[[talent]]
-key = "arcane_concentration"
-name = "Arcane Concentration"
-tree = "arcane"
-tier = 1
-col = 2
-ranks = 3
-icon = 11213
-text = "Each spell you cast has a {0%} chance to give you Clearcasting: your next spell doesn't trigger its cooldown."
-values = [0.04]
-  [[talent.effect]]
-  proc = "clearcasting"
-  amount = 0.04
-
-[[talent]]
-key = "magic_absorption"
-name = "Magic Absorption"
-tree = "arcane"
-tier = 1
-col = 3
-ranks = 2
-icon = 29441
-text = "{0%} more max health, and you take {1%} less damage."
-values = [0.05, 0.03]
-  [[talent.effect]]
-  stats = { health = 0.05, taken = 0.03 }
-
-[[talent]]
-key = "improved_arcane_explosion"
-name = "Improved Arcane Explosion"
-tree = "arcane"
-tier = 2
-col = 1
-ranks = 2
-icon = 11242
-text = "Arcane Explosion has {0%} more critical strike chance and reaches {1yd} further."
-values = [0.1, 1.5]
-  [[talent.effect]]
-  spells = "arcane_explosion"
-  add = { crit = 0.1, radius = 1.5 }
-
-[[talent]]
-key = "arcane_mind"
-name = "Arcane Mind"
-tree = "arcane"
-tier = 2
-col = 2
-ranks = 3
-icon = 11232
-text = "Your cooldowns and attacks run {0%} faster."
-values = [0.04]
-  [[talent.effect]]
-  stats = { haste = 0.04 }
-
-[[talent]]
-key = "wand_specialization"
-name = "Wand Specialization"
-tree = "arcane"
-tier = 2
-col = 3
-ranks = 2
-icon = 6057
-text = "Your wand deals {0%} more damage."
-values = [0.15]
-  [[talent.effect]]
-  stats = { auto = 0.15 }
-
-[[talent]]
-key = "presence_of_mind"
-name = "Presence of Mind"
-tree = "arcane"
-tier = 3
-col = 1
-icon = 12043
-text = "Learn Presence of Mind: your next spell is instant, doesn't trigger its cooldown and deals 20% more."
-grants = "presence_of_mind"
-
-[[talent]]
-key = "arcane_instability"
-name = "Arcane Instability"
-tree = "arcane"
-tier = 3
-col = 2
-ranks = 3
-icon = 15058
-text = "Your spells deal {0%} more damage and have {1%} more critical strike chance."
-values = [0.03, 0.02]
-  [[talent.effect]]
-  stats = { damage = 0.03, crit = 0.02 }
-
-[[talent]]
-key = "improved_arcane_missiles"
-name = "Improved Arcane Missiles"
-tree = "arcane"
-tier = 4
-col = 1
-ranks = 2
-icon = 11237
-text = "Arcane Missiles fires {0} more missiles."
-values = [1]
-  [[talent.effect]]
-  spells = "arcane_missiles"
-  add = { projectiles = 1 }
-
-[[talent]]
-key = "magic_attunement"
-name = "Magic Attunement"
-tree = "arcane"
-tier = 4
-col = 2
-ranks = 2
-icon = 11247
-text = "Your arcane spells have a {0%} chance to cast again for free."
-values = [0.08]
-  [[talent.effect]]
-  spells = "school:arcane"
-  add = { echo = 0.08 }
-
-[[talent]]
-key = "arcane_power"
-name = "Arcane Power"
-tree = "arcane"
-tier = 5
-col = 2
-icon = 12042
-text = "Learn Arcane Power: for 15 sec, 30% more damage and your cooldowns recover 30% faster."
-grants = "arcane_power"
-
-# Fire
-
-[[talent]]
-key = "improved_fireball"
-name = "Improved Fireball"
-tree = "fire"
-tier = 1
-col = 1
-ranks = 3
-icon = 11069
-text = "Fireball's cast time is {0s} shorter."
-values = [0.25]
-  [[talent.effect]]
-  spells = "fireball"
-  add = { cast = -0.25 }
-
-[[talent]]
-key = "impact"
-name = "Impact"
-tree = "fire"
-tier = 1
-col = 2
-ranks = 3
-icon = 11103
-text = "Your fire spells have a {0%} chance to stun the target for 2 sec."
-values = [0.04]
-  [[talent.effect]]
-  spells = "school:fire"
-  add = { stun_chance = 0.04 }
-
-[[talent]]
-key = "ignite"
-name = "Ignite"
-tree = "fire"
-tier = 2
-col = 1
-ranks = 3
-icon = 11119
-text = "Your fire critical strikes set the target alight for {0%} of the crit's damage over 4 sec. Ignites stack."
-values = [0.14]
-  [[talent.effect]]
-  proc = "ignite"
-  amount = 0.14
-
-[[talent]]
-key = "flame_throwing"
-name = "Flame Throwing"
-tree = "fire"
-tier = 2
-col = 2
-ranks = 2
-icon = 11100
-text = "Your fire spells reach {0yd} further and their areas are {1%} wider."
-values = [3, 0.1]
-  [[talent.effect]]
-  spells = "school:fire"
-  more = { range = 3 }
-  pct = { radius = 0.1 }
-
-[[talent]]
-key = "improved_fire_blast"
-name = "Improved Fire Blast"
-tree = "fire"
-tier = 2
-col = 3
-ranks = 2
-icon = 11078
-text = "Fire Blast's cooldown is {0s} shorter."
-values = [1]
-  [[talent.effect]]
-  spells = "fire_blast"
-  add = { cooldown = -1 }
-
-[[talent]]
-key = "improved_scorch"
-name = "Improved Scorch"
-tree = "fire"
-tier = 3
-col = 1
-ranks = 2
-icon = 11095
-text = "Scorch applies {0} more Fire Vulnerability stack, and Fireball applies one too."
-values = [1]
-  [[talent.effect]]
-  spells = "scorch"
-  add = { vuln_fire = 1 }
-  [[talent.effect]]
-  spells = "fireball"
-  add = { vuln_fire = 0.5 }
-
-[[talent]]
-key = "critical_mass"
-name = "Critical Mass"
-tree = "fire"
-tier = 3
-col = 2
-ranks = 3
-icon = 11115
-text = "Your fire spells have {0%} more critical strike chance."
-values = [0.03]
-  [[talent.effect]]
-  spells = "school:fire"
-  add = { crit = 0.03 }
-
-[[talent]]
-key = "master_of_elements"
-name = "Master of Elements"
-tree = "fire"
-tier = 4
-col = 1
-ranks = 2
-icon = 29074
-text = "Your fire critical strikes take {0s} off the cooldowns of your other fire spells."
-values = [0.5]
-  [[talent.effect]]
-  proc = "master_of_elements"
-  amount = 0.5
-
-[[talent]]
-key = "blast_wave"
-name = "Blast Wave"
-tree = "fire"
-tier = 4
-col = 2
-icon = 11113
-text = "Learn Blast Wave: a wave of flame around you that knocks enemies' legs out (50% slow)."
-grants = "blast_wave"
+  add = { power = 0.06 }
 
 [[talent]]
 key = "fire_power"
 name = "Fire Power"
-tree = "fire"
-tier = 4
-col = 3
-ranks = 3
-icon = 5835
+rarity = "common"
+ranks = 2
+icon = 11124
 text = "Your fire spells deal {0%} more damage."
-values = [0.04]
+values = [0.06]
   [[talent.effect]]
   spells = "school:fire"
-  add = { power = 0.04 }
-
-[[talent]]
-key = "combustion"
-name = "Combustion"
-tree = "fire"
-tier = 5
-col = 2
-icon = 11129
-text = "Learn Combustion: each fire spell you cast adds 10% critical strike chance, until 3 of them crit."
-grants = "combustion"
-
-# Frost
-
-[[talent]]
-key = "improved_frostbolt"
-name = "Improved Frostbolt"
-tree = "frost"
-tier = 1
-col = 1
-ranks = 3
-icon = 11070
-text = "Frostbolt's cast time is {0s} shorter."
-values = [0.2]
-  [[talent.effect]]
-  spells = "frostbolt"
-  add = { cast = -0.2 }
-
-[[talent]]
-key = "ice_shards"
-name = "Ice Shards"
-tree = "frost"
-tier = 1
-col = 2
-ranks = 3
-icon = 11207
-text = "Your frost critical strikes deal {0%} more damage."
-values = [0.15]
-  [[talent.effect]]
-  spells = "school:frost"
-  add = { crit_mult = 0.15 }
-
-[[talent]]
-key = "frostbite"
-name = "Frostbite"
-tree = "frost"
-tier = 2
-col = 1
-ranks = 3
-icon = 11071
-text = "Your frost spells have a {0%} chance to Freeze what they hit for 3 sec."
-values = [0.05]
-  [[talent.effect]]
-  spells = "school:frost"
-  add = { freeze_chance = 0.05 }
-
-[[talent]]
-key = "permafrost"
-name = "Permafrost"
-tree = "frost"
-tier = 2
-col = 2
-ranks = 2
-icon = 11175
-text = "Your Chills last {0s} longer and slow {1%} more."
-values = [1, 0.05]
-  [[talent.effect]]
-  spells = "all"
-  more = { slow_secs = 1, slow = 0.05 }
-
-[[talent]]
-key = "improved_frost_nova"
-name = "Improved Frost Nova"
-tree = "frost"
-tier = 2
-col = 3
-ranks = 2
-icon = 11165
-text = "Frost Nova's cooldown is {0s} shorter."
-values = [2]
-  [[talent.effect]]
-  spells = "frost_nova"
-  add = { cooldown = -2 }
+  add = { power = 0.06 }
 
 [[talent]]
 key = "piercing_ice"
 name = "Piercing Ice"
-tree = "frost"
-tier = 3
-col = 1
-ranks = 3
+rarity = "common"
+ranks = 2
 icon = 11151
 text = "Your frost spells deal {0%} more damage."
-values = [0.04]
+values = [0.06]
   [[talent.effect]]
   spells = "school:frost"
-  add = { power = 0.04 }
+  add = { power = 0.06 }
 
 [[talent]]
-key = "cold_snap"
-name = "Cold Snap"
-tree = "frost"
-tier = 3
-col = 2
-icon = 12472
-text = "Learn Cold Snap: finishes the cooldowns of all your frost spells."
-grants = "cold_snap"
+key = "elemental_precision"
+name = "Elemental Precision"
+rarity = "common"
+ranks = 2
+icon = 29438
+text = "{0%} more critical strike chance."
+values = [0.05]
+  [[talent.effect]]
+  stats = { crit = 0.05 }
+
+[[talent]]
+key = "arcane_mind"
+name = "Arcane Mind"
+rarity = "common"
+ranks = 2
+icon = 11232
+text = "Your spells cast and your cooldowns run {0%} faster."
+values = [0.06]
+  [[talent.effect]]
+  stats = { haste = 0.06 }
+
+[[talent]]
+key = "arcane_meditation"
+name = "Arcane Meditation"
+rarity = "common"
+icon = 18462
+text = "Your cooldowns run 12% faster."
+  [[talent.effect]]
+  stats = { cdr = 0.12 }
+
+[[talent]]
+key = "arcane_concentration"
+name = "Arcane Concentration"
+rarity = "uncommon"
+icon = 11213
+text = "Each spell you cast has an 8% chance to give you Clearcasting: your next spell is instant and doesn't trigger its cooldown."
+  [[talent.effect]]
+  proc = "clearcasting"
+  amount = 0.08
+
+[[talent]]
+key = "magic_attunement"
+name = "Magic Attunement"
+rarity = "common"
+icon = 11247
+text = "Your arcane spells have a 10% chance to go off twice."
+  [[talent.effect]]
+  spells = "school:arcane"
+  add = { echo = 0.1 }
+
+[[talent]]
+key = "ignite"
+name = "Ignite"
+rarity = "uncommon"
+ranks = 2
+icon = 11119
+text = "Your fire critical strikes set the target alight for {0%} of the crit's damage over 4 sec. Ignites stack."
+values = [0.15]
+  [[talent.effect]]
+  proc = "ignite"
+  amount = 0.15
+
+[[talent]]
+key = "critical_mass"
+name = "Critical Mass"
+rarity = "common"
+icon = 11115
+text = "Your fire spells have 8% more critical strike chance."
+  [[talent.effect]]
+  spells = "school:fire"
+  add = { crit = 0.08 }
+
+[[talent]]
+key = "master_of_elements"
+name = "Master of Elements"
+rarity = "uncommon"
+icon = 12350
+text = "Your fire critical strikes take 0.6 sec off your other fire spells' cooldowns."
+  [[talent.effect]]
+  proc = "master_of_elements"
+  amount = 0.6
+
+[[talent]]
+key = "flame_throwing"
+name = "Flame Throwing"
+rarity = "common"
+icon = 11100
+text = "Your fire spells reach 5 yd further and their areas are 15% wider."
+  [[talent.effect]]
+  spells = "school:fire"
+  more = { range = 5 }
+  pct = { radius = 0.15 }
+
+[[talent]]
+key = "ice_shards"
+name = "Ice Shards"
+rarity = "common"
+icon = 11207
+text = "Your frost critical strikes deal 30% more damage."
+  [[talent.effect]]
+  spells = "school:frost"
+  add = { crit_mult = 0.3 }
 
 [[talent]]
 key = "shatter"
 name = "Shatter"
-tree = "frost"
-tier = 4
-col = 1
-ranks = 3
+rarity = "common"
+ranks = 2
 icon = 11170
 text = "Your spells have {0%} more critical strike chance against Frozen enemies."
-values = [0.12]
+values = [0.15]
   [[talent.effect]]
   spells = "all"
-  add = { crit_vs_frozen = 0.12 }
+  add = { crit_vs_frozen = 0.15 }
+
+[[talent]]
+key = "permafrost"
+name = "Permafrost"
+rarity = "common"
+icon = 11175
+text = "Your chills slow 10% more and last 2 sec longer."
+  [[talent.effect]]
+  spells = "all"
+  more = { slow_secs = 2, slow = 0.1 }
 
 [[talent]]
 key = "arctic_reach"
 name = "Arctic Reach"
-tree = "frost"
-tier = 4
-col = 2
-ranks = 2
+rarity = "common"
 icon = 16757
-text = "Your frost spells reach {0yd} further and their areas are {1%} wider."
-values = [3, 0.1]
+text = "Your frost spells reach 5 yd further and their areas are 15% wider."
   [[talent.effect]]
   spells = "school:frost"
-  more = { range = 3 }
-  pct = { radius = 0.1 }
+  more = { range = 5 }
+  pct = { radius = 0.15 }
 
 [[talent]]
 key = "winters_chill"
 name = "Winter's Chill"
-tree = "frost"
-tier = 4
-col = 3
-ranks = 3
+rarity = "common"
 icon = 11180
-text = "Your frost spells have a {0%} chance to leave Winter's Chill: +2% critical strike chance for frost spells against the target per stack, up to 5."
-values = [0.34]
+text = "Your frost spells have a 50% chance to leave Winter's Chill: 2% more frost critical strike chance against the target per stack, up to 5."
   [[talent.effect]]
   spells = "school:frost"
-  add = { vuln_frost = 0.34 }
+  add = { vuln_frost = 0.5 }
 
 [[talent]]
-key = "ice_barrier"
-name = "Ice Barrier"
-tree = "frost"
-tier = 5
-col = 2
-icon = 11426
-text = "Learn Ice Barrier: a shield of ice that absorbs 35% of your max health."
-grants = "ice_barrier"
-
-
-# --- combinations: offered only to a mage holding both spells ----------------------------------------
-
-[[talent]]
-key = "arcane_barrage"
-name = "Arcane Barrage"
-tree = "arcane"
-tier = 3
-col = 4
-icon = 5143
-text = "With Arcane Missiles and Arcane Explosion: Arcane Missiles strikes a second enemy, and Arcane Explosion deals 30% more."
-requires = ["arcane_missiles", "arcane_explosion"]
+key = "magic_absorption"
+name = "Magic Absorption"
+rarity = "common"
+ranks = 2
+icon = 29441
+text = "{0%} more max health, and you take {1%} less damage."
+values = [0.08, 0.05]
   [[talent.effect]]
-  spells = "arcane_missiles"
-  add = { targets = 1 }
-  [[talent.effect]]
-  spells = "arcane_explosion"
-  add = { power = 0.3 }
+  stats = { health = 0.08, taken = 0.05 }
 
 [[talent]]
-key = "mind_of_fire"
-name = "Mind of Fire"
-tree = "arcane"
-tier = 4
-col = 4
+key = "frost_armor"
+name = "Frost Armor"
+rarity = "uncommon"
+icon = 168
+text = "Whatever strikes you is chilled: 40% slower for 4 sec."
+  [[talent.trigger]]
+  on = "hurt"
+  slow = 0.4
+  slow_secs = 4
+  icd = 0.5
+  shout = false
+
+[[talent]]
+key = "molten_armor"
+name = "Molten Armor"
+rarity = "uncommon"
+icon = 543
+text = "Whatever strikes you has a 30% chance to burn for 0.8 times your hit."
+  [[talent.trigger]]
+  on = "hurt"
+  chance = 0.3
+  burn = 0.8
+  icd = 0.5
+  shout = false
+
+[[talent]]
+key = "mana_shield"
+name = "Mana Shield"
+rarity = "uncommon"
+icon = 1463
+text = "A blow that takes 10% of your health or more shields you for 20% of your max health (once every 15 sec)."
+  [[talent.trigger]]
+  on = "hurt"
+  blow_above = 0.1
+  shield = 0.2
+  icd = 15
+
+[[talent]]
+key = "blazing_speed"
+name = "Blazing Speed"
+rarity = "uncommon"
+icon = 2983
+text = "A blow that takes 8% of your health or more makes you run 50% faster for 4 sec."
+  [[talent.trigger]]
+  on = "hurt"
+  blow_above = 0.08
+  icd = 8
+  buff = { key = "blazing_speed", secs = 4, speed = 0.5, icon = 2983 }
+
+[[talent]]
+key = "ice_block_talent"
+name = "Ice Block"
+rarity = "rare"
+icon = 11958
+text = "When a blow leaves you below 25% health you're encased in ice: 80% less damage for 3 sec, and enemies within 8 yd frozen (once a minute)."
+  [[talent.trigger]]
+  on = "hurt"
+  self_below = 0.25
+  icd = 60
+  freeze = 3
+  radius = 8
+  at_self = true
+  visual = 122
+  buff = { key = "ice_block", secs = 3, taken = 0.8, icon = 11958 }
+
+[[talent]]
+key = "evocation"
+name = "Evocation"
+rarity = "rare"
+icon = 12051
+text = "Every wave begins with all your cooldowns ready."
+  [[talent.trigger]]
+  on = "wave"
+  resets = "all"
+
+[[talent]]
+key = "arcane_intellect"
+name = "Arcane Intellect"
+rarity = "common"
+icon = 1459
+text = "You and allies within 30 yd deal 6% more damage."
+  [[talent.effect]]
+  team = { damage = 0.06 }
+
+[[talent]]
+key = "dampen_magic"
+name = "Dampen Magic"
+rarity = "common"
+icon = 604
+text = "You and allies within 30 yd take 5% less damage."
+  [[talent.effect]]
+  team = { taken = 0.05 }
+
+[[talent]]
+key = "amplify_magic"
+name = "Amplify Magic"
+rarity = "common"
+icon = 1008
+text = "You and allies within 30 yd attack and cast 5% faster."
+  [[talent.effect]]
+  team = { haste = 0.05 }
+
+[[talent]]
+key = "arcane_hunger"
+name = "Arcane Hunger"
+rarity = "uncommon"
 icon = 12043
-text = "With Presence of Mind and Pyroblast: Pyroblast deals 30% more and Presence of Mind comes back 15 sec sooner."
-requires = ["presence_of_mind", "pyroblast"]
-  [[talent.effect]]
-  spells = "pyroblast"
-  add = { power = 0.3 }
-  [[talent.effect]]
-  spells = "presence_of_mind"
-  add = { cooldown = -15 }
+text = "Each kill: 4% more damage for 20 sec, stacking 5 times."
+  [[talent.trigger]]
+  on = "kill"
+  buff = { key = "arcane_hunger", secs = 20, stacks = 5, damage = 0.04, icon = 12043 }
+  shout = false
 
 [[talent]]
-key = "frostfire"
+key = "wand_specialization"
+name = "Wand Specialization"
+rarity = "common"
+icon = 6057
+text = "Your wand deals 25% more damage."
+  [[talent.effect]]
+  stats = { auto = 0.25 }
+
+[[talent]]
+key = "warden_ancient_m"
+name = "Warden of the Ancient"
+rarity = "uncommon"
+icon = 12975
+text = "Each kill within 25 yd of the Ancient heals it 0.5% of its health."
+  [[talent.trigger]]
+  on = "kill"
+  near_ancient = 25
+  heal_ancient = 0.005
+  shout = false
+
+[[talent]]
+key = "elemental_mastery"
+name = "Elemental Mastery"
+rarity = "common"
+ranks = 2
+icon = 29079
+text = "Your spells deal {0%} more damage."
+values = [0.04]
+  [[talent.effect]]
+  spells = "all"
+  add = { power = 0.04 }
+
+[[talent]]
+key = "presence_of_power"
+name = "Spell Echo"
+rarity = "rare"
+icon = 11255
+text = "Your spells' critical strikes have a 12% chance to finish their own cooldown."
+  [[talent.trigger]]
+  on = "crit"
+  chance = 0.12
+  reset = true
+  icd = 1
+
+[[talent]]
+key = "clearcast_missiles"
+name = "Arcane Missiles!"
+rarity = "rare"
+icon = 5143
+text = "Your spells' hits have a 6% chance to light up Arcane Missiles: ready at once, 50% more damage."
+requires = ["arcane_missiles"]
+  [[talent.trigger]]
+  on = "hit"
+  chance = 0.06
+  icd = 4
+  buff = { key = "am_proc", secs = 8, next = "arcane_missiles", power = 0.5, icon = 5143 }
+
+[[talent]]
+key = "fingers_of_frost_t"
+name = "Fingers of Frost"
+rarity = "rare"
+icon = 12497
+text = "Your frost hits on Frozen enemies have a 25% chance to light up Frostbolt: ready at once, instant, 50% more damage."
+requires = ["frostbolt"]
+  [[talent.trigger]]
+  on = "hit"
+  spells = "school:frost"
+  target = "frozen"
+  chance = 0.25
+  icd = 3
+  buff = { key = "fof_t", secs = 8, next = "frostbolt", instant = true, power = 0.5, icon = 116 }
+
+[[talent]]
+key = "firestarter_t"
+name = "Firestarter"
+rarity = "rare"
+icon = 2120
+text = "Fire Blast and Scorch kills light up Flamestrike: ready at once and instant."
+requires = ["flamestrike"]
+  [[talent.trigger]]
+  on = "kill"
+  spells = "fire_blast, scorch"
+  icd = 4
+  buff = { key = "firestarter", secs = 8, next = "flamestrike", instant = true, icon = 2120 }
+
+[[talent]]
+key = "improved_counterspell_t"
+name = "Spell Lock"
+rarity = "common"
+icon = 2139
+text = "Counterspell breaks casts up to 10 yd further."
+requires = ["counterspell"]
+  [[talent.effect]]
+  spells = "counterspell"
+  add = { interrupt = 10, range = 10 }
+
+# === combinations: offered only while you hold both spells =====================================
+
+[[talent]]
+key = "frostfire_bolt"
 name = "Frostfire"
-tree = "fire"
-tier = 3
-col = 4
-icon = 133
-text = "With Frostbolt and Fireball: Frostbolt leaves Fire Vulnerability, and Fireball deals 40% more to chilled enemies."
+rarity = "uncommon"
+icon = 116
+text = "Frostbolt leaves Fire Vulnerability, and Fireball deals 40% more to chilled enemies."
 requires = ["frostbolt", "fireball"]
   [[talent.effect]]
   spells = "frostbolt"
@@ -1148,43 +2382,904 @@ requires = ["frostbolt", "fireball"]
   add = { vs_chilled = 0.4 }
 
 [[talent]]
-key = "scorched_earth"
-name = "Scorched Earth"
-tree = "fire"
-tier = 4
-col = 4
-icon = 2120
-text = "With Flamestrike and Blizzard: both cover 3 yd more ground and deal 20% more."
-requires = ["flamestrike", "blizzard"]
-  [[talent.effect]]
-  spells = "flamestrike,blizzard"
-  add = { radius = 3, power = 0.2 }
+key = "shatter_combo"
+name = "Shatter Combo"
+rarity = "rare"
+icon = 2136
+text = "Frost Nova lights up Fire Blast: ready at once, 50% more damage."
+requires = ["frost_nova", "fire_blast"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "frost_nova"
+  buff = { key = "shatter_combo", secs = 6, next = "fire_blast", power = 0.5, icon = 2136 }
 
 [[talent]]
-key = "deep_freeze"
+key = "deep_freeze_combo"
 name = "Deep Freeze"
-tree = "frost"
-tier = 3
-col = 4
+rarity = "uncommon"
 icon = 120
-text = "With Frost Nova and Cone of Cold: Cone of Cold deals 60% more to frozen enemies."
+text = "Cone of Cold deals 60% more to Frozen enemies, and Frost Nova comes back 3 sec sooner."
 requires = ["frost_nova", "cone_of_cold"]
   [[talent.effect]]
   spells = "cone_of_cold"
   add = { vs_frozen = 0.6 }
+  [[talent.effect]]
+  spells = "frost_nova"
+  add = { cooldown = -3 }
+
+[[talent]]
+key = "scorched_earth_combo"
+name = "Scorched Earth"
+rarity = "uncommon"
+icon = 2120
+text = "Flamestrike and Blizzard both cover 3 yd more ground and deal 20% more."
+requires = ["flamestrike", "blizzard"]
+  [[talent.effect]]
+  spells = "flamestrike, blizzard"
+  add = { radius = 3, power = 0.2 }
 
 [[talent]]
 key = "winters_grip"
 name = "Winter's Grip"
-tree = "frost"
-tier = 4
-col = 4
+rarity = "uncommon"
 icon = 10
-text = "With Blizzard and Frostbolt: Blizzard slows 20% more and deals 15% more, and Frostbolt deals 30% more to chilled enemies."
+text = "Blizzard slows 20% more, and Frostbolt deals 30% more to chilled enemies."
 requires = ["blizzard", "frostbolt"]
   [[talent.effect]]
   spells = "blizzard"
-  add = { slow = 0.2, power = 0.15 }
+  add = { slow = 0.2 }
   [[talent.effect]]
   spells = "frostbolt"
   add = { vs_chilled = 0.3 }
+
+[[talent]]
+key = "arcane_barrage"
+name = "Arcane Barrage"
+rarity = "uncommon"
+icon = 1449
+text = "Arcane Missiles strikes a second enemy, and Arcane Explosion deals 30% more."
+requires = ["arcane_missiles", "arcane_explosion"]
+  [[talent.effect]]
+  spells = "arcane_missiles"
+  add = { targets = 1 }
+  [[talent.effect]]
+  spells = "arcane_explosion"
+  add = { power = 0.3 }
+
+[[talent]]
+key = "frozen_escape"
+name = "Frozen Escape"
+rarity = "rare"
+icon = 122
+text = "Blink lands with a free Frost Nova."
+requires = ["blink", "frost_nova"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "blink"
+  cast = "frost_nova"
+  icd = 1
+
+[[talent]]
+key = "arcane_exit"
+name = "Arcane Exit"
+rarity = "rare"
+icon = 1953
+text = "Blink lands with a free Arcane Explosion."
+requires = ["blink", "arcane_explosion"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "blink"
+  cast = "arcane_explosion"
+  icd = 1
+
+[[talent]]
+key = "ignite_the_wound"
+name = "Searing Touch"
+rarity = "rare"
+icon = 2948
+text = "Scorch's critical strikes light up Fireball: ready at once, instant."
+requires = ["scorch", "fireball"]
+  [[talent.trigger]]
+  on = "crit"
+  spells = "scorch"
+  icd = 3
+  buff = { key = "searing_touch", secs = 8, next = "fireball", instant = true, icon = 133 }
+
+[[talent]]
+key = "pyre"
+name = "Pyre"
+rarity = "uncommon"
+icon = 2120
+text = "Flamestrike's flames leave Fire Vulnerability, and Scorch deals 40% more to burning enemies."
+requires = ["scorch", "flamestrike"]
+  [[talent.effect]]
+  spells = "flamestrike"
+  add = { vuln_fire = 1 }
+  [[talent.effect]]
+  spells = "scorch"
+  add = { vs_burning = 0.4 }
+
+[[talent]]
+key = "firestarter_combo"
+name = "Kindling"
+rarity = "rare"
+icon = 2136
+text = "Fire Blast spreads the target's burns to 2 enemies, and Scorch's critical strikes finish Fire Blast's cooldown."
+requires = ["fire_blast", "scorch"]
+  [[talent.effect]]
+  spells = "fire_blast"
+  add = { spread = 2 }
+  [[talent.trigger]]
+  on = "crit"
+  spells = "scorch"
+  resets = "fire_blast"
+
+[[talent]]
+key = "arcane_lockdown"
+name = "Arcane Lockdown"
+rarity = "rare"
+icon = 2139
+text = "Breaking a cast lights up Arcane Missiles: ready at once, 50% more damage."
+requires = ["counterspell", "arcane_missiles"]
+  [[talent.trigger]]
+  on = "interrupt"
+  spells = "counterspell"
+  buff = { key = "arcane_lockdown", secs = 8, next = "arcane_missiles", power = 0.5, icon = 5143 }
+
+[[talent]]
+key = "frozen_silence"
+name = "Frozen Silence"
+rarity = "uncommon"
+icon = 2139
+text = "Counterspell Freezes its target for 3 sec."
+requires = ["counterspell", "frost_nova"]
+  [[talent.effect]]
+  spells = "counterspell"
+  set = { freeze_chance = 1, freeze_secs = 3 }
+
+[[talent]]
+key = "spell_lash"
+name = "Spell Lash"
+rarity = "rare"
+icon = 2136
+text = "Breaking a cast finishes Fire Blast's cooldown, and Fire Blast deals 50% more to stunned enemies."
+requires = ["counterspell", "fire_blast"]
+  [[talent.effect]]
+  spells = "fire_blast"
+  add = { vs_stunned = 0.5 }
+  [[talent.trigger]]
+  on = "interrupt"
+  spells = "counterspell"
+  resets = "fire_blast"
+
+[[talent]]
+key = "winters_wall"
+name = "Winter's Wall"
+rarity = "uncommon"
+icon = 120
+text = "Cone of Cold leaves Winter's Chill, and Blizzard deals 40% more."
+requires = ["cone_of_cold", "blizzard"]
+  [[talent.effect]]
+  spells = "cone_of_cold"
+  add = { vuln_frost = 1 }
+  [[talent.effect]]
+  spells = "blizzard"
+  add = { power = 0.4 }
+
+[[talent]]
+key = "pyromaniac"
+name = "Pyromaniac"
+rarity = "rare"
+icon = 11366
+text = "Fireball's critical strikes light up Pyroblast: ready at once, instant."
+requires = ["fireball", "pyroblast"]
+  [[talent.trigger]]
+  on = "crit"
+  spells = "fireball"
+  icd = 4
+  buff = { key = "pyromaniac", secs = 10, next = "pyroblast", instant = true, icon = 11366 }
+
+[[talent]]
+key = "searing_pyre_combo"
+name = "Searing Pyre"
+rarity = "rare"
+icon = 2948
+text = "Each Scorch has a 15% chance to light up Pyroblast (instant), and Pyroblast leaves 2 Fire Vulnerability stacks."
+requires = ["scorch", "pyroblast"]
+  [[talent.effect]]
+  spells = "pyroblast"
+  add = { vuln_fire = 2 }
+  [[talent.trigger]]
+  on = "cast"
+  spells = "scorch"
+  chance = 0.15
+  buff = { key = "searing_pyre", secs = 10, next = "pyroblast", instant = true, icon = 11366 }
+
+[[talent]]
+key = "flash_point"
+name = "Flash Point"
+rarity = "rare"
+icon = 11129
+text = "Combustion finishes Fire Blast's cooldown, and Fire Blast's critical strikes take 3 sec off Combustion's."
+requires = ["combustion", "fire_blast"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "combustion"
+  resets = "fire_blast"
+  [[talent.trigger]]
+  on = "crit"
+  spells = "fire_blast"
+  chance = 0.25
+  resets = "combustion"
+
+[[talent]]
+key = "frost_barrier"
+name = "Frost Barrier"
+rarity = "rare"
+icon = 11426
+text = "Ice Barrier lets loose a free Frost Nova, and Frost Nova shields you for 10% of your max health."
+requires = ["ice_barrier", "frost_nova"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "ice_barrier"
+  cast = "frost_nova"
+  [[talent.trigger]]
+  on = "cast"
+  spells = "frost_nova"
+  shield = 0.1
+
+[[talent]]
+key = "winters_resolve"
+name = "Winter's Resolve"
+rarity = "uncommon"
+icon = 12472
+text = "Cold Snap heals you 15%, and Ice Barrier absorbs 20% more."
+requires = ["cold_snap", "ice_barrier"]
+  [[talent.effect]]
+  spells = "ice_barrier"
+  add = { absorb = 0.2 }
+  [[talent.trigger]]
+  on = "cast"
+  spells = "cold_snap"
+  heal = 0.15
+
+[[talent]]
+key = "endless_winter"
+name = "Endless Winter"
+rarity = "rare"
+icon = 10
+text = "Cold Snap lets loose a free Blizzard."
+requires = ["cold_snap", "blizzard"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "cold_snap"
+  cast = "blizzard"
+
+[[talent]]
+key = "arcane_power_missiles"
+name = "Arcane Torrent"
+rarity = "rare"
+icon = 12042
+text = "Arcane Power lights up Arcane Missiles (50% more damage), and Arcane Missiles deals 25% more to elites and bosses."
+requires = ["arcane_power", "arcane_missiles"]
+  [[talent.effect]]
+  spells = "arcane_missiles"
+  add = { vs_elite = 0.25 }
+  [[talent.trigger]]
+  on = "cast"
+  spells = "arcane_power"
+  buff = { key = "arcane_torrent_c", secs = 10, next = "arcane_missiles", power = 0.5, icon = 5143 }
+
+[[talent]]
+key = "mind_of_fire_combo"
+name = "Mind of Fire"
+rarity = "uncommon"
+icon = 12043
+text = "Pyroblast deals 30% more, and Presence of Mind comes back 10 sec sooner."
+requires = ["presence_of_mind", "pyroblast"]
+  [[talent.effect]]
+  spells = "pyroblast"
+  add = { power = 0.3 }
+  [[talent.effect]]
+  spells = "presence_of_mind"
+  add = { cooldown = -10 }
+
+[[talent]]
+key = "quick_thinking"
+name = "Quick Thinking"
+rarity = "rare"
+icon = 2139
+text = "Presence of Mind finishes Counterspell's cooldown, and Counterspell breaks casts 10 yd further."
+requires = ["presence_of_mind", "counterspell"]
+  [[talent.effect]]
+  spells = "counterspell"
+  add = { interrupt = 10, range = 10 }
+  [[talent.trigger]]
+  on = "cast"
+  spells = "presence_of_mind"
+  resets = "counterspell"
+
+[[talent]]
+key = "arcane_speed"
+name = "Arcane Speed"
+rarity = "rare"
+icon = 1953
+text = "Arcane Power finishes Blink's cooldown, and Blink comes back 3 sec sooner."
+requires = ["arcane_power", "blink"]
+  [[talent.effect]]
+  spells = "blink"
+  add = { cooldown = -3 }
+  [[talent.trigger]]
+  on = "cast"
+  spells = "arcane_power"
+  resets = "blink"
+
+[[talent]]
+key = "ice_spray"
+name = "Ice Spray"
+rarity = "uncommon"
+icon = 120
+text = "Cone of Cold and Frostbolt both deal 30% more to chilled enemies."
+requires = ["frostbolt", "cone_of_cold"]
+  [[talent.effect]]
+  spells = "frostbolt, cone_of_cold"
+  add = { vs_chilled = 0.3 }
+
+[[talent]]
+key = "arcane_frost"
+name = "Arcane Frost"
+rarity = "rare"
+icon = 1449
+text = "Frost Nova lights up Arcane Explosion (50% more damage), and Arcane Explosion deals 60% more to Frozen enemies."
+requires = ["frost_nova", "arcane_explosion"]
+  [[talent.effect]]
+  spells = "arcane_explosion"
+  add = { vs_frozen = 0.6 }
+  [[talent.trigger]]
+  on = "cast"
+  spells = "frost_nova"
+  buff = { key = "arcane_frost", secs = 6, next = "arcane_explosion", power = 0.5, icon = 1449 }
+
+[[talent]]
+key = "frozen_pyre"
+name = "Frozen Pyre"
+rarity = "rare"
+icon = 2120
+text = "Frost Nova lights up Flamestrike (ready at once, instant), and Flamestrike deals 50% more to Frozen enemies."
+requires = ["frost_nova", "flamestrike"]
+  [[talent.effect]]
+  spells = "flamestrike"
+  add = { vs_frozen = 0.5 }
+  [[talent.trigger]]
+  on = "cast"
+  spells = "frost_nova"
+  buff = { key = "frozen_pyre", secs = 6, next = "flamestrike", instant = true, icon = 2120 }
+
+[[talent]]
+key = "blazing_retreat"
+name = "Blazing Retreat"
+rarity = "rare"
+icon = 133
+text = "Blink lights up Fireball: ready at once, instant."
+requires = ["blink", "fireball"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "blink"
+  buff = { key = "blazing_retreat", secs = 6, next = "fireball", instant = true, icon = 133 }
+
+[[talent]]
+key = "frozen_core_combo"
+name = "Frozen Fire"
+rarity = "uncommon"
+icon = 133
+text = "Fireball and Pyroblast deal 50% more to Frozen enemies, and Frostbolt's freezes last 1 sec longer."
+requires = ["frostbolt", "pyroblast"]
+  [[talent.effect]]
+  spells = "fireball, pyroblast"
+  add = { vs_frozen = 0.5 }
+  [[talent.effect]]
+  spells = "frostbolt"
+  add = { freeze_secs = 1 }
+
+[[talent]]
+key = "combustion_wave"
+name = "Combustion Wave"
+rarity = "rare"
+icon = 2120
+text = "Combustion lets loose a free Flamestrike."
+requires = ["combustion", "flamestrike"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "combustion"
+  cast = "flamestrike"
+
+[[talent]]
+key = "arcane_missiles_snap"
+name = "Cold Calculation"
+rarity = "rare"
+icon = 12472
+text = "Cold Snap finishes Arcane Missiles' and Counterspell's cooldowns."
+requires = ["cold_snap", "counterspell"]
+  [[talent.trigger]]
+  on = "cast"
+  spells = "cold_snap"
+  resets = "counterspell, arcane_missiles"
+
+# === specializations: one a run, at random. Each opens its spells to the spell cards ===========
+
+[[talent]]
+key = "path_of_fire"
+name = "Specialization: Fire"
+tree = "fire"
+path = "fire"
+path_name = "Fire"
+rarity = "legendary"
+icon = 11129
+text = "Specialize in Fire: your fire spells crit 10% more often, and their crits set the target alight (Ignite: 30% of the crit over 4 sec). Opens Pyroblast and Combustion to your spell cards, and the Fire path cards. One specialization a run."
+  [[talent.effect]]
+  spells = "school:fire"
+  add = { crit = 0.1 }
+  [[talent.effect]]
+  proc = "ignite"
+  amount = 0.3
+
+[[talent]]
+key = "path_of_frost"
+name = "Specialization: Frost"
+tree = "frost"
+path = "frost"
+path_name = "Frost"
+rarity = "legendary"
+icon = 11426
+text = "Specialize in Frost: your spells crit 30% more often against Frozen enemies, your frost spells deal 20% more to chilled ones, and you take 10% less damage. Opens Ice Barrier and Cold Snap to your spell cards, and the Frost path cards. One specialization a run."
+  [[talent.effect]]
+  spells = "all"
+  add = { crit_vs_frozen = 0.3 }
+  [[talent.effect]]
+  spells = "school:frost"
+  add = { vs_chilled = 0.2 }
+  [[talent.effect]]
+  stats = { taken = 0.1 }
+
+[[talent]]
+key = "path_of_arcane"
+name = "Specialization: Arcane"
+tree = "arcane"
+path = "arcane"
+path_name = "Arcane"
+rarity = "legendary"
+icon = 12042
+text = "Specialize in Arcane: your cooldowns run 15% faster, each spell has a 10% chance to give you Clearcasting (the next is instant and doesn't trigger its cooldown), and your arcane spells deal 10% more. Opens Arcane Power and Presence of Mind to your spell cards, and the Arcane path cards. One specialization a run."
+  [[talent.effect]]
+  stats = { cdr = 0.15 }
+  [[talent.effect]]
+  proc = "clearcasting"
+  amount = 0.1
+  [[talent.effect]]
+  spells = "school:arcane"
+  add = { power = 0.1 }
+
+# === path cards: offered only on that specialization; the Epic once 4 of them are taken =========
+
+[[talent]]
+key = "fi_fire_mastery"
+name = "Fire Mastery"
+path_only = "fire"
+rarity = "common"
+ranks = 2
+icon = 11124
+text = "Your fire spells deal {0%} more damage."
+values = [0.06]
+  [[talent.effect]]
+  spells = "school:fire"
+  add = { power = 0.06 }
+
+[[talent]]
+key = "fi_incineration"
+name = "Incineration"
+path_only = "fire"
+rarity = "common"
+icon = 11115
+text = "Your fire spells have 8% more critical strike chance."
+  [[talent.effect]]
+  spells = "school:fire"
+  add = { crit = 0.08 }
+
+[[talent]]
+key = "fi_burning_ignite"
+name = "Searing Ignite"
+path_only = "fire"
+rarity = "common"
+icon = 11119
+text = "Your Ignites burn 25% more of the crit."
+  [[talent.effect]]
+  proc = "ignite"
+  amount = 0.25
+
+[[talent]]
+key = "fi_burning_soul"
+name = "Burning Soul"
+path_only = "fire"
+rarity = "uncommon"
+fork = "fi_style"
+icon = 11083
+text = "Steady: 10% more max health and 10% less damage taken."
+  [[talent.effect]]
+  stats = { health = 0.1, taken = 0.1 }
+
+[[talent]]
+key = "fi_pyromania"
+name = "Pyromania"
+path_only = "fire"
+rarity = "uncommon"
+fork = "fi_style"
+icon = 11366
+text = "Reckless: your fire critical strikes deal 40% more."
+  [[talent.effect]]
+  spells = "school:fire"
+  add = { crit_mult = 0.4 }
+
+[[talent]]
+key = "fi_master_elements"
+name = "Master of Flame"
+path_only = "fire"
+rarity = "uncommon"
+icon = 12350
+text = "Your fire critical strikes take 1 sec off your other fire spells' cooldowns."
+  [[talent.effect]]
+  proc = "master_of_elements"
+  amount = 1.0
+
+[[talent]]
+key = "fi_blast_wave"
+name = "Blast Wave"
+path_only = "fire"
+rarity = "uncommon"
+icon = 11113
+text = "A blow that takes 10% of your health or more sends a wave of flame: 1.5 times your hit to enemies within 8 yd, slowed 50% (once every 8 sec)."
+  [[talent.trigger]]
+  on = "hurt"
+  blow_above = 0.1
+  icd = 8
+  damage = 1.5
+  radius = 8
+  at_self = true
+  slow = 0.5
+  slow_secs = 3
+  school = "fire"
+  visual = 11113
+
+[[talent]]
+key = "fi_molten_shields"
+name = "Molten Shields"
+path_only = "fire"
+rarity = "uncommon"
+icon = 543
+text = "Whatever strikes you has a 40% chance to burn for 1 times your hit."
+  [[talent.trigger]]
+  on = "hurt"
+  chance = 0.4
+  burn = 1.0
+  icd = 0.5
+  shout = false
+
+[[talent]]
+key = "fi_hot_streak"
+name = "Hot Streak"
+path_only = "fire"
+rarity = "rare"
+icon = 18459
+text = "Your fire critical strikes have a 10% chance to light up Pyroblast: ready at once and instant."
+  [[talent.trigger]]
+  on = "crit"
+  spells = "school:fire"
+  chance = 0.1
+  icd = 3
+  buff = { key = "fi_hot_streak", secs = 10, next = "pyroblast", instant = true, icon = 11366 }
+
+[[talent]]
+key = "fi_living_bomb"
+name = "Living Bomb"
+path_only = "fire"
+rarity = "uncommon"
+icon = 11103
+text = "Your fire spells' kills set enemies within 8 yd burning for 0.8 times your hit."
+  [[talent.trigger]]
+  on = "kill"
+  spells = "school:fire"
+  burn = 0.8
+  radius = 8
+  icd = 0.5
+  visual = 2120
+  shout = false
+
+[[talent]]
+key = "fi_firelord"
+name = "Firelord"
+path_only = "fire"
+rarity = "epic"
+needs = 4
+icon = 11129
+text = "Your fire spells deal 15% more damage and crit 10% more often."
+  [[talent.effect]]
+  spells = "school:fire"
+  add = { power = 0.15, crit = 0.1 }
+
+[[talent]]
+key = "fr_frost_mastery"
+name = "Frost Mastery"
+path_only = "frost"
+rarity = "common"
+ranks = 2
+icon = 11151
+text = "Your frost spells deal {0%} more damage."
+values = [0.06]
+  [[talent.effect]]
+  spells = "school:frost"
+  add = { power = 0.06 }
+
+[[talent]]
+key = "fr_shatter_mastery"
+name = "Shatter Mastery"
+path_only = "frost"
+rarity = "common"
+icon = 11170
+text = "Your spells have 25% more critical strike chance against Frozen enemies."
+  [[talent.effect]]
+  spells = "all"
+  add = { crit_vs_frozen = 0.25 }
+
+[[talent]]
+key = "fr_icy_veins"
+name = "Icy Veins"
+path_only = "frost"
+rarity = "common"
+icon = 12472
+text = "Your spells cast and your cooldowns run 10% faster."
+  [[talent.effect]]
+  stats = { haste = 0.1 }
+
+[[talent]]
+key = "fr_ice_armor"
+name = "Ice Armor"
+path_only = "frost"
+rarity = "uncommon"
+fork = "fr_style"
+icon = 7302
+text = "Hold: you take 15% less damage, and whatever strikes you is slowed 50%."
+  [[talent.effect]]
+  stats = { taken = 0.15 }
+  [[talent.trigger]]
+  on = "hurt"
+  slow = 0.5
+  slow_secs = 4
+  icd = 0.5
+  shout = false
+
+[[talent]]
+key = "fr_deep_winter"
+name = "Deep Winter"
+path_only = "frost"
+rarity = "uncommon"
+fork = "fr_style"
+icon = 11180
+text = "Strike: your frost spells leave a stack of Winter's Chill every time."
+  [[talent.effect]]
+  spells = "school:frost"
+  add = { vuln_frost = 1 }
+
+[[talent]]
+key = "fr_permafrost"
+name = "Permafrost Mastery"
+path_only = "frost"
+rarity = "common"
+icon = 11175
+text = "Your chills slow 15% more and last 3 sec longer."
+  [[talent.effect]]
+  spells = "all"
+  more = { slow_secs = 3, slow = 0.15 }
+
+[[talent]]
+key = "fr_frozen_core"
+name = "Frozen Core"
+path_only = "frost"
+rarity = "uncommon"
+icon = 11189
+text = "A blow that takes 10% of your health or more freezes enemies within 8 yd for 3 sec (once every 12 sec)."
+  [[talent.trigger]]
+  on = "hurt"
+  blow_above = 0.1
+  icd = 12
+  freeze = 3
+  radius = 8
+  at_self = true
+  visual = 122
+
+[[talent]]
+key = "fr_fingers"
+name = "Fingers of Frost"
+path_only = "frost"
+rarity = "rare"
+icon = 12497
+text = "Your frost hits on Frozen enemies have a 15% chance to light up Frostbolt: ready at once, instant, 50% more damage."
+  [[talent.trigger]]
+  on = "hit"
+  spells = "school:frost"
+  target = "frozen"
+  chance = 0.15
+  icd = 3
+  buff = { key = "fr_fof", secs = 8, next = "frostbolt", instant = true, power = 0.5, icon = 116 }
+
+[[talent]]
+key = "fr_arctic_mastery"
+name = "Arctic Mastery"
+path_only = "frost"
+rarity = "common"
+icon = 16757
+text = "Your frost spells reach 5 yd further and their areas are 20% wider."
+  [[talent.effect]]
+  spells = "school:frost"
+  more = { range = 5 }
+  pct = { radius = 0.2 }
+
+[[talent]]
+key = "fr_frostbite"
+name = "Frostbite"
+path_only = "frost"
+rarity = "uncommon"
+icon = 12494
+text = "Your frost hits have a 10% chance to Freeze the target for 3 sec."
+  [[talent.trigger]]
+  on = "hit"
+  spells = "school:frost"
+  chance = 0.1
+  freeze = 3
+  icd = 1
+  shout = false
+
+[[talent]]
+key = "fr_winters_heart"
+name = "Winter's Heart"
+path_only = "frost"
+rarity = "epic"
+needs = 4
+icon = 11958
+text = "Your frost spells deal 15% more, and every frost hit has a 10% chance to Freeze."
+  [[talent.effect]]
+  spells = "school:frost"
+  add = { power = 0.15 }
+  [[talent.trigger]]
+  on = "hit"
+  spells = "school:frost"
+  chance = 0.1
+  freeze = 3
+  icd = 0.5
+  shout = false
+
+[[talent]]
+key = "ar_arcane_mastery"
+name = "Arcane Mastery"
+path_only = "arcane"
+rarity = "common"
+ranks = 2
+icon = 12840
+text = "Your arcane spells deal {0%} more damage."
+values = [0.06]
+  [[talent.effect]]
+  spells = "school:arcane"
+  add = { power = 0.06 }
+
+[[talent]]
+key = "ar_concentration"
+name = "Deep Concentration"
+path_only = "arcane"
+rarity = "uncommon"
+icon = 11213
+text = "8% more chance of Clearcasting."
+  [[talent.effect]]
+  proc = "clearcasting"
+  amount = 0.08
+
+[[talent]]
+key = "ar_mind"
+name = "Arcane Celerity"
+path_only = "arcane"
+rarity = "common"
+icon = 11232
+text = "Your spells cast and your cooldowns run 8% faster."
+  [[talent.effect]]
+  stats = { haste = 0.08 }
+
+[[talent]]
+key = "ar_instability"
+name = "Arcane Instability"
+path_only = "arcane"
+rarity = "uncommon"
+fork = "ar_style"
+icon = 15060
+text = "Reckless: you deal 10% more damage and crit 5% more often."
+  [[talent.effect]]
+  stats = { damage = 0.1, crit = 0.05 }
+
+[[talent]]
+key = "ar_fortitude"
+name = "Arcane Fortitude"
+path_only = "arcane"
+rarity = "uncommon"
+fork = "ar_style"
+icon = 2857
+text = "Steady: 15% more max health and 10% less damage taken."
+  [[talent.effect]]
+  stats = { health = 0.15, taken = 0.1 }
+
+[[talent]]
+key = "ar_attunement"
+name = "Arcane Echoes"
+path_only = "arcane"
+rarity = "uncommon"
+icon = 11247
+text = "Your arcane spells have a 12% chance to go off twice."
+  [[talent.effect]]
+  spells = "school:arcane"
+  add = { echo = 0.12 }
+
+[[talent]]
+key = "ar_meditation"
+name = "Arcane Flow"
+path_only = "arcane"
+rarity = "common"
+icon = 18462
+text = "Your cooldowns run 10% faster."
+  [[talent.effect]]
+  stats = { cdr = 0.1 }
+
+[[talent]]
+key = "ar_surge"
+name = "Arcane Surge"
+path_only = "arcane"
+rarity = "uncommon"
+icon = 12042
+text = "Your critical strikes take 1 sec off your other cooldowns."
+  [[talent.trigger]]
+  on = "crit"
+  cdr = 1
+  icd = 0.5
+  shout = false
+
+[[talent]]
+key = "ar_missiles"
+name = "Missile Barrage"
+path_only = "arcane"
+rarity = "rare"
+icon = 12536
+text = "Your spells' hits have an 8% chance to light up Arcane Missiles: ready at once, 50% more damage."
+  [[talent.trigger]]
+  on = "hit"
+  chance = 0.08
+  icd = 4
+  buff = { key = "ar_mb", secs = 8, next = "arcane_missiles", power = 0.5, icon = 5143 }
+
+[[talent]]
+key = "ar_slow"
+name = "Slow"
+path_only = "arcane"
+rarity = "uncommon"
+icon = 246
+text = "Your arcane spells slow what they hit 30% for 4 sec."
+  [[talent.effect]]
+  spells = "school:arcane"
+  add = { slow = 0.3, slow_secs = 4 }
+
+[[talent]]
+key = "ar_archmage"
+name = "Archmage"
+path_only = "arcane"
+rarity = "epic"
+needs = 4
+icon = 12042
+text = "Your spells deal 10% more damage and your cooldowns run 15% faster."
+  [[talent.effect]]
+  spells = "all"
+  add = { power = 0.1 }
+  [[talent.effect]]
+  stats = { cdr = 0.15 }

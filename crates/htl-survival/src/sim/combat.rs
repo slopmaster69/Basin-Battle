@@ -142,11 +142,26 @@ impl Survival {
     /// Act on an input now if the hero is free to; false if it must wait.
     fn try_act(&mut self, id: Id, input: Input) -> bool {
         let c = self.content.clone();
-        let Some(p) = self.players.get(&id) else { return true };
+        if !self.players.contains_key(&id) {
+            return true;
+        }
         // In Ice Block nothing but its own key (an ability key) does anything.
         if self.immune(id) && !matches!(input, Input::Ability(..) | Input::GuardUp | Input::AttackUp) {
             return true;
         }
+        // A brace that ends the moment the hero does anything else (Retaliation, Shield Wall):
+        // it ends, and what they pressed goes on; its own key again only lowers it.
+        if matches!(input, Input::Attack | Input::Heavy | Input::Guard | Input::Dodge | Input::Ability(..)) && self.ends_on_action(id) {
+            let own = match input {
+                Input::Ability(slot, _) => self.stance_key(id, slot as usize),
+                _ => false,
+            };
+            self.end_stance(id);
+            if own {
+                return true;
+            }
+        }
+        let Some(p) = self.players.get(&id) else { return true };
         let aiming = matches!(p.action, Action::Aim { .. });
         let charging = matches!(p.action, Action::Charge { .. });
         let free = matches!(p.action, Action::Ready | Action::Guard);
@@ -427,12 +442,16 @@ impl Survival {
             _ => (&set.light[step], w.windup, w.recovery),
         };
         let heavy = kind == StrikeKind::Heavy;
+        // Onslaught: every blow comes that much quicker.
+        let now = self.clock;
+        let haste = self.cc_of(id).iter().filter(|c| c.kind == "onslaught" && c.until > now).map(|c| c.amount).fold(0.0f32, f32::max);
+        let quick = 1.0 / (1.0 + haste);
         Strike {
             kind,
             step: step as u8,
-            windup: windup * m.windup,
+            windup: windup * m.windup * quick,
             active: w.active,
-            recovery: recovery * m.recovery,
+            recovery: recovery * m.recovery * quick,
             damage: m.damage * if heavy { h.damage } else { 1.0 },
             range: w.range * m.range,
             arc: w.arc,
@@ -1712,6 +1731,10 @@ impl Survival {
     /// dodge's dash, it's a Corey roll: the client carries the dash's speed through the air, and
     /// an attack in it strikes as the hero lands.
     pub fn jumped(&mut self, id: Id) {
+        // A jump ends a brace that ends on any action.
+        if self.ends_on_action(id) {
+            self.end_stance(id);
+        }
         let cost = self.content.player.jump_stamina;
         let now = self.clock;
         let dash = self.content.dodge.dash_secs + COREY_GRACE;
@@ -1725,6 +1748,20 @@ impl Survival {
         if cost > 0.0 {
             self.spend(id, cost);
         }
+    }
+
+    /// In a stance that ends the moment they act.
+    fn ends_on_action(&self, id: Id) -> bool {
+        matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Stance { ability, .. })
+            if self.content.abilities[*ability].counter.as_ref().is_some_and(|c| c.ends_on_action))
+    }
+
+    /// The key on `slot` is the one the hero's stance came from.
+    fn stance_key(&self, id: Id, slot: usize) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        let Action::Stance { ability, .. } = p.action else { return false };
+        let on_key = crate::content::SLOTS.get(slot).and_then(|s| p.loadout.get(*s)).and_then(|k| self.content.ability(k));
+        on_key == Some(self.content.base_of(ability))
     }
 
     /// Their client landed: an attack pressed in the air (out of a Corey roll, or out of a dodge
@@ -1917,25 +1954,21 @@ impl Survival {
         }
         // The log says what felled them too (the recap's last blow), for tuning the fights.
         let why = self.death_recap(id).lines.into_iter().next().map_or(String::new(), |l| format!(": {l}"));
+        // The camp's fighting record: who felled whom, hero against hero (not in Siege, whose
+        // heroes are made for the match).
+        if let Some(k) = hero.as_ref().filter(|_| !self.is_siege()) {
+            self.forward_count("fells", k, 1);
+            self.forward_count("felled", &name, 1);
+        }
         match &hero {
             Some(k) => self.events.push(Event::Log(format!("{k} fells {name}{why}."))),
             None => self.events.push(Event::Log(format!("{name} fell{why}"))),
         }
         self.events.push(Event::Kill { killer: hero.or(creature), victim: name });
         self.events.push(Event::Dirty);
-        // Whatever was fighting them looks elsewhere (a raider, for its next foe).
-        let mut next = Vec::new();
-        for (mid, m) in self.mobs.iter_mut() {
-            if m.state.target() == Some(id) {
-                m.state = mobs::MobState::Return;
-                if m.raider {
-                    next.push(*mid);
-                }
-            }
-        }
-        for m in next {
-            self.raider_next(m);
-        }
+        // Whatever was fighting them turns on the next hero still in its fight; with none left,
+        // it goes home (a raider, to its next foe).
+        self.foe_gone(id);
     }
 
     fn revive(&mut self, id: Id) {
@@ -2028,7 +2061,11 @@ impl Survival {
         let (range, arc) = (strike.range, strike.arc);
         self.set_action(id, Action::Swing { t: 0.0, struck: Vec::new(), weapon: windex, strike });
         self.events.push(Event::Swing { attacker: id, victim: None, damage: 0, outcome: Outcome::Miss, anim: true, style: Blow::Heavy });
-        // No guard stops it: whoever it's coming for sees the weapon go red.
+        // No guard stops it: the weapon goes red for everyone, the striker too (so they know it's
+        // the unstoppable one), and a hero it's coming for is warned.
+        if d.unblockable {
+            self.events.push(Event::Glow { id, secs: windup });
+        }
         if d.unblockable && self.content.pvp.friendly_fire {
             let p = &self.players[&id];
             let (pos, f) = (p.pos, p.facing);
@@ -2186,7 +2223,7 @@ impl Survival {
         let mut k = 1.0;
         for c in self.cc_of(id).iter().filter(|c| c.until > now) {
             match c.kind.as_str() {
-                "deathmark" => k *= 1.0 + c.amount,
+                "deathmark" | "sunder" => k *= 1.0 + c.amount,
                 "hallowed" => k *= (1.0 - c.amount).max(0.0),
                 _ => {}
             }

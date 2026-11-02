@@ -30,10 +30,13 @@ jobs:
           workspaces: |
             .
             tools/addon-harness
+            tools/clip-census
       - name: Build the server
         run: cargo build --release -p htl-server
       - name: Unit tests
         run: cargo test --release --workspace --lib --bins
+      - name: The clip census's motion measure
+        run: cargo test --release --manifest-path tools/clip-census/Cargo.toml
       - name: Add-ons load and run without Lua errors
         run: |
           scripts/check-addon.sh | tee addon-check.txt

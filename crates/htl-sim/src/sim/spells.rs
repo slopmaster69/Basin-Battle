@@ -9,10 +9,9 @@ use super::enemies::Via;
 use super::*;
 use crate::kit::{Nums, SpellDef, SpellKind};
 
-/// Upgrades a spell can take (each a card): rank 1 plus four.
+/// Upgrades a spell can take (each a card) where a class kit doesn't say: rank 1 plus four.
+#[allow(dead_code)]
 pub(super) const MAX_PERKS: usize = 4;
-/// Every upgrade also adds this much power.
-pub(super) const PERK_POWER: f32 = 0.1;
 /// Most stacks of Fire Vulnerability, Winter's Chill, Shadow Vulnerability and Sunder Armor.
 pub(super) const MAX_VULN: u8 = 5;
 const VULN_SECS: f32 = 15.0;
@@ -22,7 +21,7 @@ pub(super) const SHADOW_VULN: f32 = 0.04;
 pub(super) const SUNDER: f32 = 0.05;
 pub(super) const WINTERS_CHILL: f32 = 0.02;
 /// Seconds an ally of this radius counts as "near" for heals, team buffs and mends.
-const ALLY_RANGE: f32 = 30.0;
+pub(super) const ALLY_RANGE: f32 = 30.0;
 /// The window Revenge opens after a blow.
 const REVENGE_SECS: f32 = 5.0;
 /// Rage numbers: per second of swing, per share of max health taken, decay a second.
@@ -192,6 +191,14 @@ pub(super) struct Afflictions {
     pub taunt: Option<(EntityId, f32)>,
     /// A warrior charged it: defenders nearby turn on it until then.
     pub rallied_until: f32,
+    /// Thunder Clapped: attacks this much slower until then.
+    pub weaken: f32,
+    pub weaken_until: f32,
+    /// Hamstrung: takes this much more damage from everyone until then.
+    pub exposed: f32,
+    pub exposed_until: f32,
+    /// Mortal Wound: can't be healed until then.
+    pub wound_until: f32,
     /// The debuffs last shown on it: (spell, stacks), in slot order.
     pub shown: Vec<(u32, u8)>,
 }
@@ -262,8 +269,12 @@ impl Sim {
     }
 
     /// Spells on the bar: cards' and the ones talents taught. Six keys hold them all.
+    /// The spells taking the bar's card slots: a weapon path's own skills ride on extra keys.
     pub(super) fn card_spells(&self, id: EntityId) -> usize {
-        self.entities.get(&id).and_then(|e| e.player()).map_or(0, |p| p.spells.len())
+        self.entities.get(&id).and_then(|e| e.player()).map_or(0, |p| {
+            let kit = self.content.kit(p.class);
+            p.spells.iter().filter(|o| kit.spells[o.spell].path.is_none()).count()
+        })
     }
 
     /// Learn a spell from a card (rank 1).
@@ -278,18 +289,24 @@ impl Sim {
         p.spells.push(OwnedSpell { spell, perks: Vec::new(), talent, cooldown, nums: Nums::default(), on: false, key });
         self.recompute(id);
         self.events.push(Event::Bar { player: id });
+        self.events.push(Event::Talents { player: id });
     }
 
     /// Take an upgrade for a held spell.
     pub(super) fn take_perk(&mut self, id: EntityId, spell: usize, perk: usize) {
+        let Some(class) = self.entities.get(&id).and_then(|e| e.player()).map(|p| p.class) else { return };
+        let kit = self.content.kit(class);
+        let cap = kit.upgrades_per_spell;
+        let def = kit.spells[spell].clone();
         let Some(p) = self.entities.get_mut(&id).and_then(|e| e.player_mut()) else { return };
         let Some(o) = p.spells.iter_mut().find(|o| o.spell == spell) else { return };
-        if o.perks.contains(&perk) || o.perks.len() >= MAX_PERKS {
+        if !def.perk_open(&o.perks, perk, cap) {
             return;
         }
         o.perks.push(perk);
         self.recompute(id);
         self.events.push(Event::Bar { player: id });
+        self.events.push(Event::Talents { player: id });
     }
 
     /// Work out every held spell's numbers: base, upgrades, talents, gear.
@@ -308,7 +325,8 @@ impl Sim {
                 if let Some(perk) = def.perks.get(pk) {
                     perk.patch.apply(&mut n, 1.0);
                 }
-                n.power += PERK_POWER;
+                n.power += kit.upgrade_power;
+                n.cost *= 1.0 - kit.upgrade_cost_cut;
             }
             for (ti, t) in kit.talents.iter().enumerate() {
                 let rank = p.talents.get(ti).copied().unwrap_or(0);
@@ -438,7 +456,7 @@ impl Sim {
                 m *= 1.0 + o.buff_value;
             }
         }
-        m
+        m * (1.0 + self.tbuff(id, |b| b.damage))
     }
 
     /// How fast a player's cooldowns run.
@@ -458,7 +476,7 @@ impl Sim {
         if self.content.classes[p.class].key == "mage" && p.stats.set_pieces >= 2 && (school == 2 || school == 4) {
             r *= 1.1;
         }
-        r
+        r * (1.0 + self.tbuff(id, |b| b.haste))
     }
 
     /// Attack speed multiplier from buffs (Flurry, Quick Shots, Rapid Fire).
@@ -473,7 +491,7 @@ impl Sim {
                 _ => {}
             }
         }
-        r
+        r * (1.0 + self.tbuff(id, |b| b.haste))
     }
 
     /// Share of damage a player's buffs take off.
@@ -485,13 +503,15 @@ impl Sim {
             match b.kind {
                 BuffKind::ShieldWall | BuffKind::Deterrence | BuffKind::Warded | BuffKind::Inspiration => m *= 1.0 - b.value.min(0.9),
                 BuffKind::InnerFire => m *= 1.0 - b.value2.min(0.9),
+                // Death Wish: more damage taken (value2 is how much more).
+                BuffKind::DeathWish => m *= 1.0 + b.value2.max(0.0),
                 _ => {}
             }
         }
         if let Some(o) = self.toggle_on(id, "shadowform") {
             m *= 1.0 - o.buff_value2.min(0.9);
         }
-        m
+        m * (1.0 - self.tbuff(id, |b| b.taken).min(0.8))
     }
 
     /// The numbers of a toggle that is on (`effect` named).
@@ -728,6 +748,7 @@ impl Sim {
                     cost: o.nums.cost.round() as u32,
                     talent: o.talent,
                     on: o.on,
+                    lit: self.is_lit(id, &def.key),
                 }
             })
             .collect();
@@ -750,9 +771,11 @@ impl Sim {
             return Ok(false);
         }
         // Presence of Mind, Clearcasting and Inner Focus make the next cast instant.
+        // ...and so does a lit key that says so.
         let instant = self.buff(id, BuffKind::PresenceOfMind).is_some()
             || self.buff(id, BuffKind::InnerFocus).is_some()
-            || self.buff(id, BuffKind::Clearcasting).is_some();
+            || self.buff(id, BuffKind::Clearcasting).is_some()
+            || self.empower_for(id, &def.key).is_some_and(|b| b.instant);
         if instant {
             return Ok(false);
         }
@@ -845,11 +868,16 @@ impl Sim {
         if p.spells[i].cooldown > 0.05 {
             return Err(CastError::NotReady);
         }
-        if p.gcd_until > self.clock + 0.05 {
+        let off_gcd = p.spells[i].nums.off_gcd > 0.0;
+        if !off_gcd && p.gcd_until > self.clock + 0.05 {
             return Err(CastError::Gcd);
         }
         if !self.begin_cast(id, i)? {
             self.cast(id, i)?;
+        }
+        if off_gcd {
+            self.events.push(Event::Bar { player: id });
+            return Ok(());
         }
         let haste = self.entities[&id].player().map_or(0.0, |p| p.stats.haste);
         let gcd = self.content.game.gcd_secs / (1.0 + haste);
@@ -940,11 +968,26 @@ impl Sim {
 
     /// Cast the player's `i`th spell now (checks rage, targets; starts the cooldown).
     pub(super) fn cast(&mut self, id: EntityId, i: usize) -> CastResult {
-        let (def, nums) = {
+        let (def, mut nums) = {
             let p = self.entities[&id].player().unwrap();
             let o = &p.spells[i];
             (self.content.kit(p.class).spells[o.spell].clone(), o.nums.clone())
         };
+        // An empowered cast waiting (its key lit up): stronger, free, on any target.
+        let empowered = self.empower_for(id, &def.key);
+        if let Some(b) = &empowered {
+            nums.power += b.power;
+            if b.free {
+                nums.cost = 0.0;
+            }
+            if b.any_target {
+                nums.only_below = 0.0;
+                nums.after_hit = 0.0;
+            }
+            if b.sure_crit {
+                nums.crit += 1.0;
+            }
+        }
         let shadowform = self.toggle_on(id, "shadowform").is_some();
         if shadowform && (def.school == 1 || def.is_heal()) && def.effect != "shadowform" {
             return Err(CastError::Shadowform);
@@ -952,6 +995,14 @@ impl Sim {
         if nums.cost > 0.0 && self.entities[&id].player().unwrap().rage + 0.01 < nums.cost {
             return Err(CastError::NoRage);
         }
+        // Spending the rest: what's held beyond the cost (up to `spend`) goes into the blow.
+        let spent = if nums.spend > 0.0 {
+            let rage = self.entities[&id].player().unwrap().rage;
+            (rage - nums.cost).clamp(0.0, nums.spend)
+        } else {
+            0.0
+        };
+        nums.power += spent * nums.spend_power;
         if nums.after_hit > 0.0 && self.entities[&id].player().unwrap().revenge_until < self.clock {
             return Err(CastError::NotNow);
         }
@@ -960,7 +1011,22 @@ impl Sim {
             || self.buff(id, BuffKind::InnerFocus).is_some()
             || self.buff(id, BuffKind::Clearcasting).is_some();
         let talent_buff = def.kind == SpellKind::Buff && matches!(def.effect.as_str(), "presence_of_mind" | "inner_focus");
-        let ok = self.cast_kind(id, &def, &nums, i)?;
+        // The cooldown starts as it goes off, so what the cast sets off (a crit, a kill, a
+        // broken cast) can finish it again.
+        let prev_cd = {
+            let p = self.entities.get_mut(&id).unwrap().player_mut().unwrap();
+            std::mem::replace(&mut p.spells[i].cooldown, nums.cooldown)
+        };
+        let ok = match self.cast_kind(id, &def, &nums, i) {
+            Ok(true) => true,
+            other => {
+                if let Some(p) = self.entities.get_mut(&id).and_then(|e| e.player_mut()) {
+                    p.spells[i].cooldown = prev_cd;
+                }
+                other?;
+                false
+            }
+        };
         if !ok {
             return Err(CastError::NoTarget);
         }
@@ -984,20 +1050,30 @@ impl Sim {
         }
         {
             let p = self.entities.get_mut(&id).unwrap().player_mut().unwrap();
-            if nums.cost > 0.0 {
-                p.rage = (p.rage - nums.cost).max(0.0);
+            if nums.cost > 0.0 || spent > 0.0 {
+                p.rage = (p.rage - nums.cost - spent).max(0.0);
             }
-            p.spells[i].cooldown = if no_cooldown { 0.0 } else { nums.cooldown };
+            if no_cooldown {
+                p.spells[i].cooldown = 0.0;
+            }
             p.casts += 1;
             p.fighting_until = self.clock + 6.0;
         }
-        if nums.cost > 0.0 {
+        if nums.cost > 0.0 || spent > 0.0 {
             self.send_rage(id);
         }
         if nums.rage > 0.0 && def.kind != SpellKind::Charge {
             self.gain_rage(id, nums.rage);
         }
+        if empowered.is_some() {
+            self.spend_empower(id, &def.key);
+        }
         self.after_cast(id, &def, &nums);
+        if let Some(src) = self.entities[&id].player().and_then(|p| self.content.kit(p.class).spell_index(&def.key)) {
+            let pos = self.entities[&id].pos;
+            let target = self.chosen_enemy(id, pos, 40.0);
+            self.fire(id, crate::kit::On::Cast, Some(src), target, 0.0);
+        }
         // Echo: sometimes it goes off again, free.
         if nums.echo > 0.0 && self.rng.gen::<f32>() < nums.echo.min(1.0) && !matches!(def.kind, SpellKind::Buff | SpellKind::Toggle) {
             let _ = self.cast_kind(id, &def, &nums, i);
@@ -1054,6 +1130,11 @@ impl Sim {
         }
     }
 
+    /// The spell's work again, free (a trigger's echo).
+    pub(super) fn cast_again(&mut self, id: EntityId, def: &SpellDef, n: &Nums, slot: usize) -> Result<bool, CastError> {
+        self.cast_kind(id, def, n, slot)
+    }
+
     /// Does the spell's work; false when it had nothing to act on.
     fn cast_kind(&mut self, id: EntityId, def: &SpellDef, n: &Nums, slot: usize) -> Result<bool, CastError> {
         let pos = self.entities[&id].pos;
@@ -1070,7 +1151,7 @@ impl Sim {
                     return Ok(false);
                 }
                 self.events.push(Event::SpellGo { caster: id, spell: visual, target: SpellTarget::Unit(id), hits: hits.clone() });
-                let base = self.spell_base(id, def, n);
+                let base = self.spell_base(id, def, n) * (1.0 + n.per_enemy * hits.len().saturating_sub(1) as f32);
                 let info = self.hit_info(id, def, n);
                 let mut cdr = 0.0;
                 for v in &hits {
@@ -1111,7 +1192,7 @@ impl Sim {
                     return Ok(false);
                 }
                 self.events.push(Event::SpellGo { caster: id, spell: visual, target: SpellTarget::Unit(id), hits: hits.clone() });
-                let base = self.spell_base(id, def, n);
+                let base = self.spell_base(id, def, n) * (1.0 + n.per_enemy * hits.len().saturating_sub(1) as f32);
                 let info = self.hit_info(id, def, n);
                 for v in &hits {
                     self.land_hit(id, *v, base, &info);
@@ -1224,6 +1305,17 @@ impl Sim {
     /// A bolt (or strike) at the chosen enemy, the nearest one, or one not yet afflicted.
     fn cast_bolt(&mut self, id: EntityId, def: &SpellDef, n: &Nums) -> Result<bool, CastError> {
         let pos = self.entities[&id].pos;
+        // An interrupt goes for whoever is casting something breakable within its reach first.
+        if n.interrupt > 0.0 {
+            let caster = self.enemies_near(pos, n.interrupt).into_iter().map(|(v, _)| v).find(|v| self.casting_breakable(*v));
+            if let Some(v) = caster {
+                let info = self.hit_info(id, def, n);
+                let base = self.spell_base(id, def, n);
+                self.events.push(Event::SpellGo { caster: id, spell: def.visual(), target: SpellTarget::Unit(v), hits: vec![v] });
+                self.land_hit(id, v, base, &info);
+                return Ok(true);
+            }
+        }
         let range = if n.range > 0.0 { n.range } else { 30.0 };
         let near = self.enemies_near(pos, range);
         if near.is_empty() {
@@ -1337,7 +1429,15 @@ impl Sim {
             "inner_focus" => self.give_buff(id, BuffKind::InnerFocus, secs, 1.0, 1),
             "arcane_power" => self.give_buff(id, BuffKind::ArcanePower, secs, n.buff_value, 1),
             "combustion" => self.give_buff(id, BuffKind::Combustion, secs, n.buff_value, 0),
-            "death_wish" => self.give_buff(id, BuffKind::DeathWish, secs, n.buff_value, 1),
+            "death_wish" => {
+                // As in the old game: the fury costs you. You take more damage while it lasts.
+                self.give_buff(id, BuffKind::DeathWish, secs, n.buff_value, 1);
+                if let Some(p) = self.entities.get_mut(&id).and_then(|e| e.player_mut()) {
+                    if let Some(b) = p.buffs.iter_mut().find(|b| b.kind == BuffKind::DeathWish) {
+                        b.value2 = n.buff_value2;
+                    }
+                }
+            }
             "last_stand" => {
                 self.give_buff(id, BuffKind::LastStand, secs, n.buff_value, 1);
                 let e = &self.entities[&id];
@@ -1628,7 +1728,7 @@ impl Sim {
         out
     }
 
-    fn most_hurt(&self, id: EntityId, pos: Vec3, r: f32, below: f32) -> Option<EntityId> {
+    pub(super) fn most_hurt(&self, id: EntityId, pos: Vec3, r: f32, below: f32) -> Option<EntityId> {
         self.hurt_allies(id, pos, r, below).into_iter().next()
     }
 
@@ -1645,13 +1745,37 @@ impl Sim {
     /// A spell's hit before the target: the caster's hit times the spell's damage and every
     /// bonus that doesn't depend on who it lands on.
     pub(super) fn spell_base(&self, id: EntityId, def: &SpellDef, n: &Nums) -> f32 {
-        self.player_hit(id) * n.damage * (1.0 + n.power) * self.buff_damage(id, Some(def.school))
+        self.player_hit(id) * n.damage * (1.0 + n.power) * self.buff_damage(id, Some(def.school)) * self.caster_power(id, n)
+    }
+
+    /// Bonuses a spell's numbers give from the caster's own state: hurt, full of rage, by the
+    /// Ancient, at a bridge post.
+    pub(super) fn caster_power(&self, id: EntityId, n: &Nums) -> f32 {
+        let mut m = 1.0;
+        let Some(e) = self.entities.get(&id) else { return m };
+        if n.hurt_power > 0.0 {
+            let missing = 1.0 - e.health as f32 / e.max_health.max(1) as f32;
+            m *= 1.0 + n.hurt_power * (missing * 10.0).floor();
+        }
+        if n.rage_power > 0.0 {
+            let rage = e.player().map_or(0.0, |p| p.rage);
+            m *= 1.0 + n.rage_power * (rage / 10.0).floor();
+        }
+        if n.ancient_power > 0.0 && self.near_ancient(id, 25.0) {
+            m *= 1.0 + n.ancient_power;
+        }
+        if n.post_power > 0.0 && self.at_post(id) {
+            m *= 1.0 + n.post_power;
+        }
+        m
     }
 
     pub(super) fn hit_info(&self, id: EntityId, def: &SpellDef, n: &Nums) -> HitInfo {
-        let hit = self.player_hit(id) * (1.0 + n.power) * self.buff_damage(id, Some(def.school));
+        let hit = self.player_hit(id) * (1.0 + n.power) * self.buff_damage(id, Some(def.school)) * self.caster_power(id, n);
         let force_crit = self.buff(id, BuffKind::InnerFocus).is_some();
+        let src = self.entities.get(&id).and_then(|e| e.player()).and_then(|p| self.content.kit(p.class).spell_index(&def.key));
         HitInfo {
+            src,
             nums: Box::new(n.clone()),
             school: def.school,
             spell: def.visual(),
@@ -1683,7 +1807,7 @@ impl Sim {
 
     pub(super) fn player_crit(&self, id: EntityId) -> f32 {
         let Some(p) = self.entities.get(&id).and_then(|e| e.player()) else { return 0.05 };
-        p.stats.crit
+        p.stats.crit + self.tbuff(id, |b| b.crit)
     }
 
     pub(super) fn player_heal_mult(&self, id: EntityId) -> f32 {
@@ -1710,6 +1834,15 @@ impl Sim {
             let periodic = false;
             self.deal(caster, victim, dmg.round().max(1.0) as u32, crit, Via::Spell { spell: info.spell, school: info.school, periodic });
             self.after_damage(owner, victim, dmg, info.school, crit, info);
+        }
+        // The spell's upgrades and the talents watching it.
+        if !info.from_pet && !info.splash && self.entities.get(&owner).is_some_and(|e| e.is_player()) {
+            if let Some(src) = info.src {
+                self.fire(owner, crate::kit::On::Hit, Some(src), Some(victim), 0.0);
+                if crit {
+                    self.fire(owner, crate::kit::On::Crit, Some(src), Some(victim), 0.0);
+                }
+            }
         }
         let alive = self.entities.get(&victim).is_some_and(|e| e.alive());
         // What it leaves behind.
@@ -1810,6 +1943,12 @@ impl Sim {
         if n.execute > 0.0 && e.health as f32 / e.max_health.max(1) as f32 <= n.execute_at.max(0.2) {
             m *= 1.0 + n.execute;
         }
+        if n.vs_full > 0.0 && e.health as f32 >= e.max_health as f32 * 0.8 {
+            m *= 1.0 + n.vs_full;
+        }
+        if n.vs_elite > 0.0 && (en.elite || en.kind.boss) {
+            m *= 1.0 + n.vs_elite;
+        }
         if (en.elite || en.kind.boss) && !pet {
             let elite = self.entities.get(&owner).and_then(|o| o.player()).map_or(0.0, |p| p.stats.elite_damage);
             m *= 1.0 + elite;
@@ -1823,8 +1962,9 @@ impl Sim {
         if !self.entities.get(&owner).is_some_and(|e| e.is_player() && e.alive()) {
             return;
         }
-        if n.leech > 0.0 {
-            self.heal(owner, owner, info.spell, (dmg * n.leech).round() as u32, false);
+        let leech = n.leech + self.tbuff(owner, |b| b.leech);
+        if leech > 0.0 {
+            self.heal(owner, owner, info.spell, (dmg * leech).round() as u32, false);
         }
         if n.mend > 0.0 {
             let pos = self.entities[&owner].pos;
@@ -1914,7 +2054,7 @@ impl Sim {
         let now = self.clock;
         if info.dot_total > 0.0 && n.dot_secs > 0.0 {
             let leech = n.leech;
-            self.add_dot_full(owner, victim, info.spell, info.school, info.dot_total, n.dot_secs, n.dot_stack > 0.0, leech, n.spread_on_death);
+            self.add_dot_full(owner, victim, info.spell, info.school, info.dot_total, n.dot_secs, n.dot_stack > 0.0, leech, n.spread_on_death, n.mend);
         }
         if n.slow > 0.0 {
             self.slow_enemy(victim, n.slow, if n.slow_secs > 0.0 { n.slow_secs } else { 3.0 });
@@ -1941,6 +2081,24 @@ impl Sim {
                     self.add_vuln(victim, v, stacks);
                 }
             }
+        }
+        if n.weaken > 0.0 || n.expose > 0.0 || n.wound_secs > 0.0 {
+            if let Some(en) = self.entities.get_mut(&victim).and_then(|e| e.enemy_mut()) {
+                if n.weaken > 0.0 {
+                    en.aff.weaken = en.aff.weaken.max(n.weaken.min(0.8));
+                    en.aff.weaken_until = en.aff.weaken_until.max(now + n.weaken_secs.max(1.0));
+                }
+                if n.expose > 0.0 {
+                    en.aff.exposed = en.aff.exposed.max(n.expose);
+                    en.aff.exposed_until = en.aff.exposed_until.max(now + n.expose_secs.max(1.0));
+                }
+                if n.wound_secs > 0.0 {
+                    en.aff.wound_until = en.aff.wound_until.max(now + n.wound_secs);
+                }
+            }
+        }
+        if n.interrupt > 0.0 && !info.splash && self.interrupt_enemy(owner, victim) {
+            self.fire(owner, crate::kit::On::Interrupt, info.src, Some(victim), 0.0);
         }
         if n.demoralize > 0.0 {
             if let Some(en) = self.entities.get_mut(&victim).and_then(|e| e.enemy_mut()) {
@@ -2017,7 +2175,7 @@ impl Sim {
         self.dirty_debuffs(id);
     }
 
-    fn taunt_enemy(&mut self, id: EntityId, by: EntityId, secs: f32) {
+    pub(super) fn taunt_enemy(&mut self, id: EntityId, by: EntityId, secs: f32) {
         let now = self.clock;
         if let Some(en) = self.entities.get_mut(&id).and_then(|e| e.enemy_mut()) {
             if en.guard.is_some() && !matches!(en.goal, Goal::Player(_)) {
@@ -2029,7 +2187,7 @@ impl Sim {
         }
     }
 
-    fn add_vuln(&mut self, id: EntityId, v: Vuln, stacks: u8) {
+    pub(super) fn add_vuln(&mut self, id: EntityId, v: Vuln, stacks: u8) {
         let now = self.clock;
         if let Some(en) = self.entities.get_mut(&id).and_then(|e| e.enemy_mut()) {
             let s = &mut en.aff.vulns[v as usize];
@@ -2191,6 +2349,9 @@ impl Sim {
                         add(1130, 1, f32::INFINITY);
                     }
                     add(1160, 1, a.demoralize_until);
+                    add(6343, 1, a.weaken_until);
+                    add(1715, 1, a.exposed_until);
+                    add(12294, 1, a.wound_until);
                     for d in &en.dots {
                         add(d.spell, d.stacks, now + d.ticks_left as f32 + 0.5);
                     }
@@ -2605,12 +2766,14 @@ impl Sim {
         let kit = self.content.kit(p.class);
         let Some(t) = kit.talents.get(index) else { return };
         let (ranks, grants) = (t.ranks, t.grants);
+        let class_style = kit.class_talents;
         let had = p.talents.get(index).copied().unwrap_or(0);
         let Some(p) = self.entities.get_mut(&id).and_then(|e| e.player_mut()) else { return };
         if p.talents.len() <= index {
             p.talents.resize(index + 1, 0);
         }
-        p.talents[index] = ranks;
+        // A class talent comes a rank a card; a tree talent straight to its full rank.
+        p.talents[index] = if class_style { (had + 1).min(ranks) } else { ranks };
         if had == 0 {
             if let Some(spell) = grants {
                 self.learn_spell(id, spell, true);
@@ -2729,6 +2892,39 @@ impl Sim {
         }
     }
 
+    /// A player's skills and the upgrades each has taken, for the build window: in bar order.
+    pub fn build_view(&self, id: EntityId) -> Vec<SkillBuild> {
+        let Some(p) = self.entities.get(&id).and_then(|e| e.player()) else { return Vec::new() };
+        let kit = self.content.kit(p.class);
+        let mut spells: Vec<&OwnedSpell> = p.spells.iter().collect();
+        spells.sort_by_key(|o| o.key);
+        spells
+            .into_iter()
+            .map(|o| {
+                let def = &kit.spells[o.spell];
+                let mut taken: Vec<(String, String, u8)> = Vec::new();
+                for &k in &o.perks {
+                    let perk = &def.perks[k];
+                    match taken.iter_mut().find(|t| t.0 == perk.name) {
+                        Some(t) => t.2 += 1,
+                        None => taken.push((perk.name.clone(), perk.text.clone(), 1)),
+                    }
+                }
+                let open = (0..def.perks.len()).filter(|&k| def.perk_open(&o.perks, k, kit.upgrades_per_spell)).count();
+                SkillBuild {
+                    key: def.key.clone(),
+                    name: def.name.clone(),
+                    icon_spell: def.icon,
+                    taken,
+                    count: o.perks.len(),
+                    cap: kit.upgrades_per_spell,
+                    open,
+                    deck: def.perks.len(),
+                }
+            })
+            .collect()
+    }
+
     /// A player's talents, for the talent window: rank of each of the class's talents.
     pub fn talent_ranks(&self, id: EntityId) -> Vec<u8> {
         let Some(p) = self.entities.get(&id).and_then(|e| e.player()) else { return Vec::new() };
@@ -2804,6 +3000,10 @@ impl Sim {
 
     pub fn hit_for_test(&self, id: EntityId) -> f32 {
         self.player_hit(id)
+    }
+
+    pub fn stunned_for_test(&self, id: EntityId) -> bool {
+        self.entities.get(&id).and_then(|e| e.enemy()).is_some_and(|en| en.aff.stun_until > self.clock)
     }
 
     pub fn casts_for_test(&self, id: EntityId) -> u32 {

@@ -289,7 +289,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 8;
+pub(crate) const ADDON_NEWEST: u32 = 9;
 pub(crate) const CLIENT_NEWEST: u8 = 10;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
@@ -1302,9 +1302,10 @@ impl SurvivalGame {
                 Ok(level) => self.sim.travel_wager(me, &arg, level),
                 Err(_) => Err("Try .es wager <dungeon> <level>, as .es wager deadmines 3.".into()),
             },
-            "board" => self.ui_board_page(conn, &arg),
+            "board" => self.ui_board_page(conn, &arg, arg2),
             "ladder" | "rating" => self.ui_ladder_page(conn, me),
             "news" | "week" => self.ui_week_page(conn),
+            "record" | "fights" => self.ui_record_page(conn),
             "ready" => self.sim.wager_ready(me),
             "meter" => self.meter_command(conn, me, &arg),
             // The book at camp, and the lamps below.

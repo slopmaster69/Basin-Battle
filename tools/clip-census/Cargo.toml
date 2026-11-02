@@ -1,0 +1,15 @@
+[package]
+name = "clip-census"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Measures every character model's attack clips from a WoW 1.12.1 Data folder (what each one does:
+# a leap, a flip, a spin, a lunge, an overhead chop, a sweep, a thrust; how fast it lands), so a
+# move's or a foe's `from` can pick the one that fits: see scripts/clip-census.sh.
+[dependencies]
+benilla-formats = { git = "https://github.com/samwhosung/benilla", rev = "c23d0163d5efa1ae39e4748877fe4ba831202848" }
+glam = "0.31"
+anyhow = "1"
+
+[workspace]

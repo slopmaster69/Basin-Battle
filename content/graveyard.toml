@@ -383,6 +383,7 @@ key = "gy_torturer"
 name = "Scarlet Torturer"
 subname = "The Scarlet Crusade"
 display = 2607
+clips_from = "OrcMale"
 health = 120
 run_speed = 7.0
 walk_speed = 2.0
@@ -407,19 +408,20 @@ respawn = 0.0
   [[mob.pattern]]
   name = "knives"
   weight = 3.0
-  steps = [ { clip = 85, take = 0, windup = 0.4, damage = 10, recovery = 0.1 }, { clip = 88, take = 0, windup = 0.34, damage = 10, recovery = 0.1 }, { clip = 85, take = 0, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  steps = [ { from = "GnomeMale", clip = 85, take = 0, windup = 0.4, damage = 10, recovery = 0.1 }, { from = "DwarfFemale", clip = 88, take = 0, windup = 0.34, damage = 10, recovery = 0.1 }, { from = "TaurenFemale", clip = 85, take = 0, windup = 0.45, damage = 14, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 1.5
   min_range = 3.5
   max_range = 8.0
-  steps = [ { clip = 85, take = 0, windup = 0.5, lunge = 4.5, damage = 15, recovery = 0.8 } ]
+  steps = [ { from = "ScourgeFemale", clip = 85, take = 0, windup = 0.5, lunge = 4.5, damage = 15, recovery = 0.8 } ]
 
 [[mob]]
 key = "gy_scryer"
 name = "Scarlet Scryer"
 subname = "The Scarlet Crusade"
 display = 2603
+clips_from = "TaurenFemale"
 health = 90
 run_speed = 7.0
 walk_speed = 2.0
@@ -455,7 +457,7 @@ respawn = 0.0
   name = "frost ring"
   weight = 2.0
   max_range = 3.5
-  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  steps = [ { from = "HumanMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
 
 [[mob]]
 key = "gy_zombie"
@@ -602,6 +604,7 @@ key = "gy_vishas"
 name = "Interrogator Vishas"
 subname = "The Scarlet Crusade"
 display = 2968
+clips_from = "OrcMale"
 health = 850
 run_speed = 7.0
 walk_speed = 2.0
@@ -629,7 +632,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "knives"
   weight = 3.0
-  steps = [ { clip = 85, take = 0, windup = 0.42, damage = 16, recovery = 0.08 }, { clip = 88, take = 0, windup = 0.34, damage = 16, recovery = 0.08 }, { clip = 85, take = 0, windup = 0.34, damage = 16, recovery = 0.08 }, { clip = 88, take = 0, windup = 0.5, damage = 22, heavy = true, recovery = 0.9 } ]
+  steps = [ { from = "NightElfMale", clip = 85, take = 0, windup = 0.42, damage = 16, recovery = 0.08 }, { from = "HumanFemale", clip = 88, take = 0, windup = 0.34, damage = 16, recovery = 0.08 }, { from = "HumanMale", clip = 85, take = 0, windup = 0.34, damage = 16, recovery = 0.08 }, { from = "GnomeFemale", clip = 88, take = 0, windup = 0.5, damage = 22, heavy = true, recovery = 0.9 } ]
   # A word of pain: shadow where you stand.
   [[mob.pattern]]
   name = "shadow word"
@@ -657,20 +660,20 @@ respawn = 0.0
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 24, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "TaurenMale", clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 24, kit = 379, heavy = true, recovery = 1.2 } ]
   # A quick one, then a heavy blow held back to catch an early dodge.
   [[mob.pattern]]
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 30, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { from = "OrcMale", clip = 17, take = 0, windup = 0.45, damage = 16, recovery = 0.1 }, { from = "ScourgeFemale", clip = 57, take = 0, windup = 1.25, damage = 30, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
   # Nearer its end: a blow all the way round.
   [[mob.pattern]]
   name = "sweep"
   weight = 1.5
   below = 0.5
   max_range = 4
-  steps = [ { clip = 126, windup = 0.9, damage = 20, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "ScourgeFemale", clip = 126, windup = 0.9, damage = 20, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
 
 [[mob]]
 key = "gy_ironspine"
@@ -756,6 +759,7 @@ key = "gy_thalnos"
 name = "Bloodmage Thalnos"
 subname = "The Graveyard"
 display = 1565
+clips_from = "TrollMale"
 scale = 1.2
 health = 1300
 run_speed = 7.0
@@ -807,7 +811,7 @@ then_look = 10604
   name = "fire nova"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  steps = [ { from = "ScourgeMale", clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
   [[mob.pattern]]
   name = "blood rite"
   weight = 2.0

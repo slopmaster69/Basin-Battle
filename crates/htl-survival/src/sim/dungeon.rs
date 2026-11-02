@@ -1216,6 +1216,22 @@ impl Survival {
         self.events.push(Event::Dirty);
     }
 
+    /// The camp's fighting record, hero against hero: (name, heroes felled, falls to heroes),
+    /// most felled first (then fewest falls, then by name).
+    pub fn fighting_record(&self) -> Vec<(String, u32, u32)> {
+        let mut heroes: BTreeMap<String, (u32, u32)> = BTreeMap::new();
+        for (k, n) in &self.camp.counts {
+            if let Some(name) = k.strip_prefix("fells:") {
+                heroes.entry(name.to_string()).or_default().0 += n;
+            } else if let Some(name) = k.strip_prefix("felled:") {
+                heroes.entry(name.to_string()).or_default().1 += n;
+            }
+        }
+        let mut out: Vec<(String, u32, u32)> = heroes.into_iter().map(|(name, (w, l))| (name, w, l)).collect();
+        out.sort_by(|a, b| b.1.cmp(&a.1).then(a.2.cmp(&b.2)).then(a.0.cmp(&b.0)));
+        out
+    }
+
     /// A dungeon cleared for the first time: its gift to the camp's chest, a banner for every hero
     /// at camp, and the book's next page.
     pub(crate) fn first_clear(&mut self, key: &str) {
