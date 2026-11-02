@@ -1817,7 +1817,17 @@ impl Survival {
             if a.radius >= LOB_RADIUS {
                 let at = self.ground_near(to[0], to[1], to[2]);
                 let fly = lob_flight(dist2d(pos, at), a.speed);
-                let mk = self.mark_ground(at, a.radius, a.windup + fly + 0.3, ground_look(a.spell, a.look));
+                let secs = a.windup + fly + 0.3;
+                let look = ground_look(a.spell, a.look);
+                // Its spell's own look on the ground where it has one; else a warning ring laid
+                // there (the clients' plain hostile circle is the "can't cast here" texture, a
+                // red stop sign: play-test).
+                let mk = if look != 0 && a.radius >= GROUND_LOOK_MIN {
+                    self.mark_ground(at, a.radius, secs, look)
+                } else {
+                    let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false };
+                    self.mark_as(at, a.radius, secs, Some(tele))
+                };
                 self.mobs.get_mut(&id).unwrap().lob = Some((at, mk));
             }
             None

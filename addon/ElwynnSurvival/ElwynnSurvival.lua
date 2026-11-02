@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 9
+local VERSION = 10
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1873,7 +1873,9 @@ vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
 vit.healthText:SetWidth(120)
 vit.healthText:SetJustifyH("RIGHT")
 vit.healthText:SetTextColor(1, 0.92, 0.85)
-vit.stamina = MakeLagBar(vit, 100 / ST_PER_PX, VIT_STAMINA, { r = 0.26, g = 0.66, b = 0.27 }, { r = 0.85, g = 0.95, b = 0.7 })
+-- What a spend just took drains in amber: the old pale green read as the bar itself on the
+-- parchment (play-test).
+vit.stamina = MakeLagBar(vit, 100 / ST_PER_PX, VIT_STAMINA, { r = 0.26, g = 0.66, b = 0.27 }, { r = 1.0, g = 0.62, b = 0.1 })
 
 -- Lit while the guard is up, and when a swing would reach someone.
 vit.guard = Icon(vit, "ARTWORK", "INV_Shield_09", 14)
@@ -2921,6 +2923,47 @@ heal:SetScript("OnUpdate", function()
   end
   this:ClearAllPoints()
   this:SetPoint("BOTTOM", vit.health, "TOP", 0, 4 + math.min(t, 1.4) * 18)
+  if since > 0.9 then this:SetAlpha((1.4 - since) / 0.5) end
+end)
+
+-- HO: you healed a friend this much: "+18 Bren" in green, rising over the middle of the screen
+-- (1.12 floats no heal over another; play-test). Ticks on the same friend add up.
+ES.healOther = CreateFrame("Frame", "ElwynnSurvivalHealOther", UIParent)
+ES.healOther:SetWidth(240)
+ES.healOther:SetHeight(24)
+ES.healOther:SetFrameStrata("HIGH")
+ES.healOther:Hide()
+ES.healOther.text = Text(ES.healOther, FONT_NUM, 17, "OUTLINE")
+ES.healOther.text:SetPoint("CENTER", ES.healOther, "CENTER", 0, 0)
+ES.healOther.text:SetTextColor(0.4, 1, 0.45)
+ES.healOther.sum = 0
+
+function ES.HealOtherLine(f)
+  local name, n = f[2] or "", tonumber(f[3] or "") or 0
+  if n <= 0 then return end
+  local h, now = ES.healOther, GetTime()
+  if h:IsShown() and h.who == name and now - (h.at or 0) < 0.8 then
+    h.sum = h.sum + n
+  else
+    h.sum = n
+    h.born = now
+  end
+  h.who = name
+  h.at = now
+  h.text:SetText("+" .. h.sum .. " " .. name)
+  h:SetAlpha(1)
+  h:Show()
+end
+
+ES.healOther:SetScript("OnUpdate", function()
+  local t = GetTime() - (this.born or 0)
+  local since = GetTime() - (this.at or 0)
+  if since > 1.4 then
+    this:Hide()
+    return
+  end
+  this:ClearAllPoints()
+  this:SetPoint("CENTER", UIParent, "CENTER", 0, 70 + math.min(t, 1.4) * 22)
   if since > 0.9 then this:SetAlpha((1.4 - since) / 0.5) end
 end)
 
@@ -3984,6 +4027,10 @@ local function OpenWindow(kind, title, note, icon, grid)
     win.slots[i]:Hide()
   end
   Shape(grid)
+  -- Never taller or wider than the screen: a small one scales it down to fit (play-test: the
+  -- Smuggler's Logbook ran off a laptop's screen).
+  local fit = math.min(1, (UIParent:GetHeight() - 40) / math.max(1, win:GetHeight()), (UIParent:GetWidth() - 40) / math.max(1, win:GetWidth()))
+  win:SetScale(math.max(0.5, fit))
   win.restDetail = nil
   ShowDetail("", "", "")
   win.extra:Hide()
@@ -6020,6 +6067,8 @@ function ES.Line(line)
     ES.PromptLine(f)
   elseif verb == "HL" then
     ES.HealLine(f)
+  elseif verb == "HO" then
+    ES.HealOtherLine(f)
   elseif verb == "ST" then
     -- A swing called off (a feint): ours went at once; another's lets go now.
     if f[3] == "1" then

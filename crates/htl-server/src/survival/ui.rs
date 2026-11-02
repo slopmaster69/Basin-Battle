@@ -289,7 +289,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 9;
+pub(crate) const ADDON_NEWEST: u32 = 10;
 pub(crate) const CLIENT_NEWEST: u8 = 10;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
