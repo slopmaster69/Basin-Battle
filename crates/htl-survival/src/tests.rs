@@ -2580,7 +2580,8 @@ fn a_parried_lesser_champion_still_reels_only_a_boss_fills_its_posture_instead()
     assert!(!s.content.mobs[s.mobs[&o].def].boss && s.posture_limit(o) > 0, "a champion, not a boss");
     s.engage(o, Foe::Hero(p));
     s.input(p, Input::GuardUp);
-    run(&mut s, s.content.parry.cooldown + 0.05);
+    let wait = s.content.parry.cooldown + 0.05;
+    run(&mut s, wait);
     s.input(p, Input::Guard);
     run(&mut s, 0.05);
     assert_eq!(s.strike_player(o, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
