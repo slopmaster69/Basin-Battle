@@ -556,13 +556,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "swings"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.55, damage = 11, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 11, recovery = 0.2 }, { clip = 17, take = 0, windup = 0.5, damage = 14, recovery = 0.9 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.55, damage = 11, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 11, recovery = 0.2 }, { clip = 16, take = 1, windup = 0.5, damage = 14, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "lunge"
   weight = 1.5
   min_range = 3.5
   max_range = 8.0
-  steps = [ { clip = 17, take = 1, windup = 0.6, lunge = 4.5, damage = 14, recovery = 0.9 } ]
+  steps = [ { clip = 57, take = 0, windup = 0.6, lunge = 4.5, damage = 14, recovery = 0.9 } ]
 
 # Trogg shamans: lightning from the back.
 [[mob]]
@@ -630,13 +630,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "bites"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 12, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.45, damage = 12, recovery = 0.9 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.5, damage = 12, recovery = 0.2 }, { clip = 16, take = 0, windup = 0.45, damage = 12, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "burrow"
   weight = 1.5
   min_range = 4.0
   max_range = 12.0
-  steps = [ { clip = 17, take = 1, windup = 0.9, lunge = 7.0, damage = 18, heavy = true, recovery = 1.1, kit = 356, look = 26271 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.9, lunge = 7.0, damage = 18, heavy = true, recovery = 1.1, kit = 356, look = 26271 } ]
 
 # Searing Blade cultists: fire from afar, a ring of it close in.
 [[mob]]
@@ -792,7 +792,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "blows"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.6, damage = 14, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.5, damage = 14, recovery = 0.9 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.6, damage = 14, recovery = 0.2 }, { clip = 16, take = 0, windup = 0.5, damage = 14, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "flare"
   weight = 2.0
@@ -832,12 +832,12 @@ respawn = 0.0
   [[mob.pattern]]
   name = "clubs"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.75, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.6, damage = 24, recovery = 1.1 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.75, damage = 22, recovery = 0.2 }, { clip = 17, take = 1, windup = 0.6, damage = 24, recovery = 1.1 } ]
   [[mob.pattern]]
   name = "cleave"
   weight = 2.0
   max_range = 3.5
-  steps = [ { clip = 126, windup = 0.9, range = 4.2, arc = 360.0, damage = 20, heavy = true, recovery = 1.1, kit = 369 } ]
+  steps = [ { clip = 57, take = 0, windup = 0.9, range = 4.2, arc = 360.0, damage = 20, heavy = true, recovery = 1.1, kit = 369 } ]
   [[mob.pattern]]
   name = "stomp"
   weight = 1.5
@@ -864,20 +864,20 @@ respawn = 0.0
   [[mob.pattern]]
   name = "string"
   weight = 3
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 22, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 34, kit = 379, heavy = true, recovery = 1.1 } ]
+  steps = [ { clip = 17, take = 1, windup = 0.5, damage = 22, recovery = 0.15 }, { clip = 16, take = 1, windup = 0.42, damage = 22, recovery = 0.15 }, { clip = 57, take = 0, windup = 0.8, damage = 34, kit = 379, heavy = true, recovery = 1.1 } ]
   # From range: it closes the gap in one blow.
   [[mob.pattern]]
   name = "lunge"
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 31, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { clip = 58, take = 0, windup = 0.75, lunge = 8, damage = 31, kit = 379, heavy = true, recovery = 1.2 } ]
   # A quick one, then a heavy blow held back to catch an early dodge.
   [[mob.pattern]]
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { clip = 18, take = 1, windup = 0.45, damage = 21, recovery = 0.1 }, { clip = 57, take = 0, windup = 1.25, damage = 39, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
 
 [[mob]]
 key = "rf_bazzalan"
@@ -910,13 +910,13 @@ respawn = 0.0
   [[mob.pattern]]
   name = "claws"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 15, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.32, damage = 15, recovery = 0.1 }, { clip = 17, take = 0, windup = 0.32, damage = 15, recovery = 0.1 }, { clip = 17, take = 1, windup = 0.5, damage = 20, heavy = true, recovery = 0.9 } ]
+  steps = [ { clip = 17, take = 0, windup = 0.4, damage = 15, recovery = 0.1 }, { clip = 18, take = 1, windup = 0.32, damage = 15, recovery = 0.1 }, { clip = 17, take = 0, windup = 0.32, damage = 15, recovery = 0.1 }, { clip = 18, take = 1, windup = 0.5, damage = 20, heavy = true, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "pounce"
   weight = 2.0
   min_range = 4.0
   max_range = 12.0
-  steps = [ { clip = 17, take = 1, windup = 0.55, lunge = 7.0, damage = 22, recovery = 0.9 } ]
+  steps = [ { clip = 18, take = 1, windup = 0.55, lunge = 7.0, damage = 22, recovery = 0.9 } ]
   # A spit of venom where you stand.
   [[mob.pattern]]
   name = "venom"
@@ -928,7 +928,7 @@ respawn = 0.0
   name = "frenzy"
   weight = 2.0
   below = 0.4
-  steps = [ { clip = 17, take = 0, windup = 0.35, damage = 14, recovery = 0.06 }, { clip = 17, take = 1, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 17, take = 0, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 17, take = 1, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 17, take = 0, windup = 0.5, lunge = 3.0, damage = 22, heavy = true, recovery = 1.4 } ]
+  steps = [ { clip = 18, take = 0, windup = 0.35, damage = 14, recovery = 0.06 }, { clip = 17, take = 0, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 18, take = 1, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 17, take = 0, windup = 0.25, damage = 14, recovery = 0.06 }, { clip = 18, take = 1, windup = 0.5, lunge = 3.0, damage = 22, heavy = true, recovery = 1.4 } ]
   [[mob.phase]]
   at = 0.65
   speed = 0.88
@@ -950,14 +950,14 @@ respawn = 0.0
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { clip = 17, take = 0, windup = 0.45, damage = 14, recovery = 0.1 }, { clip = 57, windup = 1.25, damage = 27, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { clip = 19, take = 0, windup = 0.45, damage = 14, recovery = 0.1 }, { clip = 18, take = 1, windup = 1.25, damage = 27, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
   # Nearer its end: a blow all the way round.
   [[mob.pattern]]
   name = "sweep"
   weight = 1.5
   below = 0.5
   max_range = 4
-  steps = [ { clip = 126, windup = 0.9, damage = 18, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
+  steps = [ { clip = 19, take = 1, windup = 0.9, damage = 18, range = 4.6, arc = 360, kit = 369, heavy = true, recovery = 1.2 } ]
 
 [[mob]]
 key = "rf_jergosh"
@@ -1012,7 +1012,7 @@ then_look = 10604
   name = "invocation"
   weight = 2.0
   max_range = 26.0
-  steps = [ { ranged = true, windup = 1.4, damage = 28, range = 26.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
+  steps = [ { clip = 55, take = 0, ranged = true, windup = 1.4, damage = 28, range = 26.0, radius = 4.0, speed = 12.0, spell = 133, look = 10604, blockable = false, recovery = 1.2 } ]
   [[mob.pattern]]
   name = "staff"
   weight = 1.5
@@ -1023,7 +1023,7 @@ then_look = 10604
   weight = 2.0
   below = 0.4
   max_range = 26.0
-  steps = [ { ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 1.4 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 1.0, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 1.4 } ]
   [[mob.phase]]
   at = 0.7
   speed = 0.9
@@ -1077,7 +1077,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "blows"
   weight = 3.0
-  steps = [ { clip = 17, take = 0, windup = 0.8, damage = 28, recovery = 0.25 }, { clip = 17, take = 1, windup = 0.6, damage = 30, recovery = 1.2 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.8, damage = 28, recovery = 0.25 }, { clip = 16, take = 1, windup = 0.6, damage = 30, recovery = 1.2 } ]
   [[mob.pattern]]
   name = "eruption"
   weight = 2.0
@@ -1109,14 +1109,14 @@ respawn = 0.0
   [[mob.pattern]]
   name = "string"
   weight = 3
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 26, recovery = 0.15 }, { clip = 17, take = 1, windup = 0.42, damage = 26, recovery = 0.15 }, { clip = 57, windup = 0.8, damage = 39, kit = 379, heavy = true, recovery = 1.1 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.5, damage = 26, recovery = 0.15 }, { clip = 16, take = 0, windup = 0.42, damage = 26, recovery = 0.15 }, { clip = 16, take = 1, windup = 0.8, damage = 39, kit = 379, heavy = true, recovery = 1.1 } ]
   # From range: it closes the gap in one blow.
   [[mob.pattern]]
   name = "lunge"
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 36, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { clip = 16, take = 1, windup = 0.75, lunge = 8, damage = 36, kit = 379, heavy = true, recovery = 1.2 } ]
 
 [[mob]]
 key = "rf_taragaman"
@@ -1155,7 +1155,7 @@ respawn = 0.0
   name = "uppercut"
   weight = 2.0
   max_range = 3.2
-  steps = [ { clip = 57, windup = 1.0, damage = 34, arc = 80.0, heavy = true, recovery = 1.2, kit = 379 } ]
+  steps = [ { clip = 18, take = 0, windup = 1.0, damage = 34, arc = 80.0, heavy = true, recovery = 1.2, kit = 379 } ]
   # Fire all round him.
   [[mob.pattern]]
   name = "fire nova"
@@ -1167,12 +1167,12 @@ respawn = 0.0
   weight = 1.5
   min_range = 6.0
   max_range = 15.0
-  steps = [ { clip = 57, windup = 1.1, lunge = 9.0, range = 4.0, arc = 360.0, damage = 36, heavy = true, recovery = 1.4, kit = 379, look = 10604 } ]
+  steps = [ { clip = 17, take = 1, windup = 1.1, lunge = 9.0, range = 4.0, arc = 360.0, damage = 36, heavy = true, recovery = 1.4, kit = 379, look = 10604 } ]
   [[mob.pattern]]
   name = "hunger"
   weight = 2.5
   below = 0.3
-  steps = [ { clip = 17, take = 0, windup = 0.5, damage = 24, heavy = false, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.4, damage = 24, heavy = false, recovery = 0.08 }, { clip = 17, take = 0, windup = 0.4, damage = 24, heavy = false, recovery = 0.08 }, { clip = 54, windup = 0.8, range = 6.0, arc = 360.0, damage = 30, heavy = true, blockable = false, recovery = 1.7, look = 10604 } ]
+  steps = [ { clip = 16, take = 0, windup = 0.5, damage = 24, heavy = false, recovery = 0.08 }, { clip = 17, take = 1, windup = 0.4, damage = 24, heavy = false, recovery = 0.08 }, { clip = 18, take = 0, windup = 0.4, damage = 24, heavy = false, recovery = 0.08 }, { clip = 54, windup = 0.8, range = 6.0, arc = 360.0, damage = 30, heavy = true, blockable = false, recovery = 1.7, look = 10604 } ]
   [[mob.phase]]
   at = 0.66
   speed = 0.88
@@ -1259,7 +1259,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "string"
   weight = 3
-  steps = [ { from = "NightElfFemale", clip = 17, take = 0, windup = 0.5, damage = 29, recovery = 0.15 }, { from = "GnomeMale", clip = 17, take = 2, windup = 0.42, damage = 29, recovery = 0.15 }, { from = "NightElfMale", clip = 57, take = 0, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
+  steps = [ { from = "NightElfFemale", clip = 17, take = 0, windup = 0.5, damage = 29, recovery = 0.15 }, { from = "GnomeMale", clip = 17, take = 1, windup = 0.42, damage = 29, recovery = 0.15 }, { from = "NightElfMale", clip = 57, take = 0, windup = 0.8, damage = 44, kit = 379, heavy = true, recovery = 1.1 } ]
   # A quick one, then a heavy blow held back to catch an early dodge.
   [[mob.pattern]]
   name = "held blow"

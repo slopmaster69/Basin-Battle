@@ -635,7 +635,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "two swings"
   weight = 3.0
-  steps = [ { from = "GnomeFemale", clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 2, windup = 0.45, damage = 14, recovery = 0.9 } ]
+  steps = [ { from = "GnomeFemale", clip = 17, take = 0, windup = 0.55, damage = 14, recovery = 0.2 }, { from = "ScourgeMale", clip = 17, take = 1, windup = 0.45, damage = 14, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "haymaker"
   weight = 1.5
@@ -763,7 +763,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "chops"
   weight = 3.0
-  steps = [ { from = "TaurenMale", clip = 17, take = 0, windup = 0.55, damage = 20, recovery = 0.15 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.45, damage = 20, recovery = 0.15 }, { from = "GnomeFemale", clip = 57, take = 0, windup = 0.85, damage = 30, heavy = true, recovery = 1.1 } ]
+  steps = [ { from = "TaurenMale", clip = 57, take = 0, windup = 0.55, damage = 20, recovery = 0.15 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.45, damage = 20, recovery = 0.15 }, { from = "GnomeFemale", clip = 57, take = 0, windup = 0.85, damage = 30, heavy = true, recovery = 1.1 } ]
   # The shield in your face: it knocks a wind-up out of you.
   [[mob.pattern]]
   name = "shield slam"
@@ -788,7 +788,7 @@ respawn = 0.0
   name = "deepfury"
   weight = 2.0
   below = 0.25
-  steps = [ { from = "NightElfFemale", clip = 126, windup = 0.8, range = 4.2, arc = 360.0, damage = 20, recovery = 0.1, kit = 369 }, { from = "GnomeFemale", clip = 126, windup = 0.45, range = 4.2, arc = 360.0, damage = 22, recovery = 0.1 }, { from = "HumanMale", clip = 126, windup = 0.45, range = 4.2, arc = 360.0, damage = 26, heavy = true, recovery = 1.5 } ]
+  steps = [ { from = "NightElfFemale", clip = 16, take = 0, windup = 0.8, range = 4.2, arc = 360.0, damage = 20, recovery = 0.1, kit = 369 }, { from = "GnomeFemale", clip = 16, take = 1, windup = 0.45, range = 4.2, arc = 360.0, damage = 22, recovery = 0.1 }, { from = "HumanMale", clip = 57, take = 0, windup = 0.45, range = 4.2, arc = 360.0, damage = 26, heavy = true, recovery = 1.5 } ]
   [[mob.phase]]
   at = 0.6
   speed = 0.88
@@ -836,7 +836,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "pummel"
   weight = 3.0
-  steps = [ { from = "TrollMale", clip = 17, take = 0, windup = 0.6, damage = 18, recovery = 0.15 }, { from = "HumanMale", clip = 17, take = 1, windup = 0.5, damage = 18, recovery = 0.15 }, { from = "ScourgeMale", clip = 57, take = 0, windup = 0.9, damage = 28, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "TrollMale", clip = 17, take = 1, windup = 0.6, damage = 18, recovery = 0.15 }, { from = "HumanMale", clip = 17, take = 0, windup = 0.5, damage = 18, recovery = 0.15 }, { from = "ScourgeMale", clip = 57, take = 0, windup = 0.9, damage = 28, heavy = true, recovery = 1.2 } ]
   # Lightning from his hands, jumping to where you stand.
   [[mob.pattern]]
   name = "chain lightning"
@@ -864,13 +864,13 @@ respawn = 0.0
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { from = "ScourgeFemale", clip = 17, take = 1, windup = 0.75, lunge = 8, damage = 26, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "ScourgeFemale", clip = 57, take = 0, windup = 0.75, lunge = 8, damage = 26, kit = 379, heavy = true, recovery = 1.2 } ]
   # A quick one, then a heavy blow held back to catch an early dodge.
   [[mob.pattern]]
   name = "held blow"
   weight = 1.5
   below = 0.66
-  steps = [ { from = "NightElfFemale", clip = 17, take = 1, windup = 0.45, damage = 18, recovery = 0.1 }, { from = "GnomeMale", clip = 57, take = 0, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
+  steps = [ { from = "NightElfFemale", clip = 17, take = 0, windup = 0.45, damage = 18, recovery = 0.1 }, { from = "GnomeMale", clip = 57, take = 0, windup = 1.25, damage = 33, kit = 379, heavy = true, blockable = false, recovery = 1.4 } ]
 
 [[mob]]
 key = "st_targorr"
@@ -924,13 +924,13 @@ respawn = 0.0
   weight = 2.0
   below = 0.6
   max_range = 4.0
-  steps = [ { from = "TaurenFemale", clip = 126, windup = 0.9, range = 4.6, arc = 360.0, damage = 26, heavy = true, recovery = 0.2, kit = 369 }, { from = "ScourgeFemale", clip = 126, windup = 0.55, range = 4.6, arc = 360.0, damage = 28, heavy = true, recovery = 1.4 } ]
+  steps = [ { from = "TaurenFemale", clip = 57, take = 0, windup = 0.9, range = 4.6, arc = 360.0, damage = 26, heavy = true, recovery = 0.2, kit = 369 }, { from = "ScourgeFemale", clip = 58, take = 0, windup = 0.55, range = 4.6, arc = 360.0, damage = 28, heavy = true, recovery = 1.4 } ]
   # At the last: chop after chop, and the floor cracks under the last.
   [[mob.pattern]]
   name = "the dread"
   weight = 2.5
   below = 0.3
-  steps = [ { from = "ScourgeFemale", clip = 18, take = 1, windup = 0.55, damage = 28, heavy = false, recovery = 0.1 }, { from = "NightElfFemale", clip = 18, take = 1, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { from = "OrcMale", clip = 18, take = 0, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { from = "TrollFemale", clip = 58, take = 0, windup = 0.85, range = 5.0, arc = 360.0, damage = 46, heavy = true, recovery = 1.8, look = 26271 } ]
+  steps = [ { from = "ScourgeFemale", clip = 18, take = 0, windup = 0.55, damage = 28, heavy = false, recovery = 0.1 }, { from = "NightElfFemale", clip = 18, take = 1, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { from = "OrcMale", clip = 18, take = 0, windup = 0.45, damage = 28, heavy = false, recovery = 0.1 }, { from = "TrollFemale", clip = 58, take = 0, windup = 0.85, range = 5.0, arc = 360.0, damage = 46, heavy = true, recovery = 1.8, look = 26271 } ]
   [[mob.phase]]
   at = 0.6
   speed = 0.85
@@ -997,7 +997,7 @@ respawn = 0.0
   name = "void"
   weight = 1.5
   max_range = 24.0
-  steps = [ { ranged = true, windup = 1.4, damage = 30, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.2 } ]
+  steps = [ { clip = 55, take = 0, ranged = true, windup = 1.4, damage = 30, range = 24.0, radius = 4.0, speed = 12.0, spell = 27812, look = 27812, blockable = false, recovery = 1.2 } ]
   # From his first turn: three bolts at once, one after another.
   [[mob.pattern]]
   name = "volley"
@@ -1005,7 +1005,7 @@ respawn = 0.0
   below = 0.5
   min_range = 3.0
   max_range = 26.0
-  steps = [ { ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 1.2 } ]
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 1.5, speed = 22.0, spell = 686, blockable = true, recovery = 1.2 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.85
@@ -1244,14 +1244,14 @@ respawn = 0.0
   [[mob.pattern]]
   name = "string"
   weight = 3
-  steps = [ { from = "DwarfFemale", clip = 17, take = 1, windup = 0.5, damage = 32, recovery = 0.15 }, { from = "TrollFemale", clip = 17, take = 1, windup = 0.42, damage = 32, recovery = 0.15 }, { from = "NightElfMale", clip = 57, take = 0, windup = 0.8, damage = 49, kit = 379, heavy = true, recovery = 1.1 } ]
+  steps = [ { from = "DwarfFemale", clip = 17, take = 0, windup = 0.5, damage = 32, recovery = 0.15 }, { from = "TrollFemale", clip = 17, take = 1, windup = 0.42, damage = 32, recovery = 0.15 }, { from = "NightElfMale", clip = 57, take = 0, windup = 0.8, damage = 49, kit = 379, heavy = true, recovery = 1.1 } ]
   # From range: it closes the gap in one blow.
   [[mob.pattern]]
   name = "lunge"
   weight = 2
   min_range = 5
   max_range = 13
-  steps = [ { from = "GnomeMale", clip = 17, take = 0, windup = 0.75, lunge = 8, damage = 46, kit = 379, heavy = true, recovery = 1.2 } ]
+  steps = [ { from = "GnomeMale", clip = 57, take = 0, windup = 0.75, lunge = 8, damage = 46, kit = 379, heavy = true, recovery = 1.2 } ]
   # Nearer its end, from range: dynamite thrown where you stand (marked as it winds up).
   [[mob.pattern]]
   name = "dynamite"

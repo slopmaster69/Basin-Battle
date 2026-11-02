@@ -257,3 +257,30 @@ fn a_boss_whose_foe_runs_past_its_leash_turns_on_another_in_its_fight_not_home()
     assert_eq!(s.mobs[&k].state.target(), Some(b), "on Bren: {:?}", s.mobs[&k].state);
     assert!(s.mobs[&k].health < 50_000, "not home healed");
 }
+
+#[test]
+fn a_cast_naming_a_clip_plays_it_and_one_that_doesnt_plays_its_spells_own() {
+    let parse = |t: &str| -> crate::content::PatternDef { toml::from_str(t).unwrap() };
+    for (with, clip) in [(true, Some(54u16)), (false, None)] {
+        let mut s = world();
+        let a = hero(&mut s, "Ayla", [0.0, 0.0, 0.0], 0.0);
+        let k = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
+        let def = s.mobs[&k].def;
+        let step = if with { "{ ranged = true, clip = 54, take = 0, windup = 1.0, damage = 5, range = 20.0, radius = 1.5, speed = 20.0, spell = 133 }" } else { "{ ranged = true, windup = 1.0, damage = 5, range = 20.0, radius = 1.5, speed = 20.0, spell = 133 }" };
+        s.content.mobs[def].patterns = vec![parse(&format!("name = \"volley\"\nmin_range = 3.0\nmax_range = 20.0\nsteps = [ {step} ]"))];
+        s.content.mobs[def].attack.ranged = true;
+        s.content.mobs[def].attack.range = 20.0;
+        s.engage(k, Foe::Hero(a));
+        let mut seen = None;
+        for _ in 0..60 {
+            for e in s.step(DT) {
+                if let Event::MobWindup { id, clip, take, .. } = e {
+                    if id == k {
+                        seen = Some((clip, take));
+                    }
+                }
+            }
+        }
+        assert_eq!(seen.map(|c| c.0), clip, "with a clip: {with}");
+    }
+}
