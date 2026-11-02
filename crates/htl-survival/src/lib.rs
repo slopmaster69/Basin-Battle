@@ -43,6 +43,8 @@ mod tests_meter;
 #[cfg(test)]
 mod tests_siege;
 #[cfg(test)]
+mod tests_control;
+#[cfg(test)]
 mod tests_support;
 #[cfg(test)]
 mod tests_tactics;
