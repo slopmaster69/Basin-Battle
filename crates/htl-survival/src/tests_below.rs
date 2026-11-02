@@ -1079,6 +1079,30 @@ fn a_ground_look_is_only_laid_for_an_area_as_big_as_it_looks() {
 }
 
 #[test]
+fn below_a_foes_currency_goes_to_every_hero_in_the_fight() {
+    let c = Content::builtin().for_dungeon_of("deadmines");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let a = s.join("ayla", "Ayla", None);
+    let b = s.join("bren", "Bren", None);
+    let far = s.join("cass", "Cass", None);
+    run(&mut s, 0.2);
+    let pirate = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "dm_pirate").unwrap().0;
+    let at = s.mobs[&pirate].pos;
+    s.players.get_mut(&a).unwrap().pos = [at[0] + 2.0, at[1], at[2]];
+    s.players.get_mut(&b).unwrap().pos = [at[0] - 6.0, at[1], at[2]];
+    s.players.get_mut(&far).unwrap().pos = [at[0] + 200.0, at[1], at[2]];
+    run(&mut s, 0.05);
+    let plunder = s.content.item("plunder").unwrap();
+    let have = |s: &Survival, h: Id| s.players[&h].bag.get(&plunder).copied().unwrap_or(0);
+    let (a0, b0, f0) = (have(&s, a), have(&s, b), have(&s, far));
+    s.hurt_mob(pirate, a, 1_000_000);
+    run(&mut s, 0.05);
+    assert!(have(&s, a) > a0, "the killer's");
+    assert!(have(&s, b) > b0, "and the hero beside them, their own share");
+    assert_eq!(have(&s, far), f0, "not one far off, out of the fight");
+}
+
+#[test]
 fn every_dungeon_has_a_count_of_foes_for_its_wager() {
     use crate::sim::wager::{wager_forces_needed, wager_forces_total, WAGER_FORCES};
     let c = Content::builtin();
