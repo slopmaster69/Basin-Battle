@@ -229,6 +229,11 @@ pub enum Event {
     /// A blow no guard stops on its way to `player` for `secs`; `from` the creature winding it up
     /// (its weapon goes red), none for a hazard or a spell's ground.
     Danger { player: Id, secs: f32, from: Option<Id> },
+    /// `id`'s weapon glows red for `secs`, for everyone who can see it (the striker too): a blow
+    /// no guard stops is on its way.
+    Glow { id: Id, secs: f32 },
+    /// `id`'s body drawn at `scale` (1: as it is): Onslaught's titan.
+    Grow { id: Id, scale: f32 },
     /// Open a station's work for a hero.
     StationOpen { player: Id, station: Id },
     /// Ask a hero to confirm something (ringing the bell).
@@ -645,6 +650,9 @@ pub struct Mob {
     pub raider: bool,
     /// Reeling (parried, or struck mid wind-up) until then: it does nothing, and takes more.
     pub stagger_until: f32,
+    /// Thrown (knocked back or pulled) through the air until then: it lands where it was thrown,
+    /// whatever else the blow did (a slow, a root or a stagger takes hold once it's down).
+    pub thrown_until: f32,
     /// The stagger came from a parry (the riposte bonus applies).
     pub riposte: bool,
     /// The blow it's winding up is its special one.

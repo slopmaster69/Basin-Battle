@@ -137,6 +137,11 @@ pub struct AbilityDef {
     /// much a second.
     #[serde(default)]
     pub delay: f32,
+    /// Ground: how long its look takes to come down (a meteor's fall is in the effect's own
+    /// model, from the moment it's shown): shown that much before it lands, so the blow and the
+    /// look land together.
+    #[serde(default)]
+    pub look_lead: f32,
     #[serde(default)]
     pub linger: f32,
     #[serde(default)]
@@ -231,6 +236,9 @@ pub struct AbilityDef {
     /// Every hero has it from the start (the rest are unlocked later; all in a dev build).
     #[serde(default)]
     pub free: bool,
+    /// A returning projectile: its key again while it flies out calls it back from where it is.
+    #[serde(default)]
+    pub recall: bool,
     /// A weapon art's blow: its wind-up (seconds), its share of the weapon's damage, yards past the
     /// weapon's reach, its arc (0: the weapon's), its stamina; a guard that blocks it loses
     /// `crush` times the stamina; no guard stops it or parry turns it (`unblockable`); light
@@ -559,15 +567,15 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// go; their next blow counts as from behind) until they strike or cast; `cheat_death` keeps a hero
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
-pub const OTHER_EFFECTS: [&str; 15] =
-    ["burn", "mark", "heal", "cleanse_panic", "deathmark", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
+pub const OTHER_EFFECTS: [&str; 16] =
+    ["burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
 pub const BOONS: [&str; 8] = ["onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 11] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark"];
+pub const HARMFUL: [&str; 12] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius
@@ -619,6 +627,26 @@ pub struct CounterDef {
     /// A counter that catches something comes back this much sooner (a share of its cooldown).
     #[serde(default = "half")]
     pub caught_cooldown: f32,
+    /// And one that catches nothing (Retaliation: a misread costs little).
+    #[serde(default = "whole")]
+    pub missed_cooldown: f32,
+    /// The hero's own attack, guard, dodge, jump or another ability ends it at once.
+    #[serde(default)]
+    pub ends_on_action: bool,
+    /// What it strikes back with when it catches a melee blow: this ability (a cone) from the
+    /// hero, along their facing (Retaliation's sweep).
+    #[serde(default)]
+    pub answer: String,
+    /// Only blows and projectiles from in front, within this arc (degrees; 0: from anywhere).
+    #[serde(default)]
+    pub front: f32,
+    /// The guard's pose held while it lasts (Shield Wall: the shield up).
+    #[serde(default)]
+    pub guard_pose: bool,
+}
+
+fn whole() -> f32 {
+    1.0
 }
 
 fn half() -> f32 {

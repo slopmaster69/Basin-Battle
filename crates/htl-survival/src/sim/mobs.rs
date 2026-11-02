@@ -304,6 +304,7 @@ impl Survival {
                 pack,
                 raider,
                 stagger_until: 0.0,
+                thrown_until: 0.0,
                 riposte: false,
                 special: false,
                 pattern: None,
@@ -1017,7 +1018,8 @@ impl Survival {
             }
             // Rooted or stunned: no walking; stunned, frozen or panicked: no thinking (a panic runs
             // by itself).
-            if self.held_still(id) {
+            let thrown = self.mobs[&id].thrown_until > now;
+            if self.held_still(id) && !thrown {
                 if !self.mobs[&id].path.is_empty() {
                     self.halt(id);
                 }
@@ -1307,8 +1309,36 @@ impl Survival {
         self.events.push(Event::MobMove { id, path: vec![from, to], speed, face: None });
     }
 
-    fn halt(&mut self, id: Id) {
+    /// Thrown to `to` over `air` seconds: it lands there whatever else the blow did, turned the
+    /// while to `face` (whoever threw it), so a knockback drives it back rather than turning it to
+    /// run.
+    pub(crate) fn throw_mob(&mut self, id: Id, to: Vec3, air: f32, face: Option<Id>) {
+        let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
+        let from = m.pos;
+        let speed = dist2d(from, to) / air.max(0.05);
+        m.path = vec![to];
+        m.plan_to = None;
+        m.speed = speed;
+        m.thrown_until = now + air;
+        let face = face.filter(|f| self.players.contains_key(f));
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.sidle = face;
+        if let Some(at) = face.and_then(|f| self.players.get(&f)).map(|p| p.pos) {
+            m.facing = facing(from, at);
+        } else {
+            m.facing = facing(from, to);
+        }
+        self.events.push(Event::MobMove { id, path: vec![from, to], speed, face });
+    }
+
+    fn halt(&mut self, id: Id) {
+        let now = self.clock;
+        let Some(m) = self.mobs.get_mut(&id) else { return };
+        // In the air it comes down where it was thrown: nothing stops it short.
+        if m.thrown_until > now && !m.path.is_empty() {
+            return;
+        }
         let was_moving = !m.path.is_empty();
         m.path.clear();
         m.speed = 0.0;

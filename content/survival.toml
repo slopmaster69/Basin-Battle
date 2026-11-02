@@ -2758,7 +2758,7 @@ panic_speed = 5.0
 
 [loadout]
 ranged = "hurled_axe"
-close = "sundering_blow"
+close = "shockwave"
 utility = "charge"
 defense = "retaliation"
 ultimate = "onslaught"
@@ -2769,14 +2769,15 @@ ultimate = "onslaught"
 # the warrior stands now: walk so its way back crosses the fight.
 [[ability]]
 key = "hurled_axe"
-name = "Hurled Axe"
-text = "Throw your axe along the reticle: it flies out 22 yards through every foe, then comes back to you, striking each one again. It comes back to where you are now: walk so its way back crosses the fight."
+name = "Axe Throw"
+text = "Throws an axe up to 22 yd along the aimed line, following the ground at hand height. Each enemy it passes takes 12 damage. The axe returns to your current position, hitting each enemy again. Recast to recall it early from where it is."
 icon = "INV_ThrowingAxe_01"
 school = "warrior"
 slot = "ranged"
 kind = "projectile"
 free = true
 returns = true
+recall = true
 damage = [12.0, 12.0]
 range = [22.0, 22.0]
 radius = [0.35, 0.35]
@@ -2789,9 +2790,9 @@ valor_hit = 4.0
 
 [[ability]]
 key = "rending_axe"
-name = "Rending Axe"
+name = "Grasping Axe"
 ex_of = "hurled_axe"
-text = "A faster axe that drags: every foe it strikes, going out and coming back, is pulled 3 yards toward you and staggered. Haul a pack into your Sundering Blow."
+text = "Throws a heavy axe up to 22 yd. Each enemy it hits takes 14 damage, is pulled 3 yd toward you and staggered for 0.5 sec, on the way out and again on the way back."
 icon = "INV_Axe_04"
 slot = "ranged"
 kind = "projectile"
@@ -2943,46 +2944,45 @@ spell = 2812
 
 # Steel: the guard breaker.
 [[ability]]
-key = "sundering_blow"
-name = "Sundering Blow"
-text = "A slow overhead with your weapon (0.75 s wind-up) for 220% of its damage: it staggers what it hits for 1.2 s, a guard that blocks it loses three times the stamina, and a frozen foe shatters."
-icon = "Ability_Warrior_Sunder"
+key = "shockwave"
+name = "Shockwave"
+text = "After a 0.4 sec windup, slams the ground and sends a shockwave through a 9 yd cone. Enemies hit take 120% weapon damage and are knocked back 4 yd. An enemy knocked into a wall or tree is stunned for 1.5 sec (0.75 sec against players)."
+icon = "Ability_ShockWave"
 school = "warrior"
 slot = "close"
-kind = "art"
+kind = "cone"
 free = true
-windup = 0.75
-weapon = 2.2
-reach = 0.5
-stamina = 28.0
-crush = 3.0
-shatter = true
-cooldown = 9.0
-clip = 57
-spell = 12294
+range = [9.0, 9.0]
+arc = 60.0
+cast = 0.4
+weapon = 1.2
+cooldown = 8.0
+spell = 25425
 valor_hit = 6.0
-effects = [{ kind = "stagger", secs = [1.2, 1.2] }]
+effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
 
+# Shockwave's EX: one target, committed. Unstoppable Blow merged in (the red glow, no guard, no
+# parry, no interrupting the wind-up), and the Sunder that makes it the warrior's boss button.
 [[ability]]
-key = "unstoppable_blow"
-name = "Unstoppable Blow"
-ex_of = "sundering_blow"
-text = "No guard stops it and no parry turns it (your weapon glows red to whoever it's coming for), nothing knocks you out of the wind-up, and it cleaves wide."
-icon = "Ability_Warrior_SavageBlow"
+key = "sundering_blow"
+name = "Sundering Blow"
+ex_of = "shockwave"
+text = "A 0.75 sec overhead strike that cannot be blocked, parried or interrupted; your weapon glows red during the windup. Deals 260% weapon damage, staggers for 1.2 sec and Sunders the target for 8 sec: it takes 15% more damage from all sources. Shatters frozen enemies."
+icon = "Ability_Warrior_Sunder"
 slot = "close"
 kind = "art"
 valor = 25
 windup = 0.75
-weapon = 2.4
+weapon = 2.6
 reach = 0.5
-arc = 150.0
 stamina = 28.0
 unblockable = true
 poise = true
 shatter = true
 clip = 57
 spell = 12294
-effects = [{ kind = "stagger", secs = [1.5, 1.5] }]
+valor_hit = 6.0
+effects = [{ kind = "stagger", secs = [1.2, 1.2] }, { kind = "sunder", secs = [8.0, 8.0], amount = 0.15 }]
 
 # Shadow: from behind.
 [[ability]]
@@ -3097,19 +3097,18 @@ spell = 26573
 [[ability]]
 key = "charge"
 name = "Charge"
-text = "Charge up to 20 yards along the reticle, untouchable on the way, and bowl through everyone in your path: each takes 10 and is staggered for 0.6 s."
+text = "Charges up to 20 yd along the aimed line and stops at the first enemy in your path, dealing 10 damage and staggering it for 1 sec. You cannot be hit during the charge."
 icon = "Ability_Warrior_Charge"
 school = "warrior"
 slot = "utility"
 kind = "dash"
 free = true
-through = true
 damage = [10.0, 10.0]
 range = [20.0, 20.0]
 cooldown = 12.0
 invulnerable = true
 spell = 100
-effects = [{ kind = "stagger", secs = [0.6, 0.6] }]
+effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 
 # Shadow: in and out.
 [[ability]]
@@ -3240,31 +3239,46 @@ effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }, { kind = "steadf
 [[ability]]
 key = "retaliation"
 name = "Retaliation"
-text = "Press it as a melee blow comes: for 1.5 s every melee blow at you is blocked and its attacker staggered for 1 s (open to your hits). It does nothing against arrows, spells on the ground or beams, so save it for a swing."
+text = "Braces for up to 1 sec. The first melee attack that strikes you from the front is blocked, and you counterattack every enemy in front of you for 150% weapon damage, staggering them for 1 sec. Ends early when you attack, dodge, jump, guard or use another ability. Does not stop projectiles. If nothing strikes you, the cooldown is halved."
 icon = "Ability_Warrior_Challange"
 school = "warrior"
 slot = "defense"
 kind = "stance"
 free = true
-secs = 1.5
+secs = 1.0
 cooldown = 12.0
 spell = 20230
 aura = 20230
-counter = { block = true, melee_only = true, attacker = [{ kind = "stagger", secs = [1.0, 1.0] }] }
+counter = { block = true, melee_only = true, once = true, front = 180.0, ends_on_action = true, answer = "retaliation_sweep", caught_cooldown = 1.0, missed_cooldown = 0.5 }
+
+# Retaliation's counterattack: the sweep in front of the warrior when it catches a blow.
+[[ability]]
+key = "retaliation_sweep"
+name = "Retaliation"
+text = "The counterattack: every enemy in front of you takes 150% weapon damage and is staggered for 1 sec."
+icon = "Ability_Warrior_Challange"
+slot = "close"
+kind = "cone"
+inner = true
+range = [4.5, 4.5]
+arc = 150.0
+weapon = 1.5
+spell = 845
+effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 
 [[ability]]
 key = "shield_wall"
 name = "Shield Wall"
 ex_of = "retaliation"
-text = "Three seconds behind the shield: every melee blow and projectile is blocked. Hold the line while a pack swings, or walk a duel's bolts in."
+text = "Raises your shield for up to 4 sec. Melee attacks and projectiles from the front are blocked, and projectiles stop against the shield. You move at half speed. Ends when you attack, dodge or press it again."
 icon = "Ability_Warrior_ShieldWall"
 slot = "defense"
 kind = "stance"
 valor = 25
-secs = 3.0
+secs = 4.0
 spell = 871
 aura = 871
-counter = { block = true }
+counter = { block = true, front = 180.0, ends_on_action = true, guard_pose = true }
 
 # Shadow: outlast them. 12 a second for 3 s, every point of it back to you; a miss costs nothing.
 [[ability]]
@@ -3366,16 +3380,17 @@ spell = 633
 [[ability]]
 key = "onslaught"
 name = "Onslaught"
-text = "For 6 s: your attacks and guard spend no stamina, nothing staggers you, and your heavy attacks can't be blocked."
-icon = "Ability_CriticalStrike"
+text = "For 8 sec, you grow 30% larger and your weapon glows red. Your attacks and guard cost no Stamina, you attack 20% faster, you cannot be staggered or knocked back, and your heavy attacks cannot be blocked. Stuns, roots and damage still affect you."
+icon = "Ability_Racial_BloodRage"
 school = "warrior"
 slot = "ultimate"
 kind = "buff"
 free = true
 valor = 100
 cooldown = 40.0
-spell = 12328
-effects = [{ kind = "onslaught", secs = [6.0, 6.0] }]
+# Bloodlust's burst and roar.
+spell = 379
+effects = [{ kind = "onslaught", secs = [8.0, 8.0], amount = 0.2 }]
 
 # Shadow: marked for death.
 [[ability]]
@@ -3684,8 +3699,8 @@ respawn = 0.0
 key = "heroic_leap"
 name = "Heroic Leap"
 ex_of = "charge"
-text = "Leap to the reticle (up to 16 yd) over anything in the way. Where you'll land is drawn for everyone; all within 4 yd take 12 and are thrown back 5 yd and slowed 40% for 2 s."
-icon = "Ability_Warrior_WarCry"
+text = "Leaps to the target location up to 16 yd away, over obstacles. Enemies within 4 yd of the landing take 12 damage, are knocked back 5 yd and slowed by 40% for 2 sec. Other players see where you will land."
+icon = "Ability_WarStomp"
 slot = "utility"
 kind = "leap"
 valor = 25
@@ -4340,6 +4355,9 @@ valor = 100
 range = [34.0, 34.0]
 radius = [7.0, 7.0]
 delay = 1.5
+# Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
+# moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
+look_lead = 0.8
 damage = [70.0, 70.0]
 linger = 4.0
 linger_damage = 8.0
@@ -5298,20 +5316,6 @@ spell = 26616
 effects = [{ kind = "stun", secs = [1.5, 1.5] }]
 
 # 3: grow into it.
-[[ability]]
-key = "avatar"
-name = "Avatar"
-text = "For 8 s you're a titan: nothing staggers you, your attacks and guard cost no stamina, your heavy attacks can't be blocked, you run 20% faster and take 20% less from everything."
-icon = "Ability_Racial_BloodRage"
-school = "beta"
-slot = "ultimate"
-kind = "buff"
-valor = 100
-cooldown = 40.0
-spell = 8913
-# (No boon adds damage yet: Onslaught's unblockable heavies and a hide of 20% stand in for it.)
-effects = [{ kind = "onslaught", secs = [8.0, 8.0] }, { kind = "haste", secs = [8.0, 8.0], amount = 0.2 }, { kind = "hallowed", secs = [8.0, 8.0], amount = 0.2 }]
-
 # 3: bound to you.
 [[ability]]
 key = "soul_chain"
@@ -9379,10 +9383,10 @@ name = "The Garrison's Banner"
 at = [-9674.0, 704.0]
 display = 631
 scale = 1.0
-teaches = ["hurled_axe", "sundering_blow"]
+teaches = ["hurled_axe", "shockwave"]
 keep = true
 secs = 3.0
-text = "Westbrook's banner, and the drill the garrison's footmen learned under it: the throw, and the blow that breaks a guard."
+text = "Westbrook's banner, and the drill the garrison's footmen learned under it: the throw, and the slam that drives a line back."
 trial = ["trial_shrine_warrior_0", "trial_shrine_warrior_1"]
 
 [[chest]]

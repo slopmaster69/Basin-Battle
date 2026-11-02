@@ -151,7 +151,7 @@ impl Survival {
             self.events.push(Event::Hop { player: victim, dir, speed: moved / air, lift, roll: false, style: "" });
         } else {
             self.stagger_mob(victim, air + 0.15, false);
-            self.flee_to(victim, to, moved / air);
+            self.throw_mob(victim, to, air, Some(owner));
         }
     }
 

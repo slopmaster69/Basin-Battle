@@ -65,6 +65,8 @@ pub(crate) struct GroundCast {
     pub share: f32,
     pub land_at: f32,
     pub mark: Option<Id>,
+    /// Its look already on its way down (`look_lead`).
+    pub shown: bool,
 }
 
 /// Ground left burning: whoever stands in it takes `dps` a second until then.
@@ -580,6 +582,11 @@ impl Survival {
             self.tell(id, format!("{} isn't yours yet.", self.content.abilities[base].name));
             return true;
         }
+        // A returning axe still flying out: its key again calls it back from where it is.
+        if self.content.abilities[base].recall && self.recall(id, base) {
+            return true;
+        }
+        let p = &self.players[&id];
         // The key armed for its recast: pressed again (Ctrl or not), the recast goes, for nothing
         // (the first cast spent the cooldown). Empowered (a combo), it's the EX version, free.
         let recast = self.recast_armed(id, base).map(|r| r.ability);
@@ -975,6 +982,17 @@ impl Survival {
         let from = self.hands(id, yaw);
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
+        // A thrown axe that comes back skims the ground along the aim's line, at hand height over
+        // where its range ends (up a hill, down one): aimed at the ground it would bury itself a
+        // few yards out and turn there.
+        let base = if d.returns {
+            let flat = norm([base[0], base[1], 0.0]);
+            let far = [from[0] + flat[0] * range, from[1] + flat[1] * range];
+            let floor = self.ground_near(far[0], far[1], from[2]);
+            norm([far[0] - from[0], far[1] - from[1], floor[2] + HAND_UP - from[2]])
+        } else {
+            base
+        };
         let n = d.count.max(1);
         // A lob arcs to the ground at the reticle (within its range), over whatever is between.
         let lob_at = d.lob.then(|| self.aim_point(id, range));
@@ -1148,6 +1166,17 @@ impl Survival {
     /// A boomerang at its turn: its look flown back from there to its thrower (by an unseen
     /// anchor standing there), and a fresh pass (what it struck going out it can strike again),
     /// at its way back's share of the damage.
+    /// Call back the hero's own returning projectile of this ability (or its EX version) that is
+    /// still flying out; false if none is.
+    fn recall(&mut self, id: Id, base: usize) -> bool {
+        let ex = self.content.ex_of(base);
+        let Some(k) = self.projectiles.iter().position(|p| p.owner == id && p.stage == Stage::Out && (p.ability == base || Some(p.ability) == ex)) else { return false };
+        let mut p = self.projectiles.remove(k);
+        self.turn_back(&mut p);
+        self.projectiles.push(p);
+        true
+    }
+
     fn turn_back(&mut self, p: &mut Projectile) {
         let share = self.content.abilities[p.ability].return_damage;
         // It turns at hand height over the ground there: thrown high, it doesn't come back over
@@ -1776,7 +1805,7 @@ impl Survival {
         if d.delay > 0.0 {
             self.events.push(Event::Cast { caster: id, spell: d.spell, ms: (d.delay * 1000.0) as u32 });
         }
-        self.grounds.push(GroundCast { owner: id, ability, at, radius, share, land_at, mark });
+        self.grounds.push(GroundCast { owner: id, ability, at, radius, share, land_at, mark, shown: false });
         if d.delay <= 0.0 {
             self.step_grounds();
         }
@@ -1785,6 +1814,17 @@ impl Survival {
     /// Ground marked for an ability lands; burning ground burns.
     pub(crate) fn step_grounds(&mut self) {
         let now = self.clock;
+        // A look that takes its time to come down starts that much early.
+        for k in 0..self.grounds.len() {
+            let g = &self.grounds[k];
+            let d = &self.content.abilities[g.ability];
+            if !g.shown && d.look_lead > 0.0 && g.land_at - d.look_lead <= now {
+                let target = if d.at_self { Target::Unit(g.owner) } else { Target::Point(g.at) };
+                let (owner, spell) = (g.owner, d.spell);
+                self.grounds[k].shown = true;
+                self.events.push(Event::Missile { caster: owner, spell, target });
+            }
+        }
         let (due, keep): (Vec<GroundCast>, Vec<GroundCast>) = std::mem::take(&mut self.grounds).into_iter().partition(|g| g.land_at <= now);
         self.grounds = keep;
         for g in due {
@@ -1793,7 +1833,9 @@ impl Survival {
             }
             let d = self.content.abilities[g.ability].clone();
             let target = if d.at_self { Target::Unit(g.owner) } else { Target::Point(g.at) };
-            self.events.push(Event::Missile { caster: g.owner, spell: d.spell, target });
+            if !g.shown {
+                self.events.push(Event::Missile { caster: g.owner, spell: d.spell, target });
+            }
             let damage = AbilityDef::at(d.damage, g.share);
             self.area(g.owner, g.ability, g.at, g.radius, g.share, damage, None);
             self.linger_at(g.owner, g.ability, g.at, g.radius);
@@ -1968,7 +2010,12 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
-        let damage = AbilityDef::at(d.damage, share);
+        // A blow of the weapon's (Shockwave, Retaliation's sweep): a share of its roll.
+        let swing = self.players.get(&id).filter(|_| d.weapon > 0.0).map(|p| self.weapon_of(p).damage);
+        let damage = match swing {
+            Some(w) => self.roll(w) as f32 * d.weapon,
+            None => AbilityDef::at(d.damage, share),
+        };
         self.area(id, ability, at, range, share, damage, Some((yaw, d.arc.max(10.0))));
         if self.debug {
             for k in -2..=2 {
@@ -2326,6 +2373,9 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false });
         self.set_action(id, Action::Stance { ability, until: now + d.secs });
+        if d.counter.as_ref().is_some_and(|c| c.guard_pose) {
+            self.events.push(Event::Guard { player: id, up: true });
+        }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
         self.events.push(Event::Auras { id });
         self.update_rooted(id);
@@ -2339,7 +2389,14 @@ impl Survival {
         if let (Some(nova), Some(at)) = (self.content.ability(&d.leaves), self.players.get(&id).filter(|p| p.health > 0).map(|p| p.pos)) {
             self.nova(id, nova, at, 1.0);
         }
-        let share = if s.caught { d.counter.as_ref().map_or(1.0, |c| c.caught_cooldown) } else { 1.0 };
+        let share = match &d.counter {
+            Some(c) if s.caught => c.caught_cooldown,
+            Some(c) => c.missed_cooldown,
+            None => 1.0,
+        };
+        if d.counter.as_ref().is_some_and(|c| c.guard_pose) {
+            self.events.push(Event::Guard { player: id, up: false });
+        }
         if self.players.contains_key(&id) {
             self.spend_charge(id, s.ability, share);
             if matches!(self.players[&id].action, Action::Stance { .. }) {
@@ -2377,6 +2434,16 @@ impl Survival {
         if c.mirror || (c.melee_only && how != HitKind::Melee) || (c.ranged_only && how != HitKind::Projectile) {
             return None;
         }
+        // A shield held to the front: what comes from behind or the side gets round it.
+        if c.front > 0.0 {
+            let looks = self.players.get(&victim).map(|p| p.facing);
+            let from = self.unit_pos(attacker).zip(self.unit_pos(victim)).map(|(a, v)| facing(v, a));
+            if let (Some(f), Some(dir)) = (looks, from) {
+                if angle_between(f, dir) > c.front / 2.0 {
+                    return None;
+                }
+            }
+        }
         if let Some(st) = self.stances.get_mut(&victim) {
             st.caught = true;
         }
@@ -2389,6 +2456,13 @@ impl Survival {
         let close = self.unit_pos(attacker).zip(self.unit_pos(victim)).is_some_and(|(a, v)| dist2d(a, v) <= 6.0);
         if !c.attacker.is_empty() && (how == HitKind::Melee || c.any_attacker || close) {
             self.apply_effects(victim, attacker, &c.attacker, 1.0, &d.name);
+        }
+        // It strikes back: a sweep in front of the hero (Retaliation).
+        if how == HitKind::Melee {
+            if let (Some(sweep), Some(p)) = (self.content.ability(&c.answer), self.players.get(&victim)) {
+                let (at, yaw) = (p.pos, p.facing);
+                self.cone_at(victim, sweep, at, yaw, 1.0);
+            }
         }
         let out = if c.dodge {
             Outcome::Dodged
