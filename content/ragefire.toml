@@ -1404,3 +1404,64 @@ radius = 1.5
 count = 2
 link = 10.0
 wake = "ledge_cache"
+
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands a few yards behind, linked: a front to break and a back to reach.
+
+[[dungeon.pack]]
+mob = "rf_warlock"
+at = [-302.3, 263.5]
+z = -13.4
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-174.3, 7.5]
+z = -30.8
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_molten"
+at = [-232.3, 229.5]
+z = -25.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_trogg"
+at = [-410.3, 213.5]
+z = 0.6
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_molten"
+at = [-198.3, 71.5]
+z = -15.6
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-176.3, 161.5]
+z = -25.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rf_cultist"
+at = [-264.3, -106.5]
+z = -58.1
+radius = 3.0
+count = 2
+link = 12.0

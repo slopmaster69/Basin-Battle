@@ -802,6 +802,19 @@ count = 2
 link = 10.0
 wake = "restricted_cache"
 
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands a few yards behind, linked: a front to break and a back to reach.
+
+[[dungeon.pack]]
+mob = "sc_gallant"
+at = [278.0, -232.0]
+z = 18.5
+radius = 3.0
+count = 2
+link = 12.0
+
 # The Archivist: a scholar of what the Crusade burned, and he kept a copy of all of it.
 [[mob]]
 key = "sl_archivist"
