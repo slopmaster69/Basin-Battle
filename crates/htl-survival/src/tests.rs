@@ -2456,6 +2456,151 @@ fn a_group_needs_more_to_break_a_champion_and_it_stands_back_up_before_it_can_br
 }
 
 #[test]
+fn a_parry_gives_back_stamina_and_opens_a_window_where_everything_costs_half() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.players.get_mut(&p).unwrap().stamina = 40.0;
+    s.input(p, Input::Guard);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
+    let back = s.content.parry.stamina;
+    assert!(back > 0.0);
+    assert_eq!(s.players[&p].stamina, 40.0 + back, "the parry pays");
+    // In the opening, a roll costs half...
+    s.input(p, Input::GuardUp);
+    let before = s.players[&p].stamina;
+    s.spend(p, 20.0);
+    assert_eq!(s.players[&p].stamina, before - 10.0, "half in the opening");
+    // ...and after it, all of it.
+    let opening = s.content.parry.opening;
+    run(&mut s, opening + 0.1);
+    let before = s.players[&p].stamina;
+    s.spend(p, 20.0);
+    assert_eq!(s.players[&p].stamina, before - 20.0, "whole after");
+}
+
+#[test]
+fn rolling_through_a_blow_gives_back_a_little_stamina() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = s.content.mob("grunt").unwrap();
+    s.content.mobs[g].aggro = 0.0;
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.input(p, Input::Dodge);
+    s.step(0.1);
+    let before = s.players[&p].stamina;
+    assert_eq!(s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, false, Blow::Light), Outcome::Dodged);
+    assert_eq!(s.players[&p].stamina, (before + s.content.dodge.refund).min(s.content.player.stamina));
+    assert!(s.content.dodge.refund > 0.0);
+}
+
+#[test]
+fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let w = mob(&mut s, "warlord", [2.0, 0.0, 0.0]);
+    s.engage(w, Foe::Hero(p));
+    let limit = s.posture_limit(w);
+    assert!(limit > 0);
+    let share = s.content.parry.posture;
+    let wait = s.content.parry.cooldown + 0.05;
+    // Only the test's blows: the Warlord's own swings would land between them (it stays in the
+    // fight, for its posture's size, but held idle).
+    let hold = |s: &mut Survival| {
+        s.mobs.get_mut(&w).unwrap().state = MobState::Idle { wander_at: 1e9 };
+        s.pending.clear();
+    };
+    let parry = |s: &mut Survival| {
+        hold(s);
+        s.input(p, Input::GuardUp);
+        for _ in 0..(wait / 0.05).ceil() as usize {
+            hold(s);
+            run(s, 0.05);
+        }
+        hold(s);
+        s.input(p, Input::Guard);
+        run(s, 0.05);
+        s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light)
+    };
+    assert_eq!(parry(&mut s), Outcome::Parried);
+    assert!(s.mobs[&w].stagger_until <= s.clock, "a champion isn't stopped by one parry");
+    let built = s.posture_of(w);
+    assert!((built as f32 - limit as f32 * share).abs() <= 2.0, "a parry fills a share of its posture: {built} of {limit}");
+    // Parry after parry, its stance breaks (the bar drains a little between them).
+    let mut broke = false;
+    for _ in 0..(3.0 / share).ceil() as usize {
+        if s.mobs[&w].stagger_until > s.clock {
+            broke = true;
+            break;
+        }
+        assert_eq!(parry(&mut s), Outcome::Parried);
+    }
+    broke |= s.mobs[&w].stagger_until > s.clock;
+    assert!(broke, "parries break its stance");
+    assert!(s.stance_broken(w), "the bar shows it broken");
+}
+
+#[test]
+fn a_champions_posture_drains_smoothly_from_its_last_blow() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let w = mob(&mut s, "warlord", [3.0, 0.0, 0.0]);
+    s.engage(w, Foe::Hero(p));
+    let limit = s.posture_limit(w);
+    assert!(s.build_posture(w, p, limit / 2) == false);
+    let full = s.posture_of(w);
+    run(&mut s, 1.0);
+    let some = s.posture_of(w);
+    assert!(some < full && some > 0, "drains, not all at once: {some} of {full}");
+    run(&mut s, 6.0);
+    assert_eq!(s.posture_of(w), 0, "and is gone");
+}
+
+/// A group's blows land close together: a flow under the drain must never break a stance however
+/// often it comes, and a flow over it must.
+#[test]
+fn only_a_flow_faster_than_the_drain_breaks_a_champions_stance() {
+    let flow = |share: f32, every: f32| -> bool {
+        let mut s = world();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let w = mob(&mut s, "warlord", [3.0, 0.0, 0.0]);
+        s.engage(w, Foe::Hero(p));
+        let per_sec = s.posture_limit(w) as f32 / s.content.mobs[s.mobs[&w].def].posture_secs;
+        let chunk = (per_sec * share * every).round() as u32;
+        for _ in 0..(60.0 / every) as usize {
+            if s.build_posture(w, p, chunk) {
+                return true;
+            }
+            run(&mut s, every);
+            // Held still, not fighting back, for the count's sake.
+            s.mobs.get_mut(&w).unwrap().state = MobState::Idle { wander_at: 1e9 };
+        }
+        false
+    };
+    assert!(!flow(0.8, 0.3), "four-fifths of the drain, in quick blows, a whole minute: never");
+    assert!(!flow(0.8, 0.9), "nor in slower ones");
+    assert!(flow(1.5, 0.3), "half again the drain breaks it");
+}
+
+#[test]
+fn a_parried_lesser_champion_still_reels_only_a_boss_fills_its_posture_instead() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let o = mob(&mut s, "overseer", [2.0, 0.0, 0.0]);
+    assert!(!s.content.mobs[s.mobs[&o].def].boss && s.posture_limit(o) > 0, "a champion, not a boss");
+    s.engage(o, Foe::Hero(p));
+    s.input(p, Input::GuardUp);
+    let wait = s.content.parry.cooldown + 0.05;
+    run(&mut s, wait);
+    s.input(p, Input::Guard);
+    run(&mut s, 0.05);
+    assert_eq!(s.strike_player(o, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
+    assert!(s.mobs[&o].stagger_until > s.clock, "it reels, open to a riposte");
+    assert_eq!(s.posture_of(o), 0, "its posture isn't filled instead");
+}
+
+#[test]
 fn a_champion_whose_foe_falls_turns_on_the_next_hero_in_its_fight() {
     let mut s = world();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -3146,7 +3291,9 @@ fn keen_gear_gives_back_breath_on_a_parry_and_peerless_gear_throws_a_dodged_foe_
     run(&mut s, 0.1);
     assert_eq!(s.strike_player(k, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
     let st = s.players[&p].stamina;
-    assert!((st - (50.0 + KEEN_BREATH)).abs() < 0.5, "breath back: {st}");
+    // (On top of what every parry gives back.)
+    let every = s.content.parry.stamina;
+    assert!((st - (50.0 + every + KEEN_BREATH)).abs() < 0.5, "breath back: {st}");
     s.input(p, Input::GuardUp);
     run(&mut s, 2.0);
     // Without one, a dodge through the grunt's blow doesn't throw it; with a Peerless piece, it does.

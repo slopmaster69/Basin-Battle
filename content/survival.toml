@@ -37,7 +37,8 @@ health = 200
 stamina = 100.0
 # Stamina comes back this fast, once this long has passed since it was last spent.
 stamina_regen = 32.0
-stamina_delay = 0.8
+# (0.8 felt like a wall between trading blows: half a second keeps a rhythm.)
+stamina_delay = 0.5
 # Below this stamina nothing that costs any can start (a short vulnerable spell, not a wait).
 exhausted_below = 1.0
 run_speed = 7.0
@@ -91,6 +92,8 @@ back_step = [8.0, 3.0]
 # on every roll, and Charge's (100) trailed a long red ribbon. `.es fx spell <id>` tries another
 # on yourself.
 spell = 0
+# Rolling through a blow, not just rolling: a little breath back, the reward for reading it.
+refund = 10.0
 
 [heavy]
 # The heavy attack (Shift + left mouse): the weapon's wind-up and recovery this much longer, its
@@ -330,6 +333,14 @@ stagger = 1.4
 riposte = 1.5
 # A hero whose blow is parried (by another hero) reels this long.
 hero_stagger = 0.9
+# The parry pays: this much stamina back, and for this long after, every blow, roll and guard
+# costs half (the opening to answer with).
+stamina = 25.0
+opening = 2.0
+# A boss isn't stopped by a parry: in a group parries came so often it reeled forever. Each parry
+# fills this share of its posture instead (on its bar); a few in a row, or parries and blows
+# together, break its stance. Lesser champions with a posture still reel from a parry.
+posture = 0.25
 
 # --- heroes against heroes ------------------------------------------------------------------------
 

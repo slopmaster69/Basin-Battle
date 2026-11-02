@@ -404,6 +404,11 @@ impl Survival {
         let now = self.clock;
         // Onslaught: blows and the guard cost nothing.
         let amount = if self.has_cc(id, "onslaught") { 0.0 } else { amount };
+        // A parry's opening: half the cost (not a guard broken, which takes it all).
+        let amount = match self.players.get(&id) {
+            Some(p) if p.opening_until > now && amount < 1000.0 => amount * 0.5,
+            _ => amount,
+        };
         if let Some(p) = self.players.get_mut(&id) {
             p.stamina = (p.stamina - amount).max(0.0);
             p.spent_at = now;
@@ -1622,8 +1627,24 @@ impl Survival {
             }
             Outcome::Parried => {
                 self.events.push(Event::Flash { player: victim, text: "Parry!".into() });
+                // The parry pays: breath back, and an opening to answer in.
+                if let Some(p) = self.players.get_mut(&victim) {
+                    p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
+                    p.opening_until = now + c.parry.opening;
+                    self.events.push(Event::Stamina { player: victim });
+                }
                 if self.mobs.contains_key(&attacker) {
-                    self.stagger_mob(attacker, c.parry.stagger, true);
+                    // A boss doesn't reel from each one (a group parried it into reeling
+                    // forever): it fills its posture, shown on its bar, and enough breaks it.
+                    // Lesser champions with a posture still reel, as anything else does.
+                    let def = self.mobs[&attacker].def;
+                    let limit = self.content.mobs[def].posture;
+                    if limit > 0 && self.content.mobs[def].boss && c.parry.posture > 0.0 {
+                        let fill = self.posture_limit(attacker) as f32 * c.parry.posture;
+                        self.build_posture(attacker, victim, fill.round() as u32);
+                    } else {
+                        self.stagger_mob(attacker, c.parry.stagger, true);
+                    }
                 } else if self.players.get(&attacker).is_some_and(|a| a.health > 0) {
                     // A hero parried: they reel, open to a riposte.
                     let until = now + c.parry.hero_stagger;
@@ -1642,7 +1663,16 @@ impl Survival {
         }
         match outcome {
             Outcome::Parried => self.gain_valor(victim, c.valor.parry),
-            Outcome::Dodged if !dashing && damage > 0 => self.gain_valor(victim, c.valor.roll),
+            Outcome::Dodged if !dashing && damage > 0 => {
+                self.gain_valor(victim, c.valor.roll);
+                // Rolled through it, not just away: a little breath back.
+                if c.dodge.refund > 0.0 {
+                    if let Some(p) = self.players.get_mut(&victim) {
+                        p.stamina = (p.stamina + c.dodge.refund).min(c.player.stamina);
+                        self.events.push(Event::Stamina { player: victim });
+                    }
+                }
+            }
             _ => {}
         }
         self.honed_tricks(attacker, victim, outcome, damage > 0 && !dashing);
