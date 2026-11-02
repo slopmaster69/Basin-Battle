@@ -1719,10 +1719,11 @@ fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing
     c.drain(0.6);
     let times = addon_lines(&c, "ES").iter().filter(|l| l.starts_with("T\t") && l.contains("older than this server's")).count();
     assert_eq!(times, 1, "once a run");
-    // The newest add-on on the newest client: not a word.
+    // The newest add-on on the newest client: not a word. (`ADDON_NEWEST` and `CLIENT_NEWEST` in
+    // survival/ui.rs: raise these with them.)
     let mut d = Client::connect(server.login, "wren", "hold", REALM).unwrap();
     enter(&mut d);
-    d.chat(".es hello 9 ac10");
+    d.chat(".es hello 10 ac10");
     assert!(d.until(2.0, |d| addon_lines(d, "ES").iter().any(|l| l.starts_with("V\t"))), "awake");
     d.drain(0.5);
     assert!(!told(&d), "nothing to update");
