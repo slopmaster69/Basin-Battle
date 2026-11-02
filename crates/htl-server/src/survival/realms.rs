@@ -272,8 +272,9 @@ impl Realms {
                 }
             }
             let news = std::mem::take(&mut self.below[k].to_camp);
+            let place = self.below[k].sim.dungeon_name();
             for (counts, items) in news {
-                self.camp.sim.from_below(&counts, &items);
+                self.camp.sim.from_below_at(place.as_deref(), &counts, &items);
             }
         }
         self.sync_pages();

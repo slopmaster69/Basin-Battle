@@ -793,6 +793,8 @@ impl Survival {
             *won.entry(self.content.honed(i, tier)).or_default() += 1;
         }
         if !won.is_empty() {
+            let names: Vec<String> = won.iter().map(|(i, n)| if *n > 1 { format!("{n} {}", self.content.items[*i].name) } else { self.content.items[*i].name.clone() }).collect();
+            self.announce(format!("The Bookmaker's gear goes to the camp's chest: {}.", names.join(", ")));
             self.events.push(Event::ToCamp { counts: Vec::new(), items: won });
         }
     }

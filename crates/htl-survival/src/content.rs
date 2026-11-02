@@ -2760,8 +2760,14 @@ impl Content {
                 "explore" => g.what == "any" || self.sites.iter().any(|x| x.key == g.what || x.kind == g.what),
                 "open" => g.what == "any" || self.chests.iter().any(|c| c.key == g.what),
                 "secret" | "learn" => g.what == "any",
-                // Below: the book read, a lamp lit (by its key), or out the front door.
-                "delve" => g.what == "book" || g.what == "end" || self.dungeon.as_ref().is_some_and(|d| d.lamps.iter().any(|l| l.key == g.what)),
+                // Below: the book read, a lamp lit (by its key), out of any dungeon's way out
+                // (`end`) or one's (`end:<dungeon>`).
+                "delve" => {
+                    g.what == "book"
+                        || g.what == "end"
+                        || g.what.strip_prefix("end:").is_some_and(|k| self.dungeons().any(|d| d.key == k))
+                        || self.dungeons().any(|d| d.lamps.iter().any(|l| l.key == g.what))
+                }
                 _ => ARMOR_SLOTS.contains(&g.what.as_str()),
             };
             if !known {
