@@ -929,7 +929,33 @@ impl Survival {
         } else if !raider && pack.is_some() {
             self.respawns.push((def, home, pack, now + d.respawn));
         }
-        // What it drops goes straight into the killer's bags.
+        // What it drops goes straight into the killer's bags. Below, the dungeon's own currency
+        // goes to every hero in the fight, each their own roll: a band's kills are everyone's
+        // (else the one landing the last blows takes it all).
+        let currency = self.dungeon_def().map(|d| d.plunder.clone());
+        if let Some(cur) = currency.filter(|_| self.is_below() && self.players.contains_key(&killer)) {
+            if let (Some(range), Some(item)) = (d.drops.get(&cur).copied(), self.content.item(&cur)) {
+                let at = self.mobs[&mid].pos;
+                let band: Vec<Id> = self
+                    .players
+                    .iter()
+                    .filter(|(h, p)| **h != killer && p.health > 0 && dist2d(p.pos, at) <= FIGHT_RANGE && (p.pos[2] - at[2]).abs() < 10.0)
+                    .map(|(h, _)| *h)
+                    .collect();
+                for h in band {
+                    let n = self.roll(range);
+                    if n > 0 {
+                        let left = self.give(h, item, n);
+                        if n > left {
+                            self.tell(h, format!("Your share: {} {}.", n - left, self.content.items[item].name));
+                        }
+                        if left > 0 {
+                            self.tell(h, format!("Your bags are full: {left} {} left behind.", self.content.items[item].name));
+                        }
+                    }
+                }
+            }
+        }
         if self.players.contains_key(&killer) {
             let mut got = Vec::new();
             for (k, range) in &d.drops {
