@@ -544,6 +544,7 @@ impl Game {
                 zone: arena.area_id,
                 map: arena.map_id,
                 pos: arena.player_spawn,
+                gear: [(0, 0); 19],
             })
             .collect();
         // Sent at character select so the client keeps it for its world entry: a bank that

@@ -1304,6 +1304,14 @@ fn characters_are_made_on_the_creation_screen_listed_played_and_deleted() {
     let t = &chars[1];
     assert_eq!((t.race, t.class, t.gender, t.facial_hair), (2, 7, 0, 5));
     assert_ne!(m.guid, t.guid);
+    // Dressed on the select screen as in the world, not bare: the survivor's jerkin, belt,
+    // trousers, boots and bracers (chest 4 .. wrists 8), and a weapon in hand (main hand 15).
+    for h in &chars {
+        let worn: Vec<(u32, u8)> = (4..9).map(|k| (h.equipment[k].display_id, h.equipment[k].inventory_type)).collect();
+        assert_eq!(worn, [(3413, 5), (3418, 6), (3414, 7), (18576, 8), (4448, 9)], "{} in the plain outfit", h.name);
+        assert_ne!(h.equipment[15].display_id, 0, "{} holds a weapon", h.name);
+        assert_eq!(h.equipment[0].display_id, 0, "{} bare-headed", h.name);
+    }
 
     // In as Morgana: drawn as she was made, and she knows the mage's Q and E (no more yet).
     let me = c.enter_with(|chars| chars.iter().position(|h| h.name == "Morgana").unwrap());

@@ -55,6 +55,9 @@ pub struct CharEntry<'a> {
     pub zone: u32,
     pub map: u32,
     pub pos: [f32; 3],
+    /// What it's seen wearing, by equipment slot (0 head .. 18 tabard): display id and
+    /// inventory type, `(0, 0)` for nothing.
+    pub gear: [(u32, u8); 19],
 }
 
 pub fn char_enum(chars: &[CharEntry]) -> Packet {
@@ -77,8 +80,8 @@ pub fn char_enum(chars: &[CharEntry]) -> Packet {
             .u32(0) // pet display
             .u32(0) // pet level
             .u32(0); // pet family
-        for _ in 0..19 {
-            b.u32(0).u8(0); // equipment: display id, inventory type
+        for (display, inv) in c.gear {
+            b.u32(display).u8(inv); // equipment: display id, inventory type
         }
         b.u32(0).u8(0); // first bag
     }

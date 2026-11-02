@@ -88,6 +88,23 @@ pub(crate) fn armor_slot(slot: &str) -> (u32, u8) {
     }
 }
 
+/// What's worn, slot by slot (item entries): the plain outfit, with the armor in its place, then
+/// the weapon, the shield and the bow, the ones there are.
+fn worn_of(armor: &[(&str, usize)], weapon: Option<usize>, shield: Option<usize>, bow: Option<usize>) -> Vec<(u8, u32)> {
+    let mut v: Vec<(u8, u32)> = OUTFIT
+        .iter()
+        .enumerate()
+        .filter(|(_, (slot, ..))| !armor.iter().any(|(a, _)| armor_slot(a).1 == *slot))
+        .map(|(k, (slot, ..))| (*slot, OUTFIT_ENTRY + k as u32))
+        .collect();
+    for (slot, item) in armor {
+        v.push((armor_slot(slot).1, ITEM_ENTRY + *item as u32));
+    }
+    let hands = [(SLOT_MAIN_HAND, weapon), (SLOT_OFF_HAND, shield), (SLOT_RANGED, bow)];
+    v.extend(hands.into_iter().filter_map(|(slot, i)| i.map(|i| (slot, ITEM_ENTRY + i as u32))));
+    v
+}
+
 /// What every survivor wears: a plain jerkin, belt, trousers, boots and bracers (cosmetic).
 /// (slot, inventory type, display, name)
 const OUTFIT: [(u8, u32, u32, &str); 5] = [
@@ -434,23 +451,31 @@ impl SurvivalGame {
     /// The gear a hero shows: (slot, item entry), the outfit included.
     pub(crate) fn worn(&self, id: Id) -> Vec<(u8, u32)> {
         let Some(p) = self.sim.players.get(&id) else { return Vec::new() };
-        // The plain outfit, with what armor they wear in its place.
-        let mut v: Vec<(u8, u32)> = OUTFIT
-            .iter()
-            .enumerate()
-            .filter(|(_, (slot, ..))| ! p.armor.keys().any(|a| armor_slot(a).1 == *slot))
-            .map(|(k, (slot, ..))| (*slot, OUTFIT_ENTRY + k as u32))
-            .collect();
-        for (slot, item) in &p.armor {
-            v.push((armor_slot(slot).1, ITEM_ENTRY + *item as u32));
-        }
-        v.push((SLOT_MAIN_HAND, ITEM_ENTRY + p.weapon as u32));
+        let armor: Vec<(&str, usize)> = p.armor.iter().map(|(s, i)| (s.as_str(), *i)).collect();
         // A two-handed grip leaves no hand for the shield.
-        if !self.sim.weapon_of(p).two_handed {
-            v.push((SLOT_OFF_HAND, ITEM_ENTRY + p.shield as u32));
+        let shield = Some(p.shield).filter(|_| !self.sim.weapon_of(p).two_handed);
+        worn_of(&armor, Some(p.weapon), shield, Some(p.bow))
+    }
+
+    /// What a hero out of the world wears, from its save: as `worn` would have it in the world
+    /// (a key the rules no longer have left off).
+    pub(crate) fn worn_saved(&self, s: &PlayerSave) -> Vec<(u8, u32)> {
+        let c = &self.sim.content;
+        let armor: Vec<(&str, usize)> = s.armor.iter().filter_map(|(slot, k)| c.item(k).map(|i| (slot.as_str(), i))).collect();
+        let two = c.weapon(&s.weapon).is_some_and(|w| w.two_handed);
+        let shield = c.item(&s.shield).filter(|_| !two);
+        worn_of(&armor, c.item(&s.weapon), shield, c.item(&s.bow))
+    }
+
+    /// The character screen's look of what's worn: each slot's display and inventory type.
+    pub(crate) fn dress(&self, worn: &[(u8, u32)]) -> [(u32, u8); 19] {
+        let mut out = [(0, 0); 19];
+        for (slot, entry) in worn {
+            if let (Some(o), Some((t, _))) = (out.get_mut(usize::from(*slot)), self.item_template(*entry)) {
+                *o = (t.display_id, t.inventory_type as u8);
+            }
         }
-        v.push((SLOT_RANGED, ITEM_ENTRY + p.bow as u32));
-        v
+        out
     }
 
     /// How many slots each of the four bags has: what the rules let a hero carry past the
