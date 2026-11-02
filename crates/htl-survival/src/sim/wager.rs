@@ -742,6 +742,12 @@ impl Survival {
             if timed { "in time" } else { "over time" }
         ));
         self.pay_wager(d, w.level, timed);
+        // Each hero's tally of the run, with what it paid them.
+        let how = format!("Wager +{}, {}: {}", w.level, if timed { "in time" } else { "over time" }, clock_words(secs));
+        let heroes: Vec<Id> = self.players.keys().copied().collect();
+        for id in heroes {
+            self.run_page(id, &how);
+        }
     }
 
     /// What a won wager pays: plunder to everyone down here, and gear into the camp's chest.

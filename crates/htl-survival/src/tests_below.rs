@@ -1559,3 +1559,45 @@ fn the_camp_hears_where_its_chests_news_comes_from() {
     let ev = camp.step(DT);
     assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.contains("From The Stockade"))), "{:?}", ev.iter().filter(|e| matches!(e, Event::Announce { .. })).collect::<Vec<_>>());
 }
+
+#[test]
+fn a_hero_leaving_a_run_gets_its_tally() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    // Plunder picked up below, a foe felled, a fall.
+    let plunder = s.content.item("plunder").unwrap();
+    *s.players.get_mut(&id).unwrap().bag.entry(plunder).or_default() += 7;
+    let grunt = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "grunt").unwrap();
+    s.hurt_mob(grunt, id, 1_000_000);
+    s.run_fall(id);
+    // Home by a lamp: the page, with what they did.
+    let lamp = obj(&s, |k| matches!(k, ObjKind::Lamp { key } if key == "first"));
+    s.move_player(id, [0.0, 0.0, 0.0], 0.0, Moving::default());
+    s.interact(id, Some(lamp));
+    run(&mut s, 0.1);
+    s.travel(id, "camp").unwrap();
+    let ev = run(&mut s, 0.05);
+    let page = ev.iter().find_map(|e| if let Event::Letter { kind, place, text, .. } = e { (kind == "run").then(|| (place.clone(), text.clone())) } else { None }).expect("the run's page");
+    assert_eq!(page.0, "Home by a lamp");
+    assert!(page.1.contains("Foes felled: 1") && page.1.contains("You fell once") && page.1.contains("7 "), "{}", page.1);
+    assert!(page.1.contains("Still standing") || page.1.contains("No boss down yet"), "{}", page.1);
+}
+
+#[test]
+fn a_second_trip_down_tallies_only_itself() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let sword = s.content.item("sword").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(sword, 1);
+    s.below.as_mut().unwrap().log.gear.entry("ayla".into()).or_default().push(sword);
+    // Home, and down again: the sword went home on the first trip.
+    s.leave(id);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(!text.contains(&s.content.items[sword].name), "{text}");
+}
