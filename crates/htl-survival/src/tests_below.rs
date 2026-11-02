@@ -1513,3 +1513,15 @@ fn a_wagers_count_of_foes_grows_with_the_band() {
         }
     }
 }
+
+#[test]
+fn every_dungeon_pack_is_a_foe_that_exists_and_every_dungeon_lays_out() {
+    let c = Content::builtin();
+    for d in c.dungeons() {
+        for p in &d.packs {
+            assert!(c.mob(&p.mob).is_some(), "{}: no foe {}", d.key, p.mob);
+        }
+        let s = Survival::new_dungeon(c.for_dungeon_of(&d.key), Box::new(FlatLand::default()), 5, 1_000_000.0);
+        assert!(s.mobs.len() >= d.packs.iter().filter(|p| p.hidden <= 0.0 && p.wake.is_empty()).count() / 2, "{}: laid out", d.key);
+    }
+}

@@ -1636,3 +1636,104 @@ radius = 1.5
 count = 2
 link = 10.0
 wake = "fang_stash"
+
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
+
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [8.9, 460.2]
+z = -79.9
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [8.9, 460.2]
+z = -79.9
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_ravager"
+at = [-317.1, 44.2]
+z = -94.9
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-317.1, 44.2]
+z = -94.9
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_lasher"
+at = [-77.1, -39.8]
+z = -58.5
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-77.1, -39.8]
+z = -58.5
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-43.1, 124.2]
+z = -105.4
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_ectoplasm"
+at = [-25.1, 460.2]
+z = -99.0
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-25.1, 460.2]
+z = -99.0
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-25.1, 270.2]
+z = -105.2
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-259.1, 52.2]
+z = -85.2
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "wc_druid"
+at = [-91.1, -155.8]
+z = -66.7
+radius = 3.0
+count = 2
+link = 12.0

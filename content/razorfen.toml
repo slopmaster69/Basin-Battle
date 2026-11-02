@@ -1417,3 +1417,80 @@ radius = 1.5
 count = 2
 link = 10.0
 wake = "bone_cache"
+
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2116.0, 1834.0]
+z = 79.6
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2104.0, 1726.0]
+z = 78.2
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2104.0, 1726.0]
+z = 78.2
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_dustweaver"
+at = [2102.0, 1900.0]
+z = 75.1
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2126.0, 1748.0]
+z = 52.4
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_boar"
+at = [2016.0, 1492.0]
+z = 77.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_acolyte"
+at = [2202.0, 1590.0]
+z = 82.3
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_geomancer"
+at = [2090.0, 1782.0]
+z = 78.0
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "rk_defender"
+at = [2144.0, 1914.0]
+z = 66.6
+radius = 3.0
+count = 2
+link = 12.0

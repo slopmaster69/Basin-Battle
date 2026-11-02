@@ -1193,3 +1193,40 @@ z = 7.5
 radius = 0.0
 count = 1
 link = 12.0
+
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
+
+[[dungeon.pack]]
+mob = "gy_zombie"
+at = [1816.0, 1438.0]
+z = 8.4
+radius = 3.0
+count = 3
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_scryer"
+at = [1816.0, 1438.0]
+z = 8.4
+radius = 0.0
+count = 1
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_phantasm"
+at = [1810.0, 1170.0]
+z = 6.8
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "gy_zombie"
+at = [1802.0, 1400.0]
+z = 8.0
+radius = 3.0
+count = 2
+link = 12.0

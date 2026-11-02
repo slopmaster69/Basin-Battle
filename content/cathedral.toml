@@ -1202,3 +1202,32 @@ radius = 1.5
 count = 2
 link = 10.0
 wake = "tithe_box"
+
+# --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
+# Each where the survey found the most ground farthest from any foe, near the way to a boss and
+# clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
+
+[[dungeon.pack]]
+mob = "sc_champion"
+at = [984.0, 1344.0]
+z = 29.1
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_monk"
+at = [1082.0, 1380.0]
+z = 30.3
+radius = 3.0
+count = 2
+link = 12.0
+
+[[dungeon.pack]]
+mob = "sc_myrmidon"
+at = [1076.0, 1420.0]
+z = 30.3
+radius = 3.0
+count = 2
+link = 12.0
