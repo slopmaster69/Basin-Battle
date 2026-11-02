@@ -1918,6 +1918,7 @@ impl Survival {
         }
         if below {
             self.wager_fall();
+            self.run_fall(id);
         }
         let dropped = if below { self.below_drops(id) } else { dropped };
         let Some(p) = self.players.get(&id) else {

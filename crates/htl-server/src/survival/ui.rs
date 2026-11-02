@@ -35,7 +35,8 @@
 //! - `LP\t<key>\t<name>\t<draughts>\t<most>\t<key~name^...>\t<key~name~price~can~icon^...>\t<plunder>`:
 //!   a lamp below: the hero's Draughts, the other lit lamps, the quartermaster's wares.
 //! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: a page to read and keep
-//!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board); `{n}`
+//!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board, a
+//!   run's tally as a hero leaves it: kind `run`); `{n}`
 //!   breaks a line.
 //! - `WT\t<dungeon>\t<level>\t<elapsed>\t<limit>\t<falls>\t<state>\t<terms>\t<name~down^...>\t<felled~needed~total>`:
 //!   a wager's clock below (state `wait`, `run`, `won` or `over`; the bosses it must beat, and its
@@ -295,7 +296,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 11;
+pub(crate) const ADDON_NEWEST: u32 = 12;
 /// 11: a borrowed clip's turns go back to rest (patch 0016), so a shield isn't left crooked.
 pub(crate) const CLIENT_NEWEST: u8 = 11;
 
