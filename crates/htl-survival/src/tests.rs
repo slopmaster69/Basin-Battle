@@ -1413,7 +1413,9 @@ fn light_attacks_chain_through_the_set_late_in_each_recovery() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.input(p, Input::Attack);
     let first = strike_of(&s, p).unwrap();
-    assert_eq!((first.step, first.clip, first.take), (0, 17, 0));
+    assert_eq!((first.step, first.clip, first.take), (0, 17, 1));
+    // Every hero's blows are one model's, whatever their race.
+    assert_eq!(first.from.as_deref(), Some("ScourgeMale"));
     // Pressed again early: it waits (the buffer), not chained at once.
     run(&mut s, 0.2);
     s.input(p, Input::Attack);
@@ -1423,12 +1425,12 @@ fn light_attacks_chain_through_the_set_late_in_each_recovery() {
     run(&mut s, late - 0.2);
     s.input(p, Input::Attack);
     let second = strike_of(&s, p).unwrap();
-    assert_eq!((second.step, second.clip, second.take), (1, 17, 1), "chained");
+    assert_eq!((second.step, second.clip, second.take), (1, 17, 2), "chained");
     // And the third, the set's finisher: slower, harder.
     run(&mut s, second.windup + second.active + second.recovery * 0.5);
     s.input(p, Input::Attack);
     let third = strike_of(&s, p).unwrap();
-    assert_eq!((third.step, third.clip), (2, 57));
+    assert_eq!((third.step, third.clip, third.take), (2, 17, 2));
     assert!(third.windup > first.windup && third.damage > first.damage);
     // After a pause the chain starts over.
     run(&mut s, 3.0);
@@ -1458,7 +1460,8 @@ fn a_heavy_attack_and_a_running_attack_are_their_own_blows() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.input(p, Input::Heavy);
     let heavy = strike_of(&s, p).unwrap();
-    assert_eq!((heavy.kind, heavy.clip), (StrikeKind::Heavy, 57));
+    // The Undead man's overhead: no spin, no leap, whatever the hero's race.
+    assert_eq!((heavy.kind, heavy.clip, heavy.take, heavy.from.as_deref()), (StrikeKind::Heavy, 17, 2, Some("ScourgeMale")));
     run(&mut s, 3.0);
     // Sprinting forward, an attack is the running one, with a long lunge.
     s.move_player(p, ORIGIN, 0.0, Moving { forward: true, ..Default::default() });
