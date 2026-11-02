@@ -26,6 +26,7 @@ pub mod recap;
 pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
+pub mod hunter;
 mod raid;
 pub mod siege;
 pub mod wager;
@@ -260,6 +261,8 @@ pub enum Event {
     Auras { id: Id },
     /// A hero held still (a root, a stun) or let go: their client is told.
     Rooted { player: Id, on: bool },
+    /// A hero falls slowly (feather fall: Skyfall's hang over the fight), or as ever again.
+    FeatherFall { player: Id, on: bool },
     /// A hero's own dash along the ground: which way, how fast, how long.
     Dash { player: Id, dir: f32, speed: f32, secs: f32 },
     /// A hero's ability keys, cooldowns or tree changed.
@@ -834,6 +837,8 @@ pub struct Survival {
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
     pub(crate) traps: Vec<moves::Trap>,
+    /// The Hunter's: planted arrows, tripwires, Call of the Wild's chains and beasts.
+    pub hunt: hunter::Hunt,
     pub(crate) windups: Vec<moves::Windup>,
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Where the blow whose effects are being given came from (a knockback's centre).
@@ -938,6 +943,7 @@ impl Survival {
             projectiles: Vec::new(),
             landings: Vec::new(),
             traps: Vec::new(),
+            hunt: hunter::Hunt::default(),
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             fx_from: None,
@@ -1018,6 +1024,7 @@ impl Survival {
         self.step_moves();
         self.step_grounds();
         self.step_bounces();
+        self.step_hunt();
         self.step_totems();
         self.step_stances();
         self.step_combos();

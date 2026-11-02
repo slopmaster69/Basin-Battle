@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 16
+local VERSION = 17
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -5226,12 +5226,14 @@ end
 local BOARD_COLS = { "warrior", "paladin", "hunter", "rogue", "priest", "shaman", "mage", "warlock", "druid" }
 local BOARD_N = 9
 local BOARD_ROWS = { "ranged", "close", "utility", "defense", "ultimate" }
-local CARD_W, CARD_H, CARD_GAP = 112, 50, 5
+-- Each row holds a class's two choices, the second under the first: a row is two cards high
+-- (`CARD_H * 2 + 4`; no local of its own, the main chunk is near Lua's 200).
+local CARD_W, CARD_H, CARD_GAP = 112, 44, 5
 local BOARD_LABEL = 100
 local BOARD_W = 24 + BOARD_LABEL + BOARD_N * CARD_W + (BOARD_N - 1) * CARD_GAP + 24
 local BOARD_TOP = 84
 local BOARD_DETAIL = 128
-local BOARD_H = BOARD_TOP + AB_N * (CARD_H + CARD_GAP) + BOARD_DETAIL + 74
+local BOARD_H = BOARD_TOP + AB_N * ((CARD_H * 2 + 4) + CARD_GAP) + BOARD_DETAIL + 74
 
 local tree = CreateFrame("Frame", "ElwynnSurvivalTree", UIParent)
 tree:SetWidth(BOARD_W)
@@ -5268,7 +5270,7 @@ local function ColX(c)
   return 24 + BOARD_LABEL + (c - 1) * (CARD_W + CARD_GAP)
 end
 local function RowY(r)
-  return BOARD_TOP + (r - 1) * (CARD_H + CARD_GAP)
+  return BOARD_TOP + (r - 1) * ((CARD_H * 2 + 4) + CARD_GAP)
 end
 -- (Kept in `tree.heads`, so the beta page can put them away while it's up.)
 tree.heads = {}
@@ -5291,20 +5293,20 @@ for r = 1, AB_N do
   local words = ROW_WORDS[BOARD_ROWS[r]]
   local y = RowY(r)
   local cap = Tex(tree, "ARTWORK", "keycap", 30, 22)
-  cap:SetPoint("TOPLEFT", tree, "TOPLEFT", 24, -y - (CARD_H - 22) / 2)
+  cap:SetPoint("TOPLEFT", tree, "TOPLEFT", 24, -y - ((CARD_H * 2 + 4) - 22) / 2)
   cap:SetVertexColor(0.16, 0.14, 0.12, 0.95)
   local k = Text(tree, FONT_NUM, 13, "OUTLINE")
   k:SetPoint("CENTER", cap, "CENTER", 0, 0)
   k:SetTextColor(1, 0.88, 0.6)
   tree.rowKeys[r] = k
   local name = Text(tree, FONT_TITLE, 13, "OUTLINE")
-  name:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - CARD_H / 2 + 8)
+  name:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - (CARD_H * 2 + 4) / 2 + 8)
   name:SetWidth(BOARD_LABEL - 40)
   name:SetJustifyH("LEFT")
   name:SetTextColor(0.95, 0.9, 0.8)
   name:SetText(words[1])
   local sub = Text(tree, FONT_BODY, 8)
-  sub:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - CARD_H / 2 - 9)
+  sub:SetPoint("LEFT", tree, "TOPLEFT", 24 + 38, -y - (CARD_H * 2 + 4) / 2 - 9)
   sub:SetWidth(BOARD_LABEL - 36)
   sub:SetJustifyH("LEFT")
   sub:SetTextColor(0.6, 0.58, 0.54)
@@ -5456,7 +5458,7 @@ local ROW_N = { ranged = 1, close = 2, utility = 3, defense = 4, ultimate = 5 }
 
 -- What the board's other page (BetaBoard.lua) builds its cards and its tabs with.
 ES.boardKit = {
-  Card = BoardCard, ColX = ColX, RowY = RowY, ROW_N = ROW_N, N = BOARD_N, W = CARD_W, H = CARD_H, GAP = CARD_GAP,
+  Card = BoardCard, ColX = ColX, RowY = RowY, ROW_N = ROW_N, N = BOARD_N, W = CARD_W, H = CARD_H, GAP = CARD_GAP, ROW_H = CARD_H * 2 + 4,
   Button = MakeButton, Text = Text, TITLE = FONT_TITLE, BODY = FONT_BODY, ICONS = ICONS, GOLD = GOLD, WHITE = WHITE,
 }
 
@@ -5540,11 +5542,13 @@ function ES.TreeLine(f)
         exKey = e[15] or "", exName = e[16] or "", exIcon = e[17] or "", exValor = tonumber(e[18] or "") or 0,
         exText = e[19] or "", exFacts = e[20] or "", where = e[21] or "",
       }
-      local slot = (r - 1) * BOARD_N + c
+      -- A class's second choice in the row sits under its first (older servers send none: 1).
+      local choice = (e[23] == "2") and 2 or 1
+      local slot = (r - 1) * BOARD_N * 2 + (choice - 1) * BOARD_N + c
       used[slot] = true
       local b = BoardCard(slot)
       b:ClearAllPoints()
-      b:SetPoint("TOPLEFT", tree, "TOPLEFT", ColX(c), -RowY(r))
+      b:SetPoint("TOPLEFT", tree, "TOPLEFT", ColX(c), -RowY(r) - (choice - 1) * (CARD_H + 4))
       b.d = d
       b.icon:SetTexture(ICONS .. d.icon)
       if d.owned then

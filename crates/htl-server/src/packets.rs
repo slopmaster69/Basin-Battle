@@ -767,6 +767,13 @@ pub fn force_move_root(guid: u64, counter: u32, root: bool) -> Packet {
     Packet::new(if root { op::SMSG_FORCE_MOVE_ROOT } else { op::SMSG_FORCE_MOVE_UNROOT }, b)
 }
 
+/// Fall slowly (feather fall), or as ever.
+pub fn move_feather_fall(guid: u64, counter: u32, on: bool) -> Packet {
+    let mut b = Body::new();
+    b.packed_guid(guid).u32(counter);
+    Packet::new(if on { op::SMSG_MOVE_FEATHER_FALL } else { op::SMSG_MOVE_NORMAL_FALL }, b)
+}
+
 pub fn force_run_speed(guid: u64, counter: u32, speed: f32) -> Packet {
     let mut b = Body::new();
     b.packed_guid(guid).u32(counter).f32(speed);

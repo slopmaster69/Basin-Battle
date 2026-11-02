@@ -3914,6 +3914,207 @@ respawn = 0.0
   turn_rate = 0.0
   lock = 0.0
 
+# Call of the Wild's beasts: each runs from the hunter's side to the foe, strikes once and is gone (an
+# inert body: nothing strikes it, it strikes nothing itself; the hunter's call does the damage).
+
+[[mob]]
+key = "spirit_wolf"
+name = "Spirit Wolf"
+display = 447
+scale = 1.0
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_owl"
+name = "Spirit Owl"
+display = 4615
+scale = 1.0
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_scorpid"
+name = "Spirit Scorpid"
+display = 2487
+scale = 0.8
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_gorilla"
+name = "Spirit Gorilla"
+display = 837
+scale = 1.0
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_raptor"
+name = "Spirit Raptor"
+display = 180
+scale = 1.0
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_basilisk"
+name = "Spirit Basilisk"
+display = 1074
+scale = 0.9
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_bear"
+name = "Spirit Bear"
+display = 822
+scale = 1.0
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_kodo"
+name = "Spirit Kodo"
+display = 1230
+scale = 0.7
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
+key = "spirit_thunder_lizard"
+name = "Spirit Thunder Lizard"
+display = 1540
+scale = 0.6
+health = 30
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
 # `.es dummy`: something to practise on; `.es dummy guard`, `roll` or `counter <school>` loop
 # a block, a roll or a counter.
 [[mob]]
@@ -3961,13 +4162,16 @@ impact_kit = 5089
 effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
 
 # ----------------------------------------------------------------------------------- Hunter --
+# The archer who owns the ground: every arrow that ends its flight sticks where it stops (`plants`:
+# 6 s, 12 at most) and Arrow Recall brings them all back through the fight. Two choices a row
+# (`choice = 2` is the second), each with its EX.
 
-# The sniper's shot: hold the click to draw. (Its key isn't `aimed_shot`: that's the bow's shot on
-# the bench.)
+# Q: the sniper's shot: hold the click to draw. (Its key isn't `aimed_shot`: that's the bow's shot
+# on the bench.)
 [[ability]]
 key = "aimed_arrow"
 name = "Aimed Shot"
-text = "Hold the click to draw, up to 1.4 s: the longer the draw, the harder, farther and faster the arrow. Fully drawn it glows and goes through every foe in its line. A heavy blow on you spoils the draw."
+text = "Hold to draw your bow for up to 1.4 sec, then release to fire. Damage, range and arrow speed increase with the draw. A full draw pierces every enemy in its line. A heavy hit on you cancels the draw. The arrow plants where its flight ends."
 icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
@@ -3977,11 +4181,9 @@ fragile = true
 damage = [14.0, 36.0]
 range = [26.0, 40.0]
 radius = [0.3, 0.3]
-# A plain arrow (the bow's look) while drawing; fully drawn, Arcane Shot's glowing one, faster,
-# through everything in the line.
+# A plain arrow (the bow's look) while drawing; fully drawn, a burning one, faster, through every
+# foe in the line.
 speed = 40.0
-# Aimed Shot's own arcane arrow (Auto Shot, 75, draws only the bow's ammo, and a hero casting
-# this needn't hold a bow: nothing flew); fully drawn, a burning arrow (Fire Shot).
 spell = 19434
 full_spell = 3011
 full_speed = 60.0
@@ -3989,17 +4191,18 @@ full_pierce = 9
 cooldown = 3.0
 clip = 53
 valor_hit = 5.0
+plants = true
 
 [[ability]]
 key = "multi_shot"
 name = "Multi-Shot"
 ex_of = "aimed_arrow"
-text = "Five arrows at once in a wide fan, no draw: clear a pack, or catch a foe who dodges. Frozen foes shatter. Free right after a Freezing Trap."
+text = "Fires 5 arrows at once in a wide fan, with no draw. Each arrow deals 18 damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
 icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-damage = [10.0, 10.0]
+damage = [18.0, 18.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 40.0
@@ -4010,14 +4213,351 @@ shatter = true
 # Frost-tipped arrows (Frost Shot): the volley that shatters the frozen.
 spell = 6984
 clip = 53
+plants = true
 
+# Q, the second choice: the arrow that reads the room. Off a wall, a tree or a rock it comes away
+# harder (`bounce_gain` of its damage more a bounce) and goes through the first foe it meets after.
+[[ability]]
+key = "bank_shot"
+name = "Bank Shot"
+text = "Fires an arrow that ricochets off walls, trees and rocks up to twice. Each bounce makes it hit harder. An arrow that has bounced pierces the first enemy it hits. It plants where it finally stops."
+icon = "Ability_Hunter_SniperShot"
+school = "hunter"
+slot = "ranged"
+choice = 2
+kind = "projectile"
+damage = [16.0, 16.0]
+range = [30.0, 30.0]
+radius = [0.3, 0.3]
+speed = 45.0
+bounces = 2
+bounce_gain = 0.5
+cooldown = 4.0
+# Concussive Shot's arrow: a heavy, blunt flight.
+spell = 5116
+clip = 53
+valor_hit = 5.0
+plants = true
+
+[[ability]]
+key = "split_arrow"
+name = "Split Arrow"
+ex_of = "bank_shot"
+text = "Fires a spray of 6 arrows in a short cone and kicks you back 2 yd. Point blank, all 6 hit one target. Every arrow plants where it stops."
+icon = "Ability_Hunter_Quickshot"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+# 6 × 8 point blank: 48, just under what an EX of a 16 poke may be.
+damage = [8.0, 8.0]
+range = [10.0, 10.0]
+radius = [0.3, 0.3]
+speed = 40.0
+count = 6
+# 10° apart: a 50° cone, every arrow in one body within 3 yd.
+spread = 10.0
+spell = 2643
+clip = 53
+valor_hit = 1.5
+plants = true
+also = "split_recoil"
+
+# Split Arrow's kick: a short hop straight back.
+[[ability]]
+key = "split_recoil"
+name = "Split Arrow"
+text = "Split Arrow's recoil."
+icon = "Ability_Hunter_Quickshot"
+inner = true
+slot = "ranged"
+kind = "leap"
+back = true
+range = [2.0, 2.0]
+lift = 1.5
+
+# E: a spirit beast a press, a chain that builds: the first stage sets something on the foe, the
+# second turns it into something else, the third cashes it in (the beasts in `[[beast]]`).
+[[ability]]
+key = "call_of_the_wild"
+name = "Call of the Wild"
+text = "Calls a spirit beast that leaps from your side to the target and strikes once. Each call brings the next stage of the chain: Stage 1 beasts set up, Stage 2 exploit, Stage 3 finish. The beast for each stage is drawn at random from three, and the key shows which is coming. After Stage 3, or 4 sec without a call, the chain starts again."
+icon = "Ability_Hunter_BeastCall"
+school = "hunter"
+slot = "close"
+kind = "buff"
+hunt = "call"
+range = [25.0, 25.0]
+radius = [1.0, 1.0]
+# (The beast bursts out of Spirit Wolf's flash at the hunter's side.)
+spell = 2645
+clip = 54
+
+[[ability]]
+key = "double_call"
+name = "Double Call"
+ex_of = "call_of_the_wild"
+text = "Calls the beast you're shown and, at once, a random beast from the next stage. The second beast isn't empowered. The chain then skips a stage."
+icon = "Ability_Hunter_BeastCall02"
+slot = "close"
+kind = "buff"
+hunt = "double_call"
+valor = 25
+range = [25.0, 25.0]
+radius = [1.0, 1.0]
+clip = 54
+
+# E, the second choice: a spear chain. Each hit arms the next (a recast), the third throws you up
+# with it, and the fourth is the dive down, wherever you choose.
+[[ability]]
+key = "raptor_strike"
+name = "Raptor Strike"
+text = "A three-hit spear chain. Press again within 1.5 sec for the next hit. Hit 1 thrusts. Hit 2 sweeps everything in front of you. Hit 3 is an Uppercut that launches the target and you with it. While airborne, press again within 3.5 sec to Stoop: dive to a spot within 12 yd, slamming any enemy there."
+icon = "Ability_MeleeDamage"
+school = "hunter"
+slot = "close"
+choice = 2
+kind = "cone"
+at_once = true
+damage = [12.0, 12.0]
+range = [4.5, 4.5]
+arc = 50.0
+stamina = 10.0
+cooldown = 7.0
+spell = 2973
+clip = 19
+impact_kit = 83
+recast = "raptor_sweep"
+recast_secs = 1.5
+
+[[ability]]
+key = "raptor_sweep"
+name = "Sweep"
+text = "Raptor Strike's second hit: a wide sweep."
+icon = "Ability_Rogue_Ambush"
+inner = true
+slot = "close"
+kind = "cone"
+at_once = true
+damage = [14.0, 14.0]
+range = [4.0, 4.0]
+arc = 180.0
+stamina = 10.0
+spell = 845
+clip = 18
+impact_kit = 83
+recast = "raptor_uppercut"
+recast_secs = 1.5
+
+[[ability]]
+key = "raptor_uppercut"
+name = "Uppercut"
+text = "Raptor Strike's third hit: launches the target, and you with it."
+icon = "Ability_Druid_Bash"
+inner = true
+slot = "close"
+kind = "cone"
+at_once = true
+damage = [16.0, 16.0]
+range = [4.0, 4.0]
+arc = 70.0
+stamina = 10.0
+spell = 12294
+clip = 57
+impact_kit = 83
+also = "raptor_rise"
+recast = "stoop"
+recast_secs = 3.5
+effects = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "knockback", amount = 0.5, lift = 10.0 }]
+
+# The hunter goes up with it, boss or no boss: Stoop is always there.
+[[ability]]
+key = "raptor_rise"
+name = "Uppercut"
+text = "The Uppercut's rise."
+icon = "Ability_Druid_Bash"
+inner = true
+slot = "close"
+kind = "leap"
+range = [0.5, 0.5]
+lift = 9.0
+spell = 0
+
+[[ability]]
+key = "stoop"
+name = "Stoop"
+text = "Dive to the target spot within 12 yd. Enemies within 3 yd of where you land take 20 damage and are knocked down for 1 sec."
+icon = "Ability_Hunter_Pet_Owl"
+inner = true
+slot = "close"
+kind = "leap"
+range = [12.0, 12.0]
+radius = [3.0, 3.0]
+damage = [20.0, 20.0]
+lift = 2.0
+spell = 16979
+impact_kit = 1666
+stamina = 10.0
+effects = [{ kind = "knockdown", secs = [1.0, 1.0] }]
+
+[[ability]]
+key = "harpoon_dive"
+name = "Harpoon Dive"
+ex_of = "raptor_strike"
+text = "Throws your spear up to 15 yd. If it hits an enemy or the ground, you dive after it, and your next press is the Uppercut, with Stoop ready after."
+icon = "INV_Spear_04"
+slot = "close"
+kind = "projectile"
+valor = 25
+damage = [12.0, 12.0]
+range = [15.0, 15.0]
+radius = [0.35, 0.35]
+speed = 60.0
+yank = true
+spell = 6533
+clip = 107
+recast = "raptor_uppercut"
+recast_secs = 2.5
+
+# 1: up and over: a grappling arrow to whatever it bites.
+[[ability]]
+key = "grapple_arrow"
+name = "Grapple Arrow"
+text = "Fires a grappling arrow up to 25 yd. If it strikes a wall, tree, rock or enemy, it pulls you there. Works in the air."
+icon = "Ability_Hunter_Pathfinding"
+school = "hunter"
+slot = "utility"
+kind = "projectile"
+range = [25.0, 25.0]
+radius = [0.35, 0.35]
+speed = 60.0
+yank = true
+cooldown = 10.0
+spell = 6533
+clip = 53
+
+[[ability]]
+key = "reverse_grapple"
+name = "Reverse Grapple"
+ex_of = "grapple_arrow"
+text = "Hooks an enemy and hauls it to you. It lands at your feet and staggers for 1 sec. A boss, or anything that can't be moved, hauls you to it instead."
+icon = "INV_Spear_04"
+slot = "utility"
+kind = "projectile"
+valor = 25
+damage = [8.0, 8.0]
+range = [25.0, 25.0]
+radius = [0.35, 0.35]
+speed = 60.0
+hunt = "haul"
+spell = 6533
+clip = 53
+effects = [{ kind = "pull", amount = 25.0, from_caster = true }, { kind = "stagger", secs = [1.0, 1.0] }]
+
+# 1, the second choice: Disengage as retail has it: on the key press, mid-jump or falling too.
+[[ability]]
+key = "ensnaring_retreat"
+name = "Ensnaring Retreat"
+text = "Leaps 12 yd backward and throws a net forward. The first enemy it hits is rooted for 2 sec. Works mid-jump and while falling."
+icon = "Ability_Rogue_Feint"
+school = "hunter"
+slot = "utility"
+choice = 2
+kind = "leap"
+back = true
+range = [12.0, 12.0]
+lift = 5.0
+cooldown = 12.0
+spell = 781
+also = "hunter_net"
+
+[[ability]]
+key = "hunter_net"
+name = "Net"
+icon = "INV_Misc_Net_01"
+text = "Ensnaring Retreat's net."
+inner = true
+slot = "utility"
+kind = "projectile"
+range = [14.0, 14.0]
+radius = [0.6, 0.6]
+speed = 40.0
+spell = 6533
+effects = [{ kind = "root", secs = [2.0, 2.0] }]
+
+[[ability]]
+key = "trappers_instinct"
+name = "Trapper's Instinct"
+ex_of = "ensnaring_retreat"
+text = "Readies you for 2 sec. If anything hits you, the hit misses: you leap 12 yd away, net the attacker and scatter 5 arrows where you stood. Each enemy within 2 yd of a scattered arrow takes 10 damage. If nothing hits you, it fires as a plain Ensnaring Retreat when the 2 sec are up."
+icon = "Ability_Ensnare"
+slot = "utility"
+kind = "stance"
+valor = 25
+secs = 2.0
+spell = 5384
+counter = { immune = true, once = true, answer = "trappers_leap", expire_answer = "ensnaring_retreat" }
+
+# What Trapper's Instinct does when it's struck: away, the net on whoever struck, arrows scattered.
+[[ability]]
+key = "trappers_leap"
+name = "Trapper's Instinct"
+text = "Trapper's Instinct's escape."
+icon = "Ability_Ensnare"
+inner = true
+slot = "utility"
+kind = "leap"
+back = true
+range = [12.0, 12.0]
+lift = 5.0
+damage = [10.0, 10.0]
+radius = [2.0, 2.0]
+spell = 781
+also = "hunter_net"
+
+# 2: two arrows and a wire between them.
+[[ability]]
+key = "tripwire"
+name = "Tripwire"
+text = "Fires two arrows that plant 6 yd apart at the target spot, up to 20 yd away, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec; its two arrows stay planted for 18 sec, snapped or not."
+icon = "Spell_Nature_Web"
+school = "hunter"
+slot = "defense"
+kind = "ground"
+hunt = "tripwire"
+range = [20.0, 20.0]
+radius = [3.0, 3.0]
+damage = [12.0, 12.0]
+secs = 12.0
+cooldown = 12.0
+spell = 19434
+clip = 53
+effects = [{ kind = "knockdown", secs = [1.5, 1.5] }]
+
+[[ability]]
+key = "arrow_recall"
+name = "Arrow Recall"
+ex_of = "tripwire"
+text = "Every arrow you have planted flies back to you at once. Each arrow hits every enemy it passes through for 10 damage, with no falloff. An enemy struck by 3 or more arrows is Lacerated: it bleeds 4 damage per sec for 4 sec, 1 sec longer for every arrow past the third."
+icon = "Ability_Hunter_RunningShot"
+slot = "defense"
+kind = "buff"
+hunt = "recall"
+valor = 25
+damage = [10.0, 10.0]
+radius = [0.6, 0.6]
+speed = 40.0
+spell = 19434
+clip = 54
+
+# 2, the second choice: the traps.
 [[ability]]
 key = "explosive_trap"
 name = "Explosive Trap"
-text = "Set a trap at the reticle (up to 10 yd; it arms in 0.75 s, lasts 20 s, two at once). The first foe within 2 yd sets it off: 24 to all within 4.5 yd, thrown back 6 yd, and the ground burns 3 s (4 a second)."
+text = "Places a trap at the target location up to 10 yd away. It arms after 0.75 sec and lasts 20 sec; up to 2 at once. The first enemy within 2 yd sets it off: enemies within 4.5 yd take 24 damage and are knocked back 6 yd, and the ground burns for 4 damage per sec for 3 sec."
 icon = "Spell_Fire_SelfDestruct"
 school = "hunter"
-slot = "close"
+slot = "defense"
+choice = 2
 kind = "trap"
 range = [10.0, 10.0]
 radius = [2.0, 2.0]
@@ -4041,9 +4581,9 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "A trap that freezes everyone within 3 yd of whoever sets it off for 3 s (1.5 s on heroes): no moving, no acting, and fire or a Sundering Blow shatters them. Setting it readies your bow: the next Aimed Shot within 8 s is a free Multi-Shot, and the frozen shatter."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. Setting it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
-slot = "close"
+slot = "defense"
 kind = "trap"
 valor = 25
 range = [10.0, 10.0]
@@ -4060,93 +4600,11 @@ effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
 # springs: 8 s, room to kite them onto it.)
 empower = { ability = "aimed_arrow", secs = 8.0 }
 
-[[ability]]
-key = "disengage"
-name = "Disengage"
-text = "Leap 10 yd straight back from where you face, shaking off roots and slows, and run 30% faster for 2 s. No aiming: it goes at once."
-icon = "Ability_Rogue_Feint"
-school = "hunter"
-slot = "utility"
-kind = "leap"
-back = true
-range = [10.0, 10.0]
-lift = 5.0
-cleanse = true
-cooldown = 12.0
-spell = 781
-self_effects = [{ kind = "haste", secs = [2.0, 2.0], amount = 0.3 }]
-
-[[ability]]
-key = "disengage_net"
-name = "Net and Disengage"
-ex_of = "disengage"
-text = "The Disengage, and as you go a net flies forward along your facing: the first foe it catches is rooted for 3 s (1.5 s on heroes)."
-icon = "Ability_Ensnare"
-slot = "utility"
-kind = "leap"
-valor = 25
-back = true
-range = [10.0, 10.0]
-lift = 5.0
-cleanse = true
-spell = 781
-also = "hunter_net"
-self_effects = [{ kind = "haste", secs = [2.0, 2.0], amount = 0.3 }]
-
-[[ability]]
-key = "hunter_net"
-name = "Net"
-icon = "Ability_Ensnare"
-text = "Disengage's net."
-inner = true
-slot = "utility"
-kind = "projectile"
-range = [14.0, 14.0]
-radius = [0.6, 0.6]
-speed = 40.0
-spell = 6533
-effects = [{ kind = "root", secs = [3.0, 3.0] }]
-
-# Peel without hiding: a flare lobbed onto whoever's coming.
-[[ability]]
-key = "flare"
-name = "Flare"
-text = "Lob a flare at the reticle. Where it lands, every foe within 4 yd is blinded for 2 s (1 s on heroes): they can't act until something hits them. Throw it on the pack that's on you, then step away."
-icon = "Spell_Fire_Flare"
-school = "hunter"
-slot = "defense"
-kind = "projectile"
-lob = true
-splash = 4.0
-range = [24.0, 24.0]
-radius = [0.3, 0.3]
-# The flight matches its look's (Holy Wrath's bright orb, which bursts in light where it lands).
-speed = 20.0
-cooldown = 14.0
-spell = 2812
-clip = 53
-effects = [{ kind = "incapacitate", secs = [2.0, 2.0] }]
-
-[[ability]]
-key = "feign_death"
-name = "Feign Death"
-ex_of = "flare"
-text = "Drop as if dead for up to 2 s: nothing reaches you, creatures lose you and locks on you let go, and you stay hidden 5 s after (until you strike). Press it again to get up early."
-icon = "Ability_Rogue_FeignDeath"
-slot = "defense"
-kind = "stance"
-valor = 25
-secs = 2.0
-spell = 5384
-clip = 1
-counter = { immune = true }
-self_effects = [{ kind = "veil", secs = [7.0, 7.0] }]
-
-# The finisher you line up.
+# 3: the finisher you line up.
 [[ability]]
 key = "kill_shot"
 name = "Kill Shot"
-text = "Draw for 1 s, then loose an arrow that goes through everything in a 40 yd line for 60, and kills outright any foe under a quarter of its health. Line them up."
+text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 60 damage. Enemies below 25% health are killed outright."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
@@ -4163,6 +4621,45 @@ speed = 50.0
 cooldown = 40.0
 # Arcane Shot's glowing arrow, as Aimed Shot's full draw.
 spell = 3044
+clip = 53
+
+# 3, the second choice: up above the fight, then rain on it. The leap's top is where the volley's
+# aimed from; the key again (within its window) lets it go at the reticle.
+[[ability]]
+key = "skyfall"
+name = "Skyfall"
+text = "Leaps 15 yd straight up. While you're in the air, press again to rain a volley of 12 arrows on a 6 yd circle up to 30 yd away over 1 sec. You can't be hurt or crowd-controlled while airborne. The arrows plant."
+icon = "Ability_Hunter_Pet_WindSerpent"
+school = "hunter"
+slot = "ultimate"
+choice = 2
+kind = "leap"
+at_once = true
+valor = 100
+range = [0.5, 0.5]
+lift = 16.0
+hunt = "float"
+invulnerable = true
+cooldown = 40.0
+spell = 781
+recast = "skyfall_volley"
+recast_secs = 3.5
+
+[[ability]]
+key = "skyfall_volley"
+name = "Skyfall"
+text = "Skyfall's volley: 12 arrows on a 6 yd circle over 1 sec, 14 damage each."
+icon = "Ability_Hunter_Pet_WindSerpent"
+inner = true
+slot = "ultimate"
+kind = "buff"
+hunt = "volley"
+count = 12
+range = [30.0, 30.0]
+radius = [6.0, 6.0]
+damage = [14.0, 14.0]
+speed = 50.0
+spell = 19434
 clip = 53
 
 # ------------------------------------------------------------------------------------ Rogue --
@@ -4934,43 +5431,6 @@ clip = 107
 # and one before it would hold it there; slowed first, it's dragged in all the same.
 effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.7 }, { kind = "pull", amount = 6.0, lift = 3.0 }]
 
-# Q: a hook that hauls you to whatever it bites.
-[[ability]]
-key = "grappling_hook"
-name = "Grappling Hook"
-text = "Fire a hook along the reticle (up to 24 yd). Whatever it bites, a wall, the ground or a foe, you're hauled to it; a foe also takes 10 and staggers. Miss and nothing happens. Your way up a cliff, across a gap, or into their face."
-icon = "Ability_Hunter_Pathfinding"
-school = "beta"
-slot = "ranged"
-kind = "projectile"
-damage = [10.0, 10.0]
-range = [24.0, 24.0]
-radius = [0.35, 0.35]
-speed = 60.0
-yank = true
-cooldown = 8.0
-spell = 6533
-clip = 107
-effects = [{ kind = "stagger", secs = [0.4, 0.4] }]
-
-[[ability]]
-key = "harpoon"
-name = "Harpoon"
-ex_of = "grappling_hook"
-text = "The other way round: the foe it bites is dragged all the way to you, takes 12 and is slowed 40% for 2 s."
-icon = "INV_Spear_04"
-slot = "ranged"
-kind = "projectile"
-valor = 25
-damage = [12.0, 12.0]
-range = [24.0, 24.0]
-radius = [0.35, 0.35]
-speed = 60.0
-spell = 6533
-clip = 107
-effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
-
-# Q: a slow orb that trades places.
 [[ability]]
 key = "displacer_orb"
 name = "Displacer Orb"
@@ -5051,73 +5511,6 @@ tick_spell = 779
 self_effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.6 }, { kind = "steadfast", secs = [3.0, 3.0], amount = 1.0 }]
 
 # E: up they go, and down you come.
-[[ability]]
-key = "launcher"
-name = "Launcher"
-text = "An uppercut (4 yd in front): 10 damage and the foe is thrown up, stunned 0.8 s (less on heroes). Press it again within 1.5 s to Slam: leap onto them, 14 to all within 3 yd."
-icon = "Ability_Warrior_Revenge"
-school = "beta"
-slot = "close"
-kind = "cone"
-damage = [10.0, 10.0]
-range = [4.0, 4.0]
-arc = 70.0
-cooldown = 8.0
-spell = 12294
-impact_kit = 83
-# Stunned, then thrown straight up (a yard of ground, a long air time).
-effects = [{ kind = "stun", secs = [0.8, 0.8] }, { kind = "knockback", amount = 1.0, lift = 9.0 }]
-recast = "launcher_slam"
-recast_secs = 1.5
-
-[[ability]]
-key = "launcher_slam"
-name = "Slam"
-text = "Launcher's follow-up: leap onto them."
-inner = true
-slot = "close"
-kind = "leap"
-damage = [14.0, 14.0]
-range = [10.0, 10.0]
-radius = [3.0, 3.0]
-lift = 7.0
-spell = 16979
-impact_kit = 1666
-
-[[ability]]
-key = "juggle"
-name = "Juggle"
-ex_of = "launcher"
-text = "A harder uppercut (14) that keeps them up longer (stunned 1.2 s, less on heroes); then within 2 s the Slam hits 18 and throws them 4 yd."
-icon = "Ability_Druid_Bash"
-slot = "close"
-kind = "cone"
-valor = 25
-damage = [14.0, 14.0]
-range = [4.0, 4.0]
-arc = 70.0
-spell = 12294
-impact_kit = 83
-effects = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "knockback", amount = 1.0, lift = 11.0 }]
-recast = "juggle_slam"
-recast_secs = 2.0
-
-[[ability]]
-key = "juggle_slam"
-name = "Slam"
-text = "Juggle's follow-up: leap onto them and throw them."
-inner = true
-slot = "close"
-kind = "leap"
-damage = [18.0, 18.0]
-range = [12.0, 12.0]
-radius = [3.5, 3.5]
-lift = 8.0
-spell = 16979
-impact_kit = 1666
-effects = [{ kind = "knockback", amount = 4.0 }]
-
-# E: a slash that drinks.
 [[ability]]
 key = "siphon_blade"
 name = "Siphon Blade"
@@ -7387,7 +7780,7 @@ unparryable = true
 posture = 150
 drops = { meat = [3, 4], hide = [3, 4] }
 trophy = { hide = 6, leather = 4 }
-teaches = ["kill_shot"]
+teaches = ["kill_shot", "skyfall"]
 respawn = 1200.0
   [mob.attack]
   windup = 0.55
@@ -9725,7 +10118,7 @@ name = "The Hunter's Lodge Banner"
 at = [-9460.0, -1380.0]
 display = 4313
 scale = 1.0
-teaches = ["aimed_arrow", "explosive_trap"]
+teaches = ["aimed_arrow", "bank_shot", "call_of_the_wild", "raptor_strike"]
 keep = true
 secs = 3.0
 text = "The old lodge's banner, and a hunter's notes nailed to its pole: a shot, and a snare for the road."
@@ -9833,7 +10226,7 @@ trial = ["trial_relic_rogue_0", "trial_relic_rogue_1"]
 key = "relic_hunter"
 name = "A Lost Hunter's Pack"
 at = [-8797.0, -1056.0]
-teaches = ["disengage", "flare"]
+teaches = ["grapple_arrow", "ensnaring_retreat", "tripwire", "explosive_trap"]
 loot = { hide = 3, leather = 2 }
 display = 259
 secret = 7.0

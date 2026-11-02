@@ -168,6 +168,10 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         out.push(format!("{}% healing", pct(d.area_heal)));
     }
     match d.kind.as_str() {
+        _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire · {} sec duration", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
+        _ if d.hunt == "call" || d.hunt == "double_call" => out.push(format!("{} yd range", n(d.range[1]))),
+        _ if d.hunt == "recall" => out.push("Every planted arrow · Lacerates at 3+ arrows".to_string()),
+        _ if d.hunt == "volley" => out.push(format!("{} arrows · {} yd range · {} yd radius", d.count, n(d.range[1]), n(d.radius[1]))),
         "nova" => out.push(format!("{} yd radius", n(d.radius[1]))),
         "ground" if d.at_self => out.push(format!("{} yd radius", n(d.radius[1]))),
         "ground" => out.push(format!("{} yd range · {} yd radius", n(d.range[1]), n(d.radius[1]))),
@@ -260,6 +264,16 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.kind == "art" && d.windup > 0.0 {
         out.push(format!("{} sec windup", n(d.windup)));
     }
+    if d.bounces > 0 {
+        out.push(format!("{} ricochets · +{}% damage each", d.bounces, pct(d.bounce_gain)));
+    }
+    if d.plants {
+        out.push("Arrows plant".to_string());
+    }
+    // Call of the Wild: its stage's stamina, half when empowered.
+    if d.hunt == "call" || d.hunt == "double_call" {
+        out.push("15 / 20 / 25 Stamina by stage · Half when empowered".to_string());
+    }
     // Stamina once (a weapon strike's is easy to miss, so it's always said).
     if d.stamina > 0.0 {
         out.push(format!("{} Stamina", n(d.stamina)));
@@ -307,7 +321,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 16;
+pub(crate) const ADDON_NEWEST: u32 = 17;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019).
 pub(crate) const CLIENT_NEWEST: u8 = 12;
@@ -1700,7 +1714,8 @@ impl SurvivalGame {
     }
 
     /// The board (N): `TR\t<dev>\t<what the count says>\t<card>^...`, each card
-    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts~where learned~page`.
+    /// `key~name~row~column~icon~owned~can unlock~on key~kind~aimed~least charge~full charge~text~facts~EX key~EX name~EX icon~EX Valor~EX text~EX facts~where learned~page~choice`
+    /// (`choice` 2: the class's second card in that row, shown under its first).
     /// `page` is 1 for a class's card (`column` its class) and 2 for the beta page's (`column`
     /// `beta`): an add-on from before the beta page knows no `beta` column and leaves those out.
     fn tree_line(&self, id: Id) -> Option<String> {
@@ -1722,7 +1737,7 @@ impl SurvivalGame {
                 });
                 let at = if owned { String::new() } else { clean(&self.sim.learned_where(&a.key)) };
                 format!(
-                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}~{}",
+                    "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{:.2}~{:.2}~{}~{}~{exs}~{at}~{}~{}",
                     a.key,
                     clean(&a.name),
                     a.slot,
@@ -1738,6 +1753,7 @@ impl SurvivalGame {
                     clean(&a.text),
                     clean(&ability_facts(a, None, c.valor.max)),
                     a.page(),
+                    a.choice,
                 )
             })
             .collect();
@@ -1811,11 +1827,18 @@ impl SurvivalGame {
                     None => "~~~~~~~~".to_string(),
                 };
                 let (ext, exf) = ex.map(|x| &c.abilities[x]).map_or((String::new(), String::new()), |x| (clean(&x.text), clean(&ability_facts(x, Some(d), c.valor.max))));
+                // Call of the Wild's key shows the beast that's coming (and says so).
+                let (name, icon) = if d.hunt == "call" {
+                    let b = self.sim.next_beast(id);
+                    (format!("{}: {}", d.name, b.name), b.icon.to_string())
+                } else {
+                    (d.name.clone(), d.icon.clone())
+                };
                 format!(
                     "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}",
                     d.key,
-                    clean(&d.name),
-                    clean(&d.icon),
+                    clean(&name),
+                    clean(&icon),
                     d.kind,
                     shape(d),
                     if p.cd_off { d.charges.max(1) } else { cd.charges },

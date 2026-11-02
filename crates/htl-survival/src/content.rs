@@ -3215,6 +3215,15 @@ impl Content {
             if a.through && a.kind != "dash" {
                 bail!("{what}: only a dash goes `through`");
             }
+            if !a.hunt.is_empty() && !crate::content_abilities::HUNTS.contains(&a.hunt.as_str()) {
+                bail!("{what}: hunt {:?} (one of {:?})", a.hunt, crate::content_abilities::HUNTS);
+            }
+            if !(1..=2).contains(&a.choice) {
+                bail!("{what}: choice {} (1 or 2: a class has two a row)", a.choice);
+            }
+            if a.bounces > 0 && a.kind != "projectile" {
+                bail!("{what}: only a projectile ricochets (`bounces`)");
+            }
             if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
                 bail!("{what}: an empower needs its `secs`");
             }
@@ -3290,8 +3299,19 @@ impl Content {
                 if !r.inner || r.key == a.key {
                     bail!("{what}: its recast {} must be an `inner` ability of its own", a.recast);
                 }
-                if !r.recast.is_empty() {
-                    bail!("{what}: its recast {} can't have a recast of its own", a.recast);
+                // A chain (Raptor Strike): a recast may arm one of its own, never back round.
+                let mut seen = vec![a.key.clone()];
+                let mut next = r.recast.clone();
+                while !next.is_empty() {
+                    if seen.contains(&next) {
+                        bail!("{what}: its recasts come back round to {next}");
+                    }
+                    let Some(k) = self.ability(&next) else { bail!("{what}: recast {next}, no such ability") };
+                    if !self.abilities[k].inner {
+                        bail!("{what}: its chain's recast {next} must be an `inner` ability of its own");
+                    }
+                    seen.push(next.clone());
+                    next = self.abilities[k].recast.clone();
                 }
             }
             // A burst as ground ends, or as a shield does, is a nova (a shield's with its own reach).
@@ -3318,15 +3338,17 @@ impl Content {
         // The board: a card a column at most in each row; the beta page, four a row.
         for row in SLOTS {
             let (beta, cards): (Vec<&AbilityDef>, Vec<&AbilityDef>) = self.abilities.iter().filter(|a| a.on_board() && a.slot == row).partition(|a| a.is_beta());
-            if cards.len() > SCHOOLS.len() {
-                bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len());
+            if cards.len() > SCHOOLS.len() * 2 {
+                bail!("the board's {row} row: {} cards, at most {}", cards.len(), SCHOOLS.len() * 2);
             }
             if beta.len() > BETA_ROW {
                 bail!("the beta page's {row} row: {} cards, at most {BETA_ROW}", beta.len());
             }
             for col in SCHOOLS {
-                if cards.iter().filter(|a| a.school == col).count() > 1 {
-                    bail!("the board's {row} row: two {col} cards");
+                for choice in [1, 2] {
+                    if cards.iter().filter(|a| a.school == col && a.choice == choice).count() > 1 {
+                        bail!("the board's {row} row: two {col} cards as its choice {choice}");
+                    }
                 }
             }
         }

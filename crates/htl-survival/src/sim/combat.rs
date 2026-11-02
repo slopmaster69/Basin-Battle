@@ -1271,6 +1271,10 @@ impl Survival {
                 self.events.push(Event::Visual { id: mid, kit: KIT_CLEAVE, by: Some(id) });
             }
         }
+        // A blow landed: the hunter's next beast comes empowered.
+        if !struck.is_empty() {
+            self.prime_wild(id);
+        }
     }
 
     /// Hero `id`'s swing reaches hero `victim`: a blow like any other, guarded, parried or dodged
@@ -1674,9 +1678,13 @@ impl Survival {
             p.last_hit_by = Some(attacker);
         }
         match outcome {
-            Outcome::Parried => self.gain_valor(victim, c.valor.parry),
+            Outcome::Parried => {
+                self.gain_valor(victim, c.valor.parry);
+                self.prime_wild(victim);
+            }
             Outcome::Dodged if !dashing && damage > 0 => {
                 self.gain_valor(victim, c.valor.roll);
+                self.prime_wild(victim);
                 // Rolled through it, not just away: a little breath back.
                 if c.dodge.refund > 0.0 {
                     if let Some(p) = self.players.get_mut(&victim) {
