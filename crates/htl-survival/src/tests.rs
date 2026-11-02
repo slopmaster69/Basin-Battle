@@ -925,6 +925,28 @@ fn take_up(s: &mut Survival, p: Id, key: &str) {
 }
 
 #[test]
+fn a_giant_is_too_heavy_to_parry_a_timed_guard_only_blocks_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let g = mob(&mut s, "blackfang", [2.0, 0.0, 0.0]);
+    assert!(s.content.mobs[s.mobs[&g].def].unparryable, "Old Blackfang is a giant");
+    s.input(p, Input::Guard);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(g, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Blocked, "blocked, not parried");
+    assert!(s.mobs[&g].stagger_until <= s.clock, "it doesn't reel");
+    let ev = s.step(0.0);
+    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == p && text.contains("Too heavy"))), "told why");
+    // A humanoid boss can still be parried.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let w = mob(&mut s, "warlord", [2.0, 0.0, 0.0]);
+    assert!(!s.content.mobs[s.mobs[&w].def].unparryable);
+    s.input(p, Input::Guard);
+    run(&mut s, 0.1);
+    assert_eq!(s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
+}
+
+#[test]
 fn a_guard_raised_just_in_time_parries_and_the_attacker_reels() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);

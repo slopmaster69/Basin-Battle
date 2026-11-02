@@ -6913,6 +6913,8 @@ walk_speed = 2.0
 aggro = 16.0
 leash = 40.0
 boss = true
+# Too big to parry (a paw, a stomp, a slab, not a blade): a timed guard only blocks it.
+unparryable = true
 posture = 220
 drops = { stone = [4, 6], silver = [1, 2] }
 trophy = { silver = 3, stone = 8 }
@@ -6974,6 +6976,7 @@ aggro = 20.0
 leash = 40.0
 keep_away = 8.0
 boss = true
+unparryable = true
 posture = 160
 drops = { mageroyal = [2, 3] }
 trophy = { silver = 2, mageroyal = 4 }
@@ -7163,6 +7166,7 @@ walk_speed = 2.5
 aggro = 18.0
 leash = 45.0
 boss = true
+unparryable = true
 posture = 150
 drops = { meat = [3, 4], hide = [3, 4] }
 trophy = { hide = 6, leather = 4 }
@@ -7255,6 +7259,7 @@ walk_speed = 2.0
 aggro = 16.0
 leash = 40.0
 boss = true
+unparryable = true
 posture = 130
 drops = { silk = [3, 5] }
 trophy = { silk = 6, silver = 2 }
@@ -7307,6 +7312,7 @@ aggro = 20.0
 leash = 40.0
 keep_away = 8.0
 boss = true
+unparryable = true
 posture = 150
 drops = { silverleaf = [2, 3], mageroyal = [1, 1] }
 trophy = { silver = 2, silverleaf = 4 }
@@ -7368,6 +7374,7 @@ walk_speed = 2.0
 aggro = 12.0
 leash = 40.0
 boss = true
+unparryable = true
 posture = 120
 drops = { meat = [5, 7], hide = [2, 3] }
 trophy = { meat = 10, pumpkin = 6 }

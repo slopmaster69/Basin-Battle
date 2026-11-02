@@ -1583,6 +1583,11 @@ impl Survival {
         let heavy_blow = style == Blow::Heavy || (heavy && self.mobs.contains_key(&attacker));
         // Untouchable: in Ice Block, or mid-dash on an ability that's untouchable while it runs.
         let dashing = matches!(&p.action, Action::Dash { ability, .. } if self.content.abilities[*ability].invulnerable);
+        // A giant's blow (`unparryable`) can be blocked, not parried.
+        let giant = self.mobs.get(&attacker).is_some_and(|m| c.mobs[m.def].unparryable);
+        let parryable = parryable && !giant;
+        // The guard raised just in time: a parry, if the blow can be parried at all.
+        let timed = now - p.guard_at <= c.parry.window + self.weapon_of(p).parry && p.guard_at - p.prev_guard_at >= c.parry.cooldown;
         let outcome = match &p.action {
             _ if self.immune(victim) => Outcome::Blocked,
             _ if dashing => Outcome::Dodged,
@@ -1591,7 +1596,7 @@ impl Survival {
                 let toward = facing(p.pos, from);
                 if angle_between(p.facing, toward) > guard.arc / 2.0 {
                     Outcome::Hit
-                } else if parryable && now - p.guard_at <= c.parry.window + self.weapon_of(p).parry && p.guard_at - p.prev_guard_at >= c.parry.cooldown {
+                } else if parryable && timed {
                     Outcome::Parried
                 } else if p.stamina >= cost {
                     Outcome::Blocked
@@ -1601,6 +1606,10 @@ impl Survival {
             }
             _ => Outcome::Hit,
         };
+        // A parry timed on a giant's blow: told why it only blocked.
+        if giant && timed && outcome == Outcome::Blocked && matches!(p.action, Action::Guard) {
+            self.events.push(Event::Flash { player: victim, text: "Too heavy to parry!".into() });
+        }
         // Armor takes its share off whatever gets through.
         let worn = 1.0 - self.armor_reduce(p);
         let worn = worn * self.taken_share(victim);

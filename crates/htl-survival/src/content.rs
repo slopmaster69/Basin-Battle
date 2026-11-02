@@ -1568,6 +1568,10 @@ pub struct MobDef {
     /// while it fights, and never more than one of it in a raid.
     #[serde(default)]
     pub boss: bool,
+    /// Too big to parry (a giant beast, an elemental, a construct: a paw, a stomp, a slab of stone,
+    /// not a blade): a timed guard only blocks its blows. Its blows are still blocked as ever.
+    #[serde(default)]
+    pub unparryable: bool,
     /// Its second wind: below a share of its health, a pattern at once and quicker blows after.
     #[serde(default)]
     pub enrage: Option<EnrageDef>,
