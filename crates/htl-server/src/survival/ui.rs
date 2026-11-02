@@ -300,7 +300,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 14;
+pub(crate) const ADDON_NEWEST: u32 = 15;
 /// 11: a borrowed clip's turns go back to rest (patch 0016), so a shield isn't left crooked.
 pub(crate) const CLIENT_NEWEST: u8 = 11;
 
@@ -568,21 +568,32 @@ impl SurvivalGame {
         format!("PM\t{found}~{}~{open}~{all}~{sf}~{secrets}\t{}", sites.len(), list.join("^"))
     }
 
-    /// A champion fighting near the hero, for the bar across the bottom of the screen:
-    /// `BS\t<name>\t<health>\t<max>\t<enraged>` (just `BS` with none).
+    /// A champion fighting near the hero, for the bar across the top of the screen:
+    /// `BS\t<name>\t<health>\t<max>\t<enraged>\t<posture>\t<posture limit>\t<broken>` (just
+    /// `BS` with none). Its posture shows under its health, Sekiro's way: it fills from the
+    /// middle out, and drains when the pressure stops; `broken` while its stance is broken.
     fn boss_line(&self, id: Id) -> Option<String> {
         let p = self.sim.players.get(&id)?;
         let c = &self.sim.content;
         let near = self
             .sim
             .mobs
-            .values()
-            .filter(|m| c.mobs[m.def].boss && m.health > 0 && m.state.foe().is_some())
-            .map(|m| (htl_survival::dist2d(m.pos, p.pos), m))
-            .filter(|(d, _)| *d < BOSS_BAR_RANGE)
+            .iter()
+            .filter(|(_, m)| c.mobs[m.def].boss && m.health > 0 && m.state.foe().is_some())
+            .map(|(mid, m)| (htl_survival::dist2d(m.pos, p.pos), *mid, m))
+            .filter(|(d, _, _)| *d < BOSS_BAR_RANGE)
             .min_by(|a, b| a.0.total_cmp(&b.0));
         Some(match near {
-            Some((_, m)) => format!("BS\t{}\t{}\t{}\t{}", clean(&c.mobs[m.def].name), m.health, m.max_health, u8::from(m.enraged)),
+            Some((_, mid, m)) => format!(
+                "BS\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                clean(&c.mobs[m.def].name),
+                m.health,
+                m.max_health,
+                u8::from(m.enraged),
+                self.sim.posture_of(mid),
+                self.sim.posture_limit(mid),
+                u8::from(self.sim.stance_broken(mid))
+            ),
             None => "BS".to_string(),
         })
     }

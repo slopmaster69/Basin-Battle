@@ -359,6 +359,9 @@ WG	0XF130000000000026	0.90
 # A champion's bar: shown while he fights near, redder in his second wind, gone after.
 BS	Warlord Gorzak	900	1200	0
 BS	Warlord Gorzak	500	1200	1
+BS	Warlord Gorzak	480	1200	1	150	300	0
+BS	Warlord Gorzak	460	1200	1	270	300	0
+BS	Warlord Gorzak	440	1200	1	0	300	1
 !table.insert(SAID, "boss bar: " .. tostring(ElwynnSurvivalBoss:IsShown()) .. " " .. tostring(ElwynnSurvival.boss.name:GetText()))
 # Trading blows with the champion: one bar for him, not two; another foe goes under his.
 H	150	200	100	100	melee	Footman's Axe	5	16	-1	0	idle	0	0	0	1	2	Warlord Gorzak	500	1200	bow

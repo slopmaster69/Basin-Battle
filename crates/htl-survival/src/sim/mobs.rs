@@ -534,32 +534,15 @@ impl Survival {
             self.mob_died(mid, by);
             return;
         }
-        // A champion's posture: enough damage in a short while breaks its stance. It takes as much
-        // more for each hero in its fight as its health does, and none builds while it reels
-        // from a break or just after.
-        let limit = self.content.mobs[self.mobs[&mid].def].posture;
-        let fighters = self.mobs[&mid].fighters.max(1);
-        let limit = (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32;
-        if limit > 0 && self.players.contains_key(&by) && now >= self.mobs[&mid].posture_guard {
-            let window = self.content.mobs[self.mobs[&mid].def].posture_secs;
-            let m = self.mobs.get_mut(&mid).unwrap();
-            if now - m.posture_from > window {
-                m.posture = 0;
-                m.posture_from = now;
-            }
+        // A champion's posture: enough damage in a short while breaks its stance (heavier
+        // weapons count more, and a blow in its recovery more again).
+        if self.players.contains_key(&by) && self.content.mobs[self.mobs[&mid].def].posture > 0 {
             let heft = self.players.get(&by).map_or(1.0, |p| self.weapon_of(p).posture).max(1.0);
             // Struck just after its own blow, it's open: that counts more.
-            let m = self.mobs.get_mut(&mid).unwrap();
+            let m = &self.mobs[&mid];
             let open = matches!(m.state, MobState::Recover { .. }) && m.stagger_until <= now;
             let heft = if open { heft * self.content.combat.recovery_posture.max(1.0) } else { heft };
-            m.posture += (damage as f32 * heft).round() as u32;
-            if m.posture >= limit {
-                m.posture = 0;
-                m.posture_from = now;
-                m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
-                self.stagger_mob(mid, POSTURE_BREAK, true);
-                self.events.push(Event::Flash { player: by, text: "Stance broken!".into() });
-                self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
+            if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
                 return;
             }
         }
@@ -610,6 +593,56 @@ impl Survival {
     pub(crate) fn phase_now(&self, mid: Id) -> Option<&crate::content::EnrageDef> {
         let m = self.mobs.get(&mid)?;
         m.phase.checked_sub(1).and_then(|k| self.content.mobs[m.def].phases.get(k))
+    }
+
+    /// How much breaks creature `mid`'s stance: its own posture, and as much more for each hero
+    /// in its fight as its health takes (0: it has none).
+    pub fn posture_limit(&self, mid: Id) -> u32 {
+        let Some(m) = self.mobs.get(&mid) else { return 0 };
+        let limit = self.content.mobs[m.def].posture;
+        let fighters = m.fighters.max(1);
+        (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
+    }
+
+    /// Creature `mid`'s posture now: what it built, less what's drained since. It drains all the
+    /// time, the whole bar over its `posture_secs`, blows or no blows (so only a flow faster than
+    /// that breaks it, however close together the blows come, and the bar falls smoothly).
+    pub fn posture_of(&self, mid: Id) -> u32 {
+        let Some(m) = self.mobs.get(&mid) else { return 0 };
+        let limit = self.posture_limit(mid) as f32;
+        let window = self.content.mobs[m.def].posture_secs.max(0.5);
+        let idle = (self.clock - m.posture_from).max(0.0);
+        (m.posture as f32 - limit / window * idle).max(0.0).round() as u32
+    }
+
+    /// Creature `mid`'s stance takes `amount` more from hero `by` (a blow's, a parry's): full, it
+    /// breaks, and it reels open to a riposte. True if it broke. None builds while it reels from
+    /// a break or just after (else a group fills it again while it reels and it never stands).
+    pub(crate) fn build_posture(&mut self, mid: Id, by: Id, amount: u32) -> bool {
+        let now = self.clock;
+        let limit = self.posture_limit(mid);
+        let Some(m) = self.mobs.get(&mid) else { return false };
+        if limit == 0 || m.health == 0 || now < m.posture_guard || amount == 0 {
+            return false;
+        }
+        let built = self.posture_of(mid) + amount;
+        let m = self.mobs.get_mut(&mid).unwrap();
+        m.posture_from = now;
+        if built < limit {
+            m.posture = built;
+            return false;
+        }
+        m.posture = 0;
+        m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
+        self.stagger_mob(mid, POSTURE_BREAK, true);
+        self.events.push(Event::Flash { player: by, text: "Stance broken!".into() });
+        self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
+        true
+    }
+
+    /// Whether creature `mid` is reeling from a broken stance now.
+    pub fn stance_broken(&self, mid: Id) -> bool {
+        self.mobs.get(&mid).is_some_and(|m| m.posture_guard > self.clock + POSTURE_GRACE && m.stagger_until > self.clock)
     }
 
     /// A creature reels for `secs`: a wind-up in hand is lost, it stands and does nothing, and (from

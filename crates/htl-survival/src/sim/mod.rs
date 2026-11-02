@@ -506,6 +506,8 @@ pub struct Player {
     pub landing_attack: Option<StrikeKind>,
     /// Reeling from a parried blow until then: every blow on them lands harder.
     pub riposte_until: f32,
+    /// A parry's opening: until then everything they do costs half the stamina.
+    pub opening_until: f32,
     /// Who struck them last (a fall to another hero is announced).
     pub last_hit_by: Option<Id>,
     /// What the next hurt on them is (set by the blow about to land), and the hurts of the last
@@ -684,7 +686,8 @@ pub struct Mob {
     /// A lobbed throw being wound up: where it will come down, and the ring marked there from the
     /// wind-up's start until it lands.
     pub lob: Option<(Vec3, Id)>,
-    /// Damage towards breaking its posture, and since when it's been piling up.
+    /// Damage towards breaking its posture as of `posture_from`, when it last grew: it drains
+    /// away steadily from then (`Sim::posture_of` has it now).
     pub posture: u32,
     pub posture_from: f32,
     /// Its stance can't be broken again before then (a break, then time to stand back up).
@@ -1071,6 +1074,7 @@ impl Survival {
             dodge_attack: false,
             landing_attack: None,
             riposte_until: -100.0,
+            opening_until: -100.0,
             last_hit_by: None,
             cause: None,
             wounds: Vec::new(),
