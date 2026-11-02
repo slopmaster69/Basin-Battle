@@ -2505,11 +2505,20 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
     assert!(limit > 0);
     let share = s.content.parry.posture;
     let wait = s.content.parry.cooldown + 0.05;
-    let parry = |s: &mut Survival| {
-        s.input(p, Input::GuardUp);
-        run(s, wait);
-        // Only the test's blows: the Warlord's own swings would land between them.
+    // Only the test's blows: the Warlord's own swings would land between them (it stays in the
+    // fight, for its posture's size, but held idle).
+    let hold = |s: &mut Survival| {
         s.mobs.get_mut(&w).unwrap().state = MobState::Idle { wander_at: 1e9 };
+        s.pending.clear();
+    };
+    let parry = |s: &mut Survival| {
+        hold(s);
+        s.input(p, Input::GuardUp);
+        for _ in 0..(wait / 0.05).ceil() as usize {
+            hold(s);
+            run(s, 0.05);
+        }
+        hold(s);
         s.input(p, Input::Guard);
         run(s, 0.05);
         s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light)
