@@ -841,16 +841,16 @@ fn a_common_foe_with_a_second_form_comes_back_once_at_a_rest() {
     s.engage(druid, mobs::Foe::Hero(id));
     s.hurt_mob(druid, id, 1_000_000);
     s.step(DT);
-    assert_eq!(count(&s, "wc_fang_serpent"), 1, "the serpent crawls out");
-    let serpent = *s.mobs.iter().find(|(_, m)| m.health > 0 && s.content.mobs[m.def].key == "wc_fang_serpent").unwrap().0;
-    s.hurt_mob(serpent, id, 1_000_000);
+    assert_eq!(count(&s, "wc_fang_serpent"), 1, "the dream raptor tears out");
+    let raptor = *s.mobs.iter().find(|(_, m)| m.health > 0 && s.content.mobs[m.def].key == "wc_fang_serpent").unwrap().0;
+    s.hurt_mob(raptor, id, 1_000_000);
     run(&mut s, 5.0);
     let lamp = obj(&s, |k| matches!(k, ObjKind::Lamp { key } if key == "first"));
     s.move_player(id, [0.0, 0.0, 0.0], 0.0, Moving::default());
     s.interact(id, Some(lamp));
     run(&mut s, 5.0);
     s.rest(id).unwrap();
-    assert_eq!((count(&s, "wc_druid"), count(&s, "wc_fang_serpent")), (1, 0), "the druid is back, once; no serpent of its own");
+    assert_eq!((count(&s, "wc_druid"), count(&s, "wc_fang_serpent")), (1, 0), "the druid is back, once; no raptor of its own");
 }
 
 #[test]

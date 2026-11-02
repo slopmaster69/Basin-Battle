@@ -5813,7 +5813,7 @@ respawn = 200.0
   weight = 2.0
   min_range = 6.0
   max_range = 20.0
-  steps = [ { ranged = true, clip = 107, windup = 1.0, damage = 12, range = 20.0, speed = 30.0, radius = 1.0, spell = 23065, recovery = 1.0 } ]
+  steps = [ { ranged = true, clip = 107, take = 0, windup = 1.0, damage = 12, range = 20.0, speed = 30.0, radius = 1.0, spell = 23065, recovery = 1.0 } ]
   # A lunge.
   [[mob.pattern]]
   name = "lunge"
@@ -6954,7 +6954,7 @@ respawn = 1200.0
   weight = 1.5
   min_range = 7.0
   max_range = 24.0
-  steps = [ { ranged = true, clip = 16, windup = 1.3, damage = 24, range = 24.0, speed = 18.0, radius = 2.4, spell = 9483, look = 26271, recovery = 1.2 } ]
+  steps = [ { ranged = true, clip = 16, take = 0, windup = 1.3, damage = 24, range = 24.0, speed = 18.0, radius = 2.4, spell = 9483, look = 26271, recovery = 1.2 } ]
 
 # The Unbound Flame: a fire Theocritus called up at the Tower of Azora and couldn't put back. It
 # is the mage's trial: the camp learns Meteor when it's put out.
@@ -7287,7 +7287,7 @@ respawn = 1200.0
   weight = 2.0
   min_range = 6.0
   max_range = 22.0
-  steps = [ { ranged = true, clip = 16, windup = 1.1, damage = 18, range = 22.0, speed = 20.0, radius = 2.0, spell = 6917, look = 8245, recovery = 1.0 } ]
+  steps = [ { ranged = true, clip = 16, take = 0, windup = 1.1, damage = 18, range = 22.0, speed = 20.0, radius = 2.0, spell = 6917, look = 8245, recovery = 1.0 } ]
 
 # Moonfeather, the great owl who watches over Thunder Falls: wind and moonlight. It is the druid's
 # trial: the camp learns Hurricane when it falls.
