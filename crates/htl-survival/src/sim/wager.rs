@@ -825,17 +825,26 @@ impl Survival {
         let now = week_of(self.wall());
         // Each past week's best: (week, level, dungeon), from the wins counted.
         let mut best: BTreeMap<u64, (u32, String)> = BTreeMap::new();
+        let mut late: Vec<String> = Vec::new();
         for k in self.camp.counts.keys() {
             let Some(rest) = k.strip_prefix("wagerweek:") else { continue };
             let mut it = rest.splitn(3, ':');
             let (Some(week), Some(dungeon), Some(level)) = (it.next().and_then(|w| w.parse::<u64>().ok()), it.next(), it.next().and_then(|l| l.parse::<u32>().ok())) else { continue };
-            if week >= now || self.camp.counts.contains_key(&format!("weekchest:{week}")) {
+            if week >= now {
+                continue;
+            }
+            // (A win that reached the camp after its week paid: too late for it; let go.)
+            if self.camp.counts.contains_key(&format!("weekchest:{week}")) {
+                late.push(k.clone());
                 continue;
             }
             let e = best.entry(week).or_insert((0, String::new()));
             if level > e.0 {
                 *e = (level, dungeon.to_string());
             }
+        }
+        for k in late {
+            self.camp.counts.remove(&k);
         }
         for (week, (level, dungeon)) in best {
             // Paid once: the week's wins go (the camp's counts are mirrored below every tick, so

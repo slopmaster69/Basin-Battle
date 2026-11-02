@@ -1111,6 +1111,11 @@ fn the_weeks_best_wager_pays_the_bookmakers_chest_when_the_week_turns() {
     assert_eq!(camp.storage.values().sum::<u32>(), after);
     assert!(!camp.camp.counts.keys().any(|k| k.starts_with(&format!("wagerweek:{}:", now - 1))));
     assert_eq!(camp.camp.counts.get(&format!("weekchest:{}", now - 1)), Some(&5));
+    // A win for that week arriving late: not paid again, and let go.
+    camp.camp.counts.insert(format!("wagerweek:{}:stockade:9", now - 1), 1);
+    camp.step(DT);
+    assert_eq!(camp.storage.values().sum::<u32>(), after);
+    assert!(!camp.camp.counts.contains_key(&format!("wagerweek:{}:stockade:9", now - 1)));
 }
 
 #[test]
