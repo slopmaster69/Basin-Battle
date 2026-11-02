@@ -1408,7 +1408,7 @@ wake = "ledge_cache"
 # --- spread through the empty stretches (tools: crates/htl-server/examples/dungeon_survey.rs) ---
 # Each where the survey found the most ground farthest from any foe, near the way to a boss and
 # clear of the lamps; of the place's own kind (its nearest pack's). Where the stretch is a big
-# one, a caster stands a few yards behind, linked: a front to break and a back to reach.
+# one, a caster stands in the middle of the pack, linked: guards to get through to it.
 
 [[dungeon.pack]]
 mob = "rf_warlock"
