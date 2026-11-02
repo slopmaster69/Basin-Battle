@@ -457,9 +457,12 @@ On the action-combat client (the patch's second part) the client plays clips its
   are your own movement, sped up for a moment, with nothing waiting on the server; others see the
   pace through the server.
 - **Swings use the game's real attack clips**, timed so the clip's own impact keyframe lands when
-  the server's blow does: Attack1H (17), a dagger's Attack1HPierce (85), Attack2H (18), a
-  polearm's Attack2HL (19); the heavy attack's Special1H (57) or Special2H (58). Each leaves a
-  **weapon trail**: a faint pale streak, a heavy blow's ember.
+  the server's blow does: Attack1H (17), a dagger's Attack1HPierce (85) and its slash (88),
+  Attack2H (18), a polearm's Attack2HL (19). **Every hero's are one model's, whatever their
+  race**, picked from the clip census for being plain to read: the Undead man's for swords, axes,
+  maces, two-handers and polearms (a chop, then an overhead; the heavy attack an overhead held a
+  beat, never a spin or a leap), the dwarf man's for daggers. Each leaves a **weapon trail**: a
+  faint pale streak, a heavy blow's ember.
 - **Hit-stop**: a blow that lands holds both bodies still for a moment (60 ms, 115 heavy, 150 on a
   parry, 50 on a block), and **the camera shakes** for whoever is in it, harder for the one struck.
 - **The dodge tumbles**: the whole body rolls head over heels, about the hips, the way it dashes.
@@ -1331,8 +1334,8 @@ bars that were hard to read. This pass answers those. Still to see with your own
   the arrow's line; the slower look while aiming;
 - the bow's drawn and held pose from Auto Shot's start, on you and on others, and that the release
   follows on the loose;
-- the heavy attack's swing (Special1H and Special2H on the action-combat client) and its
-  knock-back;
+- the heavy attack's swing (an overhead from the Undead man's takes, on every race, on the
+  action-combat client) and its knock-back;
 - the attack clips' timing (fitted to each weapon's wind-up), the trails' colours, how long the
   hit-stop holds and how hard the shake is; the roll's look and its pivot at the hips;
 - the upper body's lean with the aim, and the camera stopping short of other bodies;
