@@ -1163,7 +1163,9 @@ impl Survival {
         let d = self.dungeon_def()?;
         let account = &self.players.get(&id)?.account;
         let flasks = self.below.as_ref()?.heroes.get(account).map_or(0, |h| h.flasks);
-        (d.draughts + flasks < d.draughts_max).then(|| round5(self.run_worth() as f32 * FLASK_SHARE))
+        // (A dungeon whose foes drop no currency sells none: it would be all but free.)
+        let worth = self.run_worth();
+        (worth > 0 && d.draughts + flasks < d.draughts_max).then(|| round5(worth as f32 * FLASK_SHARE))
     }
 
     /// What honing a piece to `tier` costs: a share of a run's currency, more each tier.
@@ -1176,6 +1178,10 @@ impl Survival {
     /// (in their bags or worn): (item key, name, the tier it becomes by name, price, can pay).
     pub fn hone_offers(&self, id: Id) -> Vec<(String, String, String, u32, bool)> {
         let Some(p) = self.players.get(&id) else { return Vec::new() };
+        // (A dungeon whose foes drop no currency hones nothing: it would be all but free.)
+        if self.run_worth() == 0 {
+            return Vec::new();
+        }
         let have = self.currency_of(id);
         let mut pieces: Vec<usize> = p.bag.iter().filter(|(_, n)| **n > 0).map(|(i, _)| *i).collect();
         pieces.extend(p.armor.values().copied());

@@ -1640,6 +1640,21 @@ fn the_quartermaster_hones_the_dungeons_own_gear_and_sells_a_flask_for_its_curre
     s.players.get_mut(&id).unwrap().bag.insert(plunder, price);
     s.buy(id, &d.flask).unwrap();
     assert_eq!(s.below.as_ref().unwrap().heroes["ayla"].flasks, 1);
+    // A dungeon whose foes drop none of its currency: nothing honed, no flask, at any price.
+    let mut c = Content::builtin().for_dungeon_of("deadmines");
+    for m in &mut c.mobs {
+        m.drops.clear();
+    }
+    c.dungeon.as_mut().unwrap().boxes.clear();
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let cutlass = s.content.item("pirate_cutlass").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(cutlass, 1);
+    assert_eq!(s.run_worth(), 0);
+    assert!(s.hone_offers(id).is_empty());
+    let flask = s.dungeon_def().unwrap().flask.clone();
+    assert!(!s.trades(id).iter().any(|t| t.0 == flask));
 }
 
 #[test]
