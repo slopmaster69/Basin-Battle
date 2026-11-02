@@ -101,170 +101,176 @@ fn slot_of(s: &str) -> &str {
     }
 }
 
-/// What a card does in numbers, for its tooltip: damage, healing, reach, charge, wind-up,
-/// stamina, cooldown, Valor (`·` between).
+/// What an ability does in numbers, for its tooltip's stat line, in the house style (the spell
+/// copy handoff): damage, healing, size, timing, traits, cooldown, cost, `·` between. Sizes are a
+/// radius; times in sec; one label per thing.
 pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<&htl_survival::content::AbilityDef>, valor_max: f32) -> String {
+    // Whole numbers bare, else as few decimals as say it (0.75 stays 0.75, not 0.8).
     let n = |v: f32| -> String {
-        if (v - v.round()).abs() < 0.05 {
+        if (v - v.round()).abs() < 0.005 {
             format!("{}", v.round() as i64)
-        } else {
+        } else if (v * 10.0 - (v * 10.0).round()).abs() < 0.05 {
             format!("{v:.1}")
-        }
-    };
-    let span = |r: [f32; 2], unit: &str| -> String {
-        if (r[1] - r[0]).abs() < 0.01 {
-            format!("{}{unit}", n(r[0]))
         } else {
-            format!("{}–{}{unit}", n(r[0]), n(r[1]))
+            format!("{v:.2}")
         }
     };
+    let span = |r: [f32; 2]| -> String {
+        if (r[1] - r[0]).abs() < 0.01 {
+            n(r[0])
+        } else {
+            format!("{}–{}", n(r[0]), n(r[1]))
+        }
+    };
+    let pct = |v: f32| n(v * 100.0);
     let mut out: Vec<String> = Vec::new();
     if d.kind == "art" {
-        out.push(format!("{}% weapon damage", n(d.weapon * 100.0)));
+        out.push(format!("{}% weapon damage", pct(d.weapon)));
         if d.behind > 1.0 {
-            out.push(format!("×{} from behind", n(d.behind)));
-        }
-        // A weapon art is a swing: it takes stamina as well (said, as it's easy to miss).
-        if d.stamina > 0.0 {
-            out.push(format!("{} stamina", n(d.stamina)));
+            out.push(format!("{}× damage from behind", n(d.behind)));
         }
     } else if d.damage[1] > 0.0 {
         let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
-        // A beam's is a second in it.
-        let per = if d.kind == "beam" { " a second" } else { "" };
-        out.push(format!("{count}{} damage{per}", span(d.damage, "")));
+        if d.kind == "channel" && d.tick > 0.0 {
+            let per_sec = [d.damage[0] / d.tick, d.damage[1] / d.tick];
+            out.push(format!("{count}{} damage per sec", span(per_sec)));
+        } else {
+            let per = if d.kind == "beam" { " per sec" } else { "" };
+            out.push(format!("{count}{} damage{per}", span(d.damage)));
+        }
     }
     if d.linger > 0.0 && d.linger_damage > 0.0 {
-        out.push(format!("{} a second for {} s", n(d.linger_damage), n(d.linger)));
+        out.push(format!("{} damage per sec for {} sec", n(d.linger_damage), n(d.linger)));
     } else if d.linger > 0.0 {
-        out.push(format!("{} s", n(d.linger)));
+        out.push(format!("{} sec duration", n(d.linger)));
     }
     if d.ally_heal > 0.0 && d.kind == "beam" {
-        out.push(format!("heals friends in it {}% a second", n(d.ally_heal * 100.0)));
+        out.push(format!("{}% healing per sec", pct(d.ally_heal)));
     } else if d.ally_heal > 0.0 {
-        out.push(format!("heals {}%", n(d.ally_heal * 100.0)));
+        out.push(format!("{}% healing", pct(d.ally_heal)));
     }
     if d.linger_heal > 0.0 {
-        out.push(format!("heals {}% a second", n(d.linger_heal * 100.0)));
+        out.push(format!("{}% healing per sec", pct(d.linger_heal)));
     }
     if d.area_heal > 0.0 {
-        out.push(format!("heals {}%", n(d.area_heal * 100.0)));
+        out.push(format!("{}% healing", pct(d.area_heal)));
     }
     match d.kind.as_str() {
-        "nova" => out.push(format!("{} yd around you", n(d.radius[1]))),
-        "ground" if d.at_self => out.push(format!("{} yd around you", n(d.radius[1]))),
-        "ground" => out.push(format!("{} yd away, {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "nova" => out.push(format!("{} yd radius", n(d.radius[1]))),
+        "ground" if d.at_self => out.push(format!("{} yd radius", n(d.radius[1]))),
+        "ground" => out.push(format!("{} yd range · {} yd radius", n(d.range[1]), n(d.radius[1]))),
         "cone" => out.push(format!("{} yd cone", n(d.range[1]))),
-        "line" => out.push(format!("{} yd strip, {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
-        "beam" => out.push(format!("{} yd beam, {} yd wide, held {} s", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
-        "ally" => out.push("on an ally, or yourself".to_string()),
-        "leap" if d.back => out.push(format!("{} yd back", n(d.range[1]))),
-        "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap, lands {} yd wide", n(d.range[1]), n(d.radius[1] * 2.0))),
-        "trap" if d.launch > 0.0 => out.push(format!("{} yd away, launches you or a friend {} yd, lasts {} s", n(d.range[1]), n(d.launch), n(d.secs))),
-        "trap" => out.push(format!("{} yd away, springs within {} yd, lasts {} s", n(d.range[1]), n(d.radius[1]), n(d.secs))),
-        "place" => out.push(format!("totem {} s, {} yd", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
-        "blink" if d.anchor > 0.0 => out.push(format!("circle lasts {} s", n(d.anchor))),
+        "line" => out.push(format!("{} yd line · {} yd width", n(d.range[1]), n(d.radius[1] * 2.0))),
+        "beam" => out.push(format!("{} yd beam · {} yd width · {} sec duration", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
+        "ally" => out.push("Ally or self".to_string()),
+        "leap" if d.back => out.push(format!("{} yd backward leap", n(d.range[1]))),
+        "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap · {} yd landing radius", n(d.range[1]), n(d.radius[1]))),
+        "trap" if d.launch > 0.0 => out.push(format!("{} yd placement range · {} yd launch · {} sec duration", n(d.range[1]), n(d.launch), n(d.secs))),
+        "trap" => out.push(format!("{} yd placement range · {} yd trigger radius · {} sec duration", n(d.range[1]), n(d.radius[1]), n(d.secs))),
+        "place" => out.push(format!("{} sec totem · {} yd radius", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
+        "blink" if d.anchor > 0.0 => out.push(format!("{} sec circle duration", n(d.anchor))),
         "art" if d.ambush > 0.0 => out.push(format!("{} yd step", n(d.ambush))),
         "art" | "buff" | "stance" => {}
-        _ if d.range[1] > 0.0 => out.push(span(d.range, " yd")),
+        "channel" if d.secs > 0.0 => out.push(format!("{} yd range · {} sec channel", span(d.range), n(d.secs))),
+        _ if d.range[1] > 0.0 => out.push(format!("{} yd range", span(d.range))),
         _ => {}
     }
     if d.delay > 0.0 && matches!(d.kind.as_str(), "ground" | "line") {
-        out.push(format!("lands after {} s", n(d.delay)));
+        out.push(format!("{} sec delay", n(d.delay)));
     }
     if d.cast > 0.0 {
-        out.push(format!("{} s wind-up", n(d.cast)));
+        out.push(format!("{} sec windup", n(d.cast)));
     }
     if d.pierce > 0 {
-        out.push(format!("through {} more", d.pierce));
+        out.push(format!("Pierces {} additional targets", d.pierce));
     }
     if d.chain > 0 {
-        out.push(format!("leaps on {}×", d.chain));
+        out.push(format!("{} bounce{}", d.chain, if d.chain == 1 { "" } else { "s" }));
     }
     if d.splash > 0.0 && d.kind != "trap" {
-        out.push(format!("{} yd burst", n(d.splash)));
+        out.push(format!("{} yd burst radius", n(d.splash)));
     }
     if d.returns {
-        out.push("comes back".to_string());
+        out.push("Returning projectile".to_string());
     }
     if d.lob {
-        out.push("lobbed over foes".to_string());
+        out.push("Arcs over enemies".to_string());
     }
     if d.fuse > 0.0 {
-        out.push(format!("sticks, goes off after {} s", n(d.fuse)));
+        out.push(format!("{} sec delay", n(d.fuse)));
     }
     if d.yank {
-        out.push("pulls you to what it strikes".to_string());
+        out.push("Pulls you to the target".to_string());
     }
     if d.swap {
-        out.push("swaps places with what it strikes".to_string());
+        out.push("Swaps positions".to_string());
     }
     if d.tether_secs > 0.0 {
-        out.push(format!("binds for {} s, drags back past {} yd", n(d.tether_secs), n(d.tether_range)));
+        out.push(format!("{} sec tether · Pulls targets beyond {} yd", n(d.tether_secs), n(d.tether_range)));
     }
     if d.rewind {
-        out.push(if d.recast.is_empty() { format!("back where you were after {} s", n(d.rewind_secs)) } else { "leaves an echo to come back to".to_string() });
+        out.push(if d.recast.is_empty() { format!("Returns you after {} sec", n(d.rewind_secs)) } else { "Records position and health".to_string() });
     }
     if !d.end_burst.is_empty() {
-        out.push("bursts as it ends".to_string());
+        out.push("Explodes on expiration".to_string());
     }
     if d.counter.as_ref().is_some_and(|c| c.mirror) {
-        out.push("turns projectiles back".to_string());
+        out.push("Reflects projectiles".to_string());
     }
     for e in d.effects.iter().chain(&d.tick_effects) {
         match e.kind.as_str() {
-            "knockback" if e.wall_stun > 0.0 => out.push(format!("knocks back {} yd, stuns {} s against a wall", n(e.amount), n(e.wall_stun))),
-            "knockback" => out.push(format!("knocks back {} yd", n(e.amount))),
-            "cheat_death" => out.push(format!("a killing blow leaves you at 1 health, then heals {}%", n(e.amount * 100.0))),
-            "shield" if !e.pop.is_empty() => out.push("bursts as the shield ends".to_string()),
-            "pull" => out.push(if e.from_caster { "pulls to you".to_string() } else { format!("pulls {} yd in", n(e.amount)) }),
+            "knockback" if e.wall_stun > 0.0 => out.push(format!("{} yd knockback · {} sec stun on wall collision", n(e.amount), n(e.wall_stun))),
+            "knockback" => out.push(format!("{} yd knockback", n(e.amount))),
+            "cheat_death" => out.push(format!("Survive at 1 health · {}% healing", pct(e.amount))),
+            "shield" if !e.pop.is_empty() => out.push("Bursts when the shield ends".to_string()),
+            "pull" => out.push(if e.from_caster { "Pulls targets to you".to_string() } else { format!("{} yd pull", n(e.amount)) }),
             _ => {}
         }
     }
     if d.kind == "stance" && d.secs > 0.0 {
-        out.push(format!("{} s", n(d.secs)));
+        out.push(format!("{} sec", n(d.secs)));
     }
     if d.kind == "buff" || d.kind == "ally" {
         if let Some(e) = d.effects.first() {
-            out.push(format!("{} s", n(e.secs[1])));
+            out.push(format!("{} sec", n(e.secs[1])));
         }
     }
     if d.charge[1] > 0.0 {
         if (d.charge[1] - d.charge[0]).abs() < 0.01 {
-            out.push(format!("{} s charge", n(d.charge[1])));
+            out.push(format!("{} sec charge", n(d.charge[1])));
         } else {
-            out.push(format!("charge up to {} s", n(d.charge[1])));
+            out.push(format!("Up to {} sec charge", n(d.charge[1])));
         }
         if d.full_spell != 0 && d.full_speed > d.speed && d.speed > 0.0 {
-            out.push(format!("full: {}× as fast", n(d.full_speed / d.speed)));
+            out.push(format!("Full charge: {}× projectile speed", n(d.full_speed / d.speed)));
         }
     }
     if d.kind == "art" && d.windup > 0.0 {
-        out.push(format!("{} s wind-up", n(d.windup)));
+        out.push(format!("{} sec windup", n(d.windup)));
     }
+    // Stamina once (a weapon strike's is easy to miss, so it's always said).
     if d.stamina > 0.0 {
-        out.push(format!("{} stamina", n(d.stamina)));
+        out.push(format!("{} Stamina", n(d.stamina)));
     }
     if d.through {
-        out.push("runs through foes".to_string());
+        out.push("Passes through enemies".to_string());
     }
     if !d.recast.is_empty() && d.recast_secs > 0.0 {
-        out.push(format!("press again within {} s", n(d.recast_secs)));
+        out.push(format!("Recast within {} sec", n(d.recast_secs)));
     }
     if let Some(e) = &d.empower {
-        out.push(format!("empowers for {} s", n(e.secs)));
+        out.push(format!("{} sec empowerment", n(e.secs)));
     }
-    // An EX version runs on its base's cooldown.
+    // An EX version runs on its base's cooldown (its Valor is shown beside its name).
     let cd = base.map_or(d.cooldown, |b| b.cooldown);
     if base.is_none() && cd > 0.0 {
-        out.push(format!("{} s cooldown", n(cd)));
+        out.push(format!("{} sec cooldown", n(cd)));
     }
     if base.is_none() && d.charges > 1 {
         out.push(format!("{} charges", d.charges));
     }
-    // (An EX version's Valor is shown beside its name.)
     if d.slot == "ultimate" {
-        out.push(if d.valor as f32 >= valor_max { "the whole Valor bar".to_string() } else { format!("{} Valor", d.valor) });
+        out.push(if d.valor as f32 >= valor_max { "Full Valor bar".to_string() } else { format!("{} Valor", d.valor) });
     } else if d.valor > 0 && base.is_none() {
         out.push(format!("{} Valor", d.valor));
     }
@@ -1831,5 +1837,45 @@ mod version_tests {
         assert_eq!(version, ADDON_NEWEST, "bump ADDON_NEWEST with the add-on's VERSION");
         let level: u8 = src.match_indices("\" ac").filter_map(|(i, _)| src[i + 4..].split('"').next()?.parse().ok()).max().expect("the hello's acN");
         assert_eq!(level, CLIENT_NEWEST, "the newest client the add-on asks for");
+    }
+}
+
+#[cfg(test)]
+mod facts_tests {
+    use super::*;
+
+    fn facts(key: &str) -> String {
+        let c = htl_survival::Content::builtin();
+        let i = c.ability(key).unwrap();
+        let base = (0..c.abilities.len()).find(|b| c.ex_of(*b) == Some(i)).map(|b| &c.abilities[b]);
+        ability_facts(&c.abilities[i], base, c.valor.max)
+    }
+
+    #[test]
+    fn the_stat_line_says_each_thing_once_in_sec_and_yd() {
+        let sunder = facts("sundering_blow");
+        assert_eq!(sunder.matches("Stamina").count(), 1, "Stamina once: {sunder}");
+        assert!(sunder.contains("% weapon damage") && sunder.contains("sec windup"), "{sunder}");
+        assert!(!sunder.contains(" s ") && !sunder.ends_with(" s"), "sec, not s: {sunder}");
+        // (The Warrior's Sundering Blow costs only Stamina now: a cooldown in sec, on another.)
+        let axe = facts("hurled_axe");
+        assert!(axe.contains("sec cooldown") && !axe.contains(" s ") && !axe.ends_with(" s"), "{axe}");
+        // An area is said as its radius.
+        let rift = facts("void_rift");
+        assert!(rift.contains("yd radius") && !rift.contains("wide"), "{rift}");
+        assert!(rift.ends_with("Full Valor bar"), "an ultimate's cost: {rift}");
+        // An EX version shows no cooldown of its own (it shares its base's).
+        let ex = facts("rending_axe");
+        assert!(!ex.contains("cooldown"), "{ex}");
+    }
+
+    #[test]
+    #[ignore = "prints every ability's stat line to read over"]
+    fn print_every_stat_line() {
+        let c = htl_survival::Content::builtin();
+        for (i, a) in c.abilities.iter().enumerate().filter(|(_, a)| a.on_board()) {
+            let base = (0..c.abilities.len()).find(|b| c.ex_of(*b) == Some(i)).map(|b| &c.abilities[b]);
+            println!("{}: {}", a.name, ability_facts(a, base, c.valor.max));
+        }
     }
 }
