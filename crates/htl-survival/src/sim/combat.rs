@@ -1974,19 +1974,9 @@ impl Survival {
         }
         self.events.push(Event::Kill { killer: hero.or(creature), victim: name });
         self.events.push(Event::Dirty);
-        // Whatever was fighting them looks elsewhere (a raider, for its next foe).
-        let mut next = Vec::new();
-        for (mid, m) in self.mobs.iter_mut() {
-            if m.state.target() == Some(id) {
-                m.state = mobs::MobState::Return;
-                if m.raider {
-                    next.push(*mid);
-                }
-            }
-        }
-        for m in next {
-            self.raider_next(m);
-        }
+        // Whatever was fighting them turns on the next hero still in its fight; with none left,
+        // it goes home (a raider, to its next foe).
+        self.foe_gone(id);
     }
 
     fn revive(&mut self, id: Id) {

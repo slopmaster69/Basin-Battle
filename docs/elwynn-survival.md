@@ -377,8 +377,8 @@ Some of this needs a change to the client itself, which this folder carries as p
   out. A blow meant for someone else is fainter, and has no growing fill;
 - a blow meant for you tells you when to answer it, with the floor markers on or off: the
   striker glows over its wind-up (amber: a guard stops it, red: it doesn't), and a reaction's
-  time before your window opens the glow flashes bright: raise the guard now to parry (with a
-  ping), or roll now for a red one. The stroke into the blow wooshes, heavier for a slower
+  time before your window opens the glow flashes bright: raise the guard now to parry, or roll
+  now for a red one (with a ping). The stroke into the blow wooshes, heavier for a slower
   wind-up;
 - a raised guard's ShieldBlock goes up once and holds there (on the upper body while moving),
   where it used to loop;
@@ -389,6 +389,11 @@ Some of this needs a change to the client itself, which this folder carries as p
   creature's `from` in the content (`"ScourgeFemale"`) plays that model's take on the unit's own
   body, retargeted by its key bones: the tenth round. `/esclip <clip> [take] [Model]` tries one on
   your hero, and `scripts/race-clips.sh` lists every model's attack clips from your game data.
+  `scripts/clip-census.sh` measures what each does (a flip, a leap, a spin, a quick thrust…), and
+  `tools/clip-census/assign.py logs/clip-census.md` picks every humanoid foe's borrowed clips from
+  that: quick takes for a flurry, overheads and chops for a heavy, leaps for a lunge, flips and
+  spins for a boss's signature blows alone (a regular foe spins only on a blow all round), each
+  take timed near its step, and a boss never repeating one.
 
 On a stock benilla the add-on falls back to a click-catcher over the world: the same keys, right
 mouse guards and looks around, and aiming keeps the normal camera. The Controls card says which

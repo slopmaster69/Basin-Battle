@@ -682,6 +682,8 @@ pub struct Mob {
     /// Damage towards breaking its posture, and since when it's been piling up.
     pub posture: u32,
     pub posture_from: f32,
+    /// Its stance can't be broken again before then (a break, then time to stand back up).
+    pub posture_guard: f32,
     /// Its walk: the path and how far along.
     pub path: Vec<Vec3>,
     pub speed: f32,
@@ -1157,12 +1159,8 @@ impl Survival {
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
         self.meters.remove(&id);
-        // Creatures fighting them go home.
-        for m in self.mobs.values_mut() {
-            if m.state.target() == Some(id) {
-                m.state = mobs::MobState::Return;
-            }
-        }
+        // Creatures fighting them turn on whoever else is in the fight, or go home.
+        self.foe_gone(id);
         self.events.push(Event::Dirty);
         Some(save)
     }
