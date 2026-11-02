@@ -108,6 +108,12 @@ impl Survival {
         if !self.alive(victim) || self.immune(victim) || self.unstaggerable(victim) {
             return;
         }
+        // A boss, a totem, a creature winding up a blow no guard stops: not moved (an ultimate's
+        // aside).
+        if !e.vs_bosses && self.holds_ground(victim) {
+            self.shrugged_off(owner, victim);
+            return;
+        }
         if self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].inert()) {
             return;
         }
@@ -151,7 +157,7 @@ impl Survival {
             self.events.push(Event::Hop { player: victim, dir, speed: moved / air, lift, roll: false, style: "" });
         } else {
             self.stagger_mob(victim, air + 0.15, false);
-            self.flee_to(victim, to, moved / air);
+            self.throw_mob(victim, to, air, Some(owner));
         }
     }
 

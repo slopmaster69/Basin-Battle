@@ -474,12 +474,13 @@ fn go_home(s: &mut Sim, p: EntityId) {
     s.move_player(p, [hub[0] + 7.0, hub[1], hub[2]], 0.0);
 }
 
+/// Four bots: a warrior, priest, mage and hunter (TEAM=a,b,c,d swaps the classes for the
+/// balance reports, e.g. a team without a warrior).
 fn four_bots(s: &mut Sim, policy: Policy) -> Vec<Bot> {
-    ["warrior", "priest", "mage", "hunter"]
-        .iter()
-        .enumerate()
-        .map(|(i, c)| Bot::new(s.add_player(&format!("Bot{i}"), c, Luck::default()), policy))
-        .collect()
+    let team: Vec<String> = std::env::var("TEAM")
+        .map(|t| t.split(',').map(String::from).collect())
+        .unwrap_or(["warrior", "priest", "mage", "hunter"].iter().map(|c| c.to_string()).collect());
+    team.iter().enumerate().map(|(i, c)| Bot::new(s.add_player(&format!("Bot{i}"), c, Luck::default()), policy)).collect()
 }
 
 #[test]
@@ -586,8 +587,10 @@ fn bases_open_get_claimed_and_escalate() {
     content.scaling.stream_secs = 0.0;
     content.scaling.stream_rest_secs = 0.0;
     content.hub.health *= 4;
-    // Nor do they dodge boss abilities.
+    // Nor do they dodge boss abilities, or carry a warrior's Sunder Armor.
     content.scaling.elite_abilities.clear();
+    content.scaling.elite_armor = 0.0;
+    content.scaling.boss_armor = 0.0;
     for b in content.bosses.iter_mut() {
         b.abilities.clear();
     }
@@ -643,8 +646,13 @@ fn bases_open_get_claimed_and_escalate() {
 #[test]
 #[ignore]
 fn balance() {
+    let seeds: u64 = std::env::var("SEEDS").ok().and_then(|v| v.parse().ok()).unwrap_or(3);
+    let modes = std::env::var("MODES").unwrap_or("defend,expedition".into());
     for (name, policy) in [("defend", Policy::Defend), ("expedition", Policy::Expedition(3))] {
-        for seed in 0..3 {
+        if !modes.split(',').any(|m| m == name) {
+            continue;
+        }
+        for seed in 0..seeds {
             let mut s = Sim::new(test_content(), arena(), Box::new(Flat(0.0)), seed);
             let mut bots = four_bots(&mut s, Policy::Defend);
             bots[0].policy = policy;
@@ -929,36 +937,18 @@ fn upgrades_and_talents_change_how_spells_play() {
     assert_eq!(s.cast_slot(p, 0), Ok(()), "Frost Nova");
     s.step(0.05);
     assert!(s.is_frozen_for_test(boss), "Frost Nova freezes");
-    // Shatter: crits against the frozen. Talent points go down Frost to it.
+    // The Frost specialization: crits against the frozen, and Cold Snap among the spell cards.
+    assert!(!s.spell_open_for_test(p, "cold_snap"), "Cold Snap is Frost's");
     let kit = s.kit_for_test(p);
-    let frost = kit.tree_index("frost").unwrap();
-    let shatter = kit.talents.iter().position(|t| t.key == "shatter").unwrap();
-    for _ in 0..12 {
-        if s.tree_points(p)[frost] >= 9 {
-            break;
-        }
-        let next = kit
-            .talents
-            .iter()
-            .enumerate()
-            .filter(|(i, t)| t.tree == frost && *i != shatter)
-            .map(|(i, _)| i)
-            .find(|&i| s.talent_for_test(p, i).is_ok());
-        if next.is_none() {
-            break;
-        }
-    }
-    assert_eq!(s.talent_for_test(p, shatter), Ok(()));
-    let cold_snap = kit.talents.iter().position(|t| t.key == "cold_snap").unwrap();
-    assert_eq!(s.talent_for_test(p, cold_snap), Ok(()));
-    assert!(s.tree_points(p)[frost] >= 9, "{:?}", s.tree_points(p));
+    let frost = kit.talents.iter().position(|t| t.key == "path_of_frost").unwrap();
+    assert_eq!(s.talent_for_test(p, frost), Ok(()));
     let after = s.spell_nums_for_test(p, "fire_blast");
-    assert!(after.crit_vs_frozen > before.crit_vs_frozen, "Shatter adds crit against the frozen");
-    assert!(after.vs_frozen >= 1.0, "Fire Blast with Frostfire: double damage to the frozen");
-    // A talent that teaches a spell puts it on the bar.
+    assert!(after.crit_vs_frozen > before.crit_vs_frozen, "Frost adds crit against the frozen");
+    assert!(after.vs_frozen >= 1.5, "Fire Blast with Frostfire: more than double damage to the frozen");
+    assert!(s.spell_open_for_test(p, "cold_snap"), "Cold Snap comes in the cards now");
+    s.give_test_card(p, "cold_snap", 0);
     let bar = s.spell_bar(p).unwrap();
-    assert!(bar.slots.iter().any(|b| b.key == "cold_snap" && b.talent), "{:?}", bar.slots.iter().map(|b| &b.key).collect::<Vec<_>>());
-    assert!(s.reset_talents(p).is_err() || s.tree_points(p)[frost] == 0);
+    assert!(bar.slots.iter().any(|b| b.key == "cold_snap"), "{:?}", bar.slots.iter().map(|b| &b.key).collect::<Vec<_>>());
 }
 
 /// Walking into a sprint totem makes you faster for a while.
@@ -1542,7 +1532,8 @@ fn enemy_roles_play_their_part() {
     let _mender = s.spawn_for_test("dark_mender", [-82.0, 80.0, 0.0]);
     let (h, m) = s.health_for_test(skel);
     s.set_health_for_test(skel, m / 3);
-    for _ in 0..(20 * 4) {
+    // It casts Dark Mending (a 2.5 sec cast to break) a moment after it sees a hurt ally.
+    for _ in 0..(20 * 8) {
         s.step(0.05);
     }
     let (after, _) = s.health_for_test(skel);
@@ -1694,33 +1685,33 @@ fn choosing_a_card_pauses_the_world_until_it_is_chosen() {
 #[test]
 fn spells_swap_keys() {
     let mut s = sim();
-    let p = s.add_player("Ayla", "mage", Luck::default());
+    let p = s.add_player("Ayla", "hunter", Luck::default());
     s.close_all_menus_for_test(p);
-    s.give_test_card(p, "frostbolt", 0);
-    s.give_test_card(p, "fireball", 0);
-    s.give_test_card(p, "frost_nova", 0);
+    s.give_test_card(p, "arcane_shot", 0);
+    s.give_test_card(p, "serpent_sting", 0);
+    s.give_test_card(p, "multi_shot", 0);
     let keys = |s: &Sim| s.spell_bar(p).unwrap().slots.iter().map(|b| b.key.clone()).collect::<Vec<_>>();
     let start = keys(&s);
-    assert_eq!(&start[..3], &["frostbolt", "fireball", "frost_nova"]);
+    assert_eq!(&start[..3], &["arcane_shot", "serpent_sting", "multi_shot"]);
     assert!(s.move_spell(p, 0, 2));
-    assert_eq!(&keys(&s)[..3], &["frost_nova", "fireball", "frostbolt"]);
+    assert_eq!(&keys(&s)[..3], &["multi_shot", "serpent_sting", "arcane_shot"]);
     assert!(!s.move_spell(p, 0, 9), "no spell there");
     // Casting follows the new order.
     let bar = s.spell_bar(p).unwrap();
-    assert_eq!(bar.slots[2].key, "frostbolt");
-    // A spell a talent taught takes the next key, and swaps with the cards' spells.
-    s.give_test_talent(p, "presence_of_mind");
+    assert_eq!(bar.slots[2].key, "arcane_shot");
+    // A path's spell takes the next key, and swaps with the cards' spells.
+    s.give_test_card(p, "bestial_wrath", 0);
     assert_eq!(keys(&s).len(), 4);
     assert!(s.move_spell(p, 3, 0));
-    assert_eq!(keys(&s)[0], "presence_of_mind");
+    assert_eq!(keys(&s)[0], "bestial_wrath");
     // A spell moves onto an empty key too (key 6, E), leaving its own empty.
     assert!(s.move_spell(p, 1, 5));
-    assert_eq!(keys(&s), ["presence_of_mind", "", "frostbolt", "frost_nova", "", "fireball"].map(String::from).to_vec());
+    assert_eq!(keys(&s), ["bestial_wrath", "", "arcane_shot", "multi_shot", "", "serpent_sting"].map(String::from).to_vec());
     assert!(!s.move_spell(p, 1, 2), "nothing on key 2 to move");
     assert!(!s.move_spell(p, 0, 6), "only six keys");
     // The next spell learned fills the first empty key.
-    s.give_test_card(p, "arcane_missiles", 0);
-    assert_eq!(keys(&s)[1], "arcane_missiles");
+    s.give_test_card(p, "concussive_shot", 0);
+    assert_eq!(keys(&s)[1], "concussive_shot");
 }
 
 /// Six spells fill the bar, whichever way they came: no more spell cards, and no talents that
@@ -1728,15 +1719,13 @@ fn spells_swap_keys() {
 #[test]
 fn six_spells_fill_the_bar() {
     let mut s = sim();
-    let p = s.add_player("Ayla", "mage", Luck::default());
+    let p = s.add_player("Ayla", "hunter", Luck::default());
     s.close_all_menus_for_test(p);
-    for k in ["fireball", "frostbolt", "arcane_missiles", "scorch"] {
+    for k in ["arcane_shot", "serpent_sting", "multi_shot", "concussive_shot", "volley", "explosive_trap"] {
         s.give_test_card(p, k, 1);
     }
-    s.give_test_talent(p, "presence_of_mind");
-    s.give_test_talent(p, "arcane_power");
     assert_eq!(s.spell_bar(p).unwrap().slots.len(), 6);
-    let class = s.content().class_index("mage").unwrap();
+    let class = s.content().class_index("hunter").unwrap();
     let teaching: Vec<String> = s.content().kit(class).talents.iter().filter(|t| t.grants.is_some()).map(|t| format!("talent:{}", t.key)).collect();
     let mut upgrades = 0;
     for _ in 0..200 {
@@ -2851,6 +2840,15 @@ fn solo_class_report() {
             }
         }
         if st.phase == PhaseName::Defeat || st.wave > waves {
+            if let Some(v) = s.player_view(me) {
+                let c = s.content().class_index(&class).unwrap();
+                let kit = s.content().kit(c).clone();
+                let taken: Vec<String> = s.talent_ranks(me).iter().enumerate().filter(|(_, r)| **r > 0).map(|(i, r)| format!("{}x{r}", kit.talents[i].key)).collect();
+                eprintln!("{:?} {:?}", v.cards, taken);
+                for b in s.build_view(me) {
+                    eprintln!("  {}: {:?}", b.name, b.taken.iter().map(|t| t.0.clone()).collect::<Vec<_>>());
+                }
+            }
             eprintln!("{st:?}");
             break;
         }
@@ -3053,43 +3051,285 @@ fn talent_index(s: &Sim, class: &str, key: &str) -> usize {
     s.content().kit(c).talents.iter().position(|t| t.key == key).unwrap_or_else(|| panic!("no talent {key}"))
 }
 
-/// Take talents of a tree until it has `points` (any that are open), as level-up cards would.
-fn fill_tree(s: &mut Sim, p: EntityId, class: &str, tree: &str, points: u32) {
-    let c = s.content().class_index(class).unwrap();
-    let kit = s.content().kit(c).clone();
-    let t = kit.tree_index(tree).unwrap();
-    for _ in 0..30 {
-        if s.tree_points(p)[t] >= points {
-            return;
-        }
-        let open = (0..kit.talents.len()).find(|&i| kit.talents[i].tree == t && kit.talents[i].path.is_none() && s.talent_for_test(p, i).is_ok());
-        if open.is_none() {
-            return;
-        }
-    }
-}
-
 /// Talents that only reshape a spell come only to heroes holding it; combinations need both
-/// spells; talents come every other level.
+/// spells; class talents come whatever you hold.
 #[test]
 fn talents_follow_the_spells_you_hold() {
     let mut s = sim();
     let p = s.add_player("Ayla", "warrior", Luck::default());
     s.close_all_menus_for_test(p);
-    let itc = talent_index(&s, "warrior", "improved_thunder_clap");
-    fill_tree(&mut s, p, "warrior", "protection", 3);
-    assert!(s.talent_for_test(p, itc).is_err(), "no Thunder Clap talents without Thunder Clap");
-    s.give_test_card(p, "thunder_clap", 0);
-    assert!(s.talent_for_test(p, itc).is_ok(), "with it, yes");
-    // Rending Whirl: Whirlwind and Rend, and 6 points in Fury.
+    let carnage = talent_index(&s, "warrior", "carnage");
+    assert!(s.talent_for_test(p, carnage).is_ok(), "a class talent needs no skill");
+    // Rending Whirl: Whirlwind and Rend.
     let rw = talent_index(&s, "warrior", "rending_whirl");
-    fill_tree(&mut s, p, "warrior", "fury", 6);
+    assert!(s.talent_for_test(p, rw).is_err(), "nothing held");
     s.give_test_card(p, "whirlwind", 0);
     assert!(s.talent_for_test(p, rw).is_err(), "Whirlwind alone isn't enough");
     s.give_test_card(p, "rend", 0);
     let before = s.spell_nums_for_test(p, "whirlwind").dot;
     s.talent_for_test(p, rw).expect("with both");
     assert!(s.spell_nums_for_test(p, "whirlwind").dot > before + 0.5, "Whirlwind bleeds now");
+    assert!(s.talent_for_test(p, rw).is_err(), "once");
+}
+
+/// A skill's upgrades: rank-ups come back, forks close each other, follow-ups wait for theirs,
+/// and a skill takes only so many.
+#[test]
+fn upgrades_rank_fork_and_chain() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.give_test_card(p, "heroic_strike", 0);
+    let base = s.spell_nums_for_test(p, "heroic_strike").damage;
+    for _ in 0..2 {
+        s.perk_for_test(p, "heroic_strike", "honed_strike").expect("a rank-up, twice");
+    }
+    assert!(s.perk_for_test(p, "heroic_strike", "honed_strike").is_err(), "but not three times");
+    assert!(s.spell_nums_for_test(p, "heroic_strike").damage > base * 1.5);
+    assert!(s.perk_for_test(p, "heroic_strike", "sweeping_cleave").is_err(), "Sweeping Cleave follows Cleave");
+    s.perk_for_test(p, "heroic_strike", "cleave").expect("Cleave");
+    assert!(s.perk_for_test(p, "heroic_strike", "slam").is_err(), "Cleave or Slam, not both");
+    assert!(s.perk_for_test(p, "heroic_strike", "heroic_throw").is_err(), "nor the Throw");
+    s.perk_for_test(p, "heroic_strike", "sweeping_cleave").expect("now Sweeping Cleave");
+    assert_eq!(s.spell_nums_for_test(p, "heroic_strike").targets.round() as i32, 6);
+    // The Epic waits for 5 upgrades.
+    assert!(s.perk_for_test(p, "heroic_strike", "heroic_fury").is_err(), "the Epic comes after 5 upgrades");
+    s.perk_for_test(p, "heroic_strike", "rampant_rage").expect("a fifth");
+    s.perk_for_test(p, "heroic_strike", "heroic_fury").expect("now the Epic");
+    // Up to the cap (10), then no more.
+    let keys = ["improved_heroic_strike", "improved_heroic_strike", "overflow", "riposte", "battle_trance", "overpower"];
+    let mut taken = 6;
+    for k in keys {
+        if s.perk_for_test(p, "heroic_strike", k).is_ok() {
+            taken += 1;
+        }
+    }
+    assert_eq!(taken, 10);
+    assert!(s.perk_for_test(p, "heroic_strike", "weave").is_err(), "a skill takes 10 upgrades");
+}
+
+/// A combination's trigger casts the other skill: Charge lands with a free Thunder Clap,
+/// which reaches the enemy standing next to the one charged.
+#[test]
+fn a_combination_casts_the_other_skill() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.set_level_for_test(p, 20);
+    s.give_test_card(p, "charge", 0);
+    s.give_test_card(p, "thunder_clap", 0);
+    let combo = talent_index(&s, "warrior", "thunderous_arrival");
+    s.talent_for_test(p, combo).expect("both held");
+    s.set_manual(p, true);
+    s.start_now();
+    s.clear_wave_for_test();
+    let _ = s.step(0.05);
+    let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+    let far = s.spawn_boss_for_test(0, [me[0] + 18.0, me[1], 0.0]);
+    let beside = s.spawn_boss_for_test(1, [me[0] + 18.0, me[1] + 3.0, 0.0]);
+    let full = s.health_for_test(beside);
+    s.select(p, Some(far));
+    // Thunder Clap has nothing in reach from here: whichever slot goes off is Charge.
+    let mut cast = false;
+    for _ in 0..40 {
+        s.prime_for_test(p);
+        if s.cast_slot(p, 0).is_ok() || s.cast_slot(p, 1).is_ok() {
+            cast = true;
+            break;
+        }
+        let _ = s.step(0.05);
+    }
+    assert!(cast, "charged");
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    assert!(s.health_for_test(beside) < full, "the clap reached the enemy beside the target");
+}
+
+/// A combination's trigger finishes the other skill's cooldown: Last Stand readies Death Wish.
+/// And an upgrade's trigger fires on its own event: Battle Ready gives rage as a wave begins.
+#[test]
+fn triggers_reset_and_give() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.set_level_for_test(p, 20);
+    s.give_test_card(p, "death_wish", 0);
+    s.give_test_card(p, "last_stand", 0);
+    let combo = talent_index(&s, "warrior", "facing_death");
+    s.talent_for_test(p, combo).expect("both held");
+    s.set_manual(p, true);
+    s.start_now();
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    let left = |s: &Sim, key: &str| s.spell_bar(p).unwrap().slots.iter().find(|x| x.key == key).map(|x| x.remaining).unwrap();
+    let slot = |s: &Sim, key: &str| s.spell_bar(p).unwrap().slots.iter().position(|x| x.key == key).unwrap();
+    s.prime_for_test(p);
+    s.cast_slot(p, slot(&s, "death_wish")).expect("Death Wish");
+    assert!(left(&s, "death_wish") > 30.0, "on cooldown");
+    let _ = s.step(0.05);
+    s.prime_for_test(p);
+    s.cast_slot(p, slot(&s, "last_stand")).expect("Last Stand");
+    assert!(left(&s, "death_wish") < 0.01, "Last Stand finished Death Wish's cooldown");
+    // Battle Ready: 25 rage as a wave begins.
+    let mut s = sim();
+    let p = s.add_player("Bren", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.give_test_card(p, "bloodrage", 0);
+    s.perk_for_test(p, "bloodrage", "battle_ready").expect("open");
+    s.start_now();
+    let mut most = 0u32;
+    for _ in 0..400 {
+        let _ = s.step(0.05);
+        most = most.max(s.spell_bar(p).unwrap().rage.unwrap_or(0));
+    }
+    assert!(most >= 20, "a wave began with rage: {most}");
+}
+
+/// Every upgrade and talent of a class-style kit goes off in a fight without upsetting anything:
+/// each upgrade alone on its skill, then every talent at once.
+#[test]
+fn every_upgrade_and_talent_survives_a_fight() {
+    let content = test_content();
+    for (ci, class) in content.classes.iter().enumerate() {
+        let kit = &content.kits[ci];
+        if !kit.class_talents {
+            continue;
+        }
+        let fight = |s: &mut Sim, p: EntityId, steps: usize| {
+            let mut l = Ledger::new(s);
+            s.set_manual(p, true);
+            s.start_now();
+            for _ in 0..30 {
+                let ev = s.step(0.05);
+                l.see(s, &ev);
+            }
+            let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+            let near = s.spawn_boss_for_test(0, [me[0] + 4.0, me[1], 0.0]);
+            let _pack: Vec<_> = (0..3).map(|k| s.spawn_boss_for_test(1, [me[0] + 5.0 + k as f32, me[1] + 2.0, 0.0])).collect();
+            let _far = s.spawn_boss_for_test(1, [me[0] + 15.0, me[1], 0.0]);
+            s.select(p, Some(near));
+            s.attack(p, near);
+            for k in 0..steps {
+                s.prime_for_test(p);
+                if k % 7 == 0 {
+                    let (_, max) = s.health_for_test(p);
+                    s.set_health_for_test(p, max * 3 / 10);
+                }
+                for slot in 0..6 {
+                    let _ = s.cast_slot(p, slot);
+                }
+                let ev = s.step(0.05);
+                l.see(s, &ev);
+            }
+        };
+        for def in kit.spells.iter() {
+            if def.talent {
+                continue;
+            }
+            for perk in def.perks.iter() {
+                let mut s = sim();
+                let p = s.add_player("Ayla", &class.key, Luck::default());
+                s.close_all_menus_for_test(p);
+                s.set_level_for_test(p, 30);
+                s.give_test_card(p, &def.key, 0);
+                if let Some(a) = perk.after {
+                    s.perk_for_test(p, &def.key, &def.perks[a].key).expect("its first step");
+                }
+                // A capstone: first the upgrades it waits for.
+                let mut taken = 0;
+                for other in def.perks.iter() {
+                    if taken >= perk.needs as usize {
+                        break;
+                    }
+                    if other.key != perk.key && other.needs == 0 && other.after.is_none() && other.fork.is_none() {
+                        s.perk_for_test(p, &def.key, &other.key).expect("an upgrade before the capstone");
+                        taken += 1;
+                    }
+                }
+                for _ in 0..perk.repeat {
+                    s.perk_for_test(p, &def.key, &perk.key).unwrap_or_else(|e| panic!("{} {}: {e}", def.key, perk.key));
+                }
+                fight(&mut s, p, 120);
+            }
+        }
+        // Six skills and every talent (a path among them).
+        let mut s = sim();
+        let p = s.add_player("Bren", &class.key, Luck::default());
+        s.close_all_menus_for_test(p);
+        s.set_level_for_test(p, 40);
+        let mut six: Vec<String> = ["charge", "thunder_clap", "whirlwind", "execute", "bloodrage", "shield_slam"].iter().map(|x| x.to_string()).collect();
+        if kit.spell_index(&six[0]).is_none() {
+            // Another class: its first six spells and a path spell.
+            six = kit.spells.iter().filter(|s| s.path.is_none()).take(5).chain(kit.spells.iter().filter(|s| s.path.is_some()).take(1)).map(|s| s.key.clone()).collect();
+        }
+        for k in &six {
+            if kit.spell_index(k).is_some() {
+                s.give_test_card(p, k, 4);
+            }
+        }
+        for t in 0..kit.talents.len() {
+            for _ in 0..kit.talents[t].ranks {
+                let _ = s.talent_for_test(p, t);
+            }
+        }
+        fight(&mut s, p, 400);
+    }
+}
+
+/// An empowered cast: Heroic Leap lights up Heroic Strike as Charge lands (its key lit, its
+/// cooldown done, the card called out); the next Heroic Strike is free and uses it up.
+#[test]
+fn a_lit_key_casts_free_once() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.set_level_for_test(p, 20);
+    s.give_test_card(p, "charge", 0);
+    s.give_test_card(p, "heroic_strike", 0);
+    let combo = talent_index(&s, "warrior", "heroic_leap");
+    s.talent_for_test(p, combo).expect("both held");
+    s.set_manual(p, true);
+    s.start_now();
+    s.clear_wave_for_test();
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+    let far = s.spawn_boss_for_test(0, [me[0] + 18.0, me[1], 0.0]);
+    s.tough_for_test(far);
+    s.select(p, Some(far));
+    let slot = |s: &Sim, key: &str| s.spell_bar(p).unwrap().slots.iter().position(|x| x.key == key).unwrap();
+    let lit = |s: &Sim| s.spell_bar(p).unwrap().slots.iter().find(|x| x.key == "heroic_strike").unwrap().lit;
+    assert!(!lit(&s));
+    s.prime_for_test(p);
+    s.cast_slot(p, slot(&s, "charge")).expect("Charge");
+    let mut called = false;
+    for _ in 0..40 {
+        for e in s.step(0.05) {
+            if matches!(&e, Event::Proc { player, name, .. } if *player == p && name == "Heroic Leap") {
+                called = true;
+            }
+        }
+        if lit(&s) {
+            break;
+        }
+    }
+    assert!(lit(&s), "Heroic Strike lit up as Charge landed");
+    assert!(called, "and the card was called out");
+    let mut cast = false;
+    for _ in 0..40 {
+        let rage = s.spell_bar(p).unwrap().rage.unwrap();
+        if s.cast_slot(p, slot(&s, "heroic_strike")).is_ok() {
+            assert!(s.spell_bar(p).unwrap().rage.unwrap() >= rage, "it was free");
+            cast = true;
+            break;
+        }
+        let _ = s.step(0.05);
+    }
+    assert!(cast, "the lit Heroic Strike went off");
+    assert!(!lit(&s), "and used up");
 }
 
 /// A weapon path re-arms the warrior (sword and shield), closes the other paths, and the
@@ -3101,9 +3341,6 @@ fn the_shieldbearer_takes_up_sword_and_shield() {
     s.close_all_menus_for_test(p);
     let path = talent_index(&s, "warrior", "path_of_the_shieldbearer");
     let other = talent_index(&s, "warrior", "path_of_the_berserker");
-    assert!(s.talent_for_test(p, path).is_err(), "a second-tier talent: 3 points first");
-    fill_tree(&mut s, p, "warrior", "protection", 3);
-    fill_tree(&mut s, p, "warrior", "fury", 3);
     let taken = s.content().defenses.reference_health;
     let _ = taken;
     let hp = s.player_view(p).unwrap().stats.max_health;
@@ -3204,4 +3441,523 @@ fn soldiers_shoot_heal_rise_in_rank_and_march() {
     }
     assert!(walked, "it walks");
     assert!(dist2d(start, post) - last > 5.0, "and gets on its way: {} -> {last}", dist2d(start, post));
+}
+
+/// A run's level-ups, 1 to 60, without the fighting (run by hand): what the cards offer as the
+/// build fills, whether late offers still have three real choices, how wide the decks are.
+/// CLASS (warrior), RUNS (40), PICK=first|random (random).
+#[test]
+#[ignore]
+fn level_up_report() {
+    use rand::{Rng, SeedableRng};
+    let class = std::env::var("CLASS").unwrap_or("warrior".into());
+    let runs: u64 = std::env::var("RUNS").ok().and_then(|r| r.parse().ok()).unwrap_or(40);
+    let first = std::env::var("PICK").is_ok_and(|p| p == "first");
+    let kind = |v: &CardView| -> &'static str {
+        if v.slot.starts_with("Takes a spell slot") {
+            "skill"
+        } else if v.slot.starts_with("Upgrade") {
+            "upgrade"
+        } else if v.slot.starts_with("Combination") {
+            "combo"
+        } else if v.slot.starts_with("Weapon Path") || v.slot.starts_with("Specialization") {
+            "path"
+        } else if v.slot.contains("its own key") {
+            "pskill"
+        } else if v.slot.contains("path card") {
+            "pcard"
+        } else {
+            "talent"
+        }
+    };
+    let kinds = ["skill", "upgrade", "talent", "combo", "path", "pskill", "pcard"];
+    // Per band of 10 levels: offers, cards, short offers, empty offers, and cards by kind.
+    let mut bands = vec![[0u32; 11]; 6];
+    // When the path came (and was taken), and how many of its skills and cards followed.
+    let mut path_at = Vec::new();
+    let mut path_skills = 0u32;
+    let mut path_cards = 0u32;
+    let mut epics = 0u32;
+    let mut seen = std::collections::HashSet::new();
+    let mut taken_all = std::collections::HashMap::<String, u32>::new();
+    let mut finals = Vec::new();
+    for run in 0..runs {
+        let mut s = Sim::new(test_content(), arena(), Box::new(Flat(0.0)), 100 + run);
+        let p = s.add_player("Ayla", &class, Luck::default());
+        s.close_all_menus_for_test(p);
+        let mut rng = rand::rngs::StdRng::seed_from_u64(run);
+        let mut taken = 0;
+        for level in 1..=60u32 {
+            s.set_level_for_test(p, level);
+            let mut choose = |v: &[CardView]| if first { 0 } else { rng.gen_range(0..v.len().max(1)) };
+            let (views, k) = s.level_up_for_test(p, &mut choose);
+            let b = &mut bands[((level - 1) / 10) as usize];
+            b[0] += 1;
+            b[1] += views.len() as u32;
+            if views.len() < 3 {
+                b[2] += 1;
+            }
+            if views.is_empty() {
+                b[3] += 1;
+            } else {
+                taken += 1;
+                *taken_all.entry(views[k].key.clone()).or_default() += 1;
+                match kind(&views[k]) {
+                    "path" => path_at.push(level),
+                    "pskill" => path_skills += 1,
+                    "pcard" => path_cards += 1,
+                    _ => {}
+                }
+                if views[k].rarity == crate::content::Rarity::Epic {
+                    epics += 1;
+                }
+            }
+            for v in &views {
+                seen.insert(v.key.clone());
+                b[4 + kinds.iter().position(|x| *x == kind(v)).unwrap()] += 1;
+            }
+        }
+        let v = s.player_view(p).unwrap();
+        finals.push((taken, v.cards.clone()));
+    }
+    eprintln!("{class}, {runs} runs, picking {}", if first { "the first card" } else { "at random" });
+    eprintln!("levels   cards/offer  short  empty   skill upgrade talent combo path pskill pcard (share of cards)");
+    for (i, b) in bands.iter().enumerate() {
+        let cards = b[1].max(1) as f32;
+        eprintln!(
+            "{:>2}-{:<2}   {:>9.2}  {:>4.0}%  {:>4.0}%   {:>5.0}% {:>6.0}% {:>5.0}% {:>4.0}% {:>3.0}% {:>5.0}% {:>4.0}%",
+            i * 10 + 1,
+            i * 10 + 10,
+            b[1] as f32 / b[0] as f32,
+            100.0 * b[2] as f32 / b[0] as f32,
+            100.0 * b[3] as f32 / b[0] as f32,
+            100.0 * b[4] as f32 / cards,
+            100.0 * b[5] as f32 / cards,
+            100.0 * b[6] as f32 / cards,
+            100.0 * b[7] as f32 / cards,
+            100.0 * b[8] as f32 / cards,
+            100.0 * b[9] as f32 / cards,
+            100.0 * b[10] as f32 / cards
+        );
+    }
+    path_at.sort();
+    eprintln!(
+        "paths taken in {} of {runs} runs, at levels {:?}; then {:.1} path skills and {:.1} path cards a run; {:.1} Epics a run",
+        path_at.len(),
+        path_at,
+        path_skills as f32 / path_at.len().max(1) as f32,
+        path_cards as f32 / path_at.len().max(1) as f32,
+        epics as f32 / runs as f32
+    );
+    let c = s_kit(&class);
+    let total = c.0;
+    eprintln!("distinct cards seen: {} of {total} in the class's decks; distinct taken: {}", seen.len(), taken_all.len());
+    for (taken, cards) in finals.iter().take(5) {
+        eprintln!("  {taken} picks: {:?}", cards);
+    }
+}
+
+/// How many cards a class's decks hold: skills, upgrades, talents.
+fn s_kit(class: &str) -> (usize,) {
+    let content = test_content();
+    let kit = &content.kits[content.class_index(class).unwrap()];
+    let cards = kit.spells.iter().filter(|s| !s.talent).count();
+    let perks: usize = kit.spells.iter().map(|s| s.perks.len()).sum();
+    (cards + perks + kit.talents.len(),)
+}
+
+/// What a whole run's level-ups add up to (run by hand): RUNS heroes of each class in CLASSES
+/// level to LEVEL (40) picking cards at random, then hit a tough dummy (and a pack) for 30 sec.
+#[test]
+#[ignore]
+fn late_dps_report() {
+    use rand::{Rng, SeedableRng};
+    let classes: Vec<String> = std::env::var("CLASSES").map(|c| c.split(',').map(String::from).collect()).unwrap_or(vec!["warrior".into(), "mage".into()]);
+    let runs: u64 = std::env::var("RUNS").ok().and_then(|r| r.parse().ok()).unwrap_or(12);
+    let top: u32 = std::env::var("LEVEL").ok().and_then(|r| r.parse().ok()).unwrap_or(40);
+    for class in classes {
+        let (mut one, mut pack, mut taken_dmg, mut swings) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+        for run in 0..runs {
+            for packed in [false, true] {
+                let mut s = Sim::new(test_content(), arena(), Box::new(Flat(0.0)), 300 + run);
+                let p = s.add_player("Ayla", &class, Luck::default());
+                s.close_all_menus_for_test(p);
+                let mut rng = rand::rngs::StdRng::seed_from_u64(run);
+                if let Ok(list) = std::env::var("SPELLS") {
+                    for k in list.split(',') {
+                        s.give_test_card(p, k, 0);
+                    }
+                }
+                for level in 1..=top {
+                    s.set_level_for_test(p, level);
+                    let mut choose = |v: &[CardView]| rng.gen_range(0..v.len().max(1));
+                    let (views, k) = s.level_up_for_test(p, &mut choose);
+                    if std::env::var_os("SHOW").is_some() && run == 0 && !packed && !views.is_empty() {
+                        eprintln!("  {level}: {}", views[k].key);
+                    }
+                }
+                s.start_now();
+                s.clear_wave_for_test();
+                for _ in 0..40 {
+                    s.step(0.05);
+                }
+                let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+                let mut targets = vec![s.spawn_boss_for_test(0, [me[0] + 5.0, me[1], 0.0])];
+                if packed {
+                    for k in 0..6 {
+                        targets.push(s.spawn_boss_for_test(1, [me[0] + 6.0 + k as f32, me[1] + 2.0, 0.0]));
+                    }
+                }
+                for t in &targets {
+                    s.tough_for_test(*t);
+                }
+                s.attack(p, targets[0]);
+                let mut dealt = 0u64;
+                let mut hurt = 0u64;
+                let rage_full = std::env::var_os("FULL_RAGE").is_some();
+                for step in 0..600 {
+                    s.prime_hp_for_test(p);
+                    if rage_full && step % 20 == 0 {
+                        s.prime_for_test(p);
+                    }
+                    for ev in s.step(0.05) {
+                        match ev {
+                            Event::Hit { attacker, victim, damage, .. } | Event::SpellHit { caster: attacker, victim, damage, .. } => {
+                                if (attacker == p || s.owner_for_test(attacker) == p) && targets.contains(&victim) {
+                                    dealt += damage as u64;
+                                    if !packed && matches!(ev, Event::Hit { .. }) {
+                                        swings += damage as f64 / 30.0;
+                                    }
+                                }
+                                if victim == p {
+                                    hurt += damage as u64;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                if packed {
+                    pack += dealt as f64 / 30.0;
+                    taken_dmg += hurt as f64 / 30.0;
+                } else {
+                    one += dealt as f64 / 30.0;
+                }
+            }
+        }
+        let n = runs as f64;
+        eprintln!("{class:<8} level {top}: one {:>6.0}/s ({:>5.0} swings)  pack {:>6.0}/s  taken in a pack {:>5.0}/s", one / n, swings / n, pack / n, taken_dmg / n);
+    }
+}
+
+/// Four bots defending (run by hand): per wave, each hero's damage, deaths and level, and the
+/// Ancient's health. SEED (4), WAVES (12).
+#[test]
+#[ignore]
+fn team_report() {
+    let seed: u64 = std::env::var("SEED").ok().and_then(|s| s.parse().ok()).unwrap_or(4);
+    let waves: u32 = std::env::var("WAVES").ok().and_then(|w| w.parse().ok()).unwrap_or(12);
+    let mut s = Sim::new(test_content(), arena(), Box::new(Flat(0.0)), seed);
+    let mut bots = four_bots(&mut s, Policy::Defend);
+    let ids: Vec<EntityId> = bots.iter().map(|b| b.id).collect();
+    let _ = s.step(0.0);
+    s.start_now();
+    let mut dealt = [0u64; 4];
+    let mut died = [0u32; 4];
+    let mut last = 0;
+    let mut t = 0.0;
+    while t < 3600.0 {
+        for b in bots.iter_mut() {
+            bot_turn(&mut s, b, 0.05);
+        }
+        for ev in s.step(0.05) {
+            match ev {
+                Event::Hit { attacker, damage, .. } | Event::SpellHit { caster: attacker, damage, .. } => {
+                    for (k, id) in ids.iter().enumerate() {
+                        if attacker == *id || s.owner_for_test(attacker) == *id {
+                            dealt[k] += damage as u64;
+                        }
+                    }
+                }
+                Event::Died { id, .. } => {
+                    if let Some(k) = ids.iter().position(|x| *x == id) {
+                        died[k] += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+        t += 0.05;
+        let st = s.status();
+        if st.phase == PhaseName::Intermission {
+            for b in bots.iter() {
+                shop_defences(&mut s, b.id);
+            }
+            if st.seconds_left > 3 {
+                s.start_now();
+            }
+        }
+        if st.wave != last || st.phase == PhaseName::Defeat {
+            let lv: Vec<u32> = ids.iter().map(|i| s.player_view(*i).unwrap().level).collect();
+            eprintln!("wave {:2} {:?} hub {:3}%  dealt {:?} died {:?} levels {:?}", st.wave, st.phase, st.hub_health * 100 / st.hub_max_health.max(1), dealt, died, lv);
+            dealt = [0; 4];
+            died = [0; 4];
+            last = st.wave;
+        }
+        if st.phase == PhaseName::Defeat || st.wave > waves {
+            break;
+        }
+    }
+    let v = s.player_view(ids[0]).unwrap();
+    eprintln!("warrior: {:?}", v.cards);
+    for b in s.build_view(ids[0]) {
+        eprintln!("  {}: {:?}", b.name, b.taken.iter().map(|t| t.0.clone()).collect::<Vec<_>>());
+    }
+}
+
+
+/// A weapon path teaches nothing: it opens its own skills to the skill cards and its own path
+/// cards, and its Epic waits for 4 of them. The other paths' skills and cards stay shut.
+#[test]
+fn a_path_opens_its_skills_and_cards() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    // A full bar: six skills.
+    for k in ["charge", "heroic_strike", "rend", "thunder_clap", "whirlwind", "execute"] {
+        s.give_test_card(p, k, 0);
+    }
+    assert!(!s.spell_open_for_test(p, "sunder_armor"), "the bar is full");
+    let card = |s: &Sim, k: &str| talent_index(s, "warrior", k);
+    assert!(!s.spell_open_for_test(p, "shield_slam"), "Shield Slam needs the Shieldbearer path");
+    assert!(s.talent_for_test(p, card(&s, "sb_shield_block")).is_err(), "and so do its cards");
+    let bar = s.spell_bar(p).unwrap().slots.len();
+    s.talent_for_test(p, card(&s, "path_of_the_shieldbearer")).expect("the path");
+    assert_eq!(s.spell_bar(p).unwrap().slots.len(), bar, "it teaches nothing by itself");
+    assert!(s.spell_open_for_test(p, "shield_slam") && s.spell_open_for_test(p, "shield_wall"), "its skills come in the cards now, full bar or not");
+    s.give_test_card(p, "shield_slam", 0);
+    assert_eq!(s.spell_bar(p).unwrap().slots.iter().filter(|x| !x.key.is_empty()).count(), bar + 1, "on a key of its own");
+    assert!(s.spell_open_for_test(p, "shield_wall"), "and Shield Wall still can come");
+    assert!(!s.spell_open_for_test(p, "bloodthirst") && !s.spell_open_for_test(p, "mortal_strike"), "the others' don't");
+    assert!(s.talent_for_test(p, card(&s, "bz_flurry_of_blows")).is_err(), "nor their cards");
+    let epic = card(&s, "sb_unbreakable_bulwark");
+    assert!(s.talent_for_test(p, epic).is_err(), "the Epic waits");
+    s.talent_for_test(p, card(&s, "sb_shield_block")).expect("a path card");
+    s.talent_for_test(p, card(&s, "sb_shield_block")).expect("rank 2");
+    s.talent_for_test(p, card(&s, "sb_bastion")).expect("a choice");
+    assert!(s.talent_for_test(p, card(&s, "sb_vanguard")).is_err(), "Bastion or Vanguard");
+    assert!(s.talent_for_test(p, epic).is_err(), "still waiting");
+    s.talent_for_test(p, card(&s, "sb_guardian")).expect("a fourth");
+    s.talent_for_test(p, epic).expect("now the Epic");
+}
+
+/// An enemy caster's Soul Bolt can be broken: a warrior holding Shield Slam sees its key light
+/// up, and the slam breaks the cast (it never lands, the caster reels). With Spellbreaker the
+/// break stuns everything around the caster and Shield Slam comes straight back.
+#[test]
+fn shield_slam_breaks_a_cast() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.set_level_for_test(p, 20);
+    let path = talent_index(&s, "warrior", "path_of_the_shieldbearer");
+    s.talent_for_test(p, path).expect("the path");
+    s.give_test_card(p, "shield_slam", 5);
+    s.perk_for_test(p, "shield_slam", "spellbreaker").expect("the Epic after 5");
+    s.set_manual(p, true);
+    s.start_now();
+    s.clear_wave_for_test();
+    for _ in 0..20 {
+        let _ = s.step(0.05);
+    }
+    let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+    let caster = s.spawn_for_test("bonecaster", [me[0] + 14.0, me[1], 0.0]);
+    let buddy = s.spawn_for_test("skeleton", [me[0] + 16.0, me[1] + 1.0, 0.0]);
+    s.tough_for_test(caster);
+    s.tough_for_test(buddy);
+    let slot = s.spell_bar(p).unwrap().slots.iter().position(|x| x.key == "shield_slam").unwrap();
+    let lit = |s: &Sim| s.spell_bar(p).unwrap().slots[slot].lit;
+    let mut cued = false;
+    let mut broke = false;
+    let mut stunned_buddy = false;
+    for _ in 0..400 {
+        s.prime_hp_for_test(p);
+        s.prime_for_test(p);
+        let ev = s.step(0.05);
+        for e in &ev {
+            if let Event::EnemyCast { caster: c, interruptible, .. } = e {
+                if *c == caster && *interruptible {
+                    cued = true;
+                }
+            }
+        }
+        if cued && lit(&s) {
+            s.select(p, Some(caster));
+            let _ = s.cast_slot(p, slot);
+            let ev = s.step(0.05);
+            broke = ev.iter().any(|e| matches!(e, Event::CastInterrupted { caster: c, .. } if *c == caster));
+            stunned_buddy = s.stunned_for_test(buddy);
+            break;
+        }
+    }
+    assert!(cued, "the bonecaster cast something breakable");
+    assert!(broke, "and Shield Slam broke it");
+    assert!(stunned_buddy, "Spellbreaker stunned the skeleton beside it");
+    assert!(s.spell_bar(p).unwrap().slots[slot].remaining <= 0.01, "and Shield Slam is ready again");
+}
+
+/// Avatar of Vengeance: blows you take let loose free Revenges.
+#[test]
+fn avatar_of_vengeance_strikes_back() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.set_level_for_test(p, 20);
+    s.give_test_card(p, "revenge", 5);
+    s.perk_for_test(p, "revenge", "avatar_of_vengeance").expect("the Epic after 5");
+    s.set_manual(p, true);
+    s.start_now();
+    s.clear_wave_for_test();
+    let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+    for k in 0..3 {
+        let e = s.spawn_for_test("skeleton", [me[0] + 1.5, me[1] + k as f32 - 1.0, 0.0]);
+        s.tough_for_test(e);
+    }
+    let ci = s.content().classes.iter().position(|c| c.key == "warrior").unwrap();
+    let kit = &s.content().kits[ci];
+    let revenge = kit.spells[kit.spell_index("revenge").unwrap()].visual();
+    let mut went = 0;
+    for _ in 0..400 {
+        s.prime_hp_for_test(p);
+        for e in s.step(0.05) {
+            if matches!(e, Event::SpellGo { caster, spell, .. } if caster == p && spell == revenge) {
+                went += 1;
+            }
+        }
+    }
+    assert!(went > 0, "Revenge went off by itself");
+}
+
+/// Every spell's card text for a class (run by hand, CLASS=mage): to read the notes beside what
+/// the game writes from the numbers.
+#[test]
+#[ignore]
+fn spell_text_report() {
+    let class = std::env::var("CLASS").unwrap_or("mage".into());
+    let content = test_content();
+    let kit = &content.kits[content.class_index(&class).unwrap()];
+    for sp in &kit.spells {
+        let t = crate::describe::spell_text(sp, &sp.nums, 60.0, false);
+        eprintln!("{}: {}", sp.name, t.text);
+    }
+}
+
+/// The Mage's Counterspell breaks a Bonecaster's Soul Bolt, no path needed.
+#[test]
+fn counterspell_breaks_a_cast() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "mage", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.set_level_for_test(p, 20);
+    s.give_test_card(p, "counterspell", 0);
+    s.set_manual(p, true);
+    s.start_now();
+    s.clear_wave_for_test();
+    for _ in 0..20 {
+        let _ = s.step(0.05);
+    }
+    let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+    let caster = s.spawn_for_test("bonecaster", [me[0] + 20.0, me[1], 0.0]);
+    s.tough_for_test(caster);
+    let slot = s.spell_bar(p).unwrap().slots.iter().position(|x| x.key == "counterspell").unwrap();
+    let mut broke = false;
+    for _ in 0..400 {
+        s.prime_hp_for_test(p);
+        let _ = s.step(0.05);
+        if s.spell_bar(p).unwrap().slots[slot].lit {
+            let _ = s.cast_slot(p, slot);
+            let ev = s.step(0.05);
+            broke = ev.iter().any(|e| matches!(e, Event::CastInterrupted { caster: c, .. } if *c == caster));
+            break;
+        }
+    }
+    assert!(broke, "Counterspell broke the cast");
+}
+
+/// A lit key can make a cast instant: Frost Nova with Shatter Setup lights up Frostbolt, and the
+/// next Frostbolt goes off at once instead of casting for 1.8 sec.
+#[test]
+fn a_lit_key_can_make_a_cast_instant() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "mage", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.set_level_for_test(p, 20);
+    s.give_test_card(p, "frost_nova", 0);
+    s.give_test_card(p, "frostbolt", 0);
+    s.give_test_perk(p, "frost_nova", "shatter_nova");
+    s.set_manual(p, true);
+    s.start_now();
+    s.clear_wave_for_test();
+    for _ in 0..20 {
+        let _ = s.step(0.05);
+    }
+    let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+    let foe = s.spawn_boss_for_test(0, [me[0] + 5.0, me[1], 0.0]);
+    s.tough_for_test(foe);
+    s.select(p, Some(foe));
+    let slot = |s: &Sim, k: &str| s.spell_bar(p).unwrap().slots.iter().position(|x| x.key == k).unwrap();
+    assert_eq!(s.cast_slot(p, slot(&s, "frost_nova")), Ok(()));
+    assert!(s.spell_bar(p).unwrap().slots[slot(&s, "frostbolt")].lit, "Frostbolt lit up");
+    for _ in 0..30 {
+        let _ = s.step(0.05);
+    }
+    let before = s.casts_for_test(p);
+    assert_eq!(s.cast_slot(p, slot(&s, "frostbolt")), Ok(()));
+    assert_eq!(s.casts_for_test(p), before + 1, "it went off at once, no cast time");
+}
+
+/// The Shadow priest: the path opens Silence (it breaks a cast) and Vampiric Embrace (its
+/// damage over time mends a hurt ally).
+#[test]
+fn shadow_priest_silences_and_embraces() {
+    let mut s = sim();
+    let p = s.add_player("Ayla", "priest", Luck::default());
+    let ally = s.add_player("Bren", "warrior", Luck::default());
+    s.close_all_menus_for_test(p);
+    s.close_all_menus_for_test(ally);
+    s.set_level_for_test(p, 20);
+    assert!(!s.spell_open_for_test(p, "silence"), "Silence is Shadow's");
+    let path = talent_index(&s, "priest", "path_of_shadow");
+    s.talent_for_test(p, path).expect("the path");
+    s.give_test_card(p, "silence", 0);
+    s.give_test_card(p, "vampiric_embrace", 0);
+    s.set_manual(p, true);
+    s.set_manual(ally, true);
+    s.start_now();
+    s.clear_wave_for_test();
+    for _ in 0..20 {
+        let _ = s.step(0.05);
+    }
+    let me = s.entities().into_iter().find(|e| e.id == p).unwrap().pos;
+    s.move_player(ally, [me[0] + 2.0, me[1], me[2]], 0.0);
+    let caster = s.spawn_for_test("bonecaster", [me[0] + 20.0, me[1], 0.0]);
+    s.tough_for_test(caster);
+    s.select(p, Some(caster));
+    let slot = |s: &Sim, k: &str| s.spell_bar(p).unwrap().slots.iter().position(|x| x.key == k).unwrap();
+    assert_eq!(s.cast_slot(p, slot(&s, "vampiric_embrace")), Ok(()));
+    s.hurt_for_test(ally, 0.5);
+    let (hurt, _) = s.health_for_test(ally);
+    let mut broke = false;
+    for _ in 0..400 {
+        s.prime_hp_for_test(p);
+        let _ = s.step(0.05);
+        if s.spell_bar(p).unwrap().slots[slot(&s, "silence")].lit {
+            let _ = s.cast_slot(p, slot(&s, "silence"));
+            let ev = s.step(0.05);
+            broke = ev.iter().any(|e| matches!(e, Event::CastInterrupted { caster: c, .. } if *c == caster));
+            break;
+        }
+    }
+    assert!(broke, "Silence broke the cast");
+    assert!(s.health_for_test(ally).0 > hurt, "Vampiric Embrace mended the hurt warrior");
 }
