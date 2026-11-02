@@ -101,6 +101,10 @@ pub struct Content {
     /// each a world of its own and a page of the same book.
     #[serde(rename = "more_dungeon", default)]
     pub more_dungeons: Vec<DungeonDef>,
+    /// In a dungeon's own world, the book's other dungeons: not this world's, but on its ladder
+    /// (what the run's page says is next).
+    #[serde(skip)]
+    pub elsewhere: Vec<DungeonDef>,
     /// The Proving Ring: endless waves, a page of the same book.
     #[serde(default)]
     pub arena: Option<ArenaDef>,
@@ -2350,6 +2354,7 @@ impl Content {
     pub fn for_dungeon_of(&self, key: &str) -> Self {
         let mut c = self.clone();
         c.dungeon = self.dungeons().find(|d| d.key == key).cloned();
+        c.elsewhere = self.ladder().filter(|d| d.key != key).cloned().collect();
         c.more_dungeons.clear();
         if let Some(d) = &c.dungeon {
             c.packs = d.packs.clone();
@@ -2369,6 +2374,12 @@ impl Content {
     /// Every dungeon in these rules (the Deadmines', and those beside it).
     pub fn dungeons(&self) -> impl Iterator<Item = &DungeonDef> {
         self.dungeon.iter().chain(self.more_dungeons.iter())
+    }
+
+    /// Every dungeon on the book's ladder, in a dungeon's own world too (where the others are
+    /// `elsewhere`).
+    pub fn ladder(&self) -> impl Iterator<Item = &DungeonDef> {
+        self.dungeons().chain(self.elsewhere.iter())
     }
 
     /// The dungeon (by key) a lamp is in.
