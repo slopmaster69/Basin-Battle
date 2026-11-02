@@ -160,12 +160,12 @@ impl Survival {
     }
 
     /// A creature whose hero has two pressing them already: it turns on a hero in its fight that
-    /// fewer are on and nobody's pressing (the nearest such), at most once a look
-    /// (`retarget_secs`), so a band's foes spread over the band. Whether it turned.
+    /// fewer are on and nobody's pressing (the nearest such), so a band's foes spread over the
+    /// band. (Only to one with fewer on them: it doesn't turn back and forth.) Whether it turned.
     pub(crate) fn turn_to_free(&mut self, id: Id, hero: Id) -> bool {
         let now = self.clock;
         let Some(m) = self.mobs.get(&id) else { return false };
-        if now < m.retarget_at || m.raider || m.pattern.is_some() || self.content.mobs[m.def].boss {
+        if m.raider || m.pattern.is_some() || self.content.mobs[m.def].boss {
             return false;
         }
         let here = self.on_hero(hero, id);
@@ -182,10 +182,10 @@ impl Survival {
                 best = Some((*h, d));
             }
         }
+        let Some((h, _)) = best else { return false };
         let secs = self.content.ai.retarget_secs.max(0.2);
         let m = self.mobs.get_mut(&id).unwrap();
         m.retarget_at = now + secs;
-        let Some((h, _)) = best else { return false };
         m.state = MobState::Chase { foe: Foe::Hero(h) };
         m.think = 0.0;
         m.path.clear();

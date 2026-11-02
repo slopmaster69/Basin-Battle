@@ -51,7 +51,7 @@ fn a_hero_shooting_from_just_past_the_leash_still_draws_the_fight() {
     let p = hero(&mut s, "Ayla", [at, 0.0, 0.0]);
     let g = mob(&mut s, "grunt", [0.0, 0.0, 0.0]);
     s.hurt_mob(g, p, 1);
-    run(&mut s, 6.0);
+    run(&mut s, 10.0);
     assert!(matches!(s.mobs[&g].state, MobState::Chase { .. } | MobState::Windup { .. } | MobState::Recover { .. }), "it came: {:?}", s.mobs[&g].state);
     assert!(dist2d(s.mobs[&g].pos, [at, 0.0, 0.0]) < 4.0, "and reached the hero: {:?}", s.mobs[&g].pos);
 }

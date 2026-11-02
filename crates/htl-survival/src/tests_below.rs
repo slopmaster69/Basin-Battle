@@ -1488,7 +1488,7 @@ fn a_pack_grows_with_the_heroes_below_and_shares_its_health_over_them() {
     assert_eq!(in_pack(&s), 3, "grown for two");
     let one = *s.mobs.iter().find(|(_, m)| m.pack == Some(k)).unwrap().0;
     s.engage(one, mobs::Foe::Hero(b));
-    s.leave(b);
+    let _c = s.join("cass", "Cass", None);
     run(&mut s, 0.1);
     assert_eq!(in_pack(&s), 3, "left as it is mid-fight");
 }
