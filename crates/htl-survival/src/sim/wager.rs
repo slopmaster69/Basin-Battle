@@ -205,40 +205,59 @@ pub fn wager_bosses(d: &DungeonDef, content: &crate::content::Content) -> Vec<St
         .collect()
 }
 
-/// The foes a wager counts: those standing from the start that aren't bosses (not a secret's, a
-/// strongbox's guards, a rare, a totem or a dummy). Others felled count as well; these make the
-/// total.
+/// The foes a wager counts for one hero: those standing from the start that aren't bosses (not a
+/// secret's, a strongbox's guards, a rare, a totem or a dummy). Others felled count as well;
+/// these make the total.
 pub fn wager_forces_total(d: &DungeonDef, content: &crate::content::Content) -> u32 {
+    wager_forces_total_for(d, content, 1)
+}
+
+/// ...and for a band of `heroes`, its packs grown for them ([`super::dungeon::pack_count`]).
+pub fn wager_forces_total_for(d: &DungeonDef, content: &crate::content::Content, heroes: usize) -> u32 {
     let kept: BTreeSet<&String> = d.doors.iter().flat_map(|dr| dr.reveals.iter()).collect();
     d.packs
         .iter()
         .filter(|p| !p.rare && p.wake.is_empty() && !kept.contains(&p.key))
         .filter(|p| content.mobs.iter().any(|m| m.key == p.mob && !m.boss && !m.inert() && !m.critter))
-        .map(|p| p.count.max(1) as u32)
+        .map(|p| super::dungeon::pack_count(p, d, content, heroes).max(1) as u32)
         .sum()
 }
 
-/// How many of them a run must fell.
+/// How many of them a run must fell, for one hero.
 pub fn wager_forces_needed(d: &DungeonDef, content: &crate::content::Content) -> u32 {
-    (wager_forces_total(d, content) as f32 * WAGER_FORCES).ceil() as u32
+    wager_forces_needed_for(d, content, 1)
+}
+
+/// ...and for a band of `heroes`.
+pub fn wager_forces_needed_for(d: &DungeonDef, content: &crate::content::Content, heroes: usize) -> u32 {
+    (wager_forces_total_for(d, content, heroes) as f32 * WAGER_FORCES).ceil() as u32
 }
 
 impl Survival {
-    /// A foe's leash: how far from home it chases (farther during a wager).
+    /// A foe's leash: how far from home it chases (`ai.leash_scale` times its own; farther
+    /// during a wager).
     pub(crate) fn leash_of(&self, def: usize) -> f32 {
         let leash = self.content.mobs[def].leash;
+        let scale = self.content.ai.leash_scale.max(0.1);
         if self.wager_running() {
-            leash * WAGER_LEASH
+            leash * scale.max(WAGER_LEASH)
         } else {
-            leash
+            leash * scale
         }
     }
 
-    /// A wager's count of foes: (felled, needed, standing from the start).
+    /// A wager's count of foes: (felled, needed, standing from the start), for the heroes below
+    /// now, as its packs at rest are grown for them.
     pub fn wager_forces(&self) -> Option<(u32, u32, u32)> {
         let w = self.wager()?;
         let d = self.dungeon_def()?;
-        Some((w.forces, wager_forces_needed(d, &self.content), wager_forces_total(d, &self.content)))
+        let n = self.wager_band();
+        Some((w.forces, wager_forces_needed_for(d, &self.content, n), wager_forces_total_for(d, &self.content, n)))
+    }
+
+    /// How many heroes a wager's count is for: those below now (the band the packs are grown for).
+    pub(crate) fn wager_band(&self) -> usize {
+        self.players.len().max(1)
     }
 
     /// Whether the wager under way has a term (by key).
@@ -409,7 +428,7 @@ impl Survival {
             if m.health == 0 || m.health < m.max_health {
                 continue;
             }
-            let max = self.foe_health(m.def);
+            let max = self.foe_health(m.def, m.pack);
             let m = self.mobs.get_mut(&id).unwrap();
             m.max_health = max;
             m.health = max;
@@ -648,7 +667,7 @@ impl Survival {
         let w = self.wager().cloned().unwrap();
         // Its last boss down and enough of its foes: won, in time or not.
         if !bosses.is_empty() && bosses.iter().all(|k| self.slain(k)) {
-            let needed = wager_forces_needed(&d, &self.content);
+            let needed = wager_forces_needed_for(&d, &self.content, self.wager_band());
             if w.forces >= needed {
                 self.win_wager(&d);
             } else if !w.short_told {
