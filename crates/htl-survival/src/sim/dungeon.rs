@@ -1045,7 +1045,7 @@ impl Survival {
         }
         // Found once, the camp's rack has it.
         if matches!(self.content.items[item].kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) {
-            let key = self.content.items[item].key.clone();
+            let key = self.content.base_key(item).to_string();
             self.forward_count("found", &key, 1);
         }
         let d = &self.content.items[item];
@@ -1277,9 +1277,8 @@ impl Survival {
                 *self.storage.entry(*i).or_default() += n;
                 names.push(self.content.items[*i].name.clone());
                 // Gear sent home is found, too (a wager's, a trophy): the rack has it after.
-                let it = &self.content.items[*i];
-                if matches!(it.kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) {
-                    let key = if it.honed_from.is_empty() { it.key.clone() } else { it.honed_from.clone() };
+                if matches!(self.content.items[*i].kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) {
+                    let key = self.content.base_key(*i).to_string();
                     *self.camp.counts.entry(format!("found:{key}")).or_default() += 1;
                 }
             }

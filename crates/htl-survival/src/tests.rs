@@ -3219,3 +3219,18 @@ fn a_harder_dungeons_weapons_hit_harder_than_an_easier_ones() {
         assert!(t.windows(2).all(|w| w[1] > w[0]), "two-handed {two}: {t:?}");
     }
 }
+
+#[test]
+fn a_honed_copy_found_or_one_already_in_the_chest_puts_its_piece_on_the_rack() {
+    let mut s = world();
+    let rack = s.content.world.rack;
+    let p = hero(&mut s, "Ayla", [rack[0] + 1.0, rack[1], 0.0], 0.0);
+    let keys = |s: &Survival| s.rack_view(p).into_iter().map(|r| r.0).collect::<Vec<String>>();
+    // A camp from before finds were counted, with a dungeon's weapon (honed) in its chest.
+    let piece = s.content.dungeons().flat_map(|d| d.packs.iter()).filter_map(|pk| s.content.mob(&pk.mob)).flat_map(|m| s.content.mobs[m].gear.clone()).find(|g| s.content.weapon(g).is_some() && !s.content.is_trophy(g)).unwrap();
+    assert!(!keys(&s).contains(&piece));
+    let honed = s.content.honed(s.content.item(&piece).unwrap(), 2);
+    s.storage.insert(honed, 1);
+    assert!(keys(&s).contains(&piece), "{piece}: one honed copy in the chest");
+    assert_eq!(s.content.base_key(honed), piece);
+}

@@ -3146,7 +3146,6 @@ impl Content {
     pub fn mob(&self, key: &str) -> Option<usize> {
         self.mobs.iter().position(|m| m.key == key)
     }
-    /// Whether an item is some champion's trophy (won, never on the rack).
     /// A dungeon's own gear: what a foe of one of its packs carries (`gear`) or yields
     /// (`trophy`). It's earned down there: the rack at camp offers it once the camp has found one.
     pub fn is_dungeon_gear(&self, key: &str) -> bool {
@@ -3155,6 +3154,13 @@ impl Content {
         })
     }
 
+    /// A piece's own key, a honed copy's that of the piece it was honed from.
+    pub fn base_key(&self, item: usize) -> &str {
+        let it = &self.items[item];
+        if it.honed_from.is_empty() { &it.key } else { &it.honed_from }
+    }
+
+    /// Whether an item is some champion's trophy (won, never on the rack).
     pub fn is_trophy(&self, key: &str) -> bool {
         self.mobs.iter().any(|m| m.trophy.contains_key(key)) || self.chests.iter().any(|c| c.loot.contains_key(key) || c.roll.contains_key(key))
     }

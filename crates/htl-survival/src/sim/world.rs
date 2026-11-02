@@ -906,10 +906,14 @@ impl Survival {
     }
 
     /// Whether the rack offers this piece: anything but a dungeon's own, and that once the camp
-    /// has found one (taken it from the ground below, or had it sent to the chest). In Siege,
-    /// whose heroes are made for the match, everything.
+    /// has found one (taken it from the ground below, or had it sent to the chest; or one, or a
+    /// honed copy, already lies in the chest, from before finds were counted). In Siege, whose
+    /// heroes are made for the match, everything.
     pub(crate) fn rack_has(&self, key: &str) -> bool {
-        self.is_siege() || !self.content.is_dungeon_gear(key) || self.ever("found", key)
+        self.is_siege()
+            || !self.content.is_dungeon_gear(key)
+            || self.ever("found", key)
+            || self.storage.iter().any(|(i, n)| *n > 0 && self.content.base_key(*i) == key)
     }
 
     /// Take up a weapon or shield from the rack (free while the armory is open).
