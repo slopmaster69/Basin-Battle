@@ -1405,13 +1405,16 @@ impl Survival {
     }
 
     /// Whether a hero is in this creature's fight: alive, not hidden from it, within its leash,
-    /// and near (a boss's whole room, its leash: a hero shooting from the far wall is in it), or
+    /// and near (a boss's whole room, its own leash: a hero shooting from the far wall is in it), or
     /// one who has hurt it lately from a little farther off.
     pub(crate) fn in_fight_of(&self, m: &Mob, hero: Id) -> bool {
         let Some(p) = self.players.get(&hero) else { return false };
         let leash = self.leash_of(m.def);
         let d = dist2d(p.pos, m.pos);
-        let reach = if self.content.mobs[m.def].boss { FIGHT_RANGE.max(leash) } else { FIGHT_RANGE };
+        // (A boss's room by its own leash, not the farther chase `ai.leash_scale` gives it: a hero
+        // waiting by the door a hundred yards off isn't in its fight.)
+        let room = self.content.mobs[m.def].leash;
+        let reach = if self.content.mobs[m.def].boss { FIGHT_RANGE.max(room) } else { FIGHT_RANGE };
         p.health > 0
             && !self.unseen(hero)
             && (p.pos[2] - m.pos[2]).abs() < 10.0

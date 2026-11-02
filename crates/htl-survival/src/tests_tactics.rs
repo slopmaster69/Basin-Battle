@@ -241,9 +241,11 @@ fn a_creature_with_no_turn_at_its_hero_goes_for_one_nobody_is_pressing() {
 fn a_boss_whose_foe_runs_past_its_leash_turns_on_another_in_its_fight_not_home() {
     let mut s = world();
     let a = hero(&mut s, "Ayla", [3.0, 0.0, 0.0], 0.0);
-    // Bren shoots it from across its room (farther than a pack's fight reaches, inside its leash).
+    // Bren shoots it from across its room (farther than a pack's fight reaches, inside the room:
+    // its own leash).
     let leash = s.leash_of(s.content.mob("wolf").unwrap());
-    let b = hero(&mut s, "Bren", [-(leash - 2.0), 0.0, 0.0], 0.0);
+    let room = s.content.mobs[s.content.mob("wolf").unwrap()].leash;
+    let b = hero(&mut s, "Bren", [-(room - 2.0), 0.0, 0.0], 0.0);
     let k = mob(&mut s, "wolf", ORIGIN);
     let def = s.mobs[&k].def;
     s.content.mobs[def].boss = true;
