@@ -1660,6 +1660,77 @@ fn a_second_trip_down_tallies_only_itself() {
 }
 
 #[test]
+fn a_new_band_down_starts_its_own_tally_and_the_bosses_are_the_dungeons() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let grunt = *s.mobs.keys().find(|m| s.content.mobs[s.mobs[*m].def].key == "grunt").unwrap();
+    s.hurt_mob(grunt, id, 1_000_000);
+    s.run_fall(id);
+    s.below.as_mut().unwrap().log.first = true;
+    s.leave(id);
+    run(&mut s, 120.0);
+    // Back down alone, and home at once: none of the last trip's.
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains("Foes felled: 0") && text.contains("didn't fall") && !text.contains("A first") && !text.contains("Time below: 2"), "{text}");
+    // A boss the dungeon has down (kept over a restart, as its slain are) is on the page.
+    let d = s.dungeon_def().cloned().unwrap();
+    let boss = crate::sim::wager::wager_bosses(&d, &s.content)[0].clone();
+    s.below.as_mut().unwrap().slain.insert(boss);
+    s.below.as_mut().unwrap().log.paged.clear();
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains("Bosses down: "), "{text}");
+}
+
+#[test]
+fn a_run_page_comes_once_a_trip_and_its_wager_link_is_a_command() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.run_page(id, "Wager +2, in time: 9:00");
+    let ev = run(&mut s, 0.05);
+    let links = ev.iter().find_map(|e| if let Event::Letter { kind, links, .. } = e { (kind == "run").then(|| links.clone()) } else { None }).unwrap();
+    assert!(links.iter().all(|(cmd, _)| cmd.starts_with(".es ")), "{links:?}");
+    // Home by a lamp after the won wager: no second page over the first.
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Letter { kind, .. } if kind == "run")));
+}
+
+#[test]
+fn a_run_page_names_the_gear_carried_out_honed() {
+    let c = Content::builtin().for_dungeon_of("deadmines");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let base = (0..s.content.items.len()).find(|i| s.content.honed(*i, 1) != *i && s.content.is_dungeon_gear(&s.content.items[*i].key)).expect("a dungeon piece with a honed copy");
+    let honed = s.content.honed(base, 1);
+    s.below.as_mut().unwrap().log.gear.entry("ayla".into()).or_default().push(base);
+    s.players.get_mut(&id).unwrap().bag.insert(honed, 1);
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(text.contains(&s.content.items[honed].name), "{text}");
+}
+
+#[test]
+fn a_dungeons_own_world_knows_the_book_s_next_dungeon() {
+    let all = Content::builtin();
+    let c = all.for_dungeon_of("ragefire");
+    assert_eq!(c.ladder().count(), all.dungeons().count());
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    s.camp.counts.insert("cleared:ragefire".into(), 1);
+    let next = s.next_dungeon().map(|d| d.key.clone());
+    assert!(next.as_deref().is_some_and(|k| k != "ragefire"), "{next:?}");
+}
+
+#[test]
 fn the_quartermaster_hones_the_dungeons_own_gear_and_sells_a_flask_for_its_currency() {
     let c = Content::builtin().for_dungeon_of("deadmines");
     let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
