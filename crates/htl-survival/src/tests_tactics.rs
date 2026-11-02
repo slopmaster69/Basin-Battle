@@ -176,3 +176,84 @@ fn a_raider_at_a_station_turns_on_a_hero_who_comes_near() {
     run(&mut s, t);
     assert_eq!(s.mobs[&k].state.target(), Some(p), "drawn off by the hero");
 }
+
+/// A pack of `n` wolves at `at`, linked: drawing one draws them all.
+fn pack(s: &mut Survival, n: usize, at: [f32; 2]) -> Vec<Id> {
+    s.content.packs.push(crate::content::PackDef { mob: "wolf".into(), at, radius: 2.0, count: n, link: 12.0, route: Vec::new(), wait: 1.0, camp: String::new(),
+        z: None,
+        key: String::new(),
+        elite: false,
+        hidden: 0.0, wake: String::new(), spots: Vec::new(), rare: false,
+    });
+    let k = s.content.packs.len() - 1;
+    let def = s.content.mob("wolf").unwrap();
+    (0..n)
+        .map(|i| {
+            let id = s.spawn_mob(def, [at[0] + i as f32, at[1], 0.0], Some(k), false);
+            s.mobs.get_mut(&id).unwrap().state = MobState::Idle { wander_at: 1e9 };
+            id
+        })
+        .collect()
+}
+
+#[test]
+fn a_pack_drawn_by_one_hero_spreads_over_the_band_as_it_comes() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", [0.0, 0.0, 0.0], 0.0);
+    let b = hero(&mut s, "Bren", [0.0, 5.0, 0.0], 0.0);
+    let c = hero(&mut s, "Cass", [0.0, -5.0, 0.0], 0.0);
+    let ks = pack(&mut s, 6, [8.0, 0.0]);
+    // Ayla pulls: the first comes for her, the rest spread over the three of them.
+    s.engage(ks[0], Foe::Hero(a));
+    let on = |s: &Survival, h: Id| ks.iter().filter(|k| s.mobs[k].state.target() == Some(h)).count();
+    assert_eq!(on(&s, a) + on(&s, b) + on(&s, c), 6, "all six came");
+    assert!(on(&s, a) <= 3 && on(&s, b) >= 1 && on(&s, c) >= 1, "spread: {} {} {}", on(&s, a), on(&s, b), on(&s, c));
+    // And over a fight they stay spread rather than piling onto one.
+    run(&mut s, 6.0);
+    let most = [a, b, c].iter().map(|h| on(&s, *h)).max().unwrap();
+    assert!(most <= 3, "no one hero with most of them: {} {} {}", on(&s, a), on(&s, b), on(&s, c));
+}
+
+#[test]
+fn alone_a_hero_has_the_whole_pack() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", [0.0, 0.0, 0.0], 0.0);
+    let ks = pack(&mut s, 4, [8.0, 0.0]);
+    s.engage(ks[0], Foe::Hero(a));
+    assert!(ks.iter().all(|k| s.mobs[k].state.target() == Some(a)));
+}
+
+#[test]
+fn a_creature_with_no_turn_at_its_hero_goes_for_one_nobody_is_pressing() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", [0.0, 0.0, 0.0], 0.0);
+    let b = hero(&mut s, "Bren", [0.0, 7.0, 0.0], 0.0);
+    // Three on Ayla, none on Bren: two press her, the third goes for Bren.
+    let ks: Vec<Id> = (0..3).map(|i| mob(&mut s, "wolf", [2.0, i as f32 - 1.0, 0.0])).collect();
+    for k in &ks {
+        s.engage(*k, Foe::Hero(a));
+    }
+    run(&mut s, 3.0);
+    assert!(ks.iter().any(|k| s.mobs[k].state.target() == Some(b)), "one turned to Bren: {:?}", ks.iter().map(|k| s.mobs[k].state.target()).collect::<Vec<_>>());
+}
+
+#[test]
+fn a_boss_whose_foe_runs_past_its_leash_turns_on_another_in_its_fight_not_home() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", [3.0, 0.0, 0.0], 0.0);
+    // Bren shoots it from across its room (farther than a pack's fight reaches, inside its leash).
+    let leash = s.leash_of(s.content.mob("wolf").unwrap());
+    let b = hero(&mut s, "Bren", [-(leash - 2.0), 0.0, 0.0], 0.0);
+    let k = mob(&mut s, "wolf", ORIGIN);
+    let def = s.mobs[&k].def;
+    s.content.mobs[def].boss = true;
+    s.mobs.get_mut(&k).unwrap().health = 50_000;
+    s.mobs.get_mut(&k).unwrap().max_health = 50_000;
+    s.engage(k, Foe::Hero(a));
+    s.hurt_mob(k, b, 10);
+    // Ayla runs far off, past its leash.
+    s.move_player(a, [leash + 40.0, 0.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 1.0);
+    assert_eq!(s.mobs[&k].state.target(), Some(b), "on Bren: {:?}", s.mobs[&k].state);
+    assert!(s.mobs[&k].health < 50_000, "not home healed");
+}

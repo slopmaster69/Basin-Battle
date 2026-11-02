@@ -1,5 +1,7 @@
 //! How a creature fights a band of heroes ([`crate::content::AiDef`]): whom it goes for (who
-//! hurts it, who's open, who's hurt, who's near, who isn't already beset), pressing an opening at
+//! hurts it, who's open, who's hurt, who's near, who isn't already beset), a pack spreading over
+//! the band as it comes (not all onto whoever drew it) and one with no turn at its hero going for
+//! a hero nobody's pressing, pressing an opening at
 //! once, reaching for the blow no guard stops against a raised guard, now and then giving ground
 //! after a string, working round to a hero's back while it waits its turn, and blows that don't
 //! come on a metronome.
@@ -112,7 +114,7 @@ impl Survival {
                 score += ai.opening;
             }
             score += ai.wounded * (1.0 - p.health as f32 / p.max_health.max(1) as f32);
-            score -= ai.crowd * self.on_hero(*h, id).saturating_sub(1) as f32;
+            score -= ai.crowd * self.on_hero(*h, id) as f32;
             if Some(*h) == current {
                 score += ai.stick;
             }
@@ -127,6 +129,66 @@ impl Survival {
         let m = self.mobs.get_mut(&id).unwrap();
         m.state = MobState::Chase { foe: Foe::Hero(h) };
         m.think = 0.0;
+        true
+    }
+
+    /// Whom a creature brought into a fight by its pack goes for: the hero in its fight with the
+    /// fewest creatures on them already, the nearer first, the one who drew it a little ahead
+    /// (`crowd` for each creature on a hero, `distance` for every 10 yards, `stick` for the first).
+    /// Alone, or with nobody else in its fight, the one who drew it.
+    pub(crate) fn spread_foe(&self, id: Id, first: Foe) -> Foe {
+        let Foe::Hero(drew) = first else { return first };
+        let Some(m) = self.mobs.get(&id) else { return first };
+        if m.raider || self.content.mobs[m.def].critter {
+            return first;
+        }
+        let ai = &self.content.ai;
+        let mut best: Option<(Id, f32)> = None;
+        for (h, p) in &self.players {
+            if !self.in_fight_of(m, *h) || self.unseen_by(id, *h) {
+                continue;
+            }
+            let mut cost = ai.crowd * self.on_hero(*h, id) as f32 + ai.distance * dist2d(p.pos, m.pos) / 10.0;
+            if *h == drew {
+                cost -= ai.stick;
+            }
+            if best.is_none_or(|b| cost < b.1) {
+                best = Some((*h, cost));
+            }
+        }
+        best.map_or(first, |(h, _)| Foe::Hero(h))
+    }
+
+    /// A creature whose hero has two pressing them already: it turns on a hero in its fight that
+    /// fewer are on and nobody's pressing (the nearest such), at most once a look
+    /// (`retarget_secs`), so a band's foes spread over the band. Whether it turned.
+    pub(crate) fn turn_to_free(&mut self, id: Id, hero: Id) -> bool {
+        let now = self.clock;
+        let Some(m) = self.mobs.get(&id) else { return false };
+        if now < m.retarget_at || m.raider || m.pattern.is_some() || self.content.mobs[m.def].boss {
+            return false;
+        }
+        let here = self.on_hero(hero, id);
+        let mut best: Option<(Id, f32)> = None;
+        for (h, p) in &self.players {
+            if *h == hero || !self.in_fight_of(m, *h) || self.unseen_by(id, *h) {
+                continue;
+            }
+            let d = dist2d(p.pos, m.pos);
+            if d > mobs::FIGHT_RANGE * 0.6 || self.attackers_on(*h, id) >= mobs::MAX_ATTACKERS || self.on_hero(*h, id) >= here {
+                continue;
+            }
+            if best.is_none_or(|b| d < b.1) {
+                best = Some((*h, d));
+            }
+        }
+        let secs = self.content.ai.retarget_secs.max(0.2);
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.retarget_at = now + secs;
+        let Some((h, _)) = best else { return false };
+        m.state = MobState::Chase { foe: Foe::Hero(h) };
+        m.think = 0.0;
+        m.path.clear();
         true
     }
 

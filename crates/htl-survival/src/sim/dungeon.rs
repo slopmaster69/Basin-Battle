@@ -1559,35 +1559,42 @@ impl Survival {
         }
     }
 
-    /// Foes take more health for each hero below: a foe unhurt is set to it.
-    /// A foe's health for the heroes below now (`hero_health` more for each past the first).
-    pub(crate) fn foe_health(&self, def: usize) -> u32 {
+    /// A foe's health for the heroes below now (`hero_health` more for each past the first); in a
+    /// pack grown for them ([`pack_count`]), the pack's whole health shared over its bodies.
+    pub(crate) fn foe_health(&self, def: usize, pack: Option<usize>) -> u32 {
         let base = self.base_health(def);
-        let Some(share) = self.dungeon_def().map(|d| d.hero_health) else {
+        let Some(d) = self.dungeon_def() else {
             return base;
         };
         let n = self.players.len().max(1);
-        (base as f32 * (1.0 + share * (n - 1) as f32)).round() as u32
+        let grown = pack.map_or(1.0, |k| {
+            let p = &self.content.packs[k];
+            pack_count(p, d, &self.content, n) as f32 / p.count.max(1) as f32
+        });
+        let max = base as f32 * (1.0 + d.hero_health * (n - 1) as f32) / grown;
+        (max.round() as u32).max(base)
     }
 
+    /// Foes take more health for each hero below, and packs at rest take more foes (or give back
+    /// those grown for heroes gone): a foe unhurt is set to its health.
     fn scale_foes(&mut self, force: bool) {
-        let Some(share) = self.dungeon_def().map(|d| d.hero_health) else {
+        if self.dungeon_def().is_none() {
             return;
-        };
+        }
         let n = self.players.len().max(1);
         let b = self.below.as_mut().unwrap();
         if !force && b.heroes_seen == n {
             return;
         }
         b.heroes_seen = n;
+        self.grow_packs(n);
         let ids: Vec<Id> = self.mobs.keys().copied().collect();
         for id in ids {
             let m = &self.mobs[&id];
             if m.health == 0 || m.health < m.max_health {
                 continue;
             }
-            let base = self.base_health(m.def) as f32;
-            let max = (base * (1.0 + share * (n - 1) as f32)).round() as u32;
+            let max = self.foe_health(m.def, m.pack);
             let m = self.mobs.get_mut(&id).unwrap();
             m.max_health = max;
             m.health = max;
@@ -1598,6 +1605,81 @@ impl Survival {
             });
         }
     }
+}
+
+impl Survival {
+    /// Each pack at rest (every foe of it standing idle and whole, none in a fight) brought to its
+    /// size for `n` heroes ([`pack_count`]): those it lacks laid out round its others, those past
+    /// it (grown for heroes since gone) taken away. A pack in a fight, beaten or kept by a secret
+    /// is left as it is; those of it fallen since the last rest count as there (they're back at
+    /// the next).
+    fn grow_packs(&mut self, n: usize) {
+        let Some(d) = self.dungeon_def().cloned() else { return };
+        if d.hero_foes <= 0.0 {
+            return;
+        }
+        for k in 0..self.content.packs.len() {
+            if self.content.packs[k].count < 2 {
+                continue; // (a lone foe never grows)
+            }
+            let want = pack_count(&self.content.packs[k], &d, &self.content, n);
+            if !self.pack_wanted(k) || self.lasting_pack(k) {
+                continue;
+            }
+            let members: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.pack == Some(k) && m.health > 0 && m.form_of.is_none()).map(|(id, _)| *id).collect();
+            let at_rest = members.iter().all(|id| {
+                let m = &self.mobs[id];
+                matches!(m.state, mobs::MobState::Idle { .. }) && m.health >= m.max_health && !m.hidden
+            });
+            if members.is_empty() || !at_rest {
+                continue;
+            }
+            let fallen = self.below.as_ref().unwrap().fallen.iter().filter(|f| f.2 == Some(k)).count();
+            let have = members.len() + fallen;
+            if have < want {
+                let Some(def) = self.content.mob(&self.content.packs[k].mob) else { continue };
+                // Round where the others stand (a wanderer's at the spot it took this time).
+                let mid = members.iter().fold([0.0f32; 3], |a, id| {
+                    let p = self.mobs[id].home;
+                    [a[0] + p[0], a[1] + p[1], a[2] + p[2]]
+                });
+                let c = members.len() as f32;
+                let mid = [mid[0] / c, mid[1] / c];
+                for i in have..want {
+                    let at = self.member_spot(k, mid, i, want);
+                    self.spawn_mob(def, at, Some(k), false);
+                }
+            } else if have > want {
+                let mut extra = have - want;
+                // The fallen first (they'd only come back at the rest), then the farthest out.
+                let b = self.below.as_mut().unwrap();
+                while extra > 0 {
+                    let Some(i) = b.fallen.iter().rposition(|f| f.2 == Some(k)) else { break };
+                    b.fallen.remove(i);
+                    extra -= 1;
+                }
+                for id in members.into_iter().rev().take(extra) {
+                    self.mobs.remove(&id);
+                    self.events.push(Event::MobGone { id });
+                }
+            }
+        }
+    }
+}
+
+/// How many foes a pack has for `heroes` below: `hero_foes` more for each past the first, in a
+/// pack of two or more that's neither a boss's nor an elite's (rounded); any other as it is.
+pub fn pack_count(p: &crate::content::PackDef, d: &DungeonDef, content: &crate::content::Content, heroes: usize) -> usize {
+    if p.count < 2 || p.elite || d.hero_foes <= 0.0 || p.rare {
+        return p.count;
+    }
+    if content.mob(&p.mob).is_none_or(|m| {
+        let m = &content.mobs[m];
+        m.boss || m.critter || m.inert()
+    }) {
+        return p.count;
+    }
+    (p.count as f32 * (1.0 + d.hero_foes * heroes.saturating_sub(1) as f32)).round() as usize
 }
 
 /// The look of resting at a lamp (a soft glow).
