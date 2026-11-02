@@ -262,6 +262,7 @@ local FRAME_RECTS = {
 }
 L.FRAME_RECTS = FRAME_RECTS
 local CARD_RECTS = Even(256, 48)
+L.CARD_RECTS = CARD_RECTS
 
 -- A three-slice across: caps `capPx` wide in the art (`tw` wide), drawn `h` tall; the caps keep
 -- their shape at any height.
