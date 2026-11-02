@@ -361,6 +361,14 @@ BS	Warlord Gorzak	900	1200	0
 BS	Warlord Gorzak	500	1200	1
 BS	Warlord Gorzak	480	1200	1	150	300	0
 BS	Warlord Gorzak	460	1200	1	270	300	0
+# The bars over heads (V): the client's plates, anonymous WorldFrame children (border, glow, name...,
+# the health bar their child). The champion's posture hangs under his plate and no other, with the
+# bars at the top put away too; a plate gone to another unit loses it.
+!local function plate(name) local f = CreateFrame("Button", nil, WorldFrame) f:SetWidth(120) f:SetHeight(30) f:SetPoint("CENTER", WorldFrame, "CENTER", 0, 0) local b = f:CreateTexture(nil, "BORDER") b:SetTexture("Interface\\Tooltips\\Nameplate-Border") f:CreateTexture(nil, "BORDER") local n = f:CreateFontString(nil, "ARTWORK") n:SetFont("Fonts\\FRIZQT__.TTF", 12) n:SetText(name) local h = CreateFrame("StatusBar", nil, f) h:SetWidth(100) h:SetHeight(8) h:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 4, 4) return f end PLATE_GRUNT = plate("Warsong Grunt") PLATE_BOSS = plate("Warlord Gorzak")
+!local w = ElwynnSurvival.boss.plateWatch this = w arg1 = 0.2 w:GetScript("OnUpdate")() local bar = ElwynnSurvival.boss.plate table.insert(SAID, "plate posture: " .. tostring(bar:IsShown()) .. " on the champion's " .. tostring(bar:GetParent() == PLATE_BOSS) .. " width " .. tostring(bar:GetWidth()) .. " filled " .. string.format("%.2f", bar.shown))
+!ElwynnSurvivalSettings.noTopBars = 1 ElwynnSurvival.PlaceTopBars() local w = ElwynnSurvival.boss.plateWatch this = w arg1 = 0.2 w:GetScript("OnUpdate")() table.insert(SAID, "top bars away: boss bar seen " .. tostring(ElwynnSurvivalBoss:IsVisible()) .. ", plate posture " .. tostring(ElwynnSurvival.boss.plate:IsShown()))
+!ElwynnSurvival.DrawKeys() table.insert(SAID, "menu: bars at the top " .. tostring(ElwynnSurvival.card.topBars.label:GetText())) ElwynnSurvival.card:Hide() ElwynnSurvivalSettings.noTopBars = nil ElwynnSurvival.PlaceTopBars()
+!local r1, r2, n = PLATE_BOSS:GetRegions() n:SetText("Defias Pirate") local w = ElwynnSurvival.boss.plateWatch this = w arg1 = 0.2 w:GetScript("OnUpdate")() table.insert(SAID, "plate to another: posture " .. tostring(ElwynnSurvival.boss.plate:IsShown())) n:SetText("Warlord Gorzak") PLATE_GRUNT:Hide() PLATE_BOSS:Hide()
 BS	Warlord Gorzak	440	1200	1	0	300	1
 !table.insert(SAID, "boss bar: " .. tostring(ElwynnSurvivalBoss:IsShown()) .. " " .. tostring(ElwynnSurvival.boss.name:GetText()))
 # Trading blows with the champion: one bar for him, not two; another foe goes under his.

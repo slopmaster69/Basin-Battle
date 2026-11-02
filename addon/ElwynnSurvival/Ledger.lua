@@ -818,7 +818,7 @@ local function SkinCard()
   end
   -- Every button the same wooden plate (the floor markers and the mouse's - and + kept the old
   -- dark one, and inked on it they read as switched off).
-  for _, k in ipairs({ "switch", "reset", "middle", "where", "size", "marks", "slower", "faster", "close" }) do
+  for _, k in ipairs({ "switch", "reset", "middle", "where", "size", "marks", "topBars", "slower", "faster", "close" }) do
     Button(c[k], true)
   end
   InkAll(c)

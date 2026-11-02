@@ -3000,7 +3000,17 @@ local function TopY()
   return (ES.VitalsWhere() == "corner") and -118 or -38
 end
 
-local foe = CreateFrame("Frame", "ElwynnSurvivalFoe", UIParent)
+-- The bars across the top (the locked-on foe's and a champion's) under one holder, so the menu
+-- can put them away for those who fight by the bars over heads (V) alone.
+ES.topBars = CreateFrame("Frame", "ElwynnSurvivalTopBars", UIParent)
+ES.topBars:SetAllPoints(UIParent)
+function ES.TopBarsOn()
+  return not (ElwynnSurvivalSettings and ElwynnSurvivalSettings.noTopBars)
+end
+function ES.PlaceTopBars()
+  if ES.TopBarsOn() then ES.topBars:Show() else ES.topBars:Hide() end
+end
+local foe = CreateFrame("Frame", "ElwynnSurvivalFoe", ES.topBars)
 foe:SetWidth(440)
 foe:SetHeight(30)
 foe:SetPoint("TOP", UIParent, "TOP", 0, -38)
@@ -3196,7 +3206,7 @@ end
 
 -- --- a champion's bar, across the top ---------------------------------------------------------
 
-local boss = CreateFrame("Frame", "ElwynnSurvivalBoss", UIParent)
+local boss = CreateFrame("Frame", "ElwynnSurvivalBoss", ES.topBars)
 boss:SetWidth(600)
 boss:SetHeight(40)
 boss:SetPoint("TOP", UIParent, "TOP", 0, -38)
@@ -3244,7 +3254,8 @@ boss.posture.mid:SetVertexColor(FRAME.r, FRAME.g, FRAME.b, 0.95)
 boss.posture.shown, boss.posture.goal, boss.posture.flash = 0, 0, 0
 function boss.posture:Draw()
   local share = Clamp(self.shown, 0, 1)
-  local w = math.max(0.5, 180 * share)
+  local half = self.half or 180
+  local w = math.max(0.5, half * share)
   self.left:SetWidth(w)
   self.right:SetWidth(w)
   local r, g, b = 1, 0.72, 0.22
@@ -3258,8 +3269,8 @@ function boss.posture:Draw()
   if self.flash > GetTime() then
     local k = (self.flash - GetTime()) / 0.9
     r, g, b = 1, 0.9, 0.45 + 0.4 * k
-    self.left:SetWidth(180)
-    self.right:SetWidth(180)
+    self.left:SetWidth(half)
+    self.right:SetWidth(half)
     self.left:SetAlpha(0.5 + 0.5 * k)
     self.right:SetAlpha(0.5 + 0.5 * k)
   else
@@ -3278,6 +3289,100 @@ boss.posture:SetScript("OnUpdate", function()
   self:Draw()
 end)
 
+-- The same posture under the champion's bar over its head (V's health bars), for those who fight
+-- by those: its plate found among the client's (anonymous WorldFrame children, the plate border
+-- their first region, the name their third, the health bar their one child), as plate add-ons
+-- find them, by the champion's name. Eased and drawn on its own, so it goes on with the bars at
+-- the top put away. (In `boss`'s table, for the locals.)
+boss.plate = CreateFrame("Frame", nil, UIParent)
+boss.plate:SetWidth(100)
+boss.plate:SetHeight(4)
+boss.plate:Hide()
+boss.plate.track = Tex(boss.plate, "BACKGROUND", "bar")
+boss.plate.track:SetAllPoints(boss.plate)
+boss.plate.track:SetVertexColor(0.03, 0.03, 0.03, 0.8)
+boss.plate.left = Tex(boss.plate, "ARTWORK", "bar")
+boss.plate.left:SetPoint("TOPRIGHT", boss.plate, "TOP", 0, 0)
+boss.plate.left:SetPoint("BOTTOMRIGHT", boss.plate, "BOTTOM", 0, 0)
+boss.plate.right = Tex(boss.plate, "ARTWORK", "bar")
+boss.plate.right:SetPoint("TOPLEFT", boss.plate, "TOP", 0, 0)
+boss.plate.right:SetPoint("BOTTOMLEFT", boss.plate, "BOTTOM", 0, 0)
+boss.plate.mid = Tex(boss.plate, "OVERLAY", "diamond", 7, 7)
+boss.plate.mid:SetPoint("CENTER", boss.plate, "CENTER", 0, 0)
+boss.plate.mid:SetVertexColor(FRAME.r, FRAME.g, FRAME.b, 0.95)
+boss.plate.shown, boss.plate.goal, boss.plate.flash, boss.plate.half = 0, 0, 0, 50
+boss.plate.Draw = boss.posture.Draw
+boss.PLATE_BORDER = "Interface\\Tooltips\\Nameplate-Border"
+-- A plate's name and health bar, if `f` is a plate up now.
+function boss.ReadPlate(f)
+  if not f or not f.GetRegions or f:GetName() or not f:IsShown() then return nil end
+  local border, _, name = f:GetRegions()
+  if not (border and border.GetTexture and border:GetTexture() == boss.PLATE_BORDER) then return nil end
+  if not (name and name.GetText) then return nil end
+  return name:GetText(), f:GetChildren()
+end
+-- The champion's plate (the one it's on, if that's still its), else nil.
+function boss.FindPlate()
+  local on = boss.plate.on
+  if on and boss.ReadPlate(on) == boss.who then return on end
+  if not WorldFrame or not WorldFrame.GetChildren then return nil end
+  local kids = { WorldFrame:GetChildren() }
+  for i = 1, table.getn(kids) do
+    if kids[i] ~= on and boss.ReadPlate(kids[i]) == boss.who then return kids[i] end
+  end
+  return nil
+end
+-- Under the plate's health bar, its width, or put away.
+function boss.HangPlate()
+  local pb, bar = boss.posture, boss.plate
+  local plate = boss.who and pb:IsShown() and boss.FindPlate()
+  if not plate then
+    bar.on = nil
+    bar:Hide()
+    return
+  end
+  if bar.on ~= plate then
+    bar.on = plate
+    local _, health = boss.ReadPlate(plate)
+    bar:SetParent(plate)
+    bar:SetFrameLevel(plate:GetFrameLevel() + 3)
+    bar:ClearAllPoints()
+    local w = (health and health:GetWidth() or 0)
+    if w < 8 then w = math.max(40, (plate:GetWidth() or 100) - 20) end
+    bar:SetWidth(w)
+    bar:SetHeight(math.max(3, math.min(6, ((health and health:GetHeight()) or 8) * 0.45)))
+    bar.half = w / 2
+    bar.shown = pb.goal
+    if health then
+      -- Lined up with the health bar, just under the plate's border (which wraps the health
+      -- bar a little way above the plate's foot), not on it.
+      local hb, pb2 = health:GetBottom(), plate:GetBottom()
+      local drop = (hb and pb2 and hb > pb2) and (hb - pb2) or 0
+      bar:SetPoint("TOPLEFT", health, "BOTTOMLEFT", 0, -drop - 1)
+    else
+      bar:SetPoint("TOP", plate, "BOTTOM", 0, 0)
+    end
+  end
+  bar:Show()
+end
+-- Always running (the bar itself, hidden, runs nothing): a look for the plate a few times a
+-- second, and the bar eased like the one at the top.
+boss.plateWatch = CreateFrame("Frame", nil, UIParent)
+boss.plateWatch:SetScript("OnUpdate", function()
+  this.t = (this.t or 0) + (arg1 or 0)
+  if this.t >= 0.1 then
+    this.t = 0
+    boss.HangPlate()
+  end
+  local bar, pb = boss.plate, boss.posture
+  if not bar:IsShown() then return end
+  bar.goal, bar.flash = pb.goal, pb.flash
+  local d = bar.goal - bar.shown
+  local rate = d > 0 and 6 or 2.5
+  bar.shown = bar.shown + d * math.min(1, (arg1 or 0) * rate)
+  bar:Draw()
+end)
+
 -- BS: the champion fighting near: its name, health, most health, and whether it's in its second
 -- wind; nothing, none.
 function ES.BossLine(f)
@@ -3285,6 +3390,7 @@ function ES.BossLine(f)
   if not name or name == "" or not hp or not maxhp then
     boss:Hide()
     boss.who, boss.most = nil, nil
+    boss.HangPlate()
     ES.DrawFoe()
     return
   end
@@ -5095,6 +5201,8 @@ function ES.HideChrome()
       f:SetParent(holder)
     end
   end
+  -- The bars across the top as the menu has them.
+  if ES.PlaceTopBars then ES.PlaceTopBars() end
   -- Health bars over everyone's heads in place of the portraits (unless V has turned them off).
   if ElwynnSurvivalSettings and ElwynnSurvivalSettings.noBars then
     if HideNameplates then pcall(HideNameplates) end
@@ -5836,6 +5944,15 @@ card.marks = MakeButton(card, 130, 24, "", GOLD, function()
   ES.DrawKeys()
 end)
 card.Place(card.marks, card.Setting(2, 2, "Floor markers"))
+-- The foe's and a champion's bars across the top; hidden, the bars over heads (V) are the ones
+-- to go by (a champion's posture under its own).
+card.topBars = MakeButton(card, 130, 24, "", GOLD, function()
+  local set = Settings()
+  if set.noTopBars then set.noTopBars = nil else set.noTopBars = 1 end
+  ES.PlaceTopBars()
+  ES.DrawKeys()
+end)
+card.Place(card.topBars, card.Setting(2, 3, "Bars at the top"))
 card.where = MakeButton(card, 130, 24, "", GOLD, function()
   local set = Settings()
   if ES.VitalsWhere() == "corner" then set.vitals = "hero" else set.vitals = "corner" end
@@ -6007,6 +6124,7 @@ function ES.DrawKeys()
   card.where.label:SetText((ES.VitalsWhere() == "corner") and "Top Left" or "By Hero")
   card.size.label:SetText(string.format("%d%%", math.floor(ES.VitalsScale() * 100 + 0.5)))
   card.marks.label:SetText(ES.MarksOn() and "Shown" or "Hidden")
+  card.topBars.label:SetText(ES.TopBarsOn() and "Shown" or "Hidden")
   card.mouseText:SetText(string.format("%d%%", math.floor(ES.MouseSpeed() * 100 + 0.5)))
 end
 
