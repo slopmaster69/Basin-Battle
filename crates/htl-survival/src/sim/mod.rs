@@ -732,6 +732,9 @@ pub struct Mob {
     pub retarget_at: f32,
     /// A raider at a station struck by this hero: it ends the string it's in and turns on them.
     pub drawn_off: Option<Id>,
+    /// Called up by this creature in its fight (a boss's adds, at a turn): it goes when that
+    /// fight ends, its own or the boss's, instead of standing where the boss stood.
+    pub summoned_by: Option<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -677,6 +677,58 @@ fn a_boss_turns_at_each_of_its_phases_harder_and_quicker_each_time() {
 }
 
 #[test]
+fn a_bosss_adds_go_when_its_fight_ends_with_its_heroes_fallen_but_not_when_it_falls() {
+    use crate::content::EnrageDef;
+    let mut c = content();
+    let w = c.mob("warlord").unwrap();
+    c.mobs[w].enrage = None;
+    c.mobs[w].posture = 0;
+    let summon = vec!["grunt".to_string(), "grunt".to_string()];
+    c.mobs[w].phases = vec![EnrageDef { at: 0.75, speed: 1.0, pattern: String::new(), text: String::new(), summon, might: 1.0, kit: 0, look: 0, sound: 0, shove: 0.0 }];
+    // The boss at its first turn, its two adds called up on the hero.
+    let fight = |c: Content| {
+        let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+        let id = s.join("ayla", "Ayla", None);
+        s.move_player(id, [95.0, 0.0, 0.0], 0.0, Moving::default());
+        let boss = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "warlord").unwrap().0;
+        s.engage(boss, mobs::Foe::Hero(id));
+        let max = s.mobs[&boss].max_health;
+        s.hurt_mob(boss, id, max - (0.7 * max as f32) as u32);
+        let adds: Vec<Id> = s.mobs.iter().filter(|(_, m)| m.summoned_by == Some(boss)).map(|(a, _)| *a).collect();
+        assert_eq!(adds.len(), 2, "two called up");
+        (s, id, boss, adds)
+    };
+    let (mut s, id, boss, adds) = fight(c.clone());
+    let others: Vec<Id> = s.mobs.keys().copied().filter(|m| *m != boss && !adds.contains(m)).collect();
+    assert!(!others.is_empty(), "the grunt on the way in");
+    // The hero falls: the fight's over, and its adds go at once, not home to where the boss stood.
+    s.hurt_player(id, 10_000);
+    let ev = run(&mut s, 1.0);
+    for a in &adds {
+        assert!(!s.mobs.contains_key(a), "an add gone");
+        assert!(ev.iter().any(|e| matches!(e, Event::MobGone { id } if id == a)), "and gone from the client");
+    }
+    for o in &others {
+        assert!(s.mobs.contains_key(o), "the dungeon's own stay");
+    }
+    // The boss itself goes home and stands whole, its turn to come again.
+    run(&mut s, 30.0);
+    let b = &s.mobs[&boss];
+    assert!(matches!(b.state, MobState::Idle { .. }), "{:?}", b.state);
+    assert_eq!((b.health, b.phase), (b.max_health, 0));
+    assert!(!s.mobs.values().any(|m| m.summoned_by == Some(boss)), "none left");
+
+    // The boss felled with its adds still up: they fight on.
+    let (mut s, id, boss, adds) = fight(c);
+    s.hurt_mob(boss, id, 1_000_000);
+    run(&mut s, 1.0);
+    for a in &adds {
+        let m = &s.mobs[a];
+        assert!(m.health > 0 && m.state.target() == Some(id), "{:?}", m.state);
+    }
+}
+
+#[test]
 fn a_secret_form_rises_from_a_fallen_boss_only_once_its_secret_is_found() {
     let mut c = content();
     let w = c.mob("warlord").unwrap();

@@ -342,6 +342,7 @@ impl Survival {
                 threat: Vec::new(),
                 retarget_at: 0.0,
                 drawn_off: None,
+                summoned_by: None,
             },
         );
         // An ambusher lies unseen until a hero comes near (or its chest is opened).
@@ -747,6 +748,7 @@ impl Survival {
             let s = self.spawn_mob(sd, p, None, false);
             if let Some(m) = self.mobs.get_mut(&s) {
                 m.home = at;
+                m.summoned_by = Some(mid);
             }
             self.events.push(Event::Visual { id: s, kit: combat::KIT_DUST, by: None });
             self.engage(s, foe);
@@ -1515,6 +1517,30 @@ impl Survival {
         }
     }
 
+    /// A creature called up in a fight goes, out of the world: its wind-up's mark and what it
+    /// had in the air with it.
+    fn dismiss(&mut self, id: Id) {
+        let Some(m) = self.mobs.remove(&id) else { return };
+        if let MobState::Windup { mark: Some(mk), .. } = m.state {
+            self.unmark(mk);
+        }
+        let marks: Vec<Id> = self.missiles.iter().filter(|x| x.owner == id && x.mark != 0).map(|x| x.mark).collect();
+        self.missiles.retain(|x| x.owner != id);
+        for mk in marks {
+            self.unmark(mk);
+        }
+        self.events.push(Event::MobGone { id });
+    }
+
+    /// A boss's fight is over (its heroes fell or left, or it was drawn past its leash): what it
+    /// called up still standing goes with it. The fallen lie where they fell.
+    fn dismiss_adds(&mut self, boss: Id) {
+        let adds: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.summoned_by == Some(boss) && !matches!(m.state, MobState::Dead { .. })).map(|(id, _)| *id).collect();
+        for id in adds {
+            self.dismiss(id);
+        }
+    }
+
     /// It lets its foe go and heads home.
     fn give_up(&mut self, id: Id) {
         self.show_guard(id, false);
@@ -1585,6 +1611,13 @@ impl Survival {
                 }
             }
             MobState::Return => {
+                // Called up in a fight that's over: it doesn't walk back to where the boss stood,
+                // it goes. And a boss heading home takes its adds with it.
+                if self.mobs[&id].summoned_by.is_some() {
+                    self.dismiss(id);
+                    return;
+                }
+                self.dismiss_adds(id);
                 // (Home on its own floor: not stopped short under the deck it lives on.)
                 if self.at_home(pos, home) {
                     self.halt(id);
