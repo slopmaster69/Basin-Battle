@@ -204,9 +204,12 @@ flank = true
 # Its cooldown between strings, give or take this share: no metronome to learn.
 jitter = 0.25
 # Every foe's leash (its own `leash`, how far from home it chases) times this, in the open and
-# below. (Play-test: foes ran home too soon, a fight barely begun; half as far again. A wager's
-# farther chase is the farther of this and its own, not both.)
-leash_scale = 1.5
+# below. (Play-test: foes ran home far too soon; four times. Most leashes are 30 yards, so about
+# 120: a dungeon's packs stand 15 to 40 yards from the next (25 the middle, up to 95 in the
+# Wailing Caverns' long caves), so a pack follows you through two or three rooms, into the next
+# pack's, before it gives up. A wager's farther chase, 1.75, is the farther of this and its own:
+# this one, now.)
+leash_scale = 4.0
 
 # Each grip's blows. `clip` is the game's own animation (AnimationData id) and `take` which of the
 # model's versions of it; `windup` and `recovery` are shares of the weapon's own times, `damage`

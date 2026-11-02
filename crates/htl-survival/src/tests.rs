@@ -493,7 +493,8 @@ fn creatures_call_their_neighbours_and_give_up_past_their_leash() {
     assert!(matches!(s.mobs[&b].state, MobState::Chase { .. }), "the neighbour joins in");
     assert!(matches!(s.mobs[&far].state, MobState::Idle { .. }), "one far off doesn't");
     // Run off: past its leash it turns back.
-    for k in 0..200 {
+    let steps = ((s.leash_of(def) + 60.0) * 2.0) as usize;
+    for k in 0..steps {
         s.move_player(p, [-(k as f32) * 0.5, 0.0, 0.0], 0.0, Moving::default());
         let _ = s.step(DT);
     }
