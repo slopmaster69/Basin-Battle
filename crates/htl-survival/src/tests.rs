@@ -2415,6 +2415,59 @@ fn enough_damage_quickly_breaks_a_champions_stance() {
 }
 
 #[test]
+fn a_group_needs_more_to_break_a_champion_and_it_stands_back_up_before_it_can_break_again() {
+    let mut s = world();
+    // The game's own scaling (a dev build has none).
+    s.content.combat.hero_health = 0.7;
+    let heroes: Vec<Id> = (0..4).map(|k| hero(&mut s, &format!("Hero{k}"), [0.0, k as f32 * 1.5, 0.0], 0.0)).collect();
+    let w = mob(&mut s, "warlord", [3.0, 2.0, 0.0]);
+    s.engage(w, Foe::Hero(heroes[0]));
+    run(&mut s, 0.1);
+    assert_eq!(s.mobs[&w].fighters, 4, "all four in its fight");
+    let limit = s.content.mobs[s.mobs[&w].def].posture;
+    // A blow that would just break it for a lone hero (the weapon's own posture counted) no
+    // longer does with four on it.
+    s.content.combat.recovery_posture = 1.0;
+    let heft = s.weapon_of(&s.players[&heroes[0]]).posture.max(1.0);
+    s.hurt_mob(w, heroes[0], (limit as f32 / heft).ceil() as u32 + 1);
+    let ev = s.step(0.0);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")), "a group needs more");
+    run(&mut s, 3.0);
+    // Enough breaks it...
+    for h in &heroes {
+        s.hurt_mob(w, *h, limit);
+    }
+    let ev = s.step(0.0);
+    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")), "broken");
+    // ...and the beating it takes while it reels and just after doesn't break it again.
+    let mut broken_again = false;
+    for _ in 0..(5.0 / 0.25) as usize {
+        for h in &heroes {
+            s.hurt_mob(w, *h, limit / 4);
+        }
+        let ev = run(&mut s, 0.25);
+        broken_again |= ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!"));
+    }
+    assert!(!broken_again, "it stands back up before it can be broken again");
+}
+
+#[test]
+fn a_champion_whose_foe_falls_turns_on_the_next_hero_in_its_fight() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [0.0, 4.0, 0.0], 0.0);
+    let w = mob(&mut s, "warlord", [3.0, 0.0, 0.0]);
+    s.engage(w, Foe::Hero(a));
+    s.hurt_mob(w, b, 5);
+    run(&mut s, 0.2);
+    assert_eq!(s.mobs[&w].state.target(), Some(a));
+    // Ayla falls.
+    s.fall_damage(a, 10_000);
+    run(&mut s, 0.5);
+    assert_eq!(s.mobs[&w].state.target(), Some(b), "on to Bren, not home: {:?}", s.mobs[&w].state);
+}
+
+#[test]
 fn a_creatures_wind_up_marks_its_blow_with_its_true_reach_arc_and_timing() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
