@@ -108,6 +108,12 @@ impl Survival {
         if !self.alive(victim) || self.immune(victim) || self.unstaggerable(victim) {
             return;
         }
+        // A boss, a totem, a creature winding up a blow no guard stops: not moved (an ultimate's
+        // aside).
+        if !e.vs_bosses && self.holds_ground(victim) {
+            self.shrugged_off(owner, victim);
+            return;
+        }
         if self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].inert()) {
             return;
         }
@@ -151,13 +157,14 @@ impl Survival {
             self.events.push(Event::Hop { player: victim, dir, speed: moved / air, lift, roll: false, style: "" });
         } else {
             self.stagger_mob(victim, air + 0.15, false);
-            self.flee_to(victim, to, moved / air);
+            self.throw_mob(victim, to, air, Some(owner));
         }
     }
 
     // --- a veil (Vanish) -----------------------------------------------------------------------------
 
-    /// Veiled: every lock on them lets go, and the creatures after them lose them.
+    /// Veiled: every lock on them lets go, and the creatures after them lose them. Not a boss: a
+    /// champion in its fight keeps it (a veil never resets one, nor empties its fight).
     pub(crate) fn veiled(&mut self, id: Id) {
         let now = self.clock;
         let lockers: Vec<Id> = self.players.iter().filter(|(h, p)| **h != id && p.lock == Some(id)).map(|(h, _)| *h).collect();
@@ -165,7 +172,12 @@ impl Survival {
             self.players.get_mut(&h).unwrap().lock = None;
             self.events.push(Event::Lock { player: h, target: None });
         }
-        let hunters: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.health > 0 && m.state.foe() == Some(mobs::Foe::Hero(id))).map(|(m, _)| *m).collect();
+        let hunters: Vec<Id> = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.health > 0 && m.state.foe() == Some(mobs::Foe::Hero(id)) && !self.content.mobs[m.def].boss)
+            .map(|(m, _)| *m)
+            .collect();
         for m in hunters {
             self.halt_mob(m);
             if let Some(mob) = self.mobs.get_mut(&m) {
@@ -188,6 +200,11 @@ impl Survival {
     /// Hidden from creatures (veiled).
     pub(crate) fn unseen(&self, id: Id) -> bool {
         self.has_cc(id, "veil")
+    }
+
+    /// Hidden from this creature: veiled, and it's no boss (a champion sees through a veil).
+    pub(crate) fn unseen_by(&self, mob: Id, hero: Id) -> bool {
+        self.unseen(hero) && !self.mobs.get(&mob).is_some_and(|m| self.content.mobs[m.def].boss)
     }
 
     // --- leaps ----------------------------------------------------------------------------------------

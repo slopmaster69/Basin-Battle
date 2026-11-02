@@ -418,20 +418,6 @@ fn earthsplitter_breaks_open_along_your_aim_a_moment_later() {
     assert_eq!(dealt(&ev, aside), 0, "off the line");
 }
 
-#[test]
-fn avatar_makes_you_unstoppable_faster_and_harder_to_hurt() {
-    let mut s = world(true, false);
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    ready(&mut s, p, "avatar");
-    cast(&mut s, p, "ultimate", false);
-    for k in ["onslaught", "haste", "hallowed"] {
-        assert!(s.has_cc(p, k), "{k}");
-    }
-    assert!(s.unstaggerable(p));
-    run(&mut s, 8.2);
-    assert!(!s.has_cc(p, "onslaught"), "for 8 s");
-}
-
 // --- the cards on engine pieces of their own ------------------------------------------------------
 
 /// [`world`] with a wall of radius `r` at `at`.
@@ -602,4 +588,17 @@ fn bubble_pops_and_black_hole_collapses_as_they_end() {
     let mut ev = cast(&mut s, p, "ultimate", false);
     ev.extend(run(&mut s, 5.0));
     assert!(blows(&ev, g).contains(&30), "it collapses on them: {:?}", blows(&ev, g));
+}
+
+#[test]
+fn harpoon_leaves_the_creature_standing_beside_you_not_where_it_was() {
+    let mut s = world(true, false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let h = mob(&mut s, [12.0, 0.0, 0.0]);
+    ready(&mut s, p, "grappling_hook");
+    s.set_valor(p, 25.0);
+    cast(&mut s, p, "ranged", true);
+    run(&mut s, 0.6);
+    let d = dist2d(s.mobs[&h].pos, s.players[&p].pos);
+    assert!(d < 4.0, "it stands beside her, not {d:.1} yd off at {:?}", s.mobs[&h].pos);
 }

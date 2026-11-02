@@ -841,11 +841,14 @@ fn the_action_combat_client_gets_its_clips_impacts_and_rolls_and_others_the_emot
     assert!(impact.starts_with(&format!("IM\t{ag:#X}\t{bg:#X}\tlight\thit\t1\t0")), "{impact}");
     assert!(b.seen.iter().any(|p| matches!(p, ServerPacket::Emote { guid, .. } if *guid == ag)), "ben sees the emote");
     assert!(!addon_lines(&b, "ES").iter().any(|l| l.starts_with("AN\t") || l.starts_with("IM\t")), "and no clips");
-    // A heavy attack: Special1H.
+    // A heavy attack: every hero's is the Undead man's overhead (Attack1H's third take), whatever
+    // their race.
     a.chat(".es in h");
     a.chat(".es in au");
     a.drain(1.6);
-    assert!(addon_lines(&a, "ES").iter().any(|l| l.starts_with(&format!("AN\t{ag:#X}\t57\t"))), "the heavy attack's clip");
+    let heavy = addon_lines(&a, "ES").into_iter().find(|l| l.starts_with(&format!("AN\t{ag:#X}\t17\t")) && l.contains("\theavy\t")).expect("the heavy attack's clip");
+    let h: Vec<&str> = heavy.split('\t').collect();
+    assert_eq!((h[7], h[12]), ("2", "ScourgeMale"), "{heavy}");
     // Ben dodges: Ann sees him roll.
     a.drain(1.0);
     b.chat(".es in d");
@@ -880,7 +883,7 @@ fn the_third_round_client_gets_its_blows_reactions_lock_on_and_runs_its_own_dodg
     let f: Vec<&str> = mv.split('\t').collect();
     assert_eq!(f[1], "0", "one-handed");
     assert_eq!(f[10].split('^').count(), 3, "three light blows: {mv}");
-    assert!(f[10].starts_with("17~0~") && f[13].starts_with("59~") && f[14].starts_with("95~"), "{mv}");
+    assert!(f[10].starts_with("17~1~") && f[13].starts_with("59~") && f[14].starts_with("95~"), "{mv}");
     let ping = lines.iter().find(|l| l.starts_with("PI\t")).cloned().expect("a ping");
     a.chat(&format!(".es po {}", &ping[3..]));
     // Ann's light blow: the clip, its take, recovery, lunge and kind.
@@ -896,7 +899,7 @@ fn the_third_round_client_gets_its_blows_reactions_lock_on_and_runs_its_own_dodg
     let lines = addon_lines(&a, "ES");
     let swing = lines.iter().find(|l| l.starts_with(&swung)).cloned().expect("ann's swing");
     let f: Vec<&str> = swing.split('\t').collect();
-    assert_eq!((f[6], f[7], f[10], f[11]), ("1", "0", "light", "0"), "{swing}");
+    assert_eq!((f[6], f[7], f[10], f[11]), ("1", "1", "light", "0"), "{swing}");
     assert!(f[9].parse::<f32>().unwrap() > 0.0, "a lunge");
     // Ben flinches back from it, on both screens; his own marked his.
     assert!(flinch(&a, "\t0\t0.00"), "ann sees ben flinch: {:?}", lines.iter().filter(|l| l.starts_with("RE\t")).collect::<Vec<_>>());
@@ -1008,7 +1011,7 @@ fn the_rules_are_tuned_in_play_and_everyone_gets_the_new_blows() {
     a.chat(".es tune moveset.one_hand.light.0.lunge 1.2");
     a.drain(0.5);
     let mv = addon_lines(&a, "ES").into_iter().rfind(|l| l.starts_with("MV\t")).unwrap();
-    assert!(mv.split('\t').nth(10).unwrap().starts_with("17~0~0.380~0.480~1.20"), "{mv}");
+    assert!(mv.split('\t').nth(10).unwrap().starts_with("17~1~0.380~0.480~1.20"), "{mv}");
 }
 
 #[test]
@@ -1722,7 +1725,7 @@ fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing
     // The newest add-on on the newest client: not a word.
     let mut d = Client::connect(server.login, "wren", "hold", REALM).unwrap();
     enter(&mut d);
-    d.chat(".es hello 8 ac10");
+    d.chat(".es hello 9 ac10");
     assert!(d.until(2.0, |d| addon_lines(d, "ES").iter().any(|l| l.starts_with("V\t"))), "awake");
     d.drain(0.5);
     assert!(!told(&d), "nothing to update");
