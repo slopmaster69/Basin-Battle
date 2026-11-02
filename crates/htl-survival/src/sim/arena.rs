@@ -121,23 +121,23 @@ impl Survival {
         if fresh {
             self.arena = Arena { heroes: self.arena.heroes.clone(), timer: a.first_gap, ..Arena::default() };
             let best = self.arena_best();
-            let record = if best > 0 { format!("; the camp's best is wave {best}") } else { String::new() };
+            let record = if best > 0 { format!(". The camp's best is wave {best}") } else { String::new() };
             self.events.push(Event::Banner {
                 player: Some(id),
                 title: a.page.clone(),
-                sub: format!("The first wave in {} seconds{record}", a.first_gap as u32),
+                sub: format!("First wave in {} sec{record}", a.first_gap as u32),
             });
-            self.tell(id, format!("{}: they come in waves that never end, more and tougher every time, a champion every {}th. Fall and you get up at the camp, nothing lost; the banner behind you takes you home.", a.page.clone(), a.boss_every));
+            self.tell(id, format!("{} sends endless waves, larger and tougher each time, with a champion every {}th wave. If you fall, you respawn at the camp and lose nothing. Use the banner behind you to go home.", a.page.clone(), a.boss_every));
         } else {
             let now = if self.arena.fighting {
                 format!("Wave {} under way", self.arena.wave)
             } else {
-                format!("Wave {} in {} seconds", self.arena.wave + 1, self.arena.timer.ceil() as u32)
+                format!("Wave {} in {} sec", self.arena.wave + 1, self.arena.timer.ceil() as u32)
             };
             self.events.push(Event::Banner { player: Some(id), title: a.page.clone(), sub: now });
             for h in self.arena.heroes.clone() {
                 if h != id {
-                    self.tell(h, format!("{name} joins you in the ring."));
+                    self.tell(h, format!("{name} joined you in the ring."));
                 }
             }
         }
@@ -161,17 +161,17 @@ impl Survival {
                 let at = self.landing_spot(self.ground(w.spawn[0], w.spawn[1]));
                 self.put_at(id, at, w.spawn_facing);
                 self.land_from_far(id);
-                self.tell(id, format!("You leave {} {reached}, and make your way back to the camp.", a.name));
+                self.tell(id, format!("You left {} {reached} and returned to the camp.", a.name));
             }
-            Exit::Fell => self.tell(id, format!("You fall in {} {reached}. Nothing you carried is lost: you'll get up at the camp.", a.name)),
-            Exit::Strayed => self.tell(id, format!("You've walked out of {}: your run's over, {reached}.", a.name)),
+            Exit::Fell => self.tell(id, format!("You fell in {} {reached}. Nothing you carried is lost. You'll respawn at the camp.", a.name)),
+            Exit::Strayed => self.tell(id, format!("You walked out of {}. Your run ended {reached}.", a.name)),
             Exit::Gone => {}
         }
         if !name.is_empty() {
             for h in self.arena.heroes.clone() {
                 let why = match how {
-                    Exit::Fell => "falls",
-                    _ => "leaves the ring",
+                    Exit::Fell => "fell",
+                    _ => "left the ring",
                 };
                 self.tell(h, format!("{name} {why}."));
             }
@@ -209,7 +209,7 @@ impl Survival {
             return Err("You're not in the ring.".into());
         }
         if self.arena.fighting {
-            return Err("A wave's already on you.".into());
+            return Err("A wave is already under way.".into());
         }
         self.arena.timer = 0.0;
         Ok(())
@@ -365,13 +365,13 @@ impl Survival {
                 }
             }
             self.events.push(Event::Storage);
-            paid = format!("; into the camp's chest: {}", self.cost_text(&a.reward));
+            paid = format!(". Sent to storage: {}", self.cost_text(&a.reward));
         }
         for h in self.arena.heroes.clone() {
             self.events.push(Event::Banner {
                 player: Some(h),
                 title: format!("Wave {wave} Beaten"),
-                sub: format!("Wave {} in {} seconds{paid}", wave + 1, a.gap as u32),
+                sub: format!("Wave {} in {} sec{paid}", wave + 1, a.gap as u32),
             });
         }
         self.count("arena", "wave", 1);
@@ -385,7 +385,7 @@ impl Survival {
                     1 => names[0].clone(),
                     n => format!("{} and {}", names[..n - 1].join(", "), names[n - 1]),
                 };
-                self.announce(format!("{who} beat wave {wave} in {}: the camp's best yet.", a.name));
+                self.announce(format!("{who} beat wave {wave} in {}, the camp's best yet.", a.name));
             }
         }
         self.events.push(Event::Dirty);

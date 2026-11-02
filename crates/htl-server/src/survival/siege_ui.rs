@@ -55,7 +55,7 @@ impl SurvivalGame {
                 return;
             }
             let list: Vec<String> = modes.iter().map(|m| format!(".siege join {} ({}, {} of {})", m.key, m.name, m.heroes.len(), m.seats)).collect();
-            self.say_to(conn, &format!("The Siege Muster: {status}. {}; .siege start begins yours with whoever's waiting; .es travel camp goes home.", list.join("; ")));
+            self.say_to(conn, &format!("The Siege Muster: {status}. {}. Use .siege start to begin yours with whoever is waiting, or .es travel camp to go home.", list.join(", ")));
             return;
         }
         let ways: Vec<String> = modes
@@ -77,7 +77,7 @@ impl SurvivalGame {
                 return;
             }
             let list: Vec<String> = sends.iter().map(|s| format!(".siege send {} ({}, {} gold, +{} income)", s.key, s.name, s.cost, s.income)).collect();
-            self.say_to(conn, &format!("Mercenary Ledger: {gold} gold, {income} a wave; sends go to {to} (.siege target changes it). {}", list.join("; ")));
+            self.say_to(conn, &format!("Mercenary Ledger: {gold} gold, {income} a wave. Sends go to {to}. Use .siege target to change it. {}", list.join(", ")));
             return;
         }
         let list: Vec<String> = sends
@@ -94,7 +94,7 @@ impl SurvivalGame {
         let cards = self.sim.siege_trainer(id);
         if !self.has_addon(conn) {
             let list: Vec<String> = cards.iter().map(|(k, n, p, ..)| format!(".es craft {k} ({n}, {p} gold)")).collect();
-            self.say_to(conn, &format!("Battle Trainer: {}", if list.is_empty() { "you know every card of your class.".to_string() } else { list.join("; ") }));
+            self.say_to(conn, &format!("Battle Trainer. {}", if list.is_empty() { "You know every card of your class.".to_string() } else { list.join(", ") }));
             return;
         }
         let rows: Vec<String> = cards
@@ -131,7 +131,7 @@ impl SurvivalGame {
     /// `.siege ...`
     pub(super) fn siege_command(&mut self, conn: ConnId, me: Id, arg: &str, arg2: &str) -> Result<(), String> {
         if !self.sim.is_siege() {
-            return Err("Siege is played in Arathi Basin: read its page in the book at camp.".into());
+            return Err("Siege is played in Arathi Basin. Read its page in the book at camp.".into());
         }
         let said = match arg {
             "join" => self.sim.siege_join(me, &arg2.to_lowercase())?,
@@ -142,7 +142,7 @@ impl SurvivalGame {
             "ready" => self.sim.siege_ready(me)?,
             "" | "status" => {
                 let (status, secs) = self.sim.siege_status();
-                format!("{status}{}", if secs > 0.0 { format!(" ({secs:.0} s)") } else { String::new() })
+                format!("{status}{}", if secs > 0.0 { format!(" ({secs:.0} sec)") } else { String::new() })
             }
             other => self.sim.siege_join(me, other)?,
         };

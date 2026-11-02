@@ -3069,7 +3069,7 @@ fn the_building_ground_is_wide_ringed_by_torches_and_says_which_way_it_is() {
     // Past its north edge: which way it is, and how far.
     let out = [c[0] + w.build_radius + 20.0, c[1], 0.0];
     let why = s.site_problem(fire, out, None).unwrap();
-    assert!(why.contains("ringed by torches") && why.contains("south of here") && why.contains("yd"), "{why}");
+    assert!(why.contains("torch-ringed yard") && why.contains("south of here") && why.contains("yd"), "{why}");
 }
 
 // --- attacks out of a dodge and out of a Corey roll ----------------------------------------------
@@ -3295,7 +3295,7 @@ fn a_fall_is_recapped_with_who_struck_how_each_blow_caught_them_and_a_tip() {
     assert!(r.lines[0].starts_with(&format!("{grunt}'s heavy blow, through your guard (")), "the last blow first: {:?}", r.lines);
     assert!(r.lines[1].starts_with(&format!("{grunt}'s blow, around your guard (")), "{:?}", r.lines);
     assert!(r.lines[2].starts_with(&format!("{grunt}'s blow, unguarded (")), "{:?}", r.lines);
-    assert!(r.tip.contains("dodge"), "how to answer a broken guard: {}", r.tip);
+    assert!(r.tip.contains("Dodge"), "how to answer a broken guard: {}", r.tip);
 }
 
 #[test]

@@ -12,7 +12,7 @@ impl SurvivalGame {
     /// A dungeon's wager page: what it is, the levels open, the camp's best, the board's.
     pub(crate) fn ui_wager_page(&mut self, conn: ConnId, id: Id, dungeon: &str) -> Result<(), String> {
         let c = &self.sim.content;
-        let d = c.dungeons().find(|d| d.key == dungeon).cloned().ok_or("No such dungeon in the book: .es wager deadmines (or stockade, ...).")?;
+        let d = c.dungeons().find(|d| d.key == dungeon).cloned().ok_or("No such dungeon in the book. Try .es wager deadmines or .es wager stockade.")?;
         let most = self.sim.wager_unlocked(&d.key);
         let limit = wager_limit(&d, c);
         let (needed, total) = (wager_forces_needed(&d, c), wager_forces_total(&d, c));
@@ -20,13 +20,13 @@ impl SurvivalGame {
         let mut paras = vec![
             format!("The Bookmaker bets you can't clear {} before the sand runs out.", d.name),
             format!(
-                "Take a wager below and the dungeon starts fresh for your run: every boss up again, every secret hidden, every shortcut shut. At the first lamp, each of you says you're ready (the button on the clock, or .es ready). When everyone has, the clock starts after a short count, or at once if someone steps away from the lamp first. It stops when the last boss falls and enough of the dungeon's foes are down too: {needed} of its {total} for one hero, more for a band (every pack grows with the heroes below). Each death costs {}.",
+                "Take a wager below and the dungeon resets for your run. Every boss is back, every secret hidden and every shortcut shut. At the first lamp, each hero says they're ready with the button on the clock or .es ready. When everyone has, the clock starts after a short countdown, or at once if someone leaves the lamp first. It stops when the last boss dies and enough of the dungeon's enemies are dead too. That's {needed} of its {total} for 1 hero, and more for a group, since every pack grows with the heroes in the dungeon. Each death costs {}.",
                 clock_words(WAGER_DEATH)
             ),
-            "Foes chase much farther during a wager, so you can pull one pack into the next and fight them together. Big pulls are the quick way to the count.".to_string(),
-            "Beat the clock at your highest open wager and the next one opens. Finish with a fifth of the time to spare and you skip a level; with two-fifths to spare, two.".to_string(),
+            "Enemies chase much farther during a wager, so you can pull one pack into the next and fight them together. Big pulls are the fastest way to the count.".to_string(),
+            "Beat the clock at your highest open wager and the next one opens. Finish with 20% of the time to spare to skip a level, or 40% to skip 2.".to_string(),
             "Going home through a lamp takes you out of the run. Once everyone is out, the run is over and the dungeon is back as you left it.".to_string(),
-            "The higher the wager, the tougher the foes and the better the pay: plunder for everyone, and the dungeon's gear in the camp's chest, the finer pieces from +3. From +4 that gear comes honed, better than any foe's own: Honed at +4, Keen at +8, Peerless at +12.".to_string(),
+            "The higher the wager, the tougher the enemies and the better the pay. Everyone gets plunder, and the dungeon's gear is sent to storage, with finer pieces from +3. From +4 that gear comes honed, better than any enemy's own. It's Honed at +4, Keen at +8 and Peerless at +12.".to_string(),
         ];
         if most <= 1 {
             paras.push("Only +1 is open for now. Beat it in time to open +2.".to_string());
@@ -35,14 +35,14 @@ impl SurvivalGame {
         let wall = self.sim.wall();
         let terms: Vec<String> = TERM_LEVELS.iter().zip(week_terms(wall)).map(|(at, t)| format!("+{at} {}: {}", t.name, t.text)).collect();
         let next: Vec<String> = TERM_LEVELS.iter().zip(week_terms(wall + 7.0 * 86_400.0)).map(|(at, t)| format!("+{at} {}", t.name)).collect();
-        paras.push(format!("This week, as the stakes rise:\n{}\nNext week's (they change every Monday): {}.", terms.join("\n"), next.join(", ")));
+        paras.push(format!("This week, as the stakes rise:\n{}\nNext week's terms, which change every Monday: {}.", terms.join("\n"), next.join(", ")));
         let (bests, top) = self.board.as_ref().map_or((Vec::new(), Vec::new()), |b| {
             let b = b.lock().unwrap();
             (b.bests_here(&d.key), b.top(&d.key, 1))
         });
         if !bests.is_empty() {
             let list: Vec<String> = bests.iter().take(4).map(|(l, ms)| format!("+{l} in {}", clock_words(*ms as f32 / 1000.0))).collect();
-            paras.push(format!("Your camp's best in time: {}.", list.join("; ")));
+            paras.push(format!("Your camp's best in time: {}.", list.join(", ")));
         }
         if let Some(r) = top.first() {
             paras.push(format!("The board's best: +{} in {}, by {} of {}.", r.level, clock_words(r.ms as f32 / 1000.0), r.heroes(), r.host));
@@ -75,7 +75,7 @@ impl SurvivalGame {
             "solo" => Some("solo"),
             "duo" | "duos" => Some("duo"),
             "group" | "groups" => Some("group"),
-            _ => return Err("A board for solo, duo or group: .es board deadmines duo".into()),
+            _ => return Err("Try a board for solo, duo or group, as .es board deadmines duo".into()),
         };
         let (top, hosts, remote, synced, here) = {
             let b = board.lock().unwrap();
@@ -99,10 +99,10 @@ impl SurvivalGame {
         let reach = match (&remote, synced) {
             (None, _) => "this server keeps the board for everyone".to_string(),
             (Some(_), Some((at, true))) => format!("last word from the board's keeper {} ago", clock_words(at.elapsed().as_secs_f32())),
-            (Some(_), Some((_, false))) => "the board's keeper can't be reached just now: your runs wait to be sent".to_string(),
+            (Some(_), Some((_, false))) => "the board's keeper can't be reached right now, so your runs wait to be sent".to_string(),
             (Some(_), None) => "asking the board's keeper".to_string(),
         };
-        let place = format!("In time only, highest first, then quickest: {hosts} camp{} on it, {reach}", if hosts == 1 { "" } else { "s" });
+        let place = format!("In time only, highest first, then fastest. {hosts} camp{} on it, {reach}", if hosts == 1 { "" } else { "s" });
         // The board by party size: a duo's time and four heroes' are different feats.
         let mut links: Vec<(String, String)> = [(None, "Every party"), (Some("solo"), "Solo"), (Some("duo"), "Duos"), (Some("group"), "Groups of three or four")]
             .into_iter()
@@ -159,8 +159,8 @@ impl SurvivalGame {
         };
         // The camp's own best this week, and what the Bookmaker's chest will pay for it.
         let mine = match self.sim.week_best_here() {
-            Some((level, d)) => format!("Your camp's best this week: +{level} in {}. When the week turns, the Bookmaker's chest pays it: that dungeon's gear, more and finer the higher the level.", names.get(&d).unwrap_or(&d)),
-            None => "Win a wager in time this week and the Bookmaker's chest pays your camp's best when the week turns: that dungeon's gear, more and finer the higher the level.".to_string(),
+            Some((level, d)) => format!("Your camp's best this week: +{level} in {}. When the week turns, the Bookmaker's chest pays out that dungeon's gear, more and finer the higher the level.", names.get(&d).unwrap_or(&d)),
+            None => "Win a wager in time this week and the Bookmaker's chest pays out for your camp's best when the week turns. It holds that dungeon's gear, more and finer the higher the level.".to_string(),
         };
         let text = format!("The terms turned on Monday. This week, as the stakes rise:
 {}
@@ -220,7 +220,7 @@ impl SurvivalGame {
             lines.push("Nobody has won a wager in time yet. The first to do it tops the ladder.".to_string());
         }
         let text = format!(
-            "{}\n\nA rating is each dungeon's best run in time, summed: 50, and 20 for each level, and up to 20 more for time to spare. A harder dungeon is worth a quarter more for each tier.",
+            "{}\n\nA rating is the sum of each dungeon's best run in time. Each run is worth 50, plus 20 for each level and up to 20 more for time to spare. A harder dungeon is worth 25% more for each tier.",
             lines.join("\n")
         );
         let place = match mine {

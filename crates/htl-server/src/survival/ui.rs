@@ -293,14 +293,14 @@ use super::play::clean;
 use super::*;
 
 /// The controls in a sentence, for chat (the add-on's Keys card has them all).
-pub(crate) const CONTROLS_TEXT: &str = "WASD moves. Left click attacks (hold it, or Shift+click, for a heavy attack); \
-    right click raises your guard (just as a blow lands: a parry); mouse button 4 dodges (hold it to sprint). \
-    Abilities: Q (ranged), E (close), 1 (utility), 2 (defense), 3 (ultimate: hold it); hold Q, E, 1 \
-    or 2 a moment (or Ctrl with it) for its charged-up EX version; an aimed one raises the reticle, \
-    left click charges or casts it, right click or a roll calls it off. F uses, Space jumps, R puts \
-    your weapons away, T uses the quick item (G picks the next), X walks, B opens the bags, H \
-    builds, N the board, V the health bars over heads. Tab locks on (Tab again lets go; Ctrl+Tab: the \
-    next foe). K shows every key and changes them, and the mouse speed.";
+pub(crate) const CONTROLS_TEXT: &str = "WASD moves. Left-click to attack. Hold it or Shift-click for a heavy attack. \
+    Right-click to raise your guard, and raise it just as an attack lands to parry. Mouse button 4 dodges, and \
+    holding it sprints. Abilities are (Q) ranged, (E) close, (1) utility, (2) defense and (3) ultimate, which \
+    you hold. Hold (Q), (E), (1) or (2) a moment, or press it with Ctrl, for its EX version. An aimed ability \
+    raises the reticle. Left-click charges or casts it, and right-click or a dodge cancels it. (F) uses, (Space) \
+    jumps, (R) sheathes your weapons, (T) uses the quick item and (G) picks the next. (X) walks, (B) opens your \
+    bags, (H) builds, (N) opens the board and (V) shows health bars. (Tab) locks on and (Tab) again lets go. \
+    Ctrl-Tab picks the next enemy. (K) shows and changes every key and the mouse speed.";
 
 pub(crate) const PREFIX: &str = "ES";
 pub(crate) const VERSION: u32 = 2;
@@ -319,9 +319,9 @@ pub(crate) fn out_of_date(version: u32, level: u8) -> Option<String> {
     let client = level < CLIENT_NEWEST;
     let what = match (addon, client) {
         (false, false) => return None,
-        (true, false) => format!("Your Elwynn Survival add-on is older than this server's (v{version}; the server has v{ADDON_NEWEST}): some screens may be missing."),
-        (false, true) => "Your game client is older than this server's: some effects won't show.".to_string(),
-        (true, true) => format!("Your game client and add-on (v{version}) are older than this server's: some screens and effects won't show."),
+        (true, false) => format!("Your Elwynn Survival add-on (v{version}) is older than this server's (v{ADDON_NEWEST}). Some screens may be missing."),
+        (false, true) => "Your game client is older than this server's. Some effects won't show.".to_string(),
+        (true, true) => format!("Your game client and add-on (v{version}) are older than this server's. Some screens and effects won't show."),
     };
     Some(format!("{what} {}", crate::HOW_TO_UPDATE))
 }
@@ -855,9 +855,9 @@ impl SurvivalGame {
             if addon {
                 self.ui_line(conn, &line);
             } else {
-                let text = if words.is_empty() { "The camp's chest is empty.".to_string() } else { format!("The camp's chest: {}.", words.join(", ")) };
+                let text = if words.is_empty() { "Storage is empty.".to_string() } else { format!("Storage: {}.", words.join(", ")) };
                 self.say_to(conn, &text);
-                self.say_to(conn, "Take things with .take <item> <count>; swap gear with .equip <item>.");
+                self.say_to(conn, "Take items with .take <item> <count>. Equip gear with .equip <item>.");
             }
             return;
         }
@@ -921,9 +921,9 @@ impl SurvivalGame {
                 }
                 self.say_to(
                     conn,
-                    &format!("The Smuggler's Logbook: {}", list.join("; ")),
+                    &format!("The Smuggler's Logbook: {}", list.join(", ")),
                 );
-                self.say_to(conn, "Each dungeon's notes: .es lore <dungeon> (deadmines, stockade, ...); a note again: .es note <note>.");
+                self.say_to(conn, "Read a dungeon's notes with .es lore <dungeon>, such as .es lore deadmines. Read a note again with .es note <note>.");
             }
             return;
         }
@@ -950,7 +950,7 @@ impl SurvivalGame {
                 self.ui_line(conn, &line);
             } else {
                 let list: Vec<String> = rack.iter().map(|(k, n, kind, _, _)| format!(".arm {k} ({n}, {kind})")).collect();
-                self.say_to(conn, &format!("Weapon Rack: {}", list.join("; ")));
+                self.say_to(conn, &format!("Weapon Rack: {}", list.join(", ")));
             }
             return;
         }
@@ -984,10 +984,10 @@ impl SurvivalGame {
             self.ui_line(conn, &line);
         } else {
             let list: Vec<String> = recipes.iter().map(|(k, out, cost, _)| format!(".craft {k} ({out}: {cost})")).collect();
-            self.say_to(conn, &format!("{}: {}", v.name, list.join("; ")));
+            self.say_to(conn, &format!("{}: {}", v.name, list.join(", ")));
             if let Some(a) = self.sim.station_actions(id, station) {
                 let acts: Vec<String> = a.actions.iter().map(|(k, l, _, _)| format!(".es {k} ({l})")).collect();
-                self.say_to(conn, &format!("Health {} of {}. {}", a.health, a.max, acts.join("; ")));
+                self.say_to(conn, &format!("Health {} of {}. {}", a.health, a.max, acts.join(", ")));
             }
         }
     }
@@ -1004,7 +1004,7 @@ impl SurvivalGame {
         if self.has_addon(conn) {
             self.ui_line(conn, &format!("AW\t{wave}\t{}\t{secs:.0}\t{best}\t{heroes}", u8::from(fighting)));
         } else {
-            self.say_to(conn, "The Proving Ring's banner: .arena next to bring on the next wave now; .travel camp to go home.");
+            self.say_to(conn, "The Proving Ring's banner. Use .arena next to bring on the next wave now, or .travel camp to go home.");
         }
     }
 
@@ -1096,7 +1096,7 @@ impl SurvivalGame {
             );
             self.ui_line(conn, &line);
         } else {
-            self.say_to(conn, &format!("{name}: .rest to rest here (whole again, Draughts filled, the foes back at their posts); .travel <lamp> to go to another lit lamp; .travel camp to go home; .buy <ware> for {currency}; .hone <piece> to hone this dungeon's gear a tier further."));
+            self.say_to(conn, &format!("{name}. Use .rest to rest here, restoring your health and Draughts and returning enemies to their posts. Use .travel <lamp> to go to another lit lamp, or .travel camp to go home. Use .buy <ware> to buy for {currency}, and .hone <piece> to hone this dungeon's gear 1 tier further."));
         }
     }
 
@@ -1131,8 +1131,8 @@ impl SurvivalGame {
             }
             self.ui_line(conn, &line);
         } else {
-            let list: Vec<String> = menu.iter().map(|(k, n, cost, _, built, _)| format!(".build {k} ({n}, {cost}; {built} built)")).collect();
-            self.say_to(conn, &format!("Build: {}. Then .place to set it down, .rotate to turn it, .cancel to stop.", list.join("; ")));
+            let list: Vec<String> = menu.iter().map(|(k, n, cost, _, built, _)| format!(".build {k} ({n}, {cost}, {built} built)")).collect();
+            self.say_to(conn, &format!("Build: {}. Then use .place to place it, .rotate to turn it or .cancel to stop.", list.join(", ")));
         }
     }
 
@@ -1245,7 +1245,7 @@ impl SurvivalGame {
                     self.ui_tree(conn, me);
                     Ok(())
                 }
-                _ => Err("Try .es tree (the board), .es tree take <ability> (dev: .es tree full, .es tree reset).".into()),
+                _ => Err("Try .es tree or .es tree take <ability>. Dev builds also have .es tree full and .es tree reset.".into()),
             },
             // Put an ability on a key: `.es slot q frostbolt` (or a slot's own name, or just the
             // ability, on its role's key).
@@ -1261,11 +1261,11 @@ impl SurvivalGame {
             "spells" | "allspells" if self.dev_ok() => {
                 let full = arg != "reset";
                 self.sim.set_tree(me, full);
-                self.tell(conn, if full { "Every spell is yours: open the board (N) to put them on your keys." } else { "The board is back to your class's first cards." });
+                self.tell(conn, if full { "Every spell is yours. Open the board (N) to put them on your keys." } else { "The board is back to your class's first cards." });
                 self.ui_tree(conn, me);
                 Ok(())
             }
-            "spells" | "allspells" => Err("Turn debug on first (.es debug), then .es spells.".into()),
+            "spells" | "allspells" => Err("Turn debug on first with .es debug, then use .es spells.".into()),
             "valor" if self.dev_ok() => {
                 let max = self.sim.content.valor.max;
                 let v = if arg == "full" { max } else { arg.parse::<f32>().unwrap_or(0.0) };
@@ -1299,7 +1299,7 @@ impl SurvivalGame {
             "pvp" if self.dev_ok() => {
                 let on = arg != "off";
                 self.sim.content.pvp.friendly_fire = on;
-                self.announce(if on { "Friendly fire is on: heroes can strike each other." } else { "Friendly fire is off." });
+                self.announce(if on { "Friendly fire is on. Heroes can damage each other." } else { "Friendly fire is off." });
                 Ok(())
             }
             // Testing the camp's building: everything free (`.es freebuild`, again to stop), or
@@ -1311,7 +1311,7 @@ impl SurvivalGame {
                     _ => !self.sim.free_build,
                 };
                 self.sim.free_build = on;
-                self.announce(if on { "Building is free: stations, upgrades and mending cost nothing (.es freebuild off to stop)." } else { "Building costs what it costs again." });
+                self.announce(if on { "Building is free. Stations, upgrades and repairs cost nothing. Use .es freebuild off to stop." } else { "Building costs what it costs again." });
                 if let Some(w) = self.world_of(conn) {
                     if w.addon {
                         self.ui_build_menu(conn, me);
@@ -1322,10 +1322,10 @@ impl SurvivalGame {
             "mats" | "materials" if self.dev_ok() => {
                 let n = arg.parse::<u32>().unwrap_or(50).clamp(1, 9999);
                 let names = self.sim.stock_for_building(n);
-                self.tell(conn, &format!("Into the camp's chest, {n} of each: {}.", names.join(", ")));
+                self.tell(conn, &format!("Sent to storage, {n} of each: {}.", names.join(", ")));
                 Ok(())
             }
-            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" => Err("That's for dev builds ([dev] full_tree) or with .es debug on.".into()),
+            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // The add-on's answer to a ping: the round trip.
             "po" => {
                 let n = arg.parse::<u32>().unwrap_or(0);
@@ -1449,7 +1449,7 @@ impl SurvivalGame {
             // The Proving Ring's banner: the next wave now.
             "arena" | "ring" => match arg.as_str() {
                 "next" | "" => self.sim.arena_next_now(me).map(|_| {
-                    self.tell(conn, "You raise the banner: here they come.");
+                    self.tell(conn, "You raised the banner. Here they come.");
                 }),
                 "leave" | "home" => self.sim.travel(me, "camp"),
                 _ => Err("Try .arena next or .arena leave.".into()),
@@ -1461,11 +1461,11 @@ impl SurvivalGame {
                 self.refresh_lamp(conn, me);
             }),
             "hone" => self.sim.hone(me, &arg).map(|what| {
-                self.tell(conn, &format!("The quartermaster hands it back: {what}."));
+                self.tell(conn, &format!("The quartermaster hands back your {what}."));
                 self.refresh_lamp(conn, me);
             }),
             "arm" => self.sim.arm(me, &arg).map(|name| {
-                self.tell(conn, &format!("You take up the {name}."));
+                self.tell(conn, &format!("You equipped the {name}."));
                 let rack = self.world_of(conn).and_then(|w| w.station).filter(|s| matches!(self.sim.objs.get(s).map(|o| &o.kind), Some(ObjKind::Rack))).unwrap_or_else(|| self.sim.rack_id());
                 self.ui_station(conn, me, rack);
             }),
@@ -1524,7 +1524,7 @@ impl SurvivalGame {
                 let mut rows: Vec<String> = self.in_world().map(|(_, _, w)| format!("{} {:.0} ms", w.name, w.rtt * 1000.0)).collect();
                 rows.sort();
                 let text = format!(
-                    "Round trips: {}. A swing judges where others were up to {:.0} ms back; a blow on you waits up to {:.0} ms for your dodge or guard (.es tune combat.max_rewind / combat.max_grace).",
+                    "Round trips: {}. A swing judges where others were up to {:.0} ms back. An attack on you waits up to {:.0} ms for your dodge or guard. Change these with .es tune combat.max_rewind and combat.max_grace.",
                     rows.join(", "),
                     k.max_rewind * 1000.0,
                     k.max_grace * 1000.0
@@ -1568,11 +1568,11 @@ impl SurvivalGame {
                     }),
                 },
                 "me" | "camp" => Err("Turn debug on first (.es debug).".into()),
-                _ => Err("Try .es reset me (this hero's first day) or .es reset camp (the whole world's).".into()),
+                _ => Err("Try .es reset me to restart this hero, or .es reset camp to restart the whole world.".into()),
             },
             "debug" => {
                 self.sim.debug = !self.sim.debug;
-                self.say_to(conn, if self.sim.debug { "Debug on: .es spells (every spell), .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es reset me and .es reset camp work." } else { "Debug off." });
+                self.say_to(conn, if self.sim.debug { "Debug is on. .es spells, .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es reset me and .es reset camp now work." } else { "Debug off." });
                 Ok(())
             }
             "where" => {
@@ -1587,7 +1587,7 @@ impl SurvivalGame {
                 let chest: Vec<String> = s.iter().map(|(_, n, c)| format!("{c} {n}")).collect();
                 let stations: Vec<String> = self.sim.objects().into_iter().filter(|v| matches!(v.kind, ObjKind::Station { .. })).map(|v| v.name).collect();
                 let text = format!(
-                    "Camp chest: {}. Stations: {}. Raid: {:?}.",
+                    "Storage: {}. Stations: {}. Raid: {:?}.",
                     if chest.is_empty() { "empty".into() } else { chest.join(", ") },
                     if stations.is_empty() { "none yet".into() } else { stations.join(", ") },
                     self.sim.raid.phase
@@ -1598,7 +1598,7 @@ impl SurvivalGame {
             // Basin Battle's add-on says hello too: it's asleep here.
             "bb" => Ok(()),
             _ => {
-                self.say_to(conn, &format!("Elwynn Survival: {CONTROLS_TEXT} Commands: .es unstuck (back to your lamp, or the camp), .bank, .take <item> <n>, .equip <item>, .arm <weapon> (at the rack), .build [station], .place, .rotate, .cancel, .craft <recipe>, .status, .where; .es tune to change the rules in play."));
+                self.say_to(conn, &format!("Elwynn Survival. {CONTROLS_TEXT} Commands are .es unstuck to return to your lamp or the camp, .bank, .take <item> <n>, .equip <item>, .arm <weapon> at the rack, .build [station], .place, .rotate, .cancel, .craft <recipe>, .status and .where. Use .es tune to change the rules in play."));
                 Ok(())
             }
         };
@@ -1609,13 +1609,13 @@ impl SurvivalGame {
 
     fn tune(&mut self, conn: ConnId, me: Id, path: &str, value: &str) -> Result<(), String> {
         if self.realm.siege {
-            return Err("Tune the rules at camp: Siege's world plays them as the camp's are.".into());
+            return Err("Tune the rules at camp. Siege's world uses the camp's rules.".into());
         }
         let who = self.sim.players.get(&me).map_or_else(String::new, |p| p.name.clone());
         match (path, value) {
             ("", _) => {
                 let text = if self.tuned.is_empty() {
-                    "Nothing tuned yet. .es tune combat.chain_after 0.3 changes a value of survival.toml in play; .es tune keep writes the changes into it, .es tune reload reads it again.".to_string()
+                    "Nothing tuned yet. .es tune combat.chain_after 0.3 changes a value of survival.toml in play. .es tune keep writes the changes into it, and .es tune reload reads it again.".to_string()
                 } else {
                     let list: Vec<String> = self.tuned.iter().map(|(p, v)| format!("{p} = {v}")).collect();
                     format!("Tuned: {}.", list.join(", "))
@@ -1651,7 +1651,7 @@ impl SurvivalGame {
                 self.tuned.retain(|(p, _)| p != path);
                 self.tuned.push((path.to_string(), now.clone()));
                 println!("[survival] {who} tuned {path}: {} -> {now}", old.as_deref().unwrap_or("default"));
-                self.announce(&format!("{who} tuned {path}: {} to {now}.", old.as_deref().unwrap_or("default")));
+                self.announce(&format!("{who} tuned {path} from {} to {now}.", old.as_deref().unwrap_or("default")));
                 Ok(())
             }
         }
@@ -1970,7 +1970,7 @@ mod version_tests {
         assert_eq!(out_of_date(ADDON_NEWEST, CLIENT_NEWEST), None);
         assert_eq!(out_of_date(ADDON_NEWEST + 1, CLIENT_NEWEST + 1), None, "newer than the server: nothing to say");
         let addon = out_of_date(ADDON_NEWEST - 1, CLIENT_NEWEST).unwrap();
-        assert!(addon.contains("add-on is older") && addon.contains("releases"), "{addon}");
+        assert!(addon.contains("add-on (v") && addon.contains("is older than this server's") && addon.contains("releases"), "{addon}");
         let client = out_of_date(ADDON_NEWEST, CLIENT_NEWEST - 1).unwrap();
         assert!(client.starts_with("Your game client is older"), "{client}");
         assert!(out_of_date(1, 0).unwrap().contains("client and add-on (v1)"));

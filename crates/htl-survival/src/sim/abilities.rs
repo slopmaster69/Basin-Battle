@@ -267,15 +267,15 @@ impl Survival {
         }
         if !self.reachable(&owned, key) {
             if def.is_beta() && def.on_board() && self.is_siege() {
-                return Err(format!("{} is a beta card: Siege leaves those out.", def.name));
+                return Err(format!("{} is a beta card. Siege doesn't use beta cards.", def.name));
             }
             let at = self.learned_where(key);
-            return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("{} is learned out in Elwynn: {at}.", def.name) });
+            return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("Learn {} in Elwynn first. {at}.", def.name) });
         }
         // Siege: bought, in a match.
         if self.is_siege() && !self.debug {
             if self.camp_of(id).is_none() {
-                return Err("Cards are bought in a match.".into());
+                return Err("Buy cards during a match.".into());
             }
             let price = self.card_price(key).unwrap_or(0);
             self.spend_gold(id, price)?;
@@ -283,10 +283,10 @@ impl Survival {
             self.siege_slot_bought(id, key);
             let on = self.players[&id].loadout.iter().find(|(_, k)| *k == key).map(|(s, _)| s.clone());
             let tail = match on {
-                Some(s) => format!("it's on your {s} key"),
-                None => "put it on its key from the board (N)".to_string(),
+                Some(s) => format!("It's on your {s} key"),
+                None => "Put it on a key from the board (N)".to_string(),
             };
-            self.tell(id, format!("{} is yours for {price} gold: {tail}.", def.name));
+            self.tell(id, format!("You bought {} for {price} gold. {tail}.", def.name));
         }
         self.players.get_mut(&id).unwrap().owned.insert(key.to_string());
         self.events.push(Event::Abilities { player: id });
@@ -312,11 +312,11 @@ impl Survival {
     pub fn slot_ability(&mut self, id: Id, slot: &str, key: &str) -> Result<String, String> {
         let a = self.content.ability(key).ok_or_else(|| {
             let keys: Vec<&str> = self.content.abilities.iter().filter(|a| !a.is_ex() && !a.inner).map(|a| a.key.as_str()).collect();
-            format!("No ability {key}: try {}.", keys.join(", "))
+            format!("No ability called {key}. Try {}.", keys.join(", "))
         })?;
         let def = self.content.abilities[a].clone();
         if def.is_ex() {
-            return Err(format!("{} is an EX version: hold {}'s key.", def.name, self.content.ability(&def.ex_of).map_or("its ability", |b| self.content.abilities[b].name.as_str())));
+            return Err(format!("{} is an EX version. Hold {}'s key.", def.name, self.content.ability(&def.ex_of).map_or("its ability", |b| self.content.abilities[b].name.as_str())));
         }
         let p = self.players.get(&id).ok_or("No hero.")?;
         if !p.owned.contains(key) {
@@ -539,7 +539,7 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return true };
         let Some(slot_name) = SLOTS.get(slot) else { return true };
         let Some(base) = p.loadout.get(*slot_name).and_then(|k| self.content.ability(k)) else {
-            self.tell(id, format!("Nothing on that key yet: open the board (N) and choose a card for it ({}).", slot_role(slot_name)));
+            self.tell(id, format!("Nothing on that key. Open the board (N) and choose a card for the {} key.", slot_role(slot_name)));
             return true;
         };
         // Ice Block: its key again breaks out of it.
@@ -624,7 +624,7 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         if self.silenced(id) || self.immune(id) {
             // Why nothing happened, said where the hero is looking.
-            let why = if self.silenced(id) { "Silenced: no abilities for now" } else { "Can't cast now" };
+            let why = if self.silenced(id) { "Can't use abilities while silenced" } else { "Can't cast now" };
             self.events.push(Event::Flash { player: id, text: why.into() });
             return true;
         }
@@ -634,25 +634,25 @@ impl Survival {
         }
         if recast.is_none() && !self.ready(id, ability) {
             let left = (self.cooldown(id, ability).next_at - self.clock).max(0.0);
-            let text = if left > 0.05 { format!("{}: ready in {:.0} s", d.name, left.ceil()) } else { format!("{}: not ready", d.name) };
+            let text = if left > 0.05 { format!("{} ready in {:.0} sec", d.name, left.ceil()) } else { format!("{} isn't ready", d.name) };
             self.events.push(Event::Flash { player: id, text });
             return true;
         }
         let cost = if recast.is_some() || empowered { 0.0 } else { self.valor_cost(&d) };
         let valor = self.players[&id].valor;
         if valor + 0.001 < cost {
-            self.events.push(Event::Flash { player: id, text: format!("{} needs {} Valor (you have {})", d.name, cost.round(), valor.floor()) });
+            self.events.push(Event::Flash { player: id, text: format!("Not enough Valor for {} (need {}, have {})", d.name, cost.round(), valor.floor()) });
             return true;
         }
         // A weapon art takes its stamina; an Ambush, a foe to step behind.
         if d.kind == "art" {
             if self.players[&id].stamina + 0.001 < d.stamina && !self.has_cc(id, "onslaught") {
                 self.winded(id);
-                self.events.push(Event::Flash { player: id, text: format!("{} needs {:.0} stamina", d.name, d.stamina) });
+                self.events.push(Event::Flash { player: id, text: format!("Not enough stamina for {} (need {:.0})", d.name, d.stamina) });
                 return true;
             }
             if d.ambush > 0.0 && self.ambush_spot(id, d.ambush).is_none() {
-                self.events.push(Event::Flash { player: id, text: "No foe in reach to step behind: put the reticle on one, or lock on".into() });
+                self.events.push(Event::Flash { player: id, text: "No enemy in reach to step behind. Aim at one or lock on".into() });
                 return true;
             }
         }
@@ -729,7 +729,7 @@ impl Survival {
             // A fixed charge (Pyroblast) let go early is dropped; one with a range goes at its
             // least, as soon as it's reached.
             if (hi - lo).abs() < 1.0e-3 {
-                self.tell(id, "Let go too soon: the charge is lost.");
+                self.tell(id, "Released too soon. The charge is lost.");
                 self.end_ability_action(id);
                 self.set_action(id, Action::Ready);
             } else if let Some(p) = self.players.get_mut(&id) {
@@ -1658,7 +1658,7 @@ impl Survival {
         }
         if killed && d.refund_kill && d.valor > 0 {
             self.gain_valor(owner, d.valor as f32);
-            self.events.push(Event::Flash { player: owner, text: "Valor back".into() });
+            self.events.push(Event::Flash { player: owner, text: "Valor returned".into() });
         }
     }
 
@@ -1785,7 +1785,7 @@ impl Survival {
             let now = self.clock;
             if self.lockouts.get(&(target, ability)).is_some_and(|t| *t > now) {
                 let left = self.lockouts[&(target, ability)] - now;
-                self.events.push(Event::Flash { player: id, text: format!("{}: not again on them for {:.0} sec", d.name, left.ceil()) });
+                self.events.push(Event::Flash { player: id, text: format!("Can't use {} on them again for {:.0} sec", d.name, left.ceil()) });
                 let cost = self.valor_cost(&d);
                 self.gain_valor(id, cost);
                 return;
@@ -2252,7 +2252,7 @@ impl Survival {
         let t = self.trace(o, dir, range + 3.0, 0.8, id);
         let target = t.unit.filter(|u| self.unit_pos(*u).is_some_and(|at| dist2d(at, self.players[&id].pos) <= range + 1.0));
         let Some(target) = target else {
-            self.tell(id, format!("{}: nothing there to drain.", d.name));
+            self.tell(id, format!("Nothing there for {} to drain.", d.name));
             // Nothing spent for a miss.
             if let Some(p) = self.players.get_mut(&id) {
                 p.cooldowns.remove(&self.content.base_of(ability));
@@ -2523,7 +2523,7 @@ impl Survival {
                 self.set_action(id, Action::Ready);
             }
             if !s.caught {
-                self.events.push(Event::Flash { player: id, text: format!("{}: caught nothing", d.name) });
+                self.events.push(Event::Flash { player: id, text: format!("{} caught nothing", d.name) });
             }
             self.update_rooted(id);
         }

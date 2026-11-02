@@ -119,7 +119,7 @@ local function DrawForces(fc, below)
   end
   f.forces:ClearAllPoints()
   f.forces:SetPoint("TOP", below, "BOTTOM", 0, -6)
-  f.forces:SetText("Foes  " .. fc.felled .. " / " .. fc.needed)
+  f.forces:SetText("Enemies  " .. fc.felled .. " / " .. fc.needed)
   f.forces:Show()
   f.forceBar:ClearAllPoints()
   f.forceBar:SetPoint("TOP", f.forces, "BOTTOM", 0, -3)
@@ -216,9 +216,9 @@ local function Draw()
   local rd = last.ready
   if last.state == "wait" and rd then
     if rd.count then
-      words.wait = "Everyone's ready: the clock starts in " .. math.max(0, math.ceil(rd.count - (GetTime() - last.at)))
+      words.wait = "Everyone is ready. The clock starts in " .. math.max(0, math.ceil(rd.count - (GetTime() - last.at)))
     else
-      words.wait = "Ready " .. rd.ready .. " of " .. rd.heroes .. ", or step off from the lamp to start"
+      words.wait = "Ready " .. rd.ready .. " of " .. rd.heroes .. ". Step off the lamp to start"
     end
   end
   local falls = ""

@@ -230,15 +230,15 @@ impl Realms {
                 (Some(n), Some((at, false))) if busy && at == n => {}
                 (Some(n), _) if !busy => below.sim.start_wager(n),
                 (Some(_), Some((at, false))) => {
-                    self.camp.say_to(conn, &format!("A wager is under way in {name} at +{at}: join that one, or wait for it to end."));
+                    self.camp.say_to(conn, &format!("A wager is under way in {name} at +{at}. Join it or wait for it to end."));
                     continue;
                 }
                 (Some(_), _) => {
-                    self.camp.say_to(conn, &format!("Heroes are down in {name} already: a wager starts on an empty dungeon."));
+                    self.camp.say_to(conn, &format!("Heroes are already in {name}. A wager needs an empty dungeon."));
                     continue;
                 }
                 (None, Some((at, _))) if busy => {
-                    self.camp.say_to(conn, &format!("{name} is the Bookmaker's for now: a wager at +{at} is on. Join it from the book's wager page."));
+                    self.camp.say_to(conn, &format!("A wager at +{at} is under way in {name}. Join it from the book's wager page."));
                     continue;
                 }
                 (None, _) => {}
@@ -288,7 +288,7 @@ impl Realms {
         self.camp.transfers = rest;
         let Some(siege) = self.siege.as_mut() else {
             for (conn, _) in to_siege {
-                self.camp.say_to(conn, "Siege isn't open on this server (Arathi Basin couldn't be read).");
+                self.camp.say_to(conn, "Siege isn't open on this server. Arathi Basin couldn't be read.");
             }
             return;
         };

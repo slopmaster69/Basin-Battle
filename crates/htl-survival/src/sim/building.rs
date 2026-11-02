@@ -45,7 +45,7 @@ impl Survival {
             return Err("Only at the camp.".into());
         }
         if self.raid.active() {
-            return Err("Not while the raid's on!".into());
+            return Err("Not during a raid.".into());
         }
         Ok((*def, *pos))
     }
@@ -66,10 +66,10 @@ impl Survival {
                 actions.push(("upgrade".to_string(), format!("Upgrade to {}", t.name), format!("{} ({})", t.text, self.cost_text(&cost)), can));
             }
         }
-        actions.push(("move".to_string(), "Move it".to_string(), "Pick it up and set it down somewhere else in the camp, as it is.".to_string(), true));
+        actions.push(("move".to_string(), "Move".to_string(), "Place it somewhere else in the camp. Nothing is lost.".to_string(), true));
         let back = self.refund(*def);
         let back = if back.is_empty() { "nothing".to_string() } else { self.cost_text(&back) };
-        actions.push(("demolish".to_string(), "Tear it down".to_string(), format!("Half of what it cost comes back to the chest: {back}."), true));
+        actions.push(("demolish".to_string(), "Tear Down".to_string(), format!("Returns 50% of its cost to storage: {back}."), true));
         Some(StationActions { actions, health: *health, max: s.health })
     }
 
@@ -96,7 +96,7 @@ impl Survival {
         self.objs.insert(ghost, Obj { kind: ObjKind::Ghost { player: id, def, ok: false }, pos, facing: f });
         self.players.get_mut(&id).unwrap().preview = Some(Preview { ghost, def, turn: 0.0, pos, facing: f, problem: Some("…".into()), moving: Some(station) });
         self.place_preview_now(id);
-        self.tell(id, format!("Moving the {}: F sets it down, R or T turns it, H leaves it where it was.", self.content.stations[def].name));
+        self.tell(id, format!("Moving the {}. Press (F) to place it, (R) or (T) to turn it, (H) to cancel.", self.content.stations[def].name));
         Ok(())
     }
 
@@ -126,7 +126,7 @@ impl Survival {
         }
         self.yielded.remove(&station);
         let name = self.content.stations[pv.def].name.clone();
-        self.tell(id, format!("You set the {name} down."));
+        self.tell(id, format!("You moved the {name}."));
         self.events.push(Event::Dirty);
         Ok(name)
     }
@@ -142,9 +142,9 @@ impl Survival {
     /// the chest).
     pub fn demolish(&mut self, id: Id, station: Option<Id>, yes: bool) -> Result<(), String> {
         let station = match (station, yes) {
-            (_, true) => self.players.get(&id).and_then(|p| p.demolish).ok_or("Use the station you mean to tear down first.")?,
+            (_, true) => self.players.get(&id).and_then(|p| p.demolish).ok_or("Use the station you want to tear down first.")?,
             (Some(s), false) => s,
-            (None, false) => return Err("Use the station you mean to tear down first.".into()),
+            (None, false) => return Err("Use the station you want to tear down first.".into()),
         };
         let (def, _) = self.station_at(id, station)?;
         let s = self.content.stations[def].clone();
@@ -155,9 +155,9 @@ impl Survival {
             self.events.push(Event::Confirm {
                 player: id,
                 what: "demolish".into(),
-                text: format!("Tear down the {}? Half of what it cost comes back to the camp's chest: {words}.", s.name),
-                yes: "Tear it down".into(),
-                no: "Keep it".into(),
+                text: format!("Tear down the {}? 50% of its cost returns to storage: {words}.", s.name),
+                yes: "Tear Down".into(),
+                no: "Keep It".into(),
             });
             return Ok(());
         }
@@ -174,7 +174,7 @@ impl Survival {
         self.events.push(Event::Storage);
         self.events.push(Event::Missile { caster: id, spell: CRAFT_SPELL, target: Target::Unit(id) });
         let name = self.players[&id].name.clone();
-        self.announce(format!("{name} tears down the {}.", s.name));
+        self.announce(format!("{name} tore down the {}.", s.name));
         self.events.push(Event::Dirty);
         Ok(())
     }
@@ -199,29 +199,29 @@ impl Survival {
         let pos = self.players[&id].pos;
         self.set_action(id, Action::Work { t: 0.0, total: secs, job: Job::Upgrade { station }, at: pos });
         self.events.push(Event::Cast { caster: id, spell: 2575, ms: (secs * 1000.0) as u32 });
-        self.tell(id, format!("You set to making it a {name}."));
+        self.tell(id, format!("Upgrading it to a {name}."));
         Ok(name)
     }
 
     fn upgrade_check(&self, id: Id, station: Id) -> Result<(usize, f32), String> {
         let (def, _) = self.station_at(id, station)?;
         let s = &self.content.stations[def];
-        let u = s.upgrade.as_ref().ok_or(format!("The {} is as good as it gets.", s.name))?;
+        let u = s.upgrade.as_ref().ok_or(format!("The {} is fully upgraded.", s.name))?;
         let to = self.content.station(&u.to).ok_or("No such station.")?;
         if matches!(self.objs.get(&station).map(|o| &o.kind), Some(ObjKind::Station { damaged: true, .. })) {
-            return Err("It's damaged: mend it first.".into());
+            return Err("It's damaged. Repair it first.".into());
         }
         let t = &self.content.stations[to];
         if t.most > 0 && self.standing(&t.key) as u32 >= t.most {
-            return Err(format!("The camp has its {} already.", t.name));
+            return Err(format!("The camp already has a {}.", t.name));
         }
         // Its own ground grown: nothing in the way of the bigger one.
         let pos = self.objs[&station].pos;
         if let Some(problem) = self.site_problem_except(to, pos, None, Some(station)) {
-            return Err(format!("No room for a {} here: {problem}", t.name));
+            return Err(format!("No room for a {} here. {problem}", t.name));
         }
         let cost = self.upgrade_cost(def);
-        self.affords(id, &cost).map_err(|e| format!("To make it a {}: {} ({e})", t.name, self.cost_text(&cost)))?;
+        self.affords(id, &cost).map_err(|e| format!("A {} costs {}. {e}", t.name, self.cost_text(&cost)))?;
         Ok((to, self.content.work.build * t.work))
     }
 
@@ -242,7 +242,7 @@ impl Survival {
         self.events.push(Event::ObjChanged { id: station });
         self.events.push(Event::Missile { caster: id, spell: CRAFT_SPELL, target: Target::Unit(id) });
         let name = self.players[&id].name.clone();
-        self.announce(format!("{name} makes the camp a {}.", t.name));
+        self.announce(format!("{name} upgraded a station to a {}.", t.name));
         self.count("build", &t.key, 1);
         self.count("upgrade", &t.key, 1);
         self.events.push(Event::Dirty);

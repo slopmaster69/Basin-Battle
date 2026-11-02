@@ -631,7 +631,7 @@ display = 1312
 icon = "INV_TradeskillItem_01"
 kind = "resource"
 stack = 20
-text = "Builds stations and mends them. Cut from fallen wood around the camp."
+text = "Builds and repairs stations. \"Cut from fallen wood around the camp.\""
 
 [[item]]
 key = "meat"
@@ -640,7 +640,7 @@ display = 1117
 icon = "INV_Misc_Food_14"
 kind = "resource"
 stack = 20
-text = "Cook it at a cooking fire."
+text = "Cooked into Roast Meat at a Cooking Fire."
 
 [[item]]
 key = "ore"
@@ -649,7 +649,7 @@ display = 4681
 icon = "INV_Ore_Copper_01"
 kind = "resource"
 stack = 20
-text = "Dug in the Fargodeep mine yard. A smithy works it into better gear."
+text = "A Smithing Anvil works it into better gear. \"Dug from the Fargodeep mine yard.\""
 
 [[item]]
 key = "roast"
@@ -661,7 +661,7 @@ stack = 5
 # Eating takes this long (moving slowly, open to a hit) and heals this share of max health.
 use_secs = 1.6
 heal = 0.45
-text = "Eat with 1: heals 45% of your health over a short meal. A hit spoils the bite."
+text = "Heals 45% of your health over a 1.6 sec meal. Taking damage interrupts it. Press (T) to eat."
 
 [[item]]
 key = "axe"
@@ -677,7 +677,7 @@ name = "Bearded Axe"
 display = 8458
 icon = "INV_Axe_06"
 kind = "weapon"
-text = "Slower to swing and dearer in stamina, but it bites much deeper."
+text = "Slower and costs more stamina to swing, but deals much more damage."
 
 [[item]]
 key = "sword"
@@ -685,7 +685,7 @@ name = "Footman's Sword"
 display = 862
 icon = "INV_Sword_04"
 kind = "weapon"
-text = "Fast and cheap to swing; strikes one foe at a time."
+text = "Fast and cheap to swing. Strikes 1 enemy at a time."
 
 [[item]]
 key = "mace"
@@ -693,7 +693,7 @@ name = "Militia Mace"
 display = 1161
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "A blow that lands while a foe winds up knocks its attack aside."
+text = "Hitting an enemy during its windup knocks its attack aside."
 
 [[item]]
 key = "dagger"
@@ -701,7 +701,7 @@ name = "Poacher's Knife"
 display = 2699
 icon = "INV_Weapon_ShortBlade_05"
 kind = "weapon"
-text = "Very quick and light, short in reach and in damage."
+text = "Very quick and light, with short reach and low damage."
 
 [[item]]
 key = "greatsword"
@@ -709,7 +709,7 @@ name = "Footman's Claymore"
 display = 563
 icon = "INV_Sword_08"
 kind = "weapon"
-text = "Two-handed: slow, wide sweeps that strike up to four. Guards with the blade (no shield)."
+text = "Two-handed. Slow, wide sweeps that strike up to 4 enemies. Guards with the blade instead of a shield."
 
 [[item]]
 key = "halberd"
@@ -717,7 +717,7 @@ name = "Goldshire Halberd"
 display = 869
 icon = "INV_Spear_06"
 kind = "weapon"
-text = "Two-handed: a long, narrow reach to keep foes off. Guards with the haft."
+text = "Two-handed. A long, narrow reach that keeps enemies at bay. Guards with the haft."
 
 [[item]]
 key = "maul"
@@ -725,7 +725,7 @@ name = "Quarry Maul"
 display = 1243
 icon = "INV_Hammer_01"
 kind = "weapon"
-text = "Two-handed: very slow and very heavy. Breaks a foe's wind-up. Guards with the haft."
+text = "Two-handed. Very slow and very heavy. Breaks an enemy's windup. Guards with the haft."
 
 [[item]]
 key = "buckler"
@@ -733,7 +733,7 @@ name = "Militia Buckler"
 display = 2456
 icon = "INV_Shield_02"
 kind = "shield"
-text = "Raise it with S. Blocks wear your stamina; raised just as a blow lands, it parries."
+text = "Hold right mouse to raise it. Blocking costs stamina. Raise it just as an attack lands to parry."
 
 [[item]]
 key = "reinforced_shield"
@@ -741,7 +741,7 @@ name = "Reinforced Shield"
 display = 1705
 icon = "INV_Shield_04"
 kind = "shield"
-text = "Covers more and costs about half the stamina to block with."
+text = "Covers a wider arc than the Militia Buckler. Blocking costs about 50% less stamina."
 
 [[item]]
 key = "bow"
@@ -750,7 +750,7 @@ name = "Hunting Bow"
 display = 18341
 icon = "INV_Weapon_Bow_08"
 kind = "bow"
-text = "Hold right mouse to aim (the string draws as you hold), click to loose."
+text = "Hold right mouse to aim. The string draws while you hold. Click to shoot."
 
 [[item]]
 key = "crossbow"
@@ -758,7 +758,7 @@ name = "Militia Crossbow"
 display = 2462
 icon = "INV_Weapon_Crossbow_01"
 kind = "bow"
-text = "Hold right mouse to aim, click to shoot at full power at once; a long reload after."
+text = "Hold right mouse to aim. Click to shoot at full power at once. Long reload after each shot."
 
 [[item]]
 key = "hide"
@@ -767,7 +767,7 @@ display = 1421
 icon = "INV_Misc_Pelt_Wolf_01"
 kind = "resource"
 stack = 20
-text = "From wolves, boars and bears. A tanning rack cures it into leather."
+text = "A Tanning Rack cures it into Cured Leather. \"From wolves, boars and bears.\""
 
 [[item]]
 key = "linen"
@@ -776,7 +776,7 @@ display = 4745
 icon = "INV_Fabric_Linen_01"
 kind = "resource"
 stack = 20
-text = "Torn from the Horde's packs and rags. Binds salves, lines armor, sews packs."
+text = "Used for salves, armor and packs. \"Torn from the Horde's packs and rags.\""
 
 [[item]]
 key = "peacebloom"
@@ -785,7 +785,7 @@ display = 18168
 icon = "INV_Misc_Herb_02"
 kind = "resource"
 stack = 20
-text = "A pale flower of Elwynn's meadows. A cauldron makes it into salves; a cook into stew."
+text = "A Herbalist's Cauldron brews it into salves. A Cooking Fire makes it into stew. \"A pale flower of Elwynn's meadows.\""
 
 [[item]]
 key = "silverleaf"
@@ -794,7 +794,7 @@ display = 18088
 icon = "INV_Misc_Herb_10"
 kind = "resource"
 stack = 20
-text = "A silvery herb that grows in the shade of the forest's trees. Makes a stamina tonic."
+text = "Brewed into a Silverleaf Tonic. \"A silvery herb from the shade of the forest's trees.\""
 
 [[item]]
 key = "stone"
@@ -803,7 +803,7 @@ display = 1364
 icon = "INV_Stone_04"
 kind = "resource"
 stack = 20
-text = "Broken from the boulders along the mine road. Builds a cauldron and a workbench; grinds into sharpening stones."
+text = "Builds a Herbalist's Cauldron and a Workbench. Ground into sharpening stones. \"Broken from the boulders along the mine road.\""
 
 [[item]]
 key = "tin"
@@ -812,7 +812,7 @@ display = 4690
 icon = "INV_Ore_Tin_01"
 kind = "resource"
 stack = 20
-text = "From the veins at the back of the mine yard. With copper, an anvil makes bronze."
+text = "With copper, a Smithing Anvil makes Bronze Bars. \"From the veins at the back of the mine yard.\""
 
 [[item]]
 key = "leather"
@@ -821,7 +821,7 @@ display = 7594
 icon = "INV_Misc_LeatherScrap_08"
 kind = "resource"
 stack = 20
-text = "Hide cured at a tanning rack. Makes armor and packs."
+text = "Made from Rough Hide at a Tanning Rack. Used for armor and packs."
 
 [[item]]
 key = "bronze"
@@ -830,7 +830,7 @@ display = 4694
 icon = "INV_Ingot_Bronze"
 kind = "resource"
 stack = 20
-text = "Copper and tin smelted together at an anvil: for mail and helms."
+text = "Smelted from copper and tin at a Smithing Anvil. Used for mail and helms."
 
 [[item]]
 key = "stew"
@@ -841,7 +841,7 @@ kind = "food"
 stack = 5
 use_secs = 2.0
 heal = 0.5
-text = "Heals half your health, and for three minutes after your stamina comes back a fifth faster."
+text = "Heals 50% of your health. Increases stamina regeneration by 20% for 3 min."
 effect = { kind = "stamina", amount = 0.2, secs = 180.0, name = "Well Fed" }
 
 [[item]]
@@ -853,7 +853,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 heal = 0.1
-text = "Quick to put on: heals a little at once and 30% more over the next ten seconds."
+text = "Heals 10% of your health at once and 30% more over 10 sec. Quick to apply."
 effect = { kind = "regen", amount = 0.03, secs = 10.0, name = "Salve" }
 
 [[item]]
@@ -865,7 +865,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 below = true
-text = "For a minute, stamina comes back half again as fast."
+text = "Increases stamina regeneration by 50% for 60 sec."
 effect = { kind = "stamina", amount = 0.5, secs = 60.0, name = "Tonic" }
 
 [[item]]
@@ -877,7 +877,7 @@ kind = "food"
 stack = 5
 use_secs = 2.0
 below = true
-text = "Hones your blade: for two minutes every blow does a tenth more."
+text = "Increases your damage by 10% for 2 min. \"Hones the blade.\""
 effect = { kind = "might", amount = 0.1, secs = 120.0, name = "Honed" }
 
 [[item]]
@@ -888,7 +888,7 @@ icon = "INV_Chest_Leather_07"
 kind = "armor"
 slot = "chest"
 reduce = 0.1
-text = "Takes a tenth off every blow that lands, and weighs nothing to speak of."
+text = "Reduces damage taken by 10%. Does not slow stamina regeneration."
 
 [[item]]
 key = "leather_cap"
@@ -898,7 +898,7 @@ icon = "INV_Helmet_04"
 kind = "armor"
 slot = "head"
 reduce = 0.04
-text = "Takes a little off every blow."
+text = "Reduces damage taken by 4%."
 
 [[item]]
 key = "bronze_mail"
@@ -909,7 +909,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.2
 weight = 0.1
-text = "Takes a fifth off every blow that lands, but stamina comes back a tenth slower."
+text = "Reduces damage taken by 20%. Slows stamina regeneration by 10%."
 
 [[item]]
 key = "captain_shield"
@@ -917,7 +917,7 @@ name = "Grashak's Shield"
 display = 20900
 icon = "INV_Shield_13"
 kind = "shield"
-text = "The Warsong Captain's shield: wider than any other, and light to hold up against a blow."
+text = "Covers the widest arc of any shield. Blocking costs very little stamina. \"The Warsong Captain's own.\""
 
 [[item]]
 key = "zanjin_spear"
@@ -925,7 +925,7 @@ name = "Zanjin's Spear"
 display = 1733
 icon = "INV_Spear_05"
 kind = "weapon"
-text = "The Shadow Hunter's spear. Two-handed: the longest reach there is, quick for its length. Guards with the haft."
+text = "Two-handed. The longest reach of any weapon, and quick for its length. Guards with the haft. \"The Shadow Hunter's spear.\""
 
 [[item]]
 key = "warlord_axe"
@@ -933,7 +933,7 @@ name = "Gorzak's Cleaver"
 display = 3232
 icon = "INV_Axe_02"
 kind = "weapon"
-text = "The Warlord's axe. Two-handed: wide, heavy and quicker than it looks; it staggers what it hits. Guards with the haft."
+text = "Two-handed. Wide, heavy and quicker than it looks. Staggers enemies it hits. Guards with the haft. \"Warlord Gorzak's.\""
 
 [[item]]
 key = "warlord_helm"
@@ -944,7 +944,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.1
 weight = 0.03
-text = "The Warlord's helm: takes a tenth off every blow, and hardly slows the stamina."
+text = "Reduces damage taken by 10%. Slows stamina regeneration by 3%. \"Warlord Gorzak's.\""
 
 [[item]]
 key = "bronze_helm"
@@ -955,7 +955,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.07
 weight = 0.04
-text = "Takes a fair share off every blow, and a little off the stamina's return."
+text = "Reduces damage taken by 7%. Slows stamina regeneration by 4%."
 
 [[item]]
 key = "linen_pack"
@@ -964,7 +964,7 @@ display = 1244
 icon = "INV_Misc_Bag_07"
 kind = "pack"
 carry = 0.5
-text = "Timber, ore, hides and herbs stack half again as high in your bags."
+text = "Timber, ore, hides and herbs stack 50% higher in your bags."
 
 [[item]]
 key = "rucksack"
@@ -973,7 +973,7 @@ display = 2585
 icon = "INV_Misc_Bag_09"
 kind = "pack"
 carry = 1.0
-text = "Timber, ore, hides and herbs stack twice as high in your bags."
+text = "Timber, ore, hides and herbs stack 100% higher in your bags."
 
 # What a new hero carries.
 [start]
@@ -1010,7 +1010,7 @@ cost = { wood = 6 }
 health = 300
 repair = { wood = 3 }
 upgrade = { to = "kitchen", cost = { wood = 8, stone = 4, ore = 2 } }
-text = "Turns raw meat into roasts to carry on a trip."
+text = "Cooks Raw Meat into Roast Meat to carry on a trip."
 
 [[station]]
 key = "smithy"
@@ -1024,7 +1024,7 @@ cost = { wood = 8, ore = 4 }
 health = 400
 repair = { wood = 4 }
 upgrade = { to = "forge", cost = { stone = 8, ore = 6, wood = 4 } }
-text = "Works Fargodeep copper into a stronger shield or a heavier axe."
+text = "Forges Fargodeep Copper into a stronger shield or a heavier axe."
 
 [[station]]
 key = "tanning"
@@ -1037,7 +1037,7 @@ footprint = 2.0
 cost = { wood = 6, hide = 2 }
 health = 300
 repair = { wood = 3 }
-text = "Cures hides into leather, and makes leather armor and a linen pack."
+text = "Cures hides into leather. Makes leather armor and a Linen Pack."
 
 [[station]]
 key = "cauldron"
@@ -1050,7 +1050,7 @@ footprint = 1.8
 cost = { stone = 4, ore = 2 }
 health = 350
 repair = { stone = 2 }
-text = "Brews peacebloom into healing salves and silverleaf into stamina tonics."
+text = "Brews Peacebloom into Healing Salves and Silverleaf into Silverleaf Tonics."
 
 [[station]]
 key = "workbench"
@@ -1063,7 +1063,7 @@ footprint = 2.0
 cost = { wood = 8, stone = 3 }
 health = 350
 repair = { wood = 3 }
-text = "Grinds sharpening stones and sews a leather rucksack."
+text = "Grinds sharpening stones and sews a Leather Rucksack."
 
 [[station]]
 key = "palisade"
@@ -1082,7 +1082,7 @@ health = 700
 repair = { wood = 4 }
 # Raiders go for a defence first when they pass near it.
 defense = true
-text = "Stacked crates, braced and roped: raiders break it before they reach what it guards. Set blocks side by side for a wall."
+text = "Raiders nearby attack it first and must break it to reach what it guards. Place blocks side by side to build a wall. \"Stacked crates, braced and roped.\""
 
 [[station]]
 key = "barricade"
@@ -1101,7 +1101,7 @@ repair = { wood = 3, ore = 1 }
 defense = true
 # Raiders at it take this much a second.
 spikes = 6
-text = "A hedge of thorns, staked and grown thick: raiders go for it first, and bleed for it."
+text = "Raiders nearby attack it first. Raiders at it take 6 damage per sec. \"Thorns, staked and grown thick.\""
 
 [[station]]
 key = "watchtower"
@@ -1119,7 +1119,7 @@ repair = { wood = 4, stone = 2 }
 defense = true
 # Its archers shoot the nearest raider within this many yards, this often.
 shoots = { damage = 14, range = 22.0, every = 2.0 }
-text = "Archers on a tower: they shoot the nearest raider in reach. Raiders go for it first."
+text = "Archers shoot the nearest raider within 22 yd for 14 damage every 2 sec. Raiders nearby attack it first."
 
 # --- the gate, the upgrades and the buildings ----------------------------------------------------
 # An upgrade (`menu = false`) is built only from what it upgrades, at its window: it stands where
@@ -1143,7 +1143,7 @@ cost = { wood = 6, linen = 2 }
 health = 500
 repair = { wood = 2 }
 defense = true
-text = "An opening in the wall under Stormwind's banner: heroes walk through it, raiders have to tear it down."
+text = "Heroes walk through it. Raiders must tear it down. \"An opening in the wall under Stormwind's banner.\""
 
 [[station]]
 key = "kitchen"
@@ -1161,7 +1161,7 @@ bonus = 1
 cost = { wood = 14, stone = 4, ore = 2 }
 health = 500
 repair = { wood = 4 }
-text = "A proper kitchen: cooks a third faster, and every batch makes one more."
+text = "Cooking takes 33% less time. Each batch makes 1 extra. \"A proper kitchen.\""
 
 [[station]]
 key = "forge"
@@ -1178,7 +1178,7 @@ work_speed = 1.6
 cost = { wood = 12, ore = 10, stone = 8 }
 health = 700
 repair = { wood = 4, stone = 2 }
-text = "A forge beside the anvil: smithing goes much faster."
+text = "Smithing takes 37.5% less time. \"A forge beside the anvil.\""
 
 [[station]]
 key = "iron_bulwark"
@@ -1195,7 +1195,7 @@ cost = { wood = 10, stone = 6, bronze = 1 }
 health = 1300
 repair = { wood = 4, stone = 2 }
 defense = true
-text = "Iron-bound crates: nearly twice as hard to break."
+text = "Has 1300 health, up from 700. \"Iron-bound crates.\""
 
 [[station]]
 key = "thorn_wall"
@@ -1212,7 +1212,7 @@ health = 600
 repair = { wood = 3, ore = 1 }
 defense = true
 spikes = 12
-text = "Briarthorn woven through the hedge: it bites twice as hard."
+text = "Raiders at it take 12 damage per sec, up from 6. \"Briarthorn woven through the hedge.\""
 
 [[station]]
 key = "guard_tower"
@@ -1230,7 +1230,7 @@ health = 900
 repair = { wood = 6, stone = 3 }
 defense = true
 shoots = { damage = 22, range = 28.0, every = 1.6 }
-text = "A stone guard tower: its archers shoot harder, farther and more often."
+text = "Archers shoot the nearest raider within 28 yd for 22 damage every 1.6 sec. \"A stone guard tower.\""
 
 [[station]]
 key = "barracks"
@@ -1246,7 +1246,7 @@ cost = { wood = 20, linen = 6, leather = 4 }
 health = 800
 repair = { wood = 6, linen = 2 }
 respawn = { faster = 2.0, health = 0.2 }
-text = "Cots and a watch roster: heroes who fall are up again twice as soon, and with a fifth more of their health."
+text = "Heroes respawn 50% faster, with +20% health. \"Cots and a watch roster.\""
 
 [[station]]
 key = "infirmary"
@@ -1262,7 +1262,7 @@ cost = { wood = 12, linen = 8, peacebloom = 6 }
 health = 500
 repair = { wood = 4, linen = 2 }
 rest = { radius = 9.0, faster = 2.5 }
-text = "Bandages and beds: rest by it (out of a fight, not during a raid) and wounds close two and a half times as fast."
+text = "Resting within 9 yd heals 150% faster. Only out of combat, and not during a raid. \"Bandages and beds.\""
 
 [[station]]
 key = "mill"
@@ -1278,7 +1278,7 @@ cost = { wood = 24, stone = 10, ore = 6, bronze = 2 }
 health = 900
 repair = { wood = 6, stone = 2 }
 yields = { items = { wood = 2 }, every = 60.0 }
-text = "Saws the fallen timber the camp's people drag in: two Elwynn Timber into the chest every minute (not while a raid is on)."
+text = "Banks 2 Elwynn Timber every 60 sec, except during a raid. \"The camp's people drag in the fallen timber to saw.\""
 
 [[recipe]]
 key = "roast"
@@ -2558,14 +2558,14 @@ link = 0.0
 [[camp]]
 key = "mine"
 name = "the Fargodeep mine yard"
-title = "The Mine Yard Is Taken"
+title = "Mine Yard Taken"
 hold = 600.0
 reward = { tin = 3, bronze = 2, linen = 4 }
 
 [[camp]]
 key = "darkspear"
 name = "the Darkspear camp"
-title = "The Darkspear Camp Is Taken"
+title = "Darkspear Camp Taken"
 hold = 600.0
 reward = { leather = 3, silverleaf = 3, peacebloom = 3 }
 
@@ -2688,7 +2688,7 @@ reward = { linen = 2, leather = 2, ore = 2 }
 
 [[goal]]
 title = "Timber for the camp"
-text = "Gather fallen timber under the trees round the camp, then bring it to the Camp Storage chest and use it (right-click) to bank it. Only timber in the chest counts, not what you carry."
+text = "Gather fallen timber under the trees around the camp. Right-click Camp Storage to bank it. Only banked timber counts."
 kind = "bank"
 what = "wood"
 count = 10
@@ -2696,14 +2696,14 @@ reward = { roast = 2 }
 
 [[goal]]
 title = "A fire to cook on"
-text = "Build a Cooking Fire in the camp's yard by the fire (H)."
+text = "Build a Cooking Fire in camp (H)."
 kind = "build"
 what = "cooking"
 reward = { meat = 4 }
 
 [[goal]]
 title = "Provisions"
-text = "Hunt boars for meat and cook three roasts at the fire."
+text = "Hunt boars for meat and cook 3 Roast Meat at the Cooking Fire."
 kind = "craft"
 what = "roast"
 count = 3
@@ -2711,7 +2711,7 @@ reward = { peacebloom = 3 }
 
 [[goal]]
 title = "Scout Elwynn"
-text = "Elwynn is wide, and the camp is only its middle: find four of its places. M opens the world map, and every mark on it is a place worth going to."
+text = "Find 4 of Elwynn's places. Every mark on the world map (M) is one worth going to."
 kind = "explore"
 what = "any"
 count = 4
@@ -2719,7 +2719,7 @@ reward = { linen = 2, wood = 4 }
 
 [[goal]]
 title = "Copper from Fargodeep"
-text = "The Warsong hold the Fargodeep mine yard, south-east down the Goldshire road. Bring back copper and bank it at the Camp Storage chest (what you carry doesn't count until it's banked)."
+text = "Bank copper from the Fargodeep mine yard, south-east down the Goldshire road. The Warsong hold it. Only banked copper counts."
 kind = "bank"
 what = "ore"
 count = 6
@@ -2734,7 +2734,7 @@ reward = { ore = 4 }
 
 [[goal]]
 title = "Thin the Warsong"
-text = "Fell three Warsong Grunts: read their strings of blows, parry, punish the recovery."
+text = "Kill 3 Warsong Grunts. Read their attack strings, parry, then punish the recovery."
 kind = "kill"
 what = "grunt"
 count = 3
@@ -2742,7 +2742,7 @@ reward = { stone = 4, linen = 2 }
 
 [[goal]]
 title = "A shrine's lesson"
-text = "Every class has a shrine in Elwynn, held by its foes (the marked sanctums on the map): use one and its guardians wake; beat them and everyone there learns two of its cards (each hero learns for themselves). N opens the board to slot them."
+text = "Use one of Elwynn's class shrines, the marked sanctums on the map, and beat the guardians it wakes. Each hero there learns 2 of its cards. Open the board (N) to slot them."
 kind = "learn"
 what = "any"
 count = 2
@@ -2757,7 +2757,7 @@ reward = { hide = 4, linen = 4 }
 
 [[goal]]
 title = "Snapper for supper"
-text = "Take Mud Snappers off the murlocs at Elwynn's lakes (Crystal Lake, Mirror Lake, Stone Cairn) and grill three at the fire."
+text = "Take Mud Snappers from the murlocs at Crystal Lake, Mirror Lake or Stone Cairn, and grill 3 at the Cooking Fire."
 kind = "craft"
 what = "grilled_fish"
 count = 3
@@ -2765,14 +2765,14 @@ reward = { pumpkin = 2 }
 
 [[goal]]
 title = "The Smuggler's Logbook"
-text = "The scouts have read the Defias logbook by the chest: its first page goes down to the Deadmines. Read it and go down once."
+text = "Read the Smuggler's Logbook by Camp Storage and go down to the Deadmines once. The scouts say its first page leads there."
 kind = "delve"
 what = "book"
 reward = { linen = 3 }
 
 [[goal]]
 title = "Cookie's stew pot"
-text = "Below, Cookie keeps the smugglers fed from his stew pot by the pier in the cove. Kill him once (he throws his stew at half his health: step out of the rings)."
+text = "Kill Cookie once, by his stew pot at the pier in the cove below. At 50% health he throws his stew, so step out of the rings."
 kind = "kill"
 what = "dm_cookie"
 reward = { whetstone = 2, linen = 2 }
@@ -2786,21 +2786,21 @@ reward = { leather = 2 }
 
 [[goal]]
 title = "Armor of hide"
-text = "Make a Hide Jerkin at the tanning rack and wear it."
+text = "Make a Hide Jerkin at the Tanning Rack and equip it."
 kind = "wear"
 what = "chest"
 reward = { linen = 4 }
 
 [[goal]]
 title = "A herbalist's cauldron"
-text = "Build a Herbalist's Cauldron (boulders along the mine road give stone)."
+text = "Build a Herbalist's Cauldron. Boulders along the mine road give stone."
 kind = "build"
 what = "cauldron"
 reward = { peacebloom = 4 }
 
 [[goal]]
 title = "Salves for the road"
-text = "Brew four Healing Salves."
+text = "Brew 4 Healing Salves."
 kind = "craft"
 what = "salve"
 count = 4
@@ -2808,7 +2808,7 @@ reward = { silverleaf = 2 }
 
 [[goal]]
 title = "Elwynn's secrets"
-text = "Some things in Elwynn are hidden: they show themselves only when you come close (a den, behind a farm, under a dock, behind a waterfall). Come upon two."
+text = "Find 2 of Elwynn's hidden places. They show only up close. Look in a den, behind a farm, under a dock and behind a waterfall."
 kind = "secret"
 what = "any"
 count = 2
@@ -2816,28 +2816,28 @@ reward = { silver = 2 }
 
 [[goal]]
 title = "Drive off the Darkspear"
-text = "The Darkspear come from their camp to the west: ring the bell and beat them."
+text = "Ring the bell and beat the Darkspear. They come from their camp to the west."
 kind = "raid"
 what = "1"
 reward = { tin = 4 }
 
 [[goal]]
 title = "The Darkspear camp"
-text = "Take the fight to them: kill every Darkspear at their camp to the west."
+text = "Kill every Darkspear at their camp to the west. Take the fight to them."
 kind = "clear"
 what = "darkspear"
 reward = { hide = 4 }
 
 [[goal]]
 title = "The Overseer"
-text = "Fell the Warsong Overseer in the mine yard: dodge the slam, kick the wind-up."
+text = "Kill the Warsong Overseer in the mine yard. Dodge the slam, kick the windup."
 kind = "kill"
 what = "overseer"
 reward = { bronze = 2 }
 
 [[goal]]
 title = "Silver"
-text = "Jasperlode, Echo Ridge and Ridgepoint have silver in their deeper veins (and their kobolds carry some): bank four at the Camp Storage chest."
+text = "Bank 4 Silver Ore. Jasperlode, Echo Ridge and Ridgepoint have silver in their deeper veins, and their kobolds carry some."
 kind = "bank"
 what = "silver"
 count = 4
@@ -2845,21 +2845,21 @@ reward = { bronze = 2 }
 
 [[goal]]
 title = "Take the mine yard"
-text = "Kill every Warsong fighter in the Fargodeep mine yard: they stay away for ten minutes."
+text = "Kill every Warsong fighter in the Fargodeep mine yard. They stay away for 10 min."
 kind = "clear"
 what = "mine"
 reward = { ore = 4 }
 
 [[goal]]
 title = "Hogger"
-text = "Hogger roams the Riverpaw camps of Forest's Edge, west past the orchard: bring him down. The Westbrook armory opens when he falls."
+text = "Bring down Hogger. He roams the Riverpaw camps of Forest's Edge, west past the orchard. The Westbrook armory opens when he falls."
 kind = "kill"
 what = "hogger"
 reward = { leather = 3, silver = 1 }
 
 [[goal]]
 title = "Bronze"
-text = "Smelt four Bronze Bars at the anvil (copper and tin from the back of the mine yard)."
+text = "Smelt 4 Bronze Bars at the Smithing Anvil. Copper and tin come from the back of the mine yard."
 kind = "craft"
 what = "bronze"
 count = 4
@@ -2867,7 +2867,7 @@ reward = { stone = 4 }
 
 [[goal]]
 title = "A wall"
-text = "Raise a Crate Bulwark: raiders break it before they reach what it guards."
+text = "Build a Crate Bulwark. Raiders must break it to reach what it guards."
 kind = "build"
 what = "palisade"
 reward = { wood = 10 }
@@ -2881,7 +2881,7 @@ reward = { whetstone = 4 }
 
 [[goal]]
 title = "The far reaches"
-text = "Find eighteen of Elwynn's places: Northshire, the lakes, the Tower of Azora, Eastvale, Ridgepoint..."
+text = "Find 18 of Elwynn's places, from Northshire and the lakes to the Tower of Azora, Eastvale and Ridgepoint."
 kind = "explore"
 what = "any"
 count = 18
@@ -2889,21 +2889,21 @@ reward = { silk = 4, wool = 4 }
 
 [[goal]]
 title = "An explorer's pack"
-text = "Make an Explorer's Pack at the tanning rack (spider silk from Jasperlode, wool off the Brotherhood): resources stack two and a half times as high."
+text = "Make an Explorer's Pack at the Tanning Rack, with spider silk from Jasperlode and wool from the Brotherhood. Resources stack 150% higher."
 kind = "craft"
 what = "explorer_pack"
 reward = { fish = 4, meat = 4 }
 
 [[goal]]
 title = "Archers on the wall"
-text = "Raise a Watchtower by the bulwark (timber, stone and bronze): its archers shoot raiders in reach."
+text = "Build a Watchtower by the bulwark with timber, stone and bronze. Its archers shoot raiders in range."
 kind = "build"
 what = "watchtower"
 reward = { stone = 4, wood = 6 }
 
 [[goal]]
 title = "The classes' trials"
-text = "Each class's champion guards its strongest card (Warlord Gorzak, Brother Malach, Morvane, the Unbound Flame, Rumbler, Vexx, Morgan, Old Blackfang, Moonfeather): everyone who fights it learns it. Learn sixteen cards between you, from shrines, hidden relics and champions."
+text = "Learn 16 cards between you, from shrines, hidden relics and champions. Everyone who fights a champion learns its card. The champions are Warlord Gorzak, Brother Malach, Morvane, the Unbound Flame, Rumbler, Vexx, Morgan, Old Blackfang and Moonfeather."
 kind = "learn"
 what = "any"
 count = 16
@@ -2911,21 +2911,21 @@ reward = { silver = 3, pearl = 2 }
 
 [[goal]]
 title = "Break the warband"
-text = "The whole Horde camp comes up the road with Warlord Gorzak at its back: ring the bell and hold. He leaves his axe and helm in the chest."
+text = "Ring the bell and hold against the whole Horde camp, with Warlord Gorzak at its back. He leaves his axe and helm in storage."
 kind = "raid"
 what = "2"
 reward = { bronze = 6, leather = 4 }
 
 [[goal]]
 title = "Ridgepoint"
-text = "The Blackrock hold Ridgepoint Tower at Elwynn's eastern edge: kill Rak'gash the Herald and open the tower's armory."
+text = "Kill Rak'gash the Herald and open the tower's armory. The Blackrock hold Ridgepoint Tower at Elwynn's eastern edge."
 kind = "kill"
 what = "rakgash"
 reward = { bronze = 4, silver = 2 }
 
 [[goal]]
 title = "The Blackrock Assault"
-text = "With the warband broken the Blackrock come along the Goldshire road with Rak'gash at their back: ring the bell and hold."
+text = "Ring the bell and hold against the Blackrock Assault. With the warband broken, they come along the Goldshire road with Rak'gash at their back."
 kind = "raid"
 what = "3"
 reward = { silver = 3, bronze = 4 }
@@ -3051,7 +3051,7 @@ effects = [{ kind = "pull", amount = 3.0, from_caster = true }, { kind = "stagge
 [[ability]]
 key = "seed_of_corruption"
 name = "Seed of Corruption"
-text = "Plant a seed in a foe: 2 s later it bursts, 20 to everyone within 5 yards of them, and leaves each of them rotting, 4 a second for 4 s. Plant it in the one in the middle of the pack."
+text = "Plants a seed in an enemy. After 2 sec it bursts, dealing 20 damage to every enemy within 5 yd of the target, then 4 damage per sec for 4 sec. Best planted in the middle of a pack."
 icon = "Spell_Shadow_AbominationExplosion"
 school = "warlock"
 slot = "ranged"
@@ -3077,7 +3077,7 @@ effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0, aura = 172 }]
 key = "chaos_bolt"
 name = "Chaos Bolt"
 ex_of = "seed_of_corruption"
-text = "Hold 1 s, then let fly a bolt of chaos that tears through every foe in its line for 36. Let go early and it's lost; a heavy blow on you while you hold it breaks it."
+text = "Deals 36 damage to every enemy in a line. Hold 1 sec, then release. Releasing early wastes it. A heavy attack on you while you hold breaks it."
 icon = "Spell_Fire_SoulBurn"
 slot = "ranged"
 kind = "projectile"
@@ -3098,7 +3098,7 @@ impact_kit = 2709
 [[ability]]
 key = "fireball"
 name = "Fireball"
-text = "Grows bigger and harder the longer it charges, and sets what it strikes Burning for 4 s. Fire on a frozen foe shatters it: half again the damage."
+text = "Deals 16 to 36 damage, growing larger the longer you charge it, up to 1.5 sec. Sets the target Burning for 4 damage per sec for 4 sec. Fire on a frozen enemy shatters it for 50% more damage."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
@@ -3122,7 +3122,7 @@ effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 key = "pyroblast"
 name = "Pyroblast"
 ex_of = "fireball"
-text = "Hold 1.5 s to hurl a huge, slow fireball that burns for 6 s and shatters a frozen foe. Let go early and it's lost; a heavy blow on you while you hold it snuffs it."
+text = "Hold 1.5 sec to hurl a huge, slow fireball for 48 damage. It burns the target for 5 damage per sec for 6 sec and shatters a frozen enemy. Releasing early wastes it. A heavy attack on you while you hold snuffs it."
 icon = "Spell_Fire_Fireball02"
 slot = "ranged"
 kind = "projectile"
@@ -3143,7 +3143,7 @@ effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 5.0 }]
 [[ability]]
 key = "avengers_shield"
 name = "Avenger's Shield"
-text = "Throws your shield along the aimed line. It strikes the first enemy for 15 damage, then flies to up to 2 more enemies within 9 yd, preferring one that is casting. Each bounce deals less damage. Enemies hit are silenced for 1.5 sec (0.75 sec against players). With a two-handed weapon, throws Hammer of Justice instead."
+text = "Throws your shield along the aimed line. It strikes the first enemy for 15 damage, then flies to up to 2 more enemies within 9 yd, preferring one that is casting. Each bounce deals less damage. Enemies hit are silenced for 1.5 sec (0.75 sec against heroes). With a two-handed weapon, throws Hammer of Justice instead."
 icon = "Ability_Warrior_ShieldBash"
 school = "paladin"
 slot = "ranged"
@@ -3170,7 +3170,7 @@ two_hand = "hammer_of_justice"
 key = "holy_shock"
 name = "Holy Shock"
 ex_of = "avengers_shield"
-text = "Strikes the target nearest your reticle with holy light. An ally (or you, when no ally is near the reticle) is healed for 20% of maximum health. An enemy takes 30 damage instead."
+text = "Strikes the target nearest your reticle with holy light. An ally is healed for 20% of maximum health. An enemy takes 30 damage instead. With no ally near the reticle, heals you."
 icon = "Spell_Holy_SearingLight"
 slot = "ranged"
 kind = "ally"
@@ -3187,7 +3187,7 @@ foe_damage = true
 [[ability]]
 key = "shockwave"
 name = "Shockwave"
-text = "After a 0.4 sec windup, slams the ground and sends a shockwave through a 9 yd cone. Enemies hit take 120% weapon damage and are knocked back 4 yd. An enemy knocked into a wall or tree is stunned for 1.5 sec (0.75 sec against players)."
+text = "After a 0.4 sec windup, slams the ground and sends a shockwave through a 9 yd cone. Enemies hit take 120% weapon damage and are knocked back 4 yd. An enemy knocked into a wall or tree is stunned for 1.5 sec (0.75 sec against heroes)."
 icon = "Ability_ShockWave"
 school = "warrior"
 slot = "close"
@@ -3208,7 +3208,7 @@ effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
 key = "sundering_blow"
 name = "Sundering Blow"
 ex_of = "shockwave"
-text = "A 0.75 sec overhead strike that cannot be blocked, parried or interrupted; your weapon glows red during the windup. Deals 260% weapon damage, staggers for 1.2 sec and Sunders the target for 8 sec: it takes 15% more damage from all sources. Shatters frozen enemies."
+text = "A 0.75 sec overhead strike that cannot be blocked, parried or interrupted. Your weapon glows red during the windup. Deals 260% weapon damage, staggers the target for 1.2 sec and Sunders it for 8 sec, increasing all damage it takes by 15%. Shatters frozen enemies."
 icon = "Ability_Warrior_Sunder"
 slot = "close"
 kind = "art"
@@ -3229,7 +3229,7 @@ effects = [{ kind = "stagger", secs = [1.2, 1.2] }, { kind = "sunder", secs = [8
 [[ability]]
 key = "backstab"
 name = "Backstab"
-text = "A quick stab (0.25 s) for 120% of your weapon's damage, three times that from behind; on a foe Marked by your Fan of Knives it crits for half again."
+text = "A quick 0.25 sec stab for 120% weapon damage. Deals triple damage from behind. Against an enemy Marked by Fan of Knives, it crits for 50% more."
 icon = "Ability_BackStab"
 school = "rogue"
 slot = "close"
@@ -3247,7 +3247,7 @@ spell = 53
 key = "ambush"
 name = "Ambush"
 ex_of = "backstab"
-text = "First steps through the shadows behind the foe under your reticle (up to 12 yards), then stabs: always from behind."
+text = "Steps through the shadows behind the enemy under your reticle, up to 12 yd away, then stabs for 140% weapon damage. Always counts as from behind."
 icon = "Ability_Rogue_Ambush"
 slot = "close"
 kind = "art"
@@ -3265,7 +3265,7 @@ spell = 8676
 [[ability]]
 key = "cone_of_cold"
 name = "Cone of Cold"
-text = "A 10 yard cone along the reticle that slows by 50% for 4 s; a foe it finds already slowed freezes."
+text = "Blasts a 10 yd cone along the reticle for 18 damage, slowing enemies by 50% for 4 sec. Enemies already slowed are frozen."
 icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
@@ -3283,7 +3283,7 @@ effects = [{ kind = "snare", secs = [4.0, 4.0], amount = 0.5, freeze_if_snared =
 key = "frost_nova"
 name = "Frost Nova"
 ex_of = "cone_of_cold"
-text = "Freezes everything within 8 yards of you for 3 s (1.5 s on heroes), and for 5 s your Fireball key throws a Pyroblast for free. Freeze them, then shatter them."
+text = "Freezes every enemy within 8 yd of you for 3 sec (1.5 sec against heroes) and deals 6 damage. For 5 sec, your Fireball key casts a free Pyroblast. Freeze them, then shatter them."
 icon = "Spell_Frost_FrostNova"
 slot = "close"
 kind = "nova"
@@ -3355,7 +3355,7 @@ effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 [[ability]]
 key = "shadowstep"
 name = "Shadowstep"
-text = "Step through the shadows to the reticle, up to 20 yards, out of roots and slows. Press it again within 3 s to step straight back to where you were: dive, stab, gone."
+text = "Steps through the shadows to the reticle, up to 20 yd, breaking roots and slows. Press again within 3 sec to step straight back to where you were. \"Dive, stab, gone.\""
 icon = "Ability_Vanish"
 school = "rogue"
 slot = "utility"
@@ -3371,7 +3371,7 @@ recast_secs = 3.0
 [[ability]]
 key = "shadowstep_back"
 name = "Step Back"
-text = "Back to where your Shadowstep began."
+text = "Returns you to where your Shadowstep began."
 icon = "Ability_Rogue_Sprint"
 inner = true
 school = "rogue"
@@ -3385,7 +3385,7 @@ spell = 1856
 key = "dread_scream"
 name = "Dread Scream"
 icon = "Spell_Shadow_PsychicScream"
-text = "Dread Step's scream."
+text = "Dread Circle's scream. Every enemy within 6 yd flees in terror for 2 sec (1 sec against heroes)."
 inner = true
 school = "warlock"
 slot = "utility"
@@ -3398,7 +3398,7 @@ effects = [{ kind = "panic", secs = [2.0, 2.0] }]
 [[ability]]
 key = "blink"
 name = "Blink"
-text = "Step through space to the reticle, up to 20 yards; it breaks roots and slows."
+text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows."
 icon = "Spell_Arcane_Blink"
 school = "mage"
 slot = "utility"
@@ -3412,7 +3412,7 @@ spell = 1953
 key = "frost_blink"
 name = "Frost Blink"
 ex_of = "blink"
-text = "The Blink, and it leaves a Frost Nova where you stood."
+text = "Blinks to the reticle, up to 20 yd, breaking roots and slows. Leaves a Frost Nova where you stood."
 icon = "Spell_Frost_FrostNova"
 slot = "utility"
 kind = "blink"
@@ -3442,7 +3442,7 @@ effects = [{ kind = "steed", secs = [4.0, 4.0], amount = 1.0 }]
 [[ability]]
 key = "hammer_of_justice"
 name = "Hammer of Justice"
-text = "Throws a slow hammer along the aimed line. The first enemy hit takes 8 damage and is stunned for 1.5 sec (0.75 sec against players)."
+text = "Throws a slow hammer along the aimed line. The first enemy hit takes 8 damage and is stunned for 1.5 sec (0.75 sec against heroes)."
 icon = "Spell_Holy_SealOfMight"
 inner = true
 slot = "utility"
@@ -3478,7 +3478,7 @@ effects = [{ kind = "freedom", secs = [4.0, 4.0], amount = 1.0 }, { kind = "hast
 [[ability]]
 key = "retaliation"
 name = "Retaliation"
-text = "Braces for up to 1 sec. The first melee attack that strikes you from the front is blocked, and you counterattack every enemy in front of you for 150% weapon damage, staggering them for 1 sec. Ends early when you attack, dodge, jump, guard or use another ability. Does not stop projectiles. If nothing strikes you, the cooldown is halved."
+text = "Braces for up to 1 sec. The first melee attack that strikes you from the front is blocked, and you counterattack every enemy in front of you for 150% weapon damage, staggering them for 1 sec. Ends early when you attack, dodge, jump, guard or use another ability. Does not stop projectiles. If nothing strikes you, the cooldown is 50% shorter."
 icon = "Ability_Warrior_Challange"
 school = "warrior"
 slot = "defense"
@@ -3509,7 +3509,7 @@ effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 key = "shield_wall"
 name = "Shield Wall"
 ex_of = "retaliation"
-text = "Raises your shield for up to 4 sec. Melee attacks and projectiles from the front are blocked, and projectiles stop against the shield. You move at half speed. Ends when you attack, dodge or press it again."
+text = "Raises your shield for up to 4 sec. Melee attacks and projectiles from the front are blocked, and projectiles stop against the shield. You move 50% slower. Ends when you attack, dodge or press it again."
 icon = "Ability_Warrior_ShieldWall"
 slot = "defense"
 kind = "stance"
@@ -3523,7 +3523,7 @@ counter = { block = true, front = 180.0, ends_on_action = true, guard_pose = tru
 [[ability]]
 key = "drain_life"
 name = "Drain Life"
-text = "Tether the first foe along the reticle for 3 s and drain them, 12 a second, every point of it healing you, while you walk. Outlast what's hitting you. It snaps past 20 yards or out of sight."
+text = "Tethers the first enemy along the reticle for 3 sec, draining 12 damage per sec and healing you for all of it. You can walk while draining. The tether breaks beyond 20 yd or out of sight."
 icon = "Spell_Shadow_LifeDrain02"
 school = "warlock"
 slot = "defense"
@@ -3541,7 +3541,7 @@ aura = 689
 key = "death_coil"
 name = "Death Coil"
 ex_of = "drain_life"
-text = "Hurl a coil of shadow: the foe it strikes flees in terror for 3 s (1.5 s on heroes), and you heal 15% of your health. Your way out of a corner."
+text = "Hurls a coil of shadow for 14 damage. The enemy struck flees in terror for 3 sec (1.5 sec against heroes), and you heal 15% of your health."
 icon = "Spell_Shadow_DeathCoil"
 slot = "defense"
 kind = "projectile"
@@ -3558,7 +3558,7 @@ effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 [[ability]]
 key = "ice_block"
 name = "Ice Block"
-text = "Encased in ice for 2 s: nothing reaches you, but you can't act either; press it again to break out early."
+text = "Encases you in ice for 2 sec. Nothing can harm you, but you cannot act. Press again to break out early."
 icon = "Spell_Frost_Frost"
 school = "mage"
 slot = "defense"
@@ -3573,7 +3573,7 @@ counter = { immune = true }
 key = "cold_snap"
 name = "Cold Snap"
 ex_of = "ice_block"
-text = "The Ice Block, and as it breaks (or you break out) it freezes everything within 8 yards for 3 s."
+text = "Ice Block, and when it breaks or you break out, freezes every enemy within 8 yd for 3 sec."
 icon = "Spell_Frost_WizardMark"
 slot = "defense"
 kind = "stance"
@@ -3619,7 +3619,7 @@ lockout = 60.0
 [[ability]]
 key = "onslaught"
 name = "Onslaught"
-text = "For 8 sec, you grow 30% larger and your weapon glows red. Your attacks and guard cost no Stamina, you attack 20% faster, you cannot be staggered or knocked back, and your heavy attacks cannot be blocked. Stuns, roots and damage still affect you."
+text = "For 8 sec, you grow 30% larger and your weapon glows red. Your attacks and guard cost no stamina, you attack 20% faster, you cannot be staggered or knocked back, and your heavy attacks cannot be blocked. Stuns, roots and damage still affect you."
 icon = "Ability_Racial_BloodRage"
 school = "warrior"
 slot = "ultimate"
@@ -3635,7 +3635,7 @@ effects = [{ kind = "onslaught", secs = [8.0, 8.0], amount = 0.2 }]
 [[ability]]
 key = "death_mark"
 name = "Death Mark"
-text = "A bolt that marks what it strikes for death: for 8 s it takes 30% more from everything, and if it dies marked, all your cooldowns are ready again."
+text = "Fires a bolt for 20 damage that marks the target for death. For 8 sec it takes 30% more damage from all sources. If it dies while marked, all your cooldowns are reset."
 icon = "Ability_Hunter_SniperShot"
 school = "rogue"
 slot = "ultimate"
@@ -3654,7 +3654,7 @@ effects = [{ kind = "deathmark", secs = [8.0, 8.0], amount = 0.3 }]
 [[ability]]
 key = "avenging_wrath"
 name = "Avenging Wrath"
-text = "For 10 sec, holy light gathers around you. Each of your heavy attacks releases a wave of light 10 yd forward. Enemies it passes take 80% weapon damage. Allies it passes gain a shield that absorbs 10% of their maximum health; a new shield replaces the old one."
+text = "For 10 sec, holy light gathers around you. Each of your heavy attacks releases a wave of light 10 yd forward. Enemies it passes take 80% weapon damage. Allies it passes gain a shield that absorbs 10% of their maximum health. A new shield replaces the old one."
 icon = "Spell_Holy_AuraOfLight"
 school = "paladin"
 slot = "ultimate"
@@ -3669,7 +3669,7 @@ effects = [{ kind = "wrath", secs = [10.0, 10.0], amount = 1.0 }]
 [[ability]]
 key = "avenging_wave"
 name = "Avenging Wrath"
-text = "A wave of light: enemies take 80% weapon damage, allies gain a shield absorbing 10% of their maximum health."
+text = "A wave of light. Enemies take 80% weapon damage. Allies gain a shield that absorbs 10% of their maximum health."
 icon = "Spell_Holy_AuraOfLight"
 slot = "ultimate"
 kind = "line"
@@ -3714,7 +3714,7 @@ effects = [{ kind = "stun", secs = [1.0, 1.6] }]
 [[ability]]
 key = "frostbolt"
 name = "Frostbolt"
-text = "Charge 0.4 to 1.2 s: the longer, the harder it lands and the longer it slows (by 40%)."
+text = "Charge for 0.4 to 1.2 sec. Deals 16 to 32 damage and slows the target by 40% for 2 to 4 sec, more the longer you charge."
 icon = "Spell_Frost_FrostBolt02"
 school = "mage"
 slot = "ranged"
@@ -3737,7 +3737,7 @@ effects = [{ kind = "snare", secs = [2.0, 4.0], amount = 0.4 }]
 key = "deep_freeze_bolt"
 name = "Deep Freeze Bolt"
 ex_of = "frostbolt"
-text = "Freezes what it strikes for 1.5 s instead of slowing it."
+text = "Deals 14 to 24 damage and freezes the target for 1.5 sec instead of slowing it."
 icon = "Spell_Frost_FrostShock"
 slot = "ranged"
 kind = "projectile"
@@ -3755,7 +3755,7 @@ effects = [{ kind = "petrify", secs = [1.5, 1.5] }]
 [[ability]]
 key = "flamestrike"
 name = "Flamestrike"
-text = "A pillar of fire at the reticle, marked for 1 s before it lands, then burning ground for 6 s."
+text = "Calls a pillar of fire at the reticle. The spot is marked for 1 sec, then takes 30 damage within 4 yd and burns for 6 sec at 6 damage per sec."
 icon = "Spell_Fire_SelfDestruct"
 school = "mage"
 slot = "ranged"
@@ -3777,7 +3777,7 @@ linger_spell = 13812
 key = "flash_flamestrike"
 name = "Flash Flamestrike"
 ex_of = "flamestrike"
-text = "No delay, half the radius."
+text = "Flamestrike with no delay and a 2 yd radius. Deals 26 damage, and the ground burns for 4 sec at 6 damage per sec."
 icon = "Spell_Fire_SelfDestruct"
 slot = "ranged"
 kind = "ground"
@@ -3795,7 +3795,7 @@ linger_spell = 13812
 [[ability]]
 key = "entangling_roots"
 name = "Entangling Roots"
-text = "A seed along the reticle instead: the first foe it strikes is rooted for 3 s (1.5 s on heroes); after the first second, damage breaks it. Hold them still for a Mind Blast or a Meteor."
+text = "Throws a seed along the reticle instead. The first enemy it strikes takes 4 damage and is rooted for 3 sec (1.5 sec against heroes). After 1 sec, damage breaks the root. Hold them still for a Mind Blast or a Meteor."
 icon = "Spell_Nature_StrangleVines"
 slot = "ranged"
 kind = "projectile"
@@ -3811,7 +3811,7 @@ effects = [{ kind = "root", secs = [3.0, 3.0], break_after = 1.0 }]
 [[ability]]
 key = "natures_grasp"
 name = "Nature's Grasp"
-text = "A 3 s stance: the first who strikes you in melee is rooted for 2 s (the blow still lands)."
+text = "For 3 sec, the first enemy to strike you in melee is rooted for 2 sec. The attack still lands."
 icon = "Spell_Nature_NaturesWrath"
 school = "druid"
 slot = "utility"
@@ -3826,7 +3826,7 @@ counter = { melee_only = true, once = true, attacker = [{ kind = "root", secs = 
 [[ability]]
 key = "earthbind_totem"
 name = "Earthbind Totem"
-text = "Set a totem down at the reticle: every foe within 10 yards of it is slowed by 50%, for 15 s or until it's broken."
+text = "Places a totem at the reticle, up to 20 yd away. Every enemy within 10 yd of it is slowed by 50%. Lasts 15 sec or until destroyed."
 icon = "Spell_Nature_StrengthOfEarthTotem02"
 school = "shaman"
 slot = "utility"
@@ -3842,7 +3842,7 @@ effects = [{ kind = "snare", secs = [1.5, 1.5], amount = 0.5 }]
 [[ability]]
 key = "fire_ward"
 name = "Fire Ward"
-text = "A 1.5 s stance: projectiles that reach you are absorbed and fired back as Fire Blasts."
+text = "For 1.5 sec, projectiles that reach you are absorbed and fired back as Fire Blasts."
 icon = "Spell_Fire_FireArmor"
 school = "mage"
 slot = "defense"
@@ -3858,7 +3858,7 @@ counter = { reflect = "fire_blast" }
 key = "fire_blast"
 name = "Fire Blast"
 icon = "Spell_Fire_Fireball"
-text = "Fire Ward's answer to a projectile."
+text = "Fire Ward's answer to a projectile. Deals 20 damage."
 inner = true
 slot = "ranged"
 kind = "projectile"
@@ -3947,7 +3947,7 @@ respawn = 0.0
 key = "heroic_leap"
 name = "Heroic Leap"
 ex_of = "charge"
-text = "Leaps to the target location up to 16 yd away, over obstacles. Enemies within 4 yd of the landing take 12 damage, are knocked back 5 yd and slowed by 40% for 2 sec. Other players see where you will land."
+text = "Leaps to the target location up to 16 yd away, over obstacles. Enemies within 4 yd of the landing take 12 damage, are knocked back 5 yd and slowed by 40% for 2 sec. Other heroes see where you will land."
 icon = "Ability_WarStomp"
 slot = "utility"
 kind = "leap"
@@ -4171,7 +4171,7 @@ clip = 53
 [[ability]]
 key = "fan_of_knives"
 name = "Fan of Knives"
-text = "Flick three poisoned knives in a fan. Up close all three hit, each poisoning and Marking: a Backstab on a Marked foe crits. From farther off only one lands, so get in their face first. Two in hand."
+text = "Flicks 3 poisoned knives in a fan for 8 damage each. Each knife poisons for 3 damage per sec for 4 sec and Marks the target for 6 sec. Up close all 3 hit. From farther off only 1 lands. A Backstab on a Marked enemy crits. Holds 2 charges."
 icon = "INV_ThrowingKnife_04"
 school = "rogue"
 slot = "ranged"
@@ -4197,7 +4197,7 @@ effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 3.0, aura = 1978 }, { ki
 key = "crippling_throw"
 name = "Crippling Throw"
 ex_of = "fan_of_knives"
-text = "One long throw instead of the fan: a blade through two foes and on, 16 each, slowing them 50% for 3 s and poisoning them. Catch the one running away."
+text = "Throws a single blade instead of the fan. It passes through 2 enemies and on, dealing 16 damage to each, slowing them by 50% for 3 sec and poisoning them for 3 damage per sec for 4 sec. Catch the one running away."
 icon = "Ability_PoisonSting"
 slot = "ranged"
 kind = "projectile"
@@ -4215,7 +4215,7 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }, { kind = "burn",
 key = "blinding_step"
 name = "Blinding Step"
 ex_of = "shadowstep"
-text = "The Shadowstep, and where you come out a cloud of blinding powder incapacitates everyone within 4 yd for 3 s (1.5 s on heroes); any damage ends it. Backstab the one you meant, then press it again to step back out."
+text = "Shadowstep, and a cloud of blinding powder bursts where you come out. Every enemy within 4 yd is incapacitated for 3 sec (1.5 sec against heroes), and any damage ends it. Backstab the one you meant, then press again to step back out."
 icon = "Ability_Gouge"
 slot = "utility"
 kind = "blink"
@@ -4231,7 +4231,7 @@ recast_secs = 3.0
 key = "blinding_powder"
 name = "Blinding Powder"
 icon = "Spell_Shadow_MindSteal"
-text = "Blinding Step's cloud."
+text = "Blinding Step's cloud. Incapacitates every enemy within 4 yd for 3 sec."
 inner = true
 slot = "utility"
 kind = "nova"
@@ -4244,7 +4244,7 @@ effects = [{ kind = "incapacitate", secs = [3.0, 3.0] }]
 [[ability]]
 key = "smoke_bomb"
 name = "Smoke Bomb"
-text = "Smash a bomb at your feet: a 5 yd cloud of smoke for 4 s. Inside it you and your friends are hidden (creatures lose you, locks let go) and foes are slowed 30%. Strike from it, or slip away."
+text = "Smashes a bomb at your feet, filling 5 yd with smoke for 4 sec. You and allies inside are hidden, so enemies lose track of you and locks break. Enemies inside are slowed by 30%. Strike from it, or slip away."
 icon = "INV_Misc_Bomb_01"
 school = "rogue"
 slot = "defense"
@@ -4265,7 +4265,7 @@ effects = [{ kind = "snare", secs = [1.5, 1.5], amount = 0.3 }]
 key = "vanish"
 name = "Vanish"
 ex_of = "smoke_bomb"
-text = "Vanish at once: roots and slows fall off, creatures lose you, locks on you let go, and you run 30% faster for 2 s. Hidden 5 s or until you strike; that first blow counts as from behind (a Backstab's triple)."
+text = "Vanishes at once. Roots and slows fall off, enemies lose track of you, locks on you break, and you run 30% faster for 2 sec. You stay hidden for 5 sec or until you attack. That first attack counts as from behind, for Backstab's triple damage."
 icon = "Ability_Vanish"
 slot = "defense"
 kind = "buff"
@@ -4280,7 +4280,7 @@ effects = [{ kind = "veil", secs = [5.0, 5.0] }, { kind = "haste", secs = [2.0, 
 [[ability]]
 key = "penance"
 name = "Penance"
-text = "Hold a lance of light out from you for 1.5 s and sweep it as you turn: foes in it burn, friends in it heal. Rake it across a pack, or across a friend in trouble."
+text = "Holds a lance of light out from you for 1.5 sec, sweeping as you turn. Enemies in it take 20 damage per sec. Allies in it heal 4% of maximum health per sec. Rake it across a pack, or across an ally in trouble."
 icon = "Spell_Holy_HolySmite"
 school = "priest"
 slot = "ranged"
@@ -4309,7 +4309,7 @@ clip = 53
 key = "mind_blast"
 name = "Mind Blast"
 ex_of = "penance"
-text = "A dark star bursts at the reticle (up to 30 yd) 0.6 s later, drawn for everyone: 28 to all within 3.5 yd, and they flee in terror for 2 s (1 s on heroes). Lead your target."
+text = "A dark star bursts at the reticle, up to 30 yd away, 0.6 sec later. Its spot is shown to everyone. Deals 28 damage to all within 3.5 yd, and they flee in terror for 2 sec (1 sec against heroes). Lead your target."
 icon = "Spell_Shadow_UnholyFrenzy"
 slot = "ranged"
 kind = "ground"
@@ -4326,7 +4326,7 @@ effects = [{ kind = "panic", secs = [2.0, 2.0] }]
 [[ability]]
 key = "holy_nova"
 name = "Holy Nova"
-text = "Light bursts from you: 12 to every foe within 7 yd, and you and every friend in it heal 6% of their health."
+text = "Light bursts from you, dealing 12 damage to every enemy within 7 yd. You and every ally in it heal 6% of maximum health."
 icon = "Spell_Holy_HolyNova"
 school = "priest"
 slot = "close"
@@ -4341,7 +4341,7 @@ spell = 15237
 key = "psychic_scream"
 name = "Psychic Scream"
 ex_of = "holy_nova"
-text = "A scream: every foe within 8 yd flees in terror for 3 s (1.5 s on heroes); enough damage ends it early."
+text = "Every enemy within 8 yd flees in terror for 3 sec (1.5 sec against heroes). Enough damage ends it early."
 icon = "Spell_Shadow_PsychicScream"
 slot = "close"
 kind = "nova"
@@ -4353,7 +4353,7 @@ effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 [[ability]]
 key = "leap_of_faith"
 name = "Leap of Faith"
-text = "A ray of light along the reticle (up to 22 yd): the first body it touches, friend or foe, is pulled to you. Save a friend from a pack, or drag a foe into your Holy Nova."
+text = "Sends a ray of light along the reticle, up to 22 yd. The first target it touches, ally or enemy, is pulled to you. Save an ally from a pack, or drag an enemy into your Holy Nova."
 icon = "Spell_Holy_SealOfSalvation"
 school = "priest"
 slot = "utility"
@@ -4371,7 +4371,7 @@ effects = [{ kind = "pull", amount = 22.0, from_caster = true }]
 key = "mind_grip"
 name = "Mind Grip"
 ex_of = "leap_of_faith"
-text = "A faster ray of shadow: a foe is pulled to you and rooted for 2 s (1 s on heroes); a friend is pulled to you and shielded for 30."
+text = "A faster ray of shadow. An enemy is pulled to you and rooted for 2 sec (1 sec against heroes). An ally is pulled to you and shielded for 30 damage for 5 sec."
 icon = "Spell_Shadow_Possession"
 slot = "utility"
 kind = "projectile"
@@ -4389,7 +4389,7 @@ effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "root"
 [[ability]]
 key = "power_word_barrier"
 name = "Power Word: Barrier"
-text = "Raise a 6 yd dome of light around you for 5 s: you and every friend under it take 25% less and can't be staggered. Hold the line inside it."
+text = "Raises a 6 yd dome of light around you for 5 sec. You and every ally under it take 25% less damage and cannot be staggered. Hold the line inside it."
 icon = "Spell_Holy_PowerInfusion"
 school = "priest"
 slot = "defense"
@@ -4411,7 +4411,7 @@ self_effects = [{ kind = "hallowed", secs = [1.5, 1.5], amount = 0.25 }, { kind 
 key = "power_word_shield"
 name = "Power Word: Shield"
 ex_of = "power_word_barrier"
-text = "Shield the friend under your reticle (or yourself): it soaks 45 damage for 6 s, and they run 20% faster while it holds."
+text = "Shields the ally under your reticle, or you. The shield absorbs 45 damage for 6 sec, and they run 20% faster while it holds."
 icon = "Spell_Holy_PowerWordShield"
 slot = "defense"
 kind = "ally"
@@ -4423,7 +4423,7 @@ effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }, { kind = "hast
 [[ability]]
 key = "void_rift"
 name = "Void Rift"
-text = "Tear open the void at the reticle (up to 30 yd, 8 yd wide) after 0.8 s: 10 damage, then for 4 s it drags everyone in it 3 yd toward its middle each second, 6 a second. Pull them into a trap, a Volley, a Meteor."
+text = "Tears open the void at the reticle, up to 30 yd away, after 0.8 sec. Deals 10 damage, then for 4 sec drags every enemy in its 8 yd radius 3 yd toward its center each second, dealing 6 damage per sec. Pull them into a trap, a Volley or a Meteor."
 icon = "Spell_Shadow_SealOfKings"
 school = "priest"
 slot = "ultimate"
@@ -4448,7 +4448,7 @@ tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
 [[ability]]
 key = "lava_burst"
 name = "Lava Burst"
-text = "Lob molten rock at the reticle, over anyone in the way. It lands a moment later where the ring shows, bursting 3 yd wide, and the ground there burns for 3 s. Lead your target."
+text = "Lobs molten rock at the reticle, over anyone in the way. It lands a moment later where the ring shows, dealing 22 damage within 3 yd, and the ground burns for 3 sec at 5 damage per sec. Lead your target."
 icon = "Spell_Fire_Incinerate"
 school = "shaman"
 slot = "ranged"
@@ -4475,7 +4475,7 @@ linger_spell = 13812
 key = "chain_lightning"
 name = "Chain Lightning"
 ex_of = "lava_burst"
-text = "Lightning instead of the rock: a fast bolt along the reticle that leaps from what it strikes to the nearest other foe within 9 yd, twice: 20, then 14, then 10."
+text = "Lightning instead of the rock. A fast bolt along the reticle leaps from its target to the nearest other enemy within 9 yd, 2 times, dealing 20, then 14, then 10 damage."
 icon = "Spell_Nature_ChainLightning"
 slot = "ranged"
 kind = "projectile"
@@ -4493,7 +4493,7 @@ clip = 53
 [[ability]]
 key = "thunderstorm"
 name = "Thunderstorm"
-text = "Thunder all round you: 14 to every foe within 7 yd, thrown back 8 yd and slowed 30% for 2 s. Your answer to anyone in your face."
+text = "Thunder bursts around you, dealing 14 damage to every enemy within 7 yd. They are knocked back 8 yd and slowed by 30% for 2 sec. Your answer to anyone in your face."
 icon = "Spell_Nature_ThunderClap"
 school = "shaman"
 slot = "close"
@@ -4508,7 +4508,7 @@ effects = [{ kind = "knockback", amount = 8.0 }, { kind = "snare", secs = [2.0, 
 key = "thundercrack"
 name = "Thundercrack"
 ex_of = "thunderstorm"
-text = "A bigger storm (9 yd): 16 damage, thrown back 10 yd and silenced for 2 s (1 s on heroes): no abilities."
+text = "A bigger storm, 9 yd. Deals 16 damage, knocks enemies back 10 yd and silences them for 2 sec (1 sec against heroes), so they cannot use abilities."
 icon = "Spell_Nature_Purge"
 slot = "close"
 kind = "nova"
@@ -4522,7 +4522,7 @@ effects = [{ kind = "knockback", amount = 10.0 }, { kind = "silence", secs = [2.
 key = "earthgrab_totem"
 name = "Earthgrab Totem"
 ex_of = "earthbind_totem"
-text = "A totem at the reticle (up to 20 yd) for 9 s: every 3 s it roots every foe within 8 yd for 1.5 s (0.75 s on heroes). Break it to stop it."
+text = "Places a totem at the reticle, up to 20 yd away, for 9 sec. Every 3 sec it roots every enemy within 8 yd for 1.5 sec (0.75 sec against heroes). Destroy it to stop it."
 icon = "Spell_Nature_StoneClawTotem"
 slot = "utility"
 kind = "place"
@@ -4537,7 +4537,7 @@ effects = [{ kind = "root", secs = [1.5, 1.5] }]
 [[ability]]
 key = "healing_stream_totem"
 name = "Healing Stream Totem"
-text = "A totem at your feet for 10 s: you and every friend within 10 yd heal 3% of their health a second. Foes can break it."
+text = "Places a totem at your feet for 10 sec. You and every ally within 10 yd heal 3% of maximum health per sec. Enemies can destroy it."
 icon = "INV_Spear_04"
 school = "shaman"
 slot = "defense"
@@ -4554,7 +4554,7 @@ totem = { mob = "healing_stream_totem", radius = 10.0 }
 key = "grounding_totem"
 name = "Grounding Totem"
 ex_of = "healing_stream_totem"
-text = "A totem at your feet for 8 s that pulls the first foe's projectile flying within 8 yd into itself, and falls doing it: a Pyroblast, a hammer, a Death Mark."
+text = "Places a totem at your feet for 8 sec. It pulls the first enemy projectile within 8 yd into itself and is destroyed doing it, whether a Pyroblast, a hammer or a Death Mark."
 icon = "Spell_Nature_GroundingTotem"
 slot = "defense"
 kind = "place"
@@ -4569,7 +4569,7 @@ totem = { mob = "grounding_totem", radius = 8.0 }
 [[ability]]
 key = "earthquake"
 name = "Earthquake"
-text = "The ground at the reticle (up to 30 yd, 9 yd wide) heaves 0.9 s later: 18 damage and everyone in it stunned for 1.5 s (0.75 s on heroes), then 5 s of tremors, 8 a second, slowing 40%."
+text = "The ground at the reticle, up to 30 yd away, heaves 0.9 sec later. Deals 18 damage within 9 yd and stuns every enemy in it for 1.5 sec (0.75 sec against heroes). Then 5 sec of tremors deal 8 damage per sec and slow by 40%."
 icon = "Spell_Nature_Earthquake"
 school = "shaman"
 slot = "ultimate"
@@ -4594,7 +4594,7 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.4 }]
 [[ability]]
 key = "meteor"
 name = "Meteor"
-text = "Call a meteor down on the reticle (up to 34 yd); it lands 1.5 s later on a 7 yd circle drawn for everyone: 70 damage, thrown back 6 yd and burning 5 a second for 4 s, and the crater burns 4 s more. Freeze them first."
+text = "Calls a meteor down on the reticle, up to 34 yd away. It lands 1.5 sec later on a 7 yd circle shown to everyone. Deals 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 4 sec more at 8 damage per sec. Freeze them first."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ultimate"
@@ -4622,7 +4622,7 @@ effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4
 [[ability]]
 key = "shadowfury"
 name = "Shadowfury"
-text = "Shadow erupts at the reticle (up to 14 yd) 0.5 s later: 16 to all within 3.5 yd, stunned for 2 s (1 s on heroes)."
+text = "Shadow erupts at the reticle, up to 14 yd away, 0.5 sec later. Deals 16 damage to all within 3.5 yd and stuns them for 2 sec (1 sec against heroes)."
 icon = "Spell_Shadow_Curse"
 school = "warlock"
 slot = "close"
@@ -4641,7 +4641,7 @@ effects = [{ kind = "stun", secs = [2.0, 2.0] }]
 key = "shadowflame"
 name = "Shadowflame"
 ex_of = "shadowfury"
-text = "After a 0.3 s wind-up (drawn for everyone), breathe shadowflame in a 10 yd cone: 14 damage, burning 6 a second for 4 s, slowed 30% for 2 s."
+text = "After a 0.3 sec windup shown to everyone, breathes shadowflame in a 10 yd cone. Deals 14 damage, burns for 6 damage per sec for 4 sec and slows by 30% for 2 sec."
 icon = "Spell_Shadow_RainOfFire"
 slot = "close"
 kind = "cone"
@@ -4656,7 +4656,7 @@ effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 6.0 }, { kind = "snare",
 [[ability]]
 key = "demonic_circle"
 name = "Demonic Circle"
-text = "Press: draw a circle at your feet (it lasts 14 s and costs nothing). Press again: step back to it, out of roots and slows; then it cools down. Fight forward knowing the way out."
+text = "Press to draw a circle at your feet. It lasts 14 sec and costs nothing. Press again to step back to it, breaking roots and slows. Then the cooldown starts. Fight forward knowing the way out."
 icon = "Spell_Shadow_Teleport"
 school = "warlock"
 slot = "utility"
@@ -4671,7 +4671,7 @@ charge_spell = 18540
 key = "dread_circle"
 name = "Dread Circle"
 ex_of = "demonic_circle"
-text = "The step back to your circle, and where you left a scream sends every foe within 6 yd fleeing for 2 s (1 s on heroes)."
+text = "Steps back to your circle. Where you left, a scream sends every enemy within 6 yd fleeing for 2 sec (1 sec against heroes)."
 icon = "Spell_Shadow_Charm"
 slot = "utility"
 kind = "blink"
@@ -4685,7 +4685,7 @@ leaves = "dread_scream"
 [[ability]]
 key = "summon_infernal"
 name = "Summon Infernal"
-text = "An Infernal falls on the reticle (up to 28 yd) 1.2 s later, its landing drawn for everyone: 40 to all within 5 yd, stunned 2 s (1 s on heroes). It stands 10 s, burning everyone within 6 yd, 6 a second, until it's broken."
+text = "An Infernal falls on the reticle, up to 28 yd away, 1.2 sec later. Its landing is shown to everyone. Deals 40 damage to all within 5 yd and stuns them for 2 sec (1 sec against heroes). It stands for 10 sec, burning everyone within 6 yd for 6 damage per sec, until it is destroyed."
 icon = "Spell_Shadow_SummonInfernal"
 school = "warlock"
 slot = "ultimate"
@@ -4711,7 +4711,7 @@ tick_effects = [{ kind = "burn", secs = [1.5, 1.5], amount = 6.0 }]
 [[ability]]
 key = "living_seed"
 name = "Living Seed"
-text = "Throw a seed along the reticle: it strikes a foe for 16, or settles on a friend and heals them 4% of their health a second for 4 s. Two at hand."
+text = "Throws a seed along the reticle. It strikes an enemy for 16 damage, or settles on an ally and heals them 4% of maximum health per sec for 4 sec. Holds 2 charges."
 icon = "Spell_Nature_Rejuvenation"
 school = "druid"
 slot = "ranged"
@@ -4731,7 +4731,7 @@ effects = [{ kind = "regen", secs = [4.0, 4.0], amount = 0.04 }]
 [[ability]]
 key = "swipe"
 name = "Swipe"
-text = "Claw everything in a 6 yd arc in front of you (120°): 20 damage and a bleed, 3 a second for 3 s."
+text = "Claws every enemy in a 6 yd, 120° arc in front of you. Deals 20 damage and causes a bleed for 3 damage per sec for 3 sec."
 icon = "INV_Misc_MonsterClaw_03"
 school = "druid"
 slot = "close"
@@ -4747,7 +4747,7 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 3.0, aura = 1079 }]
 key = "typhoon"
 name = "Typhoon"
 ex_of = "swipe"
-text = "After a 0.25 s wind-up (drawn for everyone), a gale in a 10 yd cone: 16 damage, thrown back 9 yd and slowed 50% for 2 s."
+text = "After a 0.25 sec windup shown to everyone, a gale blasts a 10 yd cone. Deals 16 damage, knocks enemies back 9 yd and slows them by 50% for 2 sec."
 icon = "Spell_Nature_Cyclone"
 slot = "close"
 kind = "cone"
@@ -4762,7 +4762,7 @@ effects = [{ kind = "knockback", amount = 9.0 }, { kind = "snare", secs = [2.0, 
 [[ability]]
 key = "feral_leap"
 name = "Feral Leap"
-text = "Bound to the reticle (up to 14 yd), its landing drawn for everyone: 10 to all within 3 yd, staggered 1 s (whatever they had in hand is lost)."
+text = "Bounds to the reticle, up to 14 yd away. The landing is shown to everyone. Deals 10 damage to all within 3 yd and staggers them for 1 sec. Whatever they were doing is lost."
 icon = "Ability_Hunter_Pet_Cat"
 school = "druid"
 slot = "utility"
@@ -4780,7 +4780,7 @@ effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 key = "pounce"
 name = "Pounce"
 ex_of = "feral_leap"
-text = "The Feral Leap, and everyone it lands on is stunned 2 s (1 s on heroes) for 14 damage."
+text = "Feral Leap, and every enemy it lands on takes 14 damage and is stunned for 2 sec (1 sec against heroes)."
 icon = "Ability_Druid_SupriseAttack"
 slot = "utility"
 kind = "leap"
@@ -4796,7 +4796,7 @@ effects = [{ kind = "stun", secs = [2.0, 2.0] }]
 [[ability]]
 key = "barkskin"
 name = "Barkskin"
-text = "For 5 s you take 30% less from everything and nothing staggers you. You can still fight."
+text = "For 5 sec, you take 30% less damage from all sources and cannot be staggered. You can still fight."
 icon = "Spell_Nature_StoneClawTotem"
 school = "druid"
 slot = "defense"
@@ -4810,7 +4810,7 @@ effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 },
 key = "ironbark"
 name = "Ironbark"
 ex_of = "barkskin"
-text = "Wrap the friend under your reticle in bark (no one there: yourself): for 5 s they take 30% less from everything and heal 5% of their health a second."
+text = "Wraps the ally under your reticle in bark, or you if no ally is there. For 5 sec they take 30% less damage from all sources and heal 5% of maximum health per sec."
 icon = "Spell_Nature_Regeneration"
 slot = "defense"
 kind = "ally"
@@ -4822,7 +4822,7 @@ effects = [{ kind = "hallowed", secs = [5.0, 5.0], amount = 0.3, aura = 22812 },
 [[ability]]
 key = "hurricane"
 name = "Hurricane"
-text = "A storm on the reticle (up to 30 yd, 9 yd wide) 0.6 s later, for 5 s: 9 a second, slowed 50%, and every second its winds hurl everyone in it 3 yd out from its middle. Clear a point, or keep them off it."
+text = "A storm forms on the reticle, up to 30 yd away, 0.6 sec later and rages for 5 sec. Deals 8 damage, then enemies in its 9 yd radius take 9 damage per sec and are slowed by 50%. Every second its winds hurl them 3 yd out from its center. Clear a point, or keep them off it."
 icon = "Spell_Nature_Cyclone"
 school = "druid"
 slot = "ultimate"
@@ -4853,7 +4853,7 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }, { kind = "k
 [[ability]]
 key = "ricochet"
 name = "Ricochet"
-text = "A spike shot along the reticle that bounces from what it strikes to the nearest other foe within 8 yd, three times, and every bounce hits harder: 7, then 9, 11, 14. Weak on one, vicious in a crowd."
+text = "Fires a spike shot along the reticle that bounces from its target to the nearest other enemy within 8 yd, 3 times. Each bounce hits harder, for 7, then 9, 11 and 14 damage. Weak against one, vicious in a crowd."
 icon = "Spell_Nature_Thorns"
 school = "beta"
 slot = "ranged"
@@ -4875,7 +4875,7 @@ clip = 107
 key = "pinball"
 name = "Pinball"
 ex_of = "ricochet"
-text = "Five bounces, each harder than the last, and everything it strikes is stunned for a moment (0.75 s, less on heroes). Into a pack it ends at 21 a hit."
+text = "Bounces 5 times, each harder than the last. Every enemy it strikes is stunned for 0.75 sec (0.375 sec against heroes). In a pack it ends at 21 damage a hit."
 icon = "Spell_Nature_StarFall"
 slot = "ranged"
 kind = "projectile"
@@ -4896,7 +4896,7 @@ effects = [{ kind = "stun", secs = [0.75, 0.75] }]
 [[ability]]
 key = "gravity_lance"
 name = "Gravity Lance"
-text = "A heavy bolt of shadow along the reticle (up to 24 yd). Where it strikes, every other foe within 5 yd is dragged into the one it hit, and all of them take 14. Bunch them up for any area card."
+text = "Fires a heavy bolt of shadow along the reticle, up to 24 yd. Every other enemy within 5 yd of the one it hits is dragged into it, and all of them take 14 damage. Bunch them up for any area card."
 icon = "Spell_Arcane_StarFire"
 school = "beta"
 slot = "ranged"
@@ -4917,7 +4917,7 @@ effects = [{ kind = "pull", amount = 5.0, lift = 3.0 }]
 key = "collapse"
 name = "Collapse"
 ex_of = "gravity_lance"
-text = "A wider pull (6 yd) that hits 16, and everything it drags in is slowed 70% for 2 s: they stay in the heap."
+text = "A wider pull, 6 yd, that deals 16 damage. Every enemy it drags in is slowed by 70% for 2 sec, so they stay in the heap."
 icon = "Spell_Shadow_BlackPlague"
 slot = "ranged"
 kind = "projectile"
@@ -4974,7 +4974,7 @@ effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "snare
 [[ability]]
 key = "displacer_orb"
 name = "Displacer Orb"
-text = "A slow, glowing orb along the reticle (up to 22 yd). Whatever it touches, foe or friend, trades places with you: 6 damage to a foe. Pull a friend out of trouble, put a foe where your friends are, or hop past a wall of them. Bosses and the unstoppable hold their ground."
+text = "Fires a slow, glowing orb along the reticle, up to 22 yd. Whatever it touches, enemy or ally, trades places with you. An enemy takes 6 damage. Pull an ally out of trouble, put an enemy among your allies, or hop past a wall of them. Bosses and unstoppable enemies hold their ground."
 icon = "INV_Misc_Orb_02"
 school = "beta"
 slot = "ranged"
@@ -4994,7 +4994,7 @@ clip = 54
 key = "displacer_pulse"
 name = "Displacer Pulse"
 ex_of = "displacer_orb"
-text = "The same swap, and a foe you trade places with is left slowed 40% for 2 s, stranded where you were."
+text = "The same swap, and an enemy you trade places with takes 8 damage and is slowed by 40% for 2 sec, stranded where you were."
 icon = "INV_Misc_Orb_05"
 slot = "ranged"
 kind = "projectile"
@@ -5013,7 +5013,7 @@ effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
 [[ability]]
 key = "whirlwind"
 name = "Whirlwind"
-text = "Spin for 2 s, still on the move: everything within 4 yd in front of you and to your sides takes 5 every half second. Turn to carve through a pack; press it again to stop."
+text = "Spins for 2 sec while you keep moving. Every enemy within 4 yd in front of you and to your sides takes 5 damage every 0.5 sec. Turn to carve through a pack. Press again to stop."
 icon = "Ability_Whirlwind"
 school = "beta"
 slot = "close"
@@ -5035,7 +5035,7 @@ self_effects = [{ kind = "haste", secs = [2.0, 2.0], amount = 0.6 }]
 key = "bladestorm"
 name = "Bladestorm"
 ex_of = "whirlwind"
-text = "Three seconds of it, and nothing staggers you while you spin: walk it through their swings."
+text = "Whirlwind for 3 sec, and nothing staggers you while you spin. Walk it through their swings."
 icon = "Ability_Warrior_Cleave"
 slot = "close"
 kind = "beam"
@@ -5121,7 +5121,7 @@ effects = [{ kind = "knockback", amount = 4.0 }]
 [[ability]]
 key = "siphon_blade"
 name = "Siphon Blade"
-text = "A dark slash in a 4 yd arc in front of you: 12 to every foe in it, and you heal 60% of all it deals. Three foes, a potion's worth."
+text = "A dark slash in a 4 yd arc in front of you. Deals 12 damage to every enemy in it, and you heal for 60% of the damage dealt."
 icon = "Spell_Shadow_SiphonMana"
 school = "beta"
 slot = "close"
@@ -5138,7 +5138,7 @@ impact_kit = 2709
 key = "soul_rend"
 name = "Soul Rend"
 ex_of = "siphon_blade"
-text = "A wider, deeper slash (5 yd, 140°): 16 to each, and every point of it comes back to you as health."
+text = "A wider, deeper slash, 5 yd and 140°. Deals 16 damage to each enemy, and you heal for all of it."
 icon = "Spell_Shadow_UnholyStrength"
 slot = "close"
 kind = "cone"
@@ -5154,7 +5154,7 @@ impact_kit = 2709
 [[ability]]
 key = "wall_slam"
 name = "Wall Slam"
-text = "A shoulder shove (4 yd in front): 8 damage and thrown back 6 yd. Anything that hits a wall or a rock face on the way is stunned 1.5 s (less on heroes). Line it up first."
+text = "A shoulder shove 4 yd in front of you. Deals 8 damage and knocks the enemy back 6 yd. An enemy knocked into a wall or rock face is stunned for 1.5 sec (0.75 sec against heroes). Line it up first."
 icon = "Ability_Warrior_PunishingBlow"
 school = "beta"
 slot = "close"
@@ -5171,7 +5171,7 @@ effects = [{ kind = "knockback", amount = 6.0, wall_stun = 1.5 }]
 key = "haymaker"
 name = "Haymaker"
 ex_of = "wall_slam"
-text = "A full swing: 10 damage, thrown back 10 yd, and a wall stuns 2 s."
+text = "A full swing. Deals 10 damage and knocks the enemy back 10 yd. Hitting a wall stuns for 2 sec (1 sec against heroes)."
 icon = "Ability_Warrior_DecisiveStrike"
 slot = "close"
 kind = "cone"
@@ -5187,7 +5187,7 @@ effects = [{ kind = "knockback", amount = 10.0, wall_stun = 2.0 }]
 [[ability]]
 key = "blink_dagger"
 name = "Blink Dagger"
-text = "Blink 12 yd to the reticle; press it again within 3 s to blink again. The most mobile card on the board, and nothing else."
+text = "Blinks 12 yd to the reticle. Press again within 3 sec to blink again. The most mobile card on the board, and nothing else."
 icon = "INV_Weapon_ShortBlade_05"
 school = "beta"
 slot = "utility"
@@ -5212,7 +5212,7 @@ spell = 1856
 key = "phase_strike"
 name = "Phase Strike"
 ex_of = "blink_dagger"
-text = "Both blinks, and each lands with a strike: 8 to every foe within 3 yd of where you come out."
+text = "Both blinks, and each lands with a strike for 8 damage to every enemy within 3 yd of where you come out."
 icon = "Spell_Shadow_Twilight"
 slot = "utility"
 kind = "blink"
@@ -5237,7 +5237,7 @@ also = "phase_strike_hit"
 [[ability]]
 key = "phase_strike_hit"
 name = "Phase Strike"
-text = "Where a Phase Strike comes out."
+text = "Where a Phase Strike comes out. Deals 8 damage within 3 yd."
 inner = true
 slot = "utility"
 kind = "ground"
@@ -5250,7 +5250,7 @@ spell = 6343
 [[ability]]
 key = "phase_dash"
 name = "Phase Dash"
-text = "Dash 10 yd along the reticle straight through foes, untouchable on the way: each one you pass through takes 4 and burns, 4 a second for 3 s."
+text = "Dashes 10 yd along the reticle straight through enemies. You cannot be hit during the dash. Each enemy you pass through takes 4 damage and burns for 4 damage per sec for 3 sec."
 icon = "Ability_Rogue_Sprint"
 school = "beta"
 slot = "utility"
@@ -5268,7 +5268,7 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
 key = "searing_dash"
 name = "Searing Dash"
 ex_of = "phase_dash"
-text = "A longer dash (14 yd), and everyone you pass through is slowed 40% for 2 s as well as burning."
+text = "A longer dash, 14 yd. Every enemy you pass through burns and is slowed by 40% for 2 sec."
 icon = "Spell_Fire_FlameShock"
 slot = "utility"
 kind = "dash"
@@ -5284,7 +5284,7 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }, { kind = "snare",
 [[ability]]
 key = "rewind"
 name = "Rewind"
-text = "Leave an echo where you stand. Within 4 s, press it again: you snap back to the echo with the health you had when you left it (never less than now). Dive in, take the hit, undo it."
+text = "Leaves an echo where you stand. Press again within 4 sec to snap back to the echo with the health you had when you left it, never less than now. Dive in, take the hit, undo it."
 icon = "Spell_Nature_TimeStop"
 school = "beta"
 slot = "utility"
@@ -5299,7 +5299,7 @@ burst_spell = 1953
 [[ability]]
 key = "rewind_back"
 name = "Rewind"
-text = "Back to the echo."
+text = "Returns you to the echo."
 inner = true
 slot = "utility"
 kind = "buff"
@@ -5309,7 +5309,7 @@ spell = 1953
 key = "paradox"
 name = "Paradox"
 ex_of = "rewind"
-text = "The echo fights for you: when you snap back to it, everything within 4 yd of it takes 10."
+text = "Rewind, and the echo fights for you. When you snap back to it, every enemy within 4 yd of it takes 10 damage."
 icon = "Spell_Arcane_ArcaneResilience"
 slot = "utility"
 kind = "buff"
@@ -5323,7 +5323,7 @@ burst_spell = 1953
 [[ability]]
 key = "paradox_back"
 name = "Paradox"
-text = "Back to the echo, and it bursts."
+text = "Returns you to the echo, and it bursts for 10 damage within 4 yd."
 inner = true
 slot = "utility"
 kind = "nova"
@@ -5335,7 +5335,7 @@ spell = 1449
 [[ability]]
 key = "jump_pad"
 name = "Jump Pad"
-text = "Throw down a pad at the reticle (up to 8 yd; it lasts 8 s, two at once). You or any friend who steps on it is launched 14 yd the way they're facing. Foes can't use it."
+text = "Throws down a pad at the reticle, up to 8 yd away. It lasts 8 sec, 2 at a time. You or any ally who steps on it is launched 14 yd the way they face. Enemies cannot use it."
 icon = "INV_Gizmo_RocketBoot_01"
 school = "beta"
 slot = "utility"
@@ -5352,7 +5352,7 @@ burst_spell = 1953
 key = "launch_rig"
 name = "Launch Rig"
 ex_of = "jump_pad"
-text = "A stronger pad: 20 yd, and whoever it throws lands with a shove, 6 damage and foes within 1.5 yd thrown back 3 yd."
+text = "A stronger pad that launches 20 yd. Whoever it throws lands with a shove, dealing 6 damage and knocking enemies within 1.5 yd back 3 yd."
 icon = "INV_Gizmo_02"
 slot = "utility"
 kind = "trap"
@@ -5370,7 +5370,7 @@ effects = [{ kind = "knockback", amount = 3.0 }]
 [[ability]]
 key = "riposte"
 name = "Riposte"
-text = "A 0.8 s parry: the first melee blow or projectile is turned aside, and an attacker within 6 yd reels (staggered 1 s) and bleeds, 7 a second for 4 s. Caught, it's back in half the time. Read the swing."
+text = "A 0.8 sec parry. The first melee attack or projectile is turned aside, and an attacker within 6 yd is staggered for 1 sec and bleeds for 7 damage per sec for 4 sec. If it catches an attack, the cooldown is 50% shorter. Read the swing."
 icon = "Ability_Parry"
 school = "beta"
 slot = "defense"
@@ -5387,7 +5387,7 @@ counter = { block = true, once = true, attacker = [{ kind = "stagger", secs = [1
 key = "counterstrike"
 name = "Counterstrike"
 ex_of = "riposte"
-text = "A longer parry (1.2 s), and the attacker it catches is stunned 1.2 s (less on heroes) as well as cut."
+text = "A longer parry, 1.2 sec. The attacker it catches is stunned for 1.2 sec (0.6 sec against heroes) as well as cut."
 icon = "Ability_Warrior_Riposte"
 slot = "defense"
 kind = "stance"
@@ -5401,7 +5401,7 @@ counter = { block = true, once = true, attacker = [{ kind = "stun", secs = [1.2,
 [[ability]]
 key = "cheat_death"
 name = "Cheat Death"
-text = "For 6 s, a blow that would kill you leaves you at 1 health instead, and you heal a quarter of your health over the next 3 s. Spent once it saves you."
+text = "For 6 sec, an attack that would kill you leaves you at 1 health instead, and you heal 25% of your health over the next 3 sec. Ends once it saves you."
 icon = "Spell_Shadow_RitualOfSacrifice"
 school = "beta"
 slot = "defense"
@@ -5415,7 +5415,7 @@ effects = [{ kind = "cheat_death", secs = [6.0, 6.0], amount = 0.25, aura = 8909
 key = "undying"
 name = "Undying"
 ex_of = "cheat_death"
-text = "Ten seconds of it, and the save heals 40%."
+text = "Cheat Death for 10 sec, and the save heals 40%."
 icon = "Spell_Shadow_DarkRitual"
 slot = "defense"
 kind = "buff"
@@ -5427,7 +5427,7 @@ effects = [{ kind = "cheat_death", secs = [10.0, 10.0], amount = 0.4, aura = 890
 [[ability]]
 key = "reflect"
 name = "Reflect"
-text = "Raise a mirror for 1 s: bolts, arrows and spells that would hit you fly back at whoever threw them, at full damage. Blades still land. Time it on the cast."
+text = "Raises a mirror for 1 sec. Bolts, arrows and spells that would hit you fly back at whoever cast them, at full damage. Melee attacks still land. Time it on the cast."
 icon = "Spell_Nature_WispSplode"
 school = "beta"
 slot = "defense"
@@ -5443,7 +5443,7 @@ counter = { mirror = true }
 key = "prism"
 name = "Prism"
 ex_of = "reflect"
-text = "A longer mirror (1.5 s), and nothing staggers you while you hold it."
+text = "A longer mirror, 1.5 sec, and nothing staggers you while you hold it."
 icon = "Spell_Nature_AstralRecal"
 slot = "defense"
 kind = "stance"
@@ -5459,7 +5459,7 @@ self_effects = [{ kind = "steadfast", secs = [1.5, 1.5] }]
 [[ability]]
 key = "bubble"
 name = "Bubble"
-text = "Wrap a friend along the reticle (up to 30 yd), or yourself, in a bubble that soaks 40 damage for 4 s. When it breaks or runs out it pops, throwing foes within 4 yd back."
+text = "Wraps an ally along the reticle, up to 30 yd away, or you, in a bubble that absorbs 40 damage for 4 sec. When it breaks or expires, it pops and knocks enemies within 4 yd back 5 yd."
 icon = "INV_Misc_Orb_04"
 school = "beta"
 slot = "defense"
@@ -5472,7 +5472,7 @@ effects = [{ kind = "shield", secs = [4.0, 4.0], amount = 40.0, aura = 498, pop 
 [[ability]]
 key = "bubble_pop"
 name = "Bubble"
-text = "The bubble pops: foes within 4 yd are thrown back."
+text = "The bubble pops, dealing 4 damage and knocking enemies within 4 yd back 5 yd."
 inner = true
 slot = "defense"
 kind = "nova"
@@ -5486,7 +5486,7 @@ effects = [{ kind = "knockback", amount = 5.0 }]
 key = "hard_bubble"
 name = "Hard Bubble"
 ex_of = "bubble"
-text = "A thicker bubble: it soaks 70, and its pop stuns 1 s as well."
+text = "A thicker bubble that absorbs 70 damage. Its pop also stuns for 1 sec."
 icon = "INV_Misc_Orb_01"
 slot = "defense"
 kind = "ally"
@@ -5498,7 +5498,7 @@ effects = [{ kind = "shield", secs = [4.0, 4.0], amount = 70.0, aura = 498 , pop
 [[ability]]
 key = "hard_bubble_pop"
 name = "Hard Bubble"
-text = "The bubble pops: foes within 4 yd are thrown back and stunned 1 s."
+text = "The bubble pops, dealing 6 damage, knocking enemies within 4 yd back 5 yd and stunning them for 1 sec."
 inner = true
 slot = "defense"
 kind = "nova"
@@ -5512,7 +5512,7 @@ effects = [{ kind = "stun", secs = [1.0, 1.0] }, { kind = "knockback", amount = 
 [[ability]]
 key = "black_hole"
 name = "Black Hole"
-text = "Lob a singularity to the reticle (up to 26 yd), its landing drawn for everyone: for 3 s it drags every foe within 7 yd 3 yd toward its middle each second, 6 a second. Then it collapses: 30 damage and everything in it thrown 6 yd out. Feed it to your area cards first."
+text = "Lobs a singularity to the reticle, up to 26 yd away. Its landing is shown to everyone. For 3 sec it drags every enemy within 7 yd 3 yd toward its center each second, dealing 6 damage per sec. Then it collapses, dealing 30 damage and knocking everything in it 6 yd out. Feed it to your area cards first."
 icon = "Spell_Arcane_PortalUndercity"
 school = "beta"
 slot = "ultimate"
@@ -5537,7 +5537,7 @@ end_burst = "black_hole_collapse"
 [[ability]]
 key = "black_hole_collapse"
 name = "Black Hole"
-text = "It collapses: 30 damage and everything in it thrown 6 yd out."
+text = "It collapses, dealing 30 damage and knocking everything in it 6 yd out."
 inner = true
 slot = "ultimate"
 kind = "nova"
@@ -5549,7 +5549,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 [[ability]]
 key = "earthsplitter"
 name = "Earthsplitter"
-text = "Split the earth along your aim: a 30 yd fissure, 3 yd wide and drawn for everyone, bursts 0.8 s later with a hurled boulder. 30 damage and stunned 1.5 s (0.75 s on heroes) to all it crosses."
+text = "Splits the earth along your aim. A 30 yd fissure, 3 yd wide and shown to everyone, bursts 0.8 sec later with a hurled boulder. Every enemy it crosses takes 30 damage and is stunned for 1.5 sec (0.75 sec against heroes)."
 icon = "Spell_Nature_EarthShock"
 school = "beta"
 slot = "ultimate"
@@ -5568,7 +5568,7 @@ effects = [{ kind = "stun", secs = [1.5, 1.5] }]
 [[ability]]
 key = "soul_chain"
 name = "Soul Chain"
-text = "Throw a chain along the reticle (up to 20 yd): it binds the foe it strikes, and up to two more within 6 yd of them, to you for 5 s, 14 damage each. Any of them who gets more than 8 yd away is yanked back to you and stunned 1.5 s (less on heroes). Then that chain breaks."
+text = "Throws a chain along the reticle, up to 20 yd. It binds the enemy it strikes, and up to 2 more within 6 yd of them, to you for 5 sec, dealing 14 damage to each. Any of them who gets more than 8 yd away is yanked back to you and stunned for 1.5 sec (0.75 sec against heroes), and that chain breaks."
 icon = "Spell_Shadow_ShadowWordDominate"
 school = "beta"
 slot = "ultimate"
@@ -8047,7 +8047,7 @@ display = 1208
 icon = "INV_Misc_Fish_02"
 kind = "resource"
 stack = 20
-text = "Taken off the murlocs of Elwynn's lakes and rivers. Grill it at a cooking fire."
+text = "Grill it at a Cooking Fire. \"Taken from the murlocs of Elwynn's lakes and rivers.\""
 
 [[item]]
 key = "silver"
@@ -8056,7 +8056,7 @@ display = 18107
 icon = "INV_Stone_16"
 kind = "resource"
 stack = 20
-text = "A seam of silver: in the deeper veins at Jasperlode, Echo Ridge and Ridgepoint. The anvil works it into inlay."
+text = "A Smithing Anvil works it into inlay. \"From the deeper veins at Jasperlode, Echo Ridge and Ridgepoint.\""
 
 [[item]]
 key = "mageroyal"
@@ -8065,7 +8065,7 @@ display = 942
 icon = "INV_Jewelry_Talisman_03"
 kind = "resource"
 stack = 20
-text = "A violet herb that grows round the Tower of Azora and in Northshire. Brews a Clarity Draught."
+text = "Brewed into a Clarity Draught. \"A violet herb from around the Tower of Azora and Northshire.\""
 
 [[item]]
 key = "earthroot"
@@ -8074,7 +8074,7 @@ display = 1464
 icon = "INV_Misc_Herb_07"
 kind = "resource"
 stack = 20
-text = "A tough root from the stony ground round Stone Cairn and Ridgepoint. Makes a poultice that hardens the skin."
+text = "Makes a poultice that hardens the skin. \"A tough root from the stony ground around Stone Cairn and Ridgepoint.\""
 
 [[item]]
 key = "briarthorn"
@@ -8083,7 +8083,7 @@ display = 941
 icon = "INV_Misc_Root_01"
 kind = "resource"
 stack = 20
-text = "A thorny vine of Forest's Edge and Brackwell. Pressed into an oil for a blade."
+text = "Pressed into an oil for a blade, or woven into a Thorn Wall. \"A thorny vine of Forest's Edge and Brackwell.\""
 
 [[item]]
 key = "wool"
@@ -8092,7 +8092,7 @@ display = 4746
 icon = "INV_Fabric_Wool_01"
 kind = "resource"
 stack = 20
-text = "Off the Brotherhood, the gnolls and Stonefield's sheep. Woven at the tanning rack."
+text = "Woven at a Tanning Rack. \"From the Brotherhood, the gnolls and Stonefield's sheep.\""
 
 [[item]]
 key = "silk"
@@ -8101,7 +8101,7 @@ display = 4747
 icon = "INV_Fabric_Silk_01"
 kind = "resource"
 stack = 20
-text = "Spun by Jasperlode's spiders: strong and light. Lines a pack."
+text = "Lines a pack. \"Spun by Jasperlode's spiders. Strong and light.\""
 
 [[item]]
 key = "pumpkin"
@@ -8110,7 +8110,7 @@ display = 4779
 icon = "INV_Misc_Food_19"
 kind = "resource"
 stack = 20
-text = "From the Brackwell patch, under the Brotherhood's noses. Bakes a pie."
+text = "Baked into a pie. \"From the Brackwell patch, under the Brotherhood's noses.\""
 
 [[item]]
 key = "pearl"
@@ -8119,7 +8119,7 @@ display = 12309
 icon = "INV_Misc_Gem_Pearl_03"
 kind = "resource"
 stack = 20
-text = "A pearl from the lakes' murlocs (and what thieves hoard). Set in silver."
+text = "Set in silver. \"From the lakes' murlocs, and what thieves hoard.\""
 
 [[item]]
 key = "grilled_fish"
@@ -8142,7 +8142,7 @@ stack = 5
 use_secs = 2.4
 heal = 0.6
 effect = { kind = "stamina", amount = 0.25, secs = 300.0, name = "Well Fed" }
-text = "Heals 60%, and for five minutes after your stamina comes back a quarter faster."
+text = "Heals 60% of your health. Increases stamina regeneration by 25% for 5 min."
 
 [[item]]
 key = "pumpkin_pie"
@@ -8154,7 +8154,7 @@ stack = 5
 use_secs = 2.0
 heal = 0.33
 effect = { kind = "regen", amount = 0.011, secs = 30.0, name = "Pie" }
-text = "Heals a third at once and a third more over the next half minute."
+text = "Heals 33% of your health at once and 33% more over 30 sec."
 
 [[item]]
 key = "clarity"
@@ -8166,7 +8166,7 @@ stack = 5
 use_secs = 0.8
 below = true
 effect = { kind = "focus", amount = 0.25, secs = 90.0, name = "Clarity" }
-text = "For a minute and a half, your abilities come back a quarter sooner."
+text = "Reduces ability cooldowns by 25% for 90 sec."
 
 [[item]]
 key = "poultice"
@@ -8178,7 +8178,7 @@ stack = 5
 use_secs = 1.2
 below = true
 effect = { kind = "ward", amount = 0.12, secs = 120.0, name = "Stoneskin" }
-text = "Hardens the skin: for two minutes, blows on you lose an eighth more."
+text = "Reduces damage taken by an extra 12% for 2 min."
 
 [[item]]
 key = "briar_oil"
@@ -8190,7 +8190,7 @@ stack = 5
 use_secs = 2.0
 below = true
 effect = { kind = "might", amount = 0.2, secs = 90.0, name = "Briar-Oiled" }
-text = "Oils your blade with thorn: for a minute and a half every blow does a fifth more."
+text = "Increases your damage by 20% for 90 sec."
 
 [[item]]
 key = "wool_bandage"
@@ -8202,7 +8202,7 @@ stack = 5
 use_secs = 0.9
 heal = 0.1
 effect = { kind = "regen", amount = 0.03, secs = 8.0, name = "Bandaged" }
-text = "Quick to tie on: a tenth at once and a quarter more over eight seconds."
+text = "Heals 10% of your health at once and 24% more over 8 sec. Quick to apply."
 
 [[item]]
 key = "gambeson"
@@ -8212,7 +8212,7 @@ icon = "INV_Chest_Cloth_09"
 kind = "armor"
 slot = "chest"
 reduce = 0.14
-text = "Quilted wool over leather: a seventh off every blow, and light enough to run in."
+text = "Reduces damage taken by 14%. Does not slow stamina regeneration. \"Quilted wool over leather.\""
 
 [[item]]
 key = "wool_leggings"
@@ -8222,7 +8222,7 @@ icon = "INV_Pants_09"
 kind = "armor"
 slot = "legs"
 reduce = 0.06
-text = "Wool and leather: a little off every blow."
+text = "Reduces damage taken by 6%. \"Wool and leather.\""
 
 [[item]]
 key = "silver_helm"
@@ -8233,7 +8233,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.1
 weight = 0.02
-text = "Bronze inlaid with silver and a pearl: a tenth off every blow, for little weight."
+text = "Reduces damage taken by 10%. Slows stamina regeneration by 2%. \"Bronze inlaid with silver and a pearl.\""
 
 [[item]]
 key = "ridgepoint_pauldrons"
@@ -8244,7 +8244,7 @@ kind = "armor"
 slot = "shoulders"
 reduce = 0.08
 weight = 0.02
-text = "Rak'gash's mail shoulders: a fair share off every blow."
+text = "Reduces damage taken by 8%. Slows stamina regeneration by 2%. \"Rak'gash's mail shoulders.\""
 
 [[item]]
 key = "explorer_pack"
@@ -8253,7 +8253,7 @@ display = 1168
 icon = "INV_Misc_Bag_10"
 kind = "pack"
 carry = 1.5
-text = "Silk-lined: timber, ore, hides and herbs stack two and a half times as high. Elwynn is wide."
+text = "Timber, ore, hides and herbs stack 150% higher in your bags. \"Silk-lined. Elwynn is wide.\""
 
 [[item]]
 key = "hogger_club"
@@ -8261,7 +8261,7 @@ name = "Hogger's Cudgel"
 display = 1115
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "Hogger's own: a spiked club that staggers what it hits."
+text = "Staggers enemies it hits. \"Hogger's own spiked club.\""
 
 [[item]]
 key = "silver_sword"
@@ -8269,7 +8269,7 @@ name = "Silver-Edged Longsword"
 display = 20075
 icon = "INV_Sword_27"
 kind = "weapon"
-text = "Bronze with a silver edge: quick, true, and harder than it looks."
+text = "Quick, true, and harder-hitting than it looks. \"Bronze with a silver edge.\""
 
 # Hogger's club: a one-handed mace that hits like a heavy one.
 [[weapon]]
@@ -9644,7 +9644,7 @@ scale = 1.0
 teaches = ["hurled_axe", "shockwave"]
 keep = true
 secs = 3.0
-text = "Westbrook's banner, carried off by the Riverpaw, and the drill the garrison's footmen learned under it: the throw, and the slam that drives a line back."
+text = "Westbrook's banner, carried off by the Riverpaw. The garrison's footmen learned the throw under it, and the slam that drives a line back."
 trial = ["trial_shrine_warrior_0", "trial_shrine_warrior_1"]
 
 [[chest]]
@@ -9656,7 +9656,7 @@ scale = 0.45
 teaches = ["penance", "holy_nova"]
 keep = true
 secs = 3.0
-text = "The Abbey's altar remembers its priests: the Light, and the shadow behind it."
+text = "The Abbey's altar remembers its priests. The Light, and the shadow behind it."
 trial = ["trial_shrine_priest_0", "trial_shrine_priest_1"]
 
 [[chest]]
@@ -9692,7 +9692,7 @@ scale = 1.2
 teaches = ["lava_burst", "thunderstorm"]
 keep = true
 secs = 3.0
-text = "The cairn's stones speak, if you listen: of lightning and of thunder."
+text = "The cairn's stones speak, if you listen, of lightning and of thunder."
 trial = ["trial_shrine_shaman_0"]
 
 [[chest]]
@@ -9716,7 +9716,7 @@ scale = 1.0
 teaches = ["fan_of_knives", "backstab"]
 keep = true
 secs = 3.0
-text = "Under the crate: a Defias training ledger. Throwing knives, and where to put a blade."
+text = "Under the crate, a Defias training ledger. Throwing knives, and where to put a blade."
 trial = ["trial_shrine_rogue_0", "trial_shrine_rogue_1"]
 
 [[chest]]
@@ -9740,7 +9740,7 @@ scale = 0.7
 teaches = ["living_seed", "swipe"]
 keep = true
 secs = 3.0
-text = "The moonwell's water is still and bright: a seed that grows where it lands, and the bear's swipe."
+text = "The moonwell's water is still and bright. A seed that grows where it lands, and the bear's swipe."
 trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 
 [[chest]]
@@ -9752,7 +9752,7 @@ loot = { bronze = 1, leather = 1 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "Behind the tin at Fargodeep, the kit of a footman who held the yard alone for a while: how to close the distance, and how to make them pay for it."
+text = "Behind the tin at Fargodeep, the kit of a footman who held the yard alone for a while. How to close the distance, and how to make them pay for it."
 trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 
 [[chest]]
@@ -9764,7 +9764,7 @@ loot = { linen = 3 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "Behind the Abbey, under a loose flagstone: Brother Paxton's psalter."
+text = "Under a loose flagstone behind the Abbey, Brother Paxton's psalter."
 trial = ["trial_relic_priest_0", "trial_relic_priest_1"]
 
 [[chest]]
@@ -9777,7 +9777,7 @@ loot = { bronze = 2 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "Wrapped in a Westbrook tabard: a paladin's book of orders, left by a soldier who knew one."
+text = "Wrapped in a Westbrook tabard, a paladin's book of orders. A soldier who knew one left it here."
 trial = ["trial_relic_paladin_0"]
 
 [[chest]]
@@ -9789,7 +9789,7 @@ loot = { mageroyal = 3 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "In the bear den, the satchel of an apprentice who ran from the tower: her notes on blinking out of harm."
+text = "In the bear den, the satchel of an apprentice who ran from the tower. Her notes on blinking out of harm."
 trial = ["trial_relic_mage_0", "trial_relic_mage_1"]
 
 [[chest]]
@@ -9814,7 +9814,7 @@ loot = { silk = 3 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "Wrapped in spider silk at Jasperlode: a grimoire bound in black. It's warm."
+text = "Wrapped in spider silk at Jasperlode, a grimoire bound in black. Still warm."
 trial = ["trial_relic_warlock_0"]
 
 [[chest]]
@@ -9826,7 +9826,7 @@ loot = { wool = 3, bronze = 1 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "Under the dock at Jerod's Landing: Morgan the Collector's stash, and his notes on getting away."
+text = "Under the dock at Jerod's Landing, Morgan the Collector's stash, and his notes on getting away."
 trial = ["trial_relic_rogue_0", "trial_relic_rogue_1"]
 
 [[chest]]
@@ -9850,7 +9850,7 @@ loot = { peacebloom = 3 }
 display = 259
 secret = 7.0
 secs = 2.0
-text = "Under the oldest tree of the orchard: an acorn that is warm in the hand."
+text = "Under the oldest tree of the orchard, an acorn. It is warm in the hand."
 trial = ["trial_relic_druid_0", "trial_relic_druid_1"]
 
 [[chest]]
@@ -9863,7 +9863,7 @@ secs = 2.5
 ambush = ["sunken_ambush"]
 loot = { pearl = 2, silver = 2 }
 roll = { bronze = [1, 2] }
-text = "A smuggler's strongbox in the shallows... and the murlocs who've been guarding it."
+text = "A smuggler's strongbox in the shallows, and the murlocs who have been guarding it."
 
 [[chest]]
 key = "kobold_hoard"
@@ -9872,7 +9872,7 @@ at = [-8588.0, -186.0]
 z = 90.7
 display = 2450
 after = "snivvle"
-locked = "The taskmaster sits on his hoard: it won't open while Snivvle lives."
+locked = "The taskmaster sits on his hoard. It won't open while Snivvle lives."
 respawn = 2400.0
 loot = { ore = 4, tin = 3 }
 roll = { silver = [1, 3] }
@@ -9935,7 +9935,7 @@ display = 5743
 secret = 6.0
 loot = { silver = 2, pearl = 1 }
 roll = { bronze = [1, 2] }
-text = "Hidden behind the barn where the kobolds didn't think to look: Ma Stonefield's savings."
+text = "Hidden behind the barn where the kobolds didn't think to look, Ma Stonefield's savings."
 
 [[chest]]
 key = "farm_lockbox"
@@ -9945,7 +9945,7 @@ display = 5743
 respawn = 1800.0
 loot = { meat = 3, peacebloom = 2 }
 roll = { linen = [1, 2] }
-text = "A farmer's lockbox: supper and a little cloth."
+text = "A farmer's lockbox. Supper and a little cloth."
 
 [[chest]]
 key = "westbrook_armory"
@@ -9957,7 +9957,7 @@ locked = "The garrison's armory is barred while Hogger roams Forest's Edge."
 respawn = 3600.0
 loot = { bronze = 3, leather = 2 }
 roll = { silver = [1, 2] }
-text = "What the garrison left when the gnolls came: bronze, leather, a little silver."
+text = "What the garrison left when the gnolls came. Bronze, leather, a little silver."
 
 [[chest]]
 key = "ridgepoint_armory"
@@ -9965,7 +9965,7 @@ name = "Ridgepoint Armory"
 at = [-9772.0, -1408.0]
 display = 41
 after = "rakgash"
-locked = "Rak'gash holds the tower: its armory won't open while he lives."
+locked = "Rak'gash holds the tower. Its armory won't open while he lives."
 respawn = 3600.0
 loot = { bronze = 4, ore = 4 }
 roll = { silver = [2, 3] }
@@ -9981,7 +9981,7 @@ locked = "The coffer is too hot to touch while the Unbound Flame burns."
 respawn = 3600.0
 loot = { mageroyal = 4 }
 roll = { silver = [1, 2], pearl = [0, 1] }
-text = "The old mage's coffer, scorched: herbs, silver and a pearl."
+text = "The old mage's coffer, scorched. Herbs, silver and a pearl."
 
 [[chest]]
 key = "vineyard_loot"
@@ -9989,7 +9989,7 @@ name = "Garrick's Takings"
 at = [-9095.0, -360.0]
 display = 1
 after = "garrick"
-locked = "Garrick Padfoot's takings: locked, and he's got the key."
+locked = "Garrick Padfoot's takings. Locked, and he has the key."
 respawn = 3600.0
 loot = { wool = 4 }
 roll = { bronze = [1, 2], silver = [0, 1] }
@@ -10002,7 +10002,7 @@ at = [-8848.0, -962.0]
 display = 235
 scale = 0.5
 after = "rumbler"
-locked = "The ground shakes: nothing at the cairn can be touched while Rumbler is awake."
+locked = "The ground shakes. Nothing at the cairn can be touched while Rumbler is awake."
 respawn = 3600.0
 loot = { stone = 6, earthroot = 3 }
 roll = { silver = [1, 2] }
@@ -10018,7 +10018,7 @@ locked = "Vexx's coffer is sealed with shadow while he lives."
 respawn = 3600.0
 loot = { wool = 4, mageroyal = 2 }
 roll = { silver = [1, 2] }
-text = "The summoner's coffer: cloth, herbs and silver for the cult's work."
+text = "The summoner's coffer. Cloth, herbs and silver for the cult's work."
 
 [[chest]]
 key = "owl_nest"
@@ -10031,7 +10031,7 @@ locked = "Moonfeather watches her nest."
 respawn = 3600.0
 loot = { silverleaf = 4 }
 roll = { pearl = [1, 1], silver = [0, 1] }
-text = "Among the bones and feathers: shining things the owl took."
+text = "Among the bones and feathers, shining things the owl took."
 
 [[chest]]
 key = "blackfang_den"
@@ -10040,7 +10040,7 @@ at = [-9798.0, -1252.0]
 display = 278
 scale = 0.8
 after = "blackfang"
-locked = "Old Blackfang's den: not while he lives."
+locked = "Old Blackfang's den. Not while he lives."
 respawn = 3600.0
 loot = { hide = 4, leather = 2 }
 roll = { bronze = [0, 2] }
@@ -10076,7 +10076,7 @@ name = "Brother Malach's Cache"
 at = [-9155.0, -478.0]
 display = 5743
 after = "malach"
-locked = "Shadow coils round the cache while Malach lives."
+locked = "Shadow coils around the cache while Malach lives."
 respawn = 3600.0
 loot = { linen = 3, mageroyal = 2 }
 roll = { silver = [1, 1] }
@@ -10091,7 +10091,7 @@ scale = 0.7
 respawn = 1800.0
 loot = { hide = 2 }
 roll = { meat = [1, 3], linen = [0, 2] }
-text = "Bones, and a lost traveller's things."
+text = "Bones, and a lost traveler's things."
 
 [[chest]]
 key = "den_eastvale"
@@ -10102,7 +10102,7 @@ scale = 0.7
 respawn = 1800.0
 loot = { hide = 3 }
 roll = { leather = [0, 2], bronze = [0, 1] }
-text = "Bones, and a lost traveller's things."
+text = "Bones, and a lost traveler's things."
 
 [[chest]]
 key = "den_crystal"
@@ -10125,7 +10125,7 @@ name = "The Camp at Westbrook"
 at = [-9624.0, 688.0]
 radius = 30.0
 kind = "camp"
-text = "Your camp in the old Westbrook garrison's yard: the chest, the stations, the alarm bell, the Smuggler's Logbook."
+text = "Your camp in the old Westbrook garrison's yard. Storage, the stations, the alarm bell and the Smuggler's Logbook."
 
 [[site]]
 key = "goldshire"
@@ -10141,7 +10141,7 @@ name = "The Fargodeep Mine Yard"
 at = [-9866.0, 205.0]
 radius = 35.0
 kind = "horde"
-text = "Held by the Warsong: copper and tin among grunts, a shaman, archers and the Overseer."
+text = "Held by the Warsong. Copper and tin among grunts, a shaman, archers and the Overseer."
 reward = { stone = 2 }
 
 [[site]]
@@ -10150,7 +10150,7 @@ name = "The Darkspear Camp"
 at = [-9568.0, 232.0]
 radius = 30.0
 kind = "horde"
-text = "Darkspear berserkers, spearmen and a witch doctor; leather and herbs in their crates."
+text = "Darkspear berserkers, spearmen and a witch doctor. Leather and herbs in their crates."
 reward = { hide = 2 }
 
 [[site]]
@@ -10168,7 +10168,7 @@ name = "The Proving Ring"
 at = [-9910.0, 98.0]
 radius = 20.0
 kind = "arena"
-text = "Endless waves from a page of the Logbook; a champion every fifth."
+text = "Endless waves from a page of the Logbook. A champion every 5 waves."
 
 [[site]]
 key = "northshire"
@@ -10177,7 +10177,7 @@ at = [-8905.0, -175.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Holy_PowerWordShield"
-text = "The priest's shrine at the Abbey (Penance, Holy Nova). Something hidden behind it."
+text = "The priest's shrine at the Abbey teaches Penance and Holy Nova. Something is hidden behind it."
 reward = { linen = 3 }
 
 [[site]]
@@ -10186,7 +10186,7 @@ name = "Northshire Vineyards"
 at = [-9090.0, -400.0]
 radius = 55.0
 kind = "foes"
-text = "The Brotherhood robs the vines; Garrick Padfoot wanders the rows. Brother Malach, the priest's trial, at the far end."
+text = "The Brotherhood robs the vines, and Garrick Padfoot wanders the rows. Brother Malach, the priest's trial, waits at the far end."
 reward = { wool = 2 }
 
 [[site]]
@@ -10195,7 +10195,7 @@ name = "Echo Ridge Mine"
 at = [-8680.0, -145.0]
 radius = 45.0
 kind = "mine"
-text = "Kobolds, Taskmaster Snivvle and his hoard; copper, tin and silver at the mine's mouth."
+text = "Kobolds, Taskmaster Snivvle and his hoard. Copper, tin and silver at the mine's mouth."
 reward = { ore = 3 }
 
 [[site]]
@@ -10204,7 +10204,7 @@ name = "Crystal Lake"
 at = [-9409.0, -328.0]
 radius = 70.0
 kind = "fishing"
-text = "Murlocs on the shore and Grizzlefin their chief; fish and pearls; a bear den on the north side."
+text = "Murlocs on the shore and Grizzlefin their chief. Fish and pearls, and a bear den on the north side."
 reward = { fish = 3 }
 
 [[site]]
@@ -10213,7 +10213,7 @@ name = "Jasperlode Mine"
 at = [-9190.0, -615.0]
 radius = 45.0
 kind = "mine"
-text = "Kobold geomancers, spiders in the dark and Mother Fang; tin and silver."
+text = "Kobold geomancers, spiders in the dark and Mother Fang. Tin and silver."
 reward = { tin = 2 }
 
 [[site]]
@@ -10223,7 +10223,7 @@ at = [-9540.0, -695.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Frost_FrostBolt02"
-text = "The mage's shrine (Fireball, Cone of Cold). Defias conjurers rob the tower; the Unbound Flame, the mage's trial, burns behind it."
+text = "The mage's shrine teaches Fireball and Cone of Cold. Defias conjurers rob the tower, and the Unbound Flame, the mage's trial, burns behind it."
 reward = { mageroyal = 3 }
 
 [[site]]
@@ -10233,7 +10233,7 @@ at = [-9128.0, -1046.0]
 radius = 40.0
 kind = "sanctum"
 icon = "Spell_Holy_HolyBolt"
-text = "The paladin's shrine (Avenger's Shield, Consecration). Forsaken defile the memorial; Defiler Morvane, the paladin's trial, leads them."
+text = "The paladin's shrine teaches Avenger's Shield and Consecration. Forsaken defile the memorial, and Defiler Morvane, the paladin's trial, leads them."
 reward = { bronze = 1 }
 
 [[site]]
@@ -10243,7 +10243,7 @@ at = [-8855.0, -950.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Nature_LightningShield"
-text = "The shaman's shrine (Lava Burst, Thunderstorm). The stones are awake: Rumbler, the shaman's trial."
+text = "The shaman's shrine teaches Lava Burst and Thunderstorm. The stones are awake, and Rumbler is the shaman's trial."
 reward = { stone = 3 }
 
 [[site]]
@@ -10252,7 +10252,7 @@ name = "Stone Cairn Lake"
 at = [-8905.0, -1080.0]
 radius = 60.0
 kind = "fishing"
-text = "Elwynn's great lake, Heroes' Vigil on its island: murlocs on every shore, fish and pearls."
+text = "Elwynn's great lake, Heroes' Vigil on its island. Murlocs on every shore, fish and pearls."
 reward = { fish = 3 }
 
 [[site]]
@@ -10262,7 +10262,7 @@ at = [-8905.0, -712.0]
 radius = 35.0
 kind = "sanctum"
 icon = "Spell_Shadow_ShadowBolt"
-text = "The warlock's shrine (Shadow Bolt, Shadowfury) in the cult's ruin; Summoner Vexx, the warlock's trial, and his demons."
+text = "The warlock's shrine in the cult's ruin teaches Seed of Corruption and Shadowfury. Summoner Vexx, the warlock's trial, waits with his demons."
 reward = { wool = 2 }
 
 [[site]]
@@ -10272,7 +10272,7 @@ at = [-9800.0, -900.0]
 radius = 55.0
 kind = "sanctum"
 icon = "Ability_BackStab"
-text = "The rogue's shrine (Fan of Knives, Backstab) in the Brotherhood's camp; Morgan the Collector, the rogue's trial; Princess; pumpkins."
+text = "The rogue's shrine in the Brotherhood's camp teaches Fan of Knives and Backstab. Morgan the Collector is the rogue's trial. Princess, and pumpkins."
 reward = { pumpkin = 2 }
 
 [[site]]
@@ -10282,7 +10282,7 @@ at = [-9454.0, -1380.0]
 radius = 55.0
 kind = "sanctum"
 icon = "Ability_Hunter_SniperShot"
-text = "The hunter's shrine (Aimed Shot, Explosive Trap) at the old lodge; prowlers and bears in the woods; timber."
+text = "The hunter's shrine at the old lodge teaches Aimed Shot and Explosive Trap. Prowlers and bears in the woods, and timber."
 reward = { wood = 4 }
 
 [[site]]
@@ -10291,7 +10291,7 @@ name = "Ridgepoint Tower"
 at = [-9785.0, -1405.0]
 radius = 45.0
 kind = "foes"
-text = "The Blackrock hold the tower: outrunners, shadowcasters and Rak'gash the Herald. Silver in the hill."
+text = "The Blackrock hold the tower with outrunners, shadowcasters and Rak'gash the Herald. Silver in the hill."
 reward = { bronze = 1 }
 
 [[site]]
@@ -10300,7 +10300,7 @@ name = "Blackfang's Den"
 at = [-9794.0, -1257.0]
 radius = 25.0
 kind = "lair"
-text = "Old Blackfang, the prowlers' leader: the hunter's trial."
+text = "Old Blackfang, the prowlers' leader, is the hunter's trial."
 
 [[site]]
 key = "jerods_landing"
@@ -10308,7 +10308,7 @@ name = "Jerod's Landing"
 at = [-9940.0, -145.0]
 radius = 40.0
 kind = "foes"
-text = "Defias smugglers at the dock, murlocs on the river; fish."
+text = "Defias smugglers at the dock, murlocs on the river, and fish."
 reward = { wool = 2 }
 
 [[site]]
@@ -10317,7 +10317,7 @@ name = "The Maclure Vineyards"
 at = [-9975.0, 50.0]
 radius = 45.0
 kind = "foes"
-text = "Kobolds raid the farm; cows and chickens; Goldtooth comes and goes."
+text = "Kobolds raid the farm. Cows and chickens, and Goldtooth comes and goes."
 reward = { meat = 3 }
 
 [[site]]
@@ -10326,7 +10326,7 @@ name = "The Stonefield Farm"
 at = [-9905.0, 380.0]
 radius = 45.0
 kind = "foes"
-text = "Kobolds in the fields, sheep for wool; Goldtooth comes and goes."
+text = "Kobolds in the fields and sheep for wool. Goldtooth comes and goes."
 reward = { wool = 2 }
 
 [[site]]
@@ -10344,7 +10344,7 @@ name = "Thunder Falls"
 at = [-9337.0, 800.0]
 radius = 35.0
 kind = "lair"
-text = "Moonfeather, the great owl: the druid's trial."
+text = "The druid's trial. \"Moonfeather has watched these falls for a hundred years.\""
 
 [[site]]
 key = "mirror_lake"
@@ -10353,7 +10353,7 @@ at = [-9440.0, 450.0]
 radius = 50.0
 kind = "sanctum"
 icon = "Spell_Nature_HealingTouch"
-text = "The druid's shrine (Wrath, Swipe) at the moonwell; fish in the lake."
+text = "The druid's shrine at the moonwell teaches Living Seed and Swipe. Fish in the lake."
 reward = { silverleaf = 2 }
 
 [[site]]
@@ -10402,7 +10402,7 @@ name = "The Wolf Den"
 at = [-9608.0, 514.0]
 radius = 20.0
 kind = "lair"
-text = "Wolves, and a lost traveller's things."
+text = "Wolves, and a lost traveler's things."
 
 [[site]]
 key = "eastvale_den"
@@ -10410,7 +10410,7 @@ name = "The Prowler Den"
 at = [-9443.0, -977.0]
 radius = 20.0
 kind = "lair"
-text = "Prowlers, and a lost traveller's things."
+text = "Prowlers, and a lost traveler's things."
 
 [[site]]
 key = "cairn_den"
@@ -10535,7 +10535,7 @@ scale = 0.8
 facing = 0.4
 after = "built:cooking"
 clear = 5.0
-say = "Word of a fire at Westbrook gets round: a quartermaster rides in from Goldshire with a wagon of supplies, and a cook comes with him."
+say = "A quartermaster arrives from Goldshire with a wagon of supplies, and a cook comes with him."
 
 [[prop]]
 display = 288
@@ -10600,7 +10600,7 @@ scale = 0.8
 facing = 2.11
 after = "built:tanning"
 clear = 2.5
-say = "A trapper from Forest's Edge hangs her racks by the shelter: the camp's hides are worth her while."
+say = "A trapper from Forest's Edge, drawn by the camp's hides, hangs her racks by the shelter."
 
 [[prop]]
 display = 1439
@@ -10620,7 +10620,7 @@ scale = 1.1
 facing = 3.9
 after = "built:cauldron"
 clear = 1.0
-say = "An herbalist off the Goldshire road finds the camp's cauldron, and stays."
+say = "An herbalist off the Goldshire road finds the camp's cauldron and stays."
 
 [[prop]]
 display = 1295
@@ -10640,7 +10640,7 @@ scale = 0.8
 facing = 3.141592653589793
 after = "raids:1"
 clear = 1.0
-say = "The Warsong are beaten. The camp digs in: sentries on the gate, and Stormwind's flag over the shelter."
+say = "The Warsong are beaten, and the camp digs in with sentries on the gate and Stormwind's flag over the shelter."
 
 [[prop]]
 display = 624
@@ -10686,7 +10686,7 @@ scale = 0.5
 facing = 2.5
 after = "raids:2"
 clear = 6.0
-say = "With the Darkspear driven off, the camp raises a guard tower over its north-east corner, and a scout keeps it."
+say = "With the Darkspear driven off, the camp builds a guard tower over its north-east corner, and a scout keeps it."
 
 [[prop]]
 display = 1364
@@ -10706,7 +10706,7 @@ scale = 0.5
 facing = 3.78
 after = "raids:3"
 clear = 6.0
-say = "The Horde warband is broken. Westbrook stands again: a second tower over the west wall, and a marshal from Stormwind takes command of the camp."
+say = "The Horde warband is broken, and Westbrook stands again with a second tower over the west wall and a marshal from Stormwind in command."
 
 [[prop]]
 display = 1276
@@ -10736,7 +10736,7 @@ clear = 1.2
 npc = true
 name = "Westbrook Footman"
 subname = "Westbrook Garrison"
-say = "The Blackrock break at Westbrook's gate. Stormwind sends footmen: the camp is a garrison again."
+say = "The Blackrock break at Westbrook's gate, and Stormwind sends footmen to make the camp a garrison again."
 
 [[prop]]
 display = 1500
@@ -10992,7 +10992,7 @@ secret = 4.0
 secs = 2.0
 loot = { silver = 2, linen = 2 }
 roll = { pearl = [0, 1] }
-text = "Under a loose board by the hearth: the Maclures' silver, wrapped in linen."
+text = "Under a loose board by the hearth, the Maclures' silver, wrapped in linen."
 
 # The Maclure barn: two of the Brotherhood asleep in the hay, up as their pay is touched.
 
@@ -11035,7 +11035,7 @@ respawn = 1800.0
 secs = 2.0
 loot = { meat = 3, roast = 1 }
 roll = { peacebloom = [1, 2] }
-text = "Ma Stonefield's pantry: meat, a roast, a few herbs."
+text = "Ma Stonefield's pantry. Meat, a roast, a few herbs."
 
 # The Stonefield barn: the kobolds' den now, candles and all.
 
@@ -11062,7 +11062,7 @@ secret = 4.0
 secs = 2.0
 loot = { ore = 3, tin = 2 }
 roll = { silver = [0, 2] }
-text = "Under a pile of candle stubs: what the kobolds dug up and kept."
+text = "Under a pile of candle stubs, what the kobolds dug up and kept."
 
 # The Brackwell house: the Brotherhood's conjurer keeps his books in the farmer's parlour.
 
@@ -11089,7 +11089,7 @@ secret = 4.0
 secs = 2.0
 loot = { pearl = 2, silver = 1 }
 roll = { bronze = [1, 2] }
-text = "Behind the parlour's loose stone: the Brackwells' heirloom, which the Brotherhood never found."
+text = "Behind the parlor's loose stone, the Brackwells' heirloom. The Brotherhood never found it."
 
 # The Brackwell barn: archers in the loft.
 
@@ -11142,7 +11142,7 @@ secret = 4.0
 secs = 2.0
 loot = { silver = 1, leather = 2 }
 roll = { bronze = [1, 2] }
-text = "Tucked in the rafters: a woodcutter's savings. The bear didn't care for silver."
+text = "Tucked in the rafters, a woodcutter's savings. The bear didn't care for silver."
 
 # The farm west of the camp: a smuggler's drop, and its keeper, out of sight till it's opened.
 
@@ -11165,7 +11165,7 @@ secs = 2.0
 ambush = ["farm_drop_keeper"]
 loot = { linen = 3, bronze = 1 }
 roll = { pearl = [0, 1], silver = [0, 1] }
-text = "Cargo waiting for the Deadmines' boats... and its keeper wakes."
+text = "Cargo waiting for the Deadmines' boats, and its keeper wakes."
 
 # The orchard house by Mirror Lake: a family that never left it.
 
@@ -11185,7 +11185,7 @@ secret = 4.0
 secs = 2.0
 loot = { pearl = 1, silverleaf = 2 }
 roll = { silver = [1, 1] }
-text = "On the mantel, where she left it: a locket. The house is quieter now."
+text = "On the mantel, where she left it, a locket. The house is quieter now."
 
 # The Lion's Pride Inn: the Brotherhood drinks in Goldshire now, and the innkeeper's strongbox is in the back.
 
@@ -11311,7 +11311,7 @@ respawn = 2400.0
 secs = 2.0
 loot = { ore = 4, tin = 2 }
 roll = { silver = [1, 2], pearl = [0, 1] }
-text = "At the mine's flooded bottom: what the kobolds were hoarding down here."
+text = "At the mine's flooded bottom, what the kobolds were hoarding down here."
 
 # --- roaming the wilds ----------------------------------------------------------------------------
 # Spread over the whole forest at a world's start (`[[roam]]`), so no stretch of it is empty: wolves

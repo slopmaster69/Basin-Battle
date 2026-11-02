@@ -167,8 +167,7 @@ impl Survival {
             } else if !c.text.is_empty() {
                 self.tell(id, c.text.clone());
             }
-            let name = self.players[&id].name.clone();
-            if self.teach(&[id], &c.teaches, &format!("{name} at {}", c.name)) == 0 {
+            if self.teach(&[id], &c.teaches, &format!("at {}", c.name)) == 0 {
                 self.tell(id, format!("You know all {} has to teach.", c.name));
             }
             if first {
@@ -233,10 +232,10 @@ impl Survival {
             self.tell(id, c.text.clone());
         }
         if !words.is_empty() {
-            self.tell(id, format!("In {}: {}.", c.name, words.join(", ")));
+            self.tell(id, format!("{} held {}.", c.name, words.join(", ")));
         }
         if !banked.is_empty() {
-            self.tell(id, format!("Your bags were full: {} went to the camp's chest.", banked.join(", ")));
+            self.tell(id, format!("Your bags were full. {} went to storage.", banked.join(", ")));
             self.events.push(Event::Storage);
         }
         self.events.push(Event::Bags { player: id });
@@ -259,7 +258,7 @@ impl Survival {
             self.count("learn", "any", new.len() as u32);
             self.events.push(Event::Abilities { player: h });
             self.events.push(Event::Banner { player: Some(h), title: format!("Learned: {list}"), sub: "Open the board (N) to put it on a key".into() });
-            self.announce(format!("{how}: {name} has learned {list}."));
+            self.announce(format!("{name} learned {list} {how}."));
         }
         if all > 0 {
             self.events.push(Event::Dirty);
@@ -277,7 +276,7 @@ impl Survival {
             return;
         }
         if self.trials.contains_key(&def) {
-            self.tell(id, format!("The trial is under way: defeat {}'s guardians.", c.name));
+            self.tell(id, format!("The trial is under way. Defeat {}'s guardians.", c.name));
             return;
         }
         for key in &c.trial {
@@ -302,7 +301,7 @@ impl Survival {
         let now = self.clock;
         self.trials.insert(def, Trial { obj, by: id, near_at: now });
         self.events.push(Event::Banner { player: Some(id), title: format!("The Trial of {}", c.name), sub: "Defeat its guardians to learn what it teaches".into() });
-        self.tell(id, format!("{} wakes: its guardians come. Defeat them, and everyone near learns its cards.", c.name));
+        self.tell(id, format!("{} wakes and its guardians attack. Defeat them and everyone nearby learns its cards.", c.name));
     }
 
     /// Trials under way: passed when the last guardian falls (everyone near learns, the first
@@ -326,7 +325,7 @@ impl Survival {
                     heroes.push(t.by);
                 }
                 for h in &heroes {
-                    self.events.push(Event::Banner { player: Some(*h), title: "Trial passed".into(), sub: c.name.clone() });
+                    self.events.push(Event::Banner { player: Some(*h), title: "Trial Passed".into(), sub: c.name.clone() });
                 }
                 if !self.camp.opened.contains_key(&c.key) && self.players.contains_key(&t.by) {
                     self.camp.opened.insert(c.key.clone(), NEVER);
@@ -334,7 +333,7 @@ impl Survival {
                     self.count("open", &c.key, 1);
                     self.count("open", "any", 1);
                 }
-                self.teach(&heroes, &c.teaches, &format!("The trial of {}", c.name));
+                self.teach(&heroes, &c.teaches, &format!("in the trial of {}", c.name));
                 self.events.push(Event::Sites);
                 self.events.push(Event::Dirty);
                 continue;
@@ -406,7 +405,7 @@ impl Survival {
             self.set_chest(def, false);
             self.count("secret", "any", 1);
             // Quietly: a line to the finder (no banner and horn, which are for what's coming).
-            self.tell(by, format!("You've come upon something hidden: {name}."));
+            self.tell(by, format!("You found something hidden: {name}."));
             self.events.push(Event::Dirty);
         }
         // Ambushers lying in wait step out as a hero comes near.
@@ -475,10 +474,10 @@ impl Survival {
         let name = self.players.get(&by).map_or(String::new(), |p| p.name.clone());
         let n = self.camp.found.len();
         let of = self.content.sites.len();
-        let reward = if site.reward.is_empty() { String::new() } else { format!(" Into the chest: {}.", self.cost_text(&site.reward)) };
+        let reward = if site.reward.is_empty() { String::new() } else { format!(" Sent to storage: {}.", self.cost_text(&site.reward)) };
         // The add-on tells this one quietly by its "Discovered: " start (ES.Banner): keep the words.
         self.events.push(Event::Banner { player: None, title: format!("Discovered: {}", site.name), sub: format!("{n} of {of} places in Elwynn") });
-        self.announce(format!("{name} has found {}.{reward}", site.name));
+        self.announce(format!("{name} found {}.{reward}", site.name));
         if !site.reward.is_empty() {
             self.events.push(Event::Storage);
         }
@@ -490,7 +489,7 @@ impl Survival {
     pub fn goto_site(&mut self, id: Id, key: &str) -> Result<String, String> {
         let Some(site) = self.content.sites.iter().find(|s| s.key == key).cloned() else {
             let keys: Vec<&str> = self.content.sites.iter().map(|s| s.key.as_str()).collect();
-            return Err(format!("No place {key}: try {}.", keys.join(", ")));
+            return Err(format!("No place called {key}. Try {}.", keys.join(", ")));
         };
         if self.is_below() || self.in_arena(id) {
             return Err("Not from here.".into());
@@ -531,7 +530,7 @@ impl Survival {
             return if ch.secret > 0.0 { format!("A hidden relic somewhere near{}", at.trim_start_matches(',')) } else { format!("{}{at}", ch.name) };
         }
         if let Some(m) = c.mobs.iter().position(|m| m.teaches.iter().any(|k| k == key)) {
-            let at = c.packs.iter().find(|p| p.mob == c.mobs[m].key).and_then(|p| place(p.at)).map_or(String::new(), |p| format!(" ({p})"));
+            let at = c.packs.iter().find(|p| p.mob == c.mobs[m].key).and_then(|p| place(p.at)).map_or(String::new(), |p| format!(" near {p}"));
             return format!("When {} falls{at}", c.mobs[m].name);
         }
         String::new()

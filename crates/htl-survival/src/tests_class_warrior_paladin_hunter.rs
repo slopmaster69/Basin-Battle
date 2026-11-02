@@ -408,7 +408,7 @@ fn lay_on_hands_takes_a_touch_heals_three_fifths_and_not_again_on_them_for_a_min
     s.set_aim_line(a, 0.0, 0.0);
     let ev = click(&mut s, a);
     assert_eq!(s.players[&b].health, max / 4, "not again yet");
-    assert!(flashed(&ev, a, "not again"));
+    assert!(flashed(&ev, a, "on them again"));
     assert!((s.players[&a].valor - valor).abs() < 1.0, "its Valor back");
     // Out of touch range, it's yours.
     run(&mut s, 0.8);

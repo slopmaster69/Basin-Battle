@@ -42,7 +42,7 @@ local FOOT = {
   note = "Kept in the logbook, under Secrets and Notes.",
   secret = "Written into the logbook, under Secrets and Notes.",
   lore = "Click a note to read it again.",
-  wager = "Click a wager to take it: down you go, fresh.",
+  wager = "Click a wager to take it. The dungeon starts fresh.",
   board = "Every server's runs, through the board's keeper.",
   run = "The run's tally, as you leave it. The book at camp keeps the dungeon's page.",
 }

@@ -1225,7 +1225,7 @@ impl Survival {
             if let Some(p) = self.players.get_mut(&id) {
                 p.last_safe = safe;
             }
-            self.tell(id, "You fell through the world: back to the last firm ground.");
+            self.tell(id, "You fell through the world. You're back on the last firm ground.");
             return;
         }
         let Some(p) = self.players.get_mut(&id) else { return };
@@ -1296,7 +1296,7 @@ impl Survival {
     pub fn unstuck(&mut self, id: Id) -> Result<(), String> {
         let p = self.players.get(&id).ok_or("No hero.")?;
         if p.health == 0 {
-            return Err("You're down: you'll get up shortly.".into());
+            return Err("You're down. You'll respawn shortly.".into());
         }
         let account = p.account.clone();
         let (pos, f) = match self.lamp_of(&account).filter(|_| self.is_below()) {
@@ -1437,7 +1437,7 @@ impl Survival {
         let mut out = String::new();
         if !d.perks.is_empty() {
             let words: Vec<String> = d.perks.iter().map(|p| crate::content::perk_words(&p.kind, p.amount)).collect();
-            out.push_str(&format!("{}: {}.", if d.kind == ItemKind::Armor { "Worn" } else { "In hand" }, words.join(", ")));
+            out.push_str(&format!("Equipped: {}.", words.join(", ")));
         }
         if let Some(s) = c.sets.iter().find(|s| s.key == d.set) {
             // (Its pieces, not their honed copies.)
@@ -1446,7 +1446,7 @@ impl Survival {
             if !out.is_empty() {
                 out.push(' ');
             }
-            out.push_str(&format!("{} ({n} pieces). {}.", s.name, bonus.join("; ")));
+            out.push_str(&format!("{} ({n} pieces). {}.", s.name, bonus.join(". ")));
         }
         out
     }
@@ -1541,7 +1541,7 @@ impl Survival {
             let i = self.content.item(k).ok_or("Unknown material.")?;
             let have = self.available(id, i);
             if have < *n {
-                return Err(format!("Needs {} {} (you have {have} with the chest).", n, self.content.items[i].name));
+                return Err(format!("Not enough {} (need {}, have {have}).", self.content.items[i].name, n));
             }
             need.push((i, *n));
         }
@@ -1567,7 +1567,7 @@ impl Survival {
             }
             let rest = n - from_bag;
             if rest > 0 {
-                let s = self.storage.get_mut(&i).ok_or("The chest ran short.")?;
+                let s = self.storage.get_mut(&i).ok_or("Storage ran short.")?;
                 *s -= rest;
                 if *s == 0 {
                     self.storage.remove(&i);

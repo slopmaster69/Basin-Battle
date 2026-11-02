@@ -331,7 +331,7 @@ impl Survival {
             self.beta.later.push(Later { at: self.clock + airtime(TETHER_LIFT), owner: t.owner, victim: t.foe, effects: d.tether_effects.clone(), source: d.name.clone() });
         }
         if self.players.contains_key(&t.owner) {
-            self.events.push(Event::Flash { player: t.owner, text: format!("{}: dragged back", d.name) });
+            self.events.push(Event::Flash { player: t.owner, text: format!("{} pulled them back", d.name) });
         }
     }
 

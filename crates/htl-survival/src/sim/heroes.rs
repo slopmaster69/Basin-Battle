@@ -39,7 +39,7 @@ impl Survival {
     pub fn reset_hero(&mut self, id: Id) -> Result<(), String> {
         let p = self.players.get(&id).ok_or("No hero.")?;
         if self.is_below() {
-            return Err("Not below: go home first.".into());
+            return Err("Not in a dungeon. Go home first.".into());
         }
         if self.in_arena(id) {
             return Err("Leave the ring first.".into());
@@ -77,7 +77,7 @@ impl Survival {
         self.events.push(Event::Effects { player: id });
         self.events.push(Event::Gear { player: id });
         self.events.push(Event::Dirty);
-        self.tell(id, "You start over: the camp's first day, your class's first two cards (Q and E), an axe, a buckler, a bow and a roast.");
+        self.tell(id, "You started over on the camp's first day, with your class's first 2 cards (Q) and (E), an axe, a buckler, a bow and a roast.");
         Ok(())
     }
 
@@ -88,7 +88,7 @@ impl Survival {
     /// Deadmines over with it: [`Survival::reset_below`].)
     pub fn reset_camp(&mut self) -> Result<(), String> {
         if self.is_below() {
-            return Err("Not from below.".into());
+            return Err("Not in a dungeon. Go home first.".into());
         }
         let in_ring: Vec<Id> = self.players.keys().copied().filter(|h| self.in_arena(*h)).collect();
         for h in in_ring {
@@ -121,7 +121,7 @@ impl Survival {
         self.events.push(Event::Goal);
         self.events.push(Event::Sites);
         self.events.push(Event::Dirty);
-        self.announce("The camp starts over: a new world's first day.");
+        self.announce("The camp started over on a new world's first day.");
         Ok(())
     }
 
@@ -196,10 +196,10 @@ impl Survival {
                 self.arrive_at(p, &first);
             }
             let place = self.dungeon_def().map_or_else(|| "The dungeon".to_string(), |d| d.name.clone());
-            self.announce(format!("{place} starts over with the camp: no lamp lit, no door open."));
+            self.announce(format!("{place} started over with the camp. Every lamp is out and every door is shut."));
         } else {
             let place = self.dungeon_def().map_or_else(|| "The dungeon".to_string(), |d| d.name.clone());
-            self.announce(format!("{place}: its bosses stand again, and its strongboxes are full."));
+            self.announce(format!("{place} reset. Its bosses are back and its strongboxes are full."));
         }
         self.events.push(Event::Dirty);
     }

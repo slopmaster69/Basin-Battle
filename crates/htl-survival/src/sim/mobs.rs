@@ -359,7 +359,7 @@ impl Survival {
     pub fn summon(&mut self, id: Id, key: &str) -> Result<String, String> {
         let def = self.content.mob(key).ok_or_else(|| {
             let keys: Vec<&str> = self.content.mobs.iter().map(|m| m.key.as_str()).collect();
-            format!("No creature {key}: try {}.", keys.join(", "))
+            format!("No enemy called {key}. Try {}.", keys.join(", "))
         })?;
         let p = self.players.get(&id).ok_or("No hero.")?;
         let at = self.ground_near(p.pos[0] + p.facing.cos() * 8.0, p.pos[1] + p.facing.sin() * 8.0,
@@ -446,7 +446,7 @@ impl Survival {
             if pack.is_some_and(|k| self.content.packs[k].rare) && !self.is_below() {
                 let name = self.content.mobs[def].name.clone();
                 let near = self.place_near([home[0], home[1]]).map_or(String::new(), |p| format!(" near {p}"));
-                self.announce(format!("{name} has been seen again{near}."));
+                self.announce(format!("{name} was seen again{near}."));
             }
         }
     }
@@ -903,8 +903,8 @@ impl Survival {
             }
             self.events.push(Event::Storage);
             let name = self.content.mobs[def].name.clone();
-            self.events.push(Event::Banner { player: None, title: format!("{name} Falls"), sub: format!("Into the chest: {}", names.join(", ")) });
-            self.announce(format!("{name} is dead. In the camp's chest: {}.", names.join(", ")));
+            self.events.push(Event::Banner { player: None, title: format!("{name} Falls"), sub: format!("Sent to storage: {}", names.join(", ")) });
+            self.announce(format!("{name} is dead. Sent to storage: {}.", names.join(", ")));
         }
         let d = self.content.mobs[def].clone();
         let killer_name = self.players.get(&killer).map(|p| p.name.clone());
@@ -912,13 +912,13 @@ impl Survival {
         if !d.teaches.is_empty() && !self.is_below() {
             let at = self.mobs[&mid].pos;
             let fought: Vec<Id> = self.players.iter().filter(|(h, p)| **h == killer || dist2d(p.pos, at) <= TEACH_RANGE).map(|(h, _)| *h).collect();
-            self.teach(&fought, &d.teaches, &format!("{} has fallen", d.name));
+            self.teach(&fought, &d.teaches, &format!("for felling {}", d.name));
         }
         if pack.is_some_and(|k| self.content.packs[k].rare) {
             // A rare creature's fall is news.
             let by = killer_name.map_or(String::new(), |n| format!(" to {n}"));
             self.events.push(Event::Banner { player: None, title: format!("{} Falls", d.name), sub: String::new() });
-            self.announce(format!("{} has fallen{by}.", d.name));
+            self.announce(format!("{} fell{by}.", d.name));
         }
         // What steps out of it (a shredder's driver): in its place and its pack, so the pack
         // stands until that falls too.
@@ -985,7 +985,7 @@ impl Survival {
                             self.tell(h, format!("Your share: {} {}.", n - left, self.content.items[item].name));
                         }
                         if left > 0 {
-                            self.tell(h, format!("Your bags are full: {left} {} left behind.", self.content.items[item].name));
+                            self.tell(h, format!("Your bags are full. {left} {} left behind.", self.content.items[item].name));
                         }
                     }
                 }
@@ -1002,11 +1002,11 @@ impl Survival {
                 let left = self.give(killer, item, n);
                 got.push(format!("{} {}", n - left, self.content.items[item].name));
                 if left > 0 {
-                    self.tell(killer, format!("Your bags are full: {left} {} left behind.", self.content.items[item].name));
+                    self.tell(killer, format!("Your bags are full. {left} {} left behind.", self.content.items[item].name));
                 }
             }
             if !got.is_empty() {
-                self.tell(killer, format!("Looted: {}.", got.join(", ")));
+                self.tell(killer, format!("You looted {}.", got.join(", ")));
             }
         }
         self.events.push(Event::Dirty);
@@ -1045,17 +1045,17 @@ impl Survival {
         let first = self.camp.counts.get(&format!("clear:{key}")).copied().unwrap_or(0) == 0;
         self.count("clear", key, 1);
         let mins = (c.hold / 60.0).round() as u32;
-        let mut sub = format!("The Horde won't be back for {mins} minutes");
+        let mut sub = format!("The Horde won't return for {mins} min");
         if first && !c.reward.is_empty() {
             for (k, n) in &c.reward {
                 let item = self.content.item(k).unwrap();
                 *self.storage.entry(item).or_default() += n;
             }
             self.events.push(Event::Storage);
-            sub = format!("{sub}. Into the chest: {}", self.cost_text(&c.reward));
+            sub = format!("{sub}. Sent to storage: {}", self.cost_text(&c.reward));
         }
         self.events.push(Event::Banner { player: None, title: c.title.clone(), sub });
-        self.announce(format!("The Horde is driven from {}! None come back there for {mins} minutes.", c.name));
+        self.announce(format!("The Horde was driven from {}. It won't return for {mins} min.", c.name));
     }
 
     pub(crate) fn step_mobs(&mut self, dt: f32) {

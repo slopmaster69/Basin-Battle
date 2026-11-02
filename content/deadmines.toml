@@ -65,7 +65,7 @@ stack = 6
 use_secs = 1.4
 heal = 0.4
 below = true
-text = "The only heal in the Deadmines: drink with R for 40% of your health. Every rest at a lamp fills your Draughts again."
+text = "Drink with (T) to restore 40% of your health. Resting at a lamp refills your Draughts. The only heal below."
 
 [[item]]
 key = "draught_flask"
@@ -74,7 +74,7 @@ display = 18117
 icon = "INV_Drink_13"
 kind = "resource"
 stack = 1
-text = "A miner's spare flask: one Draught more at every rest, for good (up to six)."
+text = "Adds 1 Draught to every rest for good, up to 6. \"A miner's spare flask.\""
 
 [[item]]
 key = "plunder"
@@ -83,7 +83,7 @@ display = 7629
 icon = "INV_Misc_Coin_04"
 kind = "resource"
 stack = 50
-text = "The Brotherhood's loot. The lamps' quartermaster trades it; you drop it all when you fall below."
+text = "Trade it to the quartermaster at any lamp. You drop all of it when you fall. \"The Brotherhood's loot.\""
 
 # --- the way through: lamps -----------------------------------------------------------------------
 # Three lamps the whole way, and long walks between them: in by the sea tunnel (the landing), up it
@@ -234,7 +234,7 @@ name = "Pirate's Cutlass"
 display = 1853
 icon = "INV_Sword_13"
 kind = "weapon"
-text = "A Defias Pirate's cutlass: quick, with a long reach for a one-handed blade."
+text = "Quick, with a long reach for a one-handed blade. \"A Defias pirate's cutlass.\""
 
 [[item]]
 key = "red_bandana"
@@ -244,7 +244,7 @@ icon = "INV_Misc_Bandana_03"
 kind = "armor"
 slot = "head"
 reduce = 0.04
-text = "The Brotherhood's red mask: a little off every blow, and no weight at all."
+text = "Reduces damage taken by 4%. Does not slow stamina regeneration. \"The Brotherhood's red mask.\""
 set = "brotherhood"
 
 # The Squallshaper's staff: two-handed, a long reach, guards with the haft.
@@ -269,7 +269,7 @@ name = "Squallshaper's Staff"
 display = 5415
 icon = "INV_Staff_08"
 kind = "weapon"
-text = "Two-handed: a long reach and quick for its length. Guards with the haft."
+text = "Two-handed, with a long reach. Quick for its length. Guards with the haft."
 
 [[ranged]]
 key = "defias_crossbow"
@@ -290,7 +290,7 @@ name = "Defias Crossbow"
 display = 2462
 icon = "INV_Weapon_Crossbow_02"
 kind = "bow"
-text = "One slow, hard bolt at full power, then a long reload."
+text = "Fires 1 bolt at full power for 42 damage. Reloads for 2.1 sec."
 
 # Cookie's: a blow that lands on a wind-up knocks it aside, whatever the blow.
 [[weapon]]
@@ -312,7 +312,7 @@ name = "Cookie's Tenderizer"
 display = 1161
 icon = "INV_Mace_06"
 kind = "weapon"
-text = "Cookie's meat mallet. Hit a foe while it's winding up a blow (after it draws back, before it swings) and that blow is knocked aside and the foe staggered for 1 s; light blows do it too. Not on a boss, a heavy creature's braced wind-up (only a heavy blow breaks that), or one knocked aside a moment ago."
+text = "Light and heavy blows that land during an enemy's wind-up knock it aside and stagger the enemy for 1 sec. Does not work on bosses, on an enemy staggered a moment ago, or on a heavy enemy's braced wind-up, which only a heavy blow breaks. \"Cookie's meat mallet.\""
 
 # Mr. Smite's: the heaviest swing there is.
 [[weapon]]
@@ -338,7 +338,7 @@ name = "Smite's Mighty Hammer"
 display = 2056
 icon = "INV_Hammer_04"
 kind = "weapon"
-text = "Mr. Smite's: the heaviest swing there is, and it breaks a stance half again as fast."
+text = "Breaks stances 50% faster. \"Mr. Smite's own. The heaviest swing there is.\""
 
 # VanCleef's own: the timed guard comes easier with it in hand.
 [[weapon]]
@@ -360,7 +360,7 @@ name = "Cruel Barb"
 display = 1928
 icon = "INV_Sword_27"
 kind = "weapon"
-text = "Edwin VanCleef's sword: quick, and a parry comes easier with it (a wider moment for the timed guard)."
+text = "Quick. Widens the parry window by 0.12 sec. \"Edwin VanCleef's sword.\""
 perks = [{ kind = "might", amount = 0.04 }]
 
 [[item]]
@@ -372,7 +372,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.2
 weight = 0.03
-text = "VanCleef's own: the protection of mail at the weight of leather."
+text = "Reduces damage taken by 20%. Slows stamina regeneration by 3%. \"VanCleef's own. Mail's protection at leather's weight.\""
 perks = [{ kind = "ward", amount = 0.04 }]
 
 # --- the Brotherhood below --------------------------------------------------------------------------
@@ -538,7 +538,7 @@ respawn = 0.0
 then = "dm_cookie_gorged"
 then_after = 3.5
 then_needs = "secret_ingredient"
-then_text = "\"Mmmrrrggglll... MORE STEW!\" Cookie gulps down the last of the pot, and grows."
+then_text = "\"Mmmrrrggglll... MORE STEW!\" Cookie gulps down the last of the pot and grows."
 then_kit = 356
 then_look = 10987
   [mob.attack]
@@ -921,14 +921,14 @@ respawn = 0.0
 
 [[goal]]
 title = "Cookie's stew"
-text = "Down in the Deadmines, the Brotherhood's cook keeps his pot by the cove's east pier. Put him out of business."
+text = "Beat Cookie, the Brotherhood's cook, at his stew pot by the cove's east pier in the Deadmines."
 kind = "kill"
 what = "dm_cookie"
 reward = { meat = 6, peacebloom = 4 }
 
 [[goal]]
 title = "The first mate"
-text = "Mr. Smite holds the island where the scaffold round the Juggernaut comes down to the dry dock. Beat him, and keep going: the next lamp is past the Foundry."
+text = "Beat Mr. Smite on the island where the scaffold around the Juggernaut meets the dry dock. The next lamp is past the Foundry."
 kind = "kill"
 what = "dm_smite"
 reward = { bronze = 4, leather = 2 }
@@ -1007,7 +1007,7 @@ at = [-240.0, -579.0, 51.2]
 facing = 0.0
 boss = "gilnid"
 bars = [[-240.0, -572.0], [-240.0, -586.0]]
-text = "With Gilnid down, the Foundry's back door stands open at the top of the ramp."
+text = "Gilnid is beaten. The Foundry's back door stands open at the top of the ramp."
 
 # Gilnid in the pit, by the smelter.
 [[dungeon.pack]]
@@ -1128,7 +1128,7 @@ at = [-244.0, -482.0, 49.4]
 facing = 1.6
 boss = "sneed"
 bars = [[-244.0, -468.0], [-244.0, -497.0]]
-text = "Sneed is beaten: the Mast Room's north door opens on the galleries."
+text = "Sneed is beaten. The Mast Room's north door opens on the galleries."
 
 # Sneed in his shredder; he climbs out of the wreck.
 [[dungeon.pack]]
@@ -1160,7 +1160,7 @@ name = "Goblin Woodcutter's Axe"
 display = 453
 icon = "INV_Axe_04"
 kind = "weapon"
-text = "A felling axe: one-handed, and its wide chop takes two."
+text = "One-handed. Its wide chop hits up to 2 enemies. \"A felling axe.\""
 
 # An engineer's wrench: a knock that jars a wind-up.
 [[weapon]]
@@ -1182,7 +1182,7 @@ name = "Engineer's Wrench"
 display = 1610
 icon = "INV_Misc_Wrench_01"
 kind = "weapon"
-text = "A goblin engineer's wrench. Hit a foe while it's winding up a blow and that blow is knocked aside and the foe staggered for a moment (0.6 s); light blows do it too. Not on a boss, a heavy creature's braced wind-up, or one knocked aside a moment ago."
+text = "Light and heavy blows that land during an enemy's wind-up knock it aside and stagger the enemy for 0.6 sec. Does not work on bosses, on an enemy staggered a moment ago, or on a heavy enemy's braced wind-up. \"A goblin engineer's wrench.\""
 
 # Gilnid's: one hand, and it breaks a stance like a two-hander.
 [[weapon]]
@@ -1205,7 +1205,7 @@ name = "The Smelter's Spanner"
 display = 1653
 icon = "INV_Misc_Wrench_01"
 kind = "weapon"
-text = "Gilnid's own: one-handed, yet it breaks a stance faster than a two-hander."
+text = "One-handed. Breaks stances 60% faster, more than most two-handers. \"Gilnid's own.\""
 
 # Sneed's: quick, and cruel from behind.
 [[weapon]]
@@ -1227,7 +1227,7 @@ name = "Sneed's Machete"
 display = 1552
 icon = "INV_Sword_04"
 kind = "weapon"
-text = "Sneed's: quick, and a blow from behind does three times its damage."
+text = "Quick. Blows from behind deal 300% damage. \"Sneed's own.\""
 
 # --- the Foundry's goblins --------------------------------------------------------------------------
 
@@ -1426,7 +1426,7 @@ then_text = "\"My shredder! Oh, you'll pay for that, you will!\""
   at = 0.5
   speed = 0.8
   pattern = "grind"
-  text = "The shredder's engine screams; smoke pours out of it."
+  text = "The shredder's engine screams. Smoke pours out of it."
   shove = 5.0
   [mob.attack]
   windup = 0.85
@@ -1524,14 +1524,14 @@ respawn = 0.0
 
 [[goal]]
 title = "The Smelter"
-text = "Gilnid works the Foundry's pit, west up the Cannon Gallery from the dry dock. Beat him and his back door opens at the top of the ramp."
+text = "Beat Gilnid in the Foundry's pit, west up the Cannon Gallery from the dry dock. His back door opens at the top of the ramp."
 kind = "kill"
 what = "dm_gilnid"
 reward = { ore = 8, bronze = 4 }
 
 [[goal]]
 title = "The Lumbermaster"
-text = "Sneed rides his shredder in the Mast Room, past the Foundry's workshop. Wreck it, then beat the goblin who climbs out."
+text = "Wreck Sneed's shredder in the Mast Room, past the Foundry's workshop. Then beat the goblin who climbs out."
 kind = "kill"
 what = "dm_sneed"
 reward = { wood = 10, linen = 4 }
@@ -1670,7 +1670,7 @@ name = "Defias Miner's Pick"
 display = 1378
 icon = "INV_Pick_02"
 kind = "weapon"
-text = "A miner's pick: one-handed, and its point chips at a stance."
+text = "One-handed. Breaks stances 30% faster. \"A miner's pick.\""
 
 # Rhahk'Zor's: a wide two-handed swing that takes three and knocks a wind-up aside.
 [[weapon]]
@@ -1696,7 +1696,7 @@ name = "Rhahk'Zor's Maul"
 display = 1478
 icon = "INV_Hammer_09"
 kind = "weapon"
-text = "Rhahk'Zor's: a two-handed swing as wide as they come, three struck and their wind-ups knocked aside."
+text = "Two-handed, with a swing as wide as they come. Hits up to 3 enemies and knocks their wind-ups aside. \"Rhahk'Zor's own.\""
 
 # (The Defias outfit the creatures wear has no icon of its own in the game's data, so the bags
 # showed a question mark: these pieces wear the nearest leather that has one.)
@@ -1708,7 +1708,7 @@ icon = "INV_Chest_Leather_09"
 kind = "armor"
 slot = "chest"
 reduce = 0.12
-text = "The Brotherhood's leathers: a little better than hide, and no weight at all."
+text = "Reduces damage taken by 12%. Does not slow stamina regeneration. \"The Brotherhood's leathers, a little better than hide.\""
 set = "brotherhood"
 
 [[item]]
@@ -1719,7 +1719,7 @@ icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.05
-text = "The Brotherhood's shoulderpads: a little off every blow."
+text = "Reduces damage taken by 5%. \"The Brotherhood's shoulderpads.\""
 set = "brotherhood"
 
 [[item]]
@@ -1746,7 +1746,7 @@ icon = "INV_Pants_03"
 kind = "armor"
 slot = "legs"
 reduce = 0.09
-text = "The cook's own: they've taken a ladle or two."
+text = "The cook's own. They've taken a ladle or two."
 
 [[item]]
 key = "smite_breastplate"
@@ -1757,7 +1757,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.22
 weight = 0.08
-text = "Mr. Smite's: heavy plate, a fifth off every blow and more, and you'll feel its weight."
+text = "Reduces damage taken by 22%. Slows stamina regeneration by 8%. \"Mr. Smite's heavy plate.\""
 
 [[item]]
 key = "greenskin_tricorne"
@@ -1777,7 +1777,7 @@ icon = "INV_Shoulder_08"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
-text = "Edwin VanCleef's shoulderguards: leather over steel, no weight at all."
+text = "Reduces damage taken by 10%. Does not slow stamina regeneration. \"Edwin VanCleef's shoulderguards, leather over steel.\""
 
 [[item]]
 key = "gilnid_pauldrons"
@@ -2037,14 +2037,14 @@ aggro_sound = 5774
 
 [[goal]]
 title = "The foreman"
-text = "Rhahk'Zor keeps the mine's front door shut, east through the galleries from the Mast Room. Beat him."
+text = "Beat Rhahk'Zor at the mine's front door, east through the galleries from the Mast Room."
 kind = "kill"
 what = "dm_rhahkzor"
 reward = { bronze = 6, leather = 4 }
 
 [[goal]]
 title = "Out into Moonbrook"
-text = "With Rhahk'Zor down the front door stands open. Walk out of the Deadmines."
+text = "Walk out of the Deadmines by the front door. It stands open with Rhahk'Zor down."
 kind = "delve"
 # (Out of the Deadmines: `end` alone is any dungeon's way out.)
 what = "end:deadmines"
@@ -2058,56 +2058,56 @@ reward = { roast = 4, linen = 4 }
 
 [[goal]]
 title = "Into the fire"
-text = "The book's next pages: Ragefire Chasm, the caves under Orgrimmar where the Searing Blade hides. Clear it: every boss down in one run."
+text = "Clear Ragefire Chasm, every boss down in one run. The Searing Blade hides in the caves under Orgrimmar."
 kind = "cleared"
 what = "ragefire"
 reward = { bronze = 4, leather = 4 }
 
 [[goal]]
 title = "Naralex's nightmare"
-text = "The Wailing Caverns under the Barrens, where the Druids of the Fang dream. Clear it, every Fanglord and Verdan with them."
+text = "Clear the Wailing Caverns, every Fanglord and Verdan with them. The Druids of the Fang dream under the Barrens."
 kind = "cleared"
 what = "wailing"
 reward = { bronze = 4, linen = 6 }
 
 [[goal]]
 title = "The Stockade"
-text = "Two of the first dungeons cleared: the book reads on. Stormwind's prison is in its inmates' hands. Clear it."
+text = "Clear the Stockade, Stormwind's prison, now in its inmates' hands. Its pages open once 2 of the first dungeons are cleared."
 kind = "cleared"
 what = "stockade"
 reward = { silver = 1, bronze = 6 }
 
 [[goal]]
 title = "Arugal's keep"
-text = "Shadowfang Keep in Silverpine, Arugal's worgen and its old lords' ghosts. Clear it."
+text = "Clear Shadowfang Keep in Silverpine, held by Arugal's worgen and its old lords' ghosts."
 kind = "cleared"
 what = "shadowfang"
 reward = { silver = 2, leather = 6 }
 
 [[goal]]
 title = "The warren of thorns"
-text = "Razorfen Kraul, where Charlga Razorflank speaks for Agamaggan. Clear it."
+text = "Clear Razorfen Kraul, where Charlga Razorflank speaks for Agamaggan."
 kind = "cleared"
 what = "razorfen"
 reward = { silver = 2, linen = 8 }
 
 [[goal]]
 title = "The Crusade's dead"
-text = "The book's last pages: the Scarlet Monastery. Its Graveyard first, where the dead won't stay buried. Clear it."
+text = "Clear the Graveyard of the Scarlet Monastery, where the dead won't stay buried. The book's last pages start here."
 kind = "cleared"
 what = "graveyard"
 reward = { silver = 2, pearl = 1 }
 
 [[goal]]
 title = "The Crusade's books"
-text = "The Library: its hounds, its Arcanist, and whatever he keeps bound in his tomes. Clear it."
+text = "Clear the Library, with its hounds, its Arcanist and whatever he keeps bound in his tomes."
 kind = "cleared"
 what = "library"
 reward = { silver = 3, pearl = 1 }
 
 [[goal]]
 title = "The Crusade's heart"
-text = "The Cathedral: Mograine at the altar, and Whitemane who won't let him die. Clear it, and the book is done."
+text = "Clear the Cathedral, where Mograine stands at the altar and Whitemane won't let him die. The book ends here."
 kind = "cleared"
 what = "cathedral"
 reward = { silver = 4, pearl = 2 }
@@ -2139,7 +2139,7 @@ scale = 1.3
 name = "Orders, Sealed in Red"
 at = [-8.0, -772.0, 9.5]
 facing = 1.0
-text = "\"Smite: the Juggernaut is yours to guard. My quarters at the stern are MINE. Nobody goes aft of the mast; nobody reads what I leave there. Not you, not the goblins, not my own daughter's tutor. -- E. V.\""
+text = "\"Smite, the Juggernaut is yours to guard. My quarters at the stern are MINE. Nobody goes aft of the mast. Nobody reads what I leave there. Not you, not the goblins, not my own daughter's tutor. -- E. V.\""
 
 [[dungeon.note]]
 key = "gilnid_ledger"
@@ -2150,7 +2150,7 @@ scale = 1.4
 name = "Gilnid's Ledger"
 at = [-247.0, -575.0, 51.1]
 facing = 3.0
-text = "\"Silver out of the east lobe: none since the cave-in. Johnson swears there's a seam at the very back of it, past the pond, and that the foreman wants it for himself. Johnson went back for it alone. Not seen in a week.\""
+text = "\"No silver out of the east lobe since the cave-in. Johnson swears there's a seam at the very back of it, past the pond, and that the foreman wants it for himself. Johnson went back for it alone. Not seen in a week.\""
 
 [[dungeon.note]]
 key = "miners_diary"
@@ -2187,7 +2187,7 @@ kind = "hidden"
 at = [-159.0, -908.0, 8.8]
 find = 4.0
 reveals = ["pantry"]
-text = "inside the little tent at the south end of the cove, under a heap of sacks: Cookie's pantry, and a jar that wriggles."
+text = "found Cookie's pantry under a heap of sacks, in the little tent at the south end of the cove. A jar in it wriggles."
 page = "The tent smells of fish and old onions. Pinned to the pole with a filleting knife is a greasy card, written out in a pirate's hand, as if someone had stood over the pot and taken it down word for word.{n}{n}COOKIE'S STEW, as he gargled it to me. Salt pork, two fists. Rum, a good glug, and one for the cook. Whatever the lads caught that morning, scales and all. Boil till it fights back.{n}{n}Then the jar. Not before the pot boils, he says, and never all of it. And never let him see it once he's hurt, or he'll eat the lot, and there's no telling what comes up out of him after. The last mate who tried to take it off him is in the stew.{n}{n}Among the sacks, the jar knocks against your boot. It is knocking from the inside."
 
 [[dungeon.box]]
@@ -2200,14 +2200,14 @@ loot = { secret_ingredient = 1, plunder = 8 }
 [[dungeon.door]]
 key = "vancleef_quarters"
 display = 32
-look = "A Barrel Stencilled 'E. V.'"
+look = "A Barrel Stenciled 'E. V.'"
 name = "VanCleef's Quarters"
 kind = "hidden"
 at = [-105.0, -818.0, 37.9]
 find = 4.0
 reveals = ["quarters", "vancleef_letter"]
-text = "aft of the mast, under the stern, a barrel stencilled E. V. rolls aside from a hatch: VanCleef's quarters, and a letter he never sent."
-page = "Below the hatch is a cabin no bigger than a cell, kept as neat as a mason's yard: a hammock, a sea-chest, a chart of the Westfall coast pinned flat with four chisels. On the table lies a sheet of Stonemasons' Guild paper, ruled in red, in a hand that pressed hard enough to score the wood beneath.{n}{n}OWED BY THE HOUSE OF NOBLES, for the rebuilding of the city after the orcs burned it. Walls, gates, the Cathedral, the Keep. Wages, two years. Paid: nothing.{n}{n}Beneath the sum are the names of every noble who voted against paying it, and beside each a small red mark. Most of the marks are crosses. A few are still only dots.{n}{n}Folded under the chisels is a letter in the same hand, addressed to Vanessa. It was never sealed."
+text = "found VanCleef's quarters under a hatch aft of the mast, behind a barrel stenciled E. V. A letter he never sent lies inside."
+page = "Below the hatch is a cabin no bigger than a cell, kept as neat as a mason's yard. A hammock, a sea-chest, a chart of the Westfall coast pinned flat with four chisels. On the table lies a sheet of Stonemasons' Guild paper, ruled in red, in a hand that pressed hard enough to score the wood beneath.{n}{n}OWED BY THE HOUSE OF NOBLES, for the rebuilding of the city after the orcs burned it. Walls, gates, the Cathedral, the Keep. Wages, two years. Paid: nothing.{n}{n}Beneath the sum are the names of every noble who voted against paying it, and beside each a small red mark. Most of the marks are crosses. A few are still only dots.{n}{n}Folded under the chisels is a letter in the same hand, addressed to Vanessa. It was never sealed."
 
 [[dungeon.note]]
 key = "vancleef_letter"
@@ -2216,7 +2216,7 @@ scale = 1.3
 name = "A Letter, Never Sent"
 at = [-106.0, -815.0, 37.8]
 facing = 1.5
-text = "\"My dearest Vanessa -- if this reaches you, I am dead and Stormwind has won nothing. They took everything from us; I will not let them take the Brotherhood. Even dead, I will stand. Even dead, I will not bow. -- your father\""
+text = "\"My dearest Vanessa -- if this reaches you, I am dead and Stormwind has won nothing. They took everything from us. I will not let them take the Brotherhood. Even dead, I will stand. Even dead, I will not bow. -- your father\""
 
 [[dungeon.box]]
 key = "quarters"
@@ -2234,7 +2234,7 @@ kind = "hidden"
 at = [-118.0, -450.0, 55.6]
 find = 4.0
 reveals = ["johnson"]
-text = "in the east lobe's back wall, a seam of silver dug out by hand, and the man who dug it turns round."
+text = "found a seam of silver dug out by hand in the east lobe's back wall. The man who dug it turned around."
 page = "Someone has cut a ledge into the wall with a pick and a great deal of patience, and the silver in it runs bright as a stream. Scratched beside it, the letters gouged deep enough to hold the lamp-soot:{n}{n}THIS SEAM IS JOHNSON'S. Not the foreman's. Not the Kingpin's. Not Gilnid's for his smelter. I found it before the cave-in and I dug it out after. Mine by right.{n}{n}Under that runs a tally of days, and beside each a weight in ounces. The weights climb. The hand gets worse. The last lines are only the word MINE, over and over, until the scratches turn to gouges and stop.{n}{n}A lantern burns on the ledge, freshly trimmed. At the end of it, a man in a battered miner's helm stops digging."
 
 # The powder crates across the cannon gallery's alcove.
@@ -2249,7 +2249,7 @@ facing = 0.0
 scale = 1.8
 bars = [[-110.0, -607.0], [-110.0, -623.0]]
 reveals = ["marisa", "gallery"]
-text = "the crates are empty, and stacked across a gap: behind them, the alcove, and Marisa du'Paige."
+text = "found Marisa du'Paige in the alcove behind the empty powder crates."
 page = "A blanket, a stub of candle, and a skin of frost on everything. Loose pages are tucked into a crack in the rock, written small to save paper.{n}{n}First night behind the crates. I heard them in the gallery, the Kingpin's men, asking after the mage who saw too much at Moonbrook. I held my breath until it froze on my lips.{n}{n}Fourth night. One of them sat down on the other side of the crates and talked to me as if he knew. He said Stormwind still has a warrant with my name on it, and the Brotherhood never asked what for. He said VanCleef pays his people, which is more than the Crown ever did.{n}{n}Ninth night. I have stopped hiding.{n}{n}The candle is still warm. Close by, frost crackles across the stone."
 
 # The back of the goblins' workshop, past the sawhorses: the noble they keep.
@@ -2263,7 +2263,7 @@ kind = "hidden"
 at = [-300.0, -611.0, 47.6]
 find = 4.0
 reveals = ["noble"]
-text = "in the back of the workshop: a man in the rags of fine clothes, talking to the dark. He turns."
+text = "found a man in the rags of fine clothes at the back of the workshop, talking to the dark. He turned."
 page = "A chain runs from a bolt in the floor to an open cuff. The wall above it is covered in writing, scratched with a nail by someone who was taught a fine hand and has lost it.{n}{n}I am a lord of the House of Nobles. I sat in the chamber when the masons came for their wages, and I voted no. I would vote no again. Tell my wife they want gold for me. Tell her to pay it.{n}{n}Lower down, the letters grow larger and lean the other way. They have stopped asking for gold. He comes in the dark and asks me whom I serve. I tell him the King.{n}{n}Lowest of all, in a hand that is not the first one: WE SERVE. WE SERVE. AS HE SERVES.{n}{n}Deeper in the dark, the muttering stops."
 
 # --- the rares the secrets keep ---------------------------------------------------------------------
@@ -2424,7 +2424,7 @@ icon = "INV_Misc_Food_15"
 kind = "resource"
 stack = 1
 below = true
-text = "A jar of something that wriggles. Cookie puts it in his stew. Carry it into a fight with him and see what it does to him when he's beaten."
+text = "Carry it into the fight with Cookie and see what it does to him once he's beaten. \"A jar of something that wriggles. Cookie puts it in his stew.\""
 
 [[item]]
 key = "gorged_apron"
@@ -2458,7 +2458,7 @@ kind = "armor"
 slot = "head"
 reduce = 0.09
 weight = 0.01
-text = "A mail cap with a lamp's soot on the brim. Johnson found the silver; the silver didn't save him."
+text = "A mail cap with a lamp's soot on the brim. Johnson found the silver. The silver didn't save him."
 perks = [{ kind = "stamina", amount = 0.08 }]
 
 [[item]]
@@ -2469,7 +2469,7 @@ icon = "INV_Shoulder_05"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
-text = "Rimed with frost that never melts. Marisa du'Paige hid from the Brotherhood; then she joined it."
+text = "Rimed with frost that never melts. Marisa du'Paige hid from the Brotherhood, then joined it."
 perks = [{ kind = "focus", amount = 0.06 }]
 
 [[item]]

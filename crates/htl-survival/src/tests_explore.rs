@@ -382,7 +382,7 @@ rare = true
     let hp = s.mobs[&hogger].health;
     s.hurt_mob(hogger, p, hp);
     let ev = s.step(DT);
-    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.starts_with("Hogger has fallen to Ayla"))));
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.starts_with("Hogger fell to Ayla"))));
     // He comes back at one of his spots.
     let r = s.respawns.iter().find(|r| s.content.mobs[r.0].key == "hogger").cloned().unwrap();
     s.respawns.retain(|x| s.content.mobs[x.0].key != "hogger");
@@ -391,7 +391,7 @@ rare = true
     let ev = run(&mut s, 0.2);
     let h = s.mobs.values().filter(|m| m.health > 0).find(|m| s.content.mobs[m.def].key == "hogger").unwrap().pos;
     assert!(dist2d(h, [300.0, 0.0, 0.0]) < 1.0 || dist2d(h, [0.0, 300.0, 0.0]) < 1.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.starts_with("Hogger has been seen again"))), "his return is news");
+    assert!(ev.iter().any(|e| matches!(e, Event::Announce { text } if text.starts_with("Hogger was seen again"))), "his return is news");
 }
 
 #[test]
@@ -629,7 +629,7 @@ fn a_shrine_teaches_only_once_its_trial_is_passed_and_everyone_near_learns() {
     }
     let ev = run(&mut s, 0.3);
     assert!(s.players[&a].owned.contains("fireball") && s.players[&b].owned.contains("fireball"), "everyone near learns");
-    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "Trial passed")));
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, .. } if title == "Trial Passed")));
     let pearl = s.content.item("pearl").unwrap();
     assert_eq!(s.players[&a].bag.get(&pearl), Some(&1));
     // A hero who comes later calls it up again, the fallen guardians standing at once.

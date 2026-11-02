@@ -17,7 +17,7 @@ area = 718
 icon = "Spell_Nature_Sleep"
 blurb = "Naralex's dream gone bad, under the Barrens"
 first_page = "The caverns' mouth, where the wailing starts. Every way from here winds down."
-welcome = "The Wailing Caverns. The Druids of the Fang dream Naralex's nightmare and make it flesh; their deviate things fill every cave. Two lamps: one at the mouth, one at the western crossing. Rest at a lamp to heal, fill your Draughts (T) and send the dreamers back to their dreaming. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+welcome = "The Wailing Caverns. The Druids of the Fang dream Naralex's nightmare and make it flesh, and their deviate things fill every cave. There are 2 lamps, at the mouth and at the western crossing. Rest at a lamp to heal, refill your Draughts (T) and send the dreamers back to their dreaming. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): the Wailing Caverns: an early one (17 to 24).
 tier = 1
@@ -73,8 +73,8 @@ kind = "hidden"
 at = [-202.4, -338.0, -71.0]
 find = 4.5
 reveals = ["disciple_cache", "disciple_journal"]
-text = "in the warren's far bulge: a disciple of Naralex, long dead in his sleep, his journal open on his chest. You read the last page, and the dream reads you back."
-page = "The disciple lies on his back as if he had only lain down to rest, and the moss has grown over him like a blanket. The journal on his chest is swollen with damp; most of it will not open. The pages that will are written in a careful, sleepy hand.{n}{n}We came down with Naralex to heal the Barrens. He would dream the land green again, and we would keep him while he slept. The others have begun to wear fangs. They say the dream has changed them, and they are glad of it.{n}{n}I hid from them today. One of the Fanglords passed so close I could have touched his robe.{n}{n}I am so tired. I will write down what he truly dreams, and then I will sleep.{n}{n}One page is left, the last, and it has fallen open towards you."
+text = "read the journal of a disciple of Naralex, long dead in his sleep in the warren's far bulge. The dream read back."
+page = "The disciple lies on his back as if he had only lain down to rest, and the moss has grown over him like a blanket. The journal on his chest is swollen with damp. Most of it will not open. The pages that will are written in a careful, sleepy hand.{n}{n}We came down with Naralex to heal the Barrens. He would dream the land green again, and we would keep him while he slept. The others have begun to wear fangs. They say the dream has changed them, and they are glad of it.{n}{n}I hid from them today. One of the Fanglords passed so close I could have touched his robe.{n}{n}I am so tired. I will write down what he truly dreams, and then I will sleep.{n}{n}One page is left, the last, and it has fallen open toward you."
 
 [[dungeon.box]]
 key = "disciple_cache"
@@ -90,7 +90,7 @@ scale = 1.4
 name = "A Disciple's Journal"
 at = [-201.0, -339.5, -71.0]
 facing = 1.0
-text = "\"Verdan is not the nightmare. Verdan is only what grows over it. When the Everliving falls, what Naralex truly dreams will come up through the roots, and it is hungry. Whoever has read this: it knows you now.\""
+text = "\"Verdan is not the nightmare. Verdan is only what grows over it. When the Everliving falls, what Naralex truly dreams will come up through the roots, and it is hungry. Whoever has read this, it knows you now.\""
 
 # A ledge off the low south tunnel: the Fang's cache.
 [[dungeon.door]]
@@ -102,8 +102,8 @@ kind = "hidden"
 at = [-337.0, 37.4, -99.0]
 find = 4.0
 reveals = ["fang_stash"]
-text = "past the end of the low tunnel: the Druids of the Fang's cache, wrapped in shed skins."
-page = "Inside the bundle, each shed skin has been rolled round something and tied with a strip of green cloth. The outermost skin, the largest, has been written on in sap, in the curling hand the Druids of the Fang use for their oaths.{n}{n}We are the Fang. We keep the Dreamer's sleep. What we take from the deviate things is ours to keep, against the day the Dreamer wakes and the Barrens come green under our feet.{n}{n}Lord Cobrahn holds the low tunnel. None but a Fanglord unwraps this cache. Any who do: let the serpents have them.{n}{n}Someone has drawn a line through \"the day the Dreamer wakes\", and written above it, smaller: if."
+text = "found the Druids of the Fang's cache past the end of the low tunnel, wrapped in shed skins."
+page = "Inside the bundle, each shed skin has been rolled around something and tied with a strip of green cloth. The outermost skin, the largest, has been written on in sap, in the curling hand the Druids of the Fang use for their oaths.{n}{n}We are the Fang. We keep the Dreamer's sleep. What we take from the deviate things is ours to keep, against the day the Dreamer wakes and the Barrens come green under our feet.{n}{n}Lord Cobrahn holds the low tunnel. None but a Fanglord unwraps this cache. Any who do: let the serpents have them.{n}{n}Someone has drawn a line through \"the day the Dreamer wakes\", and written above it, smaller: if."
 
 [[dungeon.box]]
 key = "fang_stash"
@@ -123,8 +123,8 @@ kind = "hidden"
 at = [-97.1, 457.2, -71.6]
 find = 4.0
 reveals = ["faerie"]
-text = "the nook glitters with dust that wasn't there a moment ago; something blinks out of the air."
-page = "Tucked under the glittering caps is a waxed notebook, the kind the Cenarion Circle's surveyors carry, its last pages smeared with the same shining dust.{n}{n}A faerie dragon, I am almost sure. Smaller than the ones in Feralas and quicker, and its scales have gone the strange colours of everything else that drinks this water. It does not mind me. It takes things: my pencil, my spare socks, the buttons off my coat. It brings some of them back.{n}{n}Today it would not let me leave the nook. Every time I turned for the tunnel it was there first, laughing. I think it is lonely. I think it is playing. I am no longer sure those are different things down here.{n}{n}The dust settles on your sleeve. Very close, something giggles."
+text = "disturbed a nook glittering with dust that wasn't there a moment ago. Something blinked out of the air."
+page = "Tucked under the glittering caps is a waxed notebook, the kind the Cenarion Circle's surveyors carry, its last pages smeared with the same shining dust.{n}{n}A faerie dragon, I am almost sure. Smaller than the ones in Feralas and quicker, and its scales have gone the strange colors of everything else that drinks this water. It does not mind me. It takes things: my pencil, my spare socks, the buttons off my coat. It brings some of them back.{n}{n}Today it would not let me leave the nook. Every time I turned for the tunnel it was there first, laughing. I think it is lonely. I think it is playing. I am no longer sure those are different things down here.{n}{n}The dust settles on your sleeve. Very close, something giggles."
 
 # --- notes -------------------------------------------------------------------------------------------
 
@@ -138,19 +138,19 @@ scale = 1.3
 name = "A Cenarion Warning"
 at = [-139.0, 131.0, -77.0]
 facing = 1.0
-text = "\"Naralex went down to heal the Barrens by dreaming. His disciples followed; they call themselves the Druids of the Fang now. One of his first disciples hid from them at the far end of the western warren, they say, and wrote down what Naralex truly dreams. Find him.\""
+text = "\"Naralex went down to heal the Barrens by dreaming. His disciples followed. They call themselves the Druids of the Fang now. One of his first disciples hid from them at the far end of the western warren, they say, and wrote down what Naralex truly dreams. Find him.\""
 
 [[dungeon.note]]
 key = "fang_orders"
 hints = ["fang_cache", "faerie_nook"]
 # #27: the nook is at the far end of the east caves, by Pythas (it read "far west").
-clue = "The Fang's cache is past the end of the low tunnel; something glitters in a nook at the far end of the east caves."
+clue = "The Fang's cache is past the end of the low tunnel. Something glitters in a nook at the far end of the east caves."
 display = 190
 scale = 1.3
 name = "The Fanglords' Orders"
 at = [7.9, 277.2, -86.1]
 facing = 0.0
-text = "\"Anacondra holds the pit. Cobrahn, the low south tunnel. Pythas, the east caves. Serpentis, the western warren. None passes to the Everliving.\" Underneath, smaller: \"Our cache is past the end of the low tunnel. Tell no one. And stay out of the glittering nook at the far end of the east caves: what lives there is not ours.\""
+text = "\"Anacondra holds the pit. Cobrahn, the low south tunnel. Pythas, the east caves. Serpentis, the western warren. None passes to the Everliving.\" Underneath, smaller: \"Our cache is past the end of the low tunnel. Tell no one. And stay out of the glittering nook at the far end of the east caves. What lives there is not ours.\""
 
 # --- the dreamers and their deviates -----------------------------------------------------------------
 
@@ -434,7 +434,7 @@ display = 1515
 icon = "INV_Misc_Bone_01"
 kind = "resource"
 stack = 50
-text = "A fang from one of the deviate things. The lamps' quartermaster in the Wailing Caverns trades them; you drop them all when you fall below."
+text = "Trade them to the quartermaster at any lamp in the Wailing Caverns. You drop all of them when you fall. \"A fang from one of the deviate things.\""
 
 [[item]]
 key = "anacondra_mantle"
@@ -444,7 +444,7 @@ icon = "INV_Helmet_26"
 kind = "armor"
 slot = "head"
 reduce = 0.09
-text = "Lady Anacondra's: a band of woven vine and shed skin, the Fanglords' mark."
+text = "Lady Anacondra's. A band of woven vine and shed skin, the Fanglords' mark."
 set = "fanglord"
 
 [[item]]
@@ -455,7 +455,7 @@ icon = "INV_Shoulder_30"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.08
-text = "Lord Cobrahn's: it smells of the low tunnel, and of snake."
+text = "Lord Cobrahn's. It smells of the low tunnel, and of snake."
 set = "fanglord"
 
 [[item]]
@@ -467,7 +467,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.12
 weight = 0.01
-text = "Lord Pythas's: soft leggings for a druid who never stopped walking the Nightmare."
+text = "Lord Pythas's. Soft leggings for a druid who never stopped walking the Nightmare."
 set = "fanglord"
 
 [[item]]
@@ -478,7 +478,7 @@ icon = "INV_Chest_Fur"
 kind = "armor"
 slot = "chest"
 reduce = 0.11
-text = "Lord Serpentis's: green fur over scales that shift colour when you aren't looking."
+text = "Lord Serpentis's. Green fur over scales that shift color when you aren't looking."
 set = "fanglord"
 
 [[item]]
@@ -500,7 +500,7 @@ icon = "INV_Pants_06"
 kind = "armor"
 slot = "legs"
 reduce = 0.1
-text = "Thunder lizard hide: it crackles when you walk."
+text = "Thunder lizard hide. It crackles when you walk."
 
 [[item]]
 key = "verdan_breastplate"
@@ -691,7 +691,7 @@ leash = 24.0
 drops = { deviate_fang = [1, 3] }
 respawn = 0.0
 then = "wc_ooze"
-then_text = "The ectoplasm splits; a smaller blob crawls out of it."
+then_text = "The ectoplasm splits, and a smaller blob crawls out of it."
   [mob.attack]
   windup = 0.6
   damage = 12
@@ -984,7 +984,7 @@ respawn = 0.0
   speed = 0.72
   might = 1.2
   pattern = "venom"
-  text = "Cobrahn's skin splits; scales show underneath."
+  text = "Cobrahn's skin splits. Scales show underneath."
   summon = ["wc_fang_serpent", "wc_fang_serpent"]
   shove = 5.0
 
@@ -1282,7 +1282,7 @@ respawn = 0.0
   speed = 0.82
   might = 1.15
   pattern = "chained bolt"
-  text = "Sparks crawl over Skum's back; the pool hums."
+  text = "Sparks crawl over Skum's back. The pool hums."
   shove = 5.0
   look = 10604
 
@@ -1366,7 +1366,7 @@ then_look = 27812
   at = 0.66
   speed = 0.88
   pattern = "wild growth"
-  text = "Verdan's roots rip up out of the floor all round it."
+  text = "Verdan's roots rip up out of the floor all around it."
   summon = ["wc_lasher", "wc_lasher"]
   look = 26271
   [[mob.phase]]
@@ -1374,7 +1374,7 @@ then_look = 27812
   speed = 0.78
   might = 1.15
   pattern = "everliving"
-  text = "Verdan heals over its wounds in a heave of green; then the green turns black."
+  text = "Verdan heals over its wounds in a heave of green. Then the green turns black."
   summon = ["wc_shambler"]
   shove = 6.0
   look = 26271
@@ -1434,7 +1434,7 @@ respawn = 0.0
   at = 0.5
   speed = 0.82
   pattern = "naralex's nightmare"
-  text = "Mutanus wails; every deviate thing in the warren answers."
+  text = "Mutanus wails, and every deviate thing in the warren answers."
   summon = ["wc_ravager", "wc_ravager"]
   [[mob.phase]]
   at = 0.2
@@ -1550,7 +1550,7 @@ name = "Cobrahn's Fang"
 display = 2709
 icon = "INV_Weapon_ShortBlade_03"
 kind = "weapon"
-text = "Lord Cobrahn's: a serpent's tooth on a hilt. Strike from behind."
+text = "Blows from behind deal 340% damage. \"Lord Cobrahn's. A serpent's tooth on a hilt.\""
 perks = [{ kind = "might", amount = 0.03 }]
 
 [[weapon]]
@@ -1575,7 +1575,7 @@ name = "Thornroot Maul"
 display = 1206
 icon = "INV_Hammer_03"
 kind = "weapon"
-text = "Verdan's: a root as thick as a man, and as hard as stone."
+text = "Verdan's. A root as thick as a man, and as hard as stone."
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
 # strongbox's guards, casters behind the fighters -------------------------------------------

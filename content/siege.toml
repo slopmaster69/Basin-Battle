@@ -13,7 +13,7 @@
 [siege]
 name = "the Siege of Arathi Basin"
 page = "The Siege of Arathi Basin"
-text = "Hold a camp in Arathi Basin against the waves your rivals buy for you, and buy theirs: every creature you send raises your income for the rest of the match."
+text = "Hold a camp in Arathi Basin against the waves your rivals buy for you, and buy theirs. Every creature you send raises your income for the rest of the match."
 # Where heroes wait for a match (Trollbane Hall's yard, looking down into the basin), and the
 # Blacksmith between the camps (the contested middle: its veins pay gold).
 lobby = [1294.4, 1308.9, -10.8]
@@ -112,21 +112,21 @@ per_base = 1
 [[siege.mode]]
 key = "2v2"
 name = "Two against two"
-text = "Two heroes to a camp, the Stables against the Farm: one Hearth, two purses."
+text = "Two heroes share each camp, the Stables against the Farm. One Hearth, two purses."
 bases = ["stables", "farm"]
 per_base = 2
 
 [[siege.mode]]
 key = "1v1v1"
 name = "Three, each for themselves"
-text = "The Stables, the Gold Mine and the Lumber Mill: send to whom you like."
+text = "The Stables, the Gold Mine and the Lumber Mill, each for itself. Send to any rival."
 bases = ["stables", "gold_mine", "lumber_mill"]
 per_base = 1
 
 [[siege.mode]]
 key = "1v1v1v1"
 name = "Four, each for themselves"
-text = "Every camp in the basin taken: send to whom you like."
+text = "Every camp in the basin is held, each for itself. Send to any rival."
 bases = ["stables", "farm", "gold_mine", "lumber_mill"]
 per_base = 1
 
@@ -198,7 +198,7 @@ count = 3
 cost = 15
 income = 1
 from = 1
-text = "Three kobold diggers: they swarm whatever stands in the way."
+text = "3 kobold diggers. They swarm whatever stands in the way."
 
 [[siege.send]]
 key = "murlocs"
@@ -207,7 +207,7 @@ count = 4
 cost = 25
 income = 2
 from = 2
-text = "Four murlocs, quick and weak: they surround a hero alone."
+text = "4 murlocs, quick and weak. They surround a lone hero."
 
 [[siege.send]]
 key = "wolves"
@@ -216,7 +216,7 @@ count = 3
 cost = 30
 income = 2
 from = 2
-text = "A pack of three wolves: they circle and bite from behind."
+text = "A pack of 3 wolves. They circle and bite from behind."
 
 [[siege.send]]
 key = "footpads"
@@ -225,7 +225,7 @@ count = 2
 cost = 40
 income = 3
 from = 3
-text = "Two Defias footpads: quick blades that punish a guard held too long."
+text = "2 Defias footpads. Their quick blades punish a guard held too long."
 
 [[siege.send]]
 key = "spiders"
@@ -234,7 +234,7 @@ count = 2
 cost = 45
 income = 3
 from = 4
-text = "Two mine spiders out of Jasperlode."
+text = "2 mine spiders out of Jasperlode."
 
 [[siege.send]]
 key = "brute"
@@ -243,7 +243,7 @@ count = 1
 cost = 60
 income = 4
 from = 4
-text = "A Riverpaw brute: a slow, heavy overhead that punishes greed."
+text = "A Riverpaw brute. Its slow, heavy overhead punishes greed."
 
 [[siege.send]]
 key = "conjurers"
@@ -252,7 +252,7 @@ count = 2
 cost = 70
 income = 5
 from = 5
-text = "Two Defias conjurers: fire from afar on heroes and towers alike."
+text = "2 Defias conjurers. They cast fire from afar at heroes and towers alike."
 
 [[siege.send]]
 key = "berserkers"
@@ -261,7 +261,7 @@ count = 2
 cost = 80
 income = 5
 from = 6
-text = "Two Darkspear berserkers: flurries of three (parry the first and the rest never come)."
+text = "2 Darkspear berserkers. They attack in flurries of 3. Parry the first blow and the rest never come."
 
 [[siege.send]]
 key = "mystics"
@@ -270,7 +270,7 @@ count = 2
 cost = 90
 income = 6
 from = 7
-text = "Two Riverpaw mystics: lightning from the back of the wave."
+text = "2 Riverpaw mystics. They cast lightning from the back of the wave."
 
 [[siege.send]]
 key = "bear"
@@ -279,7 +279,7 @@ count = 1
 cost = 100
 income = 6
 from = 7
-text = "An Elwynn black bear: a lot of health and heavy paws."
+text = "An Elwynn black bear, with a lot of health and heavy paws."
 
 [[siege.send]]
 key = "brave"
@@ -288,7 +288,7 @@ count = 1
 cost = 110
 income = 7
 from = 8
-text = "A Bloodhoof brave with his great mace (poised: a light blow doesn't knock it aside)."
+text = "A Bloodhoof brave with his great mace. Poised, so a light blow doesn't knock him aside."
 
 [[siege.send]]
 key = "overseer"
@@ -297,7 +297,7 @@ count = 1
 cost = 120
 income = 8
 from = 8
-text = "A Warsong overseer and his two-handed axe: wide cleaves, an overhead through the guard."
+text = "A Warsong overseer with a two-handed axe. He cleaves wide, and his overhead goes through a guard."
 
 [[siege.send]]
 key = "hogger"
@@ -307,7 +307,7 @@ cost = 400
 income = 25
 from = 10
 once = true
-text = "Hogger himself. One per hero per match."
+text = "Hogger himself. Limit 1 per hero per match."
 
 [[siege.send]]
 key = "warlord"
@@ -317,7 +317,7 @@ cost = 700
 income = 40
 from = 12
 once = true
-text = "Warlord Gorzak and his great axe, whirlwind and all. One per hero per match."
+text = "Warlord Gorzak with his great axe, whirlwind and all. Limit 1 per hero per match."
 
 # A camp's Hearth: its heart. It falls, the camp is out. Only Siege builds one (never the build
 # menu); raiders go for it once nothing stands in their way.
@@ -342,7 +342,7 @@ display = 7368
 stack = 1000000
 icon = "INV_Misc_Coin_01"
 kind = "resource"
-text = "Siege's gold: from your income, the foes you fell and the Blacksmith's veins."
+text = "Spent only in Siege. Earned from your income, enemies you defeat and the Blacksmith's veins."
 
 # The Blacksmith's veins round the middle (gathered for gold, not ore).
 [[siege.node]]

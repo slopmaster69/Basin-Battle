@@ -129,13 +129,13 @@ f.you = Button("You", 38, function() m.tab = "own" m.folded = false ES.DrawMeter
   "Your own damage or healing by card, since you last reset it.")
 f.you:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
 f.fightTab = Button("Fight", 42, function() m.tab = "fight" m.folded = false ES.DrawMeter() end,
-  "You and the heroes fighting with you, in this fight (or the last one).")
+  "You and the heroes fighting with you, this fight or the last.")
 f.fightTab:SetPoint("RIGHT", f.you, "LEFT", -3, 0)
 f.mode = Button("Healing", 52, function() m.heal = not m.heal m.folded = false ES.DrawMeter() end,
-  "Show healing instead of damage, or back again.")
+  "Switch between damage and healing.")
 f.mode:SetPoint("RIGHT", f.fightTab, "LEFT", -3, 0)
 f.reset = Button("Reset", 42, function() if ES.Say then ES.Say(".es meter reset") end end,
-  "Start your own count over (the fight's stays).")
+  "Reset your own count. The fight's count stays.")
 f.reset:SetPoint("TOPRIGHT", f.you, "BOTTOMRIGHT", 0, -3)
 
 f.rows = {}
@@ -293,9 +293,9 @@ function ES.ToggleMeter()
   local s = Settings()
   s.meterHidden = not s.meterHidden
   if s.meterHidden then
-    DEFAULT_CHAT_FRAME:AddMessage("Elwynn Survival: the damage meter is hidden (/esmeter to show it).")
+    DEFAULT_CHAT_FRAME:AddMessage("Elwynn Survival: Damage meter hidden. Type /esmeter to show it.")
   else
-    DEFAULT_CHAT_FRAME:AddMessage("Elwynn Survival: the damage meter is shown.")
+    DEFAULT_CHAT_FRAME:AddMessage("Elwynn Survival: Damage meter shown.")
   end
   ES.DrawMeter()
 end

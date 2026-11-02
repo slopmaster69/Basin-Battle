@@ -425,7 +425,7 @@ impl SurvivalGame {
         let mut to = p.clone().into_os_string();
         to.push(format!(".before-reset-{secs}"));
         let to = PathBuf::from(to);
-        std::fs::copy(&p, &to).map_err(|e| format!("Couldn't keep the save at {} ({e}); nothing was reset.", to.display()))?;
+        std::fs::copy(&p, &to).map_err(|e| format!("Couldn't keep the save at {} ({e}). Nothing was reset.", to.display()))?;
         Ok(Some(to))
     }
 
@@ -735,10 +735,10 @@ impl SurvivalGame {
             (None, false) => self.say_to(
             conn,
             &format!(
-                "Welcome to Elwynn Survival. The camp by Goldshire is home: gather timber, meat and \
-                 Fargodeep copper, bank it at the camp's chest, and build. {} Friendly fire is on: \
-                 heroes can strike each other and get up again a second later. Try every weapon at \
-                 the rack by the chest. The key icon at the bottom right lists your controls.",
+                "Welcome to Elwynn Survival. The camp by Goldshire is home. Gather timber, meat and \
+                 Fargodeep copper, bank it at Camp Storage, and build. {} Friendly fire is on. \
+                 Heroes can damage each other and respawn 1 sec later. Try every weapon at \
+                 the rack by Camp Storage. The key icon at the bottom right lists your controls.",
                 ui::CONTROLS_TEXT
             ),
         ),
@@ -746,15 +746,16 @@ impl SurvivalGame {
         }
         if self.realm.siege {
             let page = self.sim.content.siege.as_ref().map_or(String::new(), |d| d.page.clone());
-            self.say_to(conn, &format!("{page}. You're in Trollbane Hall: muster at the banner to join a way to play (one against one, two against two, three or four each for themselves). Every match starts the same: your class's Q and E and the plain kit; your camp's things wait at Goldshire. The banner takes you home."));
+            self.say_to(conn, &format!("{page}. You're in Trollbane Hall. Muster at the banner to join a way to play: 1 against 1, 2 against 2, or 3 or 4 heroes each for themselves. Every match starts the same, with your class's (Q) and (E) cards and the plain kit. Your camp's items wait at Goldshire. The banner takes you home."));
         }
         if self.realm.below {
             let own = self.sim.content.dungeon.as_ref().map(|d| d.welcome.clone()).filter(|w| !w.is_empty());
             let text = own.unwrap_or_else(|| {
-                "The Deadmines. Light the lamps as you go: a lamp is where you wake, and resting at one \
-                 heals you and fills your Draughts (T), the only heal down here; it also brings the \
-                 Brotherhood back to their posts. Fall, and what you found waits in a sack where you \
-                 fell: fall again before you win it back and it's gone. Any lit lamp takes you home."
+                "The Deadmines. There are 3 lamps, at the Smugglers' Landing, the Foundry's back door and \
+                 the Galleries. Light them as you go, since you respawn at a lit lamp. Rest at a lamp to \
+                 heal, refill your Draughts (T) and send the Brotherhood back to their posts. Draughts \
+                 are the only heal down here. If you fall, your finds wait in a sack where you fell. \
+                 Fall again before you recover it and it's lost. Any lit lamp takes you home."
                     .to_string()
             });
             self.say_to(conn, &text);

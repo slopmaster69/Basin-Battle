@@ -395,8 +395,8 @@ impl SurvivalGame {
             Event::Kill { killer, victim } => {
                 let line = format!("KF\t{}\t{}", clean(killer.as_deref().unwrap_or("")), clean(&victim));
                 let text = match &killer {
-                    Some(k) => format!("{k} fells {victim}."),
-                    None => format!("{victim} falls."),
+                    Some(k) => format!("{k} felled {victim}."),
+                    None => format!("{victim} fell."),
                 };
                 let conns: Vec<ConnId> = self.in_world().map(|(c, _, _)| *c).collect();
                 for c in conns {
@@ -661,7 +661,7 @@ impl SurvivalGame {
                     if self.has_addon(c) {
                         self.ui_line(c, &format!("CF\t{}\t{}\t{}\t{}", clean(&what), clean(&text), clean(&yes), clean(&no)));
                     } else {
-                        self.say_to(c, &format!("{text} Type .{what} yes to go ahead."));
+                        self.say_to(c, &format!("{text} Type .{what} yes to confirm."));
                     }
                 }
             }

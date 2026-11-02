@@ -348,7 +348,7 @@ impl Survival {
                         self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (c.items[item].use_secs * 1000.0) as u32 });
                         self.punish_healing(id);
                     }
-                    None => self.tell(id, "Nothing to use: cook raw meat at a cooking fire, or brew at a cauldron."),
+                    None => self.tell(id, "Nothing to use. Cook raw meat at a Cooking Fire or brew at a cauldron."),
                 }
                 true
             }
@@ -929,12 +929,12 @@ impl Survival {
                             self.events.push(Event::Effects { player: id });
                             // Said plainly, so a slow effect isn't taken for nothing.
                             let what = match e.kind.as_str() {
-                                "regen" => format!("{name}: you heal {:.0}% of your health over {:.0} s.", e.amount * e.secs * 100.0, e.secs),
-                                "stamina" => format!("{name}: your stamina comes back {:.0}% faster for {:.0} s.", e.amount * 100.0, e.secs),
-                                "might" => format!("{name}: your blows land {:.0}% harder for {:.0} s.", e.amount * 100.0, e.secs),
-                                "ward" => format!("{name}: blows on you lose {:.0}% more for {:.0} s.", e.amount * 100.0, e.secs),
-                                "focus" => format!("{name}: your abilities come back {:.0}% sooner for {:.0} s.", e.amount * 100.0, e.secs),
-                                _ => format!("{name} for {:.0} s.", e.secs),
+                                "regen" => format!("{name} restores {:.0}% of your health over {:.0} sec.", e.amount * e.secs * 100.0, e.secs),
+                                "stamina" => format!("{name} increases stamina regeneration by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                                "might" => format!("{name} increases your damage by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                                "ward" => format!("{name} reduces damage taken by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                                "focus" => format!("{name} makes your abilities recover {:.0}% faster for {:.0} sec.", e.amount * 100.0, e.secs),
+                                _ => format!("{name} for {:.0} sec.", e.secs),
                             };
                             self.events.push(Event::Tell { player: id, text: what });
                         }
@@ -1691,7 +1691,7 @@ impl Survival {
         // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
-            self.tell(victim, "The heavy blow breaks your charge!");
+            self.tell(victim, "The heavy attack breaks your charge!");
             self.end_ability_action(victim);
             self.set_action(victim, Action::Ready);
         }
@@ -1984,9 +1984,9 @@ impl Survival {
             self.objs.insert(cid, Obj { kind: ObjKind::Cache { uid, owner: account, items: dropped }, pos: at, facing: 0.0 });
             self.events.push(Event::ObjSpawned { id: cid });
             if below {
-                self.tell(id, format!("You fall. Your sack ({}) waits where you fell: win it back before you fall again, or it's lost.", what.join(", ")));
+                self.tell(id, format!("You fell. Your sack ({}) waits where you fell. Recover it before you fall again or it's lost.", what.join(", ")));
             } else {
-                self.tell(id, format!("You fall. What you carried ({}) waits where you fell: go back for it.", what.join(", ")));
+                self.tell(id, format!("You fell. What you carried ({}) waits where you fell. Go back for it.", what.join(", ")));
             }
         }
         // Who felled them, for everyone's kill feed: a hero, or a creature.
@@ -2293,7 +2293,7 @@ impl Survival {
             if let Some(p) = self.players.get_mut(&o) {
                 p.cooldowns.clear();
                 self.events.push(Event::Abilities { player: o });
-                self.events.push(Event::Flash { player: o, text: "Death Mark: every cooldown ready".into() });
+                self.events.push(Event::Flash { player: o, text: "Death Mark readied every cooldown".into() });
             }
         }
     }

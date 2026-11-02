@@ -17,8 +17,8 @@ area = 796
 window = [[1590.0, 950.0], [1900.0, 1470.0]]
 icon = "Spell_Shadow_RaiseDead"
 blurb = "The Crusade's dead, who won't stay buried, and their torturers"
-first_page = "The Graveyard's chapel door. The bells have stopped; the digging hasn't."
-welcome = "The Scarlet Monastery's Graveyard. The Crusade buries its dead here, and they don't stay buried; the Interrogator keeps the living busy. Two lamps: the chapel door, and the mausoleum steps. Rest at a lamp to heal, fill your Draughts (T) and send the dead back to their graves for a while. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+first_page = "The Graveyard's chapel door. The bells have stopped. The digging hasn't."
+welcome = "The Scarlet Monastery's Graveyard. The Crusade buries its dead here, and they don't stay buried. The Interrogator keeps the living busy. There are 2 lamps, at the chapel door and on the mausoleum steps. Rest at a lamp to heal, refill your Draughts (T) and send the dead back to their graves for a while. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): the Scarlet Monastery's Graveyard: among the hardest (26 to 36).
 tier = 3
@@ -74,7 +74,7 @@ kind = "hidden"
 at = [1851.7, 1327.3, 18.0]
 find = 4.0
 reveals = ["grave_goods", "grave_rhyme"]
-text = "a grave with no headstone, freshly turned, a carved pumpkin grinning on top of it. Something under the earth laughs. It's Hallow's End; the dead remember."
+text = "found a grave with no headstone, freshly turned, a carved pumpkin grinning on top. Something under the earth laughed. It's Hallow's End, and the dead remember."
 page = "Under the pumpkin, someone has driven a stake with a slip of parchment nailed to it, the way the sexton marks a grave until its stone comes. This one's stone never came.{n}{n}Name: not given. Taken on Hallow's End at the crossroads, riding without a head and laughing all the same. Put down by the Bloodmage, who would not say how. Buried without rites, face down, by the Bloodmage's order, and no stone, so that none should know where.{n}{n}Beneath it, in the sexton's hand: Somebody brings the pumpkin every year. I have never seen who. I took it away the first time. In the morning it was back, and lit.{n}{n}The candle in the pumpkin is burning now. Nobody here lit it. Under your feet the turned earth settles, like a sleeper rolling over."
 
 [[dungeon.box]]
@@ -103,7 +103,7 @@ kind = "hidden"
 at = [1852.0, 1415.0, 22.7]
 find = 4.0
 reveals = ["azshir"]
-text = "the seal on the crypt has cracked from the inside. Something comes out of it, wailing."
+text = "found a crypt whose seal had cracked from the inside. Something came out of it, wailing."
 page = "The lid of the crypt is cut with the Crusade's flame and a name: SISTER AZSHIR. Beneath it is the inscription the Crusade gives its own.{n}{n}She kept the night vigil in the chapel nine years and never once closed her eyes. When the plague came she would not sleep, for fear of what sleep would bring. Rest now, Sister. You have earned it.{n}{n}Below that, cut by a less careful chisel: Sealed by order of the Bloodmage, with silver. Do not open, whatever is heard.{n}{n}The silver in the seal has gone black, and the crack in it runs outward, from within. Through it, very faintly, comes a woman's voice counting the hours, and losing count, and starting again."
 
 # Among the graves, one with a champion's arms carved on it.
@@ -116,7 +116,7 @@ kind = "hidden"
 at = [1820.9, 1281.8, 17.7]
 find = 4.0
 reveals = ["champion"]
-text = "a grave carved with a champion's arms: the earth over it heaves, and its champion climbs out."
+text = "found a grave carved with a champion's arms. The earth over it heaved, and its champion climbed out."
 page = "The stone is carved with a Scarlet champion's arms, a sword upright through a flame. The epitaph is long, and someone has scored half of it away.{n}{n}Here lies a champion of the Scarlet Crusade, who held the Brill road for the Light and fell at the last with his face to the dead. He asked to be laid among his brothers, and not...{n}{n}The rest is gouged out. In its place, in red paint gone brown: QUESTIONED. -- V.{n}{n}Along the foot of the stone run many small scratches, as if fingers had worked at it from below. The newest are fresh. The earth over the grave lifts, and settles, and lifts again."
 
 # --- notes -------------------------------------------------------------------------------------------
@@ -124,13 +124,13 @@ page = "The stone is carved with a Scarlet champion's arms, a sword upright thro
 [[dungeon.note]]
 key = "sexton_log"
 hints = ["horseman_grave", "azshir_crypt"]
-clue = "A pumpkin on a grave with no stone, in the far corner; past it, a sealed crypt that wails."
+clue = "A pumpkin sits on a grave with no stone in the far corner. Past it, a sealed crypt wails."
 display = 105
 scale = 1.4
 name = "The Sexton's Log"
 at = [1671.0, 1028.9, 18.7]
 facing = 0.9
-text = "\"Buried four more today; dug up three again by nightfall. Thalnos says it's the cold. It isn't the cold. And somebody keeps putting a pumpkin on the grave in the far corner, the one with no stone. Every Hallow's End. And the sealed crypt past it has started to wail at night. From the inside.\""
+text = "\"Buried four more today. Dug up three again by nightfall. Thalnos says it's the cold. It isn't the cold. And somebody keeps putting a pumpkin on the grave in the far corner, the one with no stone. Every Hallow's End. And the sealed crypt past it has started to wail at night. From the inside.\""
 
 [[dungeon.note]]
 key = "vishas_ledger"
@@ -141,7 +141,7 @@ scale = 1.3
 name = "The Interrogator's Ledger"
 at = [1777.8, 1146.3, 7.6]
 facing = 1.57
-text = "A list of names, each crossed out in red. At the bottom: \"The champion's grave in the yard: I hear him at night. He wants out. Let him have the yard, if he likes.\""
+text = "A list of names, each crossed out in red. At the bottom: \"The champion's grave in the yard. I hear him at night. He wants out. Let him have the yard, if he likes.\""
 
 # --- the dead and their keepers ----------------------------------------------------------------------
 
@@ -309,7 +309,7 @@ display = 2956
 icon = "INV_Misc_Bone_02"
 kind = "resource"
 stack = 50
-text = "Dust from the Crusade's graves. The lamps' quartermaster in the Graveyard trades it; you drop it all when you fall below."
+text = "Trade it to the quartermaster at any lamp in the Graveyard. You drop all of it when you fall. \"Dust from the Crusade's graves.\""
 
 [[item]]
 key = "vishas_hood"
@@ -319,7 +319,7 @@ icon = "INV_Helmet_04"
 kind = "armor"
 slot = "head"
 reduce = 0.08
-text = "Vishas's: it's seen a great deal it shouldn't have."
+text = "Vishas's. It's seen a great deal it shouldn't have."
 set = "gravewarden"
 
 [[item]]
@@ -342,7 +342,7 @@ icon = "INV_Shirt_Black_01"
 kind = "armor"
 slot = "chest"
 reduce = 0.1
-text = "Thalnos's: dyed with something that isn't dye."
+text = "Thalnos's. Dyed with something that isn't dye."
 set = "gravewarden"
 
 [[item]]
@@ -354,7 +354,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.12
 weight = 0.02
-text = "The champion's: they remember a better death than his."
+text = "The champion's. They remember a better death than his."
 set = "gravewarden"
 
 [[item]]
@@ -365,7 +365,7 @@ icon = "INV_Shoulder_02"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
-text = "Azshir's: you won't sleep well in it either."
+text = "Azshir's. You won't sleep well in it either."
 perks = [{ kind = "focus", amount = 0.05 }]
 
 [[item]]
@@ -731,7 +731,7 @@ respawn = 0.0
   at = 0.6
   speed = 0.85
   pattern = "bone storm"
-  text = "Ironspine's bones grind; the graves round him split open."
+  text = "Ironspine's bones grind, and the graves around him split open."
   summon = ["gy_zombie", "gy_zombie"]
   [[mob.phase]]
   at = 0.25
@@ -1032,7 +1032,7 @@ respawn = 0.0
   at = 0.5
   speed = 0.82
   pattern = "terrify"
-  text = "Azshir's wail rises; the graves round her answer."
+  text = "Azshir's wail rises, and the graves around her answer."
   summon = ["gy_ghoul", "gy_ghoul"]
   [[mob.phase]]
   at = 0.2
@@ -1084,7 +1084,7 @@ name = "Ironspine's Fist"
 display = 2047
 icon = "INV_Mace_01"
 kind = "weapon"
-text = "Ironspine's: bone grown around iron. It breaks guards."
+text = "Breaks guards. \"Ironspine's. Bone grown around iron.\""
 
 [[weapon]]
 key = "horsemans_scythe"
@@ -1107,7 +1107,7 @@ name = "The Horseman's Scythe"
 display = 5637
 icon = "INV_Spear_06"
 kind = "weapon"
-text = "The Headless Rider's: long, cruel, and it never stops swinging."
+text = "The Headless Rider's. Long, cruel, and it never stops swinging."
 perks = [{ kind = "might", amount = 0.05 }]
 
 [[weapon]]
@@ -1131,7 +1131,7 @@ name = "Fallen Champion's Greatsword"
 display = 5176
 icon = "INV_Sword_15"
 kind = "weapon"
-text = "The Fallen Champion's: it fought for the Crusade once."
+text = "The Fallen Champion's. It fought for the Crusade once."
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
 # strongbox's guards, casters behind the fighters -------------------------------------------

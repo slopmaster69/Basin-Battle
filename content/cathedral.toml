@@ -15,9 +15,9 @@ map_dir = "MonasteryInstances"
 area = 796
 window = [[740.0, 1230.0], [1250.0, 1490.0]]
 icon = "Spell_Holy_HolySmite"
-blurb = "The Crusade's heart: Mograine at the altar, and Whitemane who won't let him die"
-first_page = "The Cathedral's courtyard gate. The Crusade sings inside; they've heard you coming."
-welcome = "The Scarlet Monastery's Cathedral. Commander Mograine guards the altar, and High Inquisitor Whitemane will not let him stay dead. Two lamps: the courtyard gate, and the nave. Rest at a lamp to heal, fill your Draughts (T) and send the Crusade back to its prayers. Fall, and what you found waits in a sack where you fell. Any lit lamp takes you home."
+blurb = "The Crusade's heart, where Whitemane won't let Mograine die"
+first_page = "The Cathedral's courtyard gate. The Crusade sings inside. They've heard you coming."
+welcome = "The Scarlet Monastery's Cathedral. Commander Mograine guards the altar, and High Inquisitor Whitemane will not let him stay dead. There are 2 lamps, at the courtyard gate and in the nave. Rest at a lamp to heal, refill your Draughts (T) and send the Crusade back to its prayers. If you fall, your finds wait in a sack where you fell. Any lit lamp takes you home."
 gate_raids = 0
 # How hard next to the others (1 to 3): the Cathedral: the hardest (35 to 45).
 tier = 3
@@ -84,7 +84,7 @@ at = [1205.5, 1397.5, 29.0]
 find = 4.0
 reveals = ["fairbanks"]
 # #27: the Crusade barred him in (his own lines and the page say so).
-text = "the door behind the altar was barred from this side, and the bar comes away in your hands. The thing behind it stands up."
+text = "unbarred the door behind the altar. The thing behind it stood up."
 page = "The black candles have burned down to stubs and been lit again, many times, by someone on this side of the door. Words have been scratched into the flagstone at its foot, as if pushed out through the gap beneath it with a nail.{n}{n}I saw what stands in the Grand Crusader's shadow. It is not a man. Whitemane knows. Mograine does not.{n}{n}They shut the door on me and told me to pray. I have prayed. My candle has gone out. It is dark in here now.{n}{n}It is not so bad, the dark. It listens.{n}{n}Beyond the door, something rises, slowly, the way a man gets up after kneeling a very long while."
 
 # The courtyard's west chapel: the Crusade's reliquary, and a shard of something that burned.
@@ -98,8 +98,8 @@ kind = "hidden"
 at = [785.5, 1289.4, 18.7]
 find = 4.0
 reveals = ["reliquary_cache", "reliquary_inscription"]
-text = "in the courtyard's west chapel: the Crusade's reliquary, and in it a shard of a blade that still smoulders. It knows the name Mograine."
-page = "The reliquary is a little chest of red gold, set on the chapel altar under a cloth stitched with flames. Tucked beneath the cloth is the keeper's register, in the careful hand of a chaplain who has written the same words many times.{n}{n}Received from the Commander's own hand, on his return from the north: one shard of the Ashbringer, wrapped in his cloak. The Commander would not say how it came to be broken. He would not look at it.{n}{n}Note: the shard is warm. It has never once been cold, not in the deepest winter. On the nights the Commander prays in the cathedral it smoulders, and the chapel smells of smoke.{n}{n}Note: by order of High Inquisitor Whitemane, it is never to be brought near him. Never.{n}{n}Words are cut into the reliquary's lid."
+text = "found the Crusade's reliquary in the courtyard's west chapel. In it, a shard of a blade still smolders. It knows the name Mograine."
+page = "The reliquary is a little chest of red gold, set on the chapel altar under a cloth stitched with flames. Tucked beneath the cloth is the keeper's register, in the careful hand of a chaplain who has written the same words many times.{n}{n}Received from the Commander's own hand, on his return from the north: one shard of the Ashbringer, wrapped in his cloak. The Commander would not say how it came to be broken. He would not look at it.{n}{n}Note: the shard is warm. It has never once been cold, not in the deepest winter. On the nights the Commander prays in the cathedral it smolders, and the chapel smells of smoke.{n}{n}Note: by order of High Inquisitor Whitemane, it is never to be brought near him. Never.{n}{n}Words are cut into the reliquary's lid."
 
 [[dungeon.box]]
 key = "reliquary_cache"
@@ -127,7 +127,7 @@ kind = "hidden"
 at = [892.7, 1434.2, 18.7]
 find = 4.0
 reveals = ["tithe_box"]
-text = "behind a statue in the courtyard: the tithes a chaplain kept for himself."
+text = "found the tithes a chaplain kept for himself, behind a statue in the courtyard."
 page = "Wedged behind the statue's heel is a sack of the Crusade's insignia, and folded among them a page torn from a confessor's book, filled in by the confessor himself.{n}{n}I confess I have kept back the tithes, a little at every collection, since the winter. I confess I meant to buy passage to Theramore with them, and a new name, and a life where no one asks me to bless the fires.{n}{n}I confess I have seen what is done in the Inquisitor's rooms, and said the words over it, and gone in to supper.{n}{n}I confess I will not be forgiven. I only ask the Light to let me be gone before the next burning.{n}{n}It is not signed. Above it the statue looks down with stone eyes and an expression that, in this light, might be disappointment."
 
 [[dungeon.box]]
@@ -142,13 +142,13 @@ loot = { scarlet_insignia = 16, tonic = 1, whetstone = 1 }
 [[dungeon.note]]
 key = "crusade_hymn"
 hints = ["scarlet_reliquary", "chaplain_cache"]
-clue = "The reliquary is in the courtyard's west chapel; the missing tithes are behind a courtyard statue."
+clue = "The reliquary is in the courtyard's west chapel. The missing tithes are behind a courtyard statue."
 display = 254
 scale = 1.4
 name = "A Crusade Hymnal"
 at = [870.1, 1325.2, 18.0]
 facing = 0.4
-text = "\"...and Whitemane shall raise him, and raise him again, for the Commander is the Crusade's sword and she its hand.\" In the margin, in a smaller hand: \"The reliquary in the west chapel holds a shard of the Ashbringer. The Inquisitor says never to bring it near him.\" Under that, in a third hand, angrier: \"And whoever is skimming the tithes: the statue in the courtyard is NOT a strongroom.\""
+text = "\"...and Whitemane shall raise him, and raise him again, for the Commander is the Crusade's sword and she its hand.\" In the margin, in a smaller hand: \"The reliquary in the west chapel holds a shard of the Ashbringer. The Inquisitor says never to bring it near him.\" Under that, in a third hand, angrier: \"And whoever is skimming the tithes, the statue in the courtyard is NOT a strongroom.\""
 
 [[dungeon.note]]
 key = "fairbanks_warning"
@@ -317,7 +317,7 @@ display = 6244
 icon = "INV_Misc_Coin_05"
 kind = "resource"
 stack = 50
-text = "A Crusade insignia. The lamps' quartermaster in the Cathedral trades them; you drop them all when you fall below."
+text = "Trade them to the quartermaster at any lamp in the Cathedral. You drop all of them when you fall. \"A Crusade insignia.\""
 
 [[item]]
 key = "mograine_breastplate"
@@ -328,7 +328,7 @@ kind = "armor"
 slot = "chest"
 reduce = 0.24
 weight = 0.08
-text = "Mograine's: red plate, and it's been through more deaths than yours will."
+text = "Mograine's. Red plate, and it's been through more deaths than yours will."
 set = "crusader"
 
 [[item]]
@@ -339,7 +339,7 @@ icon = "INV_Shoulder_30"
 kind = "armor"
 slot = "shoulders"
 reduce = 0.1
-text = "The High Inquisitor's: you feel, faintly, that someone wants you to get up again."
+text = "The High Inquisitor's. It feels, faintly, as if someone wants you to get up again."
 set = "crusader"
 
 [[item]]
@@ -374,7 +374,7 @@ icon = "INV_Shirt_01"
 kind = "armor"
 slot = "chest"
 reduce = 0.09
-text = "The Abbot's: heavy with gold thread and prayers."
+text = "The Abbot's. Heavy with gold thread and prayers."
 
 # --- the Crusade -----------------------------------------------------------------------------------------
 
@@ -979,7 +979,7 @@ respawn = 0.0
   speed = 0.72
   might = 1.25
   pattern = "ashbringer"
-  text = "The fire round Mograine roars up into the vaults."
+  text = "The fire around Mograine roars up into the vaults."
   shove = 7.0
   look = 24171
 
@@ -1081,7 +1081,7 @@ kind = "armor"
 slot = "legs"
 reduce = 0.12
 weight = 0.02
-text = "The Abbot's: blessed, polished, and never once knelt in."
+text = "The Abbot's. Blessed, polished, and never once knelt in."
 set = "crusader"
 
 [[weapon]]
@@ -1106,7 +1106,7 @@ name = "Mograine's Might"
 display = 1726
 icon = "INV_Hammer_03"
 kind = "weapon"
-text = "Scarlet Commander Mograine's: the Crusade's hammer, and it falls like judgement."
+text = "Scarlet Commander Mograine's. The Crusade's hammer, and it falls like judgment."
 
 [[weapon]]
 key = "hand_of_righteousness"
@@ -1127,7 +1127,7 @@ name = "Hand of Righteousness"
 display = 1461
 icon = "INV_Hammer_04"
 kind = "weapon"
-text = "Whitemane's: it mends the hand that holds it."
+text = "Whitemane's. It mends the hand that holds it."
 perks = [{ kind = "regen", amount = 0.003 }]
 
 # --- the polish pass: patrols on the empty stretches, sleepers in the side passages, a
