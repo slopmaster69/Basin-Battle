@@ -1855,8 +1855,11 @@ mod facts_tests {
     fn the_stat_line_says_each_thing_once_in_sec_and_yd() {
         let sunder = facts("sundering_blow");
         assert_eq!(sunder.matches("Stamina").count(), 1, "Stamina once: {sunder}");
-        assert!(sunder.contains("% weapon damage") && sunder.contains("sec windup") && sunder.contains("sec cooldown"), "{sunder}");
+        assert!(sunder.contains("% weapon damage") && sunder.contains("sec windup"), "{sunder}");
         assert!(!sunder.contains(" s ") && !sunder.ends_with(" s"), "sec, not s: {sunder}");
+        // (The Warrior's Sundering Blow costs only Stamina now: a cooldown in sec, on another.)
+        let axe = facts("hurled_axe");
+        assert!(axe.contains("sec cooldown") && !axe.contains(" s ") && !axe.ends_with(" s"), "{axe}");
         // An area is said as its radius.
         let rift = facts("void_rift");
         assert!(rift.contains("yd radius") && !rift.contains("wide"), "{rift}");
