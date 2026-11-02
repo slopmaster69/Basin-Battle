@@ -89,6 +89,8 @@ impl Survival {
                         "Ring the bell for the {}? {who} will march on the camp from {} in {} seconds. They'll wreck the stations they reach.",
                         plan.title, plan.road, plan.warning as u32
                     ),
+                    yes: "Ring it".into(),
+                    no: "Not yet".into(),
                 });
             }
         }

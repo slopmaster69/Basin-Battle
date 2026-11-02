@@ -14,7 +14,11 @@
 //! - `FL\t<text>`: a word flashed big (a parry).
 //! - `BP\t<name>\t<cost>\t<problem>\t<x~y~z~yards>`: the station being placed and where its ghost stands (`BP`
 //!   alone: none).
-//! - `CF\t<what>\t<text>`: confirm something (ringing the bell).
+//! - `CF\t<what>\t<text>\t<yes>\t<no>`: confirm something (ringing the bell, tearing a station
+//!   down), with its answers' words (an older add-on keeps its own).
+//! - `CW`: close the open window (the station picked up to move, torn down, being upgraded).
+//! - `W` goes on `\t<key~label~text~can^...>\t<health>\t<max>`: what else the station offers
+//!   (`upgrade`, `move`, `demolish`, each `.es <key>`), and how whole it is.
 //! - `BN\t<title>\t<sub>`: a big banner. `T\t<text>`: a short message. `DE\t<secs>\t<blows>\t<tip>`: down, up in;
 //!   `blows` is what felled them, the last first, with `^` between ("Targorr's heavy blow, through
 //!   your guard (212)"), `tip` a word on answering it (both may be empty; an older add-on reads
@@ -410,6 +414,11 @@ impl SurvivalGame {
                 htl_survival::Job::Build => p.preview.as_ref().map_or("", |pv| c.stations[pv.def].name.as_str()),
                 htl_survival::Job::Repair { station } => match self.sim.objs.get(station).map(|o| &o.kind) {
                     Some(ObjKind::Station { def, .. }) => c.stations[*def].name.as_str(),
+                    _ => "",
+                },
+                // Upgrading: what it becomes.
+                htl_survival::Job::Upgrade { station } => match self.sim.objs.get(station).map(|o| &o.kind) {
+                    Some(ObjKind::Station { def, .. }) => c.stations[*def].upgrade.as_ref().and_then(|u| c.station(&u.to)).map_or("", |t| c.stations[t].name.as_str()),
                     _ => "",
                 },
             },
@@ -967,10 +976,19 @@ impl SurvivalGame {
                 _ => String::new(),
             };
             let _ = write!(line, "\t{}", clean(&icon));
+            // What else it offers (upgrading, moving, tearing down), and its health.
+            if let Some(a) = self.sim.station_actions(id, station) {
+                let acts: Vec<String> = a.actions.iter().map(|(k, l, t, can)| format!("{}~{}~{}~{}", clean(k), clean(l), clean(t), u8::from(*can))).collect();
+                let _ = write!(line, "\t{}\t{}\t{}", acts.join("^"), a.health, a.max);
+            }
             self.ui_line(conn, &line);
         } else {
             let list: Vec<String> = recipes.iter().map(|(k, out, cost, _)| format!(".craft {k} ({out}: {cost})")).collect();
             self.say_to(conn, &format!("{}: {}", v.name, list.join("; ")));
+            if let Some(a) = self.sim.station_actions(id, station) {
+                let acts: Vec<String> = a.actions.iter().map(|(k, l, _, _)| format!(".es {k} ({l})")).collect();
+                self.say_to(conn, &format!("Health {} of {}. {}", a.health, a.max, acts.join("; ")));
+            }
         }
     }
 
@@ -1284,7 +1302,30 @@ impl SurvivalGame {
                 self.announce(if on { "Friendly fire is on: heroes can strike each other." } else { "Friendly fire is off." });
                 Ok(())
             }
-            "valor" | "cd" | "heal" | "dummy" | "pvp" => Err("That's for dev builds ([dev] full_tree) or with .es debug on.".into()),
+            // Testing the camp's building: everything free (`.es freebuild`, again to stop), or
+            // the chest stocked with what building asks for (`.es mats [n]`, 50 of each).
+            "freebuild" | "free" if self.dev_ok() => {
+                let on = match arg.as_str() {
+                    "on" => true,
+                    "off" => false,
+                    _ => !self.sim.free_build,
+                };
+                self.sim.free_build = on;
+                self.announce(if on { "Building is free: stations, upgrades and mending cost nothing (.es freebuild off to stop)." } else { "Building costs what it costs again." });
+                if let Some(w) = self.world_of(conn) {
+                    if w.addon {
+                        self.ui_build_menu(conn, me);
+                    }
+                }
+                Ok(())
+            }
+            "mats" | "materials" if self.dev_ok() => {
+                let n = arg.parse::<u32>().unwrap_or(50).clamp(1, 9999);
+                let names = self.sim.stock_for_building(n);
+                self.tell(conn, &format!("Into the camp's chest, {n} of each: {}.", names.join(", ")));
+                Ok(())
+            }
+            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" => Err("That's for dev builds ([dev] full_tree) or with .es debug on.".into()),
             // The add-on's answer to a ping: the round trip.
             "po" => {
                 let n = arg.parse::<u32>().unwrap_or(0);
@@ -1320,6 +1361,31 @@ impl SurvivalGame {
                 Ok(())
             }
             "place" | "ok" => self.sim.build_confirm(me).map(|_| ()),
+            // The station whose window is open (or the nearest): picked up to move, torn down
+            // (asked first), upgraded.
+            "move" => match self.open_station(conn, me) {
+                Some(s) => {
+                    self.close_window(conn);
+                    self.sim.move_start(me, s)
+                }
+                None => Err("Use the station you mean to move first.".into()),
+            },
+            "demolish" | "teardown" if arg == "no" => {
+                self.sim.demolish_no(me);
+                Ok(())
+            }
+            "demolish" | "teardown" => {
+                let s = self.open_station(conn, me);
+                self.sim.demolish(me, s, arg == "yes").map(|_| {
+                    if arg == "yes" {
+                        self.close_window(conn);
+                    }
+                })
+            }
+            "upgrade" => match self.open_station(conn, me) {
+                Some(s) => self.sim.upgrade(me, s).map(|_| self.close_window(conn)),
+                None => Err("Use the station you mean to upgrade first.".into()),
+            },
             "cancel" => {
                 self.sim.cancel_preview(me);
                 Ok(())
@@ -1506,7 +1572,7 @@ impl SurvivalGame {
             },
             "debug" => {
                 self.sim.debug = !self.sim.debug;
-                self.say_to(conn, if self.sim.debug { "Debug on: .es spells (every spell), .es raid reset, .es spawn <creature>, .es reset me and .es reset camp work." } else { "Debug off." });
+                self.say_to(conn, if self.sim.debug { "Debug on: .es spells (every spell), .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es reset me and .es reset camp work." } else { "Debug off." });
                 Ok(())
             }
             "where" => {
@@ -1588,6 +1654,30 @@ impl SurvivalGame {
                 self.announce(&format!("{who} tuned {path}: {} to {now}.", old.as_deref().unwrap_or("default")));
                 Ok(())
             }
+        }
+    }
+
+    /// The station whose window the hero has open, else the camp's station nearest them.
+    fn open_station(&self, conn: ConnId, me: Id) -> Option<Id> {
+        let open = self.world_of(conn).and_then(|w| w.station).filter(|s| matches!(self.sim.objs.get(s).map(|o| &o.kind), Some(ObjKind::Station { .. })));
+        open.or_else(|| {
+            let p = self.sim.players.get(&me)?;
+            self.sim
+                .objs
+                .iter()
+                .filter(|(_, o)| matches!(o.kind, ObjKind::Station { .. }) && htl_survival::dist2d(o.pos, p.pos) <= 6.5)
+                .min_by(|a, b| htl_survival::dist2d(a.1.pos, p.pos).total_cmp(&htl_survival::dist2d(b.1.pos, p.pos)))
+                .map(|(id, _)| *id)
+        })
+    }
+
+    /// The window the hero has open is shut (they've gone on to placing, or what it was is gone).
+    fn close_window(&mut self, conn: ConnId) {
+        if let Some(w) = self.world_mut(conn) {
+            w.station = None;
+        }
+        if self.has_addon(conn) {
+            self.ui_line(conn, "CW");
         }
     }
 

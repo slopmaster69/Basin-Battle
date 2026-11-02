@@ -181,6 +181,15 @@ impl SurvivalGame {
         entry
     }
 
+    fn obj_look_in(&self, v: &ObjView) -> (u32, u32) {
+        let (kind, flags) = Self::obj_look(v);
+        // A gate: walked through on a patched client (0017's no-hull flag), raiders still break it.
+        match v.kind {
+            ObjKind::Station { def, .. } if self.sim.content.stations.get(def).is_some_and(|s| s.passable) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            _ => (kind, flags),
+        }
+    }
+
     fn obj_look(v: &ObjView) -> (u32, u32) {
         // Usable things are right-clicked; the rest (ghosts, fires) are only seen.
         if matches!(v.kind, ObjKind::Door { .. }) {
@@ -681,7 +690,7 @@ impl SurvivalGame {
         if let Some(def) = self.resident(&v) {
             return vec![self.resident_create(def, &v)];
         }
-        let (kind, flags) = Self::obj_look(&v);
+        let (kind, flags) = self.obj_look_in(&v);
         let entry = self.go_entry(v.display, &v.name, kind);
         let guid = object_guid(entry, id);
         self.bind(id, guid);

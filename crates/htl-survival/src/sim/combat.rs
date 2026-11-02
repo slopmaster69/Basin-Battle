@@ -1005,9 +1005,12 @@ impl Survival {
         let p = &self.players[&id];
         if p.health > 0 && p.health < p.max_health {
             let heart = c.world.heart;
-            let home = dist2d(p.pos, [heart[0], heart[1], 0.0]) <= c.world.rest_radius && !self.raid.active();
+            // Resting at the chest, or (faster) at an infirmary.
+            let ward = self.infirmary_at(p.pos);
+            let home = (dist2d(p.pos, [heart[0], heart[1], 0.0]) <= c.world.rest_radius || ward.is_some()) && !self.raid.active();
             let calm = now - p.combat_at >= c.player.field_regen_after;
-            let rate = if home && now - p.combat_at >= 2.0 { c.player.rest_regen } else if calm { c.player.field_regen } else { 0.0 };
+            let rest = c.player.rest_regen * ward.unwrap_or(1.0).max(1.0);
+            let rate = if home && now - p.combat_at >= 2.0 { rest } else if calm { c.player.field_regen } else { 0.0 };
             if rate > 0.0 {
                 let p = self.players.get_mut(&id).unwrap();
                 p.heal_bank += p.max_health as f32 * rate * dt;
@@ -1920,7 +1923,8 @@ impl Survival {
     fn die(&mut self, id: Id) {
         let now = self.clock;
         let pvp = self.content.pvp.clone();
-        let secs = self.siege_respawn_secs(id).unwrap_or_else(|| pvp.respawn_secs.unwrap_or(self.content.player.respawn_secs));
+        // A barracks at the camp gets the fallen up sooner.
+        let secs = self.siege_respawn_secs(id).unwrap_or_else(|| pvp.respawn_secs.unwrap_or(self.content.player.respawn_secs) * self.barracks().0);
         self.cancel_preview(id);
         self.end_ability_action(id);
         self.stances.remove(&id);
@@ -2028,12 +2032,14 @@ impl Survival {
                 c.world.spawn_facing,
             ),
         };
+        // (A barracks at the camp gets them up with more.)
+        let barracks = self.barracks().1;
         let Some(p) = self.players.get_mut(&id) else { return };
         // Below, a hero wakes at the lamp whole.
         let share = if self.below.is_some() || self.siege.is_some() {
             1.0
         } else {
-            c.pvp.respawn_health.unwrap_or(c.player.respawn_health)
+            (c.pvp.respawn_health.unwrap_or(c.player.respawn_health) + barracks).min(1.0)
         };
         p.health = ((p.max_health as f32 * share).round() as u32).max(1);
         p.last_hit_by = None;

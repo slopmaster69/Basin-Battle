@@ -656,10 +656,10 @@ impl SurvivalGame {
                     self.ui_station(c, player, station);
                 }
             }
-            Event::Confirm { player, what, text } => {
+            Event::Confirm { player, what, text, yes, no } => {
                 if let Some(c) = self.conn_of(player) {
                     if self.has_addon(c) {
-                        self.ui_line(c, &format!("CF\t{}\t{}", clean(&what), clean(&text)));
+                        self.ui_line(c, &format!("CF\t{}\t{}\t{}\t{}", clean(&what), clean(&text), clean(&yes), clean(&no)));
                     } else {
                         self.say_to(c, &format!("{text} Type .{what} yes to go ahead."));
                     }

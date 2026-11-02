@@ -322,6 +322,9 @@ impl Survival {
     /// own materials.
     pub(crate) fn station_cost(&self, def: usize) -> BTreeMap<String, u32> {
         let s = &self.content.stations[def];
+        if self.free_build && !self.is_siege() {
+            return BTreeMap::new();
+        }
         match self.siege_def() {
             Some(d) if self.is_siege() => d.build.get(&s.key).map(|n| BTreeMap::from([("gold".to_string(), *n)])).unwrap_or_default(),
             _ => s.cost.clone(),
@@ -331,6 +334,9 @@ impl Survival {
     /// What mending a wrecked station costs here: half its gold, in a match.
     pub(crate) fn station_repair(&self, def: usize) -> BTreeMap<String, u32> {
         let s = &self.content.stations[def];
+        if self.free_build && !self.is_siege() {
+            return BTreeMap::new();
+        }
         match self.siege_def() {
             Some(d) if self.is_siege() => d.build.get(&s.key).map(|n| BTreeMap::from([("gold".to_string(), n.div_ceil(2))])).unwrap_or_default(),
             _ => s.repair.clone(),

@@ -1208,6 +1208,38 @@ and it's back ten minutes later.
 | Herbalist's Cauldron | 4 stone, 2 copper | Healing Salve (quick: a tenth at once, 30% more over 10 s), Silverleaf Tonic (stamina back half again as fast for a minute) |
 | Workbench | 8 timber, 3 stone | Rough Sharpening Stones (every blow a tenth harder for 2 minutes), Leather Rucksack |
 
+**What's built, at its window.** Using a station (F) opens its window: its work, its health, and
+what else it offers. **Upgrade** turns it into what it becomes where it stands (paid for as the
+work's done, full health; it still does what it did, so a raid that needs a cooking fire finds a
+field kitchen). **Move** picks it up: its ghost follows you as when placing, F sets it down
+(nothing to pay, half the building's work), H leaves it where it was. **Tear down** asks first,
+then gives half of what it cost back to the chest. None of it during a raid, nor in Siege.
+
+| Upgrade | From | Costs more | Does |
+| --- | --- | --- | --- |
+| Field Kitchen | Cooking Fire | 8 timber, 4 stone, 2 copper | cooks a third faster, one more of every batch |
+| Forge | Smithing Anvil | 4 timber, 6 copper, 8 stone | smithing much faster (1.6 times) |
+| Iron-Bound Bulwark | Crate Bulwark | 4 stone, 1 bronze | 1300 health against 700 |
+| Thorn Wall | Thorn Hedge | 4 timber, 3 briarthorn | its spikes bite twice as hard |
+| Guard Tower | Watchtower | 6 timber, 8 stone, 3 bronze | shoots 22 within 28 yd every 1.6 s (14, 22 yd, 2 s) |
+
+**Walls.** The bulwark, the hedge and the **Banner Gate** (6 timber, 2 linen) sit on the camp's
+3-yard grid (`snap`), a quarter turn at a time, and stand cell to cell: lay blocks side by side
+and they make a wall, the gate a cell of it. Heroes walk through the gate (client patch 0017
+draws it with no collision); raiders go for it like any defence and must tear it down.
+
+**Buildings**, one of each (`most`), on a bigger footprint:
+
+| Building | Costs | Its job |
+| --- | --- | --- |
+| Barracks Tent | 20 timber, 6 linen, 4 leather | the fallen are up twice as soon, with a fifth more health |
+| Infirmary Tent | 12 timber, 8 linen, 6 peacebloom | resting within 9 yd heals two and a half times as fast |
+| Lumber Mill | 24 timber, 10 stone, 6 copper, 2 bronze | two timber into the chest every minute (not during a raid) |
+
+**Testing the building**: with `.es debug` on, `.es freebuild` makes stations, upgrades and
+mending free at the camp (again to stop), `.es mats [n]` puts n (50) of every building material
+in the chest, and `.es tune work.build 0` makes the work instant.
+
 **Armor** is worn on the chest and the head, over the plain outfit, and shows on the hero. It
 takes its share off every blow that lands (the HUD shows the total): Hide Jerkin 10%, Leather Cap
 4%, Bronze-Ringed Mail 20% (stamina back a tenth slower), Bronze Helm 7% (a little slower). Made

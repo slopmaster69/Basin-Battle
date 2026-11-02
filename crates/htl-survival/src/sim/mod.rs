@@ -14,6 +14,8 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub mod cc;
+mod building;
+pub use building::StationActions;
 mod combat;
 pub mod dungeon;
 mod journal;
@@ -240,6 +242,8 @@ pub enum Event {
     StationOpen { player: Id, station: Id },
     /// Ask a hero to confirm something (ringing the bell).
     Confirm { player: Id, what: String, text: String,
+        /// The answers' words (none: the bell's, "Ring it" and "Not yet").
+        yes: String, no: String,
     },
     /// A hero goes between the camp and the Deadmines: to a lamp below (its key), or (`None`)
     /// home to the camp.
@@ -406,7 +410,7 @@ impl Action {
             Action::Eat { .. } => "eat",
             Action::Gather { .. } => "gather",
             Action::Work { job: Job::Craft { .. }, .. } => "craft",
-            Action::Work { job: Job::Build, .. } => "build",
+            Action::Work { job: Job::Build | Job::Upgrade { .. }, .. } => "build",
             Action::Work { job: Job::Repair { .. }, .. } => "repair",
             Action::Stagger { .. } => "stagger",
             Action::Dead { .. } => "dead",
@@ -421,6 +425,8 @@ pub enum Job {
     Craft { station: Id, recipe: String },
     Build,
     Repair { station: Id },
+    /// Upgrading a station into what it becomes.
+    Upgrade { station: Id },
 }
 
 /// An input a hero sent: the mouse buttons and keys of the action layout.
@@ -545,6 +551,8 @@ pub struct Player {
     /// Until when they're held still where they landed (see [`ARRIVE_HOLD`]); 0 when not.
     pub hold_until: f32,
     pub preview: Option<world::Preview>,
+    /// The station this hero was asked to confirm tearing down.
+    pub demolish: Option<Id>,
     /// The run speed as last sent.
     pub sent_speed: f32,
     pub sent_back: f32,
@@ -859,6 +867,8 @@ pub struct Survival {
     /// moves on.
     pub(crate) patrols: BTreeMap<usize, (usize, f32)>,
     pub debug: bool,
+    /// Testing: stations, upgrades and mending cost nothing at the camp (`.es freebuild`).
+    pub free_build: bool,
     /// The world below (the Deadmines), if this is it.
     pub below: Option<Below>,
     /// Siege's world (Arathi Basin), if this is it.
@@ -873,6 +883,8 @@ pub struct Survival {
     pub(crate) chests_looked: f32,
     /// When the camp last looked at how far it has grown (`grow_camp`).
     pub(crate) grown_at: f32,
+    /// When each mill last put what it makes into the chest (`[[station]]` `yields`).
+    pub(crate) yielded: BTreeMap<Id, f32>,
     /// Shrines' and relics' trials under way, by chest: where it stands, who called it, when a
     /// hero was last near.
     pub(crate) trials: BTreeMap<usize, Trial>,
@@ -949,6 +961,7 @@ impl Survival {
             respawns: Vec::new(),
             patrols: BTreeMap::new(),
             debug: false,
+            free_build: false,
         below: None,
             siege: None,
             pages: Vec::new(),
@@ -956,6 +969,7 @@ impl Survival {
             unfound: BTreeSet::new(),
             chests_looked: 0.0,
             grown_at: 0.0,
+            yielded: BTreeMap::new(),
             trials: BTreeMap::new(),
             beta: beta::Beta::default(),
         }
@@ -1028,6 +1042,7 @@ impl Survival {
             self.step_raid(dt);
             self.step_arena(dt);
             self.step_explore();
+            self.step_mills();
             self.step_goals();
             self.step_weekly_chest();
         }
@@ -1100,6 +1115,7 @@ impl Survival {
             landing_until: 0.0,
             hold_until: 0.0,
             preview: None,
+            demolish: None,
             sent_speed: c.player.run_speed,
             sent_back: BACK_SPEED,
             combo_next: 0,

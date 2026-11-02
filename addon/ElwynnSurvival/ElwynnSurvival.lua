@@ -4449,22 +4449,46 @@ function ES.Chest(list)
 end
 ES.redraw.chest = function() ES.Chest(ES.chestList) end
 
--- --- a station's work (W: station, name, then recipe~output~cost~can~text~icon; its icon) ---------
+-- --- a station's work (W: station, name, then recipe~output~cost~can~text~icon; its icon; what
+-- else it offers, key~label~text~can; its health and most) ------------------------------------------
 
-function ES.Station(name, list, icon)
+local ACTION_ICONS = { upgrade = "Spell_ChargePositive", move = "INV_Misc_Note_01", demolish = "INV_Hammer_20" }
+
+function ES.Station(name, list, icon, actions, health, most)
   local note = "What it needs comes out of your bags first, then the camp's chest."
   if ES.siege then
     note = "Your class's other cards, for gold. A card bought goes on its key if that key is free; N swaps cards on the board."
+  elseif health and most and most ~= "" then
+    note = "Health " .. health .. " of " .. most .. ". " .. note
   end
   OpenWindow("station", name, note, icon ~= "" and icon or nil)
   local items = Items(list)
-  if table.getn(items) == 0 then
+  local acts = Items(actions)
+  if table.getn(items) == 0 and table.getn(acts) == 0 then
     Rest(ES.siege and "You know every card of your class." or "Nothing to make here yet.", "", "")
   end
-  for i = 1, math.min(LIST_ROWS, table.getn(items)) do
+  -- Upgrading, moving and tearing down come first: room for them before the recipes.
+  local top = 0
+  for j = 1, math.min(LIST_ROWS, table.getn(acts)) do
+    local a = Split(acts[j], "~")
+    local can = a[4] == "1"
+    top = top + 1
+    Row(top, {
+      icon = ACTION_ICONS[a[1] or ""] or "INV_Misc_Gear_01",
+      name = a[2] or "?",
+      sub = a[3] or "",
+      go = a[1] == "upgrade" and "Upgrade" or (a[1] == "move" and "Move" or "Tear down"),
+      cmd = ".es " .. (a[1] or ""),
+      can = can,
+      detail = a[3] or "",
+      hint = can and "" or "Short of something",
+    })
+    if j == 1 and table.getn(items) == 0 then Rest(a[2] or "?", a[3] or "", "") end
+  end
+  for i = 1, math.min(LIST_ROWS - top, table.getn(items)) do
     local f = Split(items[i], "~")
     local can = f[4] == "1"
-    Row(i, {
+    Row(top + i, {
       icon = f[6],
       name = f[2] or "?",
       sub = CostText(f[3]),
@@ -6288,7 +6312,7 @@ function ES.Line(line)
   elseif verb == "S" then
     ES.Chest(f[2])
   elseif verb == "W" then
-    ES.Station(f[3] or "", f[4], f[5] or "")
+    ES.Station(f[3] or "", f[4], f[5] or "", f[6], f[7], f[8])
   elseif verb == "AR" then
     ES.Rack(f[2])
   elseif verb == "BK" then
@@ -6322,11 +6346,15 @@ function ES.Line(line)
     ES.BuildMenu(f[2])
   elseif verb == "BP" then
     ES.Placing(f)
+  elseif verb == "CW" then
+    if win:IsShown() then win:Hide() end
   elseif verb == "CF" then
     confirm.what = f[2]
     confirm.text:SetText(f[3] or "")
+    confirm.yes.label:SetText((f[4] and f[4] ~= "") and f[4] or "Ring it")
+    confirm.no.label:SetText((f[5] and f[5] ~= "") and f[5] or "Not yet")
     confirm:Show()
-    Play("raid")
+    if f[2] == "raid" then Play("raid") end
     WindowMode()
   elseif verb == "DE" then
     local secs = tonumber(f[2]) or 0

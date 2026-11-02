@@ -1009,6 +1009,7 @@ footprint = 2.0
 cost = { wood = 6 }
 health = 300
 repair = { wood = 3 }
+upgrade = { to = "kitchen", cost = { wood = 8, stone = 4, ore = 2 } }
 text = "Turns raw meat into roasts to carry on a trip."
 
 [[station]]
@@ -1022,6 +1023,7 @@ footprint = 2.2
 cost = { wood = 8, ore = 4 }
 health = 400
 repair = { wood = 4 }
+upgrade = { to = "forge", cost = { stone = 8, ore = 6, wood = 4 } }
 text = "Works Fargodeep copper into a stronger shield or a heavier axe."
 
 [[station]]
@@ -1066,13 +1068,15 @@ text = "Grinds sharpening stones and sews a leather rucksack."
 [[station]]
 key = "palisade"
 name = "Crate Bulwark"
-# A block of stacked cargo crates (DeadMineCargoBoxes, 2.6 by 2.3 yards, 1.8 high, a third
-# bigger): near enough square that it stands the same whichever way it's turned, and blocks
-# set side by side make a wall. It was Elwynn's long fence, which had to be lined up.
+# A block of stacked cargo crates (DeadMineCargoBoxes, 2.6 by 2.3 yards, 1.8 high, grown to a
+# 3-yard cell): near enough square that it stands the same whichever way it's turned. It sits on
+# the camp's 3-yard grid (`snap`), so blocks laid side by side make a wall, a gate among them.
 display = 36
 icon = "Ability_Defend"
-scale = 1.3
+scale = 1.15
 footprint = 2.0
+snap = 3.0
+upgrade = { to = "iron_bulwark", cost = { stone = 4, bronze = 1 } }
 cost = { wood = 10, stone = 2 }
 health = 700
 repair = { wood = 4 }
@@ -1083,12 +1087,14 @@ text = "Stacked crates, braced and roped: raiders break it before they reach wha
 [[station]]
 key = "barricade"
 name = "Thorn Hedge"
-# Duskwood's thorn bush grown wide (1.4 by 1.5 yards, more than twice over): round, so it stands
-# the same whichever way it's turned. It was Elwynn's simple fence, a long thin rail.
+# Duskwood's thorn bush grown wide (1.4 by 1.5 yards, twice over): round, so it stands the
+# same whichever way it's turned, on the same 3-yard grid as the bulwark.
 display = 301
 icon = "Spell_Nature_Thorns"
-scale = 2.2
+scale = 2.0
 footprint = 1.8
+snap = 3.0
+upgrade = { to = "thorn_wall", cost = { wood = 4, briarthorn = 3 } }
 cost = { wood = 6, ore = 2 }
 health = 350
 repair = { wood = 3, ore = 1 }
@@ -1106,6 +1112,7 @@ icon = "Ability_Marksmanship"
 # Elwynn's own watchtower at a third of its size: a lookout over the yard, 14 yards high.
 scale = 0.33
 footprint = 3.2
+upgrade = { to = "guard_tower", cost = { wood = 6, stone = 8, bronze = 3 } }
 cost = { wood = 12, stone = 6, bronze = 2 }
 health = 500
 repair = { wood = 4, stone = 2 }
@@ -1113,6 +1120,165 @@ defense = true
 # Its archers shoot the nearest raider within this many yards, this often.
 shoots = { damage = 14, range = 22.0, every = 2.0 }
 text = "Archers on a tower: they shoot the nearest raider in reach. Raiders go for it first."
+
+# --- the gate, the upgrades and the buildings ----------------------------------------------------
+# An upgrade (`menu = false`) is built only from what it upgrades, at its window: it stands where
+# that stood, does its work as well (`makes_as`, so a raid that needs a cooking fire still finds
+# one), and its `cost` is what it all came to (half of it back if it's torn down). A building is
+# one of a kind (`most = 1`) with a job: getting the fallen up, resting, filling the chest.
+
+[[station]]
+key = "gate"
+name = "Banner Gate"
+# Stormwind's griffon banner on its poles (4.9 yards wide, made a 3-yard cell): an opening in a
+# wall that heroes walk through (`passable`: no collision on a patched client), but raiders go
+# for like any defence and must tear down.
+display = 624
+icon = "INV_BannerPVP_02"
+scale = 0.6
+footprint = 1.5
+snap = 3.0
+passable = true
+cost = { wood = 6, linen = 2 }
+health = 500
+repair = { wood = 2 }
+defense = true
+text = "An opening in the wall under Stormwind's banner: heroes walk through it, raiders have to tear it down."
+
+[[station]]
+key = "kitchen"
+menu = false
+work_spell = 2538
+name = "Field Kitchen"
+# A cooking table over its own fire (OrcTableCooker, 3 yards square).
+display = 331
+icon = "INV_Misc_Food_15"
+scale = 1.0
+footprint = 2.4
+makes_as = ["cooking"]
+work_speed = 1.5
+bonus = 1
+cost = { wood = 14, stone = 4, ore = 2 }
+health = 500
+repair = { wood = 4 }
+text = "A proper kitchen: cooks a third faster, and every batch makes one more."
+
+[[station]]
+key = "forge"
+menu = false
+work_spell = 2660
+name = "Forge"
+# A smith's forge and its chimney (Tradeskill_Forge_01, 2.3 by 3.5, nearly 5 high).
+display = 233
+icon = "Trade_BlackSmithing"
+scale = 0.85
+footprint = 2.4
+makes_as = ["smithy"]
+work_speed = 1.6
+cost = { wood = 12, ore = 10, stone = 8 }
+health = 700
+repair = { wood = 4, stone = 2 }
+text = "A forge beside the anvil: smithing goes much faster."
+
+[[station]]
+key = "iron_bulwark"
+menu = false
+name = "Iron-Bound Bulwark"
+# Dark Iron crates, bound and riveted (2.4 yards a side, 2.2 high, made a 3-yard cell).
+display = 1868
+icon = "INV_Shield_06"
+scale = 1.25
+footprint = 2.0
+snap = 3.0
+makes_as = ["palisade"]
+cost = { wood = 10, stone = 6, bronze = 1 }
+health = 1300
+repair = { wood = 4, stone = 2 }
+defense = true
+text = "Iron-bound crates: nearly twice as hard to break."
+
+[[station]]
+key = "thorn_wall"
+menu = false
+name = "Thorn Wall"
+display = 301
+icon = "Spell_Nature_Thorns"
+scale = 2.15
+footprint = 1.8
+snap = 3.0
+makes_as = ["barricade"]
+cost = { wood = 10, ore = 2, briarthorn = 3 }
+health = 600
+repair = { wood = 3, ore = 1 }
+defense = true
+spikes = 12
+text = "Briarthorn woven through the hedge: it bites twice as hard."
+
+[[station]]
+key = "guard_tower"
+menu = false
+work = 2.0
+name = "Guard Tower"
+# Elwynn's own guard tower at two fifths of its size (7 yards a side, 13 high).
+display = 661
+icon = "Ability_Marksmanship"
+scale = 0.42
+footprint = 3.8
+makes_as = ["watchtower"]
+cost = { wood = 18, stone = 14, bronze = 5 }
+health = 900
+repair = { wood = 6, stone = 3 }
+defense = true
+shoots = { damage = 22, range = 28.0, every = 1.6 }
+text = "A stone guard tower: its archers shoot harder, farther and more often."
+
+[[station]]
+key = "barracks"
+most = 1
+work = 2.0
+name = "Barracks Tent"
+# A soldiers' canvas tent (Westfall's, 5 by 6.5 yards).
+display = 4176
+icon = "INV_Misc_Bandage_15"
+scale = 1.0
+footprint = 3.6
+cost = { wood = 20, linen = 6, leather = 4 }
+health = 800
+repair = { wood = 6, linen = 2 }
+respawn = { faster = 2.0, health = 0.2 }
+text = "Cots and a watch roster: heroes who fall are up again twice as soon, and with a fifth more of their health."
+
+[[station]]
+key = "infirmary"
+most = 1
+work = 1.5
+name = "Infirmary Tent"
+# A hide tent on poles (the centaurs', 8 by 9 yards, made half that).
+display = 2352
+icon = "Spell_Holy_Heal"
+scale = 0.55
+footprint = 3.0
+cost = { wood = 12, linen = 8, peacebloom = 6 }
+health = 500
+repair = { wood = 4, linen = 2 }
+rest = { radius = 9.0, faster = 2.5 }
+text = "Bandages and beds: rest by it (out of a fight, not during a raid) and wounds close two and a half times as fast."
+
+[[station]]
+key = "mill"
+most = 1
+work = 2.5
+name = "Lumber Mill"
+# A saw on its frame and its log carriage (LogMachine01, at three tenths: 7 by 5 yards).
+display = 1110
+icon = "INV_TradeskillItem_01"
+scale = 0.3
+footprint = 4.0
+cost = { wood = 24, stone = 10, ore = 6, bronze = 2 }
+health = 900
+repair = { wood = 6, stone = 2 }
+yields = { items = { wood = 2 }, every = 60.0 }
+text = "Saws the fallen timber the camp's people drag in: two Elwynn Timber into the chest every minute (not while a raid is on)."
 
 [[recipe]]
 key = "roast"
@@ -10399,15 +10565,15 @@ npc = true
 name = "Tobin"
 subname = "Camp Cook"
 
-# Once there's an anvil: the west yard's forge and its smith.
+# Once there's an anvil: the west yard's tool rack and its smith.
 [[prop]]
-display = 233
+display = 1487
 at = [-9634.0, 713.0]
 scale = 0.8
 facing = 5.09
 after = "built:smithy"
 clear = 3.0
-say = "A smith walks in off the Westfall road and lights a forge in the west yard."
+say = "A smith walks in off the Westfall road and hangs his tools in the west yard."
 
 [[prop]]
 display = 1109

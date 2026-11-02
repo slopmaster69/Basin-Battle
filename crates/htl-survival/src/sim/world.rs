@@ -23,6 +23,8 @@ pub struct Preview {
     pub facing: f32,
     /// Why it can't go here, if it can't.
     pub problem: Option<String>,
+    /// A station already built that this is moving (none: a new one).
+    pub moving: Option<Id>,
 }
 
 /// Where a station would go and whether it can, for the hero's screen.
@@ -460,7 +462,8 @@ impl Survival {
             }
             ObjKind::Node { .. } => {}
             ObjKind::Station { damaged: true, .. } => self.repair(id, t),
-            ObjKind::Station { def, health, .. } if self.content.stations[def].defense => {
+            // (A defence opens its window too, in Siege's match only its word.)
+            ObjKind::Station { def, health, .. } if self.content.stations[def].defense && self.is_siege() => {
                 let d = &self.content.stations[def];
                 let spikes = if d.spikes > 0 { " Its spikes bite whoever stands at it." } else { "" };
                 self.tell(id, format!("The {}: {health} of {}. Raiders go for it before what it guards.{spikes}", d.name, d.health));
@@ -617,15 +620,17 @@ impl Survival {
     /// whether they have it all).
     pub fn recipes(&self, id: Id, station: Id) -> Vec<(String, String, String, bool)> {
         let Some(ObjKind::Station { def, .. }) = self.objs.get(&station).map(|o| &o.kind) else { return Vec::new() };
-        let key = &self.content.stations[*def].key;
+        let def = *def;
+        let bonus = self.content.stations[def].bonus;
         self.content
             .recipes
             .iter()
-            .filter(|r| &r.station == key)
+            .filter(|r| self.station_does(def, &r.station))
             .map(|r| {
                 let can = r.inputs.iter().all(|(k, n)| self.content.item(k).is_some_and(|i| self.available(id, i) >= *n));
                 let out = &self.content.items[self.content.item(&r.output).unwrap()];
-                let name = if r.count > 1 { format!("{} x{}", out.name, r.count) } else { out.name.clone() };
+                let n = r.count + if matches!(out.kind, ItemKind::Resource | ItemKind::Food) { bonus } else { 0 };
+                let name = if n > 1 { format!("{} x{n}", out.name) } else { out.name.clone() };
                 (r.key.clone(), name, self.cost_text(&r.inputs), can)
             })
             .collect()
@@ -659,7 +664,7 @@ impl Survival {
             Some(Obj { kind: ObjKind::Station { def, damaged, .. }, pos, .. }) => (*def, *damaged, *pos),
             _ => return Err("That's not a station.".into()),
         };
-        if c.stations[def].key != recipe.station {
+        if !self.station_does(def, &recipe.station) {
             return Err(format!("That's made at a {}.", c.stations[c.station(&recipe.station).unwrap()].name));
         }
         if damaged {
@@ -675,30 +680,33 @@ impl Survival {
         let out = c.item(&recipe.output).unwrap();
         let kind = c.items[out].kind;
         let stackable = matches!(kind, ItemKind::Resource | ItemKind::Food);
-        if stackable && !self.bag_fits(id, &BTreeMap::from([(out, recipe.count)])) {
+        let count = recipe.count + if stackable { c.stations[def].bonus } else { 0 };
+        if stackable && !self.bag_fits(id, &BTreeMap::from([(out, count)])) {
             return Err("Your bags are full.".into());
         }
         self.affords(id, &recipe.inputs)?;
         let gear = if stackable { 1.0 } else { c.work.gear };
-        Ok((c.items[out].name.clone(), c.work.craft * recipe.work * gear, def))
+        Ok((c.items[out].name.clone(), c.work.craft * recipe.work * gear / c.stations[def].work_speed.max(0.1), def))
     }
 
     /// The making done: paid for, and what it makes in the bags (gear put on).
     fn craft_done(&mut self, id: Id, station: Id, key: &str) -> Result<(), String> {
-        self.craft_check(id, station, key)?;
+        let (_, _, def) = self.craft_check(id, station, key)?;
         let c = self.content.clone();
         let recipe = c.recipes.iter().find(|r| r.key == key).ok_or("No such recipe.")?;
         let out = c.item(&recipe.output).unwrap();
         let kind = c.items[out].kind;
         self.pay(id, &recipe.inputs)?;
-        self.count("craft", &recipe.key, recipe.count);
         let name = c.items[out].name.clone();
         match kind {
             ItemKind::Resource | ItemKind::Food => {
-                self.give(id, out, recipe.count);
-                self.tell(id, format!("You make {} {name}.", recipe.count));
+                let n = recipe.count + c.stations[def].bonus;
+                self.count("craft", &recipe.key, n);
+                self.give(id, out, n);
+                self.tell(id, format!("You make {n} {name}."));
             }
             ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor | ItemKind::Pack => {
+                self.count("craft", &recipe.key, recipe.count);
                 let old = self.put_on(id, out);
                 self.events.push(Event::Gear { player: id });
                 let what = c.items[out].text.clone();
@@ -725,6 +733,7 @@ impl Survival {
             Job::Craft { station, recipe } => self.craft_done(id, station, &recipe),
             Job::Build => self.build_done(id).map(|_| ()),
             Job::Repair { station } => self.repair_done(id, station),
+            Job::Upgrade { station } => self.upgrade_done(id, station),
         };
         if let Err(e) = result {
             self.tell(id, e);
@@ -1034,7 +1043,7 @@ impl Survival {
         }
     }
 
-    fn put_out(&mut self, station: Id) {
+    pub(crate) fn put_out(&mut self, station: Id) {
         let fires: Vec<Id> = self.objs.iter().filter(|(_, o)| o.kind == ObjKind::Fire { on: station }).map(|(id, _)| *id).collect();
         for f in fires {
             self.objs.remove(&f);
@@ -1068,10 +1077,14 @@ impl Survival {
             return Err("You're down.".into());
         }
         let (pos, f) = (p.pos, p.facing);
+        let s = &self.content.stations[def];
+        if s.most > 0 && !self.is_siege() && self.standing(&s.key) as u32 >= s.most {
+            return Err(if s.most == 1 { format!("The camp has its {} already.", s.name) } else { format!("The camp has {} {}s already: the most it keeps.", s.most, s.name) });
+        }
         self.cancel_preview(id);
         let ghost = self.alloc();
         self.objs.insert(ghost, Obj { kind: ObjKind::Ghost { player: id, def, ok: false }, pos, facing: f });
-        self.players.get_mut(&id).unwrap().preview = Some(Preview { ghost, def, turn: 0.0, pos, facing: f, problem: Some("…".into()) });
+        self.players.get_mut(&id).unwrap().preview = Some(Preview { ghost, def, turn: 0.0, pos, facing: f, problem: Some("…".into()), moving: None });
         self.place_preview(id, true);
         Ok(())
     }
@@ -1106,8 +1119,13 @@ impl Survival {
             return Err(problem.clone());
         }
         let s = self.content.stations[pv.def].clone();
-        self.affords(id, &self.station_cost(pv.def))?;
-        let secs = self.content.work.build * s.work;
+        let secs = match pv.moving {
+            Some(_) => self.move_secs(pv.def),
+            None => {
+                self.affords(id, &self.station_cost(pv.def))?;
+                self.content.work.build * s.work
+            }
+        };
         if secs <= 0.0 {
             return self.build_done(id);
         }
@@ -1120,6 +1138,9 @@ impl Survival {
     /// The building done: the station stands where its ghost did, paid for.
     fn build_done(&mut self, id: Id) -> Result<String, String> {
         let pv = self.players.get(&id).and_then(|p| p.preview.clone()).ok_or("You aren't placing anything.")?;
+        if let Some(station) = pv.moving {
+            return self.move_done(id, &pv, station);
+        }
         // Judged again where it stands (someone may have built there meanwhile).
         if let Some(problem) = self.site_problem(pv.def, pv.pos, Some(pv.ghost)) {
             return Err(problem);
@@ -1165,16 +1186,22 @@ impl Survival {
         }
     }
 
+    pub(crate) fn place_preview_now(&mut self, id: Id) {
+        self.place_preview(id, true);
+    }
+
     /// Move the ghost in front of the hero and judge the spot.
     fn place_preview(&mut self, id: Id, force: bool) {
         let Some(p) = self.players.get(&id) else { return };
         let Some(pv) = p.preview.clone() else { return };
         let f = p.facing;
         let at = [p.pos[0] + f.cos() * BUILD_DISTANCE, p.pos[1] + f.sin() * BUILD_DISTANCE];
-        let pos = self.ground(at[0], at[1]);
         let facing_ = (f + std::f32::consts::PI + pv.turn).rem_euclid(std::f32::consts::TAU);
-        let mut problem = self.site_problem(pv.def, pos, Some(pv.ghost));
-        if problem.is_none() {
+        // A block of wall on its grid, a quarter turn at a time.
+        let (at, facing_) = self.snapped(pv.def, at, facing_);
+        let pos = self.ground(at[0], at[1]);
+        let mut problem = self.site_problem_except(pv.def, pos, Some(pv.ghost), pv.moving);
+        if problem.is_none() && pv.moving.is_none() {
             let cost = self.station_cost(pv.def);
             let short: Vec<String> = cost
                 .iter()
@@ -1211,6 +1238,12 @@ impl Survival {
     /// Why station `def` can't stand at `pos`, if it can't: outside the camp, on the road, on
     /// steep or wet ground, too near another station or the camp's own spots.
     pub fn site_problem(&self, def: usize, pos: Vec3, ghost: Option<Id>) -> Option<String> {
+        self.site_problem_except(def, pos, ghost, None)
+    }
+
+    /// [`Self::site_problem`], not counting object `except` (the station being moved, or grown
+    /// into its upgrade).
+    pub fn site_problem_except(&self, def: usize, pos: Vec3, ghost: Option<Id>, except: Option<Id>) -> Option<String> {
         let w = &self.content.world;
         let s = &self.content.stations[def];
         let r = s.footprint;
@@ -1258,8 +1291,18 @@ impl Survival {
             return Some("The ground's too steep.".into());
         }
         for (oid, o) in &self.objs {
-            if Some(*oid) == ghost {
+            if Some(*oid) == ghost || Some(*oid) == except {
                 continue;
+            }
+            // Blocks of a wall stand cell to cell on their grid.
+            if let ObjKind::Station { def: d, .. } = &o.kind {
+                let (a, b) = (s.snap, self.content.stations[*d].snap);
+                if a > 0.0 && b > 0.0 {
+                    if dist2d(o.pos, pos) < a.max(b) * 0.95 {
+                        return Some("Too close to something else.".into());
+                    }
+                    continue;
+                }
             }
             let other = match &o.kind {
                 ObjKind::Station { def, .. } => self.content.stations[*def].footprint,
@@ -1344,7 +1387,7 @@ impl Survival {
 
     /// A standing station of kind `key` is up.
     pub fn has_station(&self, key: &str) -> bool {
-        self.objs.values().any(|o| matches!(o.kind, ObjKind::Station { def, damaged: false, .. } if self.content.stations[def].key == key))
+        self.objs.values().any(|o| matches!(o.kind, ObjKind::Station { def, damaged: false, .. } if self.station_does(def, key)))
     }
 
     /// One more towards a goal's count (`bank:wood`, `craft:roast`, `kill:kobold`...).

@@ -1369,9 +1369,69 @@ pub struct StationDef {
     /// The spell whose look making something at it wears (its cast on the maker; 0: a bandage's).
     #[serde(default)]
     pub work_spell: u32,
-    /// In the build menu (a Siege camp's Hearth is not).
+    /// In the build menu (a Siege camp's Hearth is not; nor what a station is upgraded into).
     #[serde(default = "yes")]
     pub menu: bool,
+    /// The most the camp may have standing (0: no limit): one of each building.
+    #[serde(default)]
+    pub most: u32,
+    /// Set on a grid this many yards a cell (and turned a quarter at a time), and blocks of it
+    /// stand cell to cell: a wall laid out by eye lines up. 0: anywhere, any way round.
+    #[serde(default)]
+    pub snap: f32,
+    /// Heroes walk through it (a gate): drawn with no collision on a patched client (0017);
+    /// raiders still have to break it.
+    #[serde(default)]
+    pub passable: bool,
+    /// What it can be upgraded into (another station's key), and what that costs: the station
+    /// stays where it stands, keeps its uid, and comes back to full health as the new one.
+    #[serde(default)]
+    pub upgrade: Option<UpgradeDef>,
+    /// The stations whose work it does as well as its own (an upgrade does what it was).
+    #[serde(default)]
+    pub makes_as: Vec<String>,
+    /// Its work goes this many times as fast (an upgraded workplace: 1.5 is a third less time).
+    #[serde(default = "one_f")]
+    pub work_speed: f32,
+    /// This many more of what it makes, for a meal or a material (not gear).
+    #[serde(default)]
+    pub bonus: u32,
+    /// A building's job. Barracks: heroes who fall get up this many times as soon, and with
+    /// this share of their health more.
+    #[serde(default)]
+    pub respawn: Option<RespawnDef>,
+    /// Infirmary: resting within `radius` of it heals this many times as fast (as at the chest).
+    #[serde(default)]
+    pub rest: Option<RestDef>,
+    /// A mill: what it adds to the camp's chest, every `every` seconds while it stands (not
+    /// damaged, not during a raid).
+    #[serde(default)]
+    pub yields: Option<YieldDef>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpgradeDef {
+    pub to: String,
+    pub cost: BTreeMap<String, u32>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct RespawnDef {
+    pub faster: f32,
+    #[serde(default)]
+    pub health: f32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct RestDef {
+    pub radius: f32,
+    pub faster: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct YieldDef {
+    pub items: BTreeMap<String, u32>,
+    pub every: f32,
 }
 
 fn one_f() -> f32 {

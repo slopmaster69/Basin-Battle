@@ -64,3 +64,5 @@ mod tests_beta;
 mod tests_sim;
 #[cfg(test)]
 mod tests_camp;
+#[cfg(test)]
+mod tests_building;
