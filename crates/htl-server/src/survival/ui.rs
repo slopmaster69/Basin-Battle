@@ -26,8 +26,9 @@
 //! - `BK\t<open>\t<key~name~dungeon^...>\t<arena key~name~best wave>\t<siege>\t<dungeons>`: the
 //!   Smuggler's Logbook at camp, its pages (lamps below, each with its dungeon's key), the Proving
 //!   Ring's and Siege's (there from the start), then each dungeon
-//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page~secrets found~secrets~notes read~notes~wager open~wager secs~tier~cleared~next`,
-//!   joined by `^`; the fields after `first page` from newer servers), the easiest first.
+//!   (`key~name~icon~open~gate~lamps~pages~blurb~first page~secrets found~secrets~notes read~notes~wager open~wager secs~tier~cleared~next~locked`,
+//!   joined by `^`; the fields after `first page` from newer servers; `locked`, what opens a
+//!   locked one in words), the easiest first.
 //! - `AA\t<wave>\t<foes standing>\t<secs to the next, or -1 in a wave>\t<the camp's best>`: the
 //!   Proving Ring as a hero in it sees it (`AA` alone: not in it).
 //! - `AW\t<wave>\t<in a wave>\t<secs to the next>\t<the camp's best>\t<heroes in it>`: the ring's
@@ -836,7 +837,7 @@ impl SurvivalGame {
                 let dungeons: Vec<String> = books
                     .iter()
                     .map(|b| format!(
-                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
+                            "{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}~{}",
                             clean(&b.key),
                             clean(&b.name),
                             clean(&b.icon),
@@ -854,7 +855,8 @@ impl SurvivalGame {
                             b.wager.1.round(),
                             b.tier,
                             u8::from(b.cleared),
-                            u8::from(b.next)
+                            u8::from(b.next),
+                            clean(&b.locked)
                         ))
                     .collect();
                 let ring = arena.map_or_else(String::new, |(k, n, best)| format!("{}~{}~{best}", clean(&k), clean(&n)));

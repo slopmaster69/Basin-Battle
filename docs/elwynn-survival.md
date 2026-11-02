@@ -900,7 +900,7 @@ little: a tick with a hero at any of the places takes about a quarter of a milli
 
 ## The Deadmines
 
-Read the Smuggler's Logbook by the camp's chest (after the first raid) to go down (its Proving
+Read the Smuggler's Logbook by the camp's chest to go down (its Proving
 Ring page is open from the start: see below). The run goes
 backwards through the instance, lamp to lamp (`content/deadmines.toml`); resting at a lamp fills
 your Miner's Draughts and puts every foe but the bosses back at their posts.
@@ -933,6 +933,17 @@ whoever's below set down at the first lamp; their save is kept aside as well).
 **The journal below** is the camp's: the goal shown there, and its count, are the camp's
 (mirrored every tick; the journal moves on only at camp). After the Logbook, the next goal is to
 kill Cookie once.
+
+## The book's ladder
+
+The book holds nine dungeons in three tiers. The first tier (the Deadmines, Ragefire Chasm, the
+Wailing Caverns) is open from the start. A tier past the first opens once the camp has cleared
+two dungeons of the tier below (every boss down in one run; `LADDER_CLEARS`): the Stockade,
+Shadowfang Keep and Razorfen Kraul after two of the first, the Scarlet Monastery's three after
+two of those. A locked dungeon's page says what opens it. A dungeon the camp has already been in
+(a lamp lit past the first, a boss felled) stays open. The journal walks the camp through them in
+that order after the Deadmines' own steps (`kind = "cleared"`), each paying into the chest on top
+of the dungeon's first-clear gift.
 
 ## Secrets and notes
 
