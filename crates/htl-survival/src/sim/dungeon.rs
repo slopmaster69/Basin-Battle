@@ -1560,16 +1560,20 @@ impl Survival {
     }
 
     /// A foe's health for the heroes below now (`hero_health` more for each past the first); in a
-    /// pack grown for them ([`pack_count`]), the pack's whole health shared over its bodies.
+    /// pack grown for them ([`pack_count`]), the pack's whole health shared over the bodies it
+    /// has (those standing and those fallen since the last rest): a pack left ungrown (in a fight
+    /// as a hero came) keeps its whole share in each.
     pub(crate) fn foe_health(&self, def: usize, pack: Option<usize>) -> u32 {
         let base = self.base_health(def);
         let Some(d) = self.dungeon_def() else {
             return base;
         };
         let n = self.players.len().max(1);
-        let grown = pack.map_or(1.0, |k| {
-            let p = &self.content.packs[k];
-            pack_count(p, d, &self.content, n) as f32 / p.count.max(1) as f32
+        let grown = pack.filter(|_| d.hero_foes > 0.0).map_or(1.0, |k| {
+            let own = self.content.packs[k].count.max(1);
+            let standing = self.mobs.values().filter(|m| m.pack == Some(k) && m.health > 0 && m.form_of.is_none()).count();
+            let fallen = self.below.as_ref().map_or(0, |b| b.fallen.iter().filter(|f| f.2 == Some(k)).count());
+            (standing + fallen).max(own) as f32 / own as f32
         });
         let max = base as f32 * (1.0 + d.hero_health * (n - 1) as f32) / grown;
         (max.round() as u32).max(base)

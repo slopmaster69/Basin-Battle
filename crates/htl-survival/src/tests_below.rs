@@ -1491,6 +1491,10 @@ fn a_pack_grows_with_the_heroes_below_and_shares_its_health_over_them() {
     let _c = s.join("cass", "Cass", None);
     run(&mut s, 0.1);
     assert_eq!(in_pack(&s), 3, "left as it is mid-fight");
+    // ...and its unhurt foes keep the whole share for three heroes (3 bodies of its own 2: the
+    // pack's 2 x 2.2 over 3), not the share of a pack grown to four.
+    let other = s.mobs.iter().find(|(id, m)| **id != one && m.pack == Some(k) && m.health == m.max_health).map(|(_, m)| m.max_health as f32).unwrap();
+    assert!((other - base * 2.2 * 2.0 / 3.0).abs() <= 1.0, "{other} of {base}");
 }
 
 #[test]
