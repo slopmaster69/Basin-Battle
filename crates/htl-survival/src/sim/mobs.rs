@@ -98,7 +98,7 @@ const ATTACK_PIERCE: u16 = 85;
 const LUNGE_SECS: f32 = 0.25;
 /// At most this many fighters press one hero at once; the rest circle at about this far, a step
 /// round at a time.
-const MAX_ATTACKERS: usize = 2;
+pub(crate) const MAX_ATTACKERS: usize = 2;
 /// An opening this near draws a creature in at once (past its turn).
 pub(crate) const PRESS_RANGE: f32 = 7.0;
 const CIRCLE_RADIUS: f32 = 3.5;
@@ -117,7 +117,7 @@ const POSTURE_BREAK: f32 = 2.2;
 /// (else a group fills it again while it reels and it never stands).
 const POSTURE_GRACE: f32 = 4.0;
 /// Heroes this near a creature's fight are in it.
-const FIGHT_RANGE: f32 = 25.0;
+pub(crate) const FIGHT_RANGE: f32 = 25.0;
 /// A hero healing this near a foe on them draws its attack this soon.
 const PUNISH_RANGE: f32 = 9.0;
 const PUNISH_SECS: f32 = 0.25;
@@ -253,26 +253,33 @@ impl Survival {
             // A wanderer comes at one of its spots.
             let mid = self.pack_spot(k);
             for n in 0..pack.count {
-                let a = n as f32 / pack.count.max(1) as f32 * std::f32::consts::TAU + self.rng.gen::<f32>() * 0.6;
-                let r = if pack.count > 1 { pack.radius * (0.4 + 0.6 * self.rng.gen::<f32>()) } else { 0.0 };
-                // Not in a trunk nor a wall: round the circle, then nearer its middle.
-                let z = pack.z.unwrap_or(TOP);
-                let at = (0..12)
-                    .map(|t| {
-                        // (One alone at its spot steps out from it, a little farther each try.)
-                        let (aa, rr) = (a + t as f32 * 0.9, r * (1.0 - t as f32 / 12.0) + t as f32 * 0.6);
-                        self.ground_near(mid[0] + aa.cos() * rr, mid[1] + aa.sin() * rr, z)
-                    })
-                    .find(|p| {
-                        !self.land.blocked_near(p[0], p[1], p[2])
-                            // One down in a cave stays on its own floor (not the hill's slope over it).
-                            && pack.z.is_none_or(|want| (p[2] - want).abs() < 3.0)
-                            && (self.is_below() || pack.z.is_some() || !self.steep_at(p[0], p[1], 2.4) && !self.up_on_something(p[0], p[1]))
-                    })
-                    .unwrap_or_else(|| if pack.z.is_some() { self.ground_near(mid[0], mid[1], z) } else { self.ground_near(mid[0] + a.cos() * r, mid[1] + a.sin() * r, z) });
+                let at = self.member_spot(k, mid, n, pack.count);
                 self.spawn_mob(def, at, Some(k), false);
             }
         }
+    }
+
+    /// Where the `n`th of a pack's `of` stands round `mid`: round its circle, not in a trunk nor
+    /// a wall (then nearer its middle).
+    pub(crate) fn member_spot(&mut self, k: usize, mid: [f32; 2], n: usize, of: usize) -> Vec3 {
+        let pack = &self.content.packs[k];
+        let (radius, pz) = (pack.radius, pack.z);
+        let a = n as f32 / of.max(1) as f32 * std::f32::consts::TAU + self.rng.gen::<f32>() * 0.6;
+        let r = if of > 1 { radius * (0.4 + 0.6 * self.rng.gen::<f32>()) } else { 0.0 };
+        let z = pz.unwrap_or(TOP);
+        (0..12)
+            .map(|t| {
+                // (One alone at its spot steps out from it, a little farther each try.)
+                let (aa, rr) = (a + t as f32 * 0.9, r * (1.0 - t as f32 / 12.0) + t as f32 * 0.6);
+                self.ground_near(mid[0] + aa.cos() * rr, mid[1] + aa.sin() * rr, z)
+            })
+            .find(|p| {
+                !self.land.blocked_near(p[0], p[1], p[2])
+                    // One down in a cave stays on its own floor (not the hill's slope over it).
+                    && pz.is_none_or(|want| (p[2] - want).abs() < 3.0)
+                    && (self.is_below() || pz.is_some() || !self.steep_at(p[0], p[1], 2.4) && !self.up_on_something(p[0], p[1]))
+            })
+            .unwrap_or_else(|| if pz.is_some() { self.ground_near(mid[0], mid[1], z) } else { self.ground_near(mid[0] + a.cos() * r, mid[1] + a.sin() * r, z) })
     }
 
     /// Where a pack stands this time: its spot, or one of its `spots` at random.
@@ -444,10 +451,13 @@ impl Survival {
     }
 
     /// `mid` turns on `foe`, and its neighbours within its pack's link come too.
-    pub(crate) fn engage(&mut self, mid: Id, foe: Foe) {
+    /// Those it brings spread over the heroes in the fight ([`Self::spread_foe`]), not all onto
+    /// the one who drew it.
+    pub(crate) fn engage(&mut self, mid: Id, first: Foe) {
         let mut queue = vec![mid];
         let mut seen = vec![mid];
         while let Some(m) = queue.pop() {
+            let foe = if m == mid { first } else { self.spread_foe(m, first) };
             let Some(mob) = self.mobs.get_mut(&m) else { continue };
             if mob.health == 0 {
                 continue;
@@ -886,7 +896,7 @@ impl Survival {
             if self.is_arena_foe(mid) {
                 self.arena.foes.push(s);
             }
-            let max = if self.is_below() { self.foe_health(nd) } else { self.base_health(nd) };
+            let max = if self.is_below() { self.foe_health(nd, pack) } else { self.base_health(nd) };
             let waits = d.then_after > 0.0;
             // Its first form (the one put back at a rest), down a chain of them.
             let root = self.mobs[&mid].form_of.unwrap_or(def);
@@ -1200,7 +1210,7 @@ impl Survival {
     }
 
     /// Hero `hero`'s foes in the middle of an attack on them (winding up or between blows).
-    fn attackers_on(&self, hero: Id, except: Id) -> usize {
+    pub(crate) fn attackers_on(&self, hero: Id, except: Id) -> usize {
         self.mobs
             .iter()
             // Up close: an archer or a caster loosing from afar isn't one of the two.
@@ -1394,20 +1404,28 @@ impl Survival {
         dist2d(foe, home) > leash + LEASH_SLACK || dist2d(pos, home) > leash + 2.0 * LEASH_SLACK
     }
 
-    /// The hero it turns to when its foe falls: one still in its fight (in reach, in its leash,
-    /// not hidden from it), the one it has most against first, then the nearest.
+    /// Whether a hero is in this creature's fight: alive, not hidden from it, within its leash,
+    /// and near (a boss's whole room, its leash: a hero shooting from the far wall is in it), or
+    /// one who has hurt it lately from a little farther off.
+    pub(crate) fn in_fight_of(&self, m: &Mob, hero: Id) -> bool {
+        let Some(p) = self.players.get(&hero) else { return false };
+        let leash = self.leash_of(m.def);
+        let d = dist2d(p.pos, m.pos);
+        let reach = if self.content.mobs[m.def].boss { FIGHT_RANGE.max(leash) } else { FIGHT_RANGE };
+        p.health > 0
+            && !self.unseen(hero)
+            && (p.pos[2] - m.pos[2]).abs() < 10.0
+            && (d <= reach || d <= leash + LEASH_SLACK && self.threat_on(m, hero) > 0.01)
+            && (m.raider || !self.leashed(m.home, m.pos, p.pos, leash))
+    }
+
+    /// The hero it turns to when its foe falls: one still in its fight ([`Self::in_fight_of`]),
+    /// the one it has most against first, then the nearest.
     pub(crate) fn next_in_fight(&self, id: Id) -> Option<Id> {
         let m = self.mobs.get(&id)?;
-        let leash = self.leash_of(m.def);
         self.players
             .iter()
-            .filter(|(h, p)| {
-                p.health > 0
-                    && !self.unseen(**h)
-                    && dist2d(p.pos, m.pos) <= FIGHT_RANGE
-                    && (p.pos[2] - m.pos[2]).abs() < 10.0
-                    && (m.raider || !self.leashed(m.home, m.pos, p.pos, leash))
-            })
+            .filter(|(h, _)| self.in_fight_of(m, **h))
             .map(|(h, p)| (*h, self.threat_on(m, *h), dist2d(p.pos, m.pos)))
             .max_by(|a, b| a.1.total_cmp(&b.1).then(b.2.total_cmp(&a.2)))
             .map(|(h, ..)| h)
@@ -1578,6 +1596,19 @@ impl Survival {
                     return;
                 }
                 if !raider && (lost || self.leashed(home, pos, to, self.leash_of(self.mobs[&id].def))) {
+                    // Its foe ran past its leash (or out of reach), but others are still in its
+                    // fight: it turns on one of them, not home to heal.
+                    let gone = match foe {
+                        Foe::Hero(h) => Some(h),
+                        Foe::Obj(_) => None,
+                    };
+                    if let Some(h) = self.next_in_fight(id).filter(|h| Some(*h) != gone) {
+                        let m = self.mobs.get_mut(&id).unwrap();
+                        m.state = MobState::Chase { foe: Foe::Hero(h) };
+                        m.lost_at = None;
+                        m.path.clear();
+                        return;
+                    }
                     self.give_up(id);
                     return;
                 }
@@ -1625,6 +1656,11 @@ impl Survival {
                         // Two at a time: the rest circle and wait their turn (and those farther
                         // off don't leap in meanwhile; they come up to wait).
                         busy = !press && self.attackers_on(h, id) >= MAX_ATTACKERS;
+                        // Its hero has two on them already: it goes for one nobody's pressing
+                        // instead, if there's one in its fight, rather than queue for a turn.
+                        if busy && self.turn_to_free(id, h) {
+                            return;
+                        }
                         if busy && dist <= CIRCLE_RADIUS + 3.0 {
                             self.circle_foe(id, h, to, CIRCLE_RADIUS + 1.0);
                             return;
