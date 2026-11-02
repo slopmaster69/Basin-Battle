@@ -33,6 +33,7 @@ pub mod idx {
     pub const UNIT_COMBATREACH: u16 = 130;
     pub const UNIT_DISPLAYID: u16 = 131;
     pub const UNIT_NATIVEDISPLAYID: u16 = 132;
+    pub const UNIT_MOUNTDISPLAYID: u16 = 133;
     pub const UNIT_MINDAMAGE: u16 = 134;
     pub const UNIT_MAXDAMAGE: u16 = 135;
     pub const UNIT_BYTES_1: u16 = 138;

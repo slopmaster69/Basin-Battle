@@ -2916,8 +2916,8 @@ effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 5.0 }]
 [[ability]]
 key = "avengers_shield"
 name = "Avenger's Shield"
-text = "Hurl your shield along the reticle: it strikes the first foe and ricochets to two more within 9 yd, each blow weaker, silencing what it strikes for 1.5 s (0.75 s on heroes). Shut a caster up."
-icon = "Spell_Holy_BlessingOfProtection"
+text = "Throws your shield along the aimed line. It strikes the first enemy for 15 damage, then flies to up to 2 more enemies within 9 yd, preferring one that is casting. Each bounce deals less damage. Enemies hit are silenced for 1.5 sec (0.75 sec against players). With a two-handed weapon, throws Hammer of Justice instead."
+icon = "Ability_Warrior_ShieldBash"
 school = "paladin"
 slot = "ranged"
 kind = "projectile"
@@ -2934,6 +2934,8 @@ spell = 24275
 clip = 107
 valor_hit = 4.0
 effects = [{ kind = "silence", secs = [1.5, 1.5] }]
+chain_casters = true
+two_hand = "hammer_of_justice"
 
 # The heal moves to the EX, as a true ally spell. (`holy_shock` was the Q card before: a save
 # naming it gets Avenger's Shield, the card in its place.)
@@ -2941,15 +2943,16 @@ effects = [{ kind = "silence", secs = [1.5, 1.5] }]
 key = "holy_shock"
 name = "Holy Shock"
 ex_of = "avengers_shield"
-text = "At once, on the friend under your reticle (or on you): a quarter of their health back, and every root, slow, stun, burn and fear on them ends."
+text = "Strikes the target nearest your reticle with holy light. An ally (or you, when no ally is near the reticle) is healed for 20% of maximum health. An enemy takes 30 damage instead."
 icon = "Spell_Holy_SearingLight"
 slot = "ranged"
 kind = "ally"
 valor = 25
 range = [30.0, 30.0]
-ally_heal = 0.25
-cleanse = true
+ally_heal = 0.2
 spell = 2812
+damage = [30.0, 30.0]
+foe_damage = true
 
 # === E: close ======================================================================================
 
@@ -3069,7 +3072,7 @@ empower = { ability = "fireball", secs = 5.0 }
 [[ability]]
 key = "consecration"
 name = "Consecration"
-text = "Hallow the ground around you (6 yards) for 6 s: foes in it burn, 5 a second, and friends in it (you too) heal 1.5% of their health a second."
+text = "Consecrates the ground in a 6 yd radius around you for 6 sec. Enemies inside take 8 damage, then 5 damage per sec. Allies inside, including you, heal 1.5% of maximum health per sec."
 icon = "Spell_Holy_InnerFire"
 school = "paladin"
 slot = "close"
@@ -3086,20 +3089,20 @@ spell = 26573
 [[ability]]
 key = "hallowed_ground"
 name = "Hallowed Ground"
-text = "Wider (8 yards), and friends standing in it take 30% less damage."
 ex_of = "consecration"
-icon = "Spell_Holy_InnerFire"
+text = "Hallows the ground in an 8 yd radius around you for 6 sec. Allies inside, including you, take 30% less damage and cannot be staggered. It deals no damage."
+icon = "Spell_Holy_HolyProtection"
 slot = "close"
 kind = "ground"
 at_self = true
 valor = 25
-damage = [8.0, 8.0]
 radius = [8.0, 8.0]
 linger = 6.0
-linger_damage = 5.0
-linger_heal = 0.02
-boon = "hallowed"
+boon = "hallowed+steadfast"
 boon_amount = 0.3
+# Divine Protection's shimmer on everyone it covers (the same look as Blessing of Protection's:
+# "you're protected").
+aura = 498
 spell = 26573
 
 # === 1: utility ====================================================================================
@@ -3196,25 +3199,23 @@ spell = 1953
 [[ability]]
 key = "divine_steed"
 name = "Divine Steed"
-text = "A burst of holy speed: 60% faster for 3 s, and whatever holds you (roots, slows) falls away. Press again within 3 s to throw Hammer of Justice, stunning what it strikes for 2 s (1 s on heroes). Ride in, then punish."
+text = "Summons a charger and rides it for 4 sec, moving 100% faster. Ends roots and slows on you when cast. Attacking or using an ability dismounts you."
 icon = "Spell_Nature_Swiftness"
 school = "paladin"
 slot = "utility"
 kind = "buff"
 cleanse = true
 cooldown = 14.0
-# Summon Warhorse's flash of light.
-spell = 13819
-effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.6 }]
-recast = "hammer_of_justice"
-recast_secs = 3.0
+# Summon Charger's flash as you mount.
+spell = 23214
+effects = [{ kind = "steed", secs = [4.0, 4.0], amount = 1.0 }]
 
 # Divine Steed's second press. (`hammer_of_justice` was the 1 card before: a save naming it gets
 # Divine Steed, the card in its place.)
 [[ability]]
 key = "hammer_of_justice"
 name = "Hammer of Justice"
-text = "Divine Steed's second press: a thrown hammer that stuns what it strikes for 2 s (1 s on heroes)."
+text = "Throws a slow hammer along the aimed line. The first enemy hit takes 8 damage and is stunned for 1.5 sec (0.75 sec against players)."
 icon = "Spell_Holy_SealOfMight"
 inner = true
 slot = "utility"
@@ -3226,21 +3227,21 @@ speed = 20.0
 spell = 20685
 clip = 107
 impact_kit = 485
-effects = [{ kind = "stun", secs = [2.0, 2.0] }]
+effects = [{ kind = "stun", secs = [1.5, 1.5] }]
+cooldown = 7.0
 
 [[ability]]
 key = "blessing_of_freedom"
 name = "Blessing of Freedom"
 ex_of = "divine_steed"
-text = "On the friend under your reticle (or on you): whatever holds them falls away, and for 4 s they run 40% faster and nothing staggers them."
+text = "Blesses the ally nearest your reticle, or you. Ends roots, slows, stuns and marks on them, and for 4 sec they cannot be rooted, slowed or stunned and move 40% faster."
 icon = "Spell_Holy_SealOfValor"
 slot = "utility"
 kind = "ally"
 valor = 25
 range = [30.0, 30.0]
-cleanse = true
 spell = 1044
-effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }, { kind = "steadfast", secs = [4.0, 4.0], amount = 1.0 }]
+effects = [{ kind = "freedom", secs = [4.0, 4.0], amount = 1.0 }, { kind = "haste", secs = [4.0, 4.0], amount = 0.4 }]
 
 # === 2: defense ====================================================================================
 # Staying alive: alone, the answer to a pack or a champion's big blow; in a duel, a read (each
@@ -3360,7 +3361,7 @@ counter = { immune = true }
 [[ability]]
 key = "blessing_of_protection"
 name = "Blessing of Protection"
-text = "On the friend under your reticle (or on you): for 3 s they take half damage and nothing staggers them. The one defense you can give away."
+text = "Blesses the ally nearest your reticle, or you. For 3 sec they take 50% less damage and cannot be staggered."
 icon = "Spell_Holy_SealOfProtection"
 school = "paladin"
 slot = "defense"
@@ -3375,15 +3376,15 @@ effects = [{ kind = "hallowed", secs = [3.0, 3.0], amount = 0.5, aura = 498 }, {
 key = "lay_on_hands"
 name = "Lay on Hands"
 ex_of = "blessing_of_protection"
-text = "On the friend under your reticle (or on you): 40% of their health back at once, and every snare, root, stun and mark on them ends."
+text = "Touches an ally within 3 yd, or yourself, restoring 60% of their maximum health. That ally cannot receive Lay on Hands again for 60 sec."
 icon = "Spell_Holy_LayOnHands"
 slot = "defense"
 kind = "ally"
 valor = 25
-range = [30.0, 30.0]
-ally_heal = 0.4
-cleanse = true
+range = [3.0, 3.0]
+ally_heal = 0.6
 spell = 633
+lockout = 60.0
 
 # === 3: ultimate ===================================================================================
 
@@ -3424,24 +3425,33 @@ effects = [{ kind = "deathmark", secs = [8.0, 8.0], amount = 0.3 }]
 
 # The Warden: sanctuary.
 [[ability]]
-key = "sanctuary"
-name = "Sanctuary"
-text = "An 8 yard ring around you for 6 s: friends in it (you too) heal 4% of their health a second and can't be staggered; foes in it are slowed by 40%."
-icon = "Spell_Holy_DivineIntervention"
+key = "avenging_wrath"
+name = "Avenging Wrath"
+text = "For 10 sec, holy light gathers around you. Each of your heavy attacks releases a wave of light 10 yd forward. Enemies it passes take 80% weapon damage. Allies it passes gain a shield that absorbs 10% of their maximum health; a new shield replaces the old one."
+icon = "Spell_Holy_AuraOfLight"
 school = "paladin"
 slot = "ultimate"
-kind = "ground"
-at_self = true
+kind = "buff"
 valor = 100
-radius = [8.0, 8.0]
-linger = 6.0
-linger_heal = 0.04
-boon = "steadfast"
-boon_amount = 1.0
 cooldown = 40.0
-# A ring of light on the ground while it lasts (Resurrection Impact Visual).
-spell = 24171
-effects = [{ kind = "snare", secs = [1.5, 1.5], amount = 0.4 }]
+# Holy Strength's gold glow as it begins.
+spell = 20007
+effects = [{ kind = "wrath", secs = [10.0, 10.0], amount = 1.0 }]
+
+# Avenging Wrath's wave, sent along the paladin's facing by each heavy attack.
+[[ability]]
+key = "avenging_wave"
+name = "Avenging Wrath"
+text = "A wave of light: enemies take 80% weapon damage, allies gain a shield absorbing 10% of their maximum health."
+icon = "Spell_Holy_AuraOfLight"
+slot = "ultimate"
+kind = "line"
+inner = true
+range = [10.0, 10.0]
+radius = [1.5, 1.5]
+weapon = 0.8
+boon_amount = 0.1
+spell = 2812
 
 # === the bench ======================================================================================
 # Off the board for now; their mechanics stay (and the tests that try them). Move one onto the board
@@ -6523,7 +6533,7 @@ boss = true
 posture = 150
 drops = { linen = [3, 4], wool = [1, 2] }
 trophy = { silver = 2, bronze = 2 }
-teaches = ["sanctuary"]
+teaches = ["avenging_wrath"]
 respawn = 1200.0
   [mob.attack]
   ranged = true

@@ -234,6 +234,8 @@ pub enum Event {
     Glow { id: Id, secs: f32 },
     /// `id`'s body drawn at `scale` (1: as it is): Onslaught's titan.
     Grow { id: Id, scale: f32 },
+    /// `id` rides `display` (a mount's creature display; 0: on foot): Divine Steed.
+    Mount { id: Id, display: u32 },
     /// Open a station's work for a hero.
     StationOpen { player: Id, station: Id },
     /// Ask a hero to confirm something (ringing the bell).
@@ -806,6 +808,10 @@ pub struct Survival {
     /// Heroes' projectiles in flight, ground marked to land, ground burning, totems standing.
     pub(crate) projectiles: Vec<abilities::Projectile>,
     pub(crate) grounds: Vec<abilities::GroundCast>,
+    /// Bounces in flight (Avenger's Shield, Chain Lightning): each lands when it gets there.
+    pub(crate) bounces: Vec<abilities::Bounce>,
+    /// (hero, ability): when they can have it again (Lay on Hands).
+    pub(crate) lockouts: BTreeMap<(Id, usize), f32>,
     pub(crate) burnings: Vec<abilities::Burning>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
@@ -915,6 +921,8 @@ impl Survival {
             fx_vs_bosses: false,
             told_immune: BTreeMap::new(),
             grounds: Vec::new(),
+            bounces: Vec::new(),
+            lockouts: BTreeMap::new(),
             burnings: Vec::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
@@ -983,6 +991,7 @@ impl Survival {
         self.step_projectiles(dt);
         self.step_moves();
         self.step_grounds();
+        self.step_bounces();
         self.step_totems();
         self.step_stances();
         self.step_combos();

@@ -42,6 +42,10 @@ const IMMUNE_TOLD_EVERY: f32 = 1.5;
 
 /// How much larger Onslaught draws a hero.
 pub(crate) const ONSLAUGHT_SCALE: f32 = 1.3;
+/// Divine Steed's charger (the paladin's mount display).
+pub(crate) const STEED_DISPLAY: u32 = 14584;
+/// What Blessing of Freedom ends and keeps off.
+const FREEDOM: [&str; 3] = ["root", "snare", "stun"];
 
 impl Survival {
     /// The effects on a unit now.
@@ -75,7 +79,7 @@ impl Survival {
     pub fn speed_share(&self, id: Id) -> f32 {
         let now = self.clock;
         let worst = self.cc_of(id).iter().filter(|c| c.kind == "snare" && c.until > now).map(|c| c.amount).fold(0.0f32, f32::max);
-        let haste = self.cc_of(id).iter().filter(|c| c.kind == "haste" && c.until > now).map(|c| c.amount).fold(0.0f32, f32::max);
+        let haste = self.cc_of(id).iter().filter(|c| (c.kind == "haste" || c.kind == "steed") && c.until > now).map(|c| c.amount).fold(0.0f32, f32::max);
         ((1.0 - worst) * (1.0 + haste)).clamp(0.05, 2.0)
     }
 
@@ -130,6 +134,10 @@ impl Survival {
         let boon = crate::content::BOONS.contains(&kind);
         // Nothing reaches someone in Ice Block.
         if self.immune(target) && !boon {
+            return false;
+        }
+        // Freed (Blessing of Freedom): no root, slow or stun takes hold.
+        if FREEDOM.contains(&kind) && self.has_cc(target, "freedom") {
             return false;
         }
         // A boss, a totem, a creature winding up a blow no guard stops: it shrugs control off
@@ -211,6 +219,14 @@ impl Survival {
             }
             if kind == "panic" {
                 self.players.get_mut(&id).unwrap().panic_stride = self.clock;
+            }
+            // Freed: what held them ends (a mark too).
+            if kind == "freedom" {
+                self.cleanse(id, &["root", "snare", "stun", "mark", "deathmark"]);
+            }
+            // On the charger.
+            if kind == "steed" {
+                self.events.push(Event::Mount { id, display: STEED_DISPLAY });
             }
             // Onslaught: larger, and red for everyone to see, while it lasts.
             if kind == "onslaught" {
@@ -407,6 +423,9 @@ impl Survival {
         self.events.push(Event::Auras { id });
         if self.players.contains_key(&id) && kinds.iter().any(|k| k == "onslaught") && !self.has_cc(id, "onslaught") {
             self.events.push(Event::Grow { id, scale: 1.0 });
+        }
+        if self.players.contains_key(&id) && kinds.iter().any(|k| k == "steed") && !self.has_cc(id, "steed") {
+            self.events.push(Event::Mount { id, display: 0 });
         }
         if self.players.contains_key(&id) {
             // The grace, once the last of the three is over.

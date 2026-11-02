@@ -197,7 +197,7 @@ fn backstab_does_three_times_from_behind_and_crits_on_a_mark_and_ambush_steps_be
 }
 
 #[test]
-fn holy_shock_heals_the_friend_under_the_reticle_and_ends_what_holds_them_and_the_shield_strikes_a_foe() {
+fn holy_shock_heals_the_friend_under_the_reticle_and_the_shield_strikes_a_foe() {
     let mut s = world_with(false);
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [8.0, 0.0, 0.0], 0.0);
@@ -209,7 +209,7 @@ fn holy_shock_heals_the_friend_under_the_reticle_and_ends_what_holds_them_and_th
     s.set_aim_line(a, 0.0, 0.0);
     cast(&mut s, a, "ranged", "avengers_shield", true);
     let healed = s.players[&b].health - max / 2;
-    assert_eq!(healed, (max as f32 * 0.25).round() as u32, "a quarter of his health");
+    assert_eq!(healed, (max as f32 * 0.2).round() as u32, "a fifth of his health");
     // A foe takes the shield as a blow.
     let k = mob(&mut s, "grunt", [8.0, 6.0, 0.0], 0.0);
     s.players.get_mut(&b).unwrap().pos = [0.0, -20.0, 0.0];
@@ -218,17 +218,6 @@ fn holy_shock_heals_the_friend_under_the_reticle_and_ends_what_holds_them_and_th
     let mut ev = cast(&mut s, a, "ranged", "avengers_shield", false);
     ev.extend(run(&mut s, 1.0));
     assert!(hits_on(&ev, k).iter().any(|h| h.0 > 0));
-    // Holy Shock ends a root on a friend.
-    calm(&mut s, k);
-    s.mobs.get_mut(&k).unwrap().pos = [0.0, 30.0, 0.0];
-    s.players.get_mut(&b).unwrap().pos = [8.0, 0.0, 0.0];
-    s.apply_cc(b, k, "root", 4.0, 0.0, 0.0, "test");
-    assert!(s.has_cc(b, "root"));
-    s.set_valor(a, 50.0);
-    s.set_aim_line(a, 0.0, 0.0);
-    cast(&mut s, a, "ranged", "avengers_shield", true);
-    run(&mut s, 0.2);
-    assert!(!s.has_cc(b, "root"), "set free");
 }
 
 #[test]
@@ -315,22 +304,22 @@ fn a_death_mark_makes_everything_land_harder_and_a_kill_under_it_readies_every_c
 }
 
 #[test]
-fn sanctuary_mends_and_steadies_friends_and_slows_foes() {
+fn avenging_wrath_sends_a_wave_with_each_heavy_attack_that_strikes_foes_and_shields_friends() {
     let mut s = world_with(false);
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let b = hero(&mut s, "Bren", [4.0, 0.0, 0.0], 0.0);
-    let k = mob(&mut s, "grunt", [0.0, 5.0, 0.0], 0.0);
-    let max = s.players[&b].max_health;
-    s.players.get_mut(&b).unwrap().health = max / 2;
+    let b = hero(&mut s, "Bren", [5.0, 0.5, 0.0], 0.0);
+    let k = mob(&mut s, "grunt", [8.0, 0.0, 0.0], 0.0);
+    let health = s.mobs[&k].health;
     s.set_valor(a, 100.0);
-    cast(&mut s, a, "ultimate", "sanctuary", false);
-    run(&mut s, 2.1);
-    calm(&mut s, k);
-    assert!(s.players[&b].health >= max / 2 + (max as f32 * 0.04 * 2.0) as u32 - 1, "4% a second");
-    assert!(s.has_cc(b, "steadfast"));
-    s.apply_cc(b, k, "stagger", 1.0, 0.0, 0.0, "test");
-    assert!(!matches!(s.players[&b].action, Action::Stagger { .. }), "can't be staggered");
-    assert!(s.has_cc(k, "snare"), "the foe is slowed");
+    cast(&mut s, a, "ultimate", "avenging_wrath", false);
+    assert!(s.has_cc(a, "wrath"));
+    run(&mut s, 0.8);
+    s.input(a, Input::Heavy);
+    run(&mut s, 0.3);
+    assert!(s.mobs[&k].health < health, "the wave reaches the foe 8 yd off");
+    assert!(s.has_cc(b, "shield"), "and shields the friend it passes");
+    run(&mut s, 10.0);
+    assert!(!s.has_cc(a, "wrath"), "for 10 s");
 }
 
 #[test]
@@ -427,17 +416,14 @@ fn the_board_has_five_rows_of_nine() {
 }
 
 #[test]
-fn lay_on_hands_alone_heals_two_fifths_and_ends_what_is_on_you() {
+fn lay_on_hands_alone_heals_three_fifths() {
     let mut s = world_with(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    s.players.get_mut(&p).unwrap().health = 50;
-    s.apply_cc(p, p, "snare", 5.0, 0.5, 0.0, "test");
-    assert!(s.has_cc(p, "snare"));
+    s.players.get_mut(&p).unwrap().health = 20;
     s.set_valor(p, 25.0);
     cast(&mut s, p, "defense", "blessing_of_protection", true);
     let p_ = &s.players[&p];
-    assert_eq!(p_.health, 50 + (p_.max_health as f32 * 0.4).round() as u32);
-    assert!(!s.has_cc(p, "snare"), "cleansed");
+    assert_eq!(p_.health, (20 + (p_.max_health as f32 * 0.6).round() as u32).min(p_.max_health));
 }
 
 #[test]

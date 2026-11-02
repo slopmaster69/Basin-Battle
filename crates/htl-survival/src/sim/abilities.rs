@@ -69,6 +69,18 @@ pub(crate) struct GroundCast {
     pub shown: bool,
 }
 
+/// A bounce on its way from one target to the next: it strikes `to` when it gets there, then
+/// bounces on while it has bounces left.
+#[derive(Debug, Clone)]
+pub(crate) struct Bounce {
+    pub land_at: f32,
+    pub shot: Projectile,
+    pub to: Id,
+    pub from_at: Vec3,
+    pub hit: Vec<Id>,
+    pub left: u32,
+}
+
 /// Ground left burning: whoever stands in it takes `dps` a second until then.
 #[derive(Debug, Clone)]
 pub(crate) struct Burning {
@@ -603,6 +615,11 @@ impl Survival {
             }
         } else {
             base
+        };
+        // No shield to throw with a two-handed weapon: the key fires its alternative.
+        let ability = match self.content.ability(&self.content.abilities[ability].two_hand) {
+            Some(alt) if ability == base && self.players.get(&id).is_some_and(|p| self.weapon_of(p).two_handed) => alt,
+            _ => ability,
         };
         let d = self.content.abilities[ability].clone();
         if self.silenced(id) || self.immune(id) {
@@ -1398,30 +1415,61 @@ impl Survival {
         self.linger_at(p.owner, p.ability, at, d.splash);
     }
 
-    /// A hit that leaps on (Chain Lightning): to the nearest other foe each time, weaker each.
+    /// A hit that leaps on (Chain Lightning, Avenger's Shield): to the nearest other foe each time
+    /// (one casting first, for a shield), weaker each. Each leap flies there and lands when it
+    /// arrives, so the look and the blow go together.
     fn chain_on(&mut self, p: &Projectile, first: Id) {
         let d = self.content.abilities[p.ability].clone();
-        let mut hit = vec![first];
-        let mut from = first;
-        let mut damage = p.damage;
-        for _ in 0..d.chain {
-            let Some(at) = self.unit_pos(from) else { break };
-            let range = if d.chain_range > 0.0 { d.chain_range } else { 8.0 };
-            let next = self
-                .mobs
-                .iter()
-                .filter(|(m, x)| x.health > 0 && !x.hidden && !hit.contains(m) && !self.content.mobs[x.def].inert() && dist2d(x.pos, at) <= range)
-                .map(|(m, x)| (*m, dist2d(x.pos, at)))
-                .chain(self.players.iter().filter(|(h, x)| self.hostile(p.owner, **h) && x.health > 0 && !hit.contains(h) && dist2d(x.pos, at) <= range).map(|(h, x)| (*h, dist2d(x.pos, at))))
-                .min_by(|a, b| a.1.total_cmp(&b.1))
-                .map(|(u, _)| u);
-            let Some(v) = next else { break };
-            damage *= d.chain_falloff;
-            self.events.push(Event::Missile { caster: from, spell: d.spell, target: Target::Unit(v) });
-            let jump = Projectile { damage, pos: at, ..p.clone() };
-            self.strike_with(&jump, v, at);
-            hit.push(v);
-            from = v;
+        if d.chain == 0 {
+            return;
+        }
+        self.bounce_from(p.clone(), first, vec![first], d.chain);
+    }
+
+    /// The next leap from `from` (already struck), if there's a foe in reach.
+    fn bounce_from(&mut self, p: Projectile, from: Id, hit: Vec<Id>, left: u32) {
+        let d = self.content.abilities[p.ability].clone();
+        let Some(at) = self.unit_pos(from) else { return };
+        let range = if d.chain_range > 0.0 { d.chain_range } else { 8.0 };
+        let casting = |s: &Self, u: Id| {
+            s.mobs.get(&u).is_some_and(|m| matches!(m.state, mobs::MobState::Windup { .. }) && s.attack_now(u).ranged)
+                || s.players.get(&u).is_some_and(|h| matches!(h.action, Action::Cast { .. } | Action::Channel { .. } | Action::Charge { .. }))
+        };
+        let prefer = d.chain_casters;
+        let next = self
+            .mobs
+            .iter()
+            .filter(|(m, x)| x.health > 0 && !x.hidden && !hit.contains(m) && !self.content.mobs[x.def].inert() && dist2d(x.pos, at) <= range)
+            .map(|(m, x)| (*m, dist2d(x.pos, at)))
+            .chain(self.players.iter().filter(|(h, x)| self.hostile(p.owner, **h) && x.health > 0 && !hit.contains(h) && dist2d(x.pos, at) <= range).map(|(h, x)| (*h, dist2d(x.pos, at))))
+            .min_by(|a, b| {
+                let ca = prefer && casting(self, a.0);
+                let cb = prefer && casting(self, b.0);
+                cb.cmp(&ca).then(a.1.total_cmp(&b.1))
+            })
+            .map(|(u, dist)| (u, dist));
+        let Some((v, dist)) = next else { return };
+        self.events.push(Event::Missile { caster: from, spell: d.spell, target: Target::Unit(v) });
+        let shot = Projectile { damage: p.damage * d.chain_falloff, pos: at, ..p };
+        let speed = if d.speed > 0.0 { d.speed } else { 60.0 };
+        let mut hit = hit;
+        hit.push(v);
+        self.bounces.push(Bounce { land_at: self.clock + dist / speed, shot, to: v, from_at: at, hit, left: left - 1 });
+    }
+
+    /// Bounces land when they get there, and leap on.
+    pub(crate) fn step_bounces(&mut self) {
+        let now = self.clock;
+        let (due, keep): (Vec<Bounce>, Vec<Bounce>) = std::mem::take(&mut self.bounces).into_iter().partition(|b| b.land_at <= now);
+        self.bounces = keep;
+        for b in due {
+            if !self.alive(b.to) {
+                continue;
+            }
+            self.strike_with(&b.shot, b.to, b.from_at);
+            if b.left > 0 {
+                self.bounce_from(b.shot, b.to, b.hit, b.left);
+            }
         }
     }
 
@@ -1714,7 +1762,36 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);
         let radius = AbilityDef::at(d.radius, share);
+        // A foe on the reticle's line takes the light instead (Holy Shock).
+        if d.foe_damage {
+            let (o, dir) = self.reticle(id);
+            let t = self.trace(o, dir, range + 3.0, ALLY_TRACE, id);
+            let at = self.players[&id].pos;
+            if let Some(v) = t.unit.filter(|v| self.unit_pos(*v).is_some_and(|p| dist2d(p, at) <= range + 1.0)) {
+                self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(v) });
+                let damage = AbilityDef::at(d.damage, share);
+                if self.mobs.contains_key(&v) {
+                    self.ability_on_mob(id, v, ability, share, damage, t.point, HitKind::Projectile, d.spell);
+                } else {
+                    let dmg = self.ability_damage(id, v, ability, damage);
+                    self.strike_fair_as(id, v, dmg, at, false, false, false, Blow::Arrow(d.spell), None, combat::Follow::Ability { ability, share }, HitKind::Projectile);
+                }
+                return;
+            }
+        }
         let target = self.ally_target(id, range, if radius > 0.0 { radius } else { ALLY_TRACE });
+        // Given to this hero not long ago: not again yet (its Valor back).
+        if d.lockout > 0.0 {
+            let now = self.clock;
+            if self.lockouts.get(&(target, ability)).is_some_and(|t| *t > now) {
+                let left = self.lockouts[&(target, ability)] - now;
+                self.events.push(Event::Flash { player: id, text: format!("{}: not again on them for {:.0} sec", d.name, left.ceil()) });
+                let cost = self.valor_cost(&d);
+                self.gain_valor(id, cost);
+                return;
+            }
+            self.lockouts.insert((target, ability), now + d.lockout);
+        }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(target) });
         if d.impact_kit != 0 {
             self.events.push(Event::Visual { id: target, kit: d.impact_kit, by: None });
@@ -1737,6 +1814,37 @@ impl Survival {
             self.events.push(Event::Flash { player: id, text });
             let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
             self.gain_valor(id, v);
+        }
+    }
+
+    /// Avenging Wrath's wave: along the hero's facing, foes struck (a share of the weapon) and
+    /// friends shielded for a share of their health (a new shield replaces the old).
+    pub(crate) fn avenging_wave(&mut self, id: Id) {
+        let Some(wave) = self.content.ability("avenging_wave") else { return };
+        let d = self.content.abilities[wave].clone();
+        let Some(p) = self.players.get(&id) else { return };
+        let (pos, yaw) = (p.pos, p.facing);
+        let len = AbilityDef::at(d.range, 1.0);
+        let half = AbilityDef::at(d.radius, 1.0).max(0.5);
+        let w = self.weapon_of(p).damage;
+        let damage = self.roll(w) as f32 * d.weapon;
+        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(add(pos, [yaw.cos(), yaw.sin(), 0.0], len)) });
+        self.area_shape(id, wave, pos, len, 1.0, damage, Shape::Line(yaw, len, half));
+        let (c, s) = (yaw.cos(), yaw.sin());
+        let friends: Vec<Id> = self
+            .players
+            .iter()
+            .filter(|(h, f)| {
+                let (dx, dy) = (f.pos[0] - pos[0], f.pos[1] - pos[1]);
+                let along = dx * c + dy * s;
+                **h != id && f.health > 0 && self.helpable(id, **h) && (0.0..=len).contains(&along) && (-dx * s + dy * c).abs() <= half + HERO_SIZE
+            })
+            .map(|(h, _)| *h)
+            .collect();
+        for f in friends {
+            let amount = self.players[&f].max_health as f32 * d.boon_amount;
+            self.cleanse(f, &["shield"]);
+            self.apply_cc(f, id, "shield", 6.0, amount, 0.0, &d.name);
         }
     }
 
@@ -1979,8 +2087,9 @@ impl Survival {
                 let amount = self.players.get(&h).map_or(0, |p| (p.max_health as f32 * d.linger_heal * self.weakened(owner)).round() as u32);
                 self.heal_hero_by(h, amount, owner, &d.name);
             }
-            if !d.boon.is_empty() {
-                self.apply_cc(h, owner, &d.boon, BOON_HOLD, d.boon_amount, 0.0, &d.name);
+            // Its boons (`hallowed+steadfast`: each), worn with the ability's aura look.
+            for boon in d.boon.split('+').filter(|b| !b.is_empty()) {
+                self.apply_cc_look(h, owner, boon, BOON_HOLD, d.boon_amount, 0.0, &d.name, d.aura);
             }
             for e in &gifts {
                 self.apply_cc(h, owner, &e.kind, BOON_HOLD, e.amount, 0.0, &d.name);

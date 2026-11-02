@@ -428,6 +428,13 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Mount { id, display } => {
+                // On a mount (Divine Steed's charger) or back on foot, for everyone.
+                let Some(g) = self.guid_of(id) else { return };
+                let mut f = Fields::new();
+                f.set(idx::UNIT_MOUNTDISPLAYID, display);
+                self.broadcast(&packets::update_object(&[], &[(g, &f)]));
+            }
             Event::Grow { id, scale } => {
                 // The body drawn larger (Onslaught), for everyone, its owner too.
                 let Some(g) = self.guid_of(id) else { return };
