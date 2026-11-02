@@ -32,8 +32,11 @@
 //!   Proving Ring as a hero in it sees it (`AA` alone: not in it).
 //! - `AW\t<wave>\t<in a wave>\t<secs to the next>\t<the camp's best>\t<heroes in it>`: the ring's
 //!   banner, used.
-//! - `LP\t<key>\t<name>\t<draughts>\t<most>\t<key~name^...>\t<key~name~price~can~icon^...>\t<plunder>`:
-//!   a lamp below: the hero's Draughts, the other lit lamps, the quartermaster's wares.
+//! - `LP\t<key>\t<name>\t<draughts>\t<most>\t<key~name^...>\t<key~name~price~can~icon^...>\t<plunder>`
+//!   `\t<currency name>\t<key~name~tier~price~can~icon^...>`: a lamp below: the hero's Draughts,
+//!   the other lit lamps, the quartermaster's wares (a flask among them while there's room for
+//!   one), the dungeon's currency the hero carries and its name, and the pieces of the dungeon's
+//!   gear the quartermaster can hone a tier further (to `tier`).
 //! - `NT\t<kind>\t<title>\t<place>\t<text>\t<clue>\t<command~label^...>`: a page to read and keep
 //!   up (a note, a secret found, the book's record of a dungeon, a wager's page, the board, a
 //!   run's tally as a hero leaves it: kind `run`); `{n}`
@@ -296,7 +299,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 12;
+pub(crate) const ADDON_NEWEST: u32 = 13;
 /// 11: a borrowed clip's turns go back to rest (patch 0016), so a shield isn't left crooked.
 pub(crate) const CLIENT_NEWEST: u8 = 11;
 
@@ -1017,17 +1020,30 @@ impl SurvivalGame {
                 )
             })
             .collect();
+        // What the quartermaster can hone a tier further: the hero's pieces of this dungeon's gear.
+        let hones: Vec<String> = self
+            .sim
+            .hone_offers(id)
+            .into_iter()
+            .map(|(k, n, tier, price, can)| {
+                let icon = c.item(&k).map_or("", |i| c.items[i].icon.as_str());
+                format!("{}~{}~{}~{price}~{}~{}", clean(&k), clean(&n), clean(&tier), u8::from(can), clean(icon))
+            })
+            .collect();
+        let currency = self.sim.currency_name();
         if self.has_addon(conn) {
             let line = format!(
-                "LP\t{}\t{}\t{have}\t{most}\t{}\t{}\t{plunder}",
+                "LP\t{}\t{}\t{have}\t{most}\t{}\t{}\t{plunder}\t{}\t{}",
                 clean(key),
                 clean(&name),
                 lamps.join("^"),
-                trades.join("^")
+                trades.join("^"),
+                clean(&currency),
+                hones.join("^")
             );
             self.ui_line(conn, &line);
         } else {
-            self.say_to(conn, &format!("{name}: .rest to rest here (whole again, Draughts filled, the Brotherhood back at their posts); .travel <lamp> to go to another lit lamp; .travel camp to go home; .buy <ware> for plunder."));
+            self.say_to(conn, &format!("{name}: .rest to rest here (whole again, Draughts filled, the foes back at their posts); .travel <lamp> to go to another lit lamp; .travel camp to go home; .buy <ware> for {currency}; .hone <piece> to hone this dungeon's gear a tier further."));
         }
     }
 
@@ -1341,6 +1357,10 @@ impl SurvivalGame {
             "rest" => self.sim.rest(me).map(|_| self.refresh_lamp(conn, me)),
             "buy" => self.sim.buy(me, &arg).map(|name| {
                 self.tell(conn, &format!("The quartermaster hands you a {name}."));
+                self.refresh_lamp(conn, me);
+            }),
+            "hone" => self.sim.hone(me, &arg).map(|what| {
+                self.tell(conn, &format!("The quartermaster hands it back: {what}."));
                 self.refresh_lamp(conn, me);
             }),
             "arm" => self.sim.arm(me, &arg).map(|name| {
