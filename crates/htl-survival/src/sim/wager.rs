@@ -859,6 +859,8 @@ impl Survival {
             let mut names = Vec::new();
             for (i, n) in &won {
                 *self.storage.entry(*i).or_default() += n;
+                // Found, as gear carried home is: the rack keeps it once it's taken from the chest.
+                *self.camp.counts.entry(format!("found:{}", self.content.base_key(*i))).or_default() += 1;
                 names.push(self.content.items[*i].name.clone());
             }
             self.events.push(Event::Storage);

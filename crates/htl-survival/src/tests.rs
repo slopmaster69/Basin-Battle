@@ -3190,11 +3190,13 @@ fn a_dungeons_weapon_is_on_the_rack_only_once_the_camp_has_found_one() {
     assert!(s.content.is_dungeon_gear("mograines_might"));
     assert!(!keys(&s).contains(&"mograines_might".to_string()), "earned below first");
     assert!(s.arm(p, "mograines_might").is_err());
+    assert!(s.arm(p, "mograines_might_honed3").is_err(), "nor its honed copy, by name");
     assert!(keys(&s).contains(&"maul".to_string()), "the camp's own are there");
     // Found below (or sent home): on the rack.
     s.camp.counts.insert("found:mograines_might".into(), 1);
     assert!(keys(&s).contains(&"mograines_might".to_string()));
     assert!(s.arm(p, "mograines_might").is_ok());
+    assert!(s.arm(p, "mograines_might_honed3").is_err(), "a honed one is the lamp's, never the rack's");
 }
 
 #[test]

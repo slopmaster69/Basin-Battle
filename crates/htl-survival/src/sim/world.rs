@@ -926,6 +926,10 @@ impl Survival {
         if self.content.is_trophy(key) {
             return Err("That one's won from its owner, not taken from the rack.".into());
         }
+        // The rack holds weapons as they're found; a honed one is the lamp's work, and its own.
+        if self.content.items[item].hone > 0 {
+            return Err("The rack holds weapons as they're found: a honed one is honed at the lamp.".into());
+        }
         if !self.rack_has(key) {
             return Err("That one's found below first: the rack has it once the camp does.".into());
         }
