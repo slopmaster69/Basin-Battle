@@ -72,8 +72,8 @@ effect.
 | Right + left mouse | **Shield bash** (with a two-hander, a kick); with Shift, the **kick**: breaks a guard harder |
 | Mouse button 4 | Tap: **dodge** as you let go, the way you're moving (15 stamina, and it takes at least 18 to start one). Hold: sprint. It works with the mouse freed (Z) too |
 | Shift (hold) | Sprint too: 12 against 7 (over the 11 the hero's own Sprint clip needs, so a strafe doesn't flicker between it and Run), only 3 stamina a second: a way across the world, not a fight's cost |
-| Q | The **ranged** ability (Hurled Axe to begin with) |
-| E | The **close** ability (Sundering Blow) |
+| Q | The **ranged** ability (Axe Throw to begin with) |
+| E | The **close** ability (Shockwave) |
 | 1 | The **utility** ability (Charge) |
 | 2 | The **defense** ability (Retaliation) |
 | 3 (hold) | The **ultimate** (Onslaught): held a quarter second it goes (a line fills along the key), so a stray press never spends the whole Valor bar |
@@ -136,8 +136,8 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Hurled Axe · *Rending Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
-| E | **Close** | Sundering Blow · *Unstoppable Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
+| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Flare · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
 | 3 | **Ultimate** | Onslaught | Sanctuary | Kill Shot | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
@@ -147,11 +147,14 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
 
 **The classes**, in a line each:
 
-- **Warrior**: bulldoze: close the gap, smash through, break guards. Hurled Axe flies out through
-  every foe and comes back to wherever you stand, striking each again (walk so its way back crosses
-  the fight; its EX, Rending Axe, drags what it strikes toward you). Charge bowls through everyone
-  in its line, staggering each (or Heroic Leap, landing in a burst that throws everyone back);
-  Sundering Blow; Retaliation against blades; Onslaught.
+- **Warrior**: the weight of the weapon: decide where the fight happens. Axe Throw flies out
+  through every foe and comes back to wherever you stand, striking each again; its key again calls
+  it back early (its EX, Grasping Axe, drags what it strikes toward you). Shockwave slams a cone
+  back and stuns whoever it drives into a wall; its EX, Sundering Blow, is an unblockable red
+  overhead that Sunders one target (15% more damage from everyone). Charge stops at the first foe
+  and staggers it (or Heroic Leap, landing in a burst that throws everyone back). Retaliation is a
+  one-second brace that blocks a blade and sweeps everyone in front; Shield Wall holds the shield up
+  against everything from the front. Onslaught: larger, red and relentless for 8 s.
 - **Paladin**: shield your friends, punish who touches them. Avenger's Shield ricochets to two
   more foes and silences them; its EX, Holy Shock, heals the friend under your reticle (or you) and
   frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a burst of speed out of
@@ -272,8 +275,8 @@ duration creatures do.
 
 - **Weapon arts** (Sundering Blow, Backstab) are blows with the weapon in hand, through the same
   rules as any swing: their own wind-up and reach, a share of the weapon's damage, stamina, and a
-  guard and a parry answer them (the Unstoppable Blow aside: no guard stops it, no parry turns it,
-  and its target sees the weapon go red).
+  guard and a parry answer them (Sundering Blow aside: no guard stops it, no parry turns it, and
+  everyone sees the weapon go red).
 - **Defense** is a read and a bait in a duel: Retaliation blocks melee (not bolts), Flare
   blinds whoever is coming till they're struck, Smoke Bomb hides you (a creature loses you, a lock
   lets go), Drain Life out-heals them, Ice Block lets nothing in but you can't act.
@@ -374,8 +377,8 @@ Some of this needs a change to the client itself, which this folder carries as p
   out. A blow meant for someone else is fainter, and has no growing fill;
 - a blow meant for you tells you when to answer it, with the floor markers on or off: the
   striker glows over its wind-up (amber: a guard stops it, red: it doesn't), and a reaction's
-  time before your window opens the glow flashes bright: raise the guard now to parry (with a
-  ping), or roll now for a red one. The stroke into the blow wooshes, heavier for a slower
+  time before your window opens the glow flashes bright: raise the guard now to parry, or roll
+  now for a red one (with a ping). The stroke into the blow wooshes, heavier for a slower
   wind-up;
 - a raised guard's ShieldBlock goes up once and holds there (on the upper body while moving),
   where it used to loop;
@@ -454,9 +457,12 @@ On the action-combat client (the patch's second part) the client plays clips its
   are your own movement, sped up for a moment, with nothing waiting on the server; others see the
   pace through the server.
 - **Swings use the game's real attack clips**, timed so the clip's own impact keyframe lands when
-  the server's blow does: Attack1H (17), a dagger's Attack1HPierce (85), Attack2H (18), a
-  polearm's Attack2HL (19); the heavy attack's Special1H (57) or Special2H (58). Each leaves a
-  **weapon trail**: a faint pale streak, a heavy blow's ember.
+  the server's blow does: Attack1H (17), a dagger's Attack1HPierce (85) and its slash (88),
+  Attack2H (18), a polearm's Attack2HL (19). **Every hero's are one model's, whatever their
+  race**, picked from the clip census for being plain to read: the Undead man's for swords, axes,
+  maces, two-handers and polearms (a chop, then an overhead; the heavy attack an overhead held a
+  beat, never a spin or a leap), the dwarf man's for daggers. Each leaves a **weapon trail**: a
+  faint pale streak, a heavy blow's ember.
 - **Hit-stop**: a blow that lands holds both bodies still for a moment (60 ms, 115 heavy, 150 on a
   parry, 50 on a block), and **the camera shakes** for whoever is in it, harder for the one struck.
 - **The dodge tumbles**: the whole body rolls head over heels, about the hips, the way it dashes.
@@ -1256,8 +1262,8 @@ code logs in to the survival realm and every packet the server sends must parse:
 - a champion called up with `.es spawn` (debug only) and its bar's line.
 
 `crates/htl-survival/src/tests_board.rs` covers the board's new cards: Sundering Blow's wind-up,
-share of the weapon and stagger, the guard it crushes and the Unstoppable Blow no guard stops (its
-target warned), Backstab from behind and on a Mark, Ambush's step, Holy Shock healing a friend and
+share of the weapon, stagger and Sunder, and the guard it goes through (its weapon red, its target
+warned), Backstab from behind and on a Mark, Ambush's step, Holy Shock healing a friend and
 freeing them (and Avenger's Shield striking a foe), holy ground burning foes and healing friends (and Hallowed Ground's
 softened blows), Onslaught, the Death Mark and its reset, Sanctuary, Cold Snap and the shatter,
 Dread Step, an old save's keys put on the board's rows, the five rows of four, Lay on Hands,
@@ -1328,8 +1334,8 @@ bars that were hard to read. This pass answers those. Still to see with your own
   the arrow's line; the slower look while aiming;
 - the bow's drawn and held pose from Auto Shot's start, on you and on others, and that the release
   follows on the loose;
-- the heavy attack's swing (Special1H and Special2H on the action-combat client) and its
-  knock-back;
+- the heavy attack's swing (an overhead from the Undead man's takes, on every race, on the
+  action-combat client) and its knock-back;
 - the attack clips' timing (fitted to each weapon's wind-up), the trails' colours, how long the
   hit-stop holds and how hard the shake is; the roll's look and its pivot at the hips;
 - the upper body's lean with the aim, and the camera stopping short of other bodies;

@@ -108,12 +108,14 @@ fn weapon_roll(s: &Survival, p: Id) -> (f32, f32) {
 }
 
 #[test]
-fn sundering_blow_winds_up_hits_for_its_share_of_the_weapon_and_staggers() {
+fn sundering_blow_winds_up_hits_for_its_share_of_the_weapon_staggers_and_sunders() {
     let mut s = world_with(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "brave", [2.5, 0.0, 0.0], std::f32::consts::PI);
     let stamina = s.players[&p].stamina;
-    let ev = cast(&mut s, p, "close", "sundering_blow", false);
+    s.set_valor(p, 25.0);
+    // Shockwave's EX.
+    let ev = cast(&mut s, p, "close", "shockwave", true);
     assert!(matches!(s.players[&p].action, Action::Swing { ref strike, .. } if strike.art.is_some()), "a swing of its own");
     assert!(s.players[&p].stamina < stamina, "its stamina");
     assert!(hits_on(&ev, k).is_empty(), "nothing before its wind-up");
@@ -124,41 +126,32 @@ fn sundering_blow_winds_up_hits_for_its_share_of_the_weapon_and_staggers() {
     let hit = hits_on(&ev, k);
     assert_eq!(hit.len(), 1, "{hit:?}");
     let (lo, hi) = weapon_roll(&s, p);
-    assert!(hit[0].0 as f32 >= lo * 2.2 - 1.0 && hit[0].0 as f32 <= hi * 2.2 + 1.0, "220% of the weapon: {}", hit[0].0);
+    assert!(hit[0].0 as f32 >= lo * 2.6 - 1.0 && hit[0].0 as f32 <= hi * 2.6 + 1.0, "260% of the weapon: {}", hit[0].0);
     assert!(s.cc_log_of(p).iter().any(|l| l.contains("stagger")), "it staggers");
+    assert!(s.has_cc(k, "sunder"), "and Sunders");
+    assert!((s.taken_share(k) - 1.15).abs() < 0.01, "15% more from everyone: {}", s.taken_share(k));
     // Too winded for another.
     calm(&mut s, k);
     run(&mut s, 2.0);
     s.set_cooldowns(p, true);
+    s.set_valor(p, 25.0);
     s.players.get_mut(&p).unwrap().stamina = 5.0;
-    let ev = cast(&mut s, p, "close", "sundering_blow", false);
+    let ev = cast(&mut s, p, "close", "shockwave", true);
     assert!(ev.is_empty() && !matches!(s.players[&p].action, Action::Swing { .. }), "winded");
 }
 
 #[test]
-fn a_guard_that_blocks_a_sundering_blow_is_crushed_and_the_unstoppable_one_goes_through_it() {
+fn sundering_blow_goes_through_a_guard_and_its_weapon_glows_red() {
     let mut s = world_with(true);
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
     s.input(b, Input::Guard);
-    run(&mut s, 0.4);
-    let before = s.players[&b].stamina;
-    cast(&mut s, a, "close", "sundering_blow", false);
-    let ev = run(&mut s, 1.0);
-    let hit = hits_on(&ev, b);
-    assert!(hit.iter().any(|h| matches!(h.1, Outcome::Blocked | Outcome::GuardBroken)), "{hit:?}");
-    assert!(before - s.players[&b].stamina > 40.0 || matches!(s.players[&b].action, Action::Stagger { .. }), "crushed: {before} to {}", s.players[&b].stamina);
-    // The Unstoppable Blow: Bren is warned (a red weapon), and his guard doesn't stop it.
-    run(&mut s, 3.0);
-    s.players.get_mut(&b).unwrap().stamina = 100.0;
-    s.input(b, Input::GuardUp);
-    s.input(b, Input::Guard);
     run(&mut s, 0.5);
-    s.set_cooldowns(a, true);
     s.set_valor(a, 50.0);
     let health = s.players[&b].health;
-    let mut ev = cast(&mut s, a, "close", "sundering_blow", true);
+    let mut ev = cast(&mut s, a, "close", "shockwave", true);
     ev.extend(run(&mut s, 1.0));
+    assert!(ev.iter().any(|e| matches!(e, Event::Glow { id, .. } if *id == a)), "red for everyone");
     assert!(ev.iter().any(|e| matches!(e, Event::Danger { player, from: Some(f), .. } if *player == b && *f == a)), "warned");
     assert!(hits_on(&ev, b).iter().any(|h| h.1 == Outcome::Hit), "no guard stops it: {:?}", hits_on(&ev, b));
     assert!(s.players[&b].health < health);
@@ -407,7 +400,7 @@ fn an_old_saves_keys_go_on_the_boards_rows() {
     assert_eq!(l.get("utility").map(String::as_str), Some("divine_steed"), "the first card for the row (the old Hammer of Justice's place)");
     assert_eq!(l.get("ultimate").map(String::as_str), Some("meteor"));
     assert_eq!(l.get("defense").map(String::as_str), Some("retaliation"), "the old counter, on its own row now");
-    assert_eq!(l.get("close").map(String::as_str), Some("sundering_blow"), "a row it had nothing for keeps the default");
+    assert_eq!(l.get("close").map(String::as_str), Some("shockwave"), "a row it had nothing for keeps the default");
     assert!(!l.contains_key("spell1"));
     // A card since moved to another row (Ice Block, utility to defense) goes with it.
     let mut save = s.leave(q).unwrap();

@@ -195,7 +195,7 @@ fn a_counter_takes_melee_and_projectiles_but_not_ground_spells() {
 }
 
 #[test]
-fn a_counter_that_catches_nothing_goes_on_its_full_cooldown() {
+fn retaliation_that_catches_nothing_comes_back_in_half_its_cooldown_and_one_that_catches_takes_it_all() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], std::f32::consts::PI);
@@ -205,13 +205,13 @@ fn a_counter_that_catches_nothing_goes_on_its_full_cooldown() {
     cast(&mut s, b, "defense", false, 0.0);
     run(&mut s, 2.0);
     let left = s.cooldown(b, ret).next_at - s.clock;
-    assert!(left > full - 2.5, "baited: the whole cooldown ({left:.1})");
+    assert!(left < full * 0.5 + 0.1 && left > full * 0.5 - 2.5, "misread: half of it ({left:.1})");
     run(&mut s, full);
     cast(&mut s, b, "defense", false, 0.0);
     s.input(a, Input::Attack);
     run(&mut s, 2.0);
     let left = s.cooldown(b, ret).next_at - s.clock;
-    assert!(left < full * 0.5, "caught: half of it ({left:.1})");
+    assert!(left > full - 2.5, "caught: the whole of it ({left:.1})");
 }
 
 #[test]
@@ -283,12 +283,50 @@ fn a_totem_slows_the_foes_near_it_until_it_is_broken() {
     run(&mut s, 1.2);
     assert!(s.has_cc(k, "snare"), "slowed near it");
     assert!(s.speed_share(k) < 0.6);
-    // Broken: no more slowing.
+    // Broken (by a foe): no more slowing.
     let hp = s.mobs[&totem].health;
-    s.hurt_mob(totem, p, hp);
+    s.hurt_mob(totem, k, hp);
     run(&mut s, 3.0);
     assert!(!s.has_cc(k, "snare"));
     assert!(!s.mobs.contains_key(&totem) || s.mobs[&totem].health == 0);
+}
+
+#[test]
+fn a_heros_totem_takes_nothing_from_them_or_a_friend_but_a_rival_may_break_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let f = hero(&mut s, "Bren", [0.0, 3.0, 0.0], 0.0);
+    slot(&mut s, p, "utility", "earthbind_totem");
+    s.set_aim_line(p, 0.0, -0.2);
+    cast(&mut s, p, "utility", false, 0.0);
+    let totem = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "earthbind_totem").map(|(id, _)| id).unwrap();
+    let hp = s.mobs[&totem].health;
+    s.hurt_mob(totem, p, hp);
+    s.hurt_mob(totem, f, hp);
+    assert_eq!(s.mobs[&totem].health, hp, "neither its own hero nor a friend hurts it");
+    // A friend's swing passes it by: it isn't among what a swing can strike.
+    s.move_player(f, [s.mobs[&totem].pos[0] - 1.5, s.mobs[&totem].pos[1], 0.0], 0.0, Moving::default());
+    s.input(f, Input::Attack);
+    let ev = run(&mut s, 0.1);
+    s.input(f, Input::AttackUp);
+    let mut ev = ev;
+    ev.extend(run(&mut s, 1.0));
+    assert!(hits_on(&ev, totem).is_empty(), "no blow lands on it");
+    assert_eq!(s.mobs[&totem].health, hp);
+
+    // With friendly fire on in the open world, another hero's totem is fair game (yours never is).
+    let mut s = pvp();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let r = hero(&mut s, "Bren", [0.0, 3.0, 0.0], 0.0);
+    slot(&mut s, p, "utility", "earthbind_totem");
+    s.set_aim_line(p, 0.0, -0.2);
+    cast(&mut s, p, "utility", false, 0.0);
+    let totem = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "earthbind_totem").map(|(id, _)| id).unwrap();
+    let hp = s.mobs[&totem].health;
+    s.hurt_mob(totem, p, 1);
+    assert_eq!(s.mobs[&totem].health, hp, "still not by its own hero");
+    s.hurt_mob(totem, r, 1);
+    assert_eq!(s.mobs[&totem].health, hp - 1, "a rival's blow lands");
 }
 
 #[test]
@@ -397,7 +435,7 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     // learned out in Elwynn, and the board says where (taken from it only in a debug world).
     s.set_tree(p, false);
     let owned: Vec<&str> = s.players[&p].owned.iter().map(String::as_str).collect();
-    assert_eq!(owned, ["hurled_axe", "sundering_blow"], "Q and E are free");
+    assert_eq!(owned, ["hurled_axe", "shockwave"], "Q and E are free");
     assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_err(), "not unlocked");
     let why = s.take_node(p, "seed_of_corruption").unwrap_err();
     assert!(why.contains("The Cult's Altar"), "{why}");
@@ -526,4 +564,33 @@ fn a_creatures_blow_all_round_lays_its_look_at_its_feet() {
         ev.iter().any(|e| matches!(e, Event::Missile { caster, spell, target: Target::Point(at) } if *caster == m && *spell == look && dist2d(*at, ORIGIN) < 1.0)),
         "the slam's shockwave where it stands"
     );
+}
+
+#[test]
+fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().owned.insert("meteor".into());
+    slot(&mut s, p, "ultimate", "meteor");
+    s.set_valor(p, 100.0);
+    let meteor = s.content.ability("meteor").unwrap();
+    let d = s.content.abilities[meteor].clone();
+    assert!(d.look_lead > 0.0 && d.look_lead < d.delay);
+    let mut ev = cast(&mut s, p, "ultimate", false, 0.0);
+    let start = s.clock;
+    let mut look_at = None;
+    let mut looks = 0;
+    for _ in 0..(2.5 / DT).round() as usize {
+        for e in s.step(DT) {
+            if matches!(e, Event::Missile { spell, .. } if spell == d.spell) {
+                looks += 1;
+                look_at.get_or_insert(s.clock - start);
+            }
+            ev.push(e);
+        }
+    }
+    assert_eq!(looks, 1, "shown once");
+    let t = look_at.expect("its look");
+    let want = d.delay - d.look_lead;
+    assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
 }

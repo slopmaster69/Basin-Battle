@@ -428,6 +428,23 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Grow { id, scale } => {
+                // The body drawn larger (Onslaught), for everyone, its owner too.
+                let Some(g) = self.guid_of(id) else { return };
+                let mut f = Fields::new();
+                f.set_f32(idx::SCALE_X, scale);
+                self.broadcast(&packets::update_object(&[], &[(g, &f)]));
+            }
+            Event::Glow { id, secs } => {
+                // `WG\t<guid>\t<secs>` to every add-on here, the striker's own included; a
+                // warning for the same wind-up then glows nothing more.
+                let Some(g) = self.guid_of(id) else { return };
+                self.warned_glow.insert(id, self.sim.clock + secs);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &format!("WG\t{g:#X}\t{secs:.2}"));
+                }
+            }
             Event::Flash { player, text } => {
                 if let Some(c) = self.conn_of(player) {
                     if self.has_addon(c) {
@@ -533,6 +550,10 @@ impl SurvivalGame {
                 let line = self.mark_line(id, pos, radius);
                 let conns: Vec<(ConnId, Id, u8)> = self.in_world().map(|(c, _, w)| (*c, w.id, if w.addon { w.level } else { 0 })).collect();
                 for (c, hero, level) in conns {
+                    // A leap's landing isn't drawn for the hero leaping (others still see it).
+                    if tele.is_some_and(|t| t.own_hidden && t.mob == hero) {
+                        continue;
+                    }
                     match tele {
                         // A shape on the ground at a spot (a sky-fall, a strip), on the clients
                         // that lay one there; the rest the circle.

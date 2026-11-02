@@ -199,6 +199,8 @@ fn a_leap_lands_where_it_was_aimed_drawn_for_everyone_and_strikes_there() {
     let h = hops(&ev, p);
     assert_eq!(h.len(), 1);
     assert!(ev.iter().any(|e| matches!(e, Event::Mark { tele: Some(t), .. } if t.hero && t.at.is_some())), "its landing ring");
+    // Drawn for everyone but the hero leaping (they know where they aimed).
+    assert!(ev.iter().any(|e| matches!(e, Event::Mark { tele: Some(t), .. } if t.own_hidden && t.mob == p)), "not for her");
     let hp = s.mobs[&m].health;
     run(&mut s, 0.8);
     assert!((s.players[&p].pos[0] - 12.0).abs() < 0.5, "landed: {:?}", s.players[&p].pos);
