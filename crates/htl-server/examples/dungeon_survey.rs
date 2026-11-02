@@ -41,6 +41,9 @@ const NEAR_WAY: f32 = 25.0;
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    if args.len() < 3 {
+        anyhow::bail!("usage: dungeon_survey <WoW 1.12.1 Data folder> <out dir> [dungeon key]");
+    }
     let data = std::path::Path::new(&args[1]);
     let out = std::path::Path::new(&args[2]);
     let only = args.get(3).cloned();
