@@ -1067,13 +1067,9 @@ impl Survival {
         let Some(d) = self.dungeon_def() else {
             return Vec::new();
         };
-        let have = self
-            .content
-            .item(&d.plunder)
-            .and_then(|i| self.players.get(&id).and_then(|p| p.bag.get(&i)))
-            .copied()
-            .unwrap_or(0);
-        d.trade
+        let have = self.currency_of(id);
+        let mut out: Vec<(String, String, u32, bool)> = d
+            .trade
             .iter()
             .filter_map(|(k, n)| {
                 Some((
@@ -1083,11 +1079,160 @@ impl Survival {
                     have >= *n,
                 ))
             })
+            .collect();
+        // A flask for good (one more Draught at every rest), while there's room for one.
+        if let (Some(i), Some(price)) = (self.content.item(&d.flask), self.flask_price(id)) {
+            out.push((d.flask.clone(), self.content.items[i].name.clone(), price, have >= price));
+        }
+        out
+    }
+
+    /// The dungeon's currency in a hero's bags.
+    pub fn currency_of(&self, id: Id) -> u32 {
+        let Some(d) = self.dungeon_def() else { return 0 };
+        self.content.item(&d.plunder).and_then(|i| self.players.get(&id).and_then(|p| p.bag.get(&i))).copied().unwrap_or(0)
+    }
+
+    /// The dungeon's currency by name ("Deviate Fang").
+    pub fn currency_name(&self) -> String {
+        self.dungeon_def().and_then(|d| self.content.item(&d.plunder)).map_or_else(|| "plunder".to_string(), |i| self.content.items[i].name.clone())
+    }
+
+    /// What a whole run through the dungeon drops of its currency, about (every pack's foes'
+    /// drops on average, and its strongboxes'): the measure of what the quartermaster asks.
+    pub fn run_worth(&self) -> u32 {
+        let Some(d) = self.dungeon_def() else { return 0 };
+        let mut n = 0.0;
+        for p in &d.packs {
+            if let Some(m) = self.content.mob(&p.mob) {
+                if let Some(r) = self.content.mobs[m].drops.get(&d.plunder) {
+                    n += (r[0] + r[1]) as f32 / 2.0 * p.count.max(1) as f32;
+                }
+            }
+        }
+        n += d.boxes.iter().filter_map(|b| b.loot.get(&d.plunder)).sum::<u32>() as f32;
+        n.round() as u32
+    }
+
+    /// What one more flask costs (three-quarters of a run), while the hero has room for one.
+    fn flask_price(&self, id: Id) -> Option<u32> {
+        let d = self.dungeon_def()?;
+        let account = &self.players.get(&id)?.account;
+        let flasks = self.below.as_ref()?.heroes.get(account).map_or(0, |h| h.flasks);
+        (d.draughts + flasks < d.draughts_max).then(|| round5(self.run_worth() as f32 * FLASK_SHARE))
+    }
+
+    /// What honing a piece to `tier` costs: a share of a run's currency, more each tier.
+    pub fn hone_price(&self, tier: u8) -> u32 {
+        let share = HONE_SHARE.get(tier.saturating_sub(1) as usize).copied().unwrap_or(f32::MAX);
+        round5(self.run_worth() as f32 * share)
+    }
+
+    /// The hero's pieces of this dungeon's own gear the quartermaster can hone a tier further
+    /// (in their bags or worn): (item key, name, the tier it becomes by name, price, can pay).
+    pub fn hone_offers(&self, id: Id) -> Vec<(String, String, String, u32, bool)> {
+        let Some(p) = self.players.get(&id) else { return Vec::new() };
+        let have = self.currency_of(id);
+        let mut pieces: Vec<usize> = p.bag.iter().filter(|(_, n)| **n > 0).map(|(i, _)| *i).collect();
+        pieces.extend(p.armor.values().copied());
+        pieces.extend([p.weapon, p.shield]);
+        pieces.sort();
+        pieces.dedup();
+        pieces
+            .into_iter()
+            .filter_map(|i| {
+                let it = self.content.items.get(i)?;
+                let base = if it.honed_from.is_empty() { it.key.clone() } else { it.honed_from.clone() };
+                if !self.own_gear(&base) || it.hone as usize >= crate::content::HONE_TIERS.len() {
+                    return None;
+                }
+                let to = it.hone + 1;
+                let next = self.content.honed(self.content.item(&base)?, to);
+                if next == i {
+                    return None;
+                }
+                let price = self.hone_price(to);
+                Some((it.key.clone(), it.name.clone(), crate::content::HONE_TIERS[to as usize - 1].1.to_string(), price, have >= price))
+            })
             .collect()
+    }
+
+    /// Whether a piece (by its unhoned key) is this dungeon's own gear: a foe of its packs
+    /// carries it.
+    fn own_gear(&self, key: &str) -> bool {
+        self.dungeon_def().is_some_and(|d| d.packs.iter().any(|p| self.content.mob(&p.mob).is_some_and(|m| self.content.mobs[m].gear.iter().any(|g| g == key))))
+    }
+
+    /// The quartermaster hones a piece of the dungeon's own gear a tier further, for its
+    /// currency: the piece in the hero's bags (or worn) becomes its honed copy.
+    pub fn hone(&mut self, id: Id, key: &str) -> Result<String, String> {
+        let p = self.players.get(&id).ok_or("No hero.")?;
+        if self.lamp_near(p.pos).is_none() {
+            return Err("The quartermaster keeps to the lamps.".into());
+        }
+        if self.in_fight(id) {
+            return Err("Not with foes on you!".into());
+        }
+        let (_, name, tier, price, can) = self.hone_offers(id).into_iter().find(|o| o.0 == key).ok_or("The quartermaster can't hone that: only this dungeon's own gear, a tier at a time, up to Peerless.")?;
+        if !can {
+            return Err(format!("That's {price} {}.", self.currency_name()));
+        }
+        let d = self.dungeon_def().cloned().ok_or("Nobody hones here.")?;
+        let item = self.content.item(key).ok_or("No such thing.")?;
+        let it = &self.content.items[item];
+        let base = self.content.item(if it.honed_from.is_empty() { &it.key } else { &it.honed_from }).ok_or("No such thing.")?;
+        let next = self.content.honed(base, it.hone + 1);
+        let coin = self.content.item(&d.plunder).ok_or("No currency.")?;
+        let p = self.players.get_mut(&id).unwrap();
+        let c = p.bag.get_mut(&coin).unwrap();
+        *c -= price;
+        if *c == 0 {
+            p.bag.remove(&coin);
+        }
+        // In the bags, else worn: the one piece becomes its honed copy.
+        if let Some(n) = p.bag.get_mut(&item).filter(|n| **n > 0) {
+            *n -= 1;
+            if *n == 0 {
+                p.bag.remove(&item);
+            }
+            *p.bag.entry(next).or_default() += 1;
+        } else if p.weapon == item {
+            p.weapon = next;
+        } else if p.shield == item {
+            p.shield = next;
+        } else if let Some(slot) = p.armor.iter().find(|(_, v)| **v == item).map(|(k, _)| k.clone()) {
+            p.armor.insert(slot, next);
+        }
+        self.events.push(Event::Bags { player: id });
+        self.events.push(Event::Gear { player: id });
+        self.events.push(Event::Dirty);
+        Ok(format!("{name}, {tier}"))
     }
 
     pub fn buy(&mut self, id: Id, key: &str) -> Result<String, String> {
         let d = self.dungeon_def().cloned().ok_or("Nobody trades here.")?;
+        // A flask: one more Draught for good (as one found in a strongbox).
+        if key == d.flask && d.trade.get(key).is_none() {
+            let price = self.flask_price(id).ok_or("You carry all the Draughts there are room for.")?;
+            let p = self.players.get(&id).ok_or("No hero.")?;
+            if self.lamp_near(p.pos).is_none() {
+                return Err("The quartermaster keeps to the lamps.".into());
+            }
+            if self.currency_of(id) < price {
+                return Err(format!("That's {price} {}.", self.currency_name()));
+            }
+            let coin = self.content.item(&d.plunder).ok_or("No currency.")?;
+            let p = self.players.get_mut(&id).unwrap();
+            let c = p.bag.get_mut(&coin).unwrap();
+            *c -= price;
+            if *c == 0 {
+                p.bag.remove(&coin);
+            }
+            self.add_flasks(id, 1);
+            self.events.push(Event::Bags { player: id });
+            self.events.push(Event::Dirty);
+            return Ok(self.content.item(key).map_or_else(|| "flask".to_string(), |i| self.content.items[i].name.clone()));
+        }
         let price = *d
             .trade
             .get(key)
@@ -1841,6 +1986,17 @@ impl Survival {
             *b.log.falls.entry(account).or_default() += 1;
         }
     }
+}
+
+/// What the quartermaster asks, as shares of what a whole run drops of the dungeon's currency: to
+/// hone a piece of its gear to Honed, Keen and Peerless, and for one more flask. (First guesses:
+/// a piece Honed for under half a run, Peerless for two; to try in play.)
+const HONE_SHARE: [f32; 3] = [0.4, 1.0, 2.0];
+const FLASK_SHARE: f32 = 0.75;
+
+/// A price, to the nearest 5 (and at least 5).
+fn round5(n: f32) -> u32 {
+    ((n / 5.0).round() as u32 * 5).max(5)
 }
 
 /// The look of resting at a lamp (a soft glow).

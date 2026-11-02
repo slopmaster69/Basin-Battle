@@ -1601,3 +1601,42 @@ fn a_second_trip_down_tallies_only_itself() {
     let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
     assert!(!text.contains(&s.content.items[sword].name), "{text}");
 }
+
+#[test]
+fn the_quartermaster_hones_the_dungeons_own_gear_and_sells_a_flask_for_its_currency() {
+    let c = Content::builtin().for_dungeon_of("deadmines");
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let cutlass = s.content.item("pirate_cutlass").unwrap();
+    let plunder = s.content.item("plunder").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(cutlass, 1);
+    let worth = s.run_worth();
+    assert!(worth > 100, "a run's worth of plunder: {worth}");
+    // Offered, a tier on, at a share of a run; too dear with none.
+    let offer = s.hone_offers(id).into_iter().find(|o| o.0 == "pirate_cutlass").expect("offered");
+    assert_eq!(offer.2, "Honed");
+    assert!(!offer.4, "can't pay yet");
+    assert!(s.hone(id, "pirate_cutlass").unwrap_err().contains("Defias Plunder"));
+    assert!(s.buy(id, "whetstone").unwrap_err().contains("Defias Plunder"), "the ware's price in the dungeon's own currency");
+    // Paid: the cutlass in the bags is its Honed copy, the price gone.
+    s.players.get_mut(&id).unwrap().bag.insert(plunder, offer.3 + 5);
+    s.hone(id, "pirate_cutlass").unwrap();
+    let honed = s.content.honed(cutlass, 1);
+    assert_ne!(honed, cutlass);
+    assert_eq!(s.players[&id].bag.get(&honed), Some(&1));
+    assert!(!s.players[&id].bag.contains_key(&cutlass));
+    assert_eq!(s.players[&id].bag.get(&plunder), Some(&5));
+    // Next it offers Keen, dearer; a camp's own piece is never offered.
+    let next = s.hone_offers(id).into_iter().find(|o| o.0 == s.content.items[honed].key).expect("again");
+    assert!(next.2 == "Keen" && next.3 > offer.3);
+    let sword = s.content.item("sword").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(sword, 1);
+    assert!(!s.hone_offers(id).iter().any(|o| o.0 == "sword"));
+    // A flask: one more Draught for good.
+    let d = s.dungeon_def().unwrap().clone();
+    let price = s.trades(id).into_iter().find(|t| t.0 == d.flask).expect("a flask on offer").2;
+    s.players.get_mut(&id).unwrap().bag.insert(plunder, price);
+    s.buy(id, &d.flask).unwrap();
+    assert_eq!(s.below.as_ref().unwrap().heroes["ayla"].flasks, 1);
+}
