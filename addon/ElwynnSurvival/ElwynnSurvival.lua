@@ -878,6 +878,21 @@ function ES.GuardSound(how, mine)
   PlaySoundFile(set[math.random(1, table.getn(set))])
 end
 
+-- Braced: a defensive is on us (less damage taken, a shield, a counter's or Ice Block's stance):
+-- blows landing on us don't shake the view or kick the camera then (play-test: it should feel
+-- like the hit didn't land properly).
+ES.BRACED = { hallowed = 1, shield = 1, stance = 1 }
+function ES.Braced()
+  local c = ES.cc
+  if not c or not c.list then return false end
+  local now = GetTime()
+  for i = 1, table.getn(c.list) do
+    local e = c.list[i]
+    if ES.BRACED[e.kind] and e.untilT > now then return true end
+  end
+  return false
+end
+
 -- IM: a blow lands, is blocked or is parried.
 function ES.ImpactLine(f)
   local a, v, kind, how, struck, wasStruck = f[2], f[3], f[4] or "light", f[5], f[6] == "1", f[7] == "1"
@@ -914,7 +929,7 @@ function ES.ImpactLine(f)
   HitStop(v, stop)
   if ShakeCamera then
     if struck and shakeBy and shakeBy[1] > 0 then ShakeCamera(shakeBy[1], shakeBy[2]) end
-    if wasStruck and shakeTo and shakeTo[1] > 0 then ShakeCamera(shakeTo[1], shakeTo[2]) end
+    if wasStruck and shakeTo and shakeTo[1] > 0 and not ES.Braced() then ShakeCamera(shakeTo[1], shakeTo[2]) end
   end
   if CameraKick then
     local k
@@ -925,6 +940,8 @@ function ES.ImpactLine(f)
     elseif how == "hit" and wasStruck and kind ~= "arrow" then
       k = KICK.struck
     end
+    -- Struck while braced: no kick.
+    if k and wasStruck and not struck and ES.Braced() then k = nil end
     if k then CameraKick(k[1], k[2]) end
   end
 end
@@ -2614,6 +2631,7 @@ function ES.DrawAbilities()
     local s = ES.slots[n]
     b.keyText:SetText(ShortKey("ES_AB" .. n))
     b.glow:Hide()
+    b.glow:SetBlendMode("BLEND")
     if not s or s.key == "" then
       b:Set(ICONS .. "INV_Misc_QuestionMark", false)
       b.icon:SetVertexColor(0.25, 0.25, 0.25)
@@ -2652,13 +2670,19 @@ function ES.DrawAbilities()
       if n == ULT and ready then
         b.glow:Show()
       end
-      -- Empowered: it glows (and pulses, its seconds in the corner); armed for its recast, it
-      -- glows green.
+      -- Empowered: it blazes gold and pulses, "Free" on it and its seconds in the corner; armed
+      -- for its recast, it blazes green. (Play-test: the softer glow went unseen.)
       if em then
+        b.glow:SetVertexColor(1, 0.82, 0.3, 1)
+        b.glow:SetBlendMode("ADD")
         b.glow:Show()
+        if s.ex then
+          b.count:SetText("|cffffd24dFree|r")
+        end
       end
       if rc then
-        b.glow:SetVertexColor(0.45, 1, 0.7, 0.6)
+        b.glow:SetVertexColor(0.45, 1, 0.7, 1)
+        b.glow:SetBlendMode("ADD")
         b.glow:Show()
       end
       -- An aimed one up: its rim lit.
@@ -2732,7 +2756,7 @@ abar:SetScript("OnUpdate", function()
         b.glow:SetAlpha(1 - t)
       end
     elseif (rc or em) and b.glow:IsShown() then
-      b.glow:SetAlpha(0.6 + 0.35 * math.sin(now * (em and 6 or 3)))
+      b.glow:SetAlpha(0.7 + 0.3 * math.sin(now * (em and 7 or 5)))
     elseif n == ULT and b.glow:IsShown() and not Aiming() then
       b.glow:SetAlpha(0.55 + 0.35 * math.sin(now * 3))
     end

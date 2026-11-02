@@ -1307,7 +1307,7 @@ impl Survival {
             // Under a living unit the ring goes with them (a warning to all); else it's laid where
             // it lies, as the caster's ground.
             let tele = match alive {
-                Some(u) => Telegraph { mob: u, reach: splash, arc: 360.0, secs, blockable: false, foe: self.players.contains_key(&u).then_some(u), width: 0.0, at: None, hero: false },
+                Some(u) => Telegraph { mob: u, reach: splash, arc: 360.0, secs, blockable: false, foe: self.players.contains_key(&u).then_some(u), width: 0.0, at: None, hero: false, own_hidden: false },
                 None => Telegraph::hero_shape(p.owner, splash, 360.0, 0.0, secs, Some((at, 0.0))),
             };
             mark = Some(self.mark_as(at, splash, secs + 0.1, Some(tele)));
