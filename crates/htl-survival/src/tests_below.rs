@@ -1090,6 +1090,35 @@ fn every_dungeon_has_a_count_of_foes_for_its_wager() {
 }
 
 #[test]
+fn the_weeks_best_wager_pays_the_bookmakers_chest_when_the_week_turns() {
+    use crate::sim::wager::week_of;
+    let c = Content::builtin();
+    let mut camp = Survival::new(c, Box::new(FlatLand::default()), 1, 1_800_000_000.0);
+    let now = week_of(camp.wall());
+    // Last week: +5 in the Stockade and +3 in the Deadmines; this week, +2 in Ragefire.
+    camp.camp.counts.insert(format!("wagerweek:{}:stockade:5", now - 1), 1);
+    camp.camp.counts.insert(format!("wagerweek:{}:deadmines:3", now - 1), 1);
+    camp.camp.counts.insert(format!("wagerweek:{now}:ragefire:2"), 1);
+    assert_eq!(camp.week_best_here(), Some((2, "ragefire".to_string())));
+    let before: u32 = camp.storage.values().sum();
+    let ev = camp.step(DT);
+    let after: u32 = camp.storage.values().sum();
+    assert_eq!(after - before, 2, "the best, +5: two pieces (one, and one more at +4)");
+    assert!(camp.storage.keys().any(|i| camp.content.items[*i].hone == 1), "honed, as a +5 wager pays");
+    assert!(ev.iter().any(|e| matches!(e, Event::Banner { title, sub, .. } if title == "The Bookmaker's Chest" && sub.contains("+5") && sub.contains("Stockade"))));
+    // Once a week; this week's waits for it to turn. Last week's wins are gone, its mark kept.
+    camp.step(DT);
+    assert_eq!(camp.storage.values().sum::<u32>(), after);
+    assert!(!camp.camp.counts.keys().any(|k| k.starts_with(&format!("wagerweek:{}:", now - 1))));
+    assert_eq!(camp.camp.counts.get(&format!("weekchest:{}", now - 1)), Some(&5));
+    // A win for that week arriving late: not paid again, and let go.
+    camp.camp.counts.insert(format!("wagerweek:{}:stockade:9", now - 1), 1);
+    camp.step(DT);
+    assert_eq!(camp.storage.values().sum::<u32>(), after);
+    assert!(!camp.camp.counts.contains_key(&format!("wagerweek:{}:stockade:9", now - 1)));
+}
+
+#[test]
 fn a_wagers_clock_waits_till_everyone_is_ready_then_counts_down() {
     use crate::sim::wager::WAGER_COUNTDOWN;
     let mut s = below();

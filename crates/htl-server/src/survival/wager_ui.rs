@@ -157,10 +157,17 @@ impl SurvivalGame {
 {}", lines.join("
 "))
         };
+        // The camp's own best this week, and what the Bookmaker's chest will pay for it.
+        let mine = match self.sim.week_best_here() {
+            Some((level, d)) => format!("Your camp's best this week: +{level} in {}. When the week turns, the Bookmaker's chest pays it: that dungeon's gear, more and finer the higher the level.", names.get(&d).unwrap_or(&d)),
+            None => "Win a wager in time this week and the Bookmaker's chest pays your camp's best when the week turns: that dungeon's gear, more and finer the higher the level.".to_string(),
+        };
         let text = format!("The terms turned on Monday. This week, as the stakes rise:
 {}
 
-{last}", terms.join("
+{last}
+
+{mine}", terms.join("
 "));
         let mut links = vec![(".es ladder".to_string(), "The Bookmaker's Ladder".to_string())];
         if let Some(d) = self.sim.next_dungeon().or_else(|| self.sim.content.dungeons().next()) {
