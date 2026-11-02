@@ -2642,6 +2642,22 @@ fn a_save_keeps_its_journal_goal_by_title_and_an_older_one_is_read_through_the_f
 }
 
 #[test]
+fn a_camp_done_with_its_journal_goes_on_to_steps_added_since() {
+    let mut s = Survival::new(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0);
+    // Done with the journal as it was before the book's ladder: its steps end where the ladder's begin.
+    let ladder = s.content.goals.iter().position(|g| g.kind == "cleared").expect("the ladder's steps");
+    s.camp.goal = ladder;
+    let mut save = s.save(&BTreeMap::new());
+    save.goal_title = None;
+    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
+    assert_eq!(back.camp.goal, ladder, "on to the ladder's first step");
+    // Done with this one: still done.
+    save.goal = s.content.goals.len();
+    let back = Survival::load(Content::builtin(), Box::new(FlatLand::default()), 1, 1_000_000.0, &save);
+    assert_eq!(back.camp.goal, back.content.goals.len());
+}
+
+#[test]
 fn a_camp_isnt_taken_again_by_killing_the_first_of_them_back() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", [300.0, 300.0, 0.0], 0.0);
