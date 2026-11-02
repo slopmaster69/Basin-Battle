@@ -199,11 +199,7 @@ impl Survival {
         if id == v || !self.players.contains_key(&id) || !self.alive(id) || !self.alive(v) {
             return;
         }
-        let rooted = self.mobs.get(&v).is_some_and(|m| {
-            let d = &self.content.mobs[m.def];
-            d.boss || d.totem
-        });
-        if rooted || self.immune(v) || self.unstaggerable(v) {
+        if self.holds_ground(v) || self.immune(v) || self.unstaggerable(v) {
             let text = format!("{} holds its ground", self.unit_name(v));
             self.events.push(Event::Flash { player: id, text });
             return;
@@ -328,7 +324,8 @@ impl Survival {
     /// does.
     fn drag_back(&mut self, t: &Tether, d: &AbilityDef) {
         let (Some(a), Some(b)) = (self.unit_pos(t.owner), self.unit_pos(t.foe)) else { return };
-        let pull = AbilityEffect { kind: "pull".into(), amount: dist2d(a, b) + 1.0, lift: TETHER_LIFT, from_caster: true, ..Default::default() };
+        // An ultimate's tether (Soul Chain) drags a boss too.
+        let pull = AbilityEffect { kind: "pull".into(), amount: dist2d(a, b) + 1.0, lift: TETHER_LIFT, from_caster: true, vs_bosses: d.slot == "ultimate", ..Default::default() };
         self.displace(t.owner, t.foe, &pull);
         if !d.tether_effects.is_empty() {
             self.beta.later.push(Later { at: self.clock + airtime(TETHER_LIFT), owner: t.owner, victim: t.foe, effects: d.tether_effects.clone(), source: d.name.clone() });

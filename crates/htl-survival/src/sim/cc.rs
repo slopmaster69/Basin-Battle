@@ -36,6 +36,12 @@ const DISABLED: [&str; 4] = ["stun", "incapacitate", "petrify", "panic"];
 const PANIC_STRIDE: f32 = 0.5;
 /// How many lines of the crowd-control log a hero keeps.
 const LOG_KEEP: usize = 40;
+/// A hero is told a foe shrugged their control off at most this often, per foe.
+const IMMUNE_TOLD_EVERY: f32 = 1.5;
+
+
+/// How much larger Onslaught draws a hero.
+pub(crate) const ONSLAUGHT_SCALE: f32 = 1.3;
 
 impl Survival {
     /// The effects on a unit now.
@@ -126,6 +132,12 @@ impl Survival {
         if self.immune(target) && !boon {
             return false;
         }
+        // A boss, a totem, a creature winding up a blow no guard stops: it shrugs control off
+        // (an ultimate's aside).
+        if !boon && from != target && crate::content::CONTROL.contains(&kind) && !self.fx_vs_bosses && self.holds_ground(target) {
+            self.shrugged_off(from, target);
+            return false;
+        }
         let secs = if hero && !boon { secs * self.content.cc.player_share } else { secs };
         let (by, to) = (self.unit_name(from), self.unit_name(target));
         if kind == "stagger" && self.unstaggerable(target) {
@@ -199,6 +211,11 @@ impl Survival {
             }
             if kind == "panic" {
                 self.players.get_mut(&id).unwrap().panic_stride = self.clock;
+            }
+            // Onslaught: larger, and red for everyone to see, while it lasts.
+            if kind == "onslaught" {
+                self.events.push(Event::Grow { id, scale: ONSLAUGHT_SCALE });
+                self.events.push(Event::Glow { id, secs });
             }
             self.update_rooted(id);
             self.update_speed(id);
@@ -388,6 +405,9 @@ impl Survival {
             list.retain(|c| c.until > now);
         }
         self.events.push(Event::Auras { id });
+        if self.players.contains_key(&id) && kinds.iter().any(|k| k == "onslaught") && !self.has_cc(id, "onslaught") {
+            self.events.push(Event::Grow { id, scale: 1.0 });
+        }
         if self.players.contains_key(&id) {
             // The grace, once the last of the three is over.
             if kinds.iter().any(|k| HARD.contains(&k.as_str())) && !self.cc_of(id).iter().any(|c| HARD.contains(&c.kind.as_str())) {
@@ -483,6 +503,33 @@ impl Survival {
     }
 
     /// A unit nothing reaches (in Ice Block).
+    /// A creature that holds its ground: a champion (a boss), a totem, or one winding up a blow no
+    /// guard stops (unstoppable). Crowd control and forced movement don't take on it, except an
+    /// ultimate's. Heroes are never this (Ice Block and Onslaught keep their own rules).
+    pub fn holds_ground(&self, id: Id) -> bool {
+        let Some(m) = self.mobs.get(&id) else { return false };
+        let d = &self.content.mobs[m.def];
+        d.boss || d.totem || (matches!(m.state, super::mobs::MobState::Windup { .. }) && !self.attack_now(id).blockable)
+    }
+
+    /// The hero whose control a foe shrugged off is told so (as WoW says it: Immune), once a
+    /// moment per foe so a burst over a crowd doesn't flood the screen.
+    pub(crate) fn shrugged_off(&mut self, from: Id, target: Id) {
+        if !self.players.contains_key(&from) {
+            return;
+        }
+        let now = self.clock;
+        let key = (from, target);
+        if self.told_immune.get(&key).is_some_and(|t| now < *t) {
+            return;
+        }
+        if self.told_immune.len() > 256 {
+            self.told_immune.retain(|_, t| now < *t);
+        }
+        self.told_immune.insert(key, now + IMMUNE_TOLD_EVERY);
+        self.events.push(Event::Flash { player: from, text: format!("{}: Immune", self.unit_name(target)) });
+    }
+
     pub fn immune(&self, id: Id) -> bool {
         self.stances.get(&id).is_some_and(|s| s.until > self.clock && self.content.abilities[s.ability].counter.as_ref().is_some_and(|c| c.immune))
     }

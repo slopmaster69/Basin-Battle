@@ -113,6 +113,9 @@ const LUNGE_SHORT: f32 = 1.8;
 const CAMP_RETURNING: f32 = 60.0;
 /// A broken posture: reeling this long, open to a riposte.
 const POSTURE_BREAK: f32 = 2.2;
+/// After a break it stands back up: its posture builds again only this long after the reel ends
+/// (else a group fills it again while it reels and it never stands).
+const POSTURE_GRACE: f32 = 4.0;
 /// Heroes this near a creature's fight are in it.
 const FIGHT_RANGE: f32 = 25.0;
 /// A hero healing this near a foe on them draws its attack this soon.
@@ -301,6 +304,7 @@ impl Survival {
                 pack,
                 raider,
                 stagger_until: 0.0,
+                thrown_until: 0.0,
                 riposte: false,
                 special: false,
                 pattern: None,
@@ -314,6 +318,7 @@ impl Survival {
                 lob: None,
                 posture: 0,
                 posture_from: 0.0,
+                posture_guard: 0.0,
                 path: Vec::new(),
                 speed: 0.0,
                 think: 0.0,
@@ -496,6 +501,10 @@ impl Survival {
     /// A creature hurt by `by`: what took it (`label`) for a hero's damage meter.
     pub(crate) fn hurt_mob_as(&mut self, mid: Id, by: Id, damage: u32, label: &str) {
         let now = self.clock;
+        // A hero's own totem or summon, or a friend's, takes nothing from them.
+        if self.own_totem(mid, by) {
+            return;
+        }
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
@@ -515,9 +524,13 @@ impl Survival {
             self.mob_died(mid, by);
             return;
         }
-        // A champion's posture: enough damage in a short while breaks its stance.
+        // A champion's posture: enough damage in a short while breaks its stance. It takes as much
+        // more for each hero in its fight as its health does, and none builds while it reels
+        // from a break or just after.
         let limit = self.content.mobs[self.mobs[&mid].def].posture;
-        if limit > 0 && self.players.contains_key(&by) {
+        let fighters = self.mobs[&mid].fighters.max(1);
+        let limit = (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32;
+        if limit > 0 && self.players.contains_key(&by) && now >= self.mobs[&mid].posture_guard {
             let window = self.content.mobs[self.mobs[&mid].def].posture_secs;
             let m = self.mobs.get_mut(&mid).unwrap();
             if now - m.posture_from > window {
@@ -533,6 +546,7 @@ impl Survival {
             if m.posture >= limit {
                 m.posture = 0;
                 m.posture_from = now;
+                m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
                 self.stagger_mob(mid, POSTURE_BREAK, true);
                 self.events.push(Event::Flash { player: by, text: "Stance broken!".into() });
                 self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
@@ -1008,7 +1022,8 @@ impl Survival {
             }
             // Rooted or stunned: no walking; stunned, frozen or panicked: no thinking (a panic runs
             // by itself).
-            if self.held_still(id) {
+            let thrown = self.mobs[&id].thrown_until > now;
+            if self.held_still(id) && !thrown {
                 if !self.mobs[&id].path.is_empty() {
                     self.halt(id);
                 }
@@ -1298,8 +1313,36 @@ impl Survival {
         self.events.push(Event::MobMove { id, path: vec![from, to], speed, face: None });
     }
 
-    fn halt(&mut self, id: Id) {
+    /// Thrown to `to` over `air` seconds: it lands there whatever else the blow did, turned the
+    /// while to `face` (whoever threw it), so a knockback drives it back rather than turning it to
+    /// run.
+    pub(crate) fn throw_mob(&mut self, id: Id, to: Vec3, air: f32, face: Option<Id>) {
+        let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
+        let from = m.pos;
+        let speed = dist2d(from, to) / air.max(0.05);
+        m.path = vec![to];
+        m.plan_to = None;
+        m.speed = speed;
+        m.thrown_until = now + air;
+        let face = face.filter(|f| self.players.contains_key(f));
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.sidle = face;
+        if let Some(at) = face.and_then(|f| self.players.get(&f)).map(|p| p.pos) {
+            m.facing = facing(from, at);
+        } else {
+            m.facing = facing(from, to);
+        }
+        self.events.push(Event::MobMove { id, path: vec![from, to], speed, face });
+    }
+
+    fn halt(&mut self, id: Id) {
+        let now = self.clock;
+        let Some(m) = self.mobs.get_mut(&id) else { return };
+        // In the air it comes down where it was thrown: nothing stops it short.
+        if m.thrown_until > now && !m.path.is_empty() {
+            return;
+        }
         let was_moving = !m.path.is_empty();
         m.path.clear();
         m.speed = 0.0;
@@ -1351,6 +1394,47 @@ impl Survival {
         dist2d(foe, home) > leash + LEASH_SLACK || dist2d(pos, home) > leash + 2.0 * LEASH_SLACK
     }
 
+    /// The hero it turns to when its foe falls: one still in its fight (in reach, in its leash,
+    /// not hidden from it), the one it has most against first, then the nearest.
+    pub(crate) fn next_in_fight(&self, id: Id) -> Option<Id> {
+        let m = self.mobs.get(&id)?;
+        let leash = self.leash_of(m.def);
+        self.players
+            .iter()
+            .filter(|(h, p)| {
+                p.health > 0
+                    && !self.unseen(**h)
+                    && dist2d(p.pos, m.pos) <= FIGHT_RANGE
+                    && (p.pos[2] - m.pos[2]).abs() < 10.0
+                    && (m.raider || !self.leashed(m.home, m.pos, p.pos, leash))
+            })
+            .map(|(h, p)| (*h, self.threat_on(m, *h), dist2d(p.pos, m.pos)))
+            .max_by(|a, b| a.1.total_cmp(&b.1).then(b.2.total_cmp(&a.2)))
+            .map(|(h, ..)| h)
+    }
+
+    /// A hero is gone from the fight (fallen, or left): each creature on them turns on the next
+    /// hero in its fight; with none, it goes home (a raider, on to its next foe).
+    pub(crate) fn foe_gone(&mut self, hero: Id) {
+        let on: Vec<Id> = self.mobs.iter().filter(|(_, m)| m.state.target() == Some(hero)).map(|(m, _)| *m).collect();
+        for mid in on {
+            if let Some(h) = self.next_in_fight(mid).filter(|h| *h != hero) {
+                let now = self.clock;
+                let m = self.mobs.get_mut(&mid).unwrap();
+                m.state = MobState::Chase { foe: Foe::Hero(h) };
+                m.pattern = None;
+                m.lost_at = None;
+                m.ready_at = m.ready_at.max(now + 0.6);
+                continue;
+            }
+            let raider = self.mobs[&mid].raider;
+            self.mobs.get_mut(&mid).unwrap().state = MobState::Return;
+            if raider {
+                self.raider_next(mid);
+            }
+        }
+    }
+
     /// It lets its foe go and heads home.
     fn give_up(&mut self, id: Id) {
         self.show_guard(id, false);
@@ -1400,7 +1484,7 @@ impl Survival {
                     let seen = self
                         .players
                         .iter()
-                        .filter(|(h, p)| p.health > 0 && dist2d(p.pos, pos) <= d.aggro && !self.unseen(**h))
+                        .filter(|(h, p)| p.health > 0 && dist2d(p.pos, pos) <= d.aggro && !self.unseen_by(id, **h))
                         .filter(|(_, p)| clear_line(self.land.as_ref(), pos, p.pos))
                         .min_by(|a, b| dist2d(a.1.pos, pos).total_cmp(&dist2d(b.1.pos, pos)))
                         .map(|(id, _)| *id);
@@ -1471,6 +1555,13 @@ impl Survival {
                 };
                 let Some(to) = self.foe_pos(foe) else {
                     self.show_guard(id, false);
+                    // Its foe fell (or left): the next hero still in its fight, if there is one.
+                    if let Some(h) = self.next_in_fight(id) {
+                        let m = self.mobs.get_mut(&id).unwrap();
+                        m.state = MobState::Chase { foe: Foe::Hero(h) };
+                        m.lost_at = None;
+                        return;
+                    }
                     if raider {
                         self.raider_next(id);
                     } else {
@@ -1808,7 +1899,7 @@ impl Survival {
             Foe::Hero(h) => Some(h),
             _ => None,
         };
-        let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false };
+        let tele = Telegraph { mob: id, reach: a.range + 0.4, arc: a.arc, secs: a.windup, blockable: a.blockable, foe: hero, width: 0.0, at: None, hero: false, own_hidden: false };
         let mark = if a.ranged {
             self.events.push(Event::Cast { caster: id, spell: a.spell, ms: (a.windup * 1000.0) as u32 });
             // A lobbed throw that splashes: where it will come down is chosen now and marked

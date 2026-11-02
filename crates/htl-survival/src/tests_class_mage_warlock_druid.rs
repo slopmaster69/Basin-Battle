@@ -344,3 +344,24 @@ fn an_old_save_with_wrath_loads_with_living_seed() {
     assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("living_seed"));
     assert_eq!(h.loadout.get("utility").map(String::as_str), Some("feral_leap"));
 }
+
+#[test]
+fn typhoon_throws_a_creature_back_and_its_slow_takes_hold_after() {
+    let mut s = world(false);
+    let p = hero(&mut s, "Ayla", [0.0, 0.0, 0.0], 0.0);
+    learn(&mut s, p, "swipe");
+    let b = boar(&mut s, [4.0, 0.0, 0.0]);
+    s.set_valor(p, 25.0);
+    let mut ev = press(&mut s, p, "close", true);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.input(p, Input::Attack);
+    ev.extend(s.step(DT));
+    s.input(p, Input::AttackUp);
+    for _ in 0..(1.2 / DT).round() as usize {
+        ev.extend(s.step(DT));
+    }
+    let x = s.mobs[&b].pos[0];
+    assert!(x > 11.0, "thrown back about 9 yd from 4: at {x:.1}");
+    assert!(s.has_cc(b, "snare"), "and slowed");
+    let _ = ev;
+}
