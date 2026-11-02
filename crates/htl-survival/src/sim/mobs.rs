@@ -1916,7 +1916,7 @@ impl Survival {
                 let mk = if look != 0 && a.radius >= GROUND_LOOK_MIN {
                     self.mark_ground(at, a.radius, secs, look)
                 } else {
-                    let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false };
+                    let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false, own_hidden: false };
                     self.mark_as(at, a.radius, secs, Some(tele))
                 };
                 self.mobs.get_mut(&id).unwrap().lob = Some((at, mk));
