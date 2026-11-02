@@ -1068,7 +1068,7 @@ impl Survival {
         let style = if strike.heavy() { Blow::Heavy } else { Blow::Light };
         let mut hits: Vec<(f32, Id)> = Vec::new();
         for (&mid, m) in &self.mobs {
-            if m.health == 0 || struck.contains(&mid) {
+            if m.health == 0 || struck.contains(&mid) || self.own_totem(mid, id) {
                 continue;
             }
             let at = self.pos_at(mid, seen_at).unwrap_or(m.pos);
@@ -2135,7 +2135,7 @@ impl Survival {
         let f = self.swing_aim_at(id, reach, seen_at);
         let mut hits: Vec<(f32, Id, Vec3, f32)> = Vec::new();
         for (&mid, m) in &self.mobs {
-            if m.health == 0 || m.hidden || struck.contains(&mid) || self.content.mobs[m.def].inert() && !self.content.mobs[m.def].dummy {
+            if m.health == 0 || m.hidden || struck.contains(&mid) || self.own_totem(mid, id) || self.content.mobs[m.def].inert() && !self.content.mobs[m.def].dummy {
                 continue;
             }
             let at = self.pos_at(mid, seen_at).unwrap_or(m.pos);

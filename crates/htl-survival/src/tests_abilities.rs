@@ -283,12 +283,50 @@ fn a_totem_slows_the_foes_near_it_until_it_is_broken() {
     run(&mut s, 1.2);
     assert!(s.has_cc(k, "snare"), "slowed near it");
     assert!(s.speed_share(k) < 0.6);
-    // Broken: no more slowing.
+    // Broken (by a foe): no more slowing.
     let hp = s.mobs[&totem].health;
-    s.hurt_mob(totem, p, hp);
+    s.hurt_mob(totem, k, hp);
     run(&mut s, 3.0);
     assert!(!s.has_cc(k, "snare"));
     assert!(!s.mobs.contains_key(&totem) || s.mobs[&totem].health == 0);
+}
+
+#[test]
+fn a_heros_totem_takes_nothing_from_them_or_a_friend_but_a_rival_may_break_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let f = hero(&mut s, "Bren", [0.0, 3.0, 0.0], 0.0);
+    slot(&mut s, p, "utility", "earthbind_totem");
+    s.set_aim_line(p, 0.0, -0.2);
+    cast(&mut s, p, "utility", false, 0.0);
+    let totem = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "earthbind_totem").map(|(id, _)| id).unwrap();
+    let hp = s.mobs[&totem].health;
+    s.hurt_mob(totem, p, hp);
+    s.hurt_mob(totem, f, hp);
+    assert_eq!(s.mobs[&totem].health, hp, "neither its own hero nor a friend hurts it");
+    // A friend's swing passes it by: it isn't among what a swing can strike.
+    s.move_player(f, [s.mobs[&totem].pos[0] - 1.5, s.mobs[&totem].pos[1], 0.0], 0.0, Moving::default());
+    s.input(f, Input::Attack);
+    let ev = run(&mut s, 0.1);
+    s.input(f, Input::AttackUp);
+    let mut ev = ev;
+    ev.extend(run(&mut s, 1.0));
+    assert!(hits_on(&ev, totem).is_empty(), "no blow lands on it");
+    assert_eq!(s.mobs[&totem].health, hp);
+
+    // With friendly fire on in the open world, another hero's totem is fair game (yours never is).
+    let mut s = pvp();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let r = hero(&mut s, "Bren", [0.0, 3.0, 0.0], 0.0);
+    slot(&mut s, p, "utility", "earthbind_totem");
+    s.set_aim_line(p, 0.0, -0.2);
+    cast(&mut s, p, "utility", false, 0.0);
+    let totem = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "earthbind_totem").map(|(id, _)| id).unwrap();
+    let hp = s.mobs[&totem].health;
+    s.hurt_mob(totem, p, 1);
+    assert_eq!(s.mobs[&totem].health, hp, "still not by its own hero");
+    s.hurt_mob(totem, r, 1);
+    assert_eq!(s.mobs[&totem].health, hp - 1, "a rival's blow lands");
 }
 
 #[test]
