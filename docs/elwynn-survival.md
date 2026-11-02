@@ -68,9 +68,9 @@ effect.
 | The mouse | In action mode, it steers: the view turns the hero. A window up (the bags, a chest, the board, the card, the map) frees the cursor until it closes; Z frees it on purpose |
 | Left mouse | Attack. Blows **chain**: press again during one's follow-through and the next of the weapon's set comes at once, each with a short **lunge** into it. Attacking while sprinting is a **running attack** that lunges much farther. Pressed during a dodge, the **attack out of the dodge** comes as the roll ends. Jump while a dodge still dashes (about 0.2 s in) for a **Corey roll**: the leap carries the dash's speed, and an attack pressed in the air strikes as you land, a long heavy **leap attack**. Corey rolls chain: land, roll, jump again. While an ability is aimed: **cast** it (held: charge it) |
 | Shift + left mouse | **Heavy attack**: slower, 1.7 times the damage and 1.6 times the stamina. It doesn't stop a creature's wind-up (hitting first only trades blows); landed just after the creature's own blow, it staggers it (never a boss) |
-| Right mouse (hold) | Raise your **guard**. Raise it just as a blow lands to **parry**: nothing gets through, no stamina, and the attacker reels. Raised while your own blow still winds up, it **feints**: the blow is called off and its stamina comes back (once it has landed, no). Late in a swing's follow-through it cuts the rest short. While an ability is aimed: call it off |
+| Right mouse (hold) | Raise your **guard**. Raise it just as a blow lands to **parry**: nothing gets through, 25 stamina comes back, everything costs half for 2 s (the opening), and the attacker reels (a champion with a posture doesn't: a parry fills a quarter of its posture instead). Raised while your own blow still winds up, it **feints**: the blow is called off and its stamina comes back (once it has landed, no). Late in a swing's follow-through it cuts the rest short. While an ability is aimed: call it off |
 | Right + left mouse | **Shield bash** (with a two-hander, a kick); with Shift, the **kick**: breaks a guard harder |
-| Mouse button 4 | Tap: **dodge** as you let go, the way you're moving (15 stamina, and it takes at least 18 to start one). Hold: sprint. It works with the mouse freed (Z) too |
+| Mouse button 4 | Tap: **dodge** as you let go, the way you're moving (15 stamina, and it takes at least 18 to start one; rolling through a blow gives 10 back). Hold: sprint. It works with the mouse freed (Z) too |
 | Shift (hold) | Sprint too: 12 against 7 (over the 11 the hero's own Sprint clip needs, so a strafe doesn't flicker between it and Run), only 3 stamina a second: a way across the world, not a fight's cost |
 | Q | The **ranged** ability (Axe Throw to begin with) |
 | E | The **close** ability (Shockwave) |
@@ -758,7 +758,11 @@ hero instead; a hazard (a cannon's blast, a spell's ground) keeps the **!** ever
 **Posture.** The heavy fighters and the champions have a stance to break: enough damage within six
 seconds (110 for the Overseer, 100 for the Brave, 130 for the Captain, 150 for the Shadow Hunter,
 240 for the Warlord) and it reels for a couple of seconds, open to a riposte ("Stance broken!").
-Fighting together, keep the pressure on.
+Blows and parries both fill it (a parry a quarter of it, and a champion isn't stopped by one);
+it holds a second after the last, then drains, the whole of it over those six seconds. A boss's
+shows under its health bar, Sekiro's way: it fills from the middle out, amber, then orange, then
+a throbbing red near breaking, and flashes gold as it breaks. Fighting together, keep the pressure
+on.
 
 **Backstabs.** A blow on a creature from behind does half again its damage, with Backstab's
 flash: get round the ones circling you, or the one busy with your friend.

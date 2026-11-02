@@ -212,6 +212,9 @@ pub struct DodgeDef {
     /// A spell whose cast look (a whoosh and a dust trail, no animation) marks the dash; 0 for none.
     #[serde(default)]
     pub spell: u32,
+    /// A roll through a blow (a perfect dodge) gives back this much stamina.
+    #[serde(default)]
+    pub refund: f32,
 }
 
 impl DodgeDef {
@@ -242,6 +245,16 @@ pub struct ParryDef {
     pub riposte: f32,
     /// A hero whose blow is parried reels this long.
     pub hero_stagger: f32,
+    /// A parry gives back this much stamina...
+    #[serde(default)]
+    pub stamina: f32,
+    /// ...and opens this long a window in which everything costs half the stamina.
+    #[serde(default)]
+    pub opening: f32,
+    /// A champion with a posture isn't staggered by a parry: the parry fills this share of its
+    /// posture instead (so parries break a boss's stance, they don't lock it).
+    #[serde(default)]
+    pub posture: f32,
 }
 
 /// The heavy attack (Shift with the left mouse): slower to come, harder to take.

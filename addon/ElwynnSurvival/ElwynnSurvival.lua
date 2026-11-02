@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 10
+local VERSION = 11
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -3025,7 +3025,8 @@ function ES.PlaceTop()
   end
   foe:ClearAllPoints()
   if b and b:IsShown() then
-    foe:SetPoint("TOP", UIParent, "TOP", 0, top - 58)
+    -- (Clear of the champion's posture bar, which hangs under its health.)
+    foe:SetPoint("TOP", UIParent, "TOP", 0, top - 70)
   else
     foe:SetPoint("TOP", UIParent, "TOP", 0, top)
   end
@@ -3216,6 +3217,66 @@ boss.capR = Tex(boss, "OVERLAY", "diamond", 14, 14)
 boss.capR:SetPoint("CENTER", boss.bar, "RIGHT", 6, 0)
 boss.capR:SetVertexColor(FRAME.r, FRAME.g, FRAME.b, 0.95)
 ES.boss = boss
+-- Its posture, Sekiro's way: a bar under its health that fills from the middle out as you press
+-- it (blows, parries) and drains when you let up; amber, then orange, then a hot red-orange near
+-- breaking, and a gold flash as the stance breaks. (All in `boss`'s table: the main chunk is near
+-- Lua's 200 locals.)
+boss.posture = CreateFrame("Frame", nil, boss)
+boss.posture:SetWidth(360)
+boss.posture:SetHeight(7)
+boss.posture:SetPoint("TOP", boss.bar, "BOTTOM", 0, -6)
+boss.posture.track = Tex(boss.posture, "BACKGROUND", "bar")
+boss.posture.track:SetAllPoints(boss.posture)
+boss.posture.track:SetVertexColor(0.03, 0.03, 0.03, 0.75)
+boss.posture.rim = Tex(boss.posture, "BACKGROUND", "hairline")
+boss.posture.rim:SetPoint("TOPLEFT", boss.posture, "TOPLEFT", -1.5, 1.5)
+boss.posture.rim:SetPoint("BOTTOMRIGHT", boss.posture, "BOTTOMRIGHT", 1.5, -1.5)
+boss.posture.rim:SetVertexColor(FRAME.r * 0.75, FRAME.g * 0.75, FRAME.b * 0.75, 0.8)
+boss.posture.left = Tex(boss.posture, "ARTWORK", "bar")
+boss.posture.left:SetPoint("TOPRIGHT", boss.posture, "TOP", 0, 0)
+boss.posture.left:SetPoint("BOTTOMRIGHT", boss.posture, "BOTTOM", 0, 0)
+boss.posture.right = Tex(boss.posture, "ARTWORK", "bar")
+boss.posture.right:SetPoint("TOPLEFT", boss.posture, "TOP", 0, 0)
+boss.posture.right:SetPoint("BOTTOMLEFT", boss.posture, "BOTTOM", 0, 0)
+boss.posture.mid = Tex(boss.posture, "OVERLAY", "diamond", 11, 11)
+boss.posture.mid:SetPoint("CENTER", boss.posture, "CENTER", 0, 0)
+boss.posture.mid:SetVertexColor(FRAME.r, FRAME.g, FRAME.b, 0.95)
+boss.posture.shown, boss.posture.goal, boss.posture.flash = 0, 0, 0
+function boss.posture:Draw()
+  local share = Clamp(self.shown, 0, 1)
+  local w = math.max(0.5, 180 * share)
+  self.left:SetWidth(w)
+  self.right:SetWidth(w)
+  local r, g, b = 1, 0.72, 0.22
+  if share >= 0.8 then
+    -- Close to breaking: hot, and it throbs.
+    local beat = 0.75 + 0.25 * math.sin(GetTime() * 12)
+    r, g, b = 1, 0.28 * beat, 0.05
+  elseif share >= 0.5 then
+    r, g, b = 1, 0.5, 0.12
+  end
+  if self.flash > GetTime() then
+    local k = (self.flash - GetTime()) / 0.9
+    r, g, b = 1, 0.9, 0.45 + 0.4 * k
+    self.left:SetWidth(180)
+    self.right:SetWidth(180)
+    self.left:SetAlpha(0.5 + 0.5 * k)
+    self.right:SetAlpha(0.5 + 0.5 * k)
+  else
+    self.left:SetAlpha(share > 0 and 1 or 0)
+    self.right:SetAlpha(share > 0 and 1 or 0)
+  end
+  self.left:SetVertexColor(r, g, b, 0.97)
+  self.right:SetVertexColor(r, g, b, 0.97)
+end
+boss.posture:SetScript("OnUpdate", function()
+  local self = this
+  -- Ease toward the posture: up fast (a blow lands hard), down gently (it recovers).
+  local d = self.goal - self.shown
+  local rate = d > 0 and 6 or 2.5
+  self.shown = self.shown + d * math.min(1, (arg1 or 0) * rate)
+  self:Draw()
+end)
 
 -- BS: the champion fighting near: its name, health, most health, and whether it's in its second
 -- wind; nothing, none.
@@ -3238,6 +3299,20 @@ function ES.BossLine(f)
   end
   boss.bar.fill:SetVertexColor(boss.bar.color.r, boss.bar.color.g, boss.bar.color.b, 0.97)
   boss.bar:Set(hp / math.max(1, maxhp), fresh)
+  -- Its posture (older servers send none: no bar).
+  local pz, plim = tonumber(f[6] or ""), tonumber(f[7] or "")
+  if pz and plim and plim > 0 then
+    local pb = boss.posture
+    if f[8] == "1" and not pb.broken then
+      pb.flash = GetTime() + 0.9
+    end
+    pb.broken = f[8] == "1"
+    pb.goal = pz / plim
+    if fresh then pb.shown = pb.goal end
+    pb:Show()
+  else
+    boss.posture:Hide()
+  end
   if ES.awake then boss:Show() end
   ES.DrawFoe()
 end
