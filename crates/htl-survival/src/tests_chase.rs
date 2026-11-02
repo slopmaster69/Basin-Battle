@@ -45,7 +45,7 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
 #[test]
 fn a_hero_shooting_from_just_past_the_leash_still_draws_the_fight() {
     let mut s = world_on(Box::new(FlatLand::default()));
-    let leash = s.content.mobs[s.content.mob("grunt").unwrap()].leash;
+    let leash = s.leash_of(s.content.mob("grunt").unwrap());
     // The hero stands a little past the leash from where the grunt lives.
     let at = leash + 3.0;
     let p = hero(&mut s, "Ayla", [at, 0.0, 0.0]);
@@ -59,7 +59,7 @@ fn a_hero_shooting_from_just_past_the_leash_still_draws_the_fight() {
 #[test]
 fn a_creature_gone_home_past_its_leash_evades_until_its_foe_comes_back() {
     let mut s = world_on(Box::new(FlatLand::default()));
-    let leash = s.content.mobs[s.content.mob("grunt").unwrap()].leash;
+    let leash = s.leash_of(s.content.mob("grunt").unwrap());
     let p = hero(&mut s, "Ayla", [3.0, 0.0, 0.0]);
     let g = mob(&mut s, "grunt", [0.0, 0.0, 0.0]);
     // Drawn a way from home already.

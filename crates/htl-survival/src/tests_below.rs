@@ -1025,7 +1025,7 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     assert!(s.wager_elapsed() >= 10.0, "a fall's ten seconds");
     // Foes chase farther during a wager.
     use crate::sim::wager::WAGER_LEASH;
-    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * WAGER_LEASH);
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * WAGER_LEASH.max(s.content.ai.leash_scale));
     // Its boss down first: not won till enough of its foes are down too.
     assert_eq!(s.wager_forces(), Some((0, 1, 1)), "one grunt standing, one needed");
     let boss = *s.mobs.iter().find(|(_, m)| m.pack.is_some_and(|k| s.content.packs[k].key == "boss")).unwrap().0;
@@ -1050,7 +1050,7 @@ fn a_wager_runs_against_the_clock_raises_the_stakes_and_gives_the_dungeon_back()
     run(&mut s, 0.2);
     assert!(s.wager().is_none());
     assert!(s.door_is_open("short"), "given back");
-    assert_eq!(s.leash_of(def), s.content.mobs[def].leash);
+    assert_eq!(s.leash_of(def), s.content.mobs[def].leash * s.content.ai.leash_scale);
 }
 
 #[test]
@@ -1449,4 +1449,63 @@ fn the_call_wakes_only_the_called_pack_not_what_rests_beside_it() {
     run(&mut s, CALL_AFTER + 0.5);
     assert!(!resting(&s, b), "the nearest pack comes");
     assert!(resting(&s, third), "and nothing it's linked to");
+}
+
+#[test]
+fn a_pack_grows_with_the_heroes_below_and_shares_its_health_over_them() {
+    let mut c = content();
+    let d = c.dungeon.as_mut().unwrap();
+    d.hero_foes = 0.5;
+    d.hero_health = 0.6;
+    let mut two = pack("grunt", "", [30.0, 10.0], false);
+    two.count = 2;
+    two.radius = 3.0;
+    d.packs.push(two);
+    let mut s = Survival::new_dungeon(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    let k = s.content.packs.iter().position(|p| p.count == 2).unwrap();
+    let def = s.content.mob("grunt").unwrap();
+    let in_pack = |s: &Survival| s.mobs.values().filter(|m| m.pack == Some(k) && m.health > 0).count();
+    let names = ["ayla", "bren", "cass"];
+    let ids: Vec<Id> = names.iter().map(|n| s.join(n, n, None)).collect();
+    run(&mut s, 0.2);
+    // Three heroes: two more foes' worth (2 x (1 + 0.5 x 2) = 4), the pack's health (2 x 2.2)
+    // over the four of them.
+    assert_eq!(in_pack(&s), 4, "grown for three");
+    let base = s.base_health(def) as f32;
+    let each = s.mobs.values().find(|m| m.pack == Some(k)).unwrap().max_health as f32;
+    assert!((each - base * 2.2 * 2.0 / 4.0).abs() <= 1.0, "{each} of {base}");
+    // A lone grunt doesn't grow; it takes the whole health.
+    let lone = s.mobs.values().filter(|m| m.pack.is_some_and(|p| s.content.packs[p].count == 1 && s.content.packs[p].mob == "grunt")).count();
+    assert_eq!(lone, 1);
+    // Two go home: the pack at rest gives back what it grew for them.
+    s.leave(ids[1]);
+    s.leave(ids[2]);
+    run(&mut s, 0.2);
+    assert_eq!(in_pack(&s), 2, "back to its own two");
+    // A pack in a fight isn't changed under it.
+    let b = s.join("bren", "Bren", None);
+    run(&mut s, 0.2);
+    assert_eq!(in_pack(&s), 3, "grown for two");
+    let one = *s.mobs.iter().find(|(_, m)| m.pack == Some(k)).unwrap().0;
+    s.engage(one, mobs::Foe::Hero(b));
+    s.leave(b);
+    run(&mut s, 0.1);
+    assert_eq!(in_pack(&s), 3, "left as it is mid-fight");
+}
+
+#[test]
+fn a_wagers_count_of_foes_grows_with_the_band() {
+    use crate::sim::dungeon::pack_count;
+    use crate::sim::wager::{wager_forces_total, wager_forces_total_for};
+    let c = Content::builtin();
+    for d in c.dungeons() {
+        let (one, four) = (wager_forces_total(d, &c), wager_forces_total_for(d, &c, 4));
+        assert!(four as f32 >= one as f32 * 1.5, "{}: {one} alone, {four} for four", d.key);
+        // Bosses and elites stay alone.
+        for p in &d.packs {
+            if p.elite || c.mob(&p.mob).is_some_and(|m| c.mobs[m].boss) {
+                assert_eq!(pack_count(p, d, &c, 4), p.count, "{}: {}", d.key, p.mob);
+            }
+        }
+    }
 }

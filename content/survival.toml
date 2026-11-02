@@ -175,15 +175,18 @@ backstab = 1.5
 # seconds) times `threat`; `opening` more for a hero with their guard down (eating, working,
 # gathering, in a swing's follow-through, drawing back or casting a spell, reeling); `wounded`
 # times how hurt they are; `distance` less for every 10 yards off; `crowd` less for each other
-# creature already on them past the first (a pack spreads over a band); `stick` more for its foe
-# now, so it doesn't turn every second. A raider on its way to a station turns on a hero who
-# comes near it.
+# creature already on them (a pack spreads over a band: the same weighs as 10 yards, so a foe
+# walks a few steps to a hero nobody's on); `stick` more for its foe now, so it doesn't turn
+# every second. A pack drawn in spreads the same way as it comes, and one with no turn at its
+# hero (two pressing them) goes for a hero nobody's pressing. A raider on its way to a station
+# turns on a hero who comes near it.
 retarget_secs = 1.2
 threat = 3.0
 opening = 1.0
 wounded = 0.8
 distance = 1.0
-crowd = 0.6
+# (Was 0.6 past the first: four foes still stacked on whoever pulled. Play-test: spread them.)
+crowd = 1.0
 stick = 0.8
 threat_half = 8.0
 # An opening within 7 yards: it comes at once, up to `press_early` seconds before its cooldown is
@@ -200,6 +203,10 @@ retreat_yards = 4.0
 flank = true
 # Its cooldown between strings, give or take this share: no metronome to learn.
 jitter = 0.25
+# Every foe's leash (its own `leash`, how far from home it chases) times this, in the open and
+# below. (Play-test: foes ran home too soon, a fight barely begun; half as far again. A wager's
+# farther chase is the farther of this and its own, not both.)
+leash_scale = 1.5
 
 # Each grip's blows. `clip` is the game's own animation (AnimationData id) and `take` which of the
 # model's versions of it; `windup` and `recovery` are shares of the weapon's own times, `damage`

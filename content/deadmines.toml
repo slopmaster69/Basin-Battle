@@ -26,6 +26,10 @@ plunder = "plunder"
 # Each hero below past the first: foes take this share more health (and their blows
 # `combat.hero_damage` more), as on the surface.
 hero_health = 0.7
+# Each hero past the first: this share more foes in every pack of two or more (not a boss's nor
+# an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
+# same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
+hero_foes = 0.35
 # Out the front door (the mine's mouth), once Rhahk'Zor is down.
 exit = [-16.4, -383.1, 61.8]
 exit_radius = 5.0

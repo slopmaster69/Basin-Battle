@@ -29,6 +29,10 @@ draughts_max = 6
 flask = "draught_flask"
 plunder = "plunder"
 hero_health = 0.7
+# Each hero past the first: this share more foes in every pack of two or more (not a boss's nor
+# an elite's), the pack's health (`hero_health`) shared over them. (Play-test: four heroes met the
+# same two foes as one did, each a sponge, all on one hero. About twice the foes for four.)
+hero_foes = 0.35
 exit = [57.0, 0.3, -18.2]
 exit_radius = 5.0
 exit_boss = "bazil"

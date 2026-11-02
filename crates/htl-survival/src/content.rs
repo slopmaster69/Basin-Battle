@@ -552,7 +552,7 @@ pub struct AiDef {
     /// Whom it goes for: the damage a hero has done it lately (as a share of its health) times
     /// `threat`, `opening` more for a hero with their guard down (healing, working, mid-swing,
     /// drawing a spell, reeling), `wounded` times how hurt they are; less `distance` for every
-    /// 10 yards off and `crowd` for every other creature already on them past the first; its
+    /// 10 yards off and `crowd` for every other creature already on them; its
     /// foe now counts `stick` more, so it doesn't turn every second.
     pub threat: f32,
     pub opening: f32,
@@ -575,6 +575,10 @@ pub struct AiDef {
     pub flank: bool,
     /// Its cooldown between strings, give or take this share.
     pub jitter: f32,
+    /// Every creature's leash (how far from home it chases) times this: one knob for how far
+    /// foes follow, in the open and below. A wager's own farther chase isn't stacked on it
+    /// (the farther of the two).
+    pub leash_scale: f32,
 }
 
 impl Default for AiDef {
@@ -585,7 +589,7 @@ impl Default for AiDef {
             opening: 1.0,
             wounded: 0.8,
             distance: 1.0,
-            crowd: 0.6,
+            crowd: 1.0,
             stick: 0.8,
             threat_half: 8.0,
             press_early: 1.2,
@@ -594,6 +598,7 @@ impl Default for AiDef {
             retreat_yards: 4.0,
             flank: true,
             jitter: 0.25,
+            leash_scale: 1.0,
         }
     }
 }
@@ -998,6 +1003,11 @@ pub struct DungeonDef {
     /// Each hero past the first gives every foe this share more health.
     #[serde(default)]
     pub hero_health: f32,
+    /// Each hero past the first brings this share more foes into every pack of two or more
+    /// (rounded; a boss's, an elite's or a lone foe's stays as it is). The pack's whole health
+    /// is what `hero_health` would have made it, shared over its bodies (each at least its own).
+    #[serde(default)]
+    pub hero_foes: f32,
     /// Where the run ends: past the front door, and how near counts.
     pub exit: [f32; 3],
     #[serde(default = "exit_radius")]
