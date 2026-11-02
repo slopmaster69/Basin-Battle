@@ -2508,6 +2508,8 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
     let parry = |s: &mut Survival| {
         s.input(p, Input::GuardUp);
         run(s, wait);
+        // Only the test's blows: the Warlord's own swings would land between them.
+        s.mobs.get_mut(&w).unwrap().state = MobState::Idle { wander_at: 1e9 };
         s.input(p, Input::Guard);
         run(s, 0.05);
         s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light)
@@ -2516,9 +2518,9 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
     assert!(s.mobs[&w].stagger_until <= s.clock, "a champion isn't stopped by one parry");
     let built = s.posture_of(w);
     assert!((built as f32 - limit as f32 * share).abs() <= 2.0, "a parry fills a share of its posture: {built} of {limit}");
-    // Parry after parry, its stance breaks.
+    // Parry after parry, its stance breaks (the bar drains a little between them).
     let mut broke = false;
-    for _ in 0..(1.0 / share).ceil() as usize + 1 {
+    for _ in 0..(3.0 / share).ceil() as usize {
         if s.mobs[&w].stagger_until > s.clock {
             broke = true;
             break;
