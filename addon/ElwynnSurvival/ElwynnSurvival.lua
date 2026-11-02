@@ -3523,8 +3523,8 @@ end
 
 -- Tells: a blow coming at you reads on the striker itself, with the floor markers on or off. Its
 -- wind-up glows (amber: a guard stops it, red: nothing does, from the TG line); a moment before
--- the window to answer it opens, the glow flashes bright: raise the guard now for a parry, with a
--- ping, or roll now for an unblockable blow. The stroke into the blow wooshes, heavier for
+-- the window to answer it opens, the glow flashes bright: raise the guard now for a parry, or
+-- roll now for an unblockable blow, which pings as well. The stroke into the blow wooshes, heavier for
 -- a longer wind-up. ES.tells[key] is the wind-up's number, so a blow called off (its TG gone
 -- before it lands, or a new one for the same key) plays nothing more.
 ES.tells, ES.tellN = {}, 0
@@ -3532,8 +3532,9 @@ ES.tells, ES.tellN = {}, 0
 -- inside the window, not after it.
 ES.TELL_LEAD = 0.12
 ES.TELL_FLASH = "FFF6D8"
--- The cue to raise the guard: a ping, not a weapon's sound. It used to be a blade's ring, the very
--- sound of a guard meeting a blow, so the warning sounded like a parry had already happened.
+-- The cue to roll: only a blow no guard stops (red) pings, so the sound alone says "get out of
+-- the way". An amber one is answered by the guard, and its flash is enough; it once rang like a
+-- blade, the very sound of a parry, which read as a parry already made.
 ES.TELL_RING = "Sound\\Interface\\MapPing.wav"
 function ES.Tell(key, guid, secs, kind, parry, roll)
   ES.tellN = ES.tellN + 1
@@ -3545,7 +3546,7 @@ function ES.Tell(key, guid, secs, kind, parry, roll)
   After(flashAt, function()
     if ES.tells[key] ~= n then return end
     if SetUnitWeaponGlow then SetUnitWeaponGlow(guid, ES.TELL_FLASH, math.max(0.15, secs - flashAt + 0.05)) end
-    if kind == "block" then PlaySoundFile(ES.TELL_RING) end
+    if kind == "unblockable" then PlaySoundFile(ES.TELL_RING) end
   end)
   After(math.max(0, secs - 0.22), function()
     if ES.tells[key] ~= n then return end
