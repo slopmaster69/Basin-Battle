@@ -610,6 +610,12 @@ Two-handed weapons have no shield: their guard is narrower and dearer, but parri
 
 Bows and crossbows aren't on the rack: ranged fighting is off the board (Aimed Shot is benched), though the Hunting Bow and Militia Crossbow are still defined for the camp's towers and older saves.
 
+A dungeon's own weapons (what its foes carry or yield) aren't on the rack until the camp has
+found one: taken it from the ground below, or had it sent to the chest (a wager's gear). Then
+the rack has it for everyone. A harder dungeon's weapons hit harder: each tier's, taken
+together, 15% more damage a second than the rack's own per tier (`tools/gear-tiers.py` sets
+them), so the Cathedral's two-handers beat the Deadmines'.
+
 ## Enemies near the camp
 
 Every foe has `combat.foe_health` (1.6) times the health its own entry gives (critters, dummies

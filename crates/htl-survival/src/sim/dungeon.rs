@@ -1043,6 +1043,11 @@ impl Survival {
         if let (Some(account), Some(b)) = (self.players.get(&id).map(|p| p.account.clone()), self.below.as_mut()) {
             b.log.gear.entry(account).or_default().push(item);
         }
+        // Found once, the camp's rack has it.
+        if matches!(self.content.items[item].kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) {
+            let key = self.content.base_key(item).to_string();
+            self.forward_count("found", &key, 1);
+        }
         let d = &self.content.items[item];
         let how = if matches!(
             d.kind,
@@ -1271,6 +1276,11 @@ impl Survival {
             for (i, n) in items {
                 *self.storage.entry(*i).or_default() += n;
                 names.push(self.content.items[*i].name.clone());
+                // Gear sent home is found, too (a wager's, a trophy): the rack has it after.
+                if matches!(self.content.items[*i].kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) {
+                    let key = self.content.base_key(*i).to_string();
+                    *self.camp.counts.entry(format!("found:{key}")).or_default() += 1;
+                }
             }
             self.events.push(Event::Storage);
             let place = place.map(str::to_string).or_else(|| self.dungeon_def().map(|d| d.name.clone())).unwrap_or_else(|| "below".to_string());
