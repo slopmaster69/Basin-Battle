@@ -116,8 +116,6 @@ const POSTURE_BREAK: f32 = 2.2;
 /// After a break it stands back up: its posture builds again only this long after the reel ends
 /// (else a group fills it again while it reels and it never stands).
 const POSTURE_GRACE: f32 = 4.0;
-/// A posture holds this long after it last grew before it starts to drain.
-const POSTURE_HOLD: f32 = 1.0;
 /// Heroes this near a creature's fight are in it.
 pub(crate) const FIGHT_RANGE: f32 = 25.0;
 /// A hero healing this near a foe on them draws its attack this soon.
@@ -597,8 +595,6 @@ impl Survival {
         m.phase.checked_sub(1).and_then(|k| self.content.mobs[m.def].phases.get(k))
     }
 
-    /// A creature reels for `secs`: a wind-up in hand is lost, it stands and does nothing, and (from
-    /// a parry) takes more from every blow meanwhile.
     /// How much breaks creature `mid`'s stance: its own posture, and as much more for each hero
     /// in its fight as its health takes (0: it has none).
     pub fn posture_limit(&self, mid: Id) -> u32 {
@@ -608,15 +604,15 @@ impl Survival {
         (limit as f32 * (1.0 + self.content.combat.hero_health * (fighters - 1) as f32)).round() as u32
     }
 
-    /// Creature `mid`'s posture now: what it built, less what's drained since. After a moment
-    /// without more it drains, the whole bar over its `posture_secs` (so a steady flow of that
-    /// much a second is what breaks it, as before, and the bar falls smoothly, not all at once).
+    /// Creature `mid`'s posture now: what it built, less what's drained since. It drains all the
+    /// time, the whole bar over its `posture_secs`, blows or no blows: only a flow faster than that
+    /// fills it, as before, and the bar falls smoothly, not all at once.
     pub fn posture_of(&self, mid: Id) -> u32 {
         let Some(m) = self.mobs.get(&mid) else { return 0 };
         let limit = self.posture_limit(mid) as f32;
         let window = self.content.mobs[m.def].posture_secs.max(0.5);
-        let idle = (self.clock - m.posture_from - POSTURE_HOLD).max(0.0);
-        (m.posture as f32 - limit / window * idle).max(0.0).round() as u32
+        let since = (self.clock - m.posture_from).max(0.0);
+        (m.posture as f32 - limit / window * since).max(0.0).round() as u32
     }
 
     /// Creature `mid`'s stance takes `amount` more from hero `by` (a blow's, a parry's): full, it
@@ -649,6 +645,8 @@ impl Survival {
         self.mobs.get(&mid).is_some_and(|m| m.posture_guard > self.clock + POSTURE_GRACE && m.stagger_until > self.clock)
     }
 
+    /// A creature reels for `secs`: a wind-up in hand is lost, it stands and does nothing, and (from
+    /// a parry) takes more from every blow meanwhile.
     pub(crate) fn stagger_mob(&mut self, mid: Id, secs: f32, riposte: bool) {
         let now = self.clock;
         let Some(m) = self.mobs.get(&mid) else { return };

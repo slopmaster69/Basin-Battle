@@ -337,7 +337,7 @@ hero_stagger = 0.9
 # costs half (the opening to answer with).
 stamina = 25.0
 opening = 2.0
-# A champion with a posture (every boss) isn't stopped by a parry: in a group parries came so
+# A boss isn't stopped by a parry: in a group parries came so
 # often it reeled forever. Each parry fills this share of its posture instead; a few in a row, or
 # parries and blows together, break its stance.
 posture = 0.25

@@ -1634,11 +1634,11 @@ impl Survival {
                     self.events.push(Event::Stamina { player: victim });
                 }
                 if self.mobs.contains_key(&attacker) {
-                    // A champion with a posture doesn't reel from each one (a group parried it
-                    // into reeling forever): it fills its posture, and enough breaks it.
-                    let def = self.mobs[&attacker].def;
-                    let limit = self.content.mobs[def].posture;
-                    if limit > 0 && c.parry.posture > 0.0 {
+                    // A boss doesn't reel from each one (a group parried it into reeling
+                    // forever): it fills its posture, and enough breaks it. Heavies below a boss
+                    // have no bar to show that, so they reel as ever.
+                    let d = &self.content.mobs[self.mobs[&attacker].def];
+                    if d.boss && d.posture > 0 && c.parry.posture > 0.0 {
                         let fill = self.posture_limit(attacker) as f32 * c.parry.posture;
                         self.build_posture(attacker, victim, fill.round() as u32);
                     } else {

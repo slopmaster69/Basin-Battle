@@ -2505,9 +2505,12 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
     assert!(limit > 0);
     let share = s.content.parry.posture;
     let wait = s.content.parry.cooldown + 0.05;
+    // (Only the blows it's given here: its own would stop the hero's guard.)
     let parry = |s: &mut Survival| {
+        s.mobs.get_mut(&w).unwrap().state = crate::sim::mobs::MobState::Idle { wander_at: 1e9 };
         s.input(p, Input::GuardUp);
         run(s, wait);
+        s.mobs.get_mut(&w).unwrap().state = crate::sim::mobs::MobState::Idle { wander_at: 1e9 };
         s.input(p, Input::Guard);
         run(s, 0.05);
         s.strike_player(w, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light)
@@ -2516,9 +2519,9 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
     assert!(s.mobs[&w].stagger_until <= s.clock, "a champion isn't stopped by one parry");
     let built = s.posture_of(w);
     assert!((built as f32 - limit as f32 * share).abs() <= 2.0, "a parry fills a share of its posture: {built} of {limit}");
-    // Parry after parry, its stance breaks.
+    // Parry after parry, as fast as they come, its stance breaks (it drains meanwhile).
     let mut broke = false;
-    for _ in 0..(1.0 / share).ceil() as usize + 1 {
+    for _ in 0..12 {
         if s.mobs[&w].stagger_until > s.clock {
             broke = true;
             break;
@@ -2531,21 +2534,62 @@ fn a_parried_champion_doesnt_reel_its_posture_fills_and_enough_parries_break_it(
 }
 
 #[test]
-fn a_champions_posture_holds_a_moment_then_drains_smoothly() {
+fn a_champions_posture_drains_smoothly() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let w = mob(&mut s, "warlord", [3.0, 0.0, 0.0]);
     s.engage(w, Foe::Hero(p));
     let limit = s.posture_limit(w);
-    assert!(s.build_posture(w, p, limit / 2) == false);
+    assert!(!s.build_posture(w, p, limit / 2));
     let full = s.posture_of(w);
-    run(&mut s, 0.8);
-    assert_eq!(s.posture_of(w), full, "it holds a moment");
     run(&mut s, 1.5);
     let some = s.posture_of(w);
-    assert!(some < full && some > 0, "then drains, not all at once: {some} of {full}");
+    assert!(some < full && some > 0, "it drains, not all at once: {some} of {full}");
     run(&mut s, 6.0);
     assert_eq!(s.posture_of(w), 0, "and is gone");
+}
+
+#[test]
+fn a_flow_below_a_champions_drain_never_breaks_it_and_one_above_does() {
+    let flow = |share: f32| {
+        let mut s = world();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let w = mob(&mut s, "warlord", [3.0, 0.0, 0.0]);
+        s.engage(w, Foe::Hero(p));
+        let d = &s.content.mobs[s.mobs[&w].def];
+        let drain = s.posture_limit(w) as f32 / d.posture_secs;
+        // Blows closer together than a second, so nothing stops the drain between them.
+        let blow = (drain * share * 0.9).round() as u32;
+        for _ in 0..200 {
+            if s.build_posture(w, p, blow) {
+                return true;
+            }
+            for _ in 0..9 {
+                s.mobs.get_mut(&w).unwrap().state = crate::sim::mobs::MobState::Idle { wander_at: 1e9 };
+                run(&mut s, 0.1);
+            }
+        }
+        false
+    };
+    assert!(!flow(0.8), "under what drains: never");
+    assert!(flow(1.3), "over it: it breaks");
+}
+
+#[test]
+fn a_parried_heavy_below_a_boss_still_reels() {
+    let mut s = world();
+    let heavy = s.content.mobs.iter().find(|d| !d.boss && !d.inert() && d.posture > 0).map(|d| d.key.clone()).expect("a heavy with a posture");
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = mob(&mut s, &heavy, [2.0, 0.0, 0.0]);
+    s.engage(m, Foe::Hero(p));
+    s.input(p, Input::GuardUp);
+    let wait = s.content.parry.cooldown + 0.05;
+    run(&mut s, wait);
+    s.input(p, Input::Guard);
+    run(&mut s, 0.05);
+    assert_eq!(s.strike_player(m, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Parried);
+    assert!(s.mobs[&m].stagger_until > s.clock, "it reels");
+    assert_eq!(s.posture_of(m), 0, "no bar to fill");
 }
 
 #[test]
