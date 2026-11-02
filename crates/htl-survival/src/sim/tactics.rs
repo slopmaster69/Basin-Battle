@@ -96,7 +96,7 @@ impl Survival {
         let m = &self.mobs[&id];
         let mut best: Option<(Id, f32)> = None;
         for (h, p) in &self.players {
-            if p.health == 0 || self.unseen(*h) {
+            if p.health == 0 || self.unseen_by(id, *h) {
                 continue;
             }
             let d = dist2d(p.pos, pos);
