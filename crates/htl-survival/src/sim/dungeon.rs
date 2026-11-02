@@ -327,7 +327,9 @@ impl Survival {
         let bag = self.players[&id].bag.clone();
         let b = self.below.as_mut().unwrap();
         b.log.began.get_or_insert(clock);
+        // (Each trip down counts from here: what they carried home before is home.)
         b.log.bags.insert(account.clone(), bag);
+        b.log.gear.remove(&account);
         let first = d.lamps.first().map(|l| l.key.clone()).unwrap_or_default();
         let hero = b
             .heroes
@@ -1798,8 +1800,12 @@ impl Survival {
                 (more > 0 && !matches!(it.kind, ItemKind::Weapon | ItemKind::Shield | ItemKind::Bow | ItemKind::Armor) && it.key != d.draught).then(|| format!("{more} {}", it.name))
             })
             .collect();
+        // (Only what they still have: gear lost in a fall lies in their sack.)
         for i in log.gear.get(&account).into_iter().flatten() {
-            gains.push(self.content.items[*i].name.clone());
+            let kept = p.bag.get(i).is_some_and(|n| *n > 0) || p.weapon == *i || p.shield == *i || p.armor.values().any(|a| a == i);
+            if kept {
+                gains.push(self.content.items[*i].name.clone());
+            }
         }
         lines.push(if gains.is_empty() { "You carry nothing new out.".to_string() } else { format!("You carry out: {}.", gains.join(", ")) });
         if log.first {

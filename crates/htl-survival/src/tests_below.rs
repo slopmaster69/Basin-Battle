@@ -1583,3 +1583,21 @@ fn a_hero_leaving_a_run_gets_its_tally() {
     assert!(page.1.contains("Foes felled: 1") && page.1.contains("You fell once") && page.1.contains("7 "), "{}", page.1);
     assert!(page.1.contains("Still standing") || page.1.contains("No boss down yet"), "{}", page.1);
 }
+
+#[test]
+fn a_second_trip_down_tallies_only_itself() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    let sword = s.content.item("sword").unwrap();
+    s.players.get_mut(&id).unwrap().bag.insert(sword, 1);
+    s.below.as_mut().unwrap().log.gear.entry("ayla".into()).or_default().push(sword);
+    // Home, and down again: the sword went home on the first trip.
+    s.leave(id);
+    let id = s.join("ayla", "Ayla", None);
+    run(&mut s, 0.2);
+    s.run_page(id, "Home by a lamp");
+    let ev = run(&mut s, 0.05);
+    let text = ev.iter().find_map(|e| if let Event::Letter { kind, text, .. } = e { (kind == "run").then(|| text.clone()) } else { None }).unwrap();
+    assert!(!text.contains(&s.content.items[sword].name), "{text}");
+}
