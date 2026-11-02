@@ -216,10 +216,19 @@ const RENAMED: &[(&str, &str)] = &[
     ("hammer_of_justice", "divine_steed"),
     ("divine_protection", "blessing_of_protection"),
     ("sanctuary", "avenging_wrath"),
-    // Hunter
+    // Hunter (Disengage is Ensnaring Retreat now; Blinding Flare and Feign Death gave the defense
+    // row to Tripwire; the beta page's hooks and uppercuts went to the Hunter)
     ("arcane_shot", "aimed_arrow"),
-    ("deterrence", "flare"),
+    ("deterrence", "tripwire"),
     ("volley", "kill_shot"),
+    ("disengage", "ensnaring_retreat"),
+    ("disengage_net", "ensnaring_retreat"),
+    ("flare", "tripwire"),
+    ("feign_death", "tripwire"),
+    ("grappling_hook", "grapple_arrow"),
+    ("harpoon", "grapple_arrow"),
+    ("launcher", "raptor_strike"),
+    ("juggle", "raptor_strike"),
     // Rogue
     ("deadly_throw", "fan_of_knives"),
     ("evasion", "smoke_bomb"),

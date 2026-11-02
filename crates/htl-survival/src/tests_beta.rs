@@ -277,24 +277,6 @@ fn whirlwind_carves_round_you_as_you_move() {
 }
 
 #[test]
-fn launcher_throws_them_up_and_its_recast_slams_down_on_them() {
-    let mut s = world(true, false);
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let m = mob(&mut s, [3.0, 0.0, 0.0]);
-    ready(&mut s, p, "launcher");
-    let mut ev = cast(&mut s, p, "close", false);
-    assert!(s.has_cc(m, "stun"), "up in the air");
-    assert!(s.recast_keys(p).iter().any(|(n, r, _)| *n == 1 && *r == idx(&s, "launcher_slam")), "E armed for the Slam");
-    // Its beat over, E again within the window: aimed, and away.
-    ev.extend(run(&mut s, 0.4));
-    ev.extend(cast(&mut s, p, "close", false));
-    ev.extend(run(&mut s, 1.2));
-    let hits = blows(&ev, m);
-    assert!(hits.contains(&10) && hits.contains(&14), "the uppercut, then the Slam: {hits:?}");
-    assert!(s.recast_keys(p).is_empty(), "the window spent");
-}
-
-#[test]
 fn siphon_blade_heals_you_a_share_of_all_it_deals() {
     let mut s = world(true, false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -436,27 +418,27 @@ fn walled(at: [f32; 2], r: f32) -> Survival {
 }
 
 #[test]
-fn grappling_hook_hauls_you_to_the_foe_it_bites_and_harpoon_drags_the_foe_to_you() {
+fn grapple_arrow_hauls_you_to_the_foe_it_bites_and_reverse_grapple_drags_the_foe_to_you() {
+    // (The beta page's Grappling Hook and Harpoon, now the Hunter's.)
     let mut s = world(true, false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let g = mob(&mut s, [10.0, 0.0, 0.0]);
-    ready(&mut s, p, "grappling_hook");
-    let mut ev = cast(&mut s, p, "ranged", false);
+    ready(&mut s, p, "grapple_arrow");
+    let mut ev = cast(&mut s, p, "utility", false);
     ev.extend(run(&mut s, 1.0));
-    assert_eq!(dealt(&ev, g), 10);
     let at = s.players[&p].pos;
     assert!(at[0] > 7.0 && at[0] < 10.0, "hauled up to it: {at:?}");
+    let _ = ev;
     // The EX the other way round: it comes to her.
     // (The first one out of the way.)
     s.mobs.get_mut(&g).unwrap().pos = [at[0], 20.0, 0.0];
     let h = mob(&mut s, [at[0] + 7.0, 0.0, 0.0]);
     run(&mut s, 1.0);
-    let mut ev = cast(&mut s, p, "ranged", true);
+    let mut ev = cast(&mut s, p, "utility", true);
     ev.extend(run(&mut s, 1.0));
-    assert!(dealt(&ev, h) > 0, "the harpoon bites");
+    assert!(dealt(&ev, h) > 0, "the hook bites");
     let me = s.players[&p].pos;
     assert!(moved_near(&ev, h, me, 4.0), "and drags it to her");
-    assert!(s.has_cc(h, "snare"));
 }
 
 #[test]
@@ -591,13 +573,13 @@ fn bubble_pops_and_black_hole_collapses_as_they_end() {
 }
 
 #[test]
-fn harpoon_leaves_the_creature_standing_beside_you_not_where_it_was() {
+fn reverse_grapple_leaves_the_creature_standing_beside_you_not_where_it_was() {
     let mut s = world(true, false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let h = mob(&mut s, [12.0, 0.0, 0.0]);
-    ready(&mut s, p, "grappling_hook");
+    ready(&mut s, p, "grapple_arrow");
     s.set_valor(p, 25.0);
-    cast(&mut s, p, "ranged", true);
+    cast(&mut s, p, "utility", true);
     run(&mut s, 0.6);
     let d = dist2d(s.mobs[&h].pos, s.players[&p].pos);
     assert!(d < 4.0, "it stands beside her, not {d:.1} yd off at {:?}", s.mobs[&h].pos);

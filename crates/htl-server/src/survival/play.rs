@@ -689,6 +689,14 @@ impl SurvivalGame {
                 });
                 self.send(c, packets::force_move_root(g, counter, on));
             }
+            Event::FeatherFall { player, on } => {
+                let (Some(g), Some(c)) = (self.guid_of(player), self.conn_of(player)) else { return };
+                let counter = self.world_mut(c).map_or(0, |w| {
+                    w.counter += 1;
+                    w.counter
+                });
+                self.send(c, packets::move_feather_fall(g, counter, on));
+            }
             Event::Dash { player, dir, speed, secs } => {
                 let (Some(g), Some(c)) = (self.guid_of(player), self.conn_of(player)) else { return };
                 let local = self.world_of(c).is_some_and(|w| w.local);

@@ -436,7 +436,38 @@ pub struct AbilityDef {
     /// `radius`, if it has one).
     #[serde(default)]
     pub end_burst: String,
+    /// Which of its class's two choices in its row it is (1 the first, 2 the second): the board
+    /// shows the second under the first, and a hero takes one of the two onto the key.
+    #[serde(default = "first_choice")]
+    pub choice: u32,
+    /// The Hunter's arrows: one that ends its flight sticks in the ground where it stops (at its
+    /// range's end, at the wall it meets, a yard past the foe that stopped it), for Arrow Recall.
+    #[serde(default)]
+    pub plants: bool,
+    /// A Hunter ability's own mechanic, beyond its kind's: `call` and `double_call` (Call of the
+    /// Wild's beasts), `tripwire`, `recall` (Arrow Recall), `haul` (a pull that hauls its caster
+    /// to what won't move), `scatter` (arrows scattered where a leap began), `volley` (Skyfall's),
+    /// `float` (a leap that hangs: feather fall for a while after).
+    #[serde(default)]
+    pub hunt: String,
+    /// A projectile that ricochets off walls, trees and rocks this many times, each bounce adding
+    /// `bounce_gain` of its damage (Bank Shot).
+    #[serde(default)]
+    pub bounces: u32,
+    #[serde(default)]
+    pub bounce_gain: f32,
+    /// It goes on the key press, along the facing (no aim and click): Raptor Strike's hits,
+    /// Skyfall's leap.
+    #[serde(default)]
+    pub at_once: bool,
 }
+
+fn first_choice() -> u32 {
+    1
+}
+
+/// The Hunter's own mechanics an ability can name (`hunt`).
+pub const HUNTS: [&str; 8] = ["call", "double_call", "tripwire", "recall", "haul", "scatter", "volley", "float"];
 
 /// What an ability empowers as it goes: the base card (`ability`, one with an EX version) whose
 /// next press is its EX version for free, within `secs`.
@@ -474,6 +505,7 @@ impl AbilityDef {
     /// It's aimed with the reticle (the shoulder camera comes up for it).
     pub fn aimed(&self) -> bool {
         !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff")
+            && !self.at_once
             && !self.at_self
             && !(self.kind == "leap" && self.back)
             && self.anchor <= 0.0
@@ -589,8 +621,8 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// go; their next blow counts as from behind) until they strike or cast; `cheat_death` keeps a hero
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
-pub const OTHER_EFFECTS: [&str; 19] =
-    ["burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
+pub const OTHER_EFFECTS: [&str; 20] =
+    ["knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
 pub const BOONS: [&str; 11] = ["freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death"];
@@ -665,6 +697,10 @@ pub struct CounterDef {
     /// The guard's pose held while it lasts (Shield Wall: the shield up).
     #[serde(default)]
     pub guard_pose: bool,
+    /// What goes off when it runs out having caught nothing (Trapper's Instinct: the plain
+    /// Ensnaring Retreat), so a read that wasn't needed still does something.
+    #[serde(default)]
+    pub expire_answer: String,
 }
 
 fn whole() -> f32 {

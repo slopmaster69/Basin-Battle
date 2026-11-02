@@ -71,9 +71,9 @@ target_within = 6.0
 card = "explosive_trap"
 target_within = 6.0
 
-# (Disengage leaps back from where the hunter faces: facing the foe, it's out.)
+# (Ensnaring Retreat leaps back from where the hunter faces: facing the foe, it's out.)
 [[class.hunter]]
-card = "disengage"
+card = "ensnaring_retreat"
 target_within = 3.5
 
 # In and out: Shadowstep in from afar, Backstab, and the knives up close.

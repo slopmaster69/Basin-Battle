@@ -136,11 +136,11 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 
 | Key | Row | Warrior | Paladin | Hunter | Rogue | Priest | Shaman | Mage | Warlock | Druid |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
-| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Explosive Trap · *Freezing Trap* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
-| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Disengage · *Net and Disengage* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
-| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Flare · *Feign Death* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
-| 3 | **Ultimate** | Onslaught | Avenging Wrath | Kill Shot | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
+| Q | **Ranged** | Axe Throw · *Grasping Axe* | Avenger's Shield · *Holy Shock* | Aimed Shot · *Multi-Shot*, or Bank Shot · *Split Arrow* | Fan of Knives · *Crippling Throw* | Penance · *Mind Blast* | Lava Burst · *Chain Lightning* | Fireball · *Pyroblast* | Seed of Corruption · *Chaos Bolt* | Living Seed · *Entangling Roots* |
+| E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
+| 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
+| 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
+| 3 | **Ultimate** | Onslaught | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
 it) to cast that for Valor instead. An ultimate has none: it is the bar's whole worth.
@@ -161,14 +161,20 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   roots, and its key again within 3 s throws Hammer of Justice, a stun: ride in, then punish
   (its EX, Blessing of Freedom, frees and speeds a friend). Blessing of Protection halves what a
   friend takes for 3 s, the one defense you give away; Lay on Hands is 40% of their health at once.
-- **Hunter**: set up, then snipe. Aimed Shot is a draw: the longer you hold it, the harder,
-  farther and faster the arrow, and fully drawn it goes through the whole line (a heavy blow on you
-  spoils it); Multi-Shot is five arrows in a fan. Traps arm and wait (Explosive: a burst that throws
-  back and burns; Freezing: a freeze, and setting it makes your next Aimed Shot a free Multi-Shot
-  that shatters the frozen). Disengage leaps you straight back (its EX nets the foe in front);
-  Flare is lobbed onto a pack and blinds them till they're struck, Feign Death drops you as if dead
-  and every creature and lock lets go; Kill Shot is a 1 s draw that goes through a 40 yd line and
-  finishes anything under a quarter of its health.
+- **Hunter**: the archer who owns the ground, with two choices on every key (the board shows the
+  second under the first). Every arrow that ends its flight sticks in the ground for 6 s (up to
+  12), and Arrow Recall (Tripwire's EX) brings them all home through the fight, each at full damage;
+  three or more in one foe Lacerate it. Q: Aimed Shot, a draw (its EX Multi-Shot a fan), or Bank
+  Shot, which ricochets off walls and trees harder each bounce (its EX Split Arrow a point-blank
+  spray that kicks you back). E: Call of the Wild, a chain of spirit beasts that builds from setup
+  to finisher (the key shows the beast coming; a hit, parry or perfect dodge since the last call
+  empowers the next), or Raptor Strike, a spear chain (thrust, sweep, an Uppercut that throws you
+  up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
+  foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
+  (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
+  Tripwire, two planted arrows and a wire that knocks down the first to cross, or the traps. 3:
+  Kill Shot, or Skyfall: a leap straight up, a slow fall over the fight, and a volley of 12 arrows
+  where you aim (they plant).
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
@@ -332,7 +338,6 @@ page last (1 or 2), so an add-on from before them simply doesn't show them.
 | Q | Ricochet · *Pinball* | A spike that bounces to three more foes within 8 yd, each bounce ×1.25 (7, 9, 11, 14). EX: five bounces, each stunning 0.75 s. |
 | Q | Gravity Lance · *Collapse* | A heavy bolt: every foe within 5 yd of the one it strikes is dragged into it, all take 14. EX: 6 yd, 16, and they're slowed 70% for 2 s. |
 | E | Whirlwind · *Bladestorm* | Spin 2 s, still moving at about 70%: 5 every half second to everything within 4 yd in front and to your sides. EX: 3 s, and nothing staggers you. |
-| E | Launcher · *Juggle* | An uppercut: 10, stunned 0.8 s and thrown up; E again within 1.5 s leaps you onto them for 14 in 3 yd (Slam). EX: 14, 1.2 s, a Slam of 18 that throws them 4 yd. |
 | E | Siphon Blade · *Soul Rend* | A 4 yd slash, 12 to each foe, and you heal 60% of all it deals. EX: wider, 16, and you heal all of it. |
 | 1 | Blink Dagger · *Phase Strike* | Blink 12 yd, and again within 3 s. EX: each blink lands with 8 to everyone within 3 yd. |
 | 1 | Phase Dash · *Searing Dash* | Dash 10 yd through foes, untouchable: each takes 4 and burns 4 a second for 3 s. EX: 14 yd, and they're slowed 40% too. |
