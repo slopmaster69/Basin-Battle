@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 10
+local VERSION = 11
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6258,8 +6258,10 @@ events:SetScript("OnEvent", function()
   elseif event == "PLAYER_ENTERING_WORLD" then
     -- Asleep until an Elwynn Survival server answers. "ac": this client aims over the shoulder.
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
-    -- ac10: a clip can come from another character model.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 10 then
+    -- ac10: a clip can come from another character model; ac11: its turns go back to rest after.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
+      Say(".es hello " .. VERSION .. " ac11")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 10 then
       Say(".es hello " .. VERSION .. " ac10")
     elseif LocalHits() and SetTelegraphAt and (tonumber(HasActionCombat()) or 0) >= 9 then
       Say(".es hello " .. VERSION .. " ac9")

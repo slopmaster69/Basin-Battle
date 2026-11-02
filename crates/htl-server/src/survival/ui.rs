@@ -295,8 +295,9 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 10;
-pub(crate) const CLIENT_NEWEST: u8 = 10;
+pub(crate) const ADDON_NEWEST: u32 = 11;
+/// 11: a borrowed clip's turns go back to rest (patch 0016), so a shield isn't left crooked.
+pub(crate) const CLIENT_NEWEST: u8 = 11;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1084,7 +1085,8 @@ impl SurvivalGame {
                 // `.es hello <version> ac`: the action-combat client, aiming over the shoulder;
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
-                // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`).
+                // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
+                // another model's clips; `ac11` puts their bones back to rest after.
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,

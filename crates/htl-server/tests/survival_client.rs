@@ -1726,7 +1726,7 @@ fn an_older_add_on_or_client_hears_how_to_update_and_a_current_one_hears_nothing
     // survival/ui.rs: raise these with them.)
     let mut d = Client::connect(server.login, "wren", "hold", REALM).unwrap();
     enter(&mut d);
-    d.chat(".es hello 10 ac10");
+    d.chat(".es hello 11 ac11");
     assert!(d.until(2.0, |d| addon_lines(d, "ES").iter().any(|l| l.starts_with("V\t"))), "awake");
     d.drain(0.5);
     assert!(!told(&d), "nothing to update");
