@@ -108,6 +108,21 @@ impl Survival {
         }
     }
 
+    /// Aims hero `id`'s reticle through `at`, from where the reticle's line starts (over the
+    /// shoulder when the camera is there), not from the hero's middle: aimed from the middle, the
+    /// line passed beside a body at arm's length and a leap flew on to the ground beyond it.
+    pub fn lab_aim_at(&mut self, id: Id, at: Vec3) {
+        for _ in 0..3 {
+            if !self.players.contains_key(&id) {
+                return;
+            }
+            let (o, _) = self.reticle(id);
+            let flat = dist2d(o, at).max(0.3);
+            let yaw = (at[1] - o[1]).atan2(at[0] - o[0]);
+            self.set_aim_line(id, yaw, (at[2] - o[2]).atan2(flat));
+        }
+    }
+
     /// The hero is aiming an ability (the lab's click lets it go).
     pub fn lab_aiming(&self, id: Id) -> bool {
         matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Aim { .. }))
@@ -133,5 +148,23 @@ mod tests {
         assert!((s.players[&p].facing - 1.0).abs() < 0.05, "facing the middle body, straight ahead");
         s.lab_clear(&mobs);
         assert_eq!(s.players[&p].lock, None);
+    }
+
+    #[test]
+    fn the_labs_aim_meets_the_body_it_is_aimed_at_from_over_the_shoulder() {
+        let mut s = Survival::new(Content::dev(), Box::new(FlatLand::default()), 7, 1_000_000.0);
+        s.mobs.clear();
+        s.respawns.clear();
+        let p = s.join("ayla", "Ayla", None);
+        s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+        let _ = s.step(0.0);
+        if let Some(h) = s.players.get_mut(&p) {
+            h.shoulder_cam = true;
+        }
+        let m = s.lab_scene(p, "one", "brave").unwrap()[0];
+        let at = s.mobs[&m].pos;
+        s.lab_aim_at(p, at);
+        let landing = s.aim_point(p, 16.0);
+        assert!(dist2d(landing, at) < 1.0, "the aim lands on the brave 5 yd off, not beyond: {landing:?} vs {at:?}");
     }
 }

@@ -165,7 +165,8 @@ impl SurvivalGame {
             mobs,
             trace,
             slot,
-            ground: matches!(d.kind.as_str(), "ground" | "trap" | "place"),
+            // Aimed at the feet: what lands on a spot (a leap's landing too).
+            ground: matches!(d.kind.as_str(), "ground" | "trap" | "place" | "leap"),
             debug_was: self.sim.debug,
             asked: std::time::SystemTime::now(),
         });
@@ -242,11 +243,8 @@ impl SurvivalGame {
         let nearest = lab.mobs.first().copied();
         for step in due {
             // Aimed at the scene's middle body: its chest, or its feet for the ground's.
-            if let (Some(t), Some(p)) = (target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos), self.sim.players.get(&me).map(|p| p.pos)) {
-                let d = htl_survival::dist2d(p, t).max(0.5);
-                let yaw = (t[1] - p[1]).atan2(t[0] - p[0]);
-                let rise = if ground { t[2] - (p[2] + 1.9) } else { t[2] + 1.0 - (p[2] + 1.9) };
-                self.sim.set_aim_line(me, yaw, rise.atan2(d));
+            if let Some(t) = target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos) {
+                self.sim.lab_aim_at(me, if ground { t } else { [t[0], t[1], t[2] + 1.0] });
             }
             let input = match step.as_str() {
                 "click" | "attack" => Some(Input::Attack),
