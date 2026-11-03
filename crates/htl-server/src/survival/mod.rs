@@ -212,6 +212,9 @@ pub struct SurvivalGame {
     pub(crate) spline_id: u32,
     /// The ring under each station being placed.
     pub(crate) rings: HashMap<Id, u64>,
+    /// The unseen creatures flying a missile from a spot, by the rules' anchor (see
+    /// [`play::StandIn`]).
+    pub(crate) stand_ins: BTreeMap<Id, play::StandIn>,
     /// Lingering ground's looks (DynamicObjects), by the mark they go with.
     pub(crate) area_looks: HashMap<Id, u64>,
     /// Danger marks on the ground: where, and how wide.
@@ -327,6 +330,7 @@ impl SurvivalGame {
             go_entries: HashMap::new(),
             spline_id: 1,
             rings: HashMap::new(),
+            stand_ins: BTreeMap::new(),
             area_looks: HashMap::new(),
             mark_at: HashMap::new(),
             warned_glow: HashMap::new(),

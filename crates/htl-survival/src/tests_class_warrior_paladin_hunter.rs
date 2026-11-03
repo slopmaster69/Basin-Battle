@@ -201,6 +201,32 @@ fn hurled_axe_strikes_each_foe_going_out_and_again_coming_back() {
     assert!(s.projectiles.is_empty(), "caught");
 }
 
+/// The way back is its own flight, from where the axe turned to the thrower, by an unseen anchor
+/// the server stands there (a missile flies only from a unit); the anchor goes once it's caught.
+#[test]
+fn hurled_axes_way_back_flies_from_where_it_turned_to_the_thrower_and_its_anchor_goes_when_caught() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    press(&mut s, p, "hurled_axe", false);
+    s.set_aim_line(p, 0.0, down_to(24.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run(&mut s, 3.5));
+    let spell = s.content.abilities[idx(&s, "hurled_axe")].spell;
+    let back: Vec<(Id, Vec3)> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::MissileFrom { anchor, caster, spell: k, from, target: Target::Unit(t) } if *caster == p && *t == p && *k == spell => Some((*anchor, *from)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(back.len(), 1, "one way back, flown at the thrower: {back:?}");
+    let (anchor, from) = back[0];
+    assert!(from[0] > 15.0 && from[1].abs() < 2.0, "from where it turned, out along the throw: {from:?}");
+    assert!(from[2] > 0.3 && from[2] < 2.0, "at hand height: {from:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == anchor)), "caught: its anchor goes");
+    assert!(s.projectiles.is_empty(), "caught");
+}
+
 #[test]
 fn hurled_axe_comes_back_to_where_you_stand_now_so_a_step_lays_its_way_back_across_a_foe() {
     let mut s = world();
@@ -866,6 +892,76 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
     let c = s.cc_of(k).iter().find(|c| c.kind == "burn").unwrap();
     assert!((c.until - s.clock - 6.0).abs() < 0.6, "4 sec and one for each arrow past three: {}", c.until - s.clock);
     assert!(s.planted_of(p).is_empty(), "every arrow home");
+}
+
+/// A planted arrow reads on the ground: its arrow at its model's own size where it landed, and a
+/// friend's green ring under it for as long as it stays; both go with it.
+#[test]
+fn a_planted_arrow_stands_full_size_over_a_green_ring_and_both_go_with_it() {
+    use crate::sim::hunter::{PLANT_LOOK, PLANT_RING, PLANT_SCALE, PLANT_SECS};
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.plant_arrow(p, [10.0, 2.0, 0.0]);
+    let ev = s.step(DT);
+    let a = s.hunt.planted[0].clone();
+    let look = s.object(a.obj).expect("its arrow stands there");
+    assert_eq!((look.display, look.scale), (PLANT_LOOK, PLANT_SCALE));
+    assert!(look.scale >= 1.0, "not shrunk: {}", look.scale);
+    assert!((look.pos[0] - 10.0).abs() < 0.1 && (look.pos[1] - 2.0).abs() < 0.1, "where it landed: {:?}", look.pos);
+    let ring = ev.iter().find_map(|e| match e {
+        Event::Mark { id, pos, radius, tele: None, .. } if *id == a.mark => Some((*pos, *radius)),
+        _ => None,
+    });
+    let (at, r) = ring.expect("its ring laid on the ground");
+    assert!((at[0] - 10.0).abs() < 0.1 && (at[1] - 2.0).abs() < 0.1, "under the arrow: {at:?}");
+    assert_eq!(r, PLANT_RING);
+    assert!(s.mark_friendly(a.mark), "a friend's green, not a warning's red");
+    assert!(s.mark_left(a.mark) > PLANT_SECS - 0.2, "as long as the arrow stays: {}", s.mark_left(a.mark));
+    let ev = run(&mut s, PLANT_SECS + 0.2);
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "the arrow fades");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == a.mark)), "and its ring");
+    assert!(s.planted_of(p).is_empty());
+}
+
+/// Arrow Recall: each arrow leaves the ground (its arrow and ring gone) and flies from where it
+/// stood to the hunter, each by its own unseen anchor, which goes once the arrow is home.
+#[test]
+fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_off_the_ground() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    for y in [-3.0f32, 0.0, 3.0] {
+        s.plant_arrow(p, [12.0, y, 0.0]);
+    }
+    let _ = s.step(DT);
+    let planted = s.hunt.planted.clone();
+    assert_eq!(planted.len(), 3);
+    s.set_valor(p, 25.0);
+    let mut ev = press(&mut s, p, "tripwire", true);
+    ev.extend(run(&mut s, 0.1));
+    let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
+    let mut anchors = Vec::new();
+    for a in &planted {
+        let gone = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)).expect("its arrow leaves the ground");
+        assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == a.mark)), "and its ring");
+        let flight = ev
+            .iter()
+            .position(|e| {
+                matches!(e, Event::MissileFrom { caster, spell: k, from, target: Target::Unit(t), .. }
+                    if *caster == p && *t == p && *k == spell && (from[0] - a.pos[0]).abs() < 0.1 && (from[1] - a.pos[1]).abs() < 0.1)
+            })
+            .expect("flown home from where it stood");
+        assert!(gone < flight, "the arrow leaves the ground as it flies");
+        if let Event::MissileFrom { anchor, .. } = &ev[flight] {
+            anchors.push(*anchor);
+        }
+    }
+    anchors.dedup();
+    assert_eq!(anchors.len(), 3, "an anchor for each");
+    assert!(s.planted_of(p).is_empty());
+    ev.extend(run(&mut s, 1.0));
+    for a in anchors {
+        assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a)), "home: its anchor goes");
+    }
 }
 
 #[test]
