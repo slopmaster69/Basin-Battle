@@ -36,7 +36,7 @@ what it sent, side by side on one sheet.
 
 ### Options
 
-`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here]`
+`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]]`
 
 - **Scenes:** `one` (one body 5 yd ahead), `pack` (three across the front), `close` (one at arm's
   length), `ring` (three at arm's length), `far` (one 14 yd off). The default is `close` for
@@ -50,6 +50,9 @@ what it sent, side by side on one sheet.
   none are lost.
 - **Camera:** `behind`, `close` (nearer: the default for `close` and `ring`) or `none` (left
   where it is).
+- **Look:** `look 3631` tries that spell's look (and its lasting aura's) on the ability for this
+  run only; `look 12294/3631` gives the spell and the aura apart. Put back after the run, so a
+  queue can try several looks side by side before one goes into the rules.
 - **Stage:** every run starts on the lab's stage (above); `stage here` runs it where you stand.
 - `.es lab clear` takes the scene away and lets go of the lock.
 - **From a file:** each line of `logs/lab/queue.txt` where you host is run as if typed after
@@ -66,7 +69,7 @@ what it sent, side by side on one sheet.
   `logs/lab/find-<words>.txt`, read from your own game data. `find missile <word>...` looks at
   their missiles, `find area <word>...` at what they play at a ground point they're sent to, and
   `find spell <id>...` lists those spells whatever they show. Pick from it, then try the pick
-  with `.es tune ability.<key>.spell <id>` and a lab run.
+  in a lab run with `look <id>`, and keep it with `.es tune ability.<key>.spell <id>`.
 
 Examples:
 
