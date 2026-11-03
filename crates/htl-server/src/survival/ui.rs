@@ -1298,6 +1298,23 @@ impl SurvivalGame {
             }
             // `.es dummy clear`: every training dummy goes (the visual check starts each run from
             // one fresh dummy, not a pile of them).
+            // A creature to try abilities on (the visual check): `.es target <creature> [yards]
+            // [still] [hp%]`, or `.es target clear`.
+            "target" if self.dev_ok() && arg == "clear" => {
+                let n = self.sim.clear_targets();
+                self.tell(conn, &format!("Cleared {n} targets."));
+                Ok(())
+            }
+            "target" if self.dev_ok() => {
+                let rest: Vec<String> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("target")).skip(2).map(|w| w.to_lowercase()).collect();
+                let yards = rest.iter().find_map(|w| w.parse::<f32>().ok()).unwrap_or(10.0);
+                let still = rest.iter().any(|w| w == "still");
+                let hp = rest.iter().find_map(|w| w.strip_suffix('%').and_then(|n| n.parse::<f32>().ok())).map_or(1.0, |n| n / 100.0);
+                self.sim.spawn_target(me, &arg, yards, still, hp).map(|name| {
+                    let how = if still { "stands" } else { "comes at you from" };
+                    self.tell(conn, &format!("{name} {how} {yards:.0} yd ahead."));
+                })
+            }
             "dummy" if self.dev_ok() && arg == "clear" => {
                 let n = self.sim.clear_dummies();
                 self.tell(conn, &format!("Cleared {n} training dummies."));
@@ -1352,7 +1369,7 @@ impl SurvivalGame {
                 let n = arg2.parse::<u32>().unwrap_or(1).clamp(1, 99);
                 self.sim.give_for_testing(me, &arg, n).map(|name| self.tell(conn, &format!("{n} {name} into your bags.")))
             }
-            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
+            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" | "target" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // The add-on's answer to a ping: the round trip.
             "po" => {
                 let n = arg.parse::<u32>().unwrap_or(0);
@@ -1600,8 +1617,10 @@ impl SurvivalGame {
             // `.es debug` turns it over; `.es debug on` and `.es debug off` set it, so a script
             // knows where it stands whatever the last one left.
             "debug" => {
+                // `quiet`: its commands without its drawing (the visual check records with it).
+                self.sim.debug_quiet = arg == "quiet";
                 self.sim.debug = match arg.as_str() {
-                    "on" => true,
+                    "on" | "quiet" => true,
                     "off" => false,
                     _ => !self.sim.debug,
                 };

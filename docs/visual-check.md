@@ -12,8 +12,8 @@ watcher, below).
 ## What it needs, once
 
 1. **The test server**, running on that PC: `Host Basin Battle.bat`, built from the branch under
-   test. The scenarios use `.es debug on`, `.es dummy clear` and `.es give`, which servers from
-   before this check don't have.
+   test. The scenarios use `.es debug quiet`, `.es dummy clear`, `.es target` and `.es give`, which
+   servers from before this check don't have.
 2. **benilla's dev build.** The player build has none of the scripted probes this drives. On
    GitHub: Actions, Release, Run workflow, pick the branch, tick **dev**. (Or
    `gh workflow run release.yml --ref <branch> -f dev=true`.) The run's artifact
@@ -132,7 +132,7 @@ include _setup                # another file's lines, at their own times
 ```
 
 - **Times** count from when the hero is in the world and `settle` seconds have passed, whatever the
-  login took. `_setup` takes the first 4 s: debug on, every spell owned, cooldowns off, the hero
+  login took. `_setup` takes the first 4 s: debug's commands on without its drawing (`.es debug quiet`), every spell owned, cooldowns off, the hero
   healed with full Valor, at Goldshire facing north, one fresh training dummy 6 yd ahead.
 - **Casting**: `.es in ab <slot> <ex>` presses an ability key (slot 0 to 4: Q, E, 1, 2, 3; ex 1 is
   Ctrl with it, the EX version). An aimed ability comes up and `.es in a` (the left button) casts

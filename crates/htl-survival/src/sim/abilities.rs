@@ -1088,7 +1088,7 @@ impl Survival {
                 look: None,
             });
         }
-        if self.debug {
+        if self.debug_draws() {
             let end = add(from, base, range);
             self.mark(end, radius.max(0.3), range / speed.max(1.0));
         }
@@ -1192,7 +1192,7 @@ impl Survival {
                 self.beta_hit(&p, None, t.point);
                 let d = &self.content.abilities[p.ability];
                 let (kit, splash) = (d.impact_kit, d.splash);
-                if kit != 0 && self.debug {
+                if kit != 0 && self.debug_draws() {
                     self.mark(t.point, 0.4, 0.6);
                 }
                 if splash > 0.0 {
@@ -1201,7 +1201,7 @@ impl Survival {
                 continue;
             }
             // `.es debug`: the projectile's body drawn every two yards of its flight.
-            if self.debug && (p.left / 2.0).floor() != ((p.left - go) / 2.0).floor() {
+            if self.debug_draws() && (p.left / 2.0).floor() != ((p.left - go) / 2.0).floor() {
                 self.mark(t.point, p.radius.max(0.2), 0.4);
             }
             p.pos = t.point;
@@ -2257,7 +2257,7 @@ impl Survival {
             None => AbilityDef::at(d.damage, share),
         };
         self.area(id, ability, at, range, share, damage, Some((yaw, d.arc.max(10.0))));
-        if self.debug {
+        if self.debug_draws() {
             for k in -2..=2 {
                 let a = yaw + (k as f32 / 2.0) * (d.arc / 2.0).to_radians();
                 self.mark([at[0] + a.cos() * range, at[1] + a.sin() * range, at[2]], 0.3, 0.8);
@@ -2272,7 +2272,7 @@ impl Survival {
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
         let damage = AbilityDef::at(d.damage, share);
         self.area(id, ability, at, radius, share, damage, None);
-        if self.debug {
+        if self.debug_draws() {
             self.mark(at, radius, 0.8);
         }
     }
@@ -2293,7 +2293,7 @@ impl Survival {
         }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         self.totems.push(Totem { mob: mid, owner: id, ability, until: now + d.secs.max(1.0), next: now });
-        if self.debug {
+        if self.debug_draws() {
             self.mark(at, t.radius, d.secs.max(1.0));
         }
     }
@@ -2508,7 +2508,7 @@ impl Survival {
                 self.heal_hero_by(f, amount, id, &d.name);
             }
         }
-        if self.debug {
+        if self.debug_draws() {
             let end = self.slide_end(pos, yaw, len);
             self.mark(end, half.max(0.3), tick);
         }
@@ -2874,6 +2874,45 @@ impl Survival {
             self.stances.remove(id);
             self.events.push(Event::MobGone { id: *id });
         }
+        gone.len()
+    }
+
+    /// A creature to practise on and look at (a dev command, `.es target`): `key` `yards` ahead
+    /// (1 to 40), facing the hero, at `hp` of its health (a share, 0.01 to 1). Standing `still`,
+    /// it never moves or strikes of itself but takes everything a creature does (a knock-up, a
+    /// pull, a trip), so what an ability does to a creature can be seen; otherwise it comes at the
+    /// hero (across a tripwire, say).
+    pub fn spawn_target(&mut self, id: Id, key: &str, yards: f32, still: bool, hp: f32) -> Result<String, String> {
+        let def = self.content.mob(key).ok_or_else(|| format!("No creature called {key}."))?;
+        if self.content.mobs[def].dummy || self.content.mobs[def].inert() {
+            return Err("That one only stands there: use .es dummy.".into());
+        }
+        let p = self.players.get(&id).ok_or("No hero.")?;
+        let yards = yards.clamp(1.0, 40.0);
+        let at = self.ground_near(p.pos[0] + p.facing.cos() * yards, p.pos[1] + p.facing.sin() * yards, p.pos[2]);
+        let face = facing(at, p.pos);
+        let mid = self.spawn_mob(def, at, None, false);
+        if let Some(m) = self.mobs.get_mut(&mid) {
+            m.facing = face;
+            m.home = at;
+            m.health = ((m.max_health as f32 * hp.clamp(0.01, 1.0)).round() as u32).max(1);
+        }
+        self.targets.insert(mid, still);
+        if !still {
+            self.engage(mid, mobs::Foe::Hero(id));
+        }
+        Ok(self.content.mobs[def].name.clone())
+    }
+
+    /// Every `.es target` creature taken away.
+    pub fn clear_targets(&mut self) -> usize {
+        let gone: Vec<Id> = self.targets.keys().copied().filter(|id| self.mobs.contains_key(id)).collect();
+        for id in &gone {
+            self.mobs.remove(id);
+            self.stances.remove(id);
+            self.events.push(Event::MobGone { id: *id });
+        }
+        self.targets.clear();
         gone.len()
     }
 

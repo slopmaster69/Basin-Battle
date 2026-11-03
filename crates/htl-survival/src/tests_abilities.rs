@@ -624,3 +624,31 @@ fn a_dummy_can_be_put_up_nearer_or_farther() {
     assert!((m.pos[0] - 3.0).abs() < 0.1, "3 yd ahead: {:?}", m.pos);
     assert_eq!(s.dummies.get(d).map(|x| x.as_str()), Some("guard"));
 }
+
+/// `.es target`: a real creature to look at, standing still (or coming at you), at some health.
+#[test]
+fn a_still_target_stands_and_strikes_nothing_but_is_moved_like_any_creature() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_target(p, "grunt", 3.0, true, 0.2).unwrap();
+    let t = *s.targets.keys().next().expect("a target");
+    let from = s.mobs[&t].pos;
+    assert!((from[0] - 3.0).abs() < 0.1, "3 yd ahead: {from:?}");
+    assert!(s.mobs[&t].health * 5 <= s.mobs[&t].max_health + 5, "a fifth of its health: {}", s.mobs[&t].health);
+    let hp = s.players[&p].health;
+    for _ in 0..60 {
+        let _ = s.step(0.05);
+    }
+    assert_eq!(s.mobs[&t].pos, from, "it stood still");
+    assert_eq!(s.players[&p].health, hp, "and struck nothing");
+    // A knockback throws it as far as any creature (it isn't a dummy).
+    let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: 6.0, from_caster: true, ..Default::default() };
+    s.displace(p, t, &push);
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    let moved = ((s.mobs[&t].pos[0] - from[0]).powi(2) + (s.mobs[&t].pos[1] - from[1]).powi(2)).sqrt();
+    assert!(moved > 3.0, "thrown: {moved:.2}");
+    assert_eq!(s.clear_targets(), 1);
+    assert!(!s.mobs.contains_key(&t));
+}
