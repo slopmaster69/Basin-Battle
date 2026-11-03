@@ -1,7 +1,7 @@
 -- Elwynn Survival: the spell lab's camera (dev builds' `.es lab`, see docs/spell-lab.md).
 --
 -- The server sends, when a lab run starts:
---   LB n ms label [cam]   (cam: behind, close or none; behind if it's missing)
+--   LB n ms label [cam] [secs]   (cam: behind, close or none; behind if it's missing)
 -- and this takes n screenshots, one every ms milliseconds, from now: the frames the server's
 -- trace (logs/lab/<label>.txt) is timed against. The client numbers shots taken within one second
 -- (WoWScrnShot_<date>_<time>_2.png ...), so a burst keeps every frame. The "Screen captured"
@@ -40,7 +40,7 @@ frame:SetScript("OnUpdate", function()
     if UIParent then UIParent:Show() end
     frame:Hide()
     Quiet(false)
-    if DEFAULT_CHAT_FRAME then
+    if DEFAULT_CHAT_FRAME and lab.taken > 0 then
       DEFAULT_CHAT_FRAME:AddMessage("Lab: " .. lab.taken .. " shots of " .. lab.label .. " saved in Screenshots.")
     end
     return
@@ -81,7 +81,10 @@ function ES.LabLine(f)
   lab.label = f[4] or ""
   lab.taken = 0
   lab.next = GetTime()
-  lab.show_at = lab.next + lab.left * lab.every + 1.0
+  -- A run recorded as video sends no stills (n is 0) and its video's length (secs).
+  local secs = tonumber(f[6]) or 0
+  if secs < lab.left * lab.every then secs = lab.left * lab.every end
+  lab.show_at = lab.next + secs + 1.0
   Quiet(true)
   if UIParent then UIParent:Hide() end
   frame:Show()

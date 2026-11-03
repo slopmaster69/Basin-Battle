@@ -90,12 +90,13 @@ impl SurvivalGame {
             return Ok(());
         }
         // A night of runs once filled the host's disk: past its budget, the lab stops and says so.
-        let used = folder_bytes(&std::path::Path::new("logs").join("lab"));
+        let used = folder_bytes(&lab_dir());
         if used > LAB_BUDGET {
             return Err(format!(
-                "The lab's runs take {:.1} GB, over its {:.0} GB budget. Delete old run folders in logs/lab, then run it again.",
+                "The lab's runs take {:.1} GB, over its {:.0} GB budget. Delete old run folders in {}, then run it again.",
                 used as f64 / 1e9,
-                LAB_BUDGET as f64 / 1e9
+                LAB_BUDGET as f64 / 1e9,
+                lab_dir().display()
             ));
         }
         let key = first.to_lowercase();
@@ -113,7 +114,8 @@ impl SurvivalGame {
         let mut stage = true;
         let mut look: Option<(u32, Option<u32>)> = None;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
-        let (mut shots, mut every) = if cfg!(windows) && ffmpeg().is_some() { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
+        let video = cfg!(windows) && ffmpeg().is_some();
+        let (mut shots, mut every) = if video { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
         let mut k = 1;
         let mut free = 0;
         while k < words.len() {
@@ -228,7 +230,10 @@ impl SurvivalGame {
             steps: queue,
             start,
             until: start + secs - LEAD + 0.3,
-            burst: Some((now + SETTLE, format!("LB\t{shots}\t{every}\t{label}\t{cam}"), secs + 0.6)),
+            // With video, no stills (the video holds every frame; a night's stills once filled the
+            // lab's budget): the shots' count and spacing only time the run, and the add-on keeps
+            // the interface hidden for the video's length.
+            burst: Some((now + SETTLE, format!("LB\t{}\t{every}\t{label}\t{cam}\t{:.2}", if video { 0 } else { shots }, secs + 0.6), secs + 0.6)),
             mobs,
             trace,
             slot,
@@ -377,7 +382,7 @@ impl SurvivalGame {
         let lab = self.lab.take().unwrap();
         self.sim.debug = lab.debug_was;
         self.lab_look_back(lab.look_was);
-        let dir = std::path::Path::new("logs").join("lab");
+        let dir = lab_dir();
         let path = dir.join(format!("{}.txt", lab.label));
         let written = std::fs::create_dir_all(&dir).and_then(|_| std::fs::File::create(&path)).and_then(|mut f| f.write_all((lab.trace.join("\n") + "\n").as_bytes()));
         // The run's screenshots, copied beside its trace once the client has written them all.
@@ -391,7 +396,7 @@ impl SurvivalGame {
         });
         match written {
             // In chat, not on screen: a queued run starting at once would have it in its frames.
-            Ok(()) => self.say_to(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
+            Ok(()) => self.say_to(lab.conn, &format!("Lab done: {}", dir.join(format!("{}.txt", lab.label)).display())),
             Err(e) => self.say_to(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
         }
     }
@@ -432,8 +437,8 @@ fn record_video(label: &str, secs: f32) {
     let Some(ff) = ffmpeg() else { return };
     let label = label.to_string();
     std::thread::spawn(move || {
-        let out = std::path::Path::new("logs").join("lab").join(format!("{label}.mp4"));
-        let _ = std::fs::create_dir_all("logs/lab");
+        let out = lab_dir().join(format!("{label}.mp4"));
+        let _ = std::fs::create_dir_all(lab_dir());
         let began = std::time::Instant::now();
         let window = "gfxcapture=window_exe=(?i)benilla:capture_cursor=0:max_framerate=60";
         let screen = "ddagrab=output_idx=0:framerate=60:draw_mouse=0:dup_frames=1";
@@ -443,7 +448,7 @@ fn record_video(label: &str, secs: f32) {
                 break;
             }
             // What ffmpeg says (frames dropped, a grab that failed) beside the video.
-            let said = std::fs::OpenOptions::new().create(true).append(k > 0).write(true).truncate(k == 0).open(std::path::Path::new("logs").join("lab").join(format!("{label}.ffmpeg.txt")));
+            let said = std::fs::OpenOptions::new().create(true).append(k > 0).write(true).truncate(k == 0).open(lab_dir().join(format!("{label}.ffmpeg.txt")));
             // Every frame at 60, scaled to 1920 wide, encoded with x264's fastest preset so the
             // encoder keeps up with a wide screen.
             let ran = std::process::Command::new(&ff)
@@ -487,7 +492,7 @@ fn lab_find(args: &[String]) {
     let words: Vec<String> = args.iter().filter(|a| *a != "missile" && *a != "area").take_while(|a| *a != "spell").cloned().collect();
     let only: Vec<u32> = args.iter().skip_while(|a| *a != "spell").skip(1).filter_map(|a| a.parse().ok()).collect();
     let name: String = args.join("-").chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).take(60).collect();
-    let out = std::path::Path::new("logs").join("lab").join(format!("find-{name}.txt"));
+    let out = lab_dir().join(format!("find-{name}.txt"));
     let text = match data_dir().ok_or_else(|| anyhow::anyhow!("no --data")).and_then(|d| htl_map::spell_find(&d, &words, &what, &only, 600)) {
         Ok(lines) => lines.join("\n") + "\n",
         Err(e) => format!("find failed: {e:#}\n"),
@@ -495,7 +500,13 @@ fn lab_find(args: &[String]) {
     let _ = std::fs::create_dir_all(out.parent().unwrap()).and_then(|_| std::fs::write(&out, text));
 }
 
-/// The most the lab's runs may take on the host's disk (logs/lab): about 60 runs at half size.
+/// Where the lab's runs go: `LAB_DIR` (the lab helper points it at another drive when the host
+/// has one), else `logs/lab`. The queue stays in `logs/lab` either way.
+pub(crate) fn lab_dir() -> std::path::PathBuf {
+    std::env::var_os("LAB_DIR").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::Path::new("logs").join("lab"))
+}
+
+/// The most the lab's runs may take on the disk (`lab_dir`): about 300 runs of video alone.
 const LAB_BUDGET: u64 = 3_000_000_000;
 
 /// Everything under `dir`, in bytes (0 if it isn't there).
