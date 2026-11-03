@@ -22,6 +22,7 @@ mod journal;
 pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
+pub(crate) mod warlord;
 pub mod recap;
 pub mod recasts;
 pub(crate) mod explore;
@@ -906,6 +907,8 @@ pub struct Survival {
     pub(crate) trials: BTreeMap<usize, Trial>,
     /// The beta page's mechanics in play: yanks, echoes, tethers, shields that burst, pads.
     pub(crate) beta: beta::Beta,
+    /// The Warlord's (the Warrior's second choices): Tackles under way.
+    pub(crate) warlord: warlord::Warlord,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -989,6 +992,7 @@ impl Survival {
             yielded: BTreeMap::new(),
             trials: BTreeMap::new(),
             beta: beta::Beta::default(),
+            warlord: warlord::Warlord::default(),
         }
     }
 
@@ -1037,6 +1041,7 @@ impl Survival {
         self.step_stances();
         self.step_combos();
         self.step_beta();
+        self.step_warlord();
         self.step_cc();
         self.step_holds();
         self.step_dummies();
@@ -1617,6 +1622,8 @@ impl Survival {
             Action::Dash { .. } => return DASH_SPEED,
             Action::Swing { .. } => c.attack_speed,
             Action::Guard => c.guard_speed,
+            // Bladestorm's spin walks at its own pace, near a run.
+            Action::Channel { ability, .. } if self.content.abilities[ability].around => c.run_speed * crate::content::AROUND_PACE,
             Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } => c.aim_speed,
             Action::Stance { .. } => c.guard_speed,
             Action::Eat { .. } => c.use_speed,

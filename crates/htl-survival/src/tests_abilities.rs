@@ -433,7 +433,8 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     // learned out in Elwynn, and the board says where (taken from it only in a debug world).
     s.set_tree(p, false);
     let owned: Vec<&str> = s.players[&p].owned.iter().map(String::as_str).collect();
-    assert_eq!(owned, ["hurled_axe", "shockwave"], "Q and E are free");
+    // (Both choices of each: the Juggernaut's and the Warlord's.)
+    assert_eq!(owned, ["cleave", "hurled_axe", "ravager", "shockwave"], "Q and E are free");
     assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_err(), "not unlocked");
     let why = s.take_node(p, "seed_of_corruption").unwrap_err();
     assert!(why.contains("The Cult's Altar"), "{why}");

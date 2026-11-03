@@ -155,7 +155,7 @@ impl Survival {
 
     /// A grappling hook's pull: its caster dashes along the ground to where it struck (beside the
     /// one it struck), a wall stopping them short. Rooted or stunned, they stay.
-    fn yank_to(&mut self, id: Id, ability: usize, share: f32, at: Vec3, unit: Option<Id>) {
+    pub(crate) fn yank_to(&mut self, id: Id, ability: usize, share: f32, at: Vec3, unit: Option<Id>) {
         let now = self.clock;
         let Some(p) = self.players.get(&id) else { return };
         if p.health == 0 || self.held_still(id) {
