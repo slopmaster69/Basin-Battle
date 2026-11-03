@@ -1,15 +1,16 @@
 # Elwynn Survival
 
-A small survival and action-combat experiment beside Basin Battle, on the same benilla client and
-the same host. You are a footman of Goldshire: fight with aimed, committed blows, a shield and a
-dodge; gather timber, meat and Fargodeep copper; bank it at the camp; build a cooking fire
-and a smithing anvil in the old Westbrook garrison's yard; and, when you're ready, ring the bell
-and hold the camp against the Horde's raids. It is always night, under Duskwood's mist. Past the camp the whole of Elwynn Forest is open, from Northshire to
-the Westfall bridge and the Redridge road: its places are marked on the world map, and each has
-its foes, its goods, its chests and secrets, and the shrines and champions that teach the camp
-its cards.
+A soulslike survival game on the benilla client, run by the same host as Basin Battle. You are a
+hero of Goldshire: fight with aimed, committed blows, a guard, a parry and a dodge, with five
+abilities picked from any of nine classes; gather timber, meat and Fargodeep copper; bank it at the
+camp; build a cooking fire and a smithing anvil in the old Westbrook garrison's yard; and, when
+you're ready, ring the bell and hold the camp against the Horde's raids. It is always night, under
+Duskwood's mist. Past the camp the whole of Elwynn Forest is open, from Northshire to the Westfall
+bridge and the Redridge road: its places are marked on the world map, and each has its foes, its
+goods, its chests and secrets, and the shrines and champions that teach the camp its cards. Below
+lie the dungeons and the Bookmaker's Wager; the camp's book also opens Siege, camp against camp.
 
-It is a prototype for playtesting the brief's first loop, not a finished game.
+It is a prototype in active play-testing, not a finished game.
 
 ## Running it
 
@@ -20,16 +21,23 @@ The host runs both games at once. Each has its own realm on the one login:
 | Basin Battle | `Basin Battle` | 8085 |
 | Elwynn Survival | `Elwynn Survival` | 8086 |
 
-```sh
-scripts/host.sh                      # both games (password: hold)
-scripts/host.sh --game survival      # only Elwynn Survival (or --game basin)
-scripts/play-survival.sh             # play it on this Mac (scripts/play.sh is Basin Battle)
-scripts/play-survival.sh 192.168.1.20   # a friend's game
-```
+How to install, host, play alone and join friends (on Windows, a Mac or Linux) is in the
+[README](../README.md). In short: one person hosts, everyone plays, all on the same release.
 
-Windows players double-click **Play Elwynn Survival.bat** in the Windows folder (Play Basin
-Battle.bat is the other game). Over the internet the router must forward TCP **3724, 8085 and
-8086**.
+- **Windows:** the host runs **Host Basin Battle.bat** from the release's source; everyone plays
+  with **Play Elwynn Survival.bat** from the release's Windows zip (the host types `127.0.0.1`).
+- **Mac:**
+
+  ```sh
+  scripts/host.sh                      # both games (password: hold)
+  scripts/host.sh --game survival      # only Elwynn Survival (or --game basin)
+  scripts/play-survival.sh             # play it on this Mac (scripts/play.sh is Basin Battle)
+  scripts/play-survival.sh 192.168.1.20   # a friend's game
+  ```
+
+Log in with any name (it becomes your hero) and the host's password (**hold** by default). Over the
+internet the router must forward TCP **3724** and **8086** (8085 too for Basin Battle), or use
+Tailscale (README).
 
 The survival world is saved in `saves/elwynn-survival.toml` (a server option, `--survival-save`,
 moves it). Delete that file to start the world over. Its tuning is `content/survival.toml`
@@ -41,8 +49,9 @@ hello, so neither changes the other game's keys or screen.
 ## Controls
 
 The controls follow the soulslike keyboard and mouse: the mouse steers (in action mode the view
-turns the hero, as in a shooter), left mouse attacks, right mouse raises the guard, Space is the
-dash button (tap to dodge, hold to sprint), and the five abilities sit on Q, E, 1, 2 and 3.
+turns the hero, as in a shooter), left mouse attacks (Shift with it: a heavy attack), right mouse
+raises the guard (just as a blow lands: a parry), Mouse 4 dodges (hold Shift to sprint), Space
+jumps, and the five abilities sit on Q, E, 1, 2 and 3.
 
 The Elwynn layout is set for the session whatever your saved bindings say, and your own bindings
 come back when you leave. The Controls card (K, or the key icon bottom right) lists every control
