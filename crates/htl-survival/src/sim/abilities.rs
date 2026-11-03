@@ -2704,7 +2704,8 @@ impl Survival {
         // attack goes out at once, nothing touching them until it strikes.
         if c.parry_heavy && how == HitKind::Melee && self.players.contains_key(&victim) {
             let from = self.unit_pos(attacker).unwrap_or(self.players[&victim].pos);
-            self.events.push(Event::Missile { caster: victim, spell: d.spell, target: Target::Unit(victim) });
+            // No second burst of the brace's spikes: seen in the lab, they hung over the heavy
+            // answer. The parry's spark and the heavy say it.
             self.parry_pays(victim, attacker);
             self.parry_looks(victim, from);
             self.end_stance(victim);
