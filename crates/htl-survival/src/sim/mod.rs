@@ -842,6 +842,10 @@ pub struct Survival {
     /// (hero, ability): when they can have it again (Lay on Hands).
     pub(crate) lockouts: BTreeMap<(Id, usize), f32>,
     pub(crate) burnings: Vec<abilities::Burning>,
+    /// The spell lab's bodies, which swing only when the lab asks (`lab_blow`, the one in
+    /// `lab_blowing` while it does).
+    pub(crate) lab_quiet: Vec<Id>,
+    pub(crate) lab_blowing: Option<Id>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -964,6 +968,8 @@ impl Survival {
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),
             burnings: Vec::new(),
+            lab_quiet: Vec::new(),
+            lab_blowing: None,
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),

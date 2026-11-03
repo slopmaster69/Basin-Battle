@@ -51,6 +51,7 @@ impl Survival {
             }
             out.push(mid);
         }
+        self.lab_quiet.extend(out.iter().copied());
         self.lab_lock(id, &out);
         Ok(out)
     }
@@ -79,30 +80,18 @@ impl Survival {
             if let Some(m) = self.mobs.get_mut(&mob) {
                 m.facing = facing(m.pos, at);
             }
+            self.lab_blowing = Some(mob);
             self.windup(mob, Foe::Hero(hero), at);
+            self.lab_blowing = None;
         }
     }
 
     /// The lab's creatures held where they stand: struck, they'd come at the hero, and the next
-    /// run's frames would be of a brawl. A wind-up the lab asked for (`lab_blow`, the creatures in
-    /// `blows`) and a reel go on; any other wind-up is called off (a struck brave's own blow once
-    /// staggered the hero and the run's next ability never came out).
-    pub fn lab_hold(&mut self, mobs: &[Id], blows: &[Id]) {
+    /// run's frames would be of a brawl. A wind-up the lab asked for (`lab_blow`) and a reel go on;
+    /// they never start one of their own (`lab_quiet`): a struck brave's own blow once staggered
+    /// the hero and the run's next ability never came out.
+    pub fn lab_hold(&mut self, mobs: &[Id]) {
         for m in mobs {
-            let own = !blows.contains(m) && self.mobs.get(m).is_some_and(|x| matches!(x.state, MobState::Windup { .. }));
-            if own {
-                if let Some(MobState::Windup { mark: Some(mk), .. }) = self.mobs.get(m).map(|x| x.state.clone()) {
-                    self.unmark(mk);
-                }
-                if self.attack_now(*m).ranged {
-                    self.events.push(Event::CastEnd { caster: *m });
-                }
-                self.halt_mob(*m);
-                if let Some(x) = self.mobs.get_mut(m) {
-                    x.state = MobState::Idle { wander_at: f32::MAX };
-                }
-                continue;
-            }
             let chasing = self.mobs.get(m).is_some_and(|x| matches!(x.state, MobState::Chase { .. } | MobState::Recover { .. }));
             if chasing {
                 self.halt_mob(*m);
@@ -133,6 +122,7 @@ impl Survival {
         for h in held {
             self.unlock(h);
         }
+        self.lab_quiet.retain(|q| !mobs.contains(q));
         for m in mobs {
             if self.mobs.remove(m).is_some() {
                 self.events.push(Event::MobGone { id: *m });
@@ -300,15 +290,16 @@ mod tests {
         s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
         let _ = s.step(0.0);
         let m = s.lab_scene(p, "close", "brave").unwrap()[0];
-        // Its own blow (struck, it turned on the hero): called off.
+        // Its own blow (struck, it would turn on the hero): never started.
+        s.windup(m, Foe::Hero(p), s.players[&p].pos);
+        assert!(!matches!(s.mobs[&m].state, MobState::Windup { .. }), "no blow of its own");
+        // The one a `blow` step asks for: it goes on.
         s.lab_blow(m, p);
-        assert!(matches!(s.mobs[&m].state, MobState::Windup { .. }));
-        s.lab_hold(&[m], &[]);
-        assert!(matches!(s.mobs[&m].state, MobState::Idle { .. }), "its own wind-up called off");
-        // The one a `blow` step asked for: it goes on.
-        s.lab_blow(m, p);
-        s.lab_hold(&[m], &[m]);
+        s.lab_hold(&[m]);
         assert!(matches!(s.mobs[&m].state, MobState::Windup { .. }), "the lab's blow goes on");
+        // Cleared away, it's an ordinary creature again.
+        s.lab_clear(&[m]);
+        assert!(s.lab_quiet.is_empty());
     }
 
     #[test]
