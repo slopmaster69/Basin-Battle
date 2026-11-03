@@ -234,7 +234,8 @@ fn consecration_burns_foes_and_heals_friends_and_hallowed_ground_softens_their_b
     let mob_hp = s.mobs[&k].health;
     let ev = run_held(&mut s, k, 0.0, 3.2);
     assert!(s.mobs[&k].health < mob_hp, "the foe burns");
-    assert!(ev.iter().any(|e| matches!(e, Event::Mark { .. })));
+    // Its own glow on the ground, and no circle drawn round it (a hero's ground with a look).
+    assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { .. })));
     assert!(s.players[&a].health > max / 2 && s.players[&b].health > max / 2, "friends heal");
     // Hallowed: a blow on a friend standing in it lands 30% lighter.
     run_held(&mut s, k, 0.0, 4.0);

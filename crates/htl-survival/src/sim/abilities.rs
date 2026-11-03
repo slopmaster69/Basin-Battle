@@ -2217,10 +2217,14 @@ impl Survival {
         if d.linger <= 0.0 {
             return;
         }
-        // Holy ground is a friend's mark (green), burning ground a warning.
+        // Holy ground is a friend's mark (green), burning ground a warning. A hero's own ground
+        // with a look of its own (a trap's fire, Consecration's glow) is that look alone, with no
+        // circle drawn round it (Corey's review: a hero's circles are floor clutter, and the red
+        // one reads as an error); a creature's keeps its warning.
         let friendly = d.linger_heal > 0.0 || !d.boon.is_empty();
-        let mark = Some(self.mark_kind(at, radius, d.linger, friendly));
         let spell = if d.linger_spell != 0 { d.linger_spell } else { d.spell };
+        let hero = self.players.contains_key(&owner);
+        let mark = Some(if hero && spell != 0 { self.mark_unseen(d.linger) } else { self.mark_kind(at, radius, d.linger, friendly) });
         if let (Some(m), true) = (mark, spell != 0) {
             self.events.push(Event::AreaLook { id: m, caster: owner, spell, pos: at, radius });
         }

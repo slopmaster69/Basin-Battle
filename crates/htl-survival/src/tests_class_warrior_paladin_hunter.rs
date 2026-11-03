@@ -1008,10 +1008,9 @@ fn tripwire_plants_one_arrow_then_the_key_again_places_the_second_and_the_wire_r
     assert!(dist2d(first[0], [10.0, -3.0, 0.0]) < 1.5, "where it was aimed: {first:?}");
     assert!(s.hunt.wires.is_empty(), "no wire from one arrow");
     assert_eq!(s.recast_keys(p).len(), 1, "the key armed for the second");
-    // A ring round the first arrow shows how far the wire can span.
-    let ring = ground_shapes(&ev).into_iter().find(|(_, t)| t.arc >= 300.0).expect("a ring round the first arrow");
-    assert!((ring.1.reach - hunter::WIRE_SPAN).abs() < 1.0e-3, "as wide as the wire spans: {}", ring.1.reach);
-    assert!(dist2d(ring.1.at.unwrap().0, first[0]) < 0.3, "round the first arrow");
+    // No ring drawn round the first arrow for the wire's span (floor clutter, Corey's review).
+    assert!(!ground_shapes(&ev).into_iter().any(|(_, t)| t.arc >= 300.0 && (t.reach - hunter::WIRE_SPAN).abs() < 1.0e-3), "no span ring");
+    let ring = (s.hunt.first_arrows[&p].ring, ());
     // The second press: the other arrow where it's aimed, and the wire.
     let mut ev = press_again(&mut s, p, "defense");
     assert_eq!(aiming(&s, p), Some(idx(&s, "tripwire_second")));
@@ -1059,11 +1058,12 @@ fn a_tripwire_left_at_one_arrow_is_just_a_planted_arrow_once_the_key_stops_waiti
     let mut ev = press(&mut s, p, "tripwire", false);
     aim_at(&mut s, p, [10.0, 0.0]);
     ev.extend(click(&mut s, p));
-    let ring = ground_shapes(&ev).into_iter().find(|(_, t)| t.arc >= 300.0).expect("a ring").0;
+    let _ = ev;
+    let ring = s.hunt.first_arrows[&p].ring;
     let window = s.content.abilities[idx(&s, "tripwire")].recast_secs;
     let ev = run(&mut s, window + 0.5);
     assert!(s.recast_keys(p).is_empty(), "the window closed");
-    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == ring)), "its ring gone");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == ring)), "its mark gone");
     assert_eq!(s.planted_of(p).len(), 1, "the arrow stays planted");
     assert!(s.hunt.wires.is_empty(), "no wire");
     // The key is Tripwire's first arrow again...

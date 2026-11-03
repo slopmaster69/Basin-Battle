@@ -1682,6 +1682,14 @@ impl Survival {
         id
     }
 
+    /// A mark with no circle drawn (a hero's ground whose own spell look shows it): it lasts and
+    /// goes as any mark, taking that look with it.
+    pub(crate) fn mark_unseen(&mut self, secs: f32) -> Id {
+        let id = self.alloc();
+        self.marks.push((id, self.clock + secs));
+        id
+    }
+
     /// A warning laid on the ground as a real spell's look (`ground`, see [`mobs::ground_look`]):
     /// a creature's splash coming down, a hazard about to go off. 0: the drawn circle. A spell's
     /// ground look keeps its own size whatever the radius (Heated Ground covers a whole room), so

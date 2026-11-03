@@ -4527,7 +4527,9 @@ choice = 2
 kind = "leap"
 back = true
 range = [12.0, 12.0]
-lift = 5.0
+# Higher than a plain leap back (Corey's review: a little more height, so it reads as a
+# real jump away): 1.1 yd up at the top (0.65 at 5), 0.67 sec in the air (0.52).
+lift = 6.5
 cooldown = 12.0
 # No cast look of its own: Disengage's (781) is a white blink star on the hunter, which read as
 # something going wrong (visual check, run 015). The flip and the net are the look.
@@ -4585,7 +4587,9 @@ slot = "utility"
 kind = "leap"
 back = true
 range = [12.0, 12.0]
-lift = 5.0
+# Higher than a plain leap back (Corey's review: a little more height, so it reads as a
+# real jump away): 1.1 yd up at the top (0.65 at 5), 0.67 sec in the air (0.52).
+lift = 6.5
 damage = [10.0, 10.0]
 radius = [2.0, 2.0]
 # No cast look: Disengage's (781) is a white blink star on the hunter (see Ensnaring Retreat).
@@ -4598,7 +4602,7 @@ leap_flip = true
 
 # 2: two arrows and a wire between them, each arrow placed by the hero. The first press plants
 # one; the key again (within its window) places the second within 10 yd of it (hunter.rs's
-# WIRE_SPAN, the ring shown round the first), and the wire forms between them.
+# WIRE_SPAN), and the wire forms between them.
 [[ability]]
 key = "tripwire"
 name = "Tripwire"

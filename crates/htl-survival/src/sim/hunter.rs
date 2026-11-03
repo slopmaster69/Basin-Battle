@@ -356,9 +356,9 @@ impl Survival {
 
     // --- the tripwire ------------------------------------------------------------------------------
 
-    /// Tripwire's first press plants one arrow at the reticle and arms the key for the second
-    /// (its recast), a ring round the arrow showing how far the wire can span; the second press
-    /// (the recast, `inner`) plants the other within that ring and the wire forms between them.
+    /// Tripwire's first press plants one arrow at the reticle and arms the key for the second (its
+    /// recast); the second press (the recast, `inner`) plants the other within [`WIRE_SPAN`] of it
+    /// and the wire forms between them.
     fn lay_tripwire(&mut self, id: Id, ability: usize, share: f32) {
         let d = self.content.abilities[ability].clone();
         if d.inner {
@@ -371,16 +371,16 @@ impl Survival {
         if let Some(old) = self.hunt.first_arrows.remove(&id) {
             self.unmark(old.ring);
         }
-        // The ring the second arrow lands in, for as long as the key waits for it (a little past,
-        // while it's aimed; it goes when the window does).
+        // How long the key waits for the second (a little past, while it's aimed). No ring is
+        // drawn round the first for how far the wire spans (Corey's review: floor clutter); a
+        // second aimed past the span still lands on its edge (`within_span`).
         let window = d.recast_secs.max(0.5);
-        let tele = Telegraph { own_hidden: false, ..Telegraph::hero_shape(id, WIRE_SPAN, 360.0, 0.0, window, Some((at, 0.0))) };
-        let ring = self.mark_as(at, WIRE_SPAN, window + 10.0, Some(tele));
+        let ring = self.mark_unseen(window + 10.0);
         self.hunt.first_arrows.insert(id, FirstArrow { ability, at, ring });
     }
 
-    /// The second arrow: within the ring round the first (aimed past it, at its edge), and the
-    /// wire between the two.
+    /// The second arrow: within [`WIRE_SPAN`] of the first (aimed past it, at that distance), and
+    /// the wire between the two.
     fn tie_tripwire(&mut self, id: Id, ability: usize, share: f32) {
         let now = self.clock;
         let range = AbilityDef::at(self.content.abilities[ability].range, share);
@@ -1179,7 +1179,7 @@ fn side(a: Vec3, b: Vec3, p: Vec3) -> bool {
 }
 
 /// Where a tripwire's second arrow goes, aimed at `at` with the first at `a`: there, or on the
-/// edge of the ring round the first ([`WIRE_SPAN`]) when aimed past it.
+/// span's end ([`WIRE_SPAN`] from the first) when aimed past it.
 pub(crate) fn within_span(a: Vec3, at: Vec3) -> Vec3 {
     let d = dist2d(a, at);
     if d <= WIRE_SPAN {
