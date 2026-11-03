@@ -306,8 +306,9 @@ impl SurvivalGame {
             copy_shots(since, upto, &folder);
         });
         match written {
-            Ok(()) => self.tell(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
-            Err(e) => self.tell(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
+            // In chat, not on screen: a queued run starting at once would have it in its frames.
+            Ok(()) => self.say_to(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
+            Err(e) => self.say_to(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
         }
     }
 }
