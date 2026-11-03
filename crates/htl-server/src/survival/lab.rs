@@ -381,22 +381,33 @@ fn lab_find(args: &[String]) {
     let _ = std::fs::create_dir_all(out.parent().unwrap()).and_then(|_| std::fs::write(&out, text));
 }
 
-/// The screenshots saved from `since` (a moment before) to `upto`, copied into `to`.
+/// The screenshots saved from `since` (a moment before) to `upto`, moved into `to` at half size.
+/// Moved, not copied, and halved: at full size, a night of runs kept twice over filled the host's
+/// disk (a 3440 wide shot is about 6 MB). Half size still makes a 1280 wide clip.
 fn copy_shots(since: std::time::SystemTime, upto: std::time::SystemTime, to: &std::path::Path) {
     let Some(dir) = shots_dir() else { return };
     let from = since - std::time::Duration::from_millis(500);
     let Ok(entries) = std::fs::read_dir(&dir) else { return };
-    let mut copied = 0;
+    let mut made = false;
     for e in entries.flatten() {
         let fresh = e.metadata().and_then(|m| m.modified()).is_ok_and(|t| t >= from && t <= upto);
         let name = e.file_name();
-        if fresh && name.to_string_lossy().starts_with("WoWScrnShot_") {
-            if copied == 0 && std::fs::create_dir_all(to).is_err() {
+        if !fresh || !name.to_string_lossy().starts_with("WoWScrnShot_") {
+            continue;
+        }
+        if !made {
+            if std::fs::create_dir_all(to).is_err() {
                 return;
             }
-            if std::fs::copy(e.path(), to.join(&name)).is_ok() {
-                copied += 1;
-            }
+            made = true;
+        }
+        let out = to.join(&name);
+        let halved = image::open(e.path()).ok().map(|im| im.resize(im.width() / 2, im.height() / 2, image::imageops::FilterType::Triangle)).and_then(|im| im.save(&out).ok());
+        // The original goes only once its half-size copy is written; if that failed, it moves whole.
+        if halved.is_some() {
+            let _ = std::fs::remove_file(e.path());
+        } else if std::fs::rename(e.path(), &out).is_err() {
+            let _ = std::fs::copy(e.path(), &out);
         }
     }
 }
