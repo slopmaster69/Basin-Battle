@@ -44,9 +44,9 @@ const WILD_EMPOWERED: f32 = 1.25;
 /// arrow empowered it too, so from range every call was half price. Now it pays for the core's
 /// own moves, and only for a few seconds: answer the parry with a beast.)
 pub const WILD_PRIMED_SECS: f32 = 4.0;
-/// A beast rushes from the hunter's side to its target this long after the call, and strikes as
-/// it arrives (Corey's review: at 0.3 sec it was on the foe before anyone could see which beast
-/// came), then stays this long after its strike, so who came and what it did can be seen
+/// A beast appears near its target and charges it, striking as it arrives this long after the
+/// call (Corey's review: at 0.3 sec, out of the hunter, it was on the foe before anyone could see
+/// which beast came), then stays this long after its strike, so who came and what it did can be seen
 /// (play-test: at 0.9 sec they were gone before anyone could tell), then goes in the flash it
 /// came in.
 const POUNCE_SECS: f32 = 0.6;
