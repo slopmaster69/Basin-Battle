@@ -443,7 +443,7 @@ fn shield_wall_blocks_bolts() {
 }
 
 #[test]
-fn a_full_charge_flares_and_the_arrow_flies_half_again_as_fast() {
+fn a_full_draw_flies_the_arrow_half_again_as_fast_with_no_flare_on_the_drawer() {
     let mut s = world_with(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.slot_ability(p, "ranged", "aimed_arrow").unwrap();
@@ -462,7 +462,8 @@ fn a_full_charge_flares_and_the_arrow_flies_half_again_as_fast() {
     run(&mut s, 2.0);
     s.set_cooldowns(p, true);
     let ev = shoot(&mut s, 1.5);
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 353, .. } if *id == p)), "the flare as it tops out");
+    // A bow's draw has no flare on the drawer (it read as a stray buff): the camera shows it.
+    assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 353, .. } if *id == p)), "no flare as it tops out");
     assert!(ev.iter().any(|e| matches!(e, Event::Missile { spell: 3011, .. })), "full: the glowing arrow");
     assert!((s.projectiles[0].speed - 60.0).abs() < 0.01);
 }

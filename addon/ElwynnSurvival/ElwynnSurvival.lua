@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 18
+local VERSION = 19
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2172,6 +2172,34 @@ empower:SetScript("OnUpdate", function()
 end)
 ES.empower = empower
 
+-- Drawing a Hunter's bow: the camera leans in over the shoulder as the draw builds (deeper for
+-- the ultimate), and at full draw the view trembles until the shot goes (Corey's review: Aimed
+-- Shot, Kill Shot). nil: not drawing, the plain aiming camera again.
+function ES.ChargeCamera(d, share)
+  if not SetAimCamera then return end
+  if not (d and d.school == "hunter" and (d.hi or 0) >= 0.6) then
+    if ES.chargeCam then
+      ES.chargeCam = nil
+      ES.chargeShakeAt = nil
+      if ES.aimCam then SetAimCamera(1, 2.4, 0.75, 0.25) end
+    end
+    return
+  end
+  local ult = d.n == 5
+  local dist = 2.4 - (ult and 1.3 or 0.9) * share
+  if not ES.chargeCam or math.abs(ES.chargeCam - dist) > 0.04 then
+    ES.chargeCam = dist
+    SetAimCamera(1, dist, 0.75 - 0.2 * share, 0.25)
+  end
+  if share >= 1 and ShakeCamera then
+    local now = GetTime()
+    if not ES.chargeShakeAt or now >= ES.chargeShakeAt then
+      ES.chargeShakeAt = now + 0.15
+      ShakeCamera(ult and 0.9 or 0.5, 0.18, 22)
+    end
+  end
+end
+
 local BURST_SECS = 0.45
 function ES.ChargeFull(d)
   local look = d and COLUMN_LOOK[d.school or ""]
@@ -2250,6 +2278,7 @@ aim:SetScript("OnUpdate", function()
   if a.name == "charge" and d and d.hi > 0 then
     local t = GetTime() - a.start
     local share = Clamp(t / d.hi, 0, 1)
+    ES.ChargeCamera(d, share)
     size = 56 - 32 * share
     if share >= 1 then
       -- Full: gold, with a slow beat, and once the burst.
@@ -2272,7 +2301,10 @@ aim:SetScript("OnUpdate", function()
     alpha = 0.95
   end
   if ES.StepCatch then ES.StepCatch() end
-  if a.name ~= "charge" then this.fullAt = nil end
+  if a.name ~= "charge" then
+    this.fullAt = nil
+    ES.ChargeCamera(nil)
+  end
   if this.burstAt then
     local t = (GetTime() - this.burstAt) / BURST_SECS
     if t >= 1 then

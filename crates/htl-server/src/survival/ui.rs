@@ -333,7 +333,9 @@ pub(crate) const VERSION: u32 = 2;
 /// 18: the Hunter's play-test fixes (#110): Call of the Wild's empowered key (`AB`'s last field),
 /// Skyfall's hang on the action bar, and Grapple Arrow's catch preview and Disengage's flip
 /// (`GP`, `FP`, `Grapple.lua`).
-pub(crate) const ADDON_NEWEST: u32 = 18;
+/// 19: a Hunter's bow draw leans the camera in and trembles it at full draw (Aimed Shot, Kill
+/// Shot).
+pub(crate) const ADDON_NEWEST: u32 = 19;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019).
 pub(crate) const CLIENT_NEWEST: u8 = 12;

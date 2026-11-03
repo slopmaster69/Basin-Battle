@@ -2991,8 +2991,10 @@ impl Survival {
                 let held = now - since;
                 let pending = self.players[&id].release_at_least;
                 let hold = self.content.abilities[ability].hold;
-                // Topped out: the flare on the caster (everyone sees it), once.
-                if hi > 0.0 && held >= hi && held - dt < hi {
+                // Topped out: the flare on the caster (everyone sees it), once. Not on a bow's
+                // draw: there the bow's own tension shows it, and the drawer's camera leans in and
+                // trembles (the add-on); the flare read as a stray buff (Corey's review).
+                if hi > 0.0 && held >= hi && held - dt < hi && !self.content.abilities[ability].bow {
                     let kit = self.full_kit(ability);
                     if kit != 0 {
                         self.events.push(Event::Visual { id, kit, by: None });
