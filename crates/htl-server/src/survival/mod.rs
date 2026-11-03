@@ -256,6 +256,8 @@ pub struct SurvivalGame {
     /// The spell lab's run under way (`.es lab`), and the bodies its last scene set out.
     pub(crate) lab: Option<lab::Lab>,
     pub(crate) lab_mobs: Vec<Id>,
+    /// When the lab's queue file was last looked at.
+    pub(crate) lab_polled: Instant,
     dirty: bool,
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
@@ -357,6 +359,7 @@ impl SurvivalGame {
             clock_at: Instant::now(),
             lab: None,
             lab_mobs: Vec::new(),
+            lab_polled: Instant::now(),
         };
         g.bind_world();
         g
@@ -369,6 +372,7 @@ impl SurvivalGame {
     /// One tick: the rules step, their events play out, the add-ons hear what changed, and the
     /// world is saved now and then.
     pub(crate) fn tick(&mut self) {
+                self.lab_queue();
                 self.lab_steps();
                 let events = self.sim.step(TICK.as_secs_f32());
                 self.lab_trace(&events);

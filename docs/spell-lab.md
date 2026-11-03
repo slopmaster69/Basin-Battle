@@ -21,7 +21,14 @@ what it sent, side by side on one sheet.
    python3 tools/spell-lab/sheet.py <screenshots folder> <trace.txt> sheet.png
    ```
 
-   Each frame shows its time from the press and what the server sent in that frame's interval:
+   To share it with the group as a video (each frame stamped with its time; `--speed 0.25`
+   for quarter speed, a `.gif` for chats that won't play video):
+
+   ```sh
+   python3 tools/spell-lab/clip.py <screenshots folder> clip.mp4 --every 80 --speed 0.25
+   ```
+
+   Each frame of the sheet shows its time from the press and what the server sent in that frame's interval:
    the presses (blue), spell visuals, clips, missiles, hops and reels.
 
 ### Options
