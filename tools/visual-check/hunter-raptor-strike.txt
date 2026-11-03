@@ -1,0 +1,17 @@
+# Raptor Strike (E, its second choice), the whole chain: Raptor Strike, Sweep, Uppercut (the
+# knock-up and the hunter's jump), then Stoop down onto it.
+# On main the 4th E brings Stoop up aimed and a left click sends it; #110 moves it to the 4th E
+# alone: then drop the two Stoop clicks below.
+# Look for: the dummy knocked up, a high jump, a fast Stoop, a landing that slams (#110: 5).
+hero hunter
+include _setup
+5.0 .es slot e raptor_strike
+5.5 lua MoveForwardStart()           # two steps in: the dummy within reach (4.5 yd)
+5.8 lua MoveForwardStop()
+6.5 .es in ab 1 0                    # Raptor Strike
+7.2 .es in ab 1 0                    # Sweep
+7.9 .es in ab 1 0                    # Uppercut: up they go, and the hunter with them
+8.5 .es in ab 1 0                    # Stoop
+8.7 .es in a {facing} -0.7           # down onto the dummy
+8.8 .es in au {facing} -0.7
+6.3 shots chain 60 0.06

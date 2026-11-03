@@ -1,0 +1,17 @@
+# Tripwire (2): laid between the hunter and the dummy, then Reverse Grapple hauls the dummy across.
+# On main both arrows go down at once; #110 has the hunter place each: then aim two presses here.
+# Look for: two arrows in the ground with the rope running between them (not across them), and
+# the dummy tripping on it (#110: 2).
+hero hunter
+include _setup
+5.0 .es slot 2 tripwire
+5.2 .es slot 1 grapple_arrow
+5.5 .es valor full
+6.0 .es in ab 3 0
+6.5 .es in a {facing} -0.56          # the ground about 3 yd ahead
+6.6 .es in au {facing} -0.56
+6.3 shots laid 12 0.1
+8.5 .es in ab 2 1                    # Reverse Grapple: the dummy dragged over the wire
+9.0 .es in a
+9.1 .es in au
+8.8 shots tripped 35 0.06

@@ -592,3 +592,24 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     let want = d.delay - d.look_lead;
     assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
 }
+
+/// `.es dummy clear`, which the visual check runs before it puts up its one dummy.
+#[test]
+fn clearing_the_dummies_takes_every_dummy_and_nothing_else() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.spawn_dummy(p, "").unwrap();
+    s.spawn_dummy(p, "guard").unwrap();
+    let boar = s.content.mob("boar").unwrap();
+    let boar = s.spawn_mob(boar, [20.0, 0.0, 0.0], None, false);
+    let _ = s.step(DT);
+    let dummies = |s: &Survival| s.mobs.values().filter(|m| s.content.mobs[m.def].dummy).count();
+    assert_eq!(dummies(&s), 2);
+    assert_eq!(s.clear_dummies(), 2);
+    let ev = s.step(DT);
+    assert_eq!(dummies(&s), 0, "every dummy is gone");
+    assert!(s.dummies.is_empty(), "and its mode with it");
+    assert!(s.mobs.contains_key(&boar), "the boar stays");
+    assert!(!ev.iter().any(|e| matches!(e, Event::MobGone { id } if *id == boar)));
+    assert_eq!(s.clear_dummies(), 0, "again, nothing to clear");
+}

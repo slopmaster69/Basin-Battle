@@ -1,0 +1,10 @@
+# Multi-Shot (Ctrl+Q, Aimed Shot's EX version): five arrows fanned out at the dummy.
+# Look for: the bow and its draw, five separate arrows, where each lands or plants.
+hero hunter
+include _setup
+5.0 .es slot q aimed_arrow
+5.5 .es valor full
+6.0 .es in ab 0 1                    # Ctrl+Q: aiming the EX version
+6.6 .es in a
+6.8 .es in au
+6.3 shots fan 30 0.05

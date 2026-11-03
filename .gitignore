@@ -4,6 +4,9 @@
 /.sync
 /settings.sh
 /settings-windows.txt
+/visual-check-settings.txt
+/visual-check-out/
+/visual-check-client/
 /saves
 /tools/addon-harness/target
 logs/

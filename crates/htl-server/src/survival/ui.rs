@@ -1296,6 +1296,13 @@ impl SurvivalGame {
                 self.sim.heal_full(me);
                 Ok(())
             }
+            // `.es dummy clear`: every training dummy goes (the visual check starts each run from
+            // one fresh dummy, not a pile of them).
+            "dummy" if self.dev_ok() && arg == "clear" => {
+                let n = self.sim.clear_dummies();
+                self.tell(conn, &format!("Cleared {n} training dummies."));
+                Ok(())
+            }
             "dummy" if self.dev_ok() => {
                 let mode: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("dummy")).skip(1).collect();
                 self.sim.spawn_dummy(me, &mode.join(" ")).map(|t| self.tell(conn, &format!("{t} stands before you.")))
@@ -1584,8 +1591,14 @@ impl SurvivalGame {
                 "me" | "camp" => Err("Turn debug on first (.es debug).".into()),
                 _ => Err("Try .es reset me to restart this hero, or .es reset camp to restart the whole world.".into()),
             },
+            // `.es debug` turns it over; `.es debug on` and `.es debug off` set it, so a script
+            // knows where it stands whatever the last one left.
             "debug" => {
-                self.sim.debug = !self.sim.debug;
+                self.sim.debug = match arg.as_str() {
+                    "on" => true,
+                    "off" => false,
+                    _ => !self.sim.debug,
+                };
                 self.say_to(conn, if self.sim.debug { "Debug is on. .es spells, .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es reset me and .es reset camp now work." } else { "Debug off." });
                 Ok(())
             }

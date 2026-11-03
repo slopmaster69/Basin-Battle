@@ -2862,6 +2862,18 @@ impl Survival {
         Ok(if mode.is_empty() { "A training dummy".into() } else { format!("A training dummy ({mode})") })
     }
 
+    /// Every training dummy gone (dev: `.es dummy clear`); how many there were.
+    pub fn clear_dummies(&mut self) -> usize {
+        let gone: Vec<Id> = self.mobs.iter().filter(|(_, m)| self.content.mobs[m.def].dummy).map(|(id, _)| *id).collect();
+        for id in &gone {
+            self.mobs.remove(id);
+            self.dummies.remove(id);
+            self.stances.remove(id);
+            self.events.push(Event::MobGone { id: *id });
+        }
+        gone.len()
+    }
+
     /// A dummy rolling just now: what reaches it misses.
     pub(crate) fn dummy_rolls(&self, mid: Id) -> bool {
         self.dummies.get(&mid).is_some_and(|m| m == "roll") && (self.clock % 2.0) < 0.6

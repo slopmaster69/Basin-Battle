@@ -1,0 +1,15 @@
+# Harpoon Dive (Ctrl+E with Raptor Strike on E): the harpoon hauls the hunter to the dummy, then
+# Uppercut and Stoop from there.
+# Look for: the harpoon's flight and the haul, then the chain's knock-up and Stoop.
+hero hunter
+include _setup
+5.0 .es slot e raptor_strike
+5.5 .es valor full
+6.0 .es in ab 1 1                    # Ctrl+E: aiming the harpoon
+6.5 .es in a
+6.6 .es in au
+7.5 .es in ab 1 0                    # Uppercut
+8.1 .es in ab 1 0                    # Stoop
+8.3 .es in a {facing} -0.7
+8.4 .es in au {facing} -0.7
+6.3 shots dive 55 0.06

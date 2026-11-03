@@ -1,0 +1,14 @@
+# Bank Shot (Q, its second choice): into the ground ahead so it bounces, then straight at the dummy.
+# Look for: the flight, each bounce, and where it ends, all readable; it mustn't vanish into the
+# ground (#110: 4).
+hero hunter
+include _setup
+5.0 .es slot q bank_shot
+6.0 .es in ab 0 0
+6.5 .es in a {facing} -0.45          # into the ground about 4 yd ahead: it bounces up off it
+6.6 .es in au {facing} -0.45
+6.3 shots bounce 40 0.05
+10.0 .es in ab 0 0
+10.5 .es in a                        # level, at the dummy
+10.6 .es in au
+10.3 shots straight 25 0.05

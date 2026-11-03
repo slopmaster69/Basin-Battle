@@ -1,0 +1,8 @@
+# Double Call (Ctrl+E with Call of the Wild on E): two beasts at once, the second from the next stage.
+# Look for: both beasts, each its own animal, readable together.
+hero hunter
+include _setup
+5.0 .es slot e call_of_the_wild
+5.5 .es valor full
+6.0 .es in ab 1 1
+5.8 shots beasts 30 0.07

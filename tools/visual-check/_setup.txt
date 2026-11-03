@@ -1,0 +1,12 @@
+# Every scenario starts with this (include _setup): debug on, every spell owned, no cooldowns,
+# the hero whole and with a full Valor bar, at Goldshire facing north (.es goto always leaves the
+# hero facing 0), and one fresh training dummy 6 yd ahead of them. The scenario's own lines start
+# at 5 s. To check somewhere else, change the goto: .es goto with no place lists them.
+0.0 .es debug on
+0.3 .es spells
+0.6 .es cd off
+0.9 .es goto goldshire
+3.0 .es dummy clear
+3.3 .es dummy
+3.6 .es heal
+3.9 .es valor full

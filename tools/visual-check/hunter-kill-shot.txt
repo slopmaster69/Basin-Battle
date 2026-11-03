@@ -1,0 +1,11 @@
+# Kill Shot (3): the 1 s charge, then the shot through the dummy.
+# Look for: the bow and its long draw (#110: 3), the shot's flight and hit.
+hero hunter
+include _setup
+5.0 .es slot 3 kill_shot
+5.5 .es valor full
+6.0 .es in ab 4 0
+6.4 .es in a                         # the charge
+7.7 .es in au                        # let go once it's full
+6.2 shots charge 8 0.2
+7.6 shots shot 25 0.05

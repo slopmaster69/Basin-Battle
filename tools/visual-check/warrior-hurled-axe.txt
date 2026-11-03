@@ -1,0 +1,15 @@
+# The Warrior's Axe Throw (hurled_axe, Q): thrown at the dummy and back, then thrown wide and
+# called back mid-flight with its key.
+# Look for: the axe's way back, seen all the way to the hand (#110: 7).
+hero warrior
+include _setup
+5.0 .es slot q hurled_axe
+6.0 .es in ab 0 0
+6.4 .es in a
+6.5 .es in au
+6.2 shots throw 45 0.05
+9.5 .es in ab 0 0
+9.9 .es in a {facing+0.4} -0.05      # wide of the dummy
+10.0 .es in au {facing+0.4} -0.05
+10.3 .es in ab 0 0                   # the key again: it comes back from where it is
+9.7 shots recall 35 0.05

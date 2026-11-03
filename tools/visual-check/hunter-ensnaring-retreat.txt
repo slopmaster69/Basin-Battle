@@ -1,0 +1,10 @@
+# Ensnaring Retreat (1, its second choice): a leap back from the dummy with a net thrown at it.
+# Look for: the jump-cast leap (#110: 6, the Undead female's mid-jump cast for every race), the net
+# and the dummy held in it.
+hero hunter
+include _setup
+5.0 .es slot 1 ensnaring_retreat
+5.5 lua MoveForwardStart()           # two steps in first, as if it came close
+5.8 lua MoveForwardStop()
+6.5 .es in ab 2 0
+6.3 shots retreat 35 0.06

@@ -1,0 +1,10 @@
+# Reverse Grapple (Ctrl+1 with Grapple Arrow on 1): the dummy is hauled to the hunter.
+# Look for: the line and the dummy dragged in, staggered.
+hero hunter
+include _setup
+5.0 .es slot 1 grapple_arrow
+5.5 .es valor full
+6.0 .es in ab 2 1
+6.5 .es in a
+6.6 .es in au
+6.3 shots haul 35 0.06

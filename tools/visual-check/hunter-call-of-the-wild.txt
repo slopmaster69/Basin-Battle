@@ -1,0 +1,10 @@
+# Call of the Wild (E): three calls, one per stage of the chain, at the dummy ahead (no target).
+# Look for: each beast's own body, animation and effect, there long enough to read which came and
+# what it did; its icon on the key matching the animal; no nameplates on the beasts (#110: 1).
+hero hunter
+include _setup
+5.0 .es slot e call_of_the_wild
+6.0 .es in ab 1 0                    # the first stage's beast
+7.4 .es in ab 1 0                    # the second
+8.8 .es in ab 1 0                    # the third
+5.8 shots beasts 50 0.1

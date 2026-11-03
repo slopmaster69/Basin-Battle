@@ -1,0 +1,13 @@
+# Skyfall (3, its second choice): the leap up, the hang, then the volley on the key again.
+# Seen from low and farther back, so the hunter stays in frame up high.
+# Look for: the leap, the hover with the bow drawn aiming down, the volley bursting out, the
+# landing (#110: 3).
+hero hunter
+cam 0 10 18
+include _setup
+5.0 .es slot 3 skyfall
+5.5 .es valor full
+6.0 .es in ab 4 0                    # up
+7.8 .es in ab 4 0                    # the volley
+5.8 shots leap 25 0.07
+7.6 shots volley 50 0.07

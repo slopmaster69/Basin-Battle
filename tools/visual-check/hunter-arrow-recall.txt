@@ -1,0 +1,23 @@
+# Arrow Recall (Ctrl+2 with Tripwire on 2): four Aimed Shots planted round the dummy, then every
+# arrow flies back to the hunter (planted arrows last 6 s).
+# Look for: the planted arrows easy to see on the ground, and each one seen flying back (#110: 7).
+hero hunter
+include _setup
+5.0 .es slot q aimed_arrow
+5.2 .es slot 2 tripwire
+6.0 .es in ab 0 0
+6.3 .es in a {facing-0.25} -0.4
+6.4 .es in au {facing-0.25} -0.4
+7.0 .es in ab 0 0
+7.3 .es in a {facing+0.25} -0.4
+7.4 .es in au {facing+0.25} -0.4
+8.0 .es in ab 0 0
+8.3 .es in a {facing} -0.3
+8.4 .es in au {facing} -0.3
+9.0 .es in ab 0 0
+9.3 .es in a                         # one into the dummy
+9.4 .es in au
+6.5 shots planted 4 1.0
+9.8 .es valor full
+10.2 .es in ab 3 1                   # Arrow Recall
+10.0 shots recall 40 0.05

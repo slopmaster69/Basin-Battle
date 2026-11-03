@@ -1,0 +1,15 @@
+# Aimed Shot (Q): a full draw at the dummy, then a quick shot into the ground.
+# Look for: the bow raised and drawn (not the melee weapon), the arrow's flight and hit, the
+# planted arrow standing in the ground, readable (#110: 3 and 7).
+hero hunter
+include _setup
+5.0 .es slot q aimed_arrow
+6.0 .es in ab 0 0                    # Q: aiming
+6.5 .es in a                         # left button down: the draw
+8.0 .es in au                        # let go at a full draw
+6.0 shots draw 10 0.2
+8.0 shots flight 20 0.05
+10.0 .es in ab 0 0
+10.4 .es in a {facing} -0.4          # down into the ground about 4 yd ahead
+10.5 .es in au {facing} -0.4
+10.4 shots planted 15 0.1

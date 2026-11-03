@@ -1,0 +1,15 @@
+# Grapple Arrow (1): at the dummy (hauled to it), then from the start again at the ground ahead.
+# Look for: whether the aim shows it'll catch something, the line, the haul; on terrain too
+# (#110: 6). For walls and doodads, change the goto in _setup to a place with one ahead.
+hero hunter
+include _setup
+5.0 .es slot 1 grapple_arrow
+6.0 .es in ab 2 0
+6.5 .es in a                         # level, at the dummy
+6.6 .es in au
+6.0 shots dummy 30 0.06
+9.0 .es goto goldshire
+11.5 .es in ab 2 0
+12.0 .es in a {facing+0.5} -0.2      # wide of the dummy, at the ground about 9 yd out
+12.1 .es in au {facing+0.5} -0.2
+11.6 shots ground 30 0.06
