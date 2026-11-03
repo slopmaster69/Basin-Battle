@@ -8,8 +8,9 @@ what it sent, side by side on one sheet.
 ## Running it
 
 1. Host with debug on (`.es debug`) or a dev build (`[dev] full_tree`). Stand somewhere open and
-   flat, camera behind the hero at your usual distance. Nothing on screen you don't want in the
-   frames.
+   flat. Put the camera in the same place every time: `/script ResetView(2) SetView(2)
+   CameraZoomOut(3)` sets it behind the hero at a fixed distance and pitch. Nothing on screen you
+   don't want in the frames.
 2. Type `.es lab <ability>`. It sets out the scene in front of you, puts the ability on its key
    (cooldowns off, full Valor and health), starts a burst of screenshots and presses the key for
    you a quarter-second later. Hold still until it says "Lab done".
@@ -83,9 +84,14 @@ links or attaches its sheets, before and after.
   model). Try another id with `.es fx spell <id>`, `.es fx emote <id>` or `.es fx cast <id>` on
   yourself, in its own lab burst, before putting it in content.
 - **Neither has it:** the rules never sent it. A test can catch that; add one.
-- **The frames have something the trace doesn't:** the client is doing it on its own, usually
-  from the spell's own data (its cast's clip, its visual's own movement). Pick a spell id whose
-  look is only what we want.
+- **The frames have something the trace doesn't:** the client is doing it on its own, from the
+  spell's own data. The client plays a spell's **impact** (its visual and its clip, which can be
+  a knockdown) on every unit the spell names as struck. A look sent at the caster
+  (`Target::Unit(caster)`) plays the impact on the caster: that's how Shockwave knocked its own
+  caster flat. Send an area's look at the spot (`Target::Point`) and keep `Unit` for a look that
+  belongs on that body (a buff, an aura).
+- **To try another look without a rebuild:** `.es tune ability.<key>.spell <id>`, then the lab
+  again. `.es tune keep` writes it into the rules once it's right.
 
 ## Why it's done this way
 
