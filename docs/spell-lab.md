@@ -53,7 +53,9 @@ what it sent, side by side on one sheet.
 - **From a file:** each line of `logs/lab/queue.txt` where you host is run as if typed after
   `.es lab` (`@Name` first picks the hero), one at a time. Each run's screenshots move out of
   `Screenshots` into `logs/lab/<label>/` beside its trace, at half size (a full-size burst is
-  about 250 MB). With ffmpeg on the host it's recorded as `logs/lab/<label>.mp4` too. Delete old
+  about 250 MB). With ffmpeg on the host (Windows), each run is also
+  recorded as `logs/lab/<label>.mp4` at 60 fps by Desktop Duplication (a few MB a run), and the
+  burst drops to 8 stills for the sheet. Delete old
   run folders when you're done with them: past 3 GB in `logs/lab`, the lab refuses new runs
   and says so.
 - **Finding a look:** a queue line `find <word>...` lists the game's spells whose cast, impact or

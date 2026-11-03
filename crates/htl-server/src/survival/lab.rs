@@ -27,6 +27,9 @@ use super::*;
 /// The burst unless the command says otherwise: 2.4 sec of shots, 12 a second.
 const SHOTS: u32 = 30;
 const EVERY_MS: u32 = 80;
+/// With a video of the run, the stills for its sheet: 8, every 300 ms (the same 2.4 sec).
+const VIDEO_STILLS: u32 = 8;
+const VIDEO_EVERY_MS: u32 = 300;
 /// The shots start this long before the first step, so the frame before it is in the burst.
 const LEAD: f32 = 0.25;
 /// The scene stands this long before the burst: a body just set out fades in on the client over
@@ -93,7 +96,8 @@ impl SurvivalGame {
         let mut creature = if d.kind == "stance" { "brave" } else { "dummy" }.to_string();
         let mut steps: Option<String> = None;
         let mut cam: Option<String> = None;
-        let (mut shots, mut every) = (SHOTS, EVERY_MS);
+        // With video on this computer, the stills are only the sheet's: a few, spread over the run.
+        let (mut shots, mut every) = if cfg!(windows) && ffmpeg().is_some() { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
         let mut k = 1;
         let mut free = 0;
         while k < words.len() {
@@ -340,8 +344,10 @@ fn ffmpeg() -> Option<std::path::PathBuf> {
     })
 }
 
-/// The screen as video for the run, 60 frames a second, to `logs/lab/<label>.mp4` (Windows's
-/// screen grabber; nothing happens without ffmpeg or on another system).
+/// The screen as video for the run, 60 frames a second, to `logs/lab/<label>.mp4`: a few MB a
+/// run where the screenshot burst is tens. By Desktop Duplication (ffmpeg's `ddagrab`), which sees
+/// every frame benilla's Vulkan window presents; GDI's grab (`gdigrab`) sees only a few stale
+/// ones (the visual check, #119, found it). Nothing happens without ffmpeg or on another system.
 fn record_video(label: &str, secs: f32) {
     if !cfg!(windows) {
         return;
@@ -350,8 +356,9 @@ fn record_video(label: &str, secs: f32) {
     let out = std::path::Path::new("logs").join("lab").join(format!("{label}.mp4"));
     let _ = std::fs::create_dir_all("logs/lab");
     let spawned = std::process::Command::new(ff)
-        .args(["-y", "-loglevel", "error", "-f", "gdigrab", "-framerate", "60", "-draw_mouse", "0", "-t", &format!("{secs:.2}"), "-i", "desktop"])
-        .args(["-vf", "scale=1920:-2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p"])
+        .args(["-y", "-loglevel", "error", "-f", "lavfi", "-i", "ddagrab=output_idx=0:framerate=60:draw_mouse=0"])
+        .args(["-t", &format!("{secs:.2}"), "-vf", "hwdownload,format=bgra,scale=1920:-2", "-r", "60"])
+        .args(["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"])
         .arg(&out)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
