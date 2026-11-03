@@ -110,22 +110,6 @@ For checks nobody has to click: `Install Visual Check Watcher.bat` starts the wa
   hash and unpacks the client into `clients\<name>\`. A request with a line `client <name>` runs
   on it; every other request keeps the default client from the settings.
 
-- **A GitHub mailbox**, so whoever sends the work never has to reach into the PC (each reach can
-  ask the PC's owner for permission). Make a private repository with a README, and a fine-grained
-  token for that repository alone with Contents read and write. Then put two files in
-  `Documents\visual-check\`: `github-repo.txt` (`owner/name`) and `github-token.txt` (the token;
-  never commit it or paste it anywhere else). Every 30 s the watcher reads that repository's
-  releases:
-  - A release tagged `in-<id>` carries files by name: `request--<id>.txt`, `query--<id>.txt`,
-    `scenario--<name>.txt`, `deploy--<name>.zip` (a build, as above) and `client--<name>.zip` (a
-    dev client's whole zip).
-  - Each file goes where it would be dropped by hand, requests last. The tag is noted in
-    `mailbox-seen.txt`, so it's taken once.
-  - When a request or a query ends, its `out\` folder, its `.done` or `.failed` and the end of
-    `watcher.log` go back zipped, as the asset `out--<id>.zip` of a release tagged `out-<id>-<time>`.
-
-  The token is only ever sent to api.github.com and uploads.github.com, for that one repository.
-
 The watcher needs nothing typed: a missing setting fails the request (in `.failed`) rather than
 asking. It uses the repository folder it was installed from, at whatever branch is checked out there.
 
