@@ -325,7 +325,8 @@ The numbers live in `[[ability]]` in `content/survival.toml`. For testing, with 
 in this build): `.es tree` (the board; `full`, `reset`), `.es slot <q|e|1|2|3> <ability>` (a bench
 ability too, on its row's key), `.es valor <n|full>`,
 `.es cd off|on`, `.es heal`, `.es dummy [guard|roll|counter <school>]` (a training dummy in front
-of you; `.es dummy clear` takes every dummy away), `.es cc log` and `.es pvp on|off`. `.es debug`
+of you; `.es dummy clear` takes every dummy away), `.es give <item> [n]` (an item into your
+bags, by its key in `content/`), `.es cc log` and `.es pvp on|off`. `.es debug`
 turns debug over (`.es debug on` and `.es debug off` set it); it also draws projectiles' bodies
 and every ground area on the ground. [The visual check](visual-check.md) uses these to cast
 abilities in the real client and photograph them.

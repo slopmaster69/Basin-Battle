@@ -12,8 +12,8 @@ watcher, below).
 ## What it needs, once
 
 1. **The test server**, running on that PC: `Host Basin Battle.bat`, built from the branch under
-   test. The scenarios use `.es debug on` and `.es dummy clear`, which servers from before this
-   check don't have.
+   test. The scenarios use `.es debug on`, `.es dummy clear` and `.es give`, which servers from
+   before this check don't have.
 2. **benilla's dev build.** The player build has none of the scripted probes this drives. On
    GitHub: Actions, Release, Run workflow, pick the branch, tick **dev**. (Or
    `gh workflow run release.yml --ref <branch> -f dev=true`.) The run's artifact
@@ -126,8 +126,8 @@ include _setup                # another file's lines, at their own times
   facing in degrees (0 is behind the hero `.es goto` leaves facing north), pitch below 0 looks down.
 - **Bursts**: 0.05 to 0.1 s apart is dense enough to step through an animation; the client takes
   at most one still a frame. Keep the count to what the moment needs: each still is a file.
-- **Abilities being reworked** (#110): the scenarios cast them as they are on `main`; each file
-  says what to change when the rework lands (Stoop on the 4th E, Tripwire's two placed arrows).
+- **Tripwire** takes two presses, each a placed arrow, and **Stoop** goes on the 4th E by itself:
+  their scenarios play them as #110's rework (#120) has them.
 
 `scripts\visual-check-windows.ps1 -Check` reads every scenario and builds what it would hand the
 client, without running anything (the dev Release run does this too).

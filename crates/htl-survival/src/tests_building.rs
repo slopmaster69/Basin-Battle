@@ -231,3 +231,13 @@ fn free_building_and_stocking_the_chest_are_for_testing() {
     let p = hero(&mut s, at, 0.0);
     assert!(build_at(&mut s, p, "watchtower", at).is_ok(), "nothing to pay");
 }
+
+#[test]
+fn giving_an_item_for_testing_puts_it_in_the_bags() {
+    let mut s = world();
+    let p = hero(&mut s, [0.0, 0.0, 0.0], 0.0);
+    let roast = s.content.item("roast").unwrap();
+    assert!(s.give_for_testing(p, "roast", 2).is_ok());
+    assert_eq!(s.players[&p].bag.get(&roast).copied(), Some(2));
+    assert!(s.give_for_testing(p, "no_such_thing", 1).is_err());
+}

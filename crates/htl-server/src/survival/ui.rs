@@ -1346,7 +1346,13 @@ impl SurvivalGame {
                 self.tell(conn, &format!("Sent to storage, {n} of each: {}.", names.join(", ")));
                 Ok(())
             }
-            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
+            // `.es give <item> [n]`: n (1) of an item, by its key, into the bags (the visual check's
+            // food and drink).
+            "give" if self.dev_ok() => {
+                let n = arg2.parse::<u32>().unwrap_or(1).clamp(1, 99);
+                self.sim.give_for_testing(me, &arg, n).map(|name| self.tell(conn, &format!("{n} {name} into your bags.")))
+            }
+            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // The add-on's answer to a ping: the round trip.
             "po" => {
                 let n = arg.parse::<u32>().unwrap_or(0);
@@ -1599,7 +1605,7 @@ impl SurvivalGame {
                     "off" => false,
                     _ => !self.sim.debug,
                 };
-                self.say_to(conn, if self.sim.debug { "Debug is on. .es spells, .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es reset me and .es reset camp now work." } else { "Debug off." });
+                self.say_to(conn, if self.sim.debug { "Debug is on. .es spells, .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es give <item> [n], .es reset me and .es reset camp now work." } else { "Debug off." });
                 Ok(())
             }
             "where" => {
