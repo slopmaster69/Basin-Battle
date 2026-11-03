@@ -1,11 +1,12 @@
 # Basin Battle for Windows players: sets up the benilla client and connects to a host's game.
 # Run in PowerShell from the Basin Battle folder:
 #   powershell -ExecutionPolicy Bypass -File scripts\play-windows.ps1 -Server 1.2.3.4
+#   ... -Game survival      Elwynn Survival (or basin, the default; the realm names are project.toml's)
 # The first run installs what's missing and builds the client (10-30 minutes).
 param(
     [Parameter(Mandatory = $true)][string]$Server,
     [string]$WowData = "",
-    [string]$Game = "Basin Battle"
+    [string]$Game = "basin"
 )
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -55,6 +56,18 @@ if (-not (Test-Path $Exe) -or $Built -ne $Stamp) {
 }
 $env:WOW_DATA = $WowData
 $env:WOW_HOST = $Server
+# The realm to enter, by the name project.toml gives its game (a full realm name is taken as is).
+function ProjectName($key, $default) {
+    $file = Join-Path $Root "project.toml"
+    if (Test-Path $file) {
+        foreach ($line in Get-Content $file) {
+            if ($line -match ('^\s*' + $key + '\s*=\s*"([^"]*)"') -and $Matches[1]) { return $Matches[1] }
+        }
+    }
+    return $default
+}
+if ($Game -match '^(survival|elwynn)') { $Game = ProjectName "survival" "Elwynn Survival" }
+elseif (-not $Game -or $Game -match '^basin$') { $Game = ProjectName "basin" "Basin Battle" }
 $env:WOW_REALM = $Game
 Push-Location $Benilla
 & $Exe

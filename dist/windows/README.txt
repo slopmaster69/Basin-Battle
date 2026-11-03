@@ -55,6 +55,16 @@ If you're unsure, close every benilla window and start again from the
 .bat.
 
 
+WANT TO HOST (PLAY ALONE, OR LET FRIENDS JOIN YOU)?
+--------------------------------------------------
+This zip is only the game. The server comes from the same release on the
+Releases page: download "Source code (zip)", unzip it, double-click "Host
+Basin Battle.bat" in it and leave that window open (the first time it
+builds for 5-10 minutes). Then play with this zip and type 127.0.0.1 as
+the address. Its window shows the addresses friends join with. The full
+steps are in the project's README on GitHub.
+
+
 ELWYNN SURVIVAL: CONTROLS
 -------------------------
 Press K in the game for the full list (click any key there to change it).
@@ -175,7 +185,9 @@ TROUBLESHOOTING
 
 "Unable to connect" on the login screen
     - Check the address with the host.
-    - The host must have the game running (scripts/host.sh).
+    - The host's server window must be open (Host Basin Battle.bat on
+      Windows, scripts/host.sh on a Mac).
+    - You and the host must be on the same release.
     - Over the internet, the host's router must forward ports 3724, 8085 and
       8086 to their computer.
 
