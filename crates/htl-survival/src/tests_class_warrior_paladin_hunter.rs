@@ -1143,7 +1143,7 @@ fn call_of_the_wild_sends_a_beast_a_press_through_three_stages_for_stamina() {
         let before = s.players[&p].stamina;
         s.set_aim_line(p, 0.0, 0.0);
         let mut ev = press(&mut s, p, "call_of_the_wild", false);
-        ev.extend(run_pinned(&mut s, 0.5, &[k]));
+        ev.extend(run_pinned(&mut s, 0.8, &[k]));
         assert!(!hits(&ev, p, k).is_empty(), "stage {stage}'s beast strikes");
         assert!(ev.iter().any(|e| matches!(e, Event::MobMove { .. })), "it runs there");
         let spent = before - s.players[&p].stamina;
@@ -1157,7 +1157,7 @@ fn call_of_the_wild_sends_a_beast_a_press_through_three_stages_for_stamina() {
     assert!(!s.mobs.values().any(|m| s.content.mobs[m.def].key.starts_with("spirit_")));
     // Four seconds without a call: back to the first stage.
     press(&mut s, p, "call_of_the_wild", false);
-    run_pinned(&mut s, 0.5, &[k]);
+    run_pinned(&mut s, 0.8, &[k]);
     assert_eq!(s.wild_now(p).stage, 1);
     run_pinned(&mut s, 4.5, &[k]);
     assert_eq!(s.wild_now(p).stage, 0, "back to the start");
@@ -1188,19 +1188,19 @@ fn the_owl_marks_and_the_bear_mauls_a_staggered_foe_for_triple() {
     s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 0, next: owl, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     s.set_aim_line(p, 0.0, 0.0);
     press(&mut s, p, "call_of_the_wild", false);
-    run_pinned(&mut s, 0.5, &[k]);
+    run_pinned(&mut s, 0.8, &[k]);
     assert!(s.has_cc(k, "mark"), "the Owl marks");
     // The Bear on a plain foe, then on a staggered one.
     s.cleanse(k, &["mark"]);
     s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     let mut ev = press(&mut s, p, "call_of_the_wild", false);
-    ev.extend(run_pinned(&mut s, 0.5, &[k]));
+    ev.extend(run_pinned(&mut s, 0.8, &[k]));
     let plain = hits(&ev, p, k)[0];
     s.mobs.get_mut(&k).unwrap().health = 9999;
     s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     s.stagger_mob(k, 2.0, false);
     let mut ev = press(&mut s, p, "call_of_the_wild", false);
-    ev.extend(run(&mut s, 0.5));
+    ev.extend(run(&mut s, 0.8));
     let mauled = hits(&ev, p, k)[0];
     assert!(mauled as f32 >= plain as f32 * 2.5, "triple on the staggered: {plain} then {mauled}");
 }
@@ -1270,14 +1270,15 @@ fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() 
     assert!(s.has_cc(k, "root"), "the attacker netted");
     assert_eq!(s.planted_of(p).len(), 5, "five arrows scattered");
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)) || matches!(s.players[&p].action, Action::Dash { .. }), "and away");
-    // Unused, it leaves anyway when it runs out.
+    // Unused, it's wasted: no leap when it runs out (a counter and nothing else).
     run(&mut s, 3.0);
     s.set_valor(p, 25.0);
     s.set_cooldowns(p, true);
     s.input(p, Input::Ability(key_of("utility"), true));
     let mut ev = s.step(DT);
     ev.extend(run(&mut s, 2.3));
-    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)), "a plain Ensnaring Retreat as it ends");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)), "no leap when nothing struck");
+    assert!(s.planted_of(p).len() <= 5, "no more arrows scattered");
 }
 
 #[test]

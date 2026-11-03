@@ -4559,7 +4559,7 @@ effects = [{ kind = "root", secs = [2.0, 2.0], aura = 6533 }]
 key = "trappers_instinct"
 name = "Trapper's Instinct"
 ex_of = "ensnaring_retreat"
-text = "Readies you for 2 sec. If anything hits you, the hit misses: you leap 12 yd away, net the attacker and scatter 5 arrows where you stood. Each enemy within 2 yd of a scattered arrow takes 10 damage. If nothing hits you, it fires as a plain Ensnaring Retreat when the 2 sec are up."
+text = "Readies you for 2 sec. If anything hits you, the hit misses: you leap 12 yd away, net the attacker and scatter 5 arrows where you stood. Each enemy within 2 yd of a scattered arrow takes 10 damage. If nothing hits you, it's wasted."
 icon = "Ability_Ensnare"
 slot = "utility"
 kind = "stance"
@@ -4570,7 +4570,9 @@ secs = 2.0
 # 11426 (reads, but frost), Stoneform 20594 (darkens her).
 aura = 1719
 spell = 5384
-counter = { immune = true, once = true, answer = "trappers_leap", expire_answer = "ensnaring_retreat" }
+# A counter and nothing else (Corey's review, Nov 3): unanswered, it's spent and on cooldown, with
+# no leap of its own.
+counter = { immune = true, once = true, answer = "trappers_leap" }
 
 # What Trapper's Instinct does when it's struck: away, the net on whoever struck, arrows scattered.
 [[ability]]
@@ -4586,7 +4588,8 @@ range = [12.0, 12.0]
 lift = 5.0
 damage = [10.0, 10.0]
 radius = [2.0, 2.0]
-spell = 781
+# No cast look: Disengage's (781) is a white blink star on the hunter (see Ensnaring Retreat).
+spell = 0
 also = "hunter_net"
 # Ensnaring Retreat's flip (#110).
 leap_clip = 38

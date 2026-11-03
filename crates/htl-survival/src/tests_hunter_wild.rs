@@ -102,7 +102,7 @@ fn with_no_lock_one_press_sends_the_beast_at_the_foe_the_camera_looks_at() {
     assert!(s.players[&p].lock.is_none());
     let mut ev = call(&mut s, p, Some((0.0, 0.0)));
     assert!(!matches!(s.players[&p].action, Action::Aim { .. }), "no aiming: it goes at once");
-    ev.extend(run_pinned(&mut s, 0.5, &[ahead, aside]));
+    ev.extend(run_pinned(&mut s, 0.8, &[ahead, aside]));
     assert!(!hits(&ev, p, ahead).is_empty(), "the beast strikes the foe ahead of the camera");
     assert!(hits(&ev, p, aside).is_empty(), "not the one off the line");
 }
@@ -116,7 +116,7 @@ fn a_press_kept_past_a_swing_still_goes_where_the_camera_was() {
     s.set_aim_line(p, 0.0, 0.0);
     run_pinned(&mut s, 1.0, &[k]);
     let mut ev = call(&mut s, p, None);
-    ev.extend(run_pinned(&mut s, 0.5, &[k]));
+    ev.extend(run_pinned(&mut s, 0.8, &[k]));
     assert!(!hits(&ev, p, k).is_empty(), "the camera's line from a second ago, not the hero's back");
 }
 
@@ -129,7 +129,7 @@ fn the_lock_still_wins() {
     let locked = mob(&mut s, "grunt", [0.0, 10.0, 0.0]);
     s.players.get_mut(&p).unwrap().lock = Some(locked);
     let mut ev = call(&mut s, p, Some((0.0, 0.0)));
-    ev.extend(run_pinned(&mut s, 0.5, &[ahead, locked]));
+    ev.extend(run_pinned(&mut s, 0.8, &[ahead, locked]));
     assert!(!hits(&ev, p, locked).is_empty());
     assert!(hits(&ev, p, ahead).is_empty());
 }
@@ -188,7 +188,7 @@ fn a_parry_empowers_the_next_call_for_a_few_seconds() {
     let k = mob(&mut s, "grunt", [10.0, 0.0, 0.0]);
     s.prime_wild(p);
     call(&mut s, p, Some((0.0, 0.0)));
-    run_pinned(&mut s, 0.5, &[k]);
+    run_pinned(&mut s, 0.8, &[k]);
     assert!(!s.wild_now(p).primed);
 }
 
@@ -199,7 +199,7 @@ fn a_blow_landed_no_longer_empowers_the_call() {
     slot_call(&mut s, p, true);
     let k = mob(&mut s, "grunt", [10.0, 0.0, 0.0]);
     call(&mut s, p, Some((0.0, 0.0)));
-    let ev = run_pinned(&mut s, 0.5, &[k]);
+    let ev = run_pinned(&mut s, 0.8, &[k]);
     // (Its own beast's strike landed, and the next call is a full one.)
     assert!(!hits(&ev, p, k).is_empty());
     assert!(!s.wild_now(p).primed);
@@ -215,7 +215,7 @@ fn the_beast_strikes_with_its_own_look_roars_lingers_and_goes_in_a_flash() {
     let body = spirits(&s)[0];
     let beast = BEASTS.iter().find(|b| s.content.mob(b.mob) == Some(s.mobs[&body].def)).unwrap();
     assert!(s.spirit_body(body));
-    ev.extend(run_pinned(&mut s, 0.5, &[k]));
+    ev.extend(run_pinned(&mut s, 0.8, &[k]));
     assert!(
         ev.iter().any(|e| matches!(e, Event::Missile { caster, spell, target: Target::Unit(t) } if *caster == body && *spell == beast.strike && *t == k)),
         "{}'s own strike, from it onto the foe",
@@ -237,7 +237,7 @@ fn a_beast_is_never_locked_on_nor_in_the_way() {
     slot_call(&mut s, p, true);
     let k = mob(&mut s, "grunt", [10.0, 0.0, 0.0]);
     call(&mut s, p, Some((0.0, 0.0)));
-    run_pinned(&mut s, 0.5, &[k]);
+    run_pinned(&mut s, 0.8, &[k]);
     let body = spirits(&s)[0];
     // The foe gone, only the beast is left in front of the hero: Tab finds nothing.
     s.mobs.remove(&k);
@@ -260,14 +260,24 @@ fn every_beast_has_a_body_and_an_icon_of_its_own_animal() {
 }
 
 #[test]
-fn a_beast_strikes_from_the_foes_flank_clear_of_the_hunters_back() {
+fn a_beast_appears_by_the_foe_and_strikes_from_its_flank_clear_of_the_hunters_back() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     slot_call(&mut s, p, true);
     let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
-    call(&mut s, p, Some((0.0, 0.0)));
+    let ev = call(&mut s, p, Some((0.0, 0.0)));
     let body = spirits(&s)[0];
-    run_pinned(&mut s, 0.5, &[k]);
+    // It appears by the foe, off to one side, not out of the hunter, and charges in.
+    let start = ev
+        .iter()
+        .find_map(|e| match e {
+            Event::MobMove { id, path, .. } if *id == body => path.first().copied(),
+            _ => None,
+        })
+        .expect("it charges");
+    assert!(dist2d(start, [6.0, 0.0, 0.0]) < dist2d(start, ORIGIN), "nearer the foe than the hunter: {start:?}");
+    assert!(start[1].abs() > 1.5, "off to the side, in the camera's view: {start:?}");
+    run_pinned(&mut s, 0.8, &[k]);
     // The action camera looks down the hunter's back at the foe: a beast on that line (between
     // them) is hidden behind her. Beside the foe, well off the line, it's seen.
     let at = s.mobs[&body].pos;

@@ -44,14 +44,20 @@ const WILD_EMPOWERED: f32 = 1.25;
 /// arrow empowered it too, so from range every call was half price. Now it pays for the core's
 /// own moves, and only for a few seconds: answer the parry with a beast.)
 pub const WILD_PRIMED_SECS: f32 = 4.0;
-/// A beast is on its target this long after the call (quick: play-test liked the dash), and
-/// stays this long after its strike, so who came and what it did can be seen (play-test: at 0.9
-/// sec they were gone before anyone could tell), then goes in the flash it came in.
-const POUNCE_SECS: f32 = 0.3;
+/// A beast rushes from the hunter's side to its target this long after the call, and strikes as
+/// it arrives (Corey's review: at 0.3 sec it was on the foe before anyone could see which beast
+/// came), then stays this long after its strike, so who came and what it did can be seen
+/// (play-test: at 0.9 sec they were gone before anyone could tell), then goes in the flash it
+/// came in.
+const POUNCE_SECS: f32 = 0.6;
 const BEAST_STAYS: f32 = 1.8;
 /// How far round the foe from the near side the beast strikes from (radians): about a right
 /// angle, so it stands beside the foe, clear of the hunter's back.
 const BEAST_FLANK: f32 = 1.4;
+/// Where a beast appears: this far from its foe (yards), this far round from the hunter's side of
+/// it (radians), so it charges in across the camera's view.
+const BEAST_RUN_UP: f32 = 6.0;
+const BEAST_START: f32 = 1.0;
 /// It roars (or howls, or hisses: its model's own roar) this long after its strike.
 const BEAST_ROAR_AFTER: f32 = 0.5;
 /// `EMOTE_ONESHOT_ROAR`.
@@ -932,19 +938,24 @@ impl Survival {
         }
     }
 
-    /// A beast bursts out at the hero's side and runs at `target`.
+    /// A beast bursts out of the ground near `target`, to one side of it, and charges it (Corey's
+    /// review: not out of the hunter; it comes in close and rushes the foe).
     fn send_beast(&mut self, id: Id, ability: usize, beast: usize, target: Id, empowered: bool, delay: f32) {
         let now = self.clock;
         let Some(from) = self.players.get(&id).map(|p| p.pos) else { return };
         let Some(to) = self.unit_pos(target) else { return };
         let f = facing(from, to);
         let side = if self.rng.gen::<bool>() { 1.0 } else { -1.0 };
-        let start = self.ground_near(from[0] + (f + side * 1.2).cos() * 1.5, from[1] + (f + side * 1.2).sin() * 1.5, from[2] + 1.0);
         // It strikes from the foe's flank on its own side, not from the near side: there it stood
         // between the hunter and the foe, behind her back from the action camera (run 015: the
         // first two beasts of a chain were never seen).
         let flank = f + std::f32::consts::PI - side * BEAST_FLANK;
         let end = [to[0] + flank.cos() * 1.5, to[1] + flank.sin() * 1.5, to[2]];
+        // It appears a run-up out from that flank, off to the side and a little toward the hunter
+        // (in the camera's view), never farther out than most of the way to her.
+        let run_up = BEAST_RUN_UP.min(dist2d(from, to) * 0.6).max(2.0);
+        let out = f + std::f32::consts::PI - side * BEAST_START;
+        let start = self.ground_near(to[0] + out.cos() * run_up, to[1] + out.sin() * run_up, to[2] + 1.0);
         let body = self.content.mob(BEASTS[beast].mob).map(|def| {
             let mid = self.spawn_mob(def, start, None, false);
             if let Some(m) = self.mobs.get_mut(&mid) {
