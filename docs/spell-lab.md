@@ -60,7 +60,8 @@ what it sent, side by side on one sheet.
   `Screenshots` into `logs/lab/<label>/` beside its trace, at half size (a full-size burst is
   about 250 MB). With ffmpeg on the host (Windows), each run is also
   recorded as `logs/lab/<label>.mp4` at 60 fps by Desktop Duplication, 1920 wide (a few MB a
-  run; what ffmpeg said beside it in `<label>.ffmpeg.txt`), and the
+  run; what ffmpeg said beside it in `<label>.ffmpeg.txt`): the game's own window by Windows
+  Graphics Capture, whatever stands over it, with the interface hidden while the burst runs; and the
   burst drops to 8 stills for the sheet. Delete old
   run folders when you're done with them: past 3 GB in `logs/lab`, the lab refuses new runs
   and says so.

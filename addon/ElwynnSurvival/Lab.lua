@@ -5,13 +5,15 @@
 -- and this takes n screenshots, one every ms milliseconds, from now: the frames the server's
 -- trace (logs/lab/<label>.txt) is timed against. The client numbers shots taken within one second
 -- (WoWScrnShot_<date>_<time>_2.png ...), so a burst keeps every frame. The "Screen captured"
--- line is kept out of the frames while the burst runs.
+-- line is kept out of the frames while the burst runs, and so is the whole interface (bars, chat,
+-- windows: a window left open once covered the hero in every frame of a night's runs), shown
+-- again a moment after the burst, when the server's video of it has ended too.
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., table.getn, `this`.
 
 local ES = ElwynnSurvival
 if not ES then return end
 
-local lab = { left = 0, every = 0.08, next = 0, label = "" }
+local lab = { left = 0, every = 0.08, next = 0, label = "", show_at = nil }
 ES.lab = lab
 
 local frame = CreateFrame("Frame")
@@ -32,6 +34,10 @@ end
 frame:SetScript("OnUpdate", function()
   local now = GetTime()
   if lab.left <= 0 then
+    -- The interface back once the video's last frame is past.
+    if lab.show_at and now < lab.show_at then return end
+    lab.show_at = nil
+    if UIParent then UIParent:Show() end
     frame:Hide()
     Quiet(false)
     if DEFAULT_CHAT_FRAME then
@@ -71,6 +77,8 @@ function ES.LabLine(f)
   lab.label = f[4] or ""
   lab.taken = 0
   lab.next = GetTime()
+  lab.show_at = lab.next + lab.left * lab.every + 1.0
   Quiet(true)
+  if UIParent then UIParent:Hide() end
   frame:Show()
 end
