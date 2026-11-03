@@ -1145,7 +1145,11 @@ impl Survival {
         self.events.push(Event::Health { id, health: h, max: m });
         self.events.push(Event::Bags { player: id });
         self.events.push(Event::Dirty);
-        self.events.push(Event::Missile { caster: id, spell: EAT_DONE_SPELL, target: Target::Unit(id) });
+        // A bite or a gulp is its own look (the clip, then the health bar filling): the visual
+        // check showed the done-burst (Lesser Heal's golden light) reading as a priest's heal.
+        if d.anim.is_empty() {
+            self.events.push(Event::Missile { caster: id, spell: EAT_DONE_SPELL, target: Target::Unit(id) });
+        }
     }
 
     /// The end of a commitment: back to ready (or the held guard or aim), then any buffered input.

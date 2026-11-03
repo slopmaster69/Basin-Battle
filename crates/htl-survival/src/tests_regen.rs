@@ -270,3 +270,21 @@ fn a_salve_still_has_the_food_spells_look() {
     assert!(clips(&ev, p).is_empty());
     assert!(casts(&ev, p).contains(&EAT_SPELL));
 }
+
+/// A bite's look is the eating clip and the health bar filling, not a priest's golden heal (the
+/// visual check showed Lesser Heal's burst on a Roast).
+#[test]
+fn eating_shows_no_heal_burst() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN);
+    give(&mut s, p, "roast", 1);
+    wounded(&mut s, p, 0.25);
+    s.input(p, Input::Use);
+    let mut ev = Vec::new();
+    for _ in 0..30 {
+        ev.extend(s.step(0.05));
+    }
+    assert!(s.players[&p].effects.iter().any(|e| e.kind == MEAL), "eaten");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell, .. } if *spell == EAT_DONE_SPELL)), "no golden burst");
+    assert!(ev.iter().any(|e| matches!(e, Event::Clip { clip, .. } if *clip == s.content.player.eat_clip)), "the eating clip");
+}
