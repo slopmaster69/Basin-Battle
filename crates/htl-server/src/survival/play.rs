@@ -31,11 +31,12 @@ const STAND_IN_LINGER_TICKS: u32 = 30;
 const STAND_IN_MOST_TICKS: u32 = 600;
 
 /// An unseen creature standing at a spot to fly a missile from there (see
-/// [`SurvivalGame::stand_in_create`]): its guid, its cast still to go out, how many ticks it's
-/// stood, and whether the rules are done with it (their `ObjGone`).
+/// [`SurvivalGame::stand_in_create`]): its guid, its casts still to go out (its missile, and any
+/// look cast from it in the same tick, as a Bank Shot's flash), how many ticks it's stood, and
+/// whether the rules are done with it (their `ObjGone`).
 pub(crate) struct StandIn {
     guid: u64,
-    go: Option<Packet>,
+    go: Vec<Packet>,
     ticks: u32,
     gone: bool,
 }
@@ -73,9 +74,7 @@ impl SurvivalGame {
         for (id, s) in self.stand_ins.iter_mut() {
             s.ticks += 1;
             if s.ticks >= STAND_IN_CAST_TICKS {
-                if let Some(go) = s.go.take() {
-                    cast.push(go);
-                }
+                cast.append(&mut s.go);
             }
             if (s.gone && s.ticks >= STAND_IN_CAST_TICKS + STAND_IN_LINGER_TICKS) || s.ticks >= STAND_IN_MOST_TICKS {
                 done.push((*id, s.guid));
@@ -289,12 +288,19 @@ impl SurvivalGame {
                     Aim::Point(_) => Vec::new(),
                 };
                 let ranged = self.sim.content.ranged.iter().any(|r| r.spell == spell);
-                let ammo = ranged.then_some(ARROW_DISPLAY);
+                let ammo = arrow_ammo(&self.sim.content, spell);
                 // The shot ends the bow's drawn pose.
                 if ranged {
                     self.casting.remove(&caster);
                 }
-                self.broadcast(&packets::spell_go(c, spell, aim, &hits, ammo));
+                let go = packets::spell_go(c, spell, aim, &hits, ammo);
+                // A stand-in made this tick (a flash where a Bank Shot struck) casts with its
+                // missile, once the client has placed its body (`step_stand_ins`).
+                if let Some(s) = self.stand_ins.get_mut(&caster).filter(|s| s.ticks < STAND_IN_CAST_TICKS) {
+                    s.go.push(go);
+                    return;
+                }
+                self.broadcast(&go);
             }
             Event::MissileFrom { anchor, caster: _, spell, from, target } => {
                 // A missile from a spot (a boomerang turning back, an arrow called home). The
@@ -310,9 +316,8 @@ impl SurvivalGame {
                 };
                 let (g, made) = self.stand_in_create(anchor, from);
                 self.broadcast(&made);
-                let arrow = self.sim.content.ranged.iter().any(|r| r.spell == spell) || ARROW_SPELLS.contains(&spell);
-                let go = packets::spell_go(g, spell, aim, &hits, arrow.then_some(ARROW_DISPLAY));
-                self.stand_ins.insert(anchor, StandIn { guid: g, go: Some(go), ticks: 0, gone: false });
+                let go = packets::spell_go(g, spell, aim, &hits, arrow_ammo(&self.sim.content, spell));
+                self.stand_ins.insert(anchor, StandIn { guid: g, go: vec![go], ticks: 0, gone: false });
             }
             Event::Cast { caster, spell, ms } => {
                 let Some(c) = self.guid_of(caster) else { return };
@@ -902,4 +907,15 @@ impl SurvivalGame {
 
 pub(crate) fn clean(s: &str) -> String {
     s.replace(['\t', '\n', '\r', '|', '~', '^'], " ")
+}
+
+/// The arrow a missile flies with when its look is a nocked arrow (the bow's shot, the hunter's
+/// shots in `ARROW_SPELLS`, and every Hunter arrow, those that plant), from the hero or from a
+/// stand-in: the client draws a shot with no missile model of its own from the ammo it's sent,
+/// and with none, nothing.
+fn arrow_ammo(c: &htl_survival::content::Content, spell: u32) -> Option<u32> {
+    let arrow = c.ranged.iter().any(|r| r.spell == spell)
+        || ARROW_SPELLS.contains(&spell)
+        || c.abilities.iter().any(|a| a.plants && (a.spell == spell || a.full_spell == spell));
+    arrow.then_some(ARROW_DISPLAY)
 }

@@ -3224,6 +3224,12 @@ impl Content {
             if a.bounces > 0 && a.kind != "projectile" {
                 bail!("{what}: only a projectile ricochets (`bounces`)");
             }
+            if !a.splits.is_empty() {
+                match self.ability(&a.splits).map(|k| &self.abilities[k]) {
+                    Some(s) if a.kind == "projectile" && s.inner && s.kind == "projectile" && s.splits.is_empty() => {}
+                    _ => bail!("{what}: a projectile splits into an `inner` projectile that doesn't split again (`splits` {})", a.splits),
+                }
+            }
             if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
                 bail!("{what}: an empower needs its `secs`");
             }

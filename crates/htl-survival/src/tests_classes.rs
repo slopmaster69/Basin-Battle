@@ -140,6 +140,16 @@ fn worth(d: &AbilityDef) -> f32 {
     hit + chain + burn + 0.5 * linger
 }
 
+/// [`worth`], with the spray it bursts into (`splits`): every arrow of it can go through the one
+/// foe it burst in.
+fn worth_with_spray(c: &Content, d: &AbilityDef) -> f32 {
+    let spray = c.ability(&d.splits).map_or(0.0, |k| {
+        let s = &c.abilities[k];
+        (s.damage[0] + s.damage[1]) / 2.0 * s.count.max(1) as f32
+    });
+    worth(d) + spray
+}
+
 /// The hard crowd control a hero gets from it (half a creature's).
 fn hard_cc(d: &AbilityDef) -> f32 {
     d.effects
@@ -195,7 +205,7 @@ fn the_board_keeps_to_its_budgets() {
             }
             if card.is_ex() {
                 assert!([25, 50].contains(&card.valor), "{}: an EX costs a segment or two ({})", card.key, card.valor);
-                assert!(worth(card) <= worth(d) * 1.8 + 20.0, "{}: an EX is better, not a different league", card.key);
+                assert!(worth_with_spray(c, card) <= worth(d) * 1.8 + 20.0, "{}: an EX is better, not a different league", card.key);
             }
         }
     }

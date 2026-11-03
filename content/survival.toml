@@ -4215,12 +4215,13 @@ spell = 6984
 clip = 53
 plants = true
 
-# Q, the second choice: the arrow that reads the room. Off a wall, a tree or a rock it comes away
-# harder (`bounce_gain` of its damage more a bounce) and goes through the first foe it meets after.
+# Q, the second choice: the arrow that reads the room. Off a wall or a tree it comes away harder
+# (`bounce_gain` of its damage more a bounce) and goes through the first foe it meets after; into
+# the ground at a low angle it skips off, no harder. (Rocks aren't solid to the rules yet.)
 [[ability]]
 key = "bank_shot"
 name = "Bank Shot"
-text = "Fires an arrow that ricochets off walls, trees and rocks up to twice. Each bounce makes it hit harder. An arrow that has bounced pierces the first enemy it hits. It plants where it finally stops."
+text = "Fires an arrow that ricochets off walls and trees up to 2 times, and skips off the ground at a low angle. Each ricochet adds 8 damage. An arrow that has ricocheted pierces the first enemy it hits. It plants where it finally stops."
 icon = "Ability_Hunter_SniperShot"
 school = "hunter"
 slot = "ranged"
@@ -4229,51 +4230,61 @@ kind = "projectile"
 damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
-speed = 45.0
+speed = 40.0
 bounces = 2
 bounce_gain = 0.5
 cooldown = 4.0
-# Concussive Shot's arrow: a heavy, blunt flight.
-spell = 5116
+# The Hunter's arrow (Aimed Shot's, at its speed, flown with the bow's ammo), seen the whole way:
+# each leg off a wall flies from where it struck. A burst of fire where it strikes (the Lava
+# Burst's landing), at every ricochet and skip.
+spell = 19434
+burst_spell = 5162
 clip = 53
 valor_hit = 5.0
 plants = true
 
+# Its EX: one long glowing arrow that bursts into a spray where its flight ends.
 [[ability]]
 key = "split_arrow"
 name = "Split Arrow"
 ex_of = "bank_shot"
-text = "Fires a spray of 6 arrows in a short cone and kicks you back 2 yd. Point blank, all 6 hit one target. Every arrow plants where it stops."
+text = "Fires a glowing arrow up to 36 yd. It bursts at the first enemy or wall it meets, or at the end of its flight, dealing 12 damage to the enemy it bursts in. 6 arrows spray out from the burst in a 60° fan, each dealing 5 damage to the first 2 enemies in its path. Every arrow plants where it stops."
 icon = "Ability_Hunter_Quickshot"
 slot = "ranged"
 kind = "projectile"
 valor = 25
-# 6 × 8 point blank: 48, just under what an EX of a 16 poke may be.
-damage = [8.0, 8.0]
-range = [10.0, 10.0]
+# Point blank, 12 and all 6 of the spray through one foe: 42, under what an EX of a 16 poke may be.
+damage = [12.0, 12.0]
+range = [36.0, 36.0]
 radius = [0.3, 0.3]
-speed = 40.0
-count = 6
-# 10° apart: a 50° cone, every arrow in one body within 3 yd.
-spread = 10.0
-spell = 2643
+# Arcane Shot's glowing arrow (as Kill Shot's), at its speed; a burst of fire where it splits.
+speed = 50.0
+spell = 3044
+burst_spell = 5162
+splits = "split_spray"
 clip = 53
 valor_hit = 1.5
-plants = true
-also = "split_recoil"
 
-# Split Arrow's kick: a short hop straight back.
+# Split Arrow's spray: out from the burst, through the foe it burst in and on to the next.
 [[ability]]
-key = "split_recoil"
+key = "split_spray"
 name = "Split Arrow"
-text = "Split Arrow's recoil."
+text = "Split Arrow's spray."
 icon = "Ability_Hunter_Quickshot"
 inner = true
 slot = "ranged"
-kind = "leap"
-back = true
-range = [2.0, 2.0]
-lift = 1.5
+kind = "projectile"
+damage = [5.0, 5.0]
+range = [12.0, 12.0]
+radius = [0.3, 0.3]
+speed = 50.0
+count = 6
+# 12° apart: a 60° fan.
+spread = 12.0
+pierce = 1
+spell = 3044
+valor_hit = 1.0
+plants = true
 
 # E: a spirit beast a press, a chain that builds: the first stage sets something on the foe, the
 # second turns it into something else, the third cashes it in (the beasts in `[[beast]]`).
