@@ -8,9 +8,10 @@ what it sent, side by side on one sheet.
 ## Running it
 
 1. Host with debug on (`.es debug`) or a dev build (`[dev] full_tree`). Stand somewhere open and
-   flat. Put the camera in the same place every time: `/script ResetView(2) SetView(2)
-   CameraZoomOut(3)` sets it behind the hero at a fixed distance and pitch. Nothing on screen you
-   don't want in the frames.
+   flat. Nothing on screen you don't want in the frames. The lab puts the camera in the same
+   place every run (behind the hero at a set distance, nearer for `close` and `ring`) and locks
+   the hero on to the scene's middle body, so the body and the camera face it. Don't turn the
+   camera yourself: in Elwynn Survival the body turns with it, and the blows go wide.
 2. Type `.es lab <ability>`. It sets out the scene in front of you, puts the ability on its key
    (cooldowns off, full Valor and health), starts a burst of screenshots and presses the key for
    you a quarter-second later. Hold still until it says "Lab done".
@@ -33,7 +34,7 @@ what it sent, side by side on one sheet.
 
 ### Options
 
-`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>]`
+`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none]`
 
 - **Scenes:** `one` (one body 5 yd ahead), `pack` (three across the front), `close` (one at arm's
   length), `ring` (three at arm's length), `far` (one 14 yd off). The default is `close` for
@@ -45,7 +46,13 @@ what it sent, side by side on one sheet.
   nearest creature swings at you), `wait:<secs>`. The default is the key, then `click?`.
 - **Shots:** 30 every 80 ms by default (2.4 sec). The client numbers shots within a second, so
   none are lost.
-- `.es lab clear` takes the scene away.
+- **Camera:** `behind`, `close` (nearer: the default for `close` and `ring`) or `none` (left
+  where it is).
+- `.es lab clear` takes the scene away and lets go of the lock.
+- **From a file:** each line of `logs/lab/queue.txt` where you host is run as if typed after
+  `.es lab` (`@Name` first picks the hero), one at a time. Each run's screenshots are copied to
+  `logs/lab/<label>/` beside its trace, and with ffmpeg on the host it's recorded as
+  `logs/lab/<label>.mp4` too.
 
 Examples:
 

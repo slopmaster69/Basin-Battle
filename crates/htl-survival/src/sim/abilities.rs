@@ -2709,9 +2709,16 @@ impl Survival {
             self.parry_pays(victim, attacker);
             self.parry_looks(victim, from);
             self.end_stance(victim);
-            // Turned to the one it parried, so the answer goes their way.
+            // Turned to the one it parried, so the answer goes their way. The client turns the
+            // body (its facing comes back with every step), so with nothing else held the hero
+            // locks on to them: seen in the lab, the answer swung off the way the camera faced.
             if let Some(p) = self.players.get_mut(&victim) {
                 p.facing = facing(p.pos, from);
+                if p.lock.is_none() && attacker != victim {
+                    p.lock = Some(attacker);
+                    p.lock_seen.clear();
+                    self.events.push(Event::Lock { player: victim, target: Some(attacker) });
+                }
             }
             self.heavy_answer(victim);
             return Some(Outcome::Parried);

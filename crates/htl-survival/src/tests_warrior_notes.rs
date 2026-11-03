@@ -213,3 +213,25 @@ fn shockwave_throws_the_pack_and_leaves_its_caster_where_they_stand() {
     assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, target: Target::Point(_), .. } if *caster == p)), "the look at the spot");
     assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, target: Target::Unit(t), .. } if *caster == p && *t == p)), "not on the caster");
 }
+
+/// Seen in the lab: the client's body faced 55 degrees off the brave, every step sent that facing
+/// back, and the free heavy swung at nothing.
+#[test]
+fn retaliation_answer_lands_though_the_client_faces_away_and_locks_on() {
+    let mut s = world_with(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [0.5, 1.5, 0.0]);
+    let hk = s.mobs[&k].health;
+    press(&mut s, p, "retaliation", false);
+    let out = s.counter_catch(p, k, crate::sim::abilities::HitKind::Melee, None);
+    assert_eq!(out, Some(Outcome::Parried));
+    let mut ev = Vec::new();
+    for _ in 0..30 {
+        // The client still faces the way it did: straight along +x.
+        s.move_player(p, ORIGIN, 0.0, Moving::default());
+        ev.extend(s.step(DT));
+    }
+    assert!(s.mobs[&k].health < hk, "the free heavy lands on the one parried");
+    assert_eq!(s.players[&p].lock, Some(k), "the hero locks on to the one parried");
+    assert!(s.players[&p].facing.abs() < 1e-3, "the client's facing counts again once it has struck");
+}

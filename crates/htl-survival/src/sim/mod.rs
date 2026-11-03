@@ -1244,11 +1244,14 @@ impl Survival {
             self.tell(id, "You fell through the world. You're back on the last firm ground.");
             return;
         }
+        let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
         if pos.iter().all(|v| v.is_finite()) {
             p.pos = pos;
         }
-        if facing.is_finite() {
+        // Retaliation's answer keeps the facing the parry turned it to until it has struck,
+        // whichever way the client's body still faces.
+        if facing.is_finite() && now >= p.untouchable_until {
             p.facing = facing;
         }
         p.moving = moving;

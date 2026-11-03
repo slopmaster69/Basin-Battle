@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|side|none]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none]`
 //!
 //! - It sets out the scene in front of the hero (`one`, `pack`, `close`, `ring`, `far`; see
 //!   `htl_survival::sim::lab`), of training dummies or of a creature (`brave`), puts the ability
@@ -139,9 +139,9 @@ impl SurvivalGame {
         let secs = shots as f32 * every as f32 / 1000.0;
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|t| t.as_secs()).unwrap_or(0);
         let label = format!("{key}-{scene}-{stamp}");
-        // The camera the add-on puts the run in: to the side at arm's length (the hero would
-        // hide what they strike), else behind.
-        let cam = cam.unwrap_or_else(|| if matches!(scene.as_str(), "close" | "ring") { "side" } else { "behind" }.to_string());
+        // The camera the add-on puts the run in: nearer for a scene at arm's length, else behind
+        // (the hero is locked on to the scene, so either way it's in front of them).
+        let cam = cam.unwrap_or_else(|| if matches!(scene.as_str(), "close" | "ring") { "close" } else { "behind" }.to_string());
         self.ui_line(conn, &format!("LB\t{shots}\t{every}\t{label}\t{cam}"));
         record_video(&label, shots as f32 * every as f32 / 1000.0 + 0.6);
         let mut trace = vec![
@@ -285,11 +285,13 @@ impl SurvivalGame {
         let path = dir.join(format!("{}.txt", lab.label));
         let written = std::fs::create_dir_all(&dir).and_then(|_| std::fs::File::create(&path)).and_then(|mut f| f.write_all((lab.trace.join("\n") + "\n").as_bytes()));
         // The run's screenshots, copied beside its trace once the client has written them all.
+        // Only this run's: a queued run that starts at once takes its own after it.
         let since = lab.asked;
+        let upto = std::time::SystemTime::now() + std::time::Duration::from_millis(400);
         let folder = dir.join(&lab.label);
         std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(3));
-            copy_shots(since, &folder);
+            copy_shots(since, upto, &folder);
         });
         match written {
             Ok(()) => self.tell(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
@@ -337,14 +339,14 @@ fn shots_dir() -> Option<std::path::PathBuf> {
     candidates.into_iter().flatten().find(|d| d.is_dir())
 }
 
-/// The screenshots saved since `since` (a moment before), copied into `to`.
-fn copy_shots(since: std::time::SystemTime, to: &std::path::Path) {
+/// The screenshots saved from `since` (a moment before) to `upto`, copied into `to`.
+fn copy_shots(since: std::time::SystemTime, upto: std::time::SystemTime, to: &std::path::Path) {
     let Some(dir) = shots_dir() else { return };
     let from = since - std::time::Duration::from_millis(500);
     let Ok(entries) = std::fs::read_dir(&dir) else { return };
     let mut copied = 0;
     for e in entries.flatten() {
-        let fresh = e.metadata().and_then(|m| m.modified()).is_ok_and(|t| t >= from);
+        let fresh = e.metadata().and_then(|m| m.modified()).is_ok_and(|t| t >= from && t <= upto);
         let name = e.file_name();
         if fresh && name.to_string_lossy().starts_with("WoWScrnShot_") {
             if copied == 0 && std::fs::create_dir_all(to).is_err() {
