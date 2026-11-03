@@ -1,15 +1,27 @@
-# Grapple Arrow (1): at the dummy (hauled to it), then from the start again at the ground ahead.
-# Look for: whether the aim shows it'll catch something, the line, the haul; on terrain too
-# (#110: 6). For walls and doodads, change the goto in _setup to a place with one ahead.
+# Grapple Arrow (1) from max range, four ways, each from the start again (Corey's review): the
+# ground 24 yd ahead, a creature 22 yd off, the inn's wall to the right, a tree ahead-left. Seen
+# from the side and higher so the flight shows. Look for: the catch, the line, the flight.
 hero hunter
+cam 60 -15 14
 include _setup
+4.2 .es dummy clear
 5.0 .es slot 1 grapple_arrow
 6.0 .es in ab 2 0
-6.5 .es in a                         # level, at the dummy
-6.6 .es in au
-6.0 shots dummy 30 0.06
+6.5 .es in a {facing} -0.08          # the ground about 24 yd ahead
+6.6 .es in au {facing} -0.08
+6.0 shots ground 4 0.4
 9.0 .es goto goldshire
+10.5 .es target grunt 22 still
 11.5 .es in ab 2 0
-12.0 .es in a {facing+0.5} -0.2      # wide of the dummy, at the ground about 9 yd out
-12.1 .es in au {facing+0.5} -0.2
-11.6 shots ground 30 0.06
+12.0 .es in a {facing} 0.0           # the creature
+12.1 .es in au {facing} 0.0
+14.5 .es target clear
+14.8 .es goto goldshire
+16.5 .es in ab 2 0
+17.0 .es in a {facing-1.1} 0.05      # the inn's wall, to the right
+17.1 .es in au {facing-1.1} 0.05
+19.8 .es goto goldshire
+21.5 .es in ab 2 0
+22.0 .es in a {facing+0.35} 0.08     # a tree ahead and to the left
+22.1 .es in au {facing+0.35} 0.08
+26 end

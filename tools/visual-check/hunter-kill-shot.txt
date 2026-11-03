@@ -1,11 +1,14 @@
-# Kill Shot (3): the 1 s charge, then the shot through the dummy.
-# Look for: the bow and its long draw (#110: 3), the shot's flight and hit.
+# Kill Shot (3): the whole draw held, then loosed at a creature 30 yd off under a quarter of its
+# health: the kill. Look for: a long draw, a heavy shot, and how the kill reads (Corey's review).
 hero hunter
+cam 0 -8 8
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 30 still 20%
 5.0 .es slot 3 kill_shot
 5.5 .es valor full
 6.0 .es in ab 4 0
-6.4 .es in a                         # the charge
-7.7 .es in au                        # let go once it's full
-6.2 shots charge 8 0.2
-7.6 shots shot 25 0.05
+6.4 .es in a {facing} 0.0            # the charge
+9.0 .es in au {facing} 0.0           # let go well after it's full
+6.2 shots charge 6 0.5
+13 end

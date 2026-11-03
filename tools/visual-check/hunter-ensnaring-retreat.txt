@@ -1,10 +1,12 @@
-# Ensnaring Retreat (1, its second choice): a leap back from the dummy with a net thrown at it.
-# Look for: the jump-cast leap (#110: 6, the Undead female's mid-jump cast for every race), the net
-# and the dummy held in it.
+# Ensnaring Retreat (1) with a creature close in front: the leap back with the flip and the net on
+# it, standing still. (Strafing and mid-jump need key presses the driver can't make yet: a client
+# change in #129.) Look for: the flip (the Undead woman's), its height, the net on the creature.
 hero hunter
+cam 70 -10 11
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 4 still
 5.0 .es slot 1 ensnaring_retreat
-5.2 .es dummy clear
-5.4 .es dummy 3                      # the dummy within reach (melee is 4.5 yd)
 6.5 .es in ab 2 0
-6.3 shots retreat 35 0.06
+6.3 shots retreat 5 0.3
+10 end

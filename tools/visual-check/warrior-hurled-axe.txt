@@ -1,15 +1,17 @@
-# The Warrior's Axe Throw (hurled_axe, Q): thrown at the dummy and back, then thrown wide and
-# called back mid-flight with its key.
-# Look for: the axe's way back, seen all the way to the hand (#110: 7).
+# Axe Throw (Q, the warrior's) at a creature 18 yd off, out and back; then thrown wide and called
+# back early with the key again. Look for: the axe out and home, its size and spin, the catch.
 hero warrior
+cam 0 -14 12
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 18 still
 5.0 .es slot q hurled_axe
 6.0 .es in ab 0 0
-6.4 .es in a
-6.5 .es in au
-6.2 shots throw 45 0.05
+6.4 .es in a {facing} 0.0
+6.5 .es in au {facing} 0.0
+6.2 shots throw 5 0.5
 9.5 .es in ab 0 0
-9.9 .es in a {facing+0.4} -0.05      # wide of the dummy
+9.9 .es in a {facing+0.4} -0.05      # wide of it
 10.0 .es in au {facing+0.4} -0.05
-10.3 .es in ab 0 0                   # the key again: it comes back from where it is
-9.7 shots recall 35 0.05
+10.4 .es in ab 0 0                   # the key again: it comes back from where it is
+14 end

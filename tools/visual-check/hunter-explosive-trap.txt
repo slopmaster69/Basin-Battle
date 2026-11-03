@@ -1,9 +1,13 @@
-# Explosive Trap (2, its second choice): thrown at the dummy's feet, where it goes off.
-# Look for: the trap thrown and set, the blast, the fire it leaves, the dummy thrown back.
+# Explosive Trap (2) thrown at a creature 8 yd off. Look for: the throw, the blast, the burning
+# ground's look (Corey's review: no red circle for the hero's own ground).
 hero hunter
+cam 0 -18 12
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 8 still
 5.0 .es slot 2 explosive_trap
 6.0 .es in ab 3 0
-6.5 .es in a {facing} -0.33          # at the dummy's feet, about 5.5 yd ahead
-6.6 .es in au {facing} -0.33
-6.3 shots trap 50 0.06
+6.5 .es in a {facing} -0.23          # at its feet
+6.6 .es in au {facing} -0.23
+6.3 shots trap 6 0.5
+11 end

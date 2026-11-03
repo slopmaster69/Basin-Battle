@@ -10,8 +10,7 @@ include _setup
 5.0 .es slot 3 skyfall
 5.5 .es valor full
 6.0 .es in ab 4 0                    # up
-9.5 .es in ab 4 0                    # the volley, from the hang
-9.8 .es in a {facing} -1.2           # down at the dummy, 16 yd below and 6 ahead
-9.9 .es in au {facing} -1.2
+9.5 .es in ab 4 0 {facing} -1.2      # the volley, from the hang, down at the dummy (the key
+                                     # carries the camera's line, as the client's does)
 5.8 shots hang 30 0.12
 9.4 shots volley 50 0.08

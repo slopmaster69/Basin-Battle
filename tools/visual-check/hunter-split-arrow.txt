@@ -1,10 +1,14 @@
-# Split Arrow (Ctrl+Q with Bank Shot on Q): the arrows burst out, and the hunter hops back.
-# Look for: what makes it more than Multi-Shot's cone (#110: 4), the hop back.
+# Split Arrow (Ctrl+Q with Bank Shot): one arrow out to a creature 30 yd off, then the burst and
+# the spray where it hits (Corey's review: from range, so the lone arrow's flight shows).
 hero hunter
+cam 0 -14 12
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 30 still
 5.0 .es slot q bank_shot
 5.5 .es valor full
 6.0 .es in ab 0 1
-6.6 .es in a
-6.7 .es in au
-6.4 shots split 30 0.05
+6.6 .es in a {facing} 0.0
+6.7 .es in au {facing} 0.0
+6.4 shots split 6 0.3
+11 end

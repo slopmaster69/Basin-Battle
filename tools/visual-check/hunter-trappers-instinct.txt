@@ -1,12 +1,16 @@
-# Trapper's Instinct (Ctrl+1 with Ensnaring Retreat on 1): the 2 s stance; nothing strikes the
-# hunter here, so it ends in its Ensnaring Retreat.
-# To see its answer to a blow instead, uncomment the spawn: the boar comes at the hunter and stays
-# in the world after the run (it isn't a dummy, so .es dummy clear won't take it).
-# Look for: the stance shown on the hunter, then the leap and net.
+# Trapper's Instinct (Ctrl+1) with a creature coming at the hunter: its stance, then its blow is
+# answered (the leap away, the net on it, the scattered arrows); then once more with nothing
+# striking, when it should be wasted (Corey's review: it fires only on a blow).
 hero hunter
+cam 70 -12 12
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 6               # it comes at the hunter and strikes
 5.0 .es slot 1 ensnaring_retreat
 5.5 .es valor full
-# 5.6 .es spawn boar
-6.5 .es in ab 2 1
-6.3 shots stance 45 0.07
+5.8 .es in ab 2 1
+5.6 shots stance 5 0.4
+9.0 .es target clear
+9.5 .es valor full
+10.0 .es in ab 2 1                   # nothing strikes: wasted
+14 end

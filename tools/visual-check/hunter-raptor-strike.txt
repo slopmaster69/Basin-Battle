@@ -1,14 +1,15 @@
-# Raptor Strike (E, its second choice), the whole chain: Raptor Strike, Sweep, Uppercut (the
-# knock-up and the hunter's jump), then Stoop down onto it.
-# Since #110 the 4th E sends Stoop by itself, no click.
-# Look for: the dummy knocked up, a high jump, a fast Stoop, a landing that slams (#110: 5).
+# Raptor Strike (E, four times) on a creature, not a dummy or a boss (Corey's review: does the
+# Uppercut throw the foe up?), recorded without debug's floor drawing. Look for: thrust, sweep, the
+# Uppercut throwing foe and hunter up, then the Stoop coming down beside it.
 hero hunter
+cam 50 -12 11
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 3 still
 5.0 .es slot e raptor_strike
-5.2 .es dummy clear
-5.4 .es dummy 3                      # the dummy within reach (melee is 4.5 yd)
 6.5 .es in ab 1 0                    # Raptor Strike
 7.2 .es in ab 1 0                    # Sweep
-7.9 .es in ab 1 0                    # Uppercut: up they go, and the hunter with them
-8.5 .es in ab 1 0                    # Stoop: down onto the dummy
-6.3 shots chain 60 0.06
+7.9 .es in ab 1 0                    # Uppercut
+8.5 .es in ab 1 0                    # Stoop
+6.3 shots chain 6 0.5
+12 end

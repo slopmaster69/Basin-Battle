@@ -1,17 +1,20 @@
-# Freezing Trap (Ctrl+2 with Explosive Trap on 2): the dummy frozen, then Q is empowered by it
-# (its EX version, free) for 8 s.
-# Look for: the ice on the dummy, and the Q key showing it's empowered before the shot.
+# Freezing Trap (Ctrl+2) on a creature 8 yd off, then the free, empowered Multi-Shot it readies,
+# which shatters the ice (Corey's review: the shatter should be big). Look for: the freeze, the
+# shot, the shatter.
 hero hunter
+cam 0 -15 12
 include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 8 still
 5.0 .es slot 2 explosive_trap
 5.2 .es slot q aimed_arrow
 5.5 .es valor full
 6.0 .es in ab 3 1
-6.5 .es in a {facing} -0.33
-6.6 .es in au {facing} -0.33
-6.3 shots freeze 30 0.07
+6.5 .es in a {facing} -0.23
+6.6 .es in au {facing} -0.23
+6.3 shots freeze 4 0.5
 9.5 .es valor 0                      # no Valor: what comes out is the trap's gift
 10.0 .es in ab 0 0
-10.4 .es in a
-10.5 .es in au
-9.3 shots empowered 25 0.06
+10.4 .es in a {facing} 0.0
+10.5 .es in au {facing} 0.0
+14 end
