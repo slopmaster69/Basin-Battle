@@ -10,6 +10,7 @@
 #   scripts\visual-check-windows.ps1 all                   every scenario in turn
 #   scripts\visual-check-windows.ps1 setup                 make the test heroes (once)
 #   scripts\visual-check-windows.ps1 -Watch                run what request files ask for, forever
+#                                                           (dropped in, or from a GitHub mailbox)
 #   scripts\visual-check-windows.ps1 -InstallWatcher       start the watcher with Windows, and now
 #   scripts\visual-check-windows.ps1 -UninstallWatcher     stop it, and not with Windows any more
 #   scripts\visual-check-windows.ps1 -Check                read every scenario, run nothing (CI)
@@ -733,6 +734,7 @@ function Invoke-Request($file) {
     New-Item -ItemType Directory -Force -Path $doneDir | Out-Null
     Move-Item -Force $file.FullName (Join-Path $doneDir $file.Name)
     Write-WatchLog "request $id $status"
+    Send-Mail $id $out @((Join-Path $outRoot "$id.$status"))
 }
 
 # A new build to check, with nobody at the PC: a branch's source zip (`git archive`) dropped in
@@ -825,6 +827,7 @@ function Invoke-Queries($file) {
     } finally {
         Pop-Location -ErrorAction SilentlyContinue
     }
+    Send-Mail "$id-queries" $null @($outFile)
 }
 
 # Another dev client to check with (a branch's client patches), with nobody at the PC: its zip in
@@ -856,6 +859,122 @@ function Invoke-ClientDeploy($dir) {
     Write-WatchLog "client $name : unpacked into $dest$(if ($exe) { " ($($exe.FullName))" } else { ' (no benilla.exe in it)' })"
 }
 
+# A mailbox on GitHub, so nobody has to touch this PC to send work or fetch results: with a token
+# in github-token.txt (a fine-grained token for one private repository, Contents read and write)
+# and that repository's name in github-repo.txt (owner/name), the watcher checks the repository's
+# releases every 30 s. A release tagged in-<id> carries files by name:
+#   request--<id>.txt   a request (as in requests\)       query--<id>.txt   data questions
+#   deploy--<name>.zip  a build to check (as in deploy\)  client--<name>.zip a dev client
+#   scenario--<name>.txt a scenario override (scenarios\)
+# Each is put where the watcher would find it dropped by hand, and the in- release is marked seen
+# (mailbox-seen.txt). When a request or a query ends, its out\ folder goes back zipped as a
+# release tagged out-<id>, with the end of watcher.log. Nothing else on GitHub is read or written.
+$MailEvery = 30
+$script:MailNext = Get-Date
+function Get-Mailbox {
+    $tokFile = Join-Path $Folder "github-token.txt"
+    if (-not (Test-Path $tokFile)) { return $null }
+    $tok = (Get-Content $tokFile -Raw).Trim()
+    if (-not $tok) { return $null }
+    $repoFile = Join-Path $Folder "github-repo.txt"
+    if (-not (Test-Path $repoFile)) { return $null }
+    $repo = (Get-Content $repoFile -Raw).Trim()
+    if ($repo -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { return $null }
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    @{ Repo = $repo; Headers = @{ Authorization = "Bearer $tok"; Accept = "application/vnd.github+json"; "User-Agent" = "basin-battle-visual-check" } }
+}
+
+# An asset's bytes: GitHub answers with a redirect to its storage, which must be fetched without the
+# token (the storage refuses a second way of signing in).
+function Save-Asset($url, $auth, $path) {
+    $r = [Net.HttpWebRequest]::Create($url)
+    $r.AllowAutoRedirect = $false
+    $r.Accept = "application/octet-stream"
+    $r.UserAgent = "basin-battle-visual-check"
+    $r.Headers.Add("Authorization", $auth)
+    $resp = $r.GetResponse()
+    try {
+        $code = [int]$resp.StatusCode
+        if ($code -ge 300 -and $code -lt 400) {
+            $wc = New-Object System.Net.WebClient
+            $wc.Headers.Add("User-Agent", "basin-battle-visual-check")
+            $wc.DownloadFile($resp.Headers["Location"], $path)
+            return
+        }
+        $in = $resp.GetResponseStream(); $out = [IO.File]::Create($path)
+        try { $in.CopyTo($out) } finally { $out.Close(); $in.Close() }
+    } finally { $resp.Close() }
+}
+
+function Receive-Mail {
+    if ((Get-Date) -lt $script:MailNext) { return }
+    $script:MailNext = (Get-Date).AddSeconds($MailEvery)
+    $mb = Get-Mailbox
+    if (-not $mb) { return }
+    $seenFile = Join-Path $Folder "mailbox-seen.txt"
+    $seen = @(); if (Test-Path $seenFile) { $seen = @(Get-Content $seenFile) }
+    try {
+        $rels = @(Invoke-RestMethod -Uri "https://api.github.com/repos/$($mb.Repo)/releases?per_page=50" -Headers $mb.Headers)
+    } catch { Write-WatchLog "mailbox: can't read $($mb.Repo): $($_.Exception.Message)"; return }
+    $new = @($rels | Where-Object { $_.tag_name -like "in-*" -and $seen -notcontains $_.tag_name } | Sort-Object created_at)
+    foreach ($rel in $new) {
+        Write-WatchLog "mailbox: $($rel.tag_name), $(@($rel.assets).Count) files"
+        # Requests last, so the build and the scenarios they run on are in place first.
+        $assets = @($rel.assets | Sort-Object { if ($_.name -like "request--*") { 1 } else { 0 } }, name)
+        foreach ($a in $assets) {
+            $n = $a.name
+            if ($n -notmatch '^(request|query|deploy|client|scenario)--([A-Za-z0-9._-]+)$') { Write-WatchLog "mailbox:   skipped $n"; continue }
+            $kind = $Matches[1]; $file = $Matches[2]
+            $tmp = Join-Path $Folder "mailbox-download.part"
+            Save-Asset $a.url $mb.Headers.Authorization $tmp
+            if ($kind -eq "client") {
+                # One whole zip: part-0 and its hash, as Invoke-ClientDeploy takes them.
+                $cname = [IO.Path]::GetFileNameWithoutExtension($file)
+                $cdir = Join-Path $Folder "deploy\clients\$cname"
+                New-Item -ItemType Directory -Force -Path $cdir | Out-Null
+                Move-Item -Force $tmp (Join-Path $cdir "part-0")
+                $hash = (Get-FileHash (Join-Path $cdir "part-0") -Algorithm SHA256).Hash.ToLower()
+                Set-Content -Path (Join-Path $cdir "$cname.sha256") -Value $hash
+                (Get-Item (Join-Path $cdir "$cname.sha256")).LastWriteTime = (Get-Date).AddSeconds(-10)
+                Write-WatchLog "mailbox:   $n -> $cdir"
+                continue
+            }
+            $sub = @{ request = "requests"; query = "queries"; scenario = "scenarios"; deploy = "deploy" }[$kind]
+            $dest = Join-Path (Join-Path $Folder $sub) $file
+            Move-Item -Force $tmp $dest
+            # Old enough for the loop's "nobody is still writing it" checks.
+            (Get-Item $dest).LastWriteTime = (Get-Date).AddSeconds(-10)
+            Write-WatchLog "mailbox:   $n -> $dest"
+        }
+        Add-Content -Path $seenFile -Value $rel.tag_name
+    }
+}
+
+function Send-Mail($id, $dir, [string[]]$extra = @()) {
+    $mb = Get-Mailbox
+    if (-not $mb) { return }
+    try {
+        $zip = Join-Path $Folder "mailbox-out-$id.zip"
+        Remove-Item $zip -ErrorAction SilentlyContinue
+        $stage = Join-Path $Folder "mailbox-stage"
+        if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path $stage | Out-Null
+        if ($dir -and (Test-Path $dir)) { Copy-Item $dir (Join-Path $stage $id) -Recurse }
+        foreach ($f in $extra) { if (Test-Path $f) { Copy-Item $f $stage } }
+        Get-Content (Join-Path $Folder "watcher.log") -Tail 200 -ErrorAction SilentlyContinue | Set-Content (Join-Path $stage "watcher-tail.txt")
+        Compress-Archive -Path (Join-Path $stage "*") -DestinationPath $zip
+        Remove-Item $stage -Recurse -Force
+        $tag = "out-$id-$(Get-Date -Format 'MMddHHmmss')"
+        $body = @{ tag_name = $tag; name = $tag; prerelease = $true } | ConvertTo-Json
+        $rel = Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$($mb.Repo)/releases" -Headers $mb.Headers -Body $body -ContentType "application/json"
+        $up = ($rel.upload_url -replace '\{.*\}$', '') + "?name=out--$id.zip"
+        $kb = [int]((Get-Item $zip).Length / 1024)
+        Invoke-RestMethod -Method Post -Uri $up -Headers $mb.Headers -InFile $zip -ContentType "application/zip" | Out-Null
+        Remove-Item $zip -Force
+        Write-WatchLog "mailbox: sent $tag ($kb KB)"
+    } catch { Write-WatchLog "mailbox: couldn't send $id : $($_.Exception.Message)" }
+}
+
 function Start-Watcher {
     $requests = Join-Path $Folder "requests"
     foreach ($d in @($requests, (Join-Path $Folder "out"), (Join-Path $Folder "scenarios"), (Join-Path $Folder "deploy"), (Join-Path $Folder "queries"))) {
@@ -869,6 +988,8 @@ function Start-Watcher {
     Write-WatchLog "watching $requests (from $Root)"
     try {
         while ($true) {
+            # The GitHub mailbox, if there is one (at most every 30 s).
+            try { Receive-Mail } catch { Write-WatchLog "mailbox: $($_.Exception.Message)" }
             # A new build first (between requests, never during one).
             $zip = Get-ChildItem (Join-Path $Folder "deploy") -Filter *.zip -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-5) } | Sort-Object LastWriteTime | Select-Object -First 1
