@@ -235,3 +235,26 @@ fn retaliation_answer_lands_though_the_client_faces_away_and_locks_on() {
     assert_eq!(s.players[&p].lock, Some(k), "the hero locks on to the one parried");
     assert!(s.players[&p].facing.abs() < 1e-3, "the client's facing counts again once it has struck");
 }
+
+#[test]
+fn shockwaves_look_runs_down_the_cone_not_round_the_caster() {
+    let mut s = world_with(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _k = mob(&mut s, "brave", [4.0, 0.0, 0.0]);
+    let mut ev = press(&mut s, p, "shockwave", false);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.input(p, Input::Attack);
+    ev.extend(s.step(DT));
+    s.input(p, Input::AttackUp);
+    ev.extend(run(&mut s, 1.0));
+    let spots: Vec<Vec3> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::Missile { spell: 26271, target: Target::Point(at), .. } => Some(*at),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(spots.len(), 3, "three bursts down the cone");
+    assert!(spots.iter().all(|a| a[0] > 2.0 && a[1].abs() < 0.5), "ahead of the caster, along its facing: {spots:?}");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: 25425, .. })), "no ring at the caster's feet");
+}
