@@ -2848,10 +2848,12 @@ impl Survival {
                 self.set_action(id, Action::Ready);
             }
             if !s.caught {
-                // Caught nothing: what it does then (Trapper's Instinct leaves anyway).
-                match self.content.ability(d.counter.as_ref().map_or("", |c| c.expire_answer.as_str())) {
-                    Some(then) if self.players[&id].health > 0 => self.fire(id, then, 1.0),
-                    _ => self.events.push(Event::Flash { player: id, text: format!("{} caught nothing", d.name) }),
+                // Caught nothing: what it does then (Trapper's Instinct leaves anyway). Otherwise
+                // it just ends: its look fades and the key goes on its cooldown, no word.
+                if let Some(then) = self.content.ability(d.counter.as_ref().map_or("", |c| c.expire_answer.as_str())) {
+                    if self.players[&id].health > 0 {
+                        self.fire(id, then, 1.0);
+                    }
                 }
             }
             self.update_rooted(id);
@@ -2898,7 +2900,6 @@ impl Survival {
         }
         if self.players.contains_key(&victim) {
             self.gain_valor(victim, self.content.valor.counter);
-            self.events.push(Event::Flash { player: victim, text: d.name.clone() });
         }
         self.events.push(Event::Missile { caster: victim, spell: d.spell, target: Target::Unit(victim) });
         // What it does to the one who struck.

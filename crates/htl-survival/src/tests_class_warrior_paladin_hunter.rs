@@ -1099,7 +1099,9 @@ fn a_tripwire_knocks_down_the_first_creature_across_it() {
         s.mobs.get_mut(&k).unwrap().pos = [x, 0.0, 0.0];
         ev.extend(s.step(DT));
     }
-    assert!(flashed(&ev, p, "Tripped!"), "it trips");
+    // It trips with no word over it: the dust, the fall and the snapped rope say so.
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == k && *kit == KIT_DUST)), "dust where it trips");
     assert_eq!(hits(&ev, p, k).len(), 1, "and takes the wire's damage: {:?} planted {:?}", hits(&ev, p, k), s.planted_of(p));
     assert!(s.has_cc(k, "stun"), "down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == k && *anim == KNOCKDOWN_ANIM)), "knocked to the ground");
@@ -1270,6 +1272,8 @@ fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() 
     assert!(s.has_cc(k, "root"), "the attacker netted");
     assert_eq!(s.planted_of(p).len(), 5, "five arrows scattered");
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)) || matches!(s.players[&p].action, Action::Dash { .. }), "and away");
+    // No word says it caught: the net on the grunt and the leap away do (Corey's review).
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word when it catches");
     // Unused, it's wasted: no leap when it runs out (a counter and nothing else).
     run(&mut s, 3.0);
     s.set_valor(p, 25.0);
@@ -1278,6 +1282,7 @@ fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() 
     let mut ev = s.step(DT);
     ev.extend(run(&mut s, 2.3));
     assert!(!ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)), "no leap when nothing struck");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "and no \"caught nothing\" word");
     assert!(s.planted_of(p).len() <= 5, "no more arrows scattered");
 }
 

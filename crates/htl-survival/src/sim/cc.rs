@@ -538,8 +538,9 @@ impl Survival {
         d.boss || d.totem || (matches!(m.state, super::mobs::MobState::Windup { .. }) && !self.attack_now(id).blockable)
     }
 
-    /// The hero whose control a foe shrugged off is told so (as WoW says it: Immune), once a
-    /// moment per foe so a burst over a crowd doesn't flood the screen.
+    /// A foe shrugs off a hero's control: it glances off it in a clash of sparks (no "Immune"
+    /// word: a spell's look says what happened, not text), seen by everyone, once a moment per
+    /// hero and foe so a burst over a crowd doesn't flood it.
     pub(crate) fn shrugged_off(&mut self, from: Id, target: Id) {
         if !self.players.contains_key(&from) {
             return;
@@ -553,7 +554,7 @@ impl Survival {
             self.told_immune.retain(|_, t| now < *t);
         }
         self.told_immune.insert(key, now + IMMUNE_TOLD_EVERY);
-        self.events.push(Event::Flash { player: from, text: format!("{}: Immune", self.unit_name(target)) });
+        self.events.push(Event::Visual { id: target, kit: super::combat::KIT_PARRY, by: None });
     }
 
     pub fn immune(&self, id: Id) -> bool {

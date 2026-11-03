@@ -485,6 +485,7 @@ impl Survival {
     }
 
     /// The wire catches `v`: its damage, and it goes down (a boss stumbles: posture instead).
+    /// No word says so: the rope snaps, the dust kicks up and the foe falls (Corey's rule).
     fn trip(&mut self, owner: Id, v: Id, ability: usize) {
         let d = self.content.abilities[ability].clone();
         let Some(at) = self.unit_pos(v) else { return };
@@ -493,7 +494,6 @@ impl Survival {
         if self.holds_ground(v) {
             self.build_posture(v, owner, 40);
         }
-        self.events.push(Event::Flash { player: owner, text: "Tripped!".into() });
     }
 
     // --- knockdown ---------------------------------------------------------------------------------
