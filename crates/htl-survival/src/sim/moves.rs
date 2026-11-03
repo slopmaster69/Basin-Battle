@@ -322,12 +322,25 @@ impl Survival {
             .min_by(|a, b| dist2d(a.1.pos, pos).total_cmp(&dist2d(b.1.pos, pos)))
             .map(|(_, m)| {
                 let up = loft_at(m.thrown_lift, m.thrown_until, now);
-                self.ground_near(m.pos[0], m.pos[1], m.pos[2] - up)
+                (self.ground_near(m.pos[0], m.pos[1], m.pos[2] - up), 0.5 * self.content.mobs[m.def].scale)
             });
-        let locked = self.players[&id].lock.filter(|l| self.alive(*l)).and_then(|l| self.unit_pos(l)).filter(|at| dist2d(*at, pos) <= range).map(|at| self.ground_near(at[0], at[1], at[2]));
-        let target = thrown.or(locked).unwrap_or_else(|| self.aim_point(id, range));
+        let locked = self.players[&id].lock.filter(|l| self.alive(*l)).and_then(|l| self.unit_pos(l).map(|at| (l, at))).filter(|(_, at)| dist2d(*at, pos) <= range).map(|(l, at)| {
+            let body = self.mobs.get(&l).map_or(HERO_SIZE, |m| 0.5 * self.content.mobs[m.def].scale);
+            (self.ground_near(at[0], at[1], at[2]), body)
+        });
+        let (foe, body) = match thrown.or(locked) {
+            Some((at, body)) => (Some(at), body),
+            None => (None, 0.0),
+        };
+        let foe_at = foe.unwrap_or_else(|| self.aim_point(id, range));
+        let dir = if dist2d(pos, foe_at) > 0.1 { facing(pos, foe_at) } else { self.players[&id].facing };
+        // Onto a foe: down at its side, not into its body (the visual check showed the hunter
+        // standing inside the dummy after the slam); its blow still lands on it.
+        let target = match foe {
+            Some(at) if dist2d(pos, at) > body + HERO_SIZE + 0.1 => self.ground_near(at[0] - dir.cos() * (body + HERO_SIZE), at[1] - dir.sin() * (body + HERO_SIZE), at[2]),
+            _ => foe_at,
+        };
         let dist = dist2d(pos, target);
-        let dir = if dist > 0.1 { facing(pos, target) } else { self.players[&id].facing };
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = dir;
         }

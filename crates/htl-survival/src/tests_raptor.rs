@@ -161,7 +161,9 @@ fn stoop_is_armed_by_the_uppercut_and_the_fourth_press_dives_with_no_click() {
     assert_eq!(hits(&ev, p, k).len(), 1, "the slam lands on it");
     assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_SLAM)), "its impact");
     assert!(ev.iter().any(|e| matches!(e, Event::Swing { attacker, victim: Some(v), style: Blow::Heavy, .. } if *attacker == p && *v == k)), "landing as heavily as a heavy attack");
-    assert!(dist2d(s.players[&p].pos, s.mobs[&k].pos) < 1.5, "where the foe is: {:?} {:?}", s.players[&p].pos, s.mobs[&k].pos);
+    // Beside it, not inside its body (the visual check showed the hunter standing in the dummy).
+    let gap = dist2d(s.players[&p].pos, s.mobs[&k].pos);
+    assert!(gap > 0.5 && gap < 1.5, "at the foe's side: {gap:.2} {:?} {:?}", s.players[&p].pos, s.mobs[&k].pos);
 }
 
 #[test]
