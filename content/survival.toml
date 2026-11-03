@@ -3946,11 +3946,13 @@ respawn = 0.0
 [[mob]]
 key = "spirit_owl"
 name = "Spirit Owl"
-display = 4615
+# A white owl (Owl.mdx, OwlWhite): the brown one (4615) was lost against the night sky. It flies
+# above the foe, high in the action camera's view (visual check, runs 016 and 017).
+display = 6212
 # Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
 # Particles, big, was the clearest of 11 tried).
 aura = 31748
-scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
+scale = 1.0
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
