@@ -1,58 +1,71 @@
-ELWYNN SURVIVAL AND BASIN BATTLE - FOR WINDOWS PLAYERS
-=====================================================
+ELWYNN SURVIVAL AND BASIN BATTLE - FOR WINDOWS
+=============================================
 
-Two co-op games run by the same host on the "benilla" game client, which
-uses the art and sound from your own copy of World of Warcraft 1.12.1:
+Two co-op games on the "benilla" game client, which uses the art and sound
+from your own copy of World of Warcraft 1.12.1:
 
-- ELWYNN SURVIVAL (double-click "Play Elwynn Survival.bat"): a soulslike
-  survival game in Elwynn Forest. Gather, build a camp, hold it against
-  raids, go down below into the Deadmines, and fight other players in
-  Siege (Arathi Basin) from the book at camp.
-- BASIN BATTLE (double-click "Play Basin Battle.bat"): defend the Ancient in
-  Arathi Basin against endless waves. Its own section is further down.
+- ELWYNN SURVIVAL: a soulslike survival game in Elwynn Forest. Gather,
+  build a camp, hold it against raids, go below into the dungeons, and
+  fight other camps in Siege from the book at camp.
+- BASIN BATTLE: defend the Ancient in Arathi Basin against endless waves.
 
-This download contains only the game client, a launcher and the two
-add-ons. It contains no World of Warcraft files. You need your own WoW
-1.12.1 install.
+This folder has no World of Warcraft files in it. You need your own WoW
+1.12.1 install (a folder with WoW.exe and Data\dbc.MPQ in it). Newer WoW
+Classic installs will NOT work.
 
 
-WHAT YOU NEED
--------------
-1. A World of Warcraft 1.12.1 install: a folder with WoW.exe in it and a
-   "Data" folder inside it (dbc.MPQ, model.MPQ, texture.MPQ...). Version
-   1.12.1 specifically: newer WoW Classic installs will NOT work.
-2. A graphics card with up-to-date drivers (DirectX 12 or Vulkan).
-3. The address of the game from whoever is hosting, plus its password.
+THE TWO BUTTONS
+---------------
+  Play.bat   Plays. It gets the newest version first if there is one, finds
+             your WoW 1.12.1 by itself, and starts where you played last time.
+             Press C in the first 3 seconds to choose again: which game, and
+             which server (yours, or someone else's).
+  Host.bat   Runs YOUR server, for both games: for you alone, or for friends to
+             join. Leave its window open while anyone plays.
+
+Log in with ANY name you like (it becomes your hero) and the password
+(hold, unless the host changed it).
+
+The first time, Windows may say "Windows protected your PC": click "More
+info", then "Run anyway".
 
 
-FIRST TIME
+PLAY ALONE
 ----------
-1. Unzip this whole folder somewhere you like, e.g. Documents\Basin Battle.
-   Keep all the files together.
-2. Double-click "Play Elwynn Survival.bat" (or "Play Basin Battle.bat").
-   Windows may say "Windows protected your PC": click "More info", then
-   "Run anyway". You only need to do this once.
-3. A folder picker opens (look behind the console window if you don't see
-   it). Choose your World of Warcraft 1.12.1 folder, the one with WoW.exe.
-4. Type the address the host gave you and press Enter.
-5. The game opens and the launcher window closes itself. On the login
-   screen type ANY account name (it becomes your hero's name) and the
-   host's password (default: hold).
-
-Your folder and the address are saved in settings.txt: next time just
-double-click the .bat and press Enter.
+Double-click Play.bat and choose "My own server on this PC". If your server
+isn't running, Play starts it (a second window: leave it open) and joins it.
+Next time, just double-click Play.bat.
 
 
-UPDATING TO A NEW ZIP
----------------------
-Close the game, then unzip the new zip over your old folder (say yes to
-replacing files). Your settings.txt, your mouse speed, key changes and
-other settings are kept: the zip doesn't carry them.
+PLAY WITH FRIENDS ON YOUR SERVER (YOU HOST)
+-------------------------------------------
+Play alone as above (or double-click Host.bat). The server's window shows
+the addresses to give your friends:
+  Same house or Wi-Fi     the 192.168... address
+  Over Tailscale          the 100... address (if you and they use Tailscale)
+  Over the internet       works once your router forwards TCP ports 3724,
+                          8085 and 8086 to this PC
+If Windows asks whether htl-server may use the network, click Allow.
 
-Only ONE game window should be open. The game's window is titled
-"benilla"; the black launcher window closes itself once the game starts.
-If you're unsure, close every benilla window and start again from the
-.bat.
+
+PLAY ON A FRIEND'S SERVER
+-------------------------
+Double-click Play.bat, press C, pick the game, then "Someone else's server"
+and type the address they give you. It's remembered for next time.
+
+
+UPDATES
+-------
+Nothing to do. Play updates this folder when a new version is out, and Host
+does too: while it runs, it warns everyone 5 minutes ahead, saves the worlds
+and comes back on the new version by itself. Your settings, keys and mouse
+speed are kept, and the worlds are backed up first (server\saves-backups).
+
+Your worlds live in server\saves. Delete a file there (with the server
+stopped) to start that world over.
+
+Only ONE game window at a time: it's titled "benilla". If you're unsure,
+close every benilla window and start again from Play.bat.
 
 
 ELWYNN SURVIVAL: CONTROLS
@@ -169,22 +182,29 @@ BASIN BATTLE: PLAYING
 
 TROUBLESHOOTING
 ---------------
-"benilla: no WoW install found"
-    The folder you picked isn't a 1.12.1 install. Delete settings.txt and
-    pick the folder that has WoW.exe and Data\dbc.MPQ in it.
+"benilla: no WoW install found", or Play found the wrong WoW
+    Double-click Play.bat, press C, then W, and pick the folder that has
+    WoW.exe and Data\dbc.MPQ in it.
 
 "Unable to connect" on the login screen
     - Check the address with the host.
-    - The host must have the game running (scripts/host.sh).
+    - The host's server window must be open.
+    - You and the host must be on the same version: close the game and
+      start it again from Play.bat (it updates), and ask the host to
+      restart Host.bat if theirs is older.
     - Over the internet, the host's router must forward ports 3724, 8085 and
-      8086 to their computer.
+      8086 to their computer (or use Tailscale).
 
 The game window is black or closes right away
     Update your graphics drivers from NVIDIA, AMD or Intel and try again.
 
-Anti-virus removed benilla.exe
-    It's flagged because it's new and unsigned. Restore it from your
-    anti-virus quarantine, or ask the host for a fresh copy.
+Anti-virus removed benilla.exe or server\htl-server.exe
+    They're flagged because they're new and unsigned. Restore them from your
+    anti-virus quarantine, or download the game again.
+
+"Port 3724 is taken" when hosting
+    Another server is already running on this PC (an older copy of the
+    game, say). Close its window, then start Host.bat again.
 
 No mouse cursor after logging out
     The cursor comes back as you leave the world. If it doesn't (an old

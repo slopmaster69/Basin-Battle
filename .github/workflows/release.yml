@@ -1,10 +1,14 @@
-# Push a tag (git tag v0.4.0 && git push origin v0.4.0) to build "Basin Battle for Windows.zip":
-# the pinned benilla client with this repo's patches, built for Windows, plus the launcher and the
-# add-ons, attached to a GitHub release for that tag. It holds no WoW files.
+# Push a tag (git tag v0.4.0 && git push origin v0.4.0) to build "<title> for Windows.zip" (the
+# title is project.toml's): the pinned benilla client with this repo's patches, the server, both
+# built for Windows, the add-ons, the server's content, and Play.bat and Host.bat with their
+# launcher, attached to a GitHub release for that tag. It holds no WoW files. A folder unzipped
+# from it updates itself from later releases (launcher\update.ps1, by the tag in
+# launcher\version.txt).
 #
-# To try a branch's Windows client before a release: Actions -> Release -> Run workflow on that
+# To try a branch's Windows build before a release: Actions -> Release -> Run workflow on that
 # branch (or `gh workflow run release.yml --ref <branch>`). The zip's folder is then the run's
-# "Basin Battle for Windows" artifact, and no release is made.
+# artifact, and no release is made; its version says it's a branch build, so it never updates
+# itself over to a release.
 name: Release
 
 on:
@@ -41,30 +45,65 @@ jobs:
         working-directory: benilla
         run: cargo build --release -p benilla --bin benilla --no-default-features
 
+      # The server ships ready to run, so hosting needs no Rust and no build. Built the way
+      # "Host Basin Battle.bat" builds it on a player's PC (the GNU toolchain, no MinGW on the
+      # PATH: see ci.yml's windows-server job), so it runs on a PC with nothing installed.
+      - name: Rust with the GNU toolchain for the server
+        run: rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: server
+
+      - name: Build the server
+        env:
+          RUSTUP_TOOLCHAIN: stable-x86_64-pc-windows-gnu
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object {
+            $_ -and -not (Test-Path (Join-Path $_ 'gcc.exe')) -and -not (Test-Path (Join-Path $_ 'dlltool.exe'))
+          }) -join ';'
+          . scripts\windows-rust.ps1
+          cargo build --release -p htl-server
+          if ($LASTEXITCODE -ne 0) { throw "the server didn't build" }
+          target\release\htl-server.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "htl-server.exe --help failed (exit $LASTEXITCODE)" }
+
       - name: Package
         shell: pwsh
         run: |
-          $out = "dist-out/Basin Battle for Windows"
-          New-Item -ItemType Directory -Force -Path "$out/benilla-config/AddOns" | Out-Null
+          # The title players see, from project.toml.
+          $title = "Basin Battle"
+          foreach ($line in Get-Content project.toml) { if ($line -match '^\s*title\s*=\s*"([^"]+)"') { $title = $Matches[1] } }
+          $package = "$title for Windows"
+          "PACKAGE=$package" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $out = "dist-out/$package"
+          New-Item -ItemType Directory -Force -Path "$out/benilla-config/AddOns", "$out/launcher", "$out/server" | Out-Null
+          # The top of the folder: the two buttons, the read-me and the game.
+          Copy-Item dist/windows/Play.bat, dist/windows/Host.bat, dist/windows/README.txt "$out/"
           Copy-Item benilla/target/release/benilla.exe "$out/"
-          Copy-Item "dist/windows/Play Basin Battle.bat", "dist/windows/Play Elwynn Survival.bat", `
-            dist/windows/launcher.ps1, dist/windows/README.txt, dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/"
-          # As config.default.toml: the launcher copies it to config.toml on a first run only.
+          # As config.default.toml: Play copies it to config.toml on a first run only.
           Copy-Item dist/windows/benilla-config/config.toml "$out/benilla-config/config.default.toml"
           Copy-Item -Recurse addon/BasinBattle, addon/ElwynnSurvival "$out/benilla-config/AddOns/"
-          Compress-Archive -Path $out -DestinationPath "dist-out/Basin Battle for Windows.zip"
+          # What the buttons run, the names, the licences and the version it updates from.
+          Copy-Item dist/windows/launcher/*.ps1, project.toml, dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/launcher/"
+          $version = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "branch $env:GITHUB_REF_NAME ($($env:GITHUB_SHA.Substring(0, 7)))" }
+          Set-Content -Path "$out/launcher/version.txt" -Value $version
+          # The server and its content (saves and logs are made beside them on the host's PC).
+          Copy-Item target/release/htl-server.exe "$out/server/"
+          Copy-Item -Recurse content "$out/server/content"
+          Compress-Archive -Path $out -DestinationPath "dist-out/$package.zip"
 
       # Every run keeps the folder as an artifact (a week), so a branch can be tried before a tag.
       - name: Keep the folder as the run's artifact
         uses: actions/upload-artifact@v7
         with:
-          name: Basin Battle for Windows
-          path: dist-out/Basin Battle for Windows
+          name: ${{ env.PACKAGE }}
+          path: dist-out/${{ env.PACKAGE }}
           retention-days: 7
 
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
-          files: dist-out/Basin Battle for Windows.zip
+          files: dist-out/${{ env.PACKAGE }}.zip
           generate_release_notes: true
