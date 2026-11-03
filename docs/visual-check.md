@@ -101,7 +101,14 @@ For checks nobody has to click: `Install Visual Check Watcher.bat` starts the wa
   of the repository's read-only data tools against the WoW data (`cargo run -p htl-map --example
   <tool> -- <Data> <args...>`: `spellfx`, `creaturedisp`, `displays`, `kitanims` and the rest in
   `crates/htl-map/examples/`), to find a look to borrow. The answers go to `out\<id>.queries.txt`.
-  Nothing in the game, the data or the repository changes.
+  Nothing in the game, the data or the repository changes. `godisp path <model path>` measures a
+  doodad no display names (`+` for a space in its path).
+
+- **Another client**, for a branch's client patches: the dev build's zip (the Release workflow's
+  `dev` artifact) cut into `deploy\clients\<name>\part-0`, `part-1`, ... with
+  `<name>.sha256` (the whole zip's SHA-256) written last. The watcher joins the parts, checks the
+  hash and unpacks the client into `clients\<name>\`. A request with a line `client <name>` runs
+  on it; every other request keeps the default client from the settings.
 
 The watcher needs nothing typed: a missing setting fails the request (in `.failed`) rather than
 asking. It uses the repository folder it was installed from, at whatever branch is checked out there.
