@@ -102,6 +102,11 @@ impl SurvivalGame {
                 if let Some(p) = self.mob_create(id) {
                     self.broadcast(&p);
                 }
+                // Its auras went with it: the next change clears what's no longer on it.
+                let n = self.sim.auras_of(id).len().min(16);
+                if n > 0 {
+                    self.auras_shown.insert(id, n);
+                }
             }
             Event::MobGone { id } => {
                 if let Some(g) = self.unbind(id) {

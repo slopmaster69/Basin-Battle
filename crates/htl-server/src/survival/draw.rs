@@ -662,6 +662,18 @@ impl SurvivalGame {
         if m.health == 0 {
             f.set(idx::UNIT_DYNAMIC_FLAGS, fields::UNIT_DYNFLAG_DEAD);
         }
+        // What it wears from the start (a spirit beast's ghostly look) and whatever's on it, in
+        // the packet that makes it: an aura sent apart could reach the client before the unit.
+        let auras = self.sim.auras_of(id);
+        if !auras.is_empty() {
+            let mut bar = [(0u32, 0u8); 48];
+            for (k, a) in auras.iter().take(16).enumerate() {
+                bar[k] = (*a, 1);
+            }
+            for slot in 0..auras.len().min(16) {
+                fields::aura_words(&mut f, &bar, slot);
+            }
+        }
         Some(packets::update_object(
             &[Create {
                 guid,
