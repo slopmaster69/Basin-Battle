@@ -1800,8 +1800,10 @@ fn the_bookmakers_week_is_shown_once_as_a_hero_comes_in_and_again_on_asking() {
 /// The client flies a missile only from a unit (a game object's cast has no caster unit, and it
 /// draws nothing), and places a unit only after the frame that made it. So a missile from a spot
 /// comes from an unseen creature made there: its own template, shrunk to nothing, never
-/// selectable, made in an earlier packet than its cast, which flies at `me` and hits them. Each
-/// such cast of `spell`: the creature's guid and where it stood.
+/// selectable, made in an earlier packet than its cast, which flies at `me` without naming them
+/// struck (the client plays a spell's impact on whoever it names struck, and the Axe Throw's
+/// knocked its own warrior down as he caught it). Each such cast of `spell`: the creature's guid
+/// and where it stood.
 fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
     let all = placed(c);
     let mut out = Vec::new();
@@ -1810,7 +1812,7 @@ fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
         if g.spell_id != spell || g.caster == me {
             continue;
         }
-        assert!(g.hits.contains(&me), "flown at the hero: {:?}", g.hits);
+        assert!(!g.hits.contains(&me), "not naming the hero struck: {:?}", g.hits);
         assert_eq!(g.targets.unit_target, Some(me), "homing on them");
         assert!(c.seen[..k].iter().any(|q| creates_guid(q, g.caster)), "its caster {:#x} made before it casts", g.caster);
         let (_, kind, at, f) = all.iter().find(|(x, ..)| *x == g.caster).cloned().expect("its caster made");

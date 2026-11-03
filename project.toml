@@ -16,11 +16,14 @@ basin = "Basin Battle"
 # Where releases (and the Windows download's updates) come from: owner/name on GitHub.
 repository = "slopmaster69/Basin-Battle"
 
-# The group's own server: Play goes there by itself, so friends never type an address. It's the
-# host's Tailscale address (100.x.y.z) or a hostname. Empty: Play asks the first time.
-server = "100.125.4.34"
-
-# A second host for when the first doesn't answer: Play's "Try again" screen then offers it with
-# one click (for that session; next time it's the first again). It's its own world, so heroes made
-# on one aren't on the other. Empty: no backup.
-backup = ""
+# The group's servers, in the order Play tries them. Each is an address, with :port when its
+# login port isn't 3724 (its world ports follow from its host's settings). Play goes to `server`
+# by itself, so friends never type an address; when it doesn't answer, the Try again screen offers
+# the next one with one click (for that session: next time it's `server` again). Each is its own
+# world: heroes made on one aren't on the others. A `_name` is how Play shows it. Empty: unused.
+server = "24.64.116.126"
+server_name = "Corios's desktop"
+backup = "24.64.116.126:3725"
+backup_name = "Corios's laptop"
+backup2 = "100.125.4.34"
+backup2_name = "David's PC (Tailscale)"
