@@ -4307,11 +4307,11 @@ radius = [1.0, 1.0]
 clip = 54
 
 # E, the second choice: a spear chain. Each hit arms the next (a recast), the third throws you up
-# with it, and the fourth is the dive down, wherever you choose.
+# with it, and the fourth press is the dive down onto it, before you land.
 [[ability]]
 key = "raptor_strike"
 name = "Raptor Strike"
-text = "A three-hit spear chain. Press again within 1.5 sec for the next hit. Hit 1 thrusts. Hit 2 sweeps everything in front of you. Hit 3 is an Uppercut that launches the target and you with it. While airborne, press again within 3.5 sec to Stoop: dive to a spot within 12 yd, slamming any enemy there."
+text = "A three-hit spear chain. Press again within 1.5 sec for the next hit. Hit 1 thrusts. Hit 2 sweeps everything in front of you. Hit 3 is an Uppercut that launches the target and you with it. Press again before you land to Stoop: dive onto the launched enemy and slam it, harder the higher you start."
 icon = "Ability_MeleeDamage"
 school = "hunter"
 slot = "close"
@@ -4366,7 +4366,9 @@ clip = 57
 impact_kit = 83
 also = "raptor_rise"
 recast = "stoop"
-recast_secs = 3.5
+# Stoop's window: the rise's time in the air (1.45 sec at lift 14). Landing closes it sooner.
+recast_secs = 1.5
+# The launch: lift 10 throws a creature 2.6 yd up and down again in 1.04 sec, stunned the while.
 effects = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "knockback", amount = 0.5, lift = 10.0 }]
 
 # The hunter goes up with it, boss or no boss: Stoop is always there.
@@ -4379,21 +4381,27 @@ inner = true
 slot = "close"
 kind = "leap"
 range = [0.5, 0.5]
-lift = 9.0
+# Well over the foe it launched: lift 14 peaks at 5.1 yd (the foe's 2.6), 1.45 sec in the air.
+lift = 14.0
 spell = 0
 
 [[ability]]
 key = "stoop"
 name = "Stoop"
-text = "Dive to the target spot within 12 yd. Enemies within 3 yd of where you land take 20 damage and are knocked down for 1 sec."
+text = "Dives onto the enemy you launched, or the spot you aim at within 12 yd. Deals 6 to 30 damage to enemies within 3 yd of the landing, more the higher you start. Knocks them down for 1 sec. Only while airborne."
 icon = "Ability_Hunter_Pet_Owl"
 inner = true
 slot = "close"
 kind = "leap"
 range = [12.0, 12.0]
 radius = [3.0, 3.0]
-damage = [20.0, 20.0]
-lift = 2.0
+# On the key press, down in 0.3 sec. Its damage grows with its height as it starts, evenly: 6 from
+# the ground, 30 from 5 yd up (the top of the Uppercut's rise), 4.8 a yard. A Stoop at the top is
+# 10 more than the old flat 20, a late one far less, so the chain's 12 + 14 + 16 + Stoop stays
+# within the close row's 45 a hit.
+at_once = true
+dive = true
+damage = [6.0, 30.0]
 spell = 16979
 impact_kit = 1666
 stamina = 10.0

@@ -321,6 +321,11 @@ pub struct AbilityDef {
     pub lift: f32,
     #[serde(default)]
     pub back: bool,
+    /// A dive (Stoop): a leap only from the air (landing first closes its recast), down onto the
+    /// foe thrown up with the hero, fast however high it starts, its damage from `damage[0]` near
+    /// the ground to `damage[1]` from high up.
+    #[serde(default)]
+    pub dive: bool,
     /// A blink with an anchor: the first press sets it at the feet (and costs nothing); pressed
     /// again within this many seconds, the hero steps back to it.
     #[serde(default)]

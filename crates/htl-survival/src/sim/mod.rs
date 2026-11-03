@@ -194,7 +194,7 @@ pub enum Event {
     /// The dodge's dash (`roll`: a dodge, which tumbles), or a blow throwing a hero back.
     /// `speed` 0: no throw (the dash runs on the ground, by [`Event::Speed`]); just the tumble.
     /// `style`: which way a dodge goes relative to the facing (`roll` forward, `left`, `right`,
-    /// `back`).
+    /// `back`). `lift` is the upward speed; below zero, the hero is driven down (a dive).
     Hop { player: Id, dir: f32, speed: f32, lift: f32, roll: bool, style: &'static str },
     /// The guard went up or down (the hero's stance).
     Guard { player: Id, up: bool },
@@ -673,6 +673,9 @@ pub struct Mob {
     /// Thrown (knocked back or pulled) through the air until then: it lands where it was thrown,
     /// whatever else the blow did (a slow, a root or a stagger takes hold once it's down).
     pub thrown_until: f32,
+    /// Thrown up (the Uppercut's launch): its arc's upward speed, its height over the ground
+    /// following it until it lands (0: thrown along the ground).
+    pub thrown_lift: f32,
     /// The stagger came from a parry (the riposte bonus applies).
     pub riposte: bool,
     /// The blow it's winding up is its special one.

@@ -66,3 +66,5 @@ mod tests_sim;
 mod tests_camp;
 #[cfg(test)]
 mod tests_building;
+#[cfg(test)]
+mod tests_raptor;
