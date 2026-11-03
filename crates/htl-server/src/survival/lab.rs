@@ -1,8 +1,11 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here]`
 //!
+//! - Each run starts on the lab's stage, the nearest open level ground to the camp's spawn (no
+//!   tree, wall or water within 22 yd), facing the spawn's way; `stage here` keeps the hero
+//!   where they stand.
 //! - It sets out the scene in front of the hero (`one`, `pack`, `close`, `ring`, `far`; see
 //!   `htl_survival::sim::lab`), of training dummies or of a creature (`brave`), puts the ability
 //!   on its key with cooldowns off, full Valor and full health.
@@ -36,6 +39,8 @@ const LEAD: f32 = 0.25;
 /// about a second (seen in the lab: the brave's wind-up was invisible), and the lock-on camera
 /// settles.
 const SETTLE: f32 = 1.5;
+/// And this much more when the run first sets the hero down on the lab's stage.
+const MOVED_SETTLE: f32 = 2.0;
 
 pub(crate) struct Lab {
     pub hero: Id,
@@ -96,6 +101,7 @@ impl SurvivalGame {
         let mut creature = if d.kind == "stance" { "brave" } else { "dummy" }.to_string();
         let mut steps: Option<String> = None;
         let mut cam: Option<String> = None;
+        let mut stage = true;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
         let (mut shots, mut every) = if cfg!(windows) && ffmpeg().is_some() { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
         let mut k = 1;
@@ -104,6 +110,10 @@ impl SurvivalGame {
             match words[k] {
                 "do" => {
                     steps = words.get(k + 1).map(|s| s.to_string());
+                    k += 1;
+                }
+                "stage" => {
+                    stage = words.get(k + 1).is_none_or(|w| *w != "here");
                     k += 1;
                 }
                 "cam" => {
@@ -140,10 +150,26 @@ impl SurvivalGame {
         self.sim.set_cooldowns(me, true);
         self.sim.set_valor(me, 100.0);
         self.sim.heal_full(me);
+        // Every run from the same open ground, facing the same way (`stage here` keeps the hero
+        // where they stand): a run that started wherever the last left the hero was once framed
+        // through a tree.
+        let moved = if stage {
+            if self.lab_stage.is_none() {
+                let spawn = self.sim.content.world.spawn;
+                self.lab_stage = self.sim.lab_stage(spawn, &[]);
+                if let Some((at, f)) = self.lab_stage {
+                    eprintln!("[lab] the lab's stage: {at:?} facing {f:.2}");
+                }
+            }
+            self.lab_stage.is_some_and(|st| self.sim.lab_to_stage(me, st))
+        } else {
+            false
+        };
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
-        // The steps, timed from a moment after the burst starts.
-        let now = self.sim.clock;
+        // The steps, timed from a moment after the burst starts (and after the client has set the
+        // hero down, if the stage moved them).
+        let now = self.sim.clock + if moved { MOVED_SETTLE } else { 0.0 };
         let start = now + SETTLE + LEAD;
         let mut at = start;
         let mut queue = VecDeque::new();
@@ -355,14 +381,20 @@ fn record_video(label: &str, secs: f32) {
     let Some(ff) = ffmpeg() else { return };
     let out = std::path::Path::new("logs").join("lab").join(format!("{label}.mp4"));
     let _ = std::fs::create_dir_all("logs/lab");
+    // What ffmpeg says (frames dropped, a grab that failed) beside the video.
+    let said = std::fs::File::create(std::path::Path::new("logs").join("lab").join(format!("{label}.ffmpeg.txt")));
+    // The game's monitor (the primary, output 0; the old GDI grab took every monitor and 20
+    // frames a second), every frame at 60, scaled to 1920 wide and encoded with x264's fastest
+    // preset so the encoder keeps up with a wide screen.
     let spawned = std::process::Command::new(ff)
-        .args(["-y", "-loglevel", "error", "-f", "lavfi", "-i", "ddagrab=output_idx=0:framerate=60:draw_mouse=0"])
-        .args(["-t", &format!("{secs:.2}"), "-vf", "hwdownload,format=bgra,scale=1920:-2", "-r", "60"])
-        .args(["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"])
+        .args(["-y", "-hide_banner", "-loglevel", "warning"])
+        .args(["-f", "lavfi", "-i", "ddagrab=output_idx=0:framerate=60:draw_mouse=0:dup_frames=1"])
+        .args(["-t", &format!("{secs:.2}"), "-vf", "hwdownload,format=bgra,scale=1920:-2:flags=bilinear,format=yuv420p"])
+        .args(["-fps_mode", "cfr", "-r", "60", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "18"])
         .arg(&out)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stderr(said.map(std::process::Stdio::from).unwrap_or_else(|_| std::process::Stdio::null()))
         .spawn();
     if let Err(e) = spawned {
         eprintln!("[lab] couldn't record {}: {e}", out.display());

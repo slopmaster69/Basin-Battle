@@ -127,7 +127,79 @@ impl Survival {
     pub fn lab_aiming(&self, id: Id) -> bool {
         matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Aim { .. }))
     }
+
+    /// The lab's stage: the nearest open, level ground to `near` (the camp's spawn, for one),
+    /// with no trunk, wall or water within [`STAGE_CLEAR`] yards and no creature of the world
+    /// within [`STAGE_QUIET`], and the way to face there. Every run starts on it, so the camera
+    /// never ends in a canopy and each run is framed like the last (a run that left the hero
+    /// wherever a charge or a leap put them once framed the next one through a tree).
+    pub fn lab_stage(&self, near: [f32; 2], skip: &[Id]) -> Option<(Vec3, f32)> {
+        let trees = self.land.trees();
+        let f = self.content.world.spawn_facing;
+        let open = |x: f32, y: f32| -> bool {
+            if !self.land.in_zone(x, y) || self.land.blocked(x, y) || self.land.water(x, y) {
+                return false;
+            }
+            let z = self.land.height(x, y);
+            if trees.iter().any(|t| dist2d(*t, [x, y, 0.0]) < STAGE_CLEAR) {
+                return false;
+            }
+            // Level, and clear all round: the scene ahead and the camera behind.
+            for k in 0..16 {
+                let a = k as f32 * std::f32::consts::TAU / 16.0;
+                for r in [STAGE_CLEAR * 0.5, STAGE_CLEAR] {
+                    let (px, py) = (x + a.cos() * r, y + a.sin() * r);
+                    if !self.land.in_zone(px, py) || self.land.blocked(px, py) || self.land.water(px, py) {
+                        return false;
+                    }
+                    if (self.land.height(px, py) - z).abs() > STAGE_LEVEL * r / STAGE_CLEAR {
+                        return false;
+                    }
+                }
+            }
+            !self.mobs.iter().any(|(id, m)| m.health > 0 && !skip.contains(id) && dist2d(m.pos, [x, y, 0.0]) < STAGE_QUIET)
+        };
+        // Ring by ring out from `near`, so the nearest open spot is the one found, each time.
+        let mut r = 0.0f32;
+        while r <= STAGE_SEARCH {
+            let n = ((r * std::f32::consts::TAU / STAGE_STEP).ceil() as usize).max(1);
+            for k in 0..n {
+                let a = k as f32 * std::f32::consts::TAU / n as f32;
+                let (x, y) = (near[0] + a.cos() * r, near[1] + a.sin() * r);
+                if open(x, y) {
+                    return Some((self.ground(x, y), f));
+                }
+            }
+            r += STAGE_STEP;
+        }
+        None
+    }
+
+    /// Puts hero `id` on the lab's stage, facing its way, unless they stand there already: true
+    /// if they were moved (their client then needs a moment to settle there).
+    pub fn lab_to_stage(&mut self, id: Id, stage: (Vec3, f32)) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        if dist2d(p.pos, stage.0) < 0.5 && (p.pos[2] - stage.0[2]).abs() < 2.0 {
+            if let Some(p) = self.players.get_mut(&id) {
+                p.facing = stage.1;
+            }
+            return false;
+        }
+        self.set_down(id, stage.0, stage.1);
+        true
+    }
 }
+
+/// The lab's stage is this far from any trunk, wall or water (the camera stands ~8 yd behind
+/// the hero, a scene's far body 14 yd ahead).
+pub const STAGE_CLEAR: f32 = 22.0;
+/// No creature of the world this near the stage when it's chosen.
+const STAGE_QUIET: f32 = 40.0;
+/// The ground within the clear ring rises or falls no more than this.
+const STAGE_LEVEL: f32 = 2.5;
+/// How far from the spawn the stage is looked for, in steps of this.
+const STAGE_SEARCH: f32 = 600.0;
+const STAGE_STEP: f32 = 6.0;
 
 #[cfg(test)]
 mod tests {
@@ -166,5 +238,28 @@ mod tests {
         s.lab_aim_at(p, at);
         let landing = s.aim_point(p, 16.0);
         assert!(dist2d(landing, at) < 1.0, "the aim lands on the brave 5 yd off, not beyond: {landing:?} vs {at:?}");
+    }
+
+    #[test]
+    fn the_labs_stage_is_the_nearest_ground_clear_of_trees_and_each_run_starts_on_it() {
+        // Trees all round the spawn, out to 30 yd: the stage is past them, and the same each time.
+        let trees: Vec<Vec3> = (0..12).flat_map(|k| {
+            let a = k as f32 * std::f32::consts::TAU / 12.0;
+            [10.0f32, 30.0].map(|r| [a.cos() * r, a.sin() * r, 0.0])
+        }).collect();
+        let land = FlatLand { trees: trees.clone(), ..Default::default() };
+        let mut s = Survival::new(Content::dev(), Box::new(land), 7, 1_000_000.0);
+        s.mobs.clear();
+        s.respawns.clear();
+        let p = s.join("ayla", "Ayla", None);
+        s.move_player(p, [3.0, 0.0, 0.0], 0.0, Moving::default());
+        let _ = s.step(0.0);
+        let stage = s.lab_stage([0.0, 0.0], &[]).expect("open ground past the trees");
+        assert!(trees.iter().all(|t| dist2d(*t, stage.0) >= STAGE_CLEAR), "clear of every trunk: {stage:?}");
+        assert!(dist2d(stage.0, [0.0, 0.0, 0.0]) < 30.0 + STAGE_CLEAR + 8.0, "and the nearest such ground: {stage:?}");
+        assert_eq!(s.lab_stage([0.0, 0.0], &[]).map(|x| x.0), Some(stage.0), "the same stage each time");
+        assert!(s.lab_to_stage(p, stage), "moved there");
+        assert!(dist2d(s.players[&p].pos, stage.0) < 0.1);
+        assert!(!s.lab_to_stage(p, stage), "already there: not moved again");
     }
 }
