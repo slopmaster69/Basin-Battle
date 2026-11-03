@@ -249,7 +249,11 @@ function LuaStr($s) { '"' + $s.Replace('\', '\\').Replace('"', '\"') + '"' }
 # With $cue it takes one shot at that time first, the video's cue (the script sees the file land).
 function Build-Lua($sc, $settle, $cue) {
     $steps = @($sc.Steps)
-    if ($null -ne $cue) { $steps = @(@{ T = $cue; Kind = "shots"; Text = "cue"; Count = 1; Every = 0 }) + $steps }
+    if ($null -ne $cue) {
+        # In time order: the driver takes each step only once those before it are due.
+        $steps = @(@(@{ T = $cue; Kind = "shots"; Text = "cue"; Count = 1; Every = 0; Order = -1 }) + $steps |
+            Sort-Object -Property @{ Expression = { $_.T } }, @{ Expression = { $_.Order } })
+    }
     $rows = foreach ($st in $steps) {
         if ($st.Kind -eq "shots") {
             "{$(Fmt $st.T),`"shots`",$(LuaStr $st.Text),$($st.Count),$(Fmt $st.Every)}"
@@ -375,7 +379,7 @@ function Start-Video($v, $client, [string]$how) {
     } else {
         $grab += @("-i", "title=benilla")
     }
-    $all = @("-hide_banner", "-loglevel", "warning", "-y") + $grab + @(
+    $all = @("-hide_banner", "-nostdin", "-loglevel", "warning", "-y") + $grab + @(
         "-t", (Fmt $v.Duration), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", $v.Out)
     $v.How = $how
