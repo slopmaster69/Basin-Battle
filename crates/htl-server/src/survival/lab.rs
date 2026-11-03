@@ -185,23 +185,22 @@ impl SurvivalGame {
         self.lab_polled = std::time::Instant::now();
         let path = std::path::Path::new("logs").join("lab").join("queue.txt");
         let Ok(text) = std::fs::read_to_string(&path) else { return };
-        let mut lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
+        let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
         if lines.is_empty() {
             return;
         }
-        let line = lines.remove(0).to_string();
-        let rest = lines.join("\n");
-        let _ = std::fs::write(&path, if rest.is_empty() { String::new() } else { rest + "\n" });
+        let line = lines[0].to_string();
         let mut words: Vec<&str> = line.split_whitespace().collect();
         let named = words.first().and_then(|w| w.strip_prefix('@')).map(str::to_lowercase);
         if named.is_some() {
             words.remove(0);
         }
+        // Every world the server runs (Elwynn, each dungeon below) reads this file: the line is
+        // left for the one the hero is in.
         let who = self.in_world().find(|(_, _, w)| named.as_ref().is_none_or(|n| w.name.to_lowercase() == *n)).map(|(c, _, w)| (*c, w.id));
-        let Some((conn, me)) = who else {
-            eprintln!("[lab] queued run skipped, no hero in the world: {line}");
-            return;
-        };
+        let Some((conn, me)) = who else { return };
+        let rest = lines[1..].join("\n");
+        let _ = std::fs::write(&path, if rest.is_empty() { String::new() } else { rest + "\n" });
         if let Err(e) = self.lab_command(conn, me, &words) {
             eprintln!("[lab] queued run failed: {line}: {e}");
             self.tell(conn, &format!("Lab: {e}"));
