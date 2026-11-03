@@ -258,3 +258,19 @@ fn every_beast_has_a_body_and_an_icon_of_its_own_animal() {
         assert!(b.strike != 0);
     }
 }
+
+#[test]
+fn a_beast_strikes_from_the_foes_flank_clear_of_the_hunters_back() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    slot_call(&mut s, p, true);
+    let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
+    call(&mut s, p, Some((0.0, 0.0)));
+    let body = spirits(&s)[0];
+    run_pinned(&mut s, 0.5, &[k]);
+    // The action camera looks down the hunter's back at the foe: a beast on that line (between
+    // them) is hidden behind her. Beside the foe, well off the line, it's seen.
+    let at = s.mobs[&body].pos;
+    assert!(at[1].abs() > 1.2, "off the line to one side: {at:?}");
+    assert!(at[0] > 4.5, "up by the foe, not at the hunter: {at:?}");
+}

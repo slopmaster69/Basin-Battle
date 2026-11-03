@@ -49,6 +49,9 @@ pub const WILD_PRIMED_SECS: f32 = 4.0;
 /// sec they were gone before anyone could tell), then goes in the flash it came in.
 const POUNCE_SECS: f32 = 0.3;
 const BEAST_STAYS: f32 = 1.8;
+/// How far round the foe from the near side the beast strikes from (radians): about a right
+/// angle, so it stands beside the foe, clear of the hunter's back.
+const BEAST_FLANK: f32 = 1.4;
 /// It roars (or howls, or hisses: its model's own roar) this long after its strike.
 const BEAST_ROAR_AFTER: f32 = 0.5;
 /// `EMOTE_ONESHOT_ROAR`.
@@ -937,14 +940,18 @@ impl Survival {
         let f = facing(from, to);
         let side = if self.rng.gen::<bool>() { 1.0 } else { -1.0 };
         let start = self.ground_near(from[0] + (f + side * 1.2).cos() * 1.5, from[1] + (f + side * 1.2).sin() * 1.5, from[2] + 1.0);
+        // It strikes from the foe's flank on its own side, not from the near side: there it stood
+        // between the hunter and the foe, behind her back from the action camera (run 015: the
+        // first two beasts of a chain were never seen).
+        let flank = f + std::f32::consts::PI - side * BEAST_FLANK;
+        let end = [to[0] + flank.cos() * 1.5, to[1] + flank.sin() * 1.5, to[2]];
         let body = self.content.mob(BEASTS[beast].mob).map(|def| {
             let mid = self.spawn_mob(def, start, None, false);
             if let Some(m) = self.mobs.get_mut(&mid) {
-                m.facing = f;
+                m.facing = facing(end, to);
             }
             mid
         });
-        let end = [to[0] - f.cos() * 1.5, to[1] - f.sin() * 1.5, to[2]];
         if let Some(b) = body {
             let dist = dist2d(start, end).max(0.5);
             self.events.push(Event::MobMove { id: b, path: vec![start, end], speed: dist / (POUNCE_SECS + delay).max(0.1), face: None });

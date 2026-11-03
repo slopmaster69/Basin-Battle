@@ -3925,7 +3925,7 @@ display = 2446
 # Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
 # Particles, big, was the clearest of 11 tried).
 aura = 31748
-scale = 1.0
+scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -3950,7 +3950,7 @@ display = 4615
 # Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
 # Particles, big, was the clearest of 11 tried).
 aura = 31748
-scale = 1.0
+scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -3975,7 +3975,7 @@ display = 2487
 # Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
 # Particles, big, was the clearest of 11 tried).
 aura = 31748
-scale = 0.8
+scale = 1.1   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4000,7 +4000,7 @@ display = 837
 # Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
 # Particles, big, was the clearest of 11 tried).
 aura = 31748
-scale = 1.0
+scale = 1.2   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4025,7 +4025,7 @@ display = 180
 # Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
 # Particles, big, was the clearest of 11 tried).
 aura = 31748
-scale = 1.0
+scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4050,7 +4050,7 @@ display = 1074
 # Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
 # Particles, big, was the clearest of 11 tried).
 aura = 31748
-scale = 0.9
+scale = 1.1   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4527,7 +4527,9 @@ back = true
 range = [12.0, 12.0]
 lift = 5.0
 cooldown = 12.0
-spell = 781
+# No cast look of its own: Disengage's (781) is a white blink star on the hunter, which read as
+# something going wrong (visual check, run 015). The flip and the net are the look.
+spell = 0
 also = "hunter_net"
 # Play-test (#110): the Undead woman's flip out of a strafing jump was the one to keep. Every
 # hero, every race, standing or mid-jump, now plays it: a tumble back head over heels with the
@@ -4548,7 +4550,8 @@ range = [14.0, 14.0]
 radius = [0.6, 0.6]
 speed = 40.0
 spell = 6533
-effects = [{ kind = "root", secs = [2.0, 2.0] }]
+# The net itself on whoever it holds (Net's own state look), not the roots of a plain root.
+effects = [{ kind = "root", secs = [2.0, 2.0], aura = 6533 }]
 
 [[ability]]
 key = "trappers_instinct"
