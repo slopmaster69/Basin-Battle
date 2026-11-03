@@ -343,3 +343,60 @@ fn bladestorm_takes_no_other_ability_and_a_stagger_ends_it() {
     assert!(s.apply_cc(p, k, "stagger", 1.0, 0.0, 0.0, "test"), "it can be staggered");
     assert!(!matches!(s.players[&p].action, Action::Channel { .. }), "and the stagger ends it");
 }
+
+// --- Cleave, Thunder Clap ---------------------------------------------------------------------------------
+
+#[test]
+fn cleave_hits_an_opened_enemy_for_250_percent() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let open = mob(&mut s, "brave", [2.5, 1.5, 0.0]);
+    let shut = mob(&mut s, "brave", [2.5, -1.5, 0.0]);
+    let behind = mob(&mut s, "brave", [-2.5, 0.0, 0.0]);
+    let mut ev = cast(&mut s, p, "cleave", false, 0.0, 0.0);
+    s.stagger_mob(open, 3.0, false);
+    assert!(s.opened(open) && !s.opened(shut));
+    ev.extend(run(&mut s, 0.8));
+    let (o, c) = (struck(&ev, open), struck(&ev, shut));
+    assert_eq!((o.len(), c.len()), (1, 1), "each struck once: {o:?} {c:?}");
+    assert!(o[0] as f32 >= c[0] as f32 * 2.3, "250% against 100%: {} and {}", o[0], c[0]);
+    assert!(struck(&ev, behind).is_empty(), "nothing behind the 180° arc");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == open && *kit == KIT_RIPOSTE)), "a red spark on the one cashed in");
+}
+
+#[test]
+fn opened_means_staggered_stunned_knocked_down_or_a_boss_stance_broken() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
+    assert!(!s.opened(k));
+    s.apply_cc(k, p, "stun", 2.0, 0.0, 0.0, "test");
+    assert!(s.opened(k), "stunned");
+    let w = mob(&mut s, "warlord", [3.0, 5.0, 0.0]);
+    s.stagger_mob(w, 1.0, false);
+    assert!(!s.opened(w), "a boss is opened only by a broken stance");
+    let limit = s.posture_limit(w);
+    assert!(s.build_posture(w, p, limit));
+    assert!(s.opened(w), "stance-broken");
+}
+
+#[test]
+fn thunder_clap_slows_the_packs_swings() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [4.0, 0.0, 0.0]);
+    let far = mob(&mut s, "brave", [12.0, 0.0, 0.0]);
+    let w = mob(&mut s, "warlord", [0.0, 5.0, 0.0]);
+    let (wk, ww) = (s.attack_now(k).windup, s.attack_now(w).windup);
+    let before = hp(&s, k);
+    s.set_valor(p, 25.0);
+    let ev = press(&mut s, p, "cleave", true);
+    assert!(hp(&s, k) < before, "8 damage");
+    assert!(struck(&ev, far).is_empty(), "nothing past 8 yd");
+    assert!((s.attack_now(k).windup - wk * 1.3).abs() < 1e-3, "30% slower: {} from {wk}", s.attack_now(k).windup);
+    assert!((s.attack_now(w).windup - ww * 1.15).abs() < 1e-3, "a boss 15%: {} from {ww}", s.attack_now(w).windup);
+    let until = |s: &Survival, m: Id| s.cc_of(m).iter().find(|c| c.kind == "slow_attacks").map(|c| c.until - s.clock).unwrap_or(0.0);
+    assert!((until(&s, k) - 6.0).abs() < 0.2 && (until(&s, w) - 4.0).abs() < 0.2, "6 sec, a boss's 4: {} {}", until(&s, k), until(&s, w));
+    run(&mut s, 6.2);
+    assert!((s.attack_now(k).windup - wk).abs() < 1e-3, "back to its pace after");
+}

@@ -4661,6 +4661,43 @@ clip = 53
 # (staggered, knocked down, stunned, or a boss stance-broken). An EX shares its key's cooldown.
 # First numbers for tuning (Corey's blueprint, Nov 2). None of it seen in the client yet.
 
+# E: the crowd cash-in. No knockback, no stagger: it just hits the opened hard.
+[[ability]]
+key = "cleave"
+name = "Cleave"
+text = "After a 0.5 sec windup, swings your weapon through a 180° arc in front of you, 5 yd deep. Enemies hit take 100% weapon damage. Opened enemies (staggered, knocked down, stunned or stance-broken) take 250% instead."
+icon = "Ability_Warrior_Cleave"
+school = "warrior"
+slot = "close"
+choice = 2
+kind = "cone"
+range = [5.0, 5.0]
+arc = 180.0
+cast = 0.5
+weapon = 1.0
+opened = 2.5
+cooldown = 8.0
+# The two-handed sweep over the windup.
+clip = 19
+spell = 845
+valor_hit = 6.0
+
+# E's EX: the stomp that makes the openings easier to earn. Slowed swings aren't crowd control:
+# the pack still acts, just slower, so its blows are easier to parry.
+[[ability]]
+key = "thunder_clap"
+name = "Thunder Clap"
+ex_of = "cleave"
+text = "Stomps the ground. Enemies within 8 yd take 8 damage, and their attacks wind up 30% slower for 6 sec. A boss's attacks wind up 15% slower for 4 sec."
+icon = "Spell_Nature_ThunderClap"
+slot = "close"
+kind = "nova"
+valor = 25
+damage = [8.0, 8.0]
+radius = [8.0, 8.0]
+spell = 6343
+effects = [{ kind = "slow_attacks", secs = [6.0, 6.0], amount = 0.3 }]
+
 # 1: the Warrior's one body slam (Beta's Wall Slam retires into it). The rush is short, so the
 # skill is the angle: the wall, the tree or the second enemy behind your target.
 [[ability]]
@@ -10130,7 +10167,7 @@ name = "The Garrison's Banner"
 at = [-9885.0, 675.0]
 display = 631
 scale = 1.0
-teaches = ["hurled_axe", "shockwave"]
+teaches = ["hurled_axe", "shockwave", "cleave"]
 keep = true
 secs = 3.0
 text = "Westbrook's banner, carried off by the Riverpaw. The garrison's footmen learned the throw under it, and the slam that drives a line back."

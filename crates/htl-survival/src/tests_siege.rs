@@ -80,8 +80,8 @@ fn a_full_way_begins_and_puts_each_hero_at_their_own_camp_fresh() {
         let hearth = s.objs[&hearth_of(&s, k)].pos;
         assert!(dist2d(s.players[&h].pos, hearth) < 10.0, "by their Hearth");
         assert_eq!(s.gold_of(h), d.start_gold);
-        // Their class's first two cards, nothing else.
-        assert_eq!(s.players[&h].owned.len(), 2, "{:?}", s.players[&h].owned);
+        // Their class's first cards (its Q and E, both choices of each), nothing else.
+        assert_eq!(s.players[&h].owned.len(), 3, "{:?}", s.players[&h].owned);
     }
     assert!(s.siege_hud(a).is_some_and(|h| h.camps.len() == 2 && h.camps[0].mine && h.camps[1].target));
     // Each camp has its ledger and rack.
@@ -175,7 +175,7 @@ fn a_hearth_fallen_ends_it_and_everyone_is_back_in_the_hall_fresh() {
     let lobby = def().lobby;
     for h in [a, b] {
         assert!(dist2d(s.players[&h].pos, [lobby[0], lobby[1], 0.0]) < 12.0, "back in the hall");
-        assert_eq!(s.players[&h].owned.len(), 2, "fresh again");
+        assert_eq!(s.players[&h].owned.len(), 3, "fresh again");
         assert!(s.siege_hud(h).is_none());
     }
 }
