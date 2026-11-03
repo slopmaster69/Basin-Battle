@@ -271,6 +271,10 @@ impl Survival {
         }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
         self.events.push(Event::Hop { player: id, dir, speed: dist / air, lift, roll: false, style: "" });
+        // Its own look (a Disengage's flip), the same from the ground as from mid-jump.
+        if d.leap_clip != 0 || d.leap_flip {
+            self.events.push(Event::LeapLook { player: id, secs: air, clip: d.leap_clip, take: d.leap_take, from: d.leap_from.clone(), flip: d.leap_flip });
+        }
         self.set_action(id, Action::Dash { t: 0.0, secs: air, ability, target: None, share });
         let radius = AbilityDef::at(d.radius, share);
         let mark = (radius > 0.0).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));

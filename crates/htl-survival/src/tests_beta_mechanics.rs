@@ -698,3 +698,189 @@ fn the_rules_take_the_beta_mechanics_and_turn_away_what_makes_no_sense() {
         assert!(check(&text).is_err(), "should be turned away:\n{b}");
     }
 }
+
+// --- Grapple Arrow: what it catches, the aim's word on it, and Disengage's flip (#110) ------------
+
+/// Open ground with a boulder only the land's shapes know (`Land::ray`; no cell a walker can't
+/// enter), as Elwynn's rocks, fences and roofs were missing from what a hook could meet.
+struct Boulder {
+    at: [f32; 2],
+    r: f32,
+    top: f32,
+}
+
+impl crate::land::Land for Boulder {
+    fn height(&self, _x: f32, _y: f32) -> f32 {
+        0.0
+    }
+    fn ray(&self, from: Vec3, dir: Vec3, max: f32) -> Option<f32> {
+        let mut d = 0.0f32;
+        while d <= max {
+            let p = [from[0] + dir[0] * d, from[1] + dir[1] * d, from[2] + dir[2] * d];
+            if dist2d(p, [self.at[0], self.at[1], 0.0]) <= self.r && (0.0..=self.top).contains(&p[2]) {
+                return Some(d);
+            }
+            d += 0.05;
+        }
+        None
+    }
+}
+
+/// The built-in rules (Grapple Arrow and Ensnaring Retreat as they ship) on this land.
+fn shipped_on(land: Box<dyn crate::land::Land>) -> Survival {
+    let mut c = Content::dev();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, land, 7, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    s
+}
+
+/// Grapple Arrow aimed along the reticle's line (facing, elevation) and loosed.
+fn grapple(s: &mut Survival, p: Id, yaw: f32, pitch: f32) -> Vec<Event> {
+    s.set_aim_line(p, yaw, pitch);
+    let mut ev = cast(s, p, "grapple_arrow");
+    ev.extend(run(s, 1.0));
+    ev
+}
+
+/// What the hero was told about where the aimed hook would catch, in order.
+fn catches(ev: &[Event], who: Id) -> Vec<Option<(Vec3, bool)>> {
+    ev.iter()
+        .filter_map(|e| match e {
+            Event::Catch { player, at, .. } if *player == who => Some(*at),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn grapple_arrow_catches_a_wall_and_a_boulder_the_walking_grid_never_had() {
+    // A wall: pulled to its foot.
+    let mut s = shipped_on(Box::new(walled([12.0, 0.0], 1.0)));
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ev = grapple(&mut s, p, 0.0, 0.0);
+    let d = dashes(&ev, p);
+    assert_eq!(d.len(), 1, "one pull to the wall: {d:?}");
+    let at = s.players[&p].pos;
+    assert!(at[0] > 8.5 && at[0] < 11.0 && at[1].abs() < 0.8, "at the wall's foot: {at:?}");
+    // A boulder only the land's shapes know: caught all the same.
+    let mut s = shipped_on(Box::new(Boulder { at: [15.0, 0.0], r: 1.5, top: 2.5 }));
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ev = grapple(&mut s, p, 0.0, 0.0);
+    assert_eq!(dashes(&ev, p).len(), 1, "pulled to the boulder");
+    let at = s.players[&p].pos;
+    assert!(at[0] > 10.5 && at[0] < 13.6, "short of the boulder, not in it: {at:?}");
+    // Over its top, nothing to catch: the arrow runs out in the open.
+    s.move_player(p, ORIGIN, 0.0, Moving::default());
+    let ev = grapple(&mut s, p, 0.0, 0.35);
+    assert!(dashes(&ev, p).is_empty(), "nothing caught over the top");
+}
+
+#[test]
+fn grapple_arrow_into_open_air_does_nothing() {
+    let mut s = shipped_on(Box::new(open()));
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ev = grapple(&mut s, p, 1.0, 0.3);
+    assert!(dashes(&ev, p).is_empty(), "no pull on a miss");
+    assert!(dist2d(s.players[&p].pos, ORIGIN) < 0.1, "she stays: {:?}", s.players[&p].pos);
+}
+
+#[test]
+fn grapple_arrow_goes_where_the_reticle_is_not_to_the_locked_foe() {
+    let mut s = shipped_on(Box::new(open()));
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = mob(&mut s, "boar", [14.0, 0.0, 0.0]);
+    s.players.get_mut(&p).unwrap().lock = Some(b);
+    // Locked on, the reticle off to the side and up: the boar isn't caught.
+    s.set_aim_line(p, 0.9, 0.3);
+    let mut ev = cast(&mut s, p, "grapple_arrow");
+    ev.extend(run_still(&mut s, &[b], 1.0));
+    assert!(dashes(&ev, p).is_empty(), "the lock alone pulls nothing: {:?}", dashes(&ev, p));
+    // Wide of it by most of a yard: the boar isn't caught (a foe counts only on the line), the
+    // ground past it is.
+    s.move_player(p, ORIGIN, 0.0, Moving::default());
+    s.set_aim_line(p, (0.85f32 / 14.0).atan(), -0.1);
+    let mut ev = cast(&mut s, p, "grapple_arrow");
+    ev.extend(run_still(&mut s, &[b], 1.0));
+    assert_eq!(dashes(&ev, p).len(), 1, "pulled to the ground");
+    assert!(s.players[&p].pos[0] > 15.5, "past the boar, not beside it: {:?}", s.players[&p].pos);
+    // The reticle on it: caught, and pulled beside it, lock or no lock.
+    s.players.get_mut(&p).unwrap().lock = None;
+    s.move_player(p, ORIGIN, 0.0, Moving::default());
+    s.set_aim_line(p, 0.0, -0.1);
+    let mut ev = cast(&mut s, p, "grapple_arrow");
+    ev.extend(run_still(&mut s, &[b], 1.0));
+    assert_eq!(dashes(&ev, p).len(), 1, "on the line, the boar is caught");
+    let gap = dist2d(s.players[&p].pos, s.mobs[&b].pos);
+    assert!(gap > 0.6 && gap < 2.0, "beside it: {gap}");
+}
+
+#[test]
+fn while_aimed_the_hero_is_told_where_the_hook_would_catch_and_when_it_would_miss() {
+    let mut s = shipped_on(Box::new(walled([12.0, 0.0], 1.0)));
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = s.content.ability("grapple_arrow").unwrap();
+    s.players.get_mut(&p).unwrap().owned.insert("grapple_arrow".into());
+    s.slot_ability(p, "utility", "grapple_arrow").unwrap();
+    s.set_cooldowns(p, true);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.input(p, Input::Ability(key_of("utility"), false));
+    let ev = run(&mut s, 0.1);
+    assert!(matches!(s.players[&p].action, Action::Aim { .. }), "aiming");
+    // At the wall: a catch, at its face.
+    let told = catches(&ev, p);
+    let Some(Some((at, true))) = told.last().copied() else { panic!("a catch at the wall: {told:?}") };
+    assert!(at[0] > 10.0 && at[0] < 11.5 && at[1].abs() < 0.8, "at the wall's face: {at:?}");
+    assert_eq!(s.catch_preview(p, k), Some((at, true)), "the same as asked now");
+    // Held still, nothing new to say.
+    s.set_aim_line(p, 0.0, 0.0);
+    assert!(catches(&run(&mut s, 0.3), p).is_empty(), "no repeats");
+    // Up at the sky the other way (this test's wall stands to any height): a miss, out at the end
+    // of its range.
+    s.set_aim_line(p, std::f32::consts::PI, 0.5);
+    let told = catches(&run(&mut s, 0.1), p);
+    let Some(Some((end, false))) = told.last().copied() else { panic!("a miss: {told:?}") };
+    assert!(dist2d(end, ORIGIN) > 18.0, "out at its range's end: {end:?}");
+    // Back on the wall and loosed: it catches where it said, and the word is taken back.
+    s.set_aim_line(p, 0.0, 0.0);
+    let _ = run(&mut s, 0.1);
+    s.input(p, Input::Attack);
+    let mut ev = s.step(DT);
+    s.input(p, Input::AttackUp);
+    ev.extend(run(&mut s, 1.0));
+    assert!(catches(&ev, p).contains(&None), "the aim let go: {:?}", catches(&ev, p));
+    assert_eq!(dashes(&ev, p).len(), 1, "and the pull to the wall");
+}
+
+#[test]
+fn every_disengage_plays_the_same_borrowed_flip_from_the_ground_too() {
+    let c = Content::dev();
+    for key in ["ensnaring_retreat", "trappers_leap"] {
+        let d = &c.abilities[c.ability(key).unwrap()];
+        assert!(d.leap_flip && d.leap_clip != 0 && d.leap_from == "ScourgeFemale", "{key}: the Undead woman's flip");
+    }
+    let mut s = shipped_on(Box::new(open()));
+    for name in ["Ayla", "Grosh"] {
+        let p = hero(&mut s, name, ORIGIN, 0.0);
+        let ev = cast(&mut s, p, "ensnaring_retreat");
+        let looks: Vec<(u16, String, bool, f32)> = ev
+            .iter()
+            .filter_map(|e| match e {
+                Event::LeapLook { player, clip, from, flip, secs, .. } if *player == p => Some((*clip, from.clone(), *flip, *secs)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(looks.len(), 1, "{name}: one flip: {looks:?}");
+        let (clip, from, flip, secs) = looks[0].clone();
+        assert!(clip == 38 && from == "ScourgeFemale" && flip && secs > 0.3, "{name}: {looks:?}");
+        assert!(!hops(&ev, p).is_empty(), "{name}: a hop back into it, from the ground");
+        let _ = run(&mut s, 2.0);
+    }
+    // A leap's look on anything but a leap, or from no model the clients know, is turned away.
+    let card = |kind: &str, more: &str| format!("[[ability]]\nkey = \"t_bad\"\nname = \"Bad\"\nschool = \"hunter\"\nslot = \"utility\"\nkind = \"{kind}\"\nrange = [8.0, 8.0]\n{more}\n");
+    check(&card("leap", "back = true\nleap_clip = 38\nleap_from = \"ScourgeFemale\"\nleap_flip = true")).unwrap();
+    for bad in [card("nova", "leap_flip = true"), card("leap", "leap_from = \"ScourgeFemale\""), card("leap", "leap_clip = 38\nleap_from = \"Murloc\"")] {
+        assert!(check(&bad).is_err(), "should be turned away:\n{bad}");
+    }
+}

@@ -115,7 +115,7 @@ fn main() -> Result<()> {
         };
         println!("Reading Elwynn Forest from {} ...", data.display());
         let loaded = htl_map::elwynn::load(&data)?;
-        println!("Elwynn ready: {} trees around Goldshire.", loaded.trunks.len());
+        println!("Elwynn ready: {} trees around Goldshire, {} solid faces for a grappling hook.", loaded.trunks.len(), loaded.solids.len());
         // The dungeons below, each on its own instance map: without its ground, its page stays shut.
         let mut below: Vec<(String, Box<dyn htl_survival::Land>)> = Vec::new();
         for d in content.dungeons() {

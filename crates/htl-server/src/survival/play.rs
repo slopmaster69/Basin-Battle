@@ -794,6 +794,30 @@ impl SurvivalGame {
                     self.send(c, packets::knock_back(g, counter, dir, speed * 0.8, 1.5));
                 }
             }
+            Event::Catch { player, ability, at } => {
+                // Where an aimed grappling hook would catch, for the add-on's aim line.
+                let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) else { return };
+                let line = match (at, self.sim.players.get(&player).map(|p| p.pos)) {
+                    (Some((at, caught)), Some(pos)) => {
+                        let ground = self.sim.land().height_near(at[0], at[1], at[2] + 1.0);
+                        let yards = htl_survival::dist2d(pos, at);
+                        let key = self.sim.content.abilities.get(ability).map_or("", |d| d.key.as_str());
+                        format!("GP\t{}\t{:.2}\t{:.2}\t{:.2}\t{yards:.2}\t{ground:.2}\t{key}", u8::from(caught), at[0], at[1], at[2])
+                    }
+                    _ => "GP".to_string(),
+                };
+                self.ui_line(c, &line);
+            }
+            Event::LeapLook { player, secs, clip, take, from, flip } => {
+                // A leap's own look (a Disengage's flip), on the clients that play clips.
+                let Some(g) = self.guid_of(player) else { return };
+                let mine = self.conn_of(player);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let line = format!("FP\t{g:#X}\t{secs:.2}\t{clip}\t{take}\t{from}\t{}\t{}", u8::from(flip), u8::from(Some(c) == mine));
+                    self.ui_line(c, &line);
+                }
+            }
             Event::Abilities { player } => {
                 self.abilities_dirty.insert(player);
             }

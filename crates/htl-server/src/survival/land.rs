@@ -41,6 +41,8 @@ pub struct ElwynnLand {
     caves: Vec<CaveLand>,
     /// Walks that found no way, and when.
     failed: std::sync::Mutex<std::collections::HashMap<(i32, i32, i32, i32), std::time::Instant>>,
+    /// The buildings' and doodads' shapes in the round, for a grappling hook's line.
+    solids: htl_map::solids::Solids,
 }
 
 /// A cave's ground and its box.
@@ -55,7 +57,7 @@ const UNDERGROUND: f32 = 2.5;
 
 impl ElwynnLand {
     pub fn new(loaded: LoadedElwynn) -> Self {
-        let LoadedElwynn { min, max, grid, trunks, zone, caves } = loaded;
+        let LoadedElwynn { min, max, grid, trunks, zone, caves, solids } = loaded;
         let caves = caves.into_iter().map(|c| CaveLand { min: c.min, max: c.max, land: DeadminesLand::from_layers(c.ground) }).collect();
         let (w, h) = grid.size();
         let mut trunk_cells = vec![false; w * h];
@@ -76,7 +78,7 @@ impl ElwynnLand {
             }
         }
         let extra = trunk_cells.iter().map(|t| if *t { TRUNK_COST } else { 1.0 }).collect();
-        Self { grid, trunks, trunk_cells, extra, zone, bounds: (min, max), caves, failed: Default::default() }
+        Self { grid, trunks, trunk_cells, extra, zone, bounds: (min, max), caves, failed: Default::default(), solids }
     }
 
     pub fn height_at(&self, x: f32, y: f32) -> f32 {
@@ -145,6 +147,10 @@ impl Land for ElwynnLand {
 
     fn water(&self, x: f32, y: f32) -> bool {
         self.grid.is_water(x, y)
+    }
+
+    fn ray(&self, from: Vec3, dir: Vec3, max: f32) -> Option<f32> {
+        self.solids.ray(from, dir, max)
     }
 
     fn road(&self, x: f32, y: f32) -> f32 {
@@ -454,7 +460,7 @@ mod tests {
     fn land() -> ElwynnLand {
         let grid = HeightGrid::sample([0.0, -40.0], [80.0, 40.0], 1.0, |x, _| Some(if x >= 40.0 { 20.0 } else { 0.0 }));
         let trunks = vec![Trunk { pos: [20.0, 0.0, 0.0], radius: 1.5 }];
-        ElwynnLand::new(LoadedElwynn { min: htl_map::elwynn::MIN, max: htl_map::elwynn::MAX, grid, trunks, zone: Default::default(), caves: Vec::new() })
+        ElwynnLand::new(LoadedElwynn { min: htl_map::elwynn::MIN, max: htl_map::elwynn::MAX, grid, trunks, zone: Default::default(), caves: Vec::new(), solids: Default::default() })
     }
 
     #[test]

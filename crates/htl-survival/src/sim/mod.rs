@@ -268,6 +268,13 @@ pub enum Event {
     FeatherFall { player: Id, on: bool },
     /// A hero's own dash along the ground: which way, how fast, how long.
     Dash { player: Id, dir: f32, speed: f32, secs: f32 },
+    /// While a hero aims a grappling hook (`ability`): where its line ends and whether it catches
+    /// there (a wall, a rock, the ground, a foe); `None` once the aim is let go.
+    Catch { player: Id, ability: usize, at: Option<(Vec3, bool)> },
+    /// A hero's leap with a look of its own (a Disengage): a clip over the whole body, borrowed
+    /// from another character model (`from`, empty: their own), and a tumble head over heels
+    /// along the way it flies (`flip`), for `secs`.
+    LeapLook { player: Id, secs: f32, clip: u16, take: u32, from: String, flip: bool },
     /// A hero's ability keys, cooldowns or tree changed.
     Abilities { player: Id },
     /// A hero's Valor changed.

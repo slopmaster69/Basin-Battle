@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use super::abilities::{Burning, Projectile, Stage, HERO_SIZE};
+use super::abilities::{Burning, Projectile, Stage, Trace, HERO_SIZE};
 use super::moves::{airtime, Landing, Trap};
 use super::*;
 use crate::content::{AbilityDef, AbilityEffect};
@@ -45,6 +45,9 @@ pub(crate) struct Beta {
     pub pops: Vec<(Id, usize)>,
     /// When each hero was last launched by a pad.
     pub launched: BTreeMap<Id, f32>,
+    /// Heroes aiming a grappling hook: what they were last told it would meet (the hook, whether
+    /// it catches, and where to a quarter yard).
+    pub catches: BTreeMap<Id, (usize, bool, [i32; 3])>,
 }
 
 /// Effects given at `at`, by `owner` to `victim` (`source` names them in the log).
@@ -116,6 +119,7 @@ impl Survival {
         }
         self.step_echoes();
         self.step_tethers();
+        self.step_catches();
         let pops = std::mem::take(&mut self.beta.pops);
         for (h, nova) in pops {
             if self.has_cc(h, "shield") {
@@ -184,6 +188,74 @@ impl Survival {
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
         self.events.push(Event::Dash { player: id, dir, speed: moved / secs, secs });
         self.beta.yanks.insert(id, (end, now + secs));
+    }
+
+    /// A grappling hook's line meets the land's solid shapes as the game draws them (a rock, a
+    /// fence, a statue, a building's walls and roof, a trunk), not only the ground and the cells
+    /// a walker can't enter: `t`, a line traced from `from` along `dir`, cut short where the
+    /// first of them stands. Only for an ability that yanks; the rest fly as ever.
+    pub(crate) fn catch_solid(&self, ability: usize, from: Vec3, dir: Vec3, t: Trace) -> Trace {
+        if !self.content.abilities.get(ability).is_some_and(|d| d.yank) {
+            return t;
+        }
+        match self.land.ray(from, dir, t.dist) {
+            // Before what the line met (a body or the ground), or anywhere along a line that met
+            // nothing.
+            Some(r) if r < t.dist || (r <= t.dist && t.unit.is_none() && !t.solid) => {
+                let r = r.max(0.0);
+                Trace { dist: r, point: [from[0] + dir[0] * r, from[1] + dir[1] * r, from[2] + dir[2] * r], unit: None, solid: true }
+            }
+            _ => t,
+        }
+    }
+
+    /// Where a grappling hook aimed now would end, as the cast would fly it from the
+    /// hands toward what the reticle's line meets: the spot, and whether it catches there (a
+    /// wall, a solid shape, the ground or a foe; false: it runs out of range in the open).
+    pub fn catch_preview(&self, id: Id, ability: usize) -> Option<(Vec3, bool)> {
+        let d = self.content.abilities.get(ability)?;
+        if !self.players.contains_key(&id) {
+            return None;
+        }
+        let (range, radius) = (AbilityDef::at(d.range, 1.0), AbilityDef::at(d.radius, 1.0));
+        let (yaw, _) = self.aim_of(id);
+        let (o, dir) = self.reticle(id);
+        let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
+        let from = self.hands(id, yaw);
+        let base = if dist2d(from, aim.point) < 2.0 { dir } else { unit3(sub3(aim.point, from)) };
+        let t = self.catch_solid(ability, from, base, self.trace_with(from, base, range, radius, id, d.friends()));
+        Some((t.point, t.unit.is_some() || t.solid))
+    }
+
+    /// While a hero aims a grappling hook, where it would catch, told to them each time it moves
+    /// a quarter yard or turns from a catch to a miss (`Event::Catch`); `None` once the aim is
+    /// let go (cast, called off, or cut short).
+    fn step_catches(&mut self) {
+        let aiming: Vec<(Id, usize)> = self
+            .players
+            .iter()
+            .filter(|(_, p)| p.health > 0)
+            .filter_map(|(h, p)| match p.action {
+                Action::Aim { ability } | Action::Charge { ability, .. } if self.content.abilities[ability].yank => Some((*h, ability)),
+                _ => None,
+            })
+            .collect();
+        let gone: Vec<Id> = self.beta.catches.keys().filter(|h| !aiming.iter().any(|(a, _)| a == *h)).copied().collect();
+        for h in gone {
+            if let Some((ability, ..)) = self.beta.catches.remove(&h) {
+                self.events.push(Event::Catch { player: h, ability, at: None });
+            }
+        }
+        for (h, ability) in aiming {
+            let Some((at, caught)) = self.catch_preview(h, ability) else { continue };
+            let q = |v: f32| (v * 4.0).round() as i32;
+            let key = (ability, caught, [q(at[0]), q(at[1]), q(at[2])]);
+            if self.beta.catches.get(&h) == Some(&key) {
+                continue;
+            }
+            self.beta.catches.insert(h, key);
+            self.events.push(Event::Catch { player: h, ability, at: Some((at, caught)) });
+        }
     }
 
     /// How wide a unit's body is.
