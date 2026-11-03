@@ -54,7 +54,8 @@ what it sent, side by side on one sheet.
   `.es lab` (`@Name` first picks the hero), one at a time. Each run's screenshots move out of
   `Screenshots` into `logs/lab/<label>/` beside its trace, at half size (a full-size burst is
   about 250 MB). With ffmpeg on the host it's recorded as `logs/lab/<label>.mp4` too. Delete old
-  run folders when you're done with them.
+  run folders when you're done with them: past 3 GB in `logs/lab`, the lab refuses new runs
+  and says so.
 - **Finding a look:** a queue line `find <word>...` lists the game's spells whose cast, impact or
   lasting look shows a model with one of those words in its path into
   `logs/lab/find-<words>.txt`, read from your own game data. `find missile <word>...` looks at

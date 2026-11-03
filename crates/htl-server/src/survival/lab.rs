@@ -72,6 +72,15 @@ impl SurvivalGame {
             self.tell(conn, "The lab is cleared.");
             return Ok(());
         }
+        // A night of runs once filled the host's disk: past its budget, the lab stops and says so.
+        let used = folder_bytes(&std::path::Path::new("logs").join("lab"));
+        if used > LAB_BUDGET {
+            return Err(format!(
+                "The lab's runs take {:.1} GB, over its {:.0} GB budget. Delete old run folders in logs/lab, then run it again.",
+                used as f64 / 1e9,
+                LAB_BUDGET as f64 / 1e9
+            ));
+        }
         let key = first.to_lowercase();
         let ability = self.sim.content.ability(&key).ok_or_else(|| format!("No ability called {key}."))?;
         let d = self.sim.content.abilities[ability].clone();
@@ -379,6 +388,21 @@ fn lab_find(args: &[String]) {
         Err(e) => format!("find failed: {e:#}\n"),
     };
     let _ = std::fs::create_dir_all(out.parent().unwrap()).and_then(|_| std::fs::write(&out, text));
+}
+
+/// The most the lab's runs may take on the host's disk (logs/lab): about 60 runs at half size.
+const LAB_BUDGET: u64 = 3_000_000_000;
+
+/// Everything under `dir`, in bytes (0 if it isn't there).
+fn folder_bytes(dir: &std::path::Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
+    entries
+        .flatten()
+        .map(|e| match e.file_type() {
+            Ok(t) if t.is_dir() => folder_bytes(&e.path()),
+            _ => e.metadata().map(|m| m.len()).unwrap_or(0),
+        })
+        .sum()
 }
 
 /// The screenshots saved from `since` (a moment before) to `upto`, moved into `to` at half size.
