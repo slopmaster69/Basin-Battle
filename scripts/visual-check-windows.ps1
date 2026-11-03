@@ -697,11 +697,20 @@ function Invoke-Request($file) {
     Remove-Item (Join-Path $outRoot "$id.done"), (Join-Path $outRoot "$id.failed") -ErrorAction SilentlyContinue
     Set-Content (Join-Path $out "status.txt") "running since $(Get-Date -Format s)"
     $names = @(Get-Content $file.FullName | ForEach-Object { ($_ -replace '#.*$', '').Trim() } | Where-Object { $_ })
-    Write-WatchLog "request $id : $($names -join ' ')"
+    # `client <name>`: this request runs on clients\<name>\ (Invoke-ClientDeploy), not the default.
+    $use = $names | Where-Object { $_ -match '^client\s+\S+$' } | Select-Object -First 1
+    $names = @($names | Where-Object { $_ -notmatch '^client\s+\S+$' })
+    Write-WatchLog "request $id : $($names -join ' ')$(if ($use) { " ($use)" })"
     $report = @()
     $failed = $false
     try {
         $s = Resolve-Settings $false
+        if ($use) {
+            $cname = ($use -split '\s+')[1]
+            $exe = Get-ChildItem (Join-Path $Folder "clients\$cname") -Filter benilla.exe -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $exe) { throw "No client $cname in $(Join-Path $Folder 'clients')." }
+            $s.client = $exe.FullName
+        }
         $results = Invoke-Runs $s $names $out
         foreach ($r in $results) {
             $word = if ($r.Ok) { "ok    " } else { "FAILED" }
@@ -818,6 +827,35 @@ function Invoke-Queries($file) {
     }
 }
 
+# Another dev client to check with (a branch's client patches), with nobody at the PC: its zip in
+# parts in deploy\clients\<name>\ (part-0, part-1, ...), then <name>.sha256 last, holding the
+# whole zip's SHA-256. The parts are joined, checked and unpacked into clients\<name>\; a request
+# that says `client <name>` runs on it. The default client (settings) is left as it is.
+function Invoke-ClientDeploy($dir) {
+    $name = $dir.Name
+    $hashFile = Join-Path $dir.FullName "$name.sha256"
+    $want = (Get-Content $hashFile -Raw).Trim().ToLower()
+    $parts = @(Get-ChildItem $dir.FullName -Filter "part-*" -File | Sort-Object { [int]($_.Name -replace '^part-', '') })
+    $zip = Join-Path $dir.FullName "$name.zip"
+    $out = [System.IO.File]::Create($zip)
+    try {
+        foreach ($p in $parts) { $b = [System.IO.File]::ReadAllBytes($p.FullName); $out.Write($b, 0, $b.Length) }
+    } finally { $out.Close() }
+    $got = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+    if ($got -ne $want) {
+        Write-WatchLog "client $name : refused, the parts make $got, not $want"
+        Rename-Item $hashFile "$name.sha256.refused"
+        Remove-Item $zip -Force
+        return
+    }
+    $dest = Join-Path $Folder "clients\$name"
+    if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+    Expand-Archive -Path $zip -DestinationPath $dest -Force
+    Remove-Item $dir.FullName -Recurse -Force
+    $exe = Get-ChildItem $dest -Filter benilla.exe -File -Recurse | Select-Object -First 1
+    Write-WatchLog "client $name : unpacked into $dest$(if ($exe) { " ($($exe.FullName))" } else { ' (no benilla.exe in it)' })"
+}
+
 function Start-Watcher {
     $requests = Join-Path $Folder "requests"
     foreach ($d in @($requests, (Join-Path $Folder "out"), (Join-Path $Folder "scenarios"), (Join-Path $Folder "deploy"), (Join-Path $Folder "queries"))) {
@@ -835,6 +873,14 @@ function Start-Watcher {
             $zip = Get-ChildItem (Join-Path $Folder "deploy") -Filter *.zip -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-5) } | Sort-Object LastWriteTime | Select-Object -First 1
             if ($zip -and (Invoke-Deploy $zip)) { break }
+            # A client to check with, once its last file (the hash) has sat for 5 s.
+            $cl = Get-ChildItem (Join-Path $Folder "deploy\clients") -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $h = Get-Item (Join-Path $_.FullName "$($_.Name).sha256") -ErrorAction SilentlyContinue; $h -and $h.LastWriteTime -lt (Get-Date).AddSeconds(-5) } |
+                Select-Object -First 1
+            if ($cl) {
+                try { Invoke-ClientDeploy $cl } catch { Write-WatchLog "client $($cl.Name): $($_.Exception.Message)" }
+                continue
+            }
             # Data questions next, then scenarios.
             $q = Get-ChildItem (Join-Path $Folder "queries") -Filter *.txt -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-2) } | Sort-Object LastWriteTime | Select-Object -First 1
