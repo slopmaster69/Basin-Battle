@@ -256,6 +256,8 @@ pub struct SurvivalGame {
     /// The spell lab's run under way (`.es lab`), and the bodies its last scene set out.
     pub(crate) lab: Option<lab::Lab>,
     pub(crate) lab_mobs: Vec<Id>,
+    /// Where every lab run starts (open ground near the spawn), once found.
+    pub(crate) lab_stage: Option<([f32; 3], f32)>,
     /// When the lab's queue file was last looked at.
     pub(crate) lab_polled: Instant,
     dirty: bool,
@@ -359,6 +361,7 @@ impl SurvivalGame {
             clock_at: Instant::now(),
             lab: None,
             lab_mobs: Vec::new(),
+            lab_stage: None,
             lab_polled: Instant::now(),
         };
         g.bind_world();

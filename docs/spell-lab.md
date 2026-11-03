@@ -7,8 +7,9 @@ what it sent, side by side on one sheet.
 
 ## Running it
 
-1. Host with debug on (`.es debug`) or a dev build (`[dev] full_tree`). Stand somewhere open and
-   flat. Nothing on screen you don't want in the frames. The lab puts the camera in the same
+1. Host with debug on (`.es debug`) or a dev build (`[dev] full_tree`). Each run first sets the
+   hero down on the lab's stage: the nearest open, level ground to the camp's spawn, with no
+   trunk, wall or water within 22 yd, facing the spawn's way (the host's log names it). Nothing on screen you don't want in the frames. The lab puts the camera in the same
    place every run (behind the hero at a set distance, nearer for `close` and `ring`) and locks
    the hero on to the scene's middle body, so the body and the camera face it. Don't turn the
    camera yourself: in Elwynn Survival the body turns with it, and the blows go wide.
@@ -35,7 +36,7 @@ what it sent, side by side on one sheet.
 
 ### Options
 
-`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none]`
+`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here]`
 
 - **Scenes:** `one` (one body 5 yd ahead), `pack` (three across the front), `close` (one at arm's
   length), `ring` (three at arm's length), `far` (one 14 yd off). The default is `close` for
@@ -49,12 +50,14 @@ what it sent, side by side on one sheet.
   none are lost.
 - **Camera:** `behind`, `close` (nearer: the default for `close` and `ring`) or `none` (left
   where it is).
+- **Stage:** every run starts on the lab's stage (above); `stage here` runs it where you stand.
 - `.es lab clear` takes the scene away and lets go of the lock.
 - **From a file:** each line of `logs/lab/queue.txt` where you host is run as if typed after
   `.es lab` (`@Name` first picks the hero), one at a time. Each run's screenshots move out of
   `Screenshots` into `logs/lab/<label>/` beside its trace, at half size (a full-size burst is
   about 250 MB). With ffmpeg on the host (Windows), each run is also
-  recorded as `logs/lab/<label>.mp4` at 60 fps by Desktop Duplication (a few MB a run), and the
+  recorded as `logs/lab/<label>.mp4` at 60 fps by Desktop Duplication, 1920 wide (a few MB a
+  run; what ffmpeg said beside it in `<label>.ffmpeg.txt`), and the
   burst drops to 8 stills for the sheet. Delete old
   run folders when you're done with them: past 3 GB in `logs/lab`, the lab refuses new runs
   and says so.
