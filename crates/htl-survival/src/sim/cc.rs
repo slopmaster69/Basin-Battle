@@ -126,7 +126,7 @@ impl Survival {
     pub(crate) fn apply_cc_look(&mut self, target: Id, from: Id, kind: &str, secs: f32, amount: f32, break_after: f32, source: &str, aura: u32) -> bool {
         let now = self.clock;
         let hero = self.players.contains_key(&target);
-        let alive = self.players.get(&target).is_some_and(|p| p.health > 0) || self.mobs.get(&target).is_some_and(|m| m.health > 0 && !self.content.mobs[m.def].inert());
+        let alive = self.players.get(&target).is_some_and(|p| p.health > 0) || self.mobs.get(&target).is_some_and(|m| m.health > 0 && !self.content.mobs[m.def].totem);
         if !alive || secs <= 0.0 {
             return false;
         }

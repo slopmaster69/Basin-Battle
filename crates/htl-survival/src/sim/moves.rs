@@ -16,6 +16,8 @@ const KNOCK_LIFT: f32 = 4.5;
 const PULL_LIFT: f32 = 3.0;
 /// A pull stops this far short of where it pulls to.
 const PULL_STOP: f32 = 1.6;
+/// The farthest a knockback or a pull moves a training dummy (it has no legs to walk back).
+const DUMMY_STEP: f32 = 1.0;
 /// A leap's arc where the ability names none.
 const LEAP_LIFT: f32 = 6.0;
 /// One step along the ground for a slide's end.
@@ -114,9 +116,12 @@ impl Survival {
             self.shrugged_off(owner, victim);
             return;
         }
-        if self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].inert()) {
+        // A totem stands. A training dummy is thrown like any foe, so a knockback, a pull or a
+        // launch shows on it, but never farther than a step: it stays about where it was put up.
+        if self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].totem) {
             return;
         }
+        let dummy = self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].dummy);
         let caster = self.unit_pos(owner);
         let origin = if e.from_caster { caster } else { self.fx_from.or(caster) }.unwrap_or(v);
         let pull = e.kind == "pull";
@@ -127,6 +132,7 @@ impl Survival {
             let dir = if d < 0.3 { self.players.get(&owner).map_or(0.0, |p| p.facing) } else { facing(origin, v) };
             (dir, e.amount)
         };
+        let dist = if dummy { dist.min(DUMMY_STEP) } else { dist };
         if dist < 0.3 {
             return;
         }
@@ -158,6 +164,14 @@ impl Survival {
         } else {
             self.stagger_mob(victim, air + 0.15, false);
             self.throw_mob(victim, to, air, Some(owner));
+            // A dummy isn't stepped (it only stands there): it's where the throw ends at once,
+            // while everyone's client flies it there.
+            if dummy {
+                if let Some(m) = self.mobs.get_mut(&victim) {
+                    m.pos = to;
+                    m.path.clear();
+                }
+            }
         }
     }
 
@@ -381,7 +395,7 @@ impl Survival {
     fn trap_victim(&self, t: &Trap) -> Option<Id> {
         let radius = AbilityDef::at(self.content.abilities[t.ability].radius, t.share);
         let mob = self.mobs.iter().find(|(mid, m)| {
-            m.health > 0 && !m.hidden && !self.content.mobs[m.def].inert() && dist2d(m.pos, t.at) <= radius + 0.5 * self.content.mobs[m.def].scale && (m.pos[2] - t.at[2]).abs() < 3.0 && !self.totems.iter().any(|x| x.mob == **mid)
+            m.health > 0 && !m.hidden && !self.content.mobs[m.def].totem && dist2d(m.pos, t.at) <= radius + 0.5 * self.content.mobs[m.def].scale && (m.pos[2] - t.at[2]).abs() < 3.0 && !self.totems.iter().any(|x| x.mob == **mid)
         });
         if let Some((mid, _)) = mob {
             return Some(*mid);

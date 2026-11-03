@@ -325,7 +325,8 @@ The numbers live in `[[ability]]` in `content/survival.toml`. For testing, with 
 in this build): `.es tree` (the board; `full`, `reset`), `.es slot <q|e|1|2|3> <ability>` (a bench
 ability too, on its row's key), `.es valor <n|full>`,
 `.es cd off|on`, `.es heal`, `.es dummy [guard|roll|counter <school>]` (a training dummy in front
-of you), `.es cc log` and `.es pvp on|off`. `.es debug` also draws projectiles' bodies and every
+of you: it takes everything a foe does, traps, ground, bounces, beasts, tripwires and crowd
+control, and a knockback or a pull throws it a step at most), `.es cc log` and `.es pvp on|off`. `.es debug` also draws projectiles' bodies and every
 ground area on the ground.
 
 ### The beta page

@@ -320,7 +320,7 @@ impl Survival {
         let mut out: Vec<(Id, Vec3)> = self
             .mobs
             .iter()
-            .filter(|(m, x)| x.health > 0 && !x.hidden && !self.content.mobs[x.def].inert() && !self.own_totem(**m, owner) && dist2d(x.pos, at) <= reach)
+            .filter(|(m, x)| x.health > 0 && !x.hidden && !self.content.mobs[x.def].totem && !self.own_totem(**m, owner) && dist2d(x.pos, at) <= reach)
             .map(|(m, x)| (*m, x.pos))
             .collect();
         if self.content.pvp.friendly_fire {
