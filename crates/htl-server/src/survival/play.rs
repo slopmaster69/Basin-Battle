@@ -676,12 +676,17 @@ impl SurvivalGame {
                 self.area_looks.insert(id, guid);
             }
             Event::Rope { id, a, b } => {
-                // On the clients that stretch a rope from end to end (patch 0020); the rest keep
-                // the strip on the ground.
+                // On the clients that stretch a rope from end to end (patch 0020), in place of the
+                // strip on the ground laid for it just before (taken off theirs as a gone mark's
+                // is: floor clutter, Corey's review); the rest keep the strip.
                 let p = self.rope_create(id, a, b);
-                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.level >= super::draw::ROPE_LEVEL).map(|(c, _, _)| *c).collect();
-                for c in conns {
+                let conns: Vec<(ConnId, bool)> = self.in_world().filter(|(_, _, w)| w.level >= super::draw::ROPE_LEVEL).map(|(c, _, w)| (*c, w.addon)).collect();
+                for (c, addon) in conns {
                     self.send(c, p.clone());
+                    if addon {
+                        self.ui_line(c, &format!("MK\t{id}"));
+                        self.ui_line(c, &format!("TG\t{id}"));
+                    }
                 }
                 self.ropes.insert(id);
             }
