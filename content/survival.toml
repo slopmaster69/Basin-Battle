@@ -3202,9 +3202,6 @@ cooldown = 8.0
 # (spell lab, Nov 2).
 clip = 57
 spell = 25425
-# The earth bursting at three spots down the cone (Rocky Ground Impact's look): seen in the lab,
-# Shockwave's own look was a blue ring all round the caster, the shape of a nova, not a cone.
-ground_spell = 26271
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
 

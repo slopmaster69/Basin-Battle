@@ -356,11 +356,6 @@ pub struct AbilityDef {
     /// beam's, from the caster to the first foe in it or its far end.
     #[serde(default)]
     pub tick_spell: u32,
-    /// A cone's look as a line along the ground instead of `spell` at the caster's feet: this
-    /// spell sent to three spots down the cone's middle, near to far (Shockwave: the earth
-    /// bursting where the wave runs, where `spell` was a ring all round the caster).
-    #[serde(default)]
-    pub ground_spell: u32,
     /// A second activation (Battlerite's recast): once this goes, its key is armed for
     /// `recast_secs`, and pressed again meanwhile it fires this `inner` ability from the hero's
     /// aim, for no Valor and no cooldown (the cooldown was spent by the first cast). An EX
