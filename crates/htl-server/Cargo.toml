@@ -21,8 +21,9 @@ benilla-protocol.workspace = true
 htl-sim = { path = "../htl-sim" }
 htl-map = { path = "../htl-map" }
 htl-survival = { path = "../htl-survival" }
+# The spell lab halves its screenshots (survival/lab.rs).
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [dev-dependencies]
 anyhow.workspace = true
 benilla-srp = { git = "https://github.com/samwhosung/benilla", rev = "c23d0163d5efa1ae39e4748877fe4ba831202848" }
-image = { version = "0.25", default-features = false, features = ["png"] }
