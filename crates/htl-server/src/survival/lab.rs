@@ -45,6 +45,8 @@ pub(crate) struct Lab {
     pub ground: bool,
     /// Debug was on (its marks are kept out of the shots while the run lasts).
     pub debug_was: bool,
+    /// When (wall clock) the burst was asked for, to find its screenshots after.
+    pub asked: std::time::SystemTime,
 }
 
 impl SurvivalGame {
@@ -105,7 +107,12 @@ impl SurvivalGame {
         let keyname = ["q", "e", "1", "2", "3"].get(slot as usize).copied().unwrap_or("q");
         let steps = steps.unwrap_or_else(|| format!("{}{keyname},click?", if ex { "^" } else { "" }));
         // The hero ready: the ability on its key, nothing cooling down, full Valor and health.
-        self.sim.slot_ability(me, &row, &self.sim.content.abilities[base].key.clone())?;
+        let base_key = self.sim.content.abilities[base].key.clone();
+        if self.sim.slot_ability(me, &row, &base_key).is_err() {
+            // Not learned yet: the lab's hero gets the whole board.
+            self.sim.set_tree(me, true);
+            self.sim.slot_ability(me, &row, &base_key)?;
+        }
         self.sim.set_cooldowns(me, true);
         self.sim.set_valor(me, 100.0);
         self.sim.heal_full(me);
@@ -128,6 +135,7 @@ impl SurvivalGame {
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|t| t.as_secs()).unwrap_or(0);
         let label = format!("{key}-{scene}-{stamp}");
         self.ui_line(conn, &format!("LB\t{shots}\t{every}\t{label}"));
+        record_video(&label, shots as f32 * every as f32 / 1000.0 + 0.6);
         let mut trace = vec![
             format!("# {label}: {} ({}), scene {scene} of {creature}, steps {steps}, {shots} shots every {every} ms from -{LEAD:.2} s", d.name, d.key),
             format!("# spell {} aura {} icon {} clip {} kind {}", d.spell, d.aura, d.icon, d.clip, d.kind),
@@ -146,11 +154,45 @@ impl SurvivalGame {
             slot,
             ground: matches!(d.kind.as_str(), "ground" | "trap" | "place"),
             debug_was: self.sim.debug,
+            asked: std::time::SystemTime::now(),
         });
         // Debug's rings and marks would be in every shot: off while the run lasts.
         self.sim.debug = false;
         self.tell(conn, &format!("Lab: {} on {scene}. Hold still.", d.name));
         Ok(())
+    }
+
+    /// A lab run asked for in a file instead of in chat (`logs/lab/queue.txt`, one command a line,
+    /// as typed after `.es lab`; `@Name` first picks the hero): so a run can be set going on the
+    /// computer that hosts, with no one at the keyboard. Only that computer can write the file.
+    pub(crate) fn lab_queue(&mut self) {
+        if self.lab.is_some() || self.lab_polled.elapsed() < std::time::Duration::from_millis(500) {
+            return;
+        }
+        self.lab_polled = std::time::Instant::now();
+        let path = std::path::Path::new("logs").join("lab").join("queue.txt");
+        let Ok(text) = std::fs::read_to_string(&path) else { return };
+        let mut lines: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
+        if lines.is_empty() {
+            return;
+        }
+        let line = lines.remove(0).to_string();
+        let rest = lines.join("\n");
+        let _ = std::fs::write(&path, if rest.is_empty() { String::new() } else { rest + "\n" });
+        let mut words: Vec<&str> = line.split_whitespace().collect();
+        let named = words.first().and_then(|w| w.strip_prefix('@')).map(str::to_lowercase);
+        if named.is_some() {
+            words.remove(0);
+        }
+        let who = self.in_world().find(|(_, _, w)| named.as_ref().is_none_or(|n| w.name.to_lowercase() == *n)).map(|(c, _, w)| (*c, w.id));
+        let Some((conn, me)) = who else {
+            eprintln!("[lab] queued run skipped, no hero in the world: {line}");
+            return;
+        };
+        if let Err(e) = self.lab_command(conn, me, &words) {
+            eprintln!("[lab] queued run failed: {line}: {e}");
+            self.tell(conn, &format!("Lab: {e}"));
+        }
     }
 
     /// Before the rules step: the lab's steps that are due.
@@ -234,9 +276,75 @@ impl SurvivalGame {
         let dir = std::path::Path::new("logs").join("lab");
         let path = dir.join(format!("{}.txt", lab.label));
         let written = std::fs::create_dir_all(&dir).and_then(|_| std::fs::File::create(&path)).and_then(|mut f| f.write_all((lab.trace.join("\n") + "\n").as_bytes()));
+        // The run's screenshots, copied beside its trace once the client has written them all.
+        let since = lab.asked;
+        let folder = dir.join(&lab.label);
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            copy_shots(since, &folder);
+        });
         match written {
             Ok(()) => self.tell(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
             Err(e) => self.tell(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
+        }
+    }
+}
+
+/// ffmpeg on this computer, if it's there: `LAB_FFMPEG`, the lab helper's copy beside this checkout
+/// (`Documents\\Basin-Battle-Lab\\ffmpeg`), or one on the path.
+fn ffmpeg() -> Option<std::path::PathBuf> {
+    let found = [std::env::var("LAB_FFMPEG").ok().map(std::path::PathBuf::from), Some(std::path::PathBuf::from("../Basin-Battle-Lab/ffmpeg/bin/ffmpeg.exe"))];
+    found.into_iter().flatten().find(|p| p.is_file()).or_else(|| {
+        let ok = std::process::Command::new("ffmpeg").arg("-version").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().is_ok_and(|s| s.success());
+        ok.then(|| std::path::PathBuf::from("ffmpeg"))
+    })
+}
+
+/// The screen as video for the run, 60 frames a second, to `logs/lab/<label>.mp4` (Windows's
+/// screen grabber; nothing happens without ffmpeg or on another system).
+fn record_video(label: &str, secs: f32) {
+    if !cfg!(windows) {
+        return;
+    }
+    let Some(ff) = ffmpeg() else { return };
+    let out = std::path::Path::new("logs").join("lab").join(format!("{label}.mp4"));
+    let _ = std::fs::create_dir_all("logs/lab");
+    let spawned = std::process::Command::new(ff)
+        .args(["-y", "-loglevel", "error", "-f", "gdigrab", "-framerate", "60", "-draw_mouse", "0", "-t", &format!("{secs:.2}"), "-i", "desktop"])
+        .args(["-vf", "scale=1920:-2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p"])
+        .arg(&out)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+    if let Err(e) = spawned {
+        eprintln!("[lab] couldn't record {}: {e}", out.display());
+    }
+}
+
+/// Where the client on this computer saves its screenshots: `LAB_SHOTS`, or the Windows
+/// release's folder beside this checkout (`Documents\\Basin Battle for Windows`).
+fn shots_dir() -> Option<std::path::PathBuf> {
+    let candidates = [std::env::var("LAB_SHOTS").ok().map(std::path::PathBuf::from), Some(std::path::PathBuf::from("../Basin Battle for Windows/benilla-config/Screenshots"))];
+    candidates.into_iter().flatten().find(|d| d.is_dir())
+}
+
+/// The screenshots saved since `since` (a moment before), copied into `to`.
+fn copy_shots(since: std::time::SystemTime, to: &std::path::Path) {
+    let Some(dir) = shots_dir() else { return };
+    let from = since - std::time::Duration::from_millis(500);
+    let Ok(entries) = std::fs::read_dir(&dir) else { return };
+    let mut copied = 0;
+    for e in entries.flatten() {
+        let fresh = e.metadata().and_then(|m| m.modified()).is_ok_and(|t| t >= from);
+        let name = e.file_name();
+        if fresh && name.to_string_lossy().starts_with("WoWScrnShot_") {
+            if copied == 0 && std::fs::create_dir_all(to).is_err() {
+                return;
+            }
+            if std::fs::copy(e.path(), to.join(&name)).is_ok() {
+                copied += 1;
+            }
         }
     }
 }
