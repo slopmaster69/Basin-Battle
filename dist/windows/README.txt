@@ -18,8 +18,8 @@ THE TWO BUTTONS
 ---------------
   Play       Plays. It gets the newest version first if there is one, finds
              your WoW 1.12.1 by itself, and starts where you played last time.
-             Click Change in the first 3 seconds to choose again: which game,
-             which server (yours, or someone else's), or your WoW folder.
+             In the first 3 seconds you can click Single player, or Change to
+             choose the game, the server or your WoW folder.
   Host       Runs YOUR server, for both games: for you alone, or for friends to
              join. Leave its window open while anyone plays.
 
@@ -33,18 +33,19 @@ info", then "Run anyway".
 PLAY WITH THE GROUP
 -------------------
 Double-click Play. It joins the group's server by itself: nothing to
-type, nothing else to install. If that server isn't up, Play says so and
-offers the next one (a backup) with one click. Each server is its own
-world: a hero made on one isn't on the others.
+type, nothing else to install. If that server isn't up, Play tries the
+next one in the group's list by itself (a backup). If none is up, it says
+so and offers Try again or Single player. Each server is its own world: a
+hero made on one isn't on the others.
 (A server listed as "Tailscale" needs Tailscale, tailscale.com/download,
 and an invite from its host. The others don't.)
 
 
-PLAY ALONE
-----------
-Double-click Play, click Change, and choose "My own server on this PC". If
-your server isn't running, Play starts it (a second window: leave it open)
-and joins it. Next time, just double-click Play.
+SINGLE PLAYER
+-------------
+Double-click Play and click Single player. Play starts your own server on
+this PC (a second window: leave it open) and joins it. To make it what Play
+does every time, click Change and choose "Single player".
 
 
 PLAY WITH FRIENDS ON YOUR SERVER (YOU HOST)
@@ -56,8 +57,10 @@ the addresses to give your friends:
   Over the internet       works once your router forwards the TCP ports it
                           lists (3724, 8085 and 8086) to this PC
 Two hosts behind one router (a desktop and a laptop, say) need different
-ports: on the second, add these lines to settings.txt (beside Play) and forward
-those ports to it instead. Its address then ends in :3725.
+ports. A PC named in the group's list (project.toml's _pc lines) takes its
+server's ports by itself: the second's are 3725, 8087 and 8088, and its
+address ends in :3725. Any other PC can take them with these lines in
+settings.txt (beside Play):
   login_port = 3725
   world_port = 8087
   survival_port = 8088

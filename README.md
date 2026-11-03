@@ -39,11 +39,15 @@ One download does everything: playing, hosting and updating.
    A small window with the shield shows what it's doing; no console.
    - It finds your WoW 1.12.1 install by itself (or asks for the folder once).
    - It goes straight to **the group's server** (the `server` line in `project.toml`), so joining
-     the group is one click and nothing else to install. If it doesn't answer, Play says so and
-     offers the next one (`backup`, then `backup2`) with one click. Each server is its own world.
-     Click **Change** in the first 3 seconds to choose instead: one of the group's servers, **your
-     own server on this PC** (alone, or friends join you) or **someone else's server** (type the
-     address they give you). It remembers what you chose.
+     the group is one click and nothing else to install. If it doesn't answer, Play tries the
+     next one by itself (`backup`, then `backup2`), and if none is up it offers Try again or
+     Single player. Each server is its own world. In the first 3 seconds you can click **Single
+     player** (your own server on this PC), or **Change** to choose one of the group's servers,
+     single player, or **someone else's server** (type the address they give you). It
+     remembers what you chose under Change.
+   - On a PC named in `project.toml` as one of the group's servers (`server_pc`, `backup_pc`),
+     Play starts that server right there, and Host takes its ports by itself: the second host
+     behind one router uses 3725, 8087 and 8088.
    - A group server reached over Tailscale (a 100.x address) needs
      [Tailscale](https://tailscale.com/download) and its host's invite; Play says so when it's
      missing or off.

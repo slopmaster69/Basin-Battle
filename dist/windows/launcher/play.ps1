@@ -81,7 +81,7 @@ function Button($x, $w, $primary) {
     $b.Size = Size $w 40
     $b.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $b.FlatAppearance.BorderColor = $Gold
-    $b.Font = Font 11 -Bold:$primary
+    $b.Font = if ($primary) { Font 11 -Bold } else { Font 10 }
     if ($primary) { $b.BackColor = $Gold; $b.ForeColor = $Night } else { $b.BackColor = $Wood; $b.ForeColor = $Ink }
     $b.Visible = $false
     return $b
@@ -131,7 +131,7 @@ foreach ($srv in $Servers) {
     $serverRadios[$srv.key] = $r
     $y += 23
 }
-$rOwn = Radio "My own server on this PC" $y
+$rOwn = Radio "Single player (your own server on this PC)" $y
 $y += 23
 $rOther = Radio "Someone else's:" $y
 $rOther.Size = Size 130 22
@@ -220,10 +220,30 @@ function Reach($address, $port, $ms) {
 }
 function Where-Words($s) {
     switch ($s["place"]) {
-        "own" { "your own server on this PC" }
+        "own" { "single player, on this PC" }
         "address" { "$($s["address"])" }
         default { $srv = Server-Of $s["place"]; if ($srv) { $srv.name } else { "" } }
     }
+}
+# This PC's own server (its ports: Own-Ports), started in its own window when it isn't running.
+# Its address for the game.
+function Start-Own($worldPort) {
+    if (-not ((Reach "127.0.0.1" $own.login 500) -and (Reach "127.0.0.1" $worldPort 500))) {
+        if (-not (Test-Path $ServerExe)) { Fail "This download has no server in it (server\htl-server.exe). Download the newest version, or play on someone else's server." }
+        Set-Status "Starting your server. It opens in its own window: leave that open while you play." -Busy
+        $hostExe = Join-Path $Root "Host.exe"
+        if (Test-Path $hostExe) { Start-Process -FilePath $hostExe -WorkingDirectory $Root }
+        else { Start-Process powershell.exe -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $Launcher "host.ps1")`"") -WorkingDirectory $Root }
+        $waited = 0
+        while (-not ((Reach "127.0.0.1" $own.login 500) -and (Reach "127.0.0.1" $worldPort 500))) {
+            Wait-Pumping 1000
+            $waited += 2
+            if ($waited % 10 -eq 0) { Set-Status "Your server is loading the world ($waited s). Its window shows how it's going." -Busy }
+            if ($waited -ge 600) { Fail "Your server didn't start in 10 minutes. Its window says what went wrong." }
+        }
+    }
+    if ($own.login -ne 3724) { return "127.0.0.1:$($own.login)" }
+    return "127.0.0.1"
 }
 # The choices, filled from $s; back into $s when Play is pressed there.
 function Choose($s) {
@@ -334,65 +354,70 @@ try {
     # With the group's servers named in project.toml, a first run goes straight to the first: one click to join.
     if (-not $settings["place"] -and $Servers.Count) { $settings["place"] = $Servers[0].key }
     $own = Own-Ports $settings
+    # Single player for this time only (its button), whatever the saved choice is.
+    $solo = $false
     if ($Change -or -not (Where-Words $settings)) { Choose $settings }
 
     while ($true) {
         $gameName = GameName $settings["game"]
         $port = WorldPort $settings["game"] $own
         # Last time's choice, unless Change is pressed in the next 3 seconds.
-        Set-Status "Playing $gameName on $(Where-Words $settings)."
+        $place = $settings["place"]
+        if ($solo) { $place = "own" }
+        $words = if ($solo) { "single player, on this PC" } else { Where-Words $settings }
+        Set-Status "Playing $gameName on $words."
         $go = $null
+        $offerSolo = ($place -ne "own")
         for ($left = 3; $left -ge 1 -and -not $go; $left--) {
-            Buttons "Play ($left)" "Change..." "Quit"
+            if ($offerSolo) { Buttons "Play ($left)" "Single player" "Change..." } else { Buttons "Play ($left)" "Change..." "" }
             $go = Wait-Click 1000
         }
-        if ($go -eq "c") { Leave }
-        if ($go -eq "b") { Choose $settings; continue }
+        if ($offerSolo -and $go -eq "b") { $solo = $true; continue }
+        if (($offerSolo -and $go -eq "c") -or (-not $offerSolo -and $go -eq "b")) { $solo = $false; Choose $settings; continue }
         Buttons "" "" ""
 
         # 4. The server.
-        switch ($settings["place"]) {
-            "own" { $address = "127.0.0.1" }
-            "address" { $address = $settings["address"] }
-            default { $address = (Server-Of $settings["place"]).address }
-        }
-        if ($settings["place"] -eq "own") {
-            # This PC's server, on its own ports (settings.txt) when they aren't the usual ones.
-            if ($own.login -ne 3724) { $address = "127.0.0.1:$($own.login)" }
-            if (-not ((Reach "127.0.0.1" $own.login 500) -and (Reach "127.0.0.1" $port 500))) {
-                if (-not (Test-Path $ServerExe)) { Fail "This download has no server in it (server\htl-server.exe). Download the newest version, or play on someone else's server." }
-                Set-Status "Starting your server. It opens in its own window: leave that open while you play." -Busy
-                $hostExe = Join-Path $Root "Host.exe"
-                if (Test-Path $hostExe) { Start-Process -FilePath $hostExe -WorkingDirectory $Root }
-                else { Start-Process powershell.exe -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $Launcher "host.ps1")`"") -WorkingDirectory $Root }
-                $waited = 0
-                while (-not ((Reach "127.0.0.1" $own.login 500) -and (Reach "127.0.0.1" $port 500))) {
-                    Wait-Pumping 1000
-                    $waited += 2
-                    if ($waited % 10 -eq 0) { Set-Status "Your server is loading the world ($waited s). Its window shows how it's going." -Busy }
-                    if ($waited -ge 600) { Fail "Your server didn't start in 10 minutes. Its window says what went wrong." }
-                }
-            }
-            break
-        }
-        # Someone else's server: check it answers before the game opens, and say why when it doesn't.
-        Set-Status "Looking for the server at $address..." -Busy
-        $at = Split-Address $address
-        if (Reach $at.host $at.port 4000) { break }
-        if ((Is-TailscaleAddress $address) -and -not (Test-Path $TailscaleExe)) { Start-Process "https://tailscale.com/download/windows" }
-        # One of the group's servers down: the next is one click away (for this time only: not saved).
-        $next = Next-Server $settings["place"]
-        $why = Why-Unreachable $address
-        if ($next) {
-            Set-Status "$why`n`nOr play on the next one: $($next.name)."
-            Buttons "Try again" "Use next" "Quit"
+        $address = $null
+        $where = $words
+        if ($place -eq "own") { $address = Start-Own $port; break }
+        if ($place -eq "address") {
+            $candidates = @(@{ key = "address"; address = $settings["address"]; name = $settings["address"]; pc = "" })
         } else {
-            Set-Status $why
-            Buttons "Try again" "Change..." "Quit"
+            # The chosen one of the group's servers, then each after it: the first that answers.
+            $candidates = @()
+            $on = $false
+            foreach ($srv in $Servers) { if ($srv.key -eq $place) { $on = $true }; if ($on) { $candidates += $srv } }
         }
+        $tried = @()
+        foreach ($srv in $candidates) {
+            # A Tailscale address only answers with Tailscale on this PC: skipped then, unless it was picked.
+            if ((Is-TailscaleAddress $srv.address) -and -not (Test-Path $TailscaleExe) -and $srv.key -ne $place) { continue }
+            if ($srv.pc -and $srv.pc -ieq $env:COMPUTERNAME) {
+                # This PC hosts that one: its own server, started if it isn't running.
+                $address = Start-Own $port
+                $where = "$($srv.name) (this PC)"
+                break
+            }
+            Set-Status "Looking for $($srv.name)..." -Busy
+            $at = Split-Address $srv.address
+            if (Reach $at.host $at.port 4000) { $address = $srv.address; $where = $srv.name; break }
+            Log "no answer from $($srv.name) at $($srv.address)"
+            $tried += $srv
+        }
+        if ($address) { break }
+
+        # None answered: say why, and offer single player.
+        if ($tried.Count -eq 1) {
+            if ((Is-TailscaleAddress $tried[0].address) -and -not (Test-Path $TailscaleExe)) { Start-Process "https://tailscale.com/download/windows" }
+            Set-Status (Why-Unreachable $tried[0].address)
+        } else {
+            $names = ($tried | ForEach-Object { $_.name }) -join ", "
+            Set-Status "None of the group's servers is up right now ($names). Someone has to be hosting for you to join: try again in a bit, or play single player on this PC."
+        }
+        Buttons "Try again" "Single player" "Change..."
         $answer = Wait-Click
-        if ($answer -eq "c") { Leave }
-        if ($answer -eq "b") { if ($next) { $settings["place"] = $next.key } else { Choose $settings } }
+        if ($answer -eq "b") { $solo = $true }
+        if ($answer -eq "c") { $solo = $false; Choose $settings }
     }
 
     # 5. Play.
@@ -412,7 +437,8 @@ try {
     $start.UseShellExecute = $false
     $start.CreateNoWindow = $true
     [System.Diagnostics.Process]::Start($start) | Out-Null
-    Set-Status "Starting $gameName...`n`nLog in with any name you like (it becomes your hero) and the password: hold, unless the host changed it." -Busy
+    Log "joining $gameName at $address ($where)"
+    Set-Status "Starting $gameName on $where...`n`nLog in with any name you like (it becomes your hero) and the password: hold, unless the host changed it." -Busy
     Wait-Pumping 5000
     Leave
 } catch {

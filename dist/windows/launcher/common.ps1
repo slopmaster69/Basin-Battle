@@ -35,7 +35,7 @@ $Repository = ProjectName "repository" "slopmaster69/Basin-Battle"
 $Servers = @()
 foreach ($k in @("server", "backup", "backup2")) {
     $a = ProjectName $k ""
-    if ($a) { $Servers += @{ key = $k; address = $a; name = (ProjectName "$($k)_name" $a) } }
+    if ($a) { $Servers += @{ key = $k; address = $a; name = (ProjectName "$($k)_name" $a); pc = (ProjectName "$($k)_pc" "") } }
 }
 $GroupServer = if ($Servers.Count) { $Servers[0].address } else { "" }
 function Server-Of($key) { foreach ($s in $Servers) { if ($s.key -eq $key) { return $s } }; return $null }
@@ -50,10 +50,21 @@ function Split-Address($address) {
     return @{ host = "$address"; port = 3724 }
 }
 
-# This PC's own server's ports: 3724 and 8085/8086 unless settings.txt says otherwise (a second
-# host behind the same router needs its own: login_port, world_port, survival_port).
+# The group's server this PC hosts (its `_pc` is this PC's name), or $null.
+function This-Server {
+    foreach ($s in $Servers) { if ($s.pc -and $s.pc -ieq $env:COMPUTERNAME) { return $s } }
+    return $null
+}
+# This PC's own server's ports: 3724 and 8085/8086; on a PC that hosts one of the group's servers,
+# that server's (its :port, and the worlds 8085 + 2 x (port - 3724) and the next); and over either,
+# settings.txt's login_port, world_port and survival_port when it has them.
 function Own-Ports($s) {
     $p = @{ login = 3724; basin = 8085; survival = 8086 }
+    $mine = This-Server
+    if ($mine) {
+        $login = (Split-Address $mine.address).port
+        $p = @{ login = $login; basin = 8085 + 2 * ($login - 3724); survival = 8086 + 2 * ($login - 3724) }
+    }
     foreach ($pair in @(@("login_port", "login"), @("world_port", "basin"), @("survival_port", "survival"))) {
         $v = 0
         if ($s[$pair[0]] -and [int]::TryParse($s[$pair[0]], [ref]$v) -and $v -gt 0) { $p[$pair[1]] = $v }

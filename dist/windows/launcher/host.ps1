@@ -14,8 +14,9 @@ function Stop-Here($text) { Warn $text; Read-Host "Press Enter to close"; exit 1
 
 if (-not (Test-Path $ServerExe)) { Stop-Here "server\htl-server.exe is missing. Your anti-virus may have taken it: restore it, or download the game again." }
 if (Get-OurServer) { Stop-Here "Your server is already running (another window is hosting). Only one at a time." }
-# This PC's ports: the usual 3724, 8085 and 8086, or its own from settings.txt (login_port,
-# world_port, survival_port) when it's a second host behind the same router.
+# This PC's ports: the usual 3724, 8085 and 8086; the ones of the group's server this PC is
+# (project.toml's `_pc`), so a second host behind the same router takes its own; or settings.txt's
+# login_port, world_port and survival_port.
 $own = Own-Ports (Read-Settings)
 foreach ($port in @($own.login, $own.basin, $own.survival)) {
     if (PortOpen "127.0.0.1" $port) { Stop-Here "Port $port is taken: another server (another copy of the game, or a test build) is running on this PC. Close it first." }
@@ -43,7 +44,13 @@ $serverArgs = @("--realm", $BasinName, "--survival-realm", $SurvivalName, "--dat
 # How an address is written for this PC: with :port when its login port isn't 3724.
 $suffix = if ($own.login -ne 3724) { ":$($own.login)" } else { "" }
 Write-Host ""
-Say "Give your friends one of these addresses (they choose 'Someone else's server' in Play):"
+$mine = This-Server
+if ($mine) {
+    Say "This PC is $($mine.name) in the group's list: friends' Play finds it by itself (TCP $($own.login), $($own.basin), $($own.survival))."
+    Say "Anyone else can type one of these addresses ('Someone else's' under Change in Play):"
+} else {
+    Say "Give your friends one of these addresses (they choose 'Someone else's' under Change in Play):"
+}
 try {
     # The adapter with a default gateway is the one on the home network (WSL's and Hyper-V's
     # virtual adapters have none).
