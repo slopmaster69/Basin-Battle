@@ -889,6 +889,7 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
     assert!(struck.iter().all(|d| *d == struck[0]), "no falloff: {struck:?}");
     assert!(hits(&ev, p, aside).is_empty());
     assert!(s.has_cc(k, "burn"), "Lacerated");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "its bleed shows it, no word");
     let c = s.cc_of(k).iter().find(|c| c.kind == "burn").unwrap();
     assert!((c.until - s.clock - 6.0).abs() < 0.6, "4 sec and one for each arrow past three: {}", c.until - s.clock);
     assert!(s.planted_of(p).is_empty(), "every arrow home");
@@ -1205,6 +1206,9 @@ fn the_owl_marks_and_the_bear_mauls_a_staggered_foe_for_triple() {
     ev.extend(run(&mut s, 0.8));
     let mauled = hits(&ev, p, k)[0];
     assert!(mauled as f32 >= plain as f32 * 2.5, "triple on the staggered: {plain} then {mauled}");
+    // The bonus shows as a heavier impact on the foe, never as the beast's name in words.
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == k && *kit == KIT_SLAM)), "a heavier impact");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word");
 }
 
 #[test]

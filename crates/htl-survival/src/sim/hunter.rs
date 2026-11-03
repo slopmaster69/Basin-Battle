@@ -567,8 +567,8 @@ impl Survival {
             }
             if n >= LACERATE_AT && self.alive(v) {
                 let secs = LACERATE_SECS + (n - LACERATE_AT) as f32;
+                // The bleed's own look on the foe says it, no word.
                 self.apply_cc_look(v, id, "burn", secs, LACERATE_DPS, 0.0, "Lacerate", BLEED_AURA);
-                self.events.push(Event::Flash { player: id, text: format!("Lacerated! ({n} arrows)") });
             }
         }
     }
@@ -1029,8 +1029,10 @@ impl Survival {
         let Some(at) = self.unit_pos(v) else { return };
         let boss = self.holds_ground(v);
         let name = format!("{} ({})", self.content.abilities[ability].name, beast.name);
+        // Its bonus fits: the blow lands with a heavier impact on the foe (Slam's), no word.
+        // Which beast it was is plain from the beast itself.
         if lit {
-            self.events.push(Event::Flash { player: owner, text: format!("{}!", beast.name) });
+            self.events.push(Event::Visual { id: v, kit: combat::KIT_SLAM, by: None });
         }
         match beast.key {
             "wolf" => {
