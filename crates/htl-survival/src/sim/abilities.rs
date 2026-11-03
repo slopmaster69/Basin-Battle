@@ -2257,7 +2257,15 @@ impl Survival {
         // Sent at the caster's spot, not at the caster: the client plays a spell's impact on
         // every unit it names as struck, and some impacts are a knockdown (Shockwave's put its
         // own caster on the ground).
-        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
+        if d.ground_spell == 0 {
+            self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
+        } else {
+            // Down the cone's middle, so the look runs the way the cone does and as far.
+            for k in [0.3, 0.6, 0.9] {
+                let p = self.ground_near(at[0] + yaw.cos() * range * k, at[1] + yaw.sin() * range * k, at[2] + 1.0);
+                self.events.push(Event::Missile { caster: id, spell: d.ground_spell, target: Target::Point(p) });
+            }
+        }
         // A blow of the weapon's (Shockwave, Retaliation's sweep): a share of its roll.
         let swing = self.players.get(&id).filter(|_| d.weapon > 0.0).map(|p| self.weapon_of(p).damage);
         let damage = match swing {
