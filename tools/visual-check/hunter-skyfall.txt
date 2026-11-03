@@ -1,4 +1,5 @@
-# Skyfall (3, its second choice): the leap up, the hang, then the volley on the key again.
+# Skyfall (3, its second choice): the leap up, the hang with the bow drawn (#120: 5.5 sec), then
+# the volley on the key again, aimed down at the dummy, and the float down.
 # Seen from low and farther back, so the hunter stays in frame up high.
 # Look for: the leap, the hover with the bow drawn aiming down, the volley bursting out, the
 # landing (#110: 3).
@@ -8,6 +9,8 @@ include _setup
 5.0 .es slot 3 skyfall
 5.5 .es valor full
 6.0 .es in ab 4 0                    # up
-7.8 .es in ab 4 0                    # the volley
-5.8 shots leap 25 0.07
-7.6 shots volley 50 0.07
+9.5 .es in ab 4 0                    # the volley, from the hang
+9.8 .es in a {facing} -1.2           # down at the dummy, 16 yd below and 6 ahead
+9.9 .es in au {facing} -1.2
+5.8 shots hang 30 0.12
+9.4 shots volley 50 0.08

@@ -328,6 +328,14 @@ end)
 local frame = CreateFrame("Frame")
 VC.frame = frame
 frame:SetScript("OnUpdate", function()
+  -- No window over the scene, ever: the board .es spells and .es slot open, the week's letter
+  -- at login, the ledger (every window Escape closes).
+  if UISpecialFrames then
+    for _, n in ipairs(UISpecialFrames) do
+      local w = getglobal(n)
+      if w and w:IsShown() then w:Hide() end
+    end
+  end
   local now = GetTime() - VC.t0
   if now < 0 then return end
   while VC.steps[VC.i] and VC.steps[VC.i][1] <= now do
