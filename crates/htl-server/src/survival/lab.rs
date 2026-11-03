@@ -41,6 +41,8 @@ const LEAD: f32 = 0.25;
 /// about a second (seen in the lab: the brave's wind-up was invisible), and the lock-on camera
 /// settles.
 const SETTLE: f32 = 1.5;
+/// A `blow` step's creature may swing this long: its wind-up and the blow landing.
+const BLOW_LASTS: f32 = 2.0;
 /// And this much more when the run first sets the hero down on the lab's stage (far from where
 /// they stood, the client shows its loading screen first).
 const MOVED_SETTLE: f32 = 5.0;
@@ -164,6 +166,7 @@ impl SurvivalGame {
             self.sim.set_tree(me, true);
             self.sim.slot_ability(me, &row, &base_key)?;
         }
+        self.sim.lab_reset(me);
         self.sim.set_cooldowns(me, true);
         self.sim.set_valor(me, 100.0);
         self.sim.heal_full(me);
@@ -288,7 +291,9 @@ impl SurvivalGame {
         let now = self.sim.clock;
         if !self.lab_mobs.is_empty() {
             let mobs = self.lab_mobs.clone();
-            self.sim.lab_hold(&mobs);
+            self.lab_blows.retain(|(_, until)| *until > now);
+            let blows: Vec<Id> = self.lab_blows.iter().map(|(m, _)| *m).collect();
+            self.sim.lab_hold(&mobs, &blows);
         }
         let Some(lab) = self.lab.as_mut() else { return };
         if lab.burst.as_ref().is_some_and(|(at, _, _)| *at <= now) {
@@ -325,6 +330,9 @@ impl SurvivalGame {
                 "blow" => {
                     if let Some(m) = nearest {
                         self.sim.lab_blow(m, me);
+                        // Its wind-up and the blow itself (a brave's is 1.1 sec).
+                        let now = self.sim.clock;
+                        self.lab_blows.push((m, now + BLOW_LASTS));
                     }
                     None
                 }
