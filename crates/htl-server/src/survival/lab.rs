@@ -1,8 +1,10 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]]`
 //!
+//! - `look` tries another of the game's looks on the ability for that run only (its spell, and
+//!   its lasting aura's, the same unless given), put back after.
 //! - Each run starts on the lab's stage, the nearest open level ground to the camp's spawn (no
 //!   tree, wall or water within 22 yd), facing the spawn's way; `stage here` keeps the hero
 //!   where they stand.
@@ -61,6 +63,9 @@ pub(crate) struct Lab {
     pub debug_was: bool,
     /// When (wall clock) the burst was asked for, to find its screenshots after.
     pub asked: std::time::SystemTime,
+    /// A look tried for this run only (`look <spell>[/<aura>]`): the ability and the spell and
+    /// aura it had, put back when the run is over.
+    pub look_was: Option<(usize, u32, u32)>,
 }
 
 impl SurvivalGame {
@@ -73,6 +78,7 @@ impl SurvivalGame {
         if let Some(old) = self.lab.take() {
             self.sim.lab_clear(&old.mobs);
             self.sim.debug = old.debug_was;
+            self.lab_look_back(old.look_was);
         }
         let old = std::mem::take(&mut self.lab_mobs);
         self.sim.lab_clear(&old);
@@ -102,6 +108,7 @@ impl SurvivalGame {
         let mut steps: Option<String> = None;
         let mut cam: Option<String> = None;
         let mut stage = true;
+        let mut look: Option<(u32, Option<u32>)> = None;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
         let (mut shots, mut every) = if cfg!(windows) && ffmpeg().is_some() { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
         let mut k = 1;
@@ -110,6 +117,15 @@ impl SurvivalGame {
             match words[k] {
                 "do" => {
                     steps = words.get(k + 1).map(|s| s.to_string());
+                    k += 1;
+                }
+                // A look to try for this run only: `look 3631` (its spell and aura both),
+                // `look 12294/3631` (the spell's, then the aura's).
+                "look" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    let mut it = spec.split('/');
+                    let sp = it.next().and_then(|n| n.parse().ok()).ok_or("Try look <spell>[/<aura>].")?;
+                    look = Some((sp, it.next().and_then(|n| n.parse().ok())));
                     k += 1;
                 }
                 "stage" => {
@@ -165,6 +181,14 @@ impl SurvivalGame {
         } else {
             false
         };
+        let look_was = look.map(|(sp, au)| {
+            let a = &mut self.sim.content.abilities[ability];
+            let was = (ability, a.spell, a.aura);
+            a.spell = sp;
+            a.aura = au.unwrap_or(sp);
+            was
+        });
+        let d = self.sim.content.abilities[ability].clone();
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
         // The steps, timed from a moment after the burst starts (and after the client has set the
@@ -208,6 +232,7 @@ impl SurvivalGame {
             ground: matches!(d.kind.as_str(), "ground" | "trap" | "place" | "leap"),
             debug_was: self.sim.debug,
             asked: std::time::SystemTime::now(),
+            look_was,
         });
         // Debug's rings and marks would be in every shot: off while the run lasts.
         self.sim.debug = false;
@@ -340,6 +365,7 @@ impl SurvivalGame {
         }
         let lab = self.lab.take().unwrap();
         self.sim.debug = lab.debug_was;
+        self.lab_look_back(lab.look_was);
         let dir = std::path::Path::new("logs").join("lab");
         let path = dir.join(format!("{}.txt", lab.label));
         let written = std::fs::create_dir_all(&dir).and_then(|_| std::fs::File::create(&path)).and_then(|mut f| f.write_all((lab.trace.join("\n") + "\n").as_bytes()));
@@ -356,6 +382,18 @@ impl SurvivalGame {
             // In chat, not on screen: a queued run starting at once would have it in its frames.
             Ok(()) => self.say_to(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
             Err(e) => self.say_to(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
+        }
+    }
+}
+
+impl SurvivalGame {
+    /// Puts back the look a run tried (`look`), if it tried one.
+    fn lab_look_back(&mut self, was: Option<(usize, u32, u32)>) {
+        if let Some((i, sp, au)) = was {
+            if let Some(a) = self.sim.content.abilities.get_mut(i) {
+                a.spell = sp;
+                a.aura = au;
+            }
         }
     }
 }
