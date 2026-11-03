@@ -195,6 +195,16 @@ impl SurvivalGame {
         if named.is_some() {
             words.remove(0);
         }
+        // `find [missile] <word>... [spell <id>...]`: the game's own spell looks that show a model
+        // by that name, written to logs/lab/find-<words>.txt, to pick a look from instead of
+        // guessing. Any world takes it; it reads the game data off the rules' thread.
+        if words.first() == Some(&"find") {
+            let rest = lines[1..].join("\n");
+            let _ = std::fs::write(&path, if rest.is_empty() { String::new() } else { rest + "\n" });
+            let args: Vec<String> = words[1..].iter().map(|w| w.to_string()).collect();
+            std::thread::spawn(move || lab_find(&args));
+            return;
+        }
         // Every world the server runs (Elwynn, each dungeon below) reads this file: the line is
         // left for the one the hero is in.
         let who = self.in_world().find(|(_, _, w)| named.as_ref().is_none_or(|n| w.name.to_lowercase() == *n)).map(|(c, _, w)| (*c, w.id));
@@ -306,8 +316,9 @@ impl SurvivalGame {
             copy_shots(since, upto, &folder);
         });
         match written {
-            Ok(()) => self.tell(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
-            Err(e) => self.tell(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
+            // In chat, not on screen: a queued run starting at once would have it in its frames.
+            Ok(()) => self.say_to(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
+            Err(e) => self.say_to(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
         }
     }
 }
@@ -349,6 +360,27 @@ fn record_video(label: &str, secs: f32) {
 fn shots_dir() -> Option<std::path::PathBuf> {
     let candidates = [std::env::var("LAB_SHOTS").ok().map(std::path::PathBuf::from), Some(std::path::PathBuf::from("../Basin Battle for Windows/benilla-config/Screenshots"))];
     candidates.into_iter().flatten().find(|d| d.is_dir())
+}
+
+/// The game's Data folder, as the server was started with it (`--data`, or `WOW_DATA`).
+fn data_dir() -> Option<std::path::PathBuf> {
+    let args: Vec<String> = std::env::args().collect();
+    args.iter().position(|a| a == "--data").and_then(|i| args.get(i + 1)).map(std::path::PathBuf::from).or_else(|| std::env::var_os("WOW_DATA").map(std::path::PathBuf::from))
+}
+
+/// A lab `find`: the spells whose looks show a model by one of these words (`missile` first: the
+/// missile's), or the `spell <id>...` named, into logs/lab/find-<words>.txt.
+fn lab_find(args: &[String]) {
+    let missiles = args.first().is_some_and(|a| a == "missile");
+    let words: Vec<String> = args.iter().filter(|a| *a != "missile").take_while(|a| *a != "spell").cloned().collect();
+    let only: Vec<u32> = args.iter().skip_while(|a| *a != "spell").skip(1).filter_map(|a| a.parse().ok()).collect();
+    let name: String = args.join("-").chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).take(60).collect();
+    let out = std::path::Path::new("logs").join("lab").join(format!("find-{name}.txt"));
+    let text = match data_dir().ok_or_else(|| anyhow::anyhow!("no --data")).and_then(|d| htl_map::spell_find(&d, &words, missiles, &only, 600)) {
+        Ok(lines) => lines.join("\n") + "\n",
+        Err(e) => format!("find failed: {e:#}\n"),
+    };
+    let _ = std::fs::create_dir_all(out.parent().unwrap()).and_then(|_| std::fs::write(&out, text));
 }
 
 /// The screenshots saved from `since` (a moment before) to `upto`, copied into `to`.
