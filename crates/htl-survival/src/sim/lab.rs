@@ -48,17 +48,25 @@ impl Survival {
             }
             out.push(mid);
         }
-        // Locked on to the middle body, so the client turns the hero (and the camera behind them)
-        // to the scene: turning the camera alone turned the body with it and the blows went wide.
-        if let Some(&mid) = out.get(out.len() / 2) {
-            if let Some(p) = self.players.get_mut(&id) {
-                p.lock = Some(mid);
-                p.lock_seen.clear();
-                p.facing = facing(pos, self.mobs[&mid].pos);
-            }
-            self.events.push(Event::Lock { player: id, target: Some(mid) });
-        }
+        self.lab_lock(id, &out);
         Ok(out)
+    }
+
+    /// Hero `id` locked on to the middle of a scene's bodies, so the client turns the hero (and
+    /// the camera behind them) to the scene: turning the camera alone turned the body with it and
+    /// the blows went wide. Again as the burst starts: a hero just set down on the stage lost the
+    /// lock at once, to a step their client sent from where they had stood.
+    pub fn lab_lock(&mut self, id: Id, scene: &[Id]) {
+        let Some(&mid) = scene.get(scene.len() / 2) else { return };
+        let Some(at) = self.mobs.get(&mid).filter(|m| m.health > 0).map(|m| m.pos) else { return };
+        let Some(p) = self.players.get_mut(&id) else { return };
+        if p.lock == Some(mid) {
+            return;
+        }
+        p.lock = Some(mid);
+        p.lock_seen.clear();
+        p.facing = facing(p.pos, at);
+        self.events.push(Event::Lock { player: id, target: Some(mid) });
     }
 
     /// One of the lab's creatures swings at the hero now (its own blow, wind-up and all).
@@ -224,6 +232,10 @@ mod tests {
         let mobs = s.lab_scene(p, "ring", "dummy").unwrap();
         assert_eq!(s.players[&p].lock, Some(mobs[1]));
         assert!((s.players[&p].facing - 1.0).abs() < 0.05, "facing the middle body, straight ahead");
+        // Lost (a stale step from far off), and locked on again as the burst starts.
+        s.unlock(p);
+        s.lab_lock(p, &mobs);
+        assert_eq!(s.players[&p].lock, Some(mobs[1]));
         s.lab_clear(&mobs);
         assert_eq!(s.players[&p].lock, None);
     }

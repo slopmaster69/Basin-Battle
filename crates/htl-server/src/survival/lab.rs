@@ -293,7 +293,9 @@ impl SurvivalGame {
         let Some(lab) = self.lab.as_mut() else { return };
         if lab.burst.as_ref().is_some_and(|(at, _, _)| *at <= now) {
             let (_, line, secs) = lab.burst.take().unwrap();
-            let (conn, label) = (lab.conn, lab.label.clone());
+            let (conn, label, hero, scene) = (lab.conn, lab.label.clone(), lab.hero, lab.mobs.clone());
+            self.sim.lab_lock(hero, &scene);
+            let Some(lab) = self.lab.as_mut() else { return };
             lab.asked = std::time::SystemTime::now();
             self.ui_line(conn, &line);
             record_video(&label, secs);
