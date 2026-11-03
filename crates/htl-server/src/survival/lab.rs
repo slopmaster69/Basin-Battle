@@ -1,0 +1,265 @@
+//! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
+//! exactly what it looked like.
+//!
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>]`
+//!
+//! - It sets out the scene in front of the hero (`one`, `pack`, `close`, `ring`, `far`; see
+//!   `htl_survival::sim::lab`), of training dummies or of a creature (`brave`), puts the ability
+//!   on its key with cooldowns off, full Valor and full health.
+//! - It tells the add-on to take a burst of screenshots (`LB\t<n>\t<ms>\t<label>`; the add-on's
+//!   `Lab.lua`), and a moment later plays the steps: by default the ability's key (with Ctrl for
+//!   an EX) and a click if it's aimed. Steps, comma-separated: `q e 1 2 3` (a key), `^q`... (with
+//!   Ctrl), `click`, `attack`, `heavy`, `guard`, `guardup`, `dodge`, `bash`, `blow` (the nearest
+//!   creature of the scene swings at the hero), `wait:<secs>`.
+//! - Everything the rules sent that touches the hero or the scene, until the burst is over, goes
+//!   to `logs/lab/<label>.txt`, each line with its time from the first step. `tools/spell-lab`
+//!   lays the screenshots and that trace out side by side (docs/spell-lab.md).
+//!
+//! `.es lab clear` takes the scene away.
+
+use std::collections::VecDeque;
+use std::io::Write as _;
+
+use htl_survival::{Event, Id, Input};
+
+use super::*;
+
+/// The burst unless the command says otherwise: 2.4 sec of shots, 12 a second.
+const SHOTS: u32 = 30;
+const EVERY_MS: u32 = 80;
+/// The shots start this long before the first step, so the frame before it is in the burst.
+const LEAD: f32 = 0.25;
+
+pub(crate) struct Lab {
+    pub hero: Id,
+    pub conn: ConnId,
+    pub label: String,
+    /// When (game clock) each step goes.
+    pub steps: VecDeque<(f32, String)>,
+    pub start: f32,
+    pub until: f32,
+    pub mobs: Vec<Id>,
+    pub trace: Vec<String>,
+    /// The ability's key on the bar (0-4) and whether its aim is the ground's.
+    pub slot: u8,
+    pub ground: bool,
+    /// Debug was on (its marks are kept out of the shots while the run lasts).
+    pub debug_was: bool,
+}
+
+impl SurvivalGame {
+    pub(crate) fn lab_command(&mut self, conn: ConnId, me: Id, words: &[&str]) -> Result<(), String> {
+        let first = words.first().copied().unwrap_or("");
+        if first.is_empty() {
+            return Err(format!("Try .es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>]. Scenes: {}.", htl_survival::sim::lab::LAB_SCENES));
+        }
+        // What the last run set out goes first.
+        if let Some(old) = self.lab.take() {
+            self.sim.lab_clear(&old.mobs);
+            self.sim.debug = old.debug_was;
+        }
+        let old = std::mem::take(&mut self.lab_mobs);
+        self.sim.lab_clear(&old);
+        if first == "clear" {
+            self.tell(conn, "The lab is cleared.");
+            return Ok(());
+        }
+        let key = first.to_lowercase();
+        let ability = self.sim.content.ability(&key).ok_or_else(|| format!("No ability called {key}."))?;
+        let d = self.sim.content.abilities[ability].clone();
+        let base = self.sim.content.base_of(ability);
+        let ex = base != ability;
+        let row = self.sim.content.abilities[base].slot.clone();
+        let slot = htl_survival::content::SLOTS.iter().position(|s| *s == row).ok_or("That ability has no key.")? as u8;
+        // The words after the ability: a scene, a creature, then `do` and `shots`.
+        let mut scene = if d.kind == "stance" || d.kind == "art" { "close" } else { "pack" }.to_string();
+        let mut creature = if d.kind == "stance" { "brave" } else { "dummy" }.to_string();
+        let mut steps: Option<String> = None;
+        let (mut shots, mut every) = (SHOTS, EVERY_MS);
+        let mut k = 1;
+        let mut free = 0;
+        while k < words.len() {
+            match words[k] {
+                "do" => {
+                    steps = words.get(k + 1).map(|s| s.to_string());
+                    k += 1;
+                }
+                "shots" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    let mut it = spec.split('@');
+                    shots = it.next().and_then(|n| n.parse().ok()).unwrap_or(SHOTS).clamp(1, 120);
+                    every = it.next().and_then(|n| n.parse().ok()).unwrap_or(EVERY_MS).clamp(16, 1000);
+                    k += 1;
+                }
+                w if free == 0 => {
+                    scene = w.to_lowercase();
+                    free += 1;
+                }
+                w => {
+                    creature = w.to_lowercase();
+                    free += 1;
+                }
+            }
+            k += 1;
+        }
+        let keyname = ["q", "e", "1", "2", "3"].get(slot as usize).copied().unwrap_or("q");
+        let steps = steps.unwrap_or_else(|| format!("{}{keyname},click?", if ex { "^" } else { "" }));
+        // The hero ready: the ability on its key, nothing cooling down, full Valor and health.
+        self.sim.slot_ability(me, &row, &self.sim.content.abilities[base].key.clone())?;
+        self.sim.set_cooldowns(me, true);
+        self.sim.set_valor(me, 100.0);
+        self.sim.heal_full(me);
+        let mobs = self.sim.lab_scene(me, &scene, &creature)?;
+        self.lab_mobs = mobs.clone();
+        // The steps, timed from a moment after the burst starts.
+        let now = self.sim.clock;
+        let start = now + LEAD;
+        let mut at = start;
+        let mut queue = VecDeque::new();
+        for s in steps.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            if let Some(w) = s.strip_prefix("wait:") {
+                at += w.parse::<f32>().unwrap_or(0.0).clamp(0.0, 10.0);
+            } else {
+                queue.push_back((at, s.to_string()));
+                at += 0.05;
+            }
+        }
+        let secs = shots as f32 * every as f32 / 1000.0;
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|t| t.as_secs()).unwrap_or(0);
+        let label = format!("{key}-{scene}-{stamp}");
+        self.ui_line(conn, &format!("LB\t{shots}\t{every}\t{label}"));
+        let mut trace = vec![
+            format!("# {label}: {} ({}), scene {scene} of {creature}, steps {steps}, {shots} shots every {every} ms from -{LEAD:.2} s", d.name, d.key),
+            format!("# spell {} aura {} icon {} clip {} kind {}", d.spell, d.aura, d.icon, d.clip, d.kind),
+            format!("# hero {me} at {:?}, scene {:?}", self.sim.players.get(&me).map(|p| p.pos), mobs),
+        ];
+        trace.push(format!("{:+.3} burst starts", -LEAD));
+        self.lab = Some(Lab {
+            hero: me,
+            conn,
+            label: label.clone(),
+            steps: queue,
+            start,
+            until: start + secs - LEAD + 0.3,
+            mobs,
+            trace,
+            slot,
+            ground: matches!(d.kind.as_str(), "ground" | "trap" | "place"),
+            debug_was: self.sim.debug,
+        });
+        // Debug's rings and marks would be in every shot: off while the run lasts.
+        self.sim.debug = false;
+        self.tell(conn, &format!("Lab: {} on {scene}. Hold still.", d.name));
+        Ok(())
+    }
+
+    /// Before the rules step: the lab's steps that are due.
+    pub(crate) fn lab_steps(&mut self) {
+        let now = self.sim.clock;
+        let Some(lab) = self.lab.as_mut() else { return };
+        let mut due = Vec::new();
+        while lab.steps.front().is_some_and(|(at, _)| *at <= now) {
+            due.push(lab.steps.pop_front().unwrap().1);
+        }
+        let (me, start, slot, ground) = (lab.hero, lab.start, lab.slot, lab.ground);
+        let target = lab.mobs.get(lab.mobs.len() / 2).copied();
+        let nearest = lab.mobs.first().copied();
+        for step in due {
+            // Aimed at the scene's middle body: its chest, or its feet for the ground's.
+            if let (Some(t), Some(p)) = (target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos), self.sim.players.get(&me).map(|p| p.pos)) {
+                let d = htl_survival::dist2d(p, t).max(0.5);
+                let yaw = (t[1] - p[1]).atan2(t[0] - p[0]);
+                let rise = if ground { t[2] - (p[2] + 1.9) } else { t[2] + 1.0 - (p[2] + 1.9) };
+                self.sim.set_aim_line(me, yaw, rise.atan2(d));
+            }
+            let input = match step.as_str() {
+                "click" | "attack" => Some(Input::Attack),
+                "click?" if self.sim.lab_aiming(me) => Some(Input::Attack),
+                "click?" => None,
+                "heavy" => Some(Input::Heavy),
+                "guard" => Some(Input::Guard),
+                "guardup" => Some(Input::GuardUp),
+                "dodge" => Some(Input::Dodge),
+                "bash" => Some(Input::Bash),
+                "blow" => {
+                    if let Some(m) = nearest {
+                        self.sim.lab_blow(m, me);
+                    }
+                    None
+                }
+                k => {
+                    let (ex, k) = match k.strip_prefix('^') {
+                        Some(rest) => (true, rest),
+                        None => (false, k),
+                    };
+                    ["q", "e", "1", "2", "3"].iter().position(|x| *x == k).map(|s| Input::Ability(s as u8, ex)).or(if k == "key" { Some(Input::Ability(slot, false)) } else { None })
+                }
+            };
+            if let Some(i) = input {
+                self.sim.input(me, i);
+                // A click is let go at once, as a tap.
+                if i == Input::Attack {
+                    self.sim.input(me, Input::AttackUp);
+                }
+            }
+            let what = self.sim.lab_action(me);
+            if let Some(lab) = self.lab.as_mut() {
+                lab.trace.push(format!("{:+.3} STEP {step} -> {what}", now - start));
+            }
+        }
+    }
+
+    /// After the rules step: what they sent that touches the hero or the scene, until the burst
+    /// is over; then the trace is written.
+    pub(crate) fn lab_trace(&mut self, events: &[Event]) {
+        let now = self.sim.clock;
+        let Some(lab) = self.lab.as_mut() else { return };
+        let mut ids: Vec<Id> = lab.mobs.clone();
+        ids.push(lab.hero);
+        for e in events {
+            let text = format!("{e:?}");
+            if mentions(&text, &ids) {
+                lab.trace.push(format!("{:+.3} {text}", now - lab.start));
+            }
+        }
+        if now < lab.until {
+            return;
+        }
+        let lab = self.lab.take().unwrap();
+        self.sim.debug = lab.debug_was;
+        let dir = std::path::Path::new("logs").join("lab");
+        let path = dir.join(format!("{}.txt", lab.label));
+        let written = std::fs::create_dir_all(&dir).and_then(|_| std::fs::File::create(&path)).and_then(|mut f| f.write_all((lab.trace.join("\n") + "\n").as_bytes()));
+        match written {
+            Ok(()) => self.tell(lab.conn, &format!("Lab done: logs/lab/{}.txt", lab.label)),
+            Err(e) => self.tell(lab.conn, &format!("Lab done, but its trace couldn't be written: {e}")),
+        }
+    }
+}
+
+/// The event's text names one of these ids: the number as a field's value (`: 12`, `Some(12)`,
+/// `Unit(12)`, `[12, 30]`), not part of a longer number or a position.
+fn mentions(text: &str, ids: &[Id]) -> bool {
+    ids.iter().any(|id| {
+        let n = id.to_string();
+        text.match_indices(&n).any(|(i, _)| {
+            let before = text[..i].chars().last();
+            let after = text[i + n.len()..].chars().next();
+            matches!(before, Some(' ' | '(' | '[')) && !after.is_some_and(|c| c.is_ascii_digit() || c == '.') && !text[..i].ends_with("pos: [") && !text[..i].trim_end().ends_with(".")
+        })
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::mentions;
+
+    #[test]
+    fn a_trace_keeps_the_events_that_name_the_hero_or_the_scene() {
+        assert!(mentions("Swing { attacker: 12, victim: Some(34), damage: 0 }", &[34]));
+        assert!(mentions("Missile { caster: 12, spell: 845, target: Unit(12) }", &[12]));
+        assert!(!mentions("Missile { caster: 120, spell: 845 }", &[12]), "not part of a longer number");
+        assert!(!mentions("Hop { player: 7, dir: 12.5 }", &[12]), "not a number with a point");
+        assert!(!mentions("Swing { damage: 34 }", &[3]));
+    }
+}

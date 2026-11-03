@@ -27,6 +27,7 @@ pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 pub mod hunter;
+pub mod lab;
 mod raid;
 pub mod siege;
 pub mod wager;

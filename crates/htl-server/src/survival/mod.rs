@@ -20,6 +20,7 @@ use crate::world::{ConnId, Inbound};
 pub mod board;
 mod draw;
 mod heroes;
+mod lab;
 pub mod land;
 mod meter_ui;
 mod play;
@@ -252,6 +253,9 @@ pub struct SurvivalGame {
     pub(crate) wagers: Vec<htl_survival::sim::wager::WagerRun>,
     /// The Bookmaker's Board (shared with the login port, which serves it as the board host).
     pub(crate) board: Option<board::Shared>,
+    /// The spell lab's run under way (`.es lab`), and the bodies its last scene set out.
+    pub(crate) lab: Option<lab::Lab>,
+    pub(crate) lab_mobs: Vec<Id>,
     dirty: bool,
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
@@ -351,6 +355,8 @@ impl SurvivalGame {
             dirty: true,
             saved_at: Instant::now(),
             clock_at: Instant::now(),
+            lab: None,
+            lab_mobs: Vec::new(),
         };
         g.bind_world();
         g
@@ -363,7 +369,9 @@ impl SurvivalGame {
     /// One tick: the rules step, their events play out, the add-ons hear what changed, and the
     /// world is saved now and then.
     pub(crate) fn tick(&mut self) {
+                self.lab_steps();
                 let events = self.sim.step(TICK.as_secs_f32());
+                self.lab_trace(&events);
                 self.play(events);
                 self.ui_flush();
                 self.hold_clock();
