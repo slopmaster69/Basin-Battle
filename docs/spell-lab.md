@@ -51,9 +51,10 @@ what it sent, side by side on one sheet.
   where it is).
 - `.es lab clear` takes the scene away and lets go of the lock.
 - **From a file:** each line of `logs/lab/queue.txt` where you host is run as if typed after
-  `.es lab` (`@Name` first picks the hero), one at a time. Each run's screenshots are copied to
-  `logs/lab/<label>/` beside its trace, and with ffmpeg on the host it's recorded as
-  `logs/lab/<label>.mp4` too.
+  `.es lab` (`@Name` first picks the hero), one at a time. Each run's screenshots move out of
+  `Screenshots` into `logs/lab/<label>/` beside its trace, at half size (a full-size burst is
+  about 250 MB). With ffmpeg on the host it's recorded as `logs/lab/<label>.mp4` too. Delete old
+  run folders when you're done with them.
 - **Finding a look:** a queue line `find <word>...` lists the game's spells whose cast, impact or
   lasting look shows a model with one of those words in its path into
   `logs/lab/find-<words>.txt`, read from your own game data. `find missile <word>...` looks at
