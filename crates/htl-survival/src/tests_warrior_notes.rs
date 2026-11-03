@@ -208,4 +208,8 @@ fn shockwave_throws_the_pack_and_leaves_its_caster_where_they_stand() {
     assert!(ev.iter().any(|e| matches!(e, Event::MobMove { id, path, .. } if *id == k && path.last().is_some_and(|end| dist2d(*end, from) > 3.0))), "the creature thrown back");
     assert!(!ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)), "the caster isn't thrown");
     assert!(dist2d(s.players[&p].pos, ORIGIN) < 0.3, "and stands where they cast it");
+    // Its look goes to the caster's spot, never to the caster: the client plays a spell's impact
+    // (a knockdown, for this one) on every unit the spell names as struck.
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, target: Target::Point(_), .. } if *caster == p)), "the look at the spot");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, target: Target::Unit(t), .. } if *caster == p && *t == p)), "not on the caster");
 }

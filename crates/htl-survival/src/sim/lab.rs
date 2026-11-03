@@ -62,6 +62,20 @@ impl Survival {
         }
     }
 
+    /// The lab's creatures held where they stand: struck, they'd come at the hero, and the next
+    /// run's frames would be of a brawl. A wind-up the lab asked for (`lab_blow`) and a reel go on.
+    pub fn lab_hold(&mut self, mobs: &[Id]) {
+        for m in mobs {
+            let chasing = self.mobs.get(m).is_some_and(|x| matches!(x.state, MobState::Chase { .. } | MobState::Recover { .. }));
+            if chasing {
+                self.halt_mob(*m);
+                if let Some(x) = self.mobs.get_mut(m) {
+                    x.state = MobState::Idle { wander_at: f32::MAX };
+                }
+            }
+        }
+    }
+
     /// The lab's bodies taken away.
     pub fn lab_clear(&mut self, mobs: &[Id]) {
         for m in mobs {

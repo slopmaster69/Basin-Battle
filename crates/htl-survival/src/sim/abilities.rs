@@ -2254,7 +2254,10 @@ impl Survival {
     pub(crate) fn cone_at(&mut self, id: Id, ability: usize, at: Vec3, yaw: f32, share: f32) {
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);
-        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        // Sent at the caster's spot, not at the caster: the client plays a spell's impact on
+        // every unit it names as struck, and some impacts are a knockdown (Shockwave's put its
+        // own caster on the ground).
+        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         // A blow of the weapon's (Shockwave, Retaliation's sweep): a share of its roll.
         let swing = self.players.get(&id).filter(|_| d.weapon > 0.0).map(|p| self.weapon_of(p).damage);
         let damage = match swing {
@@ -2274,7 +2277,8 @@ impl Survival {
     pub(crate) fn nova(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
         let d = self.content.abilities[ability].clone();
         let radius = AbilityDef::at(d.radius, share);
-        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        // At the spot, not at the caster (see `cone_at`).
+        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         let damage = AbilityDef::at(d.damage, share);
         self.area(id, ability, at, radius, share, damage, None);
         if self.debug {
