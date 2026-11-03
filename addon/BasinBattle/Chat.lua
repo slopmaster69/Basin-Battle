@@ -16,9 +16,10 @@ local CHAT_LEFT = 16
 
 local BB = BasinBattle
 
+-- Only once a Basin Battle server has answered (the realm's name could be anything: it comes
+-- from the host's project.toml).
 local function InBasin()
-  local realm = GetRealmName and GetRealmName() or ""
-  return not string.find(realm, "Elwynn")
+  return BB and BB.connected
 end
 
 local placing = false
@@ -54,6 +55,9 @@ if FCF_RestorePositionAndDimensions then
     PlaceChat()
   end
 end
+
+-- Placed again the moment the server answers (the world was entered before it did).
+if BB then BB.PlaceChat = PlaceChat end
 
 local chat = CreateFrame("Frame")
 chat:RegisterEvent("PLAYER_ENTERING_WORLD")

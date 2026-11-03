@@ -8,6 +8,12 @@ SETTINGS="$ROOT/settings.sh"
 # Elwynn Survival), applied on top of the pinned revision.
 BENILLA_PATCHES="$ROOT/patches/benilla"
 [ -f "$SETTINGS" ] && . "$SETTINGS"
+# A name from project.toml (the one place the project's player-facing names live), or the default.
+project_name() { # key default
+    local v
+    v="$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$ROOT/project.toml" 2>/dev/null | head -1)"
+    printf '%s' "${v:-$2}"
+}
 [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 save_setting() { # name value
