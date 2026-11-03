@@ -238,7 +238,8 @@ function Read-Scenario($name, $depth = 0) {
     }
     if ($null -eq $sc.End) { $sc.End = $last + 3.0 }
     # The video starts a moment before the first shots (or where `<secs> video` says), to the end.
-    if ($null -eq $sc.Video) { $sc.Video = [Math]::Max(0, $(if ($null -ne $firstShot) { $firstShot } else { 0 }) - 1.5) }
+    # (0.0, not 0: with an int first, PowerShell picks Max(int, int) and rounds the time.)
+    if ($null -eq $sc.Video) { $sc.Video = [Math]::Max(0.0, $(if ($null -ne $firstShot) { $firstShot } else { 0 }) - 1.5) }
     $sc
 }
 
@@ -425,7 +426,7 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
             }
             # The window's title didn't match: once more, from the screen where the window is.
             if ($rec -and $rec.HasExited -and $null -ne $rec.ExitCode -and $rec.ExitCode -ne 0 -and $v.How -eq "title" -and ((Get-Date) - $v.Started).TotalSeconds -lt 5) {
-                $v.Duration = [Math]::Max(1, $v.Duration - ((Get-Date) - $v.Started).TotalSeconds)
+                $v.Duration = [Math]::Max(1.0, $v.Duration - ((Get-Date) - $v.Started).TotalSeconds)
                 $rec = Start-Video $v $p "desktop"
             }
             Start-Sleep -Milliseconds 100
@@ -541,7 +542,7 @@ function Invoke-Scenario($s, $name, $out) {
     $videoNote = ""
     if ($s.video -eq "off") { $videoNote = "no video: video = off in the settings" }
     elseif (-not $s.ffmpeg) { $videoNote = "no video: no ffmpeg.exe in $(Join-Path $Folder 'ffmpeg') (or the ffmpeg setting)" }
-    else { $v = @{ Ffmpeg = $s.ffmpeg; Out = (Join-Path $out "$name.mp4"); Duration = [Math]::Max(1, $sc.End - $sc.Video); Status = "" } }
+    else { $v = @{ Ffmpeg = $s.ffmpeg; Out = (Join-Path $out "$name.mp4"); Duration = [Math]::Max(1.0, $sc.End - $sc.Video); Status = "" } }
     $lua = Build-Lua $sc $settle $(if ($v) { $sc.Video } else { $null })
     if ($lua.Length -gt 30000) { throw "$name is too long to hand the client ($($lua.Length) characters of Lua; 30000 at most)." }
     $asked = 0
