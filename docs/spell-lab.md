@@ -55,10 +55,11 @@ what it sent, side by side on one sheet.
   `logs/lab/<label>/` beside its trace, and with ffmpeg on the host it's recorded as
   `logs/lab/<label>.mp4` too.
 - **Finding a look:** a queue line `find <word>...` lists the game's spells whose cast, impact or
-  lasting look shows a model with one of those words in its path (`find missile <word>...`: their
-  missile's; `find spell <id>...`: those spells, whatever they show) into
-  `logs/lab/find-<words>.txt`, read from your own game data. Pick from it, then try the pick with
-  `.es tune ability.<key>.spell <id>` and a lab run.
+  lasting look shows a model with one of those words in its path into
+  `logs/lab/find-<words>.txt`, read from your own game data. `find missile <word>...` looks at
+  their missiles, `find area <word>...` at what they play at a ground point they're sent to, and
+  `find spell <id>...` lists those spells whatever they show. Pick from it, then try the pick
+  with `.es tune ability.<key>.spell <id>` and a lab run.
 
 Examples:
 
