@@ -1546,6 +1546,13 @@ impl SurvivalGame {
                 self.say_to(conn, &text);
                 Ok(())
             }
+            // The spell lab (dev builds): `.es lab <ability> [scene] [creature] [do <steps>]
+            // [shots <n>@<ms>]`, `.es lab clear` (survival/lab.rs).
+            "lab" if self.dev_ok() => {
+                let rest: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("lab")).skip(1).collect();
+                self.lab_command(conn, me, &rest)
+            }
+            "lab" => Err("The spell lab is only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // With debug on, a creature to fight at once: `.es spawn warlord`.
             // `.es spawn grunt 3`: that many.
             "spawn" if self.sim.debug => {
