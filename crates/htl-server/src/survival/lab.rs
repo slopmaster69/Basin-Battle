@@ -369,14 +369,14 @@ fn data_dir() -> Option<std::path::PathBuf> {
 }
 
 /// A lab `find`: the spells whose looks show a model by one of these words (`missile` first: the
-/// missile's), or the `spell <id>...` named, into logs/lab/find-<words>.txt.
+/// missile's; `area` first: what it plays at a ground point), or the `spell <id>...` named, into logs/lab/find-<words>.txt.
 fn lab_find(args: &[String]) {
-    let missiles = args.first().is_some_and(|a| a == "missile");
-    let words: Vec<String> = args.iter().filter(|a| *a != "missile").take_while(|a| *a != "spell").cloned().collect();
+    let what = args.first().filter(|a| *a == "missile" || *a == "area").cloned().unwrap_or_default();
+    let words: Vec<String> = args.iter().filter(|a| *a != "missile" && *a != "area").take_while(|a| *a != "spell").cloned().collect();
     let only: Vec<u32> = args.iter().skip_while(|a| *a != "spell").skip(1).filter_map(|a| a.parse().ok()).collect();
     let name: String = args.join("-").chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' }).take(60).collect();
     let out = std::path::Path::new("logs").join("lab").join(format!("find-{name}.txt"));
-    let text = match data_dir().ok_or_else(|| anyhow::anyhow!("no --data")).and_then(|d| htl_map::spell_find(&d, &words, missiles, &only, 600)) {
+    let text = match data_dir().ok_or_else(|| anyhow::anyhow!("no --data")).and_then(|d| htl_map::spell_find(&d, &words, &what, &only, 600)) {
         Ok(lines) => lines.join("\n") + "\n",
         Err(e) => format!("find failed: {e:#}\n"),
     };

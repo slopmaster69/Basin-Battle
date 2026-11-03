@@ -85,11 +85,13 @@ pub fn spell_icons(data_dir: &Path, spells: &[u32]) -> Result<std::collections::
     Ok(out)
 }
 
-/// Spells whose looks show a model whose path holds one of `words` (any case): with `missiles`,
-/// the missile's model; otherwise any effect of the precast, cast, impact or state kit. `only`
+/// Spells whose looks show a model whose path holds one of `words` (any case): `what` "missile",
+/// the missile's model; "area", the one-shot a spell sent to a ground point plays there (and
+/// whether it plays a kit on its caster too); otherwise any effect of the precast, cast, impact or
+/// state kit. `only`
 /// names spells to list whatever they show. One line a spell, at most `limit`: its id, name,
 /// missile speed, each kit's animation and the matching models. Read from the player's own data.
-pub fn spell_find(data_dir: &Path, words: &[String], missiles: bool, only: &[u32], limit: usize) -> Result<Vec<String>> {
+pub fn spell_find(data_dir: &Path, words: &[String], what: &str, only: &[u32], limit: usize) -> Result<Vec<String>> {
     let mut chain = Chain::open(data_dir)
         .with_context(|| format!("opening the game data in {}", data_dir.display()))?;
     let visuals = benilla_formats::load_spell_visual_catalog(&mut chain).context("reading SpellVisual.dbc")?;
@@ -107,7 +109,14 @@ pub fn spell_find(data_dir: &Path, words: &[String], missiles: bool, only: &[u32
         };
         let mut hits = Vec::new();
         let missile = visuals.effect_path(st.missile_model).unwrap_or("").to_string();
-        if missiles {
+        if what == "area" {
+            let path = visuals.effect_path(st.area_effect).unwrap_or("");
+            let l = path.to_lowercase();
+            if st.missile_gate == 0 && !path.is_empty() && words.iter().any(|w| l.contains(w.as_str())) {
+                let on_caster = if st.precast != 0 || st.cast != 0 { " (and a kit on the caster)" } else { "" };
+                hits.push(format!("area:{path}{on_caster}"));
+            }
+        } else if what == "missile" {
             let l = missile.to_lowercase();
             if !missile.is_empty() && words.iter().any(|w| l.contains(w.as_str())) {
                 hits.push(format!("missile:{missile}"));
