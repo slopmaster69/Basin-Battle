@@ -1334,7 +1334,13 @@ impl Survival {
             // The chain's last blow and a running attack cleave.
             let last = self.content.moveset_of(w).light.len().saturating_sub(1);
             let finisher = matches!(strike.kind, StrikeKind::Running | StrikeKind::Leap) || (strike.kind == StrikeKind::Light && strike.step as usize == last && last > 0);
-            if strike.shove() {
+            if strike.wall_bash() {
+                // Shield Wall's bash: the bash's sparks were too small to read in the lab; the
+                // heavy blow's flash with them.
+                self.events.push(Event::Visual { id: mid, kit: KIT_BASH, by: Some(id) });
+                let kit = self.heavy_kit();
+                self.events.push(Event::Visual { id: mid, kit, by: Some(id) });
+            } else if strike.shove() {
                 self.events.push(Event::Visual { id: mid, kit: KIT_BASH, by: Some(id) });
             } else if reeling || behind {
                 self.events.push(Event::Visual { id: mid, kit: KIT_RIPOSTE, by: Some(id) });
