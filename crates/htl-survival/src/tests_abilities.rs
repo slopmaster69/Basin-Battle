@@ -613,3 +613,14 @@ fn clearing_the_dummies_takes_every_dummy_and_nothing_else() {
     assert!(!ev.iter().any(|e| matches!(e, Event::MobGone { id } if *id == boar)));
     assert_eq!(s.clear_dummies(), 0, "again, nothing to clear");
 }
+
+/// `.es dummy 3`: a dummy that near (the visual check's melee scenarios), the mode after it.
+#[test]
+fn a_dummy_can_be_put_up_nearer_or_farther() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_dummy(p, "3 guard").unwrap();
+    let (d, m) = s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].dummy).expect("a dummy");
+    assert!((m.pos[0] - 3.0).abs() < 0.1, "3 yd ahead: {:?}", m.pos);
+    assert_eq!(s.dummies.get(d).map(|x| x.as_str()), Some("guard"));
+}

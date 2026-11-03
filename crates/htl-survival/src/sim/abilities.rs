@@ -2837,11 +2837,14 @@ impl Survival {
     // --- training dummies -----------------------------------------------------------------------------
 
     /// A training dummy in front of the hero (`mode`: `guard`, `roll`, `counter <school>`, or
-    /// plain).
+    /// plain), 6 yd ahead, or as many as a number first in `mode` says (1 to 30: `3 guard`).
     pub fn spawn_dummy(&mut self, id: Id, mode: &str) -> Result<String, String> {
         let def = self.content.mobs.iter().position(|m| m.dummy).ok_or("No training dummy in the rules.")?;
         let p = self.players.get(&id).ok_or("No hero.")?;
-        let at = self.ground_near(p.pos[0] + p.facing.cos() * 6.0, p.pos[1] + p.facing.sin() * 6.0, p.pos[2]);
+        let first = mode.split_whitespace().next().and_then(|w| w.parse::<f32>().ok());
+        let ahead = first.map_or(6.0, |y| y.clamp(1.0, 30.0));
+        let mode = if first.is_some() { mode.trim().split_once(char::is_whitespace).map_or("", |(_, rest)| rest) } else { mode };
+        let at = self.ground_near(p.pos[0] + p.facing.cos() * ahead, p.pos[1] + p.facing.sin() * ahead, p.pos[2]);
         let face = facing(at, p.pos);
         let mid = self.spawn_mob(def, at, None, false);
         if let Some(m) = self.mobs.get_mut(&mid) {

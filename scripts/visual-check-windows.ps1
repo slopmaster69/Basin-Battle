@@ -318,9 +318,14 @@ ev:RegisterEvent("CHAT_MSG_ADDON")
 ev:SetScript("OnEvent", function()
   local text = tostring(arg1)
   if event == "CHAT_MSG_ADDON" then
-    -- The add-on's own lines: only its words to the hero (T), not the HUD's.
+    -- The add-on's own lines: only its words to the hero (T) and what flashes mid-screen (FL:
+    -- "No enemy in range", "Too far"), not the HUD's.
     local _, _, said = string.find(tostring(arg2), "^T\t(.*)")
-    if not said then return end
+    if not said then
+      local _, _, flashed = string.find(tostring(arg2), "^FL\t(.*)")
+      if not flashed then return end
+      said = "(flash) " .. flashed
+    end
     text = said
   end
   log("visual-check: server: " .. text)
@@ -702,9 +707,60 @@ function Invoke-Request($file) {
     Write-WatchLog "request $id $status"
 }
 
+# A new build to check, with nobody at the PC: a branch's source zip (`git archive`) dropped in
+# deploy\ as <name>.zip. Only where this copy of the game came from such a zip (no .git here: a
+# checkout is never replaced): a handover script stops the server and this watcher, replaces
+# everything but the build, saves, logs, settings and visual-check files, starts the server on the
+# new source (it builds first) and a new watcher from it. The steps go to watcher.log.
+$Handover = @'
+param([string]$Zip, [string]$Root, [string]$Folder, [int]$Watcher)
+$ErrorActionPreference = "Stop"
+$log = Join-Path $Folder "watcher.log"
+function L($t) { Add-Content -Path $log -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') deploy: $t" }
+try {
+    Wait-Process -Id $Watcher -Timeout 60 -ErrorAction SilentlyContinue
+    Get-Process htl-server -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Seconds 2
+    Get-ChildItem $Root -Force -Exclude target, saves, logs, settings-windows.txt, settings.sh, "visual-check-*" | Remove-Item -Recurse -Force
+    Expand-Archive -Path $Zip -DestinationPath $Root -Force
+    Remove-Item $Zip -Force
+    L "unpacked into $Root; starting the server (it builds first)"
+    Start-Process -FilePath (Join-Path $Root "Host Basin Battle.bat") -WorkingDirectory $Root -WindowStyle Minimized
+    $until = (Get-Date).AddMinutes(40); $up = $false
+    while (-not $up -and (Get-Date) -lt $until) {
+        try { $t = New-Object System.Net.Sockets.TcpClient; $t.Connect("127.0.0.1", 3724); $up = $t.Connected; $t.Close() } catch { Start-Sleep -Seconds 10 }
+    }
+    if ($up) { L "the server answers" } else { L "the server never answered on 3724 (a build error? see its window)" }
+} catch {
+    L "failed: $($_.Exception.Message)"
+} finally {
+    $me = '"' + (Join-Path $Root "scripts\visual-check-windows.ps1") + '"'
+    Start-Process powershell -WindowStyle Minimized -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $me, "-Watch")
+    L "a new watcher is started"
+}
+'@
+
+function Invoke-Deploy($zip) {
+    if (Test-Path (Join-Path $Root ".git")) {
+        Write-WatchLog "deploy $($zip.Name): refused, $Root is a git checkout (deploys only replace a test copy made from a zip)"
+        Move-Item $zip.FullName ($zip.FullName + ".refused") -Force
+        return $false
+    }
+    $dir = Join-Path $Folder "deploy\in-progress"
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $staged = Join-Path $dir "deploying.zip"
+    Move-Item $zip.FullName $staged -Force
+    $script = Join-Path $dir "handover.ps1"
+    Set-Content -Path $script -Value $Handover
+    Write-WatchLog "deploy $($zip.Name): handing over (this watcher stops; a new one starts once the server is up)"
+    Start-Process powershell -WindowStyle Minimized -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Quote $script),
+        "-Zip", (Quote $staged), "-Root", (Quote $Root), "-Folder", (Quote $Folder), "-Watcher", $PID)
+    return $true
+}
+
 function Start-Watcher {
     $requests = Join-Path $Folder "requests"
-    foreach ($d in @($requests, (Join-Path $Folder "out"), (Join-Path $Folder "scenarios"))) {
+    foreach ($d in @($requests, (Join-Path $Folder "out"), (Join-Path $Folder "scenarios"), (Join-Path $Folder "deploy"))) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     $one = New-Object System.Threading.Mutex($false, "Local\BasinBattleVisualCheckWatcher")
@@ -715,6 +771,10 @@ function Start-Watcher {
     Write-WatchLog "watching $requests (from $Root)"
     try {
         while ($true) {
+            # A new build first (between requests, never during one).
+            $zip = Get-ChildItem (Join-Path $Folder "deploy") -Filter *.zip -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-5) } | Sort-Object LastWriteTime | Select-Object -First 1
+            if ($zip -and (Invoke-Deploy $zip)) { break }
             # Oldest first, and only a file nobody has written to for 2 s (not still being copied in).
             $next = Get-ChildItem $requests -Filter *.txt -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-2) } |

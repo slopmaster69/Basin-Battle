@@ -4,7 +4,7 @@
 hero hunter
 include _setup
 5.0 .es slot 1 ensnaring_retreat
-5.5 lua MoveForwardStart()           # two steps in first, as if it came close
-5.8 lua MoveForwardStop()
+5.2 .es dummy clear
+5.4 .es dummy 3                      # the dummy within reach (melee is 4.5 yd)
 6.5 .es in ab 2 0
 6.3 shots retreat 35 0.06

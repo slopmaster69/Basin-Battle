@@ -89,6 +89,14 @@ For checks nobody has to click: `Install Visual Check Watcher.bat` starts the wa
 - `scenarios\` there may hold scenario files too; one there wins over the repository's of the same
   name, so a scenario can be adjusted without a commit.
 
+- **A new build**, with nobody at the PC: a branch's source zip (`git archive --format=zip HEAD`)
+  dropped in `deploy\` as `<name>.zip`. Between requests the watcher hands over to a small script
+  that stops the server and the watcher, replaces everything in the game folder but `target\`,
+  `saves\`, `logs\`, the settings files and the visual-check files, starts the server on it (it
+  builds first) and, once it answers, a new watcher from the new source. Each step goes to
+  `watcher.log`. Only a test copy made from such a zip is ever replaced: in a git checkout the zip
+  is refused (renamed `.refused`).
+
 The watcher needs nothing typed: a missing setting fails the request (in `.failed`) rather than
 asking. It uses the repository folder it was installed from, at whatever branch is checked out there.
 
