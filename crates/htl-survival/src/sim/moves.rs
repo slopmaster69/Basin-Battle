@@ -117,7 +117,7 @@ impl Survival {
             return;
         }
         // A totem stands. A training dummy is thrown like any foe, so a knockback, a pull or a
-        // launch shows on it, but never farther than a step: it stays about where it was put up.
+        // launch shows on it, but never farther than a step from where it was put up.
         if self.mobs.get(&victim).is_some_and(|m| self.content.mobs[m.def].totem) {
             return;
         }
@@ -136,7 +136,15 @@ impl Survival {
         if dist < 0.3 {
             return;
         }
-        let to = self.slide_end(v, dir, dist);
+        let mut to = self.slide_end(v, dir, dist);
+        // However many throws, a dummy ends no farther than a step from where it was put up.
+        if let Some(home) = self.mobs.get(&victim).filter(|_| dummy).map(|m| m.home) {
+            let off = dist2d(home, to);
+            if off > DUMMY_STEP {
+                let k = DUMMY_STEP / off;
+                to = self.ground_near(home[0] + (to[0] - home[0]) * k, home[1] + (to[1] - home[1]) * k, to[2]);
+            }
+        }
         let moved = dist2d(v, to);
         // Thrown into a wall (or up against a steep step): stunned as it hits.
         if !pull && e.wall_stun > 0.0 && moved + 0.3 < dist && self.walled(to, dir) {
