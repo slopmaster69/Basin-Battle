@@ -156,6 +156,10 @@ impl SurvivalGame {
     /// Before the rules step: the lab's steps that are due.
     pub(crate) fn lab_steps(&mut self) {
         let now = self.sim.clock;
+        if !self.lab_mobs.is_empty() {
+            let mobs = self.lab_mobs.clone();
+            self.sim.lab_hold(&mobs);
+        }
         let Some(lab) = self.lab.as_mut() else { return };
         let mut due = Vec::new();
         while lab.steps.front().is_some_and(|(at, _)| *at <= now) {
