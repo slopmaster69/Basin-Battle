@@ -55,11 +55,13 @@ end)
 -- and the camera turn to it; turning the camera here turned the body with it, off the scene.
 local function Frame(cam)
   if cam == "none" then return end
+  -- View 4 is the high one (30 degrees down): from behind at a steeper angle the hero hides
+  -- less of what stands in front of them.
   if ResetView and SetView then
-    ResetView(2)
-    SetView(2)
+    ResetView(4)
+    SetView(4)
   end
-  if CameraZoomOut then CameraZoomOut((cam == "side" or cam == "close") and 2 or 4) end
+  if (cam == "side" or cam == "close") and CameraZoomIn then CameraZoomIn(5) end
 end
 
 function ES.LabLine(f)

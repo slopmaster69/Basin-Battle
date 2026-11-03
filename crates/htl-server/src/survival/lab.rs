@@ -166,7 +166,7 @@ impl SurvivalGame {
         });
         // Debug's rings and marks would be in every shot: off while the run lasts.
         self.sim.debug = false;
-        self.tell(conn, &format!("Lab: {} on {scene}. Hold still.", d.name));
+        // Nothing said on screen while it runs: it would be in every frame.
         Ok(())
     }
 
