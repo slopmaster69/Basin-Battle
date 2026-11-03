@@ -226,6 +226,36 @@ fn both_realms_are_listed_and_basin_battle_still_plays() {
     assert!(addon_lines(&sv, "BB").is_empty() && addon_lines(&sv, "ES").is_empty(), "no reply to the Basin's add-on");
 }
 
+/// The names are the host's to choose (project.toml, passed as --realm and --survival-realm): a
+/// renamed game is listed, entered and played under its new name, and its add-on still wakes.
+#[test]
+fn renamed_realms_are_listed_and_played_under_their_new_names() {
+    let config = Config {
+        bind: "127.0.0.1".into(),
+        login_port: 0,
+        world_port: 0,
+        realm_name: "Last Stand".into(),
+        survival: Some(SurvivalSetup {
+            world_port: 0,
+            realm_name: "Hearthwood".into(),
+            save: None,
+            content: content(),
+            land: Box::new(htl_survival::FlatLand::default()),
+            below: Vec::new(),
+            siege: None,
+        }),
+        ..Config::default()
+    };
+    let server = htl_server::start_games(config, None).expect("server starts");
+    let logon = benilla_protocol::logon(&format!("127.0.0.1:{}", server.login.port()), "fen", "hold", u32::from_be_bytes(*b"enUS")).unwrap();
+    let names: Vec<&str> = logon.realms.iter().map(|r| r.name.as_str()).collect();
+    assert_eq!(names, ["Hearthwood"], "only the survival game runs here, under its new name");
+    let mut c = Client::connect(server.login, "fen", "hold", "Hearthwood").expect("into the renamed realm");
+    let _ = enter(&mut c);
+    c.chat(".es hello 1");
+    assert!(c.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("V\t"))), "its add-on is greeted as before");
+}
+
 #[test]
 fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     let server = start_with(None, false);
