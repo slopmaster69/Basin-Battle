@@ -39,7 +39,8 @@ what it sent, side by side on one sheet.
 `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]]`
 
 - **Scenes:** `one` (one body 5 yd ahead), `pack` (three across the front), `close` (one at arm's
-  length), `ring` (three at arm's length), `far` (one 14 yd off). The default is `close` for
+  length), `ring` (three at arm's length), `far` (one 14 yd off), `line` (two in a row, 4 and 7.5 yd ahead: a rush that drives one
+  into the other). The default is `close` for
   stances and weapon arts, `pack` for the rest.
 - **Creature:** `dummy` (the training dummy, the default) or any creature's key, e.g. `brave`,
   which can be made to swing. Stances default to `brave`.

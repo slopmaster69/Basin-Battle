@@ -18,11 +18,14 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
         "ring" => &[(1.9, -32.0), (2.1, 0.0), (1.9, 32.0)],
         // Far: a long shot, a charge's run.
         "far" => &[(14.0, 0.0)],
+        // Two in a row along the hero's facing: a rush that drives one into the other, a shot
+        // that pierces.
+        "line" => &[(4.0, 0.0), (7.5, 0.0)],
         _ => return None,
     })
 }
 
-pub const LAB_SCENES: &str = "one, pack, close, ring or far";
+pub const LAB_SCENES: &str = "one, pack, close, ring, far or line";
 
 impl Survival {
     /// Sets out a scene in front of hero `id`: `creature`s (a `[[mob]]` key; "dummy" for the
