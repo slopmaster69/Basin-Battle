@@ -181,6 +181,13 @@ pub struct AbilityDef {
     pub cleanse: bool,
     #[serde(default)]
     pub invulnerable: bool,
+    /// One of the Hunter's bow abilities: the bow comes into the hands as it's aimed (the hero's
+    /// own, or the camp's first bow if they carry none), it's drawn with the base game's draw
+    /// while it charges (or, with nothing to charge, while it's aimed), and it looses with the
+    /// bow's own release before the melee weapon comes back. A leap with the bow (Skyfall) holds
+    /// it through the leap.
+    #[serde(default)]
+    pub bow: bool,
     /// An EX blink leaves this ability (a Frost Nova) where it started.
     #[serde(default)]
     pub leaves: String,
@@ -447,7 +454,7 @@ pub struct AbilityDef {
     /// A Hunter ability's own mechanic, beyond its kind's: `call` and `double_call` (Call of the
     /// Wild's beasts), `tripwire`, `recall` (Arrow Recall), `haul` (a pull that hauls its caster
     /// to what won't move), `scatter` (arrows scattered where a leap began), `volley` (Skyfall's),
-    /// `float` (a leap that hangs: feather fall for a while after).
+    /// `float` (a leap that hangs at its top, aiming its `recast`, then floats down).
     #[serde(default)]
     pub hunt: String,
     /// A projectile that ricochets off walls, trees and rocks this many times, each bounce adding

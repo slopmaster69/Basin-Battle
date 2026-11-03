@@ -693,6 +693,15 @@ impl SurvivalGame {
                     self.broadcast(&packets::spell_failed_other(c, was));
                 }
             }
+            Event::Loose { caster, spell } => {
+                // A bow ability's arrow: the go of the bow's own draw, which lets the string go
+                // (AttackBow, as the base game's shot) with nothing flying of its own (no target,
+                // no ammo): the ability's missiles fly theirs.
+                self.casting.remove(&caster);
+                if let (Some(c), true) = (self.guid_of(caster), spell != 0) {
+                    self.broadcast(&packets::spell_go(c, spell, Aim::Caster, &[], None));
+                }
+            }
             Event::Auras { id } => self.show_auras(id),
             Event::Rooted { player, on } => {
                 let (Some(g), Some(c)) = (self.guid_of(player), self.conn_of(player)) else { return };

@@ -49,8 +49,12 @@ const SCATTER: u32 = 5;
 const SCATTER_RING: f32 = 1.6;
 /// Skyfall's arrows come down over this long.
 const VOLLEY_SECS: f32 = 1.0;
-/// Skyfall's hang: the hero falls slowly this long after the leap.
-const FLOAT_SECS: f32 = 4.0;
+/// Skyfall's hang: held at the leap's top this long, the bow drawn on the volley. The add-on
+/// looses it as it runs out; the rules a moment after (`HANG_GRACE`), at the last reticle heard.
+const FLOAT_SECS: f32 = 5.5;
+const HANG_GRACE: f32 = 0.5;
+/// After the volley: feather fall, untouchable, till they land (or this long at most).
+const DESCENT_SECS: f32 = 3.0;
 /// Each of its arrows strikes everyone within this of where it lands.
 const VOLLEY_SPLASH: f32 = 2.5;
 
@@ -133,6 +137,19 @@ pub(crate) struct Arrowfall {
     pub land_at: f32,
 }
 
+/// A hero on Skyfall: the leap and its volley, when the leap tops out and where, and until when
+/// they hang there (`held`: up there now, held still, aiming).
+#[derive(Debug, Clone)]
+pub(crate) struct Hang {
+    pub owner: Id,
+    pub leap: usize,
+    pub volley: usize,
+    pub top_at: f32,
+    pub top: Vec3,
+    pub until: f32,
+    pub held: bool,
+}
+
 /// The Hunter's state in the world.
 #[derive(Debug, Clone, Default)]
 pub struct Hunt {
@@ -143,8 +160,10 @@ pub struct Hunt {
     pub(crate) falls: Vec<Arrowfall>,
     /// Recalled arrows' looks on their way home: each one's unseen anchor, and when it's home.
     pub(crate) anchors: Vec<(Id, f32)>,
-    /// Heroes hanging over the fight (Skyfall's feather fall), until then.
+    /// Heroes floating down after Skyfall's volley (feather fall), until then at most.
     pub(crate) floating: Vec<(Id, f32)>,
+    /// Heroes on Skyfall: going up, or hanging over the fight.
+    pub(crate) hangs: Vec<Hang>,
 }
 
 impl Survival {
@@ -213,6 +232,9 @@ impl Survival {
         }
         if !self.hunt.pounces.is_empty() {
             self.step_pounces();
+        }
+        if !self.hunt.hangs.is_empty() {
+            self.step_hangs();
         }
         if !self.hunt.floating.is_empty() {
             let (down, keep): (Vec<(Id, f32)>, Vec<(Id, f32)>) = std::mem::take(&mut self.hunt.floating).into_iter().partition(|(_, t)| *t <= now);
@@ -495,17 +517,131 @@ impl Survival {
 
     // --- Skyfall -----------------------------------------------------------------------------------
 
-    /// Skyfall's leap: the hero falls slowly for a while, hanging over the fight to aim.
-    pub(crate) fn skyfall_float(&mut self, id: Id) {
-        let until = self.clock + FLOAT_SECS;
+    /// Skyfall's leap: up to its top, then held there over the fight with the bow drawn, aiming
+    /// its volley (its `recast`) down at the ground.
+    pub(crate) fn skyfall_float(&mut self, id: Id, ability: usize) {
+        let now = self.clock;
+        let d = self.content.abilities[ability].clone();
+        let Some(volley) = self.content.ability(&d.recast) else { return };
+        let Some(pos) = self.players.get(&id).map(|p| p.pos) else { return };
+        // Straight up: the top is where the leap's thrown speed runs out.
+        let lift = d.lift.max(0.5);
+        let rise = super::moves::airtime(lift) / 2.0;
+        let top = [pos[0], pos[1], pos[2] + lift * rise / 2.0];
+        // It comes down when the volley's gone, not when the leap would have.
+        self.landings.retain(|l| l.owner != id);
         self.hunt.floating.retain(|(h, _)| *h != id);
-        self.hunt.floating.push((id, until));
+        self.hunt.hangs.retain(|h| h.owner != id);
+        self.hunt.hangs.push(Hang { owner: id, leap: ability, volley, top_at: now + rise, top, until: now + rise + FLOAT_SECS, held: false });
+    }
+
+    /// Hanging at Skyfall's top now, held still in the air.
+    pub(crate) fn hanging(&self, id: Id) -> bool {
+        self.hunt.hangs.iter().any(|h| h.owner == id && h.held)
+    }
+
+    /// Up on Skyfall, from the leap till they land again: nothing touches them, no control takes.
+    pub(crate) fn skyfall_aloft(&self, id: Id) -> bool {
+        self.hunt.hangs.iter().any(|h| h.owner == id) || self.hunt.floating.iter().any(|(h, _)| *h == id)
+    }
+
+    /// How long they've hung and how long the hang is (the add-on's bar, and its own loose as it
+    /// runs out).
+    pub fn hang_time(&self, id: Id) -> Option<(f32, f32)> {
+        let h = self.hunt.hangs.iter().find(|h| h.owner == id && h.held)?;
+        Some(((self.clock - (h.until - FLOAT_SECS)).max(0.0), FLOAT_SECS))
+    }
+
+    /// Skyfall's leap tops out (held there, the bow drawn on the volley), or its hang runs out (the
+    /// volley goes at the reticle as last heard); a fallen hero's hang ends.
+    fn step_hangs(&mut self) {
+        let now = self.clock;
+        for h in self.hunt.hangs.clone() {
+            if !self.players.get(&h.owner).is_some_and(|p| p.health > 0) {
+                self.end_hang(h.owner);
+            } else if !h.held && now >= h.top_at {
+                self.hold_hang(&h);
+            } else if h.held && now >= h.until + HANG_GRACE {
+                if let Some(p) = self.players.get_mut(&h.owner) {
+                    if let Some((f, e, _)) = p.aim_line {
+                        p.aim_line = Some((f, e, now));
+                    }
+                }
+                self.loose_volley(h.owner);
+            }
+        }
+    }
+
+    /// The top of Skyfall's leap: held there, the bow drawn, the volley's circle aimed.
+    fn hold_hang(&mut self, h: &Hang) {
+        let id = h.owner;
+        if let Some(x) = self.hunt.hangs.iter_mut().find(|x| x.owner == id) {
+            x.held = true;
+        }
+        // Where they hang (their client's last word may be from on the way up).
+        if let Some(p) = self.players.get_mut(&id) {
+            p.pos[2] = p.pos[2].max(h.top[2]);
+        }
+        self.update_rooted(id);
+        self.events.push(Event::FeatherFall { player: id, on: true });
+        self.set_action(id, Action::Aim { ability: h.volley });
+        self.set_kit(id, Kit::Bow);
+        self.draw_bow(id);
+        self.events.push(Event::Abilities { player: id });
+    }
+
+    /// Skyfall's hang over (its volley gone, or the hero fallen): let go, and down slowly,
+    /// untouchable till they land.
+    fn end_hang(&mut self, id: Id) {
+        let was = self.hunt.hangs.len();
+        self.hunt.hangs.retain(|h| h.owner != id);
+        if self.hunt.hangs.len() == was {
+            return;
+        }
+        self.update_rooted(id);
+        self.hunt.floating.retain(|(h, _)| *h != id);
+        self.hunt.floating.push((id, self.clock + DESCENT_SECS));
         self.events.push(Event::FeatherFall { player: id, on: true });
     }
 
-    /// Skyfall's volley: its arrows come down over a second, scattered over the circle at the
-    /// reticle.
+    /// Down from Skyfall: the slow fall ends as they land.
+    pub(crate) fn skyfall_landed(&mut self, id: Id) {
+        if self.hunt.floating.iter().any(|(h, _)| *h == id) {
+            self.hunt.floating.retain(|(h, _)| *h != id);
+            self.events.push(Event::FeatherFall { player: id, on: false });
+        }
+    }
+
+    /// The volley loosed from the hang.
+    fn loose_volley(&mut self, id: Id) {
+        let Some(volley) = self.hunt.hangs.iter().find(|h| h.owner == id && h.held).map(|h| h.volley) else { return };
+        self.fire(id, volley, 1.0);
+        // (However it went, the hang is over.)
+        self.end_hang(id);
+    }
+
+    /// An input on Skyfall (true: it's taken): up there, the click or the key again looses the
+    /// volley, and nothing else does anything; on the way up, nothing at all.
+    pub(crate) fn hang_input(&mut self, id: Id, input: Input) -> bool {
+        let Some(h) = self.hunt.hangs.iter().find(|h| h.owner == id).cloned() else { return false };
+        let own_key = match input {
+            Input::Ability(slot, _) => crate::content::SLOTS
+                .get(slot as usize)
+                .and_then(|s| self.players.get(&id).and_then(|p| p.loadout.get(*s)))
+                .and_then(|k| self.content.ability(k))
+                .is_some_and(|a| a == self.content.base_of(h.leap)),
+            _ => false,
+        };
+        if h.held && (own_key || matches!(input, Input::Attack | Input::Heavy)) {
+            self.loose_volley(id);
+        }
+        true
+    }
+
+    /// Skyfall's volley: from the hero, its arrows come down over a second, scattered over the
+    /// circle at the reticle; then down they float.
     fn skyfall_volley(&mut self, id: Id, ability: usize, share: f32) {
+        self.end_hang(id);
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);

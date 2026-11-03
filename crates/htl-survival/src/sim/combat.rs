@@ -149,6 +149,10 @@ impl Survival {
         if self.immune(id) && !matches!(input, Input::Ability(..) | Input::GuardUp | Input::AttackUp) {
             return true;
         }
+        // On Skyfall: the click or its key looses the volley from the hang, and nothing else goes.
+        if self.hang_input(id, input) {
+            return true;
+        }
         // On the charger: an attack or an ability puts them back on foot.
         if matches!(input, Input::Attack | Input::Heavy | Input::Ability(..)) && self.has_cc(id, "steed") {
             self.cleanse(id, &["steed"]);
@@ -856,20 +860,23 @@ impl Survival {
             }
         }
         // Drawing the bow on the move, the legs walk (the drawn pose's cast is withdrawn); stood
-        // still, it's shown again.
-        if let Action::Charge { ability, .. } = self.players[&id].action {
-            if self.content.abilities[ability].kind == "shot" {
-                let walking = self.walking(&self.players[&id]);
-                let shown = self.players[&id].draw_shown;
-                let spell = self.ranged_of(&self.players[&id]).spell;
-                if walking && shown {
-                    self.players.get_mut(&id).unwrap().draw_shown = false;
-                    self.events.push(Event::CastEnd { caster: id });
-                } else if !walking && !shown && spell != 0 {
-                    self.players.get_mut(&id).unwrap().draw_shown = true;
-                    self.events.push(Event::Cast { caster: id, spell, ms: super::abilities::DRAW_HOLD_MS });
-                }
+        // still, it's shown again. (A bow ability's draw too; never in Skyfall's hang.)
+        if self.bow_drawn(id) {
+            let walking = self.walking(&self.players[&id]) && !self.hanging(id);
+            let shown = self.players[&id].draw_shown;
+            let spell = self.ranged_of(&self.players[&id]).spell;
+            if walking && shown {
+                self.players.get_mut(&id).unwrap().draw_shown = false;
+                self.events.push(Event::CastEnd { caster: id });
+            } else if !walking && !shown && spell != 0 {
+                self.players.get_mut(&id).unwrap().draw_shown = true;
+                self.events.push(Event::Cast { caster: id, spell, ms: super::abilities::DRAW_HOLD_MS });
             }
+        }
+        // The bow back for the melee weapon once nothing in hand needs it (its release played
+        // out, anything else done, a grapple's pull).
+        if self.players[&id].kit == Kit::Bow && !self.bow_in_hand(id) {
+            self.set_kit(id, Kit::Melee);
         }
         // The action in hand.
         let action = self.players[&id].action.clone();
@@ -1594,7 +1601,7 @@ impl Survival {
         // heavy creature's.
         let heavy_blow = style == Blow::Heavy || (heavy && self.mobs.contains_key(&attacker));
         // Untouchable: in Ice Block, or mid-dash on an ability that's untouchable while it runs.
-        let dashing = matches!(&p.action, Action::Dash { ability, .. } if self.content.abilities[*ability].invulnerable);
+        let dashing = matches!(&p.action, Action::Dash { ability, .. } if self.content.abilities[*ability].invulnerable) || self.skyfall_aloft(victim);
         // A giant's blow (`unparryable`) can be blocked, not parried.
         let giant = self.mobs.get(&attacker).is_some_and(|m| c.mobs[m.def].unparryable);
         let parryable = parryable && !giant;
@@ -1828,6 +1835,7 @@ impl Survival {
         // Only the landing of the leap it was pressed in: one whose landing went unheard (a lost
         // packet, a teleport) is over after [`AIR_MOST`], and its attack with it.
         let current = self.airborne(id).is_some();
+        self.skyfall_landed(id);
         let Some(p) = self.players.get_mut(&id) else { return };
         p.air = None;
         if let Some(kind) = p.landing_attack.take().filter(|_| current) {

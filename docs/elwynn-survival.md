@@ -179,8 +179,9 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
   (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
   Tripwire, two planted arrows and a wire that knocks down the first to cross, or the traps. 3:
-  Kill Shot, or Skyfall: a leap straight up, a slow fall over the fight, and a volley of 12 arrows
-  where you aim (they plant).
+  Kill Shot, or Skyfall: a leap straight up, a 5.5 s hang there with the bow drawn on a ring below,
+  and a volley of 12 arrows where you aim (they plant), then a slow fall. Every bow ability brings
+  the bow into the hands and draws it with the base game's bow draw.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;

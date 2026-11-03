@@ -161,6 +161,9 @@ pub enum Event {
     /// A cast went (its missile or its effect follows): its bar and its look (the precast, the
     /// glow in the hands) end with it, no failure shown. `spell`: only if it's that one (0: any).
     CastDone { caster: Id, spell: u32 },
+    /// A bow ability's arrow goes: the bow's own release (the go of its draw, `spell`), with no
+    /// arrow of its own (the ability's missiles are their own events).
+    Loose { caster: Id, spell: u32 },
     /// Ground that lingers (holy ground, fire) wears this spell's look (a DynamicObject) until
     /// the mark `id` is gone.
     AreaLook { id: Id, caster: Id, spell: u32, pos: Vec3, radius: f32 },
@@ -528,6 +531,9 @@ pub struct Player {
     /// The bow's drawn pose is shown (the draw's cast is out): not while they walk, when the legs
     /// must walk (the action-combat client holds the draw on the upper body meanwhile).
     pub draw_shown: bool,
+    /// A bow ability's release plays out till then: the bow stays in hand meanwhile, unless they
+    /// do something else.
+    pub bow_until: f32,
     /// Who they last traded blows with, and when: the foe's bar on their screen.
     pub foe: Option<(Id, f32)>,
     /// Their client aims over the shoulder (the action-combat client): aimed shots fly along
@@ -1111,6 +1117,7 @@ impl Survival {
             wounds: Vec::new(),
             buffered: None,
             draw_shown: false,
+            bow_until: -100.0,
             foe: None,
             shoulder_cam: false,
             aim_line: None,
@@ -1839,6 +1846,31 @@ impl Survival {
     pub fn ranged_of(&self, p: &Player) -> &crate::content::RangedDef {
         let c = &self.content;
         c.ranged(&c.items[p.bow].key).or_else(|| c.ranged.first()).expect("a bow")
+    }
+
+    /// The bow a hero holds for a bow ability: their own if it's a bow, else the camp's first bow
+    /// (a crossbow, or no bow at all, would show the wrong draw or none).
+    pub fn bow_look(&self, p: &Player) -> usize {
+        let c = &self.content;
+        let drawn = |i: usize| c.items.get(i).is_some_and(|d| d.kind == ItemKind::Bow && c.ranged(&d.key).is_some_and(|r| r.draw_secs > 0.0));
+        if drawn(p.bow) {
+            return p.bow;
+        }
+        c.item(&c.start.bow).filter(|i| drawn(*i)).or_else(|| (0..c.items.len()).find(|i| drawn(*i))).unwrap_or(p.bow)
+    }
+
+    /// What a hero's ranged slot shows: what they carry, or while a bow ability has the bow in
+    /// their hands, the bow it draws ([`Self::bow_look`]).
+    pub fn ranged_shown(&self, p: &Player) -> usize {
+        let shot = match &p.action {
+            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } => self.content.abilities[*ability].kind == "shot",
+            _ => false,
+        };
+        if p.kit == Kit::Bow && !shot {
+            self.bow_look(p)
+        } else {
+            p.bow
+        }
     }
 
     /// How many creatures a hero's swing would reach right now (in reach, in front, in sight).
