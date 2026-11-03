@@ -964,19 +964,135 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     }
 }
 
+/// The reticle on the ground at `at` (x, y), for a hero standing at the origin.
+fn aim_at(s: &mut Survival, p: Id, at: [f32; 2]) {
+    s.set_aim_line(p, at[1].atan2(at[0]), down_to(at[0].hypot(at[1])));
+}
+
+/// Tripwire laid arrow by arrow: its key, the first arrow aimed at `a` and loosed; the key again,
+/// the second aimed at `b` and loosed.
+fn lay_tripwire(s: &mut Survival, p: Id, a: [f32; 2], b: [f32; 2], mobs: &[Id]) -> Vec<Event> {
+    let mut ev = press(s, p, "tripwire", false);
+    aim_at(s, p, a);
+    ev.extend(click(s, p));
+    ev.extend(run_pinned(s, 0.5, mobs));
+    ev.extend(press_again(s, p, "defense"));
+    assert_eq!(aiming(s, p), Some(idx(s, "tripwire_second")), "the key again aims the second arrow");
+    aim_at(s, p, b);
+    ev.extend(click(s, p));
+    ev.extend(run_pinned(s, 0.2, mobs));
+    ev
+}
+
+/// The shapes laid on the ground at a spot that went down in `ev`: (mark, telegraph).
+fn ground_shapes(ev: &[Event]) -> Vec<(Id, Telegraph)> {
+    ev.iter()
+        .filter_map(|e| match e {
+            Event::Mark { id, tele: Some(t), .. } if t.at.is_some() => Some((*id, *t)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn tripwire_plants_one_arrow_then_the_key_again_places_the_second_and_the_wire_runs_between_them() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    // The first press: one arrow where it's aimed, no wire yet, the key waiting for the second.
+    let mut ev = press(&mut s, p, "tripwire", false);
+    aim_at(&mut s, p, [10.0, -3.0]);
+    ev.extend(click(&mut s, p));
+    ev.extend(run(&mut s, 0.5));
+    let first = s.planted_of(p);
+    assert_eq!(first.len(), 1, "one arrow: {first:?}");
+    assert!(dist2d(first[0], [10.0, -3.0, 0.0]) < 1.5, "where it was aimed: {first:?}");
+    assert!(s.hunt.wires.is_empty(), "no wire from one arrow");
+    assert_eq!(s.recast_keys(p).len(), 1, "the key armed for the second");
+    // A ring round the first arrow shows how far the wire can span.
+    let ring = ground_shapes(&ev).into_iter().find(|(_, t)| t.arc >= 300.0).expect("a ring round the first arrow");
+    assert!((ring.1.reach - hunter::WIRE_SPAN).abs() < 1.0e-3, "as wide as the wire spans: {}", ring.1.reach);
+    assert!(dist2d(ring.1.at.unwrap().0, first[0]) < 0.3, "round the first arrow");
+    // The second press: the other arrow where it's aimed, and the wire.
+    let mut ev = press_again(&mut s, p, "defense");
+    assert_eq!(aiming(&s, p), Some(idx(&s, "tripwire_second")));
+    aim_at(&mut s, p, [10.0, 3.0]);
+    ev.extend(click(&mut s, p));
+    ev.extend(run(&mut s, 0.2));
+    let both = s.planted_of(p);
+    assert_eq!(both.len(), 2, "two arrows: {both:?}");
+    let (a, b) = (both[0], both[1]);
+    assert!(dist2d(b, [10.0, 3.0, 0.0]) < 1.5, "the second where it was aimed: {both:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == ring.0)), "the ring goes as the wire forms");
+    assert!(s.recast_keys(p).is_empty(), "the key's done");
+    assert_eq!(s.hunt.wires.len(), 1, "a wire");
+    let w = &s.hunt.wires[0];
+    assert!(dist2d(w.a, a) < 0.1 && dist2d(w.b, b) < 0.1, "the wire's ends are the arrows: {:?} {:?} {both:?}", w.a, w.b);
+    // Drawn as a strip from one arrow to the other: its length along the arrows, its width across.
+    let (_, wire) = ground_shapes(&ev).into_iter().find(|(_, t)| t.width > 0.0).expect("the wire drawn on the ground");
+    let (from, yaw) = wire.at.unwrap();
+    let to = [from[0] + yaw.cos() * wire.reach, from[1] + yaw.sin() * wire.reach, 0.0];
+    assert!(dist2d(from, a) < 0.1, "from the first arrow: {from:?} {a:?}");
+    assert!(dist2d(to, b) < 0.1, "to the second: {to:?} {b:?}");
+    assert!(wire.width < wire.reach, "a rope along the arrows, not a band across them: {} wide, {} long", wire.width, wire.reach);
+}
+
+#[test]
+fn tripwires_second_arrow_aimed_past_the_ring_lands_on_its_edge() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    lay_tripwire(&mut s, p, [10.0, 0.0], [10.0, 16.0], &[]);
+    let both = s.planted_of(p);
+    assert_eq!(both.len(), 2, "two arrows: {both:?}");
+    let span = dist2d(both[0], both[1]);
+    assert!((span - hunter::WIRE_SPAN).abs() < 0.3, "held to the ring: {span} {both:?}");
+    assert!(both[1][1] > 8.0 && both[1][1] < 11.0, "on the ring toward the aim: {both:?}");
+    // Within it, where it's aimed.
+    assert_eq!(hunter::within_span([0.0, 0.0, 0.0], [3.0, 4.0, 0.0]), [3.0, 4.0, 0.0]);
+    let edge = hunter::within_span([0.0, 0.0, 0.0], [0.0, -30.0, 2.0]);
+    assert!(edge[0].abs() < 1.0e-4 && (edge[1] + hunter::WIRE_SPAN).abs() < 1.0e-4, "{edge:?}");
+}
+
+#[test]
+fn a_tripwire_left_at_one_arrow_is_just_a_planted_arrow_once_the_key_stops_waiting() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut ev = press(&mut s, p, "tripwire", false);
+    aim_at(&mut s, p, [10.0, 0.0]);
+    ev.extend(click(&mut s, p));
+    let ring = ground_shapes(&ev).into_iter().find(|(_, t)| t.arc >= 300.0).expect("a ring").0;
+    let window = s.content.abilities[idx(&s, "tripwire")].recast_secs;
+    let ev = run(&mut s, window + 0.5);
+    assert!(s.recast_keys(p).is_empty(), "the window closed");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == ring)), "its ring gone");
+    assert_eq!(s.planted_of(p).len(), 1, "the arrow stays planted");
+    assert!(s.hunt.wires.is_empty(), "no wire");
+    // The key is Tripwire's first arrow again...
+    press(&mut s, p, "tripwire", false);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "tripwire")), "a new first arrow, not the second");
+    s.input(p, Input::Cancel);
+    s.step(DT);
+    // ...and Arrow Recall brings the lone arrow home.
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "tripwire", true);
+    run(&mut s, 0.5);
+    assert!(s.planted_of(p).is_empty(), "home");
+}
+
+#[test]
+fn a_wires_line_on_the_ground_faces_from_one_arrow_to_the_other() {
+    let (yaw, len) = hunter::wire_line([2.0, 1.0, 0.0], [2.0, 6.0, 0.0]);
+    assert!((yaw - std::f32::consts::FRAC_PI_2).abs() < 1.0e-4 && (len - 5.0).abs() < 1.0e-4, "{yaw} {len}");
+    let (yaw, len) = hunter::wire_line([0.0, 0.0, 0.0], [-3.0, -3.0, 0.0]);
+    assert!((yaw - 1.25 * std::f32::consts::PI).abs() < 1.0e-4 && (len - 18f32.sqrt()).abs() < 1.0e-4, "{yaw} {len}");
+}
+
 #[test]
 fn a_tripwire_knocks_down_the_first_creature_across_it() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [14.0, 0.0, 0.0]);
-    press(&mut s, p, "tripwire", false);
-    // Laid at the reticle, across the hero's line, its two arrows planted.
-    s.set_aim_line(p, 0.0, down_to(10.0));
-    let mut ev = click(&mut s, p);
-    ev.extend(run_pinned(&mut s, 0.2, &[k]));
-    if aiming(&s, p).is_some() {
-        ev.extend(click(&mut s, p));
-    }
+    // Laid arrow by arrow across the hero's line, its two arrows planted.
+    let mut ev = lay_tripwire(&mut s, p, [10.0, -3.0], [10.0, 3.0], &[k]);
     assert_eq!(s.planted_of(p).len(), 2, "two anchors");
     // It walks over the wire.
     for x in [12.0f32, 11.0, 10.4, 9.8, 9.0] {
@@ -994,13 +1110,7 @@ fn a_tripwires_arrows_outlast_its_cooldown_so_recall_on_the_same_key_brings_them
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [30.0, 0.0, 0.0]);
-    press(&mut s, p, "tripwire", false);
-    s.set_aim_line(p, 0.0, down_to(10.0));
-    click(&mut s, p);
-    run_pinned(&mut s, 0.2, &[k]);
-    if aiming(&s, p).is_some() {
-        click(&mut s, p);
-    }
+    lay_tripwire(&mut s, p, [10.0, -3.0], [10.0, 3.0], &[k]);
     assert_eq!(s.planted_of(p).len(), 2, "two anchors");
     // A shot's arrow planted alongside fades on its usual clock...
     s.plant_arrow(p, [12.0, 4.0, 0.0]);
