@@ -2555,7 +2555,8 @@ end
 
 -- AB: the five keys, each slot~ability~name~icon~kind~shape~least~full~cooldown left~cooldown~
 -- charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~
--- EX radius~EX arc~text~facts~EX text~EX facts~aimed~column.
+-- EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered (the seconds Call of the
+-- Wild's next call stays empowered by a parry or a perfect dodge; 0 or none: it isn't).
 function ES.AbilitiesLine(f)
   local parts = Split(f[2] or "", "^")
   ES.abilities = {}
@@ -2570,6 +2571,8 @@ function ES.AbilitiesLine(f)
       valor = tonumber(e[16] or "") or 0, text = e[26] or "", facts = e[27] or "", at = GetTime(),
       aimed = e[30] == "1", school = e[31] or "",
     }
+    local primed = tonumber(e[32] or "") or 0
+    if primed > 0 then s.primedEnds = GetTime() + primed end
     if (e[17] or "") ~= "" then
       s.ex = {
         n = n, key = e[17], name = e[18] or "", icon = e[19] or "", valor = tonumber(e[20] or "") or 0,
@@ -2687,6 +2690,15 @@ function ES.DrawAbilities()
         b.glow:SetBlendMode("ADD")
         b.glow:Show()
       end
+      -- Empowered by a parry or a perfect dodge (Call of the Wild): a cold spirit-blue blaze that
+      -- breathes slowly, its rim blue and its seconds in the corner, unlike the gold of an EX
+      -- that's free or the green of a recast.
+      if s.primedEnds and s.primedEnds > GetTime() and not rc and not em then
+        b.glow:SetVertexColor(0.4, 0.7, 1, 1)
+        b.glow:SetBlendMode("ADD")
+        b.glow:Show()
+        b.rim:SetVertexColor(0.55, 0.8, 1, 1)
+      end
       -- An aimed one up: its rim lit.
       local up = Aiming()
       if up and (up == s.key or (s.ex and up == s.ex.key) or (rc and up == rc.key)) then
@@ -2734,8 +2746,19 @@ abar:SetScript("OnUpdate", function()
         ES.DrawAbilities()
       end
     end
+    local primed = s and s.primedEnds
+    if primed and now >= primed then
+      -- Its empowerment is over: the key as it was.
+      s.primedEnds = nil
+      primed = nil
+      ES.DrawAbilities()
+    end
     if em then
+      b.timer:SetTextColor(1, 0.85, 0.4)
       b.timer:SetText(string.format("%d", math.ceil(math.max(0, em - now))))
+    elseif primed then
+      b.timer:SetTextColor(0.6, 0.85, 1)
+      b.timer:SetText(string.format("%d", math.ceil(math.max(0, primed - now))))
     else
       b.timer:SetText("")
     end
@@ -2759,6 +2782,8 @@ abar:SetScript("OnUpdate", function()
       end
     elseif (rc or em) and b.glow:IsShown() then
       b.glow:SetAlpha(0.7 + 0.3 * math.sin(now * (em and 7 or 5)))
+    elseif primed and b.glow:IsShown() then
+      b.glow:SetAlpha(0.55 + 0.45 * math.sin(now * 2.5))
     elseif n == ULT and b.glow:IsShown() and not Aiming() then
       b.glow:SetAlpha(0.55 + 0.35 * math.sin(now * 3))
     end

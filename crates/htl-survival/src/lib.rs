@@ -49,6 +49,8 @@ mod tests_support;
 #[cfg(test)]
 mod tests_tactics;
 #[cfg(test)]
+mod tests_hunter_wild;
+#[cfg(test)]
 mod tests_projectiles;
 #[cfg(test)]
 mod tests_class_warrior_paladin_hunter;

@@ -25,6 +25,11 @@ const BAG_ENTRY: u32 = 300_950;
 const BAG_DISPLAY: u32 = 1244;
 const GO_ENTRY: u32 = 400_000;
 
+/// Whether a creature (by its key) is one of Call of the Wild's spirit beasts.
+fn spirit_beast(key: &str) -> bool {
+    htl_survival::sim::hunter::BEASTS.iter().any(|b| b.mob == key)
+}
+
 /// A hero's model: their race's own, a man's or a woman's (1.12's `ChrRaces` displays, by race
 /// id 1 to 8).
 fn native_display(race: u8, gender: u8) -> u32 {
@@ -628,7 +633,9 @@ impl SurvivalGame {
             damage: [d.attack.damage; 2],
             run_speed: d.run_speed,
             npc_flags: 0,
-            unit_flags: 0,
+            // Call of the Wild's beasts can't be selected: no nameplate, no health bar, no name
+            // over them (the client draws none for a `NOT_SELECTABLE` unit), nothing to click.
+            unit_flags: if spirit_beast(&d.key) { fields::UNIT_FLAG_NOT_SELECTABLE } else { 0 },
             main_hand: d.weapon,
             main_hand_info: grip_info(&d.grip),
             off_hand: d.shield,

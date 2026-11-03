@@ -1152,8 +1152,8 @@ fn call_of_the_wild_sends_a_beast_a_press_through_three_stages_for_stamina() {
         run_pinned(&mut s, 0.6, &[k]);
         assert_eq!(s.wild_now(p).stage, (stage + 1) % 3, "the chain moves on");
     }
-    // The beasts' bodies are gone after.
-    run_pinned(&mut s, 1.0, &[k]);
+    // The beasts' bodies are gone after (each stays a while after its strike, to be seen).
+    run_pinned(&mut s, 2.0, &[k]);
     assert!(!s.mobs.values().any(|m| s.content.mobs[m.def].key.starts_with("spirit_")));
     // Four seconds without a call: back to the first stage.
     press(&mut s, p, "call_of_the_wild", false);
@@ -1164,7 +1164,7 @@ fn call_of_the_wild_sends_a_beast_a_press_through_three_stages_for_stamina() {
 }
 
 #[test]
-fn a_parry_or_a_landed_blow_empowers_the_next_beast_for_half_the_stamina() {
+fn a_parry_empowers_the_next_beast_for_half_the_stamina() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
@@ -1185,19 +1185,19 @@ fn the_owl_marks_and_the_bear_mauls_a_staggered_foe_for_triple() {
     let k = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
     let owl = crate::sim::hunter::BEASTS.iter().position(|b| b.key == "owl").unwrap();
     let bear = crate::sim::hunter::BEASTS.iter().position(|b| b.key == "bear").unwrap();
-    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 0, next: owl, until: s.clock + 4.0, primed: false, drawn: true });
+    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 0, next: owl, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     s.set_aim_line(p, 0.0, 0.0);
     press(&mut s, p, "call_of_the_wild", false);
     run_pinned(&mut s, 0.5, &[k]);
     assert!(s.has_cc(k, "mark"), "the Owl marks");
     // The Bear on a plain foe, then on a staggered one.
     s.cleanse(k, &["mark"]);
-    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true });
+    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     let mut ev = press(&mut s, p, "call_of_the_wild", false);
     ev.extend(run_pinned(&mut s, 0.5, &[k]));
     let plain = hits(&ev, p, k)[0];
     s.mobs.get_mut(&k).unwrap().health = 9999;
-    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true });
+    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     s.stagger_mob(k, 2.0, false);
     let mut ev = press(&mut s, p, "call_of_the_wild", false);
     ev.extend(run(&mut s, 0.5));

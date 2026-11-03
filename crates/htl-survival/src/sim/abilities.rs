@@ -483,7 +483,7 @@ impl Survival {
         let mut out: Vec<(Id, Vec3, f32, f32)> = self
             .mobs
             .iter()
-            .filter(|(id, m)| **id != skip && m.health > 0 && !m.hidden && !self.own_totem(**id, skip))
+            .filter(|(id, m)| **id != skip && m.health > 0 && !m.hidden && !self.own_totem(**id, skip) && !self.spirit_body(**id))
             .map(|(id, m)| {
                 let s = self.content.mobs[m.def].scale;
                 (*id, m.pos, HERO_TALL * s, 0.5 * s)
@@ -1720,10 +1720,6 @@ impl Survival {
     /// A projectile reaches someone: a friend it's for is healed (and moved, with a pull); a foe
     /// is struck, or caught in its burst; a chaining one leaps on.
     fn projectile_hit(&mut self, p: &Projectile, victim: Id, from: Vec3) {
-        // An arrow (any ability's projectile) on a foe: the hunter's next beast comes empowered.
-        if !p.allies && self.players.contains_key(&p.owner) {
-            self.prime_wild(p.owner);
-        }
         // A friend touched by light: healed, not struck.
         // (Outside Siege that's any other hero, friendly fire or not: a bolt that would both heal
         // and hurt them heals them, as the caster meant.)
@@ -2272,7 +2268,7 @@ impl Survival {
                 _ => true,
             }
         };
-        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner)).map(|(id, _)| *id).collect();
+        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner) && !self.spirit_body(**mid)).map(|(id, _)| *id).collect();
         let heroes: Vec<Id> = if self.content.pvp.friendly_fire {
             // (Not one it mends: a healing area spares a hero it can help.)
             self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
@@ -2611,7 +2607,7 @@ impl Survival {
         let mut foes: Vec<(Id, f32)> = self
             .mobs
             .iter()
-            .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && combat::in_strip(pos, yaw, len, half + 0.5 * self.content.mobs[m.def].scale, m.pos))
+            .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && !self.spirit_body(**mid) && combat::in_strip(pos, yaw, len, half + 0.5 * self.content.mobs[m.def].scale, m.pos))
             .map(|(mid, m)| (*mid, along(m.pos)))
             .chain(self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.hostile(id, **h) && !friend(**h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, p)| (*h, along(p.pos))))
             .collect();
