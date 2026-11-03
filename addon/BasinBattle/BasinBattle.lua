@@ -4124,6 +4124,7 @@ function BB.Line(msg)
     if not BB.connected then
       BB.connected = true
       BB.ApplyKeys()
+      if BB.PlaceChat then BB.PlaceChat() end
       if mapLayer then mapLayer:Show() end
     end
   end

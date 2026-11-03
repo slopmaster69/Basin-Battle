@@ -13,7 +13,8 @@ cd "$ROOT"
 find_wow_data
 # Rebuilds only what changed since last time: a few seconds, or a minute or two after an update.
 cargo build --release -q -p htl-server
-args=(--data "$WOW_DATA" --content content/game.toml --saves saves/basin-battle.toml --survival-content content/survival.toml --survival-save saves/elwynn-survival.toml)
+args=(--realm "$(project_name basin "Basin Battle")" --survival-realm "$(project_name survival "Elwynn Survival")"
+    --data "$WOW_DATA" --content content/game.toml --saves saves/basin-battle.toml --survival-content content/survival.toml --survival-save saves/elwynn-survival.toml)
 if [[ " $* " != *" --public-host "* ]]; then
     # Friends on the internet are sent to your public address; find it unless it's given.
     public="${HTL_PUBLIC_HOST:-$(curl -s --max-time 4 https://api.ipify.org || true)}"
