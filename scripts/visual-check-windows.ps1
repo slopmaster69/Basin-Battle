@@ -52,7 +52,7 @@ $Defaults = [ordered]@{
     resolution    = "1280x720"
     format        = "jpg"
     width         = "1280"
-    video         = "title"
+    video         = "screen"
     ffmpeg        = ""
     settle        = "6"
     login_timeout = "120"
@@ -66,8 +66,9 @@ $SettingsHelp = @(
     "#   only, on a local server; the password is the one the host prints, 'hold' unless you changed it).",
     "# hunter, warrior: the test heroes on that account the scenarios play ('setup' makes them).",
     "# resolution: the client's window. format: jpg (small) or png. width: stills wider are scaled down.",
-    "# video: title (record the game window), desktop (the screen where the window is: use it if the",
-    "#   title's video comes out black) or off. ffmpeg: ffmpeg.exe (empty: Documents\visual-check\ffmpeg).",
+    "# video: screen (the game window's rectangle, by Desktop Duplication: the one that sees a Vulkan",
+    "#   window's frames), title or desktop (GDI: they see only a few stale frames of benilla's window), or off.",
+    "#   ffmpeg: ffmpeg.exe (empty: Documents\visual-check\ffmpeg).",
     "# settle: seconds the world gets to load in before a scenario starts. login_timeout: seconds to log in."
 )
 
@@ -375,15 +376,32 @@ public static class VisualCheckWin {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
 }
 "@
 [void][VisualCheckWin]::SetProcessDPIAware()
 
 # ffmpeg recording the client's window ("benilla", the title benilla's lib.rs gives it) for
-# $v.Duration seconds into $v.Out; `desktop` records the screen's rectangle where the window is.
+# $v.Duration seconds into $v.Out. `screen` (the default) takes the window's rectangle by Desktop
+# Duplication (ffmpeg's ddagrab), which sees every frame a Vulkan window presents; GDI's grabs
+# (`title`, the window; `desktop`, the screen's rectangle where it is) see only a few stale ones of
+# benilla's window (the first run on Corey's laptop: 3 different frames in 289).
 function Start-Video($v, $client, [string]$how) {
     $grab = @("-f", "gdigrab", "-framerate", "30")
-    if ($how -eq "desktop") {
+    $vf = "scale=trunc(iw/2)*2:trunc(ih/2)*2"
+    if ($how -eq "screen") {
+        $client.Refresh()
+        $r = New-Object VisualCheckWin+RECT
+        if (-not [VisualCheckWin]::GetWindowRect($client.MainWindowHandle, [ref]$r)) { return $null }
+        # The primary screen's own coordinates; a window hanging past its edges is cut to them.
+        $sw = [VisualCheckWin]::GetSystemMetrics(0); $sh = [VisualCheckWin]::GetSystemMetrics(1)
+        $l = [Math]::Max(0, $r.Left); $t = [Math]::Max(0, $r.Top)
+        $w = [Math]::Min($sw, $r.Right) - $l; $h = [Math]::Min($sh, $r.Bottom) - $t
+        $w -= $w % 2; $h -= $h % 2
+        if ($w -lt 64 -or $h -lt 64) { return $null }
+        $grab = @("-f", "lavfi", "-i", "ddagrab=output_idx=0:framerate=30:draw_mouse=0:offset_x=$($l):offset_y=$($t):video_size=$($w)x$($h)")
+        $vf = "hwdownload,format=bgra," + $vf
+    } elseif ($how -eq "desktop") {
         $client.Refresh()
         $r = New-Object VisualCheckWin+RECT
         if (-not [VisualCheckWin]::GetWindowRect($client.MainWindowHandle, [ref]$r)) { return $null }
@@ -394,7 +412,7 @@ function Start-Video($v, $client, [string]$how) {
         $grab += @("-i", "title=benilla")
     }
     $all = @("-hide_banner", "-nostdin", "-loglevel", "warning", "-y") + $grab + @(
-        "-t", (Fmt $v.Duration), "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-t", (Fmt $v.Duration), "-vf", $vf,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", $v.Out)
     $v.How = $how
     $v.Started = Get-Date
@@ -437,10 +455,11 @@ function Invoke-Client($s, [hashtable]$vars, [int]$timeout, $chome, $log, $v = $
                 $rec = Start-Video $v $p $s.video
                 if (-not $rec) { $v.Status = "no video: the game window wasn't found" }
             }
-            # The window's title didn't match: once more, from the screen where the window is.
-            if ($rec -and $rec.HasExited -and $null -ne $rec.ExitCode -and $rec.ExitCode -ne 0 -and $v.How -eq "title" -and ((Get-Date) - $v.Started).TotalSeconds -lt 5) {
+            # Desktop Duplication refused (an ffmpeg without it, a locked screen), or the window's
+            # title didn't match: once more, the next way down.
+            if ($rec -and $rec.HasExited -and $null -ne $rec.ExitCode -and $rec.ExitCode -ne 0 -and $v.How -ne "desktop" -and ((Get-Date) - $v.Started).TotalSeconds -lt 5) {
                 $v.Duration = [Math]::Max(1.0, $v.Duration - ((Get-Date) - $v.Started).TotalSeconds)
-                $rec = Start-Video $v $p "desktop"
+                $rec = Start-Video $v $p $(if ($v.How -eq "screen") { "title" } else { "desktop" })
             }
             Start-Sleep -Milliseconds 100
         }

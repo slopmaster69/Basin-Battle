@@ -36,7 +36,7 @@ watcher, below).
    | `hunter`, `warrior` | `Vchunter`, `Vcwarrior` | the test heroes the scenarios play |
    | `resolution` | `1280x720` | the client's window while it runs |
    | `format`, `width` | `jpg`, `1280` | the stills: JPG (or `png`), scaled down past this width |
-   | `video` | `title` | `title` records the game window, `desktop` the screen where it is, `off` none |
+   | `video` | `screen` | `screen` records the game window's rectangle by Desktop Duplication (it sees every frame); `title` and `desktop` are GDI's grabs, which see only a few stale frames of benilla's Vulkan window; `off` none |
    | `ffmpeg` | `Documents\visual-check\ffmpeg\ffmpeg.exe` | |
    | `settle` | `6` | seconds the world gets to load in before a scenario starts |
    | `login_timeout` | `120` | seconds the client gets to log in |
@@ -155,9 +155,10 @@ branch's and none of the player's settings are touched. benilla's env probes do 
   the lines due by then in one frame and shoot the loading screen. The driver's stills are the
   game's own `Screenshot()`, with the "Screen captured" line kept out of them.
 - The video starts when the driver's first (cue) still lands, so it's within a few tenths of a
-  second of the plan. If the game window's video comes out black (some graphics drivers), set
-  `video = desktop`: it then records the screen where the window is, which works while the window
-  is on top, as it is during a run.
+  second of the plan. It's taken by Desktop Duplication (ffmpeg's `ddagrab`) from the window's
+  rectangle on the main screen, which works while the window is on top (as it is during a run) and
+  the screen isn't locked: keep the PC awake and unlocked while checks run. GDI's grabs see only a
+  few stale frames of a Vulkan window, so they're the fallback, not the way.
 - Trapper's Instinct answers a blow; the dummy never strikes, so its scenario shows the stance
   running out. Spawning a boar (commented in the file) shows the answer, but the boar stays.
 - Training dummies don't move back after Reverse Grapple or Tripwire; `_setup` clears every dummy
