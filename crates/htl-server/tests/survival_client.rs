@@ -1833,7 +1833,7 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
         let f = placed(&c).into_iter().find(|(x, ..)| x == g).unwrap().3;
         assert_eq!(field(&f, 4).map(f32::from_bits), Some(1.0), "at its model's own size");
     }
-    let rings: Vec<Vec<String>> = addon_lines(&c, "ES").into_iter().filter(|l| l.starts_with("MK\t")).map(|l| l.split('\t').map(str::to_string).collect()).filter(|f: &Vec<String>| f.len() == 8 && f[7] == "1").collect();
+    let rings: Vec<Vec<String>> = addon_lines(&c, "ES").into_iter().filter(|l| l.starts_with("MK\t")).map(|l| l.split('\t').map(str::to_string).collect::<Vec<String>>()).filter(|f| f.len() == 8 && f[7] == "1").collect();
     assert_eq!(rings.len(), 2, "a friend's ring under each: {rings:?}");
     for r in &rings {
         let (x, y): (f32, f32) = (r[2].parse().unwrap(), r[3].parse().unwrap());
