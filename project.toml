@@ -1,0 +1,21 @@
+# What players see this project called, and where it lives. Change a name here and the scripts,
+# the server's realm list and the next release's Windows download all use it: the download and
+# its folder, the window titles, the Play menu and the realm each game runs on.
+#
+# Keep every line `key = "value"` on one line: the Windows and Mac scripts read this file with a
+# plain search, not a TOML library. Code names (the htl-* crates, addon/ElwynnSurvival,
+# BasinBattle) don't change with these, and neither does what the games say in play.
+
+# The whole project: the download is "<title> for Windows.zip", and the host window's title.
+title = "Basin Battle"
+
+# Each game's name: its realm in the realm list, and its line in the Play menu.
+survival = "Elwynn Survival"
+basin = "Basin Battle"
+
+# Where releases (and the Windows download's updates) come from: owner/name on GitHub.
+repository = "slopmaster69/Basin-Battle"
+
+# The group's own server, if there is one: Play offers it first, so friends never type an
+# address. Empty: Play asks for one (or plays on this PC's own server).
+server = ""

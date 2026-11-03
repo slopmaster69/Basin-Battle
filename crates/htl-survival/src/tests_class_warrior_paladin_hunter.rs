@@ -1341,3 +1341,26 @@ fn bank_shot_comes_off_a_wall_harder_and_strikes_round_the_corner() {
     assert_eq!(h.len(), 1, "round the corner: {h:?} {logs:?} planted {:?}", s.planted_of(p));
     assert!(h[0] > 16, "harder for the bounce: {}", h[0]);
 }
+
+#[test]
+fn a_training_dummy_takes_a_beast_and_a_freezing_trap() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.spawn_dummy(p, "").unwrap();
+    let d = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].dummy).expect("a dummy").0;
+    let at = s.mobs[&d].pos;
+    // Call of the Wild finds it ("No enemy in range" before) and the beast strikes it.
+    s.set_aim_line(p, 0.0, 0.0);
+    let mut ev = press(&mut s, p, "call_of_the_wild", false);
+    ev.extend(run(&mut s, 1.0));
+    assert!(!hits(&ev, p, d).is_empty(), "the beast strikes the dummy");
+    // A Freezing Trap at its feet springs on it.
+    run(&mut s, 2.0);
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "freezing_trap")));
+    s.set_aim_line(p, 0.0, down_to(at[0].hypot(at[1])));
+    click(&mut s, p);
+    run(&mut s, 1.2);
+    assert!(s.has_cc(d, "petrify"), "sprung on the dummy: frozen");
+}

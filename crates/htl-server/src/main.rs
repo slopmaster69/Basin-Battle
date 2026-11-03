@@ -23,14 +23,16 @@ OPTIONS:
     --data <path>         The Data folder of your 1.12.1 install (or set WOW_DATA)
     --password <text>     The password everyone logs in with (default: hold)
     --public-host <host>  Your internet address or hostname, for friends outside your network
-    --realm <name>        The realm name shown in the realm list (default: Basin Battle)
+    --realm <name>        Basin Battle's realm name in the realm list (default: Basin Battle)
+    --survival-realm <n>  Elwynn Survival's realm name (default: Elwynn Survival); the host
+                          scripts pass both from project.toml
     --content <file>      A game.toml to use instead of the built-in one (cards.toml and
                           gear.toml are read from the same folder)
     --saves <file>        Where high scores and Renown are kept (default: saves/basin-battle.toml)
     --login-port <port>   Default 3724
     --world-port <port>   Default 8085
     --game <which>        both (default), basin or survival: the games to run, each on its own
-                          realm (\"Basin Battle\" and \"Elwynn Survival\")
+                          realm
     --survival-port <p>   Elwynn Survival's world port (default 8086)
     --survival-save <f>   Where the survival world is kept (default saves/elwynn-survival.toml)
     --survival-content <f> A survival.toml to use instead of the built-in one
@@ -48,6 +50,7 @@ fn main() -> Result<()> {
     let mut survival_port = htl_server::SURVIVAL_PORT;
     let mut survival_save: PathBuf = "saves/elwynn-survival.toml".into();
     let mut survival_content: Option<PathBuf> = None;
+    let mut survival_realm = String::from(htl_server::SURVIVAL_REALM);
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         let mut value = |name: &str| args.next().with_context(|| format!("{name} needs a value"));
@@ -64,6 +67,7 @@ fn main() -> Result<()> {
             "--survival-port" => survival_port = value("--survival-port")?.parse()?,
             "--survival-save" => survival_save = value("--survival-save")?.into(),
             "--survival-content" => survival_content = Some(value("--survival-content")?.into()),
+            "--survival-realm" => survival_realm = value("--survival-realm")?,
             "--board" => config.board = Some(value("--board")?).filter(|b| !b.is_empty()),
             "--board-name" => config.board_name = value("--board-name")?,
             "--help" | "-h" => {
@@ -140,7 +144,7 @@ fn main() -> Result<()> {
         };
         config.survival = Some(htl_server::SurvivalSetup {
             world_port: survival_port,
-            realm_name: htl_server::SURVIVAL_REALM.into(),
+            realm_name: survival_realm.clone(),
             save: Some(survival_save),
             content,
             land: Box::new(htl_server::survival::land::ElwynnLand::new(loaded)),
@@ -149,6 +153,7 @@ fn main() -> Result<()> {
         });
     }
     let password = config.password.clone();
+    let basin_realm = config.realm_name.clone();
     let public = config.public_host.clone();
     let running = htl_server::start_games(config, basin)?;
     // The games running, each to save before a warned restart.
@@ -156,15 +161,15 @@ fn main() -> Result<()> {
     println!();
     match (basin_on, running.survival) {
         (true, Some(sv)) => {
-            println!("Basin Battle and Elwynn Survival are running.");
-            println!("  Login server: port {}   Basin Battle: port {}   Elwynn Survival: port {}", running.login.port(), running.world.port(), sv.port());
+            println!("{basin_realm} and {survival_realm} are running.");
+            println!("  Login server: port {}   {basin_realm}: port {}   {survival_realm}: port {}", running.login.port(), running.world.port(), sv.port());
         }
         (true, None) => {
-            println!("Basin Battle is running.");
+            println!("{basin_realm} is running.");
             println!("  Login server: port {}   World server: port {}", running.login.port(), running.world.port());
         }
         (false, _) => {
-            println!("Elwynn Survival is running.");
+            println!("{survival_realm} is running.");
             println!("  Login server: port {}   World server: port {}", running.login.port(), running.world.port());
         }
     }
@@ -173,7 +178,8 @@ fn main() -> Result<()> {
         Some(host) => println!("  Friends on the internet connect to: {host}"),
         None => println!("  Friends outside your network: start with --public-host <your address>"),
     }
-    println!("Press Ctrl+C to stop, or double-click Restart Basin Battle to restart with a warning.");
+    println!("Press Ctrl+C to stop. To restart with a warning to everyone: Restart Basin Battle.command,");
+    println!("or the minutes written in {} in this folder.", htl_server::restart::REQUEST_FILE);
     // A warned restart: asked for by a file in this folder; once every game has warned its
     // players and saved, out with the code that has the host script start it again.
     let here = std::env::current_dir().unwrap_or_default();

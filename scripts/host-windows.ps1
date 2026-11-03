@@ -14,7 +14,18 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
-$Host.UI.RawUI.WindowTitle = "Basin Battle server (close this window to stop it)"
+# The names players see, from project.toml (the one place they live; see that file).
+function ProjectName($key, $default) {
+    $file = Join-Path $Root "project.toml"
+    if (Test-Path $file) {
+        foreach ($line in Get-Content $file) {
+            if ($line -match ('^\s*' + $key + '\s*=\s*"([^"]*)"') -and $Matches[1]) { return $Matches[1] }
+        }
+    }
+    return $default
+}
+$Title = ProjectName "title" "Basin Battle"
+$Host.UI.RawUI.WindowTitle = "$Title server (close this window to stop it)"
 $Settings = Join-Path $Root "settings-windows.txt"
 
 function Say($text) { Write-Host $text -ForegroundColor Cyan }
@@ -44,14 +55,14 @@ if (-not $data) {
         $dialog.Description = "Pick your World of Warcraft 1.12.1 folder (the one that contains the Data folder)"
         $dialog.ShowNewFolderButton = $false
         if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
-            Say "No folder picked. Run Host Basin Battle again when you're ready."
+            Say "No folder picked. Run Host $Title again when you're ready."
             exit 1
         }
         $data = DataFolderOf $dialog.SelectedPath
         if (-not $data) {
             [System.Windows.Forms.MessageBox]::Show(
                 "That folder has no Data\dbc.MPQ in it, so it isn't a WoW 1.12.1 install. Pick the folder that has WoW.exe in it.",
-                "Basin Battle") | Out-Null
+                $Title) | Out-Null
         }
     }
     Set-Content -Path $Settings -Value $data
@@ -65,7 +76,8 @@ if ($LASTEXITCODE -ne 0) { throw "The server didn't build (exit $LASTEXITCODE): 
 $exe = Join-Path $Root "target\release\htl-server.exe"
 
 # --- addresses -----------------------------------------------------------------------------------
-$serverArgs = @("--data", $data, "--content", "content/game.toml", "--saves", "saves/basin-battle.toml",
+$serverArgs = @("--realm", (ProjectName "basin" "Basin Battle"), "--survival-realm", (ProjectName "survival" "Elwynn Survival"),
+    "--data", $data, "--content", "content/game.toml", "--saves", "saves/basin-battle.toml",
     "--survival-content", "content/survival.toml", "--survival-save", "saves/elwynn-survival.toml")
 if (-not ($args -contains "--public-host")) {
     $public = $env:HTL_PUBLIC_HOST

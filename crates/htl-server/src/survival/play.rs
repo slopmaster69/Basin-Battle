@@ -307,12 +307,20 @@ impl SurvivalGame {
                 }
                 self.broadcast(&go);
             }
-            Event::MissileFrom { anchor, caster: _, spell, from, target } => {
+            Event::MissileFrom { anchor, caster, spell, from, target } => {
                 // A missile from a spot (a boomerang turning back, an arrow called home). The
                 // client flies a missile only from a unit (a game object's cast has no caster
                 // unit, and it draws nothing), so an unseen creature stands there and flies it, a
                 // tick after it's made (`step_stand_ins`), until the rules say it's gone.
                 let (aim, hits) = match target {
+                    // Coming home to whoever threw it: aimed at them, but not naming them struck.
+                    // The client plays a spell's impact on everyone it names struck, and the Axe
+                    // Throw's impact knocked its own warrior down as he caught it (the visual
+                    // check, Nov 2).
+                    Target::Unit(t) if t == caster => match self.guid_of(t) {
+                        Some(g) => (Aim::Unit(g), Vec::new()),
+                        None => return,
+                    },
                     Target::Unit(t) => match self.guid_of(t) {
                         Some(g) => (Aim::Unit(g), vec![g]),
                         None => return,

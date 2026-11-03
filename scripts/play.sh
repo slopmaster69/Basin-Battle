@@ -2,7 +2,8 @@
 # Play: starts the benilla client pointed at a Basin Battle server.
 #   scripts/play.sh                 the game hosted on this computer
 #   scripts/play.sh 192.168.1.20    a friend's game
-#   scripts/play-survival.sh [...]  the same, into Elwynn Survival (HTL_REALM picks the realm)
+#   scripts/play-survival.sh [...]  the same, into Elwynn Survival (HTL_GAME=survival picks it;
+#                                   HTL_REALM names a realm outright)
 # Log in with any name and the host's password (default: hold), then pick a class.
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
@@ -25,4 +26,6 @@ cp -R "$ROOT/addon/BasinBattle" "$ROOT/addon/ElwynnSurvival" benilla/benilla-con
 # The client's memory of item and creature details: cleared so it always asks this server afresh.
 rm -rf benilla/benilla-config/cache
 cd benilla
-WOW_DATA="$WOW_DATA" WOW_HOST="$host" WOW_REALM="${HTL_REALM:-Basin Battle}" exec target/release/benilla
+# The realm to enter, by the name project.toml gives its game.
+if [ "${HTL_GAME:-basin}" = "survival" ]; then realm="$(project_name survival "Elwynn Survival")"; else realm="$(project_name basin "Basin Battle")"; fi
+WOW_DATA="$WOW_DATA" WOW_HOST="$host" WOW_REALM="${HTL_REALM:-$realm}" exec target/release/benilla
