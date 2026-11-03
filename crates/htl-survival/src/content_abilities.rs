@@ -463,6 +463,69 @@ pub struct AbilityDef {
     /// Skyfall's leap.
     #[serde(default)]
     pub at_once: bool,
+    /// The Warlord's (the Warrior's second choices).
+    /// A dash that carries the first body it meets to the end of its rush and Crashes it into
+    /// what's there (Tackle): a wall, another body, or nothing (dropped for its `damage`).
+    #[serde(default)]
+    pub crash: Option<CrashDef>,
+    /// An `ally` that rushes to the friend it picks (up to its `range`) and takes the first blow
+    /// meant for them within this many seconds (Intervene).
+    #[serde(default)]
+    pub intervene: f32,
+    /// A nova's friends in it (the caster too): this much stamina back, these boons, and this
+    /// spell's look on each of them (Rallying Cry, Battle Cry).
+    #[serde(default)]
+    pub ally_stamina: f32,
+    #[serde(default)]
+    pub ally_effects: Vec<AbilityEffect>,
+    #[serde(default)]
+    pub ally_spell: u32,
+    /// A beam all round the caster, `radius` out, not a strip along the aim (Bladestorm's spin);
+    /// it walks at [`AROUND_PACE`] of a run.
+    #[serde(default)]
+    pub around: bool,
+    /// A beam whose every strike after the first deals this much more, up to `ramp_cap` a strike
+    /// (Bladestorm's ramp).
+    #[serde(default)]
+    pub ramp: f32,
+    #[serde(default)]
+    pub ramp_cap: f32,
+    /// A channel the guard ends at once, raising the guard on that press (a dodge ends any
+    /// channel and comes out on its press already): Bladestorm.
+    #[serde(default)]
+    pub bail: bool,
+    /// Against an opened enemy (staggered, knocked down, stunned, or a boss stance-broken) it
+    /// deals this many times its damage instead (Cleave's 250%: `weapon = 1.0`, `opened = 2.5`).
+    #[serde(default)]
+    pub opened: f32,
+    /// A recast that tears the lingering ground its first cast left (Ravager's axe) out and back
+    /// to the caster: every enemy on the way, `radius` either side, takes its `damage`, and the
+    /// ground ends.
+    #[serde(default)]
+    pub tears_back: bool,
+    /// A projectile that flies level along the aim's line at hand height, as a returning axe does
+    /// (Heroic Throw's spear through a line of enemies), not up or down to the reticle's point.
+    #[serde(default)]
+    pub skims: bool,
+}
+
+/// An around beam (Bladestorm) walks at this share of a run.
+pub const AROUND_PACE: f32 = 0.7;
+
+/// Tackle's Crash: what the carried body takes where the rush ends. Into a wall, a tree or a
+/// rock: `wall_damage` and stunned `wall_stun` (a hero's shortened as any stun's). Into another
+/// enemy: both take `foe_damage` and are knocked down `knockdown`. A boss (anything that won't
+/// move) in the way: the rush stops against it for `posture`; a body carried into one gives it
+/// `boss_posture`. A hero is carried at most `hero_carry` yd.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct CrashDef {
+    pub wall_damage: f32,
+    pub wall_stun: f32,
+    pub foe_damage: f32,
+    pub knockdown: f32,
+    pub posture: u32,
+    pub boss_posture: u32,
+    pub hero_carry: f32,
 }
 
 fn first_choice() -> u32 {
@@ -624,15 +687,22 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// go; their next blow counts as from behind) until they strike or cast; `cheat_death` keeps a hero
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
-pub const OTHER_EFFECTS: [&str; 20] =
-    ["knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
+///
+/// The Warlord's: `battle_cry` (heavy attacks build `amount` more posture, and their staggers last
+/// `amount` longer), `guarded` (the first blow meant for them strikes the one who gave it instead:
+/// Intervene), `slow_attacks` (a creature's attacks wind up `amount` slower; a boss's half that),
+/// `taunt` (a creature attacks only the one who taunted it; a taunted hero deals `amount` less
+/// damage to anyone else).
+pub const OTHER_EFFECTS: [&str; 24] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "battle_cry", "guarded", "slow_attacks", "taunt",
+];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 11] = ["freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death"];
+pub const BOONS: [&str; 13] = ["freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death", "battle_cry", "guarded"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 12] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder"];
+pub const HARMFUL: [&str; 14] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "slow_attacks", "taunt"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius

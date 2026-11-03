@@ -474,7 +474,7 @@ impl Survival {
 
     /// The bodies a line can meet: (unit, feet, height, width), not `skip`'s (and heroes only with
     /// friendly fire on).
-    fn bodies(&self, skip: Id) -> Vec<(Id, Vec3, f32, f32)> {
+    pub(crate) fn bodies(&self, skip: Id) -> Vec<(Id, Vec3, f32, f32)> {
         self.bodies_with(skip, false)
     }
 
@@ -962,6 +962,11 @@ impl Survival {
                 self.nova(id, ability, at, share);
                 self.set_action(id, next);
             }
+            // Ravager's recall: the axe torn back to the hero.
+            "line" if d.tears_back => {
+                self.tear_back(id, ability, share);
+                self.set_action(id, next);
+            }
             "line" => {
                 if !self.start_line(id, ability, yaw, share) {
                     self.set_action(id, next);
@@ -983,10 +988,12 @@ impl Survival {
             }
             "channel" => self.start_channel(id, ability, share),
             "beam" => self.start_beam(id, ability, share),
+            "ally" if d.intervene > 0.0 => self.intervene(id, ability, share),
             "ally" => {
                 self.ally(id, ability, share);
                 self.set_action(id, next);
             }
+            "dash" if d.crash.is_some() => self.start_tackle(id, ability, yaw, share),
             "dash" => self.start_dash(id, ability, yaw, share),
             "blink" if d.anchor > 0.0 => {
                 self.return_to_anchor(id, ability);
@@ -1042,7 +1049,7 @@ impl Survival {
         // A thrown axe that comes back skims the ground along the aim's line, at hand height over
         // where its range ends (up a hill, down one): aimed at the ground it would bury itself a
         // few yards out and turn there.
-        let base = if d.returns {
+        let base = if d.returns || d.skims {
             let flat = norm([base[0], base[1], 0.0]);
             let far = [from[0] + flat[0] * range, from[1] + flat[1] * range];
             let floor = self.ground_near(far[0], far[1], from[2]);
@@ -1655,7 +1662,9 @@ impl Survival {
         let d = &self.content.abilities[ability];
         let might = self.players.get(&owner).map_or(1.0, |p| 1.0 + self.effect_of(p, "might"));
         let execute = d.execute;
-        let mut dmg = base * might * self.weakened(owner);
+        // Cleave on an opened enemy: its bigger share, in place of a riposte's.
+        let opened = d.opened > 0.0 && self.opened(victim);
+        let mut dmg = base * might * self.weakened(owner) * if opened { d.opened } else { 1.0 };
         let shatter = d.shatter;
         let mark_crit = d.mark_crit;
         let mark = self.take_mark(victim);
@@ -1670,8 +1679,13 @@ impl Survival {
             self.cleanse(victim, &["petrify"]);
             self.events.push(Event::Flash { player: owner, text: "Shatter!".into() });
         }
+        if opened {
+            self.events.push(Event::Visual { id: victim, kit: combat::KIT_RIPOSTE, by: Some(owner) });
+        }
         // A foe reeling from a parry takes it as a riposte.
-        dmg = if self.players.contains_key(&victim) {
+        dmg = if opened {
+            dmg
+        } else if self.players.contains_key(&victim) {
             self.hero_riposted(victim, dmg.round() as u32) as f32
         } else {
             self.riposted(victim, dmg.round() as u32) as f32
@@ -1805,6 +1819,7 @@ impl Survival {
             "cleanse_panic" => self.cleanse(victim, &["panic"]),
             "knockback" | "pull" => self.displace(owner, victim, e),
             "knockdown" => self.knock_down(owner, victim, secs, source),
+            "slow_attacks" | "taunt" => self.warlord_effect(owner, victim, e, secs, source),
             "burn" | "mark" => {
                 self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
             }
@@ -2028,7 +2043,8 @@ impl Survival {
         if let (Some(m), true) = (mark, spell != 0) {
             self.events.push(Event::AreaLook { id: m, caster: owner, spell, pos: at, radius });
         }
-        self.burnings.push(Burning { owner, ability, at, radius, dps: d.linger_damage, until: now + d.linger, next: now + 1.0, mark });
+        let every = if d.kind == "ground" && d.tick > 0.0 { d.tick } else { 1.0 };
+        self.burnings.push(Burning { owner, ability, at, radius, dps: d.linger_damage, until: now + d.linger, next: now + every, mark });
     }
 
     fn ground_cast(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
@@ -2098,13 +2114,17 @@ impl Survival {
             if self.burnings[k].next > now {
                 continue;
             }
-            self.burnings[k].next += 1.0;
+            // Every second, or every `tick` of ground that names one (Ravager's half second), at its
+            // share of the damage a second.
+            let d = &self.content.abilities[self.burnings[k].ability];
+            let every = if d.kind == "ground" && d.tick > 0.0 { d.tick } else { 1.0 };
+            self.burnings[k].next += every;
             let b = self.burnings[k].clone();
             let tick = self.content.abilities[b.ability].tick_spell;
             if tick != 0 {
                 self.events.push(Event::Missile { caster: b.owner, spell: tick, target: Target::Point(b.at) });
             }
-            self.area_tick(b.owner, b.ability, b.at, b.radius, b.dps);
+            self.area_tick(b.owner, b.ability, b.at, b.radius, b.dps * every);
         }
     }
 
@@ -2133,6 +2153,8 @@ impl Survival {
                 self.heal_hero_by(f, amount, owner, &name);
             }
         }
+        // Rallying Cry, Battle Cry: friends in it get stamina and boons.
+        self.shout_to_friends(owner, ability, at, radius);
         let inside = |pos: Vec3, size: f32| -> bool {
             if let Shape::Line(f, len, half) = shape {
                 return combat::in_strip(at, f, len, half + size, pos);
@@ -2277,8 +2299,11 @@ impl Survival {
     pub(crate) fn nova(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
         let d = self.content.abilities[ability].clone();
         let radius = AbilityDef::at(d.radius, share);
-        // At the spot, not at the caster (see `cone_at`).
-        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
+        // At the spot, not at the caster (see `cone_at`). A shout's look is on each friend it
+        // reaches instead (`ally_spell`).
+        if d.spell != 0 {
+            self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
+        }
         let damage = AbilityDef::at(d.damage, share);
         self.area(id, ability, at, radius, share, damage, None);
         if self.debug {
@@ -2463,7 +2488,10 @@ impl Survival {
     pub(crate) fn step_beam(&mut self, id: Id) {
         let now = self.clock;
         let Some(Action::Channel { ability, target, until, next, share }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
-        if now >= until || self.silenced(id) {
+        let d = self.content.abilities[ability].clone();
+        // A ramping spin (Bladestorm) strikes its last strike as its time ends.
+        let last_due = d.ramp > 0.0 && next <= until + 1.0e-3 && now >= next;
+        if (now >= until && !last_due) || self.silenced(id) {
             self.end_ability_action(id);
             self.set_action(id, Action::Ready);
             return;
@@ -2471,7 +2499,6 @@ impl Survival {
         if now < next {
             return;
         }
-        let d = self.content.abilities[ability].clone();
         let tick = d.tick.max(0.2);
         if let Some(p) = self.players.get_mut(&id) {
             p.action = Action::Channel { ability, target, until, next: next + tick, share };
@@ -2482,6 +2509,9 @@ impl Survival {
         let half = AbilityDef::at(d.radius, share);
         let (c, s) = (yaw.cos(), yaw.sin());
         let along = |at: Vec3| (at[0] - pos[0]) * c + (at[1] - pos[1]) * s;
+        // A strip along the aim, or (Bladestorm) a ring round the caster.
+        let around = d.around;
+        let in_beam = |at: Vec3, size: f32| if around { dist2d(at, pos) <= half + size && (at[2] - pos[2]).abs() < 4.0 } else { combat::in_strip(pos, yaw, len, half + size, at) };
         // A hero it can help is a friend in it (a healing beam heals a co-op hero, friendly fire
         // or not, and doesn't burn them); one it can't, if friendly fire lets it, a foe.
         let friend = |h: Id| self.helpable(id, h) && (d.heals() || !self.hostile(id, h));
@@ -2489,12 +2519,12 @@ impl Survival {
         let mut foes: Vec<(Id, f32)> = self
             .mobs
             .iter()
-            .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && combat::in_strip(pos, yaw, len, half + 0.5 * self.content.mobs[m.def].scale, m.pos))
+            .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && in_beam(m.pos, 0.5 * self.content.mobs[m.def].scale))
             .map(|(mid, m)| (*mid, along(m.pos)))
-            .chain(self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.hostile(id, **h) && !friend(**h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, p)| (*h, along(p.pos))))
+            .chain(self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.hostile(id, **h) && !friend(**h) && in_beam(p.pos, HERO_SIZE)).map(|(h, p)| (*h, along(p.pos))))
             .collect();
         foes.sort_by(|a, b| a.1.total_cmp(&b.1));
-        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && friend(**h) && combat::in_strip(pos, yaw, len, half + HERO_SIZE, p.pos)).map(|(h, _)| *h).collect();
+        let friends: Vec<Id> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && friend(**h) && in_beam(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect();
         // Its look: to the first foe in it, else to its far end.
         if d.tick_spell != 0 {
             let to = match foes.first() {
@@ -2503,7 +2533,20 @@ impl Survival {
             };
             self.events.push(Event::Missile { caster: id, spell: d.tick_spell, target: to });
         }
-        let per = AbilityDef::at(d.damage, share) * tick;
+        let mut per = AbilityDef::at(d.damage, share) * tick;
+        // A ramp (Bladestorm): each strike after the first harder, up to its cap; a flare on the
+        // caster as it tops out.
+        if d.ramp > 0.0 {
+            let strikes = ((next - (until - d.secs)) / tick).round().max(1.0) - 1.0;
+            let before = (per + d.ramp * (strikes - 1.0).max(0.0)).min(d.ramp_cap);
+            per = (per + d.ramp * strikes).min(d.ramp_cap);
+            if strikes > 0.0 && before < d.ramp_cap && per >= d.ramp_cap {
+                let kit = self.full_kit(ability);
+                if kit != 0 {
+                    self.events.push(Event::Visual { id, kit, by: None });
+                }
+            }
+        }
         if per > 0.0 || !d.effects.is_empty() {
             for (f, _) in foes {
                 if self.alive(f) {
@@ -2572,6 +2615,11 @@ impl Survival {
     pub(crate) fn end_dash(&mut self, id: Id) {
         let Some(Action::Dash { ability, target, share, secs, .. }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
         self.set_action(id, Action::Ready);
+        // A Tackle: its Crash lands.
+        if self.warlord.tackles.contains_key(&id) {
+            self.tackle_lands(id);
+            return;
+        }
         self.dash_through(id, ability, share, secs + 1.0);
         let Some(v) = target.filter(|v| self.alive(*v)) else { return };
         let from = self.players[&id].pos;

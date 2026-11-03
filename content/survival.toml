@@ -4655,6 +4655,49 @@ speed = 50.0
 spell = 19434
 clip = 53
 
+# ------------------------------------------------------------------------- Warrior, the Warlord --
+# The Warrior's second choice on every key (`choice = 2`): the Warlord gives up the Juggernaut's
+# block to drive the group. Its one body slam is Tackle; its cash-in is Cleave, on an opened enemy
+# (staggered, knocked down, stunned, or a boss stance-broken). An EX shares its key's cooldown.
+# First numbers for tuning (Corey's blueprint, Nov 2). None of it seen in the client yet.
+
+# 1: the Warrior's one body slam (Beta's Wall Slam retires into it). The rush is short, so the
+# skill is the angle: the wall, the tree or the second enemy behind your target.
+[[ability]]
+key = "tackle"
+name = "Tackle"
+text = "Lowers your shoulder and rushes 8 yd along your aim. The first enemy you meet is carried to the end of the rush. If you drive it into a wall, tree or rock, it Crashes for 20 damage and is stunned for 1.5 sec (0.75 sec against heroes). If you drive it into another enemy, both Crash for 14 damage and are knocked down for 1 sec. Otherwise it is dropped at your feet for 10 damage. An enemy that can't be moved stops the rush. Heroes are carried at most 4 yd. You cannot be staggered during the rush. Costs 12 stamina."
+icon = "Ability_Warrior_PunishingBlow"
+school = "warrior"
+slot = "utility"
+choice = 2
+kind = "dash"
+range = [8.0, 8.0]
+damage = [10.0, 10.0]
+stamina = 12.0
+cooldown = 12.0
+# Charge's rush trail; the Crash is the dust and the heavy flash on the one crashed.
+spell = 100
+valor_hit = 6.0
+self_effects = [{ kind = "steadfast", secs = [0.4, 0.4], amount = 1.0 }]
+crash = { wall_damage = 20.0, wall_stun = 1.5, foe_damage = 14.0, knockdown = 1.0, posture = 35, boss_posture = 20, hero_carry = 4.0 }
+
+# 1's EX: the same moment (close the gap now), the other answer: toward a friend.
+[[ability]]
+key = "intervene"
+name = "Intervene"
+ex_of = "tackle"
+text = "Rushes up to 25 yd to the ally nearest your reticle. For 3 sec, the first blow aimed at them strikes you instead. If your guard is up when it lands, your guard takes it."
+icon = "Ability_Warrior_DefensiveStance"
+slot = "utility"
+kind = "ally"
+valor = 25
+range = [25.0, 25.0]
+intervene = 3.0
+spell = 100
+# Blessing of Sacrifice's gold on the friend while it holds.
+aura = 6940
+
 # ------------------------------------------------------------------------------------ Rogue --
 
 # A shotgun, not a sniper: point blank all three knives land, at range one does.
@@ -10133,7 +10176,7 @@ trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 key = "relic_warrior"
 name = "A Veteran's Kit"
 at = [-9888.0, 220.0]
-teaches = ["charge", "retaliation"]
+teaches = ["charge", "retaliation", "tackle"]
 loot = { bronze = 1, leather = 1 }
 display = 259
 secret = 7.0

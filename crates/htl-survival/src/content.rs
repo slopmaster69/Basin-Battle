@@ -3169,7 +3169,7 @@ impl Content {
             if a.kind == "ally" && !a.foe_damage && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
                 bail!("{what}: an ally ability helps whoever it lands on: no `damage` (unless `foe_damage`: a foe on the line takes it)");
             }
-            if a.kind == "beam" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0 || a.secs <= 0.0) {
+            if a.kind == "beam" && ((a.range[1] <= 0.0 && !a.around) || a.radius[1] <= 0.0 || a.secs <= 0.0) {
                 bail!("{what}: a beam needs its length (`range`), half-width (`radius`) and how long it's held (`secs`)");
             }
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
@@ -3221,6 +3221,31 @@ impl Content {
             if !(1..=2).contains(&a.choice) {
                 bail!("{what}: choice {} (1 or 2: a class has two a row)", a.choice);
             }
+            // The Warlord's mechanics.
+            if a.crash.is_some() && a.kind != "dash" {
+                bail!("{what}: only a dash carries a body to Crash it (`crash`)");
+            }
+            if a.intervene > 0.0 && a.kind != "ally" {
+                bail!("{what}: only an ally ability rushes to a friend to take a blow (`intervene`)");
+            }
+            if (a.ally_stamina > 0.0 || !a.ally_effects.is_empty()) && a.kind != "nova" {
+                bail!("{what}: only a nova gives friends stamina or boons (`ally_stamina`, `ally_effects`)");
+            }
+            if a.ally_effects.iter().any(|e| !BOONS.contains(&e.kind.as_str())) {
+                bail!("{what}: `ally_effects` are boons (one of {BOONS:?})");
+            }
+            if (a.around || a.ramp > 0.0) && a.kind != "beam" {
+                bail!("{what}: only a beam spins round the caster (`around`) or ramps (`ramp`)");
+            }
+            if a.ramp > 0.0 && a.ramp_cap <= 0.0 {
+                bail!("{what}: a ramp needs its most a strike (`ramp_cap`)");
+            }
+            if a.bail && a.kind != "beam" {
+                bail!("{what}: only a beam is ended into a guard (`bail`)");
+            }
+            if a.tears_back && (a.kind != "line" || !a.inner) {
+                bail!("{what}: only an inner strip (a recast) tears ground back (`tears_back`)");
+            }
             if a.bounces > 0 && a.kind != "projectile" {
                 bail!("{what}: only a projectile ricochets (`bounces`)");
             }
@@ -3270,7 +3295,7 @@ impl Content {
                     bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
                 }
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects) {
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {
