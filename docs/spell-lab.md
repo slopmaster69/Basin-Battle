@@ -13,8 +13,9 @@ what it sent, side by side on one sheet.
    the hero on to the scene's middle body, so the body and the camera face it. Don't turn the
    camera yourself: in Elwynn Survival the body turns with it, and the blows go wide.
 2. Type `.es lab <ability>`. It sets out the scene in front of you, puts the ability on its key
-   (cooldowns off, full Valor and health), starts a burst of screenshots and presses the key for
-   you a quarter-second later. Hold still until it says "Lab done".
+   (cooldowns off, full Valor and health), lets the scene stand a moment and settle (a body just
+   set out fades in), then starts a burst of screenshots and presses the key for you a
+   quarter-second later. Hold still until it says "Lab done".
 3. Copy the run's screenshots (`benilla-config\Screenshots`, the newest ones) and its trace
    (`logs/lab/<ability>-<scene>-<time>.txt`, where you host) into one place, and make the sheet:
 
