@@ -682,13 +682,63 @@ impl Survival {
         }
         if d.aimed() {
             self.set_action(id, Action::Aim { ability });
-            if d.kind == "shot" {
+            if d.kind == "shot" || d.bow {
                 self.set_kit(id, Kit::Bow);
             }
+            // A bow ability with nothing to charge: drawn as it's aimed, loosed on the click.
+            if self.bow_drawn(id) {
+                self.draw_bow(id);
+            }
         } else {
+            if d.bow {
+                self.set_kit(id, Kit::Bow);
+            }
             self.fire(id, ability, 1.0);
         }
         true
+    }
+
+    /// The bow's draw is out for what's in hand: a shot's or a bow ability's charge, or a bow
+    /// ability with nothing to charge while it's aimed (Skyfall's volley from its hang too).
+    pub(crate) fn bow_drawn(&self, id: Id) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        match p.action {
+            Action::Charge { ability, .. } => {
+                let d = &self.content.abilities[ability];
+                d.kind == "shot" || d.bow
+            }
+            Action::Aim { ability } => self.content.abilities[ability].bow && self.charge_of(id, ability).1 <= 0.0,
+            _ => false,
+        }
+    }
+
+    /// The bow stays in the hands: aiming, drawing or loosing a shot or a bow ability, a bow
+    /// ability's leap (Skyfall's) and its hang, and a release still playing out while they stand.
+    pub(crate) fn bow_in_hand(&self, id: Id) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        let bow = |a: usize| {
+            let d = &self.content.abilities[a];
+            d.kind == "shot" || d.bow
+        };
+        match p.action {
+            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Dash { ability, .. } => bow(ability),
+            Action::Ready => p.bow_until > self.clock || self.hanging(id),
+            _ => self.hanging(id),
+        }
+    }
+
+    /// The bow drawn as the base game draws it: the bow's own shot begun (the client pulls the
+    /// string, LoadBow, and holds it, HoldBow), held until it looses or is let down.
+    pub(crate) fn draw_bow(&mut self, id: Id) {
+        let Some(p) = self.players.get(&id) else { return };
+        let spell = self.ranged_of(p).spell;
+        if spell == 0 {
+            return;
+        }
+        self.events.push(Event::Cast { caster: id, spell, ms: DRAW_HOLD_MS });
+        if let Some(p) = self.players.get_mut(&id) {
+            p.draw_shown = true;
+        }
     }
 
     /// What an ability costs in Valor (an ultimate: the whole bar).
@@ -726,9 +776,11 @@ impl Survival {
         }
         let d = self.content.abilities[ability].clone();
         self.set_action(id, Action::Charge { ability, since: now });
-        let spell = if d.kind == "shot" { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
-        if spell != 0 {
-            let ms = if d.kind == "shot" { DRAW_HOLD_MS } else { ((hi + d.hold.max(0.5)) * 1000.0) as u32 };
+        let spell = if d.kind == "shot" || d.bow { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
+        if spell != 0 && (d.kind == "shot" || d.bow) {
+            self.draw_bow(id);
+        } else if spell != 0 {
+            let ms = ((hi + d.hold.max(0.5)) * 1000.0) as u32;
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
             self.events.push(Event::Clip { id, clip: HOLD_THROWN, secs: hi + d.hold.max(0.5) });
@@ -791,6 +843,10 @@ impl Survival {
                 if d.charge_spell == 0 && d.clip == THROW_CLIP && d.kind != "shot" {
                     self.events.push(Event::ClipStop { id });
                 }
+            }
+            // A bow ability drawn as it's aimed: the draw let down.
+            Action::Aim { ability } if self.content.abilities[ability].bow => {
+                self.events.push(Event::CastEnd { caster: id });
             }
             Action::Channel { .. } => {
                 self.events.push(Event::CastEnd { caster: id });
@@ -870,6 +926,19 @@ impl Survival {
         if matches!(self.players[&id].action, Action::Charge { .. }) {
             self.events.push(Event::CastDone { caster: id, spell: 0 });
         }
+        // A bow ability's arrow: the bow's own release (its draw let go, or drawn and loosed at
+        // once), the bow in hand till it's played out. (A leap with the bow looses nothing.)
+        if d.bow && d.kind != "leap" {
+            let p = &self.players[&id];
+            let spell = self.ranged_of(p).spell;
+            let look = self.bow_look(p);
+            let release = self.content.ranged(&self.content.items[look].key).map_or(CAST_RECOVERY, |r| r.recovery).max(CAST_RECOVERY);
+            self.events.push(Event::Loose { caster: id, spell });
+            if let Some(p) = self.players.get_mut(&id) {
+                p.bow_until = now + release;
+                p.draw_shown = false;
+            }
+        }
         if d.counter.is_none() && !matches!(free, Some(Free::Recast { .. })) {
             self.spend_charge(id, ability, 1.0);
         }
@@ -877,7 +946,8 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = yaw;
         }
-        if d.clip != 0 && d.kind != "art" {
+        // (A bow ability's look is the bow's own draw and release, not a clip.)
+        if d.clip != 0 && d.kind != "art" && !d.bow {
             // A stance holds its clip while it lasts (Feign Death lies there).
             let secs = if d.kind == "stance" { d.secs } else { CAST_RECOVERY + 0.2 };
             self.events.push(Event::Clip { id, clip: d.clip, secs });
@@ -967,7 +1037,7 @@ impl Survival {
             // Skyfall: up, and a slow fall to aim from.
             "leap" if d.hunt == "float" => {
                 self.start_leap(id, ability, share);
-                self.skyfall_float(id);
+                self.skyfall_float(id, ability);
             }
             "leap" => match free {
                 // A leap back to where the cast before it began.

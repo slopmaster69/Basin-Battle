@@ -132,8 +132,8 @@ impl Survival {
         }
         // A boon (Onslaught, holy ground's) helps: the rules that soften what harms don't touch it.
         let boon = crate::content::BOONS.contains(&kind);
-        // Nothing reaches someone in Ice Block.
-        if self.immune(target) && !boon {
+        // Nothing reaches someone in Ice Block, or up on Skyfall.
+        if (self.immune(target) || self.skyfall_aloft(target)) && !boon {
             return false;
         }
         // Freed (Blessing of Freedom): no root, slow or stun takes hold.
@@ -293,6 +293,8 @@ impl Survival {
         let now = self.clock;
         let still = self.held_still(id)
             || self.players.get(&id).is_some_and(|p| p.hold_until > now && p.health > 0)
+            // Skyfall's hang: held up there in the air.
+            || self.hanging(id)
             || self.players.get(&id).is_some_and(|p| matches!(&p.action, Action::Stance { ability, .. } if self.content.abilities[*ability].counter.as_ref().is_some_and(|c| c.immune)));
         let Some(p) = self.players.get_mut(&id) else { return };
         if p.rooted != still {

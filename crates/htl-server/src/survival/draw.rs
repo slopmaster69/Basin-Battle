@@ -469,7 +469,8 @@ impl SurvivalGame {
         let armor: Vec<(&str, usize)> = p.armor.iter().map(|(s, i)| (s.as_str(), *i)).collect();
         // A two-handed grip leaves no hand for the shield.
         let shield = Some(p.shield).filter(|_| !self.sim.weapon_of(p).two_handed);
-        worn_of(&armor, Some(p.weapon), shield, Some(p.bow))
+        // (A bow ability's bow in hand: the one it draws.)
+        worn_of(&armor, Some(p.weapon), shield, Some(self.sim.ranged_shown(p)))
     }
 
     /// What a hero out of the world wears, from its save: as `worn` would have it in the world

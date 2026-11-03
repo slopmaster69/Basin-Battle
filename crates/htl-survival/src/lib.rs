@@ -72,3 +72,5 @@ mod tests_camp;
 mod tests_building;
 #[cfg(test)]
 mod tests_raptor;
+#[cfg(test)]
+mod tests_hunter_bow;

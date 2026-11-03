@@ -4177,6 +4177,7 @@ text = "Hold to draw your bow for up to 1.4 sec, then release to fire. Damage, r
 icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
+bow = true
 kind = "projectile"
 charge = [0.0, 1.4]
 fragile = true
@@ -4202,6 +4203,7 @@ ex_of = "aimed_arrow"
 text = "Fires 5 arrows at once in a wide fan, with no draw. Each arrow deals 18 damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
 icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
+bow = true
 kind = "projectile"
 valor = 25
 damage = [18.0, 18.0]
@@ -4227,6 +4229,7 @@ text = "Fires an arrow that ricochets off walls and trees up to 2 times, and ski
 icon = "Ability_Hunter_SniperShot"
 school = "hunter"
 slot = "ranged"
+bow = true
 choice = 2
 kind = "projectile"
 damage = [16.0, 16.0]
@@ -4253,6 +4256,7 @@ ex_of = "bank_shot"
 text = "Fires a glowing arrow up to 36 yd. It bursts at the first enemy or wall it meets, or at the end of its flight, dealing 12 damage to the enemy it bursts in. 6 arrows spray out from the burst in a 60° fan, each dealing 5 damage to the first 2 enemies in its path. Every arrow plants where it stops."
 icon = "Ability_Hunter_Quickshot"
 slot = "ranged"
+bow = true
 kind = "projectile"
 valor = 25
 # Point blank, 12 and all 6 of the spray through one foe: 42, under what an EX of a 16 poke may be.
@@ -4450,6 +4454,7 @@ text = "Fires a grappling arrow up to 25 yd. If it strikes a wall, tree, rock or
 icon = "Ability_Hunter_Pathfinding"
 school = "hunter"
 slot = "utility"
+bow = true
 kind = "projectile"
 range = [25.0, 25.0]
 radius = [0.35, 0.35]
@@ -4466,6 +4471,7 @@ ex_of = "grapple_arrow"
 text = "Hooks an enemy and hauls it to you. It lands at your feet and staggers for 1 sec. A boss, or anything that can't be moved, hauls you to it instead."
 icon = "INV_Spear_04"
 slot = "utility"
+bow = true
 kind = "projectile"
 valor = 25
 damage = [8.0, 8.0]
@@ -4548,6 +4554,7 @@ text = "Fires an arrow that plants at the target spot, up to 20 yd away. Press a
 icon = "Spell_Nature_Web"
 school = "hunter"
 slot = "defense"
+bow = true
 kind = "ground"
 hunt = "tripwire"
 range = [20.0, 20.0]
@@ -4578,6 +4585,8 @@ range = [30.0, 30.0]
 radius = [0.5, 0.5]
 spell = 19434
 clip = 53
+# Drawn from the bow like the first arrow (#115), not cast over the melee weapon.
+bow = true
 
 [[ability]]
 key = "arrow_recall"
@@ -4654,6 +4663,7 @@ text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pie
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
+bow = true
 kind = "projectile"
 valor = 100
 charge = [1.0, 1.0]
@@ -4669,16 +4679,18 @@ cooldown = 40.0
 spell = 3044
 clip = 53
 
-# 3, the second choice: up above the fight, then rain on it. The leap's top is where the volley's
-# aimed from; the key again (within its window) lets it go at the reticle.
+# 3, the second choice: up above the fight, then rain on it. The leap tops out and hangs there
+# (5.5 s, in `sim/hunter.rs`), the bow drawn on the volley's circle; a click or the key again
+# looses it from the hero, and it looses by itself as the hang ends. Then a slow fall down.
 [[ability]]
 key = "skyfall"
 name = "Skyfall"
-text = "Leaps 15 yd straight up. While you're in the air, press again to rain a volley of 12 arrows on a 6 yd circle up to 30 yd away over 1 sec. You can't be hurt or crowd-controlled while airborne. The arrows plant."
+text = "Leaps straight up and hangs in the air for 5.5 sec with your bow drawn. Click or press again to loose a volley of 12 arrows on a 6 yd circle up to 30 yd away. If you wait, it looses at the reticle as the hang ends. Then you float down. You can't be hurt or crowd-controlled until you land. The arrows plant."
 icon = "Ability_Hunter_Pet_WindSerpent"
 school = "hunter"
 slot = "ultimate"
 choice = 2
+bow = true
 kind = "leap"
 at_once = true
 valor = 100
@@ -4689,7 +4701,8 @@ invulnerable = true
 cooldown = 40.0
 spell = 781
 recast = "skyfall_volley"
-recast_secs = 3.5
+# The rise and the whole hang (0.8 + 5.5 + 0.5 s): its key shows the volley till it goes.
+recast_secs = 7.0
 
 [[ability]]
 key = "skyfall_volley"
@@ -4698,7 +4711,9 @@ text = "Skyfall's volley: 12 arrows on a 6 yd circle over 1 sec, 14 damage each.
 icon = "Ability_Hunter_Pet_WindSerpent"
 inner = true
 slot = "ultimate"
-kind = "buff"
+bow = true
+# Aimed at the ground (its circle under the reticle) from the hang.
+kind = "ground"
 hunt = "volley"
 count = 12
 range = [30.0, 30.0]

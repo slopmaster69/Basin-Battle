@@ -2058,14 +2058,14 @@ local LOOK = {
   dead = { 0.5, 0.5, 0.5, "" },
 }
 -- The ones the bar shows (a cast, a channel and a stance by the ability's name).
-local BARRED = { eat = 1, gather = 1, craft = 1, build = 1, repair = 1, stagger = 1, cast = 1, channel = 1, stance = 1, charge = 1 }
+local BARRED = { eat = 1, gather = 1, craft = 1, build = 1, repair = 1, stagger = 1, cast = 1, channel = 1, stance = 1, charge = 1, aim = 1 }
 
 ES.action = { name = "ready", start = 0, total = 0, ability = "" }
 ES.h = nil
 
 -- The bar's word: the ability's name for a cast, a channel, a stance or a charge.
 local function ActionWord(a, look)
-  if a.ability and a.ability ~= "" and (a.name == "cast" or a.name == "channel" or a.name == "stance" or a.name == "charge") then
+  if a.ability and a.ability ~= "" and (a.name == "cast" or a.name == "channel" or a.name == "stance" or a.name == "charge" or a.name == "aim") then
     local d = ES.AbilityInfo and ES.AbilityInfo(a.ability)
     return (d and d.name) or a.ability
   end
@@ -2121,7 +2121,7 @@ act:SetScript("OnUpdate", function()
   elseif a.total > 0 then
     local share = (GetTime() - a.start) / a.total
     -- What drains: a stagger, a channel and a stance.
-    if a.name == "stagger" or a.name == "channel" or a.name == "stance" then
+    if a.name == "stagger" or a.name == "channel" or a.name == "stance" or a.name == "aim" then
       share = 1 - share
     end
     act.bar:Set(share)
@@ -6168,12 +6168,21 @@ local function Typing()
   return ChatFrameEditBox and ChatFrameEditBox:IsVisible()
 end
 
--- Walking with the bow drawn (Aimed Shot's charge): the server lets the legs walk, and the
--- upper body holds the draw (HoldBow) meanwhile, on the clients with an action layer.
+-- Walking with the bow drawn (Aimed Shot's charge, or a bow ability with nothing to charge,
+-- drawn as it's aimed): the server lets the legs walk, and the upper body holds the draw (HoldBow)
+-- meanwhile, on the clients with an action layer.
 local HOLD_BOW = 109
+function ES.BowDrawn()
+  local a = ES.action
+  if not a or ES.Kit() ~= "bow" then return false end
+  if a.name == "charge" then return true end
+  local d = a.name == "aim" and ES.AbilityInfo(a.ability)
+  return d and d.kind ~= "shot" and (d.hi <= 0 or d.isEx) and true or false
+end
+
 function ES.BowWalk()
   local want = false
-  if ActionLayer() and ActionMoveKeys and ES.action and ES.action.name == "charge" and ES.Kit() == "bow" then
+  if ActionLayer() and ActionMoveKeys and ES.BowDrawn() then
     local f, r = ActionMoveKeys()
     want = (f ~= 0 or r ~= 0)
   end
@@ -6186,12 +6195,25 @@ function ES.BowWalk()
   end
 end
 
+-- Skyfall's hang (an aim the server gives a length): it looses by itself as it runs out, along
+-- the reticle as it is then (the server looses it a moment later at the last line it heard).
+function ES.HangOut()
+  local a = ES.action
+  if a and a.name == "aim" and a.total > 0 and not a.loosed and GetTime() - a.start >= a.total then
+    a.loosed = true
+    local line = ES.AimLine()
+    Say(".es in a" .. line)
+    Say(".es in au" .. line)
+  end
+end
+
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function()
   if not ES.awake then return end
   ES.RunTimers()
   ES.Markers()
   ES.BowWalk()
+  ES.HangOut()
   ES.StepExHold()
   ES.StepLockHold()
   local typing = Typing()

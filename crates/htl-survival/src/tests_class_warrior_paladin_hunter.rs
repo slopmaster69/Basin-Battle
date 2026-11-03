@@ -1288,9 +1288,12 @@ fn skyfall_leaps_up_and_its_volley_rains_where_the_reticle_points_planting_its_a
     s.mobs.get_mut(&k).unwrap().health = 9999;
     s.set_valor(p, 100.0);
     let mut ev = press(&mut s, p, "skyfall", false);
-    ev.extend(run(&mut s, 0.6));
+    ev.extend(run(&mut s, 1.0));
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, lift, .. } if *player == p && *lift > 10.0)), "straight up");
-    s.set_aim_line(p, 0.0, down_to(15.0));
+    // Hanging at the top: the key again looses the volley, aimed down from up there.
+    assert_eq!(aiming(&s, p), Some(idx(&s, "skyfall_volley")), "hanging, aiming");
+    let up = s.players[&p].pos[2];
+    s.set_aim_line(p, 0.0, -(up + 1.9).atan2(15.0));
     let mut ev = press_again(&mut s, p, "ultimate");
     if aiming(&s, p).is_some() {
         s.set_aim_line(p, 0.0, down_to(15.0));

@@ -417,6 +417,8 @@ impl SurvivalGame {
             Action::Work { t, total, .. } => (*t, *total),
             Action::Stagger { until } => (0.0, (until - now).max(0.0)),
             Action::Dead { until } => (0.0, (until - now).max(0.0)),
+            // Skyfall's hang: aimed for as long as it lasts (the add-on looses it as it runs out).
+            Action::Aim { .. } => self.sim.hang_time(id).unwrap_or((0.0, 0.0)),
             _ => (0.0, 0.0),
         };
         // Started at: what tells one swing from the next.
