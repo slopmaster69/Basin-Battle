@@ -375,7 +375,13 @@ impl Survival {
                 match self.quick_item(p) {
                     Some(item) => {
                         self.set_action(id, Action::Eat { t: 0.0, item });
-                        self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (c.items[item].use_secs * 1000.0) as u32 });
+                        // Eating or drinking looks like it (its clip over the use, on everyone);
+                        // anything else, the Food spell's cast.
+                        let d = &c.items[item];
+                        match d.use_clip(&c.player) {
+                            0 => self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (d.use_secs * 1000.0) as u32 }),
+                            clip => self.events.push(Event::Clip { id, clip, secs: d.use_secs }),
+                        }
                         self.punish_healing(id);
                     }
                     None => self.tell(id, "Nothing to use. Cook raw meat at a Cooking Fire or brew at a cauldron."),
@@ -399,6 +405,15 @@ impl Survival {
         // stagger takes.
         if matches!(action, Action::Stagger { .. }) && self.unstaggerable(id) {
             return;
+        }
+        // A blow that staggers a hero mid-bite doesn't spoil a steady one (food): it's eaten all
+        // the same, its healing to come.
+        let bite = match self.players.get(&id).map(|p| &p.action) {
+            Some(Action::Eat { item, .. }) if matches!(action, Action::Stagger { .. }) && self.content.items[*item].steady => Some(*item),
+            _ => None,
+        };
+        if let Some(item) = bite {
+            self.eaten(id, item);
         }
         let Some(p) = self.players.get_mut(&id) else { return };
         let was_eating = matches!(p.action, Action::Eat { .. });
@@ -907,9 +922,9 @@ impl Survival {
                 self.events.push(Event::Stamina { player: id });
             }
         }
-        // Lasting effects: a salve's healing, and running out.
+        // Lasting effects: a salve's or a meal's healing (in a fight too), and running out.
         {
-            let regen = self.effect_of(&self.players[&id], "regen");
+            let regen = self.effect_of(&self.players[&id], "regen") + self.effect_of(&self.players[&id], MEAL);
             let p = self.players.get_mut(&id).unwrap();
             if regen > 0.0 && p.health > 0 && p.health < p.max_health {
                 p.heal_bank += p.max_health as f32 * regen * dt;
@@ -990,40 +1005,8 @@ impl Survival {
                 }
             }
             Action::Eat { t, item } => {
-                let d = &c.items[item];
-                if t + dt >= d.use_secs {
-                    // Eaten: the bite is taken from the bag only now.
-                    let p = self.players.get_mut(&id).unwrap();
-                    if let Some(n) = p.bag.get_mut(&item) {
-                        *n -= 1;
-                        if *n == 0 {
-                            p.bag.remove(&item);
-                        }
-                        let heal = (p.max_health as f32 * d.heal).round() as u32;
-                        p.health = (p.health + heal).min(p.max_health);
-                        let (h, m) = (p.health, p.max_health);
-                        // What it does for a while: a fresh one replaces the last of its kind.
-                        if let Some(e) = &d.effect {
-                            p.effects.retain(|x| x.kind != e.kind);
-                            let name = if e.name.is_empty() { d.name.clone() } else { e.name.clone() };
-                            p.effects.push(Effect { kind: e.kind.clone(), amount: e.amount, until: now + e.secs, name: name.clone() });
-                            self.events.push(Event::Effects { player: id });
-                            // Said plainly, so a slow effect isn't taken for nothing.
-                            let what = match e.kind.as_str() {
-                                "regen" => format!("{name} restores {:.0}% of your health over {:.0} sec.", e.amount * e.secs * 100.0, e.secs),
-                                "stamina" => format!("{name} increases stamina regeneration by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
-                                "might" => format!("{name} increases your damage by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
-                                "ward" => format!("{name} reduces damage taken by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
-                                "focus" => format!("{name} makes your abilities recover {:.0}% faster for {:.0} sec.", e.amount * 100.0, e.secs),
-                                _ => format!("{name} for {:.0} sec.", e.secs),
-                            };
-                            self.events.push(Event::Tell { player: id, text: what });
-                        }
-                        self.events.push(Event::Health { id, health: h, max: m });
-                        self.events.push(Event::Bags { player: id });
-                        self.events.push(Event::Dirty);
-                        self.events.push(Event::Missile { caster: id, spell: EAT_DONE_SPELL, target: Target::Unit(id) });
-                    }
+                if t + dt >= c.items[item].use_secs {
+                    self.eaten(id, item);
                     self.events.push(Event::CastEnd { caster: id });
                     self.players.get_mut(&id).unwrap().action = Action::Ready;
                     self.finish_commitment(id);
@@ -1082,7 +1065,8 @@ impl Survival {
             }
             Action::Ready | Action::Guard | Action::Aim { .. } | Action::Dead { .. } => {}
         }
-        // Health back: resting at the camp, or a trickle in the field after a while.
+        // Health back: resting at the camp, or anywhere (the field, below, Siege) a while after the
+        // last blow dealt or taken. Never in a fight: there, only gear, food and heals.
         let p = &self.players[&id];
         if p.health > 0 && p.health < p.max_health {
             let heart = c.world.heart;
@@ -1113,6 +1097,55 @@ impl Survival {
             // The floor itself, not where the feet were over it.
             self.players.get_mut(&id).unwrap().last_safe = [x, y, ground];
         }
+    }
+
+    /// A used item (food, a drink, a salve) takes effect: taken from the bag only now, its healing
+    /// (at once, or over its `heal_secs` as a regeneration, which a hit doesn't stop) and what it
+    /// does for a while.
+    pub(crate) fn eaten(&mut self, id: Id, item: usize) {
+        let now = self.clock;
+        let d = self.content.items[item].clone();
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let Some(n) = p.bag.get_mut(&item) else { return };
+        *n -= 1;
+        if *n == 0 {
+            p.bag.remove(&item);
+        }
+        if d.heal_secs > 0.0 {
+            // A bite: the healing comes over the next few seconds, shown as it comes in.
+            if d.heal > 0.0 {
+                p.effects.push(Effect { kind: MEAL.to_string(), amount: d.heal / d.heal_secs, until: now + d.heal_secs, name: d.name.clone() });
+                self.events.push(Event::Effects { player: id });
+                let text = format!("{} restores {:.0}% of your health over {:.0} sec.", d.name, d.heal * 100.0, d.heal_secs);
+                self.events.push(Event::Tell { player: id, text });
+            }
+        } else {
+            let heal = (p.max_health as f32 * d.heal).round() as u32;
+            p.health = (p.health + heal).min(p.max_health);
+        }
+        let p = self.players.get_mut(&id).unwrap();
+        let (h, m) = (p.health, p.max_health);
+        // What it does for a while: a fresh one replaces the last of its kind.
+        if let Some(e) = &d.effect {
+            p.effects.retain(|x| x.kind != e.kind);
+            let name = if e.name.is_empty() { d.name.clone() } else { e.name.clone() };
+            p.effects.push(Effect { kind: e.kind.clone(), amount: e.amount, until: now + e.secs, name: name.clone() });
+            self.events.push(Event::Effects { player: id });
+            // Said plainly, so a slow effect isn't taken for nothing.
+            let what = match e.kind.as_str() {
+                "regen" => format!("{name} restores {:.0}% of your health over {:.0} sec.", e.amount * e.secs * 100.0, e.secs),
+                "stamina" => format!("{name} increases stamina regeneration by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                "might" => format!("{name} increases your damage by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                "ward" => format!("{name} reduces damage taken by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                "focus" => format!("{name} makes your abilities recover {:.0}% faster for {:.0} sec.", e.amount * 100.0, e.secs),
+                _ => format!("{name} for {:.0} sec.", e.secs),
+            };
+            self.events.push(Event::Tell { player: id, text: what });
+        }
+        self.events.push(Event::Health { id, health: h, max: m });
+        self.events.push(Event::Bags { player: id });
+        self.events.push(Event::Dirty);
+        self.events.push(Event::Missile { caster: id, spell: EAT_DONE_SPELL, target: Target::Unit(id) });
     }
 
     /// The end of a commitment: back to ready (or the held guard or aim), then any buffered input.
@@ -2029,8 +2062,12 @@ impl Survival {
             p.combat_at = now;
         }
         let (h, m) = (p.health, p.max_health);
-        // A hit spoils a meal or a gather.
-        let interrupted = matches!(p.action, Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
+        // A hit spoils a gather, or the use of an item that isn't steady (a bite of food is).
+        let interrupted = match &p.action {
+            Action::Eat { item, .. } => !self.content.items[*item].steady,
+            Action::Gather { .. } | Action::Work { .. } => true,
+            _ => false,
+        };
         self.events.push(Event::Health { id, health: h, max: m });
         self.meter_taken(id, lost);
         self.keep_wound(id, lost);
@@ -2533,9 +2570,12 @@ const LOCK_HOLD: f32 = 1.3;
 /// can say it doesn't.
 pub const SPRINT_SPELL: u32 = 2983;
 
-/// The meal's cast look (eating), and the burst when it's done.
+/// The meal's cast look (an item used with no `anim`), and the burst when it's done.
 pub const EAT_SPELL: u32 = 433;
 pub const EAT_DONE_SPELL: u32 = 2050;
+/// The lasting effect a bite of food leaves: its healing coming in, a share of max health a second
+/// (the food's name on the hero's effects).
+pub const MEAL: &str = "meal";
 
 /// A hero's health now (0 when they're gone).
 fn p_health(s: &Survival, id: Id) -> u32 {
