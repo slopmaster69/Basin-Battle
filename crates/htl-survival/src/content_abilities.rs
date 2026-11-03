@@ -224,6 +224,19 @@ pub struct AbilityDef {
     /// The cast's clip (`AnimationData`), played on the caster as it goes.
     #[serde(default)]
     pub clip: u16,
+    /// A leap's own look, the same on every hero whatever their race or how they were moving: a
+    /// clip over the whole body for the flight (`leap_clip`, its `leap_take`), borrowed from
+    /// another character model (`leap_from`, as `"ScourgeFemale"`; empty: their own), and a
+    /// tumble head over heels along the way it flies (`leap_flip`), on the clients that play
+    /// clips. In place of the spell's own cast pose.
+    #[serde(default)]
+    pub leap_clip: u16,
+    #[serde(default)]
+    pub leap_take: u32,
+    #[serde(default)]
+    pub leap_from: String,
+    #[serde(default)]
+    pub leap_flip: bool,
     /// Valor for each foe it strikes (0: `[valor].ability`).
     #[serde(default)]
     pub valor_hit: f32,

@@ -88,6 +88,13 @@
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
 //!   friend's), `MK\t<id>` gone.
 //! - `DA\t<secs>\t<speed>\t<facing>`: run the dash of an ability (Charge) along the facing.
+//! - `GP\t<catch 1|0>\t<x>\t<y>\t<z>\t<yards>\t<ground z>\t<ability key>`: while a grappling hook
+//!   is aimed, where its line ends (`yards` along the ground from the hero) and whether it catches there; the
+//!   add-on answers with `.es in al <facing> <elevation>` as the reticle moves. `GP` alone: the
+//!   aim let go.
+//! - `FP\t<guid>\t<secs>\t<clip>\t<take>\t<from>\t<flip 1|0>\t<mine>`: a hero's leap with its own
+//!   look (a Disengage): the clip over the whole body for the flight, from another character
+//!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
 //! - `HL\t<amount>`: healed (a green number). `NP\t<verb>\t<name>`: what the use key would use.
 //! - `A` goes on `\t<ability key>` (what's aimed, charged, cast or channelled).
 //! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
@@ -1232,6 +1239,15 @@ impl SurvivalGame {
                     }
                     _ => None,
                 };
+                // While a grappling hook is aimed, the reticle's line alone (`al <facing>
+                // <elevation>`), for where it would catch.
+                if arg == "al" {
+                    if let Ok(f) = rest.parse::<f32>() {
+                        let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
+                        self.sim.set_aim_line(me, f, e);
+                    }
+                    return Ok(());
+                }
                 // An attack, its release and an ability key carry the reticle's line (the
                 // client's own camera, as a facing and an elevation).
                 if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {

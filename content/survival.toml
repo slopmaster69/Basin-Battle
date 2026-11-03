@@ -4428,7 +4428,9 @@ school = "hunter"
 slot = "utility"
 kind = "projectile"
 range = [25.0, 25.0]
-radius = [0.35, 0.35]
+# Play-test (#110): it caught a tab-targeted foe far too easily. A foe counts only when the
+# reticle's line crosses its body (its own width and 0.1 yd), as a wall does. Was 0.35.
+radius = [0.1, 0.1]
 speed = 60.0
 yank = true
 cooldown = 10.0
@@ -4469,6 +4471,12 @@ lift = 5.0
 cooldown = 12.0
 spell = 781
 also = "hunter_net"
+# Play-test (#110): the Undead woman's flip out of a strafing jump was the one to keep. Every
+# hero, every race, standing or mid-jump, now plays it: a tumble back head over heels with the
+# Undead woman's tucked Jump (38). Swap the clip here after a look in game (/esclip).
+leap_clip = 38
+leap_from = "ScourgeFemale"
+leap_flip = true
 
 [[ability]]
 key = "hunter_net"
@@ -4513,6 +4521,10 @@ damage = [10.0, 10.0]
 radius = [2.0, 2.0]
 spell = 781
 also = "hunter_net"
+# Ensnaring Retreat's flip (#110).
+leap_clip = 38
+leap_from = "ScourgeFemale"
+leap_flip = true
 
 # 2: two arrows and a wire between them.
 [[ability]]

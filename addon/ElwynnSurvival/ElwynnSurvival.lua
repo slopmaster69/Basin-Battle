@@ -2226,11 +2226,17 @@ function ES.DrawAimMarker()
   if not SetAimMarker then return end
   local d = aim.info
   local shape = ES.AimMarkerShape(d)
-  local want = shape and (shape .. d.range .. d.radius .. d.arc) or nil
+  -- A grappling hook's strip runs only to where it would catch (Grapple.lua).
+  local range = d and d.range
+  local c = shape == "line" and ES.CatchNow and ES.CatchNow()
+  if c and c.yards and c.yards > 0 then
+    range = math.floor(c.yards * 4 + 0.5) / 4
+  end
+  local want = shape and (shape .. range .. d.radius .. d.arc) or nil
   if want == ES.aimMarker then return end
   ES.aimMarker = want
   if want then
-    SetAimMarker(shape, d.range, d.radius, d.arc)
+    SetAimMarker(shape, range, d.radius, d.arc)
   else
     SetAimMarker(nil)
   end
@@ -2260,7 +2266,12 @@ aim:SetScript("OnUpdate", function()
     end
   elseif d and not ES.AbilityReady(d) then
     r, g, b, alpha = 0.55, 0.55, 0.55, 0.6
+  elseif d and ES.CatchColor and ES.CatchColor() then
+    -- A grappling hook: green, it will catch; red, it will miss (Grapple.lua).
+    r, g, b = ES.CatchColor()
+    alpha = 0.95
   end
+  if ES.StepCatch then ES.StepCatch() end
   if a.name ~= "charge" then this.fullAt = nil end
   if this.burstAt then
     local t = (GetTime() - this.burstAt) / BURST_SECS
@@ -6238,6 +6249,7 @@ function ES.Sleep()
   if ClearGroundMarker then ClearGroundMarker() end
   if ClearTelegraph then ClearTelegraph() end
   ES.aimMarker = nil
+  ES.catch = nil
   if ES.orbitHeld and ToggleMouseMove then ToggleMouseMove() end
   if ES.sprintHeld then Say(".es in spu") end
   ES.lookHeld, ES.guardHeld, ES.attackHeld, ES.orbitHeld, ES.sprintHeld = nil, nil, nil, nil, false
@@ -6393,6 +6405,12 @@ function ES.Line(line)
       ClearGroundMarker(key)
       ES.marksUp.mk[key] = nil
     end
+  elseif verb == "GP" then
+    -- Where the aimed grappling hook would catch (Grapple.lua).
+    if ES.CatchLine then ES.CatchLine(f) end
+  elseif verb == "FP" then
+    -- A leap's own look, a Disengage's flip (Grapple.lua).
+    if ES.FlipLine then ES.FlipLine(f) end
   elseif verb == "DA" then
     -- A dash of ours (Charge, Intercept): the body runs it here, as a dodge's.
     if ActionDash then ActionDash(tonumber(f[2]) or 0.3, tonumber(f[3]) or 20, "f") end

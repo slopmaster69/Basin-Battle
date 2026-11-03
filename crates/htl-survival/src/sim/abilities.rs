@@ -463,7 +463,7 @@ impl Survival {
     }
 
     /// Where a cast leaves the hero's hands.
-    fn hands(&self, id: Id, yaw: f32) -> Vec3 {
+    pub(crate) fn hands(&self, id: Id, yaw: f32) -> Vec3 {
         let p = &self.players[&id];
         [
             p.pos[0] + yaw.cos() * HAND_AHEAD + yaw.sin() * HAND_RIGHT,
@@ -1030,7 +1030,7 @@ impl Survival {
             (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), AbilityDef::at(d.damage, share), spell)
         };
         // Where the reticle points: the projectile flies from the hands to there, and on.
-        let aim = self.trace(o, dir, range + 4.0, 0.0, id);
+        let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
         let from = self.hands(id, yaw);
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
@@ -1121,7 +1121,8 @@ impl Survival {
                 (d.returns, d.fuse > 0.0)
             };
             let go = (p.speed * dt).min(p.left);
-            let t = self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &p.hits);
+            // (A grappling hook meets the land's solid shapes too: a rock, a fence, a roof.)
+            let t = self.catch_solid(p.ability, p.pos, p.dir, self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &p.hits));
             if let Some(v) = t.unit {
                 let from = p.pos;
                 p.pos = t.point;
