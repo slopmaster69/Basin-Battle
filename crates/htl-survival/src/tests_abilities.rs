@@ -173,13 +173,13 @@ fn a_counter_takes_melee_and_projectiles_but_not_ground_spells() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], std::f32::consts::PI);
-    // Bren's Retaliation: Ayla's swing is blocked, and she reels.
+    // Bren's Retaliation: Ayla's swing is parried, and she reels.
     slot(&mut s, b, "defense", "retaliation");
     cast(&mut s, b, "defense", false, 0.0);
     assert!(matches!(s.players[&b].action, Action::Stance { .. }));
     s.input(a, Input::Attack);
     let ev = run(&mut s, 0.6);
-    assert_eq!(hits_on(&ev, b)[0].1, Outcome::Blocked);
+    assert_eq!(hits_on(&ev, b)[0].1, Outcome::Parried);
     assert!(matches!(s.players[&a].action, Action::Stagger { .. }), "the attacker staggers");
     // A Flamestrike under him passes the stance by.
     run(&mut s, 2.0);

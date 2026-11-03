@@ -53,6 +53,8 @@ mod tests_projectiles;
 #[cfg(test)]
 mod tests_class_warrior_paladin_hunter;
 #[cfg(test)]
+mod tests_warrior_notes;
+#[cfg(test)]
 mod tests_class_rogue_priest_shaman;
 #[cfg(test)]
 mod tests_class_mage_warlock_druid;

@@ -628,6 +628,11 @@ impl Survival {
             _ => ability,
         };
         let d = self.content.abilities[ability].clone();
+        // A shield's ability, with no shield in hand (a two-handed weapon).
+        if d.needs_shield && self.players.get(&id).is_some_and(|p| self.weapon_of(p).two_handed) {
+            self.events.push(Event::Flash { player: id, text: format!("{} requires a shield", d.name) });
+            return true;
+        }
         if self.silenced(id) || self.immune(id) {
             // Why nothing happened, said where the hero is looking.
             let why = if self.silenced(id) { "Can't use abilities while silenced" } else { "Can't cast now" };
@@ -2690,6 +2695,21 @@ impl Survival {
         }
         if let Some(st) = self.stances.get_mut(&victim) {
             st.caught = true;
+        }
+        // Retaliation: a melee blow is parried, as a timed guard would, and the hero's own heavy
+        // attack goes out at once, nothing touching them until it strikes.
+        if c.parry_heavy && how == HitKind::Melee && self.players.contains_key(&victim) {
+            let from = self.unit_pos(attacker).unwrap_or(self.players[&victim].pos);
+            self.events.push(Event::Missile { caster: victim, spell: d.spell, target: Target::Unit(victim) });
+            self.parry_pays(victim, attacker);
+            self.parry_looks(victim, from);
+            self.end_stance(victim);
+            // Turned to the one it parried, so the answer goes their way.
+            if let Some(p) = self.players.get_mut(&victim) {
+                p.facing = facing(p.pos, from);
+            }
+            self.heavy_answer(victim);
+            return Some(Outcome::Parried);
         }
         if self.players.contains_key(&victim) {
             self.gain_valor(victim, self.content.valor.counter);

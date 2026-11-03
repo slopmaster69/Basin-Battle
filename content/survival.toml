@@ -3474,11 +3474,12 @@ effects = [{ kind = "freedom", secs = [4.0, 4.0], amount = 1.0 }, { kind = "hast
 # Staying alive: alone, the answer to a pack or a champion's big blow; in a duel, a read (each
 # catches some things and not others) and a bait.
 
-# Steel: punish the swing.
+# Steel: punish the swing. A parry the hero doesn't have to time, then their own heavy attack at
+# once, and nothing touches them while it goes out (a pack can't punish the answer).
 [[ability]]
 key = "retaliation"
 name = "Retaliation"
-text = "Braces for up to 1 sec. The first melee attack that strikes you from the front is blocked, and you counterattack every enemy in front of you for 150% weapon damage, staggering them for 1 sec. Ends early when you attack, dodge, jump, guard or use another ability. Does not stop projectiles. If nothing strikes you, the cooldown is 50% shorter."
+text = "Braces for up to 1 sec. The first melee attack that strikes you from the front is parried, and you answer at once with a heavy attack. Until it lands, nothing can damage, move or stagger you. Ends early when you attack, dodge, jump, guard or use another ability. Does not stop projectiles. If nothing strikes you, the cooldown is 50% shorter."
 icon = "Ability_Warrior_Challange"
 school = "warrior"
 slot = "defense"
@@ -3488,28 +3489,16 @@ secs = 1.0
 cooldown = 12.0
 spell = 20230
 aura = 20230
-counter = { block = true, melee_only = true, once = true, front = 180.0, ends_on_action = true, answer = "retaliation_sweep", caught_cooldown = 1.0, missed_cooldown = 0.5 }
+counter = { block = true, melee_only = true, once = true, front = 180.0, ends_on_action = true, parry_heavy = true, caught_cooldown = 1.0, missed_cooldown = 0.5 }
 
-# Retaliation's counterattack: the sweep in front of the warrior when it catches a blow.
-[[ability]]
-key = "retaliation_sweep"
-name = "Retaliation"
-text = "The counterattack: every enemy in front of you takes 150% weapon damage and is staggered for 1 sec."
-icon = "Ability_Warrior_Challange"
-slot = "close"
-kind = "cone"
-inner = true
-range = [4.5, 4.5]
-arc = 150.0
-weapon = 1.5
-spell = 845
-effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
-
+# The shield held up for the group; the bash still goes (right-click held, then left-click), and
+# harder while it's up: up to 3 struck, twice the damage and reel, driven 2.5 yd back, no stamina
+# (WALL_BASH in sim/combat.rs). A two-handed weapon has no shield to hold.
 [[ability]]
 key = "shield_wall"
 name = "Shield Wall"
 ex_of = "retaliation"
-text = "Raises your shield for up to 4 sec. Melee attacks and projectiles from the front are blocked, and projectiles stop against the shield. You move 50% slower. Ends when you attack, dodge or press it again."
+text = "Raises your shield for up to 4 sec. Melee attacks and projectiles from the front are blocked, and projectiles stop against the shield. You move 50% slower. Hold right-click and left-click to Shield Bash: it strikes up to 3 enemies in front of you for double damage, knocks them back 2.5 yd and staggers them twice as long, and costs no Stamina. Requires a shield. Ends when you dodge, attack, use another ability or press it again."
 icon = "Ability_Warrior_ShieldWall"
 slot = "defense"
 kind = "stance"
@@ -3517,7 +3506,8 @@ valor = 25
 secs = 4.0
 spell = 871
 aura = 871
-counter = { block = true, front = 180.0, ends_on_action = true, guard_pose = true }
+needs_shield = true
+counter = { block = true, front = 180.0, ends_on_action = true, guard_pose = true, bash = true }
 
 # Shadow: outlast them. 12 a second for 3 s, every point of it back to you; a miss costs nothing.
 [[ability]]

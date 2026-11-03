@@ -721,19 +721,17 @@ fn shockwave_throws_a_pack_back_and_stuns_only_the_one_it_drives_into_a_wall() {
 }
 
 #[test]
-fn retaliation_blocks_the_first_blow_and_sweeps_everyone_in_front_then_ends_when_you_act() {
+fn retaliation_parries_the_first_blow_and_answers_then_ends_when_you_act() {
     let mut s = world_with(true);
     let pi = std::f32::consts::PI;
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], pi);
-    let c = hero(&mut s, "Cara", [0.5, 1.0, 0.0], 0.0);
     press(&mut s, b, "retaliation", false);
-    let (ha, hb, hc) = (s.players[&a].health, s.players[&b].health, s.players[&c].health);
+    let (ha, hb) = (s.players[&a].health, s.players[&b].health);
     s.input(a, Input::Attack);
-    run(&mut s, 1.0);
-    assert_eq!(s.players[&b].health, hb, "Ayla's blow blocked");
-    assert!(s.players[&a].health < ha, "the sweep strikes the one who swung");
-    assert!(s.players[&c].health < hc, "and everyone else in front");
+    run(&mut s, 1.5);
+    assert_eq!(s.players[&b].health, hb, "Ayla's blow parried");
+    assert!(s.players[&a].health < ha, "the heavy answer strikes the one who swung");
     // Braced again, then a swing of his own ends it at once.
     run(&mut s, 2.0);
     press(&mut s, b, "retaliation", false);
