@@ -1845,8 +1845,8 @@ boss = true
 posture = 240
 drops = { ore = [3, 4], bronze = [1, 2], leather = [1, 2] }
 trophy = { warlord_axe = 1, warlord_helm = 1 }
-# The Warrior's champion: every hero who fought him learns Onslaught as he falls.
-teaches = ["onslaught"]
+# The Warrior's champion: every hero who fought him learns Onslaught and Bladestorm as he falls.
+teaches = ["onslaught", "warrior_bladestorm"]
 respawn = 600.0
   [mob.attack]
   windup = 0.9
@@ -4730,6 +4730,33 @@ clip = 55
 # Rallying Cry of the Dragonslayer's red-gold flare on each ally (to be checked in the lab).
 ally_spell = 22888
 ally_effects = [{ kind = "battle_cry", secs = [8.0, 8.0], amount = 0.5 }]
+
+# 3: the spin that ramps (Beta's Whirlwind retires into it). 4, then 1 more a strike up to 15, two
+# a second: a full 6 sec is 114 to each enemy in reach, nearly half of it in the last 2 sec.
+[[ability]]
+key = "warrior_bladestorm"
+name = "Bladestorm"
+text = "Spin with your weapon out for up to 6 sec, moving at 70% speed and striking every enemy within 5 yd twice a sec. The first strike deals 4 damage, and each strike after deals 1 more, up to 15. You can't attack, guard or use other abilities while you spin, and a stagger or a stun ends it. Dodge or guard to end it at once, and the dodge or the guard comes out on that same press. Press again to stop."
+icon = "Ability_Whirlwind"
+school = "warrior"
+slot = "ultimate"
+choice = 2
+kind = "beam"
+valor = 100
+cooldown = 40.0
+around = true
+bail = true
+radius = [5.0, 5.0]
+secs = 6.0
+tick = 0.5
+damage = [8.0, 8.0]
+ramp = 1.0
+ramp_cap = 15.0
+# Whirlwind's spin and its aura, as Beta's; Sweeping Strikes' flare as the ramp tops out.
+spell = 1680
+aura = 9632
+tick_spell = 779
+valor_hit = 1.0
 
 # ------------------------------------------------------------------------------------ Rogue --
 

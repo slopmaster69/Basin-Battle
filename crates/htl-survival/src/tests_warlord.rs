@@ -277,3 +277,69 @@ fn battle_cry_makes_the_groups_heavy_attacks_break_a_stance_faster() {
     let (r1, r2) = (p1 as f32 / d1 as f32, p2 as f32 / d2 as f32);
     assert!(r2 > r1 * 1.35, "50% more posture a point of damage: {r1:.2} then {r2:.2}");
 }
+
+// --- Bladestorm ------------------------------------------------------------------------------------------
+
+fn spin(s: &mut Survival, p: Id) -> Vec<Event> {
+    s.set_valor(p, 100.0);
+    cast(s, p, "warrior_bladestorm", false, 0.0, 0.0)
+}
+
+#[test]
+fn bladestorm_ramps_a_point_a_strike_up_to_15() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "warlord", [3.5, 0.0, 0.0]);
+    let mut ev = spin(&mut s, p);
+    assert!(matches!(s.players[&p].action, Action::Channel { .. }), "spinning");
+    ev.extend(run(&mut s, 6.5));
+    let hits = struck(&ev, k);
+    assert_eq!(hits.len(), 12, "twice a second for 6 sec: {hits:?}");
+    assert_eq!(hits, (4..=15).collect::<Vec<u32>>(), "4, then 1 more a strike, up to 15");
+    assert_eq!(hits.iter().sum::<u32>(), 114);
+    assert!(!matches!(s.players[&p].action, Action::Channel { .. }), "done after 6 sec");
+}
+
+#[test]
+fn bladestorm_walks_at_70_percent_of_a_run() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    spin(&mut s, p);
+    let run_speed = s.content.player.run_speed;
+    assert!((s.speed_for(p) - run_speed * 0.7).abs() < 0.01, "{} of {run_speed}", s.speed_for(p));
+}
+
+#[test]
+fn bladestorm_ends_into_a_guard_on_that_press() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    spin(&mut s, p);
+    run(&mut s, 1.0);
+    s.input(p, Input::Guard);
+    assert!(matches!(s.players[&p].action, Action::Guard), "the guard up at once: {:?}", s.players[&p].action);
+    assert!((s.players[&p].guard_at - s.clock).abs() < 1e-3, "a fresh guard: its parry window open");
+}
+
+#[test]
+fn bladestorm_ends_into_a_dodge_on_that_press() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    spin(&mut s, p);
+    run(&mut s, 1.0);
+    s.input(p, Input::Dodge);
+    assert!(matches!(s.players[&p].action, Action::Dodge { .. }), "the dodge at once: {:?}", s.players[&p].action);
+}
+
+#[test]
+fn bladestorm_takes_no_other_ability_and_a_stagger_ends_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    spin(&mut s, p);
+    s.slot_ability(p, "utility", "tackle").unwrap();
+    s.input(p, Input::Ability(key_of("utility"), false));
+    s.step(DT);
+    assert!(matches!(s.players[&p].action, Action::Channel { .. }), "no other ability while it spins");
+    let k = mob(&mut s, "brave", [1.5, 0.0, 0.0]);
+    assert!(s.apply_cc(p, k, "stagger", 1.0, 0.0, 0.0, "test"), "it can be staggered");
+    assert!(!matches!(s.players[&p].action, Action::Channel { .. }), "and the stagger ends it");
+}
