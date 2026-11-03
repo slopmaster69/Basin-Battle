@@ -836,8 +836,9 @@ fn while_aimed_the_hero_is_told_where_the_hook_would_catch_and_when_it_would_mis
     // Held still, nothing new to say.
     s.set_aim_line(p, 0.0, 0.0);
     assert!(catches(&run(&mut s, 0.3), p).is_empty(), "no repeats");
-    // Up at the sky: a miss, out at the end of its range.
-    s.set_aim_line(p, 0.0, 0.5);
+    // Up at the sky the other way (this test's wall stands to any height): a miss, out at the end
+    // of its range.
+    s.set_aim_line(p, std::f32::consts::PI, 0.5);
     let told = catches(&run(&mut s, 0.1), p);
     let Some(Some((end, false))) = told.last().copied() else { panic!("a miss: {told:?}") };
     assert!(dist2d(end, ORIGIN) > 18.0, "out at its range's end: {end:?}");
