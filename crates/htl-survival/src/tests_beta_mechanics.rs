@@ -209,7 +209,7 @@ fn a_hook_into_a_wall_yanks_its_caster_up_to_it() {
     let mut s = world(false, walled([12.0, 0.0], 1.0), HOOK);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let mut ev = cast(&mut s, p, "t_hook");
-    ev.extend(run(&mut s, 1.0));
+    ev.extend(run(&mut s, 1.5));
     let d = dashes(&ev, p);
     assert_eq!(d.len(), 1, "one dash to the wall: {d:?}");
     assert!(d[0].0.sin().abs() < 0.15 && d[0].0.cos() > 0.0 && d[0].1 > 8.5 && d[0].1 < 11.0, "along +x, short of the wall: {d:?}");
@@ -223,7 +223,7 @@ fn a_hook_into_a_foe_yanks_its_caster_beside_it_and_a_miss_does_nothing() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = mob(&mut s, "boar", [14.0, 0.0, 0.0]);
     let mut ev = cast(&mut s, p, "t_hook");
-    ev.extend(run_still(&mut s, &[b], 1.0));
+    ev.extend(run_still(&mut s, &[b], 1.5));
     assert_eq!(hits(&ev, p, b).len(), 1, "the boar is struck");
     assert_eq!(dashes(&ev, p).len(), 1, "and she's pulled to it");
     let gap = dist2d(s.players[&p].pos, s.mobs[&b].pos);
@@ -761,7 +761,7 @@ fn shipped_on(land: Box<dyn crate::land::Land>) -> Survival {
 fn grapple(s: &mut Survival, p: Id, yaw: f32, pitch: f32) -> Vec<Event> {
     s.set_aim_line(p, yaw, pitch);
     let mut ev = cast(s, p, "grapple_arrow");
-    ev.extend(run(s, 1.0));
+    ev.extend(run(s, 1.5));
     ev
 }
 
@@ -823,7 +823,7 @@ fn grapple_arrow_goes_where_the_reticle_is_not_to_the_locked_foe() {
     s.move_player(p, ORIGIN, 0.0, Moving::default());
     s.set_aim_line(p, (0.85f32 / 14.0).atan(), -0.1);
     let mut ev = cast(&mut s, p, "grapple_arrow");
-    ev.extend(run_still(&mut s, &[b], 1.0));
+    ev.extend(run_still(&mut s, &[b], 1.5));
     assert_eq!(dashes(&ev, p).len(), 1, "pulled to the ground");
     assert!(s.players[&p].pos[0] > 15.5, "past the boar, not beside it: {:?}", s.players[&p].pos);
     // The reticle on it: caught, and pulled beside it, lock or no lock.

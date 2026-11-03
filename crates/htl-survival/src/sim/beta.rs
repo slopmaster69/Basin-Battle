@@ -13,7 +13,7 @@ use crate::content::{AbilityDef, AbilityEffect};
 
 /// A yank runs this fast (yards a second), stopping this far short of a wall and this far from a
 /// foe's body (beside it, not in it).
-const YANK_SPEED: f32 = 32.0;
+const YANK_SPEED: f32 = 24.0;
 /// The pose a yanked hero flies in: the arm held out along the line (SpellCastDirected).
 const YANK_CLIP: u16 = 53;
 const YANK_WALL: f32 = 0.6;
@@ -182,7 +182,9 @@ impl Survival {
         if moved < 0.5 {
             return;
         }
-        let secs = (moved / YANK_SPEED).max(0.08);
+        // At least long enough to be seen flying (the visual check: a 6 yd pull at 32 yd a
+        // second was over in 5 frames).
+        let secs = (moved / YANK_SPEED).max(0.3);
         self.interrupt_hero(id);
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = dir;
