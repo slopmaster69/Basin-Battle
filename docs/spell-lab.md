@@ -63,9 +63,10 @@ what it sent, side by side on one sheet.
   `logs/lab/<label>.mp4`: the game's own window at 60 fps by Windows Graphics Capture, whatever
   stands over it (Desktop Duplication of the primary monitor if that can't start), 1920 wide, about
   10 MB a run, with what ffmpeg said beside it in `<label>.ffmpeg.txt`. The interface is hidden
-  while the burst runs, and the burst drops to 8 stills for the sheet. Delete old
-  run folders when you're done with them: past 3 GB in `logs/lab`, the lab refuses new runs
-  and says so.
+  while the burst runs, and no stills are taken (the video holds every frame). Runs go to
+  `LAB_DIR` if it's set (the lab helper sets it to a folder on a second drive), else
+  `logs/lab`; the queue stays in `logs/lab`. Delete old runs when you're done with them: past
+  3 GB there, the lab refuses new runs and says so.
 - **Finding a look:** a queue line `find <word>...` lists the game's spells whose cast, impact or
   lasting look shows a model with one of those words in its path into
   `logs/lab/find-<words>.txt`, read from your own game data. `find missile <word>...` looks at
