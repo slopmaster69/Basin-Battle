@@ -258,6 +258,9 @@ pub struct SurvivalGame {
     pub(crate) lab_mobs: Vec<Id>,
     /// Where every lab run starts (open ground near the spawn), once found.
     pub(crate) lab_stage: Option<([f32; 3], f32)>,
+    /// The scene's creatures a `blow` step set swinging, and until when (game clock) their blow
+    /// may go on: any other blow of theirs is called off.
+    pub(crate) lab_blows: Vec<(Id, f32)>,
     /// When the lab's queue file was last looked at.
     pub(crate) lab_polled: Instant,
     dirty: bool,
@@ -362,6 +365,7 @@ impl SurvivalGame {
             lab: None,
             lab_mobs: Vec::new(),
             lab_stage: None,
+            lab_blows: Vec::new(),
             lab_polled: Instant::now(),
         };
         g.bind_world();

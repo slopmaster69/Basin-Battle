@@ -84,9 +84,25 @@ impl Survival {
     }
 
     /// The lab's creatures held where they stand: struck, they'd come at the hero, and the next
-    /// run's frames would be of a brawl. A wind-up the lab asked for (`lab_blow`) and a reel go on.
-    pub fn lab_hold(&mut self, mobs: &[Id]) {
+    /// run's frames would be of a brawl. A wind-up the lab asked for (`lab_blow`, the creatures in
+    /// `blows`) and a reel go on; any other wind-up is called off (a struck brave's own blow once
+    /// staggered the hero and the run's next ability never came out).
+    pub fn lab_hold(&mut self, mobs: &[Id], blows: &[Id]) {
         for m in mobs {
+            let own = !blows.contains(m) && self.mobs.get(m).is_some_and(|x| matches!(x.state, MobState::Windup { .. }));
+            if own {
+                if let Some(MobState::Windup { mark: Some(mk), .. }) = self.mobs.get(m).map(|x| x.state.clone()) {
+                    self.unmark(mk);
+                }
+                if self.attack_now(*m).ranged {
+                    self.events.push(Event::CastEnd { caster: *m });
+                }
+                self.halt_mob(*m);
+                if let Some(x) = self.mobs.get_mut(m) {
+                    x.state = MobState::Idle { wander_at: f32::MAX };
+                }
+                continue;
+            }
             let chasing = self.mobs.get(m).is_some_and(|x| matches!(x.state, MobState::Chase { .. } | MobState::Recover { .. }));
             if chasing {
                 self.halt_mob(*m);
@@ -94,6 +110,20 @@ impl Survival {
                     x.state = MobState::Idle { wander_at: f32::MAX };
                 }
             }
+        }
+    }
+
+    /// Hero `id` ready for the next run: what they left burning on the ground (a Ravager's axe
+    /// still spinning in the last run's spot struck the next scene) put out, and a stagger the last
+    /// run's creature gave them ended.
+    pub fn lab_reset(&mut self, id: Id) {
+        let theirs: Vec<Option<Id>> = self.burnings.iter().filter(|b| b.owner == id).map(|b| b.mark).collect();
+        self.burnings.retain(|b| b.owner != id);
+        for m in theirs.into_iter().flatten() {
+            self.unmark(m);
+        }
+        if self.players.get(&id).is_some_and(|p| matches!(p.action, Action::Stagger { .. })) {
+            self.set_action(id, Action::Ready);
         }
     }
 
@@ -259,6 +289,26 @@ mod tests {
         s.lab_aim_at(p, at);
         let landing = s.aim_point(p, 16.0);
         assert!(dist2d(landing, at) < 1.0, "the aim lands on the brave 5 yd off, not beyond: {landing:?} vs {at:?}");
+    }
+
+    #[test]
+    fn a_scene_creature_swings_only_when_the_lab_asks_it_to() {
+        let mut s = Survival::new(Content::dev(), Box::new(FlatLand::default()), 7, 1_000_000.0);
+        s.mobs.clear();
+        s.respawns.clear();
+        let p = s.join("ayla", "Ayla", None);
+        s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+        let _ = s.step(0.0);
+        let m = s.lab_scene(p, "close", "brave").unwrap()[0];
+        // Its own blow (struck, it turned on the hero): called off.
+        s.lab_blow(m, p);
+        assert!(matches!(s.mobs[&m].state, MobState::Windup { .. }));
+        s.lab_hold(&[m], &[]);
+        assert!(matches!(s.mobs[&m].state, MobState::Idle { .. }), "its own wind-up called off");
+        // The one a `blow` step asked for: it goes on.
+        s.lab_blow(m, p);
+        s.lab_hold(&[m], &[m]);
+        assert!(matches!(s.mobs[&m].state, MobState::Windup { .. }), "the lab's blow goes on");
     }
 
     #[test]
