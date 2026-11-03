@@ -130,9 +130,35 @@ function Get-WowData($settings, [switch]$Pick) {
 }
 
 # --- this PC's own server ---------------------------------------------------------------------------
-function PortOpen($address, $port) {
+function PortOpen($address, $port, $ms = 500) {
     $c = New-Object Net.Sockets.TcpClient
-    try { return ($c.ConnectAsync($address, $port).Wait(500) -and $c.Connected) } catch { return $false } finally { $c.Close() }
+    try { return ($c.ConnectAsync($address, $port).Wait($ms) -and $c.Connected) } catch { return $false } finally { $c.Close() }
+}
+
+# --- Tailscale (how the group plays together for now) ------------------------------------------------
+$TailscaleExe = Join-Path $env:ProgramFiles "Tailscale\tailscale.exe"
+# An address on a Tailscale network: 100.64.0.0/10, or a MagicDNS name (*.ts.net).
+function Is-TailscaleAddress($address) {
+    if ($address -match '\.ts\.net$') { return $true }
+    if ($address -match '^100\.(\d+)\.\d+\.\d+$') { $b = [int]$Matches[1]; return ($b -ge 64 -and $b -le 127) }
+    return $false
+}
+# Why a server can't be reached, in words a player can act on.
+function Why-Unreachable($address) {
+    if (Is-TailscaleAddress $address) {
+        if (-not (Test-Path $TailscaleExe)) {
+            return "This server is on the group's Tailscale network, and Tailscale isn't on this PC yet. Install it from the page that just opened, sign in with the account the host invited, then run Play again."
+        }
+        # (Its complaints go to stderr, which under "Stop" would end the script: not here.)
+        $ErrorActionPreference = "Continue"
+        $up = $false
+        try { $null = & $TailscaleExe status 2>&1; $up = ($LASTEXITCODE -eq 0) } catch { }
+        if (-not $up) {
+            return "Tailscale is off or signed out. Open it (its icon is by the clock), log in and connect, then try again."
+        }
+        return "Tailscale is on, but the server at $address doesn't answer. Is the host's server running (their Host window open)? If you were only just invited, the host may need to share their PC with you in Tailscale."
+    }
+    return "The server at $address doesn't answer. Is the host's server running (their Host window open), and is the address right?"
 }
 function Get-OurServer {
     Get-Process htl-server -ErrorAction SilentlyContinue |

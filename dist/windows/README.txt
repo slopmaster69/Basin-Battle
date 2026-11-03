@@ -30,11 +30,23 @@ The first time, Windows may say "Windows protected your PC": click "More
 info", then "Run anyway".
 
 
+PLAY WITH THE GROUP
+-------------------
+Double-click Play.bat. It joins the group's server by itself: nothing to
+type. The group plays over Tailscale (a private network between friends'
+PCs), so the first time only:
+  1. Install Tailscale (tailscale.com/download) and sign in.
+  2. Accept the invite to the host's PC (the host shares it with you in
+     Tailscale).
+If Play can't reach the server it says why: Tailscale not installed, off,
+or the host's server not running.
+
+
 PLAY ALONE
 ----------
-Double-click Play.bat and choose "My own server on this PC". If your server
-isn't running, Play starts it (a second window: leave it open) and joins it.
-Next time, just double-click Play.bat.
+Double-click Play.bat, press C, and choose "My own server on this PC". If
+your server isn't running, Play starts it (a second window: leave it open)
+and joins it. Next time, just double-click Play.bat.
 
 
 PLAY WITH FRIENDS ON YOUR SERVER (YOU HOST)
@@ -51,7 +63,8 @@ If Windows asks whether htl-server may use the network, click Allow.
 PLAY ON A FRIEND'S SERVER
 -------------------------
 Double-click Play.bat, press C, pick the game, then "Someone else's server"
-and type the address they give you. It's remembered for next time.
+and type the address they give you. It's remembered for next time. (The
+group's own server is already built in: see PLAY WITH THE GROUP.)
 
 
 UPDATES

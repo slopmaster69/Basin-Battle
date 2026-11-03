@@ -48,8 +48,14 @@ try {
 } catch { }
 $tailscale = Join-Path $env:ProgramFiles "Tailscale\tailscale.exe"
 if (Test-Path $tailscale) {
-    $ts = (& $tailscale ip -4 2>$null | Select-Object -First 1)
-    if ($ts) { Say "  Over Tailscale:           $ts" }
+    $ErrorActionPreference = "Continue"
+    $ts = $null
+    try { $ts = (& $tailscale ip -4 2>&1 | Where-Object { "$_" -match '^\d+\.\d+\.\d+\.\d+$' } | Select-Object -First 1) } catch { }
+    $ErrorActionPreference = "Stop"
+    if ($ts) {
+        Say "  Over Tailscale:           $ts"
+        if ($GroupServer -ne $ts) { Say "    (To make this PC the group's server, so friends join with one click: put  server = `"$ts`"  in project.toml.)" }
+    }
 }
 if (-not ($extra -contains "--public-host")) {
     $public = $env:HTL_PUBLIC_HOST

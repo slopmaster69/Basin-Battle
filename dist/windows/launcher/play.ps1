@@ -34,6 +34,8 @@ if (-not $data) { Stop-Here "No WoW 1.12.1 folder picked. Run Play again when yo
 if ($Game -match 'basin') { $settings["game"] = "basin" } elseif ($Game) { $settings["game"] = "survival" }
 if (-not $settings["game"]) { $settings["game"] = "survival" }
 if ($settings["place"] -eq "group" -and -not $GroupServer) { $settings["place"] = "" }
+# With a group server named in project.toml, a first run goes straight there: one click to join.
+if (-not $settings["place"] -and $GroupServer) { $settings["place"] = "group" }
 
 function Where-Words($s) {
     switch ($s["place"]) {
@@ -123,6 +125,23 @@ switch ($settings["place"]) {
                 if ($waited -ge 600) { Stop-Here "The server didn't start in 10 minutes. Look at its window for what went wrong." }
             }
             Say "Your server is up."
+        }
+    }
+}
+
+# Someone else's server: check it answers before the game opens, and say why when it doesn't.
+if ($address -ne "127.0.0.1") {
+    while (-not (PortOpen $address 3724 4000)) {
+        Write-Host ""
+        if ((Is-TailscaleAddress $address) -and -not (Test-Path $TailscaleExe)) { Start-Process "https://tailscale.com/download/windows" }
+        Warn (Why-Unreachable $address)
+        $answer = (Read-Host "Press Enter to try again, C to choose another server, or Q to quit").Trim()
+        if ($answer -eq "q" -or $answer -eq "Q") { exit 0 }
+        if ($answer -eq "c" -or $answer -eq "C") {
+            Choose $settings
+            Save-Settings $settings
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Launcher "play.ps1") -NoUpdate
+            exit $LASTEXITCODE
         }
     }
 }
