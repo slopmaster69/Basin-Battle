@@ -178,7 +178,7 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
   foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
   (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
-  Tripwire, two planted arrows and a wire that knocks down the first to cross, or the traps. 3:
+  Tripwire, two arrows placed a press each and a wire that knocks down the first to cross, or the traps. 3:
   Kill Shot, or Skyfall: a leap straight up, a slow fall over the fight, and a volley of 12 arrows
   where you aim (they plant).
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land

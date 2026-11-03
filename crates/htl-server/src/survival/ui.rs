@@ -168,7 +168,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         out.push(format!("{}% healing", pct(d.area_heal)));
     }
     match d.kind.as_str() {
-        _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire · {} sec duration", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
+        _ if d.hunt == "tripwire" && d.inner => out.push(format!("Within {} yd of the first arrow", n(htl_survival::sim::hunter::WIRE_SPAN))),
+        _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire at most · {} sec duration", n(d.range[1]), n(htl_survival::sim::hunter::WIRE_SPAN), n(d.secs))),
         _ if d.hunt == "call" || d.hunt == "double_call" => out.push(format!("{} yd range", n(d.range[1]))),
         _ if d.hunt == "recall" => out.push("Every planted arrow · Lacerates at 3+ arrows".to_string()),
         _ if d.hunt == "volley" => out.push(format!("{} arrows · {} yd range · {} yd radius", d.count, n(d.range[1]), n(d.radius[1]))),

@@ -19,9 +19,11 @@ pub const PLANT_MOST: usize = 12;
 /// How it looks stuck in the ground: a big brown feather, the fletching standing up.
 const PLANT_LOOK: u32 = 2630;
 const PLANT_SCALE: f32 = 0.45;
-/// A tripwire's arrows plant this far each side of its middle; it trips anything within this of
-/// the wire.
+/// A tripwire trips anything within this of the wire.
 const WIRE_REACH: f32 = 0.7;
+/// The most a tripwire spans: its second arrow plants within this of the first (the ring shown
+/// round the first while the key waits for the second).
+pub const WIRE_SPAN: f32 = 10.0;
 /// A tripwire's two arrows stay in the ground this long, snapped or not: past Tripwire's own
 /// cooldown, so Arrow Recall (the same key) can bring them home once it's back.
 pub const ANCHOR_SECS: f32 = 18.0;
@@ -99,6 +101,15 @@ pub(crate) struct Wire {
     pub mark: Id,
 }
 
+/// A tripwire's first arrow, planted, waiting for the key again to place the second: the ability
+/// that laid it (its wire's damage, life and effects), where it stands, and the ring round it.
+#[derive(Debug, Clone)]
+pub(crate) struct FirstArrow {
+    pub ability: usize,
+    pub at: Vec3,
+    pub ring: Id,
+}
+
 /// A hero's Call of the Wild chain: the stage the next call is, the beast drawn for it, until
 /// when the chain holds, and whether the next call is empowered.
 #[derive(Debug, Clone, Default)]
@@ -138,6 +149,8 @@ pub(crate) struct Arrowfall {
 pub struct Hunt {
     pub planted: Vec<Planted>,
     pub(crate) wires: Vec<Wire>,
+    /// Tripwires half laid: each hero's first arrow, until the key's window for the second closes.
+    pub(crate) first_arrows: BTreeMap<Id, FirstArrow>,
     pub wild: BTreeMap<Id, Wild>,
     pub(crate) pounces: Vec<Pounce>,
     pub(crate) falls: Vec<Arrowfall>,
@@ -211,6 +224,9 @@ impl Survival {
         if !self.hunt.wires.is_empty() {
             self.step_wires();
         }
+        if !self.hunt.first_arrows.is_empty() {
+            self.step_first_arrows();
+        }
         if !self.hunt.pounces.is_empty() {
             self.step_pounces();
         }
@@ -268,33 +284,73 @@ impl Survival {
 
     // --- the tripwire ------------------------------------------------------------------------------
 
+    /// Tripwire's first press plants one arrow at the reticle and arms the key for the second
+    /// (its recast), a ring round the arrow showing how far the wire can span; the second press
+    /// (the recast, `inner`) plants the other within that ring and the wire forms between them.
     fn lay_tripwire(&mut self, id: Id, ability: usize, share: f32) {
-        let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        let range = AbilityDef::at(d.range, share);
-        let half = AbilityDef::at(d.radius, share).max(1.0);
-        let at = self.aim_point(id, range);
-        // Across the hero's line of fire, so what comes at them crosses it.
-        let f = self.players[&id].facing + std::f32::consts::FRAC_PI_2;
-        let a = self.ground_near(at[0] + f.cos() * half, at[1] + f.sin() * half, at[2] + 1.0);
-        let b = self.ground_near(at[0] - f.cos() * half, at[1] - f.sin() * half, at[2] + 1.0);
+        if d.inner {
+            self.tie_tripwire(id, ability, share);
+            return;
+        }
+        let at = self.aim_point(id, AbilityDef::at(d.range, share));
+        self.events.push(Event::Missile { caster: id, spell: 19434, target: Target::Point(at) });
+        self.plant_arrow_for(id, at, ANCHOR_SECS);
+        if let Some(old) = self.hunt.first_arrows.remove(&id) {
+            self.unmark(old.ring);
+        }
+        // The ring the second arrow lands in, for as long as the key waits for it (a little past,
+        // while it's aimed; it goes when the window does).
+        let window = d.recast_secs.max(0.5);
+        let tele = Telegraph { own_hidden: false, ..Telegraph::hero_shape(id, WIRE_SPAN, 360.0, 0.0, window, Some((at, 0.0))) };
+        let ring = self.mark_as(at, WIRE_SPAN, window + 10.0, Some(tele));
+        self.hunt.first_arrows.insert(id, FirstArrow { ability, at, ring });
+    }
+
+    /// The second arrow: within the ring round the first (aimed past it, at its edge), and the
+    /// wire between the two.
+    fn tie_tripwire(&mut self, id: Id, ability: usize, share: f32) {
+        let now = self.clock;
+        let range = AbilityDef::at(self.content.abilities[ability].range, share);
+        let aimed = self.aim_point(id, range);
+        let Some(first) = self.hunt.first_arrows.remove(&id) else {
+            // The first is gone (its window closed as this went): just an arrow.
+            self.events.push(Event::Missile { caster: id, spell: 19434, target: Target::Point(aimed) });
+            self.plant_arrow_for(id, aimed, ANCHOR_SECS);
+            return;
+        };
+        self.unmark(first.ring);
+        let a = first.at;
+        let to = within_span(a, aimed);
+        let b = if dist2d(to, aimed) > 0.01 { self.ground_near(to[0], to[1], aimed[2].max(a[2]) + 1.0) } else { aimed };
+        self.events.push(Event::Missile { caster: id, spell: 19434, target: Target::Point(b) });
+        self.plant_arrow_for(id, b, ANCHOR_SECS);
         // One wire a hunter.
         let old: Vec<Wire> = self.hunt.wires.iter().filter(|w| w.owner == id).cloned().collect();
         self.hunt.wires.retain(|w| w.owner != id);
         for w in old {
             self.unmark(w.mark);
         }
-        for end in [a, b] {
-            self.events.push(Event::Missile { caster: id, spell: 19434, target: Target::Point(end) });
-            self.plant_arrow_for(id, end, ANCHOR_SECS);
-        }
-        let life = d.secs.max(1.0);
+        let life = self.content.abilities[first.ability].secs.max(1.0);
         let mid = [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0, (a[2] + b[2]) / 2.0];
-        let len = dist2d(a, b);
-        let tele = Telegraph { own_hidden: false, ..Telegraph::hero_shape(id, WIRE_REACH, 0.0, len, life, Some((mid, f))) };
+        // The wire on the ground: a strip from the first arrow to the second (its length along
+        // the way it faces, its width across).
+        let (yaw, len) = wire_line(a, b);
+        let tele = Telegraph { own_hidden: false, ..Telegraph::hero_shape(id, len, 0.0, WIRE_REACH * 2.0, life, Some((a, yaw))) };
         let mark = self.mark_as(mid, WIRE_REACH, life, Some(tele));
         let sides = self.wire_sides(a, b, id);
-        self.hunt.wires.push(Wire { owner: id, ability, a, b, until: now + life, sides, mark });
+        self.hunt.wires.push(Wire { owner: id, ability: first.ability, a, b, until: now + life, sides, mark });
+    }
+
+    /// First arrows whose key no longer waits for the second (the window closed, the hero fell or
+    /// left): just planted arrows now, their rings gone.
+    fn step_first_arrows(&mut self) {
+        let lapsed: Vec<Id> = self.hunt.first_arrows.iter().filter(|(h, f)| self.recast_armed(**h, self.content.base_of(f.ability)).is_none()).map(|(h, _)| *h).collect();
+        for h in lapsed {
+            if let Some(f) = self.hunt.first_arrows.remove(&h) {
+                self.unmark(f.ring);
+            }
+        }
     }
 
     /// Which side of the line a..b each creature (and rival hero) near it stands on.
@@ -866,6 +922,25 @@ const THUNDER_KIT: u32 = 2709;
 /// Which side of the line a..b the point p is on.
 fn side(a: Vec3, b: Vec3, p: Vec3) -> bool {
     (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) >= 0.0
+}
+
+/// Where a tripwire's second arrow goes, aimed at `at` with the first at `a`: there, or on the
+/// edge of the ring round the first ([`WIRE_SPAN`]) when aimed past it.
+pub(crate) fn within_span(a: Vec3, at: Vec3) -> Vec3 {
+    let d = dist2d(a, at);
+    if d <= WIRE_SPAN {
+        return at;
+    }
+    let k = WIRE_SPAN / d;
+    [a[0] + (at[0] - a[0]) * k, a[1] + (at[1] - a[1]) * k, at[2]]
+}
+
+/// A wire's line on the ground from `a` to `b`: the way it faces (WoW's facing, from +x toward
+/// +y) and its length.
+pub(crate) fn wire_line(a: Vec3, b: Vec3) -> (f32, f32) {
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    let yaw = if dx.abs() + dy.abs() < 1.0e-4 { 0.0 } else { dy.atan2(dx) };
+    (yaw.rem_euclid(std::f32::consts::TAU), (dx * dx + dy * dy).sqrt())
 }
 
 /// How far p is from the segment a..b, across the ground.

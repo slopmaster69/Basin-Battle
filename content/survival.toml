@@ -4514,24 +4514,46 @@ radius = [2.0, 2.0]
 spell = 781
 also = "hunter_net"
 
-# 2: two arrows and a wire between them.
+# 2: two arrows and a wire between them, each arrow placed by the hero. The first press plants
+# one; the key again (within its window) places the second within 10 yd of it (hunter.rs's
+# WIRE_SPAN, the ring shown round the first), and the wire forms between them.
 [[ability]]
 key = "tripwire"
 name = "Tripwire"
-text = "Fires two arrows that plant 6 yd apart at the target spot, up to 20 yd away, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec; its two arrows stay planted for 18 sec, snapped or not."
+text = "Fires an arrow that plants at the target spot, up to 20 yd away. Press again within 5 sec to plant a second arrow within 10 yd of the first, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec. Its arrows stay planted for 18 sec, snapped or not."
 icon = "Spell_Nature_Web"
 school = "hunter"
 slot = "defense"
 kind = "ground"
 hunt = "tripwire"
 range = [20.0, 20.0]
-radius = [3.0, 3.0]
+# The arrow's spot under the reticle (how far the wire can span is WIRE_SPAN).
+radius = [0.5, 0.5]
 damage = [12.0, 12.0]
 secs = 12.0
 cooldown = 12.0
 spell = 19434
 clip = 53
 effects = [{ kind = "knockdown", secs = [1.5, 1.5] }]
+# Time to aim the second arrow.
+recast = "tripwire_second"
+recast_secs = 5.0
+
+# Its second arrow: aimed up to 30 yd away (the first's 20 and the wire's 10), planted within 10
+# yd of the first. The wire's damage, life and knockdown are Tripwire's.
+[[ability]]
+key = "tripwire_second"
+name = "Tripwire"
+text = "Plants Tripwire's second arrow within 10 yd of the first. The wire forms between them."
+icon = "Spell_Nature_Web"
+inner = true
+slot = "defense"
+kind = "ground"
+hunt = "tripwire"
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+spell = 19434
+clip = 53
 
 [[ability]]
 key = "arrow_recall"

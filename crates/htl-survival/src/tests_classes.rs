@@ -62,6 +62,15 @@ fn use_card(s: &mut Survival, p: Id, card: &AbilityDef, ex: bool) -> Vec<Event> 
         ev.extend(run(s, 0.3));
         s.input(p, Input::Ability(slot, ex));
     }
+    // Tripwire's second press places its other arrow, and the wire forms.
+    if card.hunt == "tripwire" && !ex {
+        ev.extend(run(s, 0.5));
+        s.input(p, Input::Ability(slot, false));
+        ev.extend(s.step(DT));
+        s.input(p, Input::Attack);
+        ev.extend(s.step(DT));
+        s.input(p, Input::AttackUp);
+    }
     ev.extend(run(s, 2.5));
     ev
 }
