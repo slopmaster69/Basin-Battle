@@ -30,7 +30,7 @@ function Font($size, [switch]$Bold, $face = "Segoe UI") {
 $ui = @{ clicked = $null; closed = $false }
 $form = New-Object System.Windows.Forms.Form
 $form.Text = $Title
-$form.ClientSize = Size 640 340
+$form.ClientSize = Size 640 366
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
 $form.MaximizeBox = $false
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
@@ -97,7 +97,7 @@ $main.Controls.AddRange(@($btnA, $btnB, $btnC))
 # --- the choices (shown by Change) ---------------------------------------------------------------------
 $choices = New-Object System.Windows.Forms.Panel
 $choices.Location = Pos 262 16
-$choices.Size = Size 366 316
+$choices.Size = Size 366 346
 $choices.Visible = $false
 $form.Controls.Add($choices)
 $choices.Controls.Add((Label "Game" 0 0 300 22 (Font 11 -Bold) $Gold))
@@ -120,13 +120,17 @@ $gameBox.Controls.AddRange(@($rSurvival, $rBasin))
 $choices.Controls.Add((Label "Server" 0 78 300 22 (Font 11 -Bold) $Gold))
 $placeBox = New-Object System.Windows.Forms.Panel
 $placeBox.Location = Pos 8 100
-$placeBox.Size = Size 350 96
+$placeBox.Size = Size 350 120
 $choices.Controls.Add($placeBox)
 $y = 2
-$rGroup = $null
-if ($GroupServer) { $rGroup = Radio "The group's server ($GroupServer)" $y; $placeBox.Controls.Add($rGroup); $y += 23 }
-$rBackup = $null
-if ($BackupServer) { $rBackup = Radio "The backup server ($BackupServer)" $y; $placeBox.Controls.Add($rBackup); $y += 23 }
+# One choice for each of the group's servers (project.toml), then your own, then any other.
+$serverRadios = @{}
+foreach ($srv in $Servers) {
+    $r = Radio "$($srv.name)  ($($srv.address))" $y
+    $placeBox.Controls.Add($r)
+    $serverRadios[$srv.key] = $r
+    $y += 23
+}
 $rOwn = Radio "My own server on this PC" $y
 $y += 23
 $rOther = Radio "Someone else's:" $y
@@ -137,12 +141,12 @@ $addressBox.Size = Size 200 24
 $addressBox.Font = Font 10
 $addressBox.Add_TextChanged({ if ($addressBox.Focused -and $addressBox.Text) { $rOther.Checked = $true } })
 $placeBox.Controls.AddRange(@($rOwn, $rOther, $addressBox))
-$choices.Controls.Add((Label "World of Warcraft 1.12.1" 0 196 300 22 (Font 11 -Bold) $Gold))
-$wowLabel = Label "" 8 218 270 34 (Font 9) $Dim
+$choices.Controls.Add((Label "World of Warcraft 1.12.1" 0 224 300 22 (Font 11 -Bold) $Gold))
+$wowLabel = Label "" 8 246 270 34 (Font 9) $Dim
 $choices.Controls.Add($wowLabel)
 $wowButton = New-Object System.Windows.Forms.Button
 $wowButton.Text = "Change..."
-$wowButton.Location = Pos 282 216
+$wowButton.Location = Pos 282 244
 $wowButton.Size = Size 76 26
 $wowButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $wowButton.FlatAppearance.BorderColor = $Gold
@@ -155,7 +159,7 @@ $wowButton.Add_Click({
 $choices.Controls.Add($wowButton)
 $okButton = New-Object System.Windows.Forms.Button
 $okButton.Text = "Play"
-$okButton.Location = Pos 2 262
+$okButton.Location = Pos 2 290
 $okButton.Size = Size 150 40
 $okButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
 $okButton.BackColor = $Gold
@@ -216,11 +220,9 @@ function Reach($address, $port, $ms) {
 }
 function Where-Words($s) {
     switch ($s["place"]) {
-        "group" { "the group's server" }
-        "backup" { "the backup server" }
         "own" { "your own server on this PC" }
         "address" { "$($s["address"])" }
-        default { "" }
+        default { $srv = Server-Of $s["place"]; if ($srv) { $srv.name } else { "" } }
     }
 }
 # The choices, filled from $s; back into $s when Play is pressed there.
@@ -229,8 +231,8 @@ function Choose($s) {
     $addressBox.Text = "$($s["address"])"
     $which = $rOwn
     if ($s["place"] -eq "address") { $which = $rOther }
-    elseif ($rBackup -and $s["place"] -eq "backup") { $which = $rBackup }
-    elseif ($rGroup -and ($s["place"] -eq "group" -or -not $s["place"])) { $which = $rGroup }
+    elseif ($serverRadios.ContainsKey("$($s["place"])")) { $which = $serverRadios[$s["place"]] }
+    elseif (-not $s["place"] -and $Servers.Count) { $which = $serverRadios[$Servers[0].key] }
     $which.Checked = $true
     $wowLabel.Text = "$($ui.data)"
     $main.Visible = $false
@@ -245,8 +247,9 @@ function Choose($s) {
         break
     }
     $s["game"] = if ($rBasin.Checked) { "basin" } else { "survival" }
-    if ($rGroup -and $rGroup.Checked) { $s["place"] = "group" }
-    elseif ($rBackup -and $rBackup.Checked) { $s["place"] = "backup" }
+    $picked = $null
+    foreach ($k in $serverRadios.Keys) { if ($serverRadios[$k].Checked) { $picked = $k } }
+    if ($picked) { $s["place"] = $picked }
     elseif ($rOther.Checked) { $s["place"] = "address"; $s["address"] = $addressBox.Text.Trim() }
     else { $s["place"] = "own" }
     if ($ui.data) { $s["wow"] = $ui.data }
@@ -325,15 +328,17 @@ try {
     # 3. Which game, and where.
     if ($Game -match 'basin') { $settings["game"] = "basin" } elseif ($Game) { $settings["game"] = "survival" }
     if (-not $settings["game"]) { $settings["game"] = "survival" }
-    if ($settings["place"] -eq "group" -and -not $GroupServer) { $settings["place"] = "" }
-if ($settings["place"] -eq "backup" -and -not $BackupServer) { $settings["place"] = "" }
-    # With a group server named in project.toml, a first run goes straight there: one click to join.
-    if (-not $settings["place"] -and $GroupServer) { $settings["place"] = "group" }
+    # An older launcher's "group" is the first server; a server project.toml no longer names is forgotten.
+    if ($settings["place"] -eq "group") { $settings["place"] = "server" }
+    if ($settings["place"] -and @("own", "address") -notcontains $settings["place"] -and -not (Server-Of $settings["place"])) { $settings["place"] = "" }
+    # With the group's servers named in project.toml, a first run goes straight to the first: one click to join.
+    if (-not $settings["place"] -and $Servers.Count) { $settings["place"] = $Servers[0].key }
+    $own = Own-Ports $settings
     if ($Change -or -not (Where-Words $settings)) { Choose $settings }
 
     while ($true) {
         $gameName = GameName $settings["game"]
-        $port = WorldPort $settings["game"]
+        $port = WorldPort $settings["game"] $own
         # Last time's choice, unless Change is pressed in the next 3 seconds.
         Set-Status "Playing $gameName on $(Where-Words $settings)."
         $go = $null
@@ -347,20 +352,21 @@ if ($settings["place"] -eq "backup" -and -not $BackupServer) { $settings["place"
 
         # 4. The server.
         switch ($settings["place"]) {
-            "group" { $address = $GroupServer }
-            "backup" { $address = $BackupServer }
+            "own" { $address = "127.0.0.1" }
             "address" { $address = $settings["address"] }
-            default { $address = "127.0.0.1" }
+            default { $address = (Server-Of $settings["place"]).address }
         }
-        if ($address -eq "127.0.0.1") {
-            if (-not ((Reach $address 3724 500) -and (Reach $address $port 500))) {
+        if ($settings["place"] -eq "own") {
+            # This PC's server, on its own ports (settings.txt) when they aren't the usual ones.
+            if ($own.login -ne 3724) { $address = "127.0.0.1:$($own.login)" }
+            if (-not ((Reach "127.0.0.1" $own.login 500) -and (Reach "127.0.0.1" $port 500))) {
                 if (-not (Test-Path $ServerExe)) { Fail "This download has no server in it (server\htl-server.exe). Download the newest version, or play on someone else's server." }
                 Set-Status "Starting your server. It opens in its own window: leave that open while you play." -Busy
                 $hostExe = Join-Path $Root "Host.exe"
                 if (Test-Path $hostExe) { Start-Process -FilePath $hostExe -WorkingDirectory $Root }
                 else { Start-Process powershell.exe -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$(Join-Path $Launcher "host.ps1")`"") -WorkingDirectory $Root }
                 $waited = 0
-                while (-not ((Reach $address 3724 500) -and (Reach $address $port 500))) {
+                while (-not ((Reach "127.0.0.1" $own.login 500) -and (Reach "127.0.0.1" $port 500))) {
                     Wait-Pumping 1000
                     $waited += 2
                     if ($waited % 10 -eq 0) { Set-Status "Your server is loading the world ($waited s). Its window shows how it's going." -Busy }
@@ -371,15 +377,22 @@ if ($settings["place"] -eq "backup" -and -not $BackupServer) { $settings["place"
         }
         # Someone else's server: check it answers before the game opens, and say why when it doesn't.
         Set-Status "Looking for the server at $address..." -Busy
-        if (Reach $address 3724 4000) { break }
+        $at = Split-Address $address
+        if (Reach $at.host $at.port 4000) { break }
         if ((Is-TailscaleAddress $address) -and -not (Test-Path $TailscaleExe)) { Start-Process "https://tailscale.com/download/windows" }
-        Set-Status (Why-Unreachable $address)
-        # The group's server down: the backup is one click away (for this time only: not saved).
-        $offerBackup = ($settings["place"] -eq "group" -and $BackupServer)
-        if ($offerBackup) { Buttons "Try again" "Use backup" "Quit" } else { Buttons "Try again" "Change..." "Quit" }
+        # One of the group's servers down: the next is one click away (for this time only: not saved).
+        $next = Next-Server $settings["place"]
+        $why = Why-Unreachable $address
+        if ($next) {
+            Set-Status "$why`n`nOr play on the next one: $($next.name)."
+            Buttons "Try again" "Use next" "Quit"
+        } else {
+            Set-Status $why
+            Buttons "Try again" "Change..." "Quit"
+        }
         $answer = Wait-Click
         if ($answer -eq "c") { Leave }
-        if ($answer -eq "b") { if ($offerBackup) { $settings["place"] = "backup" } else { Choose $settings } }
+        if ($answer -eq "b") { if ($next) { $settings["place"] = $next.key } else { Choose $settings } }
     }
 
     # 5. Play.

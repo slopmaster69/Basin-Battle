@@ -14,7 +14,10 @@ function Stop-Here($text) { Warn $text; Read-Host "Press Enter to close"; exit 1
 
 if (-not (Test-Path $ServerExe)) { Stop-Here "server\htl-server.exe is missing. Your anti-virus may have taken it: restore it, or download the game again." }
 if (Get-OurServer) { Stop-Here "Your server is already running (another window is hosting). Only one at a time." }
-foreach ($port in @(3724, 8085, 8086)) {
+# This PC's ports: the usual 3724, 8085 and 8086, or its own from settings.txt (login_port,
+# world_port, survival_port) when it's a second host behind the same router.
+$own = Own-Ports (Read-Settings)
+foreach ($port in @($own.login, $own.basin, $own.survival)) {
     if (PortOpen "127.0.0.1" $port) { Stop-Here "Port $port is taken: another server (another copy of the game, or a test build) is running on this PC. Close it first." }
 }
 
@@ -35,7 +38,10 @@ if (-not $data) { Stop-Here "No WoW 1.12.1 folder picked: the server builds its 
 # --- what friends type ---------------------------------------------------------------------------------
 $serverArgs = @("--realm", $BasinName, "--survival-realm", $SurvivalName, "--data", $data,
     "--content", "content\game.toml", "--saves", "saves\basin-battle.toml",
-    "--survival-content", "content\survival.toml", "--survival-save", "saves\elwynn-survival.toml")
+    "--survival-content", "content\survival.toml", "--survival-save", "saves\elwynn-survival.toml",
+    "--login-port", "$($own.login)", "--world-port", "$($own.basin)", "--survival-port", "$($own.survival)")
+# How an address is written for this PC: with :port when its login port isn't 3724.
+$suffix = if ($own.login -ne 3724) { ":$($own.login)" } else { "" }
 Write-Host ""
 Say "Give your friends one of these addresses (they choose 'Someone else's server' in Play):"
 try {
@@ -44,7 +50,7 @@ try {
     $lan = Get-NetIPConfiguration -ErrorAction Stop |
         Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq "Up" } |
         ForEach-Object { $_.IPv4Address.IPAddress } | Select-Object -First 1
-    if ($lan) { Say "  Same house or Wi-Fi:      $lan" }
+    if ($lan) { Say "  Same house or Wi-Fi:      $lan$suffix" }
 } catch { }
 $tailscale = Join-Path $env:ProgramFiles "Tailscale\tailscale.exe"
 if (Test-Path $tailscale) {
@@ -53,8 +59,8 @@ if (Test-Path $tailscale) {
     try { $ts = (& $tailscale ip -4 2>&1 | Where-Object { "$_" -match '^\d+\.\d+\.\d+\.\d+$' } | Select-Object -First 1) } catch { }
     $ErrorActionPreference = "Stop"
     if ($ts) {
-        Say "  Over Tailscale:           $ts"
-        if ($GroupServer -ne $ts) { Say "    (To make this PC the group's server, so friends join with one click: put  server = `"$ts`"  in project.toml.)" }
+        Say "  Over Tailscale:           $ts$suffix"
+        if (-not ($Servers | Where-Object { $_.address -eq "$ts$suffix" })) { Say "    (To make this PC one of the group's servers, so friends join with one click: put  `"$ts$suffix`"  in project.toml.)" }
     }
 }
 if (-not ($extra -contains "--public-host")) {
@@ -64,7 +70,7 @@ if (-not ($extra -contains "--public-host")) {
     }
     if ($public -match '^[0-9a-fA-F.:]+$') {
         $serverArgs += @("--public-host", $public)
-        Say "  Over the internet:        $public   (only once your router forwards TCP 3724, 8085 and 8086 to this PC)"
+        Say "  Over the internet:        $public$suffix   (only once your router forwards TCP $($own.login), $($own.basin) and $($own.survival) to this PC)"
     }
 }
 Say "Password: hold, unless you started Host with --password."

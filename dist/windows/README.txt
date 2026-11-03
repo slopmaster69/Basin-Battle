@@ -33,13 +33,11 @@ info", then "Run anyway".
 PLAY WITH THE GROUP
 -------------------
 Double-click Play. It joins the group's server by itself: nothing to
-type. The group plays over Tailscale (a private network between friends'
-PCs), so the first time only:
-  1. Install Tailscale (tailscale.com/download) and sign in.
-  2. Accept the invite to the host's PC (the host shares it with you in
-     Tailscale).
-If Play can't reach the server it says why: Tailscale not installed, off,
-or the host's server not running.
+type, nothing else to install. If that server isn't up, Play says so and
+offers the next one (a backup) with one click. Each server is its own
+world: a hero made on one isn't on the others.
+(A server listed as "Tailscale" needs Tailscale, tailscale.com/download,
+and an invite from its host. The others don't.)
 
 
 PLAY ALONE
@@ -55,8 +53,14 @@ Play alone as above (or double-click Host). The server's window shows
 the addresses to give your friends:
   Same house or Wi-Fi     the 192.168... address
   Over Tailscale          the 100... address (if you and they use Tailscale)
-  Over the internet       works once your router forwards TCP ports 3724,
-                          8085 and 8086 to this PC
+  Over the internet       works once your router forwards the TCP ports it
+                          lists (3724, 8085 and 8086) to this PC
+Two hosts behind one router (a desktop and a laptop, say) need different
+ports: on the second, add these lines to settings.txt (beside Play) and forward
+those ports to it instead. Its address then ends in :3725.
+  login_port = 3725
+  world_port = 8087
+  survival_port = 8088
 If Windows asks whether htl-server may use the network, click Allow.
 
 
@@ -206,8 +210,11 @@ TROUBLESHOOTING
     - You and the host must be on the same version: close the game and
       start it again from Play (it updates), and ask the host to
       restart Host if theirs is older.
-    - Over the internet, the host's router must forward ports 3724, 8085 and
-      8086 to their computer (or use Tailscale).
+    - Over the internet, the host's router must forward the ports their
+      Host window lists (usually 3724, 8085 and 8086) to their computer.
+      The router's rule must point at the computer's current address
+      (192.168...): give the computer a fixed one in the router, or in
+      Windows' network settings, so it doesn't change.
 
 The game window is black or closes right away
     Update your graphics drivers from NVIDIA, AMD or Intel and try again.
@@ -216,7 +223,7 @@ Anti-virus removed benilla.exe or server\htl-server.exe
     They're flagged because they're new and unsigned. Restore them from your
     anti-virus quarantine, or download the game again.
 
-"Port 3724 is taken" when hosting
+"Port 3724 is taken" (or 3725...) when hosting
     Another server is already running on this PC (an older copy of the
     game, say). Close its window, then start Host again.
 

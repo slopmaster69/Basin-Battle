@@ -38,7 +38,7 @@ How to install, host, play alone and join friends (on Windows, a Mac or Linux) i
 
 Log in with any name (it becomes your hero) and the host's password (**hold** by default). Over the
 internet the router must forward TCP **3724** and **8086** (8085 too for Basin Battle), or use
-Tailscale (README).
+Tailscale; a second host behind the same router uses other ports (README).
 
 The survival world is saved in `saves/elwynn-survival.toml` (a server option, `--survival-save`,
 moves it). Delete that file to start the world over. Its tuning is `content/survival.toml`

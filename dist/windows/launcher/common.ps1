@@ -30,11 +30,38 @@ $Title = ProjectName "title" "Basin Battle"
 $SurvivalName = ProjectName "survival" "Elwynn Survival"
 $BasinName = ProjectName "basin" "Basin Battle"
 $Repository = ProjectName "repository" "slopmaster69/Basin-Battle"
-$GroupServer = ProjectName "server" ""
-$BackupServer = ProjectName "backup" ""
+# The group's servers, in the order Play tries them: key (server, backup, backup2), address
+# ("host" or "host:port") and the name Play shows.
+$Servers = @()
+foreach ($k in @("server", "backup", "backup2")) {
+    $a = ProjectName $k ""
+    if ($a) { $Servers += @{ key = $k; address = $a; name = (ProjectName "$($k)_name" $a) } }
+}
+$GroupServer = if ($Servers.Count) { $Servers[0].address } else { "" }
+function Server-Of($key) { foreach ($s in $Servers) { if ($s.key -eq $key) { return $s } }; return $null }
+# The one after $key in the order, or $null.
+function Next-Server($key) {
+    for ($i = 0; $i -lt $Servers.Count - 1; $i++) { if ($Servers[$i].key -eq $key) { return $Servers[$i + 1] } }
+    return $null
+}
+# "host:port" (or "host": port 3724) as @{ host; port }.
+function Split-Address($address) {
+    if ("$address" -match '^([^:]+):(\d+)$') { return @{ host = $Matches[1]; port = [int]$Matches[2] } }
+    return @{ host = "$address"; port = 3724 }
+}
 
-# The world port of each game, as the server runs them.
-function WorldPort($game) { if ($game -eq "basin") { 8085 } else { 8086 } }
+# This PC's own server's ports: 3724 and 8085/8086 unless settings.txt says otherwise (a second
+# host behind the same router needs its own: login_port, world_port, survival_port).
+function Own-Ports($s) {
+    $p = @{ login = 3724; basin = 8085; survival = 8086 }
+    foreach ($pair in @(@("login_port", "login"), @("world_port", "basin"), @("survival_port", "survival"))) {
+        $v = 0
+        if ($s[$pair[0]] -and [int]::TryParse($s[$pair[0]], [ref]$v) -and $v -gt 0) { $p[$pair[1]] = $v }
+    }
+    return $p
+}
+# The world port of each game on this PC's own server.
+function WorldPort($game, $ports) { if ($game -eq "basin") { $ports.basin } else { $ports.survival } }
 function GameName($game) { if ($game -eq "basin") { $BasinName } else { $SurvivalName } }
 
 # --- settings.txt: one "key = value" a line, kept across updates (the zip carries none) ---------
@@ -141,8 +168,9 @@ function PortOpen($address, $port, $ms = 500) {
 $TailscaleExe = Join-Path $env:ProgramFiles "Tailscale\tailscale.exe"
 # An address on a Tailscale network: 100.64.0.0/10, or a MagicDNS name (*.ts.net).
 function Is-TailscaleAddress($address) {
-    if ($address -match '\.ts\.net$') { return $true }
-    if ($address -match '^100\.(\d+)\.\d+\.\d+$') { $b = [int]$Matches[1]; return ($b -ge 64 -and $b -le 127) }
+    $h = (Split-Address $address).host
+    if ($h -match '\.ts\.net$') { return $true }
+    if ($h -match '^100\.(\d+)\.\d+\.\d+$') { $b = [int]$Matches[1]; return ($b -ge 64 -and $b -le 127) }
     return $false
 }
 # Why a server can't be reached, in words a player can act on.

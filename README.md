@@ -39,12 +39,14 @@ One download does everything: playing, hosting and updating.
    A small window with the shield shows what it's doing; no console.
    - It finds your WoW 1.12.1 install by itself (or asks for the folder once).
    - It goes straight to **the group's server** (the `server` line in `project.toml`), so joining
-     the group is one click. Click **Change** in the first 3 seconds to choose instead: **your own
-     server on this PC** (alone, or friends join you) or **someone else's server** (type the
+     the group is one click and nothing else to install. If it doesn't answer, Play says so and
+     offers the next one (`backup`, then `backup2`) with one click. Each server is its own world.
+     Click **Change** in the first 3 seconds to choose instead: one of the group's servers, **your
+     own server on this PC** (alone, or friends join you) or **someone else's server** (type the
      address they give you). It remembers what you chose.
-   - The group plays over Tailscale for now: the first time, install
-     [Tailscale](https://tailscale.com/download) and accept the host's invite. If Play can't reach
-     a server it says why (Tailscale missing or off, or the host's server not running).
+   - A group server reached over Tailscale (a 100.x address) needs
+     [Tailscale](https://tailscale.com/download) and its host's invite; Play says so when it's
+     missing or off.
    - On your own server it starts the server for you, in a second window: leave that open.
 3. Log in with **any name** (it becomes your hero) and the password (**hold** unless the host
    changed it).
@@ -102,10 +104,15 @@ VPS (under `tmux` or `screen`).
 The host's window prints the addresses to give out.
 
 - **Same house or Wi-Fi:** the "Friends on your own network join with: 192.168.x.x" address.
-- **Over the internet, the router way:** forward TCP ports **3724**, **8085** (Basin Battle) and
-  **8086** (Elwynn Survival) on the router to the host's computer. Friends use the "Friends on the
-  internet" address. The Windows host finds it by itself; on a Mac pass it:
+- **Over the internet, the router way** (the group's default): forward TCP ports **3724**,
+  **8085** (Basin Battle) and **8086** (Elwynn Survival) on the router to the host's computer, and
+  give that computer a fixed address on the home network so the rule keeps pointing at it. Friends
+  use the "Over the internet" address. The Windows host finds it by itself; on a Mac pass it:
   `scripts/host.sh --public-host 203.0.113.7`.
+- **Two hosts behind one router:** the second needs its own ports. On Windows, put
+  `login_port = 3725`, `world_port = 8087` and `survival_port = 8088` in its
+  `settings.txt`, beside Play (on a Mac or Linux, `--login-port 3725 --world-port 8087 --survival-port
+  8088`), forward those to it, and its address ends in `:3725`.
 - **Over the internet, no router changes (Tailscale):** a private network between your computers,
   free for a few friends. Everyone installs [Tailscale](https://tailscale.com/download) and signs
   in, and the host shares their computer with each friend in Tailscale's admin console. Friends use
@@ -128,7 +135,8 @@ The host's window prints the addresses to give out.
   `settings-windows.txt` (Windows server) or the game folder's `settings.txt` (Windows game) and
   pick again.
 - **Only one game window**: it's titled "benilla". If you're unsure, close them all and start again.
-- **Two servers at once**: they share ports, so only one can run on a computer.
+- **Two servers at once**: they share ports, so only one can run on a computer (unless one is given
+  other ports, as above).
 - More for players (black window, anti-virus, sound, keys): the README.txt in the Windows zip.
 
 ## How it fits together
