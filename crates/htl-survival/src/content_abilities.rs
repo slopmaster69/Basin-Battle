@@ -456,6 +456,11 @@ pub struct AbilityDef {
     pub bounces: u32,
     #[serde(default)]
     pub bounce_gain: f32,
+    /// A projectile that bursts where its flight ends (the first foe, a wall, the ground or its
+    /// range's end) into this `inner` projectile's arrows, fanned out from there (Split Arrow);
+    /// its `burst_spell` shows at the burst.
+    #[serde(default)]
+    pub splits: String,
     /// It goes on the key press, along the facing (no aim and click): Raptor Strike's hits,
     /// Skyfall's leap.
     #[serde(default)]

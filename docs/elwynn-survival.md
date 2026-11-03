@@ -171,8 +171,9 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   second under the first). Every arrow that ends its flight sticks in the ground for 6 s (up to
   12), and Arrow Recall (Tripwire's EX) brings them all home through the fight, each at full damage;
   three or more in one foe Lacerate it. Q: Aimed Shot, a draw (its EX Multi-Shot a fan), or Bank
-  Shot, which ricochets off walls and trees harder each bounce (its EX Split Arrow a point-blank
-  spray that kicks you back). E: Call of the Wild, a chain of spirit beasts that builds from setup
+  Shot, which ricochets off walls and trees harder each bounce and skips off the ground at a low
+  angle, a flash at each (its EX Split Arrow a long glowing arrow that bursts into a fan of 6 where
+  its flight ends). E: Call of the Wild, a chain of spirit beasts that builds from setup
   to finisher (the key shows the beast coming; a hit, parry or perfect dodge since the last call
   empowers the next), or Raptor Strike, a spear chain (thrust, sweep, an Uppercut that throws you
   up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the

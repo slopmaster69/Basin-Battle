@@ -1114,6 +1114,7 @@ impl Survival {
                 continue;
             }
             if self.grounded(&p) {
+                self.drop_look(&p);
                 continue;
             }
             let (returns, sticks) = {
@@ -1140,6 +1141,10 @@ impl Survival {
                 self.projectile_hit(&p, v, from);
                 // A hook yanks its caster to it, an orb swaps them, a chain binds the foe.
                 self.beta_hit(&p, Some(v), t.point);
+                // Split Arrow bursts in the first foe it strikes.
+                if self.split_burst(&p, t.point, false) {
+                    continue;
+                }
                 if returns {
                     // A boomerang goes on through everything it meets, each once a way.
                     p.hits.push(v);
@@ -1186,6 +1191,10 @@ impl Survival {
                     keep.push(p);
                     continue;
                 }
+                // Split Arrow bursts against it, its spray coming back off it.
+                if self.split_burst(&p, t.point, true) {
+                    continue;
+                }
                 self.plant_at_end(p.owner, p.ability, t.point, p.dir, false);
                 self.drop_look(&p);
                 // A hook that meets a wall or the ground yanks its caster there.
@@ -1216,8 +1225,9 @@ impl Survival {
                 p.pos = self.ground_near(p.pos[0], p.pos[1], p.pos[2]);
                 self.stick(&mut p, None);
                 keep.push(p);
-            } else {
-                // Its range spent: a Hunter's arrow comes down and sticks there.
+            } else if !self.split_burst(&p, p.pos, false) {
+                // Its range spent: a Hunter's arrow comes down and sticks there (Split Arrow
+                // bursts in the air there instead).
                 self.plant_at_end(p.owner, p.ability, p.pos, p.dir, false);
                 self.drop_look(&p);
             }
@@ -1226,59 +1236,177 @@ impl Survival {
         self.projectiles = keep;
     }
 
-    /// A projectile that ricochets (Bank Shot) meets a wall, a trunk or a rock at `at`: with a
-    /// bounce left it comes off it (mirrored about the surface, flat), harder by its
-    /// `bounce_gain`, through the next foe it meets, its look flown on from there. False: no
-    /// bounce, it ends as ever.
+    /// A projectile that ricochets (Bank Shot) meets something solid at `at`. Off a wall or a
+    /// trunk, with a bounce left, it comes off it (mirrored about the surface, flat), harder by
+    /// its `bounce_gain`, through the next foe it meets. Into the ground at a shallow angle it
+    /// skips off it (as steeply up as it came down), no harder and no bounce spent; a steeper one
+    /// stops there. Either way its `burst_spell` flashes where it struck and its look flies on
+    /// from there. False: it ends as ever (and plants).
     fn ricochet(&mut self, p: &mut Projectile, at: Vec3) -> bool {
+        // Shallower than this (its sine, about 20°), an arrow skips off the ground.
+        const SKIP: f32 = 0.34;
         let d = &self.content.abilities[p.ability];
-        if p.bounced >= d.bounces || p.left < 1.0 {
+        let (gain, base, bounces, flash) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell);
+        // (Its flight this step, up to where it struck.)
+        let left = p.left - len(sub(at, p.pos));
+        if bounces == 0 || left < 1.0 {
             return false;
         }
-        let (gain, base) = (d.bounce_gain, AbilityDef::at(d.damage, p.share));
-        // The surface's way out: toward the open ground round where it struck.
-        let mut n = [0.0f32, 0.0];
-        for k in 0..16 {
-            let a = k as f32 / 16.0 * std::f32::consts::TAU;
-            let q = [at[0] + a.cos() * 0.9, at[1] + a.sin() * 0.9, at[2]];
-            if !self.land.blocked_near(q[0], q[1], q[2]) {
-                n[0] += a.cos();
-                n[1] += a.sin();
+        match self.surface(at, p.dir) {
+            None => {
+                if p.dir[2] >= 0.0 || -p.dir[2] > SKIP {
+                    return false;
+                }
+                let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
+                p.dir = [p.dir[0], p.dir[1], -p.dir[2]];
+                p.pos = [at[0], at[1], at[2].max(ground + 0.15)];
+            }
+            Some(n) => {
+                if p.bounced >= bounces {
+                    return false;
+                }
+                let dot = p.dir[0] * n[0] + p.dir[1] * n[1];
+                p.dir = norm([p.dir[0] - 2.0 * dot * n[0], p.dir[1] - 2.0 * dot * n[1], 0.0]);
+                p.pos = [at[0] + n[0] * 0.5, at[1] + n[1] * 0.5, at[2]];
+                p.bounced += 1;
+                p.damage += base * gain;
+                p.pierce = p.pierce.max(1);
+                p.hits.clear();
             }
         }
-        let l = (n[0] * n[0] + n[1] * n[1]).sqrt();
-        // Struck the ground, or a wall all round: no bounce.
-        let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
-        if l < 0.2 || at[2] < ground + 0.15 {
-            return false;
-        }
-        let n = [n[0] / l, n[1] / l];
-        let dot = p.dir[0] * n[0] + p.dir[1] * n[1];
-        if dot >= 0.0 {
-            return false;
-        }
-        p.dir = norm([p.dir[0] - 2.0 * dot * n[0], p.dir[1] - 2.0 * dot * n[1], 0.0]);
-        p.pos = [at[0] + n[0] * 0.5, at[1] + n[1] * 0.5, at[2]];
-        p.bounced += 1;
-        p.damage += base * gain;
-        p.pierce = p.pierce.max(1);
-        p.hits.clear();
-        // Its look: the arrow flown on from where it struck.
+        p.left = left;
+        // Its look: the arrow flown on from where it struck (by an unseen anchor standing there),
+        // and a flash there.
         self.drop_look(p);
         let anchor = self.alloc();
-        let end = self.wall_trace(p.pos, p.dir, p.left, p.owner).point;
+        let end = self.look_end(p);
         self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: p.spell, from: p.pos, target: Target::Point(end) });
+        if flash != 0 {
+            self.events.push(Event::Missile { caster: anchor, spell: flash, target: Target::Point(at) });
+        }
         p.look = Some(anchor);
-        if self.players.contains_key(&p.owner) {
-            self.events.push(Event::Flash { player: p.owner, text: format!("Bank! x{}", p.bounced + 1) });
+        true
+    }
+
+    /// What a projectile flying along `dir` struck just past `at`: a wall or a trunk (`Some`: the
+    /// flat way out of it, away from the solid round the spot, so a thin wall, a trunk and a
+    /// corner alike; straight back if that can't be told), or the ground (`None`).
+    fn surface(&self, at: Vec3, dir: Vec3) -> Option<[f32; 2]> {
+        let next = add(at, dir, STEP);
+        if !self.land.blocked_near(next[0], next[1], next[2]) && !self.land.blocked_near(at[0], at[1], at[2]) {
+            return None;
+        }
+        let mut n = [0.0f32, 0.0];
+        for r in [0.5f32, 0.9] {
+            for k in 0..16 {
+                let a = k as f32 / 16.0 * std::f32::consts::TAU;
+                if self.land.blocked_near(at[0] + a.cos() * r, at[1] + a.sin() * r, at[2]) {
+                    n[0] -= a.cos();
+                    n[1] -= a.sin();
+                }
+            }
+        }
+        let back = [-dir[0], -dir[1]];
+        let flat = |v: [f32; 2]| {
+            let l = (v[0] * v[0] + v[1] * v[1]).sqrt();
+            (l > 1.0e-3).then(|| [v[0] / l, v[1] / l])
+        };
+        let n = if (n[0] * n[0] + n[1] * n[1]).sqrt() < 0.2 { flat(back) } else { flat(n) };
+        // (Straight down at a wall: no way off it but the ground's.)
+        let n = n?;
+        // It came at it: off it. Along it or away (a wall it grazed): straight back.
+        if dir[0] * n[0] + dir[1] * n[1] < -0.05 {
+            Some(n)
+        } else {
+            flat(back).or(Some(n))
+        }
+    }
+
+    /// Where a projectile's flight would end if nothing moved, through as many bodies as it can
+    /// still pierce: the next body, a wall, the ground or its range's end (for its look).
+    fn look_end(&self, p: &Projectile) -> Vec3 {
+        let mut skip = p.hits.clone();
+        loop {
+            let t = self.trace_skipping(p.pos, p.dir, p.left, p.radius, p.owner, p.allies, &skip);
+            match t.unit {
+                Some(v) if skip.len() < p.hits.len() + p.pierce as usize => skip.push(v),
+                _ => return t.point,
+            }
+        }
+    }
+
+    /// A splitting arrow (Split Arrow) bursts at `at`, its flight over: its `burst_spell` there,
+    /// and its `splits` arrows fanned out from there `spread` apart, on along its way (level),
+    /// or back off the wall it struck (`solid`), each its look flown from the burst by an unseen
+    /// anchor. They go through the foe it burst in and on. False: it doesn't split.
+    fn split_burst(&mut self, p: &Projectile, at: Vec3, solid: bool) -> bool {
+        let d = &self.content.abilities[p.ability];
+        let flash = d.burst_spell;
+        let Some(k) = self.content.ability(&d.splits) else { return false };
+        let s = self.content.abilities[k].clone();
+        let way = {
+            let l = (p.dir[0] * p.dir[0] + p.dir[1] * p.dir[1]).sqrt();
+            if l > 1.0e-3 {
+                [p.dir[0] / l, p.dir[1] / l]
+            } else {
+                [1.0, 0.0]
+            }
+        };
+        // Off a wall: mirrored about it, starting out of it a little. Off the ground or in the
+        // open: on along its way.
+        let (way, from) = match solid.then(|| self.surface(at, p.dir)).flatten() {
+            Some(n) => {
+                let dot = way[0] * n[0] + way[1] * n[1];
+                ([way[0] - 2.0 * dot * n[0], way[1] - 2.0 * dot * n[1]], [at[0] + n[0] * 0.4, at[1] + n[1] * 0.4, at[2]])
+            }
+            None => (way, at),
+        };
+        // Out of the ground, at the least.
+        let floor = self.land.height_near(from[0], from[1], from[2] + 0.6);
+        let from = [from[0], from[1], from[2].max(floor + 0.4)];
+        self.drop_look(p);
+        let n = s.count.max(1);
+        let mut first = None;
+        for i in 0..n {
+            let off = (i as f32 - (n - 1) as f32 / 2.0) * s.spread.to_radians();
+            let (c, sn) = (off.cos(), off.sin());
+            let anchor = self.alloc();
+            let shot = Projectile {
+                owner: p.owner,
+                ability: k,
+                pos: from,
+                dir: [way[0] * c - way[1] * sn, way[0] * sn + way[1] * c, 0.0],
+                speed: s.speed.max(1.0),
+                radius: AbilityDef::at(s.radius, p.share),
+                left: AbilityDef::at(s.range, p.share),
+                share: p.share,
+                damage: AbilityDef::at(s.damage, p.share),
+                spell: s.spell,
+                allies: s.friends(),
+                hits: Vec::new(),
+                pierce: s.pierce,
+                stage: Stage::Out,
+                born: self.clock,
+                bounced: 0,
+                look: Some(anchor),
+            };
+            let end = self.look_end(&shot);
+            self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: s.spell, from, target: Target::Point(end) });
+            first.get_or_insert(anchor);
+            self.projectiles.push(shot);
+        }
+        // The burst, from the first arrow's anchor (its look there, nothing on the hunter).
+        if let (Some(a), true) = (first, flash != 0) {
+            self.events.push(Event::Missile { caster: a, spell: flash, target: Target::Point(at) });
         }
         true
     }
 
-    /// A ricocheted projectile's look's anchor goes with it.
+    /// A ricocheted or split projectile's look's anchor goes with it, a moment after (the client
+    /// may still be about to fly its missile from there).
     fn drop_look(&mut self, p: &Projectile) {
         if let Some(a) = p.look {
-            self.events.push(Event::ObjGone { id: a });
+            self.hunt.anchors.push((a, self.clock + 1.0));
         }
     }
 
@@ -1480,6 +1608,9 @@ impl Survival {
         for p in std::mem::take(&mut self.projectiles) {
             if let Stage::Back { anchor } = p.stage {
                 self.events.push(Event::ObjGone { id: anchor });
+            }
+            if let Some(a) = p.look {
+                self.events.push(Event::ObjGone { id: a });
             }
         }
     }

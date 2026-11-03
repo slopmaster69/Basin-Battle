@@ -60,7 +60,7 @@ pub(crate) const GO_FLAG_PREVIEW_GHOST: u32 = 0x2000_0000;
 /// green rune ring for a spot that's good.
 const DANGER_DISPLAY: u32 = 5812;
 const DANGER_MODEL_RADIUS: f32 = 6.48;
-/// A missile's anchor (see [`SurvivalGame::anchor_create`]) is that circle shrunk to nothing.
+/// A missile's anchor (see [`SurvivalGame::anchor_create`]) is a creature shrunk to nothing.
 const ANCHOR_SCALE: f32 = 0.001;
 const GOOD_RING_DISPLAY: u32 = 674;
 
@@ -812,14 +812,41 @@ impl SurvivalGame {
         }
     }
 
-    /// An unseen object standing at `pos` to fly a missile from there, not from a unit (a
-    /// boomerang turning back): its guid, and the packet that makes it. It's gone with the
-    /// rules' `ObjGone` of `id`.
+    /// An unseen creature standing at `pos` to fly a missile from there, not from a hero (a
+    /// boomerang turning back, an arrow off a wall): its guid, and the packet that makes it. It's
+    /// gone with the rules' `ObjGone` of `id`. A creature, not a game object: the client flies a
+    /// spell's missile, and shows its look at a point, only from a unit (a game object's cast
+    /// skips both). Shrunk to nothing, and nobody can select it, so it shows no name or plate.
     pub(crate) fn anchor_create(&mut self, id: Id, pos: [f32; 3]) -> (u64, Packet) {
-        let entry = self.go_entry(DANGER_DISPLAY, "", GO_TYPE_GENERIC);
-        let guid = object_guid(entry, id);
+        let entry = CREATURE_ENTRY;
+        let display = self.sim.content.mobs.first().map_or(0, |d| d.display);
+        let guid = creature_guid(entry, id);
         self.bind(id, guid);
-        (guid, Self::go_packet(guid, entry, DANGER_DISPLAY, GO_TYPE_GENERIC, GO_FLAGS_INERT, ANCHOR_SCALE, pos, 0.0))
+        let look = UnitLook {
+            guid,
+            entry,
+            display_id: display,
+            scale: ANCHOR_SCALE,
+            level: 1,
+            faction: fields::FACTION_FRIENDLY,
+            health: 1,
+            max_health: 1,
+            attack_ms: 2000,
+            damage: [0, 0],
+            run_speed: 1.0,
+            npc_flags: 0,
+            unit_flags: fields::UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE,
+            main_hand: 0,
+            main_hand_info: 0,
+            off_hand: 0,
+            ranged: 0,
+        };
+        let f = fields::unit_fields(&look);
+        let made = packets::update_object(
+            &[Create { guid, object_type: packets::TYPE_UNIT, is_self: false, placement: Placement::Living { pos, facing: 0.0, speeds: packets::speeds(1.0) }, fields: &f }],
+            &[],
+        );
+        (guid, made)
     }
 
     /// A danger circle drawn to `radius`.

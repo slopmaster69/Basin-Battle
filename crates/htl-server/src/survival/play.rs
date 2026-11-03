@@ -241,7 +241,7 @@ impl SurvivalGame {
                     Aim::Point(_) => Vec::new(),
                 };
                 let ranged = self.sim.content.ranged.iter().any(|r| r.spell == spell);
-                let ammo = ranged.then_some(ARROW_DISPLAY);
+                let ammo = arrow_ammo(&self.sim.content, spell);
                 // The shot ends the bow's drawn pose.
                 if ranged {
                     self.casting.remove(&caster);
@@ -260,7 +260,7 @@ impl SurvivalGame {
                 };
                 let (g, made) = self.anchor_create(anchor, from);
                 self.broadcast(&made);
-                let ammo = self.sim.content.ranged.iter().any(|r| r.spell == spell).then_some(ARROW_DISPLAY);
+                let ammo = arrow_ammo(&self.sim.content, spell);
                 self.broadcast(&packets::spell_go(g, spell, aim, &hits, ammo));
             }
             Event::Cast { caster, spell, ms } => {
@@ -847,4 +847,12 @@ impl SurvivalGame {
 
 pub(crate) fn clean(s: &str) -> String {
     s.replace(['\t', '\n', '\r', '|', '~', '^'], " ")
+}
+
+/// The arrow a missile flies with when its look is a nocked arrow (the bow's shot, and every
+/// Hunter arrow, those that plant): the client draws a shot with no missile model of its own from
+/// the ammo it's sent, and with none, nothing.
+fn arrow_ammo(c: &htl_survival::content::Content, spell: u32) -> Option<u32> {
+    let arrow = c.ranged.iter().any(|r| r.spell == spell) || c.abilities.iter().any(|a| a.plants && (a.spell == spell || a.full_spell == spell));
+    arrow.then_some(ARROW_DISPLAY)
 }
