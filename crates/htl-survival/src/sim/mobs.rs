@@ -352,6 +352,10 @@ impl Survival {
             self.mobs.get_mut(&id).unwrap().hidden = true;
         } else {
             self.events.push(Event::MobSpawned { id });
+            // Its own look, on it from the start.
+            if self.content.mobs[def].aura != 0 {
+                self.events.push(Event::Auras { id });
+            }
         }
         id
     }

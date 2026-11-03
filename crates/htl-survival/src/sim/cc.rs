@@ -591,6 +591,13 @@ impl Survival {
                 }
             }
         }
+        // A creature's own look (a spirit beast's glow).
+        if let Some(m) = self.mobs.get(&id) {
+            let a = self.content.mobs[m.def].aura;
+            if a != 0 {
+                out.push(a);
+            }
+        }
         // A sticky projectile's fuse burning on them.
         out.extend(self.fuse_auras(id));
         out.sort_unstable();

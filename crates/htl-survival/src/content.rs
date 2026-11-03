@@ -1778,6 +1778,10 @@ pub struct MobDef {
     pub totem: bool,
     #[serde(default)]
     pub dummy: bool,
+    /// A look it always wears: a spell whose state look plays on it (a spirit beast's ghostly
+    /// glow). 0: none.
+    #[serde(default)]
+    pub aura: u32,
     /// The cards the camp learns the first time it falls (a class's champion).
     #[serde(default)]
     pub teaches: Vec<String>,
