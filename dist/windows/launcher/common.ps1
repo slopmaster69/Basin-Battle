@@ -31,6 +31,7 @@ $SurvivalName = ProjectName "survival" "Elwynn Survival"
 $BasinName = ProjectName "basin" "Basin Battle"
 $Repository = ProjectName "repository" "slopmaster69/Basin-Battle"
 $GroupServer = ProjectName "server" ""
+$BackupServer = ProjectName "backup" ""
 
 # The world port of each game, as the server runs them.
 function WorldPort($game) { if ($game -eq "basin") { 8085 } else { 8086 } }

@@ -120,11 +120,13 @@ $gameBox.Controls.AddRange(@($rSurvival, $rBasin))
 $choices.Controls.Add((Label "Server" 0 78 300 22 (Font 11 -Bold) $Gold))
 $placeBox = New-Object System.Windows.Forms.Panel
 $placeBox.Location = Pos 8 100
-$placeBox.Size = Size 350 92
+$placeBox.Size = Size 350 96
 $choices.Controls.Add($placeBox)
 $y = 2
 $rGroup = $null
 if ($GroupServer) { $rGroup = Radio "The group's server ($GroupServer)" $y; $placeBox.Controls.Add($rGroup); $y += 23 }
+$rBackup = $null
+if ($BackupServer) { $rBackup = Radio "The backup server ($BackupServer)" $y; $placeBox.Controls.Add($rBackup); $y += 23 }
 $rOwn = Radio "My own server on this PC" $y
 $y += 23
 $rOther = Radio "Someone else's:" $y
@@ -215,6 +217,7 @@ function Reach($address, $port, $ms) {
 function Where-Words($s) {
     switch ($s["place"]) {
         "group" { "the group's server" }
+        "backup" { "the backup server" }
         "own" { "your own server on this PC" }
         "address" { "$($s["address"])" }
         default { "" }
@@ -226,6 +229,7 @@ function Choose($s) {
     $addressBox.Text = "$($s["address"])"
     $which = $rOwn
     if ($s["place"] -eq "address") { $which = $rOther }
+    elseif ($rBackup -and $s["place"] -eq "backup") { $which = $rBackup }
     elseif ($rGroup -and ($s["place"] -eq "group" -or -not $s["place"])) { $which = $rGroup }
     $which.Checked = $true
     $wowLabel.Text = "$($ui.data)"
@@ -242,6 +246,7 @@ function Choose($s) {
     }
     $s["game"] = if ($rBasin.Checked) { "basin" } else { "survival" }
     if ($rGroup -and $rGroup.Checked) { $s["place"] = "group" }
+    elseif ($rBackup -and $rBackup.Checked) { $s["place"] = "backup" }
     elseif ($rOther.Checked) { $s["place"] = "address"; $s["address"] = $addressBox.Text.Trim() }
     else { $s["place"] = "own" }
     if ($ui.data) { $s["wow"] = $ui.data }
@@ -321,6 +326,7 @@ try {
     if ($Game -match 'basin') { $settings["game"] = "basin" } elseif ($Game) { $settings["game"] = "survival" }
     if (-not $settings["game"]) { $settings["game"] = "survival" }
     if ($settings["place"] -eq "group" -and -not $GroupServer) { $settings["place"] = "" }
+if ($settings["place"] -eq "backup" -and -not $BackupServer) { $settings["place"] = "" }
     # With a group server named in project.toml, a first run goes straight there: one click to join.
     if (-not $settings["place"] -and $GroupServer) { $settings["place"] = "group" }
     if ($Change -or -not (Where-Words $settings)) { Choose $settings }
@@ -342,6 +348,7 @@ try {
         # 4. The server.
         switch ($settings["place"]) {
             "group" { $address = $GroupServer }
+            "backup" { $address = $BackupServer }
             "address" { $address = $settings["address"] }
             default { $address = "127.0.0.1" }
         }
@@ -367,10 +374,12 @@ try {
         if (Reach $address 3724 4000) { break }
         if ((Is-TailscaleAddress $address) -and -not (Test-Path $TailscaleExe)) { Start-Process "https://tailscale.com/download/windows" }
         Set-Status (Why-Unreachable $address)
-        Buttons "Try again" "Change..." "Quit"
+        # The group's server down: the backup is one click away (for this time only: not saved).
+        $offerBackup = ($settings["place"] -eq "group" -and $BackupServer)
+        if ($offerBackup) { Buttons "Try again" "Use backup" "Quit" } else { Buttons "Try again" "Change..." "Quit" }
         $answer = Wait-Click
         if ($answer -eq "c") { Leave }
-        if ($answer -eq "b") { Choose $settings }
+        if ($answer -eq "b") { if ($offerBackup) { $settings["place"] = "backup" } else { Choose $settings } }
     }
 
     # 5. Play.

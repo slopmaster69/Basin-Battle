@@ -16,6 +16,11 @@ basin = "Basin Battle"
 # Where releases (and the Windows download's updates) come from: owner/name on GitHub.
 repository = "slopmaster69/Basin-Battle"
 
-# The group's own server, if there is one: Play offers it first, so friends never type an
-# address. Empty: Play asks for one (or plays on this PC's own server).
-server = ""
+# The group's own server: Play goes there by itself, so friends never type an address. It's the
+# host's Tailscale address (100.x.y.z) or a hostname. Empty: Play asks the first time.
+server = "100.125.4.34"
+
+# A second host for when the first doesn't answer: Play's "Try again" screen then offers it with
+# one click (for that session; next time it's the first again). It's its own world, so heroes made
+# on one aren't on the other. Empty: no backup.
+backup = ""
