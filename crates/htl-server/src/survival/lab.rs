@@ -29,6 +29,10 @@ const SHOTS: u32 = 30;
 const EVERY_MS: u32 = 80;
 /// The shots start this long before the first step, so the frame before it is in the burst.
 const LEAD: f32 = 0.25;
+/// The scene stands this long before the burst: a body just set out fades in on the client over
+/// about a second (seen in the lab: the brave's wind-up was invisible), and the lock-on camera
+/// settles.
+const SETTLE: f32 = 1.5;
 
 pub(crate) struct Lab {
     pub hero: Id,
@@ -38,6 +42,8 @@ pub(crate) struct Lab {
     pub steps: VecDeque<(f32, String)>,
     pub start: f32,
     pub until: f32,
+    /// The burst's line to the add-on and the video's length, sent once the scene has settled.
+    pub burst: Option<(f32, String, f32)>,
     pub mobs: Vec<Id>,
     pub trace: Vec<String>,
     /// The ability's key on the bar (0-4) and whether its aim is the ground's.
@@ -125,7 +131,7 @@ impl SurvivalGame {
         self.lab_mobs = mobs.clone();
         // The steps, timed from a moment after the burst starts.
         let now = self.sim.clock;
-        let start = now + LEAD;
+        let start = now + SETTLE + LEAD;
         let mut at = start;
         let mut queue = VecDeque::new();
         for s in steps.split(',').map(str::trim).filter(|s| !s.is_empty()) {
@@ -142,8 +148,6 @@ impl SurvivalGame {
         // The camera the add-on puts the run in: nearer for a scene at arm's length, else behind
         // (the hero is locked on to the scene, so either way it's in front of them).
         let cam = cam.unwrap_or_else(|| if matches!(scene.as_str(), "close" | "ring") { "close" } else { "behind" }.to_string());
-        self.ui_line(conn, &format!("LB\t{shots}\t{every}\t{label}\t{cam}"));
-        record_video(&label, shots as f32 * every as f32 / 1000.0 + 0.6);
         let mut trace = vec![
             format!("# {label}: {} ({}), scene {scene} of {creature}, steps {steps}, {shots} shots every {every} ms from -{LEAD:.2} s", d.name, d.key),
             format!("# spell {} aura {} icon {} clip {} kind {}", d.spell, d.aura, d.icon, d.clip, d.kind),
@@ -157,6 +161,7 @@ impl SurvivalGame {
             steps: queue,
             start,
             until: start + secs - LEAD + 0.3,
+            burst: Some((now + SETTLE, format!("LB\t{shots}\t{every}\t{label}\t{cam}"), secs + 0.6)),
             mobs,
             trace,
             slot,
@@ -209,6 +214,14 @@ impl SurvivalGame {
         if !self.lab_mobs.is_empty() {
             let mobs = self.lab_mobs.clone();
             self.sim.lab_hold(&mobs);
+        }
+        let Some(lab) = self.lab.as_mut() else { return };
+        if lab.burst.as_ref().is_some_and(|(at, _, _)| *at <= now) {
+            let (_, line, secs) = lab.burst.take().unwrap();
+            let (conn, label) = (lab.conn, lab.label.clone());
+            lab.asked = std::time::SystemTime::now();
+            self.ui_line(conn, &line);
+            record_video(&label, secs);
         }
         let Some(lab) = self.lab.as_mut() else { return };
         let mut due = Vec::new();
