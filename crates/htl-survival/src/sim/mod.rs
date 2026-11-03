@@ -224,6 +224,9 @@ pub enum Event {
     /// Shadow Fissure...) in place of the drawn circle; 0, the circle.
     Mark { id: Id, pos: Vec3, radius: f32, tele: Option<Telegraph>, ground: u32 },
     MarkGone { id: Id },
+    /// A rope from `a` to `b` (Tripwire's wire, taut a hand above the ground), until the mark
+    /// `id` it goes with is gone (`MarkGone`).
+    Rope { id: Id, a: Vec3, b: Vec3 },
     Bags { player: Id },
     Storage,
     Tell { player: Id, text: String },
