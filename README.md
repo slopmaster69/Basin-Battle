@@ -35,10 +35,11 @@ One download does everything: playing, hosting and updating.
 1. From the [Releases](https://github.com/slopmaster69/Basin-Battle/releases) page, download the
    newest **Basin Battle for Windows.zip** and unzip it anywhere, e.g. `Documents\Basin Battle`.
    This is the last time you download it by hand: from then on it updates itself.
-2. Double-click **Play.bat**. If Windows says it protected your PC: More info → Run anyway.
+2. Double-click **Play** (the shield). If Windows says it protected your PC: More info → Run anyway.
+   A small window with the shield shows what it's doing; no console.
    - It finds your WoW 1.12.1 install by itself (or asks for the folder once).
    - It goes straight to **the group's server** (the `server` line in `project.toml`), so joining
-     the group is one click. Press **C** in the first 3 seconds to choose instead: **your own
+     the group is one click. Click **Change** in the first 3 seconds to choose instead: **your own
      server on this PC** (alone, or friends join you) or **someone else's server** (type the
      address they give you). It remembers what you chose.
    - The group plays over Tailscale for now: the first time, install
@@ -48,10 +49,10 @@ One download does everything: playing, hosting and updating.
 3. Log in with **any name** (it becomes your hero) and the password (**hold** unless the host
    changed it).
 
-**Hosting without playing**, or for a group: double-click **Host.bat** and leave its window open.
+**Hosting without playing**, or for a group: double-click **Host** and leave its window open.
 The server comes ready-made in the download (nothing to install or build), and its window shows
 the addresses friends join with (see [Friends joining](#friends-joining)). Options go after it:
-`Host.bat --password ember`, or `--game survival` for only Elwynn Survival. Allow `htl-server` on
+`Host.exe --password ember`, or `--game survival` for only Elwynn Survival. Allow `htl-server` on
 the network when Windows asks.
 
 **Updates are automatic.** Play gets the newest release before it starts the game. Host checks
@@ -60,14 +61,14 @@ minutes ahead, saves the worlds, and comes back on the new version by itself. So
 friends who update by playing always match. Your settings, keys and mouse speed are kept, and
 the worlds (in `server\saves`) are backed up first, to `server\saves-backups`.
 
-**What's in the folder:** Play.bat, Host.bat and README.txt are all you use. `benilla.exe` and
+**What's in the folder:** Play, Host and README.txt are all you use. `benilla.exe` and
 `benilla-config` are the game, `server` is the server and your saved worlds, and `launcher` is
 what the two buttons run (with `project.toml`, the names, and `version.txt`).
 
 **Hosting from the source instead** (to try a branch, or change the server): get the code (below)
 and double-click **Host Basin Battle.bat** in it. The first run installs Rust if it's missing (no
 Visual Studio needed), asks for your WoW 1.12.1 folder once (kept in `settings-windows.txt`) and
-builds the server (5-10 minutes). Players join it with Play.bat as usual.
+builds the server (5-10 minutes). Players join it with Play as usual.
 
 ## Mac
 

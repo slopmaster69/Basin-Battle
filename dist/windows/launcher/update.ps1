@@ -77,6 +77,13 @@ try {
         & robocopy $from $to $how /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
         if ($LASTEXITCODE -ge 8) { throw "copying into $to failed (robocopy $LASTEXITCODE)" }
     }
+    # A running Play.exe or Host.exe (Host runs this at a restart) can't be written over, but can
+    # be renamed: out of the way, and gone next time.
+    foreach ($button in @("Play.exe", "Host.exe")) {
+        $at = Join-Path $Root $button
+        Remove-Item "$at.old" -Force -ErrorAction SilentlyContinue
+        if ((Test-Path $at) -and (Test-Path (Join-Path $new $button))) { Move-Item $at "$at.old" -Force }
+    }
     # Everything over the old, which keeps your files (the download has none of them)...
     Copy-Tree $new $Root
     # ...then what the release owns outright made exactly the new one, so nothing stale is left
@@ -86,6 +93,7 @@ try {
     }
     # Files an older download had that this one doesn't.
     $retired = @("launcher.ps1", "Play Basin Battle.bat", "Play Elwynn Survival.bat", "LICENSE-MIT", "LICENSE-APACHE",
+        "Play.bat", "Host.bat", "Play.exe.old", "Host.exe.old",
         "Start on this PC.bat", "Start Elwynn Survival on this PC.bat", "start-on-this-pc.ps1", "start-elwynn-on-this-pc.ps1")
     foreach ($f in $retired) { Remove-Item (Join-Path $Root $f) -Force -ErrorAction SilentlyContinue }
     # The game's memory of item and creature details: asked afresh of the new server.

@@ -24,8 +24,8 @@ The host runs both games at once. Each has its own realm on the one login:
 How to install, host, play alone and join friends (on Windows, a Mac or Linux) is in the
 [README](../README.md). In short: one person hosts, everyone plays, all on the same release.
 
-- **Windows:** one download from the Releases page, with two buttons: **Play.bat** (it joins the
-  group's server, or yours) and **Host.bat** (your own server, ready to run). Both keep the folder
+- **Windows:** one download from the Releases page, with two buttons: **Play** (it joins the
+  group's server, or yours) and **Host** (your own server, ready to run). Both keep the folder
   up to date by themselves.
 - **Mac:**
 

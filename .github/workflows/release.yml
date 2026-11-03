@@ -1,7 +1,7 @@
 # Push a tag (git tag v0.4.0 && git push origin v0.4.0) to build "<title> for Windows.zip" (the
 # title is project.toml's): the pinned benilla client with this repo's patches, the server, both
-# built for Windows, the add-ons, the server's content, and Play.bat and Host.bat with their
-# launcher, attached to a GitHub release for that tag. It holds no WoW files. A folder unzipped
+# built for Windows, the add-ons, the server's content, and Play.exe and Host.exe with their
+# launcher (all three exes wearing dist/windows/art/icon.ico), attached to a GitHub release for that tag. It holds no WoW files. A folder unzipped
 # from it updates itself from later releases (launcher\update.ps1, by the tag in
 # launcher\version.txt).
 #
@@ -68,6 +68,20 @@ jobs:
           target\release\htl-server.exe --help | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "htl-server.exe --help failed (exit $LASTEXITCODE)" }
 
+      # Play.exe and Host.exe, the two buttons; then the project's shield on them and on the game
+      # (rcedit writes the icon into an exe that's already built: no change to the client).
+      - name: Build the buttons, and put the icon on them and on the game
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: |
+          cargo build --release --manifest-path dist/windows/buttons/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw "the buttons didn't build" }
+          Invoke-WebRequest -UseBasicParsing -OutFile rcedit.exe -Uri https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
+          foreach ($exe in "dist/windows/buttons/target/release/Play.exe", "dist/windows/buttons/target/release/Host.exe", "benilla/target/release/benilla.exe") {
+            ./rcedit.exe $exe --set-icon dist/windows/art/icon.ico
+            if ($LASTEXITCODE -ne 0) { throw "rcedit couldn't put the icon on $exe" }
+          }
+
       - name: Package
         shell: pwsh
         run: |
@@ -79,13 +93,15 @@ jobs:
           $out = "dist-out/$package"
           New-Item -ItemType Directory -Force -Path "$out/benilla-config/AddOns", "$out/launcher", "$out/server" | Out-Null
           # The top of the folder: the two buttons, the read-me and the game.
-          Copy-Item dist/windows/Play.bat, dist/windows/Host.bat, dist/windows/README.txt "$out/"
+          Copy-Item dist/windows/buttons/target/release/Play.exe, dist/windows/buttons/target/release/Host.exe, dist/windows/README.txt "$out/"
           Copy-Item benilla/target/release/benilla.exe "$out/"
           # As config.default.toml: Play copies it to config.toml on a first run only.
           Copy-Item dist/windows/benilla-config/config.toml "$out/benilla-config/config.default.toml"
           Copy-Item -Recurse addon/BasinBattle, addon/ElwynnSurvival "$out/benilla-config/AddOns/"
           # What the buttons run, the names, the licences and the version it updates from.
           Copy-Item dist/windows/launcher/*.ps1, project.toml, dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/launcher/"
+          # The shield: the launcher's window shows it, and its title bar's icon.
+          Copy-Item dist/windows/art/icon.ico, dist/windows/art/shield.png "$out/launcher/"
           $version = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "branch $env:GITHUB_REF_NAME ($($env:GITHUB_SHA.Substring(0, 7)))" }
           Set-Content -Path "$out/launcher/version.txt" -Value $version
           # The server and its content (saves and logs are made beside them on the host's PC).

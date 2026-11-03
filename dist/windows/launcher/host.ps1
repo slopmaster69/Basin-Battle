@@ -1,8 +1,8 @@
-# What Host.bat runs: this PC's server for both games, the one that came in this download (nothing
+# What Host.exe runs: this PC's server for both games, the one that came in this download (nothing
 # to build). Leave its window open while anyone plays; close it to stop the server.
-#   Host.bat --password secret       the password everyone logs in with (default: hold)
-#   Host.bat --game survival         only one of the games (or --game basin)
-# Any option goes to the server as given (Host.bat --help lists them).
+#   Host.exe --password secret       the password everyone logs in with (default: hold)
+#   Host.exe --game survival         only one of the games (or --game basin)
+# Any option goes to the server as given (Host.exe --help lists them).
 # Every 15 minutes it asks GitHub for a new version. When there is one, everyone playing is
 # warned 5 minutes ahead, the worlds are saved, and the server comes back on the new version by
 # itself, so the host and the friends who update by playing always match.

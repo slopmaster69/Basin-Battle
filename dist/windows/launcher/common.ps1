@@ -77,8 +77,9 @@ function DataFolderOf($dir) {
 # desktop, Documents, Downloads and Games folders, one level into any folder whose name says WoW.
 function Find-WowData {
     $places = New-Object System.Collections.Generic.List[string]
-    $drives = @(Get-PSDrive -PSProvider FileSystem -ErrorAction SilentlyContinue |
-        Where-Object { $_.Root -match '^[A-Z]:\\$' } | ForEach-Object { $_.Root })
+    # Local drives only: a network drive could keep the search waiting.
+    $drives = @([IO.DriveInfo]::GetDrives() | Where-Object { $_.DriveType -eq "Fixed" -and $_.IsReady } |
+        ForEach-Object { $_.RootDirectory.FullName })
     $homes = @($env:USERPROFILE, [Environment]::GetFolderPath("Desktop"), [Environment]::GetFolderPath("MyDocuments"),
         (Join-Path $env:USERPROFILE "Downloads"), (Join-Path $env:USERPROFILE "Games"),
         $env:ProgramFiles, ${env:ProgramFiles(x86)}) | Where-Object { $_ }

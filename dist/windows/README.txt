@@ -16,11 +16,11 @@ Classic installs will NOT work.
 
 THE TWO BUTTONS
 ---------------
-  Play.bat   Plays. It gets the newest version first if there is one, finds
+  Play       Plays. It gets the newest version first if there is one, finds
              your WoW 1.12.1 by itself, and starts where you played last time.
-             Press C in the first 3 seconds to choose again: which game, and
-             which server (yours, or someone else's).
-  Host.bat   Runs YOUR server, for both games: for you alone, or for friends to
+             Click Change in the first 3 seconds to choose again: which game,
+             which server (yours, or someone else's), or your WoW folder.
+  Host       Runs YOUR server, for both games: for you alone, or for friends to
              join. Leave its window open while anyone plays.
 
 Log in with ANY name you like (it becomes your hero) and the password
@@ -32,7 +32,7 @@ info", then "Run anyway".
 
 PLAY WITH THE GROUP
 -------------------
-Double-click Play.bat. It joins the group's server by itself: nothing to
+Double-click Play. It joins the group's server by itself: nothing to
 type. The group plays over Tailscale (a private network between friends'
 PCs), so the first time only:
   1. Install Tailscale (tailscale.com/download) and sign in.
@@ -44,14 +44,14 @@ or the host's server not running.
 
 PLAY ALONE
 ----------
-Double-click Play.bat, press C, and choose "My own server on this PC". If
+Double-click Play, click Change, and choose "My own server on this PC". If
 your server isn't running, Play starts it (a second window: leave it open)
-and joins it. Next time, just double-click Play.bat.
+and joins it. Next time, just double-click Play.
 
 
 PLAY WITH FRIENDS ON YOUR SERVER (YOU HOST)
 -------------------------------------------
-Play alone as above (or double-click Host.bat). The server's window shows
+Play alone as above (or double-click Host). The server's window shows
 the addresses to give your friends:
   Same house or Wi-Fi     the 192.168... address
   Over Tailscale          the 100... address (if you and they use Tailscale)
@@ -62,8 +62,8 @@ If Windows asks whether htl-server may use the network, click Allow.
 
 PLAY ON A FRIEND'S SERVER
 -------------------------
-Double-click Play.bat, press C, pick the game, then "Someone else's server"
-and type the address they give you. It's remembered for next time. (The
+Double-click Play, click Change, pick the game, then "Someone else's" and
+type the address they give you. It's remembered for next time. (The
 group's own server is already built in: see PLAY WITH THE GROUP.)
 
 
@@ -78,7 +78,7 @@ Your worlds live in server\saves. Delete a file there (with the server
 stopped) to start that world over.
 
 Only ONE game window at a time: it's titled "benilla". If you're unsure,
-close every benilla window and start again from Play.bat.
+close every benilla window and start again from Play.
 
 
 ELWYNN SURVIVAL: CONTROLS
@@ -196,15 +196,16 @@ BASIN BATTLE: PLAYING
 TROUBLESHOOTING
 ---------------
 "benilla: no WoW install found", or Play found the wrong WoW
-    Double-click Play.bat, press C, then W, and pick the folder that has
+    Double-click Play, click Change, then Change... under World of Warcraft,
+    and pick the folder that has
     WoW.exe and Data\dbc.MPQ in it.
 
 "Unable to connect" on the login screen
     - Check the address with the host.
     - The host's server window must be open.
     - You and the host must be on the same version: close the game and
-      start it again from Play.bat (it updates), and ask the host to
-      restart Host.bat if theirs is older.
+      start it again from Play (it updates), and ask the host to
+      restart Host if theirs is older.
     - Over the internet, the host's router must forward ports 3724, 8085 and
       8086 to their computer (or use Tailscale).
 
@@ -217,7 +218,7 @@ Anti-virus removed benilla.exe or server\htl-server.exe
 
 "Port 3724 is taken" when hosting
     Another server is already running on this PC (an older copy of the
-    game, say). Close its window, then start Host.bat again.
+    game, say). Close its window, then start Host again.
 
 No mouse cursor after logging out
     The cursor comes back as you leave the world. If it doesn't (an old
