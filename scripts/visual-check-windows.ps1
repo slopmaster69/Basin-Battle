@@ -724,6 +724,10 @@ try {
     Get-ChildItem $Root -Force -Exclude target, saves, logs, settings-windows.txt, settings.sh, "visual-check-*" | Remove-Item -Recurse -Force
     Expand-Archive -Path $Zip -DestinationPath $Root -Force
     Remove-Item $Zip -Force
+    # A zip's files keep the commit's time, which can be older than the last build: cargo would
+    # call the old build fresh. Now, so it rebuilds what's there.
+    $now = Get-Date
+    Get-ChildItem (Join-Path $Root "crates"), (Join-Path $Root "content") -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { $_.LastWriteTime = $now }
     L "unpacked into $Root; starting the server (it builds first)"
     Start-Process -FilePath (Join-Path $Root "Host Basin Battle.bat") -WorkingDirectory $Root -WindowStyle Minimized
     $until = (Get-Date).AddMinutes(40); $up = $false
