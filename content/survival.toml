@@ -4661,6 +4661,76 @@ clip = 53
 # (staggered, knocked down, stunned, or a boss stance-broken). An EX shares its key's cooldown.
 # First numbers for tuning (Corey's blueprint, Nov 2). None of it seen in the client yet.
 
+# Q: the axe that holds a spot. 12 a second for 5 sec within 3 yd (a tick each half second), and
+# the recast tears it back through the pack for 16.
+[[ability]]
+key = "ravager"
+name = "Ravager"
+text = "Hurls a great axe to the target spot up to 20 yd away. It lands spinning and stays for 5 sec. Enemies within 3 yd of it take 6 damage every 0.5 sec. Recast to recall it. It tears back to you, dealing 16 damage to every enemy in its 2 yd wide path."
+icon = "INV_Axe_09"
+school = "warrior"
+slot = "ranged"
+choice = 2
+kind = "ground"
+range = [20.0, 20.0]
+radius = [3.0, 3.0]
+# The axe's flight: Grasping Axe's spinning axe flown to the spot as it's hurled, landing as it
+# arrives (20 yd at its 40 yd a sec).
+delay = 0.5
+look_lead = 0.5
+spell = 24020
+linger = 5.0
+linger_damage = 12.0
+tick = 0.5
+# Whirlwind's spin where it stands (to be checked in the lab).
+linger_spell = 1680
+cooldown = 10.0
+clip = 107
+valor_hit = 3.0
+recast = "ravager_recall"
+recast_secs = 5.5
+
+[[ability]]
+key = "ravager_recall"
+name = "Ravager"
+text = "Ravager's recall. Tears the axe back to you, dealing 16 damage to every enemy in its 2 yd wide path."
+icon = "INV_Axe_09"
+inner = true
+slot = "ranged"
+kind = "line"
+at_once = true
+tears_back = true
+range = [20.0, 20.0]
+radius = [1.0, 1.0]
+damage = [16.0, 16.0]
+speed = 40.0
+spell = 24020
+valor_hit = 4.0
+
+# Q's EX: the spear that pulls the fight off a friend. A Taunt isn't crowd control: the enemy acts
+# freely, on you, so it works on a boss too.
+[[ability]]
+key = "heroic_throw"
+name = "Heroic Throw"
+ex_of = "ravager"
+text = "Throws a spear 30 yd along the aimed line. It pierces up to 3 enemies, dealing 16 damage to each and Taunting them for 4 sec (2 sec against heroes). A Taunted enemy attacks only you. A Taunted hero deals 30% less damage to anyone but you."
+icon = "INV_Spear_02"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [16.0, 16.0]
+range = [30.0, 30.0]
+radius = [0.45, 0.45]
+pierce = 2
+# Level along the line, so it goes through all three, not over the third.
+skims = true
+# The Darkspear's thrown spear, at its own speed.
+speed = 30.0
+spell = 23065
+clip = 107
+# Taunt's red flash on each one pierced.
+effects = [{ kind = "taunt", secs = [4.0, 4.0], amount = 0.3, aura = 355 }]
+
 # E: the crowd cash-in. No knockback, no stagger: it just hits the opened hard.
 [[ability]]
 key = "cleave"
@@ -10167,7 +10237,7 @@ name = "The Garrison's Banner"
 at = [-9885.0, 675.0]
 display = 631
 scale = 1.0
-teaches = ["hurled_axe", "shockwave", "cleave"]
+teaches = ["hurled_axe", "shockwave", "ravager", "cleave"]
 keep = true
 secs = 3.0
 text = "Westbrook's banner, carried off by the Riverpaw. The garrison's footmen learned the throw under it, and the slam that drives a line back."

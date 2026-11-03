@@ -99,6 +99,38 @@ fn walled(at: [f32; 2], r: f32) -> FlatLand {
     FlatLand { walls: vec![(at, r)], ..Default::default() }
 }
 
+// --- the board ---------------------------------------------------------------------------------------
+
+#[test]
+fn every_warrior_key_has_the_warlord_as_its_second_choice() {
+    let s = world();
+    for (slot, key) in [("ranged", "ravager"), ("close", "cleave"), ("utility", "tackle"), ("defense", "rallying_cry"), ("ultimate", "warrior_bladestorm")] {
+        let d = &s.content.abilities[s.content.ability(key).unwrap()];
+        assert_eq!((d.school.as_str(), d.slot.as_str(), d.choice), ("warrior", slot, 2), "{key}");
+        assert!(d.on_board(), "{key} is a card on the board");
+    }
+    for (ex, base) in [("heroic_throw", "ravager"), ("thunder_clap", "cleave"), ("intervene", "tackle"), ("battle_cry", "rallying_cry")] {
+        let x = s.content.ability(ex).unwrap();
+        assert_eq!(s.content.abilities[x].ex_of, base);
+        // An EX shares its key's cooldown.
+        assert_eq!(s.content.base_of(x), s.content.ability(base).unwrap(), "{ex} runs on {base}'s cooldown");
+    }
+    // Learned where the Juggernaut's are: the shrine, the relic, the champion.
+    for key in ["ravager", "cleave", "tackle", "rallying_cry", "warrior_bladestorm"] {
+        assert!(!s.learned_where(key).is_empty(), "{key} is learned somewhere");
+    }
+}
+
+#[test]
+fn a_hero_takes_the_warlord_or_the_juggernaut_onto_each_key() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "utility", "tackle").unwrap();
+    assert_eq!(s.players[&p].loadout.get("utility").map(String::as_str), Some("tackle"));
+    s.slot_ability(p, "utility", "charge").unwrap();
+    assert_eq!(s.players[&p].loadout.get("utility").map(String::as_str), Some("charge"), "one of the two on the key");
+}
+
 // --- Tackle --------------------------------------------------------------------------------------------
 
 #[test]
@@ -399,4 +431,65 @@ fn thunder_clap_slows_the_packs_swings() {
     assert!((until(&s, k) - 6.0).abs() < 0.2 && (until(&s, w) - 4.0).abs() < 0.2, "6 sec, a boss's 4: {} {}", until(&s, k), until(&s, w));
     run(&mut s, 6.2);
     assert!((s.attack_now(k).windup - wk).abs() < 1e-3, "back to its pace after");
+}
+
+// --- Ravager, Heroic Throw --------------------------------------------------------------------------------
+
+#[test]
+fn ravager_holds_a_spot_then_tears_back_through_the_pack() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let held = mob(&mut s, "brave", [10.0, 1.5, 0.0]);
+    // Off the reticle's line (it would stop the aim on its body), inside the axe's 2 yd path home.
+    let between = mob(&mut s, "brave", [5.0, 0.8, 0.0]);
+    for m in [held, between] {
+        s.apply_cc(m, p, "root", 20.0, 0.0, 0.0, "test");
+    }
+    // Down at the ground 10 yd ahead (the reticle from the hero's eye).
+    let pitch = -(1.9f32 / 10.0).atan();
+    let mut ev = cast(&mut s, p, "ravager", false, 0.0, pitch);
+    ev.extend(run(&mut s, 2.1));
+    let ticks = struck(&ev, held);
+    assert!(ticks.len() >= 3 && ticks.iter().all(|d| *d == 6), "6 damage every 0.5 sec: {ticks:?}");
+    assert!(struck(&ev, between).is_empty(), "only within 3 yd of the axe");
+    assert_eq!(s.burnings.len(), 1, "the axe still spinning");
+    // The recast: torn back.
+    let ev = press(&mut s, p, "ravager", false);
+    assert!(s.burnings.is_empty(), "the axe is gone from the spot");
+    assert_eq!(struck(&ev, between), vec![16], "the one in its path takes 16");
+    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { target: Target::Unit(u), .. } if *u == p)), "flown home to the hero");
+}
+
+#[test]
+fn heroic_throw_pierces_three_and_taunts_them_off_a_friend() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [8.0, 6.0, 0.0], 0.0);
+    let line: Vec<Id> = [4.0, 7.0, 10.0, 13.0].iter().map(|x| mob(&mut s, "brave", [*x, 0.0, 0.0])).collect();
+    for m in &line {
+        s.mobs.get_mut(m).unwrap().state = MobState::Chase { foe: Foe::Hero(b) };
+        s.apply_cc(*m, b, "root", 20.0, 0.0, 0.0, "test");
+    }
+    s.set_valor(p, 25.0);
+    let mut ev = cast(&mut s, p, "ravager", true, 0.0, 0.0);
+    ev.extend(run(&mut s, 0.8));
+    for m in &line[..3] {
+        assert_eq!(struck(&ev, *m), vec![16], "pierced");
+        assert!(s.has_cc(*m, "taunt"), "and Taunted");
+        assert_eq!(s.mobs[m].state.target(), Some(p), "it comes for Ayla, not Bren");
+    }
+    assert!(struck(&ev, line[3]).is_empty(), "three at most");
+    run(&mut s, 3.6);
+    assert!(!s.has_cc(line[0], "taunt"), "4 sec");
+}
+
+#[test]
+fn a_taunted_hero_hits_anyone_else_for_30_percent_less() {
+    let mut s = world_on(true, FlatLand::default());
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
+    let c = hero(&mut s, "Cara", [6.0, 0.0, 0.0], 0.0);
+    assert!(s.apply_cc(b, a, "taunt", 4.0, 0.3, 0.0, "test"));
+    assert_eq!(s.taunted_damage(b, c, 100), 70);
+    assert_eq!(s.taunted_damage(b, a, 100), 100, "full on the one who taunted them");
 }
