@@ -225,3 +225,55 @@ fn intervene_with_no_friend_in_reach_spends_nothing() {
     let t = s.content.ability("tackle").unwrap();
     assert!(s.cooldown(a, t).charges > 0, "and the cooldown");
 }
+
+// --- Rallying Cry, Battle Cry -------------------------------------------------------------------------------
+
+#[test]
+fn rallying_cry_refills_the_stamina_of_everyone_near() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    let c = hero(&mut s, "Cara", [25.0, 0.0, 0.0], 0.0);
+    for h in [a, b, c] {
+        s.players.get_mut(&h).unwrap().stamina = 10.0;
+    }
+    let ev = press(&mut s, a, "rallying_cry", false);
+    assert!(s.players[&a].stamina >= 50.0, "Ayla's own: {}", s.players[&a].stamina);
+    assert!(s.players[&b].stamina >= 50.0, "Bren, 10 yd off: {}", s.players[&b].stamina);
+    assert!(s.players[&c].stamina < 20.0, "Cara, 25 yd off, out of reach: {}", s.players[&c].stamina);
+    let shouted: Vec<Id> = ev.iter().filter_map(|e| match e { Event::Missile { spell: 6673, target: Target::Unit(u), .. } => Some(*u), _ => None }).collect();
+    assert!(shouted.contains(&a) && shouted.contains(&b) && !shouted.contains(&c), "Battle Shout's look on each one reached: {shouted:?}");
+}
+
+#[test]
+fn battle_cry_makes_the_groups_heavy_attacks_break_a_stance_faster() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [0.0, 6.0, 0.0], 0.0);
+    // Two bosses: the first struck before the cry, the second after.
+    let w1 = mob(&mut s, "warlord", [1.6, 6.0, 0.0]);
+    let w2 = mob(&mut s, "warlord", [1.6, 20.0, 0.0]);
+    let heavy_on = |s: &mut Survival, w: Id| -> (u32, u32) {
+        let (h0, p0) = (s.mobs[&w].health, s.posture_of(w));
+        s.input(b, Input::Heavy);
+        for _ in 0..60 {
+            s.step(DT);
+            if s.mobs[&w].health < h0 {
+                break;
+            }
+        }
+        (h0 - s.mobs[&w].health, s.posture_of(w) - p0)
+    };
+    let (d1, p1) = heavy_on(&mut s, w1);
+    assert!(d1 > 0 && p1 > 0, "the plain heavy lands: {d1} damage, {p1} posture");
+    s.set_valor(a, 25.0);
+    run(&mut s, 1.0);
+    press(&mut s, a, "rallying_cry", true);
+    assert!(s.has_cc(b, "battle_cry") && s.has_cc(a, "battle_cry"), "the whole group within 15 yd");
+    // Over to the second boss.
+    s.move_player(b, [0.0, 20.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.6);
+    let (d2, p2) = heavy_on(&mut s, w2);
+    let (r1, r2) = (p1 as f32 / d1 as f32, p2 as f32 / d2 as f32);
+    assert!(r2 > r1 * 1.35, "50% more posture a point of damage: {r1:.2} then {r2:.2}");
+}

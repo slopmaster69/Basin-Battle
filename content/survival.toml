@@ -4698,6 +4698,39 @@ spell = 100
 # Blessing of Sacrifice's gold on the friend while it holds.
 aura = 6940
 
+# 2: the group's stamina. The Warlord's defense is everyone's staying power.
+[[ability]]
+key = "rallying_cry"
+name = "Rallying Cry"
+text = "You and allies within 15 yd regain 40 stamina."
+icon = "Ability_Warrior_BattleShout"
+school = "warrior"
+slot = "defense"
+choice = 2
+kind = "nova"
+radius = [15.0, 15.0]
+ally_stamina = 40.0
+cooldown = 16.0
+# The roar, and Battle Shout's look on every ally it reaches.
+clip = 55
+ally_spell = 6673
+
+# 2's EX: the push when the enemy is open.
+[[ability]]
+key = "battle_cry"
+name = "Battle Cry"
+ex_of = "rallying_cry"
+text = "You and allies within 15 yd deal 50% more posture damage with heavy attacks for 8 sec. Staggers from those heavy attacks last 50% longer."
+icon = "Ability_Warrior_WarCry"
+slot = "defense"
+kind = "nova"
+valor = 25
+radius = [15.0, 15.0]
+clip = 55
+# Rallying Cry of the Dragonslayer's red-gold flare on each ally (to be checked in the lab).
+ally_spell = 22888
+ally_effects = [{ kind = "battle_cry", secs = [8.0, 8.0], amount = 0.5 }]
+
 # ------------------------------------------------------------------------------------ Rogue --
 
 # A shotgun, not a sniper: point blank all three knives land, at range one does.
@@ -10176,7 +10209,7 @@ trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 key = "relic_warrior"
 name = "A Veteran's Kit"
 at = [-9888.0, 220.0]
-teaches = ["charge", "retaliation", "tackle"]
+teaches = ["charge", "retaliation", "tackle", "rallying_cry"]
 loot = { bronze = 1, leather = 1 }
 display = 259
 secret = 7.0
