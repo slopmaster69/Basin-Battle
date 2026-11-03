@@ -272,7 +272,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     }
     // Call of the Wild: its stage's stamina, half when empowered.
     if d.hunt == "call" || d.hunt == "double_call" {
-        out.push("15 / 20 / 25 Stamina by stage · Half when empowered".to_string());
+        let [a, b, c] = htl_survival::sim::hunter::WILD_STAMINA;
+        out.push(format!("{} / {} / {} Stamina by stage · Half when empowered", n(a), n(b), n(c)));
     }
     // Stamina once (a weapon strike's is easy to miss, so it's always said).
     if d.stamina > 0.0 {
@@ -1773,8 +1774,10 @@ impl SurvivalGame {
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 
-    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column>^...`
-    /// (one per key, its fields empty when nothing's on it).
+    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered>^...`
+    /// (one per key, its fields empty when nothing's on it). `empowered`: the seconds Call of the
+    /// Wild's next call stays empowered (a parry or a perfect dodge), 0 when it isn't (and for
+    /// every other key); an older add-on ignores it.
     pub(crate) fn bar_line(&self, id: Id) -> Option<String> {
         let c = &self.sim.content;
         let now = self.sim.clock;
@@ -1834,8 +1837,9 @@ impl SurvivalGame {
                 } else {
                     (d.name.clone(), d.icon.clone())
                 };
+                let empowered = if d.hunt == "call" { self.sim.wild_primed_left(id) } else { 0.0 };
                 format!(
-                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}",
+                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}~{empowered:.1}",
                     d.key,
                     clean(&name),
                     clean(&icon),

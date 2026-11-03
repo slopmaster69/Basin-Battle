@@ -4093,11 +4093,13 @@ respawn = 0.0
   turn_rate = 0.0
   lock = 0.0
 
+# (The lightning finisher is a wind serpent, a dreadfang's body: Lightning Breath's own beast,
+# and the only one of the three with a 1.12 icon of its animal for the key.)
 [[mob]]
-key = "spirit_thunder_lizard"
-name = "Spirit Thunder Lizard"
-display = 1540
-scale = 0.6
+key = "spirit_wind_serpent"
+name = "Spirit Wind Serpent"
+display = 1974
+scale = 0.8
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4280,7 +4282,7 @@ lift = 1.5
 [[ability]]
 key = "call_of_the_wild"
 name = "Call of the Wild"
-text = "Calls a spirit beast that leaps from your side to the target and strikes once. Each call brings the next stage of the chain: Stage 1 beasts set up, Stage 2 exploit, Stage 3 finish. The beast for each stage is drawn at random from three, and the key shows which is coming. After Stage 3, or 4 sec without a call, the chain starts again."
+text = "Calls a spirit beast that leaps from your side at your target, or the enemy you're looking at, and strikes once. Each call brings the next stage of the chain: Stage 1 beasts set up, Stage 2 exploit, Stage 3 finish. The beast for each stage is drawn at random from three, and the key shows which is coming. After Stage 3, or 4 sec without a call, the chain starts again. A parry or a perfect dodge empowers the next call for 4 sec. An empowered call costs half the stamina and deals 25% more damage."
 icon = "Ability_Hunter_BeastCall"
 school = "hunter"
 slot = "close"
@@ -4288,6 +4290,9 @@ kind = "buff"
 hunt = "call"
 range = [25.0, 25.0]
 radius = [1.0, 1.0]
+# A short recharge between calls (play-test: 5 to 8 calls from range in a row killed most
+# enemies). A whole chain now takes 3 sec at least, and a call is a choice, not a spam.
+cooldown = 1.5
 # (The beast bursts out of Spirit Wolf's flash at the hunter's side.)
 spell = 2645
 clip = 54

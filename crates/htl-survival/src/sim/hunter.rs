@@ -28,15 +28,33 @@ pub const ANCHOR_SECS: f32 = 18.0;
 /// Call of the Wild: the chain falls back to its first stage after this long without a call.
 pub const WILD_SECS: f32 = 4.0;
 /// The stamina each stage costs (half when empowered), and the damage each stage's beast does.
-pub const WILD_STAMINA: [f32; 3] = [15.0, 20.0, 25.0];
+/// (Play-test: at 15 / 20 / 25 a hero cast it 5 to 8 times from range and never thought about
+/// stamina. At 25 / 30 / 35 a whole chain is 90 of the 100 stamina: the finisher leaves no dodge
+/// unless a parry or a perfect dodge paid for half of a call.)
+pub const WILD_STAMINA: [f32; 3] = [25.0, 30.0, 35.0];
 pub const WILD_DAMAGE: [f32; 3] = [12.0, 18.0, 30.0];
-/// Empowered (a hit, a parry or a perfect dodge since the last call): this much more damage.
+/// Empowered (a parry or a perfect dodge in the last `WILD_PRIMED_SECS`): this much more damage.
 const WILD_EMPOWERED: f32 = 1.25;
-/// A beast is on its target this long after the call, and gone this long after.
+/// A parry or a perfect dodge empowers the next call this long. (Play-test: a landed hit or an
+/// arrow empowered it too, so from range every call was half price. Now it pays for the core's
+/// own moves, and only for a few seconds: answer the parry with a beast.)
+pub const WILD_PRIMED_SECS: f32 = 4.0;
+/// A beast is on its target this long after the call (quick: play-test liked the dash), and
+/// stays this long after its strike, so who came and what it did can be seen (play-test: at 0.9
+/// sec they were gone before anyone could tell), then goes in the flash it came in.
 const POUNCE_SECS: f32 = 0.3;
-const BEAST_STAYS: f32 = 0.9;
+const BEAST_STAYS: f32 = 1.8;
+/// It roars (or howls, or hisses: its model's own roar) this long after its strike.
+const BEAST_ROAR_AFTER: f32 = 0.5;
+/// `EMOTE_ONESHOT_ROAR`.
+const BEAST_ROAR: u32 = 15;
 /// A lit beast takes a foe that qualifies within this of the reticle's foe instead.
 const LIT_REACH: f32 = 8.0;
+/// No lock: the call goes for the foe the camera looks at, within this of the view's centre
+/// line (radians), by the line the client sent with the press (this old at most: a press kept
+/// for the end of a swing still goes where the camera was).
+const CALL_CONE: f32 = 0.6;
+const CALL_AIM_FRESH: f32 = 2.0;
 /// Arrow Recall: a foe struck by this many arrows or more is Lacerated, a second longer for each
 /// past it.
 const LACERATE_AT: u32 = 3;
@@ -55,26 +73,39 @@ const FLOAT_SECS: f32 = 4.0;
 const VOLLEY_SPLASH: f32 = 2.5;
 
 /// One of Call of the Wild's beasts: its creature (a `[[mob]]` with `totem = true`), its icon on
-/// the key, and its stage (0 sets up, 1 exploits, 2 finishes).
+/// the key (a 1.12 icon of that animal), its stage (0 sets up, 1 exploits, 2 finishes), and the
+/// spell whose look its strike plays from it to its foe (its own pet ability's, in 1.12).
 pub struct Beast {
     pub key: &'static str,
     pub name: &'static str,
     pub mob: &'static str,
     pub icon: &'static str,
     pub stage: usize,
+    pub strike: u32,
 }
 
-/// Three a stage, in stage order.
+/// Three a stage, in stage order. (No 1.12 icon shows a basilisk or a thunder lizard: the
+/// basilisk wears the crocolisk's, the nearest beast, and the lightning finisher is a wind
+/// serpent, Lightning Breath's own beast, where an Ability_ThunderBolt hammer stood before.)
 pub const BEASTS: [Beast; 9] = [
-    Beast { key: "wolf", name: "Wolf", mob: "spirit_wolf", icon: "Ability_Hunter_Pet_Wolf", stage: 0 },
-    Beast { key: "owl", name: "Owl", mob: "spirit_owl", icon: "Ability_Hunter_Pet_Owl", stage: 0 },
-    Beast { key: "scorpid", name: "Scorpid", mob: "spirit_scorpid", icon: "Ability_Hunter_Pet_Scorpid", stage: 0 },
-    Beast { key: "gorilla", name: "Gorilla", mob: "spirit_gorilla", icon: "Ability_Hunter_Pet_Gorilla", stage: 1 },
-    Beast { key: "raptor", name: "Raptor", mob: "spirit_raptor", icon: "Ability_Hunter_Pet_Raptor", stage: 1 },
-    Beast { key: "basilisk", name: "Basilisk", mob: "spirit_basilisk", icon: "Ability_Hunter_Pet_Crocolisk", stage: 1 },
-    Beast { key: "bear", name: "Bear", mob: "spirit_bear", icon: "Ability_Hunter_Pet_Bear", stage: 2 },
-    Beast { key: "kodo", name: "Kodo", mob: "spirit_kodo", icon: "INV_Misc_Foot_Kodo", stage: 2 },
-    Beast { key: "thunder_lizard", name: "Thunder Lizard", mob: "spirit_thunder_lizard", icon: "Ability_ThunderBolt", stage: 2 },
+    // Bite.
+    Beast { key: "wolf", name: "Wolf", mob: "spirit_wolf", icon: "Ability_Hunter_Pet_Wolf", stage: 0, strike: 17253 },
+    // Screech.
+    Beast { key: "owl", name: "Owl", mob: "spirit_owl", icon: "Ability_Hunter_Pet_Owl", stage: 0, strike: 24423 },
+    // Scorpid Poison.
+    Beast { key: "scorpid", name: "Scorpid", mob: "spirit_scorpid", icon: "Ability_Hunter_Pet_Scorpid", stage: 0, strike: 24640 },
+    // Thunderstomp.
+    Beast { key: "gorilla", name: "Gorilla", mob: "spirit_gorilla", icon: "Ability_Hunter_Pet_Gorilla", stage: 1, strike: 26090 },
+    // Claw.
+    Beast { key: "raptor", name: "Raptor", mob: "spirit_raptor", icon: "Ability_Hunter_Pet_Raptor", stage: 1, strike: 16827 },
+    // Crystal Gaze.
+    Beast { key: "basilisk", name: "Basilisk", mob: "spirit_basilisk", icon: "Ability_Hunter_Pet_Crocolisk", stage: 1, strike: 3635 },
+    // Maul.
+    Beast { key: "bear", name: "Bear", mob: "spirit_bear", icon: "Ability_Hunter_Pet_Bear", stage: 2, strike: 6807 },
+    // War Stomp.
+    Beast { key: "kodo", name: "Kodo", mob: "spirit_kodo", icon: "Ability_Mount_Kodo_01", stage: 2, strike: 20549 },
+    // Lightning Breath.
+    Beast { key: "wind_serpent", name: "Wind Serpent", mob: "spirit_wind_serpent", icon: "Ability_Hunter_Pet_WindSerpent", stage: 2, strike: 24844 },
 ];
 
 /// An arrow stuck in the ground.
@@ -100,7 +131,8 @@ pub(crate) struct Wire {
 }
 
 /// A hero's Call of the Wild chain: the stage the next call is, the beast drawn for it, until
-/// when the chain holds, and whether the next call is empowered.
+/// when the chain holds, and whether the next call is empowered (as [`Survival::wild_now`] has
+/// it: until `primed_until`).
 #[derive(Debug, Clone, Default)]
 pub struct Wild {
     pub stage: usize,
@@ -108,9 +140,10 @@ pub struct Wild {
     pub until: f32,
     pub primed: bool,
     pub drawn: bool,
+    pub primed_until: f32,
 }
 
-/// A beast on its way to its target: it strikes at `at`, and its body goes at `gone`.
+/// A beast on its way to its target: it strikes at `at`, roars, and its body goes at `gone`.
 #[derive(Debug, Clone)]
 pub(crate) struct Pounce {
     pub owner: Id,
@@ -122,6 +155,7 @@ pub(crate) struct Pounce {
     pub empowered: bool,
     pub body: Option<Id>,
     pub struck: bool,
+    pub roared: bool,
 }
 
 /// One of Skyfall's arrows coming down.
@@ -552,6 +586,7 @@ impl Survival {
             // (The draw shown before it's made: the first of the stage, until a call draws.)
             w.next = w.stage * 3;
         }
+        w.primed = w.primed && w.primed_until > self.clock;
         w
     }
 
@@ -560,15 +595,33 @@ impl Survival {
         &BEASTS[self.wild_now(id).next]
     }
 
-    /// Something the hero did that empowers their next call: a hit landed, a parry, a perfect
-    /// dodge.
-    pub(crate) fn prime_wild(&mut self, id: Id) {
-        if let Some(w) = self.hunt.wild.get_mut(&id) {
-            if !w.primed {
-                w.primed = true;
-                self.events.push(Event::Abilities { player: id });
-            }
+    /// How long the hero's next call stays empowered (0: it isn't), for the key's look.
+    pub fn wild_primed_left(&self, id: Id) -> f32 {
+        let w = self.wild_now(id);
+        if w.primed {
+            (w.primed_until - self.clock).max(0.0)
+        } else {
+            0.0
         }
+    }
+
+    /// Something the hero did that empowers their next call for [`WILD_PRIMED_SECS`]: a parry,
+    /// a perfect dodge (a hero with Call of the Wild on a key, before their first call too).
+    pub(crate) fn prime_wild(&mut self, id: Id) {
+        let now = self.clock;
+        let calls = self.players.get(&id).is_some_and(|p| p.loadout.values().any(|k| self.content.ability(k).is_some_and(|a| matches!(self.content.abilities[a].hunt.as_str(), "call" | "double_call"))));
+        if !calls {
+            return;
+        }
+        let w = self.hunt.wild.entry(id).or_default();
+        w.primed = true;
+        w.primed_until = now + WILD_PRIMED_SECS;
+        self.events.push(Event::Abilities { player: id });
+    }
+
+    /// Whether `mid` is a beast's body (never struck, never in the way, never locked on).
+    pub fn spirit_body(&self, mid: Id) -> bool {
+        self.hunt.pounces.iter().any(|p| p.body == Some(mid))
     }
 
     fn draw_beast(&mut self, stage: usize) -> usize {
@@ -589,6 +642,12 @@ impl Survival {
         let Some(target) = self.beast_target(id, range, w.next) else {
             self.events.push(Event::Flash { player: id, text: "No enemy in range".into() });
             self.hunt.wild.insert(id, w);
+            // No beast went: its recharge isn't spent either.
+            let base = self.content.base_of(ability);
+            if let Some(p) = self.players.get_mut(&id) {
+                p.cooldowns.remove(&base);
+            }
+            self.events.push(Event::Abilities { player: id });
             return;
         };
         let cost = WILD_STAMINA[w.stage] * if w.primed { 0.5 } else { 1.0 };
@@ -608,34 +667,49 @@ impl Survival {
             stage = 0;
         }
         let next = self.draw_beast(stage);
-        self.hunt.wild.insert(id, Wild { stage, next, until: now + WILD_SECS, primed: false, drawn: true });
+        self.hunt.wild.insert(id, Wild { stage, next, until: now + WILD_SECS, primed: false, drawn: true, primed_until: 0.0 });
         self.events.push(Event::Abilities { player: id });
     }
 
-    /// Whom a beast goes for: the hero's lock, else the foe nearest the reticle's line within
-    /// range; a beast whose bonus a foe near that one fits goes for that one instead, unless the
-    /// aimed one fits.
+    /// Whom a beast goes for: the hero's lock, else the foe the camera looks at (one press, no
+    /// aiming: [`Self::called_at`]); a beast whose bonus a foe near that one fits goes for that
+    /// one instead, unless the aimed one fits.
     fn beast_target(&self, id: Id, range: f32, beast: usize) -> Option<Id> {
         let p = self.players.get(&id)?;
         let pos = p.pos;
-        let locked = p.lock.filter(|v| self.alive(*v) && self.unit_pos(*v).is_some_and(|at| dist2d(at, pos) <= range));
-        let aimed = locked.or_else(|| {
-            let (yaw, _) = self.aim_of(id);
-            self.foes_near(id, pos, range)
-                .into_iter()
-                .filter(|(_, at)| angle_between(yaw, facing(pos, *at)) <= 0.6 && clear_line(self.land.as_ref(), pos, *at))
-                .min_by(|a, b| {
-                    let off = |at: Vec3| angle_between(yaw, facing(pos, at)) * 10.0 + dist2d(pos, at) * 0.05;
-                    off(a.1).total_cmp(&off(b.1))
-                })
-                .map(|(v, _)| v)
-        })?;
+        let foes = self.foes_near(id, pos, range);
+        let locked = p.lock.filter(|v| foes.iter().any(|(f, _)| f == v));
+        let aimed = locked.or_else(|| self.called_at(id, &foes, range))?;
         if self.beast_lit(beast, aimed) {
             return Some(aimed);
         }
         let at = self.unit_pos(aimed)?;
         let other = self.foes_near(id, at, LIT_REACH).into_iter().filter(|(v, vat)| *v != aimed && dist2d(*vat, pos) <= range && self.beast_lit(beast, *v)).min_by(|a, b| dist2d(a.1, at).total_cmp(&dist2d(b.1, at)));
         Some(other.map_or(aimed, |(v, _)| v))
+    }
+
+    /// The foe the camera looks at, by the line the client sent with the press (the hero's
+    /// facing without one): the first of `foes` that line meets from the hero's head, else the
+    /// one nearest the line within [`CALL_CONE`] of it, in sight.
+    fn called_at(&self, id: Id, foes: &[(Id, Vec3)], range: f32) -> Option<Id> {
+        let p = self.players.get(&id)?;
+        let pos = p.pos;
+        let (yaw, pitch) = match p.aim_line {
+            Some((f, e, at)) if self.clock - at <= CALL_AIM_FRESH => (f, e),
+            _ => (p.facing, 0.0),
+        };
+        let head = [pos[0], pos[1], pos[2] + 1.7];
+        let met = self.trace(head, look_dir(yaw, pitch), range + 3.0, 0.4, id).unit.filter(|u| foes.iter().any(|(f, _)| f == u));
+        if met.is_some() {
+            return met;
+        }
+        let (c, s) = (yaw.cos(), yaw.sin());
+        // How far off the line a foe stands (yards across it), a little for how far it is.
+        let off = |at: Vec3| (-(at[0] - pos[0]) * s + (at[1] - pos[1]) * c).abs() + dist2d(pos, at) * 0.02;
+        foes.iter()
+            .filter(|(_, at)| angle_between(yaw, facing(pos, *at)) <= CALL_CONE && clear_line(self.land.as_ref(), pos, *at))
+            .min_by(|a, b| off(a.1).total_cmp(&off(b.1)))
+            .map(|(v, _)| *v)
     }
 
     /// Whether a beast's bonus fits `v` now.
@@ -646,12 +720,12 @@ impl Survival {
             "wolf" => self.mobs.get(&v).is_some_and(|m| matches!(m.state, MobState::Windup { .. })),
             "owl" => true,
             "scorpid" => self.has_cc(v, "mark") || self.has_cc(v, "sunder"),
-            "gorilla" => self.unit_pos(v).is_some_and(|at| self.mobs.values().filter(|m| m.health > 0 && dist2d(m.pos, at) <= 6.0).count() >= 3),
+            "gorilla" => self.unit_pos(v).is_some_and(|at| self.mobs.values().filter(|m| m.health > 0 && !self.content.mobs[m.def].inert() && dist2d(m.pos, at) <= 6.0).count() >= 3),
             "raptor" => self.has_cc(v, "burn"),
             "basilisk" => self.has_cc(v, "snare"),
             "bear" => staggered || self.has_cc(v, "stun") || self.has_cc(v, "petrify") || self.stance_broken(v),
             "kodo" => self.has_cc(v, "mark"),
-            "thunder_lizard" => self.mobs.get(&v).is_some_and(|m| m.guarding) || self.players.get(&v).is_some_and(|p| matches!(p.action, Action::Guard)),
+            "wind_serpent" => self.mobs.get(&v).is_some_and(|m| m.guarding) || self.players.get(&v).is_some_and(|p| matches!(p.action, Action::Guard)),
             _ => false,
         }
     }
@@ -675,9 +749,13 @@ impl Survival {
         if let Some(b) = body {
             let dist = dist2d(start, end).max(0.5);
             self.events.push(Event::MobMove { id: b, path: vec![start, end], speed: dist / (POUNCE_SECS + delay).max(0.1), face: None });
+            // Where it stands from its strike on (for whoever comes into sight of it later).
+            if let Some(m) = self.mobs.get_mut(&b) {
+                m.pos = end;
+            }
         }
         self.events.push(Event::Missile { caster: id, spell: SPIRIT_FLASH, target: Target::Point(start) });
-        self.hunt.pounces.push(Pounce { owner: id, ability, beast, target, at: now + POUNCE_SECS + delay, gone: now + POUNCE_SECS + delay + BEAST_STAYS, empowered, body, struck: false });
+        self.hunt.pounces.push(Pounce { owner: id, ability, beast, target, at: now + POUNCE_SECS + delay, gone: now + POUNCE_SECS + delay + BEAST_STAYS, empowered, body, struck: false, roared: false });
     }
 
     fn step_pounces(&mut self) {
@@ -689,13 +767,28 @@ impl Survival {
                 p.struck = true;
                 if let Some(b) = p.body {
                     self.events.push(Event::Swing { attacker: b, victim: Some(p.target), damage: 0, outcome: Outcome::Hit, anim: true, style: Blow::Heavy });
+                    // Its own pet ability's look, from it onto the foe: which beast, what it did.
+                    if self.alive(p.target) {
+                        self.events.push(Event::Missile { caster: b, spell: BEASTS[p.beast].strike, target: Target::Unit(p.target) });
+                    }
                 }
                 if self.alive(p.target) && self.players.contains_key(&p.owner) {
                     self.beast_strikes(&p);
                 }
             }
+            if p.struck && !p.roared && now >= p.at + BEAST_ROAR_AFTER {
+                p.roared = true;
+                if let Some(b) = p.body.filter(|b| self.mobs.contains_key(b)) {
+                    self.events.push(Event::Emote { id: b, emote: BEAST_ROAR });
+                }
+            }
             if p.gone <= now {
                 if let Some(b) = p.body {
+                    // Gone in the flash it came in (laid on the ground where it stood, so it plays
+                    // with the body already gone).
+                    if let Some(at) = self.mobs.get(&b).map(|m| m.pos).filter(|_| self.players.contains_key(&p.owner)) {
+                        self.events.push(Event::Missile { caster: p.owner, spell: SPIRIT_FLASH, target: Target::Point(at) });
+                    }
                     if self.mobs.remove(&b).is_some() {
                         self.events.push(Event::MobGone { id: b });
                     }
@@ -828,7 +921,7 @@ impl Survival {
                     }
                 }
             }
-            "thunder_lizard" => {
+            "wind_serpent" => {
                 self.hunt_hit(owner, v, ability, base, at);
                 if self.content.mobs.get(self.mobs.get(&v).map_or(usize::MAX, |m| m.def)).is_some_and(|d| d.posture > 0) {
                     self.build_posture(v, owner, 40);
@@ -860,7 +953,7 @@ impl Survival {
 
 /// The flash a spirit beast bursts out of (Spirit Wolf's summoning).
 const SPIRIT_FLASH: u32 = 2645;
-/// The Thunder Lizard's shock on what it strikes (Thunderclap's).
+/// The Wind Serpent's shock on what it strikes (Thunderclap's).
 const THUNDER_KIT: u32 = 2709;
 
 /// Which side of the line a..b the point p is on.

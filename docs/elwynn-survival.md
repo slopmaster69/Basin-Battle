@@ -173,7 +173,7 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   three or more in one foe Lacerate it. Q: Aimed Shot, a draw (its EX Multi-Shot a fan), or Bank
   Shot, which ricochets off walls and trees harder each bounce (its EX Split Arrow a point-blank
   spray that kicks you back). E: Call of the Wild, a chain of spirit beasts that builds from setup
-  to finisher (the key shows the beast coming; a hit, parry or perfect dodge since the last call
+  to finisher (the key shows the beast coming; a parry or perfect dodge lights it blue and, for 4 s,
   empowers the next), or Raptor Strike, a spear chain (thrust, sweep, an Uppercut that throws you
   up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
   foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump

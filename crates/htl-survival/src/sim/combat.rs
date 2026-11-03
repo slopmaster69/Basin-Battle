@@ -577,7 +577,8 @@ impl Survival {
             found.push((d / LOCK_RANGE + off / arc + bias, tid));
         };
         for (mid, m) in &self.mobs {
-            if m.health > 0 && !m.hidden {
+            // (Never a Call of the Wild beast: it's there to be seen, not fought.)
+            if m.health > 0 && !m.hidden && !self.spirit_body(*mid) {
                 consider(*mid, m.pos, lean(*mid, false, m.state.foe().is_some()));
             }
         }
@@ -1270,10 +1271,6 @@ impl Survival {
             } else if finisher {
                 self.events.push(Event::Visual { id: mid, kit: KIT_CLEAVE, by: Some(id) });
             }
-        }
-        // A blow landed: the hunter's next beast comes empowered.
-        if !struck.is_empty() {
-            self.prime_wild(id);
         }
     }
 
