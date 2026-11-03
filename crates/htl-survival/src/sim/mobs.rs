@@ -1088,6 +1088,16 @@ impl Survival {
                 }
                 continue;
             }
+            // Thrown up and its time in the air over: down on the ground where it was thrown
+            // (its last step may fall a moment after, when nothing walks it there).
+            if self.mobs[&id].thrown_lift > 0.0 && self.mobs[&id].thrown_until <= now {
+                let m = self.mobs.get_mut(&id).unwrap();
+                m.thrown_lift = 0.0;
+                let at = m.path.pop().unwrap_or(m.pos);
+                m.path.clear();
+                let ground = self.ground_near(at[0], at[1], at[2]);
+                self.mobs.get_mut(&id).unwrap().pos = ground;
+            }
             // A totem or a dummy only stands there; a secret form waits to rise.
             if self.content.mobs[self.mobs[&id].def].inert() || self.mobs[&id].rise_at.is_some() {
                 continue;
