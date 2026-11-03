@@ -804,7 +804,11 @@ impl SurvivalGame {
         let guid = Self::player_guid(&account);
         let id = self.sim.join(&account, &name, Some(&save));
         match lamp {
-            Some(l) if self.realm.below => self.sim.arrive_at(id, l),
+            Some(l) if self.realm.below => {
+                self.sim.arrive_at(id, l);
+                // Down from the camp: whole to start the dungeon.
+                self.sim.come_down(id);
+            }
             _ if self.realm.siege => self.sim.siege_arrive(id),
             _ => {
                 // Home by the book, beside it.
