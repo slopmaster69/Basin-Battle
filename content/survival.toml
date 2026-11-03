@@ -3198,6 +3198,9 @@ arc = 60.0
 cast = 0.4
 weapon = 1.2
 cooldown = 8.0
+# The two-handed overhead (57) over the windup: without it the hero stood idle for 0.4 sec
+# (spell lab, Nov 2).
+clip = 57
 spell = 25425
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
