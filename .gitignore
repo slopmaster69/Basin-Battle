@@ -12,3 +12,4 @@ logs/
 /restart.request
 /tools/clip-census/target
 /tools/*/Cargo.lock
+__pycache__/
