@@ -1,7 +1,7 @@
 -- Elwynn Survival: the spell lab's camera (dev builds' `.es lab`, see docs/spell-lab.md).
 --
 -- The server sends, when a lab run starts:
---   LB n ms label [cam]   (cam: behind, side or none; behind if it's missing)
+--   LB n ms label [cam]   (cam: behind, close or none; behind if it's missing)
 -- and this takes n screenshots, one every ms milliseconds, from now: the frames the server's
 -- trace (logs/lab/<label>.txt) is timed against. The client numbers shots taken within one second
 -- (WoWScrnShot_<date>_<time>_2.png ...), so a burst keeps every frame. The "Screen captured"
@@ -50,16 +50,16 @@ frame:SetScript("OnUpdate", function()
   end
 end)
 
--- The same view for every run, so runs compare: behind the hero at a set distance, or turned to
--- the side (`side`) for a scene at arm's length, where the hero would hide what they strike.
+-- The same view for every run, so runs compare: behind the hero at a set distance, nearer for a
+-- scene at arm's length (`side`, `close`). The server locks the hero on to the scene, so the body
+-- and the camera turn to it; turning the camera here turned the body with it, off the scene.
 local function Frame(cam)
   if cam == "none" then return end
   if ResetView and SetView then
     ResetView(2)
     SetView(2)
   end
-  if CameraZoomOut then CameraZoomOut(cam == "side" and 2 or 4) end
-  if cam == "side" and FlipCameraYaw then FlipCameraYaw(55) end
+  if CameraZoomOut then CameraZoomOut((cam == "side" or cam == "close") and 2 or 4) end
 end
 
 function ES.LabLine(f)

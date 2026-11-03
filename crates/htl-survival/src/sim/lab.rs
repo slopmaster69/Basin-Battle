@@ -48,6 +48,16 @@ impl Survival {
             }
             out.push(mid);
         }
+        // Locked on to the middle body, so the client turns the hero (and the camera behind them)
+        // to the scene: turning the camera alone turned the body with it and the blows went wide.
+        if let Some(&mid) = out.get(out.len() / 2) {
+            if let Some(p) = self.players.get_mut(&id) {
+                p.lock = Some(mid);
+                p.lock_seen.clear();
+                p.facing = facing(pos, self.mobs[&mid].pos);
+            }
+            self.events.push(Event::Lock { player: id, target: Some(mid) });
+        }
         Ok(out)
     }
 
@@ -78,6 +88,10 @@ impl Survival {
 
     /// The lab's bodies taken away.
     pub fn lab_clear(&mut self, mobs: &[Id]) {
+        let held: Vec<Id> = self.players.iter().filter(|(_, p)| p.lock.is_some_and(|t| mobs.contains(&t))).map(|(id, _)| *id).collect();
+        for h in held {
+            self.unlock(h);
+        }
         for m in mobs {
             if self.mobs.remove(m).is_some() {
                 self.events.push(Event::MobGone { id: *m });
@@ -97,5 +111,27 @@ impl Survival {
     /// The hero is aiming an ability (the lab's click lets it go).
     pub fn lab_aiming(&self, id: Id) -> bool {
         matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Aim { .. }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::content::Content;
+    use crate::land::FlatLand;
+
+    #[test]
+    fn a_scene_locks_the_hero_on_to_its_middle_body_and_clearing_it_lets_go() {
+        let mut s = Survival::new(Content::dev(), Box::new(FlatLand::default()), 7, 1_000_000.0);
+        s.mobs.clear();
+        s.respawns.clear();
+        let p = s.join("ayla", "Ayla", None);
+        s.move_player(p, [0.0, 0.0, 0.0], 1.0, Moving::default());
+        let _ = s.step(0.0);
+        let mobs = s.lab_scene(p, "ring", "dummy").unwrap();
+        assert_eq!(s.players[&p].lock, Some(mobs[1]));
+        assert!((s.players[&p].facing - 1.0).abs() < 0.05, "facing the middle body, straight ahead");
+        s.lab_clear(&mobs);
+        assert_eq!(s.players[&p].lock, None);
     }
 }
