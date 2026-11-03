@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|side|none]`
 //!
 //! - It sets out the scene in front of the hero (`one`, `pack`, `close`, `ring`, `far`; see
 //!   `htl_survival::sim::lab`), of training dummies or of a creature (`brave`), puts the ability
@@ -77,6 +77,7 @@ impl SurvivalGame {
         let mut scene = if d.kind == "stance" || d.kind == "art" { "close" } else { "pack" }.to_string();
         let mut creature = if d.kind == "stance" { "brave" } else { "dummy" }.to_string();
         let mut steps: Option<String> = None;
+        let mut cam: Option<String> = None;
         let (mut shots, mut every) = (SHOTS, EVERY_MS);
         let mut k = 1;
         let mut free = 0;
@@ -84,6 +85,10 @@ impl SurvivalGame {
             match words[k] {
                 "do" => {
                     steps = words.get(k + 1).map(|s| s.to_string());
+                    k += 1;
+                }
+                "cam" => {
+                    cam = words.get(k + 1).map(|w| w.to_lowercase());
                     k += 1;
                 }
                 "shots" => {
@@ -134,7 +139,10 @@ impl SurvivalGame {
         let secs = shots as f32 * every as f32 / 1000.0;
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|t| t.as_secs()).unwrap_or(0);
         let label = format!("{key}-{scene}-{stamp}");
-        self.ui_line(conn, &format!("LB\t{shots}\t{every}\t{label}"));
+        // The camera the add-on puts the run in: to the side at arm's length (the hero would
+        // hide what they strike), else behind.
+        let cam = cam.unwrap_or_else(|| if matches!(scene.as_str(), "close" | "ring") { "side" } else { "behind" }.to_string());
+        self.ui_line(conn, &format!("LB\t{shots}\t{every}\t{label}\t{cam}"));
         record_video(&label, shots as f32 * every as f32 / 1000.0 + 0.6);
         let mut trace = vec![
             format!("# {label}: {} ({}), scene {scene} of {creature}, steps {steps}, {shots} shots every {every} ms from -{LEAD:.2} s", d.name, d.key),
