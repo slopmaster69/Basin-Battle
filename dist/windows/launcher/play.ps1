@@ -392,7 +392,13 @@ if ($settings["place"] -eq "backup" -and -not $BackupServer) { $settings["place"
     $config = Join-Path $Root "benilla-config\config.toml"
     $defaults = Join-Path $Root "benilla-config\config.default.toml"
     if (-not (Test-Path $config) -and (Test-Path $defaults)) { Copy-Item $defaults $config }
-    Start-Process -FilePath $Exe -WorkingDirectory $Root
+    # benilla is a console program: started like this it opens no console window behind the game.
+    $start = New-Object System.Diagnostics.ProcessStartInfo
+    $start.FileName = $Exe
+    $start.WorkingDirectory = $Root
+    $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    [System.Diagnostics.Process]::Start($start) | Out-Null
     Set-Status "Starting $gameName...`n`nLog in with any name you like (it becomes your hero) and the password: hold, unless the host changed it." -Busy
     Wait-Pumping 5000
     Leave
