@@ -97,6 +97,12 @@ For checks nobody has to click: `Install Visual Check Watcher.bat` starts the wa
   `watcher.log`. Only a test copy made from such a zip is ever replaced: in a git checkout the zip
   is refused (renamed `.refused`).
 
+- **Data questions**: a text file in `queries\` whose lines are `<tool> <args...>`, each run as one
+  of the repository's read-only data tools against the WoW data (`cargo run -p htl-map --example
+  <tool> -- <Data> <args...>`: `spellfx`, `creaturedisp`, `displays`, `kitanims` and the rest in
+  `crates/htl-map/examples/`), to find a look to borrow. The answers go to `out\<id>.queries.txt`.
+  Nothing in the game, the data or the repository changes.
+
 The watcher needs nothing typed: a missing setting fails the request (in `.failed`) rather than
 asking. It uses the repository folder it was installed from, at whatever branch is checked out there.
 

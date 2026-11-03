@@ -781,9 +781,46 @@ function Invoke-Deploy($zip) {
     return $true
 }
 
+# Data questions, with nobody at the PC: a file in queries\ of lines `<tool> <args...>`, each run
+# as one of the repository's read-only data tools against the WoW data (`cargo run -p htl-map
+# --example <tool> -- <Data> <args...>`: spellfx, creaturedisp, displays, kitanims...) to find a
+# look to borrow. The answers go to out\<id>.queries.txt (400 lines a question at most). Nothing
+# in the game, the data or the repository changes.
+function Invoke-Queries($file) {
+    $id = [IO.Path]::GetFileNameWithoutExtension($file.Name)
+    $outFile = Join-Path $Folder "out\$id.queries.txt"
+    Write-WatchLog "queries $id"
+    $done = Join-Path $Folder "queries\done"
+    New-Item -ItemType Directory -Force -Path $done | Out-Null
+    $lines = @(Get-Content $file.FullName)
+    Move-Item $file.FullName (Join-Path $done $file.Name) -Force
+    "" | Set-Content $outFile
+    try {
+        $s = Resolve-Settings $false
+        Push-Location $Root
+        . (Join-Path $Root "scripts\windows-rust.ps1")
+        foreach ($line in $lines) {
+            $line = $line.Trim()
+            if ($line -eq "" -or $line.StartsWith("#")) { continue }
+            $parts = $line -split '\s+'
+            if ($parts[0] -notmatch '^[a-z0-9_]+$') { "== $line`r`n(not a tool name)" | Add-Content $outFile; continue }
+            $rest = @(); if ($parts.Length -gt 1) { $rest = $parts[1..($parts.Length - 1)] }
+            "== $line" | Add-Content $outFile
+            & cargo run --release -q -p htl-map --example $parts[0] -- $s.data @rest 2>&1 | Select-Object -First 400 | ForEach-Object { "$_" } | Add-Content $outFile
+        }
+        "== done" | Add-Content $outFile
+        Write-WatchLog "queries $id done"
+    } catch {
+        "== failed: $($_.Exception.Message)" | Add-Content $outFile
+        Write-WatchLog "queries $id failed: $($_.Exception.Message)"
+    } finally {
+        Pop-Location -ErrorAction SilentlyContinue
+    }
+}
+
 function Start-Watcher {
     $requests = Join-Path $Folder "requests"
-    foreach ($d in @($requests, (Join-Path $Folder "out"), (Join-Path $Folder "scenarios"), (Join-Path $Folder "deploy"))) {
+    foreach ($d in @($requests, (Join-Path $Folder "out"), (Join-Path $Folder "scenarios"), (Join-Path $Folder "deploy"), (Join-Path $Folder "queries"))) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     $one = New-Object System.Threading.Mutex($false, "Local\BasinBattleVisualCheckWatcher")
@@ -798,6 +835,13 @@ function Start-Watcher {
             $zip = Get-ChildItem (Join-Path $Folder "deploy") -Filter *.zip -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-5) } | Sort-Object LastWriteTime | Select-Object -First 1
             if ($zip -and (Invoke-Deploy $zip)) { break }
+            # Data questions next, then scenarios.
+            $q = Get-ChildItem (Join-Path $Folder "queries") -Filter *.txt -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-2) } | Sort-Object LastWriteTime | Select-Object -First 1
+            if ($q) {
+                try { Invoke-Queries $q } catch { Write-WatchLog "queries $($q.Name): $($_.Exception.Message)" }
+                continue
+            }
             # Oldest first, and only a file nobody has written to for 2 s (not still being copied in).
             $next = Get-ChildItem $requests -Filter *.txt -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.LastWriteTime -lt (Get-Date).AddSeconds(-2) } |
