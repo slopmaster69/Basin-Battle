@@ -330,7 +330,10 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 17;
+/// 18: the Hunter's play-test fixes (#110): Call of the Wild's empowered key (`AB`'s last field),
+/// Skyfall's hang on the action bar, and Grapple Arrow's catch preview and Disengage's flip
+/// (`GP`, `FP`, `Grapple.lua`).
+pub(crate) const ADDON_NEWEST: u32 = 18;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019).
 pub(crate) const CLIENT_NEWEST: u8 = 12;
