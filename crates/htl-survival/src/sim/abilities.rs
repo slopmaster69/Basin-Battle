@@ -962,6 +962,8 @@ impl Survival {
                     self.set_action(id, next);
                 }
             }
+            // Stoop: down out of the air, fast.
+            "leap" if d.dive => self.dive(id, ability),
             // Skyfall: up, and a slow fall to aim from.
             "leap" if d.hunt == "float" => {
                 self.start_leap(id, ability, share);
@@ -1846,7 +1848,8 @@ impl Survival {
         }
         let damage = self.ability_damage(owner, mid, ability, base);
         let damage = (damage as f32 * self.taken_share(mid)).round() as u32;
-        let style = if self.content.abilities[ability].kind == "art" { Blow::Heavy } else { Blow::Arrow(spell) };
+        // (A dive's slam lands as heavily as a heavy attack: its hit-stop and shake.)
+        let style = if self.content.abilities[ability].kind == "art" || self.content.abilities[ability].dive { Blow::Heavy } else { Blow::Arrow(spell) };
         self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style });
         let kit = self.content.abilities[ability].impact_kit;
         if kit != 0 {

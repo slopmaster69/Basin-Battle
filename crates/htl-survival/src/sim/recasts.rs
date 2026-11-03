@@ -44,12 +44,18 @@ fn in_hand(action: &Action, ability: usize) -> bool {
     matches!(action, Action::Aim { ability: a } | Action::Charge { ability: a, .. } if *a == ability)
 }
 
+/// Whether a recast still holds for a hero doing `action`: a dive (Stoop) only while they're in
+/// the air on a leap, so landing first ends the chain.
+fn holds(c: &crate::content::Content, action: &Action, ability: usize) -> bool {
+    !c.abilities[ability].dive || matches!(action, Action::Dash { ability: a, .. } if c.abilities[*a].kind == "leap")
+}
+
 impl Survival {
     /// The recast a key would fire now (the key's base ability), if it's armed.
     pub(crate) fn recast_armed(&self, id: Id, base: usize) -> Option<Recast> {
         let p = self.players.get(&id)?;
         let r = *p.combos.recasts.get(&base)?;
-        (r.until > self.clock || in_hand(&p.action, r.ability)).then_some(r)
+        ((r.until > self.clock || in_hand(&p.action, r.ability)) && holds(&self.content, &p.action, r.ability)).then_some(r)
     }
 
     /// Whether a base ability's next press is its EX version, free.
@@ -64,7 +70,7 @@ impl Survival {
     pub(crate) fn take_free(&mut self, id: Id, ability: usize) -> Option<Free> {
         let now = self.clock;
         let p = self.players.get(&id)?;
-        let key = p.combos.recasts.iter().find(|(_, r)| r.ability == ability && (r.until > now || in_hand(&p.action, ability))).map(|(b, _)| *b);
+        let key = p.combos.recasts.iter().find(|(_, r)| r.ability == ability && (r.until > now || in_hand(&p.action, ability)) && holds(&self.content, &p.action, ability)).map(|(b, _)| *b);
         if let Some(b) = key {
             let r = self.players.get_mut(&id)?.combos.recasts.remove(&b)?;
             self.events.push(Event::Abilities { player: id });
@@ -147,7 +153,7 @@ impl Survival {
                 p.combos.empowered.clear();
             } else {
                 let action = p.action.clone();
-                p.combos.recasts.retain(|_, r| r.until > now || in_hand(&action, r.ability));
+                p.combos.recasts.retain(|_, r| (r.until > now || in_hand(&action, r.ability)) && holds(content, &action, r.ability));
                 p.combos.empowered.retain(|b, until| *until > now || content.ex_of(*b).is_some_and(|x| in_hand(&action, x)));
             }
             if p.combos.recasts.len() + p.combos.empowered.len() != before {
