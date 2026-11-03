@@ -41,8 +41,9 @@ const LEAD: f32 = 0.25;
 /// about a second (seen in the lab: the brave's wind-up was invisible), and the lock-on camera
 /// settles.
 const SETTLE: f32 = 1.5;
-/// And this much more when the run first sets the hero down on the lab's stage.
-const MOVED_SETTLE: f32 = 2.0;
+/// And this much more when the run first sets the hero down on the lab's stage (far from where
+/// they stood, the client shows its loading screen first).
+const MOVED_SETTLE: f32 = 5.0;
 
 pub(crate) struct Lab {
     pub hero: Id,
@@ -408,35 +409,52 @@ fn ffmpeg() -> Option<std::path::PathBuf> {
     })
 }
 
-/// The screen as video for the run, 60 frames a second, to `logs/lab/<label>.mp4`: a few MB a
-/// run where the screenshot burst is tens. By Desktop Duplication (ffmpeg's `ddagrab`), which sees
-/// every frame benilla's Vulkan window presents; GDI's grab (`gdigrab`) sees only a few stale
-/// ones (the visual check, #119, found it). Nothing happens without ffmpeg or on another system.
+/// The game's window as video for the run, 60 frames a second, to `logs/lab/<label>.mp4`: a few
+/// MB a run where the screenshot burst is tens. By Windows Graphics Capture (ffmpeg's
+/// `gfxcapture`), the game's own window whatever stands over it (a window on top was in the
+/// desktop's frames); where that can't start, by Desktop Duplication (`ddagrab`) of the primary
+/// monitor. GDI's grab (`gdigrab`) saw only a few stale frames of benilla's Vulkan window (#119).
+/// Nothing happens without ffmpeg or on another system.
 fn record_video(label: &str, secs: f32) {
     if !cfg!(windows) {
         return;
     }
     let Some(ff) = ffmpeg() else { return };
-    let out = std::path::Path::new("logs").join("lab").join(format!("{label}.mp4"));
-    let _ = std::fs::create_dir_all("logs/lab");
-    // What ffmpeg says (frames dropped, a grab that failed) beside the video.
-    let said = std::fs::File::create(std::path::Path::new("logs").join("lab").join(format!("{label}.ffmpeg.txt")));
-    // The game's monitor (the primary, output 0; the old GDI grab took every monitor and 20
-    // frames a second), every frame at 60, scaled to 1920 wide and encoded with x264's fastest
-    // preset so the encoder keeps up with a wide screen.
-    let spawned = std::process::Command::new(ff)
-        .args(["-y", "-hide_banner", "-loglevel", "warning"])
-        .args(["-f", "lavfi", "-i", "ddagrab=output_idx=0:framerate=60:draw_mouse=0:dup_frames=1"])
-        .args(["-t", &format!("{secs:.2}"), "-vf", "hwdownload,format=bgra,scale=1920:-2:flags=bilinear,format=yuv420p"])
-        .args(["-fps_mode", "cfr", "-r", "60", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "18"])
-        .arg(&out)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(said.map(std::process::Stdio::from).unwrap_or_else(|_| std::process::Stdio::null()))
-        .spawn();
-    if let Err(e) = spawned {
-        eprintln!("[lab] couldn't record {}: {e}", out.display());
-    }
+    let label = label.to_string();
+    std::thread::spawn(move || {
+        let out = std::path::Path::new("logs").join("lab").join(format!("{label}.mp4"));
+        let _ = std::fs::create_dir_all("logs/lab");
+        let began = std::time::Instant::now();
+        let window = "gfxcapture=window_exe=(?i)benilla:capture_cursor=0:max_framerate=60";
+        let screen = "ddagrab=output_idx=0:framerate=60:draw_mouse=0:dup_frames=1";
+        for (k, source) in [window, screen].into_iter().enumerate() {
+            let left = secs - began.elapsed().as_secs_f32();
+            if left < 1.0 {
+                break;
+            }
+            // What ffmpeg says (frames dropped, a grab that failed) beside the video.
+            let said = std::fs::OpenOptions::new().create(true).append(k > 0).write(true).truncate(k == 0).open(std::path::Path::new("logs").join("lab").join(format!("{label}.ffmpeg.txt")));
+            // Every frame at 60, scaled to 1920 wide, encoded with x264's fastest preset so the
+            // encoder keeps up with a wide screen.
+            let ran = std::process::Command::new(&ff)
+                .args(["-y", "-hide_banner", "-loglevel", "warning", "-f", "lavfi", "-i", source])
+                .args(["-t", &format!("{left:.2}"), "-vf", "hwdownload,format=bgra,scale=1920:-2:flags=bilinear,format=yuv420p"])
+                .args(["-fps_mode", "cfr", "-r", "60", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-crf", "18"])
+                .arg(&out)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(said.map(std::process::Stdio::from).unwrap_or_else(|_| std::process::Stdio::null()))
+                .status();
+            match ran {
+                Ok(st) if st.success() => break,
+                Ok(st) => eprintln!("[lab] {source} ended with {st}; trying the next way"),
+                Err(e) => {
+                    eprintln!("[lab] couldn't record {}: {e}", out.display());
+                    break;
+                }
+            }
+        }
+    });
 }
 
 /// Where the client on this computer saves its screenshots: `LAB_SHOTS`, or the Windows
