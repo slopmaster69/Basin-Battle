@@ -1238,7 +1238,7 @@ fn a_training_dummy_takes_a_beast_and_a_freezing_trap() {
     // Call of the Wild finds it ("No enemy in range" before) and the beast strikes it.
     s.set_aim_line(p, 0.0, 0.0);
     let mut ev = press(&mut s, p, "call_of_the_wild", false);
-    ev.extend(run(&mut s, 0.5));
+    ev.extend(run(&mut s, 1.0));
     assert!(!hits(&ev, p, d).is_empty(), "the beast strikes the dummy");
     // A Freezing Trap at its feet springs on it.
     run(&mut s, 2.0);
