@@ -3920,7 +3920,11 @@ respawn = 0.0
 [[mob]]
 key = "spirit_wolf"
 name = "Spirit Wolf"
-display = 447
+# The wolf on its own ghost model (Wolf_ghost.mdx).
+display = 2446
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -3943,6 +3947,9 @@ respawn = 0.0
 key = "spirit_owl"
 name = "Spirit Owl"
 display = 4615
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -3965,6 +3972,9 @@ respawn = 0.0
 key = "spirit_scorpid"
 name = "Spirit Scorpid"
 display = 2487
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 0.8
 health = 30
 run_speed = 0.0
@@ -3987,6 +3997,9 @@ respawn = 0.0
 key = "spirit_gorilla"
 name = "Spirit Gorilla"
 display = 837
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -4009,6 +4022,9 @@ respawn = 0.0
 key = "spirit_raptor"
 name = "Spirit Raptor"
 display = 180
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -4031,6 +4047,9 @@ respawn = 0.0
 key = "spirit_basilisk"
 name = "Spirit Basilisk"
 display = 1074
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 0.9
 health = 30
 run_speed = 0.0
@@ -4053,6 +4072,9 @@ respawn = 0.0
 key = "spirit_bear"
 name = "Spirit Bear"
 display = 822
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -4075,6 +4097,9 @@ respawn = 0.0
 key = "spirit_kodo"
 name = "Spirit Kodo"
 display = 1230
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 0.7
 health = 30
 run_speed = 0.0
@@ -4099,6 +4124,9 @@ respawn = 0.0
 key = "spirit_wind_serpent"
 name = "Spirit Wind Serpent"
 display = 1974
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 0.8
 health = 30
 run_speed = 0.0
