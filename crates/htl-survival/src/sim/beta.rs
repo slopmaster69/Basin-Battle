@@ -13,7 +13,9 @@ use crate::content::{AbilityDef, AbilityEffect};
 
 /// A yank runs this fast (yards a second), stopping this far short of a wall and this far from a
 /// foe's body (beside it, not in it).
-const YANK_SPEED: f32 = 40.0;
+const YANK_SPEED: f32 = 32.0;
+/// The pose a yanked hero flies in: the arm held out along the line (SpellCastDirected).
+const YANK_CLIP: u16 = 53;
 const YANK_WALL: f32 = 0.6;
 const YANK_BESIDE: f32 = 0.3;
 /// A cheated death mends what it does over this long.
@@ -186,7 +188,12 @@ impl Survival {
             p.facing = dir;
         }
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
-        self.events.push(Event::Dash { player: id, dir, speed: moved / secs, secs });
+        // Pulled through the air on the line, the way a hookshot flies you (play-test: a run along
+        // the ground read as a Charge): a flat arc that lands as the line's time is up, the arm
+        // held out along it.
+        let lift = secs / airtime(1.0);
+        self.events.push(Event::Hop { player: id, dir, speed: moved / secs, lift, roll: false, style: "" });
+        self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: String::new(), flip: false });
         self.beta.yanks.insert(id, (end, now + secs));
     }
 

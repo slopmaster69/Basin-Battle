@@ -130,14 +130,35 @@ fn hits(ev: &[Event], a: Id, v: Id) -> Vec<u32> {
         .collect()
 }
 
-/// The hero's dashes: (facing, length).
+/// The hero's pulls on a hook's line, flown through the air (a hop with the line's own arm-out
+/// look), or run along the ground (a dash): (facing, length). A hop's length is its speed over
+/// its time in the air (the rules' gravity, 19.29 yd/s²).
 fn dashes(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
+    let looked = ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 53, .. } if *player == who));
     ev.iter()
         .filter_map(|e| match e {
             Event::Dash { player, dir, speed, secs } if *player == who => Some((*dir, speed * secs)),
+            Event::Hop { player, dir, speed, lift, .. } if *player == who && looked => Some((*dir, speed * 2.0 * lift.max(0.5) / 19.29)),
             _ => None,
         })
         .collect()
+}
+
+/// A hook pulls its caster through the air, as a hookshot does (play-test: a run along the
+/// ground read as a Charge): a flat hop, the arm held out along the line, landing at the wall.
+#[test]
+fn a_hooks_pull_flies_its_caster_through_the_air() {
+    let mut s = world(false, walled([12.0, 0.0], 1.0), HOOK);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut ev = cast(&mut s, p, "t_hook");
+    ev.extend(run(&mut s, 1.0));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Dash { player, .. } if *player == p)), "no run along the ground");
+    let hop = ev.iter().find_map(|e| match e {
+        Event::Hop { player, lift, .. } if *player == p => Some(*lift),
+        _ => None,
+    });
+    assert!(hop.is_some_and(|l| l > 0.5 && l < 6.0), "a flat arc through the air: {hop:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 53, .. } if *player == p)), "the arm out along the line");
 }
 
 fn hops(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
