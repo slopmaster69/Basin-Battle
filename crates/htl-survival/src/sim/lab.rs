@@ -130,14 +130,20 @@ impl Survival {
 
     /// The lab's stage: the nearest open, level ground to `near` (the camp's spawn, for one),
     /// with no trunk, wall or water within [`STAGE_CLEAR`] yards and no creature of the world
-    /// within [`STAGE_QUIET`], and the way to face there. Every run starts on it, so the camera
+    /// within [`STAGE_QUIET`], outside the camp's yard (its fire and stores stood behind the
+    /// scene, a creature in the flames), and the way to face there. Every run starts on it, so the camera
     /// never ends in a canopy and each run is framed like the last (a run that left the hero
     /// wherever a charge or a leap put them once framed the next one through a tree).
     pub fn lab_stage(&self, near: [f32; 2], skip: &[Id]) -> Option<(Vec3, f32)> {
         let trees = self.land.trees();
         let f = self.content.world.spawn_facing;
+        let w = &self.content.world;
+        let (yard_at, yard) = (w.build_center, w.build_radius + STAGE_CLEAR);
         let open = |x: f32, y: f32| -> bool {
             if !self.land.in_zone(x, y) || self.land.blocked(x, y) || self.land.water(x, y) {
+                return false;
+            }
+            if yard > STAGE_CLEAR && dist2d([yard_at[0], yard_at[1], 0.0], [x, y, 0.0]) < yard {
                 return false;
             }
             let z = self.land.height(x, y);
@@ -258,6 +264,14 @@ mod tests {
         assert!(trees.iter().all(|t| dist2d(*t, stage.0) >= STAGE_CLEAR), "clear of every trunk: {stage:?}");
         assert!(dist2d(stage.0, [0.0, 0.0, 0.0]) < 30.0 + STAGE_CLEAR + 8.0, "and the nearest such ground: {stage:?}");
         assert_eq!(s.lab_stage([0.0, 0.0], &[]).map(|x| x.0), Some(stage.0), "the same stage each time");
+        // Out of the camp's yard too: its fire once burned behind the scene's body.
+        let mut c = Content::dev();
+        c.world.build_center = [200.0, 0.0];
+        c.world.build_radius = 30.0;
+        let mut t = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
+        t.mobs.clear();
+        let yard = t.lab_stage([200.0, 0.0], &[]).expect("open ground past the yard").0;
+        assert!(dist2d(yard, [200.0, 0.0, 0.0]) >= 30.0 + STAGE_CLEAR - 0.1, "outside the yard: {yard:?}");
         assert!(s.lab_to_stage(p, stage), "moved there");
         assert!(dist2d(s.players[&p].pos, stage.0) < 0.1);
         assert!(!s.lab_to_stage(p, stage), "already there: not moved again");

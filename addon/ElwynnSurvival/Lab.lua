@@ -67,7 +67,11 @@ local function Frame(cam)
     ResetView(4)
     SetView(4)
   end
-  if (cam == "side" or cam == "close") and CameraZoomIn then CameraZoomIn(5) end
+  -- Nearer than the high view's own distance: from there the hero was a small figure in a wide
+  -- field, the ability's look smaller still.
+  if CameraZoomIn then
+    if cam == "side" or cam == "close" then CameraZoomIn(5) else CameraZoomIn(3) end
+  end
 end
 
 function ES.LabLine(f)
