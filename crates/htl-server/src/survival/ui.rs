@@ -1246,7 +1246,6 @@ impl SurvivalGame {
                         let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                         self.sim.set_aim_line(me, f, e);
                     }
-                    return Ok(());
                 }
                 // An attack, its release and an ability key carry the reticle's line (the
                 // client's own camera, as a facing and an elevation).
