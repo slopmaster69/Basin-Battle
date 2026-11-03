@@ -1,0 +1,93 @@
+From 8a2af861dab23e8ef9a11f4b487bbcc9c1a418c5 Mon Sep 17 00:00:00 2001
+From: Basin Battle <basin@battle>
+Date: Tue, 3 Nov 2026 12:15:17 -0700
+Subject: [PATCH] The bowstring stays on its bow, and is pale enough to see at
+ night
+
+A posed limb tip left on another clip's frame put the string's top yards up in the sky, a long
+dark line from the hand (Corey's review of every bow ability: "way too broken"). The string now
+keeps to its bow: posed tips farther apart than the bow at rest (by more than 15%), or half a bow
+off its ends, fall back to the rest tips, and the nocking hand draws it back at most 0.9 bow
+lengths from between them, else it's straight. It's drawn a pale gut colour, not near-black.
+---
+ crates/benilla-app/src/bowstring.rs | 43 +++++++++++++++++++++++++----
+ 1 file changed, 37 insertions(+), 6 deletions(-)
+
+diff --git a/crates/benilla-app/src/bowstring.rs b/crates/benilla-app/src/bowstring.rs
+index b19faab..7773d11 100644
+--- a/crates/benilla-app/src/bowstring.rs
++++ b/crates/benilla-app/src/bowstring.rs
+@@ -17,6 +17,10 @@ const HAND_ARROW: u16 = 0x23;
+ 
+ /// No bow's string, drawn or not, is longer than this (yards).
+ const MAX_STRING: f32 = 2.5;
++/// Posed tips farther apart than the bow at rest by more than this share are a broken pose.
++const TIP_SLACK: f32 = 1.15;
++/// The farthest the nocking hand draws the string from between the tips, in bow lengths.
++const DRAW_REACH: f32 = 0.9;
+ 
+ /// Marks a bow prop root whose model authors the `$WTT`/`$WTB` anchors; despawned with the prop.
+ #[derive(Component)]
+@@ -44,8 +48,9 @@ fn draw_bowstrings(
+     joints: Query<&GlobalTransform>,
+     mut gizmos: Gizmos,
+ ) {
+-    // Inferred: the reference's packed vertex color is not decoded.
+-    const STRING_COLOR: Color = Color::srgb(0.12, 0.10, 0.08);
++    // Inferred: the reference's packed vertex color is not decoded. Basin Battle: a pale gut
++    // string, as a bowstring catches the light; the near-black one was lost against the night.
++    const STRING_COLOR: Color = Color::srgb(0.78, 0.72, 0.6);
+     for (bs, prop, vis, flex) in &bows {
+         if !vis.get() {
+             continue;
+@@ -56,8 +61,23 @@ fn draw_bowstrings(
+             flex.and_then(|p| p.posed_point(prop, bone, offset))
+                 .unwrap_or_else(|| prop.transform_point(offset))
+         };
+-        let top = tip(bs.top);
+-        let bottom = tip(bs.bottom);
++        // The tips at rest, on the prop's rigid frame: how long this bow is.
++        let rest_top = prop.transform_point(bs.top.1);
++        let rest_bottom = prop.transform_point(bs.bottom.1);
++        let rest = rest_top.distance(rest_bottom);
++        let (mut top, mut bottom) = (tip(bs.top), tip(bs.bottom));
++        // Basin Battle: a posed tip yards from where the bow is (a limb bone left on another
++        // clip's frame) drew the string as a long line off into the sky (Corey's review: "way
++        // too broken"). A draw bends the limbs toward each other, never apart: posed tips farther
++        // apart than the bow at rest, or off its ends, fall back to the rest tips.
++        if rest > 0.01
++            && (top.distance(bottom) > rest * TIP_SLACK
++                || top.distance(rest_top) > rest * 0.5
++                || bottom.distance(rest_bottom) > rest * 0.5)
++        {
++            top = rest_top;
++            bottom = rest_bottom;
++        }
+         let middle = owners
+             .get(bs.owner)
+             .ok()
+@@ -72,8 +92,19 @@ fn draw_bowstrings(
+         if top.distance(bottom) > MAX_STRING {
+             continue;
+         }
+-        let middle = if top.distance(middle) > MAX_STRING || bottom.distance(middle) > MAX_STRING {
+-            (top + bottom) / 2.0
++        // The nocking hand pulls the string back about as far as the bow is long at most; a hand
++        // farther off (a clip that put it elsewhere) leaves the string straight between the tips.
++        let reach = if rest > 0.01 {
++            rest * DRAW_REACH
++        } else {
++            MAX_STRING
++        };
++        let mid_tips = (top + bottom) / 2.0;
++        let middle = if top.distance(middle) > MAX_STRING
++            || bottom.distance(middle) > MAX_STRING
++            || mid_tips.distance(middle) > reach
++        {
++            mid_tips
+         } else {
+             middle
+         };
+-- 
+2.43.0
+
