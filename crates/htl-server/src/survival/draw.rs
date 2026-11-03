@@ -71,8 +71,12 @@ pub(crate) const ROPE_LEVEL: u8 = 19;
 /// from its origin, 0.14 yd thick, a little above the ground.
 const ROPE_DISPLAY: u32 = 60_001;
 const ROPE_MODEL_LEN: f32 = 3.18;
-/// Its size: about 0.3 yd thick and a shin above the ground.
-const ROPE_SCALE: f32 = 2.0;
+/// The model's rope runs this high over its origin (the middle of its 0.22 to 0.41).
+const ROPE_MODEL_MID_Z: f32 = 0.315;
+/// Its size: about 0.2 yd thick (at 2 it read as a hawser at knee height: visual check, run 020).
+const ROPE_SCALE: f32 = 1.4;
+/// How high it's strung over the arrows: an ankle's height, where a tripwire catches a foot.
+const ROPE_HEIGHT: f32 = 0.2;
 const ROPE_ENTRY_NAME: &str = "Tripwire";
 
 /// Danger marks and the placing rings: the ritual circle (drawn 6.48 yd across at scale 1) and a
@@ -728,9 +732,13 @@ impl SurvivalGame {
         }
     }
 
-    /// A rope from `a` to `b`: the dig site's rope at its origin on `a`, turned toward `b` and
-    /// drawn as long as the span (`GO_FLAG_STRETCH_X`), never solid (`GO_FLAG_PREVIEW_MOVE`).
+    /// A rope from `a` to `b`: the dig site's rope at its origin on `a`, turned toward `b`, drawn
+    /// as long as the span (`GO_FLAG_STRETCH_X`) and strung an ankle's height over the ground,
+    /// never solid (`GO_FLAG_PREVIEW_MOVE`).
     pub(crate) fn rope_create(&mut self, id: Id, a: [f32; 3], b: [f32; 3]) -> Packet {
+        // The model's own rope sits above its origin: lowered so it's strung at ROPE_HEIGHT.
+        let drop = ROPE_HEIGHT - ROPE_MODEL_MID_Z * ROPE_SCALE;
+        let (a, b) = ([a[0], a[1], a[2] + drop], [b[0], b[1], b[2] + drop]);
         let entry = self.go_entry(ROPE_DISPLAY, ROPE_ENTRY_NAME, GO_TYPE_GENERIC);
         let guid = rope_guid(id);
         let span = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2) + (b[2] - a[2]).powi(2)).sqrt();
