@@ -206,7 +206,7 @@ impl Survival {
             // clips: a humanoid's reads as flight (Corey's review of Reverse Grapple); another
             // model plays whatever it has for it.
             if pull {
-                self.events.push(Event::Clip { id: victim, clip: 42, secs: air });
+                self.events.push(Event::Clip { id: victim, clip: 42, secs: air, take: 0, from: None, at: 0.0 });
             }
             // A dummy isn't stepped (it only stands there): it's where the throw ends at once,
             // while everyone's client flies it there.
