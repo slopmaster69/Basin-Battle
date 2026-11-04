@@ -768,7 +768,7 @@ pub struct MissileLookDef {
     /// of flat about its up (the sixteenth client; older ones spin it flat).
     #[serde(default)]
     pub tumble: bool,
-    /// How fast it flies, yards a second, on a client with patch 0032 (0: the spell's own speed,
+    /// How fast it flies, yards a second, on a client with patch 0039 (0: the spell's own speed,
     /// which the clients cap at 100): a bolt quicker than anything in the data (Kill Shot). The
     /// rules' own speed is the ability's; this keeps the look in step with it.
     #[serde(default)]
