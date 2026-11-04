@@ -796,6 +796,21 @@ fn bladestorm_tells_the_clients_its_flurry_and_flashes_each_cut_that_lands() {
 }
 
 #[test]
+fn shockwave_flashes_its_cone_on_the_ground_as_it_lands() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut ev = cast(&mut s, p, "shockwave", false, 0.0, 0.0);
+    ev.extend(run(&mut s, 0.6));
+    let wedge = ev.iter().find_map(|e| match e {
+        Event::Mark { tele: Some(t), .. } if t.hero && t.mob == p && t.at.is_some() => Some(*t),
+        _ => None,
+    });
+    let t = wedge.expect("the cone on the ground as it lands");
+    let d = s.content.abilities.iter().find(|a| a.key == "shockwave").unwrap();
+    assert!((t.reach - d.range[0]).abs() < 0.1 && (t.arc - d.arc).abs() < 0.1 && (t.secs - d.ground_flash).abs() < 1e-3, "{t:?}");
+}
+
+#[test]
 fn bladestorm_walks_at_70_percent_of_a_run() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
