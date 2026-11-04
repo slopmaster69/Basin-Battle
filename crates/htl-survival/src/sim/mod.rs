@@ -884,6 +884,9 @@ pub struct Survival {
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
     pub dummies: BTreeMap<Id, String>,
+    /// Creatures put up to practise on and look at (`.es target`): `true` for one that stands
+    /// still, never moving or striking of itself (thrown, pulled and knocked up all the same).
+    pub targets: BTreeMap<Id, bool>,
     /// Crowd control on units, the heroes' grace after a hard one, and each hero's log of it.
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
@@ -908,6 +911,9 @@ pub struct Survival {
     /// moves on.
     pub(crate) patrols: BTreeMap<usize, (usize, f32)>,
     pub debug: bool,
+    /// Debug's commands without its drawing (`.es debug quiet`: the visual check records with
+    /// it, so projectiles' bodies and ground areas aren't drawn over the footage).
+    pub debug_quiet: bool,
     /// Testing: stations, upgrades and mending cost nothing at the camp (`.es freebuild`).
     pub free_build: bool,
     /// The world below (the Deadmines), if this is it.
@@ -991,6 +997,7 @@ impl Survival {
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
+            targets: BTreeMap::new(),
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),
@@ -1005,6 +1012,7 @@ impl Survival {
             respawns: Vec::new(),
             patrols: BTreeMap::new(),
             debug: false,
+            debug_quiet: false,
             free_build: false,
         below: None,
             siege: None,
@@ -1740,6 +1748,11 @@ impl Survival {
         self.marks.push((id, self.clock + secs));
         self.events.push(Event::Mark { id, pos, radius, tele, ground: 0 });
         id
+    }
+
+    /// Debug draws projectiles' bodies and every ground area (not with `.es debug quiet`).
+    pub(crate) fn debug_draws(&self) -> bool {
+        self.debug && !self.debug_quiet
     }
 
     /// Seconds a danger mark has left on the ground (0: gone).

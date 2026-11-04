@@ -1127,6 +1127,11 @@ impl Survival {
             } else {
                 self.walk(id, dt);
             }
+            // A target put up to stand still (`.es target ... still`): moved by what moves it,
+            // never of its own will.
+            if self.targets.get(&id).copied().unwrap_or(false) {
+                continue;
+            }
             if self.disabled(id) {
                 continue;
             }

@@ -1,0 +1,26 @@
+# Tripwire (2, twice) laid in two places, seen from higher up: first across the ground ahead-left,
+# then across the way ahead, where a creature then runs through it (Corey's review: does the rope
+# go where it's aimed, and the trip on a creature). Look for: each rope where it was aimed, the
+# creature's trip.
+hero hunter
+cam 0 -25 14
+include _setup
+4.2 .es dummy clear
+5.0 .es slot 2 tripwire
+5.5 .es valor full
+6.0 .es in ab 3 0                    # the first wire, ahead and to the left
+6.4 .es in a {facing+0.7} -0.25
+6.5 .es in au {facing+0.7} -0.25
+7.0 .es in ab 3 0
+7.4 .es in a {facing+0.25} -0.25
+7.5 .es in au {facing+0.25} -0.25
+6.2 shots left 4 0.5
+10.0 .es in ab 3 0                   # the second, straight across the way ahead
+10.4 .es in a {facing+0.35} -0.3
+10.5 .es in au {facing+0.35} -0.3
+11.0 .es in ab 3 0
+11.4 .es in a {facing-0.35} -0.3
+11.5 .es in au {facing-0.35} -0.3
+12.5 .es target grunt 16             # it comes at the hunter, across the wire
+13.0 shots trip 6 0.4
+19 end

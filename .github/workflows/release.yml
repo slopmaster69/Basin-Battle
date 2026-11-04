@@ -9,12 +9,22 @@
 # branch (or `gh workflow run release.yml --ref <branch>`). The zip's folder is then the run's
 # artifact, and no release is made; its version says it's a branch build, so it never updates
 # itself over to a release.
+#
+# The visual check's client (docs/visual-check.md): Run workflow with "dev" ticked (or
+# `gh workflow run release.yml --ref <branch> -f dev=true`) builds benilla's dev build instead,
+# whose scripted probes (log in, type chat, take screenshots, quit) drive the check. It's kept as
+# the run's "Basin Battle for Windows (visual check)" artifact and never attached to a release.
 name: Release
 
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      dev:
+        description: "Build the dev client for the visual check (scripted probes) instead of the player build; never released"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -23,8 +33,18 @@ jobs:
   windows-zip:
     runs-on: windows-latest
     timeout-minutes: 120
+    env:
+      # A tag push has no inputs: the player build.
+      PACKAGE: ${{ inputs.dev && 'Basin Battle for Windows (visual check)' || 'Basin Battle for Windows' }}
     steps:
       - uses: actions/checkout@v7
+
+      # The script that drives the dev client, under the Windows PowerShell players have: every
+      # scenario read and turned into the client's Lua, nothing run.
+      - name: Read the visual check's scenarios
+        if: ${{ inputs.dev }}
+        shell: powershell
+        run: scripts\visual-check-windows.ps1 -Check
 
       - name: Fetch the pinned benilla and apply the patches
         shell: bash
@@ -40,22 +60,36 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: benilla
+          # The dev build compiles other features: it keeps a cache of its own (the player
+          # build's key stays as it was).
+          key: ${{ inputs.dev && 'dev' || '' }}
 
       - name: "Build the client (the player build, its settings and add-ons beside the exe)"
+        if: ${{ !inputs.dev }}
         working-directory: benilla
         run: cargo build --release -p benilla --bin benilla --no-default-features
+
+      # The visual check sets BENILLA_HOME, since a dev build otherwise keeps its settings and
+      # add-ons in this runner's source folder.
+      - name: "Build the dev client (default features: the scripted probes the visual check drives)"
+        if: ${{ inputs.dev }}
+        working-directory: benilla
+        run: cargo build --release -p benilla --bin benilla
 
       # The server ships ready to run, so hosting needs no Rust and no build. Built the way
       # "Host Basin Battle.bat" builds it on a player's PC (the GNU toolchain, no MinGW on the
       # PATH: see ci.yml's windows-server job), so it runs on a PC with nothing installed.
       - name: Rust with the GNU toolchain for the server
+        if: ${{ !inputs.dev }}
         run: rustup toolchain install stable-x86_64-pc-windows-gnu --profile minimal
 
       - uses: Swatinem/rust-cache@v2
+        if: ${{ !inputs.dev }}
         with:
           key: server
 
       - name: Build the server
+        if: ${{ !inputs.dev }}
         env:
           RUSTUP_TOOLCHAIN: stable-x86_64-pc-windows-gnu
         run: |
@@ -71,6 +105,7 @@ jobs:
       # Play.exe and Host.exe, the two buttons; then the project's shield on them and on the game
       # (rcedit writes the icon into an exe that's already built: no change to the client).
       - name: Build the buttons, and put the icon on them and on the game
+        if: ${{ !inputs.dev }}
         env:
           RUSTFLAGS: -C target-feature=+crt-static
         run: |
@@ -83,6 +118,7 @@ jobs:
           }
 
       - name: Package
+        if: ${{ !inputs.dev }}
         shell: pwsh
         run: |
           # The title players see, from project.toml.
@@ -109,6 +145,22 @@ jobs:
           Copy-Item -Recurse content "$out/server/content"
           Compress-Archive -Path $out -DestinationPath "dist-out/$package.zip"
 
+      # The exe alone: the visual check brings the branch's own add-ons and a settings folder of
+      # its own each run, and the player launchers would start this build without them.
+      - name: Package the dev client
+        if: ${{ inputs.dev }}
+        shell: pwsh
+        run: |
+          $out = "dist-out/$env:PACKAGE"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          Copy-Item benilla/target/release/benilla.exe "$out/"
+          Copy-Item dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/"
+          Set-Content "$out/README.txt" @(
+            "The dev build of the Basin Battle client, for the visual check only. Don't play with it.",
+            "Built from $env:GITHUB_REF_NAME ($env:GITHUB_SHA).",
+            "Run it with Visual Check.bat from the repository, which docs/visual-check.md explains."
+          )
+
       # Every run keeps the folder as an artifact (a week), so a branch can be tried before a tag.
       - name: Keep the folder as the run's artifact
         uses: actions/upload-artifact@v7
@@ -118,7 +170,7 @@ jobs:
           retention-days: 7
 
       - name: Attach to the release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dev
         uses: softprops/action-gh-release@v3
         with:
           files: dist-out/${{ env.PACKAGE }}.zip

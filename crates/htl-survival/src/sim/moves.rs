@@ -439,7 +439,7 @@ impl Survival {
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(end) });
         let damage = AbilityDef::at(d.damage, share);
         self.area_shape(id, ability, at, len, share, damage, Shape::Line(yaw, len, half));
-        if self.debug {
+        if self.debug_draws() {
             for k in 0..=4 {
                 let t = len * k as f32 / 4.0;
                 self.mark([at[0] + yaw.cos() * t, at[1] + yaw.sin() * t, at[2]], half, 0.8);

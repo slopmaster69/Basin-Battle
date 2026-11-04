@@ -1,0 +1,17 @@
+# Bank Shot (Q, its second choice), seen from farther back and higher: into the ground well ahead
+# so it bounces on, then at the inn's wall to the right (Corey's review: the bounce, at range, and
+# off a wall). Look for: the flight, each bounce, and where it ends.
+hero hunter
+cam 0 -22 16
+include _setup
+4.2 .es dummy clear
+5.0 .es slot q bank_shot
+6.0 .es in ab 0 0
+6.5 .es in a {facing} -0.2           # into the ground about 9 yd ahead: it bounces on
+6.6 .es in au {facing} -0.2
+6.3 shots ground 6 0.3
+10.0 .es in ab 0 0
+10.5 .es in a {facing-1.1} 0.0       # at the inn's wall, to the right
+10.6 .es in au {facing-1.1} 0.0
+10.3 shots wall 6 0.3
+15 end

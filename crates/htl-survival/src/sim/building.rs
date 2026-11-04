@@ -280,6 +280,17 @@ impl Survival {
         names
     }
 
+    /// Testing: `n` of an item, by its key in content/, straight into a hero's bags (the visual
+    /// check's food and drink). Its name.
+    pub fn give_for_testing(&mut self, id: Id, key: &str, n: u32) -> Result<String, String> {
+        let item = self.content.item(key).ok_or_else(|| format!("There's no item {key}."))?;
+        let p = self.players.get_mut(&id).ok_or_else(|| "No hero.".to_string())?;
+        *p.bag.entry(item).or_default() += n;
+        self.events.push(Event::Bags { player: id });
+        self.events.push(Event::Dirty);
+        Ok(self.content.items[item].name.clone())
+    }
+
     // --- the buildings' jobs --------------------------------------------------------------------
 
     /// Standing, whole buildings of the camp (not below, not in Siege), with their kind.
