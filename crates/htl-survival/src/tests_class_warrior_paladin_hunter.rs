@@ -591,9 +591,9 @@ fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() 
     assert_eq!(missiles(&ev, p, 3044), 0, "let go too soon");
     assert_eq!(s.players[&p].action, Action::Ready);
     assert_eq!(s.players[&p].valor, 100.0, "nothing spent");
-    // The whole draw.
+    // The whole draw (1.3 s now: longer than Aimed Shot's, Corey's review).
     press(&mut s, p, "kill_shot", false);
-    let mut ev = draw(&mut s, p, 1.1, aim, &pins);
+    let mut ev = draw(&mut s, p, 1.4, aim, &pins);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
     assert_eq!(missiles(&ev, p, 3044), 1, "loosed");
     assert_eq!(hits(&ev, p, first).len(), 1, "the first struck");
@@ -920,7 +920,8 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     s.set_valor(p, 25.0);
     let mut ev = press(&mut s, p, "tripwire", true);
     ev.extend(run(&mut s, 0.1));
-    let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
+    // The arrows fly home as the Hunter's arrow; the key itself plays no buff (its spell is 0).
+    let spell = crate::sim::hunter::RECALL_ARROW;
     let mut anchors = Vec::new();
     for a in &planted {
         let gone = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)).expect("its arrow leaves the ground");
