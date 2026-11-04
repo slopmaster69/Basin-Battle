@@ -460,8 +460,10 @@ trail = "9ADFFF"
 width = 0.22
 secs = 0.3
 
-# The Warrior's Hurled Axe: bigger, spinning flat like a boomerang, a steel-pale streak, so the
-# way back reads (Corey's review: "larger, and spin while it flies, like a boomerang").
+# The Warrior's Hurled Axe: bigger, tumbling end over end as a thrown axe does, a steel-pale
+# streak, so the way back reads (Corey's review: "larger, and spin while it flies"; then of the
+# flat spin, "goofy, it should be a horizontal X-axis spin that just rotates 360"). The tumble
+# needs the sixteenth client; older ones spin it flat.
 [[missile_look]]
 spell = 16075
 trail = "D8E4F0"
@@ -469,6 +471,7 @@ width = 0.3
 secs = 0.35
 scale = 1.8
 spin = 2.5
+tumble = true
 
 # --- melee weapons and shields --------------------------------------------------------------------
 

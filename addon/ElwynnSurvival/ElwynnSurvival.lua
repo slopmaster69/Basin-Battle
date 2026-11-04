@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 23
+local VERSION = 24
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6505,12 +6505,15 @@ function ES.Line(line)
     end
   elseif verb == "ML" then
     -- How a spell's missiles look (patch 0029): a ribbon behind them, their size and a spin; with
-    -- a caster's guid, for its next one alone (a ricochet's colour).
+    -- a caster's guid, for its next one alone (a ricochet's colour); and the spin's axis after it
+    -- ("side": end over end, patch 0035; "-" in the caster's place when there's none).
     if SetMissileLook and f[2] then
       local trail = f[3]
       if trail == "-" then trail = nil end
+      local caster = f[8]
+      if caster == "-" then caster = nil end
       SetMissileLook(tonumber(f[2]) or 0, trail, tonumber(f[4]) or 0.25, tonumber(f[5]) or 0.35,
-        tonumber(f[6]) or 1, tonumber(f[7]) or 0, f[8])
+        tonumber(f[6]) or 1, tonumber(f[7]) or 0, caster, f[9])
     end
   elseif verb == "MK" then
     -- A blow coming down there: its circle on the ground (the client lays it), or gone.
