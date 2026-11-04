@@ -16,10 +16,10 @@ Classic installs will NOT work.
 
 THE TWO BUTTONS
 ---------------
-  Play       Plays. It gets the newest version first if there is one, finds
-             your WoW 1.12.1 by itself, and starts where you played last time.
-             In the first 3 seconds you can click Single player, or Change to
-             choose the game, the server or your WoW folder.
+  Play       The launcher. It gets the newest version first if there is one
+             and finds your WoW 1.12.1 by itself. Pick the game at the top
+             (Elwynn Survival or Basin Battle), check the server at the bottom
+             left, and press Play.
   Host       Runs YOUR server, for both games: for you alone, or for friends to
              join. Leave its window open while anyone plays.
 
@@ -32,10 +32,11 @@ info", then "Run anyway".
 
 PLAY WITH THE GROUP
 -------------------
-Double-click Play. It joins the group's server by itself: nothing to
-type, nothing else to install. If that server isn't up, Play tries the
-next one in the group's list by itself (a backup). If none is up, it says
-so and offers Try again or Single player. Each server is its own world: a
+Double-click Play and press Play. It joins the group's server by itself:
+nothing to type, nothing else to install. The lamp by the server's name
+(bottom left) says whether it's up. If that server isn't up, Play tries
+the next one in the group's list by itself (a backup). If none is up, it
+says so and offers Try Again or Play Single Player. Each server is its own world: a
 hero made on one isn't on the others.
 (A server listed as "Tailscale" needs Tailscale, tailscale.com/download,
 and an invite from its host. The others don't.)
@@ -43,9 +44,9 @@ and an invite from its host. The others don't.)
 
 SINGLE PLAYER
 -------------
-Double-click Play and click Single player. Play starts your own server on
-this PC (a second window: leave it open) and joins it. To make it what Play
-does every time, click Change and choose "Single player".
+Double-click Play, click the server at the bottom left and choose Single
+player, then press Play. Play starts your own server on this PC (a second
+window: leave it open) and joins it, and remembers the choice.
 
 
 PLAY WITH FRIENDS ON YOUR SERVER (YOU HOST)
@@ -69,8 +70,9 @@ If Windows asks whether htl-server may use the network, click Allow.
 
 PLAY ON A FRIEND'S SERVER
 -------------------------
-Double-click Play, click Change, pick the game, then "Someone else's" and
-type the address they give you. It's remembered for next time. (The
+Double-click Play, click the server at the bottom left, choose "Custom
+server..." and type the address they give you. It's remembered for next
+time. (The
 group's own server is already built in: see PLAY WITH THE GROUP.)
 
 
@@ -202,10 +204,16 @@ BASIN BATTLE: PLAYING
 
 TROUBLESHOOTING
 ---------------
+Play's window is blank, or the plain launcher opens instead of the map
+    Play's map needs Microsoft Edge WebView2, which Windows 10 and 11 come
+    with. Without it Play opens its plain window, which plays the same. To
+    get the map, install the "Evergreen" WebView2 Runtime from Microsoft.
+    Play.exe -Classic always opens the plain window.
+
 "benilla: no WoW install found", or Play found the wrong WoW
-    Double-click Play, click Change, then Change... under World of Warcraft,
-    and pick the folder that has
-    WoW.exe and Data\dbc.MPQ in it.
+    Double-click Play, click the cog at the top right (Settings), then Game
+    files, Choose Folder, and pick the folder that has WoW.exe and
+    Data\dbc.MPQ in it.
 
 "Unable to connect" on the login screen
     - Check the address with the host.

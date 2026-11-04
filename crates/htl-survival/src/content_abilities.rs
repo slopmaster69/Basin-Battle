@@ -224,6 +224,10 @@ pub struct AbilityDef {
     pub object: u32,
     #[serde(default)]
     pub burst_spell: u32,
+    /// A ricochet's flash where it skips off the ground, apart from the wall's `burst_spell`
+    /// (Bank Shot: not fire on the floor; Corey's review). 0: none, the arrow flies on from there.
+    #[serde(default)]
+    pub skip_spell: u32,
     /// A trap's throw: the spell whose missile flies from the hand to the spot before the trap
     /// is set there (a bomb's), so the player sees it go out (Corey's review: "the trap should
     /// fly out of the hand and land on the spot"). 0: set at once.

@@ -12,6 +12,8 @@ const ORIGIN: Vec3 = [0.0, 0.0, 0.0];
 /// Aimed Shot's arrow, Bank Shot's look; Split Arrow's burst where it splits; its glowing arrow.
 const ARROW: u32 = 19434;
 const FLASH: u32 = 5162;
+/// The splash of earth where it skips off the ground (not the wall's fire: Corey's review).
+const SPLASH: u32 = 26271;
 const GLOW: u32 = 3044;
 
 /// Level ground with walls: everything at or past `east` is solid, and with `west`, everything at
@@ -186,7 +188,10 @@ fn bank_shot_aimed_low_skips_off_the_ground_into_the_foe() {
     let (_, from, to) = l[0];
     assert!(from[2] < 0.6 && from[0] > 15.0, "off the ground where it came down: {from:?}");
     assert!(to[2] > from[2], "and up from it: {from:?} to {to:?}");
-    assert!(flashes(&ev, FLASH).is_empty(), "no burst where it skipped");
+    // No fire on the ground where it skipped: it isn't an explosion (the arrow's flight on from
+    // there is the look; no small splash of dirt exists in the data).
+    assert!(flashes(&ev, FLASH).is_empty(), "no fire on the ground: it isn't an explosion");
+    assert!(flashes(&ev, SPLASH).is_empty(), "and no boulders either");
     // Into the foe past it, no harder (a skip isn't a ricochet), and planted past it.
     let h = hits(&ev, p, k);
     assert!(h.len() == 1 && h[0] < 24, "it still strikes, no harder: {h:?}");
