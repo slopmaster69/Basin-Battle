@@ -88,10 +88,19 @@ builds the server (5-10 minutes). Players join it with Play as usual.
    folder (or asks for it) and builds everything.
 3. Host, and leave that window open: `scripts/host.sh` (password **hold**), or
    `scripts/host.sh --password ember`. Or double-click **Host Basin Battle.command**.
-4. Play, in a second window: `scripts/play-survival.sh` for Elwynn Survival or `scripts/play.sh`
-   for Basin Battle. For a friend's game add their address: `scripts/play-survival.sh 192.168.1.20`.
+4. Play: double-click **Play Basin Battle.command**. It opens the War Table, the same launcher
+   as the Windows download's Play: pick the game at the top, check the server at the bottom
+   left (the group's servers from `project.toml`, a friend's address, or single player on this
+   Mac) and press **Play**. The first time it builds the launcher (a few minutes) and puts
+   **Basin Battle.app** in this folder: open that from then on, or drag it to the Dock. It plays
+   through `scripts/play.sh`, so the client still rebuilds itself after an update, and each time
+   it opens it brings this folder up to date with GitHub (`git pull` of `main`, and only when
+   you haven't changed anything here yourself).
+   The plain way still works, in Terminal: `scripts/play-survival.sh` for Elwynn Survival or
+   `scripts/play.sh` for Basin Battle. For a friend's game add their address:
+   `scripts/play-survival.sh 192.168.1.20`.
 
-To update, `git pull` and double-click **Restart Basin Battle.command** (or give it a number of
+To update by hand, `git pull` (Basin Battle.app does it when it opens) and double-click **Restart Basin Battle.command** (or give it a number of
 minutes, or `cancel`): everyone playing sees a countdown, the worlds are saved, and the server
 builds the newest version and starts again. The play scripts rebuild the client when its patches
 change.

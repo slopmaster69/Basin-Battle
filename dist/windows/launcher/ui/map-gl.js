@@ -57,6 +57,11 @@ const MapGL = (() => {
   function create(canvas, manifestUrl, opts = {}) {
     const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false, powerPreference: "high-performance", preserveDrawingBuffer: false });
     if (!gl) throw new Error("WebGL2 isn't available");
+    // A lost context (the GPU reset, or out of memory) is reported, and the map drawn again
+    // from scratch when it comes back.
+    let lost = false;
+    canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); lost = true; opts.onLost && opts.onLost(); });
+    canvas.addEventListener("webglcontextrestored", () => { opts.onRestored && opts.onRestored(); });
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
     const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
@@ -95,7 +100,9 @@ const MapGL = (() => {
       const order = tiles.slice().sort((a, b) => dist(a) - dist(b));
       await Promise.all(order.map(t => decode(dir + t.file).then(bm => { toUpload.push([t, bm]); })));
       const wait = () => new Promise(r => { const f = () => { if (toUpload.length === 0 && tiles.every(t => t.tex)) r(); else requestAnimationFrame(f); }; f(); });
-      await wait(); state.ready = true; opts.onReady && opts.onReady();
+      await wait(); state.ready = true;
+      state.error = gl.getError();   // GL_NO_ERROR (0) if every upload worked
+      opts.onReady && opts.onReady();
       function dist(t) { const c = state.cam; return Math.hypot(t.x + 512 - c.x, t.y + 512 - c.y); }
     }).catch(e => { console.error(e); opts.onError && opts.onError(e); });
 
@@ -132,15 +139,94 @@ const MapGL = (() => {
       }
       return true;
     }
+    // The colour drawn in the middle of the screen this moment, read straight back from the GPU.
+    function probe() {
+      state.dirty = true; render(performance.now());
+      const px = new Uint8Array(4); gl.readPixels(canvas.width >> 1, canvas.height >> 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return Array.from(px).join(",");
+    }
     return {
-      gl, state, resize, render,
+      gl, state, resize, render, probe,
       setCamera(cam, anchor) { state.cam = cam; state.anchor = anchor; state.dirty = true; },
       setLight(light, flicker) { if (light !== state.light || Math.abs(flicker - state.flicker) > .002) { state.light = light; state.flicker = flicker; state.dirty = true; } },
       project([x, y]) { const c = state.cam; return [(x - c.x) * c.z + state.anchor[0], (y - c.y) * c.z + state.anchor[1]]; },
       unproject([sx, sy]) { const c = state.cam; return [(sx - state.anchor[0]) / c.z + c.x, (sy - state.anchor[1]) / c.z + c.y]; },
       get ready() { return state.ready; },
       tilesLoaded() { return tiles.filter(t => t.tex).length + "/" + tiles.length; },
+      // What this PC draws with, for the launcher's log.
+      about() {
+        const d = gl.getExtension("WEBGL_debug_renderer_info");
+        return { renderer: d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+          error: state.error, lost: lost || gl.isContextLost(), canvas: canvas.width + "x" + canvas.height, tiles: tiles.filter(t => t.tex).length + "/" + tiles.length,
+          centre: probe(), style: getComputedStyle(canvas).display + "/" + getComputedStyle(canvas).visibility + "/" + canvas.clientWidth + "x" + canvas.clientHeight };
+      },
     };
   }
-  return { create };
+
+  // The same map drawn with a 2D canvas, for a webview whose WebGL draws but doesn't reach the
+  // screen. The same art, camera and candlelight (the shader's two layers as two gradients, the
+  // glow in soft-light), at the cost of more work a frame.
+  function create2d(canvas, manifestUrl, opts = {}) {
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const state = { cam: { x: 0, y: 0, z: 1 }, anchor: [0, 0], view: [1, 1], dpr: 1, dirty: true, light: 1, flicker: 0, ready: false, error: 0 };
+    let manifest = null, base = null, tiles = [];
+    const decode = url => fetch(url).then(r => { if (!r.ok) throw new Error(url + " " + r.status); return r.blob(); }).then(b => createImageBitmap(b));
+    const dir = manifestUrl.replace(/[^/]*$/, "");
+    fetch(manifestUrl).then(r => r.json()).then(async m => {
+      manifest = m; base = await decode(dir + m.base); state.dirty = true;
+      tiles = m.tiles.map(t => ({ ...t, bm: null }));
+      await Promise.all(tiles.map(t => decode(dir + t.file).then(bm => { t.bm = bm; state.dirty = true; })));
+      state.ready = true; opts.onReady && opts.onReady();
+    }).catch(e => { console.error(e); opts.onError && opts.onError(e); });
+    function resize() {
+      const dpr = Math.min(devicePixelRatio || 1, 2), w = canvas.clientWidth, h = canvas.clientHeight;
+      state.dpr = dpr; state.view = [w, h];
+      if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
+      state.dirty = true;
+    }
+    // An ellipse's gradient: centre and radii as fractions of the view, stops along its radius.
+    function ellipse(cx, cy, rx, ry, stops, op) {
+      const [w, h] = state.view;
+      ctx.save(); ctx.globalCompositeOperation = op;
+      ctx.translate(cx * w, cy * h); ctx.scale(rx * w, ry * h);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1); for (const [at, c] of stops) g.addColorStop(at, c);
+      ctx.fillStyle = g; ctx.fillRect(-4, -4, 8, 8); ctx.restore();
+    }
+    function render() {
+      if (!state.dirty || !manifest || !base) return false;
+      state.dirty = false;
+      const [w, h] = state.view, c = state.cam, z = c.z, [ax, ay] = state.anchor;
+      ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+      ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "#171310"; ctx.fillRect(0, 0, w, h);
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = z < .6 ? "medium" : "high";
+      const [W, H] = manifest.art, T = manifest.tile, G = manifest.gutter;
+      const sx = x => (x - c.x) * z + ax, sy = y => (y - c.y) * z + ay;
+      ctx.drawImage(base, sx(0), sy(0), W * z, H * z);
+      const x0 = c.x - ax / z, y0 = c.y - ay / z, x1 = x0 + w / z, y1 = y0 + h / z;
+      for (const t of tiles) {
+        if (!t.bm || t.x > x1 || t.x + T < x0 || t.y > y1 || t.y + T < y0) continue;
+        // Half a pixel of overlap, so no seam shows between tiles.
+        ctx.drawImage(t.bm, G, G, T, T, sx(t.x) - .25, sy(t.y) - .25, T * z + .5, T * z + .5);
+      }
+      const a = .42 * state.light * state.flicker;
+      if (a > 0) ellipse(.44, .36, .55, .60, [[0, `rgba(255,196,120,${a})`], [.72, "rgba(255,196,120,0)"], [1, "rgba(255,196,120,0)"]], "soft-light");
+      ellipse(.50, .42, .66, .74, [[0, "rgba(16,23,28,0)"], [.38, "rgba(16,23,28,0)"], [.74, "rgba(16,23,28,.5)"], [1, "rgba(16,23,28,.88)"]], "source-over");
+      return true;
+    }
+    function probe() {
+      state.dirty = true; render();
+      const d = ctx.getImageData(canvas.width >> 1, canvas.height >> 1, 1, 1).data; return Array.from(d).join(",");
+    }
+    return {
+      gl: null, state, resize, render, probe,
+      setCamera(cam, anchor) { state.cam = cam; state.anchor = anchor; state.dirty = true; },
+      setLight(light, flicker) { if (light !== state.light || Math.abs(flicker - state.flicker) > .002) { state.light = light; state.flicker = flicker; state.dirty = true; } },
+      project([x, y]) { const c = state.cam; return [(x - c.x) * c.z + state.anchor[0], (y - c.y) * c.z + state.anchor[1]]; },
+      unproject([sx, sy]) { const c = state.cam; return [(sx - state.anchor[0]) / c.z + c.x, (sy - state.anchor[1]) / c.z + c.y]; },
+      get ready() { return state.ready; },
+      tilesLoaded() { return tiles.filter(t => t.bm).length + "/" + tiles.length; },
+      about() { return { renderer: "canvas 2d", canvas: canvas.width + "x" + canvas.height, tiles: tiles.filter(t => t.bm).length + "/" + tiles.length, centre: probe() }; },
+    };
+  }
+  return { create, create2d };
 })();
