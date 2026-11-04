@@ -219,7 +219,7 @@ fn tackle_kicks_up_dust_from_its_first_step() {
     let _k = mob(&mut s, "brave", [6.0, 0.0, 0.0]);
     let mut ev = cast(&mut s, p, "tackle", false, 0.0, 0.0);
     ev.extend(run(&mut s, 0.45));
-    let puffs = ev.iter().filter(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == 5649)).count(); // 5649: the knockdown's dust (combat::KIT_DUST)
+    let puffs = ev.iter().filter(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == 44)).count(); // 44: a landing's small dust cloud
     assert!(puffs >= 2, "dust from the feet through the rush, not Charge's purple: {puffs}");
 }
 
