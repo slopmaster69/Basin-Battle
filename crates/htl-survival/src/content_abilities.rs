@@ -38,7 +38,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 18] = [
+pub const KINDS: [&str; 19] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -84,6 +84,9 @@ pub const KINDS: [&str; 18] = [
     // it passes once; the key again stops it where it is (`stop_secs`, `stop_effects`), a foe
     // within `perfect_arc` of its centre a perfect (the stop check).
     "sweep",
+    // An orb rolling out along the reticle, hurting what it passes; the key again stops it where
+    // it is and it bursts, a foe under it a perfect (the stop check).
+    "orb",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -418,6 +421,21 @@ pub struct AbilityDef {
     pub stop_effects: Vec<AbilityEffect>,
     #[serde(default)]
     pub perfect_arc: f32,
+    /// An orb (`kind = "orb"`, the stop check): it rolls out along the reticle `range` yards
+    /// over `linger` seconds, `linger_damage` a second to every foe within `radius` (with the
+    /// ability's `effects`), every `tick`. The key again stops it where it is and it bursts:
+    /// `damage` (the low end; the high end on a perfect) in `stop_radius`; a foe within
+    /// `perfect_yd` of it makes the stop a perfect and the burst carries `stop_effects` (the
+    /// freeze). Stopped within `backfire_yd` of the caster, `backfire_effects` fall on them.
+    /// Rolled the whole way, it fades with no burst.
+    #[serde(default)]
+    pub stop_radius: f32,
+    #[serde(default)]
+    pub perfect_yd: f32,
+    #[serde(default)]
+    pub backfire_yd: f32,
+    #[serde(default)]
+    pub backfire_effects: Vec<AbilityEffect>,
     /// A second activation (Battlerite's recast): once this goes, its key is armed for
     /// `recast_secs`, and pressed again meanwhile it fires this `inner` ability from the hero's
     /// aim, for no Valor and no cooldown (the cooldown was spent by the first cast). An EX

@@ -564,6 +564,11 @@ impl Survival {
                 return true;
             }
         }
+        // An orb of this key's rolling: its key again stops it where it is (the stop check).
+        if let Some(k) = self.orb_of(id, base) {
+            self.stop_orb(id, k);
+            return true;
+        }
         // A sweep: its key again stops the jet where it is (the stop check).
         if let Action::Sweep { ability, .. } = p.action {
             if self.content.base_of(ability) == base {
@@ -1122,6 +1127,10 @@ impl Survival {
                 self.set_action(id, next);
             }
             "sweep" => self.start_sweep(id, ability, yaw),
+            "orb" => {
+                self.start_orb(id, ability);
+                self.set_action(id, next);
+            }
             "nova" => {
                 let at = self.players[&id].pos;
                 self.nova(id, ability, at, share);

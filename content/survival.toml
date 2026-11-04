@@ -5886,6 +5886,40 @@ linger_spell = 22191
 clip = 54
 effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4.0], amount = 5.0 }]
 
+# 3, the second choice: Frost's ultimate, the stop check rolling. An orb rolls out along the
+# reticle; the key again stops it where it is and it bursts. Stopped on a foe it's a perfect: the
+# bigger burst and a freeze on everything in it (the group's shatter setup). Stopped at the
+# caster's own feet, they freeze. Rolled the whole way, nothing. (The Mage design,
+# claude/mage-kit-draft.md.)
+[[ability]]
+key = "frozen_orb"
+name = "Frozen Orb"
+text = "An orb of frost rolls out along the reticle for up to 4 sec, 25 yd: 15 damage per sec to everything within 2 yd of it, slowing them. Press again to stop it: it bursts for 30 damage within 6 yd. Stop it on an enemy and it bursts for 40 and freezes everything within 6 yd for 2 sec (1 sec against heroes). Stop it at your own feet and you freeze. Let it roll the whole way and it fades."
+icon = "Spell_Frost_FrostShock"
+school = "mage"
+slot = "ultimate"
+choice = 2
+kind = "orb"
+valor = 100
+range = [25.0, 25.0]
+# The roll: its length in seconds, its damage a second to those within its reach, in quarter-second ticks.
+linger = 4.0
+linger_damage = 15.0
+tick = 0.25
+radius = [2.0, 2.0]
+# The burst: plain, and on a foe.
+damage = [30.0, 40.0]
+stop_radius = 6.0
+perfect_yd = 1.5
+backfire_yd = 3.0
+cooldown = 40.0
+# Frostbolt's missile rolled along the ground for the orb; Frost Nova's ring for the burst.
+tick_spell = 116
+spell = 122
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
+stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
+backfire_effects = [{ kind = "petrify", secs = [1.5, 1.5] }]
+
 # ---------------------------------------------------------------------------------- Warlock --
 
 [[ability]]
@@ -8362,7 +8396,7 @@ unparryable = true
 posture = 160
 drops = { mageroyal = [2, 3] }
 trophy = { silver = 2, mageroyal = 4 }
-teaches = ["meteor"]
+teaches = ["meteor", "frozen_orb"]
 respawn = 1200.0
   [mob.attack]
   ranged = true

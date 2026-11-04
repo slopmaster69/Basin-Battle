@@ -30,6 +30,7 @@ pub(crate) mod heroes;
 pub mod hunter;
 mod raid;
 pub mod siege;
+mod orb;
 mod staff;
 mod sweep;
 pub mod wager;
@@ -886,6 +887,8 @@ pub struct Survival {
     /// (hero, ability): when they can have it again (Lay on Hands).
     pub(crate) lockouts: BTreeMap<(Id, usize), f32>,
     pub(crate) burnings: Vec<abilities::Burning>,
+    /// Orbs rolling out (Frozen Orb), until stopped or spent.
+    pub(crate) orbs: Vec<orb::Orb>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -1008,6 +1011,7 @@ impl Survival {
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),
             burnings: Vec::new(),
+            orbs: Vec::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
@@ -1077,6 +1081,7 @@ impl Survival {
         self.reckon_players(dt);
         self.step_players(dt);
         self.step_projectiles(dt);
+        self.step_orbs(dt);
         self.step_moves();
         self.step_grounds();
         self.step_bounces();
