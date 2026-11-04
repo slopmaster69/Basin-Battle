@@ -36,7 +36,7 @@ what it sent, side by side on one sheet.
 
 ### Options
 
-`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]]`
+`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [as <race>-<m|f>] [allies <n>]`
 
 - **Scenes:** `one` (one body 5 yd ahead), `pack` (three across the front), `close` (one at arm's
   length), `ring` (three at arm's length), `far` (one 14 yd off), `line` (two in a row, 4 and 7.5 yd ahead: a rush that drives one
@@ -54,6 +54,12 @@ what it sent, side by side on one sheet.
 - **Look:** `look 3631` tries that spell's look (and its lasting aura's) on the ability for this
   run only; `look 12294/3631` gives the spell and the aura apart. Put back after the run, so a
   queue can try several looks side by side before one goes into the rules.
+- **Race:** `as tauren-f` makes the hero that race and gender (plain looks) for this run and the
+  ones after: `human`, `orc`, `dwarf`, `nightelf`, `undead`, `tauren`, `gnome`, `troll`, then `m` or
+  `f`. Every race's take on an ability, one run after another.
+- **Allies:** `allies 2` stands up to 4 stand-in ally heroes beside the hero (left, right, behind),
+  each a different race, for what reaches allies (a shout, an Intervene). They go with the next
+  run and are never saved.
 - **Stage:** every run starts on the lab's stage (above); `stage here` runs it where you stand.
 - `.es lab clear` takes the scene away and lets go of the lock.
 - **From a file:** each line of `logs/lab/queue.txt` where you host is run as if typed after

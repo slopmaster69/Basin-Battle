@@ -1,8 +1,10 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [as <race>-<m|f>] [allies <n>]`
 //!
+//! - `as tauren-f` makes the hero that race and gender (plain looks) for this run and the ones after;
+//!   `allies 2` stands that many stand-in ally heroes beside them (gone with the next run).
 //! - `look` tries another of the game's looks on the ability for that run only (its spell, and
 //!   its lasting aura's, the same unless given), put back after.
 //! - Each run starts on the lab's stage, the nearest open level ground to the camp's spawn (no
@@ -84,6 +86,7 @@ impl SurvivalGame {
         let old = std::mem::take(&mut self.lab_mobs);
         self.sim.lab_clear(&old);
         if first == "clear" {
+            self.lab_set_allies(me, 0);
             self.tell(conn, "The lab is cleared.");
             return Ok(());
         }
@@ -111,6 +114,8 @@ impl SurvivalGame {
         let mut cam: Option<String> = None;
         let mut stage = true;
         let mut look: Option<(u32, Option<u32>)> = None;
+        let mut body: Option<(u8, u8)> = None;
+        let mut allies = 0usize;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
         let video = cfg!(windows) && ffmpeg().is_some();
         let (mut shots, mut every) = if video { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
@@ -129,6 +134,18 @@ impl SurvivalGame {
                     let mut it = spec.split('/');
                     let sp = it.next().and_then(|n| n.parse().ok()).ok_or("Try look <spell>[/<aura>].")?;
                     look = Some((sp, it.next().and_then(|n| n.parse().ok())));
+                    k += 1;
+                }
+                // The hero's race and gender for this run and the ones after (`as tauren-f`): every
+                // race's take on an ability, recorded one after another.
+                "as" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    body = Some(race_gender(spec).ok_or_else(|| format!("No race called {spec}. Try as <{}>-<m|f>.", RACE_NAMES.join("|")))?);
+                    k += 1;
+                }
+                // Stand-in ally heroes beside the hero (`allies 2`), for what reaches allies.
+                "allies" => {
+                    allies = words.get(k + 1).and_then(|n| n.parse().ok()).unwrap_or(2).min(4);
                     k += 1;
                 }
                 "stage" => {
@@ -170,6 +187,7 @@ impl SurvivalGame {
         self.sim.set_cooldowns(me, true);
         self.sim.set_valor(me, 100.0);
         self.sim.heal_full(me);
+        let reshaped = body.is_some_and(|(race, gender)| self.lab_reshape(me, race, gender));
         // Every run from the same open ground, facing the same way (`stage here` keeps the hero
         // where they stand): a run that started wherever the last left the hero was once framed
         // through a tree.
@@ -195,9 +213,10 @@ impl SurvivalGame {
         let d = self.sim.content.abilities[ability].clone();
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
+        self.lab_set_allies(me, allies);
         // The steps, timed from a moment after the burst starts (and after the client has set the
         // hero down, if the stage moved them).
-        let now = self.sim.clock + if moved { MOVED_SETTLE } else { 0.0 };
+        let now = self.sim.clock + if moved || reshaped { MOVED_SETTLE } else { 0.0 };
         let start = now + SETTLE + LEAD;
         let mut at = start;
         let mut queue = VecDeque::new();
@@ -395,7 +414,81 @@ impl SurvivalGame {
     }
 }
 
+/// The races a lab run can take (`as <race>-<m|f>`), in the game's order (`ChrRaces`, 1 to 8).
+const RACE_NAMES: [&str; 8] = ["human", "orc", "dwarf", "nightelf", "undead", "tauren", "gnome", "troll"];
+
+/// `tauren-f` → (6, 1).
+fn race_gender(spec: &str) -> Option<(u8, u8)> {
+    let (race, gender) = spec.to_lowercase().split_once('-').map(|(r, g)| (r.to_string(), g.to_string()))?;
+    let race = RACE_NAMES.iter().position(|r| *r == race.replace(['_', ' '], ""))? as u8 + 1;
+    let gender = match gender.as_str() {
+        "m" | "male" => 0,
+        "f" | "female" => 1,
+        _ => return None,
+    };
+    Some((race, gender))
+}
+
 impl SurvivalGame {
+    /// The hero takes another race and gender (plain looks), redrawn in place on every client:
+    /// true if they changed (their client builds the new body, so the run waits a moment).
+    pub(crate) fn lab_reshape(&mut self, id: Id, race: u8, gender: u8) -> bool {
+        let Some(p) = self.sim.players.get_mut(&id) else { return false };
+        if p.look.race == race && p.look.gender == gender {
+            return false;
+        }
+        p.look = htl_survival::HeroLook { race, gender, skin: 0, face: 0, hair: 0, hair_color: 0, facial: 0 };
+        let class = htl_survival::content::class_id_of(&p.class);
+        self.lab_redraw(id, race, gender, class);
+        true
+    }
+
+    /// A hero's body sent again as fields that changed: their race, gender and looks, and the
+    /// display that makes the client build the new model.
+    fn lab_redraw(&mut self, id: Id, race: u8, gender: u8, class: u8) {
+        let Some(g) = self.guid_of(id) else { return };
+        let mut f = Fields::new();
+        f.set(idx::UNIT_BYTES_0, race as u32 | (class as u32) << 8 | (gender as u32) << 16 | 3 << 24)
+            .set(idx::PLAYER_BYTES, 0)
+            .set(idx::PLAYER_BYTES_2, 0x02 << 24)
+            .set(idx::PLAYER_BYTES_3, gender as u32)
+            .set(idx::UNIT_DISPLAYID, super::draw::native_display(race, gender))
+            .set(idx::UNIT_NATIVEDISPLAYID, super::draw::native_display(race, gender));
+        self.broadcast(&packets::update_object(&[], &[(g, &f)]));
+    }
+
+    /// `n` stand-in ally heroes beside hero `id` (the last run's taken away first): to their left,
+    /// right and behind, each a different race, still unless something moves them.
+    pub(crate) fn lab_set_allies(&mut self, id: Id, n: usize) {
+        for a in std::mem::take(&mut self.lab_allies) {
+            if let Some(g) = self.guid_of(a) {
+                self.broadcast(&packets::destroy_object(g));
+            }
+            self.guids.remove(&a);
+            let _ = self.sim.leave(a);
+        }
+        let Some((pos, f)) = self.sim.players.get(&id).map(|p| (p.pos, p.facing)) else { return };
+        let looks: [(u8, u8); 4] = [(2, 1), (3, 0), (4, 1), (6, 0)];
+        let spots: [(f32, f32); 4] = [(3.0, 90.0), (3.0, -90.0), (3.5, 150.0), (3.5, -150.0)];
+        for k in 0..n.min(4) {
+            let account = format!("{}{k}", htl_survival::sim::lab::LAB_ALLY);
+            let a = self.sim.join(&account, &format!("Ally {}", k + 1), None);
+            let (d, off) = spots[k];
+            let ang = f + off.to_radians();
+            let (x, y) = (pos[0] + ang.cos() * d, pos[1] + ang.sin() * d);
+            let at = [x, y, self.sim.land().height(x, y)];
+            if let Some(p) = self.sim.players.get_mut(&a) {
+                let (race, gender) = looks[k];
+                p.look = htl_survival::HeroLook { race, gender, skin: 0, face: 0, hair: 0, hair_color: 0, facial: 0 };
+            }
+            self.sim.move_player(a, at, f, htl_survival::Moving::default());
+            self.bind(a, Self::player_guid(&account));
+            let p = self.player_create(a, false);
+            self.broadcast(&p);
+            self.lab_allies.push(a);
+        }
+    }
+
     /// Puts back the look a run tried (`look`), if it tried one.
     fn lab_look_back(&mut self, was: Option<(usize, u32, u32)>) {
         if let Some((i, sp, au)) = was {
@@ -560,7 +653,16 @@ fn mentions(text: &str, ids: &[Id]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::mentions;
+    use super::{mentions, race_gender};
+
+    #[test]
+    fn a_run_names_its_race_and_gender_as_race_dash_m_or_f() {
+        assert_eq!(race_gender("tauren-f"), Some((6, 1)));
+        assert_eq!(race_gender("NightElf-male"), Some((4, 0)));
+        assert_eq!(race_gender("night_elf-m"), Some((4, 0)));
+        assert_eq!(race_gender("goblin-m"), None);
+        assert_eq!(race_gender("orc"), None);
+    }
 
     #[test]
     fn a_trace_keeps_the_events_that_name_the_hero_or_the_scene() {
