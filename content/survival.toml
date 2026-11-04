@@ -3214,9 +3214,12 @@ arc = 60.0
 cast = 0.4
 weapon = 1.2
 cooldown = 8.0
-# The two-handed overhead (57) over the windup: without it the hero stood idle for 0.4 sec
-# (spell lab, Nov 2).
-clip = 57
+# One quick overhead on every race: the night elf men's two-handed chop (18/0, the quickest
+# overhead in the census: it lands at 0.37 s), borrowed by all. The human's own 57 was a spin, not
+# an overhead (Corey's review, Nov 3; picked from the lab's side-on strips, Nov 4).
+clip = 18
+take = 0
+from = "NightElfMale"
 spell = 25425
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
