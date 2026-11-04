@@ -498,7 +498,9 @@ impl Survival {
         }
         let radius = AbilityDef::at(d.radius, share);
         let life = d.secs.max(1.0);
-        let mark = self.mark_kind(at, radius, life, true);
+        // No circle under it: the trap's own model shows where it is (a hero's own circles are
+        // floor clutter, Corey's review), and a foe isn't shown where it waits.
+        let mark = self.mark_unseen(life);
         // The trap on the ground where it's set (no spell's look there: Explosive Trap's own
         // shows the client's placeholder at a point).
         let obj = (d.object != 0).then(|| {

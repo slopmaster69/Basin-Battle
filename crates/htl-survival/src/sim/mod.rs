@@ -342,9 +342,11 @@ pub struct Telegraph {
 }
 
 impl Telegraph {
-    /// A hero's ability on the ground: a ring (`arc` 360), a wedge or a strip.
+    /// A hero's ability on the ground: a ring (`arc` 360), a wedge or a strip. Everyone else sees
+    /// it coming; the hero casting it doesn't (Corey's review: a hero's own circles are floor
+    /// clutter; they know where they aimed).
     pub fn hero_shape(owner: Id, reach: f32, arc: f32, width: f32, secs: f32, at: Option<(Vec3, f32)>) -> Self {
-        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true, own_hidden: false }
+        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true, own_hidden: true }
     }
 }
 

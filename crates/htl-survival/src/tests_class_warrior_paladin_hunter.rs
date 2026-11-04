@@ -960,11 +960,12 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
     assert!(s.planted_of(p).is_empty(), "every arrow home");
 }
 
-/// A planted arrow reads on the ground: its arrow at its model's own size where it landed, and a
-/// friend's green ring under it for as long as it stays; both go with it.
+/// A planted arrow reads on the ground: its arrow at its model's own size where it landed, for as
+/// long as it stays, with no ring drawn under it (Corey's review: a hero's own circles are floor
+/// clutter).
 #[test]
-fn a_planted_arrow_stands_full_size_over_a_green_ring_and_both_go_with_it() {
-    use crate::sim::hunter::{PLANT_LOOK, PLANT_RING, PLANT_SCALE, PLANT_SECS};
+fn a_planted_arrow_stands_full_size_with_no_ring_under_it_and_goes_in_time() {
+    use crate::sim::hunter::{PLANT_LOOK, PLANT_SCALE, PLANT_SECS};
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.plant_arrow(p, [10.0, 2.0, 0.0]);
@@ -974,19 +975,28 @@ fn a_planted_arrow_stands_full_size_over_a_green_ring_and_both_go_with_it() {
     assert_eq!((look.display, look.scale), (PLANT_LOOK, PLANT_SCALE));
     assert!(look.scale >= 1.0, "not shrunk: {}", look.scale);
     assert!((look.pos[0] - 10.0).abs() < 0.1 && (look.pos[1] - 2.0).abs() < 0.1, "where it landed: {:?}", look.pos);
-    let ring = ev.iter().find_map(|e| match e {
-        Event::Mark { id, pos, radius, tele: None, .. } if *id == a.mark => Some((*pos, *radius)),
-        _ => None,
-    });
-    let (at, r) = ring.expect("its ring laid on the ground");
-    assert!((at[0] - 10.0).abs() < 0.1 && (at[1] - 2.0).abs() < 0.1, "under the arrow: {at:?}");
-    assert_eq!(r, PLANT_RING);
-    assert!(s.mark_friendly(a.mark), "a friend's green, not a warning's red");
-    assert!(s.mark_left(a.mark) > PLANT_SECS - 0.2, "as long as the arrow stays: {}", s.mark_left(a.mark));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "no ring on the ground");
     let ev = run(&mut s, PLANT_SECS + 0.2);
     assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "the arrow fades");
-    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == a.mark)), "and its ring");
     assert!(s.planted_of(p).is_empty());
+}
+
+/// A hero's own shapes on the ground are for everyone else: a trap lays no circle, and a wind-up's
+/// or a lob's shape is hidden from the hero casting it (Corey's review: floor clutter).
+#[test]
+fn a_heros_own_trap_lays_no_circle_and_its_own_shapes_are_hidden_from_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", false);
+    s.set_aim_line(p, 0.0, down_to(6.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run(&mut s, 1.0));
+    assert!(!s.traps.is_empty(), "the trap is set");
+    // The throw's shape alone (#142's lob), and that hidden from her.
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { tele, .. } if !tele.as_ref().is_some_and(|t| t.own_hidden && t.mob == p))), "with no circle under it");
+    let t = Telegraph::hero_shape(p, 4.0, 360.0, 0.0, 1.0, None);
+    assert!(t.own_hidden && t.mob == p, "hidden from its caster, shown to the rest");
 }
 
 /// Arrow Recall: each arrow leaves the ground (its arrow and ring gone) and flies from where it

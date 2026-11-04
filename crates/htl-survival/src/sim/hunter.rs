@@ -20,8 +20,6 @@ pub const PLANT_MOST: usize = 12;
 /// model's own size (at 0.45 it was too small to tell from the ground in a fight).
 pub const PLANT_LOOK: u32 = 2630;
 pub const PLANT_SCALE: f32 = 1.0;
-/// And a friend's green ring on the ground under it, this wide, that reads from across a fight.
-pub const PLANT_RING: f32 = 0.5;
 /// A tripwire trips anything within this of the wire.
 const WIRE_REACH: f32 = 0.7;
 /// The most a tripwire spans: its second arrow plants within this of the first (the ring shown
@@ -268,7 +266,9 @@ impl Survival {
         let facing = self.rng.gen::<f32>() * std::f32::consts::TAU;
         self.objs.insert(obj, Obj { kind: ObjKind::Prop { display: PLANT_LOOK, scale: PLANT_SCALE }, pos, facing });
         self.events.push(Event::ObjSpawned { id: obj });
-        let mark = self.mark_kind(pos, PLANT_RING, secs, true);
+        // No ring under it: the arrow standing in the ground shows where it is (Corey's review:
+        // a hero's own circles are floor clutter; a dozen of these lay at once).
+        let mark = self.mark_unseen(secs);
         self.hunt.planted.push(Planted { owner, pos, until: now + secs, obj, mark });
     }
 
