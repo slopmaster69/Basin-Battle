@@ -22,13 +22,13 @@ pub const PLANT_LOOK: u32 = 2630;
 pub const PLANT_SCALE: f32 = 1.0;
 /// And a friend's green ring on the ground under it, this wide, that reads from across a fight.
 pub const PLANT_RING: f32 = 0.5;
-/// And a glow laid on the ground under the arrow, this wide: Consecration's pale gold ring
-/// (20116), a small light that scales with its radius. (Flare's at 1.5 yd read as a fire under
-/// each arrow and lit a whole volley's circle orange: Corey's review, "it looks like fire...
-/// grey? white? smaller to avoid clutter"; Frost Trap's frost, tried in run 060, is a mist the
-/// radius doesn't shrink, and twelve of them fogged the whole screen. The data has no white or
-/// grey light at a point.)
-pub const ARROW_GLOW: u32 = 20116;
+/// And a glow laid on the ground under the arrow, this wide (0: none). None for now: Flare's
+/// (1543) read as a fire under each arrow and lit a whole volley's circle orange (Corey's review,
+/// "it looks like fire... grey? white? smaller to avoid clutter"); Frost Trap's frost (13810)
+/// and Consecration's gold (20116), tried in runs 060 and 061, are a mist and a disc the radius
+/// doesn't shrink, and twelve of them covered the whole screen. The data has no small white or
+/// grey light at a point; the arrow's own model (patch 0027, a glowing arcane arrow) marks it.
+pub const ARROW_GLOW: u32 = 0;
 pub const ARROW_GLOW_RADIUS: f32 = 0.6;
 /// A tripwire trips anything within this of the wire.
 const WIRE_REACH: f32 = 0.7;
@@ -283,6 +283,9 @@ impl Survival {
     /// circle: the ground looks below `GROUND_LOOK_MIN` are circles, so it's laid by hand.
     fn arrow_glow(&mut self, pos: Vec3, secs: f32) -> Id {
         let id = self.alloc();
+        if ARROW_GLOW == 0 {
+            return id;
+        }
         self.marks.push((id, self.clock + secs));
         self.events.push(Event::Mark { id, pos, radius: ARROW_GLOW_RADIUS, tele: None, ground: ARROW_GLOW });
         id
