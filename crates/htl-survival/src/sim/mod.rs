@@ -765,6 +765,9 @@ pub struct Mob {
     pub fighters: u32,
     /// Its wind-up was knocked aside lately: not again until then.
     pub wary_until: f32,
+    /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
+    /// another until then.
+    pub whiff_until: f32,
     /// Who has hurt it, how much, and when last (it fades): whom it goes for.
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.
