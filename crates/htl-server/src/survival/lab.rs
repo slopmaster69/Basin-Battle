@@ -1,8 +1,10 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [as <race>-<m|f>] [allies <n>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [allies <n>]`
 //!
+//! - `anim` tries another clip on the ability for that run only (its take, and the model every race
+//!   plays it from), put back after.
 //! - `as tauren-f` makes the hero that race and gender (plain looks) for this run and the ones after;
 //!   `allies 2` stands that many stand-in ally heroes beside them (gone with the next run).
 //! - `look` tries another of the game's looks on the ability for that run only (its spell, and
@@ -69,6 +71,9 @@ pub(crate) struct Lab {
     /// A look tried for this run only (`look <spell>[/<aura>]`): the ability and the spell and
     /// aura it had, put back when the run is over.
     pub look_was: Option<(usize, u32, u32)>,
+    /// A clip tried for this run only (`anim <clip>[/<take>[/<Model>]]`): the ability and the
+    /// clip, take and model it had.
+    pub anim_was: Option<(usize, u16, u32, Option<String>)>,
 }
 
 impl SurvivalGame {
@@ -82,6 +87,7 @@ impl SurvivalGame {
             self.sim.lab_clear(&old.mobs);
             self.sim.debug = old.debug_was;
             self.lab_look_back(old.look_was);
+            self.lab_anim_back(old.anim_was);
         }
         let old = std::mem::take(&mut self.lab_mobs);
         self.sim.lab_clear(&old);
@@ -115,6 +121,7 @@ impl SurvivalGame {
         let mut stage = true;
         let mut look: Option<(u32, Option<u32>)> = None;
         let mut body: Option<(u8, u8)> = None;
+        let mut anim: Option<(u16, u32, Option<String>)> = None;
         let mut allies = 0usize;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
         let video = cfg!(windows) && ffmpeg().is_some();
@@ -146,6 +153,16 @@ impl SurvivalGame {
                 // Stand-in ally heroes beside the hero (`allies 2`), for what reaches allies.
                 "allies" => {
                     allies = words.get(k + 1).and_then(|n| n.parse().ok()).unwrap_or(2).min(4);
+                    k += 1;
+                }
+                // A clip to try for this run only: `anim 18/0/TaurenMale` (the clip, its take, the
+                // model whose take every race plays), `anim 18` (the hero's own take 0).
+                "anim" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    let mut it = spec.split('/');
+                    let clip = it.next().and_then(|n| n.parse().ok()).ok_or("Try anim <clip>[/<take>[/<Model>]].")?;
+                    let take = it.next().and_then(|n| n.parse().ok()).unwrap_or(0);
+                    anim = Some((clip, take, it.next().filter(|m| !m.is_empty()).map(str::to_string)));
                     k += 1;
                 }
                 "stage" => {
@@ -210,6 +227,12 @@ impl SurvivalGame {
             a.aura = au.unwrap_or(sp);
             was
         });
+        let anim_was = anim.map(|(clip, take, from)| {
+            let a = &mut self.sim.content.abilities[ability];
+            let was = (ability, a.clip, a.take, a.from.clone());
+            (a.clip, a.take, a.from) = (clip, take, from);
+            was
+        });
         let d = self.sim.content.abilities[ability].clone();
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
@@ -259,6 +282,7 @@ impl SurvivalGame {
             debug_was: self.sim.debug,
             asked: std::time::SystemTime::now(),
             look_was,
+            anim_was,
         });
         // Debug's rings and marks would be in every shot: off while the run lasts.
         self.sim.debug = false;
@@ -397,6 +421,7 @@ impl SurvivalGame {
         // that started at once set its scene out in the last one's frames.
         self.lab_polled = std::time::Instant::now() + std::time::Duration::from_millis(1500);
         self.lab_look_back(lab.look_was);
+        self.lab_anim_back(lab.anim_was);
         let dir = lab_dir();
         let path = dir.join(format!("{}.txt", lab.label));
         let written = std::fs::create_dir_all(&dir).and_then(|_| std::fs::File::create(&path)).and_then(|mut f| f.write_all((lab.trace.join("\n") + "\n").as_bytes()));
@@ -490,6 +515,15 @@ impl SurvivalGame {
             let p = self.player_create(a, false);
             self.broadcast(&p);
             self.lab_allies.push(a);
+        }
+    }
+
+    /// Puts back the clip a run tried (`anim`), if it tried one.
+    fn lab_anim_back(&mut self, was: Option<(usize, u16, u32, Option<String>)>) {
+        if let Some((i, clip, take, from)) = was {
+            if let Some(a) = self.sim.content.abilities.get_mut(i) {
+                (a.clip, a.take, a.from) = (clip, take, from);
+            }
         }
     }
 
