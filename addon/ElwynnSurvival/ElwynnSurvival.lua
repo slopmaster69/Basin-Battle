@@ -1602,6 +1602,8 @@ function ES.DrawAimCamera()
   local want = ES.awake and Aiming() ~= nil and ES.AimShape() ~= "self"
   if want == ES.aimCam then return end
   ES.aimCam = want
+  -- A rise's camera (Cues.lua) has the view for the moment; it hands back when its time is up.
+  if ES.riseCamAt and GetTime() < ES.riseCamAt then return end
   if SetAimCamera then
     if want then
       SetAimCamera(1, 2.4, 0.75, 0.25)
