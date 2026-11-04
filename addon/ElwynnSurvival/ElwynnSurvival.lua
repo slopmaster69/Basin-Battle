@@ -2199,9 +2199,11 @@ function ES.ChargeCamera(d, share)
     return
   end
   -- Deeper the longer it's held (Corey's review: "zoom in more and more the longer you hold
-  -- it"): from the aiming camera's 2.4 down to 1.1 at a full draw, 0.8 for the ultimate.
+  -- it"): from the aiming camera's 2.4 down to 1.1 at a full draw, 1.3 for the ultimate, which
+  -- holds longer (at 0.8 the camera was inside the hero: the body went and the bowstring stood
+  -- alone, run 060).
   local ult = d.n == 5
-  local dist = 2.4 - (ult and 1.6 or 1.3) * share
+  local dist = 2.4 - (ult and 1.1 or 1.3) * share
   if not ES.chargeCam or math.abs(ES.chargeCam - dist) > 0.04 then
     ES.chargeCam = dist
     SetAimCamera(1, dist, 0.75 - 0.2 * share, 0.25)
