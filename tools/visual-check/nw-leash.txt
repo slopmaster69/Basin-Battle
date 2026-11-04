@@ -1,0 +1,25 @@
+# No words (#135), a creature walking home: a grunt runs in from 40 yd; once it's on the hero
+# its leash is tuned down to nothing (ai.leash_scale 0.05: 1.75 yd), so it gives up and runs
+# home north; three Aimed Shots go into its back on the way. Look for: nothing on it, no "Miss"
+# over it, no number, no word; the arrows pass through. (leash_scale is put back to 4.0.)
+hero hunter
+cam 0 -12 12
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 40
+5.0 .es slot q aimed_arrow
+10.5 .es tune ai.leash_scale 0.05
+11.5 .es in ab 0 0
+11.8 .es in a {facing} 0.0
+11.9 .es in au {facing} 0.0
+12.8 .es in ab 0 0
+13.1 .es in a {facing} 0.0
+13.2 .es in au {facing} 0.0
+14.1 .es in ab 0 0
+14.4 .es in a {facing} 0.0
+14.5 .es in au {facing} 0.0
+11.6 shots home 16 0.25
+16.0 .es tune ai.leash_scale 4.0
+16.5 .es target clear
+16.7 .es heal
+19 end
