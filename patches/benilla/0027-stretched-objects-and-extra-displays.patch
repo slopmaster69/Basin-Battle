@@ -1,6 +1,6 @@
-From 5c46e3e94c320248dce171599b67941b664878d4 Mon Sep 17 00:00:00 2001
-From: Basin Battle <basin@battle>
-Date: Tue, 3 Nov 2026 07:19:23 -0700
+From 9021f8840b246595c31f9fc45ef5505d7e1acab5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:40:40 -0600
 Subject: [PATCH] A game object can be drawn longer along one axis, and doodads
  the data has no row for can be placed
 
@@ -11,7 +11,7 @@ re-create and the scale ease. So one rope piece spans any length at the thicknes
 gives it. A factor that isn't a finite number from 0 to 100 draws it unstretched.
 GameObjectDisplayInfo gains rows from 60000 for doodads the client ships only as models
 (benilla-formats EXTRA_DISPLAYS, mirrored by Elwynn Survival's server); a row the data has is
-never replaced. The first is the dwarven dig site's rope, Tripwire's wire. HasActionCombat() is 13.
+never replaced. The first is the dwarven dig site's rope, Tripwire's wire. HasActionCombat() is 19.
 ---
  crates/benilla-app/src/entities.rs            |  1 +
  crates/benilla-app/src/entities/attach/mod.rs |  4 +-
@@ -24,7 +24,7 @@ never replaced. The first is the dwarven dig site's rope, Tripwire's wire. HasAc
  create mode 100644 crates/benilla-app/src/entities/stretch.rs
 
 diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
-index 343ffe7..c1e0cdc 100644
+index 343ffe7e..c1e0cdc9 100644
 --- a/crates/benilla-app/src/entities.rs
 +++ b/crates/benilla-app/src/entities.rs
 @@ -26,6 +26,7 @@ use display::{
@@ -36,7 +36,7 @@ index 343ffe7..c1e0cdc 100644
  /// Attaching a visual to each net entity: skeleton, animation, character geosets and skin, fade.
  pub(crate) mod attach;
 diff --git a/crates/benilla-app/src/entities/attach/mod.rs b/crates/benilla-app/src/entities/attach/mod.rs
-index 521cc81..a675683 100644
+index 521cc810..a6756835 100644
 --- a/crates/benilla-app/src/entities/attach/mod.rs
 +++ b/crates/benilla-app/src/entities/attach/mod.rs
 @@ -737,7 +737,9 @@ pub(super) fn attach_entity_visuals(
@@ -51,7 +51,7 @@ index 521cc81..a675683 100644
              } else {
                  Transform::default()
 diff --git a/crates/benilla-app/src/entities/live_display.rs b/crates/benilla-app/src/entities/live_display.rs
-index b9ebe73..22b0f79 100644
+index b9ebe739..22b0f79f 100644
 --- a/crates/benilla-app/src/entities/live_display.rs
 +++ b/crates/benilla-app/src/entities/live_display.rs
 @@ -40,6 +40,9 @@ pub(super) struct ScaleEase {
@@ -97,7 +97,7 @@ index b9ebe73..22b0f79 100644
      }
 diff --git a/crates/benilla-app/src/entities/stretch.rs b/crates/benilla-app/src/entities/stretch.rs
 new file mode 100644
-index 0000000..94b8d45
+index 00000000..94b8d454
 --- /dev/null
 +++ b/crates/benilla-app/src/entities/stretch.rs
 @@ -0,0 +1,99 @@
@@ -201,7 +201,7 @@ index 0000000..94b8d45
 +    }
 +}
 diff --git a/crates/benilla-app/src/net/objects.rs b/crates/benilla-app/src/net/objects.rs
-index 5c2b6ae..ab66841 100644
+index 5c2b6ae4..ab66841b 100644
 --- a/crates/benilla-app/src/net/objects.rs
 +++ b/crates/benilla-app/src/net/objects.rs
 @@ -645,7 +645,12 @@ fn object_create(
@@ -219,7 +219,7 @@ index 5c2b6ae..ab66841 100644
              }
              e
 diff --git a/crates/benilla-formats/src/gameobjects.rs b/crates/benilla-formats/src/gameobjects.rs
-index b637b39..fdc3012 100644
+index b637b391..fdc30128 100644
 --- a/crates/benilla-formats/src/gameobjects.rs
 +++ b/crates/benilla-formats/src/gameobjects.rs
 @@ -45,6 +45,18 @@ fn schema() -> Schema {
@@ -252,15 +252,15 @@ index b637b39..fdc3012 100644
  }
  
 diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
-index d9495dd..d71449b 100644
+index 1517d5c8..1b962d6d 100644
 --- a/crates/benilla-ui/src/action_combat.rs
 +++ b/crates/benilla-ui/src/action_combat.rs
-@@ -121,6 +121,12 @@
+@@ -148,6 +148,12 @@
  //!   inside it, and water keeps its own. Called again, it eases from where it is to the new look.
  //! - `ClearWorldFog([seconds])`: ease back to the zone's own fog (at once with no time).
  //!   Leaving the world clears it.
 +//!
-+//! The thirteenth (`HasActionCombat() >= 13`), objects the game draws evenly drawn longer: a game
++//! The nineteenth (`HasActionCombat() >= 19`), objects the game draws evenly drawn longer: a game
 +//! object whose flags carry `0x40000000` (`0x80000000`) is longer along its model's X (Y) axis by
 +//! the factor its `GAMEOBJECT_LEVEL` holds as a float's bits (`benilla-app`'s
 +//! `entities::stretch`), and displays from 60000 name doodads the data has no row for
@@ -268,15 +268,15 @@ index d9495dd..d71449b 100644
  
  use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
  
-@@ -720,7 +726,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -812,7 +818,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
      )?;
      g.set(
          "HasActionCombat",
--        lua.create_function(|_, _: MultiValue| Ok(12))?,
-+        lua.create_function(|_, _: MultiValue| Ok(13))?,
+-        lua.create_function(|_, _: MultiValue| Ok(18))?,
++        lua.create_function(|_, _: MultiValue| Ok(19))?,
      )?;
      g.set(
          "SetCameraUnitCollision",
 -- 
-2.43.0
+2.56.0.windows.4
 
