@@ -4809,7 +4809,11 @@ effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 1160 }]
 # Placeholder looks (to be checked in the lab): Intimidating Shout's roar, Demoralizing Shout's
 # look on each one Cowed (the effect's `aura`), the roar (55) as the clip.
 spell = 5246
-clip = 55
+# The roar itself, the same on every race: the orc men's Roar emote (74/0), head back and arms
+# wide. Not the battle roar (55): that's Blood Fury's, and Berserker Rage flexes (82).
+clip = 74
+take = 0
+from = "OrcMale"
 
 # E: the crowd cash-in. No knockback, no stagger: it just hits the opened hard.
 [[ability]]
