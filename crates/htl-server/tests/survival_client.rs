@@ -1652,6 +1652,63 @@ fn the_bookmaker_takes_a_wager_from_the_book_and_keeps_a_board_for_every_server(
 }
 
 #[test]
+fn a_hero_hurt_at_camp_comes_down_to_a_dungeon_whole() {
+    let dir = std::env::temp_dir().join(format!("htl-whole-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let save = dir.join("world.toml");
+    let _ = std::fs::remove_file(&save);
+    {
+        let server = start_below(Some(save.clone()), false, content(), &["stockade"]);
+        let mut c = Client::connect(server.login, "hal", "hold", REALM).unwrap();
+        enter(&mut c);
+        c.drain(0.3);
+        c.send(op::CMSG_LOGOUT_REQUEST, &[]);
+        assert!(c.wait(2.0, |p| p.name() == "SMSG_LOGOUT_COMPLETE").is_some());
+        let end = Instant::now() + Duration::from_secs(3);
+        while !save.exists() && Instant::now() < end {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+    // Hal left the camp hurt: his health in his save down to 10.
+    let text = std::fs::read_to_string(&save).expect("the world is saved");
+    let (mut out, mut his, mut done) = (String::new(), false, false);
+    for line in text.lines() {
+        if line.starts_with('[') {
+            his = line.contains("hal") && !line.contains("hal\".") && line.matches('.').count() <= 1;
+        }
+        if his && !done && line.starts_with("health = ") {
+            out.push_str("health = 10\n");
+            done = true;
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    assert!(done, "his health in the save: {text}");
+    std::fs::write(&save, out).unwrap();
+    let server = start_below(Some(save.clone()), false, content(), &["stockade"]);
+    let mut c = Client::connect(server.login, "hal", "hold", REALM).unwrap();
+    let me = enter(&mut c);
+    c.drain(0.5);
+    let (_, _, _, f) = placed(&c).into_iter().find(|(g, ..)| *g == me).expect("our own create");
+    assert_eq!(field(&f, 22), Some(10), "still hurt at camp");
+    // A wager taken at the book: down, and whole to start it.
+    let book = htl_survival::Content::builtin().dungeon.as_ref().unwrap().book;
+    stand(&mut c, [book[0], book[1], 0.0], 0.0);
+    // (Debug opens every dungeon's page, as the wager test has it.)
+    c.chat(".es debug");
+    c.chat(".es wager stockade 1");
+    assert!(c.wait(2.0, |p| p.name() == "SMSG_NEW_WORLD").is_some(), "down to the Stockade: {:?}", c.seen.iter().filter_map(|p| if let ServerPacket::MessageChat(m) = p { Some(m.text.clone()) } else { None }).collect::<Vec<_>>());
+    c.seen.clear();
+    c.send(op::MSG_MOVE_WORLDPORT_ACK, &[]);
+    c.drain(1.0);
+    let (_, _, _, f) = placed(&c).into_iter().find(|(g, ..)| *g == me).expect("our create below");
+    let (hp, max) = (field(&f, 22), field(&f, 28));
+    assert!(max.is_some_and(|m| m > 10) && hp == max, "whole below: {hp:?} of {max:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn a_client_running_its_own_dodge_is_told_its_run_again_after_a_sprinting_roll() {
     let server = start_with(None, false);
     let mut c = Client::connect(server.login, "ann", "hold", REALM).unwrap();
