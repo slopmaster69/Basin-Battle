@@ -281,6 +281,9 @@ pub enum Event {
     Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32, at: f32 },
     /// A unit's clip called off (a feint: the guard raised before the blow came).
     ClipStop { id: Id },
+    /// An ability's shape flashed on the ground as it lands, for the clients that draw one: at a
+    /// spot facing a way, `shape` `wedge`, `ring` or `line` (`width` wide), `reach` out over `arc`.
+    GroundBurst { at: Vec3, yaw: f32, shape: &'static str, reach: f32, arc: f32, width: f32, secs: f32, colour: String },
     /// A flurry of cuts starts on a unit, for the clients that play clips (Bladestorm): how it
     /// goes is the ability's `flurry`; a `ClipStop` ends it with its finishing sweep.
     Flurry { id: Id, secs: f32, def: crate::content_abilities::FlurryDef },
