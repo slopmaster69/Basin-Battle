@@ -1618,7 +1618,7 @@ impl Survival {
     /// A lob's flight: its look flown to `at`, the ring everyone sees there until it lands
     /// (distance / speed from now), and a warning for the foes near it. `(speed, radius, share,
     /// damage, spell)` as [`Self::launch`] reckoned them.
-    fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
+    pub(crate) fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
         let splash = self.content.abilities[ability].splash;
         let dist = len(sub(at, from));
         let flight = dist / speed.max(1.0);
@@ -1660,6 +1660,12 @@ impl Survival {
         }
         if let Some(m) = mark {
             self.unmark(m);
+        }
+        // A thrown trap: it's set where it lands, and arms from there; its burst is for when it
+        // springs, not now.
+        if self.content.abilities[p.ability].kind == "trap" {
+            self.set_trap(p.owner, p.ability, at, p.share);
+            return true;
         }
         let look = self.content.abilities[p.ability].burst_spell;
         self.burst_look(p, at, (look != 0).then_some(look));
