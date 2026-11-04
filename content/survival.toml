@@ -4386,6 +4386,10 @@ cooldown = 4.0
 spell = 19434
 burst_spell = 5162
 skip_spell = 0
+# each leg off a wall flies from where it struck. No burst where it strikes: a bounce shows no
+# burst (Corey's review: the Lava Burst's landing there read as the arrow going off in the inn
+# wall; the arrow flown on from the wall, harder each bounce, is the bounce's look).
+burst_spell = 0
 clip = 53
 valor_hit = 5.0
 plants = true
