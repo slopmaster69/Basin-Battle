@@ -125,6 +125,9 @@ pub struct Content {
     /// The Juggernaut's Momentum: its numbers.
     #[serde(default)]
     pub momentum: MomentumDef,
+    /// What a hit in a creature's back looks like, whoever lands it.
+    #[serde(default)]
+    pub backstab: BackstabDef,
     #[serde(default)]
     pub dev: DevDef,
     /// How long the work at the camp takes: making something at a station, building one, mending.
@@ -3623,5 +3626,24 @@ impl NodeDef {
         } else {
             &self.key
         }
+    }
+}
+
+/// A hit in a creature's back, by anyone (a swing, an art, an arrow): the backstab. Besides the
+/// riposte's stab (kit 330, Backstab's chest impact: it plays on the chest, the side turned away
+/// from whoever stabbed it, so from behind it shows nothing), the sound and the beat, a look of
+/// its own on the creature that reads from behind.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct BackstabDef {
+    /// The look (`SpellVisualKit`) on the stabbed creature; 0 for none. `.es tune backstab.kit
+    /// <id>` to film another: 220 `BloodyExplosion` (Rend's and Rupture's blood burst), 290 (the
+    /// same burst as Shred and Maul play it), 815 (as Rip plays it), 3051 (as Hamstring does).
+    pub kit: u32,
+}
+
+impl Default for BackstabDef {
+    fn default() -> Self {
+        Self { kit: 220 }
     }
 }
