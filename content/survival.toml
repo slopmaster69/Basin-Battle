@@ -4800,9 +4800,11 @@ effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
 # burst's 3 yd of ground for 6 s, snaring every creature in it each second (a hero's own ground
 # never slows them). Its look is the ground's spell (`linger_spell`, tunable in play:
 # `.es tune ability.freezing_trap.linger_spell <id>`): 7083 is Frost Nova's ice on the ground
-# with no caster-side kit. Not 13810 cast as a spell (the whiteout above).
+# with no caster-side kit, which run 070 showed lays nothing lasting on the ground; 13810 laid as
+# the ground's spell (not cast as one: that was the whiteout) is vanilla's Frost Trap mist, about
+# 10 yd wide, wider than the 3 yd that slows.
 linger = 6.0
-linger_spell = 7083
+linger_spell = 13810
 tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }]
 # The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
 # springs: 8 s, room to kite them onto it.)
