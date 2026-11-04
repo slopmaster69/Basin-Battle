@@ -3457,22 +3457,30 @@ clip = 85
 spell = 8676
 
 # Elements: cold at arm's length.
+# The stop check: a jet of frost sweeps across the front; the key again stops it where it is, and
+# what's in it freezes. (The Mage design, claude/mage-kit-draft.md: Frost stops things.)
 [[ability]]
 key = "cone_of_cold"
 name = "Cone of Cold"
-text = "Blasts a 10 yd cone along the reticle for 18 damage, slowing enemies by 50% for 4 sec. Enemies already slowed are frozen."
+text = "A jet of frost sweeps across your front over 1 sec, 10 yd long: everything it passes takes 12 damage and is slowed by 50% for 3 sec. Press again to stop it: enemies in the jet freeze for 2 sec (1 sec against heroes). Stop it with an enemy at its centre."
 icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
-kind = "cone"
-# 18 (was 10): the solo sim had the mage near three times slower than the warrior at clearing
-# a pack; Fireball is already at the poke's budget, so the brawl key carries more.
-damage = [18.0, 18.0]
+kind = "sweep"
+# The jet: 30° wide, sweeping 120° in a second; it holds half a second where it's stopped.
+damage = [12.0, 12.0]
 range = [10.0, 10.0]
-arc = 60.0
-cooldown = 10.0
+arc = 30.0
+sweep = 120.0
+secs = 1.0
+stop_secs = 0.5
+perfect_arc = 10.0
+cooldown = 8.0
+# The cone's own look where it stops; a Frostbolt streams to the jet's reach while it sweeps.
 spell = 120
-effects = [{ kind = "snare", secs = [4.0, 4.0], amount = 0.5, freeze_if_snared = true }]
+tick_spell = 116
+effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
+stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
 
 [[ability]]
 key = "frost_nova"

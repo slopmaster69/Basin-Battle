@@ -361,26 +361,6 @@ fn a_charge_cannot_be_struck_on_the_way_and_staggers_what_it_meets() {
 }
 
 #[test]
-fn cone_of_cold_freezes_what_is_already_slowed() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    slot(&mut s, p, "close", "cone_of_cold");
-    s.set_cooldowns(p, true);
-    let k = mob(&mut s, "grunt", [6.0, 0.5, 0.0]);
-    cast(&mut s, p, "close", false, 0.0);
-    assert!(s.has_cc(k, "snare") && !s.has_cc(k, "petrify"));
-    run(&mut s, 0.5);
-    calm(&mut s, k);
-    s.mobs.get_mut(&k).unwrap().pos = [6.0, 0.5, 0.0];
-    cast(&mut s, p, "close", false, 0.0);
-    assert!(s.has_cc(k, "petrify"), "frozen");
-    // The ice takes the next blows first.
-    let hp = s.mobs[&k].health;
-    s.hurt_mob(k, p, 10);
-    assert_eq!(s.mobs[&k].health, hp, "the ice took it");
-}
-
-#[test]
 fn fire_ward_sends_a_projectile_back_and_ice_block_lets_nothing_in() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);

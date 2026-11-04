@@ -164,6 +164,7 @@ fn hard_cc(d: &AbilityDef) -> f32 {
     d.effects
         .iter()
         .chain(&d.tick_effects)
+        .chain(&d.stop_effects)
         .filter(|e| matches!(e.kind.as_str(), "stun" | "incapacitate" | "petrify" | "panic"))
         .map(|e| e.secs[1] * 0.5)
         .fold(0.0, f32::max)

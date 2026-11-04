@@ -84,3 +84,5 @@ mod tests_ward;
 mod tests_staff;
 #[cfg(test)]
 mod tests_release;
+#[cfg(test)]
+mod tests_sweep;

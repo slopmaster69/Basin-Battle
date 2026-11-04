@@ -38,7 +38,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 17] = [
+pub const KINDS: [&str; 18] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -80,6 +80,10 @@ pub const KINDS: [&str; 17] = [
     // (times the tick) to each foe in it, with `effects`, and heals each friend in it `ally_heal`
     // a second.
     "beam",
+    // A jet `arc` wide sweeping `sweep` degrees across the front over `secs`, striking each foe
+    // it passes once; the key again stops it where it is (`stop_secs`, `stop_effects`), a foe
+    // within `perfect_arc` of its centre a perfect (the stop check).
+    "sweep",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -401,6 +405,19 @@ pub struct AbilityDef {
     /// beam's, from the caster to the first foe in it or its far end.
     #[serde(default)]
     pub tick_spell: u32,
+    /// A sweep (`kind = "sweep"`, the stop check): a jet `arc` wide and `range` long that
+    /// sweeps `sweep` degrees across the hero's front over `secs`, striking each foe it passes
+    /// once (`damage`, `effects`). The key again stops it: the jet holds for `stop_secs` and the
+    /// foes in it take `stop_effects` (a freeze); a foe within `perfect_arc` of the jet's centre
+    /// makes the stop a perfect (`[checks]`). Not stopped, it finishes its sweep.
+    #[serde(default)]
+    pub sweep: f32,
+    #[serde(default)]
+    pub stop_secs: f32,
+    #[serde(default)]
+    pub stop_effects: Vec<AbilityEffect>,
+    #[serde(default)]
+    pub perfect_arc: f32,
     /// A second activation (Battlerite's recast): once this goes, its key is armed for
     /// `recast_secs`, and pressed again meanwhile it fires this `inner` ability from the hero's
     /// aim, for no Valor and no cooldown (the cooldown was spent by the first cast). An EX

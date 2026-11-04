@@ -292,7 +292,7 @@ impl Survival {
                     self.set_action(id, Action::Ready);
                 }
                 let p = &self.players[&id];
-                if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. }) {
+                if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. } | Action::Sweep { .. }) {
                     return true;
                 }
                 // A feint: the guard raised while a blow still winds up calls it off, its stamina back.
@@ -1057,7 +1057,7 @@ impl Survival {
                     }
                 }
             }
-            Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Dash { .. } | Action::Stance { .. } => {
+            Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Dash { .. } | Action::Stance { .. } | Action::Sweep { .. } => {
                 self.step_ability_action(id, dt);
             }
             Action::Stagger { until } => {
@@ -1192,7 +1192,7 @@ impl Survival {
     }
 
     /// The end of a commitment: back to ready (or the held guard or aim), then any buffered input.
-    fn finish_commitment(&mut self, id: Id) {
+    pub(crate) fn finish_commitment(&mut self, id: Id) {
         let now = self.clock;
         // Shield Wall's bash done, the wall still holding: the shield goes back up.
         if self.bash_wall(id) && matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { .. })) {

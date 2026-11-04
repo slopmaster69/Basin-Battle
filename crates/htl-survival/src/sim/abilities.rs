@@ -564,6 +564,13 @@ impl Survival {
                 return true;
             }
         }
+        // A sweep: its key again stops the jet where it is (the stop check).
+        if let Action::Sweep { ability, .. } = p.action {
+            if self.content.base_of(ability) == base {
+                self.stop_sweep(id);
+                return true;
+            }
+        }
         // A beam: its key again ends it early.
         if let Action::Channel { ability, .. } = p.action {
             if self.content.abilities[ability].kind == "beam" && self.content.base_of(ability) == base {
@@ -900,6 +907,7 @@ impl Survival {
                 self.end_stance(id);
                 return;
             }
+            Action::Sweep { .. } => self.events.push(Event::Auras { id }),
             _ => {}
         }
         if let Some(p) = self.players.get_mut(&id) {
@@ -1113,6 +1121,7 @@ impl Survival {
                 self.cone(id, ability, yaw, share);
                 self.set_action(id, next);
             }
+            "sweep" => self.start_sweep(id, ability, yaw),
             "nova" => {
                 let at = self.players[&id].pos;
                 self.nova(id, ability, at, share);
@@ -3221,6 +3230,7 @@ impl Survival {
                     self.fire(id, ability, 1.0);
                 }
             }
+            Action::Sweep { .. } => self.step_sweep(id, dt),
             Action::Cast { t, total, ability } => {
                 if t + dt >= total {
                     let shot = self.content.abilities[ability].kind == "shot";

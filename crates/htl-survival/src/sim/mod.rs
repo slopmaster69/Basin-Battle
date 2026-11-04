@@ -31,6 +31,7 @@ pub mod hunter;
 mod raid;
 pub mod siege;
 mod staff;
+mod sweep;
 pub mod wager;
 mod tactics;
 mod world;
@@ -409,6 +410,9 @@ pub enum Action {
     Channel { ability: usize, target: Id, until: f32, next: f32, share: f32 },
     /// A counter's stance until then.
     Stance { ability: usize, until: f32 },
+    /// A jet sweeping across the hero's front from `from` (a facing) since then until `until`,
+    /// whom it has struck; `held`: stopped at that moment, holding where it was.
+    Sweep { ability: usize, from: f32, since: f32, until: f32, struck: Vec<Id>, held: Option<f32> },
     /// A dash along the ground, `t` of `secs` in, into whoever's at its end.
     Dash { t: f32, secs: f32, ability: usize, target: Option<Id>, share: f32 },
     /// Eating, `t` seconds in.
@@ -437,6 +441,7 @@ impl Action {
             Action::Aim { .. } => "aim",
             Action::Charge { .. } => "charge",
             Action::Cast { .. } => "cast",
+            Action::Sweep { .. } => "sweep",
             Action::Channel { .. } => "channel",
             Action::Stance { .. } => "stance",
             Action::Dash { .. } => "dash",
@@ -1669,7 +1674,7 @@ impl Survival {
             Action::Guard => c.guard_speed,
             // Bladestorm's spin walks at its own pace, near a run.
             Action::Channel { ability, .. } if self.content.abilities[ability].around => c.run_speed * crate::content::AROUND_PACE,
-            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } => c.aim_speed,
+            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Sweep { .. } => c.aim_speed,
             Action::Stance { .. } => c.guard_speed,
             Action::Eat { .. } => c.use_speed,
             Action::Gather { .. } | Action::Work { .. } | Action::Stagger { .. } => c.use_speed,
