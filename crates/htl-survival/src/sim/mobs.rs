@@ -107,6 +107,11 @@ const CIRCLE_STEP: f32 = 0.6;
 const BACKSTEP: f32 = 3.0;
 const BACKSTEP_SECS: f32 = 0.35;
 const DODGE_ANIM: u16 = 30;
+/// A blow on a creature walking home past its leash: it slips it (the Dodge clip, fitted to this
+/// long), at most once in this long however many blows come (Corey's review: it needs a dodge
+/// or whiff when it's not doing anything).
+const WHIFF_SECS: f32 = 0.4;
+const WHIFF_GAP: f32 = 0.5;
 /// A lunge lands this far short of its foe (not on top of them).
 const LUNGE_SHORT: f32 = 1.8;
 /// A camp whose fighters are due back within this long isn't taken by killing the first back.
@@ -340,6 +345,7 @@ impl Survival {
                 turn_on: None,
                 fighters: 1,
                 wary_until: 0.0,
+                whiff_until: 0.0,
                 threat: Vec::new(),
                 retarget_at: 0.0,
                 drawn_off: None,
@@ -1613,6 +1619,18 @@ impl Survival {
         !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK
     }
 
+    /// An evading creature slips a blow from `from`: the dodge's clip on it, and no word over it
+    /// (no "Dodge", no "Evade": Corey's rule). Blows close together get the one clip.
+    pub(crate) fn whiff(&mut self, mid: Id, from: Vec3) {
+        let now = self.clock;
+        let Some(m) = self.mobs.get_mut(&mid) else { return };
+        if m.whiff_until > now {
+            return;
+        }
+        m.whiff_until = now + WHIFF_GAP;
+        self.events.push(Event::React { id: mid, anim: DODGE_ANIM, from, lean: 0.0, hold: 0.0, fit: WHIFF_SECS });
+    }
+
     fn think(&mut self, id: Id, dt: f32) {
         let now = self.clock;
         let Some(m) = self.mobs.get(&id) else { return };
@@ -1903,6 +1921,25 @@ impl Survival {
                     let to = self.ground_near(p0[0] + f.cos() * lunge, p0[1] + f.sin() * lunge, p0[2]);
                     if self.land.walk_clear(p0, to) {
                         self.go(id, to, lunge / LUNGE_SECS);
+                    }
+                }
+                // A hero readied to counter with a leap (Trapper's Instinct) answers as the blow
+                // commits, at the facing lock, not as it lands: the dodge begins before the blade
+                // arrives, as a dodge should (Corey's review, run 040: "you missed the timing on
+                // the actual dodge"). The stance ends with the answer, so the blow then finds
+                // nothing to catch and resolves as it would on anyone.
+                if let Foe::Hero(h) = foe {
+                    if !a.ranged && t2 >= a.windup - a.lock {
+                        let leaps = self
+                            .stances
+                            .get(&h)
+                            .filter(|s| s.until > now)
+                            .and_then(|s| self.content.abilities[s.ability].counter.as_ref())
+                            .and_then(|c| self.content.ability(&c.answer))
+                            .is_some_and(|ans| self.content.abilities[ans].kind == "leap");
+                        if leaps && self.foe_pos(foe).is_some_and(|at| dist2d(self.mobs[&id].pos, at) <= a.range + 1.0) {
+                            self.counter_catch(h, id, super::abilities::HitKind::Melee, None);
+                        }
                     }
                 }
                 let mut shown = shown;
