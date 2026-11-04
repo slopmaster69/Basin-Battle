@@ -1,4 +1,4 @@
-From 135737a69697e330dc564453a1ccc96c7ab10d03 Mon Sep 17 00:00:00 2001
+From 1ecd5f84a547df9233896f2a7ded2572dc6ce6db Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Wed, 4 Nov 2026 09:58:23 -0600
 Subject: [PATCH] A shape flashed on the ground as an ability lands:
@@ -23,7 +23,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 
 diff --git a/crates/benilla-app/src/target/ground_burst.rs b/crates/benilla-app/src/target/ground_burst.rs
 new file mode 100644
-index 00000000..5b251a05
+index 00000000..e9d90094
 --- /dev/null
 +++ b/crates/benilla-app/src/target/ground_burst.rs
 @@ -0,0 +1,275 @@
@@ -280,13 +280,13 @@ index 00000000..5b251a05
 +    for (k, front, flash) in jobs {
 +        let b = &state.list[k];
 +        let t = ((now - b.start) / b.secs.max(1.0e-3)).clamp(0.0, 1.0);
-+        let flash_alpha = 0.85 * (1.0 - t / FLASH_SHARE).max(0.0);
++        let flash_alpha = (1.0 - t / FLASH_SHARE).max(0.0);
 +        let front_alpha = if t < RUN_SHARE { 1.0 } else { 1.0 - (t - RUN_SHARE) / (1.0 - RUN_SHARE) };
 +        telegraph::push_layer(&mut draw, cam, flash.id(), &b.flash, b.rgb, flash_alpha);
-+        // The front twice: a bright crest over the fill, white-hot at its edge.
++        // The front twice, in its own colour: a bright crest over the fill (once was a faint arc;
++        // a white-hot copy over it washed the colour out).
 +        telegraph::push_layer(&mut draw, cam, front.id(), &b.front, b.rgb, front_alpha);
-+        let hot = [1.0 - (1.0 - b.rgb[0]) * 0.4, 1.0 - (1.0 - b.rgb[1]) * 0.4, 1.0 - (1.0 - b.rgb[2]) * 0.4];
-+        telegraph::push_layer(&mut draw, cam, front.id(), &b.front, hot, front_alpha * 0.8);
++        telegraph::push_layer(&mut draw, cam, front.id(), &b.front, b.rgb, front_alpha * 0.7);
 +    }
 +}
 +

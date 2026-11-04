@@ -3229,7 +3229,7 @@ from = "NightElfMale"
 # cone hit (Corey's review, Nov 4), and the data has no cone-shaped ground look; 20572 shows
 # nothing of its own. The heavy blow's flash on each body the wave strikes.
 spell = 20572
-burst = { secs = 0.45, colour = "66BBFF" }
+burst = { secs = 0.45, colour = "3399FF" }
 impact_kit = 437
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
