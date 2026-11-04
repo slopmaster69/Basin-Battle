@@ -21,6 +21,10 @@ const YANK_SPEED: f32 = 40.0;
 /// one pass of it to the flight. Was the arm held out (SpellCastDirected, 53), which read as no
 /// flight at all.
 const YANK_CLIP: u16 = 42;
+/// Whose Swim: the dwarf man's, on every hero but a dwarf (Corey's review: the human's swim while
+/// flying looked silly; the dwarf's read as a flight). A dwarf flies with their own.
+const YANK_FROM: &str = "DwarfMale";
+const DWARF: u8 = 3;
 const YANK_WALL: f32 = 0.6;
 const YANK_BESIDE: f32 = 0.3;
 /// A cheated death mends what it does over this long.
@@ -184,6 +188,7 @@ impl Survival {
             return;
         }
         let from = p.pos;
+        let swim_from = if p.look.race == DWARF { String::new() } else { YANK_FROM.to_string() };
         let (spot, stop) = match unit.and_then(|u| self.unit_pos(u).map(|pos| (u, pos))) {
             Some((u, pos)) => (pos, self.body_of(u) + HERO_SIZE + YANK_BESIDE),
             None => (at, YANK_WALL),
@@ -216,10 +221,10 @@ impl Survival {
         self.events.push(Event::Tether { from: id, to, secs });
         // Pulled through the air on the line, the way a hookshot flies you (play-test: a run along
         // the ground read as a Charge): a flat arc that lands as the line's time is up, the body
-        // flat along it.
+        // flat along it, in the dwarf man's Swim (a dwarf's own).
         let lift = secs / airtime(1.0);
         self.events.push(Event::Hop { player: id, dir, speed: moved / secs, lift, roll: false, style: "" });
-        self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: String::new(), flip: false });
+        self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: swim_from, flip: false });
         self.beta.yanks.insert(id, (end, now + secs));
     }
 
