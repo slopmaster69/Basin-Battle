@@ -4771,7 +4771,7 @@ cooldown = 18.0
 # Full size: at 60% the pole stood hidden inside whatever it was planted beside (the lab, Nov 4).
 # Berserker Rage's red fists (18499, a lasting look) on every hero near it while they stand by it:
 # Battle Shout's (6673) is a one-shot, and left nothing to see.
-banner = { health = 60.0, regen = 2.0, stagger = 0.3, aura = 12328, scale = 1.0 }
+banner = { health = 60.0, regen = 2.0, stagger = 0.3, aura = 18499, scale = 1.0 }
 recast = "war_banner_move"
 recast_secs = 10.0
 # Placeholder looks (to be checked in the lab): Elwynn's battle-glade banner (4313, seen standing
@@ -4821,7 +4821,7 @@ range = [15.0, 15.0]
 arc = 60.0
 # Intimidating Shout's own fear mark over the head (5246's lasting look) on each one Cowed for the
 # 6 sec: Demoralizing Shout's (1160) was a one-shot and left nothing to see after.
-effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 20572 }]
+effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 5246 }]
 # Intimidating Shout's roar as it goes.
 spell = 5246
 # The roar itself, the same on every race: the orc men's Roar emote (74/0), head back and arms
@@ -4966,8 +4966,8 @@ ally_stamina = 100.0
 # Savagery's red glow (5515, a lasting state look with no anim of its own) on everyone rallied
 # for the 8 sec: the mark that says the buff is on them. Not Rallying Cry of the Dragonslayer
 # (22888): that's lightning hands, and Corey keeps lightning for the magic classes.
-ally_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.1, aura = 12328 }]
-self_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.2, aura = 12328 }, { kind = "fury", secs = [8.0, 8.0], amount = 0.0 }, { kind = "grown", secs = [8.0, 8.0], amount = 0.15 }]
+ally_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.1, aura = 5515 }]
+self_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.2, aura = 5515 }, { kind = "fury", secs = [8.0, 8.0], amount = 0.0 }, { kind = "grown", secs = [8.0, 8.0], amount = 0.15 }]
 # Onslaught's rage burst at the warrior as the arm goes up: Enrage's (12880), the same burst as
 # Bloodlust's (379) without the roar anim 379 plays on the caster, which would fight the Point.
 # Battle Shout's flare on every ally it reaches (the quick "you got it" mark), and the fury's
