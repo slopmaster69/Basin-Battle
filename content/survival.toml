@@ -4850,9 +4850,12 @@ cast = 0.5
 weapon = 1.2
 self_effects = [{ kind = "steadfast", secs = [0.55, 0.55], amount = 1.0 }]
 effects = [{ kind = "exposed", secs = [5.0, 5.0], amount = 0.2, aura = 8647 }]
-# Placeholder looks (to be checked in the lab): the two-handed sweep (19) as Cleave's, Overpower's
-# flash, Expose Armor's look on each one Exposed (the effect's `aura`).
+# The rising cut, the same on every race: the tauren women's slow two-handed upswing (19/1), the
+# weapon brought up from the ground to over the head (picked from the lab's side-on strips, Nov 4).
+# Overpower's flash, Expose Armor's look on each one Exposed (the effect's `aura`).
 clip = 19
+take = 1
+from = "TaurenFemale"
 spell = 7384
 valor_hit = 6.0
 
