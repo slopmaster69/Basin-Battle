@@ -384,12 +384,15 @@ pub(crate) const VERSION: u32 = 2;
 /// 21: the add-on says `ac19` for a client with patch 0027 (Tripwire's rope).
 /// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0029).
 /// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0030).
-pub(crate) const ADDON_NEWEST: u32 = 23;
+
+pub(crate) const ADDON_NEWEST: u32 = 24;
 /// `Cues.lua`. 22: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 21: a cast's `AN` line names the body its clip drives (`full`, `upper`, `lower`): Skyfall's
 /// hang on the legs alone.
 /// 22: those speed lines redrawn (finer, soft-ended, laid over the screen as a square so none is
 /// cut at an edge, and quicker).
+/// 24: a fan of projectiles (Multi-Shot) aims with a fan on the reticle, not a strip on the
+/// ground (the `AB` line's shape `fan`).
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1928,6 +1931,8 @@ impl SurvivalGame {
         let shape = |d: &htl_survival::content::AbilityDef| match d.kind.as_str() {
             // A lob is aimed at the ground, as ground is.
             "projectile" if d.lob => "circle",
+            // A fan of them (Multi-Shot) shows its spread on the reticle (add-on 23), not a strip.
+            "projectile" if d.count > 1 => "fan",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
             "nova" | "stance" | "art" | "buff" => "self",
@@ -2015,6 +2020,7 @@ impl SurvivalGame {
                     Some(&(_, a, until)) => {
                         let d = &c.abilities[a];
                         let shape = match d.kind.as_str() {
+                            "projectile" if d.count > 1 && !d.lob => "fan",
                             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
                             "cone" => "cone",
                             "nova" | "stance" | "art" | "buff" => "self",
