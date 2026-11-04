@@ -2956,6 +2956,10 @@ reward = { silver = 4, pearl = 2, silk = 4 }
 # a step aside after the throw makes it miss. Numbers are starting points for tuning:
 # `.es tune ability.fireball.damage [20, 40]`.
 #
+# An ability's `clip` plays on the caster as it goes (a weapon art's is its blow), `take` which of
+# the model's versions; `from` names the character model whose take every hero plays
+# (`from = "TaurenMale"`, as a moveset's), so the ability looks the same on every race and gender.
+#
 # `bench = true` keeps an ability out of the board (its mechanics stay, for tests and for putting
 # back on the board later; `.es slot` puts one on its row's key in a dev build).
 

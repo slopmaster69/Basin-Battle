@@ -68,7 +68,8 @@
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
 //! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
 //!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
-//!   (a creature's line carries it too). Each `MV` blow goes on `~<from>` the same way.
+//!   (a creature's line carries it too, and so does a cast's: an ability's own clip, the same on
+//!   every race). Each `MV` blow goes on `~<from>` the same way.
 //!   The kind: `light`, `heavy`, `running`, `bash`, `kick`, `cast`, a creature's `mob`, and the
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.

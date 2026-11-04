@@ -793,7 +793,7 @@ impl SurvivalGame {
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, secs } => {
+            Event::Clip { id, clip, take, from, secs } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
                 // marked as theirs.
                 let Some(g) = self.guid_of(id) else { return };
@@ -802,7 +802,7 @@ impl SurvivalGame {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t0\t{:.3}\t0\tcast\t0", secs - impact);
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}", secs - impact, from.as_deref().unwrap_or(""));
                     self.ui_line(c, &line);
                 }
             }
