@@ -2383,9 +2383,13 @@ impl Survival {
             } else {
                 self.ability_on_mob(id, v, ability, 1.0, base, pos, HitKind::Melee, d.spell);
             }
-            let kit = if d.impact_kit != 0 { d.impact_kit } else if behind && d.behind > 0.0 { KIT_RIPOSTE } else { KIT_SLAM };
+            let kit = if behind && d.behind > 0.0 { KIT_RIPOSTE } else { KIT_SLAM };
             if self.alive(v) {
                 self.events.push(Event::Visual { id: v, kit, by: Some(id) });
+                // The art's own impact beside the heavy flash (Sundering Blow's armor crack).
+                if d.impact_kit != 0 {
+                    self.events.push(Event::Visual { id: v, kit: d.impact_kit, by: Some(id) });
+                }
             }
         }
     }
