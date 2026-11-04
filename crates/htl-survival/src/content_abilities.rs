@@ -192,6 +192,17 @@ pub struct AbilityDef {
     /// it through the leap.
     #[serde(default)]
     pub bow: bool,
+    /// A bow ability's damage as a share of the hero's bow's at the same draw (Aimed Shot's 1.2:
+    /// 120% of what the bow would do), so it grows with the bow as a weapon art grows with the
+    /// weapon. 0: its own `damage`. (Serg's play-test, #118.)
+    #[serde(default)]
+    pub bow_damage: f32,
+    /// A fan (`count` > 1) whose arrows pass this far apart (yd) where the reticle points, so a
+    /// pack there is covered near or far; `spread` is then the widest it opens (close in). 0: a
+    /// fixed `spread`. (Multi-Shot: 10° apart left the arrows passing between a pack past 15 yd;
+    /// Serg's play-test, #118.)
+    #[serde(default)]
+    pub spread_yd: f32,
     /// An EX blink leaves this ability (a Frost Nova) where it started.
     #[serde(default)]
     pub leaves: String,

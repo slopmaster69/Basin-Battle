@@ -1148,7 +1148,17 @@ impl Survival {
             // Full: the faster missile, when it has one.
             let full = AbilityDef::full(share) && d.full_spell != 0;
             let (speed, spell) = if full { (d.full_speed.max(d.speed), d.full_spell) } else { (d.speed, d.spell) };
-            (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), AbilityDef::at(d.damage, share), spell)
+            // A share of the bow's own damage at this draw (Aimed Shot's), or its own.
+            // (The bow in their hands: their own, or the camp's when they carry a crossbow.)
+            let damage = if d.bow_damage > 0.0 {
+                let p = &self.players[&id];
+                let held = self.bow_look(p);
+                let r = self.content.ranged(&self.content.items[held].key).unwrap_or_else(|| self.ranged_of(p));
+                (r.damage[0] as f32 + (r.damage[1] as f32 - r.damage[0] as f32) * share) * d.bow_damage
+            } else {
+                AbilityDef::at(d.damage, share)
+            };
+            (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), damage, spell)
         };
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
@@ -1170,8 +1180,11 @@ impl Survival {
         // A lob arcs to the ground at the reticle (within its range), over whatever is between.
         let lob_at = d.lob.then(|| self.aim_point(id, range));
         let feet = self.players[&id].pos;
+        // A fan spaced where the reticle points: the angle that puts `spread_yd` between arrows
+        // there, no wider than `spread`.
+        let step = if d.spread_yd > 0.0 { (d.spread_yd / dist2d(from, aim.point).max(1.0)).atan().min(d.spread.to_radians()) } else { d.spread.to_radians() };
         for k in 0..n {
-            let off = (k as f32 - (n - 1) as f32 / 2.0) * d.spread.to_radians();
+            let off = (k as f32 - (n - 1) as f32 / 2.0) * step;
             let (c, s) = (off.cos(), off.sin());
             let flat = (base[0] * base[0] + base[1] * base[1]).sqrt();
             let b = [base[0] * c - base[1] * s, base[0] * s + base[1] * c, base[2]];

@@ -156,6 +156,9 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         if d.behind > 1.0 {
             out.push(format!("{}× damage from behind", n(d.behind)));
         }
+    } else if d.bow_damage > 0.0 {
+        let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
+        out.push(format!("{count}{}% bow damage", pct(d.bow_damage)));
     } else if d.damage[1] > 0.0 {
         let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
         if d.kind == "channel" && d.tick > 0.0 {
