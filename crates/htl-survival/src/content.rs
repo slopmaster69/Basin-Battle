@@ -55,6 +55,10 @@ pub struct Content {
     pub kick: ShoveDef,
     #[serde(rename = "ranged")]
     pub ranged: Vec<RangedDef>,
+    /// How chosen spells' missiles look on a client that draws them (patch 0029): a glowing
+    /// ribbon behind them, a size, a flat spin.
+    #[serde(rename = "missile_look", default)]
+    pub missile_looks: Vec<MissileLookDef>,
     #[serde(rename = "weapon")]
     pub weapons: Vec<WeaponDef>,
     #[serde(rename = "shield")]
@@ -749,6 +753,37 @@ pub struct PvpDef {
 }
 
 /// A bow or crossbow.
+/// A spell's missiles as a client with patch 0029 draws them (`SetMissileLook`): a ribbon of
+/// `trail` (`"RRGGBB"`; empty, none) `width` yards wide, each stretch fading over `secs`, the model
+/// `scale` times its size and spinning `spin` turns a second, flat. Keyed by the spell, so every
+/// ability flying it looks so.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct MissileLookDef {
+    pub spell: u32,
+    #[serde(default)]
+    pub trail: String,
+    #[serde(default = "look_width")]
+    pub width: f32,
+    #[serde(default = "look_secs")]
+    pub secs: f32,
+    #[serde(default = "full_size")]
+    pub scale: f32,
+    #[serde(default)]
+    pub spin: f32,
+}
+
+fn look_width() -> f32 {
+    0.25
+}
+
+fn look_secs() -> f32 {
+    0.35
+}
+
+fn full_size() -> f32 {
+    1.0
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct RangedDef {
     pub key: String,
@@ -3166,6 +3201,20 @@ impl Content {
     }
 
     pub(crate) fn validate_abilities(&self) -> Result<()> {
+        let rgb = |c: &str| c.len() == 6 && u32::from_str_radix(c, 16).is_ok();
+        for (k, l) in self.missile_looks.iter().enumerate() {
+            if l.spell == 0 || self.missile_looks[..k].iter().any(|o| o.spell == l.spell) {
+                bail!("missile_look {}: a spell, once", l.spell);
+            }
+            if !(l.trail.is_empty() || rgb(&l.trail)) || l.width < 0.0 || l.secs < 0.0 || l.scale <= 0.0 {
+                bail!("missile_look {}: its trail is \"RRGGBB\" (or none), and its width, secs and scale aren't below 0", l.spell);
+            }
+        }
+        for a in &self.abilities {
+            if let Some(c) = a.bounce_trail.iter().find(|c| !rgb(c)) {
+                bail!("{}: bounce_trail colour {c:?} isn't \"RRGGBB\"", a.key);
+            }
+        }
         let mut keys = std::collections::BTreeSet::new();
         let effect_ok = |e: &AbilityEffect, what: &str| -> Result<()> {
             if !CC_KINDS.contains(&e.kind.as_str()) && !OTHER_EFFECTS.contains(&e.kind.as_str()) {

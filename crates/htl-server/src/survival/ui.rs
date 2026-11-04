@@ -90,6 +90,7 @@
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
+//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid>]`: how a spell's missiles look on an `ac20` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour).
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
 //!   `fit` seconds: a knockdown).
@@ -371,13 +372,15 @@ pub(crate) const VERSION: u32 = 2;
 /// 21: outcomes show without words: `CU` beats (the outcome's hit-stop, shake and kick) in
 /// `Cues.lua`.
 /// 21: the add-on says `ac19` for a client with patch 0027 (Tripwire's rope).
-pub(crate) const ADDON_NEWEST: u32 = 21;
+/// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0029).
+pub(crate) const ADDON_NEWEST: u32 = 22;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
 /// as an ability lands (0026). 19: an object drawn longer along one axis, and doodads placed as
 /// objects (0027): Tripwire's rope.
-pub(crate) const CLIENT_NEWEST: u8 = 19;
+/// 20: a missile's ribbon, size and spin (0029).
+pub(crate) const CLIENT_NEWEST: u8 = 20;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1226,7 +1229,7 @@ impl SurvivalGame {
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
                 // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
-                // object stretched from end to end (Tripwire's rope).
+                // object stretched from end to end (Tripwire's rope); `ac20` a missile's look.
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,
@@ -1244,6 +1247,12 @@ impl SurvivalGame {
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));
+                // `ac20` draws a missile's look (patch 0029): every spell's that has one.
+                if level >= super::draw::MISSILE_LOOK_LEVEL {
+                    for l in &self.sim.content.missile_looks {
+                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None));
+                    }
+                }
                 // An older add-on or client: say so, and how to update (on screen and in chat).
                 let version: u32 = arg.parse().unwrap_or(0);
                 let name = self.world_of(conn).map_or(String::new(), |w| w.name.clone());
