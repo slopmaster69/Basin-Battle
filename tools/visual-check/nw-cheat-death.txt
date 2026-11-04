@@ -1,0 +1,23 @@
+# No words (#135), a killing blow cheated: Cheat Death (2) up, then a boar put 2 yd off gores
+# once. For the take: every foe's blow is made 60 times as hard (combat.foe_damage; 1.35 in play)
+# and the boar's "two gores" pattern is weighted out (its second gore, 0.6 s after the first,
+# killed the hero at 1 health in the diagnostics), so its one gore lands ~0.6 s after it's put
+# there and the next can't come for ~3 s; both are put back right after. Look for: a Soulstone's
+# rising and Flash of Light's glow on the hero as the gore lands, the long hit-stop with the view
+# barely moving; no "Cheated death" word.
+hero hunter
+cam 60 -12 9
+include _setup
+4.2 .es dummy clear
+5.0 .es slot 2 cheat_death
+5.3 .es tune mob.boar.pattern.1.weight 0
+5.6 .es tune combat.foe_damage 60
+6.0 .es in ab 3 0                    # Cheat Death: the dark shield, 6 s
+6.5 .es target boar 2                # its gore lands at ~7.1
+6.8 shots cheat 14 0.15
+8.0 .es target clear
+8.2 .es tune combat.foe_damage 1.35
+8.4 .es tune mob.boar.pattern.1.weight 1.5
+8.8 .es heal
+9.5 .es cc log
+12 end
