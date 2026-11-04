@@ -24,8 +24,9 @@ The host runs both games at once. Each has its own realm on the one login:
 How to install, host, play alone and join friends (on Windows, a Mac or Linux) is in the
 [README](../README.md). In short: one person hosts, everyone plays, all on the same release.
 
-- **Windows:** the host runs **Host Basin Battle.bat** from the release's source; everyone plays
-  with **Play Elwynn Survival.bat** from the release's Windows zip (the host types `127.0.0.1`).
+- **Windows:** one download from the Releases page, with two buttons: **Play** (it joins the
+  group's server, or yours) and **Host** (your own server, ready to run). Both keep the folder
+  up to date by themselves.
 - **Mac:**
 
   ```sh
@@ -37,7 +38,7 @@ How to install, host, play alone and join friends (on Windows, a Mac or Linux) i
 
 Log in with any name (it becomes your hero) and the host's password (**hold** by default). Over the
 internet the router must forward TCP **3724** and **8086** (8085 too for Basin Battle), or use
-Tailscale (README).
+Tailscale; a second host behind the same router uses other ports (README).
 
 The survival world is saved in `saves/elwynn-survival.toml` (a server option, `--survival-save`,
 moves it). Delete that file to start the world over. Its tuning is `content/survival.toml`
