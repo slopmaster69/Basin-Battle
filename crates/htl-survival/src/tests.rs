@@ -234,7 +234,7 @@ fn a_blow_too_heavy_for_the_stamina_left_breaks_the_guard() {
     // heavy beat on the hero's own screen.
     let ev = s.step(0.0);
     assert!(!ev.iter().any(|e| matches!(e, Event::Tell { player, .. } | Event::Flash { player, .. } if *player == p)), "no words: {ev:?}");
-    assert!(ev.iter().any(|e| matches!(e, Event::Beat { player, beat: "break", .. } if *player == p)), "the beat: {ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Beat { player, beat: b, .. } if *player == p && b == "break")), "the beat: {ev:?}");
     // Staggered: the next blow lands whole, and nothing can be done for a moment.
     s.input(p, Input::Dodge);
     assert_eq!(s.players[&p].action.name(), "stagger", "no dodging out of a stagger");

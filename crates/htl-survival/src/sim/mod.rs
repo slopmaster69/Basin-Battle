@@ -171,7 +171,8 @@ pub enum Event {
     /// arrow of its own (the ability's missiles are their own events).
     Loose { caster: Id, spell: u32 },
     /// A beat on a hero's own screen alone (the add-on's `BT`): Kill Shot's speed lines as it
-    /// goes, its hit-stop and shake as it kills; `on` the foe it struck (`None`: nobody).
+    /// goes, its hit-stop and shake as it kills; `on` the foe it struck (`None`: nobody). And an
+    /// outcome's beat (`cues::BEAT_*`, the add-on's `CU`): a hit-stop, a shake, the camera's kick.
     Beat { player: Id, beat: String, on: Option<Id> },
     /// Ground that lingers (holy ground, fire) wears this spell's look (a DynamicObject) until
     /// the mark `id` is gone.
@@ -216,9 +217,6 @@ pub enum Event {
     /// Words on one hero's screen: a refusal (out of range, not ready) or a hint. Never an
     /// outcome: those show by [`Event::Visual`], [`Event::Sound`] and [`Event::Beat`].
     Flash { player: Id, text: String },
-    /// An outcome's beat on one hero's own screen (`cues::BEAT_*`: a hit-stop, a shake, the
-    /// camera's kick), `on` the unit it happened to.
-    Beat { player: Id, beat: &'static str, on: Id },
     /// A sound (`SoundEntries.dbc`) for one hero's ears only: their own voice on a refusal, coins.
     Hear { player: Id, sound: u32 },
     /// Too winded for what they tried: the stamina bar says so.

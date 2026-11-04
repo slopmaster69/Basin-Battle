@@ -661,12 +661,20 @@ fn a_multi_shot_at_a_pack_strikes_most_of_it() {
         let struck = pack.iter().filter(|m| !hits(&ev, p, **m).is_empty()).count();
         assert!(struck >= 3, "at {dist} yd, {gap} yd apart: {struck} of the 4 struck");
     }
+}
+
+#[test]
 fn freezing_trap_leaves_frost_that_slows_what_stands_in_it() {
     // Friendly fire on: even then the hunter's own frost never slows her.
     let mut s = world_with(true);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
     // 5 yd off the spot: outside the 3 yd of frost.
     let near = mob(&mut s, "grunt", [6.0, 5.0, 0.0]);
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", true);
     assert_eq!(aiming(&s, p), Some(idx(&s, "freezing_trap")));
+    s.set_aim_line(p, 0.0, down_to(6.0));
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.2, &[k, near]));
     assert!(s.has_cc(k, "petrify"), "sprung: frozen");
@@ -674,6 +682,7 @@ fn freezing_trap_leaves_frost_that_slows_what_stands_in_it() {
     let (look, wide, lasts) = {
         let d = &s.content.abilities[idx(&s, "freezing_trap")];
         (d.linger_spell, d.splash, d.linger)
+    };
     assert!(look != 0, "the frost has a look of its own");
     let frost = ev.iter().find_map(|e| match e {
         Event::AreaLook { id, caster, spell, pos, radius } if *caster == p && *spell == look && (*radius - wide).abs() < 0.01 && (pos[0] - 6.0).abs() < 0.5 => Some(*id),

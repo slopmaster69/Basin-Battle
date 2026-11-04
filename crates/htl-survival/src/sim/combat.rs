@@ -380,7 +380,7 @@ impl Survival {
                         let d = &c.items[item];
                         match d.use_clip(&c.player) {
                             0 => self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (d.use_secs * 1000.0) as u32 }),
-                            clip => self.events.push(Event::Clip { id, clip, secs: d.use_secs, take: 0, from: None, at: 0.0 }),
+                            clip => self.events.push(Event::Clip { id, clip, secs: d.use_secs, take: 0, from: None, at: 0.0, body: ClipBody::Full }),
                         }
                         self.punish_healing(id);
                     }
@@ -1821,7 +1821,7 @@ impl Survival {
             self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
             let (speed, lift) = too_heavy_skid();
             self.events.push(Event::Hop { player: victim, dir: facing(from, p.pos), speed, lift, roll: false, style: "" });
-            self.events.push(Event::Beat { player: victim, beat: cues::BEAT_TOO_HEAVY, on: victim });
+            self.events.push(Event::Beat { player: victim, beat: cues::BEAT_TOO_HEAVY.to_string(), on: Some(victim) });
         }
         // Armor takes its share off whatever gets through.
         let worn = 1.0 - self.armor_reduce(p);

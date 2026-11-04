@@ -199,7 +199,7 @@ impl Survival {
         // The hauler's own look over the flight (Reverse Grapple: a pull, not the bow's release
         // pose), on the clients that play clips, for as long as what it hauls is in the air.
         if let Some((clip, from)) = self.fx_pull_look.clone().filter(|_| pull && self.players.contains_key(&owner)) {
-            self.events.push(Event::Clip { id: owner, clip, take: 0, from: if from.is_empty() { None } else { Some(from) }, secs: air, at: 0.0 });
+            self.events.push(Event::Clip { id: owner, clip, take: 0, from: if from.is_empty() { None } else { Some(from) }, secs: air, at: 0.0, body: ClipBody::Full });
         }
         if self.players.contains_key(&victim) {
             self.interrupt_hero(victim);
@@ -218,7 +218,7 @@ impl Survival {
             // clips: a humanoid's reads as flight (Corey's review of Reverse Grapple); another
             // model plays whatever it has for it.
             if pull {
-                self.events.push(Event::Clip { id: victim, clip: 42, secs: air, take: 0, from: None, at: 0.0 });
+                self.events.push(Event::Clip { id: victim, clip: 42, secs: air, take: 0, from: None, at: 0.0, body: ClipBody::Full });
             }
             // A dummy isn't stepped (it only stands there): it's where the throw ends at once,
             // while everyone's client flies it there.
@@ -687,7 +687,7 @@ impl Survival {
             // over a stun's held pose (struck out of the air, they come down as the blow left
             // them).
             if d.leap_clip != 0 && !self.held_still(l.owner) {
-                self.events.push(Event::Clip { id: l.owner, clip: LAND_CLIP, secs: LAND_SECS, take: 0, from: None, at: 0.0 });
+                self.events.push(Event::Clip { id: l.owner, clip: LAND_CLIP, secs: LAND_SECS, take: 0, from: None, at: 0.0, body: ClipBody::Full });
             }
             if d.impact_kit != 0 {
                 self.events.push(Event::Visual { id: l.owner, kit: d.impact_kit, by: None });

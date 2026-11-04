@@ -390,6 +390,7 @@ posture = 0.25
 # blood burst; to film another, .es tune backstab.kit <id> (290, 815, 3051 are the same burst as
 # other blows play it). 0 for none.
 kit = 220
+
 # The ice shattering off a frozen foe: one look for every class, whoever's ability shatters it.
 # With the frost burst (kit 450), the ice-breaking sound and the biggest beat, a short pale burst
 # of action lines on the foe (a spell visual kit; 0 for none). None seen on video yet; to try
@@ -399,6 +400,7 @@ kit = 220
 # the foe's base); 283 LightningBolt_Impact_Chest (a white-blue electric flash).
 [shatter]
 burst_kit = 121
+
 
 # --- heroes against heroes ------------------------------------------------------------------------
 

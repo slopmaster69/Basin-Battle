@@ -722,7 +722,7 @@ impl Survival {
             // A thrown one: the arm drawn back while it's aimed (the harpoon held ready, the axe
             // wound up), till it goes or the aim is let go.
             if thrown(&d) {
-                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0 });
+                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0, body: ClipBody::Full });
             }
         } else {
             if d.bow {
@@ -2400,7 +2400,7 @@ impl Survival {
                 // Thrown up with the foe, the hero's own camera comes in and tips down onto the
                 // fight, to aim the dive that follows (Corey's review of Raptor Strike: "the
                 // knock-up camera"): a beat for their add-on, nothing for anyone else.
-                self.events.push(Event::Beat { player: id, beat: cues::BEAT_RISE, on: id });
+                self.events.push(Event::Beat { player: id, beat: cues::BEAT_RISE.to_string(), on: Some(id) });
             }
             "ground" => {
                 let at = if d.at_self { pos } else { self.aim_point(id, AbilityDef::at(d.range, share)) };

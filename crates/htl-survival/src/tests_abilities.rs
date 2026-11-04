@@ -604,6 +604,8 @@ fn a_creature_wears_its_own_look_from_the_start() {
     let ev = s.step(0.0);
     assert!(s.auras_of(m).contains(&27827), "its look: {:?}", s.auras_of(m));
     assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == m)), "shown as it comes");
+}
+
 /// `.es dummy clear`, which the visual check runs before it puts up its one dummy.
 #[test]
 fn clearing_the_dummies_takes_every_dummy_and_nothing_else() {

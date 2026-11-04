@@ -129,6 +129,7 @@ pub struct Content {
     #[serde(default)]
     pub backstab: BackstabDef,
     /// How the ice shatters off a frozen foe: the same for every class.
+    #[serde(default)]
     pub shatter: ShatterDef,
     #[serde(default)]
     pub dev: DevDef,
