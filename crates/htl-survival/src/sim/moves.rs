@@ -13,7 +13,7 @@ use crate::content::{AbilityDef, AbilityEffect};
 pub(super) const GRAVITY: f32 = 19.29;
 /// A knockback's and a pull's arc (their upward speed) where the effect names none.
 const KNOCK_LIFT: f32 = 4.5;
-const PULL_LIFT: f32 = 3.0;
+pub(crate) const PULL_LIFT: f32 = 3.0;
 /// A pull stops this far short of where it pulls to.
 const PULL_STOP: f32 = 1.6;
 /// The farthest a knockback or a pull moves a training dummy (it has no legs to walk back).
@@ -196,6 +196,11 @@ impl Survival {
         let line = format!("{} on {} ({moved:.1} yd) from {}", e.kind, self.unit_name(victim), self.unit_name(owner));
         self.cc_note(victim, line.clone());
         self.cc_note(owner, line);
+        // The hauler's own look over the flight (Reverse Grapple: a pull, not the bow's release
+        // pose), on the clients that play clips, for as long as what it hauls is in the air.
+        if let Some((clip, from)) = self.fx_pull_look.clone().filter(|_| pull && self.players.contains_key(&owner)) {
+            self.events.push(Event::Clip { id: owner, clip, take: 0, from: if from.is_empty() { None } else { Some(from) }, secs: air, at: 0.0 });
+        }
         if self.players.contains_key(&victim) {
             self.interrupt_hero(victim);
             self.set_action(victim, Action::Stagger { until: now + air });

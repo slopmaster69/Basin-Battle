@@ -1487,6 +1487,57 @@ fn reverse_grapple_hauls_a_creature_but_a_boss_hauls_the_hunter() {
     assert!(ev.iter().any(|e| matches!(e, Event::Tether { from, to: Target::Unit(t), .. } if *from == p && *t == b)), "in on the line to it");
 }
 
+/// The dev rules with these values of `survival.toml` changed (`.es tune <path> <value>`).
+fn tuned(changes: &[(&str, &str)]) -> Content {
+    let mut text = crate::content::DEFAULT.to_string();
+    for (path, value) in changes {
+        text = crate::tune::set(&text, path, value).unwrap_or_else(|e| panic!("{path}: {e}")).0;
+    }
+    Content::into_dev(Content::parse_with(&text, crate::content::DEFAULT_DUNGEON).expect("the tuned rules read"))
+}
+
+#[test]
+fn reverse_grapple_plays_the_hunters_pull_clip_for_the_haul_and_its_tune_keys_swap_it() {
+    // The hunter's own clips (the bow's release is no clip) as a creature `key` is hauled in.
+    let haul = |c: Content, key: &str| -> Vec<(u16, String, f32)> {
+        let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
+        s.mobs.clear();
+        s.respawns.clear();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let w = mob(&mut s, key, [12.0, 0.0, 0.0]);
+        s.set_valor(p, 50.0);
+        press(&mut s, p, "grapple_arrow", true);
+        s.set_aim_line(p, 0.0, 0.0);
+        let mut ev = click(&mut s, p);
+        ev.extend(run_pinned(&mut s, 0.6, &[w]));
+        ev.iter()
+            .filter_map(|e| match e {
+                Event::Clip { id, clip, secs, from, .. } if *id == p => Some((*clip, from.clone().unwrap_or_default(), *secs)),
+                _ => None,
+            })
+            .collect()
+    };
+    // As shipped: EmoteUseStanding (63) on the hunter for exactly the creature's time in the air.
+    let air = crate::sim::moves::airtime(crate::sim::moves::PULL_LIFT);
+    let clips = haul(Content::dev(), "wolf");
+    assert_eq!(clips.len(), 1, "one pull clip on the hunter: {clips:?}");
+    let (clip, from, secs) = &clips[0];
+    assert!(*clip == 63 && from.is_empty(), "the hunter's own EmoteUseStanding: {clips:?}");
+    assert!((secs - air).abs() < 1e-3 && *secs > 0.25, "for the haul's flight ({air:.3} s): {secs}");
+    // Tuned: another clip, and another character model's take on it.
+    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clip", "19")]), "wolf");
+    assert!(matches!(clips.as_slice(), [(19, f, _)] if f.is_empty()), "the tuned clip: {clips:?}");
+    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clip", "58"), ("ability.reverse_grapple.pull_from", "ScourgeFemale")]), "wolf");
+    assert!(matches!(clips.as_slice(), [(58, f, _)] if f == "ScourgeFemale"), "the borrowed take: {clips:?}");
+    // Tuned off: no clip (the bow's release alone, as before).
+    assert!(haul(tuned(&[("ability.reverse_grapple.pull_clip", "0")]), "wolf").is_empty(), "no pull clip when it's 0");
+    // A boss hauls the hunter instead: no pull to pose for.
+    assert!(haul(Content::dev(), "warlord").is_empty(), "no pull clip when the hunter is the one hauled");
+    // From no model the clients know: turned away, as a leap's borrowed clip is.
+    let (bad, _) = crate::tune::set(crate::content::DEFAULT, "ability.reverse_grapple.pull_from", "Murloc").unwrap();
+    assert!(Content::parse_with(&bad, crate::content::DEFAULT_DUNGEON).is_err(), "pull_from Murloc is no character model");
+}
+
 #[test]
 fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() {
     let mut s = world();

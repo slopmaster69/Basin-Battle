@@ -765,6 +765,7 @@ function ES.SwingLine(f)
   if kind == "cast" then
     if mine then guid = "player" end
     local body = (f[14] and f[14] ~= "") and f[14] or "full"
+    if from and PreloadAnimationSource then PreloadAnimationSource(from) end
     PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, body, from)
     return
   end

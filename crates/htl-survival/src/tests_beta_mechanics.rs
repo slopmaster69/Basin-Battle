@@ -947,3 +947,14 @@ fn every_disengage_plays_the_same_borrowed_flip_from_the_ground_too() {
         assert!(check(&bad).is_err(), "should be turned away:\n{bad}");
     }
 }
+
+#[test]
+fn a_pulls_look_on_its_caster_is_only_for_an_ability_that_pulls_from_a_model_the_clients_know() {
+    let card = |more: &str| format!("[[ability]]\nkey = \"t_bad\"\nname = \"Bad\"\nschool = \"hunter\"\nslot = \"utility\"\nkind = \"projectile\"\nrange = [8.0, 8.0]\nspeed = 40.0\n{more}\n");
+    let pull = "effects = [{ kind = \"pull\", amount = 10.0, from_caster = true }]";
+    check(&card(&format!("pull_clip = 63\n{pull}"))).unwrap();
+    check(&card(&format!("pull_clip = 63\npull_from = \"ScourgeFemale\"\n{pull}"))).unwrap();
+    for bad in [card("pull_clip = 63"), card(&format!("pull_from = \"ScourgeFemale\"\n{pull}")), card(&format!("pull_clip = 63\npull_from = \"Murloc\"\n{pull}"))] {
+        assert!(check(&bad).is_err(), "should be turned away:\n{bad}");
+    }
+}
