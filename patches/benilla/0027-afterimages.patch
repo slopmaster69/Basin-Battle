@@ -1,0 +1,394 @@
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 86313db8..6176c3f1 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -32,6 +32,7 @@ use bevy::prelude::*;
+ use super::{find_resolved, AnimData, BodyTwist};
+ 
+ mod donor;
++mod afterimage;
+ mod flurry;
+ mod strike_trail;
+ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+@@ -1469,6 +1470,8 @@ pub(super) fn plugin(app: &mut App) {
+                 track_lock_on,
+                 shuffle_on_lock_turn.after(drain_action_calls),
+                 flurry::step_flurries.before(drain_action_calls),
++                afterimage::spawn_afterimages.after(flurry::step_flurries),
++                afterimage::expire_afterimages,
+                 strike_trail::fire_strike_trails
+                     .after(drain_action_calls)
+                     .before(crate::weapon_trail::fire_weapon_trails),
+@@ -1477,7 +1480,7 @@ pub(super) fn plugin(app: &mut App) {
+         )
+         .add_systems(
+             OnExit(crate::client_state::ClientState::InWorld),
+-            reset_action_on_world_exit,
++            (reset_action_on_world_exit, afterimage::clear_afterimages),
+         )
+         .add_systems(
+             PostUpdate,
+diff --git a/crates/benilla-app/src/creature_anim/action/afterimage.rs b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+new file mode 100644
+index 00000000..e80f6363
+--- /dev/null
++++ b/crates/benilla-app/src/creature_anim/action/afterimage.rs
+@@ -0,0 +1,243 @@
++//! Basin Battle: afterimages, frozen translucent copies of a unit's body and what it holds, left
++//! where a blow landed and gone again in a moment (Bladestorm's storm of cuts).
++//!
++//! A copy is no model of its own. Its parts draw the unit's own meshes from a fresh palette slot
++//! holding the rows the unit's rig had at that instant (`RigSkin::frozen_copy`, one for the body
++//! and one for each held item), on their blend twins under the engine's teardown ramp
++//! (`RenderFade`), so the picture is exactly the pose at the cut, weapons and all, and the depth
++//! twin (`zfill`) keeps the overlapping limbs one layer, lit as a highlighted target so it reads
++//! as light rather than shadow. Nothing writes the slot afterwards (no
++//! pose, no rider), so the copy stays where it was made while the body moves on. It costs a slot
++//! a rig for its moment, and goes with its root.
++
++use std::collections::HashMap;
++
++use benilla_world::instance_tint::{self, InstanceTints};
++use benilla_world::interior::InteriorLit;
++use benilla_world::mesh_tag::{spawn_tag, HIGHLIGHT_BIT};
++use benilla_world::model_fade::{FadeCurve, FadeMaterials, RenderFade};
++use benilla_world::rig_palette::{RigPalettes, RigPart, RigSkin};
++use bevy::camera::visibility::NoFrustumCulling;
++use bevy::mesh::MeshTag;
++use bevy::prelude::*;
++
++/// The most copies alive at once, over every unit; the oldest goes when another comes.
++const MAX_IMAGES: usize = 24;
++
++/// A copy of the unit is due at `at` (seconds): a flurry asks for one as each cut's blow lands.
++#[derive(Component, Clone, Copy)]
++pub(crate) struct AfterimageDue {
++    pub(crate) at: f32,
++    /// How long the copy stays, fading the whole way.
++    pub(crate) secs: f32,
++    /// Its alpha as it appears.
++    pub(crate) alpha: f32,
++    /// A colour over it, the trail's; `None` leaves the body's own.
++    pub(crate) tint: Option<[u8; 3]>,
++}
++
++/// A copy's root: its parts and its rigs are its children, and all go together at `until`.
++#[derive(Component)]
++pub(crate) struct Afterimage {
++    started: f32,
++    until: f32,
++}
++
++/// Holds one of a copy's palette slots (`RigSkin` frees it with the entity).
++#[derive(Component)]
++struct ImageRig;
++
++/// Make the copies that fell due: the unit's drawn parts (the body's and its held items') again
++/// under a root of their own, each rig's rows frozen into a slot of the copy's.
++#[allow(clippy::type_complexity)]
++pub(crate) fn spawn_afterimages(
++    mut commands: Commands,
++    time: Res<Time>,
++    due: Query<(Entity, &AfterimageDue)>,
++    children: Query<&Children>,
++    parts: Query<(
++        &Mesh3d,
++        &MeshTag,
++        &FadeMaterials,
++        &RigPart,
++        Option<&InteriorLit>,
++    )>,
++    skins: Query<&RigSkin>,
++    images: Query<(Entity, &Afterimage)>,
++    mut palettes: ResMut<RigPalettes>,
++    mut tints: ResMut<InstanceTints>,
++) {
++    let now = time.elapsed_secs();
++    let mut alive: Vec<(f32, Entity)> = images.iter().map(|(e, a)| (a.started, e)).collect();
++    alive.sort_by(|a, b| a.0.total_cmp(&b.0));
++    let mut oldest = 0;
++    for (unit, d) in &due {
++        if now < d.at {
++            continue;
++        }
++        commands.entity(unit).try_remove::<AfterimageDue>();
++        // Room for one more: the oldest goes early.
++        if alive.len() - oldest >= MAX_IMAGES {
++            if let Some(&(_, e)) = alive.get(oldest) {
++                commands.entity(e).try_despawn();
++                oldest += 1;
++            }
++        }
++        let root = commands
++            .spawn((
++                Afterimage {
++                    started: now,
++                    until: now + d.secs,
++                },
++                Transform::IDENTITY,
++                Visibility::default(),
++            ))
++            .id();
++        // The copy's slot for each rig the unit draws from, made as the first part of it comes.
++        let mut copies: HashMap<Entity, u16> = HashMap::new();
++        let mut any = false;
++        for e in children.iter_descendants(unit) {
++            let Ok((mesh, tag, fm, rig, lit)) = parts.get(e) else {
++                continue;
++            };
++            // A part the unit is not drawing now (its alpha down at the floor) is not copied.
++            if benilla_world::mesh_tag::alpha_of(tag.0) <= 0.02 {
++                continue;
++            }
++            let slot = match copies.get(&rig.0) {
++                Some(&slot) => slot,
++                None => {
++                    let Ok(src) = skins.get(rig.0) else {
++                        continue;
++                    };
++                    let Some(copy) = RigSkin::frozen_copy(&mut palettes, src) else {
++                        continue;
++                    };
++                    let slot = copy.slot;
++                    if let Some(t) = d.tint {
++                        tints.set(slot, instance_tint::pack(t));
++                    }
++                    commands.spawn((copy, ImageRig, ChildOf(root)));
++                    copies.insert(rig.0, slot);
++                    slot
++                }
++            };
++            commands.spawn((
++                Mesh3d(mesh.0.clone()),
++                MeshMaterial3d(fm.material_for(lit, true).clone()),
++                // Lit up as a hovered target is (the highlight bit): a ghost of light, not a
++                // shadow of the body.
++                MeshTag(spawn_tag(slot, d.alpha) | HIGHLIGHT_BIT),
++                fm.clone(),
++                RenderFade {
++                    started: now,
++                    duration: d.secs,
++                    from: d.alpha,
++                    to: 0.0,
++                    curve: FadeCurve::Smoothstep,
++                },
++                Transform::IDENTITY,
++                NoFrustumCulling,
++                ChildOf(root),
++            ));
++            any = true;
++        }
++        if any {
++            alive.push((now, root));
++        } else {
++            commands.entity(root).despawn();
++        }
++    }
++}
++
++/// A copy whose time is up goes, parts, rigs (their slots) and all.
++pub(crate) fn expire_afterimages(
++    mut commands: Commands,
++    time: Res<Time>,
++    images: Query<(Entity, &Afterimage)>,
++) {
++    let now = time.elapsed_secs();
++    for (e, a) in &images {
++        if now >= a.until {
++            commands.entity(e).try_despawn();
++        }
++    }
++}
++
++/// Leaving the world: every copy goes.
++pub(crate) fn clear_afterimages(mut commands: Commands, images: Query<Entity, With<Afterimage>>) {
++    for e in &images {
++        commands.entity(e).try_despawn();
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// The flow without a renderer: a flurry asks for a copy as its first cut lands, and the ask
++    /// is taken up (and, the unit having no parts here, leaves nothing behind).
++    #[test]
++    fn a_flurry_asks_for_a_copy_as_a_cut_lands_and_the_ask_is_taken_up() {
++        use std::time::Duration;
++        let mut app = App::new();
++        app.insert_resource(Time::<()>::default());
++        app.init_resource::<RigPalettes>();
++        app.init_resource::<InstanceTints>();
++        app.add_systems(
++            Update,
++            (super::super::flurry::step_flurries, spawn_afterimages).chain(),
++        );
++        let unit = app
++            .world_mut()
++            .spawn((
++                Transform::IDENTITY,
++                super::super::flurry::Flurry::new(
++                    "player".into(),
++                    1.0,
++                    None,
++                    vec![(17, 0), (18, 1)],
++                    0.14,
++                    0.15,
++                    (88, 0),
++                    0.25,
++                    70.0,
++                    Some((0xC8E8F0FF, 220)),
++                    0.0,
++                ),
++            ))
++            .id();
++        app.update();
++        let due = app
++            .world()
++            .get::<AfterimageDue>(unit)
++            .copied()
++            .expect("the first cut asks for a copy");
++        assert!((due.at - 0.15).abs() < 1.0e-3, "as the wind-up lands: {}", due.at);
++        assert_eq!(due.tint, Some([0xC8, 0xE8, 0xF0]));
++        // Not yet: the ask waits for its time.
++        app.world_mut().resource_mut::<Time<()>>().advance_by(Duration::from_millis(100));
++        app.update();
++        assert!(app.world().get::<AfterimageDue>(unit).is_some(), "too soon");
++        app.world_mut().resource_mut::<Time<()>>().advance_by(Duration::from_millis(100));
++        app.update();
++        assert!(app.world().get::<AfterimageDue>(unit).is_none(), "taken up at its time");
++        let world = app.world_mut();
++        assert_eq!(world.query::<&Afterimage>().iter(world).count(), 0, "nothing to copy here");
++    }
++
++    #[test]
++    fn a_copy_fades_the_whole_way_and_is_gone_at_its_end() {
++        let fade = RenderFade {
++            started: 10.0,
++            duration: 0.4,
++            from: 0.6,
++            to: 0.0,
++            curve: FadeCurve::Smoothstep,
++        };
++        let at = |t: f32| fade.alpha_at((t - 10.0) / 0.4);
++        assert!(at(10.0) > 0.5, "near its start alpha as it appears: {}", at(10.0));
++        assert!(at(10.2) < at(10.0) && at(10.2) > 0.0);
++        assert!(at(10.4) <= 1.0e-3, "gone at the end: {}", at(10.4));
++    }
++}
+diff --git a/crates/benilla-app/src/creature_anim/action/flurry.rs b/crates/benilla-app/src/creature_anim/action/flurry.rs
+index a03030d4..457961c4 100644
+--- a/crates/benilla-app/src/creature_anim/action/flurry.rs
++++ b/crates/benilla-app/src/creature_anim/action/flurry.rs
+@@ -13,6 +13,7 @@
+ use benilla_ui::action_combat::{self, ActionBody, ActionCall};
+ use bevy::prelude::*;
+ 
++use super::afterimage::AfterimageDue;
+ use super::{ActionTilt, TiltKind};
+ 
+ /// The share of a cut before its blow lands; the rest is its recovery, into the next cut.
+@@ -24,6 +25,10 @@ const TURN_SNAP: f32 = 0.07;
+ /// The turns, in `turn`s, cut by cut and round again: ahead, right, left, further right, further
+ /// left, back left, back right, nearly behind each way, ahead.
+ const TURNS: [f32; 10] = [0.0, 1.0, -1.0, 2.0, -2.0, -1.0, 1.0, 2.5, -2.5, 0.0];
++/// Each cut leaves an afterimage of the body as its blow lands (`super::afterimage`): how long it
++/// stays, fading the whole way, and how solid it appears.
++const IMAGE_SECS: f32 = 0.45;
++const IMAGE_ALPHA: f32 = 0.7;
+ 
+ enum Phase {
+     Cuts,
+@@ -93,6 +98,21 @@ impl Flurry {
+         self.ending = true;
+     }
+ 
++    /// The afterimage a cut leaves as its blow lands, in `impact` seconds: a ghost in the trail's
++    /// colour, deepened (the trail is near white; a tint only takes colour away, so the ghost
++    /// takes the trail's hue by losing the rest).
++    fn image(&self, now: f32, impact: f32) -> AfterimageDue {
++        AfterimageDue {
++            at: now + impact,
++            secs: IMAGE_SECS,
++            alpha: IMAGE_ALPHA,
++            tint: self.trail.map(|(c, _)| {
++                let (r, g, b) = ((c >> 24) as u8, (c >> 16) as u8, (c >> 8) as u8);
++                [(f32::from(r) * 0.55) as u8, (f32::from(g) * 0.8) as u8, b]
++            }),
++        }
++    }
++
+     /// One cut (or the finish) through the add-on's own animation path.
+     fn play(&self, (anim, take): (u16, usize), impact: f32, recovery: f32, trail_share: f32) {
+         let trail = self
+@@ -138,6 +158,7 @@ pub(super) fn step_flurries(
+                     let impact = if f.i == 0 { f.windup } else { f.cut * CUT_LANDS_AT };
+                     let recovery = f.cut * (1.0 - CUT_LANDS_AT);
+                     f.play(cut, impact, recovery, 1.0);
++                    commands.entity(entity).try_insert(f.image(now, impact));
+                     let yaw = f.turn * TURNS[f.i % TURNS.len()];
+                     let hold = (f.until - now).max(0.0) + f.finish_secs + 1.0;
+                     turn(&mut commands, &mut tilts, entity, t, yaw, TURN_SNAP, hold, now);
+@@ -152,6 +173,7 @@ pub(super) fn step_flurries(
+         // The finish: one wider sweep, facing ahead again as it goes.
+         let impact = f.finish_secs * CUT_LANDS_AT;
+         f.play(f.finish, impact, f.finish_secs - impact, FINISH_TRAIL);
++        commands.entity(entity).try_insert(f.image(now, impact));
+         turn(
+             &mut commands,
+             &mut tilts,
+diff --git a/crates/benilla-world/src/rig_palette.rs b/crates/benilla-world/src/rig_palette.rs
+index 72c2ecab..752fdaf2 100644
+--- a/crates/benilla-world/src/rig_palette.rs
++++ b/crates/benilla-world/src/rig_palette.rs
+@@ -414,6 +414,33 @@ impl RigPalettes {
+         self.dirty.push((base, len, mirrored));
+     }
+ 
++    /// Basin Battle: `to` takes `from`'s rows and origin as they stand ([`RigSkin::frozen_copy`]).
++    pub(crate) fn copy_rows(&mut self, from: &RigSkin, to: &RigSkin) {
++        let n = from.len.min(to.len);
++        if n == 0 {
++            return;
++        }
++        if let Some(o) = self.origins.get(from.slot as usize).copied() {
++            self.set_origin(to.slot, Vec3::new(o[0], o[1], o[2]));
++        }
++        self.cost_rows += n;
++        let wm = self.bone_watermark();
++        let rows = rows_make_mut(
++            &mut self.rows,
++            &mut self.spare,
++            wm,
++            &mut self.cost_copies,
++            &mut self.cost_copy_us,
++        );
++        let (r0, r1) = (3 * from.base as usize, 3 * (from.base + n) as usize);
++        let t0 = 3 * to.base as usize;
++        if r1 <= rows.len() && t0 + (r1 - r0) <= rows.len() {
++            rows.copy_within(r0..r1, t0);
++        }
++        let mirrored = self.mirrored.get(to.slot as usize).copied().unwrap_or(false);
++        self.dirty.push((to.base, n, mirrored));
++    }
++
+     /// Flag a booth rig's rows to also reach the mirror buffers ([`RigPaletteMirrors`]).
+     pub fn mark_mirrored(&mut self, slot: u16) {
+         if let Some(m) = self.mirrored.get_mut(slot as usize) {
+@@ -561,6 +588,15 @@ impl RigSkin {
+         Self::allocate_inner(palettes, bones, joints, ibp)
+     }
+ 
++    /// Basin Battle: a copy of `src`'s rig frozen as it is this instant, a slot of its own with
++    /// the same bones and inverse bindposes and `src`'s rows and origin copied in. Nothing writes
++    /// it afterwards (no pose, no rider), so it holds the pose; an afterimage draws from it.
++    pub fn frozen_copy(palettes: &mut RigPalettes, src: &RigSkin) -> Option<Self> {
++        let copy = Self::allocate_bones(palettes, src.len, src.ibp.clone())?;
++        palettes.copy_rows(src, &copy);
++        Some(copy)
++    }
++
+     fn allocate_inner(
+         palettes: &mut RigPalettes,
+         bones: u32,
