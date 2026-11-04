@@ -395,6 +395,14 @@ impl SurvivalGame {
                     }
                     None
                 }
+                // The nearest creature swings at the first stand-in ally instead (an Intervene's
+                // guard taking the blow meant for them).
+                "blowally" => {
+                    if let (Some(m), Some(a)) = (nearest, self.lab_allies.first().copied()) {
+                        self.sim.lab_blow(m, a);
+                    }
+                    None
+                }
                 k => {
                     let (ex, k) = match k.strip_prefix('^') {
                         Some(rest) => (true, rest),
