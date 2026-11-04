@@ -4775,9 +4775,12 @@ hunt = "recall"
 valor = 25
 damage = [10.0, 10.0]
 radius = [0.6, 0.6]
-speed = 40.0
-spell = 19434
-clip = 54
+# Slow enough to follow home with the eye (Corey's review: "we need to see them fly to his
+# hands"). No buff look or pose on the key: the call is a hand held out (`sim/hunter.rs`), and
+# the arrows' own look flies home.
+speed = 24.0
+spell = 0
+clip = 0
 
 # 2, the second choice: the traps.
 [[ability]]
@@ -4843,6 +4846,7 @@ empower = { ability = "aimed_arrow", secs = 8.0 }
 key = "kill_shot"
 name = "Kill Shot"
 text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 200% bow damage. Enemies below 25% health are killed outright."
+text = "Draws for 1.3 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 60 damage. Enemies below 25% health are killed outright."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
@@ -4853,6 +4857,13 @@ charge = [1.0, 1.0]
 hold = 1.0
 # 200% of a full draw's bow damage: 60 with the hunting bow (#118).
 bow_damage = 2.0
+# A longer draw and hold than Aimed Shot's, and a heavier hit (Corey's review, run 040: "this
+# looks like a worse version of Aimed Shot... this needs to feel like the coolest moment in the
+# world for a hunter"): the camera comes all the way in over the draw (the add-on), the arrow's
+# ribbon is Kill Shot's own, and each foe it passes takes Heroic Strike's heavy flash.
+charge = [1.3, 1.3]
+hold = 1.2
+damage = [60.0, 60.0]
 range = [40.0, 40.0]
 radius = [0.4, 0.4]
 pierce = 9
@@ -4861,6 +4872,7 @@ speed = 50.0
 cooldown = 40.0
 # Arcane Shot's glowing arrow, as Aimed Shot's full draw.
 spell = 3044
+impact_kit = 437
 clip = 53
 
 # 3, the second choice: up above the fight, then rain on it. The leap tops out and hangs there
