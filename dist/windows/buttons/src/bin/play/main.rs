@@ -1,22 +1,24 @@
 //! Play.exe: the launcher. Its window is the War Table menu (launcher\ui\index.html, drawn by
-//! the WebView2 that comes with Windows 10 and 11); what it does behind the menu is in
-//! backend.rs. Without WebView2, or if the menu can't draw its map, it starts the plain launcher
-//! instead (launcher\play.ps1, classic.rs), so Play always plays.
+//! the WebView2 that comes with Windows 10 and 11, or by the Mac's own WebKit); what it does
+//! behind the menu is in backend.rs. Without WebView2, or if the menu can't draw its map, it
+//! starts the plain launcher instead (classic.rs), so Play always plays.
+//! On a Mac it runs from the repository (Basin Battle.app, made by Play Basin Battle.command).
 //!   Play.exe -Change       opens the server list at once
 //!   Play.exe -Game basin   opens on Basin Battle
 //!   Play.exe -NoUpdate     doesn't look for a new version this time
 //!   Play.exe -Classic      the plain launcher
 //!   Play.exe -Bench        measures how smoothly this PC draws the map
+//!   Play.exe -Map2D        draws the map with a 2D canvas instead of WebGL (a Mac does unless -WebGL)
 #![windows_subsystem = "windows"]
 
 mod backend;
 mod classic;
 
-use backend::{Backend, Options};
+use backend::{Backend, Kind, Options, Paths};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::ffi::OsString;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Component, Path};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,20 +41,25 @@ enum Ui {
 }
 
 fn main() {
-    let root = std::env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf)).unwrap_or_default();
+    let exe = std::env::current_exe().unwrap_or_default();
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
     let flag = |f: &str| args.iter().any(|a| a.eq_ignore_ascii_case(f));
-    let ui = root.join("launcher").join("ui");
-    if flag("-Classic") || !ui.join("index.html").is_file() {
-        classic::start(&root, &args);
+    let Some(paths) = Paths::find(&exe) else {
+        // A Play.exe without its menu beside it: the plain launcher, if it's there.
+        classic::start(&Paths::download(exe.parent().map(Path::to_path_buf).unwrap_or_default()), &args);
+        return;
+    };
+    if flag("-Classic") {
+        classic::start(&paths, &args);
         return;
     }
     let game = args.iter().position(|a| a.eq_ignore_ascii_case("-Game")).and_then(|i| args.get(i + 1)).map(|g| g.to_string_lossy().to_string());
     let opts = Options { change: flag("-Change"), no_update: flag("-NoUpdate"), game, bench: flag("-Bench") };
-    if let Err(e) = run(root.clone(), ui, opts) {
+    let (log, kind, root) = (paths.log.clone(), paths.kind, paths.root.clone());
+    if let Err(e) = run(paths, opts) {
         // No WebView2 on this PC (or it wouldn't start): the plain launcher.
-        let _ = std::fs::write(root.join("launcher").join("play.log"), format!("Play: the menu couldn't open ({e}), so the plain launcher instead.\r\n"));
-        classic::start(&root, &args);
+        let _ = std::fs::write(log, format!("Play: the menu couldn't open ({e}), so the plain launcher instead.\r\n"));
+        classic::start(&if kind == Kind::Download { Paths::download(root) } else { Paths::checkout(root) }, &args);
     }
 }
 
@@ -72,13 +79,14 @@ fn content_type(path: &Path) -> &'static str {
     }
 }
 
-/// A file of the menu's, from launcher\ui only.
-fn serve(ui: &Path, uri_path: &str) -> Response<Cow<'static, [u8]>> {
+/// A file of the menu's, from its folder only (or the shield, from the art beside it).
+fn serve(ui: &Path, art: &Path, uri_path: &str) -> Response<Cow<'static, [u8]>> {
     let rel = uri_path.trim_start_matches('/');
     let rel = if rel.is_empty() { "index.html" } else { rel };
     let rel = Path::new(rel);
     let safe = rel.components().all(|c| matches!(c, Component::Normal(_)));
-    let path = ui.join(rel);
+    let mut path = ui.join(rel);
+    if !path.is_file() && rel == Path::new("shield.png") { path = art.join(rel); }
     match std::fs::read(&path) {
         Ok(bytes) if safe => Response::builder()
             .header(CONTENT_TYPE, content_type(&path))
@@ -89,14 +97,15 @@ fn serve(ui: &Path, uri_path: &str) -> Response<Cow<'static, [u8]>> {
     }
 }
 
-fn run(root: PathBuf, ui: PathBuf, opts: Options) -> Result<(), String> {
+fn run(paths: Paths, opts: Options) -> Result<(), String> {
+    let (root, ui, art, kind) = (paths.root.clone(), paths.ui.clone(), paths.art.clone(), paths.kind);
     let event_loop = EventLoopBuilder::<Ui>::with_user_event().build();
     let proxy = event_loop.create_proxy();
     let bench = opts.bench;
     let backend = {
         let (p1, p2) = (proxy.clone(), proxy.clone());
         Backend::new(
-            root.clone(),
+            paths,
             opts,
             Arc::new(move |v: Value| { let _ = p1.send_event(Ui::Js(v.to_string())); }),
             Arc::new(move || { let _ = p2.send_event(Ui::Quit); }),
@@ -110,13 +119,21 @@ fn run(root: PathBuf, ui: PathBuf, opts: Options) -> Result<(), String> {
         w = f64::min(w, s.width * 0.92);
         h = f64::min(h, s.height * 0.88);
     }
-    #[cfg_attr(not(windows), allow(unused_mut))]
-    let mut wb = WindowBuilder::new()
+    let wb = WindowBuilder::new()
         .with_title(&backend.project.title)
         .with_inner_size(LogicalSize::new(w, h))
         .with_min_inner_size(LogicalSize::new(f64::min(960.0, w), f64::min(600.0, h)))
-        .with_decorations(false)
         .with_visible(false);
+    // Windows and Linux: no frame, the menu's own title bar. A Mac keeps its traffic lights,
+    // over the menu's title bar.
+    #[cfg(not(target_os = "macos"))]
+    #[cfg_attr(not(windows), allow(unused_mut))]
+    let mut wb = wb.with_decorations(false);
+    #[cfg(target_os = "macos")]
+    let wb = {
+        use tao::platform::macos::WindowBuilderExtMacOS;
+        wb.with_titlebar_transparent(true).with_title_hidden(true).with_fullsize_content_view(true)
+    };
     #[cfg(windows)]
     {
         use tao::platform::windows::{IconExtWindows, WindowBuilderExtWindows};
@@ -131,15 +148,21 @@ fn run(root: PathBuf, ui: PathBuf, opts: Options) -> Result<(), String> {
     // WebView2 keeps its own files (its cache) outside the game's folder, which updates replace.
     let data = dirs::data_local_dir().unwrap_or_else(std::env::temp_dir).join(&backend.project.title).join("WebView2");
     let mut context = WebContext::new(Some(data));
-    let ui_dir = ui.clone();
+    let (ui_dir, art_dir) = (ui.clone(), art.clone());
     let p_ipc = proxy.clone();
-    let url = if bench { "bb://localhost/index.html#bench" } else { "bb://localhost/index.html" };
+    // #map2d: the map drawn with a 2D canvas instead of WebGL (Play -Map2D, or BB_MAP2D=1). A Mac
+    // draws it that way unless told -WebGL: there its WebGL can draw without reaching the screen
+    // (seen on GitHub's Mac runners), while its 2D canvas always does, as fast and as faithful.
+    let arg = |f: &str| std::env::args_os().any(|a| a.eq_ignore_ascii_case(f));
+    let map2d = arg("-Map2D") || std::env::var_os("BB_MAP2D").is_some() || (cfg!(target_os = "macos") && !arg("-WebGL"));
+    let hash = [(bench, "bench"), (map2d, "map2d")].iter().filter(|(on, _)| *on).map(|(_, n)| *n).collect::<Vec<_>>().join("-");
+    let url = if hash.is_empty() { "bb://localhost/index.html".to_string() } else { format!("bb://localhost/index.html#{hash}") };
     let builder = WebViewBuilder::new_with_web_context(&mut context)
-        .with_url(url)
+        .with_url(&url)
         .with_background_color((16, 12, 8, 255))
         .with_asynchronous_custom_protocol("bb".into(), move |_, req, responder| {
-            let (ui, path) = (ui_dir.clone(), req.uri().path().to_string());
-            std::thread::spawn(move || responder.respond(serve(&ui, &path)));
+            let (ui, art, path) = (ui_dir.clone(), art_dir.clone(), req.uri().path().to_string());
+            std::thread::spawn(move || responder.respond(serve(&ui, &art, &path)));
         })
         .with_ipc_handler(move |req| { let _ = p_ipc.send_event(Ui::Ipc(req.body().clone())); })
         // The menu is one page: links to the web open in the browser instead (the menu asks).
@@ -173,7 +196,7 @@ fn run(root: PathBuf, ui: PathBuf, opts: Options) -> Result<(), String> {
         });
     }
     let mut shown = false;
-    let classic_root = root.clone();
+    let classic_paths = if kind == Kind::Download { Paths::download(root.clone()) } else { Paths::checkout(root.clone()) };
     event_loop.run(move |event, _, flow| {
         *flow = ControlFlow::Wait;
         let _ = &context;
@@ -188,7 +211,7 @@ fn run(root: PathBuf, ui: PathBuf, opts: Options) -> Result<(), String> {
             }
             Event::UserEvent(Ui::Quit) => *flow = ControlFlow::Exit,
             Event::UserEvent(Ui::Stalled) => {
-                classic::start(&classic_root, &std::env::args_os().skip(1).collect::<Vec<_>>());
+                classic::start(&classic_paths, &std::env::args_os().skip(1).collect::<Vec<_>>());
                 *flow = ControlFlow::Exit;
             }
             Event::UserEvent(Ui::Ipc(body)) => {
@@ -215,7 +238,7 @@ fn run(root: PathBuf, ui: PathBuf, opts: Options) -> Result<(), String> {
                     }
                     "pick-wow" => {
                         let picked = rfd::FileDialog::new()
-                            .set_title("Pick your World of Warcraft 1.12.1 folder (the one with WoW.exe and a Data folder in it)")
+                            .set_title("Pick your World of Warcraft 1.12.1 folder (the one with a Data folder in it)")
                             .set_parent(&window)
                             .pick_folder();
                         match picked {
@@ -225,7 +248,7 @@ fn run(root: PathBuf, ui: PathBuf, opts: Options) -> Result<(), String> {
                     }
                     "classic" => {
                         backend.log(&format!("the menu can't draw here ({}): the plain launcher instead", m.get("why").and_then(|v| v.as_str()).unwrap_or("")));
-                        classic::start(&classic_root, &std::env::args_os().skip(1).collect::<Vec<_>>());
+                        classic::start(&classic_paths, &std::env::args_os().skip(1).collect::<Vec<_>>());
                         *flow = ControlFlow::Exit;
                     }
                     _ => backend.handle(&m),

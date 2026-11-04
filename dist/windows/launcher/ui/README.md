@@ -1,7 +1,7 @@
 # Play's menu: the War Table
 
-What Play.exe shows (`dist/windows/buttons/src/bin/play/`): one page, drawn by WebView2, served
-from this folder. The release copies it to `launcher\ui` in the Windows download, with the
+What Play shows (`dist/windows/buttons/src/bin/play/`): one page, drawn by WebView2 on Windows
+and by the Mac's WebKit in Basin Battle.app (`scripts/mac-launcher.sh`), served from this folder. The release copies it to `launcher\ui` in the Windows download, with the
 shield (`dist/windows/art/shield.png`) and `news.json`, the dispatches, written from the
 repository's history by `scripts/launcher-news.py`.
 
