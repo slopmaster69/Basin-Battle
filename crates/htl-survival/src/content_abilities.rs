@@ -224,6 +224,10 @@ pub struct AbilityDef {
     pub object: u32,
     #[serde(default)]
     pub burst_spell: u32,
+    /// A ricochet's flash where it skips off the ground, when that should differ from the wall's
+    /// `burst_spell` (Bank Shot: a splash of dirt, not fire; Corey's review). 0: the burst's.
+    #[serde(default)]
+    pub skip_spell: u32,
     /// The look its lingering ground wears (a DynamicObject of this spell for as long as it
     /// lingers: Consecration's holy ground, Flamestrike's fire); 0: its own `spell`.
     #[serde(default)]

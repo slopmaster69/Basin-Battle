@@ -1368,7 +1368,7 @@ impl Survival {
         // Shallower than this (its sine, about 20°), an arrow skips off the ground.
         const SKIP: f32 = 0.34;
         let d = &self.content.abilities[p.ability];
-        let (gain, base, bounces, flash) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell);
+        let (gain, base, bounces, mut flash, skip) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell, d.skip_spell);
         // (Its flight this step, up to where it struck.)
         let left = p.left - len(sub(at, p.pos));
         if bounces == 0 || left < 1.0 {
@@ -1378,6 +1378,10 @@ impl Survival {
             None => {
                 if p.dir[2] >= 0.0 || -p.dir[2] > SKIP {
                     return false;
+                }
+                // A skip off the ground shows its own splash (dirt, not the wall's fire).
+                if skip != 0 {
+                    flash = skip;
                 }
                 let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
                 p.dir = [p.dir[0], p.dir[1], -p.dir[2]];
