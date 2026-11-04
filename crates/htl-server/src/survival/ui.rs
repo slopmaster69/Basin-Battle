@@ -333,8 +333,10 @@ pub(crate) const VERSION: u32 = 2;
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
 pub(crate) const ADDON_NEWEST: u32 = 19;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
-/// Westbrook's garrison taken out of the map for the camp (0019).
-pub(crate) const CLIENT_NEWEST: u8 = 12;
+/// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
+/// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
+/// as an ability lands (0026); 13 to 15 are the hunter's open branches (0020 to 0023).
+pub(crate) const CLIENT_NEWEST: u8 = 18;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
