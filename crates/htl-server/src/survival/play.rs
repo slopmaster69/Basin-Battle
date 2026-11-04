@@ -455,9 +455,22 @@ impl SurvivalGame {
             // The add-on's effects line follows on the next flush.
             Event::Effects { .. } | Event::Goal | Event::Sites => {}
             Event::Guard { player, up } => {
-                // The guard's pose, held while the hero stands with it up.
+                // The guard's pose, held while the hero stands with it up. Down, a pose the rules
+                // hold of their own (Arrow Recall's arm out) comes back rather than nothing.
                 let Some(g) = self.guid_of(player) else { return };
-                let pose = if up { self.guard_pose(player) } else { 0 };
+                let pose = if up { self.guard_pose(player) } else { self.poses.get(&player).copied().unwrap_or(0) };
+                let mut f = Fields::new();
+                f.set(idx::UNIT_NPC_EMOTESTATE, pose);
+                self.broadcast(&packets::update_object(&[], &[(g, &f)]));
+            }
+            Event::Pose { id, pose } => {
+                // A pose held until the rules let it go (0), the way the guard's is.
+                if pose == 0 {
+                    self.poses.remove(&id);
+                } else {
+                    self.poses.insert(id, pose);
+                }
+                let Some(g) = self.guid_of(id) else { return };
                 let mut f = Fields::new();
                 f.set(idx::UNIT_NPC_EMOTESTATE, pose);
                 self.broadcast(&packets::update_object(&[], &[(g, &f)]));

@@ -233,6 +233,9 @@ pub struct SurvivalGame {
     /// many aura slots each unit showed last.
     pub(crate) abilities_dirty: BTreeSet<Id>,
     pub(crate) auras_shown: HashMap<Id, usize>,
+    /// The pose each unit holds at the rules' word ([`Event::Pose`]), for a guard let down to
+    /// fall back to it.
+    pub(crate) poses: HashMap<Id, u32>,
     /// Healing come in since the last flush, by hero (shown as one green number).
     pub(crate) healed: HashMap<Id, u32>,
     pub(crate) save_path: Option<PathBuf>,
@@ -340,6 +343,7 @@ impl SurvivalGame {
             storage_dirty: false,
             abilities_dirty: BTreeSet::new(),
             auras_shown: HashMap::new(),
+            poses: HashMap::new(),
             healed: HashMap::new(),
             save_path,
             offline,

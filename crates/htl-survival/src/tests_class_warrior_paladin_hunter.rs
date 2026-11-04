@@ -943,8 +943,14 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
         s.plant_arrow(p, [12.0, y, 0.0]);
     }
     s.set_valor(p, 25.0);
+    // The hand goes out at the press, and the arrows follow it a moment later (Corey's review:
+    // the arm came up late, after the arrows).
     let mut ev = press(&mut s, p, "tripwire", true);
-    ev.extend(run_pinned(&mut s, 0.5, &[k, aside]));
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: hunter::RECALL_POSE } if *id == p)), "the arm out at once");
+    ev.extend(run_pinned(&mut s, 0.15, &[k, aside]));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "no arrow flies before the hand is out");
+    assert!(hits(&ev, p, k).is_empty(), "nor strikes");
+    ev.extend(run_pinned(&mut s, 0.35, &[k, aside]));
     let struck = hits(&ev, p, k);
     assert_eq!(struck.len(), 5, "each arrow on its way home, full damage: {struck:?}");
     assert!(struck.iter().all(|d| *d == struck[0]), "no falloff: {struck:?}");
@@ -1011,6 +1017,13 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     ev.extend(run(&mut s, 0.1));
     // The arrows fly home as the Hunter's arrow; the key itself plays no buff (its spell is 0).
     let spell = crate::sim::hunter::RECALL_ARROW;
+    assert!(s.planted_of(p).is_empty(), "spoken for at the press: nothing else moves them");
+    // The arrows wait for the hand to come out.
+    ev.extend(run(&mut s, 0.15));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "none flies yet");
+    assert!(!ev.iter().any(|e| matches!(e, Event::ObjGone { .. })), "none leaves the ground yet");
+    ev.extend(run(&mut s, 0.15));
+    let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
     let mut anchors = Vec::new();
     for a in &planted {
         let gone = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)).expect("its arrow leaves the ground");
@@ -1030,10 +1043,37 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     anchors.dedup();
     assert_eq!(anchors.len(), 3, "an anchor for each");
     assert!(s.planted_of(p).is_empty());
+    assert!(!ev.iter().any(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)), "the hand stays out while they fly");
     ev.extend(run(&mut s, 1.0));
+    let mut last_home = 0;
     for a in anchors {
-        assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a)), "home: its anchor goes");
+        let home = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a)).expect("home: its anchor goes");
+        last_home = last_home.max(home);
     }
+    // Then the hand comes down, once the last is home.
+    let down = ev.iter().position(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)).expect("the hand comes down");
+    assert!(down > last_home, "after the last arrow is home: {down} {last_home}");
+    assert!(s.hunt.recalls.is_empty());
+}
+
+/// A hunter felled with the hand out: the arrows spoken for go without flying, and the hand
+/// comes down with them.
+#[test]
+fn arrow_recall_cut_short_lets_the_hand_down_and_takes_its_arrows() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.plant_arrow(p, [12.0, 0.0, 0.0]);
+    let _ = s.step(DT);
+    let a = s.hunt.planted[0].clone();
+    s.set_valor(p, 25.0);
+    let mut ev = press(&mut s, p, "tripwire", true);
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: hunter::RECALL_POSE } if *id == p)));
+    s.hurt_player(p, 10_000);
+    ev.extend(run(&mut s, 0.5));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "no arrow flies to the fallen");
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "its arrow goes");
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)), "the hand down");
+    assert!(s.hunt.recalls.is_empty());
 }
 
 /// The reticle on the ground at `at` (x, y), for a hero standing at the origin.
