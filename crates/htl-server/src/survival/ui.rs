@@ -1210,8 +1210,8 @@ impl SurvivalGame {
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
-                // another model's clips; `ac11` puts their bones back to rest after; `ac13` draws an
-                // object stretched from end to end (Tripwire's rope); `ac14` a missile's look; `ac15` a rope
+                // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
+                // object stretched from end to end (Tripwire's rope); `ac20` a missile's look; `ac21` a rope
                 // from the hand; `ac22` the bowstring on its bow, units with no fade, the aiming
                 // camera's tip down, the arrow display and a missile's tumble (patches 0031 to 0035).
                 let ac = arg2.to_ascii_lowercase();
