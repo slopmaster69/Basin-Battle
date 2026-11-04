@@ -6829,7 +6829,10 @@ events:SetScript("OnEvent", function()
     -- ac20: a missile's look (SetMissileLook: a ribbon behind it, its size, a spin).
     -- ac21: a rope from a unit's hand (SetUnitRope: a grappling hook's line).
     -- ac22: the bowstring on its bow, units that never fade, the aiming camera's tip down.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
+    -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
+      Say(".es hello " .. VERSION .. " ac23")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
       Say(".es hello " .. VERSION .. " ac22")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 21 then
       Say(".es hello " .. VERSION .. " ac21")
