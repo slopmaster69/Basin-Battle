@@ -485,11 +485,11 @@ impl Survival {
     }
 
     /// The wire catches `v`: its damage, and it goes down (a boss stumbles: posture instead).
-    /// No word says so: the rope snaps, the dust kicks up and the foe falls (Corey's rule).
+    /// No word says so: the rope snaps and the foe falls (Corey's rule). The fall's own dust is
+    /// the wire's knockdown's ([`knock_down`]): nothing else is played here, so it comes up once.
     fn trip(&mut self, owner: Id, v: Id, ability: usize) {
         let d = self.content.abilities[ability].clone();
         let Some(at) = self.unit_pos(v) else { return };
-        self.events.push(Event::Visual { id: v, kit: KIT_DUST, by: None });
         self.hunt_hit(owner, v, ability, AbilityDef::at(d.damage, 1.0), at);
         if self.holds_ground(v) {
             self.build_posture(v, owner, 40);
@@ -511,7 +511,7 @@ impl Survival {
             let from = self.unit_pos(owner).unwrap_or([0.0; 3]);
             let secs = if self.players.contains_key(&victim) { secs * self.content.cc.player_share } else { secs };
             self.events.push(Event::React { id: victim, anim: KNOCKDOWN_ANIM, from, lean: 0.0, hold: 0.0, fit: secs });
-            self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
+            self.events.push(Event::Visual { id: victim, kit: KIT_FALL_DUST, by: None });
         }
     }
 
