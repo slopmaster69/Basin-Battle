@@ -31,6 +31,7 @@ pub mod hunter;
 mod raid;
 pub mod siege;
 mod orb;
+mod rhythm;
 mod staff;
 mod sweep;
 pub mod wager;
@@ -411,6 +412,9 @@ pub enum Action {
     Channel { ability: usize, target: Id, until: f32, next: f32, share: f32 },
     /// A counter's stance until then.
     Stance { ability: usize, until: f32 },
+    /// A rhythm spell going off on its beats since then: `done` beats gone, `pressed` beats
+    /// earned by a press (the free ones count without), `cued` beats whose pulse has shown.
+    Rhythm { ability: usize, since: f32, done: u32, pressed: u32, cued: u32 },
     /// A jet sweeping across the hero's front from `from` (a facing) since then until `until`,
     /// whom it has struck; `held`: stopped at that moment, holding where it was.
     Sweep { ability: usize, from: f32, since: f32, until: f32, struck: Vec<Id>, held: Option<f32> },
@@ -443,6 +447,7 @@ impl Action {
             Action::Charge { .. } => "charge",
             Action::Cast { .. } => "cast",
             Action::Sweep { .. } => "sweep",
+            Action::Rhythm { .. } => "channel",
             Action::Channel { .. } => "channel",
             Action::Stance { .. } => "stance",
             Action::Dash { .. } => "dash",
@@ -548,6 +553,8 @@ pub struct Player {
     pub ward_up: bool,
     /// The cast going out now was released on its flare (a perfect): its strength and its pay.
     pub cast_perfect: bool,
+    /// What the cast going out now strikes for, when its own numbers don't say (a beat's).
+    pub cast_damage: Option<f32>,
     pub sprint_held: bool,
     /// Sprinting now (held, moving, not walking, not committed to anything, stamina left).
     pub sprinting: bool,
@@ -1166,6 +1173,7 @@ impl Survival {
             ward_down_at: -100.0,
             ward_up: false,
             cast_perfect: false,
+            cast_damage: None,
             sprint_held: false,
             sprinting: false,
             air: None,
@@ -1679,7 +1687,7 @@ impl Survival {
             Action::Guard => c.guard_speed,
             // Bladestorm's spin walks at its own pace, near a run.
             Action::Channel { ability, .. } if self.content.abilities[ability].around => c.run_speed * crate::content::AROUND_PACE,
-            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Sweep { .. } => c.aim_speed,
+            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Sweep { .. } | Action::Rhythm { .. } => c.aim_speed,
             Action::Stance { .. } => c.guard_speed,
             Action::Eat { .. } => c.use_speed,
             Action::Gather { .. } | Action::Work { .. } | Action::Stagger { .. } => c.use_speed,

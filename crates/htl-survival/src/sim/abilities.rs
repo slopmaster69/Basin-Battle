@@ -564,6 +564,13 @@ impl Survival {
                 return true;
             }
         }
+        // A rhythm going: its key again is a press for the next beat (the rhythm check).
+        if let Action::Rhythm { ability, .. } = p.action {
+            if self.content.base_of(ability) == base {
+                self.press_beat(id);
+                return true;
+            }
+        }
         // An orb of this key's rolling: its key again stops it where it is (the stop check).
         if let Some(k) = self.orb_of(id, base) {
             self.stop_orb(id, k);
@@ -913,6 +920,7 @@ impl Survival {
                 return;
             }
             Action::Sweep { .. } => self.events.push(Event::Auras { id }),
+            Action::Rhythm { .. } => self.events.push(Event::CastEnd { caster: id }),
             _ => {}
         }
         if let Some(p) = self.players.get_mut(&id) {
@@ -1131,6 +1139,7 @@ impl Survival {
                 self.start_orb(id, ability);
                 self.set_action(id, next);
             }
+            "rhythm" => self.start_rhythm(id, ability),
             "nova" => {
                 let at = self.players[&id].pos;
                 self.nova(id, ability, at, share);
@@ -1198,7 +1207,7 @@ impl Survival {
 
     /// The projectiles of an ability (or of the bow) leave the hands, along the reticle's line to
     /// what it meets.
-    fn launch(&mut self, id: Id, ability: usize, share: f32) {
+    pub(crate) fn launch(&mut self, id: Id, ability: usize, share: f32) {
         let d = self.content.abilities[ability].clone();
         let (yaw, _) = self.aim_of(id);
         let (o, dir) = self.reticle(id);
@@ -1212,6 +1221,8 @@ impl Survival {
             let (speed, spell) = if full { (d.full_speed.max(d.speed), d.full_spell) } else { (d.speed, d.spell) };
             (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), AbilityDef::at(d.damage, share), spell)
         };
+        // A beat's own strength (a rhythm's), when it has one.
+        let damage = self.players.get(&id).and_then(|p| p.cast_damage).unwrap_or(damage);
         let damage = damage * self.perfect_mult(id);
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
@@ -3240,6 +3251,7 @@ impl Survival {
                 }
             }
             Action::Sweep { .. } => self.step_sweep(id, dt),
+            Action::Rhythm { .. } => self.step_rhythm(id),
             Action::Cast { t, total, ability } => {
                 if t + dt >= total {
                     let shot = self.content.abilities[ability].kind == "shot";

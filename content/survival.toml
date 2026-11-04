@@ -3457,6 +3457,34 @@ clip = 85
 spell = 8676
 
 # Elements: cold at arm's length.
+# Q, the second choice: Arcane's rhythm, along the reticle. Three missiles by themselves, then one
+# more for every press on the beat, each a little harder, up to eight; the eighth, the finisher,
+# twice as hard. Miss a beat and the volley ends where it is. (The Mage design.)
+[[ability]]
+key = "arcane_missiles"
+name = "Arcane Missiles"
+text = "Fires a volley of arcane missiles along the reticle, one every 0.35 sec: the first 3 by themselves, then one more each time you press again on the beat, up to 8. Each deals 1 more than the last, from 5; the eighth deals double. Miss the beat and the volley ends. You can walk slowly while it lasts."
+icon = "Spell_Nature_StarFall"
+school = "mage"
+slot = "ranged"
+choice = 2
+kind = "rhythm"
+beat_kind = "projectile"
+beat = 0.35
+free_beats = 3
+most_beats = 8
+beat_window = [0.15, 0.08]
+damage = [5.0, 5.0]
+beat_step = 1.0
+finisher_damage = 2.0
+range = [30.0, 30.0]
+radius = [0.3, 0.3]
+speed = 40.0
+cooldown = 9.0
+spell = 7268
+charge_spell = 5143
+beat_kit = 448
+
 # The stop check: a jet of frost sweeps across the front; the key again stops it where it is, and
 # what's in it freezes. (The Mage design, claude/mage-kit-draft.md: Frost stops things.)
 [[ability]]
@@ -3481,6 +3509,33 @@ spell = 120
 tick_spell = 116
 effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
 stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
+
+# E, the second choice: Arcane's rhythm, round the caster. A burst; then press on the beat for a
+# second, wider and harder, and a third that throws them back. Miss a beat and it ends there.
+# (The Mage design, claude/mage-kit-draft.md: Arcane keeps the beat.)
+[[ability]]
+key = "arcane_explosion"
+name = "Arcane Explosion"
+text = "A burst of arcane force around you: 10 damage within 6 yd. Press again on the beat for a second, 14 damage within 7 yd, then a third, 18 damage within 8 yd that knocks enemies back 4 yd. Miss the beat and it ends there."
+icon = "Spell_Nature_WispSplode"
+school = "mage"
+slot = "close"
+choice = 2
+kind = "rhythm"
+beat_kind = "nova"
+# Beats half a second apart: the first by itself, two more on presses, the windows tightening
+# from 0.15 to 0.08 sec either side.
+beat = 0.5
+free_beats = 1
+most_beats = 3
+beat_window = [0.15, 0.08]
+damage = [10.0, 10.0]
+beat_step = 4.0
+radius = [6.0, 8.0]
+cooldown = 7.0
+spell = 1449
+beat_kit = 448
+finisher_effects = [{ kind = "knockback", amount = 4.0 }]
 
 [[ability]]
 key = "frost_nova"
@@ -10876,7 +10931,7 @@ name = "Theocritus's Ward-Stone"
 at = [-9562.0, -668.0]
 display = 2650
 scale = 0.6
-teaches = ["fireball", "cone_of_cold"]
+teaches = ["fireball", "cone_of_cold", "arcane_missiles", "arcane_explosion"]
 keep = true
 secs = 3.0
 text = "The ward-stone of the Tower of Azora still hums with what the old mage taught there."
@@ -11422,7 +11477,7 @@ at = [-9540.0, -695.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Frost_FrostBolt02"
-text = "The mage's shrine teaches Fireball and Cone of Cold. Defias conjurers rob the tower, and the Unbound Flame, the mage's trial, burns behind it."
+text = "The mage's shrine teaches Fireball, Cone of Cold, Arcane Missiles and Arcane Explosion. Defias conjurers rob the tower, and the Unbound Flame, the mage's trial, burns behind it."
 reward = { mageroyal = 3 }
 
 [[site]]

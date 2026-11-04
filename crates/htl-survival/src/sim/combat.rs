@@ -292,7 +292,7 @@ impl Survival {
                     self.set_action(id, Action::Ready);
                 }
                 let p = &self.players[&id];
-                if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. } | Action::Sweep { .. }) {
+                if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. } | Action::Sweep { .. } | Action::Rhythm { .. }) {
                     return true;
                 }
                 // A feint: the guard raised while a blow still winds up calls it off, its stamina back.
@@ -1057,7 +1057,7 @@ impl Survival {
                     }
                 }
             }
-            Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Dash { .. } | Action::Stance { .. } | Action::Sweep { .. } => {
+            Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Dash { .. } | Action::Stance { .. } | Action::Sweep { .. } | Action::Rhythm { .. } => {
                 self.step_ability_action(id, dt);
             }
             Action::Stagger { until } => {

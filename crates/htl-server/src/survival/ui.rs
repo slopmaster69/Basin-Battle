@@ -438,6 +438,10 @@ impl SurvivalGame {
             }
             Action::Dash { t, secs, .. } => (*t, *secs),
             Action::Sweep { since, until, .. } => (now - since, until - since),
+            Action::Rhythm { since, ability, .. } => {
+                let d = &c.abilities[*ability];
+                (now - since, d.beat * d.most_beats as f32)
+            }
             Action::Eat { t, item } => (*t, c.items[*item].use_secs),
             Action::Gather { t, node, .. } => {
                 let secs = match self.sim.objs.get(node).map(|o| &o.kind) {
@@ -457,7 +461,7 @@ impl SurvivalGame {
         let started = now - elapsed;
         // What's aimed or charged: its key, so the bar and the reticle show it.
         let what = match &p.action {
-            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Channel { ability, .. } | Action::Stance { ability, .. } | Action::Dash { ability, .. } | Action::Sweep { ability, .. } => c.abilities[*ability].key.as_str(),
+            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Channel { ability, .. } | Action::Stance { ability, .. } | Action::Dash { ability, .. } | Action::Sweep { ability, .. } | Action::Rhythm { ability, .. } => c.abilities[*ability].key.as_str(),
             // Work: what it makes, builds or mends, by name.
             Action::Work { job, .. } => match job {
                 htl_survival::Job::Craft { recipe, .. } => c.recipes.iter().find(|r| &r.key == recipe).and_then(|r| c.item(&r.output)).map_or("", |i| c.items[i].name.as_str()),

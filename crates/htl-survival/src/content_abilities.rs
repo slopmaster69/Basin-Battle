@@ -38,7 +38,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 19] = [
+pub const KINDS: [&str; 20] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -87,6 +87,9 @@ pub const KINDS: [&str; 19] = [
     // An orb rolling out along the reticle, hurting what it passes; the key again stops it where
     // it is and it bursts, a foe under it a perfect (the stop check).
     "orb",
+    // Beats: the first few by themselves, then one more for every press on the beat, up to its
+    // most; a press out of time or a beat let pass ends it (the rhythm check).
+    "rhythm",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -421,6 +424,33 @@ pub struct AbilityDef {
     pub stop_effects: Vec<AbilityEffect>,
     #[serde(default)]
     pub perfect_arc: f32,
+    /// A rhythm (`kind = "rhythm"`, the rhythm check): it goes off on beats `beat` seconds
+    /// apart, the first `free_beats` by themselves, then each further one only if its key is
+    /// pressed within its window of the beat (`beat_window`: the first's, tightening to the
+    /// last's), up to `most_beats`. A press out of time, or a beat let pass, ends it where it is.
+    /// Each beat is `beat_kind`: a `projectile` along the reticle or a `nova` round the caster
+    /// (its `radius` growing from the low end to the high over the beats), for `damage` plus
+    /// `beat_step` a beat; the last beat is the finisher, `finisher_damage` times as hard and
+    /// with `finisher_effects`. A full chain is a perfect.
+    #[serde(default)]
+    pub beat: f32,
+    #[serde(default)]
+    pub free_beats: u32,
+    #[serde(default)]
+    pub most_beats: u32,
+    #[serde(default)]
+    pub beat_window: [f32; 2],
+    #[serde(default)]
+    pub beat_step: f32,
+    #[serde(default)]
+    pub beat_kind: String,
+    #[serde(default)]
+    pub finisher_damage: f32,
+    #[serde(default)]
+    pub finisher_effects: Vec<AbilityEffect>,
+    /// The pulse on the caster on every beat to come (a spell visual kit): the beat to press on.
+    #[serde(default)]
+    pub beat_kit: u32,
     /// An orb (`kind = "orb"`, the stop check): it rolls out along the reticle `range` yards
     /// over `linger` seconds, `linger_damage` a second to every foe within `radius` (with the
     /// ability's `effects`), every `tick`. The key again stops it where it is and it bursts:

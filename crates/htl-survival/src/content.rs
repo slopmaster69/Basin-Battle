@@ -405,11 +405,13 @@ pub struct ChecksDef {
     pub perfect_valor: f32,
     /// The burst on the caster at a perfect release (a spell visual kit).
     pub perfect_kit: u32,
+    /// A full rhythm chain's Valor (a whole segment).
+    pub chain_valor: f32,
 }
 
 impl Default for ChecksDef {
     fn default() -> Self {
-        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450 }
+        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0 }
     }
 }
 

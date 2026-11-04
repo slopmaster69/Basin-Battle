@@ -88,3 +88,5 @@ mod tests_release;
 mod tests_sweep;
 #[cfg(test)]
 mod tests_orb;
+#[cfg(test)]
+mod tests_rhythm;
