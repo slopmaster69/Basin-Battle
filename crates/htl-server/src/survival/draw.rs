@@ -74,16 +74,21 @@ pub(crate) const MISSILE_LOOK_LEVEL: u8 = 20;
 pub(crate) const UNIT_ROPE_LEVEL: u8 = 21;
 
 /// The add-on's `ML` line for a spell's missiles: `ML <spell> <RRGGBB or -> <width> <secs>
-/// <scale> <spin> [<caster's guid, for its next missile alone>]`.
-pub(crate) fn missile_look_line(spell: u32, trail: &str, width: f32, secs: f32, scale: f32, spin: f32, caster: Option<u64>, tumble: bool) -> String {
+/// <scale> <spin> [<caster's guid, for its next missile alone> [<spin axis> [<speed>]]]`.
+pub(crate) fn missile_look_line(spell: u32, trail: &str, width: f32, secs: f32, scale: f32, spin: f32, caster: Option<u64>, tumble: bool, speed: f32) -> String {
     let trail = if trail.is_empty() { "-" } else { trail };
     let mut line = format!("ML\t{spell}\t{trail}\t{width:.2}\t{secs:.2}\t{scale:.2}\t{spin:.2}");
-    // A tumble (end over end, patch 0035) names its axis after the caster's place, `-` for none.
-    match (caster, tumble) {
-        (Some(g), false) => line += &format!("\t0x{g:016X}"),
-        (Some(g), true) => line += &format!("\t0x{g:016X}\tside"),
-        (None, true) => line += "\t-\tside",
-        (None, false) => {}
+    // The tail is written as far as it's needed, `-` in an empty place before a set one: the
+    // caster, then a tumble's axis (end over end, patch 0035), then a speed of its own in yards
+    // a second (patch 0039; 0: the spell's).
+    let caster = caster.map_or_else(|| "-".to_string(), |g| format!("0x{g:016X}"));
+    let axis = if tumble { "side" } else { "-" };
+    if speed > 0.0 {
+        line += &format!("\t{caster}\t{axis}\t{speed:.0}");
+    } else if tumble {
+        line += &format!("\t{caster}\t{axis}");
+    } else if caster != "-" {
+        line += &format!("\t{caster}");
     }
     line
 }
@@ -1287,11 +1292,15 @@ fn grip_info(grip: &str) -> u32 {
 mod rope_tests {
     #[test]
     fn a_missile_look_line_says_each_field_and_a_caster_only_when_its_for_one_missile() {
-        assert_eq!(super::missile_look_line(19434, "F2E6C8", 0.18, 0.3, 1.0, 0.0, None, false), "ML\t19434\tF2E6C8\t0.18\t0.30\t1.00\t0.00");
-        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, Some(0xF130_0000_0000_002A), false), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t0xF13000000000002A");
+        assert_eq!(super::missile_look_line(19434, "F2E6C8", 0.18, 0.3, 1.0, 0.0, None, false, 0.0), "ML\t19434\tF2E6C8\t0.18\t0.30\t1.00\t0.00");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, Some(0xF130_0000_0000_002A), false, 0.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t0xF13000000000002A");
         // A tumble names its axis after the caster's place.
-        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, None, true), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t-\tside");
-        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, Some(0x2A), true), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t0x000000000000002A\tside");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, None, true, 0.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t-\tside");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, Some(0x2A), true, 0.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t0x000000000000002A\tside");
+        // A speed of its own comes tenth, after the caster's and the axis's places (Kill Shot).
+        assert_eq!(super::missile_look_line(10346, "FF6A2A", 0.5, 0.5, 1.5, 0.0, None, false, 120.0), "ML\t10346\tFF6A2A\t0.50\t0.50\t1.50\t0.00\t-\t-\t120");
+        assert_eq!(super::missile_look_line(10346, "FF6A2A", 0.5, 0.5, 1.5, 0.0, Some(0x2A), false, 120.0), "ML\t10346\tFF6A2A\t0.50\t0.50\t1.50\t0.00\t0x000000000000002A\t-\t120");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, None, true, 90.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t-\tside\t90");
     }
 
     use super::rope_rotation;
