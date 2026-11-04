@@ -13,10 +13,12 @@
 local ES = ElwynnSurvival
 if not ES then return end
 
--- Each beat: the hit-stop (ms) on the hero and on the unit, the shake (inches, seconds) and the
--- camera's kick (back, seconds). A field left out isn't played. None of these has been seen in
--- the game yet: they're starting numbers, set against the blows' own (a heavy blow stops 115 ms
--- and shakes 3.0 for 0.26 s; a parry stops 150 ms).
+-- Each beat: the hit-stop (ms) on the hero and on the unit, the shake (inches, seconds), the
+-- camera's kick (back, seconds), and an edge: the screen's corners flashed in a colour (r, g, b)
+-- that fades over its seconds (ES.Edge; a hurt's red is only ever damage taken). A field left
+-- out isn't played. None of these has been seen in the game yet: they're starting numbers, set
+-- against the blows' own (a heavy blow stops 115 ms and shakes 3.0 for 0.26 s; a parry stops
+-- 150 ms).
 ES.CUE = {
   -- A critical: past a heavy blow's weight, a sharp kick.
   crit = { stop = 130, shake = { 3.6, 0.26 }, kick = { 0.07, 0.28 } },
@@ -29,8 +31,9 @@ ES.CUE = {
   -- A champion's stance breaking: a long stop on it, a heavy shake.
   ["break"] = { stop = 160, shake = { 4.2, 0.32 }, kick = { 0.06, 0.3 } },
   -- A parry that only blocks (a giant's blow): driven back into the guard, the view shoved
-  -- harder than any other block takes it, so it reads with no word (Corey: louder cues, not text).
-  too_heavy = { stop = 95, shake = { 6.5, 0.34 }, kick = { 0.12, 0.34 }, self = true },
+  -- harder than any other block takes it, so it reads with no word (Corey: louder cues, not text),
+  -- and the corners flashed the dust's colour, not red (red would say damage taken).
+  too_heavy = { stop = 95, shake = { 6.5, 0.34 }, kick = { 0.12, 0.34 }, self = true, edge = { 0.78, 0.68, 0.50, 0.40 } },
   -- A body crashing into a wall: a stop on it and a thump of the view.
   wall = { stop = 120, shake = { 3.2, 0.24 } },
   -- A killing blow cheated: the world held around the hero a long moment, the view barely moving.
@@ -63,6 +66,7 @@ function ES.CueLine(f)
   end
   if c.shake and ShakeCamera then ShakeCamera(c.shake[1], c.shake[2]) end
   if c.kick and CameraKick then CameraKick(c.kick[1], c.kick[2]) end
+  if c.edge and ES.Edge then ES.Edge(c.edge[1], c.edge[2], c.edge[3], c.edge[4]) end
 end
 
 -- Valor given back: the bar blinks twice as it fills back.

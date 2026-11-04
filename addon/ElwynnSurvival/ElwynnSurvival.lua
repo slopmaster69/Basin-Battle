@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 21
+local VERSION = 22
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -3185,11 +3185,13 @@ hurt:SetAllPoints(UIParent)
 -- strata so the bars stay readable.
 hurt:SetFrameStrata("LOW")
 hurt:SetFrameLevel(1)
--- The vignette's red band (its outer 40 of 256 px) in eight pieces at a fixed 150 px, so it's as
+-- The vignette's band (its outer 40 of 256 px) in eight pieces at a fixed 150 px, so it's as
 -- deep at the top and bottom as at the sides (stretched whole, the sides got 213 px and the top
--- 120 on a wide screen); no middle.
-hurt.pieces = {}
-do
+-- 120 on a wide screen); no middle. The four corners take the whole colour, the four sides
+-- `sides` of it (1: an even band; less: a flash that sits in the corners). Each piece keeps its
+-- alpha in `a`, for recolouring.
+function hurt.Pieces(frame, r, g, b, sides)
+  local pieces = {}
   local E, c = 150, 40 / 256
   local cut = { { 0, c }, { c, 1 - c }, { 1 - c, 1 } }
   local X = { { "LEFT", 0, "LEFT", E }, { "LEFT", E, "RIGHT", -E }, { "RIGHT", -E, "RIGHT", 0 } }
@@ -3197,20 +3199,57 @@ do
   for row = 1, 3 do
     for col = 1, 3 do
       if row ~= 2 or col ~= 2 then
-        local t = Tex(hurt, "ARTWORK", "vignette")
+        local t = Tex(frame, "ARTWORK", "vignette")
         t:SetTexCoord(cut[col][1], cut[col][2], cut[row][1], cut[row][2])
-        t:SetPoint("TOPLEFT", hurt, Y[row][1] .. X[col][1], X[col][2], Y[row][2])
-        t:SetPoint("BOTTOMRIGHT", hurt, Y[row][3] .. X[col][3], X[col][4], Y[row][4])
-        t:SetVertexColor(0.7, 0.02, 0.02, 1)
-        table.insert(hurt.pieces, t)
+        t:SetPoint("TOPLEFT", frame, Y[row][1] .. X[col][1], X[col][2], Y[row][2])
+        t:SetPoint("BOTTOMRIGHT", frame, Y[row][3] .. X[col][3], X[col][4], Y[row][4])
+        t.a = 1
+        if row == 2 or col == 2 then t.a = sides end
+        t:SetVertexColor(r, g, b, t.a)
+        table.insert(pieces, t)
       end
     end
   end
+  return pieces
 end
+hurt.pieces = hurt.Pieces(hurt, 0.7, 0.02, 0.02, 1)
 hurt:SetAlpha(0)
 hurt:Hide()
 hurt.flash = 0
 ES.hurt = hurt
+
+-- A beat's edge (Cues.lua: `edge = { r, g, b, secs }`): the same band in the beat's own colour
+-- on a frame of its own, so it never fights a real hurt's red (which only damage taken shows);
+-- brightest in the corners, full at once and gone over its seconds. A giant's blow on the
+-- guard flashes it dust-coloured (Corey: "something dangerous in the corners, but not red").
+ES.edge = CreateFrame("Frame", "ElwynnSurvivalEdge", UIParent)
+ES.edge:SetAllPoints(UIParent)
+ES.edge:SetFrameStrata("LOW")
+ES.edge:SetFrameLevel(2)
+ES.edge.pieces = hurt.Pieces(ES.edge, 1, 1, 1, 0.45)
+ES.edge.secs, ES.edge.left = 0.4, 0
+ES.edge:SetAlpha(0)
+ES.edge:Hide()
+function ES.Edge(r, g, b, secs)
+  local e = ES.edge
+  for i = 1, table.getn(e.pieces) do
+    local t = e.pieces[i]
+    t:SetVertexColor(r or 1, g or 1, b or 1, t.a)
+  end
+  e.secs = math.max(0.05, tonumber(secs) or 0.4)
+  e.left = e.secs
+  e:SetAlpha(0.85)
+  e:Show()
+end
+ES.edge:SetScript("OnUpdate", function()
+  this.left = this.left - (arg1 or 0)
+  if this.left <= 0 then
+    this:SetAlpha(0)
+    this:Hide()
+    return
+  end
+  this:SetAlpha(0.85 * this.left / this.secs)
+end)
 
 -- A blow: the edge flares by how much it took.
 function ES.Hurt(share)
