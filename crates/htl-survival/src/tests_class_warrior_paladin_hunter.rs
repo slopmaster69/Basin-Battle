@@ -1170,9 +1170,11 @@ fn a_tripwire_knocks_down_the_first_creature_across_it() {
         s.mobs.get_mut(&k).unwrap().pos = [x, 0.0, 0.0];
         ev.extend(s.step(DT));
     }
-    // It trips with no word over it: the dust, the fall and the snapped rope say so.
+    // It trips with no word over it: the fall's dust (a low puff, played once: the wing-buffet
+    // nova read as a white streak), the fall and the snapped rope say so.
     assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == k && *kit == KIT_DUST)), "dust where it trips");
+    let dust: Vec<u32> = ev.iter().filter_map(|e| match e { Event::Visual { id, kit, .. } if *id == k => Some(*kit), _ => None }).collect();
+    assert_eq!(dust, vec![KIT_FALL_DUST], "one low puff where it trips, nothing else on it: {dust:?}");
     assert_eq!(hits(&ev, p, k).len(), 1, "and takes the wire's damage: {:?} planted {:?}", hits(&ev, p, k), s.planted_of(p));
     assert!(s.has_cc(k, "stun"), "down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == k && *anim == KNOCKDOWN_ANIM)), "knocked to the ground");

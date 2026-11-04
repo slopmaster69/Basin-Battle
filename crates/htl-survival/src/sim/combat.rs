@@ -2553,6 +2553,10 @@ pub const KIT_HEAVY: u32 = 437;
 pub const KIT_SLAM: u32 = 1666;
 pub const KIT_CLEAVE: u32 = 507;
 pub const KIT_DUST: u32 = 5649;
+/// A body knocked to the ground: Charge's landing puff (`DustCloud_Land`), low and about a
+/// creature's width. The dust nova above is a dragon's wing buffet: on a tripped grunt, seen from
+/// a high camera, it read as a 10-yd white streak drifting off downwind (Corey's review, run 022).
+pub const KIT_FALL_DUST: u32 = 5930;
 /// Knocked to the ground and up again, and the parry's own sweep.
 pub const KNOCKDOWN_ANIM: u16 = 121;
 /// A blow this far off a creature's facing (degrees) is from behind.
