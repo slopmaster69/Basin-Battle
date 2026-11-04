@@ -1,7 +1,7 @@
 //! What a walker stands on: terrain, plus building and bridge floors, with walls and deep water
 //! marked. Built once at startup from the arena's terrain, buildings (WMOs) and liquids.
 
-use benilla_formats::{load_wmo_collision_tris, Chain, ChunkMesh, TileMesh, ALPHA_MAP_SIZE};
+use benilla_formats::{load_m2_collision_hull, load_wmo_collision_tris, Chain, ChunkMesh, TileMesh, ALPHA_MAP_SIZE};
 
 use crate::grid::HeightGrid;
 
@@ -98,6 +98,31 @@ pub fn load_buildings(chain: &mut Chain, tiles: &[TileMesh], min: [f32; 2], max:
                     tris,
                 });
             }
+        }
+    }
+    out
+}
+
+/// Every doodad placed on `tiles` within the box with a collision hull (rocks, fences, stone
+/// walls, statues, carts, tree trunks; grass, flowers and bushes have none), its hull's triangles
+/// in world space, deduplicated. Each model's hull is read once.
+pub fn doodad_hulls(chain: &mut Chain, tiles: &[TileMesh], min: [f32; 2], max: [f32; 2]) -> Vec<[[f32; 3]; 3]> {
+    let mut hulls: std::collections::HashMap<String, Option<benilla_formats::CollisionMesh>> = std::collections::HashMap::new();
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for t in tiles {
+        for d in &t.doodads {
+            let inside = d.position[0] >= min[0] && d.position[0] <= max[0] && d.position[1] >= min[1] && d.position[1] <= max[1];
+            if !inside || !seen.insert(d.unique_id) {
+                continue;
+            }
+            let key = d.model.to_lowercase();
+            let hull = hulls.entry(key).or_insert_with(|| load_m2_collision_hull(chain, &d.model).ok().filter(|h| !h.is_empty()));
+            let Some(h) = hull.as_ref() else { continue };
+            let m = placement_matrix(d.rotation);
+            let s = d.scale;
+            let world: Vec<[f32; 3]> = h.positions.iter().map(|v| transform(&m, d.position, [v[0] * s, v[1] * s, v[2] * s])).collect();
+            out.extend(h.indices.chunks_exact(3).filter_map(|c| Some([*world.get(c[0] as usize)?, *world.get(c[1] as usize)?, *world.get(c[2] as usize)?])));
         }
     }
     out

@@ -593,6 +593,18 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
 }
 
+/// A creature's own look (`aura` on its `[[mob]]`: a spirit beast's glow) is on it from the start.
+#[test]
+fn a_creature_wears_its_own_look_from_the_start() {
+    let mut s = world();
+    let def = s.content.mob("boar").unwrap();
+    s.content.mobs[def].aura = 27827;
+    let m = s.spawn_mob(def, [5.0, 0.0, 0.0], None, false);
+    let ev = s.step(0.0);
+    assert!(s.auras_of(m).contains(&27827), "its look: {:?}", s.auras_of(m));
+    assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == m)), "shown as it comes");
+}
+
 /// A training dummy is there to practice on: crowd control takes hold on it and a knockback
 /// throws it, as on any foe, though a step at most, so it stays about where it was put up.
 #[test]

@@ -181,6 +181,13 @@ pub struct AbilityDef {
     pub cleanse: bool,
     #[serde(default)]
     pub invulnerable: bool,
+    /// One of the Hunter's bow abilities: the bow comes into the hands as it's aimed (the hero's
+    /// own, or the camp's first bow if they carry none), it's drawn with the base game's draw
+    /// while it charges (or, with nothing to charge, while it's aimed), and it looses with the
+    /// bow's own release before the melee weapon comes back. A leap with the bow (Skyfall) holds
+    /// it through the leap.
+    #[serde(default)]
+    pub bow: bool,
     /// An EX blink leaves this ability (a Frost Nova) where it started.
     #[serde(default)]
     pub leaves: String,
@@ -224,6 +231,19 @@ pub struct AbilityDef {
     /// The cast's clip (`AnimationData`), played on the caster as it goes.
     #[serde(default)]
     pub clip: u16,
+    /// A leap's own look, the same on every hero whatever their race or how they were moving: a
+    /// clip over the whole body for the flight (`leap_clip`, its `leap_take`), borrowed from
+    /// another character model (`leap_from`, as `"ScourgeFemale"`; empty: their own), and a
+    /// tumble head over heels along the way it flies (`leap_flip`), on the clients that play
+    /// clips. In place of the spell's own cast pose.
+    #[serde(default)]
+    pub leap_clip: u16,
+    #[serde(default)]
+    pub leap_take: u32,
+    #[serde(default)]
+    pub leap_from: String,
+    #[serde(default)]
+    pub leap_flip: bool,
     /// Valor for each foe it strikes (0: `[valor].ability`).
     #[serde(default)]
     pub valor_hit: f32,
@@ -321,6 +341,11 @@ pub struct AbilityDef {
     pub lift: f32,
     #[serde(default)]
     pub back: bool,
+    /// A dive (Stoop): a leap only from the air (landing first closes its recast), down onto the
+    /// foe thrown up with the hero, fast however high it starts, its damage from `damage[0]` near
+    /// the ground to `damage[1]` from high up.
+    #[serde(default)]
+    pub dive: bool,
     /// A blink with an anchor: the first press sets it at the feet (and costs nothing); pressed
     /// again within this many seconds, the hero steps back to it.
     #[serde(default)]
@@ -447,7 +472,7 @@ pub struct AbilityDef {
     /// A Hunter ability's own mechanic, beyond its kind's: `call` and `double_call` (Call of the
     /// Wild's beasts), `tripwire`, `recall` (Arrow Recall), `haul` (a pull that hauls its caster
     /// to what won't move), `scatter` (arrows scattered where a leap began), `volley` (Skyfall's),
-    /// `float` (a leap that hangs: feather fall for a while after).
+    /// `float` (a leap that hangs at its top, aiming its `recast`, then floats down).
     #[serde(default)]
     pub hunt: String,
     /// A projectile that ricochets off walls, trees and rocks this many times, each bounce adding
@@ -456,6 +481,11 @@ pub struct AbilityDef {
     pub bounces: u32,
     #[serde(default)]
     pub bounce_gain: f32,
+    /// A projectile that bursts where its flight ends (the first foe, a wall, the ground or its
+    /// range's end) into this `inner` projectile's arrows, fanned out from there (Split Arrow);
+    /// its `burst_spell` shows at the burst.
+    #[serde(default)]
+    pub splits: String,
     /// It goes on the key press, along the facing (no aim and click): Raptor Strike's hits,
     /// Skyfall's leap.
     #[serde(default)]

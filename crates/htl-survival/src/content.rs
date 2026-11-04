@@ -1778,6 +1778,10 @@ pub struct MobDef {
     pub totem: bool,
     #[serde(default)]
     pub dummy: bool,
+    /// A look it always wears: a spell whose state look plays on it (a spirit beast's ghostly
+    /// glow). 0: none.
+    #[serde(default)]
+    pub aura: u32,
     /// The cards the camp learns the first time it falls (a class's champion).
     #[serde(default)]
     pub teaches: Vec<String>,
@@ -3224,8 +3228,21 @@ impl Content {
             if a.bounces > 0 && a.kind != "projectile" {
                 bail!("{what}: only a projectile ricochets (`bounces`)");
             }
+            if !a.splits.is_empty() {
+                match self.ability(&a.splits).map(|k| &self.abilities[k]) {
+                    Some(s) if a.kind == "projectile" && s.inner && s.kind == "projectile" && s.splits.is_empty() => {}
+                    _ => bail!("{what}: a projectile splits into an `inner` projectile that doesn't split again (`splits` {})", a.splits),
+                }
+            }
             if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
                 bail!("{what}: an empower needs its `secs`");
+            }
+            // A leap's own look: on a leap, from a character model the clients can find.
+            if (a.leap_clip != 0 || a.leap_flip || !a.leap_from.is_empty()) && a.kind != "leap" {
+                bail!("{what}: only a leap has a leap's look (`leap_clip`, `leap_from`, `leap_flip`)");
+            }
+            if !a.leap_from.is_empty() && (a.leap_clip == 0 || !clip_source_ok(&a.leap_from)) {
+                bail!("{what}: leap_from {:?} needs a `leap_clip` and a character model (<Race><Gender>, as ScourgeFemale)", a.leap_from);
             }
             // The beta page's mechanics.
             let tether = a.tether_secs > 0.0;
