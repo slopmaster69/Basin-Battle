@@ -615,6 +615,11 @@ impl Survival {
         // The key armed for its recast: pressed again (Ctrl or not), the recast goes, for nothing
         // (the first cast spent the cooldown). Empowered (a combo), it's the EX version, free.
         let recast = self.recast_armed(id, base).map(|r| r.ability);
+        // A Ctrl press takes the key's EX version over the base's own recast (the Roar while a
+        // banner stands; the plain key still moves the banner): the recast stays armed. A recast
+        // the EX version armed keeps the press (Corey, Nov 4).
+        let base_recast = self.content.ability(&self.content.abilities[base].recast);
+        let recast = if ex && recast.is_some() && recast == base_recast && self.content.ex_of(base).is_some() { None } else { recast };
         let empowered = recast.is_none() && self.empowered(id, base);
         let ability = if let Some(r) = recast {
             r
