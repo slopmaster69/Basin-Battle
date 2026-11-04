@@ -1381,7 +1381,7 @@ impl Survival {
         // Shallower than this (its sine, about 20°), an arrow skips off the ground.
         const SKIP: f32 = 0.34;
         let d = &self.content.abilities[p.ability];
-        let (gain, base, bounces, flash) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell);
+        let (gain, base, bounces, mut flash, skip) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell, d.skip_spell);
         // (Its flight this step, up to where it struck.)
         let left = p.left - len(sub(at, p.pos));
         if bounces == 0 || left < 1.0 {
@@ -1392,6 +1392,12 @@ impl Survival {
                 if p.dir[2] >= 0.0 || -p.dir[2] > SKIP {
                     return false;
                 }
+                // A skip off the ground shows its own splash, not the wall's fire: an explosion on
+                // the floor read as the arrow going off (Corey's review). The data has no small
+                // one-shot of dirt at a point (Rocky Ground Impact, tried in run 050, left a pile
+                // of boulders for seconds), so with none named the skip shows nothing but the
+                // arrow's own flight on from the ground.
+                flash = skip;
                 let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
                 p.dir = [p.dir[0], p.dir[1], -p.dir[2]];
                 p.pos = [at[0], at[1], at[2].max(ground + 0.15)];
@@ -1625,7 +1631,7 @@ impl Survival {
     /// A lob's flight: its look flown to `at`, the ring everyone sees there until it lands
     /// (distance / speed from now), and a warning for the foes near it. `(speed, radius, share,
     /// damage, spell)` as [`Self::launch`] reckoned them.
-    fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
+    pub(crate) fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
         let splash = self.content.abilities[ability].splash;
         let dist = len(sub(at, from));
         let flight = dist / speed.max(1.0);
@@ -1667,6 +1673,12 @@ impl Survival {
         }
         if let Some(m) = mark {
             self.unmark(m);
+        }
+        // A thrown trap: it's set where it lands, and arms from there; its burst is for when it
+        // springs, not now.
+        if self.content.abilities[p.ability].kind == "trap" {
+            self.set_trap(p.owner, p.ability, at, p.share);
+            return true;
         }
         let look = self.content.abilities[p.ability].burst_spell;
         self.burst_look(p, at, (look != 0).then_some(look));
@@ -1964,9 +1976,9 @@ impl Survival {
         if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) || self.own_totem(mid, owner) {
             return;
         }
+        // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
         if self.players.contains_key(&owner) && self.evading(mid, owner) {
-            self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style: Blow::Arrow(spell) });
-            self.events.push(Event::Flash { player: owner, text: "Evade".into() });
+            self.whiff(mid, from);
             return;
         }
         // A dummy in a counter's stance.

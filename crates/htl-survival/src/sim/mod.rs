@@ -36,7 +36,7 @@ mod world;
 
 #[cfg(test)]
 pub(crate) use combat::Follow;
-pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, WOUND_ANIM,
+pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_FALL_DUST, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, WOUND_ANIM,
 };
 pub use abilities::{look_dir, Cooldown, HitKind, Stance};
 pub use cc::Cc;
@@ -173,6 +173,9 @@ pub enum Event {
     /// the mark `id` is gone.
     AreaLook { id: Id, caster: Id, spell: u32, pos: Vec3, radius: f32 },
     Emote { id: Id, emote: u32 },
+    /// A pose held until it's let go (`UNIT_NPC_EMOTESTATE`, a state emote), where an `Emote` is
+    /// a one-shot the client plays at its own pace: the arm out for Arrow Recall. 0 lets it go.
+    Pose { id: Id, pose: u32 },
     Health { id: Id, health: u32, max: u32 },
     Stamina { player: Id },
     /// The hero's run speed and run-back speed.
@@ -762,6 +765,9 @@ pub struct Mob {
     pub fighters: u32,
     /// Its wind-up was knocked aside lately: not again until then.
     pub wary_until: f32,
+    /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
+    /// another until then.
+    pub whiff_until: f32,
     /// Who has hurt it, how much, and when last (it fades): whom it goes for.
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.

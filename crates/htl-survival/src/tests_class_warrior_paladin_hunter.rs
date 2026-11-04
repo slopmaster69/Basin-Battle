@@ -941,8 +941,14 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
         s.plant_arrow(p, [12.0, y, 0.0]);
     }
     s.set_valor(p, 25.0);
+    // The hand goes out at the press, and the arrows follow it a moment later (Corey's review:
+    // the arm came up late, after the arrows).
     let mut ev = press(&mut s, p, "tripwire", true);
-    ev.extend(run_pinned(&mut s, 0.5, &[k, aside]));
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: hunter::RECALL_POSE } if *id == p)), "the arm out at once");
+    ev.extend(run_pinned(&mut s, 0.15, &[k, aside]));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "no arrow flies before the hand is out");
+    assert!(hits(&ev, p, k).is_empty(), "nor strikes");
+    ev.extend(run_pinned(&mut s, 0.35, &[k, aside]));
     let struck = hits(&ev, p, k);
     assert_eq!(struck.len(), 5, "each arrow on its way home, full damage: {struck:?}");
     assert!(struck.iter().all(|d| *d == struck[0]), "no falloff: {struck:?}");
@@ -997,7 +1003,12 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     assert_eq!(planted.len(), 3);
     s.set_valor(p, 25.0);
     let mut ev = press(&mut s, p, "tripwire", true);
-    ev.extend(run(&mut s, 0.1));
+    assert!(s.planted_of(p).is_empty(), "spoken for at the press: nothing else moves them");
+    // The arrows wait for the hand to come out.
+    ev.extend(run(&mut s, 0.15));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "none flies yet");
+    assert!(!ev.iter().any(|e| matches!(e, Event::ObjGone { .. })), "none leaves the ground yet");
+    ev.extend(run(&mut s, 0.15));
     let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
     let mut anchors = Vec::new();
     for a in &planted {
@@ -1018,10 +1029,37 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     anchors.dedup();
     assert_eq!(anchors.len(), 3, "an anchor for each");
     assert!(s.planted_of(p).is_empty());
+    assert!(!ev.iter().any(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)), "the hand stays out while they fly");
     ev.extend(run(&mut s, 1.0));
+    let mut last_home = 0;
     for a in anchors {
-        assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a)), "home: its anchor goes");
+        let home = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a)).expect("home: its anchor goes");
+        last_home = last_home.max(home);
     }
+    // Then the hand comes down, once the last is home.
+    let down = ev.iter().position(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)).expect("the hand comes down");
+    assert!(down > last_home, "after the last arrow is home: {down} {last_home}");
+    assert!(s.hunt.recalls.is_empty());
+}
+
+/// A hunter felled with the hand out: the arrows spoken for go without flying, and the hand
+/// comes down with them.
+#[test]
+fn arrow_recall_cut_short_lets_the_hand_down_and_takes_its_arrows() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.plant_arrow(p, [12.0, 0.0, 0.0]);
+    let _ = s.step(DT);
+    let a = s.hunt.planted[0].clone();
+    s.set_valor(p, 25.0);
+    let mut ev = press(&mut s, p, "tripwire", true);
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: hunter::RECALL_POSE } if *id == p)));
+    s.hurt_player(p, 10_000);
+    ev.extend(run(&mut s, 0.5));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "no arrow flies to the fallen");
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "its arrow goes");
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)), "the hand down");
+    assert!(s.hunt.recalls.is_empty());
 }
 
 /// The reticle on the ground at `at` (x, y), for a hero standing at the origin.
@@ -1159,9 +1197,11 @@ fn a_tripwire_knocks_down_the_first_creature_across_it() {
         s.mobs.get_mut(&k).unwrap().pos = [x, 0.0, 0.0];
         ev.extend(s.step(DT));
     }
-    // It trips with no word over it: the dust, the fall and the snapped rope say so.
+    // It trips with no word over it: the fall's dust (a low puff, played once: the wing-buffet
+    // nova read as a white streak), the fall and the snapped rope say so.
     assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == k && *kit == KIT_DUST)), "dust where it trips");
+    let dust: Vec<u32> = ev.iter().filter_map(|e| match e { Event::Visual { id, kit, .. } if *id == k => Some(*kit), _ => None }).collect();
+    assert_eq!(dust, vec![KIT_FALL_DUST], "one low puff where it trips, nothing else on it: {dust:?}");
     assert_eq!(hits(&ev, p, k).len(), 1, "and takes the wire's damage: {:?} planted {:?}", hits(&ev, p, k), s.planted_of(p));
     assert!(s.has_cc(k, "stun"), "down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == k && *anim == KNOCKDOWN_ANIM)), "knocked to the ground");
@@ -1337,8 +1377,11 @@ fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() 
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)) || matches!(s.players[&p].action, Action::Dash { .. }), "and away");
     // No word says it caught: the net on the grunt and the leap away do (Corey's review).
     assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word when it catches");
-    // Unused, it's wasted: no leap when it runs out (a counter and nothing else).
+    // Unused, it's wasted: no leap when it runs out (a counter and nothing else). The grunt is
+    // taken away first: a blow it commits to during the stance is answered as it commits, before
+    // it lands, so a grunt closing in would be a blow, not nothing.
     run(&mut s, 3.0);
+    s.mobs.remove(&k);
     s.set_valor(p, 25.0);
     s.set_cooldowns(p, true);
     s.input(p, Input::Ability(key_of("utility"), true));
@@ -1404,6 +1447,8 @@ fn bank_shot_comes_off_a_wall_harder_and_strikes_round_the_corner() {
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.5, &[k]));
     assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "it banks: its arrow flies on from the wall");
+    // (And nothing bursts in the wall: a bounce isn't an explosion, Corey's review.)
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: 5162, .. })), "no burst in the wall");
     let h = hits(&ev, p, k);
     let logs: Vec<&Event> = ev.iter().filter(|e| matches!(e, Event::Log(_) | Event::Flash { .. } | Event::Missile { .. })).collect();
     assert_eq!(h.len(), 1, "round the corner: {h:?} {logs:?} planted {:?}", s.planted_of(p));

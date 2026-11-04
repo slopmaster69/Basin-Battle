@@ -4359,10 +4359,15 @@ bounces = 2
 bounce_gain = 0.5
 cooldown = 4.0
 # The Hunter's arrow (Aimed Shot's, at its speed, flown with the bow's ammo), seen the whole way:
-# each leg off a wall flies from where it struck. A burst of fire where it strikes (the Lava
-# Burst's landing), at every ricochet and skip.
+# each leg off a wall flies from where it struck. No burst where it strikes a wall (Corey's review:
+# the Lava Burst's landing there read as the arrow going off in the inn wall; the arrow flown on
+# from the wall, harder each bounce, is the bounce's look), and none off the ground either, so a
+# skip doesn't read as an explosion (Corey's review, run 040): the data has no small splash of dirt
+# at a point (the burrow burst, 26271, left a pile of boulders for seconds in run 050). The arrow's
+# ribbon flying on from the ground shows the skip.
 spell = 19434
-burst_spell = 5162
+burst_spell = 0
+skip_spell = 0
 clip = 53
 valor_hit = 5.0
 plants = true
@@ -4557,11 +4562,16 @@ kind = "projectile"
 valor = 25
 damage = [12.0, 12.0]
 range = [15.0, 15.0]
-radius = [0.35, 0.35]
+# Wide enough to bite a body the reticle sits on (Corey's review, run 040: "he went flying
+# further than the unit": at 0.35 a spear aimed at a creature's edge flew past it into the ground
+# behind, and the dive went there). And the bitten creature holds still for the dive, so the
+# hunter lands beside it, not where it stood.
+radius = [1.0, 1.0]
 speed = 60.0
 yank = true
 spell = 6533
 clip = 107
+effects = [{ kind = "stagger", secs = [0.6, 0.6] }]
 recast = "raptor_uppercut"
 recast_secs = 2.5
 
@@ -4662,8 +4672,10 @@ secs = 2.0
 aura = 1719
 spell = 5384
 # A counter and nothing else (Corey's review, Nov 3): unanswered, it's spent and on cooldown, with
-# no leap of its own.
-counter = { immune = true, once = true, answer = "trappers_leap" }
+# no leap of its own. A dodge, not a block: the blow misses, and the hunter never raises a shield
+# to it (Corey's review, run 040: "you missed the timing on the actual dodge"). The answer comes
+# as the blow commits, before the blade lands (`sim/mobs.rs`, the wind-up's lock).
+counter = { immune = true, dodge = true, once = true, answer = "trappers_leap" }
 
 # What Trapper's Instinct does when it's struck: away, the net on whoever struck, arrows scattered.
 [[ability]]
@@ -4768,9 +4780,11 @@ damage = [24.0, 24.0]
 linger = 3.0
 linger_damage = 4.0
 cooldown = 14.0
-# Its look: the trap on the ground while it's set, a burst there as it goes off, and fire on each
-# one it strikes (13812 is Explosive Trap Effect, named in the combat log).
+# Its look: thrown from the hand as a bomb (Iron Grenade's missile) to its spot, the trap on the
+# ground once it lands, a burst there as it goes off, and fire on each one it strikes (13812 is
+# Explosive Trap Effect, named in the combat log).
 spell = 13812
+lob_spell = 4068
 object = 3072
 burst_spell = 5162
 impact_kit = 286
@@ -4792,6 +4806,8 @@ splash = 3.0
 delay = 0.75
 secs = 25.0
 spell = 3355
+# Thrown to its spot like Explosive Trap, as a bomb.
+lob_spell = 4068
 object = 3071
 # The burst as it springs: Frost Nova's ring (the visual check, Nov 2: Frost Trap Aura, 13810,
 # whited out the whole screen for its 30 sec; 122 rings out and leaves the ice on whoever it froze).
