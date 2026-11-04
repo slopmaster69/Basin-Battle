@@ -393,6 +393,9 @@ impl SurvivalGame {
         }
         let lab = self.lab.take().unwrap();
         self.sim.debug = lab.debug_was;
+        // The next queued run waits until this one's video has ended and a moment more: a run
+        // that started at once set its scene out in the last one's frames.
+        self.lab_polled = std::time::Instant::now() + std::time::Duration::from_millis(1500);
         self.lab_look_back(lab.look_was);
         let dir = lab_dir();
         let path = dir.join(format!("{}.txt", lab.label));
@@ -457,8 +460,8 @@ impl SurvivalGame {
         self.broadcast(&packets::update_object(&[], &[(g, &f)]));
     }
 
-    /// `n` stand-in ally heroes beside hero `id` (the last run's taken away first): to their left,
-    /// right and behind, each a different race, still unless something moves them.
+    /// `n` stand-in ally heroes beside hero `id` (the last run's taken away first): two ahead of
+    /// them and two at their sides, each a different race, still unless something moves them.
     pub(crate) fn lab_set_allies(&mut self, id: Id, n: usize) {
         for a in std::mem::take(&mut self.lab_allies) {
             if let Some(g) = self.guid_of(a) {
@@ -469,7 +472,8 @@ impl SurvivalGame {
         }
         let Some((pos, f)) = self.sim.players.get(&id).map(|p| (p.pos, p.facing)) else { return };
         let looks: [(u8, u8); 4] = [(2, 1), (3, 0), (4, 1), (6, 0)];
-        let spots: [(f32, f32); 4] = [(3.0, 90.0), (3.0, -90.0), (3.5, 150.0), (3.5, -150.0)];
+        // The first two ahead, where an Intervene's reticle finds them; the rest at the sides.
+        let spots: [(f32, f32); 4] = [(6.0, 25.0), (6.0, -25.0), (3.0, 90.0), (3.0, -90.0)];
         for k in 0..n.min(4) {
             let account = format!("{}{k}", htl_survival::sim::lab::LAB_ALLY);
             let a = self.sim.join(&account, &format!("Ally {}", k + 1), None);

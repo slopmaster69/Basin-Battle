@@ -57,7 +57,7 @@ what it sent, side by side on one sheet.
 - **Race:** `as tauren-f` makes the hero that race and gender (plain looks) for this run and the
   ones after: `human`, `orc`, `dwarf`, `nightelf`, `undead`, `tauren`, `gnome`, `troll`, then `m` or
   `f`. Every race's take on an ability, one run after another.
-- **Allies:** `allies 2` stands up to 4 stand-in ally heroes beside the hero (left, right, behind),
+- **Allies:** `allies 2` stands up to 4 stand-in ally heroes near the hero (two ahead, two at the sides),
   each a different race, for what reaches allies (a shout, an Intervene). They go with the next
   run and are never saved.
 - **Stage:** every run starts on the lab's stage (above); `stage here` runs it where you stand.
