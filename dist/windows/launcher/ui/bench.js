@@ -7,7 +7,7 @@
 //    1000 / that cost is the highest frame rate this PC could hold.
 "use strict";
 (() => {
-  if (location.hash !== "#bench") return;
+  if (!/bench/.test(location.hash)) return;
   const out = document.createElement("pre");
   Object.assign(out.style, { position: "fixed", left: "50%", top: "56px", transform: "translateX(-50%)", zIndex: 60, margin: 0, padding: "12px 16px", maxWidth: "92vw",
     font: "12.5px/1.45 ui-monospace, Consolas, monospace", color: "#ede6d4", background: "rgba(10,14,16,.9)", border: "1px solid #6b5530", whiteSpace: "pre-wrap" });
@@ -17,8 +17,8 @@
   async function main() {
     while (!(window.demo && demo.ready())) await new Promise(r => setTimeout(r, 100));
     await new Promise(r => setTimeout(r, 1200));
-    const gl = demo.map.gl, dbg = gl.getExtension("WEBGL_debug_renderer_info");
-    const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    const gl = demo.map.gl, dbg = gl && gl.getExtension("WEBGL_debug_renderer_info");
+    const gpu = !gl ? "canvas 2d" : dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     // Refresh rate, from 120 idle frames.
     const idle = []; let t = await raf(); for (let i = 0; i < 120; i++) { const n = await raf(); idle.push(n - t); t = n; }
     const refresh = q(idle, .5);
@@ -38,7 +38,7 @@
         demo.setCam({ x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, z: Math.exp(Math.log(a.z) + (Math.log(b.z) - Math.log(a.z)) * e - 1.1 * Math.sin(Math.PI * e)) });
         demo.map.state.dirty = true; demo.map.render(performance.now()); drawPieces(performance.now());
       }
-      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);   // waits for the GPU to finish
+      if (gl) gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); else demo.map.probe();   // waits for the GPU to finish
       cost.push((performance.now() - s) / K);
     }
     await demo.pick("elwynn");

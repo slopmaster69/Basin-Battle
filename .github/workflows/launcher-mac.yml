@@ -44,11 +44,22 @@ jobs:
           cat "$log" || true
           pkill -x Play || true
           grep -q "the menu is drawn" "$log" || { echo "Play's menu didn't open (see the picture in the play-menu-mac artifact)"; exit 1; }
+          # The same with the map drawn by WebGL, for comparison.
+          sleep 2
+          open "Basin Battle.app" --args -NoUpdate -WebGL
+          for i in $(seq 1 90); do
+            grep -q "the menu is drawn" "$log" 2>/dev/null && break
+            sleep 1
+          done
+          sleep 7
+          screencapture -x play-menu-mac-webgl.png || true
+          cat "$log" || true
+          pkill -x Play || true
       - name: The picture of Play's menu
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: play-menu-mac
-          path: play-menu-mac.png
+          path: play-menu-mac*.png
           if-no-files-found: ignore
           retention-days: 7

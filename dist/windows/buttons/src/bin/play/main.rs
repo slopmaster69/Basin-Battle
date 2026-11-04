@@ -8,6 +8,7 @@
 //!   Play.exe -NoUpdate     doesn't look for a new version this time
 //!   Play.exe -Classic      the plain launcher
 //!   Play.exe -Bench        measures how smoothly this PC draws the map
+//!   Play.exe -Map2D        draws the map with a 2D canvas instead of WebGL (a Mac does unless -WebGL)
 #![windows_subsystem = "windows"]
 
 mod backend;
@@ -149,9 +150,15 @@ fn run(paths: Paths, opts: Options) -> Result<(), String> {
     let mut context = WebContext::new(Some(data));
     let (ui_dir, art_dir) = (ui.clone(), art.clone());
     let p_ipc = proxy.clone();
-    let url = if bench { "bb://localhost/index.html#bench" } else { "bb://localhost/index.html" };
+    // #map2d: the map drawn with a 2D canvas instead of WebGL (Play -Map2D, or BB_MAP2D=1). A Mac
+    // draws it that way unless told -WebGL: there its WebGL can draw without reaching the screen
+    // (seen on GitHub's Mac runners), while its 2D canvas always does, as fast and as faithful.
+    let arg = |f: &str| std::env::args_os().any(|a| a.eq_ignore_ascii_case(f));
+    let map2d = arg("-Map2D") || std::env::var_os("BB_MAP2D").is_some() || (cfg!(target_os = "macos") && !arg("-WebGL"));
+    let hash = [(bench, "bench"), (map2d, "map2d")].iter().filter(|(on, _)| *on).map(|(_, n)| *n).collect::<Vec<_>>().join("-");
+    let url = if hash.is_empty() { "bb://localhost/index.html".to_string() } else { format!("bb://localhost/index.html#{hash}") };
     let builder = WebViewBuilder::new_with_web_context(&mut context)
-        .with_url(url)
+        .with_url(&url)
         .with_background_color((16, 12, 8, 255))
         .with_asynchronous_custom_protocol("bb".into(), move |_, req, responder| {
             let (ui, art, path) = (ui_dir.clone(), art_dir.clone(), req.uri().path().to_string());
