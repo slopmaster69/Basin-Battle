@@ -22,10 +22,13 @@ pub const PLANT_LOOK: u32 = 2630;
 pub const PLANT_SCALE: f32 = 1.0;
 /// And a friend's green ring on the ground under it, this wide, that reads from across a fight.
 pub const PLANT_RING: f32 = 0.5;
-/// And a glow laid on the ground under the arrow, this wide: Frost Trap's pale frost (13810), a
-/// small cold light. (Flare's at 1.5 yd read as a fire under each arrow and lit a whole volley's
-/// circle orange: Corey's review, "it looks like fire... grey? white? smaller to avoid clutter".)
-pub const ARROW_GLOW: u32 = 13810;
+/// And a glow laid on the ground under the arrow, this wide: Consecration's pale gold ring
+/// (20116), a small light that scales with its radius. (Flare's at 1.5 yd read as a fire under
+/// each arrow and lit a whole volley's circle orange: Corey's review, "it looks like fire...
+/// grey? white? smaller to avoid clutter"; Frost Trap's frost, tried in run 060, is a mist the
+/// radius doesn't shrink, and twelve of them fogged the whole screen. The data has no white or
+/// grey light at a point.)
+pub const ARROW_GLOW: u32 = 20116;
 pub const ARROW_GLOW_RADIUS: f32 = 0.6;
 /// A tripwire trips anything within this of the wire.
 const WIRE_REACH: f32 = 0.7;
