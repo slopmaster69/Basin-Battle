@@ -168,7 +168,10 @@ pub fn save_settings(file: &Path, s: &Settings) {
     keys.sort_by_key(|k| k.to_lowercase());
     let mut out = String::from("\u{FEFF}# Your choices, kept across updates. Delete this file to be asked again.\r\n");
     for k in keys {
-        out.push_str(&format!("{k} = {}\r\n", s[k]));
+        // One line each, whatever was typed or pasted: a line break in a value would otherwise
+        // write a second setting.
+        let v: String = s[k].chars().filter(|c| !c.is_control()).collect();
+        out.push_str(&format!("{k} = {}\r\n", v.trim()));
     }
     // With its UTF-8 mark, so the plain launcher (Windows PowerShell) reads a folder name with
     // accents in it as it is.
@@ -426,6 +429,9 @@ impl Backend {
         save_settings(&self.paths.settings, &s);
     }
 
+    /// own, address, or one of project.toml's servers.
+    fn known_place(&self, p: &str) -> bool { p == "own" || p == "address" || self.project.server(p).is_some() }
+
     fn here(&self, s: &Server) -> bool { !s.pc.is_empty() && s.pc.eq_ignore_ascii_case(&self.this_pc) }
 
     fn say(&self, t: &str, stage: &str, now: &str, then: &str) {
@@ -441,6 +447,7 @@ impl Backend {
             "check" => { let b = self.clone(); thread::spawn(move || b.check_servers()); }
             "choose" => {
                 let (game, place, address) = (s("game"), s("place"), s("address"));
+                let place = if self.known_place(&place) { place } else { String::new() };
                 self.save(|st| {
                     if !game.is_empty() { st.insert("game".into(), saved_game(&game).into()); }
                     if !place.is_empty() { st.insert("place".into(), place.clone()); }
@@ -457,6 +464,7 @@ impl Backend {
                 if self.playing.swap(true, Ordering::SeqCst) { return; }
                 let b = self.clone();
                 let (game, place, address, solo) = (s("game"), s("place"), s("address"), m.get("solo").and_then(|v| v.as_bool()).unwrap_or(false));
+                let place = if self.known_place(&place) { place } else { "own".to_string() };
                 thread::spawn(move || {
                     b.play(&game, &place, &address, solo);
                     b.playing.store(false, Ordering::SeqCst);
@@ -829,6 +837,12 @@ mod tests {
         save_settings(&f, &s);
         let again = read_settings(&f);
         assert_eq!(again, s);
+        // A pasted address with a line break in it stays one setting.
+        s.insert("address".into(), "1.2.3.4\r\nwow = C:\\x".into());
+        save_settings(&f, &s);
+        let again = read_settings(&f);
+        assert_eq!(again["address"], "1.2.3.4wow = C:\\x");
+        assert_eq!(again["wow"], "C:\\Users\\José\\WoW\\Data");
         let _ = fs::remove_dir_all(dir);
     }
 }
