@@ -523,6 +523,12 @@ impl Survival {
         self.traps.push(Trap { owner: id, ability, at, share, armed_at: now + d.delay, until: now + life, mark, obj });
     }
 
+    /// Whether an object is a trap lying set (drawn without the client's fade-in: it should be
+    /// there the moment it's set, Corey's review).
+    pub fn is_trap_obj(&self, id: Id) -> bool {
+        self.traps.iter().any(|t| t.obj == Some(id))
+    }
+
     /// A trap gone (sprung, faded, or the oldest of too many): its mark and the trap itself.
     fn clear_trap(&mut self, t: &Trap) {
         self.unmark(t.mark);
@@ -556,7 +562,10 @@ impl Survival {
         let radius = AbilityDef::at(d.radius, t.share);
         let burst = if d.splash > 0.0 { d.splash } else { radius };
         if d.burst_spell != 0 {
-            self.events.push(Event::Missile { caster: t.owner, spell: d.burst_spell, target: Target::Point(t.at) });
+            // From the trap's spot, not the hunter: a spell cast by them plays its caster-side
+            // look on them (Freezing Trap's nova rang out round the hunter too, Corey's review).
+            let anchor = self.alloc();
+            self.events.push(Event::MissileFrom { anchor, caster: t.owner, spell: d.burst_spell, from: t.at, target: Target::Point(t.at) });
         }
         let damage = AbilityDef::at(d.damage, t.share);
         self.area(t.owner, t.ability, t.at, burst, t.share, damage, None);
