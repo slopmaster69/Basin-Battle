@@ -38,6 +38,11 @@ ES.CUE = {
   -- Valor given back, and every cooldown readied: on the HUD (below), not the camera.
   valor = { hud = "valor" },
   readied = { hud = "keys" },
+  -- Thrown up by the Uppercut (Raptor Strike): the camera comes in close and tips down onto the
+  -- fight to aim the Stoop that follows (Corey's review: "zoom in and tip down"): distance,
+  -- right, up, the tip down (radians; the sixteenth client, older ones only come in), and for
+  -- how long (the rise's time in the air), then back to the aiming camera or off.
+  rise = { cam = { 1.6, 0.4, 0.8, 0.5, 1.4 } },
 }
 
 function ES.CueLine(f)
@@ -57,6 +62,13 @@ function ES.CueLine(f)
     end
     return
   end
+  if c.cam then
+    if SetAimCamera then
+      ES.riseCamAt = GetTime() + c.cam[5]
+      SetAimCamera(1, c.cam[1], c.cam[2], c.cam[3], c.cam[4])
+    end
+    return
+  end
   if c.stop and HitStop then
     HitStop("player", c.stop)
     if guid and not c.self then HitStop(guid, c.stop) end
@@ -64,6 +76,21 @@ function ES.CueLine(f)
   if c.shake and ShakeCamera then ShakeCamera(c.shake[1], c.shake[2]) end
   if c.kick and CameraKick then CameraKick(c.kick[1], c.kick[2]) end
 end
+
+-- The rise's camera let go as its time runs out: back to the aiming camera if one is up (the
+-- Stoop's reticle), else off. While it's up, DrawAimCamera leaves the camera to it.
+local rise = CreateFrame("Frame", nil, UIParent)
+rise:SetScript("OnUpdate", function()
+  local at = ES.riseCamAt
+  if not at or GetTime() < at then return end
+  ES.riseCamAt = nil
+  if not SetAimCamera then return end
+  if ES.aimCam then
+    SetAimCamera(1, 2.4, 0.75, 0.25)
+  else
+    SetAimCamera(nil)
+  end
+end)
 
 -- Valor given back: the bar blinks twice as it fills back.
 local glow = CreateFrame("Frame", nil, UIParent)

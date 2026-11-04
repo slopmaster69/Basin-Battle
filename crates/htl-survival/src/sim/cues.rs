@@ -68,6 +68,9 @@ pub const BEAT_WALL: &str = "wall";
 pub const BEAT_CHEAT_DEATH: &str = "cheat_death";
 pub const BEAT_READIED: &str = "readied";
 pub const BEAT_VALOR_BACK: &str = "valor";
+/// Thrown up by a blow's leap (Raptor Strike's Uppercut): the camera in and tipped down on the
+/// fight, to aim the dive. A camera beat, no stop and no shake.
+pub const BEAT_RISE: &str = "rise";
 
 // --- the hero's voice on a refusal --------------------------------------------------------------------
 
