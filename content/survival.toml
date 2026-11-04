@@ -4768,7 +4768,10 @@ range = [20.0, 20.0]
 radius = [8.0, 8.0]
 secs = 10.0
 cooldown = 18.0
-banner = { health = 60.0, regen = 2.0, stagger = 0.3, aura = 6673, scale = 0.6 }
+# Full size: at 60% the pole stood hidden inside whatever it was planted beside (the lab, Nov 4).
+# Berserker Rage's red fists (18499, a lasting look) on every hero near it while they stand by it:
+# Battle Shout's (6673) is a one-shot, and left nothing to see.
+banner = { health = 60.0, regen = 2.0, stagger = 0.3, aura = 18499, scale = 1.0 }
 recast = "war_banner_move"
 recast_secs = 10.0
 # Placeholder looks (to be checked in the lab): Elwynn's battle-glade banner (4313, seen standing
@@ -4872,7 +4875,9 @@ range = [5.0, 5.0]
 arc = 120.0
 cast = 0.5
 weapon = 1.2
-self_effects = [{ kind = "steadfast", secs = [0.55, 0.55], amount = 1.0 }]
+# The wind-up's poise shows nothing (20572 has no visual): the default steadfast look is Power
+# Infusion's blue glow, a magic look on a sword's wind-up (the lab, Nov 4). The wind-up is the clip.
+self_effects = [{ kind = "steadfast", secs = [0.55, 0.55], amount = 1.0, aura = 20572 }]
 effects = [{ kind = "exposed", secs = [5.0, 5.0], amount = 0.2, aura = 8647 }]
 # The rising cut, the same on every race: the tauren women's slow two-handed upswing (19/1), the
 # weapon brought up from the ground to over the head (picked from the lab's side-on strips, Nov 4).
@@ -4898,10 +4903,13 @@ range = [8.0, 8.0]
 damage = [10.0, 10.0]
 stamina = 12.0
 cooldown = 12.0
-# Intercept's rush (20252): the dust kicked up, without Charge's purple trail, so a Tackle isn't
-# mistaken for a Charge (Corey's review, Nov 3). The Crash is dust, War Stomp's shock ring and the
-# heavy flash on the one crashed.
-spell = 20252
+# Earth kicked up at the hero's feet as the rush starts (Rocky Ground Impact, 26271: a brown
+# burst, played at the spot). Not a charge look: every charge-like look in the game data (Charge,
+# Intercept, the creatures' charges) is the one kit with the purple trail and the dust cloud that
+# made a Tackle look like a Charge (Corey's review, Nov 3; seen again in the lab on Intercept's,
+# Nov 4). The barge itself and the Crash (dust, War Stomp's shock ring, the heavy flash) are the
+# rest of the look.
+spell = 26271
 # The shoulder hit, the same on every race: the orc men's Shield Bash (59/0), the one attack clip
 # that's a body check (shoulder and shield driven forward, low) rather than a weapon swing, as
 # Corey asked (his review, Nov 3). It plays over the rush and lands as the rush ends.
@@ -4909,7 +4917,9 @@ clip = 59
 take = 0
 from = "OrcMale"
 valor_hit = 6.0
-self_effects = [{ kind = "steadfast", secs = [0.4, 0.4], amount = 1.0 }]
+# The rush's poise shows nothing (20572 has no visual): the default steadfast look is Power
+# Infusion's blue glow, a magic look on a shoulder barge (the lab, Nov 4).
+self_effects = [{ kind = "steadfast", secs = [0.4, 0.4], amount = 1.0, aura = 20572 }]
 # A 2 sec knockdown (and the wall's stun to match): a knockdown is the Warlord's big payoff, and
 # at 1 sec it was over before it read (Corey's review, Nov 3). Heroes get half, as with any stun.
 crash = { wall_damage = 20.0, wall_stun = 2.0, foe_damage = 14.0, knockdown = 2.0, posture = 35, boss_posture = 20, hero_carry = 4.0 }
