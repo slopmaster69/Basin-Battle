@@ -382,7 +382,7 @@ fn blessing_of_freedom_frees_a_friend_and_keeps_them_free() {
     assert_eq!(aiming(&s, a), Some(idx(&s, "blessing_of_freedom")), "aimed at a friend");
     s.set_aim_line(a, 0.0, 0.0);
     let ev = click(&mut s, a);
-    assert!(flashed(&ev, a, "Bren"), "on him");
+    assert!(!flashed(&ev, a, "Bren"), "no word names him: the blessing's look on him says it");
     assert!(!s.has_cc(b, "root") && !s.has_cc(b, "mark"), "free, unmarked");
     assert!(s.has_cc(b, "haste"), "faster");
     assert!(!s.apply_cc(b, b, "stun", 2.0, 0.0, 0.0, "test"), "and no stun takes hold for 4 s");
@@ -426,7 +426,8 @@ fn lay_on_hands_takes_a_touch_heals_three_fifths_and_not_again_on_them_for_a_min
     let ev = click(&mut s, a);
     let (got, want) = (s.players[&b].health - max / 4, (max as f32 * 0.6).round() as u32);
     assert!(got >= want && got <= want + 2, "three fifths of his health: {got}");
-    assert!(flashed(&ev, a, "Healed Bren"));
+    assert!(!flashed(&ev, a, "Healed"), "no word: his green number and the light on him");
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, .. } if *healer == a && *target == b)), "her number for him");
     // Again on him at once: not yet, and the Valor back.
     run(&mut s, 0.8);
     s.players.get_mut(&b).unwrap().health = max / 4;
@@ -435,7 +436,8 @@ fn lay_on_hands_takes_a_touch_heals_three_fifths_and_not_again_on_them_for_a_min
     s.set_aim_line(a, 0.0, 0.0);
     let ev = click(&mut s, a);
     assert_eq!(s.players[&b].health, max / 4, "not again yet");
-    assert!(flashed(&ev, a, "on them again"));
+    assert!(flashed(&ev, a, "on them again"), "a refusal keeps its words");
+    assert!(ev.iter().any(|e| matches!(e, Event::Hear { player, .. } if *player == a)), "and she says it");
     assert!((s.players[&a].valor - valor).abs() < 1.0, "its Valor back");
     // Out of touch range, it's yours.
     run(&mut s, 0.8);
@@ -564,7 +566,8 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     ev.extend(run_pinned(&mut s, 1.0, &[k]));
     assert_eq!(missiles(&ev, p, 6984), 5, "five arrows");
     assert!(s.players[&p].valor + 0.01 >= valor, "no Valor spent: {valor} then {}", s.players[&p].valor);
-    assert!(flashed(&ev, p, "Shatter!"), "the ice shatters");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST), "the ice shatters");
+    assert!(!flashed(&ev, p, "Shatter"), "no word");
     assert!(!s.has_cc(k, "petrify"));
     assert!(s.empowered_keys(p).is_empty(), "spent");
     // The next press is the plain draw again.
@@ -599,7 +602,8 @@ fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() 
     assert_eq!(hits(&ev, p, first).len(), 1, "the first struck");
     assert!(s.alive(first), "a hale one lives");
     assert!(!s.alive(weak), "the weak one finished");
-    assert!(flashed(&ev, p, "Execute!"));
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_EXECUTE) && crate::sim::cues::seen::sounded(&ev, weak, crate::sim::cues::SOUND_EXECUTE) && crate::sim::cues::seen::looked(&ev, weak, KIT_SLAM), "the execute's blow");
+    assert!(!flashed(&ev, p, "Execute"), "no word");
     assert_eq!(hits(&ev, p, last).len(), 1, "and on through to the last");
 }
 

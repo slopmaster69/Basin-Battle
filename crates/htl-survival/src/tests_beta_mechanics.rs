@@ -542,7 +542,9 @@ fn a_mirror_turns_a_rivals_bolt_back_at_them() {
     assert_eq!(s.players[&b].health, hb, "the mirror took nothing");
     assert!(!hits(&ev, b, a).is_empty(), "the bolt came back at her, his now");
     assert!(s.players[&a].health < ha, "and hurt her");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == b && text == "Mirror")), "he sees it catch");
+    // He sees it catch by its look on him (the spell), not its name in words.
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 543, target: Target::Unit(t) } if *caster == b && *t == b)), "he sees it catch");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == b)), "no word");
 }
 
 #[test]

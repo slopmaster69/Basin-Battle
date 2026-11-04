@@ -14,6 +14,7 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub mod cc;
+pub mod cues;
 mod building;
 pub use building::StationActions;
 mod combat;
@@ -206,8 +207,14 @@ pub enum Event {
     Hop { player: Id, dir: f32, speed: f32, lift: f32, roll: bool, style: &'static str },
     /// The guard went up or down (the hero's stance).
     Guard { player: Id, up: bool },
-    /// A word flashed on one hero's screen (a parry).
+    /// Words on one hero's screen: a refusal (out of range, not ready) or a hint. Never an
+    /// outcome: those show by [`Event::Visual`], [`Event::Sound`] and [`Event::Beat`].
     Flash { player: Id, text: String },
+    /// An outcome's beat on one hero's own screen (`cues::BEAT_*`: a hit-stop, a shake, the
+    /// camera's kick), `on` the unit it happened to.
+    Beat { player: Id, beat: &'static str, on: Id },
+    /// A sound (`SoundEntries.dbc`) for one hero's ears only: their own voice on a refusal, coins.
+    Hear { player: Id, sound: u32 },
     /// Too winded for what they tried: the stamina bar says so.
     Winded { player: Id },
     /// Someone fell: to `killer` if a hero or creature struck them last.
@@ -880,6 +887,8 @@ pub struct Survival {
     pub(crate) fx_vs_bosses: bool,
     /// When a hero may next be told this foe shrugged their control off (hero, foe).
     pub(crate) told_immune: BTreeMap<(Id, Id), f32>,
+    /// When a hero may next say a refusal in their own voice.
+    pub(crate) told_vocal: BTreeMap<Id, f32>,
     /// Counters' stances (a hero's, a dummy's), by unit.
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
@@ -984,6 +993,7 @@ impl Survival {
             fx_from: None,
             fx_vs_bosses: false,
             told_immune: BTreeMap::new(),
+            told_vocal: BTreeMap::new(),
             grounds: Vec::new(),
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),

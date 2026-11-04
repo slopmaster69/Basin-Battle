@@ -143,6 +143,8 @@ fn a_call_costs_its_stage_and_waits_a_moment_for_the_next_and_a_miss_costs_nothi
     // Nothing there: no beast, no stamina, no recharge.
     let ev = call(&mut s, p, Some((0.0, 0.0)));
     assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "No enemy in range")));
+    // And says it: "Out of range.", in a Human man's voice (the default hero's).
+    assert!(crate::sim::cues::seen::heard(&ev, p, 1913), "the hero's own voice");
     assert!((s.players[&p].stamina - 100.0).abs() < 0.01);
     assert_eq!(s.cooldown(p, a).charges, 1, "a miss spends no recharge");
     run_pinned(&mut s, 1.0, &[]);
@@ -157,6 +159,8 @@ fn a_call_costs_its_stage_and_waits_a_moment_for_the_next_and_a_miss_costs_nothi
     let mut ev = call(&mut s, p, Some((0.0, 0.0)));
     ev.extend(run_pinned(&mut s, 0.2, &[k]));
     assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text.contains("ready in"))), "{ev:?}");
+    // "That ability isn't ready yet.": though said out of range a moment ago, it's been 1.6 s.
+    assert!(crate::sim::cues::seen::heard(&ev, p, 1917), "said too");
     assert_eq!(spirits(&s).len(), 1, "no second beast yet");
     s.players.get_mut(&p).unwrap().stamina = 100.0;
     run_pinned(&mut s, 0.8, &[k]);

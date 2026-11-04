@@ -48,6 +48,11 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
     out
 }
 
+/// A champion's stance broke under `by`: the crack on it and the beat on their screen.
+fn broke(ev: &[Event], mob: Id, by: Id) -> bool {
+    crate::sim::cues::seen::sounded(ev, mob, crate::sim::cues::SOUND_BREAK) && crate::sim::cues::seen::beat(ev, by, crate::sim::cues::BEAT_BREAK)
+}
+
 fn hits_on(events: &[Event], victim: Id) -> Vec<(u32, Outcome)> {
     events
         .iter()
@@ -958,7 +963,10 @@ fn a_giant_is_too_heavy_to_parry_a_timed_guard_only_blocks_it() {
     assert_eq!(s.strike_player(g, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Blocked, "blocked, not parried");
     assert!(s.mobs[&g].stagger_until <= s.clock, "it doesn't reel");
     let ev = s.step(0.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == p && text.contains("Too heavy"))), "told why");
+    // No word says why: a shield's dull thud (no parry's clang) and the view shoved hard.
+    assert!(crate::sim::cues::seen::sounded(&ev, p, crate::sim::cues::SOUND_TOO_HEAVY), "the guard's thud");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_TOO_HEAVY), "driven into the guard");
+    assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
     // A humanoid boss can still be parried.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -981,8 +989,11 @@ fn a_guard_raised_just_in_time_parries_and_the_attacker_reels() {
     assert_eq!((s.players[&p].health, s.players[&p].stamina), (hp, st), "nothing lands and it costs nothing");
     let m = &s.mobs[&k];
     assert!(m.stagger_until > s.clock + 1.0 && m.riposte, "the kobold reels");
-    let ev = s.step(0.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)));
+    // No "Parry!": Disarm's spark on her (the clang and hit-stop come with the swing's impact).
+    let ev = std::mem::take(&mut s.events);
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_PARRY)), "the spark");
+    assert!(ev.iter().any(|e| matches!(e, Event::Swing { victim: Some(v), outcome: Outcome::Parried, .. } if *v == p)), "the impact: a parry");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })), "no word");
     // A riposte while it reels bites harder than any ordinary blow.
     s.input(p, Input::GuardUp);
     s.input(p, Input::Attack);
@@ -1308,7 +1319,10 @@ fn with_friendly_fire_heroes_strike_block_parry_and_fell_each_other() {
     let ev = run(&mut s, 0.3);
     assert_eq!(hits_on(&ev, b).last().map(|h| h.1), Some(Outcome::Parried));
     assert_eq!(s.players[&a].action.name(), "stagger");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == a)));
+    // No "Parried!" for her: she reels (the stun's swirl), the spark on Bren.
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == b && *kit == KIT_PARRY)), "the spark on him");
+    assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == a && *anim == STUN_ANIM)), "she reels");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })), "no word");
     s.input(b, Input::GuardUp);
     s.input(b, Input::Attack);
     let ev = run(&mut s, 0.6);
@@ -2358,7 +2372,11 @@ fn a_blow_from_behind_is_a_backstab() {
     assert_eq!(hits.len(), 1);
     let w = s.weapon_of(&s.players[&p]).damage;
     assert!(hits[0].0 as f32 >= w[0] as f32 * 1.4, "harder from behind: {hits:?}");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Backstab!")));
+    // It shows in the blow: the stab's look, a dagger's crit, a sharp beat; no word.
+    assert!(crate::sim::cues::seen::looked(&ev, k, KIT_RIPOSTE), "the stab's look");
+    assert!(crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_BACKSTAB), "a dagger's crit");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_BACKSTAB));
+    assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
 }
 
 #[test]
@@ -2460,7 +2478,8 @@ fn enough_damage_quickly_breaks_a_champions_stance() {
     let ev = s.step(0.0);
     assert!(s.mobs[&w].stagger_until > s.clock + 1.5, "broken");
     assert!(s.mobs[&w].riposte, "open to a riposte");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")));
+    assert!(broke(&ev, w, p), "it shows it broke");
+    assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
 }
 
 #[test]
@@ -2480,14 +2499,14 @@ fn a_group_needs_more_to_break_a_champion_and_it_stands_back_up_before_it_can_br
     let heft = s.weapon_of(&s.players[&heroes[0]]).posture.max(1.0);
     s.hurt_mob(w, heroes[0], (limit as f32 / heft).ceil() as u32 + 1);
     let ev = s.step(0.0);
-    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")), "a group needs more");
+    assert!(!heroes.iter().any(|h| broke(&ev, w, *h)), "a group needs more");
     run(&mut s, 3.0);
     // Enough breaks it...
     for h in &heroes {
         s.hurt_mob(w, *h, limit);
     }
     let ev = s.step(0.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")), "broken");
+    assert!(heroes.iter().any(|h| broke(&ev, w, *h)), "broken");
     // ...and the beating it takes while it reels and just after doesn't break it again.
     let mut broken_again = false;
     for _ in 0..(5.0 / 0.25) as usize {
@@ -2495,7 +2514,7 @@ fn a_group_needs_more_to_break_a_champion_and_it_stands_back_up_before_it_can_br
             s.hurt_mob(w, *h, limit / 4);
         }
         let ev = run(&mut s, 0.25);
-        broken_again |= ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!"));
+        broken_again |= heroes.iter().any(|h| broke(&ev, w, *h));
     }
     assert!(!broken_again, "it stands back up before it can be broken again");
 }

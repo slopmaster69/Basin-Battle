@@ -528,6 +528,17 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Beat { player, beat, on } => {
+                // `CU\t<beat>\t<guid>`: the add-on plays the outcome's hit-stop, shake and kick.
+                let g = self.guid_of(on).unwrap_or(0);
+                if let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) {
+                    self.ui_line(c, &format!("CU\t{beat}\t{g:#X}"));
+                }
+            }
+            Event::Hear { player, sound } => {
+                // The stock client plays it itself: no add-on needed.
+                self.to_player(player, packets::play_sound(sound));
+            }
             Event::Hop { player, dir, speed, lift, roll, style } => {
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(c) = self.conn_of(player) else { return };

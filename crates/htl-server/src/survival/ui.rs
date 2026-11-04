@@ -11,7 +11,14 @@
 //! - `W\t<station>\t<name>\t<recipe~output~cost~can>^...`: a station's work.
 //! - `BM\t<key~name~cost~can~built~text>^...`: the build menu.
 //! - `AR\t<key~name~kind~held~text>^...`: the weapon rack.
-//! - `FL\t<text>`: a word flashed big (a parry).
+//! - `FL\t<text>`: words flashed big: a refusal (out of range, not ready, too winded) or a hint,
+//!   never an outcome. A refusal's voice comes with it as `SMSG_PLAY_SOUND` (the hero's race and
+//!   sex voice, `sim::cues::vocal_sound`), which the stock client plays: no line for it.
+//! - `CU\t<beat>\t<guid>`: an outcome of the hero's (since add-on 21): its beat on their screen
+//!   (`crit`, `shatter`, `execute`, `backstab`, `break`, `too_heavy`, `wall`, `cheat_death`,
+//!   `readied`, `valor`), `guid` the unit it happened to (0x0 none). Its look and sound come
+//!   by `SMSG_PLAY_SPELL_VISUAL` and `SMSG_PLAY_OBJECT_SOUND` to everyone near; an older add-on
+//!   ignores the line and misses only the beat.
 //! - `FU\t<guid>\t<own>\t<secs>\t<from>\t<cuts>\t<cut>\t<windup>\t<finish>\t<finish secs>\t<turn deg>\t<trail>\t<trail ms>`:
 //!   a storm of cuts starts on a unit (Bladestorm's flurry, the ability's `flurry` field for
 //!   field; `cuts` and `finish` as `clip/take`), for a client with patch 0025 (`PlayUnitFlurry`);
@@ -347,7 +354,11 @@ pub(crate) const VERSION: u32 = 2;
 /// Shot).
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
-pub(crate) const ADDON_NEWEST: u32 = 20;
+pub(crate) const ADDON_NEWEST: u32 = 21;
+/// 21: taken by #130.
+/// 21: outcomes show without words: `CU` beats (the outcome's hit-stop, shake and kick) in
+/// `Cues.lua`.
+pub(crate) const ADDON_NEWEST: u32 = 21;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
