@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 20
+local VERSION = 21
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2198,17 +2198,22 @@ function ES.ChargeCamera(d, share)
     end
     return
   end
+  -- Deeper the longer it's held (Corey's review: "zoom in more and more the longer you hold
+  -- it"): from the aiming camera's 2.4 down to 1.1 at a full draw, 1.3 for the ultimate, which
+  -- holds longer (at 0.8 the camera was inside the hero: the body went and the bowstring stood
+  -- alone, run 060).
   local ult = d.n == 5
-  local dist = 2.4 - (ult and 1.3 or 0.9) * share
+  local dist = 2.4 - (ult and 1.1 or 1.3) * share
   if not ES.chargeCam or math.abs(ES.chargeCam - dist) > 0.04 then
     ES.chargeCam = dist
     SetAimCamera(1, dist, 0.75 - 0.2 * share, 0.25)
   end
+  -- Full draw: the view trembles until the shot goes.
   if share >= 1 and ShakeCamera then
     local now = GetTime()
     if not ES.chargeShakeAt or now >= ES.chargeShakeAt then
       ES.chargeShakeAt = now + 0.15
-      ShakeCamera(ult and 0.9 or 0.5, 0.18, 22)
+      ShakeCamera(ult and 1.4 or 0.9, 0.18, 22)
     end
   end
 end
@@ -2221,10 +2226,16 @@ function ES.ChargeFull(d)
   aim.burstAt = GetTime()
   aim.burstColor = { r, g, b }
   aim.burst:Show()
-  empower.edge:SetVertexColor(r, g, b, 1)
-  empower.flash = 0.55
-  empower:Show()
-  if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  -- A bow's full draw is the reticle's bloom and the tremble (ChargeCamera): no flash over the
+  -- whole screen and no kick (Corey's review of Aimed Shot and Kill Shot: it read as a strange
+  -- buff going off). Other charges keep theirs.
+  local bow = d and d.school == "hunter"
+  if not bow then
+    empower.edge:SetVertexColor(r, g, b, 1)
+    empower.flash = 0.55
+    empower:Show()
+    if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  end
   local bar = ES.abar
   if d and bar and bar.slots[d.n] then bar.slots[d.n].fullAt = GetTime() end
 end

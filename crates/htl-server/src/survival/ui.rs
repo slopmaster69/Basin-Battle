@@ -350,7 +350,9 @@ pub(crate) const VERSION: u32 = 2;
 /// Shot).
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
-pub(crate) const ADDON_NEWEST: u32 = 20;
+/// 21: the draw leans in deeper the longer it's held, and a bow's full draw no longer
+/// flashes the whole screen.
+pub(crate) const ADDON_NEWEST: u32 = 21;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
