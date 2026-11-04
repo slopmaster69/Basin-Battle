@@ -175,6 +175,19 @@ fn hp(s: &Survival, m: Id) -> u32 {
     s.mobs[&m].health
 }
 
+/// The Hurled Axe's missile tumbles forward end over end, about three turns a second (Corey's
+/// review: "the spin looks goofy still, we need it to be spinning like a boomerang"), and the way
+/// back flies the same spell, so it tumbles so too.
+#[test]
+fn the_hurled_axes_look_tumbles_forward_three_turns_a_second() {
+    let c = Content::dev();
+    let l = c.missile_looks.iter().find(|l| l.spell == 16075).expect("the axe's look");
+    assert!(l.tumble, "end over end, not flat");
+    assert!((l.spin + 3.0).abs() < 1.0e-6, "a forward tumble, three turns a second: {}", l.spin);
+    assert!((l.scale - 1.8).abs() < 1.0e-6, "its size kept");
+    assert!(c.validate_abilities().is_ok(), "the rules take a spin below 0");
+}
+
 #[test]
 fn a_boomerang_strikes_each_foe_going_out_and_again_coming_back() {
     let mut s = world(PROJECTILES);
