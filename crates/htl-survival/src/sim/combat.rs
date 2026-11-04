@@ -1472,8 +1472,10 @@ impl Survival {
             } else {
                 self.events.push(Event::React { id: victim, anim: STUN_ANIM, from, lean: 0.35, hold: secs, fit: 0.0 });
             }
+            // No word: the stagger (or the fall) shows it, with a crack of the guard and a heavy
+            // beat on their own screen.
             if broke {
-                self.tell(victim, if down { "Kicked down!" } else { "Your guard breaks!" });
+                self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             }
         }
         self.events.push(Event::Visual { id: victim, kit: KIT_BASH, by: Some(id) });
@@ -1790,7 +1792,9 @@ impl Survival {
                 if c.combat.riposte_any_stagger {
                     self.players.get_mut(&victim).unwrap().riposte_until = now + secs;
                 }
-                self.tell(victim, if heavy_blow { "Your guard breaks and you go down!" } else { "Your guard breaks!" });
+                // No word: the stagger (or the fall) shows it, with a crack of the guard and a
+                // heavy beat on their own screen.
+                self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             }
             Outcome::Parried => self.parry_pays(victim, attacker),
             _ => {}
@@ -1816,7 +1820,9 @@ impl Survival {
         // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
-            self.tell(victim, "The heavy attack breaks your charge!");
+            // No word: the charge's glow goes out, the blow lands, and the same crack and beat as a
+            // broken guard.
+            self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             self.end_ability_action(victim);
             self.set_action(victim, Action::Ready);
         }
@@ -2051,8 +2057,8 @@ impl Survival {
         if h == 0 {
             self.die(id);
         } else if interrupted {
+            // No word: the blow lands, and the meal or the work stops in their hands.
             self.set_action(id, Action::Ready);
-            self.tell(id, "Interrupted!");
         }
     }
 
@@ -2439,7 +2445,8 @@ impl Survival {
                 self.players.get_mut(&victim).unwrap().riposte_until = now + guard.break_secs;
             }
             self.events.push(Event::Emote { id: victim, emote: mobs::STUN_EMOTE });
-            self.tell(victim, "Your guard is crushed!");
+            // No word: the stagger shows it, with a broken guard's crack and beat.
+            self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
         }
     }
 

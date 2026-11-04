@@ -230,6 +230,11 @@ fn a_blow_too_heavy_for_the_stamina_left_breaks_the_guard() {
     let took = hp - s.players[&p].health;
     assert!(took > 0 && took < 42, "part of it lands: {took}");
     assert_eq!(s.players[&p].action.name(), "stagger");
+    // No word says so (Corey's rule): the stagger shows it, with a broken guard's crack and a
+    // heavy beat on the hero's own screen.
+    let ev = s.step(0.0);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Tell { player, .. } | Event::Flash { player, .. } if *player == p)), "no words: {ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Beat { player, beat: "break", .. } if *player == p)), "the beat: {ev:?}");
     // Staggered: the next blow lands whole, and nothing can be done for a moment.
     s.input(p, Input::Dodge);
     assert_eq!(s.players[&p].action.name(), "stagger", "no dodging out of a stagger");

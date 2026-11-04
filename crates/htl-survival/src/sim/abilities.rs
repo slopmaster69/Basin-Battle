@@ -819,7 +819,8 @@ impl Survival {
             // A fixed charge (Pyroblast) let go early is dropped; one with a range goes at its
             // least, as soon as it's reached.
             if (hi - lo).abs() < 1.0e-3 {
-                self.tell(id, "Released too soon. The charge is lost.");
+                // A mistake of the hand, like a refusal: its words, and said ("I can't do that.").
+                self.refuse(id, "Released too soon", cues::Vocal::CantDo);
                 self.end_ability_action(id);
                 self.set_action(id, Action::Ready);
             } else if let Some(p) = self.players.get_mut(&id) {
@@ -2686,8 +2687,9 @@ impl Survival {
         let at = self.unit_pos(target);
         let holds = alive && at.is_some_and(|a| dist2d(a, pos) <= range + 2.0 && clear_line(self.land.as_ref(), pos, a));
         if !holds || now >= until {
+            // Out of reach or out of sight: no word, the beam ends, and they say "Out of range."
             if !holds {
-                self.tell(id, format!("{} breaks.", d.name));
+                self.say_vocal(id, cues::Vocal::OutOfRange);
             }
             self.end_ability_action(id);
             self.set_action(id, Action::Ready);
