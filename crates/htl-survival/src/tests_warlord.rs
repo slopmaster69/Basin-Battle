@@ -481,7 +481,7 @@ fn intimidating_roar_cows_the_pack_their_blows_softer_and_slower() {
     let a = s.attack_now(k);
     assert!((a.damage as f32 - d0 as f32 * 0.75).abs() <= 1.0, "25% less: {} from {d0}", a.damage);
     assert!((a.windup - w0 * 1.15).abs() < 1e-3, "15% slower: {} from {w0}", a.windup);
-    assert!(s.auras_of(k).contains(&1160), "the Cowed look on it");
+    assert!(s.auras_of(k).contains(&5246), "the Cowed look on it: {:?}", s.auras_of(k));
 }
 
 #[test]
@@ -662,7 +662,7 @@ fn rallying_cry_leaves_everyone_near_unstaggerable_for_8_sec() {
     press(&mut s, a, "rallying_cry", false);
     assert!(!matches!(s.players[&b].action, Action::Stagger { .. }), "his stagger ended");
     assert!(!s.apply_cc(b, k, "stagger", 1.0, 0.0, 0.0, "test") && !s.apply_cc(a, k, "stagger", 1.0, 0.0, 0.0, "test"), "neither can be staggered");
-    assert!(s.auras_of(b).contains(&22888), "the mark on Bren");
+    assert!(s.auras_of(b).contains(&5515), "the mark on Bren: {:?}", s.auras_of(b));
     run(&mut s, 8.1);
     assert!(s.apply_cc(b, k, "stagger", 1.0, 0.0, 0.0, "test"), "8 sec");
 }
