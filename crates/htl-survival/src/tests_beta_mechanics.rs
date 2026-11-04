@@ -902,7 +902,7 @@ fn every_disengage_plays_the_same_borrowed_flip_from_the_ground_too() {
         let ends: Vec<f32> = landed
             .iter()
             .filter_map(|e| match e {
-                Event::Clip { id, clip: 39, secs } if *id == p => Some(*secs),
+                Event::Clip { id, clip: 39, secs, .. } if *id == p => Some(*secs),
                 _ => None,
             })
             .collect();

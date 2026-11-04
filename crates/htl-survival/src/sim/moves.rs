@@ -647,7 +647,7 @@ impl Survival {
             // over a stun's held pose (struck out of the air, they come down as the blow left
             // them).
             if d.leap_clip != 0 && !self.held_still(l.owner) {
-                self.events.push(Event::Clip { id: l.owner, clip: LAND_CLIP, secs: LAND_SECS });
+                self.events.push(Event::Clip { id: l.owner, clip: LAND_CLIP, secs: LAND_SECS, take: 0, from: None, at: 0.0 });
             }
             if d.impact_kit != 0 {
                 self.events.push(Event::Visual { id: l.owner, kit: d.impact_kit, by: None });
