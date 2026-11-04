@@ -87,7 +87,7 @@
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
 //!   A `cast` goes on `\t<body>` after `from`: `full` (the whole model), `upper` or `lower`
 //!   (that half alone, the rest keeping what it was doing: Skyfall's hang holds the Jump clip on
-//!   the legs while the arms draw the bow). `lower` takes client patch 0029 (`ac17`); `ac16`
+//!   the legs while the arms draw the bow). `lower` takes client patch 0036 (`ac23`); `ac22`
 //!   reads it as the whole body.
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
@@ -384,8 +384,6 @@ pub(crate) const VERSION: u32 = 2;
 /// 21: the add-on says `ac19` for a client with patch 0027 (Tripwire's rope).
 /// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0029).
 /// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0030).
-
-pub(crate) const ADDON_NEWEST: u32 = 25;
 /// `Cues.lua`. 22: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 21: a cast's `AN` line names the body its clip drives (`full`, `upper`, `lower`): Skyfall's
 /// hang on the legs alone.
@@ -399,7 +397,7 @@ pub(crate) const ADDON_NEWEST: u32 = 25;
 /// 24: the add-on preloads a cast's borrowed model before it plays (Reverse Grapple's pull).
 /// 24: the add-on says `ac22` (patches 0031 to 0035).
 /// 25: the add-on says `ac23` (patches 0036 to 0039).
-pub(crate) const ADDON_NEWEST: u32 = 25;
+pub(crate) const ADDON_NEWEST: u32 = 26;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

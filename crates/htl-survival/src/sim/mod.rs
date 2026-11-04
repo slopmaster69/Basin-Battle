@@ -244,7 +244,7 @@ pub enum Event {
     /// from a ricochet) takes the ribbon colour `ability`'s `bounce_trail` has for its `bounce`.
     MissileTint { caster: Id, spell: u32, ability: usize, bounce: u8 },
     /// A taut line from `from`'s hand to `to` for `secs` (a grappling hook pulling its hunter in,
-    /// a foe hauled in on it), drawn on a client with patch 0023.
+    /// a foe hauled in on it), drawn on a client with patch 0030.
     Tether { from: Id, to: Target, secs: f32 },
     Bags { player: Id },
     Storage,
@@ -341,7 +341,7 @@ pub enum Event {
 /// How much of a unit a clip drives ([`Event::Clip`]): all of it (the usual), its arms and
 /// torso only (a draw, a cast, the legs free to run), or its pelvis and legs only (Skyfall's
 /// hang: the legs drawn up while the arms keep drawing the bow). The lower half takes client
-/// patch 0029 (`ac17`); an older client plays it as a whole-body clip.
+/// patch 0036 (`ac23`); an older client plays it as a whole-body clip.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ClipBody {
     #[default]

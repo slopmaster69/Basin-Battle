@@ -27,7 +27,7 @@ pub const PLANT_RING: f32 = 0.5;
 /// "it looks like fire... grey? white? smaller to avoid clutter"); Frost Trap's frost (13810)
 /// and Consecration's gold (20116), tried in runs 060 and 061, are a mist and a disc the radius
 /// doesn't shrink, and twelve of them covered the whole screen. The data has no small white or
-/// grey light at a point; the arrow's own model (patch 0027, a glowing arcane arrow) marks it.
+/// grey light at a point; the arrow's own model (patch 0034, a glowing arcane arrow) marks it.
 pub const ARROW_GLOW: u32 = 0;
 pub const ARROW_GLOW_RADIUS: f32 = 0.6;
 /// A tripwire trips anything within this of the wire.

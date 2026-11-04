@@ -104,7 +104,7 @@ const ROPE_SCALE: f32 = 1.4;
 /// How high it's strung over the arrows: an ankle's height, where a tripwire catches a foot.
 const ROPE_HEIGHT: f32 = 0.2;
 const ROPE_ENTRY_NAME: &str = "Tripwire";
-/// Ours, read by client patch 0031: the object glows softly white, with a small white light at
+/// Ours, read by client patch 0038: the object glows softly white, with a small white light at
 /// it (a planted arrow, so it can be found in the grass: Corey's review, "I want the arrows to
 /// still have a white glow or indicator"). Older clients ignore it.
 pub(crate) const GO_FLAG_GLOW: u32 = 0x0800_0000;
@@ -120,9 +120,9 @@ const STAND_IN_ENTRY: u32 = 69_000;
 const STAND_IN_DISPLAY: u32 = 1359;
 const STAND_IN_SCALE: f32 = 0.001;
 const GOOD_RING_DISPLAY: u32 = 674;
-/// The clients that have patch 0027's arrow display (`ac16`): for them a planted arrow is a real
+/// The clients that have patch 0034's arrow display (`ac22`): for them a planted arrow is a real
 /// arrow stood head-down in the ground; the rest keep the feather (`PLANT_LOOK`).
-pub(crate) const ARROW_LEVEL: u8 = 16;
+pub(crate) const ARROW_LEVEL: u8 = 22;
 /// That display (the client's `EXTRA_DISPLAYS`, which must change with this): the human weapons
 /// doodad arrow (60003, `HumanArrow.m2`), placed as the doodad is, at its size; 60002 is the
 /// Hunter's own arcane arrow (`ArcaneShot_Missile.mdx`, +X nock to head, which wants a tilt of
@@ -897,7 +897,7 @@ impl SurvivalGame {
     }
 
     /// The same, as a client of round `level` draws it: from `ARROW_LEVEL` a planted arrow is a
-    /// real arrow stood in the ground (patch 0027's display), the feather for the rest. The entry
+    /// real arrow stood in the ground (patch 0034's display), the feather for the rest. The entry
     /// and the guid are the feather's for everyone, so one destroy takes it from all of them; a
     /// client draws the display the create names, not the entry's.
     pub(crate) fn obj_create_for(&mut self, id: Id, level: u8) -> Vec<Packet> {
@@ -911,7 +911,7 @@ impl SurvivalGame {
         self.bind(id, guid);
         let state = self.obj_state(&v);
         let arrow = Self::planted_arrow(&v) && level >= ARROW_LEVEL;
-        // The arrow glows white (patch 0031's flag) so it can be found in the grass; a client
+        // The arrow glows white (patch 0038's flag) so it can be found in the grass; a client
         // without the patch ignores the bit.
         let (display, scale, tilt, flags) =
             if arrow { (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT, flags | GO_FLAG_GLOW) } else { (v.display, v.scale, 0.0, flags) };
