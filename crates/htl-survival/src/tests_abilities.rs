@@ -651,10 +651,11 @@ fn a_test_hop_throws_the_hero_up_where_they_stand() {
 fn a_still_target_stands_and_strikes_nothing_but_is_moved_like_any_creature() {
     let mut s = world();
     let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
-    s.spawn_target(p, "grunt", 3.0, true, 0.2).unwrap();
+    s.spawn_target(p, "grunt", 3.0, true, false, 0.2).unwrap();
     let t = *s.targets.keys().next().expect("a target");
     let from = s.mobs[&t].pos;
     assert!((from[0] - 3.0).abs() < 0.1, "3 yd ahead: {from:?}");
+    assert!(angle_between(s.mobs[&t].facing, std::f32::consts::PI) < 1.0, "facing the hero: {}", s.mobs[&t].facing);
     assert!(s.mobs[&t].health * 5 <= s.mobs[&t].max_health + 5, "a fifth of its health: {}", s.mobs[&t].health);
     let hp = s.players[&p].health;
     for _ in 0..60 {
@@ -672,6 +673,25 @@ fn a_still_target_stands_and_strikes_nothing_but_is_moved_like_any_creature() {
     assert!(moved > 3.0, "thrown: {moved:.2}");
     assert_eq!(s.clear_targets(), 1);
     assert!(!s.mobs.contains_key(&t));
+}
+
+/// `.es target <creature> <yards> still away`: it stands with its back to the hero (a shot or a
+/// blow into its back), and keeps it turned until something turns it.
+#[test]
+fn a_target_put_up_away_stands_with_its_back_to_the_hero() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_target(p, "grunt", 8.0, true, true, 1.0).unwrap();
+    let t = *s.targets.keys().next().expect("a target");
+    assert!((s.mobs[&t].pos[0] - 8.0).abs() < 0.1, "8 yd ahead: {:?}", s.mobs[&t].pos);
+    assert!(angle_between(s.mobs[&t].facing, 0.0) < 1.0, "its back to the hero: {}", s.mobs[&t].facing);
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    assert!(angle_between(s.mobs[&t].facing, 0.0) < 1.0, "and still turned away: {}", s.mobs[&t].facing);
+    // A blow in its back from where the hero stands counts as from behind.
+    assert!(angle_between(s.mobs[&t].facing, facing(s.mobs[&t].pos, s.players[&p].pos)) > 120.0);
+    s.clear_targets();
 }
 
 /// A training dummy is there to practice on: crowd control takes hold on it and a knockback

@@ -1337,7 +1337,8 @@ impl SurvivalGame {
             // `.es dummy clear`: every training dummy goes (the visual check starts each run from
             // one fresh dummy, not a pile of them).
             // A creature to try abilities on (the visual check): `.es target <creature> [yards]
-            // [still] [hp%]`, or `.es target clear`.
+            // [still] [away] [hp%]`, or `.es target clear`. `away` turns its back to you (it
+            // faces you otherwise): for a shot or a blow into a creature's back.
             "target" if self.dev_ok() && arg == "clear" => {
                 let n = self.sim.clear_targets();
                 self.tell(conn, &format!("Cleared {n} targets."));
@@ -1347,9 +1348,10 @@ impl SurvivalGame {
                 let rest: Vec<String> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("target")).skip(2).map(|w| w.to_lowercase()).collect();
                 let yards = rest.iter().find_map(|w| w.parse::<f32>().ok()).unwrap_or(10.0);
                 let still = rest.iter().any(|w| w == "still");
+                let away = rest.iter().any(|w| w == "away");
                 let hp = rest.iter().find_map(|w| w.strip_suffix('%').and_then(|n| n.parse::<f32>().ok())).map_or(1.0, |n| n / 100.0);
-                self.sim.spawn_target(me, &arg, yards, still, hp).map(|name| {
-                    let how = if still { "stands" } else { "comes at you from" };
+                self.sim.spawn_target(me, &arg, yards, still, away, hp).map(|name| {
+                    let how = if still && away { "stands with its back to you" } else if still { "stands" } else { "comes at you from" };
                     self.tell(conn, &format!("{name} {how} {yards:.0} yd ahead."));
                 })
             }
