@@ -254,6 +254,11 @@ impl Survival {
                 if aiming || charging {
                     self.ability_cancel(id);
                 }
+                // Bladestorm: the guard ends the spin at once and comes up on this press.
+                if matches!(self.players[&id].action, Action::Channel { ability, .. } if self.content.abilities[ability].bail) {
+                    self.end_ability_action(id);
+                    self.set_action(id, Action::Ready);
+                }
                 let p = &self.players[&id];
                 if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. }) {
                     return true;
@@ -1318,7 +1323,9 @@ impl Survival {
             // one just after its own blow.
             if standing && !changed && strike.stagger > 0.0 && (winding || shoved || recovering) {
                 let riposte = self.content.combat.riposte_any_stagger;
-                self.stagger_mob(mid, strike.stagger, riposte);
+                // Battle Cry: a heavy attack's stagger lasts longer.
+                let cry = if strike.heavy() { 1.0 + self.battle_cry(id) } else { 1.0 };
+                self.stagger_mob(mid, strike.stagger * cry, riposte);
                 if winding && !shoved {
                     let wary = self.clock + self.content.combat.knock_aside_wary;
                     self.mobs.get_mut(&mid).unwrap().wary_until = wary;
@@ -1493,6 +1500,13 @@ impl Survival {
     ) {
         // A creature's blow lands as hard as its fight makes it.
         let damage = if self.mobs.contains_key(&attacker) { (damage as f32 * self.foe_blow_share(attacker)).round() as u32 } else { damage };
+        // Intervene: the blow meant for a friend strikes the Warrior who rushed in for them.
+        let (victim, area) = match self.intervened(attacker, victim) {
+            Some(g) => (g, None),
+            None => (victim, area),
+        };
+        // A Taunted hero hits anyone but the one who taunted them for less.
+        let damage = self.taunted_damage(attacker, victim, damage);
         let grace = self.players.get(&victim).map_or(0.0, |p| p.rtt.min(self.content.combat.max_grace));
         let pending = PendingStrike { attacker, victim, damage, from, blockable, heavy, parryable, style, at: self.clock + grace, area, follow, how };
         if grace <= 0.0 {

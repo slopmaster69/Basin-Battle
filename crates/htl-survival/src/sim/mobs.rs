@@ -516,6 +516,8 @@ impl Survival {
         if self.own_totem(mid, by) {
             return;
         }
+        // A Taunted hero's blows on anything but the one who taunted them are weaker.
+        let damage = self.taunted_damage(by, mid, damage);
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
@@ -543,6 +545,8 @@ impl Survival {
             let m = &self.mobs[&mid];
             let open = matches!(m.state, MobState::Recover { .. }) && m.stagger_until <= now;
             let heft = if open { heft * self.content.combat.recovery_posture.max(1.0) } else { heft };
+            // Battle Cry: a heavy attack breaks a stance faster.
+            let heft = if self.heavy_landing(by) { heft * (1.0 + self.battle_cry(by)) } else { heft };
             if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
                 return;
             }
@@ -1933,6 +1937,11 @@ impl Survival {
             a.recovery *= e.speed;
             a.cooldown *= e.speed;
             a.damage = (a.damage as f32 * e.might).round() as u32;
+        }
+        // Thunder Clap: its swings come slower.
+        let slow = self.swing_slow(id);
+        if slow > 0.0 {
+            a.windup *= 1.0 + slow;
         }
         // A wager's level, its pack's rally, and the dungeon's tier.
         let frenzy = if self.wager_has("frenzied") && (m.health as f32) < m.max_health as f32 * super::wager::FRENZY_BELOW { super::wager::FRENZY_MIGHT } else { 1.0 };

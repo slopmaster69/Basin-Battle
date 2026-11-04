@@ -1845,8 +1845,8 @@ boss = true
 posture = 240
 drops = { ore = [3, 4], bronze = [1, 2], leather = [1, 2] }
 trophy = { warlord_axe = 1, warlord_helm = 1 }
-# The Warrior's champion: every hero who fought him learns Onslaught as he falls.
-teaches = ["onslaught"]
+# The Warrior's champion: every hero who fought him learns Onslaught and Bladestorm as he falls.
+teaches = ["onslaught", "warrior_bladestorm"]
 respawn = 600.0
   [mob.attack]
   windup = 0.9
@@ -4654,6 +4654,216 @@ damage = [14.0, 14.0]
 speed = 50.0
 spell = 19434
 clip = 53
+
+# ------------------------------------------------------------------------- Warrior, the Warlord --
+# The Warrior's second choice on every key (`choice = 2`): the Warlord gives up the Juggernaut's
+# block to drive the group. Its one body slam is Tackle; its cash-in is Cleave, on an opened enemy
+# (staggered, knocked down, stunned, or a boss stance-broken). An EX shares its key's cooldown.
+# First numbers for tuning (Corey's blueprint, Nov 2). None of it seen in the client yet.
+
+# Q: the axe that holds a spot. 12 a second for 5 sec within 3 yd (a tick each half second), and
+# the recast tears it back through the pack for 16.
+[[ability]]
+key = "ravager"
+name = "Ravager"
+text = "Hurls a great axe to the target spot up to 20 yd away. It lands spinning and stays for 5 sec. Enemies within 3 yd of it take 6 damage every 0.5 sec. Recast to recall it. It tears back to you, dealing 16 damage to every enemy in its 2 yd wide path."
+icon = "INV_Axe_09"
+school = "warrior"
+slot = "ranged"
+choice = 2
+kind = "ground"
+range = [20.0, 20.0]
+radius = [3.0, 3.0]
+# The axe's flight: Grasping Axe's spinning axe flown to the spot as it's hurled, landing as it
+# arrives (20 yd at its 40 yd a sec).
+delay = 0.5
+look_lead = 0.5
+spell = 24020
+linger = 5.0
+linger_damage = 12.0
+tick = 0.5
+# Whirlwind's spin where it stands (to be checked in the lab).
+linger_spell = 1680
+cooldown = 10.0
+clip = 107
+valor_hit = 3.0
+recast = "ravager_recall"
+recast_secs = 5.5
+
+[[ability]]
+key = "ravager_recall"
+name = "Ravager"
+text = "Ravager's recall. Tears the axe back to you, dealing 16 damage to every enemy in its 2 yd wide path."
+icon = "INV_Axe_09"
+inner = true
+slot = "ranged"
+kind = "line"
+at_once = true
+tears_back = true
+range = [20.0, 20.0]
+radius = [1.0, 1.0]
+damage = [16.0, 16.0]
+speed = 40.0
+spell = 24020
+valor_hit = 4.0
+
+# Q's EX: the spear that pulls the fight off a friend. A Taunt isn't crowd control: the enemy acts
+# freely, on you, so it works on a boss too.
+[[ability]]
+key = "heroic_throw"
+name = "Heroic Throw"
+ex_of = "ravager"
+text = "Throws a spear 30 yd along the aimed line. It pierces up to 3 enemies, dealing 16 damage to each and Taunting them for 4 sec (2 sec against heroes). A Taunted enemy attacks only you. A Taunted hero deals 30% less damage to anyone but you."
+icon = "INV_Spear_02"
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [16.0, 16.0]
+range = [30.0, 30.0]
+radius = [0.45, 0.45]
+pierce = 2
+# Level along the line, so it goes through all three, not over the third.
+skims = true
+# The Darkspear's thrown spear, at its own speed.
+speed = 30.0
+spell = 23065
+clip = 107
+# Taunt's red flash on each one pierced.
+effects = [{ kind = "taunt", secs = [4.0, 4.0], amount = 0.3, aura = 355 }]
+
+# E: the crowd cash-in. No knockback, no stagger: it just hits the opened hard.
+[[ability]]
+key = "cleave"
+name = "Cleave"
+text = "After a 0.5 sec windup, swings your weapon through a 180° arc in front of you, 5 yd deep. Enemies hit take 100% weapon damage. Opened enemies (staggered, knocked down, stunned or stance-broken) take 250% instead."
+icon = "Ability_Warrior_Cleave"
+school = "warrior"
+slot = "close"
+choice = 2
+kind = "cone"
+range = [5.0, 5.0]
+arc = 180.0
+cast = 0.5
+weapon = 1.0
+opened = 2.5
+cooldown = 8.0
+# The two-handed sweep over the windup.
+clip = 19
+spell = 845
+valor_hit = 6.0
+
+# E's EX: the stomp that makes the openings easier to earn. Slowed swings aren't crowd control:
+# the pack still acts, just slower, so its blows are easier to parry.
+[[ability]]
+key = "thunder_clap"
+name = "Thunder Clap"
+ex_of = "cleave"
+text = "Stomps the ground. Enemies within 8 yd take 8 damage, and their attacks wind up 30% slower for 6 sec. A boss's attacks wind up 15% slower for 4 sec."
+icon = "Spell_Nature_ThunderClap"
+slot = "close"
+kind = "nova"
+valor = 25
+damage = [8.0, 8.0]
+radius = [8.0, 8.0]
+spell = 6343
+effects = [{ kind = "slow_attacks", secs = [6.0, 6.0], amount = 0.3 }]
+
+# 1: the Warrior's one body slam (Beta's Wall Slam retires into it). The rush is short, so the
+# skill is the angle: the wall, the tree or the second enemy behind your target.
+[[ability]]
+key = "tackle"
+name = "Tackle"
+text = "Lowers your shoulder and rushes 8 yd along your aim. The first enemy you meet is carried to the end of the rush. If you drive it into a wall, tree or rock, it Crashes for 20 damage and is stunned for 1.5 sec (0.75 sec against heroes). If you drive it into another enemy, both Crash for 14 damage and are knocked down for 1 sec. Otherwise it is dropped at your feet for 10 damage. An enemy that can't be moved stops the rush. Heroes are carried at most 4 yd. You cannot be staggered during the rush. Costs 12 stamina."
+icon = "Ability_Warrior_PunishingBlow"
+school = "warrior"
+slot = "utility"
+choice = 2
+kind = "dash"
+range = [8.0, 8.0]
+damage = [10.0, 10.0]
+stamina = 12.0
+cooldown = 12.0
+# Charge's rush trail; the Crash is the dust and the heavy flash on the one crashed.
+spell = 100
+valor_hit = 6.0
+self_effects = [{ kind = "steadfast", secs = [0.4, 0.4], amount = 1.0 }]
+crash = { wall_damage = 20.0, wall_stun = 1.5, foe_damage = 14.0, knockdown = 1.0, posture = 35, boss_posture = 20, hero_carry = 4.0 }
+
+# 1's EX: the same moment (close the gap now), the other answer: toward a friend.
+[[ability]]
+key = "intervene"
+name = "Intervene"
+ex_of = "tackle"
+text = "Rushes up to 25 yd to the ally nearest your reticle. For 3 sec, the first blow aimed at them strikes you instead. If your guard is up when it lands, your guard takes it."
+icon = "Ability_Warrior_DefensiveStance"
+slot = "utility"
+kind = "ally"
+valor = 25
+range = [25.0, 25.0]
+intervene = 3.0
+spell = 100
+# Blessing of Sacrifice's gold on the friend while it holds.
+aura = 6940
+
+# 2: the group's stamina. The Warlord's defense is everyone's staying power.
+[[ability]]
+key = "rallying_cry"
+name = "Rallying Cry"
+text = "You and allies within 15 yd regain 40 stamina."
+icon = "Ability_Warrior_BattleShout"
+school = "warrior"
+slot = "defense"
+choice = 2
+kind = "nova"
+radius = [15.0, 15.0]
+ally_stamina = 40.0
+cooldown = 16.0
+# The roar, and Battle Shout's look on every ally it reaches.
+clip = 55
+ally_spell = 6673
+
+# 2's EX: the push when the enemy is open.
+[[ability]]
+key = "battle_cry"
+name = "Battle Cry"
+ex_of = "rallying_cry"
+text = "You and allies within 15 yd deal 50% more posture damage with heavy attacks for 8 sec. Staggers from those heavy attacks last 50% longer."
+icon = "Ability_Warrior_WarCry"
+slot = "defense"
+kind = "nova"
+valor = 25
+radius = [15.0, 15.0]
+clip = 55
+# Rallying Cry of the Dragonslayer's red-gold flare on each ally (to be checked in the lab).
+ally_spell = 22888
+ally_effects = [{ kind = "battle_cry", secs = [8.0, 8.0], amount = 0.5 }]
+
+# 3: the spin that ramps (Beta's Whirlwind retires into it). 4, then 1 more a strike up to 15, two
+# a second: a full 6 sec is 114 to each enemy in reach, nearly half of it in the last 2 sec.
+[[ability]]
+key = "warrior_bladestorm"
+name = "Bladestorm"
+text = "Spin with your weapon out for up to 6 sec, moving at 70% speed and striking every enemy within 5 yd twice a sec. The first strike deals 4 damage, and each strike after deals 1 more, up to 15. You can't attack, guard or use other abilities while you spin, and a stagger or a stun ends it. Dodge or guard to end it at once, and the dodge or the guard comes out on that same press. Press again to stop."
+icon = "Ability_Whirlwind"
+school = "warrior"
+slot = "ultimate"
+choice = 2
+kind = "beam"
+valor = 100
+cooldown = 40.0
+around = true
+bail = true
+radius = [5.0, 5.0]
+secs = 6.0
+tick = 0.5
+damage = [8.0, 8.0]
+ramp = 1.0
+ramp_cap = 15.0
+# Whirlwind's spin and its aura, as Beta's; Sweeping Strikes' flare as the ramp tops out.
+spell = 1680
+aura = 9632
+tick_spell = 779
+valor_hit = 1.0
 
 # ------------------------------------------------------------------------------------ Rogue --
 
@@ -10027,7 +10237,7 @@ name = "The Garrison's Banner"
 at = [-9885.0, 675.0]
 display = 631
 scale = 1.0
-teaches = ["hurled_axe", "shockwave"]
+teaches = ["hurled_axe", "shockwave", "ravager", "cleave"]
 keep = true
 secs = 3.0
 text = "Westbrook's banner, carried off by the Riverpaw. The garrison's footmen learned the throw under it, and the slam that drives a line back."
@@ -10133,7 +10343,7 @@ trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 key = "relic_warrior"
 name = "A Veteran's Kit"
 at = [-9888.0, 220.0]
-teaches = ["charge", "retaliation"]
+teaches = ["charge", "retaliation", "tackle", "rallying_cry"]
 loot = { bronze = 1, leather = 1 }
 display = 259
 secret = 7.0
