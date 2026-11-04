@@ -3220,7 +3220,11 @@ cooldown = 8.0
 clip = 18
 take = 0
 from = "NightElfMale"
-spell = 25425
+# Force Punch's look (24189): the same ThunderClap shock ring as Shockwave's own (25425), but
+# with no cast animation of its own. 25425's cast anim 54 threw the hero's hand up after the
+# chop (Corey's "Michael Jackson" hand, his review, Nov 3); every other ThunderClap look in the
+# game data plays some body anim (the lab's find, Nov 4).
+spell = 24189
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
 
