@@ -4460,24 +4460,21 @@ radius = [0.3, 0.3]
 speed = 40.0
 # Hotter each bounce (Corey's review: "every bounce should change the color of the trail"):
 # yellow as it flies, orange off the first wall, red off the second. Drawn on a client with patch
-# 0022.
+# 0029.
 bounce_trail = ["FFE27A", "FF9A2A", "FF3A1A"]
 bounces = 2
 bounce_gain = 0.5
 cooldown = 4.0
 # The Hunter's arrow (Aimed Shot's, at its speed, flown with the bow's ammo), seen the whole way:
-# each leg off a wall flies from where it struck. A burst of fire where it strikes a wall (the
-# Lava Burst's landing); off the ground, no burst at all, so a skip doesn't read as an explosion
-# (Corey's review, run 040): the data has no small splash of dirt at a point (the burrow burst,
-# 26271, left a pile of boulders for seconds in run 050). The arrow's ribbon flying on from the
-# ground shows the skip.
-spell = 19434
-burst_spell = 5162
-skip_spell = 0
 # each leg off a wall flies from where it struck. No burst where it strikes: a bounce shows no
 # burst (Corey's review: the Lava Burst's landing there read as the arrow going off in the inn
-# wall; the arrow flown on from the wall, harder each bounce, is the bounce's look).
+# wall; the arrow flown on from the wall, harder each bounce, is the bounce's look). Off the
+# ground, no burst either, so a skip doesn't read as an explosion (Corey's review, run 040): the
+# data has no small splash of dirt at a point (the burrow burst, 26271, left a pile of boulders
+# for seconds in run 050). The arrow's ribbon flying on from the ground shows the skip.
+spell = 19434
 burst_spell = 0
+skip_spell = 0
 clip = 53
 valor_hit = 5.0
 plants = true
