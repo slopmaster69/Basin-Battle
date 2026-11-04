@@ -1316,7 +1316,7 @@ impl Survival {
                 (self.roll(w.damage) as f32 * strike.damage * might * self.blow_share(id)).round() as u32
             };
             // From behind (a backstab): harder, unless it's a riposte already.
-            let behind = !reeling && self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, pos)) >= BACKSTAB_ARC);
+            let behind = !reeling && self.from_behind(mid, pos);
             let stab = if w.backstab > 0.0 { w.backstab } else { self.content.combat.backstab };
             // Stabbed in the back again and again, it's ready for it: each backstab lately (more
             // so with more heroes on it) takes from the next one's bonus.
@@ -2410,7 +2410,11 @@ impl Survival {
             let mut base = self.roll(w.damage) as f32 * d.weapon * might;
             if behind && d.behind > 0.0 {
                 base *= d.behind;
-                // Its stab shows (the riposte's kit, below) with a dagger's crit and a beat.
+            }
+            // Any art in a foe's back is a backstab (Corey: the backstab is any character's hit
+            // in an enemy's back, not the rogue's ability): its stab shows (the riposte's kit,
+            // below) with a dagger's crit and a beat. Only Backstab's own `behind` makes it harder.
+            if behind {
                 self.cue(Some(id), v, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
             }
             if self.players.contains_key(&v) {
@@ -2419,7 +2423,7 @@ impl Survival {
             } else {
                 self.ability_on_mob(id, v, ability, 1.0, base, pos, HitKind::Melee, d.spell);
             }
-            let kit = if behind && d.behind > 0.0 { KIT_RIPOSTE } else { KIT_SLAM };
+            let kit = if behind { KIT_RIPOSTE } else { KIT_SLAM };
             if self.alive(v) {
                 self.events.push(Event::Visual { id: v, kit, by: Some(id) });
                 // The art's own impact beside the heavy flash (Sundering Blow's armor crack).
@@ -2580,6 +2584,12 @@ impl Survival {
     #[cfg(test)]
     pub(crate) fn backstab_bonus_for_test(&mut self, mid: Id) -> f32 {
         self.backstab_bonus(mid, 2.0)
+    }
+
+    /// A blow on creature `mid` from `at` lands in its back: `at` is more than `BACKSTAB_ARC`
+    /// off the way it faces. The one rule for every hit a hero lands (a swing, an art, an arrow).
+    pub(crate) fn from_behind(&self, mid: Id, at: Vec3) -> bool {
+        self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, at)) >= BACKSTAB_ARC)
     }
 
     /// A backstab's bonus on a creature, less for each one it took lately.
