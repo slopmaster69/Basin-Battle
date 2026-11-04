@@ -4879,12 +4879,25 @@ range = [40.0, 40.0]
 radius = [0.4, 0.4]
 pierce = 9
 execute = 0.25
-speed = 50.0
+# As fast as a shot flies in 1.12: Fire Shot's missile (80 yd/s; no arrow flies faster than 40,
+# and the client flies a missile at its own spell's speed, so this keeps the rules in step with
+# the look). Corey's review, Nov 4: it looked too like Aimed Shot; for him to judge on video.
+speed = 80.0
 cooldown = 40.0
 # Arcane Shot's glowing arrow, as Aimed Shot's full draw.
 spell = 3044
 impact_kit = 437
+spell = 10346
 clip = 53
+# The power behind it: speed lines on the hunter's own screen as it goes; on each foe it goes
+# through, the heavy blow's flash (437) and crack (238, HeavyWeaponCritical) and its reel; a kill
+# lands with a colossal stone's fall (930, mDeathImpactColossalStoneA) from the foe's spot, for
+# everyone near, and a hit-stop and shake on the hunter's screen alone.
+beat = "kill_shot"
+through_kit = 437
+through_sound = 238
+kill_sound = 930
+kill_beat = "kill_shot_kill"
 
 # 3, the second choice: up above the fight, then rain on it. The leap tops out and hangs there
 # (5.5 s, in `sim/hunter.rs`), the bow drawn on the volley's circle; a click or the key again

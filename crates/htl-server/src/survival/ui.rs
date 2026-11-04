@@ -111,6 +111,8 @@
 //! - `DP`, `DM`: the damage meters (see `meter_ui.rs`).
 //! - `EM\t<slot>\t<secs>`: the key in that slot is empowered (a combo) for `secs` more: its next
 //!   press is its EX version, for no Valor; `EM\t<slot>`: spent or gone.
+//! - `BT\t<beat>\t<guid>`: a beat on the hero's own screen alone: `kill_shot` as Kill Shot goes
+//!   (its speed lines), `kill_shot_kill` as it kills (`guid` the foe: a hit-stop and shake).
 
 use std::fmt::Write as _;
 
@@ -355,6 +357,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 21: a hook's pull flies the hero flat (Swim), the clip fitted to the flight (`FP`).
 /// 21: Ensnaring Retreat's borrowed jump fitted to the flight (`FP`), so it ends as the hero
 /// lands.
+/// 21: Kill Shot's weight on the hunter's screen (`BT`: its speed lines as it goes, its hit-stop
+/// and shake as it kills).
 pub(crate) const ADDON_NEWEST: u32 = 21;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim

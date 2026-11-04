@@ -959,6 +959,25 @@ function ES.ImpactLine(f)
   end
 end
 
+-- BT: a beat on our screen alone (what everyone sees and hears, the server plays on the bodies):
+-- Kill Shot's speed lines and a kick as it goes; the hit-stop, shake and kick as it kills, the
+-- foe it felled held still with us.
+ES.BEAT = {
+  kill_shot = { lines = true, kick = { 0.08, 0.3 } },
+  kill_shot_kill = { stop = 260, shake = { 2.0, 0.3 }, kick = { 0.1, 0.4 } },
+}
+function ES.BeatLine(f)
+  local b = ES.BEAT[f[2] or ""]
+  if not b then return end
+  if b.lines and ES.KillLines then ES.KillLines() end
+  if b.stop and HitStop then
+    HitStop("player", b.stop)
+    if f[3] and f[3] ~= "0x0" then HitStop(f[3], b.stop) end
+  end
+  if b.shake and ShakeCamera then ShakeCamera(b.shake[1], b.shake[2]) end
+  if b.kick and CameraKick then CameraKick(b.kick[1], b.kick[2]) end
+end
+
 -- Our own blow reaching its impact keyframe: what the blade crosses takes its weight here and now
 -- (the server's word follows, and isn't played twice).
 ES.localHit = nil
@@ -2184,6 +2203,38 @@ empower:SetScript("OnUpdate", function()
   if this.flash <= 0 then this:Hide() end
 end)
 ES.empower = empower
+
+-- Kill Shot going, on our screen: an action scene's speed lines rush in from the edges, over the
+-- world and under the windows, and swell a little as they fade in a third of a second (Corey's
+-- review, Nov 4: the shot should read as the strongest). The frame is sized to the screen and
+-- anchored at its middle, so the swell is about the aim. (`ES.killlines`, not a local: the main
+-- chunk is near Lua 5.0's limit.)
+ES.killlines = CreateFrame("Frame", "ElwynnSurvivalKillLines", UIParent)
+ES.killlines:SetFrameStrata("FULLSCREEN")
+ES.killlines:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+ES.killlines.lines = Tex(ES.killlines, "ARTWORK", "speedlines")
+ES.killlines.lines:SetAllPoints(ES.killlines)
+ES.killlines.left = 0
+ES.killlines:Hide()
+ES.killlines:SetScript("OnUpdate", function()
+  this.left = this.left - arg1
+  if this.left <= 0 then
+    this:Hide()
+    return
+  end
+  local share = this.left / 0.35
+  this:SetAlpha(share)
+  this:SetScale(1 + 0.08 * (1 - share))
+end)
+function ES.KillLines()
+  local f = ES.killlines
+  f:SetWidth(UIParent:GetWidth())
+  f:SetHeight(UIParent:GetHeight())
+  f:SetScale(1)
+  f:SetAlpha(1)
+  f.left = 0.35
+  f:Show()
+end
 
 -- Drawing a Hunter's bow: the camera leans in over the shoulder as the draw builds (deeper for
 -- the ultimate), and at full draw the view trembles until the shot goes (Corey's review: Aimed
@@ -6457,6 +6508,8 @@ function ES.Line(line)
     ES.HealLine(f)
   elseif verb == "HO" then
     ES.HealOtherLine(f)
+  elseif verb == "BT" then
+    ES.BeatLine(f)
   elseif verb == "ST" then
     -- A swing called off (a feint): ours went at once; another's lets go now.
     if f[3] == "1" then
