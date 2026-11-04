@@ -133,6 +133,10 @@ pub struct AbilityDef {
     /// The cone's width (degrees).
     #[serde(default)]
     pub arc: f32,
+    /// Its shape flashed on the ground as it lands (a cone's wedge, a nova's ring), on the clients
+    /// that draw one (patch 0026's `PlayGroundBurst`): an effect, not a floor marker.
+    #[serde(default)]
+    pub burst: Option<BurstDef>,
     /// Ground: seconds between the mark and the landing; then burning ground this long, at this
     /// much a second.
     #[serde(default)]
@@ -590,6 +594,14 @@ pub struct CrashDef {
 
 fn first_choice() -> u32 {
     1
+}
+
+/// A shape flashed on the ground as an ability lands: a shock front runs out to the edge over most
+/// of `secs` and fades, in `colour` (`RRGGBB`).
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct BurstDef {
+    pub secs: f32,
+    pub colour: String,
 }
 
 /// Bladestorm's flurry, as the client plays it (patch 0025's `PlayUnitFlurry`): `cuts` the clips

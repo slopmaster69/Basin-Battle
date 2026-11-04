@@ -6438,6 +6438,13 @@ function ES.Line(line)
     ES.SwingLine(f)
   elseif verb == "FU" then
     ES.FlurryLine(f)
+  elseif verb == "GB" then
+    -- A shape flashed on the ground as an ability lands (Shockwave's cone), on a client with
+    -- patch 0026: an effect, drawn whatever the floor markers are set to.
+    if PlayGroundBurst then
+      PlayGroundBurst(tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 0,
+        f[6] or "wedge", tonumber(f[7]) or 5, tonumber(f[8]) or 90, tonumber(f[9]) or 0.35, f[10] or "C0E8FF", tonumber(f[11]) or 0)
+    end
   elseif verb == "IM" then
     ES.ImpactLine(f)
   elseif verb == "RO" then
@@ -6537,8 +6544,11 @@ events:SetScript("OnEvent", function()
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
     -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
-    -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and (tonumber(HasActionCombat()) or 0) >= 17 then
+    -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
+    -- ac18: a shape flashed on the ground as an ability lands (0026).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
+      Say(".es hello " .. VERSION .. " ac18")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and (tonumber(HasActionCombat()) or 0) >= 17 then
       Say(".es hello " .. VERSION .. " ac17")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
       Say(".es hello " .. VERSION .. " ac12")

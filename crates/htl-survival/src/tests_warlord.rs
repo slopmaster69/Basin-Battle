@@ -796,6 +796,19 @@ fn bladestorm_tells_the_clients_its_flurry_and_flashes_each_cut_that_lands() {
 }
 
 #[test]
+fn shockwave_bursts_its_cone_on_the_ground_as_it_lands() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut ev = cast(&mut s, p, "shockwave", false, 0.0, 0.0);
+    ev.extend(run(&mut s, 0.6));
+    let d = s.content.abilities.iter().find(|a| a.key == "shockwave").unwrap();
+    let b = d.burst.as_ref().expect("Shockwave has a burst");
+    let found = ev.iter().any(|e| matches!(e, Event::GroundBurst { shape: "wedge", reach, arc, secs, colour, .. }
+        if (*reach - d.range[0]).abs() < 0.1 && (*arc - d.arc).abs() < 0.1 && (*secs - b.secs).abs() < 1e-3 && *colour == b.colour));
+    assert!(found, "the cone flashed on the ground as it lands: {ev:?}");
+}
+
+#[test]
 fn bladestorm_walks_at_70_percent_of_a_run() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);

@@ -2324,6 +2324,10 @@ impl Survival {
         // every unit it names as struck, and some impacts are a knockdown (Shockwave's put its
         // own caster on the ground).
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
+        // Its shape flashed on the ground as it lands, where the look alone is a ring (Shockwave).
+        if let Some(b) = &d.burst {
+            self.events.push(Event::GroundBurst { at, yaw, shape: "wedge", reach: range, arc: d.arc.max(10.0), width: 0.0, secs: b.secs, colour: b.colour.clone() });
+        }
         // A blow of the weapon's (Shockwave, Retaliation's sweep): a share of its roll.
         let swing = self.players.get(&id).filter(|_| d.weapon > 0.0).map(|p| self.weapon_of(p).damage);
         let damage = match swing {

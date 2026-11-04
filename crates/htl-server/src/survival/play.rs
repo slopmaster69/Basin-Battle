@@ -830,6 +830,15 @@ impl SurvivalGame {
                     self.ui_line(c, &line);
                 }
             }
+            Event::GroundBurst { at, yaw, shape, reach, arc, width, secs, colour } => {
+                // A shape flashed on the ground, for the clients that draw one (the add-on asks
+                // its client; an older client ignores the line).
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                let line = format!("GB\t{:.2}\t{:.2}\t{:.2}\t{yaw:.3}\t{shape}\t{reach:.2}\t{arc:.0}\t{secs:.2}\t{colour}\t{width:.2}", at[0], at[1], at[2]);
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::ClipStop { id } => {
                 // A feint: the swing let go on the clients that play clips (the caster's own
                 // marked, which has let it go already).
