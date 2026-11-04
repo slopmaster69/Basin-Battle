@@ -75,11 +75,14 @@ const GOOD_RING_DISPLAY: u32 = 674;
 /// The clients that have patch 0027's arrow display (`ac16`): for them a planted arrow is a real
 /// arrow stood head-down in the ground; the rest keep the feather (`PLANT_LOOK`).
 pub(crate) const ARROW_LEVEL: u8 = 16;
-/// That display (the Hunter's arrow, `ArcaneShot_Missile.mdx`; the client's `EXTRA_DISPLAYS`,
-/// which must change with this), its size, and how far it leans from upright (radians).
-const ARROW_DISPLAY: u32 = 60_002;
+/// That display (the client's `EXTRA_DISPLAYS`, which must change with this): the human weapons
+/// doodad arrow (60003, `HumanArrow.m2`), placed as the doodad is, at its size; 60002 is the
+/// Hunter's own arcane arrow (`ArcaneShot_Missile.mdx`, +X nock to head, which wants a tilt of
+/// a quarter turn to stand: run 061 read it as a purple spike), 60004 the plain ammo arrow in
+/// flight (+X too). `ARROW_TILT` turns the model about its Y after its facing (radians).
+const ARROW_DISPLAY: u32 = 60_003;
 const ARROW_SCALE: f32 = 1.0;
-const ARROW_LEAN: f32 = 0.3;
+const ARROW_TILT: f32 = 0.0;
 
 /// Equipment slots, as the client numbers them.
 pub(crate) const SLOT_MAIN_HAND: u8 = 15;
@@ -789,7 +792,7 @@ impl SurvivalGame {
         self.bind(id, guid);
         let state = self.obj_state(&v);
         let arrow = Self::planted_arrow(&v) && level >= ARROW_LEVEL;
-        let (display, scale, tilt) = if arrow { (ARROW_DISPLAY, ARROW_SCALE, std::f32::consts::FRAC_PI_2 - ARROW_LEAN) } else { (v.display, v.scale, 0.0) };
+        let (display, scale, tilt) = if arrow { (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT) } else { (v.display, v.scale, 0.0) };
         let mut out = vec![Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt)];
         if let ObjKind::Ghost { def, ok, .. } = v.kind {
             let r = self.sim.content.stations[def].footprint;
