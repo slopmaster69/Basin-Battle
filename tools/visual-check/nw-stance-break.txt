@@ -1,0 +1,32 @@
+# No words (#135), a champion's stance breaking: Captain Grashak (posture 130 within 6 s) 8 yd
+# off, standing still; a full Kill Shot (60) then Multi-Shots (up to 90 each) a second apart
+# until it breaks. Look for: dust bursting off him as he reels, a great mace's crack on metal,
+# the long stop and heavy shake; no "Break!" or stance word.
+hero hunter
+cam 40 -12 10
+include _setup
+4.2 .es dummy clear
+4.4 .es target captain 8 still
+5.0 .es slot 3 kill_shot
+5.2 .es slot q aimed_arrow
+6.0 .es in ab 4 0                    # Kill Shot, the draw held
+6.3 .es in a {facing} 0.0
+7.9 .es in au {facing} 0.0
+8.1 .es valor full
+8.3 .es in ab 0 1                    # Ctrl+Q: Multi-Shot
+8.6 .es in a {facing} 0.0
+8.7 .es in au {facing} 0.0
+9.1 .es valor full
+9.3 .es in ab 0 1
+9.6 .es in a {facing} 0.0
+9.7 .es in au {facing} 0.0
+10.1 .es valor full
+10.3 .es in ab 0 1
+10.6 .es in a {facing} 0.0
+10.7 .es in au {facing} 0.0
+11.1 .es valor full
+11.3 .es in ab 0 1
+11.6 .es in a {facing} 0.0
+11.7 .es in au {facing} 0.0
+8.0 shots break 20 0.2
+14 end
