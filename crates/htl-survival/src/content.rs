@@ -128,6 +128,8 @@ pub struct Content {
     /// What a hit in a creature's back looks like, whoever lands it.
     #[serde(default)]
     pub backstab: BackstabDef,
+    /// How the ice shatters off a frozen foe: the same for every class.
+    pub shatter: ShatterDef,
     #[serde(default)]
     pub dev: DevDef,
     /// How long the work at the camp takes: making something at a station, building one, mending.
@@ -363,6 +365,28 @@ pub struct ParryDef {
     /// posture instead (so parries break a boss's stance, they don't lock it).
     #[serde(default)]
     pub posture: f32,
+}
+
+/// The ice shattering off a frozen foe (a shattering ability on it): one look for every class,
+/// whoever's ability it was (Corey: "SHATTER is a global effect not a class specific effect").
+/// Besides the frost burst (kit 450), the sound and the beat, a short pale radial burst on the
+/// foe, action lines round the shatter (Corey: "small bursty action lines on the target").
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct ShatterDef {
+    /// The action lines' look (`SpellVisualKit`), on the shattered foe with the frost burst; 0
+    /// for none. Picks by model name, none seen on video yet (`.es tune shatter.burst_kit <id>`
+    /// to try another): 121 `Holy_ImpactDD_Low_Chest` (Vindication's impact, a small white-gold
+    /// flash with radial spikes at the chest); 487 `Exorcism_Impact_Chest` (a bigger holy burst,
+    /// yellow-white rays); 3381 `starfire_area` (Starfire's white-blue starburst, the biggest,
+    /// drawn at the foe's base); 283 `LightningBolt_Impact_Chest` (a white-blue electric flash).
+    pub burst_kit: u32,
+}
+
+impl Default for ShatterDef {
+    fn default() -> Self {
+        Self { burst_kit: 121 }
+    }
 }
 
 /// The heavy attack (Shift with the left mouse): slower to come, harder to take.

@@ -579,6 +579,8 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     assert_eq!(missiles(&ev, p, 6984), 5, "five arrows");
     assert!(s.players[&p].valor + 0.01 >= valor, "no Valor spent: {valor} then {}", s.players[&p].valor);
     assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST), "the ice shatters");
+    // The same shatter as a Mage's: the action lines' burst on the frozen one too.
+    assert!(s.content.shatter.burst_kit != 0 && crate::sim::cues::seen::looked(&ev, k, s.content.shatter.burst_kit), "the shatter's action lines");
     assert!(!flashed(&ev, p, "Shatter"), "no word");
     assert!(!s.has_cc(k, "petrify"));
     assert!(s.empowered_keys(p).is_empty(), "spent");

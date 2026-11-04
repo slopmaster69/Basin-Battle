@@ -187,5 +187,10 @@ mod tests {
         let (c8, old) = c.tuned("backstab.kit", "290").unwrap();
         assert_eq!(old.as_deref(), Some("220"));
         assert_eq!(c8.backstab.kit, 290);
+        // The shatter's action lines, swapped for another kit to film it.
+        assert_eq!(c.shatter.burst_kit, 121);
+        let (c7, old) = c.tuned("shatter.burst_kit", "487").unwrap();
+        assert_eq!(old.as_deref(), Some("121"));
+        assert_eq!(c7.shatter.burst_kit, 487);
     }
 }
