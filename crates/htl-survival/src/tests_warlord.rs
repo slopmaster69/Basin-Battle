@@ -213,6 +213,17 @@ fn tackle_drives_an_enemy_into_a_wall_and_it_crashes_stunned() {
 }
 
 #[test]
+fn tackle_kicks_up_dust_from_its_first_step() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _k = mob(&mut s, "brave", [6.0, 0.0, 0.0]);
+    let mut ev = cast(&mut s, p, "tackle", false, 0.0, 0.0);
+    ev.extend(run(&mut s, 0.45));
+    let puffs = ev.iter().filter(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == 5649)).count(); // 5649: the knockdown's dust (combat::KIT_DUST)
+    assert!(puffs >= 2, "dust from the feet through the rush, not Charge's purple: {puffs}");
+}
+
+#[test]
 fn tackle_into_another_enemy_knocks_both_down() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -708,6 +719,30 @@ fn bladestorm_ramps_a_point_a_strike_up_to_15() {
     assert_eq!(hits, (4..=15).collect::<Vec<u32>>(), "4, then 1 more a strike, up to 15");
     assert_eq!(hits.iter().sum::<u32>(), 114);
     assert!(!matches!(s.players[&p].action, Action::Channel { .. }), "done after 6 sec");
+}
+
+#[test]
+fn bladestorm_tells_the_clients_its_flurry_and_flashes_each_cut_that_lands() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "warlord", [3.5, 0.0, 0.0]);
+    let mut ev = spin(&mut s, p);
+    let flurry = ev.iter().find_map(|e| match e {
+        Event::Flurry { id, secs, def } if *id == p => Some((*secs, def.clone())),
+        _ => None,
+    });
+    let (secs, def) = flurry.expect("the flurry told as the spin starts");
+    assert!((secs - 6.0).abs() < 1e-3, "for the spin's whole time: {secs}");
+    assert_eq!(def.from.as_deref(), Some("OrcMale"), "the same model's cuts on every race");
+    assert!(def.cuts.len() >= 4 && def.cut > 0.0 && def.finish_secs > 0.0, "{def:?}");
+    assert_eq!(def.cuts_text().split(',').count(), def.cuts.len());
+    assert!(!ev.iter().any(|e| matches!(e, Event::ClipStop { id } if *id == p)), "not stopped as it starts");
+    ev.extend(run(&mut s, 1.0));
+    let kit = s.content.abilities.iter().find(|a| a.key == "warrior_bladestorm").unwrap().impact_kit;
+    assert!(kit != 0, "a flash on what a cut lands on");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: k2, .. } if *id == k && *k2 == kit)), "the flash on the struck brave");
+    ev.extend(run(&mut s, 6.0));
+    assert!(ev.iter().any(|e| matches!(e, Event::ClipStop { id } if *id == p)), "the spin's end finishes the flurry");
 }
 
 #[test]

@@ -502,6 +502,10 @@ pub struct AbilityDef {
     pub ramp: f32,
     #[serde(default)]
     pub ramp_cap: f32,
+    /// A beam the clients that play clips show as a storm of cuts in turning directions
+    /// (Bladestorm's flurry), over the spell's own spin.
+    #[serde(default)]
+    pub flurry: Option<FlurryDef>,
     /// A channel the guard ends at once, raising the guard on that press (a dodge ends any
     /// channel and comes out on its press already): Bladestorm.
     #[serde(default)]
@@ -586,6 +590,34 @@ pub struct CrashDef {
 
 fn first_choice() -> u32 {
     1
+}
+
+/// Bladestorm's flurry, as the client plays it (patch 0025's `PlayUnitFlurry`): `cuts` the clips
+/// and takes it cycles through, from the character model `from` names (the same on every race),
+/// each `cut` seconds long, the first wound up over `windup` (the anticipation: the draw-back,
+/// compact); the body snaps round `turn` degrees a step to face a new way for each; each trails
+/// the weapons in `trail` (`AARRGGBB`) for `trail_ms`. When the spin ends, one wider sweep
+/// (`finish`, over `finish_secs`, its trail hanging longer) as the body comes back to face ahead.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct FlurryDef {
+    pub from: Option<String>,
+    pub cuts: Vec<[u32; 2]>,
+    pub cut: f32,
+    pub windup: f32,
+    pub finish: [u32; 2],
+    pub finish_secs: f32,
+    pub turn: f32,
+    #[serde(default)]
+    pub trail: String,
+    #[serde(default)]
+    pub trail_ms: u32,
+}
+
+impl FlurryDef {
+    /// Clips and takes as the client's call reads them: `"88/0,87/0"`.
+    pub fn cuts_text(&self) -> String {
+        self.cuts.iter().map(|[c, t]| format!("{c}/{t}")).collect::<Vec<_>>().join(",")
+    }
 }
 
 /// The Hunter's own mechanics an ability can name (`hunt`).

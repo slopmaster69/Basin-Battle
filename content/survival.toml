@@ -4908,7 +4908,8 @@ cooldown = 12.0
 # Charge (Corey's review, Nov 3; seen again in the lab on Intercept's, Nov 4), and the ground
 # bursts (Rocky Ground Impact) are blue rings that read as a second Shockwave. The barge itself
 # and the Crash (Shield Bash's mark and the heavy flash on the one crashed, the knockdown's
-# dust) are the look.
+# dust) are the look, with dust kicked up from the feet every 0.2 sec of the rush (its own look,
+# apart from Charge's purple and the other classes' dashes: Corey's review, Nov 4).
 spell = 0
 # The shoulder hit, the same on every race: the orc men's Shield Bash (59/0), the one attack clip
 # that's a body check (shoulder and shield driven forward, low) rather than a weapon swing, as
@@ -5007,6 +5008,14 @@ spell = 1680
 aura = 9632
 tick_spell = 779
 valor_hit = 1.0
+# A sharp flash on each body a cut lands on (the heavy blow's), Corey's "small impact flashes".
+impact_kit = 437
+# The Blademaster's storm of cuts over the spin, on a client with patch 0025 (Corey's spec,
+# Nov 3): the orc men's cuts, level sweep (88), rising cut (87), overhead (18/1), thrust (17/1)
+# and round again, 7 a second, the body snapping 70 deg a step to face a new way, each cut a
+# steel trail; the first cut's draw-back compacted into 0.15 sec; one wide sweep (88) over
+# 0.25 sec to finish. Tune here: cut, windup, finish_secs, turn, trail (AARRGGBB), trail_ms.
+flurry = { from = "OrcMale", cuts = [[88, 0], [87, 0], [18, 1], [17, 1], [88, 0], [19, 1], [87, 0], [18, 0]], cut = 0.14, windup = 0.15, finish = [88, 0], finish_secs = 0.25, turn = 70.0, trail = "D2EEF6FF", trail_ms = 220 }
 
 # ------------------------------------------------------------------------------------ Rogue --
 

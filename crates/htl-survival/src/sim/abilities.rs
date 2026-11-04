@@ -808,10 +808,14 @@ impl Survival {
                     self.events.push(Event::ClipStop { id });
                 }
             }
-            Action::Channel { .. } => {
+            Action::Channel { ability, .. } => {
                 self.events.push(Event::CastEnd { caster: id });
                 self.events.push(Event::Auras { id });
                 self.events.push(Event::Channel { caster: id, target: None, spell: 0, ms: 0 });
+                // A flurry finishes with its sweep.
+                if self.content.abilities[ability].flurry.is_some() {
+                    self.events.push(Event::ClipStop { id });
+                }
             }
             Action::Stance { .. } => {
                 self.end_stance(id);
@@ -2491,6 +2495,11 @@ impl Survival {
             self.trade_blows(id, target);
             self.hurt_mob_as(target, id, damage, &name);
         }
+        // Its flash on the struck body, where the beam has one (Bladestorm's cuts landing).
+        let kit = self.content.abilities[ability].impact_kit;
+        if kit != 0 {
+            self.events.push(Event::Visual { id: target, kit, by: Some(id) });
+        }
         let killed = !self.alive(target);
         self.ability_after_at(id, target, ability, share, damage, killed, valor);
     }
@@ -2505,6 +2514,10 @@ impl Survival {
         self.set_action(id, Action::Channel { ability, target: id, until: now + d.secs, next: now + d.tick.max(0.2), share });
         if d.spell != 0 {
             self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        }
+        // Its storm of cuts over the spin, on the clients that play clips.
+        if let Some(f) = &d.flurry {
+            self.events.push(Event::Flurry { id, secs: d.secs, def: f.clone() });
         }
         self.events.push(Event::Auras { id });
     }
@@ -2594,6 +2607,9 @@ impl Survival {
     }
 
     // --- dashes and blinks ----------------------------------------------------------------------------
+
+    /// Tackle's rush puffs dust from the feet this often (seconds), from its first step.
+    const TACKLE_DUST_EVERY: f32 = 0.2;
 
     fn start_dash(&mut self, id: Id, ability: usize, yaw: f32, share: f32) {
         let d = self.content.abilities[ability].clone();
@@ -2942,6 +2958,11 @@ impl Survival {
             Action::Channel { ability, .. } if self.content.abilities[ability].kind == "beam" => self.step_beam(id),
             Action::Channel { .. } => self.step_channel(id),
             Action::Dash { t, secs, ability, target, share } => {
+                // Tackle's rush kicks up dust from the feet as it goes: a look of its own, apart
+                // from Charge's purple and the other classes' dashes (Corey's review, Nov 4).
+                if self.content.abilities[ability].crash.is_some() && (t <= 0.0 || ((t + dt) / Self::TACKLE_DUST_EVERY).floor() > (t / Self::TACKLE_DUST_EVERY).floor()) {
+                    self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+                }
                 // Going through: each body passed by now takes its blow (and an answer to one, a
                 // counter's stagger, ends the dash).
                 self.dash_through(id, ability, share, t + dt);

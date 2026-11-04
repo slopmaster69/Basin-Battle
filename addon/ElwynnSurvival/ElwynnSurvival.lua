@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 18
+local VERSION = 19
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -779,6 +779,18 @@ function ES.SwingLine(f)
     guid = "player"
   end
   PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery, nil, from)
+end
+
+-- FU: a storm of cuts starts on a unit (Bladestorm), on a client with patch 0025; the unit's ST
+-- ends it with its finishing sweep. The fields are the ability's flurry, field for field.
+function ES.FlurryLine(f)
+  if not PlayUnitFlurry then return end
+  local guid = f[2]
+  if f[3] == "1" then guid = "player" end
+  local from = (f[5] and f[5] ~= "") and f[5] or nil
+  local trail = (f[12] and f[12] ~= "") and f[12] or nil
+  PlayUnitFlurry(guid, tonumber(f[4]) or 6, from, f[6] or "", tonumber(f[7]) or 0.14, tonumber(f[8]) or 0.15,
+    f[9] or "", tonumber(f[10]) or 0.25, tonumber(f[11]) or 70, trail, tonumber(f[13]) or 220)
 end
 
 -- RO: a hero dodges: the tumble (or a step aside or back).
@@ -6424,6 +6436,8 @@ function ES.Line(line)
     ES.HitMark(f[3], f[4])
   elseif verb == "AN" then
     ES.SwingLine(f)
+  elseif verb == "FU" then
+    ES.FlurryLine(f)
   elseif verb == "IM" then
     ES.ImpactLine(f)
   elseif verb == "RO" then
