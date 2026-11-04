@@ -611,7 +611,6 @@ fn a_freezing_trap_that_springs_late_still_readies_its_free_multi_shot_as_the_ic
     assert!(s.has_cc(k, "petrify"), "3 s of ice from the spring");
     assert_eq!(s.empowered_keys(p).len(), 1);
 }
-
 /// What one of `key`'s arrows does to a grunt 8 yd ahead: a full draw, held.
 fn one_arrow(s: &mut Survival, p: Id, key: &str, ex: bool) -> u32 {
     let k = mob(s, "grunt", [8.0, 0.0, 0.0]);
@@ -631,7 +630,6 @@ fn one_arrow(s: &mut Survival, p: Id, key: &str, ex: bool) -> u32 {
     run(s, 0.5);
     h[0]
 }
-
 #[test]
 fn aimed_shot_kill_shot_and_multi_shot_grow_with_the_bow_as_an_art_grows_with_the_weapon() {
     // Serg's play-test (#118): a flat 14–36 was always going to fall behind melee as gear got
@@ -647,7 +645,6 @@ fn aimed_shot_kill_shot_and_multi_shot_grow_with_the_bow_as_an_art_grows_with_th
     let strong = [one_arrow(&mut s, p, "aimed_arrow", false), one_arrow(&mut s, p, "kill_shot", false), one_arrow(&mut s, p, "aimed_arrow", true)];
     assert_eq!(strong, [72, 120, 36], "twice the bow, twice the shot");
 }
-
 #[test]
 fn a_multi_shot_at_a_pack_strikes_most_of_it() {
     // Serg's play-test (#118): it "seemed not to hit often": 10° apart, a pack 16 yd off took 3
@@ -664,6 +661,44 @@ fn a_multi_shot_at_a_pack_strikes_most_of_it() {
         let struck = pack.iter().filter(|m| !hits(&ev, p, **m).is_empty()).count();
         assert!(struck >= 3, "at {dist} yd, {gap} yd apart: {struck} of the 4 struck");
     }
+fn freezing_trap_leaves_frost_that_slows_what_stands_in_it() {
+    // Friendly fire on: even then the hunter's own frost never slows her.
+    let mut s = world_with(true);
+    // 5 yd off the spot: outside the 3 yd of frost.
+    let near = mob(&mut s, "grunt", [6.0, 5.0, 0.0]);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "freezing_trap")));
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 1.2, &[k, near]));
+    assert!(s.has_cc(k, "petrify"), "sprung: frozen");
+    // The frost on the ground where it sprang, as wide as the burst, for as long as it lasts.
+    let (look, wide, lasts) = {
+        let d = &s.content.abilities[idx(&s, "freezing_trap")];
+        (d.linger_spell, d.splash, d.linger)
+    assert!(look != 0, "the frost has a look of its own");
+    let frost = ev.iter().find_map(|e| match e {
+        Event::AreaLook { id, caster, spell, pos, radius } if *caster == p && *spell == look && (*radius - wide).abs() < 0.01 && (pos[0] - 6.0).abs() < 0.5 => Some(*id),
+        _ => None,
+    });
+    let frost = frost.unwrap_or_else(|| panic!("the frost on the ground: {ev:?}"));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { id, .. } if *id == frost)), "no circle drawn round a hero's own ground: {ev:?}");
+    // A creature walking in after the freeze is slowed by half while it stands there; the one
+    // 5 yd off isn't, nor is the hunter standing in her own frost.
+    let walker = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
+    s.move_player(p, [7.0, 0.0, 0.0], 0.0, Moving::default());
+    run_pinned(&mut s, 1.2, &[k, near, walker]);
+    assert!(s.has_cc(walker, "snare"), "slowed in the frost");
+    assert!((s.speed_share(walker) - 0.5).abs() < 0.01, "by half: {}", s.speed_share(walker));
+    assert!(!s.has_cc(near, "snare"), "not outside it");
+    assert!(!s.has_cc(p, "snare") && (s.speed_share(p) - 1.0).abs() < 0.01, "never the hunter");
+    // Still slowed while it stands there, 4 s on.
+    run_pinned(&mut s, 3.0, &[k, near, walker]);
+    assert!(s.has_cc(walker, "snare"), "kept slow while it stands in the frost");
+    assert!(!s.has_cc(near, "snare"));
+    // The frost gone after its 6 s: the slow wears off and the ground is bare.
+    let ev = run_pinned(&mut s, lasts, &[k, near, walker]);
+    assert!(!s.has_cc(walker, "snare"), "the frost gone, the slow with it");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { .. })), "the look taken away: {ev:?}");
+    assert!(s.burnings.is_empty(), "no ground left");
 }
 
 #[test]
