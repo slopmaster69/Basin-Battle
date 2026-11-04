@@ -1951,9 +1951,9 @@ impl Survival {
         if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) || self.own_totem(mid, owner) {
             return;
         }
+        // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
         if self.players.contains_key(&owner) && self.evading(mid, owner) {
-            self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style: Blow::Arrow(spell) });
-            self.events.push(Event::Flash { player: owner, text: "Evade".into() });
+            self.whiff(mid, from);
             return;
         }
         // A dummy in a counter's stance.

@@ -107,6 +107,11 @@ const CIRCLE_STEP: f32 = 0.6;
 const BACKSTEP: f32 = 3.0;
 const BACKSTEP_SECS: f32 = 0.35;
 const DODGE_ANIM: u16 = 30;
+/// A blow on a creature walking home past its leash: it slips it (the Dodge clip, fitted to this
+/// long), at most once in this long however many blows come (Corey's review: it needs a dodge
+/// or whiff when it's not doing anything).
+const WHIFF_SECS: f32 = 0.4;
+const WHIFF_GAP: f32 = 0.5;
 /// A lunge lands this far short of its foe (not on top of them).
 const LUNGE_SHORT: f32 = 1.8;
 /// A camp whose fighters are due back within this long isn't taken by killing the first back.
@@ -340,6 +345,7 @@ impl Survival {
                 turn_on: None,
                 fighters: 1,
                 wary_until: 0.0,
+                whiff_until: 0.0,
                 threat: Vec::new(),
                 retarget_at: 0.0,
                 drawn_off: None,
@@ -1611,6 +1617,18 @@ impl Survival {
     pub(crate) fn evading(&self, mid: Id, by: Id) -> bool {
         let (Some(m), Some(p)) = (self.mobs.get(&mid), self.players.get(&by)) else { return false };
         !m.raider && matches!(m.state, MobState::Return) && dist2d(p.pos, m.home) > self.leash_of(m.def) + LEASH_SLACK
+    }
+
+    /// An evading creature slips a blow from `from`: the dodge's clip on it, and no word over it
+    /// (no "Dodge", no "Evade": Corey's rule). Blows close together get the one clip.
+    pub(crate) fn whiff(&mut self, mid: Id, from: Vec3) {
+        let now = self.clock;
+        let Some(m) = self.mobs.get_mut(&mid) else { return };
+        if m.whiff_until > now {
+            return;
+        }
+        m.whiff_until = now + WHIFF_GAP;
+        self.events.push(Event::React { id: mid, anim: DODGE_ANIM, from, lean: 0.0, hold: 0.0, fit: WHIFF_SECS });
     }
 
     fn think(&mut self, id: Id, dt: f32) {
