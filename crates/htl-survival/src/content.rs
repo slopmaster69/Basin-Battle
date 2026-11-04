@@ -797,6 +797,10 @@ pub struct MissileLookDef {
     pub scale: f32,
     #[serde(default)]
     pub spin: f32,
+    /// The spin end over end, about the axis across the flight (a thrown axe's tumble), instead
+    /// of flat about its up (the sixteenth client; older ones spin it flat).
+    #[serde(default)]
+    pub tumble: bool,
 }
 
 fn look_width() -> f32 {

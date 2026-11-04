@@ -385,7 +385,7 @@ pub(crate) const VERSION: u32 = 2;
 /// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0029).
 /// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0030).
 
-pub(crate) const ADDON_NEWEST: u32 = 24;
+pub(crate) const ADDON_NEWEST: u32 = 25;
 /// `Cues.lua`. 22: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 21: a cast's `AN` line names the body its clip drives (`full`, `upper`, `lower`): Skyfall's
 /// hang on the legs alone.
@@ -394,7 +394,7 @@ pub(crate) const ADDON_NEWEST: u32 = 24;
 /// 24: a fan of projectiles (Multi-Shot) aims with a fan on the reticle, not a strip on the
 /// ground (the `AB` line's shape `fan`).
 /// 25: the fan's points sit where the arrows really go, and bigger.
-pub(crate) const ADDON_NEWEST: u32 = 25;
+/// 24: the `ML` line's spin axis (a tumble, patch 0035).
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1274,7 +1274,7 @@ impl SurvivalGame {
                 // `ac20` draws a missile's look (patch 0029): every spell's that has one.
                 if level >= super::draw::MISSILE_LOOK_LEVEL {
                     for l in &self.sim.content.missile_looks {
-                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None));
+                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None, l.tumble));
                     }
                 }
                 // An older add-on or client: say so, and how to update (on screen and in chat).
