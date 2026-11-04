@@ -4825,10 +4825,11 @@ cooldown = 40.0
 spell = 10346
 clip = 53
 # The hunter themself charges up through the draw: this spell's aura look on them from the press
-# to the release or the let-go (besides the camera's lean and tremble, the add-on's). 12042 is
-# Arcane Power's glow on the hands; to film others, `.es tune ability.kill_shot.charge_look
-# <spell>` (10060 Power Infusion, 14751 Inner Focus, 20554 Berserking).
-charge_look = 12042
+# to the release or the let-go (besides the camera's lean and tremble, the add-on's). 14751 is
+# Inner Focus: a soft glow on the drawing hand and the bow (run 070: Arcane Power 12042 and Power
+# Infusion 10060 fill the screen with purple lightning from the draw's close camera, Berserking
+# 20554 shows nothing). To film others: `.es tune ability.kill_shot.charge_look <spell>`.
+charge_look = 14751
 # The power behind it: speed lines on the hunter's own screen as it goes; on each foe it goes
 # through, the heavy blow's flash (437) and crack (238, HeavyWeaponCritical) and its reel; a kill
 # lands with a colossal stone's fall (930, mDeathImpactColossalStoneA) from the foe's spot, for
