@@ -356,8 +356,6 @@ pub(crate) const VERSION: u32 = 2;
 /// Shot).
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
-pub(crate) const ADDON_NEWEST: u32 = 21;
-/// 21: taken by #130.
 /// 21: outcomes show without words: `CU` beats (the outcome's hit-stop, shake and kick) in
 /// `Cues.lua`.
 pub(crate) const ADDON_NEWEST: u32 = 21;
