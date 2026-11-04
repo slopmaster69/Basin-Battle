@@ -851,6 +851,19 @@ pub struct WeaponDef {
     /// Its blows count this many times over towards breaking a foe's stance (0: once).
     #[serde(default)]
     pub posture: f32,
+    /// A staff that casts instead of swinging: the left click casts this ability (a benched
+    /// projectile, the staff's bolt), and the heavy attack this one (empty: the heavy swings).
+    #[serde(default)]
+    pub bolt: String,
+    #[serde(default)]
+    pub heavy_bolt: String,
+}
+
+impl WeaponDef {
+    /// The weapon casts its light attack.
+    pub fn casts(&self) -> bool {
+        !self.bolt.is_empty()
+    }
 }
 
 fn turn_rate() -> f32 {
@@ -2966,6 +2979,19 @@ impl Content {
             }
             if w.two_handed && self.shield(&w.guard).is_none() {
                 bail!("weapon {}: two-handed, and its guard {:?} isn't a [[shield]]", w.key, w.guard);
+            }
+            for (what, key) in [("bolt", &w.bolt), ("heavy_bolt", &w.heavy_bolt)] {
+                if key.is_empty() {
+                    continue;
+                }
+                match self.ability(key) {
+                    Some(a) if self.abilities[a].kind == "projectile" => {}
+                    Some(_) => bail!("weapon {}: its {what} {key} isn't a projectile", w.key),
+                    None => bail!("weapon {}: no [[ability]] {key} for its {what}", w.key),
+                }
+            }
+            if !w.heavy_bolt.is_empty() && w.bolt.is_empty() {
+                bail!("weapon {}: a heavy_bolt needs a bolt", w.key);
             }
         }
         if self.ranged(&self.start.bow).is_none() {

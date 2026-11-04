@@ -80,3 +80,5 @@ mod tests_raptor;
 mod tests_hunter_bow;
 #[cfg(test)]
 mod tests_ward;
+#[cfg(test)]
+mod tests_staff;

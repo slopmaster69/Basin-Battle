@@ -594,8 +594,11 @@ guard = "haft_guard"
 emote = 38
 subclass = 6
 
-# The first staff: a caster's weapon. It swings like a two-handed weapon (the staff family's
-# bolt-firing kinds come later) and guards with the ward.
+# The staffs: a caster's weapons. Each guards with the ward (`[ward]`). The Apprentice's Staff
+# swings like any two-handed weapon; the others cast: their left click is a bolt from the staff
+# (`bolt`, a benched projectile defined with them, below the abilities) and their heavy attack a
+# heavier one (`heavy_bolt`). Their swing numbers stand for a shove and for the rules that read a
+# weapon's reach. (The Mage design, claude/mage-kit-draft.md.)
 [[weapon]]
 key = "apprentice_staff"
 windup = 0.40
@@ -610,6 +613,60 @@ two_handed = true
 guard = "arcane_ward"
 emote = 37
 subclass = 10
+
+# Fire: slow bolts that burn.
+[[weapon]]
+key = "ember_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [18, 24]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+bolt = "ember_bolt"
+heavy_bolt = "ember_bolt_heavy"
+
+# Frost: shards that chill.
+[[weapon]]
+key = "rime_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [16, 22]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+bolt = "rime_bolt"
+heavy_bolt = "rime_bolt_heavy"
+
+# Arcane: quick bolts.
+[[weapon]]
+key = "arcane_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [14, 20]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+bolt = "arcane_bolt"
+heavy_bolt = "arcane_bolt_heavy"
 
 [[shield]]
 key = "buckler"
@@ -783,6 +840,31 @@ display = 5415
 icon = "INV_Staff_08"
 kind = "weapon"
 text = "Two-handed. Guards with a ward: an arcane barrier with a bar of its own. A ward raised just as a blow lands costs nothing and reels the attacker. Broken, it can't be raised again until its bar is full."
+
+# The casting staffs share the conjurers' staff look for now (a staff each, from the data, later).
+[[item]]
+key = "ember_staff"
+name = "Ember Staff"
+display = 5415
+icon = "INV_Staff_13"
+kind = "weapon"
+text = "Two-handed. Attacks cast bolts of fire that burn; the heavy attack a slow, heavy one. Guards with a ward."
+
+[[item]]
+key = "rime_staff"
+name = "Rime Staff"
+display = 5415
+icon = "INV_Staff_14"
+kind = "weapon"
+text = "Two-handed. Attacks cast shards of frost that chill; the heavy attack a heavy shard that pierces. Guards with a ward."
+
+[[item]]
+key = "arcane_staff"
+name = "Arcane Staff"
+display = 5415
+icon = "INV_Staff_07"
+kind = "weapon"
+text = "Two-handed. Attacks cast quick bolts of arcane force; the heavy attack a heavier orb. Guards with a ward."
 
 [[item]]
 key = "buckler"
@@ -5632,6 +5714,113 @@ tick_spell = 11876
 clip = 54
 effects = [{ kind = "stun", secs = [1.5, 1.5] }]
 tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.4 }]
+
+# ------------------------------------------------------------------- the staffs' bolts --
+# A casting staff's left click and heavy attack (`bolt`, `heavy_bolt` on the [[weapon]]). Benched:
+# never on the board, cast by the staff alone. Their damage is the staff's: a bolt the low end of
+# its swing, a heavy bolt about the heavy attack's share more. Stamina as a swing's. Looks are the
+# schools' own missiles (Fireball's, Frostbolt's, Arcane Missiles'), to check in the client.
+
+[[ability]]
+key = "ember_bolt"
+name = "Ember Bolt"
+text = "A bolt of fire from the staff. Burns for 2 damage per sec for 3 sec."
+icon = "Spell_Fire_FlameBolt"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 10.0
+damage = [18.0, 18.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 30.0
+spell = 133
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
+
+[[ability]]
+key = "ember_bolt_heavy"
+name = "Ember Burst"
+text = "A heavy, slow bolt of fire. Burns for 4 damage per sec for 3 sec."
+icon = "Spell_Fire_Fireball02"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 22.0
+damage = [34.0, 34.0]
+range = [30.0, 30.0]
+radius = [0.6, 0.6]
+speed = 22.0
+spell = 23024
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
+
+[[ability]]
+key = "rime_bolt"
+name = "Rime Shard"
+text = "A shard of frost from the staff. Slows by 30% for 2 sec."
+icon = "Spell_Frost_FrostBolt"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 10.0
+damage = [16.0, 16.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 32.0
+spell = 116
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
+
+[[ability]]
+key = "rime_bolt_heavy"
+name = "Rime Lance"
+text = "A heavy shard of frost that goes through every enemy in its line. Slows by 40% for 3 sec."
+icon = "Spell_Frost_FrostBolt02"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 22.0
+damage = [30.0, 30.0]
+range = [32.0, 32.0]
+radius = [0.4, 0.4]
+speed = 36.0
+pierce = 9
+spell = 23412
+effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
+
+[[ability]]
+key = "arcane_bolt"
+name = "Arcane Bolt"
+text = "A quick bolt of arcane force from the staff."
+icon = "Spell_Arcane_StarFire"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 8.0
+damage = [14.0, 14.0]
+range = [30.0, 30.0]
+radius = [0.3, 0.3]
+speed = 44.0
+spell = 7268
+
+[[ability]]
+key = "arcane_bolt_heavy"
+name = "Arcane Orb"
+text = "A heavy orb of arcane force."
+icon = "Spell_Arcane_Blast"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 20.0
+damage = [28.0, 28.0]
+range = [30.0, 30.0]
+radius = [0.7, 0.7]
+speed = 26.0
+spell = 7268
 
 # ------------------------------------------------------------------------------------- Mage --
 

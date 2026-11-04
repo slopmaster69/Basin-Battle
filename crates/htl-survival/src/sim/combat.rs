@@ -218,6 +218,19 @@ impl Survival {
                     let kick = input == Input::Heavy || self.weapon_of(p).two_handed;
                     return self.try_shove(id, kick);
                 }
+                // A staff that casts: the click is a bolt from it, once the hero is free (a click
+                // in a cast's recovery waits for its end, as a chain's next blow does).
+                if let Some(bolt) = self.bolt_of(p, input == Input::Heavy) {
+                    if !(free || busy_soft) {
+                        return false;
+                    }
+                    if !fresh {
+                        self.winded(id);
+                        return true;
+                    }
+                    self.cast_bolt(id, bolt);
+                    return true;
+                }
                 // Late in a light blow's recovery, the next of the chain comes at once.
                 if let Action::Swing { t, strike, .. } = &p.action {
                     let chain = input == Input::Attack

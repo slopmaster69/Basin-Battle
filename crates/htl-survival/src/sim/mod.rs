@@ -30,6 +30,7 @@ pub(crate) mod heroes;
 pub mod hunter;
 mod raid;
 pub mod siege;
+mod staff;
 pub mod wager;
 mod tactics;
 mod world;
