@@ -118,6 +118,9 @@ pub struct Content {
     pub valor: ValorDef,
     #[serde(default)]
     pub cc: CcDef,
+    /// The Juggernaut's Momentum: its numbers.
+    #[serde(default)]
+    pub momentum: MomentumDef,
     #[serde(default)]
     pub dev: DevDef,
     /// How long the work at the camp takes: making something at a station, building one, mending.
@@ -3173,7 +3176,7 @@ impl Content {
             if a.kind == "ally" && !a.foe_damage && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
                 bail!("{what}: an ally ability helps whoever it lands on: no `damage` (unless `foe_damage`: a foe on the line takes it)");
             }
-            if a.kind == "beam" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0 || a.secs <= 0.0) {
+            if a.kind == "beam" && ((a.range[1] <= 0.0 && !a.around) || a.radius[1] <= 0.0 || a.secs <= 0.0) {
                 bail!("{what}: a beam needs its length (`range`), half-width (`radius`) and how long it's held (`secs`)");
             }
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
@@ -3201,8 +3204,25 @@ impl Content {
             if (a.lob || a.fuse > 0.0) && a.splash <= 0.0 {
                 bail!("{what}: a lobbed or sticky projectile bursts where it goes off: it needs `splash`");
             }
-            if a.kind == "place" && a.totem.is_none() {
-                bail!("{what}: a placed ability needs a [ability.totem]");
+            // (A banner's recast moves the banner its first cast planted: it needs none of its own.)
+            let banner = a.banner.is_some() || (a.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == a.key));
+            if a.kind == "place" && a.totem.is_some() == banner {
+                bail!("{what}: a placed ability needs a [ability.totem] or a `banner` (one of them)");
+            }
+            if a.banner.is_some() && (a.kind != "place" || a.object == 0 || a.secs <= 0.0) {
+                bail!("{what}: a banner is placed (`kind = \"place\"`), with its look (`object`) and how long it stands (`secs`)");
+            }
+            if a.banner.as_ref().is_some_and(|b| b.health <= 0.0) || (a.banner.is_some() && a.radius[1] <= 0.0) {
+                bail!("{what}: a banner needs its `health`, and the reach it helps in (`radius`)");
+            }
+            if a.breaks_free && a.kind != "buff" {
+                bail!("{what}: only a buff breaks free (`breaks_free`)");
+            }
+            if !(0.0..1.0).contains(&a.health_cost) || (a.health_cost > 0.0 && a.kind != "buff") {
+                bail!("{what}: only a buff costs health, a share of it below 1 (`health_cost`)");
+            }
+            if !a.passive.is_empty() && (!PASSIVES.contains(&a.passive.as_str()) || a.is_ex() || a.inner) {
+                bail!("{what}: passive {:?} (one of {PASSIVES:?}, on a card: not an EX version or an inner one)", a.passive);
             }
             if a.kind == "stance" && a.counter.is_none() {
                 bail!("{what}: a stance needs a [ability.counter]");
@@ -3224,6 +3244,28 @@ impl Content {
             }
             if !(1..=2).contains(&a.choice) {
                 bail!("{what}: choice {} (1 or 2: a class has two a row)", a.choice);
+            }
+            // The Warlord's mechanics.
+            if a.crash.is_some() && a.kind != "dash" {
+                bail!("{what}: only a dash carries a body to Crash it (`crash`)");
+            }
+            if a.intervene > 0.0 && a.kind != "ally" {
+                bail!("{what}: only an ally ability rushes to a friend to take a blow (`intervene`)");
+            }
+            if (a.ally_stamina > 0.0 || !a.ally_effects.is_empty()) && a.kind != "nova" {
+                bail!("{what}: only a nova gives friends stamina or boons (`ally_stamina`, `ally_effects`)");
+            }
+            if a.ally_effects.iter().any(|e| !BOONS.contains(&e.kind.as_str())) {
+                bail!("{what}: `ally_effects` are boons (one of {BOONS:?})");
+            }
+            if (a.around || a.ramp > 0.0) && a.kind != "beam" {
+                bail!("{what}: only a beam spins round the caster (`around`) or ramps (`ramp`)");
+            }
+            if a.ramp > 0.0 && a.ramp_cap <= 0.0 {
+                bail!("{what}: a ramp needs its most a strike (`ramp_cap`)");
+            }
+            if a.bail && a.kind != "beam" {
+                bail!("{what}: only a beam is ended into a guard (`bail`)");
             }
             if a.bounces > 0 && a.kind != "projectile" {
                 bail!("{what}: only a projectile ricochets (`bounces`)");
@@ -3287,7 +3329,7 @@ impl Content {
                     bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
                 }
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects) {
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {
@@ -3438,6 +3480,11 @@ impl Content {
         } else {
             a
         }
+    }
+    /// A War Banner's: it plants a `banner`, or it's the recast of one that does (which moves it).
+    pub fn plants_banner(&self, a: usize) -> bool {
+        let d = &self.abilities[a];
+        d.banner.is_some() || (d.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == d.key))
     }
 }
 

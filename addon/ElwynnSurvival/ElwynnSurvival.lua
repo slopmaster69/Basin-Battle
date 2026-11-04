@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 19
+local VERSION = 20
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -759,10 +759,11 @@ function ES.SwingLine(f)
   -- Another character model's take on the clip (ac10): an empty field is the unit's own.
   local from = (f[13] and f[13] ~= "") and f[13] or nil
   if not clip or not PlayUnitAnimation then return end
-  -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track).
+  -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track),
+  -- another model's take when the ability names one (the same on every race).
   if kind == "cast" then
     if mine then guid = "player" end
-    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery)
+    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, nil, from)
     return
   end
   if mine then
@@ -778,6 +779,18 @@ function ES.SwingLine(f)
     guid = "player"
   end
   PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery, nil, from)
+end
+
+-- FU: a storm of cuts starts on a unit (Bladestorm), on a client with patch 0025; the unit's ST
+-- ends it with its finishing sweep. The fields are the ability's flurry, field for field.
+function ES.FlurryLine(f)
+  if not PlayUnitFlurry then return end
+  local guid = f[2]
+  if f[3] == "1" then guid = "player" end
+  local from = (f[5] and f[5] ~= "") and f[5] or nil
+  local trail = (f[12] and f[12] ~= "") and f[12] or nil
+  PlayUnitFlurry(guid, tonumber(f[4]) or 6, from, f[6] or "", tonumber(f[7]) or 0.14, tonumber(f[8]) or 0.15,
+    f[9] or "", tonumber(f[10]) or 0.25, tonumber(f[11]) or 70, trail, tonumber(f[13]) or 220)
 end
 
 -- RO: a hero dodges: the tumble (or a step aside or back).
@@ -2881,7 +2894,14 @@ local CC_WORDS = {
   burn = { "Burning", 1, 0.5, 0.2 },
   mark = { "Marked", 0.75, 0.55, 1 },
   deathmark = { "Marked for death", 0.85, 0.35, 1 },
-  onslaught = { "Onslaught", 1, 0.55, 0.3 },
+  -- The Warrior's (the Juggernaut's and the Warlord's, Nov 4).
+  rallied = { "Rallied", 1, 0.8, 0.4 },
+  fury = { "Fury", 1, 0.4, 0.35 },
+  grown = { "Towering", 1, 0.6, 0.4 },
+  momentum = { "Momentum", 1, 0.9, 0.6 },
+  war_banner = { "Under the banner", 1, 0.85, 0.5 },
+  cowed = { "Cowed", 0.7, 0.6, 0.9 },
+  exposed = { "Exposed", 1, 0.65, 0.3 },
   hallowed = { "Hallowed", 1, 0.9, 0.55 },
   steadfast = { "Steadfast", 1, 0.85, 0.45 },
   cheat_death = { "Cheating death", 1, 0.9, 0.5 },
@@ -6511,6 +6531,15 @@ function ES.Line(line)
     ES.HitMark(f[3], f[4])
   elseif verb == "AN" then
     ES.SwingLine(f)
+  elseif verb == "FU" then
+    ES.FlurryLine(f)
+  elseif verb == "GB" then
+    -- A shape flashed on the ground as an ability lands (Shockwave's cone), on a client with
+    -- patch 0026: an effect, drawn whatever the floor markers are set to.
+    if PlayGroundBurst then
+      PlayGroundBurst(tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 0,
+        f[6] or "wedge", tonumber(f[7]) or 5, tonumber(f[8]) or 90, tonumber(f[9]) or 0.35, f[10] or "C0E8FF", tonumber(f[11]) or 0)
+    end
   elseif verb == "IM" then
     ES.ImpactLine(f)
   elseif verb == "RO" then
@@ -6610,7 +6639,13 @@ events:SetScript("OnEvent", function()
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
     -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
+    -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
+    -- ac18: a shape flashed on the ground as an ability lands (0026).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
+      Say(".es hello " .. VERSION .. " ac18")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and (tonumber(HasActionCombat()) or 0) >= 17 then
+      Say(".es hello " .. VERSION .. " ac17")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
       Say(".es hello " .. VERSION .. " ac12")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
       Say(".es hello " .. VERSION .. " ac11")

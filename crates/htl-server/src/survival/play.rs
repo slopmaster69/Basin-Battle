@@ -505,7 +505,7 @@ impl SurvivalGame {
                 self.broadcast(&packets::update_object(&[], &[(g, &f)]));
             }
             Event::Grow { id, scale } => {
-                // The body drawn larger (Onslaught), for everyone, its owner too.
+                // The body drawn larger (Rallying Cry), for everyone, its owner too.
                 let Some(g) = self.guid_of(id) else { return };
                 let mut f = Fields::new();
                 f.set_f32(idx::SCALE_X, scale);
@@ -836,16 +836,49 @@ impl SurvivalGame {
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, secs } => {
+            Event::Clip { id, clip, take, from, secs, at } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
-                // marked as theirs.
+                // marked as theirs. The impact where the event says, else half way.
                 let Some(g) = self.guid_of(id) else { return };
                 let mine = self.conn_of(id);
-                let impact = secs * 0.5;
+                let impact = if at > 0.0 { at.min(secs) } else { secs * 0.5 };
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t0\t{:.3}\t0\tcast\t0", secs - impact);
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}", secs - impact, from.as_deref().unwrap_or(""));
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::Flurry { id, secs, def } => {
+                // Bladestorm's storm of cuts, for the clients that play clips (the caster's own
+                // marked as theirs): the ability's `flurry`, field for field.
+                let Some(g) = self.guid_of(id) else { return };
+                let mine = self.conn_of(id);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let own = u8::from(Some(c) == mine);
+                    let line = format!(
+                        "FU\t{g:#X}\t{own}\t{secs:.2}\t{}\t{}\t{:.3}\t{:.3}\t{}/{}\t{:.3}\t{:.1}\t{}\t{}",
+                        def.from.as_deref().unwrap_or(""),
+                        def.cuts_text(),
+                        def.cut,
+                        def.windup,
+                        def.finish[0],
+                        def.finish[1],
+                        def.finish_secs,
+                        def.turn,
+                        def.trail,
+                        def.trail_ms
+                    );
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::GroundBurst { at, yaw, shape, reach, arc, width, secs, colour } => {
+                // A shape flashed on the ground, for the clients that draw one (the add-on asks
+                // its client; an older client ignores the line).
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                let line = format!("GB\t{:.2}\t{:.2}\t{:.2}\t{yaw:.3}\t{shape}\t{reach:.2}\t{arc:.0}\t{secs:.2}\t{colour}\t{width:.2}", at[0], at[1], at[2]);
+                for c in conns {
                     self.ui_line(c, &line);
                 }
             }

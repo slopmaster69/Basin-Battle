@@ -205,11 +205,16 @@ pub fn save_player(c: &Content, p: &Player) -> PlayerSave {
 /// One block per class, so changes to different classes don't collide.
 const RENAMED: &[(&str, &str)] = &[
     // Warrior (Sundering Blow is now Shockwave's EX, never saved: a saved one is the old E card;
-    // Unstoppable Blow merged into it and Avatar into Onslaught)
+    // Unstoppable Blow merged into it and Avatar into Onslaught; Onslaught retired into Rallying
+    // Cry, and the Juggernaut's ultimate is Bladestorm now; War Banner took Ravager's place, learned
+    // at the same shrine. An EX version or a recast is never saved: Heroic Throw, Thunder Clap,
+    // Battle Cry and Ravager's recall are simply gone.)
     ("aimed_throw", "hurled_axe"),
     ("sundering_blow", "shockwave"),
     ("unstoppable_blow", "shockwave"),
-    ("avatar", "onslaught"),
+    ("avatar", "warrior_bladestorm"),
+    ("onslaught", "warrior_bladestorm"),
+    ("ravager", "war_banner"),
     // Paladin (Holy Shock and Hammer of Justice live on, as Avenger's Shield's EX and Divine
     // Steed's recast: never a card of their own on a key or in a hero's tree)
     ("holy_shock", "avengers_shield"),

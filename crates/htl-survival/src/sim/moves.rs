@@ -19,7 +19,7 @@ const PULL_STOP: f32 = 1.6;
 /// The farthest a knockback or a pull moves a training dummy (it has no legs to walk back).
 const DUMMY_STEP: f32 = 1.0;
 /// A leap's arc where the ability names none.
-const LEAP_LIFT: f32 = 6.0;
+pub(crate) const LEAP_LIFT: f32 = 6.0;
 /// One step along the ground for a slide's end.
 const STEP: f32 = 0.4;
 /// The traps of one kind a hero can have set at once.
@@ -127,7 +127,7 @@ impl Survival {
     }
 
     /// A knockback or a pull on someone: thrown through the air (a hero's own client flies it),
-    /// whatever they had in hand lost. Nothing moves a body in Ice Block, Onslaught or Sanctuary.
+    /// whatever they had in hand lost. Nothing moves a body in Ice Block, steadfast or rallied.
     pub(crate) fn displace(&mut self, owner: Id, victim: Id, e: &AbilityEffect) {
         let now = self.clock;
         let Some(v) = self.unit_pos(victim) else { return };
@@ -194,6 +194,9 @@ impl Survival {
             self.set_action(victim, Action::Stagger { until: now + air });
             self.events.push(Event::Hop { player: victim, dir, speed: moved / air, lift, roll: false, style: "" });
         } else {
+            // Driven back, not turned to run: the big recoil over the whole throw, on the whole
+            // body, faced at whoever threw it (Corey's review, Nov 4).
+            self.events.push(Event::React { id: victim, anim: combat::CRIT_ANIM, from: origin, lean: 0.4, hold: 0.0, fit: air });
             self.stagger_mob(victim, air + 0.15, false);
             // A knockback thrown higher than a plain one (the Uppercut's launch) throws a
             // creature up: it rises and falls over its time in the air, and everyone sees it.
@@ -298,8 +301,14 @@ impl Survival {
             self.events.push(Event::LeapLook { player: id, secs: air, clip: d.leap_clip, take: d.leap_take, from: d.leap_from.clone(), flip: d.leap_flip });
         }
         self.set_action(id, Action::Dash { t: 0.0, secs: air, ability, target: None, share });
+        // Its swing held up through the air, the blow landing as it comes down (a clip's impact
+        // is half its length).
+        if d.clip != 0 {
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: air * 2.0, at: 0.0 });
+        }
         let radius = AbilityDef::at(d.radius, share);
-        let mark = (radius > 0.0).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));
+        // `unmarked`: nothing on the ground where it comes down (only the warning over a rival).
+        let mark = (radius > 0.0 && !d.unmarked).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));
         // A rival where it comes down hears it coming too (the warning over them), not only the
         // mark on the ground, which they may have turned off or not be looking at.
         if radius > 0.0 {
@@ -379,7 +388,7 @@ impl Survival {
         // (Some way along it, however little: a throw with none isn't sent.)
         self.events.push(Event::Hop { player: id, dir, speed: (dist / DIVE_SECS).max(0.1), lift, roll: false, style: "" });
         // The blow driven down with it, striking as it lands.
-        self.events.push(Event::Clip { id, clip: DIVE_CLIP, secs: DIVE_SECS * 2.0 });
+        self.events.push(Event::Clip { id, clip: DIVE_CLIP, take: 0, from: None, secs: DIVE_SECS * 2.0, at: 0.0 });
         self.set_action(id, Action::Dash { t: 0.0, secs: DIVE_SECS, ability, target: None, share });
         let radius = AbilityDef::at(d.radius, share);
         let mark = (radius > 0.0).then(|| self.mark_as(target, radius, DIVE_SECS + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, DIVE_SECS, Some((target, dir))) })));

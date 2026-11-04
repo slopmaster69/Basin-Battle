@@ -12,6 +12,10 @@
 //! - `BM\t<key~name~cost~can~built~text>^...`: the build menu.
 //! - `AR\t<key~name~kind~held~text>^...`: the weapon rack.
 //! - `FL\t<text>`: a word flashed big (a parry).
+//! - `FU\t<guid>\t<own>\t<secs>\t<from>\t<cuts>\t<cut>\t<windup>\t<finish>\t<finish secs>\t<turn deg>\t<trail>\t<trail ms>`:
+//!   a storm of cuts starts on a unit (Bladestorm's flurry, the ability's `flurry` field for
+//!   field; `cuts` and `finish` as `clip/take`), for a client with patch 0025 (`PlayUnitFlurry`);
+//!   the unit's `ST` ends it with its finishing sweep.
 //! - `BP\t<name>\t<cost>\t<problem>\t<x~y~z~yards>`: the station being placed and where its ghost stands (`BP`
 //!   alone: none).
 //! - `CF\t<what>\t<text>\t<yes>\t<no>`: confirm something (ringing the bell, tearing a station
@@ -68,10 +72,14 @@
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
 //! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
 //!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
-//!   (a creature's line carries it too). Each `MV` blow goes on `~<from>` the same way.
+//!   (a creature's line carries it too, and so does a cast's: an ability's own clip, the same on
+//!   every race). Each `MV` blow goes on `~<from>` the same way.
 //!   The kind: `light`, `heavy`, `running`, `bash`, `kick`, `cast`, a creature's `mob`, and the
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
+//! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
+//!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
+//!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
@@ -191,6 +199,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap · {} yd landing radius", n(d.range[1]), n(d.radius[1]))),
         "trap" if d.launch > 0.0 => out.push(format!("{} yd placement range · {} yd launch · {} sec duration", n(d.range[1]), n(d.launch), n(d.secs))),
         "trap" => out.push(format!("{} yd placement range · {} yd trigger radius · {} sec duration", n(d.range[1]), n(d.radius[1]), n(d.secs))),
+        "place" if d.banner.is_some() => out.push(format!("{} sec banner · {} yd radius · {} health", n(d.secs), n(d.radius[1]), n(d.banner.as_ref().map_or(0.0, |b| b.health)))),
+        "place" if d.totem.is_none() => out.push(format!("{} yd range", n(d.range[1]))),
         "place" => out.push(format!("{} sec totem · {} yd radius", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "blink" if d.anchor > 0.0 => out.push(format!("{} sec circle duration", n(d.anchor))),
         "art" if d.ambush > 0.0 => out.push(format!("{} yd step", n(d.ambush))),
@@ -335,10 +345,14 @@ pub(crate) const VERSION: u32 = 2;
 /// (`GP`, `FP`, `Grapple.lua`).
 /// 19: a Hunter's bow draw leans the camera in and trembles it at full draw (Aimed Shot, Kill
 /// Shot).
-pub(crate) const ADDON_NEWEST: u32 = 19;
+/// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
+/// 19's hunter work (both branches had taken 19).
+pub(crate) const ADDON_NEWEST: u32 = 20;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
-/// Westbrook's garrison taken out of the map for the camp (0019).
-pub(crate) const CLIENT_NEWEST: u8 = 12;
+/// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
+/// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
+/// as an ability lands (0026); 13 to 15 are the hunter's open branches (0020 to 0023).
+pub(crate) const CLIENT_NEWEST: u8 = 18;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.

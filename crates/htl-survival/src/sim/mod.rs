@@ -22,6 +22,7 @@ mod journal;
 pub mod meter;
 pub mod mobs;
 pub(crate) mod moves;
+pub(crate) mod warlord;
 pub mod recap;
 pub mod recasts;
 pub(crate) mod explore;
@@ -126,6 +127,10 @@ impl Strike {
     /// A guard breaker.
     pub fn shove(&self) -> bool {
         matches!(self.kind, StrikeKind::Bash | StrikeKind::Kick)
+    }
+    /// Shield Wall's Shield Bash: a bash worth more than its own roll (see `WALL_BASH`).
+    pub fn wall_bash(&self) -> bool {
+        self.kind == StrikeKind::Bash && self.damage > 1.0
     }
 }
 
@@ -238,7 +243,7 @@ pub enum Event {
     /// `id`'s weapon glows red for `secs`, for everyone who can see it (the striker too): a blow
     /// no guard stops is on its way.
     Glow { id: Id, secs: f32 },
-    /// `id`'s body drawn at `scale` (1: as it is): Onslaught's titan.
+    /// `id`'s body drawn at `scale` (1: as it is): Rallying Cry's warrior.
     Grow { id: Id, scale: f32 },
     /// `id` rides `display` (a mount's creature display; 0: on foot): Divine Steed.
     Mount { id: Id, display: u32 },
@@ -279,10 +284,19 @@ pub enum Event {
     Abilities { player: Id },
     /// A hero's Valor changed.
     Valor { player: Id },
-    /// A clip played on a unit (a throw, a cast), for the clients that play clips.
-    Clip { id: Id, clip: u16, secs: f32 },
+    /// A clip played on a unit (a throw, a cast), for the clients that play clips: `take` which
+    /// of the model's versions, `from` another character model whose take every client plays (an
+    /// ability's own, the same on every race), or the unit's own.
+    /// `at`: its impact this many seconds in (0: half way), so a cast's clip lands as the cast does.
+    Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32, at: f32 },
     /// A unit's clip called off (a feint: the guard raised before the blow came).
     ClipStop { id: Id },
+    /// An ability's shape flashed on the ground as it lands, for the clients that draw one: at a
+    /// spot facing a way, `shape` `wedge`, `ring` or `line` (`width` wide), `reach` out over `arc`.
+    GroundBurst { at: Vec3, yaw: f32, shape: &'static str, reach: f32, arc: f32, width: f32, secs: f32, colour: String },
+    /// A flurry of cuts starts on a unit, for the clients that play clips (Bladestorm): how it
+    /// goes is the ability's `flurry`; a `ClipStop` ends it with its finishing sweep.
+    Flurry { id: Id, secs: f32, def: crate::content_abilities::FlurryDef },
     /// A channel begins on `target` (its beam) or ends (`None`).
     Channel { caster: Id, target: Option<Id>, spell: u32, ms: u32 },
     /// A hero healed by this much (a green number).
@@ -527,6 +541,9 @@ pub struct Player {
     pub riposte_until: f32,
     /// A parry's opening: until then everything they do costs half the stamina.
     pub opening_until: f32,
+    /// Retaliation's answer: nothing touches them (no damage, no effect, no stagger) until then,
+    /// while their heavy attack goes out.
+    pub untouchable_until: f32,
     /// Who struck them last (a fall to another hero is announced).
     pub last_hit_by: Option<Id>,
     /// What the next hurt on them is (set by the blow about to land), and the hurts of the last
@@ -914,6 +931,8 @@ pub struct Survival {
     pub(crate) trials: BTreeMap<usize, Trial>,
     /// The beta page's mechanics in play: yanks, echoes, tethers, shields that burst, pads.
     pub(crate) beta: beta::Beta,
+    /// The Warlord's (the Warrior's second choices): Tackles under way.
+    pub(crate) warlord: warlord::Warlord,
 }
 
 /// A trial at a shrine or a relic: its guardians are up until they fall (it teaches) or no hero
@@ -997,6 +1016,7 @@ impl Survival {
             yielded: BTreeMap::new(),
             trials: BTreeMap::new(),
             beta: beta::Beta::default(),
+            warlord: warlord::Warlord::default(),
         }
     }
 
@@ -1045,6 +1065,7 @@ impl Survival {
         self.step_stances();
         self.step_combos();
         self.step_beta();
+        self.step_warlord();
         self.step_cc();
         self.step_holds();
         self.step_dummies();
@@ -1122,6 +1143,7 @@ impl Survival {
             landing_attack: None,
             riposte_until: -100.0,
             opening_until: -100.0,
+            untouchable_until: -100.0,
             last_hit_by: None,
             cause: None,
             wounds: Vec::new(),
@@ -1252,11 +1274,14 @@ impl Survival {
             self.tell(id, "You fell through the world. You're back on the last firm ground.");
             return;
         }
+        let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
         if pos.iter().all(|v| v.is_finite()) {
             p.pos = pos;
         }
-        if facing.is_finite() {
+        // Retaliation's answer keeps the facing the parry turned it to until it has struck,
+        // whichever way the client's body still faces.
+        if facing.is_finite() && now >= p.untouchable_until {
             p.facing = facing;
         }
         p.moving = moving;
@@ -1622,6 +1647,8 @@ impl Survival {
             Action::Dash { .. } => return DASH_SPEED,
             Action::Swing { .. } => c.attack_speed,
             Action::Guard => c.guard_speed,
+            // Bladestorm's spin walks at its own pace, near a run.
+            Action::Channel { ability, .. } if self.content.abilities[ability].around => c.run_speed * crate::content::AROUND_PACE,
             Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } => c.aim_speed,
             Action::Stance { .. } => c.guard_speed,
             Action::Eat { .. } => c.use_speed,

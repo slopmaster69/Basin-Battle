@@ -1986,6 +1986,16 @@ impl Survival {
             a.cooldown *= e.speed;
             a.damage = (a.damage as f32 * e.might).round() as u32;
         }
+        // Cowed (Intimidating Roar): its swings come slower and land softer (a boss's only
+        // softer, a little).
+        let slow = self.cowed_slow(id);
+        if slow > 0.0 {
+            a.windup *= 1.0 + slow;
+        }
+        let cut = self.cowed_cut(id);
+        if cut > 0.0 {
+            a.damage = (a.damage as f32 * (1.0 - cut)).round() as u32;
+        }
         // A wager's level, its pack's rally, and the dungeon's tier.
         let frenzy = if self.wager_has("frenzied") && (m.health as f32) < m.max_health as f32 * super::wager::FRENZY_BELOW { super::wager::FRENZY_MIGHT } else { 1.0 };
         let w = self.wager_scale(m.def).1 * (1.0 + 0.1 * m.rally as f32) * self.tier_scale().1 * frenzy * self.quickening(id);
@@ -2217,6 +2227,9 @@ impl Survival {
                 self.strike_fair(id, h, a.damage, pos, a.blockable, a.heavy, a.blockable, Blow::Light, area, combat::Follow::None);
             }
         }
+        // A War Banner in the blow's way takes it, as hard as a hero would.
+        let share = self.foe_blow_share(id);
+        self.banners_struck(pos, f, a.range, a.arc, a.damage as f32 * share);
         if let Foe::Obj(o) = foe {
             if let Some(op) = self.objs.get(&o).map(|o| o.pos) {
                 let size = match self.objs[&o].kind {
