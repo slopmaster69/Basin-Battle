@@ -2905,6 +2905,15 @@ impl Survival {
     }
 
     /// Every `.es target` creature taken away.
+    /// A jump the visual check can make (`.es hop`): the hero's client throws its body up `lift`
+    /// yards and lets it fall, as a jump does (a script can't press the jump key), so an ability can
+    /// be tried mid-jump.
+    pub fn test_hop(&mut self, id: Id, lift: f32) {
+        let Some(p) = self.players.get(&id) else { return };
+        let dir = p.facing;
+        self.events.push(Event::Hop { player: id, dir, speed: 0.1, lift: lift.clamp(0.5, 6.0), roll: false, style: "" });
+    }
+
     pub fn clear_targets(&mut self) -> usize {
         let gone: Vec<Id> = self.targets.keys().copied().filter(|id| self.mobs.contains_key(id)).collect();
         for id in &gone {

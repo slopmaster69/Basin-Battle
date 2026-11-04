@@ -625,6 +625,16 @@ fn a_dummy_can_be_put_up_nearer_or_farther() {
     assert_eq!(s.dummies.get(d).map(|x| x.as_str()), Some("guard"));
 }
 
+/// `.es hop`: the visual check's jump, so an ability can be tried mid-jump.
+#[test]
+fn a_test_hop_throws_the_hero_up_where_they_stand() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.test_hop(p, 1.6);
+    let ev = s.step(DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, lift, speed, .. } if *player == p && (*lift - 1.6).abs() < 1.0e-4 && *speed < 0.5)), "up, in place: {ev:?}");
+}
+
 /// `.es target`: a real creature to look at, standing still (or coming at you), at some health.
 #[test]
 fn a_still_target_stands_and_strikes_nothing_but_is_moved_like_any_creature() {

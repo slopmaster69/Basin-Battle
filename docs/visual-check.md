@@ -147,6 +147,10 @@ include _setup                # another file's lines, at their own times
   facing in degrees (0 is behind the hero `.es goto` leaves facing north), pitch below 0 looks down.
 - **Bursts**: 0.05 to 0.1 s apart is dense enough to step through an animation; the client takes
   at most one still a frame. Keep the count to what the moment needs: each still is a file.
+- **Moving**: a script can't press the movement or jump keys (they're protected), so a strafe is
+  `lua ActionDash(<secs>, <yards a second>, "l")` (or `"r"`: a sidestep at that speed) and a jump
+  is `.es hop [yards]` (the server throws the hero up where they stand). Press the ability partway
+  through either.
 - **Tripwire** takes two presses, each a placed arrow, and **Stoop** goes on the 4th E by itself:
   their scenarios play them as #110's rework (#120) has them.
 

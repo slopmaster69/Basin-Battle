@@ -339,7 +339,8 @@ control, and a knockback or a pull throws it a step at most; `.es dummy clear` t
 away), `.es give <item> [n]` (an item into your bags, by its key in `content/`), `.es target
 <creature> [yards] [still] [hp%]` (a real creature `yards` ahead to try abilities on: standing
 `still`, it moves and strikes only when something moves it; otherwise it comes at you; `.es
-target clear` takes them away), `.es cc log` and `.es pvp on|off`. `.es debug` turns debug over
+target clear` takes them away), `.es hop [yards]` (a jump on the spot, for trying an ability
+mid-jump), `.es cc log` and `.es pvp on|off`. `.es debug` turns debug over
 (`.es debug on` and `.es debug off` set it); it also draws projectiles' bodies and every ground
 area on the ground (`.es debug quiet`: debug's commands without that drawing). [The visual
 check](visual-check.md) uses these to cast abilities in the real client and photograph them.
