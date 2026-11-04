@@ -3529,15 +3529,17 @@ breaks_free = true
 # Long enough that when to spend it is a choice (a pack's next knockdown is coming), short enough
 # to have it in most fights.
 cooldown = 16.0
-# Enrage's rage burst (12880) as it goes: Berserker Rage's own 18499 plays a Roar anim on the
-# caster that would fight the Flex. Its red fists (18499's lasting look) stay on for the 3 sec.
-spell = 12880
+# Not red: Blood Fury is the red one (Corey's review, Nov 4: the two looked identical). The
+# shrug-off is Unyielding Will's chest swirl (8099, "Stamina"'s look) as it goes, and the 3 sec
+# carry no lasting mark (20572 has none); Enrage's burst (12880) and the red fists (18499) were
+# Blood Fury's colours.
+spell = 8099
 # The berserker shrugging it off, the same on every race: the orc men's Flex emote (82/0), arms
 # up and fists clenched. Blood Fury keeps the battle roar (55), the Roar roars (74).
 clip = 82
 take = 0
 from = "OrcMale"
-effects = [{ kind = "steadfast", secs = [3.0, 3.0], amount = 1.0, aura = 18499 }]
+effects = [{ kind = "steadfast", secs = [3.0, 3.0], amount = 1.0, aura = 20572 }]
 
 # Berserker Rage's EX: blood for fury. 15% of the health they have now (never the last point) for
 # 8 sec of free attacks 25% harder: what Momentum gives at 5 stacks, at once, without having to
