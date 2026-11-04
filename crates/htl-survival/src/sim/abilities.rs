@@ -1379,10 +1379,12 @@ impl Survival {
                 if p.dir[2] >= 0.0 || -p.dir[2] > SKIP {
                     return false;
                 }
-                // A skip off the ground shows its own splash (dirt, not the wall's fire).
-                if skip != 0 {
-                    flash = skip;
-                }
+                // A skip off the ground shows its own splash, not the wall's fire: an explosion on
+                // the floor read as the arrow going off (Corey's review). The data has no small
+                // one-shot of dirt at a point (Rocky Ground Impact, tried in run 050, left a pile
+                // of boulders for seconds), so with none named the skip shows nothing but the
+                // arrow's own flight on from the ground.
+                flash = skip;
                 let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
                 p.dir = [p.dir[0], p.dir[1], -p.dir[2]];
                 p.pos = [at[0], at[1], at[2].max(ground + 0.15)];

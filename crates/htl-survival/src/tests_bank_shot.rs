@@ -193,8 +193,10 @@ fn bank_shot_aimed_low_skips_off_the_ground_into_the_foe() {
     let (_, from, to) = l[0];
     assert!(from[2] < 0.6 && from[0] > 15.0, "off the ground where it came down: {from:?}");
     assert!(to[2] > from[2], "and up from it: {from:?} to {to:?}");
-    assert_eq!(flashes(&ev, SPLASH).len(), 1, "a splash of dirt where it skipped");
-    assert!(flashes(&ev, FLASH).is_empty(), "and no fire on the ground: it isn't an explosion");
+    // No fire on the ground where it skipped: it isn't an explosion (the arrow's flight on from
+    // there is the look; no small splash of dirt exists in the data).
+    assert!(flashes(&ev, FLASH).is_empty(), "no fire on the ground: it isn't an explosion");
+    assert!(flashes(&ev, SPLASH).is_empty(), "and no boulders either");
     // Into the foe past it, no harder (a skip isn't a ricochet), and planted past it.
     let h = hits(&ev, p, k);
     assert!(h.len() == 1 && h[0] < 24, "it still strikes, no harder: {h:?}");

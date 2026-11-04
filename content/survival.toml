@@ -4355,11 +4355,13 @@ bounce_gain = 0.5
 cooldown = 4.0
 # The Hunter's arrow (Aimed Shot's, at its speed, flown with the bow's ammo), seen the whole way:
 # each leg off a wall flies from where it struck. A burst of fire where it strikes a wall (the
-# Lava Burst's landing); off the ground, a splash of dirt instead (Rocky Ground Impact's burrow
-# burst), so a skip doesn't read as an explosion (Corey's review, run 040).
+# Lava Burst's landing); off the ground, no burst at all, so a skip doesn't read as an explosion
+# (Corey's review, run 040): the data has no small splash of dirt at a point (the burrow burst,
+# 26271, left a pile of boulders for seconds in run 050). The arrow's ribbon flying on from the
+# ground shows the skip.
 spell = 19434
 burst_spell = 5162
-skip_spell = 26271
+skip_spell = 0
 clip = 53
 valor_hit = 5.0
 plants = true
