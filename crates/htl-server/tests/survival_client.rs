@@ -1870,7 +1870,11 @@ fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
             continue;
         }
         assert!(!g.hits.contains(&me), "not naming the hero struck: {:?}", g.hits);
-        assert_eq!(g.targets.unit_target, Some(me), "homing on them");
+        // Aimed at the spot they stand on, not at them as a unit: the client flies a missile per
+        // unit named struck, or one at a point, and a unit aim that names no one flies nothing
+        // (the axe's way back and the recalled arrows were never seen: Corey's review, run 040).
+        assert_eq!(g.targets.unit_target, None, "no unit aim: that flies nothing unless someone is named struck");
+        assert!(g.targets.dest.is_some(), "a point to fly to: where the hero stands");
         assert!(c.seen[..k].iter().any(|q| creates_guid(q, g.caster)), "its caster {:#x} made before it casts", g.caster);
         let (_, kind, at, f) = all.iter().find(|(x, ..)| *x == g.caster).cloned().expect("its caster made");
         assert_eq!(kind, ObjectType::Unit, "a unit: the client launches from nothing else");
