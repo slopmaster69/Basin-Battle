@@ -22,46 +22,59 @@ There are two halves, like a board game and its players:
 
 So the steps are always the same: **one person hosts, everyone plays**. Playing alone is just
 hosting and playing on the same computer. The server and the game must come from the **same
-version** (the same release), or the add-ons and the server won't understand each other.
+version** (the same release), or the add-ons and the server won't understand each other; on
+Windows, Play and Host keep themselves up to date so they always do.
 
 Heroes and worlds live on the host's computer (`saves/`), so a hero made on a friend's server stays
 on that server.
 
 ## Windows
 
-Everything comes from the [Releases](https://github.com/slopmaster69/Basin-Battle/releases) page.
-Use the newest release, and take both parts from the same one.
+One download does everything: playing, hosting and updating.
 
-**To play on someone else's game** you only need the game:
-
-1. Download **Basin Battle for Windows.zip** and unzip it anywhere, e.g. `Documents\Basin Battle`.
-2. Double-click **Play Elwynn Survival.bat** (or **Play Basin Battle.bat**). If Windows says it
-   protected your PC: More info → Run anyway.
-3. The first time, pick your WoW 1.12.1 folder (the one with WoW.exe in it).
-4. Type the host's address and press Enter. Next time Enter keeps it.
-5. Log in with **any name** (it becomes your hero) and the host's password (**hold** unless they
+1. From the [Releases](https://github.com/slopmaster69/Basin-Battle/releases) page, download the
+   newest **Basin Battle for Windows.zip** and unzip it anywhere, e.g. `Documents\Basin Battle`.
+   This is the last time you download it by hand: from then on it updates itself.
+2. Double-click **Play** (the shield). If Windows says it protected your PC: More info → Run anyway.
+   A small window with the shield shows what it's doing; no console.
+   - It finds your WoW 1.12.1 install by itself (or asks for the folder once).
+   - It goes straight to **the group's server** (the `server` line in `project.toml`), so joining
+     the group is one click and nothing else to install. If it doesn't answer, Play tries the
+     next one by itself (`backup`, then `backup2`), and if none is up it offers Try again or
+     Single player. Each server is its own world. In the first 3 seconds you can click **Single
+     player** (your own server on this PC), or **Change** to choose one of the group's servers,
+     single player, or **someone else's server** (type the address they give you). It
+     remembers what you chose under Change.
+   - On a PC named in `project.toml` as one of the group's servers (`server_pc`, `backup_pc`),
+     Play starts that server right there, and Host takes its ports by itself: the second host
+     behind one router uses 3725, 8087 and 8088.
+   - A group server reached over Tailscale (a 100.x address) needs
+     [Tailscale](https://tailscale.com/download) and its host's invite; Play says so when it's
+     missing or off.
+   - On your own server it starts the server for you, in a second window: leave that open.
+3. Log in with **any name** (it becomes your hero) and the password (**hold** unless the host
    changed it).
 
-**To host** (for yourself, for friends, or both), you also need the server:
+**Hosting without playing**, or for a group: double-click **Host** and leave its window open.
+The server comes ready-made in the download (nothing to install or build), and its window shows
+the addresses friends join with (see [Friends joining](#friends-joining)). Options go after it:
+`Host.exe --password ember`, or `--game survival` for only Elwynn Survival. Allow `htl-server` on
+the network when Windows asks.
 
-1. From the same release, download **Source code (zip)** and unzip it, e.g. to
-   `Documents\Basin Battle server`.
-2. Double-click **Host Basin Battle.bat** in it and leave that window open while anyone plays; close
-   it to stop the server. It runs both games.
-   - The first run installs Rust if it's missing (no Visual Studio needed), asks for your WoW
-     1.12.1 folder once (kept in `settings-windows.txt`) and builds the server (5-10 minutes).
-     Later runs rebuild only what changed.
-   - Allow `htl-server` on the network when Windows asks.
-   - Its window shows the addresses friends join with (see [Friends joining](#friends-joining)).
-   - Options go after it: `"Host Basin Battle.bat" --password ember`, or `--game survival` for
-     only Elwynn Survival.
-3. **To play on your own server**, start the game as above and type the address **127.0.0.1**.
+**Updates are automatic.** Play gets the newest release before it starts the game. Host checks
+every 15 minutes while it runs; when there's a new release it warns everyone in the game 5
+minutes ahead, saves the worlds, and comes back on the new version by itself. So a host and the
+friends who update by playing always match. Your settings, keys and mouse speed are kept, and
+the worlds (in `server\saves`) are backed up first, to `server\saves-backups`.
 
-**To update**, close the game and the server, then take both parts from the new release: unzip the
-new game over the old game folder (your settings, mouse speed and keys are kept), and unzip the new
-source over the old server folder or into a fresh one. Keep the server folder's `saves` (your
-worlds) and `settings-windows.txt`; copy them over if you used a fresh folder. Back up `saves`
-first.
+**What's in the folder:** Play, Host and README.txt are all you use. `benilla.exe` and
+`benilla-config` are the game, `server` is the server and your saved worlds, and `launcher` is
+what the two buttons run (with `project.toml`, the names, and `version.txt`).
+
+**Hosting from the source instead** (to try a branch, or change the server): get the code (below)
+and double-click **Host Basin Battle.bat** in it. The first run installs Rust if it's missing (no
+Visual Studio needed), asks for your WoW 1.12.1 folder once (kept in `settings-windows.txt`) and
+builds the server (5-10 minutes). Players join it with Play as usual.
 
 ## Mac
 
@@ -95,10 +108,15 @@ VPS (under `tmux` or `screen`).
 The host's window prints the addresses to give out.
 
 - **Same house or Wi-Fi:** the "Friends on your own network join with: 192.168.x.x" address.
-- **Over the internet, the router way:** forward TCP ports **3724**, **8085** (Basin Battle) and
-  **8086** (Elwynn Survival) on the router to the host's computer. Friends use the "Friends on the
-  internet" address. The Windows host finds it by itself; on a Mac pass it:
+- **Over the internet, the router way** (the group's default): forward TCP ports **3724**,
+  **8085** (Basin Battle) and **8086** (Elwynn Survival) on the router to the host's computer, and
+  give that computer a fixed address on the home network so the rule keeps pointing at it. Friends
+  use the "Over the internet" address. The Windows host finds it by itself; on a Mac pass it:
   `scripts/host.sh --public-host 203.0.113.7`.
+- **Two hosts behind one router:** the second needs its own ports. On Windows, put
+  `login_port = 3725`, `world_port = 8087` and `survival_port = 8088` in its
+  `settings.txt`, beside Play (on a Mac or Linux, `--login-port 3725 --world-port 8087 --survival-port
+  8088`), forward those to it, and its address ends in `:3725`.
 - **Over the internet, no router changes (Tailscale):** a private network between your computers,
   free for a few friends. Everyone installs [Tailscale](https://tailscale.com/download) and signs
   in, and the host shares their computer with each friend in Tailscale's admin console. Friends use
@@ -121,7 +139,8 @@ The host's window prints the addresses to give out.
   `settings-windows.txt` (Windows server) or the game folder's `settings.txt` (Windows game) and
   pick again.
 - **Only one game window**: it's titled "benilla". If you're unsure, close them all and start again.
-- **Two servers at once**: they share ports, so only one can run on a computer.
+- **Two servers at once**: they share ports, so only one can run on a computer (unless one is given
+  other ports, as above).
 - More for players (black window, anti-virus, sound, keys): the README.txt in the Windows zip.
 
 ## How it fits together

@@ -1,0 +1,26 @@
+# Play.exe and Host.exe: the two buttons at the top of the Windows download. Each starts its
+# script in launcher\ (play.ps1 with no console window, host.ps1 in its own console) and carries
+# the project's icon, which the release workflow puts on them (rcedit). No dependencies.
+# Built on its own, outside the repository's workspace:
+#   cargo build --release --manifest-path dist/windows/buttons/Cargo.toml
+[package]
+name = "buttons"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[[bin]]
+name = "Play"
+path = "src/bin/play.rs"
+
+[[bin]]
+name = "Host"
+path = "src/bin/host.rs"
+
+# Not a member of the repository's workspace.
+[workspace]
+
+[profile.release]
+opt-level = "s"
+strip = true
