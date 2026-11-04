@@ -377,6 +377,13 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::SpellGo(g) if g.spell_id == 116)).is_some(), "the Frostbolt flies");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~frostbolt~"))).is_some(), "its cooldown on the bar");
     c.drain(0.5);
+    // Again at once: not ready. The words stay (a refusal), and he says it in his own voice,
+    // a Human man's "That ability isn't ready yet." (`HumanMale_CantUseAbilityCooling`), which
+    // the stock client plays from the packet.
+    c.chat(".es in ab 0 0");
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::PlaySound { sound_id } if *sound_id == 1917)).is_some(), "said in his voice");
+    assert!(addon_lines(&c, "ES").iter().any(|l| l.starts_with("FL\tFrostbolt ready in")), "and its words");
+    c.drain(0.5);
 
     // Timber: right-click the nearest pile and wait out the gather.
     let (node, at) = objects_with(&c, 1248).into_iter().min_by(|a, b| {
@@ -782,7 +789,13 @@ fn the_guard_shows_its_pose_the_rack_arms_and_a_timed_guard_parries() {
         parried = c.wait_exactly(0.65, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == wolf && s.victim == me && s.victim_state == 3)).is_some();
     }
     assert!(parried, "a parry: {:?}", c.seen.iter().filter_map(|p| if let ServerPacket::AttackerState(s) = p { Some((s.attacker == me, s.victim_state, s.damage)) } else { None }).collect::<Vec<_>>());
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "ES\tFL\tParry!")).is_some() || addon_lines(&c, "ES").iter().any(|l| l == "FL\tParry!"), "the flash");
+    // No "Parry!": Disarm's spark on the hero (the clang and hit-stop are the add-on's, from IM).
+    assert!(
+        c.wait(1.0, |p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == me && *kit_id == htl_survival::KIT_PARRY)).is_some()
+            || c.seen.iter().any(|p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == me && *kit_id == htl_survival::KIT_PARRY)),
+        "the parry's spark"
+    );
+    assert!(!addon_lines(&c, "ES").iter().any(|l| l.starts_with("FL\t")), "no word");
     assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::Emote { guid, emote_id } if *guid == wolf && *emote_id == 64)), "the wolf reels");
 }
 
@@ -819,7 +832,13 @@ fn with_friendly_fire_heroes_strike_and_parry_each_other_and_get_up_at_once() {
         a.drain(0.8);
     }
     assert!(parried, "a parry between heroes");
-    assert!(a.wait(0.5, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "ES\tFL\tParried!")).is_some() || addon_lines(&a, "ES").iter().any(|l| l == "FL\tParried!"), "ann is told she was parried");
+    // Ann isn't told in words: the spark on Ben and her own reel (below) show it.
+    assert!(
+        a.wait(0.5, |p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == bg && *kit_id == htl_survival::KIT_PARRY)).is_some()
+            || a.seen.iter().any(|p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == bg && *kit_id == htl_survival::KIT_PARRY)),
+        "ann sees the spark on ben"
+    );
+    assert!(!addon_lines(&a, "ES").iter().any(|l| l == "FL\tParried!"), "no word");
     assert!(a.seen.iter().any(|p| matches!(p, ServerPacket::Emote { guid, emote_id } if *guid == ag && *emote_id == 64)), "ann reels");
 
     // Ben strikes back with his guard down until Ann falls: announced, and up again at once.

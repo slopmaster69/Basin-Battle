@@ -83,6 +83,15 @@ fn a_creature_gone_home_past_its_leash_evades_until_its_foe_comes_back() {
     let hp = s.mobs[&g].health;
     s.hurt_mob(g, p, 0);
     assert_eq!(s.mobs[&g].health, hp);
+    // A shot at it finds nothing, and shows nothing: no word, and no "Miss" floating over it (a
+    // swing event would put one there).
+    let _ = s.step(0.0);
+    let arrow = s.content.ability("aimed_shot").expect("Aimed Shot");
+    s.ability_on_mob(p, g, arrow, 1.0, 10.0, s.players[&p].pos, HitKind::Projectile, 19434);
+    assert_eq!(s.mobs[&g].health, hp);
+    let ev = s.step(0.0);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Swing { victim: Some(v), .. } if *v == g)), "no Miss over it: {ev:?}");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })), "no word: {ev:?}");
     // Back within the leash, it's a fair target again.
     s.move_player(p, [-10.0, 0.0, 0.0], 0.0, Moving::default());
     let _ = s.step(DT);

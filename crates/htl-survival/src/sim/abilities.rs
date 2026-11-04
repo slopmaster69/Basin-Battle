@@ -185,7 +185,7 @@ fn thrown(d: &AbilityDef) -> bool {
 /// Holy ground's boon lasts this long past each tick (so it holds while they stand in it).
 const BOON_HOLD: f32 = 1.5;
 /// A friend healed: Flash of Light's look on them.
-const HEAL_LOOK: u32 = 19750;
+pub(crate) const HEAL_LOOK: u32 = 19750;
 /// Help aimed at a friend that misses them along the reticle still finds the friend nearest it
 /// within this many degrees of it (and an ally's trace is this wide, unless it says).
 const ALLY_CONE: f32 = 15.0;
@@ -598,7 +598,7 @@ impl Survival {
                         if let Some(x) = self.content.ex_of(base) {
                             let cost = self.valor_cost(&self.content.abilities[x]);
                             if p.valor + 0.001 < cost {
-                                self.events.push(Event::Flash { player: id, text: format!("{} Valor", cost.round()) });
+                                self.refuse(id, format!("{} Valor", cost.round()), cues::Vocal::CantDo);
                             } else {
                                 self.set_action(id, Action::Aim { ability: x });
                             }
@@ -659,7 +659,7 @@ impl Survival {
         if (self.silenced(id) && !breaking_free) || self.immune(id) {
             // Why nothing happened, said where the hero is looking.
             let why = if self.silenced(id) { "Can't use abilities while silenced" } else { "Can't cast now" };
-            self.events.push(Event::Flash { player: id, text: why.into() });
+            self.refuse(id, why, cues::Vocal::CantDo);
             return true;
         }
         let free = matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. } | Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. })
@@ -673,13 +673,13 @@ impl Survival {
         if recast.is_none() && !self.ready(id, ability) {
             let left = (self.cooldown(id, ability).next_at - self.clock).max(0.0);
             let text = if left > 0.05 { format!("{} ready in {:.0} sec", d.name, left.ceil()) } else { format!("{} isn't ready", d.name) };
-            self.events.push(Event::Flash { player: id, text });
+            self.refuse(id, text, cues::Vocal::NotReady);
             return true;
         }
         let cost = if recast.is_some() || empowered { 0.0 } else { self.valor_cost(&d) };
         let valor = self.players[&id].valor;
         if valor + 0.001 < cost {
-            self.events.push(Event::Flash { player: id, text: format!("Not enough Valor for {} (need {}, have {})", d.name, cost.round(), valor.floor()) });
+            self.refuse(id, format!("Not enough Valor for {} (need {}, have {})", d.name, cost.round(), valor.floor()), cues::Vocal::CantDo);
             return true;
         }
         // Any other ability that takes stamina (Raptor Strike's hits, Call of the Wild's beasts).
@@ -687,7 +687,7 @@ impl Survival {
             let need = self.hunt_stamina(id, ability);
             if need > 0.0 && self.players[&id].stamina + 0.001 < need && !self.tireless(id) {
                 self.winded(id);
-                self.events.push(Event::Flash { player: id, text: format!("{} needs {:.0} stamina", d.name, need) });
+                self.refuse(id, format!("{} needs {:.0} stamina", d.name, need), cues::Vocal::NoStamina);
                 return true;
             }
         }
@@ -695,11 +695,11 @@ impl Survival {
         if d.kind == "art" {
             if self.players[&id].stamina + 0.001 < d.stamina && !self.tireless(id) {
                 self.winded(id);
-                self.events.push(Event::Flash { player: id, text: format!("Not enough stamina for {} (need {:.0})", d.name, d.stamina) });
+                self.refuse(id, format!("Not enough stamina for {} (need {:.0})", d.name, d.stamina), cues::Vocal::NoStamina);
                 return true;
             }
             if d.ambush > 0.0 && self.ambush_spot(id, d.ambush).is_none() {
-                self.events.push(Event::Flash { player: id, text: "No enemy in reach to step behind. Aim at one or lock on".into() });
+                self.refuse(id, "No enemy in reach to step behind. Aim at one or lock on", cues::Vocal::NoTarget);
                 return true;
             }
         }
@@ -833,7 +833,8 @@ impl Survival {
             // A fixed charge (Pyroblast) let go early is dropped; one with a range goes at its
             // least, as soon as it's reached.
             if (hi - lo).abs() < 1.0e-3 {
-                self.tell(id, "Released too soon. The charge is lost.");
+                // A mistake of the hand, like a refusal: its words, and said ("I can't do that.").
+                self.refuse(id, "Released too soon", cues::Vocal::CantDo);
                 self.end_ability_action(id);
                 self.set_action(id, Action::Ready);
             } else if let Some(p) = self.players.get_mut(&id) {
@@ -1961,13 +1962,16 @@ impl Survival {
         dmg *= 1.0 + mark;
         if mark > 0.0 && mark_crit > 1.0 {
             dmg *= mark_crit;
-            self.events.push(Event::Flash { player: owner, text: "Critical!".into() });
+            // A critical shows in its blow: Heroic Strike's flash, a heavy weapon's crit and the
+            // big beat (the number already comes big, as a critical).
+            self.cue(Some(owner), victim, combat::KIT_HEAVY, cues::SOUND_CRIT, cues::BEAT_CRIT);
         }
         // Fire, or a sundering blow, on a frozen foe: the ice shatters.
         if shatter && self.has_cc(victim, "petrify") {
             dmg *= SHATTER;
             self.cleanse(victim, &["petrify"]);
-            self.events.push(Event::Flash { player: owner, text: "Shatter!".into() });
+            // The ice bursts off it: a flare of frost, the ice breaking, and the biggest beat.
+            self.cue(Some(owner), victim, cues::KIT_FROST_BURST, cues::SOUND_SHATTER, cues::BEAT_SHATTER);
         }
         if opened {
             self.events.push(Event::Visual { id: victim, kit: combat::KIT_RIPOSTE, by: Some(owner) });
@@ -1988,7 +1992,8 @@ impl Survival {
                 .or_else(|| self.mobs.get(&victim).map(|m| (m.health, m.max_health)))
                 .unwrap_or((1, 1));
             if (h as f32) < execute * max as f32 {
-                self.events.push(Event::Flash { player: owner, text: "Execute!".into() });
+                // Execute's own: its strike's sound, Slam's impact and a hard, held beat.
+                self.cue(Some(owner), victim, combat::KIT_SLAM, cues::SOUND_EXECUTE, cues::BEAT_EXECUTE);
                 dmg = dmg.max(h as f32);
             }
         }
@@ -2004,6 +2009,8 @@ impl Survival {
         }
         // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
         if self.players.contains_key(&owner) && self.evading(mid, owner) {
+            // No word and no floating "Miss" (Corey: hide it): it finds nothing, and the
+            // creature walking home slips it (`whiff`), which says the rest.
             self.whiff(mid, from);
             return;
         }
@@ -2124,7 +2131,8 @@ impl Survival {
         }
         if killed && d.refund_kill && d.valor > 0 {
             self.gain_valor(owner, d.valor as f32);
-            self.events.push(Event::Flash { player: owner, text: "Valor returned".into() });
+            // No word: the Valor bar fills back with a flare and Clearcasting's chime.
+            self.cue(Some(owner), owner, 0, cues::SOUND_VALOR_BACK, cues::BEAT_VALOR_BACK);
         }
     }
 
@@ -2171,14 +2179,14 @@ impl Survival {
     fn heal_friend(&mut self, owner: Id, friend: Id, ability: usize) {
         let d = self.content.abilities[ability].clone();
         let Some(f) = self.players.get(&friend).filter(|f| f.health > 0) else { return };
-        let (max, name) = (f.max_health, f.name.clone());
+        let max = f.max_health;
         let amount = (max as f32 * d.ally_heal * self.weakened(owner)).round() as u32;
         self.heal_hero_by(friend, amount, owner, &d.name);
         if d.cleanse {
             self.cleanse(friend, &crate::content::HARMFUL);
         }
+        // No word: Flash of Light's look on them, and the healer's green number for them (`HO`).
         self.events.push(Event::Missile { caster: owner, spell: HEAL_LOOK, target: Target::Unit(friend) });
-        self.events.push(Event::Flash { player: owner, text: format!("Healed {name}") });
         let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
         self.gain_valor(owner, v);
     }
@@ -2253,7 +2261,7 @@ impl Survival {
             let now = self.clock;
             if self.lockouts.get(&(target, ability)).is_some_and(|t| *t > now) {
                 let left = self.lockouts[&(target, ability)] - now;
-                self.events.push(Event::Flash { player: id, text: format!("Can't use {} on them again for {:.0} sec", d.name, left.ceil()) });
+                self.refuse(id, format!("Can't use {} on them again for {:.0} sec", d.name, left.ceil()), cues::Vocal::InvalidTarget);
                 let cost = self.valor_cost(&d);
                 self.gain_valor(id, cost);
                 return;
@@ -2275,11 +2283,9 @@ impl Survival {
         if !boons.is_empty() {
             self.apply_effects(id, target, &boons, share, &d.name);
         }
-        // On another hero: said to the caster, and Valor for it (not for helping yourself).
+        // On another hero: Valor for it (not for helping yourself). No word names them: the
+        // spell's look lands on them, and a heal's green number for them comes (`HO`).
         if target != id {
-            let name = self.players.get(&target).map_or_else(String::new, |p| p.name.clone());
-            let text = if d.ally_heal > 0.0 { format!("Healed {name}") } else { format!("{} on {name}", d.name) };
-            self.events.push(Event::Flash { player: id, text });
             let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
             self.gain_valor(id, v);
         }
@@ -2772,8 +2778,9 @@ impl Survival {
         let at = self.unit_pos(target);
         let holds = alive && at.is_some_and(|a| dist2d(a, pos) <= range + 2.0 && clear_line(self.land.as_ref(), pos, a));
         if !holds || now >= until {
+            // Out of reach or out of sight: no word, the beam ends, and they say "Out of range."
             if !holds {
-                self.tell(id, format!("{} breaks.", d.name));
+                self.say_vocal(id, cues::Vocal::OutOfRange);
             }
             self.end_ability_action(id);
             self.set_action(id, Action::Ready);

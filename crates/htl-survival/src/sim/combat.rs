@@ -1304,6 +1304,8 @@ impl Survival {
             }
             // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
             if self.evading(mid, id) {
+                // No word, and no "Miss" floating over it either (Corey: hide it): the blow
+                // passes through and finds nothing, and the creature walking home slips it (`whiff`), which says the rest.
                 self.whiff(mid, pos);
                 continue;
             }
@@ -1370,8 +1372,10 @@ impl Survival {
             if behind {
                 self.backstabbed(mid, id);
             }
+            // A backstab says so in its blow, not a word: the riposte's stab (below), a dagger's
+            // crit into flesh and a sharp beat on the striker's screen.
             if behind && damage > 0 {
-                self.events.push(Event::Flash { player: id, text: "Backstab!".into() });
+                self.cue(Some(id), mid, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
             }
             self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style });
             self.trade_blows(id, mid);
@@ -1514,8 +1518,10 @@ impl Survival {
             } else {
                 self.events.push(Event::React { id: victim, anim: STUN_ANIM, from, lean: 0.35, hold: secs, fit: 0.0 });
             }
+            // No word: the stagger (or the fall) shows it, with a crack of the guard and a heavy
+            // beat on their own screen.
             if broke {
-                self.tell(victim, if down { "Kicked down!" } else { "Your guard breaks!" });
+                self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             }
         }
         self.events.push(Event::Visual { id: victim, kit: KIT_BASH, by: Some(id) });
@@ -1801,9 +1807,18 @@ impl Survival {
             }
             _ => Outcome::Hit,
         };
-        // A parry timed on a giant's blow: told why it only blocked.
-        if giant && timed && outcome == Outcome::Blocked && matches!(p.action, Action::Guard) {
-            self.events.push(Event::Flash { player: victim, text: "Too heavy to parry!".into() });
+        // A parry timed on a giant's blow: it only blocks, and that has to read with no word
+        // (Corey: if it isn't plain, make the cues louder, don't bring the words back). A dull
+        // shield's thud, no clang and no spark; the blow's heavy impact on the hero and dust
+        // kicked up at their feet as they're driven back a step, guard still up; and the hardest
+        // shove of the camera any block gets.
+        if giant && timed && outcome == Outcome::Blocked && matches!(doing, Action::Guard) {
+            // (Pushed here, not by `cue`: the hero's still borrowed for their armor below.)
+            self.events.push(Event::Sound { id: victim, sound: cues::SOUND_TOO_HEAVY });
+            self.events.push(Event::Visual { id: victim, kit: KIT_HEAVY, by: None });
+            self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
+            self.events.push(Event::Hop { player: victim, dir: facing(from, p.pos), speed: TOO_HEAVY_SKID[0], lift: TOO_HEAVY_SKID[1], roll: false, style: "" });
+            self.events.push(Event::Beat { player: victim, beat: cues::BEAT_TOO_HEAVY, on: victim });
         }
         // Armor takes its share off whatever gets through.
         let worn = 1.0 - self.armor_reduce(p);
@@ -1823,7 +1838,9 @@ impl Survival {
                 if c.combat.riposte_any_stagger {
                     self.players.get_mut(&victim).unwrap().riposte_until = now + secs;
                 }
-                self.tell(victim, if heavy_blow { "Your guard breaks and you go down!" } else { "Your guard breaks!" });
+                // No word: the stagger (or the fall) shows it, with a crack of the guard and a
+                // heavy beat on their own screen.
+                self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             }
             Outcome::Parried => self.parry_pays(victim, attacker),
             _ => {}
@@ -1849,7 +1866,9 @@ impl Survival {
         // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
-            self.tell(victim, "The heavy attack breaks your charge!");
+            // No word: the charge's glow goes out, the blow lands, and the same crack and beat as a
+            // broken guard.
+            self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             self.end_ability_action(victim);
             self.set_action(victim, Action::Ready);
         }
@@ -1926,7 +1945,8 @@ impl Survival {
             }
             Outcome::Dodged if peerless && real && self.mobs.get(&attacker).is_some_and(|m| m.health > 0) => {
                 self.stagger_mob(attacker, PEERLESS_STAGGER, true);
-                self.events.push(Event::Flash { player: victim, text: "Off balance!".into() });
+                // No word: it reels (the stagger's swirl), dust kicked up where it stumbles.
+                self.events.push(Event::Visual { id: attacker, kit: KIT_DUST, by: None });
             }
             _ => {}
         }
@@ -1937,7 +1957,8 @@ impl Survival {
     pub(crate) fn parry_pays(&mut self, victim: Id, attacker: Id) {
         let now = self.clock;
         let c = self.content.clone();
-        self.events.push(Event::Flash { player: victim, text: "Parry!".into() });
+        // No word: the parry shows and sounds (Disarm's spark on the parrier, the clang and the
+        // hit-stop on the clients, from the swing's `IM` line).
         if let Some(p) = self.players.get_mut(&victim) {
             p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
             p.opening_until = now + c.parry.opening;
@@ -1963,7 +1984,8 @@ impl Survival {
             self.events.push(Event::Emote { id: attacker, emote: mobs::STUN_EMOTE });
             let at = self.players[&victim].pos;
             self.events.push(Event::React { id: attacker, anim: STUN_ANIM, from: at, lean: 0.3, hold: c.parry.hero_stagger, fit: 0.0 });
-            self.events.push(Event::Flash { player: attacker, text: "Parried!".into() });
+            // No word: they reel (the stun's swirl and the reel above), with the spark on the one
+            // who parried them and the clang.
         }
         self.gain_valor(victim, c.valor.parry);
         self.prime_wild(victim);
@@ -2085,8 +2107,8 @@ impl Survival {
         if h == 0 {
             self.die(id);
         } else if interrupted {
+            // No word: the blow lands, and the meal or the work stops in their hands.
             self.set_action(id, Action::Ready);
-            self.tell(id, "Interrupted!");
         }
     }
 
@@ -2438,7 +2460,8 @@ impl Survival {
             let mut base = self.roll(w.damage) as f32 * d.weapon * might;
             if behind && d.behind > 0.0 {
                 base *= d.behind;
-                self.events.push(Event::Flash { player: id, text: "Backstab!".into() });
+                // Its stab shows (the riposte's kit, below) with a dagger's crit and a beat.
+                self.cue(Some(id), v, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
             }
             if self.players.contains_key(&v) {
                 let dmg = self.ability_damage(id, v, ability, base);
@@ -2472,7 +2495,8 @@ impl Survival {
                 self.players.get_mut(&victim).unwrap().riposte_until = now + guard.break_secs;
             }
             self.events.push(Event::Emote { id: victim, emote: mobs::STUN_EMOTE });
-            self.tell(victim, "Your guard is crushed!");
+            // No word: the stagger shows it, with a broken guard's crack and beat.
+            self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
         }
     }
 
@@ -2509,7 +2533,9 @@ impl Survival {
             if let Some(p) = self.players.get_mut(&o) {
                 p.cooldowns.clear();
                 self.events.push(Event::Abilities { player: o });
-                self.events.push(Event::Flash { player: o, text: "Death Mark readied every cooldown".into() });
+                // No word: every key flares on the bar as it comes ready (the `readied` beat),
+                // with Cold Blood's sting on the marker.
+                self.cue(Some(o), o, 0, cues::SOUND_READIED, cues::BEAT_READIED);
             }
         }
     }
@@ -2546,6 +2572,10 @@ pub(crate) struct WeaponReach {
     pub arc: f32,
 }
 
+/// A giant's blow on a parry that can only block: the hero driven back along the ground,
+/// guard up (speed, lift: a skid, not a throw; a shove is 6 to 8 with 1.5 to 2 of lift). A
+/// starting number: check on video.
+const TOO_HEAVY_SKID: [f32; 2] = [4.5, 0.3];
 /// The reactions (`AnimationData`): a flinch, a heavy blow's, a stagger's reel, the shield taking
 /// a blow.
 pub const WOUND_ANIM: u16 = 9;
@@ -2638,7 +2668,8 @@ impl Survival {
         if m.turn_on.is_none() && self.rng.gen::<f32>() < chance {
             // It wheels round on them as soon as its blow in hand is done.
             self.mobs.get_mut(&mid).unwrap().turn_on = Some(by);
-            self.events.push(Event::Flash { player: by, text: "It turns on you!".into() });
+            // No word: it roars at them and wheels round (as it turns, in its own step).
+            self.events.push(Event::Emote { id: mid, emote: mobs::ROAR_EMOTE });
         }
     }
 

@@ -3883,7 +3883,7 @@ function ES.Message(text)
   msg:Show()
 end
 
--- A parry: a word over the hero, big and brief.
+-- A refusal or a hint (never an outcome: those show in Cues.lua): words over the hero, big and brief.
 local flash = Fader("ElwynnSurvivalFlash", 300, 40, 0.5)
 flash:SetPoint("CENTER", UIParent, "CENTER", 0, 70)
 flash.text = Text(flash, FONT_TITLE, 30, "OUTLINE")
@@ -6589,6 +6589,9 @@ function ES.Line(line)
     if ES.FightMeter then ES.FightMeter(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
+  elseif verb == "CU" then
+    -- An outcome's beat (Cues.lua): no word, the look and sound come from the server.
+    if ES.CueLine then ES.CueLine(f) end
   elseif verb == "WD" then
     vit.stamina:Flash()
   elseif verb == "HT" then

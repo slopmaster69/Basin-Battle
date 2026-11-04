@@ -21,7 +21,10 @@ const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// arrow (as Basin Battle's server sends them), or the client flies nothing to see. (10346: Fire
 /// Shot's, Kill Shot's arrow, carried the same way.)
 const ARROW_SPELLS: [u32; 4] = [2643, 3044, 10346, 19434];
-C:\Users\drago/// A stand-in's cast goes out this many ticks after its body (the client places a body only after
+/// Where a missile coming home is aimed: this far over the feet of whoever threw it (chest high
+/// on a dwarf, the hands on a human), so it flies to the body, not the ground.
+const HOME_HEIGHT: f32 = 1.2;
+/// A stand-in's cast goes out this many ticks after its body (the client places a body only after
 /// the frame that made it: cast in that frame, the missile would leave from the world's middle).
 const STAND_IN_CAST_TICKS: u32 = 1;
 /// A stand-in stays at least this many ticks past its cast, however soon the rules are done with
@@ -548,6 +551,17 @@ impl SurvivalGame {
                         self.ui_line(c, &format!("FL\t{}", clean(&text)));
                     }
                 }
+            }
+            Event::Beat { player, beat, on } => {
+                // `CU\t<beat>\t<guid>`: the add-on plays the outcome's hit-stop, shake and kick.
+                let g = self.guid_of(on).unwrap_or(0);
+                if let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) {
+                    self.ui_line(c, &format!("CU\t{beat}\t{g:#X}"));
+                }
+            }
+            Event::Hear { player, sound } => {
+                // The stock client plays it itself: no add-on needed.
+                self.to_player(player, packets::play_sound(sound));
             }
             Event::Hop { player, dir, speed, lift, roll, style } => {
                 let Some(g) = self.guid_of(player) else { return };
