@@ -676,7 +676,7 @@ impl SurvivalGame {
                 self.area_looks.insert(id, guid);
             }
             Event::Rope { id, a, b } => {
-                // On the clients that stretch a rope from end to end (patch 0027), in place of the
+                // On the clients that stretch a rope from end to end (patch 0028), in place of the
                 // strip on the ground laid for it just before (taken off theirs as a gone mark's
                 // is: floor clutter, Corey's review); the rest keep the strip.
                 let p = self.rope_create(id, a, b);

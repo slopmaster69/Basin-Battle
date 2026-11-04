@@ -6641,7 +6641,7 @@ events:SetScript("OnEvent", function()
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
     -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
     -- ac18: a shape flashed on the ground as an ability lands (0026); ac19: an object drawn longer
-    -- along one axis, and the dig site's rope (0027, Tripwire's wire).
+    -- along one axis, and the dig site's rope (0028, Tripwire's wire).
     if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 19 then
       Say(".es hello " .. VERSION .. " ac19")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
