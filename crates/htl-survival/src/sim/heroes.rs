@@ -144,6 +144,7 @@ impl Survival {
         self.grounds.clear();
         self.burnings.clear();
         self.totems.clear();
+        self.warlord.banners.clear();
         self.landings.clear();
         self.traps.clear();
         self.windups.clear();

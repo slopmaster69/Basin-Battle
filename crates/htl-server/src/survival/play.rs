@@ -495,7 +495,7 @@ impl SurvivalGame {
                 self.broadcast(&packets::update_object(&[], &[(g, &f)]));
             }
             Event::Grow { id, scale } => {
-                // The body drawn larger (Onslaught), for everyone, its owner too.
+                // The body drawn larger (Rallying Cry), for everyone, its owner too.
                 let Some(g) = self.guid_of(id) else { return };
                 let mut f = Fields::new();
                 f.set_f32(idx::SCALE_X, scale);

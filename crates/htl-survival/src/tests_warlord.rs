@@ -1,8 +1,7 @@
-//! The Warrior's second choices, the Warlord (Corey's blueprint, Nov 2): Tackle carries one enemy
-//! and Crashes it into what's behind it; Intervene takes the blow meant for a friend; Rallying Cry
-//! and Battle Cry give the group stamina and harder heavy attacks; Bladestorm ramps and is ended
-//! into a dodge or a guard; Cleave cashes in an opened enemy; Thunder Clap slows a pack's swings;
-//! Ravager holds a spot and is torn back through the pack; Heroic Throw Taunts.
+//! The Warrior's two trees (the designer's layout, Nov 4). The Warlord, the commander who holds
+//! the line: War Banner and Intimidating Roar, Cleave and Rising Cut, Tackle and Intervene,
+//! Retaliation and Shield Wall, Rallying Cry. The Juggernaut, the berserker: Axe Throw, Shockwave,
+//! Charge, Berserker Rage and Blood Fury, Bladestorm, and Momentum.
 
 use crate::content::Content;
 use crate::land::FlatLand;
@@ -99,26 +98,85 @@ fn walled(at: [f32; 2], r: f32) -> FlatLand {
     FlatLand { walls: vec![(at, r)], ..Default::default() }
 }
 
+/// How long an effect of `kind` has left on `u`.
+fn left(s: &Survival, u: Id, kind: &str) -> f32 {
+    s.cc_of(u).iter().find(|c| c.kind == kind).map_or(0.0, |c| c.until - s.clock)
+}
+
+/// Down at the ground `d` yd ahead (the reticle from the hero's eye).
+fn at_ground(d: f32) -> f32 {
+    -(1.9f32 / d).atan()
+}
+
+/// A light attack swung and let land.
+fn light(s: &mut Survival, p: Id) -> Vec<Event> {
+    s.input(p, Input::Attack);
+    s.input(p, Input::AttackUp);
+    run(s, 1.0)
+}
+
 // --- the board ---------------------------------------------------------------------------------------
 
 #[test]
-fn every_warrior_key_has_the_warlord_as_its_second_choice() {
+fn every_warrior_key_has_the_juggernaut_first_and_the_warlord_second() {
     let s = world();
-    for (slot, key) in [("ranged", "ravager"), ("close", "cleave"), ("utility", "tackle"), ("defense", "rallying_cry"), ("ultimate", "warrior_bladestorm")] {
-        let d = &s.content.abilities[s.content.ability(key).unwrap()];
-        assert_eq!((d.school.as_str(), d.slot.as_str(), d.choice), ("warrior", slot, 2), "{key}");
-        assert!(d.on_board(), "{key} is a card on the board");
+    let rows = [
+        ("ranged", "hurled_axe", "war_banner"),
+        ("close", "shockwave", "cleave"),
+        ("utility", "charge", "tackle"),
+        ("defense", "berserker_rage", "retaliation"),
+        ("ultimate", "warrior_bladestorm", "rallying_cry"),
+    ];
+    for (slot, jug, lord) in rows {
+        for (key, choice) in [(jug, 1), (lord, 2)] {
+            let d = &s.content.abilities[s.content.ability(key).unwrap()];
+            assert_eq!((d.school.as_str(), d.slot.as_str(), d.choice), ("warrior", slot, choice), "{key}");
+            assert!(d.on_board(), "{key} is a card on the board");
+            assert!(!s.learned_where(key).is_empty(), "{key} is learned somewhere");
+        }
+        let n = s.content.abilities.iter().filter(|a| a.on_board() && a.school == "warrior" && a.slot == slot).count();
+        assert_eq!(n, 2, "two Warrior cards on the {slot} key");
     }
-    for (ex, base) in [("heroic_throw", "ravager"), ("thunder_clap", "cleave"), ("intervene", "tackle"), ("battle_cry", "rallying_cry")] {
+    for (ex, base) in [("rending_axe", "hurled_axe"), ("intimidating_roar", "war_banner"), ("sundering_blow", "shockwave"), ("rising_cut", "cleave"), ("heroic_leap", "charge"), ("intervene", "tackle"), ("blood_fury", "berserker_rage"), ("shield_wall", "retaliation")] {
         let x = s.content.ability(ex).unwrap();
         assert_eq!(s.content.abilities[x].ex_of, base);
         // An EX shares its key's cooldown.
         assert_eq!(s.content.base_of(x), s.content.ability(base).unwrap(), "{ex} runs on {base}'s cooldown");
     }
-    // Learned where the Juggernaut's are: the shrine, the relic, the champion.
-    for key in ["ravager", "cleave", "tackle", "rallying_cry", "warrior_bladestorm"] {
-        assert!(!s.learned_where(key).is_empty(), "{key} is learned somewhere");
+    // An ultimate has no EX.
+    for u in ["warrior_bladestorm", "rallying_cry"] {
+        assert!(s.content.ex_of(s.content.ability(u).unwrap()).is_none(), "{u}");
     }
+}
+
+#[test]
+fn the_retired_warrior_abilities_are_gone() {
+    let s = world();
+    for k in ["ravager", "ravager_recall", "heroic_throw", "thunder_clap", "battle_cry", "onslaught"] {
+        assert!(s.content.ability(k).is_none(), "{k} retired");
+    }
+    assert_eq!(s.content.loadout.get("ultimate").map(String::as_str), Some("warrior_bladestorm"));
+    assert_eq!(s.content.loadout.get("defense").map(String::as_str), Some("berserker_rage"));
+}
+
+#[test]
+fn a_save_naming_retired_warrior_abilities_still_loads() {
+    let mut c = Content::dev();
+    c.pvp = Default::default();
+    c.dev.full_tree = false;
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut save = s.leave(p).unwrap();
+    save.class = "warrior".into();
+    save.owned = ["ravager", "heroic_throw", "thunder_clap", "rallying_cry", "battle_cry", "onslaught", "ravager_recall"].iter().map(|k| k.to_string()).collect();
+    save.loadout = [("ranged", "ravager"), ("close", "thunder_clap"), ("defense", "rallying_cry"), ("ultimate", "onslaught")].iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+    let q = s.join("ayla", "Ayla", Some(&save));
+    let h = &s.players[&q];
+    assert!(h.owned.iter().all(|k| s.content.ability(k).is_some()), "nothing unknown kept: {:?}", h.owned);
+    assert!(h.owned.contains("war_banner") && h.owned.contains("warrior_bladestorm") && h.owned.contains("rallying_cry"), "{:?}", h.owned);
+    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("war_banner"), "Ravager's key holds the War Banner");
+    assert_eq!(h.loadout.get("ultimate").map(String::as_str), Some("warrior_bladestorm"), "Onslaught's, Bladestorm");
+    assert!(h.loadout.values().all(|k| s.content.ability(k).is_some()), "{:?}", h.loadout);
 }
 
 #[test]
@@ -148,6 +206,7 @@ fn tackle_drives_an_enemy_into_a_wall_and_it_crashes_stunned() {
     assert!(struck(&ev, k).contains(&20), "20 damage on the wall: {:?}", struck(&ev, k));
     assert!(hp(&s, k) < before);
     assert!(s.has_cc(k, "stun"), "stunned against the wall");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 5089, .. } if *id == k)), "the Crash's shock ring on it");
     let at = s.mobs[&k].pos;
     assert!(at[0] > 3.5 && at[0] < 5.6, "carried up to the wall's face: {at:?}");
     assert!(s.players[&p].pos[0] > 2.0, "the hero rushed in behind it: {:?}", s.players[&p].pos);
@@ -165,10 +224,18 @@ fn tackle_into_another_enemy_knocks_both_down() {
     assert!(struck(&ev, b).contains(&14), "the one it's driven into too: {:?}", struck(&ev, b));
     assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "both knocked down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == b && *anim == KNOCKDOWN_ANIM)), "thrown to the ground");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 5089, .. } if *id == b)), "the Crash's shock ring on the one driven into");
+    // The knockdown is long enough to read: still down well after a second.
+    run(&mut s, 1.3);
+    assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "a 2 sec knockdown");
+    run(&mut s, 1.0);
+    assert!(!s.has_cc(a, "stun") && !s.has_cc(b, "stun"), "and up again");
+    // The one driven into was shoved on by the Crash.
+    assert!(s.mobs[&b].pos[0] > 6.5, "shoved on from 5.5: {:?}", s.mobs[&b].pos);
 }
 
 #[test]
-fn tackle_with_nothing_behind_drops_the_enemy_at_your_feet() {
+fn tackle_with_nothing_behind_flings_the_enemy_on_ahead() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "brave", [2.0, 0.0, 0.0]);
@@ -179,6 +246,9 @@ fn tackle_with_nothing_behind_drops_the_enemy_at_your_feet() {
     assert_eq!(struck(&ev, k), vec![10], "dropped for 10");
     assert!(!s.has_cc(k, "stun"), "no Crash, no stun");
     assert!(s.players[&p].pos[0] > 7.0, "the hero went the whole rush: {:?}", s.players[&p].pos);
+    // Not set down at the hero's feet: flung on ahead, so the hit is seen to move it.
+    run(&mut s, 0.8);
+    assert!(s.mobs[&k].pos[0] > 10.5, "flung 4 yd on from the rush's end: {:?}", s.mobs[&k].pos);
 }
 
 #[test]
@@ -258,59 +328,366 @@ fn intervene_with_no_friend_in_reach_spends_nothing() {
     assert!(s.cooldown(a, t).charges > 0, "and the cooldown");
 }
 
-// --- Rallying Cry, Battle Cry -------------------------------------------------------------------------------
+// --- War Banner -----------------------------------------------------------------------------------------
+
+/// Ayla plants her banner 6 yd ahead.
+fn plant(s: &mut Survival, p: Id) -> Vec<Event> {
+    let mut ev = cast(s, p, "war_banner", false, 0.0, at_ground(6.0));
+    ev.extend(run(s, 0.2));
+    ev
+}
+
+fn banner_at(s: &Survival, p: Id) -> Option<Vec3> {
+    s.warlord.banners.get(&p).map(|b| b.at)
+}
 
 #[test]
-fn rallying_cry_refills_the_stamina_of_everyone_near() {
+fn war_banner_stands_where_aimed_for_10_sec() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ev = plant(&mut s, p);
+    let at = banner_at(&s, p).expect("planted");
+    assert!((at[0] - 6.0).abs() < 1.0 && at[1].abs() < 0.5, "where she aimed: {at:?}");
+    let obj = s.warlord.banners[&p].obj;
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjSpawned { id } if *id == obj)), "drawn for everyone");
+    assert!(matches!(s.objs[&obj].kind, ObjKind::Prop { display: 4313, .. }), "the banner's look");
+    let ev = run(&mut s, 10.0);
+    assert!(banner_at(&s, p).is_none(), "down after 10 sec");
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == obj)));
+}
+
+#[test]
+fn war_banner_quickens_the_stamina_of_heroes_near_it() {
     let mut s = world();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
-    let c = hero(&mut s, "Cara", [25.0, 0.0, 0.0], 0.0);
+    let b = hero(&mut s, "Bren", [8.0, 3.0, 0.0], 0.0);
+    let c = hero(&mut s, "Cara", [30.0, 0.0, 0.0], 0.0);
+    plant(&mut s, a);
     for h in [a, b, c] {
-        s.players.get_mut(&h).unwrap().stamina = 10.0;
+        s.players.get_mut(&h).unwrap().stamina = 0.0;
     }
+    run(&mut s, 1.0);
+    let (sa, sb, sc) = (s.players[&a].stamina, s.players[&b].stamina, s.players[&c].stamina);
+    assert!(sc > 5.0, "Cara regains it at her own pace: {sc}");
+    assert!(sa > sc * 1.8 && sb > sc * 1.8, "twice as fast within 8 yd: {sa} {sb} against {sc}");
+}
+
+#[test]
+fn war_banner_marks_the_heroes_near_it() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [8.0, 3.0, 0.0], 0.0);
+    let c = hero(&mut s, "Cara", [30.0, 0.0, 0.0], 0.0);
+    plant(&mut s, a);
+    assert!(s.has_cc(a, "war_banner") && s.has_cc(b, "war_banner"), "Ayla and Bren near it");
+    assert!(!s.has_cc(c, "war_banner"), "Cara far off");
+    assert!(s.auras_of(b).contains(&6673), "the banner's look over Bren: {:?}", s.auras_of(b));
+    s.move_player(b, [30.0, 5.0, 0.0], 0.0, Moving::default());
+    run(&mut s, 0.5);
+    assert!(!s.has_cc(b, "war_banner"), "gone once he walks away");
+}
+
+#[test]
+fn war_banner_makes_heavy_attacks_near_it_stagger_30_percent_longer() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let far = hero(&mut s, "Bren", [40.0, 0.0, 0.0], 0.0);
+    let k = mob(&mut s, "brave", [3.0, 3.0, 0.0]);
+    plant(&mut s, a);
+    assert!((s.stagger_share(a, k, true) - 1.3).abs() < 1e-4, "a heavy attack by the banner: {}", s.stagger_share(a, k, true));
+    assert!((s.stagger_share(a, k, false) - 1.0).abs() < 1e-4, "a light one as ever");
+    assert!((s.stagger_share(far, k, true) - 1.0).abs() < 1e-4, "away from it, as ever");
+}
+
+#[test]
+fn war_banner_falls_to_an_enemys_blows() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    plant(&mut s, p);
+    let at = banner_at(&s, p).unwrap();
+    // A brave beside the banner, swinging at Ayla as she stands by it.
+    s.move_player(p, [at[0] - 1.6, 0.0, 0.0], 0.0, Moving::default());
+    let k = mob(&mut s, "brave", [at[0] + 1.2, 0.0, 0.0]);
+    {
+        let m = s.mobs.get_mut(&k).unwrap();
+        m.state = MobState::Chase { foe: Foe::Hero(p) };
+        m.ready_at = 0.0;
+    }
+    let before = s.warlord.banners[&p].health;
+    let mut fell = false;
+    for _ in 0..200 {
+        s.step(DT);
+        if !s.warlord.banners.contains_key(&p) {
+            fell = true;
+            break;
+        }
+        s.players.get_mut(&p).unwrap().health = 200;
+    }
+    assert!(before == 60.0, "60 health");
+    assert!(fell, "its blows bring it down: {:?}", s.warlord.banners.get(&p).map(|b| b.health));
+}
+
+#[test]
+fn war_banner_is_damaged_by_a_heros_own_swing() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    plant(&mut s, p);
+    let at = banner_at(&s, p).unwrap();
+    s.move_player(p, [at[0] - 1.5, at[1], 0.0], 0.0, Moving::default());
+    s.step(DT);
+    light(&mut s, p);
+    let left = s.warlord.banners.get(&p).map_or(0.0, |b| b.health);
+    assert!(left < 60.0, "her own blow takes from it: {left}");
+}
+
+#[test]
+fn war_banner_recast_moves_it_to_the_new_spot() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    plant(&mut s, p);
+    let first = banner_at(&s, p).unwrap();
+    let old = s.warlord.banners[&p].obj;
+    let until = s.warlord.banners[&p].until;
+    // The key again (no cooldown spent: the recast's free), aimed to the side.
+    s.slot_ability(p, "ranged", "war_banner").unwrap();
+    s.input(p, Input::Ability(key_of("ranged"), false));
+    s.step(DT);
+    s.set_aim_line(p, std::f32::consts::FRAC_PI_2, at_ground(6.0));
+    s.input(p, Input::Attack);
+    let mut ev = s.step(DT);
+    s.input(p, Input::AttackUp);
+    ev.extend(run(&mut s, 0.2));
+    let now = banner_at(&s, p).expect("still standing");
+    assert!(dist2d(first, now) > 5.0 && now[1] > 4.0, "planted at the new spot: {first:?} to {now:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == old)), "uprooted from the old");
+    assert!((s.warlord.banners[&p].until - until).abs() < 1e-3, "its time left goes with it");
+    assert_eq!(s.warlord.banners.len(), 1, "one banner");
+}
+
+// --- Intimidating Roar --------------------------------------------------------------------------------
+
+#[test]
+fn intimidating_roar_cows_the_pack_their_blows_softer_and_slower() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [6.0, 0.0, 0.0]);
+    let behind = mob(&mut s, "brave", [-6.0, 0.0, 0.0]);
+    let (d0, w0) = (s.attack_now(k).damage, s.attack_now(k).windup);
+    s.set_valor(p, 25.0);
+    cast(&mut s, p, "war_banner", true, 0.0, 0.0);
+    assert!(s.has_cc(k, "cowed") && !s.has_cc(behind, "cowed"), "the cone in front");
+    assert!((left(&s, k, "cowed") - 6.0).abs() < 0.2, "6 sec: {}", left(&s, k, "cowed"));
+    let a = s.attack_now(k);
+    assert!((a.damage as f32 - d0 as f32 * 0.75).abs() <= 1.0, "25% less: {} from {d0}", a.damage);
+    assert!((a.windup - w0 * 1.15).abs() < 1e-3, "15% slower: {} from {w0}", a.windup);
+    assert!(s.auras_of(k).contains(&1160), "the Cowed look on it");
+}
+
+#[test]
+fn intimidating_roar_only_takes_10_percent_off_a_bosses_blows() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let w = mob(&mut s, "warlord", [6.0, 0.0, 0.0]);
+    let (d0, w0) = (s.attack_now(w).damage, s.attack_now(w).windup);
+    s.set_valor(p, 25.0);
+    cast(&mut s, p, "war_banner", true, 0.0, 0.0);
+    let a = s.attack_now(w);
+    assert!((a.damage as f32 - d0 as f32 * 0.9).abs() <= 1.0, "10% less: {} from {d0}", a.damage);
+    assert!((a.windup - w0).abs() < 1e-3, "no slower");
+    s.mobs.get_mut(&w).unwrap().health = 50;
+    run(&mut s, 0.3);
+    assert!(!s.has_cc(w, "panic"), "a boss never flees");
+}
+
+#[test]
+fn a_cowed_enemy_near_death_flees() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let weak = mob(&mut s, "brave", [6.0, 1.0, 0.0]);
+    let strong = mob(&mut s, "brave", [6.0, -1.0, 0.0]);
+    s.mobs.get_mut(&weak).unwrap().health = 30;
+    s.set_valor(p, 25.0);
+    cast(&mut s, p, "war_banner", true, 0.0, 0.0);
+    run(&mut s, 0.2);
+    assert!(s.has_cc(weak, "panic"), "below 20%: it runs");
+    assert!(!s.has_cc(strong, "panic"), "a healthy one keeps fighting");
+}
+
+#[test]
+fn a_cowed_hero_is_cowed_half_as_long() {
+    let mut s = world_on(true, FlatLand::default());
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [6.0, 0.0, 0.0], std::f32::consts::PI);
+    s.set_valor(a, 25.0);
+    cast(&mut s, a, "war_banner", true, 0.0, 0.0);
+    assert!(s.has_cc(b, "cowed"));
+    assert!((left(&s, b, "cowed") - 3.0).abs() < 0.2, "3 sec: {}", left(&s, b, "cowed"));
+    assert!((s.blow_share(b) - 0.75).abs() < 1e-3, "his blows 25% softer: {}", s.blow_share(b));
+}
+
+// --- Cleave, Rising Cut -----------------------------------------------------------------------------------
+
+#[test]
+fn cleave_hits_an_opened_enemy_for_250_percent() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let open = mob(&mut s, "brave", [2.5, 1.5, 0.0]);
+    let shut = mob(&mut s, "brave", [2.5, -1.5, 0.0]);
+    let behind = mob(&mut s, "brave", [-2.5, 0.0, 0.0]);
+    let mut ev = cast(&mut s, p, "cleave", false, 0.0, 0.0);
+    s.stagger_mob(open, 3.0, false);
+    assert!(s.opened(open) && !s.opened(shut));
+    ev.extend(run(&mut s, 0.8));
+    let (o, c) = (struck(&ev, open), struck(&ev, shut));
+    assert_eq!((o.len(), c.len()), (1, 1), "each struck once: {o:?} {c:?}");
+    assert!(o[0] as f32 >= c[0] as f32 * 2.3, "250% against 100%: {} and {}", o[0], c[0]);
+    assert!(struck(&ev, behind).is_empty(), "nothing behind the 180° arc");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == open && *kit == KIT_RIPOSTE)), "a red spark on the one cashed in");
+}
+
+#[test]
+fn opened_means_staggered_stunned_knocked_down_exposed_or_a_boss_stance_broken() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
+    assert!(!s.opened(k));
+    s.apply_cc(k, p, "stun", 2.0, 0.0, 0.0, "test");
+    assert!(s.opened(k), "stunned");
+    let x = mob(&mut s, "brave", [3.0, -5.0, 0.0]);
+    s.apply_cc(x, p, "exposed", 2.0, 0.2, 0.0, "test");
+    assert!(s.opened(x), "Exposed");
+    let w = mob(&mut s, "warlord", [3.0, 5.0, 0.0]);
+    s.stagger_mob(w, 1.0, false);
+    assert!(!s.opened(w), "a boss is opened only by a broken stance");
+    let limit = s.posture_limit(w);
+    assert!(s.build_posture(w, p, limit));
+    assert!(s.opened(w), "stance-broken");
+}
+
+#[test]
+fn rising_cut_cannot_be_staggered_in_its_windup() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [2.5, 0.0, 0.0]);
+    s.set_valor(p, 25.0);
+    cast(&mut s, p, "cleave", true, 0.0, 0.0);
+    assert!(matches!(s.players[&p].action, Action::Cast { .. }), "winding up");
+    assert!(!s.apply_cc(p, k, "stagger", 1.0, 0.0, 0.0, "test"), "a stagger doesn't take");
+    assert!(matches!(s.players[&p].action, Action::Cast { .. }), "still winding up");
+    let ev = run(&mut s, 0.6);
+    assert_eq!(struck(&ev, k).len(), 1, "and it cuts");
+}
+
+#[test]
+fn rising_cut_exposes_what_it_hits_for_5_sec_a_boss_for_2_5() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [2.5, 1.0, 0.0]);
+    let w = mob(&mut s, "warlord", [2.5, -1.5, 0.0]);
+    let behind = mob(&mut s, "brave", [-2.5, 0.0, 0.0]);
+    s.set_valor(p, 25.0);
+    cast(&mut s, p, "cleave", true, 0.0, 0.0);
+    run(&mut s, 0.5);
+    assert!((left(&s, k, "exposed") - 5.0).abs() < 0.2, "5 sec: {}", left(&s, k, "exposed"));
+    assert!((left(&s, w, "exposed") - 2.5).abs() < 0.2, "a boss's 2.5: {}", left(&s, w, "exposed"));
+    assert!(!s.has_cc(behind, "exposed"), "only in front");
+    assert!(s.auras_of(k).contains(&8647), "the Exposed look on it");
+}
+
+#[test]
+fn an_exposed_enemy_takes_20_percent_more_and_reels_30_percent_longer() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
+    assert!((s.taken_share(k) - 1.0).abs() < 1e-4);
+    s.apply_cc(k, p, "exposed", 5.0, 0.2, 0.0, "test");
+    assert!((s.taken_share(k) - 1.2).abs() < 1e-4, "20% more: {}", s.taken_share(k));
+    assert!((s.stagger_share(p, k, false) - 1.3).abs() < 1e-4, "30% longer staggers");
+    let now = s.clock;
+    s.apply_cc(k, p, "stagger", 1.0, 0.0, 0.0, "test");
+    assert!((s.mobs[&k].stagger_until - now - 1.3).abs() < 0.01, "a 1 sec stagger is 1.3: {}", s.mobs[&k].stagger_until - now);
+}
+
+#[test]
+fn an_exposed_hero_cannot_block_a_heros_blow() {
+    let mut s = world_on(true, FlatLand::default());
+    let pi = std::f32::consts::PI;
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], pi);
+    s.input(b, Input::Guard);
+    run(&mut s, 0.6);
+    let h = s.players[&b].health;
+    light(&mut s, a);
+    assert_eq!(s.players[&b].health, h, "guarded, the blow is blocked");
+    s.apply_cc(b, a, "exposed", 5.0, 0.2, 0.0, "test");
+    let ev = light(&mut s, a);
+    assert!(s.players[&b].health < h, "Exposed, it lands through the guard: {:?}", struck(&ev, b));
+}
+
+// --- Rallying Cry ------------------------------------------------------------------------------------------
+
+#[test]
+fn rallying_cry_gets_everyone_near_up_with_full_stamina() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [15.0, 0.0, 0.0], 0.0);
+    let c = hero(&mut s, "Cara", [30.0, 0.0, 0.0], 0.0);
+    let k = mob(&mut s, "brave", [16.0, 1.0, 0.0]);
+    for h in [a, b, c] {
+        s.players.get_mut(&h).unwrap().stamina = 5.0;
+    }
+    // Bren knocked down, Cara staggered.
+    s.knock_down(k, b, 3.0, "test");
+    assert!(s.has_cc(b, "stun"));
+    s.set_valor(a, 100.0);
     let ev = press(&mut s, a, "rallying_cry", false);
-    assert!(s.players[&a].stamina >= 50.0, "Ayla's own: {}", s.players[&a].stamina);
-    assert!(s.players[&b].stamina >= 50.0, "Bren, 10 yd off: {}", s.players[&b].stamina);
-    assert!(s.players[&c].stamina < 20.0, "Cara, 25 yd off, out of reach: {}", s.players[&c].stamina);
+    assert_eq!(s.players[&a].valor, 0.0, "the whole Valor bar");
+    assert!(s.players[&a].stamina >= 99.0 && s.players[&b].stamina >= 99.0, "all of it: {} {}", s.players[&a].stamina, s.players[&b].stamina);
+    assert!(!s.has_cc(b, "stun"), "Bren up off the ground");
+    assert!(s.players[&c].stamina < 10.0, "Cara, 30 yd off, out of reach");
     let shouted: Vec<Id> = ev.iter().filter_map(|e| match e { Event::Missile { spell: 6673, target: Target::Unit(u), .. } => Some(*u), _ => None }).collect();
     assert!(shouted.contains(&a) && shouted.contains(&b) && !shouted.contains(&c), "Battle Shout's look on each one reached: {shouted:?}");
 }
 
 #[test]
-fn battle_cry_makes_the_groups_heavy_attacks_break_a_stance_faster() {
+fn rallying_cry_leaves_everyone_near_unstaggerable_for_8_sec() {
     let mut s = world();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let b = hero(&mut s, "Bren", [0.0, 6.0, 0.0], 0.0);
-    // Two bosses: the first struck before the cry, the second after.
-    let w1 = mob(&mut s, "warlord", [1.6, 6.0, 0.0]);
-    let w2 = mob(&mut s, "warlord", [1.6, 20.0, 0.0]);
-    let heavy_on = |s: &mut Survival, w: Id| -> (u32, u32) {
-        let (h0, p0) = (s.mobs[&w].health, s.posture_of(w));
-        s.input(b, Input::Heavy);
-        for _ in 0..60 {
-            s.step(DT);
-            if s.mobs[&w].health < h0 {
-                break;
-            }
-        }
-        (h0 - s.mobs[&w].health, s.posture_of(w) - p0)
-    };
-    let (d1, p1) = heavy_on(&mut s, w1);
-    assert!(d1 > 0 && p1 > 0, "the plain heavy lands: {d1} damage, {p1} posture");
-    s.set_valor(a, 25.0);
-    run(&mut s, 1.0);
-    press(&mut s, a, "rallying_cry", true);
-    assert!(s.has_cc(b, "battle_cry") && s.has_cc(a, "battle_cry"), "the whole group within 15 yd");
-    // Over to the second boss.
-    s.move_player(b, [0.0, 20.0, 0.0], 0.0, Moving::default());
-    run(&mut s, 0.6);
-    let (d2, p2) = heavy_on(&mut s, w2);
-    let (r1, r2) = (p1 as f32 / d1 as f32, p2 as f32 / d2 as f32);
-    assert!(r2 > r1 * 1.35, "50% more posture a point of damage: {r1:.2} then {r2:.2}");
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    let k = mob(&mut s, "brave", [11.0, 1.0, 0.0]);
+    assert!(s.apply_cc(b, k, "stagger", 2.0, 0.0, 0.0, "test"));
+    assert!(matches!(s.players[&b].action, Action::Stagger { .. }));
+    s.set_valor(a, 100.0);
+    press(&mut s, a, "rallying_cry", false);
+    assert!(!matches!(s.players[&b].action, Action::Stagger { .. }), "his stagger ended");
+    assert!(!s.apply_cc(b, k, "stagger", 1.0, 0.0, 0.0, "test") && !s.apply_cc(a, k, "stagger", 1.0, 0.0, 0.0, "test"), "neither can be staggered");
+    assert!(s.auras_of(b).contains(&22888), "the mark on Bren");
+    run(&mut s, 8.1);
+    assert!(s.apply_cc(b, k, "stagger", 1.0, 0.0, 0.0, "test"), "8 sec");
 }
 
-// --- Bladestorm ------------------------------------------------------------------------------------------
+#[test]
+fn rallying_cry_grows_the_warrior_and_frees_and_quickens_their_attacks() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    let (wa, wb) = (s.strike_at(a, StrikeKind::Light, 0).windup, s.strike_at(b, StrikeKind::Light, 0).windup);
+    s.set_valor(a, 100.0);
+    let mut ev = press(&mut s, a, "rallying_cry", false);
+    ev.extend(run(&mut s, 0.5));
+    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && (*scale - 1.15).abs() < 0.01)), "15% larger");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Grow { id, .. } if *id == b)), "Bren stays his size");
+    let (qa, qb) = (s.strike_at(a, StrikeKind::Light, 0).windup, s.strike_at(b, StrikeKind::Light, 0).windup);
+    assert!((qa - wa / 1.2).abs() < 1e-3, "Ayla's 20% faster: {wa} to {qa}");
+    assert!((qb - wb / 1.1).abs() < 1e-3, "Bren's 10%: {wb} to {qb}");
+    let stamina = s.players[&a].stamina;
+    light(&mut s, a);
+    assert!(s.players[&a].stamina >= stamina, "her attacks cost nothing");
+    let ev = run(&mut s, 8.0);
+    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && (*scale - 1.0).abs() < 0.01)), "back to size");
+}
+
+// --- Bladestorm (the Juggernaut's) --------------------------------------------------------------------------
 
 fn spin(s: &mut Survival, p: Id) -> Vec<Event> {
     s.set_valor(p, 100.0);
@@ -376,120 +753,138 @@ fn bladestorm_takes_no_other_ability_and_a_stagger_ends_it() {
     assert!(!matches!(s.players[&p].action, Action::Channel { .. }), "and the stagger ends it");
 }
 
-// --- Cleave, Thunder Clap ---------------------------------------------------------------------------------
+// --- Berserker Rage, Blood Fury -------------------------------------------------------------------------------
 
 #[test]
-fn cleave_hits_an_opened_enemy_for_250_percent() {
+fn berserker_rage_gets_you_up_from_a_knockdown() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let open = mob(&mut s, "brave", [2.5, 1.5, 0.0]);
-    let shut = mob(&mut s, "brave", [2.5, -1.5, 0.0]);
-    let behind = mob(&mut s, "brave", [-2.5, 0.0, 0.0]);
-    let mut ev = cast(&mut s, p, "cleave", false, 0.0, 0.0);
-    s.stagger_mob(open, 3.0, false);
-    assert!(s.opened(open) && !s.opened(shut));
-    ev.extend(run(&mut s, 0.8));
-    let (o, c) = (struck(&ev, open), struck(&ev, shut));
-    assert_eq!((o.len(), c.len()), (1, 1), "each struck once: {o:?} {c:?}");
-    assert!(o[0] as f32 >= c[0] as f32 * 2.3, "250% against 100%: {} and {}", o[0], c[0]);
-    assert!(struck(&ev, behind).is_empty(), "nothing behind the 180° arc");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == open && *kit == KIT_RIPOSTE)), "a red spark on the one cashed in");
+    let k = mob(&mut s, "brave", [2.0, 0.0, 0.0]);
+    s.knock_down(k, p, 4.0, "test");
+    assert!(s.has_cc(p, "stun"), "on the ground");
+    let ev = press(&mut s, p, "berserker_rage", false);
+    assert!(!s.has_cc(p, "stun"), "up at once");
+    assert!(ev.iter().any(|e| matches!(e, Event::ClipStop { id } if *id == p)), "the knockdown's clip let go");
+    assert!(!s.apply_cc(p, k, "stagger", 1.0, 0.0, 0.0, "test"), "and can't be staggered");
 }
 
 #[test]
-fn opened_means_staggered_stunned_knocked_down_or_a_boss_stance_broken() {
+fn berserker_rage_breaks_a_stagger_a_root_and_a_slow() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let k = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
-    assert!(!s.opened(k));
-    s.apply_cc(k, p, "stun", 2.0, 0.0, 0.0, "test");
-    assert!(s.opened(k), "stunned");
-    let w = mob(&mut s, "warlord", [3.0, 5.0, 0.0]);
-    s.stagger_mob(w, 1.0, false);
-    assert!(!s.opened(w), "a boss is opened only by a broken stance");
-    let limit = s.posture_limit(w);
-    assert!(s.build_posture(w, p, limit));
-    assert!(s.opened(w), "stance-broken");
+    let k = mob(&mut s, "brave", [2.0, 0.0, 0.0]);
+    s.apply_cc(p, k, "root", 4.0, 0.0, 0.0, "test");
+    s.apply_cc(p, k, "snare", 4.0, 0.5, 0.0, "test");
+    s.apply_cc(p, k, "stagger", 3.0, 0.0, 0.0, "test");
+    assert!(matches!(s.players[&p].action, Action::Stagger { .. }));
+    press(&mut s, p, "berserker_rage", false);
+    assert!(!matches!(s.players[&p].action, Action::Stagger { .. }), "out of the stagger");
+    assert!(!s.has_cc(p, "root") && !s.has_cc(p, "snare"), "free to move");
 }
 
 #[test]
-fn thunder_clap_slows_the_packs_swings() {
+fn berserker_rage_holds_off_staggers_for_3_sec() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let k = mob(&mut s, "brave", [4.0, 0.0, 0.0]);
-    let far = mob(&mut s, "brave", [12.0, 0.0, 0.0]);
-    let w = mob(&mut s, "warlord", [0.0, 5.0, 0.0]);
-    let (wk, ww) = (s.attack_now(k).windup, s.attack_now(w).windup);
-    let before = hp(&s, k);
+    let k = mob(&mut s, "brave", [2.0, 0.0, 0.0]);
+    press(&mut s, p, "berserker_rage", false);
+    run(&mut s, 2.8);
+    assert!(!s.apply_cc(p, k, "stagger", 1.0, 0.0, 0.0, "test"), "still steadfast");
+    run(&mut s, 0.3);
+    assert!(s.apply_cc(p, k, "stagger", 1.0, 0.0, 0.0, "test"), "3 sec, then a stagger takes");
+}
+
+#[test]
+fn blood_fury_costs_15_percent_of_your_health_and_never_kills() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().health = 100;
     s.set_valor(p, 25.0);
-    let ev = press(&mut s, p, "cleave", true);
-    assert!(hp(&s, k) < before, "8 damage");
-    assert!(struck(&ev, far).is_empty(), "nothing past 8 yd");
-    assert!((s.attack_now(k).windup - wk * 1.3).abs() < 1e-3, "30% slower: {} from {wk}", s.attack_now(k).windup);
-    assert!((s.attack_now(w).windup - ww * 1.15).abs() < 1e-3, "a boss 15%: {} from {ww}", s.attack_now(w).windup);
-    let until = |s: &Survival, m: Id| s.cc_of(m).iter().find(|c| c.kind == "slow_attacks").map(|c| c.until - s.clock).unwrap_or(0.0);
-    assert!((until(&s, k) - 6.0).abs() < 0.2 && (until(&s, w) - 4.0).abs() < 0.2, "6 sec, a boss's 4: {} {}", until(&s, k), until(&s, w));
-    run(&mut s, 6.2);
-    assert!((s.attack_now(k).windup - wk).abs() < 1e-3, "back to its pace after");
-}
-
-// --- Ravager, Heroic Throw --------------------------------------------------------------------------------
-
-#[test]
-fn ravager_holds_a_spot_then_tears_back_through_the_pack() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let held = mob(&mut s, "brave", [10.0, 1.5, 0.0]);
-    // Off the reticle's line (it would stop the aim on its body), inside the axe's 2 yd path home.
-    let between = mob(&mut s, "brave", [5.0, 0.8, 0.0]);
-    for m in [held, between] {
-        s.apply_cc(m, p, "root", 20.0, 0.0, 0.0, "test");
-    }
-    // Down at the ground 10 yd ahead (the reticle from the hero's eye).
-    let pitch = -(1.9f32 / 10.0).atan();
-    let mut ev = cast(&mut s, p, "ravager", false, 0.0, pitch);
-    ev.extend(run(&mut s, 2.1));
-    let ticks = struck(&ev, held);
-    assert!(ticks.len() >= 3 && ticks.iter().all(|d| *d == 6), "6 damage every 0.5 sec: {ticks:?}");
-    assert!(struck(&ev, between).is_empty(), "only within 3 yd of the axe");
-    assert_eq!(s.burnings.len(), 1, "the axe still spinning");
-    // The recast: torn back.
-    let ev = press(&mut s, p, "ravager", false);
-    assert!(s.burnings.is_empty(), "the axe is gone from the spot");
-    assert_eq!(struck(&ev, between), vec![16], "the one in its path takes 16");
-    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { target: Target::Unit(u), .. } if *u == p)), "flown home to the hero");
-}
-
-#[test]
-fn heroic_throw_pierces_three_and_taunts_them_off_a_friend() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let b = hero(&mut s, "Bren", [8.0, 6.0, 0.0], 0.0);
-    let line: Vec<Id> = [4.0, 7.0, 10.0, 13.0].iter().map(|x| mob(&mut s, "brave", [*x, 0.0, 0.0])).collect();
-    for m in &line {
-        s.mobs.get_mut(m).unwrap().state = MobState::Chase { foe: Foe::Hero(b) };
-        s.apply_cc(*m, b, "root", 20.0, 0.0, 0.0, "test");
-    }
+    press(&mut s, p, "berserker_rage", true);
+    assert_eq!(s.players[&p].health, 85, "15% of 100");
+    run(&mut s, 0.5);
+    s.players.get_mut(&p).unwrap().health = 1;
     s.set_valor(p, 25.0);
-    let mut ev = cast(&mut s, p, "ravager", true, 0.0, 0.0);
-    ev.extend(run(&mut s, 0.8));
-    for m in &line[..3] {
-        assert_eq!(struck(&ev, *m), vec![16], "pierced");
-        assert!(s.has_cc(*m, "taunt"), "and Taunted");
-        assert_eq!(s.mobs[m].state.target(), Some(p), "it comes for Ayla, not Bren");
-    }
-    assert!(struck(&ev, line[3]).is_empty(), "three at most");
-    run(&mut s, 3.6);
-    assert!(!s.has_cc(line[0], "taunt"), "4 sec");
+    press(&mut s, p, "berserker_rage", true);
+    assert_eq!(s.players[&p].health, 1, "never the last point");
 }
 
 #[test]
-fn a_taunted_hero_hits_anyone_else_for_30_percent_less() {
-    let mut s = world_on(true, FlatLand::default());
-    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let b = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
-    let c = hero(&mut s, "Cara", [6.0, 0.0, 0.0], 0.0);
-    assert!(s.apply_cc(b, a, "taunt", 4.0, 0.3, 0.0, "test"));
-    assert_eq!(s.taunted_damage(b, c, 100), 70);
-    assert_eq!(s.taunted_damage(b, a, 100), 100, "full on the one who taunted them");
+fn blood_fury_makes_attacks_free_and_25_percent_harder_for_8_sec() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "war_banner").unwrap();
+    s.slot_ability(p, "close", "cleave").unwrap();
+    s.slot_ability(p, "utility", "tackle").unwrap();
+    s.slot_ability(p, "ultimate", "rallying_cry").unwrap();
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "berserker_rage", true);
+    s.slot_ability(p, "defense", "retaliation").unwrap();
+    assert!(s.has_cc(p, "fury"));
+    assert!((s.blow_share(p) - 1.25).abs() < 1e-3, "25% harder: {}", s.blow_share(p));
+    let stamina = s.players[&p].stamina;
+    light(&mut s, p);
+    assert!(s.players[&p].stamina >= stamina, "free");
+    run(&mut s, 7.5);
+    assert!(!s.has_cc(p, "fury"), "8 sec");
+}
+
+// --- Momentum --------------------------------------------------------------------------------------------------
+
+#[test]
+fn momentum_stacks_with_each_hit_up_to_5() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "training_dummy", [1.8, 0.0, 0.0]);
+    s.mobs.get_mut(&k).unwrap().health = 10_000;
+    assert!(s.momentum_on(p), "a new Warrior's keys are the Juggernaut's");
+    for n in 1..=6u32 {
+        let ev = light(&mut s, p);
+        assert_eq!(struck(&ev, k).len(), 1, "hit {n} lands");
+        s.players.get_mut(&p).unwrap().stamina = 100.0;
+        assert_eq!(s.momentum(p), n.min(5), "a stack a hit, 5 at most");
+    }
+    assert!((s.blow_share(p) - 1.25).abs() < 1e-3, "5% a stack: {}", s.blow_share(p));
+}
+
+#[test]
+fn momentum_is_lost_when_you_raise_your_guard() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [1.8, 0.0, 0.0]);
+    light(&mut s, p);
+    light(&mut s, p);
+    assert_eq!(s.momentum(p), 2);
+    let _ = k;
+    s.input(p, Input::Guard);
+    s.step(DT);
+    assert_eq!(s.momentum(p), 0, "the guard up: gone");
+}
+
+#[test]
+fn momentum_is_lost_4_sec_after_the_last_hit() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    mob(&mut s, "brave", [1.8, 0.0, 0.0]);
+    light(&mut s, p);
+    assert_eq!(s.momentum(p), 1);
+    run(&mut s, 2.5);
+    assert_eq!(s.momentum(p), 1, "still there");
+    run(&mut s, 1.5);
+    assert_eq!(s.momentum(p), 0, "4 sec without a hit");
+}
+
+#[test]
+fn a_hero_with_no_juggernaut_card_on_a_key_has_no_momentum() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    for (slot, key) in [("ranged", "war_banner"), ("close", "cleave"), ("utility", "tackle"), ("defense", "retaliation"), ("ultimate", "rallying_cry")] {
+        s.slot_ability(p, slot, key).unwrap();
+    }
+    assert!(!s.momentum_on(p), "all the Warlord's");
+    mob(&mut s, "brave", [1.8, 0.0, 0.0]);
+    light(&mut s, p);
+    assert_eq!(s.momentum(p), 0);
+    s.slot_ability(p, "defense", "berserker_rage").unwrap();
+    assert!(s.momentum_on(p), "one of the Juggernaut's is enough");
 }

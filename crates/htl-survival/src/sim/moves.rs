@@ -103,7 +103,7 @@ impl Survival {
     }
 
     /// A knockback or a pull on someone: thrown through the air (a hero's own client flies it),
-    /// whatever they had in hand lost. Nothing moves a body in Ice Block, Onslaught or Sanctuary.
+    /// whatever they had in hand lost. Nothing moves a body in Ice Block, steadfast or rallied.
     pub(crate) fn displace(&mut self, owner: Id, victim: Id, e: &AbilityEffect) {
         let now = self.clock;
         let Some(v) = self.unit_pos(victim) else { return };

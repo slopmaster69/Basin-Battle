@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 17
+local VERSION = 18
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2814,7 +2814,14 @@ local CC_WORDS = {
   burn = { "Burning", 1, 0.5, 0.2 },
   mark = { "Marked", 0.75, 0.55, 1 },
   deathmark = { "Marked for death", 0.85, 0.35, 1 },
-  onslaught = { "Onslaught", 1, 0.55, 0.3 },
+  -- The Warrior's (the Juggernaut's and the Warlord's, Nov 4).
+  rallied = { "Rallied", 1, 0.8, 0.4 },
+  fury = { "Fury", 1, 0.4, 0.35 },
+  grown = { "Towering", 1, 0.6, 0.4 },
+  momentum = { "Momentum", 1, 0.9, 0.6 },
+  war_banner = { "Under the banner", 1, 0.85, 0.5 },
+  cowed = { "Cowed", 0.7, 0.6, 0.9 },
+  exposed = { "Exposed", 1, 0.65, 0.3 },
   hallowed = { "Hallowed", 1, 0.9, 0.55 },
   steadfast = { "Steadfast", 1, 0.85, 0.45 },
   cheat_death = { "Cheating death", 1, 0.9, 0.5 },

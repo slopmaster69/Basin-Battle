@@ -1,6 +1,6 @@
 //! The board's new cards, one rule each: the weapon arts (Sundering Blow and its crushed guard,
 //! the Unstoppable Blow no guard stops, Backstab from behind and on a Mark, Ambush), light that
-//! heals a friend, holy ground, Onslaught, the Death Mark, Sanctuary, Cold Snap, Dread Step, the
+//! heals a friend, holy ground, the Death Mark, Sanctuary, Cold Snap, Dread Step, the
 //! shatter, an old save's keys put on the board's rows, the defense row (Lay on Hands, Shield Wall)
 //! and a full charge's flare and faster missile.
 
@@ -250,35 +250,6 @@ fn consecration_burns_foes_and_heals_friends_and_hallowed_ground_softens_their_b
     };
     let armor = 1.0 - s.armor_reduce(&s.players[&b]);
     assert!((landed as f32 - 100.0 * 0.7 * armor).abs() <= 1.5, "{landed} of 100");
-}
-
-#[test]
-fn onslaught_spends_no_stamina_and_nothing_staggers_it() {
-    let mut s = world_with(true);
-    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let b = hero(&mut s, "Bren", [2.0, 0.0, 0.0], std::f32::consts::PI);
-    s.set_valor(a, 100.0);
-    cast(&mut s, a, "ultimate", "onslaught", false);
-    assert_eq!(s.players[&a].valor, 0.0, "the whole bar");
-    assert!(s.has_cc(a, "onslaught"));
-    run(&mut s, 0.5);
-    let stamina = s.players[&a].stamina;
-    s.input(a, Input::Attack);
-    s.input(a, Input::AttackUp);
-    run(&mut s, 0.2);
-    assert_eq!(s.players[&a].stamina, stamina, "no stamina spent");
-    s.apply_cc(a, b, "stagger", 1.0, 0.0, 0.0, "test");
-    assert!(!matches!(s.players[&a].action, Action::Stagger { .. }), "not staggered");
-    // Its heavy attack goes through a guard.
-    run(&mut s, 1.0);
-    s.input(b, Input::Guard);
-    run(&mut s, 0.4);
-    s.input(a, Input::Heavy);
-    let ev = run(&mut s, 1.5);
-    assert!(hits_on(&ev, b).iter().any(|h| h.1 == Outcome::Hit), "{:?}", hits_on(&ev, b));
-    // It runs out.
-    run(&mut s, 5.0);
-    assert!(!s.has_cc(a, "onslaught"));
 }
 
 #[test]

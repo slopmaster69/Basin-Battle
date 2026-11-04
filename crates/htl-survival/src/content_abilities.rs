@@ -485,7 +485,7 @@ pub struct AbilityDef {
     #[serde(default)]
     pub intervene: f32,
     /// A nova's friends in it (the caster too): this much stamina back, these boons, and this
-    /// spell's look on each of them (Rallying Cry, Battle Cry).
+    /// spell's look on each of them (Rallying Cry).
     #[serde(default)]
     pub ally_stamina: f32,
     #[serde(default)]
@@ -506,19 +506,63 @@ pub struct AbilityDef {
     /// channel and comes out on its press already): Bladestorm.
     #[serde(default)]
     pub bail: bool,
-    /// Against an opened enemy (staggered, knocked down, stunned, or a boss stance-broken) it
-    /// deals this many times its damage instead (Cleave's 250%: `weapon = 1.0`, `opened = 2.5`).
+    /// Against an opened enemy (staggered, knocked down, stunned, Exposed, or a boss
+    /// stance-broken) it deals this many times its damage instead (Cleave's 250%: `weapon = 1.0`,
+    /// `opened = 2.5`).
     #[serde(default)]
     pub opened: f32,
-    /// A recast that tears the lingering ground its first cast left (Ravager's axe) out and back
-    /// to the caster: every enemy on the way, `radius` either side, takes its `damage`, and the
-    /// ground ends.
+    /// A `place` that plants a banner at the reticle (War Banner): a thing on the ground (its
+    /// `object`, a `GameObjectDisplayInfo`) standing `secs`, with health, that helps the heroes
+    /// near it. Its recast moves it.
     #[serde(default)]
-    pub tears_back: bool,
-    /// A projectile that flies level along the aim's line at hand height, as a returning axe does
-    /// (Heroic Throw's spear through a line of enemies), not up or down to the reticle's point.
+    pub banner: Option<BannerDef>,
+    /// A buff that goes even while its caster is staggered or knocked down, and ends that, a root
+    /// and a slow (Berserker Rage).
     #[serde(default)]
-    pub skims: bool,
+    pub breaks_free: bool,
+    /// A buff that costs this share of the caster's health now as it goes (never the last point
+    /// of it: Blood Fury).
+    #[serde(default)]
+    pub health_cost: f32,
+    /// A passive the hero has while this ability is on one of their keys (one of [`PASSIVES`]):
+    /// `momentum`, the Juggernaut's.
+    #[serde(default)]
+    pub passive: String,
+}
+
+/// The passives an ability on a key can give its hero.
+pub const PASSIVES: [&str; 1] = ["momentum"];
+
+/// A War Banner as it stands: its `health` (every blow that reaches it, a foe's or a hero's,
+/// takes from it), and what heroes within its ability's `radius` of it get: stamina back `regen`
+/// times as fast, heavy attacks that stagger `stagger` longer, and `aura`'s look over them while
+/// they're near. Drawn at `scale`.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct BannerDef {
+    pub health: f32,
+    pub regen: f32,
+    pub stagger: f32,
+    #[serde(default)]
+    pub aura: u32,
+    #[serde(default = "full_share")]
+    pub scale: f32,
+}
+
+/// The Juggernaut's Momentum (`[momentum]`): each of the hero's own blows that lands (a light, a
+/// heavy, a weapon art) adds a stack, `damage` more a stack on their blows, `most` stacks at
+/// most; all lost when they raise their guard, or `secs` after their last hit.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct MomentumDef {
+    pub damage: f32,
+    pub most: u32,
+    pub secs: f32,
+}
+
+impl Default for MomentumDef {
+    fn default() -> Self {
+        Self { damage: 0.05, most: 5, secs: 4.0 }
+    }
 }
 
 /// An around beam (Bladestorm) walks at this share of a run.
@@ -700,21 +744,25 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
 ///
-/// The Warlord's: `battle_cry` (heavy attacks build `amount` more posture, and their staggers last
-/// `amount` longer), `guarded` (the first blow meant for them strikes the one who gave it instead:
-/// Intervene), `slow_attacks` (a creature's attacks wind up `amount` slower; a boss's half that),
-/// `taunt` (a creature attacks only the one who taunted it; a taunted hero deals `amount` less
-/// damage to anyone else).
-pub const OTHER_EFFECTS: [&str; 24] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "battle_cry", "guarded", "slow_attacks", "taunt",
+/// The Warrior's: `guarded` (the first blow meant for them strikes the one who gave it instead:
+/// Intervene), `rallied` (any stagger or knockdown ends as it lands; nothing staggers them, and
+/// their attacks come `amount` faster: Rallying Cry), `fury` (their attacks cost no stamina and
+/// deal `amount` more: Blood Fury, Rallying Cry), `grown` (drawn `amount` larger), `cowed` (they
+/// deal `amount` less damage and wind their attacks up slower; a creature low on health flees: a
+/// boss only deals a little less: Intimidating Roar), `exposed` (no block or parry, and every
+/// hero's hit on them deals `amount` more and staggers longer: Rising Cut), `momentum` (the
+/// Juggernaut's stacks, `amount` of them), `war_banner` (near a War Banner: kept on for a moment
+/// at a time while they stand by it).
+pub const OTHER_EFFECTS: [&str; 27] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 13] = ["freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death", "battle_cry", "guarded"];
+pub const BOONS: [&str; 16] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 14] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "slow_attacks", "taunt"];
+pub const HARMFUL: [&str; 14] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "exposed"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius
@@ -862,7 +910,8 @@ impl Default for CcDef {
             ("silence", 15487),
             ("burn", 2120),
             ("deathmark", 1130),
-            ("onslaught", 12328),
+            // Death Wish's red: Blood Fury, and the Warrior's own Rallying Cry.
+            ("fury", 12328),
             ("hallowed", 465),
             ("steadfast", 10060),
             ("shield", 17),

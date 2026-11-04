@@ -118,6 +118,9 @@ pub struct Content {
     pub valor: ValorDef,
     #[serde(default)]
     pub cc: CcDef,
+    /// The Juggernaut's Momentum: its numbers.
+    #[serde(default)]
+    pub momentum: MomentumDef,
     #[serde(default)]
     pub dev: DevDef,
     /// How long the work at the camp takes: making something at a station, building one, mending.
@@ -3197,8 +3200,25 @@ impl Content {
             if (a.lob || a.fuse > 0.0) && a.splash <= 0.0 {
                 bail!("{what}: a lobbed or sticky projectile bursts where it goes off: it needs `splash`");
             }
-            if a.kind == "place" && a.totem.is_none() {
-                bail!("{what}: a placed ability needs a [ability.totem]");
+            // (A banner's recast moves the banner its first cast planted: it needs none of its own.)
+            let banner = a.banner.is_some() || (a.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == a.key));
+            if a.kind == "place" && a.totem.is_some() == banner {
+                bail!("{what}: a placed ability needs a [ability.totem] or a `banner` (one of them)");
+            }
+            if a.banner.is_some() && (a.kind != "place" || a.object == 0 || a.secs <= 0.0) {
+                bail!("{what}: a banner is placed (`kind = \"place\"`), with its look (`object`) and how long it stands (`secs`)");
+            }
+            if a.banner.as_ref().is_some_and(|b| b.health <= 0.0) || (a.banner.is_some() && a.radius[1] <= 0.0) {
+                bail!("{what}: a banner needs its `health`, and the reach it helps in (`radius`)");
+            }
+            if a.breaks_free && a.kind != "buff" {
+                bail!("{what}: only a buff breaks free (`breaks_free`)");
+            }
+            if !(0.0..1.0).contains(&a.health_cost) || (a.health_cost > 0.0 && a.kind != "buff") {
+                bail!("{what}: only a buff costs health, a share of it below 1 (`health_cost`)");
+            }
+            if !a.passive.is_empty() && (!PASSIVES.contains(&a.passive.as_str()) || a.is_ex() || a.inner) {
+                bail!("{what}: passive {:?} (one of {PASSIVES:?}, on a card: not an EX version or an inner one)", a.passive);
             }
             if a.kind == "stance" && a.counter.is_none() {
                 bail!("{what}: a stance needs a [ability.counter]");
@@ -3242,9 +3262,6 @@ impl Content {
             }
             if a.bail && a.kind != "beam" {
                 bail!("{what}: only a beam is ended into a guard (`bail`)");
-            }
-            if a.tears_back && (a.kind != "line" || !a.inner) {
-                bail!("{what}: only an inner strip (a recast) tears ground back (`tears_back`)");
             }
             if a.bounces > 0 && a.kind != "projectile" {
                 bail!("{what}: only a projectile ricochets (`bounces`)");
@@ -3446,6 +3463,11 @@ impl Content {
         } else {
             a
         }
+    }
+    /// A War Banner's: it plants a `banner`, or it's the recast of one that does (which moves it).
+    pub fn plants_banner(&self, a: usize) -> bool {
+        let d = &self.abilities[a];
+        d.banner.is_some() || (d.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == d.key))
     }
 }
 

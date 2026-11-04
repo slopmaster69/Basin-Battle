@@ -633,13 +633,17 @@ impl Survival {
             self.events.push(Event::Flash { player: id, text: format!("{} requires a shield", d.name) });
             return true;
         }
-        if self.silenced(id) || self.immune(id) {
+        // Berserker Rage goes off the ground (a knockdown is a stun); nothing else does.
+        let breaking_free = d.breaks_free && !self.has_cc(id, "silence") && !self.cc_of(id).iter().any(|c| c.until > self.clock && matches!(c.kind.as_str(), "incapacitate" | "petrify" | "panic"));
+        if (self.silenced(id) && !breaking_free) || self.immune(id) {
             // Why nothing happened, said where the hero is looking.
             let why = if self.silenced(id) { "Can't use abilities while silenced" } else { "Can't cast now" };
             self.events.push(Event::Flash { player: id, text: why.into() });
             return true;
         }
-        let free = matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. } | Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
+        let free = matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. } | Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. })
+            // (And out of a stagger.)
+            || (breaking_free && matches!(p.action, Action::Stagger { .. }));
         // A recast goes from the air too (the Stoop out of the Uppercut, Skyfall's volley).
         let airborne_recast = recast.is_some() && matches!(p.action, Action::Dash { .. });
         if !free && !self.cancelable_now(id) && !airborne_recast {
@@ -660,7 +664,7 @@ impl Survival {
         // Any other ability that takes stamina (Raptor Strike's hits, Call of the Wild's beasts).
         if d.kind != "art" {
             let need = self.hunt_stamina(id, ability);
-            if need > 0.0 && self.players[&id].stamina + 0.001 < need && !self.has_cc(id, "onslaught") {
+            if need > 0.0 && self.players[&id].stamina + 0.001 < need && !self.tireless(id) {
                 self.winded(id);
                 self.events.push(Event::Flash { player: id, text: format!("{} needs {:.0} stamina", d.name, need) });
                 return true;
@@ -668,7 +672,7 @@ impl Survival {
         }
         // A weapon art takes its stamina; an Ambush, a foe to step behind.
         if d.kind == "art" {
-            if self.players[&id].stamina + 0.001 < d.stamina && !self.has_cc(id, "onslaught") {
+            if self.players[&id].stamina + 0.001 < d.stamina && !self.tireless(id) {
                 self.winded(id);
                 self.events.push(Event::Flash { player: id, text: format!("Not enough stamina for {} (need {:.0})", d.name, d.stamina) });
                 return true;
@@ -894,7 +898,7 @@ impl Survival {
         // A blow's stamina, for an ability that takes it (a weapon art takes its own as it swings;
         // Call of the Wild's is its stage's, taken as its beast goes).
         if d.kind != "art" && d.stamina > 0.0 && d.hunt.is_empty() {
-            self.spend(id, d.stamina);
+            self.spend_attack(id, d.stamina);
         }
         match d.kind.as_str() {
             // The Hunter's own: Call of the Wild, the tripwire, Arrow Recall, Skyfall's volley.
@@ -944,7 +948,20 @@ impl Survival {
                 if d.cleanse {
                     self.cleanse(id, &crate::content::HARMFUL);
                 }
+                // Berserker Rage: up off the ground, out of a stagger, free of roots and slows.
+                if d.breaks_free {
+                    self.break_free(id, &["stun", "root", "snare"]);
+                }
+                // Blood Fury: paid for in health first.
+                if d.health_cost > 0.0 {
+                    self.pay_health(id, d.health_cost, &d.name);
+                }
                 self.apply_effects(id, id, &d.effects, 1.0, &d.name);
+                self.set_action(id, next);
+            }
+            // A War Banner planted (or its recast's, moved).
+            "place" if self.content.plants_banner(ability) => {
+                self.plant_banner(id, ability, share);
                 self.set_action(id, next);
             }
             "place" => {
@@ -961,11 +978,6 @@ impl Survival {
             "nova" => {
                 let at = self.players[&id].pos;
                 self.nova(id, ability, at, share);
-                self.set_action(id, next);
-            }
-            // Ravager's recall: the axe torn back to the hero.
-            "line" if d.tears_back => {
-                self.tear_back(id, ability, share);
                 self.set_action(id, next);
             }
             "line" => {
@@ -1050,7 +1062,7 @@ impl Survival {
         // A thrown axe that comes back skims the ground along the aim's line, at hand height over
         // where its range ends (up a hill, down one): aimed at the ground it would bury itself a
         // few yards out and turn there.
-        let base = if d.returns || d.skims {
+        let base = if d.returns {
             let flat = norm([base[0], base[1], 0.0]);
             let far = [from[0] + flat[0] * range, from[1] + flat[1] * range];
             let floor = self.ground_near(far[0], far[1], from[2]);
@@ -1665,7 +1677,9 @@ impl Survival {
         let execute = d.execute;
         // Cleave on an opened enemy: its bigger share, in place of a riposte's.
         let opened = d.opened > 0.0 && self.opened(victim);
-        let mut dmg = base * might * self.weakened(owner) * if opened { d.opened } else { 1.0 };
+        // A Cowed caster's land softer.
+        let cowed = 1.0 - self.cowed_cut(owner);
+        let mut dmg = base * might * self.weakened(owner) * cowed * if opened { d.opened } else { 1.0 };
         let shatter = d.shatter;
         let mark_crit = d.mark_crit;
         let mark = self.take_mark(victim);
@@ -1739,8 +1753,13 @@ impl Survival {
         }
         let damage = self.ability_damage(owner, mid, ability, base);
         let damage = (damage as f32 * self.taken_share(mid)).round() as u32;
-        let style = if self.content.abilities[ability].kind == "art" { Blow::Heavy } else { Blow::Arrow(spell) };
+        let art = self.content.abilities[ability].kind == "art";
+        let style = if art { Blow::Heavy } else { Blow::Arrow(spell) };
         self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style });
+        // A weapon art is the hero's own blow: Momentum.
+        if art && self.players.contains_key(&owner) {
+            self.momentum_hit(owner);
+        }
         let kit = self.content.abilities[ability].impact_kit;
         if kit != 0 {
             self.events.push(Event::Visual { id: mid, kit, by: None });
@@ -1820,7 +1839,7 @@ impl Survival {
             "cleanse_panic" => self.cleanse(victim, &["panic"]),
             "knockback" | "pull" => self.displace(owner, victim, e),
             "knockdown" => self.knock_down(owner, victim, secs, source),
-            "slow_attacks" | "taunt" => self.warlord_effect(owner, victim, e, secs, source),
+            "exposed" | "rallied" => self.warrior_effect(owner, victim, e, secs, source),
             "burn" | "mark" => {
                 self.apply_cc_look(victim, owner, &e.kind, secs, e.amount, 0.0, source, e.aura);
             }
@@ -2115,7 +2134,7 @@ impl Survival {
             if self.burnings[k].next > now {
                 continue;
             }
-            // Every second, or every `tick` of ground that names one (Ravager's half second), at its
+            // Every second, or every `tick` of ground that names one (half a second, say), at its
             // share of the damage a second.
             let d = &self.content.abilities[self.burnings[k].ability];
             let every = if d.kind == "ground" && d.tick > 0.0 { d.tick } else { 1.0 };
@@ -2154,7 +2173,7 @@ impl Survival {
                 self.heal_hero_by(f, amount, owner, &name);
             }
         }
-        // Rallying Cry, Battle Cry: friends in it get stamina and boons.
+        // Rallying Cry: friends in it get stamina and boons.
         self.shout_to_friends(owner, ability, at, radius);
         let inside = |pos: Vec3, size: f32| -> bool {
             if let Shape::Line(f, len, half) = shape {
@@ -2954,7 +2973,8 @@ impl Survival {
 
     /// A guarding dummy facing the blow takes it on its shield.
     pub(crate) fn dummy_guards(&self, mid: Id, from: Vec3) -> bool {
-        self.dummies.get(&mid).is_some_and(|m| m == "guard") && self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, from)) <= 70.0)
+        // (Exposed, it can't.)
+        self.dummies.get(&mid).is_some_and(|m| m == "guard") && self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, from)) <= 70.0) && !self.has_cc(mid, "exposed")
     }
 
     /// Dummies on a loop: a counter's stance every few seconds; whole again a while after a blow.

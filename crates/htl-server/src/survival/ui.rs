@@ -184,6 +184,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap · {} yd landing radius", n(d.range[1]), n(d.radius[1]))),
         "trap" if d.launch > 0.0 => out.push(format!("{} yd placement range · {} yd launch · {} sec duration", n(d.range[1]), n(d.launch), n(d.secs))),
         "trap" => out.push(format!("{} yd placement range · {} yd trigger radius · {} sec duration", n(d.range[1]), n(d.radius[1]), n(d.secs))),
+        "place" if d.banner.is_some() => out.push(format!("{} sec banner · {} yd radius · {} health", n(d.secs), n(d.radius[1]), n(d.banner.as_ref().map_or(0.0, |b| b.health)))),
+        "place" if d.totem.is_none() => out.push(format!("{} yd range", n(d.range[1]))),
         "place" => out.push(format!("{} sec totem · {} yd radius", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "blink" if d.anchor > 0.0 => out.push(format!("{} sec circle duration", n(d.anchor))),
         "art" if d.ambush > 0.0 => out.push(format!("{} yd step", n(d.ambush))),
@@ -322,7 +324,7 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 17;
+pub(crate) const ADDON_NEWEST: u32 = 18;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019).
 pub(crate) const CLIENT_NEWEST: u8 = 12;
