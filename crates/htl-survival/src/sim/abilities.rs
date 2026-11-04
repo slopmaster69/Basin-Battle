@@ -2878,11 +2878,12 @@ impl Survival {
     }
 
     /// A creature to practise on and look at (a dev command, `.es target`): `key` `yards` ahead
-    /// (1 to 40), facing the hero, at `hp` of its health (a share, 0.01 to 1). Standing `still`,
-    /// it never moves or strikes of itself but takes everything a creature does (a knock-up, a
-    /// pull, a trip), so what an ability does to a creature can be seen; otherwise it comes at the
-    /// hero (across a tripwire, say).
-    pub fn spawn_target(&mut self, id: Id, key: &str, yards: f32, still: bool, hp: f32) -> Result<String, String> {
+    /// (1 to 40), facing the hero (or, `away`, with its back to them: a shot or a blow into its
+    /// back), at `hp` of its health (a share, 0.01 to 1). Standing `still`, it never moves or
+    /// strikes of itself but takes everything a creature does (a knock-up, a pull, a trip), so what
+    /// an ability does to a creature can be seen; otherwise it comes at the hero (across a
+    /// tripwire, say).
+    pub fn spawn_target(&mut self, id: Id, key: &str, yards: f32, still: bool, away: bool, hp: f32) -> Result<String, String> {
         let def = self.content.mob(key).ok_or_else(|| format!("No creature called {key}."))?;
         if self.content.mobs[def].dummy || self.content.mobs[def].inert() {
             return Err("That one only stands there: use .es dummy.".into());
@@ -2890,7 +2891,7 @@ impl Survival {
         let p = self.players.get(&id).ok_or("No hero.")?;
         let yards = yards.clamp(1.0, 40.0);
         let at = self.ground_near(p.pos[0] + p.facing.cos() * yards, p.pos[1] + p.facing.sin() * yards, p.pos[2]);
-        let face = facing(at, p.pos);
+        let face = if away { facing(p.pos, at) } else { facing(at, p.pos) };
         let mid = self.spawn_mob(def, at, None, false);
         if let Some(m) = self.mobs.get_mut(&mid) {
             m.facing = face;
