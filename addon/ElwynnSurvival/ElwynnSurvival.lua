@@ -759,10 +759,11 @@ function ES.SwingLine(f)
   -- Another character model's take on the clip (ac10): an empty field is the unit's own.
   local from = (f[13] and f[13] ~= "") and f[13] or nil
   if not clip or not PlayUnitAnimation then return end
-  -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track).
+  -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track),
+  -- another model's take when the ability names one (the same on every race).
   if kind == "cast" then
     if mine then guid = "player" end
-    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery)
+    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, nil, from)
     return
   end
   if mine then

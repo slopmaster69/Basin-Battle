@@ -17,6 +17,28 @@ const EMOTE_SHIELD_BLOCK: u32 = 43;
 pub(crate) const POSE_SHIELD: u32 = 43;
 const POSE_TWO_HANDED: u32 = 375;
 const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
+/// The hunter's shots whose own look has no missile model: flown from a spot, they carry the
+/// arrow (as Basin Battle's server sends them), or the client flies nothing to see.
+const ARROW_SPELLS: [u32; 3] = [2643, 3044, 19434];
+/// A stand-in's cast goes out this many ticks after its body (the client places a body only after
+/// the frame that made it: cast in that frame, the missile would leave from the world's middle).
+const STAND_IN_CAST_TICKS: u32 = 1;
+/// A stand-in stays at least this many ticks past its cast, however soon the rules are done with
+/// it: the client holds a missile on its caster until the cast's release (up to a throw's
+/// animation), and a caster gone before then takes its missile with it. And at most this many,
+/// whatever the rules say.
+const STAND_IN_LINGER_TICKS: u32 = 30;
+const STAND_IN_MOST_TICKS: u32 = 600;
+
+/// An unseen creature standing at a spot to fly a missile from there (see
+/// [`SurvivalGame::stand_in_create`]): its guid, its cast still to go out, how many ticks it's
+/// stood, and whether the rules are done with it (their `ObjGone`).
+pub(crate) struct StandIn {
+    guid: u64,
+    go: Option<Packet>,
+    ticks: u32,
+    gone: bool,
+}
 /// The swings' trails (`AARRGGBB`): a faint pale streak, a heavy blow's ember.
 const LIGHT_TRAIL: &str = "50F2EEE4";
 const HEAVY_TRAIL: &str = "78FF9A3C";
@@ -38,8 +60,34 @@ const DOT_SPELL: u32 = 348;
 
 impl SurvivalGame {
     pub(crate) fn play(&mut self, events: Vec<Event>) {
+        self.step_stand_ins();
         for e in events {
             self.event(e);
+        }
+    }
+
+    /// Each tick: the stand-ins made last tick cast their missiles, and those done with go.
+    fn step_stand_ins(&mut self) {
+        let mut cast = Vec::new();
+        let mut done = Vec::new();
+        for (id, s) in self.stand_ins.iter_mut() {
+            s.ticks += 1;
+            if s.ticks >= STAND_IN_CAST_TICKS {
+                if let Some(go) = s.go.take() {
+                    cast.push(go);
+                }
+            }
+            if (s.gone && s.ticks >= STAND_IN_CAST_TICKS + STAND_IN_LINGER_TICKS) || s.ticks >= STAND_IN_MOST_TICKS {
+                done.push((*id, s.guid));
+            }
+        }
+        for go in cast {
+            self.broadcast(&go);
+        }
+        for (id, guid) in done {
+            self.stand_ins.remove(&id);
+            self.unbind(id);
+            self.broadcast(&packets::destroy_object(guid));
         }
     }
 
@@ -248,20 +296,31 @@ impl SurvivalGame {
                 }
                 self.broadcast(&packets::spell_go(c, spell, aim, &hits, ammo));
             }
-            Event::MissileFrom { anchor, caster: _, spell, from, target } => {
-                // A missile from a spot (a boomerang turning back): an unseen object stands there
-                // and flies it, until the rules say it's gone (`ObjGone`).
+            Event::MissileFrom { anchor, caster, spell, from, target } => {
+                // A missile from a spot (a boomerang turning back, an arrow called home). The
+                // client flies a missile only from a unit (a game object's cast has no caster
+                // unit, and it draws nothing), so an unseen creature stands there and flies it, a
+                // tick after it's made (`step_stand_ins`), until the rules say it's gone.
                 let (aim, hits) = match target {
+                    // Coming home to whoever threw it: aimed at them, but not naming them struck.
+                    // The client plays a spell's impact on everyone it names struck, and the Axe
+                    // Throw's impact knocked its own warrior down as he caught it (the visual
+                    // check, Nov 2).
+                    Target::Unit(t) if t == caster => match self.guid_of(t) {
+                        Some(g) => (Aim::Unit(g), Vec::new()),
+                        None => return,
+                    },
                     Target::Unit(t) => match self.guid_of(t) {
                         Some(g) => (Aim::Unit(g), vec![g]),
                         None => return,
                     },
                     Target::Point(p) => (Aim::Point(p), Vec::new()),
                 };
-                let (g, made) = self.anchor_create(anchor, from);
+                let (g, made) = self.stand_in_create(anchor, from);
                 self.broadcast(&made);
-                let ammo = self.sim.content.ranged.iter().any(|r| r.spell == spell).then_some(ARROW_DISPLAY);
-                self.broadcast(&packets::spell_go(g, spell, aim, &hits, ammo));
+                let arrow = self.sim.content.ranged.iter().any(|r| r.spell == spell) || ARROW_SPELLS.contains(&spell);
+                let go = packets::spell_go(g, spell, aim, &hits, arrow.then_some(ARROW_DISPLAY));
+                self.stand_ins.insert(anchor, StandIn { guid: g, go: Some(go), ticks: 0, gone: false });
             }
             Event::Cast { caster, spell, ms } => {
                 let Some(c) = self.guid_of(caster) else { return };
@@ -523,7 +582,11 @@ impl SurvivalGame {
                 self.obj_destroy(id);
                 self.obj_show(id);
             }
-            Event::ObjGone { id } => self.obj_destroy(id),
+            // A stand-in goes in its own time (`step_stand_ins`).
+            Event::ObjGone { id } => match self.stand_ins.get_mut(&id) {
+                Some(s) => s.gone = true,
+                None => self.obj_destroy(id),
+            },
             Event::ObjChanged { id } => {
                 // A door swings by its state, drawn where it is.
                 if let (Some(v), Some(g)) = (
@@ -730,7 +793,7 @@ impl SurvivalGame {
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, secs } => {
+            Event::Clip { id, clip, take, from, secs } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
                 // marked as theirs.
                 let Some(g) = self.guid_of(id) else { return };
@@ -739,7 +802,7 @@ impl SurvivalGame {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t0\t{:.3}\t0\tcast\t0", secs - impact);
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}", secs - impact, from.as_deref().unwrap_or(""));
                     self.ui_line(c, &line);
                 }
             }
