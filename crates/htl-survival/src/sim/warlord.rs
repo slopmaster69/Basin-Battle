@@ -45,10 +45,11 @@ const BANNER_SIZE: f32 = 0.5;
 /// The look over a hero near a War Banner is kept on this long at a time, again each tick they
 /// stand near it (so it goes soon after they step away).
 const BANNER_HOLD: f32 = 0.3;
-/// A Tackle's Crash on the ground: War Stomp's shock ring under the body as it hits the wall or
-/// the other enemy (the kit Heroic Leap lands with, so it's known to show), beside the dust and the
-/// heavy flash. Corey's review: the hit against a unit or a wall needs an impact mark.
-const KIT_CRASH: u32 = 5089;
+/// A Tackle's Crash: Shield Bash's impact on the body as it hits the wall or the other enemy (a
+/// barge's mark, not a spell's), beside the heavy flash. Corey's review: the hit against a unit
+/// or a wall needs an impact mark. (War Stomp's shock ring was tried and read as a second
+/// Shockwave, the lab, Nov 4.)
+const KIT_CRASH: u32 = combat::KIT_BASH;
 /// With nothing behind it, a tackled enemy isn't set down: it's flung this far ahead of the hero
 /// (Corey's review: in the open the knockback has to be seen to move them).
 const DROP_SHOVE: f32 = 4.0;
@@ -177,8 +178,8 @@ impl Survival {
         self.warlord.tackles.insert(id, (ability, outcome, end));
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
         self.events.push(Event::Dash { player: id, dir: yaw, speed: rush / secs, secs });
-        // The rush's look is a burst at the hero's feet as they go (an area look, so it's sent at
-        // the spot, not on the body); the barge and the Crash are the rest of it.
+        // (A Tackle has no rush look: the barge and its Crash are the look. Every charge-like
+        // look in the game data is Charge's purple trail, and the ground bursts are blue rings.)
         if d.spell != 0 {
             self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(pos) });
         }
@@ -265,14 +266,14 @@ impl Survival {
                 if self.alive(b) && self.mobs.contains_key(&b) {
                     self.build_posture(b, id, crash.posture);
                 }
-                self.crash_looks(id, b, "Stopped hard");
+                self.crash_looks(id, b, "Stopped hard", true);
             }
             Crash::Wall(b) if self.alive(b) => {
                 self.crash_hit(id, b, ability, crash.wall_damage, from);
                 if self.alive(b) {
                     self.apply_cc_look(b, id, "stun", crash.wall_stun, 0.0, 0.0, &d.name, 0);
                 }
-                self.crash_looks(id, b, "Crash!");
+                self.crash_looks(id, b, "Crash!", true);
             }
             Crash::Into(b, o) => {
                 for (u, first) in [(b, true), (o, false)] {
@@ -295,9 +296,9 @@ impl Survival {
                         self.knock_down(id, u, crash.knockdown, &d.name);
                     }
                 }
-                self.crash_looks(id, b, "Crash!");
+                // (Each knockdown brings its own dust: none more here.)
+                self.crash_looks(id, b, "Crash!", false);
                 if self.alive(o) {
-                    self.events.push(Event::Visual { id: o, kit: combat::KIT_DUST, by: None });
                     self.events.push(Event::Visual { id: o, kit: KIT_CRASH, by: None });
                 }
             }
@@ -327,10 +328,12 @@ impl Survival {
         }
     }
 
-    /// The Crash seen: dust, the shock ring and a heavy flash on the one crashed, and the hero
-    /// told.
-    fn crash_looks(&mut self, id: Id, b: Id, text: &str) {
-        self.events.push(Event::Visual { id: b, kit: combat::KIT_DUST, by: None });
+    /// The Crash seen: the barge's mark and a heavy flash on the one crashed (and dust, where no
+    /// knockdown brings its own), and the hero told.
+    fn crash_looks(&mut self, id: Id, b: Id, text: &str, dust: bool) {
+        if dust {
+            self.events.push(Event::Visual { id: b, kit: combat::KIT_DUST, by: None });
+        }
         self.events.push(Event::Visual { id: b, kit: KIT_CRASH, by: None });
         let kit = self.heavy_kit();
         self.events.push(Event::Visual { id: b, kit, by: Some(id) });

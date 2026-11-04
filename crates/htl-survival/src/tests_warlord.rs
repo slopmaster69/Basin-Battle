@@ -206,7 +206,7 @@ fn tackle_drives_an_enemy_into_a_wall_and_it_crashes_stunned() {
     assert!(struck(&ev, k).contains(&20), "20 damage on the wall: {:?}", struck(&ev, k));
     assert!(hp(&s, k) < before);
     assert!(s.has_cc(k, "stun"), "stunned against the wall");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 5089, .. } if *id == k)), "the Crash's shock ring on it");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 83, .. } if *id == k)), "the Crash's mark on it");
     let at = s.mobs[&k].pos;
     assert!(at[0] > 3.5 && at[0] < 5.6, "carried up to the wall's face: {at:?}");
     assert!(s.players[&p].pos[0] > 2.0, "the hero rushed in behind it: {:?}", s.players[&p].pos);
@@ -224,7 +224,7 @@ fn tackle_into_another_enemy_knocks_both_down() {
     assert!(struck(&ev, b).contains(&14), "the one it's driven into too: {:?}", struck(&ev, b));
     assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "both knocked down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == b && *anim == KNOCKDOWN_ANIM)), "thrown to the ground");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 5089, .. } if *id == b)), "the Crash's shock ring on the one driven into");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 83, .. } if *id == b)), "the Crash's mark on the one driven into");
     // The knockdown is long enough to read: still down well after a second (the Crash landed
     // about 0.25 s in).
     run(&mut s, 0.9);
