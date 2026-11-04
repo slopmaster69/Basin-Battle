@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basin Battle</title>
+<style>
+@font-face { font-family: "Cormorant"; font-weight: 600; src: url(fonts/cormorant-garamond-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "Cormorant"; font-weight: 700; src: url(fonts/cormorant-garamond-latin-700-normal.woff2) format("woff2"); }
+@font-face { font-family: "Cormorant"; font-weight: 500; font-style: italic; src: url(fonts/cormorant-garamond-latin-500-italic.woff2) format("woff2"); }
+@font-face { font-family: "Cormorant"; font-weight: 600; font-style: italic; src: url(fonts/cormorant-garamond-latin-600-italic.woff2) format("woff2"); }
+@font-face { font-family: "Barlow SC"; font-weight: 400; src: url(fonts/barlow-semi-condensed-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow SC"; font-weight: 500; src: url(fonts/barlow-semi-condensed-latin-500-normal.woff2) format("woff2"); }
+@font-face { font-family: "Barlow SC"; font-weight: 600; src: url(fonts/barlow-semi-condensed-latin-600-normal.woff2) format("woff2"); }
+
+/* One light: a candle above and to the left of the table. Highlights face up-left, every
+   shadow falls down and to the right. */
+:root {
+  --slate: #1b252c; --slate-2: #222e36; --edge: #10171c;
+  --chalk: #ede6d4; --cool: #aab3b5;
+  --enemy: #a4483c;              /* muted red: who's coming */
+  --route: #f1e4bf;              /* pale ivory: where you're going */
+  --up: #95cf8d; --off: #e0846f;
+  --brass: linear-gradient(162deg, #7a5c27 0%, #c39c4f 12%, #e6cb88 22%, #d4b064 33%, #b48b41 50%, #c49d52 66%, #d9ba74 79%, #a17b37 92%, #7f6129 100%);
+  --brass-edge: inset 0 0 0 1px rgba(255,236,190,.28), inset 1px 1px 1px rgba(255,246,220,.45), inset -1px -2px 3px rgba(60,38,8,.4);
+  --wear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' seed='6'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .22 0 0 0 0 .08 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='4' seed='2'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .34 0 0 0 0 .2 0 0 0 .4 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --ui: "Barlow SC", "Segoe UI", sans-serif; --map: "Cormorant", Georgia, serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--edge); color: var(--chalk); font: 400 15px/1.4 var(--ui); }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid #ecd08a; outline-offset: 3px; }
+
+/* ---------- the map: art layers move, everything drawn on them stays sharp ---------- */
+
+/* Local shade where the title sits on the map (the candlelight is in the map's shader). */
+.shade-title { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse 560px 260px at 6% 88%, rgba(14,20,24,.86), rgba(14,20,24,.5) 50%, rgba(14,20,24,0) 78%); }
+#fade { position: fixed; inset: 0; background: var(--edge); opacity: 0; pointer-events: none; }
+
+/* ---------- top bar ---------- */
+.titlebar { position: fixed; top: 0; left: 0; right: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 8px 0 16px; z-index: 6;
+  background: linear-gradient(rgba(14,20,24,.94), rgba(14,20,24,.7)); box-shadow: 0 1px 0 rgba(236,208,138,.12); }
+.titlebar img { width: 24px; height: 24px; filter: drop-shadow(1px 2px 1px rgba(0,0,0,.6)); }
+.titlebar .name { font: 700 22px var(--map); }
+.titlebar .spacer { flex: 1; }
+.chrome { height: 30px; width: 40px; border: 0; background: none; border-radius: 4px; display: grid; place-items: center; color: var(--cool); cursor: pointer; }
+.chrome:hover { background: rgba(237,230,212,.1); color: var(--chalk); }
+.chrome.close:hover { background: #8a2e22; color: #fff; }
+.chrome svg { width: 16px; height: 16px; }
+
+/* ---------- brass ---------- */
+.brass { position: relative; background: var(--brass); box-shadow: var(--brass-edge), 0 0 0 1px #33250e, 2px 5px 9px rgba(0,0,0,.5), 1px 2px 2px rgba(0,0,0,.45); }
+.brass::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--wear); mix-blend-mode: multiply; opacity: .5; pointer-events: none; }
+.recessed { color: #4a3511; text-shadow: 0 1px 0 rgba(255,238,190,.55), 0 -1px 0 rgba(40,25,5,.45); }
+
+.switch { position: fixed; left: 24px; top: 58px; z-index: 5; display: flex; padding: 5px; gap: 4px; border-radius: 6px; }
+.switch button { position: relative; z-index: 2; display: flex; align-items: center; gap: 8px; border: 0; padding: 7px 14px 7px 10px; border-radius: 3px; cursor: pointer; font: 600 15px var(--ui); background: transparent; }
+.switch button:hover { background: rgba(255,240,200,.14); }
+.switch button[aria-pressed="true"] { color: var(--chalk); text-shadow: 0 1px 1px rgba(0,0,0,.6); box-shadow: inset 1px 2px 4px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.3), 0 1px 0 rgba(255,240,200,.35); }
+.switch button[data-game="elwynn"][aria-pressed="true"] { background: linear-gradient(162deg, #4f7d55, #3b6343 60%, #2f5236); }
+.switch button[data-game="basin"][aria-pressed="true"] { background: linear-gradient(162deg, #b5473b, #93302a 60%, #7a2620); }
+.switch svg { width: 18px; height: 18px; }
+
+/* ---------- the destination ---------- */
+.hero { position: fixed; left: 34px; bottom: 116px; width: 450px; z-index: 4; }
+.hero h1 { margin: 0; font: 700 54px/0.95 var(--map); text-shadow: 1px 2px 10px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.8); }
+.hero .line { margin: 10px 0 0; font: 500 19px/1.3 var(--ui); text-shadow: 0 1px 6px rgba(0,0,0,.9); }
+.hero .more { margin: 4px 0 0; font-size: 15px; color: var(--cool); max-width: 46ch; text-shadow: 0 1px 6px rgba(0,0,0,.9); }
+.swap { animation: swap .32s ease both; }
+.hero, .dispatches { transition: opacity .45s ease; }
+.hero.away, .dispatches.away { opacity: 0; }
+@keyframes swap { from { opacity: 0; } }
+
+/* ---------- dispatches: one opened, two folded under it ---------- */
+.dispatches { position: fixed; top: 60px; right: 24px; width: 250px; z-index: 4; }
+.dispatches h2 { margin: 0 0 8px 2px; font: 600 italic 17px var(--map); color: var(--cool); text-shadow: 0 1px 4px #000; }
+.paper { position: relative; color: #33291b; background-color: #c9b588; background-image: var(--paper-grain),
+  linear-gradient(180deg, rgba(0,0,0,0) 47%, rgba(90,66,30,.13) 48.5%, rgba(255,248,225,.16) 50%, rgba(0,0,0,0) 52%),
+  linear-gradient(160deg, #d4c194, #c4ae80 60%, #b9a274);
+  box-shadow: 1px 1px 0 #a99469, 2px 2px 0 #8d7a54, 3px 4px 3px rgba(0,0,0,.45), 6px 12px 18px rgba(0,0,0,.35); }
+.paper.open { padding: 12px 14px 12px; transform: rotate(-.6deg); }
+.paper.open::before { content: ""; position: absolute; top: 6px; left: 50%; width: 9px; height: 9px; margin-left: -4px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #efdca6, #a98440 55%, #5e451a); box-shadow: 1px 2px 1px rgba(0,0,0,.55); }
+.paper h3 { margin: 6px 0 0; font: 700 17px/1.15 var(--map); }
+.paper .meta { font: 500 12.5px var(--ui); color: #6a573a; margin: 1px 0 4px; }
+.paper .meta i { font-style: normal; color: #8c3a2c; }
+.paper p { margin: 0; font-size: 13.5px; line-height: 1.33; color: #3a3022; }
+.paper.fold { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 7px 12px; margin-top: 7px; font-size: 13.5px; background-image: var(--paper-grain), linear-gradient(160deg, #c6b183, #b39d70); }
+.paper.fold:nth-of-type(3) { transform: rotate(.5deg) translateX(-4px); }
+.paper.fold b { font: 700 15px/1.2 var(--map); }
+.paper.fold span { font-size: 12px; color: #6a573a; white-space: nowrap; }
+.dispatches a { display: inline-block; margin: 9px 0 0 2px; font: 500 13.5px var(--ui); color: var(--cool); text-decoration: none; border-bottom: 1px solid rgba(196,154,69,.6); text-shadow: 0 1px 4px #000; }
+.dispatches a:hover { color: var(--chalk); }
+
+/* ---------- the rail ---------- */
+.rail { position: fixed; left: 0; right: 0; bottom: 0; height: 96px; z-index: 5; display: grid; grid-template-columns: 300px 1fr auto; align-items: center; gap: 22px; padding: 0 24px 0 22px;
+  background: linear-gradient(#25313a, #19232a); box-shadow: 0 -10px 30px rgba(0,0,0,.35); }
+.rail::before { content: ""; position: absolute; left: 0; right: 0; top: -3px; height: 3px; background: var(--brass); box-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.server { display: flex; align-items: center; gap: 12px; border: 0; background: none; padding: 6px 8px; border-radius: 6px; cursor: pointer; text-align: left; }
+.server:hover, .server[aria-expanded="true"] { background: rgba(237,230,212,.06); }
+.lamp { width: 16px; height: 16px; border-radius: 50%; position: relative; z-index: 2; background: radial-gradient(circle at 38% 32%, #d3f6c9, #57a05a 58%, #2b5a2e); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35), 0 0 8px rgba(149,207,141,.6); }
+.lamp.off { background: radial-gradient(circle at 38% 32%, #f6c6b6, #b04a3d 58%, #6a1f17); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+.lamp.solo, .lamp.wait { background: radial-gradient(circle at 38% 32%, #dfe3e5, #7d878d 58%, #3f474c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.35); }
+.lamp.wait { animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.server b { display: block; font: 600 17px var(--ui); }
+.server small { display: block; font-size: 13.5px; color: var(--cool); }
+.server .caret { width: 12px; height: 12px; color: var(--cool); }
+.ok { color: var(--up); } .bad { color: var(--off); }
+.status { display: grid; grid-template-columns: 22px 1fr; gap: 0 10px; align-items: center; min-width: 0; }
+.status .icon { width: 22px; height: 22px; grid-row: span 2; color: #ecd08a; }
+.status .now { font: 500 16px var(--ui); }
+.status .then { font-size: 13.5px; color: var(--cool); }
+.status b { font-weight: 600; color: #ecd08a; }
+.go { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.go small { font-size: 12.5px; color: var(--cool); }
+
+.play { width: 232px; height: 58px; border: 0; padding: 0; border-radius: 4px; cursor: pointer; font: 700 30px/1 var(--map); letter-spacing: .02em;
+  transition: transform .08s ease, box-shadow .08s ease, filter .2s; }
+.play .label { position: relative; z-index: 2; }
+.play:hover { filter: brightness(1.06); }
+.play:active, .play.pressed { transform: translate(1px, 2px); box-shadow: var(--brass-edge), inset 1px 2px 4px rgba(60,38,8,.45), 0 0 0 1px #33250e, 1px 2px 3px rgba(0,0,0,.5); }
+.play[disabled] { cursor: default; filter: saturate(.7) brightness(.86); }
+.play .groove { position: absolute; z-index: 2; left: 22px; right: 22px; bottom: 9px; height: 5px; border-radius: 3px; background: rgba(40,26,6,.55); box-shadow: inset 1px 1px 1px rgba(0,0,0,.6), 0 1px 0 rgba(255,238,190,.35); display: none; overflow: hidden; }
+.play.busy .groove { display: block; }
+.play.busy .label { font-size: 21px; top: -5px; }
+.play .groove i { display: block; height: 100%; width: 0; background: linear-gradient(#fff2c6, #ecc86e); transition: width .25s linear; }
+.play.installing .groove i { width: 40% !important; animation: sweep 1.1s ease-in-out infinite; }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+/* ---------- where to play ---------- */
+.pop { position: fixed; left: 18px; bottom: 92px; width: 360px; z-index: 8; padding: 10px; border-radius: 6px; background: var(--slate-2);
+  box-shadow: 0 0 0 1px rgba(196,154,69,.45), 4px 14px 34px rgba(0,0,0,.6); transform: translateY(8px); opacity: 0; pointer-events: none; transition: .18s ease; }
+.pop.open { transform: none; opacity: 1; pointer-events: auto; }
+.pop h4 { margin: 4px 8px; font: 600 italic 16px var(--map); color: #ecd08a; }
+.pop .row { display: grid; grid-template-columns: 16px 1fr auto; gap: 12px; align-items: center; width: 100%; padding: 8px; border: 0; border-radius: 4px; background: none; text-align: left; cursor: pointer; }
+.pop .row:hover { background: rgba(237,230,212,.06); }
+.pop .row[aria-checked="true"] { background: rgba(196,154,69,.16); }
+.pop .row .lamp { width: 13px; height: 13px; }
+.pop .row b { display: block; font-weight: 600; }
+.pop .row small { display: block; font-size: 13px; color: var(--cool); }
+.pop .row .state { font-size: 13.5px; }
+.pop hr { border: 0; border-top: 1px solid rgba(196,154,69,.3); margin: 6px 4px; }
+
+/* ---------- Settings: kept plain, centred, with its section list ---------- */
+.dim { position: fixed; inset: 0; z-index: 9; background: rgba(8,12,15,.62); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.dim.open { opacity: 1; pointer-events: auto; }
+.ledger { position: fixed; left: 50%; top: 50%; width: 720px; height: 440px; margin: -210px 0 0 -360px; z-index: 10; display: grid; grid-template-columns: 190px 1fr;
+  background: var(--slate); border-radius: 6px; box-shadow: 0 0 0 1px rgba(196,154,69,.4), 4px 24px 60px rgba(0,0,0,.6); transform: scale(.97); opacity: 0; pointer-events: none; transition: .2s ease; }
+.ledger.open { transform: none; opacity: 1; pointer-events: auto; }
+.ledger nav { background: #151d22; border-radius: 6px 0 0 6px; padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+.ledger nav h2 { margin: 0 10px 12px; font: 700 28px var(--map); }
+.ledger nav button { text-align: left; border: 0; background: none; padding: 9px 12px; border-radius: 4px; cursor: pointer; font: 500 15.5px var(--ui); color: var(--cool); }
+.ledger nav button:hover { color: var(--chalk); background: rgba(237,230,212,.05); }
+.ledger nav button[aria-selected="true"] { color: var(--chalk); background: rgba(196,154,69,.16); box-shadow: inset 3px 0 0 #c49a45; }
+.ledger .pane { padding: 22px 26px; position: relative; }
+.ledger .pane h3 { margin: 0 0 6px; font: 700 24px var(--map); }
+.ledger .pane > p { margin: 0 0 8px; color: var(--cool); font-size: 14px; }
+.ledger .x { position: absolute; top: 10px; right: 10px; }
+.field { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid rgba(237,230,212,.08); }
+.field .grow { flex: 1; min-width: 0; }
+.field b { display: block; font-weight: 500; font-size: 16px; }
+.field small { display: block; color: var(--cool); font-size: 14px; }
+.btn { border: 1px solid rgba(196,154,69,.55); padding: 6px 14px; border-radius: 4px; cursor: pointer; font: 500 14.5px var(--ui); background: rgba(196,154,69,.12); white-space: nowrap; }
+.btn:hover { background: rgba(196,154,69,.25); }
+.lever { appearance: none; width: 44px; height: 24px; margin: 0; border-radius: 12px; cursor: pointer; position: relative; flex: none; background: #0f161b; box-shadow: inset 0 1px 3px rgba(0,0,0,.8), 0 0 0 1px rgba(196,154,69,.35); }
+.lever::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #8f999e; transition: transform .2s, background .2s; }
+.lever:checked { background: #22402a; }
+.lever:checked::after { transform: translateX(20px); background: #d9b866; }
+input[type=range] { width: 160px; accent-color: #c49a45; }
+
+.still *, .still *::before, .still *::after { animation: none !important; transition: none !important; }
+
+/* ---------- the table, and the map sheet lying on it ---------- */
+body { background: #171410 radial-gradient(ellipse 80% 90% at 50% 45%, #3a2c1e, #1d1610 70%, #120e0a); }
+
+
+/* ============ Campaign equipment (art director, November 4) ============
+   Cloth chooses a game, brass commits to Play, paper carries dispatches, leather and iron
+   are the utilities. One light, from the upper left. The art gives material and shape; every
+   word, light, fill and focus ring is live. */
+
+/* The game tabs: the two horizontal standards, side by side on a shared baseline. */
+.switch { left: 22px; top: 56px; padding: 0; gap: 6px; background: none; box-shadow: none; border-radius: 0; }
+.switch button { width: 196px; height: 42px; padding: 0 0 2px; justify-content: center; border-radius: 0; background: center / 100% 100% no-repeat;
+  font: 600 15px var(--ui); letter-spacing: .01em; color: #efe6cf; text-shadow: 0 1px 1px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.45);
+  filter: brightness(.76) saturate(.82); transition: filter 140ms ease, transform 140ms ease; box-shadow: none; }
+.switch button[data-game="elwynn"] { background-image: url(ui/banner-elwynn.webp); }
+.switch button[data-game="basin"] { background-image: url(ui/banner-basin.webp); }
+.switch button:hover { background-color: transparent; filter: brightness(.86) saturate(.9); }
+.switch button[aria-pressed="true"] { filter: drop-shadow(1px 3px 3px rgba(0,0,0,.55)); transform: translateY(2px); box-shadow: none; }
+.switch button[data-game="elwynn"][aria-pressed="true"] { background: url(ui/banner-elwynn.webp) center / 100% 100% no-repeat; }
+.switch button[data-game="basin"][aria-pressed="true"] { background: url(ui/banner-basin.webp) center / 100% 100% no-repeat; }
+.switch button[aria-pressed="true"] span { text-decoration: underline 1px rgba(236,208,138,.7); text-underline-offset: 4px; }
+.switch button:focus-visible { outline: 2px solid #ecd08a; outline-offset: 2px; }
+
+/* Play: the one bright metal on the screen. One plate for every state; only the light on it,
+   the face's depth and the inset track change. */
+.play { width: 234px; height: 68px; border-radius: 0; background: url(ui/play-brass.webp) center / 100% 100% no-repeat; box-shadow: none;
+  color: #3b2a0e; font: 700 30px/1 var(--map); position: relative; filter: drop-shadow(1px 4px 5px rgba(0,0,0,.5)); transition: transform 90ms ease, filter 140ms ease; }
+.play::before, .play::after { content: ""; position: absolute; left: 2.6%; right: 2.6%; top: 7%; bottom: 9%; border-radius: 2px; pointer-events: none; transition: opacity 140ms ease;
+  width: auto; height: auto; box-shadow: none; background: none; }
+.play::after { background: linear-gradient(162deg, rgba(255,246,214,.34), rgba(255,246,214,0) 38%); opacity: 0; }
+.play::before { box-shadow: inset 1px 3px 6px rgba(60,36,6,.55); opacity: 0; }
+.play:hover::after { opacity: 1; }
+.play:hover { filter: drop-shadow(1px 4px 5px rgba(0,0,0,.5)); }
+.play:active, .play.pressed { transform: translateY(1px); filter: drop-shadow(1px 2px 2px rgba(0,0,0,.55)); box-shadow: none; }
+.play:active::before, .play.pressed::before { opacity: 1; }
+.play[disabled] { filter: drop-shadow(1px 3px 4px rgba(0,0,0,.45)) saturate(.55) brightness(.82); }
+.play[disabled]::after { opacity: 0; }
+.play .label { z-index: 2; }
+.play.busy { background: url(ui/play-brass.webp) center / 100% 100% no-repeat; }
+.play.busy .label { font-size: 21px; top: -6px; }
+.play .groove { left: 30px; right: 30px; bottom: 15px; height: 6px; background: rgba(42,26,4,.62); box-shadow: inset 1px 1px 2px rgba(0,0,0,.7), 0 1px 0 rgba(255,236,180,.4); }
+.play .groove i { background: linear-gradient(#fff1c2, #e2b65a); box-shadow: 0 0 4px rgba(255,226,150,.6); }
+.play:focus-visible { outline: 2px solid #f4e3b0; outline-offset: 3px; }
+
+/* The dock: dark iron, a narrow edge, and leather for the server. */
+.rail { background: linear-gradient(#1f272c, #151b1f); box-shadow: 0 -10px 30px rgba(0,0,0,.35); }
+.rail::before { top: -2px; height: 2px; background: linear-gradient(90deg, #2b2a26, #6b5530 20%, #8a6c38 50%, #6b5530 80%, #2b2a26); box-shadow: 0 1px 0 rgba(0,0,0,.6); }
+.server { width: 304px; height: 64px; padding: 0 10px 0 6px; gap: 10px; border-radius: 0; border-style: solid; border-width: 16px 18px; border-image: url(ui/button-leather.webp) 42 48 fill / 16px 18px round;
+  margin-left: -4px; transition: filter 140ms ease; }
+.server:hover, .server[aria-expanded="true"] { background: none; filter: brightness(1.12); }
+.server:focus-visible { outline: 2px solid #ecd08a; outline-offset: 2px; }
+.socket { width: 24px; height: 24px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: radial-gradient(circle at 40% 35%, #4a4a46, #1d1d1b 70%); box-shadow: inset 0 1px 2px rgba(0,0,0,.8), 0 1px 0 rgba(255,236,190,.18), 0 0 0 1px #6b5530; }
+.lamp { width: 12px; height: 12px; }
+.server b { font-size: 16px; color: #efe6cf; line-height: 1.2; }
+.server small { color: #b9b29f; line-height: 1.25; font-size: 12.5px; white-space: nowrap; }
+
+/* Dispatches: one opened sheet, two folded strips. The paper is the art; the words are live. */
+.dispatches { width: 254px; }
+.dispatches h2 { color: #c9c2ad; }
+.paper { background: none !important; box-shadow: none !important; isolation: isolate; color: #2f2619; }
+.paper::before, .paper.open::before, .paper.fold::before { content: ""; position: absolute; inset: 0; top: 0; left: 0; right: 0; bottom: 0; margin-left: 0; z-index: -1; border-style: solid; filter: brightness(.9) drop-shadow(1px 3px 3px rgba(0,0,0,.5));
+  border-width: 10px 26px 25px 9px; border-image: url(ui/dispatch-paper.webp) 28 72 70 24 fill / 10px 26px 25px 9px stretch;
+  width: auto; height: auto; margin: 0; border-radius: 0; background: none; box-shadow: none; }
+.paper.open { padding: 22px 22px 22px 18px; transform: rotate(-.5deg); }
+.paper.open .tack { position: absolute; top: 4px; left: 50%; width: 16px; height: 16px; margin-left: -8px; background: url(ui/dispatch-pin.webp) center / contain no-repeat; filter: drop-shadow(1px 2px 1px rgba(0,0,0,.45)); }
+.paper h3 { margin: 4px 0 0; }
+.paper.fold { padding: 9px 14px 9px 13px; margin-top: 6px; }
+.paper.fold::before { border-width: 7px 8px 7px 7px; border-image: url(ui/dispatch-strip.webp) 20 22 20 20 fill / 7px 8px 7px 7px stretch; filter: brightness(.84) drop-shadow(1px 2px 2px rgba(0,0,0,.5)); }
+.paper.fold:nth-of-type(3) { transform: rotate(.4deg) translateX(-3px); }
+
+/* Settings: a restrained leather-and-metal perimeter; a calm inside. */
+.ledger { background: none; box-shadow: 4px 24px 60px rgba(0,0,0,.6); border-radius: 0; border-style: solid; border-width: 30px;
+  border-image: url(ui/settings-shell.webp) 62 fill / 30px stretch; width: 760px; height: 480px; margin: -240px 0 0 -380px; }
+.ledger nav { background: rgba(8,12,14,.45); border-radius: 0; margin: -10px 0 -10px -10px; }
+.ledger .pane { padding: 10px 16px 10px 26px; }
+.btn { background: rgba(255,255,255,.03); border-color: rgba(150,120,70,.5); }
+
+
+
+/* ============ GPU map (November 4) ============ */
+#map, #pieces { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+#map { touch-action: none; cursor: grab; }
+#map:active { cursor: grabbing; }
+#pieces { pointer-events: none; }
+/* Every panel that changes while the map moves is its own pre-drawn layer; a switch only
+   changes opacity, which the compositor does without laying out or painting anything. */
+.hero { height: 160px; }
+.hero-card, .dispatch-set { position: absolute; left: 0; right: 0; opacity: 0; transition: opacity .32s ease; will-change: opacity; pointer-events: none; }
+.hero-card { bottom: 0; }
+.dispatch-set { top: 0; }
+.hero-card.on, .dispatch-set.on { opacity: 1; pointer-events: auto; }
+.dispatches { height: 320px; }
+.hero, .dispatches, .switch, .rail { contain: layout paint; }
+#loading { position: fixed; inset: 0; z-index: 3; background: #100c08; transition: opacity .3s ease; pointer-events: none; }
+#loading.done { opacity: 0; }
+
+/* ============ Play.exe's window ============ */
+/* The window has no frame of its own: its edges resize it, the title bar drags it. */
+.edges i { position: fixed; z-index: 20; }
+.edges [data-edge=n] { top: 0; left: 8px; right: 8px; height: 4px; cursor: ns-resize; }
+.edges [data-edge=s] { bottom: 0; left: 8px; right: 8px; height: 5px; cursor: ns-resize; }
+.edges [data-edge=e] { right: 0; top: 8px; bottom: 8px; width: 5px; cursor: ew-resize; }
+.edges [data-edge=w] { left: 0; top: 8px; bottom: 8px; width: 5px; cursor: ew-resize; }
+.edges [data-edge=ne] { top: 0; right: 0; width: 8px; height: 8px; cursor: nesw-resize; }
+.edges [data-edge=sw] { bottom: 0; left: 0; width: 8px; height: 8px; cursor: nesw-resize; }
+.edges [data-edge=nw] { top: 0; left: 0; width: 8px; height: 8px; cursor: nwse-resize; }
+.edges [data-edge=se] { bottom: 0; right: 0; width: 8px; height: 8px; cursor: nwse-resize; }
+.titlebar { user-select: none; -webkit-user-select: none; }
+body { user-select: none; -webkit-user-select: none; }
+input { user-select: text; -webkit-user-select: text; }
+.server .where { min-width: 0; flex: 1; }
+.server b, .server small { overflow: hidden; text-overflow: ellipsis; }
+.status .now, .status .then { overflow-wrap: anywhere; }
+.status .then { max-height: 3.9em; overflow: hidden; }
+.status .act { margin-left: 6px; padding: 2px 10px; font-size: 13px; vertical-align: baseline; }
+.pop .custom { display: none; gap: 8px; padding: 2px 8px 8px 36px; }
+.pop .custom.open { display: flex; }
+.pop .custom input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 4px; border: 1px solid rgba(150,120,70,.5); background: #10171c; color: var(--chalk); font: 400 14px var(--ui); }
+.pop .custom input:focus { outline: 2px solid #ecd08a; outline-offset: 1px; }
+.dispatch-set:empty { display: none; }
+.paper.fold b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+</style>
+</head>
+<body>
+<canvas id="map"></canvas>
+<canvas id="pieces"></canvas>
+<div class="shade-title"></div>
+
+<div id="fade"></div>
+<div id="loading"></div>
+
+<header class="titlebar" id="titlebar">
+  <img src="shield.png" alt=""><span class="name" id="title">Play</span><span class="spacer"></span>
+  <button class="chrome" id="open-settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5"/></svg></button>
+  <button class="chrome" id="minimize" aria-label="Minimize" title="Minimize"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M6 12h12"/></svg></button>
+  <button class="chrome close" id="close" aria-label="Close" title="Close"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>
+</header>
+<div class="edges" aria-hidden="true"><i data-edge="n"></i><i data-edge="s"></i><i data-edge="e"></i><i data-edge="w"></i><i data-edge="ne"></i><i data-edge="nw"></i><i data-edge="se"></i><i data-edge="sw"></i></div>
+
+<nav class="switch" aria-label="Game">
+  <button data-game="elwynn" aria-pressed="true"><span>Elwynn Survival</span></button>
+  <button data-game="basin" aria-pressed="false"><span>Basin Battle</span></button>
+</nav>
+
+<section class="hero" id="hero" aria-live="polite"></section>
+
+<aside class="dispatches" id="dispatches"></aside>
+
+<footer class="rail">
+  <button class="server" id="server" aria-haspopup="true" aria-expanded="false">
+    <span class="socket"><span class="lamp wait" id="lamp"></span></span>
+    <span class="where"><b id="server-name">&nbsp;</b><small id="server-note">Checking…</small></span>
+    <svg class="caret" viewBox="0 0 12 12" fill="currentColor"><path d="M2 4.5 6 8.5 10 4.5Z"/></svg>
+  </button>
+  <div class="status" id="status" aria-live="polite"></div>
+  <div class="go">
+    <button class="play recessed" id="play"><span class="label" id="play-label">Play</span><span class="groove"><i id="groove"></i></span></button>
+    <small id="version">&nbsp;</small>
+  </div>
+</footer>
+
+<div class="pop" id="pop" role="menu" aria-label="Where to play">
+  <h4>Servers</h4>
+  <div id="server-rows"></div>
+  <button class="row" role="menuitemradio" aria-checked="false" data-pick="address"><span></span><span><b>Custom server…</b><small id="custom-note">Type the address a host gives you</small></span><span></span></button>
+  <form class="custom" id="custom" autocomplete="off"><input id="custom-address" spellcheck="false" placeholder="192.168.1.20 or host:3725" aria-label="Server address"><button class="btn" type="submit">Use</button></form>
+  <hr>
+  <h4>Single player</h4>
+  <button class="row" role="menuitemradio" aria-checked="false" data-pick="own"><span class="lamp solo"></span><span><b>Single player</b><small>Your own server on this PC. Heroes stay here.</small></span><span></span></button>
+</div>
+
+<div class="dim" id="dim"></div>
+<div class="ledger" id="ledger" role="dialog" aria-label="Settings">
+  <nav role="tablist">
+    <h2>Settings</h2>
+    <button role="tab" data-tab="files">Game files</button>
+    <button role="tab" data-tab="connection">Connection</button>
+    <button role="tab" data-tab="launcher">Launcher</button>
+    <button role="tab" data-tab="hosting">Hosting</button>
+    <button role="tab" data-tab="updates">Updates</button>
+  </nav>
+  <div class="pane" id="pane"></div>
+</div>
+
+<script src="map-gl.js"></script>
+<script>
+const $ = id => document.getElementById(id), NS = "http://www.w3.org/2000/svg";
+
+// ======================================================================================
+// Places. The map is ChatGPT's finished atlas: 24 tiles, 4096 x 6144 art pixels, north up.
+// It's an illustrated composition, not registered game coordinates, so each place sits on
+// its painted landmark.
+// ======================================================================================
+const ART = { w: 4096, h: 6144 };
+const PLACES = {
+  elwynn: { at: [1040, 5127], name: "Westbrook", icon: "tower", tok: [0, -36], nameAt: [20, -32], cam: [1080, 5097], zoom: .85 },        // the blue-roofed garrison by the Westfall bridge
+  basin: { at: [2651, 1012], name: "Arathi Basin", icon: "tree", tok: [46, -34], nameAt: [66, -36], cam: [2650, 1000], zoom: .75 },   // the Ancient, in the open by the Blacksmith on its island
+};
+const ZOOM = { tactical: .85, closest: 1.5 };   // screen px per art px; 1 shows each painted pixel once
+// The camp's raids, from survival.toml: where each starts, relative to the camp at
+// (-9640, 688). North is up and west is left on the map too.
+const CAMP = [-9640, 688], RAIDS = [[-9742, 520], [-9575, 560], [-9792, 812], [-9690, 420]];
+// The four outer bases, as painted. Each sends its lane of undead to the Ancient, as in the game.
+const BASES = [["Stables", [2428, 760], [-96, -4]], ["Gold Mine", [2898, 790], [0, -64]], ["Lumber Mill", [2398, 1118], [-6, -60]], ["Farm", [2840, 1150], [0, -54]]];
+const ROUTES = {   // along the painted roads: Stormwind's gate to Westbrook; the Thandol Span to the basin
+  elwynn: [[1090, 4810], [1120, 4840], [1210, 4880], [1290, 4905], [1320, 4930], [1345, 4990], [1352, 5020], [1325, 5032], [1270, 5036], [1220, 5060], [1150, 5090], [1068, 5118]],
+  basin: [[2408, 1432], [2418, 1382], [2426, 1352], [2403, 1317], [2383, 1292], [2393, 1272], [2438, 1264], [2498, 1254], [2553, 1240], [2578, 1217], [2583, 1182], [2593, 1142], [2610, 1112], [2614, 1087], [2624, 1062], [2636, 1034]],   // the Thandol Span, up the valley road and over the south bridge to the Blacksmith
+};
+
+// ======================================================================================
+// The map: drawn by the GPU (map-gl.js). Every tile and its mipmaps is in GPU memory before
+// the menu is shown, and a frame is one camera update and a few textured quads. The pieces
+// on the map are drawn on one 2D canvas above it from pre-made sprites. One frame loop
+// drives the camera, the map and the pieces, so they always move together.
+// ======================================================================================
+const TOP_UI = 44, BOTTOM_UI = 96;
+// The window's size, read only on resize: reading innerWidth in a frame after a class change
+// would force the page to lay itself out mid-frame.
+let VW = innerWidth, VH = innerHeight;
+addEventListener("resize", () => { VW = innerWidth; VH = innerHeight; });
+new ResizeObserver(() => { if (VW !== innerWidth || VH !== innerHeight) dispatchEvent(new Event("resize")); }).observe(document.documentElement);
+// No WebGL2 here (or the map won't load): Play.exe opens its plain launcher instead.
+let map;
+try { map = MapGL.create($("map"), "map/tiles.json", { onReady: () => mapLoaded(), onError: e => cantDraw(e) }); }
+catch (e) { map = { gl: null, state: {}, ready: false, resize() {}, render() {}, setCamera() {}, setLight() {}, project: p => p, unproject: p => p, tilesLoaded: () => "0" }; setTimeout(() => cantDraw(e)); }
+const anchor = () => [VW * .52, TOP_UI + (VH - TOP_UI - BOTTOM_UI) * .5];
+let cam = { x: ART.w / 2, y: 3300, z: .3 };
+const camNow = () => ({ ...cam });
+// The camera never zooms out past the art, nor pans off its edge: no bare table shows.
+const coverZoom = () => Math.max(VW / ART.w, VH / ART.h);
+function clampCam({ x, y, z }) {
+  z = Math.min(Math.max(z, coverZoom()), ZOOM.closest); const [ax, ay] = anchor();
+  const left = ax / z, right = (VW - ax) / z, top = ay / z, bottom = (VH - ay) / z;
+  return { x: Math.min(Math.max(x, left), ART.w - right), y: Math.min(Math.max(y, top), ART.h - bottom), z };
+}
+function setCam(c) { if (!(isFinite(c.x) && isFinite(c.y) && isFinite(c.z))) return; cam = clampCam(c); map.setCamera(cam, anchor()); pieces.dirty = true; }
+const overviewCam = () => ({ x: ART.w / 2, y: 3300, z: coverZoom() });
+const camFor = g => ({ x: PLACES[g].cam[0], y: PLACES[g].cam[1], z: PLACES[g].zoom });
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const lerp = (a, b, t) => a + (b - a) * t;
+function camAt(a, b, t, dip) { const e = ease(t), lz = lerp(Math.log(a.z), Math.log(b.z), e) - dip * Math.sin(Math.PI * e); return { x: lerp(a.x, b.x, e), y: lerp(a.y, b.y, e), z: Math.exp(lz) }; }
+
+// ---------- the one frame loop ----------
+// Every animation is a function of the frame's timestamp, so a 144 Hz display gets 144
+// distinct camera positions a second and a dropped frame never slows the trip down.
+const tickers = new Set();
+const perf = { on: /perf/.test(location.search), times: [], last: 0 };
+function frame(now) {
+  for (const t of [...tickers]) t(now);
+  ambient(now);
+  const t0 = performance.now();
+  map.render(now);
+  drawPieces(now);
+  if (perf.on) perfFrame(now, performance.now() - t0);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+// run(ms, step): step(0..1) once a frame from the next frame on; resolves when done.
+function run(ms, step) {
+  return new Promise(done => {
+    let t0 = null;
+    const tick = now => { if (t0 === null) t0 = now; const t = Math.min(1, (now - t0) / ms); step(t); if (t >= 1) { tickers.delete(tick); done(); } };
+    tickers.add(tick);
+  });
+}
+let onArrive = null, flying = false;   // onArrive: called once, when a trip is this far along
+async function fly(to, ms, dip, arriveAt = 2) {
+  const a = clampCam(camNow()); let fired = false; flying = true; input.stop();
+  await run(ms, t => { setCam(camAt(a, to, t, dip)); if (!fired && t >= arriveAt && onArrive) { fired = true; onArrive(); } });
+  if (!fired && onArrive) onArrive(); onArrive = null; flying = false;
+}
+async function travel(g, first) {
+  const to = camFor(g);
+  if (reduced()) { await run(120, t => $("fade").style.opacity = t); setCam(to); if (onArrive) { onArrive(); onArrive = null; } await run(160, t => $("fade").style.opacity = 1 - t); return; }
+  if (first) return fly(to, 1000, 0);                    // the opening descent
+  const a = clampCam(camNow()), far = Math.hypot(to.x - a.x, to.y - a.y);
+  return fly(to, 1050, far > 1500 ? 1.1 : .3, .7);       // a game switch: over the mountains, then a gentle settle
+}
+
+// ---------- candlelight: in the map's shader, so nothing blends over the map ----------
+let lastLight = 0;
+// The flame's breathing, as the menu had it: a 7 s cycle through 1, .9, .97, .92, eased.
+const FLAME = [[0, 1], [.35, .9], [.6, .97], [.8, .92], [1, 1]];
+function flame(now) {
+  const u = (now / 7000) % 1; let i = 1; while (FLAME[i][0] < u) i++;
+  const [a, va] = FLAME[i - 1], [b, vb] = FLAME[i], k = (u - a) / (b - a), e = k * k * (3 - 2 * k);
+  return va + (vb - va) * e;
+}
+function ambient(now) {
+  if (!fxOn) { map.setLight(0, 1); return; }
+  if (reduced()) { map.setLight(1, 1); return; }   // the light holds still
+  if (now - lastLight < 33 && !flying) return;   // the flame needs ~30 updates a second, not 144
+  lastLight = now; map.setLight(1, flame(now));
+}
+
+// ---------- the pieces on the map ----------
+const pieces = { dirty: true, cv: $("pieces"), sprites: {}, arrows: [], spin: null, pulse: null };
+const pctx = pieces.cv.getContext("2d");
+const scr = p => map.project(p);
+let routeFrac = { elwynn: 0, basin: 0 };
+function sizePieces() {
+  const dpr = Math.min(devicePixelRatio || 1, 2); pieces.dpr = dpr;
+  pieces.cv.width = Math.round(VW * dpr); pieces.cv.height = Math.round(VH * dpr);
+  pctx.setTransform(dpr, 0, 0, dpr, 0, 0); pieces.dirty = true;
+}
+// Sprites: each destination token (with its glyph, anchor and shadow) and each name, drawn
+// once at the screen's resolution, so a frame only copies them.
+async function makeSprites() {
+  await document.fonts.load('italic 600 17px Cormorant'); const dpr = pieces.dpr, load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
+  const glyphs = {
+    elwynn: new Path2D("M-5 9 V-6 h-1.5 v-5 h3 v2 h2 v-2 h3 v2 h2 v-2 h3 v5 H5 V9Z"),
+    basin: new Path2D("M-11 -2 C-13 -8 -7 -12 -3 -10 C-1 -14 5 -14 6 -10 C11 -12 14 -6 11 -2 C13 3 7 5 4 2 L2 2 L3 10 H-3 L-2 2 L-4 2 C-7 5 -13 3 -11 -2Z"),
+  };
+  for (const g of ["elwynn", "basin"]) {
+    const img = await load(`ui/token-${g}.webp`), [tx, ty] = PLACES[g].tok;
+    // The sprite's origin is the landmark (the anchor's foot); it spans 80 x 80 CSS px around it.
+    const S = 80, c = document.createElement("canvas"); c.width = c.height = S * 2 * dpr; const x = c.getContext("2d"); x.scale(dpr, dpr); x.translate(S, S);
+    x.strokeStyle = "rgba(26,16,6,.85)"; x.lineWidth = 1.4; x.beginPath(); x.moveTo(tx * .55, ty * .55); x.lineTo(0, 0); x.stroke();
+    x.fillStyle = "#f2e3b8"; x.strokeStyle = "rgba(26,16,6,.9)"; x.lineWidth = 1.2; x.beginPath(); x.arc(0, 0, 2.6, 0, 6.283); x.fill(); x.stroke();
+    x.save(); x.shadowColor = "rgba(0,0,0,.55)"; x.shadowBlur = 3 * dpr; x.shadowOffsetX = 1 * dpr; x.shadowOffsetY = 3 * dpr;
+    x.drawImage(img, tx - 16, ty - 18, 32, 36); x.restore();
+    x.save(); x.translate(tx, ty - 2); x.scale(.78, .78); x.lineWidth = 1.6; x.strokeStyle = "rgba(30,18,4,.55)"; x.stroke(glyphs[g]); x.fillStyle = "#ecd391"; x.fill(glyphs[g]); x.restore();
+    pieces.sprites[g] = { c, S };
+    // The name, beside the token.
+    const n = document.createElement("canvas"), font = "italic 600 17px Cormorant, Georgia, serif", m = n.getContext("2d"); m.font = font;
+    const w = Math.ceil(m.measureText(PLACES[g].name).width) + 12; n.width = w * dpr; n.height = 28 * dpr;
+    const q = n.getContext("2d"); q.scale(dpr, dpr); q.font = font; q.textBaseline = "middle"; q.lineJoin = "round";
+    q.lineWidth = 3.5; q.strokeStyle = "rgba(20,14,6,.85)"; q.strokeText(PLACES[g].name, 6, 14); q.fillStyle = "#ede6d4"; q.fillText(PLACES[g].name, 6, 14);
+    pieces.sprites[g + "-name"] = { c: n, w, h: 28 };
+  }
+  for (const [nm] of BASES) {   // the bases' names: smaller, and quieter than the destination's
+    const n = document.createElement("canvas"), font = "italic 600 14px Cormorant, Georgia, serif", m = n.getContext("2d"); m.font = font;
+    const w = Math.ceil(m.measureText(nm).width) + 10; n.width = w * dpr; n.height = 24 * dpr;
+    const q = n.getContext("2d"); q.scale(dpr, dpr); q.font = font; q.textBaseline = "middle"; q.lineJoin = "round"; q.textAlign = "center";
+    q.lineWidth = 3; q.strokeStyle = "rgba(20,14,6,.8)"; q.strokeText(nm, w / 2, 12); q.fillStyle = "rgba(237,230,212,.9)"; q.fillText(nm, w / 2, 12);
+    pieces.sprites["base-" + nm] = { c: n, w, h: 24 };
+  }
+  pieces.dirty = true;
+}
+// Enemy strokes: fine, red-ochre, faint where they start and strong on the final approach.
+function buildArrows() {
+  const arrow = (from, to, stopShort, bend) => {
+    const dx = to[0] - from[0], dy = to[1] - from[1], len = Math.hypot(dx, dy), e = [to[0] - dx / len * stopShort, to[1] - dy / len * stopShort];
+    pieces.arrows.push({ from, mid: [(from[0] + e[0]) / 2 - dy / len * len * bend, (from[1] + e[1]) / 2 + dx / len * len * bend], end: e, glow: 0 });
+  };
+  const [cx, cy] = PLACES.elwynn.at;
+  RAIDS.forEach(([fx, fy], i) => { const north = fx - CAMP[0], west = fy - CAMP[1], len = Math.hypot(north, west); arrow([cx - west / len * (190 + 20 * (i % 2)), cy - north / len * (190 + 20 * (i % 2))], [cx, cy], 30, .07); });
+  BASES.forEach(([, at]) => { const dx = PLACES.basin.at[0] - at[0], dy = PLACES.basin.at[1] - at[1], l = Math.hypot(dx, dy); arrow([at[0] + dx / l * 40, at[1] + dy / l * 40], PLACES.basin.at, 30, .06); });
+}
+// The routes, as polylines in art space with their lengths, so a frame never measures a path.
+const routeLines = {};
+for (const g of Object.keys(ROUTES)) {
+  const pts = ROUTES[g], seg = [0]; for (let i = 1; i < pts.length; i++) seg.push(seg[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  routeLines[g] = { pts, seg, len: seg[seg.length - 1] };
+}
+function drawPieces(now) {
+  const animating = pieces.spin || pieces.pulse || pieces.arrows.some(a => a.glow) || routeFrac.elwynn || routeFrac.basin;
+  if (!pieces.dirty && !animating) return;
+  pieces.dirty = false;
+  const c = pctx, z = cam.z; c.clearRect(0, 0, VW, VH);
+  // Your journey: an ivory dotted line along the road, with a head that travels it.
+  for (const g of ["elwynn", "basin"]) {
+    const f = routeFrac[g]; if (!f) continue;
+    const R = routeLines[g], stop = R.len * f; c.beginPath(); let head = null;
+    for (let i = 0; i < R.pts.length; i++) {
+      if (i && R.seg[i] > stop) { const k = (stop - R.seg[i - 1]) / (R.seg[i] - R.seg[i - 1]); head = scr([lerp(R.pts[i - 1][0], R.pts[i][0], k), lerp(R.pts[i - 1][1], R.pts[i][1], k)]); c.lineTo(head[0], head[1]); break; }
+      const p = scr(R.pts[i]); i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); head = p;
+    }
+    c.lineCap = "round"; c.lineJoin = "round"; c.setLineDash([]); c.lineWidth = 6; c.strokeStyle = "rgba(24,16,6,.55)"; c.stroke();
+    c.setLineDash([.1, 7.9]); c.lineWidth = 3.4; c.strokeStyle = "#f3e7c6"; c.stroke(); c.setLineDash([]);
+    c.beginPath(); c.arc(head[0], head[1], 4.5, 0, 6.283); c.fillStyle = "#f6ecd0"; c.fill(); c.lineWidth = 1.3; c.strokeStyle = "#2a1c0a"; c.stroke();
+  }
+  // Enemy arrows: hidden at the overview, and faded in as the camera comes down.
+  const show = Math.max(0, Math.min(1, (z - .36) / .2));
+  if (show) for (const a of pieces.arrows) {
+    if (a.glow && now - a.glow > 1600) a.glow = 0;
+    const w = a.glow ? Math.sin(Math.PI * (now - a.glow) / 1600) : 0;
+    const s0 = scr(a.from), m = scr(a.mid), e = scr(a.end);
+    const gr = c.createLinearGradient(s0[0], s0[1], e[0], e[1]);
+    gr.addColorStop(0, `rgba(165,80,58,${.22 * show})`); gr.addColorStop(.45 - .15 * w, `rgba(165,80,58,${(.55 + .2 * w) * show})`); gr.addColorStop(1, `rgba(180,84,60,${.95 * show})`);
+    const sh = c.createLinearGradient(s0[0], s0[1], e[0], e[1]);   // the drop shadow, fading with the stroke
+    sh.addColorStop(0, `rgba(20,10,5,${.15 * show})`); sh.addColorStop(.45 - .15 * w, `rgba(20,10,5,${(.55 + .2 * w) * .6 * show})`); sh.addColorStop(1, `rgba(20,10,5,${.6 * show})`);
+    c.lineCap = "round";
+    c.beginPath(); c.moveTo(s0[0] + .5, s0[1] + 1); c.quadraticCurveTo(m[0] + .5, m[1] + 1, e[0] + .5, e[1] + 1); c.lineWidth = 3.4; c.strokeStyle = sh; c.stroke();
+    c.beginPath(); c.moveTo(s0[0], s0[1]); c.quadraticCurveTo(m[0], m[1], e[0], e[1]); c.lineWidth = 2.6; c.strokeStyle = gr; c.stroke();
+    const ang = Math.atan2(e[1] - m[1], e[0] - m[0]); c.save(); c.translate(e[0], e[1]); c.rotate(ang);
+    c.beginPath(); c.moveTo(-12, -4.2); c.lineTo(3, 0); c.lineTo(-12, 4.2); c.lineTo(-9, 0); c.closePath();
+    c.save(); c.translate(.5, 1); c.fillStyle = `rgba(20,10,5,${.6 * show})`; c.fill(); c.restore();
+    c.fillStyle = `rgba(180,84,60,${show})`; c.fill(); c.restore();
+  }
+  // The destinations, their names, the checking ring and the one pulse.
+  const names = z > .36, k = z < .36 ? .7 : 1;
+  for (const g of ["elwynn", "basin"]) {
+    const sp = pieces.sprites[g]; if (!sp) continue;
+    const [x, y] = scr(PLACES[g].at), [tx, ty] = PLACES[g].tok, S = sp.S * k;
+    c.drawImage(sp.c, x - S, y - S, S * 2, S * 2);
+    if (names) { const n = pieces.sprites[g + "-name"], [lx, ly] = PLACES[g].nameAt; c.drawImage(n.c, x + lx, y + ly - 14, n.w, n.h); }
+    if (names && g === "basin") for (const [nm, at, [ox, oy]] of BASES) { const sp = pieces.sprites["base-" + nm]; if (!sp) continue; const [bx, by] = scr(at); c.drawImage(sp.c, bx + ox * k - sp.w / 2, by + oy * k - sp.h / 2, sp.w, sp.h); }
+    const cx = x + tx * k, cy = y + ty * k;
+    if (pieces.spin === g) { c.save(); c.translate(cx, cy); c.rotate(now / 380); c.setLineDash([5, 7]); c.lineWidth = 2; c.strokeStyle = "rgba(241,228,191,.9)"; c.beginPath(); c.arc(0, 0, 22, 0, 6.283); c.stroke(); c.restore(); }
+    if (pieces.pulse && pieces.pulse.g === g) {
+      const t = (now - pieces.pulse.t0) / 1000; if (t >= 1) pieces.pulse = null;
+      else { c.lineWidth = 2; c.strokeStyle = `rgba(244,227,176,${.95 * (1 - t)})`; c.beginPath(); c.arc(cx, cy, 17 * (.8 + 1.5 * t), 0, 6.283); c.stroke(); }
+    }
+  }
+}
+const pinFx = { spin(g, on) { pieces.spin = on ? g : null; }, pulse(g) { if (!reduced()) pieces.pulse = { g, t0: performance.now() }; } };
+// Now and then one enemy arrow brightens along its final approach; otherwise the map is still.
+setInterval(() => { if (reduced() || !fxOn) return; const a = pieces.arrows[Math.random() * pieces.arrows.length | 0]; if (a && !a.glow) a.glow = performance.now(); }, 4200);
+
+// ---------- your own hand on the map: drag to pan, wheel to zoom about the cursor ----------
+const input = (() => {
+  let drag = null, vel = [0, 0], zoomTo = null, at = null, last = 0, moved = 0;
+  const el = $("map");
+  el.addEventListener("pointerdown", e => { if (flying) return; drag = [e.clientX, e.clientY]; moved = 0; vel = [0, 0]; zoomTo = null; el.setPointerCapture(e.pointerId); });
+  el.addEventListener("pointermove", e => {
+    if (!drag) return; const dx = e.clientX - drag[0], dy = e.clientY - drag[1]; drag = [e.clientX, e.clientY]; moved += Math.abs(dx) + Math.abs(dy);
+    setCam({ x: cam.x - dx / cam.z, y: cam.y - dy / cam.z, z: cam.z }); vel = [dx, dy]; last = performance.now();
+  });
+  el.addEventListener("pointerup", e => {
+    if (drag && moved < 5) { for (const g of ["elwynn", "basin"]) { const [x, y] = scr(PLACES[g].at), [tx, ty] = PLACES[g].tok; if (Math.hypot(e.clientX - (x + tx), e.clientY - (y + ty)) < 20) pick(g); } }
+    if (performance.now() - last > 60) vel = [0, 0];
+    drag = null; tickers.add(glide);
+  });
+  el.addEventListener("wheel", e => { if (flying) return; e.preventDefault(); zoomTo = clampCam({ ...cam, z: (zoomTo ?? cam.z) * Math.exp(-e.deltaY * .0016) }).z; at = [e.clientX, e.clientY]; tickers.add(glide); }, { passive: false });
+  let prev = null;
+  function glide(now) {
+    const dt = prev ? Math.min(50, now - prev) : 16.7; prev = now; let busyNow = false;
+    if (!drag && (Math.abs(vel[0]) + Math.abs(vel[1]) > .05)) { setCam({ x: cam.x - vel[0] / cam.z, y: cam.y - vel[1] / cam.z, z: cam.z }); const k = Math.exp(-dt / 140); vel = [vel[0] * k, vel[1] * k]; busyNow = true; }
+    if (zoomTo !== null) {
+      // Keep the art under the cursor still while the zoom eases toward where the wheel asked.
+      const p = map.unproject(at), z = cam.z + (zoomTo - cam.z) * (1 - Math.exp(-dt / 70)), [ax, ay] = anchor();
+      setCam({ x: p[0] - (at[0] - ax) / z, y: p[1] - (at[1] - ay) / z, z });
+      if (Math.abs(zoomTo - cam.z) < 1e-4) zoomTo = null; else busyNow = true;
+    }
+    if (!busyNow) { tickers.delete(glide); prev = null; }
+  }
+  return { stop() { drag = null; vel = [0, 0]; zoomTo = null; tickers.delete(glide); prev = null; } };
+})();
+
+// ---------- the frame-time meter (?perf) ----------
+function perfFrame(now, work) {
+  const p = perf; if (p.last) p.times.push([now - p.last, work]); p.last = now; if (p.times.length > 300) p.times.shift();
+  if (!p.el) { p.el = document.createElement("canvas"); p.el.width = 300; p.el.height = 70; Object.assign(p.el.style, { position: "fixed", left: "50%", top: "50px", marginLeft: "-150px", zIndex: 50, background: "rgba(0,0,0,.6)", pointerEvents: "none" }); document.body.appendChild(p.el); }
+  const c = p.el.getContext("2d"); c.clearRect(0, 0, 300, 70);
+  const budget = 1000 / 144; c.fillStyle = "rgba(255,255,255,.25)"; c.fillRect(0, 60 - budget * 4, 300, 1);
+  p.times.forEach(([iv, w], i) => { c.fillStyle = iv > budget * 1.5 ? "#e0846f" : "#95cf8d"; c.fillRect(i, 60 - Math.min(60, iv * 4), 1, Math.min(60, iv * 4)); c.fillStyle = "#ecd08a"; c.fillRect(i, 60 - Math.min(60, w * 4), 1, 1); });
+  const iv = p.times.map(t => t[0]).sort((a, b) => a - b), q = k => iv[Math.floor(iv.length * k)] || 0;
+  c.fillStyle = "#fff"; c.font = "11px sans-serif"; c.fillText(`${(1000 / q(.5)).toFixed(0)} fps  p99 ${q(.99).toFixed(1)} ms  work ${work.toFixed(2)} ms`, 6, 68);
+}
+
+// Before the route draws, the camera eases back just enough to show the whole journey.
+async function frameRoute() {
+  const pts = ROUTES[game].concat([PLACES[game].at]), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);
+  const z = Math.min(ZOOM.tactical, (VW - 640) / bw, (VH - TOP_UI - BOTTOM_UI - 120) / bh);
+  const to = { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2, z };
+  if (reduced()) { setCam(to); return; }
+  await fly(to, 600, 0);
+}
+
+// ======================================================================================
+// Play.exe, behind the menu. The menu asks with host.send({do: ...}); Play.exe answers
+// through launcherRecv({t: ...}) (dist/windows/buttons/src/bin/play/backend.rs). Opened in a
+// plain browser (to work on the page), a stand-in answers instead: see `standIn` at the end.
+// ======================================================================================
+const inPlay = !!(window.ipc && window.ipc.postMessage);
+const host = { send(m) { if (inPlay) window.ipc.postMessage(JSON.stringify(m)); else standIn(m); } };
+const on = {};
+window.launcherRecv = m => { try { (on[m.t] || (() => {}))(m); } catch (e) { console.error(e); } };
+let L = { title: "Basin Battle", games: { elwynn: "Elwynn Survival", basin: "Basin Battle" }, servers: [], place: "own", address: "", prefs: { fx: true, still: false, keep: false, backups: true }, version: "", wow: null };
+const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function cantDraw(e) { console.error(e); if (inPlay) host.send({ do: "classic", why: String(e && e.message || e) }); }
+
+// The window: drag it by the title bar, double-click to fill the screen, resize it by its edges.
+$("titlebar").addEventListener("mousedown", e => { if (e.button === 0 && !e.target.closest("button")) host.send({ do: "drag" }); });
+$("titlebar").addEventListener("dblclick", e => { if (!e.target.closest("button")) host.send({ do: "max" }); });
+$("minimize").onclick = () => host.send({ do: "min" });
+$("close").onclick = () => host.send({ do: "close" });
+document.querySelectorAll(".edges i").forEach(i => i.addEventListener("mousedown", e => { if (e.button === 0) host.send({ do: "resize", edge: i.dataset.edge }); }));
+// No browser behaviour in a game launcher: no text selection by dragging, no context menu.
+document.addEventListener("contextmenu", e => { if (!e.target.closest("input")) e.preventDefault(); });
+
+// ======================================================================================
+// The games and their dispatches. The dispatches are the latest changes to the game, from
+// news.json (written when the release is built, from the repository's history).
+// ======================================================================================
+const games = {
+  elwynn: { line: "Hold the camp. Make every strike count.", more: "Build up Westbrook against the Horde's raids, then go below for the Bookmaker's wagers." },
+  basin: { line: "Defend the Ancient. Survive the undead.", more: "Hold Arathi Basin against endless waves, and build your hero ability by ability." },
+};
+const gameName = g => L.games[g] || g;
+let game = "elwynn", busy = false, news = null;
+function renderDispatches() {
+  $("hero").innerHTML = Object.entries(games).map(([k, G]) => `<div class="hero-card" data-game="${k}"><h1>${esc(gameName(k))}</h1><p class="line">${G.line}</p><p class="more">${G.more}</p></div>`).join("");
+  $("dispatches").innerHTML = Object.keys(games).map(k => {
+    const list = (news && news[k]) || [];
+    if (!list.length) return `<div class="dispatch-set" data-game="${k}"></div>`;
+    const [lead, ...rest] = list;
+    return `<div class="dispatch-set" data-game="${k}"><h2>${esc(gameName(k))} updates</h2>` +
+      `<div class="paper open"><span class="tack"></span><h3>${esc(lead.title)}</h3><div class="meta">${esc(lead.date)}${lead.shared ? " · <i>Shared update</i>" : ""}</div>${lead.text ? `<p>${esc(lead.text)}</p>` : ""}</div>` +
+      rest.slice(0, 2).map(n => `<div class="paper fold"><b>${esc(n.title)}</b><span>${esc(n.short || n.date)}${n.shared ? ", shared" : ""}</span></div>`).join("") +
+      `<a href="#" data-url="https://github.com/${esc(L.repository || "")}/commits/main">View changes on GitHub</a></div>`;
+  }).join("");
+  $("dispatches").querySelectorAll("a[data-url]").forEach(a => a.onclick = e => { e.preventDefault(); host.send({ do: "url", href: a.dataset.url }); });
+  document.querySelectorAll(".switch button span").forEach(s => s.textContent = gameName(s.parentNode.dataset.game));
+  setGameText();
+}
+fetch("news.json").then(r => r.ok ? r.json() : null).then(n => { if (n) { news = n; renderDispatches(); } }).catch(() => {});
+function setGameText() {
+  document.querySelectorAll(".hero-card, .dispatch-set").forEach(e => e.classList.toggle("on", e.dataset.game === game));
+  document.querySelectorAll(".switch button").forEach(b => b.setAttribute("aria-pressed", b.dataset.game === game));
+}
+async function pick(g) {
+  if (g === game || busy) return; game = g; host.send({ do: "choose", game: g });
+  document.querySelectorAll(".switch button").forEach(b => b.setAttribute("aria-pressed", b.dataset.game === game));   // the tab answers at once
+  routeFrac = { elwynn: 0, basin: 0 };
+  onArrive = () => setGameText();   // the title and dispatches change as the map arrives
+  busy = true; await travel(g); busy = false; if (!playing) say("ready", readyLine(), heroLine());
+}
+document.querySelectorAll(".switch button").forEach(b => b.onclick = () => pick(b.dataset.game));
+
+// ======================================================================================
+// Status: each stage has its own words and its own mark
+// ======================================================================================
+const ICONS = {
+  ready: '<path d="M4 11 h9 M10 7 l4 4 -4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M15 4 h4 v14 h-4" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  checking: '<circle cx="11" cy="11" r="2.2" fill="currentColor"/><path d="M6.5 6.5 a6.4 6.4 0 0 0 0 9 M15.5 6.5 a6.4 6.4 0 0 1 0 9 M3.5 3.5 a10.6 10.6 0 0 0 0 15 M18.5 3.5 a10.6 10.6 0 0 1 0 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  available: '<circle cx="11" cy="11" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 11.3 l2.7 2.7 l5.4 -5.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>',
+  launching: '<path d="M3 17 C7 15 8 9 12 9 S17 6 19 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="2.5 2.5" stroke-linecap="round"/><path d="M15 3.5 h4.5 v4.5" fill="none" stroke="currentColor" stroke-width="1.7"/>',
+  opened: '<path d="M6 19 V4 M6 4 h10 l-2.5 3.5 L16 11 H6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
+  downloading: '<path d="M11 3 v11 M6.5 9.5 L11 14 l4.5 -4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 18 h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  installing: '<path d="M14.5 3.5 a4 4 0 0 0 -4.6 5.2 L3.8 14.8 a1.6 1.6 0 0 0 2.3 2.3 l6.1 -6.1 a4 4 0 0 0 5.2 -4.6 l-2.4 2.4 -2.1 -.6 -.6 -2.1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  unavailable: '<circle cx="11" cy="11" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 7.5 l7 7 M14.5 7.5 l-7 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+};
+const readyLine = () => `Ready to play ${esc(gameName(game))}.`;
+const heroLine = () => "Heroes are saved on the server you play on.";
+// `then` may carry one action: [words, button, what it does].
+function say(kind, now, then = "", act = null) {
+  const s = $("status");
+  s.innerHTML = `<svg class="icon" viewBox="0 0 22 22">${ICONS[kind]}</svg><div class="now">${now}</div><div class="then">${then}${act ? ` <button class="btn act" id="status-act">${act[0]}</button>` : ""}</div>`;
+  if (act) $("status-act").onclick = act[1];
+  s.classList.remove("swap"); void s.offsetWidth; s.classList.add("swap");
+}
+
+// ======================================================================================
+// Where to play: the group's servers (project.toml), a custom address, or single player
+// ======================================================================================
+const pop = $("pop"), serverBtn = $("server");
+const state = {};   // server key -> checking, up, down, here, tailscale
+const STATES = { checking: ["Checking…", "", "wait"], up: ["Available", "ok", ""], down: ["Unavailable", "bad", "off"], here: ["This PC", "ok", "solo"], tailscale: ["Needs Tailscale", "bad", "off"] };
+const serverOf = k => L.servers.find(s => s.key === k);
+// The server Play tries after this one if it's down.
+function backupOf(k) {
+  if (!L.prefs.backups) return null;
+  const i = L.servers.findIndex(s => s.key === k);
+  return L.servers.slice(i + 1).find(s => !(s.tailscale && !L.tailscale)) || null;
+}
+function placeWords() {
+  if (L.place === "own") return ["Single player", "Your own server on this PC", "solo"];
+  if (L.place === "address") return [L.address || "Custom server", "Custom server", "solo"];
+  const s = serverOf(L.place); if (!s) return ["Single player", "Your own server on this PC", "solo"];
+  const st = state[s.key] || "checking", b = backupOf(s.key), back = b ? ` Backup: ${esc(b.name)}` : "";
+  if (st === "up") return [s.name, `<span class="ok">Available.</span>${back}`, ""];
+  if (st === "here") return [s.name, "Starts on this PC when you play.", "solo"];
+  if (st === "down") return [s.name, `<span class="bad">Unavailable.</span>${back}`, "off"];
+  if (st === "tailscale") return [s.name, '<span class="bad">Needs Tailscale on this PC.</span>', "off"];
+  return [s.name, "Checking…", "wait"];
+}
+function renderRail() {
+  const [n, note, lamp] = placeWords();
+  $("server-name").textContent = n; $("server-note").innerHTML = note; $("lamp").className = "lamp " + lamp;
+  pop.querySelectorAll(".row").forEach(r => r.setAttribute("aria-checked", r.dataset.pick === L.place));
+  $("custom-note").textContent = L.address ? L.address : "Type the address a host gives you";
+}
+function renderPop() {
+  $("server-rows").innerHTML = L.servers.map((s, i) => `<button class="row" role="menuitemradio" aria-checked="false" data-pick="${esc(s.key)}"><span class="lamp wait"></span><span><b>${esc(s.name)}</b><small>${s.tailscale ? "Over Tailscale" : i === 0 ? "The group's server" : "Backup"}</small></span><span class="state">Checking…</span></button>`).join("");
+  pop.querySelectorAll(".row").forEach(row => row.onclick = e => {
+    e.stopPropagation();
+    if (row.dataset.pick === "address") { $("custom").classList.add("open"); $("custom-address").value = L.address || ""; $("custom-address").focus(); return; }
+    choosePlace(row.dataset.pick);
+  });
+  renderStates(); renderRail();
+}
+function renderStates() {
+  for (const s of L.servers) {
+    const row = pop.querySelector(`[data-pick="${s.key}"]`); if (!row) continue;
+    const [t, c, l] = STATES[state[s.key] || "checking"];
+    row.querySelector(".lamp").className = "lamp " + l; const el = row.querySelector(".state"); el.textContent = t; el.className = "state " + c;
+  }
+}
+function choosePlace(p, address) {
+  L.place = p; if (address !== undefined) L.address = address;
+  host.send({ do: "choose", place: p, address: L.address });
+  renderRail(); openPop(false); $("custom").classList.remove("open");
+  if (!playing) { playable(); say("ready", readyLine(), heroLine()); }
+}
+$("custom").onsubmit = e => { e.preventDefault(); const a = $("custom-address").value.trim(); if (a) choosePlace("address", a); };
+function openPop(open) {
+  pop.classList.toggle("open", open); serverBtn.setAttribute("aria-expanded", open);
+  if (open) host.send({ do: "check" }); else $("custom").classList.remove("open");
+}
+serverBtn.onclick = e => { e.stopPropagation(); openPop(!pop.classList.contains("open")); };
+document.addEventListener("click", e => { if (!pop.contains(e.target)) openPop(false); });
+on.server = m => { state[m.key] = m.state; renderStates(); renderRail(); };
+// Every half minute while the menu is open, so the lamp says what Play will find.
+setInterval(() => { if (!busy && !document.hidden) host.send({ do: "check" }); }, 30000);
+
+// ======================================================================================
+// Play
+// ======================================================================================
+const wait = ms => new Promise(r => setTimeout(r, ms)), play = $("play"), label = $("play-label");
+let playing = false, soloOnce = false, wantPlay = false, updating = false;
+function playable(text = "Play") { play.disabled = false; play.classList.remove("busy", "installing"); label.textContent = text; }
+function start(solo = false) {
+  if (busy || playing || updating) return;
+  playing = true; soloOnce = solo; openPop(false);
+  play.classList.add("pressed"); setTimeout(() => play.classList.remove("pressed"), 140);
+  play.disabled = true; label.textContent = "Connecting…"; pinFx.spin(game, true);
+  host.send({ do: "play", game, place: L.place, address: L.address, solo });
+}
+play.onclick = () => start(false);
+on.play = async m => {
+  if (m.stage === "waiting" || m.stage === "checking") { label.textContent = "Connecting…"; say("checking", esc(m.now), esc(m.then)); }
+  else if (m.stage === "own") { label.textContent = "Starting server…"; say("checking", esc(m.now), esc(m.then)); }
+  else if (m.stage === "answered") { pinFx.spin(game, false); pinFx.pulse(game); say("available", esc(m.now.charAt(0).toUpperCase() + m.now.slice(1)), "Connected."); }
+  else if (m.stage === "launching") {
+    pinFx.spin(game, false); label.textContent = "Starting…"; say("launching", esc(m.now), esc(m.then));
+    busy = true; await frameRoute(); await run(reduced() ? 1 : 1400, t => routeFrac[game] = ease(t)); busy = false;
+  }
+  else if (m.stage === "opened") {
+    label.textContent = "Playing"; say("opened", m.where ? `Game opened on ${esc(m.where)}.` : esc(m.now), m.then);
+    // With the launcher kept open, Play is pressable again a little later.
+    if (L.prefs.keep) setTimeout(() => { playing = false; playable(); }, 8000);
+  }
+  else if (m.stage === "failed") {
+    // A long reason reads as a short line and what to do about it.
+    if (!m.then) { const i = m.now.indexOf(". "); if (i > 0 && i < m.now.length - 2) { m.then = m.now.slice(i + 2); m.now = m.now.slice(0, i + 1); } }
+    playing = false; pinFx.spin(game, false); playable("Try Again");
+    if (m.offer === "wow") { playable("Find WoW…"); wantPlay = true; say("unavailable", "World of Warcraft 1.12.1 wasn't found.", esc(m.now), ["Choose Folder", () => host.send({ do: "pick-wow" })]); host.send({ do: "pick-wow" }); }
+    else if (m.offer === "solo") say("unavailable", esc(m.now), esc(m.then), ["Play Single Player", () => start(true)]);
+    else if (m.offer === "address") { say("unavailable", esc(m.now), esc(m.then)); openPop(true); $("custom").classList.add("open"); $("custom-address").focus(); }
+    else say("unavailable", esc(m.now), esc(m.then));
+  }
+};
+on.wow = m => {
+  if (m.searching) { wowWords = "Looking for it on this PC…"; refreshPane(); return; }
+  if (m.cancelled) return;
+  if (m.wrong) { say("unavailable", "That folder isn't World of Warcraft 1.12.1.", "It has no Data\\dbc.MPQ in it. Pick the folder with WoW.exe in it.", ["Choose Folder", () => host.send({ do: "pick-wow" })]); return; }
+  L.wow = m.path || null; wowWords = L.wow || "Not found on this PC. Choose its folder."; refreshPane();
+  if (L.wow && wantPlay) { wantPlay = false; playable(); start(); }
+};
+let wowWords = "";
+
+// Updates: Play looks for a new release each time it opens, and updates the whole folder first.
+on.update = m => {
+  if (m.stage === "checking") { $("version").textContent = "Checking for updates…"; return; }
+  if (["working", "downloading", "installing", "done"].includes(m.stage)) {
+    updating = true; play.disabled = true; play.classList.add("busy", "installing"); label.textContent = m.stage === "downloading" ? "Downloading…" : "Updating…";
+    say(m.stage === "downloading" ? "downloading" : "installing", esc(m.now), esc(m.then)); return;
+  }
+  updating = false; $("version").textContent = versionWords();
+  if (!playing) playable();
+  if (m.stage === "none" && m.now) say("ready", esc(m.now), esc(m.then || heroLine()));
+  if (m.stage === "later" || m.stage === "failed") say("ready", readyLine(), esc(m.now));
+  updateWords = m.now || ""; refreshPane();
+};
+let updateWords = "";
+function versionWords() {
+  const v = L.version || ""; if (/^v\d/.test(v)) return `${v} installed`;
+  const sha = /\(([0-9a-f]{7})\)/.exec(v); return sha ? `Test build ${sha[1]}` : v ? "Test build" : "";
+}
+
+// ======================================================================================
+// Settings
+// ======================================================================================
+const field = (title, note, control) => `<div class="field"><div class="grow"><b>${title}</b><small>${note}</small></div>${control}</div>`;
+const lever = (id, label) => `<input type="checkbox" class="lever" id="${id}" aria-label="${label}">`;
+const panes = {
+  files: () => `<h3>Game files</h3><p>Play finds your World of Warcraft 1.12.1 by itself. Change it if you moved the game.</p>` +
+    field("World of Warcraft 1.12.1", esc(L.wow || wowWords || "Not found on this PC. Choose its folder."), `<button class="btn" id="set-wow">Choose Folder</button>`),
+  connection: () => `<h3>Connection</h3><p>Where Play goes first, and what it does if that server is down.</p>` +
+    field("Server", esc(placeWords()[0]), `<button class="btn" id="set-where">Change</button>`) +
+    field("Try the backup servers", "When the server you chose doesn't answer.", lever("backups", "Try the backup servers")),
+  launcher: () => `<h3>Launcher</h3><p>Saved on this PC.</p>` +
+    field("Keep Play open", "Otherwise it closes once the game opens.", lever("keep", "Keep Play open")) +
+    field("Ambient effects", "Candlelight and moving arrows on the map.", lever("fx", "Ambient effects")) +
+    field("Reduced motion", "The map crossfades instead of flying. The light holds still.", lever("still", "Reduced motion")),
+  hosting: () => `<h3>Hosting</h3><p>Run a server on this PC, for yourself or for friends to join.</p>` +
+    field("Host a server on this PC", L.hostable ? "Opens the server's own window. Leave it open while anyone plays." : "This download has no server in it.", L.hostable ? `<button class="btn" id="host">Open Host</button>` : ""),
+  updates: () => `<h3>Updates</h3><p>Play updates itself when a new release is out. Your settings and heroes stay as they are.</p>` +
+    field(esc(versionWords() || "Version unknown"), esc(updateWords || "Play checks each time it opens."), `<button class="btn" id="check-update">Check for Updates</button>`) +
+    field("Game folder", "Where Play, Host and the game live.", `<button class="btn" id="open-folder">Open Folder</button>`),
+};
+let fxOn = true, stillOn = matchMedia("(prefers-reduced-motion: reduce)").matches, openTab = "launcher";
+const reduced = () => stillOn;
+function tab(t) {
+  openTab = t;
+  document.querySelectorAll(".ledger nav button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
+  $("pane").innerHTML = `<button class="chrome x" id="close-settings" aria-label="Close settings"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>` + panes[t]();
+  $("close-settings").onclick = () => settings(false);
+  const bind = (id, get, set) => { const el = $(id); if (el) { el.checked = get(); el.onchange = () => { set(el.checked); host.send({ do: "pref", key: id, value: el.checked }); }; } };
+  bind("fx", () => fxOn, v => { fxOn = v; L.prefs.fx = v; });
+  bind("still", () => stillOn, v => { stillOn = v; L.prefs.still = v; document.body.classList.toggle("still", v); });
+  bind("keep", () => L.prefs.keep, v => { L.prefs.keep = v; });
+  bind("backups", () => L.prefs.backups, v => { L.prefs.backups = v; renderRail(); });
+  const click = (id, f) => { const el = $(id); if (el) el.onclick = f; };
+  click("set-where", e => { e.stopPropagation(); settings(false); openPop(true); });
+  click("set-wow", () => host.send({ do: "pick-wow" }));
+  click("host", () => host.send({ do: "host" }));
+  click("check-update", () => { updateWords = "Checking…"; refreshPane(); host.send({ do: "update" }); });
+  click("open-folder", () => host.send({ do: "folder" }));
+}
+function refreshPane() { if ($("ledger").classList.contains("open")) tab(openTab); }
+document.querySelectorAll(".ledger nav button").forEach(b => b.onclick = () => tab(b.dataset.tab));
+function settings(open) { $("ledger").classList.toggle("open", open); $("dim").classList.toggle("open", open); }
+$("open-settings").onclick = () => { tab("launcher"); settings(true); };
+$("dim").onclick = () => settings(false);
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { settings(false); openPop(false); }
+  if (e.key === "Enter" && document.activeElement === document.body && !$("ledger").classList.contains("open")) start();
+});
+
+// ======================================================================================
+// Opening: Play.exe says hello with the names, servers and choices, and the map loads its
+// tiles meanwhile. The first time, the whole map on the table, then a one-second descent;
+// after that the menu opens where you left it.
+// ======================================================================================
+let gotHello, mapIsLoaded;
+const hello = new Promise(r => gotHello = r), loaded = new Promise(r => mapIsLoaded = r);
+function mapLoaded() { mapIsLoaded(); }
+on.hello = m => {
+  L = { ...L, ...m }; game = m.game === "basin" ? "basin" : "elwynn";
+  fxOn = L.prefs.fx; stillOn = L.prefs.still || stillOn; document.body.classList.toggle("still", stillOn);
+  document.title = L.title; $("title").textContent = "Play";
+  $("version").textContent = versionWords();
+  if (L.wow === null) wowWords = "Looking for it on this PC…";
+  gotHello();
+};
+renderDispatches(); buildArrows();
+sizePieces(); map.resize(); setCam(overviewCam());
+makeSprites();
+addEventListener("resize", () => { sizePieces(); map.resize(); makeSprites(); setCam(camFor(game)); });
+say("checking", "Opening…", "");
+host.send({ do: "hello" });
+(async () => {
+  await hello;
+  renderDispatches(); renderPop();
+  if (!L.first) setCam(camFor(game)); else document.querySelectorAll(".hero, .dispatches").forEach(e => e.classList.add("away"));   // a first visit opens on the bare map
+  say("ready", readyLine(), heroLine());
+  await loaded;
+  $("loading").classList.add("done"); host.send({ do: "ready" });
+  if (L.first) {
+    await wait(500); busy = true; await travel(game, true); busy = false;
+    document.querySelectorAll(".hero, .dispatches").forEach(e => e.classList.remove("away"));
+    host.send({ do: "choose", game });
+  }
+  if (L.change) openPop(true);
+})();
+window.demo = { start, pick, say, tab, settings, openPop, map, camNow, setCam, ready: () => map.ready };
+
+// ======================================================================================
+// The stand-in for Play.exe, when the page is opened in a browser to work on it: the group's
+// servers as project.toml has them, and a pretend game start.
+// ======================================================================================
+function standIn(m) {
+  const reply = (t, d = 0) => setTimeout(() => launcherRecv(t), d);
+  if (m.do === "hello") reply({ t: "hello", title: "Basin Battle", repository: "slopmaster69/Basin-Battle", games: { elwynn: "Elwynn Survival", basin: "Basin Battle" }, version: "v0.4.1",
+    servers: [{ key: "server", name: "Corios's desktop", address: "24.64.116.126", tailscale: false, here: false }, { key: "backup", name: "Corios's laptop", address: "24.64.116.126:3725", tailscale: false, here: false }, { key: "backup2", name: "David's PC (Tailscale)", address: "100.125.4.34", tailscale: true, here: false }],
+    place: "server", address: "", game: location.hash === "#basin" ? "basin" : "elwynn", first: location.hash === "#first", wow: "C:\\Games\\World of Warcraft 1.12.1\\Data",
+    prefs: { fx: true, still: false, keep: false, backups: true }, tailscale: false, hostable: true, change: false, bench: location.hash === "#bench" });
+  if (m.do === "hello" || m.do === "check") for (const [k, s, d] of [["server", "up", 700], ["backup", "up", 900], ["backup2", "tailscale", 300]]) { reply({ t: "server", key: k, state: "checking" }); reply({ t: "server", key: k, state: s }, d); }
+  if (m.do === "play") {
+    const n = m.place === "own" || m.solo ? "Your own server" : (serverOf(m.place) || { name: m.address }).name;
+    reply({ t: "play", stage: "checking", now: `Looking for ${n}…`, then: "Asking the server if it's up." }, 50);
+    reply({ t: "play", stage: "answered", now: `${n} answered.` }, 1500);
+    reply({ t: "play", stage: "launching", now: `Starting ${gameName(game)}…`, then: "Opening the game window." }, 2600);
+    reply({ t: "play", stage: "opened", now: "Game opened.", then: "Log in with any name you like (it becomes your hero) and the password <b>hold</b>." }, 4800);
+  }
+}
+</script>
+<script src="bench.js"></script>
+</body>
+</html>
