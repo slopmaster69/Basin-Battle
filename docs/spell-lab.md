@@ -36,7 +36,7 @@ what it sent, side by side on one sheet.
 
 ### Options
 
-`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [allies <n>]`
+`.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>]`
 
 - **Scenes:** `one` (one body 5 yd ahead), `pack` (three across the front), `close` (one at arm's
   length), `ring` (three at arm's length), `far` (one 14 yd off), `line` (two in a row, 4 and 7.5 yd ahead: a rush that drives one
@@ -60,6 +60,10 @@ what it sent, side by side on one sheet.
 - **Race:** `as tauren-f` makes the hero that race and gender (plain looks) for this run and the
   ones after: `human`, `orc`, `dwarf`, `nightelf`, `undead`, `tauren`, `gnome`, `troll`, then `m` or
   `f`. Every race's take on an ability, one run after another.
+- **Side view:** `by tauren-f` has a stand-in hero of that race and gender cast it where the hero
+  stood, and sets the hero 7 yd to its side looking across the fight: the swing seen side on,
+  which the camera behind the hero hides. For abilities that stay where they're cast (a stand-in's
+  dash or leap isn't shown moving on the client).
 - **Allies:** `allies 2` stands up to 4 stand-in ally heroes near the hero (two ahead, two at the sides),
   each a different race, for what reaches allies (a shout, an Intervene). They go with the next
   run and are never saved.
