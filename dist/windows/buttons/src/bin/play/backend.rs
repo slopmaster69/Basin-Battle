@@ -612,6 +612,8 @@ impl Backend {
                 let href = s("href");
                 if href.starts_with("https://github.com/") || href.starts_with("https://tailscale.com/") { open_in_shell(&href); }
             }
+            // What the menu noticed about this PC (its GPU), for play.log.
+            "diag" => { let w: String = s("what").chars().filter(|c| !c.is_control()).take(400).collect(); self.log(&format!("menu: {w}")); }
             other => self.log(&format!("the menu sent something unknown: {other}")),
         }
     }

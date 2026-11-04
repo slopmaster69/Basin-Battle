@@ -400,7 +400,7 @@ addEventListener("resize", () => { VW = innerWidth; VH = innerHeight; });
 new ResizeObserver(() => { if (VW !== innerWidth || VH !== innerHeight) dispatchEvent(new Event("resize")); }).observe(document.documentElement);
 // No WebGL2 here (or the map won't load): Play.exe opens its plain launcher instead.
 let map;
-try { map = MapGL.create($("map"), "map/tiles.json", { onReady: () => mapLoaded(), onError: e => cantDraw(e) }); }
+try { map = MapGL.create($("map"), "map/tiles.json", { onReady: () => mapLoaded(), onError: e => cantDraw(e), onLost: () => host.send({ do: "diag", what: "the map's GPU context was lost" }), onRestored: () => location.reload() }); }
 catch (e) { map = { gl: null, state: {}, ready: false, resize() {}, render() {}, setCamera() {}, setLight() {}, project: p => p, unproject: p => p, tilesLoaded: () => "0" }; setTimeout(() => cantDraw(e)); }
 const anchor = () => [VW * .52, TOP_UI + (VH - TOP_UI - BOTTOM_UI) * .5];
 let cam = { x: ART.w / 2, y: 3300, z: .3 };
@@ -935,6 +935,8 @@ host.send({ do: "hello" });
   say("ready", readyLine(), heroLine());
   await loaded;
   $("loading").classList.add("done"); host.send({ do: "ready" });
+  try { host.send({ do: "diag", what: "map: " + JSON.stringify(map.about()) }); } catch (e) {}
+  setTimeout(() => { try { host.send({ do: "diag", what: "map after 5 sec: " + JSON.stringify(map.about()) }); } catch (e) {} }, 5000);
   if (L.first) {
     await wait(500); busy = true; await travel(game, true); busy = false;
     document.querySelectorAll(".hero, .dispatches").forEach(e => e.classList.remove("away"));

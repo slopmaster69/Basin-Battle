@@ -57,6 +57,11 @@ const MapGL = (() => {
   function create(canvas, manifestUrl, opts = {}) {
     const gl = canvas.getContext("webgl2", { alpha: false, antialias: false, depth: false, stencil: false, powerPreference: "high-performance", preserveDrawingBuffer: false });
     if (!gl) throw new Error("WebGL2 isn't available");
+    // A lost context (the GPU reset, or out of memory) is reported, and the map drawn again
+    // from scratch when it comes back.
+    let lost = false;
+    canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); lost = true; opts.onLost && opts.onLost(); });
+    canvas.addEventListener("webglcontextrestored", () => { opts.onRestored && opts.onRestored(); });
     const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
     const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
@@ -95,7 +100,9 @@ const MapGL = (() => {
       const order = tiles.slice().sort((a, b) => dist(a) - dist(b));
       await Promise.all(order.map(t => decode(dir + t.file).then(bm => { toUpload.push([t, bm]); })));
       const wait = () => new Promise(r => { const f = () => { if (toUpload.length === 0 && tiles.every(t => t.tex)) r(); else requestAnimationFrame(f); }; f(); });
-      await wait(); state.ready = true; opts.onReady && opts.onReady();
+      await wait(); state.ready = true;
+      state.error = gl.getError();   // GL_NO_ERROR (0) if every upload worked
+      opts.onReady && opts.onReady();
       function dist(t) { const c = state.cam; return Math.hypot(t.x + 512 - c.x, t.y + 512 - c.y); }
     }).catch(e => { console.error(e); opts.onError && opts.onError(e); });
 
@@ -140,6 +147,12 @@ const MapGL = (() => {
       unproject([sx, sy]) { const c = state.cam; return [(sx - state.anchor[0]) / c.z + c.x, (sy - state.anchor[1]) / c.z + c.y]; },
       get ready() { return state.ready; },
       tilesLoaded() { return tiles.filter(t => t.tex).length + "/" + tiles.length; },
+      // What this PC draws with, for the launcher's log.
+      about() {
+        const d = gl.getExtension("WEBGL_debug_renderer_info");
+        return { renderer: d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+          error: state.error, lost: lost || gl.isContextLost(), canvas: canvas.width + "x" + canvas.height, tiles: tiles.filter(t => t.tex).length + "/" + tiles.length };
+      },
     };
   }
   return { create };

@@ -39,7 +39,7 @@ jobs:
             grep -q "the menu is drawn" "$log" 2>/dev/null && break
             sleep 1
           done
-          sleep 4
+          sleep 7
           screencapture -x play-menu-mac.png || true
           cat "$log" || true
           pkill -x Play || true
