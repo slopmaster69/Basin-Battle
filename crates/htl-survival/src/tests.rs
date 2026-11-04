@@ -619,7 +619,7 @@ fn the_road_and_the_camps_own_spots_stay_clear() {
 }
 
 #[test]
-fn cooking_turns_meat_into_food_that_heals_unless_a_hit_spoils_the_meal() {
+fn cooking_turns_meat_into_food_whose_bite_a_hit_doesnt_spoil() {
     let mut s = world();
     let (at, f) = build_spot(&s);
     let p = hero(&mut s, "Ayla", at, f);
@@ -633,19 +633,19 @@ fn cooking_turns_meat_into_food_that_heals_unless_a_hit_spoils_the_meal() {
     let before = s.players[&p].bag.get(&roast).copied().unwrap_or(0);
     s.craft(p, fire, "roast").unwrap();
     assert_eq!(s.players[&p].bag[&roast], before + 1);
-    // Eat it hurt: it heals; struck mid-meal, the bite isn't eaten.
+    // Eat it hurt: struck mid-bite, it's eaten all the same, and heals over the next seconds.
     s.players.get_mut(&p).unwrap().health = 50;
+    s.players.get_mut(&p).unwrap().quick = Some(roast);
     s.input(p, Input::Use);
     run(&mut s, 0.5);
     let k = mob(&mut s, "grunt", [at[0] + 2.0, at[1], 0.0]);
     s.strike_player(k, p, 5, [at[0] + 2.0, at[1], 0.0], false, false, false, Blow::Light);
     s.mobs.remove(&k);
-    assert_eq!(s.players[&p].action, Action::Ready, "the meal is spoiled");
-    assert_eq!(s.players[&p].bag[&roast], before + 1, "and nothing eaten");
-    s.input(p, Input::Use);
-    run(&mut s, 2.0);
-    assert!(s.players[&p].health > 100, "a full meal heals: {}", s.players[&p].health);
-    assert_eq!(s.players[&p].bag.get(&roast).copied().unwrap_or(0), before);
+    assert!(matches!(s.players[&p].action, Action::Eat { .. }), "a hit doesn't spoil the bite");
+    run(&mut s, 0.6);
+    assert_eq!(s.players[&p].bag.get(&roast).copied().unwrap_or(0), before, "eaten");
+    run(&mut s, 5.0);
+    assert!(s.players[&p].health > 100, "the meal heals: {}", s.players[&p].health);
 }
 
 #[test]
