@@ -332,6 +332,10 @@ pub struct AbilityDef {
     pub lift: f32,
     #[serde(default)]
     pub back: bool,
+    /// A leap: no ring on the ground where it comes down, for anyone (a rival under it still
+    /// gets the warning over them).
+    #[serde(default)]
+    pub unmarked: bool,
     /// A blink with an anchor: the first press sets it at the feet (and costs nothing); pressed
     /// again within this many seconds, the hero steps back to it.
     #[serde(default)]

@@ -886,7 +886,8 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = yaw;
         }
-        if d.clip != 0 && d.kind != "art" {
+        // A leap's and a dash's clip go with the move (its blow lands as it does).
+        if d.clip != 0 && !matches!(d.kind.as_str(), "art" | "leap" | "dash") {
             // A stance holds its clip while it lasts (Feign Death lies there).
             let secs = if d.kind == "stance" { d.secs } else { CAST_RECOVERY + 0.2 };
             self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs });
@@ -2627,6 +2628,10 @@ impl Survival {
         }
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target, share });
         self.events.push(Event::Dash { player: id, dir: yaw, speed: dist / secs, secs });
+        // Its swing's blow lands as the run ends (a clip's impact is half its length).
+        if d.clip != 0 {
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6) });
+        }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
     }
 

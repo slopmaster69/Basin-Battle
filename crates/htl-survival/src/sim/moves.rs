@@ -19,7 +19,7 @@ const PULL_STOP: f32 = 1.6;
 /// The farthest a knockback or a pull moves a training dummy (it has no legs to walk back).
 const DUMMY_STEP: f32 = 1.0;
 /// A leap's arc where the ability names none.
-const LEAP_LIFT: f32 = 6.0;
+pub(crate) const LEAP_LIFT: f32 = 6.0;
 /// One step along the ground for a slide's end.
 const STEP: f32 = 0.4;
 /// The traps of one kind a hero can have set at once.
@@ -267,8 +267,14 @@ impl Survival {
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
         self.events.push(Event::Hop { player: id, dir, speed: dist / air, lift, roll: false, style: "" });
         self.set_action(id, Action::Dash { t: 0.0, secs: air, ability, target: None, share });
+        // Its swing held up through the air, the blow landing as it comes down (a clip's impact
+        // is half its length).
+        if d.clip != 0 {
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: air * 2.0 });
+        }
         let radius = AbilityDef::at(d.radius, share);
-        let mark = (radius > 0.0).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));
+        // `unmarked`: nothing on the ground where it comes down (only the warning over a rival).
+        let mark = (radius > 0.0 && !d.unmarked).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));
         // A rival where it comes down hears it coming too (the warning over them), not only the
         // mark on the ground, which they may have turned off or not be looking at.
         if radius > 0.0 {
