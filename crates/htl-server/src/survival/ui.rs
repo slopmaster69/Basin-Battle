@@ -81,7 +81,8 @@
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
-//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid>]`: how a spell's missiles look on an `ac20` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour).
+//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid>]`: how a spell's missiles look on an `ac14` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour).
+//! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0030's `SetUnitRope`): a grappling hook's line, a haul's.
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
 //!   `fit` seconds: a knockdown).
@@ -350,14 +351,16 @@ pub(crate) const VERSION: u32 = 2;
 /// 19's hunter work (both branches had taken 19).
 /// 21: the add-on says `ac19` for a client with patch 0027 (Tripwire's rope).
 /// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0029).
-pub(crate) const ADDON_NEWEST: u32 = 22;
+/// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0030).
+pub(crate) const ADDON_NEWEST: u32 = 23;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
 /// as an ability lands (0026). 19: an object drawn longer along one axis, and doodads placed as
 /// objects (0027): Tripwire's rope.
 /// 20: a missile's ribbon, size and spin (0029).
-pub(crate) const CLIENT_NEWEST: u8 = 20;
+/// 21: a rope from a unit's hand (0030).
+pub(crate) const CLIENT_NEWEST: u8 = 21;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1205,8 +1208,9 @@ impl SurvivalGame {
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
-                // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
-                // object stretched from end to end (Tripwire's rope); `ac20` a missile's look.
+                // another model's clips; `ac11` puts their bones back to rest after; `ac13` draws an
+                // object stretched from end to end (Tripwire's rope); `ac14` a missile's look; `ac21` a rope
+                // from the hand.
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,

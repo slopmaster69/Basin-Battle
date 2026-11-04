@@ -690,6 +690,23 @@ impl SurvivalGame {
                 }
                 self.ropes.insert(id);
             }
+            Event::Tether { from, to, secs } => {
+                // A taut line from the hand (patch 0023): `RP <key> <from> <to's guid or -> <x> <y>
+                // <z> <secs>`, keyed by who holds it, so a new line replaces theirs.
+                let Some(g) = self.guid_of(from) else { return };
+                let (to_guid, at) = match to {
+                    Target::Unit(u) => match self.guid_of(u) {
+                        Some(t) => (format!("0x{t:016X}"), [0.0; 3]),
+                        None => return,
+                    },
+                    Target::Point(p) => ("-".to_string(), p),
+                };
+                let line = format!("RP\t{g:X}\t0x{g:016X}\t{to_guid}\t{:.2}\t{:.2}\t{:.2}\t{secs:.2}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::UNIT_ROPE_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::MissileTint { caster, spell, ability, bounce } => {
                 // The next missile `caster` flies of the spell takes its bounce's colour, on the
                 // clients that draw a missile's look (patch 0029): Bank Shot hotter each bounce.

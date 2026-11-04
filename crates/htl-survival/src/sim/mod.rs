@@ -230,6 +230,9 @@ pub enum Event {
     /// The missile `caster` flies next of `spell` (the hero's arrow, or the stand-in flying it on
     /// from a ricochet) takes the ribbon colour `ability`'s `bounce_trail` has for its `bounce`.
     MissileTint { caster: Id, spell: u32, ability: usize, bounce: u8 },
+    /// A taut line from `from`'s hand to `to` for `secs` (a grappling hook pulling its hunter in,
+    /// a foe hauled in on it), drawn on a client with patch 0023.
+    Tether { from: Id, to: Target, secs: f32 },
     Bags { player: Id },
     Storage,
     Tell { player: Id, text: String },

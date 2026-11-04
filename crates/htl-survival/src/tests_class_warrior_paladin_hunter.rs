@@ -1236,19 +1236,21 @@ fn reverse_grapple_hauls_a_creature_but_a_boss_hauls_the_hunter() {
     s.set_valor(p, 50.0);
     press(&mut s, p, "grapple_arrow", true);
     s.set_aim_line(p, 0.0, 0.0);
-    click(&mut s, p);
-    run(&mut s, 0.6);
+    let mut ev = click(&mut s, p);
+    ev.extend(run(&mut s, 0.6));
     assert!(s.mobs[&w].pos[0] < 6.0, "the wolf hauled in: {:?}", s.mobs[&w].pos);
+    assert!(ev.iter().any(|e| matches!(e, Event::Tether { from, to: Target::Unit(t), .. } if *from == p && *t == w)), "on a line from her fist to it");
     let mut s = world_with(true);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = mob(&mut s, "warlord", [12.0, 0.0, 0.0]);
     s.set_valor(p, 50.0);
     press(&mut s, p, "grapple_arrow", true);
     s.set_aim_line(p, 0.0, 0.0);
-    click(&mut s, p);
-    let ev = run_pinned(&mut s, 0.3, &[b]);
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 0.3, &[b]));
     assert!((s.mobs[&b].pos[0] - 12.0).abs() < 1.0, "the boss stays: {:?}", s.mobs[&b].pos);
     assert!(ev.iter().any(|e| matches!(e, Event::Speed { player, .. } | Event::Hop { player, .. } if *player == p)) || s.players[&p].pos[0] > 3.0, "she goes to it");
+    assert!(ev.iter().any(|e| matches!(e, Event::Tether { from, to: Target::Unit(t), .. } if *from == p && *t == b)), "in on the line to it");
 }
 
 #[test]

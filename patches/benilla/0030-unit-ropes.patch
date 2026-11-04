@@ -1,0 +1,556 @@
+From 897e8085ea5cbced22bd801e5cc26f20a4fdaf05 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:42:44 -0600
+Subject: [PATCH] A rope can run from a unit's hand to a spot or to another
+ unit, following the hand
+
+A grappling hook's line was invisible: the pull read as a jump with nothing holding it (Corey's
+review of Grapple Arrow and Harpoon Dive; Reverse Grapple's haul had no line either). A placed
+object can't follow a hero flying through the air, so SetUnitRope(key, unit, x, y, z, seconds[,
+colour]) draws a taut rope from the unit's right hand to that spot, from where the hand is each
+frame; with another unit's guid in place of the spot it runs to that unit's chest. A strip facing
+the camera, a darker rim either side of a lighter tan core, depth-tested, never darker than half
+its colour so it reads at night. ClearUnitRope([key]). HasActionCombat() is 21.
+---
+ crates/benilla-app/src/entities.rs         |   5 +-
+ crates/benilla-app/src/entities/missile.rs |   4 +-
+ crates/benilla-app/src/game_plugins.rs     |   1 +
+ crates/benilla-app/src/lib.rs              |   1 +
+ crates/benilla-app/src/unit_rope.rs        | 269 +++++++++++++++++++++
+ crates/benilla-ui/src/action_combat.rs     | 147 ++++++++++-
+ 6 files changed, 423 insertions(+), 4 deletions(-)
+ create mode 100644 crates/benilla-app/src/unit_rope.rs
+
+diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
+index 2c8a0e2e..f367decb 100644
+--- a/crates/benilla-app/src/entities.rs
++++ b/crates/benilla-app/src/entities.rs
+@@ -75,7 +75,10 @@ pub(crate) use collision_height::CollisionHeight;
+ /// Spell missiles: the projectile a cast with a `Spell.dbc` Speed above 0 flies at each target.
+ mod missile;
+ use missile::{attach_missile_models, move_missiles, spawn_missiles};
+-pub(crate) use missile::{MissileMiss, MissileSound, MissileSpell, MissileSpin, PendingMissiles};
++pub(crate) use missile::{
++    attach_world_pos, AttachPosQuery, MissileMiss, MissileSound, MissileSpell, MissileSpin,
++    PendingMissiles,
++};
+ 
+ /// A WMO-display GameObject's doodad props (a ship's sails), parented under it to ride a transport.
+ mod wmo_props;
+diff --git a/crates/benilla-app/src/entities/missile.rs b/crates/benilla-app/src/entities/missile.rs
+index f3d51899..39f1b148 100644
+--- a/crates/benilla-app/src/entities/missile.rs
++++ b/crates/benilla-app/src/entities/missile.rs
+@@ -183,7 +183,7 @@ pub(super) struct Missile {
+ 
+ /// The unit-side inputs of an attachment or marker position read: the base frame, the tables and
+ /// the pose, read through `RigPose::posed_point` without an anchor entity.
+-pub(super) type AttachPosQuery<'w, 's> = Query<
++pub(crate) type AttachPosQuery<'w, 's> = Query<
+     'w,
+     's,
+     (
+@@ -195,7 +195,7 @@ pub(super) type AttachPosQuery<'w, 's> = Query<
+ 
+ /// A unit's attachment position through the tag cascade, else its base; `None` only when the unit
+ /// is gone. Chain-beam endpoints use it too, as `0x6ec780` reads the same table the same way.
+-pub(super) fn attach_world_pos(
++pub(crate) fn attach_world_pos(
+     unit: Entity,
+     tags: impl IntoIterator<Item = u16>,
+     units: &AttachPosQuery,
+diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
+index 03cdaa19..ec429fa9 100644
+--- a/crates/benilla-app/src/game_plugins.rs
++++ b/crates/benilla-app/src/game_plugins.rs
+@@ -107,6 +107,7 @@ impl PluginGroup for GamePlugins {
+             .add(BowstringPlugin)
+             .add(crate::weapon_trail::WeaponTrailPlugin)
+             .add(crate::missile_look::MissileLookPlugin)
++            .add(crate::unit_rope::UnitRopePlugin)
+             .add(FishingLinePlugin)
+             .add(QuestMarkersPlugin)
+             .add(crate::pipe_warm::plugin)
+diff --git a/crates/benilla-app/src/lib.rs b/crates/benilla-app/src/lib.rs
+index 0229405f..34b5170b 100644
+--- a/crates/benilla-app/src/lib.rs
++++ b/crates/benilla-app/src/lib.rs
+@@ -190,6 +190,7 @@ mod vm_pass;
+ mod vplates;
+ mod wdb;
+ mod missile_look;
++mod unit_rope;
+ mod weapon_trail;
+ mod world_backdrop;
+ mod world_console;
+diff --git a/crates/benilla-app/src/unit_rope.rs b/crates/benilla-app/src/unit_rope.rs
+new file mode 100644
+index 00000000..8e5167cd
+--- /dev/null
++++ b/crates/benilla-app/src/unit_rope.rs
+@@ -0,0 +1,269 @@
++//! Basin Battle's ropes from a unit's hand, not part of 1.12.1 (`SetUnitRope`, `HasActionCombat()
++//! >= 21`): a taut line from the right hand to a spot or to another unit, drawn every frame from
++//! where the hand is now, so a grappling hook's line stays in the hunter's fist as it pulls them
++//! through the air, and a foe hauled in hangs on the end of it.
++//!
++//! The rope faces the camera: a strip [`ROPE_WIDTH`] wide, a darker rim either side of a lighter
++//! core, cut into [`SEGMENTS`] stretches so it keeps facing the view along its whole length. It's
++//! alpha-blended and depth-tested, and drawn a little brighter than the scene's light would make it,
++//! so it still reads at night.
++
++use benilla_assets::coords::wow_to_bevy;
++use benilla_ui::action_combat::{self, RopeCall, RopeEnd};
++use benilla_world::particles::buffer::{EffectVertex, WorldEffectDraw};
++use benilla_world::view::WorldCamera;
++use bevy::prelude::*;
++
++use crate::entities::{attach_world_pos, AttachPosQuery};
++use crate::net::{GuidIndex, SelfPlayer};
++
++/// How wide the rope is drawn, yards.
++const ROPE_WIDTH: f32 = 0.08;
++
++/// The stretches it's cut into.
++const SEGMENTS: usize = 12;
++
++/// The right hand's attachment, then the spell hand's.
++const HAND_TAGS: [u16; 2] = [1, 22];
++
++/// Where a rope meets a unit at its far end: the chest, else the base.
++const BODY_TAGS: [u16; 2] = [0xf, 0x13];
++
++/// A unit with no hand to hold it (its model still loading): this far up from its feet.
++const HAND_UP: f32 = 1.2;
++
++/// The most ropes at once.
++const MOST_ROPES: usize = 32;
++
++/// A rope's far end, resolved to the world.
++#[derive(Clone, Copy, Debug, PartialEq)]
++enum End {
++    Spot(Vec3),
++    Unit(Entity),
++}
++
++/// One rope up.
++#[derive(Clone, Debug)]
++struct Rope {
++    key: String,
++    from: Entity,
++    to: End,
++    until: f32,
++    rgb: [f32; 3],
++}
++
++#[derive(Resource, Default)]
++struct Ropes(Vec<Rope>);
++
++fn resolve(name: &str, me: Option<Entity>, index: &GuidIndex) -> Option<Entity> {
++    if name.eq_ignore_ascii_case("player") {
++        return me;
++    }
++    let guid = match name.strip_prefix("0x").or_else(|| name.strip_prefix("0X")) {
++        Some(hex) => u64::from_str_radix(hex, 16).ok()?,
++        None => name.parse::<u64>().ok()?,
++    };
++    index.0.get(&guid).copied()
++}
++
++/// The scripts' rope calls: put up, replaced by key, taken away.
++fn drain_ropes(
++    time: Res<Time>,
++    index: Option<Res<GuidIndex>>,
++    me: Query<Entity, With<SelfPlayer>>,
++    mut ropes: ResMut<Ropes>,
++) {
++    let calls = action_combat::take_ropes();
++    let now = time.elapsed_secs();
++    let me = me.single().ok();
++    let empty = GuidIndex::default();
++    let index = index.as_deref().unwrap_or(&empty);
++    for call in calls {
++        match call {
++            RopeCall::Set {
++                key,
++                unit,
++                to,
++                secs,
++                rgb,
++            } => {
++                ropes.0.retain(|r| r.key != key);
++                let Some(from) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                let to = match to {
++                    RopeEnd::Point(p) => End::Spot(wow_to_bevy(p)),
++                    RopeEnd::Unit(g) => match index.0.get(&g) {
++                        Some(e) => End::Unit(*e),
++                        None => continue,
++                    },
++                };
++                if ropes.0.len() >= MOST_ROPES {
++                    ropes.0.remove(0);
++                }
++                ropes.0.push(Rope {
++                    key,
++                    from,
++                    to,
++                    until: now + secs,
++                    rgb,
++                });
++            }
++            RopeCall::Clear { key: Some(k) } => ropes.0.retain(|r| r.key != k),
++            RopeCall::Clear { key: None } => ropes.0.clear(),
++        }
++    }
++    ropes.0.retain(|r| r.until > now);
++}
++
++/// The strip for a rope from `a` to `b` seen from `eye`: for each stretch, two quads (rim to core,
++/// core to rim) in the lane's `[a0, a1, b1, b0]` order. Nothing for a rope with no length.
++fn rope_strip(a: Vec3, b: Vec3, eye: Vec3, width: f32, rgb: [f32; 3]) -> Vec<EffectVertex> {
++    let mut out = Vec::new();
++    let along = b - a;
++    if along.length_squared() < 1.0e-4 {
++        return out;
++    }
++    let rim = [rgb[0] * 0.55, rgb[1] * 0.55, rgb[2] * 0.55];
++    let vert = |pos: Vec3, c: [f32; 3]| EffectVertex {
++        pos: pos.to_array(),
++        uv: [0.0, 0.0],
++        color: [c[0], c[1], c[2], 1.0],
++    };
++    let point = |i: usize| a + along * (i as f32 / SEGMENTS as f32);
++    let side = |p: Vec3| along.cross(eye - p).normalize_or_zero() * (0.5 * width);
++    for i in 0..SEGMENTS {
++        let (p0, p1) = (point(i), point(i + 1));
++        let (s0, s1) = (side(p0), side(p1));
++        out.extend([
++            vert(p0 + s0, rim),
++            vert(p1 + s1, rim),
++            vert(p1, rgb),
++            vert(p0, rgb),
++        ]);
++        out.extend([
++            vert(p0, rgb),
++            vert(p1, rgb),
++            vert(p1 - s1, rim),
++            vert(p0 - s0, rim),
++        ]);
++    }
++    out
++}
++
++/// Every rope from where its hand is now to its end, after the rigs are posed this frame.
++fn draw_ropes(
++    mut draw: WorldEffectDraw,
++    white: Res<RopeWhite>,
++    ropes: Res<Ropes>,
++    world_cam: Query<(Entity, &GlobalTransform), With<WorldCamera>>,
++    units: AttachPosQuery,
++    joints: Query<&GlobalTransform>,
++    lighting: Option<Res<benilla_world::lighting::WowLighting>>,
++) {
++    let Ok((cam, eye)) = world_cam.single() else {
++        return;
++    };
++    let eye = eye.translation();
++    // A little brighter than the scene would light it, never darker than half its colour.
++    let ambient = lighting
++        .as_deref()
++        .map_or([1.0; 3], |l| l.ambient)
++        .map(|c| c.clamp(0.5, 1.0));
++    for rope in &ropes.0 {
++        let Some(base) = units.get(rope.from).ok().map(|(g, _, _)| g.translation()) else {
++            continue;
++        };
++        let hand = attach_world_pos(rope.from, HAND_TAGS, &units, &joints)
++            .filter(|p| p.distance(base) > 0.05)
++            .unwrap_or(base + Vec3::Y * HAND_UP);
++        let end = match rope.to {
++            End::Spot(p) => Some(p),
++            End::Unit(e) => attach_world_pos(e, BODY_TAGS, &units, &joints),
++        };
++        let Some(end) = end else { continue };
++        let rgb = [
++            rope.rgb[0] * ambient[0],
++            rope.rgb[1] * ambient[1],
++            rope.rgb[2] * ambient[2],
++        ];
++        let verts = rope_strip(hand, end, eye, ROPE_WIDTH, rgb);
++        if verts.is_empty() {
++            continue;
++        }
++        let mut batch = draw
++            .batch(cam, white.0.id())
++            .alpha()
++            .anchored((hand + end) * 0.5)
++            .owner(rope.from);
++        batch.extend(verts);
++        batch.quads();
++    }
++}
++
++/// The 1×1 white texel the rope samples: pure vertex colour.
++#[derive(Resource)]
++struct RopeWhite(Handle<Image>);
++
++fn init_rope_white(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
++    commands.insert_resource(RopeWhite(images.add(Image::default())));
++}
++
++/// Registers the ropes.
++pub(crate) struct UnitRopePlugin;
++
++impl Plugin for UnitRopePlugin {
++    fn build(&self, app: &mut App) {
++        app.init_resource::<Ropes>()
++            .add_systems(Startup, init_rope_white)
++            .add_systems(Update, drain_ropes)
++            .add_systems(
++                PostUpdate,
++                draw_ropes
++                    .in_set(benilla_world::billboard::BillboardPlace)
++                    .after(benilla_world::rig_anim::finalize_rig_worlds)
++                    .after(bevy::transform::TransformSystems::Propagate)
++                    // A lane that writes before the frame's clear loses everything it pushed.
++                    .after(benilla_world::particles::buffer::begin_effect_frame),
++            );
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn a_rope_is_two_quads_a_stretch_across_the_view_its_core_lighter_than_its_rim() {
++        let v = rope_strip(
++            Vec3::ZERO,
++            Vec3::new(6.0, 0.0, 0.0),
++            Vec3::new(3.0, 0.0, 10.0),
++            0.08,
++            [0.8, 0.6, 0.4],
++        );
++        assert_eq!(v.len(), SEGMENTS * 2 * 4);
++        // Across the view (the eye looks down Z): it spreads along Y, half its width either side.
++        let spread = v.iter().map(|x| x.pos[1].abs()).fold(0.0, f32::max);
++        assert!((spread - 0.04).abs() < 1.0e-4, "{spread}");
++        // The rim darker than the core, and from one end to the other.
++        let core = v
++            .iter()
++            .filter(|x| x.pos[1].abs() < 1.0e-5)
++            .map(|x| x.color[0])
++            .fold(0.0, f32::max);
++        let rim = v
++            .iter()
++            .filter(|x| x.pos[1].abs() > 0.03)
++            .map(|x| x.color[0])
++            .fold(0.0, f32::max);
++        assert!(rim < core, "{rim} {core}");
++        let xs: Vec<f32> = v.iter().map(|x| x.pos[0]).collect();
++        assert!(xs.iter().any(|x| x.abs() < 1.0e-4) && xs.iter().any(|x| (x - 6.0).abs() < 1.0e-4));
++    }
++
++    #[test]
++    fn a_rope_with_no_length_draws_nothing() {
++        assert!(rope_strip(Vec3::ONE, Vec3::ONE, Vec3::ZERO, 0.08, [1.0; 3]).is_empty());
++    }
++}
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index bc75b8ac..991e9ee6 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -167,6 +167,15 @@
+ //!   (`"0x..."`) last, the look is for that caster's next missile of the spell alone, within half a
+ //!   second (a ricochet's new colour), and the spell's own look stays for the rest.
+ //! - `SetMissileLook(spellId)` takes the look away; `SetMissileLook()` takes every one away.
++//!
++//! The twenty-first (`HasActionCombat() >= 21`), a rope from a unit's hand:
++//!
++//! - `SetUnitRope(key, unit, x, y, z, seconds[, "RRGGBB"])`: a taut rope from the unit's right
++//!   hand to that spot (WoW `x, y, z`) for that long, following the hand as the unit moves (a
++//!   grappling hook's line pulling its hunter in). `SetUnitRope(key, unit, otherUnit, seconds[,
++//!   colour])` runs it to another unit's body (a foe hauled in on it). The same key again replaces
++//!   it.
++//! - `ClearUnitRope([key])`: take one away (all of them with no key).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -547,6 +556,49 @@ pub enum GroundMarkerCall {
+ 
+ static GROUND_MARKERS: std::sync::Mutex<Vec<GroundMarkerCall>> = std::sync::Mutex::new(Vec::new());
+ 
++/// Where a rope from a unit's hand runs to (`SetUnitRope`).
++#[derive(Clone, Debug, PartialEq)]
++pub enum RopeEnd {
++    /// A spot in the world, WoW's `x, y, z`.
++    Point([f32; 3]),
++    /// Another unit, by its guid.
++    Unit(u64),
++}
++
++/// A rope asked for, or taken away (`SetUnitRope`, `ClearUnitRope`).
++#[derive(Clone, Debug, PartialEq)]
++pub enum RopeCall {
++    Set {
++        key: String,
++        /// `"player"` or a guid, as the other action calls name a unit.
++        unit: String,
++        to: RopeEnd,
++        secs: f32,
++        rgb: [f32; 3],
++    },
++    Clear {
++        key: Option<String>,
++    },
++}
++
++static ROPES: std::sync::Mutex<Vec<RopeCall>> = std::sync::Mutex::new(Vec::new());
++
++/// The rope calls since the last call, oldest first.
++pub fn take_ropes() -> Vec<RopeCall> {
++    ROPES
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
++}
++
++fn push_rope(call: RopeCall) {
++    if let Ok(mut v) = ROPES.lock() {
++        if v.len() < 256 {
++            v.push(call);
++        }
++    }
++}
++
+ /// How a spell's missiles look (`SetMissileLook`): a ribbon behind them, their size and a spin.
+ #[derive(Clone, Copy, Debug, PartialEq)]
+ pub struct MissileLook {
+@@ -790,6 +842,7 @@ pub fn reset() {
+     push_telegraph(TelegraphCall::Clear { key: None });
+     push_fog(WorldFogCall::Clear { secs: 0.0 });
+     set_missile_look(None, None);
++    push_rope(RopeCall::Clear { key: None });
+ }
+ 
+ /// The keys of a dash: `"f"`, `"b"`, `"l"`, `"r"` and their pairs, as `(forward, right)`.
+@@ -895,7 +948,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(20))?,
++        lua.create_function(|_, _: MultiValue| Ok(21))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1402,6 +1455,58 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetUnitRope",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let (Some(key), Some(unit)) = (text(v.first()), text(v.get(1))) else {
++                return Ok(());
++            };
++            // A unit's guid (a string) in the third place, else a spot's three numbers.
++            let other = match v.get(2) {
++                Some(Value::String(_)) => unit_guid(v.get(2)),
++                _ => None,
++            };
++            let (to, rest) = match other {
++                Some(g) => (Some(RopeEnd::Unit(g)), 3),
++                None => {
++                    let n = |i: usize| number(v.get(i), -1.0e6, 1.0e6);
++                    let spot = n(2)
++                        .zip(n(3))
++                        .zip(n(4))
++                        .map(|((x, y), z)| RopeEnd::Point([x, y, z]));
++                    (spot, 5)
++                }
++            };
++            let Some(to) = to else { return Ok(()) };
++            let secs = number(v.get(rest), 0.0, 30.0).unwrap_or(1.0);
++            // A hemp rope's tan, pale enough to read at night, unless asked otherwise.
++            let rgb = colour(v.get(rest + 1)).map_or([0.78, 0.62, 0.42], |c| {
++                [
++                    ((c >> 16) & 0xff) as f32 / 255.0,
++                    ((c >> 8) & 0xff) as f32 / 255.0,
++                    (c & 0xff) as f32 / 255.0,
++                ]
++            });
++            push_rope(RopeCall::Set {
++                key,
++                unit,
++                to,
++                secs,
++                rgb,
++            });
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ClearUnitRope",
++        lua.create_function(|_, args: MultiValue| {
++            push_rope(RopeCall::Clear {
++                key: text(args.front()),
++            });
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "ClearWorldFog",
+         lua.create_function(|_, args: MultiValue| {
+@@ -1542,6 +1647,46 @@ mod tests {
+         assert!(missile_look(16075).is_none());
+     }
+ 
++    #[test]
++    fn a_rope_runs_from_a_unit_to_a_spot_or_another_unit_and_is_taken_away() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        take_ropes();
++        lua.load(
++            r#"assert(HasActionCombat() >= 21)
++               SetUnitRope("g1", "player", 10, 20, 30, 0.6)
++               SetUnitRope("g2", "0xF13000000000002A", "0xF130000000000007", 0.5, "FF0000")
++               SetUnitRope("bad", "player")
++               ClearUnitRope("g1") ClearUnitRope()"#,
++        )
++        .exec()
++        .unwrap();
++        assert_eq!(
++            take_ropes(),
++            vec![
++                RopeCall::Set {
++                    key: "g1".into(),
++                    unit: "player".into(),
++                    to: RopeEnd::Point([10.0, 20.0, 30.0]),
++                    secs: 0.6,
++                    rgb: [0.78, 0.62, 0.42],
++                },
++                RopeCall::Set {
++                    key: "g2".into(),
++                    unit: "0xF13000000000002A".into(),
++                    to: RopeEnd::Unit(0xF130_0000_0000_0007),
++                    secs: 0.5,
++                    rgb: [1.0, 0.0, 0.0],
++                },
++                RopeCall::Clear {
++                    key: Some("g1".into())
++                },
++                RopeCall::Clear { key: None },
++            ],
++            "a rope with nowhere to run to is dropped"
++        );
++    }
++
+     #[test]
+     fn world_fog_calls_queue_clamped_and_in_order() {
+         let lua = Lua::new();
+-- 
+2.56.0.windows.4
+
