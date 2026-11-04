@@ -170,6 +170,9 @@ impl Survival {
             self.set_action(victim, Action::Stagger { until: now + air });
             self.events.push(Event::Hop { player: victim, dir, speed: moved / air, lift, roll: false, style: "" });
         } else {
+            // Driven back, not turned to run: the big recoil over the whole throw, on the whole
+            // body, faced at whoever threw it (Corey's review, Nov 4).
+            self.events.push(Event::React { id: victim, anim: combat::CRIT_ANIM, from: origin, lean: 0.4, hold: 0.0, fit: air });
             self.stagger_mob(victim, air + 0.15, false);
             self.throw_mob(victim, to, air, Some(owner));
             // A dummy isn't stepped (it only stands there): it's where the throw ends at once,
@@ -270,7 +273,7 @@ impl Survival {
         // Its swing held up through the air, the blow landing as it comes down (a clip's impact
         // is half its length).
         if d.clip != 0 {
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: air * 2.0 });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: air * 2.0, at: 0.0 });
         }
         let radius = AbilityDef::at(d.radius, share);
         // `unmarked`: nothing on the ground where it comes down (only the warning over a rival).

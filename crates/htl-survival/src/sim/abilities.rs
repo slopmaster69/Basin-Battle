@@ -752,7 +752,7 @@ impl Survival {
             let ms = if d.kind == "shot" { DRAW_HOLD_MS } else { ((hi + d.hold.max(0.5)) * 1000.0) as u32 };
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
-            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5) });
+            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0 });
         }
         let _ = lo;
     }
@@ -904,9 +904,17 @@ impl Survival {
         }
         // A leap's and a dash's clip go with the move (its blow lands as it does).
         if d.clip != 0 && !matches!(d.kind.as_str(), "art" | "leap" | "dash") {
-            // A stance holds its clip while it lasts (Feign Death lies there).
-            let secs = if d.kind == "stance" { d.secs } else { CAST_RECOVERY + 0.2 };
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs });
+            // A stance holds its clip while it lasts (Feign Death lies there). A cast's clip lands
+            // its blow as the cast does (Cleave's sweep with its crescent, not 0.2 sec before it),
+            // the recovery after; an instant's is quick.
+            let (secs, at) = if d.kind == "stance" {
+                (d.secs, 0.0)
+            } else if d.cast > 0.0 {
+                (d.cast + CAST_RECOVERY, d.cast)
+            } else {
+                (CAST_RECOVERY + 0.2, 0.0)
+            };
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs, at });
         }
         // The bow's own release before the sword comes back (a crossbow's long reload).
         let total = if d.kind == "shot" { self.ranged_of(&self.players[&id]).recovery.max(CAST_RECOVERY) } else { CAST_RECOVERY };
@@ -2661,7 +2669,7 @@ impl Survival {
         self.events.push(Event::Dash { player: id, dir: yaw, speed: dist / secs, secs });
         // Its swing's blow lands as the run ends (a clip's impact is half its length).
         if d.clip != 0 {
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6) });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6), at: 0.0 });
         }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
     }

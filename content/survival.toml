@@ -3529,15 +3529,17 @@ breaks_free = true
 # Long enough that when to spend it is a choice (a pack's next knockdown is coming), short enough
 # to have it in most fights.
 cooldown = 16.0
-# Enrage's rage burst (12880) as it goes: Berserker Rage's own 18499 plays a Roar anim on the
-# caster that would fight the Flex. Its red fists (18499's lasting look) stay on for the 3 sec.
-spell = 12880
+# Not red: Blood Fury is the red one (Corey's review, Nov 4: the two looked identical). The
+# shrug-off is Unyielding Will's chest swirl (8099, "Stamina"'s look) as it goes, and the 3 sec
+# carry no lasting mark (20572 has none); Enrage's burst (12880) and the red fists (18499) were
+# Blood Fury's colours.
+spell = 8099
 # The berserker shrugging it off, the same on every race: the orc men's Flex emote (82/0), arms
 # up and fists clenched. Blood Fury keeps the battle roar (55), the Roar roars (74).
 clip = 82
 take = 0
 from = "OrcMale"
-effects = [{ kind = "steadfast", secs = [3.0, 3.0], amount = 1.0, aura = 18499 }]
+effects = [{ kind = "steadfast", secs = [3.0, 3.0], amount = 1.0, aura = 20572 }]
 
 # Berserker Rage's EX: blood for fury. 15% of the health they have now (never the last point) for
 # 8 sec of free attacks 25% harder: what Momentum gives at 5 stacks, at once, without having to
@@ -4821,7 +4823,10 @@ range = [15.0, 15.0]
 arc = 60.0
 # Intimidating Shout's own fear mark over the head (5246's lasting look) on each one Cowed for the
 # 6 sec: Demoralizing Shout's (1160) was a one-shot and left nothing to see after.
-effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 5246 }]
+# The Cowed mark: Demoralizing Shout's over-the-head mark (kit 693), replayed every 1.5 sec while
+# it holds: "sluggish", not fear (Corey's review, Nov 4; the fear swirl 5246 read as a fear). No
+# lasting look of its own (20572 has none).
+effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 20572, mark = 693, mark_every = 1.5 }]
 # Intimidating Shout's roar as it goes.
 spell = 5246
 # The roar itself, the same on every race: the orc men's Roar emote (74/0), head back and arms
@@ -4878,13 +4883,16 @@ weapon = 1.2
 # The wind-up's poise shows nothing (20572 has no visual): the default steadfast look is Power
 # Infusion's blue glow, a magic look on a sword's wind-up (the lab, Nov 4). The wind-up is the clip.
 self_effects = [{ kind = "steadfast", secs = [0.55, 0.55], amount = 1.0, aura = 20572 }]
-effects = [{ kind = "exposed", secs = [5.0, 5.0], amount = 0.2, aura = 8647 }]
-# The rising cut, the same on every race: the tauren women's slow two-handed upswing (19/1), the
-# weapon brought up from the ground to over the head (picked from the lab's side-on strips, Nov 4).
-# Overpower's flash, Expose Armor's look on each one Exposed (the effect's `aura`).
-clip = 19
-take = 1
-from = "TaurenFemale"
+# Exposed shows for its 5 sec: Expose Armor's crack (kit 3069) again every 1.5 sec (the data has no
+# lasting, non-magical mark; Corey's review, Nov 4).
+effects = [{ kind = "exposed", secs = [5.0, 5.0], amount = 0.2, aura = 8647, mark = 3069, mark_every = 1.5 }]
+# The rising cut, the same on every race: the orc men's upswing (87/0), the weapon ripped up from
+# the hip to over the head, the biggest rise in the census (+0.58) and quick. The tauren women's
+# slow two-handed upswing (19/1) read as an overhead from the gameplay camera (Corey's review,
+# Nov 4). Overpower's flash, Expose Armor's look on each one Exposed (the effect's `aura`).
+clip = 87
+take = 0
+from = "OrcMale"
 spell = 7384
 valor_hit = 6.0
 
@@ -4987,7 +4995,7 @@ ally_spell = 6673
 [[ability]]
 key = "warrior_bladestorm"
 name = "Bladestorm"
-text = "Spin with your weapon out for up to 6 sec, moving at 70% speed and striking every enemy within 5 yd twice a sec. The first strike deals 4 damage, and each strike after deals 1 more, up to 15. You can't attack, guard or use other abilities while you spin, and a stagger or a stun ends it. Dodge or guard to end it at once, and the dodge or the guard comes out on that same press. Press again to stop."
+text = "Spin with your weapon out for up to 6 sec, moving at 70% speed and striking every enemy within 5 yd twice a sec. The first strike deals 5 damage, and each strike after deals 1 more, up to 16. You can't attack, guard or use other abilities while you spin, and a stagger or a stun ends it. Dodge or guard to end it at once, and the dodge or the guard comes out on that same press. Press again to stop."
 icon = "Ability_Whirlwind"
 school = "warrior"
 slot = "ultimate"
@@ -5000,9 +5008,11 @@ bail = true
 radius = [5.0, 5.0]
 secs = 6.0
 tick = 0.5
-damage = [8.0, 8.0]
+# 5, then 1 more a strike up to 16, two a second: a full 6 sec is 126 to each enemy in reach
+# (Corey, Nov 4: "slightly more"; it was 4 to 15, 114). A heavy blow is about 50.
+damage = [10.0, 10.0]
 ramp = 1.0
-ramp_cap = 15.0
+ramp_cap = 16.0
 # Whirlwind's spin and its aura, as Beta's; Sweeping Strikes' flare as the ramp tops out.
 spell = 1680
 aura = 9632

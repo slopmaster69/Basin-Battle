@@ -1044,7 +1044,7 @@ impl Survival {
                     };
                     let chop = super::world::CHOP_SECS;
                     if clip != 0 && (t / chop).floor() != ((t + dt) / chop).floor() && t + dt + chop * 0.5 < secs {
-                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: chop });
+                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: chop, at: 0.0 });
                     }
                     if t + dt >= secs {
                         self.events.push(Event::CastEnd { caster: id });
