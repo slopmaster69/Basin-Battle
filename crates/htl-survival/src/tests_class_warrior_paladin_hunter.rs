@@ -553,8 +553,13 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     assert_eq!(em.len(), 1, "Aimed Shot's key readied: {em:?}");
     assert_eq!(em[0].0, key_of("ranged") as usize);
     assert!((em[0].1 - (s.clock + 8.0)).abs() < 0.3, "for 8 s");
-    run_pinned(&mut s, 1.2, &[k]);
+    let ev = run_pinned(&mut s, 1.2, &[k]);
     assert!(s.has_cc(k, "petrify"), "sprung: frozen");
+    // Its burst is on the frozen alone: the frost burst on it, nothing cast at the spot and
+    // nothing on the hunter (Frost Nova's ring rang out round her too, Corey's review).
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 450, .. } if *id == k)), "the frost burst on the frozen: {ev:?}");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 450, .. } if *id == p)), "none on the hunter");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } | Event::MissileFrom { caster, .. } if *caster == p)), "no spell at the spot: {ev:?}");
     // Aimed Shot's key: the Multi-Shot, free, and the frozen one shatters.
     let valor = s.players[&p].valor;
     press_again(&mut s, p, "ranged");

@@ -219,7 +219,9 @@ pub struct AbilityDef {
     #[serde(default)]
     pub impact_kit: u32,
     /// A trap's look while it's set (`GameObjectDisplayInfo`: 3072 an Explosive Trap, 3071 a
-    /// Freezing Trap), and the spell shown at its spot as it goes off (its ground one-shot).
+    /// Freezing Trap), and the spell shown at its spot as it goes off (its ground one-shot, cast
+    /// from the spot by an unseen stand-in, so no caster-side look plays on the hunter; what it
+    /// does to each one it catches is the `impact_kit`).
     #[serde(default)]
     pub object: u32,
     #[serde(default)]
