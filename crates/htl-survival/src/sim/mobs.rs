@@ -843,6 +843,10 @@ impl Survival {
     fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
         self.death_mark_reset(mid);
+        // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
+        // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
+        // looks go the moment it falls, as a fallen hero's do.
+        self.clear_cc(mid);
         if matches!(self.mobs.get(&mid).map(|m| &m.state), Some(MobState::Windup { .. })) && self.attack_now(mid).ranged {
             self.events.push(Event::CastEnd { caster: mid });
         }
