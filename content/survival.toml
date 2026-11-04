@@ -3995,8 +3995,12 @@ respawn = 0.0
 [[mob]]
 key = "spirit_wolf"
 name = "Spirit Wolf"
-display = 447
-scale = 1.0
+# The wolf on its own ghost model (Wolf_ghost.mdx).
+display = 2446
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4017,7 +4021,12 @@ respawn = 0.0
 [[mob]]
 key = "spirit_owl"
 name = "Spirit Owl"
-display = 4615
+# A white owl (Owl.mdx, OwlWhite): the brown one (4615) was lost against the night sky. It flies
+# above the foe, high in the action camera's view (visual check, runs 016 and 017).
+display = 6212
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -4040,7 +4049,10 @@ respawn = 0.0
 key = "spirit_scorpid"
 name = "Spirit Scorpid"
 display = 2487
-scale = 0.8
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.1   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4062,7 +4074,10 @@ respawn = 0.0
 key = "spirit_gorilla"
 name = "Spirit Gorilla"
 display = 837
-scale = 1.0
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.2   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4084,7 +4099,10 @@ respawn = 0.0
 key = "spirit_raptor"
 name = "Spirit Raptor"
 display = 180
-scale = 1.0
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4106,7 +4124,10 @@ respawn = 0.0
 key = "spirit_basilisk"
 name = "Spirit Basilisk"
 display = 1074
-scale = 0.9
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.1   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4128,6 +4149,9 @@ respawn = 0.0
 key = "spirit_bear"
 name = "Spirit Bear"
 display = 822
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -4150,6 +4174,9 @@ respawn = 0.0
 key = "spirit_kodo"
 name = "Spirit Kodo"
 display = 1230
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 0.7
 health = 30
 run_speed = 0.0
@@ -4168,11 +4195,16 @@ respawn = 0.0
   turn_rate = 0.0
   lock = 0.0
 
+# (The lightning finisher is a wind serpent, a dreadfang's body: Lightning Breath's own beast,
+# and the only one of the three with a 1.12 icon of its animal for the key.)
 [[mob]]
-key = "spirit_thunder_lizard"
-name = "Spirit Thunder Lizard"
-display = 1540
-scale = 0.6
+key = "spirit_wind_serpent"
+name = "Spirit Wind Serpent"
+display = 1974
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 0.8
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4259,6 +4291,7 @@ text = "Hold to draw your bow for up to 1.4 sec, then release to fire. Damage, r
 icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
+bow = true
 kind = "projectile"
 charge = [0.0, 1.4]
 fragile = true
@@ -4284,6 +4317,7 @@ ex_of = "aimed_arrow"
 text = "Fires 5 arrows at once in a wide fan, with no draw. Each arrow deals 18 damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
 icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
+bow = true
 kind = "projectile"
 valor = 25
 damage = [18.0, 18.0]
@@ -4299,72 +4333,85 @@ spell = 6984
 clip = 53
 plants = true
 
-# Q, the second choice: the arrow that reads the room. Off a wall, a tree or a rock it comes away
-# harder (`bounce_gain` of its damage more a bounce) and goes through the first foe it meets after.
+# Q, the second choice: the arrow that reads the room. Off a wall or a tree it comes away harder
+# (`bounce_gain` of its damage more a bounce) and goes through the first foe it meets after; into
+# the ground at a low angle it skips off, no harder. (Rocks aren't solid to the rules yet.)
 [[ability]]
 key = "bank_shot"
 name = "Bank Shot"
-text = "Fires an arrow that ricochets off walls, trees and rocks up to twice. Each bounce makes it hit harder. An arrow that has bounced pierces the first enemy it hits. It plants where it finally stops."
+text = "Fires an arrow that ricochets off walls and trees up to 2 times, and skips off the ground at a low angle. Each ricochet adds 8 damage. An arrow that has ricocheted pierces the first enemy it hits. It plants where it finally stops."
 icon = "Ability_Hunter_SniperShot"
 school = "hunter"
 slot = "ranged"
+bow = true
 choice = 2
 kind = "projectile"
 damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
-speed = 45.0
+speed = 40.0
 bounces = 2
 bounce_gain = 0.5
 cooldown = 4.0
-# Concussive Shot's arrow: a heavy, blunt flight.
-spell = 5116
+# The Hunter's arrow (Aimed Shot's, at its speed, flown with the bow's ammo), seen the whole way:
+# each leg off a wall flies from where it struck. A burst of fire where it strikes (the Lava
+# Burst's landing), at every ricochet and skip.
+spell = 19434
+burst_spell = 5162
 clip = 53
 valor_hit = 5.0
 plants = true
 
+# Its EX: one long glowing arrow that bursts into a spray where its flight ends.
 [[ability]]
 key = "split_arrow"
 name = "Split Arrow"
 ex_of = "bank_shot"
-text = "Fires a spray of 6 arrows in a short cone and kicks you back 2 yd. Point blank, all 6 hit one target. Every arrow plants where it stops."
+text = "Fires a glowing arrow up to 36 yd. It bursts at the first enemy or wall it meets, or at the end of its flight, dealing 12 damage to the enemy it bursts in. 6 arrows spray out from the burst in a 60° fan, each dealing 5 damage to the first 2 enemies in its path. Every arrow plants where it stops."
 icon = "Ability_Hunter_Quickshot"
 slot = "ranged"
+bow = true
 kind = "projectile"
 valor = 25
-# 6 × 8 point blank: 48, just under what an EX of a 16 poke may be.
-damage = [8.0, 8.0]
-range = [10.0, 10.0]
+# Point blank, 12 and all 6 of the spray through one foe: 42, under what an EX of a 16 poke may be.
+damage = [12.0, 12.0]
+range = [36.0, 36.0]
 radius = [0.3, 0.3]
-speed = 40.0
-count = 6
-# 10° apart: a 50° cone, every arrow in one body within 3 yd.
-spread = 10.0
-spell = 2643
+# Arcane Shot's glowing arrow (as Kill Shot's), at its speed; a burst of fire where it splits.
+speed = 50.0
+spell = 3044
+burst_spell = 5162
+splits = "split_spray"
 clip = 53
 valor_hit = 1.5
-plants = true
-also = "split_recoil"
 
-# Split Arrow's kick: a short hop straight back.
+# Split Arrow's spray: out from the burst, through the foe it burst in and on to the next.
 [[ability]]
-key = "split_recoil"
+key = "split_spray"
 name = "Split Arrow"
-text = "Split Arrow's recoil."
+text = "Split Arrow's spray."
 icon = "Ability_Hunter_Quickshot"
 inner = true
 slot = "ranged"
-kind = "leap"
-back = true
-range = [2.0, 2.0]
-lift = 1.5
+kind = "projectile"
+damage = [5.0, 5.0]
+range = [12.0, 12.0]
+radius = [0.3, 0.3]
+speed = 50.0
+count = 6
+# 12° apart: a 60° fan.
+spread = 12.0
+pierce = 1
+spell = 3044
+valor_hit = 1.0
+plants = true
 
 # E: a spirit beast a press, a chain that builds: the first stage sets something on the foe, the
 # second turns it into something else, the third cashes it in (the beasts in `[[beast]]`).
 [[ability]]
 key = "call_of_the_wild"
 name = "Call of the Wild"
-text = "Calls a spirit beast that leaps from your side to the target and strikes once. Each call brings the next stage of the chain: Stage 1 beasts set up, Stage 2 exploit, Stage 3 finish. The beast for each stage is drawn at random from three, and the key shows which is coming. After Stage 3, or 4 sec without a call, the chain starts again."
+text = "Calls a spirit beast that leaps from your side at your target, or the enemy you're looking at, and strikes once. Each call brings the next stage of the chain: Stage 1 beasts set up, Stage 2 exploit, Stage 3 finish. The beast for each stage is drawn at random from three, and the key shows which is coming. After Stage 3, or 4 sec without a call, the chain starts again. A parry or a perfect dodge empowers the next call for 4 sec. An empowered call costs half the stamina and deals 25% more damage."
 icon = "Ability_Hunter_BeastCall"
 school = "hunter"
 slot = "close"
@@ -4372,6 +4419,9 @@ kind = "buff"
 hunt = "call"
 range = [25.0, 25.0]
 radius = [1.0, 1.0]
+# A short recharge between calls (play-test: 5 to 8 calls from range in a row killed most
+# enemies). A whole chain now takes 3 sec at least, and a call is a choice, not a spam.
+cooldown = 1.5
 # (The beast bursts out of Spirit Wolf's flash at the hunter's side.)
 spell = 2645
 clip = 54
@@ -4391,11 +4441,11 @@ radius = [1.0, 1.0]
 clip = 54
 
 # E, the second choice: a spear chain. Each hit arms the next (a recast), the third throws you up
-# with it, and the fourth is the dive down, wherever you choose.
+# with it, and the fourth press is the dive down onto it, before you land.
 [[ability]]
 key = "raptor_strike"
 name = "Raptor Strike"
-text = "A three-hit spear chain. Press again within 1.5 sec for the next hit. Hit 1 thrusts. Hit 2 sweeps everything in front of you. Hit 3 is an Uppercut that launches the target and you with it. While airborne, press again within 3.5 sec to Stoop: dive to a spot within 12 yd, slamming any enemy there."
+text = "A three-hit spear chain. Press again within 1.5 sec for the next hit. Hit 1 thrusts. Hit 2 sweeps everything in front of you. Hit 3 is an Uppercut that launches the target and you with it. Press again before you land to Stoop: dive onto the launched enemy and slam it, harder the higher you start."
 icon = "Ability_MeleeDamage"
 school = "hunter"
 slot = "close"
@@ -4450,7 +4500,9 @@ clip = 57
 impact_kit = 83
 also = "raptor_rise"
 recast = "stoop"
-recast_secs = 3.5
+# Stoop's window: the rise's time in the air (1.45 sec at lift 14). Landing closes it sooner.
+recast_secs = 1.5
+# The launch: lift 10 throws a creature 2.6 yd up and down again in 1.04 sec, stunned the while.
 effects = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "knockback", amount = 0.5, lift = 10.0 }]
 
 # The hunter goes up with it, boss or no boss: Stoop is always there.
@@ -4463,21 +4515,27 @@ inner = true
 slot = "close"
 kind = "leap"
 range = [0.5, 0.5]
-lift = 9.0
+# Well over the foe it launched: lift 14 peaks at 5.1 yd (the foe's 2.6), 1.45 sec in the air.
+lift = 14.0
 spell = 0
 
 [[ability]]
 key = "stoop"
 name = "Stoop"
-text = "Dive to the target spot within 12 yd. Enemies within 3 yd of where you land take 20 damage and are knocked down for 1 sec."
+text = "Dives onto the enemy you launched, or the spot you aim at within 12 yd. Deals 6 to 30 damage to enemies within 3 yd of the landing, more the higher you start. Knocks them down for 1 sec. Only while airborne."
 icon = "Ability_Hunter_Pet_Owl"
 inner = true
 slot = "close"
 kind = "leap"
 range = [12.0, 12.0]
 radius = [3.0, 3.0]
-damage = [20.0, 20.0]
-lift = 2.0
+# On the key press, down in 0.3 sec. Its damage grows with its height as it starts, evenly: 6 from
+# the ground, 30 from 5 yd up (the top of the Uppercut's rise), 4.8 a yard. A Stoop at the top is
+# 10 more than the old flat 20, a late one far less, so the chain's 12 + 14 + 16 + Stoop stays
+# within the close row's 45 a hit.
+at_once = true
+dive = true
+damage = [6.0, 30.0]
 spell = 16979
 impact_kit = 1666
 stamina = 10.0
@@ -4510,9 +4568,12 @@ text = "Fires a grappling arrow up to 25 yd. If it strikes a wall, tree, rock or
 icon = "Ability_Hunter_Pathfinding"
 school = "hunter"
 slot = "utility"
+bow = true
 kind = "projectile"
 range = [25.0, 25.0]
-radius = [0.35, 0.35]
+# Play-test (#110): it caught a tab-targeted foe far too easily. A foe counts only when the
+# reticle's line crosses its body (its own width and 0.1 yd), as a wall does. Was 0.35.
+radius = [0.1, 0.1]
 speed = 60.0
 yank = true
 cooldown = 10.0
@@ -4526,6 +4587,7 @@ ex_of = "grapple_arrow"
 text = "Hooks an enemy and hauls it to you. It lands at your feet and staggers for 1 sec. A boss, or anything that can't be moved, hauls you to it instead."
 icon = "INV_Spear_04"
 slot = "utility"
+bow = true
 kind = "projectile"
 valor = 25
 damage = [8.0, 8.0]
@@ -4549,10 +4611,20 @@ choice = 2
 kind = "leap"
 back = true
 range = [12.0, 12.0]
-lift = 5.0
+# Higher than a plain leap back (Corey's review: a little more height, so it reads as a
+# real jump away): 1.1 yd up at the top (0.65 at 5), 0.67 sec in the air (0.52).
+lift = 6.5
 cooldown = 12.0
-spell = 781
+# No cast look of its own: Disengage's (781) is a white blink star on the hunter, which read as
+# something going wrong (visual check, run 015). The flip and the net are the look.
+spell = 0
 also = "hunter_net"
+# Play-test (#110): the Undead woman's flip out of a strafing jump was the one to keep. Every
+# hero, every race, standing or mid-jump, now plays it: a tumble back head over heels with the
+# Undead woman's tucked Jump (38). Swap the clip here after a look in game (/esclip).
+leap_clip = 38
+leap_from = "ScourgeFemale"
+leap_flip = true
 
 [[ability]]
 key = "hunter_net"
@@ -4566,20 +4638,27 @@ range = [14.0, 14.0]
 radius = [0.6, 0.6]
 speed = 40.0
 spell = 6533
-effects = [{ kind = "root", secs = [2.0, 2.0] }]
+# The net itself on whoever it holds (Net's own state look), not the roots of a plain root.
+effects = [{ kind = "root", secs = [2.0, 2.0], aura = 6533 }]
 
 [[ability]]
 key = "trappers_instinct"
 name = "Trapper's Instinct"
 ex_of = "ensnaring_retreat"
-text = "Readies you for 2 sec. If anything hits you, the hit misses: you leap 12 yd away, net the attacker and scatter 5 arrows where you stood. Each enemy within 2 yd of a scattered arrow takes 10 damage. If nothing hits you, it fires as a plain Ensnaring Retreat when the 2 sec are up."
+text = "Readies you for 2 sec. If anything hits you, the hit misses: you leap 12 yd away, net the attacker and scatter 5 arrows where you stood. Each enemy within 2 yd of a scattered arrow takes 10 damage. If nothing hits you, it's wasted."
 icon = "Ability_Ensnare"
 slot = "utility"
 kind = "stance"
 valor = 25
 secs = 2.0
+# Its look while it's up, on the hunter (the visual check, Nov 2: it had none). Recklessness's
+# flare reads at night; tried: Deterrence 19263 and Rapid Fire 3045 (nothing shows), Ice Barrier
+# 11426 (reads, but frost), Stoneform 20594 (darkens her).
+aura = 1719
 spell = 5384
-counter = { immune = true, once = true, answer = "trappers_leap", expire_answer = "ensnaring_retreat" }
+# A counter and nothing else (Corey's review, Nov 3): unanswered, it's spent and on cooldown, with
+# no leap of its own.
+counter = { immune = true, once = true, answer = "trappers_leap" }
 
 # What Trapper's Instinct does when it's struck: away, the net on whoever struck, arrows scattered.
 [[ability]]
@@ -4592,30 +4671,62 @@ slot = "utility"
 kind = "leap"
 back = true
 range = [12.0, 12.0]
-lift = 5.0
+# Higher than a plain leap back (Corey's review: a little more height, so it reads as a
+# real jump away): 1.1 yd up at the top (0.65 at 5), 0.67 sec in the air (0.52).
+lift = 6.5
 damage = [10.0, 10.0]
 radius = [2.0, 2.0]
-spell = 781
+# No cast look: Disengage's (781) is a white blink star on the hunter (see Ensnaring Retreat).
+spell = 0
 also = "hunter_net"
+# Ensnaring Retreat's flip (#110).
+leap_clip = 38
+leap_from = "ScourgeFemale"
+leap_flip = true
 
-# 2: two arrows and a wire between them.
+# 2: two arrows and a wire between them, each arrow placed by the hero. The first press plants
+# one; the key again (within its window) places the second within 10 yd of it (hunter.rs's
+# WIRE_SPAN), and the wire forms between them.
 [[ability]]
 key = "tripwire"
 name = "Tripwire"
-text = "Fires two arrows that plant 6 yd apart at the target spot, up to 20 yd away, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec; its two arrows stay planted for 18 sec, snapped or not."
+text = "Fires an arrow that plants at the target spot, up to 20 yd away. Press again within 5 sec to plant a second arrow within 10 yd of the first, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec. Its arrows stay planted for 18 sec, snapped or not."
 icon = "Spell_Nature_Web"
 school = "hunter"
 slot = "defense"
+bow = true
 kind = "ground"
 hunt = "tripwire"
 range = [20.0, 20.0]
-radius = [3.0, 3.0]
+# The arrow's spot under the reticle (how far the wire can span is WIRE_SPAN).
+radius = [0.5, 0.5]
 damage = [12.0, 12.0]
 secs = 12.0
 cooldown = 12.0
 spell = 19434
 clip = 53
 effects = [{ kind = "knockdown", secs = [1.5, 1.5] }]
+# Time to aim the second arrow.
+recast = "tripwire_second"
+recast_secs = 5.0
+
+# Its second arrow: aimed up to 30 yd away (the first's 20 and the wire's 10), planted within 10
+# yd of the first. The wire's damage, life and knockdown are Tripwire's.
+[[ability]]
+key = "tripwire_second"
+name = "Tripwire"
+text = "Plants Tripwire's second arrow within 10 yd of the first. The wire forms between them."
+icon = "Spell_Nature_Web"
+inner = true
+slot = "defense"
+kind = "ground"
+hunt = "tripwire"
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+spell = 19434
+clip = 53
+# Drawn from the bow like the first arrow (#115), not cast over the melee weapon.
+bow = true
 
 [[ability]]
 key = "arrow_recall"
@@ -4677,7 +4788,9 @@ delay = 0.75
 secs = 25.0
 spell = 3355
 object = 3071
-burst_spell = 13810
+# The burst as it springs: Frost Nova's ring (the visual check, Nov 2: Frost Trap Aura, 13810,
+# whited out the whole screen for its 30 sec; 122 rings out and leaves the ice on whoever it froze).
+burst_spell = 122
 clip = 75
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
 # The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
@@ -4692,6 +4805,7 @@ text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pie
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
+bow = true
 kind = "projectile"
 valor = 100
 charge = [1.0, 1.0]
@@ -4707,16 +4821,18 @@ cooldown = 40.0
 spell = 3044
 clip = 53
 
-# 3, the second choice: up above the fight, then rain on it. The leap's top is where the volley's
-# aimed from; the key again (within its window) lets it go at the reticle.
+# 3, the second choice: up above the fight, then rain on it. The leap tops out and hangs there
+# (5.5 s, in `sim/hunter.rs`), the bow drawn on the volley's circle; a click or the key again
+# looses it from the hero, and it looses by itself as the hang ends. Then a slow fall down.
 [[ability]]
 key = "skyfall"
 name = "Skyfall"
-text = "Leaps 15 yd straight up. While you're in the air, press again to rain a volley of 12 arrows on a 6 yd circle up to 30 yd away over 1 sec. You can't be hurt or crowd-controlled while airborne. The arrows plant."
+text = "Leaps straight up and hangs in the air for 5.5 sec with your bow drawn. Click or press again to loose a volley of 12 arrows on a 6 yd circle up to 30 yd away. If you wait, it looses at the reticle as the hang ends. Then you float down. You can't be hurt or crowd-controlled until you land. The arrows plant."
 icon = "Ability_Hunter_Pet_WindSerpent"
 school = "hunter"
 slot = "ultimate"
 choice = 2
+bow = true
 kind = "leap"
 at_once = true
 valor = 100
@@ -4727,7 +4843,8 @@ invulnerable = true
 cooldown = 40.0
 spell = 781
 recast = "skyfall_volley"
-recast_secs = 3.5
+# The rise and the whole hang (0.8 + 5.5 + 0.5 s): its key shows the volley till it goes.
+recast_secs = 7.0
 
 [[ability]]
 key = "skyfall_volley"
@@ -4736,7 +4853,9 @@ text = "Skyfall's volley: 12 arrows on a 6 yd circle over 1 sec, 14 damage each.
 icon = "Ability_Hunter_Pet_WindSerpent"
 inner = true
 slot = "ultimate"
-kind = "buff"
+bow = true
+# Aimed at the ground (its circle under the reticle) from the hang.
+kind = "ground"
 hunt = "volley"
 count = 12
 range = [30.0, 30.0]

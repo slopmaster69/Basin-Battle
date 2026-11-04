@@ -26,6 +26,14 @@ pub trait Land: Send + Sync {
     fn blocked(&self, _x: f32, _y: f32) -> bool {
         false
     }
+    /// How far along a line from `from` (`dir` a unit vector) the first solid shape lies, within
+    /// `max`: a building's walls and roof, a rock, a fence, a statue, a cart, a trunk, as the game
+    /// draws them in the round (what [`Land::blocked`] flattens to the cells a walker can't
+    /// enter). `None`: nothing in the way, or a land that keeps no such shapes (the ground and
+    /// [`Land::blocked`] still stop a line).
+    fn ray(&self, _from: Vec3, _dir: Vec3, _max: f32) -> Option<f32> {
+        None
+    }
     fn water(&self, _x: f32, _y: f32) -> bool {
         false
     }

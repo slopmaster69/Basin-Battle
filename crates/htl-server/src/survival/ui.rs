@@ -96,6 +96,13 @@
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
 //!   friend's), `MK\t<id>` gone.
 //! - `DA\t<secs>\t<speed>\t<facing>`: run the dash of an ability (Charge) along the facing.
+//! - `GP\t<catch 1|0>\t<x>\t<y>\t<z>\t<yards>\t<ground z>\t<ability key>`: while a grappling hook
+//!   is aimed, where its line ends (`yards` along the ground from the hero) and whether it catches there; the
+//!   add-on answers with `.es in al <facing> <elevation>` as the reticle moves. `GP` alone: the
+//!   aim let go.
+//! - `FP\t<guid>\t<secs>\t<clip>\t<take>\t<from>\t<flip 1|0>\t<mine>`: a hero's leap with its own
+//!   look (a Disengage): the clip over the whole body for the flight, from another character
+//!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
 //! - `HL\t<amount>`: healed (a green number). `NP\t<verb>\t<name>`: what the use key would use.
 //! - `A` goes on `\t<ability key>` (what's aimed, charged, cast or channelled).
 //! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
@@ -176,7 +183,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         out.push(format!("{}% healing", pct(d.area_heal)));
     }
     match d.kind.as_str() {
-        _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire · {} sec duration", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
+        _ if d.hunt == "tripwire" && d.inner => out.push(format!("Within {} yd of the first arrow", n(htl_survival::sim::hunter::WIRE_SPAN))),
+        _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire at most · {} sec duration", n(d.range[1]), n(htl_survival::sim::hunter::WIRE_SPAN), n(d.secs))),
         _ if d.hunt == "call" || d.hunt == "double_call" => out.push(format!("{} yd range", n(d.range[1]))),
         _ if d.hunt == "recall" => out.push("Every planted arrow · Lacerates at 3+ arrows".to_string()),
         _ if d.hunt == "volley" => out.push(format!("{} arrows · {} yd range · {} yd radius", d.count, n(d.range[1]), n(d.radius[1]))),
@@ -282,7 +290,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     }
     // Call of the Wild: its stage's stamina, half when empowered.
     if d.hunt == "call" || d.hunt == "double_call" {
-        out.push("15 / 20 / 25 Stamina by stage · Half when empowered".to_string());
+        let [a, b, c] = htl_survival::sim::hunter::WILD_STAMINA;
+        out.push(format!("{} / {} / {} Stamina by stage · Half when empowered", n(a), n(b), n(c)));
     }
     // Stamina once (a weapon strike's is easy to miss, so it's always said).
     if d.stamina > 0.0 {
@@ -331,7 +340,14 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 19;
+/// 18: the Hunter's play-test fixes (#110): Call of the Wild's empowered key (`AB`'s last field),
+/// Skyfall's hang on the action bar, and Grapple Arrow's catch preview and Disengage's flip
+/// (`GP`, `FP`, `Grapple.lua`).
+/// 19: a Hunter's bow draw leans the camera in and trembles it at full draw (Aimed Shot, Kill
+/// Shot).
+/// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
+/// 19's hunter work (both branches had taken 19).
+pub(crate) const ADDON_NEWEST: u32 = 20;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -427,6 +443,8 @@ impl SurvivalGame {
             Action::Work { t, total, .. } => (*t, *total),
             Action::Stagger { until } => (0.0, (until - now).max(0.0)),
             Action::Dead { until } => (0.0, (until - now).max(0.0)),
+            // Skyfall's hang: aimed for as long as it lasts (the add-on looses it as it runs out).
+            Action::Aim { .. } => self.sim.hang_time(id).unwrap_or((0.0, 0.0)),
             _ => (0.0, 0.0),
         };
         // Started at: what tells one swing from the next.
@@ -1244,6 +1262,14 @@ impl SurvivalGame {
                     }
                     _ => None,
                 };
+                // While a grappling hook is aimed, the reticle's line alone (`al <facing>
+                // <elevation>`), for where it would catch.
+                if arg == "al" {
+                    if let Ok(f) = rest.parse::<f32>() {
+                        let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
+                        self.sim.set_aim_line(me, f, e);
+                    }
+                }
                 // An attack, its release and an ability key carry the reticle's line (the
                 // client's own camera, as a facing and an elevation).
                 if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
@@ -1792,8 +1818,10 @@ impl SurvivalGame {
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 
-    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column>^...`
-    /// (one per key, its fields empty when nothing's on it).
+    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered>^...`
+    /// (one per key, its fields empty when nothing's on it). `empowered`: the seconds Call of the
+    /// Wild's next call stays empowered (a parry or a perfect dodge), 0 when it isn't (and for
+    /// every other key); an older add-on ignores it.
     pub(crate) fn bar_line(&self, id: Id) -> Option<String> {
         let c = &self.sim.content;
         let now = self.sim.clock;
@@ -1853,8 +1881,9 @@ impl SurvivalGame {
                 } else {
                     (d.name.clone(), d.icon.clone())
                 };
+                let empowered = if d.hunt == "call" { self.sim.wild_primed_left(id) } else { 0.0 };
                 format!(
-                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}",
+                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}~{empowered:.1}",
                     d.key,
                     clean(&name),
                     clean(&icon),

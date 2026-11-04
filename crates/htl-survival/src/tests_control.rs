@@ -1,6 +1,6 @@
 //! Crowd control on foes that hold their ground: a boss (a champion), a totem, or a creature
 //! winding up a blow no guard stops shrugs off stuns, fears, freezes, roots, silences, staggers,
-//! knockbacks, pulls and swaps, and the hero is told "Immune". A snare, a burn and a mark still
+//! knockbacks, pulls and swaps, glancing off it in a clash of sparks (no "Immune" word). A snare, a burn and a mark still
 //! take. An ultimate's effects take on them all the same.
 
 use crate::content::Content;
@@ -49,8 +49,11 @@ fn give(s: &mut Survival, owner: Id, victim: Id, ability: &str) -> Vec<Event> {
     std::mem::take(&mut s.events)
 }
 
-fn told_immune(events: &[Event], hero: Id) -> bool {
-    events.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == hero && text.ends_with(": Immune")))
+/// The control glanced off `foe`: a clash of sparks on it, and no word on anyone's screen.
+fn glanced_off(events: &[Event], foe: Id) -> bool {
+    let spark = events.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == foe && *kit == KIT_PARRY));
+    let word = events.iter().any(|e| matches!(e, Event::Flash { text, .. } if text.contains("Immune")));
+    spark && !word
 }
 
 #[test]
@@ -62,7 +65,7 @@ fn a_boss_shrugs_off_a_stun_that_takes_on_an_ordinary_creature() {
     let wolf = mob(&mut s, wd, [3.0, 3.0, 0.0]);
     let ev = give(&mut s, a, boss, "shadowfury");
     assert!(!s.has_cc(boss, "stun"), "the boss isn't stunned");
-    assert!(told_immune(&ev, a), "and the hero is told it's immune");
+    assert!(glanced_off(&ev, boss), "it glances off the boss in sparks");
     give(&mut s, a, wolf, "shadowfury");
     assert!(s.has_cc(wolf, "stun"), "the wolf is");
 }
@@ -83,7 +86,7 @@ fn a_boss_is_not_thrown_back_but_still_slowed() {
     }
     assert!(dist2d(s.mobs[&boss].pos, [3.0, 0.0, 0.0]) < 0.3, "the boss stands where it was");
     assert!(s.has_cc(boss, "snare"), "but is slowed (a snare still takes)");
-    assert!(told_immune(&ev, a));
+    assert!(glanced_off(&ev, boss));
     let ev = give(&mut s, a, wolf, "thunderstorm");
     let thrown = ev.iter().any(|e| matches!(e, Event::MobMove { id, path, .. } if *id == wolf && path.last().is_some_and(|to| dist2d(*to, [0.0, 3.0, 0.0]) > 5.0)));
     assert!(thrown, "the wolf is thrown back");
@@ -103,15 +106,15 @@ fn an_ultimate_stuns_a_boss_all_the_same() {
 }
 
 #[test]
-fn the_immune_word_comes_once_a_moment_not_for_every_effect() {
+fn the_glancing_spark_comes_once_a_moment_not_for_every_effect() {
     let mut s = world();
     let a = hero(&mut s, [0.0, 0.0, 0.0]);
     let bd = boss_def(&s);
     let boss = mob(&mut s, bd, [3.0, 0.0, 0.0]);
     let mut ev = give(&mut s, a, boss, "shadowfury");
     ev.extend(give(&mut s, a, boss, "thunderstorm"));
-    let told = ev.iter().filter(|e| matches!(e, Event::Flash { text, .. } if text.ends_with(": Immune"))).count();
-    assert_eq!(told, 1, "one word for two shrugged-off effects at once");
+    let told = ev.iter().filter(|e| matches!(e, Event::Visual { id, kit, .. } if *id == boss && *kit == KIT_PARRY)).count();
+    assert_eq!(told, 1, "one spark for two shrugged-off effects at once");
 }
 
 #[test]
