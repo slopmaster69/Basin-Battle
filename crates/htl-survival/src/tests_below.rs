@@ -631,6 +631,26 @@ fn a_boss_leaves_one_of_its_pieces_for_certain_and_the_rest_by_chance() {
 }
 
 #[test]
+fn a_hero_come_down_from_the_camp_starts_whole_with_their_draughts_as_they_were() {
+    let mut s = below();
+    let id = s.join("ayla", "Ayla", None);
+    let draught = s.content.item(&s.content.dungeon.as_ref().unwrap().draught).unwrap();
+    let p = s.players.get_mut(&id).unwrap();
+    p.health = 7;
+    p.stamina = 1.0;
+    p.bag.insert(draught, 1);
+    s.come_down(id);
+    let p = &s.players[&id];
+    assert_eq!(p.health, p.max_health, "whole");
+    assert_eq!(p.stamina, s.content.player.stamina, "rested");
+    assert_eq!(p.bag.get(&draught).copied(), Some(1), "the Draughts as they were");
+    // One fallen (their body below) isn't stood up by it.
+    s.players.get_mut(&id).unwrap().health = 0;
+    s.come_down(id);
+    assert_eq!(s.players[&id].health, 0);
+}
+
+#[test]
 fn below_the_journal_is_the_camps() {
     let mut s = below();
     let _id = s.join("ayla", "Ayla", None);
