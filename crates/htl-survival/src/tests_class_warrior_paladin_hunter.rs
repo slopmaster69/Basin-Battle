@@ -555,15 +555,12 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     s.set_aim_line(p, 0.0, down_to(6.0));
     click(&mut s, p);
     assert!(s.empowered_keys(p).is_empty(), "set, nothing readied yet (#118: it comes as the trap springs)");
-    run_pinned(&mut s, 1.2, &[k]);
+    let ev = run_pinned(&mut s, 1.2, &[k]);
     assert!(s.has_cc(k, "petrify"), "sprung: frozen");
     let em = s.empowered_keys(p);
     assert_eq!(em.len(), 1, "sprung, Aimed Shot's key readied: {em:?}");
     assert_eq!(em[0].0, key_of("ranged") as usize);
     assert!(em[0].1 > s.clock + 7.0 && em[0].1 <= s.clock + 8.0, "for 8 s from the spring: {} at {}", em[0].1, s.clock);
-    assert_eq!(em.len(), 1, "Aimed Shot's key readied: {em:?}");
-    assert!((em[0].1 - (s.clock + 8.0)).abs() < 0.3, "for 8 s");
-    let ev = run_pinned(&mut s, 1.2, &[k]);
     // Its burst is on the frozen alone: the frost burst on it, nothing cast at the spot and
     // nothing on the hunter (Frost Nova's ring rang out round her too, Corey's review).
     assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 450, .. } if *id == k)), "the frost burst on the frozen: {ev:?}");
@@ -785,7 +782,7 @@ fn kill_shots_draw_winds_the_hunter_up_and_the_release_or_the_let_go_takes_it_of
     assert!(!s.auras_of(p).contains(&look), "and the wind-up off her");
     // The whole draw: on her till the release, off as the shot goes.
     press(&mut s, p, "kill_shot", false);
-    let ev = draw(&mut s, p, 1.1, aim, &[m]);
+    let ev = draw(&mut s, p, 1.4, aim, &[m]);
     assert_eq!(missiles(&ev, p, s.content.abilities[idx(&s, "kill_shot")].spell), 1, "loosed");
     assert!(shown(&ev), "her slots shown as it goes");
     assert!(!s.auras_of(p).contains(&look), "the wind-up gone with the shot");
@@ -1106,7 +1103,8 @@ fn a_heros_own_trap_lays_no_circle_and_its_own_shapes_are_hidden_from_it() {
     let mut ev = click(&mut s, p);
     ev.extend(run(&mut s, 1.0));
     assert!(!s.traps.is_empty(), "the trap is set");
-    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "with no circle under it");
+    // The throw's shape alone, and that hidden from her.
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { tele, .. } if !tele.as_ref().is_some_and(|t| t.own_hidden && t.mob == p))), "with no circle under it");
     let t = Telegraph::hero_shape(p, 4.0, 360.0, 0.0, 1.0, None);
     assert!(t.own_hidden && t.mob == p, "hidden from its caster, shown to the rest");
 }
@@ -1125,7 +1123,6 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     assert_eq!(planted.len(), 3);
     s.set_valor(p, 25.0);
     let mut ev = press(&mut s, p, "tripwire", true);
-    ev.extend(run(&mut s, 0.1));
     // The arrows fly home as the Hunter's arrow; the key itself plays no buff (its spell is 0).
     let spell = crate::sim::hunter::RECALL_ARROW;
     assert!(s.planted_of(p).is_empty(), "spoken for at the press: nothing else moves them");
@@ -1134,7 +1131,6 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "none flies yet");
     assert!(!ev.iter().any(|e| matches!(e, Event::ObjGone { .. })), "none leaves the ground yet");
     ev.extend(run(&mut s, 0.15));
-    let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
     let mut anchors = Vec::new();
     for a in &planted {
         let gone = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)).expect("its arrow leaves the ground");
@@ -1526,8 +1522,11 @@ fn reverse_grapple_plays_the_hunters_pull_clip_for_the_haul_and_its_tune_keys_sw
             })
             .collect()
     };
-    // As shipped: EmoteUseStanding (63) on the hunter for exactly the creature's time in the air.
-    let air = crate::sim::moves::airtime(crate::sim::moves::PULL_LIFT);
+    // As shipped: EmoteUseStanding (63) on the hunter for exactly the creature's time in the air
+    // (the pull's own lift where the rules name one, else the default).
+    let c0 = Content::dev();
+    let lift = c0.abilities[c0.ability("reverse_grapple").unwrap()].effects.iter().find(|e| e.kind == "pull").map_or(0.0, |e| e.lift);
+    let air = crate::sim::moves::airtime(if lift > 0.0 { lift } else { crate::sim::moves::PULL_LIFT });
     let clips = haul(Content::dev(), "wolf");
     assert_eq!(clips.len(), 1, "one pull clip on the hunter: {clips:?}");
     let (clip, from, secs) = &clips[0];

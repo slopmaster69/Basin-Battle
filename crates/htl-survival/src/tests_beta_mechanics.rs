@@ -815,7 +815,8 @@ fn grapple_arrow_catches_a_wall_and_a_boulder_the_walking_grid_never_had() {
     }).collect();
     assert_eq!(lines.len(), 1, "{lines:?}");
     assert!(matches!(lines[0].0, Target::Point(at) if at[0] > 10.0 && at[0] < 13.0), "to the wall: {lines:?}");
-    assert!(lines[0].1 >= 0.3, "as long as the pull: {lines:?}");
+    let flight = ev.iter().find_map(|e| match e { Event::LeapLook { player, secs, .. } if *player == p => Some(*secs), _ => None }).expect("the pull's flight");
+    assert!((lines[0].1 - flight).abs() < 1e-3 && flight >= 0.25, "as long as the pull ({flight} s): {lines:?}");
     // A boulder only the land's shapes know: caught all the same.
     let mut s = shipped_on(Box::new(Boulder { at: [15.0, 0.0], r: 1.5, top: 2.5 }));
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);

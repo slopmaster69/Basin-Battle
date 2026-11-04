@@ -2401,15 +2401,20 @@ fn a_meal_puts_the_weapons_away_and_takes_them_out_again() {
     let ev = run(&mut s, 0.6);
     assert_eq!(s.players[&p].action, Action::Ready, "eaten");
     assert_eq!(gear(&ev), 1, "out again as it ends");
-    // Struck mid-meal: out again at once.
+    // Struck mid-meal: a bite of food is steady (a hit neither stops it nor its healing), so the
+    // weapons stay away through it and come out as it ends.
     s.input(p, Input::Use);
     let ev = s.step(DT);
     assert_eq!(gear(&ev), 1);
     let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
     s.strike_player(k, p, 5, [2.0, 0.0, 0.0], false, false, false, Blow::Light);
+    s.mobs.remove(&k);
     let ev = s.step(DT);
-    assert_eq!(s.players[&p].action, Action::Ready, "the meal is spoiled");
-    assert_eq!(gear(&ev), 1, "out again as it's cut short");
+    assert_eq!(s.players[&p].action.name(), "eat", "a steady bite isn't spoiled");
+    assert_eq!(gear(&ev), 0, "the weapons stay away");
+    let ev = run(&mut s, secs);
+    assert_eq!(s.players[&p].action, Action::Ready, "eaten");
+    assert_eq!(gear(&ev), 1, "out again as it ends");
 }
 
 #[test]
