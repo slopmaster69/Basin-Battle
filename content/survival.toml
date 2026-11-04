@@ -4765,7 +4765,11 @@ recast_secs = 10.0
 # the hurl (107) as the clip, Battle Stance's red flare where it lands.
 object = 4313
 spell = 2457
-clip = 107
+# The plant, the same on every race: the Forsaken men's one-handed chop (17/1), the arm raised
+# high and driven down, as a pole is planted (picked from the lab's strips, Nov 4).
+clip = 17
+take = 1
+from = "ScourgeMale"
 
 # War Banner's recast: the same banner, uprooted and planted at the new spot (its health and time
 # left go with it).
@@ -4780,7 +4784,11 @@ kind = "place"
 range = [20.0, 20.0]
 radius = [8.0, 8.0]
 spell = 2457
-clip = 107
+# The plant, the same on every race: the Forsaken men's one-handed chop (17/1), the arm raised
+# high and driven down, as a pole is planted (picked from the lab's strips, Nov 4).
+clip = 17
+take = 1
+from = "ScourgeMale"
 
 # Q's EX: the roar that breaks their nerve. Not crowd control (they still fight, worse): 25% less
 # damage and 15% slower wind-ups for 6 sec, blows easier to take and to parry, and a creature
