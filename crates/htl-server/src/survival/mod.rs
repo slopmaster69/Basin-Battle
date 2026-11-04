@@ -263,6 +263,9 @@ pub struct SurvivalGame {
     pub(crate) lab_stage: Option<([f32; 3], f32)>,
     /// The lab's ally heroes (`allies <n>`): stand-ins beside the hero for what reaches allies.
     pub(crate) lab_allies: Vec<Id>,
+    /// The lab's stand-in caster (`by <race>-<m|f>`): a hero of that race who casts the run's
+    /// ability while the camera watches from the side.
+    pub(crate) lab_caster: Option<Id>,
     /// When the lab's queue file was last looked at.
     pub(crate) lab_polled: Instant,
     dirty: bool,
@@ -369,6 +372,7 @@ impl SurvivalGame {
             lab_mobs: Vec::new(),
             lab_stage: None,
             lab_allies: Vec::new(),
+            lab_caster: None,
             lab_polled: Instant::now(),
         };
         g.bind_world();

@@ -76,6 +76,12 @@ impl Survival {
         self.events.push(Event::Lock { player: id, target: Some(mid) });
     }
 
+    /// Hero `id` lets go of whatever they're locked on to (the lab's camera hero, watching a
+    /// stand-in from the side, holds no lock: it would turn them to it).
+    pub fn unlock_hero(&mut self, id: Id) {
+        self.unlock(id);
+    }
+
     /// One of the lab's creatures swings at the hero now (its own blow, wind-up and all).
     pub fn lab_blow(&mut self, mob: Id, hero: Id) {
         let Some(at) = self.players.get(&hero).map(|p| p.pos) else { return };

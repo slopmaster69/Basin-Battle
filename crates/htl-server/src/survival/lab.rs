@@ -1,8 +1,9 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [allies <n>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>]`
 //!
+//! - `by tauren-f` has a stand-in hero of that race cast it, the hero (and camera) at its side.
 //! - `anim` tries another clip on the ability for that run only (its take, and the model every race
 //!   plays it from), put back after.
 //! - `as tauren-f` makes the hero that race and gender (plain looks) for this run and the ones after;
@@ -93,6 +94,7 @@ impl SurvivalGame {
         self.sim.lab_clear(&old);
         if first == "clear" {
             self.lab_set_allies(me, 0);
+            self.lab_drop_caster();
             self.tell(conn, "The lab is cleared.");
             return Ok(());
         }
@@ -123,6 +125,7 @@ impl SurvivalGame {
         let mut body: Option<(u8, u8)> = None;
         let mut anim: Option<(u16, u32, Option<String>)> = None;
         let mut allies = 0usize;
+        let mut by: Option<(u8, u8)> = None;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
         let video = cfg!(windows) && ffmpeg().is_some();
         let (mut shots, mut every) = if video { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
@@ -148,6 +151,13 @@ impl SurvivalGame {
                 "as" => {
                     let spec = words.get(k + 1).copied().unwrap_or("");
                     body = Some(race_gender(spec).ok_or_else(|| format!("No race called {spec}. Try as <{}>-<m|f>.", RACE_NAMES.join("|")))?);
+                    k += 1;
+                }
+                // A stand-in hero of that race casts it, seen from the side (`by tauren-f`): how
+                // the swing reads, which the camera behind the hero hides.
+                "by" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    by = Some(race_gender(spec).ok_or_else(|| format!("No race called {spec}. Try by <{}>-<m|f>.", RACE_NAMES.join("|")))?);
                     k += 1;
                 }
                 // Stand-in ally heroes beside the hero (`allies 2`), for what reaches allies.
@@ -195,15 +205,7 @@ impl SurvivalGame {
         let steps = steps.unwrap_or_else(|| format!("{}{keyname},click?", if ex { "^" } else { "" }));
         // The hero ready: the ability on its key, nothing cooling down, full Valor and health.
         let base_key = self.sim.content.abilities[base].key.clone();
-        if self.sim.slot_ability(me, &row, &base_key).is_err() {
-            // Not learned yet: the lab's hero gets the whole board.
-            self.sim.set_tree(me, true);
-            self.sim.slot_ability(me, &row, &base_key)?;
-        }
-        self.sim.lab_reset(me);
-        self.sim.set_cooldowns(me, true);
-        self.sim.set_valor(me, 100.0);
-        self.sim.heal_full(me);
+        self.lab_ready(me, &row, &base_key)?;
         let reshaped = body.is_some_and(|(race, gender)| self.lab_reshape(me, race, gender));
         // Every run from the same open ground, facing the same way (`stage here` keeps the hero
         // where they stand): a run that started wherever the last left the hero was once framed
@@ -234,9 +236,25 @@ impl SurvivalGame {
             was
         });
         let d = self.sim.content.abilities[ability].clone();
+        // A stand-in caster where the hero stood, the hero (and the camera) at its side looking
+        // across the scene; or the hero casts.
+        let me_conn = me;
+        let me = match by {
+            Some((race, gender)) => {
+                let c = self.lab_side_caster(me_conn, race, gender);
+                self.lab_ready(c, &row, &base_key)?;
+                c
+            }
+            None => {
+                self.lab_drop_caster();
+                me
+            }
+        };
+        let moved = moved || by.is_some();
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
         self.lab_set_allies(me, allies);
+        let _ = me_conn;
         // The steps, timed from a moment after the burst starts (and after the client has set the
         // hero down, if the stage moved them).
         let now = self.sim.clock + if moved || reshaped { MOVED_SETTLE } else { 0.0 };
@@ -483,6 +501,58 @@ impl SurvivalGame {
             .set(idx::UNIT_DISPLAYID, super::draw::native_display(race, gender))
             .set(idx::UNIT_NATIVEDISPLAYID, super::draw::native_display(race, gender));
         self.broadcast(&packets::update_object(&[], &[(g, &f)]));
+    }
+
+    /// Hero `id` ready for a run: the ability on its key (the whole board if it isn't learned),
+    /// nothing cooling down, nothing left burning, full Valor and health.
+    fn lab_ready(&mut self, id: Id, row: &str, base_key: &str) -> Result<(), String> {
+        if self.sim.slot_ability(id, row, base_key).is_err() {
+            self.sim.set_tree(id, true);
+            self.sim.slot_ability(id, row, base_key)?;
+        }
+        self.sim.lab_reset(id);
+        self.sim.set_cooldowns(id, true);
+        self.sim.set_valor(id, 100.0);
+        self.sim.heal_full(id);
+        Ok(())
+    }
+
+    /// A stand-in hero of this race and gender where hero `id` stands, facing their way; `id`
+    /// set down 7 yd to its side, facing a point 2.5 yd ahead of it, so the camera behind them
+    /// looks across the stand-in and its scene. The stand-in, to cast the run.
+    fn lab_side_caster(&mut self, id: Id, race: u8, gender: u8) -> Id {
+        self.lab_drop_caster();
+        let (pos, f) = self.sim.players.get(&id).map_or(([0.0; 3], 0.0), |p| (p.pos, p.facing));
+        let account = format!("{}caster", htl_survival::sim::lab::LAB_ALLY);
+        let c = self.sim.join(&account, "Stand-in", None);
+        if let Some(p) = self.sim.players.get_mut(&c) {
+            p.look = htl_survival::HeroLook { race, gender, skin: 0, face: 0, hair: 0, hair_color: 0, facial: 0 };
+        }
+        self.sim.move_player(c, pos, f, htl_survival::Moving::default());
+        self.bind(c, Self::player_guid(&account));
+        let pk = self.player_create(c, false);
+        self.broadcast(&pk);
+        self.lab_caster = Some(c);
+        // The hero to the stand-in's right, looking across it at the middle of the fight.
+        let side = f - std::f32::consts::FRAC_PI_2;
+        let (x, y) = (pos[0] + side.cos() * 7.0, pos[1] + side.sin() * 7.0);
+        let at = [x, y, self.sim.land().height(x, y)];
+        let mid = [pos[0] + f.cos() * 2.5, pos[1] + f.sin() * 2.5];
+        let look = (mid[1] - y).atan2(mid[0] - x);
+        self.sim.unlock_hero(id);
+        self.sim.lab_to_stage(id, (at, look));
+        c
+    }
+
+    /// The last run's stand-in caster taken away.
+    fn lab_drop_caster(&mut self) {
+        if let Some(c) = self.lab_caster.take() {
+            if let Some(g) = self.guid_of(c) {
+                self.broadcast(&packets::destroy_object(g));
+            }
+            self.guids.remove(&c);
+            let _ = self.sim.leave(c);
+        }
     }
 
     /// `n` stand-in ally heroes beside hero `id` (the last run's taken away first): two ahead of
