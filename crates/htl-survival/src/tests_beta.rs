@@ -439,6 +439,12 @@ fn grapple_arrow_hauls_you_to_the_foe_it_bites_and_reverse_grapple_drags_the_foe
     assert!(dealt(&ev, h) > 0, "the hook bites");
     let me = s.players[&p].pos;
     assert!(moved_near(&ev, h, me, 4.0), "and drags it to her");
+    // Flat and headlong for the haul (Swim, 42), long enough to be seen (about 0.5 sec).
+    let flew = ev.iter().find_map(|e| match e {
+        Event::Clip { id, clip: 42, secs } if *id == h => Some(*secs),
+        _ => None,
+    });
+    assert!(flew.is_some_and(|secs| secs > 0.4 && secs < 0.6), "the creature flies in flat: {flew:?}");
 }
 
 #[test]

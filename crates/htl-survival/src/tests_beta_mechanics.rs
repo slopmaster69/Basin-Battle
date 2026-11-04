@@ -130,11 +130,11 @@ fn hits(ev: &[Event], a: Id, v: Id) -> Vec<u32> {
         .collect()
 }
 
-/// The hero's pulls on a hook's line, flown through the air (a hop with the line's own arm-out
-/// look), or run along the ground (a dash): (facing, length). A hop's length is its speed over
-/// its time in the air (the rules' gravity, 19.29 yd/s²).
+/// The hero's pulls on a hook's line, flown through the air (a hop with the line's own flat
+/// Swim look), or run along the ground (a dash): (facing, length). A hop's length is its speed
+/// over its time in the air (the rules' gravity, 19.29 yd/s²).
 fn dashes(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
-    let looked = ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 53, .. } if *player == who));
+    let looked = ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 42, .. } if *player == who));
     ev.iter()
         .filter_map(|e| match e {
             Event::Dash { player, dir, speed, secs } if *player == who => Some((*dir, speed * secs)),
@@ -145,7 +145,8 @@ fn dashes(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
 }
 
 /// A hook pulls its caster through the air, as a hookshot does (play-test: a run along the
-/// ground read as a Charge): a flat hop, the arm held out along the line, landing at the wall.
+/// ground read as a Charge): a flat hop, the body flat along the line (Swim), landing at the
+/// wall.
 #[test]
 fn a_hooks_pull_flies_its_caster_through_the_air() {
     let mut s = world(false, walled([12.0, 0.0], 1.0), HOOK);
@@ -158,7 +159,7 @@ fn a_hooks_pull_flies_its_caster_through_the_air() {
         _ => None,
     });
     assert!(hop.is_some_and(|l| l > 0.5 && l < 6.0), "a flat arc through the air: {hop:?}");
-    assert!(ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 53, .. } if *player == p)), "the arm out along the line");
+    assert!(ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 42, .. } if *player == p)), "flat along the line (Swim)");
 }
 
 fn hops(ev: &[Event], who: Id) -> Vec<(f32, f32)> {

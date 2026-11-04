@@ -4597,7 +4597,9 @@ speed = 60.0
 hunt = "haul"
 spell = 6533
 clip = 53
-effects = [{ kind = "pull", amount = 25.0, from_caster = true }, { kind = "stagger", secs = [1.0, 1.0] }]
+# The haul's arc: about 0.5 sec in the air (lift 5), long enough for the creature's flight to be
+# seen (Corey's review). A plain pull's 3 had it over in 0.3 sec, 60 to 80 yd a second.
+effects = [{ kind = "pull", amount = 25.0, lift = 5.0, from_caster = true }, { kind = "stagger", secs = [1.0, 1.0] }]
 
 # 1, the second choice: Disengage as retail has it: on the key press, mid-jump or falling too.
 [[ability]]

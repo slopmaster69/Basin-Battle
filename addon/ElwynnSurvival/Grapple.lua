@@ -107,6 +107,10 @@ function ES.FlipLine(f)
   end
   if clip > 0 and PlayUnitAnimation and layer then
     if from and PreloadAnimationSource then PreloadAnimationSource(from) end
-    PlayUnitAnimation(guid, clip, 0, nil, nil, take, secs, "full", from)
+    -- A pull's clip (a hook's Swim) fitted to the flight: one pass over it, its fade (0.16 sec)
+    -- done as the hero lands. A flip's tumble keeps the clip at its own pace.
+    local fit = 0
+    if not flip then fit = math.max(0.05, secs - 0.16) end
+    PlayUnitAnimation(guid, clip, fit, nil, nil, take, secs, "full", from)
   end
 end
