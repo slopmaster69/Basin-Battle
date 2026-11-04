@@ -352,7 +352,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 21: the add-on says `ac19` for a client with patch 0027 (Tripwire's rope).
 /// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0029).
 /// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0030).
-pub(crate) const ADDON_NEWEST: u32 = 23;
+/// 24: the add-on says `ac22` (patches 0031 to 0035).
+pub(crate) const ADDON_NEWEST: u32 = 24;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -360,7 +361,8 @@ pub(crate) const ADDON_NEWEST: u32 = 23;
 /// objects (0027): Tripwire's rope.
 /// 20: a missile's ribbon, size and spin (0029).
 /// 21: a rope from a unit's hand (0030).
-pub(crate) const CLIENT_NEWEST: u8 = 21;
+/// 22: the bowstring on its bow (0031), units that never fade (0032), the aiming camera's tip down (0033), the arrow display (0034) and a missile's tumble (0035).
+pub(crate) const CLIENT_NEWEST: u8 = 22;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1208,9 +1210,10 @@ impl SurvivalGame {
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
-                // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
-                // object stretched from end to end (Tripwire's rope); `ac20` a missile's look; `ac21` a rope
-                // from the hand.
+                // another model's clips; `ac11` puts their bones back to rest after; `ac13` draws an
+                // object stretched from end to end (Tripwire's rope); `ac14` a missile's look; `ac15` a rope
+                // from the hand; `ac22` the bowstring on its bow, units with no fade, the aiming
+                // camera's tip down, the arrow display and a missile's tumble (patches 0031 to 0035).
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,
