@@ -1172,6 +1172,14 @@ fn tripwire_plants_one_arrow_then_the_key_again_places_the_second_and_the_wire_r
     assert!(dist2d(from, a) < 0.1, "from the first arrow: {from:?} {a:?}");
     assert!(dist2d(to, b) < 0.1, "to the second: {to:?} {b:?}");
     assert!(wire.width < wire.reach, "a rope along the arrows, not a band across them: {} wide, {} long", wire.width, wire.reach);
+    // And a rope between the arrows, gone with the strip.
+    let rope = ev.iter().find_map(|e| match e {
+        Event::Rope { id, a: ra, b: rb } => Some((*id, *ra, *rb)),
+        _ => None,
+    });
+    let (rid, ra, rb) = rope.expect("a rope between the arrows");
+    assert!(dist2d(ra, a) < 0.1 && dist2d(rb, b) < 0.1, "from arrow to arrow: {ra:?} {rb:?} {both:?}");
+    assert_eq!(rid, w.mark, "it goes with the wire's strip");
 }
 
 #[test]

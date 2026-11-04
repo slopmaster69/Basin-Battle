@@ -469,6 +469,8 @@ impl Survival {
         let (yaw, len) = wire_line(a, b);
         let tele = Telegraph { own_hidden: false, ..Telegraph::hero_shape(id, len, 0.0, WIRE_REACH * 2.0, life, Some((a, yaw))) };
         let mark = self.mark_as(mid, WIRE_REACH, life, Some(tele));
+        // And the wire itself, a rope between the two arrows, gone with the strip.
+        self.events.push(Event::Rope { id: mark, a, b });
         let sides = self.wire_sides(a, b, id);
         self.hunt.wires.push(Wire { owner: id, ability: first.ability, a, b, until: now + life, sides, mark });
     }

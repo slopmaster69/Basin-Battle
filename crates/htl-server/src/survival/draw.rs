@@ -60,6 +60,24 @@ const GO_FLAGS_INERT: u32 = 0x10 | 0x20;
 /// and tinted light blue (`PREVIEW_GHOST`): a station being placed, and its ring.
 pub(crate) const GO_FLAG_PREVIEW_MOVE: u32 = 0x1000_0000;
 pub(crate) const GO_FLAG_PREVIEW_GHOST: u32 = 0x2000_0000;
+/// Ours, read by client patch 0027: drawn longer along the model's X axis by the factor
+/// `GAMEOBJECT_LEVEL` holds as an `f32`'s bits (a rope from one point to another).
+pub(crate) const GO_FLAG_STRETCH_X: u32 = 0x4000_0000;
+/// The clients that draw a stretched object and patch 0027's displays (`ac19`): the rest are
+/// sent no rope (a short piece would lie at one end of the wire), and keep the strip.
+pub(crate) const ROPE_LEVEL: u8 = 19;
+/// Patch 0027's own display for the dwarven dig site's rope (`ExcavationRope.mdx`; the client's
+/// `EXTRA_DISPLAYS`, which must change with this): a straight rope 3.18 yd along its X axis
+/// from its origin, 0.14 yd thick, a little above the ground.
+const ROPE_DISPLAY: u32 = 60_001;
+const ROPE_MODEL_LEN: f32 = 3.18;
+/// The model's rope runs this high over its origin (the middle of its 0.22 to 0.41).
+const ROPE_MODEL_MID_Z: f32 = 0.315;
+/// Its size: about 0.2 yd thick (at 2 it read as a hawser at knee height: visual check, run 020).
+const ROPE_SCALE: f32 = 1.4;
+/// How high it's strung over the arrows: an ankle's height, where a tripwire catches a foot.
+const ROPE_HEIGHT: f32 = 0.2;
+const ROPE_ENTRY_NAME: &str = "Tripwire";
 
 /// Danger marks and the placing rings: the ritual circle (drawn 6.48 yd across at scale 1) and a
 /// green rune ring for a spot that's good.
@@ -131,6 +149,23 @@ pub(crate) fn creature_guid(entry: u32, id: Id) -> u64 {
 /// A lingering ground look's DynamicObject, by its mark.
 pub(crate) fn area_guid(id: Id) -> u64 {
     (0xF100u64 << 48) | u64::from(id & 0x00FF_FFFF)
+}
+
+/// A rope's game object, by the mark it goes with.
+pub(crate) fn rope_guid(id: Id) -> u64 {
+    (HIGH_GAMEOBJECT << 48) | (0xFF_FFFF << 24) | u64::from(id & 0x00FF_FFFF)
+}
+
+/// The rotation (`GAMEOBJECT_ROTATION`, x y z w) turning a model's X axis from `a` toward `b`:
+/// its yaw about Z, then its pitch up or down to `b`'s height.
+pub(crate) fn rope_rotation(a: [f32; 3], b: [f32; 3]) -> [f32; 4] {
+    let (dx, dy, dz) = (b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    let yaw = dy.atan2(dx);
+    let pitch = dz.atan2((dx * dx + dy * dy).sqrt());
+    let (sz, cz) = (yaw / 2.0).sin_cos();
+    // Raising X toward Z is a turn about −Y.
+    let (sy, cy) = (-pitch / 2.0).sin_cos();
+    [-sz * sy, cz * sy, sz * cy, cz * cy]
 }
 
 /// A DynamicObject wearing `spell`'s area look at `pos`, `radius` round, cast by `caster`.
@@ -704,6 +739,45 @@ impl SurvivalGame {
         }
     }
 
+    /// A rope from `a` to `b`: the dig site's rope at its origin on `a`, turned toward `b`, drawn
+    /// as long as the span (`GO_FLAG_STRETCH_X`) and strung an ankle's height over the ground,
+    /// never solid (`GO_FLAG_PREVIEW_MOVE`).
+    pub(crate) fn rope_create(&mut self, id: Id, a: [f32; 3], b: [f32; 3]) -> Packet {
+        // The model's own rope sits above its origin: lowered so it's strung at ROPE_HEIGHT.
+        let drop = ROPE_HEIGHT - ROPE_MODEL_MID_Z * ROPE_SCALE;
+        let (a, b) = ([a[0], a[1], a[2] + drop], [b[0], b[1], b[2] + drop]);
+        let entry = self.go_entry(ROPE_DISPLAY, ROPE_ENTRY_NAME, GO_TYPE_GENERIC);
+        let guid = rope_guid(id);
+        let span = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2) + (b[2] - a[2]).powi(2)).sqrt();
+        let stretch = (span / (ROPE_MODEL_LEN * ROPE_SCALE)).clamp(0.05, 50.0);
+        let rot = rope_rotation(a, b);
+        let facing = (b[1] - a[1]).atan2(b[0] - a[0]);
+        let mut f = Fields::new();
+        f.set_u64(idx::GUID, guid)
+            .set(idx::TYPE, fields::TYPEMASK_GAMEOBJECT)
+            .set(idx::ENTRY, entry)
+            .set_f32(idx::SCALE_X, ROPE_SCALE)
+            .set(idx::GAMEOBJECT_DISPLAYID, ROPE_DISPLAY)
+            .set(idx::GAMEOBJECT_FLAGS, GO_FLAGS_INERT | GO_FLAG_PREVIEW_MOVE | GO_FLAG_STRETCH_X)
+            .set_f32(idx::GAMEOBJECT_ROTATION, rot[0])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 1, rot[1])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 2, rot[2])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 3, rot[3])
+            .set(idx::GAMEOBJECT_STATE, 1)
+            .set_f32(idx::GAMEOBJECT_POS_X, a[0])
+            .set_f32(idx::GAMEOBJECT_POS_X + 1, a[1])
+            .set_f32(idx::GAMEOBJECT_POS_X + 2, a[2])
+            .set_f32(idx::GAMEOBJECT_FACING, facing)
+            .set(idx::GAMEOBJECT_FACTION, 35)
+            .set(idx::GAMEOBJECT_TYPE_ID, GO_TYPE_GENERIC)
+            .set(idx::GAMEOBJECT_LEVEL, stretch.to_bits())
+            .set(idx::GAMEOBJECT_ANIMPROGRESS, 100);
+        packets::update_object(
+            &[Create { guid, object_type: packets::TYPE_GAMEOBJECT, is_self: false, placement: Placement::At { pos: a, facing }, fields: &f }],
+            &[],
+        )
+    }
+
     fn go_packet(guid: u64, entry: u32, display: u32, kind: u32, flags: u32, scale: f32, pos: [f32; 3], facing: f32,
     ) -> Packet {
         Self::go_packet_state(guid, entry, display, kind, flags, scale, pos, facing, 1)
@@ -1193,4 +1267,30 @@ fn grip_info(grip: &str) -> u32 {
         _ => return 0,
     };
     2 | sub << 8 | 1 << 16 | inv << 24
+}
+
+#[cfg(test)]
+mod rope_tests {
+    use super::rope_rotation;
+
+    /// The model's X axis turned by a rotation (x y z w).
+    fn turned_x(q: [f32; 4]) -> [f32; 3] {
+        let [x, y, z, w] = q;
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + w * z), 2.0 * (x * z - w * y)]
+    }
+
+    fn near(a: [f32; 3], b: [f32; 3]) -> bool {
+        (0..3).all(|k| (a[k] - b[k]).abs() < 1.0e-4)
+    }
+
+    #[test]
+    fn a_rope_points_from_its_first_end_to_its_second_on_the_level_and_up_a_slope() {
+        // Level, along +Y: a quarter turn, no tilt.
+        assert!(near(turned_x(rope_rotation([0.0, 0.0, 0.0], [0.0, 5.0, 0.0])), [0.0, 1.0, 0.0]));
+        // Back along −X.
+        assert!(near(turned_x(rope_rotation([0.0, 0.0, 0.0], [-4.0, 0.0, 0.0])), [-1.0, 0.0, 0.0]));
+        // Up a slope: 3 along, 4 up.
+        let s = (3.0f32 * 3.0 + 4.0 * 4.0).sqrt();
+        assert!(near(turned_x(rope_rotation([1.0, 1.0, 0.0], [1.0, 4.0, 4.0])), [0.0, 3.0 / s, 4.0 / s]));
+    }
 }
