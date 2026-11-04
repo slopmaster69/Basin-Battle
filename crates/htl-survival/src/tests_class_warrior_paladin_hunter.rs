@@ -519,15 +519,16 @@ fn a_heavy_blow_spoils_the_aimed_shot_draw() {
 fn multi_shot_looses_five_arrows_in_a_fan() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    // One on each arrow's line, 7 yd out, 10° apart; one well outside the fan.
-    let fan: Vec<Id> = [-20.0f32, -10.0, 0.0, 10.0, 20.0].iter().map(|deg| mob(&mut s, "grunt", [7.0 * deg.to_radians().cos(), 7.0 * deg.to_radians().sin(), 0.0])).collect();
-    let wide = mob(&mut s, "grunt", [7.0 * 50f32.to_radians().cos(), 7.0 * 50f32.to_radians().sin(), 0.0]);
+    // One on each arrow's line where the reticle points, 12 yd out: the fan spreads 1.2 yd an
+    // arrow there (#118). One well outside it.
+    let fan: Vec<Id> = [-2.4f32, -1.2, 0.0, 1.2, 2.4].iter().map(|y| mob(&mut s, "grunt", [12.0, *y, 0.0])).collect();
+    let wide = mob(&mut s, "grunt", [12.0, 7.0, 0.0]);
     let mut pins = fan.clone();
     pins.push(wide);
     s.set_valor(p, 25.0);
     press(&mut s, p, "aimed_arrow", true);
     assert_eq!(aiming(&s, p), Some(idx(&s, "multi_shot")), "Ctrl: the Multi-Shot");
-    s.set_aim_line(p, 0.0, down_to(14.0));
+    s.set_aim_line(p, 0.0, down_to(12.0));
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
     assert_eq!(missiles(&ev, p, 6984), 5, "five arrows, no draw");
@@ -549,12 +550,13 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     assert_eq!(aiming(&s, p), Some(idx(&s, "freezing_trap")));
     s.set_aim_line(p, 0.0, down_to(6.0));
     click(&mut s, p);
-    let em = s.empowered_keys(p);
-    assert_eq!(em.len(), 1, "Aimed Shot's key readied: {em:?}");
-    assert_eq!(em[0].0, key_of("ranged") as usize);
-    assert!((em[0].1 - (s.clock + 8.0)).abs() < 0.3, "for 8 s");
+    assert!(s.empowered_keys(p).is_empty(), "set, nothing readied yet (#118: it comes as the trap springs)");
     run_pinned(&mut s, 1.2, &[k]);
     assert!(s.has_cc(k, "petrify"), "sprung: frozen");
+    let em = s.empowered_keys(p);
+    assert_eq!(em.len(), 1, "sprung, Aimed Shot's key readied: {em:?}");
+    assert_eq!(em[0].0, key_of("ranged") as usize);
+    assert!(em[0].1 > s.clock + 7.0 && em[0].1 <= s.clock + 8.0, "for 8 s from the spring: {} at {}", em[0].1, s.clock);
     // Aimed Shot's key: the Multi-Shot, free, and the frozen one shatters.
     let valor = s.players[&p].valor;
     press_again(&mut s, p, "ranged");
@@ -571,6 +573,82 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     run(&mut s, 0.5);
     press_again(&mut s, p, "ranged");
     assert_eq!(aiming(&s, p), Some(idx(&s, "aimed_arrow")));
+}
+
+#[test]
+fn a_freezing_trap_that_springs_late_still_readies_its_free_multi_shot_as_the_ice_takes() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "aimed_arrow").unwrap();
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", true);
+    s.set_aim_line(p, 0.0, down_to(6.0));
+    click(&mut s, p);
+    // Nothing comes by for longer than the free shot ever lasted (8 s).
+    run(&mut s, 12.0);
+    assert!(s.empowered_keys(p).is_empty());
+    let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
+    run_pinned(&mut s, 0.3, &[k]);
+    assert!(s.has_cc(k, "petrify"), "it springs at last");
+    assert_eq!(s.empowered_keys(p).len(), 1, "and the free Multi-Shot is there");
+    // Time to turn and fire: still frozen 2.5 s on, and the shot still free.
+    run_pinned(&mut s, 2.5, &[k]);
+    assert!(s.has_cc(k, "petrify"), "3 s of ice from the spring");
+    assert_eq!(s.empowered_keys(p).len(), 1);
+}
+
+/// What one of `key`'s arrows does to a grunt 8 yd ahead: a full draw, held.
+fn one_arrow(s: &mut Survival, p: Id, key: &str, ex: bool) -> u32 {
+    let k = mob(s, "grunt", [8.0, 0.0, 0.0]);
+    s.set_valor(p, 100.0);
+    press(s, p, key, ex);
+    let aim = (0.0, down_to(10.0));
+    let mut ev = if aiming(s, p).is_some() && s.content.abilities[aiming(s, p).unwrap()].charge[1] == 0.0 {
+        s.set_aim_line(p, aim.0, aim.1);
+        click(s, p)
+    } else {
+        draw(s, p, 1.6, aim, &[k])
+    };
+    ev.extend(run_pinned(s, 1.0, &[k]));
+    let h = hits(&ev, p, k);
+    assert_eq!(h.len(), 1, "{key}: one arrow strikes it: {h:?}");
+    s.mobs.remove(&k);
+    run(s, 0.5);
+    h[0]
+}
+
+#[test]
+fn aimed_shot_kill_shot_and_multi_shot_grow_with_the_bow_as_an_art_grows_with_the_weapon() {
+    // Serg's play-test (#118): a flat 14–36 was always going to fall behind melee as gear got
+    // better. Each is now a share of the bow's own damage at the same draw.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let plain = [one_arrow(&mut s, p, "aimed_arrow", false), one_arrow(&mut s, p, "kill_shot", false), one_arrow(&mut s, p, "aimed_arrow", true)];
+    // The hunting bow (12–30): what they always did, full drawn.
+    assert_eq!(plain, [36, 60, 18], "Aimed Shot, Kill Shot, a Multi-Shot arrow with the hunting bow");
+    // A bow twice as strong.
+    let bow = s.content.ranged.iter().position(|r| r.key == "bow").unwrap();
+    s.content.ranged[bow].damage = [24, 60];
+    let strong = [one_arrow(&mut s, p, "aimed_arrow", false), one_arrow(&mut s, p, "kill_shot", false), one_arrow(&mut s, p, "aimed_arrow", true)];
+    assert_eq!(strong, [72, 120, 36], "twice the bow, twice the shot");
+}
+
+#[test]
+fn a_multi_shot_at_a_pack_strikes_most_of_it() {
+    // Serg's play-test (#118): it "seemed not to hit often": 10° apart, a pack 16 yd off took 3
+    // arrows of 8 and one at 25 yd took 1. Four grunts 1.2 and 1.8 yd apart, near and far.
+    for (dist, gap) in [(10.0f32, 1.2f32), (16.0, 1.2), (16.0, 1.8), (25.0, 1.2), (25.0, 1.8)] {
+        let mut s = world();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let pack: Vec<Id> = [-1.5f32, -0.5, 0.5, 1.5].iter().map(|y| mob(&mut s, "grunt", [dist, *y * gap, 0.0])).collect();
+        s.set_valor(p, 25.0);
+        press(&mut s, p, "aimed_arrow", true);
+        s.set_aim_line(p, 0.0, down_to(dist + 2.0));
+        let mut ev = click(&mut s, p);
+        ev.extend(run_pinned(&mut s, 1.5, &pack));
+        let struck = pack.iter().filter(|m| !hits(&ev, p, **m).is_empty()).count();
+        assert!(struck >= 3, "at {dist} yd, {gap} yd apart: {struck} of the 4 struck");
+    }
 }
 
 #[test]
@@ -1399,3 +1477,4 @@ fn a_training_dummy_takes_a_beast_and_a_freezing_trap() {
     run(&mut s, 1.2);
     assert!(s.has_cc(d, "petrify"), "sprung on the dummy: frozen");
 }
+

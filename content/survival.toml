@@ -4287,7 +4287,7 @@ effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 
 [[ability]]
 key = "aimed_arrow"
 name = "Aimed Shot"
-text = "Hold to draw your bow for up to 1.4 sec, then release to fire. Damage, range and arrow speed increase with the draw. A full draw pierces every enemy in its line. A heavy hit on you cancels the draw. The arrow plants where its flight ends."
+text = "Hold to draw your bow for up to 1.4 sec, then release to fire for up to 120% bow damage. Damage, range and arrow speed increase with the draw. A full draw pierces every enemy in its line. A heavy hit on you cancels the draw. The arrow plants where its flight ends."
 icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
@@ -4295,7 +4295,9 @@ bow = true
 kind = "projectile"
 charge = [0.0, 1.4]
 fragile = true
-damage = [14.0, 36.0]
+# Serg's play-test (#118): it grows with the bow, as an art grows with the weapon. 120% of the
+# bow's damage at the same draw: 14–36 with the hunting bow (12–30), as it was.
+bow_damage = 1.2
 range = [26.0, 40.0]
 radius = [0.3, 0.3]
 # A plain arrow (the bow's look) while drawing; fully drawn, a burning one, faster, through every
@@ -4314,19 +4316,22 @@ plants = true
 key = "multi_shot"
 name = "Multi-Shot"
 ex_of = "aimed_arrow"
-text = "Fires 5 arrows at once in a wide fan, with no draw. Each arrow deals 18 damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
+text = "Fires 5 arrows at once in a fan 5 yd wide where you aim, with no draw. Each arrow deals 60% bow damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
 icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
 bow = true
 kind = "projectile"
 valor = 25
-damage = [18.0, 18.0]
+# 60% of a full draw's bow damage an arrow: 18 with the hunting bow (#118).
+bow_damage = 0.6
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 40.0
 count = 5
-# 10° apart: a 40° fan.
+# The fan spreads 1.2 yd an arrow where the reticle points, so it covers a pack near or far; 10°
+# apart at most, close in. (#118: a fixed 10° fan passed between a pack past 15 yd.)
 spread = 10.0
+spread_yd = 1.2
 shatter = true
 # Frost-tipped arrows (Frost Shot): the volley that shatters the frozen.
 spell = 6984
@@ -4790,7 +4795,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. Setting it readies a free Multi-Shot for 8 sec."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "defense"
 kind = "trap"
@@ -4808,16 +4813,18 @@ object = 3071
 # whited out the whole screen for its 30 sec; 122 rings out and leaves the ice on whoever it froze).
 burst_spell = 122
 clip = 75
+# 3 sec: the most the board allows (1.5 on a hero). Serg (#118) found it over before the
+# Multi-Shot; what fixes that is the free shot coming as the trap springs, below.
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
-# The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
-# springs: 8 s, room to kite them onto it.)
+# The trap combo: set it, kite them onto it, cash in. The free Multi-Shot is readied as the trap
+# springs (#118: readied as it was set, a trap that sprang late had no free shot left), for 8 s.
 empower = { ability = "aimed_arrow", secs = 8.0 }
 
 # 3: the finisher you line up.
 [[ability]]
 key = "kill_shot"
 name = "Kill Shot"
-text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 60 damage. Enemies below 25% health are killed outright."
+text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 200% bow damage. Enemies below 25% health are killed outright."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
@@ -4826,7 +4833,8 @@ kind = "projectile"
 valor = 100
 charge = [1.0, 1.0]
 hold = 1.0
-damage = [60.0, 60.0]
+# 200% of a full draw's bow damage: 60 with the hunting bow (#118).
+bow_damage = 2.0
 range = [40.0, 40.0]
 radius = [0.4, 0.4]
 pierce = 9
