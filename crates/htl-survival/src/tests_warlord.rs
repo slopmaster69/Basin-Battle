@@ -369,6 +369,25 @@ fn war_banner_stands_where_aimed_for_10_sec() {
 }
 
 #[test]
+fn ctrl_q_roars_while_the_banner_stands_and_q_still_moves_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [5.0, 0.0, 0.0]);
+    plant(&mut s, p);
+    let at = banner_at(&s, p).expect("planted");
+    // Ctrl+Q with the banner standing: the Roar, not the banner's move.
+    cast(&mut s, p, "war_banner", true, 0.0, 0.0);
+    run(&mut s, 0.5);
+    assert!(s.has_cc(k, "cowed"), "the brave in the cone is Cowed: the Roar went");
+    assert_eq!(banner_at(&s, p), Some(at), "and the banner stayed where it was");
+    // Q again moves it, as before.
+    cast(&mut s, p, "war_banner", false, 0.0, at_ground(3.0));
+    run(&mut s, 0.3);
+    let moved = banner_at(&s, p).expect("still standing");
+    assert!((moved[0] - 3.0).abs() < 1.0, "moved to the new spot: {moved:?}");
+}
+
+#[test]
 fn war_banner_quickens_the_stamina_of_heroes_near_it() {
     let mut s = world();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
