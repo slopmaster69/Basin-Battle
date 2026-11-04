@@ -310,7 +310,8 @@ pub enum Event {
     /// of the model's versions, `from` another character model whose take every client plays (an
     /// ability's own, the same on every race), or the unit's own.
     /// `at`: its impact this many seconds in (0: half way), so a cast's clip lands as the cast does.
-    Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32, at: f32 },
+    /// `body`: the whole model, or the upper or lower half only, the rest keeping what it was doing.
+    Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32, at: f32, body: ClipBody },
     /// A unit's clip called off (a feint: the guard raised before the blow came).
     ClipStop { id: Id },
     /// An ability's shape flashed on the ground as it lands, for the clients that draw one: at a
@@ -335,6 +336,29 @@ pub enum Event {
     Log(String),
     /// Something worth saving changed.
     Dirty,
+}
+
+/// How much of a unit a clip drives ([`Event::Clip`]): all of it (the usual), its arms and
+/// torso only (a draw, a cast, the legs free to run), or its pelvis and legs only (Skyfall's
+/// hang: the legs drawn up while the arms keep drawing the bow). The lower half takes client
+/// patch 0029 (`ac17`); an older client plays it as a whole-body clip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ClipBody {
+    #[default]
+    Full,
+    Upper,
+    Lower,
+}
+
+impl ClipBody {
+    /// The word the add-on's `AN` line carries.
+    pub fn word(self) -> &'static str {
+        match self {
+            ClipBody::Full => "full",
+            ClipBody::Upper => "upper",
+            ClipBody::Lower => "lower",
+        }
+    }
 }
 
 /// A creature's blow as it winds up, for the ground under it: from the creature (following it as

@@ -818,7 +818,7 @@ impl Survival {
             let ms = ((hi + d.hold.max(0.5)) * 1000.0) as u32;
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
-            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0 });
+            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0, body: ClipBody::Full });
         }
         let _ = lo;
     }
@@ -1007,7 +1007,7 @@ impl Survival {
             } else {
                 (CAST_RECOVERY + 0.2, 0.0)
             };
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs, at });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs, at, body: ClipBody::Full });
         }
         // The bow's own release before the sword comes back (a crossbow's long reload).
         let total = if d.kind == "shot" { self.ranged_of(&self.players[&id]).recovery.max(CAST_RECOVERY) } else { CAST_RECOVERY };
@@ -3004,7 +3004,7 @@ impl Survival {
         self.events.push(Event::Dash { player: id, dir: yaw, speed: dist / secs, secs });
         // Its swing's blow lands as the run ends (a clip's impact is half its length).
         if d.clip != 0 {
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6), at: 0.0 });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6), at: 0.0, body: ClipBody::Full });
         }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
     }

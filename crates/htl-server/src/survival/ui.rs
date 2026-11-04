@@ -85,6 +85,10 @@
 //!   every race). Each `MV` blow goes on `~<from>` the same way.
 //!   The kind: `light`, `heavy`, `running`, `bash`, `kick`, `cast`, a creature's `mob`, and the
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
+//!   A `cast` goes on `\t<body>` after `from`: `full` (the whole model), `upper` or `lower`
+//!   (that half alone, the rest keeping what it was doing: Skyfall's hang holds the Jump clip on
+//!   the legs while the arms draw the bow). `lower` takes client patch 0029 (`ac17`); `ac16`
+//!   reads it as the whole body.
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
@@ -377,6 +381,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0030).
 pub(crate) const ADDON_NEWEST: u32 = 23;
 /// `Cues.lua`. 22: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
+/// 21: a cast's `AN` line names the body its clip drives (`full`, `upper`, `lower`): Skyfall's
+/// hang on the legs alone.
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -399,6 +405,7 @@ pub(crate) fn out_of_date(version: u32, level: u8) -> Option<String> {
     };
     Some(format!("{what} {}", crate::HOW_TO_UPDATE))
 }
+
 const HUD_EVERY: Duration = Duration::from_millis(150);
 /// A champion's bar shows to the heroes this near it while it fights.
 const BOSS_BAR_RANGE: f32 = 60.0;
@@ -2142,6 +2149,7 @@ mod version_tests {
         let level: u8 = src.match_indices("\" ac").filter_map(|(i, _)| src[i + 4..].split('"').next()?.parse().ok()).max().expect("the hello's acN");
         assert_eq!(level, CLIENT_NEWEST, "the newest client the add-on asks for");
     }
+
 }
 
 #[cfg(test)]
