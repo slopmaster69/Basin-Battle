@@ -797,6 +797,10 @@ impl Survival {
         }
         let d = self.content.abilities[ability].clone();
         self.set_action(id, Action::Charge { ability, since: now });
+        // The wind-up on them for the draw (Kill Shot): its look in their aura slots till it goes.
+        if d.charge_look != 0 {
+            self.events.push(Event::Auras { id });
+        }
         let spell = if d.kind == "shot" || d.bow { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
         if spell != 0 && (d.kind == "shot" || d.bow) {
             self.draw_bow(id);
@@ -863,6 +867,10 @@ impl Survival {
                 let d = &self.content.abilities[ability];
                 if d.charge_spell == 0 && d.clip == THROW_CLIP && d.kind != "shot" {
                     self.events.push(Event::ClipStop { id });
+                }
+                // Its wind-up off them (the slots are read once the action has changed).
+                if d.charge_look != 0 {
+                    self.events.push(Event::Auras { id });
                 }
             }
             // A bow ability drawn as it's aimed: the draw let down.
@@ -947,9 +955,13 @@ impl Survival {
         if cost > 0.0 {
             self.events.push(Event::Valor { player: id });
         }
-        // A charge's glow ends as it goes (the bow's draw ends with its shot).
+        // A charge's glow ends as it goes (the bow's draw ends with its shot), and the wind-up on
+        // them with it (the slots are read once the action has moved on).
         if matches!(self.players[&id].action, Action::Charge { .. }) {
             self.events.push(Event::CastDone { caster: id, spell: 0 });
+            if d.charge_look != 0 {
+                self.events.push(Event::Auras { id });
+            }
         }
         // A bow ability's arrow: the bow's own release (its draw let go, or drawn and loosed at
         // once), the bow in hand till it's played out. (A leap with the bow looses nothing.)
