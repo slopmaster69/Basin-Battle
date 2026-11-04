@@ -425,7 +425,7 @@ spell = 75
 subclass = 18
 
 # --- missile looks ---------------------------------------------------------------------------------
-# How chosen spells' missiles look on a client with patch 0022 (ac14): a glowing ribbon behind
+# How chosen spells' missiles look on a client with patch 0029 (ac20): a glowing ribbon behind
 # each (`trail`, "RRGGBB"; `width` yd, each stretch fading over `secs`), the model `scale` times
 # its size, and `spin` turns a second, flat. Arrows and a thrown axe were too thin to follow at
 # night, with no spell effect in the data that fixed it (Corey's review; 14 missiles were tried

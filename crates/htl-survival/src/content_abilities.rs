@@ -419,7 +419,7 @@ pub struct AbilityDef {
     pub empower: Option<EmpowerDef>,
     /// The colour (`"RRGGBB"`) its missile's ribbon takes as it flies and after each ricochet, one
     /// a bounce, the last kept past them (Bank Shot's arrow hotter each time it bounces: Corey's
-    /// review). Drawn on a client with patch 0022, over the spell's own `[[missile_look]]`.
+    /// review). Drawn on a client with patch 0029, over the spell's own `[[missile_look]]`.
     #[serde(default)]
     pub bounce_trail: Vec<String>,
     /// A projectile that comes back (a boomerang): out to its full range (or a wall), then back to

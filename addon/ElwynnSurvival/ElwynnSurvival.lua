@@ -6492,7 +6492,7 @@ function ES.Line(line)
       ES.marksUp.tg[key] = 1
     end
   elseif verb == "ML" then
-    -- How a spell's missiles look (patch 0022): a ribbon behind them, their size and a spin; with
+    -- How a spell's missiles look (patch 0029): a ribbon behind them, their size and a spin; with
     -- a caster's guid, for its next one alone (a ricochet's colour).
     if SetMissileLook and f[2] then
       local trail = f[3]

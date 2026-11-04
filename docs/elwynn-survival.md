@@ -195,7 +195,7 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   or the traps. 3:
   Kill Shot, or Skyfall: a leap straight up, a 5.5 s hang there with the bow drawn on a ring below,
   and a volley of 12 arrows where you aim (they plant), then a slow fall. Every bow ability brings
-  the bow into the hands and draws it with the base game's bow draw. On a client with patch 0022
+  the bow into the hands and draws it with the base game's bow draw. On a client with patch 0029
   the Hunter's arrows trail a glowing ribbon (pale, burning for a full Aimed Shot, gold-red for
   Kill Shot, frost for Multi-Shot), and Bank Shot's turns from yellow to orange to red with each
   bounce. `[[missile_look]]` in `content/survival.toml` sets a spell's.

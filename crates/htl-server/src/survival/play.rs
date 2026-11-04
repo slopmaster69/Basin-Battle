@@ -692,7 +692,7 @@ impl SurvivalGame {
             }
             Event::MissileTint { caster, spell, ability, bounce } => {
                 // The next missile `caster` flies of the spell takes its bounce's colour, on the
-                // clients that draw a missile's look (patch 0022): Bank Shot hotter each bounce.
+                // clients that draw a missile's look (patch 0029): Bank Shot hotter each bounce.
                 // A stand-in flies the arrow on from a ricochet, so its own guid names that one.
                 let Some(g) = self.stand_ins.get(&caster).map(|s| s.guid).or_else(|| self.guid_of(caster)) else { return };
                 let c = &self.sim.content;
