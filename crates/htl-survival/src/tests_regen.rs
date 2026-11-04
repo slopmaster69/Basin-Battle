@@ -74,7 +74,7 @@ fn wounded(s: &mut Survival, p: Id, share: f32) -> u32 {
 /// The clips played on a hero, and the spells cast by them.
 fn clips(ev: &[Event], p: Id) -> Vec<(u16, f32)> {
     ev.iter().filter_map(|e| match e {
-        Event::Clip { id, clip, secs } if *id == p => Some((*clip, *secs)),
+        Event::Clip { id, clip, secs, .. } if *id == p => Some((*clip, *secs)),
         _ => None,
     }).collect()
 }
