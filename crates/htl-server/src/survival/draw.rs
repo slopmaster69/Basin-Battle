@@ -72,6 +72,14 @@ const STAND_IN_ENTRY: u32 = 69_000;
 const STAND_IN_DISPLAY: u32 = 1359;
 const STAND_IN_SCALE: f32 = 0.001;
 const GOOD_RING_DISPLAY: u32 = 674;
+/// The clients that have patch 0027's arrow display (`ac16`): for them a planted arrow is a real
+/// arrow stood head-down in the ground; the rest keep the feather (`PLANT_LOOK`).
+pub(crate) const ARROW_LEVEL: u8 = 16;
+/// That display (the Hunter's arrow, `ArcaneShot_Missile.mdx`; the client's `EXTRA_DISPLAYS`,
+/// which must change with this), its size, and how far it leans from upright (radians).
+const ARROW_DISPLAY: u32 = 60_002;
+const ARROW_SCALE: f32 = 1.0;
+const ARROW_LEAN: f32 = 0.3;
 
 /// Equipment slots, as the client numbers them.
 pub(crate) const SLOT_MAIN_HAND: u8 = 15;
@@ -714,16 +722,38 @@ impl SurvivalGame {
         facing: f32,
         state: u32,
     ) -> Packet {
+        Self::go_packet_tilted(guid, entry, display, kind, flags, scale, pos, facing, state, 0.0)
+    }
+
+    /// An object's create, tipped over by `tilt` (radians) about its model's own Y after its
+    /// facing: an arrow stood head-down in the ground. The client places an object by its
+    /// rotation quaternion `(x, y, z, w)`, `yaw × tilt`; at 0 it's the plain facing.
+    #[allow(clippy::too_many_arguments)]
+    fn go_packet_tilted(
+        guid: u64,
+        entry: u32,
+        display: u32,
+        kind: u32,
+        flags: u32,
+        scale: f32,
+        pos: [f32; 3],
+        facing: f32,
+        state: u32,
+        tilt: f32,
+    ) -> Packet {
         let mut f = Fields::new();
         let (s, c) = (facing / 2.0).sin_cos();
+        let (ts, tc) = (tilt / 2.0).sin_cos();
         f.set_u64(idx::GUID, guid)
             .set(idx::TYPE, fields::TYPEMASK_GAMEOBJECT)
             .set(idx::ENTRY, entry)
             .set_f32(idx::SCALE_X, scale)
             .set(idx::GAMEOBJECT_DISPLAYID, display)
             .set(idx::GAMEOBJECT_FLAGS, flags)
-            .set_f32(idx::GAMEOBJECT_ROTATION + 2, s)
-            .set_f32(idx::GAMEOBJECT_ROTATION + 3, c)
+            .set_f32(idx::GAMEOBJECT_ROTATION, -s * ts)
+            .set_f32(idx::GAMEOBJECT_ROTATION + 1, c * ts)
+            .set_f32(idx::GAMEOBJECT_ROTATION + 2, tc * s)
+            .set_f32(idx::GAMEOBJECT_ROTATION + 3, c * tc)
             .set(idx::GAMEOBJECT_STATE, state)
             .set_f32(idx::GAMEOBJECT_POS_X, pos[0])
             .set_f32(idx::GAMEOBJECT_POS_X + 1, pos[1])
@@ -741,6 +771,14 @@ impl SurvivalGame {
     /// An object's create packets: the thing, and for a station being placed, the ring under it
     /// (green where it can go, red where it can't).
     pub(crate) fn obj_create(&mut self, id: Id) -> Vec<Packet> {
+        self.obj_create_for(id, 0)
+    }
+
+    /// The same, as a client of round `level` draws it: from `ARROW_LEVEL` a planted arrow is a
+    /// real arrow stood in the ground (patch 0027's display), the feather for the rest. The entry
+    /// and the guid are the feather's for everyone, so one destroy takes it from all of them; a
+    /// client draws the display the create names, not the entry's.
+    pub(crate) fn obj_create_for(&mut self, id: Id, level: u8) -> Vec<Packet> {
         let Some(v) = self.sim.object(id) else { return Vec::new() };
         if let Some(def) = self.resident(&v) {
             return vec![self.resident_create(def, &v)];
@@ -750,8 +788,9 @@ impl SurvivalGame {
         let guid = object_guid(entry, id);
         self.bind(id, guid);
         let state = self.obj_state(&v);
-        let mut out = vec![Self::go_packet_state(guid, entry, v.display, kind, flags, v.scale, v.pos, v.facing, state,
-        )];
+        let arrow = Self::planted_arrow(&v) && level >= ARROW_LEVEL;
+        let (display, scale, tilt) = if arrow { (ARROW_DISPLAY, ARROW_SCALE, std::f32::consts::FRAC_PI_2 - ARROW_LEAN) } else { (v.display, v.scale, 0.0) };
+        let mut out = vec![Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt)];
         if let ObjKind::Ghost { def, ok, .. } = v.kind {
             let r = self.sim.content.stations[def].footprint;
             let (display, name, scale) =
@@ -813,20 +852,39 @@ impl SurvivalGame {
         }
     }
 
-    /// Draw an object for everyone who should see it (a ghost: its placer alone).
+    /// A planted arrow's prop (the Hunter's: Multi-Shot's misses, Tripwire's two, Skyfall's
+    /// twelve), drawn as an arrow for the clients that have the display.
+    fn planted_arrow(v: &ObjView) -> bool {
+        matches!(v.kind, ObjKind::Prop { display, .. } if display == htl_survival::sim::hunter::PLANT_LOOK)
+    }
+
+    /// Draw an object for everyone who should see it (a ghost: its placer alone), each client as
+    /// its round draws it (`obj_create_for`).
     pub(crate) fn obj_show(&mut self, id: Id) {
-        let packets = self.obj_create(id);
         match self.ghost_owner(id) {
             Some(owner) => {
                 if let Some(c) = self.conn_of(owner) {
-                    for p in packets {
+                    let level = self.world_of(c).map_or(0, |w| w.level);
+                    for p in self.obj_create_for(id, level) {
                         self.send(c, p);
                     }
                 }
             }
             None => {
-                for p in packets {
-                    self.broadcast(&p);
+                let packets = self.obj_create(id);
+                let arrow = self.sim.object(id).is_some_and(|v| Self::planted_arrow(&v));
+                if !arrow {
+                    for p in packets {
+                        self.broadcast(&p);
+                    }
+                    return;
+                }
+                let arrows = self.obj_create_for(id, ARROW_LEVEL);
+                let conns: Vec<(ConnId, bool)> = self.in_world().map(|(c, _, w)| (*c, w.level >= ARROW_LEVEL)).collect();
+                for (c, newer) in conns {
+                    for p in if newer { &arrows } else { &packets } {
+                        self.send(c, p.clone());
+                    }
                 }
             }
         }
@@ -914,13 +972,14 @@ impl SurvivalGame {
             }
         }
         let me = self.world_of(conn).map(|w| w.id);
+        let level = self.world_of(conn).map_or(0, |w| w.level);
         let objs: Vec<Id> = self.sim.objs.keys().copied().collect();
         for id in objs {
             // Someone else's ghost isn't theirs to see.
             if self.ghost_owner(id).is_some_and(|o| Some(o) != me) {
                 continue;
             }
-            for p in self.obj_create(id) {
+            for p in self.obj_create_for(id, level) {
                 self.send(conn, p);
             }
         }

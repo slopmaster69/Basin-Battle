@@ -22,9 +22,11 @@ pub const PLANT_LOOK: u32 = 2630;
 pub const PLANT_SCALE: f32 = 1.0;
 /// And a friend's green ring on the ground under it, this wide, that reads from across a fight.
 pub const PLANT_RING: f32 = 0.5;
-/// And a glow: the Hunter's Flare (1543), its light laid on the ground under the arrow, this wide.
-pub const ARROW_GLOW: u32 = 1543;
-pub const ARROW_GLOW_RADIUS: f32 = 1.5;
+/// And a glow laid on the ground under the arrow, this wide: Frost Trap's pale frost (13810), a
+/// small cold light. (Flare's at 1.5 yd read as a fire under each arrow and lit a whole volley's
+/// circle orange: Corey's review, "it looks like fire... grey? white? smaller to avoid clutter".)
+pub const ARROW_GLOW: u32 = 13810;
+pub const ARROW_GLOW_RADIUS: f32 = 0.6;
 /// A tripwire trips anything within this of the wire.
 const WIRE_REACH: f32 = 0.7;
 /// The most a tripwire spans: its second arrow plants within this of the first (the ring shown
