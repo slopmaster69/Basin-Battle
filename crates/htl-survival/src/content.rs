@@ -3161,6 +3161,9 @@ impl Content {
             if !a.is_ex() && !a.inner && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
                 bail!("{what}: a card needs its column, `school` (one of {SCHOOLS:?}, or {BETA} for the beta page)");
             }
+            if a.bow_damage > 0.0 && (!a.bow || a.kind != "projectile" || a.damage[1] > 0.0) {
+                bail!("{what}: a share of the bow's damage (`bow_damage`) is for a bow's projectile, in place of its own `damage`");
+            }
             if a.kind == "art" && a.weapon <= 0.0 {
                 bail!("{what}: a weapon art needs its share of the weapon's damage (`weapon`)");
             }

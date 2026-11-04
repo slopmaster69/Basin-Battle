@@ -538,6 +538,7 @@ impl Survival {
         let damage = AbilityDef::at(d.damage, t.share);
         self.area(t.owner, t.ability, t.at, burst, t.share, damage, None);
         self.linger_at(t.owner, t.ability, t.at, burst);
+        self.trap_empowers(t.owner, t.ability);
     }
 
     // --- anchors (Demonic Circle) -----------------------------------------------------------------

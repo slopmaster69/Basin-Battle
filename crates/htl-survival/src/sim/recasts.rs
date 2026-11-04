@@ -95,7 +95,8 @@ impl Survival {
         // A recast arms nothing, unless it chains on to one of its own (Raptor Strike's hits).
         let recast = self.content.ability(&d.recast).filter(|_| !matches!(free, Some(Free::Recast { .. })) || d.inner);
         let window = d.recast_secs;
-        let empower = d.empower.as_ref().and_then(|e| Some((self.content.ability(&e.ability)?, e.secs)));
+        // A trap's empowers when it springs (`trap_empowers`), not when it's set.
+        let empower = d.empower.as_ref().filter(|_| d.kind != "trap").and_then(|e| Some((self.content.ability(&e.ability)?, e.secs)));
         // A chain's later hit arms its next on the key it's on (Raptor Strike's).
         let base = if d.inner { self.chain_key(id, ability).unwrap_or_else(|| self.content.base_of(ability)) } else { self.content.base_of(ability) };
         let start = self.standing_spot(began);
@@ -112,6 +113,17 @@ impl Survival {
         if changed {
             self.events.push(Event::Abilities { player: id });
         }
+    }
+
+    /// A trap has sprung: the card it empowers is empowered now, for its time (Freezing Trap's free
+    /// Multi-Shot comes as the ice takes, so there's time to turn and fire; set, a trap may wait
+    /// long past it. Serg's play-test, #118).
+    pub(crate) fn trap_empowers(&mut self, id: Id, trap: usize) {
+        let now = self.clock;
+        let Some((b, secs)) = self.content.abilities[trap].empower.as_ref().and_then(|e| Some((self.content.ability(&e.ability)?, e.secs))) else { return };
+        let Some(p) = self.players.get_mut(&id) else { return };
+        p.combos.empowered.insert(b, now + secs);
+        self.events.push(Event::Abilities { player: id });
     }
 
     /// The base ability on a key of the hero's whose chain of recasts (its own, or its EX
