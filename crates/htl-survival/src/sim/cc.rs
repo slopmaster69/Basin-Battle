@@ -132,8 +132,8 @@ impl Survival {
         }
         // A boon (Onslaught, holy ground's) helps: the rules that soften what harms don't touch it.
         let boon = crate::content::BOONS.contains(&kind);
-        // Nothing reaches someone in Ice Block.
-        if self.immune(target) && !boon {
+        // Nothing reaches someone in Ice Block, or in Retaliation's answer.
+        if self.untouchable(target) && !boon {
             return false;
         }
         // Freed (Blessing of Freedom): no root, slow or stun takes hold.
@@ -306,7 +306,7 @@ impl Survival {
     /// after enough).
     pub(crate) fn cc_on_damage(&mut self, id: Id, damage: u32) -> u32 {
         let now = self.clock;
-        if self.immune(id) {
+        if self.untouchable(id) {
             return 0;
         }
         let Some(list) = self.cc.get_mut(&id) else { return damage };
@@ -552,6 +552,12 @@ impl Survival {
         }
         self.told_immune.insert(key, now + IMMUNE_TOLD_EVERY);
         self.events.push(Event::Flash { player: from, text: format!("{}: Immune", self.unit_name(target)) });
+    }
+
+    /// Nothing reaches them: Ice Block, or a hero's heavy attack out of Retaliation's parry while it
+    /// goes out. Unlike Ice Block, the second doesn't stop them acting.
+    pub fn untouchable(&self, id: Id) -> bool {
+        self.immune(id) || self.players.get(&id).is_some_and(|p| p.untouchable_until > self.clock)
     }
 
     pub fn immune(&self, id: Id) -> bool {

@@ -239,6 +239,9 @@ pub struct AbilityDef {
     /// With a two-handed weapon (no shield to throw), its key fires this ability instead.
     #[serde(default)]
     pub two_hand: String,
+    /// Only with a one-handed weapon and its shield (Shield Wall): with a two-hander it won't go.
+    #[serde(default)]
+    pub needs_shield: bool,
     /// An ally spell that strikes a foe instead (its `damage`) when one is on the reticle's line
     /// (Holy Shock).
     #[serde(default)]
@@ -701,6 +704,15 @@ pub struct CounterDef {
     /// Ensnaring Retreat), so a read that wasn't needed still does something.
     #[serde(default)]
     pub expire_answer: String,
+    /// A melee blow it catches is parried (as a timed guard would: the attacker reels, the hero
+    /// gets a parry's stamina and opening) and the hero answers with their own heavy attack at
+    /// once, free, untouchable until it has struck (Retaliation).
+    #[serde(default)]
+    pub parry_heavy: bool,
+    /// While it lasts, a left click with the guard held (or the bash key) shoves with the shield,
+    /// harder, and the stance holds on after it (Shield Wall's Shield Bash).
+    #[serde(default)]
+    pub bash: bool,
 }
 
 fn whole() -> f32 {

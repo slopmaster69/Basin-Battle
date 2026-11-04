@@ -628,6 +628,11 @@ impl Survival {
             _ => ability,
         };
         let d = self.content.abilities[ability].clone();
+        // A shield's ability, with no shield in hand (a two-handed weapon).
+        if d.needs_shield && self.players.get(&id).is_some_and(|p| self.weapon_of(p).two_handed) {
+            self.events.push(Event::Flash { player: id, text: format!("{} requires a shield", d.name) });
+            return true;
+        }
         if self.silenced(id) || self.immune(id) {
             // Why nothing happened, said where the hero is looking.
             let why = if self.silenced(id) { "Can't use abilities while silenced" } else { "Can't cast now" };
@@ -2249,7 +2254,10 @@ impl Survival {
     pub(crate) fn cone_at(&mut self, id: Id, ability: usize, at: Vec3, yaw: f32, share: f32) {
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);
-        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        // Sent at the caster's spot, not at the caster: the client plays a spell's impact on
+        // every unit it names as struck, and some impacts are a knockdown (Shockwave's put its
+        // own caster on the ground).
+        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         // A blow of the weapon's (Shockwave, Retaliation's sweep): a share of its roll.
         let swing = self.players.get(&id).filter(|_| d.weapon > 0.0).map(|p| self.weapon_of(p).damage);
         let damage = match swing {
@@ -2269,7 +2277,8 @@ impl Survival {
     pub(crate) fn nova(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
         let d = self.content.abilities[ability].clone();
         let radius = AbilityDef::at(d.radius, share);
-        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        // At the spot, not at the caster (see `cone_at`).
+        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         let damage = AbilityDef::at(d.damage, share);
         self.area(id, ability, at, radius, share, damage, None);
         if self.debug {
@@ -2690,6 +2699,29 @@ impl Survival {
         }
         if let Some(st) = self.stances.get_mut(&victim) {
             st.caught = true;
+        }
+        // Retaliation: a melee blow is parried, as a timed guard would, and the hero's own heavy
+        // attack goes out at once, nothing touching them until it strikes.
+        if c.parry_heavy && how == HitKind::Melee && self.players.contains_key(&victim) {
+            let from = self.unit_pos(attacker).unwrap_or(self.players[&victim].pos);
+            // No second burst of the brace's spikes: seen in the lab, they hung over the heavy
+            // answer. The parry's spark and the heavy say it.
+            self.parry_pays(victim, attacker);
+            self.parry_looks(victim, from);
+            self.end_stance(victim);
+            // Turned to the one it parried, so the answer goes their way. The client turns the
+            // body (its facing comes back with every step), so with nothing else held the hero
+            // locks on to them: seen in the lab, the answer swung off the way the camera faced.
+            if let Some(p) = self.players.get_mut(&victim) {
+                p.facing = facing(p.pos, from);
+                if p.lock.is_none() && attacker != victim {
+                    p.lock = Some(attacker);
+                    p.lock_seen.clear();
+                    self.events.push(Event::Lock { player: victim, target: Some(attacker) });
+                }
+            }
+            self.heavy_answer(victim);
+            return Some(Outcome::Parried);
         }
         if self.players.contains_key(&victim) {
             self.gain_valor(victim, self.content.valor.counter);

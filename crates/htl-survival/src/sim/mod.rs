@@ -127,6 +127,10 @@ impl Strike {
     pub fn shove(&self) -> bool {
         matches!(self.kind, StrikeKind::Bash | StrikeKind::Kick)
     }
+    /// Shield Wall's Shield Bash: a bash worth more than its own roll (see `WALL_BASH`).
+    pub fn wall_bash(&self) -> bool {
+        self.kind == StrikeKind::Bash && self.damage > 1.0
+    }
 }
 
 /// Where a missile or a visual goes.
@@ -517,6 +521,9 @@ pub struct Player {
     pub riposte_until: f32,
     /// A parry's opening: until then everything they do costs half the stamina.
     pub opening_until: f32,
+    /// Retaliation's answer: nothing touches them (no damage, no effect, no stagger) until then,
+    /// while their heavy attack goes out.
+    pub untouchable_until: f32,
     /// Who struck them last (a fall to another hero is announced).
     pub last_hit_by: Option<Id>,
     /// What the next hurt on them is (set by the blow about to land), and the hurts of the last
@@ -1106,6 +1113,7 @@ impl Survival {
             landing_attack: None,
             riposte_until: -100.0,
             opening_until: -100.0,
+            untouchable_until: -100.0,
             last_hit_by: None,
             cause: None,
             wounds: Vec::new(),
@@ -1235,11 +1243,14 @@ impl Survival {
             self.tell(id, "You fell through the world. You're back on the last firm ground.");
             return;
         }
+        let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
         if pos.iter().all(|v| v.is_finite()) {
             p.pos = pos;
         }
-        if facing.is_finite() {
+        // Retaliation's answer keeps the facing the parry turned it to until it has struck,
+        // whichever way the client's body still faces.
+        if facing.is_finite() && now >= p.untouchable_until {
             p.facing = facing;
         }
         p.moving = moving;
