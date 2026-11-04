@@ -4903,13 +4903,13 @@ range = [8.0, 8.0]
 damage = [10.0, 10.0]
 stamina = 12.0
 cooldown = 12.0
-# Earth kicked up at the hero's feet as the rush starts (Rocky Ground Impact, 26271: a brown
-# burst, played at the spot). Not a charge look: every charge-like look in the game data (Charge,
-# Intercept, the creatures' charges) is the one kit with the purple trail and the dust cloud that
-# made a Tackle look like a Charge (Corey's review, Nov 3; seen again in the lab on Intercept's,
-# Nov 4). The barge itself and the Crash (dust, War Stomp's shock ring, the heavy flash) are the
-# rest of the look.
-spell = 26271
+# No rush look: every charge-like look in the game data (Charge, Intercept, the creatures'
+# charges) is the one kit with the purple trail and the dust cloud that made a Tackle look like a
+# Charge (Corey's review, Nov 3; seen again in the lab on Intercept's, Nov 4), and the ground
+# bursts (Rocky Ground Impact) are blue rings that read as a second Shockwave. The barge itself
+# and the Crash (Shield Bash's mark and the heavy flash on the one crashed, the knockdown's
+# dust) are the look.
+spell = 0
 # The shoulder hit, the same on every race: the orc men's Shield Bash (59/0), the one attack clip
 # that's a body check (shoulder and shield driven forward, low) rather than a weapon swing, as
 # Corey asked (his review, Nov 3). It plays over the rush and lands as the rush ends.

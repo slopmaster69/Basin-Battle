@@ -162,8 +162,8 @@ fn the_board_keeps_to_its_budgets() {
     for (k, ex) in board(c) {
         let d = &c.abilities[k];
         assert!(!d.text.is_empty() && !d.icon.is_empty(), "{}: its words and icon", d.key);
-        // (A shout's look is on each friend it reaches: `ally_spell`.)
-        assert!(d.spell != 0 || d.ally_spell != 0 || d.kind == "art", "{}: its look", d.key);
+        // (A shout's look is on each friend it reaches: `ally_spell`; a Tackle's is its Crash.)
+        assert!(d.spell != 0 || d.ally_spell != 0 || d.kind == "art" || d.crash.is_some(), "{}: its look", d.key);
         if d.kind == "art" {
             continue;
         }
