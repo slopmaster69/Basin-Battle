@@ -42,7 +42,7 @@ ES.CUE = {
   -- fight to aim the Stoop that follows (Corey's review: "zoom in and tip down"): distance,
   -- right, up, the tip down (radians; the sixteenth client, older ones only come in), and for
   -- how long (the rise's time in the air), then back to the aiming camera or off.
-  rise = { cam = { 1.6, 0.4, 0.8, 0.5, 1.4 } },
+  rise = { cam = { 2.6, 0.4, 1.2, 0.55, 1.4 } },
 }
 
 function ES.CueLine(f)
