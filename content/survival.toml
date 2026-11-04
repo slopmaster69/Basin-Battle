@@ -3551,7 +3551,10 @@ health_cost = 0.15
 # Placeholder looks (to be checked in the lab): the orcs' Blood Fury cast, Death Wish's red on the
 # warrior while it lasts (the `fury` look), the roar (55) as the clip.
 spell = 20572
+# The orc men's battle roar (55/0) on every race: the pose the orcs' own Blood Fury strikes.
 clip = 55
+take = 0
+from = "OrcMale"
 effects = [{ kind = "fury", secs = [8.0, 8.0], amount = 0.25 }]
 
 # Steel, the Warlord's (`choice = 2`, from the Juggernaut's): punish the swing. A parry the hero
