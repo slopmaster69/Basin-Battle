@@ -6535,7 +6535,10 @@ events:SetScript("OnEvent", function()
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
     -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
+    -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and (tonumber(HasActionCombat()) or 0) >= 17 then
+      Say(".es hello " .. VERSION .. " ac17")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
       Say(".es hello " .. VERSION .. " ac12")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
       Say(".es hello " .. VERSION .. " ac11")

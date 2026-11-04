@@ -2610,6 +2610,9 @@ impl Survival {
 
     /// Tackle's rush puffs dust from the feet this often (seconds), from its first step.
     const TACKLE_DUST_EVERY: f32 = 0.2;
+    /// The puff: a landing's small dust cloud (kit 44, DustCloud_Land), not the knockdown's nova
+    /// (5649), which buried the whole rush in the lab.
+    const KIT_RUSH_DUST: u32 = 44;
 
     fn start_dash(&mut self, id: Id, ability: usize, yaw: f32, share: f32) {
         let d = self.content.abilities[ability].clone();
@@ -2961,7 +2964,7 @@ impl Survival {
                 // Tackle's rush kicks up dust from the feet as it goes: a look of its own, apart
                 // from Charge's purple and the other classes' dashes (Corey's review, Nov 4).
                 if self.content.abilities[ability].crash.is_some() && (t <= 0.0 || ((t + dt) / Self::TACKLE_DUST_EVERY).floor() > (t / Self::TACKLE_DUST_EVERY).floor()) {
-                    self.events.push(Event::Visual { id, kit: combat::KIT_DUST, by: None });
+                    self.events.push(Event::Visual { id, kit: Self::KIT_RUSH_DUST, by: None });
                 }
                 // Going through: each body passed by now takes its blow (and an answer to one, a
                 // counter's stagger, ends the dash).
