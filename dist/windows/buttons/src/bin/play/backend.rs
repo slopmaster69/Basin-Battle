@@ -265,7 +265,7 @@ pub fn read_settings_sh(file: &Path) -> Settings {
 /// Play's lines in settings.sh, rewritten; the scripts' own lines kept as they are.
 pub fn save_settings_sh(file: &Path, s: &Settings) {
     let mut lines: Vec<String> = fs::read_to_string(file).unwrap_or_default().lines()
-        .filter(|l| !SH_NAMES.iter().any(|(k, n)| s.contains_key(*k) && l.starts_with(&format!("{n}="))))
+        .filter(|l| !SH_NAMES.iter().any(|(_, n)| l.starts_with(&format!("{n}="))))
         .map(String::from).collect();
     for (k, n) in SH_NAMES {
         if let Some(v) = s.get(k) {
@@ -1091,6 +1091,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)] // bash reads settings.sh, as the Mac scripts do
     fn settings_sh_beside_the_scripts() {
         let dir = std::env::temp_dir().join(format!("play-settings-sh-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
@@ -1108,6 +1109,10 @@ mod tests {
         assert_eq!(again["wow"], s["wow"]);
         assert_eq!(again["place"], "backup2");
         assert_eq!(again["address"], "it'sHTL_HOST=evil");
+        // A choice cleared is gone from the file, not read back from an older line.
+        s.remove("place");
+        save_settings_sh(&f, &s);
+        assert!(!read_settings_sh(&f).contains_key("place"));
         let _ = fs::remove_dir_all(dir);
     }
 
