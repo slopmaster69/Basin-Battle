@@ -1259,9 +1259,8 @@ impl Survival {
             }
             // Gone home past its leash: the blow finds nothing.
             if self.evading(mid, id) {
-                // No word: the blow passes through and finds nothing (its miss), as WoW's own
-                // creature does on its way home.
-                self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style });
+                // No word, and no "Miss" floating over it either (Corey: hide it): the blow
+                // passes through and finds nothing, and the creature walking home says the rest.
                 continue;
             }
             // A shield-bearer between blows, facing the blow, may take a light one on its shield.
@@ -1760,12 +1759,17 @@ impl Survival {
             }
             _ => Outcome::Hit,
         };
-        // A parry timed on a giant's blow: it only blocks, and that shows: a dull shield's thud
-        // (no clang, no spark), a heavier shove of the camera, the hero driven down into the
-        // guard (the block's reaction).
+        // A parry timed on a giant's blow: it only blocks, and that has to read with no word
+        // (Corey: if it isn't plain, make the cues louder, don't bring the words back). A dull
+        // shield's thud, no clang and no spark; the blow's heavy impact on the hero and dust
+        // kicked up at their feet as they're driven back a step, guard still up; and the hardest
+        // shove of the camera any block gets.
         if giant && timed && outcome == Outcome::Blocked && matches!(doing, Action::Guard) {
             // (Pushed here, not by `cue`: the hero's still borrowed for their armor below.)
             self.events.push(Event::Sound { id: victim, sound: cues::SOUND_TOO_HEAVY });
+            self.events.push(Event::Visual { id: victim, kit: KIT_HEAVY, by: None });
+            self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
+            self.events.push(Event::Hop { player: victim, dir: facing(from, p.pos), speed: TOO_HEAVY_SKID[0], lift: TOO_HEAVY_SKID[1], roll: false, style: "" });
             self.events.push(Event::Beat { player: victim, beat: cues::BEAT_TOO_HEAVY, on: victim });
         }
         // Armor takes its share off whatever gets through.
@@ -2511,6 +2515,10 @@ pub(crate) struct WeaponReach {
     pub arc: f32,
 }
 
+/// A giant's blow on a parry that can only block: the hero driven back along the ground,
+/// guard up (speed, lift: a skid, not a throw; a shove is 6 to 8 with 1.5 to 2 of lift). A
+/// starting number: check on video.
+const TOO_HEAVY_SKID: [f32; 2] = [4.5, 0.3];
 /// The reactions (`AnimationData`): a flinch, a heavy blow's, a stagger's reel, the shield taking
 /// a blow.
 pub const WOUND_ANIM: u16 = 9;

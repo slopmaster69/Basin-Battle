@@ -135,6 +135,23 @@ fn the_lock_still_wins() {
 }
 
 #[test]
+fn error_speech_turned_off_keeps_the_words_and_drops_the_voice() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    slot_call(&mut s, p, false);
+    // The game's Error Speech off (the add-on's `.es speech 0`): never forced on anyone.
+    s.set_error_speech(p, false);
+    let ev = call(&mut s, p, Some((0.0, 0.0)));
+    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "No enemy in range")), "the words stay");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Hear { player, .. } if *player == p)), "no voice: {ev:?}");
+    // On again, it speaks.
+    s.set_error_speech(p, true);
+    run_pinned(&mut s, 1.0, &[]);
+    let ev = call(&mut s, p, Some((0.0, 0.0)));
+    assert!(crate::sim::cues::seen::heard(&ev, p, 1913), "the hero's own voice again");
+}
+
+#[test]
 fn a_call_costs_its_stage_and_waits_a_moment_for_the_next_and_a_miss_costs_nothing() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);

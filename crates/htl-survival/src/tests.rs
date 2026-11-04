@@ -966,6 +966,14 @@ fn a_giant_is_too_heavy_to_parry_a_timed_guard_only_blocks_it() {
     // No word says why: a shield's dull thud (no parry's clang) and the view shoved hard.
     assert!(crate::sim::cues::seen::sounded(&ev, p, crate::sim::cues::SOUND_TOO_HEAVY), "the guard's thud");
     assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_TOO_HEAVY), "driven into the guard");
+    // Louder than a plain block, so it reads with no word: the heavy impact and dust on the hero,
+    // and a skid back away from the giant (not a throw).
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_HEAVY)), "the heavy impact on the hero");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_DUST)), "dust at their feet");
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Hop { player, dir, lift, .. } if *player == p && *lift < 1.0 && angle_between(*dir, std::f32::consts::PI) < 1.0)),
+        "skidded back, away from the giant: {ev:?}"
+    );
     assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
     // A humanoid boss can still be parried.
     let mut s = world();

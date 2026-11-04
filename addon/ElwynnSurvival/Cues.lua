@@ -28,8 +28,9 @@ ES.CUE = {
   backstab = { stop = 110, shake = { 1.6, 0.14 } },
   -- A champion's stance breaking: a long stop on it, a heavy shake.
   ["break"] = { stop = 160, shake = { 4.2, 0.32 }, kick = { 0.06, 0.3 } },
-  -- A parry that only blocks (a giant's blow): driven into the guard, the view shoved hard.
-  too_heavy = { stop = 70, shake = { 5.5, 0.3 }, kick = { 0.08, 0.3 }, self = true },
+  -- A parry that only blocks (a giant's blow): driven back into the guard, the view shoved
+  -- harder than any other block takes it, so it reads with no word (Corey: louder cues, not text).
+  too_heavy = { stop = 95, shake = { 6.5, 0.34 }, kick = { 0.12, 0.34 }, self = true },
   -- A body crashing into a wall: a stop on it and a thump of the view.
   wall = { stop = 120, shake = { 3.2, 0.24 } },
   -- A killing blow cheated: the world held around the hero a long moment, the view barely moving.
@@ -77,4 +78,27 @@ glow:SetScript("OnUpdate", function()
   end
   -- Two quick blinks as it fills back.
   v:SetAlpha(1 - 0.6 * math.abs(math.sin(t * 3.14159 * 2)))
+end)
+
+-- The game's Error Speech setting (Sound): the server voices a refusal ("Out of range.") only
+-- while it's on, so it's never forced on anyone. Told once a server is awake and again whenever
+-- the setting changes; a client without the setting leaves the server's default (on).
+local speech = CreateFrame("Frame", nil, UIParent)
+speech.wait, speech.sent = 0, nil
+speech:SetScript("OnUpdate", function()
+  this.wait = this.wait - (arg1 or 0)
+  if this.wait > 0 then return end
+  this.wait = 1
+  if not ES.awake then
+    this.sent = nil
+    return
+  end
+  local v = ES.CVar and ES.CVar("EnableErrorSpeech")
+  if v == nil then return end
+  local on = 0
+  if v ~= 0 then on = 1 end
+  if on ~= this.sent and ES.Say then
+    this.sent = on
+    ES.Say(".es speech " .. on)
+  end
 end)

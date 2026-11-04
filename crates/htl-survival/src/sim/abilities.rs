@@ -1956,8 +1956,8 @@ impl Survival {
             return;
         }
         if self.players.contains_key(&owner) && self.evading(mid, owner) {
-            // No word: it finds nothing (its miss), as WoW's creature on its way home.
-            self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style: Blow::Arrow(spell) });
+            // No word and no floating "Miss" (Corey: hide it): it finds nothing, and the
+            // creature walking home says the rest.
             return;
         }
         // A dummy in a counter's stance.

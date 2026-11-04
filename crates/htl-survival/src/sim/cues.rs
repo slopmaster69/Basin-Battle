@@ -136,9 +136,24 @@ impl Survival {
         self.say_vocal(id, line);
     }
 
+    /// Whether a hero hears their own voice on a refusal: the game's Error Speech setting, as
+    /// their add-on reports it (on until it says otherwise).
+    pub fn set_error_speech(&mut self, id: Id, on: bool) {
+        if on {
+            self.no_error_speech.remove(&id);
+        } else {
+            self.no_error_speech.insert(id);
+        }
+    }
+
     /// The hero says `line` (to themselves: no one else hears it), unless they just said one.
     pub(crate) fn say_vocal(&mut self, id: Id, line: Vocal) {
         let Some(look) = self.players.get(&id).map(|p| p.look) else { return };
+        // The game's own Error Speech switch is theirs to turn off (Corey: never forced on
+        // anyone), and turns this off with it.
+        if self.no_error_speech.contains(&id) {
+            return;
+        }
         let now = self.clock;
         if self.told_vocal.get(&id).is_some_and(|t| now < *t) {
             return;

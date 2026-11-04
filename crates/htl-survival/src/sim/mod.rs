@@ -889,6 +889,9 @@ pub struct Survival {
     pub(crate) told_immune: BTreeMap<(Id, Id), f32>,
     /// When a hero may next say a refusal in their own voice.
     pub(crate) told_vocal: BTreeMap<Id, f32>,
+    /// Heroes who turned the game's Error Speech off (their add-on says so): no voice on a
+    /// refusal for them, the words only.
+    pub(crate) no_error_speech: BTreeSet<Id>,
     /// Counters' stances (a hero's, a dummy's), by unit.
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
@@ -994,6 +997,7 @@ impl Survival {
             fx_vs_bosses: false,
             told_immune: BTreeMap::new(),
             told_vocal: BTreeMap::new(),
+            no_error_speech: BTreeSet::new(),
             grounds: Vec::new(),
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),

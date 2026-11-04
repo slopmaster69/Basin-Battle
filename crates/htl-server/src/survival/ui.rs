@@ -13,7 +13,9 @@
 //! - `AR\t<key~name~kind~held~text>^...`: the weapon rack.
 //! - `FL\t<text>`: words flashed big: a refusal (out of range, not ready, too winded) or a hint,
 //!   never an outcome. A refusal's voice comes with it as `SMSG_PLAY_SOUND` (the hero's race and
-//!   sex voice, `sim::cues::vocal_sound`), which the stock client plays: no line for it.
+//!   sex voice, `sim::cues::vocal_sound`), which the stock client plays: no line for it. Only
+//!   while the game's Error Speech setting is on: add-on 21 sends `.es speech 0|1` once awake and
+//!   whenever that's changed (no add-on, or an older one: on).
 //! - `CU\t<beat>\t<guid>`: an outcome of the hero's (since add-on 21): its beat on their screen
 //!   (`crit`, `shatter`, `execute`, `backstab`, `break`, `too_heavy`, `wall`, `cheat_death`,
 //!   `readied`, `valor`), `guid` the unit it happened to (0x0 none). Its look and sound come
@@ -1293,6 +1295,12 @@ impl SurvivalGame {
                 Ok(())
             }
             // The board (N): its window, and unlocking a card of it.
+            // `.es speech 0|1`: the game's Error Speech setting (the add-on sends it on login
+            // and when it's changed): off, a refusal keeps its words and loses its voice.
+            "speech" => {
+                self.sim.set_error_speech(me, arg != "0");
+                Ok(())
+            }
             "tree" => match arg.as_str() {
                 "" | "open" => {
                     self.ui_tree(conn, me);
