@@ -114,7 +114,14 @@ pub struct Stance {
     pub ability: usize,
     pub until: f32,
     pub caught: bool,
+    /// When its lasting look (an `aura` apart from its `spell`: Shield Wall's circling shields)
+    /// was last played on the body; it's played again every [`STANCE_LOOK_EVERY`] while it holds.
+    pub shown: f32,
 }
+
+/// How often a stance's lasting look is played again while it holds (the game's look is a
+/// one-shot of about this long, so played this often it reads as one circling effect).
+pub const STANCE_LOOK_EVERY: f32 = 1.2;
 
 /// An ability's cooldown: the charges in hand, and when the next comes back.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -2692,7 +2699,7 @@ impl Survival {
     fn start_stance(&mut self, id: Id, ability: usize) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false });
+        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, shown: now - STANCE_LOOK_EVERY });
         self.set_action(id, Action::Stance { ability, until: now + d.secs });
         if d.counter.as_ref().is_some_and(|c| c.guard_pose) {
             self.events.push(Event::Guard { player: id, up: true });
@@ -2741,6 +2748,24 @@ impl Survival {
         let done: Vec<Id> = self.stances.iter().filter(|(_, s)| s.until <= now).map(|(id, _)| *id).collect();
         for id in done {
             self.end_stance(id);
+        }
+        // A stance's lasting look (Shield Wall's circling shields, 871) is a one-shot in the game
+        // data: played again every so often, it circles for as long as the stance holds (Corey's
+        // review: the shields while it lasts, and the block's flash too).
+        let again: Vec<(Id, u32)> = self
+            .stances
+            .iter()
+            .filter(|(_, s)| s.until > now && now >= s.shown + STANCE_LOOK_EVERY)
+            .filter_map(|(id, s)| {
+                let d = &self.content.abilities[s.ability];
+                (d.aura != 0 && d.aura != d.spell && self.players.contains_key(id)).then_some((*id, d.aura))
+            })
+            .collect();
+        for (id, aura) in again {
+            if let Some(s) = self.stances.get_mut(&id) {
+                s.shown = now;
+            }
+            self.events.push(Event::Missile { caster: id, spell: aura, target: Target::Unit(id) });
         }
     }
 
@@ -2988,7 +3013,7 @@ impl Survival {
                 let free = !self.stances.contains_key(&mid);
                 if free && (now % 4.0) < 0.06 {
                     let secs = self.content.abilities[a].secs;
-                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false });
+                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, shown: now - STANCE_LOOK_EVERY });
                     self.events.push(Event::Auras { id: mid });
                 }
             }

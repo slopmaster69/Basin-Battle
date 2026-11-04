@@ -382,7 +382,7 @@ fn war_banner_marks_the_heroes_near_it() {
     plant(&mut s, a);
     assert!(s.has_cc(a, "war_banner") && s.has_cc(b, "war_banner"), "Ayla and Bren near it");
     assert!(!s.has_cc(c, "war_banner"), "Cara far off");
-    assert!(s.auras_of(b).contains(&6673), "the banner's look over Bren: {:?}", s.auras_of(b));
+    assert!(s.auras_of(b).contains(&18499), "the banner's look over Bren: {:?}", s.auras_of(b));
     s.move_player(b, [30.0, 5.0, 0.0], 0.0, Moving::default());
     run(&mut s, 0.5);
     assert!(!s.has_cc(b, "war_banner"), "gone once he walks away");

@@ -177,7 +177,11 @@ impl Survival {
         self.warlord.tackles.insert(id, (ability, outcome, end));
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
         self.events.push(Event::Dash { player: id, dir: yaw, speed: rush / secs, secs });
-        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        // The rush's look is a burst at the hero's feet as they go (an area look, so it's sent at
+        // the spot, not on the body); the barge and the Crash are the rest of it.
+        if d.spell != 0 {
+            self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(pos) });
+        }
         // The shoulder hit's clip over the rush, as a dash's (twice the rush, so its blow lands as
         // the rush ends). Without it the Tackle was Charge's run and nothing else.
         if d.clip != 0 {
