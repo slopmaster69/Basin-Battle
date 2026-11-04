@@ -1302,10 +1302,9 @@ impl Survival {
                 self.trade_blows(id, mid);
                 continue;
             }
-            // Gone home past its leash: the blow finds nothing.
+            // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
             if self.evading(mid, id) {
-                self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style });
-                self.events.push(Event::Flash { player: id, text: "Evade".into() });
+                self.whiff(mid, pos);
                 continue;
             }
             // A shield-bearer between blows, facing the blow, may take a light one on its shield.
