@@ -295,7 +295,8 @@ fn charge_stops_at_the_first_foe_in_its_line_and_staggers_it() {
 #[test]
 fn an_old_warriors_save_comes_back_with_the_new_cards() {
     let (s, p) = load_old_save("warrior", &[("ranged", "aimed_throw"), ("close", "sundering_blow"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
-    has_on_keys(&s, p, &[("ranged", "hurled_axe"), ("close", "shockwave"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
+    // (Retaliation is the Warlord's defense now, Onslaught retired into Bladestorm's place.)
+    has_on_keys(&s, p, &[("ranged", "hurled_axe"), ("close", "shockwave"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "warrior_bladestorm")]);
     assert_eq!(crate::save::renamed("aimed_throw"), "hurled_axe");
 }
 
@@ -788,24 +789,6 @@ fn shield_wall_holds_the_shield_up_blocks_from_the_front_only_and_its_key_lowers
     let ev = press_again(&mut s, a, "defense");
     assert!(!matches!(s.players[&a].action, Action::Stance { .. }), "its key lowers it");
     assert!(ev.iter().any(|e| matches!(e, Event::Guard { player, up: false } if *player == a)));
-}
-
-#[test]
-fn onslaught_grows_you_glows_red_and_quickens_your_blows_for_8_sec() {
-    let mut s = world();
-    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let before = s.strike_at(a, StrikeKind::Light, 0).windup;
-    s.set_valor(a, 100.0);
-    let mut ev = press(&mut s, a, "onslaught", false);
-    ev.extend(run(&mut s, 0.5));
-    assert!(s.has_cc(a, "onslaught"));
-    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && *scale > 1.2)), "larger");
-    assert!(ev.iter().any(|e| matches!(e, Event::Glow { id, secs } if *id == a && *secs > 7.0)), "red the whole time");
-    let quick = s.strike_at(a, StrikeKind::Light, 0).windup;
-    assert!(quick < before * 0.9, "quicker blows: {before:.3} to {quick:.3}");
-    let ev = run(&mut s, 8.0);
-    assert!(!s.has_cc(a, "onslaught"));
-    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && (*scale - 1.0).abs() < 0.01)), "back to size");
 }
 
 

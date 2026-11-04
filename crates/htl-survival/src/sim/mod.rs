@@ -240,7 +240,7 @@ pub enum Event {
     /// `id`'s weapon glows red for `secs`, for everyone who can see it (the striker too): a blow
     /// no guard stops is on its way.
     Glow { id: Id, secs: f32 },
-    /// `id`'s body drawn at `scale` (1: as it is): Onslaught's titan.
+    /// `id`'s body drawn at `scale` (1: as it is): Rallying Cry's warrior.
     Grow { id: Id, scale: f32 },
     /// `id` rides `display` (a mount's creature display; 0: on foot): Divine Steed.
     Mount { id: Id, display: u32 },

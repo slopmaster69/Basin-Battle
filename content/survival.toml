@@ -1845,8 +1845,8 @@ boss = true
 posture = 240
 drops = { ore = [3, 4], bronze = [1, 2], leather = [1, 2] }
 trophy = { warlord_axe = 1, warlord_helm = 1 }
-# The Warrior's champion: every hero who fought him learns Onslaught and Bladestorm as he falls.
-teaches = ["onslaught", "warrior_bladestorm"]
+# The Warrior's champion: every hero who fought him learns Bladestorm and Rallying Cry as he falls.
+teaches = ["warrior_bladestorm", "rallying_cry"]
 respawn = 600.0
   [mob.attack]
   windup = 0.9
@@ -3002,8 +3002,18 @@ panic_speed = 5.0
 ranged = "hurled_axe"
 close = "shockwave"
 utility = "charge"
-defense = "retaliation"
-ultimate = "onslaught"
+defense = "berserker_rage"
+ultimate = "warrior_bladestorm"
+
+[momentum]
+# The Juggernaut's own (any hero with one of the Juggernaut's cards on a key: `passive =
+# "momentum"`, on each of its five): each of their own blows that lands, a light, a heavy or a
+# weapon art, adds a stack, 5% more damage a stack, up to 5 (25%, Blood Fury's worth, earned by
+# keeping on hitting). Raising the guard drops them all, and so do 4 sec without a hit: the
+# berserker doesn't stop to block. First numbers for tuning (the designer's, Nov 4).
+damage = 0.05
+most = 5
+secs = 4.0
 
 # === Q: ranged ======================================================================================
 
@@ -3017,6 +3027,7 @@ icon = "INV_ThrowingAxe_01"
 school = "warrior"
 slot = "ranged"
 kind = "projectile"
+passive = "momentum"
 free = true
 returns = true
 recall = true
@@ -3196,6 +3207,7 @@ icon = "Ability_ShockWave"
 school = "warrior"
 slot = "close"
 kind = "cone"
+passive = "momentum"
 free = true
 range = [9.0, 9.0]
 arc = 60.0
@@ -3350,6 +3362,7 @@ icon = "Ability_Warrior_Charge"
 school = "warrior"
 slot = "utility"
 kind = "dash"
+passive = "momentum"
 free = true
 damage = [10.0, 10.0]
 range = [20.0, 20.0]
@@ -3481,8 +3494,53 @@ effects = [{ kind = "freedom", secs = [4.0, 4.0], amount = 1.0 }, { kind = "hast
 # Staying alive: alone, the answer to a pack or a champion's big blow; in a duel, a read (each
 # catches some things and not others) and a bait.
 
-# Steel: punish the swing. A parry the hero doesn't have to time, then their own heavy attack at
-# once, and nothing touches them while it goes out (a pack can't punish the answer).
+# Steel, the Juggernaut: no guard, no brace. The berserker shrugs off what holds them and keeps
+# swinging (Momentum drops the moment they block), so its defense is getting back up.
+# Berserker Rage is the answer to being caught: it goes off the ground and out of a stagger (the
+# one key that works then), with 3 sec of poise after so the next blow of the same string can't
+# put them straight back down.
+[[ability]]
+key = "berserker_rage"
+name = "Berserker Rage"
+text = "Breaks free of any stagger, knockdown, root or slow. You cannot be staggered for 3 sec. Usable while staggered or knocked down."
+icon = "Spell_Nature_AncestralGuardian"
+school = "warrior"
+slot = "defense"
+kind = "buff"
+passive = "momentum"
+free = true
+breaks_free = true
+# Long enough that when to spend it is a choice (a pack's next knockdown is coming), short enough
+# to have it in most fights.
+cooldown = 16.0
+# Placeholder looks (to be checked in the lab): Berserker Rage's own cast and look on the warrior
+# for the 3 sec, the roar (55) as the clip.
+spell = 18499
+clip = 55
+effects = [{ kind = "steadfast", secs = [3.0, 3.0], amount = 1.0, aura = 18499 }]
+
+# Berserker Rage's EX: blood for fury. 15% of the health they have now (never the last point) for
+# 8 sec of free attacks 25% harder: what Momentum gives at 5 stacks, at once, without having to
+# keep it. Nothing heals it back: the price stays paid.
+[[ability]]
+key = "blood_fury"
+name = "Blood Fury"
+ex_of = "berserker_rage"
+text = "Costs 15% of your current health, never your last point. For 8 sec, your attacks cost no stamina and deal 25% more damage."
+icon = "Racial_Orc_BerserkerStrength"
+slot = "defense"
+kind = "buff"
+valor = 25
+health_cost = 0.15
+# Placeholder looks (to be checked in the lab): the orcs' Blood Fury cast, Death Wish's red on the
+# warrior while it lasts (the `fury` look), the roar (55) as the clip.
+spell = 20572
+clip = 55
+effects = [{ kind = "fury", secs = [8.0, 8.0], amount = 0.25 }]
+
+# Steel, the Warlord's (`choice = 2`, from the Juggernaut's): punish the swing. A parry the hero
+# doesn't have to time, then their own heavy attack at once, and nothing touches them while it
+# goes out (a pack can't punish the answer).
 [[ability]]
 key = "retaliation"
 name = "Retaliation"
@@ -3490,6 +3548,7 @@ text = "Braces for up to 1 sec. The first melee attack that strikes you from the
 icon = "Ability_Warrior_Challange"
 school = "warrior"
 slot = "defense"
+choice = 2
 kind = "stance"
 free = true
 secs = 1.0
@@ -3611,22 +3670,8 @@ spell = 633
 lockout = 60.0
 
 # === 3: ultimate ===================================================================================
-
-# Steel: the onslaught.
-[[ability]]
-key = "onslaught"
-name = "Onslaught"
-text = "For 8 sec, you grow 30% larger and your weapon glows red. Your attacks and guard cost no stamina, you attack 20% faster, you cannot be staggered or knocked back, and your heavy attacks cannot be blocked. Stuns, roots and damage still affect you."
-icon = "Ability_Racial_BloodRage"
-school = "warrior"
-slot = "ultimate"
-kind = "buff"
-free = true
-valor = 100
-cooldown = 40.0
-# Bloodlust's burst and roar.
-spell = 379
-effects = [{ kind = "onslaught", secs = [8.0, 8.0], amount = 0.2 }]
+# (Steel: the Juggernaut's Bladestorm and the Warlord's Rallying Cry are with the Warlord's cards,
+# below.)
 
 # Shadow: marked for death.
 [[ability]]
@@ -4660,86 +4705,86 @@ spell = 19434
 clip = 53
 
 # ------------------------------------------------------------------------- Warrior, the Warlord --
-# The Warrior's second choice on every key (`choice = 2`): the Warlord gives up the Juggernaut's
-# block to drive the group. Its one body slam is Tackle; its cash-in is Cleave, on an opened enemy
-# (staggered, knocked down, stunned, or a boss stance-broken). An EX shares its key's cooldown.
-# First numbers for tuning (Corey's blueprint, Nov 2). None of it seen in the client yet.
+# The Warrior's second choice on every key (`choice = 2`): the Warlord, the commander who holds the
+# line. It plants the ground the group fights from (War Banner), breaks a pack's nerve (Intimidating
+# Roar), cashes in what's opened (Cleave) and opens it (Rising Cut), body-slams with Tackle and
+# covers a friend with Intervene, keeps the Juggernaut's old guard (Retaliation, Shield Wall), and
+# rallies everyone near (Rallying Cry). An opened enemy is staggered, knocked down, stunned,
+# Exposed, or a boss stance-broken. An EX shares its key's cooldown. Its ultimate's old place
+# (Bladestorm) is the Juggernaut's now, below with it. First numbers for tuning (the designer's
+# layout, Nov 4). None of the new ones seen in the client yet.
 
-# Q: the axe that holds a spot. 12 a second for 5 sec within 3 yd (a tick each half second), and
-# the recast tears it back through the pack for 16.
+# Q: the banner that holds the line. Planted where the hero aims, it makes the ground round it the
+# place to fight from: stamina back twice as fast and heavy attacks that stagger 30% longer for
+# every hero within 8 yd. It's a thing in the fight, not a spell: any blow that reaches it, a
+# foe's or a hero's own, takes from its 60 health (two or three of a pack's blows), so where it
+# stands is a choice. The recast moves it once, free (the cooldown was spent planting it), when
+# the fight moves on. 18 sec: it's up a bit over half the time.
 [[ability]]
-key = "ravager"
-name = "Ravager"
-text = "Hurls a great axe to the target spot up to 20 yd away. It lands spinning and stays for 5 sec. Enemies within 3 yd of it take 6 damage every 0.5 sec. Recast to recall it. It tears back to you, dealing 16 damage to every enemy in its 2 yd wide path."
-icon = "INV_Axe_09"
+key = "war_banner"
+name = "War Banner"
+text = "Plants a war banner at the target spot up to 20 yd away. It stands for 10 sec. You and allies within 8 yd regenerate stamina 100% faster, and heavy attacks stagger 30% longer. The banner has 60 health. Every blow that reaches it damages it, an ally's too. Recast to move it to a new spot."
+icon = "INV_Banner_02"
 school = "warrior"
 slot = "ranged"
 choice = 2
-kind = "ground"
+kind = "place"
 range = [20.0, 20.0]
-radius = [3.0, 3.0]
-# The axe's flight: Grasping Axe's spinning axe flown to the spot as it's hurled, landing as it
-# arrives (20 yd at its 40 yd a sec).
-delay = 0.5
-look_lead = 0.5
-spell = 24020
-linger = 5.0
-linger_damage = 12.0
-tick = 0.5
-# Whirlwind's spin where it stands (to be checked in the lab).
-linger_spell = 1680
-cooldown = 10.0
+# Where heroes stand to have its help (8 yd: a pack's whole fight round it, not the whole field).
+radius = [8.0, 8.0]
+secs = 10.0
+cooldown = 18.0
+banner = { health = 60.0, regen = 2.0, stagger = 0.3, aura = 6673, scale = 0.6 }
+recast = "war_banner_move"
+recast_secs = 10.0
+# Placeholder looks (to be checked in the lab): Elwynn's battle-glade banner (4313, seen standing
+# in the Proving Ring) at 60%, Battle Shout's look over each hero near it (the banner's `aura`),
+# the hurl (107) as the clip, Battle Stance's red flare where it lands.
+object = 4313
+spell = 2457
 clip = 107
-valor_hit = 3.0
-recast = "ravager_recall"
-recast_secs = 5.5
 
+# War Banner's recast: the same banner, uprooted and planted at the new spot (its health and time
+# left go with it).
 [[ability]]
-key = "ravager_recall"
-name = "Ravager"
-text = "Ravager's recall. Tears the axe back to you, dealing 16 damage to every enemy in its 2 yd wide path."
-icon = "INV_Axe_09"
+key = "war_banner_move"
+name = "War Banner"
+text = "War Banner's recast. Uproots the banner and plants it at the target spot up to 20 yd away."
+icon = "INV_Banner_02"
 inner = true
 slot = "ranged"
-kind = "line"
-at_once = true
-tears_back = true
+kind = "place"
 range = [20.0, 20.0]
-radius = [1.0, 1.0]
-damage = [16.0, 16.0]
-speed = 40.0
-spell = 24020
-valor_hit = 4.0
-
-# Q's EX: the spear that pulls the fight off a friend. A Taunt isn't crowd control: the enemy acts
-# freely, on you, so it works on a boss too.
-[[ability]]
-key = "heroic_throw"
-name = "Heroic Throw"
-ex_of = "ravager"
-text = "Throws a spear 30 yd along the aimed line. It pierces up to 3 enemies, dealing 16 damage to each and Taunting them for 4 sec (2 sec against heroes). A Taunted enemy attacks only you. A Taunted hero deals 30% less damage to anyone but you."
-icon = "INV_Spear_02"
-slot = "ranged"
-kind = "projectile"
-valor = 25
-damage = [16.0, 16.0]
-range = [30.0, 30.0]
-radius = [0.45, 0.45]
-pierce = 2
-# Level along the line, so it goes through all three, not over the third.
-skims = true
-# The Darkspear's thrown spear, at its own speed.
-speed = 30.0
-spell = 23065
+radius = [8.0, 8.0]
+spell = 2457
 clip = 107
-# Taunt's red flash on each one pierced.
-effects = [{ kind = "taunt", secs = [4.0, 4.0], amount = 0.3, aura = 355 }]
+
+# Q's EX: the roar that breaks their nerve. Not crowd control (they still fight, worse): 25% less
+# damage and 15% slower wind-ups for 6 sec, blows easier to take and to parry, and a creature
+# already near death runs. A boss only takes 10% off its blows, never more, so it's never shut
+# down.
+[[ability]]
+key = "intimidating_roar"
+name = "Intimidating Roar"
+ex_of = "war_banner"
+text = "Roars in a 15 yd cone in front of you. Enemies hit are Cowed for 6 sec (3 sec against heroes). Cowed enemies deal 25% less damage, and their attacks wind up 15% slower. A Cowed enemy below 20% health flees in fear. A boss deals only 10% less damage."
+icon = "Ability_GolemThunderClap"
+slot = "ranged"
+kind = "cone"
+valor = 25
+range = [15.0, 15.0]
+arc = 60.0
+effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 1160 }]
+# Placeholder looks (to be checked in the lab): Intimidating Shout's roar, Demoralizing Shout's
+# look on each one Cowed (the effect's `aura`), the roar (55) as the clip.
+spell = 5246
+clip = 55
 
 # E: the crowd cash-in. No knockback, no stagger: it just hits the opened hard.
 [[ability]]
 key = "cleave"
 name = "Cleave"
-text = "After a 0.5 sec windup, swings your weapon through a 180° arc in front of you, 5 yd deep. Enemies hit take 100% weapon damage. Opened enemies (staggered, knocked down, stunned or stance-broken) take 250% instead."
+text = "After a 0.5 sec windup, swings your weapon through a 180° arc in front of you, 5 yd deep. Enemies hit take 100% weapon damage. Opened enemies (staggered, knocked down, stunned, Exposed or stance-broken) take 250% instead."
 icon = "Ability_Warrior_Cleave"
 school = "warrior"
 slot = "close"
@@ -4756,21 +4801,31 @@ clip = 19
 spell = 845
 valor_hit = 6.0
 
-# E's EX: the stomp that makes the openings easier to earn. Slowed swings aren't crowd control:
-# the pack still acts, just slower, so its blows are easier to parry.
+# E's EX: the opening made, not waited for. Half a second of poise (nothing staggers the warrior
+# in the wind-up, so a pack can't knock it out of their hands; a stun still does), then a rising cut
+# that leaves everything in front Exposed: no block or parry, 20% more from every hero's hit, 30%
+# longer staggers, and open to Cleave's 250%. A boss is Exposed half as long (2.5 sec): a window,
+# never a shutdown.
 [[ability]]
-key = "thunder_clap"
-name = "Thunder Clap"
+key = "rising_cut"
+name = "Rising Cut"
 ex_of = "cleave"
-text = "Stomps the ground. Enemies within 8 yd take 8 damage, and their attacks wind up 30% slower for 6 sec. A boss's attacks wind up 15% slower for 4 sec."
-icon = "Spell_Nature_ThunderClap"
+text = "After a 0.5 sec windup in which nothing can stagger you, cuts upward through a 120° arc in front of you, 5 yd deep. Enemies hit take 120% weapon damage and are Exposed for 5 sec (2.5 sec for a boss). Exposed enemies cannot block or parry. Every hero's hit on them deals 20% more damage and staggers 30% longer."
+icon = "Ability_MeleeDamage"
 slot = "close"
-kind = "nova"
+kind = "cone"
 valor = 25
-damage = [8.0, 8.0]
-radius = [8.0, 8.0]
-spell = 6343
-effects = [{ kind = "slow_attacks", secs = [6.0, 6.0], amount = 0.3 }]
+range = [5.0, 5.0]
+arc = 120.0
+cast = 0.5
+weapon = 1.2
+self_effects = [{ kind = "steadfast", secs = [0.55, 0.55], amount = 1.0 }]
+effects = [{ kind = "exposed", secs = [5.0, 5.0], amount = 0.2, aura = 8647 }]
+# Placeholder looks (to be checked in the lab): the two-handed sweep (19) as Cleave's, Overpower's
+# flash, Expose Armor's look on each one Exposed (the effect's `aura`).
+clip = 19
+spell = 7384
+valor_hit = 6.0
 
 # 1: the Warrior's one body slam (Beta's Wall Slam retires into it). The rush is short, so the
 # skill is the angle: the wall, the tree or the second enemy behind your target.
@@ -4809,41 +4864,38 @@ spell = 100
 # Blessing of Sacrifice's gold on the friend while it holds.
 aura = 6940
 
-# 2: the group's stamina. The Warlord's defense is everyone's staying power.
+# 2: the Warlord's guard is Retaliation and Shield Wall, the Juggernaut's before (with the
+# defense keys, above).
+
+# 3: the cry that turns a fight (Onslaught retires into it). Everyone within 20 yd off the ground,
+# with full stamina and 8 sec where nothing staggers them: the group's chance to press. The
+# warrior's own share is Onslaught's, a little smaller: 15% larger, attacks free and 20% faster;
+# the group's attacks 10% faster. Alone, it's still a whole ultimate: back up, full stamina, 8 sec
+# of free, quicker blows that nothing interrupts.
 [[ability]]
 key = "rallying_cry"
 name = "Rallying Cry"
-text = "You and allies within 15 yd regain 40 stamina."
+text = "You and allies within 20 yd regain all stamina, recover from any stagger or knockdown, and cannot be staggered for 8 sec. For 8 sec, you grow 15% larger, and your attacks cost no stamina and are 20% faster. Allies' attacks are 10% faster."
 icon = "Ability_Warrior_BattleShout"
 school = "warrior"
-slot = "defense"
+slot = "ultimate"
 choice = 2
 kind = "nova"
-radius = [15.0, 15.0]
-ally_stamina = 40.0
-cooldown = 16.0
-# The roar, and Battle Shout's look on every ally it reaches.
+valor = 100
+cooldown = 40.0
+radius = [20.0, 20.0]
+# The whole bar (`player.stamina`).
+ally_stamina = 100.0
+ally_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.1, aura = 22888 }]
+self_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.2, aura = 22888 }, { kind = "fury", secs = [8.0, 8.0], amount = 0.0 }, { kind = "grown", secs = [8.0, 8.0], amount = 0.15 }]
+# The roar, and Battle Shout's look on every ally it reaches; Rallying Cry of the Dragonslayer's
+# on each while it lasts (the effects' `aura`, to be checked in the lab).
 clip = 55
 ally_spell = 6673
 
-# 2's EX: the push when the enemy is open.
-[[ability]]
-key = "battle_cry"
-name = "Battle Cry"
-ex_of = "rallying_cry"
-text = "You and allies within 15 yd deal 50% more posture damage with heavy attacks for 8 sec. Staggers from those heavy attacks last 50% longer."
-icon = "Ability_Warrior_WarCry"
-slot = "defense"
-kind = "nova"
-valor = 25
-radius = [15.0, 15.0]
-clip = 55
-# Rallying Cry of the Dragonslayer's red-gold flare on each ally (to be checked in the lab).
-ally_spell = 22888
-ally_effects = [{ kind = "battle_cry", secs = [8.0, 8.0], amount = 0.5 }]
-
-# 3: the spin that ramps (Beta's Whirlwind retires into it). 4, then 1 more a strike up to 15, two
-# a second: a full 6 sec is 114 to each enemy in reach, nearly half of it in the last 2 sec.
+# 3, the Juggernaut's (its first choice, from the Warlord's): the spin that ramps (Beta's
+# Whirlwind retires into it). 4, then 1 more a strike up to 15, two a second: a full 6 sec is 114
+# to each enemy in reach, nearly half of it in the last 2 sec.
 [[ability]]
 key = "warrior_bladestorm"
 name = "Bladestorm"
@@ -4851,8 +4903,8 @@ text = "Spin with your weapon out for up to 6 sec, moving at 70% speed and strik
 icon = "Ability_Whirlwind"
 school = "warrior"
 slot = "ultimate"
-choice = 2
 kind = "beam"
+passive = "momentum"
 valor = 100
 cooldown = 40.0
 around = true
@@ -10241,7 +10293,7 @@ name = "The Garrison's Banner"
 at = [-9885.0, 675.0]
 display = 631
 scale = 1.0
-teaches = ["hurled_axe", "shockwave", "ravager", "cleave"]
+teaches = ["hurled_axe", "shockwave", "war_banner", "cleave"]
 keep = true
 secs = 3.0
 text = "Westbrook's banner, carried off by the Riverpaw. The garrison's footmen learned the throw under it, and the slam that drives a line back."
@@ -10347,7 +10399,7 @@ trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 key = "relic_warrior"
 name = "A Veteran's Kit"
 at = [-9888.0, 220.0]
-teaches = ["charge", "retaliation", "tackle", "rallying_cry"]
+teaches = ["charge", "berserker_rage", "tackle", "retaliation"]
 loot = { bronze = 1, leather = 1 }
 display = 259
 secret = 7.0

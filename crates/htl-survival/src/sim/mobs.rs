@@ -516,8 +516,6 @@ impl Survival {
         if self.own_totem(mid, by) {
             return;
         }
-        // A Taunted hero's blows on anything but the one who taunted them are weaker.
-        let damage = self.taunted_damage(by, mid, damage);
         // A frozen creature's ice takes it first; a panic or an incapacitate may end.
         let damage = self.cc_on_damage(mid, damage);
         let Some(m) = self.mobs.get_mut(&mid) else { return };
@@ -545,8 +543,6 @@ impl Survival {
             let m = &self.mobs[&mid];
             let open = matches!(m.state, MobState::Recover { .. }) && m.stagger_until <= now;
             let heft = if open { heft * self.content.combat.recovery_posture.max(1.0) } else { heft };
-            // Battle Cry: a heavy attack breaks a stance faster.
-            let heft = if self.heavy_landing(by) { heft * (1.0 + self.battle_cry(by)) } else { heft };
             if self.build_posture(mid, by, (damage as f32 * heft).round() as u32) {
                 return;
             }
@@ -1938,10 +1934,15 @@ impl Survival {
             a.cooldown *= e.speed;
             a.damage = (a.damage as f32 * e.might).round() as u32;
         }
-        // Thunder Clap: its swings come slower.
-        let slow = self.swing_slow(id);
+        // Cowed (Intimidating Roar): its swings come slower and land softer (a boss's only
+        // softer, a little).
+        let slow = self.cowed_slow(id);
         if slow > 0.0 {
             a.windup *= 1.0 + slow;
+        }
+        let cut = self.cowed_cut(id);
+        if cut > 0.0 {
+            a.damage = (a.damage as f32 * (1.0 - cut)).round() as u32;
         }
         // A wager's level, its pack's rally, and the dungeon's tier.
         let frenzy = if self.wager_has("frenzied") && (m.health as f32) < m.max_health as f32 * super::wager::FRENZY_BELOW { super::wager::FRENZY_MIGHT } else { 1.0 };
@@ -2174,6 +2175,9 @@ impl Survival {
                 self.strike_fair(id, h, a.damage, pos, a.blockable, a.heavy, a.blockable, Blow::Light, area, combat::Follow::None);
             }
         }
+        // A War Banner in the blow's way takes it, as hard as a hero would.
+        let share = self.foe_blow_share(id);
+        self.banners_struck(pos, f, a.range, a.arc, a.damage as f32 * share);
         if let Foe::Obj(o) = foe {
             if let Some(op) = self.objs.get(&o).map(|o| o.pos) {
                 let size = match self.objs[&o].kind {
