@@ -2170,7 +2170,9 @@ aim.burst:Hide()
 -- degrees, outermost arrow to outermost arrow.
 aim.fan = {}
 for k = 1, 5 do
-  aim.fan[k] = Tex(aim, "OVERLAY", "dot", 10, 10)
+  -- Bigger than the plain dot: spread over the real fan they sit far apart, and at 10 they were
+  -- lost against the grass (the visual check, run 050).
+  aim.fan[k] = Tex(aim, "OVERLAY", "dot", 18, 18)
   aim.fan[k]:SetPoint("CENTER", aim, "CENTER", (k - 3) * 18, -math.abs(k - 3) * 4)
   aim.fan[k]:Hide()
 end
