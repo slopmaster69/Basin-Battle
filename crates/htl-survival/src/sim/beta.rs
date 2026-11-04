@@ -12,10 +12,12 @@ use super::*;
 use crate::content::{AbilityDef, AbilityEffect};
 
 /// A yank runs this fast (yards a second), stopping this far short of a wall and this far from a
-/// foe's body (beside it, not in it).
-const YANK_SPEED: f32 = 24.0;
-/// The pose a yanked hero flies in: the arm held out along the line (SpellCastDirected).
-const YANK_CLIP: u16 = 53;
+/// foe's body (beside it, not in it). Was 24 (Corey's review: the flight should be quicker).
+const YANK_SPEED: f32 = 40.0;
+/// The pose a yanked hero flies in: flat and headlong along the line (Swim), the add-on fitting
+/// one pass of it to the flight. Was the arm held out (SpellCastDirected, 53), which read as no
+/// flight at all.
+const YANK_CLIP: u16 = 42;
 const YANK_WALL: f32 = 0.6;
 const YANK_BESIDE: f32 = 0.3;
 /// A cheated death mends what it does over this long.
@@ -183,16 +185,17 @@ impl Survival {
             return;
         }
         // At least long enough to be seen flying (the visual check: a 6 yd pull at 32 yd a
-        // second was over in 5 frames).
-        let secs = (moved / YANK_SPEED).max(0.3);
+        // second was over in 5 frames); a little shorter than it was (0.3) now that the flight
+        // itself is quicker.
+        let secs = (moved / YANK_SPEED).max(0.25);
         self.interrupt_hero(id);
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = dir;
         }
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
         // Pulled through the air on the line, the way a hookshot flies you (play-test: a run along
-        // the ground read as a Charge): a flat arc that lands as the line's time is up, the arm
-        // held out along it.
+        // the ground read as a Charge): a flat arc that lands as the line's time is up, the body
+        // flat along it.
         let lift = secs / airtime(1.0);
         self.events.push(Event::Hop { player: id, dir, speed: moved / secs, lift, roll: false, style: "" });
         self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: String::new(), flip: false });
