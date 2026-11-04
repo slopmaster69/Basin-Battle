@@ -2345,6 +2345,38 @@ fn healing_in_front_of_a_foe_draws_its_attack() {
     assert!(s.mobs[&k].ready_at <= s.clock + 0.3, "it comes at once");
 }
 
+/// A meal puts the weapons away for its while and takes them out again after, whether it ends
+/// or is cut short; the hero's own toggle (R) is left as it was (Corey's review: eating with the
+/// axe still in hand).
+#[test]
+fn a_meal_puts_the_weapons_away_and_takes_them_out_again() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    give(&mut s, p, "roast", 2);
+    s.players.get_mut(&p).unwrap().health = 50;
+    let gear = |ev: &[Event]| ev.iter().filter(|e| matches!(e, Event::Gear { player } if *player == p)).count();
+    s.input(p, Input::Use);
+    let ev = s.step(DT);
+    assert_eq!(s.players[&p].action.name(), "eat");
+    assert_eq!(gear(&ev), 1, "put away as the meal starts");
+    assert!(!s.players[&p].sheathed, "the hero's own toggle as it was");
+    let secs = s.content.items[s.content.item("roast").unwrap()].use_secs;
+    let ev = run(&mut s, secs - 0.3);
+    assert_eq!(gear(&ev), 0, "and stays so through the meal");
+    let ev = run(&mut s, 0.6);
+    assert_eq!(s.players[&p].action, Action::Ready, "eaten");
+    assert_eq!(gear(&ev), 1, "out again as it ends");
+    // Struck mid-meal: out again at once.
+    s.input(p, Input::Use);
+    let ev = s.step(DT);
+    assert_eq!(gear(&ev), 1);
+    let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.strike_player(k, p, 5, [2.0, 0.0, 0.0], false, false, false, Blow::Light);
+    let ev = s.step(DT);
+    assert_eq!(s.players[&p].action, Action::Ready, "the meal is spoiled");
+    assert_eq!(gear(&ev), 1, "out again as it's cut short");
+}
+
 #[test]
 fn a_blow_from_behind_is_a_backstab() {
     let mut s = world();
