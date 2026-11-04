@@ -4808,7 +4808,13 @@ weapon = 1.0
 opened = 2.5
 cooldown = 8.0
 # The two-handed sweep over the windup.
+# One smooth sweep on every race: the troll men's slow, wide two-handed sweep (19/1, 1.4 s, the
+# widest side stroke in the census), borrowed by all. Side on in the lab its arc crosses the body
+# the way the green crescent (845) does; the human's own 19 swung from the other side (Corey's
+# review, Nov 3; picked from the lab's strips, Nov 4).
 clip = 19
+take = 1
+from = "TrollMale"
 spell = 845
 valor_hit = 6.0
 
