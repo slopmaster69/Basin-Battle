@@ -388,6 +388,8 @@ pub(crate) const ADDON_NEWEST: u32 = 23;
 /// `Cues.lua`. 22: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 21: a cast's `AN` line names the body its clip drives (`full`, `upper`, `lower`): Skyfall's
 /// hang on the legs alone.
+/// 22: those speed lines redrawn (finer, soft-ended, laid over the screen as a square so none is
+/// cut at an edge, and quicker).
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

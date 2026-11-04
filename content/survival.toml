@@ -4958,16 +4958,24 @@ range = [40.0, 40.0]
 radius = [0.4, 0.4]
 pierce = 9
 execute = 0.25
-# As fast as a shot flies in 1.12: Fire Shot's missile (80 yd/s; no arrow flies faster than 40,
-# and the client flies a missile at its own spell's speed, so this keeps the rules in step with
-# the look). Corey's review, Nov 4: it looked too like Aimed Shot; for him to judge on video.
-speed = 80.0
+# Faster than anything flies in 1.12 (Fire Shot's missile, the quickest, flies 80 yd/s; no arrow
+# faster than 40). Corey's review, Nov 4: at 80 it looked too like Aimed Shot, then "maybe even
+# needs to be faster". The rules land it at this speed; a client with patch 0032 flies the bolt
+# at it too (its `[[missile_look]]`'s `speed`); older clients fly it at the spell's own 80, so
+# there the bolt arrives after the hit.
+speed = 120.0
 cooldown = 40.0
 # Arcane Shot's glowing arrow, as Aimed Shot's full draw.
 spell = 3044
 impact_kit = 437
 spell = 10346
 clip = 53
+# The hunter themself charges up through the draw: this spell's aura look on them from the press
+# to the release or the let-go (besides the camera's lean and tremble, the add-on's). 14751 is
+# Inner Focus: a soft glow on the drawing hand and the bow (run 070: Arcane Power 12042 and Power
+# Infusion 10060 fill the screen with purple lightning from the draw's close camera, Berserking
+# 20554 shows nothing). To film others: `.es tune ability.kill_shot.charge_look <spell>`.
+charge_look = 14751
 # The power behind it: speed lines on the hunter's own screen as it goes; on each foe it goes
 # through, the heavy blow's flash (437) and crack (238, HeavyWeaponCritical) and its reel; a kill
 # lands with a colossal stone's fall (930, mDeathImpactColossalStoneA) from the foe's spot, for

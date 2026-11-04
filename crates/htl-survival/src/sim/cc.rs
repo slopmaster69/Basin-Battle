@@ -620,11 +620,14 @@ impl Survival {
             }
         }
         if let Some(p) = self.players.get(&id) {
-            if let Action::Channel { ability, .. } = &p.action {
-                let a = self.content.abilities[*ability].aura;
-                if a != 0 {
-                    out.push(a);
-                }
+            // A channel's glow while it's held; a charge's wind-up on them while it's drawn.
+            let a = match &p.action {
+                Action::Channel { ability, .. } => self.content.abilities[*ability].aura,
+                Action::Charge { ability, .. } => self.content.abilities[*ability].charge_look,
+                _ => 0,
+            };
+            if a != 0 {
+                out.push(a);
             }
         }
         // A creature's own look (a spirit beast's glow).
