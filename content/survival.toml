@@ -3579,7 +3579,9 @@ slot = "defense"
 kind = "stance"
 valor = 25
 secs = 4.0
-spell = 871
+# Shield Block's flash as the wall goes up (2565) and Shield Wall's own circling shields while it
+# lasts (871): Corey wanted both (his review, Nov 3; tried as look 2565/871 in q29).
+spell = 2565
 aura = 871
 needs_shield = true
 counter = { block = true, front = 180.0, ends_on_action = true, guard_pose = true, bash = true }
