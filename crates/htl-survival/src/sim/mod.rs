@@ -277,7 +277,8 @@ pub enum Event {
     /// A clip played on a unit (a throw, a cast), for the clients that play clips: `take` which
     /// of the model's versions, `from` another character model whose take every client plays (an
     /// ability's own, the same on every race), or the unit's own.
-    Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32 },
+    /// `at`: its impact this many seconds in (0: half way), so a cast's clip lands as the cast does.
+    Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32, at: f32 },
     /// A unit's clip called off (a feint: the guard raised before the blow came).
     ClipStop { id: Id },
     /// A flurry of cuts starts on a unit, for the clients that play clips (Bladestorm): how it

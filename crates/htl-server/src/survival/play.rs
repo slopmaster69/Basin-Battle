@@ -793,12 +793,12 @@ impl SurvivalGame {
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, take, from, secs } => {
+            Event::Clip { id, clip, take, from, secs, at } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
-                // marked as theirs.
+                // marked as theirs. The impact where the event says, else half way.
                 let Some(g) = self.guid_of(id) else { return };
                 let mine = self.conn_of(id);
-                let impact = secs * 0.5;
+                let impact = if at > 0.0 { at.min(secs) } else { secs * 0.5 };
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);

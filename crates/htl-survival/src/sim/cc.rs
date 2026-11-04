@@ -26,6 +26,8 @@ pub struct Cc {
     pub next_tick: f32,
     /// Its look, in place of the kind's (0: the kind's).
     pub aura: u32,
+    /// The next replay of its `mark` (an effect's one-shot look kept up while it holds).
+    pub next_mark: f32,
 }
 
 /// The three that bring the grace after them.
@@ -181,7 +183,7 @@ impl Survival {
             }
         } else {
             list.retain(|c| c.kind != kind);
-            list.push(Cc { kind: kind.into(), until: now + secs, since: now, from, amount, break_after, left, source: source.into(), next_tick: now + 1.0, aura });
+            list.push(Cc { kind: kind.into(), until: now + secs, since: now, from, amount, break_after, left, source: source.into(), next_tick: now + 1.0, aura, next_mark: now });
         }
         let renewed = boon && self.cc_of(target).iter().any(|c| c.kind == kind && c.since < now);
         if renewed {
@@ -399,6 +401,29 @@ impl Survival {
             for (from, share, source) in mends {
                 let amount = self.players.get(&id).map_or(0, |p| (p.max_health as f32 * share).round() as u32);
                 self.heal_hero_by(id, amount, from, &source);
+            }
+            // A mark kept up: the effect's one-shot look replayed on them while it holds.
+            let due: Vec<(usize, String, String)> = self
+                .cc
+                .get(&id)
+                .map(|l| l.iter().enumerate().filter(|(_, c)| c.next_mark <= now && c.until > now).map(|(i, c)| (i, c.source.clone(), c.kind.clone())).collect())
+                .unwrap_or_default();
+            for (i, source, kind) in due {
+                let mark = self
+                    .content
+                    .abilities
+                    .iter()
+                    .find(|a| a.name == source)
+                    .and_then(|a| a.effects.iter().chain(a.ally_effects.iter()).chain(a.self_effects.iter()).find(|e| e.kind == kind && e.mark != 0).map(|e| (e.mark, e.mark_every)));
+                if let Some(c) = self.cc.get_mut(&id).and_then(|l| l.get_mut(i)) {
+                    c.next_mark = match mark {
+                        Some((_, every)) if every > 0.0 => now + every,
+                        _ => f32::INFINITY,
+                    };
+                }
+                if let Some((kit, _)) = mark {
+                    self.events.push(Event::Visual { id, kit, by: None });
+                }
             }
             let Some(list) = self.cc.get_mut(&id) else { continue };
             let gone: Vec<String> = list.iter().filter(|c| c.until <= now).map(|c| c.kind.clone()).collect();

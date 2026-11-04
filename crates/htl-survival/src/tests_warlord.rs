@@ -505,13 +505,18 @@ fn intimidating_roar_cows_the_pack_their_blows_softer_and_slower() {
     let behind = mob(&mut s, "brave", [-6.0, 0.0, 0.0]);
     let (d0, w0) = (s.attack_now(k).damage, s.attack_now(k).windup);
     s.set_valor(p, 25.0);
-    cast(&mut s, p, "war_banner", true, 0.0, 0.0);
+    let ev0 = cast(&mut s, p, "war_banner", true, 0.0, 0.0);
     assert!(s.has_cc(k, "cowed") && !s.has_cc(behind, "cowed"), "the cone in front");
     assert!((left(&s, k, "cowed") - 6.0).abs() < 0.2, "6 sec: {}", left(&s, k, "cowed"));
     let a = s.attack_now(k);
     assert!((a.damage as f32 - d0 as f32 * 0.75).abs() <= 1.0, "25% less: {} from {d0}", a.damage);
     assert!((a.windup - w0 * 1.15).abs() < 1e-3, "15% slower: {} from {w0}", a.windup);
-    assert!(s.auras_of(k).contains(&5246), "the Cowed look on it: {:?}", s.auras_of(k));
+    assert!(!s.auras_of(k).contains(&5246), "no fear swirl on it: {:?}", s.auras_of(k));
+    // Its mark: Demoralizing Shout's over the head, now and again every 1.5 sec while it holds.
+    let marks = |ev: &[Event]| ev.iter().filter(|e| matches!(e, Event::Visual { id, kit: 693, .. } if *id == k)).count();
+    assert_eq!(marks(&ev0), 1, "the mark as it starts");
+    let ev = run(&mut s, 3.2);
+    assert_eq!(marks(&ev), 2, "and again every 1.5 sec");
 }
 
 #[test]
@@ -726,7 +731,7 @@ fn spin(s: &mut Survival, p: Id) -> Vec<Event> {
 }
 
 #[test]
-fn bladestorm_ramps_a_point_a_strike_up_to_15() {
+fn bladestorm_ramps_a_point_a_strike_up_to_16() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "warlord", [3.5, 0.0, 0.0]);
@@ -735,8 +740,8 @@ fn bladestorm_ramps_a_point_a_strike_up_to_15() {
     ev.extend(run(&mut s, 6.5));
     let hits = struck(&ev, k);
     assert_eq!(hits.len(), 12, "twice a second for 6 sec: {hits:?}");
-    assert_eq!(hits, (4..=15).collect::<Vec<u32>>(), "4, then 1 more a strike, up to 15");
-    assert_eq!(hits.iter().sum::<u32>(), 114);
+    assert_eq!(hits, (5..=16).collect::<Vec<u32>>(), "5, then 1 more a strike, up to 16");
+    assert_eq!(hits.iter().sum::<u32>(), 126);
     assert!(!matches!(s.players[&p].action, Action::Channel { .. }), "done after 6 sec");
 }
 

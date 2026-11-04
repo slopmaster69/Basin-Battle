@@ -739,6 +739,13 @@ pub struct AbilityEffect {
     /// centre, a projectile's flight).
     #[serde(default)]
     pub from_caster: bool,
+    /// A one-shot look (a `SpellVisualKit`) replayed on whoever has it every `mark_every` seconds
+    /// while it holds, where the data has no lasting look that fits: the Cowed mark over the head,
+    /// the Exposed crack. A kit plays no body animation, as a spell's cast would.
+    #[serde(default)]
+    pub mark: u32,
+    #[serde(default)]
+    pub mark_every: f32,
     /// Its look on whoever has it, in place of the kind's own (a spell whose state look plays).
     #[serde(default)]
     pub aura: u32,
