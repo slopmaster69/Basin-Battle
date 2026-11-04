@@ -1,0 +1,237 @@
+From c3725fb905fe8ea9b11d184ab20d22a4a76f781e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 06:56:27 -0600
+Subject: [PATCH] A spell look's own animation stays off a body an add-on's
+ clip owns
+
+A spell look (its kit's AnimID: Cleave's and Rising Cut's 57, Thunder Clap's 54) used to play
+its body animation on a hero in the middle of a borrowed clip from PlayUnitAnimation: a second
+swing after the first, or the raised hand after the chop. Now a whole-body clip of the add-on's
+owns the body for its length and a moment after (the spell's own packet and the add-on's call
+cross the wire apart), and a kit's animation arriving meanwhile is dropped, so the clip is the
+swing and the look only its effects. A clip on the upper body alone (a held bow) owns nothing,
+so a shot's own animation still plays over it. HasActionCombat() is 16 (13 to 15 are the
+hunter's patches 0020 to 0023).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ .../benilla-app/src/creature_anim/action.rs   | 54 ++++++++++++++++++-
+ .../benilla-app/src/creature_anim/driver.rs   | 28 +++++++++-
+ crates/benilla-ui/src/action_combat.rs        | 10 +++-
+ 3 files changed, 87 insertions(+), 5 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 0597b26..8434c23 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -142,6 +142,26 @@ impl ActionClip {
+     }
+ }
+ 
++/// Units whose body a script's clip owns, each until when (elapsed seconds). A spell look's own
++/// body animation (its kit's `AnimID`) arriving meanwhile is dropped by the driver, so the look's
++/// effects play over the clip instead of a second swing after it: Cleave's and Rising Cut's cast
++/// anim 57 over a borrowed sweep, Thunder Clap's 54 after a chop. A reaction's clip and the
++/// lock-on's shuffle own nothing; a hold on the upper body (a drawn bow) owns nothing either, as
++/// the shot's own animation must still play over it.
++#[derive(Resource, Default)]
++pub(crate) struct ClipOwnsBody(pub(crate) bevy::ecs::entity::EntityHashMap<f32>);
++
++impl ClipOwnsBody {
++    /// Whether a kit's body animation on the unit is dropped now.
++    pub(crate) fn muted(&self, entity: Entity, now: f32) -> bool {
++        self.0.get(&entity).is_some_and(|&until| now < until)
++    }
++}
++
++/// A look's animation arriving this long after the clip's end is still dropped: the spell's own
++/// packet and the add-on's call cross the wire apart.
++const KIT_ANIM_TAIL: f32 = 0.25;
++
+ /// The animation held still until then: every clip playing at speed 0 meanwhile, each one's own
+ /// speed kept to give back. Not `pause()`: a paused clip a transition leaves (the driver re-arming
+ /// its gait mid-stop) is never faded or stopped by Bevy's transitions, and once resumed it plays
+@@ -433,6 +453,23 @@ impl ActionClip {
+         }
+     }
+ 
++    /// About how long it plays in real seconds: its wind-up and recovery as asked, the clip's own
++    /// pace where not, and its hold.
++    fn real_len(&self) -> f32 {
++        let (to_key, after) = if self.key > 0.0 {
++            (self.key, self.len - self.key)
++        } else {
++            (self.len, 0.0)
++        };
++        let wind = if self.windup > 0.0 { self.windup } else { to_key };
++        let rec = if self.key > 0.0 && self.recovery > 0.0 {
++            self.recovery
++        } else {
++            after
++        };
++        wind + rec + self.hold.max(0.0)
++    }
++
+     fn nodes(&self) -> impl Iterator<Item = AnimationNodeIndex> {
+         std::iter::once(self.full).chain(self.upper)
+     }
+@@ -496,11 +533,12 @@ pub(super) fn drain_action_calls(
+         Query<&mut HitStopped>,
+         ResMut<strike_trail::StrikeTrails>,
+     ),
+-    (mut donors, assets, models, rigs): (
++    (mut donors, assets, models, rigs, mut owns): (
+         ResMut<donor::Donors>,
+         Res<AssetServer>,
+         Res<Assets<benilla_assets::M2Model>>,
+         Query<(&RigPose, Option<&benilla_world::rig_anim::PoseExtra>)>,
++        ResMut<ClipOwnsBody>,
+     ),
+ ) {
+     let calls = action_combat::take_calls();
+@@ -508,6 +546,7 @@ pub(super) fn drain_action_calls(
+         return;
+     }
+     let now = time.elapsed_secs();
++    owns.0.retain(|_, until| *until > now);
+     let me = me.single().ok();
+     let empty = GuidIndex::default();
+     let index = index.as_deref().unwrap_or(&empty);
+@@ -563,6 +602,12 @@ pub(super) fn drain_action_calls(
+                 let creature = clip.coil
+                     || guid_of(&unit).is_some_and(|g| g >> 48 == 0xF130 || g >> 48 == 0xF150);
+                 let (clip_id, clip_key, clip_node) = (clip.id, clip.key, clip.full);
++                // A whole-body clip of the script's owns the body for its length: the spell
++                // look's own animation is dropped meanwhile (`ClipOwnsBody`).
++                if body != ActionBody::Upper {
++                    owns.0
++                        .insert(entity, now + clip.real_len() + KIT_ANIM_TAIL);
++                }
+                 start_clip(&mut commands, &mut clips, entity, clip);
+                 // A creature's trail waits for its last stroke into the blow (`ac9`), and one
+                 // with nothing in its hands trails whatever strikes (strike_trail.rs).
+@@ -609,6 +654,9 @@ pub(super) fn drain_action_calls(
+                 if let Ok(mut c) = clips.get_mut(entity) {
+                     c.stopping = Some(fade.max(0.01));
+                 }
++                if let Some(until) = owns.0.get_mut(&entity) {
++                    *until = until.min(now + fade.max(0.01) + KIT_ANIM_TAIL);
++                }
+             }
+             ActionCall::React {
+                 unit,
+@@ -1144,9 +1192,11 @@ pub(super) fn apply_action_tilts(
+ pub(super) fn reset_action_on_world_exit(
+     mut lock: ResMut<LockOn>,
+     fog: Option<ResMut<benilla_world::lighting::FogOverride>>,
++    mut owns: ResMut<ClipOwnsBody>,
+ ) {
+     action_combat::reset();
+     lock.0 = None;
++    owns.0.clear();
+     if let Some(mut fog) = fog {
+         *fog = benilla_world::lighting::FogOverride::default();
+     }
+@@ -1342,6 +1392,7 @@ pub(super) fn shuffle_on_lock_turn(
+ 
+ pub(super) fn plugin(app: &mut App) {
+     app.init_resource::<LockOn>()
++        .init_resource::<ClipOwnsBody>()
+         .init_resource::<strike_trail::StrikeTrails>()
+         .init_resource::<donor::Donors>()
+         .add_systems(
+@@ -1393,6 +1444,7 @@ mod tests {
+         use benilla_world::lighting::{FogLook, FogOverride};
+         let mut app = App::new();
+         app.init_resource::<LockOn>();
++        app.init_resource::<ClipOwnsBody>();
+         let mut fog = FogOverride::default();
+         let look = FogLook {
+             color: [0.1, 0.1, 0.1],
+diff --git a/crates/benilla-app/src/creature_anim/driver.rs b/crates/benilla-app/src/creature_anim/driver.rs
+index 64d0a10..6d575dd 100644
+--- a/crates/benilla-app/src/creature_anim/driver.rs
++++ b/crates/benilla-app/src/creature_anim/driver.rs
+@@ -323,14 +323,25 @@ pub(super) fn drive_animations(
+         Option<Res<crate::ui_session::InteractNpc>>,
+         // `ChrClasses.dbc`, for the setter's class test on the ranged state.
+         Option<Res<crate::chr_classes::ChrClassTable>>,
++        // Units whose body an add-on's clip owns: a kit's anim on one is dropped.
++        Option<Res<super::action::ClipOwnsBody>>,
+     ),
+     // The variation roll's LCG, the reference's single CRT `_rand` stream shared by every play.
+     mut rng: ResMut<benilla_assets::AnimRng>,
+     // The last anim trace line per traced unit; the trace writes only on change.
+     mut anim_trace_last: Local<std::collections::HashMap<Entity, String>>,
+ ) {
+-    let (emote_sounds, loot_kneel, time, names, mut recomputes, riders, interact, class_table) =
+-        aux;
++    let (
++        emote_sounds,
++        loot_kneel,
++        time,
++        names,
++        mut recomputes,
++        riders,
++        interact,
++        class_table,
++        clip_owns,
++    ) = aux;
+     let classes = class_table.as_deref().map(|t| &t.0);
+     let dt = time.delta_secs();
+     // This frame's one-shot plays per unit, replayed in the reference's call order (`PlaySeq`
+@@ -377,6 +388,19 @@ pub(super) fn drive_animations(
+         pending_slow.insert(s.0);
+     }
+     for e in emotes.read() {
++        // A spell look's own body animation (never a player's emote) on a unit whose body an
++        // add-on's clip owns: dropped, so the clip is the swing and the look its effects.
++        if !e.via_player
++            && clip_owns
++                .as_deref()
++                .is_some_and(|o| o.muted(e.entity, time.elapsed_secs()))
++        {
++            debug!(
++                "anim: kit anim {} on {:?} dropped under the add-on's clip",
++                e.anim_id, e.entity
++            );
++            continue;
++        }
+         pending
+             .entry(e.entity)
+             .or_default()
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index d9495dd..45f69f2 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -111,6 +111,12 @@
+ //!   `parrySeconds` (the parry's window); `focus` false draws only a faint outline.
+ //! - `ClearTelegraph([key])`: take one away (all with no key).
+ //!
++//! The sixteenth (`HasActionCombat() >= 16`; the thirteenth to fifteenth are the hunter's: stretched
++//! objects, missile looks, ropes): a spell look's own body animation (its kit's `AnimID`) is
++//! dropped on a unit while a whole-body `PlayUnitAnimation` clip of the add-on's plays, and for a
++//! moment after, so the clip is the swing and the look only its effects (no second swing after
++//! a borrowed one). A clip on the upper body only (a held bow) drops nothing.
++//!
+ //! The twelfth (`HasActionCombat() >= 12`), the outdoor atmosphere:
+ //!
+ //! - `SetWorldFog(r, g, b, fogEnd, startFrac, weight, seconds[, darken])`: the outdoor scene fog
+@@ -720,7 +726,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(12))?,
++        lua.create_function(|_, _: MultiValue| Ok(16))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1213,7 +1219,7 @@ mod tests {
+         take_world_fog();
+         lua.load(
+             r#"SetWorldFog(0.1, 0.2, 2, 90, 0.1, 0.8, 6, 0.5) SetWorldFog(0.1, 0.2) ClearWorldFog(3) ClearWorldFog()
+-               assert(HasActionCombat() >= 12)"#,
++               assert(HasActionCombat() >= 16)"#,
+         )
+         .exec()
+         .unwrap();

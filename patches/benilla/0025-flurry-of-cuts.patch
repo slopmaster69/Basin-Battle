@@ -1,0 +1,530 @@
+From 59e7e531be9351bcc7ab30d4bb4699d63f894985 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 06:56:28 -0600
+Subject: [PATCH] A storm of cuts in turning directions: PlayUnitFlurry, for
+ Bladestorm
+
+PlayUnitFlurry(unit, seconds, from, cuts, cutSeconds, windupSeconds, finish, finishSeconds,
+turnDegrees, trail, trailMs) plays cut after cut from another model's clips through
+PlayUnitAnimation's own path, each cutSeconds long, the first wound up over windupSeconds (the
+anticipation), the body snapping turnDegrees a step round its feet to face a new way for each
+(ahead, right, left, further right, further left, and round again), each trailing the weapons
+it holds; when the time is up or StopUnitAnimation ends it, one wider finishing sweep as the
+body comes back to face ahead. A tilt can now be a Turn (about the feet, snapping round and
+holding). HasActionCombat() is 17.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ .../benilla-app/src/creature_anim/action.rs   |  60 ++++-
+ .../src/creature_anim/action/flurry.rs        | 239 ++++++++++++++++++
+ crates/benilla-ui/src/action_combat.rs        |  89 ++++++-
+ 3 files changed, 384 insertions(+), 4 deletions(-)
+ create mode 100644 crates/benilla-app/src/creature_anim/action/flurry.rs
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 8434c23..86313db 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -32,6 +32,7 @@ use bevy::prelude::*;
+ use super::{find_resolved, AnimData, BodyTwist};
+ 
+ mod donor;
++mod flurry;
+ mod strike_trail;
+ use crate::net::{GuidIndex, NetEntity, SelfPlayer};
+ 
+@@ -188,6 +189,9 @@ enum TiltKind {
+     Roll { pivot: f32 },
+     /// Thrown back this far (radians) and settling, along a fixed direction.
+     Lean { amount: f32 },
++    /// Turned about its feet from `from` to `to` radians off its facing over `over` seconds, held
++    /// there for the tilt's time (a flurry's cut facing its own way).
++    Turn { from: f32, to: f32, over: f32 },
+ }
+ 
+ /// A tilt of the whole body about a pivot over its feet: a roll or a struck lean. Each root bone
+@@ -204,6 +208,19 @@ pub(crate) struct ActionTilt {
+     bones: Vec<(usize, Transform, Transform)>,
+ }
+ 
++impl ActionTilt {
++    /// How far a turn has the body round now (radians), none for another kind of tilt.
++    fn turn_now(&self, now: f32) -> Option<f32> {
++        let TiltKind::Turn { from, to, over } = self.kind else {
++            return None;
++        };
++        let k = self
++            .start
++            .map_or(0.0, |s| ((now - s) / over.max(1.0e-3)).clamp(0.0, 1.0));
++        Some(from + (to - from) * (k * k * (3.0 - 2.0 * k)))
++    }
++}
++
+ /// A unit's weapons tinted (an unblockable blow winding up), until then (app seconds); read by
+ /// `crate::aura_visual::apply_aura_tint`, over any aura's tint.
+ #[derive(Component, Clone, Copy, Debug)]
+@@ -528,10 +545,11 @@ pub(super) fn drain_action_calls(
+     mut lock: ResMut<LockOn>,
+     mut kits: MessageWriter<super::spell_visual::KitPush>,
+     mut play_seq: ResMut<super::PlaySeq>,
+-    (env, mut stops, mut strikes): (
++    (env, mut stops, mut strikes, mut flurries): (
+         Option<Res<super::EnvDamageTable>>,
+         Query<&mut HitStopped>,
+         ResMut<strike_trail::StrikeTrails>,
++        Query<&mut flurry::Flurry>,
+     ),
+     (mut donors, assets, models, rigs, mut owns): (
+         ResMut<donor::Donors>,
+@@ -647,10 +665,47 @@ pub(super) fn drain_action_calls(
+             ActionCall::Preload { from } => {
+                 donors.load(&assets, &from);
+             }
++            ActionCall::Flurry {
++                unit,
++                secs,
++                from,
++                cuts,
++                cut,
++                windup,
++                finish,
++                finish_secs,
++                turn,
++                trail,
++            } => {
++                let Some(entity) = resolve(&unit, me, index) else {
++                    continue;
++                };
++                if let Some(name) = from.as_deref() {
++                    donors.load(&assets, name);
++                }
++                commands.entity(entity).try_insert(flurry::Flurry::new(
++                    unit,
++                    secs,
++                    from,
++                    cuts,
++                    cut,
++                    windup,
++                    finish,
++                    finish_secs,
++                    turn,
++                    trail,
++                    now,
++                ));
++            }
+             ActionCall::Stop { unit, fade } => {
+                 let Some(entity) = resolve(&unit, me, index) else {
+                     continue;
+                 };
++                // A flurry under way finishes (its sweep) rather than fading out.
++                if let Ok(mut f) = flurries.get_mut(entity) {
++                    f.end();
++                    continue;
++                }
+                 if let Ok(mut c) = clips.get_mut(entity) {
+                     c.stopping = Some(fade.max(0.01));
+                 }
+@@ -1135,6 +1190,8 @@ pub(super) fn apply_action_tilts(
+                 };
+                 (amount * shape, LEAN_PIVOT)
+             }
++            // About its feet, snapping round and holding.
++            TiltKind::Turn { .. } => (tilt.turn_now(now).unwrap_or(0.0), 0.0),
+         };
+         let Ok(frame) = globals.get(rig.joints_root) else {
+             continue;
+@@ -1411,6 +1468,7 @@ pub(super) fn plugin(app: &mut App) {
+                 collect_nearby,
+                 track_lock_on,
+                 shuffle_on_lock_turn.after(drain_action_calls),
++                flurry::step_flurries.before(drain_action_calls),
+                 strike_trail::fire_strike_trails
+                     .after(drain_action_calls)
+                     .before(crate::weapon_trail::fire_weapon_trails),
+diff --git a/crates/benilla-app/src/creature_anim/action/flurry.rs b/crates/benilla-app/src/creature_anim/action/flurry.rs
+new file mode 100644
+index 0000000..a03030d
+--- /dev/null
++++ b/crates/benilla-app/src/creature_anim/action/flurry.rs
+@@ -0,0 +1,239 @@
++//! Basin Battle: a flurry of cuts in turning directions (Bladestorm's Blademaster storm).
++//!
++//! `PlayUnitFlurry` starts one on a unit. The first cut's wind-up is the anticipation: its
++//! draw-back compacted into `windup` seconds. Then cut after cut from the list, each `cut` seconds
++//! long, the body snapping round to face a new way for each (`turn` a step: ahead, right, left,
++//! further right, further left, and round again), each trailing the weapons it holds. When its
++//! time is up, or the unit's clip is stopped (`StopUnitAnimation`: the spin ended early), one
++//! wider finishing sweep (`finish`, over `finish_secs`, its trail hanging longer) as the body
++//! comes back to face ahead. Every cut goes through `PlayUnitAnimation`'s own path (another
++//! model's take, the weapon trail, the body owned against the spell look's own animation), so a
++//! cut is a blow like any of the add-on's.
++
++use benilla_ui::action_combat::{self, ActionBody, ActionCall};
++use bevy::prelude::*;
++
++use super::{ActionTilt, TiltKind};
++
++/// The share of a cut before its blow lands; the rest is its recovery, into the next cut.
++const CUT_LANDS_AT: f32 = 0.45;
++/// The finishing sweep's trail, as a share of a cut's: it hangs in the air as the body settles.
++const FINISH_TRAIL: f32 = 1.8;
++/// A turn snaps round in this long (seconds): the cut starts already facing its way.
++const TURN_SNAP: f32 = 0.07;
++/// The turns, in `turn`s, cut by cut and round again: ahead, right, left, further right, further
++/// left, back left, back right, nearly behind each way, ahead.
++const TURNS: [f32; 10] = [0.0, 1.0, -1.0, 2.0, -2.0, -1.0, 1.0, 2.5, -2.5, 0.0];
++
++enum Phase {
++    Cuts,
++    Finish,
++    /// Over at this time (seconds): the component goes.
++    Done(f32),
++}
++
++/// A flurry under way on a unit.
++#[derive(Component)]
++pub(crate) struct Flurry {
++    /// The unit as the script named it (`"player"`, a guid), for the cuts' own calls.
++    unit: String,
++    from: Option<String>,
++    cuts: Vec<(u16, usize)>,
++    cut: f32,
++    windup: f32,
++    finish: (u16, usize),
++    finish_secs: f32,
++    /// Radians a step.
++    turn: f32,
++    trail: Option<(u32, u32)>,
++    until: f32,
++    /// The next cut is due then.
++    next: f32,
++    i: usize,
++    phase: Phase,
++    /// Told to end: the finish on the next step.
++    ending: bool,
++}
++
++impl Flurry {
++    #[allow(clippy::too_many_arguments)]
++    pub(super) fn new(
++        unit: String,
++        secs: f32,
++        from: Option<String>,
++        cuts: Vec<(u16, usize)>,
++        cut: f32,
++        windup: f32,
++        finish: (u16, usize),
++        finish_secs: f32,
++        turn_degrees: f32,
++        trail: Option<(u32, u32)>,
++        now: f32,
++    ) -> Self {
++        Self {
++            unit,
++            from,
++            cuts,
++            cut: cut.max(0.06),
++            windup: windup.max(0.03),
++            finish,
++            finish_secs: finish_secs.max(0.1),
++            turn: turn_degrees.to_radians(),
++            trail,
++            until: now + secs.max(0.0),
++            next: now,
++            i: 0,
++            phase: Phase::Cuts,
++            ending: false,
++        }
++    }
++
++    /// The spin ended (the clip stopped): the finishing sweep next.
++    pub(super) fn end(&mut self) {
++        self.ending = true;
++    }
++
++    /// One cut (or the finish) through the add-on's own animation path.
++    fn play(&self, (anim, take): (u16, usize), impact: f32, recovery: f32, trail_share: f32) {
++        let trail = self
++            .trail
++            .map(|(c, ms)| (c, ((ms as f32) * trail_share).round().max(50.0) as u32));
++        action_combat::push(ActionCall::Anim {
++            unit: self.unit.clone(),
++            anim,
++            impact,
++            trail,
++            variation: Some(take),
++            recovery,
++            body: ActionBody::Full,
++            from: self.from.clone(),
++        });
++    }
++}
++
++/// The cuts as they fall due, each facing its own way; the finish when the time is up or the
++/// spin was ended; then the component goes.
++pub(super) fn step_flurries(
++    mut commands: Commands,
++    time: Res<Time>,
++    mut units: Query<(Entity, &mut Flurry, &Transform)>,
++    mut tilts: Query<&mut ActionTilt>,
++) {
++    let now = time.elapsed_secs();
++    for (entity, mut f, t) in &mut units {
++        let f = &mut *f;
++        match f.phase {
++            Phase::Done(at) => {
++                if now >= at {
++                    commands.entity(entity).try_remove::<Flurry>();
++                }
++                continue;
++            }
++            Phase::Cuts if now < f.next => continue,
++            Phase::Cuts => {
++                // Room for one more whole cut before the time is up, else the finish now.
++                if !f.ending && now + f.cut <= f.until && !f.cuts.is_empty() {
++                    let cut = f.cuts[f.i % f.cuts.len()];
++                    // The first cut's wind-up is the anticipation: the draw-back, compact.
++                    let impact = if f.i == 0 { f.windup } else { f.cut * CUT_LANDS_AT };
++                    let recovery = f.cut * (1.0 - CUT_LANDS_AT);
++                    f.play(cut, impact, recovery, 1.0);
++                    let yaw = f.turn * TURNS[f.i % TURNS.len()];
++                    let hold = (f.until - now).max(0.0) + f.finish_secs + 1.0;
++                    turn(&mut commands, &mut tilts, entity, t, yaw, TURN_SNAP, hold, now);
++                    f.next = now + impact + recovery;
++                    f.i += 1;
++                    continue;
++                }
++                f.phase = Phase::Finish;
++            }
++            Phase::Finish => {}
++        }
++        // The finish: one wider sweep, facing ahead again as it goes.
++        let impact = f.finish_secs * CUT_LANDS_AT;
++        f.play(f.finish, impact, f.finish_secs - impact, FINISH_TRAIL);
++        turn(
++            &mut commands,
++            &mut tilts,
++            entity,
++            t,
++            0.0,
++            f.finish_secs,
++            f.finish_secs + 0.1,
++            now,
++        );
++        f.phase = Phase::Done(now + f.finish_secs + 0.1);
++    }
++}
++
++/// Face `to` radians off the unit's own facing, from wherever the body is turned now, over
++/// `over` seconds, held for `secs` (then the animated pose comes back).
++#[allow(clippy::too_many_arguments)]
++fn turn(
++    commands: &mut Commands,
++    tilts: &mut Query<&mut ActionTilt>,
++    entity: Entity,
++    t: &Transform,
++    to: f32,
++    over: f32,
++    secs: f32,
++    now: f32,
++) {
++    let from = tilts
++        .get(entity)
++        .ok()
++        .and_then(|cur| cur.turn_now(now))
++        .unwrap_or(0.0);
++    let tilt = ActionTilt {
++        kind: TiltKind::Turn { from, to, over },
++        asked: now,
++        start: Some(now),
++        secs,
++        from: t.translation,
++        axis: Some(Vec3::Y),
++        bones: Vec::new(),
++    };
++    match tilts.get_mut(entity) {
++        // A tumble under way keeps itself.
++        Ok(cur) if matches!(cur.kind, TiltKind::Roll { .. }) => {}
++        Ok(mut cur) => {
++            let bones = std::mem::take(&mut cur.bones);
++            *cur = ActionTilt { bones, ..tilt };
++        }
++        Err(_) => {
++            commands.entity(entity).try_insert(tilt);
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_turns_go_both_ways_and_come_back_ahead() {
++        assert_eq!(TURNS[0], 0.0);
++        assert!(TURNS.iter().any(|t| *t > 0.0) && TURNS.iter().any(|t| *t < 0.0));
++        assert_eq!(TURNS[TURNS.len() - 1], 0.0);
++    }
++
++    #[test]
++    fn a_flurry_fits_its_cuts_into_its_time_then_finishes() {
++        let f = Flurry::new(
++            "player".into(),
++            1.0,
++            None,
++            vec![(17, 0), (18, 1)],
++            0.14,
++            0.15,
++            (88, 0),
++            0.25,
++            70.0,
++            Some((0xC8E8F0FF, 220)),
++            10.0,
++        );
++        assert_eq!(f.until, 11.0);
++        assert!(matches!(f.phase, Phase::Cuts));
++        assert!((f.turn - 70.0f32.to_radians()).abs() < 1.0e-6);
++    }
++}
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 45f69f2..8d99437 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -111,6 +111,18 @@
+ //!   `parrySeconds` (the parry's window); `focus` false draws only a faint outline.
+ //! - `ClearTelegraph([key])`: take one away (all with no key).
+ //!
++//! The seventeenth (`HasActionCombat() >= 17`), a storm of cuts:
++//!
++//! - `PlayUnitFlurry(unit, seconds, from, cuts, cutSeconds, windupSeconds, finish, finishSeconds,
++//!   turnDegrees, trail, trailMs)`: the unit cuts and cuts for `seconds`, `cuts` the clips and takes
++//!   it cycles through (`"88/0,87/0,18/1"`, from the model `from` names as `PlayUnitAnimation`'s
++//!   ninth argument does), each `cutSeconds` long, the first wound up over `windupSeconds` (the
++//!   anticipation); for each the body snaps round `turnDegrees` a step to face a new way (ahead,
++//!   right, left, further right, further left...), and each trails the weapons in `trail`
++//!   (`"AARRGGBB"`) for `trailMs`. When the time is up, or `StopUnitAnimation(unit)` ends it early,
++//!   one wider sweep (`finish`, over `finishSeconds`, its trail hanging longer) as the body comes
++//!   back to face ahead.
++//!
+ //! The sixteenth (`HasActionCombat() >= 16`; the thirteenth to fifteenth are the hunter's: stretched
+ //! objects, missile looks, ropes): a spell look's own body animation (its kit's `AnimID`) is
+ //! dropped on a unit while a whole-body `PlayUnitAnimation` clip of the add-on's plays, and for a
+@@ -170,6 +182,22 @@ pub enum ActionCall {
+         unit: String,
+         fade: f32,
+     },
++    /// A flurry of cuts in turning directions (`PlayUnitFlurry`): `cuts` the clips and takes
++    /// cycled through, `cut` seconds each, the first wound up over `windup`; `turn` degrees a
++    /// step round; `finish` the wider sweep over `finish_secs` when `secs` are up or the clip
++    /// is stopped; `trail` the weapons' colour and milliseconds a cut.
++    Flurry {
++        unit: String,
++        secs: f32,
++        from: Option<String>,
++        cuts: Vec<(u16, usize)>,
++        cut: f32,
++        windup: f32,
++        finish: (u16, usize),
++        finish_secs: f32,
++        turn: f32,
++        trail: Option<(u32, u32)>,
++    },
+     /// Start loading another model's clips (`PreloadAnimationSource`).
+     Preload {
+         from: String,
+@@ -381,7 +409,8 @@ pub fn take_calls() -> Vec<ActionCall> {
+         .unwrap_or_default()
+ }
+ 
+-fn push(call: ActionCall) {
++/// A call as a script would make it (the app's own flurry makes its cuts this way).
++pub fn push(call: ActionCall) {
+     if let Ok(mut v) = CALLS.lock() {
+         // A runaway script can't grow it without bound.
+         if v.len() < 256 {
+@@ -677,6 +706,21 @@ fn colour(v: Option<&Value>) -> Option<u32> {
+     }
+ }
+ 
++/// Clips and takes written `"88/0,87/0,18/1"` (a bare `"88"` is take 0); what won't parse is left
++/// out.
++fn clip_takes(s: &str) -> Vec<(u16, usize)> {
++    s.split(',')
++        .filter_map(|part| {
++            let part = part.trim();
++            if part.is_empty() {
++                return None;
++            }
++            let (clip, take) = part.split_once('/').unwrap_or((part, "0"));
++            Some((clip.trim().parse().ok()?, take.trim().parse().unwrap_or(0)))
++        })
++        .collect()
++}
++
+ /// A Lua truth as the 1.12 API reads flags: nil, false and 0 are off.
+ fn truthy(v: Option<&Value>) -> bool {
+     match v {
+@@ -726,7 +770,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(16))?,
++        lua.create_function(|_, _: MultiValue| Ok(17))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -768,6 +812,45 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "PlayUnitFlurry",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let (Some(unit), Some(secs)) = (text(v.first()), number(v.get(1), 0.0, 60.0)) else {
++                return Ok(());
++            };
++            let from = text(v.get(2)).filter(|f| !f.is_empty());
++            let cuts = clip_takes(text(v.get(3)).as_deref().unwrap_or(""));
++            let cut = number(v.get(4), 0.06, 2.0).unwrap_or(0.14);
++            let windup = number(v.get(5), 0.03, 2.0).unwrap_or(0.15);
++            let finish = clip_takes(text(v.get(6)).as_deref().unwrap_or(""))
++                .first()
++                .copied()
++                .or_else(|| cuts.first().copied());
++            let finish_secs = number(v.get(7), 0.1, 3.0).unwrap_or(0.25);
++            let turn = number(v.get(8), 0.0, 180.0).unwrap_or(70.0);
++            let trail = colour(v.get(9)).map(|c| {
++                let ms = number(v.get(10), 50.0, 3000.0).unwrap_or(220.0) as u32;
++                (c, ms)
++            });
++            let Some(finish) = finish else {
++                return Ok(());
++            };
++            push(ActionCall::Flurry {
++                unit,
++                secs,
++                from,
++                cuts,
++                cut,
++                windup,
++                finish,
++                finish_secs,
++                turn,
++                trail,
++            });
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "PreloadAnimationSource",
+         lua.create_function(|_, args: MultiValue| {
+@@ -1219,7 +1302,7 @@ mod tests {
+         take_world_fog();
+         lua.load(
+             r#"SetWorldFog(0.1, 0.2, 2, 90, 0.1, 0.8, 6, 0.5) SetWorldFog(0.1, 0.2) ClearWorldFog(3) ClearWorldFog()
+-               assert(HasActionCombat() >= 16)"#,
++               assert(HasActionCombat() >= 17)"#,
+         )
+         .exec()
+         .unwrap();

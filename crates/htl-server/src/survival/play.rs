@@ -806,6 +806,30 @@ impl SurvivalGame {
                     self.ui_line(c, &line);
                 }
             }
+            Event::Flurry { id, secs, def } => {
+                // Bladestorm's storm of cuts, for the clients that play clips (the caster's own
+                // marked as theirs): the ability's `flurry`, field for field.
+                let Some(g) = self.guid_of(id) else { return };
+                let mine = self.conn_of(id);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let own = u8::from(Some(c) == mine);
+                    let line = format!(
+                        "FU\t{g:#X}\t{own}\t{secs:.2}\t{}\t{}\t{:.3}\t{:.3}\t{}/{}\t{:.3}\t{:.1}\t{}\t{}",
+                        def.from.as_deref().unwrap_or(""),
+                        def.cuts_text(),
+                        def.cut,
+                        def.windup,
+                        def.finish[0],
+                        def.finish[1],
+                        def.finish_secs,
+                        def.turn,
+                        def.trail,
+                        def.trail_ms
+                    );
+                    self.ui_line(c, &line);
+                }
+            }
             Event::ClipStop { id } => {
                 // A feint: the swing let go on the clients that play clips (the caster's own
                 // marked, which has let it go already).
