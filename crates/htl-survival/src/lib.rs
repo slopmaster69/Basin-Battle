@@ -82,3 +82,5 @@ mod tests_hunter_bow;
 mod tests_ward;
 #[cfg(test)]
 mod tests_staff;
+#[cfg(test)]
+mod tests_release;

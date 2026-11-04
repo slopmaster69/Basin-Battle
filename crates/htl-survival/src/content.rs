@@ -34,6 +34,10 @@ pub struct Content {
     /// A caster's guard: the ward a staff raises, with a bar of its own (`[ward]`).
     #[serde(default)]
     pub ward: WardDef,
+    /// The skill checks built into spells: the window a perfect must land in, and what a perfect
+    /// pays (`[checks]`).
+    #[serde(default)]
+    pub checks: ChecksDef,
     #[serde(default)]
     pub heavy: HeavyDef,
     #[serde(default)]
@@ -382,6 +386,30 @@ pub struct WardDef {
 impl Default for WardDef {
     fn default() -> Self {
         Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, perfect_kit: 555, break_kit: 7 }
+    }
+}
+
+/// The skill checks built into spells. The first kind, the release: a charged spell with
+/// `perfect = true` flares as its charge tops out, and a release within `window` of the top is a
+/// perfect cast: full strength and `perfect_damage` times more, `perfect_valor` to the caster,
+/// and a burst on them everyone sees. Let go earlier it goes at its charge, as ever; held past
+/// the window it's full and no more. A missed check is still a working spell.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct ChecksDef {
+    /// Half the window, seconds either side of the moment.
+    pub window: f32,
+    /// A perfect's damage, times the full charge's.
+    pub perfect_damage: f32,
+    /// The Valor a perfect gives (a parry's).
+    pub perfect_valor: f32,
+    /// The burst on the caster at a perfect release (a spell visual kit).
+    pub perfect_kit: u32,
+}
+
+impl Default for ChecksDef {
+    fn default() -> Self {
+        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450 }
     }
 }
 

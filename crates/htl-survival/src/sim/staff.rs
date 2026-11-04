@@ -22,8 +22,14 @@ impl Survival {
         self.content.ability(key)
     }
 
-    /// The staff's attack: the bolt cast now, aimed along the reticle.
+    /// The staff's attack: the bolt cast now, aimed along the reticle; a bolt with a charge (a
+    /// heavy one) begins its charge instead, let go with the button (its release check with it).
     pub(crate) fn cast_bolt(&mut self, id: Id, ability: usize) {
-        self.fire(id, ability, 1.0);
+        let hi = self.content.abilities[ability].charge[1];
+        if hi > 0.0 {
+            self.begin_charge(id, ability, hi);
+        } else {
+            self.fire(id, ability, 1.0);
+        }
     }
 }

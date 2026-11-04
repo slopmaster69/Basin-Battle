@@ -392,6 +392,18 @@ aura = 1463
 perfect_kit = 555
 break_kit = 7
 
+[checks]
+# The skill checks built into spells. The release: a charged spell with `perfect = true` flares
+# as its window opens, and a release within `window` of the charge's top is a perfect cast: full,
+# `perfect_damage` times more, `perfect_valor` to the caster (a parry's), and a burst on them that
+# everyone sees. Let go earlier it goes at its charge, as ever; held past the window it's full and
+# no more. A missed check is still a working spell. (The Mage design, claude/mage-kit-draft.md.)
+window = 0.1
+perfect_damage = 1.2
+perfect_valor = 10.0
+# The burst (the shatter's kit, to replace once seen).
+perfect_kit = 450
+
 # --- heroes against heroes ------------------------------------------------------------------------
 
 [pvp]
@@ -3252,12 +3264,14 @@ impact_kit = 2709
 [[ability]]
 key = "fireball"
 name = "Fireball"
-text = "Deals 16 to 36 damage, growing larger the longer you charge it, up to 1.5 sec. Sets the target Burning for 4 damage per sec for 4 sec. Fire on a frozen enemy shatters it for 50% more damage."
+text = "Deals 16 to 36 damage, growing larger the longer you charge it, up to 1.5 sec; let go on the flare for more. Sets the target Burning for 4 damage per sec for 4 sec. Fire on a frozen enemy shatters it for 50% more damage."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 charge = [0.3, 1.5]
+# Released on the flare: 20% more, the fast missile, and a perfect's Valor.
+perfect = true
 damage = [16.0, 36.0]
 range = [32.0, 34.0]
 radius = [0.35, 0.9]
@@ -3283,6 +3297,7 @@ kind = "projectile"
 valor = 25
 charge = [1.5, 1.5]
 hold = 1.0
+perfect = true
 fragile = true
 damage = [48.0, 48.0]
 range = [36.0, 36.0]
@@ -5718,7 +5733,8 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.4 }]
 # ------------------------------------------------------------------- the staffs' bolts --
 # A casting staff's left click and heavy attack (`bolt`, `heavy_bolt` on the [[weapon]]). Benched:
 # never on the board, cast by the staff alone. Their damage is the staff's: a bolt the low end of
-# its swing, a heavy bolt about the heavy attack's share more. Stamina as a swing's. Looks are the
+# its swing, a heavy bolt (held, let go on its flare for a perfect: `[checks]`) about the heavy
+# attack's share more. Stamina as a swing's. Looks are the
 # schools' own missiles (Fireball's, Frostbolt's, Arcane Missiles'), to check in the client.
 
 [[ability]]
@@ -5747,8 +5763,11 @@ school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
+# Held, and let go on the flare for the perfect.
+charge = [0.3, 1.2]
+perfect = true
 stamina = 22.0
-damage = [34.0, 34.0]
+damage = [24.0, 34.0]
 range = [30.0, 30.0]
 radius = [0.6, 0.6]
 speed = 22.0
@@ -5781,8 +5800,11 @@ school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
+# Held, and let go on the flare for the perfect.
+charge = [0.3, 1.2]
+perfect = true
 stamina = 22.0
-damage = [30.0, 30.0]
+damage = [20.0, 30.0]
 range = [32.0, 32.0]
 radius = [0.4, 0.4]
 speed = 36.0
@@ -5815,8 +5837,11 @@ school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
+# Held, and let go on the flare for the perfect.
+charge = [0.3, 1.2]
+perfect = true
 stamina = 20.0
-damage = [28.0, 28.0]
+damage = [18.0, 28.0]
 range = [30.0, 30.0]
 radius = [0.7, 0.7]
 speed = 26.0
@@ -5827,19 +5852,22 @@ spell = 7268
 [[ability]]
 key = "meteor"
 name = "Meteor"
-text = "Calls a meteor down on the reticle, up to 34 yd away. It lands 1.5 sec later on a 7 yd circle shown to everyone. Deals 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 4 sec more at 8 damage per sec. Freeze them first."
+text = "Hold to call a meteor down on the reticle, up to 34 yd away; let go on the flare for the whole of it. It lands 1.5 sec later on a circle shown to everyone, 5 to 7 yd wide. Deals 35 to 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 4 sec more at 8 damage per sec. Freeze them first."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ultimate"
 kind = "ground"
 valor = 100
 range = [34.0, 34.0]
-radius = [7.0, 7.0]
+radius = [5.0, 7.0]
+# Held to call it down: let go early it's half the meteor; on the flare, the whole of it and more.
+charge = [0.5, 1.5]
+perfect = true
 delay = 1.5
 # Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
 # moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
 look_lead = 0.8
-damage = [70.0, 70.0]
+damage = [35.0, 70.0]
 linger = 4.0
 linger_damage = 8.0
 cooldown = 40.0

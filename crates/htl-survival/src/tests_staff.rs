@@ -96,7 +96,12 @@ fn the_heavy_attack_casts_the_heavy_bolt_and_each_staff_has_its_own_school() {
     let p = armed(&mut s, "Ayla", ORIGIN, "ember_staff");
     let k = mob(&mut s, "grunt", [12.0, 0.0, 0.0]);
     let hp = s.mobs[&k].health;
+    // The heavy is held, then let go.
     s.input(p, Input::Heavy);
+    let ev = s.step(0.0);
+    assert!(missiles(&ev, p).is_empty() && s.players[&p].action.name() == "charge", "a heavy bolt charges: {}", s.players[&p].action.name());
+    run(&mut s, 1.3);
+    s.input(p, Input::AttackUp);
     let ev = s.step(0.0);
     assert_eq!(missiles(&ev, p), vec![23024], "the heavy bolt's own look");
     run(&mut s, 1.5);
@@ -113,6 +118,8 @@ fn the_heavy_attack_casts_the_heavy_bolt_and_each_staff_has_its_own_school() {
     run(&mut s, 1.0);
     assert!(s.has_cc(near, "snare"), "chilled");
     s.input(p, Input::Heavy);
+    run(&mut s, 1.3);
+    s.input(p, Input::AttackUp);
     let ev = run(&mut s, 1.5);
     assert_eq!(missiles(&ev, p), vec![23412]);
     let struck = |v: Id| ev.iter().any(|e| matches!(e, Event::Swing { victim: Some(x), damage, .. } if *x == v && *damage > 0));

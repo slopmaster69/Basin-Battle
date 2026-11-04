@@ -70,6 +70,8 @@ pub(crate) struct GroundCast {
     pub mark: Option<Id>,
     /// Its look already on its way down (`look_lead`).
     pub shown: bool,
+    /// Released on its flare: it lands that much harder.
+    pub perfect: bool,
 }
 
 /// A bounce on its way from one target to the next: it strikes `to` when it gets there, then
@@ -788,13 +790,19 @@ impl Survival {
 
     /// Left click while aiming: a charge begins (or a tap ability goes at once).
     pub(crate) fn ability_press(&mut self, id: Id) {
-        let now = self.clock;
         let Some(Action::Aim { ability }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
-        let (lo, hi) = self.charge_of(id, ability);
+        let (_, hi) = self.charge_of(id, ability);
         if hi <= 0.0 {
             self.fire(id, ability, 1.0);
             return;
         }
+        self.begin_charge(id, ability, hi);
+    }
+
+    /// A charge begins: held until it's let go (or goes by itself), with its glow in the hands,
+    /// the bow's draw, or a throw held back.
+    pub(crate) fn begin_charge(&mut self, id: Id, ability: usize, hi: f32) {
+        let now = self.clock;
         let d = self.content.abilities[ability].clone();
         self.set_action(id, Action::Charge { ability, since: now });
         let spell = if d.kind == "shot" || d.bow { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
@@ -806,7 +814,6 @@ impl Survival {
         } else if d.clip == THROW_CLIP {
             self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0 });
         }
-        let _ = lo;
     }
 
     /// Left click let go: a charge goes (at what it's reached), or waits for its least.
@@ -828,7 +835,9 @@ impl Survival {
             return;
         }
         let share = if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 };
-        self.fire(id, ability, share);
+        // Released on the flare: a perfect cast, full and then some.
+        let perfect = self.content.abilities[ability].perfect && hi > 0.0 && (held - hi).abs() <= self.content.checks.window + 1.0e-4;
+        self.fire_with(id, ability, if perfect { 1.0 } else { share }, perfect);
     }
 
     /// An aim or a charge called off (right click, a roll, the key again): no cooldown spent.
@@ -836,6 +845,15 @@ impl Survival {
         if matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Aim { .. } | Action::Charge { .. })) {
             self.end_ability_action(id);
             self.set_action(id, Action::Ready);
+        }
+    }
+
+    /// What a perfect release does to the damage going out now (1 for any other cast).
+    pub(crate) fn perfect_mult(&self, id: Id) -> f32 {
+        if self.players.get(&id).is_some_and(|p| p.cast_perfect) {
+            self.content.checks.perfect_damage
+        } else {
+            1.0
         }
     }
 
@@ -926,6 +944,22 @@ impl Survival {
 
     /// An ability goes, at `share` of its full charge.
     pub(crate) fn fire(&mut self, id: Id, ability: usize, share: f32) {
+        self.fire_with(id, ability, share, false);
+    }
+
+    /// An ability goes, released on its flare or not: the perfect's strength holds while what it
+    /// sends out is made, and no longer.
+    pub(crate) fn fire_with(&mut self, id: Id, ability: usize, share: f32, perfect: bool) {
+        if let Some(p) = self.players.get_mut(&id) {
+            p.cast_perfect = perfect;
+        }
+        self.fire_body(id, ability, share);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.cast_perfect = false;
+        }
+    }
+
+    fn fire_body(&mut self, id: Id, ability: usize, share: f32) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
         let began = self.players[&id].pos;
@@ -946,6 +980,16 @@ impl Survival {
         }
         if cost > 0.0 {
             self.events.push(Event::Valor { player: id });
+        }
+        // A perfect release: its pay and its burst, for everyone to see. (Its strength is read
+        // by what goes out, below, and the flag cleared as the cast ends.)
+        if self.players[&id].cast_perfect {
+            let k = self.content.checks.clone();
+            self.gain_valor(id, k.perfect_valor);
+            if k.perfect_kit != 0 {
+                self.events.push(Event::Visual { id, kit: k.perfect_kit, by: None });
+            }
+            self.events.push(Event::Perfect { player: id, ability });
         }
         // A charge's glow ends as it goes (the bow's draw ends with its shot).
         if matches!(self.players[&id].action, Action::Charge { .. }) {
@@ -1150,6 +1194,7 @@ impl Survival {
             let (speed, spell) = if full { (d.full_speed.max(d.speed), d.full_spell) } else { (d.speed, d.spell) };
             (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), AbilityDef::at(d.damage, share), spell)
         };
+        let damage = damage * self.perfect_mult(id);
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
         let from = self.hands(id, yaw);
@@ -2311,7 +2356,8 @@ impl Survival {
         if d.delay > 0.0 {
             self.events.push(Event::Cast { caster: id, spell: d.spell, ms: (d.delay * 1000.0) as u32 });
         }
-        self.grounds.push(GroundCast { owner: id, ability, at, radius, share, land_at, mark, shown: false });
+        let perfect = self.players.get(&id).is_some_and(|p| p.cast_perfect);
+        self.grounds.push(GroundCast { owner: id, ability, at, radius, share, land_at, mark, shown: false, perfect });
         if d.delay <= 0.0 {
             self.step_grounds();
         }
@@ -2342,7 +2388,7 @@ impl Survival {
             if !g.shown {
                 self.events.push(Event::Missile { caster: g.owner, spell: d.spell, target });
             }
-            let damage = AbilityDef::at(d.damage, g.share);
+            let damage = AbilityDef::at(d.damage, g.share) * if g.perfect { self.content.checks.perfect_damage } else { 1.0 };
             self.area(g.owner, g.ability, g.at, g.radius, g.share, damage, None);
             self.linger_at(g.owner, g.ability, g.at, g.radius);
             // What it calls down stands there (an Infernal).
@@ -3160,7 +3206,10 @@ impl Survival {
                 // Topped out: the flare on the caster (everyone sees it), once. Not on a bow's
                 // draw: there the bow's own tension shows it, and the drawer's camera leans in and
                 // trembles (the add-on); the flare read as a stray buff (Corey's review).
-                if hi > 0.0 && held >= hi && held - dt < hi && !self.content.abilities[ability].bow {
+                // A release check's flare comes as its window opens, so a release on seeing
+                // it lands inside.
+                let flare_at = if self.content.abilities[ability].perfect { hi - self.content.checks.window } else { hi };
+                if hi > 0.0 && held >= flare_at && held - dt < flare_at && !self.content.abilities[ability].bow {
                     let kit = self.full_kit(ability);
                     if kit != 0 {
                         self.events.push(Event::Visual { id, kit, by: None });

@@ -575,7 +575,8 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     let meteor = s.content.ability("meteor").unwrap();
     let d = s.content.abilities[meteor].clone();
     assert!(d.look_lead > 0.0 && d.look_lead < d.delay);
-    let mut ev = cast(&mut s, p, "ultimate", false, 0.0);
+    // (Meteor is held now: let go once it can go, and it's called from the release.)
+    let mut ev = cast(&mut s, p, "ultimate", false, d.charge[0] + 0.1);
     let start = s.clock;
     let mut look_at = None;
     let mut looks = 0;

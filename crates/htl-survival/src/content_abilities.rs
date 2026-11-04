@@ -115,6 +115,10 @@ pub struct AbilityDef {
     /// A full charge can be held this long past full before it goes by itself (0: until let go).
     #[serde(default)]
     pub hold: f32,
+    /// A release check: the charge flares as it tops out, and a release inside `[checks]`'s
+    /// window of the top is a perfect cast (stronger, Valor, a burst everyone sees).
+    #[serde(default)]
+    pub perfect: bool,
     /// Damage, range and radius at the least and the full charge (one value: both).
     #[serde(default)]
     pub damage: [f32; 2],

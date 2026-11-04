@@ -178,6 +178,9 @@ pub enum Event {
     Stamina { player: Id },
     /// The hero's ward bar changed (a staff's guard), or broke, or is whole again.
     Ward { player: Id },
+    /// A perfect cast: the hero released an ability on its flare (its burst and Valor are their
+    /// own events; this is for the hero's own screen, a beat).
+    Perfect { player: Id, ability: usize },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
@@ -537,6 +540,8 @@ pub struct Player {
     pub ward_down_at: f32,
     /// The ward is up (its look is on them).
     pub ward_up: bool,
+    /// The cast going out now was released on its flare (a perfect): its strength and its pay.
+    pub cast_perfect: bool,
     pub sprint_held: bool,
     /// Sprinting now (held, moving, not walking, not committed to anything, stamina left).
     pub sprinting: bool,
@@ -1150,6 +1155,7 @@ impl Survival {
             ward_broken: false,
             ward_down_at: -100.0,
             ward_up: false,
+            cast_perfect: false,
             sprint_held: false,
             sprinting: false,
             air: None,
