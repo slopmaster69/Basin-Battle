@@ -1326,6 +1326,8 @@ fn bank_shot_comes_off_a_wall_harder_and_strikes_round_the_corner() {
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.5, &[k]));
     assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "it banks: its arrow flies on from the wall");
+    // (And nothing bursts in the wall: a bounce isn't an explosion, Corey's review.)
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: 5162, .. })), "no burst in the wall");
     let h = hits(&ev, p, k);
     let logs: Vec<&Event> = ev.iter().filter(|e| matches!(e, Event::Log(_) | Event::Flash { .. } | Event::Missile { .. })).collect();
     assert_eq!(h.len(), 1, "round the corner: {h:?} {logs:?} planted {:?}", s.planted_of(p));
