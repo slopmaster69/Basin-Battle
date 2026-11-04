@@ -4215,6 +4215,13 @@ damage = [12.0, 12.0]
 lift = 7.0
 # No ring where it comes down: nobody sees the landing coming (a rival under it is still warned).
 unmarked = true
+# The weapon held high through the jump: the Forsaken men's slow two-handed overhead (19/0) runs
+# over the whole airtime (a leap's clip is twice its airtime), so the weapon is up over the head
+# all the way and comes down as the hero lands. Corey's review: no more weapons held idle in
+# the air. The same clip as Sundering Blow's, at the leap's own pace.
+clip = 19
+take = 0
+from = "ScourgeMale"
 spell = 16979
 impact_kit = 5089
 effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
