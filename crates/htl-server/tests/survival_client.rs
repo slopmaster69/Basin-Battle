@@ -1258,27 +1258,36 @@ fn an_eighth_round_client_sees_a_sky_fall_laid_at_its_spot_and_an_older_one_its_
     let mut b = Client::connect(server.login, "ben", "hold", REALM).unwrap();
     let _ = enter(&mut b);
     b.chat(".es hello 5 ac5");
+    // A friend on an eighth-round client watching: the caster's own ring isn't drawn for her
+    // (floor clutter, Corey's review), everyone else's is.
+    let mut c = Client::connect(server.login, "cal", "hold", REALM).unwrap();
+    let _ = enter(&mut c);
+    c.chat(".es hello 5 ac8");
     a.drain(0.6);
     b.drain(0.3);
+    c.drain(0.3);
     // Mind Blast (a dark star at the reticle 0.6 s later): Penance's EX version, on Q with Ctrl.
     a.chat(".es slot q penance");
     a.chat(".es valor full");
     a.drain(0.2);
     a.seen.clear();
     b.seen.clear();
+    c.seen.clear();
     a.chat(".es in ab 0 1");
     a.chat(".es in a");
     a.chat(".es in au 0.0 -0.3");
-    let ta = a.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tTA\t")));
+    let ta = c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tTA\t")));
     match ta {
         Some(ServerPacket::MessageChat(m)) => {
             let f: Vec<&str> = m.text.split('\t').collect();
             assert_eq!(f[7], "ring", "{}", m.text);
-            assert_eq!(f[11], "friendly", "its own: a friend's colour");
+            assert_eq!(f[11], "friendly", "a friend's: a friend's colour");
         }
         _ => panic!("the ring laid at its spot"),
     }
     assert!(b.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tMK\t"))).is_some(), "the older client: its circle");
+    a.drain(0.3);
+    assert!(!a.seen.iter().any(|p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tTA\t") || m.text.starts_with("ES\tMK\t"))), "nothing on the caster's own floor");
 }
 
 #[test]
@@ -1826,7 +1835,7 @@ fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
 }
 
 #[test]
-fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_arrow_stands_over_its_ring() {
+fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_arrow_stands_with_no_ring() {
     let server = start_content(None, false, content());
     let mut c = Client::connect(server.login, "corey", "hold", REALM).unwrap();
     let me = enter(&mut c);
@@ -1849,7 +1858,7 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
     assert_eq!(back.len(), 1, "one way back");
 
     // Two Aimed Shots into the ground ahead: each arrow stands where it ends, at its model's own
-    // size, with a friend's ring under it for an add-on that lays one.
+    // size, with no ring under it (a hero's own circles are floor clutter, Corey's review).
     c.chat(".es slot q aimed_arrow");
     c.drain(0.2);
     for _ in 0..2 {
@@ -1866,14 +1875,10 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
         assert_eq!(field(&f, 4).map(f32::from_bits), Some(1.0), "at its model's own size");
     }
     let rings: Vec<Vec<String>> = addon_lines(&c, "ES").into_iter().filter(|l| l.starts_with("MK\t")).map(|l| l.split('\t').map(str::to_string).collect::<Vec<String>>()).filter(|f| f.len() == 8 && f[7] == "1").collect();
-    assert_eq!(rings.len(), 2, "a friend's ring under each: {rings:?}");
-    for r in &rings {
-        let (x, y): (f32, f32) = (r[2].parse().unwrap(), r[3].parse().unwrap());
-        assert!(arrows.iter().any(|(_, a)| (a[0] - x).hypot(a[1] - y) < 0.2), "under an arrow: {r:?} {arrows:?}");
-    }
+    assert!(rings.is_empty(), "no ring under them: {rings:?}");
 
-    // Arrow Recall (Tripwire's EX): each arrow leaves the ground, its ring with it, and flies from
-    // where it stood to the hunter, an arrow on the wire.
+    // Arrow Recall (Tripwire's EX): each arrow leaves the ground and flies from where it stood to
+    // the hunter, an arrow on the wire.
     c.chat(".es slot 2 tripwire");
     c.chat(".es valor full");
     c.drain(0.2);
@@ -1882,9 +1887,6 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
     let home = stand_in_casts(&c, 19434, me);
     for (g, _) in &arrows {
         assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if guid == g)), "its arrow leaves the ground");
-    }
-    for r in &rings {
-        assert!(c.until(0.5, |c| addon_lines(c, "ES").iter().any(|l| *l == format!("MK\t{}", r[1]))), "its ring goes: {r:?}");
     }
     for (_, at) in &home {
         assert!(arrows.iter().any(|(_, a)| (a[0] - at[0]).hypot(a[1] - at[1]) < 0.3), "from where an arrow stood: {at:?} {arrows:?}");
