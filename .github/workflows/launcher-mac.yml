@@ -1,0 +1,54 @@
+# The War Table launcher on a Mac: Play Basin Battle.command's build (scripts/mac-launcher.sh
+# makes Basin Battle.app), then the app opened on the runner's screen as on a player's Mac. It
+# fails if the menu isn't drawn, and keeps a picture of the screen (the play-menu-mac artifact).
+# Runs when the launcher, its menu or the Mac scripts change, and by hand (Actions -> Run workflow).
+name: Launcher on a Mac
+
+on:
+  pull_request:
+    paths:
+      - "dist/windows/buttons/**"
+      - "dist/windows/launcher/ui/**"
+      - "scripts/mac-launcher.sh"
+      - "scripts/launcher-news.py"
+      - "Play Basin Battle.command"
+      - ".github/workflows/launcher-mac.yml"
+  workflow_dispatch:
+
+jobs:
+  mac-app:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 100
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: dist/windows/buttons
+      - name: Build Play and Basin Battle.app
+        run: bash scripts/mac-launcher.sh
+      - name: The launcher's own tests
+        run: cargo test --release --manifest-path dist/windows/buttons/Cargo.toml
+      - name: Basin Battle.app opens its menu
+        run: |
+          python3 scripts/launcher-news.py dist/windows/launcher/ui/news.json
+          open "Basin Battle.app" --args -NoUpdate
+          log=logs/launcher.log
+          for i in $(seq 1 90); do
+            grep -q "the menu is drawn" "$log" 2>/dev/null && break
+            sleep 1
+          done
+          sleep 4
+          screencapture -x play-menu-mac.png || true
+          cat "$log" || true
+          pkill -x Play || true
+          grep -q "the menu is drawn" "$log" || { echo "Play's menu didn't open (see the picture in the play-menu-mac artifact)"; exit 1; }
+      - name: The picture of Play's menu
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: play-menu-mac
+          path: play-menu-mac.png
+          if-no-files-found: ignore
+          retention-days: 7

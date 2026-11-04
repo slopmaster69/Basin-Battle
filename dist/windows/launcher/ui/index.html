@@ -293,6 +293,9 @@ input { user-select: text; -webkit-user-select: text; }
 .pop .custom input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 4px; border: 1px solid rgba(150,120,70,.5); background: #10171c; color: var(--chalk); font: 400 14px var(--ui); }
 .pop .custom input:focus { outline: 2px solid #ecd08a; outline-offset: 1px; }
 .dispatch-set:empty { display: none; }
+/* A Mac keeps its own window buttons (top left, over the title bar) and resizes by its edges. */
+.mac .titlebar { padding-left: 84px; }
+.mac #minimize, .mac #close, .mac .edges { display: none; }
 .paper.fold b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 </style>
@@ -812,7 +815,7 @@ on.play = async m => {
   else if (m.stage === "failed") {
     // A long reason reads as a short line and what to do about it.
     if (!m.then) { const i = m.now.indexOf(". "); if (i > 0 && i < m.now.length - 2) { m.then = m.now.slice(i + 2); m.now = m.now.slice(0, i + 1); } }
-    playing = false; pinFx.spin(game, false); playable("Try Again");
+    playing = false; pinFx.spin(game, false); playable("Try Again"); routeFrac = { elwynn: 0, basin: 0 }; pieces.dirty = true;
     if (m.offer === "wow") { playable("Find WoW…"); wantPlay = true; say("unavailable", "World of Warcraft 1.12.1 wasn't found.", esc(m.now), ["Choose Folder", () => host.send({ do: "pick-wow" })]); host.send({ do: "pick-wow" }); }
     else if (m.offer === "solo") say("unavailable", esc(m.now), esc(m.then), ["Play Single Player", () => start(true)]);
     else if (m.offer === "address") { say("unavailable", esc(m.now), esc(m.then)); openPop(true); $("custom").classList.add("open"); $("custom-address").focus(); }
@@ -822,7 +825,7 @@ on.play = async m => {
 on.wow = m => {
   if (m.searching) { wowWords = "Looking for it on this PC…"; refreshPane(); return; }
   if (m.cancelled) return;
-  if (m.wrong) { say("unavailable", "That folder isn't World of Warcraft 1.12.1.", "It has no Data\\dbc.MPQ in it. Pick the folder with WoW.exe in it.", ["Choose Folder", () => host.send({ do: "pick-wow" })]); return; }
+  if (m.wrong) { say("unavailable", "That folder isn't World of Warcraft 1.12.1.", "It has no Data folder with dbc.MPQ in it. Pick the WoW 1.12.1 folder that has one.", ["Choose Folder", () => host.send({ do: "pick-wow" })]); return; }
   L.wow = m.path || null; wowWords = L.wow || "Not found on this PC. Choose its folder."; refreshPane();
   if (L.wow && wantPlay) { wantPlay = false; playable(); start(); }
 };
@@ -843,7 +846,9 @@ on.update = m => {
 };
 let updateWords = "";
 function versionWords() {
-  const v = L.version || ""; if (/^v\d/.test(v)) return `${v} installed`;
+  const v = L.version || "", git = /^(v[\d.]+)-(\d+)-g([0-9a-f]+)$/.exec(v);
+  if (git) return `${git[1]} + ${git[2]} changes (${git[3]})`;   // a Mac's checkout: git describe
+  if (/^v\d/.test(v)) return `${v} installed`;
   const sha = /\(([0-9a-f]{7})\)/.exec(v); return sha ? `Test build ${sha[1]}` : v ? "Test build" : "";
 }
 
@@ -864,9 +869,9 @@ const panes = {
     field("Reduced motion", "The map crossfades instead of flying. The light holds still.", lever("still", "Reduced motion")),
   hosting: () => `<h3>Hosting</h3><p>Run a server on this PC, for yourself or for friends to join.</p>` +
     field("Host a server on this PC", L.hostable ? "Opens the server's own window. Leave it open while anyone plays." : "This download has no server in it.", L.hostable ? `<button class="btn" id="host">Open Host</button>` : ""),
-  updates: () => `<h3>Updates</h3><p>Play updates itself when a new release is out. Your settings and heroes stay as they are.</p>` +
+  updates: () => `<h3>Updates</h3><p>${L.checkout ? "Play brings this folder up to date with GitHub each time it opens. The game rebuilds itself after an update." : "Play updates itself when a new release is out."} Your settings and heroes stay as they are.</p>` +
     field(esc(versionWords() || "Version unknown"), esc(updateWords || "Play checks each time it opens."), `<button class="btn" id="check-update">Check for Updates</button>`) +
-    field("Game folder", "Where Play, Host and the game live.", `<button class="btn" id="open-folder">Open Folder</button>`),
+    field("Game folder", L.checkout ? "The Basin Battle folder: the game, its scripts and your worlds." : "Where Play, Host and the game live.", `<button class="btn" id="open-folder">Open Folder</button>`),
 };
 let fxOn = true, stillOn = matchMedia("(prefers-reduced-motion: reduce)").matches, openTab = "launcher";
 const reduced = () => stillOn;
@@ -894,6 +899,9 @@ $("open-settings").onclick = () => { tab("launcher"); settings(true); };
 $("dim").onclick = () => settings(false);
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") { settings(false); openPop(false); }
+  // A Mac's own keys for closing the window.
+  if (L.platform === "mac" && e.metaKey && (e.key === "q" || e.key === "w")) { e.preventDefault(); host.send({ do: "close" }); }
+  if (L.platform === "mac" && e.metaKey && e.key === "m") { e.preventDefault(); host.send({ do: "min" }); }
   if (e.key === "Enter" && document.activeElement === document.body && !$("ledger").classList.contains("open")) start();
 });
 
@@ -909,6 +917,7 @@ on.hello = m => {
   L = { ...L, ...m }; game = m.game === "basin" ? "basin" : "elwynn";
   fxOn = L.prefs.fx; stillOn = L.prefs.still || stillOn; document.body.classList.toggle("still", stillOn);
   document.title = L.title; $("title").textContent = "Play";
+  document.body.classList.toggle("mac", L.platform === "mac");
   $("version").textContent = versionWords();
   if (L.wow === null) wowWords = "Looking for it on this PC…";
   gotHello();
