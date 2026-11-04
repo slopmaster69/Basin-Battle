@@ -78,7 +78,7 @@ pub(crate) const UNIT_ROPE_LEVEL: u8 = 21;
 pub(crate) fn missile_look_line(spell: u32, trail: &str, width: f32, secs: f32, scale: f32, spin: f32, caster: Option<u64>, tumble: bool) -> String {
     let trail = if trail.is_empty() { "-" } else { trail };
     let mut line = format!("ML\t{spell}\t{trail}\t{width:.2}\t{secs:.2}\t{scale:.2}\t{spin:.2}");
-    // A tumble (end over end, patch 0028) names its axis after the caster's place, `-` for none.
+    // A tumble (end over end, patch 0035) names its axis after the caster's place, `-` for none.
     match (caster, tumble) {
         (Some(g), false) => line += &format!("\t0x{g:016X}"),
         (Some(g), true) => line += &format!("\t0x{g:016X}\tside"),
