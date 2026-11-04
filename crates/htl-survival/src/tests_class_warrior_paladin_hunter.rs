@@ -579,6 +579,53 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
 }
 
 #[test]
+fn freezing_trap_leaves_frost_that_slows_what_stands_in_it() {
+    // Friendly fire on: even then the hunter's own frost never slows her.
+    let mut s = world_with(true);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
+    // 5 yd off the spot: outside the 3 yd of frost.
+    let near = mob(&mut s, "grunt", [6.0, 5.0, 0.0]);
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "freezing_trap")));
+    s.set_aim_line(p, 0.0, down_to(6.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 1.2, &[k, near]));
+    assert!(s.has_cc(k, "petrify"), "sprung: frozen");
+    // The frost on the ground where it sprang, as wide as the burst, for as long as it lasts.
+    let (look, wide, lasts) = {
+        let d = &s.content.abilities[idx(&s, "freezing_trap")];
+        (d.linger_spell, d.splash, d.linger)
+    };
+    assert!(look != 0, "the frost has a look of its own");
+    let frost = ev.iter().find_map(|e| match e {
+        Event::AreaLook { id, caster, spell, pos, radius } if *caster == p && *spell == look && (*radius - wide).abs() < 0.01 && (pos[0] - 6.0).abs() < 0.5 => Some(*id),
+        _ => None,
+    });
+    let frost = frost.unwrap_or_else(|| panic!("the frost on the ground: {ev:?}"));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { id, .. } if *id == frost)), "no circle drawn round a hero's own ground: {ev:?}");
+    // A creature walking in after the freeze is slowed by half while it stands there; the one
+    // 5 yd off isn't, nor is the hunter standing in her own frost.
+    let walker = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
+    s.move_player(p, [7.0, 0.0, 0.0], 0.0, Moving::default());
+    run_pinned(&mut s, 1.2, &[k, near, walker]);
+    assert!(s.has_cc(walker, "snare"), "slowed in the frost");
+    assert!((s.speed_share(walker) - 0.5).abs() < 0.01, "by half: {}", s.speed_share(walker));
+    assert!(!s.has_cc(near, "snare"), "not outside it");
+    assert!(!s.has_cc(p, "snare") && (s.speed_share(p) - 1.0).abs() < 0.01, "never the hunter");
+    // Still slowed while it stands there, 4 s on.
+    run_pinned(&mut s, 3.0, &[k, near, walker]);
+    assert!(s.has_cc(walker, "snare"), "kept slow while it stands in the frost");
+    assert!(!s.has_cc(near, "snare"));
+    // The frost gone after its 6 s: the slow wears off and the ground is bare.
+    let ev = run_pinned(&mut s, lasts, &[k, near, walker]);
+    assert!(!s.has_cc(walker, "snare"), "the frost gone, the slow with it");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { .. })), "the look taken away: {ev:?}");
+    assert!(s.burnings.is_empty(), "no ground left");
+}
+
+#[test]
 fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);

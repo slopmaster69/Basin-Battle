@@ -4776,7 +4776,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. Setting it readies a free Multi-Shot for 8 sec."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec and leaves frost that slows what stands in it by 50% for 6 sec. Fire and Sundering Blow shatter them for double damage. Setting it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "defense"
 kind = "trap"
@@ -4796,6 +4796,14 @@ burst_spell = 0
 impact_kit = 450
 clip = 75
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
+# The frost it leaves (Corey's review, round 3: the floor should slow what's round it): the
+# burst's 3 yd of ground for 6 s, snaring every creature in it each second (a hero's own ground
+# never slows them). Its look is the ground's spell (`linger_spell`, tunable in play:
+# `.es tune ability.freezing_trap.linger_spell <id>`): 7083 is Frost Nova's ice on the ground
+# with no caster-side kit. Not 13810 cast as a spell (the whiteout above).
+linger = 6.0
+linger_spell = 7083
+tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }]
 # The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
 # springs: 8 s, room to kite them onto it.)
 empower = { ability = "aimed_arrow", secs = 8.0 }
