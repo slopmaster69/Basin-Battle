@@ -36,15 +36,18 @@ One download does everything: playing, hosting and updating.
    newest **Basin Battle for Windows.zip** and unzip it anywhere, e.g. `Documents\Basin Battle`.
    This is the last time you download it by hand: from then on it updates itself.
 2. Double-click **Play** (the shield). If Windows says it protected your PC: More info → Run anyway.
-   A small window with the shield shows what it's doing; no console.
+   The launcher opens on the War Table, a painted map: pick the game at the top (Elwynn
+   Survival or Basin Battle) and press **Play**.
    - It finds your WoW 1.12.1 install by itself (or asks for the folder once).
-   - It goes straight to **the group's server** (the `server` line in `project.toml`), so joining
-     the group is one click and nothing else to install. If it doesn't answer, Play tries the
-     next one by itself (`backup`, then `backup2`), and if none is up it offers Try again or
-     Single player. Each server is its own world. In the first 3 seconds you can click **Single
-     player** (your own server on this PC), or **Change** to choose one of the group's servers,
-     single player, or **someone else's server** (type the address they give you). It
-     remembers what you chose under Change.
+   - It goes to **the group's server** (the `server` line in `project.toml`), so joining the
+     group is one click and nothing else to install. The lamp by the server's name, bottom left,
+     says whether it's up. If it doesn't answer, Play tries the next one by itself (`backup`, then
+     `backup2`), and if none is up it offers Try Again or Play Single Player. Each server is its
+     own world. Click the server's name to choose another of the group's servers, **single
+     player** (your own server on this PC) or **someone else's server** (type the address they
+     give you). It remembers what you chose.
+   - The map needs WebView2, which Windows 10 and 11 come with. Without it, Play opens its plain
+     window instead (`Play.exe -Classic` always does), which plays the same.
    - On a PC named in `project.toml` as one of the group's servers (`server_pc`, `backup_pc`),
      Play starts that server right there, and Host takes its ports by itself: the second host
      behind one router uses 3725, 8087 and 8088.
@@ -85,10 +88,19 @@ builds the server (5-10 minutes). Players join it with Play as usual.
    folder (or asks for it) and builds everything.
 3. Host, and leave that window open: `scripts/host.sh` (password **hold**), or
    `scripts/host.sh --password ember`. Or double-click **Host Basin Battle.command**.
-4. Play, in a second window: `scripts/play-survival.sh` for Elwynn Survival or `scripts/play.sh`
-   for Basin Battle. For a friend's game add their address: `scripts/play-survival.sh 192.168.1.20`.
+4. Play: double-click **Play Basin Battle.command**. It opens the War Table, the same launcher
+   as the Windows download's Play: pick the game at the top, check the server at the bottom
+   left (the group's servers from `project.toml`, a friend's address, or single player on this
+   Mac) and press **Play**. The first time it builds the launcher (a few minutes) and puts
+   **Basin Battle.app** in this folder: open that from then on, or drag it to the Dock. It plays
+   through `scripts/play.sh`, so the client still rebuilds itself after an update, and each time
+   it opens it brings this folder up to date with GitHub (`git pull` of `main`, and only when
+   you haven't changed anything here yourself).
+   The plain way still works, in Terminal: `scripts/play-survival.sh` for Elwynn Survival or
+   `scripts/play.sh` for Basin Battle. For a friend's game add their address:
+   `scripts/play-survival.sh 192.168.1.20`.
 
-To update, `git pull` and double-click **Restart Basin Battle.command** (or give it a number of
+To update by hand, `git pull` (Basin Battle.app does it when it opens) and double-click **Restart Basin Battle.command** (or give it a number of
 minutes, or `cancel`): everyone playing sees a countdown, the worlds are saved, and the server
 builds the newest version and starts again. The play scripts rebuild the client when its patches
 change.
