@@ -94,7 +94,7 @@
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
-//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid>]`: how a spell's missiles look on an `ac20` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour).
+//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid or ->[\t<side or ->[\t<speed>]]]`: how a spell's missiles look on an `ac20` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour); `side`, a tumble end over end (patch 0035); a speed of their own in yards a second, uncapped (patch 0039; absent or 0: the spell's own).
 //! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0030's `SetUnitRope`): a grappling hook's line, a haul's.
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
@@ -395,6 +395,8 @@ pub(crate) const ADDON_NEWEST: u32 = 25;
 /// ground (the `AB` line's shape `fan`).
 /// 25: the fan's points sit where the arrows really go, and bigger.
 /// 24: the `ML` line's spin axis (a tumble, patch 0035).
+/// 25: the `ML` line's own speed (patch 0039).
+pub(crate) const ADDON_NEWEST: u32 = 25;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1274,7 +1276,7 @@ impl SurvivalGame {
                 // `ac20` draws a missile's look (patch 0029): every spell's that has one.
                 if level >= super::draw::MISSILE_LOOK_LEVEL {
                     for l in &self.sim.content.missile_looks {
-                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None, l.tumble));
+                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None, l.tumble, l.speed));
                     }
                 }
                 // An older add-on or client: say so, and how to update (on screen and in chat).

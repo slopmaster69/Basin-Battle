@@ -473,12 +473,25 @@ trail = "FF9A3C"
 width = 0.35
 secs = 0.45
 
-# Kill Shot (and Split Arrow, which flies the same): a hot gold-red line.
+# Split Arrow (Arcane Shot's arrow; Kill Shot's too until #157 moves it to Fire Shot's bolt): a hot
+# gold-red line.
 [[missile_look]]
 spell = 3044
 trail = "FF6A2A"
 width = 0.4
 secs = 0.5
+
+# Kill Shot once it flies Fire Shot's bolt (10346, #157): the same hot line, wider, the bolt drawn
+# half again its size, and flown at 120 yd/s on a client with patch 0039 (the rules land it at
+# that speed; older clients fly the spell's own 80, so there the bolt arrives after the hit).
+# Corey's review, Nov 4: "maybe even needs to be faster".
+[[missile_look]]
+spell = 10346
+trail = "FF6A2A"
+width = 0.5
+secs = 0.5
+scale = 1.5
+speed = 120
 
 # Multi-Shot's frost-tipped fan.
 [[missile_look]]

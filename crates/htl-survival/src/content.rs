@@ -801,6 +801,11 @@ pub struct MissileLookDef {
     /// of flat about its up (the sixteenth client; older ones spin it flat).
     #[serde(default)]
     pub tumble: bool,
+    /// How fast it flies, yards a second, on a client with patch 0039 (0: the spell's own speed,
+    /// which the clients cap at 100): a bolt quicker than anything in the data (Kill Shot). The
+    /// rules' own speed is the ability's; this keeps the look in step with it.
+    #[serde(default)]
+    pub speed: f32,
 }
 
 fn look_width() -> f32 {
@@ -3237,8 +3242,8 @@ impl Content {
             if l.spell == 0 || self.missile_looks[..k].iter().any(|o| o.spell == l.spell) {
                 bail!("missile_look {}: a spell, once", l.spell);
             }
-            if !(l.trail.is_empty() || rgb(&l.trail)) || l.width < 0.0 || l.secs < 0.0 || l.scale <= 0.0 {
-                bail!("missile_look {}: its trail is \"RRGGBB\" (or none), and its width, secs and scale aren't below 0", l.spell);
+            if !(l.trail.is_empty() || rgb(&l.trail)) || l.width < 0.0 || l.secs < 0.0 || l.scale <= 0.0 || l.speed < 0.0 {
+                bail!("missile_look {}: its trail is \"RRGGBB\" (or none), and its width, secs, scale and speed aren't below 0", l.spell);
             }
         }
         for a in &self.abilities {
