@@ -735,6 +735,21 @@ impl Survival {
         Ok(())
     }
 
+    /// Come down from the camp (a page of the book, or a wager): whole to start the trip, health
+    /// and stamina full. Their Draughts are as they left them (a rest refills those), and a hero
+    /// logging in below isn't made whole, so leaving mid-fight heals nothing.
+    pub fn come_down(&mut self, id: Id) {
+        let stamina = self.content.player.stamina;
+        let Some(p) = self.players.get_mut(&id).filter(|p| p.health > 0) else {
+            return;
+        };
+        p.health = p.max_health;
+        p.stamina = stamina;
+        let (health, max) = (p.health, p.max_health);
+        self.events.push(Event::Health { id, health, max });
+        self.events.push(Event::Stamina { player: id });
+    }
+
     /// Whole again, Draughts refilled.
     fn refresh_hero(&mut self, id: Id) {
         let Some(d) = self.dungeon_def().cloned() else {
