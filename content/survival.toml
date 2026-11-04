@@ -4951,7 +4951,12 @@ ally_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.1, aura = 2288
 self_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.2, aura = 22888 }, { kind = "fury", secs = [8.0, 8.0], amount = 0.0 }, { kind = "grown", secs = [8.0, 8.0], amount = 0.15 }]
 # The roar, and Battle Shout's look on every ally it reaches; Rallying Cry of the Dragonslayer's
 # on each while it lasts (the effects' `aura`, to be checked in the lab).
-clip = 55
+# The general's arm, the same on every race: the human men's Point emote (84/0), the arm thrown
+# up and then forward ("with me!"), not a shout. Corey's review, Nov 3; picked from the lab's
+# strips against Cheer, Shout, Salute, Flex, Wave and the battle roar, Nov 4.
+clip = 84
+take = 0
+from = "HumanMale"
 ally_spell = 6673
 
 # 3, the Juggernaut's (its first choice, from the Warlord's): the spin that ramps (Beta's
