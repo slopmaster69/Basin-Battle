@@ -221,9 +221,17 @@ pub struct AbilityDef {
     pub ammo: u32,
     #[serde(default)]
     pub aura: u32,
-    /// The cast's clip (`AnimationData`), played on the caster as it goes.
+    /// The cast's clip (`AnimationData`), played on the caster as it goes (a weapon art's: its
+    /// blow).
     #[serde(default)]
     pub clip: u16,
+    /// Which of the model's versions of `clip` (0 the first).
+    #[serde(default)]
+    pub take: u32,
+    /// Another character model whose take on `clip` every hero plays (`"TaurenMale"`; as a
+    /// move's `from`), so the ability looks the same on every race; without one, the hero's own.
+    #[serde(default)]
+    pub from: Option<String>,
     /// Valor for each foe it strikes (0: `[valor].ability`).
     #[serde(default)]
     pub valor_hit: f32,

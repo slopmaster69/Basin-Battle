@@ -456,7 +456,7 @@ impl Survival {
                     0 => self.events.push(Event::Cast { caster: id, spell, ms: (secs * 1000.0) as u32 }),
                     clip => {
                         self.unsheathe(id);
-                        self.events.push(Event::Clip { id, clip, secs: CHOP_SECS });
+                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: CHOP_SECS });
                     }
                 }
             }

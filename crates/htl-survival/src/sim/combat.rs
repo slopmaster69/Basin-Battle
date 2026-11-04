@@ -1030,7 +1030,7 @@ impl Survival {
                     };
                     let chop = super::world::CHOP_SECS;
                     if clip != 0 && (t / chop).floor() != ((t + dt) / chop).floor() && t + dt + chop * 0.5 < secs {
-                        self.events.push(Event::Clip { id, clip, secs: chop });
+                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: chop });
                     }
                     if t + dt >= secs {
                         self.events.push(Event::CastEnd { caster: id });
@@ -2200,9 +2200,12 @@ impl Survival {
         if d.arc > 0.0 {
             s.arc = d.arc;
         }
+        // Its own clip: the ability's take, from the model it names (the same blow on every
+        // race), else the hero's own.
         if d.clip != 0 {
             s.clip = d.clip;
-            s.take = 0;
+            s.take = d.take;
+            s.from = d.from.clone();
         }
         s.lunge = s.lunge.min(0.6);
         s.stamina = d.stamina;

@@ -736,7 +736,7 @@ impl Survival {
             let ms = if d.kind == "shot" { DRAW_HOLD_MS } else { ((hi + d.hold.max(0.5)) * 1000.0) as u32 };
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
-            self.events.push(Event::Clip { id, clip: HOLD_THROWN, secs: hi + d.hold.max(0.5) });
+            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5) });
         }
         let _ = lo;
     }
@@ -885,7 +885,7 @@ impl Survival {
         if d.clip != 0 && d.kind != "art" {
             // A stance holds its clip while it lasts (Feign Death lies there).
             let secs = if d.kind == "stance" { d.secs } else { CAST_RECOVERY + 0.2 };
-            self.events.push(Event::Clip { id, clip: d.clip, secs });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs });
         }
         // The bow's own release before the sword comes back (a crossbow's long reload).
         let total = if d.kind == "shot" { self.ranged_of(&self.players[&id]).recovery.max(CAST_RECOVERY) } else { CAST_RECOVERY };

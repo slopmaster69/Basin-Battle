@@ -643,3 +643,29 @@ fn a_training_dummy_stays_a_step_from_home_and_a_panic_never_turns_it() {
     assert_eq!(s.mobs[&d].pos, at, "not moved by it");
     assert!(s.dummy_guards(d, [0.0, 0.0, 0.0]), "still guarding the hero after");
 }
+
+#[test]
+fn an_abilitys_own_clip_comes_from_the_model_it_names_on_every_race() {
+    // The same take of the same model for every hero, whatever their race (a cast's clip, and a
+    // weapon art's blow); an ability naming no model plays the hero's own.
+    let mut s = world();
+    let frost = s.content.ability("frostbolt").unwrap();
+    s.content.abilities[frost].clip = 57;
+    s.content.abilities[frost].take = 2;
+    s.content.abilities[frost].from = Some("TaurenMale".into());
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    slot(&mut s, p, "ranged", "frostbolt");
+    let mut ev = cast(&mut s, p, "ranged", false, 1.2);
+    ev.extend(run(&mut s, 0.5));
+    let clip = ev.iter().find_map(|e| match e {
+        Event::Clip { id, clip, take, from, .. } if *id == p => Some((*clip, *take, from.clone())),
+        _ => None,
+    });
+    assert_eq!(clip, Some((57, 2, Some("TaurenMale".to_string()))));
+    let art = s.content.abilities.iter().position(|a| a.kind == "art").expect("a weapon art in the rules");
+    s.content.abilities[art].clip = 58;
+    s.content.abilities[art].take = 1;
+    s.content.abilities[art].from = Some("TaurenMale".into());
+    let strike = s.art_strike(p, art);
+    assert_eq!((strike.clip, strike.take, strike.from.as_deref()), (58, 1, Some("TaurenMale")));
+}
