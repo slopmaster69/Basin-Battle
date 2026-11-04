@@ -225,9 +225,10 @@ fn tackle_into_another_enemy_knocks_both_down() {
     assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "both knocked down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == b && *anim == KNOCKDOWN_ANIM)), "thrown to the ground");
     assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 5089, .. } if *id == b)), "the Crash's shock ring on the one driven into");
-    // The knockdown is long enough to read: still down well after a second.
-    run(&mut s, 1.3);
-    assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "a 2 sec knockdown");
+    // The knockdown is long enough to read: still down well after a second (the Crash landed
+    // about 0.25 s in).
+    run(&mut s, 0.9);
+    assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "a 2 sec knockdown: {:?} / {:?} at {}", s.cc_of(a), s.cc_of(b), s.clock);
     run(&mut s, 1.0);
     assert!(!s.has_cc(a, "stun") && !s.has_cc(b, "stun"), "and up again");
     // The one driven into was shoved on by the Crash.
