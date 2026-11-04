@@ -315,6 +315,10 @@ impl Survival {
         let key = |i: &usize| c.items[*i].key.clone();
         let mut players = offline.clone();
         for p in self.players.values() {
+            // (Not the spell lab's stand-in allies.)
+            if p.account.starts_with(crate::sim::lab::LAB_ALLY) {
+                continue;
+            }
             players.insert(p.account.clone(), save_player(c, p));
         }
         let mut out = WorldSave {

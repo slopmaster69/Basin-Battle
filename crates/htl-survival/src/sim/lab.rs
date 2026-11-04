@@ -25,6 +25,9 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
     })
 }
 
+/// The account every spell lab stand-in ally hero's starts with: never saved.
+pub const LAB_ALLY: &str = "lab~ally";
+
 pub const LAB_SCENES: &str = "one, pack, close, ring, far or line";
 
 impl Survival {
