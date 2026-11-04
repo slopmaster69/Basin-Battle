@@ -1,4 +1,4 @@
-From d156d87d9f868a48eaa31b7988f814b366f737e7 Mon Sep 17 00:00:00 2001
+From 135737a69697e330dc564453a1ccc96c7ab10d03 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Wed, 4 Nov 2026 09:58:23 -0600
 Subject: [PATCH] A shape flashed on the ground as an ability lands:
@@ -14,19 +14,19 @@ HasActionCombat() is 18.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 ---
- crates/benilla-app/src/target/ground_burst.rs | 228 ++++++++++++++++++
+ crates/benilla-app/src/target/ground_burst.rs | 275 ++++++++++++++++++
  crates/benilla-app/src/target/mod.rs          |   4 +
  crates/benilla-app/src/target/telegraph.rs    |  15 +-
- crates/benilla-ui/src/action_combat.rs        |  72 +++++-
- 4 files changed, 310 insertions(+), 9 deletions(-)
+ crates/benilla-ui/src/action_combat.rs        |  72 ++++-
+ 4 files changed, 357 insertions(+), 9 deletions(-)
  create mode 100644 crates/benilla-app/src/target/ground_burst.rs
 
 diff --git a/crates/benilla-app/src/target/ground_burst.rs b/crates/benilla-app/src/target/ground_burst.rs
 new file mode 100644
-index 00000000..87a6a752
+index 00000000..5b251a05
 --- /dev/null
 +++ b/crates/benilla-app/src/target/ground_burst.rs
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,275 @@
 +//! Basin Battle's ground bursts, not part of 1.12.1: an ability's shape flashed on the ground as
 +//! it lands, for the Elwynn Survival add-on (`PlayGroundBurst`). A shock front runs from the spot
 +//! out to the reach over the burst's time and fades behind itself, with a flash of the whole
@@ -54,12 +54,12 @@ index 00000000..87a6a752
 +/// The front's run is over by this share of the burst's time; the rest is its fade.
 +const RUN_SHARE: f32 = 0.7;
 +/// The flash of the whole shape is gone by this share of the burst's time.
-+const FLASH_SHARE: f32 = 0.55;
++const FLASH_SHARE: f32 = 0.6;
 +/// The textures' size (px) and the share of their half-width the shape's edge sits at.
 +const TEX: u32 = 128;
 +const EDGE: f32 = 0.97;
 +/// The front band's thickness, as a share of the radius (the strip's length).
-+const BAND: f32 = 0.16;
++const BAND: f32 = 0.22;
 +
 +/// One burst under way.
 +struct Burst {
@@ -97,9 +97,9 @@ index 00000000..87a6a752
 +            .or_insert_with(|| {
 +                images.add(match (shape, front) {
 +                    (TeleShape::Line, true) => line_front_image(),
-+                    (TeleShape::Line, false) => telegraph::line_image(true),
++                    (TeleShape::Line, false) => line_fill_image(),
 +                    (_, true) => shape_front_image(shape == TeleShape::Ring, arc),
-+                    (_, false) => telegraph::shape_image(shape == TeleShape::Ring, arc, true),
++                    (_, false) => shape_fill_image(shape == TeleShape::Ring, arc),
 +                })
 +            })
 +            .clone()
@@ -127,7 +127,7 @@ index 00000000..87a6a752
 +        return 0.0;
 +    }
 +    // Sharp at the front, trailing off behind.
-+    (1.0 - back).powf(1.5)
++    1.0 - back
 +}
 +
 +/// A wedge's (or a ring's) front: the band at the rim, pointing along +u from the centre.
@@ -153,6 +153,50 @@ index 00000000..87a6a752
 +            if a < 1.0 {
 +                continue;
 +            }
++            let k = ((j * TEX + i) * 4) as usize;
++            data[k..k + 4].copy_from_slice(&[255, 255, 255, a as u8]);
++        }
++    }
++    image(data)
++}
++
++/// A wedge's (or a ring's) flash: a strong fill, brighter toward the edge, its sides softened.
++fn shape_fill_image(ring: bool, arc_deg: f32) -> Image {
++    let half = (arc_deg.clamp(5.0, 360.0) / 2.0).to_radians();
++    let mut data = vec![0u8; (TEX * TEX * 4) as usize];
++    let c = TEX as f32 / 2.0;
++    for j in 0..TEX {
++        for i in 0..TEX {
++            let dx = (i as f32 + 0.5 - c) / (c * EDGE);
++            let dy = (j as f32 + 0.5 - c) / (c * EDGE);
++            let r = (dx * dx + dy * dy).sqrt();
++            if r > 1.0 {
++                continue;
++            }
++            let ang = dy.atan2(dx).abs();
++            if !ring && ang > half {
++                continue;
++            }
++            let rim = 1.0 - r;
++            let side = if ring { 1.0 } else { (half - ang) * r };
++            let soft = (rim.min(side) / 0.04).clamp(0.0, 1.0);
++            let a = (90.0 + 130.0 * r) * soft;
++            let k = ((j * TEX + i) * 4) as usize;
++            data[k..k + 4].copy_from_slice(&[255, 255, 255, a as u8]);
++        }
++    }
++    image(data)
++}
++
++/// A strip's flash: a strong fill, brighter toward its far end.
++fn line_fill_image() -> Image {
++    let mut data = vec![0u8; (TEX * TEX * 4) as usize];
++    for j in 0..TEX {
++        for i in 0..TEX {
++            let u = (i as f32 + 0.5) / TEX as f32;
++            let v = (j as f32 + 0.5) / TEX as f32;
++            let edge = (u.min(1.0 - u) / 0.02).min(v.min(1.0 - v) / 0.08).clamp(0.0, 1.0);
++            let a = (90.0 + 130.0 * u) * edge;
 +            let k = ((j * TEX + i) * 4) as usize;
 +            data[k..k + 4].copy_from_slice(&[255, 255, 255, a as u8]);
 +        }
@@ -236,10 +280,13 @@ index 00000000..87a6a752
 +    for (k, front, flash) in jobs {
 +        let b = &state.list[k];
 +        let t = ((now - b.start) / b.secs.max(1.0e-3)).clamp(0.0, 1.0);
-+        let flash_alpha = 0.6 * (1.0 - t / FLASH_SHARE).max(0.0);
++        let flash_alpha = 0.85 * (1.0 - t / FLASH_SHARE).max(0.0);
 +        let front_alpha = if t < RUN_SHARE { 1.0 } else { 1.0 - (t - RUN_SHARE) / (1.0 - RUN_SHARE) };
 +        telegraph::push_layer(&mut draw, cam, flash.id(), &b.flash, b.rgb, flash_alpha);
++        // The front twice: a bright crest over the fill, white-hot at its edge.
 +        telegraph::push_layer(&mut draw, cam, front.id(), &b.front, b.rgb, front_alpha);
++        let hot = [1.0 - (1.0 - b.rgb[0]) * 0.4, 1.0 - (1.0 - b.rgb[1]) * 0.4, 1.0 - (1.0 - b.rgb[2]) * 0.4];
++        telegraph::push_layer(&mut draw, cam, front.id(), &b.front, hot, front_alpha * 0.8);
 +    }
 +}
 +
