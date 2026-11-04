@@ -3242,7 +3242,13 @@ stamina = 28.0
 unblockable = true
 poise = true
 shatter = true
-clip = 57
+# One big overhead on every race: the Forsaken men's slow two-handed overhead (19/0: the weapon
+# goes right up over the head and comes down in 0.63 s), borrowed by all. Corey asked for the
+# tauren's big overhead, but the tauren's own two-handed clips are thrusts (the census): this is
+# the biggest overhead there is (picked from the lab's side-on strips, Nov 4).
+clip = 19
+take = 0
+from = "ScourgeMale"
 spell = 12294
 valor_hit = 6.0
 effects = [{ kind = "stagger", secs = [1.2, 1.2] }, { kind = "sunder", secs = [8.0, 8.0], amount = 0.15 }]
