@@ -3529,9 +3529,9 @@ breaks_free = true
 # Long enough that when to spend it is a choice (a pack's next knockdown is coming), short enough
 # to have it in most fights.
 cooldown = 16.0
-# Placeholder looks (to be checked in the lab): Berserker Rage's own cast and look on the warrior
-# for the 3 sec, the roar (55) as the clip.
-spell = 18499
+# Enrage's rage burst (12880) as it goes: Berserker Rage's own 18499 plays a Roar anim on the
+# caster that would fight the Flex. Its red fists (18499's lasting look) stay on for the 3 sec.
+spell = 12880
 # The berserker shrugging it off, the same on every race: the orc men's Flex emote (82/0), arms
 # up and fists clenched. Blood Fury keeps the battle roar (55), the Roar roars (74).
 clip = 82
@@ -3552,9 +3552,9 @@ slot = "defense"
 kind = "buff"
 valor = 25
 health_cost = 0.15
-# Placeholder looks (to be checked in the lab): the orcs' Blood Fury cast, Death Wish's red on the
-# warrior while it lasts (the `fury` look), the roar (55) as the clip.
-spell = 20572
+# Savage Rage's burst (3258) as the blood is paid: the orcs' own Blood Fury (20572) has no
+# visual in the game data. Death Wish's red on the warrior while it lasts (the `fury` look).
+spell = 3258
 # The orc men's battle roar (55/0) on every race: the pose the orcs' own Blood Fury strikes.
 clip = 55
 take = 0
@@ -4816,9 +4816,10 @@ kind = "cone"
 valor = 25
 range = [15.0, 15.0]
 arc = 60.0
-effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 1160 }]
-# Placeholder looks (to be checked in the lab): Intimidating Shout's roar, Demoralizing Shout's
-# look on each one Cowed (the effect's `aura`), the roar (55) as the clip.
+# Intimidating Shout's own fear mark over the head (5246's lasting look) on each one Cowed for the
+# 6 sec: Demoralizing Shout's (1160) was a one-shot and left nothing to see after.
+effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 5246 }]
+# Intimidating Shout's roar as it goes.
 spell = 5246
 # The roar itself, the same on every race: the orc men's Roar emote (74/0), head back and arms
 # wide. Not the battle roar (55): that's Blood Fury's, and Berserker Rage flexes (82).
@@ -4951,10 +4952,16 @@ cooldown = 40.0
 radius = [20.0, 20.0]
 # The whole bar (`player.stamina`).
 ally_stamina = 100.0
-ally_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.1, aura = 22888 }]
-self_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.2, aura = 22888 }, { kind = "fury", secs = [8.0, 8.0], amount = 0.0 }, { kind = "grown", secs = [8.0, 8.0], amount = 0.15 }]
-# The roar, and Battle Shout's look on every ally it reaches; Rallying Cry of the Dragonslayer's
-# on each while it lasts (the effects' `aura`, to be checked in the lab).
+# Savagery's red glow (5515, a lasting state look with no anim of its own) on everyone rallied
+# for the 8 sec: the mark that says the buff is on them. Not Rallying Cry of the Dragonslayer
+# (22888): that's lightning hands, and Corey keeps lightning for the magic classes.
+ally_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.1, aura = 5515 }]
+self_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.2, aura = 5515 }, { kind = "fury", secs = [8.0, 8.0], amount = 0.0 }, { kind = "grown", secs = [8.0, 8.0], amount = 0.15 }]
+# Onslaught's rage burst at the warrior as the arm goes up: Enrage's (12880), the same burst as
+# Bloodlust's (379) without the roar anim 379 plays on the caster, which would fight the Point.
+# Battle Shout's flare on every ally it reaches (the quick "you got it" mark), and the fury's
+# Death Wish red on the warrior while it lasts.
+spell = 12880
 # The general's arm, the same on every race: the human men's Point emote (84/0), the arm thrown
 # up and then forward ("with me!"), not a shout. Corey's review, Nov 3; picked from the lab's
 # strips against Cheer, Shout, Salute, Flex, Wave and the battle roar, Nov 4.
