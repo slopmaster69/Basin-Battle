@@ -495,6 +495,20 @@ DE	10	Targorr the Dread's heavy blow, through your guard (212)^Targorr the Dread
 !local r = ElwynnSurvival.recapShown table.insert(SAID, "recap: " .. tostring(r.lines) .. " lines, tip " .. tostring(r.tip ~= "") .. ", band " .. tostring(ElwynnSurvivalDown:GetHeight()))
 DE	0
 !table.insert(SAID, "recap after getting up: " .. tostring(ElwynnSurvival.recapShown) .. ", band " .. tostring(ElwynnSurvivalDown:GetHeight()))
+# Grapple Arrow aimed: the server's word on where it would catch (GP), the reticle's tint and the
+# ring; then a Disengage's flip (FP), the same on every hero.
+A	aim	0.00	0.00	grapple_arrow
+!OLDSGM = SetGroundMarker function SetGroundMarker(k, x, y, z, r, s, h) table.insert(SAID, "ring " .. k .. string.format(" %.1f %.1f r%.1f ", x, y, r) .. tostring(h)) end
+GP	1	10.60	0.00	1.80	10.60	0.00	grapple_arrow
+!table.insert(SAID, "grapple aimed: catch " .. tostring(ElwynnSurvival.CatchNow() and ElwynnSurvival.CatchNow().caught) .. ", tint " .. table.concat({ ElwynnSurvival.CatchColor() }, " "))
+GP	0	22.00	0.00	9.00	22.00	0.00	grapple_arrow
+!table.insert(SAID, "grapple miss: tint " .. table.concat({ ElwynnSurvival.CatchColor() }, " "))
+GP
+!table.insert(SAID, "grapple let go: " .. tostring(ElwynnSurvival.catch)) SetGroundMarker = OLDSGM
+A	ready	0.00	0.00
+!OLDRU = RollUnit function RollUnit(u, s, st, p, t) table.insert(SAID, "flip " .. u .. string.format(" %.2f ", s) .. tostring(st) .. " tuck " .. tostring(t)) end
+FP	0X1	0.52	38	0	ScourgeFemale	1	1
+!RollUnit = OLDRU
 # Below, with nothing else to point at: the corner's arrow points north.
 WR	below
 H	200	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90

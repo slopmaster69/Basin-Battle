@@ -86,7 +86,7 @@ effect.
 | E | The **close** ability (Shockwave) |
 | 1 | The **utility** ability (Charge) |
 | 2 | The **defense** ability (Retaliation) |
-| 3 (hold) | The **ultimate** (Onslaught): held a quarter second it goes (a line fills along the key), so a stray press never spends the whole Valor bar |
+| 3 (hold) | The **ultimate** (Bladestorm, or the Warlord's Rallying Cry): held a quarter second it goes (a line fills along the key), so a stray press never spends the whole Valor bar |
 | Q, E, 1 or 2 held (0.35 s), or Ctrl + it | Its **charged-up EX version**, for Valor: an aimed one comes up as itself and turns EX as the hold passes (the key shows the EX and clicks); one that goes at once (a weapon art, a stance, a nova, holy ground) waits to see which you meant. Without the Valor for the EX version, the key is a plain press at once (nothing waits on a hold you can't pay for) |
 | Space | Jump: 8 stamina, and not without it |
 | F | Use what's in front of you (the prompt over the dock says what): a chest, a station, the weapon rack, timber, copper, the bell, your dropped supplies. While placing a station, put it down |
@@ -156,7 +156,7 @@ one class's fantasy or a mix (a Warrior's Charge with a Mage's Meteor and a Prie
 | E | **Close** | Shockwave · *Sundering Blow* | Consecration · *Hallowed Ground* | Call of the Wild · *Double Call*, or Raptor Strike · *Harpoon Dive* | Backstab · *Ambush* | Holy Nova · *Psychic Scream* | Thunderstorm · *Thundercrack* | Cone of Cold · *Frost Nova* | Shadowfury · *Shadowflame* | Swipe · *Typhoon* |
 | 1 | **Utility** | Charge · *Heroic Leap* | Divine Steed · *Blessing of Freedom* | Grapple Arrow · *Reverse Grapple*, or Ensnaring Retreat · *Trapper's Instinct* | Shadowstep · *Blinding Step* | Leap of Faith · *Mind Grip* | Earthbind Totem · *Earthgrab Totem* | Blink · *Frost Blink* | Demonic Circle · *Dread Circle* | Feral Leap · *Pounce* |
 | 2 | **Defense** | Retaliation · *Shield Wall* | Blessing of Protection · *Lay on Hands* | Tripwire · *Arrow Recall*, or Explosive Trap · *Freezing Trap* | Smoke Bomb · *Vanish* | Power Word: Barrier · *Power Word: Shield* | Healing Stream Totem · *Grounding Totem* | Ice Block · *Cold Snap* | Drain Life · *Death Coil* | Barkskin · *Ironbark* |
-| 3 | **Ultimate** | Onslaught | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
+| 3 | **Ultimate** | Bladestorm, or Rallying Cry | Avenging Wrath | Kill Shot, or Skyfall | Death Mark | Void Rift | Earthquake | Meteor | Summon Infernal | Hurricane |
 
 In italics, each card's **charged-up EX version**: hold its key a quarter second (or Ctrl with
 it) to cast that for Valor instead. An ultimate has none: it is the bar's whole worth.
@@ -170,7 +170,8 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   overhead that Sunders one target (15% more damage from everyone). Charge stops at the first foe
   and staggers it (or Heroic Leap, landing in a burst that throws everyone back). Retaliation is a
   one-second brace that blocks a blade and sweeps everyone in front; Shield Wall holds the shield up
-  against everything from the front. Onslaught: larger, red and relentless for 8 s.
+  against everything from the front. Bladestorm: a 6 s spin that ramps; or Rallying Cry: everyone
+  near back on their feet with full stamina, and nothing staggers them for 8 s.
 - **Paladin**: shield your friends, punish who touches them. Avenger's Shield ricochets to two
   more foes and silences them; its EX, Holy Shock, heals the friend under your reticle (or you) and
   frees them. Consecration and Sanctuary lay healing ground. Divine Steed is a burst of speed out of
@@ -181,16 +182,18 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   second under the first). Every arrow that ends its flight sticks in the ground for 6 s (up to
   12), and Arrow Recall (Tripwire's EX) brings them all home through the fight, each at full damage;
   three or more in one foe Lacerate it. Q: Aimed Shot, a draw (its EX Multi-Shot a fan), or Bank
-  Shot, which ricochets off walls and trees harder each bounce (its EX Split Arrow a point-blank
-  spray that kicks you back). E: Call of the Wild, a chain of spirit beasts that builds from setup
-  to finisher (the key shows the beast coming; a hit, parry or perfect dodge since the last call
+  Shot, which ricochets off walls and trees harder each bounce and skips off the ground at a low
+  angle, a flash at each (its EX Split Arrow a long glowing arrow that bursts into a fan of 6 where
+  its flight ends). E: Call of the Wild, a chain of spirit beasts that builds from setup
+  to finisher (the key shows the beast coming; a parry or perfect dodge lights it blue and, for 4 s,
   empowers the next), or Raptor Strike, a spear chain (thrust, sweep, an Uppercut that throws you
   up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
   foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
   (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
-  Tripwire, two planted arrows and a wire that knocks down the first to cross, or the traps. 3:
-  Kill Shot, or Skyfall: a leap straight up, a slow fall over the fight, and a volley of 12 arrows
-  where you aim (they plant).
+  Tripwire, two arrows placed a press each and a wire that knocks down the first to cross, or the traps. 3:
+  Kill Shot, or Skyfall: a leap straight up, a 5.5 s hang there with the bow drawn on a ring below,
+  and a volley of 12 arrows where you aim (they plant), then a slow fall. Every bow ability brings
+  the bow into the hands and draws it with the base game's bow draw.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
@@ -225,7 +228,7 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
 **How they move bodies**: a **knockback** throws someone away from where it came from (a burst's
 middle, a projectile's flight, the caster), a **pull** draws them toward it (Leap of Faith, Mind
 Grip and Void Rift); both cut short what they had in hand, and fly heroes on their own client.
-Nothing moves a body in Ice Block, Onslaught, Sanctuary or Barkskin. A **leap** goes through the
+Nothing moves a body in Ice Block, Sanctuary, Barkskin or a Rallying Cry's 8 s. A **leap** goes through the
 air to the reticle's point (or straight back, a Disengage) and strikes what's there as it lands;
 Demonic Circle sets an **anchor** to step back to; **traps** arm, wait (two at once) and spring on
 the first foe to step near; a **wind-up** (Shadowflame, Typhoon) holds you a moment and is lost to
@@ -1384,7 +1387,7 @@ code logs in to the survival realm and every packet the server sends must parse:
 share of the weapon, stagger and Sunder, and the guard it goes through (its weapon red, its target
 warned), Backstab from behind and on a Mark, Ambush's step, Holy Shock healing a friend and
 freeing them (and Avenger's Shield striking a foe), holy ground burning foes and healing friends (and Hallowed Ground's
-softened blows), Onslaught, the Death Mark and its reset, Sanctuary, Cold Snap and the shatter,
+softened blows), the Death Mark and its reset, Sanctuary, Cold Snap and the shatter,
 Dread Step, an old save's keys put on the board's rows, the five rows of four, Lay on Hands,
 Shield Wall, and a full charge's flare and faster arrow (Aimed Shot). `tests.rs` has Tab switching
 round the foes in view and held letting go, a jump's stamina and a roll's least stamina.

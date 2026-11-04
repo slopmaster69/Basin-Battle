@@ -34,11 +34,12 @@ const STAND_IN_LINGER_TICKS: u32 = 30;
 const STAND_IN_MOST_TICKS: u32 = 600;
 
 /// An unseen creature standing at a spot to fly a missile from there (see
-/// [`SurvivalGame::stand_in_create`]): its guid, its cast still to go out, how many ticks it's
-/// stood, and whether the rules are done with it (their `ObjGone`).
+/// [`SurvivalGame::stand_in_create`]): its guid, its casts still to go out (its missile, and any
+/// look cast from it in the same tick, as a Bank Shot's flash), how many ticks it's stood, and
+/// whether the rules are done with it (their `ObjGone`).
 pub(crate) struct StandIn {
     guid: u64,
-    go: Option<Packet>,
+    go: Vec<Packet>,
     ticks: u32,
     gone: bool,
 }
@@ -76,9 +77,7 @@ impl SurvivalGame {
         for (id, s) in self.stand_ins.iter_mut() {
             s.ticks += 1;
             if s.ticks >= STAND_IN_CAST_TICKS {
-                if let Some(go) = s.go.take() {
-                    cast.push(go);
-                }
+                cast.append(&mut s.go);
             }
             if (s.gone && s.ticks >= STAND_IN_CAST_TICKS + STAND_IN_LINGER_TICKS) || s.ticks >= STAND_IN_MOST_TICKS {
                 done.push((*id, s.guid));
@@ -105,6 +104,11 @@ impl SurvivalGame {
                 self.bind(id, creature_guid(CREATURE_ENTRY + def as u32, id));
                 if let Some(p) = self.mob_create(id) {
                     self.broadcast(&p);
+                }
+                // Its auras went with it: the next change clears what's no longer on it.
+                let n = self.sim.auras_of(id).len().min(16);
+                if n > 0 {
+                    self.auras_shown.insert(id, n);
                 }
             }
             Event::MobGone { id } => {
@@ -292,12 +296,19 @@ impl SurvivalGame {
                     Aim::Point(_) => Vec::new(),
                 };
                 let ranged = self.sim.content.ranged.iter().any(|r| r.spell == spell);
-                let ammo = ranged.then_some(ARROW_DISPLAY);
+                let ammo = arrow_ammo(&self.sim.content, spell);
                 // The shot ends the bow's drawn pose.
                 if ranged {
                     self.casting.remove(&caster);
                 }
-                self.broadcast(&packets::spell_go(c, spell, aim, &hits, ammo));
+                let go = packets::spell_go(c, spell, aim, &hits, ammo);
+                // A stand-in made this tick (a flash where a Bank Shot struck) casts with its
+                // missile, once the client has placed its body (`step_stand_ins`).
+                if let Some(s) = self.stand_ins.get_mut(&caster).filter(|s| s.ticks < STAND_IN_CAST_TICKS) {
+                    s.go.push(go);
+                    return;
+                }
+                self.broadcast(&go);
             }
             Event::MissileFrom { anchor, caster, spell, from, target } => {
                 // A missile from a spot (a boomerang turning back, an arrow called home). The
@@ -328,9 +339,8 @@ impl SurvivalGame {
                 };
                 let (g, made) = self.stand_in_create(anchor, from);
                 self.broadcast(&made);
-                let arrow = self.sim.content.ranged.iter().any(|r| r.spell == spell) || ARROW_SPELLS.contains(&spell);
-                let go = packets::spell_go(g, spell, aim, &hits, arrow.then_some(ARROW_DISPLAY));
-                self.stand_ins.insert(anchor, StandIn { guid: g, go: Some(go), ticks: 0, gone: false });
+                let go = packets::spell_go(g, spell, aim, &hits, arrow_ammo(&self.sim.content, spell));
+                self.stand_ins.insert(anchor, StandIn { guid: g, go: vec![go], ticks: 0, gone: false });
             }
             Event::Cast { caster, spell, ms } => {
                 let Some(c) = self.guid_of(caster) else { return };
@@ -505,7 +515,7 @@ impl SurvivalGame {
                 self.broadcast(&packets::update_object(&[], &[(g, &f)]));
             }
             Event::Grow { id, scale } => {
-                // The body drawn larger (Onslaught), for everyone, its owner too.
+                // The body drawn larger (Rallying Cry), for everyone, its owner too.
                 let Some(g) = self.guid_of(id) else { return };
                 let mut f = Fields::new();
                 f.set_f32(idx::SCALE_X, scale);
@@ -766,6 +776,15 @@ impl SurvivalGame {
                     self.broadcast(&packets::spell_failed_other(c, was));
                 }
             }
+            Event::Loose { caster, spell } => {
+                // A bow ability's arrow: the go of the bow's own draw, which lets the string go
+                // (AttackBow, as the base game's shot) with nothing flying of its own (no target,
+                // no ammo): the ability's missiles fly theirs.
+                self.casting.remove(&caster);
+                if let (Some(c), true) = (self.guid_of(caster), spell != 0) {
+                    self.broadcast(&packets::spell_go(c, spell, Aim::Caster, &[], None));
+                }
+            }
             Event::Auras { id } => self.show_auras(id),
             Event::Rooted { player, on } => {
                 let (Some(g), Some(c)) = (self.guid_of(player), self.conn_of(player)) else { return };
@@ -798,21 +817,78 @@ impl SurvivalGame {
                     self.send(c, packets::knock_back(g, counter, dir, speed * 0.8, 1.5));
                 }
             }
+            Event::Catch { player, ability, at } => {
+                // Where an aimed grappling hook would catch, for the add-on's aim line.
+                let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) else { return };
+                let line = match (at, self.sim.players.get(&player).map(|p| p.pos)) {
+                    (Some((at, caught)), Some(pos)) => {
+                        let ground = self.sim.land().height_near(at[0], at[1], at[2] + 1.0);
+                        let yards = htl_survival::dist2d(pos, at);
+                        let key = self.sim.content.abilities.get(ability).map_or("", |d| d.key.as_str());
+                        format!("GP\t{}\t{:.2}\t{:.2}\t{:.2}\t{yards:.2}\t{ground:.2}\t{key}", u8::from(caught), at[0], at[1], at[2])
+                    }
+                    _ => "GP".to_string(),
+                };
+                self.ui_line(c, &line);
+            }
+            Event::LeapLook { player, secs, clip, take, from, flip } => {
+                // A leap's own look (a Disengage's flip), on the clients that play clips.
+                let Some(g) = self.guid_of(player) else { return };
+                let mine = self.conn_of(player);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let line = format!("FP\t{g:#X}\t{secs:.2}\t{clip}\t{take}\t{from}\t{}\t{}", u8::from(flip), u8::from(Some(c) == mine));
+                    self.ui_line(c, &line);
+                }
+            }
             Event::Abilities { player } => {
                 self.abilities_dirty.insert(player);
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, secs } => {
+            Event::Clip { id, clip, take, from, secs, at } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
-                // marked as theirs.
+                // marked as theirs. The impact where the event says, else half way.
                 let Some(g) = self.guid_of(id) else { return };
                 let mine = self.conn_of(id);
-                let impact = secs * 0.5;
+                let impact = if at > 0.0 { at.min(secs) } else { secs * 0.5 };
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t0\t{:.3}\t0\tcast\t0", secs - impact);
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}", secs - impact, from.as_deref().unwrap_or(""));
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::Flurry { id, secs, def } => {
+                // Bladestorm's storm of cuts, for the clients that play clips (the caster's own
+                // marked as theirs): the ability's `flurry`, field for field.
+                let Some(g) = self.guid_of(id) else { return };
+                let mine = self.conn_of(id);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let own = u8::from(Some(c) == mine);
+                    let line = format!(
+                        "FU\t{g:#X}\t{own}\t{secs:.2}\t{}\t{}\t{:.3}\t{:.3}\t{}/{}\t{:.3}\t{:.1}\t{}\t{}",
+                        def.from.as_deref().unwrap_or(""),
+                        def.cuts_text(),
+                        def.cut,
+                        def.windup,
+                        def.finish[0],
+                        def.finish[1],
+                        def.finish_secs,
+                        def.turn,
+                        def.trail,
+                        def.trail_ms
+                    );
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::GroundBurst { at, yaw, shape, reach, arc, width, secs, colour } => {
+                // A shape flashed on the ground, for the clients that draw one (the add-on asks
+                // its client; an older client ignores the line).
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                let line = format!("GB\t{:.2}\t{:.2}\t{:.2}\t{yaw:.3}\t{shape}\t{reach:.2}\t{arc:.0}\t{secs:.2}\t{colour}\t{width:.2}", at[0], at[1], at[2]);
+                for c in conns {
                     self.ui_line(c, &line);
                 }
             }
@@ -920,4 +996,15 @@ impl SurvivalGame {
 
 pub(crate) fn clean(s: &str) -> String {
     s.replace(['\t', '\n', '\r', '|', '~', '^'], " ")
+}
+
+/// The arrow a missile flies with when its look is a nocked arrow (the bow's shot, the hunter's
+/// shots in `ARROW_SPELLS`, and every Hunter arrow, those that plant), from the hero or from a
+/// stand-in: the client draws a shot with no missile model of its own from the ammo it's sent,
+/// and with none, nothing.
+fn arrow_ammo(c: &htl_survival::content::Content, spell: u32) -> Option<u32> {
+    let arrow = c.ranged.iter().any(|r| r.spell == spell)
+        || ARROW_SPELLS.contains(&spell)
+        || c.abilities.iter().any(|a| a.plants && (a.spell == spell || a.full_spell == spell));
+    arrow.then_some(ARROW_DISPLAY)
 }
