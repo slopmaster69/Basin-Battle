@@ -3224,11 +3224,13 @@ from = "NightElfMale"
 # with no cast animation of its own. 25425's cast anim 54 threw the hero's hand up after the
 # chop (Corey's "Michael Jackson" hand, his review, Nov 3); every other ThunderClap look in the
 # game data plays some body anim (the lab's find, Nov 4).
-spell = 24189
-# The cone itself, flashed on the ground as it lands (patch 0026: a shock front out through the 9 yd
-# wedge over 0.35 sec, in the ring's white-blue): the ring is a circle, the hit a cone (Corey's
-# review, Nov 4). The data has no cone-shaped ground look.
-burst = { secs = 0.35, colour = "C0E8FF" }
+# The look is the cone itself, flashed on the ground as it lands (patch 0026: a shock front out
+# through the 9 yd wedge over 0.45 sec, blue): Force Punch's ring (24189) was a full circle for a
+# cone hit (Corey's review, Nov 4), and the data has no cone-shaped ground look; 20572 shows
+# nothing of its own. The heavy blow's flash on each body the wave strikes.
+spell = 20572
+burst = { secs = 0.45, colour = "66BBFF" }
+impact_kit = 437
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
 
