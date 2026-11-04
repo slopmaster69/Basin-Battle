@@ -4728,7 +4728,6 @@ effects = [{ kind = "pull", amount = 25.0, lift = 5.0, from_caster = true }, { k
 # a look in game (.es tune ability.reverse_grapple.pull_clip <clip>); `pull_from` borrows another
 # character model's take on it ("ScourgeFemale").
 pull_clip = 63
-effects = [{ kind = "pull", amount = 25.0, from_caster = true }, { kind = "stagger", secs = [1.0, 1.0] }]
 
 # 1, the second choice: Disengage as retail has it: on the key press, mid-jump or falling too.
 [[ability]]
@@ -4916,8 +4915,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec and leaves frost that slows what stands in it by 50% for 6 sec. Fire and Sundering Blow shatter them for double damage. Setting it readies a free Multi-Shot for 8 sec."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec and leaves frost that slows what stands in it by 50% for 6 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "defense"
 kind = "trap"
@@ -4961,16 +4959,13 @@ empower = { ability = "aimed_arrow", secs = 8.0 }
 [[ability]]
 key = "kill_shot"
 name = "Kill Shot"
-text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 200% bow damage. Enemies below 25% health are killed outright."
-text = "Draws for 1.3 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 60 damage. Enemies below 25% health are killed outright."
+text = "Draws for 1.3 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 200% bow damage. Enemies below 25% health are killed outright."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
 bow = true
 kind = "projectile"
 valor = 100
-charge = [1.0, 1.0]
-hold = 1.0
 # 200% of a full draw's bow damage: 60 with the hunting bow (#118).
 bow_damage = 2.0
 # A longer draw and hold than Aimed Shot's, and a heavier hit (Corey's review, run 040: "this
@@ -4979,20 +4974,17 @@ bow_damage = 2.0
 # ribbon is Kill Shot's own, and each foe it passes takes Heroic Strike's heavy flash.
 charge = [1.3, 1.3]
 hold = 1.2
-damage = [60.0, 60.0]
 range = [40.0, 40.0]
 radius = [0.4, 0.4]
 pierce = 9
 execute = 0.25
 # Faster than anything flies in 1.12 (Fire Shot's missile, the quickest, flies 80 yd/s; no arrow
 # faster than 40). Corey's review, Nov 4: at 80 it looked too like Aimed Shot, then "maybe even
-# needs to be faster". The rules land it at this speed; a client with patch 0032 flies the bolt
+# needs to be faster". The rules land it at this speed; a client with patch 0039 flies the bolt
 # at it too (its `[[missile_look]]`'s `speed`); older clients fly it at the spell's own 80, so
 # there the bolt arrives after the hit.
 speed = 120.0
 cooldown = 40.0
-# Arcane Shot's glowing arrow, as Aimed Shot's full draw.
-spell = 3044
 impact_kit = 437
 spell = 10346
 clip = 53
