@@ -880,7 +880,7 @@ fn every_disengage_plays_the_same_borrowed_flip_from_the_ground_too() {
     let c = Content::dev();
     for key in ["ensnaring_retreat", "trappers_leap"] {
         let d = &c.abilities[c.ability(key).unwrap()];
-        assert!(d.leap_flip && d.leap_clip != 0 && d.leap_from == "ScourgeFemale", "{key}: the Undead woman's flip");
+        assert!(d.leap_flip && d.leap_clip != 0 && d.leap_from == "NightElfFemale", "{key}: the Night Elf woman's jump");
     }
     let mut s = shipped_on(Box::new(open()));
     for name in ["Ayla", "Grosh"] {
@@ -895,13 +895,23 @@ fn every_disengage_plays_the_same_borrowed_flip_from_the_ground_too() {
             .collect();
         assert_eq!(looks.len(), 1, "{name}: one flip: {looks:?}");
         let (clip, from, flip, secs) = looks[0].clone();
-        assert!(clip == 38 && from == "ScourgeFemale" && flip && secs > 0.3, "{name}: {looks:?}");
+        assert!(clip == 38 && from == "NightElfFemale" && flip && secs > 0.3, "{name}: {looks:?}");
         assert!(!hops(&ev, p).is_empty(), "{name}: a hop back into it, from the ground");
-        let _ = run(&mut s, 2.0);
+        // As the feet touch down, the hero's own JumpEnd (39) takes the landing, so the borrowed
+        // clip's tucked legs never snap back to rest on the ground.
+        let landed = run(&mut s, 2.0);
+        let ends: Vec<f32> = landed
+            .iter()
+            .filter_map(|e| match e {
+                Event::Clip { id, clip: 39, secs, .. } if *id == p => Some(*secs),
+                _ => None,
+            })
+            .collect();
+        assert!(ends.len() == 1 && ends[0] > 0.2 && ends[0] < 0.5, "{name}: one JumpEnd at the landing: {ends:?}");
     }
     // A leap's look on anything but a leap, or from no model the clients know, is turned away.
     let card = |kind: &str, more: &str| format!("[[ability]]\nkey = \"t_bad\"\nname = \"Bad\"\nschool = \"hunter\"\nslot = \"utility\"\nkind = \"{kind}\"\nrange = [8.0, 8.0]\n{more}\n");
-    check(&card("leap", "back = true\nleap_clip = 38\nleap_from = \"ScourgeFemale\"\nleap_flip = true")).unwrap();
+    check(&card("leap", "back = true\nleap_clip = 38\nleap_from = \"NightElfFemale\"\nleap_flip = true")).unwrap();
     for bad in [card("nova", "leap_flip = true"), card("leap", "leap_from = \"ScourgeFemale\""), card("leap", "leap_clip = 38\nleap_from = \"Murloc\"")] {
         assert!(check(&bad).is_err(), "should be turned away:\n{bad}");
     }
