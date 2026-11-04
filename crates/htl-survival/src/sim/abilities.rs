@@ -173,6 +173,15 @@ const CAST_RECOVERY: f32 = 0.35;
 /// the axe drawn back, so everyone can see a throw coming, as a bow's draw shows.
 const THROW_CLIP: u16 = 107;
 const HOLD_THROWN: u16 = 111;
+/// A thrown ability's aim holds that pose too (Corey's review: the harpoon held ready while he
+/// aims, a wind-up while the axe is aimed), for as long as anyone aims; let go as the aim ends.
+const AIM_HOLD_SECS: f32 = 20.0;
+
+/// An ability thrown by hand (a throw's clip, not a bow's draw or the bow's own shot): its aim
+/// holds the arm drawn back.
+fn thrown(d: &AbilityDef) -> bool {
+    d.clip == THROW_CLIP && d.kind != "shot" && !d.bow
+}
 /// Holy ground's boon lasts this long past each tick (so it holds while they stand in it).
 const BOON_HOLD: f32 = 1.5;
 /// A friend healed: Flash of Light's look on them.
@@ -710,6 +719,11 @@ impl Survival {
             if self.bow_drawn(id) {
                 self.draw_bow(id);
             }
+            // A thrown one: the arm drawn back while it's aimed (the harpoon held ready, the axe
+            // wound up), till it goes or the aim is let go.
+            if thrown(&d) {
+                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0 });
+            }
         } else {
             if d.bow {
                 self.set_kit(id, Kit::Bow);
@@ -869,6 +883,10 @@ impl Survival {
             Action::Aim { ability } if self.content.abilities[ability].bow => {
                 self.events.push(Event::CastEnd { caster: id });
             }
+            // A thrown one's aim let go without a throw: the drawn-back arm comes down.
+            Action::Aim { ability } if thrown(&self.content.abilities[ability]) => {
+                self.events.push(Event::ClipStop { id });
+            }
             Action::Channel { ability, .. } => {
                 self.events.push(Event::CastEnd { caster: id });
                 self.events.push(Event::Auras { id });
@@ -950,6 +968,10 @@ impl Survival {
         // A charge's glow ends as it goes (the bow's draw ends with its shot).
         if matches!(self.players[&id].action, Action::Charge { .. }) {
             self.events.push(Event::CastDone { caster: id, spell: 0 });
+        }
+        // A thrown one's aim ends with its throw: the held pose let go, the throw's own clip next.
+        if thrown(&d) && matches!(self.players[&id].action, Action::Aim { .. }) {
+            self.events.push(Event::ClipStop { id });
         }
         // A bow ability's arrow: the bow's own release (its draw let go, or drawn and loosed at
         // once), the bow in hand till it's played out. (A leap with the bow looses nothing.)
