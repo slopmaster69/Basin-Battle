@@ -2166,12 +2166,19 @@ aim.burst:SetPoint("CENTER", aim, "CENTER", 0, 0)
 aim.burst:Hide()
 -- A fan of arrows (Multi-Shot): five points spread in a shallow arc across the middle, where the
 -- arrows will go, in place of a strip on the ground (Corey's review: "a cone reticle instead").
+-- They're placed as the fan is aimed (DrawAim), from the ability's arc: the whole spread, in
+-- degrees, outermost arrow to outermost arrow.
 aim.fan = {}
 for k = 1, 5 do
   aim.fan[k] = Tex(aim, "OVERLAY", "dot", 10, 10)
   aim.fan[k]:SetPoint("CENTER", aim, "CENTER", (k - 3) * 18, -math.abs(k - 3) * 4)
   aim.fan[k]:Hide()
 end
+-- Where a direction off the view's centre shows on screen: the client's view is 45° tall over
+-- 768 units, so an angle a off the centre lands at 384 / tan(22.5°) * tan(a) = 927 * tan(a)
+-- units, whatever the window's shape. The visual check (run 040) found the fan drawn at a fixed
+-- 18 units a step, a ninth of where a 10° step really lands.
+local FAN_UNITS = 927
 aim:Hide()
 ES.aim = aim
 
@@ -2344,10 +2351,14 @@ aim:SetScript("OnUpdate", function()
   this.ring:SetHeight(size)
   this.ring:SetVertexColor(r, g, b, alpha)
   this.dot:SetVertexColor(r, g, b, 0.9)
-  -- A fan: its five points in place of the ring and the dot.
+  -- A fan: its five points in place of the ring and the dot, spread over the fan's real arc.
   local fan = d and d.shape == "fan"
+  local half = fan and math.rad(((d.arc and d.arc > 0) and d.arc or 40) / 2) or 0
   for k = 1, 5 do
     if fan then
+      local x = FAN_UNITS * math.tan(half * (k - 3) / 2)
+      this.fan[k]:ClearAllPoints()
+      this.fan[k]:SetPoint("CENTER", this, "CENTER", x, -math.abs(x) * 0.08)
       this.fan[k]:SetVertexColor(r, g, b, alpha)
       this.fan[k]:Show()
     else

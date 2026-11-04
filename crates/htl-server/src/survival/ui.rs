@@ -1850,6 +1850,10 @@ impl SurvivalGame {
         let shape = |d: &htl_survival::content::AbilityDef| if d.at_self { "self" } else { shape(d) };
         // The circle drawn where it's aimed: a lob's is its burst.
         let reach = |d: &htl_survival::content::AbilityDef| if d.lob { d.splash } else { htl_survival::content::AbilityDef::at(d.radius, 1.0) };
+        // A fan's arc is its whole spread, outermost arrow to outermost arrow (degrees), so the
+        // reticle can put its points where the arrows go (the visual check, run 040: drawn at a
+        // fixed width, the fan read as a ninth of the real spread).
+        let arc = |d: &htl_survival::content::AbilityDef| if d.kind == "projectile" && d.count > 1 && !d.lob { d.spread * (d.count - 1) as f32 } else { d.arc };
         let charge = |d: &htl_survival::content::AbilityDef| -> (f32, f32) {
             if d.kind == "shot" {
                 let r = self.sim.ranged_of(p);
@@ -1882,7 +1886,7 @@ impl SurvivalGame {
                         shape(x),
                         htl_survival::content::AbilityDef::at(x.range, 1.0),
                         reach(x),
-                        x.arc
+                        arc(x)
                     ),
                     None => "~~~~~~~~".to_string(),
                 };
@@ -1904,7 +1908,7 @@ impl SurvivalGame {
                     shape(d),
                     if p.cd_off { d.charges.max(1) } else { cd.charges },
                     d.charges.max(1),
-                    d.arc,
+                    arc(d),
                     d.valor,
                     clean(&d.text),
                     clean(&ability_facts(d, None, c.valor.max)),
@@ -1946,7 +1950,8 @@ impl SurvivalGame {
                                 d.key,
                                 clean(&d.name),
                                 htl_survival::content::AbilityDef::at(d.range, 1.0),
-                                d.arc,
+                                // A fan's whole spread, as the bar's line sends it.
+                                if shape == "fan" { d.spread * (d.count - 1) as f32 } else { d.arc },
                                 u8::from(d.aimed()),
                                 d.charge[0],
                                 d.charge[1]
