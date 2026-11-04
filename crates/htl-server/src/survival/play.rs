@@ -20,6 +20,9 @@ const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// The hunter's shots whose own look has no missile model: flown from a spot, they carry the
 /// arrow (as Basin Battle's server sends them), or the client flies nothing to see.
 const ARROW_SPELLS: [u32; 3] = [2643, 3044, 19434];
+/// Where a missile coming home is aimed: this far over the feet of whoever threw it (chest high
+/// on a dwarf, the hands on a human), so it flies to the body, not the ground.
+const HOME_HEIGHT: f32 = 1.2;
 /// A stand-in's cast goes out this many ticks after its body (the client places a body only after
 /// the frame that made it: cast in that frame, the missile would leave from the world's middle).
 const STAND_IN_CAST_TICKS: u32 = 1;
@@ -313,14 +316,21 @@ impl SurvivalGame {
                 // unit, and it draws nothing), so an unseen creature stands there and flies it, a
                 // tick after it's made (`step_stand_ins`), until the rules say it's gone.
                 let (aim, hits) = match target {
-                    // Coming home to whoever threw it: aimed at them, but not naming them struck.
-                    // The client plays a spell's impact on everyone it names struck, and the Axe
-                    // Throw's impact knocked its own warrior down as he caught it (the visual
-                    // check, Nov 2).
-                    Target::Unit(t) if t == caster => match self.guid_of(t) {
-                        Some(g) => (Aim::Unit(g), Vec::new()),
-                        None => return,
-                    },
+                    // Coming home to whoever threw it: aimed at the spot they stand on, chest
+                    // high, naming no one struck. The client plays a spell's impact on everyone
+                    // it names struck, and the Axe Throw's impact knocked its own warrior down as
+                    // he caught it (the visual check, Nov 2); but a unit aim that names no one
+                    // flies nothing at all on the 1.12 client (its launcher flies a missile per
+                    // unit named struck, or one at a point), which is why the axe's way back and
+                    // the recalled arrows were never seen (Corey's review, run 040). A point aim
+                    // flies exactly one, and its arrival is a ground impact, so nothing flinches.
+                    Target::Unit(t) if t == caster => {
+                        let at = self.sim.players.get(&t).map(|p| p.pos).or_else(|| self.sim.mobs.get(&t).map(|m| m.pos));
+                        match at {
+                            Some(p) => (Aim::Point([p[0], p[1], p[2] + HOME_HEIGHT]), Vec::new()),
+                            None => return,
+                        }
+                    }
                     Target::Unit(t) => match self.guid_of(t) {
                         Some(g) => (Aim::Unit(g), vec![g]),
                         None => return,

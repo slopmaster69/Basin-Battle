@@ -1,7 +1,7 @@
 # Push a tag (git tag v0.4.0 && git push origin v0.4.0) to build "<title> for Windows.zip" (the
 # title is project.toml's): the pinned benilla client with this repo's patches, the server, both
 # built for Windows, the add-ons, the server's content, and Play.exe and Host.exe with their
-# launcher (all three exes wearing dist/windows/art/icon.ico), attached to a GitHub release for that tag. It holds no WoW files. A folder unzipped
+# launcher (all three exes wearing dist/windows/art/icon.ico; Play's menu is launcher\ui), attached to a GitHub release for that tag. It holds no WoW files. A folder unzipped
 # from it updates itself from later releases (launcher\update.ps1, by the tag in
 # launcher\version.txt).
 #
@@ -25,6 +25,9 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Enough history for the launcher's dispatches (scripts/launcher-news.py).
+          fetch-depth: 100
 
       - name: Fetch the pinned benilla and apply the patches
         shell: bash
@@ -102,12 +105,53 @@ jobs:
           Copy-Item dist/windows/launcher/*.ps1, project.toml, dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/launcher/"
           # The shield: the launcher's window shows it, and its title bar's icon.
           Copy-Item dist/windows/art/icon.ico, dist/windows/art/shield.png "$out/launcher/"
+          # Play's menu (the War Table), with the shield, and the latest changes as its dispatches.
+          Copy-Item -Recurse dist/windows/launcher/ui "$out/launcher/ui"
+          Copy-Item dist/windows/art/shield.png "$out/launcher/ui/"
+          python scripts/launcher-news.py "$out/launcher/ui/news.json"
+          if ($LASTEXITCODE -ne 0) { throw "the launcher's news didn't build" }
           $version = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "branch $env:GITHUB_REF_NAME ($($env:GITHUB_SHA.Substring(0, 7)))" }
           Set-Content -Path "$out/launcher/version.txt" -Value $version
           # The server and its content (saves and logs are made beside them on the host's PC).
           Copy-Item target/release/htl-server.exe "$out/server/"
           Copy-Item -Recurse content "$out/server/content"
-          Compress-Archive -Path $out -DestinationPath "dist-out/$package.zip"
+
+      # Play opens on this runner as on a player's PC: its window, the menu in WebView2, the map
+      # drawn. A picture of the screen is kept as an artifact. What it wrote while it ran (its log,
+      # settings.txt) is removed before the zip is made.
+      - name: Play opens its menu
+        shell: pwsh
+        run: |
+          $out = "dist-out/$env:PACKAGE"
+          $log = "$out/launcher/play.log"
+          Start-Process -FilePath "$out/Play.exe" -ArgumentList "-NoUpdate" -WorkingDirectory $out
+          $deadline = (Get-Date).AddSeconds(90)
+          while ((Get-Date) -lt $deadline -and -not ((Test-Path $log) -and (Select-String -Path $log -Pattern "the menu is drawn" -Quiet))) { Start-Sleep -Seconds 1 }
+          Start-Sleep -Seconds 4
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $shot = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($shot).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $shot.Save("$PWD/dist-out/play-menu.png")
+          Get-Process Play -ErrorAction SilentlyContinue | Stop-Process -Force
+          Start-Sleep -Seconds 2
+          if (Test-Path $log) { Get-Content $log }
+          $drawn = (Test-Path $log) -and (Select-String -Path $log -Pattern "the menu is drawn" -Quiet)
+          Remove-Item $log, "$out/settings.txt" -Force -ErrorAction SilentlyContinue
+          if (-not $drawn) { throw "Play's menu didn't open (see the picture in the play-menu artifact)" }
+
+      - name: The picture of Play's menu
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: play-menu
+          path: dist-out/play-menu.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path "dist-out/$env:PACKAGE" -DestinationPath "dist-out/$env:PACKAGE.zip"
 
       # Every run keeps the folder as an artifact (a week), so a branch can be tried before a tag.
       - name: Keep the folder as the run's artifact

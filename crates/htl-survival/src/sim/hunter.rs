@@ -508,11 +508,11 @@ impl Survival {
     }
 
     /// The wire catches `v`: its damage, and it goes down (a boss stumbles: posture instead).
-    /// No word says so: the rope snaps, the dust kicks up and the foe falls (Corey's rule).
+    /// No word says so: the rope snaps and the foe falls (Corey's rule). The fall's own dust is
+    /// the wire's knockdown's ([`knock_down`]): nothing else is played here, so it comes up once.
     fn trip(&mut self, owner: Id, v: Id, ability: usize) {
         let d = self.content.abilities[ability].clone();
         let Some(at) = self.unit_pos(v) else { return };
-        self.events.push(Event::Visual { id: v, kit: KIT_DUST, by: None });
         self.hunt_hit(owner, v, ability, AbilityDef::at(d.damage, 1.0), at);
         if self.holds_ground(v) {
             self.build_posture(v, owner, 40);
@@ -534,7 +534,7 @@ impl Survival {
             let from = self.unit_pos(owner).unwrap_or([0.0; 3]);
             let secs = if self.players.contains_key(&victim) { secs * self.content.cc.player_share } else { secs };
             self.events.push(Event::React { id: victim, anim: KNOCKDOWN_ANIM, from, lean: 0.0, hold: 0.0, fit: secs });
-            self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
+            self.events.push(Event::Visual { id: victim, kit: KIT_FALL_DUST, by: None });
         }
     }
 
@@ -824,8 +824,10 @@ impl Survival {
         let tele = Telegraph::hero_shape(id, radius, 360.0, 0.0, VOLLEY_SECS, Some((at, 0.0)));
         self.mark_as(at, radius, VOLLEY_SECS + 0.2, Some(tele));
         for k in 0..n {
-            // Spread evenly over the circle (a sunflower's spiral), each a beat after the last.
-            let r = radius * ((k as f32 + 0.5) / n as f32).sqrt();
+            // Spread evenly over the circle (a sunflower's spiral), each a beat after the last;
+            // the first lands on the aimed spot itself (Corey's review: "the volley doesn't seem
+            // to go where the marker is": no arrow ever fell within 1.2 yd of its centre).
+            let r = radius * (k as f32 / n as f32).sqrt();
             let a = k as f32 * 2.399_963;
             let spot = self.ground_near(at[0] + a.cos() * r, at[1] + a.sin() * r, at[2] + 2.0);
             let land_at = now + 0.2 + VOLLEY_SECS * k as f32 / n as f32;
