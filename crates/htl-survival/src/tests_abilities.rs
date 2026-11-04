@@ -173,13 +173,13 @@ fn a_counter_takes_melee_and_projectiles_but_not_ground_spells() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], std::f32::consts::PI);
-    // Bren's Retaliation: Ayla's swing is blocked, and she reels.
+    // Bren's Retaliation: Ayla's swing is parried, and she reels.
     slot(&mut s, b, "defense", "retaliation");
     cast(&mut s, b, "defense", false, 0.0);
     assert!(matches!(s.players[&b].action, Action::Stance { .. }));
     s.input(a, Input::Attack);
     let ev = run(&mut s, 0.6);
-    assert_eq!(hits_on(&ev, b)[0].1, Outcome::Blocked);
+    assert_eq!(hits_on(&ev, b)[0].1, Outcome::Parried);
     assert!(matches!(s.players[&a].action, Action::Stagger { .. }), "the attacker staggers");
     // A Flamestrike under him passes the stance by.
     run(&mut s, 2.0);
@@ -433,7 +433,8 @@ fn the_board_has_five_rows_of_nine_and_a_dev_build_owns_every_card() {
     // learned out in Elwynn, and the board says where (taken from it only in a debug world).
     s.set_tree(p, false);
     let owned: Vec<&str> = s.players[&p].owned.iter().map(String::as_str).collect();
-    assert_eq!(owned, ["hurled_axe", "shockwave"], "Q and E are free");
+    // (Both choices of each: the Juggernaut's and the Warlord's.)
+    assert_eq!(owned, ["cleave", "hurled_axe", "shockwave", "war_banner"], "Q and E are free");
     assert!(s.slot_ability(p, "ranged", "seed_of_corruption").is_err(), "not unlocked");
     let why = s.take_node(p, "seed_of_corruption").unwrap_err();
     assert!(why.contains("The Cult's Altar"), "{why}");
@@ -593,6 +594,18 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
 }
 
+/// A creature's own look (`aura` on its `[[mob]]`: a spirit beast's glow) is on it from the start.
+#[test]
+fn a_creature_wears_its_own_look_from_the_start() {
+    let mut s = world();
+    let def = s.content.mob("boar").unwrap();
+    s.content.mobs[def].aura = 27827;
+    let m = s.spawn_mob(def, [5.0, 0.0, 0.0], None, false);
+    let ev = s.step(0.0);
+    assert!(s.auras_of(m).contains(&27827), "its look: {:?}", s.auras_of(m));
+    assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == m)), "shown as it comes");
+}
+
 /// A training dummy is there to practice on: crowd control takes hold on it and a knockback
 /// throws it, as on any foe, though a step at most, so it stays about where it was put up.
 #[test]
@@ -641,4 +654,30 @@ fn a_training_dummy_stays_a_step_from_home_and_a_panic_never_turns_it() {
     assert_eq!(s.mobs[&d].facing, facing, "not turned by the panic");
     assert_eq!(s.mobs[&d].pos, at, "not moved by it");
     assert!(s.dummy_guards(d, [0.0, 0.0, 0.0]), "still guarding the hero after");
+}
+
+#[test]
+fn an_abilitys_own_clip_comes_from_the_model_it_names_on_every_race() {
+    // The same take of the same model for every hero, whatever their race (a cast's clip, and a
+    // weapon art's blow); an ability naming no model plays the hero's own.
+    let mut s = world();
+    let frost = s.content.ability("frostbolt").unwrap();
+    s.content.abilities[frost].clip = 57;
+    s.content.abilities[frost].take = 2;
+    s.content.abilities[frost].from = Some("TaurenMale".into());
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    slot(&mut s, p, "ranged", "frostbolt");
+    let mut ev = cast(&mut s, p, "ranged", false, 1.2);
+    ev.extend(run(&mut s, 0.5));
+    let clip = ev.iter().find_map(|e| match e {
+        Event::Clip { id, clip, take, from, .. } if *id == p => Some((*clip, *take, from.clone())),
+        _ => None,
+    });
+    assert_eq!(clip, Some((57, 2, Some("TaurenMale".to_string()))));
+    let art = s.content.abilities.iter().position(|a| a.kind == "art").expect("a weapon art in the rules");
+    s.content.abilities[art].clip = 58;
+    s.content.abilities[art].take = 1;
+    s.content.abilities[art].from = Some("TaurenMale".into());
+    let strike = s.art_strike(p, art);
+    assert_eq!((strike.clip, strike.take, strike.from.as_deref()), (58, 1, Some("TaurenMale")));
 }

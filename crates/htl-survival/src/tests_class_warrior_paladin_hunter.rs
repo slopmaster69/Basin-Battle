@@ -295,7 +295,8 @@ fn charge_stops_at_the_first_foe_in_its_line_and_staggers_it() {
 #[test]
 fn an_old_warriors_save_comes_back_with_the_new_cards() {
     let (s, p) = load_old_save("warrior", &[("ranged", "aimed_throw"), ("close", "sundering_blow"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
-    has_on_keys(&s, p, &[("ranged", "hurled_axe"), ("close", "shockwave"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "onslaught")]);
+    // (Retaliation is the Warlord's defense now, Onslaught retired into Bladestorm's place.)
+    has_on_keys(&s, p, &[("ranged", "hurled_axe"), ("close", "shockwave"), ("utility", "charge"), ("defense", "retaliation"), ("ultimate", "warrior_bladestorm")]);
     assert_eq!(crate::save::renamed("aimed_throw"), "hurled_axe");
 }
 
@@ -747,19 +748,17 @@ fn shockwave_throws_a_pack_back_and_stuns_only_the_one_it_drives_into_a_wall() {
 }
 
 #[test]
-fn retaliation_blocks_the_first_blow_and_sweeps_everyone_in_front_then_ends_when_you_act() {
+fn retaliation_parries_the_first_blow_and_answers_then_ends_when_you_act() {
     let mut s = world_with(true);
     let pi = std::f32::consts::PI;
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = hero(&mut s, "Bren", [1.8, 0.0, 0.0], pi);
-    let c = hero(&mut s, "Cara", [0.5, 1.0, 0.0], 0.0);
     press(&mut s, b, "retaliation", false);
-    let (ha, hb, hc) = (s.players[&a].health, s.players[&b].health, s.players[&c].health);
+    let (ha, hb) = (s.players[&a].health, s.players[&b].health);
     s.input(a, Input::Attack);
-    run(&mut s, 1.0);
-    assert_eq!(s.players[&b].health, hb, "Ayla's blow blocked");
-    assert!(s.players[&a].health < ha, "the sweep strikes the one who swung");
-    assert!(s.players[&c].health < hc, "and everyone else in front");
+    run(&mut s, 1.5);
+    assert_eq!(s.players[&b].health, hb, "Ayla's blow parried");
+    assert!(s.players[&a].health < ha, "the heavy answer strikes the one who swung");
     // Braced again, then a swing of his own ends it at once.
     run(&mut s, 2.0);
     press(&mut s, b, "retaliation", false);
@@ -790,24 +789,6 @@ fn shield_wall_holds_the_shield_up_blocks_from_the_front_only_and_its_key_lowers
     let ev = press_again(&mut s, a, "defense");
     assert!(!matches!(s.players[&a].action, Action::Stance { .. }), "its key lowers it");
     assert!(ev.iter().any(|e| matches!(e, Event::Guard { player, up: false } if *player == a)));
-}
-
-#[test]
-fn onslaught_grows_you_glows_red_and_quickens_your_blows_for_8_sec() {
-    let mut s = world();
-    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let before = s.strike_at(a, StrikeKind::Light, 0).windup;
-    s.set_valor(a, 100.0);
-    let mut ev = press(&mut s, a, "onslaught", false);
-    ev.extend(run(&mut s, 0.5));
-    assert!(s.has_cc(a, "onslaught"));
-    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && *scale > 1.2)), "larger");
-    assert!(ev.iter().any(|e| matches!(e, Event::Glow { id, secs } if *id == a && *secs > 7.0)), "red the whole time");
-    let quick = s.strike_at(a, StrikeKind::Light, 0).windup;
-    assert!(quick < before * 0.9, "quicker blows: {before:.3} to {quick:.3}");
-    let ev = run(&mut s, 8.0);
-    assert!(!s.has_cc(a, "onslaught"));
-    assert!(ev.iter().any(|e| matches!(e, Event::Grow { id, scale } if *id == a && (*scale - 1.0).abs() < 0.01)), "back to size");
 }
 
 
@@ -889,6 +870,7 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
     assert!(struck.iter().all(|d| *d == struck[0]), "no falloff: {struck:?}");
     assert!(hits(&ev, p, aside).is_empty());
     assert!(s.has_cc(k, "burn"), "Lacerated");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "its bleed shows it, no word");
     let c = s.cc_of(k).iter().find(|c| c.kind == "burn").unwrap();
     assert!((c.until - s.clock - 6.0).abs() < 0.6, "4 sec and one for each arrow past three: {}", c.until - s.clock);
     assert!(s.planted_of(p).is_empty(), "every arrow home");
@@ -964,26 +946,144 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     }
 }
 
+/// The reticle on the ground at `at` (x, y), for a hero standing at the origin.
+fn aim_at(s: &mut Survival, p: Id, at: [f32; 2]) {
+    s.set_aim_line(p, at[1].atan2(at[0]), down_to(at[0].hypot(at[1])));
+}
+
+/// Tripwire laid arrow by arrow: its key, the first arrow aimed at `a` and loosed; the key again,
+/// the second aimed at `b` and loosed.
+fn lay_tripwire(s: &mut Survival, p: Id, a: [f32; 2], b: [f32; 2], mobs: &[Id]) -> Vec<Event> {
+    let mut ev = press(s, p, "tripwire", false);
+    aim_at(s, p, a);
+    ev.extend(click(s, p));
+    ev.extend(run_pinned(s, 0.5, mobs));
+    ev.extend(press_again(s, p, "defense"));
+    assert_eq!(aiming(s, p), Some(idx(s, "tripwire_second")), "the key again aims the second arrow");
+    aim_at(s, p, b);
+    ev.extend(click(s, p));
+    ev.extend(run_pinned(s, 0.2, mobs));
+    ev
+}
+
+/// The shapes laid on the ground at a spot that went down in `ev`: (mark, telegraph).
+fn ground_shapes(ev: &[Event]) -> Vec<(Id, Telegraph)> {
+    ev.iter()
+        .filter_map(|e| match e {
+            Event::Mark { id, tele: Some(t), .. } if t.at.is_some() => Some((*id, *t)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn tripwire_plants_one_arrow_then_the_key_again_places_the_second_and_the_wire_runs_between_them() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    // The first press: one arrow where it's aimed, no wire yet, the key waiting for the second.
+    let mut ev = press(&mut s, p, "tripwire", false);
+    aim_at(&mut s, p, [10.0, -3.0]);
+    ev.extend(click(&mut s, p));
+    ev.extend(run(&mut s, 0.5));
+    let first = s.planted_of(p);
+    assert_eq!(first.len(), 1, "one arrow: {first:?}");
+    assert!(dist2d(first[0], [10.0, -3.0, 0.0]) < 1.5, "where it was aimed: {first:?}");
+    assert!(s.hunt.wires.is_empty(), "no wire from one arrow");
+    assert_eq!(s.recast_keys(p).len(), 1, "the key armed for the second");
+    // No ring drawn round the first arrow for the wire's span (floor clutter, Corey's review).
+    assert!(!ground_shapes(&ev).into_iter().any(|(_, t)| t.arc >= 300.0 && (t.reach - hunter::WIRE_SPAN).abs() < 1.0e-3), "no span ring");
+    let ring = (s.hunt.first_arrows[&p].ring, ());
+    // The second press: the other arrow where it's aimed, and the wire.
+    let mut ev = press_again(&mut s, p, "defense");
+    assert_eq!(aiming(&s, p), Some(idx(&s, "tripwire_second")));
+    aim_at(&mut s, p, [10.0, 3.0]);
+    ev.extend(click(&mut s, p));
+    ev.extend(run(&mut s, 0.2));
+    let both = s.planted_of(p);
+    assert_eq!(both.len(), 2, "two arrows: {both:?}");
+    let (a, b) = (both[0], both[1]);
+    assert!(dist2d(b, [10.0, 3.0, 0.0]) < 1.5, "the second where it was aimed: {both:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == ring.0)), "the ring goes as the wire forms");
+    assert!(s.recast_keys(p).is_empty(), "the key's done");
+    assert_eq!(s.hunt.wires.len(), 1, "a wire");
+    let w = &s.hunt.wires[0];
+    assert!(dist2d(w.a, a) < 0.1 && dist2d(w.b, b) < 0.1, "the wire's ends are the arrows: {:?} {:?} {both:?}", w.a, w.b);
+    // Drawn as a strip from one arrow to the other: its length along the arrows, its width across.
+    let (_, wire) = ground_shapes(&ev).into_iter().find(|(_, t)| t.width > 0.0).expect("the wire drawn on the ground");
+    let (from, yaw) = wire.at.unwrap();
+    let to = [from[0] + yaw.cos() * wire.reach, from[1] + yaw.sin() * wire.reach, 0.0];
+    assert!(dist2d(from, a) < 0.1, "from the first arrow: {from:?} {a:?}");
+    assert!(dist2d(to, b) < 0.1, "to the second: {to:?} {b:?}");
+    assert!(wire.width < wire.reach, "a rope along the arrows, not a band across them: {} wide, {} long", wire.width, wire.reach);
+}
+
+#[test]
+fn tripwires_second_arrow_aimed_past_the_ring_lands_on_its_edge() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    lay_tripwire(&mut s, p, [10.0, 0.0], [10.0, 16.0], &[]);
+    let both = s.planted_of(p);
+    assert_eq!(both.len(), 2, "two arrows: {both:?}");
+    let span = dist2d(both[0], both[1]);
+    assert!((span - hunter::WIRE_SPAN).abs() < 0.3, "held to the ring: {span} {both:?}");
+    assert!(both[1][1] > 8.0 && both[1][1] < 11.0, "on the ring toward the aim: {both:?}");
+    // Within it, where it's aimed.
+    assert_eq!(hunter::within_span([0.0, 0.0, 0.0], [3.0, 4.0, 0.0]), [3.0, 4.0, 0.0]);
+    let edge = hunter::within_span([0.0, 0.0, 0.0], [0.0, -30.0, 2.0]);
+    assert!(edge[0].abs() < 1.0e-4 && (edge[1] + hunter::WIRE_SPAN).abs() < 1.0e-4, "{edge:?}");
+}
+
+#[test]
+fn a_tripwire_left_at_one_arrow_is_just_a_planted_arrow_once_the_key_stops_waiting() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let mut ev = press(&mut s, p, "tripwire", false);
+    aim_at(&mut s, p, [10.0, 0.0]);
+    ev.extend(click(&mut s, p));
+    let _ = ev;
+    let ring = s.hunt.first_arrows[&p].ring;
+    let window = s.content.abilities[idx(&s, "tripwire")].recast_secs;
+    let ev = run(&mut s, window + 0.5);
+    assert!(s.recast_keys(p).is_empty(), "the window closed");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == ring)), "its mark gone");
+    assert_eq!(s.planted_of(p).len(), 1, "the arrow stays planted");
+    assert!(s.hunt.wires.is_empty(), "no wire");
+    // The key is Tripwire's first arrow again...
+    press(&mut s, p, "tripwire", false);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "tripwire")), "a new first arrow, not the second");
+    s.input(p, Input::Cancel);
+    s.step(DT);
+    // ...and Arrow Recall brings the lone arrow home.
+    s.set_valor(p, 25.0);
+    press(&mut s, p, "tripwire", true);
+    run(&mut s, 0.5);
+    assert!(s.planted_of(p).is_empty(), "home");
+}
+
+#[test]
+fn a_wires_line_on_the_ground_faces_from_one_arrow_to_the_other() {
+    let (yaw, len) = hunter::wire_line([2.0, 1.0, 0.0], [2.0, 6.0, 0.0]);
+    assert!((yaw - std::f32::consts::FRAC_PI_2).abs() < 1.0e-4 && (len - 5.0).abs() < 1.0e-4, "{yaw} {len}");
+    let (yaw, len) = hunter::wire_line([0.0, 0.0, 0.0], [-3.0, -3.0, 0.0]);
+    assert!((yaw - 1.25 * std::f32::consts::PI).abs() < 1.0e-4 && (len - 18f32.sqrt()).abs() < 1.0e-4, "{yaw} {len}");
+}
+
 #[test]
 fn a_tripwire_knocks_down_the_first_creature_across_it() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [14.0, 0.0, 0.0]);
-    press(&mut s, p, "tripwire", false);
-    // Laid at the reticle, across the hero's line, its two arrows planted.
-    s.set_aim_line(p, 0.0, down_to(10.0));
-    let mut ev = click(&mut s, p);
-    ev.extend(run_pinned(&mut s, 0.2, &[k]));
-    if aiming(&s, p).is_some() {
-        ev.extend(click(&mut s, p));
-    }
+    // Laid arrow by arrow across the hero's line, its two arrows planted.
+    let mut ev = lay_tripwire(&mut s, p, [10.0, -3.0], [10.0, 3.0], &[k]);
     assert_eq!(s.planted_of(p).len(), 2, "two anchors");
     // It walks over the wire.
     for x in [12.0f32, 11.0, 10.4, 9.8, 9.0] {
         s.mobs.get_mut(&k).unwrap().pos = [x, 0.0, 0.0];
         ev.extend(s.step(DT));
     }
-    assert!(flashed(&ev, p, "Tripped!"), "it trips");
+    // It trips with no word over it: the dust, the fall and the snapped rope say so.
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == k && *kit == KIT_DUST)), "dust where it trips");
     assert_eq!(hits(&ev, p, k).len(), 1, "and takes the wire's damage: {:?} planted {:?}", hits(&ev, p, k), s.planted_of(p));
     assert!(s.has_cc(k, "stun"), "down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == k && *anim == KNOCKDOWN_ANIM)), "knocked to the ground");
@@ -994,13 +1094,7 @@ fn a_tripwires_arrows_outlast_its_cooldown_so_recall_on_the_same_key_brings_them
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [30.0, 0.0, 0.0]);
-    press(&mut s, p, "tripwire", false);
-    s.set_aim_line(p, 0.0, down_to(10.0));
-    click(&mut s, p);
-    run_pinned(&mut s, 0.2, &[k]);
-    if aiming(&s, p).is_some() {
-        click(&mut s, p);
-    }
+    lay_tripwire(&mut s, p, [10.0, -3.0], [10.0, 3.0], &[k]);
     assert_eq!(s.planted_of(p).len(), 2, "two anchors");
     // A shot's arrow planted alongside fades on its usual clock...
     s.plant_arrow(p, [12.0, 4.0, 0.0]);
@@ -1033,7 +1127,7 @@ fn call_of_the_wild_sends_a_beast_a_press_through_three_stages_for_stamina() {
         let before = s.players[&p].stamina;
         s.set_aim_line(p, 0.0, 0.0);
         let mut ev = press(&mut s, p, "call_of_the_wild", false);
-        ev.extend(run_pinned(&mut s, 0.5, &[k]));
+        ev.extend(run_pinned(&mut s, 0.8, &[k]));
         assert!(!hits(&ev, p, k).is_empty(), "stage {stage}'s beast strikes");
         assert!(ev.iter().any(|e| matches!(e, Event::MobMove { .. })), "it runs there");
         let spent = before - s.players[&p].stamina;
@@ -1042,19 +1136,19 @@ fn call_of_the_wild_sends_a_beast_a_press_through_three_stages_for_stamina() {
         run_pinned(&mut s, 0.6, &[k]);
         assert_eq!(s.wild_now(p).stage, (stage + 1) % 3, "the chain moves on");
     }
-    // The beasts' bodies are gone after.
-    run_pinned(&mut s, 1.0, &[k]);
+    // The beasts' bodies are gone after (each stays a while after its strike, to be seen).
+    run_pinned(&mut s, 2.0, &[k]);
     assert!(!s.mobs.values().any(|m| s.content.mobs[m.def].key.starts_with("spirit_")));
     // Four seconds without a call: back to the first stage.
     press(&mut s, p, "call_of_the_wild", false);
-    run_pinned(&mut s, 0.5, &[k]);
+    run_pinned(&mut s, 0.8, &[k]);
     assert_eq!(s.wild_now(p).stage, 1);
     run_pinned(&mut s, 4.5, &[k]);
     assert_eq!(s.wild_now(p).stage, 0, "back to the start");
 }
 
 #[test]
-fn a_parry_or_a_landed_blow_empowers_the_next_beast_for_half_the_stamina() {
+fn a_parry_empowers_the_next_beast_for_half_the_stamina() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
@@ -1075,24 +1169,27 @@ fn the_owl_marks_and_the_bear_mauls_a_staggered_foe_for_triple() {
     let k = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
     let owl = crate::sim::hunter::BEASTS.iter().position(|b| b.key == "owl").unwrap();
     let bear = crate::sim::hunter::BEASTS.iter().position(|b| b.key == "bear").unwrap();
-    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 0, next: owl, until: s.clock + 4.0, primed: false, drawn: true });
+    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 0, next: owl, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     s.set_aim_line(p, 0.0, 0.0);
     press(&mut s, p, "call_of_the_wild", false);
-    run_pinned(&mut s, 0.5, &[k]);
+    run_pinned(&mut s, 0.8, &[k]);
     assert!(s.has_cc(k, "mark"), "the Owl marks");
     // The Bear on a plain foe, then on a staggered one.
     s.cleanse(k, &["mark"]);
-    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true });
+    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     let mut ev = press(&mut s, p, "call_of_the_wild", false);
-    ev.extend(run_pinned(&mut s, 0.5, &[k]));
+    ev.extend(run_pinned(&mut s, 0.8, &[k]));
     let plain = hits(&ev, p, k)[0];
     s.mobs.get_mut(&k).unwrap().health = 9999;
-    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true });
+    s.hunt.wild.insert(p, crate::sim::hunter::Wild { stage: 2, next: bear, until: s.clock + 4.0, primed: false, drawn: true, primed_until: 0.0 });
     s.stagger_mob(k, 2.0, false);
     let mut ev = press(&mut s, p, "call_of_the_wild", false);
-    ev.extend(run(&mut s, 0.5));
+    ev.extend(run(&mut s, 0.8));
     let mauled = hits(&ev, p, k)[0];
     assert!(mauled as f32 >= plain as f32 * 2.5, "triple on the staggered: {plain} then {mauled}");
+    // The bonus shows as a heavier impact on the foe, never as the beast's name in words.
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == k && *kit == KIT_SLAM)), "a heavier impact");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word");
 }
 
 #[test]
@@ -1160,14 +1257,18 @@ fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() 
     assert!(s.has_cc(k, "root"), "the attacker netted");
     assert_eq!(s.planted_of(p).len(), 5, "five arrows scattered");
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)) || matches!(s.players[&p].action, Action::Dash { .. }), "and away");
-    // Unused, it leaves anyway when it runs out.
+    // No word says it caught: the net on the grunt and the leap away do (Corey's review).
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word when it catches");
+    // Unused, it's wasted: no leap when it runs out (a counter and nothing else).
     run(&mut s, 3.0);
     s.set_valor(p, 25.0);
     s.set_cooldowns(p, true);
     s.input(p, Input::Ability(key_of("utility"), true));
     let mut ev = s.step(DT);
     ev.extend(run(&mut s, 2.3));
-    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)), "a plain Ensnaring Retreat as it ends");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)), "no leap when nothing struck");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "and no \"caught nothing\" word");
+    assert!(s.planted_of(p).len() <= 5, "no more arrows scattered");
 }
 
 #[test]
@@ -1178,9 +1279,12 @@ fn skyfall_leaps_up_and_its_volley_rains_where_the_reticle_points_planting_its_a
     s.mobs.get_mut(&k).unwrap().health = 9999;
     s.set_valor(p, 100.0);
     let mut ev = press(&mut s, p, "skyfall", false);
-    ev.extend(run(&mut s, 0.6));
+    ev.extend(run(&mut s, 1.0));
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, lift, .. } if *player == p && *lift > 10.0)), "straight up");
-    s.set_aim_line(p, 0.0, down_to(15.0));
+    // Hanging at the top: the key again looses the volley, aimed down from up there.
+    assert_eq!(aiming(&s, p), Some(idx(&s, "skyfall_volley")), "hanging, aiming");
+    let up = s.players[&p].pos[2];
+    s.set_aim_line(p, 0.0, -(up + 1.9).atan2(15.0));
     let mut ev = press_again(&mut s, p, "ultimate");
     if aiming(&s, p).is_some() {
         s.set_aim_line(p, 0.0, down_to(15.0));
@@ -1221,7 +1325,7 @@ fn bank_shot_comes_off_a_wall_harder_and_strikes_round_the_corner() {
     s.set_aim_line(p, std::f32::consts::FRAC_PI_4, 0.0);
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.5, &[k]));
-    assert!(flashed(&ev, p, "Bank!"), "it banks");
+    assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "it banks: its arrow flies on from the wall");
     let h = hits(&ev, p, k);
     let logs: Vec<&Event> = ev.iter().filter(|e| matches!(e, Event::Log(_) | Event::Flash { .. } | Event::Missile { .. })).collect();
     assert_eq!(h.len(), 1, "round the corner: {h:?} {logs:?} planted {:?}", s.planted_of(p));

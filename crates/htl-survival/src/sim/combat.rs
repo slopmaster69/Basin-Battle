@@ -101,13 +101,21 @@ impl Survival {
         if matches!(p.action, Action::Dead { .. }) {
             return;
         }
-        // Stunned, frozen, panicked: nothing (a guard let go still counts).
-        if self.disabled(id) && !matches!(input, Input::GuardUp | Input::AttackUp) {
+        // Stunned, frozen, panicked: nothing (a guard let go still counts), but a key that breaks
+        // free of it (Berserker Rage, off the ground).
+        if self.disabled(id) && !matches!(input, Input::GuardUp | Input::AttackUp) && !self.breaks_free_key(id, input) {
             return;
         }
         if !self.try_act(id, input) {
             self.buffer(id, input);
         }
+    }
+
+    /// An ability key (not with Ctrl: its base) whose ability breaks free (Berserker Rage).
+    fn breaks_free_key(&self, id: Id, input: Input) -> bool {
+        let Input::Ability(slot, false) = input else { return false };
+        let Some(p) = self.players.get(&id) else { return false };
+        crate::content::SLOTS.get(slot as usize).and_then(|s| p.loadout.get(*s)).and_then(|k| self.content.ability(k)).is_some_and(|a| self.content.abilities[a].breaks_free)
     }
 
     /// Keep an input for the end of the current commitment if it's nearly over; otherwise it's
@@ -149,12 +157,27 @@ impl Survival {
         if self.immune(id) && !matches!(input, Input::Ability(..) | Input::GuardUp | Input::AttackUp) {
             return true;
         }
+        // On Skyfall: the click or its key looses the volley from the hang, and nothing else goes.
+        if self.hang_input(id, input) {
+            return true;
+        }
         // On the charger: an attack or an ability puts them back on foot.
         if matches!(input, Input::Attack | Input::Heavy | Input::Ability(..)) && self.has_cc(id, "steed") {
             self.cleanse(id, &["steed"]);
         }
         // A brace that ends the moment the hero does anything else (Retaliation, Shield Wall):
         // it ends, and what they pressed goes on; its own key again only lowers it.
+        // Shield Wall: the shield is up already (the guard changes nothing), and an attack with
+        // the guard held, or the bash key, bashes with it while the wall holds.
+        if self.bash_wall(id) {
+            let held = self.players.get(&id).is_some_and(|p| p.guard_held);
+            match input {
+                Input::Guard | Input::GuardUp => return true,
+                Input::Attack | Input::Heavy if held => return self.wall_bash(id),
+                Input::Bash => return self.wall_bash(id),
+                _ => {}
+            }
+        }
         if matches!(input, Input::Attack | Input::Heavy | Input::Guard | Input::Dodge | Input::Ability(..)) && self.ends_on_action(id) {
             let own = match input {
                 Input::Ability(slot, _) => self.stance_key(id, slot as usize),
@@ -171,6 +194,8 @@ impl Survival {
         let free = matches!(p.action, Action::Ready | Action::Guard);
         let busy_soft = matches!(p.action, Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
         let fresh = p.stamina >= c.player.exhausted_below;
+        // In a fury (Blood Fury, Rallying Cry) attacks cost nothing: there's always breath for one.
+        let fresh_attack = fresh || self.tireless(id);
         match input {
             // While aiming, the click charges the ability (or casts it); its release lets it go.
             Input::Attack | Input::Heavy if aiming => {
@@ -201,7 +226,7 @@ impl Survival {
                     if !chain {
                         return false;
                     }
-                    if !fresh {
+                    if !fresh_attack {
                         self.winded(id);
                         return true;
                     }
@@ -223,7 +248,7 @@ impl Survival {
                 if !(free || busy_soft) {
                     return false;
                 }
-                if !fresh {
+                if !fresh_attack {
                     self.winded(id);
                     return true;
                 }
@@ -242,6 +267,11 @@ impl Survival {
                 // Right click calls off an aim or a charge.
                 if aiming || charging {
                     self.ability_cancel(id);
+                }
+                // Bladestorm: the guard ends the spin at once and comes up on this press.
+                if matches!(self.players[&id].action, Action::Channel { ability, .. } if self.content.abilities[ability].bail) {
+                    self.end_ability_action(id);
+                    self.set_action(id, Action::Ready);
                 }
                 let p = &self.players[&id];
                 if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. }) {
@@ -365,7 +395,8 @@ impl Survival {
         if matches!(action, Action::Swing { .. }) {
             self.end_veil(id);
         }
-        // Steadfast (Onslaught, Sanctuary), or in an unstoppable art's wind-up: no stagger takes.
+        // Steadfast (Sanctuary, Berserker Rage), rallied, or in an unstoppable art's wind-up: no
+        // stagger takes.
         if matches!(action, Action::Stagger { .. }) && self.unstaggerable(id) {
             return;
         }
@@ -385,6 +416,10 @@ impl Survival {
         if guard != was_guard {
             self.events.push(Event::Guard { player: id, up: guard });
         }
+        // The guard raised: Momentum is lost.
+        if guard && !was_guard {
+            self.momentum_lost(id);
+        }
         self.update_speed(id);
     }
 
@@ -402,8 +437,6 @@ impl Survival {
 
     pub(crate) fn spend(&mut self, id: Id, amount: f32) {
         let now = self.clock;
-        // Onslaught: blows and the guard cost nothing.
-        let amount = if self.has_cc(id, "onslaught") { 0.0 } else { amount };
         // A parry's opening: half the cost (not a guard broken, which takes it all).
         let amount = match self.players.get(&id) {
             Some(p) if p.opening_until > now && amount < 1000.0 => amount * 0.5,
@@ -451,14 +484,13 @@ impl Survival {
             _ => (&set.light[step], w.windup, w.recovery),
         };
         let heavy = kind == StrikeKind::Heavy;
-        // Onslaught: every blow comes that much quicker.
-        let now = self.clock;
-        let haste = self.cc_of(id).iter().filter(|c| c.kind == "onslaught" && c.until > now).map(|c| c.amount).fold(0.0f32, f32::max);
-        let quick = 1.0 / (1.0 + haste);
+        // Rallying Cry: every blow comes that much quicker. Cowed, it winds up slower.
+        let quick = 1.0 / (1.0 + self.rallied_haste(id));
+        let cowed = 1.0 + self.cowed_slow(id);
         Strike {
             kind,
             step: step as u8,
-            windup: windup * m.windup * quick,
+            windup: windup * m.windup * quick * cowed,
             active: w.active,
             recovery: recovery * m.recovery * quick,
             damage: m.damage * if heavy { h.damage } else { 1.0 },
@@ -475,6 +507,26 @@ impl Survival {
     }
 
     fn start_swing(&mut self, id: Id, kind: StrikeKind) {
+        self.start_swing_with(id, kind, true);
+    }
+
+    /// Retaliation's answer: the hero's own heavy attack at once, free, and nothing touches them
+    /// until it has struck.
+    pub(crate) fn heavy_answer(&mut self, id: Id) {
+        if !self.players.get(&id).is_some_and(|p| p.health > 0) {
+            return;
+        }
+        self.unsheathe(id);
+        self.start_swing_with(id, StrikeKind::Heavy, false);
+        let now = self.clock;
+        if let Some(p) = self.players.get_mut(&id) {
+            if let Action::Swing { strike, .. } = &p.action {
+                p.untouchable_until = now + strike.windup + strike.active + UNTOUCHABLE_GRACE;
+            }
+        }
+    }
+
+    fn start_swing_with(&mut self, id: Id, kind: StrikeKind, pay: bool) {
         // Avenging Wrath: every heavy attack sends a wave of light along the hero's facing.
         if kind == StrikeKind::Heavy && self.has_cc(id, "wrath") {
             self.avenging_wave(id);
@@ -484,7 +536,9 @@ impl Survival {
         let windex = self.content.weapons.iter().position(|w| w.key == wdef.key).unwrap();
         let strike = self.strike_for(id, kind);
         let set_len = self.content.moveset_of(&wdef).light.len().max(1) as u8;
-        self.spend(id, strike.stamina);
+        if pay {
+            self.spend_attack(id, strike.stamina);
+        }
         {
             let p = self.players.get_mut(&id).unwrap();
             p.combo_next = if kind == StrikeKind::Light { (strike.step + 1) % set_len } else { 0 };
@@ -502,24 +556,45 @@ impl Survival {
 
     /// The shield bash or the kick, if there's stamina for it.
     fn try_shove(&mut self, id: Id, kick: bool) -> bool {
+        self.shove_with(id, kick, false)
+    }
+
+    /// In a stance that bashes (Shield Wall), still holding.
+    fn bash_wall(&self, id: Id) -> bool {
+        self.stances.get(&id).is_some_and(|s| s.until > self.clock && self.content.abilities[s.ability].counter.as_ref().is_some_and(|c| c.bash))
+    }
+
+    /// Shield Wall's Shield Bash: once the last one is done, the shield comes down for the blow
+    /// (its clip plays) and goes back up after it, the wall still holding.
+    fn wall_bash(&mut self, id: Id) -> bool {
+        if !matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Stance { .. })) {
+            return false;
+        }
+        self.events.push(Event::Guard { player: id, up: false });
+        self.shove_with(id, false, true)
+    }
+
+    fn shove_with(&mut self, id: Id, kick: bool, wall: bool) -> bool {
         let d = if kick { self.content.kick.clone() } else { self.content.bash.clone() };
-        if self.players[&id].stamina < self.content.player.exhausted_below.max(1.0) {
+        if !wall && self.players[&id].stamina < self.content.player.exhausted_below.max(1.0) {
             self.winded(id);
             return true;
         }
         let weapon = self.players[&id].weapon;
         let windex = self.content.weapons.iter().position(|w| w.key == self.content.items[weapon].key).unwrap_or(0);
-        self.spend(id, d.stamina);
+        if !wall {
+            self.spend_attack(id, d.stamina);
+        }
         let strike = Strike {
             kind: if kick { StrikeKind::Kick } else { StrikeKind::Bash },
             step: 0,
             windup: d.windup,
             active: d.active,
             recovery: d.recovery,
-            damage: 1.0,
-            range: d.range,
-            arc: d.arc,
-            stagger: d.stagger,
+            damage: if wall { WALL_BASH.damage } else { 1.0 },
+            range: d.range + if wall { WALL_BASH.reach } else { 0.0 },
+            arc: if wall { WALL_BASH.arc } else { d.arc },
+            stagger: d.stagger * if wall { WALL_BASH.stagger } else { 1.0 },
             clip: d.clip,
             take: 0,
             lunge: d.lunge,
@@ -577,7 +652,8 @@ impl Survival {
             found.push((d / LOCK_RANGE + off / arc + bias, tid));
         };
         for (mid, m) in &self.mobs {
-            if m.health > 0 && !m.hidden {
+            // (Never a Call of the Wild beast: it's there to be seen, not fought.)
+            if m.health > 0 && !m.hidden && !self.spirit_body(*mid) {
                 consider(*mid, m.pos, lean(*mid, false, m.state.foe().is_some()));
             }
         }
@@ -815,7 +891,7 @@ impl Survival {
         {
             let rate = {
                 let p = &self.players[&id];
-                c.player.stamina_regen * (1.0 - self.armor_weight(p)) * (1.0 + self.effect_of(p, "stamina"))
+                c.player.stamina_regen * (1.0 - self.armor_weight(p)) * (1.0 + self.effect_of(p, "stamina")) * self.banner_regen(id)
             };
             let p = self.players.get_mut(&id).unwrap();
             let before = p.stamina.floor();
@@ -856,20 +932,23 @@ impl Survival {
             }
         }
         // Drawing the bow on the move, the legs walk (the drawn pose's cast is withdrawn); stood
-        // still, it's shown again.
-        if let Action::Charge { ability, .. } = self.players[&id].action {
-            if self.content.abilities[ability].kind == "shot" {
-                let walking = self.walking(&self.players[&id]);
-                let shown = self.players[&id].draw_shown;
-                let spell = self.ranged_of(&self.players[&id]).spell;
-                if walking && shown {
-                    self.players.get_mut(&id).unwrap().draw_shown = false;
-                    self.events.push(Event::CastEnd { caster: id });
-                } else if !walking && !shown && spell != 0 {
-                    self.players.get_mut(&id).unwrap().draw_shown = true;
-                    self.events.push(Event::Cast { caster: id, spell, ms: super::abilities::DRAW_HOLD_MS });
-                }
+        // still, it's shown again. (A bow ability's draw too; never in Skyfall's hang.)
+        if self.bow_drawn(id) {
+            let walking = self.walking(&self.players[&id]) && !self.hanging(id);
+            let shown = self.players[&id].draw_shown;
+            let spell = self.ranged_of(&self.players[&id]).spell;
+            if walking && shown {
+                self.players.get_mut(&id).unwrap().draw_shown = false;
+                self.events.push(Event::CastEnd { caster: id });
+            } else if !walking && !shown && spell != 0 {
+                self.players.get_mut(&id).unwrap().draw_shown = true;
+                self.events.push(Event::Cast { caster: id, spell, ms: super::abilities::DRAW_HOLD_MS });
             }
+        }
+        // The bow back for the melee weapon once nothing in hand needs it (its release played
+        // out, anything else done, a grapple's pull).
+        if self.players[&id].kit == Kit::Bow && !self.bow_in_hand(id) {
+            self.set_kit(id, Kit::Melee);
         }
         // The action in hand.
         let action = self.players[&id].action.clone();
@@ -879,7 +958,9 @@ impl Survival {
                 let t2 = t + dt;
                 let mut struck = struck;
                 if t2 >= strike.windup && t < strike.windup + strike.active {
-                    self.connect(id, &w, &strike, &mut struck);
+                    // (Its first moment: what's struck once a swing, a War Banner, is struck then.)
+                    let first = t < strike.windup;
+                    self.connect(id, &w, &strike, &mut struck, first);
                 }
                 // Parried mid-swing: the stagger stands.
                 if !matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { .. })) {
@@ -971,7 +1052,7 @@ impl Survival {
                     };
                     let chop = super::world::CHOP_SECS;
                     if clip != 0 && (t / chop).floor() != ((t + dt) / chop).floor() && t + dt + chop * 0.5 < secs {
-                        self.events.push(Event::Clip { id, clip, secs: chop });
+                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: chop, at: 0.0 });
                     }
                     if t + dt >= secs {
                         self.events.push(Event::CastEnd { caster: id });
@@ -1037,6 +1118,21 @@ impl Survival {
     /// The end of a commitment: back to ready (or the held guard or aim), then any buffered input.
     fn finish_commitment(&mut self, id: Id) {
         let now = self.clock;
+        // Shield Wall's bash done, the wall still holding: the shield goes back up.
+        if self.bash_wall(id) && matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { .. })) {
+            if let Some(s) = self.stances.get(&id).cloned() {
+                self.set_action(id, Action::Stance { ability: s.ability, until: s.until });
+                self.events.push(Event::Guard { player: id, up: true });
+                self.update_rooted(id);
+                let buffered = self.players.get_mut(&id).and_then(|p| p.buffered.take());
+                if let Some((input, at)) = buffered {
+                    if self.clock - at <= self.content.player.buffer + 0.1 {
+                        let _ = self.try_act(id, input);
+                    }
+                }
+                return;
+            }
+        }
         let Some(p) = self.players.get(&id) else { return };
         let next = if p.guard_held { Action::Guard } else { Action::Ready };
         let buffered = p.buffered;
@@ -1071,9 +1167,9 @@ impl Survival {
 
     /// The swing's active moment: everything in the arc, in reach, and not behind something
     /// solid is struck, once, judged where the striker saw them (their round trip ago).
-    fn connect(&mut self, id: Id, w: &crate::content::WeaponDef, strike: &Strike, struck: &mut Vec<Id>) {
+    fn connect(&mut self, id: Id, w: &crate::content::WeaponDef, strike: &Strike, struck: &mut Vec<Id>, first: bool) {
         if let Some(ability) = strike.art {
-            self.connect_art(id, w, strike, ability, struck);
+            self.connect_art(id, w, strike, ability, struck, first);
             return;
         }
         let pos = self.players[&id].pos;
@@ -1082,6 +1178,10 @@ impl Survival {
         let reach = WeaponReach { range: strike.range, arc: strike.arc };
         let f = self.swing_aim_at(id, reach, seen_at);
         let style = if strike.heavy() { Blow::Heavy } else { Blow::Light };
+        // A War Banner in its arc takes the blow too (once a swing, as it first lands).
+        if first && !strike.shove() {
+            self.swing_on_banners(id, w, strike.damage, f, strike.range, strike.arc);
+        }
         let mut hits: Vec<(f32, Id)> = Vec::new();
         for (&mid, m) in &self.mobs {
             if m.health == 0 || struck.contains(&mid) || self.own_totem(mid, id) {
@@ -1126,7 +1226,7 @@ impl Survival {
         }
         // The nearest first, as many as the weapon strikes in one swing (a shove, one).
         hits.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let most = if strike.shove() { 1 } else { w.targets.max(1) };
+        let most = if strike.wall_bash() { WALL_BASH.targets } else if strike.shove() { 1 } else { w.targets.max(1) };
         let room = most.saturating_sub(struck.len());
         let lean = if strike.heavy() { self.content.combat.lean_heavy } else { self.content.combat.lean_light };
         for (_, mid) in hits.into_iter().take(room) {
@@ -1172,6 +1272,8 @@ impl Survival {
                     && matches!(m.state, mobs::MobState::Chase { .. } | mobs::MobState::Recover { .. })
                     && angle_between(m.facing, facing(m.pos, pos)) <= 70.0
             });
+            // (Exposed, it can't.)
+            let shielded = shielded && !self.has_cc(mid, "exposed");
             if shielded && !strike.heavy() && !strike.shove() {
                 let chance = self.mobs.get(&mid).map_or(0.0, |m| self.content.mobs[m.def].block);
                 if self.rng.gen::<f32>() < chance {
@@ -1207,10 +1309,11 @@ impl Survival {
             let rolled = if strike.shove() {
                 let d = if strike.kind == StrikeKind::Kick { &self.content.kick } else { &self.content.bash };
                 let (lo, hi) = (d.damage[0], d.damage[1]);
-                if hi == 0 { 0 } else { self.roll([lo, hi]) }
+                if hi == 0 { 0 } else { (self.roll([lo, hi]) as f32 * strike.damage).round() as u32 }
             } else {
                 let might = 1.0 + self.effect_of(&self.players[&id], "might");
-                (self.roll(w.damage) as f32 * strike.damage * might).round() as u32
+                // Momentum, a fury, Cowed.
+                (self.roll(w.damage) as f32 * strike.damage * might * self.blow_share(id)).round() as u32
             };
             // From behind (a backstab): harder, unless it's a riposte already.
             let behind = !reeling && self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, pos)) >= BACKSTAB_ARC);
@@ -1228,6 +1331,9 @@ impl Survival {
             }
             self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style });
             self.trade_blows(id, mid);
+            if !strike.shove() {
+                self.momentum_hit(id);
+            }
             // What the blow itself set off (a second wind, a broken stance) stands: the blow's own
             // stagger doesn't undo it.
             let before = self.mobs.get(&mid).map(|m| (m.phase, m.stagger_until));
@@ -1249,7 +1355,9 @@ impl Survival {
             // one just after its own blow.
             if standing && !changed && strike.stagger > 0.0 && (winding || shoved || recovering) {
                 let riposte = self.content.combat.riposte_any_stagger;
-                self.stagger_mob(mid, strike.stagger, riposte);
+                // Near a War Banner a heavy attack's stagger lasts longer; on an Exposed one, any.
+                let longer = self.stagger_share(id, mid, strike.heavy());
+                self.stagger_mob(mid, strike.stagger * longer, riposte);
                 if winding && !shoved {
                     let wary = self.clock + self.content.combat.knock_aside_wary;
                     self.mobs.get_mut(&mid).unwrap().wary_until = wary;
@@ -1257,10 +1365,21 @@ impl Survival {
             } else if standing {
                 self.events.push(Event::React { id: mid, anim: WOUND_ANIM, from: pos, lean: lean * 0.7, hold: 0.0, fit: 0.0 });
             }
+            // Shield Wall's bash drives a creature back off the shield, still reeling.
+            if standing && shoved && strike.wall_bash() {
+                let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: WALL_BASH.push, from_caster: true, ..Default::default() };
+                self.displace(id, mid, &push);
+            }
             // The chain's last blow and a running attack cleave.
             let last = self.content.moveset_of(w).light.len().saturating_sub(1);
             let finisher = matches!(strike.kind, StrikeKind::Running | StrikeKind::Leap) || (strike.kind == StrikeKind::Light && strike.step as usize == last && last > 0);
-            if strike.shove() {
+            if strike.wall_bash() {
+                // Shield Wall's bash: the bash's sparks were too small to read in the lab; the
+                // heavy blow's flash with them.
+                self.events.push(Event::Visual { id: mid, kit: KIT_BASH, by: Some(id) });
+                let kit = self.heavy_kit();
+                self.events.push(Event::Visual { id: mid, kit, by: Some(id) });
+            } else if strike.shove() {
                 self.events.push(Event::Visual { id: mid, kit: KIT_BASH, by: Some(id) });
             } else if reeling || behind {
                 self.events.push(Event::Visual { id: mid, kit: KIT_RIPOSTE, by: Some(id) });
@@ -1271,10 +1390,6 @@ impl Survival {
                 self.events.push(Event::Visual { id: mid, kit: KIT_CLEAVE, by: Some(id) });
             }
         }
-        // A blow landed: the hunter's next beast comes empowered.
-        if !struck.is_empty() {
-            self.prime_wild(id);
-        }
     }
 
     /// Hero `id`'s swing reaches hero `victim`: a blow like any other, guarded, parried or dodged
@@ -1282,7 +1397,7 @@ impl Survival {
     fn strike_hero(&mut self, id: Id, victim: Id, w: &crate::content::WeaponDef, strike: &Strike) {
         let from = self.players[&id].pos;
         let might = 1.0 + self.effect_of(&self.players[&id], "might");
-        let rolled = (self.roll(w.damage) as f32 * strike.damage * might).round() as u32;
+        let rolled = (self.roll(w.damage) as f32 * strike.damage * might * self.blow_share(id)).round() as u32;
         let damage = self.hero_riposted(victim, rolled);
         // A heavy attack under way is poised: a light blow doesn't knock it aside.
         let poised = (self.content.combat.heavy_poise
@@ -1295,10 +1410,9 @@ impl Survival {
         }
         let heavy = w.two_handed || w.stagger > 0.0 || strike.heavy();
         let style = if strike.heavy() { Blow::Heavy } else { Blow::Light };
-        let follow = Follow::Swing { stagger: strike.stagger, heavy: strike.heavy(), winding };
-        // In an Onslaught, a heavy attack goes through any guard.
-        let guardable = !(strike.heavy() && self.has_cc(id, "onslaught"));
-        self.strike_fair(id, victim, damage, from, guardable, heavy, guardable, style, None, follow);
+        let stagger = strike.stagger * self.stagger_share(id, victim, strike.heavy());
+        let follow = Follow::Swing { stagger, heavy: strike.heavy(), winding };
+        self.strike_fair(id, victim, damage, from, true, heavy, true, style, None, follow);
     }
 
     /// A guard breaker reaches a hero: through a raised guard (tearing stamina from it, and
@@ -1413,6 +1527,24 @@ impl Survival {
     ) {
         // A creature's blow lands as hard as its fight makes it.
         let damage = if self.mobs.contains_key(&attacker) { (damage as f32 * self.foe_blow_share(attacker)).round() as u32 } else { damage };
+        // Intervene: the blow meant for a friend strikes the Warrior who rushed in for them.
+        let (victim, area) = match self.intervened(attacker, victim) {
+            Some(g) => (g, None),
+            None => (victim, area),
+        };
+        // One blow lands on one body once: a creature's arc that takes in a covered friend and the
+        // Warrior beside them brings the friend's share to the Warrior, not a second hit.
+        if self.mobs.contains_key(&attacker) && self.players.contains_key(&victim) {
+            let now = self.clock;
+            if self.warlord.took.get(&(attacker, victim)) == Some(&now) {
+                return;
+            }
+            self.warlord.took.retain(|_, t| *t + 1.0 >= now);
+            self.warlord.took.insert((attacker, victim), now);
+        }
+        // Exposed (Rising Cut): a hero's blow can't be blocked or parried.
+        let open = self.players.contains_key(&attacker) && self.has_cc(victim, "exposed");
+        let (blockable, parryable) = (blockable && !open, parryable && !open);
         let grace = self.players.get(&victim).map_or(0.0, |p| p.rtt.min(self.content.combat.max_grace));
         let pending = PendingStrike { attacker, victim, damage, from, blockable, heavy, parryable, style, at: self.clock + grace, area, follow, how };
         if grace <= 0.0 {
@@ -1483,8 +1615,11 @@ impl Survival {
                 self.crush_guard(s.victim, s.damage, crush);
             }
         }
-        // An ability that landed: its effects, its drain, Valor.
+        // An ability that landed: its effects, its drain, Valor (and a weapon art's Momentum).
         if let Follow::Ability { ability, share } = s.follow {
+            if matches!(out, Outcome::Hit | Outcome::GuardBroken) && self.content.abilities[ability].kind == "art" && self.players.contains_key(&s.attacker) {
+                self.momentum_hit(s.attacker);
+            }
             if matches!(out, Outcome::Hit | Outcome::GuardBroken) {
                 let killed = !self.players.get(&s.victim).is_some_and(|p| p.health > 0);
                 let was = self.fx_from.replace(s.from);
@@ -1493,10 +1628,11 @@ impl Survival {
             }
             return;
         }
-        // A hero's own blow that landed on another: Valor.
+        // A hero's own blow that landed on another: Valor, Momentum.
         if matches!(out, Outcome::Hit | Outcome::GuardBroken) && self.players.contains_key(&s.attacker) {
             let v = if s.style == Blow::Heavy { self.content.valor.heavy } else { self.content.valor.light };
             self.gain_valor(s.attacker, v);
+            self.momentum_hit(s.attacker);
         }
         let Follow::Swing { stagger, heavy, winding } = s.follow else { return };
         let standing = self.players.get(&s.victim).is_some_and(|p| p.health > 0);
@@ -1594,14 +1730,17 @@ impl Survival {
         // heavy creature's.
         let heavy_blow = style == Blow::Heavy || (heavy && self.mobs.contains_key(&attacker));
         // Untouchable: in Ice Block, or mid-dash on an ability that's untouchable while it runs.
-        let dashing = matches!(&p.action, Action::Dash { ability, .. } if self.content.abilities[*ability].invulnerable);
+        let dashing = matches!(&p.action, Action::Dash { ability, .. } if self.content.abilities[*ability].invulnerable) || self.skyfall_aloft(victim);
         // A giant's blow (`unparryable`) can be blocked, not parried.
         let giant = self.mobs.get(&attacker).is_some_and(|m| c.mobs[m.def].unparryable);
         let parryable = parryable && !giant;
         // The guard raised just in time: a parry, if the blow can be parried at all.
         let timed = now - p.guard_at <= c.parry.window + self.weapon_of(p).parry && p.guard_at - p.prev_guard_at >= c.parry.cooldown;
+        // Retaliation's answer going out: the blow finds nothing to take hold of, and the swing
+        // carries on (no block clip over it).
+        let shrugged = !self.immune(victim) && self.untouchable(victim);
         let outcome = match &p.action {
-            _ if self.immune(victim) => Outcome::Blocked,
+            _ if self.untouchable(victim) => Outcome::Blocked,
             _ if dashing => Outcome::Dodged,
             Action::Dodge { t, .. } if *t >= c.dodge.evade_from && *t <= c.dodge.evade_to => Outcome::Dodged,
             Action::Guard if blockable => {
@@ -1631,6 +1770,7 @@ impl Survival {
             _ => 0,
         };
         match outcome {
+            Outcome::Blocked if shrugged => {}
             Outcome::Blocked => self.spend(victim, cost),
             Outcome::GuardBroken => {
                 self.spend(victim, 1000.0);
@@ -1641,47 +1781,13 @@ impl Survival {
                 }
                 self.tell(victim, if heavy_blow { "Your guard breaks and you go down!" } else { "Your guard breaks!" });
             }
-            Outcome::Parried => {
-                self.events.push(Event::Flash { player: victim, text: "Parry!".into() });
-                // The parry pays: breath back, and an opening to answer in.
-                if let Some(p) = self.players.get_mut(&victim) {
-                    p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
-                    p.opening_until = now + c.parry.opening;
-                    self.events.push(Event::Stamina { player: victim });
-                }
-                if self.mobs.contains_key(&attacker) {
-                    // A boss doesn't reel from each one (a group parried it into reeling
-                    // forever): it fills its posture, shown on its bar, and enough breaks it.
-                    // Lesser champions with a posture still reel, as anything else does.
-                    let def = self.mobs[&attacker].def;
-                    let limit = self.content.mobs[def].posture;
-                    if limit > 0 && self.content.mobs[def].boss && c.parry.posture > 0.0 {
-                        let fill = self.posture_limit(attacker) as f32 * c.parry.posture;
-                        self.build_posture(attacker, victim, fill.round() as u32);
-                    } else {
-                        self.stagger_mob(attacker, c.parry.stagger, true);
-                    }
-                } else if self.players.get(&attacker).is_some_and(|a| a.health > 0) {
-                    // A hero parried: they reel, open to a riposte.
-                    let until = now + c.parry.hero_stagger;
-                    self.set_action(attacker, Action::Stagger { until });
-                    self.players.get_mut(&attacker).unwrap().riposte_until = until;
-                    self.events.push(Event::Emote { id: attacker, emote: mobs::STUN_EMOTE });
-                    let at = self.players[&victim].pos;
-                    self.events.push(Event::React { id: attacker, anim: STUN_ANIM, from: at, lean: 0.3, hold: c.parry.hero_stagger, fit: 0.0 });
-                    self.events.push(Event::Flash { player: attacker, text: "Parried!".into() });
-                }
-            }
+            Outcome::Parried => self.parry_pays(victim, attacker),
             _ => {}
         }
         if let Some(p) = self.players.get_mut(&victim) {
             p.last_hit_by = Some(attacker);
         }
         match outcome {
-            Outcome::Parried => {
-                self.gain_valor(victim, c.valor.parry);
-                self.prime_wild(victim);
-            }
             Outcome::Dodged if !dashing && damage > 0 => {
                 self.gain_valor(victim, c.valor.roll);
                 self.prime_wild(victim);
@@ -1740,13 +1846,10 @@ impl Survival {
                 self.events.push(Event::React { id: victim, anim: STUN_ANIM, from, lean: lean.max(0.35), hold: guard.break_secs, fit: 0.0 });
                 self.events.push(Event::Visual { id: victim, kit: KIT_BASH, by: None });
             }
-            Outcome::Blocked => {
+            Outcome::Blocked if !shrugged => {
                 self.events.push(Event::React { id: victim, anim: BLOCK_ANIM, from, lean: lean * 0.4, hold: 0.0, fit: 0.0 });
             }
-            Outcome::Parried => {
-                self.events.push(Event::Visual { id: victim, kit: KIT_PARRY, by: None });
-                self.events.push(Event::React { id: victim, anim: PARRY_ANIM, from, lean: 0.06, hold: 0.0, fit: 0.0 });
-            }
+            Outcome::Parried => self.parry_looks(victim, from),
             _ => {}
         }
         self.events.push(Event::Swing { attacker, victim: Some(victim), damage: landed, outcome, anim: false, style });
@@ -1785,6 +1888,49 @@ impl Survival {
         }
     }
 
+    /// A hero parried a blow from `attacker` (a timed guard, or Retaliation): breath back and an
+    /// opening to answer in, Valor, and the attacker reels (a boss fills its posture instead).
+    pub(crate) fn parry_pays(&mut self, victim: Id, attacker: Id) {
+        let now = self.clock;
+        let c = self.content.clone();
+        self.events.push(Event::Flash { player: victim, text: "Parry!".into() });
+        if let Some(p) = self.players.get_mut(&victim) {
+            p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
+            p.opening_until = now + c.parry.opening;
+            self.events.push(Event::Stamina { player: victim });
+        }
+        if self.mobs.contains_key(&attacker) {
+            // A boss doesn't reel from each one (a group parried it into reeling forever): it
+            // fills its posture, shown on its bar, and enough breaks it. Lesser champions with a
+            // posture still reel, as anything else does.
+            let def = self.mobs[&attacker].def;
+            let limit = self.content.mobs[def].posture;
+            if limit > 0 && self.content.mobs[def].boss && c.parry.posture > 0.0 {
+                let fill = self.posture_limit(attacker) as f32 * c.parry.posture;
+                self.build_posture(attacker, victim, fill.round() as u32);
+            } else {
+                self.stagger_mob(attacker, c.parry.stagger, true);
+            }
+        } else if self.players.get(&attacker).is_some_and(|a| a.health > 0) {
+            // A hero parried: they reel, open to a riposte.
+            let until = now + c.parry.hero_stagger;
+            self.set_action(attacker, Action::Stagger { until });
+            self.players.get_mut(&attacker).unwrap().riposte_until = until;
+            self.events.push(Event::Emote { id: attacker, emote: mobs::STUN_EMOTE });
+            let at = self.players[&victim].pos;
+            self.events.push(Event::React { id: attacker, anim: STUN_ANIM, from: at, lean: 0.3, hold: c.parry.hero_stagger, fit: 0.0 });
+            self.events.push(Event::Flash { player: attacker, text: "Parried!".into() });
+        }
+        self.gain_valor(victim, c.valor.parry);
+        self.prime_wild(victim);
+    }
+
+    /// How a parry shows on the hero who made it: the spark and the parry clip.
+    pub(crate) fn parry_looks(&mut self, victim: Id, from: Vec3) {
+        self.events.push(Event::Visual { id: victim, kit: KIT_PARRY, by: None });
+        self.events.push(Event::React { id: victim, anim: PARRY_ANIM, from, lean: 0.06, hold: 0.0, fit: 0.0 });
+    }
+
     /// Their client jumped: it costs stamina (the add-on won't jump without enough). Taken in a
     /// dodge's dash, it's a Corey roll: the client carries the dash's speed through the air, and
     /// an attack in it strikes as the hero lands.
@@ -1810,14 +1956,15 @@ impl Survival {
 
     /// In a stance that ends the moment they act.
     fn ends_on_action(&self, id: Id) -> bool {
-        matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Stance { ability, .. })
-            if self.content.abilities[*ability].counter.as_ref().is_some_and(|c| c.ends_on_action))
+        // The stance held, not the action: Shield Wall's bash is a swing inside it.
+        self.players.contains_key(&id)
+            && self.stances.get(&id).is_some_and(|s| s.until > self.clock && self.content.abilities[s.ability].counter.as_ref().is_some_and(|c| c.ends_on_action))
     }
 
     /// The key on `slot` is the one the hero's stance came from.
     fn stance_key(&self, id: Id, slot: usize) -> bool {
         let Some(p) = self.players.get(&id) else { return false };
-        let Action::Stance { ability, .. } = p.action else { return false };
+        let Some(ability) = self.stances.get(&id).map(|s| s.ability) else { return false };
         let on_key = crate::content::SLOTS.get(slot).and_then(|s| p.loadout.get(*s)).and_then(|k| self.content.ability(k));
         on_key == Some(self.content.base_of(ability))
     }
@@ -1828,6 +1975,7 @@ impl Survival {
         // Only the landing of the leap it was pressed in: one whose landing went unheard (a lost
         // packet, a teleport) is over after [`AIR_MOST`], and its attack with it.
         let current = self.airborne(id).is_some();
+        self.skyfall_landed(id);
         let Some(p) = self.players.get_mut(&id) else { return };
         p.air = None;
         if let Some(kind) = p.landing_attack.take().filter(|_| current) {
@@ -1851,7 +1999,7 @@ impl Survival {
         if p.health == 0 || !matches!(p.action, Action::Ready | Action::Guard) || self.disabled(id) {
             return;
         }
-        if p.stamina < self.content.player.exhausted_below {
+        if p.stamina < self.content.player.exhausted_below && !self.tireless(id) {
             self.winded(id);
             return;
         }
@@ -2095,9 +2243,12 @@ impl Survival {
         if d.arc > 0.0 {
             s.arc = d.arc;
         }
+        // Its own clip: the ability's take, from the model it names (the same blow on every
+        // race), else the hero's own.
         if d.clip != 0 {
             s.clip = d.clip;
-            s.take = 0;
+            s.take = d.take;
+            s.from = d.from.clone();
         }
         s.lunge = s.lunge.min(0.6);
         s.stamina = d.stamina;
@@ -2113,7 +2264,7 @@ impl Survival {
         let weapon = self.players[&id].weapon;
         let Some(windex) = self.content.weapons.iter().position(|w| w.key == self.content.items[weapon].key) else { return };
         let strike = self.art_strike(id, ability);
-        self.spend(id, strike.stamina);
+        self.spend_attack(id, strike.stamina);
         if let Some(p) = self.players.get_mut(&id) {
             p.combo_next = 0;
             p.combo_until = -100.0;
@@ -2188,7 +2339,7 @@ impl Survival {
 
     /// A weapon art's active moment: what's in its reach takes its blow (the weapon's roll times
     /// its share, more from behind), judged as a swing is.
-    fn connect_art(&mut self, id: Id, w: &crate::content::WeaponDef, strike: &Strike, ability: usize, struck: &mut Vec<Id>) {
+    fn connect_art(&mut self, id: Id, w: &crate::content::WeaponDef, strike: &Strike, ability: usize, struck: &mut Vec<Id>, first: bool) {
         let d = self.content.abilities[ability].clone();
         let pos = self.players[&id].pos;
         let rewind = self.players[&id].rtt.min(self.content.combat.max_rewind);
@@ -2227,7 +2378,11 @@ impl Survival {
         // A wide art cleaves (three at least); the rest strike as the weapon does.
         let most = if d.arc > 0.0 { w.targets.max(3) } else { w.targets.max(1) };
         let room = most.saturating_sub(struck.len());
-        let might = 1.0 + self.effect_of(&self.players[&id], "might");
+        // Momentum and a fury (Cowed is the ability's damage's own).
+        let might = (1.0 + self.effect_of(&self.players[&id], "might")) * self.blow_boost(id);
+        if first {
+            self.swing_on_banners(id, w, d.weapon, f, strike.range, strike.arc);
+        }
         for (_, v, at, vf) in hits.into_iter().take(room) {
             struck.push(v);
             let from_veil = self.players[&id].veil_strike_until > self.clock;
@@ -2243,9 +2398,13 @@ impl Survival {
             } else {
                 self.ability_on_mob(id, v, ability, 1.0, base, pos, HitKind::Melee, d.spell);
             }
-            let kit = if d.impact_kit != 0 { d.impact_kit } else if behind && d.behind > 0.0 { KIT_RIPOSTE } else { KIT_SLAM };
+            let kit = if behind && d.behind > 0.0 { KIT_RIPOSTE } else { KIT_SLAM };
             if self.alive(v) {
                 self.events.push(Event::Visual { id: v, kit, by: Some(id) });
+                // The art's own impact beside the heavy flash (Sundering Blow's armor crack).
+                if d.impact_kit != 0 {
+                    self.events.push(Event::Visual { id: v, kit: d.impact_kit, by: Some(id) });
+                }
             }
         }
     }
@@ -2269,23 +2428,24 @@ impl Survival {
         }
     }
 
-    /// Nothing staggers them now: Onslaught or Sanctuary on them, or in the wind-up of an art that
-    /// won't be stopped.
+    /// Nothing staggers them now: steadfast (Sanctuary, Berserker Rage) or rallied (Rallying Cry)
+    /// on them, or in the wind-up of an art that won't be stopped.
     pub(crate) fn unstaggerable(&self, id: Id) -> bool {
-        if self.has_cc(id, "onslaught") || self.has_cc(id, "steadfast") {
+        if self.has_cc(id, "rallied") || self.has_cc(id, "steadfast") || self.untouchable(id) {
             return true;
         }
         matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { t, strike, .. })
             if *t < strike.windup + strike.active && strike.art.is_some_and(|a| self.content.abilities[a].poise))
     }
 
-    /// The share of a blow's damage a unit takes: more under a Death Mark, less on hallowed ground.
+    /// The share of a blow's damage a unit takes: more under a Death Mark, a Sunder or Exposed,
+    /// less on hallowed ground.
     pub(crate) fn taken_share(&self, id: Id) -> f32 {
         let now = self.clock;
         let mut k = 1.0;
         for c in self.cc_of(id).iter().filter(|c| c.until > now) {
             match c.kind.as_str() {
-                "deathmark" | "sunder" => k *= 1.0 + c.amount,
+                "deathmark" | "sunder" | "exposed" => k *= 1.0 + c.amount,
                 "hallowed" => k *= (1.0 - c.amount).max(0.0),
                 _ => {}
             }
@@ -2316,6 +2476,20 @@ const LOCK_SNAP_HERO: f32 = 50.0;
 const AMBUSH_CONE: f32 = 20.0;
 /// How wide a hero is, for blows and arrows.
 const HERO_SIZE: f32 = 0.4;
+/// Shield Wall's Shield Bash, against the plain bash: its roll times `damage`, `reach` yd more
+/// reach, an `arc` this wide, up to `targets` struck, `stagger` times as long a reel, and each
+/// creature it strikes driven `push` yd back. It costs no stamina.
+pub(crate) struct WallBash {
+    pub damage: f32,
+    pub reach: f32,
+    pub arc: f32,
+    pub targets: usize,
+    pub stagger: f32,
+    pub push: f32,
+}
+pub(crate) const WALL_BASH: WallBash = WallBash { damage: 2.0, reach: 0.5, arc: 150.0, targets: 3, stagger: 2.0, push: 2.5 };
+/// Retaliation's heavy answer: untouchable this long past the moment it strikes.
+const UNTOUCHABLE_GRACE: f32 = 0.05;
 
 /// A swing's reach: how far, how wide (degrees).
 #[derive(Clone, Copy)]
