@@ -718,6 +718,12 @@ impl SurvivalGame {
         if m.guarding && m.health > 0 {
             f.set(idx::UNIT_NPC_EMOTESTATE, super::play::POSE_SHIELD);
         }
+        // A spirit beast is there the moment it's called and gone the moment it goes: the client's
+        // two-second fade in had it still ghostly as it struck, and its fade out left it standing
+        // after (Corey's review: "the fades are the issue"). Patch 0025's flag; older clients fade.
+        if spirit_beast(&d.key) {
+            f.set(idx::UNIT_DYNAMIC_FLAGS, fields::UNIT_DYNFLAG_NO_FADE);
+        }
         if m.health == 0 {
             f.set(idx::UNIT_DYNAMIC_FLAGS, fields::UNIT_DYNFLAG_DEAD);
         }
