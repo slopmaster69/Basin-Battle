@@ -45,6 +45,15 @@ const BANNER_SIZE: f32 = 0.5;
 /// The look over a hero near a War Banner is kept on this long at a time, again each tick they
 /// stand near it (so it goes soon after they step away).
 const BANNER_HOLD: f32 = 0.3;
+/// A Tackle's Crash on the ground: War Stomp's shock ring under the body as it hits the wall or
+/// the other enemy (the kit Heroic Leap lands with, so it's known to show), beside the dust and the
+/// heavy flash. Corey's review: the hit against a unit or a wall needs an impact mark.
+const KIT_CRASH: u32 = 5089;
+/// With nothing behind it, a tackled enemy isn't set down: it's flung this far ahead of the hero
+/// (Corey's review: in the open the knockback has to be seen to move them).
+const DROP_SHOVE: f32 = 4.0;
+/// The enemy a tackled body is driven into is shoved this far by the Crash.
+const INTO_SHOVE: f32 = 2.5;
 
 /// Where a Tackle's rush ends for the body it carries.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -169,6 +178,11 @@ impl Survival {
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
         self.events.push(Event::Dash { player: id, dir: yaw, speed: rush / secs, secs });
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        // The shoulder hit's clip over the rush, as a dash's (twice the rush, so its blow lands as
+        // the rush ends). Without it the Tackle was Charge's run and nothing else.
+        if d.clip != 0 {
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6) });
+        }
     }
 
     /// Where body `b` carried `carry` yd along `yaw` stops, and why: a wall (or a steep step up)
@@ -270,21 +284,37 @@ impl Survival {
                     }
                     self.crash_hit(id, u, ability, crash.foe_damage, from);
                     if self.alive(u) {
+                        // The one driven into is shoved on by the Crash, then both go down.
+                        if !first {
+                            self.shove(id, u, INTO_SHOVE);
+                        }
                         self.knock_down(id, u, crash.knockdown, &d.name);
                     }
                 }
                 self.crash_looks(id, b, "Crash!");
                 if self.alive(o) {
                     self.events.push(Event::Visual { id: o, kit: combat::KIT_DUST, by: None });
+                    self.events.push(Event::Visual { id: o, kit: KIT_CRASH, by: None });
                 }
             }
             Crash::Drop(b) | Crash::Wall(b) => {
                 if self.alive(b) {
                     let dmg = AbilityDef::at(d.damage, 1.0);
                     self.crash_hit(id, b, ability, dmg, from);
+                    // Nothing to crash into: flung on ahead, so the hit is seen to move them.
+                    if self.alive(b) && matches!(outcome, Crash::Drop(_)) {
+                        self.shove(id, b, DROP_SHOVE);
+                    }
                 }
             }
         }
+    }
+
+    /// A body thrown `yards` on from the hero (a Tackle's drop, or the one its Crash shoves): a
+    /// knockback away from the hero, as the rules fly one.
+    fn shove(&mut self, owner: Id, victim: Id, yards: f32) {
+        let e = AbilityEffect { kind: "knockback".into(), amount: yards, from_caster: true, ..Default::default() };
+        self.displace(owner, victim, &e);
     }
 
     fn crash_hit(&mut self, id: Id, v: Id, ability: usize, damage: f32, from: Vec3) {
@@ -293,9 +323,11 @@ impl Survival {
         }
     }
 
-    /// The Crash seen: dust and a heavy flash on the one crashed, and the hero told.
+    /// The Crash seen: dust, the shock ring and a heavy flash on the one crashed, and the hero
+    /// told.
     fn crash_looks(&mut self, id: Id, b: Id, text: &str) {
         self.events.push(Event::Visual { id: b, kit: combat::KIT_DUST, by: None });
+        self.events.push(Event::Visual { id: b, kit: KIT_CRASH, by: None });
         let kit = self.heavy_kit();
         self.events.push(Event::Visual { id: b, kit, by: Some(id) });
         self.events.push(Event::Flash { player: id, text: text.into() });

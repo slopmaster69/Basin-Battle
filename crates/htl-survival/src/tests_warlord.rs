@@ -206,6 +206,7 @@ fn tackle_drives_an_enemy_into_a_wall_and_it_crashes_stunned() {
     assert!(struck(&ev, k).contains(&20), "20 damage on the wall: {:?}", struck(&ev, k));
     assert!(hp(&s, k) < before);
     assert!(s.has_cc(k, "stun"), "stunned against the wall");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 5089, .. } if *id == k)), "the Crash's shock ring on it");
     let at = s.mobs[&k].pos;
     assert!(at[0] > 3.5 && at[0] < 5.6, "carried up to the wall's face: {at:?}");
     assert!(s.players[&p].pos[0] > 2.0, "the hero rushed in behind it: {:?}", s.players[&p].pos);
@@ -223,10 +224,18 @@ fn tackle_into_another_enemy_knocks_both_down() {
     assert!(struck(&ev, b).contains(&14), "the one it's driven into too: {:?}", struck(&ev, b));
     assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "both knocked down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == b && *anim == KNOCKDOWN_ANIM)), "thrown to the ground");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 5089, .. } if *id == b)), "the Crash's shock ring on the one driven into");
+    // The knockdown is long enough to read: still down well after a second.
+    run(&mut s, 1.3);
+    assert!(s.has_cc(a, "stun") && s.has_cc(b, "stun"), "a 2 sec knockdown");
+    run(&mut s, 1.0);
+    assert!(!s.has_cc(a, "stun") && !s.has_cc(b, "stun"), "and up again");
+    // The one driven into was shoved on by the Crash.
+    assert!(s.mobs[&b].pos[0] > 6.5, "shoved on from 5.5: {:?}", s.mobs[&b].pos);
 }
 
 #[test]
-fn tackle_with_nothing_behind_drops_the_enemy_at_your_feet() {
+fn tackle_with_nothing_behind_flings_the_enemy_on_ahead() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let k = mob(&mut s, "brave", [2.0, 0.0, 0.0]);
@@ -237,6 +246,9 @@ fn tackle_with_nothing_behind_drops_the_enemy_at_your_feet() {
     assert_eq!(struck(&ev, k), vec![10], "dropped for 10");
     assert!(!s.has_cc(k, "stun"), "no Crash, no stun");
     assert!(s.players[&p].pos[0] > 7.0, "the hero went the whole rush: {:?}", s.players[&p].pos);
+    // Not set down at the hero's feet: flung on ahead, so the hit is seen to move it.
+    run(&mut s, 0.8);
+    assert!(s.mobs[&k].pos[0] > 10.5, "flung 4 yd on from the rush's end: {:?}", s.mobs[&k].pos);
 }
 
 #[test]

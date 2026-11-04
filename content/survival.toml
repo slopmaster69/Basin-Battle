@@ -3250,6 +3250,9 @@ clip = 19
 take = 0
 from = "ScourgeMale"
 spell = 12294
+# Expose Armor's cracking plates on the one struck (kit 3069), beside the yellow spark: Corey
+# wanted both, and the Sunder shown as armor breaking (his review, Nov 3).
+impact_kit = 3069
 valor_hit = 6.0
 effects = [{ kind = "stagger", secs = [1.2, 1.2] }, { kind = "sunder", secs = [8.0, 8.0], amount = 0.15 }]
 
@@ -4851,7 +4854,7 @@ valor_hit = 6.0
 [[ability]]
 key = "tackle"
 name = "Tackle"
-text = "Lowers your shoulder and rushes 8 yd along your aim. The first enemy you meet is carried to the end of the rush. If you drive it into a wall, tree or rock, it Crashes for 20 damage and is stunned for 1.5 sec (0.75 sec against heroes). If you drive it into another enemy, both Crash for 14 damage and are knocked down for 1 sec. Otherwise it is dropped at your feet for 10 damage. An enemy that can't be moved stops the rush. Heroes are carried at most 4 yd. You cannot be staggered during the rush. Costs 12 stamina."
+text = "Lowers your shoulder and rushes 8 yd along your aim. The first enemy you meet is carried to the end of the rush. If you drive it into a wall, tree or rock, it Crashes for 20 damage and is stunned for 2 sec (1 sec against heroes). If you drive it into another enemy, both Crash for 14 damage and are knocked down for 2 sec (1 sec against heroes). Otherwise it is flung 4 yd ahead of you for 10 damage. An enemy that can't be moved stops the rush. Heroes are carried at most 4 yd. You cannot be staggered during the rush. Costs 12 stamina."
 icon = "Ability_Warrior_PunishingBlow"
 school = "warrior"
 slot = "utility"
@@ -4861,11 +4864,21 @@ range = [8.0, 8.0]
 damage = [10.0, 10.0]
 stamina = 12.0
 cooldown = 12.0
-# Charge's rush trail; the Crash is the dust and the heavy flash on the one crashed.
-spell = 100
+# Intercept's rush (20252): the dust kicked up, without Charge's purple trail, so a Tackle isn't
+# mistaken for a Charge (Corey's review, Nov 3). The Crash is dust, War Stomp's shock ring and the
+# heavy flash on the one crashed.
+spell = 20252
+# The shoulder hit, the same on every race: the orc men's Shield Bash (59/0), the one attack clip
+# that's a body check (shoulder and shield driven forward, low) rather than a weapon swing, as
+# Corey asked (his review, Nov 3). It plays over the rush and lands as the rush ends.
+clip = 59
+take = 0
+from = "OrcMale"
 valor_hit = 6.0
 self_effects = [{ kind = "steadfast", secs = [0.4, 0.4], amount = 1.0 }]
-crash = { wall_damage = 20.0, wall_stun = 1.5, foe_damage = 14.0, knockdown = 1.0, posture = 35, boss_posture = 20, hero_carry = 4.0 }
+# A 2 sec knockdown (and the wall's stun to match): a knockdown is the Warlord's big payoff, and
+# at 1 sec it was over before it read (Corey's review, Nov 3). Heroes get half, as with any stun.
+crash = { wall_damage = 20.0, wall_stun = 2.0, foe_damage = 14.0, knockdown = 2.0, posture = 35, boss_posture = 20, hero_carry = 4.0 }
 
 # 1's EX: the same moment (close the gap now), the other answer: toward a friend.
 [[ability]]
