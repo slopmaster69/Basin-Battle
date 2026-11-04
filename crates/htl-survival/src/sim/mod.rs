@@ -175,6 +175,8 @@ pub enum Event {
     Emote { id: Id, emote: u32 },
     Health { id: Id, health: u32, max: u32 },
     Stamina { player: Id },
+    /// The hero's ward bar changed (a staff's guard), or broke, or is whole again.
+    Ward { player: Id },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
@@ -527,6 +529,13 @@ pub struct Player {
     /// When the guard last went up, and the time before that (a parry needs a fresh guard).
     pub guard_at: f32,
     pub prev_guard_at: f32,
+    /// The ward bar (a staff's guard), what's left of it; broken, it can't go up until it's full
+    /// again; and when it last came down or broke (it refills a moment after).
+    pub ward: f32,
+    pub ward_broken: bool,
+    pub ward_down_at: f32,
+    /// The ward is up (its look is on them).
+    pub ward_up: bool,
     pub sprint_held: bool,
     /// Sprinting now (held, moving, not walking, not committed to anything, stamina left).
     pub sprinting: bool,
@@ -1136,6 +1145,10 @@ impl Survival {
             attack_held: false,
             guard_at: -100.0,
             prev_guard_at: -100.0,
+            ward: c.ward.bar,
+            ward_broken: false,
+            ward_down_at: -100.0,
+            ward_up: false,
             sprint_held: false,
             sprinting: false,
             air: None,

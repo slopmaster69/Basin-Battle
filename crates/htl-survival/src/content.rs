@@ -31,6 +31,9 @@ pub struct Content {
     pub player: PlayerDef,
     pub dodge: DodgeDef,
     pub parry: ParryDef,
+    /// A caster's guard: the ward a staff raises, with a bar of its own (`[ward]`).
+    #[serde(default)]
+    pub ward: WardDef,
     #[serde(default)]
     pub heavy: HeavyDef,
     #[serde(default)]
@@ -350,6 +353,36 @@ pub struct ParryDef {
     /// posture instead (so parries break a boss's stance, they don't lock it).
     #[serde(default)]
     pub posture: f32,
+}
+
+/// The ward: what a staff guards with. An arcane barrier with a bar of its own in place of
+/// stamina. Every blow it stops drains the bar (the guard's `cost`s); a guard raised in the parry
+/// window is a perfect ward, which costs nothing and reels the attacker as a parry does; a blow
+/// too heavy for what's left breaks it, and a broken ward can't go up again until the bar is full.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct WardDef {
+    /// The bar.
+    pub bar: f32,
+    /// How fast it refills, a second, while the ward is down...
+    pub refill: f32,
+    /// ...starting this long after it came down (or broke).
+    pub refill_delay: f32,
+    /// A perfect ward gives this much of the bar back.
+    pub perfect_refill: f32,
+    /// A broken ward's stagger.
+    pub break_secs: f32,
+    /// The look on a hero holding the ward up (a spell whose aura the clients show).
+    pub aura: u32,
+    /// The burst of a perfect ward, and the shatter of a broken one (spell visual kits).
+    pub perfect_kit: u32,
+    pub break_kit: u32,
+}
+
+impl Default for WardDef {
+    fn default() -> Self {
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, perfect_kit: 555, break_kit: 7 }
+    }
 }
 
 /// The heavy attack (Shift with the left mouse): slower to come, harder to take.
@@ -899,6 +932,9 @@ pub struct ShieldDef {
     pub cost_per_damage: f32,
     pub break_secs: f32,
     pub break_share: f32,
+    /// A ward (a staff's guard): its costs come off the ward bar, not stamina (`[ward]`).
+    #[serde(default)]
+    pub ward: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]

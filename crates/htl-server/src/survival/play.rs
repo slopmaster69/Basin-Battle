@@ -369,6 +369,12 @@ impl SurvivalGame {
                 f.set(idx::UNIT_POWER1 + 3, p.stamina.floor() as u32);
                 self.to_player(player, packets::update_object(&[], &[(g, &f)]));
             }
+            Event::Ward { player } => {
+                if let Some(c) = self.conn_of(player) {
+                    let line = self.ward_line(player);
+                    self.ui_line(c, &line);
+                }
+            }
             Event::Speed { player, speed, back } => {
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(c) = self.conn_of(player) else { return };

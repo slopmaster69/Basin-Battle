@@ -373,6 +373,25 @@ opening = 2.0
 # together, break its stance. Lesser champions with a posture still reel from a parry.
 posture = 0.25
 
+[ward]
+# The ward: a staff's guard (a `[[shield]]` with `ward = true`). An arcane barrier with a bar of
+# its own in place of stamina. Every blow it stops drains the bar by the guard's costs; a guard
+# raised in the parry window is a perfect ward, which costs nothing, gives some of the bar back and
+# reels the attacker as a parry does (a hero's blow, too); a blow too heavy for what's left breaks
+# it, and a broken ward can't go up again until the bar is full. The bar refills while the ward is
+# down, never while it's up, so a caster who wards everything runs dry and one who times it well
+# wards the longest. (The Mage design, claude/mage-kit-draft.md.)
+bar = 100.0
+refill = 35.0
+refill_delay = 0.4
+perfect_refill = 20.0
+break_secs = 1.0
+# The looks: Mana Shield's swirl on a hero holding the ward up; the parry's burst for a perfect
+# ward and the bash's for the shatter, both to replace once seen in the client.
+aura = 1463
+perfect_kit = 555
+break_kit = 7
+
 # --- heroes against heroes ------------------------------------------------------------------------
 
 [pvp]
@@ -575,6 +594,23 @@ guard = "haft_guard"
 emote = 38
 subclass = 6
 
+# The first staff: a caster's weapon. It swings like a two-handed weapon (the staff family's
+# bolt-firing kinds come later) and guards with the ward.
+[[weapon]]
+key = "apprentice_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
 [[shield]]
 key = "buckler"
 # The arc in front a raised shield covers.
@@ -619,6 +655,17 @@ cost = 10.0
 cost_per_damage = 0.9
 break_secs = 1.0
 break_share = 0.6
+
+# The ward a staff raises (`[ward]`): wide, as a barrier around the body is, its costs off the
+# ward bar. About four light blows or two heavy ones empty a full bar.
+[[shield]]
+key = "arcane_ward"
+arc = 150.0
+cost = 8.0
+cost_per_damage = 0.8
+break_secs = 1.0
+break_share = 0.5
+ward = true
 
 # --- items ----------------------------------------------------------------------------------------
 # Resources stack in the bags until banked; food is eaten with 1. The display is the item's look
@@ -726,6 +773,16 @@ display = 1243
 icon = "INV_Hammer_01"
 kind = "weapon"
 text = "Two-handed. Very slow and very heavy. Breaks an enemy's windup. Guards with the haft."
+
+# Its look is the conjurers' staff (the same display their creatures carry), until a staff of its
+# own is picked from the data.
+[[item]]
+key = "apprentice_staff"
+name = "Apprentice's Staff"
+display = 5415
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Two-handed. Guards with a ward: an arcane barrier with a bar of its own. A ward raised just as a blow lands costs nothing and reels the attacker. Broken, it can't be raised again until its bar is full."
 
 [[item]]
 key = "buckler"

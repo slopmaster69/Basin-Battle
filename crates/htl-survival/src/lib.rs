@@ -78,3 +78,5 @@ mod tests_building;
 mod tests_raptor;
 #[cfg(test)]
 mod tests_hunter_bow;
+#[cfg(test)]
+mod tests_ward;

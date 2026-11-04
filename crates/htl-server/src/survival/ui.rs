@@ -91,6 +91,8 @@
 //! The abilities:
 //! - `AB\t...`: the ability bar, one entry per key (see [`SurvivalGame::bar_line`]).
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
+//! - `WA\t<ward>\t<most>\t<broken>`: the ward bar of a hero whose guard is a ward (a staff's);
+//!   `WA` alone: no ward, the bar hidden. Sent with the HUD and the moment it changes.
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
 //!   beta page's cards, each with its page (see [`SurvivalGame::tree_line`]).
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
@@ -347,7 +349,8 @@ pub(crate) const VERSION: u32 = 2;
 /// Shot).
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
-pub(crate) const ADDON_NEWEST: u32 = 20;
+/// 21: the ward bar (`WA`, `Ward.lua`): a staff's guard.
+pub(crate) const ADDON_NEWEST: u32 = 21;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -792,6 +795,8 @@ impl SurvivalGame {
                 if let Some(va) = self.valor_line(id) {
                     self.ui_line_changed(conn, "VA", va);
                 }
+                let wa = self.ward_line(id);
+                self.ui_line_changed(conn, "WA", wa);
                 let cc = self.cc_line(id);
                 self.ui_line_changed(conn, "CC", cc);
                 // What the use key would use, for its prompt (empty: nothing in reach).
@@ -1961,6 +1966,15 @@ impl SurvivalGame {
         let p = self.sim.players.get(&id)?;
         let v = &self.sim.content.valor;
         Some(format!("VA\t{:.0}\t{:.0}\t{:.0}", p.valor.floor(), v.max, v.segment))
+    }
+
+    /// The ward bar of a hero whose guard is a ward (a staff's): `WA\t<ward>\t<most>\t<broken>`;
+    /// `WA` alone for a hero who guards with something else (the bar hidden).
+    pub(crate) fn ward_line(&self, id: Id) -> String {
+        match self.sim.players.get(&id) {
+            Some(p) if self.sim.guard_of(p).ward => format!("WA\t{:.0}\t{:.0}\t{}", p.ward.floor(), self.sim.content.ward.bar, u8::from(p.ward_broken)),
+            _ => "WA".to_string(),
+        }
     }
 
     /// The crowd control on the hero: `CC\t<kind~seconds left~share>^...` (the grace as `grace`).
