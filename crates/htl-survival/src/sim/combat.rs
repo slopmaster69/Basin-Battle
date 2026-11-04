@@ -1528,6 +1528,16 @@ impl Survival {
             Some(g) => (g, None),
             None => (victim, area),
         };
+        // One blow lands on one body once: a creature's arc that takes in a covered friend and the
+        // Warrior beside them brings the friend's share to the Warrior, not a second hit.
+        if self.mobs.contains_key(&attacker) && self.players.contains_key(&victim) {
+            let now = self.clock;
+            if self.warlord.took.get(&(attacker, victim)) == Some(&now) {
+                return;
+            }
+            self.warlord.took.retain(|_, t| *t + 1.0 >= now);
+            self.warlord.took.insert((attacker, victim), now);
+        }
         // Exposed (Rising Cut): a hero's blow can't be blocked or parried.
         let open = self.players.contains_key(&attacker) && self.has_cc(victim, "exposed");
         let (blockable, parryable) = (blockable && !open, parryable && !open);

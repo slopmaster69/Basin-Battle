@@ -91,6 +91,9 @@ pub(crate) struct Warlord {
     pub banners: BTreeMap<Id, Banner>,
     /// Cowed creatures that have fled, until their Cow ends (each flees once a Cow).
     pub fled: BTreeMap<Id, f32>,
+    /// A creature's blow that landed on a hero, by (creature, hero), when: one blow lands on one
+    /// body once, though an Intervene brings a friend's share of it to the same body.
+    pub took: BTreeMap<(Id, Id), f32>,
 }
 
 impl Survival {

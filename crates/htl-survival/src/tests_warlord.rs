@@ -303,6 +303,32 @@ fn intervene_rushes_to_a_friend_and_takes_the_next_blow_meant_for_them() {
 }
 
 #[test]
+fn intervene_takes_a_friends_share_of_an_arc_as_one_blow_not_two() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    let k = mob(&mut s, "brave", [11.5, 0.5, 0.0]);
+    s.set_valor(a, 25.0);
+    cast(&mut s, a, "tackle", true, 0.0, 0.0);
+    run(&mut s, 0.5);
+    assert!(s.has_cc(b, "guarded"), "Bren is covered");
+    let from = s.mobs[&k].pos;
+    // The brave's arc takes in both: Bren's share comes to Ayla, and Ayla is in it herself.
+    let ha = s.players[&a].health;
+    s.strike_fair(k, b, 20, from, true, false, true, Blow::Light, None, Follow::None);
+    s.strike_fair(k, a, 20, from, true, false, true, Blow::Light, None, Follow::None);
+    s.step(DT);
+    let once = ha - s.players[&a].health;
+    assert!(once > 0, "the blow lands on Ayla");
+    // The same blow on Ayla alone, later: the same amount, so the arc landed on her once.
+    run(&mut s, 1.5);
+    let ha = s.players[&a].health;
+    s.strike_fair(k, a, 20, from, true, false, true, Blow::Light, None, Follow::None);
+    s.step(DT);
+    assert_eq!(ha - s.players[&a].health, once, "one blow, one hit");
+}
+
+#[test]
 fn intervene_with_the_guard_up_blocks_the_blow() {
     let mut s = world();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
