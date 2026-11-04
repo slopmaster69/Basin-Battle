@@ -2000,6 +2000,7 @@ impl Survival {
         // where the shot came from against the way the creature faces, as a swing is.
         if how == HitKind::Projectile && damage > 0 && self.players.contains_key(&owner) && self.from_behind(mid, from) {
             self.cue(Some(owner), mid, combat::KIT_RIPOSTE, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
+            self.backstab_look(mid, Some(owner));
         }
         self.trade_blows(owner, mid);
         if damage > 0 {

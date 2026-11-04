@@ -172,6 +172,8 @@ fn an_arrow_in_a_creatures_back_is_a_backstab_and_one_in_its_face_is_not() {
     let ev = aimed_arrow_into(&mut s, p, k);
     assert_eq!(hits(&ev, p, k), 1, "the arrow lands in its back");
     assert!(looked(&ev, k, KIT_RIPOSTE), "the stab's flash on it");
+    let look = s.content.backstab.kit;
+    assert!(look != 0 && looked(&ev, k, look), "and the backstab's own look, which reads from behind");
     assert!(sounded(&ev, k, SOUND_BACKSTAB), "a dagger's crit");
     assert!(beat(&ev, p, BEAT_BACKSTAB), "the sharp beat on her screen");
     assert!(no_words(&ev, p), "no word");
@@ -180,6 +182,7 @@ fn an_arrow_in_a_creatures_back_is_a_backstab_and_one_in_its_face_is_not() {
     let ev = aimed_arrow_into(&mut s, p, k);
     assert_eq!(hits(&ev, p, k), 1, "the arrow lands in its face");
     assert!(!looked(&ev, k, KIT_RIPOSTE), "no stab flash from the front");
+    assert!(!looked(&ev, k, look), "nor the backstab's look");
     assert!(!sounded(&ev, k, SOUND_BACKSTAB));
     assert!(!beat(&ev, p, BEAT_BACKSTAB));
     assert!(no_words(&ev, p), "no word");

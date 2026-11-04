@@ -1330,6 +1330,7 @@ impl Survival {
             // crit into flesh and a sharp beat on the striker's screen.
             if behind && damage > 0 {
                 self.cue(Some(id), mid, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
+                self.backstab_look(mid, Some(id));
             }
             self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style });
             self.trade_blows(id, mid);
@@ -2416,6 +2417,7 @@ impl Survival {
             // below) with a dagger's crit and a beat. Only Backstab's own `behind` makes it harder.
             if behind {
                 self.cue(Some(id), v, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
+                self.backstab_look(v, Some(id));
             }
             if self.players.contains_key(&v) {
                 let dmg = self.ability_damage(id, v, ability, base);
@@ -2590,6 +2592,15 @@ impl Survival {
     /// off the way it faces. The one rule for every hit a hero lands (a swing, an art, an arrow).
     pub(crate) fn from_behind(&self, mid: Id, at: Vec3) -> bool {
         self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, at)) >= BACKSTAB_ARC)
+    }
+
+    /// The backstab's own look on creature `mid` (`backstab.kit`): the riposte's stab plays on
+    /// the chest, the side turned away from whoever stabbed it, so this one is what reads.
+    pub(crate) fn backstab_look(&mut self, mid: Id, by: Option<Id>) {
+        let kit = self.content.backstab.kit;
+        if kit != 0 && self.alive(mid) {
+            self.events.push(Event::Visual { id: mid, kit, by });
+        }
     }
 
     /// A backstab's bonus on a creature, less for each one it took lately.
