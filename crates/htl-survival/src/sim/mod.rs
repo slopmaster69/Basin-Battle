@@ -887,6 +887,9 @@ pub struct Survival {
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
     pub(crate) fx_vs_bosses: bool,
+    /// The look the caster of the pull being given wears over it (its clip, the model it's
+    /// borrowed from): an ability's `pull_clip` and `pull_from`.
+    pub(crate) fx_pull_look: Option<(u16, String)>,
     /// When a hero may next be told this foe shrugged their control off (hero, foe).
     pub(crate) told_immune: BTreeMap<(Id, Id), f32>,
     /// Counters' stances (a hero's, a dummy's), by unit.
@@ -992,6 +995,7 @@ impl Survival {
             anchors: BTreeMap::new(),
             fx_from: None,
             fx_vs_bosses: false,
+            fx_pull_look: None,
             told_immune: BTreeMap::new(),
             grounds: Vec::new(),
             bounces: Vec::new(),

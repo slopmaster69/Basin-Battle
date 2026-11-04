@@ -4647,6 +4647,12 @@ speed = 60.0
 hunt = "haul"
 spell = 6533
 clip = 53
+# The hunter's own look over the haul, on the clients that play clips (Corey's review: with the
+# bow's release pose "he just has his arm out", throwing, not pulling): this clip for as long as
+# the foe is on the line, 63 EmoteUseStanding (both hands working at chest height). Swap it after
+# a look in game (.es tune ability.reverse_grapple.pull_clip <clip>); `pull_from` borrows another
+# character model's take on it ("ScourgeFemale").
+pull_clip = 63
 effects = [{ kind = "pull", amount = 25.0, from_caster = true }, { kind = "stagger", secs = [1.0, 1.0] }]
 
 # 1, the second choice: Disengage as retail has it: on the key press, mid-jump or falling too.

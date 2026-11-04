@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 23
+local VERSION = 24
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -763,6 +763,7 @@ function ES.SwingLine(f)
   -- another model's take when the ability names one (the same on every race).
   if kind == "cast" then
     if mine then guid = "player" end
+    if from and PreloadAnimationSource then PreloadAnimationSource(from) end
     PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, nil, from)
     return
   end
