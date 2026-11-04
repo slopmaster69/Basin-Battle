@@ -1202,7 +1202,7 @@ impl SurvivalGame {
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
-                // another model's clips; `ac11` puts their bones back to rest after; `ac13` draws an
+                // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
                 // object stretched from end to end (Tripwire's rope).
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {

@@ -60,13 +60,13 @@ const GO_FLAGS_INERT: u32 = 0x10 | 0x20;
 /// and tinted light blue (`PREVIEW_GHOST`): a station being placed, and its ring.
 pub(crate) const GO_FLAG_PREVIEW_MOVE: u32 = 0x1000_0000;
 pub(crate) const GO_FLAG_PREVIEW_GHOST: u32 = 0x2000_0000;
-/// Ours, read by client patch 0020: drawn longer along the model's X axis by the factor
+/// Ours, read by client patch 0027: drawn longer along the model's X axis by the factor
 /// `GAMEOBJECT_LEVEL` holds as an `f32`'s bits (a rope from one point to another).
 pub(crate) const GO_FLAG_STRETCH_X: u32 = 0x4000_0000;
 /// The clients that draw a stretched object and patch 0027's displays (`ac19`): the rest are
 /// sent no rope (a short piece would lie at one end of the wire), and keep the strip.
 pub(crate) const ROPE_LEVEL: u8 = 19;
-/// Patch 0020's own display for the dwarven dig site's rope (`ExcavationRope.mdx`; the client's
+/// Patch 0027's own display for the dwarven dig site's rope (`ExcavationRope.mdx`; the client's
 /// `EXTRA_DISPLAYS`, which must change with this): a straight rope 3.18 yd along its X axis
 /// from its origin, 0.14 yd thick, a little above the ground.
 const ROPE_DISPLAY: u32 = 60_001;
