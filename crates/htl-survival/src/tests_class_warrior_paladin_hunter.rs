@@ -909,7 +909,8 @@ fn a_heros_own_trap_lays_no_circle_and_its_own_shapes_are_hidden_from_it() {
     let mut ev = click(&mut s, p);
     ev.extend(run(&mut s, 1.0));
     assert!(!s.traps.is_empty(), "the trap is set");
-    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "with no circle under it");
+    // The throw's shape alone (#142's lob), and that hidden from her.
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { tele, .. } if !tele.as_ref().is_some_and(|t| t.own_hidden && t.mob == p))), "with no circle under it");
     let t = Telegraph::hero_shape(p, 4.0, 360.0, 0.0, 1.0, None);
     assert!(t.own_hidden && t.mob == p, "hidden from its caster, shown to the rest");
 }
