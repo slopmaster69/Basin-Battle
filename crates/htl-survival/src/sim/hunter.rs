@@ -757,8 +757,10 @@ impl Survival {
         let tele = Telegraph::hero_shape(id, radius, 360.0, 0.0, VOLLEY_SECS, Some((at, 0.0)));
         self.mark_as(at, radius, VOLLEY_SECS + 0.2, Some(tele));
         for k in 0..n {
-            // Spread evenly over the circle (a sunflower's spiral), each a beat after the last.
-            let r = radius * ((k as f32 + 0.5) / n as f32).sqrt();
+            // Spread evenly over the circle (a sunflower's spiral), each a beat after the last;
+            // the first lands on the aimed spot itself (Corey's review: "the volley doesn't seem
+            // to go where the marker is": no arrow ever fell within 1.2 yd of its centre).
+            let r = radius * (k as f32 / n as f32).sqrt();
             let a = k as f32 * 2.399_963;
             let spot = self.ground_near(at[0] + a.cos() * r, at[1] + a.sin() * r, at[2] + 2.0);
             let land_at = now + 0.2 + VOLLEY_SECS * k as f32 / n as f32;

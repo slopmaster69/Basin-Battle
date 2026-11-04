@@ -4580,11 +4580,16 @@ kind = "projectile"
 valor = 25
 damage = [12.0, 12.0]
 range = [15.0, 15.0]
-radius = [0.35, 0.35]
+# Wide enough to bite a body the reticle sits on (Corey's review, run 040: "he went flying
+# further than the unit": at 0.35 a spear aimed at a creature's edge flew past it into the ground
+# behind, and the dive went there). And the bitten creature holds still for the dive, so the
+# hunter lands beside it, not where it stood.
+radius = [1.0, 1.0]
 speed = 60.0
 yank = true
 spell = 6533
 clip = 107
+effects = [{ kind = "stagger", secs = [0.6, 0.6] }]
 recast = "raptor_uppercut"
 recast_secs = 2.5
 
@@ -4685,8 +4690,10 @@ secs = 2.0
 aura = 1719
 spell = 5384
 # A counter and nothing else (Corey's review, Nov 3): unanswered, it's spent and on cooldown, with
-# no leap of its own.
-counter = { immune = true, once = true, answer = "trappers_leap" }
+# no leap of its own. A dodge, not a block: the blow misses, and the hunter never raises a shield
+# to it (Corey's review, run 040: "you missed the timing on the actual dodge"). The answer comes
+# as the blow commits, before the blade lands (`sim/mobs.rs`, the wind-up's lock).
+counter = { immune = true, dodge = true, once = true, answer = "trappers_leap" }
 
 # What Trapper's Instinct does when it's struck: away, the net on whoever struck, arrows scattered.
 [[ability]]

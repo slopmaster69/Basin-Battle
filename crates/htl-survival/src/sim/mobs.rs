@@ -1910,6 +1910,25 @@ impl Survival {
                         self.go(id, to, lunge / LUNGE_SECS);
                     }
                 }
+                // A hero readied to counter with a leap (Trapper's Instinct) answers as the blow
+                // commits, at the facing lock, not as it lands: the dodge begins before the blade
+                // arrives, as a dodge should (Corey's review, run 040: "you missed the timing on
+                // the actual dodge"). The stance ends with the answer, so the blow then finds
+                // nothing to catch and resolves as it would on anyone.
+                if let Foe::Hero(h) = foe {
+                    if !a.ranged && t2 >= a.windup - a.lock {
+                        let leaps = self
+                            .stances
+                            .get(&h)
+                            .filter(|s| s.until > now)
+                            .and_then(|s| self.content.abilities[s.ability].counter.as_ref())
+                            .and_then(|c| self.content.ability(&c.answer))
+                            .is_some_and(|ans| self.content.abilities[ans].kind == "leap");
+                        if leaps && self.foe_pos(foe).is_some_and(|at| dist2d(self.mobs[&id].pos, at) <= a.range + 1.0) {
+                            self.counter_catch(h, id, super::abilities::HitKind::Melee, None);
+                        }
+                    }
+                }
                 let mut shown = shown;
                 if !a.ranged && !shown && t2 >= a.windup - ANIM_LEAD {
                     shown = true;
