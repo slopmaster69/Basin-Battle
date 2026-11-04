@@ -413,6 +413,12 @@ impl Survival {
         if (was_eating || was_gathering) && !eating {
             self.events.push(Event::CastEnd { caster: id });
         }
+        // A meal puts the weapons away for its while and takes them out again after (Corey's
+        // review: the bread in one hand, the axe still in the other). The hero's own toggle
+        // (`sheathed`) is left as it was; the gear shows the meal (`gear_fields`).
+        if matches!(p.action, Action::Eat { .. }) != was_eating {
+            self.events.push(Event::Gear { player: id });
+        }
         if guard != was_guard {
             self.events.push(Event::Guard { player: id, up: guard });
         }
@@ -1026,6 +1032,8 @@ impl Survival {
                     }
                     self.events.push(Event::CastEnd { caster: id });
                     self.players.get_mut(&id).unwrap().action = Action::Ready;
+                    // The weapons out again (set straight, not through `set_action`).
+                    self.events.push(Event::Gear { player: id });
                     self.finish_commitment(id);
                 } else if let Some(p) = self.players.get_mut(&id) {
                     p.action = Action::Eat { t: t + dt, item };

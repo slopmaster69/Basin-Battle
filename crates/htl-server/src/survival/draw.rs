@@ -556,7 +556,9 @@ impl SurvivalGame {
             f.set(idx::PLAYER_VISIBLE_ITEM_1_0 + 12 * slot as u16, entry);
         }
         let kit = self.sim.players.get(&id).map_or(Kit::Melee, |p| p.kit);
-        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed);
+        // Put away for a meal too, the hero's own toggle untouched (Corey's review: eating with
+        // the axe still in hand).
+        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed || matches!(p.action, htl_survival::Action::Eat { .. }));
         // Weapons out: the axe and shield in hand, or the bow; put away (R), on the back.
         f.set(idx::UNIT_BYTES_2, if sheathed { 0 } else if kit == Kit::Bow { 2 } else { 1 });
         if let Some(p) = self.sim.players.get(&id) {
