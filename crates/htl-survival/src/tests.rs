@@ -971,14 +971,22 @@ fn a_giant_is_too_heavy_to_parry_a_timed_guard_only_blocks_it() {
     // No word says why: a shield's dull thud (no parry's clang) and the view shoved hard.
     assert!(crate::sim::cues::seen::sounded(&ev, p, crate::sim::cues::SOUND_TOO_HEAVY), "the guard's thud");
     assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_TOO_HEAVY), "driven into the guard");
-    // Louder than a plain block, so it reads with no word: the heavy impact and dust on the hero,
-    // and a skid back away from the giant (not a throw).
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_HEAVY)), "the heavy impact on the hero");
+    // Louder than a plain block, so it reads with no word: dust at the hero's feet and a step's
+    // shove back away from the giant (a skid, not a throw). Not Heroic Strike's red-orange flash:
+    // red says damage taken, and the guard took it all (Corey, round 3).
+    assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_HEAVY)), "no heavy impact's flash on the hero");
     assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_DUST)), "dust at their feet");
-    assert!(
-        ev.iter().any(|e| matches!(e, Event::Hop { player, dir, lift, .. } if *player == p && *lift < 1.0 && angle_between(*dir, std::f32::consts::PI) < 1.0)),
-        "skidded back, away from the giant: {ev:?}"
-    );
+    let hop = ev.iter().find_map(|e| match e {
+        Event::Hop { player, dir, speed, lift, roll, .. } if *player == p => Some((*dir, *speed, *lift, *roll)),
+        _ => None,
+    });
+    let (dir, speed, lift, roll) = hop.expect("shoved back");
+    assert!(angle_between(dir, std::f32::consts::PI) < 1.0, "away from the giant: {dir}");
+    assert!(!roll, "no tumble: the guard stays up");
+    // How far a knockback carries: its speed over its time in the air (gravity 19.29 yd/s²).
+    let yards = speed * 2.0 * lift / 19.29;
+    assert!((yards - crate::sim::TOO_HEAVY_PUSH).abs() < 0.05, "a step back, 1.5 yd: {yards} ({speed} at {lift})");
+    assert!(lift < 2.0 && lift * lift / (2.0 * 19.29) < 0.1, "a skid along the ground, not a throw: lift {lift}");
     assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
     // A humanoid boss can still be parried.
     let mut s = world();
