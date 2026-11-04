@@ -13,3 +13,4 @@ logs/
 /tools/clip-census/target
 /tools/*/Cargo.lock
 __pycache__/
+/dist/windows/buttons/target

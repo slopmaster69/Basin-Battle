@@ -226,6 +226,36 @@ fn both_realms_are_listed_and_basin_battle_still_plays() {
     assert!(addon_lines(&sv, "BB").is_empty() && addon_lines(&sv, "ES").is_empty(), "no reply to the Basin's add-on");
 }
 
+/// The names are the host's to choose (project.toml, passed as --realm and --survival-realm): a
+/// renamed game is listed, entered and played under its new name, and its add-on still wakes.
+#[test]
+fn renamed_realms_are_listed_and_played_under_their_new_names() {
+    let config = Config {
+        bind: "127.0.0.1".into(),
+        login_port: 0,
+        world_port: 0,
+        realm_name: "Last Stand".into(),
+        survival: Some(SurvivalSetup {
+            world_port: 0,
+            realm_name: "Hearthwood".into(),
+            save: None,
+            content: content(),
+            land: Box::new(htl_survival::FlatLand::default()),
+            below: Vec::new(),
+            siege: None,
+        }),
+        ..Config::default()
+    };
+    let server = htl_server::start_games(config, None).expect("server starts");
+    let logon = benilla_protocol::logon(&format!("127.0.0.1:{}", server.login.port()), "fen", "hold", u32::from_be_bytes(*b"enUS")).unwrap();
+    let names: Vec<&str> = logon.realms.iter().map(|r| r.name.as_str()).collect();
+    assert_eq!(names, ["Hearthwood"], "only the survival game runs here, under its new name");
+    let mut c = Client::connect(server.login, "fen", "hold", "Hearthwood").expect("into the renamed realm");
+    let _ = enter(&mut c);
+    c.chat(".es hello 1");
+    assert!(c.until(1.0, |c| addon_lines(c, "ES").iter().any(|l| l.starts_with("V\t"))), "its add-on is greeted as before");
+}
+
 #[test]
 fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     let server = start_with(None, false);
@@ -1765,4 +1795,107 @@ fn the_bookmakers_week_is_shown_once_as_a_hero_comes_in_and_again_on_asking() {
     assert_eq!(weeks(&c), 1, "once a week");
     c.chat(".es news");
     assert!(c.until(2.0, |c| weeks(c) == 2), "on asking");
+}
+
+/// The client flies a missile only from a unit (a game object's cast has no caster unit, and it
+/// draws nothing), and places a unit only after the frame that made it. So a missile from a spot
+/// comes from an unseen creature made there: its own template, shrunk to nothing, never
+/// selectable, made in an earlier packet than its cast, which flies at `me` without naming them
+/// struck (the client plays a spell's impact on whoever it names struck, and the Axe Throw's
+/// knocked its own warrior down as he caught it). Each such cast of `spell`: the creature's guid
+/// and where it stood.
+fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
+    let all = placed(c);
+    let mut out = Vec::new();
+    for (k, p) in c.seen.iter().enumerate() {
+        let ServerPacket::SpellGo(g) = p else { continue };
+        if g.spell_id != spell || g.caster == me {
+            continue;
+        }
+        assert!(!g.hits.contains(&me), "not naming the hero struck: {:?}", g.hits);
+        assert_eq!(g.targets.unit_target, Some(me), "homing on them");
+        assert!(c.seen[..k].iter().any(|q| creates_guid(q, g.caster)), "its caster {:#x} made before it casts", g.caster);
+        let (_, kind, at, f) = all.iter().find(|(x, ..)| *x == g.caster).cloned().expect("its caster made");
+        assert_eq!(kind, ObjectType::Unit, "a unit: the client launches from nothing else");
+        assert_eq!(((g.caster >> 24) & 0xFF_FFFF) as u32, 69_000, "the stand-ins' own template");
+        assert!(field(&f, 4).map(f32::from_bits).is_some_and(|s| s < 0.01), "shrunk to nothing");
+        assert!(field(&f, 46).is_some_and(|u| u & 0x0200_0000 != 0), "never selectable: no nameplate, no name");
+        out.push((g.caster, at));
+    }
+    out
+}
+
+#[test]
+fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_arrow_stands_over_its_ring() {
+    let server = start_content(None, false, content());
+    let mut c = Client::connect(server.login, "corey", "hold", REALM).unwrap();
+    let me = enter(&mut c);
+    c.chat(".es hello 5 ac5");
+    c.chat(".es cd off");
+    c.drain(0.6);
+
+    // The Hurled Axe, called back early from where it is (its key again): its way back flies
+    // from where it turned to the thrower.
+    c.chat(".es slot q hurled_axe");
+    c.drain(0.2);
+    c.chat(".es in ab 0 0 0.0 0.0");
+    c.chat(".es in a 0.0 0.0");
+    c.chat(".es in au 0.0 0.0");
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::SpellGo(g) if g.spell_id == 16075 && g.caster == me)).is_some(), "thrown");
+    c.drain(0.4);
+    c.chat(".es in ab 0 0 0.0 0.0");
+    assert!(c.until(1.5, |c| !stand_in_casts(c, 16075, me).is_empty()), "the way back flies");
+    let back = stand_in_casts(&c, 16075, me);
+    assert_eq!(back.len(), 1, "one way back");
+
+    // Two Aimed Shots into the ground ahead: each arrow stands where it ends, at its model's own
+    // size, with a friend's ring under it for an add-on that lays one.
+    c.chat(".es slot q aimed_arrow");
+    c.drain(0.2);
+    for _ in 0..2 {
+        c.chat(".es in ab 0 0 0.0 -0.15");
+        c.chat(".es in a 0.0 -0.15");
+        c.drain(0.5);
+        c.chat(".es in au 0.0 -0.15");
+        c.drain(1.2);
+    }
+    let arrows = objects_with(&c, 2630);
+    assert_eq!(arrows.len(), 2, "two arrows in the ground");
+    for (g, _) in &arrows {
+        let f = placed(&c).into_iter().find(|(x, ..)| x == g).unwrap().3;
+        assert_eq!(field(&f, 4).map(f32::from_bits), Some(1.0), "at its model's own size");
+    }
+    let rings: Vec<Vec<String>> = addon_lines(&c, "ES").into_iter().filter(|l| l.starts_with("MK\t")).map(|l| l.split('\t').map(str::to_string).collect::<Vec<String>>()).filter(|f| f.len() == 8 && f[7] == "1").collect();
+    assert_eq!(rings.len(), 2, "a friend's ring under each: {rings:?}");
+    for r in &rings {
+        let (x, y): (f32, f32) = (r[2].parse().unwrap(), r[3].parse().unwrap());
+        assert!(arrows.iter().any(|(_, a)| (a[0] - x).hypot(a[1] - y) < 0.2), "under an arrow: {r:?} {arrows:?}");
+    }
+
+    // Arrow Recall (Tripwire's EX): each arrow leaves the ground, its ring with it, and flies from
+    // where it stood to the hunter, an arrow on the wire.
+    c.chat(".es slot 2 tripwire");
+    c.chat(".es valor full");
+    c.drain(0.2);
+    c.chat(".es in ab 3 1");
+    assert!(c.until(1.5, |c| stand_in_casts(c, 19434, me).len() == 2), "each arrow flies home");
+    let home = stand_in_casts(&c, 19434, me);
+    for (g, _) in &arrows {
+        assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if guid == g)), "its arrow leaves the ground");
+    }
+    for r in &rings {
+        assert!(c.until(0.5, |c| addon_lines(c, "ES").iter().any(|l| *l == format!("MK\t{}", r[1]))), "its ring goes: {r:?}");
+    }
+    for (_, at) in &home {
+        assert!(arrows.iter().any(|(_, a)| (a[0] - at[0]).hypot(a[1] - at[1]) < 0.3), "from where an arrow stood: {at:?} {arrows:?}");
+    }
+    assert!(
+        c.seen.iter().all(|p| !matches!(p, ServerPacket::SpellGo(g) if g.spell_id == 19434 && g.caster != me && g.ammo_display_id != Some(2414))),
+        "an arrow flies"
+    );
+    // Home, the stand-ins go.
+    c.drain(2.5);
+    for (g, _) in home.iter().chain(&back) {
+        assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if guid == g)), "its stand-in {g:#x} goes");
+    }
 }

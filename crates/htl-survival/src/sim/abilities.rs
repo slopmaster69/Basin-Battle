@@ -736,7 +736,7 @@ impl Survival {
             let ms = if d.kind == "shot" { DRAW_HOLD_MS } else { ((hi + d.hold.max(0.5)) * 1000.0) as u32 };
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
-            self.events.push(Event::Clip { id, clip: HOLD_THROWN, secs: hi + d.hold.max(0.5) });
+            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5) });
         }
         let _ = lo;
     }
@@ -885,7 +885,7 @@ impl Survival {
         if d.clip != 0 && d.kind != "art" {
             // A stance holds its clip while it lasts (Feign Death lies there).
             let secs = if d.kind == "stance" { d.secs } else { CAST_RECOVERY + 0.2 };
-            self.events.push(Event::Clip { id, clip: d.clip, secs });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs });
         }
         // The bow's own release before the sword comes back (a crossbow's long reload).
         let total = if d.kind == "shot" { self.ranged_of(&self.players[&id]).recovery.max(CAST_RECOVERY) } else { CAST_RECOVERY };
@@ -1564,7 +1564,7 @@ impl Survival {
         let next = self
             .mobs
             .iter()
-            .filter(|(m, x)| x.health > 0 && !x.hidden && !hit.contains(m) && !self.content.mobs[x.def].inert() && dist2d(x.pos, at) <= range)
+            .filter(|(m, x)| x.health > 0 && !x.hidden && !hit.contains(m) && !self.content.mobs[x.def].totem && dist2d(x.pos, at) <= range)
             .map(|(m, x)| (*m, dist2d(x.pos, at)))
             .chain(self.players.iter().filter(|(h, x)| self.hostile(p.owner, **h) && x.health > 0 && !hit.contains(h) && dist2d(x.pos, at) <= range).map(|(h, x)| (*h, dist2d(x.pos, at))))
             .min_by(|a, b| {
@@ -2204,7 +2204,7 @@ impl Survival {
     fn area_tick(&mut self, owner: Id, ability: usize, at: Vec3, radius: f32, dps: f32) {
         let d = self.content.abilities[ability].clone();
         let ff = self.content.pvp.friendly_fire;
-        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| m.health > 0 && dist2d(m.pos, at) <= radius && !self.own_totem(**mid, owner) && !self.content.mobs[m.def].inert()).map(|(id, _)| *id).collect();
+        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| m.health > 0 && dist2d(m.pos, at) <= radius && !self.own_totem(**mid, owner) && !self.content.mobs[m.def].totem).map(|(id, _)| *id).collect();
         let damage = dps.round().max(1.0) as u32;
         for m in &mobs {
             if dps > 0.0 {
@@ -2384,7 +2384,7 @@ impl Survival {
                 let foes: Vec<Id> = self
                     .mobs
                     .iter()
-                    .filter(|(mid, m)| **mid != t.mob && m.health > 0 && !self.content.mobs[m.def].inert() && dist2d(m.pos, at) <= radius)
+                    .filter(|(mid, m)| **mid != t.mob && m.health > 0 && !self.content.mobs[m.def].totem && dist2d(m.pos, at) <= radius)
                     .map(|(id, _)| *id)
                     .chain(self.players.iter().filter(|(h, p)| self.hostile(t.owner, **h) && !self.spared(t.owner, **h, t.ability) && p.health > 0 && dist2d(p.pos, at) <= radius).map(|(h, _)| *h))
                     .collect();

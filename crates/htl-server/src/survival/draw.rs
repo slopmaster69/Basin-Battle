@@ -60,8 +60,12 @@ pub(crate) const GO_FLAG_PREVIEW_GHOST: u32 = 0x2000_0000;
 /// green rune ring for a spot that's good.
 const DANGER_DISPLAY: u32 = 5812;
 const DANGER_MODEL_RADIUS: f32 = 6.48;
-/// A missile's anchor (see [`SurvivalGame::anchor_create`]) is that circle shrunk to nothing.
-const ANCHOR_SCALE: f32 = 0.001;
+/// A missile's stand-in (see [`SurvivalGame::stand_in_create`]): a creature of its own template,
+/// a grunt's body shrunk to nothing (a body with the casting animations, so the cast's release
+/// comes as it does for anyone).
+const STAND_IN_ENTRY: u32 = 69_000;
+const STAND_IN_DISPLAY: u32 = 1359;
+const STAND_IN_SCALE: f32 = 0.001;
 const GOOD_RING_DISPLAY: u32 = 674;
 
 /// Equipment slots, as the client numbers them.
@@ -271,6 +275,12 @@ impl SurvivalGame {
         // One of the camp's people: a humanoid with their trade under their name.
         if let Some(d) = entry.checked_sub(RESIDENT_ENTRY).and_then(|k| self.sim.content.props.get(k as usize)).filter(|d| d.npc) {
             let info = CreatureInfo { entry, name: &d.name, subname: &d.subname, creature_type: 7, rank: 0, display_id: d.display };
+            self.send(conn, packets::creature_query_response(&info));
+            return;
+        }
+        // A missile's stand-in: nameless (nothing to show if a name were ever drawn).
+        if entry == STAND_IN_ENTRY {
+            let info = CreatureInfo { entry, name: "", subname: "", creature_type: 10, rank: 0, display_id: STAND_IN_DISPLAY };
             self.send(conn, packets::creature_query_response(&info));
             return;
         }
@@ -812,14 +822,38 @@ impl SurvivalGame {
         }
     }
 
-    /// An unseen object standing at `pos` to fly a missile from there, not from a unit (a
-    /// boomerang turning back): its guid, and the packet that makes it. It's gone with the
-    /// rules' `ObjGone` of `id`.
-    pub(crate) fn anchor_create(&mut self, id: Id, pos: [f32; 3]) -> (u64, Packet) {
-        let entry = self.go_entry(DANGER_DISPLAY, "", GO_TYPE_GENERIC);
-        let guid = object_guid(entry, id);
+    /// An unseen creature standing at `pos` to fly a missile from there (a boomerang turning
+    /// back, an arrow called home): its guid, and the packet that makes it. A unit, as the client
+    /// launches a missile only from one: a game object's cast has no caster unit, and the client
+    /// draws nothing for it. Never selectable (no nameplate, no name, no tooltip), friendly to all.
+    pub(crate) fn stand_in_create(&mut self, id: Id, pos: [f32; 3]) -> (u64, Packet) {
+        let guid = creature_guid(STAND_IN_ENTRY, id);
         self.bind(id, guid);
-        (guid, Self::go_packet(guid, entry, DANGER_DISPLAY, GO_TYPE_GENERIC, GO_FLAGS_INERT, ANCHOR_SCALE, pos, 0.0))
+        let look = UnitLook {
+            guid,
+            entry: STAND_IN_ENTRY,
+            display_id: STAND_IN_DISPLAY,
+            scale: STAND_IN_SCALE,
+            level: 1,
+            faction: fields::FACTION_FRIENDLY,
+            health: 1,
+            max_health: 1,
+            attack_ms: 2000,
+            damage: [1, 1],
+            run_speed: 7.0,
+            npc_flags: 0,
+            unit_flags: UNIT_FLAG_NON_ATTACKABLE | fields::UNIT_FLAG_NOT_SELECTABLE,
+            main_hand: 0,
+            main_hand_info: 0,
+            off_hand: 0,
+            ranged: 0,
+        };
+        let f = fields::unit_fields(&look);
+        let p = packets::update_object(
+            &[Create { guid, object_type: packets::TYPE_UNIT, is_self: false, placement: Placement::Living { pos, facing: 0.0, speeds: packets::speeds(7.0) }, fields: &f }],
+            &[],
+        );
+        (guid, p)
     }
 
     /// A danger circle drawn to `radius`.

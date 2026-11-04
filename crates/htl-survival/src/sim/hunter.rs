@@ -16,9 +16,12 @@ use crate::land::clear_line;
 /// place).
 pub const PLANT_SECS: f32 = 6.0;
 pub const PLANT_MOST: usize = 12;
-/// How it looks stuck in the ground: a big brown feather, the fletching standing up.
-const PLANT_LOOK: u32 = 2630;
-const PLANT_SCALE: f32 = 0.45;
+/// How it looks stuck in the ground: a big brown feather, the fletching standing up, at its
+/// model's own size (at 0.45 it was too small to tell from the ground in a fight).
+pub const PLANT_LOOK: u32 = 2630;
+pub const PLANT_SCALE: f32 = 1.0;
+/// And a friend's green ring on the ground under it, this wide, that reads from across a fight.
+pub const PLANT_RING: f32 = 0.5;
 /// A tripwire's arrows plant this far each side of its middle; it trips anything within this of
 /// the wire.
 const WIRE_REACH: f32 = 0.7;
@@ -84,6 +87,8 @@ pub struct Planted {
     pub pos: Vec3,
     pub until: f32,
     pub obj: Id,
+    /// Its ring on the ground.
+    pub mark: Id,
 }
 
 /// A tripwire: its two anchors, until when, and which side of it each creature near it was on
@@ -169,13 +174,15 @@ impl Survival {
         let facing = self.rng.gen::<f32>() * std::f32::consts::TAU;
         self.objs.insert(obj, Obj { kind: ObjKind::Prop { display: PLANT_LOOK, scale: PLANT_SCALE }, pos, facing });
         self.events.push(Event::ObjSpawned { id: obj });
-        self.hunt.planted.push(Planted { owner, pos, until: now + secs, obj });
+        let mark = self.mark_kind(pos, PLANT_RING, secs, true);
+        self.hunt.planted.push(Planted { owner, pos, until: now + secs, obj, mark });
     }
 
     fn unplant(&mut self, a: &Planted) {
         if self.objs.remove(&a.obj).is_some() {
             self.events.push(Event::ObjGone { id: a.obj });
         }
+        self.unmark(a.mark);
     }
 
     /// A hero's planted arrows, where they stand.
@@ -313,7 +320,7 @@ impl Survival {
         let mut out: Vec<(Id, Vec3)> = self
             .mobs
             .iter()
-            .filter(|(m, x)| x.health > 0 && !x.hidden && !self.content.mobs[x.def].inert() && !self.own_totem(**m, owner) && dist2d(x.pos, at) <= reach)
+            .filter(|(m, x)| x.health > 0 && !x.hidden && !self.content.mobs[x.def].totem && !self.own_totem(**m, owner) && dist2d(x.pos, at) <= reach)
             .map(|(m, x)| (*m, x.pos))
             .collect();
         if self.content.pvp.friendly_fire {

@@ -593,3 +593,79 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     let want = d.delay - d.look_lead;
     assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
 }
+
+/// A training dummy is there to practice on: crowd control takes hold on it and a knockback
+/// throws it, as on any foe, though a step at most, so it stays about where it was put up.
+#[test]
+fn a_training_dummy_takes_crowd_control_and_a_knockback_a_step_at_most() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_dummy(p, "").unwrap();
+    let d = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].dummy).expect("a dummy").0;
+    let from = s.mobs[&d].pos;
+    let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: 6.0, from_caster: true, ..Default::default() };
+    s.displace(p, d, &push);
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    let moved = ((s.mobs[&d].pos[0] - from[0]).powi(2) + (s.mobs[&d].pos[1] - from[1]).powi(2)).sqrt();
+    assert!(moved > 0.3 && moved <= 1.05, "thrown a step, not 6 yd: {moved:.2}");
+    assert!(s.apply_cc(d, p, "root", 2.0, 0.0, 0.0, "test"), "a root takes hold on a dummy");
+    assert!(s.has_cc(d, "root"));
+}
+
+#[test]
+fn a_training_dummy_stays_a_step_from_home_and_a_panic_never_turns_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_dummy(p, "guard").unwrap();
+    let d = *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].dummy).expect("a dummy").0;
+    let home = s.mobs[&d].pos;
+    // Ten knockbacks, each a step: still about where it was put up.
+    let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: 6.0, from_caster: true, ..Default::default() };
+    for _ in 0..10 {
+        s.displace(p, d, &push);
+        for _ in 0..20 {
+            let _ = s.step(0.05);
+        }
+    }
+    let off = ((s.mobs[&d].pos[0] - home[0]).powi(2) + (s.mobs[&d].pos[1] - home[1]).powi(2)).sqrt();
+    assert!(off <= 1.05, "ten throws, still a step from home at most: {off:.2}");
+    // A panic: it can't run, so it stays facing the hero and keeps its guard.
+    let at = s.mobs[&d].pos;
+    let facing = s.mobs[&d].facing;
+    assert!(s.dummy_guards(d, [0.0, 0.0, 0.0]), "guarding the hero before");
+    assert!(s.apply_cc(d, p, "panic", 2.0, 0.0, 0.0, "test"));
+    for _ in 0..80 {
+        let _ = s.step(0.05);
+    }
+    assert_eq!(s.mobs[&d].facing, facing, "not turned by the panic");
+    assert_eq!(s.mobs[&d].pos, at, "not moved by it");
+    assert!(s.dummy_guards(d, [0.0, 0.0, 0.0]), "still guarding the hero after");
+}
+
+#[test]
+fn an_abilitys_own_clip_comes_from_the_model_it_names_on_every_race() {
+    // The same take of the same model for every hero, whatever their race (a cast's clip, and a
+    // weapon art's blow); an ability naming no model plays the hero's own.
+    let mut s = world();
+    let frost = s.content.ability("frostbolt").unwrap();
+    s.content.abilities[frost].clip = 57;
+    s.content.abilities[frost].take = 2;
+    s.content.abilities[frost].from = Some("TaurenMale".into());
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    slot(&mut s, p, "ranged", "frostbolt");
+    let mut ev = cast(&mut s, p, "ranged", false, 1.2);
+    ev.extend(run(&mut s, 0.5));
+    let clip = ev.iter().find_map(|e| match e {
+        Event::Clip { id, clip, take, from, .. } if *id == p => Some((*clip, *take, from.clone())),
+        _ => None,
+    });
+    assert_eq!(clip, Some((57, 2, Some("TaurenMale".to_string()))));
+    let art = s.content.abilities.iter().position(|a| a.kind == "art").expect("a weapon art in the rules");
+    s.content.abilities[art].clip = 58;
+    s.content.abilities[art].take = 1;
+    s.content.abilities[art].from = Some("TaurenMale".into());
+    let strike = s.art_strike(p, art);
+    assert_eq!((strike.clip, strike.take, strike.from.as_deref()), (58, 1, Some("TaurenMale")));
+}
