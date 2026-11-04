@@ -66,6 +66,20 @@ pub(crate) const GO_FLAG_STRETCH_X: u32 = 0x4000_0000;
 /// The clients that draw a stretched object and patch 0027's displays (`ac19`): the rest are
 /// sent no rope (a short piece would lie at one end of the wire), and keep the strip.
 pub(crate) const ROPE_LEVEL: u8 = 19;
+/// The clients that draw a missile's look (patch 0029's `SetMissileLook`, `ac20`): a ribbon
+/// behind it, its size and a spin (the `ML` line).
+pub(crate) const MISSILE_LOOK_LEVEL: u8 = 20;
+
+/// The add-on's `ML` line for a spell's missiles: `ML <spell> <RRGGBB or -> <width> <secs>
+/// <scale> <spin> [<caster's guid, for its next missile alone>]`.
+pub(crate) fn missile_look_line(spell: u32, trail: &str, width: f32, secs: f32, scale: f32, spin: f32, caster: Option<u64>) -> String {
+    let trail = if trail.is_empty() { "-" } else { trail };
+    let mut line = format!("ML\t{spell}\t{trail}\t{width:.2}\t{secs:.2}\t{scale:.2}\t{spin:.2}");
+    if let Some(g) = caster {
+        line += &format!("\t0x{g:016X}");
+    }
+    line
+}
 /// Patch 0027's own display for the dwarven dig site's rope (`ExcavationRope.mdx`; the client's
 /// `EXTRA_DISPLAYS`, which must change with this): a straight rope 3.18 yd along its X axis
 /// from its origin, 0.14 yd thick, a little above the ground.
@@ -1264,6 +1278,12 @@ fn grip_info(grip: &str) -> u32 {
 
 #[cfg(test)]
 mod rope_tests {
+    #[test]
+    fn a_missile_look_line_says_each_field_and_a_caster_only_when_its_for_one_missile() {
+        assert_eq!(super::missile_look_line(19434, "F2E6C8", 0.18, 0.3, 1.0, 0.0, None), "ML\t19434\tF2E6C8\t0.18\t0.30\t1.00\t0.00");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, Some(0xF130_0000_0000_002A)), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t0xF13000000000002A");
+    }
+
     use super::rope_rotation;
 
     /// The model's X axis turned by a rotation (x y z w).

@@ -1186,6 +1186,10 @@ impl Survival {
             // The look: flown to where it would end if nothing moved, never after a unit (a
             // boomerang's to where it turns, as it flies on through bodies).
             let end = if d.returns { self.wall_trace(from, dir, range, id).point } else { self.trace_with(from, dir, range, radius, id, d.friends()).point };
+            // Its ribbon's first colour (Bank Shot's, before it has bounced).
+            if !d.bounce_trail.is_empty() {
+                self.events.push(Event::MissileTint { caster: id, spell, ability, bounce: 0 });
+            }
             self.events.push(Event::Missile { caster: id, spell, target: Target::Point(end) });
             let born = self.clock;
             self.projectiles.push(Projectile {
@@ -1403,6 +1407,10 @@ impl Survival {
         let anchor = self.alloc();
         let end = self.look_end(p);
         self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: p.spell, from: p.pos, target: Target::Point(end) });
+        // Hotter each bounce (Corey's review): the arrow flown on takes its bounce's colour.
+        if !self.content.abilities[p.ability].bounce_trail.is_empty() {
+            self.events.push(Event::MissileTint { caster: anchor, spell: p.spell, ability: p.ability, bounce: p.bounced.min(255) as u8 });
+        }
         if flash != 0 {
             self.events.push(Event::Missile { caster: anchor, spell: flash, target: Target::Point(at) });
         }

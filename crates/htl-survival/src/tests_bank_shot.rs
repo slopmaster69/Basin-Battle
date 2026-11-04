@@ -179,6 +179,41 @@ fn bank_shot_banks_twice_down_a_corridor_then_plants_in_the_third_wall() {
 }
 
 #[test]
+fn bank_shots_arrow_takes_a_hotter_colour_each_bounce_for_its_own_leg() {
+    // Corey's review: "every bounce should change the color of the trail". Each leg is flown by its
+    // own stand-in, so its colour is named for that one alone, after it's made.
+    let mut s = world(Box::new(Walls { east: 4.0, west: Some(-4.0) }));
+    let p = hero(&mut s, ORIGIN);
+    let mut ev = shoot(&mut s, p, false, (std::f32::consts::FRAC_PI_4, 0.0));
+    ev.extend(run_pinned(&mut s, 2.5, &[]));
+    let tints: Vec<(Id, u8)> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::MissileTint { caster, spell: ARROW, bounce, .. } => Some((*caster, *bounce)),
+            _ => None,
+        })
+        .collect();
+    let l = legs(&ev, p, ARROW);
+    assert_eq!(tints, vec![(p, 0), (l[0].0, 1), (l[1].0, 2)], "the hunter's arrow, then each leg's own");
+    let bank = s.content.ability("bank_shot").unwrap();
+    assert_eq!(s.content.abilities[bank].bounce_trail.len(), 3, "a colour for each");
+    for (anchor, _, _) in &l {
+        let made = ev.iter().position(|e| matches!(e, Event::MissileFrom { anchor: a, .. } if a == anchor)).unwrap();
+        let tint = ev.iter().position(|e| matches!(e, Event::MissileTint { caster, .. } if caster == anchor)).unwrap();
+        assert!(made < tint, "the stand-in is made before its colour is named");
+    }
+    // An arrow with no colours of its own (Aimed Shot's) names none.
+    s.slot_ability(p, "ranged", "aimed_arrow").unwrap();
+    s.input(p, Input::Ability(0, false));
+    let mut ev = s.step(DT);
+    s.input(p, Input::Attack);
+    ev.extend(run_pinned(&mut s, 0.6, &[]));
+    s.input(p, Input::AttackUp);
+    ev.extend(run_pinned(&mut s, 1.0, &[]));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileTint { .. })));
+}
+
+#[test]
 fn bank_shot_aimed_low_skips_off_the_ground_into_the_foe() {
     let mut s = world(Box::new(FlatLand::default()));
     let p = hero(&mut s, ORIGIN);
