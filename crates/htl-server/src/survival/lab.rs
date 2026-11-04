@@ -497,8 +497,9 @@ impl SurvivalGame {
         }
         let Some((pos, f)) = self.sim.players.get(&id).map(|p| (p.pos, p.facing)) else { return };
         let looks: [(u8, u8); 4] = [(2, 1), (3, 0), (4, 1), (6, 0)];
-        // The first two ahead, where an Intervene's reticle finds them; the rest at the sides.
-        let spots: [(f32, f32); 4] = [(6.0, 25.0), (6.0, -25.0), (3.0, 90.0), (3.0, -90.0)];
+        // The first two ahead, inside the 15° an Intervene's reticle looks along; the rest at the
+        // sides.
+        let spots: [(f32, f32); 4] = [(7.0, 10.0), (7.0, -10.0), (3.0, 90.0), (3.0, -90.0)];
         for k in 0..n.min(4) {
             let account = format!("{}{k}", htl_survival::sim::lab::LAB_ALLY);
             let a = self.sim.join(&account, &format!("Ally {}", k + 1), None);
