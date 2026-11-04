@@ -594,6 +594,8 @@ impl SurvivalGame {
         f.set(idx::UNIT_POWER1 + 3, p.stamina.round() as u32);
         if matches!(p.action, htl_survival::Action::Guard) {
             f.set(idx::UNIT_NPC_EMOTESTATE, self.guard_pose(id));
+        } else if let Some(pose) = self.poses.get(&id) {
+            f.set(idx::UNIT_NPC_EMOTESTATE, *pose);
         }
         self.gear_fields(id, &mut f);
         // The whole of the world map shown: every place is known from the start.

@@ -76,6 +76,11 @@ const LACERATE_DPS: f32 = 4.0;
 const LACERATE_SECS: f32 = 4.0;
 /// A bleed's look (Rend's).
 const BLEED_AURA: u32 = 772;
+/// Arrow Recall's hand: the arm goes out at the press (a held pose, `Emotes.dbc` STATE_POINT) and
+/// the arrows leave the ground this much later, into it; it comes down once the last is home
+/// (Corey's review: the hand came out late, after the arrows, with the one-shot point).
+pub const RECALL_POSE: u32 = 29;
+pub const RECALL_HAND_SECS: f32 = 0.25;
 /// Trapper's Instinct: the arrows scattered where the hunter stood, and how far round.
 const SCATTER: u32 = 5;
 const SCATTER_RING: f32 = 1.6;
@@ -150,6 +155,18 @@ pub(crate) struct Wire {
     pub mark: Id,
 }
 
+/// An Arrow Recall under way: the hand went out at the press; the arrows (taken off the ground's
+/// list then, so nothing else moves them) fly at `at`, and the hand comes down at `release_at`,
+/// once the last is home (set as they fly).
+#[derive(Debug, Clone)]
+pub(crate) struct Recall {
+    pub owner: Id,
+    pub ability: usize,
+    pub at: f32,
+    pub arrows: Vec<Planted>,
+    pub release_at: f32,
+}
+
 /// A tripwire's first arrow, planted, waiting for the key again to place the second: the ability
 /// that laid it (its wire's damage, life and effects), where it stands, and the ring round it.
 #[derive(Debug, Clone)]
@@ -219,6 +236,8 @@ pub struct Hunt {
     pub wild: BTreeMap<Id, Wild>,
     pub(crate) pounces: Vec<Pounce>,
     pub(crate) falls: Vec<Arrowfall>,
+    /// Arrow Recalls pressed, their arrows yet to fly or their hand yet to come down.
+    pub(crate) recalls: Vec<Recall>,
     /// Recalled arrows' looks on their way home: each one's unseen anchor, and when it's home.
     pub(crate) anchors: Vec<(Id, f32)>,
     /// Heroes floating down after Skyfall's volley (feather fall), until then at most.
@@ -315,6 +334,10 @@ impl Survival {
             for (a, _) in home {
                 self.events.push(Event::ObjGone { id: a });
             }
+        }
+        // After the anchors: the hand comes down in the tick the last arrow is home, after it.
+        if !self.hunt.recalls.is_empty() {
+            self.step_recalls();
         }
         if !self.hunt.falls.is_empty() {
             let (due, keep): (Vec<Arrowfall>, Vec<Arrowfall>) = std::mem::take(&mut self.hunt.falls).into_iter().partition(|f| f.land_at <= now);
@@ -533,26 +556,69 @@ impl Survival {
     // --- Arrow Recall ------------------------------------------------------------------------------
 
     /// Every arrow the hunter has planted flies back to them, striking every foe it passes through
-    /// (each once, at full damage); three arrows or more in one foe leave it Lacerated.
+    /// (each once, at full damage); three arrows or more in one foe leave it Lacerated. The hand
+    /// goes out at the press; the arrows follow it a moment later ([`fly_recall`]), and it comes
+    /// down once the last is home ([`step_recalls`]).
     fn recall_arrows(&mut self, id: Id, ability: usize) {
-        let d = self.content.abilities[ability].clone();
-        let Some(home) = self.players.get(&id).map(|p| p.pos) else { return };
+        if !self.players.contains_key(&id) {
+            return;
+        }
         let mine: Vec<Planted> = self.hunt.planted.iter().filter(|a| a.owner == id).cloned().collect();
         self.hunt.planted.retain(|a| a.owner != id);
         if mine.is_empty() {
             self.events.push(Event::Flash { player: id, text: "No arrows planted".into() });
             return;
         }
+        self.events.push(Event::Pose { id, pose: RECALL_POSE });
+        self.hunt.recalls.push(Recall { owner: id, ability, at: self.clock + RECALL_HAND_SECS, arrows: mine, release_at: f32::INFINITY });
+    }
+
+    /// Recalls pressed: their arrows fly at their time, and the hand comes down once the last is
+    /// home, or at once if the hunter is gone (dead or left) before then, their arrows with it.
+    fn step_recalls(&mut self) {
+        let now = self.clock;
+        let recalls = std::mem::take(&mut self.hunt.recalls);
+        let mut keep = Vec::new();
+        for mut r in recalls {
+            if !self.alive(r.owner) {
+                for a in &r.arrows {
+                    self.unplant(a);
+                }
+                self.events.push(Event::Pose { id: r.owner, pose: 0 });
+                continue;
+            }
+            if !r.arrows.is_empty() && r.at <= now {
+                let arrows = std::mem::take(&mut r.arrows);
+                r.release_at = self.fly_recall(r.owner, r.ability, &arrows);
+            }
+            if r.arrows.is_empty() && r.release_at <= now {
+                self.events.push(Event::Pose { id: r.owner, pose: 0 });
+                continue;
+            }
+            keep.push(r);
+        }
+        keep.extend(std::mem::take(&mut self.hunt.recalls));
+        self.hunt.recalls = keep;
+    }
+
+    /// The arrows fly home: each leaves the ground and strikes what it passes through on the way;
+    /// the time the last is home.
+    fn fly_recall(&mut self, id: Id, ability: usize, arrows: &[Planted]) -> f32 {
+        let d = self.content.abilities[ability].clone();
+        let Some(home) = self.players.get(&id).map(|p| p.pos) else { return self.clock };
         let radius = AbilityDef::at(d.radius, 1.0).max(0.4);
         let damage = AbilityDef::at(d.damage, 1.0);
         let mut struck: BTreeMap<Id, u32> = BTreeMap::new();
-        for a in &mine {
+        let mut last_home = self.clock;
+        for a in arrows {
             self.unplant(a);
             // Its look, flown home from where it stood.
             let anchor = self.alloc();
             let from = [a.pos[0], a.pos[1], a.pos[2] + 0.8];
             self.events.push(Event::MissileFrom { anchor, caster: id, spell: d.spell, from, target: Target::Unit(id) });
-            self.hunt.anchors.push((anchor, self.clock + dist2d(from, home) / d.speed.max(10.0) + 0.2));
+            let arrival = self.clock + dist2d(from, home) / d.speed.max(10.0) + 0.2;
+            self.hunt.anchors.push((anchor, arrival));
+            last_home = last_home.max(arrival);
             // Everyone on its way home.
             for (v, at) in self.foes_near(id, home, dist2d(a.pos, home) + 2.0) {
                 if seg_dist(a.pos, home, at) <= radius + 0.5 {
@@ -571,6 +637,7 @@ impl Survival {
                 self.apply_cc_look(v, id, "burn", secs, LACERATE_DPS, 0.0, "Lacerate", BLEED_AURA);
             }
         }
+        last_home
     }
 
     // --- Trapper's Instinct ------------------------------------------------------------------------
