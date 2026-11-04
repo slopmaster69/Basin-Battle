@@ -166,6 +166,20 @@ spell = 16979
 effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 
 [[ability]]
+key = "t_slam"
+name = "Slam"
+school = "druid"
+slot = "utility"
+kind = "leap"
+range = [12.0, 12.0]
+radius = [3.0, 3.0]
+damage = [10.0, 10.0]
+unmarked = true
+clip = 18
+from = "TaurenMale"
+spell = 16979
+
+[[ability]]
 key = "t_back"
 name = "Back"
 school = "hunter"
@@ -205,6 +219,25 @@ fn a_leap_lands_where_it_was_aimed_drawn_for_everyone_and_strikes_there() {
     run(&mut s, 0.8);
     assert!((s.players[&p].pos[0] - 12.0).abs() < 0.5, "landed: {:?}", s.players[&p].pos);
     assert!(s.mobs[&m].health < hp, "what's there is struck");
+}
+
+#[test]
+fn an_unmarked_leap_leaves_no_ring_and_its_swing_lands_as_it_does() {
+    let mut s = world(false, LEAPS);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = mob(&mut s, "grunt", [12.5, 0.0, 0.0]);
+    let ev = cast(&mut s, p, "t_slam");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "no ring where it comes down");
+    // One clip, from the borrowed model, its impact (half its length) as it lands.
+    let clips: Vec<_> = ev.iter().filter_map(|e| match e { Event::Clip { id, clip, from, secs, .. } if *id == p => Some((*clip, from.clone(), *secs)), _ => None }).collect();
+    assert_eq!(clips.len(), 1, "{clips:?}");
+    assert_eq!(clips[0].0, 18);
+    assert_eq!(clips[0].1.as_deref(), Some("TaurenMale"));
+    let air = crate::sim::moves::airtime(crate::sim::moves::LEAP_LIFT);
+    assert!((clips[0].2 * 0.5 - air).abs() < 0.01, "impact at landing: {} vs {air}", clips[0].2);
+    let hp = s.mobs[&m].health;
+    run(&mut s, 0.8);
+    assert!(s.mobs[&m].health < hp, "what's there is still struck");
 }
 
 #[test]

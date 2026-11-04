@@ -4145,7 +4145,7 @@ respawn = 0.0
 key = "heroic_leap"
 name = "Heroic Leap"
 ex_of = "charge"
-text = "Leaps to the target location up to 16 yd away, over obstacles. Enemies within 4 yd of the landing take 12 damage, are knocked back 5 yd and slowed by 40% for 2 sec. Other heroes see where you will land."
+text = "Leaps to the target location up to 16 yd away, over obstacles. Enemies within 4 yd of the landing take 12 damage, are knocked back 5 yd and slowed by 40% for 2 sec."
 icon = "Ability_WarStomp"
 slot = "utility"
 kind = "leap"
@@ -4154,6 +4154,8 @@ range = [16.0, 16.0]
 radius = [4.0, 4.0]
 damage = [12.0, 12.0]
 lift = 7.0
+# No ring where it comes down: nobody sees the landing coming (a rival under it is still warned).
+unmarked = true
 spell = 16979
 impact_kit = 5089
 effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
