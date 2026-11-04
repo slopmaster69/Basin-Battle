@@ -182,5 +182,10 @@ mod tests {
         assert!((c6.mobs[g].patterns[0].steps[1].windup.unwrap() - 0.5).abs() < 1e-6);
         let (c5, _) = c.tuned("dodge.secs", "0.5").unwrap();
         assert!((c5.dodge.secs - 0.5).abs() < 1e-6);
+        // The shatter's action lines, swapped for another kit to film it.
+        assert_eq!(c.shatter.burst_kit, 121);
+        let (c7, old) = c.tuned("shatter.burst_kit", "487").unwrap();
+        assert_eq!(old.as_deref(), Some("121"));
+        assert_eq!(c7.shatter.burst_kit, 487);
     }
 }

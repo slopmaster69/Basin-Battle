@@ -1915,12 +1915,20 @@ impl Survival {
             // big beat (the number already comes big, as a critical).
             self.cue(Some(owner), victim, combat::KIT_HEAVY, cues::SOUND_CRIT, cues::BEAT_CRIT);
         }
-        // Fire, or a sundering blow, on a frozen foe: the ice shatters.
+        // Fire, or a sundering blow, on a frozen foe: the ice shatters. The one shatter for every
+        // class and ability (a Hunter's Multi-Shot, a Mage's Pyroblast): this is its only path,
+        // and nothing here reads the class. (The ability's own impact, if it has one, lands
+        // besides: that's the ability's, not the shatter's.)
         if shatter && self.has_cc(victim, "petrify") {
             dmg *= SHATTER;
             self.cleanse(victim, &["petrify"]);
-            // The ice bursts off it: a flare of frost, the ice breaking, and the biggest beat.
+            // The ice bursts off it: a flare of frost, the ice breaking, and the biggest beat,
+            // with a short pale burst of action lines round the foe (`shatter.burst_kit`).
             self.cue(Some(owner), victim, cues::KIT_FROST_BURST, cues::SOUND_SHATTER, cues::BEAT_SHATTER);
+            let lines = self.content.shatter.burst_kit;
+            if lines != 0 {
+                self.events.push(Event::Visual { id: victim, kit: lines, by: None });
+            }
         }
         if opened {
             self.events.push(Event::Visual { id: victim, kit: combat::KIT_RIPOSTE, by: Some(owner) });
