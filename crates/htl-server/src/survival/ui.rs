@@ -111,6 +111,8 @@
 //! - `DP`, `DM`: the damage meters (see `meter_ui.rs`).
 //! - `EM\t<slot>\t<secs>`: the key in that slot is empowered (a combo) for `secs` more: its next
 //!   press is its EX version, for no Valor; `EM\t<slot>`: spent or gone.
+//! - `BT\t<beat>\t<guid>`: a beat on the hero's own screen alone: `kill_shot` as Kill Shot goes
+//!   (its speed lines), `kill_shot_kill` as it kills (`guid` the foe: a hit-stop and shake).
 
 use std::fmt::Write as _;
 
@@ -347,7 +349,9 @@ pub(crate) const VERSION: u32 = 2;
 /// Shot).
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
-pub(crate) const ADDON_NEWEST: u32 = 20;
+/// 21: Kill Shot's weight on the hunter's screen (`BT`: its speed lines as it goes, its hit-stop
+/// and shake as it kills).
+pub(crate) const ADDON_NEWEST: u32 = 21;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

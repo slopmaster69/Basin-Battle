@@ -218,6 +218,21 @@ pub struct AbilityDef {
     pub full_kit: u32,
     #[serde(default)]
     pub impact_kit: u32,
+    /// A piercing shot's weight on each foe it goes through (Kill Shot): this kit and this
+    /// `SoundEntries` id on each, besides `impact_kit`, and the heavy blow's reel (0: none).
+    #[serde(default)]
+    pub through_kit: u32,
+    #[serde(default)]
+    pub through_sound: u32,
+    /// A kill with it: this `SoundEntries` id from the foe's spot, for everyone near (0: none).
+    #[serde(default)]
+    pub kill_sound: u32,
+    /// The caster's own screen as it goes, and as it kills: the add-on's beats of these names
+    /// (`BT` lines; empty: none).
+    #[serde(default)]
+    pub beat: String,
+    #[serde(default)]
+    pub kill_beat: String,
     /// A trap's look while it's set (`GameObjectDisplayInfo`: 3072 an Explosive Trap, 3071 a
     /// Freezing Trap), and the spell shown at its spot as it goes off (its ground one-shot).
     #[serde(default)]

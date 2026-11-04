@@ -1167,6 +1167,10 @@ impl Survival {
             base
         };
         let n = d.count.max(1);
+        // Its weight on the caster's own screen as it goes (Kill Shot's speed lines).
+        if !d.beat.is_empty() {
+            self.events.push(Event::Beat { player: id, beat: d.beat.clone(), on: None });
+        }
         // A lob arcs to the ground at the reticle (within its range), over whatever is between.
         let lob_at = d.lob.then(|| self.aim_point(id, range));
         let feet = self.players[&id].pos;
@@ -1989,6 +1993,21 @@ impl Survival {
         if kit != 0 {
             self.events.push(Event::Visual { id: mid, kit, by: None });
         }
+        // A piercing shot going through it (Kill Shot): the heavy blow's flash and crack on each
+        // foe, for everyone near.
+        let (through_kit, through_sound) = {
+            let d = &self.content.abilities[ability];
+            (d.through_kit, d.through_sound)
+        };
+        let through = how == HitKind::Projectile && (through_kit != 0 || through_sound != 0);
+        if through {
+            if through_kit != 0 {
+                self.events.push(Event::Visual { id: mid, kit: through_kit, by: None });
+            }
+            if through_sound != 0 {
+                self.events.push(Event::Sound { id: mid, sound: through_sound });
+            }
+        }
         self.trade_blows(owner, mid);
         if damage > 0 {
             let name = self.content.abilities[ability].name.clone();
@@ -1998,9 +2017,28 @@ impl Survival {
         let was = self.fx_from.replace(from);
         self.ability_after(owner, mid, ability, share, damage, killed);
         self.fx_from = was;
-        if !killed && self.mobs.get(&mid).is_some_and(|m| m.stagger_until <= now) {
-            let lean = self.content.combat.lean_light * 0.6;
-            self.events.push(Event::React { id: mid, anim: combat::WOUND_ANIM, from, lean, hold: 0.0, fit: 0.0 });
+        if killed {
+            // The kill's weight: its sound from the foe's spot (everyone near hears it there),
+            // and its beat on the killer's own screen alone.
+            let (sound, beat) = {
+                let d = &self.content.abilities[ability];
+                (d.kill_sound, d.kill_beat.clone())
+            };
+            if sound != 0 {
+                self.events.push(Event::Sound { id: mid, sound });
+            }
+            if !beat.is_empty() {
+                self.events.push(Event::Beat { player: owner, beat, on: Some(mid) });
+            }
+        } else if self.mobs.get(&mid).is_some_and(|m| m.stagger_until <= now) {
+            // A flinch; the heavy blow's reel from a shot that goes through (a look alone: no
+            // stagger time comes of it).
+            let (anim, lean) = if through {
+                (combat::CRIT_ANIM, self.content.combat.lean_heavy)
+            } else {
+                (combat::WOUND_ANIM, self.content.combat.lean_light * 0.6)
+            };
+            self.events.push(Event::React { id: mid, anim, from, lean, hold: 0.0, fit: 0.0 });
         }
     }
 
