@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 20
+local VERSION = 21
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -760,10 +760,12 @@ function ES.SwingLine(f)
   local from = (f[13] and f[13] ~= "") and f[13] or nil
   if not clip or not PlayUnitAnimation then return end
   -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track),
-  -- another model's take when the ability names one (the same on every race).
+  -- another model's take when the ability names one (the same on every race), over the body the
+  -- line names ("full", "upper", or "lower" from ac17: the legs alone, the arms keeping their draw).
   if kind == "cast" then
     if mine then guid = "player" end
-    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, nil, from)
+    local body = (f[14] and f[14] ~= "") and f[14] or "full"
+    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, body, from)
     return
   end
   if mine then
