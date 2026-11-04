@@ -3225,9 +3225,6 @@ from = "NightElfMale"
 # chop (Corey's "Michael Jackson" hand, his review, Nov 3); every other ThunderClap look in the
 # game data plays some body anim (the lab's find, Nov 4).
 spell = 24189
-# The cone itself, flashed on the ground as it lands (0.3 sec, the add-on's wedge sweeping out to
-# 9 yd): the ring look is a circle, the hit a cone (Corey's review, Nov 4). A try before a client look.
-ground_flash = 0.3
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
 

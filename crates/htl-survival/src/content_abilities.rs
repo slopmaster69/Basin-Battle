@@ -133,11 +133,6 @@ pub struct AbilityDef {
     /// The cone's width (degrees).
     #[serde(default)]
     pub arc: f32,
-    /// A cone's shape flashed on the ground as it lands, this long (seconds; 0: none): the
-    /// add-on's wedge, its fill sweeping out to the edge, where the spell look is a ring
-    /// (Shockwave's burst through its 9 yd cone).
-    #[serde(default)]
-    pub ground_flash: f32,
     /// Ground: seconds between the mark and the landing; then burning ground this long, at this
     /// much a second.
     #[serde(default)]
