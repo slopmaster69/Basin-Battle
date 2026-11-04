@@ -20,6 +20,7 @@ pub mod elwynn;
 pub mod grid;
 pub mod layers;
 pub mod siege;
+pub mod solids;
 pub mod world;
 pub use grid::{find_path, find_path_with, reachable, HeightGrid};
 

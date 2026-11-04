@@ -312,6 +312,7 @@ impl Survival {
                 raider,
                 stagger_until: 0.0,
                 thrown_until: 0.0,
+                thrown_lift: 0.0,
                 riposte: false,
                 special: false,
                 pattern: None,
@@ -351,6 +352,10 @@ impl Survival {
             self.mobs.get_mut(&id).unwrap().hidden = true;
         } else {
             self.events.push(Event::MobSpawned { id });
+            // Its own look, on it from the start.
+            if self.content.mobs[def].aura != 0 {
+                self.events.push(Event::Auras { id });
+            }
         }
         id
     }
@@ -851,10 +856,21 @@ impl Survival {
         m.state = MobState::Dead { gone_at: now + 4.0 };
         // It falls where it is: whatever walk, lunge or step it was in stops with it.
         let walking = !m.path.is_empty();
+        // Thrown up, it comes down where it was thrown, not left hanging in the air.
+        let down = m.path.last().copied().filter(|_| m.thrown_lift > 0.0 && m.thrown_until > now);
         m.path.clear();
         m.sidle = None;
+        m.thrown_lift = 0.0;
         let (at, face) = (m.pos, m.facing);
-        if walking {
+        if let Some(to) = down {
+            m.pos = to;
+            let (way, left) = (dist2d(at, to), m.thrown_until - now);
+            if way > 0.05 {
+                self.events.push(Event::MobMove { id: mid, path: vec![at, to], speed: way / left.max(0.05), face: None });
+            } else {
+                self.events.push(Event::MobStop { id: mid, pos: to, facing: face });
+            }
+        } else if walking {
             self.events.push(Event::MobStop { id: mid, pos: at, facing: face });
         }
         let m = self.mobs.get_mut(&mid).unwrap();
@@ -1076,6 +1092,16 @@ impl Survival {
                 }
                 continue;
             }
+            // Thrown up and its time in the air over: down on the ground where it was thrown
+            // (its last step may fall a moment after, when nothing walks it there).
+            if self.mobs[&id].thrown_lift > 0.0 && self.mobs[&id].thrown_until <= now {
+                let m = self.mobs.get_mut(&id).unwrap();
+                m.thrown_lift = 0.0;
+                let at = m.path.pop().unwrap_or(m.pos);
+                m.path.clear();
+                let ground = self.ground_near(at[0], at[1], at[2]);
+                self.mobs.get_mut(&id).unwrap().pos = ground;
+            }
             // A totem or a dummy only stands there; a secret form waits to rise.
             if self.content.mobs[self.mobs[&id].def].inert() || self.mobs[&id].rise_at.is_some() {
                 continue;
@@ -1118,10 +1144,13 @@ impl Survival {
     /// Move along the current path.
     fn walk(&mut self, id: Id, dt: f32) {
         let below = self.is_below();
+        let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
         if m.path.is_empty() || m.speed <= 0.0 {
             return;
         }
+        // Thrown up: it goes along the ground under its arc, and is put back up on it after.
+        m.pos[2] -= moves::loft_at(m.thrown_lift, m.thrown_until, now - dt);
         let start = m.pos;
         let mut left = m.speed * dt;
         while left > 0.0 && !m.path.is_empty() {
@@ -1152,7 +1181,8 @@ impl Survival {
         // Stepping round a foe: turned to them, not the way it goes.
         let face = m.sidle.and_then(|h| self.players.get(&h)).map(|p| p.pos);
         let m = self.mobs.get_mut(&id).unwrap();
-        m.pos[2] = z;
+        let up = if m.path.is_empty() { 0.0 } else { moves::loft_at(m.thrown_lift, m.thrown_until, now) };
+        m.pos[2] = z + up;
         if let Some(at) = face {
             m.facing = facing(m.pos, at);
         }
@@ -1387,15 +1417,37 @@ impl Survival {
     /// Thrown to `to` over `air` seconds: it lands there whatever else the blow did, turned the
     /// while to `face` (whoever threw it), so a knockback drives it back rather than turning it to
     /// run.
-    pub(crate) fn throw_mob(&mut self, id: Id, to: Vec3, air: f32, face: Option<Id>) {
+    pub(crate) fn throw_mob(&mut self, id: Id, to: Vec3, air: f32, face: Option<Id>, lift: f32) {
         let now = self.clock;
         let Some(m) = self.mobs.get_mut(&id) else { return };
+        // (Thrown again while up: from the ground under it.)
+        m.pos[2] -= moves::loft_at(m.thrown_lift, m.thrown_until, now);
         let from = m.pos;
         let speed = dist2d(from, to) / air.max(0.05);
         m.path = vec![to];
         m.plan_to = None;
         m.speed = speed;
         m.thrown_until = now + air;
+        m.thrown_lift = lift;
+        // Thrown up (`lift`): its way there is an arc through the air, a point every eighth of
+        // it at its height over the ground then, which the client follows (its time is the flat
+        // way's, the same as the arc's).
+        if lift > 0.0 {
+            let path: Vec<Vec3> = (0..=8)
+                .map(|k| {
+                    let f = k as f32 / 8.0;
+                    let (x, y) = (from[0] + (to[0] - from[0]) * f, from[1] + (to[1] - from[1]) * f);
+                    let g = self.land.height_near(x, y, from[2] + (to[2] - from[2]) * f);
+                    [x, y, g + moves::arc_height(lift, air * f)]
+                })
+                .collect();
+            if let Some(m) = self.mobs.get_mut(&id) {
+                m.sidle = None;
+                m.facing = facing(from, to);
+            }
+            self.events.push(Event::MobMove { id, path, speed, face: None });
+            return;
+        }
         let face = face.filter(|f| self.players.contains_key(f));
         let m = self.mobs.get_mut(&id).unwrap();
         m.sidle = face;

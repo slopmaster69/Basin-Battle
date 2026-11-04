@@ -166,6 +166,9 @@ pub enum Event {
     /// A cast went (its missile or its effect follows): its bar and its look (the precast, the
     /// glow in the hands) end with it, no failure shown. `spell`: only if it's that one (0: any).
     CastDone { caster: Id, spell: u32 },
+    /// A bow ability's arrow goes: the bow's own release (the go of its draw, `spell`), with no
+    /// arrow of its own (the ability's missiles are their own events).
+    Loose { caster: Id, spell: u32 },
     /// Ground that lingers (holy ground, fire) wears this spell's look (a DynamicObject) until
     /// the mark `id` is gone.
     AreaLook { id: Id, caster: Id, spell: u32, pos: Vec3, radius: f32 },
@@ -199,7 +202,7 @@ pub enum Event {
     /// The dodge's dash (`roll`: a dodge, which tumbles), or a blow throwing a hero back.
     /// `speed` 0: no throw (the dash runs on the ground, by [`Event::Speed`]); just the tumble.
     /// `style`: which way a dodge goes relative to the facing (`roll` forward, `left`, `right`,
-    /// `back`).
+    /// `back`). `lift` is the upward speed; below zero, the hero is driven down (a dive).
     Hop { player: Id, dir: f32, speed: f32, lift: f32, roll: bool, style: &'static str },
     /// The guard went up or down (the hero's stance).
     Guard { player: Id, up: bool },
@@ -270,6 +273,13 @@ pub enum Event {
     FeatherFall { player: Id, on: bool },
     /// A hero's own dash along the ground: which way, how fast, how long.
     Dash { player: Id, dir: f32, speed: f32, secs: f32 },
+    /// While a hero aims a grappling hook (`ability`): where its line ends and whether it catches
+    /// there (a wall, a rock, the ground, a foe); `None` once the aim is let go.
+    Catch { player: Id, ability: usize, at: Option<(Vec3, bool)> },
+    /// A hero's leap with a look of its own (a Disengage): a clip over the whole body, borrowed
+    /// from another character model (`from`, empty: their own), and a tumble head over heels
+    /// along the way it flies (`flip`), for `secs`.
+    LeapLook { player: Id, secs: f32, clip: u16, take: u32, from: String, flip: bool },
     /// A hero's ability keys, cooldowns or tree changed.
     Abilities { player: Id },
     /// A hero's Valor changed.
@@ -545,6 +555,9 @@ pub struct Player {
     /// The bow's drawn pose is shown (the draw's cast is out): not while they walk, when the legs
     /// must walk (the action-combat client holds the draw on the upper body meanwhile).
     pub draw_shown: bool,
+    /// A bow ability's release plays out till then: the bow stays in hand meanwhile, unless they
+    /// do something else.
+    pub bow_until: f32,
     /// Who they last traded blows with, and when: the foe's bar on their screen.
     pub foe: Option<(Id, f32)>,
     /// Their client aims over the shoulder (the action-combat client): aimed shots fly along
@@ -690,6 +703,9 @@ pub struct Mob {
     /// Thrown (knocked back or pulled) through the air until then: it lands where it was thrown,
     /// whatever else the blow did (a slow, a root or a stagger takes hold once it's down).
     pub thrown_until: f32,
+    /// Thrown up (the Uppercut's launch): its arc's upward speed, its height over the ground
+    /// following it until it lands (0: thrown along the ground).
+    pub thrown_lift: f32,
     /// The stagger came from a parry (the riposte bonus applies).
     pub riposte: bool,
     /// The blow it's winding up is its special one.
@@ -1133,6 +1149,7 @@ impl Survival {
             wounds: Vec::new(),
             buffered: None,
             draw_shown: false,
+            bow_until: -100.0,
             foe: None,
             shoulder_cam: false,
             aim_line: None,
@@ -1692,6 +1709,14 @@ impl Survival {
         id
     }
 
+    /// A mark with no circle drawn (a hero's ground whose own spell look shows it): it lasts and
+    /// goes as any mark, taking that look with it.
+    pub(crate) fn mark_unseen(&mut self, secs: f32) -> Id {
+        let id = self.alloc();
+        self.marks.push((id, self.clock + secs));
+        id
+    }
+
     /// A warning laid on the ground as a real spell's look (`ground`, see [`mobs::ground_look`]):
     /// a creature's splash coming down, a hazard about to go off. 0: the drawn circle. A spell's
     /// ground look keeps its own size whatever the radius (Heated Ground covers a whole room), so
@@ -1866,6 +1891,31 @@ impl Survival {
     pub fn ranged_of(&self, p: &Player) -> &crate::content::RangedDef {
         let c = &self.content;
         c.ranged(&c.items[p.bow].key).or_else(|| c.ranged.first()).expect("a bow")
+    }
+
+    /// The bow a hero holds for a bow ability: their own if it's a bow, else the camp's first bow
+    /// (a crossbow, or no bow at all, would show the wrong draw or none).
+    pub fn bow_look(&self, p: &Player) -> usize {
+        let c = &self.content;
+        let drawn = |i: usize| c.items.get(i).is_some_and(|d| d.kind == ItemKind::Bow && c.ranged(&d.key).is_some_and(|r| r.draw_secs > 0.0));
+        if drawn(p.bow) {
+            return p.bow;
+        }
+        c.item(&c.start.bow).filter(|i| drawn(*i)).or_else(|| (0..c.items.len()).find(|i| drawn(*i))).unwrap_or(p.bow)
+    }
+
+    /// What a hero's ranged slot shows: what they carry, or while a bow ability has the bow in
+    /// their hands, the bow it draws ([`Self::bow_look`]).
+    pub fn ranged_shown(&self, p: &Player) -> usize {
+        let shot = match &p.action {
+            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } => self.content.abilities[*ability].kind == "shot",
+            _ => false,
+        };
+        if p.kit == Kit::Bow && !shot {
+            self.bow_look(p)
+        } else {
+            p.bow
+        }
     }
 
     /// How many creatures a hero's swing would reach right now (in reach, in front, in sight).

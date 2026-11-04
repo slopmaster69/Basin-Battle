@@ -470,7 +470,7 @@ impl Survival {
     }
 
     /// Where a cast leaves the hero's hands.
-    fn hands(&self, id: Id, yaw: f32) -> Vec3 {
+    pub(crate) fn hands(&self, id: Id, yaw: f32) -> Vec3 {
         let p = &self.players[&id];
         [
             p.pos[0] + yaw.cos() * HAND_AHEAD + yaw.sin() * HAND_RIGHT,
@@ -490,7 +490,7 @@ impl Survival {
         let mut out: Vec<(Id, Vec3, f32, f32)> = self
             .mobs
             .iter()
-            .filter(|(id, m)| **id != skip && m.health > 0 && !m.hidden && !self.own_totem(**id, skip))
+            .filter(|(id, m)| **id != skip && m.health > 0 && !m.hidden && !self.own_totem(**id, skip) && !self.spirit_body(**id))
             .map(|(id, m)| {
                 let s = self.content.mobs[m.def].scale;
                 (*id, m.pos, HERO_TALL * s, 0.5 * s)
@@ -703,13 +703,63 @@ impl Survival {
         }
         if d.aimed() {
             self.set_action(id, Action::Aim { ability });
-            if d.kind == "shot" {
+            if d.kind == "shot" || d.bow {
                 self.set_kit(id, Kit::Bow);
             }
+            // A bow ability with nothing to charge: drawn as it's aimed, loosed on the click.
+            if self.bow_drawn(id) {
+                self.draw_bow(id);
+            }
         } else {
+            if d.bow {
+                self.set_kit(id, Kit::Bow);
+            }
             self.fire(id, ability, 1.0);
         }
         true
+    }
+
+    /// The bow's draw is out for what's in hand: a shot's or a bow ability's charge, or a bow
+    /// ability with nothing to charge while it's aimed (Skyfall's volley from its hang too).
+    pub(crate) fn bow_drawn(&self, id: Id) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        match p.action {
+            Action::Charge { ability, .. } => {
+                let d = &self.content.abilities[ability];
+                d.kind == "shot" || d.bow
+            }
+            Action::Aim { ability } => self.content.abilities[ability].bow && self.charge_of(id, ability).1 <= 0.0,
+            _ => false,
+        }
+    }
+
+    /// The bow stays in the hands: aiming, drawing or loosing a shot or a bow ability, a bow
+    /// ability's leap (Skyfall's) and its hang, and a release still playing out while they stand.
+    pub(crate) fn bow_in_hand(&self, id: Id) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        let bow = |a: usize| {
+            let d = &self.content.abilities[a];
+            d.kind == "shot" || d.bow
+        };
+        match p.action {
+            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Dash { ability, .. } => bow(ability),
+            Action::Ready => p.bow_until > self.clock || self.hanging(id),
+            _ => self.hanging(id),
+        }
+    }
+
+    /// The bow drawn as the base game draws it: the bow's own shot begun (the client pulls the
+    /// string, LoadBow, and holds it, HoldBow), held until it looses or is let down.
+    pub(crate) fn draw_bow(&mut self, id: Id) {
+        let Some(p) = self.players.get(&id) else { return };
+        let spell = self.ranged_of(p).spell;
+        if spell == 0 {
+            return;
+        }
+        self.events.push(Event::Cast { caster: id, spell, ms: DRAW_HOLD_MS });
+        if let Some(p) = self.players.get_mut(&id) {
+            p.draw_shown = true;
+        }
     }
 
     /// What an ability costs in Valor (an ultimate: the whole bar).
@@ -747,9 +797,11 @@ impl Survival {
         }
         let d = self.content.abilities[ability].clone();
         self.set_action(id, Action::Charge { ability, since: now });
-        let spell = if d.kind == "shot" { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
-        if spell != 0 {
-            let ms = if d.kind == "shot" { DRAW_HOLD_MS } else { ((hi + d.hold.max(0.5)) * 1000.0) as u32 };
+        let spell = if d.kind == "shot" || d.bow { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
+        if spell != 0 && (d.kind == "shot" || d.bow) {
+            self.draw_bow(id);
+        } else if spell != 0 {
+            let ms = ((hi + d.hold.max(0.5)) * 1000.0) as u32;
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
             self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0 });
@@ -812,6 +864,10 @@ impl Survival {
                 if d.charge_spell == 0 && d.clip == THROW_CLIP && d.kind != "shot" {
                     self.events.push(Event::ClipStop { id });
                 }
+            }
+            // A bow ability drawn as it's aimed: the draw let down.
+            Action::Aim { ability } if self.content.abilities[ability].bow => {
+                self.events.push(Event::CastEnd { caster: id });
             }
             Action::Channel { ability, .. } => {
                 self.events.push(Event::CastEnd { caster: id });
@@ -895,6 +951,19 @@ impl Survival {
         if matches!(self.players[&id].action, Action::Charge { .. }) {
             self.events.push(Event::CastDone { caster: id, spell: 0 });
         }
+        // A bow ability's arrow: the bow's own release (its draw let go, or drawn and loosed at
+        // once), the bow in hand till it's played out. (A leap with the bow looses nothing.)
+        if d.bow && d.kind != "leap" {
+            let p = &self.players[&id];
+            let spell = self.ranged_of(p).spell;
+            let look = self.bow_look(p);
+            let release = self.content.ranged(&self.content.items[look].key).map_or(CAST_RECOVERY, |r| r.recovery).max(CAST_RECOVERY);
+            self.events.push(Event::Loose { caster: id, spell });
+            if let Some(p) = self.players.get_mut(&id) {
+                p.bow_until = now + release;
+                p.draw_shown = false;
+            }
+        }
         if d.counter.is_none() && !matches!(free, Some(Free::Recast { .. })) {
             self.spend_charge(id, ability, 1.0);
         }
@@ -903,7 +972,8 @@ impl Survival {
             p.facing = yaw;
         }
         // A leap's and a dash's clip go with the move (its blow lands as it does).
-        if d.clip != 0 && !matches!(d.kind.as_str(), "art" | "leap" | "dash") {
+        // (A bow ability's look is the bow's own draw and release, not a clip.)
+        if d.clip != 0 && !matches!(d.kind.as_str(), "art" | "leap" | "dash") && !d.bow {
             // A stance holds its clip while it lasts (Feign Death lies there). A cast's clip lands
             // its blow as the cast does (Cleave's sweep with its crescent, not 0.2 sec before it),
             // the recovery after; an instant's is quick.
@@ -1009,10 +1079,12 @@ impl Survival {
                     self.set_action(id, next);
                 }
             }
+            // Stoop: down out of the air, fast.
+            "leap" if d.dive => self.dive(id, ability),
             // Skyfall: up, and a slow fall to aim from.
             "leap" if d.hunt == "float" => {
                 self.start_leap(id, ability, share);
-                self.skyfall_float(id);
+                self.skyfall_float(id, ability);
             }
             "leap" => match free {
                 // A leap back to where the cast before it began.
@@ -1079,7 +1151,7 @@ impl Survival {
             (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), AbilityDef::at(d.damage, share), spell)
         };
         // Where the reticle points: the projectile flies from the hands to there, and on.
-        let aim = self.trace(o, dir, range + 4.0, 0.0, id);
+        let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
         let from = self.hands(id, yaw);
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
@@ -1163,6 +1235,7 @@ impl Survival {
                 continue;
             }
             if self.grounded(&p) {
+                self.drop_look(&p);
                 continue;
             }
             let (returns, sticks) = {
@@ -1170,7 +1243,8 @@ impl Survival {
                 (d.returns, d.fuse > 0.0)
             };
             let go = (p.speed * dt).min(p.left);
-            let t = self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &p.hits);
+            // (A grappling hook meets the land's solid shapes too: a rock, a fence, a roof.)
+            let t = self.catch_solid(p.ability, p.pos, p.dir, self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &p.hits));
             if let Some(v) = t.unit {
                 let from = p.pos;
                 p.pos = t.point;
@@ -1189,6 +1263,10 @@ impl Survival {
                 self.projectile_hit(&p, v, from);
                 // A hook yanks its caster to it, an orb swaps them, a chain binds the foe.
                 self.beta_hit(&p, Some(v), t.point);
+                // Split Arrow bursts in the first foe it strikes.
+                if self.split_burst(&p, t.point, false) {
+                    continue;
+                }
                 if returns {
                     // A boomerang goes on through everything it meets, each once a way.
                     p.hits.push(v);
@@ -1235,6 +1313,10 @@ impl Survival {
                     keep.push(p);
                     continue;
                 }
+                // Split Arrow bursts against it, its spray coming back off it.
+                if self.split_burst(&p, t.point, true) {
+                    continue;
+                }
                 self.plant_at_end(p.owner, p.ability, t.point, p.dir, false);
                 self.drop_look(&p);
                 // A hook that meets a wall or the ground yanks its caster there.
@@ -1265,8 +1347,9 @@ impl Survival {
                 p.pos = self.ground_near(p.pos[0], p.pos[1], p.pos[2]);
                 self.stick(&mut p, None);
                 keep.push(p);
-            } else {
-                // Its range spent: a Hunter's arrow comes down and sticks there.
+            } else if !self.split_burst(&p, p.pos, false) {
+                // Its range spent: a Hunter's arrow comes down and sticks there (Split Arrow
+                // bursts in the air there instead).
                 self.plant_at_end(p.owner, p.ability, p.pos, p.dir, false);
                 self.drop_look(&p);
             }
@@ -1275,59 +1358,177 @@ impl Survival {
         self.projectiles = keep;
     }
 
-    /// A projectile that ricochets (Bank Shot) meets a wall, a trunk or a rock at `at`: with a
-    /// bounce left it comes off it (mirrored about the surface, flat), harder by its
-    /// `bounce_gain`, through the next foe it meets, its look flown on from there. False: no
-    /// bounce, it ends as ever.
+    /// A projectile that ricochets (Bank Shot) meets something solid at `at`. Off a wall or a
+    /// trunk, with a bounce left, it comes off it (mirrored about the surface, flat), harder by
+    /// its `bounce_gain`, through the next foe it meets. Into the ground at a shallow angle it
+    /// skips off it (as steeply up as it came down), no harder and no bounce spent; a steeper one
+    /// stops there. Either way its `burst_spell` flashes where it struck and its look flies on
+    /// from there. False: it ends as ever (and plants).
     fn ricochet(&mut self, p: &mut Projectile, at: Vec3) -> bool {
+        // Shallower than this (its sine, about 20°), an arrow skips off the ground.
+        const SKIP: f32 = 0.34;
         let d = &self.content.abilities[p.ability];
-        if p.bounced >= d.bounces || p.left < 1.0 {
+        let (gain, base, bounces, flash) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell);
+        // (Its flight this step, up to where it struck.)
+        let left = p.left - len(sub(at, p.pos));
+        if bounces == 0 || left < 1.0 {
             return false;
         }
-        let (gain, base) = (d.bounce_gain, AbilityDef::at(d.damage, p.share));
-        // The surface's way out: toward the open ground round where it struck.
-        let mut n = [0.0f32, 0.0];
-        for k in 0..16 {
-            let a = k as f32 / 16.0 * std::f32::consts::TAU;
-            let q = [at[0] + a.cos() * 0.9, at[1] + a.sin() * 0.9, at[2]];
-            if !self.land.blocked_near(q[0], q[1], q[2]) {
-                n[0] += a.cos();
-                n[1] += a.sin();
+        match self.surface(at, p.dir) {
+            None => {
+                if p.dir[2] >= 0.0 || -p.dir[2] > SKIP {
+                    return false;
+                }
+                let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
+                p.dir = [p.dir[0], p.dir[1], -p.dir[2]];
+                p.pos = [at[0], at[1], at[2].max(ground + 0.15)];
+            }
+            Some(n) => {
+                if p.bounced >= bounces {
+                    return false;
+                }
+                let dot = p.dir[0] * n[0] + p.dir[1] * n[1];
+                p.dir = norm([p.dir[0] - 2.0 * dot * n[0], p.dir[1] - 2.0 * dot * n[1], 0.0]);
+                p.pos = [at[0] + n[0] * 0.5, at[1] + n[1] * 0.5, at[2]];
+                p.bounced += 1;
+                p.damage += base * gain;
+                p.pierce = p.pierce.max(1);
+                p.hits.clear();
             }
         }
-        let l = (n[0] * n[0] + n[1] * n[1]).sqrt();
-        // Struck the ground, or a wall all round: no bounce.
-        let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
-        if l < 0.2 || at[2] < ground + 0.15 {
-            return false;
-        }
-        let n = [n[0] / l, n[1] / l];
-        let dot = p.dir[0] * n[0] + p.dir[1] * n[1];
-        if dot >= 0.0 {
-            return false;
-        }
-        p.dir = norm([p.dir[0] - 2.0 * dot * n[0], p.dir[1] - 2.0 * dot * n[1], 0.0]);
-        p.pos = [at[0] + n[0] * 0.5, at[1] + n[1] * 0.5, at[2]];
-        p.bounced += 1;
-        p.damage += base * gain;
-        p.pierce = p.pierce.max(1);
-        p.hits.clear();
-        // Its look: the arrow flown on from where it struck.
+        p.left = left;
+        // Its look: the arrow flown on from where it struck (by an unseen anchor standing there),
+        // and a flash there.
         self.drop_look(p);
         let anchor = self.alloc();
-        let end = self.wall_trace(p.pos, p.dir, p.left, p.owner).point;
+        let end = self.look_end(p);
         self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: p.spell, from: p.pos, target: Target::Point(end) });
+        if flash != 0 {
+            self.events.push(Event::Missile { caster: anchor, spell: flash, target: Target::Point(at) });
+        }
         p.look = Some(anchor);
-        if self.players.contains_key(&p.owner) {
-            self.events.push(Event::Flash { player: p.owner, text: format!("Bank! x{}", p.bounced + 1) });
+        true
+    }
+
+    /// What a projectile flying along `dir` struck just past `at`: a wall or a trunk (`Some`: the
+    /// flat way out of it, away from the solid round the spot, so a thin wall, a trunk and a
+    /// corner alike; straight back if that can't be told), or the ground (`None`).
+    fn surface(&self, at: Vec3, dir: Vec3) -> Option<[f32; 2]> {
+        let next = add(at, dir, STEP);
+        if !self.land.blocked_near(next[0], next[1], next[2]) && !self.land.blocked_near(at[0], at[1], at[2]) {
+            return None;
+        }
+        let mut n = [0.0f32, 0.0];
+        for r in [0.5f32, 0.9] {
+            for k in 0..16 {
+                let a = k as f32 / 16.0 * std::f32::consts::TAU;
+                if self.land.blocked_near(at[0] + a.cos() * r, at[1] + a.sin() * r, at[2]) {
+                    n[0] -= a.cos();
+                    n[1] -= a.sin();
+                }
+            }
+        }
+        let back = [-dir[0], -dir[1]];
+        let flat = |v: [f32; 2]| {
+            let l = (v[0] * v[0] + v[1] * v[1]).sqrt();
+            (l > 1.0e-3).then(|| [v[0] / l, v[1] / l])
+        };
+        let n = if (n[0] * n[0] + n[1] * n[1]).sqrt() < 0.2 { flat(back) } else { flat(n) };
+        // (Straight down at a wall: no way off it but the ground's.)
+        let n = n?;
+        // It came at it: off it. Along it or away (a wall it grazed): straight back.
+        if dir[0] * n[0] + dir[1] * n[1] < -0.05 {
+            Some(n)
+        } else {
+            flat(back).or(Some(n))
+        }
+    }
+
+    /// Where a projectile's flight would end if nothing moved, through as many bodies as it can
+    /// still pierce: the next body, a wall, the ground or its range's end (for its look).
+    fn look_end(&self, p: &Projectile) -> Vec3 {
+        let mut skip = p.hits.clone();
+        loop {
+            let t = self.trace_skipping(p.pos, p.dir, p.left, p.radius, p.owner, p.allies, &skip);
+            match t.unit {
+                Some(v) if skip.len() < p.hits.len() + p.pierce as usize => skip.push(v),
+                _ => return t.point,
+            }
+        }
+    }
+
+    /// A splitting arrow (Split Arrow) bursts at `at`, its flight over: its `burst_spell` there,
+    /// and its `splits` arrows fanned out from there `spread` apart, on along its way (level),
+    /// or back off the wall it struck (`solid`), each its look flown from the burst by an unseen
+    /// anchor. They go through the foe it burst in and on. False: it doesn't split.
+    fn split_burst(&mut self, p: &Projectile, at: Vec3, solid: bool) -> bool {
+        let d = &self.content.abilities[p.ability];
+        let flash = d.burst_spell;
+        let Some(k) = self.content.ability(&d.splits) else { return false };
+        let s = self.content.abilities[k].clone();
+        let way = {
+            let l = (p.dir[0] * p.dir[0] + p.dir[1] * p.dir[1]).sqrt();
+            if l > 1.0e-3 {
+                [p.dir[0] / l, p.dir[1] / l]
+            } else {
+                [1.0, 0.0]
+            }
+        };
+        // Off a wall: mirrored about it, starting out of it a little. Off the ground or in the
+        // open: on along its way.
+        let (way, from) = match solid.then(|| self.surface(at, p.dir)).flatten() {
+            Some(n) => {
+                let dot = way[0] * n[0] + way[1] * n[1];
+                ([way[0] - 2.0 * dot * n[0], way[1] - 2.0 * dot * n[1]], [at[0] + n[0] * 0.4, at[1] + n[1] * 0.4, at[2]])
+            }
+            None => (way, at),
+        };
+        // Out of the ground, at the least.
+        let floor = self.land.height_near(from[0], from[1], from[2] + 0.6);
+        let from = [from[0], from[1], from[2].max(floor + 0.4)];
+        self.drop_look(p);
+        let n = s.count.max(1);
+        let mut first = None;
+        for i in 0..n {
+            let off = (i as f32 - (n - 1) as f32 / 2.0) * s.spread.to_radians();
+            let (c, sn) = (off.cos(), off.sin());
+            let anchor = self.alloc();
+            let shot = Projectile {
+                owner: p.owner,
+                ability: k,
+                pos: from,
+                dir: [way[0] * c - way[1] * sn, way[0] * sn + way[1] * c, 0.0],
+                speed: s.speed.max(1.0),
+                radius: AbilityDef::at(s.radius, p.share),
+                left: AbilityDef::at(s.range, p.share),
+                share: p.share,
+                damage: AbilityDef::at(s.damage, p.share),
+                spell: s.spell,
+                allies: s.friends(),
+                hits: Vec::new(),
+                pierce: s.pierce,
+                stage: Stage::Out,
+                born: self.clock,
+                bounced: 0,
+                look: Some(anchor),
+            };
+            let end = self.look_end(&shot);
+            self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: s.spell, from, target: Target::Point(end) });
+            first.get_or_insert(anchor);
+            self.projectiles.push(shot);
+        }
+        // The burst, from the first arrow's anchor (its look there, nothing on the hunter).
+        if let (Some(a), true) = (first, flash != 0) {
+            self.events.push(Event::Missile { caster: a, spell: flash, target: Target::Point(at) });
         }
         true
     }
 
-    /// A ricocheted projectile's look's anchor goes with it.
+    /// A ricocheted or split projectile's look's anchor goes with it, a moment after (the client
+    /// may still be about to fly its missile from there).
     fn drop_look(&mut self, p: &Projectile) {
         if let Some(a) = p.look {
-            self.events.push(Event::ObjGone { id: a });
+            self.hunt.anchors.push((a, self.clock + 1.0));
         }
     }
 
@@ -1530,6 +1731,9 @@ impl Survival {
             if let Stage::Back { anchor } = p.stage {
                 self.events.push(Event::ObjGone { id: anchor });
             }
+            if let Some(a) = p.look {
+                self.events.push(Event::ObjGone { id: a });
+            }
         }
     }
 
@@ -1638,10 +1842,6 @@ impl Survival {
     /// A projectile reaches someone: a friend it's for is healed (and moved, with a pull); a foe
     /// is struck, or caught in its burst; a chaining one leaps on.
     fn projectile_hit(&mut self, p: &Projectile, victim: Id, from: Vec3) {
-        // An arrow (any ability's projectile) on a foe: the hunter's next beast comes empowered.
-        if !p.allies && self.players.contains_key(&p.owner) {
-            self.prime_wild(p.owner);
-        }
         // A friend touched by light: healed, not struck.
         // (Outside Siege that's any other hero, friendly fire or not: a bolt that would both heal
         // and hurt them heals them, as the caster meant.)
@@ -1778,7 +1978,8 @@ impl Survival {
         let damage = self.ability_damage(owner, mid, ability, base);
         let damage = (damage as f32 * self.taken_share(mid)).round() as u32;
         let art = self.content.abilities[ability].kind == "art";
-        let style = if art { Blow::Heavy } else { Blow::Arrow(spell) };
+        // (A dive's slam lands as heavily as a heavy attack: its hit-stop and shake.)
+        let style = if art || self.content.abilities[ability].dive { Blow::Heavy } else { Blow::Arrow(spell) };
         self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style });
         // A weapon art is the hero's own blow: Momentum.
         if art && self.players.contains_key(&owner) {
@@ -2080,10 +2281,14 @@ impl Survival {
         if d.linger <= 0.0 {
             return;
         }
-        // Holy ground is a friend's mark (green), burning ground a warning.
+        // Holy ground is a friend's mark (green), burning ground a warning. A hero's own ground
+        // with a look of its own (a trap's fire, Consecration's glow) is that look alone, with no
+        // circle drawn round it (Corey's review: a hero's circles are floor clutter, and the red
+        // one reads as an error); a creature's keeps its warning.
         let friendly = d.linger_heal > 0.0 || !d.boon.is_empty();
-        let mark = Some(self.mark_kind(at, radius, d.linger, friendly));
         let spell = if d.linger_spell != 0 { d.linger_spell } else { d.spell };
+        let hero = self.players.contains_key(&owner);
+        let mark = Some(if hero && spell != 0 { self.mark_unseen(d.linger) } else { self.mark_kind(at, radius, d.linger, friendly) });
         if let (Some(m), true) = (mark, spell != 0) {
             self.events.push(Event::AreaLook { id: m, caster: owner, spell, pos: at, radius });
         }
@@ -2212,7 +2417,7 @@ impl Survival {
                 _ => true,
             }
         };
-        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner)).map(|(id, _)| *id).collect();
+        let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner) && !self.spirit_body(**mid)).map(|(id, _)| *id).collect();
         let heroes: Vec<Id> = if self.content.pvp.friendly_fire {
             // (Not one it mends: a healing area spares a hero it can help.)
             self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
@@ -2576,7 +2781,7 @@ impl Survival {
         let mut foes: Vec<(Id, f32)> = self
             .mobs
             .iter()
-            .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && in_beam(m.pos, 0.5 * self.content.mobs[m.def].scale))
+            .filter(|(mid, m)| m.health > 0 && !m.hidden && !self.own_totem(**mid, id) && !self.spirit_body(**mid) && in_beam(m.pos, 0.5 * self.content.mobs[m.def].scale))
             .map(|(mid, m)| (*mid, along(m.pos)))
             .chain(self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.hostile(id, **h) && !friend(**h) && in_beam(p.pos, HERO_SIZE)).map(|(h, p)| (*h, along(p.pos))))
             .collect();
@@ -2767,10 +2972,12 @@ impl Survival {
                 self.set_action(id, Action::Ready);
             }
             if !s.caught {
-                // Caught nothing: what it does then (Trapper's Instinct leaves anyway).
-                match self.content.ability(d.counter.as_ref().map_or("", |c| c.expire_answer.as_str())) {
-                    Some(then) if self.players[&id].health > 0 => self.fire(id, then, 1.0),
-                    _ => self.events.push(Event::Flash { player: id, text: format!("{} caught nothing", d.name) }),
+                // Caught nothing: what it does then (Trapper's Instinct leaves anyway). Otherwise
+                // it just ends: its look fades and the key goes on its cooldown, no word.
+                if let Some(then) = self.content.ability(d.counter.as_ref().map_or("", |c| c.expire_answer.as_str())) {
+                    if self.players[&id].health > 0 {
+                        self.fire(id, then, 1.0);
+                    }
                 }
             }
             self.update_rooted(id);
@@ -2858,7 +3065,6 @@ impl Survival {
         }
         if self.players.contains_key(&victim) {
             self.gain_valor(victim, self.content.valor.counter);
-            self.events.push(Event::Flash { player: victim, text: d.name.clone() });
         }
         self.events.push(Event::Missile { caster: victim, spell: d.spell, target: Target::Unit(victim) });
         // What it does to the one who struck.
@@ -2951,8 +3157,10 @@ impl Survival {
                 let held = now - since;
                 let pending = self.players[&id].release_at_least;
                 let hold = self.content.abilities[ability].hold;
-                // Topped out: the flare on the caster (everyone sees it), once.
-                if hi > 0.0 && held >= hi && held - dt < hi {
+                // Topped out: the flare on the caster (everyone sees it), once. Not on a bow's
+                // draw: there the bow's own tension shows it, and the drawer's camera leans in and
+                // trembles (the add-on); the flare read as a stray buff (Corey's review).
+                if hi > 0.0 && held >= hi && held - dt < hi && !self.content.abilities[ability].bow {
                     let kit = self.full_kit(ability);
                     if kit != 0 {
                         self.events.push(Event::Visual { id, kit, by: None });

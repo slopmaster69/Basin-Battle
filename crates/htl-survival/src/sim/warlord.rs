@@ -247,7 +247,8 @@ impl Survival {
         } else {
             self.stagger_mob(b, secs + 0.1, false);
             if moved > 0.05 {
-                self.throw_mob(b, to, secs, Some(owner));
+                // Carried along the ground: no lift.
+                self.throw_mob(b, to, secs, Some(owner), 0.0);
             }
         }
     }
