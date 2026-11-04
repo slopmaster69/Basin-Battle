@@ -81,7 +81,7 @@
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
-//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid>]`: how a spell's missiles look on an `ac14` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour).
+//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid>]`: how a spell's missiles look on an `ac20` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour).
 //! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0030's `SetUnitRope`): a grappling hook's line, a haul's.
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
@@ -1208,8 +1208,8 @@ impl SurvivalGame {
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
-                // another model's clips; `ac11` puts their bones back to rest after; `ac13` draws an
-                // object stretched from end to end (Tripwire's rope); `ac14` a missile's look; `ac21` a rope
+                // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
+                // object stretched from end to end (Tripwire's rope); `ac20` a missile's look; `ac21` a rope
                 // from the hand.
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {

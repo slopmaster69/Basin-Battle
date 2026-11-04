@@ -691,7 +691,7 @@ impl SurvivalGame {
                 self.ropes.insert(id);
             }
             Event::Tether { from, to, secs } => {
-                // A taut line from the hand (patch 0023): `RP <key> <from> <to's guid or -> <x> <y>
+                // A taut line from the hand (patch 0030): `RP <key> <from> <to's guid or -> <x> <y>
                 // <z> <secs>`, keyed by who holds it, so a new line replaces theirs.
                 let Some(g) = self.guid_of(from) else { return };
                 let (to_guid, at) = match to {

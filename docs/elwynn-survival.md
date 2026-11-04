@@ -199,7 +199,7 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   the Hunter's arrows trail a glowing ribbon (pale, burning for a full Aimed Shot, gold-red for
   Kill Shot, frost for Multi-Shot), and Bank Shot's turns from yellow to orange to red with each
   bounce. `[[missile_look]]` in `content/survival.toml` sets a spell's. On a client with patch
-  0023, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
+  0030, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
   Grapple hauls a foe in on one.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps

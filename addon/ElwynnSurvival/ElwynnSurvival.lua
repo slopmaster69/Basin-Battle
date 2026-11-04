@@ -6492,7 +6492,7 @@ function ES.Line(line)
       ES.marksUp.tg[key] = 1
     end
   elseif verb == "RP" then
-    -- A taut rope from a unit's hand to another unit or a spot (patch 0023): a grappling hook's
+    -- A taut rope from a unit's hand to another unit or a spot (patch 0030): a grappling hook's
     -- line as it pulls its hunter in, a haul's.
     if SetUnitRope and f[2] and f[3] then
       local key = "es" .. f[2]
