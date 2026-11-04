@@ -139,8 +139,14 @@ const MapGL = (() => {
       }
       return true;
     }
+    // The colour drawn in the middle of the screen this moment, read straight back from the GPU.
+    function probe() {
+      state.dirty = true; render(performance.now());
+      const px = new Uint8Array(4); gl.readPixels(canvas.width >> 1, canvas.height >> 1, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return Array.from(px).join(",");
+    }
     return {
-      gl, state, resize, render,
+      gl, state, resize, render, probe,
       setCamera(cam, anchor) { state.cam = cam; state.anchor = anchor; state.dirty = true; },
       setLight(light, flicker) { if (light !== state.light || Math.abs(flicker - state.flicker) > .002) { state.light = light; state.flicker = flicker; state.dirty = true; } },
       project([x, y]) { const c = state.cam; return [(x - c.x) * c.z + state.anchor[0], (y - c.y) * c.z + state.anchor[1]]; },
@@ -151,7 +157,8 @@ const MapGL = (() => {
       about() {
         const d = gl.getExtension("WEBGL_debug_renderer_info");
         return { renderer: d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE),
-          error: state.error, lost: lost || gl.isContextLost(), canvas: canvas.width + "x" + canvas.height, tiles: tiles.filter(t => t.tex).length + "/" + tiles.length };
+          error: state.error, lost: lost || gl.isContextLost(), canvas: canvas.width + "x" + canvas.height, tiles: tiles.filter(t => t.tex).length + "/" + tiles.length,
+          centre: probe(), style: getComputedStyle(canvas).display + "/" + getComputedStyle(canvas).visibility + "/" + canvas.clientWidth + "x" + canvas.clientHeight };
       },
     };
   }
