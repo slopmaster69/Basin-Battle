@@ -4619,11 +4619,13 @@ cooldown = 12.0
 # something going wrong (visual check, run 015). The flip and the net are the look.
 spell = 0
 also = "hunter_net"
-# Play-test (#110): the Undead woman's flip out of a strafing jump was the one to keep. Every
-# hero, every race, standing or mid-jump, now plays it: a tumble back head over heels with the
-# Undead woman's tucked Jump (38). Swap the clip here after a look in game (/esclip).
+# Play-test (#110): a flip out of a strafing jump was the one to keep. Every hero, every race,
+# standing or mid-jump, plays it: a tumble back head over heels with a borrowed tucked Jump (38).
+# Corey's pick from the clips (Nov 4): the Night Elf woman's; the Undead woman's legs clipped
+# and twisted as she came down. The clip is fitted to the flight and the hero's own JumpEnd
+# takes the landing (moves.rs). Swap the model here after a look in game (/esclip).
 leap_clip = 38
-leap_from = "ScourgeFemale"
+leap_from = "NightElfFemale"
 leap_flip = true
 
 [[ability]]
@@ -4679,9 +4681,9 @@ radius = [2.0, 2.0]
 # No cast look: Disengage's (781) is a white blink star on the hunter (see Ensnaring Retreat).
 spell = 0
 also = "hunter_net"
-# Ensnaring Retreat's flip (#110).
+# Ensnaring Retreat's flip (#110), the Night Elf woman's jump (Corey's pick, Nov 4).
 leap_clip = 38
-leap_from = "ScourgeFemale"
+leap_from = "NightElfFemale"
 leap_flip = true
 
 # 2: two arrows and a wire between them, each arrow placed by the hero. The first press plants
