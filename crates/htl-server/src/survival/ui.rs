@@ -87,15 +87,15 @@
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
 //!   A `cast` goes on `\t<body>` after `from`: `full` (the whole model), `upper` or `lower`
 //!   (that half alone, the rest keeping what it was doing: Skyfall's hang holds the Jump clip on
-//!   the legs while the arms draw the bow). `lower` takes client patch 0036 (`ac23`); `ac22`
+//!   the legs while the arms draw the bow). `lower` takes client patch 0037 (`ac23`); `ac22`
 //!   reads it as the whole body.
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
-//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid or ->[\t<side or ->[\t<speed>]]]`: how a spell's missiles look on an `ac20` client (patch 0029's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour); `side`, a tumble end over end (patch 0035); a speed of their own in yards a second, uncapped (patch 0039; absent or 0: the spell's own).
-//! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0030's `SetUnitRope`): a grappling hook's line, a haul's.
+//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid or ->[\t<side or ->[\t<speed>]]]`: how a spell's missiles look on an `ac20` client (patch 0030's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour); `side`, a tumble end over end (patch 0036); a speed of their own in yards a second, uncapped (patch 0040; absent or 0: the spell's own).
+//! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0031's `SetUnitRope`): a grappling hook's line, a haul's.
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
 //!   `fit` seconds: a knockdown).
@@ -381,9 +381,9 @@ pub(crate) const VERSION: u32 = 2;
 /// and shake as it kills).
 /// 21: outcomes show without words: `CU` beats (the outcome's hit-stop, shake and kick) in
 /// `Cues.lua`.
-/// 21: the add-on says `ac19` for a client with patch 0027 (Tripwire's rope).
-/// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0029).
-/// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0030).
+/// 21: the add-on says `ac19` for a client with patch 0028 (Tripwire's rope).
+/// 22: the add-on says `ac20`, and the `ML` line's missile looks (patch 0030).
+/// 23: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0031).
 /// `Cues.lua`. 22: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 21: a cast's `AN` line names the body its clip drives (`full`, `upper`, `lower`): Skyfall's
 /// hang on the legs alone.
@@ -392,21 +392,21 @@ pub(crate) const VERSION: u32 = 2;
 /// 24: a fan of projectiles (Multi-Shot) aims with a fan on the reticle, not a strip on the
 /// ground (the `AB` line's shape `fan`).
 /// 25: the fan's points sit where the arrows really go, and bigger.
-/// 24: the `ML` line's spin axis (a tumble, patch 0035).
-/// 25: the `ML` line's own speed (patch 0039).
+/// 24: the `ML` line's spin axis (a tumble, patch 0036).
+/// 25: the `ML` line's own speed (patch 0040).
 /// 24: the add-on preloads a cast's borrowed model before it plays (Reverse Grapple's pull).
-/// 24: the add-on says `ac22` (patches 0031 to 0035).
-/// 25: the add-on says `ac23` (patches 0036 to 0039).
+/// 24: the add-on says `ac22` (patches 0032 to 0036).
+/// 25: the add-on says `ac23` (patches 0037 to 0040).
 pub(crate) const ADDON_NEWEST: u32 = 26;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
 /// as an ability lands (0026). 19: an object drawn longer along one axis, and doodads placed as
-/// objects (0027): Tripwire's rope.
-/// 20: a missile's ribbon, size and spin (0029).
-/// 21: a rope from a unit's hand (0030).
-/// 22: the bowstring on its bow (0031), units that never fade (0032), the aiming camera's tip down (0033), the arrow display (0034) and a missile's tumble (0035).
-/// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0036), a crossfade from one clip to the next (0037), a game object flagged `0x08000000` glowing at its top (0038) and a missile's own speed (the `ML` line's tenth field, 0039).
+/// objects (0028): Tripwire's rope.
+/// 20: a missile's ribbon, size and spin (0030).
+/// 21: a rope from a unit's hand (0031).
+/// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
+/// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
 pub(crate) const CLIENT_NEWEST: u8 = 23;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
@@ -1259,9 +1259,9 @@ impl SurvivalGame {
                 // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
                 // object stretched from end to end (Tripwire's rope); `ac20` a missile's look; `ac21` a rope
                 // from the hand; `ac22` the bowstring on its bow, units with no fade, the aiming
-                // camera's tip down, the arrow display and a missile's tumble (patches 0031 to 0035);
+                // camera's tip down, the arrow display and a missile's tumble (patches 0032 to 0036);
                 // `ac23` a clip on the legs alone, a crossfade between clips, a glowing object and a
-                // missile's own speed (patches 0036 to 0039).
+                // missile's own speed (patches 0037 to 0040).
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,
@@ -1279,7 +1279,7 @@ impl SurvivalGame {
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));
-                // `ac20` draws a missile's look (patch 0029): every spell's that has one.
+                // `ac20` draws a missile's look (patch 0030): every spell's that has one.
                 if level >= super::draw::MISSILE_LOOK_LEVEL {
                     for l in &self.sim.content.missile_looks {
                         self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None, l.tumble, l.speed));

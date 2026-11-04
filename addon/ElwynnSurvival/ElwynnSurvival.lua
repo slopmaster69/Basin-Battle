@@ -6645,7 +6645,7 @@ function ES.Line(line)
       ES.marksUp.tg[key] = 1
     end
   elseif verb == "RP" then
-    -- A taut rope from a unit's hand to another unit or a spot (patch 0030): a grappling hook's
+    -- A taut rope from a unit's hand to another unit or a spot (patch 0031): a grappling hook's
     -- line as it pulls its hunter in, a haul's.
     if SetUnitRope and f[2] and f[3] then
       local key = "es" .. f[2]
@@ -6657,10 +6657,10 @@ function ES.Line(line)
       end
     end
   elseif verb == "ML" then
-    -- How a spell's missiles look (patch 0029): a ribbon behind them, their size and a spin; with
+    -- How a spell's missiles look (patch 0030): a ribbon behind them, their size and a spin; with
     -- a caster's guid, for its next one alone (a ricochet's colour); the spin's axis after it
-    -- ("side": end over end, patch 0035; "-" in the caster's place when there's none); and a
-    -- speed of their own in yards a second after that (patch 0039; absent or 0: the spell's own,
+    -- ("side": end over end, patch 0036; "-" in the caster's place when there's none); and a
+    -- speed of their own in yards a second after that (patch 0040; absent or 0: the spell's own,
     -- which older clients keep: they take no tenth argument).
     if SetMissileLook and f[2] then
       local trail = f[3]
@@ -6825,7 +6825,7 @@ events:SetScript("OnEvent", function()
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
     -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
     -- ac18: a shape flashed on the ground as an ability lands (0026); ac19: an object drawn longer
-    -- along one axis, and the dig site's rope (0027, Tripwire's wire).
+    -- along one axis, and the dig site's rope (0028, Tripwire's wire).
     -- ac20: a missile's look (SetMissileLook: a ribbon behind it, its size, a spin).
     -- ac21: a rope from a unit's hand (SetUnitRope: a grappling hook's line).
     -- ac22: the bowstring on its bow, units that never fade, the aiming camera's tip down.

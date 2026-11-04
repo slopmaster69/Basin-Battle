@@ -121,7 +121,7 @@ pub const TYPEMASK_PLAYER: u32 = 0x01 | 0x08 | 0x10;
 pub const UNIT_FLAG_PVP_ATTACKABLE: u32 = 0x08;
 /// `UNIT_DYNFLAG_DEAD`: drawn as a corpse.
 pub const UNIT_DYNFLAG_DEAD: u32 = 0x20;
-/// Ours, read by client patch 0032 (`ac22`): the unit is drawn at once and gone at once, with no
+/// Ours, read by client patch 0033 (`ac22`): the unit is drawn at once and gone at once, with no
 /// appear fade and no teardown fade (a spirit beast called in for one strike). Far above the bits
 /// the data uses; a stock client ignores it.
 pub const UNIT_DYNFLAG_NO_FADE: u32 = 0x1000;

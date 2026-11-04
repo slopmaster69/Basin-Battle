@@ -454,7 +454,7 @@ spell = 75
 subclass = 18
 
 # --- missile looks ---------------------------------------------------------------------------------
-# How chosen spells' missiles look on a client with patch 0029 (ac20): a glowing ribbon behind
+# How chosen spells' missiles look on a client with patch 0030 (ac20): a glowing ribbon behind
 # each (`trail`, "RRGGBB"; `width` yd, each stretch fading over `secs`), the model `scale` times
 # its size, and `spin` turns a second, flat. Arrows and a thrown axe were too thin to follow at
 # night, with no spell effect in the data that fixed it (Corey's review; 14 missiles were tried
@@ -484,7 +484,7 @@ width = 0.4
 secs = 0.5
 
 # Kill Shot once it flies Fire Shot's bolt (10346, #157): the same hot line, wider, the bolt drawn
-# half again its size, and flown at 120 yd/s on a client with patch 0039 (the rules land it at
+# half again its size, and flown at 120 yd/s on a client with patch 0040 (the rules land it at
 # that speed; older clients fly the spell's own 80, so there the bolt arrives after the hit).
 # Corey's review, Nov 4: "maybe even needs to be faster".
 [[missile_look]]
@@ -4460,7 +4460,7 @@ radius = [0.3, 0.3]
 speed = 40.0
 # Hotter each bounce (Corey's review: "every bounce should change the color of the trail"):
 # yellow as it flies, orange off the first wall, red off the second. Drawn on a client with patch
-# 0029.
+# 0030.
 bounce_trail = ["FFE27A", "FF9A2A", "FF3A1A"]
 bounces = 2
 bounce_gain = 0.5
@@ -4980,7 +4980,7 @@ pierce = 9
 execute = 0.25
 # Faster than anything flies in 1.12 (Fire Shot's missile, the quickest, flies 80 yd/s; no arrow
 # faster than 40). Corey's review, Nov 4: at 80 it looked too like Aimed Shot, then "maybe even
-# needs to be faster". The rules land it at this speed; a client with patch 0039 flies the bolt
+# needs to be faster". The rules land it at this speed; a client with patch 0040 flies the bolt
 # at it too (its `[[missile_look]]`'s `speed`); older clients fly it at the spell's own 80, so
 # there the bolt arrives after the hit.
 speed = 120.0

@@ -4,7 +4,7 @@ Date: Wed, 4 Nov 2026 12:43:51 -0600
 Subject: [PATCH] Display 60002 is the Hunter's arrow, for an arrow planted in
  the ground
 
-Arcane Shot's missile model as a game object (benilla's own displays from 60000, with 0027's
+Arcane Shot's missile model as a game object (benilla's own displays from 60000, with 0028's
 rope): a real arrow where a planted arrow stands, stood up by its spawn's rotation, instead of
 the brown feather doodad that stood in for it (Corey's review of Tripwire: "can we physically
 have arrows sticking vertically out of the ground?").

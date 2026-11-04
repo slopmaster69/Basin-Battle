@@ -55,7 +55,7 @@ pub struct Content {
     pub kick: ShoveDef,
     #[serde(rename = "ranged")]
     pub ranged: Vec<RangedDef>,
-    /// How chosen spells' missiles look on a client that draws them (patch 0029): a glowing
+    /// How chosen spells' missiles look on a client that draws them (patch 0030): a glowing
     /// ribbon behind them, a size, a flat spin.
     #[serde(rename = "missile_look", default)]
     pub missile_looks: Vec<MissileLookDef>,
@@ -781,7 +781,7 @@ pub struct PvpDef {
 }
 
 /// A bow or crossbow.
-/// A spell's missiles as a client with patch 0029 draws them (`SetMissileLook`): a ribbon of
+/// A spell's missiles as a client with patch 0030 draws them (`SetMissileLook`): a ribbon of
 /// `trail` (`"RRGGBB"`; empty, none) `width` yards wide, each stretch fading over `secs`, the model
 /// `scale` times its size and spinning `spin` turns a second, flat. Keyed by the spell, so every
 /// ability flying it looks so.
@@ -802,7 +802,7 @@ pub struct MissileLookDef {
     /// of flat about its up (the sixteenth client; older ones spin it flat).
     #[serde(default)]
     pub tumble: bool,
-    /// How fast it flies, yards a second, on a client with patch 0039 (0: the spell's own speed,
+    /// How fast it flies, yards a second, on a client with patch 0040 (0: the spell's own speed,
     /// which the clients cap at 100): a bolt quicker than anything in the data (Kill Shot). The
     /// rules' own speed is the ability's; this keeps the look in step with it.
     #[serde(default)]

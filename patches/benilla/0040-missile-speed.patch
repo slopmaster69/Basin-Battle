@@ -9,8 +9,8 @@ flies the dressed missile at that many yards a second from where it is, over the
 gives it and over the 100 yd/s cap the launch's refit keeps (up to 400 now), so a hurled weapon can
 cross the field as fast as a thrown axe should. `0` or nothing keeps the spell's own, and every
 older line (nine arguments) reads as before. `HasActionCombat()` says 23, and the module's notes
-list this round's additions: the lower-body clip (0036), the crossfade between clips (0037), the
-glowing object (0038) and this.
+list this round's additions: the lower-body clip (0037), the crossfade between clips (0038), the
+glowing object (0039) and this.
 ---
  crates/benilla-app/src/entities.rs         |  4 +-
  crates/benilla-app/src/entities/missile.rs | 52 +++++++++++++++++++++-

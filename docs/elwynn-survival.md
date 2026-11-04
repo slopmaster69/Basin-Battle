@@ -191,15 +191,15 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
   (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
   Tripwire, two arrows placed a press each and a wire that knocks down the first to cross (a rope
-  stretched between the arrows, on a client with patch 0027; older ones see a strip on the ground),
+  stretched between the arrows, on a client with patch 0028; older ones see a strip on the ground),
   or the traps. 3:
   Kill Shot, or Skyfall: a leap straight up, a 5.5 s hang there with the bow drawn on a ring below,
   and a volley of 12 arrows where you aim (they plant), then a slow fall. Every bow ability brings
-  the bow into the hands and draws it with the base game's bow draw. On a client with patch 0029
+  the bow into the hands and draws it with the base game's bow draw. On a client with patch 0030
   the Hunter's arrows trail a glowing ribbon (pale, burning for a full Aimed Shot, gold-red for
   Kill Shot, frost for Multi-Shot), and Bank Shot's turns from yellow to orange to red with each
   bounce. `[[missile_look]]` in `content/survival.toml` sets a spell's. On a client with patch
-  0030, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
+  0031, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
   Grapple hauls a foe in on one.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps

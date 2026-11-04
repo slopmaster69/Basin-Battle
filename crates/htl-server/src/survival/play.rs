@@ -704,7 +704,7 @@ impl SurvivalGame {
                 self.area_looks.insert(id, guid);
             }
             Event::Rope { id, a, b } => {
-                // On the clients that stretch a rope from end to end (patch 0027), in place of the
+                // On the clients that stretch a rope from end to end (patch 0028), in place of the
                 // strip on the ground laid for it just before (taken off theirs as a gone mark's
                 // is: floor clutter, Corey's review); the rest keep the strip.
                 let p = self.rope_create(id, a, b);
@@ -719,7 +719,7 @@ impl SurvivalGame {
                 self.ropes.insert(id);
             }
             Event::Tether { from, to, secs } => {
-                // A taut line from the hand (patch 0030): `RP <key> <from> <to's guid or -> <x> <y>
+                // A taut line from the hand (patch 0031): `RP <key> <from> <to's guid or -> <x> <y>
                 // <z> <secs>`, keyed by who holds it, so a new line replaces theirs.
                 let Some(g) = self.guid_of(from) else { return };
                 let (to_guid, at) = match to {
@@ -737,7 +737,7 @@ impl SurvivalGame {
             }
             Event::MissileTint { caster, spell, ability, bounce } => {
                 // The next missile `caster` flies of the spell takes its bounce's colour, on the
-                // clients that draw a missile's look (patch 0029): Bank Shot hotter each bounce.
+                // clients that draw a missile's look (patch 0030): Bank Shot hotter each bounce.
                 // A stand-in flies the arrow on from a ricochet, so its own guid names that one.
                 let Some(g) = self.stand_ins.get(&caster).map(|s| s.guid).or_else(|| self.guid_of(caster)) else { return };
                 let c = &self.sim.content;

@@ -1858,7 +1858,7 @@ fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
 }
 
 /// To a client with the arrow display (`ac22`), a planted arrow is the wooden doodad arrow
-/// (60003) at half again its size, its flags carrying the glow bit client patch 0038 lights it
+/// (60003) at half again its size, its flags carrying the glow bit client patch 0039 lights it
 /// by (no feather for it).
 #[test]
 fn a_planted_arrow_is_the_wooden_arrow_half_again_its_size_with_the_glow_flag_for_a_client_that_draws_it() {
