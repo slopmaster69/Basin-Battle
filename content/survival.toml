@@ -3528,7 +3528,11 @@ cooldown = 16.0
 # Placeholder looks (to be checked in the lab): Berserker Rage's own cast and look on the warrior
 # for the 3 sec, the roar (55) as the clip.
 spell = 18499
-clip = 55
+# The berserker shrugging it off, the same on every race: the orc men's Flex emote (82/0), arms
+# up and fists clenched. Blood Fury keeps the battle roar (55), the Roar roars (74).
+clip = 82
+take = 0
+from = "OrcMale"
 effects = [{ kind = "steadfast", secs = [3.0, 3.0], amount = 1.0, aura = 18499 }]
 
 # Berserker Rage's EX: blood for fury. 15% of the health they have now (never the last point) for
