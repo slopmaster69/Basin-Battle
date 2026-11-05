@@ -28,6 +28,7 @@ pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 pub mod hunter;
+pub mod lab;
 mod raid;
 pub mod siege;
 mod orb;
@@ -896,6 +897,10 @@ pub struct Survival {
     pub(crate) burnings: Vec<abilities::Burning>,
     /// Orbs rolling out (Frozen Orb), until stopped or spent.
     pub(crate) orbs: Vec<orb::Orb>,
+    /// The spell lab's bodies, which swing only when the lab asks (`lab_blow`, the one in
+    /// `lab_blowing` while it does).
+    pub(crate) lab_quiet: Vec<Id>,
+    pub(crate) lab_blowing: Option<Id>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -1019,6 +1024,8 @@ impl Survival {
             lockouts: BTreeMap::new(),
             burnings: Vec::new(),
             orbs: Vec::new(),
+            lab_quiet: Vec::new(),
+            lab_blowing: None,
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),

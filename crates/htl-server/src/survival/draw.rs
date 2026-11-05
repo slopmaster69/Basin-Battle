@@ -32,7 +32,7 @@ fn spirit_beast(key: &str) -> bool {
 
 /// A hero's model: their race's own, a man's or a woman's (1.12's `ChrRaces` displays, by race
 /// id 1 to 8).
-fn native_display(race: u8, gender: u8) -> u32 {
+pub(crate) fn native_display(race: u8, gender: u8) -> u32 {
     let [man, woman] = match race {
         2 => [51, 52],
         3 => [53, 54],

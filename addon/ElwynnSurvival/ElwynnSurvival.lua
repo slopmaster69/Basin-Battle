@@ -6525,6 +6525,8 @@ function ES.Line(line)
     if ES.OwnMeter then ES.OwnMeter(f) end
   elseif verb == "DM" then
     if ES.FightMeter then ES.FightMeter(f) end
+  elseif verb == "LB" then
+    if ES.LabLine then ES.LabLine(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "WD" then
