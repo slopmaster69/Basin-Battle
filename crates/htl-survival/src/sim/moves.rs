@@ -19,13 +19,25 @@ const PULL_STOP: f32 = 1.6;
 /// The farthest a knockback or a pull moves a training dummy (it has no legs to walk back).
 const DUMMY_STEP: f32 = 1.0;
 /// A leap's arc where the ability names none.
-const LEAP_LIFT: f32 = 6.0;
+pub(crate) const LEAP_LIFT: f32 = 6.0;
 /// One step along the ground for a slide's end.
 const STEP: f32 = 0.4;
 /// The traps of one kind a hero can have set at once.
 const MOST_TRAPS: usize = 2;
+/// How fast a thrown trap flies to its spot (yards a second): a lob you can follow, 10 yd in
+/// about 0.6 s.
+const TRAP_THROW_SPEED: f32 = 16.0;
 /// A wind-up's beat after it goes off.
 const WINDUP_RECOVERY: f32 = 0.3;
+/// A dive (Stoop) meets the ground this long after it starts, however high that is: driven down,
+/// a slam, not a fall (from the Uppercut's 5 yd a plain fall takes about 0.7 sec).
+pub(crate) const DIVE_SECS: f32 = 0.3;
+/// A dive from this high (yd) or higher deals its full damage; from the ground, its least. The
+/// Uppercut's rise (lift 14) peaks at 5.1 yd, so a Stoop at the top of it hits its hardest.
+pub(crate) const DIVE_FULL_HEIGHT: f32 = 5.0;
+/// A dive's clip (Special2H, a two-handed blow driven down), played so that it strikes as the
+/// hero lands, with a short recovery after: the landing is the blow.
+const DIVE_CLIP: u16 = 58;
 
 /// A leap in the air: it lands at `at` then, striking what's there.
 #[derive(Debug, Clone)]
@@ -80,6 +92,21 @@ pub(crate) fn airtime(lift: f32) -> f32 {
     2.0 * lift.max(0.5) / GRAVITY
 }
 
+/// How high over the ground a body thrown up at `lift` is `t` seconds into its arc (none before
+/// it or after it lands).
+pub(crate) fn arc_height(lift: f32, t: f32) -> f32 {
+    if lift <= 0.0 {
+        return 0.0;
+    }
+    let t = t.clamp(0.0, airtime(lift));
+    (lift * t - 0.5 * GRAVITY * t * t).max(0.0)
+}
+
+/// How high a creature thrown up (`lift`, landing at `until`) is at `now`.
+pub(crate) fn loft_at(lift: f32, until: f32, now: f32) -> f32 {
+    arc_height(lift, now - (until - airtime(lift)))
+}
+
 impl Survival {
     // --- knockbacks and pulls ------------------------------------------------------------------------
 
@@ -103,7 +130,7 @@ impl Survival {
     }
 
     /// A knockback or a pull on someone: thrown through the air (a hero's own client flies it),
-    /// whatever they had in hand lost. Nothing moves a body in Ice Block, Onslaught or Sanctuary.
+    /// whatever they had in hand lost. Nothing moves a body in Ice Block, steadfast or rallied.
     pub(crate) fn displace(&mut self, owner: Id, victim: Id, e: &AbilityEffect) {
         let now = self.clock;
         let Some(v) = self.unit_pos(victim) else { return };
@@ -170,8 +197,14 @@ impl Survival {
             self.set_action(victim, Action::Stagger { until: now + air });
             self.events.push(Event::Hop { player: victim, dir, speed: moved / air, lift, roll: false, style: "" });
         } else {
+            // Driven back, not turned to run: the big recoil over the whole throw, on the whole
+            // body, faced at whoever threw it (Corey's review, Nov 4).
+            self.events.push(Event::React { id: victim, anim: combat::CRIT_ANIM, from: origin, lean: 0.4, hold: 0.0, fit: air });
             self.stagger_mob(victim, air + 0.15, false);
-            self.throw_mob(victim, to, air, Some(owner));
+            // A knockback thrown higher than a plain one (the Uppercut's launch) throws a
+            // creature up: it rises and falls over its time in the air, and everyone sees it.
+            let up = if !pull && e.lift > KNOCK_LIFT { lift } else { 0.0 };
+            self.throw_mob(victim, to, air, Some(owner), up);
             // A dummy isn't stepped (it only stands there): it's where the throw ends at once,
             // while everyone's client flies it there.
             if dummy {
@@ -266,9 +299,19 @@ impl Survival {
         }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
         self.events.push(Event::Hop { player: id, dir, speed: dist / air, lift, roll: false, style: "" });
+        // Its own look (a Disengage's flip), the same from the ground as from mid-jump.
+        if d.leap_clip != 0 || d.leap_flip {
+            self.events.push(Event::LeapLook { player: id, secs: air, clip: d.leap_clip, take: d.leap_take, from: d.leap_from.clone(), flip: d.leap_flip });
+        }
         self.set_action(id, Action::Dash { t: 0.0, secs: air, ability, target: None, share });
+        // Its swing held up through the air, the blow landing as it comes down (a clip's impact
+        // is half its length).
+        if d.clip != 0 {
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: air * 2.0, at: 0.0 });
+        }
         let radius = AbilityDef::at(d.radius, share);
-        let mark = (radius > 0.0).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));
+        // `unmarked`: nothing on the ground where it comes down (only the warning over a rival).
+        let mark = (radius > 0.0 && !d.unmarked).then(|| self.mark_as(target, radius, air + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, air, Some((target, dir))) })));
         // A rival where it comes down hears it coming too (the warning over them), not only the
         // mark on the ground, which they may have turned off or not be looking at.
         if radius > 0.0 {
@@ -282,6 +325,77 @@ impl Survival {
             self.leave_at(id, l, pos, f);
         }
         self.landings.push(Landing { owner: id, ability, at: target, share, land_at: now + air, mark });
+    }
+
+    /// How high over the ground the hero is on the leap they're in (none on the ground).
+    pub(crate) fn leap_height(&self, id: Id) -> f32 {
+        match self.players.get(&id).map(|p| &p.action) {
+            Some(Action::Dash { t, ability, .. }) if self.content.abilities[*ability].kind == "leap" => {
+                let d = &self.content.abilities[*ability];
+                arc_height(if d.lift > 0.0 { d.lift } else { LEAP_LIFT }, *t)
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// A dive from the air (Stoop), on the key press: down onto the foe thrown up nearest the
+    /// hero within its range, else the one they're locked on, else the reticle's spot. It meets
+    /// the ground in [`DIVE_SECS`] however high it starts, and the higher that is, the harder it
+    /// hits (its share of its damage).
+    pub(crate) fn dive(&mut self, id: Id, ability: usize) {
+        let now = self.clock;
+        let d = self.content.abilities[ability].clone();
+        let range = AbilityDef::at(d.range, 1.0);
+        let pos = self.players[&id].pos;
+        let high = self.leap_height(id);
+        let share = (high / DIVE_FULL_HEIGHT).clamp(0.0, 1.0);
+        let thrown = self
+            .mobs
+            .iter()
+            .filter(|(_, m)| m.health > 0 && m.thrown_lift > 0.0 && m.thrown_until > now && dist2d(m.pos, pos) <= range)
+            .min_by(|a, b| dist2d(a.1.pos, pos).total_cmp(&dist2d(b.1.pos, pos)))
+            .map(|(_, m)| {
+                let up = loft_at(m.thrown_lift, m.thrown_until, now);
+                (self.ground_near(m.pos[0], m.pos[1], m.pos[2] - up), 0.5 * self.content.mobs[m.def].scale)
+            });
+        let locked = self.players[&id].lock.filter(|l| self.alive(*l)).and_then(|l| self.unit_pos(l).map(|at| (l, at))).filter(|(_, at)| dist2d(*at, pos) <= range).map(|(l, at)| {
+            let body = self.mobs.get(&l).map_or(HERO_SIZE, |m| 0.5 * self.content.mobs[m.def].scale);
+            (self.ground_near(at[0], at[1], at[2]), body)
+        });
+        let (foe, body) = match thrown.or(locked) {
+            Some((at, body)) => (Some(at), body),
+            None => (None, 0.0),
+        };
+        let foe_at = foe.unwrap_or_else(|| self.aim_point(id, range));
+        let dir = if dist2d(pos, foe_at) > 0.1 { facing(pos, foe_at) } else { self.players[&id].facing };
+        // Onto a foe: down at its side, not into its body (the visual check showed the hunter
+        // standing inside the dummy after the slam); its blow still lands on it.
+        let target = match foe {
+            Some(at) if dist2d(pos, at) > body + HERO_SIZE + 0.1 => self.ground_near(at[0] - dir.cos() * (body + HERO_SIZE), at[1] - dir.sin() * (body + HERO_SIZE), at[2]),
+            _ => foe_at,
+        };
+        let dist = dist2d(pos, target);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.facing = dir;
+        }
+        // Thrown down to meet the ground in DIVE_SECS from that height: its upward speed is
+        // (g t² / 2 - height) / t, below zero (driven down) from any real height.
+        let lift = (0.5 * GRAVITY * DIVE_SECS * DIVE_SECS - high) / DIVE_SECS;
+        // The leap it dives out of is over, and its landing with it.
+        let (over, keep): (Vec<Landing>, Vec<Landing>) = std::mem::take(&mut self.landings).into_iter().partition(|l| l.owner == id);
+        self.landings = keep;
+        for m in over.into_iter().filter_map(|l| l.mark) {
+            self.unmark(m);
+        }
+        self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
+        // (Some way along it, however little: a throw with none isn't sent.)
+        self.events.push(Event::Hop { player: id, dir, speed: (dist / DIVE_SECS).max(0.1), lift, roll: false, style: "" });
+        // The blow driven down with it, striking as it lands.
+        self.events.push(Event::Clip { id, clip: DIVE_CLIP, take: 0, from: None, secs: DIVE_SECS * 2.0, at: 0.0 });
+        self.set_action(id, Action::Dash { t: 0.0, secs: DIVE_SECS, ability, target: None, share });
+        let radius = AbilityDef::at(d.radius, share);
+        let mark = (radius > 0.0).then(|| self.mark_as(target, radius, DIVE_SECS + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, DIVE_SECS, Some((target, dir))) })));
+        self.landings.push(Landing { owner: id, ability, at: target, share, land_at: now + DIVE_SECS, mark });
     }
 
     /// Something an ability leaves where it went from: a trap set, a nova, ground.
@@ -360,13 +474,21 @@ impl Survival {
     // --- traps ----------------------------------------------------------------------------------------
 
     /// A trap set at the reticle (or the feet): the oldest of its kind goes if there are too many.
+    /// With a `lob_spell`, it is thrown there first: its look flies from the hand and the trap is
+    /// set where it lands ([`Self::lob_lands`]), so the throw is seen (Corey's review).
     pub(crate) fn place_trap(&mut self, id: Id, ability: usize, share: f32) {
         let d = self.content.abilities[ability].clone();
         let at = if d.at_self { self.players[&id].pos } else { self.aim_point(id, AbilityDef::at(d.range, share)) };
+        if d.lob_spell != 0 && !d.at_self {
+            let from = self.players.get(&id).map_or(at, |p| [p.pos[0], p.pos[1], p.pos[2] + 1.2]);
+            let speed = if d.speed > 0.0 { d.speed } else { TRAP_THROW_SPEED };
+            self.lob(id, ability, from, at, (speed, 0.3, share, 0.0, d.lob_spell));
+            return;
+        }
         self.set_trap(id, ability, at, share);
     }
 
-    fn set_trap(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
+    pub(crate) fn set_trap(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
         let mine: Vec<usize> = self.traps.iter().enumerate().filter(|(_, t)| t.owner == id && t.ability == ability).map(|(k, _)| k).collect();
@@ -376,7 +498,9 @@ impl Survival {
         }
         let radius = AbilityDef::at(d.radius, share);
         let life = d.secs.max(1.0);
-        let mark = self.mark_kind(at, radius, life, true);
+        // No circle under it: the trap's own model shows where it is (a hero's own circles are
+        // floor clutter, Corey's review), and a foe isn't shown where it waits.
+        let mark = self.mark_unseen(life);
         // The trap on the ground where it's set (no spell's look there: Explosive Trap's own
         // shows the client's placeholder at a point).
         let obj = (d.object != 0).then(|| {
@@ -427,6 +551,7 @@ impl Survival {
         let damage = AbilityDef::at(d.damage, t.share);
         self.area(t.owner, t.ability, t.at, burst, t.share, damage, None);
         self.linger_at(t.owner, t.ability, t.at, burst);
+        self.trap_empowers(t.owner, t.ability);
     }
 
     // --- anchors (Demonic Circle) -----------------------------------------------------------------
@@ -529,6 +654,10 @@ impl Survival {
             let radius = AbilityDef::at(d.radius, l.share);
             if d.impact_kit != 0 {
                 self.events.push(Event::Visual { id: l.owner, kit: d.impact_kit, by: None });
+            }
+            // A dive slams down: the ground shakes where it lands.
+            if d.dive {
+                self.events.push(Event::Visual { id: l.owner, kit: combat::KIT_DUST, by: None });
             }
             if radius > 0.0 {
                 let damage = AbilityDef::at(d.damage, l.share);

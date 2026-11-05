@@ -118,6 +118,9 @@ pub struct Content {
     pub valor: ValorDef,
     #[serde(default)]
     pub cc: CcDef,
+    /// The Juggernaut's Momentum: its numbers.
+    #[serde(default)]
+    pub momentum: MomentumDef,
     #[serde(default)]
     pub dev: DevDef,
     /// How long the work at the camp takes: making something at a station, building one, mending.
@@ -272,6 +275,12 @@ pub struct PlayerDef {
     pub guard_speed: f32,
     pub aim_speed: f32,
     pub use_speed: f32,
+    /// The clips a hero plays using an item marked `anim = "eat"` or `"drink"` (0: the Food
+    /// spell's cast instead).
+    #[serde(default)]
+    pub eat_clip: u16,
+    #[serde(default)]
+    pub drink_clip: u16,
     pub field_regen: f32,
     pub field_regen_after: f32,
     pub rest_regen: f32,
@@ -927,6 +936,20 @@ pub struct EffectDef {
     pub name: String,
 }
 
+impl ItemDef {
+    /// What a used item's `anim` may be: nothing, eating or drinking.
+    pub const ANIMS: [&'static str; 3] = ["", "eat", "drink"];
+
+    /// The clip the body plays using it (0: none, the Food spell's cast instead).
+    pub fn use_clip(&self, player: &PlayerDef) -> u16 {
+        match self.anim.as_str() {
+            "eat" => player.eat_clip,
+            "drink" => player.drink_clip,
+            _ => 0,
+        }
+    }
+}
+
 impl EffectDef {
     pub const KINDS: [&'static str; 5] = ["regen", "stamina", "might", "ward", "focus"];
 }
@@ -946,6 +969,18 @@ pub struct ItemDef {
     pub use_secs: f32,
     #[serde(default)]
     pub heal: f32,
+    /// The `heal` comes over this many seconds once it's used, instead of at once (a bite of
+    /// food: the healing comes after it, as a regeneration).
+    #[serde(default)]
+    pub heal_secs: f32,
+    /// A hit doesn't stop it: neither the use nor the healing after it (food, a fight's
+    /// resource). Otherwise a hit interrupts it and nothing is used.
+    #[serde(default)]
+    pub steady: bool,
+    /// What the body does using it: `eat`, `drink` (the clips `[player]` names), or nothing (the
+    /// Food spell's cast).
+    #[serde(default)]
+    pub anim: String,
     #[serde(default)]
     pub text: String,
     /// A used item's lasting effect.
@@ -1096,7 +1131,7 @@ pub struct DungeonDef {
     /// Raids the camp must have beaten before the book opens.
     #[serde(default)]
     pub gate_raids: u32,
-    /// The Miner's Draught (an item key): the only heal below, charges refilled at a lamp.
+    /// The Miner's Draught (an item key): the heal in a fight below, charges refilled at a lamp.
     pub draught: String,
     pub draughts: u32,
     pub draughts_max: u32,
@@ -1778,6 +1813,10 @@ pub struct MobDef {
     pub totem: bool,
     #[serde(default)]
     pub dummy: bool,
+    /// A look it always wears: a spell whose state look plays on it (a spirit beast's ghostly
+    /// glow). 0: none.
+    #[serde(default)]
+    pub aura: u32,
     /// The cards the camp learns the first time it falls (a class's champion).
     #[serde(default)]
     pub teaches: Vec<String>,
@@ -2663,6 +2702,12 @@ impl Content {
     fn validate(&self) -> Result<()> {
         // Gear's perks and sets.
         for i in &self.items {
+            if !ItemDef::ANIMS.contains(&i.anim.as_str()) {
+                bail!("item {}: anim {:?} (one of {:?})", i.key, i.anim, ItemDef::ANIMS);
+            }
+            if i.heal_secs < 0.0 {
+                bail!("item {}: heal_secs {} below 0", i.key, i.heal_secs);
+            }
             for p in &i.perks {
                 if !EffectDef::KINDS.contains(&p.kind.as_str()) {
                     bail!("item {}: a perk of kind {:?} (one of {:?})", i.key, p.kind, EffectDef::KINDS);
@@ -3154,6 +3199,9 @@ impl Content {
             if !a.is_ex() && !a.inner && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
                 bail!("{what}: a card needs its column, `school` (one of {SCHOOLS:?}, or {BETA} for the beta page)");
             }
+            if a.bow_damage > 0.0 && (!a.bow || a.kind != "projectile" || a.damage[1] > 0.0) {
+                bail!("{what}: a share of the bow's damage (`bow_damage`) is for a bow's projectile, in place of its own `damage`");
+            }
             if a.kind == "art" && a.weapon <= 0.0 {
                 bail!("{what}: a weapon art needs its share of the weapon's damage (`weapon`)");
             }
@@ -3169,7 +3217,7 @@ impl Content {
             if a.kind == "ally" && !a.foe_damage && (a.damage[0] > 0.0 || a.damage[1] > 0.0) {
                 bail!("{what}: an ally ability helps whoever it lands on: no `damage` (unless `foe_damage`: a foe on the line takes it)");
             }
-            if a.kind == "beam" && (a.range[1] <= 0.0 || a.radius[1] <= 0.0 || a.secs <= 0.0) {
+            if a.kind == "beam" && ((a.range[1] <= 0.0 && !a.around) || a.radius[1] <= 0.0 || a.secs <= 0.0) {
                 bail!("{what}: a beam needs its length (`range`), half-width (`radius`) and how long it's held (`secs`)");
             }
             if a.cast > 0.0 && !matches!(a.kind.as_str(), "cone" | "nova" | "line") {
@@ -3197,8 +3245,25 @@ impl Content {
             if (a.lob || a.fuse > 0.0) && a.splash <= 0.0 {
                 bail!("{what}: a lobbed or sticky projectile bursts where it goes off: it needs `splash`");
             }
-            if a.kind == "place" && a.totem.is_none() {
-                bail!("{what}: a placed ability needs a [ability.totem]");
+            // (A banner's recast moves the banner its first cast planted: it needs none of its own.)
+            let banner = a.banner.is_some() || (a.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == a.key));
+            if a.kind == "place" && a.totem.is_some() == banner {
+                bail!("{what}: a placed ability needs a [ability.totem] or a `banner` (one of them)");
+            }
+            if a.banner.is_some() && (a.kind != "place" || a.object == 0 || a.secs <= 0.0) {
+                bail!("{what}: a banner is placed (`kind = \"place\"`), with its look (`object`) and how long it stands (`secs`)");
+            }
+            if a.banner.as_ref().is_some_and(|b| b.health <= 0.0) || (a.banner.is_some() && a.radius[1] <= 0.0) {
+                bail!("{what}: a banner needs its `health`, and the reach it helps in (`radius`)");
+            }
+            if a.breaks_free && a.kind != "buff" {
+                bail!("{what}: only a buff breaks free (`breaks_free`)");
+            }
+            if !(0.0..1.0).contains(&a.health_cost) || (a.health_cost > 0.0 && a.kind != "buff") {
+                bail!("{what}: only a buff costs health, a share of it below 1 (`health_cost`)");
+            }
+            if !a.passive.is_empty() && (!PASSIVES.contains(&a.passive.as_str()) || a.is_ex() || a.inner) {
+                bail!("{what}: passive {:?} (one of {PASSIVES:?}, on a card: not an EX version or an inner one)", a.passive);
             }
             if a.kind == "stance" && a.counter.is_none() {
                 bail!("{what}: a stance needs a [ability.counter]");
@@ -3221,11 +3286,46 @@ impl Content {
             if !(1..=2).contains(&a.choice) {
                 bail!("{what}: choice {} (1 or 2: a class has two a row)", a.choice);
             }
+            // The Warlord's mechanics.
+            if a.crash.is_some() && a.kind != "dash" {
+                bail!("{what}: only a dash carries a body to Crash it (`crash`)");
+            }
+            if a.intervene > 0.0 && a.kind != "ally" {
+                bail!("{what}: only an ally ability rushes to a friend to take a blow (`intervene`)");
+            }
+            if (a.ally_stamina > 0.0 || !a.ally_effects.is_empty()) && a.kind != "nova" {
+                bail!("{what}: only a nova gives friends stamina or boons (`ally_stamina`, `ally_effects`)");
+            }
+            if a.ally_effects.iter().any(|e| !BOONS.contains(&e.kind.as_str())) {
+                bail!("{what}: `ally_effects` are boons (one of {BOONS:?})");
+            }
+            if (a.around || a.ramp > 0.0) && a.kind != "beam" {
+                bail!("{what}: only a beam spins round the caster (`around`) or ramps (`ramp`)");
+            }
+            if a.ramp > 0.0 && a.ramp_cap <= 0.0 {
+                bail!("{what}: a ramp needs its most a strike (`ramp_cap`)");
+            }
+            if a.bail && a.kind != "beam" {
+                bail!("{what}: only a beam is ended into a guard (`bail`)");
+            }
             if a.bounces > 0 && a.kind != "projectile" {
                 bail!("{what}: only a projectile ricochets (`bounces`)");
             }
+            if !a.splits.is_empty() {
+                match self.ability(&a.splits).map(|k| &self.abilities[k]) {
+                    Some(s) if a.kind == "projectile" && s.inner && s.kind == "projectile" && s.splits.is_empty() => {}
+                    _ => bail!("{what}: a projectile splits into an `inner` projectile that doesn't split again (`splits` {})", a.splits),
+                }
+            }
             if a.empower.as_ref().is_some_and(|e| e.secs <= 0.0) {
                 bail!("{what}: an empower needs its `secs`");
+            }
+            // A leap's own look: on a leap, from a character model the clients can find.
+            if (a.leap_clip != 0 || a.leap_flip || !a.leap_from.is_empty()) && a.kind != "leap" {
+                bail!("{what}: only a leap has a leap's look (`leap_clip`, `leap_from`, `leap_flip`)");
+            }
+            if !a.leap_from.is_empty() && (a.leap_clip == 0 || !clip_source_ok(&a.leap_from)) {
+                bail!("{what}: leap_from {:?} needs a `leap_clip` and a character model (<Race><Gender>, as ScourgeFemale)", a.leap_from);
             }
             // The beta page's mechanics.
             let tether = a.tether_secs > 0.0;
@@ -3270,7 +3370,7 @@ impl Content {
                     bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
                 }
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects) {
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {
@@ -3421,6 +3521,11 @@ impl Content {
         } else {
             a
         }
+    }
+    /// A War Banner's: it plants a `banner`, or it's the recast of one that does (which moves it).
+    pub fn plants_banner(&self, a: usize) -> bool {
+        let d = &self.abilities[a];
+        d.banner.is_some() || (d.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == d.key))
     }
 }
 

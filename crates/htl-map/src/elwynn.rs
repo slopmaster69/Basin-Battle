@@ -115,7 +115,13 @@ pub struct LoadedElwynn {
     pub zone: ZoneMask,
     /// The caves and mines (under the hills, where the ground has floors below floors).
     pub caves: Vec<Cave>,
+    /// The buildings' and doodads' solid shapes in the round, for a line to meet (a grappling
+    /// hook into a roof, a boulder, a fence).
+    pub solids: crate::solids::Solids,
 }
+
+/// The solid shapes are bucketed in cells this many yards a side.
+const SOLID_CELL: f32 = 4.0;
 
 /// A cave or a mine: its own ground with floors below floors (its tunnels under the hill's
 /// slope), over its box (the model and a margin of the land round its mouth).
@@ -246,6 +252,10 @@ pub fn load_region(data_dir: &Path, r: &Region) -> Result<LoadedElwynn> {
         caves.push(Cave { model: b.model.clone(), min, max, ground });
     }
     world::mark_roads(&mut grid, &chunks, road_texture);
+    // The shapes in the round: every building's faces and every doodad's collision hull.
+    let mut solid: Vec<crate::solids::Tri> = buildings.iter().flat_map(|b| b.tris.iter().copied()).collect();
+    solid.extend(world::doodad_hulls(&mut chain, &tiles, min_, max_));
+    let solids = crate::solids::Solids::build(min_, max_, SOLID_CELL, solid);
     let mut seen = std::collections::HashSet::new();
     let mut trunks = Vec::new();
     for t in &tiles {
@@ -262,5 +272,5 @@ pub fn load_region(data_dir: &Path, r: &Region) -> Result<LoadedElwynn> {
             }
         }
     }
-    Ok(LoadedElwynn { min: min_, max: max_, grid, trunks, zone: ZoneMask { cells: zone, dims: zone_dims, origin: min_ }, caves })
+    Ok(LoadedElwynn { min: min_, max: max_, grid, trunks, zone: ZoneMask { cells: zone, dims: zone_dims, origin: min_ }, caves, solids })
 }

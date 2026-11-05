@@ -19,6 +19,8 @@ mod tests;
 #[cfg(test)]
 mod tests_below;
 #[cfg(test)]
+mod tests_regen;
+#[cfg(test)]
 mod tests_chase;
 #[cfg(test)]
 mod tests_abilities;
@@ -49,9 +51,17 @@ mod tests_support;
 #[cfg(test)]
 mod tests_tactics;
 #[cfg(test)]
+mod tests_hunter_wild;
+#[cfg(test)]
 mod tests_projectiles;
 #[cfg(test)]
 mod tests_class_warrior_paladin_hunter;
+#[cfg(test)]
+mod tests_warrior_notes;
+#[cfg(test)]
+mod tests_warlord;
+#[cfg(test)]
+mod tests_bank_shot;
 #[cfg(test)]
 mod tests_class_rogue_priest_shaman;
 #[cfg(test)]
@@ -66,3 +76,7 @@ mod tests_sim;
 mod tests_camp;
 #[cfg(test)]
 mod tests_building;
+#[cfg(test)]
+mod tests_raptor;
+#[cfg(test)]
+mod tests_hunter_bow;

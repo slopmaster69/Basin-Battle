@@ -90,10 +90,21 @@ attack_speed = 3.0
 guard_speed = 3.5
 aim_speed = 3.0
 use_speed = 2.5
-# Health back a second, as a share of max: in the field after a while out of combat, and resting
-# at the camp (never during the settlement attack).
-field_regen = 0.004
-field_regen_after = 10.0
+# The clips a hero plays using an item marked `anim = "eat"` or `anim = "drink"`, over its
+# `use_secs`, on every client that plays clips (`/esclip 61` tries one on yourself). 61 is
+# EmoteEat, the 1.12 client's /eat. The 1.12 client has no drinking clip of its own (its /drink
+# plays EmoteEat as well), so a drink plays the same until a better one is found; 0 falls back
+# to the Food spell's cast.
+eat_clip = 61
+drink_clip = 61
+# Health back a second, as a share of max: anywhere (the field, below, Siege) once this long has
+# passed since the hero last dealt or took a blow, and resting at the camp (never during the
+# settlement attack). In a fight only gear, set bonuses, food and heals bring health back.
+# On trial (#118, Corey's call): 2% a second from 5 sec out of combat, to recover between pulls
+# without making everyone full before the next fight, so healers still matter. Try it on the
+# next dungeon run and tune. (Was 0.4% a second from 10 sec, which barely registered.)
+field_regen = 0.02
+field_regen_after = 5.0
 rest_regen = 0.08
 respawn_secs = 6.0
 # Health on getting back up.
@@ -658,10 +669,14 @@ display = 4112
 icon = "INV_Misc_Food_15"
 kind = "food"
 stack = 5
-# Eating takes this long (moving slowly, open to a hit) and heals this share of max health.
-use_secs = 1.6
+# Food is a fight's resource (#118): a quick bite (this long, moving slowly), then this share of
+# max health over `heal_secs`. `steady`: a hit neither stops the bite nor the healing after it.
+use_secs = 1.0
 heal = 0.45
-text = "Heals 45% of your health over a 1.6 sec meal. Taking damage interrupts it. Press (T) to eat."
+heal_secs = 5.0
+steady = true
+anim = "eat"
+text = "Heals 45% of your health over 5 sec after a 1 sec bite. Taking damage doesn't stop it. Press (T) to eat."
 
 [[item]]
 key = "axe"
@@ -839,9 +854,12 @@ display = 557
 icon = "INV_Misc_Bowl_01"
 kind = "food"
 stack = 5
-use_secs = 2.0
+use_secs = 1.0
 heal = 0.5
-text = "Heals 50% of your health. Increases stamina regeneration by 20% for 3 min."
+heal_secs = 6.0
+steady = true
+anim = "eat"
+text = "Heals 50% of your health over 6 sec after a 1 sec bite. Increases stamina regeneration by 20% for 3 min."
 effect = { kind = "stamina", amount = 0.2, secs = 180.0, name = "Well Fed" }
 
 [[item]]
@@ -865,6 +883,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 below = true
+anim = "drink"
 text = "Increases stamina regeneration by 50% for 60 sec."
 effect = { kind = "stamina", amount = 0.5, secs = 60.0, name = "Tonic" }
 
@@ -1845,8 +1864,8 @@ boss = true
 posture = 240
 drops = { ore = [3, 4], bronze = [1, 2], leather = [1, 2] }
 trophy = { warlord_axe = 1, warlord_helm = 1 }
-# The Warrior's champion: every hero who fought him learns Onslaught as he falls.
-teaches = ["onslaught"]
+# The Warrior's champion: every hero who fought him learns Bladestorm and Rallying Cry as he falls.
+teaches = ["warrior_bladestorm", "rallying_cry"]
 respawn = 600.0
   [mob.attack]
   windup = 0.9
@@ -3002,8 +3021,18 @@ panic_speed = 5.0
 ranged = "hurled_axe"
 close = "shockwave"
 utility = "charge"
-defense = "retaliation"
-ultimate = "onslaught"
+defense = "berserker_rage"
+ultimate = "warrior_bladestorm"
+
+[momentum]
+# The Juggernaut's own (any hero with one of the Juggernaut's cards on a key: `passive =
+# "momentum"`, on each of its five): each of their own blows that lands, a light, a heavy or a
+# weapon art, adds a stack, 5% more damage a stack, up to 5 (25%, Blood Fury's worth, earned by
+# keeping on hitting). Raising the guard drops them all, and so do 4 sec without a hit: the
+# berserker doesn't stop to block. First numbers for tuning (the designer's, Nov 4).
+damage = 0.05
+most = 5
+secs = 4.0
 
 # === Q: ranged ======================================================================================
 
@@ -3017,6 +3046,7 @@ icon = "INV_ThrowingAxe_01"
 school = "warrior"
 slot = "ranged"
 kind = "projectile"
+passive = "momentum"
 free = true
 returns = true
 recall = true
@@ -3196,13 +3226,30 @@ icon = "Ability_ShockWave"
 school = "warrior"
 slot = "close"
 kind = "cone"
+passive = "momentum"
 free = true
 range = [9.0, 9.0]
 arc = 60.0
 cast = 0.4
 weapon = 1.2
 cooldown = 8.0
-spell = 25425
+# One quick overhead on every race: the night elf men's two-handed chop (18/0, the quickest
+# overhead in the census: it lands at 0.37 s), borrowed by all. The human's own 57 was a spin, not
+# an overhead (Corey's review, Nov 3; picked from the lab's side-on strips, Nov 4).
+clip = 18
+take = 0
+from = "NightElfMale"
+# Force Punch's look (24189): the same ThunderClap shock ring as Shockwave's own (25425), but
+# with no cast animation of its own. 25425's cast anim 54 threw the hero's hand up after the
+# chop (Corey's "Michael Jackson" hand, his review, Nov 3); every other ThunderClap look in the
+# game data plays some body anim (the lab's find, Nov 4).
+# The look is the cone itself, flashed on the ground as it lands (patch 0026: a shock front out
+# through the 9 yd wedge over 0.45 sec, blue): Force Punch's ring (24189) was a full circle for a
+# cone hit (Corey's review, Nov 4), and the data has no cone-shaped ground look; 20572 shows
+# nothing of its own. The heavy blow's flash on each body the wave strikes.
+spell = 20572
+burst = { secs = 0.45, colour = "3399FF" }
+impact_kit = 437
 valor_hit = 6.0
 effects = [{ kind = "knockback", amount = 4.0, wall_stun = 1.5 }]
 
@@ -3224,8 +3271,17 @@ stamina = 28.0
 unblockable = true
 poise = true
 shatter = true
-clip = 57
+# One big overhead on every race: the Forsaken men's slow two-handed overhead (19/0: the weapon
+# goes right up over the head and comes down in 0.63 s), borrowed by all. Corey asked for the
+# tauren's big overhead, but the tauren's own two-handed clips are thrusts (the census): this is
+# the biggest overhead there is (picked from the lab's side-on strips, Nov 4).
+clip = 19
+take = 0
+from = "ScourgeMale"
 spell = 12294
+# Expose Armor's cracking plates on the one struck (kit 3069), beside the yellow spark: Corey
+# wanted both, and the Sunder shown as armor breaking (his review, Nov 3).
+impact_kit = 3069
 valor_hit = 6.0
 effects = [{ kind = "stagger", secs = [1.2, 1.2] }, { kind = "sunder", secs = [8.0, 8.0], amount = 0.15 }]
 
@@ -3347,6 +3403,7 @@ icon = "Ability_Warrior_Charge"
 school = "warrior"
 slot = "utility"
 kind = "dash"
+passive = "momentum"
 free = true
 damage = [10.0, 10.0]
 range = [20.0, 20.0]
@@ -3478,50 +3535,97 @@ effects = [{ kind = "freedom", secs = [4.0, 4.0], amount = 1.0 }, { kind = "hast
 # Staying alive: alone, the answer to a pack or a champion's big blow; in a duel, a read (each
 # catches some things and not others) and a bait.
 
-# Steel: punish the swing.
+# Steel, the Juggernaut: no guard, no brace. The berserker shrugs off what holds them and keeps
+# swinging (Momentum drops the moment they block), so its defense is getting back up.
+# Berserker Rage is the answer to being caught: it goes off the ground and out of a stagger (the
+# one key that works then), with 3 sec of poise after so the next blow of the same string can't
+# put them straight back down.
+[[ability]]
+key = "berserker_rage"
+name = "Berserker Rage"
+text = "Breaks free of any stagger, knockdown, root or slow. You cannot be staggered for 3 sec. Usable while staggered or knocked down."
+icon = "Spell_Nature_AncestralGuardian"
+school = "warrior"
+slot = "defense"
+kind = "buff"
+passive = "momentum"
+free = true
+breaks_free = true
+# Long enough that when to spend it is a choice (a pack's next knockdown is coming), short enough
+# to have it in most fights.
+cooldown = 16.0
+# Not red: Blood Fury is the red one (Corey's review, Nov 4: the two looked identical). The
+# shrug-off is Unyielding Will's chest swirl (8099, "Stamina"'s look) as it goes, and the 3 sec
+# carry no lasting mark (20572 has none); Enrage's burst (12880) and the red fists (18499) were
+# Blood Fury's colours.
+spell = 8099
+# The berserker shrugging it off, the same on every race: the orc men's Flex emote (82/0), arms
+# up and fists clenched. Blood Fury keeps the battle roar (55), the Roar roars (74).
+clip = 82
+take = 0
+from = "OrcMale"
+effects = [{ kind = "steadfast", secs = [3.0, 3.0], amount = 1.0, aura = 20572 }]
+
+# Berserker Rage's EX: blood for fury. 15% of the health they have now (never the last point) for
+# 8 sec of free attacks 25% harder: what Momentum gives at 5 stacks, at once, without having to
+# keep it. Nothing heals it back: the price stays paid.
+[[ability]]
+key = "blood_fury"
+name = "Blood Fury"
+ex_of = "berserker_rage"
+text = "Costs 15% of your current health, never your last point. For 8 sec, your attacks cost no stamina and deal 25% more damage."
+icon = "Racial_Orc_BerserkerStrength"
+slot = "defense"
+kind = "buff"
+valor = 25
+health_cost = 0.15
+# Savage Rage's burst (3258) as the blood is paid: the orcs' own Blood Fury (20572) has no
+# visual in the game data. Death Wish's red on the warrior while it lasts (the `fury` look).
+spell = 3258
+# The orc men's battle roar (55/0) on every race: the pose the orcs' own Blood Fury strikes.
+clip = 55
+take = 0
+from = "OrcMale"
+effects = [{ kind = "fury", secs = [8.0, 8.0], amount = 0.25 }]
+
+# Steel, the Warlord's (`choice = 2`, from the Juggernaut's): punish the swing. A parry the hero
+# doesn't have to time, then their own heavy attack at once, and nothing touches them while it
+# goes out (a pack can't punish the answer).
 [[ability]]
 key = "retaliation"
 name = "Retaliation"
-text = "Braces for up to 1 sec. The first melee attack that strikes you from the front is blocked, and you counterattack every enemy in front of you for 150% weapon damage, staggering them for 1 sec. Ends early when you attack, dodge, jump, guard or use another ability. Does not stop projectiles. If nothing strikes you, the cooldown is 50% shorter."
+text = "Braces for up to 1 sec. The first melee attack that strikes you from the front is parried, and you answer at once with a heavy attack. Until it lands, nothing can damage, move or stagger you. Ends early when you attack, dodge, jump, guard or use another ability. Does not stop projectiles. If nothing strikes you, the cooldown is 50% shorter."
 icon = "Ability_Warrior_Challange"
 school = "warrior"
 slot = "defense"
+choice = 2
 kind = "stance"
 free = true
 secs = 1.0
 cooldown = 12.0
 spell = 20230
 aura = 20230
-counter = { block = true, melee_only = true, once = true, front = 180.0, ends_on_action = true, answer = "retaliation_sweep", caught_cooldown = 1.0, missed_cooldown = 0.5 }
+counter = { block = true, melee_only = true, once = true, front = 180.0, ends_on_action = true, parry_heavy = true, caught_cooldown = 1.0, missed_cooldown = 0.5 }
 
-# Retaliation's counterattack: the sweep in front of the warrior when it catches a blow.
-[[ability]]
-key = "retaliation_sweep"
-name = "Retaliation"
-text = "The counterattack: every enemy in front of you takes 150% weapon damage and is staggered for 1 sec."
-icon = "Ability_Warrior_Challange"
-slot = "close"
-kind = "cone"
-inner = true
-range = [4.5, 4.5]
-arc = 150.0
-weapon = 1.5
-spell = 845
-effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
-
+# The shield held up for the group; the bash still goes (right-click held, then left-click), and
+# harder while it's up: up to 3 struck, twice the damage and reel, driven 2.5 yd back, no stamina
+# (WALL_BASH in sim/combat.rs). A two-handed weapon has no shield to hold.
 [[ability]]
 key = "shield_wall"
 name = "Shield Wall"
 ex_of = "retaliation"
-text = "Raises your shield for up to 4 sec. Melee attacks and projectiles from the front are blocked, and projectiles stop against the shield. You move 50% slower. Ends when you attack, dodge or press it again."
+text = "Raises your shield for up to 4 sec. Melee attacks and projectiles from the front are blocked, and projectiles stop against the shield. You move 50% slower. Hold right-click and left-click to Shield Bash: it strikes up to 3 enemies in front of you for double damage, knocks them back 2.5 yd and staggers them twice as long, and costs no Stamina. Requires a shield. Ends when you dodge, attack, use another ability or press it again."
 icon = "Ability_Warrior_ShieldWall"
 slot = "defense"
 kind = "stance"
 valor = 25
 secs = 4.0
-spell = 871
+# Shield Block's flash as the wall goes up (2565) and Shield Wall's own circling shields while it
+# lasts (871): Corey wanted both (his review, Nov 3; tried as look 2565/871 in q29).
+spell = 2565
 aura = 871
-counter = { block = true, front = 180.0, ends_on_action = true, guard_pose = true }
+needs_shield = true
+counter = { block = true, front = 180.0, ends_on_action = true, guard_pose = true, bash = true }
 
 # Shadow: outlast them. 12 a second for 3 s, every point of it back to you; a miss costs nothing.
 [[ability]]
@@ -3618,22 +3722,8 @@ spell = 633
 lockout = 60.0
 
 # === 3: ultimate ===================================================================================
-
-# Steel: the onslaught.
-[[ability]]
-key = "onslaught"
-name = "Onslaught"
-text = "For 8 sec, you grow 30% larger and your weapon glows red. Your attacks and guard cost no stamina, you attack 20% faster, you cannot be staggered or knocked back, and your heavy attacks cannot be blocked. Stuns, roots and damage still affect you."
-icon = "Ability_Racial_BloodRage"
-school = "warrior"
-slot = "ultimate"
-kind = "buff"
-free = true
-valor = 100
-cooldown = 40.0
-# Bloodlust's burst and roar.
-spell = 379
-effects = [{ kind = "onslaught", secs = [8.0, 8.0], amount = 0.2 }]
+# (Steel: the Juggernaut's Bladestorm and the Warlord's Rallying Cry are with the Warlord's cards,
+# below.)
 
 # Shadow: marked for death.
 [[ability]]
@@ -3924,8 +4014,12 @@ respawn = 0.0
 [[mob]]
 key = "spirit_wolf"
 name = "Spirit Wolf"
-display = 447
-scale = 1.0
+# The wolf on its own ghost model (Wolf_ghost.mdx).
+display = 2446
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -3946,7 +4040,12 @@ respawn = 0.0
 [[mob]]
 key = "spirit_owl"
 name = "Spirit Owl"
-display = 4615
+# A white owl (Owl.mdx, OwlWhite): the brown one (4615) was lost against the night sky. It flies
+# above the foe, high in the action camera's view (visual check, runs 016 and 017).
+display = 6212
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -3969,7 +4068,10 @@ respawn = 0.0
 key = "spirit_scorpid"
 name = "Spirit Scorpid"
 display = 2487
-scale = 0.8
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.1   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -3991,7 +4093,10 @@ respawn = 0.0
 key = "spirit_gorilla"
 name = "Spirit Gorilla"
 display = 837
-scale = 1.0
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.2   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4013,7 +4118,10 @@ respawn = 0.0
 key = "spirit_raptor"
 name = "Spirit Raptor"
 display = 180
-scale = 1.0
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.3   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4035,7 +4143,10 @@ respawn = 0.0
 key = "spirit_basilisk"
 name = "Spirit Basilisk"
 display = 1074
-scale = 0.9
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 1.1   # bigger, to read from behind the hunter at 6 yd at night (run 015)
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4057,6 +4168,9 @@ respawn = 0.0
 key = "spirit_bear"
 name = "Spirit Bear"
 display = 822
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 1.0
 health = 30
 run_speed = 0.0
@@ -4079,6 +4193,9 @@ respawn = 0.0
 key = "spirit_kodo"
 name = "Spirit Kodo"
 display = 1230
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
 scale = 0.7
 health = 30
 run_speed = 0.0
@@ -4097,11 +4214,16 @@ respawn = 0.0
   turn_rate = 0.0
   lock = 0.0
 
+# (The lightning finisher is a wind serpent, a dreadfang's body: Lightning Breath's own beast,
+# and the only one of the three with a 1.12 icon of its animal for the key.)
 [[mob]]
-key = "spirit_thunder_lizard"
-name = "Spirit Thunder Lizard"
-display = 1540
-scale = 0.6
+key = "spirit_wind_serpent"
+name = "Spirit Wind Serpent"
+display = 1974
+# Its spirit look, so it reads as a spirit at night (the visual check, Nov 2: Spirit
+# Particles, big, was the clearest of 11 tried).
+aura = 31748
+scale = 0.8
 health = 30
 run_speed = 0.0
 walk_speed = 0.0
@@ -4152,7 +4274,7 @@ respawn = 0.0
 key = "heroic_leap"
 name = "Heroic Leap"
 ex_of = "charge"
-text = "Leaps to the target location up to 16 yd away, over obstacles. Enemies within 4 yd of the landing take 12 damage, are knocked back 5 yd and slowed by 40% for 2 sec. Other heroes see where you will land."
+text = "Leaps to the target location up to 16 yd away, over obstacles. Enemies within 4 yd of the landing take 12 damage, are knocked back 5 yd and slowed by 40% for 2 sec."
 icon = "Ability_WarStomp"
 slot = "utility"
 kind = "leap"
@@ -4161,6 +4283,15 @@ range = [16.0, 16.0]
 radius = [4.0, 4.0]
 damage = [12.0, 12.0]
 lift = 7.0
+# No ring where it comes down: nobody sees the landing coming (a rival under it is still warned).
+unmarked = true
+# The weapon held high through the jump: the Forsaken men's slow two-handed overhead (19/0) runs
+# over the whole airtime (a leap's clip is twice its airtime), so the weapon is up over the head
+# all the way and comes down as the hero lands. Corey's review: no more weapons held idle in
+# the air. The same clip as Sundering Blow's, at the leap's own pace.
+clip = 19
+take = 0
+from = "ScourgeMale"
 spell = 16979
 impact_kit = 5089
 effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
@@ -4175,14 +4306,17 @@ effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 
 [[ability]]
 key = "aimed_arrow"
 name = "Aimed Shot"
-text = "Hold to draw your bow for up to 1.4 sec, then release to fire. Damage, range and arrow speed increase with the draw. A full draw pierces every enemy in its line. A heavy hit on you cancels the draw. The arrow plants where its flight ends."
+text = "Hold to draw your bow for up to 1.4 sec, then release to fire for up to 120% bow damage. Damage, range and arrow speed increase with the draw. A full draw pierces every enemy in its line. A heavy hit on you cancels the draw. The arrow plants where its flight ends."
 icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
+bow = true
 kind = "projectile"
 charge = [0.0, 1.4]
 fragile = true
-damage = [14.0, 36.0]
+# Serg's play-test (#118): it grows with the bow, as an art grows with the weapon. 120% of the
+# bow's damage at the same draw: 14–36 with the hunting bow (12–30), as it was.
+bow_damage = 1.2
 range = [26.0, 40.0]
 radius = [0.3, 0.3]
 # A plain arrow (the bow's look) while drawing; fully drawn, a burning one, faster, through every
@@ -4201,90 +4335,112 @@ plants = true
 key = "multi_shot"
 name = "Multi-Shot"
 ex_of = "aimed_arrow"
-text = "Fires 5 arrows at once in a wide fan, with no draw. Each arrow deals 18 damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
+text = "Fires 5 arrows at once in a fan 5 yd wide where you aim, with no draw. Each arrow deals 60% bow damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
 icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
+bow = true
 kind = "projectile"
 valor = 25
-damage = [18.0, 18.0]
+# 60% of a full draw's bow damage an arrow: 18 with the hunting bow (#118).
+bow_damage = 0.6
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 40.0
 count = 5
-# 10° apart: a 40° fan.
+# The fan spreads 1.2 yd an arrow where the reticle points, so it covers a pack near or far; 10°
+# apart at most, close in. (#118: a fixed 10° fan passed between a pack past 15 yd.)
 spread = 10.0
+spread_yd = 1.2
 shatter = true
 # Frost-tipped arrows (Frost Shot): the volley that shatters the frozen.
 spell = 6984
 clip = 53
 plants = true
 
-# Q, the second choice: the arrow that reads the room. Off a wall, a tree or a rock it comes away
-# harder (`bounce_gain` of its damage more a bounce) and goes through the first foe it meets after.
+# Q, the second choice: the arrow that reads the room. Off a wall or a tree it comes away harder
+# (`bounce_gain` of its damage more a bounce) and goes through the first foe it meets after; into
+# the ground at a low angle it skips off, no harder. (Rocks aren't solid to the rules yet.)
 [[ability]]
 key = "bank_shot"
 name = "Bank Shot"
-text = "Fires an arrow that ricochets off walls, trees and rocks up to twice. Each bounce makes it hit harder. An arrow that has bounced pierces the first enemy it hits. It plants where it finally stops."
+text = "Fires an arrow that ricochets off walls and trees up to 2 times, and skips off the ground at a low angle. Each ricochet adds 8 damage. An arrow that has ricocheted pierces the first enemy it hits. It plants where it finally stops."
 icon = "Ability_Hunter_SniperShot"
 school = "hunter"
 slot = "ranged"
+bow = true
 choice = 2
 kind = "projectile"
 damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
-speed = 45.0
+speed = 40.0
 bounces = 2
 bounce_gain = 0.5
 cooldown = 4.0
-# Concussive Shot's arrow: a heavy, blunt flight.
-spell = 5116
+# The Hunter's arrow (Aimed Shot's, at its speed, flown with the bow's ammo), seen the whole way:
+# each leg off a wall flies from where it struck. No burst where it strikes a wall (Corey's review:
+# the Lava Burst's landing there read as the arrow going off in the inn wall; the arrow flown on
+# from the wall, harder each bounce, is the bounce's look), and none off the ground either, so a
+# skip doesn't read as an explosion (Corey's review, run 040): the data has no small splash of dirt
+# at a point (the burrow burst, 26271, left a pile of boulders for seconds in run 050). The arrow's
+# ribbon flying on from the ground shows the skip.
+spell = 19434
+burst_spell = 0
+skip_spell = 0
 clip = 53
 valor_hit = 5.0
 plants = true
 
+# Its EX: one long glowing arrow that bursts into a spray where its flight ends.
 [[ability]]
 key = "split_arrow"
 name = "Split Arrow"
 ex_of = "bank_shot"
-text = "Fires a spray of 6 arrows in a short cone and kicks you back 2 yd. Point blank, all 6 hit one target. Every arrow plants where it stops."
+text = "Fires a glowing arrow up to 36 yd. It bursts at the first enemy or wall it meets, or at the end of its flight, dealing 12 damage to the enemy it bursts in. 6 arrows spray out from the burst in a 60° fan, each dealing 5 damage to the first 2 enemies in its path. Every arrow plants where it stops."
 icon = "Ability_Hunter_Quickshot"
 slot = "ranged"
+bow = true
 kind = "projectile"
 valor = 25
-# 6 × 8 point blank: 48, just under what an EX of a 16 poke may be.
-damage = [8.0, 8.0]
-range = [10.0, 10.0]
+# Point blank, 12 and all 6 of the spray through one foe: 42, under what an EX of a 16 poke may be.
+damage = [12.0, 12.0]
+range = [36.0, 36.0]
 radius = [0.3, 0.3]
-speed = 40.0
-count = 6
-# 10° apart: a 50° cone, every arrow in one body within 3 yd.
-spread = 10.0
-spell = 2643
+# Arcane Shot's glowing arrow (as Kill Shot's), at its speed; a burst of fire where it splits.
+speed = 50.0
+spell = 3044
+burst_spell = 5162
+splits = "split_spray"
 clip = 53
 valor_hit = 1.5
-plants = true
-also = "split_recoil"
 
-# Split Arrow's kick: a short hop straight back.
+# Split Arrow's spray: out from the burst, through the foe it burst in and on to the next.
 [[ability]]
-key = "split_recoil"
+key = "split_spray"
 name = "Split Arrow"
-text = "Split Arrow's recoil."
+text = "Split Arrow's spray."
 icon = "Ability_Hunter_Quickshot"
 inner = true
 slot = "ranged"
-kind = "leap"
-back = true
-range = [2.0, 2.0]
-lift = 1.5
+kind = "projectile"
+damage = [5.0, 5.0]
+range = [12.0, 12.0]
+radius = [0.3, 0.3]
+speed = 50.0
+count = 6
+# 12° apart: a 60° fan.
+spread = 12.0
+pierce = 1
+spell = 3044
+valor_hit = 1.0
+plants = true
 
 # E: a spirit beast a press, a chain that builds: the first stage sets something on the foe, the
 # second turns it into something else, the third cashes it in (the beasts in `[[beast]]`).
 [[ability]]
 key = "call_of_the_wild"
 name = "Call of the Wild"
-text = "Calls a spirit beast that leaps from your side to the target and strikes once. Each call brings the next stage of the chain: Stage 1 beasts set up, Stage 2 exploit, Stage 3 finish. The beast for each stage is drawn at random from three, and the key shows which is coming. After Stage 3, or 4 sec without a call, the chain starts again."
+text = "Calls a spirit beast that leaps from your side at your target, or the enemy you're looking at, and strikes once. Each call brings the next stage of the chain: Stage 1 beasts set up, Stage 2 exploit, Stage 3 finish. The beast for each stage is drawn at random from three, and the key shows which is coming. After Stage 3, or 4 sec without a call, the chain starts again. A parry or a perfect dodge empowers the next call for 4 sec. An empowered call costs half the stamina and deals 25% more damage."
 icon = "Ability_Hunter_BeastCall"
 school = "hunter"
 slot = "close"
@@ -4292,6 +4448,9 @@ kind = "buff"
 hunt = "call"
 range = [25.0, 25.0]
 radius = [1.0, 1.0]
+# A short recharge between calls (play-test: 5 to 8 calls from range in a row killed most
+# enemies). A whole chain now takes 3 sec at least, and a call is a choice, not a spam.
+cooldown = 1.5
 # (The beast bursts out of Spirit Wolf's flash at the hunter's side.)
 spell = 2645
 clip = 54
@@ -4311,11 +4470,11 @@ radius = [1.0, 1.0]
 clip = 54
 
 # E, the second choice: a spear chain. Each hit arms the next (a recast), the third throws you up
-# with it, and the fourth is the dive down, wherever you choose.
+# with it, and the fourth press is the dive down onto it, before you land.
 [[ability]]
 key = "raptor_strike"
 name = "Raptor Strike"
-text = "A three-hit spear chain. Press again within 1.5 sec for the next hit. Hit 1 thrusts. Hit 2 sweeps everything in front of you. Hit 3 is an Uppercut that launches the target and you with it. While airborne, press again within 3.5 sec to Stoop: dive to a spot within 12 yd, slamming any enemy there."
+text = "A three-hit spear chain. Press again within 1.5 sec for the next hit. Hit 1 thrusts. Hit 2 sweeps everything in front of you. Hit 3 is an Uppercut that launches the target and you with it. Press again before you land to Stoop: dive onto the launched enemy and slam it, harder the higher you start."
 icon = "Ability_MeleeDamage"
 school = "hunter"
 slot = "close"
@@ -4370,7 +4529,9 @@ clip = 57
 impact_kit = 83
 also = "raptor_rise"
 recast = "stoop"
-recast_secs = 3.5
+# Stoop's window: the rise's time in the air (1.45 sec at lift 14). Landing closes it sooner.
+recast_secs = 1.5
+# The launch: lift 10 throws a creature 2.6 yd up and down again in 1.04 sec, stunned the while.
 effects = [{ kind = "stun", secs = [1.2, 1.2] }, { kind = "knockback", amount = 0.5, lift = 10.0 }]
 
 # The hunter goes up with it, boss or no boss: Stoop is always there.
@@ -4383,21 +4544,27 @@ inner = true
 slot = "close"
 kind = "leap"
 range = [0.5, 0.5]
-lift = 9.0
+# Well over the foe it launched: lift 14 peaks at 5.1 yd (the foe's 2.6), 1.45 sec in the air.
+lift = 14.0
 spell = 0
 
 [[ability]]
 key = "stoop"
 name = "Stoop"
-text = "Dive to the target spot within 12 yd. Enemies within 3 yd of where you land take 20 damage and are knocked down for 1 sec."
+text = "Dives onto the enemy you launched, or the spot you aim at within 12 yd. Deals 6 to 30 damage to enemies within 3 yd of the landing, more the higher you start. Knocks them down for 1 sec. Only while airborne."
 icon = "Ability_Hunter_Pet_Owl"
 inner = true
 slot = "close"
 kind = "leap"
 range = [12.0, 12.0]
 radius = [3.0, 3.0]
-damage = [20.0, 20.0]
-lift = 2.0
+# On the key press, down in 0.3 sec. Its damage grows with its height as it starts, evenly: 6 from
+# the ground, 30 from 5 yd up (the top of the Uppercut's rise), 4.8 a yard. A Stoop at the top is
+# 10 more than the old flat 20, a late one far less, so the chain's 12 + 14 + 16 + Stoop stays
+# within the close row's 45 a hit.
+at_once = true
+dive = true
+damage = [6.0, 30.0]
 spell = 16979
 impact_kit = 1666
 stamina = 10.0
@@ -4414,11 +4581,16 @@ kind = "projectile"
 valor = 25
 damage = [12.0, 12.0]
 range = [15.0, 15.0]
-radius = [0.35, 0.35]
+# Wide enough to bite a body the reticle sits on (Corey's review, run 040: "he went flying
+# further than the unit": at 0.35 a spear aimed at a creature's edge flew past it into the ground
+# behind, and the dive went there). And the bitten creature holds still for the dive, so the
+# hunter lands beside it, not where it stood.
+radius = [1.0, 1.0]
 speed = 60.0
 yank = true
 spell = 6533
 clip = 107
+effects = [{ kind = "stagger", secs = [0.6, 0.6] }]
 recast = "raptor_uppercut"
 recast_secs = 2.5
 
@@ -4430,9 +4602,12 @@ text = "Fires a grappling arrow up to 25 yd. If it strikes a wall, tree, rock or
 icon = "Ability_Hunter_Pathfinding"
 school = "hunter"
 slot = "utility"
+bow = true
 kind = "projectile"
 range = [25.0, 25.0]
-radius = [0.35, 0.35]
+# Play-test (#110): it caught a tab-targeted foe far too easily. A foe counts only when the
+# reticle's line crosses its body (its own width and 0.1 yd), as a wall does. Was 0.35.
+radius = [0.1, 0.1]
 speed = 60.0
 yank = true
 cooldown = 10.0
@@ -4446,6 +4621,7 @@ ex_of = "grapple_arrow"
 text = "Hooks an enemy and hauls it to you. It lands at your feet and staggers for 1 sec. A boss, or anything that can't be moved, hauls you to it instead."
 icon = "INV_Spear_04"
 slot = "utility"
+bow = true
 kind = "projectile"
 valor = 25
 damage = [8.0, 8.0]
@@ -4469,10 +4645,20 @@ choice = 2
 kind = "leap"
 back = true
 range = [12.0, 12.0]
-lift = 5.0
+# Higher than a plain leap back (Corey's review: a little more height, so it reads as a
+# real jump away): 1.1 yd up at the top (0.65 at 5), 0.67 sec in the air (0.52).
+lift = 6.5
 cooldown = 12.0
-spell = 781
+# No cast look of its own: Disengage's (781) is a white blink star on the hunter, which read as
+# something going wrong (visual check, run 015). The flip and the net are the look.
+spell = 0
 also = "hunter_net"
+# Play-test (#110): the Undead woman's flip out of a strafing jump was the one to keep. Every
+# hero, every race, standing or mid-jump, now plays it: a tumble back head over heels with the
+# Undead woman's tucked Jump (38). Swap the clip here after a look in game (/esclip).
+leap_clip = 38
+leap_from = "ScourgeFemale"
+leap_flip = true
 
 [[ability]]
 key = "hunter_net"
@@ -4486,20 +4672,29 @@ range = [14.0, 14.0]
 radius = [0.6, 0.6]
 speed = 40.0
 spell = 6533
-effects = [{ kind = "root", secs = [2.0, 2.0] }]
+# The net itself on whoever it holds (Net's own state look), not the roots of a plain root.
+effects = [{ kind = "root", secs = [2.0, 2.0], aura = 6533 }]
 
 [[ability]]
 key = "trappers_instinct"
 name = "Trapper's Instinct"
 ex_of = "ensnaring_retreat"
-text = "Readies you for 2 sec. If anything hits you, the hit misses: you leap 12 yd away, net the attacker and scatter 5 arrows where you stood. Each enemy within 2 yd of a scattered arrow takes 10 damage. If nothing hits you, it fires as a plain Ensnaring Retreat when the 2 sec are up."
+text = "Readies you for 2 sec. If anything hits you, the hit misses: you leap 12 yd away, net the attacker and scatter 5 arrows where you stood. Each enemy within 2 yd of a scattered arrow takes 10 damage. If nothing hits you, it's wasted."
 icon = "Ability_Ensnare"
 slot = "utility"
 kind = "stance"
 valor = 25
 secs = 2.0
+# Its look while it's up, on the hunter (the visual check, Nov 2: it had none). Recklessness's
+# flare reads at night; tried: Deterrence 19263 and Rapid Fire 3045 (nothing shows), Ice Barrier
+# 11426 (reads, but frost), Stoneform 20594 (darkens her).
+aura = 1719
 spell = 5384
-counter = { immune = true, once = true, answer = "trappers_leap", expire_answer = "ensnaring_retreat" }
+# A counter and nothing else (Corey's review, Nov 3): unanswered, it's spent and on cooldown, with
+# no leap of its own. A dodge, not a block: the blow misses, and the hunter never raises a shield
+# to it (Corey's review, run 040: "you missed the timing on the actual dodge"). The answer comes
+# as the blow commits, before the blade lands (`sim/mobs.rs`, the wind-up's lock).
+counter = { immune = true, dodge = true, once = true, answer = "trappers_leap" }
 
 # What Trapper's Instinct does when it's struck: away, the net on whoever struck, arrows scattered.
 [[ability]]
@@ -4512,30 +4707,62 @@ slot = "utility"
 kind = "leap"
 back = true
 range = [12.0, 12.0]
-lift = 5.0
+# Higher than a plain leap back (Corey's review: a little more height, so it reads as a
+# real jump away): 1.1 yd up at the top (0.65 at 5), 0.67 sec in the air (0.52).
+lift = 6.5
 damage = [10.0, 10.0]
 radius = [2.0, 2.0]
-spell = 781
+# No cast look: Disengage's (781) is a white blink star on the hunter (see Ensnaring Retreat).
+spell = 0
 also = "hunter_net"
+# Ensnaring Retreat's flip (#110).
+leap_clip = 38
+leap_from = "ScourgeFemale"
+leap_flip = true
 
-# 2: two arrows and a wire between them.
+# 2: two arrows and a wire between them, each arrow placed by the hero. The first press plants
+# one; the key again (within its window) places the second within 10 yd of it (hunter.rs's
+# WIRE_SPAN), and the wire forms between them.
 [[ability]]
 key = "tripwire"
 name = "Tripwire"
-text = "Fires two arrows that plant 6 yd apart at the target spot, up to 20 yd away, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec; its two arrows stay planted for 18 sec, snapped or not."
+text = "Fires an arrow that plants at the target spot, up to 20 yd away. Press again within 5 sec to plant a second arrow within 10 yd of the first, with a wire between them. The first enemy to cross the wire takes 12 damage, is knocked down for 1.5 sec, and the wire snaps. The wire lasts 12 sec. Its arrows stay planted for 18 sec, snapped or not."
 icon = "Spell_Nature_Web"
 school = "hunter"
 slot = "defense"
+bow = true
 kind = "ground"
 hunt = "tripwire"
 range = [20.0, 20.0]
-radius = [3.0, 3.0]
+# The arrow's spot under the reticle (how far the wire can span is WIRE_SPAN).
+radius = [0.5, 0.5]
 damage = [12.0, 12.0]
 secs = 12.0
 cooldown = 12.0
 spell = 19434
 clip = 53
 effects = [{ kind = "knockdown", secs = [1.5, 1.5] }]
+# Time to aim the second arrow.
+recast = "tripwire_second"
+recast_secs = 5.0
+
+# Its second arrow: aimed up to 30 yd away (the first's 20 and the wire's 10), planted within 10
+# yd of the first. The wire's damage, life and knockdown are Tripwire's.
+[[ability]]
+key = "tripwire_second"
+name = "Tripwire"
+text = "Plants Tripwire's second arrow within 10 yd of the first. The wire forms between them."
+icon = "Spell_Nature_Web"
+inner = true
+slot = "defense"
+kind = "ground"
+hunt = "tripwire"
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+spell = 19434
+clip = 53
+# Drawn from the bow like the first arrow (#115), not cast over the melee weapon.
+bow = true
 
 [[ability]]
 key = "arrow_recall"
@@ -4572,9 +4799,11 @@ damage = [24.0, 24.0]
 linger = 3.0
 linger_damage = 4.0
 cooldown = 14.0
-# Its look: the trap on the ground while it's set, a burst there as it goes off, and fire on each
-# one it strikes (13812 is Explosive Trap Effect, named in the combat log).
+# Its look: thrown from the hand as a bomb (Iron Grenade's missile) to its spot, the trap on the
+# ground once it lands, a burst there as it goes off, and fire on each one it strikes (13812 is
+# Explosive Trap Effect, named in the combat log).
 spell = 13812
+lob_spell = 4068
 object = 3072
 burst_spell = 5162
 impact_kit = 286
@@ -4585,7 +4814,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. Setting it readies a free Multi-Shot for 8 sec."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "defense"
 kind = "trap"
@@ -4596,27 +4825,35 @@ splash = 3.0
 delay = 0.75
 secs = 25.0
 spell = 3355
+# Thrown to its spot like Explosive Trap, as a bomb.
+lob_spell = 4068
 object = 3071
-burst_spell = 13810
+# The burst as it springs: Frost Nova's ring (the visual check, Nov 2: Frost Trap Aura, 13810,
+# whited out the whole screen for its 30 sec; 122 rings out and leaves the ice on whoever it froze).
+burst_spell = 122
 clip = 75
+# 3 sec: the most the board allows (1.5 on a hero). Serg (#118) found it over before the
+# Multi-Shot; what fixes that is the free shot coming as the trap springs, below.
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
-# The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
-# springs: 8 s, room to kite them onto it.)
+# The trap combo: set it, kite them onto it, cash in. The free Multi-Shot is readied as the trap
+# springs (#118: readied as it was set, a trap that sprang late had no free shot left), for 8 s.
 empower = { ability = "aimed_arrow", secs = 8.0 }
 
 # 3: the finisher you line up.
 [[ability]]
 key = "kill_shot"
 name = "Kill Shot"
-text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 60 damage. Enemies below 25% health are killed outright."
+text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 200% bow damage. Enemies below 25% health are killed outright."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
+bow = true
 kind = "projectile"
 valor = 100
 charge = [1.0, 1.0]
 hold = 1.0
-damage = [60.0, 60.0]
+# 200% of a full draw's bow damage: 60 with the hunting bow (#118).
+bow_damage = 2.0
 range = [40.0, 40.0]
 radius = [0.4, 0.4]
 pierce = 9
@@ -4627,16 +4864,18 @@ cooldown = 40.0
 spell = 3044
 clip = 53
 
-# 3, the second choice: up above the fight, then rain on it. The leap's top is where the volley's
-# aimed from; the key again (within its window) lets it go at the reticle.
+# 3, the second choice: up above the fight, then rain on it. The leap tops out and hangs there
+# (5.5 s, in `sim/hunter.rs`), the bow drawn on the volley's circle; a click or the key again
+# looses it from the hero, and it looses by itself as the hang ends. Then a slow fall down.
 [[ability]]
 key = "skyfall"
 name = "Skyfall"
-text = "Leaps 15 yd straight up. While you're in the air, press again to rain a volley of 12 arrows on a 6 yd circle up to 30 yd away over 1 sec. You can't be hurt or crowd-controlled while airborne. The arrows plant."
+text = "Leaps straight up and hangs in the air for 5.5 sec with your bow drawn. Click or press again to loose a volley of 12 arrows on a 6 yd circle up to 30 yd away. If you wait, it looses at the reticle as the hang ends. Then you float down. You can't be hurt or crowd-controlled until you land. The arrows plant."
 icon = "Ability_Hunter_Pet_WindSerpent"
 school = "hunter"
 slot = "ultimate"
 choice = 2
+bow = true
 kind = "leap"
 at_once = true
 valor = 100
@@ -4647,7 +4886,8 @@ invulnerable = true
 cooldown = 40.0
 spell = 781
 recast = "skyfall_volley"
-recast_secs = 3.5
+# The rise and the whole hang (0.8 + 5.5 + 0.5 s): its key shows the volley till it goes.
+recast_secs = 7.0
 
 [[ability]]
 key = "skyfall_volley"
@@ -4656,7 +4896,9 @@ text = "Skyfall's volley: 12 arrows on a 6 yd circle over 1 sec, 14 damage each.
 icon = "Ability_Hunter_Pet_WindSerpent"
 inner = true
 slot = "ultimate"
-kind = "buff"
+bow = true
+# Aimed at the ground (its circle under the reticle) from the hang.
+kind = "ground"
 hunt = "volley"
 count = 12
 range = [30.0, 30.0]
@@ -4665,6 +4907,293 @@ damage = [14.0, 14.0]
 speed = 50.0
 spell = 19434
 clip = 53
+
+# ------------------------------------------------------------------------- Warrior, the Warlord --
+# The Warrior's second choice on every key (`choice = 2`): the Warlord, the commander who holds the
+# line. It plants the ground the group fights from (War Banner), breaks a pack's nerve (Intimidating
+# Roar), cashes in what's opened (Cleave) and opens it (Rising Cut), body-slams with Tackle and
+# covers a friend with Intervene, keeps the Juggernaut's old guard (Retaliation, Shield Wall), and
+# rallies everyone near (Rallying Cry). An opened enemy is staggered, knocked down, stunned,
+# Exposed, or a boss stance-broken. An EX shares its key's cooldown. Its ultimate's old place
+# (Bladestorm) is the Juggernaut's now, below with it. First numbers for tuning (the designer's
+# layout, Nov 4). None of the new ones seen in the client yet.
+
+# Q: the banner that holds the line. Planted where the hero aims, it makes the ground round it the
+# place to fight from: stamina back twice as fast and heavy attacks that stagger 30% longer for
+# every hero within 8 yd. It's a thing in the fight, not a spell: any blow that reaches it, a
+# foe's or a hero's own, takes from its 60 health (two or three of a pack's blows), so where it
+# stands is a choice. The recast moves it once, free (the cooldown was spent planting it), when
+# the fight moves on. 18 sec: it's up a bit over half the time.
+[[ability]]
+key = "war_banner"
+name = "War Banner"
+text = "Plants a war banner at the target spot up to 20 yd away. It stands for 10 sec. You and allies within 8 yd regenerate stamina 100% faster, and heavy attacks stagger 30% longer. The banner has 60 health. Every blow that reaches it damages it, an ally's too. Recast to move it to a new spot."
+icon = "INV_Banner_02"
+school = "warrior"
+slot = "ranged"
+choice = 2
+kind = "place"
+range = [20.0, 20.0]
+# Where heroes stand to have its help (8 yd: a pack's whole fight round it, not the whole field).
+radius = [8.0, 8.0]
+secs = 10.0
+cooldown = 18.0
+# Full size: at 60% the pole stood hidden inside whatever it was planted beside (the lab, Nov 4).
+# Berserker Rage's red fists (18499, a lasting look) on every hero near it while they stand by it:
+# Battle Shout's (6673) is a one-shot, and left nothing to see.
+banner = { health = 60.0, regen = 2.0, stagger = 0.3, aura = 18499, scale = 1.0 }
+recast = "war_banner_move"
+recast_secs = 10.0
+# Placeholder looks (to be checked in the lab): Elwynn's battle-glade banner (4313, seen standing
+# in the Proving Ring) at 60%, Battle Shout's look over each hero near it (the banner's `aura`),
+# the hurl (107) as the clip, Battle Stance's red flare where it lands.
+object = 4313
+spell = 2457
+# The plant, the same on every race: the Forsaken men's one-handed chop (17/1), the arm raised
+# high and driven down, as a pole is planted (picked from the lab's strips, Nov 4).
+clip = 17
+take = 1
+from = "ScourgeMale"
+
+# War Banner's recast: the same banner, uprooted and planted at the new spot (its health and time
+# left go with it).
+[[ability]]
+key = "war_banner_move"
+name = "War Banner"
+text = "War Banner's recast. Uproots the banner and plants it at the target spot up to 20 yd away."
+icon = "INV_Banner_02"
+inner = true
+slot = "ranged"
+kind = "place"
+range = [20.0, 20.0]
+radius = [8.0, 8.0]
+spell = 2457
+# The plant, the same on every race: the Forsaken men's one-handed chop (17/1), the arm raised
+# high and driven down, as a pole is planted (picked from the lab's strips, Nov 4).
+clip = 17
+take = 1
+from = "ScourgeMale"
+
+# Q's EX: the roar that breaks their nerve. Not crowd control (they still fight, worse): 25% less
+# damage and 15% slower wind-ups for 6 sec, blows easier to take and to parry, and a creature
+# already near death runs. A boss only takes 10% off its blows, never more, so it's never shut
+# down.
+[[ability]]
+key = "intimidating_roar"
+name = "Intimidating Roar"
+ex_of = "war_banner"
+text = "Roars in a 15 yd cone in front of you. Enemies hit are Cowed for 6 sec (3 sec against heroes). Cowed enemies deal 25% less damage, and their attacks wind up 15% slower. A Cowed enemy below 20% health flees in fear. A boss deals only 10% less damage."
+icon = "Ability_GolemThunderClap"
+slot = "ranged"
+kind = "cone"
+valor = 25
+range = [15.0, 15.0]
+arc = 60.0
+# Intimidating Shout's own fear mark over the head (5246's lasting look) on each one Cowed for the
+# 6 sec: Demoralizing Shout's (1160) was a one-shot and left nothing to see after.
+# The Cowed mark: Demoralizing Shout's over-the-head mark (kit 693), replayed every 1.5 sec while
+# it holds: "sluggish", not fear (Corey's review, Nov 4; the fear swirl 5246 read as a fear). No
+# lasting look of its own (20572 has none).
+effects = [{ kind = "cowed", secs = [6.0, 6.0], amount = 0.25, aura = 20572, mark = 693, mark_every = 1.5 }]
+# Intimidating Shout's roar as it goes.
+spell = 5246
+# The roar itself, the same on every race: the orc men's Roar emote (74/0), head back and arms
+# wide. Not the battle roar (55): that's Blood Fury's, and Berserker Rage flexes (82).
+clip = 74
+take = 0
+from = "OrcMale"
+
+# E: the crowd cash-in. No knockback, no stagger: it just hits the opened hard.
+[[ability]]
+key = "cleave"
+name = "Cleave"
+text = "After a 0.5 sec windup, swings your weapon through a 180° arc in front of you, 5 yd deep. Enemies hit take 100% weapon damage. Opened enemies (staggered, knocked down, stunned, Exposed or stance-broken) take 250% instead."
+icon = "Ability_Warrior_Cleave"
+school = "warrior"
+slot = "close"
+choice = 2
+kind = "cone"
+range = [5.0, 5.0]
+arc = 180.0
+cast = 0.5
+weapon = 1.0
+opened = 2.5
+cooldown = 8.0
+# The two-handed sweep over the windup.
+# One smooth sweep on every race: the troll men's slow, wide two-handed sweep (19/1, 1.4 s, the
+# widest side stroke in the census), borrowed by all. Side on in the lab its arc crosses the body
+# the way the green crescent (845) does; the human's own 19 swung from the other side (Corey's
+# review, Nov 3; picked from the lab's strips, Nov 4).
+clip = 19
+take = 1
+from = "TrollMale"
+spell = 845
+valor_hit = 6.0
+
+# E's EX: the opening made, not waited for. Half a second of poise (nothing staggers the warrior
+# in the wind-up, so a pack can't knock it out of their hands; a stun still does), then a rising cut
+# that leaves everything in front Exposed: no block or parry, 20% more from every hero's hit, 30%
+# longer staggers, and open to Cleave's 250%. A boss is Exposed half as long (2.5 sec): a window,
+# never a shutdown.
+[[ability]]
+key = "rising_cut"
+name = "Rising Cut"
+ex_of = "cleave"
+text = "After a 0.5 sec windup in which nothing can stagger you, cuts upward through a 120° arc in front of you, 5 yd deep. Enemies hit take 120% weapon damage and are Exposed for 5 sec (2.5 sec for a boss). Exposed enemies cannot block or parry. Every hero's hit on them deals 20% more damage and staggers 30% longer."
+icon = "Ability_MeleeDamage"
+slot = "close"
+kind = "cone"
+valor = 25
+range = [5.0, 5.0]
+arc = 120.0
+cast = 0.5
+weapon = 1.2
+# The wind-up's poise shows nothing (20572 has no visual): the default steadfast look is Power
+# Infusion's blue glow, a magic look on a sword's wind-up (the lab, Nov 4). The wind-up is the clip.
+self_effects = [{ kind = "steadfast", secs = [0.55, 0.55], amount = 1.0, aura = 20572 }]
+# Exposed shows for its 5 sec: Expose Armor's crack (kit 3069) again every 1.5 sec (the data has no
+# lasting, non-magical mark; Corey's review, Nov 4).
+effects = [{ kind = "exposed", secs = [5.0, 5.0], amount = 0.2, aura = 8647, mark = 3069, mark_every = 1.5 }]
+# The rising cut, the same on every race: the orc men's upswing (87/0), the weapon ripped up from
+# the hip to over the head, the biggest rise in the census (+0.58) and quick. The tauren women's
+# slow two-handed upswing (19/1) read as an overhead from the gameplay camera (Corey's review,
+# Nov 4). Overpower's flash, Expose Armor's look on each one Exposed (the effect's `aura`).
+clip = 87
+take = 0
+from = "OrcMale"
+spell = 7384
+valor_hit = 6.0
+
+# 1: the Warrior's one body slam (Beta's Wall Slam retires into it). The rush is short, so the
+# skill is the angle: the wall, the tree or the second enemy behind your target.
+[[ability]]
+key = "tackle"
+name = "Tackle"
+text = "Lowers your shoulder and rushes 8 yd along your aim. The first enemy you meet is carried to the end of the rush. If you drive it into a wall, tree or rock, it Crashes for 20 damage and is stunned for 2 sec (1 sec against heroes). If you drive it into another enemy, both Crash for 14 damage and are knocked down for 2 sec (1 sec against heroes). Otherwise it is flung 4 yd ahead of you for 10 damage. An enemy that can't be moved stops the rush. Heroes are carried at most 4 yd. You cannot be staggered during the rush. Costs 12 stamina."
+icon = "Ability_Warrior_PunishingBlow"
+school = "warrior"
+slot = "utility"
+choice = 2
+kind = "dash"
+range = [8.0, 8.0]
+damage = [10.0, 10.0]
+stamina = 12.0
+cooldown = 12.0
+# No rush look: every charge-like look in the game data (Charge, Intercept, the creatures'
+# charges) is the one kit with the purple trail and the dust cloud that made a Tackle look like a
+# Charge (Corey's review, Nov 3; seen again in the lab on Intercept's, Nov 4), and the ground
+# bursts (Rocky Ground Impact) are blue rings that read as a second Shockwave. The barge itself
+# and the Crash (Shield Bash's mark and the heavy flash on the one crashed, the knockdown's
+# dust) are the look, with dust kicked up from the feet every 0.2 sec of the rush (its own look,
+# apart from Charge's purple and the other classes' dashes: Corey's review, Nov 4).
+spell = 0
+# The shoulder hit, the same on every race: the orc men's Shield Bash (59/0), the one attack clip
+# that's a body check (shoulder and shield driven forward, low) rather than a weapon swing, as
+# Corey asked (his review, Nov 3). It plays over the rush and lands as the rush ends.
+clip = 59
+take = 0
+from = "OrcMale"
+valor_hit = 6.0
+# The rush's poise shows nothing (20572 has no visual): the default steadfast look is Power
+# Infusion's blue glow, a magic look on a shoulder barge (the lab, Nov 4).
+self_effects = [{ kind = "steadfast", secs = [0.4, 0.4], amount = 1.0, aura = 20572 }]
+# A 2 sec knockdown (and the wall's stun to match): a knockdown is the Warlord's big payoff, and
+# at 1 sec it was over before it read (Corey's review, Nov 3). Heroes get half, as with any stun.
+crash = { wall_damage = 20.0, wall_stun = 2.0, foe_damage = 14.0, knockdown = 2.0, posture = 35, boss_posture = 20, hero_carry = 4.0 }
+
+# 1's EX: the same moment (close the gap now), the other answer: toward a friend.
+[[ability]]
+key = "intervene"
+name = "Intervene"
+ex_of = "tackle"
+text = "Rushes up to 25 yd to the ally nearest your reticle. For 3 sec, the first blow aimed at them strikes you instead. If your guard is up when it lands, your guard takes it."
+icon = "Ability_Warrior_DefensiveStance"
+slot = "utility"
+kind = "ally"
+valor = 25
+range = [25.0, 25.0]
+intervene = 3.0
+spell = 100
+# Blessing of Sacrifice's gold on the friend while it holds.
+aura = 6940
+
+# 2: the Warlord's guard is Retaliation and Shield Wall, the Juggernaut's before (with the
+# defense keys, above).
+
+# 3: the cry that turns a fight (Onslaught retires into it). Everyone within 20 yd off the ground,
+# with full stamina and 8 sec where nothing staggers them: the group's chance to press. The
+# warrior's own share is Onslaught's, a little smaller: 15% larger, attacks free and 20% faster;
+# the group's attacks 10% faster. Alone, it's still a whole ultimate: back up, full stamina, 8 sec
+# of free, quicker blows that nothing interrupts.
+[[ability]]
+key = "rallying_cry"
+name = "Rallying Cry"
+text = "You and allies within 20 yd regain all stamina, recover from any stagger or knockdown, and cannot be staggered for 8 sec. For 8 sec, you grow 15% larger, and your attacks cost no stamina and are 20% faster. Allies' attacks are 10% faster."
+icon = "Ability_Warrior_BattleShout"
+school = "warrior"
+slot = "ultimate"
+choice = 2
+kind = "nova"
+valor = 100
+cooldown = 40.0
+radius = [20.0, 20.0]
+# The whole bar (`player.stamina`).
+ally_stamina = 100.0
+# Savagery's red glow (5515, a lasting state look with no anim of its own) on everyone rallied
+# for the 8 sec: the mark that says the buff is on them. Not Rallying Cry of the Dragonslayer
+# (22888): that's lightning hands, and Corey keeps lightning for the magic classes.
+ally_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.1, aura = 5515 }]
+self_effects = [{ kind = "rallied", secs = [8.0, 8.0], amount = 0.2, aura = 5515 }, { kind = "fury", secs = [8.0, 8.0], amount = 0.0 }, { kind = "grown", secs = [8.0, 8.0], amount = 0.15 }]
+# Onslaught's rage burst at the warrior as the arm goes up: Enrage's (12880), the same burst as
+# Bloodlust's (379) without the roar anim 379 plays on the caster, which would fight the Point.
+# Battle Shout's flare on every ally it reaches (the quick "you got it" mark), and the fury's
+# Death Wish red on the warrior while it lasts.
+spell = 12880
+# The general's arm, the same on every race: the human men's Point emote (84/0), the arm thrown
+# up and then forward ("with me!"), not a shout. Corey's review, Nov 3; picked from the lab's
+# strips against Cheer, Shout, Salute, Flex, Wave and the battle roar, Nov 4.
+clip = 84
+take = 0
+from = "HumanMale"
+ally_spell = 6673
+
+# 3, the Juggernaut's (its first choice, from the Warlord's): the spin that ramps (Beta's
+# Whirlwind retires into it). 4, then 1 more a strike up to 15, two a second: a full 6 sec is 114
+# to each enemy in reach, nearly half of it in the last 2 sec.
+[[ability]]
+key = "warrior_bladestorm"
+name = "Bladestorm"
+text = "Spin with your weapon out for up to 6 sec, moving at 70% speed and striking every enemy within 5 yd twice a sec. The first strike deals 5 damage, and each strike after deals 1 more, up to 16. You can't attack, guard or use other abilities while you spin, and a stagger or a stun ends it. Dodge or guard to end it at once, and the dodge or the guard comes out on that same press. Press again to stop."
+icon = "Ability_Whirlwind"
+school = "warrior"
+slot = "ultimate"
+kind = "beam"
+passive = "momentum"
+valor = 100
+cooldown = 40.0
+around = true
+bail = true
+radius = [5.0, 5.0]
+secs = 6.0
+tick = 0.5
+# 5, then 1 more a strike up to 16, two a second: a full 6 sec is 126 to each enemy in reach
+# (Corey, Nov 4: "slightly more"; it was 4 to 15, 114). A heavy blow is about 50.
+damage = [10.0, 10.0]
+ramp = 1.0
+ramp_cap = 16.0
+# Whirlwind's spin and its aura, as Beta's; Sweeping Strikes' flare as the ramp tops out.
+spell = 1680
+aura = 9632
+tick_spell = 779
+valor_hit = 1.0
+# A sharp flash on each body a cut lands on (the heavy blow's), Corey's "small impact flashes".
+impact_kit = 437
+# The Blademaster's storm of cuts over the spin, on a client with patch 0025 (Corey's spec,
+# Nov 3): the orc men's cuts, level sweep (88), rising cut (87), overhead (18/1), thrust (17/1)
+# and round again, 7 a second, the body snapping 70 deg a step to face a new way, each cut a
+# steel trail; the first cut's draw-back compacted into 0.15 sec; one wide sweep (88) over
+# 0.25 sec to finish. Tune here: cut, windup, finish_secs, turn, trail (AARRGGBB), trail_ms.
+flurry = { from = "OrcMale", cuts = [[88, 0], [87, 0], [18, 1], [17, 1], [88, 0], [19, 1], [87, 0], [18, 0]], cut = 0.14, windup = 0.15, finish = [88, 0], finish_secs = 0.25, turn = 70.0, trail = "D2EEF6FF", trail_ms = 220 }
 
 # ------------------------------------------------------------------------------------ Rogue --
 
@@ -8525,9 +9054,12 @@ display = 4810
 icon = "INV_Misc_Fish_05"
 kind = "food"
 stack = 5
-use_secs = 1.6
+use_secs = 1.0
 heal = 0.4
-text = "Heals 40% of your health at once."
+heal_secs = 5.0
+steady = true
+anim = "eat"
+text = "Heals 40% of your health over 5 sec after a 1 sec bite. Taking damage doesn't stop it."
 
 [[item]]
 key = "fish_feast"
@@ -8536,10 +9068,13 @@ display = 1483
 icon = "INV_Misc_Food_09"
 kind = "food"
 stack = 5
-use_secs = 2.4
+use_secs = 1.0
 heal = 0.6
+heal_secs = 6.0
+steady = true
+anim = "eat"
 effect = { kind = "stamina", amount = 0.25, secs = 300.0, name = "Well Fed" }
-text = "Heals 60% of your health. Increases stamina regeneration by 25% for 5 min."
+text = "Heals 60% of your health over 6 sec after a 1 sec bite. Increases stamina regeneration by 25% for 5 min."
 
 [[item]]
 key = "pumpkin_pie"
@@ -8548,10 +9083,13 @@ display = 4784
 icon = "INV_Misc_Food_11"
 kind = "food"
 stack = 5
-use_secs = 2.0
+use_secs = 1.0
 heal = 0.33
+heal_secs = 4.0
+steady = true
+anim = "eat"
 effect = { kind = "regen", amount = 0.011, secs = 30.0, name = "Pie" }
-text = "Heals 33% of your health at once and 33% more over 30 sec."
+text = "Heals 33% of your health over 4 sec after a 1 sec bite, and 33% more over 30 sec."
 
 [[item]]
 key = "clarity"
@@ -8562,6 +9100,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 below = true
+anim = "drink"
 effect = { kind = "focus", amount = 0.25, secs = 90.0, name = "Clarity" }
 text = "Reduces ability cooldowns by 25% for 90 sec."
 
@@ -10038,7 +10577,7 @@ name = "The Garrison's Banner"
 at = [-9885.0, 675.0]
 display = 631
 scale = 1.0
-teaches = ["hurled_axe", "shockwave"]
+teaches = ["hurled_axe", "shockwave", "war_banner", "cleave"]
 keep = true
 secs = 3.0
 text = "Westbrook's banner, carried off by the Riverpaw. The garrison's footmen learned the throw under it, and the slam that drives a line back."
@@ -10144,7 +10683,7 @@ trial = ["trial_shrine_druid_0", "trial_shrine_druid_1"]
 key = "relic_warrior"
 name = "A Veteran's Kit"
 at = [-9888.0, 220.0]
-teaches = ["charge", "retaliation"]
+teaches = ["charge", "berserker_rage", "tackle", "retaliation"]
 loot = { bronze = 1, leather = 1 }
 display = 259
 secret = 7.0

@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 17
+local VERSION = 21
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -779,6 +779,18 @@ function ES.SwingLine(f)
     guid = "player"
   end
   PlayUnitAnimation(guid, clip, impact, trail, ms, take, recovery, nil, from)
+end
+
+-- FU: a storm of cuts starts on a unit (Bladestorm), on a client with patch 0025; the unit's ST
+-- ends it with its finishing sweep. The fields are the ability's flurry, field for field.
+function ES.FlurryLine(f)
+  if not PlayUnitFlurry then return end
+  local guid = f[2]
+  if f[3] == "1" then guid = "player" end
+  local from = (f[5] and f[5] ~= "") and f[5] or nil
+  local trail = (f[12] and f[12] ~= "") and f[12] or nil
+  PlayUnitFlurry(guid, tonumber(f[4]) or 6, from, f[6] or "", tonumber(f[7]) or 0.14, tonumber(f[8]) or 0.15,
+    f[9] or "", tonumber(f[10]) or 0.25, tonumber(f[11]) or 70, trail, tonumber(f[13]) or 220)
 end
 
 -- RO: a hero dodges: the tumble (or a step aside or back).
@@ -2059,14 +2071,14 @@ local LOOK = {
   dead = { 0.5, 0.5, 0.5, "" },
 }
 -- The ones the bar shows (a cast, a channel and a stance by the ability's name).
-local BARRED = { eat = 1, gather = 1, craft = 1, build = 1, repair = 1, stagger = 1, cast = 1, channel = 1, stance = 1, charge = 1 }
+local BARRED = { eat = 1, gather = 1, craft = 1, build = 1, repair = 1, stagger = 1, cast = 1, channel = 1, stance = 1, charge = 1, aim = 1 }
 
 ES.action = { name = "ready", start = 0, total = 0, ability = "" }
 ES.h = nil
 
 -- The bar's word: the ability's name for a cast, a channel, a stance or a charge.
 local function ActionWord(a, look)
-  if a.ability and a.ability ~= "" and (a.name == "cast" or a.name == "channel" or a.name == "stance" or a.name == "charge") then
+  if a.ability and a.ability ~= "" and (a.name == "cast" or a.name == "channel" or a.name == "stance" or a.name == "charge" or a.name == "aim") then
     local d = ES.AbilityInfo and ES.AbilityInfo(a.ability)
     return (d and d.name) or a.ability
   end
@@ -2122,7 +2134,7 @@ act:SetScript("OnUpdate", function()
   elseif a.total > 0 then
     local share = (GetTime() - a.start) / a.total
     -- What drains: a stagger, a channel and a stance.
-    if a.name == "stagger" or a.name == "channel" or a.name == "stance" then
+    if a.name == "stagger" or a.name == "channel" or a.name == "stance" or a.name == "aim" then
       share = 1 - share
     end
     act.bar:Set(share)
@@ -2173,6 +2185,39 @@ empower:SetScript("OnUpdate", function()
 end)
 ES.empower = empower
 
+-- Drawing a Hunter's bow: the camera leans in over the shoulder as the draw builds (deeper for
+-- the ultimate), and at full draw the view trembles until the shot goes (Corey's review: Aimed
+-- Shot, Kill Shot). nil: not drawing, the plain aiming camera again.
+function ES.ChargeCamera(d, share)
+  if not SetAimCamera then return end
+  if not (d and d.school == "hunter" and (d.hi or 0) >= 0.6) then
+    if ES.chargeCam then
+      ES.chargeCam = nil
+      ES.chargeShakeAt = nil
+      if ES.aimCam then SetAimCamera(1, 2.4, 0.75, 0.25) end
+    end
+    return
+  end
+  -- Deeper the longer it's held (Corey's review: "zoom in more and more the longer you hold
+  -- it"): from the aiming camera's 2.4 down to 1.1 at a full draw, 1.3 for the ultimate, which
+  -- holds longer (at 0.8 the camera was inside the hero: the body went and the bowstring stood
+  -- alone, run 060).
+  local ult = d.n == 5
+  local dist = 2.4 - (ult and 1.1 or 1.3) * share
+  if not ES.chargeCam or math.abs(ES.chargeCam - dist) > 0.04 then
+    ES.chargeCam = dist
+    SetAimCamera(1, dist, 0.75 - 0.2 * share, 0.25)
+  end
+  -- Full draw: the view trembles until the shot goes.
+  if share >= 1 and ShakeCamera then
+    local now = GetTime()
+    if not ES.chargeShakeAt or now >= ES.chargeShakeAt then
+      ES.chargeShakeAt = now + 0.15
+      ShakeCamera(ult and 1.4 or 0.9, 0.18, 22)
+    end
+  end
+end
+
 local BURST_SECS = 0.45
 function ES.ChargeFull(d)
   local look = d and COLUMN_LOOK[d.school or ""]
@@ -2181,10 +2226,16 @@ function ES.ChargeFull(d)
   aim.burstAt = GetTime()
   aim.burstColor = { r, g, b }
   aim.burst:Show()
-  empower.edge:SetVertexColor(r, g, b, 1)
-  empower.flash = 0.55
-  empower:Show()
-  if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  -- A bow's full draw is the reticle's bloom and the tremble (ChargeCamera): no flash over the
+  -- whole screen and no kick (Corey's review of Aimed Shot and Kill Shot: it read as a strange
+  -- buff going off). Other charges keep theirs.
+  local bow = d and d.school == "hunter"
+  if not bow then
+    empower.edge:SetVertexColor(r, g, b, 1)
+    empower.flash = 0.55
+    empower:Show()
+    if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  end
   local bar = ES.abar
   if d and bar and bar.slots[d.n] then bar.slots[d.n].fullAt = GetTime() end
 end
@@ -2227,11 +2278,17 @@ function ES.DrawAimMarker()
   if not SetAimMarker then return end
   local d = aim.info
   local shape = ES.AimMarkerShape(d)
-  local want = shape and (shape .. d.range .. d.radius .. d.arc) or nil
+  -- A grappling hook's strip runs only to where it would catch (Grapple.lua).
+  local range = d and d.range
+  local c = shape == "line" and ES.CatchNow and ES.CatchNow()
+  if c and c.yards and c.yards > 0 then
+    range = math.floor(c.yards * 4 + 0.5) / 4
+  end
+  local want = shape and (shape .. range .. d.radius .. d.arc) or nil
   if want == ES.aimMarker then return end
   ES.aimMarker = want
   if want then
-    SetAimMarker(shape, d.range, d.radius, d.arc)
+    SetAimMarker(shape, range, d.radius, d.arc)
   else
     SetAimMarker(nil)
   end
@@ -2245,6 +2302,7 @@ aim:SetScript("OnUpdate", function()
   if a.name == "charge" and d and d.hi > 0 then
     local t = GetTime() - a.start
     local share = Clamp(t / d.hi, 0, 1)
+    ES.ChargeCamera(d, share)
     size = 56 - 32 * share
     if share >= 1 then
       -- Full: gold, with a slow beat, and once the burst.
@@ -2261,8 +2319,16 @@ aim:SetScript("OnUpdate", function()
     end
   elseif d and not ES.AbilityReady(d) then
     r, g, b, alpha = 0.55, 0.55, 0.55, 0.6
+  elseif d and ES.CatchColor and ES.CatchColor() then
+    -- A grappling hook: green, it will catch; red, it will miss (Grapple.lua).
+    r, g, b = ES.CatchColor()
+    alpha = 0.95
   end
-  if a.name ~= "charge" then this.fullAt = nil end
+  if ES.StepCatch then ES.StepCatch() end
+  if a.name ~= "charge" then
+    this.fullAt = nil
+    ES.ChargeCamera(nil)
+  end
   if this.burstAt then
     local t = (GetTime() - this.burstAt) / BURST_SECS
     if t >= 1 then
@@ -2556,7 +2622,8 @@ end
 
 -- AB: the five keys, each slot~ability~name~icon~kind~shape~least~full~cooldown left~cooldown~
 -- charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~
--- EX radius~EX arc~text~facts~EX text~EX facts~aimed~column.
+-- EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered (the seconds Call of the
+-- Wild's next call stays empowered by a parry or a perfect dodge; 0 or none: it isn't).
 function ES.AbilitiesLine(f)
   local parts = Split(f[2] or "", "^")
   ES.abilities = {}
@@ -2571,6 +2638,8 @@ function ES.AbilitiesLine(f)
       valor = tonumber(e[16] or "") or 0, text = e[26] or "", facts = e[27] or "", at = GetTime(),
       aimed = e[30] == "1", school = e[31] or "",
     }
+    local primed = tonumber(e[32] or "") or 0
+    if primed > 0 then s.primedEnds = GetTime() + primed end
     if (e[17] or "") ~= "" then
       s.ex = {
         n = n, key = e[17], name = e[18] or "", icon = e[19] or "", valor = tonumber(e[20] or "") or 0,
@@ -2688,6 +2757,15 @@ function ES.DrawAbilities()
         b.glow:SetBlendMode("ADD")
         b.glow:Show()
       end
+      -- Empowered by a parry or a perfect dodge (Call of the Wild): a cold spirit-blue blaze that
+      -- breathes slowly, its rim blue and its seconds in the corner, unlike the gold of an EX
+      -- that's free or the green of a recast.
+      if s.primedEnds and s.primedEnds > GetTime() and not rc and not em then
+        b.glow:SetVertexColor(0.4, 0.7, 1, 1)
+        b.glow:SetBlendMode("ADD")
+        b.glow:Show()
+        b.rim:SetVertexColor(0.55, 0.8, 1, 1)
+      end
       -- An aimed one up: its rim lit.
       local up = Aiming()
       if up and (up == s.key or (s.ex and up == s.ex.key) or (rc and up == rc.key)) then
@@ -2735,8 +2813,19 @@ abar:SetScript("OnUpdate", function()
         ES.DrawAbilities()
       end
     end
+    local primed = s and s.primedEnds
+    if primed and now >= primed then
+      -- Its empowerment is over: the key as it was.
+      s.primedEnds = nil
+      primed = nil
+      ES.DrawAbilities()
+    end
     if em then
+      b.timer:SetTextColor(1, 0.85, 0.4)
       b.timer:SetText(string.format("%d", math.ceil(math.max(0, em - now))))
+    elseif primed then
+      b.timer:SetTextColor(0.6, 0.85, 1)
+      b.timer:SetText(string.format("%d", math.ceil(math.max(0, primed - now))))
     else
       b.timer:SetText("")
     end
@@ -2760,6 +2849,8 @@ abar:SetScript("OnUpdate", function()
       end
     elseif (rc or em) and b.glow:IsShown() then
       b.glow:SetAlpha(0.7 + 0.3 * math.sin(now * (em and 7 or 5)))
+    elseif primed and b.glow:IsShown() then
+      b.glow:SetAlpha(0.55 + 0.45 * math.sin(now * 2.5))
     elseif n == ULT and b.glow:IsShown() and not Aiming() then
       b.glow:SetAlpha(0.55 + 0.35 * math.sin(now * 3))
     end
@@ -2814,7 +2905,14 @@ local CC_WORDS = {
   burn = { "Burning", 1, 0.5, 0.2 },
   mark = { "Marked", 0.75, 0.55, 1 },
   deathmark = { "Marked for death", 0.85, 0.35, 1 },
-  onslaught = { "Onslaught", 1, 0.55, 0.3 },
+  -- The Warrior's (the Juggernaut's and the Warlord's, Nov 4).
+  rallied = { "Rallied", 1, 0.8, 0.4 },
+  fury = { "Fury", 1, 0.4, 0.35 },
+  grown = { "Towering", 1, 0.6, 0.4 },
+  momentum = { "Momentum", 1, 0.9, 0.6 },
+  war_banner = { "Under the banner", 1, 0.85, 0.5 },
+  cowed = { "Cowed", 0.7, 0.6, 0.9 },
+  exposed = { "Exposed", 1, 0.65, 0.3 },
   hallowed = { "Hallowed", 1, 0.9, 0.55 },
   steadfast = { "Steadfast", 1, 0.85, 0.45 },
   cheat_death = { "Cheating death", 1, 0.9, 0.5 },
@@ -6144,12 +6242,21 @@ local function Typing()
   return ChatFrameEditBox and ChatFrameEditBox:IsVisible()
 end
 
--- Walking with the bow drawn (Aimed Shot's charge): the server lets the legs walk, and the
--- upper body holds the draw (HoldBow) meanwhile, on the clients with an action layer.
+-- Walking with the bow drawn (Aimed Shot's charge, or a bow ability with nothing to charge,
+-- drawn as it's aimed): the server lets the legs walk, and the upper body holds the draw (HoldBow)
+-- meanwhile, on the clients with an action layer.
 local HOLD_BOW = 109
+function ES.BowDrawn()
+  local a = ES.action
+  if not a or ES.Kit() ~= "bow" then return false end
+  if a.name == "charge" then return true end
+  local d = a.name == "aim" and ES.AbilityInfo(a.ability)
+  return d and d.kind ~= "shot" and (d.hi <= 0 or d.isEx) and true or false
+end
+
 function ES.BowWalk()
   local want = false
-  if ActionLayer() and ActionMoveKeys and ES.action and ES.action.name == "charge" and ES.Kit() == "bow" then
+  if ActionLayer() and ActionMoveKeys and ES.BowDrawn() then
     local f, r = ActionMoveKeys()
     want = (f ~= 0 or r ~= 0)
   end
@@ -6162,12 +6269,25 @@ function ES.BowWalk()
   end
 end
 
+-- Skyfall's hang (an aim the server gives a length): it looses by itself as it runs out, along
+-- the reticle as it is then (the server looses it a moment later at the last line it heard).
+function ES.HangOut()
+  local a = ES.action
+  if a and a.name == "aim" and a.total > 0 and not a.loosed and GetTime() - a.start >= a.total then
+    a.loosed = true
+    local line = ES.AimLine()
+    Say(".es in a" .. line)
+    Say(".es in au" .. line)
+  end
+end
+
 local poll = CreateFrame("Frame")
 poll:SetScript("OnUpdate", function()
   if not ES.awake then return end
   ES.RunTimers()
   ES.Markers()
   ES.BowWalk()
+  ES.HangOut()
   ES.StepExHold()
   ES.StepLockHold()
   local typing = Typing()
@@ -6239,6 +6359,7 @@ function ES.Sleep()
   if ClearGroundMarker then ClearGroundMarker() end
   if ClearTelegraph then ClearTelegraph() end
   ES.aimMarker = nil
+  ES.catch = nil
   if ES.orbitHeld and ToggleMouseMove then ToggleMouseMove() end
   if ES.sprintHeld then Say(".es in spu") end
   ES.lookHeld, ES.guardHeld, ES.attackHeld, ES.orbitHeld, ES.sprintHeld = nil, nil, nil, nil, false
@@ -6394,6 +6515,12 @@ function ES.Line(line)
       ClearGroundMarker(key)
       ES.marksUp.mk[key] = nil
     end
+  elseif verb == "GP" then
+    -- Where the aimed grappling hook would catch (Grapple.lua).
+    if ES.CatchLine then ES.CatchLine(f) end
+  elseif verb == "FP" then
+    -- A leap's own look, a Disengage's flip (Grapple.lua).
+    if ES.FlipLine then ES.FlipLine(f) end
   elseif verb == "DA" then
     -- A dash of ours (Charge, Intercept): the body runs it here, as a dodge's.
     if ActionDash then ActionDash(tonumber(f[2]) or 0.3, tonumber(f[3]) or 20, "f") end
@@ -6417,6 +6544,15 @@ function ES.Line(line)
     ES.HitMark(f[3], f[4])
   elseif verb == "AN" then
     ES.SwingLine(f)
+  elseif verb == "FU" then
+    ES.FlurryLine(f)
+  elseif verb == "GB" then
+    -- A shape flashed on the ground as an ability lands (Shockwave's cone), on a client with
+    -- patch 0026: an effect, drawn whatever the floor markers are set to.
+    if PlayGroundBurst then
+      PlayGroundBurst(tonumber(f[2]) or 0, tonumber(f[3]) or 0, tonumber(f[4]) or 0, tonumber(f[5]) or 0,
+        f[6] or "wedge", tonumber(f[7]) or 5, tonumber(f[8]) or 90, tonumber(f[9]) or 0.35, f[10] or "C0E8FF", tonumber(f[11]) or 0)
+    end
   elseif verb == "IM" then
     ES.ImpactLine(f)
   elseif verb == "RO" then
@@ -6516,7 +6652,13 @@ events:SetScript("OnEvent", function()
     -- ac9: a creature's swing trails its last stroke into the blow (not the whole wind-up);
     -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
+    -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
+    -- ac18: a shape flashed on the ground as an ability lands (0026).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
+      Say(".es hello " .. VERSION .. " ac18")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and (tonumber(HasActionCombat()) or 0) >= 17 then
+      Say(".es hello " .. VERSION .. " ac17")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and (tonumber(HasActionCombat()) or 0) >= 12 then
       Say(".es hello " .. VERSION .. " ac12")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and (tonumber(HasActionCombat()) or 0) >= 11 then
       Say(".es hello " .. VERSION .. " ac11")
