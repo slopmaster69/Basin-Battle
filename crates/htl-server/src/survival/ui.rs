@@ -89,7 +89,8 @@
 //!   (that half alone, the rest keeping what it was doing: Skyfall's hang holds the Jump clip on
 //!   the legs while the arms draw the bow). `lower` takes client patch 0037 (`ac23`); `ac22`
 //!   reads it as the whole body.
-//! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
+//! - `ST\t<guid>\t<mine>`: a swing called off (a feint), or a held cast ended early (Skyfall's hang,
+//!   a thrown ability's aim let go), its clip let go.
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
@@ -399,7 +400,9 @@ pub(crate) const VERSION: u32 = 2;
 /// 38: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 39: a giant's blow on the guard flashes the screen's corners dust-coloured, not red (the
 /// `edge` of its beat in `Cues.lua`).
-pub(crate) const ADDON_NEWEST: u32 = 39;
+/// 40: a held cast of the hero's own (Skyfall's hang, a thrown ability's aim) lets go on the
+/// server's `ST`, not only a swing.
+pub(crate) const ADDON_NEWEST: u32 = 40;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

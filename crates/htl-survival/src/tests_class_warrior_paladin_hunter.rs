@@ -1606,6 +1606,26 @@ fn skyfall_leaps_up_and_its_volley_rains_where_the_reticle_points_planting_its_a
     assert!(s.planted_of(p).len() >= 10, "and in the ground");
 }
 
+/// Skyfall's volley loosed early ends the hang there: its hover pose (a held cast clip on the legs)
+/// is let go at once, for the hero's own screen too (the add-on's `ST`), not left to run out.
+#[test]
+fn skyfall_loosed_early_lets_the_hover_pose_go_at_once() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.set_valor(p, 100.0);
+    let mut ev = press(&mut s, p, "skyfall", false);
+    ev.extend(run(&mut s, 1.0));
+    assert!(ev.iter().any(|e| matches!(e, Event::Clip { id, body: crate::sim::ClipBody::Lower, .. } if *id == p)), "hanging in the hover pose: {ev:?}");
+    assert!(!ev.iter().any(|e| matches!(e, Event::ClipStop { id } if *id == p)), "still held while it hangs");
+    s.set_aim_line(p, 0.0, down_to(12.0));
+    let mut ev = press_again(&mut s, p, "ultimate");
+    if aiming(&s, p).is_some() {
+        ev.extend(click(&mut s, p));
+    }
+    ev.extend(run(&mut s, 0.3));
+    assert!(ev.iter().any(|e| matches!(e, Event::ClipStop { id } if *id == p)), "the hover let go as the volley goes: {ev:?}");
+}
+
 /// A wall along x = 10 (everything past it blocked).
 struct Wall;
 impl crate::land::Land for Wall {
