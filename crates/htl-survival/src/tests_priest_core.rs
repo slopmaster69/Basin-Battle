@@ -478,7 +478,10 @@ fn the_shield_is_judged_fairly_with_a_round_trip() {
 fn grace_rises_on_a_priests_perfect_falls_on_a_blow_and_fades_after_10_sec() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
-    // Any Priest spell's perfect raises it, wherever it was pushed (another branch's Penance).
+    // Any Priest spell's perfect raises it, wherever it was pushed (another branch's Penance),
+    // when it's the hero's own: on one of their keys.
+    s.slot_ability(p, "ranged", "penance").unwrap();
+    s.slot_ability(p, "defense", "power_word_shield").unwrap();
     s.events.push(Event::Perfect { player: p, ability: idx(&s, "penance") });
     let _ = s.step(DT);
     assert_eq!(s.grace_of(p), 1);

@@ -210,7 +210,9 @@ impl Survival {
             .events
             .iter()
             .filter_map(|e| match e {
-                Event::Perfect { player, ability } if self.priests(*ability) => Some(*player),
+                // Only for a perfect of the hero's own: a friend landing the Priest's Salvation
+                // beat is the Priest's Grace, not theirs.
+                Event::Perfect { player, ability } if self.priests(*ability) && self.own_ability(*player, *ability) => Some(*player),
                 _ => None,
             })
             .collect();
@@ -225,6 +227,12 @@ impl Survival {
             }
             self.events.push(Event::Auras { id });
         }
+    }
+
+    /// Whether `ability` (or the ability it's the EX of) is on one of the hero's keys.
+    fn own_ability(&self, id: Id, ability: usize) -> bool {
+        let key = &self.content.abilities[self.content.base_of(ability)].key;
+        self.players.get(&id).is_some_and(|p| p.loadout.values().any(|k| k == key))
     }
 
     /// Grace's looks on a hero: one more for each level.

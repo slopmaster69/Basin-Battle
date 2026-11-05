@@ -512,3 +512,16 @@ fn a_new_priest_starts_with_salvation_on_the_3_key() {
     let (loadout, _) = s.fresh_abilities("priest");
     assert_eq!(loadout.get("ultimate").map(String::as_str), Some("holy_word_salvation"));
 }
+
+#[test]
+fn a_friend_landing_salvations_beat_gives_the_priest_grace_not_themselves() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let a = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
+    let (_, beats) = salvation(&mut s, p);
+    until(&mut s, beats[0], &[]);
+    act(&mut s, a);
+    run(&mut s, 0.5, &[]);
+    assert_eq!(s.players[&a].priest.grace, 0, "Bren landed it, but it's not his spell");
+    assert!(s.players[&p].priest.grace >= 1, "Ayla's Grace for it");
+}
