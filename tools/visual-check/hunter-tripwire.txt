@@ -15,6 +15,7 @@ include _setup
 7.4 .es in a {facing+0.25} -0.25
 7.5 .es in au {facing+0.25} -0.25
 6.2 shots left 4 0.5
+6.35 shots aim 12 0.1               # the reticle and the first arrow landing under it (Corey: does it follow the reticle?)
 10.0 .es in ab 3 0                   # the second, straight across the way ahead
 10.4 .es in a {facing+0.35} -0.3
 10.5 .es in au {facing+0.35} -0.3

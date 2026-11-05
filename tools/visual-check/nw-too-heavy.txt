@@ -1,0 +1,30 @@
+# No words (#135), a giant's blow on a timed guard: Old Blackfang (unparryable) comes and bites
+# while the hero holds guard. A guard counts as timed only in the 0.25 s before the blow, which
+# a script can't hit, so the parry window is tuned to 2.5 s for the take (restored at the end)
+# and the guard is dropped and raised again every 2 s. The hero is healed through it (the jaws
+# pattern isn't blockable). Look for, on each bite: the heavy impact and dust on the hero, the
+# skid back a step with the guard still up, a dull shield thud (no clang, no spark), the hardest
+# camera shove of any block; no "Parry" or "Too heavy" word.
+hero hunter
+cam 50 -12 9
+include _setup
+4.2 .es dummy clear
+5.0 .es tune parry.window 2.5
+5.5 .es target blackfang 3
+6.0 .es in g
+8.0 .es in gu
+8.2 .es in g
+10.2 .es in gu
+10.4 .es in g
+12.4 .es in gu
+12.6 .es in g
+6.5 shots guard 24 0.3
+7.0 .es heal
+9.0 .es heal
+11.0 .es heal
+13.0 .es heal
+14.0 .es in gu
+14.2 .es target clear
+14.4 .es tune parry.window 0.25
+14.6 .es heal
+17 end
