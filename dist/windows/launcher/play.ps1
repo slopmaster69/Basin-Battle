@@ -1,4 +1,5 @@
-# What Play.exe runs (with no console window): the launcher. It shows the project's shield and
+# The plain launcher: what Play.exe runs (with no console window) on a PC without WebView2 for its
+# map, and for Play.exe -Classic. It plays the same as the map does. It shows the project's shield and
 # what it's doing, updates this folder if there's a new version, finds your WoW 1.12.1, then
 # starts the game where you played last time (in 3 seconds, or press Change to choose again).
 #   play.ps1 -Change      straight to the choices

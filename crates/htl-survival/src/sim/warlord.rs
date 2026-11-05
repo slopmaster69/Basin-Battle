@@ -189,7 +189,7 @@ impl Survival {
         // The shoulder hit's clip over the rush, as a dash's (twice the rush, so its blow lands as
         // the rush ends). Without it the Tackle was Charge's run and nothing else.
         if d.clip != 0 {
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6), at: 0.0 });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: (secs * 2.0).max(0.6), at: 0.0, body: ClipBody::Full });
         }
     }
 
@@ -376,7 +376,7 @@ impl Survival {
         // The shield up through the run: the block pose held on the upper body while the legs
         // run (Corey's review, Nov 4).
         if let Action::Dash { secs, .. } = self.players[&id].action {
-            self.events.push(Event::Clip { id, clip: combat::BLOCK_ANIM, take: 0, from: None, secs: secs + 0.3, at: 0.05 });
+            self.events.push(Event::Clip { id, clip: combat::BLOCK_ANIM, take: 0, from: None, secs: secs + 0.3, at: 0.05, body: ClipBody::Full });
         }
         // The guard on the friend, its look on them while it holds.
         self.apply_cc_look(friend, id, "guarded", d.intervene, 1.0, 0.0, &d.name, d.aura);

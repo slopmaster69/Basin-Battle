@@ -1,0 +1,90 @@
+From fa4d7f1883fbea1041132b01a6d6c1b54db33b18 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:44:02 -0600
+Subject: [PATCH] A missile's spin can tumble end over end (SetMissileLook's
+ eighth argument, "side")
+
+The flat spin about a missile's up read as a wobble on the Warrior's thrown axe (Corey's review:
+"the spin looks goofy, it should be a horizontal X-axis spin that just rotates 360"). An eighth
+argument to `SetMissileLook` names the spin's axis: `"side"` turns the model about the axis
+across its flight, end over end as a thrown axe tumbles; anything else, or nothing, keeps the
+flat spin.
+---
+ crates/benilla-app/src/entities/missile.rs | 9 ++++++++-
+ crates/benilla-app/src/missile_look.rs     | 2 ++
+ crates/benilla-ui/src/action_combat.rs     | 5 +++++
+ 3 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/crates/benilla-app/src/entities/missile.rs b/crates/benilla-app/src/entities/missile.rs
+index 39f1b148..1a35e84e 100644
+--- a/crates/benilla-app/src/entities/missile.rs
++++ b/crates/benilla-app/src/entities/missile.rs
+@@ -144,6 +144,9 @@ pub(crate) struct MissileSpell {
+ pub(crate) struct MissileSpin {
+     pub(crate) turns: f32,
+     pub(crate) angle: f32,
++    /// Basin Battle: end over end about the axis across the flight (local +X), a thrown axe's
++    /// tumble, instead of flat about its up.
++    pub(crate) tumble: bool,
+ }
+ 
+ /// One projectile in flight.
+@@ -874,7 +877,11 @@ pub(super) fn move_missiles(
+             if let Some(spin) = spin.as_deref_mut() {
+                 spin.angle =
+                     (spin.angle + spin.turns * std::f32::consts::TAU * dt) % std::f32::consts::TAU;
+-                transform.rotation *= Quat::from_rotation_y(spin.angle);
++                transform.rotation *= if spin.tumble {
++                    Quat::from_rotation_x(spin.angle)
++                } else {
++                    Quat::from_rotation_y(spin.angle)
++                };
+             }
+         }
+     }
+diff --git a/crates/benilla-app/src/missile_look.rs b/crates/benilla-app/src/missile_look.rs
+index 40bad3f1..2ce2c710 100644
+--- a/crates/benilla-app/src/missile_look.rs
++++ b/crates/benilla-app/src/missile_look.rs
+@@ -182,6 +182,7 @@ fn dress_missiles(
+             commands.entity(entity).insert(MissileSpin {
+                 turns: look.spin,
+                 angle: 0.0,
++                tumble: look.tumble,
+             });
+         }
+         if let Some(rgb) = look.trail.filter(|_| look.width > 0.0 && look.secs > 0.0) {
+@@ -344,6 +345,7 @@ mod tests {
+                 secs: 0.3,
+                 scale: 1.0,
+                 spin: 0.0,
++                tumble: false,
+             },
+         );
+         for i in 0..10 {
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 59ffb085..a5088f2d 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -634,6 +634,9 @@ pub struct MissileLook {
+     pub scale: f32,
+     /// Turns a second about the missile's up axis.
+     pub spin: f32,
++    /// Basin Battle: the spin end over end, about the axis across the flight (a thrown axe's
++    /// tumble), instead of flat about the up axis.
++    pub tumble: bool,
+ }
+ 
+ static MISSILE_LOOKS: std::sync::Mutex<Vec<(u32, MissileLook)>> = std::sync::Mutex::new(Vec::new());
+@@ -1462,6 +1465,8 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 secs: number(v.get(3), 0.0, 5.0).unwrap_or(0.4),
+                 scale: number(v.get(4), 0.1, 8.0).unwrap_or(1.0),
+                 spin: number(v.get(5), -20.0, 20.0).unwrap_or(0.0),
++                // The eighth argument names the spin's axis: "side" tumbles, anything else is flat.
++                tumble: text(v.get(7)).is_some_and(|a| a.eq_ignore_ascii_case("side")),
+             };
+             match (spell, unit_guid(v.get(6))) {
+                 (Some(spell), Some(caster)) => {
+-- 
+2.56.0.windows.4
+

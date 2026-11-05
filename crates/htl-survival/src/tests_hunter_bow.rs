@@ -221,6 +221,13 @@ fn skyfall_hangs_at_its_top_with_the_bow_drawn_and_a_click_looses_the_volley_fro
     assert!(ev.iter().any(|e| matches!(e, Event::Rooted { player, on: true } if *player == p)), "held in the air");
     assert!(ev.iter().any(|e| matches!(e, Event::FeatherFall { player, on: true } if *player == p)));
     assert!(drawn(&ev, p), "the bow drawn");
+    // The hover's pose (the Jump clip) on the legs alone: the arms stay on the bow.
+    assert!(
+        ev.iter().any(|e| matches!(e, Event::Clip { id, clip: 38, body: ClipBody::Lower, secs, .. } if *id == p && *secs > 5.5)),
+        "the hang's pose on the lower body for the whole hang: {:?}",
+        ev.iter().filter(|e| matches!(e, Event::Clip { .. } | Event::React { .. })).collect::<Vec<_>>()
+    );
+    assert!(!ev.iter().any(|e| matches!(e, Event::React { id, .. } if *id == p)), "no whole-body reaction over the draw");
     let h = s.players[&p].pos[2];
     assert!(h > 3.0, "up there: {h}");
     assert_eq!(s.hang_time(p).map(|(_, total)| total), Some(5.5), "for 5.5 sec");

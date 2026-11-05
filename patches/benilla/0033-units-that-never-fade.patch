@@ -1,0 +1,86 @@
+From a3f82e43163803671f505f2624378c031f693853 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:42:57 -0600
+Subject: [PATCH] A unit flagged to come and go at once draws with no appear
+ fade and no teardown fade
+
+`UNIT_DYNAMIC_FLAGS` bit 0x1000, Basin Battle's own: the unit spawns steady instead of ramping its
+alpha up over two seconds, and a destroy frees it at once instead of fading it out. For Call of
+the Wild's spirit beasts, which are called in for one strike: the beast was still fading in as it
+struck and lingered as a ghost for two seconds after (Corey's review: "the fades are the issue").
+A building preview's game object already goes this way (0017); this is the same for a unit.
+---
+ crates/benilla-app/src/entities/attach/mod.rs |  4 +++-
+ crates/benilla-app/src/entities/preview.rs    | 16 ++++++++++++++++
+ crates/benilla-app/src/net/objects.rs         |  5 ++++-
+ 3 files changed, 23 insertions(+), 2 deletions(-)
+
+diff --git a/crates/benilla-app/src/entities/attach/mod.rs b/crates/benilla-app/src/entities/attach/mod.rs
+index a6756835..4295b716 100644
+--- a/crates/benilla-app/src/entities/attach/mod.rs
++++ b/crates/benilla-app/src/entities/attach/mod.rs
+@@ -338,6 +338,8 @@ pub(super) fn attach_entity_visuals(
+         // A building preview (`super::preview`): steady, hull-less, and a ghost's look.
+         let preview = super::preview::entity_preview_bits(Some(net), stores.get(entity).ok());
+         let ghost = preview & super::preview::PREVIEW_GHOST != 0;
++        // Basin Battle: a unit flagged to come and go at once spawns steady, no appear fade.
++        let no_fade = super::preview::unit_no_fade(Some(net), stores.get(entity).ok());
+         let equip = worn.bodyslots;
+         // An empty `parts` list is either a model that draws nothing (an answer) or no model at
+         // all (a gap of ours, which the cube shows).
+@@ -688,7 +690,7 @@ pub(super) fn attach_entity_visuals(
+                 now,
+                 // A fresh visual fades in; a rebuild (`Reattached`: a mount transition, a display
+                 // swap) spawns steady.
+-                fade: if reattached || preview != 0 {
++                fade: if reattached || preview != 0 || no_fade {
+                     JoinedFade::Steady
+                 } else {
+                     JoinedFade::Pending {
+diff --git a/crates/benilla-app/src/entities/preview.rs b/crates/benilla-app/src/entities/preview.rs
+index b7b746e6..73bbc8b4 100644
+--- a/crates/benilla-app/src/entities/preview.rs
++++ b/crates/benilla-app/src/entities/preview.rs
+@@ -17,6 +17,22 @@ pub(crate) const PREVIEW_MOVE: u32 = 0x1000_0000;
+ /// `GAMEOBJECT_FLAGS` bit: with [`PREVIEW_MOVE`], drawn as a translucent light-blue ghost.
+ pub(crate) const PREVIEW_GHOST: u32 = 0x2000_0000;
+ 
++/// `UNIT_DYNAMIC_FLAGS` bit, Basin Battle's own: a unit that is there at once and gone at once,
++/// with no appear fade and no teardown fade (a spirit beast called in for one strike was still
++/// fading in as it struck, and faded out for two seconds after: Corey's review of Call of the
++/// Wild, "the fades are the issue"). Far above the bits the data uses (`0x1` to `0x40`).
++pub(crate) const UNIT_NO_FADE: u32 = 0x1000;
++
++/// Whether a streamed unit asks for no fades, from its stored fields; never for another kind.
++pub(crate) fn unit_no_fade(net: Option<&NetEntity>, store: Option<&ObjectStore>) -> bool {
++    match (net, store) {
++        (Some(n), Some(s)) => {
++            n.kind == EntityKind::Unit && s.0.unit_dynamic_flags() & UNIT_NO_FADE != 0
++        }
++        _ => false,
++    }
++}
++
+ /// The ghost's render alpha.
+ pub(crate) const GHOST_ALPHA: f32 = 0.5;
+ /// The ghost's tint, a light blue (multiplies the lit colour).
+diff --git a/crates/benilla-app/src/net/objects.rs b/crates/benilla-app/src/net/objects.rs
+index ab66841b..634ee923 100644
+--- a/crates/benilla-app/src/net/objects.rs
++++ b/crates/benilla-app/src/net/objects.rs
+@@ -849,8 +849,11 @@ fn tear_down(mut ent: EntityWorldMut) {
+         ent.get::<NetEntity>(),
+         ent.get::<ObjectStore>(),
+     );
++    // Basin Battle: so does a unit flagged to come and go at once (a spirit beast).
++    let no_fade =
++        crate::entities::preview::unit_no_fade(ent.get::<NetEntity>(), ent.get::<ObjectStore>());
+     ent.remove::<Guid>();
+-    if preview != 0 {
++    if preview != 0 || no_fade {
+         ent.despawn();
+         return;
+     }
+-- 
+2.56.0.windows.4
+

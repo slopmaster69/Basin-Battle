@@ -1,7 +1,7 @@
 //! The Deadmines: a world of its own, reached by the Smuggler's Logbook at camp. Its rules are a
 //! souls-like's: lamps to light and rest at (resting heals, refills the Draughts and brings every
-//! foe but the bosses back), Draughts the only heal, a fall that leaves one sack to win back (die
-//! again first and it's gone), plunder from every foe, gear that lies where its owner fell,
+//! foe but the bosses back), Draughts the heal in a fight (health comes back out of one), a fall
+//! that leaves one sack to win back (die again first and it's gone), plunder from every foe, gear that lies where its owner fell,
 //! strongboxes off the path, shortcuts opened from their far side, fog doors that bar a boss's
 //! room while it fights, and a front door that opens when the last boss falls.
 
@@ -733,6 +733,21 @@ impl Survival {
         });
         self.events.push(Event::Dirty);
         Ok(())
+    }
+
+    /// Come down from the camp (a page of the book, or a wager): whole to start the trip, health
+    /// and stamina full. Their Draughts are as they left them (a rest refills those), and a hero
+    /// logging in below isn't made whole, so leaving mid-fight heals nothing.
+    pub fn come_down(&mut self, id: Id) {
+        let stamina = self.content.player.stamina;
+        let Some(p) = self.players.get_mut(&id).filter(|p| p.health > 0) else {
+            return;
+        };
+        p.health = p.max_health;
+        p.stamina = stamina;
+        let (health, max) = (p.health, p.max_health);
+        self.events.push(Event::Health { id, health, max });
+        self.events.push(Event::Stamina { player: id });
     }
 
     /// Whole again, Draughts refilled.

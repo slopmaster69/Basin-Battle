@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 20
+local VERSION = 36
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -760,10 +760,13 @@ function ES.SwingLine(f)
   local from = (f[13] and f[13] ~= "") and f[13] or nil
   if not clip or not PlayUnitAnimation then return end
   -- A cast (a throw, a spell): its clip on whoever cast it, ours too (no blow of ours to track),
-  -- another model's take when the ability names one (the same on every race).
+  -- another model's take when the ability names one (the same on every race), over the body the
+  -- line names ("full", "upper", or "lower" from ac23: the legs alone, the arms keeping their draw).
   if kind == "cast" then
     if mine then guid = "player" end
-    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, nil, from)
+    local body = (f[14] and f[14] ~= "") and f[14] or "full"
+    if from and PreloadAnimationSource then PreloadAnimationSource(from) end
+    PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, body, from)
     return
   end
   if mine then
@@ -957,6 +960,25 @@ function ES.ImpactLine(f)
     if k and wasStruck and not struck and ES.Braced() then k = nil end
     if k then CameraKick(k[1], k[2]) end
   end
+end
+
+-- BT: a beat on our screen alone (what everyone sees and hears, the server plays on the bodies):
+-- Kill Shot's speed lines and a kick as it goes; the hit-stop, shake and kick as it kills, the
+-- foe it felled held still with us.
+ES.BEAT = {
+  kill_shot = { lines = true, kick = { 0.08, 0.3 } },
+  kill_shot_kill = { stop = 260, shake = { 2.0, 0.3 }, kick = { 0.1, 0.4 } },
+}
+function ES.BeatLine(f)
+  local b = ES.BEAT[f[2] or ""]
+  if not b then return end
+  if b.lines and ES.KillLines then ES.KillLines() end
+  if b.stop and HitStop then
+    HitStop("player", b.stop)
+    if f[3] and f[3] ~= "0x0" then HitStop(f[3], b.stop) end
+  end
+  if b.shake and ShakeCamera then ShakeCamera(b.shake[1], b.shake[2]) end
+  if b.kick and CameraKick then CameraKick(b.kick[1], b.kick[2]) end
 end
 
 -- Our own blow reaching its impact keyframe: what the blade crosses takes its weight here and now
@@ -2164,6 +2186,23 @@ aim.name:SetTextColor(1, 0.9, 0.6)
 aim.burst = Tex(aim, "OVERLAY", "reticle", 56, 56)
 aim.burst:SetPoint("CENTER", aim, "CENTER", 0, 0)
 aim.burst:Hide()
+-- A fan of arrows (Multi-Shot): five points spread in a shallow arc across the middle, where the
+-- arrows will go, in place of a strip on the ground (Corey's review: "a cone reticle instead").
+-- They're placed as the fan is aimed (DrawAim), from the ability's arc: the whole spread, in
+-- degrees, outermost arrow to outermost arrow.
+aim.fan = {}
+for k = 1, 5 do
+  -- Bigger than the plain dot: spread over the real fan they sit far apart, and at 10 they were
+  -- lost against the grass (the visual check, run 050).
+  aim.fan[k] = Tex(aim, "OVERLAY", "dot", 18, 18)
+  aim.fan[k]:SetPoint("CENTER", aim, "CENTER", (k - 3) * 18, -math.abs(k - 3) * 4)
+  aim.fan[k]:Hide()
+end
+-- Where a direction off the view's centre shows on screen: the client's view is 45° tall over
+-- 768 units, so an angle a off the centre lands at 384 / tan(22.5°) * tan(a) = 927 * tan(a)
+-- units, whatever the window's shape. The visual check (run 040) found the fan drawn at a fixed
+-- 18 units a step, a ninth of where a 10° step really lands.
+local FAN_UNITS = 927
 aim:Hide()
 ES.aim = aim
 
@@ -2185,6 +2224,44 @@ empower:SetScript("OnUpdate", function()
 end)
 ES.empower = empower
 
+-- Kill Shot going, on our screen: an action scene's speed lines rush in toward the aim, over the
+-- world and under the windows, settling from a touch small to their size as they ease out in a
+-- quarter of a second (Corey's review, Nov 4: the shot should read as the strongest; then of the
+-- first ones, "amateur ... cut off around the edges of the screen"). The art is square, its rays
+-- running from about 0.55 to 0.9 of the way out and soft at both ends, so it's laid over the
+-- screen as a square (not stretched to it) of side 1.15 times the screen's longer side, centred:
+-- the rays keep their aspect, their far ends lie outside the screen's long edges and inside its
+-- corners (what crosses an edge is the soft tail), and the clear middle covers the aim. The
+-- settle is a shrink that stops at 1, never past it. (`ES.killlines`, not a local: the main chunk
+-- is near Lua 5.0's limit.)
+ES.killlines = CreateFrame("Frame", "ElwynnSurvivalKillLines", UIParent)
+ES.killlines:SetFrameStrata("FULLSCREEN")
+ES.killlines:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+ES.killlines.lines = Tex(ES.killlines, "ARTWORK", "speedlines")
+ES.killlines.lines:SetAllPoints(ES.killlines)
+ES.killlines.left = 0
+ES.killlines:Hide()
+ES.killlines:SetScript("OnUpdate", function()
+  this.left = this.left - arg1
+  if this.left <= 0 then
+    this:Hide()
+    return
+  end
+  local share = this.left / 0.28
+  this:SetAlpha(share * share)
+  this:SetScale(1 - 0.03 * share)
+end)
+function ES.KillLines()
+  local f = ES.killlines
+  local side = math.max(UIParent:GetWidth(), UIParent:GetHeight()) * 1.15
+  f:SetWidth(side)
+  f:SetHeight(side)
+  f:SetScale(0.97)
+  f:SetAlpha(1)
+  f.left = 0.28
+  f:Show()
+end
+
 -- Drawing a Hunter's bow: the camera leans in over the shoulder as the draw builds (deeper for
 -- the ultimate), and at full draw the view trembles until the shot goes (Corey's review: Aimed
 -- Shot, Kill Shot). nil: not drawing, the plain aiming camera again.
@@ -2198,17 +2275,22 @@ function ES.ChargeCamera(d, share)
     end
     return
   end
+  -- Deeper the longer it's held (Corey's review: "zoom in more and more the longer you hold
+  -- it"): from the aiming camera's 2.4 down to 1.1 at a full draw, 1.3 for the ultimate, which
+  -- holds longer (at 0.8 the camera was inside the hero: the body went and the bowstring stood
+  -- alone, run 060).
   local ult = d.n == 5
-  local dist = 2.4 - (ult and 1.3 or 0.9) * share
+  local dist = 2.4 - (ult and 1.1 or 1.3) * share
   if not ES.chargeCam or math.abs(ES.chargeCam - dist) > 0.04 then
     ES.chargeCam = dist
     SetAimCamera(1, dist, 0.75 - 0.2 * share, 0.25)
   end
+  -- Full draw: the view trembles until the shot goes.
   if share >= 1 and ShakeCamera then
     local now = GetTime()
     if not ES.chargeShakeAt or now >= ES.chargeShakeAt then
       ES.chargeShakeAt = now + 0.15
-      ShakeCamera(ult and 0.9 or 0.5, 0.18, 22)
+      ShakeCamera(ult and 1.4 or 0.9, 0.18, 22)
     end
   end
 end
@@ -2221,15 +2303,21 @@ function ES.ChargeFull(d)
   aim.burstAt = GetTime()
   aim.burstColor = { r, g, b }
   aim.burst:Show()
-  empower.edge:SetVertexColor(r, g, b, 1)
-  empower.flash = 0.55
-  empower:Show()
-  if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  -- A bow's full draw is the reticle's bloom and the tremble (ChargeCamera): no flash over the
+  -- whole screen and no kick (Corey's review of Aimed Shot and Kill Shot: it read as a strange
+  -- buff going off). Other charges keep theirs.
+  local bow = d and d.school == "hunter"
+  if not bow then
+    empower.edge:SetVertexColor(r, g, b, 1)
+    empower.flash = 0.55
+    empower:Show()
+    if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  end
   local bar = ES.abar
   if d and bar and bar.slots[d.n] then bar.slots[d.n].fullAt = GetTime() end
 end
 
--- The aimed ability's shape: "line", "circle", "cone" or "self".
+-- The aimed ability's shape: "line", "circle", "cone", "fan" (a fan of projectiles) or "self".
 function ES.AimShape()
   local d = Aiming() and ES.AbilityInfo and ES.AbilityInfo(Aiming())
   return (d and d.shape) or "line"
@@ -2253,7 +2341,8 @@ end
 -- round, which draws a strip) a projectile's or a beam's path from the feet along the view, its
 -- range long and its radius either side. Nil: none (a dash, a tether, help for a friend).
 function ES.AimMarkerShape(d)
-  if not d then return nil end
+  -- A fan's reticle shows its spread (aim.fan): nothing on the ground.
+  if not d or d.shape == "fan" then return nil end
   if d.shape == "circle" or d.shape == "cone" then return d.shape end
   if (d.kind == "projectile" or d.kind == "beam") and HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8 then
     return "line"
@@ -2335,6 +2424,27 @@ aim:SetScript("OnUpdate", function()
   this.ring:SetHeight(size)
   this.ring:SetVertexColor(r, g, b, alpha)
   this.dot:SetVertexColor(r, g, b, 0.9)
+  -- A fan: its five points in place of the ring and the dot, spread over the fan's real arc.
+  local fan = d and d.shape == "fan"
+  local half = fan and math.rad(((d.arc and d.arc > 0) and d.arc or 40) / 2) or 0
+  for k = 1, 5 do
+    if fan then
+      local x = FAN_UNITS * math.tan(half * (k - 3) / 2)
+      this.fan[k]:ClearAllPoints()
+      this.fan[k]:SetPoint("CENTER", this, "CENTER", x, -math.abs(x) * 0.08)
+      this.fan[k]:SetVertexColor(r, g, b, alpha)
+      this.fan[k]:Show()
+    else
+      this.fan[k]:Hide()
+    end
+  end
+  if fan then
+    this.ring:Hide()
+    this.dot:Hide()
+  else
+    this.ring:Show()
+    this.dot:Show()
+  end
 end)
 
 local hit = Fader("ElwynnSurvivalHit", 64, 64, 0.2)
@@ -6446,6 +6556,8 @@ function ES.Line(line)
     ES.HealLine(f)
   elseif verb == "HO" then
     ES.HealOtherLine(f)
+  elseif verb == "BT" then
+    ES.BeatLine(f)
   elseif verb == "ST" then
     -- A swing called off (a feint): ours went at once; another's lets go now.
     if f[3] == "1" then
@@ -6491,6 +6603,34 @@ function ES.Line(line)
         f[11] or "unblockable", tonumber(f[12]) or 0, f[13] == "1")
       ES.marksUp.tg[key] = 1
     end
+  elseif verb == "RP" then
+    -- A taut rope from a unit's hand to another unit or a spot (patch 0031): a grappling hook's
+    -- line as it pulls its hunter in, a haul's.
+    if SetUnitRope and f[2] and f[3] then
+      local key = "es" .. f[2]
+      local secs = tonumber(f[8]) or 0.5
+      if f[4] and f[4] ~= "-" then
+        SetUnitRope(key, f[3], f[4], secs)
+      else
+        SetUnitRope(key, f[3], tonumber(f[5]) or 0, tonumber(f[6]) or 0, tonumber(f[7]) or 0, secs)
+      end
+    end
+  elseif verb == "ML" then
+    -- How a spell's missiles look (patch 0030): a ribbon behind them, their size and a spin; with
+    -- a caster's guid, for its next one alone (a ricochet's colour); the spin's axis after it
+    -- ("side": end over end, patch 0036; "-" in the caster's place when there's none); and a
+    -- speed of their own in yards a second after that (patch 0040; absent or 0: the spell's own,
+    -- which older clients keep: they take no tenth argument).
+    if SetMissileLook and f[2] then
+      local trail = f[3]
+      if trail == "-" then trail = nil end
+      local caster = f[8]
+      if caster == "-" then caster = nil end
+      local axis = f[9]
+      if axis == "-" then axis = nil end
+      SetMissileLook(tonumber(f[2]) or 0, trail, tonumber(f[4]) or 0.25, tonumber(f[5]) or 0.35,
+        tonumber(f[6]) or 1, tonumber(f[7]) or 0, caster, axis, tonumber(f[10]) or 0)
+    end
   elseif verb == "MK" then
     -- A blow coming down there: its circle on the ground (the client lays it), or gone.
     local key = "es" .. (f[2] or "")
@@ -6523,6 +6663,8 @@ function ES.Line(line)
     if ES.OwnMeter then ES.OwnMeter(f) end
   elseif verb == "DM" then
     if ES.FightMeter then ES.FightMeter(f) end
+  elseif verb == "LB" then
+    if ES.LabLine then ES.LabLine(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "WD" then
@@ -6640,8 +6782,23 @@ events:SetScript("OnEvent", function()
     -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
     -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
-    -- ac18: a shape flashed on the ground as an ability lands (0026).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
+    -- ac18: a shape flashed on the ground as an ability lands (0026); ac19: an object drawn longer
+    -- along one axis, and the dig site's rope (0028, Tripwire's wire).
+    -- ac20: a missile's look (SetMissileLook: a ribbon behind it, its size, a spin).
+    -- ac21: a rope from a unit's hand (SetUnitRope: a grappling hook's line).
+    -- ac22: the bowstring on its bow, units that never fade, the aiming camera's tip down.
+    -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
+      Say(".es hello " .. VERSION .. " ac23")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
+      Say(".es hello " .. VERSION .. " ac22")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 21 then
+      Say(".es hello " .. VERSION .. " ac21")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and (tonumber(HasActionCombat()) or 0) >= 20 then
+      Say(".es hello " .. VERSION .. " ac20")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 19 then
+      Say(".es hello " .. VERSION .. " ac19")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
       Say(".es hello " .. VERSION .. " ac18")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and (tonumber(HasActionCombat()) or 0) >= 17 then
       Say(".es hello " .. VERSION .. " ac17")
