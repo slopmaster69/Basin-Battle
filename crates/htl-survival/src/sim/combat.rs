@@ -939,9 +939,11 @@ impl Survival {
             // The arm held out: a clip at its peak a quarter second in and held there 8 sec (the
             // clients cap a clip's hold at 10), renewed every 7 while the ward stays up.
             if w.clip != 0 && now >= p.ward_clip_at {
-                p.ward_clip_at = now + 7.0;
+                let hold = w.clip_hold.clamp(1.0, 9.5);
+                p.ward_clip_at = now + (hold - 1.0).max(0.5);
                 let from = (!w.clip_from.is_empty()).then(|| w.clip_from.clone());
-                self.events.push(Event::Clip { id, clip: w.clip, take: w.clip_take, from, secs: 8.0, at: 0.25, body: ClipBody::Upper });
+                let body = if w.clip_body == "full" { ClipBody::Full } else { ClipBody::Upper };
+                self.events.push(Event::Clip { id, clip: w.clip, take: w.clip_take, from, secs: hold, at: 0.25, body });
             }
             // It crackles, more often as it runs dry.
             if w.crackle_full > 0.0 && w.block_kit != 0 && now >= p.ward_crackle_at {
