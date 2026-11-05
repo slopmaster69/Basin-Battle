@@ -6442,6 +6442,10 @@ function ES.Line(line)
     if ES.CheckLine then ES.CheckLine(f) end
   elseif verb == "CR" then
     if ES.CheckResultLine then ES.CheckResultLine(f) end
+  elseif verb == "OB" then
+    if ES.OrbLine then ES.OrbLine(f) end
+  elseif verb == "OX" then
+    if ES.OrbGoneLine then ES.OrbGoneLine(f) end
   elseif verb == "CC" then
     ES.CcLine(f)
   elseif verb == "TR" then

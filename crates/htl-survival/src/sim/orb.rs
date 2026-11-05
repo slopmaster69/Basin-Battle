@@ -31,6 +31,8 @@ pub(crate) struct Orb {
     pub until: f32,
     pub next_tick: f32,
     pub next_look: f32,
+    /// Its rolling look's key, for the clients that draw it (`Event::OrbRoll`).
+    pub look: Id,
 }
 
 impl Survival {
@@ -72,7 +74,13 @@ impl Survival {
             c: d.perfect_yd,
             pattern: format!("{:.1}|{:.1}|{}", d.backfire_yd, START_AHEAD, marks.join(",")),
         });
-        self.orbs.push(Orb { owner: id, ability, pos: start, dir, speed, until: now + secs, next_tick: now + tick, next_look: now });
+        // Its rolling look, for the clients that draw an orb: where it would end if nothing stops it.
+        let look = self.alloc();
+        if !d.orb_model.is_empty() {
+            let far = self.ground_near(start[0] + dir[0] * d.range[0], start[1] + dir[1] * d.range[0], start[2]);
+            self.events.push(Event::OrbRoll { look, from: start, to: far, secs, model: d.orb_model.clone(), scale: if d.orb_scale > 0.0 { d.orb_scale } else { 1.0 } });
+        }
+        self.orbs.push(Orb { owner: id, ability, pos: start, dir, speed, until: now + secs, next_tick: now + tick, next_look: now, look });
     }
 
     /// The orb of this key's base ability the hero has out, if any.
@@ -87,6 +95,7 @@ impl Survival {
         let mut keep = Vec::new();
         for mut o in list {
             if now >= o.until || !self.players.contains_key(&o.owner) {
+                self.events.push(Event::OrbGone { look: o.look });
                 continue;
             }
             let d = self.content.abilities[o.ability].clone();
@@ -94,10 +103,12 @@ impl Survival {
             let (x, y) = (o.pos[0] + o.dir[0] * go, o.pos[1] + o.dir[1] * go);
             // It rolls over the ground, and a wall ends it (no burst: it was never stopped).
             if self.land.blocked_near(x, y, o.pos[2]) {
+                self.events.push(Event::OrbGone { look: o.look });
                 continue;
             }
             o.pos = self.ground_near(x, y, o.pos[2]);
-            if now >= o.next_look {
+            // The old look (a missile to where it is), only where there's no rolling model.
+            if now >= o.next_look && d.orb_model.is_empty() {
                 o.next_look = now + LOOK_EVERY;
                 if d.tick_spell != 0 {
                     let at = [o.pos[0], o.pos[1], o.pos[2] + 1.0];
@@ -147,6 +158,7 @@ impl Survival {
     /// the caster under it makes it a backfire.
     pub(crate) fn stop_orb(&mut self, id: Id, k: usize) {
         let o = self.orbs.remove(k);
+        self.events.push(Event::OrbGone { look: o.look });
         let d = self.content.abilities[o.ability].clone();
         let at = o.pos;
         let (mobs, heroes) = self.near_orb(&o, d.perfect_yd.max(0.0));

@@ -390,6 +390,20 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("CK\t{key}\t{kind}\t{school}\t{a:.3}\t{b:.3}\t{crit:.3}\t{pattern}"));
                 }
             }
+            Event::OrbRoll { look, from, to, secs, model, scale } => {
+                // Everyone with the add-on sees it roll (a client with PlayGroundOrb draws it).
+                let line = format!("OB\t{look}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{secs:.2}\t{}\t{scale:.2}", from[0], from[1], from[2], to[0], to[1], to[2], model.replace('\t', " "));
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::OrbGone { look } => {
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &format!("OX\t{look}"));
+                }
+            }
             Event::WardCheck { player, grade } => {
                 if let Some(c) = self.conn_of(player) {
                     self.ui_line(c, &format!("CR	ward	{grade}"));

@@ -197,6 +197,11 @@ pub enum Event {
     /// The ward's own check: a perfect ward ("perfect") or the ward breaking ("fail"), for the
     /// warder's add-on to flash as a spell's check does.
     WardCheck { player: Id, grade: &'static str },
+    /// An orb set rolling (Frozen Orb), for the clients that draw it rolling: `look` its key, from
+    /// where to where over how long, the model and its size (`orb_model`, `orb_scale`).
+    OrbRoll { look: Id, from: Vec3, to: Vec3, secs: f32, model: String, scale: f32 },
+    /// That orb stopped or spent.
+    OrbGone { look: Id },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
