@@ -76,11 +76,17 @@
 //!   every race). Each `MV` blow goes on `~<from>` the same way.
 //!   The kind: `light`, `heavy`, `running`, `bash`, `kick`, `cast`, a creature's `mob`, and the
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
+//!   A `cast` goes on `\t<body>` after `from`: `full` (the whole model), `upper` or `lower`
+//!   (that half alone, the rest keeping what it was doing: Skyfall's hang holds the Jump clip on
+//!   the legs while the arms draw the bow). `lower` takes client patch 0037 (`ac23`); `ac22`
+//!   reads it as the whole body.
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
+//! - `ML\t<spell>\t<RRGGBB or ->\t<width>\t<secs>\t<scale>\t<spin>[\t<caster guid or ->[\t<side or ->[\t<speed>]]]`: how a spell's missiles look on an `ac20` client (patch 0030's `SetMissileLook`): a ribbon behind them, their size, a flat spin; with a caster's guid, for that caster's next one alone (a ricochet's colour); `side`, a tumble end over end (patch 0036); a speed of their own in yards a second, uncapped (patch 0040; absent or 0: the spell's own).
+//! - `RP\t<key>\t<unit guid>\t<other unit's guid or ->\t<x>\t<y>\t<z>\t<secs>`: a taut rope from the unit's hand to the other unit, else to that spot, for that long, on an `ac21` client (patch 0031's `SetUnitRope`): a grappling hook's line, a haul's.
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
 //!   `fit` seconds: a knockdown).
@@ -158,6 +164,9 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         if d.behind > 1.0 {
             out.push(format!("{}× damage from behind", n(d.behind)));
         }
+    } else if d.bow_damage > 0.0 {
+        let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
+        out.push(format!("{count}{}% bow damage", pct(d.bow_damage)));
     } else if d.damage[1] > 0.0 {
         let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
         if d.kind == "channel" && d.tick > 0.0 {
@@ -170,6 +179,11 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     }
     if d.linger > 0.0 && d.linger_damage > 0.0 {
         out.push(format!("{} damage per sec for {} sec", n(d.linger_damage), n(d.linger)));
+    } else if d.linger > 0.0 && d.kind == "trap" {
+        // Ground a trap leaves that does no damage (Freezing Trap's frost): its size (the burst's)
+        // and its time, apart from the trap's own duration below.
+        let wide = if d.splash > 0.0 { d.splash } else { d.radius[1] };
+        out.push(format!("{} yd ground for {} sec", n(wide), n(d.linger)));
     } else if d.linger > 0.0 {
         out.push(format!("{} sec duration", n(d.linger)));
     }
@@ -349,14 +363,37 @@ pub(crate) const VERSION: u32 = 2;
 /// Shot).
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
-/// 21: Kill Shot's weight on the hunter's screen (`BT`: its speed lines as it goes, its hit-stop
+/// 21: the draw leans in deeper the longer it's held, and a bow's full draw no longer
+/// flashes the whole screen.
+/// 22: Ensnaring Retreat's borrowed jump fitted to the flight (`FP`), so it ends as the hero
+/// lands.
+/// 23: the add-on says `ac19` for a client with patch 0028 (Tripwire's rope).
+/// 24: the add-on says `ac20`, and the `ML` line's missile looks (patch 0030).
+/// 25: the add-on says `ac21`, and the `RP` line's ropes from the hand (patch 0031).
+/// 26: the add-on says `ac22` (patches 0032 to 0036).
+/// 27: the add-on says `ac23` (patches 0037 to 0040).
+/// 28: a fan of projectiles (Multi-Shot) aims with a fan on the reticle, not a strip on the
+/// ground (the `AB` line's shape `fan`).
+/// 29: the `ML` line's spin axis (a tumble, patch 0036).
+/// 30: the add-on preloads a cast's borrowed model before it plays (Reverse Grapple's pull).
+/// 31: the fan's points sit where the arrows really go, and bigger.
+/// 32: the `ML` line's own speed (patch 0040).
+/// 33: a hook's pull flies the hero flat (Swim), the clip fitted to the flight (`FP`).
+/// 34: a cast's `AN` line names the body its clip drives (`full`, `upper`, `lower`): Skyfall's
+/// hang on the legs alone.
+/// 35: Kill Shot's weight on the hunter's screen (`BT`: its speed lines as it goes, its hit-stop
 /// and shake as it kills).
-pub(crate) const ADDON_NEWEST: u32 = 21;
+pub(crate) const ADDON_NEWEST: u32 = 35;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
-/// as an ability lands (0026); 13 to 15 are the hunter's open branches (0020 to 0023).
-pub(crate) const CLIENT_NEWEST: u8 = 18;
+/// as an ability lands (0026). 19: an object drawn longer along one axis, and doodads placed as
+/// objects (0028): Tripwire's rope.
+/// 20: a missile's ribbon, size and spin (0030).
+/// 21: a rope from a unit's hand (0031).
+/// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
+/// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
+pub(crate) const CLIENT_NEWEST: u8 = 23;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -371,6 +408,7 @@ pub(crate) fn out_of_date(version: u32, level: u8) -> Option<String> {
     };
     Some(format!("{what} {}", crate::HOW_TO_UPDATE))
 }
+
 const HUD_EVERY: Duration = Duration::from_millis(150);
 /// A champion's bar shows to the heroes this near it while it fights.
 const BOSS_BAR_RANGE: f32 = 60.0;
@@ -1204,7 +1242,12 @@ impl SurvivalGame {
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
-                // another model's clips; `ac11` puts their bones back to rest after.
+                // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
+                // object stretched from end to end (Tripwire's rope); `ac20` a missile's look; `ac21` a rope
+                // from the hand; `ac22` the bowstring on its bow, units with no fade, the aiming
+                // camera's tip down, the arrow display and a missile's tumble (patches 0032 to 0036);
+                // `ac23` a clip on the legs alone, a crossfade between clips, a glowing object and a
+                // missile's own speed (patches 0037 to 0040).
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,
@@ -1222,6 +1265,12 @@ impl SurvivalGame {
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));
+                // `ac20` draws a missile's look (patch 0030): every spell's that has one.
+                if level >= super::draw::MISSILE_LOOK_LEVEL {
+                    for l in &self.sim.content.missile_looks {
+                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None, l.tumble, l.speed));
+                    }
+                }
                 // An older add-on or client: say so, and how to update (on screen and in chat).
                 let version: u32 = arg.parse().unwrap_or(0);
                 let name = self.world_of(conn).map_or(String::new(), |w| w.name.clone());
@@ -1338,6 +1387,38 @@ impl SurvivalGame {
                 self.sim.heal_full(me);
                 Ok(())
             }
+            // `.es dummy clear`: every training dummy goes (the visual check starts each run from
+            // one fresh dummy, not a pile of them).
+            // A creature to try abilities on (the visual check): `.es target <creature> [yards]
+            // [still] [away] [hp%]`, or `.es target clear`. `away` turns its back to you (it
+            // faces you otherwise): for a shot or a blow into a creature's back.
+            "target" if self.dev_ok() && arg == "clear" => {
+                let n = self.sim.clear_targets();
+                self.tell(conn, &format!("Cleared {n} targets."));
+                Ok(())
+            }
+            "target" if self.dev_ok() => {
+                let rest: Vec<String> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("target")).skip(2).map(|w| w.to_lowercase()).collect();
+                let yards = rest.iter().find_map(|w| w.parse::<f32>().ok()).unwrap_or(10.0);
+                let still = rest.iter().any(|w| w == "still");
+                let away = rest.iter().any(|w| w == "away");
+                let hp = rest.iter().find_map(|w| w.strip_suffix('%').and_then(|n| n.parse::<f32>().ok())).map_or(1.0, |n| n / 100.0);
+                self.sim.spawn_target(me, &arg, yards, still, away, hp).map(|name| {
+                    let how = if still && away { "stands with its back to you" } else if still { "stands" } else { "comes at you from" };
+                    self.tell(conn, &format!("{name} {how} {yards:.0} yd ahead."));
+                })
+            }
+            // `.es hop [yards]`: a jump the visual check can make (a script can't press the jump
+            // key), to try an ability mid-jump.
+            "hop" if self.dev_ok() => {
+                self.sim.test_hop(me, arg.parse::<f32>().unwrap_or(1.6));
+                Ok(())
+            }
+            "dummy" if self.dev_ok() && arg == "clear" => {
+                let n = self.sim.clear_dummies();
+                self.tell(conn, &format!("Cleared {n} training dummies."));
+                Ok(())
+            }
             "dummy" if self.dev_ok() => {
                 let mode: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("dummy")).skip(1).collect();
                 self.sim.spawn_dummy(me, &mode.join(" ")).map(|t| self.tell(conn, &format!("{t} stands before you.")))
@@ -1381,7 +1462,13 @@ impl SurvivalGame {
                 self.tell(conn, &format!("Sent to storage, {n} of each: {}.", names.join(", ")));
                 Ok(())
             }
-            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
+            // `.es give <item> [n]`: n (1) of an item, by its key, into the bags (the visual check's
+            // food and drink).
+            "give" if self.dev_ok() => {
+                let n = arg2.parse::<u32>().unwrap_or(1).clamp(1, 99);
+                self.sim.give_for_testing(me, &arg, n).map(|name| self.tell(conn, &format!("{n} {name} into your bags.")))
+            }
+            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" | "target" | "hop" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // The add-on's answer to a ping: the round trip.
             "po" => {
                 let n = arg.parse::<u32>().unwrap_or(0);
@@ -1588,6 +1675,13 @@ impl SurvivalGame {
                 self.say_to(conn, &text);
                 Ok(())
             }
+            // The spell lab (dev builds): `.es lab <ability> [scene] [creature] [do <steps>]
+            // [shots <n>@<ms>]`, `.es lab clear` (survival/lab.rs).
+            "lab" if self.dev_ok() => {
+                let rest: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("lab")).skip(1).collect();
+                self.lab_command(conn, me, &rest)
+            }
+            "lab" => Err("The spell lab is only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // With debug on, a creature to fight at once: `.es spawn warlord`.
             // `.es spawn grunt 3`: that many.
             "spawn" if self.sim.debug => {
@@ -1626,9 +1720,17 @@ impl SurvivalGame {
                 "me" | "camp" => Err("Turn debug on first (.es debug).".into()),
                 _ => Err("Try .es reset me to restart this hero, or .es reset camp to restart the whole world.".into()),
             },
+            // `.es debug` turns it over; `.es debug on` and `.es debug off` set it, so a script
+            // knows where it stands whatever the last one left.
             "debug" => {
-                self.sim.debug = !self.sim.debug;
-                self.say_to(conn, if self.sim.debug { "Debug is on. .es spells, .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es reset me and .es reset camp now work." } else { "Debug off." });
+                // `quiet`: its commands without its drawing (the visual check records with it).
+                self.sim.debug_quiet = arg == "quiet";
+                self.sim.debug = match arg.as_str() {
+                    "on" | "quiet" => true,
+                    "off" => false,
+                    _ => !self.sim.debug,
+                };
+                self.say_to(conn, if self.sim.debug { "Debug is on. .es spells, .es raid reset, .es spawn <creature>, .es freebuild, .es mats [n], .es give <item> [n], .es reset me and .es reset camp now work." } else { "Debug off." });
                 Ok(())
             }
             "where" => {
@@ -1826,6 +1928,8 @@ impl SurvivalGame {
         let shape = |d: &htl_survival::content::AbilityDef| match d.kind.as_str() {
             // A lob is aimed at the ground, as ground is.
             "projectile" if d.lob => "circle",
+            // A fan of them (Multi-Shot) shows its spread on the reticle (add-on 23), not a strip.
+            "projectile" if d.count > 1 => "fan",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
             "nova" | "stance" | "art" | "buff" => "self",
@@ -1834,6 +1938,10 @@ impl SurvivalGame {
         let shape = |d: &htl_survival::content::AbilityDef| if d.at_self { "self" } else { shape(d) };
         // The circle drawn where it's aimed: a lob's is its burst.
         let reach = |d: &htl_survival::content::AbilityDef| if d.lob { d.splash } else { htl_survival::content::AbilityDef::at(d.radius, 1.0) };
+        // A fan's arc is its whole spread, outermost arrow to outermost arrow (degrees), so the
+        // reticle can put its points where the arrows go (the visual check, run 040: drawn at a
+        // fixed width, the fan read as a ninth of the real spread).
+        let arc = |d: &htl_survival::content::AbilityDef| if d.kind == "projectile" && d.count > 1 && !d.lob { d.spread * (d.count - 1) as f32 } else { d.arc };
         let charge = |d: &htl_survival::content::AbilityDef| -> (f32, f32) {
             if d.kind == "shot" {
                 let r = self.sim.ranged_of(p);
@@ -1866,7 +1974,7 @@ impl SurvivalGame {
                         shape(x),
                         htl_survival::content::AbilityDef::at(x.range, 1.0),
                         reach(x),
-                        x.arc
+                        arc(x)
                     ),
                     None => "~~~~~~~~".to_string(),
                 };
@@ -1888,7 +1996,7 @@ impl SurvivalGame {
                     shape(d),
                     if p.cd_off { d.charges.max(1) } else { cd.charges },
                     d.charges.max(1),
-                    d.arc,
+                    arc(d),
                     d.valor,
                     clean(&d.text),
                     clean(&ability_facts(d, None, c.valor.max)),
@@ -1913,6 +2021,7 @@ impl SurvivalGame {
                     Some(&(_, a, until)) => {
                         let d = &c.abilities[a];
                         let shape = match d.kind.as_str() {
+                            "projectile" if d.count > 1 && !d.lob => "fan",
                             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
                             "cone" => "cone",
                             "nova" | "stance" | "art" | "buff" => "self",
@@ -1929,7 +2038,8 @@ impl SurvivalGame {
                                 d.key,
                                 clean(&d.name),
                                 htl_survival::content::AbilityDef::at(d.range, 1.0),
-                                d.arc,
+                                // A fan's whole spread, as the bar's line sends it.
+                                if shape == "fan" { d.spread * (d.count - 1) as f32 } else { d.arc },
                                 u8::from(d.aimed()),
                                 d.charge[0],
                                 d.charge[1]
@@ -2054,6 +2164,7 @@ mod version_tests {
         let level: u8 = src.match_indices("\" ac").filter_map(|(i, _)| src[i + 4..].split('"').next()?.parse().ok()).max().expect("the hello's acN");
         assert_eq!(level, CLIENT_NEWEST, "the newest client the add-on asks for");
     }
+
 }
 
 #[cfg(test)]

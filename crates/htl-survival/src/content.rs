@@ -55,6 +55,10 @@ pub struct Content {
     pub kick: ShoveDef,
     #[serde(rename = "ranged")]
     pub ranged: Vec<RangedDef>,
+    /// How chosen spells' missiles look on a client that draws them (patch 0030): a glowing
+    /// ribbon behind them, a size, a flat spin.
+    #[serde(rename = "missile_look", default)]
+    pub missile_looks: Vec<MissileLookDef>,
     #[serde(rename = "weapon")]
     pub weapons: Vec<WeaponDef>,
     #[serde(rename = "shield")]
@@ -275,6 +279,12 @@ pub struct PlayerDef {
     pub guard_speed: f32,
     pub aim_speed: f32,
     pub use_speed: f32,
+    /// The clips a hero plays using an item marked `anim = "eat"` or `"drink"` (0: the Food
+    /// spell's cast instead).
+    #[serde(default)]
+    pub eat_clip: u16,
+    #[serde(default)]
+    pub drink_clip: u16,
     pub field_regen: f32,
     pub field_regen_after: f32,
     pub rest_regen: f32,
@@ -743,6 +753,46 @@ pub struct PvpDef {
 }
 
 /// A bow or crossbow.
+/// A spell's missiles as a client with patch 0030 draws them (`SetMissileLook`): a ribbon of
+/// `trail` (`"RRGGBB"`; empty, none) `width` yards wide, each stretch fading over `secs`, the model
+/// `scale` times its size and spinning `spin` turns a second, flat. Keyed by the spell, so every
+/// ability flying it looks so.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct MissileLookDef {
+    pub spell: u32,
+    #[serde(default)]
+    pub trail: String,
+    #[serde(default = "look_width")]
+    pub width: f32,
+    #[serde(default = "look_secs")]
+    pub secs: f32,
+    #[serde(default = "full_size")]
+    pub scale: f32,
+    #[serde(default)]
+    pub spin: f32,
+    /// The spin end over end, about the axis across the flight (a thrown axe's tumble), instead
+    /// of flat about its up (the sixteenth client; older ones spin it flat).
+    #[serde(default)]
+    pub tumble: bool,
+    /// How fast it flies, yards a second, on a client with patch 0040 (0: the spell's own speed,
+    /// which the clients cap at 100): a bolt quicker than anything in the data (Kill Shot). The
+    /// rules' own speed is the ability's; this keeps the look in step with it.
+    #[serde(default)]
+    pub speed: f32,
+}
+
+fn look_width() -> f32 {
+    0.25
+}
+
+fn look_secs() -> f32 {
+    0.35
+}
+
+fn full_size() -> f32 {
+    1.0
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct RangedDef {
     pub key: String,
@@ -930,6 +980,20 @@ pub struct EffectDef {
     pub name: String,
 }
 
+impl ItemDef {
+    /// What a used item's `anim` may be: nothing, eating or drinking.
+    pub const ANIMS: [&'static str; 3] = ["", "eat", "drink"];
+
+    /// The clip the body plays using it (0: none, the Food spell's cast instead).
+    pub fn use_clip(&self, player: &PlayerDef) -> u16 {
+        match self.anim.as_str() {
+            "eat" => player.eat_clip,
+            "drink" => player.drink_clip,
+            _ => 0,
+        }
+    }
+}
+
 impl EffectDef {
     pub const KINDS: [&'static str; 5] = ["regen", "stamina", "might", "ward", "focus"];
 }
@@ -949,6 +1013,18 @@ pub struct ItemDef {
     pub use_secs: f32,
     #[serde(default)]
     pub heal: f32,
+    /// The `heal` comes over this many seconds once it's used, instead of at once (a bite of
+    /// food: the healing comes after it, as a regeneration).
+    #[serde(default)]
+    pub heal_secs: f32,
+    /// A hit doesn't stop it: neither the use nor the healing after it (food, a fight's
+    /// resource). Otherwise a hit interrupts it and nothing is used.
+    #[serde(default)]
+    pub steady: bool,
+    /// What the body does using it: `eat`, `drink` (the clips `[player]` names), or nothing (the
+    /// Food spell's cast).
+    #[serde(default)]
+    pub anim: String,
     #[serde(default)]
     pub text: String,
     /// A used item's lasting effect.
@@ -1099,7 +1175,7 @@ pub struct DungeonDef {
     /// Raids the camp must have beaten before the book opens.
     #[serde(default)]
     pub gate_raids: u32,
-    /// The Miner's Draught (an item key): the only heal below, charges refilled at a lamp.
+    /// The Miner's Draught (an item key): the heal in a fight below, charges refilled at a lamp.
     pub draught: String,
     pub draughts: u32,
     pub draughts_max: u32,
@@ -2670,6 +2746,12 @@ impl Content {
     fn validate(&self) -> Result<()> {
         // Gear's perks and sets.
         for i in &self.items {
+            if !ItemDef::ANIMS.contains(&i.anim.as_str()) {
+                bail!("item {}: anim {:?} (one of {:?})", i.key, i.anim, ItemDef::ANIMS);
+            }
+            if i.heal_secs < 0.0 {
+                bail!("item {}: heal_secs {} below 0", i.key, i.heal_secs);
+            }
             for p in &i.perks {
                 if !EffectDef::KINDS.contains(&p.kind.as_str()) {
                     bail!("item {}: a perk of kind {:?} (one of {:?})", i.key, p.kind, EffectDef::KINDS);
@@ -3128,6 +3210,20 @@ impl Content {
     }
 
     pub(crate) fn validate_abilities(&self) -> Result<()> {
+        let rgb = |c: &str| c.len() == 6 && u32::from_str_radix(c, 16).is_ok();
+        for (k, l) in self.missile_looks.iter().enumerate() {
+            if l.spell == 0 || self.missile_looks[..k].iter().any(|o| o.spell == l.spell) {
+                bail!("missile_look {}: a spell, once", l.spell);
+            }
+            if !(l.trail.is_empty() || rgb(&l.trail)) || l.width < 0.0 || l.secs < 0.0 || l.scale <= 0.0 || l.speed < 0.0 {
+                bail!("missile_look {}: its trail is \"RRGGBB\" (or none), and its width, secs, scale and speed aren't below 0", l.spell);
+            }
+        }
+        for a in &self.abilities {
+            if let Some(c) = a.bounce_trail.iter().find(|c| !rgb(c)) {
+                bail!("{}: bounce_trail colour {c:?} isn't \"RRGGBB\"", a.key);
+            }
+        }
         let mut keys = std::collections::BTreeSet::new();
         let effect_ok = |e: &AbilityEffect, what: &str| -> Result<()> {
             if !CC_KINDS.contains(&e.kind.as_str()) && !OTHER_EFFECTS.contains(&e.kind.as_str()) {
@@ -3160,6 +3256,9 @@ impl Content {
             }
             if !a.is_ex() && !a.inner && !a.is_beta() && !SCHOOLS.contains(&a.school.as_str()) {
                 bail!("{what}: a card needs its column, `school` (one of {SCHOOLS:?}, or {BETA} for the beta page)");
+            }
+            if a.bow_damage > 0.0 && (!a.bow || a.kind != "projectile" || a.damage[1] > 0.0) {
+                bail!("{what}: a share of the bow's damage (`bow_damage`) is for a bow's projectile, in place of its own `damage`");
             }
             if a.kind == "art" && a.weapon <= 0.0 {
                 bail!("{what}: a weapon art needs its share of the weapon's damage (`weapon`)");
@@ -3285,6 +3384,13 @@ impl Content {
             }
             if !a.leap_from.is_empty() && (a.leap_clip == 0 || !clip_source_ok(&a.leap_from)) {
                 bail!("{what}: leap_from {:?} needs a `leap_clip` and a character model (<Race><Gender>, as ScourgeFemale)", a.leap_from);
+            }
+            // A hauler's own look: on a pull, from a character model the clients can find.
+            if (a.pull_clip != 0 || !a.pull_from.is_empty()) && !a.effects.iter().any(|e| e.kind == "pull") {
+                bail!("{what}: only an ability with a `pull` effect has the hauler's look (`pull_clip`, `pull_from`)");
+            }
+            if !a.pull_from.is_empty() && (a.pull_clip == 0 || !clip_source_ok(&a.pull_from)) {
+                bail!("{what}: pull_from {:?} needs a `pull_clip` and a character model (<Race><Gender>, as ScourgeFemale)", a.pull_from);
             }
             // The beta page's mechanics.
             let tether = a.tether_secs > 0.0;

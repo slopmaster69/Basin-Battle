@@ -21,6 +21,9 @@ const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// arrow (as Basin Battle's server sends them), or the client flies nothing to see. (10346: Fire
 /// Shot's, Kill Shot's arrow, carried the same way.)
 const ARROW_SPELLS: [u32; 4] = [2643, 3044, 10346, 19434];
+/// Where a missile coming home is aimed: this far over the feet of whoever threw it (chest high
+/// on a dwarf, the hands on a human), so it flies to the body, not the ground.
+const HOME_HEIGHT: f32 = 1.2;
 /// A stand-in's cast goes out this many ticks after its body (the client places a body only after
 /// the frame that made it: cast in that frame, the missile would leave from the world's middle).
 const STAND_IN_CAST_TICKS: u32 = 1;
@@ -314,14 +317,21 @@ impl SurvivalGame {
                 // unit, and it draws nothing), so an unseen creature stands there and flies it, a
                 // tick after it's made (`step_stand_ins`), until the rules say it's gone.
                 let (aim, hits) = match target {
-                    // Coming home to whoever threw it: aimed at them, but not naming them struck.
-                    // The client plays a spell's impact on everyone it names struck, and the Axe
-                    // Throw's impact knocked its own warrior down as he caught it (the visual
-                    // check, Nov 2).
-                    Target::Unit(t) if t == caster => match self.guid_of(t) {
-                        Some(g) => (Aim::Unit(g), Vec::new()),
-                        None => return,
-                    },
+                    // Coming home to whoever threw it: aimed at the spot they stand on, chest
+                    // high, naming no one struck. The client plays a spell's impact on everyone
+                    // it names struck, and the Axe Throw's impact knocked its own warrior down as
+                    // he caught it (the visual check, Nov 2); but a unit aim that names no one
+                    // flies nothing at all on the 1.12 client (its launcher flies a missile per
+                    // unit named struck, or one at a point), which is why the axe's way back and
+                    // the recalled arrows were never seen (Corey's review, run 040). A point aim
+                    // flies exactly one, and its arrival is a ground impact, so nothing flinches.
+                    Target::Unit(t) if t == caster => {
+                        let at = self.sim.players.get(&t).map(|p| p.pos).or_else(|| self.sim.mobs.get(&t).map(|m| m.pos));
+                        match at {
+                            Some(p) => (Aim::Point([p[0], p[1], p[2] + HOME_HEIGHT]), Vec::new()),
+                            None => return,
+                        }
+                    }
                     Target::Unit(t) => match self.guid_of(t) {
                         Some(g) => (Aim::Unit(g), vec![g]),
                         None => return,
@@ -446,9 +456,22 @@ impl SurvivalGame {
             // The add-on's effects line follows on the next flush.
             Event::Effects { .. } | Event::Goal | Event::Sites => {}
             Event::Guard { player, up } => {
-                // The guard's pose, held while the hero stands with it up.
+                // The guard's pose, held while the hero stands with it up. Down, a pose the rules
+                // hold of their own (Arrow Recall's arm out) comes back rather than nothing.
                 let Some(g) = self.guid_of(player) else { return };
-                let pose = if up { self.guard_pose(player) } else { 0 };
+                let pose = if up { self.guard_pose(player) } else { self.poses.get(&player).copied().unwrap_or(0) };
+                let mut f = Fields::new();
+                f.set(idx::UNIT_NPC_EMOTESTATE, pose);
+                self.broadcast(&packets::update_object(&[], &[(g, &f)]));
+            }
+            Event::Pose { id, pose } => {
+                // A pose held until the rules let it go (0), the way the guard's is.
+                if pose == 0 {
+                    self.poses.remove(&id);
+                } else {
+                    self.poses.insert(id, pose);
+                }
+                let Some(g) = self.guid_of(id) else { return };
                 let mut f = Fields::new();
                 f.set(idx::UNIT_NPC_EMOTESTATE, pose);
                 self.broadcast(&packets::update_object(&[], &[(g, &f)]));
@@ -676,9 +699,59 @@ impl SurvivalGame {
                 self.broadcast(&super::draw::area_create(guid, caster, spell, pos, radius));
                 self.area_looks.insert(id, guid);
             }
+            Event::Rope { id, a, b } => {
+                // On the clients that stretch a rope from end to end (patch 0028), in place of the
+                // strip on the ground laid for it just before (taken off theirs as a gone mark's
+                // is: floor clutter, Corey's review); the rest keep the strip.
+                let p = self.rope_create(id, a, b);
+                let conns: Vec<(ConnId, bool)> = self.in_world().filter(|(_, _, w)| w.level >= super::draw::ROPE_LEVEL).map(|(c, _, w)| (*c, w.addon)).collect();
+                for (c, addon) in conns {
+                    self.send(c, p.clone());
+                    if addon {
+                        self.ui_line(c, &format!("MK\t{id}"));
+                        self.ui_line(c, &format!("TG\t{id}"));
+                    }
+                }
+                self.ropes.insert(id);
+            }
+            Event::Tether { from, to, secs } => {
+                // A taut line from the hand (patch 0031): `RP <key> <from> <to's guid or -> <x> <y>
+                // <z> <secs>`, keyed by who holds it, so a new line replaces theirs.
+                let Some(g) = self.guid_of(from) else { return };
+                let (to_guid, at) = match to {
+                    Target::Unit(u) => match self.guid_of(u) {
+                        Some(t) => (format!("0x{t:016X}"), [0.0; 3]),
+                        None => return,
+                    },
+                    Target::Point(p) => ("-".to_string(), p),
+                };
+                let line = format!("RP\t{g:X}\t0x{g:016X}\t{to_guid}\t{:.2}\t{:.2}\t{:.2}\t{secs:.2}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::UNIT_ROPE_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::MissileTint { caster, spell, ability, bounce } => {
+                // The next missile `caster` flies of the spell takes its bounce's colour, on the
+                // clients that draw a missile's look (patch 0030): Bank Shot hotter each bounce.
+                // A stand-in flies the arrow on from a ricochet, so its own guid names that one.
+                let Some(g) = self.stand_ins.get(&caster).map(|s| s.guid).or_else(|| self.guid_of(caster)) else { return };
+                let c = &self.sim.content;
+                let Some(colour) = c.abilities.get(ability).and_then(|d| d.bounce_trail.get((bounce as usize).min(d.bounce_trail.len().saturating_sub(1)))) else { return };
+                let base = c.missile_looks.iter().find(|l| l.spell == spell);
+                let (width, secs, scale, spin, tumble, speed) = base.map_or((0.3, 0.4, 1.0, 0.0, false, 0.0), |l| (l.width.max(0.3), l.secs.max(0.4), l.scale, l.spin, l.tumble, l.speed));
+                let line = super::draw::missile_look_line(spell, colour, width, secs, scale, spin, Some(g), tumble, speed);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::MISSILE_LOOK_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::MarkGone { id } => {
                 if let Some(g) = self.area_looks.remove(&id) {
                     self.broadcast(&packets::destroy_object(g));
+                }
+                if self.ropes.remove(&id) {
+                    self.broadcast(&packets::destroy_object(super::draw::rope_guid(id)));
                 }
                 self.mark_at.remove(&id);
                 let conns: Vec<(ConnId, u8)> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= 5).map(|(c, _, w)| (*c, w.level)).collect();
@@ -845,7 +918,7 @@ impl SurvivalGame {
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, take, from, secs, at } => {
+            Event::Clip { id, clip, take, from, secs, at, body } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
                 // marked as theirs. The impact where the event says, else half way.
                 let Some(g) = self.guid_of(id) else { return };
@@ -854,7 +927,7 @@ impl SurvivalGame {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}", secs - impact, from.as_deref().unwrap_or(""));
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}\t{}", secs - impact, from.as_deref().unwrap_or(""), body.word());
                     self.ui_line(c, &line);
                 }
             }

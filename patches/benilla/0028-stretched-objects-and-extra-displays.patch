@@ -1,0 +1,282 @@
+From 9021f8840b246595c31f9fc45ef5505d7e1acab5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:40:40 -0600
+Subject: [PATCH] A game object can be drawn longer along one axis, and doodads
+ the data has no row for can be placed
+
+A GameObject whose GAMEOBJECT_FLAGS carry 0x40000000 (0x80000000) is drawn longer along its
+model's X (Y) axis by the factor its GAMEOBJECT_LEVEL holds as an f32's bits, on top of
+OBJECT_FIELD_SCALE_X on every axis (entities::stretch): at its dressing, a building preview's
+re-create and the scale ease. So one rope piece spans any length at the thickness its scale
+gives it. A factor that isn't a finite number from 0 to 100 draws it unstretched.
+GameObjectDisplayInfo gains rows from 60000 for doodads the client ships only as models
+(benilla-formats EXTRA_DISPLAYS, mirrored by Elwynn Survival's server); a row the data has is
+never replaced. The first is the dwarven dig site's rope, Tripwire's wire. HasActionCombat() is 19.
+---
+ crates/benilla-app/src/entities.rs            |  1 +
+ crates/benilla-app/src/entities/attach/mod.rs |  4 +-
+ .../benilla-app/src/entities/live_display.rs  | 16 ++-
+ crates/benilla-app/src/entities/stretch.rs    | 99 +++++++++++++++++++
+ crates/benilla-app/src/net/objects.rs         |  7 +-
+ crates/benilla-formats/src/gameobjects.rs     | 15 +++
+ crates/benilla-ui/src/action_combat.rs        |  8 +-
+ 7 files changed, 144 insertions(+), 6 deletions(-)
+ create mode 100644 crates/benilla-app/src/entities/stretch.rs
+
+diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
+index 343ffe7e..c1e0cdc9 100644
+--- a/crates/benilla-app/src/entities.rs
++++ b/crates/benilla-app/src/entities.rs
+@@ -26,6 +26,7 @@ use display::{
+ 
+ /// Live building previews (benilla's own): moved in place, no hull, no fades, a ghost's look.
+ pub(crate) mod preview;
++pub(crate) mod stretch;
+ 
+ /// Attaching a visual to each net entity: skeleton, animation, character geosets and skin, fade.
+ pub(crate) mod attach;
+diff --git a/crates/benilla-app/src/entities/attach/mod.rs b/crates/benilla-app/src/entities/attach/mod.rs
+index 521cc810..a6756835 100644
+--- a/crates/benilla-app/src/entities/attach/mod.rs
++++ b/crates/benilla-app/src/entities/attach/mod.rs
+@@ -737,7 +737,9 @@ pub(super) fn attach_entity_visuals(
+             // it (vmangos `Unit::GetScaleForDisplayId`, `Unit.cpp:9579`), and the reference
+             // renders at the field (`0x613ef0`).
+             let placement = if let Ok(mut t) = transforms.get_mut(entity) {
+-                t.scale = Vec3::splat(net.scale);
++                // A stretched object (`super::stretch`) is longer along one axis.
++                t.scale =
++                    super::stretch::entity_render_scale(net, stores.get(entity).ok(), net.scale);
+                 *t
+             } else {
+                 Transform::default()
+diff --git a/crates/benilla-app/src/entities/live_display.rs b/crates/benilla-app/src/entities/live_display.rs
+index b9ebe739..22b0f79f 100644
+--- a/crates/benilla-app/src/entities/live_display.rs
++++ b/crates/benilla-app/src/entities/live_display.rs
+@@ -40,6 +40,9 @@ pub(super) struct ScaleEase {
+     from: f32,
+     to: f32,
+     elapsed: f32,
++    /// A stretched object's axes (`super::stretch`): its scale on each axis per unit of the
++    /// eased one; one on every axis for any other.
++    axes: Vec3,
+ }
+ 
+ /// The live display id, read per kind as `benilla_protocol` reads it at create: `0` is absent, so
+@@ -143,10 +146,17 @@ pub(super) fn refresh_live_display(
+                     guid.0, net.scale, live
+                 );
+                 net.scale = live;
++                // Y is never stretched (`super::stretch`): the even scale the ease starts from.
+                 commands.entity(entity).insert(ScaleEase {
+-                    from: tf.scale.x,
++                    from: tf.scale.y,
+                     to: live,
+                     elapsed: 0.0,
++                    axes: super::stretch::render_scale(
++                        net.kind,
++                        store.0.gameobject_flags(),
++                        store.0.gameobject_level(),
++                        1.0,
++                    ),
+                 });
+             }
+         }
+@@ -184,9 +194,9 @@ pub(super) fn tick_scale_ease(
+         ease.elapsed += time.delta_secs();
+         let t = (ease.elapsed / SCALE_EASE_SECS).min(1.0);
+         let w = 0.5 - 0.5 * (std::f32::consts::PI * t).cos();
+-        tf.scale = Vec3::splat(ease.from + (ease.to - ease.from) * w);
++        tf.scale = ease.axes * (ease.from + (ease.to - ease.from) * w);
+         if t >= 1.0 {
+-            tf.scale = Vec3::splat(ease.to);
++            tf.scale = ease.axes * ease.to;
+             commands.entity(entity).remove::<ScaleEase>();
+         }
+     }
+diff --git a/crates/benilla-app/src/entities/stretch.rs b/crates/benilla-app/src/entities/stretch.rs
+new file mode 100644
+index 00000000..94b8d454
+--- /dev/null
++++ b/crates/benilla-app/src/entities/stretch.rs
+@@ -0,0 +1,99 @@
++//! Stretched game objects, benilla's own (no reference behaviour): a GameObject whose
++//! `GAMEOBJECT_FLAGS` carry [`STRETCH_X`] or [`STRETCH_Y`] is drawn longer along that axis of its
++//! model (WoW's model axes: X forward, Y left) by the factor `GAMEOBJECT_LEVEL` holds as an `f32`'s
++//! bits, on top of `OBJECT_FIELD_SCALE_X` on every axis. So one rope piece spans any length at the
++//! thickness its scale gives it (Elwynn Survival's tripwire: the rope between two arrows). The
++//! reference scales a model evenly; `GAMEOBJECT_LEVEL` only means something to a lockable object
++//! (`target::lock`), which a stretched one never is.
++
++use benilla_protocol::EntityKind;
++use bevy::prelude::*;
++
++use crate::net::{NetEntity, ObjectStore};
++
++/// `GAMEOBJECT_FLAGS` bit: longer along the model's X axis by the factor in `GAMEOBJECT_LEVEL`.
++pub(crate) const STRETCH_X: u32 = 0x4000_0000;
++/// `GAMEOBJECT_FLAGS` bit: longer along the model's Y axis by the factor in `GAMEOBJECT_LEVEL`.
++pub(crate) const STRETCH_Y: u32 = 0x8000_0000;
++/// The longest stretch drawn: past it, a wire value is taken as a mistake and ignored.
++const MOST: f32 = 100.0;
++
++/// A model's render scale: `scale` on every axis, the stretch factor more along the flagged axis.
++/// Bevy's local axes from the model's (`wow_to_bevy`): X → −Z, Y → −X, Z → Y; a scale has no sign.
++pub(crate) fn render_scale(kind: EntityKind, flags: u32, level: u32, scale: f32) -> Vec3 {
++    let mut v = Vec3::splat(scale);
++    if kind != EntityKind::GameObject || flags & (STRETCH_X | STRETCH_Y) == 0 {
++        return v;
++    }
++    let k = f32::from_bits(level);
++    if !(k.is_finite() && k > 0.0 && k <= MOST) {
++        return v;
++    }
++    if flags & STRETCH_X != 0 {
++        v.z *= k;
++    }
++    if flags & STRETCH_Y != 0 {
++        v.x *= k;
++    }
++    v
++}
++
++/// [`render_scale`] of a streamed entity, from its stored fields.
++pub(crate) fn entity_render_scale(
++    net: &NetEntity,
++    store: Option<&ObjectStore>,
++    scale: f32,
++) -> Vec3 {
++    match store {
++        Some(s) => render_scale(
++            net.kind,
++            s.0.gameobject_flags(),
++            s.0.gameobject_level(),
++            scale,
++        ),
++        None => Vec3::splat(scale),
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn only_a_flagged_game_object_stretches_and_along_its_axis() {
++        let two = 2.0f32.to_bits();
++        assert_eq!(
++            render_scale(EntityKind::GameObject, 0, two, 0.5),
++            Vec3::splat(0.5)
++        );
++        assert_eq!(
++            render_scale(EntityKind::GameObject, STRETCH_X, two, 0.5),
++            Vec3::new(0.5, 0.5, 1.0)
++        );
++        assert_eq!(
++            render_scale(EntityKind::GameObject, STRETCH_Y, two, 0.5),
++            Vec3::new(1.0, 0.5, 0.5)
++        );
++        // A unit's field 9 is not GameObject flags.
++        assert_eq!(
++            render_scale(EntityKind::Unit, STRETCH_X, two, 0.5),
++            Vec3::splat(0.5)
++        );
++    }
++
++    #[test]
++    fn a_nonsense_factor_draws_the_model_unstretched() {
++        for bad in [
++            0u32,
++            (-1.0f32).to_bits(),
++            f32::NAN.to_bits(),
++            f32::INFINITY.to_bits(),
++            1000.0f32.to_bits(),
++        ] {
++            assert_eq!(
++                render_scale(EntityKind::GameObject, STRETCH_X, bad, 1.5),
++                Vec3::splat(1.5)
++            );
++        }
++    }
++}
+diff --git a/crates/benilla-app/src/net/objects.rs b/crates/benilla-app/src/net/objects.rs
+index 5c2b6ae4..ab66841b 100644
+--- a/crates/benilla-app/src/net/objects.rs
++++ b/crates/benilla-app/src/net/objects.rs
+@@ -645,7 +645,12 @@ fn object_create(
+             }
+             if preview != 0 {
+                 if let Ok(mut t) = sc.transforms.get_mut(e) {
+-                    t.scale = Vec3::splat(scale);
++                    t.scale = crate::entities::stretch::render_scale(
++                        kind,
++                        fields.gameobject_flags(),
++                        fields.gameobject_level(),
++                        scale,
++                    );
+                 }
+             }
+             e
+diff --git a/crates/benilla-formats/src/gameobjects.rs b/crates/benilla-formats/src/gameobjects.rs
+index b637b391..fdc30128 100644
+--- a/crates/benilla-formats/src/gameobjects.rs
++++ b/crates/benilla-formats/src/gameobjects.rs
+@@ -45,6 +45,18 @@ fn schema() -> Schema {
+     s
+ }
+ 
++/// Game-object displays the 1.12.1 data has no row for, benilla's own: a doodad the client
++/// ships only as a model, placed by a server as an object. Ids from 60000, far past the data's
++/// last row; a row the data does have is never replaced. Elwynn Survival's server names them
++/// (`htl-server`'s `EXTRA_DISPLAYS`, which must change with this).
++pub const EXTRA_DISPLAYS: &[(u32, &str)] = &[
++    // A dwarven dig site's rope, straight between two stakes: the tripwire's wire.
++    (
++        60001,
++        "World\\Generic\\Dwarf\\Passive Doodads\\ExcavationRopeStake\\ExcavationRope.mdx",
++    ),
++];
++
+ /// Load GameObjectDisplayInfo.dbc from the patch chain into a [`GameObjectCatalog`].
+ pub fn load_gameobject_catalog(chain: &mut Chain) -> Result<GameObjectCatalog> {
+     let bytes = chain
+@@ -57,6 +69,9 @@ pub fn load_gameobject_catalog(chain: &mut Chain) -> Result<GameObjectCatalog> {
+             models.insert(id, path);
+         }
+     }
++    for (id, path) in EXTRA_DISPLAYS {
++        models.entry(*id).or_insert_with(|| (*path).to_string());
++    }
+     Ok(GameObjectCatalog { models })
+ }
+ 
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 1517d5c8..1b962d6d 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -148,6 +148,12 @@
+ //!   inside it, and water keeps its own. Called again, it eases from where it is to the new look.
+ //! - `ClearWorldFog([seconds])`: ease back to the zone's own fog (at once with no time).
+ //!   Leaving the world clears it.
++//!
++//! The nineteenth (`HasActionCombat() >= 19`), objects the game draws evenly drawn longer: a game
++//! object whose flags carry `0x40000000` (`0x80000000`) is longer along its model's X (Y) axis by
++//! the factor its `GAMEOBJECT_LEVEL` holds as a float's bits (`benilla-app`'s
++//! `entities::stretch`), and displays from 60000 name doodads the data has no row for
++//! (`benilla-formats`'s `EXTRA_DISPLAYS`): a rope from one point to another.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -812,7 +818,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(18))?,
++        lua.create_function(|_, _: MultiValue| Ok(19))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+-- 
+2.56.0.windows.4
+
