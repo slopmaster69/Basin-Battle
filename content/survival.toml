@@ -4894,7 +4894,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec and leaves frost that slows what stands in it by 50% for 6 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "defense"
 kind = "trap"
@@ -4918,6 +4918,16 @@ clip = 75
 # 3 sec: the most the board allows (1.5 on a hero). Serg (#118) found it over before the
 # Multi-Shot; what fixes that is the free shot coming as the trap springs, below.
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
+# The frost it leaves (Corey's review, round 3: the floor should slow what's round it): the
+# burst's 3 yd of ground for 6 s, snaring every creature in it each second (a hero's own ground
+# never slows them). Its look is the ground's spell (`linger_spell`, tunable in play:
+# `.es tune ability.freezing_trap.linger_spell <id>`): 7083 is Frost Nova's ice on the ground
+# with no caster-side kit, which run 070 showed lays nothing lasting on the ground; 13810 laid as
+# the ground's spell (not cast as one: that was the whiteout) is vanilla's Frost Trap mist, about
+# 10 yd wide, wider than the 3 yd that slows.
+linger = 6.0
+linger_spell = 13810
+tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }]
 # The trap combo: set it, kite them onto it, cash in. The free Multi-Shot is readied as the trap
 # springs (#118: readied as it was set, a trap that sprang late had no free shot left), for 8 s.
 empower = { ability = "aimed_arrow", secs = 8.0 }
