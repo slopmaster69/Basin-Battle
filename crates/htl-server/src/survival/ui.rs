@@ -98,6 +98,8 @@
 //!   window either side, `pattern` the ring's curve), "rhythm" (`a`, `b` the first and last
 //!   pressed beats' windows, `pattern` "free|name|t0,t1,t2r,..."); `crit` the critical's share of
 //!   a window; `school` fire, frost or arcane.
+//! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
+//!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
 //! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
 //!   from one spot to another over `secs` (Frozen Orb), its model and size, for a client that draws
 //!   it (`PlayGroundOrb`); `OX\t<key>`: it stopped or was spent.
