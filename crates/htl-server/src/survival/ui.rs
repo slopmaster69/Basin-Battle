@@ -173,6 +173,11 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     }
     if d.linger > 0.0 && d.linger_damage > 0.0 {
         out.push(format!("{} damage per sec for {} sec", n(d.linger_damage), n(d.linger)));
+    } else if d.linger > 0.0 && d.kind == "trap" {
+        // Ground a trap leaves that does no damage (Freezing Trap's frost): its size (the burst's)
+        // and its time, apart from the trap's own duration below.
+        let wide = if d.splash > 0.0 { d.splash } else { d.radius[1] };
+        out.push(format!("{} yd ground for {} sec", n(wide), n(d.linger)));
     } else if d.linger > 0.0 {
         out.push(format!("{} sec duration", n(d.linger)));
     }
