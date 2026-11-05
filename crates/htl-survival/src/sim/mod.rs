@@ -209,6 +209,9 @@ pub enum Event {
     /// A staff's stacks changed (`[staffs]`): `kind` heat or chill on `on`, charge on the caster;
     /// `n` how many now (the most: it just ignited, froze, or gathered its last).
     Stacks { player: Id, kind: &'static str, n: u32, on: Option<Id> },
+    /// A pose held on a unit (the ward's arm held out): `clip` looped for `secs` (0: let go), for
+    /// the clients that hold one (`WP`).
+    HoldPose { id: Id, clip: u16, secs: f32 },
     /// A staff's heavy bolt began its charge: it can go from `lo` seconds, and is whole at `hi`
     /// (for the staff's mark on the caster's screen; no ring, no flare on the body).
     StaffHeavy { player: Id, lo: f32, hi: f32 },
