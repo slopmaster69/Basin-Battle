@@ -1148,7 +1148,18 @@ impl Survival {
                 self.start_orb(id, ability);
                 self.set_action(id, next);
             }
-            "rhythm" => self.start_rhythm(id, ability),
+            "rhythm" => {
+                // Penance's bolts, counted as they land (the flick).
+                if d.flick {
+                    self.start_flick(id, ability);
+                }
+                self.start_rhythm(id, ability);
+            }
+            // Salvation's circle where they stand.
+            "sigil" => {
+                self.start_sigil(id, ability);
+                self.set_action(id, next);
+            }
             "bomb" => {
                 self.launch(id, ability, 1.0);
                 self.set_action(id, next);
@@ -1156,6 +1167,10 @@ impl Survival {
             "nova" => {
                 let at = self.players[&id].pos;
                 self.nova(id, ability, at, share);
+                // Holy Nova: the friends in it covered, a blow landing on them caught.
+                if d.covers {
+                    self.cover_nova(id, ability, at, AbilityDef::at(d.radius, share));
+                }
                 self.set_action(id, next);
             }
             "line" => {
@@ -1938,10 +1953,18 @@ impl Survival {
         // (Outside Siege that's any other hero, friendly fire or not: a bolt that would both heal
         // and hurt them heals them, as the caster meant.)
         if p.allies && self.players.contains_key(&victim) && self.helpable(p.owner, victim) {
+            if self.content.abilities[p.ability].flick {
+                self.flick_landed(p, true);
+            }
             self.friend_hit(p, victim);
             return;
         }
         let d = self.content.abilities[p.ability].clone();
+        if d.flick {
+            self.flick_landed(p, false);
+        }
+        // Kindle: the caster's Holy Fire burning on the foe it reaches burns hotter.
+        self.kindle(p.owner, victim);
         if d.splash > 0.0 {
             self.burst(p, p.pos, Some(victim));
             return;
@@ -1976,7 +1999,20 @@ impl Survival {
     /// them (a pull to the caster) of its effects.
     fn friend_hit(&mut self, p: &Projectile, friend: Id) {
         let d = self.content.abilities[p.ability].clone();
-        if d.ally_heal > 0.0 {
+        // Leap of Faith: the friend it pulls is covered, a blow landing on them as it does missed.
+        if d.covers {
+            if let Some(from) = self.players.get(&friend).map(|f| f.pos) {
+                self.cover_pull(p.owner, p.ability, friend, from);
+            }
+        }
+        if d.mend > 0.0 {
+            // A flat heal (Penance's bolt).
+            let amount = (d.mend * self.weakened(p.owner)).round() as u32;
+            self.heal_hero_by(friend, amount, p.owner, &d.name);
+            self.events.push(Event::Missile { caster: p.owner, spell: HEAL_LOOK, target: Target::Unit(friend) });
+            let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
+            self.gain_valor(p.owner, v);
+        } else if d.ally_heal > 0.0 {
             self.heal_friend(p.owner, friend, p.ability);
         } else if d.cleanse {
             self.cleanse(friend, &crate::content::HARMFUL);
@@ -2500,6 +2536,17 @@ impl Survival {
             let name = self.content.abilities[ability].name.clone();
             for f in friends {
                 let amount = self.players.get(&f).map_or(0, |p| (p.max_health as f32 * heal * self.weakened(owner)).round() as u32);
+                self.heal_hero_by(f, amount, owner, &name);
+            }
+        }
+        // A flat heal for friends in it (Holy Nova's); a sigil's pillar heals only those who
+        // landed its beat (`sigil.rs`).
+        let mend = self.content.abilities[ability].mend;
+        if mend > 0.0 && self.content.abilities[ability].kind != "sigil" {
+            let friends: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
+            let name = self.content.abilities[ability].name.clone();
+            let amount = (mend * self.weakened(owner)).round() as u32;
+            for f in friends {
                 self.heal_hero_by(f, amount, owner, &name);
             }
         }

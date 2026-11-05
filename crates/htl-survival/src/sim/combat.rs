@@ -75,6 +75,8 @@ impl Survival {
     /// What a hero pressed or let go.
     pub fn input(&mut self, id: Id, input: Input) {
         let now = self.clock;
+        // Salvation's beats: any action key in a circle on a beat lands it.
+        self.sigil_act(id, input);
         let Some(p) = self.players.get_mut(&id) else { return };
         match input {
             Input::Guard => {
@@ -1655,15 +1657,20 @@ impl Survival {
             self.slipped(s.victim, s.attacker, s.style);
             return;
         }
+        // A friend's Holy Nova or Leap of Faith as it landed (or since, while it waited): caught.
+        let vpos = v.pos;
+        if self.covered(s.victim, s.attacker, s.at - grace, s.style) {
+            return;
+        }
         // Out of it by now: a whiff.
         let inside = match s.area {
             None => true,
             Some(Area::Arc { pos, facing: f, range, arc }) => {
-                let d = dist2d(pos, v.pos);
-                d <= range + 0.4 && (angle_between(f, facing(pos, v.pos)) <= arc / 2.0 || d < 0.8)
+                let d = dist2d(pos, vpos);
+                d <= range + 0.4 && (angle_between(f, facing(pos, vpos)) <= arc / 2.0 || d < 0.8)
             }
-            Some(Area::Circle { at, radius }) => dist2d(v.pos, at) <= radius,
-            Some(Area::Line { pos, facing: f, len, half }) => in_strip(pos, f, len, half + 0.4, v.pos),
+            Some(Area::Circle { at, radius }) => dist2d(vpos, at) <= radius,
+            Some(Area::Line { pos, facing: f, len, half }) => in_strip(pos, f, len, half + 0.4, vpos),
         };
         if !inside {
             self.events.push(Event::Swing { attacker: s.attacker, victim: Some(s.victim), damage: 0, outcome: Outcome::Miss, anim: false, style: s.style });

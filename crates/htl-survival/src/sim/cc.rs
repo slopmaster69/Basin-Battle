@@ -640,6 +640,8 @@ impl Survival {
         }
         // A sticky projectile's fuse burning on them.
         out.extend(self.fuse_auras(id));
+        // Salvation's Holy Light.
+        out.extend(self.sigil_auras(id));
         out.sort_unstable();
         out.dedup();
         out

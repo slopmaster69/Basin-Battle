@@ -38,7 +38,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 21] = [
+pub const KINDS: [&str; 22] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -93,6 +93,9 @@ pub const KINDS: [&str; 21] = [
     // A bolt that plants a bomb on what it hits; it flares, then bursts; its key again on a flare
     // sets it off early and harder (the release check on a foe).
     "bomb",
+    // A great circle of light where the caster stands, seen by everyone: its rim closes on its
+    // centre on `beats`, and every hero inside who acts on a beat lands it (the group check).
+    "sigil",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -670,6 +673,54 @@ pub struct AbilityDef {
     /// `momentum`, the Juggernaut's.
     #[serde(default)]
     pub passive: String,
+    // --- the Light Priest's (claude/priest-kit-draft.md) ---------------------------------------
+    /// A flat heal: a friend a projectile of it meets, or a nova of it reaches, is healed this
+    /// much (not a share of their health); a sigil's pillar heals each hero who landed its last
+    /// beat this much.
+    #[serde(default)]
+    pub mend: f32,
+    /// Penance's flick: a rhythm whose beats all go by themselves (no chain to keep), each a
+    /// bolt along the reticle as it goes; every bolt landing, on at least one friend and at
+    /// least one foe, is a perfect (the last bolt's `burst_spell` where it lands).
+    #[serde(default)]
+    pub flick: bool,
+    /// Kindle: the burn this lays on a foe is fanned by each of the caster's projectiles that
+    /// strikes it after: `kindle` more a second, at most `kindle_most` more, and it starts over.
+    #[serde(default)]
+    pub kindle: f32,
+    #[serde(default)]
+    pub kindle_most: f32,
+    /// A counter for others (Holy Nova, Leap of Faith): a blow landing on a friend it reaches
+    /// within `[checks] window` of it (on the caster's screen), or while the blow waits on that
+    /// friend's round trip, is caught whole (a nova) or misses them (a pull). The first pays the
+    /// caster a counter's Valor and the perfect.
+    #[serde(default)]
+    pub covers: bool,
+    /// A sigil (`kind = "sigil"`, the group check): seconds from the cast to its first beat, and
+    /// from each beat to the next. Its rim closes on its centre over each. A hero inside its
+    /// `radius` who acts within `[checks] window` of a beat (on their own screen) lands it: a
+    /// perfect, and a stack of its `stack`. The last beat calls a pillar at the centre: the low
+    /// end of `damage`, `per_lander` more for each hero who landed it, the high end at most, to
+    /// foes inside; `mend` to each who landed it.
+    #[serde(default)]
+    pub beats: Vec<f32>,
+    #[serde(default)]
+    pub per_lander: f32,
+    #[serde(default)]
+    pub stack: Option<StackDef>,
+}
+
+/// A sigil's gift for each beat a hero lands (Holy Light): `might` more damage a stack (as a
+/// draught of might gives), `most` stacks at most, all held `secs` from the last one; their look
+/// (`aura`) while they have any. Named `name` on their buffs.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct StackDef {
+    pub name: String,
+    pub might: f32,
+    pub most: u32,
+    pub secs: f32,
+    #[serde(default)]
+    pub aura: u32,
 }
 
 /// The passives an ability on a key can give its hero.
@@ -804,7 +855,7 @@ impl AbilityDef {
     }
     /// It's aimed with the reticle (the shoulder camera comes up for it).
     pub fn aimed(&self) -> bool {
-        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff")
+        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff" | "sigil")
             && !self.at_once
             && !self.at_self
             && !(self.kind == "leap" && self.back)
@@ -829,12 +880,12 @@ impl AbilityDef {
     }
     /// A projectile that meets friends too (to heal them, to pull them to safety, to swap places).
     pub fn friends(&self) -> bool {
-        self.ally_heal > 0.0 || self.friendly || self.swap
+        self.ally_heal > 0.0 || self.friendly || self.swap || self.mend > 0.0
     }
     /// It mends friends (a heal on whoever it reaches, a nova's, holy ground's mending or boon):
     /// a hero it can help is never harmed by it, friendly fire or not.
     pub fn heals(&self) -> bool {
-        self.ally_heal > 0.0 || self.area_heal > 0.0 || self.linger_heal > 0.0 || !self.boon.is_empty()
+        self.ally_heal > 0.0 || self.area_heal > 0.0 || self.linger_heal > 0.0 || !self.boon.is_empty() || self.mend > 0.0
     }
     pub fn is_ex(&self) -> bool {
         !self.ex_of.is_empty()

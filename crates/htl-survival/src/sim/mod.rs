@@ -36,6 +36,11 @@ mod rhythm;
 mod staff;
 mod sweep;
 pub mod wager;
+// The Light Priest's (Penance's flick, Holy Fire's Kindle, counters for others, Salvation).
+mod aid;
+mod flick;
+pub(crate) mod light;
+mod sigil;
 mod tactics;
 mod world;
 
@@ -909,6 +914,8 @@ pub struct Survival {
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Each hero's last blink that slips blows (Blink's counter check).
     pub(crate) slips: BTreeMap<Id, moves::Slip>,
+    /// The Light Priest's: covers on friends, Salvation's circles, Penance's bolts.
+    pub(crate) light: light::Light,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
@@ -1017,6 +1024,7 @@ impl Survival {
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             slips: BTreeMap::new(),
+            light: light::Light::default(),
             fx_from: None,
             fx_vs_bosses: false,
             told_immune: BTreeMap::new(),
@@ -1097,6 +1105,7 @@ impl Survival {
         self.step_projectiles(dt);
         self.step_orbs(dt);
         self.step_bombs();
+        self.step_light();
         self.step_moves();
         self.step_grounds();
         self.step_bounces();

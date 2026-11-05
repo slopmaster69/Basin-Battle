@@ -147,7 +147,9 @@ impl Survival {
 
     /// The rhythm ends: a full chain is a perfect.
     fn end_rhythm(&mut self, id: Id, ability: usize, full: bool) {
-        if full {
+        // (Beats that all go by themselves are no chain to keep: Penance's flick has its own.)
+        let d = &self.content.abilities[ability];
+        if full && d.most_beats > d.free_beats {
             let c = self.content.checks.clone();
             self.gain_valor(id, c.chain_valor);
             if c.perfect_kit != 0 {

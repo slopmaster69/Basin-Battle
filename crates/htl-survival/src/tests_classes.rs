@@ -71,6 +71,10 @@ fn use_card(s: &mut Survival, p: Id, card: &AbilityDef, ex: bool) -> Vec<Event> 
         ev.extend(s.step(DT));
         s.input(p, Input::AttackUp);
     }
+    // A sigil's pillar comes on its last beat.
+    if card.kind == "sigil" {
+        ev.extend(run(s, card.beats.iter().sum::<f32>() + 0.5));
+    }
     ev.extend(run(s, 2.5));
     ev
 }
@@ -139,6 +143,10 @@ fn worth(d: &AbilityDef) -> f32 {
     // A rhythm's hit: its hardest beat (the finisher).
     if d.kind == "rhythm" {
         return rhythm_beats(d).into_iter().fold(0.0, f32::max);
+    }
+    // A sigil's pillar: at most its high end, however many land its beats.
+    if d.kind == "sigil" {
+        return d.damage[1];
     }
     // A wide fan (10° or more between its arrows) puts at most three into one foe.
     let n = if d.spread >= 10.0 { d.count.clamp(1, 3) } else { d.count.max(1) };

@@ -3438,6 +3438,25 @@ impl Content {
             if (a.pulse < 0.0 || a.rewind_health < 0.0 || a.rewind_health > 1.0) || ((a.pulse > 0.0 || a.rewind_health > 0.0) && a.anchor <= 0.0) {
                 bail!("{what}: `pulse` and `rewind_health` (0 to 1) are an anchor's (they need `anchor`)");
             }
+            // The Light Priest's.
+            if a.flick && !(a.kind == "rhythm" && a.beat_kind == "projectile" && a.free_beats >= a.most_beats && a.most_beats > 0) {
+                bail!("{what}: a flick is a rhythm of bolts that all go by themselves (`beat_kind = \"projectile\"`, `free_beats` = `most_beats`)");
+            }
+            if (a.kindle > 0.0) != (a.kindle_most > 0.0) || (a.kindle > 0.0 && !a.effects.iter().any(|e| e.kind == "burn")) {
+                bail!("{what}: Kindle fans its own burn (`kindle` and `kindle_most`, and a burn among its `effects`)");
+            }
+            if a.covers && !matches!(a.kind.as_str(), "nova" | "projectile") {
+                bail!("{what}: only a nova or a projectile covers a friend (`covers`)");
+            }
+            if a.kind == "sigil" && (a.beats.is_empty() || a.beats.iter().any(|b| *b <= 0.0) || a.radius[1] <= 0.0 || a.stack.is_none()) {
+                bail!("{what}: a sigil needs its `beats` (each after the last), its `radius` and its `stack`");
+            }
+            if a.kind != "sigil" && (!a.beats.is_empty() || a.stack.is_some() || a.per_lander > 0.0) {
+                bail!("{what}: `beats`, `stack` and `per_lander` are a sigil's");
+            }
+            if a.stack.as_ref().is_some_and(|k| k.most == 0 || k.might < 0.0 || k.secs <= 0.0) {
+                bail!("{what}: a stack needs `most`, `might` and `secs`");
+            }
             for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects) {
                 effect_ok(e, &what)?;
             }
