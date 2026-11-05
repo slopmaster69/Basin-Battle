@@ -24,6 +24,9 @@ pub(crate) const LEAP_LIFT: f32 = 6.0;
 const STEP: f32 = 0.4;
 /// The traps of one kind a hero can have set at once.
 const MOST_TRAPS: usize = 2;
+/// How fast a thrown trap flies to its spot (yards a second): a lob you can follow, 10 yd in
+/// about 0.6 s.
+const TRAP_THROW_SPEED: f32 = 16.0;
 /// A wind-up's beat after it goes off.
 const WINDUP_RECOVERY: f32 = 0.3;
 /// A dive (Stoop) meets the ground this long after it starts, however high that is: driven down,
@@ -471,13 +474,21 @@ impl Survival {
     // --- traps ----------------------------------------------------------------------------------------
 
     /// A trap set at the reticle (or the feet): the oldest of its kind goes if there are too many.
+    /// With a `lob_spell`, it is thrown there first: its look flies from the hand and the trap is
+    /// set where it lands ([`Self::lob_lands`]), so the throw is seen (Corey's review).
     pub(crate) fn place_trap(&mut self, id: Id, ability: usize, share: f32) {
         let d = self.content.abilities[ability].clone();
         let at = if d.at_self { self.players[&id].pos } else { self.aim_point(id, AbilityDef::at(d.range, share)) };
+        if d.lob_spell != 0 && !d.at_self {
+            let from = self.players.get(&id).map_or(at, |p| [p.pos[0], p.pos[1], p.pos[2] + 1.2]);
+            let speed = if d.speed > 0.0 { d.speed } else { TRAP_THROW_SPEED };
+            self.lob(id, ability, from, at, (speed, 0.3, share, 0.0, d.lob_spell));
+            return;
+        }
         self.set_trap(id, ability, at, share);
     }
 
-    fn set_trap(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
+    pub(crate) fn set_trap(&mut self, id: Id, ability: usize, at: Vec3, share: f32) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
         let mine: Vec<usize> = self.traps.iter().enumerate().filter(|(_, t)| t.owner == id && t.ability == ability).map(|(k, _)| k).collect();
@@ -487,7 +498,9 @@ impl Survival {
         }
         let radius = AbilityDef::at(d.radius, share);
         let life = d.secs.max(1.0);
-        let mark = self.mark_kind(at, radius, life, true);
+        // No circle under it: the trap's own model shows where it is (a hero's own circles are
+        // floor clutter, Corey's review), and a foe isn't shown where it waits.
+        let mark = self.mark_unseen(life);
         // The trap on the ground where it's set (no spell's look there: Explosive Trap's own
         // shows the client's placeholder at a point).
         let obj = (d.object != 0).then(|| {
@@ -538,6 +551,7 @@ impl Survival {
         let damage = AbilityDef::at(d.damage, t.share);
         self.area(t.owner, t.ability, t.at, burst, t.share, damage, None);
         self.linger_at(t.owner, t.ability, t.at, burst);
+        self.trap_empowers(t.owner, t.ability);
     }
 
     // --- anchors (Demonic Circle) -----------------------------------------------------------------

@@ -428,6 +428,12 @@ impl Survival {
         if (was_eating || was_gathering) && !eating {
             self.events.push(Event::CastEnd { caster: id });
         }
+        // A meal puts the weapons away for its while and takes them out again after (Corey's
+        // review: the bread in one hand, the axe still in the other). The hero's own toggle
+        // (`sheathed`) is left as it was; the gear shows the meal (`gear_fields`).
+        if matches!(p.action, Action::Eat { .. }) != was_eating {
+            self.events.push(Event::Gear { player: id });
+        }
         if guard != was_guard {
             self.events.push(Event::Guard { player: id, up: guard });
         }
@@ -1009,6 +1015,8 @@ impl Survival {
                     self.eaten(id, item);
                     self.events.push(Event::CastEnd { caster: id });
                     self.players.get_mut(&id).unwrap().action = Action::Ready;
+                    // The weapons out again (set straight, not through `set_action`).
+                    self.events.push(Event::Gear { player: id });
                     self.finish_commitment(id);
                 } else if let Some(p) = self.players.get_mut(&id) {
                     p.action = Action::Eat { t: t + dt, item };
@@ -1294,10 +1302,9 @@ impl Survival {
                 self.trade_blows(id, mid);
                 continue;
             }
-            // Gone home past its leash: the blow finds nothing.
+            // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
             if self.evading(mid, id) {
-                self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style });
-                self.events.push(Event::Flash { player: id, text: "Evade".into() });
+                self.whiff(mid, pos);
                 continue;
             }
             // A shield-bearer between blows, facing the blow, may take a light one on its shield.
@@ -2553,6 +2560,10 @@ pub const KIT_HEAVY: u32 = 437;
 pub const KIT_SLAM: u32 = 1666;
 pub const KIT_CLEAVE: u32 = 507;
 pub const KIT_DUST: u32 = 5649;
+/// A body knocked to the ground: Charge's landing puff (`DustCloud_Land`), low and about a
+/// creature's width. The dust nova above is a dragon's wing buffet: on a tripped grunt, seen from
+/// a high camera, it read as a 10-yd white streak drifting off downwind (Corey's review, run 022).
+pub const KIT_FALL_DUST: u32 = 5930;
 /// Knocked to the ground and up again, and the parry's own sweep.
 pub const KNOCKDOWN_ANIM: u16 = 121;
 /// A blow this far off a creature's facing (degrees) is from behind.

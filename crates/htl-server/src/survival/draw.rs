@@ -556,7 +556,9 @@ impl SurvivalGame {
             f.set(idx::PLAYER_VISIBLE_ITEM_1_0 + 12 * slot as u16, entry);
         }
         let kit = self.sim.players.get(&id).map_or(Kit::Melee, |p| p.kit);
-        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed);
+        // Put away for a meal too, the hero's own toggle untouched (Corey's review: eating with
+        // the axe still in hand).
+        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed || matches!(p.action, htl_survival::Action::Eat { .. }));
         // Weapons out: the axe and shield in hand, or the bow; put away (R), on the back.
         f.set(idx::UNIT_BYTES_2, if sheathed { 0 } else if kit == Kit::Bow { 2 } else { 1 });
         if let Some(p) = self.sim.players.get(&id) {
@@ -594,6 +596,8 @@ impl SurvivalGame {
         f.set(idx::UNIT_POWER1 + 3, p.stamina.round() as u32);
         if matches!(p.action, htl_survival::Action::Guard) {
             f.set(idx::UNIT_NPC_EMOTESTATE, self.guard_pose(id));
+        } else if let Some(pose) = self.poses.get(&id) {
+            f.set(idx::UNIT_NPC_EMOTESTATE, *pose);
         }
         self.gear_fields(id, &mut f);
         // The whole of the world map shown: every place is known from the start.
