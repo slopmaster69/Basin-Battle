@@ -130,7 +130,7 @@
 //! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
 //!   from one spot to another over `secs` (Frozen Orb), its model and size, for a client that draws
 //!   it (`PlayGroundOrb`); `OX\t<key>`: it stopped or was spent.
-//! - `CR\t<ability key>\t<grade>`: its outcome, critical, perfect, good, weak, fail or fizzle,
+//! - `CR\t<ability key>\t<grade>`: its outcome: perfect, good, early, late, full (a whole rhythm), fail, fizzle,
 //!   or `cancel` (its cast called off or cut short: the ring goes quietly).
 //! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
 //!   on their own screen; its burst and Valor come as ever).

@@ -286,7 +286,7 @@ fn every_cast_rolls_its_own_beat_sent_ahead_a_missile_leaves_on_each_press_and_a
     press(&mut s, p, "ranged");
     let ev = s.step(0.0);
     assert_eq!(missiles(&ev, p, d.spell), 1, "the fourth leaves on the press, a little early");
-    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "good" | "critical", .. })));
+    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "good" | "perfect", .. })));
     // A rest: pressing on it breaks the chain; letting it pass keeps it.
     for press_rest in [true, false] {
         let mut s = world();

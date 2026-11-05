@@ -926,7 +926,7 @@ impl Survival {
         }
         if !perfect {
             let early = held < self.players[&id].check_flare;
-            self.events.push(Event::CheckResult { player: id, ability, grade: if early { "weak" } else { "good" } });
+            self.events.push(Event::CheckResult { player: id, ability, grade: if early { "early" } else { "late" } });
         }
         if let Some(p) = self.players.get_mut(&id) {
             p.cast_critical = critical;
@@ -1139,7 +1139,7 @@ impl Survival {
             }
             self.events.push(Event::Perfect { player: id, ability });
             let critical = self.players[&id].cast_critical;
-            self.events.push(Event::CheckResult { player: id, ability, grade: if critical { "critical" } else { "perfect" } });
+            self.events.push(Event::CheckResult { player: id, ability, grade: if critical { "perfect" } else { "good" } });
         }
         // A charge's glow ends as it goes (the bow's draw ends with its shot), and the wind-up on
         // them with it (the slots are read once the action has moved on).
@@ -3605,14 +3605,14 @@ impl Survival {
                 let all = checked && self.content.abilities[ability].stakes == "all";
                 if pending && held >= lo {
                     if checked {
-                        self.events.push(Event::CheckResult { player: id, ability, grade: "weak" });
+                        self.events.push(Event::CheckResult { player: id, ability, grade: "early" });
                     }
                     self.fire(id, ability, if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 });
                 } else if all && held > self.players[&id].check_flare + self.content.checks.window + 0.05 {
                     self.fizzle(id, ability);
                 } else if hold > 0.0 && held >= hi + hold {
                     if checked {
-                        self.events.push(Event::CheckResult { player: id, ability, grade: "good" });
+                        self.events.push(Event::CheckResult { player: id, ability, grade: "late" });
                     }
                     self.fire(id, ability, 1.0);
                 }
