@@ -17,6 +17,8 @@ fn world() -> Survival {
     let mut s = meter_world();
     let cone = s.content.ability("cone_of_cold").unwrap();
     s.content.abilities[cone].meter = false;
+    // These tests time the plain sweep in tenths of its second.
+    s.content.abilities[cone].secs = 1.0;
     s
 }
 

@@ -885,7 +885,7 @@ impl Survival {
         }
         // A staff's heavy bolt builds up: the weapon held at the ready, a flash in the hands.
         if d.charge_pose != 0 {
-            self.events.push(Event::HoldPose { id, clip: d.charge_pose, secs: (hi + d.hold.max(0.5)).min(9.5) });
+            self.events.push(Event::HoldPose { id, clip: d.charge_pose, secs: (hi + d.hold.max(0.5)).min(9.5), from: d.from.clone() });
         }
         if d.charge_kit != 0 {
             self.events.push(Event::Visual { id, kit: d.charge_kit, by: None });
@@ -990,7 +990,7 @@ impl Survival {
         if let Some(Action::Charge { ability, .. }) = self.players.get(&id).map(|p| &p.action) {
             let pose = self.content.abilities[*ability].charge_pose;
             if pose != 0 {
-                self.events.push(Event::HoldPose { id, clip: pose, secs: 0.0 });
+                self.events.push(Event::HoldPose { id, clip: pose, secs: 0.0, from: None });
             }
         }
         if matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Aim { .. } | Action::Charge { .. })) {
@@ -1108,7 +1108,7 @@ impl Survival {
         // A build-up's held stance lets go for the swing.
         let pose = self.content.abilities[ability].charge_pose;
         if pose != 0 {
-            self.events.push(Event::HoldPose { id, clip: pose, secs: 0.0 });
+            self.events.push(Event::HoldPose { id, clip: pose, secs: 0.0, from: None });
         }
         self.fire_with(id, ability, share, false);
     }
@@ -1205,7 +1205,18 @@ impl Survival {
             } else {
                 (CAST_RECOVERY + 0.2, 0.0)
             };
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs, at, body: ClipBody::Full });
+            // A pool's: one of them at random, each from its own model (the same on every race).
+            let (clip, take, from) = if d.clip_pool.is_empty() {
+                (d.clip, d.take, d.from.clone())
+            } else {
+                let pick = &d.clip_pool[rand::Rng::gen_range(&mut self.rng, 0..d.clip_pool.len())];
+                let mut it = pick.split('/');
+                let clip = it.next().and_then(|c| c.trim().parse().ok()).unwrap_or(d.clip);
+                let take = it.next().and_then(|t| t.trim().parse().ok()).unwrap_or(0);
+                let from = it.next().map(|m| m.trim().to_string()).filter(|m| !m.is_empty());
+                (clip, take, from)
+            };
+            self.events.push(Event::Clip { id, clip, take, from, secs, at, body: ClipBody::Full });
         }
         // The bow's own release before the sword comes back (a crossbow's long reload).
         let total = if d.kind == "shot" { self.ranged_of(&self.players[&id]).recovery.max(CAST_RECOVERY) } else { CAST_RECOVERY };
@@ -1398,10 +1409,9 @@ impl Survival {
         // many charges; none, and nothing goes but a fizzle in the hands.
         let (damage, spell, all_charges) = match self.staff_release(id, ability) {
             Some((0, _, _)) => {
-                let k = self.content.checks.fizzle_kit;
-                if k != 0 {
-                    self.events.push(Event::Visual { id, kit: k, by: None });
-                }
+                // Nothing stored: no orb, no look on the body (Dispel's puff read as a cleanse,
+                // Corey); the staff's mark sputters on the caster's screen.
+                self.events.push(Event::Stacks { player: id, kind: "empty", n: 0, on: None });
                 return;
             }
             Some((n, share, look)) => (damage * share, if look != 0 { look } else { spell }, n >= self.content.staffs.most),

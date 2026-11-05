@@ -1066,8 +1066,9 @@ local function StepFx(now)
   local dur = ((g == "perfect" or g == "full") and 0.7) or (g == "good" and 0.55) or ((g == "fail" or g == "fizzle") and 0.7) or (f.ghost and 0.6) or 0.3
   local t = age / dur
   if f.meter then
-    -- The meter frozen where the press came, fading: how close it was to the sweet spot.
-    if t < 1 then DrawMeter(f.meter, f.meterAt, 1 - t) else
+    -- The meter frozen where the press came, fading: how close it was to the sweet spot (a fail's
+    -- cursor is in the overrun, drawn below).
+    if t < 1 then DrawMeter(f.meter, g ~= "fail" and f.meterAt or nil, 1 - t) else
       for i = 1, table.getn(meterDots) do meterDots[i]:Hide() end
       meterCursor:Hide(); meterSpot:Hide(); meterOver:Hide(); meterFrame:Hide()
     end
@@ -1114,6 +1115,15 @@ local function StepFx(now)
       ghost:Hide(); target:Hide()
     end
     pop:Hide(); core:Hide(); burst:Hide(); crack:Hide(); fizzle:Hide(); star:Hide(); wave:Hide()
+  elseif f.meter then
+    -- The meter's own failure (Corey: not the ring's red circle): the cursor stuck in the cracked
+    -- overrun, which flares red and shakes as the meter fades.
+    local shake = (1 - t) * 6 * math.sin(age * 60)
+    local ox, oy, oang = MeterXY(f.meter, 1.1)
+    Draw(meterOver, 96 * (1 + 0.25 * (1 - t)), oang, 1 - t * t, 1, 0.35 + 0.3 * t, 0.3 + 0.3 * t, ox + shake, oy)
+    local cx, cy, cang = MeterXY(f.meter, 1.1)
+    Draw(meterCursor, 100, cang, 1 - t, 1, 0.5, 0.5, cx + shake, cy)
+    pop:Hide(); core:Hide(); burst:Hide(); tick:Hide(); star:Hide(); wave:Hide(); ghost:Hide(); target:Hide(); crack:Hide(); fizzle:Hide()
   else
     -- Failed: the red crack bursts apart with a jolt; a fizzle puffs out of the middle and dies.
     local shake = (1 - t) * 5 * math.sin(age * 70)

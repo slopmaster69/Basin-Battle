@@ -924,7 +924,7 @@ impl Survival {
             self.events.push(Event::Auras { id });
             // The arm raised and held while it's up (below, renewed), let go as it comes down.
             if w.clip != 0 && !up {
-                self.events.push(Event::HoldPose { id, clip: w.clip, secs: 0.0 });
+                self.events.push(Event::HoldPose { id, clip: w.clip, secs: 0.0, from: None });
             }
             p.ward_clip_at = now;
             // The glow in the raised hand while it's up, gone as it comes down.
@@ -944,7 +944,8 @@ impl Survival {
             if w.clip != 0 && now >= p.ward_clip_at {
                 let hold = w.clip_hold.clamp(1.0, 9.5);
                 p.ward_clip_at = now + (hold - 1.0).max(0.5);
-                self.events.push(Event::HoldPose { id, clip: w.clip, secs: hold });
+                let from = (!w.clip_from.is_empty()).then(|| w.clip_from.clone());
+                self.events.push(Event::HoldPose { id, clip: w.clip, secs: hold, from });
             }
             // It crackles, more often as it runs dry.
             if w.crackle_full > 0.0 && w.block_kit != 0 && now >= p.ward_crackle_at {

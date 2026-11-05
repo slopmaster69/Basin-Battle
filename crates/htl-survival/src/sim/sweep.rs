@@ -26,7 +26,8 @@ impl Survival {
     pub(crate) fn start_sweep(&mut self, id: Id, ability: usize, yaw: f32) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        let dir = if rand::Rng::gen::<bool>(&mut self.rng) { 1.0 } else { -1.0 };
+        // A meter always runs left to right, as a gauge reads (Corey); a plain sweep either way.
+        let dir = if d.meter || rand::Rng::gen::<bool>(&mut self.rng) { 1.0 } else { -1.0 };
         let secs = d.secs.max(0.1) * (0.85 + 0.3 * rand::Rng::gen::<f32>(&mut self.rng));
         if let Some(p) = self.players.get_mut(&id) {
             p.sweep_dir = dir;

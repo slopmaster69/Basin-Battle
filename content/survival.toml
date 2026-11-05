@@ -428,6 +428,8 @@ hold_spell = 118
 clip = 124
 clip_hold = 8.0
 clip_body = "upper"
+# The human man's take on every race and gender (Corey: race-locked).
+clip_from = "HumanMale"
 # No crackle while it's merely up (0); the arc on the reticle cracks as it drains instead.
 crackle_full = 0.0
 crackle_empty = 0.0
@@ -3702,17 +3704,18 @@ crit_effects = [{ kind = "stagger", secs = [0.4, 0.4] }]
 [[ability]]
 key = "cone_of_cold"
 name = "Cone of Cold"
-text = "A jet of frost sweeps across your front over 1 sec, 10 yd long: everything it passes takes 12 damage and is slowed by 50% for 3 sec. Press again to stop it on the meter: on its sweet spot, enemies in the jet freeze for 2 sec; near it, for 1 sec. Off it, they're only slowed."
+text = "A jet of frost sweeps across your front over 0.8 sec, 10 yd long: everything it passes takes 12 damage and is slowed by 50% for 3 sec. Press again to stop it on the meter: on its sweet spot, enemies in the jet freeze for 2 sec; near it, for 1 sec. Off it, they're only slowed."
 icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
 kind = "sweep"
-# The jet: 30° wide, sweeping 120° in a second; it holds half a second where it's stopped.
+# The jet: 30° wide, sweeping 120° in 0.8 sec (the meter's cursor quicker, Corey); it holds half a
+# second where it's stopped.
 damage = [12.0, 12.0]
 range = [10.0, 10.0]
 arc = 30.0
 sweep = 120.0
-secs = 1.0
+secs = 0.8
 stop_secs = 0.5
 perfect_arc = 10.0
 # Graded on a meter (Gladius's swing meter, Corey's notes on the fourth film: a stop "when you
@@ -3720,8 +3723,10 @@ perfect_arc = 10.0
 # sweep's time of it a perfect (the whole freeze), within 16% good (the least freeze), off it the
 # slow alone; never stopped, a fail.
 meter = true
-meter_perfect = 0.06
-meter_good = 0.16
+# Harder and quicker (Corey, the fifth film): 3.5% of the sweep's time either side for a perfect,
+# 10% for good; always left to right.
+meter_perfect = 0.035
+meter_good = 0.10
 # A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
 perfect_kit = 1027
 cooldown = 8.0
@@ -6226,6 +6231,9 @@ speed = 30.0
 spell = 133
 # The directed cast (SpellCastDirected): the staff arm out, the bolt thrown along it.
 clip = 53
+# Each bolt one of four staff swings at random, the orc man's take on every race (Corey: mixed, random,
+# the same animation for all races and genders).
+clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
 effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
 
 [[ability]]
@@ -6276,6 +6284,9 @@ speed = 32.0
 # thrust out with the staff (the two-handed thrust, 18). Frost Shot's (6984) was hard to see.
 spell = 205
 clip = 18
+# Each bolt one of four staff swings at random, the orc man's take on every race (Corey: mixed, random,
+# the same animation for all races and genders).
+clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
 # The chill slows (`[staffs] chill_slow` a stack); the shard itself, nothing more.
 
 [[ability]]
@@ -6329,6 +6340,9 @@ speed = 44.0
 # both hands (SpellCastOmni).
 spell = 22600
 clip = 54
+# Each bolt one of four staff swings at random, the orc man's take on every race (Corey: mixed, random,
+# the same animation for all races and genders).
+clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
 
 [[ability]]
 key = "arcane_bolt_heavy"
@@ -6347,6 +6361,11 @@ spends = "charge"
 # 28), Blink's violet flash in the hands as it begins.
 charge_pose = 28
 charge_kit = 3394
+# Let go with its own two-handed motion, apart from the light swings (Corey): the tauren man's thrust,
+# the same on every race.
+clip = 19
+take = 0
+from = "TaurenMale"
 stamina = 20.0
 damage = [32.0, 48.0]
 crit_effects = [{ kind = "knockback", amount = 3.0 }]

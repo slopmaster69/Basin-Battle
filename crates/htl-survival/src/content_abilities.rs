@@ -153,6 +153,10 @@ pub struct AbilityDef {
     pub orb_model: String,
     #[serde(default)]
     pub orb_scale: f32,
+    /// Each cast's clip drawn at random from these (`"clip/take/Model"`, the model's own take on
+    /// every race and gender alike), in place of `clip` (Corey: the staff's light swings mixed).
+    #[serde(default)]
+    pub clip_pool: Vec<String>,
     /// A rhythm's casts, beat by beat (cycled): the body's clip for each missile.
     #[serde(default)]
     pub beat_clips: Vec<u16>,
