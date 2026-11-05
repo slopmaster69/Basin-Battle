@@ -508,6 +508,78 @@ fn a_cone_from_the_feet_goes_toward_what_the_reticle_is_on() {
     assert_eq!(s.aim_yaw(p, 4.0), s.players[&p].facing);
 }
 
+/// A thin wall across x = 10 (to 10.15): a hero pressed to it reaches past it with their hands.
+struct ThinWall;
+impl crate::land::Land for ThinWall {
+    fn height(&self, _x: f32, _y: f32) -> f32 {
+        0.0
+    }
+    fn blocked_near(&self, x: f32, _y: f32, _z: f32) -> bool {
+        (10.0..10.15).contains(&x)
+    }
+    fn blocked(&self, x: f32, _y: f32) -> bool {
+        (10.0..10.15).contains(&x)
+    }
+}
+
+/// A hero pressed to a wall has their hands past it: the shot starts from their chest instead,
+/// and the wall takes it, not the foe on its far side.
+#[test]
+fn a_shot_from_a_hero_pressed_to_a_wall_does_not_start_past_it() {
+    let mut c = Content::dev();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(ThinWall), 1, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().pos = [9.6, 0.0, 0.0];
+    let g = mob(&mut s, "grunt", [12.0, 0.0, 0.0]);
+    let ev = loose_at(&mut s, p, (0.0, 0.0), None);
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)), "the arrow is loosed");
+    assert!(hits_on(&ev, g).is_empty(), "the wall takes it");
+}
+
+/// A held charge that goes off by itself (Pyroblast held past its hold) goes along the last line
+/// the client sent while it was held, though that line is more than a moment old by then; a line
+/// from before the charge began is not kept alive for it.
+#[test]
+fn a_held_charge_that_goes_off_by_itself_goes_along_the_line_sent_while_it_was_held() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    let _ = s.slot_ability(p, "ranged", "fireball");
+    let key = crate::content::SLOTS.iter().position(|k| *k == "ranged").unwrap() as u8;
+    // Off to the left of the body's facing.
+    let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
+    let toward = std::f32::consts::FRAC_PI_4;
+    s.set_valor(p, 100.0);
+    s.input(p, Input::Ability(key, true));
+    s.input(p, Input::Attack);
+    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "Pyroblast held");
+    run(&mut s, 0.5);
+    // Aimed at the grunt once, then held on past its full charge (1.5 s) and hold (1 s).
+    s.set_aim_line(p, toward, 0.0);
+    let mut ev = run(&mut s, 2.2);
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "pyroblast"), "it went off by itself");
+    ev.extend(run(&mut s, 2.0));
+    // (Its burn ticks after the blow: hits of their own.)
+    assert!(!hits_on(&ev, g).is_empty(), "along the line sent while it was held");
+    // A line sent before the charge began: stale when it goes off, the body's facing as ever.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    let _ = s.slot_ability(p, "ranged", "fireball");
+    let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
+    s.set_valor(p, 100.0);
+    s.set_aim_line(p, toward, 0.0);
+    run(&mut s, 0.1);
+    s.input(p, Input::Ability(key, true));
+    s.input(p, Input::Attack);
+    let ev = run(&mut s, 4.7);
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "pyroblast"), "it went off by itself");
+    assert!(hits_on(&ev, g).is_empty(), "an old line isn't kept alive for it");
+}
+
 #[test]
 fn a_heavy_attack_is_slower_harder_and_throws_a_hero_back() {
     let mut s = pvp_world();

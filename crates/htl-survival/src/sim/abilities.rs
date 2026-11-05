@@ -540,6 +540,33 @@ impl Survival {
         ]
     }
 
+    /// Where a shot starts: the hands, unless something solid stands between them and the chest
+    /// (a hero pressed to a wall reaches past it, and a shot started there flew on beyond the
+    /// wall), then the chest, so the wall in front takes it. Looked at every tenth of a yard:
+    /// [`crate::land::clear_line`] can't tell, as it leaves the 0.6 yd at each end of its line to
+    /// the bodies there, and the hands are hardly more than that out. A chest already in a solid
+    /// cell (at its edge) gives no telling which side the wall is: the hands, as before.
+    pub(crate) fn shot_from(&self, id: Id, yaw: f32) -> Vec3 {
+        let hands = self.hands(id, yaw);
+        let pos = self.players[&id].pos;
+        let chest = [pos[0], pos[1], pos[2] + HAND_UP];
+        // As a flying shot meets them: a wall, or the ground over it.
+        let solid = |at: Vec3| self.land.blocked_near(at[0], at[1], at[2]) || at[2] < self.land.height_near(at[0], at[1], at[2] + 0.6) - 0.05;
+        if solid(chest) {
+            return hands;
+        }
+        let steps = (dist2d(chest, hands) / 0.1).ceil().max(1.0) as usize;
+        let walled = (1..=steps).any(|k| {
+            let t = k as f32 / steps as f32;
+            solid([chest[0] + (hands[0] - chest[0]) * t, chest[1] + (hands[1] - chest[1]) * t, chest[2] + (hands[2] - chest[2]) * t])
+        });
+        if walled {
+            chest
+        } else {
+            hands
+        }
+    }
+
     /// The bodies a line can meet: (unit, feet, height, width), not `skip`'s (and heroes only with
     /// friendly fire on).
     pub(crate) fn bodies(&self, skip: Id) -> Vec<(Id, Vec3, f32, f32)> {
@@ -1249,7 +1276,7 @@ impl Survival {
         };
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
-        let from = self.hands(id, yaw);
+        let from = self.shot_from(id, yaw);
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
         // A thrown axe that comes back skims the ground along the aim's line, at hand height over
@@ -2384,14 +2411,16 @@ impl Survival {
         }
     }
 
-    /// Avenging Wrath's wave: along the hero's facing, foes struck (a share of the weapon) and
-    /// friends shielded for a share of their health (a new shield replaces the old).
+    /// Avenging Wrath's wave: toward what the reticle is on (as every strip from the feet goes),
+    /// foes struck (a share of the weapon) and friends shielded for a share of their health (a
+    /// new shield replaces the old). Along the body's facing it missed the foe the player aimed at.
     pub(crate) fn avenging_wave(&mut self, id: Id) {
         let Some(wave) = self.content.ability("avenging_wave") else { return };
         let d = self.content.abilities[wave].clone();
-        let Some(p) = self.players.get(&id) else { return };
-        let (pos, yaw) = (p.pos, p.facing);
         let len = AbilityDef::at(d.range, 1.0);
+        let yaw = self.aim_yaw(id, len);
+        let Some(p) = self.players.get(&id) else { return };
+        let pos = p.pos;
         let half = AbilityDef::at(d.radius, 1.0).max(0.5);
         let w = self.weapon_of(p).damage;
         let damage = self.roll(w) as f32 * d.weapon;
@@ -3362,8 +3391,10 @@ impl Survival {
                     }
                 }
                 if pending && held >= lo {
+                    self.keep_charge_aim(id, since);
                     self.fire(id, ability, if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 });
                 } else if hold > 0.0 && held >= hi + hold {
+                    self.keep_charge_aim(id, since);
                     self.fire(id, ability, 1.0);
                 }
             }
@@ -3404,6 +3435,22 @@ impl Survival {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// A charge going off by itself (held past its hold, or let go before its least and reaching
+    /// it now): the player's last line, sent while it was held, is still where they aim, though
+    /// none has come for more than a moment (a view held still on its mark sends none). Made
+    /// fresh again for it, as Skyfall's volley does its own; stale, the cast went level along the
+    /// body's facing. A line from before the charge began stays stale: it's no aim at this cast.
+    fn keep_charge_aim(&mut self, id: Id, since: f32) {
+        let now = self.clock;
+        if let Some(p) = self.players.get_mut(&id) {
+            if let Some((f, e, when)) = p.aim_line {
+                if when >= since && now - when > AIM_FRESH {
+                    p.aim_line = Some((f, e, now));
+                }
+            }
         }
     }
 

@@ -548,7 +548,7 @@ impl Survival {
     }
 
     fn start_swing_with(&mut self, id: Id, kind: StrikeKind, pay: bool) {
-        // Avenging Wrath: every heavy attack sends a wave of light along the hero's facing.
+        // Avenging Wrath: every heavy attack sends a wave of light toward the reticle.
         if kind == StrikeKind::Heavy && self.has_cc(id, "wrath") {
             self.avenging_wave(id);
         }
