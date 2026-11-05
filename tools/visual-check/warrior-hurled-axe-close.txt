@@ -1,0 +1,16 @@
+# Axe Throw (Q) from close and to the side, so the axe's way back can be judged (Corey's review,
+# run 040: "it still doesn't return"): a grunt 10 yd off, one full throw, then one recalled early.
+hero warrior
+cam 60 -10 9
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 10 still
+5.0 .es slot q hurled_axe
+6.0 .es in ab 0 0
+6.4 .es in a {facing} 0.0
+6.3 shots out 16 0.1
+10.0 .es in ab 0 0
+10.4 .es in a {facing+0.6} 0.0
+10.9 .es in ab 0 0                   # the key again: called back early
+10.3 shots recall 16 0.1
+14 end

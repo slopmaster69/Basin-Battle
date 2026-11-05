@@ -1,0 +1,16 @@
+# Skyfall (3, its second choice): the leap up, the hang with the bow drawn (#120: 5.5 sec), then
+# the volley on the key again, aimed down at the dummy, and the float down.
+# Seen from farther back and looking down, as a player aims the volley from the hang (the check
+# holds the camera, so it must look down for her).
+# Look for: the leap, the hover with the bow drawn aiming down, the volley bursting out, the
+# landing (#110: 3).
+hero hunter
+cam 0 -25 18
+include _setup
+5.0 .es slot 3 skyfall
+5.5 .es valor full
+6.0 .es in ab 4 0                    # up
+9.5 .es in ab 4 0 {facing} -1.2      # the volley, from the hang, down at the dummy (the key
+                                     # carries the camera's line, as the client's does)
+5.8 shots hang 30 0.12
+9.4 shots volley 50 0.08

@@ -9,7 +9,7 @@ It runs on the same server and client as Elwynn Survival, on its own realm (`Bas
 port 8085). How to install, host, play and join friends is in the [README](../README.md); this page
 is the game itself.
 
-On Windows play it with **Play** in the game folder (click Change, then pick Basin Battle); on a Mac
+On Windows play it with **Play** in the game folder (pick Basin Battle at the top); on a Mac
 or Linux with `scripts/play.sh` (`scripts/play.sh 192.168.1.20` for a
 friend's game). Its save, with high scores and Renown, is `saves/basin-battle.toml` on the host.
 

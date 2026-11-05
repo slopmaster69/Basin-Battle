@@ -65,7 +65,8 @@ stack = 6
 use_secs = 1.4
 heal = 0.4
 below = true
-text = "Drink with (T) to restore 40% of your health. Resting at a lamp refills your Draughts. The only heal below."
+anim = "drink"
+text = "Drink with (T) to restore 40% of your health. Resting at a lamp refills your Draughts."
 
 [[item]]
 key = "draught_flask"
