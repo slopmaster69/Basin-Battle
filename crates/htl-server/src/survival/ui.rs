@@ -121,7 +121,7 @@
 //!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
 //! - `HL\t<amount>`: healed (a green number). `NP\t<verb>\t<name>`: what the use key would use.
 //! - `A` goes on `\t<ability key>` (what's aimed, charged, cast or channelled).
-//! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
+//! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>\t<count>`:
 //!   the key in that slot (0 Q to 4 the ultimate) is armed for its recast for `secs` more: pressed
 //!   again it fires that ability (its icon, its name, its aim and charge); `RC\t<slot>`: closed.
 //! - `DP`, `DM`: the damage meters (see `meter_ui.rs`).
@@ -402,7 +402,9 @@ pub(crate) const VERSION: u32 = 2;
 /// `edge` of its beat in `Cues.lua`).
 /// 40: a held cast of the hero's own (Skyfall's hang, a thrown ability's aim) lets go on the
 /// server's `ST`, not only a swing.
-pub(crate) const ADDON_NEWEST: u32 = 40;
+/// 41: a fan's reticle shows as many points as it looses (the `AB` entry's and the `RC` line's
+/// count: Fan of Knives three, Multi-Shot five).
+pub(crate) const ADDON_NEWEST: u32 = 41;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1942,7 +1944,7 @@ impl SurvivalGame {
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 
-    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered>^...`
+    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered~count~EX count>^...`
     /// (one per key, its fields empty when nothing's on it). `empowered`: the seconds Call of the
     /// Wild's next call stays empowered (a parry or a perfect dodge), 0 when it isn't (and for
     /// every other key); an older add-on ignores it.
@@ -1953,7 +1955,7 @@ impl SurvivalGame {
         let shape = |d: &htl_survival::content::AbilityDef| match d.kind.as_str() {
             // A lob is aimed at the ground, as ground is.
             "projectile" if d.lob => "circle",
-            // A fan of them (Multi-Shot) shows its spread on the reticle (add-on 23), not a strip.
+            // A fan of them (Multi-Shot) shows its spread on the reticle (add-on 28), not a strip.
             "projectile" if d.count > 1 => "fan",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
@@ -1980,7 +1982,7 @@ impl SurvivalGame {
             .bar(id)
             .into_iter()
             .map(|(slot, a, ex, cd)| {
-                let Some(a) = a else { return format!("{slot}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~") };
+                let Some(a) = a else { return format!("{slot}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~") };
                 let d = &c.abilities[a];
                 let (lo, hi) = charge(d);
                 let left = if p.cd_off || cd.charges > 0 { 0.0 } else { (cd.next_at - now).max(0.0) };
@@ -2012,8 +2014,11 @@ impl SurvivalGame {
                     (d.name.clone(), d.icon.clone())
                 };
                 let empowered = if d.hunt == "call" { self.sim.wild_primed_left(id) } else { 0.0 };
+                // How many it looses at once, the key's and its EX's: a fan's reticle shows that many
+                // points (Fan of Knives three, Multi-Shot five).
+                let ex_count = ex.map_or(0, |x| c.abilities[x].count);
                 format!(
-                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}~{empowered:.1}",
+                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}~{empowered:.1}~{}~{ex_count}",
                     d.key,
                     clean(&name),
                     clean(&icon),
@@ -2027,6 +2032,7 @@ impl SurvivalGame {
                     clean(&ability_facts(d, None, c.valor.max)),
                     u8::from(d.aimed()),
                     d.school,
+                    d.count,
                 )
             })
             .collect();
@@ -2057,7 +2063,7 @@ impl SurvivalGame {
                         (
                             format!("{}@{until:.2}", d.key),
                             format!(
-                                "RC\t{n}\t{:.1}\t{}\t{}\t{}\t{shape}\t{:.1}\t{radius:.1}\t{:.0}\t{}\t{:.2}\t{:.2}",
+                                "RC\t{n}\t{:.1}\t{}\t{}\t{}\t{shape}\t{:.1}\t{radius:.1}\t{:.0}\t{}\t{:.2}\t{:.2}\t{}",
                                 (until - now).max(0.0),
                                 clean(&d.icon),
                                 d.key,
@@ -2067,7 +2073,8 @@ impl SurvivalGame {
                                 if shape == "fan" { d.spread * (d.count - 1) as f32 } else { d.arc },
                                 u8::from(d.aimed()),
                                 d.charge[0],
-                                d.charge[1]
+                                d.charge[1],
+                                d.count
                             ),
                         )
                     }
