@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 27
+local VERSION = 28
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2164,6 +2164,14 @@ aim.name:SetTextColor(1, 0.9, 0.6)
 aim.burst = Tex(aim, "OVERLAY", "reticle", 56, 56)
 aim.burst:SetPoint("CENTER", aim, "CENTER", 0, 0)
 aim.burst:Hide()
+-- A fan of arrows (Multi-Shot): five points spread in a shallow arc across the middle, where the
+-- arrows will go, in place of a strip on the ground (Corey's review: "a cone reticle instead").
+aim.fan = {}
+for k = 1, 5 do
+  aim.fan[k] = Tex(aim, "OVERLAY", "dot", 10, 10)
+  aim.fan[k]:SetPoint("CENTER", aim, "CENTER", (k - 3) * 18, -math.abs(k - 3) * 4)
+  aim.fan[k]:Hide()
+end
 aim:Hide()
 ES.aim = aim
 
@@ -2240,7 +2248,7 @@ function ES.ChargeFull(d)
   if d and bar and bar.slots[d.n] then bar.slots[d.n].fullAt = GetTime() end
 end
 
--- The aimed ability's shape: "line", "circle", "cone" or "self".
+-- The aimed ability's shape: "line", "circle", "cone", "fan" (a fan of projectiles) or "self".
 function ES.AimShape()
   local d = Aiming() and ES.AbilityInfo and ES.AbilityInfo(Aiming())
   return (d and d.shape) or "line"
@@ -2264,7 +2272,8 @@ end
 -- round, which draws a strip) a projectile's or a beam's path from the feet along the view, its
 -- range long and its radius either side. Nil: none (a dash, a tether, help for a friend).
 function ES.AimMarkerShape(d)
-  if not d then return nil end
+  -- A fan's reticle shows its spread (aim.fan): nothing on the ground.
+  if not d or d.shape == "fan" then return nil end
   if d.shape == "circle" or d.shape == "cone" then return d.shape end
   if (d.kind == "projectile" or d.kind == "beam") and HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8 then
     return "line"
@@ -2346,6 +2355,23 @@ aim:SetScript("OnUpdate", function()
   this.ring:SetHeight(size)
   this.ring:SetVertexColor(r, g, b, alpha)
   this.dot:SetVertexColor(r, g, b, 0.9)
+  -- A fan: its five points in place of the ring and the dot.
+  local fan = d and d.shape == "fan"
+  for k = 1, 5 do
+    if fan then
+      this.fan[k]:SetVertexColor(r, g, b, alpha)
+      this.fan[k]:Show()
+    else
+      this.fan[k]:Hide()
+    end
+  end
+  if fan then
+    this.ring:Hide()
+    this.dot:Hide()
+  else
+    this.ring:Show()
+    this.dot:Show()
+  end
 end)
 
 local hit = Fader("ElwynnSurvivalHit", 64, 64, 0.2)
