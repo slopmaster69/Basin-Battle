@@ -38,6 +38,9 @@ pub struct Content {
     /// pays (`[checks]`).
     #[serde(default)]
     pub checks: ChecksDef,
+    /// What a casting staff's bolts build and its heavy bolt spends (`[staffs]`).
+    #[serde(default)]
+    pub staffs: StaffsDef,
     #[serde(default)]
     pub heavy: HeavyDef,
     #[serde(default)]
@@ -428,11 +431,51 @@ pub struct WardDef {
     /// A spell whose precast plays in the hands for as long as the ward is up (a held glow in the
     /// raised hand, where the aura wrapped the chest and hid the arm); 0 for none.
     pub hold_spell: u32,
+    /// The arm raised while it's up: this clip on the upper body (the legs free), held at its
+    /// peak until the ward comes down (`clip_take` of it, from `clip_from`'s model if given; 0:
+    /// the guard's own pose alone).
+    pub clip: u16,
+    pub clip_take: u32,
+    pub clip_from: String,
 }
 
 impl Default for WardDef {
     fn default() -> Self {
-        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0 }
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0, clip: 0, clip_take: 0, clip_from: String::new() }
+    }
+}
+
+/// What a casting staff's plain bolts build and its heavy bolt spends: the spells keep the skill
+/// checks, the staffs build and spend (Corey's playtest, Nov 5: staff attacks should feel apart
+/// from their school's spells). An Ember staff heats the foe it hits and the last heat ignites; a
+/// Rime staff chills it, slower with each, and the last chill freezes it; an Arcane staff gathers
+/// charges at the caster's staff. The heavy bolt spends them, harder for each.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct StaffsDef {
+    /// The most of any kind: the bolt that reaches it ignites or freezes (heat, chill).
+    pub most: u32,
+    /// How long heat or chill stays on a foe after the last bolt, and charges on the caster.
+    pub keep: f32,
+    /// A heavy bolt is this much harder for each stack it spends.
+    pub spend_share: f32,
+    /// Heat's ignite: this much damage round the foe, within `ignite_radius`, with the bolt's
+    /// burn, and this spell's look there (Blast Wave's burst).
+    pub ignite_damage: f32,
+    pub ignite_radius: f32,
+    pub ignite_spell: u32,
+    /// Chill: each stack slows the foe this much more; the last freezes it this long.
+    pub chill_slow: f32,
+    pub freeze_secs: f32,
+    /// Charges: the flash at the caster's hands as the last gathers (a spell visual kit), and a
+    /// heavy bolt spending them all throws the foe back this far.
+    pub charged_kit: u32,
+    pub charged_knockback: f32,
+}
+
+impl Default for StaffsDef {
+    fn default() -> Self {
+        Self { most: 3, keep: 5.0, spend_share: 0.4, ignite_damage: 18.0, ignite_radius: 2.5, ignite_spell: 11113, chill_slow: 0.15, freeze_secs: 1.5, charged_kit: 3394, charged_knockback: 3.0 }
     }
 }
 

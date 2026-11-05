@@ -187,3 +187,102 @@ fn a_winded_hero_casts_no_bolt_and_the_rack_offers_the_staffs() {
         assert!(rack.contains(&staff.to_string()), "{staff} on the rack");
     }
 }
+
+/// A sturdy foe at `pos` that stands still and never swings.
+fn sturdy(s: &mut Survival, pos: Vec3) -> Id {
+    let k = mob(s, "grunt", pos);
+    let m = s.mobs.get_mut(&k).unwrap();
+    m.health = 100_000;
+    m.max_health = 100_000;
+    k
+}
+
+/// One plain bolt at the foe ahead (put back 12 yd in front, standing), landed.
+fn bolt(s: &mut Survival, p: Id, k: Id) -> Vec<Event> {
+    let m = s.mobs.get_mut(&k).unwrap();
+    m.pos = [12.0, 0.0, 0.0];
+    m.state = MobState::Idle { wander_at: 1e9 };
+    s.players.get_mut(&p).unwrap().stamina = 100.0;
+    s.input(p, Input::Attack);
+    let mut ev = s.step(0.0);
+    s.input(p, Input::AttackUp);
+    ev.extend(run(s, 1.0));
+    ev
+}
+
+fn stacks(events: &[Event], who: Id, kind: &str) -> Vec<u32> {
+    events.iter().filter_map(|e| match e {
+        Event::Stacks { player, kind: k, n, .. } if *player == who && *k == kind => Some(*n),
+        _ => None,
+    }).collect()
+}
+
+#[test]
+fn an_ember_staffs_bolts_heat_the_foe_and_the_third_ignites_it() {
+    let mut s = world();
+    let p = armed(&mut s, "Ayla", ORIGIN, "ember_staff");
+    let k = sturdy(&mut s, [12.0, 0.0, 0.0]);
+    let ignite = s.content.staffs.ignite_spell;
+    let mut ev = bolt(&mut s, p, k);
+    ev.extend(bolt(&mut s, p, k));
+    assert_eq!(stacks(&ev, p, "heat"), vec![1, 2], "each hit heats it");
+    assert!(!ev.iter().any(|e| matches!(e, Event::AreaLook { spell, .. } if *spell == ignite)));
+    let ev = bolt(&mut s, p, k);
+    assert_eq!(stacks(&ev, p, "heat"), vec![3], "the third");
+    assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { spell, .. } if *spell == ignite)), "ignites: the burst on the foe");
+    assert!(s.staff_marks.iter().all(|m| m.on != k), "and the heat is spent");
+}
+
+#[test]
+fn a_rime_staffs_shards_chill_the_foe_slower_each_time_and_the_third_freezes_it() {
+    let mut s = world();
+    let p = armed(&mut s, "Ayla", ORIGIN, "rime_staff");
+    let k = sturdy(&mut s, [12.0, 0.0, 0.0]);
+    let mut ev = bolt(&mut s, p, k);
+    ev.extend(bolt(&mut s, p, k));
+    assert_eq!(stacks(&ev, p, "chill"), vec![1, 2]);
+    assert!(s.has_cc(k, "snare"), "chilled: slowed");
+    assert!(!s.has_cc(k, "petrify"));
+    bolt(&mut s, p, k);
+    assert!(s.has_cc(k, "petrify"), "the third chill freezes it");
+}
+
+#[test]
+fn an_arcane_staffs_bolts_gather_charges_and_the_heavy_orb_spends_them_harder_for_each() {
+    let mut s = world();
+    let p = armed(&mut s, "Ayla", ORIGIN, "arcane_staff");
+    let k = sturdy(&mut s, [12.0, 0.0, 0.0]);
+    let hb = s.content.ability("arcane_bolt_heavy").unwrap();
+    let top = s.content.abilities[hb].charge[1];
+    let heavy = |s: &mut Survival| -> u32 {
+        let m = s.mobs.get_mut(&k).unwrap();
+        m.pos = [12.0, 0.0, 0.0];
+        m.state = MobState::Idle { wander_at: 1e9 };
+        s.players.get_mut(&p).unwrap().stamina = 100.0;
+        s.input(p, Input::Heavy);
+        run(s, top + 0.05);
+        s.input(p, Input::AttackUp);
+        let ev = run(s, 1.5);
+        ev.iter().filter_map(|e| match e {
+            Event::Swing { victim: Some(v), damage, anim: false, .. } if *v == k => Some(*damage),
+            _ => None,
+        }).max().unwrap_or(0)
+    };
+    let plain = heavy(&mut s);
+    assert!(plain > 0);
+    run(&mut s, 1.0);
+    bolt(&mut s, p, k);
+    let ev = bolt(&mut s, p, k);
+    assert_eq!(stacks(&ev, p, "charge"), vec![2]);
+    assert_eq!(s.players[&p].staff_charges, 2);
+    let spent = heavy(&mut s);
+    let want = (plain as f32 * (1.0 + 2.0 * s.content.staffs.spend_share)).round() as u32;
+    assert!(spent.abs_diff(want) <= 1, "two charges: {spent}, about {want}");
+    assert_eq!(s.players[&p].staff_charges, 0, "spent");
+    // Charges fade a while after the last bolt.
+    bolt(&mut s, p, k);
+    assert_eq!(s.players[&p].staff_charges, 1);
+    let keep = s.content.staffs.keep;
+    run(&mut s, keep + 0.2);
+    assert_eq!(s.players[&p].staff_charges, 0, "faded");
+}

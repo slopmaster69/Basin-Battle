@@ -164,7 +164,7 @@ fn a_spell_without_the_check_has_no_perfect_however_well_timed() {
 }
 
 #[test]
-fn a_heavy_bolt_from_a_staff_is_held_and_let_go_on_the_flare_for_a_perfect() {
+fn a_heavy_bolt_from_a_staff_is_held_with_no_skill_check_and_its_mark_fills_instead() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let rack = s.objs[&s.rack_id()].pos;
@@ -174,16 +174,19 @@ fn a_heavy_bolt_from_a_staff_is_held_and_let_go_on_the_flare_for_a_perfect() {
     let k = dummy(&mut s, [12.0, 0.0, 0.0]);
     let hb = s.content.ability("ember_bolt_heavy").unwrap();
     let (top, full_dmg) = (s.content.abilities[hb].charge[1], s.content.abilities[hb].damage[1]);
-    let _ = top;
     s.input(p, Input::Heavy);
+    let ev = s.step(0.0);
     assert_eq!(s.players[&p].action.name(), "charge");
-    let flare = s.players[&p].check_flare;
-    run(&mut s, flare);
+    assert!(!ev.iter().any(|e| matches!(e, Event::CheckStart { .. })), "no ring: the spells keep the skill checks");
+    assert!(ev.iter().any(|e| matches!(e, Event::StaffHeavy { player, hi, .. } if *player == p && (*hi - top).abs() < 1e-3)), "the staff's mark fills");
+    let held = run(&mut s, top + 0.1);
+    let flare_kit = crate::content_abilities::full_kit_of("mage");
+    assert!(!held.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == flare_kit)), "no flare on the body");
     s.input(p, Input::AttackUp);
     let ev = s.step(0.0);
-    assert!(perfect_in(&ev, p), "on the flare");
+    assert!(!perfect_in(&ev, p));
     let landed = run(&mut s, 1.5);
-    assert_eq!(damage_on(&landed, k), (full_dmg * s.content.checks.perfect_damage).round() as u32);
+    assert_eq!(damage_on(&landed, k), full_dmg.round() as u32, "held to the top: the whole of it");
     // The right button calls a held bolt off, nothing spent.
     run(&mut s, 1.0);
     let st = s.players[&p].stamina;

@@ -415,6 +415,19 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("OX\t{look}"));
                 }
             }
+            Event::Stacks { player, kind, n, on } => {
+                // A staff's heat, chill or charges, for the caster's reticle mark.
+                if let Some(c) = self.conn_of(player) {
+                    let most = self.sim.content.staffs.most;
+                    let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                    self.ui_line(c, &format!("SK	{kind}	{n}	{most}	{g:#X}"));
+                }
+            }
+            Event::StaffHeavy { player, lo, hi } => {
+                if let Some(c) = self.conn_of(player) {
+                    self.ui_line(c, &format!("SH	{lo:.2}	{hi:.2}"));
+                }
+            }
             Event::WardCheck { player, grade } => {
                 if let Some(c) = self.conn_of(player) {
                     self.ui_line(c, &format!("CR	ward	{grade}"));
@@ -508,6 +521,21 @@ impl SurvivalGame {
                     let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
                     for c in conns {
                         self.ui_line(c, &line);
+                    }
+                    // The hero's own staff, for its mark on their screen (`ST ember|rime|arcane`,
+                    // empty for none): what its bolts build.
+                    if let Some(c) = self.conn_of(player) {
+                        let builds = self.sim.players.get(&player).and_then(|p| {
+                            let w = self.sim.weapon_of(p);
+                            self.sim.content.ability(&w.bolt).map(|i| self.sim.content.abilities[i].builds.clone())
+                        });
+                        let school = match builds.as_deref() {
+                            Some("heat") => "ember",
+                            Some("chill") => "rime",
+                            Some("charge") => "arcane",
+                            _ => "",
+                        };
+                        self.ui_line(c, &format!("ST	{school}"));
                     }
                 }
             }

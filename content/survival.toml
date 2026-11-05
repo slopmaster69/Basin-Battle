@@ -426,6 +426,25 @@ crackle_empty = 0.18
 perfect_kit = 1005
 break_kit = 2729
 
+[staffs]
+# What a casting staff's plain bolts build and its heavy bolt spends (Corey's playtest, Nov 5: the
+# staffs should feel apart from their school's spells, so the spells keep the skill checks and the
+# staffs build and spend). Ember heats the foe it hits and the third heat ignites; Rime chills it,
+# slower with each, and the third freezes it; Arcane gathers charges at the caster's staff. The
+# heavy bolt spends them, 40% harder for each.
+most = 3
+keep = 5.0
+spend_share = 0.4
+# The ignite: 18 damage within 2.5 yd with the bolt's burn, Blast Wave's burst on the foe.
+ignite_damage = 18.0
+ignite_radius = 2.5
+ignite_spell = 11113
+chill_slow = 0.15
+freeze_secs = 1.5
+# The last charge gathering: Blink's violet flash at the hands; all of them spent throw the foe back.
+charged_kit = 3394
+charged_knockback = 3.0
+
 [checks]
 # The skill checks built into spells. The release: a charged spell with `perfect = true` flares
 # as its window opens, and a release within `window` of the charge's top is a perfect cast: full,
@@ -6112,19 +6131,22 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.4 }]
 # ------------------------------------------------------------------- the staffs' bolts --
 # A casting staff's left click and heavy attack (`bolt`, `heavy_bolt` on the [[weapon]]). Benched:
 # never on the board, cast by the staff alone. Their damage is the staff's: a bolt the low end of
-# its swing, a heavy bolt (held, let go on its flare for a perfect: `[checks]`) about the heavy
-# attack's share more. Stamina as a swing's. Looks are the
+# its swing, a heavy bolt (held, as hard as the hold) about the heavy attack's share more. The
+# spells keep the skill checks; a staff builds and spends instead (`[staffs]`): each plain bolt
+# that hits builds the staff's heat, chill or charge, and the heavy bolt spends them, harder for
+# each (Corey's playtest, Nov 5). Stamina as a swing's. Looks are the
 # schools' own missiles (Fireball's, Frostbolt's, Arcane Missiles'), to check in the client.
 
 [[ability]]
 key = "ember_bolt"
 name = "Ember Bolt"
-text = "A bolt of fire from the staff. Burns for 2 damage per sec for 3 sec."
+text = "A bolt of fire from the staff. Burns for 2 damage per sec for 3 sec. Each hit heats the target. The third ignites it, dealing 18 damage to enemies within 2.5 yd."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
+builds = "heat"
 stamina = 10.0
 damage = [18.0, 18.0]
 range = [30.0, 30.0]
@@ -6138,20 +6160,15 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
 [[ability]]
 key = "ember_bolt_heavy"
 name = "Ember Burst"
-text = "A heavy, slow bolt of fire. Burns for 4 damage per sec for 3 sec."
+text = "A heavy, slow bolt of fire. Burns for 4 damage per sec for 3 sec. Spends the target's heat for 40% more damage each."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
-# Held, and let go on the flare for the perfect.
+# Held, as hard as the hold: no skill check (the spells have those). It spends the foe's heat.
 charge = [0.3, 1.2]
-perfect = true
-# A perfect bursts out of the cast at the hands: Fireball's own cast flare (Fire Nova's ring
-# flooded the screen and left the caster burning, which read as a shield).
-perfect_kit = 38
-# A critical: the burn twice as long.
-crit_effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 4.0 }]
+spends = "heat"
 stamina = 22.0
 damage = [24.0, 34.0]
 range = [30.0, 30.0]
@@ -6168,12 +6185,13 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
 [[ability]]
 key = "rime_bolt"
 name = "Rime Shard"
-text = "A shard of frost from the staff. Slows by 30% for 2 sec."
+text = "A shard of frost from the staff. Each hit chills the target, slowing it by 15% more for 5 sec. The third freezes it for 1.5 sec."
 icon = "Spell_Frost_FrostBolt"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
+builds = "chill"
 stamina = 10.0
 damage = [16.0, 16.0]
 range = [30.0, 30.0]
@@ -6183,24 +6201,21 @@ speed = 32.0
 # nothing in the client); thrust out with the staff (the two-handed thrust, 18).
 spell = 6984
 clip = 18
-effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
+# The chill slows (`[staffs] chill_slow` a stack); the shard itself, nothing more.
 
 [[ability]]
 key = "rime_bolt_heavy"
 name = "Rime Lance"
-text = "A heavy shard of frost that goes through every enemy in its line. Slows by 40% for 3 sec."
+text = "A heavy shard of frost that goes through every enemy in its line. Slows by 40% for 3 sec. Spends each target's chill for 40% more damage each, and shatters a frozen target."
 icon = "Spell_Frost_FrostBolt02"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
-# Held, and let go on the flare for the perfect.
+# Held, as hard as the hold: no skill check. It spends the chill, and shatters the frozen.
 charge = [0.3, 1.2]
-perfect = true
-# A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
-perfect_kit = 1027
-# A critical: everything the lance passes through is rooted a moment.
-crit_effects = [{ kind = "root", secs = [1.5, 1.5] }]
+spends = "chill"
+shatter = true
 stamina = 22.0
 damage = [20.0, 30.0]
 range = [32.0, 32.0]
@@ -6217,12 +6232,13 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 [[ability]]
 key = "arcane_bolt"
 name = "Arcane Bolt"
-text = "A quick bolt of arcane force from the staff."
+text = "A quick bolt of arcane force from the staff. Each hit gathers an arcane charge, up to 3, for 5 sec."
 icon = "Spell_Arcane_StarFire"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
+builds = "charge"
 stamina = 8.0
 damage = [14.0, 14.0]
 range = [30.0, 30.0]
@@ -6237,19 +6253,15 @@ clip = 54
 [[ability]]
 key = "arcane_bolt_heavy"
 name = "Arcane Orb"
-text = "A heavy orb of arcane force."
+text = "A heavy orb of arcane force. Spends your arcane charges for 40% more damage each. With 3, it knocks the target back 3 yd."
 icon = "Spell_Arcane_Blast"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
-# Held, and let go on the flare for the perfect.
+# Held, as hard as the hold: no skill check. It spends the caster's charges.
 charge = [0.3, 1.2]
-perfect = true
-# A perfect bursts out of the cast: Arcane Explosion's ring.
-perfect_kit = 1004
-# A critical: the orb throws them back.
-crit_effects = [{ kind = "knockback", amount = 3.0 }]
+spends = "charge"
 stamina = 20.0
 damage = [18.0, 28.0]
 range = [30.0, 30.0]

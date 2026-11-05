@@ -406,6 +406,13 @@ pub struct AbilityDef {
     /// On a frozen foe it shatters the ice for half again its damage.
     #[serde(default)]
     pub shatter: bool,
+    /// A staff's plain bolt: what each hit builds (`heat` or `chill` on the foe, `charge` on the
+    /// caster; `[staffs]`). Empty: nothing.
+    #[serde(default)]
+    pub builds: String,
+    /// A staff's heavy bolt: what it spends, harder for each (the same words).
+    #[serde(default)]
+    pub spends: String,
     /// A projectile that touches a friend heals them this share of their health (and, with
     /// `cleanse`, ends what's on them); so does an `ally` on whoever it picks. A `beam` heals each
     /// friend in it this share a second.

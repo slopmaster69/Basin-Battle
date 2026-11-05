@@ -206,6 +206,12 @@ pub enum Event {
     /// The ward's own check: a perfect ward ("perfect") or the ward breaking ("fail"), for the
     /// warder's add-on to flash as a spell's check does.
     WardCheck { player: Id, grade: &'static str },
+    /// A staff's stacks changed (`[staffs]`): `kind` heat or chill on `on`, charge on the caster;
+    /// `n` how many now (the most: it just ignited, froze, or gathered its last).
+    Stacks { player: Id, kind: &'static str, n: u32, on: Option<Id> },
+    /// A staff's heavy bolt began its charge: it can go from `lo` seconds, and is whole at `hi`
+    /// (for the staff's mark on the caster's screen; no ring, no flare on the body).
+    StaffHeavy { player: Id, lo: f32, hi: f32 },
     /// An orb set rolling (Frozen Orb), for the clients that draw it rolling: `look` its key, from
     /// where to where over how long, the model and its size (`orb_model`, `orb_scale`).
     OrbRoll { look: Id, from: Vec3, to: Vec3, secs: f32, model: String, scale: f32 },
@@ -629,6 +635,9 @@ pub struct Player {
     pub sweep_secs: f32,
     /// The ward's next crackle, while it's up.
     pub ward_crackle_at: f32,
+    /// An Arcane staff's charges, and when they fade.
+    pub staff_charges: u32,
+    pub staff_charges_until: f32,
     /// What the cast going out now strikes for, when its own numbers don't say (a beat's).
     pub cast_damage: Option<f32>,
     pub sprint_held: bool,
@@ -981,6 +990,8 @@ pub struct Survival {
     pub(crate) orbs: Vec<orb::Orb>,
     /// Bombs ticking on foes (Living Bomb), until they burst.
     pub(crate) bombs: Vec<bomb::Bomb>,
+    /// Heat and chill a staff's bolts left on foes, until they fade.
+    pub(crate) staff_marks: Vec<staff::StaffMark>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -1127,6 +1138,7 @@ impl Survival {
             lab_blowing: None,
             orbs: Vec::new(),
             bombs: Vec::new(),
+            staff_marks: Vec::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
@@ -1290,6 +1302,8 @@ impl Survival {
             sweep_dir: 1.0,
             sweep_secs: 1.0,
             ward_crackle_at: 0.0,
+            staff_charges: 0,
+            staff_charges_until: 0.0,
             cast_damage: None,
             sprint_held: false,
             sprinting: false,
