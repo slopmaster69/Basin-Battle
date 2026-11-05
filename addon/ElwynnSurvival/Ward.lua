@@ -153,8 +153,11 @@ function ES.WardLine(f)
 end
 
 ward:SetScript("OnUpdate", function()
-  if this.lagShare > this.share and GetTime() >= this.lagHold then
-    this.lagShare = math.max(this.share, this.lagShare - arg1 * 0.6)
+  local now = GetTime()
+  local dt = math.min(0.1, now - (this.last or now))
+  this.last = now
+  if this.lagShare > this.share and now >= this.lagHold then
+    this.lagShare = math.max(this.share, this.lagShare - dt * 0.6)
     this.lag:SetWidth(math.max(1, this.full * this.lagShare))
   end
   if this.flashUntil then
@@ -246,10 +249,13 @@ end
 
 arc:SetScript("OnUpdate", function()
   local now = GetTime()
+  -- The frame's time from the clock (not arg1, which a client may leave unset).
+  local dt = math.min(0.1, now - (this.last or now))
+  this.last = now
   -- In and out: quick up, a little slower down.
   local want = this.up and 0.9 or 0
   local rate = this.up and 8 or 5
-  this.alpha = this.alpha + (want - this.alpha) * math.min(1, arg1 * rate)
+  this.alpha = this.alpha + (want - this.alpha) * math.min(1, dt * rate)
   local a, x, size = this.alpha, 0, ARC
   -- A stopped blow: a shake and a flash.
   if this.hitAt then

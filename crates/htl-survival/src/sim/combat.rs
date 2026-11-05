@@ -499,6 +499,8 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             p.ward = (p.ward - amount).max(0.0);
             p.ward_down_at = now;
+            // The blow's reaction takes the body a moment; the arm goes out again after it.
+            p.ward_clip_at = p.ward_clip_at.min(now + 0.45);
             self.events.push(Event::Ward { player: id });
         }
         // The blow stopped: a crackle on the barrier, so a block reads on the body and not only
