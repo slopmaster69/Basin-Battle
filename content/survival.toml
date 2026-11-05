@@ -418,8 +418,10 @@ break_secs = 1.0
 # it. Now nothing wraps the body: the arm is held out (`clip`, the channelled cast on the upper
 # body) with Polymorph's swirl in the hand (`hold_spell`), and how much is left shows on the
 # warder's own reticle (the cracking arc, Ward.lua). Counterspell's crackle on it only as a blow is
-# stopped (381); Arcane Explosion's violet burst for a perfect ward (1005); Mana Burn's purple
-# fizzle as it breaks (2729). All in the ward's own colour.
+# stopped (381); Arcane Explosion's violet burst for a perfect ward (1005). Breaking reads as a
+# debuff (Corey: Mana Burn's fizzle looked like a cleanse): Curse of Weakness's dark burst on the
+# head as it goes (311), and Curse of Tongues' look on the warder until the bar is whole again
+# (1714). The barrier itself is drawn round the body by the add-on (Ward.lua, `WB`).
 aura = 0
 block_kit = 381
 hold_spell = 118
@@ -430,7 +432,8 @@ clip_body = "upper"
 crackle_full = 0.0
 crackle_empty = 0.0
 perfect_kit = 1005
-break_kit = 2729
+break_kit = 311
+broken_aura = 1714
 
 [staffs]
 # What a casting staff's plain bolts build and its heavy bolt spends (Corey's playtest, Nov 5: the
@@ -450,6 +453,12 @@ freeze_secs = 1.5
 # The last charge gathering: Blink's violet flash at the hands; all of them spent throw the foe back.
 charged_kit = 3394
 charged_knockback = 3.0
+# The Arcane heavy orb by the charges it carries: nothing, 30%, 50%, all of it; its look Arcane
+# Missiles' orb of each rank, drawn bigger with each (`[[missile_look]]` 7268, 7269, 7270); with
+# all three, Arcane Explosion's burst on what it strikes.
+charge_scale = [0.0, 0.3, 0.5, 1.0]
+charge_spells = [0, 7268, 7269, 7270]
+charge_full_kit = 1005
 
 [checks]
 # The skill checks built into spells. The release: a charged spell with `perfect = true` flares
@@ -578,6 +587,30 @@ secs = 0.3
 # tumble, the head going over the way it flies: three a second forward, out and back alike (the
 # look is the spell's, and the way back flies the same spell). The tumble needs the sixteenth
 # client; older ones spin it flat.
+# The Arcane staff's heavy orb by its charges (Corey: varying levels of arcane power): one, a small
+# pink orb; two, bigger with a short ribbon; three, big, turning, with a long bright ribbon.
+[[missile_look]]
+spell = 7268
+trail = "FF4FE6"
+width = 0.12
+secs = 0.2
+scale = 0.9
+
+[[missile_look]]
+spell = 7269
+trail = "FF4FE6"
+width = 0.25
+secs = 0.3
+scale = 1.5
+
+[[missile_look]]
+spell = 7270
+trail = "FFB0F5"
+width = 0.45
+secs = 0.45
+scale = 2.3
+spin = 1.5
+
 [[missile_look]]
 spell = 16075
 trail = "D8E4F0"
@@ -6243,7 +6276,7 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 [[ability]]
 key = "arcane_bolt"
 name = "Arcane Bolt"
-text = "A quick bolt of arcane force from the staff. Each hit gathers an arcane charge, up to 3, for 5 sec."
+text = "A quick bolt of arcane force from the staff. Each hit stores an arcane charge in the staff, up to 3, for 5 sec."
 icon = "Spell_Arcane_StarFire"
 school = "mage"
 slot = "ranged"
@@ -6251,7 +6284,8 @@ kind = "projectile"
 bench = true
 builds = "charge"
 stamina = 8.0
-damage = [14.0, 14.0]
+# Light: the staff stores the power; the heavy orb lets it go (Corey, Nov 5).
+damage = [9.0, 9.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 44.0
@@ -6264,17 +6298,19 @@ clip = 54
 [[ability]]
 key = "arcane_bolt_heavy"
 name = "Arcane Orb"
-text = "A heavy orb of arcane force. Spends your arcane charges for 40% more damage each. With 3, it knocks the target back 3 yd."
+text = "Releases the arcane power stored in the staff as an orb: 30% of its strength with 1 charge, 50% with 2, all of it with 3, which knocks the target back 3 yd. With no charge, nothing goes."
 icon = "Spell_Arcane_Blast"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
-# Held, as hard as the hold: no skill check. It spends the caster's charges.
+# Held, as hard as the hold: no skill check. It carries the charges stored in the staff, its
+# strength and its look by how many (`[staffs] charge_scale`, `charge_spells`).
 charge = [0.3, 1.2]
 spends = "charge"
 stamina = 20.0
-damage = [18.0, 28.0]
+damage = [32.0, 48.0]
+crit_effects = [{ kind = "knockback", amount = 3.0 }]
 range = [30.0, 30.0]
 radius = [0.7, 0.7]
 speed = 26.0

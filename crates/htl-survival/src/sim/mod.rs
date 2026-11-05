@@ -200,8 +200,10 @@ pub enum Event {
     /// "rhythm" (`a`, `b` the first and last pressed beats' windows, `c` the critical's share,
     /// `pattern` "free|name|t0,t1,t2r,..." the beats' seconds from the start, `r` a rest).
     CheckStart { player: Id, ability: usize, kind: &'static str, a: f32, b: f32, c: f32, pattern: String },
-    /// A skill check's outcome: "critical", "perfect", "good", "weak" (early, it went weaker),
-    /// "fail" (a missed beat, a stop on nothing) or "fizzle" (all or nothing, and nothing).
+    /// A skill check's outcome, in Corey's words: "perfect" (the very middle, the best), "good" (in
+    /// the window: the standard result), "early" or "late" (a release off its window: weaker, or
+    /// plain), "full" (a whole rhythm chain), "fail" (a missed beat, a stop on nothing), "fizzle"
+    /// (all or nothing, and nothing) or "cancel" (called off).
     CheckResult { player: Id, ability: usize, grade: &'static str },
     /// The ward's own check: a perfect ward ("perfect") or the ward breaking ("fail"), for the
     /// warder's add-on to flash as a spell's check does.

@@ -197,7 +197,8 @@ icon:SetBlendMode("ADD")
 icon:Hide()
 -- The shockwave's line, as a share of its drawn half (the art's ring, padded for turning).
 local WAVE_LINE = 0.73
-local ICONS = { release = "input_mouse", rhythm = "input_key", sweep = "input_stop", orb = "input_stop" }
+-- Only the release's mouse beside its ring; the key and the stop were clutter (Corey, Nov 5).
+local ICONS = { release = "input_mouse" }
 local ICON_FIRST = 10
 local DULL = "Sound\\Interface\\iDeselectTarget.wav"
 
@@ -227,11 +228,9 @@ local function Saved()
   return ElwynnSurvivalSettings.checkHints
 end
 
--- The first few of each kind carry the hint; three made, it goes for good.
+-- No words beside the checks (Corey, Nov 5: cluttered); HINTS is what the skills menu says.
 local function HintFor(kind)
-  local n = Saved()[kind] or 0
-  if n >= 3 then return nil end
-  return HINTS[kind]
+  return nil
 end
 
 local function Made(kind)
@@ -261,26 +260,26 @@ end
 
 -- --- outcomes --------------------------------------------------------------------------------------
 
--- Play an outcome where the ring was: "critical", "perfect", "good", "weak", "fail", "fizzle";
+-- Play an outcome where the ring was: "perfect", "good", "early", "late", "full", "fail", "fizzle";
 -- `beat` for one beat of a rhythm (small, the ring stays).
 local function Outcome(grade, school, beat)
   local sc = SCHOOL[school] or SCHOOL.arcane
   local now = GetTime()
   if beat then
     check.beatfx = { grade = grade, at = now, school = school }
-    if grade == "critical" then PlaySoundFile(CHIME) else PlaySoundFile(TICK) end
+    if grade == "perfect" then PlaySoundFile(CHIME) else PlaySoundFile(TICK) end
     return
   end
   check.fx = { grade = grade, at = now, school = school }
   burst:SetTexture(ART .. sc.ring)
-  if grade == "critical" then
+  if grade == "perfect" or grade == "full" then
     PlaySoundFile(sc.sound); PlaySoundFile(CHIME)
     if ShakeCamera then ShakeCamera(0.5, 0.18) end
-  elseif grade == "perfect" then
-    PlaySoundFile(sc.sound)
   elseif grade == "good" then
+    PlaySoundFile(sc.sound)
+  elseif grade == "late" then
     PlaySoundFile(TICK)
-  elseif grade == "weak" then
+  elseif grade == "early" then
     PlaySoundFile(DULL)
   else
     PlaySoundFile(sc.fizzle)
@@ -387,7 +386,7 @@ function ES.CheckResultLine(f)
   end
   if c and c.key == key then
     if c.kind == "rhythm" then
-      if grade == "good" or grade == "critical" then
+      if grade == "good" or grade == "perfect" then
         -- A press this side already showed, else one it didn't see (the lab's).
         if not c.shownBeat then
           local k = c.next
@@ -421,10 +420,10 @@ end
 
 local function JudgeRelease(c, now)
   local off = math.abs(now - c.start - c.flare)
-  if off <= c.window * c.crit then return "critical" end
-  if off <= c.window then return "perfect" end
-  if now - c.start < c.flare then return "weak" end
-  return "good"
+  if off <= c.window * c.crit then return "perfect" end
+  if off <= c.window then return "good" end
+  if now - c.start < c.flare then return "early" end
+  return "late"
 end
 
 local function BeatWindow(c, k)
@@ -449,7 +448,7 @@ local function JudgeBeat(c, now)
   local off = math.abs(t - b.t)
   if off > w then return "fail" end
   b.done = true
-  b.grade = (off <= w * c.crit) and "critical" or "good"
+  b.grade = (off <= w * c.crit) and "perfect" or "good"
   c.next = k + 1
   while c.beats[c.next] and c.beats[c.next].rest do c.next = c.next + 1 end
   return b.grade
@@ -831,7 +830,7 @@ StepPips = function(c, now, below)
       if b.rest then p:SetTexture(ART .. "pip_rest") else p:SetTexture(ART .. "pip_arcane") end
       local size, alpha, r, g, bl = 28, 0.3, 0.75, 0.6, 0.8
       if b.done then
-        if b.grade == "critical" then
+        if b.grade == "perfect" then
           size, alpha, r, g, bl = 38, 1, 1, 1, 1
         elseif b.rest then
           size, alpha = 28, 0.5
@@ -970,7 +969,7 @@ local function StepBeatFx(now)
   local line = sc.size * sc.line / 2
   local col = (f.grade == "free") and { sc.tint[1] * 0.8, sc.tint[2] * 0.8, sc.tint[3] * 0.8 } or { 1, 0.9, 1 }
   DrawCloser(tick, line * (1 + 0.35 * EaseOut(t)), (f.grade == "free" and 0.6 or 1) * (1 - t), col, 0)
-  if f.grade == "critical" then
+  if f.grade == "perfect" then
     Draw(beatcore, 40 + 120 * EaseOut(t), t * 1.2, 1 - t, 1, 1, 1)
   else
     beatcore:Hide()
@@ -985,7 +984,7 @@ local function StepFx(now)
   local g = f.grade
   local age = now - f.at
   local line = sc.size * sc.line / 2
-  local dur = (g == "critical" and 0.7) or (g == "perfect" and 0.55) or ((g == "fail" or g == "fizzle") and 0.7) or (f.ghost and 0.6) or 0.3
+  local dur = ((g == "perfect" or g == "full") and 0.7) or (g == "good" and 0.55) or ((g == "fail" or g == "fizzle") and 0.7) or (f.ghost and 0.6) or 0.3
   local t = age / dur
   if t >= 1 then
     check.fx = nil
@@ -994,13 +993,14 @@ local function StepFx(now)
     return
   end
   local e = EaseOut(t)
-  if g == "critical" or g == "perfect" then
+  if g == "perfect" or g == "full" or g == "good" then
     -- The school ring bursts outward and away; the pop flares white-gold (tinted to the school
     -- for a perfect); a critical's star blazes over it.
     Draw(burst, sc.size * (1 + 0.75 * e), age * 1.4, (1 - t) * 0.95, 1, 1, 1)
-    local tint = (g == "critical") and { 1, 1, 0.92 } or { 0.5 + 0.5 * sc.glow[1], 0.5 + 0.5 * sc.glow[2], 0.5 + 0.5 * sc.glow[3] }
-    Draw(pop, (g == "critical" and 300 or 240) * (0.55 + 0.75 * e), age * 0.9, (1 - t) * (1 - t) * 1.0, tint[1], tint[2], tint[3])
-    if g == "critical" then
+    local top = (g == "perfect" or g == "full")
+    local tint = top and { 1, 1, 0.92 } or { 0.5 + 0.5 * sc.glow[1], 0.5 + 0.5 * sc.glow[2], 0.5 + 0.5 * sc.glow[3] }
+    Draw(pop, (top and 300 or 240) * (0.55 + 0.75 * e), age * 0.9, (1 - t) * (1 - t) * 1.0, tint[1], tint[2], tint[3])
+    if top then
       Draw(core, 60 + 260 * e, -age * 2.2, (1 - t), 1, 1, 1)
       -- The critical's star (Corey's): blazing over it all, turning as it fades.
       Draw(star, 110 + 320 * e, age * 0.7, (1 - t) * (1 - t), 1, 0.95, 0.8)
@@ -1008,17 +1008,17 @@ local function StepFx(now)
       core:Hide(); star:Hide()
     end
     -- The shockwave out from the ring's line: white-gold for a critical, the school's for a perfect.
-    local wc = (g == "critical") and { 1, 0.9, 0.65 } or sc.tint
+    local wc = top and { 1, 0.9, 0.65 } or sc.tint
     Draw(wave, (2 * line / WAVE_LINE) * (1 + 1.2 * e), 0, (1 - t) * 0.95, wc[1], wc[2], wc[3])
     ghost:Hide(); target:Hide()
     crack:Hide(); fizzle:Hide(); tick:Hide()
-  elseif g == "good" or g == "weak" then
+  elseif g == "late" or g == "early" then
     -- A tick of light: the ring's line pulsing out once, the school's colour (grey, early).
-    local col = (g == "good") and sc.tint or { 0.62, 0.62, 0.66 }
+    local col = (g == "late") and sc.tint or { 0.62, 0.62, 0.66 }
     if f.ghost then
       -- A release off its moment: the target dimly where it was, and the closing ring frozen where
       -- the press came, outside it (early, a cold grey) or inside it (late, amber).
-      col = (g == "good") and { 1.0, 0.68, 0.25 } or { 0.62, 0.7, 0.88 }
+      col = (g == "late") and { 1.0, 0.68, 0.25 } or { 0.62, 0.7, 0.88 }
       target:SetTexture(ART .. sc.ring)
       Draw(target, sc.size, 0, (1 - t) * 0.5, 1, 1, 1)
       DrawCloser(ghost, f.ghost, (1 - t * t) * 0.95, col, 0)

@@ -113,7 +113,7 @@ fn fireball_released_on_its_flare_is_a_perfect_cast_stronger_with_valor_and_a_bu
     let _ = top;
     // Let go on this cast's flare (rolled, from 72% of the top to the top): it's perfect.
     let ev = release_at_flare(&mut s, p, "ranged", 0.0);
-    assert!(matches!(grade_in(&ev, p), Some("perfect" | "critical")), "graded: {:?}", grade_in(&ev, p));
+    assert!(matches!(grade_in(&ev, p), Some("good" | "perfect")), "graded: {:?}", grade_in(&ev, p));
     let flare_kit = crate::content_abilities::full_kit_of("mage");
     assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == flare_kit)), "no flare on the caster's body: the ring marks the moment");
     assert!(perfect_in(&ev, p), "a perfect");
@@ -240,7 +240,7 @@ fn every_cast_rolls_its_own_flare_and_the_middle_of_its_window_is_a_critical() {
         let ev = release_at_flare(&mut s, p, "ranged", 0.0);
         let flare = ev.iter().find_map(|e| match e { Event::CheckStart { a, .. } => Some(*a), _ => None }).unwrap();
         assert!(flare > lo && flare <= top + 1.0e-4, "inside the charge: {flare}");
-        assert_eq!(grade_in(&ev, p), Some("critical"), "dead on the flare is the middle of the window");
+        assert_eq!(grade_in(&ev, p), Some("perfect"), "dead on the flare is the middle of the window");
         seen.push(flare);
         run(&mut s, 4.0);
     }
@@ -249,10 +249,10 @@ fn every_cast_rolls_its_own_flare_and_the_middle_of_its_window_is_a_critical() {
     // Just inside the window's edge: a perfect, not a critical. Well early: weak.
     let w = s.content.checks.window;
     let ev = release_at_flare(&mut s, p, "ranged", w * 0.8);
-    assert_eq!(grade_in(&ev, p), Some("perfect"));
+    assert_eq!(grade_in(&ev, p), Some("good"));
     run(&mut s, 4.0);
     let ev = release_at_flare(&mut s, p, "ranged", -0.35);
-    assert_eq!(grade_in(&ev, p), Some("weak"));
+    assert_eq!(grade_in(&ev, p), Some("early"));
 }
 
 #[test]

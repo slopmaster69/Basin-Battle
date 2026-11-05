@@ -520,6 +520,7 @@ impl Survival {
             p.ward_down_at = now;
             self.events.push(Event::Ward { player: id });
             self.events.push(Event::WardCheck { player: id, grade: "fail" });
+            self.events.push(Event::Auras { id });
         }
     }
 
@@ -957,6 +958,7 @@ impl Survival {
             if p.ward >= w.bar && p.ward_broken {
                 p.ward_broken = false;
                 changed = true;
+                self.events.push(Event::Auras { id });
             }
             changed |= p.ward.floor() != before;
         }

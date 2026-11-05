@@ -190,7 +190,7 @@ impl Survival {
             return;
         }
         let critical = off <= w * self.content.checks.crit_share;
-        self.events.push(Event::CheckResult { player: id, ability, grade: if critical { "critical" } else { "good" } });
+        self.events.push(Event::CheckResult { player: id, ability, grade: if critical { "perfect" } else { "good" } });
         self.cue_beat(id, k);
         self.go_beat(id, ability, k, critical);
         self.set_done(id, k + 1, k + 1);
@@ -258,7 +258,7 @@ impl Survival {
                 self.events.push(Event::Visual { id, kit, by: None });
             }
             self.events.push(Event::Perfect { player: id, ability });
-            self.events.push(Event::CheckResult { player: id, ability, grade: "perfect" });
+            self.events.push(Event::CheckResult { player: id, ability, grade: "full" });
         }
         if let Some(p) = self.players.get_mut(&id) {
             p.rhythm_beats.clear();

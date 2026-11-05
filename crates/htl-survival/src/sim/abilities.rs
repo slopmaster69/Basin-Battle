@@ -926,7 +926,7 @@ impl Survival {
         }
         if !perfect {
             let early = held < self.players[&id].check_flare;
-            self.events.push(Event::CheckResult { player: id, ability, grade: if early { "weak" } else { "good" } });
+            self.events.push(Event::CheckResult { player: id, ability, grade: if early { "early" } else { "late" } });
         }
         if let Some(p) = self.players.get_mut(&id) {
             p.cast_critical = critical;
@@ -1139,7 +1139,7 @@ impl Survival {
             }
             self.events.push(Event::Perfect { player: id, ability });
             let critical = self.players[&id].cast_critical;
-            self.events.push(Event::CheckResult { player: id, ability, grade: if critical { "critical" } else { "perfect" } });
+            self.events.push(Event::CheckResult { player: id, ability, grade: if critical { "perfect" } else { "good" } });
         }
         // A charge's glow ends as it goes (the bow's draw ends with its shot), and the wind-up on
         // them with it (the slots are read once the action has moved on).
@@ -1375,6 +1375,19 @@ impl Survival {
         // A beat's own strength (a rhythm's), when it has one.
         let damage = self.players.get(&id).and_then(|p| p.cast_damage).unwrap_or(damage);
         let damage = damage * self.perfect_mult(id);
+        // An Arcane staff's heavy orb carries what the staff stored: its strength and look by how
+        // many charges; none, and nothing goes but a fizzle in the hands.
+        let (damage, spell, all_charges) = match self.staff_release(id, ability) {
+            Some((0, _, _)) => {
+                let k = self.content.checks.fizzle_kit;
+                if k != 0 {
+                    self.events.push(Event::Visual { id, kit: k, by: None });
+                }
+                return;
+            }
+            Some((n, share, look)) => (damage * share, if look != 0 { look } else { spell }, n >= self.content.staffs.most),
+            None => (damage, spell, false),
+        };
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
         let from = self.hands(id, yaw);
@@ -1436,7 +1449,7 @@ impl Survival {
                 damage,
                 spell,
                 allies: d.friends(),
-                critical: self.players.get(&id).is_some_and(|p| p.cast_critical),
+                critical: all_charges || self.players.get(&id).is_some_and(|p| p.cast_critical),
                 hits: Vec::new(),
                 // A full draw can go through more (Aimed Shot's).
                 pierce: if AbilityDef::full(share) { d.pierce.max(d.full_pierce) } else { d.pierce },
@@ -2145,6 +2158,11 @@ impl Survival {
             let d = self.content.abilities[p.ability].clone();
             if !d.crit_effects.is_empty() {
                 self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
+            }
+            // An Arcane orb with every charge: the burst on what it strikes.
+            let full = self.content.staffs.charge_full_kit;
+            if d.spends == "charge" && full != 0 {
+                self.events.push(Event::Visual { id: victim, kit: full, by: Some(p.owner) });
             }
         }
         // A staff's plain bolt builds its heat, chill or charge.
@@ -3605,14 +3623,14 @@ impl Survival {
                 let all = checked && self.content.abilities[ability].stakes == "all";
                 if pending && held >= lo {
                     if checked {
-                        self.events.push(Event::CheckResult { player: id, ability, grade: "weak" });
+                        self.events.push(Event::CheckResult { player: id, ability, grade: "early" });
                     }
                     self.fire(id, ability, if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 });
                 } else if all && held > self.players[&id].check_flare + self.content.checks.window + 0.05 {
                     self.fizzle(id, ability);
                 } else if hold > 0.0 && held >= hi + hold {
                     if checked {
-                        self.events.push(Event::CheckResult { player: id, ability, grade: "good" });
+                        self.events.push(Event::CheckResult { player: id, ability, grade: "late" });
                     }
                     self.fire(id, ability, 1.0);
                 }

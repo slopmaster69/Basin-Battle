@@ -6603,6 +6603,8 @@ function ES.Line(line)
   elseif verb == "MO" then
     -- Where a hero's missiles leave from (a casting staff's tip), on a client that can say so.
     if SetUnitMissileOrigin then SetUnitMissileOrigin(f[2] or "", f[3] or "") end
+  elseif verb == "WB" then
+    if ES.WardBarrierLine then ES.WardBarrierLine(f) end
   elseif verb == "WP" then
     -- A held pose (the ward's arm out): the clip looped for its hold, or let go.
     local guid = (f[5] == "1") and "player" or f[2]

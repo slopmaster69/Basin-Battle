@@ -112,6 +112,22 @@ impl Survival {
         }
     }
 
+    /// An Arcane staff's heavy orb as it goes: the charges stored in the staff go with it (`None`
+    /// for any other bolt): how many, its share of full strength, and its look (0: its own).
+    pub(crate) fn staff_release(&mut self, id: Id, ability: usize) -> Option<(u32, f32, u32)> {
+        if self.content.abilities[ability].spends != "charge" {
+            return None;
+        }
+        let k = self.content.staffs.clone();
+        let p = self.players.get_mut(&id)?;
+        let n = std::mem::take(&mut p.staff_charges).min(3);
+        if n > 0 {
+            self.events.push(Event::Stacks { player: id, kind: "charge", n: 0, on: None });
+        }
+        let i = n as usize;
+        Some((n, k.charge_scale[i], k.charge_spells[i]))
+    }
+
     /// A staff's heavy bolt reaching a foe spends what was built: its damage times this (1 for
     /// none). Heat and chill are the foe's, charges the caster's (all of them throw the foe back).
     pub(crate) fn staff_spend(&mut self, owner: Id, victim: Id, ability: usize) -> f32 {
