@@ -15,6 +15,8 @@ fn world_with(pvp: bool) -> Survival {
     if !pvp {
         c.pvp = Default::default();
     }
+    // No health back by itself out of combat: these tests count every point a heal gives.
+    c.player.field_regen = 0.0;
     let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
     s.mobs.clear();
     s.respawns.clear();
@@ -519,15 +521,16 @@ fn a_heavy_blow_spoils_the_aimed_shot_draw() {
 fn multi_shot_looses_five_arrows_in_a_fan() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    // One on each arrow's line, 7 yd out, 10° apart; one well outside the fan.
-    let fan: Vec<Id> = [-20.0f32, -10.0, 0.0, 10.0, 20.0].iter().map(|deg| mob(&mut s, "grunt", [7.0 * deg.to_radians().cos(), 7.0 * deg.to_radians().sin(), 0.0])).collect();
-    let wide = mob(&mut s, "grunt", [7.0 * 50f32.to_radians().cos(), 7.0 * 50f32.to_radians().sin(), 0.0]);
+    // One on each arrow's line where the reticle points, 12 yd out: the fan spreads 1.2 yd an
+    // arrow there (#118). One well outside it.
+    let fan: Vec<Id> = [-2.4f32, -1.2, 0.0, 1.2, 2.4].iter().map(|y| mob(&mut s, "grunt", [12.0, *y, 0.0])).collect();
+    let wide = mob(&mut s, "grunt", [12.0, 7.0, 0.0]);
     let mut pins = fan.clone();
     pins.push(wide);
     s.set_valor(p, 25.0);
     press(&mut s, p, "aimed_arrow", true);
     assert_eq!(aiming(&s, p), Some(idx(&s, "multi_shot")), "Ctrl: the Multi-Shot");
-    s.set_aim_line(p, 0.0, down_to(14.0));
+    s.set_aim_line(p, 0.0, down_to(12.0));
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
     assert_eq!(missiles(&ev, p, 6984), 5, "five arrows, no draw");
@@ -549,12 +552,13 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     assert_eq!(aiming(&s, p), Some(idx(&s, "freezing_trap")));
     s.set_aim_line(p, 0.0, down_to(6.0));
     click(&mut s, p);
-    let em = s.empowered_keys(p);
-    assert_eq!(em.len(), 1, "Aimed Shot's key readied: {em:?}");
-    assert_eq!(em[0].0, key_of("ranged") as usize);
-    assert!((em[0].1 - (s.clock + 8.0)).abs() < 0.3, "for 8 s");
+    assert!(s.empowered_keys(p).is_empty(), "set, nothing readied yet (#118: it comes as the trap springs)");
     run_pinned(&mut s, 1.2, &[k]);
     assert!(s.has_cc(k, "petrify"), "sprung: frozen");
+    let em = s.empowered_keys(p);
+    assert_eq!(em.len(), 1, "sprung, Aimed Shot's key readied: {em:?}");
+    assert_eq!(em[0].0, key_of("ranged") as usize);
+    assert!(em[0].1 > s.clock + 7.0 && em[0].1 <= s.clock + 8.0, "for 8 s from the spring: {} at {}", em[0].1, s.clock);
     // Aimed Shot's key: the Multi-Shot, free, and the frozen one shatters.
     let valor = s.players[&p].valor;
     press_again(&mut s, p, "ranged");
@@ -571,6 +575,82 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     run(&mut s, 0.5);
     press_again(&mut s, p, "ranged");
     assert_eq!(aiming(&s, p), Some(idx(&s, "aimed_arrow")));
+}
+
+#[test]
+fn a_freezing_trap_that_springs_late_still_readies_its_free_multi_shot_as_the_ice_takes() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "aimed_arrow").unwrap();
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", true);
+    s.set_aim_line(p, 0.0, down_to(6.0));
+    click(&mut s, p);
+    // Nothing comes by for longer than the free shot ever lasted (8 s).
+    run(&mut s, 12.0);
+    assert!(s.empowered_keys(p).is_empty());
+    let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
+    run_pinned(&mut s, 0.3, &[k]);
+    assert!(s.has_cc(k, "petrify"), "it springs at last");
+    assert_eq!(s.empowered_keys(p).len(), 1, "and the free Multi-Shot is there");
+    // Time to turn and fire: still frozen 2.5 s on, and the shot still free.
+    run_pinned(&mut s, 2.5, &[k]);
+    assert!(s.has_cc(k, "petrify"), "3 s of ice from the spring");
+    assert_eq!(s.empowered_keys(p).len(), 1);
+}
+
+/// What one of `key`'s arrows does to a grunt 8 yd ahead: a full draw, held.
+fn one_arrow(s: &mut Survival, p: Id, key: &str, ex: bool) -> u32 {
+    let k = mob(s, "grunt", [8.0, 0.0, 0.0]);
+    s.set_valor(p, 100.0);
+    press(s, p, key, ex);
+    let aim = (0.0, down_to(10.0));
+    let mut ev = if aiming(s, p).is_some() && s.content.abilities[aiming(s, p).unwrap()].charge[1] == 0.0 {
+        s.set_aim_line(p, aim.0, aim.1);
+        click(s, p)
+    } else {
+        draw(s, p, 1.6, aim, &[k])
+    };
+    ev.extend(run_pinned(s, 1.0, &[k]));
+    let h = hits(&ev, p, k);
+    assert_eq!(h.len(), 1, "{key}: one arrow strikes it: {h:?}");
+    s.mobs.remove(&k);
+    run(s, 0.5);
+    h[0]
+}
+
+#[test]
+fn aimed_shot_kill_shot_and_multi_shot_grow_with_the_bow_as_an_art_grows_with_the_weapon() {
+    // Serg's play-test (#118): a flat 14–36 was always going to fall behind melee as gear got
+    // better. Each is now a share of the bow's own damage at the same draw.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let plain = [one_arrow(&mut s, p, "aimed_arrow", false), one_arrow(&mut s, p, "kill_shot", false), one_arrow(&mut s, p, "aimed_arrow", true)];
+    // The hunting bow (12–30): what they always did, full drawn.
+    assert_eq!(plain, [36, 60, 18], "Aimed Shot, Kill Shot, a Multi-Shot arrow with the hunting bow");
+    // A bow twice as strong.
+    let bow = s.content.ranged.iter().position(|r| r.key == "bow").unwrap();
+    s.content.ranged[bow].damage = [24, 60];
+    let strong = [one_arrow(&mut s, p, "aimed_arrow", false), one_arrow(&mut s, p, "kill_shot", false), one_arrow(&mut s, p, "aimed_arrow", true)];
+    assert_eq!(strong, [72, 120, 36], "twice the bow, twice the shot");
+}
+
+#[test]
+fn a_multi_shot_at_a_pack_strikes_most_of_it() {
+    // Serg's play-test (#118): it "seemed not to hit often": 10° apart, a pack 16 yd off took 3
+    // arrows of 8 and one at 25 yd took 1. Four grunts 1.2 and 1.8 yd apart, near and far.
+    for (dist, gap) in [(10.0f32, 1.2f32), (16.0, 1.2), (16.0, 1.8), (25.0, 1.2), (25.0, 1.8)] {
+        let mut s = world();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let pack: Vec<Id> = [-1.5f32, -0.5, 0.5, 1.5].iter().map(|y| mob(&mut s, "grunt", [dist, *y * gap, 0.0])).collect();
+        s.set_valor(p, 25.0);
+        press(&mut s, p, "aimed_arrow", true);
+        s.set_aim_line(p, 0.0, down_to(dist + 2.0));
+        let mut ev = click(&mut s, p);
+        ev.extend(run_pinned(&mut s, 1.5, &pack));
+        let struck = pack.iter().filter(|m| !hits(&ev, p, **m).is_empty()).count();
+        assert!(struck >= 3, "at {dist} yd, {gap} yd apart: {struck} of the 4 struck");
+    }
 }
 
 #[test]
@@ -863,8 +943,14 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
         s.plant_arrow(p, [12.0, y, 0.0]);
     }
     s.set_valor(p, 25.0);
+    // The hand goes out at the press, and the arrows follow it a moment later (Corey's review:
+    // the arm came up late, after the arrows).
     let mut ev = press(&mut s, p, "tripwire", true);
-    ev.extend(run_pinned(&mut s, 0.5, &[k, aside]));
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: hunter::RECALL_POSE } if *id == p)), "the arm out at once");
+    ev.extend(run_pinned(&mut s, 0.15, &[k, aside]));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "no arrow flies before the hand is out");
+    assert!(hits(&ev, p, k).is_empty(), "nor strikes");
+    ev.extend(run_pinned(&mut s, 0.35, &[k, aside]));
     let struck = hits(&ev, p, k);
     assert_eq!(struck.len(), 5, "each arrow on its way home, full damage: {struck:?}");
     assert!(struck.iter().all(|d| *d == struck[0]), "no falloff: {struck:?}");
@@ -876,11 +962,12 @@ fn arrow_recall_brings_every_arrow_home_through_the_foe_and_three_or_more_lacera
     assert!(s.planted_of(p).is_empty(), "every arrow home");
 }
 
-/// A planted arrow reads on the ground: its arrow at its model's own size where it landed, and a
-/// friend's green ring under it for as long as it stays; both go with it.
+/// A planted arrow reads on the ground: its arrow at its model's own size where it landed, for as
+/// long as it stays, with no ring drawn under it (Corey's review: a hero's own circles are floor
+/// clutter).
 #[test]
-fn a_planted_arrow_stands_full_size_over_a_green_ring_and_both_go_with_it() {
-    use crate::sim::hunter::{PLANT_LOOK, PLANT_RING, PLANT_SCALE, PLANT_SECS};
+fn a_planted_arrow_stands_full_size_with_no_ring_under_it_and_goes_in_time() {
+    use crate::sim::hunter::{PLANT_LOOK, PLANT_SCALE, PLANT_SECS};
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.plant_arrow(p, [10.0, 2.0, 0.0]);
@@ -890,19 +977,28 @@ fn a_planted_arrow_stands_full_size_over_a_green_ring_and_both_go_with_it() {
     assert_eq!((look.display, look.scale), (PLANT_LOOK, PLANT_SCALE));
     assert!(look.scale >= 1.0, "not shrunk: {}", look.scale);
     assert!((look.pos[0] - 10.0).abs() < 0.1 && (look.pos[1] - 2.0).abs() < 0.1, "where it landed: {:?}", look.pos);
-    let ring = ev.iter().find_map(|e| match e {
-        Event::Mark { id, pos, radius, tele: None, .. } if *id == a.mark => Some((*pos, *radius)),
-        _ => None,
-    });
-    let (at, r) = ring.expect("its ring laid on the ground");
-    assert!((at[0] - 10.0).abs() < 0.1 && (at[1] - 2.0).abs() < 0.1, "under the arrow: {at:?}");
-    assert_eq!(r, PLANT_RING);
-    assert!(s.mark_friendly(a.mark), "a friend's green, not a warning's red");
-    assert!(s.mark_left(a.mark) > PLANT_SECS - 0.2, "as long as the arrow stays: {}", s.mark_left(a.mark));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "no ring on the ground");
     let ev = run(&mut s, PLANT_SECS + 0.2);
     assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "the arrow fades");
-    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { id } if *id == a.mark)), "and its ring");
     assert!(s.planted_of(p).is_empty());
+}
+
+/// A hero's own shapes on the ground are for everyone else: a trap lays no circle, and a wind-up's
+/// or a lob's shape is hidden from the hero casting it (Corey's review: floor clutter).
+#[test]
+fn a_heros_own_trap_lays_no_circle_and_its_own_shapes_are_hidden_from_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", false);
+    s.set_aim_line(p, 0.0, down_to(6.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run(&mut s, 1.0));
+    assert!(!s.traps.is_empty(), "the trap is set");
+    // The throw's shape alone (#142's lob), and that hidden from her.
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { tele, .. } if !tele.as_ref().is_some_and(|t| t.own_hidden && t.mob == p))), "with no circle under it");
+    let t = Telegraph::hero_shape(p, 4.0, 360.0, 0.0, 1.0, None);
+    assert!(t.own_hidden && t.mob == p, "hidden from its caster, shown to the rest");
 }
 
 /// Arrow Recall: each arrow leaves the ground (its arrow and ring gone) and flies from where it
@@ -919,7 +1015,12 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     assert_eq!(planted.len(), 3);
     s.set_valor(p, 25.0);
     let mut ev = press(&mut s, p, "tripwire", true);
-    ev.extend(run(&mut s, 0.1));
+    assert!(s.planted_of(p).is_empty(), "spoken for at the press: nothing else moves them");
+    // The arrows wait for the hand to come out.
+    ev.extend(run(&mut s, 0.15));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "none flies yet");
+    assert!(!ev.iter().any(|e| matches!(e, Event::ObjGone { .. })), "none leaves the ground yet");
+    ev.extend(run(&mut s, 0.15));
     let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
     let mut anchors = Vec::new();
     for a in &planted {
@@ -940,10 +1041,37 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     anchors.dedup();
     assert_eq!(anchors.len(), 3, "an anchor for each");
     assert!(s.planted_of(p).is_empty());
+    assert!(!ev.iter().any(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)), "the hand stays out while they fly");
     ev.extend(run(&mut s, 1.0));
+    let mut last_home = 0;
     for a in anchors {
-        assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a)), "home: its anchor goes");
+        let home = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a)).expect("home: its anchor goes");
+        last_home = last_home.max(home);
     }
+    // Then the hand comes down, once the last is home.
+    let down = ev.iter().position(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)).expect("the hand comes down");
+    assert!(down > last_home, "after the last arrow is home: {down} {last_home}");
+    assert!(s.hunt.recalls.is_empty());
+}
+
+/// A hunter felled with the hand out: the arrows spoken for go without flying, and the hand
+/// comes down with them.
+#[test]
+fn arrow_recall_cut_short_lets_the_hand_down_and_takes_its_arrows() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.plant_arrow(p, [12.0, 0.0, 0.0]);
+    let _ = s.step(DT);
+    let a = s.hunt.planted[0].clone();
+    s.set_valor(p, 25.0);
+    let mut ev = press(&mut s, p, "tripwire", true);
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: hunter::RECALL_POSE } if *id == p)));
+    s.hurt_player(p, 10_000);
+    ev.extend(run(&mut s, 0.5));
+    assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "no arrow flies to the fallen");
+    assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "its arrow goes");
+    assert!(ev.iter().any(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)), "the hand down");
+    assert!(s.hunt.recalls.is_empty());
 }
 
 /// The reticle on the ground at `at` (x, y), for a hero standing at the origin.
@@ -1089,9 +1217,11 @@ fn a_tripwire_knocks_down_the_first_creature_across_it() {
         s.mobs.get_mut(&k).unwrap().pos = [x, 0.0, 0.0];
         ev.extend(s.step(DT));
     }
-    // It trips with no word over it: the dust, the fall and the snapped rope say so.
+    // It trips with no word over it: the fall's dust (a low puff, played once: the wing-buffet
+    // nova read as a white streak), the fall and the snapped rope say so.
     assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == k && *kit == KIT_DUST)), "dust where it trips");
+    let dust: Vec<u32> = ev.iter().filter_map(|e| match e { Event::Visual { id, kit, .. } if *id == k => Some(*kit), _ => None }).collect();
+    assert_eq!(dust, vec![KIT_FALL_DUST], "one low puff where it trips, nothing else on it: {dust:?}");
     assert_eq!(hits(&ev, p, k).len(), 1, "and takes the wire's damage: {:?} planted {:?}", hits(&ev, p, k), s.planted_of(p));
     assert!(s.has_cc(k, "stun"), "down");
     assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == k && *anim == KNOCKDOWN_ANIM)), "knocked to the ground");
@@ -1267,8 +1397,11 @@ fn trappers_instinct_turns_a_blow_into_a_net_scattered_arrows_and_a_leap_away() 
     assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, .. } if *player == p)) || matches!(s.players[&p].action, Action::Dash { .. }), "and away");
     // No word says it caught: the net on the grunt and the leap away do (Corey's review).
     assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)), "no word when it catches");
-    // Unused, it's wasted: no leap when it runs out (a counter and nothing else).
+    // Unused, it's wasted: no leap when it runs out (a counter and nothing else). The grunt is
+    // taken away first: a blow it commits to during the stance is answered as it commits, before
+    // it lands, so a grunt closing in would be a blow, not nothing.
     run(&mut s, 3.0);
+    s.mobs.remove(&k);
     s.set_valor(p, 25.0);
     s.set_cooldowns(p, true);
     s.input(p, Input::Ability(key_of("utility"), true));
@@ -1334,6 +1467,8 @@ fn bank_shot_comes_off_a_wall_harder_and_strikes_round_the_corner() {
     let mut ev = click(&mut s, p);
     ev.extend(run_pinned(&mut s, 1.5, &[k]));
     assert!(ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "it banks: its arrow flies on from the wall");
+    // (And nothing bursts in the wall: a bounce isn't an explosion, Corey's review.)
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { spell: 5162, .. })), "no burst in the wall");
     let h = hits(&ev, p, k);
     let logs: Vec<&Event> = ev.iter().filter(|e| matches!(e, Event::Log(_) | Event::Flash { .. } | Event::Missile { .. })).collect();
     assert_eq!(h.len(), 1, "round the corner: {h:?} {logs:?} planted {:?}", s.planted_of(p));
@@ -1362,3 +1497,4 @@ fn a_training_dummy_takes_a_beast_and_a_freezing_trap() {
     run(&mut s, 1.2);
     assert!(s.has_cc(d, "petrify"), "sprung on the dummy: frozen");
 }
+

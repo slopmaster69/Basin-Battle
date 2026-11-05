@@ -28,6 +28,7 @@ pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 pub mod hunter;
+pub mod lab;
 mod raid;
 pub mod siege;
 pub mod wager;
@@ -36,7 +37,7 @@ mod world;
 
 #[cfg(test)]
 pub(crate) use combat::Follow;
-pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, WOUND_ANIM,
+pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_FALL_DUST, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, MEAL, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, WOUND_ANIM,
 };
 pub use abilities::{look_dir, Cooldown, HitKind, Stance};
 pub use cc::Cc;
@@ -173,6 +174,9 @@ pub enum Event {
     /// the mark `id` is gone.
     AreaLook { id: Id, caster: Id, spell: u32, pos: Vec3, radius: f32 },
     Emote { id: Id, emote: u32 },
+    /// A pose held until it's let go (`UNIT_NPC_EMOTESTATE`, a state emote), where an `Emote` is
+    /// a one-shot the client plays at its own pace: the arm out for Arrow Recall. 0 lets it go.
+    Pose { id: Id, pose: u32 },
     Health { id: Id, health: u32, max: u32 },
     Stamina { player: Id },
     /// The hero's run speed and run-back speed.
@@ -342,9 +346,11 @@ pub struct Telegraph {
 }
 
 impl Telegraph {
-    /// A hero's ability on the ground: a ring (`arc` 360), a wedge or a strip.
+    /// A hero's ability on the ground: a ring (`arc` 360), a wedge or a strip. Everyone else sees
+    /// it coming; the hero casting it doesn't (Corey's review: a hero's own circles are floor
+    /// clutter; they know where they aimed).
     pub fn hero_shape(owner: Id, reach: f32, arc: f32, width: f32, secs: f32, at: Option<(Vec3, f32)>) -> Self {
-        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true, own_hidden: false }
+        Telegraph { mob: owner, reach, arc, secs, blockable: false, foe: None, width, at, hero: true, own_hidden: true }
     }
 }
 
@@ -765,6 +771,9 @@ pub struct Mob {
     pub fighters: u32,
     /// Its wind-up was knocked aside lately: not again until then.
     pub wary_until: f32,
+    /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
+    /// another until then.
+    pub whiff_until: f32,
     /// Who has hurt it, how much, and when last (it fades): whom it goes for.
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.
@@ -869,6 +878,10 @@ pub struct Survival {
     /// (hero, ability): when they can have it again (Lay on Hands).
     pub(crate) lockouts: BTreeMap<(Id, usize), f32>,
     pub(crate) burnings: Vec<abilities::Burning>,
+    /// The spell lab's bodies, which swing only when the lab asks (`lab_blow`, the one in
+    /// `lab_blowing` while it does).
+    pub(crate) lab_quiet: Vec<Id>,
+    pub(crate) lab_blowing: Option<Id>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -887,6 +900,9 @@ pub struct Survival {
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
     pub dummies: BTreeMap<Id, String>,
+    /// Creatures put up to practise on and look at (`.es target`): `true` for one that stands
+    /// still, never moving or striking of itself (thrown, pulled and knocked up all the same).
+    pub targets: BTreeMap<Id, bool>,
     /// Crowd control on units, the heroes' grace after a hard one, and each hero's log of it.
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
@@ -911,6 +927,9 @@ pub struct Survival {
     /// moves on.
     pub(crate) patrols: BTreeMap<usize, (usize, f32)>,
     pub debug: bool,
+    /// Debug's commands without its drawing (`.es debug quiet`: the visual check records with
+    /// it, so projectiles' bodies and ground areas aren't drawn over the footage).
+    pub debug_quiet: bool,
     /// Testing: stations, upgrades and mending cost nothing at the camp (`.es freebuild`).
     pub free_build: bool,
     /// The world below (the Deadmines), if this is it.
@@ -991,9 +1010,12 @@ impl Survival {
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),
             burnings: Vec::new(),
+            lab_quiet: Vec::new(),
+            lab_blowing: None,
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
+            targets: BTreeMap::new(),
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),
@@ -1008,6 +1030,7 @@ impl Survival {
             respawns: Vec::new(),
             patrols: BTreeMap::new(),
             debug: false,
+            debug_quiet: false,
             free_build: false,
         below: None,
             siege: None,
@@ -1743,6 +1766,11 @@ impl Survival {
         self.marks.push((id, self.clock + secs));
         self.events.push(Event::Mark { id, pos, radius, tele, ground: 0 });
         id
+    }
+
+    /// Debug draws projectiles' bodies and every ground area (not with `.es debug quiet`).
+    pub(crate) fn debug_draws(&self) -> bool {
+        self.debug && !self.debug_quiet
     }
 
     /// Seconds a danger mark has left on the ground (0: gone).

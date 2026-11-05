@@ -107,6 +107,10 @@ function ES.FlipLine(f)
   end
   if clip > 0 and PlayUnitAnimation and layer then
     if from and PreloadAnimationSource then PreloadAnimationSource(from) end
-    PlayUnitAnimation(guid, clip, 0, nil, nil, take, secs, "full", from)
+    -- The clip fitted to the flight: one pass over it, its fade (0.16 sec) done as the hero
+    -- lands, so a borrowed jump's tucked legs are never still posed when the feet touch down
+    -- (the server's JumpEnd takes the landing from there).
+    local fit = math.max(0.05, secs - 0.16)
+    PlayUnitAnimation(guid, clip, fit, nil, nil, take, secs, "full", from)
   end
 end

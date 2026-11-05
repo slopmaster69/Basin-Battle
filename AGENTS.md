@@ -77,6 +77,7 @@ Run what covers the files you changed. A pull request isn't ready until these pa
 | An add-on (`addon/`) | `scripts/check-addon.sh` (no Lua errors) |
 | A client patch (`patches/benilla/`) | Apply the whole series on a clean benilla checkout (`scripts/play.sh` does it) and build the client |
 | A script (`scripts/`, `*.command`, `*.bat`) | Run it on the system it's for |
+| An ability: what it does, its effects, animation, icon or key (`content/`, `crates/htl-survival/src/sim/`, the add-on's bar, `patches/benilla/`) | The [visual check](docs/visual-check.md): its scenario in the real client, the screenshots or video attached to the pull request (add or adjust the scenario in `tools/visual-check/`) |
 | Anything | `scripts/check-pr.sh` (the repository rules, against `origin/main`) |
 
 Tests that need the WoW 1.12.1 data are marked `#[ignore]`; run them locally when you touch what

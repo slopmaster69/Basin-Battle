@@ -1,5 +1,6 @@
-//! Bank Shot and Split Arrow (#110): an arrow seen the whole way, every ricochet shown where it
-//! struck, and the arrow planted where it ends; Split Arrow's long flight and its burst.
+//! Bank Shot and Split Arrow (#110): an arrow seen the whole way, every ricochet flown on from
+//! where it struck (no burst there: a bounce isn't an explosion, Corey's review), and the arrow
+//! planted where it ends; Split Arrow's long flight and its burst.
 
 use crate::content::Content;
 use crate::land::{FlatLand, Land};
@@ -8,9 +9,11 @@ use crate::sim::*;
 
 const DT: f32 = 0.05;
 const ORIGIN: Vec3 = [0.0, 0.0, 0.0];
-/// Aimed Shot's arrow, Bank Shot's look; the burst where it strikes; Split Arrow's glowing arrow.
+/// Aimed Shot's arrow, Bank Shot's look; Split Arrow's burst where it splits; its glowing arrow.
 const ARROW: u32 = 19434;
 const FLASH: u32 = 5162;
+/// The splash of earth where it skips off the ground (not the wall's fire: Corey's review).
+const SPLASH: u32 = 26271;
 const GLOW: u32 = 3044;
 
 /// Level ground with walls: everything at or past `east` is solid, and with `west`, everything at
@@ -136,19 +139,15 @@ fn bank_shot_is_seen_off_the_wall_and_plants_where_it_ends() {
     assert_eq!(first.len(), 1, "one arrow loosed");
     assert!((first[0][0] - 10.0).abs() < 0.8, "flown to the wall: {:?}", first[0]);
     // Off the wall: a leg flown from where it struck, back away from the wall and on up the
-    // field, and a flash there, by the leg's own anchor.
+    // field, and nothing bursting there (Corey's review: a burst read as the arrow going off in
+    // the inn wall; a bounce shows no burst).
     let l = legs(&ev, p, ARROW);
     assert_eq!(l.len(), 1, "one ricochet: {l:?}");
     let (anchor, from, to) = l[0];
     assert!(from[0] < 10.0 && from[0] > 8.5, "from the wall: {from:?}");
     assert!(to[0] < from[0] - 5.0 && to[1] > from[1] + 5.0, "off it, mirrored: {from:?} to {to:?}");
-    let f = flashes(&ev, FLASH);
-    assert_eq!(f.len(), 1, "a flash where it struck: {f:?}");
-    assert_eq!(f[0].0, anchor, "shown by the leg's anchor, not on the hunter");
-    assert!((f[0].1[0] - 10.0).abs() < 0.8, "at the wall: {:?}", f[0].1);
-    let leg_at = ev.iter().position(|e| matches!(e, Event::MissileFrom { anchor: a, .. } if *a == anchor)).unwrap();
-    let flash_at = ev.iter().position(|e| matches!(e, Event::Missile { caster, spell, .. } if *caster == anchor && *spell == FLASH)).unwrap();
-    assert!(leg_at < flash_at, "the anchor is made before the flash is shown from it");
+    assert!(flashes(&ev, FLASH).is_empty(), "no burst where it struck: {:?}", flashes(&ev, FLASH));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } if *caster == anchor)), "the leg's anchor shows nothing but the arrow");
     // Where it ends: planted at its range's end, out past the wall's corner of the field.
     let planted = s.planted_of(p);
     assert_eq!(planted.len(), 1, "planted once: {planted:?}");
@@ -168,9 +167,7 @@ fn bank_shot_banks_twice_down_a_corridor_then_plants_in_the_third_wall() {
     assert!(l[0].1[0] > 3.0 && l[0].2[0] < -3.0, "east wall, then across: {:?}", l[0]);
     assert!(l[1].1[0] < -3.0 && l[1].2[0] > 3.0, "west wall, then back across: {:?}", l[1]);
     assert!(l[1].1[1] > l[0].1[1] + 4.0, "each further up the corridor");
-    let f = flashes(&ev, FLASH);
-    assert_eq!(f.len(), 2, "a flash at each: {f:?}");
-    assert_eq!((f[0].0, f[1].0), (l[0].0, l[1].0), "each by its own leg's anchor");
+    assert!(flashes(&ev, FLASH).is_empty(), "no burst at either: {:?}", flashes(&ev, FLASH));
     // Out of bounces, it stops in the third wall and plants under it.
     let planted = s.planted_of(p);
     assert_eq!(planted.len(), 1, "{planted:?}");
@@ -191,7 +188,10 @@ fn bank_shot_aimed_low_skips_off_the_ground_into_the_foe() {
     let (_, from, to) = l[0];
     assert!(from[2] < 0.6 && from[0] > 15.0, "off the ground where it came down: {from:?}");
     assert!(to[2] > from[2], "and up from it: {from:?} to {to:?}");
-    assert_eq!(flashes(&ev, FLASH).len(), 1, "a flash where it skipped");
+    // No fire on the ground where it skipped: it isn't an explosion (the arrow's flight on from
+    // there is the look; no small splash of dirt exists in the data).
+    assert!(flashes(&ev, FLASH).is_empty(), "no fire on the ground: it isn't an explosion");
+    assert!(flashes(&ev, SPLASH).is_empty(), "and no boulders either");
     // Into the foe past it, no harder (a skip isn't a ricochet), and planted past it.
     let h = hits(&ev, p, k);
     assert!(h.len() == 1 && h[0] < 24, "it still strikes, no harder: {h:?}");
