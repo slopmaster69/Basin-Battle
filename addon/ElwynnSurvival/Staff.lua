@@ -113,19 +113,7 @@ local function HeavyDone()
 end
 ES.StaffHeavyDone = HeavyDone
 
-local diag = mark:CreateTexture(nil, "OVERLAY")
-diag:SetTexture(ART .. "ward_whole")
-diag:SetBlendMode("ADD")
-diag:SetWidth(150)
-diag:SetHeight(150)
-diag:SetPoint("CENTER", mark, "CENTER", 0, 0)
 mark:SetScript("OnUpdate", function()
-  -- LAB DIAGNOSTIC: the ward arc drawn from this (working) frame; red while Ward.lua heard it up,
-  -- green if Ward.lua's line handler ran at all but says down.
-  if ES.wardDiag == true then diag:SetVertexColor(1, 0.2, 0.2, 1)
-  elseif ES.wardDiag == false then diag:SetVertexColor(0.2, 1, 0.2, 0.8)
-  else diag:SetVertexColor(1, 1, 1, 0.5) end
-  diag:Show()
   local s = this.staff and STAFF[this.staff]
   if not s then return end
   local now = GetTime()

@@ -246,7 +246,6 @@ function ES.WardLine(f)
   end
   local most = math.max(1, tonumber(f[3]) or 100)
   local broken = (tonumber(f[4]) or 0) > 0
-  ES.wardDiag = (tonumber(f[5]) or 0) > 0
   ArcLine((tonumber(f[5]) or 0) > 0 and not broken, now / most, broken and not wasBroken)
 end
 
