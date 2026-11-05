@@ -89,7 +89,8 @@ const VOLLEY_SECS: f32 = 1.0;
 const FLOAT_SECS: f32 = 5.5;
 const HANG_GRACE: f32 = 0.5;
 /// The pose held through the hang: the Jump clip (38), a character's mid-air pose with the legs
-/// drawn up (1.12 has no hover of its own), looped by the client as a reaction's hold.
+/// drawn up (1.12 has no hover of its own), played on the lower body only for the whole hang
+/// (`ClipBody::Lower`): the arms stay on the bow's draw.
 const HOVER_CLIP: u16 = 38;
 /// After the volley: feather fall, untouchable, till they land (or this long at most).
 const DESCENT_SECS: f32 = 3.0;
@@ -767,9 +768,10 @@ impl Survival {
         self.draw_bow(id);
         // Hung in the air in a hover's pose, not standing on nothing (Corey's review: "it looks
         // like they're just standing in the air. The legs are the problem"): the Jump clip's
-        // mid-air pose, the legs drawn up, held for the whole hang; the bow's draw plays over it.
-        // Let go as the hang ends (`end_hang`).
-        self.events.push(Event::React { id, anim: HOVER_CLIP, from: h.top, lean: 0.0, hold: FLOAT_SECS + HANG_GRACE + 0.5, fit: 0.0 });
+        // mid-air pose, the legs drawn up, held for the whole hang. On the legs only: the arms
+        // keep drawing the bow (his second review: a whole-body hold "ruined" it, "his arms still
+        // need to be drawing a bow"). Let go as the hang ends (`end_hang`).
+        self.events.push(Event::Clip { id, clip: HOVER_CLIP, take: 0, from: None, secs: FLOAT_SECS + HANG_GRACE + 0.5, at: 0.0, body: ClipBody::Lower });
         self.events.push(Event::Abilities { player: id });
     }
 
