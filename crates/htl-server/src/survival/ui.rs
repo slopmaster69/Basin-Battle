@@ -363,7 +363,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 27: the add-on says `ac23` (patches 0037 to 0040).
 /// 28: a fan of projectiles (Multi-Shot) aims with a fan on the reticle, not a strip on the
 /// ground (the `AB` line's shape `fan`).
-pub(crate) const ADDON_NEWEST: u32 = 28;
+/// 29: the `ML` line's spin axis (a tumble, patch 0036).
+pub(crate) const ADDON_NEWEST: u32 = 29;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1247,7 +1248,7 @@ impl SurvivalGame {
                 // `ac20` draws a missile's look (patch 0030): every spell's that has one.
                 if level >= super::draw::MISSILE_LOOK_LEVEL {
                     for l in &self.sim.content.missile_looks {
-                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None));
+                        self.ui_line(conn, &super::draw::missile_look_line(l.spell, &l.trail, l.width, l.secs, l.scale, l.spin, None, l.tumble));
                     }
                 }
                 // An older add-on or client: say so, and how to update (on screen and in chat).
