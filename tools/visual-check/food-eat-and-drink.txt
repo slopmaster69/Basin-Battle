@@ -1,0 +1,13 @@
+# Eating and drinking (T, here .es eat): a Roast eaten, then a Tonic drunk (#121).
+# Look for: the hero eating, hand to mouth (the /eat clip), not a spell's cast and its glow; then
+# the drink the same way (the 1.12 client has no drinking clip of its own, so it plays /eat too).
+# The camera looks at the hero's face.
+hero hunter
+cam 180 -5 5
+include _setup
+5.0 .es give roast 1
+5.2 .es give tonic 1
+6.0 .es eat
+5.8 shots eat 20 0.08
+9.0 .es eat
+8.8 shots drink 16 0.08

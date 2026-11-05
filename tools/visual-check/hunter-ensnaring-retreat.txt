@@ -1,0 +1,27 @@
+# Ensnaring Retreat (1) with a creature close in front, three ways (Corey's review): standing
+# still, strafing sideways, and pressed mid-jump. Each leap goes back 12 yd with the flip and nets
+# the creature; a fresh creature is put in front for the next. Look for: the flip (the Undead
+# woman's), its height (more than before), the net on the creature, and that the second and third
+# still leap and net.
+hero hunter
+cam 70 -10 11
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 4 still
+5.0 .es slot 1 ensnaring_retreat
+# 1: standing still.
+6.5 .es in ab 2 0
+6.3 shots still 5 0.3
+# 2: strafing left (a sidestep at a walk), pressed halfway through it.
+9.0 .es target clear
+9.2 .es target grunt 4 still
+10.0 lua ActionDash(1.2, 6, "l")
+10.5 .es in ab 2 0
+10.3 shots strafe 5 0.3
+# 3: mid-jump, pressed near the top of it.
+13.0 .es target clear
+13.2 .es target grunt 4 still
+14.0 .es hop 1.6
+14.3 .es in ab 2 0
+13.9 shots jump 6 0.25
+17 end

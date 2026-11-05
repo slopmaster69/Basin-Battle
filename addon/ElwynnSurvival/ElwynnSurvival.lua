@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 20
+local VERSION = 23
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2198,17 +2198,22 @@ function ES.ChargeCamera(d, share)
     end
     return
   end
+  -- Deeper the longer it's held (Corey's review: "zoom in more and more the longer you hold
+  -- it"): from the aiming camera's 2.4 down to 1.1 at a full draw, 1.3 for the ultimate, which
+  -- holds longer (at 0.8 the camera was inside the hero: the body went and the bowstring stood
+  -- alone, run 060).
   local ult = d.n == 5
-  local dist = 2.4 - (ult and 1.3 or 0.9) * share
+  local dist = 2.4 - (ult and 1.1 or 1.3) * share
   if not ES.chargeCam or math.abs(ES.chargeCam - dist) > 0.04 then
     ES.chargeCam = dist
     SetAimCamera(1, dist, 0.75 - 0.2 * share, 0.25)
   end
+  -- Full draw: the view trembles until the shot goes.
   if share >= 1 and ShakeCamera then
     local now = GetTime()
     if not ES.chargeShakeAt or now >= ES.chargeShakeAt then
       ES.chargeShakeAt = now + 0.15
-      ShakeCamera(ult and 0.9 or 0.5, 0.18, 22)
+      ShakeCamera(ult and 1.4 or 0.9, 0.18, 22)
     end
   end
 end
@@ -2221,10 +2226,16 @@ function ES.ChargeFull(d)
   aim.burstAt = GetTime()
   aim.burstColor = { r, g, b }
   aim.burst:Show()
-  empower.edge:SetVertexColor(r, g, b, 1)
-  empower.flash = 0.55
-  empower:Show()
-  if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  -- A bow's full draw is the reticle's bloom and the tremble (ChargeCamera): no flash over the
+  -- whole screen and no kick (Corey's review of Aimed Shot and Kill Shot: it read as a strange
+  -- buff going off). Other charges keep theirs.
+  local bow = d and d.school == "hunter"
+  if not bow then
+    empower.edge:SetVertexColor(r, g, b, 1)
+    empower.flash = 0.55
+    empower:Show()
+    if ShakeCamera then ShakeCamera(1.8, 0.22) end
+  end
   local bar = ES.abar
   if d and bar and bar.slots[d.n] then bar.slots[d.n].fullAt = GetTime() end
 end
@@ -6523,6 +6534,8 @@ function ES.Line(line)
     if ES.OwnMeter then ES.OwnMeter(f) end
   elseif verb == "DM" then
     if ES.FightMeter then ES.FightMeter(f) end
+  elseif verb == "LB" then
+    if ES.LabLine then ES.LabLine(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "WD" then
@@ -6640,8 +6653,11 @@ events:SetScript("OnEvent", function()
     -- ac10: a clip can come from another character model; ac11: its turns go back to rest after;
     -- ac12: the night's fog (SetWorldFog), previews that follow the hero, Westbrook's garrison gone.
     -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
-    -- ac18: a shape flashed on the ground as an ability lands (0026).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
+    -- ac18: a shape flashed on the ground as an ability lands (0026); ac19: an object drawn longer
+    -- along one axis, and the dig site's rope (0028, Tripwire's wire).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 19 then
+      Say(".es hello " .. VERSION .. " ac19")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
       Say(".es hello " .. VERSION .. " ac18")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and (tonumber(HasActionCombat()) or 0) >= 17 then
       Say(".es hello " .. VERSION .. " ac17")

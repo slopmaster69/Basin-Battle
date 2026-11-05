@@ -1,0 +1,17 @@
+# No words (#135), a critical: Fan of Knives (Q) Marks a creature 2 yd off, then Backstab (E)
+# from the front finds the Mark and crits. Look for: Heroic Strike's flash on the creature, a
+# heavy weapon's crit sound, the sharp camera kick; no "Critical!".
+hero hunter
+cam 50 -12 9
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 2 still
+5.0 .es slot q fan_of_knives
+5.2 .es slot e backstab
+6.0 .es in ab 0 0                    # Fan of Knives: all three knives Mark it up close
+6.4 .es in a {facing} 0.0
+6.5 .es in au {facing} 0.0
+8.0 .es in ab 1 0                    # Backstab, from in front: the Mark makes it a critical
+7.8 shots crit 10 0.2
+10.0 .es cc log
+12 end

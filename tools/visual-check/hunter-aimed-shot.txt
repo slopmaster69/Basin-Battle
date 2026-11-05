@@ -1,0 +1,17 @@
+# Aimed Shot (Q): a full draw held at a creature 25 yd off, then let go; then a quick shot into the
+# ground. Look for: the bow raised and drawn with its string, the hold at full draw, the arrow's
+# flight and hit at range, no buff look on the hunter after (#110: 3 and 7; Corey's review, Nov 3).
+hero hunter
+cam 0 -8 8
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 25 still
+5.0 .es slot q aimed_arrow
+6.0 .es in ab 0 0                    # Q: aiming
+6.5 .es in a {facing} 0.0            # left button down: the draw
+9.5 .es in au {facing} 0.0           # let go after holding the full draw a while
+6.0 shots draw 8 0.5
+12.0 .es in ab 0 0
+12.4 .es in a {facing} -0.3          # down into the ground about 6 yd ahead
+12.5 .es in au {facing} -0.3
+16 end
