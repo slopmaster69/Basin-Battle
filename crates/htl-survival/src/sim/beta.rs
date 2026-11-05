@@ -599,6 +599,12 @@ impl Survival {
         if p.owner == v || (p.allies && self.players.contains_key(&v) && self.helpable(p.owner, v)) {
             return false;
         }
+        // Spell Mirror raised too soon: it's only swallowed (gone where it reached them).
+        if !self.mirror_in_time(v, stance) {
+            p.left = 0.0;
+            self.swallowed(v, stance);
+            return true;
+        }
         let thrower = p.owner;
         let back = self.unit_pos(thrower).map(|o| [o[0], o[1], o[2] + 1.0]);
         let range = AbilityDef::at(self.content.abilities[p.ability].range, p.share).max(4.0);
@@ -627,6 +633,10 @@ impl Survival {
         }
         let found = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius.max(HERO_SIZE)).find_map(|(h, _)| self.mirror_of(*h).map(|s| (*h, s)));
         let Some((h, stance)) = found else { return false };
+        if !self.mirror_in_time(h, stance) {
+            self.swallowed(h, stance);
+            return true;
+        }
         let (Some(start), Some(to)) = (self.unit_pos(h), self.unit_pos(m.owner)) else { return false };
         let start = [start[0], start[1], start[2] + HAND_UP];
         let to = [to[0], to[1], to[2] + 1.0];
@@ -659,8 +669,27 @@ impl Survival {
         true
     }
 
+    /// Whether what reaches `v` now flies back: always, but a perfect mirror only within
+    /// `[checks] window` of raising it (judged on the hero's own screen: their round trip back).
+    fn mirror_in_time(&self, v: Id, stance: usize) -> bool {
+        if !self.content.abilities[stance].counter.as_ref().is_some_and(|c| c.perfect_mirror) {
+            return true;
+        }
+        let Some(s) = self.stances.get(&v) else { return true };
+        let rtt = self.players.get(&v).map_or(0.0, |p| p.rtt.min(self.content.combat.max_rewind));
+        self.clock - s.since <= self.content.checks.window + rtt + 1.0e-4
+    }
+
+    /// A perfect mirror raised too soon swallowed something: its look on the hero, nothing more.
+    fn swallowed(&mut self, v: Id, stance: usize) {
+        let d = &self.content.abilities[stance];
+        let look = if d.charge_spell != 0 { d.charge_spell } else { d.spell };
+        self.events.push(Event::Missile { caster: v, spell: look, target: Target::Unit(v) });
+    }
+
     /// A mirror caught something: Valor and its name for the hero, its look, what it does to the
-    /// thrower (as a counter's `attacker`), and a `once` stance ends.
+    /// thrower (as a counter's `attacker`), and a `once` stance ends. A perfect mirror's catch
+    /// is a perfect (the burst, no name).
     fn mirror_caught(&mut self, v: Id, stance: usize, thrower: Id) {
         let d = self.content.abilities[stance].clone();
         let Some(c) = d.counter.clone() else { return };
@@ -669,7 +698,15 @@ impl Survival {
         }
         if self.players.contains_key(&v) {
             self.gain_valor(v, self.content.valor.counter);
-            self.events.push(Event::Flash { player: v, text: d.name.clone() });
+            if c.perfect_mirror {
+                let k = self.content.checks.perfect_kit;
+                if k != 0 {
+                    self.events.push(Event::Visual { id: v, kit: k, by: None });
+                }
+                self.events.push(Event::Perfect { player: v, ability: stance });
+            } else {
+                self.events.push(Event::Flash { player: v, text: d.name.clone() });
+            }
         }
         self.events.push(Event::Missile { caster: v, spell: d.spell, target: Target::Unit(v) });
         let close = self.unit_pos(thrower).zip(self.unit_pos(v)).is_some_and(|(a, b)| dist2d(a, b) <= 6.0);

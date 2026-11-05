@@ -116,6 +116,8 @@ pub struct Stance {
     pub ability: usize,
     pub until: f32,
     pub caught: bool,
+    /// When it was raised (a perfect mirror's window runs from it).
+    pub since: f32,
     /// When its lasting look (an `aura` apart from its `spell`: Shield Wall's circling shields)
     /// was last played on the body; it's played again every [`STANCE_LOOK_EVERY`] while it holds.
     pub shown: f32,
@@ -1331,9 +1333,14 @@ impl Survival {
             if let Some(v) = t.unit {
                 let from = p.pos;
                 p.pos = t.point;
-                // A mirror's stance turns a foe's projectile back at whoever threw it.
+                // A mirror's stance turns a foe's projectile back at whoever threw it (one raised
+                // too soon swallows it: nothing left of it).
                 if self.mirrors(&mut p, v) {
-                    keep.push(p);
+                    if p.left > 0.0 {
+                        keep.push(p);
+                    } else {
+                        self.drop_look(&p);
+                    }
                     continue;
                 }
                 // A sticky one sticks to what it strikes (a friend it's for is met as ever).
@@ -3032,7 +3039,7 @@ impl Survival {
     fn start_stance(&mut self, id: Id, ability: usize) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, shown: now - STANCE_LOOK_EVERY });
+        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, since: now, shown: now - STANCE_LOOK_EVERY });
         self.set_action(id, Action::Stance { ability, until: now + d.secs });
         if d.counter.as_ref().is_some_and(|c| c.guard_pose) {
             self.events.push(Event::Guard { player: id, up: true });
@@ -3359,7 +3366,7 @@ impl Survival {
                 let free = !self.stances.contains_key(&mid);
                 if free && (now % 4.0) < 0.06 {
                     let secs = self.content.abilities[a].secs;
-                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, shown: now - STANCE_LOOK_EVERY });
+                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, since: now, shown: now - STANCE_LOOK_EVERY });
                     self.events.push(Event::Auras { id: mid });
                 }
             }

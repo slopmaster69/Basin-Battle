@@ -3936,6 +3936,49 @@ aura = 11958
 leaves = "frost_nova"
 counter = { immune = true }
 
+# The rhythm check on a mark: it pulses once a second, and the step back on a pulse is a perfect
+# that throws back what's near. Half the health lost comes back, against heroes too (Corey).
+# (The Mage design, claude/mage-kit-draft.md: Arcane keeps the beat.)
+[[ability]]
+key = "alter_time"
+name = "Alter Time"
+text = "Marks where you stand. Press again within 5 sec to return to the mark and get back half the health you lost since. The mark pulses once a second: return on a pulse to knock back enemies within 4 yd."
+icon = "Spell_Nature_TimeStop"
+school = "mage"
+slot = "defense"
+choice = 2
+kind = "blink"
+anchor = 5.0
+pulse = 1.0
+rewind_health = 0.5
+radius = [4.0, 4.0]
+cleanse = true
+stop_effects = [{ kind = "knockback", amount = 3.0 }]
+cooldown = 20.0
+# Blink's flash going and coming back, and at the mark as it pulses; Arcane Missiles' beat in the
+# hands on each pulse.
+spell = 1953
+charge_spell = 1953
+tick_spell = 1953
+beat_kit = 448
+
+# The counter check: only what reaches you within the window of raising it flies back.
+[[ability]]
+key = "spell_mirror"
+name = "Spell Mirror"
+ex_of = "alter_time"
+text = "Raises a mirror for 0.8 sec. A bolt, arrow or spell that reaches you as you raise it flies back at whoever cast it. Later, the mirror only absorbs it."
+icon = "Spell_Arcane_ArcaneResilience"
+slot = "defense"
+kind = "stance"
+valor = 25
+secs = 0.8
+# Magic Reflection's mirror while it's up; the ward's look as it absorbs.
+spell = 20223
+aura = 20223
+charge_spell = 1463
+counter = { mirror = true, perfect_mirror = true, once = true }
+
 # The Warden: the defense you give away.
 [[ability]]
 key = "blessing_of_protection"
@@ -11084,7 +11127,7 @@ trial = ["trial_relic_paladin_0"]
 key = "relic_mage"
 name = "An Apprentice's Satchel"
 at = [-9432.0, -553.0]
-teaches = ["blink", "ice_block", "living_bomb"]
+teaches = ["blink", "ice_block", "living_bomb", "alter_time"]
 loot = { mageroyal = 3 }
 display = 259
 secret = 7.0

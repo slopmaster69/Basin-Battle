@@ -386,6 +386,15 @@ pub struct AbilityDef {
     /// again within this many seconds, the hero steps back to it.
     #[serde(default)]
     pub anchor: f32,
+    /// Alter Time (the rhythm check, on an anchor): the mark pulses every this many seconds
+    /// (`tick_spell` at it, `beat_kit` on the hero); the step back within `[checks] window` of a
+    /// pulse is a perfect: foes within `radius` get `stop_effects` (the throw back), and the
+    /// perfect's Valor and look.
+    #[serde(default)]
+    pub pulse: f32,
+    /// The step back to the anchor gives back this share of the health lost since it was set.
+    #[serde(default)]
+    pub rewind_health: f32,
     /// Another ability fired as well, at once, from the same aim (a Disengage's Net).
     #[serde(default)]
     pub also: String,
@@ -981,6 +990,11 @@ pub struct CounterDef {
     /// through as ever. Nothing else (no block, dodge, ward or `reflect` with it).
     #[serde(default)]
     pub mirror: bool,
+    /// The counter check on a mirror (Spell Mirror): only what reaches the hero within
+    /// `[checks] window` of raising it (plus their round trip) flies back, a perfect; later in the
+    /// stance it's only swallowed.
+    #[serde(default)]
+    pub perfect_mirror: bool,
     /// A counter that catches something comes back this much sooner (a share of its cooldown).
     #[serde(default = "half")]
     pub caught_cooldown: f32,

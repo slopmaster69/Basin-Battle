@@ -92,3 +92,5 @@ mod tests_orb;
 mod tests_rhythm;
 #[cfg(test)]
 mod tests_bomb;
+#[cfg(test)]
+mod tests_alter;
