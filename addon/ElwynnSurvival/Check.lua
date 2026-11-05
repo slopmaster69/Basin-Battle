@@ -99,11 +99,11 @@ ES.check = check
 -- the barrier's colour; the Arcane staff's bolt bright pink).
 local ARCANE_PINK = "FF4FE6"
 local TINTS = {
-  ["Spells\CounterSpell_Impact_Chest"] = ARCANE_PINK, -- the ward's crackle
-  ["Spells\arcanepower_state_chest"] = ARCANE_PINK,   -- the barrier while it's up
-  ["Spells\ArcaneExplosion_Impact_Chest"] = ARCANE_PINK, -- a perfect ward's burst
-  ["Spells\ManaBurn_Chest"] = ARCANE_PINK,            -- the ward breaking
-  ["Spells\LightningStreak_Missile"] = ARCANE_PINK,   -- the Arcane staff's bolt
+  ["Spells\\CounterSpell_Impact_Chest"] = ARCANE_PINK, -- the ward's crackle
+  ["Spells\\arcanepower_state_chest"] = ARCANE_PINK,   -- the barrier while it's up
+  ["Spells\\ArcaneExplosion_Impact_Chest"] = ARCANE_PINK, -- a perfect ward's burst
+  ["Spells\\ManaBurn_Chest"] = ARCANE_PINK,            -- the ward breaking
+  ["Spells\\LightningStreak_Missile"] = ARCANE_PINK,   -- the Arcane staff's bolt
 }
 if SetEffectTint then
   for model, colour in pairs(TINTS) do SetEffectTint(model, colour) end
