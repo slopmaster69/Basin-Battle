@@ -194,6 +194,9 @@ pub enum Event {
     /// A skill check's outcome: "critical", "perfect", "good", "weak" (early, it went weaker),
     /// "fail" (a missed beat, a stop on nothing) or "fizzle" (all or nothing, and nothing).
     CheckResult { player: Id, ability: usize, grade: &'static str },
+    /// The ward's own check: a perfect ward ("perfect") or the ward breaking ("fail"), for the
+    /// warder's add-on to flash as a spell's check does.
+    WardCheck { player: Id, grade: &'static str },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
