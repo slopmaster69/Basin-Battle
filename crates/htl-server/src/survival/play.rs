@@ -738,8 +738,8 @@ impl SurvivalGame {
                 let c = &self.sim.content;
                 let Some(colour) = c.abilities.get(ability).and_then(|d| d.bounce_trail.get((bounce as usize).min(d.bounce_trail.len().saturating_sub(1)))) else { return };
                 let base = c.missile_looks.iter().find(|l| l.spell == spell);
-                let (width, secs, scale, spin) = base.map_or((0.3, 0.4, 1.0, 0.0), |l| (l.width.max(0.3), l.secs.max(0.4), l.scale, l.spin));
-                let line = super::draw::missile_look_line(spell, colour, width, secs, scale, spin, Some(g));
+                let (width, secs, scale, spin, tumble) = base.map_or((0.3, 0.4, 1.0, 0.0, false), |l| (l.width.max(0.3), l.secs.max(0.4), l.scale, l.spin, l.tumble));
+                let line = super::draw::missile_look_line(spell, colour, width, secs, scale, spin, Some(g), tumble);
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::MISSILE_LOOK_LEVEL).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     self.ui_line(c, &line);
