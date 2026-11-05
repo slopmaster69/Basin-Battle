@@ -727,9 +727,9 @@ fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() 
     assert_eq!(beats(&ev, "kill_shot", None), 0, "no speed lines for a shot that never went");
     assert_eq!(s.players[&p].action, Action::Ready);
     assert_eq!(s.players[&p].valor, 100.0, "nothing spent");
-    // The whole draw.
+    // The whole draw (1.3 s now: longer than Aimed Shot's, Corey's review).
     press(&mut s, p, "kill_shot", false);
-    let mut ev = draw(&mut s, p, 1.1, aim, &pins);
+    let mut ev = draw(&mut s, p, 1.4, aim, &pins);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
     assert_eq!(missiles(&ev, p, arrow), 1, "loosed");
     assert_eq!(hits(&ev, p, first).len(), 1, "the first struck");
@@ -779,7 +779,7 @@ fn kill_shots_draw_winds_the_hunter_up_and_the_release_or_the_let_go_takes_it_of
     assert!(!s.auras_of(p).contains(&look), "and the wind-up off her");
     // The whole draw: on her till the release, off as the shot goes.
     press(&mut s, p, "kill_shot", false);
-    let ev = draw(&mut s, p, 1.1, aim, &[m]);
+    let ev = draw(&mut s, p, 1.4, aim, &[m]);
     assert_eq!(missiles(&ev, p, s.content.abilities[idx(&s, "kill_shot")].spell), 1, "loosed");
     assert!(shown(&ev), "her slots shown as it goes");
     assert!(!s.auras_of(p).contains(&look), "the wind-up gone with the shot");
@@ -1082,7 +1082,8 @@ fn a_planted_arrow_stands_full_size_with_no_ring_under_it_and_goes_in_time() {
     assert_eq!((look.display, look.scale), (PLANT_LOOK, PLANT_SCALE));
     assert!(look.scale >= 1.0, "not shrunk: {}", look.scale);
     assert!((look.pos[0] - 10.0).abs() < 0.1 && (look.pos[1] - 2.0).abs() < 0.1, "where it landed: {:?}", look.pos);
-    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "no ring on the ground");
+    // No ring on the ground (a glow under it, a spell's own ground look, is not a ring).
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { ground: 0, .. })), "no ring on the ground");
     let ev = run(&mut s, PLANT_SECS + 0.2);
     assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "the arrow fades");
     assert!(s.planted_of(p).is_empty());
@@ -1126,7 +1127,8 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "none flies yet");
     assert!(!ev.iter().any(|e| matches!(e, Event::ObjGone { .. })), "none leaves the ground yet");
     ev.extend(run(&mut s, 0.15));
-    let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
+    // The arrows fly home as the Hunter's arrow; the key itself plays no buff (its spell is 0).
+    let spell = crate::sim::hunter::RECALL_ARROW;
     let mut anchors = Vec::new();
     for a in &planted {
         let gone = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)).expect("its arrow leaves the ground");
