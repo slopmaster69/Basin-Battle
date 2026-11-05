@@ -154,8 +154,9 @@ jobs:
 
       # Play opens on this runner as on a player's PC: its window, the menu in WebView2, the map
       # drawn. A picture of the screen is kept as an artifact. What it wrote while it ran (its log,
-      # settings.txt) is removed before the zip is made.
+      # settings.txt) is removed before the zip is made. A dev build has no Play to open.
       - name: Play opens its menu
+        if: ${{ !inputs.dev }}
         shell: pwsh
         run: |
           $out = "dist-out/$env:PACKAGE"
@@ -177,7 +178,7 @@ jobs:
           if (-not $drawn) { throw "Play's menu didn't open (see the picture in the play-menu artifact)" }
 
       - name: The picture of Play's menu
-        if: always()
+        if: ${{ always() && !inputs.dev }}
         uses: actions/upload-artifact@v7
         with:
           name: play-menu
@@ -186,6 +187,7 @@ jobs:
           retention-days: 7
 
       - name: Zip
+        if: ${{ !inputs.dev }}
         shell: pwsh
         run: Compress-Archive -Path "dist-out/$env:PACKAGE" -DestinationPath "dist-out/$env:PACKAGE.zip"
 
