@@ -6220,6 +6220,10 @@ bench = true
 # Held, as hard as the hold: no skill check (the spells have those). It spends the foe's heat.
 charge = [0.3, 1.2]
 spends = "heat"
+# The build-up (Corey: the heavy rushed): the staff held at the ready the whole charge (Ready2HL,
+# 28), Fireball's cast flare in the hands as it begins.
+charge_pose = 28
+charge_kit = 38
 stamina = 22.0
 damage = [24.0, 34.0]
 range = [30.0, 30.0]
@@ -6266,6 +6270,10 @@ bench = true
 # Held, as hard as the hold: no skill check. It spends the chill, and shatters the frozen.
 charge = [0.3, 1.2]
 spends = "chill"
+# The build-up (Corey: the heavy rushed): the staff held at the ready the whole charge (Ready2HL,
+# 28), Cone of Cold's spray in the hands as it begins.
+charge_pose = 28
+charge_kit = 1027
 shatter = true
 stamina = 22.0
 damage = [20.0, 30.0]
@@ -6315,6 +6323,10 @@ bench = true
 # strength and its look by how many (`[staffs] charge_scale`, `charge_spells`).
 charge = [0.3, 1.2]
 spends = "charge"
+# The build-up (Corey: the heavy rushed): the staff held at the ready the whole charge (Ready2HL,
+# 28), Blink's violet flash in the hands as it begins.
+charge_pose = 28
+charge_kit = 3394
 stamina = 20.0
 damage = [32.0, 48.0]
 crit_effects = [{ kind = "knockback", amount = 3.0 }]

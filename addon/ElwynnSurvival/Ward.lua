@@ -184,11 +184,15 @@ ES.PlaceWard()
 -- hexagon lattice stands round them on a client with SetUnitSprite (patch 0045): whole, cracked
 -- once below two thirds, twice below a third, dimmer as it drains. A stopped blow shakes it and
 -- flashes it, a perfect ward flares and swells it, a broken one shatters into shards and fades.
--- The slim bar under stamina is no longer shown.
+-- The slim bar under stamina is no longer shown. Each state is animated: the lattice turns slowly
+-- and breathes, flickers more the less is left, shakes on a block, swells on a perfect; the shatter
+-- flies outward; broken, Corey's cracked rune bobs over the head, pulsing, until the bar is whole.
 
 local BARRIER = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
-local SIZE = 2.6      -- yards across
+local SIZE = 1.9      -- yards across
+local ASPECT = 1.4    -- times as tall: an upright oval round the body (Corey: fits the models)
 local HEIGHT = 1.05   -- its middle, yards up the body
+local DEBUFF_UP = 2.55 -- the broken ward's mark, yards up (over the head)
 local wards = {}      -- by unit ("player" or a guid): up, share, broken, alpha, hitAt, flareAt, breakAt
 
 local function Stage(share)
@@ -240,10 +244,13 @@ barrier:SetScript("OnUpdate", function()
   for unit, w in pairs(wards) do
     local key = "es_ward_" .. unit
     -- In quick, out a little slower; dimmer as it drains.
-    local want = w.up and (0.55 + 0.4 * w.share) or 0
+    local want = w.up and (0.4 + 0.4 * w.share) or 0
     local rate = w.up and 8 or 5
     w.alpha = w.alpha + (want - w.alpha) * math.min(1, dt * rate)
-    local size, spin, a = SIZE, now * 0.25, w.alpha
+    -- Alive: it turns and breathes, and flickers harder the less is left.
+    local size, spin, a = SIZE * (1 + 0.025 * math.sin(now * 2.2)), now * 0.15, w.alpha
+    local weak = 1 - w.share
+    a = a * (1 - weak * 0.4 * (0.5 + 0.5 * math.sin(now * 23 + math.sin(now * 7) * 3)))
     if w.hitAt then
       local t = (now - w.hitAt) / 0.25
       if t >= 1 then w.hitAt = nil else
@@ -261,16 +268,21 @@ barrier:SetScript("OnUpdate", function()
     end
     if a > 0.01 then
       any = true
-      SetUnitSprite(key, unit, BARRIER .. Stage(w.share), size, HEIGHT, 1, 1, 1, a, spin)
+      SetUnitSprite(key, unit, BARRIER .. Stage(w.share), size, HEIGHT, 1, 1, 1, a, spin, ASPECT)
     end
     if w.breakAt then
       local t = (now - w.breakAt) / 0.55
       if t >= 1 then w.breakAt = nil else
         any = true
-        SetUnitSprite(key .. "_shatter", unit, BARRIER .. "barrier_shatter", SIZE * (1 + 0.45 * t), HEIGHT, 1, 1, 1, 1 - t * t, now * 0.25)
+        SetUnitSprite(key .. "_shatter", unit, BARRIER .. "barrier_shatter", SIZE * (1 + 0.6 * t), HEIGHT, 1, 1, 1, 1 - t * t, now * 0.15, ASPECT)
       end
     end
-    if a <= 0.01 and not w.breakAt and not w.up then wards[unit] = nil end
+    -- Broken: the cracked rune over the head, bobbing and pulsing.
+    if w.broken then
+      any = true
+      SetUnitSprite(key .. "_debuff", unit, BARRIER .. "ward_debuff", 0.75, DEBUFF_UP + 0.07 * math.sin(now * 2.4), 1, 1, 1, 0.7 + 0.25 * math.sin(now * 4.2), 0, 1)
+    end
+    if a <= 0.01 and not w.breakAt and not w.up and not w.broken then wards[unit] = nil end
   end
   if not any and not next(wards) then this:Hide() end
 end)

@@ -532,6 +532,13 @@ pub struct AbilityDef {
     /// (a share of the sweep's time either side) is perfect, the stop's full effects; within
     /// `meter_good`, good, the stop's least (its `secs[0]`); off it, early or late, the jet's slow
     /// alone; never stopped, it runs into the overrun, a fail.
+    /// A held charge's build-up (a staff's heavy bolt): this clip held, looping, on the caster
+    /// while it charges (`WP`; a two-handed weapon's ready stance, the staff out), let go as it goes
+    /// or is called off; and this visual kit on them as the charge begins (0: none).
+    #[serde(default)]
+    pub charge_pose: u16,
+    #[serde(default)]
+    pub charge_kit: u32,
     #[serde(default)]
     pub meter: bool,
     #[serde(default)]

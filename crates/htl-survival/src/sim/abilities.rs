@@ -883,6 +883,13 @@ impl Survival {
         } else if d.clip == THROW_CLIP {
             self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0, body: ClipBody::Full });
         }
+        // A staff's heavy bolt builds up: the weapon held at the ready, a flash in the hands.
+        if d.charge_pose != 0 {
+            self.events.push(Event::HoldPose { id, clip: d.charge_pose, secs: (hi + d.hold.max(0.5)).min(9.5) });
+        }
+        if d.charge_kit != 0 {
+            self.events.push(Event::Visual { id, kit: d.charge_kit, by: None });
+        }
     }
 
     /// Left click let go: a charge goes (at what it's reached), or waits for its least.
@@ -979,6 +986,13 @@ impl Survival {
 
     /// An aim or a charge called off (right click, a roll, the key again): no cooldown spent.
     pub(crate) fn ability_cancel(&mut self, id: Id) {
+        // A build-up's held stance lets go.
+        if let Some(Action::Charge { ability, .. }) = self.players.get(&id).map(|p| &p.action) {
+            let pose = self.content.abilities[*ability].charge_pose;
+            if pose != 0 {
+                self.events.push(Event::HoldPose { id, clip: pose, secs: 0.0 });
+            }
+        }
         if matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Aim { .. } | Action::Charge { .. })) {
             self.end_ability_action(id);
             self.set_action(id, Action::Ready);
@@ -1091,6 +1105,11 @@ impl Survival {
 
     /// An ability goes, at `share` of its full charge.
     pub(crate) fn fire(&mut self, id: Id, ability: usize, share: f32) {
+        // A build-up's held stance lets go for the swing.
+        let pose = self.content.abilities[ability].charge_pose;
+        if pose != 0 {
+            self.events.push(Event::HoldPose { id, clip: pose, secs: 0.0 });
+        }
         self.fire_with(id, ability, share, false);
     }
 
