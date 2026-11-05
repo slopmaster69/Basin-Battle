@@ -647,8 +647,10 @@ impl Survival {
         m.posture = 0;
         m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
         self.stagger_mob(mid, POSTURE_BREAK, true);
-        self.events.push(Event::Flash { player: by, text: "Stance broken!".into() });
+        // No word: it reels, dust bursts off it, a great mace's crack on metal, and a heavy beat
+        // on the screen of the hero who broke it.
         self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
+        self.cue(Some(by), mid, 0, super::cues::SOUND_BREAK, super::cues::BEAT_BREAK);
         true
     }
 

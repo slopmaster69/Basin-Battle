@@ -169,7 +169,9 @@ fn backstab_does_three_times_from_behind_and_crits_on_a_mark_and_ambush_steps_be
     let ev = run_held(&mut s, k, 0.0, 0.6);
     let hit = hits_on(&ev, k);
     assert!(hit[0].0 as f32 >= lo * 1.2 * 3.0 - 1.0, "from behind: {}", hit[0].0);
-    assert!(flashed(&ev, p, "Backstab"));
+    // Shown, not said: the stab's look, a dagger's crit, a sharp beat.
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_BACKSTAB) && crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_BACKSTAB));
+    assert!(!flashed(&ev, p, "Backstab"), "no word");
     // Face to face: its plain share.
     run_held(&mut s, k, std::f32::consts::PI, 0.6);
     cast(&mut s, p, "close", "backstab", false);
@@ -181,7 +183,8 @@ fn backstab_does_three_times_from_behind_and_crits_on_a_mark_and_ambush_steps_be
     s.apply_cc(k, p, "mark", 8.0, 0.15, 0.0, "test");
     cast(&mut s, p, "close", "backstab", false);
     let ev = run_held(&mut s, k, std::f32::consts::PI, 0.6);
-    assert!(flashed(&ev, p, "Critical"));
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_CRIT) && crate::sim::cues::seen::looked(&ev, k, KIT_HEAVY) && crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_CRIT), "a critical's blow");
+    assert!(!flashed(&ev, p, "Critical"), "no word");
     // Ambush: a step behind the foe on the reticle first.
     calm(&mut s, k);
     let far = mob(&mut s, "brave", [9.0, 0.0, 0.0], std::f32::consts::PI);
@@ -271,7 +274,9 @@ fn a_death_mark_makes_everything_land_harder_and_a_kill_under_it_readies_every_c
     s.mobs.get_mut(&k).unwrap().health = 1;
     let ev = run(&mut s, 1.0);
     assert!(!s.alive(k));
-    assert!(flashed(&ev, p, "Death Mark"));
+    // Every key flares as it comes ready, with Cold Blood's sting: no word.
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_READIED) && crate::sim::cues::seen::sounded(&ev, p, crate::sim::cues::SOUND_READIED));
+    assert!(!flashed(&ev, p, "Death Mark"), "no word");
     assert!(s.players[&p].cooldowns.is_empty(), "every cooldown ready");
 }
 
@@ -310,7 +315,8 @@ fn cold_snap_freezes_what_is_near_as_the_ice_block_breaks_and_fire_shatters_it()
     s.set_aim_line(p, 0.0, 0.0);
     let mut ev = cast(&mut s, p, "ranged", "fireball", false);
     ev.extend(run(&mut s, 1.0));
-    assert!(flashed(&ev, p, "Shatter"));
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST) && crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_SHATTER), "the ice bursts");
+    assert!(!flashed(&ev, p, "Shatter"), "no word");
     assert!(!s.has_cc(k, "petrify"), "the ice is gone");
 }
 

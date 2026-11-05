@@ -122,7 +122,7 @@ a heavy blow in its recovery, a knockdown) takes a riposte: half again damage.
 **Giants can't be parried**: a boss that's a giant beast, an elemental or a construct (Old
 Blackfang, Rumbler, Fenrus, the Avatar of Agamaggan, Sneed's Shredder and the like: `unparryable`
 on the creature) swings a paw, a stomp or a slab of stone, not a blade. A guard still blocks it,
-but a guard raised just in time only blocks it too ("Too heavy to parry!"): dodge those instead.
+but a guard raised just in time only blocks it too (a shield's dull thud, no parry's clang): dodge those instead.
 Humanoid bosses can be parried as ever.
 
 **Attack windows**: a creature's wind-up goes through your blows, a heavy one too, so getting your
@@ -804,7 +804,7 @@ hero instead; a hazard (a cannon's blast, a spell's ground) keeps the **!** ever
 
 **Posture.** The heavy fighters and the champions have a stance to break: enough damage within six
 seconds (110 for the Overseer, 100 for the Brave, 130 for the Captain, 150 for the Shadow Hunter,
-240 for the Warlord) and it reels for a couple of seconds, open to a riposte ("Stance broken!").
+240 for the Warlord) and it reels for a couple of seconds, open to a riposte (dust bursts off it with a great crack, and the view shakes).
 Blows and parries both fill it (a parry a quarter of it, and a champion isn't stopped by one);
 it holds a second after the last, then drains, the whole of it over those six seconds. A boss's
 shows under its health bar, Sekiro's way: it fills from the middle out, amber, then orange, then

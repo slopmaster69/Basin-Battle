@@ -87,7 +87,7 @@ fn retaliation_parries_the_blow_and_answers_with_a_free_heavy_attack_nothing_can
     }
     assert!(heavy_swing(&s, b), "the parry throws Bren's heavy attack at once");
     assert_eq!(s.players[&b].health, hb, "Ayla's blow was parried");
-    assert!(flashed(&ev, b, "Parry!"), "told as a parry");
+    assert!(!flashed(&ev, b, "Parry!"), "no word: the parry shows and sounds (#135)");
     assert!(matches!(s.players[&a].action, Action::Stagger { .. }), "Ayla reels, as from any parry");
     assert!(s.players[&b].stamina > 40.0 + 20.0, "a parry's stamina back, and the heavy cost nothing: {}", s.players[&b].stamina);
     assert!(s.players[&b].opening_until > s.clock, "and a parry's opening");

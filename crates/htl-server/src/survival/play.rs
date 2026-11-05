@@ -552,6 +552,10 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Hear { player, sound } => {
+                // The stock client plays it itself: no add-on needed.
+                self.to_player(player, packets::play_sound(sound));
+            }
             Event::Hop { player, dir, speed, lift, roll, style } => {
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(c) = self.conn_of(player) else { return };
@@ -854,7 +858,10 @@ impl SurvivalGame {
                 // looks and sounds): nothing is forced on anyone else's view.
                 let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
                 if let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) {
-                    self.ui_line(c, &format!("BT\t{}\t{g:#X}", clean(&beat)));
+                    // Kill Shot's weight goes as `BT`; an outcome's beat (`cues::BEAT_*`) as `CU`, where the
+                    // add-on plays its hit-stop, shake and kick.
+                    let line = if beat.starts_with("kill_shot") { "BT" } else { "CU" };
+                    self.ui_line(c, &format!("{line}\t{}\t{g:#X}", clean(&beat)));
                 }
             }
             Event::Auras { id } => self.show_auras(id),

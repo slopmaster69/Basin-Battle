@@ -804,6 +804,14 @@ pub fn play_object_sound(guid: u64, sound: u32) -> Packet {
     Packet::new(op::SMSG_PLAY_OBJECT_SOUND, b)
 }
 
+/// `SMSG_PLAY_SOUND`: a sound kit (`SoundEntries.dbc`) played flat, to whoever it's sent to (a
+/// hero's own voice on a refusal).
+pub fn play_sound(sound: u32) -> Packet {
+    let mut b = Body::new();
+    b.u32(sound);
+    Packet::new(op::SMSG_PLAY_SOUND, b)
+}
+
 /// `SMSG_PLAY_SPELL_VISUAL`: a spell visual kit (an impact's look and sound) on a unit.
 pub fn play_spell_visual(guid: u64, kit: u32) -> Packet {
     let mut b = Body::new();

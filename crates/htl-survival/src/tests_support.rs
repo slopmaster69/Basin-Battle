@@ -143,7 +143,9 @@ fn help_aimed_at_a_friend_heals_and_shields_them_not_the_caster() {
     assert!(s.has_cc(b, "shield"), "his shield");
     assert_eq!(s.players[&a].health, ha, "not hers");
     assert!(!s.has_cc(a, "shield"), "no shield on her");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == a && text.contains("Bren"))), "she's told");
+    // No word: her look lands on him and her green number for him shows.
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, .. } if *healer == a && *target == b)), "she sees what she mended");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == a)), "no word");
 }
 
 #[test]

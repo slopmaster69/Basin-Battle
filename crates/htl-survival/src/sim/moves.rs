@@ -596,7 +596,7 @@ impl Survival {
         }
         let mark = self.mark_kind(pos, 1.5, d.anchor, true);
         self.events.push(Event::Missile { caster: id, spell: d.charge_spell.max(d.spell), target: Target::Point(pos) });
-        self.events.push(Event::Flash { player: id, text: format!("Cast {} again to return", d.name) });
+        // No word: the circle on the ground is where the key (lit for its recast) brings them back.
         self.anchors.insert(id, Anchor { ability: base, at: pos, until: now + d.anchor, mark });
         self.events.push(Event::Abilities { player: id });
     }
@@ -641,7 +641,8 @@ impl Survival {
         let Some(t) = hit.cloned() else { return false };
         let at = self.mobs[&t.mob].pos;
         self.events.push(Event::Missile { caster: p.owner, spell: p.spell, target: Target::Point([at[0], at[1], at[2] + 1.0]) });
-        self.events.push(Event::Flash { player: t.owner, text: "Grounded".into() });
+        // No word: the missile flies into the totem, which swallows it and breaks.
+        self.grounding_breaks(t.mob);
         self.remove_totem(t.mob);
         true
     }
@@ -652,9 +653,14 @@ impl Survival {
             self.content.abilities[t.ability].grounding && self.mobs.get(&t.mob).is_some_and(|m| dist2d(m.pos, at) <= self.content.abilities[t.ability].totem.as_ref().map_or(8.0, |x| x.radius))
         });
         let Some(t) = hit.cloned() else { return false };
-        self.events.push(Event::Flash { player: t.owner, text: "Grounded".into() });
+        self.grounding_breaks(t.mob);
         self.remove_totem(t.mob);
         true
+    }
+
+    /// A grounding totem swallowing a missile: its absorb and a puff of dust as it breaks.
+    fn grounding_breaks(&mut self, totem: Id) {
+        self.cue(None, totem, super::combat::KIT_DUST, super::cues::SOUND_ABSORB, "");
     }
 
     // --- every tick -----------------------------------------------------------------------------------

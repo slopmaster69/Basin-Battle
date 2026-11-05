@@ -613,7 +613,7 @@ impl Survival {
         let mine: Vec<Planted> = self.hunt.planted.iter().filter(|a| a.owner == id).cloned().collect();
         self.hunt.planted.retain(|a| a.owner != id);
         if mine.is_empty() {
-            self.events.push(Event::Flash { player: id, text: "No arrows planted".into() });
+            self.refuse(id, "No arrows planted", cues::Vocal::NoArrows);
             return;
         }
         self.events.push(Event::Pose { id, pose: RECALL_POSE });
@@ -976,7 +976,7 @@ impl Survival {
         }
         let range = AbilityDef::at(d.range, 1.0);
         let Some(target) = self.beast_target(id, range, w.next) else {
-            self.events.push(Event::Flash { player: id, text: "No enemy in range".into() });
+            self.refuse(id, "No enemy in range", cues::Vocal::OutOfRange);
             self.hunt.wild.insert(id, w);
             // No beast went: its recharge isn't spent either.
             let base = self.content.base_of(ability);

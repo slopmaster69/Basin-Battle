@@ -69,6 +69,8 @@ pub(crate) struct Later {
     pub victim: Id,
     pub effects: Vec<AbilityEffect>,
     pub source: String,
+    /// A body hitting the wall it was thrown at: its crash shows as it lands.
+    pub slam: bool,
 }
 
 /// An echo a hero left (`ability`, the card): where, with what health, and how they come back to
@@ -125,6 +127,11 @@ impl Survival {
         self.beta.later = keep;
         for l in due {
             if self.alive(l.victim) {
+                if l.slam {
+                    // No word: it crashes into the wall, dust and a boulder's thud, and a hard beat
+                    // for the hero who threw it.
+                    self.cue(Some(l.owner), l.victim, combat::KIT_DUST, cues::SOUND_WALL, cues::BEAT_WALL);
+                }
                 self.apply_effects(l.owner, l.victim, &l.effects, 1.0, &l.source);
             }
         }
@@ -308,8 +315,8 @@ impl Survival {
             return;
         }
         if self.holds_ground(v) || self.immune(v) || self.unstaggerable(v) {
-            let text = format!("{} holds its ground", self.unit_name(v));
-            self.events.push(Event::Flash { player: id, text });
+            // No word: the swap glances off it in a clash of sparks, as any control it shrugs off.
+            self.events.push(Event::Visual { id: v, kit: combat::KIT_PARRY, by: None });
             return;
         }
         let (Some(a), Some(b)) = (self.unit_pos(id), self.unit_pos(v)) else { return };
@@ -436,11 +443,10 @@ impl Survival {
         let pull = AbilityEffect { kind: "pull".into(), amount: dist2d(a, b) + 1.0, lift: TETHER_LIFT, from_caster: true, vs_bosses: d.slot == "ultimate", ..Default::default() };
         self.displace(t.owner, t.foe, &pull);
         if !d.tether_effects.is_empty() {
-            self.beta.later.push(Later { at: self.clock + airtime(TETHER_LIFT), owner: t.owner, victim: t.foe, effects: d.tether_effects.clone(), source: d.name.clone() });
+            self.beta.later.push(Later { at: self.clock + airtime(TETHER_LIFT), owner: t.owner, victim: t.foe, effects: d.tether_effects.clone(), source: d.name.clone(), slam: false });
         }
-        if self.players.contains_key(&t.owner) {
-            self.events.push(Event::Flash { player: t.owner, text: format!("{} pulled them back", d.name) });
-        }
+        // No word: the chain yanks them back through the air, with its clank on them.
+        self.cue(None, t.foe, 0, cues::SOUND_TETHER, "");
     }
 
     // --- a knockback into a wall ---------------------------------------------------------------------
@@ -456,10 +462,7 @@ impl Survival {
     /// A body thrown into a wall is stunned `secs` as it hits it, `air` from now.
     pub(crate) fn wall_slam(&mut self, owner: Id, victim: Id, secs: f32, air: f32) {
         let stun = AbilityEffect { kind: "stun".into(), secs: [secs, secs], ..Default::default() };
-        self.beta.later.push(Later { at: self.clock + air, owner, victim, effects: vec![stun], source: "Wall slam".into() });
-        if self.players.contains_key(&owner) {
-            self.events.push(Event::Flash { player: owner, text: "Into the wall!".into() });
-        }
+        self.beta.later.push(Later { at: self.clock + air, owner, victim, effects: vec![stun], source: "Wall slam".into(), slam: true });
     }
 
     // --- echoes (Rewind) ------------------------------------------------------------------------------
@@ -601,7 +604,10 @@ impl Survival {
         if c.amount > 0.0 {
             self.apply_cc(id, c.from, "regen", CHEAT_SECS, c.amount / CHEAT_SECS, 0.0, &c.source);
         }
-        self.events.push(Event::Flash { player: id, text: "Death cheated!".into() });
+        // No word: a Soulstone's rising and Flash of Light's glow on them, and the world held a
+        // beat around them.
+        self.events.push(Event::Missile { caster: id, spell: abilities::HEAL_LOOK, target: Target::Unit(id) });
+        self.cue(Some(id), id, 0, cues::SOUND_CHEAT_DEATH, cues::BEAT_CHEAT_DEATH);
         self.cc_note(id, format!("{}: a killing blow cheated", c.source));
         h - 1
     }
@@ -689,9 +695,9 @@ impl Survival {
         if let Some(s) = self.stances.get_mut(&v) {
             s.caught = true;
         }
+        // No word names it: its look plays on the hero (below) and its answer on the thrower.
         if self.players.contains_key(&v) {
             self.gain_valor(v, self.content.valor.counter);
-            self.events.push(Event::Flash { player: v, text: d.name.clone() });
         }
         self.events.push(Event::Missile { caster: v, spell: d.spell, target: Target::Unit(v) });
         let close = self.unit_pos(thrower).zip(self.unit_pos(v)).is_some_and(|(a, b)| dist2d(a, b) <= 6.0);

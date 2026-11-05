@@ -14,6 +14,7 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub mod cc;
+pub mod cues;
 mod building;
 pub use building::StationActions;
 mod combat;
@@ -171,7 +172,8 @@ pub enum Event {
     /// arrow of its own (the ability's missiles are their own events).
     Loose { caster: Id, spell: u32 },
     /// A beat on a hero's own screen alone (the add-on's `BT`): Kill Shot's speed lines as it
-    /// goes, its hit-stop and shake as it kills; `on` the foe it struck (`None`: nobody).
+    /// goes, its hit-stop and shake as it kills; `on` the foe it struck (`None`: nobody). And an
+    /// outcome's beat (`cues::BEAT_*`, the add-on's `CU`): a hit-stop, a shake, the camera's kick.
     Beat { player: Id, beat: String, on: Option<Id> },
     /// Ground that lingers (holy ground, fire) wears this spell's look (a DynamicObject) until
     /// the mark `id` is gone.
@@ -213,8 +215,11 @@ pub enum Event {
     Hop { player: Id, dir: f32, speed: f32, lift: f32, roll: bool, style: &'static str },
     /// The guard went up or down (the hero's stance).
     Guard { player: Id, up: bool },
-    /// A word flashed on one hero's screen (a parry).
+    /// Words on one hero's screen: a refusal (out of range, not ready) or a hint. Never an
+    /// outcome: those show by [`Event::Visual`], [`Event::Sound`] and [`Event::Beat`].
     Flash { player: Id, text: String },
+    /// A sound (`SoundEntries.dbc`) for one hero's ears only: their own voice on a refusal, coins.
+    Hear { player: Id, sound: u32 },
     /// Too winded for what they tried: the stamina bar says so.
     Winded { player: Id },
     /// Someone fell: to `killer` if a hero or creature struck them last.
@@ -932,6 +937,11 @@ pub struct Survival {
     pub(crate) fx_pull_look: Option<(u16, String)>,
     /// When a hero may next be told this foe shrugged their control off (hero, foe).
     pub(crate) told_immune: BTreeMap<(Id, Id), f32>,
+    /// When a hero may next say a refusal in their own voice.
+    pub(crate) told_vocal: BTreeMap<Id, f32>,
+    /// Heroes who turned the game's Error Speech off (their add-on says so): no voice on a
+    /// refusal for them, the words only.
+    pub(crate) no_error_speech: BTreeSet<Id>,
     /// Counters' stances (a hero's, a dummy's), by unit.
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
@@ -1043,6 +1053,8 @@ impl Survival {
             fx_vs_bosses: false,
             fx_pull_look: None,
             told_immune: BTreeMap::new(),
+            told_vocal: BTreeMap::new(),
+            no_error_speech: BTreeSet::new(),
             grounds: Vec::new(),
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),

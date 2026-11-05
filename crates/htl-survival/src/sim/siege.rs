@@ -1040,7 +1040,8 @@ impl Survival {
         }
         if self.players.contains_key(&killer) && gold > 0 {
             self.add_gold(killer, gold);
-            self.events.push(Event::Flash { player: killer, text: format!("+{gold} gold") });
+            // The coins' clink; the Siege bar's gold shows the count.
+            self.events.push(Event::Hear { player: killer, sound: super::cues::SOUND_COINS });
         }
     }
 
