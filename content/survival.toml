@@ -4104,12 +4104,12 @@ radius = [4.0, 4.0]
 cleanse = true
 stop_effects = [{ kind = "knockback", amount = 3.0 }]
 cooldown = 20.0
-# Blink's flash going and coming back, and at the mark as it pulses; Arcane Missiles' beat in the
-# hands on each pulse.
+# Blink's flash going and coming back, and at the mark as it pulses; Blink's quick violet flash
+# in the hands on each pulse (the orange 448 read as a fire shield on the caster, Nov 5).
 spell = 1953
 charge_spell = 1953
 tick_spell = 1953
-beat_kit = 448
+beat_kit = 3394
 
 # The counter check: only what reaches you within the window of raising it flies back.
 [[ability]]

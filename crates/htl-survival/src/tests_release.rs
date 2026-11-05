@@ -115,7 +115,7 @@ fn fireball_released_on_its_flare_is_a_perfect_cast_stronger_with_valor_and_a_bu
     let ev = release_at_flare(&mut s, p, "ranged", 0.0);
     assert!(matches!(grade_in(&ev, p), Some("perfect" | "critical")), "graded: {:?}", grade_in(&ev, p));
     let flare_kit = crate::content_abilities::full_kit_of("mage");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == flare_kit)), "the flare on the caster");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == flare_kit)), "no flare on the caster's body: the ring marks the moment");
     assert!(perfect_in(&ev, p), "a perfect");
     let burst = { let a = s.content.abilities[fb].perfect_kit; if a != 0 { a } else { k_.perfect_kit } };
     assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == burst)), "and its burst");

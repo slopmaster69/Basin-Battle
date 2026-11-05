@@ -3575,11 +3575,10 @@ impl Survival {
                 // Topped out: the flare on the caster (everyone sees it), once. Not on a bow's
                 // draw: there the bow's own tension shows it, and the drawer's camera leans in and
                 // trembles (the add-on); the flare read as a stray buff (Corey's review).
-                // A release check's flare comes as its window opens, so a release on seeing
-                // it lands inside.
+                // Not on a release check either: its ring on the caster's screen marks the moment,
+                // and the flare on their body read as a fire shield (Corey's playtest, Nov 5).
                 let checked = self.content.abilities[ability].perfect && hi > 0.0;
-                let flare_at = if checked { self.players[&id].check_flare - self.content.checks.window } else { hi };
-                if hi > 0.0 && held >= flare_at && held - dt < flare_at && !self.content.abilities[ability].bow {
+                if hi > 0.0 && held >= hi && held - dt < hi && !checked && !self.content.abilities[ability].bow {
                     let kit = self.full_kit(ability);
                     if kit != 0 {
                         self.events.push(Event::Visual { id, kit, by: None });
