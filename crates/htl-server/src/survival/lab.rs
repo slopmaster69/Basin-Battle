@@ -154,6 +154,9 @@ impl SurvivalGame {
                     w.hold_spell = n.get(1).copied().unwrap_or(0);
                     w.crackle_full = if n.get(2).copied().unwrap_or(0) != 0 { 1.4 } else { 0.0 };
                     w.clip = n.get(3).copied().unwrap_or(0) as u16;
+                    // Fifth and sixth: the clip's hold in tenths of a second, and 1 for the full body.
+                    w.clip_hold = n.get(4).copied().filter(|t| *t > 0).map_or(8.0, |t| t as f32 / 10.0);
+                    w.clip_body = if n.get(5).copied().unwrap_or(0) == 1 { "full".into() } else { "upper".into() };
                     k += 1;
                 }
                 // A look to try for this run only: `look 3631` (its spell and aura both),
