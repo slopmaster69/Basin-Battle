@@ -390,6 +390,11 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("CK\t{key}\t{kind}\t{school}\t{a:.3}\t{b:.3}\t{crit:.3}\t{pattern}"));
                 }
             }
+            Event::WardCheck { player, grade } => {
+                if let Some(c) = self.conn_of(player) {
+                    self.ui_line(c, &format!("CR	ward	{grade}"));
+                }
+            }
             Event::CheckResult { player, ability, grade } => {
                 if let Some(c) = self.conn_of(player) {
                     let key = self.sim.content.abilities[ability].key.clone();
