@@ -1,0 +1,498 @@
+From 4682f02de00207f9d0fc49047ea92e100532d030 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:44:24 -0600
+Subject: [PATCH] An action clip can play on the legs alone
+ (PlayUnitAnimation's body "lower")
+
+`PlayUnitAnimation(unit, animId, impact, trail, trailMs, variation, recovery, "lower")`: the clip
+drives the pelvis and the legs and nothing above them, so the upper body keeps whatever it was
+doing (a landing's legs under a bow still drawn). Every model with an upper-body split gets a
+lower-body node beside its upper-body one, masked with a new group 5, the complement of group 2:
+every bone inside the upper-body subtree. A borrowed clip (another model's take, 0015) gets the
+same node where the model has the mask. `"full"`, `"upper"` and the automatic choice are as they
+were; a model with no split plays the whole body as before.
+---
+ .../benilla-app/src/creature_anim/action.rs   | 70 +++++++++++++++----
+ .../src/creature_anim/action/donor.rs         | 26 ++++---
+ .../src/creature_anim/driver/tests.rs         |  1 +
+ .../benilla-app/src/creature_anim/events.rs   |  1 +
+ crates/benilla-app/src/creature_anim/lod.rs   |  1 +
+ .../src/creature_anim/select/tests.rs         |  1 +
+ .../src/entities/spell_fx/lifecycle.rs        |  1 +
+ crates/benilla-app/src/go_anim.rs             |  2 +
+ crates/benilla-app/src/portrait/booth.rs      |  1 +
+ crates/benilla-app/src/portrait/glue_booth.rs |  1 +
+ .../benilla-app/src/portrait/panes_tests.rs   |  1 +
+ crates/benilla-app/src/ranged_flex.rs         |  1 +
+ crates/benilla-assets/src/m2.rs               | 15 +++-
+ crates/benilla-assets/src/model/anims.rs      |  4 ++
+ crates/benilla-ui/src/action_combat.rs        | 41 +++++++++++
+ crates/benilla-world/src/doodad_anim/mod.rs   |  1 +
+ 16 files changed, 143 insertions(+), 25 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 86313db8..90f48604 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -100,9 +100,10 @@ pub(crate) struct ActionClip {
+     /// The requested id, for a reaction replacing a swing and the inspector.
+     id: u16,
+     /// The whole-body node (the clip's second node where it has one, so the driver's own play of
+-    /// the same clip never shares its clock) and the upper-body one.
++    /// the same clip never shares its clock), the upper-body one and the lower-body one.
+     full: AnimationNodeIndex,
+     upper: Option<AnimationNodeIndex>,
++    lower: Option<AnimationNodeIndex>,
+     body: ActionBody,
+     on_upper: bool,
+     /// The clip clock (seconds into the clip), its length and its impact keyframe (0: none).
+@@ -338,6 +339,7 @@ impl ActionClip {
+             id: clip.anim_id,
+             full: clip.blend_node.unwrap_or(clip.node),
+             upper: clip.upper_node,
++            lower: clip.lower_node,
+             body,
+             on_upper: body == ActionBody::Upper,
+             t: 0.0,
+@@ -488,7 +490,20 @@ impl ActionClip {
+     }
+ 
+     fn nodes(&self) -> impl Iterator<Item = AnimationNodeIndex> {
+-        std::iter::once(self.full).chain(self.upper)
++        std::iter::once(self.full)
++            .chain(self.upper)
++            .chain(self.lower)
++    }
++
++    /// The node playing this frame: the upper body's while the legs are the gait's, the lower
++    /// body's for a clip asked onto the legs alone (the whole body on a model with no split), else
++    /// the whole body's.
++    fn on_node(&self) -> AnimationNodeIndex {
++        match (self.on_upper, self.upper, self.body) {
++            (true, Some(u), _) => u,
++            (_, _, ActionBody::Lower) => self.lower.unwrap_or(self.full),
++            _ => self.full,
++        }
+     }
+ }
+ 
+@@ -516,11 +531,8 @@ fn replace_clip(old: &mut ActionClip, clip: ActionClip) {
+         old.lambda
+     };
+     let mut release = std::mem::take(&mut old.release);
+-    release.extend(
+-        old.nodes()
+-            .filter(|n| *n != clip.full && Some(*n) != clip.upper),
+-    );
+-    release.retain(|n| *n != clip.full && Some(*n) != clip.upper);
++    release.extend(old.nodes().filter(|n| !clip.nodes().any(|k| k == *n)));
++    release.retain(|n| !clip.nodes().any(|k| k == *n));
+     *old = ActionClip {
+         lambda,
+         release,
+@@ -991,7 +1003,7 @@ pub(super) fn apply_action_clips(
+         }
+         clip.last_pos = Some(t.translation);
+         clip.on_upper = match clip.body {
+-            ActionBody::Full => false,
++            ActionBody::Full | ActionBody::Lower => false,
+             ActionBody::Upper => clip.upper.is_some(),
+             ActionBody::Auto => {
+                 clip.upper.is_some()
+@@ -1003,11 +1015,8 @@ pub(super) fn apply_action_clips(
+                     }
+             }
+         };
+-        let (on, off) = match (clip.on_upper, clip.upper) {
+-            (true, Some(u)) => (u, Some(clip.full)),
+-            _ => (clip.full, clip.upper),
+-        };
+-        if let Some(off) = off {
++        let on = clip.on_node();
++        for off in clip.nodes().filter(|n| *n != on) {
+             if player.animation(off).is_some() {
+                 player.stop(off);
+             }
+@@ -1592,6 +1601,7 @@ mod tests {
+             id: 17,
+             full: AnimationNodeIndex::new(1),
+             upper: None,
++            lower: None,
+             body: ActionBody::Auto,
+             on_upper: false,
+             t: 0.0,
+@@ -1693,6 +1703,40 @@ mod tests {
+         assert!(c.t < 1.0 && c.stopping.is_some());
+     }
+ 
++    #[test]
++    fn a_lower_body_clip_plays_on_the_legs_node_and_the_others_on_theirs() {
++        let mut c = clip(0.0, 0.0, 0.0);
++        c.upper = Some(AnimationNodeIndex::new(2));
++        c.lower = Some(AnimationNodeIndex::new(3));
++        c.body = ActionBody::Lower;
++        assert_eq!(c.on_node(), AnimationNodeIndex::new(3));
++        assert_eq!(c.nodes().count(), 3, "all three are its to stop");
++        // A model with no upper/lower split plays the whole body.
++        c.lower = None;
++        assert_eq!(c.on_node(), AnimationNodeIndex::new(1));
++        // The upper body while the legs run; the whole body otherwise.
++        c.body = ActionBody::Auto;
++        c.on_upper = true;
++        assert_eq!(c.on_node(), AnimationNodeIndex::new(2));
++        c.on_upper = false;
++        assert_eq!(c.on_node(), AnimationNodeIndex::new(1));
++        // A replacement stops only the nodes the new clip doesn't play.
++        let mut next = clip(0.0, 0.0, 0.0);
++        next.full = AnimationNodeIndex::new(7);
++        c.lower = Some(AnimationNodeIndex::new(3));
++        replace_clip(&mut c, next);
++        let mut released = c.release.clone();
++        released.sort_by_key(|n| n.index());
++        assert_eq!(
++            released,
++            [
++                AnimationNodeIndex::new(1),
++                AnimationNodeIndex::new(2),
++                AnimationNodeIndex::new(3)
++            ]
++        );
++    }
++
+     #[test]
+     fn a_held_looping_reaction_loops_until_its_hold_is_spent() {
+         let mut c = clip(0.0, 0.0, 0.0);
+diff --git a/crates/benilla-app/src/creature_anim/action/donor.rs b/crates/benilla-app/src/creature_anim/action/donor.rs
+index 49023130..72737521 100644
+--- a/crates/benilla-app/src/creature_anim/action/donor.rs
++++ b/crates/benilla-app/src/creature_anim/action/donor.rs
+@@ -126,30 +126,34 @@ impl Donors {
+         let map = benilla_world::rig_anim::map_bones(&target, &from);
+         let scale = target.height() / from.height().max(0.1);
+         let clip = benilla_world::rig_anim::retarget(dclip, &map, &rig.parents, scale);
+-        // Into the model's borrowed clips: a whole-body node, and an upper-body one where the
+-        // model has the mask for it.
+-        let upper_mask = anims
+-            .clips
+-            .iter()
+-            .find_map(|c| c.upper_node)
+-            .and_then(|u| anims.pose.node(u))
+-            .map(|p| p.mask);
+-        let (full, upper) = {
++        // Into the model's borrowed clips: a whole-body node, and an upper-body and a lower-body
++        // one where the model has the masks for them.
++        let mask_of = |node: Option<AnimationNodeIndex>| {
++            node.and_then(|u| anims.pose.node(u)).map(|p| p.mask)
++        };
++        let upper_mask = anims.clips.iter().find_map(|c| mask_of(c.upper_node));
++        let lower_mask = anims.clips.iter().find_map(|c| mask_of(c.lower_node));
++        let (full, upper, lower) = {
+             let mut x = extra.write().ok()?;
+             let at = x.clips.len() as u32;
+             x.clips.push(clip);
+-            let full = EXTRA_NODE_BASE + 2 * at as usize;
++            let full = EXTRA_NODE_BASE + 3 * at as usize;
+             x.nodes.insert(full, PoseNode { clip: at, mask: 0 });
+             let upper = upper_mask.map(|mask| {
+                 x.nodes.insert(full + 1, PoseNode { clip: at, mask });
+                 full + 1
+             });
+-            (full, upper)
++            let lower = lower_mask.map(|mask| {
++                x.nodes.insert(full + 2, PoseNode { clip: at, mask });
++                full + 2
++            });
++            (full, upper, lower)
+         };
+         let mut take = dtake.clone();
+         take.node = AnimationNodeIndex::new(full);
+         take.blend_node = None;
+         take.upper_node = upper.map(AnimationNodeIndex::new);
++        take.lower_node = lower.map(AnimationNodeIndex::new);
+         take.arm_nodes = None;
+         take.seq_index = usize::MAX;
+         info!("action: {name}'s clip {anim} (take {n}) borrowed for a unit's model");
+diff --git a/crates/benilla-app/src/creature_anim/driver/tests.rs b/crates/benilla-app/src/creature_anim/driver/tests.rs
+index 15b36a71..ec39305c 100644
+--- a/crates/benilla-app/src/creature_anim/driver/tests.rs
++++ b/crates/benilla-app/src/creature_anim/driver/tests.rs
+@@ -49,6 +49,7 @@ fn clip(anim_id: u16, node: u32, looping: bool) -> AnimClip {
+         events: Vec::new().into(),
+         arm_nodes: None,
+         upper_node: None,
++        lower_node: None,
+         frequency: 0,
+         replay: (0, 0),
+         poses_bones: true,
+diff --git a/crates/benilla-app/src/creature_anim/events.rs b/crates/benilla-app/src/creature_anim/events.rs
+index c9b54ef2..35b4fd02 100644
+--- a/crates/benilla-app/src/creature_anim/events.rs
++++ b/crates/benilla-app/src/creature_anim/events.rs
+@@ -443,6 +443,7 @@ mod tests {
+             .into(),
+             arm_nodes: None,
+             upper_node: None,
++            lower_node: None,
+             frequency: 0,
+             replay: (0, 0),
+             poses_bones: true,
+diff --git a/crates/benilla-app/src/creature_anim/lod.rs b/crates/benilla-app/src/creature_anim/lod.rs
+index 749d7a1a..a8350d8a 100644
+--- a/crates/benilla-app/src/creature_anim/lod.rs
++++ b/crates/benilla-app/src/creature_anim/lod.rs
+@@ -221,6 +221,7 @@ mod tests {
+                 .into(),
+                 arm_nodes: None,
+                 upper_node: None,
++                lower_node: None,
+                 frequency: 0,
+                 replay: (0, 0),
+                 poses_bones: true,
+diff --git a/crates/benilla-app/src/creature_anim/select/tests.rs b/crates/benilla-app/src/creature_anim/select/tests.rs
+index 4e1f3612..04f32bdd 100644
+--- a/crates/benilla-app/src/creature_anim/select/tests.rs
++++ b/crates/benilla-app/src/creature_anim/select/tests.rs
+@@ -28,6 +28,7 @@ fn clip(anim_id: u16, move_speed: f32) -> AnimClip {
+         events: Vec::new().into(),
+         arm_nodes: None,
+         upper_node: None,
++        lower_node: None,
+         frequency: 0,
+         replay: (0, 0),
+         poses_bones: true,
+diff --git a/crates/benilla-app/src/entities/spell_fx/lifecycle.rs b/crates/benilla-app/src/entities/spell_fx/lifecycle.rs
+index ca58aef7..e95e84aa 100644
+--- a/crates/benilla-app/src/entities/spell_fx/lifecycle.rs
++++ b/crates/benilla-app/src/entities/spell_fx/lifecycle.rs
+@@ -166,6 +166,7 @@ mod tests {
+             events: Vec::new().into(),
+             arm_nodes: None,
+             upper_node: None,
++            lower_node: None,
+             frequency: 0,
+             replay: (0, 0),
+             poses_bones: true,
+diff --git a/crates/benilla-app/src/go_anim.rs b/crates/benilla-app/src/go_anim.rs
+index d51f48cd..54b0e7d3 100644
+--- a/crates/benilla-app/src/go_anim.rs
++++ b/crates/benilla-app/src/go_anim.rs
+@@ -212,6 +212,7 @@ pub(crate) fn owned_anims(ids: &[u16]) -> ModelAnimations {
+                 events: Vec::new().into(),
+                 arm_nodes: None,
+                 upper_node: None,
++                lower_node: None,
+                 frequency: 0,
+                 replay: (0, 0),
+                 poses_bones: false,
+@@ -966,6 +967,7 @@ mod tests {
+                     events: Vec::new().into(),
+                     arm_nodes: None,
+                     upper_node: None,
++                    lower_node: None,
+                     frequency,
+                     replay: (0, 0),
+                     poses_bones: true,
+diff --git a/crates/benilla-app/src/portrait/booth.rs b/crates/benilla-app/src/portrait/booth.rs
+index 0629f86f..c48cdd4e 100644
+--- a/crates/benilla-app/src/portrait/booth.rs
++++ b/crates/benilla-app/src/portrait/booth.rs
+@@ -1204,6 +1204,7 @@ mod tests {
+                 events: Vec::new().into(),
+                 arm_nodes: None,
+                 upper_node: None,
++                lower_node: None,
+                 frequency: 32767,
+                 replay: (0, 0),
+                 poses_bones: true,
+diff --git a/crates/benilla-app/src/portrait/glue_booth.rs b/crates/benilla-app/src/portrait/glue_booth.rs
+index b4c3602a..0004722d 100644
+--- a/crates/benilla-app/src/portrait/glue_booth.rs
++++ b/crates/benilla-app/src/portrait/glue_booth.rs
+@@ -2925,6 +2925,7 @@ mod tests {
+                 events: Vec::new().into(),
+                 arm_nodes: None,
+                 upper_node: None,
++                lower_node: None,
+                 frequency: 0,
+                 replay: (0, 0),
+                 poses_bones: true,
+diff --git a/crates/benilla-app/src/portrait/panes_tests.rs b/crates/benilla-app/src/portrait/panes_tests.rs
+index 933d0c4c..a6ed811a 100644
+--- a/crates/benilla-app/src/portrait/panes_tests.rs
++++ b/crates/benilla-app/src/portrait/panes_tests.rs
+@@ -24,6 +24,7 @@ fn turning_model() -> benilla_assets::ModelAnimations {
+         events: Vec::new().into(),
+         arm_nodes: None,
+         upper_node: None,
++        lower_node: None,
+         frequency,
+         replay: (0, 0),
+         poses_bones: true,
+diff --git a/crates/benilla-app/src/ranged_flex.rs b/crates/benilla-app/src/ranged_flex.rs
+index dffb2c62..6b088437 100644
+--- a/crates/benilla-app/src/ranged_flex.rs
++++ b/crates/benilla-app/src/ranged_flex.rs
+@@ -247,6 +247,7 @@ mod tests {
+             events: Vec::new().into(),
+             arm_nodes: None,
+             upper_node: None,
++            lower_node: None,
+             frequency: 0,
+             replay: (0, 0),
+             poses_bones: true,
+diff --git a/crates/benilla-assets/src/m2.rs b/crates/benilla-assets/src/m2.rs
+index 88482c62..4557208d 100644
+--- a/crates/benilla-assets/src/m2.rs
++++ b/crates/benilla-assets/src/m2.rs
+@@ -445,13 +445,18 @@ impl AssetLoader for M2ModelLoader {
+                     }
+                 }
+             }
+-            // Group 2 holds every joint outside the upper body: the legs and the pelvis.
++            // Group 2 holds every joint outside the upper body: the legs and the pelvis. Group 5
++            // (Basin Battle) is its complement, every joint inside the upper body, so a node masked
++            // with it animates only the legs and the pelvis.
+             let upper_root = upper_subtree_root(&skeleton_raw);
+             if let Some(upper_root) = upper_root {
+                 for i in 0..skeleton_raw.bones.len() {
+                     if !in_subtree(&skeleton_raw, i, upper_root) {
+                         graph.add_target_to_mask_group(bone_target_id(i as u16), 2);
+                         pose.bone_masks[i] |= 1 << 2;
++                    } else {
++                        graph.add_target_to_mask_group(bone_target_id(i as u16), 5);
++                        pose.bone_masks[i] |= 1 << 5;
+                     }
+                 }
+             }
+@@ -525,6 +530,13 @@ impl AssetLoader for M2ModelLoader {
+                         pose.set_node(n, pose_idx, 1 << 2);
+                         n
+                     });
++                    // And a lower-body one (Basin Battle): the legs and the pelvis alone, for an
++                    // action clip that leaves the upper body to whatever it's doing.
++                    let lower_node = upper_root.map(|_| {
++                        let n = graph.add_clip_with_mask(clip.clone(), 1 << 5, 1.0, root);
++                        pose.set_node(n, pose_idx, 1 << 5);
++                        n
++                    });
+                     clips.push(AnimClip {
+                         anim_id: anim.anim_id,
+                         seq_index: anim.seq_index,
+@@ -558,6 +570,7 @@ impl AssetLoader for M2ModelLoader {
+                             .into(),
+                         arm_nodes,
+                         upper_node,
++                        lower_node,
+                         frequency: anim.frequency,
+                         replay: (anim.min_replay, anim.max_replay),
+                         poses_bones,
+diff --git a/crates/benilla-assets/src/model/anims.rs b/crates/benilla-assets/src/model/anims.rs
+index fda68cee..a5075cb9 100644
+--- a/crates/benilla-assets/src/model/anims.rs
++++ b/crates/benilla-assets/src/model/anims.rs
+@@ -61,6 +61,9 @@ pub struct AnimClip {
+     pub arm_nodes: Option<(AnimationNodeIndex, AnimationNodeIndex)>,
+     /// The upper-body masked node, so a swing or emote plays over the legs' own animation.
+     pub upper_node: Option<AnimationNodeIndex>,
++    /// The lower-body masked node (Basin Battle): the legs and the pelvis alone, the complement
++    /// of [`Self::upper_node`], so an action clip can drive the legs under a live upper body.
++    pub lower_node: Option<AnimationNodeIndex>,
+     /// This variation's weight in the reference's per-play roll (`M2Sequence+0x14`, `0x71248a`).
+     pub frequency: u16,
+     /// `(minReplay, maxReplay)` (`M2Sequence+0x18/+0x1c`): each arm rolls a play count `R` from
+@@ -245,6 +248,7 @@ mod tests {
+             events: Vec::new().into(),
+             arm_nodes: None,
+             upper_node: None,
++            lower_node: None,
+             frequency: 0,
+             replay: (0, 0),
+             poses_bones: true,
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index a5088f2d..a0554916 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -191,6 +191,11 @@
+ //!   in the ground).
+ //! - The bowstring is drawn on its bow in the frame the bow is drawn in, and fades with its
+ //!   wearer.
++//!
++//! The twenty-third (`HasActionCombat() >= 23`):
++//!
++//! - `PlayUnitAnimation`'s `body` may be `"lower"`: the clip drives the legs and the pelvis alone,
++//!   and the upper body keeps whatever it's doing (a landing's legs under a drawn bow).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -215,6 +220,8 @@ pub enum ActionBody {
+     Auto,
+     Full,
+     Upper,
++    /// The legs and the pelvis alone; the upper body keeps whatever it's doing.
++    Lower,
+ }
+ 
+ /// One action-animation call from a script, for the app to apply.
+@@ -1002,6 +1009,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             let body = match text(v.get(7)).as_deref() {
+                 Some("full") => ActionBody::Full,
+                 Some("upper") => ActionBody::Upper,
++                Some("lower") => ActionBody::Lower,
+                 _ => ActionBody::Auto,
+             };
+             let from = text(v.get(8)).filter(|f| !f.is_empty());
+@@ -1590,6 +1598,39 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn a_clips_body_is_full_upper_lower_or_auto() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        take_calls();
++        lua.load(
++            r#"PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "lower")
++               PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "upper")
++               PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "full")
++               PlayUnitAnimation("player", 38, 0, nil, nil, nil, 0, "sideways")
++               PlayUnitAnimation("player", 38)"#,
++        )
++        .exec()
++        .unwrap();
++        let bodies: Vec<ActionBody> = take_calls()
++            .into_iter()
++            .filter_map(|c| match c {
++                ActionCall::Anim { body, .. } => Some(body),
++                _ => None,
++            })
++            .collect();
++        assert_eq!(
++            bodies,
++            [
++                ActionBody::Lower,
++                ActionBody::Upper,
++                ActionBody::Full,
++                ActionBody::Auto,
++                ActionBody::Auto
++            ]
++        );
++    }
++
+     #[test]
+     fn the_probe_finds_the_nearest_unit_in_front_and_not_behind_or_too_far() {
+         // Facing -Z (yaw 0): a unit 2 yards ahead, one behind, one ahead but far, a player.
+diff --git a/crates/benilla-world/src/doodad_anim/mod.rs b/crates/benilla-world/src/doodad_anim/mod.rs
+index 56a1090a..fe853222 100644
+--- a/crates/benilla-world/src/doodad_anim/mod.rs
++++ b/crates/benilla-world/src/doodad_anim/mod.rs
+@@ -499,6 +499,7 @@ mod tests {
+             events: Vec::new().into(),
+             arm_nodes: None,
+             upper_node: None,
++            lower_node: None,
+             frequency: 0,
+             replay: (0, 0),
+             poses_bones: true,
+-- 
+2.56.0.windows.4
+

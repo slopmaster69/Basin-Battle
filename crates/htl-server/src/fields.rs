@@ -94,6 +94,7 @@ pub mod idx {
     pub const GAMEOBJECT_FACING: u16 = 18;
     pub const GAMEOBJECT_FACTION: u16 = 20;
     pub const GAMEOBJECT_TYPE_ID: u16 = 21;
+    pub const GAMEOBJECT_LEVEL: u16 = 22;
     pub const GAMEOBJECT_ANIMPROGRESS: u16 = 24;
 }
 

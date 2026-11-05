@@ -90,10 +90,21 @@ attack_speed = 3.0
 guard_speed = 3.5
 aim_speed = 3.0
 use_speed = 2.5
-# Health back a second, as a share of max: in the field after a while out of combat, and resting
-# at the camp (never during the settlement attack).
-field_regen = 0.004
-field_regen_after = 10.0
+# The clips a hero plays using an item marked `anim = "eat"` or `anim = "drink"`, over its
+# `use_secs`, on every client that plays clips (`/esclip 61` tries one on yourself). 61 is
+# EmoteEat, the 1.12 client's /eat. The 1.12 client has no drinking clip of its own (its /drink
+# plays EmoteEat as well), so a drink plays the same until a better one is found; 0 falls back
+# to the Food spell's cast.
+eat_clip = 61
+drink_clip = 61
+# Health back a second, as a share of max: anywhere (the field, below, Siege) once this long has
+# passed since the hero last dealt or took a blow, and resting at the camp (never during the
+# settlement attack). In a fight only gear, set bonuses, food and heals bring health back.
+# On trial (#118, Corey's call): 2% a second from 5 sec out of combat, to recover between pulls
+# without making everyone full before the next fight, so healers still matter. Try it on the
+# next dungeon run and tune. (Was 0.4% a second from 10 sec, which barely registered.)
+field_regen = 0.02
+field_regen_after = 5.0
 rest_regen = 0.08
 respawn_secs = 6.0
 # Health on getting back up.
@@ -424,6 +435,72 @@ recovery = 1.7
 spell = 75
 subclass = 18
 
+# --- missile looks ---------------------------------------------------------------------------------
+# How chosen spells' missiles look on a client with patch 0030 (ac20): a glowing ribbon behind
+# each (`trail`, "RRGGBB"; `width` yd, each stretch fading over `secs`), the model `scale` times
+# its size, and `spin` turns a second, flat. Arrows and a thrown axe were too thin to follow at
+# night, with no spell effect in the data that fixed it (Corey's review; 14 missiles were tried
+# for Bank Shot alone). Keyed by the spell: every ability flying it looks so.
+
+# The plain arrow (Aimed Shot short of full, Bank Shot, the arrows Arrow Recall calls home,
+# Skyfall's volley): a thin pale streak.
+[[missile_look]]
+spell = 19434
+trail = "F2E6C8"
+width = 0.18
+secs = 0.3
+
+# Aimed Shot fully drawn, the burning arrow.
+[[missile_look]]
+spell = 3011
+trail = "FF9A3C"
+width = 0.35
+secs = 0.45
+
+# Split Arrow (Arcane Shot's arrow; Kill Shot's too until #157 moves it to Fire Shot's bolt): a hot
+# gold-red line.
+[[missile_look]]
+spell = 3044
+trail = "FF6A2A"
+width = 0.4
+secs = 0.5
+
+# Kill Shot once it flies Fire Shot's bolt (10346, #157): the same hot line, wider, the bolt drawn
+# half again its size, and flown at 120 yd/s on a client with patch 0040 (the rules land it at
+# that speed; older clients fly the spell's own 80, so there the bolt arrives after the hit).
+# Corey's review, Nov 4: "maybe even needs to be faster".
+[[missile_look]]
+spell = 10346
+trail = "FF6A2A"
+width = 0.5
+secs = 0.5
+scale = 1.5
+speed = 120
+
+# Multi-Shot's frost-tipped fan.
+[[missile_look]]
+spell = 6984
+trail = "9ADFFF"
+width = 0.22
+secs = 0.3
+
+# The Warrior's Hurled Axe: bigger, tumbling end over end as a thrown axe does, a steel-pale
+# streak, so the way back reads (Corey's review: "larger, and spin while it flies"; then of the
+# flat spin, "goofy, it should be a horizontal X-axis spin that just rotates 360"; then of the
+# 2.5-turn backspin, "the spin looks goofy still, we need it to be spinning like a boomerang").
+# `spin` is turns a second; a tumble's positive turn is backspin (the nose up), negative a forward
+# tumble, the head going over the way it flies: three a second forward, out and back alike (the
+# look is the spell's, and the way back flies the same spell). The tumble needs the sixteenth
+# client; older ones spin it flat.
+[[missile_look]]
+spell = 16075
+trail = "D8E4F0"
+width = 0.3
+secs = 0.35
+scale = 1.8
+spin = -3.0
+tumble = true
+
 # --- melee weapons and shields --------------------------------------------------------------------
 
 # Each weapon: its wind-up, the moment it can connect, the recovery after; what a swing costs and
@@ -658,10 +735,14 @@ display = 4112
 icon = "INV_Misc_Food_15"
 kind = "food"
 stack = 5
-# Eating takes this long (moving slowly, open to a hit) and heals this share of max health.
-use_secs = 1.6
+# Food is a fight's resource (#118): a quick bite (this long, moving slowly), then this share of
+# max health over `heal_secs`. `steady`: a hit neither stops the bite nor the healing after it.
+use_secs = 1.0
 heal = 0.45
-text = "Heals 45% of your health over a 1.6 sec meal. Taking damage interrupts it. Press (T) to eat."
+heal_secs = 5.0
+steady = true
+anim = "eat"
+text = "Heals 45% of your health over 5 sec after a 1 sec bite. Taking damage doesn't stop it. Press (T) to eat."
 
 [[item]]
 key = "axe"
@@ -839,9 +920,12 @@ display = 557
 icon = "INV_Misc_Bowl_01"
 kind = "food"
 stack = 5
-use_secs = 2.0
+use_secs = 1.0
 heal = 0.5
-text = "Heals 50% of your health. Increases stamina regeneration by 20% for 3 min."
+heal_secs = 6.0
+steady = true
+anim = "eat"
+text = "Heals 50% of your health over 6 sec after a 1 sec bite. Increases stamina regeneration by 20% for 3 min."
 effect = { kind = "stamina", amount = 0.2, secs = 180.0, name = "Well Fed" }
 
 [[item]]
@@ -865,6 +949,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 below = true
+anim = "drink"
 text = "Increases stamina regeneration by 50% for 60 sec."
 effect = { kind = "stamina", amount = 0.5, secs = 60.0, name = "Tonic" }
 
@@ -4287,7 +4372,7 @@ effects = [{ kind = "knockback", amount = 5.0 }, { kind = "snare", secs = [2.0, 
 [[ability]]
 key = "aimed_arrow"
 name = "Aimed Shot"
-text = "Hold to draw your bow for up to 1.4 sec, then release to fire. Damage, range and arrow speed increase with the draw. A full draw pierces every enemy in its line. A heavy hit on you cancels the draw. The arrow plants where its flight ends."
+text = "Hold to draw your bow for up to 1.4 sec, then release to fire for up to 120% bow damage. Damage, range and arrow speed increase with the draw. A full draw pierces every enemy in its line. A heavy hit on you cancels the draw. The arrow plants where its flight ends."
 icon = "INV_Spear_07"
 school = "hunter"
 slot = "ranged"
@@ -4295,7 +4380,9 @@ bow = true
 kind = "projectile"
 charge = [0.0, 1.4]
 fragile = true
-damage = [14.0, 36.0]
+# Serg's play-test (#118): it grows with the bow, as an art grows with the weapon. 120% of the
+# bow's damage at the same draw: 14–36 with the hunting bow (12–30), as it was.
+bow_damage = 1.2
 range = [26.0, 40.0]
 radius = [0.3, 0.3]
 # A plain arrow (the bow's look) while drawing; fully drawn, a burning one, faster, through every
@@ -4314,19 +4401,22 @@ plants = true
 key = "multi_shot"
 name = "Multi-Shot"
 ex_of = "aimed_arrow"
-text = "Fires 5 arrows at once in a wide fan, with no draw. Each arrow deals 18 damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
+text = "Fires 5 arrows at once in a fan 5 yd wide where you aim, with no draw. Each arrow deals 60% bow damage and plants where it lands. Shatters frozen enemies. Free after a Freezing Trap."
 icon = "Ability_UpgradeMoonGlaive"
 slot = "ranged"
 bow = true
 kind = "projectile"
 valor = 25
-damage = [18.0, 18.0]
+# 60% of a full draw's bow damage an arrow: 18 with the hunting bow (#118).
+bow_damage = 0.6
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 40.0
 count = 5
-# 10° apart: a 40° fan.
+# The fan spreads 1.2 yd an arrow where the reticle points, so it covers a pack near or far; 10°
+# apart at most, close in. (#118: a fixed 10° fan passed between a pack past 15 yd.)
 spread = 10.0
+spread_yd = 1.2
 shatter = true
 # Frost-tipped arrows (Frost Shot): the volley that shatters the frozen.
 spell = 6984
@@ -4350,14 +4440,23 @@ damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 40.0
+# Hotter each bounce (Corey's review: "every bounce should change the color of the trail"):
+# yellow as it flies, orange off the first wall, red off the second. Drawn on a client with patch
+# 0030.
+bounce_trail = ["FFE27A", "FF9A2A", "FF3A1A"]
 bounces = 2
 bounce_gain = 0.5
 cooldown = 4.0
 # The Hunter's arrow (Aimed Shot's, at its speed, flown with the bow's ammo), seen the whole way:
-# each leg off a wall flies from where it struck. A burst of fire where it strikes (the Lava
-# Burst's landing), at every ricochet and skip.
+# each leg off a wall flies from where it struck. No burst where it strikes a wall (Corey's review:
+# the Lava Burst's landing there read as the arrow going off in the inn wall; the arrow flown on
+# from the wall, harder each bounce, is the bounce's look), and none off the ground either, so a
+# skip doesn't read as an explosion (Corey's review, run 040): the data has no small splash of dirt
+# at a point (the burrow burst, 26271, left a pile of boulders for seconds in run 050). The arrow's
+# ribbon flying on from the ground shows the skip.
 spell = 19434
-burst_spell = 5162
+burst_spell = 0
+skip_spell = 0
 clip = 53
 valor_hit = 5.0
 plants = true
@@ -4552,11 +4651,16 @@ kind = "projectile"
 valor = 25
 damage = [12.0, 12.0]
 range = [15.0, 15.0]
-radius = [0.35, 0.35]
+# Wide enough to bite a body the reticle sits on (Corey's review, run 040: "he went flying
+# further than the unit": at 0.35 a spear aimed at a creature's edge flew past it into the ground
+# behind, and the dive went there). And the bitten creature holds still for the dive, so the
+# hunter lands beside it, not where it stood.
+radius = [1.0, 1.0]
 speed = 60.0
 yank = true
 spell = 6533
 clip = 107
+effects = [{ kind = "stagger", secs = [0.6, 0.6] }]
 recast = "raptor_uppercut"
 recast_secs = 2.5
 
@@ -4599,6 +4703,12 @@ spell = 6533
 clip = 53
 # The haul's arc: about 0.5 sec in the air (lift 5), long enough for the creature's flight to be
 # seen (Corey's review). A plain pull's 3 had it over in 0.3 sec, 60 to 80 yd a second.
+# The hunter's own look over the haul, on the clients that play clips (Corey's review: with the
+# bow's release pose "he just has his arm out", throwing, not pulling): this clip for as long as
+# the foe is on the line, 63 EmoteUseStanding (both hands working at chest height). Swap it after
+# a look in game (.es tune ability.reverse_grapple.pull_clip <clip>); `pull_from` borrows another
+# character model's take on it ("ScourgeFemale").
+pull_clip = 63
 effects = [{ kind = "pull", amount = 25.0, lift = 5.0, from_caster = true }, { kind = "stagger", secs = [1.0, 1.0] }]
 
 # 1, the second choice: Disengage as retail has it: on the key press, mid-jump or falling too.
@@ -4621,11 +4731,13 @@ cooldown = 12.0
 # something going wrong (visual check, run 015). The flip and the net are the look.
 spell = 0
 also = "hunter_net"
-# Play-test (#110): the Undead woman's flip out of a strafing jump was the one to keep. Every
-# hero, every race, standing or mid-jump, now plays it: a tumble back head over heels with the
-# Undead woman's tucked Jump (38). Swap the clip here after a look in game (/esclip).
+# Play-test (#110): a flip out of a strafing jump was the one to keep. Every hero, every race,
+# standing or mid-jump, plays it: a tumble back head over heels with a borrowed tucked Jump (38).
+# Corey's pick from the clips (Nov 4): the Night Elf woman's; the Undead woman's legs clipped
+# and twisted as she came down. The clip is fitted to the flight and the hero's own JumpEnd
+# takes the landing (moves.rs). Swap the model here after a look in game (/esclip).
 leap_clip = 38
-leap_from = "ScourgeFemale"
+leap_from = "NightElfFemale"
 leap_flip = true
 
 [[ability]]
@@ -4659,8 +4771,10 @@ secs = 2.0
 aura = 1719
 spell = 5384
 # A counter and nothing else (Corey's review, Nov 3): unanswered, it's spent and on cooldown, with
-# no leap of its own.
-counter = { immune = true, once = true, answer = "trappers_leap" }
+# no leap of its own. A dodge, not a block: the blow misses, and the hunter never raises a shield
+# to it (Corey's review, run 040: "you missed the timing on the actual dodge"). The answer comes
+# as the blow commits, before the blade lands (`sim/mobs.rs`, the wind-up's lock).
+counter = { immune = true, dodge = true, once = true, answer = "trappers_leap" }
 
 # What Trapper's Instinct does when it's struck: away, the net on whoever struck, arrows scattered.
 [[ability]]
@@ -4681,9 +4795,9 @@ radius = [2.0, 2.0]
 # No cast look: Disengage's (781) is a white blink star on the hunter (see Ensnaring Retreat).
 spell = 0
 also = "hunter_net"
-# Ensnaring Retreat's flip (#110).
+# Ensnaring Retreat's flip (#110), the Night Elf woman's jump (Corey's pick, Nov 4).
 leap_clip = 38
-leap_from = "ScourgeFemale"
+leap_from = "NightElfFemale"
 leap_flip = true
 
 # 2: two arrows and a wire between them, each arrow placed by the hero. The first press plants
@@ -4765,9 +4879,11 @@ damage = [24.0, 24.0]
 linger = 3.0
 linger_damage = 4.0
 cooldown = 14.0
-# Its look: the trap on the ground while it's set, a burst there as it goes off, and fire on each
-# one it strikes (13812 is Explosive Trap Effect, named in the combat log).
+# Its look: thrown from the hand as a bomb (Iron Grenade's missile) to its spot, the trap on the
+# ground once it lands, a burst there as it goes off, and fire on each one it strikes (13812 is
+# Explosive Trap Effect, named in the combat log).
 spell = 13812
+lob_spell = 4068
 object = 3072
 burst_spell = 5162
 impact_kit = 286
@@ -4778,7 +4894,7 @@ effects = [{ kind = "knockback", amount = 6.0 }]
 key = "freezing_trap"
 name = "Freezing Trap"
 ex_of = "explosive_trap"
-text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. Setting it readies a free Multi-Shot for 8 sec."
+text = "Places a trap that freezes every enemy within 3 yd of whoever sets it off for 3 sec. Fire and Sundering Blow shatter them for double damage. When it springs, it readies a free Multi-Shot for 8 sec."
 icon = "Spell_Frost_ChainsOfIce"
 slot = "defense"
 kind = "trap"
@@ -4789,21 +4905,25 @@ splash = 3.0
 delay = 0.75
 secs = 25.0
 spell = 3355
+# Thrown to its spot like Explosive Trap, as a bomb.
+lob_spell = 4068
 object = 3071
 # The burst as it springs: Frost Nova's ring (the visual check, Nov 2: Frost Trap Aura, 13810,
 # whited out the whole screen for its 30 sec; 122 rings out and leaves the ice on whoever it froze).
 burst_spell = 122
 clip = 75
+# 3 sec: the most the board allows (1.5 on a hero). Serg (#118) found it over before the
+# Multi-Shot; what fixes that is the free shot coming as the trap springs, below.
 effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
-# The trap combo: set it, kite them onto it, cash in. (It's readied as the trap is set, not as it
-# springs: 8 s, room to kite them onto it.)
+# The trap combo: set it, kite them onto it, cash in. The free Multi-Shot is readied as the trap
+# springs (#118: readied as it was set, a trap that sprang late had no free shot left), for 8 s.
 empower = { ability = "aimed_arrow", secs = 8.0 }
 
 # 3: the finisher you line up.
 [[ability]]
 key = "kill_shot"
 name = "Kill Shot"
-text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 60 damage. Enemies below 25% health are killed outright."
+text = "Draws for 1 sec, then fires an arrow 40 yd along the aimed line that pierces every enemy. Each takes 200% bow damage. Enemies below 25% health are killed outright."
 icon = "Ability_Marksmanship"
 school = "hunter"
 slot = "ultimate"
@@ -4812,7 +4932,8 @@ kind = "projectile"
 valor = 100
 charge = [1.0, 1.0]
 hold = 1.0
-damage = [60.0, 60.0]
+# 200% of a full draw's bow damage: 60 with the hunting bow (#118).
+bow_damage = 2.0
 range = [40.0, 40.0]
 radius = [0.4, 0.4]
 pierce = 9
@@ -9013,9 +9134,12 @@ display = 4810
 icon = "INV_Misc_Fish_05"
 kind = "food"
 stack = 5
-use_secs = 1.6
+use_secs = 1.0
 heal = 0.4
-text = "Heals 40% of your health at once."
+heal_secs = 5.0
+steady = true
+anim = "eat"
+text = "Heals 40% of your health over 5 sec after a 1 sec bite. Taking damage doesn't stop it."
 
 [[item]]
 key = "fish_feast"
@@ -9024,10 +9148,13 @@ display = 1483
 icon = "INV_Misc_Food_09"
 kind = "food"
 stack = 5
-use_secs = 2.4
+use_secs = 1.0
 heal = 0.6
+heal_secs = 6.0
+steady = true
+anim = "eat"
 effect = { kind = "stamina", amount = 0.25, secs = 300.0, name = "Well Fed" }
-text = "Heals 60% of your health. Increases stamina regeneration by 25% for 5 min."
+text = "Heals 60% of your health over 6 sec after a 1 sec bite. Increases stamina regeneration by 25% for 5 min."
 
 [[item]]
 key = "pumpkin_pie"
@@ -9036,10 +9163,13 @@ display = 4784
 icon = "INV_Misc_Food_11"
 kind = "food"
 stack = 5
-use_secs = 2.0
+use_secs = 1.0
 heal = 0.33
+heal_secs = 4.0
+steady = true
+anim = "eat"
 effect = { kind = "regen", amount = 0.011, secs = 30.0, name = "Pie" }
-text = "Heals 33% of your health at once and 33% more over 30 sec."
+text = "Heals 33% of your health over 4 sec after a 1 sec bite, and 33% more over 30 sec."
 
 [[item]]
 key = "clarity"
@@ -9050,6 +9180,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 below = true
+anim = "drink"
 effect = { kind = "focus", amount = 0.25, secs = 90.0, name = "Clarity" }
 text = "Reduces ability cooldowns by 25% for 90 sec."
 

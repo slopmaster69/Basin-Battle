@@ -1,0 +1,25 @@
+# Arrow Recall (Ctrl+2) from closer and lower, so the hand held out and the arrows flying home
+# can be judged (Corey's review, run 041: "still can't see the arrows flying back"). Four arrows
+# planted within 12 yd, then called home.
+hero hunter
+cam 50 -12 9
+include _setup
+4.2 .es dummy clear
+5.0 .es slot q aimed_arrow
+5.2 .es slot 2 tripwire
+6.0 .es in ab 0 0
+6.3 .es in a {facing-0.4} -0.3
+6.4 .es in au {facing-0.4} -0.3
+7.0 .es in ab 0 0
+7.3 .es in a {facing+0.4} -0.3
+7.4 .es in au {facing+0.4} -0.3
+8.0 .es in ab 0 0
+8.3 .es in a {facing} -0.35
+8.4 .es in au {facing} -0.35
+9.0 .es in ab 0 0
+9.3 .es in a {facing+0.15} -0.5
+9.4 .es in au {facing+0.15} -0.5
+9.8 .es valor full
+10.5 .es in ab 3 1                   # Arrow Recall
+10.4 shots recall 14 0.1
+14 end

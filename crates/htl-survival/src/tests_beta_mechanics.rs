@@ -786,6 +786,15 @@ fn grapple_arrow_catches_a_wall_and_a_boulder_the_walking_grid_never_had() {
     assert_eq!(d.len(), 1, "one pull to the wall: {d:?}");
     let at = s.players[&p].pos;
     assert!(at[0] > 8.5 && at[0] < 11.0 && at[1].abs() < 0.8, "at the wall's foot: {at:?}");
+    // Its line from the fist to where it bit, for as long as the pull (Corey's review: a rope).
+    let lines: Vec<(Target, f32)> = ev.iter().filter_map(|e| match e {
+        Event::Tether { from, to, secs } if *from == p => Some((*to, *secs)),
+        _ => None,
+    }).collect();
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(matches!(lines[0].0, Target::Point(at) if at[0] > 10.0 && at[0] < 13.0), "to the wall: {lines:?}");
+    let flight = ev.iter().find_map(|e| match e { Event::LeapLook { player, secs, .. } if *player == p => Some(*secs), _ => None }).expect("the pull's flight");
+    assert!((lines[0].1 - flight).abs() < 1e-3 && flight >= 0.25, "as long as the pull ({flight} s): {lines:?}");
     // A boulder only the land's shapes know: caught all the same.
     let mut s = shipped_on(Box::new(Boulder { at: [15.0, 0.0], r: 1.5, top: 2.5 }));
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -805,6 +814,7 @@ fn grapple_arrow_into_open_air_does_nothing() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let ev = grapple(&mut s, p, 1.0, 0.3);
     assert!(dashes(&ev, p).is_empty(), "no pull on a miss");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Tether { .. })), "and no line");
     assert!(dist2d(s.players[&p].pos, ORIGIN) < 0.1, "she stays: {:?}", s.players[&p].pos);
 }
 
@@ -880,7 +890,7 @@ fn every_disengage_plays_the_same_borrowed_flip_from_the_ground_too() {
     let c = Content::dev();
     for key in ["ensnaring_retreat", "trappers_leap"] {
         let d = &c.abilities[c.ability(key).unwrap()];
-        assert!(d.leap_flip && d.leap_clip != 0 && d.leap_from == "ScourgeFemale", "{key}: the Undead woman's flip");
+        assert!(d.leap_flip && d.leap_clip != 0 && d.leap_from == "NightElfFemale", "{key}: the Night Elf woman's jump");
     }
     let mut s = shipped_on(Box::new(open()));
     for name in ["Ayla", "Grosh"] {
@@ -895,14 +905,35 @@ fn every_disengage_plays_the_same_borrowed_flip_from_the_ground_too() {
             .collect();
         assert_eq!(looks.len(), 1, "{name}: one flip: {looks:?}");
         let (clip, from, flip, secs) = looks[0].clone();
-        assert!(clip == 38 && from == "ScourgeFemale" && flip && secs > 0.3, "{name}: {looks:?}");
+        assert!(clip == 38 && from == "NightElfFemale" && flip && secs > 0.3, "{name}: {looks:?}");
         assert!(!hops(&ev, p).is_empty(), "{name}: a hop back into it, from the ground");
-        let _ = run(&mut s, 2.0);
+        // As the feet touch down, the hero's own JumpEnd (39) takes the landing, so the borrowed
+        // clip's tucked legs never snap back to rest on the ground.
+        let landed = run(&mut s, 2.0);
+        let ends: Vec<f32> = landed
+            .iter()
+            .filter_map(|e| match e {
+                Event::Clip { id, clip: 39, secs, .. } if *id == p => Some(*secs),
+                _ => None,
+            })
+            .collect();
+        assert!(ends.len() == 1 && ends[0] > 0.2 && ends[0] < 0.5, "{name}: one JumpEnd at the landing: {ends:?}");
     }
     // A leap's look on anything but a leap, or from no model the clients know, is turned away.
     let card = |kind: &str, more: &str| format!("[[ability]]\nkey = \"t_bad\"\nname = \"Bad\"\nschool = \"hunter\"\nslot = \"utility\"\nkind = \"{kind}\"\nrange = [8.0, 8.0]\n{more}\n");
-    check(&card("leap", "back = true\nleap_clip = 38\nleap_from = \"ScourgeFemale\"\nleap_flip = true")).unwrap();
+    check(&card("leap", "back = true\nleap_clip = 38\nleap_from = \"NightElfFemale\"\nleap_flip = true")).unwrap();
     for bad in [card("nova", "leap_flip = true"), card("leap", "leap_from = \"ScourgeFemale\""), card("leap", "leap_clip = 38\nleap_from = \"Murloc\"")] {
+        assert!(check(&bad).is_err(), "should be turned away:\n{bad}");
+    }
+}
+
+#[test]
+fn a_pulls_look_on_its_caster_is_only_for_an_ability_that_pulls_from_a_model_the_clients_know() {
+    let card = |more: &str| format!("[[ability]]\nkey = \"t_bad\"\nname = \"Bad\"\nschool = \"hunter\"\nslot = \"utility\"\nkind = \"projectile\"\nrange = [8.0, 8.0]\nspeed = 40.0\n{more}\n");
+    let pull = "effects = [{ kind = \"pull\", amount = 10.0, from_caster = true }]";
+    check(&card(&format!("pull_clip = 63\n{pull}"))).unwrap();
+    check(&card(&format!("pull_clip = 63\npull_from = \"ScourgeFemale\"\n{pull}"))).unwrap();
+    for bad in [card("pull_clip = 63"), card(&format!("pull_from = \"ScourgeFemale\"\n{pull}")), card(&format!("pull_clip = 63\npull_from = \"Murloc\"\n{pull}"))] {
         assert!(check(&bad).is_err(), "should be turned away:\n{bad}");
     }
 }
