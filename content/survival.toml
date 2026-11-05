@@ -459,6 +459,10 @@ charged_knockback = 3.0
 charge_scale = [0.0, 0.3, 0.5, 1.0]
 charge_spells = [0, 7268, 7269, 7270]
 charge_full_kit = 1005
+# The ice made plain (Corey: hard to see): the frost burst on a foe the third chill freezes, and
+# Cone of Cold's spray on each chill.
+freeze_kit = 450
+chill_kit = 1027
 
 [checks]
 # The skill checks built into spells. The release: a charged spell with `perfect = true` flares
@@ -587,6 +591,22 @@ secs = 0.3
 # tumble, the head going over the way it flies: three a second forward, out and back alike (the
 # look is the spell's, and the way back flies the same spell). The tumble needs the sixteenth
 # client; older ones spin it flat.
+# The Rime staff's shard and lance (Corey: the ice hard to see): Frostbolt's missile with a pale
+# icy trail, and the lance bigger with a long one.
+[[missile_look]]
+spell = 205
+trail = "BFEAFF"
+width = 0.22
+secs = 0.35
+scale = 1.1
+
+[[missile_look]]
+spell = 23412
+trail = "DDF4FF"
+width = 0.4
+secs = 0.5
+scale = 1.6
+
 # The Arcane staff's heavy orb by its charges (Corey: varying levels of arcane power): one, a small
 # pink orb; two, bigger with a short ribbon; three, big, turning, with a long bright ribbon.
 [[missile_look]]
@@ -6252,9 +6272,9 @@ damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.35, 0.35]
 speed = 32.0
-# Frost Shot's small shard of ice, not Frostbolt's own (the old small frostbolt, 2130, draws
-# nothing in the client); thrust out with the staff (the two-handed thrust, 18).
-spell = 6984
+# Frostbolt's own shard (rank 2's spell, so its look is the staff's alone: an icy trail, below),
+# thrust out with the staff (the two-handed thrust, 18). Frost Shot's (6984) was hard to see.
+spell = 205
 clip = 18
 # The chill slows (`[staffs] chill_slow` a stack); the shard itself, nothing more.
 

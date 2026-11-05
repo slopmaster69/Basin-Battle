@@ -205,9 +205,9 @@ local DULL = "Sound\\Interface\\iDeselectTarget.wav"
 -- reticle, its good zone lit in blue along the channel, the sweet spot's ice gem pulsing on it, the
 -- cracked overrun past its end, and the ice-shard cursor running the channel, pointing outward.
 local METER_N, METER_OVER = 40, 0
-local METER_R, METER_HALF = 118, 55
+local METER_R, METER_HALF = 156, 55
 -- The frame's square, drawn so its circle's centre is the reticle (its channel `METER_R` out).
-local METER_FRAME = 345
+local METER_FRAME = 456
 local meterDots = {}
 for i = 1, METER_N do meterDots[i] = Tex("check_glow", "ARTWORK") end
 local meterCursor = Tex("meter_cursor", "OVERLAY")
@@ -959,20 +959,22 @@ local function DrawMeter(c, at, fade)
     local sh = (i - 0.5) / METER_N
     if math.abs(sh - c.spot) <= c.good then
       local x, y = MeterXY(c, sh)
-      Draw(t, 14, 0, 0.75 * fade, 0.4, 0.75, 1, x, y)
+      Draw(t, 22, 0, 0.95 * fade, 0.45, 0.8, 1, x, y)
     else
       t:Hide()
     end
   end
   -- The sweet spot's gem, breathing.
   local sx, sy = MeterXY(c, c.spot)
-  Draw(meterSpot, 40 * (1 + 0.08 * math.sin(now * 6)), 0, fade, 1, 1, 1, sx, sy)
+  Draw(meterSpot, 52 * (1 + 0.1 * math.sin(now * 6)), 0, fade, 1, 1, 1, sx, sy)
   -- The overrun past the end, along the arc.
   local ox, oy, oang = MeterXY(c, 1.1)
-  Draw(meterOver, 74, oang, 0.9 * fade, 1, 1, 1, ox, oy)
+  Draw(meterOver, 96, oang, 0.9 * fade, 1, 1, 1, ox, oy)
   if at then
     local x, y, ang = MeterXY(c, Clamp(at, 0, 1.12))
-    Draw(meterCursor, 70, ang, fade, 1, 1, 1, x, y)
+    Draw(meterCursor, 100, ang, fade, 1, 1, 1, x, y)
+    -- A glow under the shard, so it reads over the jet.
+    Draw(halo, 60, 0, 0.6 * fade, 0.7, 0.9, 1, x, y)
   else
     meterCursor:Hide()
   end

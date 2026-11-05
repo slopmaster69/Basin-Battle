@@ -87,7 +87,10 @@ impl Survival {
         let n = m.n;
         self.events.push(Event::Stacks { player: owner, kind, n, on: Some(victim) });
         if n < k.most {
-            // Chill: slower with each.
+            // Chill: slower with each, a puff of frost on them.
+            if kind == "chill" && k.chill_kit != 0 {
+                self.events.push(Event::Visual { id: victim, kit: k.chill_kit, by: Some(owner) });
+            }
             if kind == "chill" && k.chill_slow > 0.0 {
                 let slow = crate::content::AbilityEffect { kind: "snare".into(), secs: [k.keep, k.keep], amount: (k.chill_slow * n as f32).min(0.9), ..Default::default() };
                 self.apply_effects(owner, victim, &[slow], 1.0, &d.name);
@@ -109,6 +112,9 @@ impl Survival {
             // The last chill freezes them (a frozen foe shatters under fire or a heavy lance).
             let freeze = crate::content::AbilityEffect { kind: "petrify".into(), secs: [k.freeze_secs, k.freeze_secs], ..Default::default() };
             self.apply_effects(owner, victim, &[freeze], 1.0, &d.name);
+            if k.freeze_kit != 0 {
+                self.events.push(Event::Visual { id: victim, kit: k.freeze_kit, by: Some(owner) });
+            }
         }
     }
 
