@@ -22,7 +22,8 @@
 //!   Ctrl), `click`, `attack`, `heavy`, `guard`, `guardup`, `dodge`, `bash`, `blow` (the nearest
 //!   creature of the scene swings at the hero), `wait:<secs>`; `press` holds the button down and
 //!   `release` lets it go (a charge held to its flare: `q,press,wait:1.45,release`);
-//!   `release:crit|edge|early|late` lets go against this cast's rolled flare (dead on, at the
+//!   `meter:perfect|good|early|late` stops a meter sweep (Cone of Cold) against its rolled sweet
+//!   spot; `release:crit|edge|early|late` lets go against this cast's rolled flare (dead on, at the
 //!   window's edge, 0.4 s early, past the window); `beats` presses a rhythm's rolled beats dead on
 //!   (`beats:good` a little off, `beats:3` the first three then none, `beats:rest` on the rest).
 //! - `weapon ember_staff` puts that weapon in the caster's hands for the run (a staff's bolts,
@@ -421,6 +422,25 @@ impl SurvivalGame {
                     let at = since + flare + off;
                     self.lab_step_at(at, "release".into());
                     queued = format!("flare {flare:.3} release at {:+.3}", at - start);
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
+            if let Some(how) = step.strip_prefix("meter:") {
+                let mut queued = String::from("no meter");
+                if let Some((since, secs, spot)) = self.sim.lab_meter(me) {
+                    let off = match how {
+                        "early" => -0.3,
+                        "late" => 0.25,
+                        "good" => 0.11,
+                        _ => 0.0,
+                    };
+                    // Half a tick early, as a release is (a step runs on the tick at or after it).
+                    let at = since + secs * (spot + off).clamp(0.02, 0.97) - 0.025;
+                    self.lab_step_at(at, "key".into());
+                    queued = format!("spot {spot:.2} stop at {:+.3}", at - start);
                 }
                 if let Some(lab) = self.lab.as_mut() {
                     lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));

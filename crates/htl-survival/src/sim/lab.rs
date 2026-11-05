@@ -164,6 +164,16 @@ impl Survival {
         }
     }
 
+    /// A meter sweep under way: when it began, its rolled length and its sweet spot (a share), for
+    /// the lab to stop it on the spot, or off it.
+    pub fn lab_meter(&self, id: Id) -> Option<(f32, f32, f32)> {
+        let p = self.players.get(&id)?;
+        match p.action {
+            Action::Sweep { since, .. } => Some((since, p.sweep_secs, p.meter_at)),
+            _ => None,
+        }
+    }
+
     /// A rhythm under way: when it began, its rolled beats, its free beats and each beat's window,
     /// for the lab to press them.
     pub fn lab_rhythm(&self, id: Id) -> Option<(f32, Vec<(f32, bool, f32)>, u32)> {
