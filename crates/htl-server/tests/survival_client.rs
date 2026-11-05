@@ -1895,6 +1895,37 @@ fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
     out
 }
 
+/// To a client with the arrow display (`ac22`), a planted arrow is the wooden doodad arrow
+/// (60003) at half again its size, its flags carrying the glow bit client patch 0039 lights it
+/// by (no feather for it).
+#[test]
+fn a_planted_arrow_is_the_wooden_arrow_half_again_its_size_with_the_glow_flag_for_a_client_that_draws_it() {
+    let server = start_content(None, false, content());
+    let mut c = Client::connect(server.login, "corey", "hold", REALM).unwrap();
+    enter(&mut c);
+    c.chat(".es hello 5 ac22");
+    c.chat(".es cd off");
+    c.drain(0.6);
+    c.chat(".es slot q aimed_arrow");
+    c.drain(0.2);
+    for _ in 0..2 {
+        c.chat(".es in ab 0 0 0.0 -0.15");
+        c.chat(".es in a 0.0 -0.15");
+        c.drain(0.5);
+        c.chat(".es in au 0.0 -0.15");
+        c.drain(1.2);
+    }
+    assert!(objects_with(&c, 2630).is_empty(), "no feather for a client that draws the arrow");
+    let arrows = objects_with(&c, 60_003);
+    assert_eq!(arrows.len(), 2, "two arrows in the ground");
+    for (g, _) in &arrows {
+        let f = placed(&c).into_iter().find(|(x, ..)| x == g).unwrap().3;
+        assert_eq!(field(&f, 4).map(f32::from_bits), Some(1.5), "half again its size");
+        let flags = field(&f, 9).unwrap_or(0);
+        assert_eq!(flags & 0x0800_0000, 0x0800_0000, "the glow bit: {flags:#x}");
+    }
+}
+
 #[test]
 fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_arrow_stands_with_no_ring() {
     let server = start_content(None, false, content());

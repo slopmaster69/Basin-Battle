@@ -104,6 +104,10 @@ const ROPE_SCALE: f32 = 1.4;
 /// How high it's strung over the arrows: an ankle's height, where a tripwire catches a foot.
 const ROPE_HEIGHT: f32 = 0.2;
 const ROPE_ENTRY_NAME: &str = "Tripwire";
+/// Ours, read by client patch 0039: the object glows softly white, with a small white light at
+/// it (a planted arrow, so it can be found in the grass: Corey's review, "I want the arrows to
+/// still have a white glow or indicator"). Older clients ignore it.
+pub(crate) const GO_FLAG_GLOW: u32 = 0x0800_0000;
 
 /// Danger marks and the placing rings: the ritual circle (drawn 6.48 yd across at scale 1) and a
 /// green rune ring for a spot that's good.
@@ -123,9 +127,11 @@ pub(crate) const ARROW_LEVEL: u8 = 22;
 /// doodad arrow (60003, `HumanArrow.m2`), placed as the doodad is, at its size; 60002 is the
 /// Hunter's own arcane arrow (`ArcaneShot_Missile.mdx`, +X nock to head, which wants a tilt of
 /// a quarter turn to stand: run 061 read it as a purple spike), 60004 the plain ammo arrow in
-/// flight (+X too). `ARROW_TILT` turns the model about its Y after its facing (radians).
+/// flight (+X too). `ARROW_TILT` turns the model about its Y after its facing (radians). Half
+/// again the doodad's size: at its own it was lost in the grass (Corey's review, "can you make
+/// the ground arrows bigger?").
 const ARROW_DISPLAY: u32 = 60_003;
-const ARROW_SCALE: f32 = 1.0;
+const ARROW_SCALE: f32 = 1.5;
 const ARROW_TILT: f32 = 0.0;
 
 /// Equipment slots, as the client numbers them.
@@ -905,7 +911,10 @@ impl SurvivalGame {
         self.bind(id, guid);
         let state = self.obj_state(&v);
         let arrow = Self::planted_arrow(&v) && level >= ARROW_LEVEL;
-        let (display, scale, tilt) = if arrow { (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT) } else { (v.display, v.scale, 0.0) };
+        // The arrow glows white (patch 0039's flag) so it can be found in the grass; a client
+        // without the patch ignores the bit.
+        let (display, scale, tilt, flags) =
+            if arrow { (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT, flags | GO_FLAG_GLOW) } else { (v.display, v.scale, 0.0, flags) };
         let mut out = vec![Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt)];
         if let ObjKind::Ghost { def, ok, .. } = v.kind {
             let r = self.sim.content.stations[def].footprint;
