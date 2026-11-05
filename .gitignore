@@ -15,6 +15,7 @@ logs/
 /restart.request
 /tools/clip-census/target
 /tools/*/Cargo.lock
+__pycache__/
 /dist/windows/buttons/target
 /dist/windows/launcher/ui/news.json
 /dist/windows/launcher/ui/shield.png
