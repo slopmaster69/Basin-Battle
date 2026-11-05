@@ -455,6 +455,58 @@ fn a_reported_aim_point_off_its_line_behind_or_stale_is_not_taken() {
     s.set_aim_point(p, [f32::NAN, 0.0, 0.0]);
     assert!(s.players[&p].aim_at.is_none(), "not a number: dropped");
 }
+/// A near point can't turn the shot sideways, and a point goes only with a line sent with it.
+#[test]
+fn a_near_point_off_to_the_side_or_sent_without_its_line_is_not_taken() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    s.set_aim_line(p, 0.0, 0.0);
+    // 1.2 yd to the side of the line and only 0.3 yd along it: close, but 76 degrees off.
+    s.set_aim_point(p, [0.3, 0.45, 1.9]);
+    assert!(s.players[&p].aim_at.is_none(), "near but sideways: dropped");
+    // A line the server refused leaves the last one standing: a point can't ride on it later.
+    run(&mut s, 0.1);
+    s.set_aim_line(p, f32::NAN, 0.0);
+    s.set_aim_point(p, [20.0, -0.75, 1.9]);
+    assert!(s.players[&p].aim_at.is_none(), "no line just sent: dropped");
+}
+
+/// A point the hero has run past since it was sent isn't aimed at: the shot goes along the line.
+#[test]
+fn a_point_the_hero_ran_past_is_not_aimed_at() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    s.set_aim_line(p, 0.0, 0.0);
+    s.set_aim_point(p, [5.0, -0.75, 1.9]);
+    assert!(s.players[&p].aim_at.is_some());
+    s.players.get_mut(&p).unwrap().pos = [8.0, 0.0, 0.0];
+    let (_, dir) = s.reticle(p);
+    assert!(dir[0] > 0.99, "ahead along the line, not back at the point: {dir:?}");
+}
+
+/// A shape laid from the feet (a cone, a strip, a beam, a dash) goes toward what the reticle is
+/// on, not along the facing beside it: a foe right under the reticle off to the right is in it.
+#[test]
+fn a_cone_from_the_feet_goes_toward_what_the_reticle_is_on() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    let g = mob(&mut s, "grunt", [3.0, -1.5, 0.0]);
+    let foe = s.mobs[&g].pos;
+    s.set_aim_line(p, 0.0, -0.29);
+    s.set_aim_point(p, [3.0, -1.5, 1.0]);
+    assert!(s.players[&p].aim_at.is_some());
+    let yaw = s.aim_yaw(p, 4.0);
+    let want = (foe[1] - ORIGIN[1]).atan2(foe[0] - ORIGIN[0]).rem_euclid(std::f32::consts::TAU);
+    let gap = (yaw - want).rem_euclid(std::f32::consts::TAU);
+    let gap = gap.min(std::f32::consts::TAU - gap);
+    assert!(gap < 0.15, "toward the grunt under the reticle: {yaw} against {want}");
+    // Without a fresh line (a cast going off by itself), the facing as before.
+    run(&mut s, 1.0);
+    assert_eq!(s.aim_yaw(p, 4.0), s.players[&p].facing);
+}
 
 #[test]
 fn a_heavy_attack_is_slower_harder_and_throws_a_hero_back() {

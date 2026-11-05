@@ -167,13 +167,14 @@ const HAND_AHEAD: f32 = 0.6;
 const HAND_RIGHT: f32 = 0.3;
 /// The reticle's line a cast carries counts this long, and this near the hero's facing.
 const AIM_FRESH: f32 = 0.6;
-/// A reported aim point is taken this far from the hero at most, and when it lies within this
-/// angle (radians) of the reported line from the aiming camera, or this close to it (yd): the
-/// client's camera sits a little behind and above the server's pivot, which shifts a near point
-/// most.
+/// A reported aim point is taken this far from the hero at most, and when it lies this close (yd)
+/// to the reported line from the aiming camera or within this angle (radians) of it. The client's
+/// camera sits a little behind and above the server's pivot (a gap of tenths of a yard), and its
+/// view can tip up from the line it reports while it presses on the ground (the smart pivot's
+/// bias), a gap that grows with range.
 const AIM_POINT_MOST: f32 = 120.0;
-const AIM_POINT_SLACK: f32 = 0.2;
 const AIM_POINT_NEAR: f32 = 1.5;
+const AIM_POINT_SLACK: f32 = 0.2;
 /// After letting an ability go, a beat before the next thing.
 const CAST_RECOVERY: f32 = 0.35;
 /// The throw's clip (AttackThrown) and the pose a thrown charge holds till it goes (HoldThrown):
@@ -484,40 +485,49 @@ impl Survival {
         let o = [p.pos[0] + yaw.sin() * right, p.pos[1] - yaw.cos() * right, p.pos[2] + EYE];
         // Their own reticle's point, when their client sent one with this line: the line goes
         // through it, so what the server finds along it is what their reticle was on.
+        // Checked again from where the hero is now: a hero who ran or dashed past it since aims
+        // along their line instead of sideways at it.
         if let (Some(at), Some((_, _, when))) = (p.aim_at, p.aim_line) {
-            if self.clock - when <= AIM_FRESH {
-                let v = [at[0] - o[0], at[1] - o[1], at[2] - o[2]];
-                if v[0] * v[0] + v[1] * v[1] + v[2] * v[2] > 0.25 {
-                    return (o, norm(v));
-                }
+            if self.clock - when <= AIM_FRESH && point_on_line(o, look_dir(yaw, pitch), at) {
+                return (o, norm([at[0] - o[0], at[1] - o[1], at[2] - o[2]]));
             }
         }
         (o, look_dir(yaw, pitch))
     }
 
-    /// A reported aim point is believable: within reach, in front of the hero, and on (or near)
-    /// the line just reported from the aiming camera.
+    /// A reported aim point is believable: sent with a line set this very moment (not one left
+    /// from before, or one the server refused), within reach, in front of the hero and on (or near)
+    /// that line from the aiming camera.
     pub(crate) fn aim_point_ok(&self, id: Id, at: Vec3) -> bool {
         let Some(p) = self.players.get(&id) else { return false };
-        if !at.iter().all(|v| v.is_finite()) || p.aim_line.is_none() {
+        if !matches!(p.aim_line, Some((_, _, when)) if when == self.clock) {
             return false;
         }
         let (yaw, pitch) = self.aim_of(id);
         let right = if p.shoulder_cam { SHOULDER } else { 0.0 };
         let o = [p.pos[0] + yaw.sin() * right, p.pos[1] - yaw.cos() * right, p.pos[2] + EYE];
-        let v = [at[0] - o[0], at[1] - o[1], at[2] - o[2]];
-        let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-        if len > AIM_POINT_MOST || len < 0.5 {
-            return false;
+        point_on_line(o, look_dir(yaw, pitch), at)
+    }
+
+    /// The facing a shape laid from the hero's feet goes along (a cone, a strip, a beam, a dash):
+    /// toward what their reticle is on, within `reach` (8 yd at least, and on 3, as the server's
+    /// own line runs past the range). The reticle's line runs over the right shoulder, beside the
+    /// feet's: along the facing alone a cone missed a foe right under the reticle. Without a fresh
+    /// line (a cast going off by itself), or with the point at their feet, the facing as before.
+    pub(crate) fn aim_yaw(&self, id: Id, reach: f32) -> f32 {
+        let (yaw, _) = self.aim_of(id);
+        let Some(p) = self.players.get(&id) else { return yaw };
+        if !matches!(p.aim_line, Some((_, _, when)) if self.clock - when <= AIM_FRESH) {
+            return yaw;
         }
-        let d = look_dir(yaw, pitch);
-        // In front: not behind the hero along the way they look.
-        if v[0] * d[0] + v[1] * d[1] < 0.0 {
-            return false;
+        let pos = p.pos;
+        let (o, dir) = self.reticle(id);
+        let at = self.trace(o, dir, reach.max(8.0) + 3.0, 0.0, id).point;
+        if dist2d(pos, at) > 1.0 {
+            facing(pos, at)
+        } else {
+            yaw
         }
-        let along = v[0] * d[0] + v[1] * d[1] + v[2] * d[2];
-        let off = ((len * len - along * along).max(0.0)).sqrt();
-        off <= AIM_POINT_NEAR || off.atan2(along.max(1.0e-3)) <= AIM_POINT_SLACK
     }
 
     /// Where a cast leaves the hero's hands.
@@ -1044,7 +1054,7 @@ impl Survival {
         if d.counter.is_none() && !matches!(free, Some(Free::Recast { .. })) {
             self.spend_charge(id, ability, 1.0);
         }
-        let (yaw, _) = self.aim_of(id);
+        let yaw = self.aim_yaw(id, AbilityDef::at(d.range, share));
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = yaw;
         }
@@ -2304,7 +2314,7 @@ impl Survival {
             d = next;
         }
         // Near it: the friend closest to the line, within the cone and the range, in sight.
-        let (yaw, _) = self.aim_of(id);
+        let yaw = self.aim_yaw(id, range);
         let (c, s) = (yaw.cos(), yaw.sin());
         let off = |at: Vec3| (-(at[0] - pos[0]) * s + (at[1] - pos[1]) * c).abs();
         friends
@@ -2951,8 +2961,8 @@ impl Survival {
             p.action = Action::Channel { ability, target, until, next: next + tick, share };
         }
         let pos = self.players[&id].pos;
-        let (yaw, _) = self.aim_of(id);
         let len = AbilityDef::at(d.range, share);
+        let yaw = self.aim_yaw(id, len);
         let half = AbilityDef::at(d.radius, share);
         let (c, s) = (yaw.cos(), yaw.sin());
         let along = |at: Vec3| (at[0] - pos[0]) * c + (at[1] - pos[1]) * s;
@@ -3549,3 +3559,20 @@ impl Survival {
 
 /// How long the bow's drawn pose is cast for: held until the shot or the aim is let go.
 pub(crate) const DRAW_HOLD_MS: u32 = 60_000;
+
+/// A point on the reticle's line from `o` along `d`: finite, within reach, ahead (never more than
+/// 45 degrees off it, so a near point can't turn the shot sideways) and close to the line, by
+/// distance or by angle (`AIM_POINT_NEAR`, `AIM_POINT_SLACK`).
+fn point_on_line(o: Vec3, d: Vec3, at: Vec3) -> bool {
+    if !at.iter().all(|v| v.is_finite()) {
+        return false;
+    }
+    let v = [at[0] - o[0], at[1] - o[1], at[2] - o[2]];
+    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if !(0.5..=AIM_POINT_MOST).contains(&len) {
+        return false;
+    }
+    let along = v[0] * d[0] + v[1] * d[1] + v[2] * d[2];
+    let off = ((len * len - along * along).max(0.0)).sqrt();
+    along > 0.0 && off <= along && (off <= AIM_POINT_NEAR || off <= along * AIM_POINT_SLACK.tan())
+}
