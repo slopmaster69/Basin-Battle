@@ -14,7 +14,7 @@ use super::*;
 use crate::content::AbilityDef;
 
 /// How often the rolling orb's look is refreshed.
-const LOOK_EVERY: f32 = 0.25;
+const LOOK_EVERY: f32 = 0.1;
 /// How far ahead of the caster it starts.
 const START_AHEAD: f32 = 1.5;
 /// The burst's look stays this long.
@@ -31,6 +31,8 @@ pub(crate) struct Orb {
     pub until: f32,
     pub next_tick: f32,
     pub next_look: f32,
+    /// Its rolling look's key, for the clients that draw it (`Event::OrbRoll`).
+    pub look: Id,
 }
 
 impl Survival {
@@ -42,10 +44,43 @@ impl Survival {
         let p = &self.players[&id];
         let dir = [yaw.cos(), yaw.sin()];
         let start = self.ground_near(p.pos[0] + dir[0] * START_AHEAD, p.pos[1] + dir[1] * START_AHEAD, p.pos[2]);
-        let secs = d.linger.max(0.1);
+        // Each cast rolls at its own pace (the same reach), so the stop is read, not counted.
+        let secs = d.linger.max(0.1) * (0.85 + 0.3 * rand::Rng::gen::<f32>(&mut self.rng));
         let speed = d.range[0] / secs;
         let tick = if d.tick > 0.0 { d.tick } else { 0.5 };
-        self.orbs.push(Orb { owner: id, ability, pos: start, dir, speed, until: now + secs, next_tick: now + tick, next_look: now });
+        // The foes along its line, by how far along it they stand, for the caster's track.
+        let reach = d.radius[1].max(1.5);
+        let pos = self.players[&id].pos;
+        let mut along: Vec<f32> = self
+            .mobs
+            .values()
+            .filter(|m| m.health > 0 && !m.hidden)
+            .map(|m| m.pos)
+            .filter_map(|q| {
+                let (dx, dy) = (q[0] - pos[0], q[1] - pos[1]);
+                let ahead = dx * dir[0] + dy * dir[1];
+                let side = (dx * dir[1] - dy * dir[0]).abs();
+                (ahead > 0.0 && ahead <= d.range[0] + 1.0 && side <= reach).then_some(ahead)
+            })
+            .collect();
+        along.sort_by(|a, b| a.total_cmp(b));
+        let marks: Vec<String> = along.iter().map(|a| format!("{a:.1}")).collect();
+        self.events.push(Event::CheckStart {
+            player: id,
+            ability,
+            kind: "orb",
+            a: secs,
+            b: d.range[0],
+            c: d.perfect_yd,
+            pattern: format!("{:.1}|{:.1}|{}", d.backfire_yd, START_AHEAD, marks.join(",")),
+        });
+        // Its rolling look, for the clients that draw an orb: where it would end if nothing stops it.
+        let look = self.alloc();
+        if !d.orb_model.is_empty() {
+            let far = self.ground_near(start[0] + dir[0] * d.range[0], start[1] + dir[1] * d.range[0], start[2]);
+            self.events.push(Event::OrbRoll { look, from: start, to: far, secs, model: d.orb_model.clone(), scale: if d.orb_scale > 0.0 { d.orb_scale } else { 1.0 } });
+        }
+        self.orbs.push(Orb { owner: id, ability, pos: start, dir, speed, until: now + secs, next_tick: now + tick, next_look: now, look });
     }
 
     /// The orb of this key's base ability the hero has out, if any.
@@ -60,6 +95,7 @@ impl Survival {
         let mut keep = Vec::new();
         for mut o in list {
             if now >= o.until || !self.players.contains_key(&o.owner) {
+                self.events.push(Event::OrbGone { look: o.look });
                 continue;
             }
             let d = self.content.abilities[o.ability].clone();
@@ -67,10 +103,12 @@ impl Survival {
             let (x, y) = (o.pos[0] + o.dir[0] * go, o.pos[1] + o.dir[1] * go);
             // It rolls over the ground, and a wall ends it (no burst: it was never stopped).
             if self.land.blocked_near(x, y, o.pos[2]) {
+                self.events.push(Event::OrbGone { look: o.look });
                 continue;
             }
             o.pos = self.ground_near(x, y, o.pos[2]);
-            if now >= o.next_look {
+            // The old look (a missile to where it is), only where there's no rolling model.
+            if now >= o.next_look && d.orb_model.is_empty() {
                 o.next_look = now + LOOK_EVERY;
                 if d.tick_spell != 0 {
                     let at = [o.pos[0], o.pos[1], o.pos[2] + 1.0];
@@ -120,6 +158,7 @@ impl Survival {
     /// the caster under it makes it a backfire.
     pub(crate) fn stop_orb(&mut self, id: Id, k: usize) {
         let o = self.orbs.remove(k);
+        self.events.push(Event::OrbGone { look: o.look });
         let d = self.content.abilities[o.ability].clone();
         let at = o.pos;
         let (mobs, heroes) = self.near_orb(&o, d.perfect_yd.max(0.0));
@@ -144,11 +183,16 @@ impl Survival {
             }
             let c = self.content.checks.clone();
             self.gain_valor(id, c.perfect_valor);
-            if c.perfect_kit != 0 {
-                self.events.push(Event::Visual { id, kit: c.perfect_kit, by: None });
+            let kit = self.perfect_kit_of(o.ability);
+            if kit != 0 {
+                self.events.push(Event::Visual { id, kit, by: None });
             }
             self.events.push(Event::Perfect { player: id, ability: o.ability });
         }
+        let own_yd = self.players.get(&id).map(|p| dist2d(p.pos, at)).unwrap_or(f32::MAX);
+        let backfire = d.backfire_yd > 0.0 && own_yd <= d.backfire_yd;
+        let grade = if backfire { "fail" } else if perfect { "perfect" } else { "good" };
+        self.check_result(id, o.ability, grade);
         // Stopped at the caster's own feet: the cold takes them too.
         let own = self.players.get(&id).map(|p| dist2d(p.pos, at)).unwrap_or(f32::MAX);
         if d.backfire_yd > 0.0 && own <= d.backfire_yd && !d.backfire_effects.is_empty() {

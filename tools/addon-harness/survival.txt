@@ -526,6 +526,33 @@ WR	below
 H	200	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90
 !table.insert(SAID, "below, the arrow: " .. tostring(ElwynnSurvivalInfo:IsShown() and "info" or "no info") .. " / " .. tostring(ElwynnSurvival.infoCacheText and ElwynnSurvival.infoCacheText() or "?"))
 WR	camp
+# The skill checks (Check.lua): a release check's ring closes on its moment; a press judged at once,
+# the server's word after; a rhythm's beats, a rest, a fail; every outcome plays out and goes.
+!ElwynnSurvival.check.pressAt = GetTime()
+CK	fireball	release	fire	1.200	0.100	0.300	stutter
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "release check: shown " .. tostring(c:IsShown()) .. " kind " .. tostring(c.cur and c.cur.kind) .. " flare " .. tostring(c.cur and c.cur.flare) .. " curve " .. tostring(c.cur and c.cur.curve))
+!ElwynnSurvival.attackHeld = true ElwynnSurvival.Attack("up") table.insert(SAID, "released: judged " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade) .. ", ring gone " .. tostring(ElwynnSurvival.check.cur == nil))
+CR	fireball	fizzle
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "after the outcome: shown " .. tostring(c:IsShown()) .. " fx " .. tostring(c.fx))
+CK	arcane_missiles	rhythm	arcane	0.150	0.080	0.300	3|swing|0.000,0.420,0.700,1.120,1.400r,1.820,2.100,2.520
+!local c = ElwynnSurvival.check table.insert(SAID, "rhythm: beats " .. tostring(c.cur and c.cur.n) .. " free " .. tostring(c.cur and c.cur.free) .. " rest " .. tostring(c.cur and c.cur.beats[5].rest) .. " next " .. tostring(c.cur and c.cur.next))
+!local c = ElwynnSurvival.check for i = 1, 20 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end
+CR	arcane_missiles	good
+CR	arcane_missiles	critical
+!local c = ElwynnSurvival.check table.insert(SAID, "two beats from the server: next " .. tostring(c.cur and c.cur.next))
+!local c = ElwynnSurvival.check for i = 1, 20 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end
+CR	arcane_missiles	fail
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "rhythm failed: ring gone " .. tostring(c.cur == nil) .. ", shown " .. tostring(c:IsShown()))
+CK	arcane_explosion	rhythm	arcane	0.150	0.080	0.300	1|steady|0.000,0.500,1.000
+!ElwynnSurvival.Ability(2, false, "down") table.insert(SAID, "pressed far off the beat: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade))
+CR	arcane_explosion	perfect
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "all done: shown " .. tostring(c:IsShown()))
+CK	cone_of_cold	sweep	frost	1.050	120.000	10.000	rl|30.0|-28.0,0.5,27.9
+!local c = ElwynnSurvival.check for i = 1, 10 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "sweep: marks " .. tostring(c.cur and table.getn(c.cur.marks)) .. " dir " .. tostring(c.cur and c.cur.dir))
+!ElwynnSurvival.check.cur.start = GetTime() - 0.52 ElwynnSurvival.Ability(2, false, "down") table.insert(SAID, "sweep stopped mid-way: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade))
+CK	frozen_orb	orb	frost	3.800	25.000	1.500	3.0|1.0|6.0,10.0,14.0
+!local c = ElwynnSurvival.check for i = 1, 10 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "orb: marks " .. tostring(c.cur and table.getn(c.cur.marks)) .. " backfire " .. tostring(c.cur and c.cur.backfire))
+!ElwynnSurvival.check.cur.start = GetTime() ElwynnSurvival.check.cur.start = GetTime() - 0.1 ElwynnSurvival.Ability(4, false, "down") table.insert(SAID, "orb stopped at once: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade))
 @PLAYER_LEAVING_WORLD
 !table.insert(SAID, "asleep: " .. tostring(ElwynnSurvival.awake) .. ", S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. ", catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()) .. ", action bar back " .. tostring(MainMenuBar:IsVisible()) .. ", bar " .. tostring(ElwynnSurvivalBar:IsVisible()))
 !table.insert(SAID, "after leaving: action bar visible " .. tostring(MainMenuBar:IsVisible()) .. ", player frame " .. tostring(PlayerFrame:IsVisible()))

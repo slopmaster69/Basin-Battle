@@ -194,6 +194,23 @@ pub enum Event {
     /// A perfect cast: the hero released an ability on its flare (its burst and Valor are their
     /// own events; this is for the hero's own screen, a beat).
     Perfect { player: Id, ability: usize },
+    /// A skill check begins for the hero, with what this cast rolled, for their add-on to draw
+    /// before it's due: `kind` "release" (`a` the flare's second from the charge's start, `b` the
+    /// window either side, `c` the critical's share of it, `pattern` how the ring closes), or
+    /// "rhythm" (`a`, `b` the first and last pressed beats' windows, `c` the critical's share,
+    /// `pattern` "free|name|t0,t1,t2r,..." the beats' seconds from the start, `r` a rest).
+    CheckStart { player: Id, ability: usize, kind: &'static str, a: f32, b: f32, c: f32, pattern: String },
+    /// A skill check's outcome: "critical", "perfect", "good", "weak" (early, it went weaker),
+    /// "fail" (a missed beat, a stop on nothing) or "fizzle" (all or nothing, and nothing).
+    CheckResult { player: Id, ability: usize, grade: &'static str },
+    /// The ward's own check: a perfect ward ("perfect") or the ward breaking ("fail"), for the
+    /// warder's add-on to flash as a spell's check does.
+    WardCheck { player: Id, grade: &'static str },
+    /// An orb set rolling (Frozen Orb), for the clients that draw it rolling: `look` its key, from
+    /// where to where over how long, the model and its size (`orb_model`, `orb_scale`).
+    OrbRoll { look: Id, from: Vec3, to: Vec3, secs: f32, model: String, scale: f32 },
+    /// That orb stopped or spent.
+    OrbGone { look: Id },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
@@ -601,6 +618,17 @@ pub struct Player {
     pub ward_up: bool,
     /// The cast going out now was released on its flare (a perfect): its strength and its pay.
     pub cast_perfect: bool,
+    /// ...and in the very middle of it (a critical): its `crit_effects` too.
+    pub cast_critical: bool,
+    /// The charge held now flares this long after it began (rolled as it began).
+    pub check_flare: f32,
+    /// A rhythm's beats, seconds from its start, and which are rests (rolled as it began).
+    pub rhythm_beats: Vec<(f32, bool)>,
+    /// A sweep's way across (+1 left to right, -1 right to left) and its time (rolled as it began).
+    pub sweep_dir: f32,
+    pub sweep_secs: f32,
+    /// The ward's next crackle, while it's up.
+    pub ward_crackle_at: f32,
     /// What the cast going out now strikes for, when its own numbers don't say (a beat's).
     pub cast_damage: Option<f32>,
     pub sprint_held: bool,
@@ -1256,6 +1284,12 @@ impl Survival {
             ward_down_at: -100.0,
             ward_up: false,
             cast_perfect: false,
+            cast_critical: false,
+            check_flare: 0.0,
+            rhythm_beats: Vec::new(),
+            sweep_dir: 1.0,
+            sweep_secs: 1.0,
+            ward_crackle_at: 0.0,
             cast_damage: None,
             sprint_held: false,
             sprinting: false,

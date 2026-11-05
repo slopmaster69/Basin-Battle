@@ -16,6 +16,8 @@ const EMOTE_SHIELD_BLOCK: u32 = 43;
 /// The guard's held pose: the shield up (ShieldBlock), or a two-handed weapon at the ready.
 pub(crate) const POSE_SHIELD: u32 = 43;
 const POSE_TWO_HANDED: u32 = 375;
+/// A ward held up: the spell-precast stance (the arm raised, channelling), not a weapon's guard.
+const POSE_WARD: u32 = 193;
 const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// The hunter's shots whose own look has no missile model: flown from a spot, they carry the
 /// arrow (as Basin Battle's server sends them), or the client flies nothing to see. (10346: Fire
@@ -392,6 +394,38 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("PF\t{key}"));
                 }
             }
+            Event::CheckStart { player, ability, kind, a, b, c: crit, pattern } => {
+                if let Some(c) = self.conn_of(player) {
+                    let d = &self.sim.content.abilities[ability];
+                    let (key, school) = (d.key.clone(), check_school(d));
+                    self.ui_line(c, &format!("CK\t{key}\t{kind}\t{school}\t{a:.3}\t{b:.3}\t{crit:.3}\t{pattern}"));
+                }
+            }
+            Event::OrbRoll { look, from, to, secs, model, scale } => {
+                // Everyone with the add-on sees it roll (a client with PlayGroundOrb draws it).
+                let line = format!("OB\t{look}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{secs:.2}\t{}\t{scale:.2}", from[0], from[1], from[2], to[0], to[1], to[2], model.replace('\t', " "));
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::OrbGone { look } => {
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &format!("OX\t{look}"));
+                }
+            }
+            Event::WardCheck { player, grade } => {
+                if let Some(c) = self.conn_of(player) {
+                    self.ui_line(c, &format!("CR	ward	{grade}"));
+                }
+            }
+            Event::CheckResult { player, ability, grade } => {
+                if let Some(c) = self.conn_of(player) {
+                    let key = self.sim.content.abilities[ability].key.clone();
+                    self.ui_line(c, &format!("CR\t{key}\t{grade}"));
+                }
+            }
             Event::Speed { player, speed, back } => {
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(c) = self.conn_of(player) else { return };
@@ -464,7 +498,19 @@ impl SurvivalGame {
                     }
                 }
             }
-            Event::Gear { player } => self.show_gear(player),
+            Event::Gear { player } => {
+                self.show_gear(player);
+                // A casting staff in hand: every add-on's client launches this hero's bolts from
+                // its tip (a client with SetUnitMissileOrigin, patch 0044); anything else, the hands.
+                if let Some(g) = self.guid_of(player) {
+                    let staff = self.sim.players.get(&player).is_some_and(|p| self.sim.weapon_of(p).casts());
+                    let line = format!("MO	{g:#X}	{}", if staff { "weapon" } else { "" });
+                    let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                    for c in conns {
+                        self.ui_line(c, &line);
+                    }
+                }
+            }
             // The add-on's effects line follows on the next flush.
             Event::Effects { .. } | Event::Goal | Event::Sites => {}
             Event::Guard { player, up } => {
@@ -1054,9 +1100,23 @@ impl SurvivalGame {
     /// The pose a hero's raised guard shows.
     pub(crate) fn guard_pose(&self, player: Id) -> u32 {
         match self.sim.players.get(&player) {
+            Some(p) if self.sim.guard_of(p).ward => POSE_WARD,
             Some(p) if self.sim.weapon_of(p).two_handed => POSE_TWO_HANDED,
             _ => POSE_SHIELD,
         }
+    }
+}
+
+/// The school a skill check is drawn in: the ability's own `check_school` when it says, else from
+/// its look (a fire, frost or arcane spell), else arcane (a mage's).
+fn check_school(d: &htl_survival::content::AbilityDef) -> &'static str {
+    let k = d.key.as_str();
+    if k.contains("fire") || k.contains("pyro") || k.contains("meteor") || k.contains("ember") || k.contains("flame") {
+        "fire"
+    } else if k.contains("frost") || k.contains("cold") || k.contains("ice") || k.contains("rime") || k.contains("orb") && !k.contains("arcane") {
+        "frost"
+    } else {
+        "arcane"
     }
 }
 

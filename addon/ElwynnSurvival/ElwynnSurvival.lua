@@ -6589,6 +6589,17 @@ function ES.Line(line)
     ES.ValorLine(f)
   elseif verb == "WA" then
     if ES.WardLine then ES.WardLine(f) end
+  elseif verb == "CK" then
+    if ES.CheckLine then ES.CheckLine(f) end
+  elseif verb == "CR" then
+    if ES.CheckResultLine then ES.CheckResultLine(f) end
+  elseif verb == "MO" then
+    -- Where a hero's missiles leave from (a casting staff's tip), on a client that can say so.
+    if SetUnitMissileOrigin then SetUnitMissileOrigin(f[2] or "", f[3] or "") end
+  elseif verb == "OB" then
+    if ES.OrbLine then ES.OrbLine(f) end
+  elseif verb == "OX" then
+    if ES.OrbGoneLine then ES.OrbGoneLine(f) end
   elseif verb == "CC" then
     ES.CcLine(f)
   elseif verb == "TR" then
@@ -6834,7 +6845,11 @@ events:SetScript("OnEvent", function()
     -- ac21: a rope from a unit's hand (SetUnitRope: a grappling hook's line).
     -- ac22: the bowstring on its bow, units that never fade, the aiming camera's tip down.
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
+    -- ac24: the Mage's skill checks: rings on the ground, recoloured spell looks, an orb rolled on
+    -- the ground, missiles from a staff's tip (patches 0041 to 0044).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 24 then
+      Say(".es hello " .. VERSION .. " ac24")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
       Say(".es hello " .. VERSION .. " ac23")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
       Say(".es hello " .. VERSION .. " ac22")

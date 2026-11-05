@@ -500,6 +500,12 @@ impl Survival {
             p.ward_down_at = now;
             self.events.push(Event::Ward { player: id });
         }
+        // The blow stopped: a crackle on the barrier, so a block reads on the body and not only
+        // on the bar.
+        let kit = self.content.ward.block_kit;
+        if kit != 0 {
+            self.events.push(Event::Visual { id, kit, by: None });
+        }
     }
 
     /// The ward shatters: the bar empty and locked until it has refilled.
@@ -510,6 +516,7 @@ impl Survival {
             p.ward_broken = true;
             p.ward_down_at = now;
             self.events.push(Event::Ward { player: id });
+            self.events.push(Event::WardCheck { player: id, grade: "fail" });
         }
     }
 
@@ -915,6 +922,12 @@ impl Survival {
         }
         if up {
             p.ward_down_at = now;
+            // It crackles, more often as it runs dry.
+            if w.crackle_full > 0.0 && w.block_kit != 0 && now >= p.ward_crackle_at {
+                let left = (p.ward / w.bar.max(1.0)).clamp(0.0, 1.0);
+                p.ward_crackle_at = now + w.crackle_empty + (w.crackle_full - w.crackle_empty) * left;
+                self.events.push(Event::Visual { id, kit: w.block_kit, by: None });
+            }
         } else if p.ward < w.bar && now - p.ward_down_at >= w.refill_delay {
             let before = p.ward.floor();
             p.ward = (p.ward + w.refill * dt).min(w.bar);
@@ -2004,9 +2017,18 @@ impl Survival {
             Outcome::GuardBroken if heavy_blow => {
                 let secs = if warded { c.ward.break_secs } else { guard.break_secs }.max(c.combat.knockdown);
                 self.events.push(Event::React { id: victim, anim: KNOCKDOWN_ANIM, from, lean: 0.0, hold: 0.0, fit: secs });
-                self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
                 if warded {
+                    // The barrier crackles and fizzles apart; no knockdown dust over it (Corey: the
+                    // dust drowned the break).
                     self.events.push(Event::Visual { id: victim, kit: c.ward.break_kit, by: None });
+                    if c.ward.block_kit != 0 {
+                        self.events.push(Event::Visual { id: victim, kit: c.ward.block_kit, by: None });
+                    }
+                    if c.checks.fizzle_kit != 0 {
+                        self.events.push(Event::Visual { id: victim, kit: c.checks.fizzle_kit, by: None });
+                    }
+                } else {
+                    self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
                 }
             }
             Outcome::GuardBroken => {
@@ -2073,6 +2095,11 @@ impl Survival {
                 p.ward = (p.ward + c.ward.perfect_refill).min(c.ward.bar);
                 self.events.push(Event::Ward { player: victim });
                 self.events.push(Event::Visual { id: victim, kit: c.ward.perfect_kit, by: None });
+                // A great parry crackles with it, and flashes on the warder's screen.
+                if c.ward.block_kit != 0 {
+                    self.events.push(Event::Visual { id: victim, kit: c.ward.block_kit, by: None });
+                }
+                self.events.push(Event::WardCheck { player: victim, grade: "perfect" });
             } else {
                 p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
                 self.events.push(Event::Stamina { player: victim });

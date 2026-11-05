@@ -416,14 +416,20 @@ pub struct WardDef {
     pub break_secs: f32,
     /// The look on a hero holding the ward up (a spell whose aura the clients show).
     pub aura: u32,
-    /// The burst of a perfect ward, and the shatter of a broken one (spell visual kits).
+    /// The crackle on the ward as it stops a blow, the burst of a perfect ward, and the fizzle of
+    /// one that breaks (spell visual kits).
+    pub block_kit: u32,
     pub perfect_kit: u32,
     pub break_kit: u32,
+    /// While up, `block_kit` crackles on the hero every `crackle_full` sec with the bar whole,
+    /// down to every `crackle_empty` sec as it runs dry (0: never).
+    pub crackle_full: f32,
+    pub crackle_empty: f32,
 }
 
 impl Default for WardDef {
     fn default() -> Self {
-        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, perfect_kit: 555, break_kit: 7 }
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0 }
     }
 }
 
@@ -445,11 +451,20 @@ pub struct ChecksDef {
     pub perfect_kit: u32,
     /// A full rhythm chain's Valor (a whole segment).
     pub chain_valor: f32,
+    /// The flare (the release check's moment) comes, at random, anywhere from this share of a
+    /// ranged charge's top to the top; a fixed charge's (Pyroblast's) up to `flare_late` seconds
+    /// after it. No two casts keep quite the same time.
+    pub flare_from: f32,
+    pub flare_late: f32,
+    /// The critical: the middle this share of any check's window.
+    pub crit_share: f32,
+    /// The look of an all-or-nothing cast that fizzles (a spell visual kit on the caster).
+    pub fizzle_kit: u32,
 }
 
 impl Default for ChecksDef {
     fn default() -> Self {
-        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0 }
+        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0, flare_from: 0.72, flare_late: 0.35, crit_share: 0.3, fizzle_kit: 0 }
     }
 }
 

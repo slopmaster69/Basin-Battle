@@ -16,28 +16,80 @@ use crate::content::AbilityDef;
 
 /// How often the jet's reach puffs while it sweeps.
 const PULSE: f32 = 0.1;
+/// A sweep's channel look replays this often.
+const CHANNEL_EVERY: f32 = 0.3;
 
 impl Survival {
-    /// The sweep begins from the hero's left, turning rightward across the front.
+    /// The sweep begins from one side, turning across the front: which side and how fast, rolled
+    /// (each cast its own), and the caster's add-on told, with where the foes in reach stand, so
+    /// the jet's needle and their marks are on the dial before it gets to them.
     pub(crate) fn start_sweep(&mut self, id: Id, ability: usize, yaw: f32) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        let from = yaw + d.sweep.to_radians() / 2.0;
-        self.set_action(id, Action::Sweep { ability, from, since: now, until: now + d.secs.max(0.1), struck: Vec::new(), held: None });
+        let dir = if rand::Rng::gen::<bool>(&mut self.rng) { 1.0 } else { -1.0 };
+        let secs = d.secs.max(0.1) * (0.85 + 0.3 * rand::Rng::gen::<f32>(&mut self.rng));
+        if let Some(p) = self.players.get_mut(&id) {
+            p.sweep_dir = dir;
+            p.sweep_secs = secs;
+        }
+        let from = yaw + dir * d.sweep.to_radians() / 2.0;
+        self.set_action(id, Action::Sweep { ability, from, since: now, until: now + secs, struck: Vec::new(), held: None });
         self.events.push(Event::Auras { id });
+        // The foes in the sweep's reach, by their bearing off the front (degrees, + to the left).
+        let at = self.players[&id].pos;
+        let (mobs, heroes) = self.in_wedge(id, ability, at, yaw, 360.0, d.range[0]);
+        let reach = (d.sweep + d.arc) / 2.0;
+        let marks: Vec<String> = mobs
+            .iter()
+            .map(|m| self.mobs[m].pos)
+            .chain(heroes.iter().map(|h| self.players[h].pos))
+            .map(|pos| {
+                let b = facing(at, pos) - yaw;
+                b.sin().atan2(b.cos()).to_degrees()
+            })
+            .filter(|b| b.abs() <= reach)
+            .map(|b| format!("{b:.1}"))
+            .collect();
+        self.events.push(Event::CheckStart {
+            player: id,
+            ability,
+            kind: "sweep",
+            a: secs,
+            b: d.sweep,
+            c: d.perfect_arc,
+            pattern: format!("{}|{:.1}|{}", if dir > 0.0 { "lr" } else { "rl" }, d.arc, marks.join(",")),
+        });
         self.pulse_sweep(id, ability, from);
     }
 
     /// Where the jet points now: the facing it swept to, or holds at.
-    fn sweep_facing(d: &AbilityDef, from: f32, since: f32, now: f32, held: Option<f32>) -> f32 {
+    fn sweep_facing(&self, id: Id, d: &AbilityDef, from: f32, since: f32, now: f32, held: Option<f32>) -> f32 {
+        let (dir, secs) = self.players.get(&id).map_or((1.0, d.secs), |p| (p.sweep_dir, p.sweep_secs));
         let t = held.unwrap_or(now) - since;
-        let share = (t / d.secs.max(0.1)).clamp(0.0, 1.0);
-        from - d.sweep.to_radians() * share
+        let share = (t / secs.max(0.1)).clamp(0.0, 1.0);
+        from - dir * d.sweep.to_radians() * share
     }
 
-    /// One of the jet's missiles, to its reach.
+    /// The jet's look this pulse: with `burst` set, a wedge of frost flashed on the ground along
+    /// it (clients with the ground burst, patch 0026), so the pulses read as one jet turning;
+    /// else one of `tick_spell`'s missiles to its reach.
     fn pulse_sweep(&mut self, id: Id, ability: usize, yaw: f32) {
+        // The channel's spray from the hands, every few pulses.
+        let kit = self.content.abilities[ability].channel_kit;
+        if kit != 0 {
+            let since = match self.players[&id].action { Action::Sweep { since, .. } => since, _ => self.clock };
+            let t = self.clock - since;
+            if t < 1.0e-4 || (t / CHANNEL_EVERY).floor() != ((t - PULSE) / CHANNEL_EVERY).floor() {
+                self.events.push(Event::Visual { id, kit, by: None });
+            }
+        }
         let d = &self.content.abilities[ability];
+        if let Some(b) = &d.burst {
+            let at = self.players[&id].pos;
+            let (reach, arc, secs, colour) = (d.range[0], d.arc.max(10.0), b.secs, b.colour.clone());
+            self.events.push(Event::GroundBurst { at, yaw, shape: "wedge", reach, arc, width: 0.0, secs, colour });
+            return;
+        }
         if d.tick_spell == 0 {
             return;
         }
@@ -60,7 +112,7 @@ impl Survival {
             return;
         }
         let d = self.content.abilities[ability].clone();
-        let yaw = Self::sweep_facing(&d, from, since, now, held);
+        let yaw = self.sweep_facing(id, &d, from, since, now, held);
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = yaw;
         }
@@ -105,7 +157,7 @@ impl Survival {
             return;
         }
         let d = self.content.abilities[ability].clone();
-        let yaw = Self::sweep_facing(&d, from, since, now, None);
+        let yaw = self.sweep_facing(id, &d, from, since, now, None);
         let hold = d.stop_secs.max(0.1);
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = yaw;
@@ -130,11 +182,14 @@ impl Survival {
         if perfect {
             let k = self.content.checks.clone();
             self.gain_valor(id, k.perfect_valor);
-            if k.perfect_kit != 0 {
-                self.events.push(Event::Visual { id, kit: k.perfect_kit, by: None });
+            let kit = self.perfect_kit_of(ability);
+            if kit != 0 {
+                self.events.push(Event::Visual { id, kit, by: None });
             }
             self.events.push(Event::Perfect { player: id, ability });
         }
+        let grade = if perfect { "perfect" } else if mobs.is_empty() && heroes.is_empty() { "fail" } else { "good" };
+        self.check_result(id, ability, grade);
     }
 
     /// The foes a wedge from `at` covers: creatures and (with friendly fire) hostile heroes.

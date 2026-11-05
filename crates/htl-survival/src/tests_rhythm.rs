@@ -53,7 +53,19 @@ fn press(s: &mut Survival, p: Id, slot: &str) {
 }
 
 /// The ability slotted and begun (its key, and the click if it aims).
+/// Begin the rhythm, then make its schedule a plain steady beat with no rest, so a test can count
+/// on `beat` apart (each cast rolls its own pattern; `every_cast_rolls...` tests that).
 fn begin(s: &mut Survival, p: Id, slot: &str, key: &str) -> Vec<Event> {
+    let ev = begin_rolled(s, p, slot, key);
+    let beat = s.content.abilities[s.content.ability(key).unwrap()].beat_secs;
+    for (k, b) in s.players.get_mut(&p).unwrap().rhythm_beats.iter_mut().enumerate() {
+        *b = (beat * k as f32, false);
+    }
+    ev
+}
+
+/// Begin the rhythm as a player would, its pattern as rolled.
+fn begin_rolled(s: &mut Survival, p: Id, slot: &str, key: &str) -> Vec<Event> {
     s.slot_ability(p, slot, key).unwrap();
     press(s, p, slot);
     if matches!(s.players[&p].action, Action::Aim { .. }) {
@@ -234,5 +246,69 @@ fn the_arcane_spells_are_the_mages_second_choices_taught_at_its_shrine() {
         let d = &c.abilities[c.ability(key).unwrap()];
         assert_eq!((d.school.as_str(), d.slot.as_str(), d.choice, d.kind.as_str()), ("mage", slot, 2, "rhythm"), "{key}");
         assert!(d.on_board(), "{key} on the board");
+    }
+}
+
+#[test]
+fn every_cast_rolls_its_own_beat_sent_ahead_a_missile_leaves_on_each_press_and_a_rest_must_be_let_pass() {
+    // The schedule is rolled and sent as the rhythm starts.
+    let mut patterns = std::collections::BTreeSet::new();
+    let mut rests = 0;
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _k = dummy(&mut s, [12.0, 0.0, 0.0]);
+    s.set_cooldowns(p, true);
+    for _ in 0..24 {
+        // Each cast left unpressed: its free beats go and it ends.
+        run(&mut s, 3.0);
+        let ev = begin_rolled(&mut s, p, "ranged", "arcane_missiles");
+        let sent = ev.iter().find_map(|e| match e {
+            Event::CheckStart { player, kind: "rhythm", pattern, .. } if *player == p => Some(pattern.clone()),
+            _ => None,
+        });
+        let sent = sent.expect("the schedule goes to the caster");
+        let parts: Vec<&str> = sent.split('|').collect();
+        assert_eq!(parts.len(), 3, "{sent}");
+        patterns.insert(parts[1].to_string());
+        assert_eq!(parts[2].split(',').count(), s.players[&p].rhythm_beats.len());
+        rests += s.players[&p].rhythm_beats.iter().filter(|b| b.1).count();
+    }
+    assert!(patterns.len() >= 2, "more than one pattern rolled: {patterns:?}");
+    assert!(rests > 0, "a long chain holds a rest some of the time");
+    // A press in time fires its missile at once, not at the beat.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _k = dummy(&mut s, [12.0, 0.0, 0.0]);
+    let d = s.content.abilities[s.content.ability("arcane_missiles").unwrap()].clone();
+    let since = s.clock;
+    begin(&mut s, p, "ranged", "arcane_missiles");
+    run_to(&mut s, since, d.beat_secs * 3.0 - 0.06);
+    press(&mut s, p, "ranged");
+    let ev = s.step(0.0);
+    assert_eq!(missiles(&ev, p, d.spell), 1, "the fourth leaves on the press, a little early");
+    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "good" | "critical", .. })));
+    // A rest: pressing on it breaks the chain; letting it pass keeps it.
+    for press_rest in [true, false] {
+        let mut s = world();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let _k = dummy(&mut s, [12.0, 0.0, 0.0]);
+        let since = s.clock;
+        begin(&mut s, p, "ranged", "arcane_missiles");
+        s.players.get_mut(&p).unwrap().rhythm_beats[4].1 = true;
+        run_to(&mut s, since, d.beat_secs * 3.0);
+        press(&mut s, p, "ranged");
+        s.step(0.0);
+        run_to(&mut s, since, d.beat_secs * 4.0);
+        if press_rest {
+            press(&mut s, p, "ranged");
+            let ev = s.step(0.0);
+            assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "fail", .. })), "pressed on the rest");
+            assert_eq!(s.players[&p].action, Action::Ready);
+        } else {
+            run_to(&mut s, since, d.beat_secs * 5.0);
+            press(&mut s, p, "ranged");
+            s.step(0.0);
+            assert!(matches!(s.players[&p].action, Action::Rhythm { .. }), "the rest let pass, the chain goes on");
+        }
     }
 }

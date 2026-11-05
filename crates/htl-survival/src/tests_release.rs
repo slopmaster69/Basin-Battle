@@ -59,6 +59,31 @@ fn charge_and_release(s: &mut Survival, p: Id, slot: &str, secs: f32) -> Vec<Eve
     ev
 }
 
+/// Press the key and hold the click to this cast's flare (rolled as the charge began, and sent to
+/// the caster in its `CheckStart`), plus `off` seconds, then let go.
+fn release_at_flare(s: &mut Survival, p: Id, slot: &str, off: f32) -> Vec<Event> {
+    s.input(p, Input::Ability(key_of(slot), false));
+    s.input(p, Input::Attack);
+    let mut ev = s.step(0.0);
+    let flare = s.players[&p].check_flare;
+    let sent = ev.iter().find_map(|e| match e {
+        Event::CheckStart { player, kind: "release", a, .. } if *player == p => Some(*a),
+        _ => None,
+    });
+    assert_eq!(sent, Some(flare), "the caster is told this cast's flare as the charge begins");
+    ev.extend(run(s, flare + off));
+    s.input(p, Input::AttackUp);
+    ev.extend(s.step(0.0));
+    ev
+}
+
+fn grade_in(events: &[Event], p: Id) -> Option<&'static str> {
+    events.iter().find_map(|e| match e {
+        Event::CheckResult { player, grade, .. } if *player == p => Some(*grade),
+        _ => None,
+    })
+}
+
 /// The blow itself (the biggest single hit: a burn's ticks come after, smaller).
 fn damage_on(events: &[Event], victim: Id) -> u32 {
     events
@@ -85,12 +110,15 @@ fn fireball_released_on_its_flare_is_a_perfect_cast_stronger_with_valor_and_a_bu
     let fb = s.content.ability("fireball").unwrap();
     let (top, full_dmg) = (s.content.abilities[fb].charge[1], s.content.abilities[fb].damage[1]);
     let valor = s.players[&p].valor;
-    // Let go right at the top of the charge: the flare came as the window opened, and it's perfect.
-    let ev = charge_and_release(&mut s, p, "ranged", top);
+    let _ = top;
+    // Let go on this cast's flare (rolled, from 72% of the top to the top): it's perfect.
+    let ev = release_at_flare(&mut s, p, "ranged", 0.0);
+    assert!(matches!(grade_in(&ev, p), Some("perfect" | "critical")), "graded: {:?}", grade_in(&ev, p));
     let flare_kit = crate::content_abilities::full_kit_of("mage");
     assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == flare_kit)), "the flare on the caster");
     assert!(perfect_in(&ev, p), "a perfect");
-    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == k_.perfect_kit)), "and its burst");
+    let burst = { let a = s.content.abilities[fb].perfect_kit; if a != 0 { a } else { k_.perfect_kit } };
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == burst)), "and its burst");
     assert_eq!(s.players[&p].valor, valor + k_.perfect_valor, "a parry's Valor");
     assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, spell, .. } if *caster == p && *spell == s.content.abilities[fb].full_spell)), "the full missile");
     let landed = run(&mut s, 1.5);
@@ -146,9 +174,11 @@ fn a_heavy_bolt_from_a_staff_is_held_and_let_go_on_the_flare_for_a_perfect() {
     let k = dummy(&mut s, [12.0, 0.0, 0.0]);
     let hb = s.content.ability("ember_bolt_heavy").unwrap();
     let (top, full_dmg) = (s.content.abilities[hb].charge[1], s.content.abilities[hb].damage[1]);
+    let _ = top;
     s.input(p, Input::Heavy);
     assert_eq!(s.players[&p].action.name(), "charge");
-    run(&mut s, top);
+    let flare = s.players[&p].check_flare;
+    run(&mut s, flare);
     s.input(p, Input::AttackUp);
     let ev = s.step(0.0);
     assert!(perfect_in(&ev, p), "on the flare");
@@ -187,8 +217,53 @@ fn meteor_is_held_and_let_go_early_it_is_half_the_meteor() {
     s.slot_ability(p, "ultimate", "meteor").unwrap();
     s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
     let k = dummy(&mut s, [10.0, 0.0, 0.0]);
-    let ev = charge_and_release(&mut s, p, "ultimate", top);
+    let _ = top;
+    let ev = release_at_flare(&mut s, p, "ultimate", 0.0);
     assert!(perfect_in(&ev, p));
     let landed = run(&mut s, 2.5);
     assert_eq!(damage_on(&landed, k), (dmg[1] * s.content.checks.perfect_damage).round() as u32);
+}
+
+#[test]
+fn every_cast_rolls_its_own_flare_and_the_middle_of_its_window_is_a_critical() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let _k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    let fb = s.content.ability("fireball").unwrap();
+    let (lo, top) = (s.content.abilities[fb].charge[0], s.content.abilities[fb].charge[1]);
+    let mut seen = Vec::new();
+    for _ in 0..6 {
+        let ev = release_at_flare(&mut s, p, "ranged", 0.0);
+        let flare = ev.iter().find_map(|e| match e { Event::CheckStart { a, .. } => Some(*a), _ => None }).unwrap();
+        assert!(flare > lo && flare <= top + 1.0e-4, "inside the charge: {flare}");
+        assert_eq!(grade_in(&ev, p), Some("critical"), "dead on the flare is the middle of the window");
+        seen.push(flare);
+        run(&mut s, 4.0);
+    }
+    seen.sort_by(|a, b| a.total_cmp(b));
+    assert!(seen[5] - seen[0] > 0.05, "no two casts quite the same: {seen:?}");
+    // Just inside the window's edge: a perfect, not a critical. Well early: weak.
+    let w = s.content.checks.window;
+    let ev = release_at_flare(&mut s, p, "ranged", w * 0.8);
+    assert_eq!(grade_in(&ev, p), Some("perfect"));
+    run(&mut s, 4.0);
+    let ev = release_at_flare(&mut s, p, "ranged", -0.35);
+    assert_eq!(grade_in(&ev, p), Some("weak"));
+}
+
+#[test]
+fn an_all_or_nothing_spell_fizzles_off_its_moment_and_spends_its_valor() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let _k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    let fb = s.content.ability("fireball").unwrap();
+    s.content.abilities[fb].stakes = "all".into();
+    let valor = s.players[&p].valor;
+    let ev = release_at_flare(&mut s, p, "ranged", 0.3);
+    assert_eq!(grade_in(&ev, p), Some("fizzle"));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)), "nothing goes");
+    assert!(s.players[&p].valor <= valor, "no Valor earned");
+    assert_eq!(s.players[&p].action, Action::Ready);
 }

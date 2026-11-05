@@ -93,14 +93,28 @@ fn the_orb_rolls_out_along_the_reticle_hurting_and_slowing_what_it_passes_then_f
     assert!(ticks.len() >= 2 && ticks.iter().all(|t| *t == (d.linger_damage * d.tick).round() as u32), "ticks as it rolls past: {ticks:?}");
     assert!(!s.has_cc(near, "petrify"));
     assert!(blows_on(&ev, aside).is_empty(), "5 yd aside: untouched");
-    assert!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, spell, .. } if *caster == p && *spell == d.tick_spell)).count() >= 10, "its look rolls with it");
     assert!(!perfect_in(&ev, p));
-    // Where it ended: about its range out.
-    let far = ev.iter().filter_map(|e| match e {
-        Event::Missile { caster, spell, target: Target::Point(at) } if *caster == p && *spell == d.tick_spell => Some(at[0]),
-        _ => None,
-    }).fold(0.0, f32::max);
-    assert!(far > d.range[0] * 0.8, "rolled out to {far:.1} yd");
+    // Its look: with a rolling model, one roll from where it starts to its range out, and gone at
+    // the end; without one, a missile to where it is, again and again.
+    if d.orb_model.is_empty() {
+        assert!(ev.iter().filter(|e| matches!(e, Event::Missile { caster, spell, .. } if *caster == p && *spell == d.tick_spell)).count() >= 10, "its look rolls with it");
+        let far = ev.iter().filter_map(|e| match e {
+            Event::Missile { caster, spell, target: Target::Point(at) } if *caster == p && *spell == d.tick_spell => Some(at[0]),
+            _ => None,
+        }).fold(0.0, f32::max);
+        assert!(far > d.range[0] * 0.8, "rolled out to {far:.1} yd");
+    } else {
+        let roll = ev.iter().find_map(|e| match e {
+            Event::OrbRoll { look, to, secs, model, .. } => Some((*look, to[0], *secs, model.clone())),
+            _ => None,
+        });
+        let (look, far, secs, model) = roll.expect("the orb's roll goes to the clients");
+        assert_eq!(model, d.orb_model);
+        assert!(far > d.range[0] * 0.8, "rolls out to {far:.1} yd");
+        assert!(secs > 0.0);
+        assert!(ev.iter().any(|e| matches!(e, Event::OrbGone { look: l } if *l == look)), "and is gone when spent");
+        assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, spell, .. } if *caster == p && *spell == d.tick_spell)), "no streak with it");
+    }
 }
 
 #[test]

@@ -108,6 +108,17 @@
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
 //! - `WA\t<ward>\t<most>\t<broken>`: the ward bar of a hero whose guard is a ward (a staff's);
 //!   `WA` alone: no ward, the bar hidden. Sent with the HUD and the moment it changes.
+//! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
+//!   (`Event::CheckStart`): "release" (`a` the flare's second from the charge's start, `b` the
+//!   window either side, `pattern` the ring's curve), "rhythm" (`a`, `b` the first and last
+//!   pressed beats' windows, `pattern` "free|name|t0,t1,t2r,..."); `crit` the critical's share of
+//!   a window; `school` fire, frost or arcane.
+//! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
+//!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
+//! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
+//!   from one spot to another over `secs` (Frozen Orb), its model and size, for a client that draws
+//!   it (`PlayGroundOrb`); `OX\t<key>`: it stopped or was spent.
+//! - `CR\t<ability key>\t<grade>`: its outcome, critical, perfect, good, weak, fail or fizzle.
 //! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
 //!   on their own screen; its burst and Valor come as ever).
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
@@ -403,7 +414,10 @@ pub(crate) const VERSION: u32 = 2;
 /// 38: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 39: a giant's blow on the guard flashes the screen's corners dust-coloured, not red (the
 /// `edge` of its beat in `Cues.lua`).
-pub(crate) const ADDON_NEWEST: u32 = 39;
+/// 40: the Mage: the ward bar (`WA`, `Ward.lua`), and the skill checks drawn (`CK`, `CR`, `OB`,
+/// `OX`, `MO`, `Check.lua`): rings, beats, the orb and their outcomes; the add-on says `ac24`
+/// (patches 0041 to 0044).
+pub(crate) const ADDON_NEWEST: u32 = 40;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -413,7 +427,8 @@ pub(crate) const ADDON_NEWEST: u32 = 39;
 /// 21: a rope from a unit's hand (0031).
 /// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
 /// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
-pub(crate) const CLIENT_NEWEST: u8 = 23;
+/// 24: the Mage's skill checks: rings on the ground (0041), recoloured spell looks (0042), an orb rolled on the ground (0043) and missiles from a held staff's tip (0044).
+pub(crate) const CLIENT_NEWEST: u8 = 24;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.

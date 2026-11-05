@@ -133,13 +133,17 @@ fn a_longer_charge_lands_harder_and_a_capstone_waits_for_its_whole_charge() {
     ev.extend(run(&mut s, 1.0));
     let late = hits_on(&ev, k)[0].0;
     assert!(late > early, "{early} then {late}");
-    // Pyroblast (Fireball's EX) let go before its 1.5 s is lost.
+    // Pyroblast (Fireball's EX) let go before its 1.5 s fizzles: all or nothing, its Valor
+    // wasted (Corey, Nov 5).
     slot(&mut s, p, "ranged", "fireball");
     s.set_valor(p, 100.0);
-    cast(&mut s, p, "ranged", true, 1.0);
+    let mut ev = cast(&mut s, p, "ranged", true, 1.0);
+    ev.extend(s.step(0.0));
     assert!(s.players[&p].last_cast.is_none_or(|(a, _)| s.content.abilities[a].key != "pyroblast"), "never cast");
     assert_eq!(s.players[&p].action, Action::Ready, "dropped");
-    assert_eq!(s.players[&p].valor, 100.0, "and nothing spent");
+    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "fizzle", .. })), "it fizzles");
+    let pyro = s.content.ability("pyroblast").unwrap();
+    assert_eq!(s.players[&p].valor, 100.0 - s.valor_cost(&s.content.abilities[pyro].clone()), "and its Valor is spent");
 }
 
 #[test]
