@@ -183,7 +183,7 @@ ES.PlaceWard()
 -- shakes it and flashes it; a perfect ward flares it; a ward that breaks shatters into shards that
 -- fly off and fade. Down, it fades away (the bar under stamina still shows it refilling).
 
-local ARC_ART = "Interface\AddOns\ElwynnSurvival\art\check\\"
+local ARC_ART = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
 local ARC = 150
 local arc = CreateFrame("Frame", "ElwynnSurvivalWardArc", WorldFrame)
 arc:SetWidth(1)
