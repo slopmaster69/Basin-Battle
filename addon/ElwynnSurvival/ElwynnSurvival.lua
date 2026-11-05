@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 23
+local VERSION = 24
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6502,6 +6502,15 @@ function ES.Line(line)
         f[11] or "unblockable", tonumber(f[12]) or 0, f[13] == "1")
       ES.marksUp.tg[key] = 1
     end
+  elseif verb == "ML" then
+    -- How a spell's missiles look (patch 0030): a ribbon behind them, their size and a spin; with
+    -- a caster's guid, for its next one alone (a ricochet's colour).
+    if SetMissileLook and f[2] then
+      local trail = f[3]
+      if trail == "-" then trail = nil end
+      SetMissileLook(tonumber(f[2]) or 0, trail, tonumber(f[4]) or 0.25, tonumber(f[5]) or 0.35,
+        tonumber(f[6]) or 1, tonumber(f[7]) or 0, f[8])
+    end
   elseif verb == "MK" then
     -- A blow coming down there: its circle on the ground (the client lays it), or gone.
     local key = "es" .. (f[2] or "")
@@ -6655,7 +6664,10 @@ events:SetScript("OnEvent", function()
     -- ac17: a spell look's own anim stays off a borrowed clip (0024), a flurry of cuts (0025);
     -- ac18: a shape flashed on the ground as an ability lands (0026); ac19: an object drawn longer
     -- along one axis, and the dig site's rope (0028, Tripwire's wire).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 19 then
+    -- ac20: a missile's look (SetMissileLook: a ribbon behind it, its size, a spin).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and (tonumber(HasActionCombat()) or 0) >= 20 then
+      Say(".es hello " .. VERSION .. " ac20")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 19 then
       Say(".es hello " .. VERSION .. " ac19")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and (tonumber(HasActionCombat()) or 0) >= 18 then
       Say(".es hello " .. VERSION .. " ac18")

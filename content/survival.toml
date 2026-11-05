@@ -435,6 +435,52 @@ recovery = 1.7
 spell = 75
 subclass = 18
 
+# --- missile looks ---------------------------------------------------------------------------------
+# How chosen spells' missiles look on a client with patch 0030 (ac20): a glowing ribbon behind
+# each (`trail`, "RRGGBB"; `width` yd, each stretch fading over `secs`), the model `scale` times
+# its size, and `spin` turns a second, flat. Arrows and a thrown axe were too thin to follow at
+# night, with no spell effect in the data that fixed it (Corey's review; 14 missiles were tried
+# for Bank Shot alone). Keyed by the spell: every ability flying it looks so.
+
+# The plain arrow (Aimed Shot short of full, Bank Shot, the arrows Arrow Recall calls home,
+# Skyfall's volley): a thin pale streak.
+[[missile_look]]
+spell = 19434
+trail = "F2E6C8"
+width = 0.18
+secs = 0.3
+
+# Aimed Shot fully drawn, the burning arrow.
+[[missile_look]]
+spell = 3011
+trail = "FF9A3C"
+width = 0.35
+secs = 0.45
+
+# Kill Shot (and Split Arrow, which flies the same): a hot gold-red line.
+[[missile_look]]
+spell = 3044
+trail = "FF6A2A"
+width = 0.4
+secs = 0.5
+
+# Multi-Shot's frost-tipped fan.
+[[missile_look]]
+spell = 6984
+trail = "9ADFFF"
+width = 0.22
+secs = 0.3
+
+# The Warrior's Hurled Axe: bigger, spinning flat like a boomerang, a steel-pale streak, so the
+# way back reads (Corey's review: "larger, and spin while it flies, like a boomerang").
+[[missile_look]]
+spell = 16075
+trail = "D8E4F0"
+width = 0.3
+secs = 0.35
+scale = 1.8
+spin = 2.5
+
 # --- melee weapons and shields --------------------------------------------------------------------
 
 # Each weapon: its wind-up, the moment it can connect, the recovery after; what a swing costs and
@@ -4374,6 +4420,10 @@ damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 40.0
+# Hotter each bounce (Corey's review: "every bounce should change the color of the trail"):
+# yellow as it flies, orange off the first wall, red off the second. Drawn on a client with patch
+# 0030.
+bounce_trail = ["FFE27A", "FF9A2A", "FF3A1A"]
 bounces = 2
 bounce_gain = 0.5
 cooldown = 4.0

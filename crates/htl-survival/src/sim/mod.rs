@@ -231,6 +231,9 @@ pub enum Event {
     /// A rope from `a` to `b` (Tripwire's wire, taut a hand above the ground), until the mark
     /// `id` it goes with is gone (`MarkGone`).
     Rope { id: Id, a: Vec3, b: Vec3 },
+    /// The missile `caster` flies next of `spell` (the hero's arrow, or the stand-in flying it on
+    /// from a ricochet) takes the ribbon colour `ability`'s `bounce_trail` has for its `bounce`.
+    MissileTint { caster: Id, spell: u32, ability: usize, bounce: u8 },
     Bags { player: Id },
     Storage,
     Tell { player: Id, text: String },
