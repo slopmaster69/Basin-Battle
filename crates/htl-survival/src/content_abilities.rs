@@ -276,6 +276,14 @@ pub struct AbilityDef {
     pub leap_from: String,
     #[serde(default)]
     pub leap_flip: bool,
+    /// A pull's look on whoever casts it, for the whole flight of what it hauls (Reverse Grapple:
+    /// a pull, not the bow's release pose): a clip (`pull_clip`), borrowed from another character
+    /// model (`pull_from`, as `"ScourgeFemale"`; empty: their own), on the clients that play
+    /// clips. Only on an ability with a `pull` effect.
+    #[serde(default)]
+    pub pull_clip: u16,
+    #[serde(default)]
+    pub pull_from: String,
     /// Valor for each foe it strikes (0: `[valor].ability`).
     #[serde(default)]
     pub valor_hit: f32,

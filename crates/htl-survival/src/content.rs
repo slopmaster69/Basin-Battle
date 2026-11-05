@@ -3380,6 +3380,13 @@ impl Content {
             if !a.leap_from.is_empty() && (a.leap_clip == 0 || !clip_source_ok(&a.leap_from)) {
                 bail!("{what}: leap_from {:?} needs a `leap_clip` and a character model (<Race><Gender>, as ScourgeFemale)", a.leap_from);
             }
+            // A hauler's own look: on a pull, from a character model the clients can find.
+            if (a.pull_clip != 0 || !a.pull_from.is_empty()) && !a.effects.iter().any(|e| e.kind == "pull") {
+                bail!("{what}: only an ability with a `pull` effect has the hauler's look (`pull_clip`, `pull_from`)");
+            }
+            if !a.pull_from.is_empty() && (a.pull_clip == 0 || !clip_source_ok(&a.pull_from)) {
+                bail!("{what}: pull_from {:?} needs a `pull_clip` and a character model (<Race><Gender>, as ScourgeFemale)", a.pull_from);
+            }
             // The beta page's mechanics.
             let tether = a.tether_secs > 0.0;
             if a.yank && !matches!(a.kind.as_str(), "projectile" | "shot") {
