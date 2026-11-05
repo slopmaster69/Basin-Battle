@@ -380,7 +380,7 @@ impl Survival {
                         let d = &c.items[item];
                         match d.use_clip(&c.player) {
                             0 => self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (d.use_secs * 1000.0) as u32 }),
-                            clip => self.events.push(Event::Clip { id, clip, secs: d.use_secs, take: 0, from: None, at: 0.0 }),
+                            clip => self.events.push(Event::Clip { id, clip, secs: d.use_secs, take: 0, from: None, at: 0.0, body: ClipBody::Full }),
                         }
                         self.punish_healing(id);
                     }

@@ -722,7 +722,7 @@ impl Survival {
             // A thrown one: the arm drawn back while it's aimed (the harpoon held ready, the axe
             // wound up), till it goes or the aim is let go.
             if thrown(&d) {
-                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0 });
+                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0, body: ClipBody::Full });
             }
         } else {
             if d.bow {
