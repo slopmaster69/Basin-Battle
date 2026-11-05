@@ -613,6 +613,10 @@ pub struct Player {
     /// The reticle's line as their client last told it with a shot: a facing, an elevation
     /// (radians, up positive) and when.
     pub aim_line: Option<(f32, f32, f32)>,
+    /// The point that line meets in the world as the client's own camera sees it (where its
+    /// reticle is), sent with it and checked (`set_aim_point`): the reticle is the truth, and a shot
+    /// goes there from the hands. None: the client sent none (an older one) or it didn't pass.
+    pub aim_at: Option<Vec3>,
     pub kit: Kit,
     pub weapon: usize,
     pub shield: usize,
@@ -1228,6 +1232,7 @@ impl Survival {
             foe: None,
             shoulder_cam: false,
             aim_line: None,
+            aim_at: None,
             kit: Kit::Melee,
             weapon: item(&c.start.weapon),
             shield: item(&c.start.shield),
@@ -1741,7 +1746,21 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             if facing.is_finite() && elevation.is_finite() {
                 p.aim_line = Some((facing.rem_euclid(std::f32::consts::TAU), elevation.clamp(-1.4, 1.4), now));
+                // A new line: the point sent with the last one no longer goes with it.
+                p.aim_at = None;
             }
+        }
+    }
+
+    /// Where the hero's reticle meets the world on their own screen, sent with the line just set
+    /// (`set_aim_line`): taken when it lies within reach, in front of them and on (or near) that
+    /// line from the aiming camera; anything else is dropped and the server's own line is used.
+    /// The client already says which way it aims; the point only says how far along, so it gives
+    /// a client nothing it couldn't aim at anyway, and the shot's flight is still the server's.
+    pub fn set_aim_point(&mut self, id: Id, at: Vec3) {
+        let ok = self.aim_point_ok(id, at);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.aim_at = ok.then_some(at);
         }
     }
 

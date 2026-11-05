@@ -404,6 +404,58 @@ fn an_aimed_shot_from_the_shoulder_camera_flies_along_its_line() {
     assert!(hits_on(&ev, body_line).is_empty());
 }
 
+/// An aimed shot loosed with the client's line and, when given, the point its reticle is on.
+fn loose_at(s: &mut Survival, p: Id, line: (f32, f32), at: Option<Vec3>) -> Vec<Event> {
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    let _ = s.slot_ability(p, "ranged", "aimed_shot");
+    s.input(p, SHOT);
+    s.input(p, Input::Attack);
+    let mut ev = run(s, 0.8);
+    s.set_aim_line(p, line.0, line.1);
+    if let Some(at) = at {
+        s.set_aim_point(p, at);
+    }
+    s.input(p, Input::AttackUp);
+    ev.extend(run(s, 1.2));
+    ev
+}
+
+/// The reticle is the truth: where the client's own camera saw its reticle meet the world is
+/// where the shot goes (from the hands), though the server's pivot would have looked past it.
+#[test]
+fn a_shot_goes_to_the_point_the_clients_reticle_was_on() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    // A grunt off the server's own line (which runs 0.75 yd right of the hero, straight ahead).
+    let g = mob(&mut s, "grunt", [20.0, 1.5, 0.0]);
+    let ev = loose_at(&mut s, p, (0.0, 0.0), None);
+    assert!(hits_on(&ev, g).is_empty(), "the server's own line goes past it");
+    let ev = loose_at(&mut s, p, (0.0, 0.0), Some([20.0, 1.5, 1.0]));
+    assert_eq!(hits_on(&ev, g).len(), 1, "the client's reticle was on it: {ev:?}");
+}
+
+/// A reported point is checked against the line sent with it: far off it, behind the hero or out
+/// of reach, it's dropped and the server's own line is used; and a new line drops the old point.
+#[test]
+fn a_reported_aim_point_off_its_line_behind_or_stale_is_not_taken() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.set_aim_point(p, [20.0, 1.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_some(), "on the line: taken");
+    s.set_aim_line(p, 0.0, 0.0);
+    assert!(s.players[&p].aim_at.is_none(), "a new line without a point: none");
+    s.set_aim_point(p, [0.0, 20.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_none(), "a quarter turn off the line: dropped");
+    s.set_aim_point(p, [-10.0, 0.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_none(), "behind the hero: dropped");
+    s.set_aim_point(p, [400.0, 0.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_none(), "out of reach: dropped");
+    s.set_aim_point(p, [f32::NAN, 0.0, 0.0]);
+    assert!(s.players[&p].aim_at.is_none(), "not a number: dropped");
+}
+
 #[test]
 fn a_heavy_attack_is_slower_harder_and_throws_a_hero_back() {
     let mut s = pvp_world();

@@ -167,6 +167,13 @@ const HAND_AHEAD: f32 = 0.6;
 const HAND_RIGHT: f32 = 0.3;
 /// The reticle's line a cast carries counts this long, and this near the hero's facing.
 const AIM_FRESH: f32 = 0.6;
+/// A reported aim point is taken this far from the hero at most, and when it lies within this
+/// angle (radians) of the reported line from the aiming camera, or this close to it (yd): the
+/// client's camera sits a little behind and above the server's pivot, which shifts a near point
+/// most.
+const AIM_POINT_MOST: f32 = 120.0;
+const AIM_POINT_SLACK: f32 = 0.2;
+const AIM_POINT_NEAR: f32 = 1.5;
 /// After letting an ability go, a beat before the next thing.
 const CAST_RECOVERY: f32 = 0.35;
 /// The throw's clip (AttackThrown) and the pose a thrown charge holds till it goes (HoldThrown):
@@ -475,7 +482,42 @@ impl Survival {
         let (yaw, pitch) = self.aim_of(id);
         let right = if p.shoulder_cam { SHOULDER } else { 0.0 };
         let o = [p.pos[0] + yaw.sin() * right, p.pos[1] - yaw.cos() * right, p.pos[2] + EYE];
+        // Their own reticle's point, when their client sent one with this line: the line goes
+        // through it, so what the server finds along it is what their reticle was on.
+        if let (Some(at), Some((_, _, when))) = (p.aim_at, p.aim_line) {
+            if self.clock - when <= AIM_FRESH {
+                let v = [at[0] - o[0], at[1] - o[1], at[2] - o[2]];
+                if v[0] * v[0] + v[1] * v[1] + v[2] * v[2] > 0.25 {
+                    return (o, norm(v));
+                }
+            }
+        }
         (o, look_dir(yaw, pitch))
+    }
+
+    /// A reported aim point is believable: within reach, in front of the hero, and on (or near)
+    /// the line just reported from the aiming camera.
+    pub(crate) fn aim_point_ok(&self, id: Id, at: Vec3) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        if !at.iter().all(|v| v.is_finite()) || p.aim_line.is_none() {
+            return false;
+        }
+        let (yaw, pitch) = self.aim_of(id);
+        let right = if p.shoulder_cam { SHOULDER } else { 0.0 };
+        let o = [p.pos[0] + yaw.sin() * right, p.pos[1] - yaw.cos() * right, p.pos[2] + EYE];
+        let v = [at[0] - o[0], at[1] - o[1], at[2] - o[2]];
+        let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        if len > AIM_POINT_MOST || len < 0.5 {
+            return false;
+        }
+        let d = look_dir(yaw, pitch);
+        // In front: not behind the hero along the way they look.
+        if v[0] * d[0] + v[1] * d[1] < 0.0 {
+            return false;
+        }
+        let along = v[0] * d[0] + v[1] * d[1] + v[2] * d[2];
+        let off = ((len * len - along * along).max(0.0)).sqrt();
+        off <= AIM_POINT_NEAR || off.atan2(along.max(1.0e-3)) <= AIM_POINT_SLACK
     }
 
     /// Where a cast leaves the hero's hands.

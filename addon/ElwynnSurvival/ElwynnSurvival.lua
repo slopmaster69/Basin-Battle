@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 41
+local VERSION = 44
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1548,12 +1548,20 @@ function ES.Attack(state)
 end
 
 -- The reticle's line (where the view's centre looks, a facing and an elevation, on the
--- action-combat client), sent with a cast or a shot so it goes where the reticle is.
+-- action-combat client), sent with a cast or a shot so it goes where the reticle is. A client
+-- that knows the point the reticle is on (ac26) adds it, and the shot goes to that point.
 function ES.AimLine()
   if not GetActionAim then return "" end
   local f, e = GetActionAim()
   if not f or not e then return "" end
-  return string.format(" %.4f %.4f", f, e)
+  local line = string.format(" %.4f %.4f", f, e)
+  if GetReticlePoint then
+    local x, y, z = GetReticlePoint()
+    if x and y and z then
+      line = line .. string.format(" %.2f %.2f %.2f", x, y, z)
+    end
+  end
+  return line
 end
 
 -- Shift + left: the heavy attack.
@@ -2377,6 +2385,13 @@ function ES.DrawAimMarker()
   end
 end
 
+-- Whether cover sits between the hands and the point the reticle is on (ac26).
+function ES.ReticleBlocked()
+  if not GetReticlePoint then return false end
+  local _, _, _, blocked = GetReticlePoint()
+  return blocked and true or false
+end
+
 aim:SetScript("OnUpdate", function()
   local a = ES.action
   local d = this.info
@@ -2406,6 +2421,9 @@ aim:SetScript("OnUpdate", function()
     -- A grappling hook: green, it will catch; red, it will miss (Grapple.lua).
     r, g, b = ES.CatchColor()
     alpha = 0.95
+  elseif ES.ReticleBlocked() then
+    -- Cover between the hands and the point the reticle is on: a shot would hit the cover.
+    r, g, b, alpha = 0.95, 0.3, 0.25, 0.9
   end
   if ES.StepCatch then ES.StepCatch() end
   if a.name ~= "charge" then
@@ -6842,7 +6860,10 @@ events:SetScript("OnEvent", function()
     -- ac21: a rope from a unit's hand (SetUnitRope: a grappling hook's line).
     -- ac22: the bowstring on its bow, units that never fade, the aiming camera's tip down.
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
+    -- ac26: the point the reticle is on (GetReticlePoint), and whether cover is in the way.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and (tonumber(HasActionCombat()) or 0) >= 26 then
+      Say(".es hello " .. VERSION .. " ac26")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
       Say(".es hello " .. VERSION .. " ac23")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
       Say(".es hello " .. VERSION .. " ac22")

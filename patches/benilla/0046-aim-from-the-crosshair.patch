@@ -1,0 +1,301 @@
+From c9b61ba6abcf2a1a016823913f01ac00c691b165 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 5 Nov 2026 09:10:23 -0600
+Subject: [PATCH] The reticle's own line: GetReticlePoint, the aim's circle on
+ it, and the twenty-sixth round
+
+The reticle is drawn in the middle of the screen, but the aim's point was found along the server's
+guess at it: a line from the hero's eye (1.9 yd up, 0.75 right) along the view, parallel to the
+camera's line and 0.25 yd under it (the camera sits over the pivot), so the circle and the reticle
+could disagree by up to a few yards on the ground.
+
+Now, while the aiming camera is up, the line is the camera's own through the middle of the screen,
+from where it passes the hero (nothing between the camera and the hero is aimed at), to the first
+ground, wall or doodad. `GetReticlePoint()` returns that point (WoW x, y, z) and whether something
+stands between the hero's hands and it (`blocked`: a shot from behind cover hits the cover); the
+add-on sends the point with each shot and the server fires there from the hands. The aim's circle
+lies on the same line. Without the aiming camera, the old line. `HasActionCombat()` says 26 (24 and
+25 are the Mage's).
+---
+ crates/benilla-app/src/target/aim_marker.rs | 119 +++++++++++++++++---
+ crates/benilla-ui/src/action_combat.rs      |  46 +++++++-
+ 2 files changed, 150 insertions(+), 15 deletions(-)
+
+diff --git a/crates/benilla-app/src/target/aim_marker.rs b/crates/benilla-app/src/target/aim_marker.rs
+index 9f4f9f82..eebe8e42 100644
+--- a/crates/benilla-app/src/target/aim_marker.rs
++++ b/crates/benilla-app/src/target/aim_marker.rs
+@@ -4,11 +4,16 @@
+ //! projector as the ground-targeting reticle ([`super::reticle`]), with its two textures: green
+ //! for ours, red for what's coming at us.
+ //!
+-//! The aim's point is found as the Elwynn Survival server finds it, so the circle lies where the
+-//! cast will land: the reticle's line from the hero's eye (1.9 yd up, the shoulder's 0.75 to the
+-//! right while the aiming camera is up), along the view's facing and elevation, to the first
+-//! ground or wall it meets within `range` + 3 yards; past `range` on the map it is pulled back to
+-//! `range` and dropped to the ground there. The add-on can read it back (`GetAimPoint`).
++//! The aim's point is where the reticle really is: the camera's own line through the middle of the
++//! screen (where the add-on draws the reticle), from where it passes the hero (nothing between the
++//! camera and the hero counts), to the first ground, wall or doodad it meets. The add-on reads it
++//! (`GetReticlePoint`) and sends it with each shot, and the server fires there from the hands: the
++//! reticle is the truth. It also says whether something stands between the hands and that point
++//! (a shot from behind cover hits the cover). The aim's circle lies there too, within `range` + 3
++//! yards; past `range` on the map it is pulled back to `range` and dropped to the ground there
++//! (`GetAimPoint`). Without the aiming camera (or a camera), the line is the server's own guess:
++//! from the hero's eye (1.9 yd up, the shoulder's 0.75 to the right) along the view's facing and
++//! elevation.
+ 
+ use bevy::prelude::*;
+ 
+@@ -16,6 +21,7 @@ use crate::net::SelfPlayer;
+ use benilla_assets::coords::{bevy_to_wow, wow_to_bevy};
+ use benilla_ui::action_combat::{self, GroundMarkerCall};
+ use benilla_world::collision::PickOccluder;
++use benilla_world::interact::DoodadOccluders;
+ use benilla_world::decal::{DecalFrame, WorldDecal};
+ use benilla_world::particles::buffer::EffectVertex;
+ use benilla_world::view::WorldCamera;
+@@ -26,6 +32,14 @@ const EYE: f32 = 1.9;
+ const SHOULDER: f32 = 0.75;
+ /// The line runs this much past the range, as the server's does from the camera.
+ const OVERSHOOT: f32 = 3.0;
++/// The reticle's point is looked for this far along its line at most (the server takes up to 120).
++const RETICLE_REACH: f32 = 100.0;
++/// Where a shot leaves the hero's hands (the server's `HAND_UP`, `HAND_AHEAD`, `HAND_RIGHT`).
++const HAND_UP: f32 = 1.45;
++const HAND_AHEAD: f32 = 0.6;
++const HAND_RIGHT: f32 = 0.3;
++/// Something this much short of the reticle's point between it and the hands blocks the shot.
++const BLOCK_SLACK: f32 = 0.5;
+ /// The decal box's vertical half-height, as the reticle's.
+ const VERT: f32 = 2.0;
+ /// The most ground markers kept at once.
+@@ -132,13 +146,9 @@ fn first_hit(
+         .map(|hit| hit.distance)
+ }
+ 
+-/// Where the reticle's line lands for an aim of `range` yards, in Bevy space.
+-pub(crate) fn aim_point(
+-    spatial: &avian3d::prelude::SpatialQuery,
+-    occluders: &Query<(), With<PickOccluder>>,
+-    feet: Vec3,
+-    range: f32,
+-) -> Vec3 {
++/// The server's own guess at the reticle's line (without the aiming camera): from the hero's eye,
++/// the shoulder's offset to the right while aiming, along the view's facing and elevation.
++fn eye_line(feet: Vec3) -> (Vec3, Vec3) {
+     let (yaw, pitch) = (
+         action_combat::view_facing(),
+         action_combat::view_elevation(),
+@@ -160,6 +170,73 @@ pub(crate) fn aim_point(
+         yaw.sin() * pitch.cos(),
+         pitch.sin(),
+     ]);
++    (origin, dir)
++}
++
++/// The reticle's line: the camera's own line through the middle of the screen, from where it
++/// passes the hero's eye (so nothing between the camera and the hero is aimed at).
++fn crosshair_line(camera: &Camera, cam_tf: &GlobalTransform, feet: Vec3) -> Option<(Vec3, Vec3)> {
++    let size = camera.logical_viewport_size()?;
++    let ray = camera.viewport_to_world(cam_tf, size * 0.5).ok()?;
++    let dir = *ray.direction;
++    let eye = feet + Vec3::Y * EYE;
++    let from = ray.origin + dir * (eye - ray.origin).dot(dir).max(0.0);
++    Some((from, dir))
++}
++
++/// The nearest ground, wall or doodad along `dir` from `from` within `max`, as a distance.
++fn first_solid(
++    spatial: &avian3d::prelude::SpatialQuery,
++    occluders: &Query<(), With<PickOccluder>>,
++    doodads: &DoodadOccluders,
++    from: Vec3,
++    dir: Vec3,
++    max: f32,
++) -> Option<f32> {
++    let terrain = first_hit(spatial, occluders, from, dir, max);
++    let doodad = Dir3::new(dir)
++        .ok()
++        .and_then(|d| doodads.nearest(Ray3d::new(from, d)))
++        .filter(|t| *t <= max);
++    match (terrain, doodad) {
++        (Some(a), Some(b)) => Some(a.min(b)),
++        (a, b) => a.or(b),
++    }
++}
++
++/// Where the reticle is on the world (Bevy space), and whether something stands between the hero's
++/// hands and there.
++fn reticle_point(
++    spatial: &avian3d::prelude::SpatialQuery,
++    occluders: &Query<(), With<PickOccluder>>,
++    doodads: &DoodadOccluders,
++    feet: Vec3,
++    (from, dir): (Vec3, Vec3),
++) -> (Vec3, bool) {
++    let at = from + dir * first_solid(spatial, occluders, doodads, from, dir, RETICLE_REACH).unwrap_or(RETICLE_REACH);
++    let yaw = action_combat::view_facing();
++    let w = bevy_to_wow(feet);
++    let hands = wow_to_bevy([
++        w[0] + yaw.cos() * HAND_AHEAD + yaw.sin() * HAND_RIGHT,
++        w[1] + yaw.sin() * HAND_AHEAD - yaw.cos() * HAND_RIGHT,
++        w[2] + HAND_UP,
++    ]);
++    let to = at - hands;
++    let len = to.length();
++    let blocked = len > BLOCK_SLACK
++        && first_solid(spatial, occluders, doodads, hands, to / len, len)
++            .is_some_and(|d| d < len - BLOCK_SLACK);
++    (at, blocked)
++}
++
++/// Where the reticle's line lands for an aim of `range` yards, in Bevy space.
++pub(crate) fn aim_point(
++    spatial: &avian3d::prelude::SpatialQuery,
++    occluders: &Query<(), With<PickOccluder>>,
++    feet: Vec3,
++    range: f32,
++    (origin, dir): (Vec3, Vec3),
++) -> Vec3 {
+     let reach = range + OVERSHOOT;
+     let mut at = origin + dir * first_hit(spatial, occluders, origin, dir, reach).unwrap_or(reach);
+     // No farther than the range on the map.
+@@ -181,6 +258,8 @@ pub(crate) fn aim_point(
+ pub(super) fn update_aim_marker(
+     spatial: avian3d::prelude::SpatialQuery,
+     occluders: Query<(), With<PickOccluder>>,
++    doodads: DoodadOccluders,
++    camera: Query<(&Camera, &GlobalTransform), With<WorldCamera>>,
+     me: Query<&GlobalTransform, With<SelfPlayer>>,
+     decals: WorldDecal,
+     time: Res<Time>,
+@@ -188,11 +267,25 @@ pub(super) fn update_aim_marker(
+     mut grounds: ResMut<GroundMarkers>,
+ ) {
+     let feet = me.single().ok().map(|t| t.translation());
++    // The reticle's own line while aiming over the shoulder (the camera through the screen's
++    // middle); else the server's guess.
++    let crosshair = feet.filter(|_| action_combat::aim_camera()).and_then(|feet| {
++        let (cam, tf) = camera.single().ok()?;
++        crosshair_line(cam, tf, feet)
++    });
++    match (crosshair, feet) {
++        (Some(line), Some(feet)) => {
++            let (at, blocked) = reticle_point(&spatial, &occluders, &doodads, feet, line);
++            action_combat::set_reticle_point(Some((bevy_to_wow(at), blocked)));
++        }
++        _ => action_combat::set_reticle_point(None),
++    }
+     // The strip, cone and ring shapes lie under the hero (`super::telegraph`); this is the circle.
+     let circle = action_combat::aim_marker().filter(|m| m.shape == action_combat::AimShape::Circle);
+     match (circle, feet) {
+         (Some(m), Some(feet)) => {
+-            let at = aim_point(&spatial, &occluders, feet, m.range);
++            let line = crosshair.unwrap_or_else(|| eye_line(feet));
++            let at = aim_point(&spatial, &occluders, feet, m.range, line);
+             state.circle.place(&decals, at, m.radius.max(0.3));
+             state.shown = !state.circle.verts.is_empty();
+             action_combat::set_aim_point(Some(bevy_to_wow(at)));
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 73e6f3ff..4a7e9f05 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -207,6 +207,16 @@
+ //!   argument flies the dressed missile at that many yards a second from where it is, over the
+ //!   speed its spell gives it and over the 100 yd/s cap the launch keeps (up to 400). `0` or
+ //!   nothing keeps the spell's own; a line with nine arguments reads as before.
++//!
++//! The twenty-sixth (`HasActionCombat() >= 26`; 24 and 25 are the Mage's):
++//!
++//! - `GetReticlePoint()`: where the reticle is on the world (WoW `x, y, z`) and whether something
++//!   stands between the hero's hands and there (`blocked`), while the aiming camera is up; nil
++//!   otherwise. The line is the camera's own through the middle of the screen, where the reticle
++//!   is drawn, from where it passes the hero; it meets the ground, the walls and the doodads. The
++//!   add-on sends the point with each shot and the server fires there from the hands.
++//! - The aim's circle (`SetAimMarker` `circle`, `GetAimPoint`) lies on that line too, so the
++//!   circle, the reticle and the shot agree.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -562,6 +572,7 @@ pub struct AimMarker {
+ 
+ static AIM_MARKER: std::sync::Mutex<Option<AimMarker>> = std::sync::Mutex::new(None);
+ static AIM_POINT: std::sync::Mutex<Option<[f32; 3]>> = std::sync::Mutex::new(None);
++static RETICLE_POINT: std::sync::Mutex<Option<([f32; 3], bool)>> = std::sync::Mutex::new(None);
+ 
+ /// The aim's circle, while one is asked for.
+ pub fn aim_marker() -> Option<AimMarker> {
+@@ -579,6 +590,18 @@ pub fn aim_point() -> Option<[f32; 3]> {
+     AIM_POINT.lock().ok().and_then(|a| *a)
+ }
+ 
++/// Where the reticle is on the world this frame (WoW coordinates) and whether something stands
++/// between the hero's hands and there, while the aiming camera is up, for `GetReticlePoint`.
++pub fn set_reticle_point(p: Option<([f32; 3], bool)>) {
++    if let Ok(mut a) = RETICLE_POINT.lock() {
++        *a = p;
++    }
++}
++
++pub fn reticle_point() -> Option<([f32; 3], bool)> {
++    RETICLE_POINT.lock().ok().and_then(|a| *a)
++}
++
+ /// A timed ground marker asked for or taken away.
+ #[derive(Clone, Debug, PartialEq)]
+ pub enum GroundMarkerCall {
+@@ -997,7 +1020,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(23))?,
++        lua.create_function(|_, _: MultiValue| Ok(26))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1407,6 +1430,15 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "GetReticlePoint",
++        lua.create_function(|_, _: MultiValue| {
++            Ok(match reticle_point() {
++                Some((p, blocked)) => (Some(p[0]), Some(p[1]), Some(p[2]), Some(blocked)),
++                None => (None, None, None, None),
++            })
++        })?,
++    )?;
+     g.set(
+         "GetAimPoint",
+         lua.create_function(|_, _: MultiValue| {
+@@ -1687,7 +1719,7 @@ mod tests {
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(
+-            r#"assert(HasActionCombat() >= 23)
++            r#"assert(HasActionCombat() >= 26)
+                SetMissileLook(19434, "F2E6C8", 0.18, 0.3)
+                SetMissileLook(16075, nil, 0.3, 0.35, 1.8, 2.5)
+                SetMissileLook(19434, "FF3A1A", 0.3, 0.4, 1, 0, "0xF13000000000002A")
+@@ -1857,6 +1889,16 @@ mod tests {
+             .eval()
+             .unwrap();
+         assert_eq!((x, z), (1.0, 3.0));
++        // The reticle's point and whether the hands are blocked from it; nil while there's none.
++        set_reticle_point(Some(([4.0, 5.0, 6.0], true)));
++        let (x, z, blocked): (f32, f32, bool) = lua
++            .load("local x, y, z, b = GetReticlePoint() return x, z, b")
++            .eval()
++            .unwrap();
++        assert_eq!((x, z, blocked), (4.0, 6.0, true));
++        set_reticle_point(None);
++        let none: bool = lua.load("return GetReticlePoint() == nil").eval().unwrap();
++        assert!(none, "nil with no aiming camera");
+     }
+ 
+     #[test]
+-- 
+2.56.0.windows.4
+
