@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>]`
 //!
 //! - `by tauren-f` has a stand-in hero of that race cast it, the hero (and camera) at its side.
 //! - `anim` tries another clip on the ability for that run only (its take, and the model every race
@@ -144,8 +144,8 @@ impl SurvivalGame {
                     steps = words.get(k + 1).map(|s| s.to_string());
                     k += 1;
                 }
-                // The ward's looks for this run and the ones after: `ward 12042/5143/1` (its aura,
-                // the held glow in the hand, and whether it crackles while up; 0 for none).
+                // The ward's looks for this run and the ones after: `ward 12042/5143/1/124` (its aura,
+                // the held glow in the hand, whether it crackles while up, the arm's clip; 0 for none).
                 "ward" => {
                     let spec = words.get(k + 1).copied().unwrap_or("");
                     let n: Vec<u32> = spec.split('/').map(|n| n.parse().unwrap_or(0)).collect();
@@ -153,6 +153,7 @@ impl SurvivalGame {
                     w.aura = n.first().copied().unwrap_or(0);
                     w.hold_spell = n.get(1).copied().unwrap_or(0);
                     w.crackle_full = if n.get(2).copied().unwrap_or(0) != 0 { 1.4 } else { 0.0 };
+                    w.clip = n.get(3).copied().unwrap_or(0) as u16;
                     k += 1;
                 }
                 // A look to try for this run only: `look 3631` (its spell and aura both),
