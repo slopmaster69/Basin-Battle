@@ -112,6 +112,15 @@ impl Survival {
             // The last chill freezes them (a frozen foe shatters under fire or a heavy lance).
             let freeze = crate::content::AbilityEffect { kind: "petrify".into(), secs: [k.freeze_secs, k.freeze_secs], ..Default::default() };
             self.apply_effects(owner, victim, &[freeze], 1.0, &d.name);
+            // No ice to soak the next shards (a spell's freeze carries one; the staff's would
+            // have taken most of what the shards after it dealt): held, not shielded.
+            let now = self.clock;
+            if let Some(list) = self.cc.get_mut(&victim) {
+                for c in list.iter_mut().filter(|c| c.kind == "petrify" && c.until > now && c.left <= self.content.cc.petrify_shield) {
+                    // `amount` below 0: an ice that holds without soaking ([`Survival::cc_on_damage`]).
+                    c.amount = -1.0;
+                }
+            }
             if k.freeze_kit != 0 {
                 self.events.push(Event::Visual { id: victim, kit: k.freeze_kit, by: Some(owner) });
             }

@@ -224,7 +224,10 @@ impl Survival {
                     if !(free || busy_soft) {
                         return false;
                     }
-                    if !fresh {
+                    // A bolt needs its whole cost in hand (a swing's chain holds stamina back as
+                    // it plays; a bolt's quick recovery doesn't, so an empty caster cast on 1).
+                    let cost = self.content.abilities[bolt].stamina.min(self.content.player.stamina);
+                    if !fresh || (self.players[&id].stamina + 1.0e-3 < cost && !self.tireless(id)) {
                         self.winded(id);
                         return true;
                     }

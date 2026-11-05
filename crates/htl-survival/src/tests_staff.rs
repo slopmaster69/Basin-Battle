@@ -85,7 +85,7 @@ fn an_ember_staffs_click_casts_a_burning_bolt_along_the_reticle_not_a_swing() {
     let ev = run(&mut s, 1.0);
     assert_eq!(swings(&ev, p), 0);
     let took = hp - s.mobs[&k].health;
-    assert!(took >= 18, "the bolt lands for the staff's damage: {took}");
+    assert!(took >= 11, "the bolt lands for the staff's damage: {took}");
     assert!(s.has_cc(k, "burn"), "and it burns");
     assert_eq!(s.players[&p].action, Action::Ready, "free again after the recovery");
 }
@@ -105,7 +105,7 @@ fn the_heavy_attack_casts_the_heavy_bolt_and_each_staff_has_its_own_school() {
     let ev = s.step(0.0);
     assert_eq!(missiles(&ev, p), vec![23024], "the heavy bolt's own look");
     run(&mut s, 1.5);
-    assert!(hp - s.mobs[&k].health >= 34, "and its weight: {}", hp - s.mobs[&k].health);
+    assert!(hp - s.mobs[&k].health >= 28, "and its weight: {}", hp - s.mobs[&k].health);
     // Rime: a shard that chills; its heavy goes through everything in its line.
     let mut s = world();
     let p = armed(&mut s, "Ayla", ORIGIN, "rime_staff");

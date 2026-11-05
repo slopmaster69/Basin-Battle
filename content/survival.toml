@@ -442,12 +442,13 @@ broken_aura = 1714
 # staffs should feel apart from their school's spells, so the spells keep the skill checks and the
 # staffs build and spend). Ember heats the foe it hits and the third heat ignites; Rime chills it,
 # slower with each, and the third freezes it; Arcane gathers charges at the caster's staff. The
-# heavy bolt spends them, 40% harder for each.
+# heavy bolt spends them, 20% harder for each (Arcane's orb by `charge_scale`).
 most = 3
 keep = 5.0
-spend_share = 0.4
-# The ignite: 18 damage within 2.5 yd with the bolt's burn, Blast Wave's burst on the foe.
-ignite_damage = 18.0
+# Balance, Nov 5 review: 40% each made a 2-heat heavy outhit the spells (61 against Fireball's 36).
+spend_share = 0.2
+# The ignite: 14 damage within 2.5 yd with the bolt's burn, Blast Wave's burst on the foe.
+ignite_damage = 14.0
 ignite_radius = 2.5
 ignite_spell = 11113
 chill_slow = 0.15
@@ -455,10 +456,10 @@ freeze_secs = 1.5
 # The last charge gathering: Blink's violet flash at the hands; all of them spent throw the foe back.
 charged_kit = 3394
 charged_knockback = 3.0
-# The Arcane heavy orb by the charges it carries: nothing, 30%, 50%, all of it; its look Arcane
+# The Arcane heavy orb by the charges it carries: nothing, 35%, 60%, all of it; its look Arcane
 # Missiles' orb of each rank, drawn bigger with each (`[[missile_look]]` 7268, 7269, 7270); with
 # all three, Arcane Explosion's burst on what it strikes.
-charge_scale = [0.0, 0.3, 0.5, 1.0]
+charge_scale = [0.0, 0.35, 0.6, 1.0]
 charge_spells = [0, 7268, 7269, 7270]
 charge_full_kit = 1005
 # The ice made plain (Corey: hard to see): the frost burst on a foe the third chill freezes, and
@@ -6218,15 +6219,16 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.4 }]
 [[ability]]
 key = "ember_bolt"
 name = "Ember Bolt"
-text = "A bolt of fire from the staff. Burns for 2 damage per sec for 3 sec. Each hit heats the target. The third ignites it, dealing 18 damage to enemies within 2.5 yd."
+text = "A bolt of fire from the staff that deals 11 damage and burns for 1 damage per sec for 3 sec. Each hit heats the target. The third ignites it, dealing 14 damage to enemies within 2.5 yd."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
 builds = "heat"
-stamina = 10.0
-damage = [18.0, 18.0]
+stamina = 14.0
+# Balance, Nov 5 review: 18 made Ember's light bolts 63 dps against melee's 34-39; ~31 now, ~17 sustained.
+damage = [11.0, 11.0]
 range = [30.0, 30.0]
 radius = [0.35, 0.35]
 speed = 30.0
@@ -6236,12 +6238,12 @@ clip = 53
 # Each bolt one of four staff swings at random, the orc man's take on every race (Corey: mixed, random,
 # the same animation for all races and genders).
 clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
-effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 1.0 }]
 
 [[ability]]
 key = "ember_bolt_heavy"
 name = "Ember Burst"
-text = "A heavy, slow bolt of fire. Burns for 4 damage per sec for 3 sec. Spends the target's heat for 40% more damage each."
+text = "Hold to charge a heavy, slow bolt of fire that deals 12 to 28 damage and burns for 3 damage per sec for 3 sec. Spends the target's heat for 20% more damage per heat."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ranged"
@@ -6255,7 +6257,8 @@ spends = "heat"
 charge_pose = 28
 charge_kit = 38
 stamina = 22.0
-damage = [24.0, 34.0]
+# Balance, Nov 5 review: held to full is worth it (12 at its least, 28 full); 2 heat make it 39, under Fireball's perfect 43.
+damage = [12.0, 28.0]
 range = [30.0, 30.0]
 radius = [0.6, 0.6]
 speed = 22.0
@@ -6265,20 +6268,21 @@ spell = 23024
 clip = 19
 take = 1
 from = "TrollMale"
-effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 3.0 }]
 
 [[ability]]
 key = "rime_bolt"
 name = "Rime Shard"
-text = "A shard of frost from the staff. Each hit chills the target, slowing it by 15% more for 5 sec. The third freezes it for 1.5 sec."
+text = "A shard of frost from the staff that deals 10 damage. Each hit chills the target, slowing it by 15% more for 5 sec. The third freezes it for 1.5 sec."
 icon = "Spell_Frost_FrostBolt"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
 builds = "chill"
-stamina = 10.0
-damage = [16.0, 16.0]
+stamina = 14.0
+# Balance, Nov 5 review: Rime's worth is its slow and freeze; its shards no longer feed their own ice.
+damage = [10.0, 10.0]
 range = [30.0, 30.0]
 radius = [0.35, 0.35]
 speed = 32.0
@@ -6294,7 +6298,7 @@ clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
 [[ability]]
 key = "rime_bolt_heavy"
 name = "Rime Lance"
-text = "A heavy shard of frost that goes through every enemy in its line. Slows by 40% for 3 sec. Spends each target's chill for 40% more damage each, and shatters a frozen target."
+text = "Hold to charge a heavy shard of frost that deals 16 to 34 damage to every enemy in its line and slows them by 40% for 3 sec. Spends each target's chill for 20% more damage per chill, and shatters a frozen target."
 icon = "Spell_Frost_FrostBolt02"
 school = "mage"
 slot = "ranged"
@@ -6309,7 +6313,8 @@ charge_pose = 28
 charge_kit = 1027
 shatter = true
 stamina = 22.0
-damage = [20.0, 30.0]
+# Balance, Nov 5 review: held to full is worth it (16 at its least, 34 full).
+damage = [16.0, 34.0]
 range = [32.0, 32.0]
 radius = [0.4, 0.4]
 speed = 36.0
@@ -6324,16 +6329,17 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 [[ability]]
 key = "arcane_bolt"
 name = "Arcane Bolt"
-text = "A quick bolt of arcane force from the staff. Each hit stores an arcane charge in the staff, up to 3, for 5 sec."
+text = "A quick bolt of arcane force from the staff that deals 10 damage. Each hit stores an arcane charge in the staff, up to 3, for 5 sec."
 icon = "Spell_Arcane_StarFire"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 bench = true
 builds = "charge"
-stamina = 8.0
+stamina = 12.0
 # Light: the staff stores the power; the heavy orb lets it go (Corey, Nov 5).
-damage = [9.0, 9.0]
+# Balance, Nov 5 review: Arcane was the weakest staff; its bolts a little more, its full orb the biggest payoff.
+damage = [10.0, 10.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 44.0
@@ -6349,7 +6355,7 @@ clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
 [[ability]]
 key = "arcane_bolt_heavy"
 name = "Arcane Orb"
-text = "Releases the arcane power stored in the staff as an orb: 30% of its strength with 1 charge, 50% with 2, all of it with 3, which knocks the target back 3 yd. With no charge, nothing goes."
+text = "Hold to charge, then release the arcane power stored in the staff as an orb that deals up to 64 damage: 35% with 1 charge, 60% with 2, 100% with 3, which also knocks the target back 3 yd. Fails with no charges."
 icon = "Spell_Arcane_Blast"
 school = "mage"
 slot = "ranged"
@@ -6369,7 +6375,8 @@ clip = 19
 take = 0
 from = "TaurenMale"
 stamina = 20.0
-damage = [32.0, 48.0]
+# Balance, Nov 5 review: a full orb 64 with all 3 charges (was 48); held to full is worth it.
+damage = [36.0, 64.0]
 crit_effects = [{ kind = "knockback", amount = 3.0 }]
 range = [30.0, 30.0]
 radius = [0.7, 0.7]
