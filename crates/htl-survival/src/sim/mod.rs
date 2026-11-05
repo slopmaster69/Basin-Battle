@@ -907,6 +907,8 @@ pub struct Survival {
     pub hunt: hunter::Hunt,
     pub(crate) windups: Vec<moves::Windup>,
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
+    /// Each hero's last blink that slips blows (Blink's counter check).
+    pub(crate) slips: BTreeMap<Id, moves::Slip>,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
@@ -1014,6 +1016,7 @@ impl Survival {
             hunt: hunter::Hunt::default(),
             windups: Vec::new(),
             anchors: BTreeMap::new(),
+            slips: BTreeMap::new(),
             fx_from: None,
             fx_vs_bosses: false,
             told_immune: BTreeMap::new(),

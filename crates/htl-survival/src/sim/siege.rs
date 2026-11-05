@@ -759,6 +759,7 @@ impl Survival {
         self.cc.remove(&id);
         self.stances.remove(&id);
         self.anchors.remove(&id);
+        self.slips.remove(&id);
         self.events.push(Event::Health { id, health: h, max: m });
         self.events.push(Event::Bags { player: id });
         self.events.push(Event::Abilities { player: id });

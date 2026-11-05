@@ -3657,7 +3657,7 @@ effects = [{ kind = "panic", secs = [2.0, 2.0] }]
 [[ability]]
 key = "blink"
 name = "Blink"
-text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows."
+text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows. Blink just as a blow lands and it misses you, and Blink comes back twice as fast."
 icon = "Spell_Arcane_Blink"
 school = "mage"
 slot = "utility"
@@ -3665,6 +3665,8 @@ kind = "blink"
 range = [20.0, 20.0]
 cooldown = 12.0
 cleanse = true
+# The counter check: blinked out of a blow just as it lands (the Mage design).
+slip = true
 spell = 1953
 
 [[ability]]
@@ -3678,6 +3680,7 @@ kind = "blink"
 valor = 25
 range = [20.0, 20.0]
 cleanse = true
+slip = true
 leaves = "frost_nova"
 spell = 1953
 
@@ -3910,7 +3913,7 @@ effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 [[ability]]
 key = "ice_block"
 name = "Ice Block"
-text = "Encases you in ice for 2 sec. Nothing can harm you, but you cannot act. Press again to break out early."
+text = "Encases you in ice for 2 sec. Nothing can harm you, but you cannot act. Press again to break out early. Break out just as a blow lands and the enemy who struck is frozen for 1.5 sec (0.75 sec against heroes)."
 icon = "Spell_Frost_Frost"
 school = "mage"
 slot = "defense"
@@ -3919,7 +3922,9 @@ secs = 2.0
 cooldown = 20.0
 spell = 11958
 aura = 11958
-counter = { immune = true }
+# The counter check: broken out of as a blow lands on it, the ice bursts at the striker (the Mage
+# design; a hero takes half a creature's freeze).
+counter = { immune = true, perfect_break = [{ kind = "petrify", secs = [1.5, 1.5] }] }
 
 [[ability]]
 key = "cold_snap"
@@ -3934,7 +3939,7 @@ secs = 2.0
 spell = 11958
 aura = 11958
 leaves = "frost_nova"
-counter = { immune = true }
+counter = { immune = true, perfect_break = [{ kind = "petrify", secs = [1.5, 1.5] }] }
 
 # The rhythm check on a mark: it pulses once a second, and the step back on a pulse is a perfect
 # that throws back what's near. Half the health lost comes back, against heroes too (Corey).

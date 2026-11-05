@@ -89,6 +89,16 @@ pub(crate) struct Anchor {
     pub pulsed: u32,
 }
 
+/// A blink that slips blows (Blink's counter check): which, when, from where, and whether its
+/// perfect has paid.
+#[derive(Debug, Clone)]
+pub(crate) struct Slip {
+    pub ability: usize,
+    pub at: f32,
+    pub from: Vec3,
+    pub paid: bool,
+}
+
 /// How long a body thrown up at `lift` stays in the air.
 pub(crate) fn airtime(lift: f32) -> f32 {
     2.0 * lift.max(0.5) / GRAVITY

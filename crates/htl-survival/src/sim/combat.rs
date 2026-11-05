@@ -1648,6 +1648,13 @@ impl Survival {
         if v.health == 0 {
             return;
         }
+        // Blinked through it as it came, while it waited on their round trip: slipped. (Blinked
+        // out before it came, it's slipped where it's swung; see `slip_from`.)
+        let grace = v.rtt.min(self.content.combat.max_grace);
+        if s.how != HitKind::Projectile && self.slips.get(&s.victim).is_some_and(|b| b.at >= s.at - grace - 1.0e-4) {
+            self.slipped(s.victim, s.attacker, s.style);
+            return;
+        }
         // Out of it by now: a whiff.
         let inside = match s.area {
             None => true,

@@ -118,6 +118,8 @@ pub struct Stance {
     pub caught: bool,
     /// When it was raised (a perfect mirror's window runs from it).
     pub since: f32,
+    /// The last blow it caught: when, and whose (Ice Block's perfect break-out answers it).
+    pub struck: Option<(f32, Id)>,
     /// When its lasting look (an `aura` apart from its `spell`: Shield Wall's circling shields)
     /// was last played on the body; it's played again every [`STANCE_LOOK_EVERY`] while it holds.
     pub shown: f32,
@@ -562,7 +564,7 @@ impl Survival {
         // Ice Block: its key again breaks out of it.
         if let Action::Stance { ability, .. } = p.action {
             if self.content.abilities[ability].counter.as_ref().is_some_and(|c| c.immune) && self.content.base_of(ability) == base {
-                self.end_stance(id);
+                self.break_out(id);
                 return true;
             }
         }
@@ -3024,6 +3026,9 @@ impl Survival {
         let f = self.players[&id].facing;
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
         self.set_down(id, land, f);
+        if d.slip {
+            self.note_slip(id, ability, start);
+        }
         if d.cleanse {
             self.cleanse(id, &["root", "snare"]);
         }
@@ -3039,7 +3044,7 @@ impl Survival {
     fn start_stance(&mut self, id: Id, ability: usize) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, since: now, shown: now - STANCE_LOOK_EVERY });
+        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY });
         self.set_action(id, Action::Stance { ability, until: now + d.secs });
         if d.counter.as_ref().is_some_and(|c| c.guard_pose) {
             self.events.push(Event::Guard { player: id, up: true });
@@ -3050,6 +3055,79 @@ impl Survival {
     }
 
     /// A stance ends: its cooldown (sooner if it caught something).
+    /// Out of Ice Block by its key: on a blow that just landed on the ice (on the hero's own
+    /// screen), the ice bursts at whoever struck it (its `perfect_break`), a perfect.
+    fn break_out(&mut self, id: Id) {
+        let now = self.clock;
+        let hit = self.stances.get(&id).and_then(|s| s.struck.map(|(at, by)| (s.ability, at, by)));
+        if let Some((ability, at, by)) = hit {
+            let rewind = self.players.get(&id).map_or(0.0, |p| p.rtt.min(self.content.combat.max_rewind));
+            let d = self.content.abilities[ability].clone();
+            let fx = d.counter.as_ref().map(|c| c.perfect_break.clone()).unwrap_or_default();
+            if !fx.is_empty() && now - at <= self.content.checks.window + rewind + 1.0e-4 {
+                if self.unit_pos(by).is_some() {
+                    let was = self.fx_from.replace(self.players[&id].pos);
+                    self.apply_effects(id, by, &fx, 1.0, &d.name);
+                    self.fx_from = was;
+                }
+                let k = self.content.checks.perfect_kit;
+                if k != 0 {
+                    self.events.push(Event::Visual { id, kit: k, by: None });
+                }
+                self.events.push(Event::Perfect { player: id, ability });
+            }
+        }
+        self.end_stance(id);
+    }
+
+    /// A blink with `slip`: where it went from and when, for the blows it slips.
+    fn note_slip(&mut self, id: Id, ability: usize, from: Vec3) {
+        let at = self.clock;
+        self.slips.insert(id, moves::Slip { ability, at, from, paid: false });
+    }
+
+    /// Where a hero blinked from, if it was a `slip` blink within `[checks] window` before now:
+    /// a blow swung now that would have caught them there missed. (A blink that came after the
+    /// blow, on a hero's round trip, is met where the blow waits on it: see `resolve`.)
+    pub(crate) fn slip_from(&self, id: Id) -> Option<Vec3> {
+        let s = self.slips.get(&id)?;
+        (self.clock - s.at <= self.content.checks.window + 1.0e-4).then_some(s.from)
+    }
+
+    /// A blow slipped by a blink: it misses, and the first pays (the cooldown halved, a
+    /// counter's Valor, the perfect's burst).
+    pub(crate) fn slipped(&mut self, id: Id, attacker: Id, style: Blow) {
+        self.events.push(Event::Swing { attacker, victim: Some(id), damage: 0, outcome: Outcome::Miss, anim: false, style });
+        let Some(s) = self.slips.get_mut(&id) else { return };
+        if s.paid {
+            return;
+        }
+        s.paid = true;
+        let ability = s.ability;
+        self.hasten(id, ability, 0.5);
+        self.gain_valor(id, self.content.valor.counter);
+        let k = self.content.checks.perfect_kit;
+        if k != 0 {
+            self.events.push(Event::Visual { id, kit: k, by: None });
+        }
+        self.events.push(Event::Perfect { player: id, ability });
+    }
+
+    /// An ability's cooldown under way comes back `share` of a whole cooldown sooner.
+    pub(crate) fn hasten(&mut self, id: Id, ability: usize, share: f32) {
+        let base = self.content.base_of(ability);
+        let every = self.content.abilities[base].cooldown.max(0.0);
+        let mut cd = self.cooldown(id, ability);
+        if cd.charges >= self.content.abilities[base].charges.max(1) {
+            return;
+        }
+        cd.next_at = (cd.next_at - every * share).max(self.clock);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.cooldowns.insert(base, cd);
+        }
+        self.events.push(Event::Abilities { player: id });
+    }
+
     pub(crate) fn end_stance(&mut self, id: Id) {
         let Some(s) = self.stances.remove(&id) else { return };
         let d = self.content.abilities[s.ability].clone();
@@ -3138,6 +3216,7 @@ impl Survival {
         }
         if let Some(st) = self.stances.get_mut(&victim) {
             st.caught = true;
+            st.struck = Some((now, attacker));
         }
         // Retaliation: a melee blow is parried, as a timed guard would, and the hero's own heavy
         // attack goes out at once, nothing touching them until it strikes.
@@ -3366,7 +3445,7 @@ impl Survival {
                 let free = !self.stances.contains_key(&mid);
                 if free && (now % 4.0) < 0.06 {
                     let secs = self.content.abilities[a].secs;
-                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, since: now, shown: now - STANCE_LOOK_EVERY });
+                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY });
                     self.events.push(Event::Auras { id: mid });
                 }
             }

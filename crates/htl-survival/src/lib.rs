@@ -94,3 +94,5 @@ mod tests_rhythm;
 mod tests_bomb;
 #[cfg(test)]
 mod tests_alter;
+#[cfg(test)]
+mod tests_counters;

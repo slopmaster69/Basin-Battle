@@ -395,6 +395,12 @@ pub struct AbilityDef {
     /// The step back to the anchor gives back this share of the health lost since it was set.
     #[serde(default)]
     pub rewind_health: f32,
+    /// A blink that slips a blow (the counter check, Blink): a creature's or a hero's blow that
+    /// would have caught the hero where they blinked from, landing within `[checks] window` of
+    /// the blink (their round trip allowed), misses. The first one pays: the cooldown halved,
+    /// a counter's Valor and the perfect's burst.
+    #[serde(default)]
+    pub slip: bool,
     /// Another ability fired as well, at once, from the same aim (a Disengage's Net).
     #[serde(default)]
     pub also: String,
@@ -971,6 +977,11 @@ pub struct CounterDef {
     /// What it does to a melee attacker (and, `any_attacker`, a shooter too): an effect each.
     #[serde(default)]
     pub attacker: Vec<AbilityEffect>,
+    /// The counter check on an immune stance (Ice Block): broken out of within `[checks] window`
+    /// of a blow landing on it (the hero's round trip allowed), it bursts: these effects on the
+    /// one who struck it, and the perfect's burst.
+    #[serde(default)]
+    pub perfect_break: Vec<AbilityEffect>,
     #[serde(default)]
     pub any_attacker: bool,
     /// Only melee blows set it off (Retaliation, Nature's Grasp); else projectiles too.

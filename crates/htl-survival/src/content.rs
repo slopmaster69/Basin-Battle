@@ -3421,6 +3421,17 @@ impl Content {
                     bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
                 }
             }
+            if a.slip && a.kind != "blink" {
+                bail!("{what}: only a blink slips blows (`slip`)");
+            }
+            if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
+                bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
+            }
+            if let Some(c) = &a.counter {
+                for e in &c.perfect_break {
+                    effect_ok(e, &what)?;
+                }
+            }
             if a.counter.as_ref().is_some_and(|c| c.perfect_mirror && !c.mirror) {
                 bail!("{what}: `perfect_mirror` is a mirror's check (it needs `mirror`)");
             }
