@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 40
+local VERSION = 43
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -620,6 +620,7 @@ local function PlayMine(kind, step, move)
     After(math.max(0, move.impact * 0.5), function() PlayUnitVocal("player", "exertion_crit") end)
   end
   ES.mine = { kind = kind, step = step, move = move, start = GetTime() }
+  ES.castHeld = nil
   if kind == "light" then
     ES.comboNext = step + 1
     ES.comboUntil = GetTime() + move.impact + move.recovery + ((mv and mv.comboGrace) or 0.6)
@@ -763,7 +764,8 @@ function ES.SwingLine(f)
   -- another model's take when the ability names one (the same on every race), over the body the
   -- line names ("full", "upper", or "lower" from ac23: the legs alone, the arms keeping their draw).
   if kind == "cast" then
-    if mine then guid = "player" end
+    -- Ours is held until it ends or the server lets it go (`ST`): Skyfall's hang, a throw's aim.
+    if mine then guid = "player"; ES.castHeld = true end
     local body = (f[14] and f[14] ~= "") and f[14] or "full"
     if from and PreloadAnimationSource then PreloadAnimationSource(from) end
     PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, body, from)
@@ -2188,12 +2190,13 @@ aim.name:SetTextColor(1, 0.9, 0.6)
 aim.burst = Tex(aim, "OVERLAY", "reticle", 56, 56)
 aim.burst:SetPoint("CENTER", aim, "CENTER", 0, 0)
 aim.burst:Hide()
--- A fan of arrows (Multi-Shot): five points spread in a shallow arc across the middle, where the
--- arrows will go, in place of a strip on the ground (Corey's review: "a cone reticle instead").
+-- A fan of arrows (Multi-Shot, Fan of Knives): a point for each, up to eight (five when the server
+-- doesn't say how many), spread in a shallow arc across the middle, where they will go, in place of a strip on the ground (Corey's review: "a cone reticle instead").
 -- They're placed as the fan is aimed (DrawAim), from the ability's arc: the whole spread, in
 -- degrees, outermost arrow to outermost arrow.
 aim.fan = {}
-for k = 1, 5 do
+local FAN_MOST = 8
+for k = 1, FAN_MOST do
   -- Bigger than the plain dot: spread over the real fan they sit far apart, and at 10 they were
   -- lost against the grass (the visual check, run 050).
   aim.fan[k] = Tex(aim, "OVERLAY", "dot", 18, 18)
@@ -2426,12 +2429,14 @@ aim:SetScript("OnUpdate", function()
   this.ring:SetHeight(size)
   this.ring:SetVertexColor(r, g, b, alpha)
   this.dot:SetVertexColor(r, g, b, 0.9)
-  -- A fan: its five points in place of the ring and the dot, spread over the fan's real arc.
+  -- A fan: a point for each it looses in place of the ring and the dot, spread evenly over the
+  -- fan's real arc, outermost to outermost.
   local fan = d and d.shape == "fan"
   local half = fan and math.rad(((d.arc and d.arc > 0) and d.arc or 40) / 2) or 0
-  for k = 1, 5 do
-    if fan then
-      local x = FAN_UNITS * math.tan(half * (k - 3) / 2)
+  local points = fan and math.max(2, math.min(FAN_MOST, (d.count and d.count > 1) and d.count or 5)) or 0
+  for k = 1, FAN_MOST do
+    if k <= points then
+      local x = FAN_UNITS * math.tan(half * ((k - 1) / (points - 1) * 2 - 1))
       this.fan[k]:ClearAllPoints()
       this.fan[k]:SetPoint("CENTER", this, "CENTER", x, -math.abs(x) * 0.08)
       this.fan[k]:SetVertexColor(r, g, b, alpha)
@@ -2724,7 +2729,8 @@ end
 -- AB: the five keys, each slot~ability~name~icon~kind~shape~least~full~cooldown left~cooldown~
 -- charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~
 -- EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered (the seconds Call of the
--- Wild's next call stays empowered by a parry or a perfect dodge; 0 or none: it isn't).
+-- Wild's next call stays empowered by a parry or a perfect dodge; 0 or none: it isn't)~count~EX count
+-- (how many it looses at once: a fan's points).
 function ES.AbilitiesLine(f)
   local parts = Split(f[2] or "", "^")
   ES.abilities = {}
@@ -2737,7 +2743,7 @@ function ES.AbilitiesLine(f)
       charges = tonumber(e[11] or "") or 0, most = tonumber(e[12] or "") or 1,
       range = tonumber(e[13] or "") or 0, radius = tonumber(e[14] or "") or 0, arc = tonumber(e[15] or "") or 0,
       valor = tonumber(e[16] or "") or 0, text = e[26] or "", facts = e[27] or "", at = GetTime(),
-      aimed = e[30] == "1", school = e[31] or "",
+      aimed = e[30] == "1", school = e[31] or "", count = tonumber(e[33] or "") or 0,
     }
     local primed = tonumber(e[32] or "") or 0
     if primed > 0 then s.primedEnds = GetTime() + primed end
@@ -2746,7 +2752,7 @@ function ES.AbilitiesLine(f)
         n = n, key = e[17], name = e[18] or "", icon = e[19] or "", valor = tonumber(e[20] or "") or 0,
         kind = e[21] or "", shape = e[22] or "line", range = tonumber(e[23] or "") or 0,
         radius = tonumber(e[24] or "") or 0, arc = tonumber(e[25] or "") or 0, lo = s.lo, hi = s.hi,
-        text = e[28] or "", facts = e[29] or "", isEx = true, school = s.school,
+        text = e[28] or "", facts = e[29] or "", isEx = true, school = s.school, count = tonumber(e[34] or "") or 0,
       }
       ES.abilities[s.ex.key] = s.ex
     end
@@ -2768,6 +2774,7 @@ function ES.RecastLine(f)
       n = n, icon = f[4] or "", key = f[5] or "", name = f[6] or "", shape = f[7] or "line",
       range = tonumber(f[8] or "") or 0, radius = tonumber(f[9] or "") or 0, arc = tonumber(f[10] or "") or 0,
       aimed = f[11] == "1", lo = tonumber(f[12] or "") or 0, hi = tonumber(f[13] or "") or 0, valor = 0,
+      count = tonumber(f[14] or "") or 0,
       ends = GetTime() + secs, isRecast = true,
     }
     ES.recasts[n] = r
@@ -6596,6 +6603,12 @@ function ES.Line(line)
   elseif verb == "MO" then
     -- Where a hero's missiles leave from (a casting staff's tip), on a client that can say so.
     if SetUnitMissileOrigin then SetUnitMissileOrigin(f[2] or "", f[3] or "") end
+  elseif verb == "SF" then
+    if ES.StaffLine then ES.StaffLine(f) end
+  elseif verb == "SK" then
+    if ES.StacksLine then ES.StacksLine(f) end
+  elseif verb == "SH" then
+    if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
   elseif verb == "OB" then
     if ES.OrbLine then ES.OrbLine(f) end
   elseif verb == "OX" then
@@ -6614,10 +6627,13 @@ function ES.Line(line)
     ES.BeatLine(f)
   elseif verb == "ST" then
     -- A swing called off (a feint): ours went at once; another's lets go now.
+    -- Ours: a swing of ours, or a held cast of ours (a hang ended early, an aim let go), else
+    -- nothing (a feint already let go here, and a newer swing must keep playing).
     if f[3] == "1" then
-      if ES.mine then
+      if ES.mine or ES.castHeld then
         if StopUnitAnimation then StopUnitAnimation("player", 0.1) end
         ES.mine = nil
+        ES.castHeld = nil
       end
     elseif StopUnitAnimation and f[2] then
       StopUnitAnimation(f[2], 0.1)
@@ -6847,7 +6863,10 @@ events:SetScript("OnEvent", function()
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
     -- ac24: the Mage's skill checks: rings on the ground, recoloured spell looks, an orb rolled on
     -- the ground, missiles from a staff's tip (patches 0041 to 0044).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 24 then
+    -- ac25: a staff stays in hand through a spell's cast (patch 0045).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 25 then
+      Say(".es hello " .. VERSION .. " ac25")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 24 then
       Say(".es hello " .. VERSION .. " ac24")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
       Say(".es hello " .. VERSION .. " ac23")

@@ -104,6 +104,10 @@ local TINTS = {
   ["Spells\\ArcaneExplosion_Impact_Chest"] = ARCANE_PINK, -- a perfect ward's burst
   ["Spells\\ManaBurn_Chest"] = ARCANE_PINK,            -- the ward breaking
   ["Spells\\LightningStreak_Missile"] = ARCANE_PINK,   -- the Arcane staff's bolt
+  -- The swirl in the ward's raised hand (Polymorph's precast), under the names it may go by.
+  ["Spells\\Polymorph_Precast_Hand"] = ARCANE_PINK,
+  ["Spells\\Arcane_Precast_Hand"] = ARCANE_PINK,
+  ["Spells\\ArcaneMissile_Precast_Hand"] = ARCANE_PINK,
 }
 if SetEffectTint then
   for model, colour in pairs(TINTS) do SetEffectTint(model, colour) end

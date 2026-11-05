@@ -867,6 +867,11 @@ impl Survival {
             }
             self.events.push(Event::CheckStart { player: id, ability, kind: "release", a: flare, b: k.window, c: k.crit_share, pattern: curve.to_string() });
         }
+        // A staff's heavy bolt: its charge fills the staff's mark instead.
+        if !d.spends.is_empty() && hi > 0.0 {
+            let (lo, _) = self.charge_of(id, ability);
+            self.events.push(Event::StaffHeavy { player: id, lo, hi });
+        }
         let spell = if d.kind == "shot" || d.bow { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
         if spell != 0 && (d.kind == "shot" || d.bow) {
             self.draw_bow(id);
@@ -2123,6 +2128,9 @@ impl Survival {
 
     /// A projectile's blow on one foe.
     fn strike_with(&mut self, p: &Projectile, victim: Id, from: Vec3) {
+        // A staff's heavy bolt spends what its plain bolts built, harder for each.
+        let spent = self.staff_spend(p.owner, victim, p.ability);
+        let p = &Projectile { damage: p.damage * spent, ..p.clone() };
         // Fire Ward's own Fire Blasts and the like are owned by whoever fired them back.
         if self.players.contains_key(&victim) {
             let damage = self.ability_damage(p.owner, victim, p.ability, p.damage);
@@ -2136,6 +2144,10 @@ impl Survival {
             if !d.crit_effects.is_empty() {
                 self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
             }
+        }
+        // A staff's plain bolt builds its heat, chill or charge.
+        if self.alive(victim) {
+            self.staff_build(p.owner, victim, p.ability);
         }
     }
 
@@ -2340,7 +2352,9 @@ impl Survival {
         let d = self.content.abilities[ability].clone();
         if !killed {
             // The look its caster wears over a pull of its own (Reverse Grapple's haul).
-            let was = std::mem::replace(&mut self.fx_pull_look, (d.pull_clip != 0).then(|| (d.pull_clip, d.pull_from.clone())));
+            // One of its pulls at random each use when it names several (`pull_clips`), else its one.
+            let clip = if d.pull_clips.is_empty() { d.pull_clip } else { d.pull_clips[self.roll([0, d.pull_clips.len() as u32 - 1]) as usize] };
+            let was = std::mem::replace(&mut self.fx_pull_look, (clip != 0).then(|| (clip, d.pull_from.clone())));
             // One that's for friends too gives a foe none of what helps.
             if d.friendly {
                 let harm: Vec<_> = d.effects.iter().filter(|e| !crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
@@ -3578,7 +3592,9 @@ impl Survival {
                 // Not on a release check either: its ring on the caster's screen marks the moment,
                 // and the flare on their body read as a fire shield (Corey's playtest, Nov 5).
                 let checked = self.content.abilities[ability].perfect && hi > 0.0;
-                if hi > 0.0 && held >= hi && held - dt < hi && !checked && !self.content.abilities[ability].bow {
+                // Nor on a staff's heavy bolt: its mark on the caster's screen fills instead.
+                let staff = !self.content.abilities[ability].spends.is_empty();
+                if hi > 0.0 && held >= hi && held - dt < hi && !checked && !staff && !self.content.abilities[ability].bow {
                     let kit = self.full_kit(ability);
                     if kit != 0 {
                         self.events.push(Event::Visual { id, kit, by: None });

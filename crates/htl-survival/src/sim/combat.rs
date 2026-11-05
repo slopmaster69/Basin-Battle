@@ -918,6 +918,15 @@ impl Survival {
         if up != p.ward_up {
             p.ward_up = up;
             self.events.push(Event::Auras { id });
+            // The arm raised and held while it's up, let go as it comes down.
+            if w.clip != 0 {
+                let from = (!w.clip_from.is_empty()).then(|| w.clip_from.clone());
+                self.events.push(if up {
+                    Event::Clip { id, clip: w.clip, take: w.clip_take, from, secs: 600.0, at: 0.25, body: ClipBody::Upper }
+                } else {
+                    Event::ClipStop { id }
+                });
+            }
             // The glow in the raised hand while it's up, gone as it comes down.
             if w.hold_spell != 0 {
                 self.events.push(if up {
@@ -1025,6 +1034,7 @@ impl Survival {
             }
         }
         self.step_ward(id, dt);
+        self.step_staff(id);
         // Lasting effects: a salve's or a meal's healing (in a fight too), and running out.
         {
             let regen = self.effect_of(&self.players[&id], "regen") + self.effect_of(&self.players[&id], MEAL);

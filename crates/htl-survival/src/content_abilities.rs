@@ -344,6 +344,10 @@ pub struct AbilityDef {
     /// clips. Only on an ability with a `pull` effect.
     #[serde(default)]
     pub pull_clip: u16,
+    /// Or one of these clips, picked at random each use (Reverse Grapple's five pulls, so the
+    /// haul doesn't look the same every time); when set, it takes the place of `pull_clip`.
+    #[serde(default)]
+    pub pull_clips: Vec<u16>,
     #[serde(default)]
     pub pull_from: String,
     /// Valor for each foe it strikes (0: `[valor].ability`).
@@ -406,6 +410,13 @@ pub struct AbilityDef {
     /// On a frozen foe it shatters the ice for half again its damage.
     #[serde(default)]
     pub shatter: bool,
+    /// A staff's plain bolt: what each hit builds (`heat` or `chill` on the foe, `charge` on the
+    /// caster; `[staffs]`). Empty: nothing.
+    #[serde(default)]
+    pub builds: String,
+    /// A staff's heavy bolt: what it spends, harder for each (the same words).
+    #[serde(default)]
+    pub spends: String,
     /// A projectile that touches a friend heals them this share of their health (and, with
     /// `cleanse`, ends what's on them); so does an `ally` on whoever it picks. A `beam` heals each
     /// friend in it this share a second.

@@ -89,7 +89,8 @@
 //!   (that half alone, the rest keeping what it was doing: Skyfall's hang holds the Jump clip on
 //!   the legs while the arms draw the bow). `lower` takes client patch 0037 (`ac23`); `ac22`
 //!   reads it as the whole body.
-//! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
+//! - `ST\t<guid>\t<mine>`: a swing called off (a feint), or a held cast ended early (Skyfall's hang,
+//!   a thrown ability's aim let go), its clip let go.
 //! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
 //!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
 //!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
@@ -106,8 +107,14 @@
 //! The abilities:
 //! - `AB\t...`: the ability bar, one entry per key (see [`SurvivalGame::bar_line`]).
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
-//! - `WA\t<ward>\t<most>\t<broken>`: the ward bar of a hero whose guard is a ward (a staff's);
+//! - `WA\t<ward>\t<most>\t<broken>\t<up>`: the ward bar of a hero whose guard is a ward (a staff's);
 //!   `WA` alone: no ward, the bar hidden. Sent with the HUD and the moment it changes.
+//! - `SF\t<ember|rime|arcane|>`: the casting staff in the hero's hands, for its mark on the
+//!   reticle (`Staff.lua`); empty for none.
+//! - `SK\t<heat|chill|charge>\t<n>\t<most>\t<guid>`: a staff's stacks changed: heat or
+//!   chill on that foe, or the hero's charges (guid 0); `n` the most: it just ignited or froze.
+//! - `SH\t<lo>\t<hi>`: a staff's heavy bolt began its charge (goes from `lo` sec, whole at
+//!   `hi`).
 //! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
 //!   (`Event::CheckStart`): "release" (`a` the flare's second from the charge's start, `b` the
 //!   window either side, `pattern` the ring's curve), "rhythm" (`a`, `b` the first and last
@@ -135,7 +142,7 @@
 //!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
 //! - `HL\t<amount>`: healed (a green number). `NP\t<verb>\t<name>`: what the use key would use.
 //! - `A` goes on `\t<ability key>` (what's aimed, charged, cast or channelled).
-//! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
+//! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>\t<count>`:
 //!   the key in that slot (0 Q to 4 the ultimate) is armed for its recast for `secs` more: pressed
 //!   again it fires that ability (its icon, its name, its aim and charge); `RC\t<slot>`: closed.
 //! - `DP`, `DM`: the damage meters (see `meter_ui.rs`).
@@ -414,10 +421,16 @@ pub(crate) const VERSION: u32 = 2;
 /// 38: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
 /// 39: a giant's blow on the guard flashes the screen's corners dust-coloured, not red (the
 /// `edge` of its beat in `Cues.lua`).
-/// 40: the Mage: the ward bar (`WA`, `Ward.lua`), and the skill checks drawn (`CK`, `CR`, `OB`,
+/// 40: a held cast of the hero's own (Skyfall's hang, a thrown ability's aim) lets go on the
+/// server's `ST`, not only a swing.
+/// 41: a fan's reticle shows as many points as it looses (the `AB` entry's and the `RC` line's
+/// count: Fan of Knives three, Multi-Shot five).
+/// 42: the Mage: the ward bar (`WA`, `Ward.lua`), and the skill checks drawn (`CK`, `CR`, `OB`,
 /// `OX`, `MO`, `Check.lua`): rings, beats, the orb and their outcomes; the add-on says `ac24`
 /// (patches 0041 to 0044).
-pub(crate) const ADDON_NEWEST: u32 = 40;
+/// 43: a staff's mark and stacks (`SF`, `SK`, `SH`, `Staff.lua`), and the ward on the reticle (the
+/// `WA` line's fifth field, whether it's up); the add-on says `ac25` (patch 0045).
+pub(crate) const ADDON_NEWEST: u32 = 43;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -428,7 +441,8 @@ pub(crate) const ADDON_NEWEST: u32 = 40;
 /// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
 /// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
 /// 24: the Mage's skill checks: rings on the ground (0041), recoloured spell looks (0042), an orb rolled on the ground (0043) and missiles from a held staff's tip (0044).
-pub(crate) const CLIENT_NEWEST: u8 = 24;
+/// 25: a staff stays in hand through a spell's cast (0045).
+pub(crate) const CLIENT_NEWEST: u8 = 25;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1965,7 +1979,7 @@ impl SurvivalGame {
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 
-    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered>^...`
+    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered~count~EX count>^...`
     /// (one per key, its fields empty when nothing's on it). `empowered`: the seconds Call of the
     /// Wild's next call stays empowered (a parry or a perfect dodge), 0 when it isn't (and for
     /// every other key); an older add-on ignores it.
@@ -1976,7 +1990,7 @@ impl SurvivalGame {
         let shape = |d: &htl_survival::content::AbilityDef| match d.kind.as_str() {
             // A lob is aimed at the ground, as ground is.
             "projectile" if d.lob => "circle",
-            // A fan of them (Multi-Shot) shows its spread on the reticle (add-on 23), not a strip.
+            // A fan of them (Multi-Shot) shows its spread on the reticle (add-on 28), not a strip.
             "projectile" if d.count > 1 => "fan",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
@@ -2003,7 +2017,7 @@ impl SurvivalGame {
             .bar(id)
             .into_iter()
             .map(|(slot, a, ex, cd)| {
-                let Some(a) = a else { return format!("{slot}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~") };
+                let Some(a) = a else { return format!("{slot}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~") };
                 let d = &c.abilities[a];
                 let (lo, hi) = charge(d);
                 let left = if p.cd_off || cd.charges > 0 { 0.0 } else { (cd.next_at - now).max(0.0) };
@@ -2035,8 +2049,11 @@ impl SurvivalGame {
                     (d.name.clone(), d.icon.clone())
                 };
                 let empowered = if d.hunt == "call" { self.sim.wild_primed_left(id) } else { 0.0 };
+                // How many it looses at once, the key's and its EX's: a fan's reticle shows that many
+                // points (Fan of Knives three, Multi-Shot five).
+                let ex_count = ex.map_or(0, |x| c.abilities[x].count);
                 format!(
-                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}~{empowered:.1}",
+                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}~{empowered:.1}~{}~{ex_count}",
                     d.key,
                     clean(&name),
                     clean(&icon),
@@ -2050,6 +2067,7 @@ impl SurvivalGame {
                     clean(&ability_facts(d, None, c.valor.max)),
                     u8::from(d.aimed()),
                     d.school,
+                    d.count,
                 )
             })
             .collect();
@@ -2080,7 +2098,7 @@ impl SurvivalGame {
                         (
                             format!("{}@{until:.2}", d.key),
                             format!(
-                                "RC\t{n}\t{:.1}\t{}\t{}\t{}\t{shape}\t{:.1}\t{radius:.1}\t{:.0}\t{}\t{:.2}\t{:.2}",
+                                "RC\t{n}\t{:.1}\t{}\t{}\t{}\t{shape}\t{:.1}\t{radius:.1}\t{:.0}\t{}\t{:.2}\t{:.2}\t{}",
                                 (until - now).max(0.0),
                                 clean(&d.icon),
                                 d.key,
@@ -2090,7 +2108,8 @@ impl SurvivalGame {
                                 if shape == "fan" { d.spread * (d.count - 1) as f32 } else { d.arc },
                                 u8::from(d.aimed()),
                                 d.charge[0],
-                                d.charge[1]
+                                d.charge[1],
+                                d.count
                             ),
                         )
                     }
@@ -2125,11 +2144,11 @@ impl SurvivalGame {
         Some(format!("VA\t{:.0}\t{:.0}\t{:.0}", p.valor.floor(), v.max, v.segment))
     }
 
-    /// The ward bar of a hero whose guard is a ward (a staff's): `WA\t<ward>\t<most>\t<broken>`;
+    /// The ward bar of a hero whose guard is a ward (a staff's): `WA\t<ward>\t<most>\t<broken>\t<up>`;
     /// `WA` alone for a hero who guards with something else (the bar hidden).
     pub(crate) fn ward_line(&self, id: Id) -> String {
         match self.sim.players.get(&id) {
-            Some(p) if self.sim.guard_of(p).ward => format!("WA\t{:.0}\t{:.0}\t{}", p.ward.floor(), self.sim.content.ward.bar, u8::from(p.ward_broken)),
+            Some(p) if self.sim.guard_of(p).ward => format!("WA\t{:.0}\t{:.0}\t{}\t{}", p.ward.floor(), self.sim.content.ward.bar, u8::from(p.ward_broken), u8::from(p.ward_up)),
             _ => "WA".to_string(),
         }
     }

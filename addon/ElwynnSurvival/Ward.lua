@@ -173,3 +173,127 @@ ward:SetScript("OnUpdate", function()
 end)
 
 ES.PlaceWard()
+
+-- --- the ward on the reticle ----------------------------------------------------------------------
+-- While it's held up (WA's fifth field), the ward stands round the left of the reticle as an
+-- arcane arc: whole, cracked once below two thirds of the bar, twice below a third. A blow it stops
+-- shakes it and flashes it; a perfect ward flares it; a ward that breaks shatters into shards that
+-- fly off and fade. Down, it fades away (the bar under stamina still shows it refilling).
+
+local ARC_ART = "Interface\AddOns\ElwynnSurvival\art\check\\"
+local ARC = 150
+local arc = CreateFrame("Frame", "ElwynnSurvivalWardArc", WorldFrame)
+arc:SetWidth(1)
+arc:SetHeight(1)
+arc:SetPoint("CENTER", WorldFrame, "CENTER", 0, 0)
+arc:SetFrameStrata("HIGH")
+arc.tex = arc:CreateTexture(nil, "ARTWORK")
+arc.tex:SetBlendMode("ADD")
+arc.tex:SetWidth(ARC)
+arc.tex:SetHeight(ARC)
+arc.tex:SetPoint("CENTER", arc, "CENTER", 0, 0)
+arc.shards = arc:CreateTexture(nil, "OVERLAY")
+arc.shards:SetTexture(ARC_ART .. "ward_shatter")
+arc.shards:SetBlendMode("ADD")
+arc.shards:Hide()
+arc.up, arc.alpha, arc.share = false, 0, 1
+arc.hitAt, arc.flareAt, arc.breakAt = nil, nil, nil
+arc.stage = nil
+
+local function ArcStage(share)
+  if share > 0.66 then return "ward_whole" end
+  if share > 0.33 then return "ward_crack1" end
+  return "ward_crack2"
+end
+
+-- From the WA line: whether it's up, its share, and whether it just broke.
+local function ArcLine(up, share, broke)
+  local now = GetTime()
+  if broke then
+    arc.breakAt = now
+    arc.up = false
+    arc.alpha = 0
+  elseif up and arc.up then
+    if share < arc.share - 0.001 then
+      arc.hitAt = now
+    elseif share > arc.share + 0.001 then
+      arc.flareAt = now
+    end
+  end
+  if not broke then arc.up = up end
+  arc.share = share
+  local stage = ArcStage(share)
+  if stage ~= arc.stage then
+    arc.stage = stage
+    arc.tex:SetTexture(ARC_ART .. stage)
+  end
+end
+
+local wardLine = ES.WardLine
+function ES.WardLine(f)
+  local wasBroken = ward.broken
+  wardLine(f)
+  local now = tonumber(f[2])
+  if not now then
+    arc.up = false
+    return
+  end
+  local most = math.max(1, tonumber(f[3]) or 100)
+  local broken = (tonumber(f[4]) or 0) > 0
+  ArcLine((tonumber(f[5]) or 0) > 0 and not broken, now / most, broken and not wasBroken)
+end
+
+arc:SetScript("OnUpdate", function()
+  local now = GetTime()
+  -- In and out: quick up, a little slower down.
+  local want = this.up and 0.9 or 0
+  local rate = this.up and 8 or 5
+  this.alpha = this.alpha + (want - this.alpha) * math.min(1, arg1 * rate)
+  local a, x, size = this.alpha, 0, ARC
+  -- A stopped blow: a shake and a flash.
+  if this.hitAt then
+    local t = (now - this.hitAt) / 0.25
+    if t >= 1 then
+      this.hitAt = nil
+    else
+      x = math.sin(t * 40) * 5 * (1 - t)
+      a = math.min(1, a + 0.5 * (1 - t))
+    end
+  end
+  -- A perfect ward: it flares and swells.
+  if this.flareAt then
+    local t = (now - this.flareAt) / 0.35
+    if t >= 1 then
+      this.flareAt = nil
+    else
+      size = size * (1 + 0.12 * (1 - t))
+      a = 1
+    end
+  end
+  if a > 0.01 then
+    this.tex:SetWidth(size)
+    this.tex:SetHeight(size)
+    this.tex:ClearAllPoints()
+    this.tex:SetPoint("CENTER", this, "CENTER", x, 0)
+    this.tex:SetVertexColor(1, 1, 1, a)
+    this.tex:Show()
+  else
+    this.tex:Hide()
+  end
+  -- Broken: the shards fly out and fade.
+  if this.breakAt then
+    local t = (now - this.breakAt) / 0.55
+    if t >= 1 then
+      this.breakAt = nil
+      this.shards:Hide()
+    else
+      local s = ARC * (1 + 0.35 * t)
+      this.shards:SetWidth(s)
+      this.shards:SetHeight(s)
+      this.shards:ClearAllPoints()
+      this.shards:SetPoint("CENTER", this, "CENTER", 18 * t, 0)
+      this.shards:SetVertexColor(1, 1, 1, 1 - t * t)
+      this.shards:Show()
+    end
+  end
+end)
