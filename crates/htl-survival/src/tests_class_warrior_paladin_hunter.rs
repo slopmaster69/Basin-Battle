@@ -1082,7 +1082,8 @@ fn a_planted_arrow_stands_full_size_with_no_ring_under_it_and_goes_in_time() {
     assert_eq!((look.display, look.scale), (PLANT_LOOK, PLANT_SCALE));
     assert!(look.scale >= 1.0, "not shrunk: {}", look.scale);
     assert!((look.pos[0] - 10.0).abs() < 0.1 && (look.pos[1] - 2.0).abs() < 0.1, "where it landed: {:?}", look.pos);
-    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "no ring on the ground");
+    // No ring on the ground (a glow under it, a spell's own ground look, is not a ring).
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { ground: 0, .. })), "no ring on the ground");
     let ev = run(&mut s, PLANT_SECS + 0.2);
     assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "the arrow fades");
     assert!(s.planted_of(p).is_empty());
