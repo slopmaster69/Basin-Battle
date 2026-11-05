@@ -487,7 +487,19 @@ impl SurvivalGame {
                     }
                 }
             }
-            Event::Gear { player } => self.show_gear(player),
+            Event::Gear { player } => {
+                self.show_gear(player);
+                // A casting staff in hand: every add-on's client launches this hero's bolts from
+                // its tip (a client with SetUnitMissileOrigin, patch 0044); anything else, the hands.
+                if let Some(g) = self.guid_of(player) {
+                    let staff = self.sim.players.get(&player).is_some_and(|p| self.sim.weapon_of(p).casts());
+                    let line = format!("MO	{g:#X}	{}", if staff { "weapon" } else { "" });
+                    let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                    for c in conns {
+                        self.ui_line(c, &line);
+                    }
+                }
+            }
             // The add-on's effects line follows on the next flush.
             Event::Effects { .. } | Event::Goal | Event::Sites => {}
             Event::Guard { player, up } => {
