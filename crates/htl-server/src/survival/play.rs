@@ -383,19 +383,19 @@ impl SurvivalGame {
                 self.to_player(player, packets::update_object(&[], &[(g, &f)]));
             }
             Event::Ward { player } => {
-                if let Some(c) = self.conn_of(player) {
-                    let line = self.ward_line(player);
-                    self.ui_line(c, &line);
+                let Some(warder) = self.sim.players.get(&player).map(|p| self.sim.guard_of(p).ward) else { return };
+                if warder {
+                    if let Some(c) = self.conn_of(player) {
+                        let line = self.ward_line(player);
+                        self.ui_line(c, &line);
+                    }
                 }
                 // The warder's barrier for everyone who sees them (`WB guid own up share broken`):
-                // drawn round the body on a client with SetUnitSprite.
+                // drawn round the body on a client with SetUnitSprite. No ward staff now: none.
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(p) = self.sim.players.get(&player) else { return };
-                if !self.sim.guard_of(p).ward {
-                    return;
-                }
                 let share = (p.ward / self.sim.content.ward.bar.max(1.0)).clamp(0.0, 1.0);
-                let (up, broken) = (u8::from(p.ward_up), u8::from(p.ward_broken));
+                let (up, broken) = (u8::from(p.ward_up && warder), u8::from(p.ward_broken && warder));
                 let mine = self.conn_of(player);
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
                 for c in conns {
@@ -548,20 +548,10 @@ impl SurvivalGame {
                     for c in conns {
                         self.ui_line(c, &line);
                     }
-                    // The hero's own staff, for its mark on their screen (`SF ember|rime|arcane`,
-                    // empty for none): what its bolts build.
+                    // The hero's own staff, for its mark on their screen.
                     if let Some(c) = self.conn_of(player) {
-                        let builds = self.sim.players.get(&player).and_then(|p| {
-                            let w = self.sim.weapon_of(p);
-                            self.sim.content.ability(&w.bolt).map(|i| self.sim.content.abilities[i].builds.clone())
-                        });
-                        let school = match builds.as_deref() {
-                            Some("heat") => "ember",
-                            Some("chill") => "rime",
-                            Some("charge") => "arcane",
-                            _ => "",
-                        };
-                        self.ui_line(c, &format!("SF	{school}"));
+                        let line = self.staff_line(player);
+                        self.ui_line(c, &line);
                     }
                 }
             }

@@ -160,9 +160,11 @@ impl Survival {
     pub(crate) fn press_beat(&mut self, id: Id) {
         let Some(Action::Rhythm { ability, since, done, pressed, .. }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
         let d = self.content.abilities[ability].clone();
-        // The press as they made it: its arrival less their round trip.
-        let rewind = self.players[&id].rtt.min(self.content.combat.max_rewind);
-        let t = self.clock - rewind;
+        // The press as it arrives: the add-on draws the beats from the caster's own press, which
+        // reached the server the same one-way trip later as this press does, so the two cancel
+        // (as for the release, the meter, the sweep and the orb). Rewinding it as well put a far
+        // hero's press on the beat a whole round trip early.
+        let t = self.clock;
         // The beat it's for: the first not yet earned.
         let mut k = pressed.max(done).max(d.free_beats);
         if k >= d.most_beats {

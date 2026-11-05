@@ -250,3 +250,21 @@ fn with_the_ward_broken_right_click_still_calls_off_an_aim() {
     s.input(p, Input::Guard);
     assert!(!matches!(s.players[&p].action, Action::Aim { .. }), "right click called it off");
 }
+
+#[test]
+fn a_warder_who_falls_with_the_ward_up_lets_it_down() {
+    let mut s = world();
+    let p = staff_hero(&mut s, "Ayla", ORIGIN);
+    let k = mob(&mut s, "grunt", [-2.0, 0.0, 0.0]);
+    s.input(p, Input::Guard);
+    run(&mut s, 1.0);
+    assert!(s.players[&p].ward_up);
+    // From behind, more than they have: they fall with it up.
+    let health = s.players[&p].health;
+    s.strike_player(k, p, health + 50, [-2.0, 0.0, 0.0], true, true, true, Blow::Light);
+    let ev = run(&mut s, 0.2);
+    assert!(matches!(s.players[&p].action, Action::Dead { .. }), "{:?}", s.players[&p].action.name());
+    assert!(!s.players[&p].ward_up, "the ward comes down with them");
+    assert!(ev.iter().any(|e| matches!(e, Event::Ward { player } if *player == p)), "everyone is told (the barrier off the body)");
+    assert!(ev.iter().any(|e| matches!(e, Event::HoldPose { id, secs, .. } if *id == p && *secs == 0.0)), "the raised arm let go");
+}

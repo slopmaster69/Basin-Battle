@@ -196,9 +196,10 @@ fn the_window_tightens_a_press_that_counts_on_the_fourth_beat_misses_on_the_eigh
 }
 
 #[test]
-fn a_late_press_from_a_far_hero_counts_as_they_made_it() {
-    // 180 ms round trip (Europe to North America): the beat they saw came 90 ms late, and their
-    // press reaches the server 90 ms after they made it.
+fn a_press_on_the_beat_from_a_far_hero_counts() {
+    // 180 ms round trip (Europe to North America): the add-on draws the beats from their own
+    // press, which reached the server 90 ms after they made it; a press on a beat as drawn reaches
+    // it the same 90 ms after that, so it lands on the server's beat.
     let mut s = world();
     let p = hero(&mut s, "Chain", ORIGIN, 0.0);
     s.set_rtt(p, 0.18);
@@ -206,9 +207,8 @@ fn a_late_press_from_a_far_hero_counts_as_they_made_it() {
     let d = s.content.abilities[s.content.ability("arcane_missiles").unwrap()].clone();
     let since = s.clock;
     begin(&mut s, p, "ranged", "arcane_missiles");
-    // Pressed right on the fourth beat as they saw it: it arrives a round trip after the beat,
-    // past the window as the server counts it.
-    run_to(&mut s, since, d.beat_secs * 3.0 + 0.18);
+    // Pressed right on the fourth beat as they saw it.
+    run_to(&mut s, since, d.beat_secs * 3.0);
     press(&mut s, p, "ranged");
     s.step(0.0);
     assert!(matches!(s.players[&p].action, Action::Rhythm { pressed, .. } if pressed == 4), "on time for them: {:?}", s.players[&p].action.name());

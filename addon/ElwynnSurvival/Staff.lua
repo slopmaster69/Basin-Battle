@@ -88,6 +88,15 @@ function ES.StacksLine(f)
   end
   if f[2] ~= s.kind then return end
   local n = tonumber(f[3]) or 0
+  -- Heat and chill are per foe: the mark follows the foe last built on; another foe's stacks
+  -- fading (or spent) leave it alone.
+  if s.kind ~= "charge" and f[5] and f[5] ~= "" then
+    if n > 0 then
+      mark.on = f[5]
+    elseif mark.on and f[5] ~= mark.on then
+      return
+    end
+  end
   mark.most = math.max(1, tonumber(f[4]) or 3)
   local now = GetTime()
   if n >= mark.most and s.kind ~= "charge" then

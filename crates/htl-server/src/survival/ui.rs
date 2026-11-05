@@ -113,6 +113,7 @@
 //!   reticle (`Staff.lua`); empty for none.
 //! - `SK\t<heat|chill|charge>\t<n>\t<most>\t<guid>`: a staff's stacks changed: heat or
 //!   chill on that foe, or the hero's charges (guid 0); `n` the most: it just ignited or froze.
+//!   `SK	empty	0	<most>	0`: a heavy let go with nothing stored (the mark sputters).
 //! - `WB\t<guid>\t<own>\t<up>\t<share>\t<broken>`: a warder's barrier, for everyone who sees them:
 //!   up or not, the bar's share left, broken (drawn round the body with `SetUnitSprite`).
 //! - `WP\t<guid>\t<clip>\t<secs>\t<own>\t<model>`: a pose held on a unit (the ward's arm out, a
@@ -126,7 +127,9 @@
 //!   pressed beats' windows, `pattern` "free|name|t0,t1,t2r,..."), "sweep" (`a` its seconds, `b`
 //!   its arc in degrees, `crit` how near a mark is perfect, `pattern` "lr|rl|<jet arc>|<marks' bearings>"),
 //!   "orb" (`a` its seconds, `b` its reach in yards, `crit` how near a mark is perfect, `pattern`
-//!   "<backfire yd>|<start yd>|<marks' distances>"); otherwise `crit` the critical's share of a
+//!   "<backfire yd>|<start yd>|<marks' distances>"), "meter" (`a` its seconds, `b` the sweet
+//!   spot's share of the sweep, `crit` the perfect zone either side, `pattern` "lr|rl|<good zone>");
+//!   otherwise `crit` the critical's share of a
 //!   window; `school` fire, frost or arcane.
 //! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
 //!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
@@ -450,7 +453,7 @@ pub(crate) const ADDON_NEWEST: u32 = 43;
 /// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
 /// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
 /// 24: the Mage's skill checks: rings on the ground (0041), recoloured spell looks (0042), an orb rolled on the ground (0043) and missiles from a held staff's tip (0044).
-/// 25: a staff stays in hand through a spell's cast (0045).
+/// 25: sprites on units (the ward's barrier) and a clip's last pose held (0045).
 pub(crate) const CLIENT_NEWEST: u8 = 25;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
@@ -1303,19 +1306,6 @@ impl SurvivalGame {
                     w.addon = true;
                     w.sent.clear();
                 }
-                // Who holds a casting staff now, for this client to launch their bolts from its tip
-                // (`MO` otherwise goes out only as gear changes).
-                let staffs: Vec<String> = self
-                    .sim
-                    .players
-                    .iter()
-                    .filter(|(_, p)| self.sim.weapon_of(p).casts())
-                    .filter_map(|(id, _)| self.guid_of(*id))
-                    .map(|g| format!("MO\t{g:#X}\tweapon"))
-                    .collect();
-                for line in staffs {
-                    self.ui_line(conn, &line);
-                }
                 // `.es hello <version> ac`: the action-combat client, aiming over the shoulder;
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
@@ -1343,6 +1333,22 @@ impl SurvivalGame {
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));
+                // After `V` (an add-on asleep drops every line before it): who holds a casting
+                // staff now, for this client to launch their bolts from its tip (`MO` otherwise
+                // goes out only as gear changes), and this hero's own staff for its mark.
+                let staffs: Vec<String> = self
+                    .sim
+                    .players
+                    .iter()
+                    .filter(|(_, p)| self.sim.weapon_of(p).casts())
+                    .filter_map(|(id, _)| self.guid_of(*id))
+                    .map(|g| format!("MO\t{g:#X}\tweapon"))
+                    .collect();
+                for line in staffs {
+                    self.ui_line(conn, &line);
+                }
+                let line = self.staff_line(me);
+                self.ui_line(conn, &line);
                 // `ac20` draws a missile's look (patch 0030): every spell's that has one.
                 if level >= super::draw::MISSILE_LOOK_LEVEL {
                     for l in &self.sim.content.missile_looks {
@@ -2164,6 +2170,22 @@ impl SurvivalGame {
         let p = self.sim.players.get(&id)?;
         let v = &self.sim.content.valor;
         Some(format!("VA\t{:.0}\t{:.0}\t{:.0}", p.valor.floor(), v.max, v.segment))
+    }
+
+    /// The hero's own staff, for its mark on their screen (`SF ember|rime|arcane`, empty for
+    /// none): what its bolts build. Sent as gear changes and on the add-on's hello.
+    pub(crate) fn staff_line(&self, player: Id) -> String {
+        let builds = self.sim.players.get(&player).and_then(|p| {
+            let w = self.sim.weapon_of(p);
+            self.sim.content.ability(&w.bolt).map(|i| self.sim.content.abilities[i].builds.clone())
+        });
+        let school = match builds.as_deref() {
+            Some("heat") => "ember",
+            Some("chill") => "rime",
+            Some("charge") => "arcane",
+            _ => "",
+        };
+        format!("SF\t{school}")
     }
 
     /// The ward bar of a hero whose guard is a ward (a staff's): `WA\t<ward>\t<most>\t<broken>\t<up>`;

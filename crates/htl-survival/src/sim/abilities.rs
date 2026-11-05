@@ -1037,6 +1037,10 @@ impl Survival {
                 if d.charge_look != 0 {
                     self.events.push(Event::Auras { id });
                 }
+                // A build-up's held stance lets go (a fizzle, too soon, a stagger, a stun).
+                if d.charge_pose != 0 {
+                    self.events.push(Event::HoldPose { id, clip: d.charge_pose, secs: 0.0, from: None });
+                }
             }
             // A bow ability drawn as it's aimed: the draw let down.
             Action::Aim { ability } if self.content.abilities[ability].bow => {
