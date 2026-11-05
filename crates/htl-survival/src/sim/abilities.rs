@@ -2379,7 +2379,13 @@ impl Survival {
             "line" => self.line_go(id, ability, pos, yaw, share),
             "trap" => self.place_trap(id, ability, share),
             // (A leap that goes with a blow: the Uppercut's rise.)
-            "leap" => self.leap_to(id, ability, share, None),
+            "leap" => {
+                self.leap_to(id, ability, share, None);
+                // Thrown up with the foe, the hero's own camera comes in and tips down onto the
+                // fight, to aim the dive that follows (Corey's review of Raptor Strike: "the
+                // knock-up camera"): a beat for their add-on, nothing for anyone else.
+                self.events.push(Event::Beat { player: id, beat: cues::BEAT_RISE, on: id });
+            }
             "ground" => {
                 let at = if d.at_self { pos } else { self.aim_point(id, AbilityDef::at(d.range, share)) };
                 self.ground_cast(id, ability, at, share);
