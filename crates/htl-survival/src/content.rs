@@ -485,11 +485,15 @@ pub struct StaffsDef {
     pub charge_scale: [f32; 4],
     pub charge_spells: [u32; 4],
     pub charge_full_kit: u32,
+    /// The burst on a foe the last chill freezes, and on one each chill takes (visual kits; 0:
+    /// none), so the ice reads (Corey: hard to see).
+    pub freeze_kit: u32,
+    pub chill_kit: u32,
 }
 
 impl Default for StaffsDef {
     fn default() -> Self {
-        Self { most: 3, keep: 5.0, spend_share: 0.4, ignite_damage: 18.0, ignite_radius: 2.5, ignite_spell: 11113, chill_slow: 0.15, freeze_secs: 1.5, charged_kit: 3394, charged_knockback: 3.0, charge_scale: [0.0, 0.3, 0.5, 1.0], charge_spells: [0; 4], charge_full_kit: 0 }
+        Self { most: 3, keep: 5.0, spend_share: 0.4, ignite_damage: 18.0, ignite_radius: 2.5, ignite_spell: 11113, chill_slow: 0.15, freeze_secs: 1.5, charged_kit: 3394, charged_knockback: 3.0, charge_scale: [0.0, 0.3, 0.5, 1.0], charge_spells: [0; 4], charge_full_kit: 0, freeze_kit: 0, chill_kit: 0 }
     }
 }
 
