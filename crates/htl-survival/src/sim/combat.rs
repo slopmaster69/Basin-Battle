@@ -918,6 +918,14 @@ impl Survival {
         if up != p.ward_up {
             p.ward_up = up;
             self.events.push(Event::Auras { id });
+            // The glow in the raised hand while it's up, gone as it comes down.
+            if w.hold_spell != 0 {
+                self.events.push(if up {
+                    Event::Cast { caster: id, spell: w.hold_spell, ms: 600_000 }
+                } else {
+                    Event::CastDone { caster: id, spell: 0 }
+                });
+            }
             changed = true;
         }
         if up {

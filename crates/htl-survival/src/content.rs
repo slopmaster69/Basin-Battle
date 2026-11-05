@@ -425,11 +425,14 @@ pub struct WardDef {
     /// down to every `crackle_empty` sec as it runs dry (0: never).
     pub crackle_full: f32,
     pub crackle_empty: f32,
+    /// A spell whose precast plays in the hands for as long as the ward is up (a held glow in the
+    /// raised hand, where the aura wrapped the chest and hid the arm); 0 for none.
+    pub hold_spell: u32,
 }
 
 impl Default for WardDef {
     fn default() -> Self {
-        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0 }
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0 }
     }
 }
 
