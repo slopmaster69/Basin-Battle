@@ -594,6 +594,76 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
 }
 
+/// `.es dummy clear`, which the visual check runs before it puts up its one dummy.
+#[test]
+fn clearing_the_dummies_takes_every_dummy_and_nothing_else() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.spawn_dummy(p, "").unwrap();
+    s.spawn_dummy(p, "guard").unwrap();
+    let boar = s.content.mob("boar").unwrap();
+    let boar = s.spawn_mob(boar, [20.0, 0.0, 0.0], None, false);
+    let _ = s.step(DT);
+    let dummies = |s: &Survival| s.mobs.values().filter(|m| s.content.mobs[m.def].dummy).count();
+    assert_eq!(dummies(&s), 2);
+    assert_eq!(s.clear_dummies(), 2);
+    let ev = s.step(DT);
+    assert_eq!(dummies(&s), 0, "every dummy is gone");
+    assert!(s.dummies.is_empty(), "and its mode with it");
+    assert!(s.mobs.contains_key(&boar), "the boar stays");
+    assert!(!ev.iter().any(|e| matches!(e, Event::MobGone { id } if *id == boar)));
+    assert_eq!(s.clear_dummies(), 0, "again, nothing to clear");
+}
+
+/// `.es dummy 3`: a dummy that near (the visual check's melee scenarios), the mode after it.
+#[test]
+fn a_dummy_can_be_put_up_nearer_or_farther() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_dummy(p, "3 guard").unwrap();
+    let (d, m) = s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].dummy).expect("a dummy");
+    assert!((m.pos[0] - 3.0).abs() < 0.1, "3 yd ahead: {:?}", m.pos);
+    assert_eq!(s.dummies.get(d).map(|x| x.as_str()), Some("guard"));
+}
+
+/// `.es hop`: the visual check's jump, so an ability can be tried mid-jump.
+#[test]
+fn a_test_hop_throws_the_hero_up_where_they_stand() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.test_hop(p, 1.6);
+    let ev = s.step(DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, lift, speed, .. } if *player == p && (*lift - 1.6).abs() < 1.0e-4 && *speed < 0.5)), "up, in place: {ev:?}");
+}
+
+/// `.es target`: a real creature to look at, standing still (or coming at you), at some health.
+#[test]
+fn a_still_target_stands_and_strikes_nothing_but_is_moved_like_any_creature() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_target(p, "grunt", 3.0, true, 0.2).unwrap();
+    let t = *s.targets.keys().next().expect("a target");
+    let from = s.mobs[&t].pos;
+    assert!((from[0] - 3.0).abs() < 0.1, "3 yd ahead: {from:?}");
+    assert!(s.mobs[&t].health * 5 <= s.mobs[&t].max_health + 5, "a fifth of its health: {}", s.mobs[&t].health);
+    let hp = s.players[&p].health;
+    for _ in 0..60 {
+        let _ = s.step(0.05);
+    }
+    assert_eq!(s.mobs[&t].pos, from, "it stood still");
+    assert_eq!(s.players[&p].health, hp, "and struck nothing");
+    // A knockback throws it as far as any creature (it isn't a dummy).
+    let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: 6.0, from_caster: true, ..Default::default() };
+    s.displace(p, t, &push);
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    let moved = ((s.mobs[&t].pos[0] - from[0]).powi(2) + (s.mobs[&t].pos[1] - from[1]).powi(2)).sqrt();
+    assert!(moved > 3.0, "thrown: {moved:.2}");
+    assert_eq!(s.clear_targets(), 1);
+    assert!(!s.mobs.contains_key(&t));
+}
+
 /// A creature's own look (`aura` on its `[[mob]]`: a spirit beast's glow) is on it from the start.
 #[test]
 fn a_creature_wears_its_own_look_from_the_start() {

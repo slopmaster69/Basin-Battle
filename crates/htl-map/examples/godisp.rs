@@ -1,5 +1,7 @@
 //! Game object displays: `godisp <Data> find <word>...` lists displays whose model path holds a
-//! word; `godisp <Data> <display>...` measures each one's mesh (its footprint on the ground).
+//! word; `godisp <Data> <display>...` measures each one's mesh (its footprint on the ground);
+//! `godisp <Data> path <model path>...` measures a model no display names (a doodad; `+` for a
+//! space in its path).
 use benilla_formats::{load_gameobject_catalog, load_object_model, m2_file_name, Chain};
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -18,11 +20,20 @@ fn main() -> anyhow::Result<()> {
         }
         return Ok(());
     }
-    for id in &args[2..] {
-        let d: u32 = id.parse()?;
-        let Some(path) = cat.model_path(d).map(str::to_string) else {
-            println!("{d}\tno such display");
-            continue;
+    // `godisp <Data> path <model path>...`: a model the catalog has no display for (a doodad). A
+    // `+` in a path stands for a space (`Passive+Doodads`).
+    let by_path = args[2] == "path";
+    let items: Vec<String> = if by_path { args[3..].iter().map(|a| a.replace('+', " ")).collect() } else { args[2..].to_vec() };
+    for id in &items {
+        let (d, path) = if by_path {
+            (0, id.clone())
+        } else {
+            let d: u32 = id.parse()?;
+            let Some(path) = cat.model_path(d).map(str::to_string) else {
+                println!("{d}\tno such display");
+                continue;
+            };
+            (d, path)
         };
         match load_object_model(&mut chain, &path) {
             Ok(meshes) => {

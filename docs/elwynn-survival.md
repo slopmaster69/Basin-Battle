@@ -337,10 +337,17 @@ stun, incapacitate or panic you're unshakable for 3 seconds (`[cc]`).
 The numbers live in `[[ability]]` in `content/survival.toml`. For testing, with `.es debug` on (or
 in this build): `.es tree` (the board; `full`, `reset`), `.es slot <q|e|1|2|3> <ability>` (a bench
 ability too, on its row's key), `.es valor <n|full>`,
-`.es cd off|on`, `.es heal`, `.es dummy [guard|roll|counter <school>]` (a training dummy in front
+`.es cd off|on`, `.es heal`, `.es dummy [yards] [guard|roll|counter <school>]` (a training dummy in front
 of you: it takes everything a foe does, traps, ground, bounces, beasts, tripwires and crowd
-control, and a knockback or a pull throws it a step at most), `.es cc log` and `.es pvp on|off`.
-`.es debug` also draws projectiles' bodies and every ground area on the ground.
+control, and a knockback or a pull throws it a step at most; `.es dummy clear` takes every dummy
+away), `.es give <item> [n]` (an item into your bags, by its key in `content/`), `.es target
+<creature> [yards] [still] [hp%]` (a real creature `yards` ahead to try abilities on: standing
+`still`, it moves and strikes only when something moves it; otherwise it comes at you; `.es
+target clear` takes them away), `.es hop [yards]` (a jump on the spot, for trying an ability
+mid-jump), `.es cc log` and `.es pvp on|off`. `.es debug` turns debug over
+(`.es debug on` and `.es debug off` set it); it also draws projectiles' bodies and every ground
+area on the ground (`.es debug quiet`: debug's commands without that drawing). [The visual
+check](visual-check.md) uses these to cast abilities in the real client and photograph them.
 
 ### The beta page
 

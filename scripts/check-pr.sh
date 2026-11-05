@@ -49,8 +49,10 @@ while IFS= read -r f; do
             fail "$f" "a log file" ;;
         target/*|benilla/*|*/target/*)
             fail "$f" "build output or the benilla checkout" ;;
-        settings.sh|settings-windows.txt)
+        settings.sh|settings-windows.txt|visual-check-settings.txt)
             fail "$f" "a local settings file (it holds paths on someone's machine)" ;;
+        visual-check-out/*)
+            fail "$f" "the visual check's output; attach its screenshots to the pull request instead" ;;
         *.zip|*.exe|*.dll|*.dylib|*.so|*.app/*)
             fail "$f" "a zip or executable; releases build these (.github/workflows/release.yml)" ;;
         .env|*.pem|*.key|*id_rsa*|*id_ed25519*)
