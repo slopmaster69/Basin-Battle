@@ -69,6 +69,9 @@ pub(crate) const ROPE_LEVEL: u8 = 19;
 /// The clients that draw a missile's look (patch 0030's `SetMissileLook`, `ac20`): a ribbon
 /// behind it, its size and a spin (the `ML` line).
 pub(crate) const MISSILE_LOOK_LEVEL: u8 = 20;
+/// The clients that draw a rope from a unit's hand (patch 0031's `SetUnitRope`, `ac21`): a
+/// grappling hook's line, a haul's (the `RP` line).
+pub(crate) const UNIT_ROPE_LEVEL: u8 = 21;
 
 /// The add-on's `ML` line for a spell's missiles: `ML <spell> <RRGGBB or -> <width> <secs>
 /// <scale> <spin> [<caster's guid, for its next missile alone>]`.
