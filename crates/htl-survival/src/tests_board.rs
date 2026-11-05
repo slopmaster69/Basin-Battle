@@ -280,6 +280,34 @@ fn a_death_mark_makes_everything_land_harder_and_a_kill_under_it_readies_every_c
     assert!(s.players[&p].cooldowns.is_empty(), "every cooldown ready");
 }
 
+/// The mark's arrow (aura 1130) hung over the body until the mark's 8 s ran out; it goes down with
+/// the creature.
+#[test]
+fn a_death_mark_goes_down_with_the_creature_it_marked() {
+    let mut s = world_with(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [10.0, 0.0, 0.0], 0.0);
+    s.set_valor(p, 100.0);
+    s.set_aim_line(p, 0.0, 0.0);
+    cast(&mut s, p, "ultimate", "death_mark", false);
+    run(&mut s, 0.6);
+    assert!(s.has_cc(k, "deathmark"));
+    assert!(s.auras_of(k).contains(&1130), "the mark's arrow over it: {:?}", s.auras_of(k));
+    calm(&mut s, k);
+    // The kill, well inside the mark's 8 s.
+    s.mobs.get_mut(&k).unwrap().health = 1;
+    s.hurt_mob_as(k, p, 5, "Melee");
+    let ev = s.step(DT);
+    assert!(!s.alive(k));
+    assert!(ev.iter().any(|e| matches!(e, Event::Died { id } if *id == k)));
+    // Its marker's cooldowns are still readied (the mark counted); the mark itself is gone.
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_READIED), "the kill under the mark still readies every key");
+    assert!(!s.has_cc(k, "deathmark"), "the mark went down with it");
+    assert!(s.cc_of(k).is_empty(), "nothing left on the body: {:?}", s.cc_of(k));
+    assert!(!s.auras_of(k).contains(&1130), "the arrow off the body: {:?}", s.auras_of(k));
+    assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == k)), "and the clients told so at once");
+}
+
 #[test]
 fn avenging_wrath_sends_a_wave_with_each_heavy_attack_that_strikes_foes_and_shields_friends() {
     let mut s = world_with(false);
