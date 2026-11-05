@@ -206,6 +206,8 @@ barrier:Hide()
 
 -- `WB guid own up share broken`.
 function ES.WardBarrierLine(f)
+  -- Drawn only on a client that puts sprites on units (patch 0045).
+  if not SetUnitSprite then return end
   local unit = (f[3] == "1") and "player" or f[2]
   if not unit then return end
   local w = wards[unit]
@@ -222,6 +224,8 @@ function ES.WardBarrierLine(f)
     if share < w.share - 0.001 then w.hitAt = now
     elseif share > w.share + 0.001 then w.flareAt = now end
   end
+  -- Whole again: the rune off the head at once.
+  if w.broken and not broken and ClearUnitSprite then ClearUnitSprite("es_ward_" .. unit .. "_debuff") end
   w.up, w.share, w.broken = up and not broken, share, broken
   barrier:Show()
 end
@@ -243,6 +247,8 @@ barrier:SetScript("OnUpdate", function()
   local any = false
   for unit, w in pairs(wards) do
     local key = "es_ward_" .. unit
+    -- Lowered: no flash of a blow or a perfect keeps it up.
+    if not w.up then w.hitAt, w.flareAt = nil, nil end
     -- In quick, out a little slower; dimmer as it drains.
     local want = w.up and (0.4 + 0.4 * w.share) or 0
     -- Lowered, it's gone at once (Corey: the effect after letting go lingered).

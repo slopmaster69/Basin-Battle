@@ -6884,7 +6884,7 @@ events:SetScript("OnEvent", function()
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
     -- ac24: the Mage's skill checks: rings on the ground, recoloured spell looks, an orb rolled on
     -- the ground, missiles from a staff's tip (patches 0041 to 0044).
-    -- ac25: a staff stays in hand through a spell's cast (patch 0045).
+    -- ac25: sprites on units (the ward's barrier) and a clip's last pose held (patch 0045).
     if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 25 then
       Say(".es hello " .. VERSION .. " ac25")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 24 then

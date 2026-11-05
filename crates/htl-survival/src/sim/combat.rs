@@ -940,7 +940,7 @@ impl Survival {
         if up {
             p.ward_down_at = now;
             // The arm held out: a clip at its peak a quarter second in and held there 8 sec (the
-            // clients cap a clip's hold at 10), renewed every 7 while the ward stays up.
+            // client holds a pose up to 30, ReactUnit's up to 10), renewed every 7 while the ward stays up.
             if w.clip != 0 && now >= p.ward_clip_at {
                 let hold = w.clip_hold.clamp(1.0, 9.5);
                 p.ward_clip_at = now + (hold - 1.0).max(0.5);
@@ -963,7 +963,9 @@ impl Survival {
             }
             changed |= p.ward.floor() != before;
         }
-        if changed && warded {
+        // Told whenever it changes, warder or not now: a ward up or broken when the staff was put
+        // away must come off everyone's screen too.
+        if changed {
             self.events.push(Event::Ward { player: id });
         }
     }
@@ -993,6 +995,10 @@ impl Survival {
         let c = self.content.clone();
         // Getting up.
         if let Some(Action::Dead { until }) = self.players.get(&id).map(|p| p.action.clone()) {
+            // A ward up as they fell comes down (the barrier and the raised arm off the body).
+            if self.players[&id].ward_up {
+                self.step_ward(id, dt);
+            }
             if now >= until {
                 self.revive(id);
             }

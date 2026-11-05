@@ -433,9 +433,14 @@ function ES.CheckResultLine(f)
   local l = check.last
   if l and l.key == key and GetTime() - l.at < 0.8 then
     if l.grade == grade then return end
-    -- The rhythm's chain made whole after its last beat: the big one.
+    -- The rhythm's chain made whole after its last beat: the big one. Or the server judged a
+    -- meter differently: the meter stays frozen where it stopped (and goes when the outcome does).
     l.grade = grade
+    local old = check.fx
     Outcome(grade, l.school)
+    if old and check.fx then
+      check.fx.meter, check.fx.meterAt, check.fx.ghost = old.meter, old.meterAt, old.ghost
+    end
     return
   end
   check.last = { key = key, grade = grade, at = GetTime(), school = "arcane" }

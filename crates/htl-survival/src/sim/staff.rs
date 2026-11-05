@@ -139,6 +139,10 @@ impl Survival {
     pub(crate) fn staff_spend(&mut self, owner: Id, victim: Id, ability: usize) -> f32 {
         let d = &self.content.abilities[ability];
         let Some(kind) = stack_kind(&d.spends) else { return 1.0 };
+        // Charges are spent as the orb leaves (`staff_release`): ones built while it flies stay.
+        if kind == "charge" {
+            return 1.0;
+        }
         let k = self.content.staffs.clone();
         let n = if kind == "charge" {
             let Some(p) = self.players.get_mut(&owner) else { return 1.0 };
