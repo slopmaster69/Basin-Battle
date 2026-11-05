@@ -493,7 +493,9 @@ local function GroundRing(key, c, tex, radius, rgba, yaw)
   if c.ground.at == "feet" then
     SetGroundRingOnUnit(key, "player", radius, tpath, rgba[1], rgba[2], rgba[3], rgba[4], yaw)
   else
-    -- Meteor's circle follows the reticle while it's held.
+    -- Meteor's circle follows the reticle while it's held; the school's ring takes the place of
+    -- the plain aim circle (left in place, the two drew over each other).
+    if SetAimMarker and ES.aimMarker then SetAimMarker(nil) end
     if GetAimPoint then
       local x, y, z = GetAimPoint()
       if x then c.gx, c.gy, c.gz = x, y, z end
@@ -508,7 +510,8 @@ local function DrawGround(c, now, q, open, closerCol, grow)
   local radius = c.ground.radius + (grow or 0)
   local a = 0.9
   if c.school == "fire" then
-    a = 0.82 + 0.16 * (0.5 * math.sin(now * 13.1) + 0.3 * math.sin(now * 23.7 + 1.3) + 0.2 * math.sin(now * 37.3))
+    -- A little quieter on the ground than on the reticle: it spans the view at Meteor's size.
+    a = 0.7 + 0.14 * (0.5 * math.sin(now * 13.1) + 0.3 * math.sin(now * 23.7 + 1.3) + 0.2 * math.sin(now * 37.3))
   elseif c.school == "frost" then
     a = 0.85 + 0.12 * math.sin(now * 2.3)
   else
