@@ -18,8 +18,9 @@ pub(crate) const POSE_SHIELD: u32 = 43;
 const POSE_TWO_HANDED: u32 = 375;
 const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// The hunter's shots whose own look has no missile model: flown from a spot, they carry the
-/// arrow (as Basin Battle's server sends them), or the client flies nothing to see.
-const ARROW_SPELLS: [u32; 3] = [2643, 3044, 19434];
+/// arrow (as Basin Battle's server sends them), or the client flies nothing to see. (10346: Fire
+/// Shot's, Kill Shot's arrow, carried the same way.)
+const ARROW_SPELLS: [u32; 4] = [2643, 3044, 10346, 19434];
 /// Where a missile coming home is aimed: this far over the feet of whoever threw it (chest high
 /// on a dwarf, the hands on a human), so it flies to the body, not the ground.
 const HOME_HEIGHT: f32 = 1.2;
@@ -846,6 +847,14 @@ impl SurvivalGame {
                 self.casting.remove(&caster);
                 if let (Some(c), true) = (self.guid_of(caster), spell != 0) {
                     self.broadcast(&packets::spell_go(c, spell, Aim::Caster, &[], None));
+                }
+            }
+            Event::Beat { player, beat, on } => {
+                // The hero's own screen alone (what everyone sees and hears went as its own
+                // looks and sounds): nothing is forced on anyone else's view.
+                let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                if let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) {
+                    self.ui_line(c, &format!("BT\t{}\t{g:#X}", clean(&beat)));
                 }
             }
             Event::Auras { id } => self.show_auras(id),

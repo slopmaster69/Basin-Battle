@@ -170,6 +170,9 @@ pub enum Event {
     /// A bow ability's arrow goes: the bow's own release (the go of its draw, `spell`), with no
     /// arrow of its own (the ability's missiles are their own events).
     Loose { caster: Id, spell: u32 },
+    /// A beat on a hero's own screen alone (the add-on's `BT`): Kill Shot's speed lines as it
+    /// goes, its hit-stop and shake as it kills; `on` the foe it struck (`None`: nobody).
+    Beat { player: Id, beat: String, on: Option<Id> },
     /// Ground that lingers (holy ground, fire) wears this spell's look (a DynamicObject) until
     /// the mark `id` is gone.
     AreaLook { id: Id, caster: Id, spell: u32, pos: Vec3, radius: f32 },

@@ -717,22 +717,37 @@ fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() 
     s.mobs.get_mut(&weak).unwrap().health = (max as f32 * 0.24) as u32;
     let aim = (0.0, down_to(20.0));
     s.set_valor(p, 100.0);
+    let arrow = s.content.abilities[idx(&s, "kill_shot")].spell;
+    let beats = |ev: &[Event], beat: &str, on: Option<Id>| ev.iter().filter(|e| matches!(e, Event::Beat { player, beat: b, on: o } if *player == p && b == beat && *o == on)).count();
+    let sounded = |ev: &[Event], m: Id, sound: u32| ev.iter().any(|e| matches!(e, Event::Sound { id, sound: s } if *id == m && *s == sound));
     // Let go before its draw: lost, and nothing spent.
     press(&mut s, p, "kill_shot", false);
     let ev = draw(&mut s, p, 0.5, aim, &pins);
-    assert_eq!(missiles(&ev, p, 3044), 0, "let go too soon");
+    assert_eq!(missiles(&ev, p, arrow), 0, "let go too soon");
+    assert_eq!(beats(&ev, "kill_shot", None), 0, "no speed lines for a shot that never went");
     assert_eq!(s.players[&p].action, Action::Ready);
     assert_eq!(s.players[&p].valor, 100.0, "nothing spent");
     // The whole draw.
     press(&mut s, p, "kill_shot", false);
     let mut ev = draw(&mut s, p, 1.1, aim, &pins);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
-    assert_eq!(missiles(&ev, p, 3044), 1, "loosed");
+    assert_eq!(missiles(&ev, p, arrow), 1, "loosed");
     assert_eq!(hits(&ev, p, first).len(), 1, "the first struck");
     assert!(s.alive(first), "a hale one lives");
     assert!(!s.alive(weak), "the weak one finished");
     assert!(flashed(&ev, p, "Execute!"));
     assert_eq!(hits(&ev, p, last).len(), 1, "and on through to the last");
+    // The power behind it: speed lines on the hunter's own screen as it goes, the heavy blow's
+    // flash and crack on each foe it goes through, and the kill's thud from the weak one's spot
+    // with its beat on the hunter's screen; nothing of the kill's on one that lives.
+    assert_eq!(beats(&ev, "kill_shot", None), 1, "the speed lines, once");
+    for m in pins {
+        assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == m && *kit == KIT_HEAVY)), "the heavy flash on each it goes through");
+        assert!(sounded(&ev, m, 238), "and its crack on each");
+    }
+    assert!(sounded(&ev, weak, 930), "the kill's thud from the foe's spot");
+    assert_eq!(beats(&ev, "kill_shot_kill", Some(weak)), 1, "and its beat on the hunter's screen");
+    assert!(!sounded(&ev, first, 930) && beats(&ev, "kill_shot_kill", Some(first)) == 0, "none of the kill's on one that lives");
 }
 
 #[test]
