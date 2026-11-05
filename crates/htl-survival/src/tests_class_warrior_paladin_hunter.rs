@@ -15,6 +15,8 @@ fn world_with(pvp: bool) -> Survival {
     if !pvp {
         c.pvp = Default::default();
     }
+    // No health back by itself out of combat: these tests count every point a heal gives.
+    c.player.field_regen = 0.0;
     let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
     s.mobs.clear();
     s.respawns.clear();

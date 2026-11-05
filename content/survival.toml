@@ -90,10 +90,21 @@ attack_speed = 3.0
 guard_speed = 3.5
 aim_speed = 3.0
 use_speed = 2.5
-# Health back a second, as a share of max: in the field after a while out of combat, and resting
-# at the camp (never during the settlement attack).
-field_regen = 0.004
-field_regen_after = 10.0
+# The clips a hero plays using an item marked `anim = "eat"` or `anim = "drink"`, over its
+# `use_secs`, on every client that plays clips (`/esclip 61` tries one on yourself). 61 is
+# EmoteEat, the 1.12 client's /eat. The 1.12 client has no drinking clip of its own (its /drink
+# plays EmoteEat as well), so a drink plays the same until a better one is found; 0 falls back
+# to the Food spell's cast.
+eat_clip = 61
+drink_clip = 61
+# Health back a second, as a share of max: anywhere (the field, below, Siege) once this long has
+# passed since the hero last dealt or took a blow, and resting at the camp (never during the
+# settlement attack). In a fight only gear, set bonuses, food and heals bring health back.
+# On trial (#118, Corey's call): 2% a second from 5 sec out of combat, to recover between pulls
+# without making everyone full before the next fight, so healers still matter. Try it on the
+# next dungeon run and tune. (Was 0.4% a second from 10 sec, which barely registered.)
+field_regen = 0.02
+field_regen_after = 5.0
 rest_regen = 0.08
 respawn_secs = 6.0
 # Health on getting back up.
@@ -658,10 +669,14 @@ display = 4112
 icon = "INV_Misc_Food_15"
 kind = "food"
 stack = 5
-# Eating takes this long (moving slowly, open to a hit) and heals this share of max health.
-use_secs = 1.6
+# Food is a fight's resource (#118): a quick bite (this long, moving slowly), then this share of
+# max health over `heal_secs`. `steady`: a hit neither stops the bite nor the healing after it.
+use_secs = 1.0
 heal = 0.45
-text = "Heals 45% of your health over a 1.6 sec meal. Taking damage interrupts it. Press (T) to eat."
+heal_secs = 5.0
+steady = true
+anim = "eat"
+text = "Heals 45% of your health over 5 sec after a 1 sec bite. Taking damage doesn't stop it. Press (T) to eat."
 
 [[item]]
 key = "axe"
@@ -839,9 +854,12 @@ display = 557
 icon = "INV_Misc_Bowl_01"
 kind = "food"
 stack = 5
-use_secs = 2.0
+use_secs = 1.0
 heal = 0.5
-text = "Heals 50% of your health. Increases stamina regeneration by 20% for 3 min."
+heal_secs = 6.0
+steady = true
+anim = "eat"
+text = "Heals 50% of your health over 6 sec after a 1 sec bite. Increases stamina regeneration by 20% for 3 min."
 effect = { kind = "stamina", amount = 0.2, secs = 180.0, name = "Well Fed" }
 
 [[item]]
@@ -865,6 +883,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 below = true
+anim = "drink"
 text = "Increases stamina regeneration by 50% for 60 sec."
 effect = { kind = "stamina", amount = 0.5, secs = 60.0, name = "Tonic" }
 
@@ -9035,9 +9054,12 @@ display = 4810
 icon = "INV_Misc_Fish_05"
 kind = "food"
 stack = 5
-use_secs = 1.6
+use_secs = 1.0
 heal = 0.4
-text = "Heals 40% of your health at once."
+heal_secs = 5.0
+steady = true
+anim = "eat"
+text = "Heals 40% of your health over 5 sec after a 1 sec bite. Taking damage doesn't stop it."
 
 [[item]]
 key = "fish_feast"
@@ -9046,10 +9068,13 @@ display = 1483
 icon = "INV_Misc_Food_09"
 kind = "food"
 stack = 5
-use_secs = 2.4
+use_secs = 1.0
 heal = 0.6
+heal_secs = 6.0
+steady = true
+anim = "eat"
 effect = { kind = "stamina", amount = 0.25, secs = 300.0, name = "Well Fed" }
-text = "Heals 60% of your health. Increases stamina regeneration by 25% for 5 min."
+text = "Heals 60% of your health over 6 sec after a 1 sec bite. Increases stamina regeneration by 25% for 5 min."
 
 [[item]]
 key = "pumpkin_pie"
@@ -9058,10 +9083,13 @@ display = 4784
 icon = "INV_Misc_Food_11"
 kind = "food"
 stack = 5
-use_secs = 2.0
+use_secs = 1.0
 heal = 0.33
+heal_secs = 4.0
+steady = true
+anim = "eat"
 effect = { kind = "regen", amount = 0.011, secs = 30.0, name = "Pie" }
-text = "Heals 33% of your health at once and 33% more over 30 sec."
+text = "Heals 33% of your health over 4 sec after a 1 sec bite, and 33% more over 30 sec."
 
 [[item]]
 key = "clarity"
@@ -9072,6 +9100,7 @@ kind = "food"
 stack = 5
 use_secs = 0.8
 below = true
+anim = "drink"
 effect = { kind = "focus", amount = 0.25, secs = 90.0, name = "Clarity" }
 text = "Reduces ability cooldowns by 25% for 90 sec."
 

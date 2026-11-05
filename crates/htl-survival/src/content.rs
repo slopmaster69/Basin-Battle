@@ -275,6 +275,12 @@ pub struct PlayerDef {
     pub guard_speed: f32,
     pub aim_speed: f32,
     pub use_speed: f32,
+    /// The clips a hero plays using an item marked `anim = "eat"` or `"drink"` (0: the Food
+    /// spell's cast instead).
+    #[serde(default)]
+    pub eat_clip: u16,
+    #[serde(default)]
+    pub drink_clip: u16,
     pub field_regen: f32,
     pub field_regen_after: f32,
     pub rest_regen: f32,
@@ -930,6 +936,20 @@ pub struct EffectDef {
     pub name: String,
 }
 
+impl ItemDef {
+    /// What a used item's `anim` may be: nothing, eating or drinking.
+    pub const ANIMS: [&'static str; 3] = ["", "eat", "drink"];
+
+    /// The clip the body plays using it (0: none, the Food spell's cast instead).
+    pub fn use_clip(&self, player: &PlayerDef) -> u16 {
+        match self.anim.as_str() {
+            "eat" => player.eat_clip,
+            "drink" => player.drink_clip,
+            _ => 0,
+        }
+    }
+}
+
 impl EffectDef {
     pub const KINDS: [&'static str; 5] = ["regen", "stamina", "might", "ward", "focus"];
 }
@@ -949,6 +969,18 @@ pub struct ItemDef {
     pub use_secs: f32,
     #[serde(default)]
     pub heal: f32,
+    /// The `heal` comes over this many seconds once it's used, instead of at once (a bite of
+    /// food: the healing comes after it, as a regeneration).
+    #[serde(default)]
+    pub heal_secs: f32,
+    /// A hit doesn't stop it: neither the use nor the healing after it (food, a fight's
+    /// resource). Otherwise a hit interrupts it and nothing is used.
+    #[serde(default)]
+    pub steady: bool,
+    /// What the body does using it: `eat`, `drink` (the clips `[player]` names), or nothing (the
+    /// Food spell's cast).
+    #[serde(default)]
+    pub anim: String,
     #[serde(default)]
     pub text: String,
     /// A used item's lasting effect.
@@ -1099,7 +1131,7 @@ pub struct DungeonDef {
     /// Raids the camp must have beaten before the book opens.
     #[serde(default)]
     pub gate_raids: u32,
-    /// The Miner's Draught (an item key): the only heal below, charges refilled at a lamp.
+    /// The Miner's Draught (an item key): the heal in a fight below, charges refilled at a lamp.
     pub draught: String,
     pub draughts: u32,
     pub draughts_max: u32,
@@ -2670,6 +2702,12 @@ impl Content {
     fn validate(&self) -> Result<()> {
         // Gear's perks and sets.
         for i in &self.items {
+            if !ItemDef::ANIMS.contains(&i.anim.as_str()) {
+                bail!("item {}: anim {:?} (one of {:?})", i.key, i.anim, ItemDef::ANIMS);
+            }
+            if i.heal_secs < 0.0 {
+                bail!("item {}: heal_secs {} below 0", i.key, i.heal_secs);
+            }
             for p in &i.perks {
                 if !EffectDef::KINDS.contains(&p.kind.as_str()) {
                     bail!("item {}: a perk of kind {:?} (one of {:?})", i.key, p.kind, EffectDef::KINDS);

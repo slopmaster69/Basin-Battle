@@ -761,8 +761,8 @@ impl SurvivalGame {
             let text = own.unwrap_or_else(|| {
                 "The Deadmines. There are 3 lamps, at the Smugglers' Landing, the Foundry's back door and \
                  the Galleries. Light them as you go, since you respawn at a lit lamp. Rest at a lamp to \
-                 heal, refill your Draughts (T) and send the Brotherhood back to their posts. Draughts \
-                 are the only heal down here. If you fall, your finds wait in a sack where you fell. \
+                 heal, refill your Draughts (T) and send the Brotherhood back to their posts. Out of \
+                 combat your health comes back on its own. If you fall, your finds wait in a sack where you fell. \
                  Fall again before you recover it and it's lost. Any lit lamp takes you home."
                     .to_string()
             });
