@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 26
+local VERSION = 27
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6679,7 +6679,10 @@ events:SetScript("OnEvent", function()
     -- ac20: a missile's look (SetMissileLook: a ribbon behind it, its size, a spin).
     -- ac21: a rope from a unit's hand (SetUnitRope: a grappling hook's line).
     -- ac22: the bowstring on its bow, units that never fade, the aiming camera's tip down.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
+    -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
+      Say(".es hello " .. VERSION .. " ac23")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
       Say(".es hello " .. VERSION .. " ac22")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 21 then
       Say(".es hello " .. VERSION .. " ac21")
