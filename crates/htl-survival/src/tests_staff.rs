@@ -114,7 +114,8 @@ fn the_heavy_attack_casts_the_heavy_bolt_and_each_staff_has_its_own_school() {
     let far = mob(&mut s, "training_dummy", [16.0, 0.0, 0.0]);
     s.input(p, Input::Attack);
     let ev = s.step(0.0);
-    assert_eq!(missiles(&ev, p), vec![116]);
+    let shard = s.content.abilities[s.content.ability("rime_bolt").unwrap()].spell;
+    assert_eq!(missiles(&ev, p), vec![shard], "the shard's own look, whatever it is tuned to");
     run(&mut s, 1.0);
     assert!(s.has_cc(near, "snare"), "chilled");
     s.input(p, Input::Heavy);
@@ -130,7 +131,8 @@ fn the_heavy_attack_casts_the_heavy_bolt_and_each_staff_has_its_own_school() {
     let k = mob(&mut s, "grunt", [12.0, 0.0, 0.0]);
     s.input(p, Input::Attack);
     let ev = s.step(0.0);
-    assert_eq!(missiles(&ev, p), vec![7268]);
+    let bolt = s.content.abilities[s.content.ability("arcane_bolt").unwrap()].spell;
+    assert_eq!(missiles(&ev, p), vec![bolt]);
     run(&mut s, 1.0);
     assert!(s.mobs[&k].health < 1000 && s.cc_of(k).is_empty(), "lands, with nothing on the foe");
 }
@@ -146,7 +148,8 @@ fn a_click_in_a_bolts_recovery_waits_for_its_end_then_goes() {
     let ev = s.step(0.0);
     assert!(missiles(&ev, p).is_empty(), "not yet: the first cast is still recovering");
     let ev = run(&mut s, 0.4);
-    assert_eq!(missiles(&ev, p), vec![7268], "the next bolt goes as the recovery ends");
+    let bolt = s.content.abilities[s.content.ability("arcane_bolt").unwrap()].spell;
+    assert_eq!(missiles(&ev, p), vec![bolt], "the next bolt goes as the recovery ends");
 }
 
 #[test]

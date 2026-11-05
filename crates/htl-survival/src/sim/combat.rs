@@ -479,6 +479,12 @@ impl Survival {
             p.ward_down_at = now;
             self.events.push(Event::Ward { player: id });
         }
+        // The blow stopped: a crackle on the barrier, so a block reads on the body and not only
+        // on the bar.
+        let kit = self.content.ward.block_kit;
+        if kit != 0 {
+            self.events.push(Event::Visual { id, kit, by: None });
+        }
     }
 
     /// The ward shatters: the bar empty and locked until it has refilled.

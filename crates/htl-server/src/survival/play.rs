@@ -16,6 +16,8 @@ const EMOTE_SHIELD_BLOCK: u32 = 43;
 /// The guard's held pose: the shield up (ShieldBlock), or a two-handed weapon at the ready.
 pub(crate) const POSE_SHIELD: u32 = 43;
 const POSE_TWO_HANDED: u32 = 375;
+/// A ward held up: the spell-precast stance (the arm raised, channelling), not a weapon's guard.
+const POSE_WARD: u32 = 193;
 const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// The hunter's shots whose own look has no missile model: flown from a spot, they carry the
 /// arrow (as Basin Battle's server sends them), or the client flies nothing to see.
@@ -965,6 +967,7 @@ impl SurvivalGame {
     /// The pose a hero's raised guard shows.
     pub(crate) fn guard_pose(&self, player: Id) -> u32 {
         match self.sim.players.get(&player) {
+            Some(p) if self.sim.guard_of(p).ward => POSE_WARD,
             Some(p) if self.sim.weapon_of(p).two_handed => POSE_TWO_HANDED,
             _ => POSE_SHIELD,
         }
