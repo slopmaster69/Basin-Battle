@@ -92,6 +92,23 @@ check:SetFrameStrata("HIGH")
 check:Hide()
 ES.check = check
 
+-- --- recoloured looks ------------------------------------------------------------------------------
+
+-- On a client with SetEffectTint (patch 0042): the Mage's arcane looks in one arcane pink, the
+-- colour of the arcane rings (Corey: the ward should crackle in arcane colours, its perfect burst
+-- the barrier's colour; the Arcane staff's bolt bright pink).
+local ARCANE_PINK = "FF4FE6"
+local TINTS = {
+  ["Spells\CounterSpell_Impact_Chest"] = ARCANE_PINK, -- the ward's crackle
+  ["Spells\arcanepower_state_chest"] = ARCANE_PINK,   -- the barrier while it's up
+  ["Spells\ArcaneExplosion_Impact_Chest"] = ARCANE_PINK, -- a perfect ward's burst
+  ["Spells\ManaBurn_Chest"] = ARCANE_PINK,            -- the ward breaking
+  ["Spells\LightningStreak_Missile"] = ARCANE_PINK,   -- the Arcane staff's bolt
+}
+if SetEffectTint then
+  for model, colour in pairs(TINTS) do SetEffectTint(model, colour) end
+end
+
 -- --- drawing helpers ------------------------------------------------------------------------------
 
 local function Tex(file, layer, add)
