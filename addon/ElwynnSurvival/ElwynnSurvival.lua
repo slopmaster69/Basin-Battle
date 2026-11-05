@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 41
+local VERSION = 46
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2121,10 +2121,11 @@ function ES.DrawAction()
   vit.state:SetText(look[4])
   vit.state:SetTextColor(look[1], look[2], look[3])
   local barred = BARRED[a.name] and (a.total > 0.3 or a.name == "charge")
-  -- A charge with nothing to charge (a tap) shows no bar.
+  -- A charge with nothing to charge (a tap) shows no bar, nor does an aimed one (Aimed Shot, Axe
+  -- Throw): the reticle's ring closes in and turns gold as it builds.
   if a.name == "charge" then
     local d = ES.AbilityInfo and ES.AbilityInfo(a.ability)
-    barred = d and d.hi > 0
+    barred = d and d.hi > 0 and not Aiming()
   end
   if barred then
     act.label:SetText(ActionWord(a, look))
