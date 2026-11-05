@@ -30,6 +30,7 @@ pub(crate) mod heroes;
 pub mod hunter;
 mod raid;
 pub mod siege;
+mod bomb;
 mod orb;
 mod rhythm;
 mod staff;
@@ -896,6 +897,8 @@ pub struct Survival {
     pub(crate) burnings: Vec<abilities::Burning>,
     /// Orbs rolling out (Frozen Orb), until stopped or spent.
     pub(crate) orbs: Vec<orb::Orb>,
+    /// Bombs ticking on foes (Living Bomb), until they burst.
+    pub(crate) bombs: Vec<bomb::Bomb>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -1019,6 +1022,7 @@ impl Survival {
             lockouts: BTreeMap::new(),
             burnings: Vec::new(),
             orbs: Vec::new(),
+            bombs: Vec::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
@@ -1089,6 +1093,7 @@ impl Survival {
         self.step_players(dt);
         self.step_projectiles(dt);
         self.step_orbs(dt);
+        self.step_bombs();
         self.step_moves();
         self.step_grounds();
         self.step_bounces();

@@ -38,7 +38,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 20] = [
+pub const KINDS: [&str; 21] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -90,6 +90,9 @@ pub const KINDS: [&str; 20] = [
     // Beats: the first few by themselves, then one more for every press on the beat, up to its
     // most; a press out of time or a beat let pass ends it (the rhythm check).
     "rhythm",
+    // A bolt that plants a bomb on what it hits; it flares, then bursts; its key again on a flare
+    // sets it off early and harder (the release check on a foe).
+    "bomb",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -451,6 +454,23 @@ pub struct AbilityDef {
     /// The pulse on the caster on every beat to come (a spell visual kit): the beat to press on.
     #[serde(default)]
     pub beat_kit: u32,
+    /// A bomb (`kind = "bomb"`, the release check on a foe): a bolt that plants it on what it
+    /// hits; it flares `bomb_flares` times over `bomb_secs`, then bursts for `damage`'s low end in
+    /// `radius` with `bomb_effects`. The key again on a flare (within `[checks] window`) sets it
+    /// off early: the high end, `stop_effects` too, a perfect; off a flare, it goes at once,
+    /// plain.
+    #[serde(default)]
+    pub bomb_secs: f32,
+    #[serde(default)]
+    pub bomb_flares: u32,
+    #[serde(default)]
+    pub bomb_effects: Vec<AbilityEffect>,
+    /// The pulse on the bombed foe at each flare (a spell visual kit).
+    #[serde(default)]
+    pub bomb_kit: u32,
+    /// Combustion: what burns on the foe this reaches catches on every foe within this many yards.
+    #[serde(default)]
+    pub spread_burns: f32,
     /// An orb (`kind = "orb"`, the stop check): it rolls out along the reticle `range` yards
     /// over `linger` seconds, `linger_damage` a second to every foe within `radius` (with the
     /// ability's `effects`), every `tick`. The key again stops it where it is and it bursts:

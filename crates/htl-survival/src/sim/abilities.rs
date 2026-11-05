@@ -564,6 +564,11 @@ impl Survival {
                 return true;
             }
         }
+        // A bomb of this key's ticking: its key again sets it off (the release check, on its flares).
+        if let Some(k) = self.bomb_of(id, base) {
+            self.press_bomb(id, k);
+            return true;
+        }
         // A rhythm going: its key again is a press for the next beat (the rhythm check).
         if let Action::Rhythm { ability, .. } = p.action {
             if self.content.base_of(ability) == base {
@@ -1140,6 +1145,10 @@ impl Survival {
                 self.set_action(id, next);
             }
             "rhythm" => self.start_rhythm(id, ability),
+            "bomb" => {
+                self.launch(id, ability, 1.0);
+                self.set_action(id, next);
+            }
             "nova" => {
                 let at = self.players[&id].pos;
                 self.nova(id, ability, at, share);
@@ -1928,7 +1937,15 @@ impl Survival {
             self.burst(p, p.pos, Some(victim));
             return;
         }
+        // A bomb's bolt plants it, and Combustion's spreads what burns on the foe it reaches.
+        if d.kind == "bomb" {
+            self.plant_bomb(p.owner, p.ability, victim);
+            return;
+        }
         self.strike_with(p, victim, from);
+        if d.spread_burns > 0.0 {
+            self.spread_burns(p.owner, p.ability, victim, d.spread_burns);
+        }
         if d.chain > 0 {
             self.chain_on(p, victim);
         }

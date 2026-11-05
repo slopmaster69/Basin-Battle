@@ -90,3 +90,5 @@ mod tests_sweep;
 mod tests_orb;
 #[cfg(test)]
 mod tests_rhythm;
+#[cfg(test)]
+mod tests_bomb;

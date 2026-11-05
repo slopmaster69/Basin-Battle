@@ -3681,6 +3681,52 @@ cleanse = true
 leaves = "frost_nova"
 spell = 1953
 
+# 1, the second choice: Fire's release check on a foe. A bolt plants a bomb that flares three times
+# and bursts; press again on a flare to set it off early, harder, and throw them back. Off a flare
+# it goes at once, plain. (The Mage design, claude/mage-kit-draft.md; a utility hits little, so
+# the burst is small and the point is where and when it goes.)
+[[ability]]
+key = "living_bomb"
+name = "Living Bomb"
+text = "Plants a bomb on the enemy the bolt reaches, up to 25 yd. It flares 3 times over 3 sec, then bursts for 10 damage within 5 yd and burns them for 2 damage per sec for 3 sec. Press again on a flare to set it off then: 14 damage, and it knocks them back 4 yd."
+icon = "Spell_Fire_SelfDestruct"
+school = "mage"
+slot = "utility"
+choice = 2
+kind = "bomb"
+range = [25.0, 25.0]
+radius = [5.0, 5.0]
+speed = 36.0
+damage = [10.0, 14.0]
+bomb_secs = 3.0
+bomb_flares = 3
+cooldown = 12.0
+# The bolt (Fireball's missile), the burst (Flamestrike's fire; Blast Wave's on a perfect), the flare's
+# pulse on the foe (the full charge's kit): placeholders to check in the client.
+spell = 133
+tick_spell = 2120
+full_spell = 11113
+bomb_kit = 448
+bomb_effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
+stop_effects = [{ kind = "knockback", amount = 4.0 }]
+
+# Living Bomb's EX: every burn on the foe the bolt reaches catches on everything within 8 yd.
+[[ability]]
+key = "combustion"
+name = "Combustion"
+ex_of = "living_bomb"
+text = "A bolt of fire, up to 25 yd: 4 damage, and every burn on the enemy it hits catches on every enemy within 8 yd of it, for as long as it had left."
+icon = "Spell_Fire_SealOfFire"
+slot = "utility"
+kind = "projectile"
+valor = 25
+range = [25.0, 25.0]
+radius = [0.4, 0.4]
+speed = 40.0
+damage = [4.0, 4.0]
+spread_burns = 8.0
+spell = 133
+
 # The Warden: ride in, then punish.
 [[ability]]
 key = "divine_steed"
@@ -11038,7 +11084,7 @@ trial = ["trial_relic_paladin_0"]
 key = "relic_mage"
 name = "An Apprentice's Satchel"
 at = [-9432.0, -553.0]
-teaches = ["blink", "ice_block"]
+teaches = ["blink", "ice_block", "living_bomb"]
 loot = { mageroyal = 3 }
 display = 259
 secret = 7.0

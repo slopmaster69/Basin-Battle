@@ -148,7 +148,8 @@ fn worth(d: &AbilityDef) -> f32 {
     // A boomerang strikes each foe going out and again coming back (at its share).
     let hit = if d.returns { hit * (1.0 + d.return_damage) } else { hit };
     let chain: f32 = (1..=d.chain).map(|k| hit * d.chain_falloff.powi(k as i32)).sum();
-    let burn: f32 = d.effects.iter().filter(|e| e.kind == "burn").map(|e| e.amount * e.secs[1]).sum();
+    // (A bomb's burst burns as its effects do.)
+    let burn: f32 = d.effects.iter().chain(&d.bomb_effects).filter(|e| e.kind == "burn").map(|e| e.amount * e.secs[1]).sum();
     let linger = d.linger_damage * d.linger;
     hit + chain + burn + 0.5 * linger
 }
