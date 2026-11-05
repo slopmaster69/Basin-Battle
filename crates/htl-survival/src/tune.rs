@@ -182,5 +182,15 @@ mod tests {
         assert!((c6.mobs[g].patterns[0].steps[1].windup.unwrap() - 0.5).abs() < 1e-6);
         let (c5, _) = c.tuned("dodge.secs", "0.5").unwrap();
         assert!((c5.dodge.secs - 0.5).abs() < 1e-6);
+        // The backstab's look, swapped for another kit to film it.
+        assert_eq!(c.backstab.kit, 220);
+        let (c8, old) = c.tuned("backstab.kit", "290").unwrap();
+        assert_eq!(old.as_deref(), Some("220"));
+        assert_eq!(c8.backstab.kit, 290);
+        // The shatter's action lines, swapped for another kit to film it.
+        assert_eq!(c.shatter.burst_kit, 121);
+        let (c7, old) = c.tuned("shatter.burst_kit", "487").unwrap();
+        assert_eq!(old.as_deref(), Some("121"));
+        assert_eq!(c7.shatter.burst_kit, 487);
     }
 }

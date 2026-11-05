@@ -1,0 +1,16 @@
+# Trapper's Instinct (Ctrl+1) with a creature coming at the hunter: its stance, then its blow is
+# answered (the leap away, the net on it, the scattered arrows); then once more with nothing
+# striking, when it should be wasted (Corey's review: it fires only on a blow).
+hero hunter
+cam 70 -12 12
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 6               # it comes at the hunter and strikes
+5.0 .es slot 1 ensnaring_retreat
+5.5 .es valor full
+5.8 .es in ab 2 1
+5.6 shots stance 5 0.4
+9.0 .es target clear
+9.5 .es valor full
+10.0 .es in ab 2 1                   # nothing strikes: wasted
+14 end

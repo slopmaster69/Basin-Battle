@@ -143,7 +143,11 @@ fn frost_nova_makes_the_next_fireball_a_free_pyroblast_that_shatters_the_frozen(
     let mut ev = hold(&mut s, p, 1.6, &pins);
     assert!(missile(&ev, 11366), "the Pyroblast flies");
     ev.extend(run_pinned(&mut s, 0.6, &pins));
-    assert!(flashed(&ev, p, "Shatter!"), "the frozen boar shatters");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST), "the frozen boar shatters");
+    // The same shatter as a Hunter's: the action lines' burst on the frozen one too, and the
+    // server adds no fire of its own (Pyroblast's own impact is the client's, from its spell).
+    assert!(s.content.shatter.burst_kit != 0 && crate::sim::cues::seen::looked(&ev, k, s.content.shatter.burst_kit), "the shatter's action lines");
+    assert!(!flashed(&ev, p, "Shatter"), "no word");
     assert!(hits(&ev, p, k).iter().any(|d| *d >= 70), "half again its 48: {:?}", hits(&ev, p, k));
     assert!(s.players[&p].valor + 0.001 >= valor, "no Valor spent: {} then {}", valor, s.players[&p].valor);
     assert!(s.empowered_keys(p).is_empty(), "the combo spent");

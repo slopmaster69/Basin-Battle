@@ -48,6 +48,11 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
     out
 }
 
+/// A champion's stance broke under `by`: the crack on it and the beat on their screen.
+fn broke(ev: &[Event], mob: Id, by: Id) -> bool {
+    crate::sim::cues::seen::sounded(ev, mob, crate::sim::cues::SOUND_BREAK) && crate::sim::cues::seen::beat(ev, by, crate::sim::cues::BEAT_BREAK)
+}
+
 fn hits_on(events: &[Event], victim: Id) -> Vec<(u32, Outcome)> {
     events
         .iter()
@@ -225,6 +230,11 @@ fn a_blow_too_heavy_for_the_stamina_left_breaks_the_guard() {
     let took = hp - s.players[&p].health;
     assert!(took > 0 && took < 42, "part of it lands: {took}");
     assert_eq!(s.players[&p].action.name(), "stagger");
+    // No word says so (Corey's rule): the stagger shows it, with a broken guard's crack and a
+    // heavy beat on the hero's own screen.
+    let ev = s.step(0.0);
+    assert!(!ev.iter().any(|e| matches!(e, Event::Tell { player, .. } | Event::Flash { player, .. } if *player == p)), "no words: {ev:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Beat { player, beat: b, .. } if *player == p && b == "break")), "the beat: {ev:?}");
     // Staggered: the next blow lands whole, and nothing can be done for a moment.
     s.input(p, Input::Dodge);
     assert_eq!(s.players[&p].action.name(), "stagger", "no dodging out of a stagger");
@@ -619,7 +629,7 @@ fn the_road_and_the_camps_own_spots_stay_clear() {
 }
 
 #[test]
-fn cooking_turns_meat_into_food_that_heals_unless_a_hit_spoils_the_meal() {
+fn cooking_turns_meat_into_food_whose_bite_a_hit_doesnt_spoil() {
     let mut s = world();
     let (at, f) = build_spot(&s);
     let p = hero(&mut s, "Ayla", at, f);
@@ -633,19 +643,19 @@ fn cooking_turns_meat_into_food_that_heals_unless_a_hit_spoils_the_meal() {
     let before = s.players[&p].bag.get(&roast).copied().unwrap_or(0);
     s.craft(p, fire, "roast").unwrap();
     assert_eq!(s.players[&p].bag[&roast], before + 1);
-    // Eat it hurt: it heals; struck mid-meal, the bite isn't eaten.
+    // Eat it hurt: struck mid-bite, it's eaten all the same, and heals over the next seconds.
     s.players.get_mut(&p).unwrap().health = 50;
+    s.players.get_mut(&p).unwrap().quick = Some(roast);
     s.input(p, Input::Use);
     run(&mut s, 0.5);
     let k = mob(&mut s, "grunt", [at[0] + 2.0, at[1], 0.0]);
     s.strike_player(k, p, 5, [at[0] + 2.0, at[1], 0.0], false, false, false, Blow::Light);
     s.mobs.remove(&k);
-    assert_eq!(s.players[&p].action, Action::Ready, "the meal is spoiled");
-    assert_eq!(s.players[&p].bag[&roast], before + 1, "and nothing eaten");
-    s.input(p, Input::Use);
-    run(&mut s, 2.0);
-    assert!(s.players[&p].health > 100, "a full meal heals: {}", s.players[&p].health);
-    assert_eq!(s.players[&p].bag.get(&roast).copied().unwrap_or(0), before);
+    assert!(matches!(s.players[&p].action, Action::Eat { .. }), "a hit doesn't spoil the bite");
+    run(&mut s, 0.6);
+    assert_eq!(s.players[&p].bag.get(&roast).copied().unwrap_or(0), before, "eaten");
+    run(&mut s, 5.0);
+    assert!(s.players[&p].health > 100, "the meal heals: {}", s.players[&p].health);
 }
 
 #[test]
@@ -958,7 +968,26 @@ fn a_giant_is_too_heavy_to_parry_a_timed_guard_only_blocks_it() {
     assert_eq!(s.strike_player(g, p, 16, [2.0, 0.0, 0.0], true, false, true, Blow::Light), Outcome::Blocked, "blocked, not parried");
     assert!(s.mobs[&g].stagger_until <= s.clock, "it doesn't reel");
     let ev = s.step(0.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == p && text.contains("Too heavy"))), "told why");
+    // No word says why: a shield's dull thud (no parry's clang) and the view shoved hard.
+    assert!(crate::sim::cues::seen::sounded(&ev, p, crate::sim::cues::SOUND_TOO_HEAVY), "the guard's thud");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_TOO_HEAVY), "driven into the guard");
+    // Louder than a plain block, so it reads with no word: dust at the hero's feet and a step's
+    // shove back away from the giant (a skid, not a throw). Not Heroic Strike's red-orange flash:
+    // red says damage taken, and the guard took it all (Corey, round 3).
+    assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_HEAVY)), "no heavy impact's flash on the hero");
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_DUST)), "dust at their feet");
+    let hop = ev.iter().find_map(|e| match e {
+        Event::Hop { player, dir, speed, lift, roll, .. } if *player == p => Some((*dir, *speed, *lift, *roll)),
+        _ => None,
+    });
+    let (dir, speed, lift, roll) = hop.expect("shoved back");
+    assert!(angle_between(dir, std::f32::consts::PI) < 1.0, "away from the giant: {dir}");
+    assert!(!roll, "no tumble: the guard stays up");
+    // How far a knockback carries: its speed over its time in the air (gravity 19.29 yd/s²).
+    let yards = speed * 2.0 * lift / 19.29;
+    assert!((yards - crate::sim::TOO_HEAVY_PUSH).abs() < 0.05, "a step back, 1.5 yd: {yards} ({speed} at {lift})");
+    assert!(lift < 2.0 && lift * lift / (2.0 * 19.29) < 0.1, "a skid along the ground, not a throw: lift {lift}");
+    assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
     // A humanoid boss can still be parried.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -981,8 +1010,11 @@ fn a_guard_raised_just_in_time_parries_and_the_attacker_reels() {
     assert_eq!((s.players[&p].health, s.players[&p].stamina), (hp, st), "nothing lands and it costs nothing");
     let m = &s.mobs[&k];
     assert!(m.stagger_until > s.clock + 1.0 && m.riposte, "the kobold reels");
-    let ev = s.step(0.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == p)));
+    // No "Parry!": Disarm's spark on her (the clang and hit-stop come with the swing's impact).
+    let ev = std::mem::take(&mut s.events);
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == KIT_PARRY)), "the spark");
+    assert!(ev.iter().any(|e| matches!(e, Event::Swing { victim: Some(v), outcome: Outcome::Parried, .. } if *v == p)), "the impact: a parry");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })), "no word");
     // A riposte while it reels bites harder than any ordinary blow.
     s.input(p, Input::GuardUp);
     s.input(p, Input::Attack);
@@ -1308,7 +1340,10 @@ fn with_friendly_fire_heroes_strike_block_parry_and_fell_each_other() {
     let ev = run(&mut s, 0.3);
     assert_eq!(hits_on(&ev, b).last().map(|h| h.1), Some(Outcome::Parried));
     assert_eq!(s.players[&a].action.name(), "stagger");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == a)));
+    // No "Parried!" for her: she reels (the stun's swirl), the spark on Bren.
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == b && *kit == KIT_PARRY)), "the spark on him");
+    assert!(ev.iter().any(|e| matches!(e, Event::React { id, anim, .. } if *id == a && *anim == STUN_ANIM)), "she reels");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })), "no word");
     s.input(b, Input::GuardUp);
     s.input(b, Input::Attack);
     let ev = run(&mut s, 0.6);
@@ -2366,15 +2401,20 @@ fn a_meal_puts_the_weapons_away_and_takes_them_out_again() {
     let ev = run(&mut s, 0.6);
     assert_eq!(s.players[&p].action, Action::Ready, "eaten");
     assert_eq!(gear(&ev), 1, "out again as it ends");
-    // Struck mid-meal: out again at once.
+    // Struck mid-meal: a bite of food is steady (a hit neither stops it nor its healing), so the
+    // weapons stay away through it and come out as it ends.
     s.input(p, Input::Use);
     let ev = s.step(DT);
     assert_eq!(gear(&ev), 1);
     let k = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
     s.strike_player(k, p, 5, [2.0, 0.0, 0.0], false, false, false, Blow::Light);
+    s.mobs.remove(&k);
     let ev = s.step(DT);
-    assert_eq!(s.players[&p].action, Action::Ready, "the meal is spoiled");
-    assert_eq!(gear(&ev), 1, "out again as it's cut short");
+    assert_eq!(s.players[&p].action.name(), "eat", "a steady bite isn't spoiled");
+    assert_eq!(gear(&ev), 0, "the weapons stay away");
+    let ev = run(&mut s, secs);
+    assert_eq!(s.players[&p].action, Action::Ready, "eaten");
+    assert_eq!(gear(&ev), 1, "out again as it ends");
 }
 
 #[test]
@@ -2390,7 +2430,11 @@ fn a_blow_from_behind_is_a_backstab() {
     assert_eq!(hits.len(), 1);
     let w = s.weapon_of(&s.players[&p]).damage;
     assert!(hits[0].0 as f32 >= w[0] as f32 * 1.4, "harder from behind: {hits:?}");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Backstab!")));
+    // It shows in the blow: the stab's look, a dagger's crit, a sharp beat; no word.
+    assert!(crate::sim::cues::seen::looked(&ev, k, KIT_RIPOSTE), "the stab's look");
+    assert!(crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_BACKSTAB), "a dagger's crit");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_BACKSTAB));
+    assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
 }
 
 #[test]
@@ -2492,7 +2536,8 @@ fn enough_damage_quickly_breaks_a_champions_stance() {
     let ev = s.step(0.0);
     assert!(s.mobs[&w].stagger_until > s.clock + 1.5, "broken");
     assert!(s.mobs[&w].riposte, "open to a riposte");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")));
+    assert!(broke(&ev, w, p), "it shows it broke");
+    assert!(crate::sim::cues::seen::no_words(&ev, p), "no word");
 }
 
 #[test]
@@ -2512,14 +2557,14 @@ fn a_group_needs_more_to_break_a_champion_and_it_stands_back_up_before_it_can_br
     let heft = s.weapon_of(&s.players[&heroes[0]]).posture.max(1.0);
     s.hurt_mob(w, heroes[0], (limit as f32 / heft).ceil() as u32 + 1);
     let ev = s.step(0.0);
-    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")), "a group needs more");
+    assert!(!heroes.iter().any(|h| broke(&ev, w, *h)), "a group needs more");
     run(&mut s, 3.0);
     // Enough breaks it...
     for h in &heroes {
         s.hurt_mob(w, *h, limit);
     }
     let ev = s.step(0.0);
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!")), "broken");
+    assert!(heroes.iter().any(|h| broke(&ev, w, *h)), "broken");
     // ...and the beating it takes while it reels and just after doesn't break it again.
     let mut broken_again = false;
     for _ in 0..(5.0 / 0.25) as usize {
@@ -2527,7 +2572,7 @@ fn a_group_needs_more_to_break_a_champion_and_it_stands_back_up_before_it_can_br
             s.hurt_mob(w, *h, limit / 4);
         }
         let ev = run(&mut s, 0.25);
-        broken_again |= ev.iter().any(|e| matches!(e, Event::Flash { text, .. } if text == "Stance broken!"));
+        broken_again |= heroes.iter().any(|h| broke(&ev, w, *h));
     }
     assert!(!broken_again, "it stands back up before it can be broken again");
 }

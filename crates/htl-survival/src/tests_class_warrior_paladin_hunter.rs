@@ -15,6 +15,8 @@ fn world_with(pvp: bool) -> Survival {
     if !pvp {
         c.pvp = Default::default();
     }
+    // No health back by itself out of combat: these tests count every point a heal gives.
+    c.player.field_regen = 0.0;
     let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
     s.mobs.clear();
     s.respawns.clear();
@@ -382,7 +384,7 @@ fn blessing_of_freedom_frees_a_friend_and_keeps_them_free() {
     assert_eq!(aiming(&s, a), Some(idx(&s, "blessing_of_freedom")), "aimed at a friend");
     s.set_aim_line(a, 0.0, 0.0);
     let ev = click(&mut s, a);
-    assert!(flashed(&ev, a, "Bren"), "on him");
+    assert!(!flashed(&ev, a, "Bren"), "no word names him: the blessing's look on him says it");
     assert!(!s.has_cc(b, "root") && !s.has_cc(b, "mark"), "free, unmarked");
     assert!(s.has_cc(b, "haste"), "faster");
     assert!(!s.apply_cc(b, b, "stun", 2.0, 0.0, 0.0, "test"), "and no stun takes hold for 4 s");
@@ -426,7 +428,8 @@ fn lay_on_hands_takes_a_touch_heals_three_fifths_and_not_again_on_them_for_a_min
     let ev = click(&mut s, a);
     let (got, want) = (s.players[&b].health - max / 4, (max as f32 * 0.6).round() as u32);
     assert!(got >= want && got <= want + 2, "three fifths of his health: {got}");
-    assert!(flashed(&ev, a, "Healed Bren"));
+    assert!(!flashed(&ev, a, "Healed"), "no word: his green number and the light on him");
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, .. } if *healer == a && *target == b)), "her number for him");
     // Again on him at once: not yet, and the Valor back.
     run(&mut s, 0.8);
     s.players.get_mut(&b).unwrap().health = max / 4;
@@ -435,7 +438,8 @@ fn lay_on_hands_takes_a_touch_heals_three_fifths_and_not_again_on_them_for_a_min
     s.set_aim_line(a, 0.0, 0.0);
     let ev = click(&mut s, a);
     assert_eq!(s.players[&b].health, max / 4, "not again yet");
-    assert!(flashed(&ev, a, "on them again"));
+    assert!(flashed(&ev, a, "on them again"), "a refusal keeps its words");
+    assert!(ev.iter().any(|e| matches!(e, Event::Hear { player, .. } if *player == a)), "and she says it");
     assert!((s.players[&a].valor - valor).abs() < 1.0, "its Valor back");
     // Out of touch range, it's yours.
     run(&mut s, 0.8);
@@ -551,12 +555,17 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     s.set_aim_line(p, 0.0, down_to(6.0));
     click(&mut s, p);
     assert!(s.empowered_keys(p).is_empty(), "set, nothing readied yet (#118: it comes as the trap springs)");
-    run_pinned(&mut s, 1.2, &[k]);
+    let ev = run_pinned(&mut s, 1.2, &[k]);
     assert!(s.has_cc(k, "petrify"), "sprung: frozen");
     let em = s.empowered_keys(p);
     assert_eq!(em.len(), 1, "sprung, Aimed Shot's key readied: {em:?}");
     assert_eq!(em[0].0, key_of("ranged") as usize);
     assert!(em[0].1 > s.clock + 7.0 && em[0].1 <= s.clock + 8.0, "for 8 s from the spring: {} at {}", em[0].1, s.clock);
+    // Its burst is on the frozen alone: the frost burst on it, nothing cast at the spot and
+    // nothing on the hunter (Frost Nova's ring rang out round her too, Corey's review).
+    assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 450, .. } if *id == k)), "the frost burst on the frozen: {ev:?}");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit: 450, .. } if *id == p)), "none on the hunter");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } | Event::MissileFrom { caster, .. } if *caster == p)), "no spell at the spot: {ev:?}");
     // Aimed Shot's key: the Multi-Shot, free, and the frozen one shatters.
     let valor = s.players[&p].valor;
     press_again(&mut s, p, "ranged");
@@ -566,7 +575,10 @@ fn freezing_trap_readies_a_free_multi_shot_and_the_frozen_shatter() {
     ev.extend(run_pinned(&mut s, 1.0, &[k]));
     assert_eq!(missiles(&ev, p, 6984), 5, "five arrows");
     assert!(s.players[&p].valor + 0.01 >= valor, "no Valor spent: {valor} then {}", s.players[&p].valor);
-    assert!(flashed(&ev, p, "Shatter!"), "the ice shatters");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST), "the ice shatters");
+    // The same shatter as a Mage's: the action lines' burst on the frozen one too.
+    assert!(s.content.shatter.burst_kit != 0 && crate::sim::cues::seen::looked(&ev, k, s.content.shatter.burst_kit), "the shatter's action lines");
+    assert!(!flashed(&ev, p, "Shatter"), "no word");
     assert!(!s.has_cc(k, "petrify"));
     assert!(s.empowered_keys(p).is_empty(), "spent");
     // The next press is the plain draw again.
@@ -652,6 +664,53 @@ fn a_multi_shot_at_a_pack_strikes_most_of_it() {
 }
 
 #[test]
+fn freezing_trap_leaves_frost_that_slows_what_stands_in_it() {
+    // Friendly fire on: even then the hunter's own frost never slows her.
+    let mut s = world_with(true);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
+    // 5 yd off the spot: outside the 3 yd of frost.
+    let near = mob(&mut s, "grunt", [6.0, 5.0, 0.0]);
+    s.set_valor(p, 50.0);
+    press(&mut s, p, "explosive_trap", true);
+    assert_eq!(aiming(&s, p), Some(idx(&s, "freezing_trap")));
+    s.set_aim_line(p, 0.0, down_to(6.0));
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 1.2, &[k, near]));
+    assert!(s.has_cc(k, "petrify"), "sprung: frozen");
+    // The frost on the ground where it sprang, as wide as the burst, for as long as it lasts.
+    let (look, wide, lasts) = {
+        let d = &s.content.abilities[idx(&s, "freezing_trap")];
+        (d.linger_spell, d.splash, d.linger)
+    };
+    assert!(look != 0, "the frost has a look of its own");
+    let frost = ev.iter().find_map(|e| match e {
+        Event::AreaLook { id, caster, spell, pos, radius } if *caster == p && *spell == look && (*radius - wide).abs() < 0.01 && (pos[0] - 6.0).abs() < 0.5 => Some(*id),
+        _ => None,
+    });
+    let frost = frost.unwrap_or_else(|| panic!("the frost on the ground: {ev:?}"));
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { id, .. } if *id == frost)), "no circle drawn round a hero's own ground: {ev:?}");
+    // A creature walking in after the freeze is slowed by half while it stands there; the one
+    // 5 yd off isn't, nor is the hunter standing in her own frost.
+    let walker = mob(&mut s, "grunt", [8.0, 0.0, 0.0]);
+    s.move_player(p, [7.0, 0.0, 0.0], 0.0, Moving::default());
+    run_pinned(&mut s, 1.2, &[k, near, walker]);
+    assert!(s.has_cc(walker, "snare"), "slowed in the frost");
+    assert!((s.speed_share(walker) - 0.5).abs() < 0.01, "by half: {}", s.speed_share(walker));
+    assert!(!s.has_cc(near, "snare"), "not outside it");
+    assert!(!s.has_cc(p, "snare") && (s.speed_share(p) - 1.0).abs() < 0.01, "never the hunter");
+    // Still slowed while it stands there, 4 s on.
+    run_pinned(&mut s, 3.0, &[k, near, walker]);
+    assert!(s.has_cc(walker, "snare"), "kept slow while it stands in the frost");
+    assert!(!s.has_cc(near, "snare"));
+    // The frost gone after its 6 s: the slow wears off and the ground is bare.
+    let ev = run_pinned(&mut s, lasts, &[k, near, walker]);
+    assert!(!s.has_cc(walker, "snare"), "the frost gone, the slow with it");
+    assert!(ev.iter().any(|e| matches!(e, Event::MarkGone { .. })), "the look taken away: {ev:?}");
+    assert!(s.burnings.is_empty(), "no ground left");
+}
+
+#[test]
 fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -663,22 +722,76 @@ fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() 
     s.mobs.get_mut(&weak).unwrap().health = (max as f32 * 0.24) as u32;
     let aim = (0.0, down_to(20.0));
     s.set_valor(p, 100.0);
+    let arrow = s.content.abilities[idx(&s, "kill_shot")].spell;
+    let beats = |ev: &[Event], beat: &str, on: Option<Id>| ev.iter().filter(|e| matches!(e, Event::Beat { player, beat: b, on: o } if *player == p && b == beat && *o == on)).count();
+    let sounded = |ev: &[Event], m: Id, sound: u32| ev.iter().any(|e| matches!(e, Event::Sound { id, sound: s } if *id == m && *s == sound));
     // Let go before its draw: lost, and nothing spent.
     press(&mut s, p, "kill_shot", false);
     let ev = draw(&mut s, p, 0.5, aim, &pins);
-    assert_eq!(missiles(&ev, p, 3044), 0, "let go too soon");
+    assert_eq!(missiles(&ev, p, arrow), 0, "let go too soon");
+    assert_eq!(beats(&ev, "kill_shot", None), 0, "no speed lines for a shot that never went");
     assert_eq!(s.players[&p].action, Action::Ready);
     assert_eq!(s.players[&p].valor, 100.0, "nothing spent");
-    // The whole draw.
+    // The whole draw (1.3 s now: longer than Aimed Shot's, Corey's review).
     press(&mut s, p, "kill_shot", false);
-    let mut ev = draw(&mut s, p, 1.1, aim, &pins);
+    let mut ev = draw(&mut s, p, 1.4, aim, &pins);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
-    assert_eq!(missiles(&ev, p, 3044), 1, "loosed");
+    assert_eq!(missiles(&ev, p, arrow), 1, "loosed");
     assert_eq!(hits(&ev, p, first).len(), 1, "the first struck");
     assert!(s.alive(first), "a hale one lives");
     assert!(!s.alive(weak), "the weak one finished");
-    assert!(flashed(&ev, p, "Execute!"));
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_EXECUTE) && crate::sim::cues::seen::sounded(&ev, weak, crate::sim::cues::SOUND_EXECUTE) && crate::sim::cues::seen::looked(&ev, weak, KIT_SLAM), "the execute's blow");
+    assert!(!flashed(&ev, p, "Execute"), "no word");
     assert_eq!(hits(&ev, p, last).len(), 1, "and on through to the last");
+    // The power behind it: speed lines on the hunter's own screen as it goes, the heavy blow's
+    // flash and crack on each foe it goes through, and the kill's thud from the weak one's spot
+    // with its beat on the hunter's screen; nothing of the kill's on one that lives.
+    assert_eq!(beats(&ev, "kill_shot", None), 1, "the speed lines, once");
+    for m in pins {
+        assert!(ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == m && *kit == KIT_HEAVY)), "the heavy flash on each it goes through");
+        assert!(sounded(&ev, m, 238), "and its crack on each");
+    }
+    assert!(sounded(&ev, weak, 930), "the kill's thud from the foe's spot");
+    assert_eq!(beats(&ev, "kill_shot_kill", Some(weak)), 1, "and its beat on the hunter's screen");
+    assert!(!sounded(&ev, first, 930) && beats(&ev, "kill_shot_kill", Some(first)) == 0, "none of the kill's on one that lives");
+}
+
+#[test]
+fn kill_shots_draw_winds_the_hunter_up_and_the_release_or_the_let_go_takes_it_off() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = mob(&mut s, "grunt", [16.0, 0.0, 0.0]);
+    let look = s.content.abilities[idx(&s, "kill_shot")].charge_look;
+    assert_ne!(look, 0, "Kill Shot's draw has a wind-up");
+    let aim = (0.0, down_to(20.0));
+    let shown = |ev: &[Event]| ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == p));
+    s.set_valor(p, 100.0);
+    assert!(!s.auras_of(p).contains(&look), "nothing on her before the draw");
+    // The click: the draw begins, and the wind-up is on her through it.
+    press(&mut s, p, "kill_shot", false);
+    s.set_aim_line(p, aim.0, aim.1);
+    s.input(p, Input::Attack);
+    let ev = s.step(DT);
+    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "drawing");
+    assert!(shown(&ev), "her slots shown as the draw begins");
+    assert!(s.auras_of(p).contains(&look), "the wind-up on her");
+    run_pinned(&mut s, 0.5, &[m]);
+    assert!(s.auras_of(p).contains(&look), "and still, half a second in");
+    // Let go too soon: the draw is lost, and the wind-up goes with it.
+    s.input(p, Input::AttackUp);
+    let ev = run_pinned(&mut s, DT, &[m]);
+    assert_eq!(s.players[&p].action, Action::Ready);
+    assert!(shown(&ev), "her slots shown again as it's let go");
+    assert!(!s.auras_of(p).contains(&look), "and the wind-up off her");
+    // The whole draw: on her till the release, off as the shot goes.
+    press(&mut s, p, "kill_shot", false);
+    let ev = draw(&mut s, p, 1.4, aim, &[m]);
+    assert_eq!(missiles(&ev, p, s.content.abilities[idx(&s, "kill_shot")].spell), 1, "loosed");
+    assert!(shown(&ev), "her slots shown as it goes");
+    assert!(!s.auras_of(p).contains(&look), "the wind-up gone with the shot");
+    // And the tune key the chat films alternates with.
+    let (c, _) = s.content.tuned("ability.kill_shot.charge_look", "14751").unwrap();
+    assert_eq!(c.abilities[idx(&s, "kill_shot")].charge_look, 14751);
 }
 
 #[test]
@@ -975,7 +1088,8 @@ fn a_planted_arrow_stands_full_size_with_no_ring_under_it_and_goes_in_time() {
     assert_eq!((look.display, look.scale), (PLANT_LOOK, PLANT_SCALE));
     assert!(look.scale >= 1.0, "not shrunk: {}", look.scale);
     assert!((look.pos[0] - 10.0).abs() < 0.1 && (look.pos[1] - 2.0).abs() < 0.1, "where it landed: {:?}", look.pos);
-    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "no ring on the ground");
+    // No ring on the ground (a glow under it, a spell's own ground look, is not a ring).
+    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { ground: 0, .. })), "no ring on the ground");
     let ev = run(&mut s, PLANT_SECS + 0.2);
     assert!(ev.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)), "the arrow fades");
     assert!(s.planted_of(p).is_empty());
@@ -1019,7 +1133,8 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     assert!(!ev.iter().any(|e| matches!(e, Event::MissileFrom { caster, .. } if *caster == p)), "none flies yet");
     assert!(!ev.iter().any(|e| matches!(e, Event::ObjGone { .. })), "none leaves the ground yet");
     ev.extend(run(&mut s, 0.15));
-    let spell = s.content.abilities[idx(&s, "arrow_recall")].spell;
+    // The arrows fly home as the Hunter's arrow; the key itself plays no buff (its spell is 0).
+    let spell = crate::sim::hunter::RECALL_ARROW;
     let mut anchors = Vec::new();
     for a in &planted {
         let gone = ev.iter().position(|e| matches!(e, Event::ObjGone { id } if *id == a.obj)).expect("its arrow leaves the ground");
@@ -1166,6 +1281,14 @@ fn tripwire_plants_one_arrow_then_the_key_again_places_the_second_and_the_wire_r
     assert!(dist2d(from, a) < 0.1, "from the first arrow: {from:?} {a:?}");
     assert!(dist2d(to, b) < 0.1, "to the second: {to:?} {b:?}");
     assert!(wire.width < wire.reach, "a rope along the arrows, not a band across them: {} wide, {} long", wire.width, wire.reach);
+    // And a rope between the arrows, gone with the strip.
+    let rope = ev.iter().find_map(|e| match e {
+        Event::Rope { id, a: ra, b: rb } => Some((*id, *ra, *rb)),
+        _ => None,
+    });
+    let (rid, ra, rb) = rope.expect("a rope between the arrows");
+    assert!(dist2d(ra, a) < 0.1 && dist2d(rb, b) < 0.1, "from arrow to arrow: {ra:?} {rb:?} {both:?}");
+    assert_eq!(rid, w.mark, "it goes with the wire's strip");
 }
 
 #[test]
@@ -1381,19 +1504,75 @@ fn reverse_grapple_hauls_a_creature_but_a_boss_hauls_the_hunter() {
     s.set_valor(p, 50.0);
     press(&mut s, p, "grapple_arrow", true);
     s.set_aim_line(p, 0.0, 0.0);
-    click(&mut s, p);
-    run(&mut s, 0.6);
+    let mut ev = click(&mut s, p);
+    ev.extend(run(&mut s, 0.6));
     assert!(s.mobs[&w].pos[0] < 6.0, "the wolf hauled in: {:?}", s.mobs[&w].pos);
+    assert!(ev.iter().any(|e| matches!(e, Event::Tether { from, to: Target::Unit(t), .. } if *from == p && *t == w)), "on a line from her fist to it");
     let mut s = world_with(true);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let b = mob(&mut s, "warlord", [12.0, 0.0, 0.0]);
     s.set_valor(p, 50.0);
     press(&mut s, p, "grapple_arrow", true);
     s.set_aim_line(p, 0.0, 0.0);
-    click(&mut s, p);
-    let ev = run_pinned(&mut s, 0.3, &[b]);
+    let mut ev = click(&mut s, p);
+    ev.extend(run_pinned(&mut s, 0.3, &[b]));
     assert!((s.mobs[&b].pos[0] - 12.0).abs() < 1.0, "the boss stays: {:?}", s.mobs[&b].pos);
     assert!(ev.iter().any(|e| matches!(e, Event::Speed { player, .. } | Event::Hop { player, .. } if *player == p)) || s.players[&p].pos[0] > 3.0, "she goes to it");
+    assert!(ev.iter().any(|e| matches!(e, Event::Tether { from, to: Target::Unit(t), .. } if *from == p && *t == b)), "in on the line to it");
+}
+
+/// The dev rules with these values of `survival.toml` changed (`.es tune <path> <value>`).
+fn tuned(changes: &[(&str, &str)]) -> Content {
+    let mut text = crate::content::DEFAULT.to_string();
+    for (path, value) in changes {
+        text = crate::tune::set(&text, path, value).unwrap_or_else(|e| panic!("{path}: {e}")).0;
+    }
+    Content::into_dev(Content::parse_with(&text, crate::content::DEFAULT_DUNGEON).expect("the tuned rules read"))
+}
+
+#[test]
+fn reverse_grapple_plays_the_hunters_pull_clip_for_the_haul_and_its_tune_keys_swap_it() {
+    // The hunter's own clips (the bow's release is no clip) as a creature `key` is hauled in.
+    let haul = |c: Content, key: &str| -> Vec<(u16, String, f32)> {
+        let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
+        s.mobs.clear();
+        s.respawns.clear();
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let w = mob(&mut s, key, [12.0, 0.0, 0.0]);
+        s.set_valor(p, 50.0);
+        press(&mut s, p, "grapple_arrow", true);
+        s.set_aim_line(p, 0.0, 0.0);
+        let mut ev = click(&mut s, p);
+        ev.extend(run_pinned(&mut s, 0.6, &[w]));
+        ev.iter()
+            .filter_map(|e| match e {
+                Event::Clip { id, clip, secs, from, .. } if *id == p => Some((*clip, from.clone().unwrap_or_default(), *secs)),
+                _ => None,
+            })
+            .collect()
+    };
+    // As shipped: EmoteUseStanding (63) on the hunter for exactly the creature's time in the air.
+    // The pull's own lift where the rules name one (the haul's 5), else the default.
+    let c0 = Content::dev();
+    let lift = c0.abilities[c0.ability("reverse_grapple").unwrap()].effects.iter().find(|e| e.kind == "pull").map_or(0.0, |e| e.lift);
+    let air = crate::sim::moves::airtime(if lift > 0.0 { lift } else { crate::sim::moves::PULL_LIFT });
+    let clips = haul(Content::dev(), "wolf");
+    assert_eq!(clips.len(), 1, "one pull clip on the hunter: {clips:?}");
+    let (clip, from, secs) = &clips[0];
+    assert!(*clip == 63 && from.is_empty(), "the hunter's own EmoteUseStanding: {clips:?}");
+    assert!((secs - air).abs() < 1e-3 && *secs > 0.25, "for the haul's flight ({air:.3} s): {secs}");
+    // Tuned: another clip, and another character model's take on it.
+    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clip", "19")]), "wolf");
+    assert!(matches!(clips.as_slice(), [(19, f, _)] if f.is_empty()), "the tuned clip: {clips:?}");
+    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clip", "58"), ("ability.reverse_grapple.pull_from", "ScourgeFemale")]), "wolf");
+    assert!(matches!(clips.as_slice(), [(58, f, _)] if f == "ScourgeFemale"), "the borrowed take: {clips:?}");
+    // Tuned off: no clip (the bow's release alone, as before).
+    assert!(haul(tuned(&[("ability.reverse_grapple.pull_clip", "0")]), "wolf").is_empty(), "no pull clip when it's 0");
+    // A boss hauls the hunter instead: no pull to pose for.
+    assert!(haul(Content::dev(), "warlord").is_empty(), "no pull clip when the hunter is the one hauled");
+    // From no model the clients know: turned away, as a leap's borrowed clip is.
+    let (bad, _) = crate::tune::set(crate::content::DEFAULT, "ability.reverse_grapple.pull_from", "Murloc").unwrap();
+    assert!(Content::parse_with(&bad, crate::content::DEFAULT_DUNGEON).is_err(), "pull_from Murloc is no character model");
 }
 
 #[test]

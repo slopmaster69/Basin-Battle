@@ -1,0 +1,16 @@
+# No words (#135), the out-of-range refusal in the hero's own voice: Call of the Wild (E) with
+# nothing within 25 yd. First with Error Speech on (.es speech 1): "No enemy in range" flashes
+# and the dwarf says "Out of range."; then with it off (.es speech 0): the words alone, no voice.
+hero hunter
+cam 0 -10 9
+include _setup
+4.2 .es dummy clear                  # nothing to call at
+5.0 .es slot e call_of_the_wild
+5.3 .es speech 1
+6.0 .es in ab 1 0                    # the flash and the voice
+5.8 shots voice 8 0.25
+9.0 .es speech 0                     # Error Speech unticked
+10.0 .es in ab 1 0                   # the flash, no voice
+9.8 shots mute 8 0.25
+12.5 .es speech 1
+14 end

@@ -20,6 +20,14 @@ pub const PLANT_MOST: usize = 12;
 /// model's own size (at 0.45 it was too small to tell from the ground in a fight).
 pub const PLANT_LOOK: u32 = 2630;
 pub const PLANT_SCALE: f32 = 1.0;
+/// And a glow laid on the ground under the arrow, this wide (0: none). None for now: Flare's
+/// (1543) read as a fire under each arrow and lit a whole volley's circle orange (Corey's review,
+/// "it looks like fire... grey? white? smaller to avoid clutter"); Frost Trap's frost (13810)
+/// and Consecration's gold (20116), tried in runs 060 and 061, are a mist and a disc the radius
+/// doesn't shrink, and twelve of them covered the whole screen. The data has no small white or
+/// grey light at a point; the arrow's own model (patch 0035, a glowing arcane arrow) marks it.
+pub const ARROW_GLOW: u32 = 0;
+pub const ARROW_GLOW_RADIUS: f32 = 0.6;
 /// A tripwire trips anything within this of the wire.
 const WIRE_REACH: f32 = 0.7;
 /// The most a tripwire spans: its second arrow plants within this of the first (the ring shown
@@ -47,8 +55,19 @@ pub const WILD_PRIMED_SECS: f32 = 4.0;
 /// which beast came), then stays this long after its strike, so who came and what it did can be seen
 /// (play-test: at 0.9 sec they were gone before anyone could tell), then goes in the flash it
 /// came in.
-const POUNCE_SECS: f32 = 0.6;
+/// A beast's entrance: it stands where it appeared this long (a beat to be seen; on the clients
+/// that draw it at once with no fade, `UNIT_DYNFLAG_NO_FADE`, it's whole from the first frame),
+/// then dashes at the foe this long and strikes as it arrives (Corey's review, run 040: "the
+/// pets need to appear quicker and dash or jump in and attack"; run 050: "the fades are the
+/// issue").
+const BEAST_SHOW: f32 = 0.2;
+const BEAST_DASH: f32 = 0.3;
+const POUNCE_SECS: f32 = BEAST_SHOW + BEAST_DASH;
 const BEAST_STAYS: f32 = 1.8;
+/// Arrow Recall's call: `EMOTE_ONESHOT_POINT`, an arm held out; and its arrows' look flying home
+/// (the Hunter's arrow, 19434; the ability's own `spell` is 0, so the key plays no buff).
+const RECALL_EMOTE: u32 = 25;
+pub const RECALL_ARROW: u32 = 19434;
 /// How far round the foe from the near side the beast strikes from (radians): about a right
 /// angle, so it stands beside the foe, clear of the hunter's back.
 const BEAST_FLANK: f32 = 1.4;
@@ -88,6 +107,10 @@ const VOLLEY_SECS: f32 = 1.0;
 /// looses it as it runs out; the rules a moment after (`HANG_GRACE`), at the last reticle heard.
 const FLOAT_SECS: f32 = 5.5;
 const HANG_GRACE: f32 = 0.5;
+/// The pose held through the hang: the Jump clip (38), a character's mid-air pose with the legs
+/// drawn up (1.12 has no hover of its own), played on the lower body only for the whole hang
+/// (`ClipBody::Lower`): the arms stay on the bow's draw.
+const HOVER_CLIP: u16 = 38;
 /// After the volley: feather fall, untouchable, till they land (or this long at most).
 const DESCENT_SECS: f32 = 3.0;
 /// Each of its arrows strikes everyone within this of where it lands.
@@ -138,6 +161,8 @@ pub struct Planted {
     pub obj: Id,
     /// Its ring on the ground.
     pub mark: Id,
+    /// The glow under it (Flare's light), gone with it.
+    pub glow: Id,
 }
 
 /// A tripwire: its two anchors, until when, and which side of it each creature near it was on
@@ -200,6 +225,10 @@ pub(crate) struct Pounce {
     pub body: Option<Id>,
     pub struck: bool,
     pub roared: bool,
+    /// When it dashes from where it appeared to `end`, beside the foe, and whether it has.
+    pub dash_at: f32,
+    pub end: Vec3,
+    pub dashed: bool,
 }
 
 /// One of Skyfall's arrows coming down.
@@ -267,9 +296,24 @@ impl Survival {
         self.objs.insert(obj, Obj { kind: ObjKind::Prop { display: PLANT_LOOK, scale: PLANT_SCALE }, pos, facing });
         self.events.push(Event::ObjSpawned { id: obj });
         // No ring under it: the arrow standing in the ground shows where it is (Corey's review:
-        // a hero's own circles are floor clutter; a dozen of these lay at once).
+        // a hero's own circles are floor clutter; a dozen of these lay at once). A glow, though.
         let mark = self.mark_unseen(secs);
-        self.hunt.planted.push(Planted { owner, pos, until: now + secs, obj, mark });
+        let glow = self.arrow_glow(pos, secs);
+        self.hunt.planted.push(Planted { owner, pos, until: now + secs, obj, mark, glow });
+    }
+
+    /// The glow under a planted arrow: Flare's light laid on the ground there, small, for as long
+    /// as the arrow stands, so the arrows read from across a fight and at night (Corey's review,
+    /// run 040: "I can't see the arrows, maybe they need to glow"). A spell's own look, not a
+    /// circle: the ground looks below `GROUND_LOOK_MIN` are circles, so it's laid by hand.
+    fn arrow_glow(&mut self, pos: Vec3, secs: f32) -> Id {
+        let id = self.alloc();
+        if ARROW_GLOW == 0 {
+            return id;
+        }
+        self.marks.push((id, self.clock + secs));
+        self.events.push(Event::Mark { id, pos, radius: ARROW_GLOW_RADIUS, tele: None, ground: ARROW_GLOW });
+        id
     }
 
     fn unplant(&mut self, a: &Planted) {
@@ -277,6 +321,7 @@ impl Survival {
             self.events.push(Event::ObjGone { id: a.obj });
         }
         self.unmark(a.mark);
+        self.unmark(a.glow);
     }
 
     /// A hero's planted arrows, where they stand.
@@ -433,6 +478,8 @@ impl Survival {
         let (yaw, len) = wire_line(a, b);
         let tele = Telegraph { own_hidden: false, ..Telegraph::hero_shape(id, len, 0.0, WIRE_REACH * 2.0, life, Some((a, yaw))) };
         let mark = self.mark_as(mid, WIRE_REACH, life, Some(tele));
+        // And the wire itself, a rope between the two arrows, gone with the strip.
+        self.events.push(Event::Rope { id: mark, a, b });
         let sides = self.wire_sides(a, b, id);
         self.hunt.wires.push(Wire { owner: id, ability: first.ability, a, b, until: now + life, sides, mark });
     }
@@ -566,7 +613,7 @@ impl Survival {
         let mine: Vec<Planted> = self.hunt.planted.iter().filter(|a| a.owner == id).cloned().collect();
         self.hunt.planted.retain(|a| a.owner != id);
         if mine.is_empty() {
-            self.events.push(Event::Flash { player: id, text: "No arrows planted".into() });
+            self.refuse(id, "No arrows planted", cues::Vocal::NoArrows);
             return;
         }
         self.events.push(Event::Pose { id, pose: RECALL_POSE });
@@ -618,14 +665,18 @@ impl Survival {
         let Some(home) = self.players.get(&id).map(|p| p.pos) else { return self.clock };
         let radius = AbilityDef::at(d.radius, 1.0).max(0.4);
         let damage = AbilityDef::at(d.damage, 1.0);
+        // The call: a hand held out to them, not a buff's pose (Corey's review: "there must be a
+        // clear hand out as if he's calling the arrows back").
+        self.events.push(Event::Emote { id, emote: RECALL_EMOTE });
         let mut struck: BTreeMap<Id, u32> = BTreeMap::new();
         let mut last_home = self.clock;
         for a in arrows {
             self.unplant(a);
-            // Its look, flown home from where it stood.
+            // Its look, flown home from where it stood: the Hunter's arrow, at a speed the eye
+            // can follow.
             let anchor = self.alloc();
             let from = [a.pos[0], a.pos[1], a.pos[2] + 0.8];
-            self.events.push(Event::MissileFrom { anchor, caster: id, spell: d.spell, from, target: Target::Unit(id) });
+            self.events.push(Event::MissileFrom { anchor, caster: id, spell: RECALL_ARROW, from, target: Target::Unit(id) });
             let arrival = self.clock + dist2d(from, home) / d.speed.max(10.0) + 0.2;
             self.hunt.anchors.push((anchor, arrival));
             last_home = last_home.max(arrival);
@@ -770,6 +821,12 @@ impl Survival {
         self.set_action(id, Action::Aim { ability: h.volley });
         self.set_kit(id, Kit::Bow);
         self.draw_bow(id);
+        // Hung in the air in a hover's pose, not standing on nothing (Corey's review: "it looks
+        // like they're just standing in the air. The legs are the problem"): the Jump clip's
+        // mid-air pose, the legs drawn up, held for the whole hang. On the legs only: the arms
+        // keep drawing the bow (his second review: a whole-body hold "ruined" it, "his arms still
+        // need to be drawing a bow"). Let go as the hang ends (`end_hang`).
+        self.events.push(Event::Clip { id, clip: HOVER_CLIP, take: 0, from: None, secs: FLOAT_SECS + HANG_GRACE + 0.5, at: 0.0, body: ClipBody::Lower });
         self.events.push(Event::Abilities { player: id });
     }
 
@@ -785,6 +842,8 @@ impl Survival {
         self.hunt.floating.retain(|(h, _)| *h != id);
         self.hunt.floating.push((id, self.clock + DESCENT_SECS));
         self.events.push(Event::FeatherFall { player: id, on: true });
+        // The hover's pose let go: the legs come down for the fall.
+        self.events.push(Event::ClipStop { id });
     }
 
     /// Down from Skyfall: the slow fall ends as they land.
@@ -927,7 +986,7 @@ impl Survival {
         }
         let range = AbilityDef::at(d.range, 1.0);
         let Some(target) = self.beast_target(id, range, w.next) else {
-            self.events.push(Event::Flash { player: id, text: "No enemy in range".into() });
+            self.refuse(id, "No enemy in range", cues::Vocal::OutOfRange);
             self.hunt.wild.insert(id, w);
             // No beast went: its recharge isn't spent either.
             let base = self.content.base_of(ability);
@@ -1042,16 +1101,12 @@ impl Survival {
             }
             mid
         });
-        if let Some(b) = body {
-            let dist = dist2d(start, end).max(0.5);
-            self.events.push(Event::MobMove { id: b, path: vec![start, end], speed: dist / (POUNCE_SECS + delay).max(0.1), face: None });
-            // Where it stands from its strike on (for whoever comes into sight of it later).
-            if let Some(m) = self.mobs.get_mut(&b) {
-                m.pos = end;
-            }
-        }
+        // It stands there a moment, then dashes in (`step_pounces`): a beast that moved off the
+        // instant it appeared was still fading in as it went, and read as never there.
         self.events.push(Event::Missile { caster: id, spell: SPIRIT_FLASH, target: Target::Point(start) });
-        self.hunt.pounces.push(Pounce { owner: id, ability, beast, target, at: now + POUNCE_SECS + delay, gone: now + POUNCE_SECS + delay + BEAST_STAYS, empowered, body, struck: false, roared: false });
+        let dash_at = now + delay + BEAST_SHOW;
+        let at = dash_at + BEAST_DASH;
+        self.hunt.pounces.push(Pounce { owner: id, ability, beast, target, at, gone: at + BEAST_STAYS, empowered, body, struck: false, roared: false, dash_at, end, dashed: false });
     }
 
     fn step_pounces(&mut self) {
@@ -1059,6 +1114,19 @@ impl Survival {
         let list = std::mem::take(&mut self.hunt.pounces);
         let mut keep = Vec::new();
         for mut p in list {
+            if !p.dashed && p.dash_at <= now {
+                p.dashed = true;
+                if let Some(b) = p.body {
+                    if let Some(from) = self.mobs.get(&b).map(|m| m.pos) {
+                        let dist = dist2d(from, p.end).max(0.5);
+                        self.events.push(Event::MobMove { id: b, path: vec![from, p.end], speed: dist / BEAST_DASH, face: None });
+                    }
+                    // Where it stands from its strike on (for whoever comes into sight of it later).
+                    if let Some(m) = self.mobs.get_mut(&b) {
+                        m.pos = p.end;
+                    }
+                }
+            }
             if !p.struck && p.at <= now {
                 p.struck = true;
                 if let Some(b) = p.body {

@@ -375,7 +375,13 @@ impl Survival {
                 match self.quick_item(p) {
                     Some(item) => {
                         self.set_action(id, Action::Eat { t: 0.0, item });
-                        self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (c.items[item].use_secs * 1000.0) as u32 });
+                        // Eating or drinking looks like it (its clip over the use, on everyone);
+                        // anything else, the Food spell's cast.
+                        let d = &c.items[item];
+                        match d.use_clip(&c.player) {
+                            0 => self.events.push(Event::Cast { caster: id, spell: EAT_SPELL, ms: (d.use_secs * 1000.0) as u32 }),
+                            clip => self.events.push(Event::Clip { id, clip, secs: d.use_secs, take: 0, from: None, at: 0.0, body: ClipBody::Full }),
+                        }
                         self.punish_healing(id);
                     }
                     None => self.tell(id, "Nothing to use. Cook raw meat at a Cooking Fire or brew at a cauldron."),
@@ -399,6 +405,15 @@ impl Survival {
         // stagger takes.
         if matches!(action, Action::Stagger { .. }) && self.unstaggerable(id) {
             return;
+        }
+        // A blow that staggers a hero mid-bite doesn't spoil a steady one (food): it's eaten all
+        // the same, its healing to come.
+        let bite = match self.players.get(&id).map(|p| &p.action) {
+            Some(Action::Eat { item, .. }) if matches!(action, Action::Stagger { .. }) && self.content.items[*item].steady => Some(*item),
+            _ => None,
+        };
+        if let Some(item) = bite {
+            self.eaten(id, item);
         }
         let Some(p) = self.players.get_mut(&id) else { return };
         let was_eating = matches!(p.action, Action::Eat { .. });
@@ -913,9 +928,9 @@ impl Survival {
                 self.events.push(Event::Stamina { player: id });
             }
         }
-        // Lasting effects: a salve's healing, and running out.
+        // Lasting effects: a salve's or a meal's healing (in a fight too), and running out.
         {
-            let regen = self.effect_of(&self.players[&id], "regen");
+            let regen = self.effect_of(&self.players[&id], "regen") + self.effect_of(&self.players[&id], MEAL);
             let p = self.players.get_mut(&id).unwrap();
             if regen > 0.0 && p.health > 0 && p.health < p.max_health {
                 p.heal_bank += p.max_health as f32 * regen * dt;
@@ -996,40 +1011,8 @@ impl Survival {
                 }
             }
             Action::Eat { t, item } => {
-                let d = &c.items[item];
-                if t + dt >= d.use_secs {
-                    // Eaten: the bite is taken from the bag only now.
-                    let p = self.players.get_mut(&id).unwrap();
-                    if let Some(n) = p.bag.get_mut(&item) {
-                        *n -= 1;
-                        if *n == 0 {
-                            p.bag.remove(&item);
-                        }
-                        let heal = (p.max_health as f32 * d.heal).round() as u32;
-                        p.health = (p.health + heal).min(p.max_health);
-                        let (h, m) = (p.health, p.max_health);
-                        // What it does for a while: a fresh one replaces the last of its kind.
-                        if let Some(e) = &d.effect {
-                            p.effects.retain(|x| x.kind != e.kind);
-                            let name = if e.name.is_empty() { d.name.clone() } else { e.name.clone() };
-                            p.effects.push(Effect { kind: e.kind.clone(), amount: e.amount, until: now + e.secs, name: name.clone() });
-                            self.events.push(Event::Effects { player: id });
-                            // Said plainly, so a slow effect isn't taken for nothing.
-                            let what = match e.kind.as_str() {
-                                "regen" => format!("{name} restores {:.0}% of your health over {:.0} sec.", e.amount * e.secs * 100.0, e.secs),
-                                "stamina" => format!("{name} increases stamina regeneration by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
-                                "might" => format!("{name} increases your damage by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
-                                "ward" => format!("{name} reduces damage taken by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
-                                "focus" => format!("{name} makes your abilities recover {:.0}% faster for {:.0} sec.", e.amount * 100.0, e.secs),
-                                _ => format!("{name} for {:.0} sec.", e.secs),
-                            };
-                            self.events.push(Event::Tell { player: id, text: what });
-                        }
-                        self.events.push(Event::Health { id, health: h, max: m });
-                        self.events.push(Event::Bags { player: id });
-                        self.events.push(Event::Dirty);
-                        self.events.push(Event::Missile { caster: id, spell: EAT_DONE_SPELL, target: Target::Unit(id) });
-                    }
+                if t + dt >= c.items[item].use_secs {
+                    self.eaten(id, item);
                     self.events.push(Event::CastEnd { caster: id });
                     self.players.get_mut(&id).unwrap().action = Action::Ready;
                     // The weapons out again (set straight, not through `set_action`).
@@ -1060,7 +1043,7 @@ impl Survival {
                     };
                     let chop = super::world::CHOP_SECS;
                     if clip != 0 && (t / chop).floor() != ((t + dt) / chop).floor() && t + dt + chop * 0.5 < secs {
-                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: chop, at: 0.0 });
+                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: chop, at: 0.0, body: ClipBody::Full });
                     }
                     if t + dt >= secs {
                         self.events.push(Event::CastEnd { caster: id });
@@ -1090,7 +1073,8 @@ impl Survival {
             }
             Action::Ready | Action::Guard | Action::Aim { .. } | Action::Dead { .. } => {}
         }
-        // Health back: resting at the camp, or a trickle in the field after a while.
+        // Health back: resting at the camp, or anywhere (the field, below, Siege) a while after the
+        // last blow dealt or taken. Never in a fight: there, only gear, food and heals.
         let p = &self.players[&id];
         if p.health > 0 && p.health < p.max_health {
             let heart = c.world.heart;
@@ -1120,6 +1104,59 @@ impl Survival {
         if !self.land.blocked_near(x, y, z) && !self.land.water_near(x, y, z) && (z - ground).abs() < 2.0 {
             // The floor itself, not where the feet were over it.
             self.players.get_mut(&id).unwrap().last_safe = [x, y, ground];
+        }
+    }
+
+    /// A used item (food, a drink, a salve) takes effect: taken from the bag only now, its healing
+    /// (at once, or over its `heal_secs` as a regeneration, which a hit doesn't stop) and what it
+    /// does for a while.
+    pub(crate) fn eaten(&mut self, id: Id, item: usize) {
+        let now = self.clock;
+        let d = self.content.items[item].clone();
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let Some(n) = p.bag.get_mut(&item) else { return };
+        *n -= 1;
+        if *n == 0 {
+            p.bag.remove(&item);
+        }
+        if d.heal_secs > 0.0 {
+            // A bite: the healing comes over the next few seconds, shown as it comes in.
+            if d.heal > 0.0 {
+                p.effects.push(Effect { kind: MEAL.to_string(), amount: d.heal / d.heal_secs, until: now + d.heal_secs, name: d.name.clone() });
+                self.events.push(Event::Effects { player: id });
+                let text = format!("{} restores {:.0}% of your health over {:.0} sec.", d.name, d.heal * 100.0, d.heal_secs);
+                self.events.push(Event::Tell { player: id, text });
+            }
+        } else {
+            let heal = (p.max_health as f32 * d.heal).round() as u32;
+            p.health = (p.health + heal).min(p.max_health);
+        }
+        let p = self.players.get_mut(&id).unwrap();
+        let (h, m) = (p.health, p.max_health);
+        // What it does for a while: a fresh one replaces the last of its kind.
+        if let Some(e) = &d.effect {
+            p.effects.retain(|x| x.kind != e.kind);
+            let name = if e.name.is_empty() { d.name.clone() } else { e.name.clone() };
+            p.effects.push(Effect { kind: e.kind.clone(), amount: e.amount, until: now + e.secs, name: name.clone() });
+            self.events.push(Event::Effects { player: id });
+            // Said plainly, so a slow effect isn't taken for nothing.
+            let what = match e.kind.as_str() {
+                "regen" => format!("{name} restores {:.0}% of your health over {:.0} sec.", e.amount * e.secs * 100.0, e.secs),
+                "stamina" => format!("{name} increases stamina regeneration by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                "might" => format!("{name} increases your damage by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                "ward" => format!("{name} reduces damage taken by {:.0}% for {:.0} sec.", e.amount * 100.0, e.secs),
+                "focus" => format!("{name} makes your abilities recover {:.0}% faster for {:.0} sec.", e.amount * 100.0, e.secs),
+                _ => format!("{name} for {:.0} sec.", e.secs),
+            };
+            self.events.push(Event::Tell { player: id, text: what });
+        }
+        self.events.push(Event::Health { id, health: h, max: m });
+        self.events.push(Event::Bags { player: id });
+        self.events.push(Event::Dirty);
+        // A bite or a gulp is its own look (the clip, then the health bar filling): the visual
+        // check showed the done-burst (Lesser Heal's golden light) reading as a priest's heal.
+        if d.anim.is_empty() {
+            self.events.push(Event::Missile { caster: id, spell: EAT_DONE_SPELL, target: Target::Unit(id) });
         }
     }
 
@@ -1267,6 +1304,8 @@ impl Survival {
             }
             // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
             if self.evading(mid, id) {
+                // No word, and no "Miss" floating over it either (Corey: hide it): the blow
+                // passes through and finds nothing, and the creature walking home slips it (`whiff`), which says the rest.
                 self.whiff(mid, pos);
                 continue;
             }
@@ -1323,7 +1362,7 @@ impl Survival {
                 (self.roll(w.damage) as f32 * strike.damage * might * self.blow_share(id)).round() as u32
             };
             // From behind (a backstab): harder, unless it's a riposte already.
-            let behind = !reeling && self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, pos)) >= BACKSTAB_ARC);
+            let behind = !reeling && self.from_behind(mid, pos);
             let stab = if w.backstab > 0.0 { w.backstab } else { self.content.combat.backstab };
             // Stabbed in the back again and again, it's ready for it: each backstab lately (more
             // so with more heroes on it) takes from the next one's bonus.
@@ -1333,8 +1372,11 @@ impl Survival {
             if behind {
                 self.backstabbed(mid, id);
             }
+            // A backstab says so in its blow, not a word: the riposte's stab (below), a dagger's
+            // crit into flesh and a sharp beat on the striker's screen.
             if behind && damage > 0 {
-                self.events.push(Event::Flash { player: id, text: "Backstab!".into() });
+                self.cue(Some(id), mid, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
+                self.backstab_look(mid, Some(id));
             }
             self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage, outcome: Outcome::Hit, anim: false, style });
             self.trade_blows(id, mid);
@@ -1477,8 +1519,10 @@ impl Survival {
             } else {
                 self.events.push(Event::React { id: victim, anim: STUN_ANIM, from, lean: 0.35, hold: secs, fit: 0.0 });
             }
+            // No word: the stagger (or the fall) shows it, with a crack of the guard and a heavy
+            // beat on their own screen.
             if broke {
-                self.tell(victim, if down { "Kicked down!" } else { "Your guard breaks!" });
+                self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             }
         }
         self.events.push(Event::Visual { id: victim, kit: KIT_BASH, by: Some(id) });
@@ -1764,9 +1808,20 @@ impl Survival {
             }
             _ => Outcome::Hit,
         };
-        // A parry timed on a giant's blow: told why it only blocked.
-        if giant && timed && outcome == Outcome::Blocked && matches!(p.action, Action::Guard) {
-            self.events.push(Event::Flash { player: victim, text: "Too heavy to parry!".into() });
+        // A parry timed on a giant's blow: it only blocks, and that has to read with no word
+        // (Corey: if it isn't plain, make the cues louder, don't bring the words back). A dull
+        // shield's thud, no clang and no spark; dust kicked up at their feet as they're shoved a
+        // step back, guard still up; the hardest shove of the camera any block gets, and a
+        // dust-coloured flash of the screen's corners (the beat's `edge`). No Heroic Strike flash
+        // on the hero and nothing red: a red flash says they took damage, and they didn't
+        // (Corey, round 3).
+        if giant && timed && outcome == Outcome::Blocked && matches!(doing, Action::Guard) {
+            // (Pushed here, not by `cue`: the hero's still borrowed for their armor below.)
+            self.events.push(Event::Sound { id: victim, sound: cues::SOUND_TOO_HEAVY });
+            self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
+            let (speed, lift) = too_heavy_skid();
+            self.events.push(Event::Hop { player: victim, dir: facing(from, p.pos), speed, lift, roll: false, style: "" });
+            self.events.push(Event::Beat { player: victim, beat: cues::BEAT_TOO_HEAVY.to_string(), on: Some(victim) });
         }
         // Armor takes its share off whatever gets through.
         let worn = 1.0 - self.armor_reduce(p);
@@ -1786,7 +1841,9 @@ impl Survival {
                 if c.combat.riposte_any_stagger {
                     self.players.get_mut(&victim).unwrap().riposte_until = now + secs;
                 }
-                self.tell(victim, if heavy_blow { "Your guard breaks and you go down!" } else { "Your guard breaks!" });
+                // No word: the stagger (or the fall) shows it, with a crack of the guard and a
+                // heavy beat on their own screen.
+                self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             }
             Outcome::Parried => self.parry_pays(victim, attacker),
             _ => {}
@@ -1812,7 +1869,9 @@ impl Survival {
         // A heavy blow that gets through breaks a fragile charge (Pyroblast's).
         let fragile = matches!(&self.players[&victim].action, Action::Charge { ability, .. } if self.content.abilities[*ability].fragile);
         if fragile && heavy_blow && matches!(outcome, Outcome::Hit | Outcome::GuardBroken) {
-            self.tell(victim, "The heavy attack breaks your charge!");
+            // No word: the charge's glow goes out, the blow lands, and the same crack and beat as a
+            // broken guard.
+            self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
             self.end_ability_action(victim);
             self.set_action(victim, Action::Ready);
         }
@@ -1889,7 +1948,8 @@ impl Survival {
             }
             Outcome::Dodged if peerless && real && self.mobs.get(&attacker).is_some_and(|m| m.health > 0) => {
                 self.stagger_mob(attacker, PEERLESS_STAGGER, true);
-                self.events.push(Event::Flash { player: victim, text: "Off balance!".into() });
+                // No word: it reels (the stagger's swirl), dust kicked up where it stumbles.
+                self.events.push(Event::Visual { id: attacker, kit: KIT_DUST, by: None });
             }
             _ => {}
         }
@@ -1900,7 +1960,8 @@ impl Survival {
     pub(crate) fn parry_pays(&mut self, victim: Id, attacker: Id) {
         let now = self.clock;
         let c = self.content.clone();
-        self.events.push(Event::Flash { player: victim, text: "Parry!".into() });
+        // No word: the parry shows and sounds (Disarm's spark on the parrier, the clang and the
+        // hit-stop on the clients, from the swing's `IM` line).
         if let Some(p) = self.players.get_mut(&victim) {
             p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
             p.opening_until = now + c.parry.opening;
@@ -1926,7 +1987,8 @@ impl Survival {
             self.events.push(Event::Emote { id: attacker, emote: mobs::STUN_EMOTE });
             let at = self.players[&victim].pos;
             self.events.push(Event::React { id: attacker, anim: STUN_ANIM, from: at, lean: 0.3, hold: c.parry.hero_stagger, fit: 0.0 });
-            self.events.push(Event::Flash { player: attacker, text: "Parried!".into() });
+            // No word: they reel (the stun's swirl and the reel above), with the spark on the one
+            // who parried them and the clang.
         }
         self.gain_valor(victim, c.valor.parry);
         self.prime_wild(victim);
@@ -2036,16 +2098,20 @@ impl Survival {
             p.combat_at = now;
         }
         let (h, m) = (p.health, p.max_health);
-        // A hit spoils a meal or a gather.
-        let interrupted = matches!(p.action, Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. });
+        // A hit spoils a gather, or the use of an item that isn't steady (a bite of food is).
+        let interrupted = match &p.action {
+            Action::Eat { item, .. } => !self.content.items[*item].steady,
+            Action::Gather { .. } | Action::Work { .. } => true,
+            _ => false,
+        };
         self.events.push(Event::Health { id, health: h, max: m });
         self.meter_taken(id, lost);
         self.keep_wound(id, lost);
         if h == 0 {
             self.die(id);
         } else if interrupted {
+            // No word: the blow lands, and the meal or the work stops in their hands.
             self.set_action(id, Action::Ready);
-            self.tell(id, "Interrupted!");
         }
     }
 
@@ -2397,7 +2463,13 @@ impl Survival {
             let mut base = self.roll(w.damage) as f32 * d.weapon * might;
             if behind && d.behind > 0.0 {
                 base *= d.behind;
-                self.events.push(Event::Flash { player: id, text: "Backstab!".into() });
+            }
+            // Any art in a foe's back is a backstab (Corey: the backstab is any character's hit
+            // in an enemy's back, not the rogue's ability): its stab shows (the riposte's kit,
+            // below) with a dagger's crit and a beat. Only Backstab's own `behind` makes it harder.
+            if behind {
+                self.cue(Some(id), v, 0, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
+                self.backstab_look(v, Some(id));
             }
             if self.players.contains_key(&v) {
                 let dmg = self.ability_damage(id, v, ability, base);
@@ -2405,7 +2477,7 @@ impl Survival {
             } else {
                 self.ability_on_mob(id, v, ability, 1.0, base, pos, HitKind::Melee, d.spell);
             }
-            let kit = if behind && d.behind > 0.0 { KIT_RIPOSTE } else { KIT_SLAM };
+            let kit = if behind { KIT_RIPOSTE } else { KIT_SLAM };
             if self.alive(v) {
                 self.events.push(Event::Visual { id: v, kit, by: Some(id) });
                 // The art's own impact beside the heavy flash (Sundering Blow's armor crack).
@@ -2431,7 +2503,8 @@ impl Survival {
                 self.players.get_mut(&victim).unwrap().riposte_until = now + guard.break_secs;
             }
             self.events.push(Event::Emote { id: victim, emote: mobs::STUN_EMOTE });
-            self.tell(victim, "Your guard is crushed!");
+            // No word: the stagger shows it, with a broken guard's crack and beat.
+            self.cue(Some(victim), victim, 0, cues::SOUND_BREAK, cues::BEAT_BREAK);
         }
     }
 
@@ -2468,7 +2541,9 @@ impl Survival {
             if let Some(p) = self.players.get_mut(&o) {
                 p.cooldowns.clear();
                 self.events.push(Event::Abilities { player: o });
-                self.events.push(Event::Flash { player: o, text: "Death Mark readied every cooldown".into() });
+                // No word: every key flares on the bar as it comes ready (the `readied` beat),
+                // with Cold Blood's sting on the marker.
+                self.cue(Some(o), o, 0, cues::SOUND_READIED, cues::BEAT_READIED);
             }
         }
     }
@@ -2505,6 +2580,17 @@ pub(crate) struct WeaponReach {
     pub arc: f32,
 }
 
+/// A giant's blow on a parry that can only block: the hero shoved this far back along the
+/// ground, guard up. A knockback flies for `2 * lift / gravity` seconds at `speed`, so the old
+/// 4.5 at 0.3 of lift moved them 0.14 yd: nothing anyone saw (Corey: "pushing the hero back per
+/// guard would be awesome"). Now a step: 1.5 yd, with just enough lift to carry it (a shove is 6
+/// to 8 with 1.5 to 2 of lift; this lift peaks 5 cm off the ground, a skid, not a throw).
+pub const TOO_HEAVY_PUSH: f32 = 1.5;
+const TOO_HEAVY_LIFT: f32 = 1.4;
+/// The skid's (speed, lift) that covers [`TOO_HEAVY_PUSH`].
+pub(crate) fn too_heavy_skid() -> (f32, f32) {
+    (TOO_HEAVY_PUSH * super::moves::GRAVITY / (2.0 * TOO_HEAVY_LIFT), TOO_HEAVY_LIFT)
+}
 /// The reactions (`AnimationData`): a flinch, a heavy blow's, a stagger's reel, the shield taking
 /// a blow.
 pub const WOUND_ANIM: u16 = 9;
@@ -2544,9 +2630,12 @@ const LOCK_HOLD: f32 = 1.3;
 /// can say it doesn't.
 pub const SPRINT_SPELL: u32 = 2983;
 
-/// The meal's cast look (eating), and the burst when it's done.
+/// The meal's cast look (an item used with no `anim`), and the burst when it's done.
 pub const EAT_SPELL: u32 = 433;
 pub const EAT_DONE_SPELL: u32 = 2050;
+/// The lasting effect a bite of food leaves: its healing coming in, a share of max health a second
+/// (the food's name on the hero's effects).
+pub const MEAL: &str = "meal";
 
 /// A hero's health now (0 when they're gone).
 fn p_health(s: &Survival, id: Id) -> u32 {
@@ -2563,6 +2652,21 @@ impl Survival {
     #[cfg(test)]
     pub(crate) fn backstab_bonus_for_test(&mut self, mid: Id) -> f32 {
         self.backstab_bonus(mid, 2.0)
+    }
+
+    /// A blow on creature `mid` from `at` lands in its back: `at` is more than `BACKSTAB_ARC`
+    /// off the way it faces. The one rule for every hit a hero lands (a swing, an art, an arrow).
+    pub(crate) fn from_behind(&self, mid: Id, at: Vec3) -> bool {
+        self.mobs.get(&mid).is_some_and(|m| angle_between(m.facing, facing(m.pos, at)) >= BACKSTAB_ARC)
+    }
+
+    /// The backstab's own look on creature `mid` (`backstab.kit`): the riposte's stab plays on
+    /// the chest, the side turned away from whoever stabbed it, so this one is what reads.
+    pub(crate) fn backstab_look(&mut self, mid: Id, by: Option<Id>) {
+        let kit = self.content.backstab.kit;
+        if kit != 0 && self.alive(mid) {
+            self.events.push(Event::Visual { id: mid, kit, by });
+        }
     }
 
     /// A backstab's bonus on a creature, less for each one it took lately.
@@ -2594,7 +2698,8 @@ impl Survival {
         if m.turn_on.is_none() && self.rng.gen::<f32>() < chance {
             // It wheels round on them as soon as its blow in hand is done.
             self.mobs.get_mut(&mid).unwrap().turn_on = Some(by);
-            self.events.push(Event::Flash { player: by, text: "It turns on you!".into() });
+            // No word: it roars at them and wheels round (as it turns, in its own step).
+            self.events.push(Event::Emote { id: mid, emote: mobs::ROAR_EMOTE });
         }
     }
 

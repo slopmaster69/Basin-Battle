@@ -49,8 +49,20 @@ A	craft	0.40	2.50	Roast Boar
 A	build	0.00	4.00	Cooking Fire
 A	repair	1.00	3.00	Smithing Anvil
 A	ready	0.00	0.00
-FL	Parry!
+FL	No enemy in range
 !table.insert(SAID, "flash: " .. tostring(ElwynnSurvivalFlash:IsShown()))
+CU	crit	0xF130000000000025
+CU	shatter	0xF130000000000025
+CU	execute	0xF130000000000025
+CU	backstab	0xF130000000000025
+CU	break	0xF130000000000025
+CU	too_heavy	0x0
+CU	wall	0xF130000000000025
+CU	cheat_death	0x0
+CU	valor	0x0
+CU	readied	0x0
+CU	nothing_known	0x0
+!table.insert(SAID, "cues: valor glow " .. tostring(ElwynnSurvival.cueValorAt ~= nil) .. ", keys flaring " .. tostring(ElwynnSurvival.abar and ElwynnSurvival.abar.slots and ElwynnSurvival.abar.slots[1] and ElwynnSurvival.abar.slots[1].fullAt ~= nil))
 !table.insert(SAID, "quick item: key " .. tostring(ElwynnSurvivalDock.quick.key:GetText()) .. " count " .. tostring(ElwynnSurvivalDock.quick.count:GetText()))
 BN	Kobold Raid	From the south-west road in 25 seconds
 BN	Discovered: Fargodeep Mine	4 of 35 places in Elwynn

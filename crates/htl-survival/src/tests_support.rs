@@ -104,9 +104,12 @@ fn looked_at(events: &[Event], caster: Id, spell: u32, unit: Id) -> bool {
     events.iter().any(|e| matches!(e, Event::Missile { caster: c, spell: s, target: Target::Unit(t) } if *c == caster && *s == spell && *t == unit))
 }
 
+/// Down to half health, a blow just taken (in the fight: no regeneration while a heal is judged).
 fn halve(s: &mut Survival, p: Id) -> u32 {
+    let now = s.clock;
     let p = s.players.get_mut(&p).unwrap();
     p.health = p.max_health / 2;
+    p.combat_at = now;
     p.health
 }
 
@@ -140,7 +143,9 @@ fn help_aimed_at_a_friend_heals_and_shields_them_not_the_caster() {
     assert!(s.has_cc(b, "shield"), "his shield");
     assert_eq!(s.players[&a].health, ha, "not hers");
     assert!(!s.has_cc(a, "shield"), "no shield on her");
-    assert!(ev.iter().any(|e| matches!(e, Event::Flash { player, text } if *player == a && text.contains("Bren"))), "she's told");
+    // No word: her look lands on him and her green number for him shows.
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, .. } if *healer == a && *target == b)), "she sees what she mended");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == a)), "no word");
 }
 
 #[test]

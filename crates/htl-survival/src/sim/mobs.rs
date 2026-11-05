@@ -647,8 +647,10 @@ impl Survival {
         m.posture = 0;
         m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
         self.stagger_mob(mid, POSTURE_BREAK, true);
-        self.events.push(Event::Flash { player: by, text: "Stance broken!".into() });
+        // No word: it reels, dust bursts off it, a great mace's crack on metal, and a heavy beat
+        // on the screen of the hero who broke it.
         self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
+        self.cue(Some(by), mid, 0, super::cues::SOUND_BREAK, super::cues::BEAT_BREAK);
         true
     }
 
@@ -847,6 +849,10 @@ impl Survival {
     fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
         self.death_mark_reset(mid);
+        // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
+        // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
+        // looks go the moment it falls, as a fallen hero's do.
+        self.clear_cc(mid);
         if matches!(self.mobs.get(&mid).map(|m| &m.state), Some(MobState::Windup { .. })) && self.attack_now(mid).ranged {
             self.events.push(Event::CastEnd { caster: mid });
         }
@@ -1132,6 +1138,11 @@ impl Survival {
                 }
             } else {
                 self.walk(id, dt);
+            }
+            // A target put up to stand still (`.es target ... still`): moved by what moves it,
+            // never of its own will.
+            if self.targets.get(&id).copied().unwrap_or(false) {
+                continue;
             }
             if self.disabled(id) {
                 continue;
@@ -2097,6 +2108,10 @@ impl Survival {
     }
 
     pub(crate) fn windup(&mut self, id: Id, foe: Foe, to: Vec3) {
+        // A spell lab body swings only when the lab asks it to.
+        if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) {
+            return;
+        }
         self.halt(id);
         if let Some(m) = self.mobs.get_mut(&id) {
             m.lost_at = None;

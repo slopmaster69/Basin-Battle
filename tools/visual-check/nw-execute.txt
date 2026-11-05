@@ -1,0 +1,14 @@
+# No words (#135), the execute: Kill Shot (3), the draw held full, at a creature 15 yd off under
+# a quarter of its health. Look for: Slam's impact on it, Execute's sound, the hard held camera
+# stop; no "Execute!".
+hero hunter
+cam 0 -10 10
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 15 still 20%
+5.0 .es slot 3 kill_shot
+6.0 .es in ab 4 0
+6.4 .es in a {facing} 0.0            # the draw
+8.0 .es in au {facing} 0.0           # let go once it's full: the kill ~0.3 s later
+7.8 shots execute 12 0.15
+11 end

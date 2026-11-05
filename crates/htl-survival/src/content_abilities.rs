@@ -219,6 +219,10 @@ pub struct AbilityDef {
     pub spell: u32,
     #[serde(default)]
     pub charge_spell: u32,
+    /// A wind-up on the caster themself while a charge is held (Kill Shot's draw): this spell's
+    /// aura look in their aura slots from the press to the release or the let-go (0: none).
+    #[serde(default)]
+    pub charge_look: u32,
     /// At full charge: a faster missile (its own spell, flying at its own speed, so the look keeps
     /// pace) and a flare on the caster as the charge tops out (0: the school's).
     #[serde(default)]
@@ -229,8 +233,25 @@ pub struct AbilityDef {
     pub full_kit: u32,
     #[serde(default)]
     pub impact_kit: u32,
+    /// A piercing shot's weight on each foe it goes through (Kill Shot): this kit and this
+    /// `SoundEntries` id on each, besides `impact_kit`, and the heavy blow's reel (0: none).
+    #[serde(default)]
+    pub through_kit: u32,
+    #[serde(default)]
+    pub through_sound: u32,
+    /// A kill with it: this `SoundEntries` id from the foe's spot, for everyone near (0: none).
+    #[serde(default)]
+    pub kill_sound: u32,
+    /// The caster's own screen as it goes, and as it kills: the add-on's beats of these names
+    /// (`BT` lines; empty: none).
+    #[serde(default)]
+    pub beat: String,
+    #[serde(default)]
+    pub kill_beat: String,
     /// A trap's look while it's set (`GameObjectDisplayInfo`: 3072 an Explosive Trap, 3071 a
-    /// Freezing Trap), and the spell shown at its spot as it goes off (its ground one-shot).
+    /// Freezing Trap), and the spell shown at its spot as it goes off (its ground one-shot, cast
+    /// from the spot by an unseen stand-in, so no caster-side look plays on the hunter; what it
+    /// does to each one it catches is the `impact_kit`).
     #[serde(default)]
     pub object: u32,
     #[serde(default)]
@@ -276,6 +297,14 @@ pub struct AbilityDef {
     pub leap_from: String,
     #[serde(default)]
     pub leap_flip: bool,
+    /// A pull's look on whoever casts it, for the whole flight of what it hauls (Reverse Grapple:
+    /// a pull, not the bow's release pose): a clip (`pull_clip`), borrowed from another character
+    /// model (`pull_from`, as `"ScourgeFemale"`; empty: their own), on the clients that play
+    /// clips. Only on an ability with a `pull` effect.
+    #[serde(default)]
+    pub pull_clip: u16,
+    #[serde(default)]
+    pub pull_from: String,
     /// Valor for each foe it strikes (0: `[valor].ability`).
     #[serde(default)]
     pub valor_hit: f32,
@@ -437,6 +466,11 @@ pub struct AbilityDef {
     /// on whatever key) fires its EX version for no Valor; the proc is spent then.
     #[serde(default)]
     pub empower: Option<EmpowerDef>,
+    /// The colour (`"RRGGBB"`) its missile's ribbon takes as it flies and after each ricochet, one
+    /// a bounce, the last kept past them (Bank Shot's arrow hotter each time it bounces: Corey's
+    /// review). Drawn on a client with patch 0030, over the spell's own `[[missile_look]]`.
+    #[serde(default)]
+    pub bounce_trail: Vec<String>,
     /// A projectile that comes back (a boomerang): out to its full range (or a wall), then back to
     /// where the caster is now, striking every foe it passes once each way. It ends at the caster.
     /// The way back strikes at `return_damage` of the way out (1: the same).

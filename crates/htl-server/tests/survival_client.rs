@@ -377,6 +377,13 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::SpellGo(g) if g.spell_id == 116)).is_some(), "the Frostbolt flies");
     assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~frostbolt~"))).is_some(), "its cooldown on the bar");
     c.drain(0.5);
+    // Again at once: not ready. The words stay (a refusal), and he says it in his own voice,
+    // a Human man's "That ability isn't ready yet." (`HumanMale_CantUseAbilityCooling`), which
+    // the stock client plays from the packet.
+    c.chat(".es in ab 0 0");
+    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::PlaySound { sound_id } if *sound_id == 1917)).is_some(), "said in his voice");
+    assert!(addon_lines(&c, "ES").iter().any(|l| l.starts_with("FL\tFrostbolt ready in")), "and its words");
+    c.drain(0.5);
 
     // Timber: right-click the nearest pile and wait out the gather.
     let (node, at) = objects_with(&c, 1248).into_iter().min_by(|a, b| {
@@ -782,7 +789,13 @@ fn the_guard_shows_its_pose_the_rack_arms_and_a_timed_guard_parries() {
         parried = c.wait_exactly(0.65, |p| matches!(p, ServerPacket::AttackerState(s) if s.attacker == wolf && s.victim == me && s.victim_state == 3)).is_some();
     }
     assert!(parried, "a parry: {:?}", c.seen.iter().filter_map(|p| if let ServerPacket::AttackerState(s) = p { Some((s.attacker == me, s.victim_state, s.damage)) } else { None }).collect::<Vec<_>>());
-    assert!(c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "ES\tFL\tParry!")).is_some() || addon_lines(&c, "ES").iter().any(|l| l == "FL\tParry!"), "the flash");
+    // No "Parry!": Disarm's spark on the hero (the clang and hit-stop are the add-on's, from IM).
+    assert!(
+        c.wait(1.0, |p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == me && *kit_id == htl_survival::KIT_PARRY)).is_some()
+            || c.seen.iter().any(|p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == me && *kit_id == htl_survival::KIT_PARRY)),
+        "the parry's spark"
+    );
+    assert!(!addon_lines(&c, "ES").iter().any(|l| l.starts_with("FL\t")), "no word");
     assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::Emote { guid, emote_id } if *guid == wolf && *emote_id == 64)), "the wolf reels");
 }
 
@@ -819,7 +832,13 @@ fn with_friendly_fire_heroes_strike_and_parry_each_other_and_get_up_at_once() {
         a.drain(0.8);
     }
     assert!(parried, "a parry between heroes");
-    assert!(a.wait(0.5, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "ES\tFL\tParried!")).is_some() || addon_lines(&a, "ES").iter().any(|l| l == "FL\tParried!"), "ann is told she was parried");
+    // Ann isn't told in words: the spark on Ben and her own reel (below) show it.
+    assert!(
+        a.wait(0.5, |p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == bg && *kit_id == htl_survival::KIT_PARRY)).is_some()
+            || a.seen.iter().any(|p| matches!(p, ServerPacket::PlaySpellVisual { unit, kit_id } if *unit == bg && *kit_id == htl_survival::KIT_PARRY)),
+        "ann sees the spark on ben"
+    );
+    assert!(!addon_lines(&a, "ES").iter().any(|l| l == "FL\tParried!"), "no word");
     assert!(a.seen.iter().any(|p| matches!(p, ServerPacket::Emote { guid, emote_id } if *guid == ag && *emote_id == 64)), "ann reels");
 
     // Ben strikes back with his guard down until Ann falls: announced, and up again at once.
@@ -1893,6 +1912,37 @@ fn stand_in_casts(c: &Client, spell: u32, me: u64) -> Vec<(u64, [f32; 3])> {
         out.push((g.caster, at));
     }
     out
+}
+
+/// To a client with the arrow display (`ac22`), a planted arrow is the wooden doodad arrow
+/// (60003) at half again its size, its flags carrying the glow bit client patch 0039 lights it
+/// by (no feather for it).
+#[test]
+fn a_planted_arrow_is_the_wooden_arrow_half_again_its_size_with_the_glow_flag_for_a_client_that_draws_it() {
+    let server = start_content(None, false, content());
+    let mut c = Client::connect(server.login, "corey", "hold", REALM).unwrap();
+    enter(&mut c);
+    c.chat(".es hello 5 ac22");
+    c.chat(".es cd off");
+    c.drain(0.6);
+    c.chat(".es slot q aimed_arrow");
+    c.drain(0.2);
+    for _ in 0..2 {
+        c.chat(".es in ab 0 0 0.0 -0.15");
+        c.chat(".es in a 0.0 -0.15");
+        c.drain(0.5);
+        c.chat(".es in au 0.0 -0.15");
+        c.drain(1.2);
+    }
+    assert!(objects_with(&c, 2630).is_empty(), "no feather for a client that draws the arrow");
+    let arrows = objects_with(&c, 60_003);
+    assert_eq!(arrows.len(), 2, "two arrows in the ground");
+    for (g, _) in &arrows {
+        let f = placed(&c).into_iter().find(|(x, ..)| x == g).unwrap().3;
+        assert_eq!(field(&f, 4).map(f32::from_bits), Some(1.5), "half again its size");
+        let flags = field(&f, 9).unwrap_or(0);
+        assert_eq!(flags & 0x0800_0000, 0x0800_0000, "the glow bit: {flags:#x}");
+    }
 }
 
 #[test]

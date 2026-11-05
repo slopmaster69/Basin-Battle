@@ -169,7 +169,9 @@ fn backstab_does_three_times_from_behind_and_crits_on_a_mark_and_ambush_steps_be
     let ev = run_held(&mut s, k, 0.0, 0.6);
     let hit = hits_on(&ev, k);
     assert!(hit[0].0 as f32 >= lo * 1.2 * 3.0 - 1.0, "from behind: {}", hit[0].0);
-    assert!(flashed(&ev, p, "Backstab"));
+    // Shown, not said: the stab's look, a dagger's crit, a sharp beat.
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_BACKSTAB) && crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_BACKSTAB));
+    assert!(!flashed(&ev, p, "Backstab"), "no word");
     // Face to face: its plain share.
     run_held(&mut s, k, std::f32::consts::PI, 0.6);
     cast(&mut s, p, "close", "backstab", false);
@@ -181,7 +183,8 @@ fn backstab_does_three_times_from_behind_and_crits_on_a_mark_and_ambush_steps_be
     s.apply_cc(k, p, "mark", 8.0, 0.15, 0.0, "test");
     cast(&mut s, p, "close", "backstab", false);
     let ev = run_held(&mut s, k, std::f32::consts::PI, 0.6);
-    assert!(flashed(&ev, p, "Critical"));
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_CRIT) && crate::sim::cues::seen::looked(&ev, k, KIT_HEAVY) && crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_CRIT), "a critical's blow");
+    assert!(!flashed(&ev, p, "Critical"), "no word");
     // Ambush: a step behind the foe on the reticle first.
     calm(&mut s, k);
     let far = mob(&mut s, "brave", [9.0, 0.0, 0.0], std::f32::consts::PI);
@@ -271,8 +274,38 @@ fn a_death_mark_makes_everything_land_harder_and_a_kill_under_it_readies_every_c
     s.mobs.get_mut(&k).unwrap().health = 1;
     let ev = run(&mut s, 1.0);
     assert!(!s.alive(k));
-    assert!(flashed(&ev, p, "Death Mark"));
+    // Every key flares as it comes ready, with Cold Blood's sting: no word.
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_READIED) && crate::sim::cues::seen::sounded(&ev, p, crate::sim::cues::SOUND_READIED));
+    assert!(!flashed(&ev, p, "Death Mark"), "no word");
     assert!(s.players[&p].cooldowns.is_empty(), "every cooldown ready");
+}
+
+/// The mark's arrow (aura 1130) hung over the body until the mark's 8 s ran out; it goes down with
+/// the creature.
+#[test]
+fn a_death_mark_goes_down_with_the_creature_it_marked() {
+    let mut s = world_with(false);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "brave", [10.0, 0.0, 0.0], 0.0);
+    s.set_valor(p, 100.0);
+    s.set_aim_line(p, 0.0, 0.0);
+    cast(&mut s, p, "ultimate", "death_mark", false);
+    run(&mut s, 0.6);
+    assert!(s.has_cc(k, "deathmark"));
+    assert!(s.auras_of(k).contains(&1130), "the mark's arrow over it: {:?}", s.auras_of(k));
+    calm(&mut s, k);
+    // The kill, well inside the mark's 8 s.
+    s.mobs.get_mut(&k).unwrap().health = 1;
+    s.hurt_mob_as(k, p, 5, "Melee");
+    let ev = s.step(DT);
+    assert!(!s.alive(k));
+    assert!(ev.iter().any(|e| matches!(e, Event::Died { id } if *id == k)));
+    // Its marker's cooldowns are still readied (the mark counted); the mark itself is gone.
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_READIED), "the kill under the mark still readies every key");
+    assert!(!s.has_cc(k, "deathmark"), "the mark went down with it");
+    assert!(s.cc_of(k).is_empty(), "nothing left on the body: {:?}", s.cc_of(k));
+    assert!(!s.auras_of(k).contains(&1130), "the arrow off the body: {:?}", s.auras_of(k));
+    assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == k)), "and the clients told so at once");
 }
 
 #[test]
@@ -310,7 +343,8 @@ fn cold_snap_freezes_what_is_near_as_the_ice_block_breaks_and_fire_shatters_it()
     s.set_aim_line(p, 0.0, 0.0);
     let mut ev = cast(&mut s, p, "ranged", "fireball", false);
     ev.extend(run(&mut s, 1.0));
-    assert!(flashed(&ev, p, "Shatter"));
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST) && crate::sim::cues::seen::sounded(&ev, k, crate::sim::cues::SOUND_SHATTER), "the ice bursts");
+    assert!(!flashed(&ev, p, "Shatter"), "no word");
     assert!(!s.has_cc(k, "petrify"), "the ice is gone");
 }
 

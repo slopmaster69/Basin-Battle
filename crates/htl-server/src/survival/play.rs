@@ -18,8 +18,9 @@ pub(crate) const POSE_SHIELD: u32 = 43;
 const POSE_TWO_HANDED: u32 = 375;
 const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// The hunter's shots whose own look has no missile model: flown from a spot, they carry the
-/// arrow (as Basin Battle's server sends them), or the client flies nothing to see.
-const ARROW_SPELLS: [u32; 3] = [2643, 3044, 19434];
+/// arrow (as Basin Battle's server sends them), or the client flies nothing to see. (10346: Fire
+/// Shot's, Kill Shot's arrow, carried the same way.)
+const ARROW_SPELLS: [u32; 4] = [2643, 3044, 10346, 19434];
 /// Where a missile coming home is aimed: this far over the feet of whoever threw it (chest high
 /// on a dwarf, the hands on a human), so it flies to the body, not the ground.
 const HOME_HEIGHT: f32 = 1.2;
@@ -551,6 +552,10 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Hear { player, sound } => {
+                // The stock client plays it itself: no add-on needed.
+                self.to_player(player, packets::play_sound(sound));
+            }
             Event::Hop { player, dir, speed, lift, roll, style } => {
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(c) = self.conn_of(player) else { return };
@@ -698,9 +703,59 @@ impl SurvivalGame {
                 self.broadcast(&super::draw::area_create(guid, caster, spell, pos, radius));
                 self.area_looks.insert(id, guid);
             }
+            Event::Rope { id, a, b } => {
+                // On the clients that stretch a rope from end to end (patch 0028), in place of the
+                // strip on the ground laid for it just before (taken off theirs as a gone mark's
+                // is: floor clutter, Corey's review); the rest keep the strip.
+                let p = self.rope_create(id, a, b);
+                let conns: Vec<(ConnId, bool)> = self.in_world().filter(|(_, _, w)| w.level >= super::draw::ROPE_LEVEL).map(|(c, _, w)| (*c, w.addon)).collect();
+                for (c, addon) in conns {
+                    self.send(c, p.clone());
+                    if addon {
+                        self.ui_line(c, &format!("MK\t{id}"));
+                        self.ui_line(c, &format!("TG\t{id}"));
+                    }
+                }
+                self.ropes.insert(id);
+            }
+            Event::Tether { from, to, secs } => {
+                // A taut line from the hand (patch 0031): `RP <key> <from> <to's guid or -> <x> <y>
+                // <z> <secs>`, keyed by who holds it, so a new line replaces theirs.
+                let Some(g) = self.guid_of(from) else { return };
+                let (to_guid, at) = match to {
+                    Target::Unit(u) => match self.guid_of(u) {
+                        Some(t) => (format!("0x{t:016X}"), [0.0; 3]),
+                        None => return,
+                    },
+                    Target::Point(p) => ("-".to_string(), p),
+                };
+                let line = format!("RP\t{g:X}\t0x{g:016X}\t{to_guid}\t{:.2}\t{:.2}\t{:.2}\t{secs:.2}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::UNIT_ROPE_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::MissileTint { caster, spell, ability, bounce } => {
+                // The next missile `caster` flies of the spell takes its bounce's colour, on the
+                // clients that draw a missile's look (patch 0030): Bank Shot hotter each bounce.
+                // A stand-in flies the arrow on from a ricochet, so its own guid names that one.
+                let Some(g) = self.stand_ins.get(&caster).map(|s| s.guid).or_else(|| self.guid_of(caster)) else { return };
+                let c = &self.sim.content;
+                let Some(colour) = c.abilities.get(ability).and_then(|d| d.bounce_trail.get((bounce as usize).min(d.bounce_trail.len().saturating_sub(1)))) else { return };
+                let base = c.missile_looks.iter().find(|l| l.spell == spell);
+                let (width, secs, scale, spin, tumble, speed) = base.map_or((0.3, 0.4, 1.0, 0.0, false, 0.0), |l| (l.width.max(0.3), l.secs.max(0.4), l.scale, l.spin, l.tumble, l.speed));
+                let line = super::draw::missile_look_line(spell, colour, width, secs, scale, spin, Some(g), tumble, speed);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::MISSILE_LOOK_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::MarkGone { id } => {
                 if let Some(g) = self.area_looks.remove(&id) {
                     self.broadcast(&packets::destroy_object(g));
+                }
+                if self.ropes.remove(&id) {
+                    self.broadcast(&packets::destroy_object(super::draw::rope_guid(id)));
                 }
                 self.mark_at.remove(&id);
                 let conns: Vec<(ConnId, u8)> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= 5).map(|(c, _, w)| (*c, w.level)).collect();
@@ -798,6 +853,17 @@ impl SurvivalGame {
                     self.broadcast(&packets::spell_go(c, spell, Aim::Caster, &[], None));
                 }
             }
+            Event::Beat { player, beat, on } => {
+                // The hero's own screen alone (what everyone sees and hears went as its own
+                // looks and sounds): nothing is forced on anyone else's view.
+                let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                if let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) {
+                    // Kill Shot's weight goes as `BT`; an outcome's beat (`cues::BEAT_*`) as `CU`, where the
+                    // add-on plays its hit-stop, shake and kick.
+                    let line = if beat.starts_with("kill_shot") { "BT" } else { "CU" };
+                    self.ui_line(c, &format!("{line}\t{}\t{g:#X}", clean(&beat)));
+                }
+            }
             Event::Auras { id } => self.show_auras(id),
             Event::Rooted { player, on } => {
                 let (Some(g), Some(c)) = (self.guid_of(player), self.conn_of(player)) else { return };
@@ -859,7 +925,7 @@ impl SurvivalGame {
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, take, from, secs, at } => {
+            Event::Clip { id, clip, take, from, secs, at, body } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
                 // marked as theirs. The impact where the event says, else half way.
                 let Some(g) = self.guid_of(id) else { return };
@@ -868,7 +934,7 @@ impl SurvivalGame {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}", secs - impact, from.as_deref().unwrap_or(""));
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}\t{}", secs - impact, from.as_deref().unwrap_or(""), body.word());
                     self.ui_line(c, &line);
                 }
             }

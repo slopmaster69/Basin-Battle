@@ -86,6 +86,74 @@ pub fn spell_icons(data_dir: &Path, spells: &[u32]) -> Result<std::collections::
     Ok(out)
 }
 
+/// Spells whose looks show a model whose path holds one of `words` (any case): `what` "missile",
+/// the missile's model; "area", the one-shot a spell sent to a ground point plays there (and
+/// whether it plays a kit on its caster too); otherwise any effect of the precast, cast, impact or
+/// state kit. `only`
+/// names spells to list whatever they show. One line a spell, at most `limit`: its id, name,
+/// missile speed, each kit's animation and the matching models. Read from the player's own data.
+pub fn spell_find(data_dir: &Path, words: &[String], what: &str, only: &[u32], limit: usize) -> Result<Vec<String>> {
+    let mut chain = Chain::open(data_dir)
+        .with_context(|| format!("opening the game data in {}", data_dir.display()))?;
+    let visuals = benilla_formats::load_spell_visual_catalog(&mut chain).context("reading SpellVisual.dbc")?;
+    let spells = benilla_formats::load_spell_catalog(&mut chain).context("reading Spell.dbc")?;
+    let words: Vec<String> = words.iter().map(|w| w.to_lowercase()).collect();
+    let mut rows: Vec<_> = spells.iter().collect();
+    rows.sort_by_key(|r| r.0);
+    let mut out = Vec::new();
+    for (id, s) in rows {
+        let Some(st) = visuals.stages(s.visual) else {
+            if only.contains(&id) {
+                out.push(format!("spell {id} {:?} speed {} (no visual {})", s.name, s.speed, s.visual));
+            }
+            continue;
+        };
+        let mut hits = Vec::new();
+        let missile = visuals.effect_path(st.missile_model).unwrap_or("").to_string();
+        if what == "area" {
+            let path = visuals.effect_path(st.area_effect).unwrap_or("");
+            let l = path.to_lowercase();
+            if st.missile_gate == 0 && !path.is_empty() && words.iter().any(|w| l.contains(w.as_str())) {
+                let on_caster = if st.precast != 0 || st.cast != 0 { " (and a kit on the caster)" } else { "" };
+                hits.push(format!("area:{path}{on_caster}"));
+            }
+        } else if what == "missile" {
+            let l = missile.to_lowercase();
+            if !missile.is_empty() && words.iter().any(|w| l.contains(w.as_str())) {
+                hits.push(format!("missile:{missile}"));
+            }
+        } else {
+            for (stage, kit) in [("precast", st.precast), ("cast", st.cast), ("impact", st.impact), ("state", st.state)] {
+                let Some(k) = visuals.kit(kit) else { continue };
+                for (_, e) in k.effects() {
+                    if let Some(p) = visuals.effect_path(e) {
+                        let l = p.to_lowercase();
+                        if words.is_empty() || words.iter().any(|w| l.contains(w.as_str())) {
+                            hits.push(format!("{stage}[kit {kit}]:{p}"));
+                        }
+                    }
+                }
+            }
+        }
+        if (hits.is_empty() && !only.contains(&id)) || (!only.is_empty() && !only.contains(&id)) || out.len() >= limit {
+            continue;
+        }
+        let anim = |kit: u32| visuals.kit(kit).and_then(|k| k.anim_id).map_or("-".to_string(), |a| a.to_string());
+        let m = if missile.is_empty() { String::new() } else { format!(" missile {missile}") };
+        out.push(format!(
+            "spell {id} {:?} speed {} precast anim {} cast anim {} impact anim {} state anim {}{m} | {}",
+            s.name,
+            s.speed,
+            anim(st.precast),
+            anim(st.cast),
+            anim(st.impact),
+            anim(st.state),
+            hits.join(" ")
+        ));
+    }
+    Ok(out)
+}
+
 /// What of these spells' and kits' looks the game data can't show: a spell missing from
 /// `Spell.dbc`, a missile or kit effect with no `SpellVisualEffectName` row (the client draws its
 /// error cube there) or whose model isn't in the data. Each line names the id and what's wrong.

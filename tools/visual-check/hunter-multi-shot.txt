@@ -1,0 +1,14 @@
+# Multi-Shot (Ctrl+Q): five arrows in a fan at a creature 15 yd off. Look for: the fan and what
+# marks it while aiming (Corey's review: no floor marker; a cone reticle is in the client batch).
+hero hunter
+cam 0 -12 10
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 15 still
+5.0 .es slot q aimed_arrow
+5.5 .es valor full
+6.0 .es in ab 0 1                    # Ctrl+Q: aiming the EX version
+7.0 .es in a {facing} 0.0
+7.2 .es in au {facing} 0.0
+6.3 shots fan 6 0.3
+11 end

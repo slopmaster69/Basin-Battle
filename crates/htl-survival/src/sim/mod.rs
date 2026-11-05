@@ -14,6 +14,7 @@ pub mod abilities;
 pub mod arena;
 pub(crate) mod beta;
 pub mod cc;
+pub mod cues;
 mod building;
 pub use building::StationActions;
 mod combat;
@@ -28,6 +29,7 @@ pub mod recasts;
 pub(crate) mod explore;
 pub(crate) mod heroes;
 pub mod hunter;
+pub mod lab;
 mod raid;
 pub mod siege;
 pub mod wager;
@@ -36,7 +38,7 @@ mod world;
 
 #[cfg(test)]
 pub(crate) use combat::Follow;
-pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_FALL_DUST, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, WOUND_ANIM,
+pub use combat::{BLOCK_ANIM, CRIT_ANIM, EAT_DONE_SPELL, EAT_SPELL, KIT_BASH, KIT_CLEAVE, KIT_DUST, KIT_FALL_DUST, KIT_HEAVY, KIT_PARRY, KIT_RIPOSTE, KIT_SLAM, KNOCKDOWN_ANIM, MEAL, PARRY_ANIM, SPRINT_SPELL, STUN_ANIM, TOO_HEAVY_PUSH, WOUND_ANIM,
 };
 pub use abilities::{look_dir, Cooldown, HitKind, Stance};
 pub use cc::Cc;
@@ -169,6 +171,10 @@ pub enum Event {
     /// A bow ability's arrow goes: the bow's own release (the go of its draw, `spell`), with no
     /// arrow of its own (the ability's missiles are their own events).
     Loose { caster: Id, spell: u32 },
+    /// A beat on a hero's own screen alone (the add-on's `BT`): Kill Shot's speed lines as it
+    /// goes, its hit-stop and shake as it kills; `on` the foe it struck (`None`: nobody). And an
+    /// outcome's beat (`cues::BEAT_*`, the add-on's `CU`): a hit-stop, a shake, the camera's kick.
+    Beat { player: Id, beat: String, on: Option<Id> },
     /// Ground that lingers (holy ground, fire) wears this spell's look (a DynamicObject) until
     /// the mark `id` is gone.
     AreaLook { id: Id, caster: Id, spell: u32, pos: Vec3, radius: f32 },
@@ -209,8 +215,11 @@ pub enum Event {
     Hop { player: Id, dir: f32, speed: f32, lift: f32, roll: bool, style: &'static str },
     /// The guard went up or down (the hero's stance).
     Guard { player: Id, up: bool },
-    /// A word flashed on one hero's screen (a parry).
+    /// Words on one hero's screen: a refusal (out of range, not ready) or a hint. Never an
+    /// outcome: those show by [`Event::Visual`], [`Event::Sound`] and [`Event::Beat`].
     Flash { player: Id, text: String },
+    /// A sound (`SoundEntries.dbc`) for one hero's ears only: their own voice on a refusal, coins.
+    Hear { player: Id, sound: u32 },
     /// Too winded for what they tried: the stamina bar says so.
     Winded { player: Id },
     /// Someone fell: to `killer` if a hero or creature struck them last.
@@ -227,6 +236,15 @@ pub enum Event {
     /// Shadow Fissure...) in place of the drawn circle; 0, the circle.
     Mark { id: Id, pos: Vec3, radius: f32, tele: Option<Telegraph>, ground: u32 },
     MarkGone { id: Id },
+    /// A rope from `a` to `b` (Tripwire's wire, taut a hand above the ground), until the mark
+    /// `id` it goes with is gone (`MarkGone`).
+    Rope { id: Id, a: Vec3, b: Vec3 },
+    /// The missile `caster` flies next of `spell` (the hero's arrow, or the stand-in flying it on
+    /// from a ricochet) takes the ribbon colour `ability`'s `bounce_trail` has for its `bounce`.
+    MissileTint { caster: Id, spell: u32, ability: usize, bounce: u8 },
+    /// A taut line from `from`'s hand to `to` for `secs` (a grappling hook pulling its hunter in,
+    /// a foe hauled in on it), drawn on a client with patch 0031.
+    Tether { from: Id, to: Target, secs: f32 },
     Bags { player: Id },
     Storage,
     Tell { player: Id, text: String },
@@ -291,7 +309,8 @@ pub enum Event {
     /// of the model's versions, `from` another character model whose take every client plays (an
     /// ability's own, the same on every race), or the unit's own.
     /// `at`: its impact this many seconds in (0: half way), so a cast's clip lands as the cast does.
-    Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32, at: f32 },
+    /// `body`: the whole model, or the upper or lower half only, the rest keeping what it was doing.
+    Clip { id: Id, clip: u16, take: u32, from: Option<String>, secs: f32, at: f32, body: ClipBody },
     /// A unit's clip called off (a feint: the guard raised before the blow came).
     ClipStop { id: Id },
     /// An ability's shape flashed on the ground as it lands, for the clients that draw one: at a
@@ -316,6 +335,29 @@ pub enum Event {
     Log(String),
     /// Something worth saving changed.
     Dirty,
+}
+
+/// How much of a unit a clip drives ([`Event::Clip`]): all of it (the usual), its arms and
+/// torso only (a draw, a cast, the legs free to run), or its pelvis and legs only (Skyfall's
+/// hang: the legs drawn up while the arms keep drawing the bow). The lower half takes client
+/// patch 0037 (`ac23`); an older client plays it as a whole-body clip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ClipBody {
+    #[default]
+    Full,
+    Upper,
+    Lower,
+}
+
+impl ClipBody {
+    /// The word the add-on's `AN` line carries.
+    pub fn word(self) -> &'static str {
+        match self {
+            ClipBody::Full => "full",
+            ClipBody::Upper => "upper",
+            ClipBody::Lower => "lower",
+        }
+    }
 }
 
 /// A creature's blow as it winds up, for the ground under it: from the creature (following it as
@@ -874,6 +916,10 @@ pub struct Survival {
     /// (hero, ability): when they can have it again (Lay on Hands).
     pub(crate) lockouts: BTreeMap<(Id, usize), f32>,
     pub(crate) burnings: Vec<abilities::Burning>,
+    /// The spell lab's bodies, which swing only when the lab asks (`lab_blow`, the one in
+    /// `lab_blowing` while it does).
+    pub(crate) lab_quiet: Vec<Id>,
+    pub(crate) lab_blowing: Option<Id>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -886,12 +932,23 @@ pub struct Survival {
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
     pub(crate) fx_vs_bosses: bool,
+    /// The look the caster of the pull being given wears over it (its clip, the model it's
+    /// borrowed from): an ability's `pull_clip` and `pull_from`.
+    pub(crate) fx_pull_look: Option<(u16, String)>,
     /// When a hero may next be told this foe shrugged their control off (hero, foe).
     pub(crate) told_immune: BTreeMap<(Id, Id), f32>,
+    /// When a hero may next say a refusal in their own voice.
+    pub(crate) told_vocal: BTreeMap<Id, f32>,
+    /// Heroes who turned the game's Error Speech off (their add-on says so): no voice on a
+    /// refusal for them, the words only.
+    pub(crate) no_error_speech: BTreeSet<Id>,
     /// Counters' stances (a hero's, a dummy's), by unit.
     pub stances: BTreeMap<Id, Stance>,
     /// Training dummies' loops (`guard`, `roll`, `counter <ability>`).
     pub dummies: BTreeMap<Id, String>,
+    /// Creatures put up to practise on and look at (`.es target`): `true` for one that stands
+    /// still, never moving or striking of itself (thrown, pulled and knocked up all the same).
+    pub targets: BTreeMap<Id, bool>,
     /// Crowd control on units, the heroes' grace after a hard one, and each hero's log of it.
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
@@ -916,6 +973,9 @@ pub struct Survival {
     /// moves on.
     pub(crate) patrols: BTreeMap<usize, (usize, f32)>,
     pub debug: bool,
+    /// Debug's commands without its drawing (`.es debug quiet`: the visual check records with
+    /// it, so projectiles' bodies and ground areas aren't drawn over the footage).
+    pub debug_quiet: bool,
     /// Testing: stations, upgrades and mending cost nothing at the camp (`.es freebuild`).
     pub free_build: bool,
     /// The world below (the Deadmines), if this is it.
@@ -991,14 +1051,20 @@ impl Survival {
             anchors: BTreeMap::new(),
             fx_from: None,
             fx_vs_bosses: false,
+            fx_pull_look: None,
             told_immune: BTreeMap::new(),
+            told_vocal: BTreeMap::new(),
+            no_error_speech: BTreeSet::new(),
             grounds: Vec::new(),
             bounces: Vec::new(),
             lockouts: BTreeMap::new(),
             burnings: Vec::new(),
+            lab_quiet: Vec::new(),
+            lab_blowing: None,
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
+            targets: BTreeMap::new(),
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),
@@ -1013,6 +1079,7 @@ impl Survival {
             respawns: Vec::new(),
             patrols: BTreeMap::new(),
             debug: false,
+            debug_quiet: false,
             free_build: false,
         below: None,
             siege: None,
@@ -1748,6 +1815,11 @@ impl Survival {
         self.marks.push((id, self.clock + secs));
         self.events.push(Event::Mark { id, pos, radius, tele, ground: 0 });
         id
+    }
+
+    /// Debug draws projectiles' bodies and every ground area (not with `.es debug quiet`).
+    pub(crate) fn debug_draws(&self) -> bool {
+        self.debug && !self.debug_quiet
     }
 
     /// Seconds a danger mark has left on the ground (0: gone).

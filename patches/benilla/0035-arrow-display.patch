@@ -1,0 +1,39 @@
+From 4117a0dcfc70530efcf57ba677193ed33ebfb762 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:43:51 -0600
+Subject: [PATCH] Display 60002 is the Hunter's arrow, for an arrow planted in
+ the ground
+
+Arcane Shot's missile model as a game object (benilla's own displays from 60000, with 0028's
+rope): a real arrow where a planted arrow stands, stood up by its spawn's rotation, instead of
+the brown feather doodad that stood in for it (Corey's review of Tripwire: "can we physically
+have arrows sticking vertically out of the ground?").
+---
+ crates/benilla-formats/src/gameobjects.rs | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/crates/benilla-formats/src/gameobjects.rs b/crates/benilla-formats/src/gameobjects.rs
+index fdc30128..74580bd4 100644
+--- a/crates/benilla-formats/src/gameobjects.rs
++++ b/crates/benilla-formats/src/gameobjects.rs
+@@ -55,6 +55,17 @@ pub const EXTRA_DISPLAYS: &[(u32, &str)] = &[
+         60001,
+         "World\\Generic\\Dwarf\\Passive Doodads\\ExcavationRopeStake\\ExcavationRope.mdx",
+     ),
++    // The Hunter's arrow (Arcane Shot's missile), as an object: an arrow planted in the ground,
++    // stood up by its spawn's rotation. Its model's +X is its flight, nock to head. (A glowing
++    // arcane arrow: run 061 read it as a purple spike.)
++    (60002, "Spells\\ArcaneShot_Missile.mdx"),
++    // A plain wooden arrow, the human weapons doodad, placed as the doodad is; and the plain
++    // ammo arrow in flight, +X nock to head.
++    (
++        60003,
++        "World\\Generic\\Human\\Passive Doodads\\Weapons&Armor\\HumanArrow.m2",
++    ),
++    (60004, "Item\\ObjectComponents\\Ammo\\ArrowFlight_01.m2"),
+ ];
+ 
+ /// Load GameObjectDisplayInfo.dbc from the patch chain into a [`GameObjectCatalog`].
+-- 
+2.56.0.windows.4
+
