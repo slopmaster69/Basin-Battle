@@ -630,6 +630,8 @@ impl Survival {
             if p.ward_up && self.content.ward.aura != 0 {
                 out.push(self.content.ward.aura);
             }
+            // Grace: one more look for each level (the Priest's core).
+            out.extend(self.grace_auras(p));
         }
         // A creature's own look (a spirit beast's glow).
         if let Some(m) = self.mobs.get(&id) {

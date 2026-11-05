@@ -352,7 +352,8 @@ fn power_word_barrier_wards_and_steadies_whoever_stands_under_it() {
     let away = hero(&mut s, "Cara", [12.0, 0.0, 0.0], 0.0);
     let m = grunt(&mut s, [4.0, 2.0, 0.0]);
     let pins = [(m, [4.0, 2.0, 0.0])];
-    let ev = cast(&mut s, p, "power_word_barrier", false);
+    // (Now Power Word: Shield's EX.)
+    let ev = cast(&mut s, p, "power_word_shield", true);
     assert!(ev.iter().any(|e| matches!(e, Event::AreaLook { spell: 20116, .. })), "its light on the ground");
     assert!(s.has_cc(p, "hallowed") && s.unstaggerable(p), "her own at once");
     assert!((s.taken_share(p) - 0.75).abs() < 0.01, "a quarter less: {}", s.taken_share(p));
@@ -371,26 +372,28 @@ fn power_word_barrier_wards_and_steadies_whoever_stands_under_it() {
 }
 
 #[test]
-fn power_word_shield_is_the_barriers_ex_and_goes_on_the_friend_under_the_reticle_else_on_you() {
+fn power_word_shield_is_the_defenses_card_and_goes_on_the_friend_under_the_reticle_else_on_you() {
+    // (The key 2 card again, the Barrier its EX: the Priest design's Power Word: Shield. Its
+    // perfect is in tests_priest_core.rs.)
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let f = hero(&mut s, "Bren", [8.0, 0.0, 0.0], 0.0);
-    let ev = cast(&mut s, p, "power_word_barrier", true);
+    let v = s.players[&p].valor;
+    let ev = cast(&mut s, p, "power_word_shield", false);
     assert!(
         ev.iter().any(|e| matches!(e, Event::Missile { caster, spell: 17, target: Target::Unit(t) } if *caster == p && *t == f)),
         "its look on him"
     );
-    assert!(s.has_cc(f, "shield") && s.has_cc(f, "haste"), "shielded and quick");
-    assert!(!s.has_cc(p, "shield") && !s.has_cc(p, "haste"), "not her");
-    let v = s.players[&p].valor;
-    assert!(v > 74.9 && v < 90.0, "a segment of Valor spent (a little back for helping): {v}");
+    assert!(s.has_cc(f, "shield"), "shielded");
+    assert!(!s.has_cc(p, "shield"), "not her");
+    assert!(s.players[&p].valor >= v, "no Valor spent (a little back for helping)");
     assert!(s.grounds.is_empty() && s.burnings.is_empty(), "no dome with it");
 
     // Alone, it's her own.
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    cast(&mut s, p, "power_word_barrier", true);
-    assert!(s.has_cc(p, "shield") && s.has_cc(p, "haste"), "on herself");
+    cast(&mut s, p, "power_word_shield", false);
+    assert!(s.has_cc(p, "shield"), "on herself");
 }
 
 #[test]
@@ -406,15 +409,14 @@ fn an_old_save_with_the_priests_old_cards_loads_with_their_successors() {
         .collect();
     let q = s.join("ayla", "Ayla", Some(&save));
     let h = &s.players[&q];
-    for k in ["penance", "holy_nova", "leap_of_faith", "power_word_barrier"] {
+    // (Power Word: Shield is the defense's card again: a save from when it was the Barrier's EX
+    // loads with it as it is now; see tests_priest_core.rs for one with the Barrier on the key.)
+    for k in ["penance", "holy_nova", "leap_of_faith", "power_word_shield"] {
         assert!(h.owned.contains(k), "owns {k}: {:?}", h.owned);
     }
-    assert!(
-        !h.owned.contains("mind_blast") && !h.owned.contains("power_word_shield"),
-        "not the EX versions: they come with their cards"
-    );
+    assert!(!h.owned.contains("mind_blast") && !h.owned.contains("power_word_barrier"), "not the EX versions: they come with their cards");
     assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("penance"));
-    assert_eq!(h.loadout.get("defense").map(String::as_str), Some("power_word_barrier"));
+    assert_eq!(h.loadout.get("defense").map(String::as_str), Some("power_word_shield"));
 }
 
 // --- Shaman -------------------------------------------------------------------------------------

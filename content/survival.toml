@@ -404,6 +404,22 @@ perfect_valor = 10.0
 # The burst (the shatter's kit, to replace once seen).
 perfect_kit = 450
 
+[grace]
+# Grace, the Light Priest's thread (claude/priest-kit-draft.md): every perfect of a Priest's spell
+# raises it a level, up to III; it fades 10 sec after the last rise, and a blow that hurts you
+# costs a level. The holy staff's Heal spends it as it begins: I casts it 30% quicker, II 60%
+# quicker and healing past full health stays on as a shield for 8 sec, III at once with twice that
+# shield. No words: a look more on the hero for each level (Renew's glow, Fear Ward's, then Inner
+# Fire's halo), and a Heal at III lands with a column of light (Sanctuary's). First picks, to check
+# in the client.
+most = 3
+secs = 10.0
+haste = [0.3, 0.6, 1.0]
+overheal = [0.0, 1.0, 2.0]
+overheal_secs = 8.0
+auras = [139, 6346, 588]
+top_spell = 24171
+
 # --- heroes against heroes ------------------------------------------------------------------------
 
 [pvp]
@@ -680,6 +696,47 @@ subclass = 10
 bolt = "arcane_bolt"
 heavy_bolt = "arcane_bolt_heavy"
 
+# The Priest's staffs (claude/priest-kit-draft.md): their right click is an ability, not a guard
+# (`alt`), so whoever wields one gives up their block and parry, Priest or not. The `guard` is
+# only what the rules that read a two-handed weapon's guard find: it's never raised.
+# Holy: Smite, the Heal held (it spends Grace), Flash Heal on the right click.
+[[weapon]]
+key = "acolyte_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [8, 12]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 10
+bolt = "acolyte_smite"
+heavy_bolt = "acolyte_heal"
+alt = "acolyte_flash_heal"
+
+# Shadow: a bolt that hangs Pain, a charged bolt, and Drain held on the right click.
+[[weapon]]
+key = "shadowcaller_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [7, 11]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 10
+bolt = "shadowcaller_bolt"
+heavy_bolt = "shadowcaller_bolt_heavy"
+alt = "shadowcaller_drain"
+
 [[shield]]
 key = "buckler"
 # The arc in front a raised shield covers.
@@ -877,6 +934,24 @@ display = 5415
 icon = "INV_Staff_07"
 kind = "weapon"
 text = "Two-handed. Attacks cast quick bolts of arcane force; the heavy attack a heavier orb. Guards with a ward."
+
+# The Priest's staffs: the Scarlet chaplains' staff for the holy one (472, the other staff look
+# creatures carry), the conjurers' (5415) for the shadow one until a staff of its own is picked.
+[[item]]
+key = "acolyte_staff"
+name = "Acolyte's Staff"
+display = 472
+icon = "INV_Staff_10"
+kind = "weapon"
+text = "Two-handed. Attacks cast Smite. Hold the heavy attack to cast Heal on the ally under your reticle. Right-click casts Flash Heal, which passes through enemies to the first ally it reaches. Cannot block or parry."
+
+[[item]]
+key = "shadowcaller_staff"
+name = "Shadowcaller's Staff"
+display = 5415
+icon = "INV_Staff_02"
+kind = "weapon"
+text = "Two-handed. Attacks cast Shadow Bolts that leave Pain on the enemy. The heavy attack casts a charged Shadow Bolt. Hold right-click to Drain the enemy under your reticle. Cannot block or parry."
 
 [[item]]
 key = "buckler"
@@ -5682,20 +5757,44 @@ spell = 23394
 clip = 54
 effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "root", secs = [2.0, 2.0] }, { kind = "shield", secs = [5.0, 5.0], amount = 30.0 }]
 
-# A place to hold: friends under the dome take less and stand their ground. Each second it gives
-# them both (its boon, and the boon among its tick effects) for 1.5 s; you have both at once.
+# Power Word: Shield, the heart of the class (claude/priest-kit-draft.md): on the friend under the
+# reticle, else on you. Given to a friend just as a blow lands on them (`parry_for`: within
+# `[checks] window` of it, the Priest's round trip allowed early, or while the blow waits on the
+# friend's), the blow is parried for them: the striker reels, the shield stays, and the Priest
+# gets a counter's Valor and the perfect (Grace). On yourself it only absorbs. Two charges, a
+# charge back every 24 sec: a Shield every 12 sec over a fight (the board's budget for a defense),
+# two at once when it counts. Its bubble is PW:Shield's own (17); the perfect's burst flares on
+# the friend.
+[[ability]]
+key = "power_word_shield"
+name = "Power Word: Shield"
+text = "Shields the ally under your reticle, up to 30 yd away, or you if there's none. Absorbs 30 damage for 6 sec. Shield an ally just as an enemy's blow lands on them and the blow is parried for them. Holds 2 charges."
+icon = "Spell_Holy_PowerWordShield"
+school = "priest"
+slot = "defense"
+kind = "ally"
+range = [30.0, 30.0]
+cooldown = 24.0
+charges = 2
+parry_for = true
+spell = 17
+effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 30.0 }]
+
+# A place to hold, now the Shield's EX: friends under the dome take less and stand their ground.
+# Each second it gives them both (its boon, and the boon among its tick effects) for 1.5 s; you
+# have both at once.
 [[ability]]
 key = "power_word_barrier"
 name = "Power Word: Barrier"
+ex_of = "power_word_shield"
 text = "Raises a 6 yd dome of light around you for 5 sec. You and every ally under it take 25% less damage and cannot be staggered. Hold the line inside it."
 icon = "Spell_Holy_PowerInfusion"
-school = "priest"
 slot = "defense"
 kind = "ground"
+valor = 25
 at_self = true
 radius = [6.0, 6.0]
 linger = 5.0
-cooldown = 18.0
 # A column of light on you as it rises (Sanctuary's), and holy light on the ground while it lasts.
 spell = 24171
 linger_spell = 20116
@@ -5703,20 +5802,6 @@ boon = "hallowed"
 boon_amount = 0.25
 tick_effects = [{ kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
 self_effects = [{ kind = "hallowed", secs = [1.5, 1.5], amount = 0.25 }, { kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
-
-# Now given away: on the friend under the reticle, else on you.
-[[ability]]
-key = "power_word_shield"
-name = "Power Word: Shield"
-ex_of = "power_word_barrier"
-text = "Shields the ally under your reticle, or you. The shield absorbs 45 damage for 6 sec, and they run 20% faster while it holds."
-icon = "Spell_Holy_PowerWordShield"
-slot = "defense"
-kind = "ally"
-valor = 25
-range = [30.0, 30.0]
-spell = 17
-effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }, { kind = "haste", secs = [6.0, 6.0], amount = 0.2 }]
 
 [[ability]]
 key = "void_rift"
@@ -6003,6 +6088,127 @@ range = [30.0, 30.0]
 radius = [0.7, 0.7]
 speed = 26.0
 spell = 7268
+
+# The Priest's staffs' (claude/priest-kit-draft.md). The holy staff: Smite on the click, Heal held
+# (a 2 sec cast: slowed meanwhile, a heavy blow breaks it, and it spends Grace), Flash Heal on the
+# right click (`alt`: a bolt for friends that passes foes by, about 1.5 a sec). Looks are first
+# picks, to check in the client: Smite's own (585), Greater Heal's cast and landing (2060), a holy
+# missile for Flash Heal (Penance's stream, 6685) landing as Flash Heal (2061).
+[[ability]]
+key = "acolyte_smite"
+name = "Smite"
+text = "A bolt of holy light from the staff."
+icon = "Spell_Holy_HolySmite"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 8.0
+damage = [9.0, 9.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 40.0
+spell = 585
+
+[[ability]]
+key = "acolyte_heal"
+name = "Heal"
+text = "Hold for 2 sec to heal the ally under your reticle, up to 30 yd away, or you if there's none, for 15% of maximum health. You move slowly while casting, and a heavy blow interrupts it. Grace makes it faster, and from Grace II healing past full health stays on as a shield for 8 sec."
+icon = "Spell_Holy_GreaterHeal"
+school = "priest"
+slot = "ranged"
+kind = "ally"
+bench = true
+# A cast: held its 2 sec, it goes by itself (let go sooner, it's lost).
+charge = [2.0, 2.0]
+hold = 0.01
+fragile = true
+spends_grace = true
+stamina = 12.0
+range = [30.0, 30.0]
+ally_heal = 0.15
+spell = 2060
+charge_spell = 2060
+
+[[ability]]
+key = "acolyte_flash_heal"
+name = "Flash Heal"
+text = "A quick bolt of light that passes through enemies. The first ally it reaches heals 3.5% of maximum health."
+icon = "Spell_Holy_FlashHeal"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+friends_only = true
+# The fire rate: one every 0.65 sec at most.
+cooldown = 0.65
+stamina = 4.0
+ally_heal = 0.035
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+speed = 40.0
+valor_hit = 1.0
+spell = 6685
+burst_spell = 2061
+
+# The shadow staff: a bolt that hangs Pain (refreshed by the next), a charged bolt (the Mage's
+# heavy bolt: let go on the flare for a perfect), and Drain held on the right click: a cord to the
+# foe under the reticle, drawing its health to you while the button is held. Looks: Shadow Bolt
+# (686) for both bolts, Shadow Word: Pain's (589) on the foe, Drain Soul's cord (1120).
+[[ability]]
+key = "shadowcaller_bolt"
+name = "Shadow Bolt"
+text = "A bolt of shadow from the staff. Leaves Pain on the enemy, 2 damage per sec for 4 sec. The next bolt renews it."
+icon = "Spell_Shadow_ShadowBolt"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 8.0
+damage = [7.0, 7.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 30.0
+spell = 686
+effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 2.0, aura = 589 }]
+
+[[ability]]
+key = "shadowcaller_bolt_heavy"
+name = "Shadow Burst"
+text = "A heavy bolt of shadow, 14 to 26 damage."
+icon = "Spell_Shadow_ShadowBolt"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+# Held, and let go on the flare for the perfect.
+charge = [0.3, 1.2]
+perfect = true
+stamina = 20.0
+damage = [14.0, 26.0]
+range = [30.0, 30.0]
+radius = [0.6, 0.6]
+speed = 26.0
+spell = 686
+
+[[ability]]
+key = "shadowcaller_drain"
+name = "Drain"
+text = "Hold to drain the enemy under your reticle, up to 15 yd away, for 4 damage per sec, healing you for all of it. Breaks beyond 17 yd or out of sight."
+icon = "Spell_Shadow_LifeDrain02"
+school = "priest"
+slot = "ranged"
+kind = "channel"
+bench = true
+damage = [4.0, 4.0]
+range = [15.0, 15.0]
+# Held as long as the button is (this long at most).
+secs = 20.0
+tick = 0.5
+drain = 1.0
+valor_hit = 0.5
+spell = 1120
+aura = 1120
 
 # ------------------------------------------------------------------------------------- Mage --
 
@@ -11107,7 +11313,7 @@ trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 key = "relic_priest"
 name = "The Abbey Reliquary"
 at = [-8865.0, -150.0]
-teaches = ["leap_of_faith", "power_word_barrier"]
+teaches = ["leap_of_faith", "power_word_shield"]
 loot = { linen = 3 }
 display = 259
 secret = 7.0
