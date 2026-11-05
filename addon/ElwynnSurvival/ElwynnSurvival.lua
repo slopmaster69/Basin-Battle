@@ -5521,8 +5521,11 @@ function ES.HideChrome()
   -- No names floating over creatures (the bar across the top names the one fought); the
   -- player's own setting comes back with the stock interface.
   if GetCVar and SetCVar and not ES.npcNames then
-    ES.npcNames = GetCVar("UnitNameNPC")
-    pcall(SetCVar, "UnitNameNPC", "0")
+    local ok, was = pcall(GetCVar, "UnitNameNPC")
+    if ok and was then
+      ES.npcNames = was
+      pcall(SetCVar, "UnitNameNPC", "0")
+    end
   end
   -- The chat stays where it is, for talking, and fades between lines (the client lays it out
   -- again as it likes, so it isn't moved).
