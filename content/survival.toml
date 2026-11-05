@@ -811,6 +811,218 @@ guard = "arcane_ward"
 emote = 37
 subclass = 10
 
+
+# LAB ONLY (claude/mage-lab-2): the game's staff models side by side, to pick each staff's look.
+[[weapon]]
+key = "staff_look_472"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_1469"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_34811"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_31346"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_31347"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_1376"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_1648"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_1373"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_1190"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_31959"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_33421"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_32461"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_31763"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+[[weapon]]
+key = "staff_look_34135"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
 # Fire: slow bolts that burn.
 [[weapon]]
 key = "ember_staff"
@@ -1041,6 +1253,118 @@ display = 5415
 icon = "INV_Staff_08"
 kind = "weapon"
 text = "Two-handed. Guards with a ward: an arcane barrier with a bar of its own. A ward raised just as a blow lands costs nothing and reels the attacker. Broken, it can't be raised again until its bar is full."
+
+[[item]]
+key = "staff_look_472"
+name = "Stave long_a_01"
+display = 472
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the long_a_01 staff model."
+
+[[item]]
+key = "staff_look_1469"
+name = "Stave long_d_01"
+display = 1469
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the long_d_01 staff model."
+
+[[item]]
+key = "staff_look_34811"
+name = "Stave long_d_05"
+display = 34811
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the long_d_05 staff model."
+
+[[item]]
+key = "staff_look_31346"
+name = "Stave epicpriest02"
+display = 31346
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the epicpriest02 staff model."
+
+[[item]]
+key = "staff_look_31347"
+name = "Stave epicpriest01"
+display = 31347
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the epicpriest01 staff model."
+
+[[item]]
+key = "staff_look_1376"
+name = "Stave jeweled_a_01"
+display = 1376
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the jeweled_a_01 staff model."
+
+[[item]]
+key = "staff_look_1648"
+name = "Stave jeweled_b_01"
+display = 1648
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the jeweled_b_01 staff model."
+
+[[item]]
+key = "staff_look_1373"
+name = "Stave jeweled_c_01"
+display = 1373
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the jeweled_c_01 staff model."
+
+[[item]]
+key = "staff_look_1190"
+name = "Stave jeweled_d_01"
+display = 1190
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the jeweled_d_01 staff model."
+
+[[item]]
+key = "staff_look_31959"
+name = "Stave blackwing_a_01"
+display = 31959
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the blackwing_a_01 staff model."
+
+[[item]]
+key = "staff_look_33421"
+name = "Stave ahnqiraj_d_02"
+display = 33421
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the ahnqiraj_d_02 staff model."
+
+[[item]]
+key = "staff_look_32461"
+name = "Stave zulgurub_d_01"
+display = 32461
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the zulgurub_d_01 staff model."
+
+[[item]]
+key = "staff_look_31763"
+name = "Stave pvpalliance_a_01"
+display = 31763
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the pvpalliance_a_01 staff model."
+
+[[item]]
+key = "staff_look_34135"
+name = "Stave ahnqiraj_d_04"
+display = 34135
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Lab: the ahnqiraj_d_04 staff model."
 
 # The casting staffs share the conjurers' staff look for now (a staff each, from the data, later).
 [[item]]
