@@ -1,4 +1,4 @@
-From d9ede9a176ffe64b5c9ab88d4dc6e1fd27570a58 Mon Sep 17 00:00:00 2001
+From 3e3a8bf08693835529fff4c3f401aaf7743e3b23 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 5 Nov 2026 09:00:21 -0600
 Subject: [PATCH] Sprites on units for the add-on: the ward's barrier
@@ -10,9 +10,9 @@ says 25.
 ---
  crates/benilla-app/src/target/ground_ring.rs |   2 +-
  crates/benilla-app/src/target/mod.rs         |   4 +
- crates/benilla-app/src/target/unit_sprite.rs | 164 +++++++++++++++++++
- crates/benilla-ui/src/action_combat.rs       |  79 ++++++++-
- 4 files changed, 246 insertions(+), 3 deletions(-)
+ crates/benilla-app/src/target/unit_sprite.rs | 169 +++++++++++++++++++
+ crates/benilla-ui/src/action_combat.rs       |  83 ++++++++-
+ 4 files changed, 255 insertions(+), 3 deletions(-)
  create mode 100644 crates/benilla-app/src/target/unit_sprite.rs
 
 diff --git a/crates/benilla-app/src/target/ground_ring.rs b/crates/benilla-app/src/target/ground_ring.rs
@@ -66,10 +66,10 @@ index 3cbfe0b8..fcbb743a 100644
              );
 diff --git a/crates/benilla-app/src/target/unit_sprite.rs b/crates/benilla-app/src/target/unit_sprite.rs
 new file mode 100644
-index 00000000..aa3f4595
+index 00000000..169525cf
 --- /dev/null
 +++ b/crates/benilla-app/src/target/unit_sprite.rs
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,169 @@
 +//! Basin Battle's sprites on units, not part of 1.12.1: an add-on texture drawn as a disc facing
 +//! the camera round a unit (`SetUnitSprite`), for the Elwynn Survival add-on's ward: a barrier
 +//! round the warder that cracks as it drains and shatters when it breaks, seen by everyone. Like
@@ -98,6 +98,7 @@ index 00000000..aa3f4595
 +    height: f32,
 +    rgba: [f32; 4],
 +    spin: f32,
++    aspect: f32,
 +    set_at: f32,
 +    /// This frame's quad (two triangles), and the point it sorts by.
 +    verts: Vec<EffectVertex>,
@@ -123,14 +124,17 @@ index 00000000..aa3f4595
 +    index.and_then(|i| i.0.get(&guid).copied())
 +}
 +
-+/// The quad of a camera-facing disc `size` across at `centre`, turned `spin` radians in the view.
-+fn quad(centre: Vec3, right: Vec3, up: Vec3, size: f32, spin: f32, rgba: [f32; 4]) -> Vec<EffectVertex> {
-+    let (s, c) = spin.sin_cos();
++/// The quad of a camera-facing disc `size` across (`aspect` times that tall) at `centre`, its
++/// texture turned `spin` radians inside the oval (the oval itself stays upright).
++fn quad(centre: Vec3, right: Vec3, up: Vec3, size: f32, aspect: f32, spin: f32, rgba: [f32; 4]) -> Vec<EffectVertex> {
 +    let half = size * 0.5;
-+    let r = (right * c + up * s) * half;
-+    let u = (up * c - right * s) * half;
-+    let corner = |a: f32, b: f32, uv: [f32; 2]| EffectVertex { pos: (centre + r * a + u * b).to_array(), uv, color: rgba };
-+    let (tl, tr, bl, br) = (corner(-1.0, 1.0, [0.0, 0.0]), corner(1.0, 1.0, [1.0, 0.0]), corner(-1.0, -1.0, [0.0, 1.0]), corner(1.0, -1.0, [1.0, 1.0]));
++    let r = right * half;
++    let u = up * half * aspect;
++    let (s, c) = spin.sin_cos();
++    // The texture turns inside the upright oval: its coordinates, turned about the middle.
++    let turn = |x: f32, y: f32| [0.5 + (x * c - y * s) * 0.5, 0.5 + (x * s + y * c) * 0.5];
++    let corner = |a: f32, b: f32| EffectVertex { pos: (centre + r * a + u * b).to_array(), uv: turn(a, -b), color: rgba };
++    let (tl, tr, bl, br) = (corner(-1.0, 1.0), corner(1.0, 1.0), corner(-1.0, -1.0), corner(1.0, -1.0));
 +    vec![tl, bl, tr, tr, bl, br]
 +}
 +
@@ -146,7 +150,7 @@ index 00000000..aa3f4595
 +    let now = time.elapsed_secs();
 +    for call in action_combat::take_unit_sprites() {
 +        match call {
-+            UnitSpriteCall::Set { key, unit, texture, size, height, rgba, spin } => {
++            UnitSpriteCall::Set { key, unit, texture, size, height, rgba, spin, aspect } => {
 +                if !state.sprites.contains_key(&key) && state.sprites.len() >= MAX_SPRITES {
 +                    continue;
 +                }
@@ -157,11 +161,12 @@ index 00000000..aa3f4595
 +                    height,
 +                    rgba,
 +                    spin,
++                    aspect,
 +                    set_at: now,
 +                    verts: Vec::new(),
 +                    at: Vec3::ZERO,
 +                });
-+                (s.unit, s.texture, s.size, s.height, s.rgba, s.spin, s.set_at) = (unit, texture, size, height, rgba, spin, now);
++                (s.unit, s.texture, s.size, s.height, s.rgba, s.spin, s.aspect, s.set_at) = (unit, texture, size, height, rgba, spin, aspect, now);
 +            }
 +            UnitSpriteCall::Clear { key: Some(key) } => {
 +                state.sprites.remove(&key);
@@ -183,7 +188,7 @@ index 00000000..aa3f4595
 +        let toward = (eye - body).normalize_or_zero() * (s.size * 0.35);
 +        let centre = body + toward;
 +        s.at = centre;
-+        s.verts = quad(centre, right, up, s.size, s.spin, s.rgba);
++        s.verts = quad(centre, right, up, s.size, s.aspect, s.spin, s.rgba);
 +    }
 +}
 +
@@ -225,7 +230,7 @@ index 00000000..aa3f4595
 +
 +    #[test]
 +    fn a_sprite_faces_the_camera_its_size_across() {
-+        let v = quad(Vec3::ZERO, Vec3::X, Vec3::Y, 2.0, 0.0, [1.0; 4]);
++        let v = quad(Vec3::ZERO, Vec3::X, Vec3::Y, 2.0, 1.0, 0.0, [1.0; 4]);
 +        assert_eq!(v.len(), 6);
 +        let xs: Vec<f32> = v.iter().map(|p| p.pos[0]).collect();
 +        let ys: Vec<f32> = v.iter().map(|p| p.pos[1]).collect();
@@ -235,17 +240,18 @@ index 00000000..aa3f4595
 +    }
 +}
 diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
-index 2e6b3a8f..b75da32b 100644
+index 2e6b3a8f..2f7160a8 100644
 --- a/crates/benilla-ui/src/action_combat.rs
 +++ b/crates/benilla-ui/src/action_combat.rs
-@@ -131,6 +131,14 @@
+@@ -131,6 +131,15 @@
  //!   particles, ribbons and meshes: a white crackle made violet, a blue streak pink. `nil` puts it
  //!   back. For the effects spawned after the call.
  //!
 +//! Sprites on units (when `SetUnitSprite` exists; Basin Battle's ward):
 +//!
-+//! - `SetUnitSprite(key, unit, texture, size, height, r, g, b, a[, spin])`: an add-on texture drawn
-+//!   additive as a disc `size` yards across facing the camera, `height` yards up the unit
++//! - `SetUnitSprite(key, unit, texture, size, height, r, g, b, a[, spin[, aspect]])`: an add-on
++//!   texture drawn additive as a disc `size` yards across (and `aspect` times that tall: an upright
++//!   oval round a body) facing the camera, `height` yards up the unit
 +//!   (`"player"`, a guid) and a little toward the camera, tinted and faded, turned `spin` radians;
 +//!   kept by `key` and gone if not set for half a second (the add-on animates it, frame by frame).
 +//! - `ClearUnitSprite([key])`: that one now, or all.
@@ -253,7 +259,7 @@ index 2e6b3a8f..b75da32b 100644
  //! Rings on the ground (when `SetGroundRing` exists; Basin Battle's skill checks):
  //!
  //! - `SetGroundRing(key, x, y, z, radius, texture, r, g, b, a[, facing])`: an add-on texture
-@@ -242,6 +250,9 @@
+@@ -242,6 +251,9 @@
  //! The twenty-fourth (`HasActionCombat() >= 24`): the Mage's skill checks, patches 0041 to 0044:
  //! rings on the ground (`SetGroundRing`), recoloured spell looks (`SetEffectTint`), an orb rolling
  //! on the ground (`PlayGroundOrb`), and missiles from a held staff's tip (`SetUnitMissileOrigin`).
@@ -263,7 +269,7 @@ index 2e6b3a8f..b75da32b 100644
  
  use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
  
-@@ -813,6 +824,41 @@ pub enum GroundRingCall {
+@@ -813,6 +825,43 @@ pub enum GroundRingCall {
  
  static RINGS: std::sync::Mutex<Vec<GroundRingCall>> = std::sync::Mutex::new(Vec::new());
  
@@ -281,6 +287,8 @@ index 2e6b3a8f..b75da32b 100644
 +        rgba: [f32; 4],
 +        /// Turned in the view, radians.
 +        spin: f32,
++        /// Its height over its width (1: round; above 1 an upright oval round a body).
++        aspect: f32,
 +    },
 +    Clear {
 +        key: Option<String>,
@@ -305,7 +313,7 @@ index 2e6b3a8f..b75da32b 100644
  /// An orb rolled on the ground (`PlayGroundOrb`, `StopGroundOrb`).
  #[derive(Clone, Debug, PartialEq)]
  pub enum GroundOrbCall {
-@@ -1114,7 +1160,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -1114,7 +1163,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
      )?;
      g.set(
          "HasActionCombat",
@@ -314,7 +322,7 @@ index 2e6b3a8f..b75da32b 100644
      )?;
      g.set(
          "SetCameraUnitCollision",
-@@ -1565,6 +1611,35 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -1565,6 +1614,36 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
              Ok(())
          })?,
      )?;
@@ -334,6 +342,7 @@ index 2e6b3a8f..b75da32b 100644
 +                    height: number(v.get(4), -10.0, 20.0).unwrap_or(1.0),
 +                    rgba: [c(5), c(6), c(7), number(v.get(8), 0.0, 1.0).unwrap_or(1.0)],
 +                    spin: number(v.get(9), -1.0e4, 1.0e4).unwrap_or(0.0),
++                    aspect: number(v.get(10), 0.2, 5.0).unwrap_or(1.0),
 +                });
 +            }
 +            Ok(())
@@ -350,7 +359,7 @@ index 2e6b3a8f..b75da32b 100644
      g.set(
          "ClearGroundRing",
          lua.create_function(|_, args: MultiValue| {
-@@ -1930,7 +2005,7 @@ mod tests {
+@@ -1930,7 +2009,7 @@ mod tests {
          let lua = Lua::new();
          install(&lua).unwrap();
          lua.load(

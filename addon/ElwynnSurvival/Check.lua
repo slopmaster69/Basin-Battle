@@ -201,6 +201,23 @@ local WAVE_LINE = 0.73
 local ICONS = { release = "input_mouse" }
 local ICON_FIRST = 10
 local DULL = "Sound\\Interface\\iDeselectTarget.wav"
+-- The meter (Cone of Cold, after Gladius's swing meter), in Corey's frost art: the ice arc over the
+-- reticle, its good zone lit in blue along the channel, the sweet spot's ice gem pulsing on it, the
+-- cracked overrun past its end, and the ice-shard cursor running the channel, pointing outward.
+local METER_N, METER_OVER = 40, 0
+local METER_R, METER_HALF = 118, 55
+-- The frame's square, drawn so its circle's centre is the reticle (its channel `METER_R` out).
+local METER_FRAME = 345
+local meterDots = {}
+for i = 1, METER_N do meterDots[i] = Tex("check_glow", "ARTWORK") end
+local meterCursor = Tex("meter_cursor", "OVERLAY")
+local meterSpot = Tex("meter_spot", "OVERLAY")
+local meterOver = Tex("meter_over", "ARTWORK")
+local meterFrame = check:CreateTexture(nil, "BORDER")
+meterFrame:SetTexture(ART .. "meter_frame")
+meterFrame:SetBlendMode("ADD")
+meterFrame:SetPoint("CENTER", check, "CENTER", 0, 0)
+meterFrame:Hide()
 
 local ClearGroundAll, HidePlatesAll
 local function HideRing()
@@ -213,6 +230,8 @@ local function HideRing()
   for i = 1, table.getn(closers) do closers[i]:Hide() end
   for i = 1, table.getn(rests) do rests[i]:Hide() end
   for i = 1, table.getn(pips) do pips[i]:Hide() end
+  for i = 1, table.getn(meterDots) do meterDots[i]:Hide() end
+  meterCursor:Hide(); meterSpot:Hide(); meterOver:Hide(); meterFrame:Hide()
 end
 
 -- --- the state -------------------------------------------------------------------------------------
@@ -312,8 +331,10 @@ local function Finish(grade)
   c.judged = grade
   check.last = { key = c.key, grade = grade, at = GetTime(), school = c.school }
   local ghostR = c.kind == "release" and not c.ground and PressRadius(c, GetTime())
+  local meterAt = c.kind == "meter" and (GetTime() - c.start) / math.max(0.1, c.secs)
   Outcome(grade, c.school)
   if ghostR and check.fx then check.fx.ghost = ghostR end
+  if meterAt and check.fx then check.fx.meter = c; check.fx.meterAt = meterAt end
 end
 
 -- --- the server's lines ----------------------------------------------------------------------------
@@ -348,6 +369,11 @@ function ES.CheckLine(f)
     c.arc = tonumber(arc) or 30
     c.marks = {}
     for m in string.gfind(list or "", "[^,]+") do table.insert(c.marks, tonumber(m) or 0) end
+  elseif kind == "meter" then
+    c.secs, c.spot, c.perfect = a, b, crit
+    local _, _, way, good = string.find(f[8] or "", "^(%a+)|(.*)$")
+    c.dir = (way == "rl") and -1 or 1
+    c.good = tonumber(good) or 0.16
   elseif kind == "orb" then
     c.secs, c.range, c.perfect = a, b, crit
     local _, _, back, ahead, list = string.find(f[8] or "", "^([^|]*)|([^|]*)|(.*)$")
@@ -488,7 +514,18 @@ end
 local function OrbAt(c, now)
   return c.ahead + (c.range - c.ahead) * Clamp((now - c.start) / math.max(0.1, c.secs), 0, 1)
 end
+local function MeterAt(c, now)
+  return (now - c.start) / math.max(0.1, c.secs)
+end
 local function JudgeStop(c, now)
+  if c.kind == "meter" then
+    local s = MeterAt(c, now)
+    local off = math.abs(s - c.spot)
+    if off <= c.perfect then return "perfect" end
+    if off <= c.good then return "good" end
+    if s < c.spot then return "early" end
+    return "late"
+  end
   if c.kind == "sweep" then
     local jet, best = JetAt(c, now), 999
     for i = 1, table.getn(c.marks) do best = math.min(best, math.abs(c.marks[i] - jet)) end
@@ -505,7 +542,7 @@ end
 
 ES.Ability = function(n, ex, state)
   local c = check.cur
-  if state ~= "up" and c and (c.kind == "sweep" or c.kind == "orb") and GetTime() - c.start > 0.08 then
+  if state ~= "up" and c and (c.kind == "sweep" or c.kind == "orb" or c.kind == "meter") and GetTime() - c.start > 0.08 then
     Finish(JudgeStop(c, GetTime()))
     return Ability(n, ex, state)
   end
@@ -905,6 +942,46 @@ end
 local TRACK_FOOT, TRACK_TOP = -120, 150
 local function TrackY(c, yd) return TRACK_FOOT + (TRACK_TOP - TRACK_FOOT) * Clamp(yd / math.max(1, c.range), 0, 1) end
 
+-- The meter at share `at` of its run (nil: no cursor), faded by `fade`.
+local function MeterXY(c, sh, r)
+  local ang = math.rad((-METER_HALF + 2 * METER_HALF * sh) * c.dir)
+  return (r or METER_R) * math.sin(ang), (r or METER_R) * math.cos(ang), ang
+end
+local function DrawMeter(c, at, fade)
+  local now = GetTime()
+  meterFrame:SetWidth(METER_FRAME)
+  meterFrame:SetHeight(METER_FRAME)
+  meterFrame:SetVertexColor(1, 1, 1, 0.95 * fade)
+  meterFrame:Show()
+  -- The good zone lit along the channel.
+  for i = 1, METER_N do
+    local t = meterDots[i]
+    local sh = (i - 0.5) / METER_N
+    if math.abs(sh - c.spot) <= c.good then
+      local x, y = MeterXY(c, sh)
+      Draw(t, 14, 0, 0.75 * fade, 0.4, 0.75, 1, x, y)
+    else
+      t:Hide()
+    end
+  end
+  -- The sweet spot's gem, breathing.
+  local sx, sy = MeterXY(c, c.spot)
+  Draw(meterSpot, 40 * (1 + 0.08 * math.sin(now * 6)), 0, fade, 1, 1, 1, sx, sy)
+  -- The overrun past the end, along the arc.
+  local ox, oy, oang = MeterXY(c, 1.1)
+  Draw(meterOver, 74, oang, 0.9 * fade, 1, 1, 1, ox, oy)
+  if at then
+    local x, y, ang = MeterXY(c, Clamp(at, 0, 1.12))
+    Draw(meterCursor, 70, ang, fade, 1, 1, 1, x, y)
+  else
+    meterCursor:Hide()
+  end
+end
+
+local function StepMeter(c, now)
+  DrawMeter(c, MeterAt(c, now), 1)
+end
+
 local function StepOrb(c, now)
   local sc = SCHOOL.frost
   local len = TRACK_TOP - TRACK_FOOT
@@ -986,6 +1063,13 @@ local function StepFx(now)
   local line = sc.size * sc.line / 2
   local dur = ((g == "perfect" or g == "full") and 0.7) or (g == "good" and 0.55) or ((g == "fail" or g == "fizzle") and 0.7) or (f.ghost and 0.6) or 0.3
   local t = age / dur
+  if f.meter then
+    -- The meter frozen where the press came, fading: how close it was to the sweet spot.
+    if t < 1 then DrawMeter(f.meter, f.meterAt, 1 - t) else
+      for i = 1, table.getn(meterDots) do meterDots[i]:Hide() end
+      meterCursor:Hide(); meterSpot:Hide(); meterOver:Hide(); meterFrame:Hide()
+    end
+  end
   if t >= 1 then
     check.fx = nil
     pop:Hide(); core:Hide(); burst:Hide(); crack:Hide(); tick:Hide(); fizzle:Hide()
@@ -1100,6 +1184,10 @@ check:SetScript("OnUpdate", function()
     elseif c.kind == "orb" then
       StepOrb(c, now)
       if now - c.start > c.secs + 0.15 then check.cur = nil; HideRing() end
+    elseif c.kind == "meter" then
+      StepMeter(c, now)
+      -- Into the overrun with no word: the server's fail comes; quietly gone if it doesn't.
+      if now - c.start > c.secs * 1.08 + 0.6 then check.cur = nil; HideRing() end
     end
   end
   if c and check.cur == c and c.icon and ICONS[c.kind] then DrawIcon(c, now) else icon:Hide() end
