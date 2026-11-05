@@ -2272,6 +2272,15 @@ impl Survival {
         let mut any = false;
         for (h, hp) in heroes {
             let dist = dist2d(pos, hp);
+            let caught = |at: Vec3| {
+                let dist = dist2d(pos, at);
+                dist <= a.range + 0.4 && (angle_between(f, facing(pos, at)) <= a.arc / 2.0 || dist < 0.8)
+            };
+            // Blinked out of it just as it came: slipped (Blink's counter check).
+            if !caught(hp) && self.slip_from(h).is_some_and(caught) {
+                self.slipped(h, id, Blow::Light);
+                continue;
+            }
             if dist <= a.range + 0.4 && (angle_between(f, facing(pos, hp)) <= a.arc / 2.0 || dist < 0.8) {
                 any = true;
                 // Settled once the hero's round trip is up: out of it by then (as they saw it), missed.

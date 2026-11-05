@@ -106,6 +106,10 @@
 //! The abilities:
 //! - `AB\t...`: the ability bar, one entry per key (see [`SurvivalGame::bar_line`]).
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
+//! - `WA\t<ward>\t<most>\t<broken>`: the ward bar of a hero whose guard is a ward (a staff's);
+//!   `WA` alone: no ward, the bar hidden. Sent with the HUD and the moment it changes.
+//! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
+//!   on their own screen; its burst and Valor come as ever).
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
 //!   beta page's cards, each with its page (see [`SurvivalGame::tree_line`]).
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
@@ -490,6 +494,11 @@ impl SurvivalGame {
                 (secs - (until - now), secs)
             }
             Action::Dash { t, secs, .. } => (*t, *secs),
+            Action::Sweep { since, until, .. } => (now - since, until - since),
+            Action::Rhythm { since, ability, .. } => {
+                let d = &c.abilities[*ability];
+                (now - since, d.beat_secs * d.most_beats as f32)
+            }
             Action::Eat { t, item } => (*t, c.items[*item].use_secs),
             Action::Gather { t, node, .. } => {
                 let secs = match self.sim.objs.get(node).map(|o| &o.kind) {
@@ -509,7 +518,7 @@ impl SurvivalGame {
         let started = now - elapsed;
         // What's aimed or charged: its key, so the bar and the reticle show it.
         let what = match &p.action {
-            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Channel { ability, .. } | Action::Stance { ability, .. } | Action::Dash { ability, .. } => c.abilities[*ability].key.as_str(),
+            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Channel { ability, .. } | Action::Stance { ability, .. } | Action::Dash { ability, .. } | Action::Sweep { ability, .. } | Action::Rhythm { ability, .. } => c.abilities[*ability].key.as_str(),
             // Work: what it makes, builds or mends, by name.
             Action::Work { job, .. } => match job {
                 htl_survival::Job::Craft { recipe, .. } => c.recipes.iter().find(|r| &r.key == recipe).and_then(|r| c.item(&r.output)).map_or("", |i| c.items[i].name.as_str()),
@@ -850,6 +859,8 @@ impl SurvivalGame {
                 if let Some(va) = self.valor_line(id) {
                     self.ui_line_changed(conn, "VA", va);
                 }
+                let wa = self.ward_line(id);
+                self.ui_line_changed(conn, "WA", wa);
                 let cc = self.cc_line(id);
                 self.ui_line_changed(conn, "CC", cc);
                 // What the use key would use, for its prompt (empty: nothing in reach).
@@ -2097,6 +2108,15 @@ impl SurvivalGame {
         let p = self.sim.players.get(&id)?;
         let v = &self.sim.content.valor;
         Some(format!("VA\t{:.0}\t{:.0}\t{:.0}", p.valor.floor(), v.max, v.segment))
+    }
+
+    /// The ward bar of a hero whose guard is a ward (a staff's): `WA\t<ward>\t<most>\t<broken>`;
+    /// `WA` alone for a hero who guards with something else (the bar hidden).
+    pub(crate) fn ward_line(&self, id: Id) -> String {
+        match self.sim.players.get(&id) {
+            Some(p) if self.sim.guard_of(p).ward => format!("WA\t{:.0}\t{:.0}\t{}", p.ward.floor(), self.sim.content.ward.bar, u8::from(p.ward_broken)),
+            _ => "WA".to_string(),
+        }
     }
 
     /// The crowd control on the hero: `CC\t<kind~seconds left~share>^...` (the grace as `grace`).

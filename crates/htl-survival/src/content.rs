@@ -31,6 +31,13 @@ pub struct Content {
     pub player: PlayerDef,
     pub dodge: DodgeDef,
     pub parry: ParryDef,
+    /// A caster's guard: the ward a staff raises, with a bar of its own (`[ward]`).
+    #[serde(default)]
+    pub ward: WardDef,
+    /// The skill checks built into spells: the window a perfect must land in, and what a perfect
+    /// pays (`[checks]`).
+    #[serde(default)]
+    pub checks: ChecksDef,
     #[serde(default)]
     pub heavy: HeavyDef,
     #[serde(default)]
@@ -387,6 +394,62 @@ pub struct ShatterDef {
 impl Default for ShatterDef {
     fn default() -> Self {
         Self { burst_kit: 121 }
+    }
+}
+
+/// The ward: what a staff guards with. An arcane barrier with a bar of its own in place of
+/// stamina. Every blow it stops drains the bar (the guard's `cost`s); a guard raised in the parry
+/// window is a perfect ward, which costs nothing and reels the attacker as a parry does; a blow
+/// too heavy for what's left breaks it, and a broken ward can't go up again until the bar is full.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct WardDef {
+    /// The bar.
+    pub bar: f32,
+    /// How fast it refills, a second, while the ward is down...
+    pub refill: f32,
+    /// ...starting this long after it came down (or broke).
+    pub refill_delay: f32,
+    /// A perfect ward gives this much of the bar back.
+    pub perfect_refill: f32,
+    /// A broken ward's stagger.
+    pub break_secs: f32,
+    /// The look on a hero holding the ward up (a spell whose aura the clients show).
+    pub aura: u32,
+    /// The burst of a perfect ward, and the shatter of a broken one (spell visual kits).
+    pub perfect_kit: u32,
+    pub break_kit: u32,
+}
+
+impl Default for WardDef {
+    fn default() -> Self {
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, perfect_kit: 555, break_kit: 7 }
+    }
+}
+
+/// The skill checks built into spells. The first kind, the release: a charged spell with
+/// `perfect = true` flares as its charge tops out, and a release within `window` of the top is a
+/// perfect cast: full strength and `perfect_damage` times more, `perfect_valor` to the caster,
+/// and a burst on them everyone sees. Let go earlier it goes at its charge, as ever; held past
+/// the window it's full and no more. A missed check is still a working spell.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct ChecksDef {
+    /// Half the window, seconds either side of the moment.
+    pub window: f32,
+    /// A perfect's damage, times the full charge's.
+    pub perfect_damage: f32,
+    /// The Valor a perfect gives (a parry's).
+    pub perfect_valor: f32,
+    /// The burst on the caster at a perfect release (a spell visual kit).
+    pub perfect_kit: u32,
+    /// A full rhythm chain's Valor (a whole segment).
+    pub chain_valor: f32,
+}
+
+impl Default for ChecksDef {
+    fn default() -> Self {
+        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0 }
     }
 }
 
@@ -896,6 +959,19 @@ pub struct WeaponDef {
     /// Its blows count this many times over towards breaking a foe's stance (0: once).
     #[serde(default)]
     pub posture: f32,
+    /// A staff that casts instead of swinging: the left click casts this ability (a benched
+    /// projectile, the staff's bolt), and the heavy attack this one (empty: the heavy swings).
+    #[serde(default)]
+    pub bolt: String,
+    #[serde(default)]
+    pub heavy_bolt: String,
+}
+
+impl WeaponDef {
+    /// The weapon casts its light attack.
+    pub fn casts(&self) -> bool {
+        !self.bolt.is_empty()
+    }
 }
 
 fn turn_rate() -> f32 {
@@ -977,6 +1053,9 @@ pub struct ShieldDef {
     pub cost_per_damage: f32,
     pub break_secs: f32,
     pub break_share: f32,
+    /// A ward (a staff's guard): its costs come off the ward bar, not stamina (`[ward]`).
+    #[serde(default)]
+    pub ward: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -3041,6 +3120,19 @@ impl Content {
             if w.two_handed && self.shield(&w.guard).is_none() {
                 bail!("weapon {}: two-handed, and its guard {:?} isn't a [[shield]]", w.key, w.guard);
             }
+            for (what, key) in [("bolt", &w.bolt), ("heavy_bolt", &w.heavy_bolt)] {
+                if key.is_empty() {
+                    continue;
+                }
+                match self.ability(key) {
+                    Some(a) if self.abilities[a].kind == "projectile" => {}
+                    Some(_) => bail!("weapon {}: its {what} {key} isn't a projectile", w.key),
+                    None => bail!("weapon {}: no [[ability]] {key} for its {what}", w.key),
+                }
+            }
+            if !w.heavy_bolt.is_empty() && w.bolt.is_empty() {
+                bail!("weapon {}: a heavy_bolt needs a bolt", w.key);
+            }
         }
         if self.ranged(&self.start.bow).is_none() {
             bail!("start: {} isn't a [[ranged]]", self.start.bow);
@@ -3462,6 +3554,23 @@ impl Content {
                 if c.block || c.dodge || c.immune || c.absorb_heal > 0.0 || !c.reflect.is_empty() || c.melee_only {
                     bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
                 }
+            }
+            if a.slip && a.kind != "blink" {
+                bail!("{what}: only a blink slips blows (`slip`)");
+            }
+            if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
+                bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
+            }
+            if let Some(c) = &a.counter {
+                for e in &c.perfect_break {
+                    effect_ok(e, &what)?;
+                }
+            }
+            if a.counter.as_ref().is_some_and(|c| c.perfect_mirror && !c.mirror) {
+                bail!("{what}: `perfect_mirror` is a mirror's check (it needs `mirror`)");
+            }
+            if (a.pulse < 0.0 || a.rewind_health < 0.0 || a.rewind_health > 1.0) || ((a.pulse > 0.0 || a.rewind_health > 0.0) && a.anchor <= 0.0) {
+                bail!("{what}: `pulse` and `rewind_health` (0 to 1) are an anchor's (they need `anchor`)");
             }
             for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects) {
                 effect_ok(e, &what)?;

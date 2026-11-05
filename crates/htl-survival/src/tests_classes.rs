@@ -136,6 +136,10 @@ fn every_card_goes_off_in_a_duel() {
 /// What a card's hit is worth in damage: its blow (every projectile, every leap of a chain), and
 /// half of what burns after (it can be walked out of).
 fn worth(d: &AbilityDef) -> f32 {
+    // A rhythm's hit: its hardest beat (the finisher).
+    if d.kind == "rhythm" {
+        return rhythm_beats(d).into_iter().fold(0.0, f32::max);
+    }
     // A wide fan (10° or more between its arrows) puts at most three into one foe.
     let n = if d.spread >= 10.0 { d.count.clamp(1, 3) } else { d.count.max(1) };
     let hit = (d.damage[0] + d.damage[1]) / 2.0 * n as f32;
@@ -144,9 +148,20 @@ fn worth(d: &AbilityDef) -> f32 {
     // A boomerang strikes each foe going out and again coming back (at its share).
     let hit = if d.returns { hit * (1.0 + d.return_damage) } else { hit };
     let chain: f32 = (1..=d.chain).map(|k| hit * d.chain_falloff.powi(k as i32)).sum();
-    let burn: f32 = d.effects.iter().filter(|e| e.kind == "burn").map(|e| e.amount * e.secs[1]).sum();
+    // (A bomb's burst burns as its effects do.)
+    let burn: f32 = d.effects.iter().chain(&d.bomb_effects).filter(|e| e.kind == "burn").map(|e| e.amount * e.secs[1]).sum();
     let linger = d.linger_damage * d.linger;
     hit + chain + burn + 0.5 * linger
+}
+
+/// Every beat of a full rhythm chain, as hard as each strikes.
+fn rhythm_beats(d: &AbilityDef) -> Vec<f32> {
+    (0..d.most_beats)
+        .map(|k| {
+            let b = d.damage[0] + d.beat_step * k as f32;
+            if k + 1 == d.most_beats && d.finisher_damage > 0.0 { b * d.finisher_damage } else { b }
+        })
+        .collect()
 }
 
 /// [`worth`], with the spray it bursts into (`splits`): every arrow of it can go through the one
@@ -164,6 +179,7 @@ fn hard_cc(d: &AbilityDef) -> f32 {
     d.effects
         .iter()
         .chain(&d.tick_effects)
+        .chain(&d.stop_effects)
         .filter(|e| matches!(e.kind.as_str(), "stun" | "incapacitate" | "petrify" | "panic"))
         .map(|e| e.secs[1] * 0.5)
         .fold(0.0, f32::max)
@@ -192,9 +208,18 @@ fn the_board_keeps_to_its_budgets() {
         match d.slot.as_str() {
             "ranged" => {
                 assert!(worth(d) <= 45.0, "{}: {} a hit is too much for a poke", d.key, worth(d));
-                assert!(worth(d) / per.max(1.0) <= 9.5, "{}: {:.1} a second off cooldown", d.key, worth(d) / per.max(1.0));
+                // (A rhythm's whole chain counts against its cooldown.)
+                let cycle = if d.kind == "rhythm" { rhythm_beats(d).iter().sum() } else { worth(d) };
+                assert!(cycle / per.max(1.0) <= 9.5, "{}: {:.1} a second off cooldown", d.key, cycle / per.max(1.0));
             }
-            "close" => assert!(worth(d) <= 45.0, "{}: {}", d.key, worth(d)),
+            "close" => {
+                assert!(worth(d) <= 45.0, "{}: {}", d.key, worth(d));
+                // A rhythm in the brawl: its whole chain is one close blow's budget.
+                if d.kind == "rhythm" {
+                    let all: f32 = rhythm_beats(d).iter().sum();
+                    assert!(all <= 45.0, "{}: {} over its chain", d.key, all);
+                }
+            }
             "utility" => assert!(worth(d) <= 20.0 && per >= 10.0, "{}: a utility hits little and comes back slowly", d.key),
             "defense" => assert!(per >= 12.0, "{}: a defense comes back slowly", d.key),
             "ultimate" => {

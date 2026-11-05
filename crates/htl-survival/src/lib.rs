@@ -80,3 +80,21 @@ mod tests_building;
 mod tests_raptor;
 #[cfg(test)]
 mod tests_hunter_bow;
+#[cfg(test)]
+mod tests_ward;
+#[cfg(test)]
+mod tests_staff;
+#[cfg(test)]
+mod tests_release;
+#[cfg(test)]
+mod tests_sweep;
+#[cfg(test)]
+mod tests_orb;
+#[cfg(test)]
+mod tests_rhythm;
+#[cfg(test)]
+mod tests_bomb;
+#[cfg(test)]
+mod tests_alter;
+#[cfg(test)]
+mod tests_counters;

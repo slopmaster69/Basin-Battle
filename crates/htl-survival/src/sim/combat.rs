@@ -218,6 +218,19 @@ impl Survival {
                     let kick = input == Input::Heavy || self.weapon_of(p).two_handed;
                     return self.try_shove(id, kick);
                 }
+                // A staff that casts: the click is a bolt from it, once the hero is free (a click
+                // in a cast's recovery waits for its end, as a chain's next blow does).
+                if let Some(bolt) = self.bolt_of(p, input == Input::Heavy) {
+                    if !(free || busy_soft) {
+                        return false;
+                    }
+                    if !fresh {
+                        self.winded(id);
+                        return true;
+                    }
+                    self.cast_bolt(id, bolt);
+                    return true;
+                }
                 // Late in a light blow's recovery, the next of the chain comes at once.
                 if let Action::Swing { t, strike, .. } = &p.action {
                     let chain = input == Input::Attack
@@ -264,6 +277,11 @@ impl Survival {
             }
             Input::AttackUp | Input::Sprint | Input::SprintUp => true,
             Input::Guard => {
+                // A broken ward can't go up until its bar is whole again: the bar says so.
+                if self.guard_of(p).ward && p.ward_broken {
+                    self.events.push(Event::Ward { player: id });
+                    return true;
+                }
                 // Right click calls off an aim or a charge.
                 if aiming || charging {
                     self.ability_cancel(id);
@@ -274,7 +292,7 @@ impl Survival {
                     self.set_action(id, Action::Ready);
                 }
                 let p = &self.players[&id];
-                if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. }) {
+                if matches!(p.action, Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. } | Action::Sweep { .. } | Action::Rhythm { .. }) {
                     return true;
                 }
                 // A feint: the guard raised while a blow still winds up calls it off, its stamina back.
@@ -467,6 +485,31 @@ impl Survival {
             p.stamina = (p.stamina - amount).max(0.0);
             p.spent_at = now;
             self.events.push(Event::Stamina { player: id });
+        }
+    }
+
+    /// A blow stopped by the ward: its cost off the ward bar (half of it in a parry's opening).
+    pub(crate) fn drain_ward(&mut self, id: Id, amount: f32) {
+        let now = self.clock;
+        let amount = match self.players.get(&id) {
+            Some(p) if p.opening_until > now => amount * 0.5,
+            _ => amount,
+        };
+        if let Some(p) = self.players.get_mut(&id) {
+            p.ward = (p.ward - amount).max(0.0);
+            p.ward_down_at = now;
+            self.events.push(Event::Ward { player: id });
+        }
+    }
+
+    /// The ward shatters: the bar empty and locked until it has refilled.
+    pub(crate) fn break_ward(&mut self, id: Id) {
+        let now = self.clock;
+        if let Some(p) = self.players.get_mut(&id) {
+            p.ward = 0.0;
+            p.ward_broken = true;
+            p.ward_down_at = now;
+            self.events.push(Event::Ward { player: id });
         }
     }
 
@@ -854,6 +897,38 @@ impl Survival {
         }
     }
 
+    /// The ward bar: it refills a moment after the ward comes down, never while it's up, and a
+    /// broken ward is whole again (and can go up) once the bar is full. The look of the ward up
+    /// goes on and off the hero with the guard.
+    fn step_ward(&mut self, id: Id, dt: f32) {
+        let now = self.clock;
+        let w = self.content.ward.clone();
+        let Some(p) = self.players.get(&id) else { return };
+        let warded = self.guard_of(p).ward;
+        let up = warded && matches!(p.action, Action::Guard);
+        let p = self.players.get_mut(&id).unwrap();
+        let mut changed = false;
+        if up != p.ward_up {
+            p.ward_up = up;
+            self.events.push(Event::Auras { id });
+            changed = true;
+        }
+        if up {
+            p.ward_down_at = now;
+        } else if p.ward < w.bar && now - p.ward_down_at >= w.refill_delay {
+            let before = p.ward.floor();
+            p.ward = (p.ward + w.refill * dt).min(w.bar);
+            if p.ward >= w.bar && p.ward_broken {
+                p.ward_broken = false;
+                changed = true;
+            }
+            changed |= p.ward.floor() != before;
+        }
+        if changed && warded {
+            self.events.push(Event::Ward { player: id });
+        }
+    }
+
     /// A lock lets go once its target is no foe to fight any more: dead or gone, gone home
     /// (leashed), or well out of reach; and a fallen hero holds none. (A lock held on leaves the
     /// body turned to it, walking sideways and back.)
@@ -928,6 +1003,7 @@ impl Survival {
                 self.events.push(Event::Stamina { player: id });
             }
         }
+        self.step_ward(id, dt);
         // Lasting effects: a salve's or a meal's healing (in a fight too), and running out.
         {
             let regen = self.effect_of(&self.players[&id], "regen") + self.effect_of(&self.players[&id], MEAL);
@@ -1002,7 +1078,7 @@ impl Survival {
                     }
                 }
             }
-            Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Dash { .. } | Action::Stance { .. } => {
+            Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Dash { .. } | Action::Stance { .. } | Action::Sweep { .. } | Action::Rhythm { .. } => {
                 self.step_ability_action(id, dt);
             }
             Action::Stagger { until } => {
@@ -1161,7 +1237,7 @@ impl Survival {
     }
 
     /// The end of a commitment: back to ready (or the held guard or aim), then any buffered input.
-    fn finish_commitment(&mut self, id: Id) {
+    pub(crate) fn finish_commitment(&mut self, id: Id) {
         let now = self.clock;
         // Shield Wall's bash done, the wall still holding: the shield goes back up.
         if self.bash_wall(id) && matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { .. })) {
@@ -1179,7 +1255,8 @@ impl Survival {
             }
         }
         let Some(p) = self.players.get(&id) else { return };
-        let next = if p.guard_held { Action::Guard } else { Action::Ready };
+        // The held guard comes back up, unless it's a ward still broken.
+        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) { Action::Guard } else { Action::Ready };
         let buffered = p.buffered;
         // A dodge with an attack pressed in it: the attack out of it, now, or as the hero lands.
         if matches!(p.action, Action::Dodge { .. }) && p.dodge_attack {
@@ -1622,6 +1699,13 @@ impl Survival {
         if v.health == 0 {
             return;
         }
+        // Blinked through it as it came, while it waited on their round trip: slipped. (Blinked
+        // out before it came, it's slipped where it's swung; see `slip_from`.)
+        let grace = v.rtt.min(self.content.combat.max_grace);
+        if s.how != HitKind::Projectile && self.slips.get(&s.victim).is_some_and(|b| b.at >= s.at - grace - 1.0e-4) {
+            self.slipped(s.victim, s.attacker, s.style);
+            return;
+        }
         // Out of it by now: a whiff.
         let inside = match s.area {
             None => true,
@@ -1777,6 +1861,9 @@ impl Survival {
         // What they were doing as it came, for the recap if it fells them.
         let doing = p.action.clone();
         let cost = (guard.cost + damage as f32 * guard.cost_per_damage) * if heavy { 2.0 } else { 1.0 };
+        // A ward (a staff's guard) pays from its own bar, not stamina.
+        let warded = guard.ward;
+        let bar = if warded { p.ward } else { p.stamina };
         // A blow heavy enough to put a hero down when it breaks their guard: a heavy attack, or a
         // heavy creature's.
         let heavy_blow = style == Blow::Heavy || (heavy && self.mobs.contains_key(&attacker));
@@ -1800,7 +1887,7 @@ impl Survival {
                     Outcome::Hit
                 } else if parryable && timed {
                     Outcome::Parried
-                } else if p.stamina >= cost {
+                } else if bar >= cost {
                     Outcome::Blocked
                 } else {
                     Outcome::GuardBroken
@@ -1833,7 +1920,18 @@ impl Survival {
         };
         match outcome {
             Outcome::Blocked if shrugged => {}
+            Outcome::Blocked if warded => self.drain_ward(victim, cost),
             Outcome::Blocked => self.spend(victim, cost),
+            Outcome::GuardBroken if warded => {
+                // The ward shatters: the bar empty and locked until it's whole again, the hero
+                // reeling (a heavy blow puts them down). The shatter is seen, not read.
+                let secs = if heavy_blow { c.ward.break_secs.max(c.combat.knockdown) } else { c.ward.break_secs };
+                self.break_ward(victim);
+                self.set_action(victim, Action::Stagger { until: now + secs });
+                if c.combat.riposte_any_stagger {
+                    self.players.get_mut(&victim).unwrap().riposte_until = now + secs;
+                }
+            }
             Outcome::GuardBroken => {
                 self.spend(victim, 1000.0);
                 let secs = if heavy_blow { guard.break_secs.max(c.combat.knockdown) } else { guard.break_secs };
@@ -1904,13 +2002,17 @@ impl Survival {
                 }
             }
             Outcome::GuardBroken if heavy_blow => {
-                let secs = guard.break_secs.max(c.combat.knockdown);
+                let secs = if warded { c.ward.break_secs } else { guard.break_secs }.max(c.combat.knockdown);
                 self.events.push(Event::React { id: victim, anim: KNOCKDOWN_ANIM, from, lean: 0.0, hold: 0.0, fit: secs });
                 self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
+                if warded {
+                    self.events.push(Event::Visual { id: victim, kit: c.ward.break_kit, by: None });
+                }
             }
             Outcome::GuardBroken => {
-                self.events.push(Event::React { id: victim, anim: STUN_ANIM, from, lean: lean.max(0.35), hold: guard.break_secs, fit: 0.0 });
-                self.events.push(Event::Visual { id: victim, kit: KIT_BASH, by: None });
+                let (hold, kit) = if warded { (c.ward.break_secs, c.ward.break_kit) } else { (guard.break_secs, KIT_BASH) };
+                self.events.push(Event::React { id: victim, anim: STUN_ANIM, from, lean: lean.max(0.35), hold, fit: 0.0 });
+                self.events.push(Event::Visual { id: victim, kit, by: None });
             }
             Outcome::Blocked if !shrugged => {
                 self.events.push(Event::React { id: victim, anim: BLOCK_ANIM, from, lean: lean * 0.4, hold: 0.0, fit: 0.0 });
@@ -1962,10 +2064,19 @@ impl Survival {
         let c = self.content.clone();
         // No word: the parry shows and sounds (Disarm's spark on the parrier, the clang and the
         // hit-stop on the clients, from the swing's `IM` line).
+        // The parry pays: breath back, and an opening to answer in. A perfect ward (a staff's
+        // guard) costs nothing and gives some of its bar back, and bursts outward.
+        let warded = self.players.get(&victim).is_some_and(|p| self.guard_of(p).ward);
         if let Some(p) = self.players.get_mut(&victim) {
-            p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
             p.opening_until = now + c.parry.opening;
-            self.events.push(Event::Stamina { player: victim });
+            if warded {
+                p.ward = (p.ward + c.ward.perfect_refill).min(c.ward.bar);
+                self.events.push(Event::Ward { player: victim });
+                self.events.push(Event::Visual { id: victim, kit: c.ward.perfect_kit, by: None });
+            } else {
+                p.stamina = (p.stamina + c.parry.stamina).min(c.player.stamina);
+                self.events.push(Event::Stamina { player: victim });
+            }
         }
         if self.mobs.contains_key(&attacker) {
             // A boss doesn't reel from each one (a group parried it into reeling forever): it

@@ -32,6 +32,11 @@ pub mod hunter;
 pub mod lab;
 mod raid;
 pub mod siege;
+mod bomb;
+mod orb;
+mod rhythm;
+mod staff;
+mod sweep;
 pub mod wager;
 mod tactics;
 mod world;
@@ -184,6 +189,11 @@ pub enum Event {
     Pose { id: Id, pose: u32 },
     Health { id: Id, health: u32, max: u32 },
     Stamina { player: Id },
+    /// The hero's ward bar changed (a staff's guard), or broke, or is whole again.
+    Ward { player: Id },
+    /// A perfect cast: the hero released an ability on its flare (its burst and Valor are their
+    /// own events; this is for the hero's own screen, a beat).
+    Perfect { player: Id, ability: usize },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
@@ -450,6 +460,12 @@ pub enum Action {
     Channel { ability: usize, target: Id, until: f32, next: f32, share: f32 },
     /// A counter's stance until then.
     Stance { ability: usize, until: f32 },
+    /// A rhythm spell going off on its beats since then: `done` beats gone, `pressed` beats
+    /// earned by a press (the free ones count without), `cued` beats whose pulse has shown.
+    Rhythm { ability: usize, since: f32, done: u32, pressed: u32, cued: u32 },
+    /// A jet sweeping across the hero's front from `from` (a facing) since then until `until`,
+    /// whom it has struck; `held`: stopped at that moment, holding where it was.
+    Sweep { ability: usize, from: f32, since: f32, until: f32, struck: Vec<Id>, held: Option<f32> },
     /// A dash along the ground, `t` of `secs` in, into whoever's at its end.
     Dash { t: f32, secs: f32, ability: usize, target: Option<Id>, share: f32 },
     /// Eating, `t` seconds in.
@@ -478,6 +494,8 @@ impl Action {
             Action::Aim { .. } => "aim",
             Action::Charge { .. } => "charge",
             Action::Cast { .. } => "cast",
+            Action::Sweep { .. } => "sweep",
+            Action::Rhythm { .. } => "channel",
             Action::Channel { .. } => "channel",
             Action::Stance { .. } => "stance",
             Action::Dash { .. } => "dash",
@@ -574,6 +592,17 @@ pub struct Player {
     /// When the guard last went up, and the time before that (a parry needs a fresh guard).
     pub guard_at: f32,
     pub prev_guard_at: f32,
+    /// The ward bar (a staff's guard), what's left of it; broken, it can't go up until it's full
+    /// again; and when it last came down or broke (it refills a moment after).
+    pub ward: f32,
+    pub ward_broken: bool,
+    pub ward_down_at: f32,
+    /// The ward is up (its look is on them).
+    pub ward_up: bool,
+    /// The cast going out now was released on its flare (a perfect): its strength and its pay.
+    pub cast_perfect: bool,
+    /// What the cast going out now strikes for, when its own numbers don't say (a beat's).
+    pub cast_damage: Option<f32>,
     pub sprint_held: bool,
     /// Sprinting now (held, moving, not walking, not committed to anything, stamina left).
     pub sprinting: bool,
@@ -920,6 +949,10 @@ pub struct Survival {
     /// `lab_blowing` while it does).
     pub(crate) lab_quiet: Vec<Id>,
     pub(crate) lab_blowing: Option<Id>,
+    /// Orbs rolling out (Frozen Orb), until stopped or spent.
+    pub(crate) orbs: Vec<orb::Orb>,
+    /// Bombs ticking on foes (Living Bomb), until they burst.
+    pub(crate) bombs: Vec<bomb::Bomb>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -928,6 +961,8 @@ pub struct Survival {
     pub hunt: hunter::Hunt,
     pub(crate) windups: Vec<moves::Windup>,
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
+    /// Each hero's last blink that slips blows (Blink's counter check).
+    pub(crate) slips: BTreeMap<Id, moves::Slip>,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
@@ -1049,6 +1084,7 @@ impl Survival {
             hunt: hunter::Hunt::default(),
             windups: Vec::new(),
             anchors: BTreeMap::new(),
+            slips: BTreeMap::new(),
             fx_from: None,
             fx_vs_bosses: false,
             fx_pull_look: None,
@@ -1061,6 +1097,8 @@ impl Survival {
             burnings: Vec::new(),
             lab_quiet: Vec::new(),
             lab_blowing: None,
+            orbs: Vec::new(),
+            bombs: Vec::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
@@ -1132,6 +1170,8 @@ impl Survival {
         self.reckon_players(dt);
         self.step_players(dt);
         self.step_projectiles(dt);
+        self.step_orbs(dt);
+        self.step_bombs();
         self.step_moves();
         self.step_grounds();
         self.step_bounces();
@@ -1211,6 +1251,12 @@ impl Survival {
             attack_held: false,
             guard_at: -100.0,
             prev_guard_at: -100.0,
+            ward: c.ward.bar,
+            ward_broken: false,
+            ward_down_at: -100.0,
+            ward_up: false,
+            cast_perfect: false,
+            cast_damage: None,
             sprint_held: false,
             sprinting: false,
             air: None,
@@ -1724,7 +1770,7 @@ impl Survival {
             Action::Guard => c.guard_speed,
             // Bladestorm's spin walks at its own pace, near a run.
             Action::Channel { ability, .. } if self.content.abilities[ability].around => c.run_speed * crate::content::AROUND_PACE,
-            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } => c.aim_speed,
+            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Sweep { .. } | Action::Rhythm { .. } => c.aim_speed,
             Action::Stance { .. } => c.guard_speed,
             Action::Eat { .. } => c.use_speed,
             Action::Gather { .. } | Action::Work { .. } | Action::Stagger { .. } => c.use_speed,

@@ -400,6 +400,36 @@ kit = 220
 # the foe's base); 283 LightningBolt_Impact_Chest (a white-blue electric flash).
 [shatter]
 burst_kit = 121
+[ward]
+# The ward: a staff's guard (a `[[shield]]` with `ward = true`). An arcane barrier with a bar of
+# its own in place of stamina. Every blow it stops drains the bar by the guard's costs; a guard
+# raised in the parry window is a perfect ward, which costs nothing, gives some of the bar back and
+# reels the attacker as a parry does (a hero's blow, too); a blow too heavy for what's left breaks
+# it, and a broken ward can't go up again until the bar is full. The bar refills while the ward is
+# down, never while it's up, so a caster who wards everything runs dry and one who times it well
+# wards the longest. (The Mage design, claude/mage-kit-draft.md.)
+bar = 100.0
+refill = 35.0
+refill_delay = 0.4
+perfect_refill = 20.0
+break_secs = 1.0
+# The looks: Mana Shield's swirl on a hero holding the ward up; the parry's burst for a perfect
+# ward and the bash's for the shatter, both to replace once seen in the client.
+aura = 1463
+perfect_kit = 555
+break_kit = 7
+
+[checks]
+# The skill checks built into spells. The release: a charged spell with `perfect = true` flares
+# as its window opens, and a release within `window` of the charge's top is a perfect cast: full,
+# `perfect_damage` times more, `perfect_valor` to the caster (a parry's), and a burst on them that
+# everyone sees. Let go earlier it goes at its charge, as ever; held past the window it's full and
+# no more. A missed check is still a working spell. (The Mage design, claude/mage-kit-draft.md.)
+window = 0.1
+perfect_damage = 1.2
+perfect_valor = 10.0
+# The burst (the shatter's kit, to replace once seen).
+perfect_kit = 450
 
 # --- heroes against heroes ------------------------------------------------------------------------
 
@@ -669,6 +699,80 @@ guard = "haft_guard"
 emote = 38
 subclass = 6
 
+# The staffs: a caster's weapons. Each guards with the ward (`[ward]`). The Apprentice's Staff
+# swings like any two-handed weapon; the others cast: their left click is a bolt from the staff
+# (`bolt`, a benched projectile defined with them, below the abilities) and their heavy attack a
+# heavier one (`heavy_bolt`). Their swing numbers stand for a shove and for the rules that read a
+# weapon's reach. (The Mage design, claude/mage-kit-draft.md.)
+[[weapon]]
+key = "apprentice_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [20, 26]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+
+# Fire: slow bolts that burn.
+[[weapon]]
+key = "ember_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [18, 24]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+bolt = "ember_bolt"
+heavy_bolt = "ember_bolt_heavy"
+
+# Frost: shards that chill.
+[[weapon]]
+key = "rime_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [16, 22]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+bolt = "rime_bolt"
+heavy_bolt = "rime_bolt_heavy"
+
+# Arcane: quick bolts.
+[[weapon]]
+key = "arcane_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [14, 20]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "arcane_ward"
+emote = 37
+subclass = 10
+bolt = "arcane_bolt"
+heavy_bolt = "arcane_bolt_heavy"
+
 [[shield]]
 key = "buckler"
 # The arc in front a raised shield covers.
@@ -713,6 +817,17 @@ cost = 10.0
 cost_per_damage = 0.9
 break_secs = 1.0
 break_share = 0.6
+
+# The ward a staff raises (`[ward]`): wide, as a barrier around the body is, its costs off the
+# ward bar. About four light blows or two heavy ones empty a full bar.
+[[shield]]
+key = "arcane_ward"
+arc = 150.0
+cost = 8.0
+cost_per_damage = 0.8
+break_secs = 1.0
+break_share = 0.5
+ward = true
 
 # --- items ----------------------------------------------------------------------------------------
 # Resources stack in the bags until banked; food is eaten with 1. The display is the item's look
@@ -824,6 +939,41 @@ display = 1243
 icon = "INV_Hammer_01"
 kind = "weapon"
 text = "Two-handed. Very slow and very heavy. Breaks an enemy's windup. Guards with the haft."
+
+# Its look is the conjurers' staff (the same display their creatures carry), until a staff of its
+# own is picked from the data.
+[[item]]
+key = "apprentice_staff"
+name = "Apprentice's Staff"
+display = 5415
+icon = "INV_Staff_08"
+kind = "weapon"
+text = "Two-handed. Guards with a ward: an arcane barrier with a bar of its own. A ward raised just as a blow lands costs nothing and reels the attacker. Broken, it can't be raised again until its bar is full."
+
+# The casting staffs share the conjurers' staff look for now (a staff each, from the data, later).
+[[item]]
+key = "ember_staff"
+name = "Ember Staff"
+display = 5415
+icon = "INV_Staff_13"
+kind = "weapon"
+text = "Two-handed. Attacks cast bolts of fire that burn; the heavy attack a slow, heavy one. Guards with a ward."
+
+[[item]]
+key = "rime_staff"
+name = "Rime Staff"
+display = 5415
+icon = "INV_Staff_14"
+kind = "weapon"
+text = "Two-handed. Attacks cast shards of frost that chill; the heavy attack a heavy shard that pierces. Guards with a ward."
+
+[[item]]
+key = "arcane_staff"
+name = "Arcane Staff"
+display = 5415
+icon = "INV_Staff_07"
+kind = "weapon"
+text = "Two-handed. Attacks cast quick bolts of arcane force; the heavy attack a heavier orb. Guards with a ward."
 
 [[item]]
 key = "buckler"
@@ -3215,12 +3365,14 @@ impact_kit = 2709
 [[ability]]
 key = "fireball"
 name = "Fireball"
-text = "Deals 16 to 36 damage, growing larger the longer you charge it, up to 1.5 sec. Sets the target Burning for 4 damage per sec for 4 sec. Fire on a frozen enemy shatters it for 50% more damage."
+text = "Deals 16 to 36 damage, growing larger the longer you charge it, up to 1.5 sec; let go on the flare for more. Sets the target Burning for 4 damage per sec for 4 sec. Fire on a frozen enemy shatters it for 50% more damage."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
 kind = "projectile"
 charge = [0.3, 1.5]
+# Released on the flare: 20% more, the fast missile, and a perfect's Valor.
+perfect = true
 damage = [16.0, 36.0]
 range = [32.0, 34.0]
 radius = [0.35, 0.9]
@@ -3246,6 +3398,7 @@ kind = "projectile"
 valor = 25
 charge = [1.5, 1.5]
 hold = 1.0
+perfect = true
 fragile = true
 damage = [48.0, 48.0]
 range = [36.0, 36.0]
@@ -3405,22 +3558,85 @@ clip = 85
 spell = 8676
 
 # Elements: cold at arm's length.
+# Q, the second choice: Arcane's rhythm, along the reticle. Three missiles by themselves, then one
+# more for every press on the beat, each a little harder, up to eight; the eighth, the finisher,
+# twice as hard. Miss a beat and the volley ends where it is. (The Mage design.)
+[[ability]]
+key = "arcane_missiles"
+name = "Arcane Missiles"
+text = "Fires a volley of arcane missiles along the reticle, one every 0.35 sec: the first 3 by themselves, then one more each time you press again on the beat, up to 8. Each deals 1 more than the last, from 5; the eighth deals double. Miss the beat and the volley ends. You can walk slowly while it lasts."
+icon = "Spell_Nature_StarFall"
+school = "mage"
+slot = "ranged"
+choice = 2
+kind = "rhythm"
+beat_kind = "projectile"
+beat_secs = 0.35
+free_beats = 3
+most_beats = 8
+beat_window = [0.15, 0.08]
+damage = [5.0, 5.0]
+beat_step = 1.0
+finisher_damage = 2.0
+range = [30.0, 30.0]
+radius = [0.3, 0.3]
+speed = 40.0
+cooldown = 9.0
+spell = 7268
+charge_spell = 5143
+beat_kit = 448
+
+# The stop check: a jet of frost sweeps across the front; the key again stops it where it is, and
+# what's in it freezes. (The Mage design, claude/mage-kit-draft.md: Frost stops things.)
 [[ability]]
 key = "cone_of_cold"
 name = "Cone of Cold"
-text = "Blasts a 10 yd cone along the reticle for 18 damage, slowing enemies by 50% for 4 sec. Enemies already slowed are frozen."
+text = "A jet of frost sweeps across your front over 1 sec, 10 yd long: everything it passes takes 12 damage and is slowed by 50% for 3 sec. Press again to stop it: enemies in the jet freeze for 2 sec (1 sec against heroes). Stop it with an enemy at its centre."
 icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
-kind = "cone"
-# 18 (was 10): the solo sim had the mage near three times slower than the warrior at clearing
-# a pack; Fireball is already at the poke's budget, so the brawl key carries more.
-damage = [18.0, 18.0]
+kind = "sweep"
+# The jet: 30° wide, sweeping 120° in a second; it holds half a second where it's stopped.
+damage = [12.0, 12.0]
 range = [10.0, 10.0]
-arc = 60.0
-cooldown = 10.0
+arc = 30.0
+sweep = 120.0
+secs = 1.0
+stop_secs = 0.5
+perfect_arc = 10.0
+cooldown = 8.0
+# The cone's own look where it stops; a Frostbolt streams to the jet's reach while it sweeps.
 spell = 120
-effects = [{ kind = "snare", secs = [4.0, 4.0], amount = 0.5, freeze_if_snared = true }]
+tick_spell = 116
+effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
+stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
+
+# E, the second choice: Arcane's rhythm, round the caster. A burst; then press on the beat for a
+# second, wider and harder, and a third that throws them back. Miss a beat and it ends there.
+# (The Mage design, claude/mage-kit-draft.md: Arcane keeps the beat.)
+[[ability]]
+key = "arcane_explosion"
+name = "Arcane Explosion"
+text = "A burst of arcane force around you: 10 damage within 6 yd. Press again on the beat for a second, 14 damage within 7 yd, then a third, 18 damage within 8 yd that knocks enemies back 4 yd. Miss the beat and it ends there."
+icon = "Spell_Nature_WispSplode"
+school = "mage"
+slot = "close"
+choice = 2
+kind = "rhythm"
+beat_kind = "nova"
+# Beats half a second apart: the first by itself, two more on presses, the windows tightening
+# from 0.15 to 0.08 sec either side.
+beat_secs = 0.5
+free_beats = 1
+most_beats = 3
+beat_window = [0.15, 0.08]
+damage = [10.0, 10.0]
+beat_step = 4.0
+radius = [6.0, 8.0]
+cooldown = 7.0
+spell = 1449
+beat_kit = 448
+finisher_effects = [{ kind = "knockback", amount = 4.0 }]
 
 [[ability]]
 key = "frost_nova"
@@ -3542,7 +3758,7 @@ effects = [{ kind = "panic", secs = [2.0, 2.0] }]
 [[ability]]
 key = "blink"
 name = "Blink"
-text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows."
+text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows. Blink just as a blow lands and it misses you, and Blink comes back twice as fast."
 icon = "Spell_Arcane_Blink"
 school = "mage"
 slot = "utility"
@@ -3550,6 +3766,8 @@ kind = "blink"
 range = [20.0, 20.0]
 cooldown = 12.0
 cleanse = true
+# The counter check: blinked out of a blow just as it lands (the Mage design).
+slip = true
 spell = 1953
 
 [[ability]]
@@ -3563,8 +3781,55 @@ kind = "blink"
 valor = 25
 range = [20.0, 20.0]
 cleanse = true
+slip = true
 leaves = "frost_nova"
 spell = 1953
+
+# 1, the second choice: Fire's release check on a foe. A bolt plants a bomb that flares three times
+# and bursts; press again on a flare to set it off early, harder, and throw them back. Off a flare
+# it goes at once, plain. (The Mage design, claude/mage-kit-draft.md; a utility hits little, so
+# the burst is small and the point is where and when it goes.)
+[[ability]]
+key = "living_bomb"
+name = "Living Bomb"
+text = "Plants a bomb on the enemy the bolt reaches, up to 25 yd. It flares 3 times over 3 sec, then bursts for 10 damage within 5 yd and burns them for 2 damage per sec for 3 sec. Press again on a flare to set it off then: 14 damage, and it knocks them back 4 yd."
+icon = "Spell_Fire_SelfDestruct"
+school = "mage"
+slot = "utility"
+choice = 2
+kind = "bomb"
+range = [25.0, 25.0]
+radius = [5.0, 5.0]
+speed = 36.0
+damage = [10.0, 14.0]
+bomb_secs = 3.0
+bomb_flares = 3
+cooldown = 12.0
+# The bolt (Fireball's missile), the burst (Flamestrike's fire; Blast Wave's on a perfect), the flare's
+# pulse on the foe (the full charge's kit): placeholders to check in the client.
+spell = 133
+tick_spell = 2120
+full_spell = 11113
+bomb_kit = 448
+bomb_effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
+stop_effects = [{ kind = "knockback", amount = 4.0 }]
+
+# Living Bomb's EX: every burn on the foe the bolt reaches catches on everything within 8 yd.
+[[ability]]
+key = "combustion"
+name = "Combustion"
+ex_of = "living_bomb"
+text = "A bolt of fire, up to 25 yd: 4 damage, and every burn on the enemy it hits catches on every enemy within 8 yd of it, for as long as it had left."
+icon = "Spell_Fire_SealOfFire"
+slot = "utility"
+kind = "projectile"
+valor = 25
+range = [25.0, 25.0]
+radius = [0.4, 0.4]
+speed = 40.0
+damage = [4.0, 4.0]
+spread_burns = 8.0
+spell = 133
 
 # The Warden: ride in, then punish.
 [[ability]]
@@ -3749,7 +4014,7 @@ effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 [[ability]]
 key = "ice_block"
 name = "Ice Block"
-text = "Encases you in ice for 2 sec. Nothing can harm you, but you cannot act. Press again to break out early."
+text = "Encases you in ice for 2 sec. Nothing can harm you, but you cannot act. Press again to break out early. Break out just as a blow lands and the enemy who struck is frozen for 1.5 sec (0.75 sec against heroes)."
 icon = "Spell_Frost_Frost"
 school = "mage"
 slot = "defense"
@@ -3758,7 +4023,9 @@ secs = 2.0
 cooldown = 20.0
 spell = 11958
 aura = 11958
-counter = { immune = true }
+# The counter check: broken out of as a blow lands on it, the ice bursts at the striker (the Mage
+# design; a hero takes half a creature's freeze).
+counter = { immune = true, perfect_break = [{ kind = "petrify", secs = [1.5, 1.5] }] }
 
 [[ability]]
 key = "cold_snap"
@@ -3773,7 +4040,50 @@ secs = 2.0
 spell = 11958
 aura = 11958
 leaves = "frost_nova"
-counter = { immune = true }
+counter = { immune = true, perfect_break = [{ kind = "petrify", secs = [1.5, 1.5] }] }
+
+# The rhythm check on a mark: it pulses once a second, and the step back on a pulse is a perfect
+# that throws back what's near. Half the health lost comes back, against heroes too (Corey).
+# (The Mage design, claude/mage-kit-draft.md: Arcane keeps the beat.)
+[[ability]]
+key = "alter_time"
+name = "Alter Time"
+text = "Marks where you stand. Press again within 5 sec to return to the mark and get back half the health you lost since. The mark pulses once a second: return on a pulse to knock back enemies within 4 yd."
+icon = "Spell_Nature_TimeStop"
+school = "mage"
+slot = "defense"
+choice = 2
+kind = "blink"
+anchor = 5.0
+pulse = 1.0
+rewind_health = 0.5
+radius = [4.0, 4.0]
+cleanse = true
+stop_effects = [{ kind = "knockback", amount = 3.0 }]
+cooldown = 20.0
+# Blink's flash going and coming back, and at the mark as it pulses; Arcane Missiles' beat in the
+# hands on each pulse.
+spell = 1953
+charge_spell = 1953
+tick_spell = 1953
+beat_kit = 448
+
+# The counter check: only what reaches you within the window of raising it flies back.
+[[ability]]
+key = "spell_mirror"
+name = "Spell Mirror"
+ex_of = "alter_time"
+text = "Raises a mirror for 0.8 sec. A bolt, arrow or spell that reaches you as you raise it flies back at whoever cast it. Later, the mirror only absorbs it."
+icon = "Spell_Arcane_ArcaneResilience"
+slot = "defense"
+kind = "stance"
+valor = 25
+secs = 0.8
+# Magic Reflection's mirror while it's up; the ward's look as it absorbs.
+spell = 20223
+aura = 20223
+charge_spell = 1463
+counter = { mirror = true, perfect_mirror = true, once = true }
 
 # The Warden: the defense you give away.
 [[ability]]
@@ -5756,24 +6066,144 @@ clip = 54
 effects = [{ kind = "stun", secs = [1.5, 1.5] }]
 tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.4 }]
 
+# ------------------------------------------------------------------- the staffs' bolts --
+# A casting staff's left click and heavy attack (`bolt`, `heavy_bolt` on the [[weapon]]). Benched:
+# never on the board, cast by the staff alone. Their damage is the staff's: a bolt the low end of
+# its swing, a heavy bolt (held, let go on its flare for a perfect: `[checks]`) about the heavy
+# attack's share more. Stamina as a swing's. Looks are the
+# schools' own missiles (Fireball's, Frostbolt's, Arcane Missiles'), to check in the client.
+
+[[ability]]
+key = "ember_bolt"
+name = "Ember Bolt"
+text = "A bolt of fire from the staff. Burns for 2 damage per sec for 3 sec."
+icon = "Spell_Fire_FlameBolt"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 10.0
+damage = [18.0, 18.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 30.0
+spell = 133
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
+
+[[ability]]
+key = "ember_bolt_heavy"
+name = "Ember Burst"
+text = "A heavy, slow bolt of fire. Burns for 4 damage per sec for 3 sec."
+icon = "Spell_Fire_Fireball02"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+# Held, and let go on the flare for the perfect.
+charge = [0.3, 1.2]
+perfect = true
+stamina = 22.0
+damage = [24.0, 34.0]
+range = [30.0, 30.0]
+radius = [0.6, 0.6]
+speed = 22.0
+spell = 23024
+effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
+
+[[ability]]
+key = "rime_bolt"
+name = "Rime Shard"
+text = "A shard of frost from the staff. Slows by 30% for 2 sec."
+icon = "Spell_Frost_FrostBolt"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 10.0
+damage = [16.0, 16.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 32.0
+spell = 116
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
+
+[[ability]]
+key = "rime_bolt_heavy"
+name = "Rime Lance"
+text = "A heavy shard of frost that goes through every enemy in its line. Slows by 40% for 3 sec."
+icon = "Spell_Frost_FrostBolt02"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+# Held, and let go on the flare for the perfect.
+charge = [0.3, 1.2]
+perfect = true
+stamina = 22.0
+damage = [20.0, 30.0]
+range = [32.0, 32.0]
+radius = [0.4, 0.4]
+speed = 36.0
+pierce = 9
+spell = 23412
+effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
+
+[[ability]]
+key = "arcane_bolt"
+name = "Arcane Bolt"
+text = "A quick bolt of arcane force from the staff."
+icon = "Spell_Arcane_StarFire"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+stamina = 8.0
+damage = [14.0, 14.0]
+range = [30.0, 30.0]
+radius = [0.3, 0.3]
+speed = 44.0
+spell = 7268
+
+[[ability]]
+key = "arcane_bolt_heavy"
+name = "Arcane Orb"
+text = "A heavy orb of arcane force."
+icon = "Spell_Arcane_Blast"
+school = "mage"
+slot = "ranged"
+kind = "projectile"
+bench = true
+# Held, and let go on the flare for the perfect.
+charge = [0.3, 1.2]
+perfect = true
+stamina = 20.0
+damage = [18.0, 28.0]
+range = [30.0, 30.0]
+radius = [0.7, 0.7]
+speed = 26.0
+spell = 7268
+
 # ------------------------------------------------------------------------------------- Mage --
 
 [[ability]]
 key = "meteor"
 name = "Meteor"
-text = "Calls a meteor down on the reticle, up to 34 yd away. It lands 1.5 sec later on a 7 yd circle shown to everyone. Deals 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 4 sec more at 8 damage per sec. Freeze them first."
+text = "Hold to call a meteor down on the reticle, up to 34 yd away; let go on the flare for the whole of it. It lands 1.5 sec later on a circle shown to everyone, 5 to 7 yd wide. Deals 35 to 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 4 sec more at 8 damage per sec. Freeze them first."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ultimate"
 kind = "ground"
 valor = 100
 range = [34.0, 34.0]
-radius = [7.0, 7.0]
+radius = [5.0, 7.0]
+# Held to call it down: let go early it's half the meteor; on the flare, the whole of it and more.
+charge = [0.5, 1.5]
+perfect = true
 delay = 1.5
 # Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
 # moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
 look_lead = 0.8
-damage = [70.0, 70.0]
+damage = [35.0, 70.0]
 linger = 4.0
 linger_damage = 8.0
 cooldown = 40.0
@@ -5783,6 +6213,40 @@ spell = 24340
 linger_spell = 22191
 clip = 54
 effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4.0], amount = 5.0 }]
+
+# 3, the second choice: Frost's ultimate, the stop check rolling. An orb rolls out along the
+# reticle; the key again stops it where it is and it bursts. Stopped on a foe it's a perfect: the
+# bigger burst and a freeze on everything in it (the group's shatter setup). Stopped at the
+# caster's own feet, they freeze. Rolled the whole way, nothing. (The Mage design,
+# claude/mage-kit-draft.md.)
+[[ability]]
+key = "frozen_orb"
+name = "Frozen Orb"
+text = "An orb of frost rolls out along the reticle for up to 4 sec, 25 yd: 15 damage per sec to everything within 2 yd of it, slowing them. Press again to stop it: it bursts for 30 damage within 6 yd. Stop it on an enemy and it bursts for 40 and freezes everything within 6 yd for 2 sec (1 sec against heroes). Stop it at your own feet and you freeze. Let it roll the whole way and it fades."
+icon = "Spell_Frost_FrostShock"
+school = "mage"
+slot = "ultimate"
+choice = 2
+kind = "orb"
+valor = 100
+range = [25.0, 25.0]
+# The roll: its length in seconds, its damage a second to those within its reach, in quarter-second ticks.
+linger = 4.0
+linger_damage = 15.0
+tick = 0.25
+radius = [2.0, 2.0]
+# The burst: plain, and on a foe.
+damage = [30.0, 40.0]
+stop_radius = 6.0
+perfect_yd = 1.5
+backfire_yd = 3.0
+cooldown = 40.0
+# Frostbolt's missile rolled along the ground for the orb; Frost Nova's ring for the burst.
+tick_spell = 116
+spell = 122
+effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
+stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
+backfire_effects = [{ kind = "petrify", secs = [1.5, 1.5] }]
 
 # ---------------------------------------------------------------------------------- Warlock --
 
@@ -8260,7 +8724,7 @@ unparryable = true
 posture = 160
 drops = { mageroyal = [2, 3] }
 trophy = { silver = 2, mageroyal = 4 }
-teaches = ["meteor"]
+teaches = ["meteor", "frozen_orb"]
 respawn = 1200.0
   [mob.attack]
   ranged = true
@@ -10750,7 +11214,7 @@ name = "Theocritus's Ward-Stone"
 at = [-9562.0, -668.0]
 display = 2650
 scale = 0.6
-teaches = ["fireball", "cone_of_cold"]
+teaches = ["fireball", "cone_of_cold", "arcane_missiles", "arcane_explosion"]
 keep = true
 secs = 3.0
 text = "The ward-stone of the Tower of Azora still hums with what the old mage taught there."
@@ -10857,7 +11321,7 @@ trial = ["trial_relic_paladin_0"]
 key = "relic_mage"
 name = "An Apprentice's Satchel"
 at = [-9432.0, -553.0]
-teaches = ["blink", "ice_block"]
+teaches = ["blink", "ice_block", "living_bomb", "alter_time"]
 loot = { mageroyal = 3 }
 display = 259
 secret = 7.0
@@ -11296,7 +11760,7 @@ at = [-9540.0, -695.0]
 radius = 45.0
 kind = "sanctum"
 icon = "Spell_Frost_FrostBolt02"
-text = "The mage's shrine teaches Fireball and Cone of Cold. Defias conjurers rob the tower, and the Unbound Flame, the mage's trial, burns behind it."
+text = "The mage's shrine teaches Fireball, Cone of Cold, Arcane Missiles and Arcane Explosion. Defias conjurers rob the tower, and the Unbound Flame, the mage's trial, burns behind it."
 reward = { mageroyal = 3 }
 
 [[site]]
