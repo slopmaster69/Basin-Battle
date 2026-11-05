@@ -218,6 +218,8 @@ pub struct SurvivalGame {
     pub(crate) stand_ins: BTreeMap<Id, play::StandIn>,
     /// Lingering ground's looks (DynamicObjects), by the mark they go with.
     pub(crate) area_looks: HashMap<Id, u64>,
+    /// Ropes drawn (Tripwire's wire), by the mark they go with.
+    pub(crate) ropes: std::collections::HashSet<Id>,
     /// Danger marks on the ground: where, and how wide.
     pub(crate) mark_at: HashMap<Id, ([f32; 3], f32)>,
     /// The creatures whose weapons were last shown red, until when (one `WG` per wind-up).
@@ -348,6 +350,7 @@ impl SurvivalGame {
             rings: HashMap::new(),
             stand_ins: BTreeMap::new(),
             area_looks: HashMap::new(),
+            ropes: Default::default(),
             mark_at: HashMap::new(),
             warned_glow: HashMap::new(),
             hud_at: Instant::now(),

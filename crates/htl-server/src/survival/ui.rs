@@ -354,12 +354,14 @@ pub(crate) const VERSION: u32 = 2;
 /// flashes the whole screen.
 /// 22: Ensnaring Retreat's borrowed jump fitted to the flight (`FP`), so it ends as the hero
 /// lands.
-pub(crate) const ADDON_NEWEST: u32 = 22;
+/// 23: the add-on says `ac19` for a client with patch 0028 (Tripwire's rope).
+pub(crate) const ADDON_NEWEST: u32 = 23;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
-/// as an ability lands (0026); 13 to 15 are the hunter's open branches (0020 to 0023).
-pub(crate) const CLIENT_NEWEST: u8 = 18;
+/// as an ability lands (0026). 19: an object drawn longer along one axis, and doodads placed as
+/// objects (0028): Tripwire's rope.
+pub(crate) const CLIENT_NEWEST: u8 = 19;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1207,7 +1209,8 @@ impl SurvivalGame {
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and
                 // lunges too; `ac4` plays its own blows' weight the moment they connect; `ac9`
                 // trails a creature's swing over its last stroke (`FOE_TRAILS_LEVEL`); `ac10` plays
-                // another model's clips; `ac11` puts their bones back to rest after.
+                // another model's clips; `ac11` puts their bones back to rest after; `ac19` draws an
+                // object stretched from end to end (Tripwire's rope).
                 let ac = arg2.to_ascii_lowercase();
                 let level: u8 = match ac.strip_prefix("ac") {
                     Some("") => 1,
