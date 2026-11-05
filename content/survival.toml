@@ -6046,7 +6046,7 @@ tick_spell = 16869
 # On a client that draws an orb (patch 0043): Ice Tomb's ice ball rolled along the ground at the
 # orb's own pace, spinning flat, in place of the missile streak (Corey: like retail's Orb of Frost).
 orb_model = "Spells\\Ice_Missile_Uber.mdx"
-orb_scale = 2.2
+orb_scale = 1.4
 spell = 122
 effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
 stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]

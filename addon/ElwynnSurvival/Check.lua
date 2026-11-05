@@ -992,7 +992,7 @@ end)
 function ES.OrbLine(f)
   if not PlayGroundOrb then return end
   local n = function(i) return tonumber(f[i]) or 0 end
-  PlayGroundOrb("es_orb_" .. (f[2] or ""), f[10] or "", n(3), n(4), n(5), n(6), n(7), n(8), n(9), tonumber(f[11]) or 1, 540)
+  PlayGroundOrb("es_orb_" .. (f[2] or ""), f[10] or "", n(3), n(4), n(5), n(6), n(7), n(8), n(9), tonumber(f[11]) or 1, 240)
 end
 function ES.OrbGoneLine(f)
   if StopGroundOrb then StopGroundOrb("es_orb_" .. (f[2] or "")) end
