@@ -751,6 +751,44 @@ fn kill_shot_wants_its_whole_draw_goes_through_the_line_and_finishes_the_weak() 
 }
 
 #[test]
+fn kill_shots_draw_winds_the_hunter_up_and_the_release_or_the_let_go_takes_it_off() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = mob(&mut s, "grunt", [16.0, 0.0, 0.0]);
+    let look = s.content.abilities[idx(&s, "kill_shot")].charge_look;
+    assert_ne!(look, 0, "Kill Shot's draw has a wind-up");
+    let aim = (0.0, down_to(20.0));
+    let shown = |ev: &[Event]| ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == p));
+    s.set_valor(p, 100.0);
+    assert!(!s.auras_of(p).contains(&look), "nothing on her before the draw");
+    // The click: the draw begins, and the wind-up is on her through it.
+    press(&mut s, p, "kill_shot", false);
+    s.set_aim_line(p, aim.0, aim.1);
+    s.input(p, Input::Attack);
+    let ev = s.step(DT);
+    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "drawing");
+    assert!(shown(&ev), "her slots shown as the draw begins");
+    assert!(s.auras_of(p).contains(&look), "the wind-up on her");
+    run_pinned(&mut s, 0.5, &[m]);
+    assert!(s.auras_of(p).contains(&look), "and still, half a second in");
+    // Let go too soon: the draw is lost, and the wind-up goes with it.
+    s.input(p, Input::AttackUp);
+    let ev = run_pinned(&mut s, DT, &[m]);
+    assert_eq!(s.players[&p].action, Action::Ready);
+    assert!(shown(&ev), "her slots shown again as it's let go");
+    assert!(!s.auras_of(p).contains(&look), "and the wind-up off her");
+    // The whole draw: on her till the release, off as the shot goes.
+    press(&mut s, p, "kill_shot", false);
+    let ev = draw(&mut s, p, 1.1, aim, &[m]);
+    assert_eq!(missiles(&ev, p, s.content.abilities[idx(&s, "kill_shot")].spell), 1, "loosed");
+    assert!(shown(&ev), "her slots shown as it goes");
+    assert!(!s.auras_of(p).contains(&look), "the wind-up gone with the shot");
+    // And the tune key the chat films alternates with.
+    let (c, _) = s.content.tuned("ability.kill_shot.charge_look", "14751").unwrap();
+    assert_eq!(c.abilities[idx(&s, "kill_shot")].charge_look, 14751);
+}
+
+#[test]
 fn an_old_hunters_save_comes_back_with_the_new_cards() {
     let (s, p) = load_old_save("hunter", &[("ranged", "arcane_shot"), ("close", "explosive_trap"), ("utility", "disengage"), ("defense", "deterrence"), ("ultimate", "volley")]);
     // Explosive Trap moved to the defense row; Disengage is Ensnaring Retreat; Deterrence and

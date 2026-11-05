@@ -219,6 +219,10 @@ pub struct AbilityDef {
     pub spell: u32,
     #[serde(default)]
     pub charge_spell: u32,
+    /// A wind-up on the caster themself while a charge is held (Kill Shot's draw): this spell's
+    /// aura look in their aura slots from the press to the release or the let-go (0: none).
+    #[serde(default)]
+    pub charge_look: u32,
     /// At full charge: a faster missile (its own spell, flying at its own speed, so the look keeps
     /// pace) and a flare on the caster as the charge tops out (0: the school's).
     #[serde(default)]
