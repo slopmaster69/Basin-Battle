@@ -2384,7 +2384,7 @@ impl Survival {
                 // Thrown up with the foe, the hero's own camera comes in and tips down onto the
                 // fight, to aim the dive that follows (Corey's review of Raptor Strike: "the
                 // knock-up camera"): a beat for their add-on, nothing for anyone else.
-                self.events.push(Event::Beat { player: id, beat: cues::BEAT_RISE, on: id });
+                self.events.push(Event::Beat { player: id, beat: cues::BEAT_RISE.to_string(), on: Some(id) });
             }
             "ground" => {
                 let at = if d.at_self { pos } else { self.aim_point(id, AbilityDef::at(d.range, share)) };
