@@ -1414,7 +1414,10 @@ fn reverse_grapple_plays_the_hunters_pull_clip_for_the_haul_and_its_tune_keys_sw
             .collect()
     };
     // As shipped: EmoteUseStanding (63) on the hunter for exactly the creature's time in the air.
-    let air = crate::sim::moves::airtime(crate::sim::moves::PULL_LIFT);
+    // The pull's own lift where the rules name one (the haul's 5), else the default.
+    let c0 = Content::dev();
+    let lift = c0.abilities[c0.ability("reverse_grapple").unwrap()].effects.iter().find(|e| e.kind == "pull").map_or(0.0, |e| e.lift);
+    let air = crate::sim::moves::airtime(if lift > 0.0 { lift } else { crate::sim::moves::PULL_LIFT });
     let clips = haul(Content::dev(), "wolf");
     assert_eq!(clips.len(), 1, "one pull clip on the hunter: {clips:?}");
     let (clip, from, secs) = &clips[0];

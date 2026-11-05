@@ -367,7 +367,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 30: the add-on preloads a cast's borrowed model before it plays (Reverse Grapple's pull).
 /// 31: the fan's points sit where the arrows really go, and bigger.
 /// 32: the `ML` line's own speed (patch 0040).
-pub(crate) const ADDON_NEWEST: u32 = 32;
+/// 33: a hook's pull flies the hero flat (Swim), the clip fitted to the flight (`FP`).
+pub(crate) const ADDON_NEWEST: u32 = 33;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

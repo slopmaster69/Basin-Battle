@@ -130,11 +130,11 @@ fn hits(ev: &[Event], a: Id, v: Id) -> Vec<u32> {
         .collect()
 }
 
-/// The hero's pulls on a hook's line, flown through the air (a hop with the line's own arm-out
-/// look), or run along the ground (a dash): (facing, length). A hop's length is its speed over
-/// its time in the air (the rules' gravity, 19.29 yd/s²).
+/// The hero's pulls on a hook's line, flown through the air (a hop with the line's own flat
+/// Swim look), or run along the ground (a dash): (facing, length). A hop's length is its speed
+/// over its time in the air (the rules' gravity, 19.29 yd/s²).
 fn dashes(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
-    let looked = ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 53, .. } if *player == who));
+    let looked = ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 42, .. } if *player == who));
     ev.iter()
         .filter_map(|e| match e {
             Event::Dash { player, dir, speed, secs } if *player == who => Some((*dir, speed * secs)),
@@ -145,7 +145,8 @@ fn dashes(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
 }
 
 /// A hook pulls its caster through the air, as a hookshot does (play-test: a run along the
-/// ground read as a Charge): a flat hop, the arm held out along the line, landing at the wall.
+/// ground read as a Charge): a flat hop, the body flat along the line (Swim), landing at the
+/// wall.
 #[test]
 fn a_hooks_pull_flies_its_caster_through_the_air() {
     let mut s = world(false, walled([12.0, 0.0], 1.0), HOOK);
@@ -158,7 +159,7 @@ fn a_hooks_pull_flies_its_caster_through_the_air() {
         _ => None,
     });
     assert!(hop.is_some_and(|l| l > 0.5 && l < 6.0), "a flat arc through the air: {hop:?}");
-    assert!(ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 53, .. } if *player == p)), "the arm out along the line");
+    assert!(ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 42, .. } if *player == p)), "flat along the line (Swim)");
 }
 
 fn hops(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
@@ -792,7 +793,8 @@ fn grapple_arrow_catches_a_wall_and_a_boulder_the_walking_grid_never_had() {
     }).collect();
     assert_eq!(lines.len(), 1, "{lines:?}");
     assert!(matches!(lines[0].0, Target::Point(at) if at[0] > 10.0 && at[0] < 13.0), "to the wall: {lines:?}");
-    assert!(lines[0].1 >= 0.3, "as long as the pull: {lines:?}");
+    let flight = ev.iter().find_map(|e| match e { Event::LeapLook { player, secs, .. } if *player == p => Some(*secs), _ => None }).expect("the pull's flight");
+    assert!((lines[0].1 - flight).abs() < 1e-3 && flight >= 0.25, "as long as the pull ({flight} s): {lines:?}");
     // A boulder only the land's shapes know: caught all the same.
     let mut s = shipped_on(Box::new(Boulder { at: [15.0, 0.0], r: 1.5, top: 2.5 }));
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
