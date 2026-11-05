@@ -57,7 +57,8 @@ impl Survival {
 
     /// Whether a hero holds their guard up.
     pub(crate) fn hero_guarding(&self, hero: Id) -> bool {
-        self.players.get(&hero).is_some_and(|p| matches!(p.action, Action::Guard) || p.guard_held)
+        // (A right mouse held on a weapon with no guard, a Drain, guards nothing.)
+        self.players.get(&hero).is_some_and(|p| matches!(p.action, Action::Guard) || (p.guard_held && !self.weapon_of(p).has_alt()))
     }
 
     /// Creatures other than `except` on `hero` now (chasing them, winding up, between blows).

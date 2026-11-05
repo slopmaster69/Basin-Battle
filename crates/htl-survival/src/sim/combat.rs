@@ -190,6 +190,21 @@ impl Survival {
                 return true;
             }
         }
+        // A weapon whose right click is an ability (a holy staff's Flash Heal, a shadow staff's
+        // Drain): no guard at all. The right click is that ability; with the button held, a
+        // click is a click (no bash or kick: there's no guard to bash from).
+        if let Some(alt) = self.players.get(&id).and_then(|p| self.alt_of(p)) {
+            match input {
+                Input::Guard => return self.alt_press(id, alt),
+                Input::GuardUp => {
+                    self.alt_release(id, alt);
+                    return true;
+                }
+                Input::Bash => return self.try_act(id, Input::Attack),
+                Input::Kick => return self.try_act(id, Input::Heavy),
+                _ => {}
+            }
+        }
         let Some(p) = self.players.get(&id) else { return true };
         let aiming = matches!(p.action, Action::Aim { .. });
         let charging = matches!(p.action, Action::Charge { .. });
@@ -1213,7 +1228,8 @@ impl Survival {
         }
         let Some(p) = self.players.get(&id) else { return };
         // The held guard comes back up, unless it's a ward still broken.
-        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) { Action::Guard } else { Action::Ready };
+        // (A weapon whose right click is an ability has no guard to come back up.)
+        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) && !self.weapon_of(p).has_alt() { Action::Guard } else { Action::Ready };
         let buffered = p.buffered;
         // A dodge with an attack pressed in it: the attack out of it, now, or as the hero lands.
         if matches!(p.action, Action::Dodge { .. }) && p.dodge_attack {
@@ -1676,6 +1692,10 @@ impl Survival {
             self.events.push(Event::Swing { attacker: s.attacker, victim: Some(s.victim), damage: 0, outcome: Outcome::Miss, anim: false, style: s.style });
             return;
         }
+        // A friend's shield landed on them just in time (Power Word: Shield): parried for them.
+        if self.shield_parries(&s) {
+            return;
+        }
         // A counter's stance meets it first.
         if let Some(out) = self.counter_catch(s.victim, s.attacker, s.how, match s.follow {
             Follow::Ability { ability, share } => Some((ability, share)),
@@ -1969,7 +1989,12 @@ impl Survival {
         if landed > 0 {
             let caught = recap::caught_word(&doing, outcome, blockable);
             self.set_cause(victim, recap::Cause::blow(attacker, recap::blow_word(style, heavy), caught));
+            let before = p_health(self, victim);
             self.hurt_player(victim, landed);
+            // A blow that hurts (past any shield) costs a level of Grace.
+            if p_health(self, victim) < before {
+                self.lose_grace(victim);
+            }
         }
         outcome
     }
@@ -2567,6 +2592,10 @@ impl Survival {
                 "hallowed" => k *= (1.0 - c.amount).max(0.0),
                 _ => {}
             }
+        }
+        // A stance that cuts what reaches them (Dispersion).
+        if let Some(c) = self.stances.get(&id).filter(|s| s.until > now).and_then(|s| self.content.abilities[s.ability].counter.as_ref()) {
+            k *= (1.0 - c.cut).max(0.0);
         }
         k
     }

@@ -493,7 +493,8 @@ fn a_save_with_void_rift_and_the_old_light_keys_still_loads_them() {
         .collect();
     let q = s.join("ayla", "Ayla", Some(&save));
     let h = &s.players[&q];
-    for (slot, k) in [("ranged", "penance"), ("close", "holy_nova"), ("utility", "leap_of_faith"), ("defense", "power_word_barrier"), ("ultimate", "void_rift")] {
+    // (The Barrier on the defense key comes back as the Shield, its EX now: the Priest's core.)
+    for (slot, k) in [("ranged", "penance"), ("close", "holy_nova"), ("utility", "leap_of_faith"), ("defense", "power_word_shield"), ("ultimate", "void_rift")] {
         assert_eq!(h.loadout.get(slot).map(String::as_str), Some(k), "{slot}");
     }
     // And Void Rift still goes off from the 3 key.

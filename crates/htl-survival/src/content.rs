@@ -136,6 +136,10 @@ pub struct Content {
     /// A fresh hero's ability keys: slot to ability.
     #[serde(default)]
     pub loadout: LoadoutDef,
+    /// Grace, the Light Priest's thread (`[grace]`): raised by the Priest's perfects, spent by
+    /// the holy staff's Heal.
+    #[serde(default)]
+    pub grace: GraceDef,
     /// The text it was read from, for tuning in play ([`crate::tune`]), and the file, if any.
     #[serde(skip)]
     pub source: String,
@@ -412,6 +416,42 @@ pub struct ChecksDef {
 impl Default for ChecksDef {
     fn default() -> Self {
         Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0 }
+    }
+}
+
+/// Grace (the Priest design, claude/priest-kit-draft.md): a hero's level, 0 to `most`. Every
+/// perfect of a Priest's spell (its card's column `priest`) raises it one; it fades `secs` after
+/// the last rise, and a blow that hurts the hero costs a level. The next Heal that spends it
+/// (`spends_grace`) is cast `haste` faster for the level it had (1: instant), and healing past
+/// full health stays on as a shield `overheal` times the excess, for `overheal_secs`. Each level
+/// shows on the hero as one more of `auras` (a spell's state look), no words; a Heal at the top
+/// level lands with `top_spell` on whoever it heals.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct GraceDef {
+    pub most: u32,
+    pub secs: f32,
+    /// By level, I first.
+    pub haste: Vec<f32>,
+    pub overheal: Vec<f32>,
+    pub overheal_secs: f32,
+    pub auras: Vec<u32>,
+    pub top_spell: u32,
+}
+
+impl Default for GraceDef {
+    fn default() -> Self {
+        Self { most: 3, secs: 10.0, haste: vec![0.3, 0.6, 1.0], overheal: vec![0.0, 1.0, 2.0], overheal_secs: 8.0, auras: vec![139, 6346, 588], top_spell: 24171 }
+    }
+}
+
+impl GraceDef {
+    /// A level's share of something given by level (0 below I).
+    pub fn at(list: &[f32], level: u32) -> f32 {
+        if level == 0 {
+            return 0.0;
+        }
+        list.get(level as usize - 1).or(list.last()).copied().unwrap_or(0.0)
     }
 }
 
@@ -887,12 +927,23 @@ pub struct WeaponDef {
     pub bolt: String,
     #[serde(default)]
     pub heavy_bolt: String,
+    /// The right click as an ability instead of a guard (a holy staff's Flash Heal, a shadow
+    /// staff's Drain): a benched ability, cast as the right mouse goes down. A `channel` is held
+    /// while the button is (let go, it ends); anything else goes on the press, as often as its
+    /// `cooldown` lets it (the fire rate). A weapon with one has no guard at all: no block, no
+    /// parry, no ward.
+    #[serde(default)]
+    pub alt: String,
 }
 
 impl WeaponDef {
     /// The weapon casts its light attack.
     pub fn casts(&self) -> bool {
         !self.bolt.is_empty()
+    }
+    /// Its right click is an ability, not a guard.
+    pub fn has_alt(&self) -> bool {
+        !self.alt.is_empty()
     }
 }
 
@@ -3010,13 +3061,15 @@ impl Content {
             if w.two_handed && self.shield(&w.guard).is_none() {
                 bail!("weapon {}: two-handed, and its guard {:?} isn't a [[shield]]", w.key, w.guard);
             }
-            for (what, key) in [("bolt", &w.bolt), ("heavy_bolt", &w.heavy_bolt)] {
+            // (A heavy bolt may be help at the reticle instead: the holy staff's Heal. The right
+            // click's ability is a bolt, or a cord held while the button is.)
+            for (what, key, kinds) in [("bolt", &w.bolt, &["projectile"][..]), ("heavy_bolt", &w.heavy_bolt, &["projectile", "ally"][..]), ("alt", &w.alt, &["projectile", "channel"][..])] {
                 if key.is_empty() {
                     continue;
                 }
                 match self.ability(key) {
-                    Some(a) if self.abilities[a].kind == "projectile" => {}
-                    Some(_) => bail!("weapon {}: its {what} {key} isn't a projectile", w.key),
+                    Some(a) if kinds.contains(&self.abilities[a].kind.as_str()) => {}
+                    Some(_) => bail!("weapon {}: its {what} {key} must be one of {kinds:?}", w.key),
                     None => bail!("weapon {}: no [[ability]] {key} for its {what}", w.key),
                 }
             }
@@ -3413,6 +3466,16 @@ impl Content {
             if a.launch < 0.0 || (a.launch > 0.0 && a.kind != "trap") {
                 bail!("{what}: only a trap launches (`launch`)");
             }
+            // The Priest's core.
+            if a.friends_only && (a.kind != "projectile" || a.ally_heal <= 0.0) {
+                bail!("{what}: only a healing projectile passes foes by (`friends_only` needs `ally_heal`)");
+            }
+            if a.spends_grace && a.kind != "ally" {
+                bail!("{what}: only help on a friend (`ally`) spends Grace");
+            }
+            if a.parry_for && (a.kind != "ally" || !a.effects.iter().any(|e| e.kind == "shield")) {
+                bail!("{what}: only a shield given to a friend (`ally` with a `shield`) parries for them (`parry_for`)");
+            }
             if !a.end_burst.is_empty() && a.linger <= 0.0 {
                 bail!("{what}: only lingering ground bursts as it ends (`end_burst` needs `linger`)");
             }
@@ -3423,6 +3486,39 @@ impl Content {
             }
             if a.slip && a.kind != "blink" {
                 bail!("{what}: only a blink slips blows (`slip`)");
+            }
+            // The Shadow Priest's mechanics.
+            if (a.slip_radius > 0.0 || !a.slip_effects.is_empty() || !a.slip_self.is_empty()) && !a.slip {
+                bail!("{what}: `slip_radius`, `slip_effects` and `slip_self` are a slip's (they need `slip`)");
+            }
+            if !a.slip_effects.is_empty() && a.slip_radius <= 0.0 {
+                bail!("{what}: `slip_effects` need the reach they land in (`slip_radius`)");
+            }
+            if let Some(f) = &a.flay {
+                if a.kind != "channel" || f.taut <= 0.0 || f.taut >= a.range[1] || f.taut_secs <= 0.0 || f.snap <= 0.0 || f.snap_cap <= 0.0 {
+                    bail!("{what}: a flay is a channel's, taut from `taut` yd short of its range, with `taut_secs`, `snap` and `snap_cap`");
+                }
+                if (f.spill > 0.0) != (f.spill_radius > 0.0) {
+                    bail!("{what}: a flay's `spill` and `spill_radius` go together");
+                }
+            }
+            if a.on_taut < 0.0 || (a.on_taut > 0.0 && a.kind != "projectile") {
+                bail!("{what}: only a projectile snaps a taut cord (`on_taut`)");
+            }
+            if (a.low_health > 0.0) != (a.low_mult > 1.0) || !(0.0..1.0).contains(&a.low_health) {
+                bail!("{what}: `low_health` (below 1) and `low_mult` (above 1) go together");
+            }
+            if a.backlash < 0.0 {
+                bail!("{what}: `backlash` is damage back at the caster (0 or more)");
+            }
+            if a.counter.as_ref().is_some_and(|c| !(0.0..1.0).contains(&c.cut) || c.mend < 0.0) {
+                bail!("{what}: a stance's `cut` is a share below 1, its `mend` 0 or more");
+            }
+            if a.counter.as_ref().is_some_and(|c| !c.perfect_pass.is_empty() && (c.immune || c.mirror || c.block || c.dodge)) {
+                bail!("{what}: `perfect_pass` lets a blow through clean (no immune, mirror, block or dodge with it)");
+            }
+            for e in a.slip_effects.iter().chain(&a.slip_self).chain(a.counter.iter().flat_map(|c| c.perfect_pass.iter())) {
+                effect_ok(e, &what)?;
             }
             if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
                 bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
