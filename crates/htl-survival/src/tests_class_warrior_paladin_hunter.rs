@@ -1052,6 +1052,31 @@ fn arrow_recall_flies_each_arrow_from_where_it_stood_to_the_hunter_and_takes_it_
     assert!(s.hunt.recalls.is_empty());
 }
 
+/// Two recalls in flight at once (a second batch planted and recalled while the first flies
+/// home): the hand stays out until the last arrow of the last recall is home, and comes down once.
+#[test]
+fn a_second_recall_keeps_the_hand_out_until_its_own_arrows_are_home() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.plant_arrow(p, [6.0, 0.0, 0.0]);
+    let _ = s.step(DT);
+    s.set_valor(p, 25.0);
+    let mut ev = press(&mut s, p, "tripwire", true);
+    ev.extend(run(&mut s, 0.3));
+    // A second arrow, far off, recalled while the first is still on its way home.
+    s.plant_arrow(p, [30.0, 0.0, 0.0]);
+    let _ = s.step(DT);
+    s.set_valor(p, 25.0);
+    ev.extend(press(&mut s, p, "tripwire", true));
+    assert_eq!(s.hunt.recalls.len(), 2, "two recalls at once");
+    ev.extend(run(&mut s, 0.5));
+    assert_eq!(s.hunt.recalls.len(), 1, "the first is home");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)), "the hand stays out for the second");
+    let ev = run(&mut s, 1.5);
+    assert!(s.hunt.recalls.is_empty(), "the second is home");
+    assert_eq!(ev.iter().filter(|e| matches!(e, Event::Pose { id, pose: 0 } if *id == p)).count(), 1, "down once, after the last");
+}
+
 /// A hunter felled with the hand out: the arrows spoken for go without flying, and the hand
 /// comes down with them.
 #[test]

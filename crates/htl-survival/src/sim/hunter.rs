@@ -575,16 +575,19 @@ impl Survival {
 
     /// Recalls pressed: their arrows fly at their time, and the hand comes down once the last is
     /// home, or at once if the hunter is gone (dead or left) before then, their arrows with it.
+    /// A hunter with a second recall still in flight keeps the hand out until that one is home
+    /// too: it comes down once, after the last.
     fn step_recalls(&mut self) {
         let now = self.clock;
         let recalls = std::mem::take(&mut self.hunt.recalls);
         let mut keep = Vec::new();
+        let mut done = Vec::new();
         for mut r in recalls {
             if !self.alive(r.owner) {
                 for a in &r.arrows {
                     self.unplant(a);
                 }
-                self.events.push(Event::Pose { id: r.owner, pose: 0 });
+                done.push(r.owner);
                 continue;
             }
             if !r.arrows.is_empty() && r.at <= now {
@@ -592,12 +595,19 @@ impl Survival {
                 r.release_at = self.fly_recall(r.owner, r.ability, &arrows);
             }
             if r.arrows.is_empty() && r.release_at <= now {
-                self.events.push(Event::Pose { id: r.owner, pose: 0 });
+                done.push(r.owner);
                 continue;
             }
             keep.push(r);
         }
         keep.extend(std::mem::take(&mut self.hunt.recalls));
+        done.sort_unstable();
+        done.dedup();
+        for owner in done {
+            if !keep.iter().any(|r| r.owner == owner) {
+                self.events.push(Event::Pose { id: owner, pose: 0 });
+            }
+        }
         self.hunt.recalls = keep;
     }
 
