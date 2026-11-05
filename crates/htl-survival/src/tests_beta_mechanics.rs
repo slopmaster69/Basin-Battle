@@ -162,6 +162,26 @@ fn a_hooks_pull_flies_its_caster_through_the_air() {
     assert!(ev.iter().any(|e| matches!(e, Event::LeapLook { player, clip: 42, .. } if *player == p)), "flat along the line (Swim)");
 }
 
+/// The flight's Swim is the dwarf man's on every hero (Corey's review: a human's swim through the
+/// air looked silly; the dwarf's read as a flight); a dwarf flies in their own.
+#[test]
+fn a_hooks_pull_flies_every_hero_in_the_dwarfs_swim() {
+    let flight = |race: u8| {
+        let mut s = world(false, walled([12.0, 0.0], 1.0), HOOK);
+        let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        s.players.get_mut(&p).unwrap().look.race = race;
+        let mut ev = cast(&mut s, p, "t_hook");
+        ev.extend(run(&mut s, 1.0));
+        ev.into_iter().find_map(|e| match e {
+            Event::LeapLook { player, clip: 42, from, .. } if player == p => Some(from),
+            _ => None,
+        })
+    };
+    assert_eq!(flight(1).as_deref(), Some("DwarfMale"), "a human flies in the dwarf man's Swim");
+    assert_eq!(flight(4).as_deref(), Some("DwarfMale"), "a night elf too");
+    assert_eq!(flight(3).as_deref(), Some(""), "a dwarf in their own");
+}
+
 fn hops(ev: &[Event], who: Id) -> Vec<(f32, f32)> {
     ev.iter()
         .filter_map(|e| match e {
