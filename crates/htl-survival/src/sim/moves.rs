@@ -10,7 +10,7 @@ use super::*;
 use crate::content::{AbilityDef, AbilityEffect};
 
 /// Gravity in the client's own units (yards a second, a second).
-const GRAVITY: f32 = 19.29;
+pub(super) const GRAVITY: f32 = 19.29;
 /// A knockback's and a pull's arc (their upward speed) where the effect names none.
 const KNOCK_LIFT: f32 = 4.5;
 pub(crate) const PULL_LIFT: f32 = 3.0;

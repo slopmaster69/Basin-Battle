@@ -1809,15 +1809,17 @@ impl Survival {
         };
         // A parry timed on a giant's blow: it only blocks, and that has to read with no word
         // (Corey: if it isn't plain, make the cues louder, don't bring the words back). A dull
-        // shield's thud, no clang and no spark; the blow's heavy impact on the hero and dust
-        // kicked up at their feet as they're driven back a step, guard still up; and the hardest
-        // shove of the camera any block gets.
+        // shield's thud, no clang and no spark; dust kicked up at their feet as they're shoved a
+        // step back, guard still up; the hardest shove of the camera any block gets, and a
+        // dust-coloured flash of the screen's corners (the beat's `edge`). No Heroic Strike flash
+        // on the hero and nothing red: a red flash says they took damage, and they didn't
+        // (Corey, round 3).
         if giant && timed && outcome == Outcome::Blocked && matches!(doing, Action::Guard) {
             // (Pushed here, not by `cue`: the hero's still borrowed for their armor below.)
             self.events.push(Event::Sound { id: victim, sound: cues::SOUND_TOO_HEAVY });
-            self.events.push(Event::Visual { id: victim, kit: KIT_HEAVY, by: None });
             self.events.push(Event::Visual { id: victim, kit: KIT_DUST, by: None });
-            self.events.push(Event::Hop { player: victim, dir: facing(from, p.pos), speed: TOO_HEAVY_SKID[0], lift: TOO_HEAVY_SKID[1], roll: false, style: "" });
+            let (speed, lift) = too_heavy_skid();
+            self.events.push(Event::Hop { player: victim, dir: facing(from, p.pos), speed, lift, roll: false, style: "" });
             self.events.push(Event::Beat { player: victim, beat: cues::BEAT_TOO_HEAVY.to_string(), on: Some(victim) });
         }
         // Armor takes its share off whatever gets through.
@@ -2572,10 +2574,17 @@ pub(crate) struct WeaponReach {
     pub arc: f32,
 }
 
-/// A giant's blow on a parry that can only block: the hero driven back along the ground,
-/// guard up (speed, lift: a skid, not a throw; a shove is 6 to 8 with 1.5 to 2 of lift). A
-/// starting number: check on video.
-const TOO_HEAVY_SKID: [f32; 2] = [4.5, 0.3];
+/// A giant's blow on a parry that can only block: the hero shoved this far back along the
+/// ground, guard up. A knockback flies for `2 * lift / gravity` seconds at `speed`, so the old
+/// 4.5 at 0.3 of lift moved them 0.14 yd: nothing anyone saw (Corey: "pushing the hero back per
+/// guard would be awesome"). Now a step: 1.5 yd, with just enough lift to carry it (a shove is 6
+/// to 8 with 1.5 to 2 of lift; this lift peaks 5 cm off the ground, a skid, not a throw).
+pub const TOO_HEAVY_PUSH: f32 = 1.5;
+const TOO_HEAVY_LIFT: f32 = 1.4;
+/// The skid's (speed, lift) that covers [`TOO_HEAVY_PUSH`].
+pub(crate) fn too_heavy_skid() -> (f32, f32) {
+    (TOO_HEAVY_PUSH * super::moves::GRAVITY / (2.0 * TOO_HEAVY_LIFT), TOO_HEAVY_LIFT)
+}
 /// The reactions (`AnimationData`): a flinch, a heavy blow's, a stagger's reel, the shield taking
 /// a blow.
 pub const WOUND_ANIM: u16 = 9;

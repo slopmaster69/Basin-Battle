@@ -396,9 +396,10 @@ pub(crate) const VERSION: u32 = 2;
 /// cut at an edge, and quicker).
 /// 37: outcomes show without words: `CU` beats (the outcome's hit-stop, shake and kick) in
 /// `Cues.lua`.
-/// 38: outcomes show without words: `CU` beats (the outcome's hit-stop, shake and kick) in
-/// `Cues.lua`. 22: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
-pub(crate) const ADDON_NEWEST: u32 = 38;
+/// 38: the `rise` beat's camera (in and tipped down for the Uppercut's dive).
+/// 39: a giant's blow on the guard flashes the screen's corners dust-coloured, not red (the
+/// `edge` of its beat in `Cues.lua`).
+pub(crate) const ADDON_NEWEST: u32 = 39;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
