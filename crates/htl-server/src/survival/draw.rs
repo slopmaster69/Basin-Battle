@@ -32,7 +32,7 @@ fn spirit_beast(key: &str) -> bool {
 
 /// A hero's model: their race's own, a man's or a woman's (1.12's `ChrRaces` displays, by race
 /// id 1 to 8).
-fn native_display(race: u8, gender: u8) -> u32 {
+pub(crate) fn native_display(race: u8, gender: u8) -> u32 {
     let [man, woman] = match race {
         2 => [51, 52],
         3 => [53, 54],
@@ -60,6 +60,54 @@ const GO_FLAGS_INERT: u32 = 0x10 | 0x20;
 /// and tinted light blue (`PREVIEW_GHOST`): a station being placed, and its ring.
 pub(crate) const GO_FLAG_PREVIEW_MOVE: u32 = 0x1000_0000;
 pub(crate) const GO_FLAG_PREVIEW_GHOST: u32 = 0x2000_0000;
+/// Ours, read by client patch 0028: drawn longer along the model's X axis by the factor
+/// `GAMEOBJECT_LEVEL` holds as an `f32`'s bits (a rope from one point to another).
+pub(crate) const GO_FLAG_STRETCH_X: u32 = 0x4000_0000;
+/// The clients that draw a stretched object and patch 0028's displays (`ac19`): the rest are
+/// sent no rope (a short piece would lie at one end of the wire), and keep the strip.
+pub(crate) const ROPE_LEVEL: u8 = 19;
+/// The clients that draw a missile's look (patch 0030's `SetMissileLook`, `ac20`): a ribbon
+/// behind it, its size and a spin (the `ML` line).
+pub(crate) const MISSILE_LOOK_LEVEL: u8 = 20;
+/// The clients that draw a rope from a unit's hand (patch 0031's `SetUnitRope`, `ac21`): a
+/// grappling hook's line, a haul's (the `RP` line).
+pub(crate) const UNIT_ROPE_LEVEL: u8 = 21;
+
+/// The add-on's `ML` line for a spell's missiles: `ML <spell> <RRGGBB or -> <width> <secs>
+/// <scale> <spin> [<caster's guid, for its next missile alone> [<spin axis> [<speed>]]]`.
+pub(crate) fn missile_look_line(spell: u32, trail: &str, width: f32, secs: f32, scale: f32, spin: f32, caster: Option<u64>, tumble: bool, speed: f32) -> String {
+    let trail = if trail.is_empty() { "-" } else { trail };
+    let mut line = format!("ML\t{spell}\t{trail}\t{width:.2}\t{secs:.2}\t{scale:.2}\t{spin:.2}");
+    // The tail is written as far as it's needed, `-` in an empty place before a set one: the
+    // caster, then a tumble's axis (end over end, patch 0036), then a speed of its own in yards
+    // a second (patch 0040; 0: the spell's).
+    let caster = caster.map_or_else(|| "-".to_string(), |g| format!("0x{g:016X}"));
+    let axis = if tumble { "side" } else { "-" };
+    if speed > 0.0 {
+        line += &format!("\t{caster}\t{axis}\t{speed:.0}");
+    } else if tumble {
+        line += &format!("\t{caster}\t{axis}");
+    } else if caster != "-" {
+        line += &format!("\t{caster}");
+    }
+    line
+}
+/// Patch 0028's own display for the dwarven dig site's rope (`ExcavationRope.mdx`; the client's
+/// `EXTRA_DISPLAYS`, which must change with this): a straight rope 3.18 yd along its X axis
+/// from its origin, 0.14 yd thick, a little above the ground.
+const ROPE_DISPLAY: u32 = 60_001;
+const ROPE_MODEL_LEN: f32 = 3.18;
+/// The model's rope runs this high over its origin (the middle of its 0.22 to 0.41).
+const ROPE_MODEL_MID_Z: f32 = 0.315;
+/// Its size: about 0.2 yd thick (at 2 it read as a hawser at knee height: visual check, run 020).
+const ROPE_SCALE: f32 = 1.4;
+/// How high it's strung over the arrows: an ankle's height, where a tripwire catches a foot.
+const ROPE_HEIGHT: f32 = 0.2;
+const ROPE_ENTRY_NAME: &str = "Tripwire";
+/// Ours, read by client patch 0039: the object glows softly white, with a small white light at
+/// it (a planted arrow, so it can be found in the grass: Corey's review, "I want the arrows to
+/// still have a white glow or indicator"). Older clients ignore it.
+pub(crate) const GO_FLAG_GLOW: u32 = 0x0800_0000;
 
 /// Danger marks and the placing rings: the ritual circle (drawn 6.48 yd across at scale 1) and a
 /// green rune ring for a spot that's good.
@@ -72,6 +120,19 @@ const STAND_IN_ENTRY: u32 = 69_000;
 const STAND_IN_DISPLAY: u32 = 1359;
 const STAND_IN_SCALE: f32 = 0.001;
 const GOOD_RING_DISPLAY: u32 = 674;
+/// The clients that have patch 0035's arrow display (`ac22`): for them a planted arrow is a real
+/// arrow stood head-down in the ground; the rest keep the feather (`PLANT_LOOK`).
+pub(crate) const ARROW_LEVEL: u8 = 22;
+/// That display (the client's `EXTRA_DISPLAYS`, which must change with this): the human weapons
+/// doodad arrow (60003, `HumanArrow.m2`), placed as the doodad is, at its size; 60002 is the
+/// Hunter's own arcane arrow (`ArcaneShot_Missile.mdx`, +X nock to head, which wants a tilt of
+/// a quarter turn to stand: run 061 read it as a purple spike), 60004 the plain ammo arrow in
+/// flight (+X too). `ARROW_TILT` turns the model about its Y after its facing (radians). Half
+/// again the doodad's size: at its own it was lost in the grass (Corey's review, "can you make
+/// the ground arrows bigger?").
+const ARROW_DISPLAY: u32 = 60_003;
+const ARROW_SCALE: f32 = 1.5;
+const ARROW_TILT: f32 = 0.0;
 
 /// Equipment slots, as the client numbers them.
 pub(crate) const SLOT_MAIN_HAND: u8 = 15;
@@ -131,6 +192,23 @@ pub(crate) fn creature_guid(entry: u32, id: Id) -> u64 {
 /// A lingering ground look's DynamicObject, by its mark.
 pub(crate) fn area_guid(id: Id) -> u64 {
     (0xF100u64 << 48) | u64::from(id & 0x00FF_FFFF)
+}
+
+/// A rope's game object, by the mark it goes with.
+pub(crate) fn rope_guid(id: Id) -> u64 {
+    (HIGH_GAMEOBJECT << 48) | (0xFF_FFFF << 24) | u64::from(id & 0x00FF_FFFF)
+}
+
+/// The rotation (`GAMEOBJECT_ROTATION`, x y z w) turning a model's X axis from `a` toward `b`:
+/// its yaw about Z, then its pitch up or down to `b`'s height.
+pub(crate) fn rope_rotation(a: [f32; 3], b: [f32; 3]) -> [f32; 4] {
+    let (dx, dy, dz) = (b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    let yaw = dy.atan2(dx);
+    let pitch = dz.atan2((dx * dx + dy * dy).sqrt());
+    let (sz, cz) = (yaw / 2.0).sin_cos();
+    // Raising X toward Z is a turn about −Y.
+    let (sy, cy) = (-pitch / 2.0).sin_cos();
+    [-sz * sy, cz * sy, sz * cy, cz * cy]
 }
 
 /// A DynamicObject wearing `spell`'s area look at `pos`, `radius` round, cast by `caster`.
@@ -210,8 +288,11 @@ impl SurvivalGame {
     fn obj_look_in(&self, v: &ObjView) -> (u32, u32) {
         let (kind, flags) = Self::obj_look(v);
         // A gate: walked through on a patched client (0017's no-hull flag), raiders still break it.
+        // A trap: there the moment it's set. The client fades every new object in over 2 s, and
+        // the flag is also its "never fade" (Corey's review: the trap should appear instantly).
         match v.kind {
             ObjKind::Station { def, .. } if self.sim.content.stations.get(def).is_some_and(|s| s.passable) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
+            ObjKind::Prop { .. } if self.sim.is_trap_obj(v.id) => (kind, flags | GO_FLAG_PREVIEW_MOVE),
             _ => (kind, flags),
         }
     }
@@ -556,7 +637,9 @@ impl SurvivalGame {
             f.set(idx::PLAYER_VISIBLE_ITEM_1_0 + 12 * slot as u16, entry);
         }
         let kit = self.sim.players.get(&id).map_or(Kit::Melee, |p| p.kit);
-        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed);
+        // Put away for a meal too, the hero's own toggle untouched (Corey's review: eating with
+        // the axe still in hand).
+        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed || matches!(p.action, htl_survival::Action::Eat { .. }));
         // Weapons out: the axe and shield in hand, or the bow; put away (R), on the back.
         f.set(idx::UNIT_BYTES_2, if sheathed { 0 } else if kit == Kit::Bow { 2 } else { 1 });
         if let Some(p) = self.sim.players.get(&id) {
@@ -594,6 +677,8 @@ impl SurvivalGame {
         f.set(idx::UNIT_POWER1 + 3, p.stamina.round() as u32);
         if matches!(p.action, htl_survival::Action::Guard) {
             f.set(idx::UNIT_NPC_EMOTESTATE, self.guard_pose(id));
+        } else if let Some(pose) = self.poses.get(&id) {
+            f.set(idx::UNIT_NPC_EMOTESTATE, *pose);
         }
         self.gear_fields(id, &mut f);
         // The whole of the world map shown: every place is known from the start.
@@ -659,6 +744,12 @@ impl SurvivalGame {
         if m.guarding && m.health > 0 {
             f.set(idx::UNIT_NPC_EMOTESTATE, super::play::POSE_SHIELD);
         }
+        // A spirit beast is there the moment it's called and gone the moment it goes: the client's
+        // two-second fade in had it still ghostly as it struck, and its fade out left it standing
+        // after (Corey's review: "the fades are the issue"). Patch 0025's flag; older clients fade.
+        if spirit_beast(&d.key) {
+            f.set(idx::UNIT_DYNAMIC_FLAGS, fields::UNIT_DYNFLAG_NO_FADE);
+        }
         if m.health == 0 {
             f.set(idx::UNIT_DYNAMIC_FLAGS, fields::UNIT_DYNFLAG_DEAD);
         }
@@ -697,6 +788,45 @@ impl SurvivalGame {
         }
     }
 
+    /// A rope from `a` to `b`: the dig site's rope at its origin on `a`, turned toward `b`, drawn
+    /// as long as the span (`GO_FLAG_STRETCH_X`) and strung an ankle's height over the ground,
+    /// never solid (`GO_FLAG_PREVIEW_MOVE`).
+    pub(crate) fn rope_create(&mut self, id: Id, a: [f32; 3], b: [f32; 3]) -> Packet {
+        // The model's own rope sits above its origin: lowered so it's strung at ROPE_HEIGHT.
+        let drop = ROPE_HEIGHT - ROPE_MODEL_MID_Z * ROPE_SCALE;
+        let (a, b) = ([a[0], a[1], a[2] + drop], [b[0], b[1], b[2] + drop]);
+        let entry = self.go_entry(ROPE_DISPLAY, ROPE_ENTRY_NAME, GO_TYPE_GENERIC);
+        let guid = rope_guid(id);
+        let span = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2) + (b[2] - a[2]).powi(2)).sqrt();
+        let stretch = (span / (ROPE_MODEL_LEN * ROPE_SCALE)).clamp(0.05, 50.0);
+        let rot = rope_rotation(a, b);
+        let facing = (b[1] - a[1]).atan2(b[0] - a[0]);
+        let mut f = Fields::new();
+        f.set_u64(idx::GUID, guid)
+            .set(idx::TYPE, fields::TYPEMASK_GAMEOBJECT)
+            .set(idx::ENTRY, entry)
+            .set_f32(idx::SCALE_X, ROPE_SCALE)
+            .set(idx::GAMEOBJECT_DISPLAYID, ROPE_DISPLAY)
+            .set(idx::GAMEOBJECT_FLAGS, GO_FLAGS_INERT | GO_FLAG_PREVIEW_MOVE | GO_FLAG_STRETCH_X)
+            .set_f32(idx::GAMEOBJECT_ROTATION, rot[0])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 1, rot[1])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 2, rot[2])
+            .set_f32(idx::GAMEOBJECT_ROTATION + 3, rot[3])
+            .set(idx::GAMEOBJECT_STATE, 1)
+            .set_f32(idx::GAMEOBJECT_POS_X, a[0])
+            .set_f32(idx::GAMEOBJECT_POS_X + 1, a[1])
+            .set_f32(idx::GAMEOBJECT_POS_X + 2, a[2])
+            .set_f32(idx::GAMEOBJECT_FACING, facing)
+            .set(idx::GAMEOBJECT_FACTION, 35)
+            .set(idx::GAMEOBJECT_TYPE_ID, GO_TYPE_GENERIC)
+            .set(idx::GAMEOBJECT_LEVEL, stretch.to_bits())
+            .set(idx::GAMEOBJECT_ANIMPROGRESS, 100);
+        packets::update_object(
+            &[Create { guid, object_type: packets::TYPE_GAMEOBJECT, is_self: false, placement: Placement::At { pos: a, facing }, fields: &f }],
+            &[],
+        )
+    }
+
     fn go_packet(guid: u64, entry: u32, display: u32, kind: u32, flags: u32, scale: f32, pos: [f32; 3], facing: f32,
     ) -> Packet {
         Self::go_packet_state(guid, entry, display, kind, flags, scale, pos, facing, 1)
@@ -714,16 +844,38 @@ impl SurvivalGame {
         facing: f32,
         state: u32,
     ) -> Packet {
+        Self::go_packet_tilted(guid, entry, display, kind, flags, scale, pos, facing, state, 0.0)
+    }
+
+    /// An object's create, tipped over by `tilt` (radians) about its model's own Y after its
+    /// facing: an arrow stood head-down in the ground. The client places an object by its
+    /// rotation quaternion `(x, y, z, w)`, `yaw × tilt`; at 0 it's the plain facing.
+    #[allow(clippy::too_many_arguments)]
+    fn go_packet_tilted(
+        guid: u64,
+        entry: u32,
+        display: u32,
+        kind: u32,
+        flags: u32,
+        scale: f32,
+        pos: [f32; 3],
+        facing: f32,
+        state: u32,
+        tilt: f32,
+    ) -> Packet {
         let mut f = Fields::new();
         let (s, c) = (facing / 2.0).sin_cos();
+        let (ts, tc) = (tilt / 2.0).sin_cos();
         f.set_u64(idx::GUID, guid)
             .set(idx::TYPE, fields::TYPEMASK_GAMEOBJECT)
             .set(idx::ENTRY, entry)
             .set_f32(idx::SCALE_X, scale)
             .set(idx::GAMEOBJECT_DISPLAYID, display)
             .set(idx::GAMEOBJECT_FLAGS, flags)
-            .set_f32(idx::GAMEOBJECT_ROTATION + 2, s)
-            .set_f32(idx::GAMEOBJECT_ROTATION + 3, c)
+            .set_f32(idx::GAMEOBJECT_ROTATION, -s * ts)
+            .set_f32(idx::GAMEOBJECT_ROTATION + 1, c * ts)
+            .set_f32(idx::GAMEOBJECT_ROTATION + 2, tc * s)
+            .set_f32(idx::GAMEOBJECT_ROTATION + 3, c * tc)
             .set(idx::GAMEOBJECT_STATE, state)
             .set_f32(idx::GAMEOBJECT_POS_X, pos[0])
             .set_f32(idx::GAMEOBJECT_POS_X + 1, pos[1])
@@ -741,6 +893,14 @@ impl SurvivalGame {
     /// An object's create packets: the thing, and for a station being placed, the ring under it
     /// (green where it can go, red where it can't).
     pub(crate) fn obj_create(&mut self, id: Id) -> Vec<Packet> {
+        self.obj_create_for(id, 0)
+    }
+
+    /// The same, as a client of round `level` draws it: from `ARROW_LEVEL` a planted arrow is a
+    /// real arrow stood in the ground (patch 0035's display), the feather for the rest. The entry
+    /// and the guid are the feather's for everyone, so one destroy takes it from all of them; a
+    /// client draws the display the create names, not the entry's.
+    pub(crate) fn obj_create_for(&mut self, id: Id, level: u8) -> Vec<Packet> {
         let Some(v) = self.sim.object(id) else { return Vec::new() };
         if let Some(def) = self.resident(&v) {
             return vec![self.resident_create(def, &v)];
@@ -750,8 +910,12 @@ impl SurvivalGame {
         let guid = object_guid(entry, id);
         self.bind(id, guid);
         let state = self.obj_state(&v);
-        let mut out = vec![Self::go_packet_state(guid, entry, v.display, kind, flags, v.scale, v.pos, v.facing, state,
-        )];
+        let arrow = Self::planted_arrow(&v) && level >= ARROW_LEVEL;
+        // The arrow glows white (patch 0039's flag) so it can be found in the grass; a client
+        // without the patch ignores the bit.
+        let (display, scale, tilt, flags) =
+            if arrow { (ARROW_DISPLAY, ARROW_SCALE, ARROW_TILT, flags | GO_FLAG_GLOW) } else { (v.display, v.scale, 0.0, flags) };
+        let mut out = vec![Self::go_packet_tilted(guid, entry, display, kind, flags, scale, v.pos, v.facing, state, tilt)];
         if let ObjKind::Ghost { def, ok, .. } = v.kind {
             let r = self.sim.content.stations[def].footprint;
             let (display, name, scale) =
@@ -813,20 +977,39 @@ impl SurvivalGame {
         }
     }
 
-    /// Draw an object for everyone who should see it (a ghost: its placer alone).
+    /// A planted arrow's prop (the Hunter's: Multi-Shot's misses, Tripwire's two, Skyfall's
+    /// twelve), drawn as an arrow for the clients that have the display.
+    fn planted_arrow(v: &ObjView) -> bool {
+        matches!(v.kind, ObjKind::Prop { display, .. } if display == htl_survival::sim::hunter::PLANT_LOOK)
+    }
+
+    /// Draw an object for everyone who should see it (a ghost: its placer alone), each client as
+    /// its round draws it (`obj_create_for`).
     pub(crate) fn obj_show(&mut self, id: Id) {
-        let packets = self.obj_create(id);
         match self.ghost_owner(id) {
             Some(owner) => {
                 if let Some(c) = self.conn_of(owner) {
-                    for p in packets {
+                    let level = self.world_of(c).map_or(0, |w| w.level);
+                    for p in self.obj_create_for(id, level) {
                         self.send(c, p);
                     }
                 }
             }
             None => {
-                for p in packets {
-                    self.broadcast(&p);
+                let packets = self.obj_create(id);
+                let arrow = self.sim.object(id).is_some_and(|v| Self::planted_arrow(&v));
+                if !arrow {
+                    for p in packets {
+                        self.broadcast(&p);
+                    }
+                    return;
+                }
+                let arrows = self.obj_create_for(id, ARROW_LEVEL);
+                let conns: Vec<(ConnId, bool)> = self.in_world().map(|(c, _, w)| (*c, w.level >= ARROW_LEVEL)).collect();
+                for (c, newer) in conns {
+                    for p in if newer { &arrows } else { &packets } {
+                        self.send(c, p.clone());
+                    }
                 }
             }
         }
@@ -914,13 +1097,14 @@ impl SurvivalGame {
             }
         }
         let me = self.world_of(conn).map(|w| w.id);
+        let level = self.world_of(conn).map_or(0, |w| w.level);
         let objs: Vec<Id> = self.sim.objs.keys().copied().collect();
         for id in objs {
             // Someone else's ghost isn't theirs to see.
             if self.ghost_owner(id).is_some_and(|o| Some(o) != me) {
                 continue;
             }
-            for p in self.obj_create(id) {
+            for p in self.obj_create_for(id, level) {
                 self.send(conn, p);
             }
         }
@@ -1186,4 +1370,43 @@ fn grip_info(grip: &str) -> u32 {
         _ => return 0,
     };
     2 | sub << 8 | 1 << 16 | inv << 24
+}
+
+#[cfg(test)]
+mod rope_tests {
+    #[test]
+    fn a_missile_look_line_says_each_field_and_a_caster_only_when_its_for_one_missile() {
+        assert_eq!(super::missile_look_line(19434, "F2E6C8", 0.18, 0.3, 1.0, 0.0, None, false, 0.0), "ML\t19434\tF2E6C8\t0.18\t0.30\t1.00\t0.00");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, Some(0xF130_0000_0000_002A), false, 0.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t0xF13000000000002A");
+        // A tumble names its axis after the caster's place.
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, None, true, 0.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t-\tside");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, Some(0x2A), true, 0.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t0x000000000000002A\tside");
+        // A speed of its own comes tenth, after the caster's and the axis's places (Kill Shot).
+        assert_eq!(super::missile_look_line(10346, "FF6A2A", 0.5, 0.5, 1.5, 0.0, None, false, 120.0), "ML\t10346\tFF6A2A\t0.50\t0.50\t1.50\t0.00\t-\t-\t120");
+        assert_eq!(super::missile_look_line(10346, "FF6A2A", 0.5, 0.5, 1.5, 0.0, Some(0x2A), false, 120.0), "ML\t10346\tFF6A2A\t0.50\t0.50\t1.50\t0.00\t0x000000000000002A\t-\t120");
+        assert_eq!(super::missile_look_line(16075, "", 0.3, 0.35, 1.8, 2.5, None, true, 90.0), "ML\t16075\t-\t0.30\t0.35\t1.80\t2.50\t-\tside\t90");
+    }
+
+    use super::rope_rotation;
+
+    /// The model's X axis turned by a rotation (x y z w).
+    fn turned_x(q: [f32; 4]) -> [f32; 3] {
+        let [x, y, z, w] = q;
+        [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y + w * z), 2.0 * (x * z - w * y)]
+    }
+
+    fn near(a: [f32; 3], b: [f32; 3]) -> bool {
+        (0..3).all(|k| (a[k] - b[k]).abs() < 1.0e-4)
+    }
+
+    #[test]
+    fn a_rope_points_from_its_first_end_to_its_second_on_the_level_and_up_a_slope() {
+        // Level, along +Y: a quarter turn, no tilt.
+        assert!(near(turned_x(rope_rotation([0.0, 0.0, 0.0], [0.0, 5.0, 0.0])), [0.0, 1.0, 0.0]));
+        // Back along −X.
+        assert!(near(turned_x(rope_rotation([0.0, 0.0, 0.0], [-4.0, 0.0, 0.0])), [-1.0, 0.0, 0.0]));
+        // Up a slope: 3 along, 4 up.
+        let s = (3.0f32 * 3.0 + 4.0 * 4.0).sqrt();
+        assert!(near(turned_x(rope_rotation([1.0, 1.0, 0.0], [1.0, 4.0, 4.0])), [0.0, 3.0 / s, 4.0 / s]));
+    }
 }

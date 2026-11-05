@@ -1,0 +1,20 @@
+# No words (#135), a Death Mark's kill: Death Mark (3) on a creature 12 yd off at 15% health,
+# cooldowns on so the key goes dark, then a full Aimed Shot kills it under the mark and every
+# cooldown is readied. Look for: every key on the bar flaring, Cold Blood's sting; no words.
+hero hunter
+cam 0 -10 10
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 12 still 15%
+5.0 .es slot 3 death_mark
+5.2 .es slot q aimed_arrow
+5.5 .es cd on                        # the keys show their cooldowns (off in _setup): back off below
+6.0 .es in ab 4 0                    # Death Mark: the bolt (its key now on its 40 s cooldown)
+6.4 .es in a {facing} 0.0
+6.5 .es in au {facing} 0.0
+7.5 .es in ab 0 0                    # Aimed Shot, a full draw: the marked creature dies
+7.8 .es in a {facing} 0.0
+9.0 .es in au {facing} 0.0
+8.8 shots readied 12 0.2
+11.5 .es cd off
+13 end

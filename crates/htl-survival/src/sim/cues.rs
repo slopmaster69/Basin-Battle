@@ -126,7 +126,7 @@ impl Survival {
             self.events.push(Event::Sound { id: on, sound });
         }
         if let Some(h) = hero.filter(|h| !beat.is_empty() && self.players.contains_key(h)) {
-            self.events.push(Event::Beat { player: h, beat, on });
+            self.events.push(Event::Beat { player: h, beat: beat.to_string(), on: Some(on) });
         }
     }
 

@@ -98,6 +98,57 @@ fn a_creature_gone_home_past_its_leash_evades_until_its_foe_comes_back() {
     assert!(!s.evading(g, p));
 }
 
+/// A creature evading on its way home is seen to slip the blows that find nothing: the dodge's
+/// clip on it, no word floated or flashed, and one clip for blows close together (Corey's
+/// review: it needs a dodge or whiff when it's not doing anything).
+#[test]
+fn a_creature_evading_on_its_way_home_slips_the_blow_with_no_word_over_it() {
+    use crate::sim::abilities::HitKind;
+    let mut s = world_on(Box::new(FlatLand::default()));
+    let leash = s.leash_of(s.content.mob("grunt").unwrap());
+    let far = leash + 20.0;
+    let p = hero(&mut s, "Ayla", [far, 0.0, 0.0]);
+    let g = mob(&mut s, "grunt", [far + 1.5, 0.0, 0.0]);
+    // Walking home from out here, the hero right beside it (held there, so the blows reach).
+    s.mobs.get_mut(&g).unwrap().home = [-20.0, 0.0, 0.0];
+    s.mobs.get_mut(&g).unwrap().state = MobState::Return;
+    let mut held = |s: &mut Survival, secs: f32| -> Vec<Event> {
+        let mut out = Vec::new();
+        for _ in 0..(secs / DT).round() as usize {
+            let m = s.mobs.get_mut(&g).unwrap();
+            m.pos = [far + 1.5, 0.0, 0.0];
+            m.path.clear();
+            out.extend(s.step(DT));
+        }
+        out
+    };
+    held(&mut s, DT);
+    assert!(s.evading(g, p));
+    let whiffs = |ev: &[Event]| ev.iter().filter(|e| matches!(e, Event::React { id, anim: 30, .. } if *id == g)).count();
+    // A swing of the axe: it slips it, with nothing said or floated.
+    s.input(p, Input::Attack);
+    let mut ev = held(&mut s, DT);
+    s.input(p, Input::AttackUp);
+    ev.extend(held(&mut s, 0.6));
+    assert_eq!(whiffs(&ev), 1, "the dodge's clip on it");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Swing { victim: Some(v), anim: false, .. } if *v == g)), "no outcome floated over it");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Flash { .. })), "no word on the screen");
+    assert_eq!(s.mobs[&g].health, s.mobs[&g].max_health, "and it takes nothing");
+    assert!(matches!(s.mobs[&g].state, MobState::Return), "still on its way home");
+    // An ability on it right after: the one clip stands...
+    let ability = s.content.ability("raptor_strike").unwrap();
+    let spell = s.content.abilities[ability].spell;
+    s.ability_on_mob(p, g, ability, 1.0, 20.0, [far, 0.0, 0.0], HitKind::Melee, spell);
+    let ev = held(&mut s, DT);
+    assert_eq!(whiffs(&ev), 0, "not a second within the moment");
+    // ...and a moment on, another.
+    held(&mut s, 0.5);
+    s.ability_on_mob(p, g, ability, 1.0, 20.0, [far, 0.0, 0.0], HitKind::Melee, spell);
+    let ev = held(&mut s, DT);
+    assert_eq!(whiffs(&ev), 1, "the next blow slipped too");
+    assert_eq!(s.mobs[&g].health, s.mobs[&g].max_health);
+}
+
 #[test]
 fn creatures_spread_round_their_foe_instead_of_standing_in_one_another() {
     let mut s = world_on(Box::new(FlatLand::default()));

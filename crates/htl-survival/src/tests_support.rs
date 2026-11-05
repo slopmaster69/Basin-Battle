@@ -104,9 +104,12 @@ fn looked_at(events: &[Event], caster: Id, spell: u32, unit: Id) -> bool {
     events.iter().any(|e| matches!(e, Event::Missile { caster: c, spell: s, target: Target::Unit(t) } if *c == caster && *s == spell && *t == unit))
 }
 
+/// Down to half health, a blow just taken (in the fight: no regeneration while a heal is judged).
 fn halve(s: &mut Survival, p: Id) -> u32 {
+    let now = s.clock;
     let p = s.players.get_mut(&p).unwrap();
     p.health = p.max_health / 2;
+    p.combat_at = now;
     p.health
 }
 

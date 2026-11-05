@@ -190,10 +190,17 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
   foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
   (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
-  Tripwire, two arrows placed a press each and a wire that knocks down the first to cross, or the traps. 3:
+  Tripwire, two arrows placed a press each and a wire that knocks down the first to cross (a rope
+  stretched between the arrows, on a client with patch 0028; older ones see a strip on the ground),
+  or the traps. 3:
   Kill Shot, or Skyfall: a leap straight up, a 5.5 s hang there with the bow drawn on a ring below,
   and a volley of 12 arrows where you aim (they plant), then a slow fall. Every bow ability brings
-  the bow into the hands and draws it with the base game's bow draw.
+  the bow into the hands and draws it with the base game's bow draw. On a client with patch 0030
+  the Hunter's arrows trail a glowing ribbon (pale, burning for a full Aimed Shot, gold-red for
+  Kill Shot, frost for Multi-Shot), and Bank Shot's turns from yellow to orange to red with each
+  bounce. `[[missile_look]]` in `content/survival.toml` sets a spell's. On a client with patch
+  0031, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
+  Grapple hauls a foe in on one.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
@@ -337,10 +344,18 @@ stun, incapacitate or panic you're unshakable for 3 seconds (`[cc]`).
 The numbers live in `[[ability]]` in `content/survival.toml`. For testing, with `.es debug` on (or
 in this build): `.es tree` (the board; `full`, `reset`), `.es slot <q|e|1|2|3> <ability>` (a bench
 ability too, on its row's key), `.es valor <n|full>`,
-`.es cd off|on`, `.es heal`, `.es dummy [guard|roll|counter <school>]` (a training dummy in front
+`.es cd off|on`, `.es heal`, `.es dummy [yards] [guard|roll|counter <school>]` (a training dummy in front
 of you: it takes everything a foe does, traps, ground, bounces, beasts, tripwires and crowd
-control, and a knockback or a pull throws it a step at most), `.es cc log` and `.es pvp on|off`.
-`.es debug` also draws projectiles' bodies and every ground area on the ground.
+control, and a knockback or a pull throws it a step at most; `.es dummy clear` takes every dummy
+away), `.es give <item> [n]` (an item into your bags, by its key in `content/`), `.es target
+<creature> [yards] [still] [away] [hp%]` (a real creature `yards` ahead to try abilities on: standing
+`still`, it moves and strikes only when something moves it; otherwise it comes at you; `away`
+puts its back to you, for a shot or a blow into a creature's back; `.es
+target clear` takes them away), `.es hop [yards]` (a jump on the spot, for trying an ability
+mid-jump), `.es cc log` and `.es pvp on|off`. `.es debug` turns debug over
+(`.es debug on` and `.es debug off` set it); it also draws projectiles' bodies and every ground
+area on the ground (`.es debug quiet`: debug's commands without that drawing). [The visual
+check](visual-check.md) uses these to cast abilities in the real client and photograph them.
 
 ### The beta page
 
@@ -565,8 +580,9 @@ On the client with the patch's fourth part (`patches/benilla/0004-*`):
 
 Others' swings and rolls come from the server as clips too (`AN`, `RO`), and every blow as an
 impact (`IM`); a stock client gets the emotes instead. Casts (a throw, a spell) play their clips
-on everyone, the caster too (`AN` with the kind `cast`), and gathering and eating show on your own
-body as others see them. The bow (Aimed Shot) plays its own clips everywhere:
+on everyone, the caster too (`AN` with the kind `cast`), and gathering shows on your own body as
+others see it. Eating and drinking play the eat clip (`[player]`'s `eat_clip` and `drink_clip`,
+EmoteEat for both: the 1.12 client has no drinking clip of its own) the same way. The bow (Aimed Shot) plays its own clips everywhere:
 drawing and holding while it charges (everyone sees it), the release as it looses. The draw takes
 a second, as the hero's own LoadBow does (no shot before the arrow is on the string, 0.45 s), and
 the release plays out (0.7 s) before the next arrow comes up. Walking with the bow drawn, the legs
@@ -1221,7 +1237,7 @@ and it's back ten minutes later.
 
 | Station | Costs | Makes |
 | --- | --- | --- |
-| Cooking Fire | 6 timber | Roast Meat (heals 45%), Hearty Stew (heals half, and *Well Fed*: stamina back a fifth faster for 3 minutes) |
+| Cooking Fire | 6 timber | Roast Meat (heals 45% over 5 seconds), Hearty Stew (heals half over 6 seconds, and *Well Fed*: stamina back a fifth faster for 3 minutes) |
 | Smithing Anvil | 8 timber, 4 copper | Reinforced Shield, Bearded Axe, Bronze Bars (2 copper, 1 tin), Bronze-Ringed Mail, Bronze Helm |
 | Tanning Rack | 6 timber, 2 hides | Cured Leather (2 hides), Hide Jerkin, Leather Cap, Linen Pack |
 | Herbalist's Cauldron | 4 stone, 2 copper | Healing Salve (quick: a tenth at once, 30% more over 10 s), Silverleaf Tonic (stamina back half again as fast for a minute) |
@@ -1270,8 +1286,8 @@ twice as high (so a trip carries more home).
 
 **The quick item**: R (or 1) uses it, **G** picks the next usable thing in the bags (a roast, a
 stew, a salve, a tonic, a sharpening stone); the equipment cross shows it with how many are left.
-Right-clicking one in the bags uses that one. What it's still doing (Well Fed, Salve, Tonic, Honed)
-shows under the stamina bar with its time left.
+Right-clicking one in the bags uses that one. What it's still doing (a meal's healing, Well Fed,
+Salve, Tonic, Honed) shows under the stamina bar with its time left.
 
 ## The loop
 
@@ -1315,8 +1331,11 @@ food stay with you. Only you can pick your sack up, all at once; each death make
 sacks last across logouts and restarts. The corner of the screen points the way to the nearest
 one.
 
-Resting at the camp heals you quickly (not during a raid); in the field health trickles back after
-a while out of combat.
+Resting at the camp heals you quickly (not during a raid). Anywhere else (the field, below, Siege)
+health comes back at 2% a second from 5 seconds after the last blow you dealt or took; in a fight
+only gear, set bonuses, food and heals bring it back. Food is for the fight: a one-second bite (a
+blow doesn't stop it), then its healing over the next few seconds. (The numbers are on trial from
+#118: `[player]` in `survival.toml`.)
 
 ## How it's built
 

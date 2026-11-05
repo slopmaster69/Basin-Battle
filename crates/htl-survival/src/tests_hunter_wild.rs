@@ -286,9 +286,11 @@ fn a_beast_appears_by_the_foe_and_strikes_from_its_flank_clear_of_the_hunters_ba
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     slot_call(&mut s, p, true);
     let k = mob(&mut s, "grunt", [6.0, 0.0, 0.0]);
-    let ev = call(&mut s, p, Some((0.0, 0.0)));
+    let mut ev = call(&mut s, p, Some((0.0, 0.0)));
     let body = spirits(&s)[0];
-    // It appears by the foe, off to one side, not out of the hunter, and charges in.
+    // It appears by the foe, off to one side, not out of the hunter, stands a moment (fading in
+    // on the client), and charges in.
+    ev.extend(run_pinned(&mut s, 0.4, &[k]));
     let start = ev
         .iter()
         .find_map(|e| match e {

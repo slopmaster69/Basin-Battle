@@ -1,0 +1,172 @@
+From 8f2308fa909e447aa1b2d66ba59c35f834e90b08 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:42:50 -0600
+Subject: [PATCH] The bowstring follows its bow: drawn in the frame the bow is
+ drawn in, and fading with its wearer
+
+Two things put the string off its bow on every bow ability (Corey's review, twice: "the bowstring
+is still broken"). The `$WTT`/`$WTB` tips are model-space points, but a posed bone's matrix moves
+pivot-relative points (the mesh's vertices go through it that way), so a posed tip landed a
+pivot's length too far out: from the hand the string ran past the limb and off into the sky, and
+the rest-tip guard never fired because the rigid frame it compared against was itself the prop
+entity's GlobalTransform, seated from a lossy decomposition of the hand bone's matrix, not the
+rider placement the mesh is drawn with. The tips now go through the posed bones as pivot-relative
+points in the rider's own frame (`write_rig_riders`), so the string sits on the drawn limbs by
+construction. And the string takes its wearer's render alpha: as the camera comes in on the hero
+at a full draw the body thins and goes, and the string drawn on alone stood in the air as a line.
+---
+ crates/benilla-app/src/bowstring.rs           | 64 +++++++++++++++----
+ .../src/entities/equipment/spawn.rs           | 17 +++++
+ 2 files changed, 67 insertions(+), 14 deletions(-)
+
+diff --git a/crates/benilla-app/src/bowstring.rs b/crates/benilla-app/src/bowstring.rs
+index 7773d11e..d6086538 100644
+--- a/crates/benilla-app/src/bowstring.rs
++++ b/crates/benilla-app/src/bowstring.rs
+@@ -6,7 +6,12 @@
+ //!
+ //! The tips are posed: `$BWP` plays BowPull (160) on the prop and `$BWR` returns it to Stand (0),
+ //! so the markers ride limb bones that bend through the draw.
++//!
++//! Basin Battle: the string is drawn in the frame the bow's mesh is drawn in (the rider's
++//! placement, `write_rig_riders`), its tips put through the posed bones the way the mesh's
++//! vertices are (pivot-relative), and it fades with its wearer.
+ 
++use bevy::math::Affine3A;
+ use bevy::prelude::*;
+ 
+ use crate::creature_anim::NockLatch;
+@@ -27,9 +32,15 @@ const DRAW_REACH: f32 = 0.9;
+ pub(crate) struct Bowstring {
+     /// The unit wearing the bow, which carries the HandArrow attach and the nock latch.
+     pub(crate) owner: Entity,
+-    /// The `$WTT` top and `$WTB` bottom anchors as `(bone, model-local offset)`.
++    /// The `$WTT` top and `$WTB` bottom anchors as `(bone, model-space point)`.
+     pub(crate) top: (u16, Vec3),
+     pub(crate) bottom: (u16, Vec3),
++    /// Basin Battle: the same points relative to their bone's pivot, the space a posed bone's
++    /// matrix (`RigPose::model`) moves, as the mesh's vertices go through it. A model-space point
++    /// put through that matrix lands a pivot's length too far out: the string ran from the hand
++    /// past the limb and off into the sky (Corey's review of every bow ability).
++    pub(crate) top_local: Vec3,
++    pub(crate) bottom_local: Vec3,
+ }
+ 
+ /// Draws every visible bow's string, tip to middle to tip, from this frame's joint frames.
+@@ -39,33 +50,58 @@ fn draw_bowstrings(
+         &GlobalTransform,
+         &InheritedVisibility,
+         Option<&benilla_world::rig_anim::RigPose>,
++        Option<&benilla_world::rig_rider::RigRider>,
+     )>,
+     owners: Query<(
+         &BoneAttach,
+         &benilla_world::rig_anim::RigPose,
+         Has<NockLatch>,
+     )>,
++    hosts: Query<&benilla_world::rig_anim::RigPose>,
+     joints: Query<&GlobalTransform>,
++    alphas: benilla_world::model_fade::UnitRenderAlpha,
+     mut gizmos: Gizmos,
+ ) {
+     // Inferred: the reference's packed vertex color is not decoded. Basin Battle: a pale gut
+     // string, as a bowstring catches the light; the near-black one was lost against the night.
+-    const STRING_COLOR: Color = Color::srgb(0.78, 0.72, 0.6);
+-    for (bs, prop, vis, flex) in &bows {
++    const STRING_RGB: [f32; 3] = [0.78, 0.72, 0.6];
++    for (bs, prop, vis, flex, rider) in &bows {
+         if !vis.get() {
+             continue;
+         }
+-        // The prop's own pose when it flexes (`joints_root` is this entity); its rigid frame
+-        // otherwise.
+-        let tip = |(bone, offset): (u16, Vec3)| {
+-            flex.and_then(|p| p.posed_point(prop, bone, offset))
+-                .unwrap_or_else(|| prop.transform_point(offset))
++        // Basin Battle: the wearer's own render alpha takes the string with it. The hero's body
++        // thins and goes as the camera comes in on them (a bow's full draw leans it in), and the
++        // string drawn on alone was a line standing in the air.
++        let alpha = alphas.get(bs.owner);
++        if alpha < 1.0 / 255.0 {
++            continue;
++        }
++        let color = Color::srgba(STRING_RGB[0], STRING_RGB[1], STRING_RGB[2], alpha);
++        // Basin Battle: the frame the bow is drawn in. A held item's vertices come through its
++        // rider's placement, the wearer's rig frame through the hand bone's composed matrix
++        // (`write_rig_riders`), while the prop entity's own `GlobalTransform` is seated from a
++        // lossy decomposition of that matrix and can sit a scale or a turn off the mesh. The
++        // rigid frame stays for a bow with no rider.
++        let frame: Affine3A = rider
++            .and_then(|r| {
++                let host = hosts.get(r.host).ok()?;
++                let root = joints.get(host.joints_root).ok()?;
++                let bone = host.model.get(r.bone as usize)?;
++                Some(root.affine() * *bone * Affine3A::from_translation(r.local))
++            })
++            .unwrap_or_else(|| prop.affine());
++        // A tip: the prop's own pose when it flexes, moving the pivot-relative point as the mesh
++        // moves its vertices; the rest point on the frame otherwise.
++        let tip = |(bone, point): (u16, Vec3), local: Vec3| {
++            flex.and_then(|p| p.model.get(bone as usize))
++                .map(|m| frame.transform_point3(m.transform_point3(local)))
++                .unwrap_or_else(|| frame.transform_point3(point))
+         };
+-        // The tips at rest, on the prop's rigid frame: how long this bow is.
+-        let rest_top = prop.transform_point(bs.top.1);
+-        let rest_bottom = prop.transform_point(bs.bottom.1);
++        // The tips at rest, on the same frame: how long this bow is.
++        let rest_top = frame.transform_point3(bs.top.1);
++        let rest_bottom = frame.transform_point3(bs.bottom.1);
+         let rest = rest_top.distance(rest_bottom);
+-        let (mut top, mut bottom) = (tip(bs.top), tip(bs.bottom));
++        let (mut top, mut bottom) = (tip(bs.top, bs.top_local), tip(bs.bottom, bs.bottom_local));
+         // Basin Battle: a posed tip yards from where the bow is (a limb bone left on another
+         // clip's frame) drew the string as a long line off into the sky (Corey's review: "way
+         // too broken"). A draw bends the limbs toward each other, never apart: posed tips farther
+@@ -108,8 +144,8 @@ fn draw_bowstrings(
+         } else {
+             middle
+         };
+-        gizmos.line(top, middle, STRING_COLOR);
+-        gizmos.line(middle, bottom, STRING_COLOR);
++        gizmos.line(top, middle, color);
++        gizmos.line(middle, bottom, color);
+     }
+ }
+ 
+diff --git a/crates/benilla-app/src/entities/equipment/spawn.rs b/crates/benilla-app/src/entities/equipment/spawn.rs
+index 24566c67..410ea53d 100644
+--- a/crates/benilla-app/src/entities/equipment/spawn.rs
++++ b/crates/benilla-app/src/entities/equipment/spawn.rs
+@@ -282,11 +282,28 @@ fn spawn_slot(
+     // author them too for the swing trail (`0x6c67f0`).
+     if slot_idx == 2 && hs.attach == attach_id::HAND_LEFT {
+         if let Some([top, bottom]) = dm.string_anchors {
++            // Basin Battle: a bone's pivot in model space (the bind locals summed to the root),
++            // so the string's tips go through the posed bones the way the mesh's vertices do.
++            let pivot = |bone: u16| {
++                let joints = &dm.skeleton.joints;
++                let mut at = Vec3::ZERO;
++                let mut i = i32::from(bone);
++                for _ in 0..joints.len() {
++                    let Some(j) = usize::try_from(i).ok().and_then(|i| joints.get(i)) else {
++                        break;
++                    };
++                    at += j.local_translation;
++                    i = i32::from(j.parent);
++                }
++                at
++            };
+             commands.entity(root).insert(crate::bowstring::Bowstring {
+                 owner: entity,
+                 // Bone and offset: the prop flexes, so the tips move.
+                 top,
+                 bottom,
++                top_local: top.1 - pivot(top.0),
++                bottom_local: bottom.1 - pivot(bottom.0),
+             });
+         }
+     }
+-- 
+2.56.0.windows.4
+
