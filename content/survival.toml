@@ -413,16 +413,20 @@ refill = 35.0
 refill_delay = 0.4
 perfect_refill = 20.0
 break_secs = 1.0
-# The looks, from the first film (Nov 5): Arcane Power's violet crackle round the chest while the
-# ward is up (12042); Counterspell's crackle on it each time a blow is stopped (381); Arcane
-# Explosion's violet burst on the chest for a perfect ward (1005); Mana Burn's purple fizzle as it
-# breaks (2729). All in the ward's own colour, apart from the steel of a shield's parry.
-aura = 12042
+# The looks. Corey's playtest (Nov 5): the ward was cluttery and the arm never showed. Arcane
+# Power's crackle round the chest (12042) hid the body, and the steady crackle while up added to
+# it. Now nothing wraps the body: the arm is held out (`clip`, the channelled cast on the upper
+# body) with Polymorph's swirl in the hand (`hold_spell`), and how much is left shows on the
+# warder's own reticle (the cracking arc, Ward.lua). Counterspell's crackle on it only as a blow is
+# stopped (381); Arcane Explosion's violet burst for a perfect ward (1005); Mana Burn's purple
+# fizzle as it breaks (2729). All in the ward's own colour.
+aura = 0
 block_kit = 381
-# While up, it crackles: once every `crackle_full` sec when the bar is whole, down to every
-# `crackle_empty` sec as it runs dry (Corey: the lower the ward, the more it crackles).
-crackle_full = 1.4
-crackle_empty = 0.18
+hold_spell = 118
+clip = 124
+# No crackle while it's merely up (0); the arc on the reticle cracks as it drains instead.
+crackle_full = 0.0
+crackle_empty = 0.0
 perfect_kit = 1005
 break_kit = 2729
 

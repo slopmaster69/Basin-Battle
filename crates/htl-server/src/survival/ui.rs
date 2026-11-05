@@ -109,6 +109,12 @@
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
 //! - `WA\t<ward>\t<most>\t<broken>\t<up>`: the ward bar of a hero whose guard is a ward (a staff's);
 //!   `WA` alone: no ward, the bar hidden. Sent with the HUD and the moment it changes.
+//! - `SF\t<ember|rime|arcane|>`: the casting staff in the hero's hands, for its mark on the
+//!   reticle (`Staff.lua`); empty for none.
+//! - `SK\t<heat|chill|charge>\t<n>\t<most>\t<guid>`: a staff's stacks changed: heat or
+//!   chill on that foe, or the hero's charges (guid 0); `n` the most: it just ignited or froze.
+//! - `SH\t<lo>\t<hi>`: a staff's heavy bolt began its charge (goes from `lo` sec, whole at
+//!   `hi`).
 //! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
 //!   (`Event::CheckStart`): "release" (`a` the flare's second from the charge's start, `b` the
 //!   window either side, `pattern` the ring's curve), "rhythm" (`a`, `b` the first and last
@@ -422,7 +428,9 @@ pub(crate) const VERSION: u32 = 2;
 /// 42: the Mage: the ward bar (`WA`, `Ward.lua`), and the skill checks drawn (`CK`, `CR`, `OB`,
 /// `OX`, `MO`, `Check.lua`): rings, beats, the orb and their outcomes; the add-on says `ac24`
 /// (patches 0041 to 0044).
-pub(crate) const ADDON_NEWEST: u32 = 42;
+/// 43: a staff's mark and stacks (`SF`, `SK`, `SH`, `Staff.lua`), and the ward on the reticle (the
+/// `WA` line's fifth field, whether it's up); the add-on says `ac25` (patch 0045).
+pub(crate) const ADDON_NEWEST: u32 = 43;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -433,7 +441,8 @@ pub(crate) const ADDON_NEWEST: u32 = 42;
 /// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
 /// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
 /// 24: the Mage's skill checks: rings on the ground (0041), recoloured spell looks (0042), an orb rolled on the ground (0043) and missiles from a held staff's tip (0044).
-pub(crate) const CLIENT_NEWEST: u8 = 24;
+/// 25: a staff stays in hand through a spell's cast (0045).
+pub(crate) const CLIENT_NEWEST: u8 = 25;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.

@@ -214,15 +214,18 @@ fn a_perfect_ward_against_a_hero_is_a_parry_the_striker_reels_open_to_a_riposte(
 fn the_wards_look_is_on_the_hero_while_it_is_up_and_a_shield_hero_has_no_bar() {
     let mut s = world();
     let p = staff_hero(&mut s, "Ayla", ORIGIN);
-    let aura = s.content.ward.aura;
-    assert!(!s.auras_of(p).contains(&aura));
+    let (aura, clip, hold) = (s.content.ward.aura, s.content.ward.clip, s.content.ward.hold_spell);
+    assert!(clip != 0 && hold != 0, "the ward is an arm held out with a glow in the hand");
     s.input(p, Input::Guard);
     let ev = run(&mut s, 0.1);
-    assert!(s.auras_of(p).contains(&aura), "the barrier shows while the ward is up");
+    assert!(ev.iter().any(|e| matches!(e, Event::Clip { id, clip: c, body: ClipBody::Upper, .. } if *id == p && *c == clip)), "the arm held out, the legs free");
+    assert!(ev.iter().any(|e| matches!(e, Event::Cast { caster, spell, .. } if *caster == p && *spell == hold)), "the glow in the hand");
     assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == p)), "and the clients are told");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == s.content.ward.block_kit)), "no crackle while it's merely up");
     s.input(p, Input::GuardUp);
-    run(&mut s, 0.1);
-    assert!(!s.auras_of(p).contains(&aura), "and goes with it");
+    let ev = run(&mut s, 0.1);
+    assert!(ev.iter().any(|e| matches!(e, Event::ClipStop { id } if *id == p)), "the arm comes down with it");
+    assert!(ev.iter().any(|e| matches!(e, Event::CastDone { caster, .. } if *caster == p)), "and the glow goes");
     // A hero with a shield guards as ever: stamina, no ward, no look.
     let q = hero(&mut s, "Bram", [0.0, 5.0, 0.0], 0.0);
     assert!(!s.guard_of(&s.players[&q]).ward);

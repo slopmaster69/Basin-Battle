@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 42
+local VERSION = 43
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6603,7 +6603,7 @@ function ES.Line(line)
   elseif verb == "MO" then
     -- Where a hero's missiles leave from (a casting staff's tip), on a client that can say so.
     if SetUnitMissileOrigin then SetUnitMissileOrigin(f[2] or "", f[3] or "") end
-  elseif verb == "ST" then
+  elseif verb == "SF" then
     if ES.StaffLine then ES.StaffLine(f) end
   elseif verb == "SK" then
     if ES.StacksLine then ES.StacksLine(f) end
@@ -6863,7 +6863,10 @@ events:SetScript("OnEvent", function()
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
     -- ac24: the Mage's skill checks: rings on the ground, recoloured spell looks, an orb rolled on
     -- the ground, missiles from a staff's tip (patches 0041 to 0044).
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 24 then
+    -- ac25: a staff stays in hand through a spell's cast (patch 0045).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 25 then
+      Say(".es hello " .. VERSION .. " ac25")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 24 then
       Say(".es hello " .. VERSION .. " ac24")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
       Say(".es hello " .. VERSION .. " ac23")

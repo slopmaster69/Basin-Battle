@@ -522,7 +522,7 @@ impl SurvivalGame {
                     for c in conns {
                         self.ui_line(c, &line);
                     }
-                    // The hero's own staff, for its mark on their screen (`ST ember|rime|arcane`,
+                    // The hero's own staff, for its mark on their screen (`SF ember|rime|arcane`,
                     // empty for none): what its bolts build.
                     if let Some(c) = self.conn_of(player) {
                         let builds = self.sim.players.get(&player).and_then(|p| {
@@ -535,7 +535,7 @@ impl SurvivalGame {
                             Some("charge") => "arcane",
                             _ => "",
                         };
-                        self.ui_line(c, &format!("ST	{school}"));
+                        self.ui_line(c, &format!("SF	{school}"));
                     }
                 }
             }

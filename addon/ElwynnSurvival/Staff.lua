@@ -6,7 +6,7 @@
 --   arcane  a rune ring with three sparks; each hit lights a spark (a charge), up to three; the
 --           heavy orb spends them all.
 -- The heavy bolt's charge brightens the mark and swells it, with a flash as it's whole; no ring,
--- no flare on the body. Lines: ST (which staff), SK (stacks), SH (the heavy's charge).
+-- no flare on the body. Lines: SF (which staff), SK (stacks), SH (the heavy's charge).
 -- Written for the 1.12 client's Lua 5.0: no #, no %, table.getn, `this`.
 
 local ES = ElwynnSurvival
@@ -64,7 +64,7 @@ local function Paint()
   mark:Show()
 end
 
--- `ST <ember|rime|arcane|>`: the staff in hand (none: the mark goes).
+-- `SF <ember|rime|arcane|>`: the staff in hand (none: the mark goes).
 function ES.StaffLine(f)
   local which = f[2] or ""
   if not STAFF[which] then which = nil end
