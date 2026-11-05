@@ -6603,6 +6603,17 @@ function ES.Line(line)
   elseif verb == "MO" then
     -- Where a hero's missiles leave from (a casting staff's tip), on a client that can say so.
     if SetUnitMissileOrigin then SetUnitMissileOrigin(f[2] or "", f[3] or "") end
+  elseif verb == "WP" then
+    -- A held pose (the ward's arm out): the clip looped for its hold, or let go.
+    local guid = (f[5] == "1") and "player" or f[2]
+    local clip, secs = tonumber(f[3]), tonumber(f[4]) or 0
+    if guid and clip then
+      if secs > 0 and ReactUnit then
+        ReactUnit(guid, clip, 0, 0, 0, secs)
+      elseif StopUnitAnimation then
+        StopUnitAnimation(guid, 0.15)
+      end
+    end
   elseif verb == "SF" then
     if ES.StaffLine then ES.StaffLine(f) end
   elseif verb == "SK" then

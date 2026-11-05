@@ -423,6 +423,17 @@ impl SurvivalGame {
                     self.ui_line(c, &format!("SK	{kind}	{n}	{most}	{g:#X}"));
                 }
             }
+            Event::HoldPose { id, clip, secs } => {
+                // A held pose (the ward's arm out), for every client that plays clips: `WP guid clip
+                // secs own` (secs 0: let go).
+                let Some(g) = self.guid_of(id) else { return };
+                let mine = self.conn_of(id);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let own = u8::from(Some(c) == mine);
+                    self.ui_line(c, &format!("WP\t{g:#X}\t{clip}\t{secs:.2}\t{own}"));
+                }
+            }
             Event::StaffHeavy { player, lo, hi } => {
                 if let Some(c) = self.conn_of(player) {
                     self.ui_line(c, &format!("SH	{lo:.2}	{hi:.2}"));
