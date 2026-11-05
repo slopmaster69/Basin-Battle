@@ -11,11 +11,20 @@ use super::moves::{airtime, Landing, Trap};
 use super::*;
 use crate::content::{AbilityDef, AbilityEffect};
 
+/// How long a haul's line shows: a pull's flight (about 0.3 s, `moves::PULL_LIFT`), and a moment.
+const HAUL_LINE_SECS: f32 = 0.45;
+
 /// A yank runs this fast (yards a second), stopping this far short of a wall and this far from a
-/// foe's body (beside it, not in it).
-const YANK_SPEED: f32 = 24.0;
-/// The pose a yanked hero flies in: the arm held out along the line (SpellCastDirected).
-const YANK_CLIP: u16 = 53;
+/// foe's body (beside it, not in it). Was 24 (Corey's review: the flight should be quicker).
+const YANK_SPEED: f32 = 40.0;
+/// The pose a yanked hero flies in: flat and headlong along the line (Swim), the add-on fitting
+/// one pass of it to the flight. Was the arm held out (SpellCastDirected, 53), which read as no
+/// flight at all.
+const YANK_CLIP: u16 = 42;
+/// Whose Swim: the dwarf man's, on every hero but a dwarf (Corey's review: the human's swim while
+/// flying looked silly; the dwarf's read as a flight). A dwarf flies with their own.
+const YANK_FROM: &str = "DwarfMale";
+const DWARF: u8 = 3;
 const YANK_WALL: f32 = 0.6;
 const YANK_BESIDE: f32 = 0.3;
 /// A cheated death mends what it does over this long.
@@ -152,6 +161,10 @@ impl Survival {
             self.yank_to(p.owner, p.ability, p.share, at, Some(v));
             return;
         }
+        // Hauled in on the line (Reverse Grapple): it runs from the fist to the foe as it comes.
+        if haul {
+            self.events.push(Event::Tether { from: p.owner, to: Target::Unit(v), secs: HAUL_LINE_SECS });
+        }
         if swap {
             self.swap_with(p.owner, v, p.ability);
         } else if tether {
@@ -168,6 +181,7 @@ impl Survival {
             return;
         }
         let from = p.pos;
+        let swim_from = if p.look.race == DWARF { String::new() } else { YANK_FROM.to_string() };
         let (spot, stop) = match unit.and_then(|u| self.unit_pos(u).map(|pos| (u, pos))) {
             Some((u, pos)) => (pos, self.body_of(u) + HERO_SIZE + YANK_BESIDE),
             None => (at, YANK_WALL),
@@ -183,19 +197,27 @@ impl Survival {
             return;
         }
         // At least long enough to be seen flying (the visual check: a 6 yd pull at 32 yd a
-        // second was over in 5 frames).
-        let secs = (moved / YANK_SPEED).max(0.3);
+        // second was over in 5 frames); a little shorter than it was (0.3) now that the flight
+        // itself is quicker.
+        let secs = (moved / YANK_SPEED).max(0.25);
         self.interrupt_hero(id);
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = dir;
         }
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
+        // The line it flies in on, from the fist to what it bit (Corey's review: "needs a visible
+        // rope").
+        let to = match unit {
+            Some(u) => Target::Unit(u),
+            None => Target::Point(at),
+        };
+        self.events.push(Event::Tether { from: id, to, secs });
         // Pulled through the air on the line, the way a hookshot flies you (play-test: a run along
-        // the ground read as a Charge): a flat arc that lands as the line's time is up, the arm
-        // held out along it.
+        // the ground read as a Charge): a flat arc that lands as the line's time is up, the body
+        // flat along it, in the dwarf man's Swim (a dwarf's own).
         let lift = secs / airtime(1.0);
         self.events.push(Event::Hop { player: id, dir, speed: moved / secs, lift, roll: false, style: "" });
-        self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: String::new(), flip: false });
+        self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: swim_from, flip: false });
         self.beta.yanks.insert(id, (end, now + secs));
     }
 

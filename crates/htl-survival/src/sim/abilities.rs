@@ -173,6 +173,15 @@ const CAST_RECOVERY: f32 = 0.35;
 /// the axe drawn back, so everyone can see a throw coming, as a bow's draw shows.
 const THROW_CLIP: u16 = 107;
 const HOLD_THROWN: u16 = 111;
+/// A thrown ability's aim holds that pose too (Corey's review: the harpoon held ready while he
+/// aims, a wind-up while the axe is aimed), for as long as anyone aims; let go as the aim ends.
+const AIM_HOLD_SECS: f32 = 20.0;
+
+/// An ability thrown by hand (a throw's clip, not a bow's draw or the bow's own shot): its aim
+/// holds the arm drawn back.
+fn thrown(d: &AbilityDef) -> bool {
+    d.clip == THROW_CLIP && d.kind != "shot" && !d.bow
+}
 /// Holy ground's boon lasts this long past each tick (so it holds while they stand in it).
 const BOON_HOLD: f32 = 1.5;
 /// A friend healed: Flash of Light's look on them.
@@ -710,6 +719,11 @@ impl Survival {
             if self.bow_drawn(id) {
                 self.draw_bow(id);
             }
+            // A thrown one: the arm drawn back while it's aimed (the harpoon held ready, the axe
+            // wound up), till it goes or the aim is let go.
+            if thrown(&d) {
+                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0 });
+            }
         } else {
             if d.bow {
                 self.set_kit(id, Kit::Bow);
@@ -869,6 +883,10 @@ impl Survival {
             Action::Aim { ability } if self.content.abilities[ability].bow => {
                 self.events.push(Event::CastEnd { caster: id });
             }
+            // A thrown one's aim let go without a throw: the drawn-back arm comes down.
+            Action::Aim { ability } if thrown(&self.content.abilities[ability]) => {
+                self.events.push(Event::ClipStop { id });
+            }
             Action::Channel { ability, .. } => {
                 self.events.push(Event::CastEnd { caster: id });
                 self.events.push(Event::Auras { id });
@@ -950,6 +968,10 @@ impl Survival {
         // A charge's glow ends as it goes (the bow's draw ends with its shot).
         if matches!(self.players[&id].action, Action::Charge { .. }) {
             self.events.push(Event::CastDone { caster: id, spell: 0 });
+        }
+        // A thrown one's aim ends with its throw: the held pose let go, the throw's own clip next.
+        if thrown(&d) && matches!(self.players[&id].action, Action::Aim { .. }) {
+            self.events.push(Event::ClipStop { id });
         }
         // A bow ability's arrow: the bow's own release (its draw let go, or drawn and loosed at
         // once), the bow in hand till it's played out. (A leap with the bow looses nothing.)
@@ -1148,7 +1170,17 @@ impl Survival {
             // Full: the faster missile, when it has one.
             let full = AbilityDef::full(share) && d.full_spell != 0;
             let (speed, spell) = if full { (d.full_speed.max(d.speed), d.full_spell) } else { (d.speed, d.spell) };
-            (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), AbilityDef::at(d.damage, share), spell)
+            // A share of the bow's own damage at this draw (Aimed Shot's), or its own.
+            // (The bow in their hands: their own, or the camp's when they carry a crossbow.)
+            let damage = if d.bow_damage > 0.0 {
+                let p = &self.players[&id];
+                let held = self.bow_look(p);
+                let r = self.content.ranged(&self.content.items[held].key).unwrap_or_else(|| self.ranged_of(p));
+                (r.damage[0] as f32 + (r.damage[1] as f32 - r.damage[0] as f32) * share) * d.bow_damage
+            } else {
+                AbilityDef::at(d.damage, share)
+            };
+            (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), damage, spell)
         };
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
@@ -1170,8 +1202,11 @@ impl Survival {
         // A lob arcs to the ground at the reticle (within its range), over whatever is between.
         let lob_at = d.lob.then(|| self.aim_point(id, range));
         let feet = self.players[&id].pos;
+        // A fan spaced where the reticle points: the angle that puts `spread_yd` between arrows
+        // there, no wider than `spread`.
+        let step = if d.spread_yd > 0.0 { (d.spread_yd / dist2d(from, aim.point).max(1.0)).atan().min(d.spread.to_radians()) } else { d.spread.to_radians() };
         for k in 0..n {
-            let off = (k as f32 - (n - 1) as f32 / 2.0) * d.spread.to_radians();
+            let off = (k as f32 - (n - 1) as f32 / 2.0) * step;
             let (c, s) = (off.cos(), off.sin());
             let flat = (base[0] * base[0] + base[1] * base[1]).sqrt();
             let b = [base[0] * c - base[1] * s, base[0] * s + base[1] * c, base[2]];
@@ -1186,6 +1221,10 @@ impl Survival {
             // The look: flown to where it would end if nothing moved, never after a unit (a
             // boomerang's to where it turns, as it flies on through bodies).
             let end = if d.returns { self.wall_trace(from, dir, range, id).point } else { self.trace_with(from, dir, range, radius, id, d.friends()).point };
+            // Its ribbon's first colour (Bank Shot's, before it has bounced).
+            if !d.bounce_trail.is_empty() {
+                self.events.push(Event::MissileTint { caster: id, spell, ability, bounce: 0 });
+            }
             self.events.push(Event::Missile { caster: id, spell, target: Target::Point(end) });
             let born = self.clock;
             self.projectiles.push(Projectile {
@@ -1209,7 +1248,7 @@ impl Survival {
                 look: None,
             });
         }
-        if self.debug {
+        if self.debug_draws() {
             let end = add(from, base, range);
             self.mark(end, radius.max(0.3), range / speed.max(1.0));
         }
@@ -1323,7 +1362,7 @@ impl Survival {
                 self.beta_hit(&p, None, t.point);
                 let d = &self.content.abilities[p.ability];
                 let (kit, splash) = (d.impact_kit, d.splash);
-                if kit != 0 && self.debug {
+                if kit != 0 && self.debug_draws() {
                     self.mark(t.point, 0.4, 0.6);
                 }
                 if splash > 0.0 {
@@ -1332,7 +1371,7 @@ impl Survival {
                 continue;
             }
             // `.es debug`: the projectile's body drawn every two yards of its flight.
-            if self.debug && (p.left / 2.0).floor() != ((p.left - go) / 2.0).floor() {
+            if self.debug_draws() && (p.left / 2.0).floor() != ((p.left - go) / 2.0).floor() {
                 self.mark(t.point, p.radius.max(0.2), 0.4);
             }
             p.pos = t.point;
@@ -1368,7 +1407,7 @@ impl Survival {
         // Shallower than this (its sine, about 20°), an arrow skips off the ground.
         const SKIP: f32 = 0.34;
         let d = &self.content.abilities[p.ability];
-        let (gain, base, bounces, flash) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell);
+        let (gain, base, bounces, mut flash, skip) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell, d.skip_spell);
         // (Its flight this step, up to where it struck.)
         let left = p.left - len(sub(at, p.pos));
         if bounces == 0 || left < 1.0 {
@@ -1379,6 +1418,12 @@ impl Survival {
                 if p.dir[2] >= 0.0 || -p.dir[2] > SKIP {
                     return false;
                 }
+                // A skip off the ground shows its own splash, not the wall's fire: an explosion on
+                // the floor read as the arrow going off (Corey's review). The data has no small
+                // one-shot of dirt at a point (Rocky Ground Impact, tried in run 050, left a pile
+                // of boulders for seconds), so with none named the skip shows nothing but the
+                // arrow's own flight on from the ground.
+                flash = skip;
                 let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
                 p.dir = [p.dir[0], p.dir[1], -p.dir[2]];
                 p.pos = [at[0], at[1], at[2].max(ground + 0.15)];
@@ -1403,6 +1448,10 @@ impl Survival {
         let anchor = self.alloc();
         let end = self.look_end(p);
         self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: p.spell, from: p.pos, target: Target::Point(end) });
+        // Hotter each bounce (Corey's review): the arrow flown on takes its bounce's colour.
+        if !self.content.abilities[p.ability].bounce_trail.is_empty() {
+            self.events.push(Event::MissileTint { caster: anchor, spell: p.spell, ability: p.ability, bounce: p.bounced.min(255) as u8 });
+        }
         if flash != 0 {
             self.events.push(Event::Missile { caster: anchor, spell: flash, target: Target::Point(at) });
         }
@@ -1612,7 +1661,7 @@ impl Survival {
     /// A lob's flight: its look flown to `at`, the ring everyone sees there until it lands
     /// (distance / speed from now), and a warning for the foes near it. `(speed, radius, share,
     /// damage, spell)` as [`Self::launch`] reckoned them.
-    fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
+    pub(crate) fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
         let splash = self.content.abilities[ability].splash;
         let dist = len(sub(at, from));
         let flight = dist / speed.max(1.0);
@@ -1654,6 +1703,12 @@ impl Survival {
         }
         if let Some(m) = mark {
             self.unmark(m);
+        }
+        // A thrown trap: it's set where it lands, and arms from there; its burst is for when it
+        // springs, not now.
+        if self.content.abilities[p.ability].kind == "trap" {
+            self.set_trap(p.owner, p.ability, at, p.share);
+            return true;
         }
         let look = self.content.abilities[p.ability].burst_spell;
         self.burst_look(p, at, (look != 0).then_some(look));
@@ -1951,9 +2006,9 @@ impl Survival {
         if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) || self.own_totem(mid, owner) {
             return;
         }
+        // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
         if self.players.contains_key(&owner) && self.evading(mid, owner) {
-            self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style: Blow::Arrow(spell) });
-            self.events.push(Event::Flash { player: owner, text: "Evade".into() });
+            self.whiff(mid, from);
             return;
         }
         // A dummy in a counter's stance.
@@ -2016,6 +2071,8 @@ impl Survival {
     fn ability_after_at(&mut self, owner: Id, victim: Id, ability: usize, share: f32, damage: u32, killed: bool, valor: f32) {
         let d = self.content.abilities[ability].clone();
         if !killed {
+            // The look its caster wears over a pull of its own (Reverse Grapple's haul).
+            let was = std::mem::replace(&mut self.fx_pull_look, (d.pull_clip != 0).then(|| (d.pull_clip, d.pull_from.clone())));
             // One that's for friends too gives a foe none of what helps.
             if d.friendly {
                 let harm: Vec<_> = d.effects.iter().filter(|e| !crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
@@ -2023,6 +2080,7 @@ impl Survival {
             } else {
                 self.apply_effects(owner, victim, &d.effects, share, &d.name);
             }
+            self.fx_pull_look = was;
         }
         if d.drain > 0.0 && damage > 0 {
             let heal = (damage as f32 * d.drain * self.weakened(owner)).round() as u32;
@@ -2544,7 +2602,7 @@ impl Survival {
             None => AbilityDef::at(d.damage, share),
         };
         self.area(id, ability, at, range, share, damage, Some((yaw, d.arc.max(10.0))));
-        if self.debug {
+        if self.debug_draws() {
             for k in -2..=2 {
                 let a = yaw + (k as f32 / 2.0) * (d.arc / 2.0).to_radians();
                 self.mark([at[0] + a.cos() * range, at[1] + a.sin() * range, at[2]], 0.3, 0.8);
@@ -2563,7 +2621,7 @@ impl Survival {
         }
         let damage = AbilityDef::at(d.damage, share);
         self.area(id, ability, at, radius, share, damage, None);
-        if self.debug {
+        if self.debug_draws() {
             self.mark(at, radius, 0.8);
         }
     }
@@ -2584,7 +2642,7 @@ impl Survival {
         }
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         self.totems.push(Totem { mob: mid, owner: id, ability, until: now + d.secs.max(1.0), next: now });
-        if self.debug {
+        if self.debug_draws() {
             self.mark(at, t.radius, d.secs.max(1.0));
         }
     }
@@ -2826,7 +2884,7 @@ impl Survival {
                 self.heal_hero_by(f, amount, id, &d.name);
             }
         }
-        if self.debug {
+        if self.debug_draws() {
             let end = self.slide_end(pos, yaw, len);
             self.mark(end, half.max(0.3), tick);
         }
@@ -3219,11 +3277,14 @@ impl Survival {
     // --- training dummies -----------------------------------------------------------------------------
 
     /// A training dummy in front of the hero (`mode`: `guard`, `roll`, `counter <school>`, or
-    /// plain).
+    /// plain), 6 yd ahead, or as many as a number first in `mode` says (1 to 30: `3 guard`).
     pub fn spawn_dummy(&mut self, id: Id, mode: &str) -> Result<String, String> {
         let def = self.content.mobs.iter().position(|m| m.dummy).ok_or("No training dummy in the rules.")?;
         let p = self.players.get(&id).ok_or("No hero.")?;
-        let at = self.ground_near(p.pos[0] + p.facing.cos() * 6.0, p.pos[1] + p.facing.sin() * 6.0, p.pos[2]);
+        let first = mode.split_whitespace().next().and_then(|w| w.parse::<f32>().ok());
+        let ahead = first.map_or(6.0, |y| y.clamp(1.0, 30.0));
+        let mode = if first.is_some() { mode.trim().split_once(char::is_whitespace).map_or("", |(_, rest)| rest) } else { mode };
+        let at = self.ground_near(p.pos[0] + p.facing.cos() * ahead, p.pos[1] + p.facing.sin() * ahead, p.pos[2]);
         let face = facing(at, p.pos);
         let mid = self.spawn_mob(def, at, None, false);
         if let Some(m) = self.mobs.get_mut(&mid) {
@@ -3242,6 +3303,67 @@ impl Survival {
             self.events.push(Event::MobGuard { id: mid, up: true });
         }
         Ok(if mode.is_empty() { "A training dummy".into() } else { format!("A training dummy ({mode})") })
+    }
+
+    /// Every training dummy gone (dev: `.es dummy clear`); how many there were.
+    pub fn clear_dummies(&mut self) -> usize {
+        let gone: Vec<Id> = self.mobs.iter().filter(|(_, m)| self.content.mobs[m.def].dummy).map(|(id, _)| *id).collect();
+        for id in &gone {
+            self.mobs.remove(id);
+            self.dummies.remove(id);
+            self.stances.remove(id);
+            self.events.push(Event::MobGone { id: *id });
+        }
+        gone.len()
+    }
+
+    /// A creature to practise on and look at (a dev command, `.es target`): `key` `yards` ahead
+    /// (1 to 40), facing the hero (or, `away`, with its back to them: a shot or a blow into its
+    /// back), at `hp` of its health (a share, 0.01 to 1). Standing `still`, it never moves or
+    /// strikes of itself but takes everything a creature does (a knock-up, a pull, a trip), so what
+    /// an ability does to a creature can be seen; otherwise it comes at the hero (across a
+    /// tripwire, say).
+    pub fn spawn_target(&mut self, id: Id, key: &str, yards: f32, still: bool, away: bool, hp: f32) -> Result<String, String> {
+        let def = self.content.mob(key).ok_or_else(|| format!("No creature called {key}."))?;
+        if self.content.mobs[def].dummy || self.content.mobs[def].inert() {
+            return Err("That one only stands there: use .es dummy.".into());
+        }
+        let p = self.players.get(&id).ok_or("No hero.")?;
+        let yards = yards.clamp(1.0, 40.0);
+        let at = self.ground_near(p.pos[0] + p.facing.cos() * yards, p.pos[1] + p.facing.sin() * yards, p.pos[2]);
+        let face = if away { facing(p.pos, at) } else { facing(at, p.pos) };
+        let mid = self.spawn_mob(def, at, None, false);
+        if let Some(m) = self.mobs.get_mut(&mid) {
+            m.facing = face;
+            m.home = at;
+            m.health = ((m.max_health as f32 * hp.clamp(0.01, 1.0)).round() as u32).max(1);
+        }
+        self.targets.insert(mid, still);
+        if !still {
+            self.engage(mid, mobs::Foe::Hero(id));
+        }
+        Ok(self.content.mobs[def].name.clone())
+    }
+
+    /// Every `.es target` creature taken away.
+    /// A jump the visual check can make (`.es hop`): the hero's client throws its body up `lift`
+    /// yards and lets it fall, as a jump does (a script can't press the jump key), so an ability can
+    /// be tried mid-jump.
+    pub fn test_hop(&mut self, id: Id, lift: f32) {
+        let Some(p) = self.players.get(&id) else { return };
+        let dir = p.facing;
+        self.events.push(Event::Hop { player: id, dir, speed: 0.1, lift: lift.clamp(0.5, 6.0), roll: false, style: "" });
+    }
+
+    pub fn clear_targets(&mut self) -> usize {
+        let gone: Vec<Id> = self.targets.keys().copied().filter(|id| self.mobs.contains_key(id)).collect();
+        for id in &gone {
+            self.mobs.remove(id);
+            self.stances.remove(id);
+            self.events.push(Event::MobGone { id: *id });
+        }
+        self.targets.clear();
+        gone.len()
     }
 
     /// A dummy rolling just now: what reaches it misses.

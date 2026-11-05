@@ -1,0 +1,12 @@
+# Double Call (Ctrl+E): two beasts of consecutive stages at once, at a creature 15 yd ahead.
+# Look for: both appearing near the foe and charging in together (Corey's review).
+hero hunter
+cam 0 -14 12
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 15 still
+5.0 .es slot e call_of_the_wild
+5.5 .es valor full
+6.0 .es in ab 1 1
+5.8 shots beasts 4 0.5
+10 end

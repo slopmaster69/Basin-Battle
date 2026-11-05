@@ -1,0 +1,18 @@
+# Harpoon Dive (Ctrl+E) at a creature 14 yd off, from higher up and farther back so the flight
+# shows (Corey's review); then the Uppercut and the Stoop from there.
+hero hunter
+cam 50 -18 14
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 14 still
+5.0 .es slot e raptor_strike
+5.5 .es valor full
+6.0 .es in ab 1 1                    # Ctrl+E: aiming the harpoon
+6.5 .es in a {facing} 0.0
+6.6 .es in au {facing} 0.0
+7.6 .es in ab 1 0                    # Uppercut
+8.2 .es in ab 1 0                    # Stoop
+8.4 .es in a {facing} -0.7
+8.5 .es in au {facing} -0.7
+6.3 shots dive 5 0.5
+12 end

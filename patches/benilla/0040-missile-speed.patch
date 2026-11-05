@@ -1,0 +1,246 @@
+From c168ccaa52a2066ecb35db20ef21093a3ee257b5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:45:19 -0600
+Subject: [PATCH] A missile's look can set its speed (SetMissileLook's tenth
+ number), and the twenty-third round
+
+`SetMissileLook(spellId, colour, width, seconds, scale, spin, caster, axis, speed)`: a last number
+flies the dressed missile at that many yards a second from where it is, over the speed its spell
+gives it and over the 100 yd/s cap the launch's refit keeps (up to 400 now), so a hurled weapon can
+cross the field as fast as a thrown axe should. `0` or nothing keeps the spell's own, and every
+older line (nine arguments) reads as before. `HasActionCombat()` says 23, and the module's notes
+list this round's additions: the lower-body clip (0037), the crossfade between clips (0038), the
+glowing object (0039) and this.
+---
+ crates/benilla-app/src/entities.rs         |  4 +-
+ crates/benilla-app/src/entities/missile.rs | 52 +++++++++++++++++++++-
+ crates/benilla-app/src/missile_look.rs     | 18 +++++---
+ crates/benilla-ui/src/action_combat.rs     | 23 ++++++++--
+ 4 files changed, 85 insertions(+), 12 deletions(-)
+
+diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
+index f367decb..63ee0950 100644
+--- a/crates/benilla-app/src/entities.rs
++++ b/crates/benilla-app/src/entities.rs
+@@ -76,8 +76,8 @@ pub(crate) use collision_height::CollisionHeight;
+ mod missile;
+ use missile::{attach_missile_models, move_missiles, spawn_missiles};
+ pub(crate) use missile::{
+-    attach_world_pos, AttachPosQuery, MissileMiss, MissileSound, MissileSpell, MissileSpin,
+-    PendingMissiles,
++    attach_world_pos, AttachPosQuery, Missile, MissileMiss, MissileSound, MissileSpell,
++    MissileSpin, PendingMissiles,
+ };
+ 
+ /// A WMO-display GameObject's doodad props (a ship's sails), parented under it to ride a transport.
+diff --git a/crates/benilla-app/src/entities/missile.rs b/crates/benilla-app/src/entities/missile.rs
+index 1a35e84e..e02f9cdf 100644
+--- a/crates/benilla-app/src/entities/missile.rs
++++ b/crates/benilla-app/src/entities/missile.rs
+@@ -149,9 +149,13 @@ pub(crate) struct MissileSpin {
+     pub(crate) tumble: bool,
+ }
+ 
++/// Basin Battle: the most a missile's own speed (`SetMissileLook`'s tenth number) flies it at,
++/// over [`DUE_SPEED`]'s cap.
++const OWN_SPEED_MOST: f32 = 400.0;
++
+ /// One projectile in flight.
+ #[derive(Component)]
+-pub(super) struct Missile {
++pub(crate) struct Missile {
+     spell_id: u32,
+     /// A ground arrival plays on the caster (`0x61d870`), a unit arrival on the target.
+     caster: Entity,
+@@ -184,6 +188,22 @@ pub(super) struct Missile {
+     weapon_visual: Option<u32>,
+ }
+ 
++impl Missile {
++    /// Basin Battle: fly the rest of the way at `speed` yards a second (`SetMissileLook`'s tenth
++    /// number), over the speed the launch fitted and its [`DUE_SPEED`] cap, up to
++    /// [`OWN_SPEED_MOST`]. The yards left are what the fitted flight had left; a flight already due
++    /// (nothing left) stays due. Nothing happens for a speed of 0 or less.
++    pub(crate) fn fly_at(&mut self, speed: f32) {
++        if speed.is_nan() || speed <= 0.0 {
++            return;
++        }
++        let speed = speed.min(OWN_SPEED_MOST);
++        let left = (self.arrive_in * self.speed).max(0.0);
++        self.speed = speed;
++        self.arrive_in = left / speed;
++    }
++}
++
+ /// The unit-side inputs of an attachment or marker position read: the base frame, the tables and
+ /// the pose, read through `RigPose::posed_point` without an anchor entity.
+ pub(crate) type AttachPosQuery<'w, 's> = Query<
+@@ -985,6 +1005,36 @@ mod tests {
+             .collect()
+     }
+ 
++    /// Basin Battle: a look's own speed refits the yards left, past the launch's 100 yd/s cap.
++    #[test]
++    fn a_missiles_own_speed_refits_the_rest_of_its_flight_past_the_launch_cap() {
++        let mut app = app();
++        let caster = caster(&mut app, Vec3::ZERO);
++        let target = app
++            .world_mut()
++            .spawn(GlobalTransform::from_xyz(24.0, 0.0, 0.0))
++            .id();
++        app.world_mut().write_message(go(caster, target, false));
++        step(&mut app, 0.0);
++        let entity = app
++            .world_mut()
++            .query_filtered::<Entity, With<Missile>>()
++            .single(app.world())
++            .unwrap();
++        let mut m = app.world_mut().get_mut::<Missile>(entity).unwrap();
++        // 24 yd at 24 yd/s: a second left.
++        assert!((m.arrive_in - 1.0).abs() < 1e-4);
++        m.fly_at(160.0);
++        assert!((m.arrive_in - 24.0 / 160.0).abs() < 1e-5, "{}", m.arrive_in);
++        assert_eq!(m.speed, 160.0);
++        // Capped at its most; 0 does nothing.
++        m.fly_at(1.0e6);
++        assert_eq!(m.speed, 400.0);
++        assert!((m.arrive_in - 24.0 / 400.0).abs() < 1e-5);
++        m.fly_at(0.0);
++        assert_eq!(m.speed, 400.0);
++    }
++
+     #[test]
+     fn release_keyframe_launches_from_the_marker_minus_queued_time() {
+         let mut app = app();
+diff --git a/crates/benilla-app/src/missile_look.rs b/crates/benilla-app/src/missile_look.rs
+index 2ce2c710..736d910b 100644
+--- a/crates/benilla-app/src/missile_look.rs
++++ b/crates/benilla-app/src/missile_look.rs
+@@ -1,6 +1,7 @@
+ //! Basin Battle's missile looks, not part of 1.12.1 (`SetMissileLook`, `HasActionCombat() >= 20`):
+-//! a chosen spell's missiles trail a glowing ribbon, are drawn larger, and spin flat as they fly,
+-//! so an arrow or a thrown axe reads at night and a ricochet's new colour shows where it bounced.
++//! a chosen spell's missiles trail a glowing ribbon, are drawn larger, spin as they fly and can fly
++//! at a speed of their own, so an arrow or a thrown axe reads at night, a ricochet's new colour
++//! shows where it bounced, and a hurled weapon crosses the field as fast as it should.
+ //!
+ //! A missile is dressed from its spell's look as it flies, and for [`LATCH_SECS`] after, so a look
+ //! set in the same moment as the cast still takes: the add-on's line and the cast's packet arrive
+@@ -19,7 +20,7 @@ use benilla_world::particles::buffer::{EffectVertex, WorldEffectDraw};
+ use benilla_world::view::WorldCamera;
+ use bevy::prelude::*;
+ 
+-use crate::entities::{MissileSpell, MissileSpin};
++use crate::entities::{Missile, MissileSpell, MissileSpin};
+ 
+ /// How long after it flies a missile still takes a look set late, or a new colour.
+ const LATCH_SECS: f32 = 0.25;
+@@ -157,15 +158,15 @@ fn ribbon(
+ }
+ 
+ /// A missile in flight takes its look: one set for this caster's next missile of the spell, else
+-/// the spell's own: its size, its spin and a ribbon behind it.
++/// the spell's own: its size, its spin, its own speed and a ribbon behind it.
+ fn dress_missiles(
+     mut commands: Commands,
+     time: Res<Time>,
+     guids: Query<&crate::net::Guid>,
+-    mut new: Query<(Entity, &MissileSpell, &mut Transform), Without<Dressed>>,
++    mut new: Query<(Entity, &MissileSpell, &mut Transform, &mut Missile), Without<Dressed>>,
+ ) {
+     let now = time.elapsed_secs();
+-    for (entity, spell, mut transform) in &mut new {
++    for (entity, spell, mut transform, mut missile) in &mut new {
+         let caster = guids.get(spell.caster).map_or(0, |g| g.0);
+         let once = action_combat::take_missile_look_once(spell.spell, caster);
+         let Some(look) = once.or_else(|| action_combat::missile_look(spell.spell)) else {
+@@ -178,6 +179,10 @@ fn dress_missiles(
+         if (look.scale - 1.0).abs() > 1.0e-3 {
+             transform.scale = Vec3::splat(look.scale);
+         }
++        // Its own speed, over the spell's and the launch's cap.
++        if look.speed > 0.0 {
++            missile.fly_at(look.speed);
++        }
+         if look.spin != 0.0 {
+             commands.entity(entity).insert(MissileSpin {
+                 turns: look.spin,
+@@ -346,6 +351,7 @@ mod tests {
+                 scale: 1.0,
+                 spin: 0.0,
+                 tumble: false,
++                speed: 0.0,
+             },
+         );
+         for i in 0..10 {
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index ccbf150f..73e6f3ff 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -203,6 +203,10 @@
+ //!   half a yard across at the top of its model, pulsing, and a small white light there, lighting
+ //!   the ground under it (`benilla-app`'s `go_glow`: an arrow planted in the grass, found at
+ //!   night). Without the bit, nothing.
++//! - `SetMissileLook(spellId, colour, width, seconds, scale, spin, caster, axis, speed)`: a tenth
++//!   argument flies the dressed missile at that many yards a second from where it is, over the
++//!   speed its spell gives it and over the 100 yd/s cap the launch keeps (up to 400). `0` or
++//!   nothing keeps the spell's own; a line with nine arguments reads as before.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -651,6 +655,9 @@ pub struct MissileLook {
+     /// Basin Battle: the spin end over end, about the axis across the flight (a thrown axe's
+     /// tumble), instead of flat about the up axis.
+     pub tumble: bool,
++    /// Basin Battle: the missile's own speed in yards a second, over its spell's and over the
++    /// launch's 100 yd/s cap; 0 keeps the spell's.
++    pub speed: f32,
+ }
+ 
+ static MISSILE_LOOKS: std::sync::Mutex<Vec<(u32, MissileLook)>> = std::sync::Mutex::new(Vec::new());
+@@ -990,7 +997,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(22))?,
++        lua.create_function(|_, _: MultiValue| Ok(23))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1482,6 +1489,8 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 spin: number(v.get(5), -20.0, 20.0).unwrap_or(0.0),
+                 // The eighth argument names the spin's axis: "side" tumbles, anything else is flat.
+                 tumble: text(v.get(7)).is_some_and(|a| a.eq_ignore_ascii_case("side")),
++                // The tenth is its own speed (yd/s); nothing, or 0, keeps the spell's.
++                speed: number(v.get(9), 0.0, 400.0).unwrap_or(0.0),
+             };
+             match (spell, unit_guid(v.get(6))) {
+                 (Some(spell), Some(caster)) => {
+@@ -1678,14 +1687,22 @@ mod tests {
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(
+-            r#"assert(HasActionCombat() >= 20)
++            r#"assert(HasActionCombat() >= 23)
+                SetMissileLook(19434, "F2E6C8", 0.18, 0.3)
+                SetMissileLook(16075, nil, 0.3, 0.35, 1.8, 2.5)
+-               SetMissileLook(19434, "FF3A1A", 0.3, 0.4, 1, 0, "0xF13000000000002A")"#,
++               SetMissileLook(19434, "FF3A1A", 0.3, 0.4, 1, 0, "0xF13000000000002A")
++               SetMissileLook(2764, nil, 0.3, 0.4, 1, 3, "-", "side", 160)
++               SetMissileLook(3018, nil, 0.3, 0.4, 1, 0, "-", "up")"#,
+         )
+         .exec()
+         .unwrap();
++        // The tenth number is the missile's own speed; a nine-argument line keeps the spell's (0).
++        let thrown = missile_look(2764).unwrap();
++        assert!(thrown.tumble && (thrown.speed - 160.0).abs() < 1.0e-5);
++        let shot = missile_look(3018).unwrap();
++        assert!(!shot.tumble && shot.speed == 0.0);
+         let arrow = missile_look(19434).unwrap();
++        assert_eq!(arrow.speed, 0.0, "absent: the spell's own");
+         assert_eq!(
+             arrow.trail,
+             Some([
+-- 
+2.56.0.windows.4
+
