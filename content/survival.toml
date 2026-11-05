@@ -4943,12 +4943,12 @@ effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
 # The frost it leaves (Corey's review, round 3: the floor should slow what's round it): the
 # burst's 3 yd of ground for 6 s, snaring every creature in it each second (a hero's own ground
 # never slows them). Its look is the ground's spell (`linger_spell`, tunable in play:
-# `.es tune ability.freezing_trap.linger_spell <id>`): 7083 is Frost Nova's ice on the ground
-# with no caster-side kit, which run 070 showed lays nothing lasting on the ground; 13810 laid as
-# the ground's spell (not cast as one: that was the whiteout) is vanilla's Frost Trap mist, about
-# 10 yd wide, wider than the 3 yd that slows.
+# `.es tune ability.freezing_trap.linger_spell <id>`): 27808, Corey's pick after the round-3
+# takes of three looks ("27808 is the best for frost trap"), over 13810 (vanilla's Frost Trap
+# mist, about 10 yd wide, wider than the 3 yd that slows) and 2969. 7083, Frost Nova's ice with no
+# caster-side kit, lays nothing lasting on the ground (run 070).
 linger = 6.0
-linger_spell = 13810
+linger_spell = 27808
 tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }]
 # The trap combo: set it, kite them onto it, cash in. The free Multi-Shot is readied as the trap
 # springs (#118: readied as it was set, a trap that sprang late had no free shot left), for 8 s.
