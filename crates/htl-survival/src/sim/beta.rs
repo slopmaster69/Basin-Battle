@@ -11,6 +11,9 @@ use super::moves::{airtime, Landing, Trap};
 use super::*;
 use crate::content::{AbilityDef, AbilityEffect};
 
+/// How long a haul's line shows: a pull's flight (about 0.3 s, `moves::PULL_LIFT`), and a moment.
+const HAUL_LINE_SECS: f32 = 0.45;
+
 /// A yank runs this fast (yards a second), stopping this far short of a wall and this far from a
 /// foe's body (beside it, not in it).
 const YANK_SPEED: f32 = 24.0;
@@ -152,6 +155,10 @@ impl Survival {
             self.yank_to(p.owner, p.ability, p.share, at, Some(v));
             return;
         }
+        // Hauled in on the line (Reverse Grapple): it runs from the fist to the foe as it comes.
+        if haul {
+            self.events.push(Event::Tether { from: p.owner, to: Target::Unit(v), secs: HAUL_LINE_SECS });
+        }
         if swap {
             self.swap_with(p.owner, v, p.ability);
         } else if tether {
@@ -190,6 +197,13 @@ impl Survival {
             p.facing = dir;
         }
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
+        // The line it flies in on, from the fist to what it bit (Corey's review: "needs a visible
+        // rope").
+        let to = match unit {
+            Some(u) => Target::Unit(u),
+            None => Target::Point(at),
+        };
+        self.events.push(Event::Tether { from: id, to, secs });
         // Pulled through the air on the line, the way a hookshot flies you (play-test: a run along
         // the ground read as a Charge): a flat arc that lands as the line's time is up, the arm
         // held out along it.

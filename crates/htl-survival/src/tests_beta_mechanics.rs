@@ -785,6 +785,14 @@ fn grapple_arrow_catches_a_wall_and_a_boulder_the_walking_grid_never_had() {
     assert_eq!(d.len(), 1, "one pull to the wall: {d:?}");
     let at = s.players[&p].pos;
     assert!(at[0] > 8.5 && at[0] < 11.0 && at[1].abs() < 0.8, "at the wall's foot: {at:?}");
+    // Its line from the fist to where it bit, for as long as the pull (Corey's review: a rope).
+    let lines: Vec<(Target, f32)> = ev.iter().filter_map(|e| match e {
+        Event::Tether { from, to, secs } if *from == p => Some((*to, *secs)),
+        _ => None,
+    }).collect();
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(matches!(lines[0].0, Target::Point(at) if at[0] > 10.0 && at[0] < 13.0), "to the wall: {lines:?}");
+    assert!(lines[0].1 >= 0.3, "as long as the pull: {lines:?}");
     // A boulder only the land's shapes know: caught all the same.
     let mut s = shipped_on(Box::new(Boulder { at: [15.0, 0.0], r: 1.5, top: 2.5 }));
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -804,6 +812,7 @@ fn grapple_arrow_into_open_air_does_nothing() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let ev = grapple(&mut s, p, 1.0, 0.3);
     assert!(dashes(&ev, p).is_empty(), "no pull on a miss");
+    assert!(!ev.iter().any(|e| matches!(e, Event::Tether { .. })), "and no line");
     assert!(dist2d(s.players[&p].pos, ORIGIN) < 0.1, "she stays: {:?}", s.players[&p].pos);
 }
 
