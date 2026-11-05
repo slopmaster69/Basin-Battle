@@ -31,6 +31,7 @@ pub mod hunter;
 mod raid;
 pub mod siege;
 mod bomb;
+mod flay;
 mod orb;
 mod rhythm;
 mod staff;
@@ -899,6 +900,8 @@ pub struct Survival {
     pub(crate) orbs: Vec<orb::Orb>,
     /// Bombs ticking on foes (Living Bomb), until they burst.
     pub(crate) bombs: Vec<bomb::Bomb>,
+    /// Each hero's Mind Flay held, and how taut its cord has been.
+    pub(crate) flays: BTreeMap<Id, flay::Flay>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -1026,6 +1029,7 @@ impl Survival {
             burnings: Vec::new(),
             orbs: Vec::new(),
             bombs: Vec::new(),
+            flays: BTreeMap::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),

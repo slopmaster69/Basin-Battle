@@ -3424,6 +3424,39 @@ impl Content {
             if a.slip && a.kind != "blink" {
                 bail!("{what}: only a blink slips blows (`slip`)");
             }
+            // The Shadow Priest's mechanics.
+            if (a.slip_radius > 0.0 || !a.slip_effects.is_empty() || !a.slip_self.is_empty()) && !a.slip {
+                bail!("{what}: `slip_radius`, `slip_effects` and `slip_self` are a slip's (they need `slip`)");
+            }
+            if !a.slip_effects.is_empty() && a.slip_radius <= 0.0 {
+                bail!("{what}: `slip_effects` need the reach they land in (`slip_radius`)");
+            }
+            if let Some(f) = &a.flay {
+                if a.kind != "channel" || f.taut <= 0.0 || f.taut >= a.range[1] || f.taut_secs <= 0.0 || f.snap <= 0.0 || f.snap_cap <= 0.0 {
+                    bail!("{what}: a flay is a channel's, taut from `taut` yd short of its range, with `taut_secs`, `snap` and `snap_cap`");
+                }
+                if (f.spill > 0.0) != (f.spill_radius > 0.0) {
+                    bail!("{what}: a flay's `spill` and `spill_radius` go together");
+                }
+            }
+            if a.on_taut < 0.0 || (a.on_taut > 0.0 && a.kind != "projectile") {
+                bail!("{what}: only a projectile snaps a taut cord (`on_taut`)");
+            }
+            if (a.low_health > 0.0) != (a.low_mult > 1.0) || !(0.0..1.0).contains(&a.low_health) {
+                bail!("{what}: `low_health` (below 1) and `low_mult` (above 1) go together");
+            }
+            if a.backlash < 0.0 {
+                bail!("{what}: `backlash` is damage back at the caster (0 or more)");
+            }
+            if a.counter.as_ref().is_some_and(|c| !(0.0..1.0).contains(&c.cut) || c.mend < 0.0) {
+                bail!("{what}: a stance's `cut` is a share below 1, its `mend` 0 or more");
+            }
+            if a.counter.as_ref().is_some_and(|c| !c.perfect_pass.is_empty() && (c.immune || c.mirror || c.block || c.dodge)) {
+                bail!("{what}: `perfect_pass` lets a blow through clean (no immune, mirror, block or dodge with it)");
+            }
+            for e in a.slip_effects.iter().chain(&a.slip_self).chain(a.counter.iter().flat_map(|c| c.perfect_pass.iter())) {
+                effect_ok(e, &what)?;
+            }
             if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
                 bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
             }

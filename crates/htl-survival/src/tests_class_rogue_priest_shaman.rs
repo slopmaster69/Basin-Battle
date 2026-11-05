@@ -324,27 +324,6 @@ fn penance_burns_the_foes_in_its_lance_heals_the_friend_it_crosses_and_sweeps_as
 }
 
 #[test]
-fn mind_blast_is_penances_ex_a_dark_star_that_lands_late_and_terrifies() {
-    let mut s = world(false);
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let m = grunt(&mut s, [12.0, 0.0, 0.0]);
-    let pins = [(m, [12.0, 0.0, 0.0])];
-    let before = hp(&s, m);
-    let ev = cast(&mut s, p, "penance", true);
-    assert!(!channelling(&s, p), "not the beam");
-    assert!(
-        ev.iter().any(|e| matches!(e, Event::Mark { radius, tele: Some(_), .. } if (*radius - 3.5).abs() < 0.01)),
-        "its ring, for everyone"
-    );
-    assert!((s.players[&p].valor - 75.0).abs() < 0.01, "a segment of Valor");
-    run_pinned(&mut s, 0.3, &pins);
-    assert_eq!(hp(&s, m), before, "not yet");
-    run_pinned(&mut s, 0.5, &pins);
-    assert!(hp(&s, m) < before, "it landed");
-    assert!(s.has_cc(m, "panic"), "and terrifies");
-}
-
-#[test]
 fn power_word_barrier_wards_and_steadies_whoever_stands_under_it() {
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);

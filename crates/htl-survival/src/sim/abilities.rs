@@ -123,6 +123,8 @@ pub struct Stance {
     /// When its lasting look (an `aura` apart from its `spell`: Shield Wall's circling shields)
     /// was last played on the body; it's played again every [`STANCE_LOOK_EVERY`] while it holds.
     pub shown: f32,
+    /// The whole seconds it has mended its hero for (Dispersion's `mend`).
+    pub mended: u32,
 }
 
 /// How often a stance's lasting look is played again while it holds (the game's look is a
@@ -174,7 +176,7 @@ const HAND_RIGHT: f32 = 0.3;
 /// The reticle's line a cast carries counts this long, and this near the hero's facing.
 const AIM_FRESH: f32 = 0.6;
 /// After letting an ability go, a beat before the next thing.
-const CAST_RECOVERY: f32 = 0.35;
+pub(crate) const CAST_RECOVERY: f32 = 0.35;
 /// The throw's clip (AttackThrown) and the pose a thrown charge holds till it goes (HoldThrown):
 /// the axe drawn back, so everyone can see a throw coming, as a bow's draw shows.
 const THROW_CLIP: u16 = 107;
@@ -408,7 +410,7 @@ impl Survival {
 
     /// Spend a charge of an ability (`share` of its cooldown: a counter that caught something
     /// comes back sooner).
-    fn spend_charge(&mut self, id: Id, ability: usize, share: f32) {
+    pub(crate) fn spend_charge(&mut self, id: Id, ability: usize, share: f32) {
         let base = self.content.base_of(ability);
         let d = self.content.abilities[base].clone();
         let max = d.charges.max(1);
@@ -561,9 +563,9 @@ impl Survival {
             self.tell(id, format!("Nothing on that key. Open the board (N) and choose a card for the {} key.", slot_role(slot_name)));
             return true;
         };
-        // Ice Block: its key again breaks out of it.
+        // Ice Block (and Dispersion): its key again breaks out of it.
         if let Action::Stance { ability, .. } = p.action {
-            if self.content.abilities[ability].counter.as_ref().is_some_and(|c| c.immune) && self.content.base_of(ability) == base {
+            if self.content.abilities[ability].counter.as_ref().is_some_and(|c| c.immune || c.key_ends) && self.content.base_of(ability) == base {
                 self.break_out(id);
                 return true;
             }
@@ -589,6 +591,13 @@ impl Survival {
         if let Action::Sweep { ability, .. } = p.action {
             if self.content.base_of(ability) == base {
                 self.stop_sweep(id);
+                return true;
+            }
+        }
+        // A flay: its key again snaps a taut cord into its foe (else lets it go).
+        if let Action::Channel { ability, .. } = p.action {
+            if self.content.abilities[ability].flay.is_some() && self.content.base_of(ability) == base {
+                self.press_flay(id);
                 return true;
             }
         }
@@ -685,7 +694,9 @@ impl Survival {
         }
         let free = matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. } | Action::Eat { .. } | Action::Gather { .. } | Action::Work { .. })
             // (And out of a stagger.)
-            || (breaking_free && matches!(p.action, Action::Stagger { .. }));
+            || (breaking_free && matches!(p.action, Action::Stagger { .. }))
+            // Another key lets a flay go (Mind Blast on a taut one snaps it, below).
+            || self.is_flaying(id);
         // A recast goes from the air too (the Stoop out of the Uppercut, Skyfall's volley).
         let airborne_recast = recast.is_some() && matches!(p.action, Action::Dash { .. });
         if !free && !self.cancelable_now(id) && !airborne_recast {
@@ -724,8 +735,14 @@ impl Survival {
                 return true;
             }
         }
+        // Mind Blast on a taut Mind Flay: at once on its foe (judged before the cord is let go).
+        let snap = if d.on_taut > 0.0 && recast.is_none() { self.taut_flay(id) } else { None };
         self.unsheathe(id);
         self.end_ability_action(id);
+        if let Some(target) = snap {
+            self.snap_blast(id, ability, target);
+            return true;
+        }
         // Demonic Circle: the first press sets the anchor, costing nothing.
         if recast.is_none() && d.kind == "blink" && d.anchor > 0.0 && self.anchor_of(id, base).is_none() {
             self.set_anchor(id, base);
@@ -916,6 +933,7 @@ impl Survival {
                 self.events.push(Event::CastEnd { caster: id });
             }
             Action::Channel { ability, .. } => {
+                self.flays.remove(&id);
                 self.events.push(Event::CastEnd { caster: id });
                 self.events.push(Event::Auras { id });
                 self.events.push(Event::Channel { caster: id, target: None, spell: 0, ms: 0 });
@@ -2006,6 +2024,14 @@ impl Survival {
         let mut dmg = base * might * self.weakened(owner) * cowed * if opened { d.opened } else { 1.0 };
         let shatter = d.shatter;
         let mark_crit = d.mark_crit;
+        // Shadow Word: Death on a foe low on health: its judgement, many times as hard.
+        let (low, low_mult) = (d.low_health, d.low_mult);
+        if low > 0.0 {
+            let (h, max) = self.players.get(&victim).map(|p| (p.health, p.max_health)).or_else(|| self.mobs.get(&victim).map(|m| (m.health, m.max_health))).unwrap_or((1, 1));
+            if (h as f32) < low * max as f32 {
+                dmg *= low_mult.max(1.0);
+            }
+        }
         let mark = self.take_mark(victim);
         dmg *= 1.0 + mark;
         if mark > 0.0 && mark_crit > 1.0 {
@@ -2140,6 +2166,15 @@ impl Survival {
         if killed && d.refund_kill && d.valor > 0 {
             self.gain_valor(owner, d.valor as f32);
             self.events.push(Event::Flash { player: owner, text: "Valor returned".into() });
+        }
+        // Shadow Word: Death that didn't kill: its backlash on the caster.
+        if d.backlash > 0.0 && !killed && self.players.get(&owner).is_some_and(|p| p.health > 0) {
+            let dmg = d.backlash.round() as u32;
+            self.events.push(Event::Swing { attacker: victim, victim: Some(owner), damage: dmg, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
+            if d.impact_kit != 0 {
+                self.events.push(Event::Visual { id: owner, kit: d.impact_kit, by: None });
+            }
+            self.hurt_player_by(owner, dmg, victim, &d.name);
         }
     }
 
@@ -2771,6 +2806,10 @@ impl Survival {
         self.set_action(id, Action::Channel { ability, target, until: now + d.secs, next: now + d.tick.max(0.2), share });
         self.events.push(Event::Channel { caster: id, target: Some(target), spell: d.spell, ms: (d.secs * 1000.0) as u32 });
         self.events.push(Event::Auras { id });
+        // Mind Flay: a cord under tension (see `flay`).
+        if d.flay.is_some() {
+            self.start_flay(id);
+        }
     }
 
     /// A channel's tick: on while the target is near enough and in sight.
@@ -2803,7 +2842,7 @@ impl Survival {
 
     /// A tether's or a beam's tick on one foe: `per` damage (none on a hero in Ice Block), then
     /// what follows a blow of it (its effects, the drain, `valor` of its Valor).
-    fn channel_hit(&mut self, id: Id, target: Id, ability: usize, share: f32, per: f32, valor: f32) {
+    pub(crate) fn channel_hit(&mut self, id: Id, target: Id, ability: usize, share: f32, per: f32, valor: f32) {
         let damage = self.ability_damage(id, target, ability, per);
         let name = self.content.abilities[ability].name.clone();
         if self.players.contains_key(&target) {
@@ -3029,6 +3068,13 @@ impl Survival {
         if d.slip {
             self.note_slip(id, ability, start);
         }
+        // Fade: nothing touches them for a moment where they come out.
+        if d.invulnerable && d.secs > 0.0 {
+            let until = self.clock + d.secs;
+            if let Some(p) = self.players.get_mut(&id) {
+                p.untouchable_until = p.untouchable_until.max(until);
+            }
+        }
         if d.cleanse {
             self.cleanse(id, &["root", "snare"]);
         }
@@ -3044,7 +3090,7 @@ impl Survival {
     fn start_stance(&mut self, id: Id, ability: usize) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY });
+        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY, mended: 0 });
         self.set_action(id, Action::Stance { ability, until: now + d.secs });
         if d.counter.as_ref().is_some_and(|c| c.guard_pose) {
             self.events.push(Event::Guard { player: id, up: true });
@@ -3103,14 +3149,32 @@ impl Survival {
             return;
         }
         s.paid = true;
-        let ability = s.ability;
-        self.hasten(id, ability, 0.5);
+        let (ability, from) = (s.ability, s.from);
+        let d = self.content.abilities[ability].clone();
+        if d.slip_hasten > 0.0 {
+            self.hasten(id, ability, d.slip_hasten);
+        }
         self.gain_valor(id, self.content.valor.counter);
         let k = self.content.checks.perfect_kit;
         if k != 0 {
             self.events.push(Event::Visual { id, kit: k, by: None });
         }
         self.events.push(Event::Perfect { player: id, ability });
+        // Fade: the foes round where they stood slowed, the hero quickened, an afterimage left.
+        if !d.slip_effects.is_empty() {
+            let (mobs, heroes) = self.in_wedge(id, ability, from, 0.0, 360.0, d.slip_radius);
+            let was = self.fx_from.replace(from);
+            for u in mobs.into_iter().chain(heroes) {
+                self.apply_effects(id, u, &d.slip_effects, 1.0, &d.name);
+            }
+            self.fx_from = was;
+        }
+        if !d.slip_self.is_empty() {
+            self.apply_effects(id, id, &d.slip_self, 1.0, &d.name);
+        }
+        if d.burst_spell != 0 {
+            self.events.push(Event::Missile { caster: id, spell: d.burst_spell, target: Target::Point(from) });
+        }
     }
 
     /// An ability's cooldown under way comes back `share` of a whole cooldown sooner.
@@ -3165,6 +3229,25 @@ impl Survival {
     /// Stances run out.
     pub(crate) fn step_stances(&mut self) {
         let now = self.clock;
+        // Dispersion mends a share of their health each whole second it holds.
+        let mends: Vec<(Id, u32, f32, String)> = self
+            .stances
+            .iter()
+            .filter_map(|(id, s)| {
+                let d = &self.content.abilities[s.ability];
+                let mend = d.counter.as_ref().map_or(0.0, |c| c.mend);
+                let due = (((now.min(s.until) - s.since) + 1.0e-4).max(0.0) as u32).min(d.secs.round() as u32);
+                (mend > 0.0 && due > s.mended && self.players.contains_key(id)).then(|| (*id, due, mend, d.name.clone()))
+            })
+            .collect();
+        for (id, due, mend, name) in mends {
+            let gone = self.stances.get(&id).map_or(0, |s| s.mended);
+            if let Some(s) = self.stances.get_mut(&id) {
+                s.mended = due;
+            }
+            let each = self.players.get(&id).map_or(0, |p| (p.max_health as f32 * mend).round() as u32);
+            self.heal_hero_by(id, each * (due - gone), id, &name);
+        }
         let done: Vec<Id> = self.stances.iter().filter(|(_, s)| s.until <= now).map(|(id, _)| *id).collect();
         for id in done {
             self.end_stance(id);
@@ -3213,6 +3296,32 @@ impl Survival {
                     return None;
                 }
             }
+        }
+        // Dispersion: a blow that reaches it as it's entered (on the hero's own screen) passes
+        // clean through and slows whoever struck, a perfect; later ones land, cut (`cut`).
+        if !c.perfect_pass.is_empty() {
+            let rtt = self.players.get(&victim).map_or(0.0, |p| p.rtt.min(self.content.combat.max_rewind));
+            if now - s.since > self.content.checks.window + rtt + 1.0e-4 {
+                return None;
+            }
+            if let Some(st) = self.stances.get_mut(&victim) {
+                st.caught = true;
+                st.struck = Some((now, attacker));
+            }
+            if self.players.contains_key(&victim) {
+                self.gain_valor(victim, self.content.valor.counter);
+                let k = self.content.checks.perfect_kit;
+                if k != 0 {
+                    self.events.push(Event::Visual { id: victim, kit: k, by: None });
+                }
+                self.events.push(Event::Perfect { player: victim, ability: s.ability });
+            }
+            if self.unit_pos(attacker).is_some() {
+                let was = self.fx_from.replace(self.unit_pos(victim).unwrap_or_default());
+                self.apply_effects(victim, attacker, &c.perfect_pass, 1.0, &d.name);
+                self.fx_from = was;
+            }
+            return Some(Outcome::Miss);
         }
         if let Some(st) = self.stances.get_mut(&victim) {
             st.caught = true;
@@ -3367,6 +3476,7 @@ impl Survival {
                 }
             }
             Action::Channel { ability, .. } if self.content.abilities[ability].kind == "beam" => self.step_beam(id),
+            Action::Channel { ability, .. } if self.content.abilities[ability].flay.is_some() => self.step_flay(id),
             Action::Channel { .. } => self.step_channel(id),
             Action::Dash { t, secs, ability, target, share } => {
                 // Tackle's rush kicks up dust from the feet as it goes: a look of its own, apart
@@ -3445,7 +3555,7 @@ impl Survival {
                 let free = !self.stances.contains_key(&mid);
                 if free && (now % 4.0) < 0.06 {
                     let secs = self.content.abilities[a].secs;
-                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY });
+                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY, mended: 0 });
                     self.events.push(Event::Auras { id: mid });
                 }
             }

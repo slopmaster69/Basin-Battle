@@ -5602,25 +5602,6 @@ aura = 10060
 tick_spell = 6685
 clip = 53
 
-# The old Mind Blast's bigger, terrifying version, now Penance's EX.
-[[ability]]
-key = "mind_blast"
-name = "Mind Blast"
-ex_of = "penance"
-text = "A dark star bursts at the reticle, up to 30 yd away, 0.6 sec later. Its spot is shown to everyone. Deals 28 damage to all within 3.5 yd, and they flee in terror for 2 sec (1 sec against heroes). Lead your target."
-icon = "Spell_Shadow_UnholyFrenzy"
-slot = "ranged"
-kind = "ground"
-valor = 25
-range = [30.0, 30.0]
-radius = [3.5, 3.5]
-delay = 0.6
-damage = [28.0, 28.0]
-# A burst of void out of the ground where it lands (Void Blast).
-spell = 27812
-clip = 54
-effects = [{ kind = "panic", secs = [2.0, 2.0] }]
-
 [[ability]]
 key = "holy_nova"
 name = "Holy Nova"
@@ -5739,6 +5720,182 @@ spell = 27810
 tick_spell = 8092
 clip = 54
 tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
+
+# --- Priest, Shadow (the second choice on Q, E, 1 and 2) ----------------------------------------
+# The Priest design (claude/priest-kit-draft.md): Shadow pulls a cord taut and keeps it on the edge
+# of snapping. The looks are first picks, to check on video.
+
+# Q: tension. A cord to the first foe along the reticle that grows stronger the farther you stand,
+# 4 a second up close to 14 from 26 yd out (the taut zone), and snaps past 30 (a whip-crack, and
+# the Priest flinches). A whole second taut is a perfect (the cord rings); the key again while it's
+# taut whips the rest of it into the foe, twice over, 45 at most. Slowed while flayed, a chasing
+# foe closes slowly: kiting at the edge.
+[[ability]]
+key = "mind_flay"
+name = "Mind Flay"
+text = "Binds the first enemy along the reticle with a cord of shadow for 3 sec, slowing it by 30%. Deals 4 damage per sec up close, rising to 14 per sec from 26 to 30 yd. Beyond 30 yd the cord snaps. Press again while it is taut to deal twice the damage left in it at once, up to 45. You can walk slowly while it lasts."
+icon = "Spell_Shadow_SiphonMana"
+school = "priest"
+slot = "ranged"
+choice = 2
+kind = "channel"
+damage = [4.0, 14.0]
+range = [30.0, 30.0]
+secs = 3.0
+tick = 0.5
+cooldown = 9.0
+# Mind Flay's own cord; taut, Drain Mana's thinner, paler beam and the Priest's flare as it
+# tightens; Void Blast on the foe as it's whipped in, Death Coil's burst on the Priest as it snaps.
+spell = 15407
+clip = 54
+effects = [{ kind = "snare", secs = [0.6, 0.6], amount = 0.3 }]
+flay = { taut = 26.0, taut_secs = 1.0, snap = 2.0, snap_cap = 45.0, taut_spell = 5138, taut_kit = 457, whip_spell = 27812, snap_kit = 219, flinch = 0.3 }
+
+[[ability]]
+key = "mind_sear"
+name = "Mind Sear"
+ex_of = "mind_flay"
+text = "Mind Flay, and every other enemy within 5 yd of the bound one takes half of each of its blows."
+icon = "Spell_Shadow_Requiem"
+slot = "ranged"
+kind = "channel"
+valor = 25
+damage = [4.0, 14.0]
+range = [30.0, 30.0]
+secs = 3.0
+tick = 0.5
+spell = 15407
+clip = 54
+effects = [{ kind = "snare", secs = [0.6, 0.6], amount = 0.3 }]
+flay = { taut = 26.0, taut_secs = 1.0, snap = 2.0, snap_cap = 45.0, taut_spell = 5138, taut_kit = 457, whip_spell = 27812, snap_kit = 219, flinch = 0.3, spill_radius = 5.0, spill = 0.5 }
+
+# E: the snap. A dark star on the first foe along the reticle. On the foe of a taut Mind Flay it
+# goes at once, wherever the reticle is, for double: the cord snaps into them with black lightning,
+# a perfect. (Mind Blast was Penance's EX before: a save naming it on the Q key gets Penance, see
+# save.rs.)
+[[ability]]
+key = "mind_blast"
+name = "Mind Blast"
+text = "Strikes the first enemy along the reticle, up to 30 yd, with a dark star for 22 damage. Cast on the enemy bound by your taut Mind Flay, it strikes that enemy at once for 44 damage."
+icon = "Spell_Shadow_UnholyFrenzy"
+school = "priest"
+slot = "close"
+choice = 2
+kind = "projectile"
+damage = [22.0, 22.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+# Near enough at once: a star, not a bolt to dodge.
+speed = 80.0
+cooldown = 8.0
+on_taut = 2.0
+# Mind Blast's own burst on the head; Void Blast's black burst with it on the snap.
+spell = 8092
+impact_kit = 2709
+full_spell = 27812
+clip = 54
+
+# A judgement, not a timing: triple on a foe that's nearly done, and it bites back if it isn't.
+[[ability]]
+key = "shadow_word_death"
+name = "Shadow Word: Death"
+ex_of = "mind_blast"
+text = "Deals 15 damage to the first enemy along the reticle, up to 30 yd, or 45 damage to an enemy below 20% health. If it does not kill, you take 10 damage."
+icon = "Spell_Shadow_ShadowWordPain"
+slot = "close"
+kind = "projectile"
+valor = 25
+damage = [15.0, 15.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+speed = 80.0
+low_health = 0.2
+low_mult = 3.0
+backlash = 10.0
+spell = 26006
+impact_kit = 219
+clip = 54
+
+# 1: the perfect dodge. A short glide into shadow along the reticle, on the key press, nothing
+# touching the Priest for half a second. Faded just as a blow lands where they stood: the foes
+# round there slowed, the Priest quicker, and a smear of shadow left where they were (Witch Time,
+# in a world that can't stop the clock).
+[[ability]]
+key = "fade"
+name = "Fade"
+text = "Melts into shadow and glides 6 yd along the reticle. Nothing can harm you for 0.5 sec. Fade just as a blow lands and enemies within 8 yd of where you stood are slowed by 50% for 2 sec, and you run 40% faster for 1.5 sec."
+icon = "Spell_Magic_LesserInvisibilty"
+school = "priest"
+slot = "utility"
+choice = 2
+kind = "blink"
+at_once = true
+range = [6.0, 6.0]
+cooldown = 10.0
+invulnerable = true
+secs = 0.5
+slip = true
+slip_hasten = 0.0
+slip_radius = 8.0
+slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.5 }]
+slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.4 }]
+# Fade's own shadow on the Priest; Void Blast's smear where they stood, on a perfect.
+spell = 586
+burst_spell = 27812
+
+[[ability]]
+key = "void_shift"
+name = "Void Shift"
+ex_of = "fade"
+text = "Trades places with the first ally or enemy along the reticle, up to 20 yd. Bosses and unstoppable enemies hold their ground."
+icon = "Spell_Shadow_Teleport"
+slot = "utility"
+kind = "projectile"
+valor = 25
+range = [20.0, 20.0]
+radius = [0.5, 0.5]
+speed = 40.0
+swap = true
+spell = 26006
+burst_spell = 27812
+clip = 54
+
+# 2: a column of shadow. 70% less damage and 5% of health back a second for 3 sec, no attacking;
+# the key again comes out. Entered just as a blow lands, it passes clean through and the striker
+# is slowed. Its cooldown is the whole 24 sec, caught or not.
+[[ability]]
+key = "dispersion"
+name = "Dispersion"
+text = "Turns you to shadow for 3 sec. You take 70% less damage and heal 5% of your maximum health per sec, but cannot attack. Press again to come out. Enter it just as a blow lands and the blow passes through you, and the enemy who struck is slowed by 50% for 2 sec."
+icon = "Spell_Shadow_Shadowform"
+school = "priest"
+slot = "defense"
+choice = 2
+kind = "stance"
+secs = 3.0
+cooldown = 24.0
+# Shadowform's dark shape while it holds.
+spell = 15473
+aura = 15473
+counter = { key_ends = true, cut = 0.7, mend = 0.05, caught_cooldown = 1.0, perfect_pass = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.5 }] }
+
+# Shadow wants to deal damage: a grip that turns the Priest's own damage into their health (only
+# theirs: Corey's ruling).
+[[ability]]
+key = "vampiric_touch"
+name = "Vampiric Touch"
+ex_of = "dispersion"
+text = "Grips the enemy in front of you with a hand of shadow for 8 sec. Your damage to it heals you for 20% of the damage dealt."
+icon = "Spell_Shadow_UnsummonBuilding"
+slot = "defense"
+kind = "cone"
+valor = 25
+at_once = true
+range = [3.5, 3.5]
+arc = 60.0
+# Vampiric Embrace's look, on the Priest as it goes and on the foe while it holds.
+spell = 15286
+effects = [{ kind = "vampiric", secs = [8.0, 8.0], amount = 0.2, aura = 15286 }]
 
 # ----------------------------------------------------------------------------------- Shaman --
 
@@ -11001,7 +11158,7 @@ name = "Altar of the Abbey"
 at = [-8935.0, -165.0]
 display = 1527
 scale = 0.45
-teaches = ["penance", "holy_nova"]
+teaches = ["penance", "holy_nova", "mind_flay", "mind_blast"]
 keep = true
 secs = 3.0
 text = "The Abbey's altar remembers its priests. The Light, and the shadow behind it."
@@ -11107,7 +11264,7 @@ trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 key = "relic_priest"
 name = "The Abbey Reliquary"
 at = [-8865.0, -150.0]
-teaches = ["leap_of_faith", "power_word_barrier"]
+teaches = ["leap_of_faith", "power_word_barrier", "fade", "dispersion"]
 loot = { linen = 3 }
 display = 259
 secret = 7.0

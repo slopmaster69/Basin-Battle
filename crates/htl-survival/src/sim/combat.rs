@@ -2561,6 +2561,10 @@ impl Survival {
                 _ => {}
             }
         }
+        // A stance that cuts what reaches them (Dispersion).
+        if let Some(c) = self.stances.get(&id).filter(|s| s.until > now).and_then(|s| self.content.abilities[s.ability].counter.as_ref()) {
+            k *= (1.0 - c.cut).max(0.0);
+        }
         k
     }
 

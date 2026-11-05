@@ -237,9 +237,8 @@ const RENAMED: &[(&str, &str)] = &[
     // Rogue
     ("deadly_throw", "fan_of_knives"),
     ("evasion", "smoke_bomb"),
-    // Priest (Mind Blast and Power Word: Shield are now EX versions, never saved: a saved one is
-    // the old card)
-    ("mind_blast", "penance"),
+    // Priest (Power Word: Shield is now an EX version, never saved: a saved one is the old card.
+    // Mind Blast is a card again, Shadow's E: see `RENAMED_ON`)
     ("power_word_shield", "power_word_barrier"),
     // Shaman
     ("lightning_bolt", "lava_burst"),
@@ -254,6 +253,17 @@ const RENAMED: &[(&str, &str)] = &[
 /// A saved card's key as it is now.
 pub fn renamed(k: &str) -> &str {
     RENAMED.iter().find(|(old, _)| *old == k).map_or(k, |(_, new)| new)
+}
+
+/// Cards whose key is another row's card now: a save with the old card on its old key (`slot`,
+/// old key, new key) has the card that took its place there, owned and on that key. Anywhere else
+/// the key is the new card. (Mind Blast was the Priest's Q card, then Penance's EX; it's Shadow's E
+/// card now.)
+const RENAMED_ON: &[(&str, &str, &str)] = &[("ranged", "mind_blast", "penance")];
+
+/// A saved card on a key, as it is now.
+fn renamed_on<'a>(slot: &str, k: &'a str) -> &'a str {
+    RENAMED_ON.iter().find(|(s, old, _)| *s == slot && *old == k).map_or_else(|| renamed(k), |(_, _, new)| new)
 }
 
 /// A returning hero is where they left, as hurt as they were: no heal and no trip home for
@@ -275,7 +285,14 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
     // The tree as they left it (a dev build owns it all whatever was saved), and their keys where
     // the abilities still exist and are theirs.
     // A card since renamed or replaced (the class redesign) comes back as its successor.
-    let saved: std::collections::BTreeSet<String> = s.owned.iter().map(|k| renamed(k).to_string()).filter(|k| c.ability(k).is_some()).collect();
+    // One on a key it's since left (Mind Blast on Q) is the card that took its place there.
+    let moved: Vec<(&str, &str)> = s.loadout.iter().filter(|(slot, k)| renamed_on(slot, k) != renamed(k)).map(|(slot, k)| (k.as_str(), renamed_on(slot, k))).collect();
+    let saved: std::collections::BTreeSet<String> = s
+        .owned
+        .iter()
+        .map(|k| moved.iter().find(|(old, _)| *old == k.as_str()).map_or_else(|| renamed(k), |(_, new)| new).to_string())
+        .filter(|k| c.ability(k).is_some())
+        .collect();
     if !c.dev.full_tree && !s.owned.is_empty() {
         p.owned = saved;
     }
@@ -288,7 +305,7 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
         let fits = |k: &str| c.ability(k).filter(|a| !c.abilities[*a].is_ex() && p.owned.contains(k));
         let mut keys = p.loadout.clone();
         let mut set = std::collections::BTreeSet::new();
-        let loadout: BTreeMap<String, String> = s.loadout.iter().map(|(slot, k)| (slot.clone(), renamed(k).to_string())).collect();
+        let loadout: BTreeMap<String, String> = s.loadout.iter().map(|(slot, k)| (slot.clone(), renamed_on(slot, k).to_string())).collect();
         for (slot, k) in &loadout {
             if crate::content::SLOTS.contains(&slot.as_str()) && fits(k).is_some_and(|a| c.abilities[a].slot == *slot) {
                 keys.insert(slot.clone(), k.clone());

@@ -670,6 +670,82 @@ pub struct AbilityDef {
     /// `momentum`, the Juggernaut's.
     #[serde(default)]
     pub passive: String,
+    /// The Shadow Priest's.
+    /// A `channel` held as a cord under tension (Mind Flay): see [`FlayDef`]. Its `damage` is a
+    /// second's, from its low end up close to its high end at the taut zone; past its `range` the
+    /// cord snaps.
+    #[serde(default)]
+    pub flay: Option<FlayDef>,
+    /// Its key pressed while the caster's Mind Flay is taut (judged on their screen): it goes at
+    /// once on the flayed foe, wherever the reticle is, for this many times its damage: the snap,
+    /// a perfect (Mind Blast).
+    #[serde(default)]
+    pub on_taut: f32,
+    /// On a foe below this share of its health, it deals `low_mult` times its damage; one it
+    /// doesn't kill sends `backlash` damage back at the caster (Shadow Word: Death).
+    #[serde(default)]
+    pub low_health: f32,
+    #[serde(default)]
+    pub low_mult: f32,
+    #[serde(default)]
+    pub backlash: f32,
+    /// A blink that slips a blow (`slip`): the share of its cooldown the slip gives back (Blink's
+    /// half), and what else the slip does: `slip_effects` on every foe within `slip_radius` of
+    /// where the hero stood, `slip_self` on the hero, and `burst_spell`'s look left there (Fade's
+    /// afterimage).
+    #[serde(default = "half")]
+    pub slip_hasten: f32,
+    #[serde(default)]
+    pub slip_radius: f32,
+    #[serde(default)]
+    pub slip_effects: Vec<AbilityEffect>,
+    #[serde(default)]
+    pub slip_self: Vec<AbilityEffect>,
+}
+
+/// Mind Flay's tension (a `channel`'s `flay`). The cord to the first foe along the reticle grows
+/// stronger the farther the caster stands: from `taut` yards out to the ability's range it's taut
+/// (`taut_spell`'s tighter look on it, `taut_kit` on the caster as it tightens). Held taut for
+/// `taut_secs` without a break, once a cast, it rings: a perfect. Its key again while it's taut
+/// whips it into the foe for `snap` times what the rest of the channel would have dealt (at most
+/// `snap_cap`; `whip_spell` on them). Past the range it snaps by itself: the channel ends with
+/// `snap_kit` on the caster, who flinches for `flinch` seconds. Foes within `spill_radius` of its
+/// foe take `spill` of each of its blows (Mind Sear).
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct FlayDef {
+    pub taut: f32,
+    pub taut_secs: f32,
+    pub snap: f32,
+    pub snap_cap: f32,
+    #[serde(default)]
+    pub taut_spell: u32,
+    #[serde(default)]
+    pub taut_kit: u32,
+    #[serde(default)]
+    pub whip_spell: u32,
+    #[serde(default)]
+    pub snap_kit: u32,
+    #[serde(default)]
+    pub flinch: f32,
+    #[serde(default)]
+    pub spill_radius: f32,
+    #[serde(default)]
+    pub spill: f32,
+}
+
+impl FlayDef {
+    /// The cord's damage a second at `dist` yards (the ability's `damage`, low up close, high from
+    /// the taut zone out).
+    pub fn dps(&self, damage: [f32; 2], dist: f32) -> f32 {
+        AbilityDef::at(damage, dist / self.taut.max(0.1))
+    }
+
+    /// The most one cast can deal its foe (its `damage` held `secs` at the taut end, cashed in by
+    /// its snap at the worst moment): for the board's budget.
+    pub fn most(&self, damage: [f32; 2], secs: f32) -> f32 {
+        let top = damage[1];
+        (0..=100).map(|k| secs * k as f32 / 100.0).map(|t| top * t + (self.snap * top * (secs - t)).min(self.snap_cap)).fold(0.0, f32::max)
+    }
 }
 
 /// The passives an ability on a key can give its hero.
@@ -929,6 +1005,9 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
 ///
+/// The Shadow Priest's: `vampiric` (everything whoever gave it deals them heals that one for
+/// `amount` of it: Vampiric Touch).
+///
 /// The Warrior's: `guarded` (the first blow meant for them strikes the one who gave it instead:
 /// Intervene), `rallied` (any stagger or knockdown ends as it lands; nothing staggers them, and
 /// their attacks come `amount` faster: Rallying Cry), `fury` (their attacks cost no stamina and
@@ -938,8 +1017,8 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// hero's hit on them deals `amount` more and staggers longer: Rising Cut), `momentum` (the
 /// Juggernaut's stacks, `amount` of them), `war_banner` (near a War Banner: kept on for a moment
 /// at a time while they stand by it).
-pub const OTHER_EFFECTS: [&str; 27] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner",
+pub const OTHER_EFFECTS: [&str; 28] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner", "vampiric",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
@@ -1038,6 +1117,21 @@ pub struct CounterDef {
     /// harder, and the stance holds on after it (Shield Wall's Shield Bash).
     #[serde(default)]
     pub bash: bool,
+    /// Its key again comes out of it, as Ice Block's does (Dispersion).
+    #[serde(default)]
+    pub key_ends: bool,
+    /// While it holds the hero takes this share less damage and mends `mend` of their health a
+    /// second (Dispersion).
+    #[serde(default)]
+    pub cut: f32,
+    #[serde(default)]
+    pub mend: f32,
+    /// The counter check on entering it (Dispersion): a melee blow or a projectile that reaches
+    /// the hero within `[checks] window` of entering (their round trip allowed) passes clean
+    /// through them, these effects land on whoever struck, and it's a perfect. Later blows land
+    /// as ever (cut by `cut`).
+    #[serde(default)]
+    pub perfect_pass: Vec<AbilityEffect>,
 }
 
 fn whole() -> f32 {
