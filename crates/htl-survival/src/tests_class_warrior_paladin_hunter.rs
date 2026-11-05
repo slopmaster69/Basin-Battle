@@ -1508,8 +1508,8 @@ fn tuned(changes: &[(&str, &str)]) -> Content {
 #[test]
 fn reverse_grapple_plays_the_hunters_pull_clip_for_the_haul_and_its_tune_keys_swap_it() {
     // The hunter's own clips (the bow's release is no clip) as a creature `key` is hauled in.
-    let haul = |c: Content, key: &str| -> Vec<(u16, String, f32)> {
-        let mut s = Survival::new(c, Box::new(FlatLand::default()), 7, 1_000_000.0);
+    let haul_seeded = |c: Content, key: &str, seed: u64| -> Vec<(u16, String, f32)> {
+        let mut s = Survival::new(c, Box::new(FlatLand::default()), seed, 1_000_000.0);
         s.mobs.clear();
         s.respawns.clear();
         let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -1526,7 +1526,8 @@ fn reverse_grapple_plays_the_hunters_pull_clip_for_the_haul_and_its_tune_keys_sw
             })
             .collect()
     };
-    // As shipped: EmoteUseStanding (63) on the hunter for exactly the creature's time in the air.
+    let haul = |c: Content, key: &str| haul_seeded(c, key, 7);
+    // As shipped: one of the five pulls (Corey's pick; never Beg, 79) on the hunter for exactly the creature's time in the air.
     // The pull's own lift where the rules name one (the haul's 5), else the default.
     let c0 = Content::dev();
     let lift = c0.abilities[c0.ability("reverse_grapple").unwrap()].effects.iter().find(|e| e.kind == "pull").map_or(0.0, |e| e.lift);
@@ -1534,15 +1535,27 @@ fn reverse_grapple_plays_the_hunters_pull_clip_for_the_haul_and_its_tune_keys_sw
     let clips = haul(Content::dev(), "wolf");
     assert_eq!(clips.len(), 1, "one pull clip on the hunter: {clips:?}");
     let (clip, from, secs) = &clips[0];
-    assert!(*clip == 63 && from.is_empty(), "the hunter's own EmoteUseStanding: {clips:?}");
+    const PULLS: [u16; 5] = [19, 16, 50, 58, 63];
+    assert!(PULLS.contains(clip) && from.is_empty(), "one of the hunter's own five pulls: {clips:?}");
+    // A random one each use: over many hauls, every one of the five and nothing else.
+    let mut seen = std::collections::BTreeSet::new();
+    for seed in 0..80u64 {
+        for (c, _, _) in haul_seeded(Content::dev(), "wolf", seed) {
+            seen.insert(c);
+        }
+    }
+    assert_eq!(seen.into_iter().collect::<Vec<_>>(), { let mut v = PULLS.to_vec(); v.sort(); v }, "all five pulls, never Beg");
     assert!((secs - air).abs() < 1e-3 && *secs > 0.25, "for the haul's flight ({air:.3} s): {secs}");
     // Tuned: another clip, and another character model's take on it.
-    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clip", "19")]), "wolf");
+    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clips", "[19]")]), "wolf");
     assert!(matches!(clips.as_slice(), [(19, f, _)] if f.is_empty()), "the tuned clip: {clips:?}");
-    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clip", "58"), ("ability.reverse_grapple.pull_from", "ScourgeFemale")]), "wolf");
+    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clips", "[58]"), ("ability.reverse_grapple.pull_from", "ScourgeFemale")]), "wolf");
     assert!(matches!(clips.as_slice(), [(58, f, _)] if f == "ScourgeFemale"), "the borrowed take: {clips:?}");
     // Tuned off: no clip (the bow's release alone, as before).
-    assert!(haul(tuned(&[("ability.reverse_grapple.pull_clip", "0")]), "wolf").is_empty(), "no pull clip when it's 0");
+    // A single clip still works in place of the list, and none at all is the bow's release alone.
+    let clips = haul(tuned(&[("ability.reverse_grapple.pull_clips", "[]"), ("ability.reverse_grapple.pull_clip", "16")]), "wolf");
+    assert!(matches!(clips.as_slice(), [(16, _, _)]), "the one clip: {clips:?}");
+    assert!(haul(tuned(&[("ability.reverse_grapple.pull_clips", "[]")]), "wolf").is_empty(), "no pull clip when there's none");
     // A boss hauls the hunter instead: no pull to pose for.
     assert!(haul(Content::dev(), "warlord").is_empty(), "no pull clip when the hunter is the one hauled");
     // From no model the clients know: turned away, as a leap's borrowed clip is.
