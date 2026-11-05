@@ -1,20 +1,55 @@
-From 3e3a8bf08693835529fff4c3f401aaf7743e3b23 Mon Sep 17 00:00:00 2001
+From 1db7bbce5ce2bf32f41843a2811e518677af6d16 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 5 Nov 2026 09:00:21 -0600
-Subject: [PATCH] Sprites on units for the add-on: the ward's barrier
- (SetUnitSprite, patch 0045)
+Subject: [PATCH] Sprites on units for the add-on, and a held last pose (patch
+ 0045)
 
-An add-on texture drawn additive as a disc facing the camera round a unit, a little toward the
-camera, set each frame by the add-on and gone when not set for half a second. HasActionCombat()
-says 25.
+SetUnitSprite: an add-on texture drawn additive as an oval facing the camera round a unit, a little
+toward the camera, set each frame and gone when not set for half a second (the ward's barrier).
+PlayUnitAnimation's tenth argument holds the clip's last pose that many seconds (the ward's arm, one
+borrowed clip on every race). HasActionCombat() says 25.
 ---
- crates/benilla-app/src/target/ground_ring.rs |   2 +-
- crates/benilla-app/src/target/mod.rs         |   4 +
- crates/benilla-app/src/target/unit_sprite.rs | 169 +++++++++++++++++++
- crates/benilla-ui/src/action_combat.rs       |  83 ++++++++-
- 4 files changed, 255 insertions(+), 3 deletions(-)
+ .../benilla-app/src/creature_anim/action.rs   |   2 +
+ .../src/creature_anim/action/flurry.rs        |   1 +
+ crates/benilla-app/src/target/ground_ring.rs  |   2 +-
+ crates/benilla-app/src/target/mod.rs          |   4 +
+ crates/benilla-app/src/target/unit_sprite.rs  | 169 ++++++++++++++++++
+ crates/benilla-ui/src/action_combat.rs        |  90 +++++++++-
+ 6 files changed, 265 insertions(+), 3 deletions(-)
  create mode 100644 crates/benilla-app/src/target/unit_sprite.rs
 
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 7c55e0ee..91a87921 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -617,6 +617,7 @@ pub(super) fn drain_action_calls(
+                 recovery,
+                 body,
+                 from,
++                hold,
+             } => {
+                 let Some(entity) = resolve(&unit, me, index) else {
+                     continue;
+@@ -650,6 +651,7 @@ pub(super) fn drain_action_calls(
+                 clip.windup = impact;
+                 clip.recovery = recovery;
+                 clip.looping = false;
++                clip.hold = hold;
+                 // A creature's (a unit named by a creature guid) slow wind-up: a coil, then the snap.
+                 clip.coil = guid_of(&unit).is_some_and(|g| g >> 48 == 0xF130 || g >> 48 == 0xF150)
+                     && clip.key > 0.0
+diff --git a/crates/benilla-app/src/creature_anim/action/flurry.rs b/crates/benilla-app/src/creature_anim/action/flurry.rs
+index 457961c4..e53625e0 100644
+--- a/crates/benilla-app/src/creature_anim/action/flurry.rs
++++ b/crates/benilla-app/src/creature_anim/action/flurry.rs
+@@ -127,6 +127,7 @@ impl Flurry {
+             recovery,
+             body: ActionBody::Full,
+             from: self.from.clone(),
++            hold: 0.0,
+         });
+     }
+ }
 diff --git a/crates/benilla-app/src/target/ground_ring.rs b/crates/benilla-app/src/target/ground_ring.rs
 index 7f0598c7..017528b9 100644
 --- a/crates/benilla-app/src/target/ground_ring.rs
@@ -240,13 +275,16 @@ index 00000000..169525cf
 +    }
 +}
 diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
-index 2e6b3a8f..2f7160a8 100644
+index 2e6b3a8f..895abdc1 100644
 --- a/crates/benilla-ui/src/action_combat.rs
 +++ b/crates/benilla-ui/src/action_combat.rs
-@@ -131,6 +131,15 @@
+@@ -131,6 +131,18 @@
  //!   particles, ribbons and meshes: a white crackle made violet, a blue streak pink. `nil` puts it
  //!   back. For the effects spawned after the call.
  //!
++//! `PlayUnitAnimation`'s tenth argument (when `SetUnitSprite` exists): seconds the clip's last pose
++//! is held once it has played (the ward's arm held out, the same borrowed clip on every race).
++//!
 +//! Sprites on units (when `SetUnitSprite` exists; Basin Battle's ward):
 +//!
 +//! - `SetUnitSprite(key, unit, texture, size, height, r, g, b, a[, spin[, aspect]])`: an add-on
@@ -259,7 +297,7 @@ index 2e6b3a8f..2f7160a8 100644
  //! Rings on the ground (when `SetGroundRing` exists; Basin Battle's skill checks):
  //!
  //! - `SetGroundRing(key, x, y, z, radius, texture, r, g, b, a[, facing])`: an add-on texture
-@@ -242,6 +251,9 @@
+@@ -242,6 +254,9 @@
  //! The twenty-fourth (`HasActionCombat() >= 24`): the Mage's skill checks, patches 0041 to 0044:
  //! rings on the ground (`SetGroundRing`), recoloured spell looks (`SetEffectTint`), an orb rolling
  //! on the ground (`PlayGroundOrb`), and missiles from a held staff's tip (`SetUnitMissileOrigin`).
@@ -269,7 +307,16 @@ index 2e6b3a8f..2f7160a8 100644
  
  use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
  
-@@ -813,6 +825,43 @@ pub enum GroundRingCall {
+@@ -284,6 +299,8 @@ pub enum ActionCall {
+         /// Another character model to take the clip from (`"ScourgeFemale"`, or a model's path),
+         /// retargeted onto this unit's skeleton; `None` the unit's own.
+         from: Option<String>,
++        /// Seconds its last pose is held once it has played (0: let go at once).
++        hold: f32,
+     },
+     Stop {
+         unit: String,
+@@ -813,6 +830,43 @@ pub enum GroundRingCall {
  
  static RINGS: std::sync::Mutex<Vec<GroundRingCall>> = std::sync::Mutex::new(Vec::new());
  
@@ -313,7 +360,7 @@ index 2e6b3a8f..2f7160a8 100644
  /// An orb rolled on the ground (`PlayGroundOrb`, `StopGroundOrb`).
  #[derive(Clone, Debug, PartialEq)]
  pub enum GroundOrbCall {
-@@ -1114,7 +1163,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -1114,7 +1168,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
      )?;
      g.set(
          "HasActionCombat",
@@ -322,7 +369,23 @@ index 2e6b3a8f..2f7160a8 100644
      )?;
      g.set(
          "SetCameraUnitCollision",
-@@ -1565,6 +1614,36 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -1144,6 +1198,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 _ => ActionBody::Auto,
+             };
+             let from = text(v.get(8)).filter(|f| !f.is_empty());
++            let hold = number(v.get(9), 0.0, 30.0).unwrap_or(0.0);
+             push(ActionCall::Anim {
+                 unit,
+                 anim: anim as u16,
+@@ -1153,6 +1208,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+                 recovery,
+                 body,
+                 from,
++                hold,
+             });
+             Ok(())
+         })?,
+@@ -1565,6 +1621,36 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
              Ok(())
          })?,
      )?;
@@ -359,7 +422,7 @@ index 2e6b3a8f..2f7160a8 100644
      g.set(
          "ClearGroundRing",
          lua.create_function(|_, args: MultiValue| {
-@@ -1930,7 +2009,7 @@ mod tests {
+@@ -1930,7 +2016,7 @@ mod tests {
          let lua = Lua::new();
          install(&lua).unwrap();
          lua.load(

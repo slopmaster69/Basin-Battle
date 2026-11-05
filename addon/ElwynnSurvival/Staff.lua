@@ -79,7 +79,14 @@ end
 -- `SK <kind> <n> <most> <guid>`: heat or chill on the foe last hit, or the caster's charges.
 function ES.StacksLine(f)
   local s = mark.staff and STAFF[mark.staff]
-  if not s or f[2] ~= s.kind then return end
+  if not s then return end
+  -- A heavy let go with nothing stored: the mark sputters grey.
+  if f[2] == "empty" then
+    mark.emptyAt = GetTime()
+    PlaySoundFile("Sound\\Spells\\Fizzle\\FizzleShadowA.wav")
+    return
+  end
+  if f[2] ~= s.kind then return end
   local n = tonumber(f[3]) or 0
   mark.most = math.max(1, tonumber(f[4]) or 3)
   local now = GetTime()
@@ -159,9 +166,18 @@ mark:SetScript("OnUpdate", function()
       end
     end
   end
+  -- Sputtered (a heavy with nothing stored): the mark shrinks grey and jitters a moment.
+  local tint = 1
+  if this.emptyAt then
+    local t = (now - this.emptyAt) / 0.45
+    if t >= 1 then this.emptyAt = nil else
+      size = size * (1 - 0.25 * math.sin(t * 3.14))
+      tint = 0.35 + 0.65 * t
+    end
+  end
   this.tex:SetWidth(size)
   this.tex:SetHeight(size)
-  this.tex:SetVertexColor(1, 1, 1, math.min(1, alpha + glow) * (busy and 0 or 1))
+  this.tex:SetVertexColor(tint, tint, tint, math.min(1, alpha + glow) * (busy and 0 or 1))
   -- The burst: the mark flung outward and fading.
   if this.popAt and not busy then
     local t = (now - this.popAt) / 0.4

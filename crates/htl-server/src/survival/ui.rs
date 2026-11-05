@@ -115,8 +115,9 @@
 //!   chill on that foe, or the hero's charges (guid 0); `n` the most: it just ignited or froze.
 //! - `WB\t<guid>\t<own>\t<up>\t<share>\t<broken>`: a warder's barrier, for everyone who sees them:
 //!   up or not, the bar's share left, broken (drawn round the body with `SetUnitSprite`).
-//! - `WP\t<guid>\t<clip>\t<secs>\t<own>`: a pose held on a unit (the ward's arm out): the clip
-//!   looped for `secs` (`ReactUnit`'s hold), renewed while it lasts; `secs` 0 lets it go.
+//! - `WP\t<guid>\t<clip>\t<secs>\t<own>\t<model>`: a pose held on a unit (the ward's arm out, a
+//!   staff heavy's ready stance): the clip held `secs`, renewed while it lasts; `secs` 0 lets it go.
+//!   `model` (if any) is the character model whose take every race plays.
 //! - `SH\t<lo>\t<hi>`: a staff's heavy bolt began its charge (goes from `lo` sec, whole at
 //!   `hi`).
 //! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins

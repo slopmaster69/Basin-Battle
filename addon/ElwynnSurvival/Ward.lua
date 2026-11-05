@@ -245,7 +245,8 @@ barrier:SetScript("OnUpdate", function()
     local key = "es_ward_" .. unit
     -- In quick, out a little slower; dimmer as it drains.
     local want = w.up and (0.4 + 0.4 * w.share) or 0
-    local rate = w.up and 8 or 5
+    -- Lowered, it's gone at once (Corey: the effect after letting go lingered).
+    local rate = w.up and 8 or 18
     w.alpha = w.alpha + (want - w.alpha) * math.min(1, dt * rate)
     -- Alive: it turns and breathes, and flickers harder the less is left.
     local size, spin, a = SIZE * (1 + 0.025 * math.sin(now * 2.2)), now * 0.15, w.alpha

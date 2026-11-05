@@ -218,7 +218,7 @@ fn the_wards_look_is_on_the_hero_while_it_is_up_and_a_shield_hero_has_no_bar() {
     assert!(clip != 0 && hold != 0, "the ward is an arm held out with a glow in the hand");
     s.input(p, Input::Guard);
     let ev = run(&mut s, 0.1);
-    assert!(ev.iter().any(|e| matches!(e, Event::HoldPose { id, clip: c, secs } if *id == p && *c == clip && *secs > 0.0)), "the arm held out");
+    assert!(ev.iter().any(|e| matches!(e, Event::HoldPose { id, clip: c, secs, .. } if *id == p && *c == clip && *secs > 0.0)), "the arm held out");
     assert!(ev.iter().any(|e| matches!(e, Event::Cast { caster, spell, .. } if *caster == p && *spell == hold)), "the glow in the hand");
     assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == p)), "and the clients are told");
     assert!(!ev.iter().any(|e| matches!(e, Event::Visual { id, kit, .. } if *id == p && *kit == s.content.ward.block_kit)), "no crackle while it's merely up");

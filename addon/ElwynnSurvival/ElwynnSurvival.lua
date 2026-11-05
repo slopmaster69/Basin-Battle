@@ -6609,8 +6609,13 @@ function ES.Line(line)
     -- A held pose (the ward's arm out): the clip looped for its hold, or let go.
     local guid = (f[5] == "1") and "player" or f[2]
     local clip, secs = tonumber(f[3]), tonumber(f[4]) or 0
+    local from = (f[6] and f[6] ~= "") and f[6] or nil
     if guid and clip then
-      if secs > 0 and ReactUnit then
+      if secs > 0 and from and SetUnitSprite and PlayUnitAnimation then
+        -- One model's take on every race (patch 0045 holds its last pose).
+        if PreloadAnimationSource then PreloadAnimationSource(from) end
+        PlayUnitAnimation(guid, clip, 0.25, nil, nil, 0, 0, "upper", from, secs)
+      elseif secs > 0 and ReactUnit then
         ReactUnit(guid, clip, 0, 0, 0, secs)
       elseif StopUnitAnimation then
         StopUnitAnimation(guid, 0.15)
