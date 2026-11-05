@@ -4908,9 +4908,12 @@ spell = 3355
 # Thrown to its spot like Explosive Trap, as a bomb.
 lob_spell = 4068
 object = 3071
-# The burst as it springs: Frost Nova's ring (the visual check, Nov 2: Frost Trap Aura, 13810,
-# whited out the whole screen for its 30 sec; 122 rings out and leaves the ice on whoever it froze).
-burst_spell = 122
+# The burst as it springs is on the frozen alone: a frost burst (450) on each one it catches, and
+# no spell at the spot (the visual check, Nov 2: Frost Trap Aura, 13810, whited out the whole
+# screen for its 30 sec; Frost Nova, 122, is a caster's ring, and it rang out round the hunter as
+# well as the trap, Corey's review. The ice on the frozen is the freeze's own).
+burst_spell = 0
+impact_kit = 450
 clip = 75
 # 3 sec: the most the board allows (1.5 on a hero). Serg (#118) found it over before the
 # Multi-Shot; what fixes that is the free shot coming as the trap springs, below.

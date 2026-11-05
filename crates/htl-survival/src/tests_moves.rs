@@ -326,6 +326,8 @@ fn a_trap_arms_then_springs_on_the_first_foe_to_step_near() {
     let trap = s.traps[0].obj.expect("the trap's object");
     assert!(matches!(s.objs[&trap].kind, ObjKind::Prop { display: 3072, .. }));
     assert!(dist2d(s.objs[&trap].pos, [8.0, 0.0, 0.0]) < 0.5, "{:?}", s.objs[&trap].pos);
+    let at = s.objs[&trap].pos;
+    assert!(s.is_trap_obj(trap), "known as a trap's (drawn without the client's fade-in)");
     assert!(set.iter().any(|e| matches!(e, Event::ObjSpawned { id } if *id == trap)));
     assert!(!set.iter().any(|e| matches!(e, Event::Missile { .. })), "no spell at the spot");
     run(&mut s, 1.0);
@@ -338,9 +340,57 @@ fn a_trap_arms_then_springs_on_the_first_foe_to_step_near() {
     assert!(s.traps.is_empty(), "sprung");
     assert!(!s.objs.contains_key(&trap), "the trap's gone");
     assert!(seen.iter().any(|e| matches!(e, Event::ObjGone { id } if *id == trap)));
-    assert!(seen.iter().any(|e| matches!(e, Event::Missile { spell: 5162, target: Target::Point(_), .. })), "its burst at the spot");
+    // Its burst is cast from the spot by an unseen stand-in, never by the hunter (a spell they
+    // cast plays its caster-side look on them: Freezing Trap's nova rang out round the hunter).
+    assert!(
+        seen.iter().any(|e| matches!(e, Event::MissileFrom { caster, spell: 5162, from, target: Target::Point(to), .. } if *caster == p && dist2d(*from, at) < 0.5 && dist2d(*to, at) < 0.5)),
+        "its burst from the spot: {seen:?}"
+    );
+    assert!(!seen.iter().any(|e| matches!(e, Event::Missile { caster, spell: 5162, .. } if *caster == p)), "nothing cast by the hunter");
     assert!(s.mobs[&m].health < hp && s.mobs[&near].health < hn, "the burst");
     assert!(bound(&s, near)[1] > 5.0, "thrown out from it");
+}
+
+const FROST_TRAP: &str = r#"
+[[ability]]
+key = "t_frost_trap"
+name = "Frost Trap"
+school = "hunter"
+slot = "close"
+kind = "trap"
+range = [8.0, 8.0]
+radius = [2.0, 2.0]
+splash = 3.0
+delay = 0.5
+secs = 20.0
+spell = 3355
+object = 3071
+impact_kit = 450
+effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
+"#;
+
+#[test]
+fn a_trap_that_only_freezes_shows_its_burst_on_the_frozen_alone() {
+    let mut s = world(false, FROST_TRAP);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = mob(&mut s, "grunt", [30.0, 0.0, 0.0]);
+    let near = mob(&mut s, "grunt", [30.0, 3.0, 0.0]);
+    let far = mob(&mut s, "grunt", [30.0, 8.0, 0.0]);
+    cast(&mut s, p, "t_frost_trap");
+    assert_eq!(s.traps.len(), 1);
+    run(&mut s, 1.0);
+    s.mobs.get_mut(&m).unwrap().pos = [8.5, 0.0, 0.0];
+    s.mobs.get_mut(&near).unwrap().pos = [8.0, 2.5, 0.0];
+    s.mobs.get_mut(&far).unwrap().pos = [8.0, 8.0, 0.0];
+    let seen = run(&mut s, 0.1);
+    assert!(s.traps.is_empty(), "sprung");
+    assert!(s.has_cc(m, "petrify") && s.has_cc(near, "petrify"), "both in its burst frozen");
+    assert!(!s.has_cc(far, "petrify"), "the one outside it is not");
+    // The frost burst on each one it froze, and on no one else: not the hunter, not the one outside.
+    let burst = |id: Id| seen.iter().filter(|e| matches!(e, Event::Visual { id: v, kit: 450, .. } if *v == id)).count();
+    assert_eq!((burst(m), burst(near)), (1, 1), "the frost burst on each of the frozen: {seen:?}");
+    assert_eq!((burst(far), burst(p)), (0, 0), "and on no one else");
+    assert!(!seen.iter().any(|e| matches!(e, Event::Missile { caster, .. } | Event::MissileFrom { caster, .. } if *caster == p)), "no spell at the spot, none from the hunter");
 }
 
 const CIRCLE: &str = r#"

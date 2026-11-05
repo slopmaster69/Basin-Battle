@@ -2482,12 +2482,16 @@ impl Survival {
         } else {
             Vec::new()
         };
-        // Nothing to strike with (Sanctuary): only what it does to them.
+        // Nothing to strike with (Sanctuary, Freezing Trap): only what it does to them, and its
+        // impact kit on each one (the way a blow plays it), so the look is on them alone.
         if damage <= 0.0 {
             let d = self.content.abilities[ability].clone();
             let was = self.fx_from.replace(at);
             for u in mobs.into_iter().chain(heroes) {
                 self.apply_effects(owner, u, &d.effects, share, &d.name);
+                if d.impact_kit != 0 {
+                    self.events.push(Event::Visual { id: u, kit: d.impact_kit, by: None });
+                }
             }
             self.fx_from = was;
             return;
