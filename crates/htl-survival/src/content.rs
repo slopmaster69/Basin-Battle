@@ -437,11 +437,15 @@ pub struct WardDef {
     pub clip: u16,
     pub clip_take: u32,
     pub clip_from: String,
+    /// How long each play of it holds (renewed a second before it ends), and on which body:
+    /// `upper` (the legs free) or `full`.
+    pub clip_hold: f32,
+    pub clip_body: String,
 }
 
 impl Default for WardDef {
     fn default() -> Self {
-        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0, clip: 0, clip_take: 0, clip_from: String::new() }
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0, clip: 0, clip_take: 0, clip_from: String::new(), clip_hold: 8.0, clip_body: String::new() }
     }
 }
 

@@ -424,6 +424,8 @@ aura = 0
 block_kit = 381
 hold_spell = 118
 clip = 124
+clip_hold = 8.0
+clip_body = "upper"
 # No crackle while it's merely up (0); the arc on the reticle cracks as it drains instead.
 crackle_full = 0.0
 crackle_empty = 0.0
