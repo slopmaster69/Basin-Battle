@@ -70,6 +70,19 @@ range = [20.0, 20.0]
 radius = [0.3, 0.3]
 damage = [10.0, 10.0]
 spell = 133
+
+[[ability]]
+key = "t_throw"
+name = "Throw"
+school = "warrior"
+slot = "ranged"
+kind = "projectile"
+speed = 20.0
+range = [16.0, 16.0]
+radius = [0.3, 0.3]
+damage = [10.0, 10.0]
+spell = 16075
+clip = 107
 "#;
 
 /// The built-in rules with these abilities (TOML, `[[ability]]` tables) added, off the board.
@@ -159,6 +172,61 @@ fn cast(s: &mut Survival, p: Id, key: &str) -> Vec<Event> {
         ev.extend(s.step(DT));
     }
     ev
+}
+
+/// Put an ability on its key and press the key alone: an aimed one is left aimed.
+fn arm(s: &mut Survival, p: Id, key: &str) -> Vec<Event> {
+    let slot = s.content.abilities[s.content.ability(key).unwrap()].slot.clone();
+    s.players.get_mut(&p).unwrap().owned.insert(key.to_string());
+    s.slot_ability(p, &slot, key).unwrap();
+    s.set_cooldowns(p, true);
+    s.input(p, Input::Ability(key_of(&slot), false));
+    s.step(DT)
+}
+
+/// Where in `ev` the hero's clip `clip` is played, and where it's let go.
+fn clip_at(ev: &[Event], p: Id, clip: u16) -> Option<usize> {
+    ev.iter().position(|e| matches!(e, Event::Clip { id, clip: c, .. } if *id == p && *c == clip))
+}
+
+fn clip_stop_at(ev: &[Event], p: Id) -> Option<usize> {
+    ev.iter().position(|e| matches!(e, Event::ClipStop { id } if *id == p))
+}
+
+/// A thrown ability's aim holds the throw's pose, the arm drawn back (HoldThrown), for as long
+/// as it's aimed (Corey's review: the harpoon held ready while he aims, a wind-up while the axe
+/// is aimed); let go as the aim is, and as the throw goes, whose own clip plays then.
+#[test]
+fn a_thrown_abilitys_aim_holds_the_arm_drawn_back_till_it_goes_or_is_let_go() {
+    let mut s = world(PROJECTILES);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    // Aimed, then let go.
+    let ev = arm(&mut s, p, "t_throw");
+    assert!(matches!(s.players[&p].action, Action::Aim { .. }), "aiming");
+    let hold = ev.iter().find_map(|e| match e {
+        Event::Clip { id, clip: 111, secs, .. } if *id == p => Some(*secs),
+        _ => None,
+    });
+    assert!(hold.is_some_and(|secs| secs >= 10.0), "the arm drawn back for as long as the aim may last: {hold:?}");
+    assert!(clip_stop_at(&ev, p).is_none(), "and held");
+    s.input(p, Input::Cancel);
+    let ev = s.step(DT);
+    assert_eq!(s.players[&p].action, Action::Ready, "the aim let go");
+    assert!(clip_stop_at(&ev, p).is_some(), "the arm comes down");
+    // Aimed, then thrown.
+    run_pinned(&mut s, 0.5, &[]);
+    let ev = arm(&mut s, p, "t_throw");
+    assert!(clip_at(&ev, p, 111).is_some(), "drawn back again");
+    s.input(p, Input::Attack);
+    let ev = s.step(DT);
+    let (stop, throw) = (clip_stop_at(&ev, p), clip_at(&ev, p, 107));
+    assert!(stop.is_some() && throw.is_some() && stop < throw, "the hold let go, then the throw's own clip: {stop:?} {throw:?}");
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)), "thrown");
+    // A bow ability's aim is the bow's draw, not this.
+    let mut s = world(PROJECTILES);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ev = arm(&mut s, p, "t_plain");
+    assert!(clip_at(&ev, p, 111).is_none(), "a plain bolt's aim holds nothing");
 }
 
 /// The damage of each of `p`'s blows that landed on `m`.
