@@ -213,6 +213,8 @@ end
 -- From the WA line: whether it's up, its share, and whether it just broke.
 local function ArcLine(up, share, broke)
   local now = GetTime()
+  -- Shown here, as a line comes, not only at load (a frame shown before the world is up may not be).
+  arc:Show()
   if broke then
     arc.breakAt = now
     arc.up = false
