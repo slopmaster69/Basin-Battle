@@ -395,11 +395,13 @@ impl SurvivalGame {
                 let mut queued = String::from("no charge");
                 if let Some((since, flare)) = self.sim.lab_check_flare(me) {
                     let w = self.sim.content.checks.window;
+                    // A step runs on the first tick at or after its time (0.05 s), so aim half a
+                    // tick early: dead on lands inside the critical, the edge inside the window.
                     let off = match how {
-                        "edge" => 0.75 * w,
+                        "edge" => 0.45 * w,
                         "early" => -0.4,
                         "late" => w + 0.3,
-                        _ => 0.0,
+                        _ => -0.025,
                     };
                     let at = since + flare + off;
                     self.lab_step_at(at, "release".into());
