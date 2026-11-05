@@ -97,7 +97,10 @@ fn the_jet_sweeps_across_the_front_striking_each_foe_once_and_slowing_them() {
         assert!(s.has_cc(who, "snare") && !s.has_cc(who, "petrify"), "{name}: slowed, not frozen");
     }
     assert!(blows_on(&ev, far).is_empty(), "out of the jet's reach");
-    assert!(missiles(&ev, p, d.tick_spell) >= 8, "the jet streams to its reach: {}", missiles(&ev, p, d.tick_spell));
+    // The jet's look, pulse by pulse: a wedge flashed on the ground along it where the ability
+    // has a `burst` (the clients that draw ground bursts), else a stream of `tick_spell`'s missile.
+    let wedges = ev.iter().filter(|e| matches!(e, Event::GroundBurst { shape: "wedge", .. })).count();
+    assert!(wedges >= 8 || missiles(&ev, p, d.tick_spell) >= 8, "the jet shows pulse by pulse: {wedges} wedges, {} missiles", missiles(&ev, p, d.tick_spell));
     assert_eq!(s.players[&p].action, Action::Ready, "over");
     assert!(!perfect_in(&ev, p));
 }

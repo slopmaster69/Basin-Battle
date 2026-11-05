@@ -378,14 +378,16 @@ pub struct WardDef {
     pub break_secs: f32,
     /// The look on a hero holding the ward up (a spell whose aura the clients show).
     pub aura: u32,
-    /// The burst of a perfect ward, and the shatter of a broken one (spell visual kits).
+    /// The crackle on the ward as it stops a blow, the burst of a perfect ward, and the fizzle of
+    /// one that breaks (spell visual kits).
+    pub block_kit: u32,
     pub perfect_kit: u32,
     pub break_kit: u32,
 }
 
 impl Default for WardDef {
     fn default() -> Self {
-        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, perfect_kit: 555, break_kit: 7 }
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7 }
     }
 }
 

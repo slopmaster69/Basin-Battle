@@ -35,9 +35,17 @@ impl Survival {
         from - d.sweep.to_radians() * share
     }
 
-    /// One of the jet's missiles, to its reach.
+    /// The jet's look this pulse: with `burst` set, a wedge of frost flashed on the ground along
+    /// it (clients with the ground burst, patch 0026), so the pulses read as one jet turning;
+    /// else one of `tick_spell`'s missiles to its reach.
     fn pulse_sweep(&mut self, id: Id, ability: usize, yaw: f32) {
         let d = &self.content.abilities[ability];
+        if let Some(b) = &d.burst {
+            let at = self.players[&id].pos;
+            let (reach, arc, secs, colour) = (d.range[0], d.arc.max(10.0), b.secs, b.colour.clone());
+            self.events.push(Event::GroundBurst { at, yaw, shape: "wedge", reach, arc, width: 0.0, secs, colour });
+            return;
+        }
         if d.tick_spell == 0 {
             return;
         }

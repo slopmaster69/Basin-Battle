@@ -386,11 +386,14 @@ refill = 35.0
 refill_delay = 0.4
 perfect_refill = 20.0
 break_secs = 1.0
-# The looks: Mana Shield's swirl on a hero holding the ward up; the parry's burst for a perfect
-# ward and the bash's for the shatter, both to replace once seen in the client.
-aura = 1463
-perfect_kit = 555
-break_kit = 7
+# The looks, from the first film (Nov 5): Arcane Power's violet crackle round the chest while the
+# ward is up (12042); Counterspell's crackle on it each time a blow is stopped (381); Arcane
+# Explosion's violet burst on the chest for a perfect ward (1005); Mana Burn's purple fizzle as it
+# breaks (2729). All in the ward's own colour, apart from the steel of a shield's parry.
+aura = 12042
+block_kit = 381
+perfect_kit = 1005
+break_kit = 2729
 
 [checks]
 # The skill checks built into spells. The release: a charged spell with `perfect = true` flares
@@ -3483,7 +3486,8 @@ speed = 40.0
 cooldown = 9.0
 spell = 7268
 charge_spell = 5143
-beat_kit = 448
+# The beat's pulse: Blink's quick violet flash (the orange 448 said nothing of a tempo).
+beat_kit = 3394
 
 # The stop check: a jet of frost sweeps across the front; the key again stops it where it is, and
 # what's in it freezes. (The Mage design, claude/mage-kit-draft.md: Frost stops things.)
@@ -3507,6 +3511,9 @@ cooldown = 8.0
 # The cone's own look where it stops; a Frostbolt streams to the jet's reach while it sweeps.
 spell = 120
 tick_spell = 116
+# The jet itself, for clients with patch 0026: a wedge of frost flashed on the ground along it
+# every pulse, so it reads as one jet turning (the frostbolt stream read as a line of bolts).
+burst = { secs = 0.3, colour = "B4ECFF" }
 effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
 stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
 
@@ -3534,7 +3541,8 @@ beat_step = 4.0
 radius = [6.0, 8.0]
 cooldown = 7.0
 spell = 1449
-beat_kit = 448
+# The beat's pulse: Blink's quick violet flash (the orange 448 said nothing of a tempo).
+beat_kit = 3394
 finisher_effects = [{ kind = "knockback", amount = 4.0 }]
 
 [[ability]]
@@ -5815,6 +5823,8 @@ range = [30.0, 30.0]
 radius = [0.35, 0.35]
 speed = 30.0
 spell = 133
+# The directed cast (SpellCastDirected): the staff arm out, the bolt thrown along it.
+clip = 53
 effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 2.0 }]
 
 [[ability]]
@@ -5851,7 +5861,10 @@ damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.35, 0.35]
 speed = 32.0
-spell = 116
+# The old small frostbolt (zzOLDFreeze III's missile), a shard, not Frostbolt's own; thrust out
+# with the staff (the two-handed thrust, 18).
+spell = 2130
+clip = 18
 effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
 
 [[ability]]
@@ -5889,7 +5902,10 @@ damage = [14.0, 14.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 44.0
-spell = 7268
+# Viper Sting's mana shot: a small violet bolt that isn't Arcane Missiles' (which the Q spell keeps).
+# Cast with both hands (SpellCastOmni).
+spell = 3034
+clip = 54
 
 [[ability]]
 key = "arcane_bolt_heavy"
@@ -5935,9 +5951,10 @@ linger = 4.0
 linger_damage = 8.0
 cooldown = 40.0
 shatter = true
-# The meteor coming down (Meteor), then the ground left burning (Heated Ground).
+# The meteor coming down (Meteor), then the ground left burning: Flamestrike's fire, which is
+# sized for a spell's circle (Heated Ground is a raid floor and covered the hillside).
 spell = 24340
-linger_spell = 22191
+linger_spell = 2120
 clip = 54
 effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4.0], amount = 5.0 }]
 
@@ -5969,7 +5986,8 @@ perfect_yd = 1.5
 backfire_yd = 3.0
 cooldown = 40.0
 # Frostbolt's missile rolled along the ground for the orb; Frost Nova's ring for the burst.
-tick_spell = 116
+# A ball of ice (Ice Tomb's missile) to where the orb is, often enough to read as one thing rolling.
+tick_spell = 16869
 spell = 122
 effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
 stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]

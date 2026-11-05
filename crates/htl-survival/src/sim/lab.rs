@@ -129,6 +129,8 @@ impl Survival {
         if self.players.get(&id).is_some_and(|p| matches!(p.action, Action::Stagger { .. })) {
             self.set_action(id, Action::Ready);
         }
+        // An aim or a charge left from the last run would eat this run's first key.
+        self.ability_cancel(id);
     }
 
     /// A weapon or shield in the lab hero's hands for a run (`weapon ember_staff`), wherever they

@@ -14,7 +14,7 @@ use super::*;
 use crate::content::AbilityDef;
 
 /// How often the rolling orb's look is refreshed.
-const LOOK_EVERY: f32 = 0.25;
+const LOOK_EVERY: f32 = 0.1;
 /// How far ahead of the caster it starts.
 const START_AHEAD: f32 = 1.5;
 /// The burst's look stays this long.
