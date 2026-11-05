@@ -77,6 +77,8 @@ local GROUND_TEX = {
   arcane = { tex = "ground_arcane", line = 0.80 },
 }
 local GROUND_CLOSER = 0.60
+-- On the ground the ring of light starts nearer (the circle is already wide from the camera).
+local GROUND_OUT = 1.6
 
 -- The dial spreads a sweep's bearings this much wider than life, so 120 degrees fill its top half.
 local DIAL_SPREAD = 1.5
@@ -517,7 +519,7 @@ local function DrawGround(c, now, q, open, closerCol, grow)
   GroundRing("es_check_ring", c, g.tex, radius * (open and 1.04 or 1), { 1, 1, 1, a }, now * sc.spin)
   GroundRing("es_check_ring2", c, g.tex, radius * 1.03, { sc.glow[1], sc.glow[2], sc.glow[3], open and 0.7 or 0.32 }, now * sc.spin2 + 1.1)
   if q then
-    local L = line * (1 + (START_OUT - 1) * (1 - Clamp(q, 0, 1)))
+    local L = line * (1 + (GROUND_OUT - 1) * (1 - Clamp(q, 0, 1)))
     local col = closerCol or sc.tint
     GroundRing("es_check_closer", c, "check_closer", L / GROUND_CLOSER, { col[1], col[2], col[3], 0.4 + 0.6 * Clamp(q, 0, 1) }, 0)
   else
