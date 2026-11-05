@@ -919,15 +919,11 @@ impl Survival {
         if up != p.ward_up {
             p.ward_up = up;
             self.events.push(Event::Auras { id });
-            // The arm raised and held while it's up, let go as it comes down.
-            if w.clip != 0 {
-                let from = (!w.clip_from.is_empty()).then(|| w.clip_from.clone());
-                self.events.push(if up {
-                    Event::Clip { id, clip: w.clip, take: w.clip_take, from, secs: 600.0, at: 0.25, body: ClipBody::Upper }
-                } else {
-                    Event::ClipStop { id }
-                });
+            // The arm raised and held while it's up (below, renewed), let go as it comes down.
+            if w.clip != 0 && !up {
+                self.events.push(Event::ClipStop { id });
             }
+            p.ward_clip_at = now;
             // The glow in the raised hand while it's up, gone as it comes down.
             if w.hold_spell != 0 {
                 self.events.push(if up {
@@ -940,6 +936,13 @@ impl Survival {
         }
         if up {
             p.ward_down_at = now;
+            // The arm held out: a clip at its peak a quarter second in and held there 8 sec (the
+            // clients cap a clip's hold at 10), renewed every 7 while the ward stays up.
+            if w.clip != 0 && now >= p.ward_clip_at {
+                p.ward_clip_at = now + 7.0;
+                let from = (!w.clip_from.is_empty()).then(|| w.clip_from.clone());
+                self.events.push(Event::Clip { id, clip: w.clip, take: w.clip_take, from, secs: 8.0, at: 0.25, body: ClipBody::Upper });
+            }
             // It crackles, more often as it runs dry.
             if w.crackle_full > 0.0 && w.block_kit != 0 && now >= p.ward_crackle_at {
                 let left = (p.ward / w.bar.max(1.0)).clamp(0.0, 1.0);

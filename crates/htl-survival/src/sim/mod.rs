@@ -635,6 +635,8 @@ pub struct Player {
     pub sweep_secs: f32,
     /// The ward's next crackle, while it's up.
     pub ward_crackle_at: f32,
+    /// When the ward's held arm is next renewed (its clip).
+    pub ward_clip_at: f32,
     /// An Arcane staff's charges, and when they fade.
     pub staff_charges: u32,
     pub staff_charges_until: f32,
@@ -1344,6 +1346,7 @@ impl Survival {
             sweep_dir: 1.0,
             sweep_secs: 1.0,
             ward_crackle_at: 0.0,
+            ward_clip_at: 0.0,
             staff_charges: 0,
             staff_charges_until: 0.0,
             check_open: None,
