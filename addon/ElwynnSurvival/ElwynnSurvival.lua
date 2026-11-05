@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 40
+local VERSION = 41
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -620,6 +620,7 @@ local function PlayMine(kind, step, move)
     After(math.max(0, move.impact * 0.5), function() PlayUnitVocal("player", "exertion_crit") end)
   end
   ES.mine = { kind = kind, step = step, move = move, start = GetTime() }
+  ES.castHeld = nil
   if kind == "light" then
     ES.comboNext = step + 1
     ES.comboUntil = GetTime() + move.impact + move.recovery + ((mv and mv.comboGrace) or 0.6)
@@ -763,7 +764,8 @@ function ES.SwingLine(f)
   -- another model's take when the ability names one (the same on every race), over the body the
   -- line names ("full", "upper", or "lower" from ac23: the legs alone, the arms keeping their draw).
   if kind == "cast" then
-    if mine then guid = "player" end
+    -- Ours is held until it ends or the server lets it go (`ST`): Skyfall's hang, a throw's aim.
+    if mine then guid = "player"; ES.castHeld = true end
     local body = (f[14] and f[14] ~= "") and f[14] or "full"
     if from and PreloadAnimationSource then PreloadAnimationSource(from) end
     PlayUnitAnimation(guid, clip, impact, nil, ms, take, recovery, body, from)
@@ -6606,10 +6608,13 @@ function ES.Line(line)
     ES.BeatLine(f)
   elseif verb == "ST" then
     -- A swing called off (a feint): ours went at once; another's lets go now.
+    -- Ours: a swing of ours, or a held cast of ours (a hang ended early, an aim let go), else
+    -- nothing (a feint already let go here, and a newer swing must keep playing).
     if f[3] == "1" then
-      if ES.mine then
+      if ES.mine or ES.castHeld then
         if StopUnitAnimation then StopUnitAnimation("player", 0.1) end
         ES.mine = nil
+        ES.castHeld = nil
       end
     elseif StopUnitAnimation and f[2] then
       StopUnitAnimation(f[2], 0.1)

@@ -303,6 +303,10 @@ pub struct AbilityDef {
     /// clips. Only on an ability with a `pull` effect.
     #[serde(default)]
     pub pull_clip: u16,
+    /// Or one of these clips, picked at random each use (Reverse Grapple's five pulls, so the
+    /// haul doesn't look the same every time); when set, it takes the place of `pull_clip`.
+    #[serde(default)]
+    pub pull_clips: Vec<u16>,
     #[serde(default)]
     pub pull_from: String,
     /// Valor for each foe it strikes (0: `[valor].ability`).

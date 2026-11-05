@@ -4721,11 +4721,13 @@ clip = 53
 # The haul's arc: about 0.5 sec in the air (lift 5), long enough for the creature's flight to be
 # seen (Corey's review). A plain pull's 3 had it over in 0.3 sec, 60 to 80 yd a second.
 # The hunter's own look over the haul, on the clients that play clips (Corey's review: with the
-# bow's release pose "he just has his arm out", throwing, not pulling): this clip for as long as
-# the foe is on the line, 63 EmoteUseStanding (both hands working at chest height). Swap it after
-# a look in game (.es tune ability.reverse_grapple.pull_clip <clip>); `pull_from` borrows another
-# character model's take on it ("ScourgeFemale").
-pull_clip = 63
+# bow's release pose "he just has his arm out", throwing, not pulling): one of five pulls at random
+# each use, for as long as the foe is on the line, so the haul doesn't look the same every time
+# (Corey's pick of the six filmed, round 3; Beg, 79, dropped): 19 Attack2HL, 16 AttackUnarmed,
+# 50 Loot, 58 Special2H, 63 EmoteUseStanding. Swap them after a look in game
+# (.es tune ability.reverse_grapple.pull_clips "[19, 63]"); `pull_from` borrows another
+# character model's take on them ("ScourgeFemale").
+pull_clips = [19, 16, 50, 58, 63]
 effects = [{ kind = "pull", amount = 25.0, lift = 5.0, from_caster = true }, { kind = "stagger", secs = [1.0, 1.0] }]
 
 # 1, the second choice: Disengage as retail has it: on the key press, mid-jump or falling too.
@@ -4941,12 +4943,12 @@ effects = [{ kind = "petrify", secs = [3.0, 3.0] }]
 # The frost it leaves (Corey's review, round 3: the floor should slow what's round it): the
 # burst's 3 yd of ground for 6 s, snaring every creature in it each second (a hero's own ground
 # never slows them). Its look is the ground's spell (`linger_spell`, tunable in play:
-# `.es tune ability.freezing_trap.linger_spell <id>`): 7083 is Frost Nova's ice on the ground
-# with no caster-side kit, which run 070 showed lays nothing lasting on the ground; 13810 laid as
-# the ground's spell (not cast as one: that was the whiteout) is vanilla's Frost Trap mist, about
-# 10 yd wide, wider than the 3 yd that slows.
+# `.es tune ability.freezing_trap.linger_spell <id>`): 27808, Corey's pick after the round-3
+# takes of three looks ("27808 is the best for frost trap"), over 13810 (vanilla's Frost Trap
+# mist, about 10 yd wide, wider than the 3 yd that slows) and 2969. 7083, Frost Nova's ice with no
+# caster-side kit, lays nothing lasting on the ground (run 070).
 linger = 6.0
-linger_spell = 13810
+linger_spell = 27808
 tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.5 }]
 # The trap combo: set it, kite them onto it, cash in. The free Multi-Shot is readied as the trap
 # springs (#118: readied as it was set, a trap that sprang late had no free shot left), for 8 s.
