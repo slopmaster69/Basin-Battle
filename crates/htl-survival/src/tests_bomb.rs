@@ -114,7 +114,7 @@ fn the_key_again_on_a_flare_sets_it_off_early_harder_a_perfect_that_throws_them_
     let k = dummy(&mut s, [10.0, 0.0, 0.0]);
     let since = plant(&mut s, p);
     // The second flare: a third of the way to the end, twice.
-    run_until(&mut s, since + d.bomb_secs * 2.0 / 3.0);
+    run_until(&mut s, since + d.bomb_secs * 2.0 / (d.bomb_flares + 1) as f32);
     let valor = s.players[&p].valor;
     press(&mut s, p, false);
     let ev = s.step(0.0);
@@ -133,7 +133,7 @@ fn off_a_flare_it_goes_at_once_plain_and_a_dead_foe_sets_it_off_where_it_fell() 
     let k = dummy(&mut s, [10.0, 0.0, 0.0]);
     let since = plant(&mut s, p);
     // Halfway between the first and second flares.
-    run_until(&mut s, since + d.bomb_secs / 2.0);
+    run_until(&mut s, since + d.bomb_secs * 1.5 / (d.bomb_flares + 1) as f32);
     press(&mut s, p, false);
     let ev = s.step(0.0);
     assert!(s.bombs.is_empty() && !perfect_in(&ev, p), "off a flare: at once, no perfect");

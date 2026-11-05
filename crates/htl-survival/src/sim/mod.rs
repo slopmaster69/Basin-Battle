@@ -1275,9 +1275,14 @@ impl Survival {
                         p.check_open = Some(*ability);
                     }
                 }
-                Event::CheckResult { player, .. } => {
+                Event::CheckResult { player, ability, grade } => {
                     if let Some(p) = self.players.get_mut(player) {
-                        p.check_open = None;
+                        // A rhythm's beat judged mid-chain isn't its end: still open, so an
+                        // interrupt after it tells the add-on to take the ring down.
+                        let beat = matches!(p.action, Action::Rhythm { ability: a, .. } if a == *ability) && matches!(*grade, "good" | "critical");
+                        if !beat {
+                            p.check_open = None;
+                        }
                     }
                 }
                 _ => {}
@@ -1443,6 +1448,8 @@ impl Survival {
     /// eaten, a gather not finished); where they stand and what they carry is kept.
     pub fn leave(&mut self, id: Id) -> Option<crate::save::PlayerSave> {
         self.cancel_preview(id);
+        // Their heat and chill on foes go with them (only their own bolts ever cleared them).
+        self.staff_marks.retain(|m| m.owner != id);
         let p = self.players.get_mut(&id)?;
         if !matches!(p.action, Action::Dead { .. } | Action::Stagger { .. }) {
             p.action = Action::Ready;

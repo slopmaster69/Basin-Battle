@@ -1043,7 +1043,7 @@ name = "Apprentice's Staff"
 display = 472
 icon = "INV_Staff_08"
 kind = "weapon"
-text = "Two-handed. Guards with a ward: an arcane barrier with a bar of its own. A ward raised just as a blow lands costs nothing and reels the attacker. Broken, it can't be raised again until its bar is full."
+text = "Two-handed. Guards with a ward, an arcane barrier with its own bar. A ward raised just as an attack lands costs nothing, restores 20% of its bar and staggers the attacker. A broken ward can't be raised again until its bar is full."
 
 # Blackwing's dark staff with its red-hot tip.
 [[item]]
@@ -1052,7 +1052,7 @@ name = "Ember Staff"
 display = 31959
 icon = "INV_Staff_06"
 kind = "weapon"
-text = "Two-handed. Attacks cast bolts of fire that burn; the heavy attack a slow, heavy one. Guards with a ward."
+text = "Two-handed. Attacks cast bolts of fire that deal 11 damage, burn and heat the target. Heavy attacks cast a slow bolt that deals 12 to 28 damage and spends the heat. Guards with a ward."
 
 [[item]]
 key = "rime_staff"
@@ -1061,7 +1061,7 @@ name = "Rime Staff"
 display = 32461
 icon = "INV_Staff_Goldfeathered_01"
 kind = "weapon"
-text = "Two-handed. Attacks cast shards of frost that chill; the heavy attack a heavy shard that pierces. Guards with a ward."
+text = "Two-handed. Attacks cast shards of frost that deal 10 damage and chill the target. Heavy attacks cast a piercing lance that deals 16 to 34 damage and spends the chill. Guards with a ward."
 
 [[item]]
 key = "arcane_staff"
@@ -1070,7 +1070,7 @@ name = "Arcane Staff"
 display = 34811
 icon = "INV_Staff_07"
 kind = "weapon"
-text = "Two-handed. Attacks cast quick bolts of arcane force; the heavy attack a heavier orb. Guards with a ward."
+text = "Two-handed. Attacks cast quick bolts of arcane force that deal 10 damage and store charges in the staff. Heavy attacks release them as an orb that deals up to 64 damage. Guards with a ward."
 
 [[item]]
 key = "buckler"
@@ -3462,7 +3462,7 @@ impact_kit = 2709
 [[ability]]
 key = "fireball"
 name = "Fireball"
-text = "Deals 16 to 36 damage, growing larger the longer you charge it, up to 1.5 sec; let go on the flare for more. Sets the target Burning for 4 damage per sec for 4 sec. Fire on a frozen enemy shatters it for 50% more damage."
+text = "Charge for 0.3 to 1.5 sec to deal 16 to 36 damage. Release on the flare for 20% more damage. Burns the target for 4 damage per sec for 4 sec. Shatters a frozen enemy for 50% more damage."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
@@ -3493,7 +3493,7 @@ effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 key = "pyroblast"
 name = "Pyroblast"
 ex_of = "fireball"
-text = "Hold 1.5 sec to hurl a huge, slow fireball for 48 damage. It burns the target for 5 damage per sec for 6 sec and shatters a frozen enemy. Releasing early wastes it. A heavy attack on you while you hold snuffs it."
+text = "Hold for 1.5 sec, then release on the flare to hurl a huge, slow fireball. Deals 48 damage and burns the target for 5 damage per sec for 6 sec. Shatters a frozen enemy for 50% more damage. Released off the flare, it fizzles. A heavy attack on you while you hold interrupts it."
 icon = "Spell_Fire_Fireball02"
 slot = "ranged"
 kind = "projectile"
@@ -3673,7 +3673,7 @@ spell = 8676
 [[ability]]
 key = "arcane_missiles"
 name = "Arcane Missiles"
-text = "Fires a volley of arcane missiles along the reticle, one every 0.35 sec: the first 3 by themselves, then one more each time you press again on the beat, up to 8. Each deals 1 more than the last, from 5; the eighth deals double. Miss the beat and the volley ends. You can walk slowly while it lasts."
+text = "Fires arcane missiles along the reticle, 1 every 0.35 sec. The first 3 fire by themselves. Press again on the beat for 1 more, up to 8. The first deals 5 damage and each deals 1 more than the last. The eighth deals 100% more. Miss the beat and the volley ends. You can walk slowly while it lasts."
 icon = "Spell_Nature_StarFall"
 school = "mage"
 slot = "ranged"
@@ -3707,7 +3707,7 @@ crit_effects = [{ kind = "stagger", secs = [0.4, 0.4] }]
 [[ability]]
 key = "cone_of_cold"
 name = "Cone of Cold"
-text = "A jet of frost sweeps across your front over 0.8 sec, 10 yd long: everything it passes takes 12 damage and is slowed by 50% for 3 sec. Press again to stop it on the meter: on its sweet spot, enemies in the jet freeze for 2 sec; near it, for 1 sec. Off it, they're only slowed."
+text = "A jet of frost sweeps across your front over 0.8 sec, reaching 10 yd. Enemies it passes take 12 damage and are slowed by 50% for 3 sec. Press again to stop it on the meter. On the sweet spot, enemies in the jet are frozen for 2 sec. Near it, they are frozen for 1 sec. Off it, they are only slowed."
 icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
@@ -3748,7 +3748,7 @@ stop_effects = [{ kind = "petrify", secs = [1.0, 2.0] }]
 [[ability]]
 key = "arcane_explosion"
 name = "Arcane Explosion"
-text = "A burst of arcane force around you: 10 damage within 6 yd. Press again on the beat for a second, 14 damage within 7 yd, then a third, 18 damage within 8 yd that knocks enemies back 4 yd. Miss the beat and it ends there."
+text = "Deals 10 damage to enemies within 6 yd of you. Press again on the beat for a second burst that deals 14 damage within 7 yd. Press on the beat again for a third that deals 18 damage within 8 yd and knocks enemies back 4 yd. Miss the beat and it ends."
 icon = "Spell_Nature_WispSplode"
 school = "mage"
 slot = "close"
@@ -3894,7 +3894,7 @@ effects = [{ kind = "panic", secs = [2.0, 2.0] }]
 [[ability]]
 key = "blink"
 name = "Blink"
-text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows. Blink just as a blow lands and it misses you, and Blink comes back twice as fast."
+text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows. Blink just as an attack lands to make it miss and take 6 sec off Blink's cooldown."
 icon = "Spell_Arcane_Blink"
 school = "mage"
 slot = "utility"
@@ -3928,7 +3928,7 @@ spell = 1953
 [[ability]]
 key = "living_bomb"
 name = "Living Bomb"
-text = "Plants a bomb on the enemy the bolt reaches, up to 25 yd. It flares 3 times over 3 sec, then bursts for 10 damage within 5 yd and burns them for 2 damage per sec for 3 sec. Press again on a flare to set it off then: 14 damage, and it knocks them back 4 yd."
+text = "Plants a bomb on the enemy the bolt reaches, up to 25 yd. It flares 3 times over 3 sec, then bursts for 10 damage within 5 yd and burns enemies for 2 damage per sec for 3 sec. Press again on a flare to set it off early for 14 damage, knocking enemies back 4 yd."
 icon = "Spell_Fire_SelfDestruct"
 school = "mage"
 slot = "utility"
@@ -4153,7 +4153,7 @@ effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 [[ability]]
 key = "ice_block"
 name = "Ice Block"
-text = "Encases you in ice for 2 sec. Nothing can harm you, but you cannot act. Press again to break out early. Break out just as a blow lands and the enemy who struck is frozen for 1.5 sec (0.75 sec against heroes)."
+text = "Encases you in ice for 2 sec. Nothing can harm you, but you cannot act. Press again to break out early. Break out just as an attack lands to freeze the attacker for 1.5 sec (0.75 sec against heroes)."
 icon = "Spell_Frost_Frost"
 school = "mage"
 slot = "defense"
@@ -4187,7 +4187,7 @@ counter = { immune = true, perfect_break = [{ kind = "petrify", secs = [1.5, 1.5
 [[ability]]
 key = "alter_time"
 name = "Alter Time"
-text = "Marks where you stand. Press again within 5 sec to return to the mark and get back half the health you lost since. The mark pulses once a second: return on a pulse to knock back enemies within 4 yd."
+text = "Marks where you stand. Press again within 5 sec to return to the mark and regain 50% of the health you lost since. The mark pulses every 1 sec. Return on a pulse to knock enemies within 4 yd back 3 yd."
 icon = "Spell_Nature_TimeStop"
 school = "mage"
 slot = "defense"
@@ -6219,7 +6219,7 @@ tick_effects = [{ kind = "snare", secs = [1.2, 1.2], amount = 0.4 }]
 [[ability]]
 key = "ember_bolt"
 name = "Ember Bolt"
-text = "A bolt of fire from the staff that deals 11 damage and burns for 1 damage per sec for 3 sec. Each hit heats the target. The third ignites it, dealing 14 damage to enemies within 2.5 yd."
+text = "A bolt of fire that deals 11 damage and burns the target for 1 damage per sec for 3 sec. Each hit heats the target. The third heat ignites it, dealing 14 damage to enemies within 2.5 yd."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
@@ -6243,7 +6243,7 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 1.0 }]
 [[ability]]
 key = "ember_bolt_heavy"
 name = "Ember Burst"
-text = "Hold to charge a heavy, slow bolt of fire that deals 12 to 28 damage and burns for 3 damage per sec for 3 sec. Spends the target's heat for 20% more damage per heat."
+text = "Hold up to 1.2 sec to charge a slow bolt of fire that deals 12 to 28 damage. Burns the target for 3 damage per sec for 3 sec. Spends the target's heat for 20% more damage per heat."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ranged"
@@ -6273,7 +6273,7 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 3.0 }]
 [[ability]]
 key = "rime_bolt"
 name = "Rime Shard"
-text = "A shard of frost from the staff that deals 10 damage. Each hit chills the target, slowing it by 15% more for 5 sec. The third freezes it for 1.5 sec."
+text = "A shard of frost that deals 10 damage. Each hit chills the target for 5 sec, slowing it by 15% more. The third chill freezes it for 1.5 sec."
 icon = "Spell_Frost_FrostBolt"
 school = "mage"
 slot = "ranged"
@@ -6298,7 +6298,7 @@ clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
 [[ability]]
 key = "rime_bolt_heavy"
 name = "Rime Lance"
-text = "Hold to charge a heavy shard of frost that deals 16 to 34 damage to every enemy in its line and slows them by 40% for 3 sec. Spends each target's chill for 20% more damage per chill, and shatters a frozen target."
+text = "Hold up to 1.2 sec to charge a shard of frost that deals 16 to 34 damage to every enemy in its line and slows them by 40% for 3 sec. Spends each target's chill for 20% more damage per chill. Shatters a frozen target for 50% more damage."
 icon = "Spell_Frost_FrostBolt02"
 school = "mage"
 slot = "ranged"
@@ -6329,7 +6329,7 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 [[ability]]
 key = "arcane_bolt"
 name = "Arcane Bolt"
-text = "A quick bolt of arcane force from the staff that deals 10 damage. Each hit stores an arcane charge in the staff, up to 3, for 5 sec."
+text = "A quick bolt of arcane force that deals 10 damage. Each hit stores an arcane charge in the staff for 5 sec, up to 3."
 icon = "Spell_Arcane_StarFire"
 school = "mage"
 slot = "ranged"
@@ -6355,7 +6355,7 @@ clip_pool = ["18/1/OrcMale", "19/1/OrcMale", "17/1/OrcMale", "58/0/OrcMale"]
 [[ability]]
 key = "arcane_bolt_heavy"
 name = "Arcane Orb"
-text = "Hold to charge, then release the arcane power stored in the staff as an orb that deals up to 64 damage: 35% with 1 charge, 60% with 2, 100% with 3, which also knocks the target back 3 yd. Fails with no charges."
+text = "Hold up to 1.2 sec, then release the staff's stored charges as an orb that deals up to 64 damage. It deals 35% with 1 charge, 60% with 2 and 100% with 3. With 3, it also knocks the target back 3 yd. Fails with no charges."
 icon = "Spell_Arcane_Blast"
 school = "mage"
 slot = "ranged"
@@ -6388,7 +6388,7 @@ spell = 7268
 [[ability]]
 key = "meteor"
 name = "Meteor"
-text = "Hold to call a meteor down on the reticle, up to 34 yd away; let go on the flare for the whole of it. It lands 1.5 sec later on a circle shown to everyone, 5 to 7 yd wide. Deals 35 to 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 4 sec more at 8 damage per sec. Freeze them first."
+text = "Hold for 0.5 to 1.5 sec to call a meteor down on the reticle, up to 34 yd away. Release on the flare for 20% more damage. It lands 1.5 sec later in a 5 to 7 yd radius shown to everyone. Deals 35 to 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 8 damage per sec for 4 sec more. Shatters frozen enemies for 50% more damage."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ultimate"
@@ -6428,7 +6428,7 @@ key = "frozen_orb"
 # A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
 perfect_kit = 1027
 name = "Frozen Orb"
-text = "An orb of frost rolls out along the reticle for up to 4 sec, 25 yd: 16 damage per sec to everything within 2 yd of it, slowing them. Press again to stop it: it bursts for 30 damage within 6 yd. Stop it on an enemy and it bursts for 40 and freezes everything within 6 yd for 2 sec (1 sec against heroes). Stop it at your own feet and you freeze. Let it roll the whole way and it fades."
+text = "An orb of frost rolls along the reticle for up to 4 sec and 25 yd. It deals 15 damage per sec to enemies within 2 yd and slows them by 30% for 2 sec. Press again to burst it for 30 damage within 6 yd. Stopped on an enemy, it bursts for 40 damage and freezes enemies within 6 yd for 2 sec (1 sec against heroes). Stopped at your feet, it freezes you for 1.5 sec. Never stopped, it fades."
 icon = "Spell_Frost_FrostShock"
 school = "mage"
 slot = "ultimate"
