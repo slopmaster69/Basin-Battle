@@ -50,10 +50,12 @@ pub const WILD_PRIMED_SECS: f32 = 4.0;
 /// which beast came), then stays this long after its strike, so who came and what it did can be seen
 /// (play-test: at 0.9 sec they were gone before anyone could tell), then goes in the flash it
 /// came in.
-/// A beast's entrance: it stands where it appeared this long (fading in, on the client), then
-/// dashes at the foe this long and strikes as it arrives (Corey's review, run 040: "the pets need
-/// to appear quicker and dash or jump in and attack").
-const BEAST_SHOW: f32 = 0.35;
+/// A beast's entrance: it stands where it appeared this long (a beat to be seen; on the clients
+/// that draw it at once with no fade, `UNIT_DYNFLAG_NO_FADE`, it's whole from the first frame),
+/// then dashes at the foe this long and strikes as it arrives (Corey's review, run 040: "the
+/// pets need to appear quicker and dash or jump in and attack"; run 050: "the fades are the
+/// issue").
+const BEAST_SHOW: f32 = 0.2;
 const BEAST_DASH: f32 = 0.3;
 const POUNCE_SECS: f32 = BEAST_SHOW + BEAST_DASH;
 const BEAST_STAYS: f32 = 1.8;
