@@ -154,6 +154,35 @@ impl Survival {
         Ok(name)
     }
 
+    /// A charge under way: when it began and this cast's rolled flare (the release check's
+    /// moment), for the lab to let go on it, or off it.
+    pub fn lab_check_flare(&self, id: Id) -> Option<(f32, f32)> {
+        let p = self.players.get(&id)?;
+        match p.action {
+            Action::Charge { since, .. } => Some((since, p.check_flare)),
+            _ => None,
+        }
+    }
+
+    /// A rhythm under way: when it began, its rolled beats, its free beats and each beat's window,
+    /// for the lab to press them.
+    pub fn lab_rhythm(&self, id: Id) -> Option<(f32, Vec<(f32, bool, f32)>, u32)> {
+        let p = self.players.get(&id)?;
+        let Action::Rhythm { ability, since, .. } = p.action else { return None };
+        let d = &self.content.abilities[ability];
+        let span = d.most_beats.saturating_sub(d.free_beats + 1).max(1) as f32;
+        let beats = p
+            .rhythm_beats
+            .iter()
+            .enumerate()
+            .map(|(k, (t, rest))| {
+                let s = ((k as u32).saturating_sub(d.free_beats) as f32 / span).clamp(0.0, 1.0);
+                (*t, *rest, d.beat_window[0] + (d.beat_window[1] - d.beat_window[0]) * s)
+            })
+            .collect();
+        Some((since, beats, d.free_beats))
+    }
+
     /// The lab's bodies taken away.
     pub fn lab_clear(&mut self, mobs: &[Id]) {
         let held: Vec<Id> = self.players.iter().filter(|(_, p)| p.lock.is_some_and(|t| mobs.contains(&t))).map(|(id, _)| *id).collect();

@@ -21,7 +21,10 @@
 //!   an EX) and a click if it's aimed. Steps, comma-separated: `q e 1 2 3` (a key), `^q`... (with
 //!   Ctrl), `click`, `attack`, `heavy`, `guard`, `guardup`, `dodge`, `bash`, `blow` (the nearest
 //!   creature of the scene swings at the hero), `wait:<secs>`; `press` holds the button down and
-//!   `release` lets it go (a charge held to its flare: `q,press,wait:1.45,release`).
+//!   `release` lets it go (a charge held to its flare: `q,press,wait:1.45,release`);
+//!   `release:crit|edge|early|late` lets go against this cast's rolled flare (dead on, at the
+//!   window's edge, 0.4 s early, past the window); `beats` presses a rhythm's rolled beats dead on
+//!   (`beats:good` a little off, `beats:3` the first three then none, `beats:rest` on the rest).
 //! - `weapon ember_staff` puts that weapon in the caster's hands for the run (a staff's bolts,
 //!   the ward), wherever the stage is.
 //! - Everything the rules sent that touches the hero or the scene, until the burst is over, goes
@@ -387,6 +390,60 @@ impl SurvivalGame {
         let target = lab.mobs.get(lab.mobs.len() / 2).copied();
         let nearest = lab.mobs.first().copied();
         for step in due {
+            // Steps timed against what this cast rolled: they queue the press or the release.
+            if let Some(how) = step.strip_prefix("release:") {
+                let mut queued = String::from("no charge");
+                if let Some((since, flare)) = self.sim.lab_check_flare(me) {
+                    let w = self.sim.content.checks.window;
+                    let off = match how {
+                        "edge" => 0.75 * w,
+                        "early" => -0.4,
+                        "late" => w + 0.3,
+                        _ => 0.0,
+                    };
+                    let at = since + flare + off;
+                    self.lab_step_at(at, "release".into());
+                    queued = format!("flare {flare:.3} release at {:+.3}", at - start);
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
+            if let Some(how) = step.strip_prefix("beats") {
+                let how = how.trim_start_matches(':');
+                let mut queued = String::from("no rhythm");
+                if let Some((since, beats, free)) = self.sim.lab_rhythm(me) {
+                    let key = ["q", "e", "1", "2", "3"].get(slot as usize).copied().unwrap_or("q").to_string();
+                    let most: usize = how.parse().unwrap_or(usize::MAX);
+                    let mut n = 0;
+                    let mut list = Vec::new();
+                    for (k, (t, rest, w)) in beats.iter().enumerate() {
+                        if (k as u32) < free {
+                            continue;
+                        }
+                        if *rest {
+                            if how == "rest" {
+                                self.lab_step_at(since + t, key.clone());
+                                list.push(format!("{t:.2}r"));
+                            }
+                            continue;
+                        }
+                        if n >= most {
+                            break;
+                        }
+                        let off = if how == "good" { 0.6 * w } else { 0.0 };
+                        self.lab_step_at(since + t + off, key.clone());
+                        list.push(format!("{:.2}", t + off));
+                        n += 1;
+                    }
+                    queued = format!("presses at {}", list.join(","));
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
             // Aimed at the scene's middle body: its chest, or its feet for the ground's.
             if let Some(t) = target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos) {
                 self.sim.lab_aim_at(me, if ground { t } else { [t[0], t[1], t[2] + 1.0] });
@@ -436,6 +493,14 @@ impl SurvivalGame {
             if let Some(lab) = self.lab.as_mut() {
                 lab.trace.push(format!("{:+.3} STEP {step} -> {what}", now - start));
             }
+        }
+    }
+
+    /// A step queued for `at`, in time order among the others.
+    fn lab_step_at(&mut self, at: f32, step: String) {
+        if let Some(lab) = self.lab.as_mut() {
+            let i = lab.steps.iter().position(|(t, _)| *t > at).unwrap_or(lab.steps.len());
+            lab.steps.insert(i, (at, step));
         }
     }
 
