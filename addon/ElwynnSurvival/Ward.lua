@@ -190,7 +190,9 @@ arc:SetWidth(1)
 arc:SetHeight(1)
 arc:SetPoint("CENTER", WorldFrame, "CENTER", 0, 0)
 arc:SetFrameStrata("HIGH")
-arc:Show()
+-- Hidden at load and shown as its lines come, as the staff's mark and the checks are: a frame
+-- shown before the world is up never got its updates in the lab's client.
+arc:Hide()
 arc.tex = arc:CreateTexture(nil, "ARTWORK")
 arc.tex:SetBlendMode("ADD")
 arc.tex:SetWidth(ARC)
@@ -213,7 +215,7 @@ end
 -- From the WA line: whether it's up, its share, and whether it just broke.
 local function ArcLine(up, share, broke)
   local now = GetTime()
-  -- Shown here, as a line comes, not only at load (a frame shown before the world is up may not be).
+  -- Shown as a line comes (see above).
   arc:Show()
   if broke then
     arc.breakAt = now
