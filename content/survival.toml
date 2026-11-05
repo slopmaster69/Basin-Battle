@@ -5987,9 +5987,9 @@ perfect_yd = 1.5
 backfire_yd = 3.0
 cooldown = 40.0
 # Frostbolt's missile rolled along the ground for the orb; Frost Nova's ring for the burst.
-# A ball of ice (the low ice missile; Ice Tomb's streaked) to where the orb is, often enough to
-# read as one thing rolling.
-tick_spell = 3120
+# Ice Tomb's ice missile to where the orb is, ten a second (the low ice missile, 3120, draws
+# nothing). It still reads as a streak along the ground: a rolling ball wants a client look.
+tick_spell = 16869
 spell = 122
 effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
 stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
