@@ -88,6 +88,9 @@ const VOLLEY_SECS: f32 = 1.0;
 /// looses it as it runs out; the rules a moment after (`HANG_GRACE`), at the last reticle heard.
 const FLOAT_SECS: f32 = 5.5;
 const HANG_GRACE: f32 = 0.5;
+/// The pose held through the hang: the Jump clip (38), a character's mid-air pose with the legs
+/// drawn up (1.12 has no hover of its own), looped by the client as a reaction's hold.
+const HOVER_CLIP: u16 = 38;
 /// After the volley: feather fall, untouchable, till they land (or this long at most).
 const DESCENT_SECS: f32 = 3.0;
 /// Each of its arrows strikes everyone within this of where it lands.
@@ -762,6 +765,11 @@ impl Survival {
         self.set_action(id, Action::Aim { ability: h.volley });
         self.set_kit(id, Kit::Bow);
         self.draw_bow(id);
+        // Hung in the air in a hover's pose, not standing on nothing (Corey's review: "it looks
+        // like they're just standing in the air. The legs are the problem"): the Jump clip's
+        // mid-air pose, the legs drawn up, held for the whole hang; the bow's draw plays over it.
+        // Let go as the hang ends (`end_hang`).
+        self.events.push(Event::React { id, anim: HOVER_CLIP, from: h.top, lean: 0.0, hold: FLOAT_SECS + HANG_GRACE + 0.5, fit: 0.0 });
         self.events.push(Event::Abilities { player: id });
     }
 
@@ -777,6 +785,8 @@ impl Survival {
         self.hunt.floating.retain(|(h, _)| *h != id);
         self.hunt.floating.push((id, self.clock + DESCENT_SECS));
         self.events.push(Event::FeatherFall { player: id, on: true });
+        // The hover's pose let go: the legs come down for the fall.
+        self.events.push(Event::ClipStop { id });
     }
 
     /// Down from Skyfall: the slow fall ends as they land.
