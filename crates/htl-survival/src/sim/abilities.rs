@@ -1148,7 +1148,17 @@ impl Survival {
             // Full: the faster missile, when it has one.
             let full = AbilityDef::full(share) && d.full_spell != 0;
             let (speed, spell) = if full { (d.full_speed.max(d.speed), d.full_spell) } else { (d.speed, d.spell) };
-            (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), AbilityDef::at(d.damage, share), spell)
+            // A share of the bow's own damage at this draw (Aimed Shot's), or its own.
+            // (The bow in their hands: their own, or the camp's when they carry a crossbow.)
+            let damage = if d.bow_damage > 0.0 {
+                let p = &self.players[&id];
+                let held = self.bow_look(p);
+                let r = self.content.ranged(&self.content.items[held].key).unwrap_or_else(|| self.ranged_of(p));
+                (r.damage[0] as f32 + (r.damage[1] as f32 - r.damage[0] as f32) * share) * d.bow_damage
+            } else {
+                AbilityDef::at(d.damage, share)
+            };
+            (speed, AbilityDef::at(d.range, share), AbilityDef::at(d.radius, share), damage, spell)
         };
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
@@ -1170,8 +1180,11 @@ impl Survival {
         // A lob arcs to the ground at the reticle (within its range), over whatever is between.
         let lob_at = d.lob.then(|| self.aim_point(id, range));
         let feet = self.players[&id].pos;
+        // A fan spaced where the reticle points: the angle that puts `spread_yd` between arrows
+        // there, no wider than `spread`.
+        let step = if d.spread_yd > 0.0 { (d.spread_yd / dist2d(from, aim.point).max(1.0)).atan().min(d.spread.to_radians()) } else { d.spread.to_radians() };
         for k in 0..n {
-            let off = (k as f32 - (n - 1) as f32 / 2.0) * d.spread.to_radians();
+            let off = (k as f32 - (n - 1) as f32 / 2.0) * step;
             let (c, s) = (off.cos(), off.sin());
             let flat = (base[0] * base[0] + base[1] * base[1]).sqrt();
             let b = [base[0] * c - base[1] * s, base[0] * s + base[1] * c, base[2]];
@@ -1368,7 +1381,7 @@ impl Survival {
         // Shallower than this (its sine, about 20°), an arrow skips off the ground.
         const SKIP: f32 = 0.34;
         let d = &self.content.abilities[p.ability];
-        let (gain, base, bounces, flash) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell);
+        let (gain, base, bounces, mut flash, skip) = (d.bounce_gain, AbilityDef::at(d.damage, p.share), d.bounces, d.burst_spell, d.skip_spell);
         // (Its flight this step, up to where it struck.)
         let left = p.left - len(sub(at, p.pos));
         if bounces == 0 || left < 1.0 {
@@ -1379,6 +1392,12 @@ impl Survival {
                 if p.dir[2] >= 0.0 || -p.dir[2] > SKIP {
                     return false;
                 }
+                // A skip off the ground shows its own splash, not the wall's fire: an explosion on
+                // the floor read as the arrow going off (Corey's review). The data has no small
+                // one-shot of dirt at a point (Rocky Ground Impact, tried in run 050, left a pile
+                // of boulders for seconds), so with none named the skip shows nothing but the
+                // arrow's own flight on from the ground.
+                flash = skip;
                 let ground = self.land.height_near(at[0], at[1], at[2] + 0.6);
                 p.dir = [p.dir[0], p.dir[1], -p.dir[2]];
                 p.pos = [at[0], at[1], at[2].max(ground + 0.15)];
@@ -1612,7 +1631,7 @@ impl Survival {
     /// A lob's flight: its look flown to `at`, the ring everyone sees there until it lands
     /// (distance / speed from now), and a warning for the foes near it. `(speed, radius, share,
     /// damage, spell)` as [`Self::launch`] reckoned them.
-    fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
+    pub(crate) fn lob(&mut self, id: Id, ability: usize, from: Vec3, at: Vec3, (speed, radius, share, damage, spell): (f32, f32, f32, f32, u32)) {
         let splash = self.content.abilities[ability].splash;
         let dist = len(sub(at, from));
         let flight = dist / speed.max(1.0);
@@ -1654,6 +1673,12 @@ impl Survival {
         }
         if let Some(m) = mark {
             self.unmark(m);
+        }
+        // A thrown trap: it's set where it lands, and arms from there; its burst is for when it
+        // springs, not now.
+        if self.content.abilities[p.ability].kind == "trap" {
+            self.set_trap(p.owner, p.ability, at, p.share);
+            return true;
         }
         let look = self.content.abilities[p.ability].burst_spell;
         self.burst_look(p, at, (look != 0).then_some(look));
@@ -1951,9 +1976,9 @@ impl Survival {
         if !self.mobs.get(&mid).is_some_and(|m| m.health > 0) || self.own_totem(mid, owner) {
             return;
         }
+        // Gone home past its leash: the blow finds nothing, and it's seen to slip it.
         if self.players.contains_key(&owner) && self.evading(mid, owner) {
-            self.events.push(Event::Swing { attacker: owner, victim: Some(mid), damage: 0, outcome: Outcome::Miss, anim: false, style: Blow::Arrow(spell) });
-            self.events.push(Event::Flash { player: owner, text: "Evade".into() });
+            self.whiff(mid, from);
             return;
         }
         // A dummy in a counter's stance.

@@ -192,6 +192,17 @@ pub struct AbilityDef {
     /// it through the leap.
     #[serde(default)]
     pub bow: bool,
+    /// A bow ability's damage as a share of the hero's bow's at the same draw (Aimed Shot's 1.2:
+    /// 120% of what the bow would do), so it grows with the bow as a weapon art grows with the
+    /// weapon. 0: its own `damage`. (Serg's play-test, #118.)
+    #[serde(default)]
+    pub bow_damage: f32,
+    /// A fan (`count` > 1) whose arrows pass this far apart (yd) where the reticle points, so a
+    /// pack there is covered near or far; `spread` is then the widest it opens (close in). 0: a
+    /// fixed `spread`. (Multi-Shot: 10° apart left the arrows passing between a pack past 15 yd;
+    /// Serg's play-test, #118.)
+    #[serde(default)]
+    pub spread_yd: f32,
     /// An EX blink leaves this ability (a Frost Nova) where it started.
     #[serde(default)]
     pub leaves: String,
@@ -224,6 +235,15 @@ pub struct AbilityDef {
     pub object: u32,
     #[serde(default)]
     pub burst_spell: u32,
+    /// A ricochet's flash where it skips off the ground, apart from the wall's `burst_spell`
+    /// (Bank Shot: not fire on the floor; Corey's review). 0: none, the arrow flies on from there.
+    #[serde(default)]
+    pub skip_spell: u32,
+    /// A trap's throw: the spell whose missile flies from the hand to the spot before the trap
+    /// is set there (a bomb's), so the player sees it go out (Corey's review: "the trap should
+    /// fly out of the hand and land on the spot"). 0: set at once.
+    #[serde(default)]
+    pub lob_spell: u32,
     /// The look its lingering ground wears (a DynamicObject of this spell for as long as it
     /// lingers: Consecration's holy ground, Flamestrike's fire); 0: its own `spell`.
     #[serde(default)]
