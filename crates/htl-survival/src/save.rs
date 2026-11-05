@@ -237,9 +237,10 @@ const RENAMED: &[(&str, &str)] = &[
     // Rogue
     ("deadly_throw", "fan_of_knives"),
     ("evasion", "smoke_bomb"),
-    // Priest (Power Word: Shield is now an EX version, never saved: a saved one is the old card.
-    // Mind Blast is a card again, Shadow's E: see `RENAMED_ON`)
-    ("power_word_shield", "power_word_barrier"),
+    // Priest (Power Word: Shield is the defense's card again and Power Word: Barrier its EX, so a
+    // hero saved with the Barrier on the key has the Shield there, the Barrier its EX. Mind Blast
+    // is a card again, Shadow's E: see `RENAMED_ON`)
+    ("power_word_barrier", "power_word_shield"),
     // Shaman
     ("lightning_bolt", "lava_burst"),
     // Mage

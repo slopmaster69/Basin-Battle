@@ -701,6 +701,21 @@ pub struct AbilityDef {
     pub slip_effects: Vec<AbilityEffect>,
     #[serde(default)]
     pub slip_self: Vec<AbilityEffect>,
+    /// The Priest's core (claude/priest-kit-draft.md).
+    /// A healing projectile that passes through foes and stops on the first friend it reaches
+    /// (the holy staff's Flash Heal).
+    #[serde(default)]
+    pub friends_only: bool,
+    /// Help on a friend that spends the caster's Grace as it begins (`[grace]`): cast faster, and
+    /// healing past full health stays on as a shield (the holy staff's Heal).
+    #[serde(default)]
+    pub spends_grace: bool,
+    /// A shield given to a friend (not the caster) within `[checks] window` before a blow lands
+    /// on them (the caster's round trip allowed early), or while that blow waits on the friend's
+    /// round trip, parries the blow for them: it fails as a parry of theirs, the striker reeling,
+    /// and the caster gets a counter's Valor and the perfect (Power Word: Shield).
+    #[serde(default)]
+    pub parry_for: bool,
 }
 
 /// Mind Flay's tension (a `channel`'s `flay`). The cord to the first foe along the reticle grows

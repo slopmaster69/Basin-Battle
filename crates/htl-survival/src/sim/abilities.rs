@@ -902,9 +902,13 @@ impl Survival {
         }
     }
 
-    /// An ability's charge (least, full), the bow's for a shot.
-    fn charge_of(&self, id: Id, ability: usize) -> (f32, f32) {
+    /// An ability's charge (least, full), the bow's for a shot; a Heal begun with Grace, quicker.
+    pub(crate) fn charge_of(&self, id: Id, ability: usize) -> (f32, f32) {
         let d = &self.content.abilities[ability];
+        if d.spends_grace {
+            let k = 1.0 - self.grace_haste(id);
+            return (d.charge[0] * k, d.charge[1] * k);
+        }
         if d.kind == "shot" {
             let r = self.ranged_of(&self.players[&id]);
             if r.draw_secs <= 0.0 {
@@ -1200,6 +1204,10 @@ impl Survival {
             "channel" => self.start_channel(id, ability, share),
             "beam" => self.start_beam(id, ability, share),
             "ally" if d.intervene > 0.0 => self.intervene(id, ability, share),
+            "ally" if d.spends_grace => {
+                self.grace_heal(id, ability, share);
+                self.set_action(id, next);
+            }
             "ally" => {
                 self.ally(id, ability, share);
                 self.set_action(id, next);
@@ -1290,7 +1298,13 @@ impl Survival {
             }
             // The look: flown to where it would end if nothing moved, never after a unit (a
             // boomerang's to where it turns, as it flies on through bodies).
-            let end = if d.returns { self.wall_trace(from, dir, range, id).point } else { self.trace_with(from, dir, range, radius, id, d.friends()).point };
+            let end = if d.returns {
+                self.wall_trace(from, dir, range, id).point
+            } else if d.friends_only {
+                self.trace_skipping(from, dir, range, radius, id, true, &self.passes_by(id, &[])).point
+            } else {
+                self.trace_with(from, dir, range, radius, id, d.friends()).point
+            };
             self.events.push(Event::Missile { caster: id, spell, target: Target::Point(end) });
             let born = self.clock;
             self.projectiles.push(Projectile {
@@ -1348,8 +1362,10 @@ impl Survival {
                 (d.returns, d.fuse > 0.0)
             };
             let go = (p.speed * dt).min(p.left);
+            // A bolt for friends goes through foes as if they weren't there.
+            let skip = if self.content.abilities[p.ability].friends_only { self.passes_by(p.owner, &p.hits) } else { p.hits.clone() };
             // (A grappling hook meets the land's solid shapes too: a rock, a fence, a roof.)
-            let t = self.catch_solid(p.ability, p.pos, p.dir, self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &p.hits));
+            let t = self.catch_solid(p.ability, p.pos, p.dir, self.trace_skipping(p.pos, p.dir, go, p.radius, p.owner, p.allies, &skip));
             if let Some(v) = t.unit {
                 let from = p.pos;
                 p.pos = t.point;
@@ -1994,6 +2010,11 @@ impl Survival {
     /// them (a pull to the caster) of its effects.
     fn friend_hit(&mut self, p: &Projectile, friend: Id) {
         let d = self.content.abilities[p.ability].clone();
+        // A bolt for friends (Flash Heal): healed, its look, no words.
+        if d.friends_only {
+            self.friendly_bolt_lands(p.owner, friend, p.ability);
+            return;
+        }
         if d.ally_heal > 0.0 {
             self.heal_friend(p.owner, friend, p.ability);
         } else if d.cleanse {
@@ -2324,6 +2345,10 @@ impl Survival {
         let boons: Vec<_> = d.effects.iter().filter(|e| crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
         if !boons.is_empty() {
             self.apply_effects(id, target, &boons, share, &d.name);
+        }
+        // Power Word: Shield on a friend: marked for the blow about to land on them.
+        if d.parry_for && target != id {
+            self.mark_shield(id, target, ability);
         }
         // On another hero: said to the caster, and Valor for it (not for helping yourself).
         if target != id {

@@ -352,7 +352,10 @@ pub(crate) const VERSION: u32 = 2;
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
 /// 21: the ward bar (`WA`, `Ward.lua`): a staff's guard.
-pub(crate) const ADDON_NEWEST: u32 = 21;
+/// 22: the right mouse carries the reticle's line (`in g <facing> <elevation>`): a Priest's staff
+/// casts its right click along it (Flash Heal, Drain). An older add-on's press goes along the
+/// hero's facing.
+pub(crate) const ADDON_NEWEST: u32 = 22;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1282,9 +1285,9 @@ impl SurvivalGame {
                         self.sim.set_aim_line(me, f, e);
                     }
                 }
-                // An attack, its release and an ability key carry the reticle's line (the
-                // client's own camera, as a facing and an elevation).
-                if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
+                // An attack, its release, an ability key and the right mouse carry the reticle's
+                // line (the client's own camera, as a facing and an elevation).
+                if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..) | Input::Guard), Ok(f)) = (input, rest.parse::<f32>()) {
                     let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                     self.sim.set_aim_line(me, f, e);
                 }

@@ -24,8 +24,12 @@ impl Survival {
 
     /// The staff's attack: the bolt cast now, aimed along the reticle; a bolt with a charge (a
     /// heavy one) begins its charge instead, let go with the button (its release check with it).
+    /// A Heal that spends Grace takes it as it begins (quicker for it; at the top, at once).
     pub(crate) fn cast_bolt(&mut self, id: Id, ability: usize) {
-        let hi = self.content.abilities[ability].charge[1];
+        if self.content.abilities[ability].spends_grace {
+            self.take_grace(id);
+        }
+        let (_, hi) = self.charge_of(id, ability);
         if hi > 0.0 {
             self.begin_charge(id, ability, hi);
         } else {

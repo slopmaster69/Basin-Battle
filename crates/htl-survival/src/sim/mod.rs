@@ -32,6 +32,7 @@ mod raid;
 pub mod siege;
 mod bomb;
 mod flay;
+pub mod priest;
 mod orb;
 mod rhythm;
 mod staff;
@@ -663,6 +664,8 @@ pub struct Player {
     pub panic_stride: f32,
     /// Keys armed for a recast, cards empowered, a dash going through bodies.
     pub combos: recasts::Combos,
+    /// Grace, the Heal begun with it, a friend's shield on them (the Priest's core).
+    pub priest: priest::Priest,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -1138,6 +1141,8 @@ impl Survival {
             self.step_weekly_chest();
         }
         self.record_trails();
+        // The Priest's perfects among what goes out raise Grace (wherever they were pushed).
+        self.step_grace();
         std::mem::take(&mut self.events)
     }
 
@@ -1240,6 +1245,7 @@ impl Survival {
             rooted: false,
             panic_stride: 0.0,
             combos: recasts::Combos::default(),
+            priest: priest::Priest::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];
