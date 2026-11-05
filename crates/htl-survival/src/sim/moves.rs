@@ -38,6 +38,10 @@ pub(crate) const DIVE_FULL_HEIGHT: f32 = 5.0;
 /// A dive's clip (Special2H, a two-handed blow driven down), played so that it strikes as the
 /// hero lands, with a short recovery after: the landing is the blow.
 const DIVE_CLIP: u16 = 58;
+/// The landing of a leap with a borrowed look (Ensnaring Retreat's flip): the hero's own JumpEnd,
+/// over this long, as the feet touch down.
+const LAND_CLIP: u16 = 39;
+const LAND_SECS: f32 = 0.35;
 
 /// A leap in the air: it lands at `at` then, striking what's there.
 #[derive(Debug, Clone)]
@@ -652,6 +656,13 @@ impl Survival {
             }
             let d = self.content.abilities[l.ability].clone();
             let radius = AbilityDef::at(d.radius, l.share);
+            // A leap with a borrowed look lands on its own legs: the hero's JumpEnd as the feet
+            // touch down (Corey's review: the borrowed clip's legs twisted at the landing). Not
+            // over a stun's held pose (struck out of the air, they come down as the blow left
+            // them).
+            if d.leap_clip != 0 && !self.held_still(l.owner) {
+                self.events.push(Event::Clip { id: l.owner, clip: LAND_CLIP, secs: LAND_SECS, take: 0, from: None, at: 0.0 });
+            }
             if d.impact_kit != 0 {
                 self.events.push(Event::Visual { id: l.owner, kit: d.impact_kit, by: None });
             }
