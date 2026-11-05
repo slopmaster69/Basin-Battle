@@ -141,6 +141,13 @@ pub struct AbilityDef {
     /// the spell's school bursting from the hands, not a shield on the caster.
     #[serde(default)]
     pub perfect_kit: u32,
+    /// A channel's look on the caster while it lasts (a sweep's: Cone of Cold's spray from the
+    /// hands), replayed every `CHANNEL_EVERY` sec.
+    #[serde(default)]
+    pub channel_kit: u32,
+    /// A rhythm's casts, beat by beat (cycled): the body's clip for each missile.
+    #[serde(default)]
+    pub beat_clips: Vec<u16>,
     /// Damage, range and radius at the least and the full charge (one value: both).
     #[serde(default)]
     pub damage: [f32; 2],

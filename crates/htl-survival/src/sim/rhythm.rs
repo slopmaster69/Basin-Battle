@@ -148,7 +148,7 @@ impl Survival {
                     self.set_done(id, done + 1, pressed.max(done + 1));
                     continue;
                 }
-                self.events.push(Event::CheckResult { player: id, ability, grade: "fail" });
+                self.check_result(id, ability, "fail");
                 self.end_rhythm(id, ability, false);
             }
             return;
@@ -172,7 +172,7 @@ impl Survival {
         if rest {
             // Pressed on a rest: the chain breaks. Pressed well after it: it was for the next.
             if (t - at).abs() <= Self::window_of(&d, k) + 1.0e-4 || t < at {
-                self.events.push(Event::CheckResult { player: id, ability, grade: "fail" });
+                self.check_result(id, ability, "fail");
                 self.end_rhythm(id, ability, false);
                 return;
             }
@@ -185,7 +185,7 @@ impl Survival {
         let w = Self::window_of(&d, k);
         let off = (t - at).abs();
         if off > w + 1.0e-4 {
-            self.events.push(Event::CheckResult { player: id, ability, grade: "fail" });
+            self.check_result(id, ability, "fail");
             self.end_rhythm(id, ability, false);
             return;
         }
@@ -230,6 +230,11 @@ impl Survival {
             }
         } else {
             let (yaw, _) = self.aim_of(id);
+            // The body's cast for this missile: the hands take turns.
+            if !d.beat_clips.is_empty() {
+                let clip = d.beat_clips[k as usize % d.beat_clips.len()];
+                self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: d.beat.max(0.25), at: 0.1 });
+            }
             if let Some(p) = self.players.get_mut(&id) {
                 p.facing = yaw;
                 p.cast_damage = Some(damage);

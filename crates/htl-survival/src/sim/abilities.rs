@@ -924,6 +924,18 @@ impl Survival {
         self.set_action(id, Action::Ready);
     }
 
+    /// A check's outcome to the caster; a fail fizzles where everyone sees it (Corey: on every
+    /// spell whose timing was missed).
+    pub(crate) fn check_result(&mut self, id: Id, ability: usize, grade: &'static str) {
+        if grade == "fail" {
+            let kit = self.content.checks.fizzle_kit;
+            if kit != 0 {
+                self.events.push(Event::Visual { id, kit, by: None });
+            }
+        }
+        self.events.push(Event::CheckResult { player: id, ability, grade });
+    }
+
     /// The burst a perfect of this ability shows: its own, or the checks' default.
     pub(crate) fn perfect_kit_of(&self, ability: usize) -> u32 {
         let own = self.content.abilities[ability].perfect_kit;

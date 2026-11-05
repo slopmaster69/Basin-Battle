@@ -16,6 +16,8 @@ use crate::content::AbilityDef;
 
 /// How often the jet's reach puffs while it sweeps.
 const PULSE: f32 = 0.1;
+/// A sweep's channel look replays this often.
+const CHANNEL_EVERY: f32 = 0.3;
 
 impl Survival {
     /// The sweep begins from one side, turning across the front: which side and how fast, rolled
@@ -72,6 +74,15 @@ impl Survival {
     /// it (clients with the ground burst, patch 0026), so the pulses read as one jet turning;
     /// else one of `tick_spell`'s missiles to its reach.
     fn pulse_sweep(&mut self, id: Id, ability: usize, yaw: f32) {
+        // The channel's spray from the hands, every few pulses.
+        let kit = self.content.abilities[ability].channel_kit;
+        if kit != 0 {
+            let since = match self.players[&id].action { Action::Sweep { since, .. } => since, _ => self.clock };
+            let t = self.clock - since;
+            if t < 1.0e-4 || (t / CHANNEL_EVERY).floor() != ((t - PULSE) / CHANNEL_EVERY).floor() {
+                self.events.push(Event::Visual { id, kit, by: None });
+            }
+        }
         let d = &self.content.abilities[ability];
         if let Some(b) = &d.burst {
             let at = self.players[&id].pos;
@@ -178,7 +189,7 @@ impl Survival {
             self.events.push(Event::Perfect { player: id, ability });
         }
         let grade = if perfect { "perfect" } else if mobs.is_empty() && heroes.is_empty() { "fail" } else { "good" };
-        self.events.push(Event::CheckResult { player: id, ability, grade });
+        self.check_result(id, ability, grade);
     }
 
     /// The foes a wedge from `at` covers: creatures and (with friendly fire) hostile heroes.

@@ -571,6 +571,8 @@ pub struct Player {
     /// A sweep's way across (+1 left to right, -1 right to left) and its time (rolled as it began).
     pub sweep_dir: f32,
     pub sweep_secs: f32,
+    /// The ward's next crackle, while it's up.
+    pub ward_crackle_at: f32,
     /// What the cast going out now strikes for, when its own numbers don't say (a beat's).
     pub cast_damage: Option<f32>,
     pub sprint_held: bool,
@@ -1196,6 +1198,7 @@ impl Survival {
             rhythm_beats: Vec::new(),
             sweep_dir: 1.0,
             sweep_secs: 1.0,
+            ward_crackle_at: 0.0,
             cast_damage: None,
             sprint_held: false,
             sprinting: false,
