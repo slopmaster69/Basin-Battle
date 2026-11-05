@@ -2761,7 +2761,7 @@ reward = { stone = 4, linen = 2 }
 
 [[goal]]
 title = "A shrine's lesson"
-text = "Use one of Elwynn's class shrines, the marked sanctums on the map, and beat the guardians it wakes. Each hero there learns 2 of its cards. Open the board (N) to slot them."
+text = "Use one of Elwynn's class shrines, the marked sanctums on the map, and beat the guardians it wakes. Each hero there learns 2 of its abilities. Open the board (N) to slot them."
 kind = "learn"
 what = "any"
 count = 2
@@ -2922,7 +2922,7 @@ reward = { stone = 4, wood = 6 }
 
 [[goal]]
 title = "The classes' trials"
-text = "Learn 16 cards between you, from shrines, hidden relics and champions. Everyone who fights a champion learns its card. The champions are Warlord Gorzak, Brother Malach, Morvane, the Unbound Flame, Rumbler, Vexx, Morgan, Old Blackfang and Moonfeather."
+text = "Learn 16 abilities between you, from shrines, hidden relics and champions. Everyone who fights a champion learns its ability. The champions are Warlord Gorzak, Brother Malach, Morvane, the Unbound Flame, Rumbler, Vexx, Morgan, Old Blackfang and Moonfeather."
 kind = "learn"
 what = "any"
 count = 16
@@ -5926,7 +5926,7 @@ effects = [{ kind = "stun", secs = [0.75, 0.75] }]
 [[ability]]
 key = "gravity_lance"
 name = "Gravity Lance"
-text = "Fires a heavy bolt of shadow along the reticle, up to 24 yd. Every other enemy within 5 yd of the one it hits is dragged into it, and all of them take 14 damage. Bunch them up for any area card."
+text = "Fires a heavy bolt of shadow along the reticle, up to 24 yd. Every other enemy within 5 yd of the one it hits is dragged into it, and all of them take 14 damage. Bunch them up for any area ability."
 icon = "Spell_Arcane_StarFire"
 school = "beta"
 slot = "ranged"
@@ -6113,7 +6113,7 @@ effects = [{ kind = "knockback", amount = 10.0, wall_stun = 2.0 }]
 [[ability]]
 key = "blink_dagger"
 name = "Blink Dagger"
-text = "Blinks 12 yd to the reticle. Press again within 3 sec to blink again. The most mobile card on the board, and nothing else."
+text = "Blinks 12 yd to the reticle. Press again within 3 sec to blink again. The most mobile ability on the board, and nothing else."
 icon = "INV_Weapon_ShortBlade_05"
 school = "beta"
 slot = "utility"
@@ -6438,7 +6438,7 @@ effects = [{ kind = "stun", secs = [1.0, 1.0] }, { kind = "knockback", amount = 
 [[ability]]
 key = "black_hole"
 name = "Black Hole"
-text = "Lobs a singularity to the reticle, up to 26 yd away. Its landing is shown to everyone. For 3 sec it drags every enemy within 7 yd 3 yd toward its center each second, dealing 6 damage per sec. Then it collapses, dealing 30 damage and knocking everything in it 6 yd out. Feed it to your area cards first."
+text = "Lobs a singularity to the reticle, up to 26 yd away. Its landing is shown to everyone. For 3 sec it drags every enemy within 7 yd 3 yd toward its center each second, dealing 6 damage per sec. Then it collapses, dealing 30 damage and knocking everything in it 6 yd out. Feed it to your area abilities first."
 icon = "Spell_Arcane_PortalUndercity"
 school = "beta"
 slot = "ultimate"

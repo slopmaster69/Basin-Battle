@@ -2852,8 +2852,8 @@ function ES.AbilityTip(b)
   local s = ES.slots[b.n]
   GameTooltip:SetOwner(b, "ANCHOR_TOP")
   if not s or s.key == "" then
-    GameTooltip:SetText("No card on this key")
-    GameTooltip:AddLine("Open the board (" .. (KeyName("ES_TREE") or "N") .. ") to choose a card for it.", 0.8, 0.8, 0.8, 1)
+    GameTooltip:SetText("No ability on this key")
+    GameTooltip:AddLine("Open the board (" .. (KeyName("ES_TREE") or "N") .. ") to choose an ability for it.", 0.8, 0.8, 0.8, 1)
     GameTooltip:Show()
     return
   end
@@ -4409,7 +4409,7 @@ Pins.icons = {
 }
 Pins.words = {
   camp = "Your camp", town = "A town", horde = "Held by the Horde", foes = "Hostile ground",
-  sanctum = "A sanctum whose trial teaches the camp new cards", lair = "A lair",
+  sanctum = "A sanctum whose trial teaches the camp new abilities", lair = "A lair",
   landmark = "A landmark", arena = "The Proving Ring", dungeon = "A way below",
   fishing = "Fishing waters", mine = "A mine", herbs = "Herbs grow here",
 }
@@ -4651,7 +4651,7 @@ local ACTION_ICONS = { upgrade = "Spell_ChargePositive", move = "INV_Misc_Note_0
 function ES.Station(name, list, icon, actions, health, most)
   local note = "Materials come from your bags first, then storage."
   if ES.siege then
-    note = "Buy your class's other cards with gold. A new card goes on its key if the key is free. Swap cards on the board (N)."
+    note = "Buy your class's other abilities with gold. A new ability goes on its key if the key is free. Swap abilities on the board (N)."
   elseif health and most and most ~= "" then
     note = "Health " .. health .. " of " .. most .. ". " .. note
   end
@@ -4659,7 +4659,7 @@ function ES.Station(name, list, icon, actions, health, most)
   local items = Items(list)
   local acts = Items(actions)
   if table.getn(items) == 0 and table.getn(acts) == 0 then
-    Rest(ES.siege and "You know every card of your class." or "Nothing to make here yet.", "", "")
+    Rest(ES.siege and "You know every ability of your class." or "Nothing to make here yet.", "", "")
   end
   -- Upgrading, moving and tearing down come first: room for them before the recipes.
   local top = 0
@@ -5006,7 +5006,7 @@ end
 -- --- Siege's muster banner (SL: open, status, secs, then key~name~text~seats~heroes~mine) ----------
 
 function ES.Muster(f)
-  OpenWindow("muster", "The Siege Muster", "Join a mode. It begins when its seats are full, or start it early with whoever is waiting. Every match starts with your class's plain Q and E cards.", "INV_BannerPVP_02")
+  OpenWindow("muster", "The Siege Muster", "Join a mode. It begins when its seats are full, or start it early with whoever is waiting. Every match starts with your class's plain Q and E abilities.", "INV_BannerPVP_02")
   local ways = Items(f[5])
   local mine = nil
   for i = 1, table.getn(ways) do
@@ -5459,7 +5459,7 @@ tree.reset:SetPoint("LEFT", tree.full, "RIGHT", 8, 0)
 tree.hint = Text(tree, FONT_BODY, 10)
 tree.hint:SetPoint("BOTTOM", tree, "BOTTOM", 0, 46)
 tree.hint:SetTextColor(0.65, 0.63, 0.58)
-tree.hint:SetText("Click a card to put it on its key.  Hold the key a moment (or Ctrl with it) for its charged-up version.")
+tree.hint:SetText("Click an ability to put it on its key.  Hold the key a moment (or Ctrl with it) for its charged-up version.")
 
 -- The column heads.
 local function ColX(c)
@@ -5661,11 +5661,11 @@ ES.boardKit = {
 function ES.BoardDetail(d)
   local r, c = tree.regular, tree.charged
   if not d then
-    r.title:SetText("Choose a card for each key")
+    r.title:SetText("Choose an ability for each key")
     r.title:SetTextColor(0.95, 0.9, 0.8)
     r.tag:SetText("")
     r.how:SetText("")
-    r.text:SetText("Two keys to deal damage (one to reach the foe, one for the brawl), one for getting in, out or through, one for staying alive, and an ultimate that takes the whole Valor bar. Any card goes with any other.")
+    r.text:SetText("Two keys to deal damage (one to reach the foe, one for the brawl), one for getting in, out or through, one for staying alive, and an ultimate that takes the whole Valor bar. Any ability goes with any other.")
     r.facts:SetText("")
     c.title:SetText("")
     c.tag:SetText("")

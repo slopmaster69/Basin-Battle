@@ -280,15 +280,15 @@ impl Survival {
         }
         if !self.reachable(&owned, key) {
             if def.is_beta() && def.on_board() && self.is_siege() {
-                return Err(format!("{} is a beta card. Siege doesn't use beta cards.", def.name));
+                return Err(format!("{} is a beta ability. Siege doesn't use beta abilities.", def.name));
             }
             let at = self.learned_where(key);
-            return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("Learn {} in Elwynn first. {at}.", def.name) });
+            return Err(if at.is_empty() { "That ability isn't on the board.".into() } else { format!("Learn {} in Elwynn first. {at}.", def.name) });
         }
         // Siege: bought, in a match.
         if self.is_siege() && !self.debug {
             if self.camp_of(id).is_none() {
-                return Err("Buy cards during a match.".into());
+                return Err("Buy abilities during a match.".into());
             }
             let price = self.card_price(key).unwrap_or(0);
             self.spend_gold(id, price)?;
@@ -552,7 +552,7 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return true };
         let Some(slot_name) = SLOTS.get(slot) else { return true };
         let Some(base) = p.loadout.get(*slot_name).and_then(|k| self.content.ability(k)) else {
-            self.tell(id, format!("Nothing on that key. Open the board (N) and choose a card for the {} key.", slot_role(slot_name)));
+            self.tell(id, format!("Nothing on that key. Open the board (N) and choose an ability for the {} key.", slot_role(slot_name)));
             return true;
         };
         // Ice Block: its key again breaks out of it.

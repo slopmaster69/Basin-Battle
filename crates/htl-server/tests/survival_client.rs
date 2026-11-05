@@ -1362,8 +1362,8 @@ fn characters_are_made_on_the_creation_screen_listed_played_and_deleted() {
     assert_eq!(field(&f, 193), Some(u32::from_le_bytes([3, 4, 5, 6])), "skin, face, hair, its colour");
     assert_eq!(field(&f, 131), Some(50), "a human woman's model");
     c.chat(".es tree");
-    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(mc) if mc.text.contains("Your cards"))).is_some());
-    let cards = c.seen.iter().rev().find_map(|p| if let ServerPacket::MessageChat(mc) = p { mc.text.contains("Your cards").then(|| mc.text.clone()) } else { None }).unwrap();
+    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(mc) if mc.text.contains("Your abilities"))).is_some());
+    let cards = c.seen.iter().rev().find_map(|p| if let ServerPacket::MessageChat(mc) = p { mc.text.contains("Your abilities").then(|| mc.text.clone()) } else { None }).unwrap();
     let rules = htl_survival::Content::builtin();
     for a in rules.abilities.iter().filter(|a| a.on_board()) {
         let k = format!("{},", a.key);
@@ -1378,8 +1378,8 @@ fn characters_are_made_on_the_creation_screen_listed_played_and_deleted() {
     assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(mc) if mc.text.contains("Every spell is yours"))).is_some());
     c.seen.clear();
     c.chat(".es tree");
-    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(mc) if mc.text.contains("Your cards"))).is_some());
-    let cards = c.seen.iter().rev().find_map(|p| if let ServerPacket::MessageChat(mc) = p { mc.text.contains("Your cards").then(|| mc.text.clone()) } else { None }).unwrap();
+    assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(mc) if mc.text.contains("Your abilities"))).is_some());
+    let cards = c.seen.iter().rev().find_map(|p| if let ServerPacket::MessageChat(mc) = p { mc.text.contains("Your abilities").then(|| mc.text.clone()) } else { None }).unwrap();
     for a in rules.abilities.iter().filter(|a| a.on_board() && !a.is_ex() && !a.inner) {
         assert!(cards.contains(&format!("{},", a.key)) || cards.contains(&format!("{}.", a.key)), "{} in: {cards}", a.key);
     }

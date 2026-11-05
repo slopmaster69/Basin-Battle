@@ -645,7 +645,7 @@ impl Survival {
                 // A few short lines, one thing each, rather than one long one.
                 self.tell(h, format!("{} has begun. You hold {}{with} against {}.", mode.name, names[k], rivals.join(" and ")));
                 self.tell(h, format!("Waves arrive every {} sec at your gate, {gate} of your Hearth and marked red on the ground. Your rivals' sends come with them.", d.wave_secs as u32));
-                self.tell(h, "Spend gold to build defenses (H), send enemies at a rival from the Mercenary Ledger (F) and learn cards at the Battle Trainer. Each send raises your income.");
+                self.tell(h, "Spend gold to build defenses (H), send enemies at a rival from the Mercenary Ledger (F) and learn abilities at the Battle Trainer. Each send raises your income.");
                 self.tell(h, "Food and salves arrive with every wave. Eat with (T). Ready early? Use your Hearth (F). When everyone is ready, the next wave comes at once.");
             }
         }

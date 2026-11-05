@@ -1296,7 +1296,7 @@ impl SurvivalGame {
                 }),
                 "full" | "reset" if self.dev_ok() => {
                     self.sim.set_tree(me, arg == "full");
-                    self.tell(conn, if arg == "full" { "Every card on the board is yours." } else { "The board is back to your class's first cards." });
+                    self.tell(conn, if arg == "full" { "Every ability on the board is yours." } else { "The board is back to your class's first abilities." });
                     self.ui_tree(conn, me);
                     Ok(())
                 }
@@ -1316,7 +1316,7 @@ impl SurvivalGame {
             "spells" | "allspells" if self.dev_ok() => {
                 let full = arg != "reset";
                 self.sim.set_tree(me, full);
-                self.tell(conn, if full { "Every spell is yours. Open the board (N) to put them on your keys." } else { "The board is back to your class's first cards." });
+                self.tell(conn, if full { "Every spell is yours. Open the board (N) to put them on your keys." } else { "The board is back to your class's first abilities." });
                 self.ui_tree(conn, me);
                 Ok(())
             }
@@ -1746,7 +1746,7 @@ impl SurvivalGame {
         if !self.has_addon(conn) {
             let Some(p) = self.sim.players.get(&id) else { return };
             let owned: Vec<String> = p.owned.iter().cloned().collect();
-            self.say_to(conn, &format!("Your cards: {}. Keys: {:?}. .es slot <q|e|r|f> <ability> puts one on a key.", owned.join(", "), p.loadout));
+            self.say_to(conn, &format!("Your abilities: {}. Keys: {:?}. .es slot <q|e|r|f> <ability> puts one on a key.", owned.join(", "), p.loadout));
             return;
         }
         if let Some(line) = self.tree_line(id) {
@@ -1805,11 +1805,11 @@ impl SurvivalGame {
         };
         let ((owned, all), (beta_owned, beta_all)) = (count(false), count(true));
         let points = if dev {
-            "Dev build: every card".to_string()
+            "Dev build: every ability".to_string()
         } else if beta_all > 0 {
-            format!("{owned} of {all} cards · beta page {beta_owned} of {beta_all}")
+            format!("{owned} of {all} abilities · beta page {beta_owned} of {beta_all}")
         } else {
-            format!("{owned} of {all} cards")
+            format!("{owned} of {all} abilities")
         };
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
