@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 31
+local VERSION = 32
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6556,15 +6556,19 @@ function ES.Line(line)
     end
   elseif verb == "ML" then
     -- How a spell's missiles look (patch 0030): a ribbon behind them, their size and a spin; with
-    -- a caster's guid, for its next one alone (a ricochet's colour); and the spin's axis after it
-    -- ("side": end over end, patch 0036; "-" in the caster's place when there's none).
+    -- a caster's guid, for its next one alone (a ricochet's colour); the spin's axis after it
+    -- ("side": end over end, patch 0036; "-" in the caster's place when there's none); and a
+    -- speed of their own in yards a second after that (patch 0040; absent or 0: the spell's own,
+    -- which older clients keep: they take no tenth argument).
     if SetMissileLook and f[2] then
       local trail = f[3]
       if trail == "-" then trail = nil end
       local caster = f[8]
       if caster == "-" then caster = nil end
+      local axis = f[9]
+      if axis == "-" then axis = nil end
       SetMissileLook(tonumber(f[2]) or 0, trail, tonumber(f[4]) or 0.25, tonumber(f[5]) or 0.35,
-        tonumber(f[6]) or 1, tonumber(f[7]) or 0, caster, f[9])
+        tonumber(f[6]) or 1, tonumber(f[7]) or 0, caster, axis, tonumber(f[10]) or 0)
     end
   elseif verb == "MK" then
     -- A blow coming down there: its circle on the ground (the client lays it), or gone.
