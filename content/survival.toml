@@ -5885,6 +5885,11 @@ range = [30.0, 30.0]
 radius = [0.6, 0.6]
 speed = 22.0
 spell = 23024
+# Let go with a heavy two-handed sweep of the staff (the troll men's, Cleave's), the burst
+# flung off its end (Corey: a HEAVY staff swing for a big cast).
+clip = 19
+take = 1
+from = "TrollMale"
 effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
 
 [[ability]]
@@ -5930,6 +5935,10 @@ radius = [0.4, 0.4]
 speed = 36.0
 pierce = 9
 spell = 23412
+# Let go with the orc men's upswing, the lance ripped up and out of the staff.
+clip = 87
+take = 0
+from = "OrcMale"
 effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 
 [[ability]]
