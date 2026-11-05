@@ -97,7 +97,7 @@ impl Survival {
         let at = self.living_pos(b.on).unwrap_or(b.at);
         let share = if perfect { 1.0 } else { 0.0 };
         let damage = crate::content::AbilityDef::at(d.damage, share);
-        let radius = d.radius[1];
+        let radius = if d.bomb_radius > 0.0 { d.bomb_radius } else { d.radius[1] };
         // The burst's look: `tick_spell`'s, a perfect's `full_spell`'s (its bolt is `spell`).
         let look = if perfect && d.full_spell != 0 { d.full_spell } else { d.tick_spell };
         if look != 0 {
