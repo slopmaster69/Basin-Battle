@@ -384,6 +384,13 @@ opening = 2.0
 # together, break its stance. Lesser champions with a posture still reel from a parry.
 posture = 0.25
 
+[backstab]
+# A hit in a creature's back, by anyone: besides the stab (kit 330, which plays on the chest and so
+# shows nothing from behind), the dagger's crit and the beat, this look on the creature. Rend's
+# blood burst; to film another, .es tune backstab.kit <id> (290, 815, 3051 are the same burst as
+# other blows play it). 0 for none.
+kit = 220
+
 # --- heroes against heroes ------------------------------------------------------------------------
 
 [pvp]

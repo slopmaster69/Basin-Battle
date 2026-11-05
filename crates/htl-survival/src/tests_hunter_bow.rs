@@ -144,6 +144,50 @@ fn aimed_shot_raises_the_bow_draws_it_as_it_charges_looses_it_and_gives_the_weap
     assert!(geared(&ev, p));
 }
 
+/// Draw Aimed Shot at `k` along the x axis, hold it a moment and let go; `k` is held where it
+/// stands (facing as set) until the arrow lands.
+fn aimed_arrow_into(s: &mut Survival, p: Id, k: Id) -> Vec<Event> {
+    press(s, p, "aimed_arrow", false);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.input(p, Input::Attack);
+    let mut ev = run_pinned(s, 0.6, &[k]);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.input(p, Input::AttackUp);
+    ev.extend(run_pinned(s, 1.5, &[k]));
+    ev
+}
+
+/// The backstab is any hit in an enemy's back (Corey), an arrow's too: a creature facing away
+/// takes the stab's flash, a dagger's crit and the sharp beat with the arrow; one facing the
+/// archer takes the arrow alone. No word either way, and the arrow's damage is the same.
+#[test]
+fn an_arrow_in_a_creatures_back_is_a_backstab_and_one_in_its_face_is_not() {
+    use crate::sim::cues::seen::{beat, looked, no_words, sounded};
+    use crate::sim::cues::{BEAT_BACKSTAB, SOUND_BACKSTAB};
+    let mut s = world();
+    let p = hero(&mut s, ORIGIN);
+    let k = mob(&mut s, [12.0, 0.0, 0.0]);
+    // Facing away from the archer (along +x, as she looks).
+    s.mobs.get_mut(&k).unwrap().facing = 0.0;
+    let ev = aimed_arrow_into(&mut s, p, k);
+    assert_eq!(hits(&ev, p, k), 1, "the arrow lands in its back");
+    assert!(looked(&ev, k, KIT_RIPOSTE), "the stab's flash on it");
+    let look = s.content.backstab.kit;
+    assert!(look != 0 && looked(&ev, k, look), "and the backstab's own look, which reads from behind");
+    assert!(sounded(&ev, k, SOUND_BACKSTAB), "a dagger's crit");
+    assert!(beat(&ev, p, BEAT_BACKSTAB), "the sharp beat on her screen");
+    assert!(no_words(&ev, p), "no word");
+    // The same arrow into its face: the arrow alone.
+    s.mobs.get_mut(&k).unwrap().facing = std::f32::consts::PI;
+    let ev = aimed_arrow_into(&mut s, p, k);
+    assert_eq!(hits(&ev, p, k), 1, "the arrow lands in its face");
+    assert!(!looked(&ev, k, KIT_RIPOSTE), "no stab flash from the front");
+    assert!(!looked(&ev, k, look), "nor the backstab's look");
+    assert!(!sounded(&ev, k, SOUND_BACKSTAB));
+    assert!(!beat(&ev, p, BEAT_BACKSTAB));
+    assert!(no_words(&ev, p), "no word");
+}
+
 #[test]
 fn a_bow_ability_with_nothing_to_charge_is_drawn_as_it_is_aimed() {
     let mut s = world();
