@@ -1246,12 +1246,12 @@ icon = "INV_Hammer_01"
 kind = "weapon"
 text = "Two-handed. Very slow and very heavy. Breaks an enemy's windup. Guards with the haft."
 
-# Its look is the conjurers' staff (the same display their creatures carry), until a staff of its
-# own is picked from the data.
+# Real staves from the game's data, each with its own icon (Corey: the conjurers' look, 5415, is a
+# totem; it stays free for druids and shamans). A plain wooden long staff.
 [[item]]
 key = "apprentice_staff"
 name = "Apprentice's Staff"
-display = 5415
+display = 472
 icon = "INV_Staff_08"
 kind = "weapon"
 text = "Two-handed. Guards with a ward: an arcane barrier with a bar of its own. A ward raised just as a blow lands costs nothing and reels the attacker. Broken, it can't be raised again until its bar is full."
@@ -1368,28 +1368,30 @@ icon = "INV_Staff_08"
 kind = "weapon"
 text = "Lab: the ahnqiraj_d_04 staff model."
 
-# The casting staffs share the conjurers' staff look for now (a staff each, from the data, later).
+# Blackwing's dark staff with its red-hot tip.
 [[item]]
 key = "ember_staff"
 name = "Ember Staff"
-display = 5415
-icon = "INV_Staff_13"
+display = 31959
+icon = "INV_Staff_06"
 kind = "weapon"
 text = "Two-handed. Attacks cast bolts of fire that burn; the heavy attack a slow, heavy one. Guards with a ward."
 
 [[item]]
 key = "rime_staff"
 name = "Rime Staff"
-display = 5415
-icon = "INV_Staff_14"
+# Zul'Gurub's staff, its tip glowing ice blue.
+display = 32461
+icon = "INV_Staff_Goldfeathered_01"
 kind = "weapon"
 text = "Two-handed. Attacks cast shards of frost that chill; the heavy attack a heavy shard that pierces. Guards with a ward."
 
 [[item]]
 key = "arcane_staff"
 name = "Arcane Staff"
-display = 5415
-icon = "INV_Staff_07"
+# A dark staff set with glowing orbs.
+display = 31347
+icon = "INV_Staff_30"
 kind = "weapon"
 text = "Two-handed. Attacks cast quick bolts of arcane force; the heavy attack a heavier orb. Guards with a ward."
 
