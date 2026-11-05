@@ -2082,6 +2082,14 @@ impl Survival {
                 self.events.push(Event::Sound { id: mid, sound: through_sound });
             }
         }
+        // An arrow, a bolt or a thrown weapon in a creature's back is a backstab like a blow in it
+        // (Corey: any character's hit in an enemy's back): the stab's flash on it, a dagger's crit
+        // and the sharp beat on the shooter's screen; no word, and no more damage. Judged from
+        // where the shot came from against the way the creature faces, as a swing is.
+        if how == HitKind::Projectile && damage > 0 && self.players.contains_key(&owner) && self.from_behind(mid, from) {
+            self.cue(Some(owner), mid, combat::KIT_RIPOSTE, cues::SOUND_BACKSTAB, cues::BEAT_BACKSTAB);
+            self.backstab_look(mid, Some(owner));
+        }
         self.trade_blows(owner, mid);
         if damage > 0 {
             let name = self.content.abilities[ability].name.clone();
