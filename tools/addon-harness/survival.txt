@@ -532,6 +532,7 @@ WR	camp
 CK	fireball	release	fire	1.200	0.100	0.300	stutter
 !local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "release check: shown " .. tostring(c:IsShown()) .. " kind " .. tostring(c.cur and c.cur.kind) .. " flare " .. tostring(c.cur and c.cur.flare) .. " curve " .. tostring(c.cur and c.cur.curve))
 !ElwynnSurvival.attackHeld = true ElwynnSurvival.Attack("up") table.insert(SAID, "released: judged " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade) .. ", ring gone " .. tostring(ElwynnSurvival.check.cur == nil))
+!table.insert(SAID, "frozen ring at " .. tostring(ElwynnSurvival.check.fx and math.floor(ElwynnSurvival.check.fx.ghost or 0)) .. " (the line at 64): early is outside")
 CR	fireball	fizzle
 !local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "after the outcome: shown " .. tostring(c:IsShown()) .. " fx " .. tostring(c.fx))
 CK	arcane_missiles	rhythm	arcane	0.150	0.080	0.300	3|swing|0.000,0.420,0.700,1.120,1.400r,1.820,2.100,2.520

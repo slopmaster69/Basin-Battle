@@ -185,12 +185,27 @@ local crack = Tex("check_fail", "OVERLAY")
 local tick = Tex("check_closer", "OVERLAY")
 local fizzle = Tex("check_fizzle", "OVERLAY")
 local beatcore = Tex("check_critical", "OVERLAY")
+-- The clarity pieces (Corey's art, Nov 5): the critical's star and a big outcome's shockwave; the
+-- ring frozen where the press came with the target dimly behind it, so early (outside), late
+-- (inside) and on time read at a glance; and the input to use, beside the ring for the first few.
+local star = Tex("fx_starburst", "OVERLAY")
+local wave = Tex("fx_shockwave", "OVERLAY")
+local ghost = Tex("check_closer", "OVERLAY")
+local target = Tex("ring_fire", "ARTWORK")
+local icon = check:CreateTexture(nil, "OVERLAY")
+icon:SetBlendMode("ADD")
+icon:Hide()
+-- The shockwave's line, as a share of its drawn half (the art's ring, padded for turning).
+local WAVE_LINE = 0.73
+local ICONS = { release = "input_mouse", rhythm = "input_key", sweep = "input_stop", orb = "input_stop" }
+local ICON_FIRST = 10
+local DULL = "Sound\\Interface\\iDeselectTarget.wav"
 
 local ClearGroundAll, HidePlatesAll
 local function HideRing()
   if ClearGroundAll then ClearGroundAll() end
   if HidePlatesAll then HidePlatesAll() end
-  ring:Hide(); ring2:Hide(); halo:Hide(); spark:Hide(); hint:Hide()
+  ring:Hide(); ring2:Hide(); halo:Hide(); spark:Hide(); hint:Hide(); icon:Hide()
   needle:Hide(); needleCore:Hide(); track:Hide(); danger:Hide()
   for i = 1, table.getn(marks) do marks[i]:Hide() end
   for i = 1, table.getn(trail) do trail[i]:Hide() end
@@ -222,6 +237,12 @@ end
 local function Made(kind)
   local h = Saved()
   h[kind] = (h[kind] or 0) + 1
+  h["icon_" .. kind] = (h["icon_" .. kind] or 0) + 1
+end
+
+-- The input's icon beside the ring for the first few of each kind.
+local function IconFor(kind)
+  return (Saved()["icon_" .. kind] or 0) < ICON_FIRST
 end
 
 -- How the closing ring travels: share of the way in, from the share of the time.
@@ -254,14 +275,32 @@ local function Outcome(grade, school, beat)
   burst:SetTexture(ART .. sc.ring)
   if grade == "critical" then
     PlaySoundFile(sc.sound); PlaySoundFile(CHIME)
+    if ShakeCamera then ShakeCamera(0.5, 0.18) end
   elseif grade == "perfect" then
     PlaySoundFile(sc.sound)
-  elseif grade == "good" or grade == "weak" then
+  elseif grade == "good" then
     PlaySoundFile(TICK)
+  elseif grade == "weak" then
+    PlaySoundFile(DULL)
   else
     PlaySoundFile(sc.fizzle)
   end
   check:Show()
+end
+
+-- Where a release's closing ring stood at the press (its radius): outside the line early, on it in
+-- the window, inside it late.
+local function PressRadius(c, now)
+  local sc = SCHOOL[c.school]
+  local line = sc.size * sc.line / 2
+  local t = now - c.start
+  if t > c.flare + c.window then
+    local late = (t - c.flare - c.window) / 0.35
+    return line * math.min(0.84, Clamp(1 - 0.35 * late, 0.4, 1))
+  end
+  if t >= c.flare - c.window then return line end
+  local q = Curve(c.curve, t / math.max(0.05, c.flare))
+  return line * math.max(1.12, 1 + (START_OUT - 1) * (1 - Clamp(q, 0, 1)))
 end
 
 -- The check is made (or lost): its ring goes at once, its outcome plays.
@@ -273,7 +312,9 @@ local function Finish(grade)
   Made(c.kind)
   c.judged = grade
   check.last = { key = c.key, grade = grade, at = GetTime(), school = c.school }
+  local ghostR = c.kind == "release" and not c.ground and PressRadius(c, GetTime())
   Outcome(grade, c.school)
+  if ghostR and check.fx then check.fx.ghost = ghostR end
 end
 
 -- --- the server's lines ----------------------------------------------------------------------------
@@ -318,6 +359,7 @@ function ES.CheckLine(f)
     return
   end
   c.hint = HintFor(kind)
+  c.icon = IconFor(kind)
   c.ground = SetGroundRing and GROUND[c.key]
   if c.ground and c.ground.at == "aim" and GetAimPoint then
     local x, y, z = GetAimPoint()
@@ -923,11 +965,12 @@ local function StepFx(now)
   local g = f.grade
   local age = now - f.at
   local line = sc.size * sc.line / 2
-  local dur = (g == "critical" and 0.62) or (g == "perfect" and 0.5) or ((g == "fail" or g == "fizzle") and 0.7) or 0.3
+  local dur = (g == "critical" and 0.7) or (g == "perfect" and 0.55) or ((g == "fail" or g == "fizzle") and 0.7) or (f.ghost and 0.6) or 0.3
   local t = age / dur
   if t >= 1 then
     check.fx = nil
     pop:Hide(); core:Hide(); burst:Hide(); crack:Hide(); tick:Hide(); fizzle:Hide()
+    star:Hide(); wave:Hide(); ghost:Hide(); target:Hide()
     return
   end
   local e = EaseOut(t)
@@ -939,15 +982,32 @@ local function StepFx(now)
     Draw(pop, (g == "critical" and 300 or 240) * (0.55 + 0.75 * e), age * 0.9, (1 - t) * (1 - t) * 1.0, tint[1], tint[2], tint[3])
     if g == "critical" then
       Draw(core, 60 + 260 * e, -age * 2.2, (1 - t), 1, 1, 1)
+      -- The critical's star (Corey's): blazing over it all, turning as it fades.
+      Draw(star, 110 + 320 * e, age * 0.7, (1 - t) * (1 - t), 1, 0.95, 0.8)
     else
-      core:Hide()
+      core:Hide(); star:Hide()
     end
+    -- The shockwave out from the ring's line: white-gold for a critical, the school's for a perfect.
+    local wc = (g == "critical") and { 1, 0.9, 0.65 } or sc.tint
+    Draw(wave, (2 * line / WAVE_LINE) * (1 + 1.2 * e), 0, (1 - t) * 0.95, wc[1], wc[2], wc[3])
+    ghost:Hide(); target:Hide()
     crack:Hide(); fizzle:Hide(); tick:Hide()
   elseif g == "good" or g == "weak" then
     -- A tick of light: the ring's line pulsing out once, the school's colour (grey, early).
     local col = (g == "good") and sc.tint or { 0.62, 0.62, 0.66 }
-    DrawCloser(tick, line * (1 + 0.45 * e), (1 - t) * 0.95, col, 0)
-    pop:Hide(); core:Hide(); burst:Hide(); crack:Hide(); fizzle:Hide()
+    if f.ghost then
+      -- A release off its moment: the target dimly where it was, and the closing ring frozen where
+      -- the press came, outside it (early, a cold grey) or inside it (late, amber).
+      col = (g == "good") and { 1.0, 0.68, 0.25 } or { 0.62, 0.7, 0.88 }
+      target:SetTexture(ART .. sc.ring)
+      Draw(target, sc.size, 0, (1 - t) * 0.5, 1, 1, 1)
+      DrawCloser(ghost, f.ghost, (1 - t * t) * 0.95, col, 0)
+      tick:Hide()
+    else
+      DrawCloser(tick, line * (1 + 0.45 * e), (1 - t) * 0.95, col, 0)
+      ghost:Hide(); target:Hide()
+    end
+    pop:Hide(); core:Hide(); burst:Hide(); crack:Hide(); fizzle:Hide(); star:Hide(); wave:Hide()
   else
     -- Failed: the red crack bursts apart with a jolt; a fizzle puffs out of the middle and dies.
     local shake = (1 - t) * 5 * math.sin(age * 70)
@@ -962,8 +1022,44 @@ local function StepFx(now)
     fizzle:SetPoint("CENTER", check, "CENTER", 0, 0)
     fizzle:SetVertexColor(0.85, 0.8, 0.95, 1)
     fizzle:Show()
-    pop:Hide(); core:Hide(); burst:Hide(); tick:Hide()
+    pop:Hide(); core:Hide(); burst:Hide(); tick:Hide(); star:Hide(); wave:Hide(); ghost:Hide(); target:Hide()
   end
+end
+
+-- The input beside the ring (the first few of each kind): the mouse for a release, its button
+-- brightening as the moment nears; a key for a rhythm, tapping on each beat; a stop for a sweep or
+-- an orb, breathing.
+local function DrawIcon(c, now)
+  local sc = SCHOOL[c.school]
+  local line = sc.size * sc.line / 2
+  local t = now - c.start
+  local x, y, size, k = 0, -78, 30, 0.6
+  if (c.kind == "release" or c.kind == "rhythm") and not c.ground then
+    x, y = line + 34, 0
+  elseif c.ground then
+    x, y = 70, -50
+  end
+  if c.kind == "release" then
+    k = 0.4 + 0.6 * Clamp(1 - math.abs(t - c.flare) / math.max(0.25, c.flare * 0.6), 0, 1)
+  elseif c.kind == "rhythm" then
+    local nb = c.beats[c.next]
+    if nb and not nb.rest then
+      local d = math.abs(t - nb.t)
+      if d < 0.14 then
+        size = size * (1 + 0.3 * (1 - d / 0.14))
+        k = 1
+      end
+    end
+  else
+    k = 0.55 + 0.35 * (0.5 + 0.5 * math.sin(now * 6))
+  end
+  icon:SetTexture(ART .. ICONS[c.kind])
+  icon:SetWidth(size)
+  icon:SetHeight(size)
+  icon:ClearAllPoints()
+  icon:SetPoint("CENTER", check, "CENTER", x, y)
+  icon:SetVertexColor(1, 1, 1, k)
+  icon:Show()
 end
 
 check:SetScript("OnUpdate", function()
@@ -986,6 +1082,7 @@ check:SetScript("OnUpdate", function()
       if now - c.start > c.secs + 0.15 then check.cur = nil; HideRing() end
     end
   end
+  if c and check.cur == c and c.icon and ICONS[c.kind] then DrawIcon(c, now) else icon:Hide() end
   StepBeatFx(now)
   StepFx(now)
   if not check.cur and not check.fx and not check.beatfx then this:Hide() end
