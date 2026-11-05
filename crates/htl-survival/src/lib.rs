@@ -19,6 +19,8 @@ mod tests;
 #[cfg(test)]
 mod tests_below;
 #[cfg(test)]
+mod tests_regen;
+#[cfg(test)]
 mod tests_chase;
 #[cfg(test)]
 mod tests_abilities;

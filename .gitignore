@@ -4,6 +4,9 @@
 /.sync
 /settings.sh
 /settings-windows.txt
+/visual-check-settings.txt
+/visual-check-out/
+/visual-check-client/
 /saves
 /tools/addon-harness/target
 logs/
@@ -12,4 +15,8 @@ logs/
 /restart.request
 /tools/clip-census/target
 /tools/*/Cargo.lock
+__pycache__/
 /dist/windows/buttons/target
+/dist/windows/launcher/ui/news.json
+/dist/windows/launcher/ui/shield.png
+/Basin Battle.app
