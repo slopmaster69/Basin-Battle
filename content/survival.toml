@@ -3842,7 +3842,10 @@ slot = "utility"
 choice = 2
 kind = "bomb"
 range = [25.0, 25.0]
-radius = [5.0, 5.0]
+# The bolt flies narrow, like any bolt; the burst is `bomb_radius` (the review on #199: a 5 yd bolt
+# caught foes 4 yd off its line).
+radius = [0.5, 0.5]
+bomb_radius = 5.0
 speed = 36.0
 damage = [10.0, 14.0]
 bomb_secs = 3.0
@@ -6304,7 +6307,7 @@ key = "frozen_orb"
 # A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
 perfect_kit = 1027
 name = "Frozen Orb"
-text = "An orb of frost rolls out along the reticle for up to 4 sec, 25 yd: 15 damage per sec to everything within 2 yd of it, slowing them. Press again to stop it: it bursts for 30 damage within 6 yd. Stop it on an enemy and it bursts for 40 and freezes everything within 6 yd for 2 sec (1 sec against heroes). Stop it at your own feet and you freeze. Let it roll the whole way and it fades."
+text = "An orb of frost rolls out along the reticle for up to 4 sec, 25 yd: 16 damage per sec to everything within 2 yd of it, slowing them. Press again to stop it: it bursts for 30 damage within 6 yd. Stop it on an enemy and it bursts for 40 and freezes everything within 6 yd for 2 sec (1 sec against heroes). Stop it at your own feet and you freeze. Let it roll the whole way and it fades."
 icon = "Spell_Frost_FrostShock"
 school = "mage"
 slot = "ultimate"

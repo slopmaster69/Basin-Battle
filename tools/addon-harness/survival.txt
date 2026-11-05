@@ -534,6 +534,9 @@ CK	fireball	release	fire	1.200	0.100	0.300	stutter
 !ElwynnSurvival.attackHeld = true ElwynnSurvival.Attack("up") table.insert(SAID, "released: judged " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade) .. ", ring gone " .. tostring(ElwynnSurvival.check.cur == nil))
 CR	fireball	fizzle
 !local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "after the outcome: shown " .. tostring(c:IsShown()) .. " fx " .. tostring(c.fx))
+CK	fireball	release	fire	1.200	0.100	0.300	steady
+CR	fireball	cancel
+!table.insert(SAID, "called off: ring gone " .. tostring(ElwynnSurvival.check.cur == nil))
 CK	arcane_missiles	rhythm	arcane	0.150	0.080	0.300	3|swing|0.000,0.420,0.700,1.120,1.400r,1.820,2.100,2.520
 !local c = ElwynnSurvival.check table.insert(SAID, "rhythm: beats " .. tostring(c.cur and c.cur.n) .. " free " .. tostring(c.cur and c.cur.free) .. " rest " .. tostring(c.cur and c.cur.beats[5].rest) .. " next " .. tostring(c.cur and c.cur.next))
 !local c = ElwynnSurvival.check for i = 1, 20 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end

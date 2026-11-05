@@ -112,14 +112,18 @@
 //! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
 //!   (`Event::CheckStart`): "release" (`a` the flare's second from the charge's start, `b` the
 //!   window either side, `pattern` the ring's curve), "rhythm" (`a`, `b` the first and last
-//!   pressed beats' windows, `pattern` "free|name|t0,t1,t2r,..."); `crit` the critical's share of
-//!   a window; `school` fire, frost or arcane.
+//!   pressed beats' windows, `pattern` "free|name|t0,t1,t2r,..."), "sweep" (`a` its seconds, `b`
+//!   its arc in degrees, `crit` how near a mark is perfect, `pattern` "lr|rl|<jet arc>|<marks' bearings>"),
+//!   "orb" (`a` its seconds, `b` its reach in yards, `crit` how near a mark is perfect, `pattern`
+//!   "<backfire yd>|<start yd>|<marks' distances>"); otherwise `crit` the critical's share of a
+//!   window; `school` fire, frost or arcane.
 //! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
 //!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
 //! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
 //!   from one spot to another over `secs` (Frozen Orb), its model and size, for a client that draws
 //!   it (`PlayGroundOrb`); `OX\t<key>`: it stopped or was spent.
-//! - `CR\t<ability key>\t<grade>`: its outcome, critical, perfect, good, weak, fail or fizzle.
+//! - `CR\t<ability key>\t<grade>`: its outcome, critical, perfect, good, weak, fail or fizzle,
+//!   or `cancel` (its cast called off or cut short: the ring goes quietly).
 //! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
 //!   on their own screen; its burst and Valor come as ever).
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
@@ -1284,6 +1288,19 @@ impl SurvivalGame {
                 if let Some(w) = self.world_mut(conn) {
                     w.addon = true;
                     w.sent.clear();
+                }
+                // Who holds a casting staff now, for this client to launch their bolts from its tip
+                // (`MO` otherwise goes out only as gear changes).
+                let staffs: Vec<String> = self
+                    .sim
+                    .players
+                    .iter()
+                    .filter(|(_, p)| self.sim.weapon_of(p).casts())
+                    .filter_map(|(id, _)| self.guid_of(*id))
+                    .map(|g| format!("MO\t{g:#X}\tweapon"))
+                    .collect();
+                for line in staffs {
+                    self.ui_line(conn, &line);
                 }
                 // `.es hello <version> ac`: the action-combat client, aiming over the shoulder;
                 // `ac2` also plays clips, hit-stops and rolls itself; `ac3` runs its own dashes and

@@ -410,6 +410,9 @@ pub struct AbilityDef {
     /// On a frozen foe it shatters the ice for half again its damage.
     #[serde(default)]
     pub shatter: bool,
+    /// A bomb's burst, yards (`kind = "bomb"`); its bolt flies with `radius` like any projectile.
+    #[serde(default)]
+    pub bomb_radius: f32,
     /// A projectile that touches a friend heals them this share of their health (and, with
     /// `cleanse`, ends what's on them); so does an `ally` on whoever it picks. A `beam` heals each
     /// friend in it this share a second.

@@ -331,6 +331,14 @@ end
 function ES.CheckResultLine(f)
   local key, grade = f[2], f[3]
   local c = check.cur
+  -- Called off (a cancel, a stagger, a stun): the ring goes quietly, nothing judged.
+  if grade == "cancel" then
+    if c and c.key == key then
+      check.cur = nil
+      HideRing()
+    end
+    return
+  end
   if c and c.key == key then
     if c.kind == "rhythm" then
       if grade == "good" or grade == "critical" then
@@ -414,6 +422,18 @@ end
 ES.Heavy = function(state)
   if state == "down" then check.pressAt = GetTime() end
   return Heavy(state)
+end
+-- Right click calls a charge off: its ring goes at once, so letting go after judges nothing.
+local Guard = ES.Guard
+if Guard then
+  ES.Guard = function(state)
+    local c = check.cur
+    if state == "down" and c and c.kind == "release" then
+      check.cur = nil
+      HideRing()
+    end
+    return Guard(state)
+  end
 end
 -- Where a sweep's jet points now (degrees off the front, + left), and an orb's yards out.
 local function JetAt(c, now)

@@ -267,3 +267,47 @@ fn an_all_or_nothing_spell_fizzles_off_its_moment_and_spends_its_valor() {
     assert!(s.players[&p].valor <= valor, "no Valor earned");
     assert_eq!(s.players[&p].action, Action::Ready);
 }
+
+#[test]
+fn a_fixed_charges_window_never_opens_before_it_can_go_so_it_never_fizzles_inside_it() {
+    // The review on #199: Pyroblast's moment could roll so its window opened before its least,
+    // and a release there fizzled while the ring showed it in the window.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let pyro = s.content.ability("pyroblast").unwrap();
+    let lo = s.content.abilities[pyro].charge[0];
+    let w = s.content.checks.window;
+    for _ in 0..40 {
+        s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
+        s.players.get_mut(&p).unwrap().cd_off = true;
+        s.input(p, Input::Ability(key_of("ranged"), true));
+        s.input(p, Input::Attack);
+        s.step(0.0);
+        assert!(matches!(s.players[&p].action, Action::Charge { .. }), "charging Pyroblast");
+        let flare = s.players[&p].check_flare;
+        assert!(flare - w >= lo - 1e-4, "the window opens at {} before its least {lo}", flare - w);
+        s.input(p, Input::Guard);
+        s.input(p, Input::GuardUp);
+        run(&mut s, 0.2);
+    }
+}
+
+#[test]
+fn a_charge_called_off_calls_its_check_off_so_its_ring_goes() {
+    // The review on #199: a called-off charge left its ring up, and a later let-go judged it.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let _k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    s.input(p, Input::Ability(key_of("ranged"), false));
+    s.input(p, Input::Attack);
+    run(&mut s, 0.4);
+    s.input(p, Input::Guard);
+    let ev = run(&mut s, 0.1);
+    assert_eq!(grade_in(&ev, p), Some("cancel"), "called off for the caster's screen");
+    s.input(p, Input::GuardUp);
+    s.input(p, Input::AttackUp);
+    let ev = run(&mut s, 0.5);
+    assert_eq!(grade_in(&ev, p), None, "nothing judged after");
+}

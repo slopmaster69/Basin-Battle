@@ -234,3 +234,16 @@ fn the_wards_look_is_on_the_hero_while_it_is_up_and_a_shield_hero_has_no_bar() {
     assert!(s.players[&q].stamina < st && s.players[&q].ward == bar, "stamina pays, the bar is untouched");
     assert!(!s.auras_of(q).contains(&aura));
 }
+
+#[test]
+fn with_the_ward_broken_right_click_still_calls_off_an_aim() {
+    // The review on #199: a broken ward swallowed right click, so an aim stayed up.
+    let mut s = world();
+    let p = staff_hero(&mut s, "Ayla", ORIGIN);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    s.players.get_mut(&p).unwrap().ward_broken = true;
+    s.input(p, Input::Ability(crate::content::SLOTS.iter().position(|x| *x == "ranged").unwrap() as u8, false));
+    assert!(matches!(s.players[&p].action, Action::Aim { .. }), "aiming");
+    s.input(p, Input::Guard);
+    assert!(!matches!(s.players[&p].action, Action::Aim { .. }), "right click called it off");
+}

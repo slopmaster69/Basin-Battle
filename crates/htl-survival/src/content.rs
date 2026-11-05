@@ -3590,7 +3590,7 @@ impl Content {
             if (a.pulse < 0.0 || a.rewind_health < 0.0 || a.rewind_health > 1.0) || ((a.pulse > 0.0 || a.rewind_health > 0.0) && a.anchor <= 0.0) {
                 bail!("{what}: `pulse` and `rewind_health` (0 to 1) are an anchor's (they need `anchor`)");
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects) {
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects).chain(&a.crit_effects).chain(&a.stop_effects).chain(&a.finisher_effects).chain(&a.bomb_effects).chain(&a.backfire_effects) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {

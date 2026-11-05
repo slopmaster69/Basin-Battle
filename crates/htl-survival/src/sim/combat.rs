@@ -277,14 +277,15 @@ impl Survival {
             }
             Input::AttackUp | Input::Sprint | Input::SprintUp => true,
             Input::Guard => {
+                // Right click calls off an aim or a charge (a broken ward's too).
+                if aiming || charging {
+                    self.ability_cancel(id);
+                }
                 // A broken ward can't go up until its bar is whole again: the bar says so.
+                let p = &self.players[&id];
                 if self.guard_of(p).ward && p.ward_broken {
                     self.events.push(Event::Ward { player: id });
                     return true;
-                }
-                // Right click calls off an aim or a charge.
-                if aiming || charging {
-                    self.ability_cancel(id);
                 }
                 // Bladestorm: the guard ends the spin at once and comes up on this press.
                 if matches!(self.players[&id].action, Action::Channel { ability, .. } if self.content.abilities[ability].bail) {

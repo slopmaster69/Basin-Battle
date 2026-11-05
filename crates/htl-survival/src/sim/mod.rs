@@ -629,6 +629,8 @@ pub struct Player {
     pub sweep_secs: f32,
     /// The ward's next crackle, while it's up.
     pub ward_crackle_at: f32,
+    /// The skill check on the reticle under way (its ability), until its result.
+    pub check_open: Option<usize>,
     /// What the cast going out now strikes for, when its own numbers don't say (a beat's).
     pub cast_damage: Option<f32>,
     pub sprint_held: bool,
@@ -1237,7 +1239,47 @@ impl Survival {
             self.step_weekly_chest();
         }
         self.record_trails();
+        self.close_checks();
         std::mem::take(&mut self.events)
+    }
+
+    /// A skill check on the reticle (a release, a rhythm, a sweep) whose action ended this step
+    /// without a result (called off, a stagger, a stun) is called off for the caster's screen, so
+    /// its ring goes and no late press is judged against it. An orb's outlives its cast.
+    fn close_checks(&mut self) {
+        for e in &self.events {
+            match e {
+                Event::CheckStart { player, ability, kind, .. } if *kind != "orb" => {
+                    if let Some(p) = self.players.get_mut(player) {
+                        p.check_open = Some(*ability);
+                    }
+                }
+                Event::CheckResult { player, .. } => {
+                    if let Some(p) = self.players.get_mut(player) {
+                        p.check_open = None;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let gone: Vec<(Id, usize)> = self
+            .players
+            .iter()
+            .filter_map(|(id, p)| {
+                let a = p.check_open?;
+                let live = match &p.action {
+                    Action::Charge { ability, .. } | Action::Rhythm { ability, .. } | Action::Sweep { ability, .. } => *ability == a,
+                    _ => false,
+                };
+                (!live).then_some((*id, a))
+            })
+            .collect();
+        for (id, ability) in gone {
+            if let Some(p) = self.players.get_mut(&id) {
+                p.check_open = None;
+            }
+            self.events.push(Event::CheckResult { player: id, ability, grade: "cancel" });
+        }
     }
 
     pub(crate) fn tell(&mut self, player: Id, text: impl Into<String>) {
@@ -1290,6 +1332,7 @@ impl Survival {
             sweep_dir: 1.0,
             sweep_secs: 1.0,
             ward_crackle_at: 0.0,
+            check_open: None,
             cast_damage: None,
             sprint_held: false,
             sprinting: false,
