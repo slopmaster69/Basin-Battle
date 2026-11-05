@@ -1636,6 +1636,9 @@ function ES.ExAffordable(s)
 end
 
 local function SendAbility(n, ex)
+  -- A skill check this starts is drawn from this moment, as one started by a click is (Check.lua):
+  -- the server's clock for it starts the same one-way trip after.
+  if ES.check then ES.check.pressAt = GetTime() end
   Say(".es in ab " .. (n - 1) .. " " .. (ex and "1" or "0") .. ES.AimLine())
 end
 
