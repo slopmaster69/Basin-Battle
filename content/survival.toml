@@ -1066,8 +1066,8 @@ text = "Two-handed. Attacks cast shards of frost that chill; the heavy attack a 
 key = "arcane_staff"
 name = "Arcane Staff"
 # A dark staff set with glowing orbs.
-display = 31347
-icon = "INV_Staff_30"
+display = 34811
+icon = "INV_Staff_07"
 kind = "weapon"
 text = "Two-handed. Attacks cast quick bolts of arcane force; the heavy attack a heavier orb. Guards with a ward."
 
