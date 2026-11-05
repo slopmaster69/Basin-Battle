@@ -93,6 +93,12 @@
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
 //! - `WA\t<ward>\t<most>\t<broken>`: the ward bar of a hero whose guard is a ward (a staff's);
 //!   `WA` alone: no ward, the bar hidden. Sent with the HUD and the moment it changes.
+//! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
+//!   (`Event::CheckStart`): "release" (`a` the flare's second from the charge's start, `b` the
+//!   window either side, `pattern` the ring's curve), "rhythm" (`a`, `b` the first and last
+//!   pressed beats' windows, `pattern` "free|name|t0,t1,t2r,..."); `crit` the critical's share of
+//!   a window; `school` fire, frost or arcane.
+//! - `CR\t<ability key>\t<grade>`: its outcome, critical, perfect, good, weak, fail or fizzle.
 //! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
 //!   on their own screen; its burst and Valor come as ever).
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
@@ -352,7 +358,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
 /// 19's hunter work (both branches had taken 19).
 /// 21: the ward bar (`WA`, `Ward.lua`): a staff's guard.
-pub(crate) const ADDON_NEWEST: u32 = 21;
+/// 22: the skill checks drawn (`CK`, `CR`, `Check.lua`): rings, beats and their outcomes.
+pub(crate) const ADDON_NEWEST: u32 = 22;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

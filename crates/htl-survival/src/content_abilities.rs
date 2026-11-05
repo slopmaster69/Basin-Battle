@@ -129,6 +129,18 @@ pub struct AbilityDef {
     /// window of the top is a perfect cast (stronger, Valor, a burst everyone sees).
     #[serde(default)]
     pub perfect: bool,
+    /// What a missed check costs: "" (safe: it still goes, weaker) or "all" (all or nothing:
+    /// anything but a perfect fizzles, the Valor spent and half the cooldown with it).
+    #[serde(default)]
+    pub stakes: String,
+    /// A critical (the very middle of a check's window): these effects on what it strikes, on
+    /// top of the perfect. Each spell its own: a longer burn, a freeze, a silence.
+    #[serde(default)]
+    pub crit_effects: Vec<AbilityEffect>,
+    /// This ability's own burst for a perfect (a spell visual kit), in place of `[checks]`'s:
+    /// the spell's school bursting from the hands, not a shield on the caster.
+    #[serde(default)]
+    pub perfect_kit: u32,
     /// Damage, range and radius at the least and the full charge (one value: both).
     #[serde(default)]
     pub damage: [f32; 2],

@@ -138,11 +138,14 @@ impl Survival {
         if perfect {
             let k = self.content.checks.clone();
             self.gain_valor(id, k.perfect_valor);
-            if k.perfect_kit != 0 {
-                self.events.push(Event::Visual { id, kit: k.perfect_kit, by: None });
+            let kit = self.perfect_kit_of(ability);
+            if kit != 0 {
+                self.events.push(Event::Visual { id, kit, by: None });
             }
             self.events.push(Event::Perfect { player: id, ability });
         }
+        let grade = if perfect { "perfect" } else if mobs.is_empty() && heroes.is_empty() { "fail" } else { "good" };
+        self.events.push(Event::CheckResult { player: id, ability, grade });
     }
 
     /// The foes a wedge from `at` covers: creatures and (with friendly fire) hostile heroes.

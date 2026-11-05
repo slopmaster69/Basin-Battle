@@ -144,11 +144,16 @@ impl Survival {
             }
             let c = self.content.checks.clone();
             self.gain_valor(id, c.perfect_valor);
-            if c.perfect_kit != 0 {
-                self.events.push(Event::Visual { id, kit: c.perfect_kit, by: None });
+            let kit = self.perfect_kit_of(o.ability);
+            if kit != 0 {
+                self.events.push(Event::Visual { id, kit, by: None });
             }
             self.events.push(Event::Perfect { player: id, ability: o.ability });
         }
+        let own_yd = self.players.get(&id).map(|p| dist2d(p.pos, at)).unwrap_or(f32::MAX);
+        let backfire = d.backfire_yd > 0.0 && own_yd <= d.backfire_yd;
+        let grade = if backfire { "fail" } else if perfect { "perfect" } else { "good" };
+        self.events.push(Event::CheckResult { player: id, ability: o.ability, grade });
         // Stopped at the caster's own feet: the cold takes them too.
         let own = self.players.get(&id).map(|p| dist2d(p.pos, at)).unwrap_or(f32::MAX);
         if d.backfire_yd > 0.0 && own <= d.backfire_yd && !d.backfire_effects.is_empty() {

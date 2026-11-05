@@ -43,6 +43,8 @@ pub(crate) struct Projectile {
     /// How many times it has ricocheted (Bank Shot), and its look's anchor since the last.
     pub bounced: u32,
     pub look: Option<Id>,
+    /// Loosed on a critical: the ability's `crit_effects` on what it strikes.
+    pub critical: bool,
 }
 
 /// Where a projectile is in its flight: going out (every projectile, at first); coming back to
@@ -784,7 +786,7 @@ impl Survival {
     }
 
     /// What an ability costs in Valor (an ultimate: the whole bar).
-    fn valor_cost(&self, d: &AbilityDef) -> f32 {
+    pub(crate) fn valor_cost(&self, d: &AbilityDef) -> f32 {
         if d.slot == "ultimate" {
             self.content.valor.max.min(d.valor.max(1) as f32).max(d.valor as f32)
         } else {
@@ -824,6 +826,20 @@ impl Survival {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
         self.set_action(id, Action::Charge { ability, since: now });
+        // A release check: this cast's flare, rolled, and the caster's ring to close on it.
+        if d.perfect && hi > 0.0 {
+            let k = self.content.checks.clone();
+            let (lo, _) = self.charge_of(id, ability);
+            let fixed = (hi - lo).abs() < 1.0e-3;
+            let (from, to) = if fixed { (hi, hi + k.flare_late) } else { ((hi * k.flare_from).max(lo + k.window), hi) };
+            let flare = from + (to - from) * rand::Rng::gen::<f32>(&mut self.rng);
+            const CURVES: [&str; 4] = ["steady", "ease", "surge", "stutter"];
+            let curve = CURVES[rand::Rng::gen_range(&mut self.rng, 0..CURVES.len())];
+            if let Some(p) = self.players.get_mut(&id) {
+                p.check_flare = flare;
+            }
+            self.events.push(Event::CheckStart { player: id, ability, kind: "release", a: flare, b: k.window, c: k.crit_share, pattern: curve.to_string() });
+        }
         let spell = if d.kind == "shot" || d.bow { self.ranged_of(&self.players[&id]).spell } else { d.charge_spell };
         if spell != 0 && (d.kind == "shot" || d.bow) {
             self.draw_bow(id);
@@ -841,10 +857,14 @@ impl Survival {
         let Some(Action::Charge { ability, since }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
         let (lo, hi) = self.charge_of(id, ability);
         let held = now - since;
+        let d = self.content.abilities[ability].clone();
+        let all = d.perfect && d.stakes == "all";
         if held + 1.0e-4 < lo {
             // A fixed charge (Pyroblast) let go early is dropped; one with a range goes at its
             // least, as soon as it's reached.
-            if (hi - lo).abs() < 1.0e-3 {
+            if all {
+                self.fizzle(id, ability);
+            } else if (hi - lo).abs() < 1.0e-3 {
                 self.tell(id, "Released too soon. The charge is lost.");
                 self.end_ability_action(id);
                 self.set_action(id, Action::Ready);
@@ -854,9 +874,60 @@ impl Survival {
             return;
         }
         let share = if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 };
-        // Released on the flare: a perfect cast, full and then some.
-        let perfect = self.content.abilities[ability].perfect && hi > 0.0 && (held - hi).abs() <= self.content.checks.window + 1.0e-4;
+        if !(d.perfect && hi > 0.0) {
+            self.fire_with(id, ability, share, false);
+            return;
+        }
+        // The release check, against this cast's flare: its middle a critical, its window a
+        // perfect (full and then some); outside it, early goes weaker and late goes as charged,
+        // or, all or nothing, fizzles.
+        let k = self.content.checks.clone();
+        let off = (held - self.players[&id].check_flare).abs();
+        let perfect = off <= k.window + 1.0e-4;
+        let critical = perfect && off <= k.window * k.crit_share + 1.0e-4;
+        if !perfect && all {
+            self.fizzle(id, ability);
+            return;
+        }
+        if !perfect {
+            let early = held < self.players[&id].check_flare;
+            self.events.push(Event::CheckResult { player: id, ability, grade: if early { "weak" } else { "good" } });
+        }
+        if let Some(p) = self.players.get_mut(&id) {
+            p.cast_critical = critical;
+        }
         self.fire_with(id, ability, if perfect { 1.0 } else { share }, perfect);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.cast_critical = false;
+        }
+    }
+
+    /// An all-or-nothing cast missed its moment: nothing goes, the Valor is spent and half the
+    /// cooldown with it, and it fizzles where everyone can see.
+    pub(crate) fn fizzle(&mut self, id: Id, ability: usize) {
+        let d = self.content.abilities[ability].clone();
+        let cost = self.valor_cost(&d);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.valor = (p.valor - cost).max(0.0);
+            p.release_at_least = false;
+        }
+        if cost > 0.0 {
+            self.events.push(Event::Valor { player: id });
+        }
+        self.spend_charge(id, ability, 0.5);
+        let kit = self.content.checks.fizzle_kit;
+        if kit != 0 {
+            self.events.push(Event::Visual { id, kit, by: None });
+        }
+        self.events.push(Event::CheckResult { player: id, ability, grade: "fizzle" });
+        self.end_ability_action(id);
+        self.set_action(id, Action::Ready);
+    }
+
+    /// The burst a perfect of this ability shows: its own, or the checks' default.
+    pub(crate) fn perfect_kit_of(&self, ability: usize) -> u32 {
+        let own = self.content.abilities[ability].perfect_kit;
+        if own != 0 { own } else { self.content.checks.perfect_kit }
     }
 
     /// An aim or a charge called off (right click, a roll, the key again): no cooldown spent.
@@ -1007,10 +1078,13 @@ impl Survival {
         if self.players[&id].cast_perfect {
             let k = self.content.checks.clone();
             self.gain_valor(id, k.perfect_valor);
-            if k.perfect_kit != 0 {
-                self.events.push(Event::Visual { id, kit: k.perfect_kit, by: None });
+            let kit = self.perfect_kit_of(ability);
+            if kit != 0 {
+                self.events.push(Event::Visual { id, kit, by: None });
             }
             self.events.push(Event::Perfect { player: id, ability });
+            let critical = self.players[&id].cast_critical;
+            self.events.push(Event::CheckResult { player: id, ability, grade: if critical { "critical" } else { "perfect" } });
         }
         // A charge's glow ends as it goes (the bow's draw ends with its shot).
         if matches!(self.players[&id].action, Action::Charge { .. }) {
@@ -1274,6 +1348,7 @@ impl Survival {
                 damage,
                 spell,
                 allies: d.friends(),
+                critical: self.players.get(&id).is_some_and(|p| p.cast_critical),
                 hits: Vec::new(),
                 // A full draw can go through more (Aimed Shot's).
                 pierce: if AbilityDef::full(share) { d.pierce.max(d.full_pierce) } else { d.pierce },
@@ -1579,6 +1654,7 @@ impl Survival {
                 damage: AbilityDef::at(s.damage, p.share),
                 spell: s.spell,
                 allies: s.friends(),
+                critical: false,
                 hits: Vec::new(),
                 pierce: s.pierce,
                 stage: Stage::Out,
@@ -1710,6 +1786,7 @@ impl Survival {
             damage,
             spell,
             allies: false,
+            critical: false,
             hits: Vec::new(),
             pierce: 0,
             stage: Stage::Lob { at, land_at, mark },
@@ -1943,6 +2020,12 @@ impl Survival {
             self.strike_fair_as(p.owner, victim, damage, from, true, false, false, blow, None, combat::Follow::Ability { ability: p.ability, share: p.share }, HitKind::Projectile);
         } else {
             self.ability_on_mob(p.owner, victim, p.ability, p.share, p.damage, from, HitKind::Projectile, p.spell);
+        }
+        if p.critical {
+            let d = self.content.abilities[p.ability].clone();
+            if !d.crit_effects.is_empty() {
+                self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
+            }
         }
     }
 
@@ -3210,6 +3293,7 @@ impl Survival {
             damage: AbilityDef::at(d.damage, share),
             spell: d.spell,
             allies: false,
+            critical: false,
             hits: Vec::new(),
             pierce: 0,
             stage: Stage::Out,
@@ -3237,16 +3321,26 @@ impl Survival {
                 // trembles (the add-on); the flare read as a stray buff (Corey's review).
                 // A release check's flare comes as its window opens, so a release on seeing
                 // it lands inside.
-                let flare_at = if self.content.abilities[ability].perfect { hi - self.content.checks.window } else { hi };
+                let checked = self.content.abilities[ability].perfect && hi > 0.0;
+                let flare_at = if checked { self.players[&id].check_flare - self.content.checks.window } else { hi };
                 if hi > 0.0 && held >= flare_at && held - dt < flare_at && !self.content.abilities[ability].bow {
                     let kit = self.full_kit(ability);
                     if kit != 0 {
                         self.events.push(Event::Visual { id, kit, by: None });
                     }
                 }
+                let all = checked && self.content.abilities[ability].stakes == "all";
                 if pending && held >= lo {
+                    if checked {
+                        self.events.push(Event::CheckResult { player: id, ability, grade: "weak" });
+                    }
                     self.fire(id, ability, if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 });
+                } else if all && held > self.players[&id].check_flare + self.content.checks.window + 0.05 {
+                    self.fizzle(id, ability);
                 } else if hold > 0.0 && held >= hi + hold {
+                    if checked {
+                        self.events.push(Event::CheckResult { player: id, ability, grade: "good" });
+                    }
                     self.fire(id, ability, 1.0);
                 }
             }

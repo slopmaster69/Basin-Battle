@@ -409,11 +409,20 @@ pub struct ChecksDef {
     pub perfect_kit: u32,
     /// A full rhythm chain's Valor (a whole segment).
     pub chain_valor: f32,
+    /// The flare (the release check's moment) comes, at random, anywhere from this share of a
+    /// ranged charge's top to the top; a fixed charge's (Pyroblast's) up to `flare_late` seconds
+    /// after it. No two casts keep quite the same time.
+    pub flare_from: f32,
+    pub flare_late: f32,
+    /// The critical: the middle this share of any check's window.
+    pub crit_share: f32,
+    /// The look of an all-or-nothing cast that fizzles (a spell visual kit on the caster).
+    pub fizzle_kit: u32,
 }
 
 impl Default for ChecksDef {
     fn default() -> Self {
-        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0 }
+        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0, flare_from: 0.72, flare_late: 0.35, crit_share: 0.3, fizzle_kit: 0 }
     }
 }
 
