@@ -364,7 +364,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 28: a fan of projectiles (Multi-Shot) aims with a fan on the reticle, not a strip on the
 /// ground (the `AB` line's shape `fan`).
 /// 29: the `ML` line's spin axis (a tumble, patch 0036).
-pub(crate) const ADDON_NEWEST: u32 = 29;
+/// 30: the add-on preloads a cast's borrowed model before it plays (Reverse Grapple's pull).
+pub(crate) const ADDON_NEWEST: u32 = 30;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

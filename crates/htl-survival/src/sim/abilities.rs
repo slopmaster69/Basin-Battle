@@ -2071,6 +2071,8 @@ impl Survival {
     fn ability_after_at(&mut self, owner: Id, victim: Id, ability: usize, share: f32, damage: u32, killed: bool, valor: f32) {
         let d = self.content.abilities[ability].clone();
         if !killed {
+            // The look its caster wears over a pull of its own (Reverse Grapple's haul).
+            let was = std::mem::replace(&mut self.fx_pull_look, (d.pull_clip != 0).then(|| (d.pull_clip, d.pull_from.clone())));
             // One that's for friends too gives a foe none of what helps.
             if d.friendly {
                 let harm: Vec<_> = d.effects.iter().filter(|e| !crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
@@ -2078,6 +2080,7 @@ impl Survival {
             } else {
                 self.apply_effects(owner, victim, &d.effects, share, &d.name);
             }
+            self.fx_pull_look = was;
         }
         if d.drain > 0.0 && damage > 0 {
             let heal = (damage as f32 * d.drain * self.weakened(owner)).round() as u32;
