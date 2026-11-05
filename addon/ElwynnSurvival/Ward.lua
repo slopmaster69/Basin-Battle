@@ -279,16 +279,7 @@ arc:SetScript("OnUpdate", function()
       a = 1
     end
   end
-  -- LAB DIAGNOSTIC (claude/mage-lab-2 only): always drawn, red while the add-on thinks it's up.
-  if not this.stage then this.stage = "ward_whole"; this.tex:SetTexture(ARC_ART .. "ward_whole") end
-  if true then
-    this.tex:SetWidth(size)
-    this.tex:SetHeight(size)
-    this.tex:ClearAllPoints()
-    this.tex:SetPoint("CENTER", this, "CENTER", x, 0)
-    if this.up then this.tex:SetVertexColor(1, 0.2, 0.2, 1) else this.tex:SetVertexColor(1, 1, 1, 0.5) end
-    this.tex:Show()
-  elseif a > 0.01 then
+  if a > 0.01 then
     this.tex:SetWidth(size)
     this.tex:SetHeight(size)
     this.tex:ClearAllPoints()
