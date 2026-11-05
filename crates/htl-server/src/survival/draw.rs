@@ -25,6 +25,11 @@ const BAG_ENTRY: u32 = 300_950;
 const BAG_DISPLAY: u32 = 1244;
 const GO_ENTRY: u32 = 400_000;
 
+/// Whether a creature (by its key) is one of Call of the Wild's spirit beasts.
+fn spirit_beast(key: &str) -> bool {
+    htl_survival::sim::hunter::BEASTS.iter().any(|b| b.mob == key)
+}
+
 /// A hero's model: their race's own, a man's or a woman's (1.12's `ChrRaces` displays, by race
 /// id 1 to 8).
 fn native_display(race: u8, gender: u8) -> u32 {
@@ -464,7 +469,8 @@ impl SurvivalGame {
         let armor: Vec<(&str, usize)> = p.armor.iter().map(|(s, i)| (s.as_str(), *i)).collect();
         // A two-handed grip leaves no hand for the shield.
         let shield = Some(p.shield).filter(|_| !self.sim.weapon_of(p).two_handed);
-        worn_of(&armor, Some(p.weapon), shield, Some(p.bow))
+        // (A bow ability's bow in hand: the one it draws.)
+        worn_of(&armor, Some(p.weapon), shield, Some(self.sim.ranged_shown(p)))
     }
 
     /// What a hero out of the world wears, from its save: as `worn` would have it in the world
@@ -550,7 +556,9 @@ impl SurvivalGame {
             f.set(idx::PLAYER_VISIBLE_ITEM_1_0 + 12 * slot as u16, entry);
         }
         let kit = self.sim.players.get(&id).map_or(Kit::Melee, |p| p.kit);
-        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed);
+        // Put away for a meal too, the hero's own toggle untouched (Corey's review: eating with
+        // the axe still in hand).
+        let sheathed = self.sim.players.get(&id).is_some_and(|p| p.sheathed || matches!(p.action, htl_survival::Action::Eat { .. }));
         // Weapons out: the axe and shield in hand, or the bow; put away (R), on the back.
         f.set(idx::UNIT_BYTES_2, if sheathed { 0 } else if kit == Kit::Bow { 2 } else { 1 });
         if let Some(p) = self.sim.players.get(&id) {
@@ -588,6 +596,8 @@ impl SurvivalGame {
         f.set(idx::UNIT_POWER1 + 3, p.stamina.round() as u32);
         if matches!(p.action, htl_survival::Action::Guard) {
             f.set(idx::UNIT_NPC_EMOTESTATE, self.guard_pose(id));
+        } else if let Some(pose) = self.poses.get(&id) {
+            f.set(idx::UNIT_NPC_EMOTESTATE, *pose);
         }
         self.gear_fields(id, &mut f);
         // The whole of the world map shown: every place is known from the start.
@@ -628,7 +638,9 @@ impl SurvivalGame {
             damage: [d.attack.damage; 2],
             run_speed: d.run_speed,
             npc_flags: 0,
-            unit_flags: 0,
+            // Call of the Wild's beasts can't be selected: no nameplate, no health bar, no name
+            // over them (the client draws none for a `NOT_SELECTABLE` unit), nothing to click.
+            unit_flags: if spirit_beast(&d.key) { fields::UNIT_FLAG_NOT_SELECTABLE } else { 0 },
             main_hand: d.weapon,
             main_hand_info: grip_info(&d.grip),
             off_hand: d.shield,
@@ -653,6 +665,18 @@ impl SurvivalGame {
         }
         if m.health == 0 {
             f.set(idx::UNIT_DYNAMIC_FLAGS, fields::UNIT_DYNFLAG_DEAD);
+        }
+        // What it wears from the start (a spirit beast's ghostly look) and whatever's on it, in
+        // the packet that makes it: an aura sent apart could reach the client before the unit.
+        let auras = self.sim.auras_of(id);
+        if !auras.is_empty() {
+            let mut bar = [(0u32, 0u8); 48];
+            for (k, a) in auras.iter().take(16).enumerate() {
+                bar[k] = (*a, 1);
+            }
+            for slot in 0..auras.len().min(16) {
+                fields::aura_words(&mut f, &bar, slot);
+            }
         }
         Some(packets::update_object(
             &[Create {

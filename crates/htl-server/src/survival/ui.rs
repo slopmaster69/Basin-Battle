@@ -12,6 +12,10 @@
 //! - `BM\t<key~name~cost~can~built~text>^...`: the build menu.
 //! - `AR\t<key~name~kind~held~text>^...`: the weapon rack.
 //! - `FL\t<text>`: a word flashed big (a parry).
+//! - `FU\t<guid>\t<own>\t<secs>\t<from>\t<cuts>\t<cut>\t<windup>\t<finish>\t<finish secs>\t<turn deg>\t<trail>\t<trail ms>`:
+//!   a storm of cuts starts on a unit (Bladestorm's flurry, the ability's `flurry` field for
+//!   field; `cuts` and `finish` as `clip/take`), for a client with patch 0025 (`PlayUnitFlurry`);
+//!   the unit's `ST` ends it with its finishing sweep.
 //! - `BP\t<name>\t<cost>\t<problem>\t<x~y~z~yards>`: the station being placed and where its ghost stands (`BP`
 //!   alone: none).
 //! - `CF\t<what>\t<text>\t<yes>\t<no>`: confirm something (ringing the bell, tearing a station
@@ -68,10 +72,14 @@
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
 //! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
 //!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
-//!   (a creature's line carries it too). Each `MV` blow goes on `~<from>` the same way.
+//!   (a creature's line carries it too, and so does a cast's: an ability's own clip, the same on
+//!   every race). Each `MV` blow goes on `~<from>` the same way.
 //!   The kind: `light`, `heavy`, `running`, `bash`, `kick`, `cast`, a creature's `mob`, and the
 //!   attacks out of a dodge (`roll`) and out of a Corey roll's landing (`leap`).
 //! - `ST\t<guid>\t<mine>`: a swing called off (a feint), its clip let go.
+//! - `GB\t<x>\t<y>\t<z>\t<facing>\t<wedge|ring|line>\t<reach>\t<arc>\t<secs>\t<RRGGBB>\t<width>`: an
+//!   ability's shape flashed on the ground as it lands (Shockwave's cone), for a client with
+//!   patch 0026 (`PlayGroundBurst`); an effect, not a floor marker.
 //! - `TG\t<key>\t<creature guid>\t<wedge|ring>\t<reach>\t<arc>\t<secs>\t<block|unblockable>\t<parry window>\t<meant for you>`: a creature's blow winding up, drawn under it (`TG\t<key>`: gone).
 //! - `RE\t<guid>\t<anim>\t<dx>\t<dy>\t<lean>\t<hold>\t<mine>\t<fit>`: a unit takes a blow (its reaction,
 //!   the lean back along `(dx, dy)`, held `hold` seconds for a stagger, or the whole clip fitted to
@@ -88,6 +96,13 @@
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
 //!   friend's), `MK\t<id>` gone.
 //! - `DA\t<secs>\t<speed>\t<facing>`: run the dash of an ability (Charge) along the facing.
+//! - `GP\t<catch 1|0>\t<x>\t<y>\t<z>\t<yards>\t<ground z>\t<ability key>`: while a grappling hook
+//!   is aimed, where its line ends (`yards` along the ground from the hero) and whether it catches there; the
+//!   add-on answers with `.es in al <facing> <elevation>` as the reticle moves. `GP` alone: the
+//!   aim let go.
+//! - `FP\t<guid>\t<secs>\t<clip>\t<take>\t<from>\t<flip 1|0>\t<mine>`: a hero's leap with its own
+//!   look (a Disengage): the clip over the whole body for the flight, from another character
+//!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
 //! - `HL\t<amount>`: healed (a green number). `NP\t<verb>\t<name>`: what the use key would use.
 //! - `A` goes on `\t<ability key>` (what's aimed, charged, cast or channelled).
 //! - `RC\t<slot>\t<secs>\t<icon>\t<key>\t<name>\t<shape>\t<range>\t<radius>\t<arc>\t<aimed>\t<least charge>\t<full charge>`:
@@ -141,6 +156,9 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         if d.behind > 1.0 {
             out.push(format!("{}× damage from behind", n(d.behind)));
         }
+    } else if d.bow_damage > 0.0 {
+        let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
+        out.push(format!("{count}{}% bow damage", pct(d.bow_damage)));
     } else if d.damage[1] > 0.0 {
         let count = if d.count > 1 { format!("{} × ", d.count) } else { String::new() };
         if d.kind == "channel" && d.tick > 0.0 {
@@ -168,7 +186,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         out.push(format!("{}% healing", pct(d.area_heal)));
     }
     match d.kind.as_str() {
-        _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire · {} sec duration", n(d.range[1]), n(d.radius[1] * 2.0), n(d.secs))),
+        _ if d.hunt == "tripwire" && d.inner => out.push(format!("Within {} yd of the first arrow", n(htl_survival::sim::hunter::WIRE_SPAN))),
+        _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire at most · {} sec duration", n(d.range[1]), n(htl_survival::sim::hunter::WIRE_SPAN), n(d.secs))),
         _ if d.hunt == "call" || d.hunt == "double_call" => out.push(format!("{} yd range", n(d.range[1]))),
         _ if d.hunt == "recall" => out.push("Every planted arrow · Lacerates at 3+ arrows".to_string()),
         _ if d.hunt == "volley" => out.push(format!("{} arrows · {} yd range · {} yd radius", d.count, n(d.range[1]), n(d.radius[1]))),
@@ -183,6 +202,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
         "leap" if d.radius[1] > 0.0 => out.push(format!("{} yd leap · {} yd landing radius", n(d.range[1]), n(d.radius[1]))),
         "trap" if d.launch > 0.0 => out.push(format!("{} yd placement range · {} yd launch · {} sec duration", n(d.range[1]), n(d.launch), n(d.secs))),
         "trap" => out.push(format!("{} yd placement range · {} yd trigger radius · {} sec duration", n(d.range[1]), n(d.radius[1]), n(d.secs))),
+        "place" if d.banner.is_some() => out.push(format!("{} sec banner · {} yd radius · {} health", n(d.secs), n(d.radius[1]), n(d.banner.as_ref().map_or(0.0, |b| b.health)))),
+        "place" if d.totem.is_none() => out.push(format!("{} yd range", n(d.range[1]))),
         "place" => out.push(format!("{} sec totem · {} yd radius", n(d.secs), n(d.totem.as_ref().map_or(0.0, |t| t.radius)))),
         "blink" if d.anchor > 0.0 => out.push(format!("{} sec circle duration", n(d.anchor))),
         "art" if d.ambush > 0.0 => out.push(format!("{} yd step", n(d.ambush))),
@@ -272,7 +293,8 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     }
     // Call of the Wild: its stage's stamina, half when empowered.
     if d.hunt == "call" || d.hunt == "double_call" {
-        out.push("15 / 20 / 25 Stamina by stage · Half when empowered".to_string());
+        let [a, b, c] = htl_survival::sim::hunter::WILD_STAMINA;
+        out.push(format!("{} / {} / {} Stamina by stage · Half when empowered", n(a), n(b), n(c)));
     }
     // Stamina once (a weapon strike's is easy to miss, so it's always said).
     if d.stamina > 0.0 {
@@ -321,10 +343,21 @@ pub(crate) const VERSION: u32 = 2;
 /// The newest add-on this server knows (its `VERSION`, sent in its hello) and the newest client
 /// (`acN`, from the client patches): a hero on an older one is told so, and how to update. Bump
 /// `ADDON_NEWEST` with the add-on's own `VERSION` when an add-on change matters to players.
-pub(crate) const ADDON_NEWEST: u32 = 17;
+/// 18: the Hunter's play-test fixes (#110): Call of the Wild's empowered key (`AB`'s last field),
+/// Skyfall's hang on the action bar, and Grapple Arrow's catch preview and Disengage's flip
+/// (`GP`, `FP`, `Grapple.lua`).
+/// 19: a Hunter's bow draw leans the camera in and trembles it at full draw (Aimed Shot, Kill
+/// Shot).
+/// 20: the Warrior rework's effect words, its flurry (`FU`) and ground-burst (`GB`) lines, with
+/// 19's hunter work (both branches had taken 19).
+/// 21: the draw leans in deeper the longer it's held, and a bow's full draw no longer
+/// flashes the whole screen.
+pub(crate) const ADDON_NEWEST: u32 = 21;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
-/// Westbrook's garrison taken out of the map for the camp (0019).
-pub(crate) const CLIENT_NEWEST: u8 = 12;
+/// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
+/// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
+/// as an ability lands (0026); 13 to 15 are the hunter's open branches (0020 to 0023).
+pub(crate) const CLIENT_NEWEST: u8 = 18;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -415,6 +448,8 @@ impl SurvivalGame {
             Action::Work { t, total, .. } => (*t, *total),
             Action::Stagger { until } => (0.0, (until - now).max(0.0)),
             Action::Dead { until } => (0.0, (until - now).max(0.0)),
+            // Skyfall's hang: aimed for as long as it lasts (the add-on looses it as it runs out).
+            Action::Aim { .. } => self.sim.hang_time(id).unwrap_or((0.0, 0.0)),
             _ => (0.0, 0.0),
         };
         // Started at: what tells one swing from the next.
@@ -1232,6 +1267,14 @@ impl SurvivalGame {
                     }
                     _ => None,
                 };
+                // While a grappling hook is aimed, the reticle's line alone (`al <facing>
+                // <elevation>`), for where it would catch.
+                if arg == "al" {
+                    if let Ok(f) = rest.parse::<f32>() {
+                        let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
+                        self.sim.set_aim_line(me, f, e);
+                    }
+                }
                 // An attack, its release and an ability key carry the reticle's line (the
                 // client's own camera, as a facing and an elevation).
                 if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
@@ -1817,8 +1860,10 @@ impl SurvivalGame {
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }
 
-    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column>^...`
-    /// (one per key, its fields empty when nothing's on it).
+    /// The ability bar: `AB\t<slot~ability~name~icon~kind~shape~least charge~full charge~cooldown left~cooldown~charges~most~range~radius~arc~Valor~EX key~EX name~EX icon~EX Valor~EX kind~EX shape~EX range~EX radius~EX arc~text~facts~EX text~EX facts~aimed~column~empowered>^...`
+    /// (one per key, its fields empty when nothing's on it). `empowered`: the seconds Call of the
+    /// Wild's next call stays empowered (a parry or a perfect dodge), 0 when it isn't (and for
+    /// every other key); an older add-on ignores it.
     pub(crate) fn bar_line(&self, id: Id) -> Option<String> {
         let c = &self.sim.content;
         let now = self.sim.clock;
@@ -1878,8 +1923,9 @@ impl SurvivalGame {
                 } else {
                     (d.name.clone(), d.icon.clone())
                 };
+                let empowered = if d.hunt == "call" { self.sim.wild_primed_left(id) } else { 0.0 };
                 format!(
-                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}",
+                    "{slot}~{}~{}~{}~{}~{}~{lo:.2}~{hi:.2}~{left:.1}~{base_cd:.1}~{}~{}~{range:.1}~{radius:.1}~{:.0}~{}~{exs}~{}~{}~{ext}~{exf}~{}~{}~{empowered:.1}",
                     d.key,
                     clean(&name),
                     clean(&icon),

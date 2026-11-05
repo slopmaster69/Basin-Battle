@@ -26,6 +26,8 @@ pub struct Cc {
     pub next_tick: f32,
     /// Its look, in place of the kind's (0: the kind's).
     pub aura: u32,
+    /// The next replay of its `mark` (an effect's one-shot look kept up while it holds).
+    pub next_mark: f32,
 }
 
 /// The three that bring the grace after them.
@@ -39,9 +41,6 @@ const LOG_KEEP: usize = 40;
 /// A hero is told a foe shrugged their control off at most this often, per foe.
 const IMMUNE_TOLD_EVERY: f32 = 1.5;
 
-
-/// How much larger Onslaught draws a hero.
-pub(crate) const ONSLAUGHT_SCALE: f32 = 1.3;
 /// Divine Steed's charger (the paladin's mount display).
 pub(crate) const STEED_DISPLAY: u32 = 14584;
 /// What Blessing of Freedom ends and keeps off.
@@ -130,10 +129,10 @@ impl Survival {
         if !alive || secs <= 0.0 {
             return false;
         }
-        // A boon (Onslaught, holy ground's) helps: the rules that soften what harms don't touch it.
+        // A boon (Rallying Cry, holy ground's) helps: the rules that soften what harms don't touch it.
         let boon = crate::content::BOONS.contains(&kind);
-        // Nothing reaches someone in Ice Block.
-        if self.immune(target) && !boon {
+        // Nothing reaches someone in Ice Block, in Retaliation's answer, or up on Skyfall.
+        if (self.untouchable(target) || self.skyfall_aloft(target)) && !boon {
             return false;
         }
         // Freed (Blessing of Freedom): no root, slow or stun takes hold.
@@ -158,6 +157,8 @@ impl Survival {
             return false;
         }
         if kind == "stagger" {
+            // Exposed: it reels longer.
+            let secs = secs * self.stagger_share(from, target, false);
             self.stagger_unit(target, from, secs);
             let line = format!("{source}: stagger {secs:.1}s from {by} on {to}");
             self.cc_note(target, line.clone());
@@ -182,7 +183,7 @@ impl Survival {
             }
         } else {
             list.retain(|c| c.kind != kind);
-            list.push(Cc { kind: kind.into(), until: now + secs, since: now, from, amount, break_after, left, source: source.into(), next_tick: now + 1.0, aura });
+            list.push(Cc { kind: kind.into(), until: now + secs, since: now, from, amount, break_after, left, source: source.into(), next_tick: now + 1.0, aura, next_mark: now });
         }
         let renewed = boon && self.cc_of(target).iter().any(|c| c.kind == kind && c.since < now);
         if renewed {
@@ -228,10 +229,10 @@ impl Survival {
             if kind == "steed" {
                 self.events.push(Event::Mount { id, display: STEED_DISPLAY });
             }
-            // Onslaught: larger, and red for everyone to see, while it lasts.
-            if kind == "onslaught" {
-                self.events.push(Event::Grow { id, scale: ONSLAUGHT_SCALE });
-                self.events.push(Event::Glow { id, secs });
+            // Grown (Rallying Cry): larger for everyone to see, while it lasts.
+            if kind == "grown" {
+                let amount = self.cc_of(id).iter().find(|c| c.kind == "grown").map_or(0.0, |c| c.amount);
+                self.events.push(Event::Grow { id, scale: 1.0 + amount });
             }
             self.update_rooted(id);
             self.update_speed(id);
@@ -293,6 +294,8 @@ impl Survival {
         let now = self.clock;
         let still = self.held_still(id)
             || self.players.get(&id).is_some_and(|p| p.hold_until > now && p.health > 0)
+            // Skyfall's hang: held up there in the air.
+            || self.hanging(id)
             || self.players.get(&id).is_some_and(|p| matches!(&p.action, Action::Stance { ability, .. } if self.content.abilities[*ability].counter.as_ref().is_some_and(|c| c.immune)));
         let Some(p) = self.players.get_mut(&id) else { return };
         if p.rooted != still {
@@ -306,7 +309,7 @@ impl Survival {
     /// after enough).
     pub(crate) fn cc_on_damage(&mut self, id: Id, damage: u32) -> u32 {
         let now = self.clock;
-        if self.immune(id) {
+        if self.untouchable(id) {
             return 0;
         }
         let Some(list) = self.cc.get_mut(&id) else { return damage };
@@ -401,6 +404,29 @@ impl Survival {
                 let amount = self.players.get(&id).map_or(0, |p| (p.max_health as f32 * share).round() as u32);
                 self.heal_hero_by(id, amount, from, &source);
             }
+            // A mark kept up: the effect's one-shot look replayed on them while it holds.
+            let due: Vec<(usize, String, String)> = self
+                .cc
+                .get(&id)
+                .map(|l| l.iter().enumerate().filter(|(_, c)| c.next_mark <= now && c.until > now).map(|(i, c)| (i, c.source.clone(), c.kind.clone())).collect())
+                .unwrap_or_default();
+            for (i, source, kind) in due {
+                let mark = self
+                    .content
+                    .abilities
+                    .iter()
+                    .find(|a| a.name == source)
+                    .and_then(|a| a.effects.iter().chain(a.ally_effects.iter()).chain(a.self_effects.iter()).find(|e| e.kind == kind && e.mark != 0).map(|e| (e.mark, e.mark_every)));
+                if let Some(c) = self.cc.get_mut(&id).and_then(|l| l.get_mut(i)) {
+                    c.next_mark = match mark {
+                        Some((_, every)) if every > 0.0 => now + every,
+                        _ => f32::INFINITY,
+                    };
+                }
+                if let Some((kit, _)) = mark {
+                    self.events.push(Event::Visual { id, kit, by: None });
+                }
+            }
             let Some(list) = self.cc.get_mut(&id) else { continue };
             let gone: Vec<String> = list.iter().filter(|c| c.until <= now).map(|c| c.kind.clone()).collect();
             list.retain(|c| c.until > now);
@@ -421,7 +447,7 @@ impl Survival {
             list.retain(|c| c.until > now);
         }
         self.events.push(Event::Auras { id });
-        if self.players.contains_key(&id) && kinds.iter().any(|k| k == "onslaught") && !self.has_cc(id, "onslaught") {
+        if self.players.contains_key(&id) && kinds.iter().any(|k| k == "grown") && !self.has_cc(id, "grown") {
             self.events.push(Event::Grow { id, scale: 1.0 });
         }
         if self.players.contains_key(&id) && kinds.iter().any(|k| k == "steed") && !self.has_cc(id, "steed") {
@@ -529,15 +555,16 @@ impl Survival {
     /// A unit nothing reaches (in Ice Block).
     /// A creature that holds its ground: a champion (a boss), a totem, or one winding up a blow no
     /// guard stops (unstoppable). Crowd control and forced movement don't take on it, except an
-    /// ultimate's. Heroes are never this (Ice Block and Onslaught keep their own rules).
+    /// ultimate's. Heroes are never this (Ice Block and steadfast keep their own rules).
     pub fn holds_ground(&self, id: Id) -> bool {
         let Some(m) = self.mobs.get(&id) else { return false };
         let d = &self.content.mobs[m.def];
         d.boss || d.totem || (matches!(m.state, super::mobs::MobState::Windup { .. }) && !self.attack_now(id).blockable)
     }
 
-    /// The hero whose control a foe shrugged off is told so (as WoW says it: Immune), once a
-    /// moment per foe so a burst over a crowd doesn't flood the screen.
+    /// A foe shrugs off a hero's control: it glances off it in a clash of sparks (no "Immune"
+    /// word: a spell's look says what happened, not text), seen by everyone, once a moment per
+    /// hero and foe so a burst over a crowd doesn't flood it.
     pub(crate) fn shrugged_off(&mut self, from: Id, target: Id) {
         if !self.players.contains_key(&from) {
             return;
@@ -551,7 +578,13 @@ impl Survival {
             self.told_immune.retain(|_, t| now < *t);
         }
         self.told_immune.insert(key, now + IMMUNE_TOLD_EVERY);
-        self.events.push(Event::Flash { player: from, text: format!("{}: Immune", self.unit_name(target)) });
+        self.events.push(Event::Visual { id: target, kit: super::combat::KIT_PARRY, by: None });
+    }
+
+    /// Nothing reaches them: Ice Block, or a hero's heavy attack out of Retaliation's parry while it
+    /// goes out. Unlike Ice Block, the second doesn't stop them acting.
+    pub fn untouchable(&self, id: Id) -> bool {
+        self.immune(id) || self.players.get(&id).is_some_and(|p| p.untouchable_until > self.clock)
     }
 
     pub fn immune(&self, id: Id) -> bool {
@@ -592,6 +625,13 @@ impl Survival {
                 if a != 0 {
                     out.push(a);
                 }
+            }
+        }
+        // A creature's own look (a spirit beast's glow).
+        if let Some(m) = self.mobs.get(&id) {
+            let a = self.content.mobs[m.def].aura;
+            if a != 0 {
+                out.push(a);
             }
         }
         // A sticky projectile's fuse burning on them.

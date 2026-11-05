@@ -233,6 +233,9 @@ pub struct SurvivalGame {
     /// many aura slots each unit showed last.
     pub(crate) abilities_dirty: BTreeSet<Id>,
     pub(crate) auras_shown: HashMap<Id, usize>,
+    /// The pose each unit holds at the rules' word ([`Event::Pose`]), for a guard let down to
+    /// fall back to it.
+    pub(crate) poses: HashMap<Id, u32>,
     /// Healing come in since the last flush, by hero (shown as one green number).
     pub(crate) healed: HashMap<Id, u32>,
     pub(crate) save_path: Option<PathBuf>,
@@ -340,6 +343,7 @@ impl SurvivalGame {
             storage_dirty: false,
             abilities_dirty: BTreeSet::new(),
             auras_shown: HashMap::new(),
+            poses: HashMap::new(),
             healed: HashMap::new(),
             save_path,
             offline,
@@ -757,8 +761,8 @@ impl SurvivalGame {
             let text = own.unwrap_or_else(|| {
                 "The Deadmines. There are 3 lamps, at the Smugglers' Landing, the Foundry's back door and \
                  the Galleries. Light them as you go, since you respawn at a lit lamp. Rest at a lamp to \
-                 heal, refill your Draughts (T) and send the Brotherhood back to their posts. Draughts \
-                 are the only heal down here. If you fall, your finds wait in a sack where you fell. \
+                 heal, refill your Draughts (T) and send the Brotherhood back to their posts. Out of \
+                 combat your health comes back on its own. If you fall, your finds wait in a sack where you fell. \
                  Fall again before you recover it and it's lost. Any lit lamp takes you home."
                     .to_string()
             });
@@ -804,7 +808,11 @@ impl SurvivalGame {
         let guid = Self::player_guid(&account);
         let id = self.sim.join(&account, &name, Some(&save));
         match lamp {
-            Some(l) if self.realm.below => self.sim.arrive_at(id, l),
+            Some(l) if self.realm.below => {
+                self.sim.arrive_at(id, l);
+                // Down from the camp: whole to start the dungeon.
+                self.sim.come_down(id);
+            }
             _ if self.realm.siege => self.sim.siege_arrive(id),
             _ => {
                 // Home by the book, beside it.

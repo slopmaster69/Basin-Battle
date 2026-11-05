@@ -44,12 +44,18 @@ fn in_hand(action: &Action, ability: usize) -> bool {
     matches!(action, Action::Aim { ability: a } | Action::Charge { ability: a, .. } if *a == ability)
 }
 
+/// Whether a recast still holds for a hero doing `action`: a dive (Stoop) only while they're in
+/// the air on a leap, so landing first ends the chain.
+fn holds(c: &crate::content::Content, action: &Action, ability: usize) -> bool {
+    !c.abilities[ability].dive || matches!(action, Action::Dash { ability: a, .. } if c.abilities[*a].kind == "leap")
+}
+
 impl Survival {
     /// The recast a key would fire now (the key's base ability), if it's armed.
     pub(crate) fn recast_armed(&self, id: Id, base: usize) -> Option<Recast> {
         let p = self.players.get(&id)?;
         let r = *p.combos.recasts.get(&base)?;
-        (r.until > self.clock || in_hand(&p.action, r.ability)).then_some(r)
+        ((r.until > self.clock || in_hand(&p.action, r.ability)) && holds(&self.content, &p.action, r.ability)).then_some(r)
     }
 
     /// Whether a base ability's next press is its EX version, free.
@@ -64,7 +70,7 @@ impl Survival {
     pub(crate) fn take_free(&mut self, id: Id, ability: usize) -> Option<Free> {
         let now = self.clock;
         let p = self.players.get(&id)?;
-        let key = p.combos.recasts.iter().find(|(_, r)| r.ability == ability && (r.until > now || in_hand(&p.action, ability))).map(|(b, _)| *b);
+        let key = p.combos.recasts.iter().find(|(_, r)| r.ability == ability && (r.until > now || in_hand(&p.action, ability)) && holds(&self.content, &p.action, ability)).map(|(b, _)| *b);
         if let Some(b) = key {
             let r = self.players.get_mut(&id)?.combos.recasts.remove(&b)?;
             self.events.push(Event::Abilities { player: id });
@@ -89,7 +95,8 @@ impl Survival {
         // A recast arms nothing, unless it chains on to one of its own (Raptor Strike's hits).
         let recast = self.content.ability(&d.recast).filter(|_| !matches!(free, Some(Free::Recast { .. })) || d.inner);
         let window = d.recast_secs;
-        let empower = d.empower.as_ref().and_then(|e| Some((self.content.ability(&e.ability)?, e.secs)));
+        // A trap's empowers when it springs (`trap_empowers`), not when it's set.
+        let empower = d.empower.as_ref().filter(|_| d.kind != "trap").and_then(|e| Some((self.content.ability(&e.ability)?, e.secs)));
         // A chain's later hit arms its next on the key it's on (Raptor Strike's).
         let base = if d.inner { self.chain_key(id, ability).unwrap_or_else(|| self.content.base_of(ability)) } else { self.content.base_of(ability) };
         let start = self.standing_spot(began);
@@ -106,6 +113,17 @@ impl Survival {
         if changed {
             self.events.push(Event::Abilities { player: id });
         }
+    }
+
+    /// A trap has sprung: the card it empowers is empowered now, for its time (Freezing Trap's free
+    /// Multi-Shot comes as the ice takes, so there's time to turn and fire; set, a trap may wait
+    /// long past it. Serg's play-test, #118).
+    pub(crate) fn trap_empowers(&mut self, id: Id, trap: usize) {
+        let now = self.clock;
+        let Some((b, secs)) = self.content.abilities[trap].empower.as_ref().and_then(|e| Some((self.content.ability(&e.ability)?, e.secs))) else { return };
+        let Some(p) = self.players.get_mut(&id) else { return };
+        p.combos.empowered.insert(b, now + secs);
+        self.events.push(Event::Abilities { player: id });
     }
 
     /// The base ability on a key of the hero's whose chain of recasts (its own, or its EX
@@ -147,7 +165,7 @@ impl Survival {
                 p.combos.empowered.clear();
             } else {
                 let action = p.action.clone();
-                p.combos.recasts.retain(|_, r| r.until > now || in_hand(&action, r.ability));
+                p.combos.recasts.retain(|_, r| (r.until > now || in_hand(&action, r.ability)) && holds(content, &action, r.ability));
                 p.combos.empowered.retain(|b, until| *until > now || content.ex_of(*b).is_some_and(|x| in_hand(&action, x)));
             }
             if p.combos.recasts.len() + p.combos.empowered.len() != before {

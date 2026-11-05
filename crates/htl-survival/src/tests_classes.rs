@@ -62,6 +62,15 @@ fn use_card(s: &mut Survival, p: Id, card: &AbilityDef, ex: bool) -> Vec<Event> 
         ev.extend(run(s, 0.3));
         s.input(p, Input::Ability(slot, ex));
     }
+    // Tripwire's second press places its other arrow, and the wire forms.
+    if card.hunt == "tripwire" && !ex {
+        ev.extend(run(s, 0.5));
+        s.input(p, Input::Ability(slot, false));
+        ev.extend(s.step(DT));
+        s.input(p, Input::Attack);
+        ev.extend(s.step(DT));
+        s.input(p, Input::AttackUp);
+    }
     ev.extend(run(s, 2.5));
     ev
 }
@@ -140,6 +149,16 @@ fn worth(d: &AbilityDef) -> f32 {
     hit + chain + burn + 0.5 * linger
 }
 
+/// [`worth`], with the spray it bursts into (`splits`): every arrow of it can go through the one
+/// foe it burst in.
+fn worth_with_spray(c: &Content, d: &AbilityDef) -> f32 {
+    let spray = c.ability(&d.splits).map_or(0.0, |k| {
+        let s = &c.abilities[k];
+        (s.damage[0] + s.damage[1]) / 2.0 * s.count.max(1) as f32
+    });
+    worth(d) + spray
+}
+
 /// The hard crowd control a hero gets from it (half a creature's).
 fn hard_cc(d: &AbilityDef) -> f32 {
     d.effects
@@ -162,7 +181,9 @@ fn the_board_keeps_to_its_budgets() {
     for (k, ex) in board(c) {
         let d = &c.abilities[k];
         assert!(!d.text.is_empty() && !d.icon.is_empty(), "{}: its words and icon", d.key);
-        assert!(d.spell != 0 || d.kind == "art", "{}: its look", d.key);
+        // (A shout's look is on each friend it reaches: `ally_spell`; a Tackle's is its Crash; a
+        // leap's own clip, Ensnaring Retreat's flip, is its look without a spell's.)
+        assert!(d.spell != 0 || d.ally_spell != 0 || d.kind == "art" || d.crash.is_some() || d.leap_flip || d.leap_clip != 0, "{}: its look", d.key);
         if d.kind == "art" {
             continue;
         }
@@ -195,7 +216,7 @@ fn the_board_keeps_to_its_budgets() {
             }
             if card.is_ex() {
                 assert!([25, 50].contains(&card.valor), "{}: an EX costs a segment or two ({})", card.key, card.valor);
-                assert!(worth(card) <= worth(d) * 1.8 + 20.0, "{}: an EX is better, not a different league", card.key);
+                assert!(worth_with_spray(c, card) <= worth(d) * 1.8 + 20.0, "{}: an EX is better, not a different league", card.key);
             }
         }
     }

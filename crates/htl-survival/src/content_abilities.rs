@@ -133,6 +133,10 @@ pub struct AbilityDef {
     /// The cone's width (degrees).
     #[serde(default)]
     pub arc: f32,
+    /// Its shape flashed on the ground as it lands (a cone's wedge, a nova's ring), on the clients
+    /// that draw one (patch 0026's `PlayGroundBurst`): an effect, not a floor marker.
+    #[serde(default)]
+    pub burst: Option<BurstDef>,
     /// Ground: seconds between the mark and the landing; then burning ground this long, at this
     /// much a second.
     #[serde(default)]
@@ -181,6 +185,24 @@ pub struct AbilityDef {
     pub cleanse: bool,
     #[serde(default)]
     pub invulnerable: bool,
+    /// One of the Hunter's bow abilities: the bow comes into the hands as it's aimed (the hero's
+    /// own, or the camp's first bow if they carry none), it's drawn with the base game's draw
+    /// while it charges (or, with nothing to charge, while it's aimed), and it looses with the
+    /// bow's own release before the melee weapon comes back. A leap with the bow (Skyfall) holds
+    /// it through the leap.
+    #[serde(default)]
+    pub bow: bool,
+    /// A bow ability's damage as a share of the hero's bow's at the same draw (Aimed Shot's 1.2:
+    /// 120% of what the bow would do), so it grows with the bow as a weapon art grows with the
+    /// weapon. 0: its own `damage`. (Serg's play-test, #118.)
+    #[serde(default)]
+    pub bow_damage: f32,
+    /// A fan (`count` > 1) whose arrows pass this far apart (yd) where the reticle points, so a
+    /// pack there is covered near or far; `spread` is then the widest it opens (close in). 0: a
+    /// fixed `spread`. (Multi-Shot: 10° apart left the arrows passing between a pack past 15 yd;
+    /// Serg's play-test, #118.)
+    #[serde(default)]
+    pub spread_yd: f32,
     /// An EX blink leaves this ability (a Frost Nova) where it started.
     #[serde(default)]
     pub leaves: String,
@@ -213,6 +235,15 @@ pub struct AbilityDef {
     pub object: u32,
     #[serde(default)]
     pub burst_spell: u32,
+    /// A ricochet's flash where it skips off the ground, apart from the wall's `burst_spell`
+    /// (Bank Shot: not fire on the floor; Corey's review). 0: none, the arrow flies on from there.
+    #[serde(default)]
+    pub skip_spell: u32,
+    /// A trap's throw: the spell whose missile flies from the hand to the spot before the trap
+    /// is set there (a bomb's), so the player sees it go out (Corey's review: "the trap should
+    /// fly out of the hand and land on the spot"). 0: set at once.
+    #[serde(default)]
+    pub lob_spell: u32,
     /// The look its lingering ground wears (a DynamicObject of this spell for as long as it
     /// lingers: Consecration's holy ground, Flamestrike's fire); 0: its own `spell`.
     #[serde(default)]
@@ -221,9 +252,30 @@ pub struct AbilityDef {
     pub ammo: u32,
     #[serde(default)]
     pub aura: u32,
-    /// The cast's clip (`AnimationData`), played on the caster as it goes.
+    /// The cast's clip (`AnimationData`), played on the caster as it goes (a weapon art's: its
+    /// blow).
     #[serde(default)]
     pub clip: u16,
+    /// Which of the model's versions of `clip` (0 the first).
+    #[serde(default)]
+    pub take: u32,
+    /// Another character model whose take on `clip` every hero plays (`"TaurenMale"`; as a
+    /// move's `from`), so the ability looks the same on every race; without one, the hero's own.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// A leap's own look, the same on every hero whatever their race or how they were moving: a
+    /// clip over the whole body for the flight (`leap_clip`, its `leap_take`), borrowed from
+    /// another character model (`leap_from`, as `"ScourgeFemale"`; empty: their own), and a
+    /// tumble head over heels along the way it flies (`leap_flip`), on the clients that play
+    /// clips. In place of the spell's own cast pose.
+    #[serde(default)]
+    pub leap_clip: u16,
+    #[serde(default)]
+    pub leap_take: u32,
+    #[serde(default)]
+    pub leap_from: String,
+    #[serde(default)]
+    pub leap_flip: bool,
     /// Valor for each foe it strikes (0: `[valor].ability`).
     #[serde(default)]
     pub valor_hit: f32,
@@ -239,6 +291,9 @@ pub struct AbilityDef {
     /// With a two-handed weapon (no shield to throw), its key fires this ability instead.
     #[serde(default)]
     pub two_hand: String,
+    /// Only with a one-handed weapon and its shield (Shield Wall): with a two-hander it won't go.
+    #[serde(default)]
+    pub needs_shield: bool,
     /// An ally spell that strikes a foe instead (its `damage`) when one is on the reticle's line
     /// (Holy Shock).
     #[serde(default)]
@@ -321,6 +376,15 @@ pub struct AbilityDef {
     pub lift: f32,
     #[serde(default)]
     pub back: bool,
+    /// A leap: no ring on the ground where it comes down, for anyone (a rival under it still
+    /// gets the warning over them).
+    #[serde(default)]
+    pub unmarked: bool,
+    /// A dive (Stoop): a leap only from the air (landing first closes its recast), down onto the
+    /// foe thrown up with the hero, fast however high it starts, its damage from `damage[0]` near
+    /// the ground to `damage[1]` from high up.
+    #[serde(default)]
+    pub dive: bool,
     /// A blink with an anchor: the first press sets it at the feet (and costs nothing); pressed
     /// again within this many seconds, the hero steps back to it.
     #[serde(default)]
@@ -447,7 +511,7 @@ pub struct AbilityDef {
     /// A Hunter ability's own mechanic, beyond its kind's: `call` and `double_call` (Call of the
     /// Wild's beasts), `tripwire`, `recall` (Arrow Recall), `haul` (a pull that hauls its caster
     /// to what won't move), `scatter` (arrows scattered where a leap began), `volley` (Skyfall's),
-    /// `float` (a leap that hangs: feather fall for a while after).
+    /// `float` (a leap that hangs at its top, aiming its `recast`, then floats down).
     #[serde(default)]
     pub hunt: String,
     /// A projectile that ricochets off walls, trees and rocks this many times, each bounce adding
@@ -456,14 +520,166 @@ pub struct AbilityDef {
     pub bounces: u32,
     #[serde(default)]
     pub bounce_gain: f32,
+    /// A projectile that bursts where its flight ends (the first foe, a wall, the ground or its
+    /// range's end) into this `inner` projectile's arrows, fanned out from there (Split Arrow);
+    /// its `burst_spell` shows at the burst.
+    #[serde(default)]
+    pub splits: String,
     /// It goes on the key press, along the facing (no aim and click): Raptor Strike's hits,
     /// Skyfall's leap.
     #[serde(default)]
     pub at_once: bool,
+    /// The Warlord's (the Warrior's second choices).
+    /// A dash that carries the first body it meets to the end of its rush and Crashes it into
+    /// what's there (Tackle): a wall, another body, or nothing (dropped for its `damage`).
+    #[serde(default)]
+    pub crash: Option<CrashDef>,
+    /// An `ally` that rushes to the friend it picks (up to its `range`) and takes the first blow
+    /// meant for them within this many seconds (Intervene).
+    #[serde(default)]
+    pub intervene: f32,
+    /// A nova's friends in it (the caster too): this much stamina back, these boons, and this
+    /// spell's look on each of them (Rallying Cry).
+    #[serde(default)]
+    pub ally_stamina: f32,
+    #[serde(default)]
+    pub ally_effects: Vec<AbilityEffect>,
+    #[serde(default)]
+    pub ally_spell: u32,
+    /// A beam all round the caster, `radius` out, not a strip along the aim (Bladestorm's spin);
+    /// it walks at [`AROUND_PACE`] of a run.
+    #[serde(default)]
+    pub around: bool,
+    /// A beam whose every strike after the first deals this much more, up to `ramp_cap` a strike
+    /// (Bladestorm's ramp).
+    #[serde(default)]
+    pub ramp: f32,
+    #[serde(default)]
+    pub ramp_cap: f32,
+    /// A beam the clients that play clips show as a storm of cuts in turning directions
+    /// (Bladestorm's flurry), over the spell's own spin.
+    #[serde(default)]
+    pub flurry: Option<FlurryDef>,
+    /// A channel the guard ends at once, raising the guard on that press (a dodge ends any
+    /// channel and comes out on its press already): Bladestorm.
+    #[serde(default)]
+    pub bail: bool,
+    /// Against an opened enemy (staggered, knocked down, stunned, Exposed, or a boss
+    /// stance-broken) it deals this many times its damage instead (Cleave's 250%: `weapon = 1.0`,
+    /// `opened = 2.5`).
+    #[serde(default)]
+    pub opened: f32,
+    /// A `place` that plants a banner at the reticle (War Banner): a thing on the ground (its
+    /// `object`, a `GameObjectDisplayInfo`) standing `secs`, with health, that helps the heroes
+    /// near it. Its recast moves it.
+    #[serde(default)]
+    pub banner: Option<BannerDef>,
+    /// A buff that goes even while its caster is staggered or knocked down, and ends that, a root
+    /// and a slow (Berserker Rage).
+    #[serde(default)]
+    pub breaks_free: bool,
+    /// A buff that costs this share of the caster's health now as it goes (never the last point
+    /// of it: Blood Fury).
+    #[serde(default)]
+    pub health_cost: f32,
+    /// A passive the hero has while this ability is on one of their keys (one of [`PASSIVES`]):
+    /// `momentum`, the Juggernaut's.
+    #[serde(default)]
+    pub passive: String,
+}
+
+/// The passives an ability on a key can give its hero.
+pub const PASSIVES: [&str; 1] = ["momentum"];
+
+/// A War Banner as it stands: its `health` (every blow that reaches it, a foe's or a hero's,
+/// takes from it), and what heroes within its ability's `radius` of it get: stamina back `regen`
+/// times as fast, heavy attacks that stagger `stagger` longer, and `aura`'s look over them while
+/// they're near. Drawn at `scale`.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct BannerDef {
+    pub health: f32,
+    pub regen: f32,
+    pub stagger: f32,
+    #[serde(default)]
+    pub aura: u32,
+    #[serde(default = "full_share")]
+    pub scale: f32,
+}
+
+/// The Juggernaut's Momentum (`[momentum]`): each of the hero's own blows that lands (a light, a
+/// heavy, a weapon art) adds a stack, `damage` more a stack on their blows, `most` stacks at
+/// most; all lost when they raise their guard, or `secs` after their last hit.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct MomentumDef {
+    pub damage: f32,
+    pub most: u32,
+    pub secs: f32,
+}
+
+impl Default for MomentumDef {
+    fn default() -> Self {
+        Self { damage: 0.05, most: 5, secs: 4.0 }
+    }
+}
+
+/// An around beam (Bladestorm) walks at this share of a run.
+pub const AROUND_PACE: f32 = 0.7;
+
+/// Tackle's Crash: what the carried body takes where the rush ends. Into a wall, a tree or a
+/// rock: `wall_damage` and stunned `wall_stun` (a hero's shortened as any stun's). Into another
+/// enemy: both take `foe_damage` and are knocked down `knockdown`. A boss (anything that won't
+/// move) in the way: the rush stops against it for `posture`; a body carried into one gives it
+/// `boss_posture`. A hero is carried at most `hero_carry` yd.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct CrashDef {
+    pub wall_damage: f32,
+    pub wall_stun: f32,
+    pub foe_damage: f32,
+    pub knockdown: f32,
+    pub posture: u32,
+    pub boss_posture: u32,
+    pub hero_carry: f32,
 }
 
 fn first_choice() -> u32 {
     1
+}
+
+/// A shape flashed on the ground as an ability lands: a shock front runs out to the edge over most
+/// of `secs` and fades, in `colour` (`RRGGBB`).
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct BurstDef {
+    pub secs: f32,
+    pub colour: String,
+}
+
+/// Bladestorm's flurry, as the client plays it (patch 0025's `PlayUnitFlurry`): `cuts` the clips
+/// and takes it cycles through, from the character model `from` names (the same on every race),
+/// each `cut` seconds long, the first wound up over `windup` (the anticipation: the draw-back,
+/// compact); the body snaps round `turn` degrees a step to face a new way for each; each trails
+/// the weapons in `trail` (`AARRGGBB`) for `trail_ms`. When the spin ends, one wider sweep
+/// (`finish`, over `finish_secs`, its trail hanging longer) as the body comes back to face ahead.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct FlurryDef {
+    pub from: Option<String>,
+    pub cuts: Vec<[u32; 2]>,
+    pub cut: f32,
+    pub windup: f32,
+    pub finish: [u32; 2],
+    pub finish_secs: f32,
+    pub turn: f32,
+    #[serde(default)]
+    pub trail: String,
+    #[serde(default)]
+    pub trail_ms: u32,
+}
+
+impl FlurryDef {
+    /// Clips and takes as the client's call reads them: `"88/0,87/0"`.
+    pub fn cuts_text(&self) -> String {
+        self.cuts.iter().map(|[c, t]| format!("{c}/{t}")).collect::<Vec<_>>().join(",")
+    }
 }
 
 /// The Hunter's own mechanics an ability can name (`hunt`).
@@ -585,6 +801,13 @@ pub struct AbilityEffect {
     /// centre, a projectile's flight).
     #[serde(default)]
     pub from_caster: bool,
+    /// A one-shot look (a `SpellVisualKit`) replayed on whoever has it every `mark_every` seconds
+    /// while it holds, where the data has no lasting look that fits: the Cowed mark over the head,
+    /// the Exposed crack. A kit plays no body animation, as a spell's cast would.
+    #[serde(default)]
+    pub mark: u32,
+    #[serde(default)]
+    pub mark_every: f32,
     /// Its look on whoever has it, in place of the kind's own (a spell whose state look plays).
     #[serde(default)]
     pub aura: u32,
@@ -621,15 +844,26 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// go; their next blow counts as from behind) until they strike or cast; `cheat_death` keeps a hero
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
-pub const OTHER_EFFECTS: [&str; 20] =
-    ["knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death"];
+///
+/// The Warrior's: `guarded` (the first blow meant for them strikes the one who gave it instead:
+/// Intervene), `rallied` (any stagger or knockdown ends as it lands; nothing staggers them, and
+/// their attacks come `amount` faster: Rallying Cry), `fury` (their attacks cost no stamina and
+/// deal `amount` more: Blood Fury, Rallying Cry), `grown` (drawn `amount` larger), `cowed` (they
+/// deal `amount` less damage and wind their attacks up slower; a creature low on health flees: a
+/// boss only deals a little less: Intimidating Roar), `exposed` (no block or parry, and every
+/// hero's hit on them deals `amount` more and staggers longer: Rising Cut), `momentum` (the
+/// Juggernaut's stacks, `amount` of them), `war_banner` (near a War Banner: kept on for a moment
+/// at a time while they stand by it).
+pub const OTHER_EFFECTS: [&str; 27] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner",
+];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 11] = ["freedom", "steed", "wrath", "onslaught", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death"];
+pub const BOONS: [&str; 16] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
-pub const HARMFUL: [&str; 12] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder"];
+pub const HARMFUL: [&str; 14] = ["stun", "incapacitate", "petrify", "panic", "root", "snare", "silence", "weaken", "burn", "mark", "deathmark", "sunder", "cowed", "exposed"];
 
 /// A totem set down: the creature it is (a `[[mob]]` with `totem = true`: its look, its health)
 /// and how far it works; every `tick` it gives the ability's `effects` to foes in that radius
@@ -701,6 +935,15 @@ pub struct CounterDef {
     /// Ensnaring Retreat), so a read that wasn't needed still does something.
     #[serde(default)]
     pub expire_answer: String,
+    /// A melee blow it catches is parried (as a timed guard would: the attacker reels, the hero
+    /// gets a parry's stamina and opening) and the hero answers with their own heavy attack at
+    /// once, free, untouchable until it has struck (Retaliation).
+    #[serde(default)]
+    pub parry_heavy: bool,
+    /// While it lasts, a left click with the guard held (or the bash key) shoves with the shield,
+    /// harder, and the stance holds on after it (Shield Wall's Shield Bash).
+    #[serde(default)]
+    pub bash: bool,
 }
 
 fn whole() -> f32 {
@@ -768,7 +1011,8 @@ impl Default for CcDef {
             ("silence", 15487),
             ("burn", 2120),
             ("deathmark", 1130),
-            ("onslaught", 12328),
+            // Death Wish's red: Blood Fury, and the Warrior's own Rallying Cry.
+            ("fury", 12328),
             ("hallowed", 465),
             ("steadfast", 10060),
             ("shield", 17),
