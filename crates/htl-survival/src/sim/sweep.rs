@@ -50,6 +50,26 @@ impl Survival {
             .filter(|b| b.abs() <= reach)
             .map(|b| format!("{b:.1}"))
             .collect();
+        // A meter: the sweet spot rolled along the sweep, and the caster told where.
+        if d.meter {
+            let lo = 0.3 + d.meter_good;
+            let hi = (0.92 - d.meter_good).max(lo);
+            let at_share = lo + (hi - lo) * rand::Rng::gen::<f32>(&mut self.rng);
+            if let Some(p) = self.players.get_mut(&id) {
+                p.meter_at = at_share;
+            }
+            self.events.push(Event::CheckStart {
+                player: id,
+                ability,
+                kind: "meter",
+                a: secs,
+                b: at_share,
+                c: d.meter_perfect,
+                pattern: format!("{}|{:.3}", if dir > 0.0 { "lr" } else { "rl" }, d.meter_good),
+            });
+            self.pulse_sweep(id, ability, from);
+            return;
+        }
         self.events.push(Event::CheckStart {
             player: id,
             ability,
@@ -106,6 +126,10 @@ impl Survival {
         let now = self.clock;
         let Some(Action::Sweep { ability, from, since, until, struck, held }) = self.players.get(&id).map(|p| p.action.clone()) else { return };
         if now >= until {
+            // A meter never stopped: it ran into the overrun.
+            if held.is_none() && self.content.abilities[ability].meter {
+                self.check_result(id, ability, "fail");
+            }
             self.end_ability_action(id);
             // Back to ready, or the guard held meanwhile.
             self.finish_commitment(id);
@@ -170,6 +194,15 @@ impl Survival {
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Unit(id) });
         let at = self.players[&id].pos;
         let (mobs, heroes) = self.in_wedge(id, ability, at, yaw, d.arc, d.range[0]);
+        if d.meter {
+            // A meter's stop lets the frost go over the whole cone it swept (its sweet spot is
+            // rolled apart from where the foes stand, so it can't hang on the jet's place).
+            let dir = self.players.get(&id).map_or(1.0, |p| p.sweep_dir);
+            let centre = from - dir * d.sweep.to_radians() / 2.0;
+            let (all_mobs, all_heroes) = self.in_wedge(id, ability, at, centre, d.sweep + d.arc, d.range[0]);
+            self.stop_meter(id, ability, since, &all_mobs, &all_heroes, at);
+            return;
+        }
         let perfect = d.perfect_arc > 0.0
             && mobs.iter().map(|m| self.mobs[m].pos).chain(heroes.iter().map(|h| self.players[h].pos)).any(|pos| angle_between(yaw, facing(at, pos)) <= d.perfect_arc);
         if !d.stop_effects.is_empty() {
@@ -189,6 +222,46 @@ impl Survival {
             self.events.push(Event::Perfect { player: id, ability });
         }
         let grade = if perfect { "perfect" } else if mobs.is_empty() && heroes.is_empty() { "fail" } else { "good" };
+        self.check_result(id, ability, grade);
+    }
+
+    /// A meter sweep stopped: graded by where along it, against this cast's sweet spot.
+    fn stop_meter(&mut self, id: Id, ability: usize, since: f32, mobs: &[Id], heroes: &[Id], at: Vec3) {
+        let d = self.content.abilities[ability].clone();
+        let (secs, spot) = self.players.get(&id).map_or((d.secs, 0.5), |p| (p.sweep_secs, p.meter_at));
+        let share = ((self.clock - since) / secs.max(0.1)).clamp(0.0, 1.0);
+        let off = (share - spot).abs();
+        let grade = if off <= d.meter_perfect {
+            "perfect"
+        } else if off <= d.meter_good {
+            "good"
+        } else if share < spot {
+            "early"
+        } else {
+            "late"
+        };
+        // Perfect: the stop's whole; good: its least; off it, nothing more than the jet's slow.
+        let share_fx = match grade {
+            "perfect" => Some(1.0),
+            "good" => Some(0.0),
+            _ => None,
+        };
+        if let Some(sh) = share_fx {
+            let was = self.fx_from.replace(at);
+            for u in mobs.iter().chain(heroes).copied().collect::<Vec<_>>() {
+                self.apply_effects(id, u, &d.stop_effects, sh, &d.name);
+            }
+            self.fx_from = was;
+        }
+        if grade == "perfect" {
+            let k = self.content.checks.clone();
+            self.gain_valor(id, k.perfect_valor);
+            let kit = self.perfect_kit_of(ability);
+            if kit != 0 {
+                self.events.push(Event::Visual { id, kit, by: None });
+            }
+            self.events.push(Event::Perfect { player: id, ability });
+        }
         self.check_result(id, ability, grade);
     }
 

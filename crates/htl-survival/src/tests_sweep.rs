@@ -11,7 +11,16 @@ use crate::sim::*;
 const DT: f32 = 0.05;
 const ORIGIN: Vec3 = [0.0, 0.0, 0.0];
 
+/// A world whose Cone of Cold is the plain sweep, graded by the foes under the jet (the meter's
+/// own tests turn it back on: `meter_world`).
 fn world() -> Survival {
+    let mut s = meter_world();
+    let cone = s.content.ability("cone_of_cold").unwrap();
+    s.content.abilities[cone].meter = false;
+    s
+}
+
+fn meter_world() -> Survival {
     let mut c = Content::dev();
     c.pvp = Default::default();
     c.dev.full_tree = true;
@@ -219,4 +228,68 @@ fn every_sweep_rolls_its_way_and_pace_and_the_caster_is_shown_where_the_foes_sta
     assert_eq!(ways.len(), 2, "both ways across: {ways:?}");
     paces.sort_by(|a, b| a.total_cmp(b));
     assert!(paces[11] - paces[0] > 0.05, "paces differ: {paces:?}");
+}
+
+#[test]
+fn cone_of_colds_meter_rolls_its_sweet_spot_and_grades_the_stop_against_it() {
+    // Corey's notes on the fourth film: graded on a meter, as Gladius's swing meter.
+    let mut s = meter_world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = dummy_at(&mut s, 6.0, 0.0);
+    s.set_cooldowns(p, true);
+    s.slot_ability(p, "close", "cone_of_cold").unwrap();
+    let cone = s.content.ability("cone_of_cold").unwrap();
+    let d = s.content.abilities[cone].clone();
+    assert!(d.meter);
+    let mut spots = Vec::new();
+    for (aim, want) in [(0.0, "perfect"), (d.meter_good - 0.05, "good"), (-0.3, "early"), (0.3, "late")] {
+        s.players.get_mut(&p).unwrap().facing = 0.0;
+        s.cc.remove(&k);
+        s.input(p, Input::Ability(key_of("close"), false));
+        if matches!(s.players[&p].action, Action::Aim { .. }) {
+            s.input(p, Input::Attack);
+            s.input(p, Input::AttackUp);
+        }
+        let ev = s.step(0.0);
+        let (secs, spot) = ev
+            .iter()
+            .find_map(|e| match e {
+                Event::CheckStart { player, kind: "meter", a, b, .. } if *player == p => Some((*a, *b)),
+                _ => None,
+            })
+            .expect("the caster is told the meter");
+        spots.push(spot);
+        // Graded against the middle from here, so each press lands where it means to.
+        let spot = 0.5;
+        s.players.get_mut(&p).unwrap().meter_at = spot;
+        let at = spot + aim;
+        run(&mut s, secs * at);
+        s.input(p, Input::Ability(key_of("close"), false));
+        let ev = s.step(0.0);
+        let grade = ev.iter().find_map(|e| match e {
+            Event::CheckResult { player, grade, .. } if *player == p => Some(*grade),
+            _ => None,
+        });
+        assert_eq!(grade, Some(want), "stopped at {at:.2} of the sweep, its spot at {spot:.2}");
+        let frozen = s.has_cc(k, "petrify");
+        assert_eq!(frozen, want == "perfect" || want == "good", "{want}: frozen {frozen}");
+        run(&mut s, 3.0);
+    }
+    spots.sort_by(|a, b| a.total_cmp(b));
+    assert!(spots[3] - spots[0] > 0.02, "the spot moves cast to cast: {spots:?}");
+}
+
+#[test]
+fn a_meter_never_stopped_runs_into_the_overrun_a_fail() {
+    let mut s = meter_world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _k = dummy_at(&mut s, 6.0, 0.0);
+    s.slot_ability(p, "close", "cone_of_cold").unwrap();
+    s.input(p, Input::Ability(key_of("close"), false));
+    if matches!(s.players[&p].action, Action::Aim { .. }) {
+        s.input(p, Input::Attack);
+        s.input(p, Input::AttackUp);
+    }
+    let ev = run(&mut s, 2.0);
+    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { player, grade: "fail", .. } if *player == p)), "the overrun");
 }

@@ -3682,7 +3682,7 @@ crit_effects = [{ kind = "stagger", secs = [0.4, 0.4] }]
 [[ability]]
 key = "cone_of_cold"
 name = "Cone of Cold"
-text = "A jet of frost sweeps across your front over 1 sec, 10 yd long: everything it passes takes 12 damage and is slowed by 50% for 3 sec. Press again to stop it: enemies in the jet freeze for 2 sec (1 sec against heroes). Stop it with an enemy at its centre."
+text = "A jet of frost sweeps across your front over 1 sec, 10 yd long: everything it passes takes 12 damage and is slowed by 50% for 3 sec. Press again to stop it on the meter: on its sweet spot, enemies in the jet freeze for 2 sec; near it, for 1 sec. Off it, they're only slowed."
 icon = "Spell_Frost_Glacier"
 school = "mage"
 slot = "close"
@@ -3695,6 +3695,13 @@ sweep = 120.0
 secs = 1.0
 stop_secs = 0.5
 perfect_arc = 10.0
+# Graded on a meter (Gladius's swing meter, Corey's notes on the fourth film: a stop "when you
+# want" wasn't a skill check): the sweet spot rolled along the sweep each cast; within 6% of the
+# sweep's time of it a perfect (the whole freeze), within 16% good (the least freeze), off it the
+# slow alone; never stopped, a fail.
+meter = true
+meter_perfect = 0.06
+meter_good = 0.16
 # A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
 perfect_kit = 1027
 cooldown = 8.0
@@ -3705,7 +3712,7 @@ tick_spell = 116
 # hands with it, so it reads as a channelled cone (Corey, Nov 5: the stream over the ground wedge).
 channel_kit = 1027
 effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
-stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
+stop_effects = [{ kind = "petrify", secs = [1.0, 2.0] }]
 
 # E, the second choice: Arcane's rhythm, round the caster. A burst; then press on the beat for a
 # second, wider and harder, and a third that throws them back. Miss a beat and it ends there.
