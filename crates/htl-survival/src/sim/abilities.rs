@@ -2165,10 +2165,12 @@ impl Survival {
             self.plant_bomb(p.owner, p.ability, victim);
             return;
         }
-        self.strike_with(p, victim, from);
+        // Combustion spreads what burns before its own blow lands (a blow that kills would leave
+        // nothing to spread from).
         if d.spread_burns > 0.0 {
             self.spread_burns(p.owner, p.ability, victim, d.spread_burns);
         }
+        self.strike_with(p, victim, from);
         if d.chain > 0 {
             self.chain_on(p, victim);
         }
@@ -2180,12 +2182,20 @@ impl Survival {
         let spent = self.staff_spend(p.owner, victim, p.ability);
         let p = &Projectile { damage: p.damage * spent, ..p.clone() };
         // Fire Ward's own Fire Blasts and the like are owned by whoever fired them back.
-        if self.players.contains_key(&victim) {
+        let landed = if self.players.contains_key(&victim) {
             let damage = self.ability_damage(p.owner, victim, p.ability, p.damage);
             let blow = Blow::Arrow(p.spell);
             self.strike_fair_as(p.owner, victim, damage, from, true, false, false, blow, None, combat::Follow::Ability { ability: p.ability, share: p.share }, HitKind::Projectile);
+            true
         } else {
+            // A creature's blow can come to nothing (dodged, guarded, gone home): then neither
+            // its critical's effects nor a staff's stack land either.
+            let before = self.mobs.get(&victim).map(|m| m.health);
             self.ability_on_mob(p.owner, victim, p.ability, p.share, p.damage, from, HitKind::Projectile, p.spell);
+            self.mobs.get(&victim).map(|m| m.health) != before
+        };
+        if !landed {
+            return;
         }
         if p.critical {
             let d = self.content.abilities[p.ability].clone();

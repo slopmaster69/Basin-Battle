@@ -126,7 +126,12 @@ impl Survival {
                     self.hurt_mob_as(*m, o.owner, per, &d.name);
                 }
                 for h in &heroes {
+                    // Not through Ice Block and the like; and seen, as a creature's is.
+                    if self.immune(*h) {
+                        continue;
+                    }
                     let dmg = self.ability_damage(o.owner, *h, o.ability, per as f32);
+                    self.events.push(Event::Swing { attacker: o.owner, victim: Some(*h), damage: dmg, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
                     self.hurt_player_by(*h, dmg, o.owner, &d.name);
                 }
                 if !d.effects.is_empty() {

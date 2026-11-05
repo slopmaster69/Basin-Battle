@@ -1751,10 +1751,7 @@ impl Survival {
         // Blinked through it as it came, while it waited on their round trip: slipped. (Blinked
         // out before it came, it's slipped where it's swung; see `slip_from`.)
         let grace = v.rtt.min(self.content.combat.max_grace);
-        if s.how != HitKind::Projectile && self.slips.get(&s.victim).is_some_and(|b| b.at >= s.at - grace - 1.0e-4) {
-            self.slipped(s.victim, s.attacker, s.style);
-            return;
-        }
+        let blinked = s.how != HitKind::Projectile && self.slips.get(&s.victim).is_some_and(|b| b.at >= s.at - grace - 1.0e-4);
         // Out of it by now: a whiff.
         let inside = match s.area {
             None => true,
@@ -1765,6 +1762,13 @@ impl Survival {
             Some(Area::Circle { at, radius }) => dist2d(v.pos, at) <= radius,
             Some(Area::Line { pos, facing: f, len, half }) => in_strip(pos, f, len, half + 0.4, v.pos),
         };
+        // A blink that left the blow's area slipped it (its reward); one that stayed inside it
+        // (a few yards within a slam, or through the attacker) didn't. A blow on them alone
+        // (no area) is slipped by the blink itself.
+        if blinked && (s.area.is_none() || !inside) {
+            self.slipped(s.victim, s.attacker, s.style);
+            return;
+        }
         if !inside {
             self.events.push(Event::Swing { attacker: s.attacker, victim: Some(s.victim), damage: 0, outcome: Outcome::Miss, anim: false, style: s.style });
             return;
@@ -2331,6 +2335,14 @@ impl Survival {
         self.cancel_preview(id);
         self.end_ability_action(id);
         self.stances.remove(&id);
+        // Alter Time's mark goes with them (it would bring them back from the camp to where they
+        // fell, health and all).
+        if self.anchors.get(&id).is_some_and(|a| self.content.abilities[a.ability].rewind_health > 0.0) {
+            if let Some(a) = self.anchors.remove(&id) {
+                self.unmark(a.mark);
+                self.events.push(Event::Abilities { player: id });
+            }
+        }
         self.death_mark_reset(id);
         self.clear_cc(id);
         // In the ring, a fall ends the run and costs nothing.
