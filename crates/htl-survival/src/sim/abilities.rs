@@ -580,7 +580,8 @@ impl Survival {
             }
         }
         // A bomb of this key's ticking: its key again sets it off (the release check, on its flares).
-        if let Some(k) = self.bomb_of(id, base) {
+        // With Ctrl it's the EX (Combustion), cast as ever.
+        if let Some(k) = self.bomb_of(id, base).filter(|_| !ex) {
             self.press_bomb(id, k);
             return true;
         }
@@ -858,7 +859,8 @@ impl Survival {
             let k = self.content.checks.clone();
             let (lo, _) = self.charge_of(id, ability);
             let fixed = (hi - lo).abs() < 1.0e-3;
-            let (from, to) = if fixed { (hi, hi + k.flare_late) } else { ((hi * k.flare_from).max(lo + k.window), hi) };
+            // A fixed charge (Pyroblast) can't go before its least, so its window opens no sooner.
+            let (from, to) = if fixed { (hi + k.window, hi + k.flare_late.max(2.0 * k.window)) } else { ((hi * k.flare_from).max(lo + k.window), hi) };
             let flare = from + (to - from) * rand::Rng::gen::<f32>(&mut self.rng);
             const CURVES: [&str; 4] = ["steady", "ease", "surge", "stutter"];
             let curve = CURVES[rand::Rng::gen_range(&mut self.rng, 0..CURVES.len())];

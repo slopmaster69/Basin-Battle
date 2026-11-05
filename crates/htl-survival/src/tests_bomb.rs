@@ -183,3 +183,33 @@ fn living_bomb_is_the_mages_second_utility_from_the_satchel_with_combustion_its_
     let relic = c.chests.iter().find(|r| r.key == "relic_mage").unwrap();
     assert!(relic.teaches.contains(&"living_bomb".to_string()));
 }
+
+#[test]
+fn the_bombs_bolt_flies_narrow_its_burst_is_the_wide_part() {
+    // The review on #199: the bolt took the burst's 5 yd radius and planted on a foe 4 yd off its line.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _off = dummy(&mut s, [12.0, 4.0, 0.0]);
+    s.slot_ability(p, "utility", "living_bomb").unwrap();
+    press(&mut s, p, false);
+    run(&mut s, 2.0);
+    assert!(s.bombs.is_empty(), "nothing planted on a foe 4 yd off the line");
+    let d = &s.content.abilities[s.content.ability("living_bomb").unwrap()];
+    assert!(d.radius[1] <= 1.0 && d.bomb_radius >= 4.0);
+}
+
+#[test]
+fn combustion_goes_with_ctrl_while_a_bomb_ticks() {
+    // The review on #199: Ctrl+key set the ticking bomb off instead of casting Combustion.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _k = dummy(&mut s, [10.0, 0.0, 0.0]);
+    plant(&mut s, p);
+    assert_eq!(s.bombs.len(), 1);
+    s.players.get_mut(&p).unwrap().valor = s.content.valor.max;
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    press(&mut s, p, true);
+    assert_eq!(s.bombs.len(), 1, "the bomb still ticks: Ctrl was Combustion");
+    let comb = s.content.ability("combustion").unwrap();
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| a == comb), "Combustion cast");
+}

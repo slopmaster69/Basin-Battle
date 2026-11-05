@@ -46,7 +46,7 @@ impl Survival {
             t += gap;
         }
         // A long chain may hold one rest, never on a free beat, the first pressed one or the last.
-        if n >= 6 && self.rng.gen::<f32>() < 0.5 {
+        if n >= 6 && d.free_beats + 1 < n - 1 && self.rng.gen::<f32>() < 0.5 {
             let k = self.rng.gen_range(d.free_beats + 1..n - 1) as usize;
             beats[k].1 = true;
         }
