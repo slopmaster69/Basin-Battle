@@ -21,6 +21,12 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
         // Two in a row along the hero's facing: a rush that drives one into the other, a shot
         // that pierces.
         "line" => &[(4.0, 0.0), (7.5, 0.0)],
+        // Three spread across the front at 8 yd: a jet that sweeps across them.
+        "spread" => &[(8.0, -28.0), (8.0, 0.0), (8.0, 28.0)],
+        // Three in a row at 6, 10 and 14 yd: an orb that rolls through them.
+        "row" => &[(6.0, 0.0), (10.0, 0.0), (14.0, 0.0)],
+        // One at 12 yd: a bolt's flight.
+        "mid" => &[(12.0, 0.0)],
         _ => return None,
     })
 }
@@ -28,7 +34,7 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
 /// The account every spell lab stand-in ally hero's starts with: never saved.
 pub const LAB_ALLY: &str = "lab~ally";
 
-pub const LAB_SCENES: &str = "one, pack, close, ring, far or line";
+pub const LAB_SCENES: &str = "one, pack, close, ring, far, line, spread, row or mid";
 
 impl Survival {
     /// Sets out a scene in front of hero `id`: `creature`s (a `[[mob]]` key; "dummy" for the
@@ -123,6 +129,27 @@ impl Survival {
         if self.players.get(&id).is_some_and(|p| matches!(p.action, Action::Stagger { .. })) {
             self.set_action(id, Action::Ready);
         }
+    }
+
+    /// A weapon or shield in the lab hero's hands for a run (`weapon ember_staff`), wherever they
+    /// stand: the rack's `arm` without the rack.
+    pub fn lab_arm(&mut self, id: Id, key: &str) -> Result<String, String> {
+        let item = self.content.item(key).ok_or_else(|| format!("No weapon called {key}."))?;
+        let kind = self.content.items[item].kind;
+        let p = self.players.get_mut(&id).ok_or("No such hero.")?;
+        match kind {
+            ItemKind::Weapon => p.weapon = item,
+            ItemKind::Shield => p.shield = item,
+            _ => return Err(format!("{key} isn't a weapon.")),
+        }
+        p.action = Action::Ready;
+        p.guard_held = false;
+        let name = self.content.items[item].name.clone();
+        self.events.push(Event::Guard { player: id, up: false });
+        self.events.push(Event::Gear { player: id });
+        self.update_speed(id);
+        self.events.push(Event::Dirty);
+        Ok(name)
     }
 
     /// The lab's bodies taken away.

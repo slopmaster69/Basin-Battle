@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>]`
 //!
 //! - `by tauren-f` has a stand-in hero of that race cast it, the hero (and camera) at its side.
 //! - `anim` tries another clip on the ability for that run only (its take, and the model every race
@@ -20,7 +20,10 @@
 //!   `Lab.lua`), and a moment later plays the steps: by default the ability's key (with Ctrl for
 //!   an EX) and a click if it's aimed. Steps, comma-separated: `q e 1 2 3` (a key), `^q`... (with
 //!   Ctrl), `click`, `attack`, `heavy`, `guard`, `guardup`, `dodge`, `bash`, `blow` (the nearest
-//!   creature of the scene swings at the hero), `wait:<secs>`.
+//!   creature of the scene swings at the hero), `wait:<secs>`; `press` holds the button down and
+//!   `release` lets it go (a charge held to its flare: `q,press,wait:1.45,release`).
+//! - `weapon ember_staff` puts that weapon in the caster's hands for the run (a staff's bolts,
+//!   the ward), wherever the stage is.
 //! - Everything the rules sent that touches the hero or the scene, until the burst is over, goes
 //!   to `logs/lab/<label>.txt`, each line with its time from the first step. `tools/spell-lab`
 //!   lays the screenshots and that trace out side by side (docs/spell-lab.md).
@@ -126,6 +129,7 @@ impl SurvivalGame {
         let mut anim: Option<(u16, u32, Option<String>)> = None;
         let mut allies = 0usize;
         let mut by: Option<(u8, u8)> = None;
+        let mut weapon: Option<String> = None;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
         let video = cfg!(windows) && ffmpeg().is_some();
         let (mut shots, mut every) = if video { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
@@ -177,6 +181,10 @@ impl SurvivalGame {
                 }
                 "stage" => {
                     stage = words.get(k + 1).is_none_or(|w| *w != "here");
+                    k += 1;
+                }
+                "weapon" => {
+                    weapon = words.get(k + 1).map(|w| w.to_lowercase());
                     k += 1;
                 }
                 "cam" => {
@@ -251,6 +259,9 @@ impl SurvivalGame {
             }
         };
         let moved = moved || by.is_some();
+        if let Some(w) = &weapon {
+            self.sim.lab_arm(me, w)?;
+        }
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
         self.lab_set_allies(me, allies);
@@ -384,6 +395,9 @@ impl SurvivalGame {
                 "click" | "attack" => Some(Input::Attack),
                 "click?" if self.sim.lab_aiming(me) => Some(Input::Attack),
                 "click?" => None,
+                // The button held down, and let go later (a charge held to its flare).
+                "press" => Some(Input::Attack),
+                "release" | "attackup" => Some(Input::AttackUp),
                 "heavy" => Some(Input::Heavy),
                 "guard" => Some(Input::Guard),
                 "guardup" => Some(Input::GuardUp),
@@ -413,8 +427,8 @@ impl SurvivalGame {
             };
             if let Some(i) = input {
                 self.sim.input(me, i);
-                // A click is let go at once, as a tap.
-                if i == Input::Attack {
+                // A click is let go at once, as a tap; a press stays down until its release.
+                if i == Input::Attack && step != "press" {
                     self.sim.input(me, Input::AttackUp);
                 }
             }
