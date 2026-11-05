@@ -6596,6 +6596,12 @@ function ES.Line(line)
   elseif verb == "MO" then
     -- Where a hero's missiles leave from (a casting staff's tip), on a client that can say so.
     if SetUnitMissileOrigin then SetUnitMissileOrigin(f[2] or "", f[3] or "") end
+  elseif verb == "ST" then
+    if ES.StaffLine then ES.StaffLine(f) end
+  elseif verb == "SK" then
+    if ES.StacksLine then ES.StacksLine(f) end
+  elseif verb == "SH" then
+    if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
   elseif verb == "OB" then
     if ES.OrbLine then ES.OrbLine(f) end
   elseif verb == "OX" then

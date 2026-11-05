@@ -553,6 +553,25 @@ CK	cone_of_cold	sweep	frost	1.050	120.000	10.000	rl|30.0|-28.0,0.5,27.9
 CK	frozen_orb	orb	frost	3.800	25.000	1.500	3.0|1.0|6.0,10.0,14.0
 !local c = ElwynnSurvival.check for i = 1, 10 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "orb: marks " .. tostring(c.cur and table.getn(c.cur.marks)) .. " backfire " .. tostring(c.cur and c.cur.backfire))
 !ElwynnSurvival.check.cur.start = GetTime() ElwynnSurvival.check.cur.start = GetTime() - 0.1 ElwynnSurvival.Ability(4, false, "down") table.insert(SAID, "orb stopped at once: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade))
+# A staff's mark (Staff.lua): heat closing in and igniting, charges lit, a heavy filling; the ward
+# on the reticle (Ward.lua): whole, cracked, shattered.
+ST	ember
+SK	heat	1	3	0x1F
+SK	heat	2	3	0x1F
+!local m = ElwynnSurvival.staffMark for i = 1, 10 do this = m arg1 = 0.04 m:GetScript("OnUpdate")() end table.insert(SAID, "ember mark: shown " .. tostring(m:IsShown()) .. " heat " .. tostring(m.n))
+SK	heat	3	3	0x1F
+!local m = ElwynnSurvival.staffMark table.insert(SAID, "ignited: heat " .. tostring(m.n) .. " burst " .. tostring(m.popAt ~= nil))
+ST	arcane
+SK	charge	2	3	0x0
+SH	0.30	1.20
+!local m = ElwynnSurvival.staffMark for i = 1, 40 do this = m arg1 = 0.04 m:GetScript("OnUpdate")() end table.insert(SAID, "arcane: charges " .. tostring(m.n) .. " shown " .. tostring(m:IsShown()))
+ST	
+!table.insert(SAID, "no staff: mark shown " .. tostring(ElwynnSurvival.staffMark:IsShown()))
+WA	100	100	0	1
+WA	60	100	0	1
+!local a = ElwynnSurvivalWardArc for i = 1, 10 do this = a arg1 = 0.04 a:GetScript("OnUpdate")() end table.insert(SAID, "ward arc: up " .. tostring(a.up) .. " stage " .. tostring(a.stage) .. " shaking " .. tostring(a.hitAt ~= nil))
+WA	0	100	1	0
+!local a = ElwynnSurvivalWardArc for i = 1, 5 do this = a arg1 = 0.04 a:GetScript("OnUpdate")() end table.insert(SAID, "ward broke: up " .. tostring(a.up) .. " shards " .. tostring(a.shards:IsShown()))
 @PLAYER_LEAVING_WORLD
 !table.insert(SAID, "asleep: " .. tostring(ElwynnSurvival.awake) .. ", S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. ", catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()) .. ", action bar back " .. tostring(MainMenuBar:IsVisible()) .. ", bar " .. tostring(ElwynnSurvivalBar:IsVisible()))
 !table.insert(SAID, "after leaving: action bar visible " .. tostring(MainMenuBar:IsVisible()) .. ", player frame " .. tostring(PlayerFrame:IsVisible()))
