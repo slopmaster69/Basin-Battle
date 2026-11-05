@@ -987,6 +987,17 @@ check:SetScript("OnUpdate", function()
   if not check.cur and not check.fx and not check.beatfx then this:Hide() end
 end)
 
+-- OB key x y z x2 y2 z2 secs model scale: an orb set rolling (Frozen Orb), drawn rolling and
+-- spinning flat on a client with PlayGroundOrb (patch 0043); OX key: it stopped or was spent.
+function ES.OrbLine(f)
+  if not PlayGroundOrb then return end
+  local n = function(i) return tonumber(f[i]) or 0 end
+  PlayGroundOrb("es_orb_" .. (f[2] or ""), f[10] or "", n(3), n(4), n(5), n(6), n(7), n(8), n(9), tonumber(f[11]) or 1, 540)
+end
+function ES.OrbGoneLine(f)
+  if StopGroundOrb then StopGroundOrb("es_orb_" .. (f[2] or "")) end
+end
+
 -- A lab run starts fresh: nothing left over from the last.
 function ES.CheckClear()
   check.cur = nil

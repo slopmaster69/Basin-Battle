@@ -145,6 +145,11 @@ pub struct AbilityDef {
     /// hands), replayed every `CHANNEL_EVERY` sec.
     #[serde(default)]
     pub channel_kit: u32,
+    /// An orb's own rolling model, drawn by the clients that can (`PlayGroundOrb`), and its size.
+    #[serde(default)]
+    pub orb_model: String,
+    #[serde(default)]
+    pub orb_scale: f32,
     /// A rhythm's casts, beat by beat (cycled): the body's clip for each missile.
     #[serde(default)]
     pub beat_clips: Vec<u16>,
