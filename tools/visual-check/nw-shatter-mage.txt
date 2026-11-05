@@ -1,0 +1,18 @@
+# No words (#135), the shatter, Mage (the test hunter owns every card after .es spells, so the
+# mage's keys go on theirs): Frost Nova (Ctrl+E on Cone of Cold's key) freezes a creature 5 yd
+# off and makes the Fireball key a free Pyroblast; held the whole 1.5 s and loosed, it shatters
+# the ice. Look for: the frost burst (kit 450), the ice-breaking sound, the biggest beat.
+hero hunter
+cam 50 -12 9
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 5 still
+5.0 .es slot e cone_of_cold
+5.2 .es slot q fireball
+6.0 .es in ab 1 1                    # Ctrl+E: Frost Nova, frozen 3 s
+6.3 .es in ab 0 0                    # the Fireball key: a free Pyroblast, held
+6.6 .es in a {facing} 0.0
+8.3 .es in au {facing} 0.0           # loosed after 1.7 s: it lands before the ice would melt
+8.1 shots shatter 12 0.15
+10.5 .es cc log
+13 end

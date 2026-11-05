@@ -1,0 +1,131 @@
+From 7d053710489a52b183d6a4e47ca3fec036d7fadf Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:43:43 -0600
+Subject: [PATCH] The aiming camera tips down on request (SetAimCamera's fifth
+ number), and the twenty-second round
+
+`SetAimCamera(on, distance, right, up, down)`: the arm tips down by `down` radians while the
+aiming camera is on, eased in and out with its seat, so a hero thrown up (Raptor Strike's
+Uppercut) can be shown the fight from above to aim the dive. A call without the number tips
+nothing. `HasActionCombat()` says 22, and the module's notes list this round's additions.
+---
+ crates/benilla-app/src/player/camera.rs | 30 ++++++++++++++-----------
+ crates/benilla-ui/src/action_combat.rs  | 27 +++++++++++++++++++++-
+ 2 files changed, 43 insertions(+), 14 deletions(-)
+
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index daebbe1d..ef138d8c 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -1343,19 +1343,6 @@ pub(super) fn seat_camera(
+     // stores the eye (`0x50edcc` → `0x50de00`) before rotating the basis `[cam+0x14]` by the bias
+     // `[cam+0x104]` (`0x50ee32`), so the arm never swings and the look does.
+     let bias = rig.smart_pivot.bias();
+-    // The ground tilt is part of the arm's pitch, unlike the bias: `0x50f710` clamps
+-    // `[cam+0xf4] + [cam+0x108]` to ±89° before the basis is built.
+-    let arm_pitch = (cam.pitch + rig.terrain_tilt.pitch()).clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
+-    let arm_rotation = Quat::from_euler(EulerRot::YXZ, cam.yaw, arm_pitch, 0.0);
+-    // Not re-clamped: the bias is composed after that clamp (`0x50ee58`), bounded only by its own
+-    // one-sided accumulate (`SmartPivot::route_pitch`) and ±89° at the body hand-off (`0x5103e0`).
+-    let rotation = if bias == 0.0 {
+-        arm_rotation
+-    } else {
+-        Quat::from_euler(EulerRot::YXZ, cam.yaw, arm_pitch + bias, 0.0)
+-    };
+-    // `Transform::forward()` is exactly `rotation * -Z`; computed here so the write can be gated.
+-    let cam_fwd = arm_rotation * Vec3::NEG_Z;
+     // Basin Battle's aiming camera: in close over the right shoulder while an add-on asks, eased
+     // both ways. First person stays first person.
+     let want = if benilla_ui::action_combat::aim_camera() {
+@@ -1372,6 +1359,23 @@ pub(super) fn seat_camera(
+     } else {
+         rig.aim_blend
+     };
++    // The ground tilt is part of the arm's pitch, unlike the bias: `0x50f710` clamps
++    // `[cam+0xf4] + [cam+0x108]` to ±89° before the basis is built. Basin Battle: so is the
++    // aiming camera's tip down (`SetAimCamera`'s fifth number), eased in with its seat, so the
++    // arm swings up and over as the view tips onto the ground.
++    let tip = benilla_ui::action_combat::aim_pitch() * blend;
++    let arm_pitch =
++        (cam.pitch + rig.terrain_tilt.pitch() - tip).clamp(-CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
++    let arm_rotation = Quat::from_euler(EulerRot::YXZ, cam.yaw, arm_pitch, 0.0);
++    // Not re-clamped: the bias is composed after that clamp (`0x50ee58`), bounded only by its own
++    // one-sided accumulate (`SmartPivot::route_pitch`) and ±89° at the body hand-off (`0x5103e0`).
++    let rotation = if bias == 0.0 {
++        arm_rotation
++    } else {
++        Quat::from_euler(EulerRot::YXZ, cam.yaw, arm_pitch + bias, 0.0)
++    };
++    // `Transform::forward()` is exactly `rotation * -Z`; computed here so the write can be gated.
++    let cam_fwd = arm_rotation * Vec3::NEG_Z;
+     let (aim_back, aim_right, aim_up) = benilla_ui::action_combat::aim_shape();
+     let distance = rig.distance + (aim_back - rig.distance) * blend;
+     let want_lock = if crate::creature_anim::lock_point().is_some() {
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 991e9ee6..59ffb085 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -176,6 +176,21 @@
+ //!   colour])` runs it to another unit's body (a foe hauled in on it). The same key again replaces
+ //!   it.
+ //! - `ClearUnitRope([key])`: take one away (all of them with no key).
++//!
++//! The twenty-second (`HasActionCombat() >= 22`):
++//!
++//! - `SetAimCamera(on, distance, right, up, down)`: a fifth number tips the aiming camera's arm
++//!   down by that many radians (up when negative) while it's on, eased with the rest (a hero
++//!   thrown up looking down on the fight to aim the dive). Absent, no tip.
++//! - `SetMissileLook(spellId, colour, width, seconds, scale, spin, caster, axis)`: an eighth
++//!   argument picks the spin's axis: `"up"` (or absent) turns it flat about its up as before,
++//!   `"side"` tumbles it end over end about the axis across its flight (a thrown axe).
++//! - A unit whose `UNIT_DYNAMIC_FLAGS` carry `0x1000` is drawn at once and gone at once: no
++//!   appear fade, no teardown fade (`entities::preview::UNIT_NO_FADE`).
++//! - Display 60002 is `Spells\ArcaneShot_Missile.mdx`, an arrow, as an object (an arrow planted
++//!   in the ground).
++//! - The bowstring is drawn on its bow in the frame the bow is drawn in, and fades with its
++//!   wearer.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -186,6 +201,8 @@ static AIM_CAMERA: AtomicBool = AtomicBool::new(false);
+ static AIM_DISTANCE: AtomicU32 = AtomicU32::new(2.4f32.to_bits());
+ static AIM_RIGHT: AtomicU32 = AtomicU32::new(0.75f32.to_bits());
+ static AIM_UP: AtomicU32 = AtomicU32::new(0.25f32.to_bits());
++/// The aiming camera's tip down (radians, down positive), `SetAimCamera`'s fifth number.
++static AIM_PITCH: AtomicU32 = AtomicU32::new(0);
+ static UNIT_COLLISION: AtomicBool = AtomicBool::new(false);
+ static VIEW_FACING: AtomicU32 = AtomicU32::new(0);
+ /// The view's elevation (radians, up positive), written by the camera each frame.
+@@ -501,6 +518,11 @@ pub fn aim_shape() -> (f32, f32, f32) {
+     (f(&AIM_DISTANCE), f(&AIM_RIGHT), f(&AIM_UP))
+ }
+ 
++/// How far the aiming camera's arm tips down (radians, down positive), eased in with the seat.
++pub fn aim_pitch() -> f32 {
++    f32::from_bits(AIM_PITCH.load(Ordering::Relaxed))
++}
++
+ /// The aim marker's shape: a circle where the reticle lands, a strip or a cone from the feet
+ /// along the view, or a ring round the feet.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -942,13 +964,16 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             if let Some(u) = number(v.get(3), -2.0, 3.0) {
+                 AIM_UP.store(u.to_bits(), Ordering::Relaxed);
+             }
++            // The tip down is the call's alone: a call without one tips nothing.
++            let down = number(v.get(4), -1.2, 1.2).unwrap_or(0.0);
++            AIM_PITCH.store(down.to_bits(), Ordering::Relaxed);
+             AIM_CAMERA.store(truthy(v.first()), Ordering::Relaxed);
+             Ok(())
+         })?,
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(21))?,
++        lua.create_function(|_, _: MultiValue| Ok(22))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+-- 
+2.56.0.windows.4
+

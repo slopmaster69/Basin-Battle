@@ -1,0 +1,361 @@
+From b06779e9c7a5e92fdd858e1d56634dcecb92d3bf Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:44:40 -0600
+Subject: [PATCH] A game object flagged to glow carries a soft light at its
+ highest point (GAMEOBJECT_FLAGS 0x08000000)
+
+`GO_FLAG_GLOW`, Basin Battle's own bit beside the preview and stretch bits: the object draws a soft
+white additive sprite about half a yard across, facing the camera, pulsing gently (0.55 to 0.85
+over 1.6 s), at the top of its world bounds, and a small white point light sits at the same spot,
+a carried torch's strength over a few yards. The top is taken from the model's box under the
+object's own transform, so a planted arrow glows at its fletching above the grass whichever way
+the model's axes run. Both come with the object and go with it; an object without the bit draws
+nothing new. For the Hunter's arrows planted in the ground, which were lost in the grass at night.
+---
+ crates/benilla-app/src/game_plugins.rs |   1 +
+ crates/benilla-app/src/go_glow.rs      | 292 +++++++++++++++++++++++++
+ crates/benilla-app/src/lib.rs          |   1 +
+ crates/benilla-ui/src/action_combat.rs |   4 +
+ 4 files changed, 298 insertions(+)
+ create mode 100644 crates/benilla-app/src/go_glow.rs
+
+diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
+index ec429fa9..c2753500 100644
+--- a/crates/benilla-app/src/game_plugins.rs
++++ b/crates/benilla-app/src/game_plugins.rs
+@@ -108,6 +108,7 @@ impl PluginGroup for GamePlugins {
+             .add(crate::weapon_trail::WeaponTrailPlugin)
+             .add(crate::missile_look::MissileLookPlugin)
+             .add(crate::unit_rope::UnitRopePlugin)
++            .add(crate::go_glow::GoGlowPlugin)
+             .add(FishingLinePlugin)
+             .add(QuestMarkersPlugin)
+             .add(crate::pipe_warm::plugin)
+diff --git a/crates/benilla-app/src/go_glow.rs b/crates/benilla-app/src/go_glow.rs
+new file mode 100644
+index 00000000..06e22e82
+--- /dev/null
++++ b/crates/benilla-app/src/go_glow.rs
+@@ -0,0 +1,292 @@
++//! Basin Battle's glowing objects, not part of 1.12.1: a game object whose `GAMEOBJECT_FLAGS` carry
++//! [`GO_FLAG_GLOW`] carries a soft white glow at its highest point, so an arrow planted in the
++//! grass can be found at night. Two things make it: a camera-facing additive sprite about half a
++//! yard across, bright at its core and nothing at its rim, pulsing gently; and a small white point
++//! light at the same spot, a carried torch's strength, which lights the ground under it.
++//!
++//! The spot is the top of the model's box under the object's own transform (its rotation, scale and
++//! stretch included), so the glow sits at an arrow's fletching whichever way the model's axes run,
++//! and moves with the object. The light is a child of the object, so it goes with it; the sprite is
++//! drawn each frame the object is there and flagged, and nothing is drawn without the flag.
++
++use std::f32::consts::TAU;
++
++use benilla_protocol::EntityKind;
++use benilla_world::lighting::WorldPointLight;
++use benilla_world::particles::buffer::{EffectVertex, WorldEffectDraw};
++use benilla_world::terrain_stream::point_light;
++use benilla_world::view::WorldCamera;
++use bevy::camera::primitives::Aabb;
++use bevy::prelude::*;
++
++use crate::entities::ModelBound;
++use crate::net::{NetEntity, ObjectStore};
++
++/// `GAMEOBJECT_FLAGS` bit, Basin Battle's own (beside the preview and stretch bits): the object
++/// glows at its top.
++pub(crate) const GO_FLAG_GLOW: u32 = 0x0800_0000;
++
++/// How wide the glow sprite is, yards.
++const GLOW_SIZE: f32 = 0.5;
++/// The share of its radius that is at full strength; the rest fades to the rim.
++const CORE_SHARE: f32 = 0.35;
++/// The wedges the disc is cut into.
++const SEGMENTS: usize = 12;
++/// The pulse: between these over this long.
++const ALPHA_LOW: f32 = 0.55;
++const ALPHA_HIGH: f32 = 0.85;
++const PULSE_SECS: f32 = 1.6;
++/// The point light: a carried torch's `colour × intensity` is about 1.4, in orange; this is white,
++/// a little under. Its range is the radius within which a unit takes it among its nearest lights
++/// (the terrain has no such cutoff).
++const LIGHT_INTENSITY: f32 = 1.0;
++const LIGHT_RANGE: f32 = 4.0;
++/// Corners this close to the top of the box count as its top.
++const TOP_BAND: f32 = 0.05;
++
++/// The glow's light, on the object that carries it.
++#[derive(Component)]
++struct ObjectGlow {
++    light: Entity,
++}
++
++/// Whether a game object's flags ask for the glow; never for another kind, whose field 9 is not
++/// `GAMEOBJECT_FLAGS`.
++pub(crate) fn glows(kind: EntityKind, flags: u32) -> bool {
++    kind == EntityKind::GameObject && flags & GO_FLAG_GLOW != 0
++}
++
++/// The glow's alpha now: a gentle pulse.
++fn pulse(now: f32) -> f32 {
++    ALPHA_LOW + (ALPHA_HIGH - ALPHA_LOW) * (0.5 + 0.5 * (TAU * now / PULSE_SECS).sin())
++}
++
++/// The top of a model's box in the world: the mean of its corners that reach the highest point
++/// under `frame` (an upright arrow's fletching end, a tilted one's top corner).
++fn top_of(aabb: &Aabb, frame: &GlobalTransform) -> Vec3 {
++    let (lo, hi) = (Vec3::from(aabb.min()), Vec3::from(aabb.max()));
++    let corners: Vec<Vec3> = (0..8)
++        .map(|i| {
++            let pick = |bit: u32, a: f32, b: f32| if i & bit != 0 { b } else { a };
++            frame.transform_point(Vec3::new(
++                pick(1, lo.x, hi.x),
++                pick(2, lo.y, hi.y),
++                pick(4, lo.z, hi.z),
++            ))
++        })
++        .collect();
++    let top = corners.iter().map(|c| c.y).fold(f32::MIN, f32::max);
++    let near: Vec<Vec3> = corners
++        .iter()
++        .copied()
++        .filter(|c| top - c.y <= TOP_BAND)
++        .collect();
++    near.iter().sum::<Vec3>() / near.len().max(1) as f32
++}
++
++/// The sprite: a disc facing `eye` at `at`, `size` across, `alpha` at its core and nothing at its
++/// rim, as wedge quads (the lane's `[a0, a1, b1, b0]` winding; a wedge's inner edge is one point).
++fn glow_sprite(at: Vec3, eye: Vec3, size: f32, alpha: f32) -> Vec<EffectVertex> {
++    let n = (eye - at).normalize_or(Vec3::Z);
++    let right = n.cross(Vec3::Y).normalize_or(Vec3::X);
++    let up = right.cross(n).normalize_or(Vec3::Y);
++    let r = size * 0.5;
++    let core = r * CORE_SHARE;
++    let vert = |p: Vec3, a: f32| EffectVertex {
++        pos: p.to_array(),
++        uv: [0.0, 0.0],
++        // Additive: the colour carries its own strength.
++        color: [a, a, a, a],
++    };
++    let dir = |i: usize| {
++        let t = TAU * i as f32 / SEGMENTS as f32;
++        right * t.cos() + up * t.sin()
++    };
++    let mut out = Vec::with_capacity(SEGMENTS * 8);
++    for i in 0..SEGMENTS {
++        let (d0, d1) = (dir(i), dir(i + 1));
++        out.extend([
++            vert(at, alpha),
++            vert(at, alpha),
++            vert(at + d1 * core, alpha),
++            vert(at + d0 * core, alpha),
++        ]);
++        out.extend([
++            vert(at + d0 * core, alpha),
++            vert(at + d1 * core, alpha),
++            vert(at + d1 * r, 0.0),
++            vert(at + d0 * r, 0.0),
++        ]);
++    }
++    out
++}
++
++/// Every flagged object's glow: its light kept at its top, and its sprite drawn there; an object
++/// whose flag has gone loses its light.
++#[allow(clippy::type_complexity)]
++fn draw_object_glows(
++    mut commands: Commands,
++    time: Res<Time>,
++    mut draw: WorldEffectDraw,
++    white: Res<GlowWhite>,
++    world_cam: Query<(Entity, &GlobalTransform), With<WorldCamera>>,
++    objects: Query<(
++        Entity,
++        &NetEntity,
++        Option<&ObjectStore>,
++        &GlobalTransform,
++        Option<&ModelBound>,
++        Option<&ObjectGlow>,
++    )>,
++    mut lights: Query<&mut Transform, With<WorldPointLight>>,
++) {
++    let now = time.elapsed_secs();
++    let cam = world_cam.single().ok().map(|(e, g)| (e, g.translation()));
++    let alpha = pulse(now);
++    for (entity, net, store, frame, bound, glow) in &objects {
++        let flags = store.map_or(0, |s| s.0.gameobject_flags());
++        if !glows(net.kind, flags) {
++            if let Some(g) = glow {
++                commands.entity(g.light).despawn();
++                commands.entity(entity).remove::<ObjectGlow>();
++            }
++            continue;
++        }
++        // Until the model is in there is no top to glow at.
++        let Some(bound) = bound else { continue };
++        let top = top_of(&bound.0, frame);
++        // The light rides the object as a child, at the top in the object's own frame.
++        let local = frame.affine().inverse().transform_point3(top);
++        match glow.and_then(|g| lights.get_mut(g.light).ok()) {
++            Some(mut t) => t.translation = local,
++            None => {
++                let light = commands
++                    .spawn((
++                        WorldPointLight {
++                            range: LIGHT_RANGE,
++                            ..point_light([1.0; 3], LIGHT_INTENSITY)
++                        },
++                        Transform::from_translation(local),
++                        Visibility::default(),
++                    ))
++                    .id();
++                commands.entity(entity).add_child(light);
++                commands.entity(entity).insert(ObjectGlow { light });
++            }
++        }
++        let Some((cam, eye)) = cam else { continue };
++        let mut batch = draw
++            .batch(cam, white.0.id())
++            .additive()
++            .anchored(top)
++            .owner(entity);
++        batch.extend(glow_sprite(top, eye, GLOW_SIZE, alpha));
++        batch.quads();
++    }
++}
++
++/// The 1×1 white texel the sprite samples: pure vertex colour.
++#[derive(Resource)]
++struct GlowWhite(Handle<Image>);
++
++fn init_glow_white(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
++    commands.insert_resource(GlowWhite(images.add(Image::default())));
++}
++
++/// Registers the glowing objects.
++pub(crate) struct GoGlowPlugin;
++
++impl Plugin for GoGlowPlugin {
++    fn build(&self, app: &mut App) {
++        app.add_systems(Startup, init_glow_white).add_systems(
++            PostUpdate,
++            draw_object_glows
++                .in_set(benilla_world::billboard::BillboardPlace)
++                .after(bevy::transform::TransformSystems::Propagate)
++                // A lane that writes before the frame's clear loses everything it pushed.
++                .after(benilla_world::particles::buffer::begin_effect_frame),
++        );
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn only_a_game_object_with_the_bit_glows() {
++        assert!(glows(EntityKind::GameObject, GO_FLAG_GLOW));
++        assert!(glows(EntityKind::GameObject, GO_FLAG_GLOW | 0x20));
++        assert!(!glows(EntityKind::GameObject, 0x20));
++        assert!(!glows(
++            EntityKind::GameObject,
++            crate::entities::stretch::STRETCH_X | crate::entities::preview::PREVIEW_MOVE
++        ));
++        // A unit's field 9 is not GameObject flags.
++        assert!(!glows(EntityKind::Unit, GO_FLAG_GLOW));
++    }
++
++    #[test]
++    fn the_glow_pulses_between_its_bounds() {
++        let mut lo = f32::MAX;
++        let mut hi = f32::MIN;
++        for i in 0..160 {
++            let a = pulse(i as f32 * 0.01);
++            lo = lo.min(a);
++            hi = hi.max(a);
++        }
++        assert!((lo - ALPHA_LOW).abs() < 0.01, "{lo}");
++        assert!((hi - ALPHA_HIGH).abs() < 0.01, "{hi}");
++    }
++
++    #[test]
++    fn the_top_is_the_highest_end_of_the_box_under_the_objects_transform() {
++        // An arrow modelled along −Z (WoW's +X), a yard long, a tenth wide.
++        let arrow = Aabb::from_min_max(Vec3::new(-0.05, -0.05, -1.0), Vec3::new(0.05, 0.05, 0.0));
++        // Lying flat: its top is the whole upper face, a yard long, centred half a yard back.
++        let flat = GlobalTransform::from_translation(Vec3::new(10.0, 2.0, 10.0));
++        let top = top_of(&arrow, &flat);
++        assert!((top - Vec3::new(10.0, 2.05, 9.5)).length() < 1.0e-4, "{top}");
++        // Stood up (turned about X so −Z goes to +Y): the fletching end, a yard up.
++        let stood = GlobalTransform::from(
++            Transform::from_translation(Vec3::new(10.0, 2.0, 10.0))
++                .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)),
++        );
++        let top = top_of(&arrow, &stood);
++        assert!((top - Vec3::new(10.0, 3.0, 10.0)).length() < 1.0e-3, "{top}");
++        // Scaled (a stretched object): the top goes with it.
++        let tall = GlobalTransform::from(
++            Transform::from_translation(Vec3::new(0.0, 0.0, 0.0))
++                .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_2))
++                .with_scale(Vec3::new(1.0, 1.0, 2.0)),
++        );
++        let top = top_of(&arrow, &tall);
++        assert!((top.y - 2.0).abs() < 1.0e-3, "{top}");
++    }
++
++    #[test]
++    fn the_sprite_is_a_disc_facing_the_eye_bright_at_its_core_and_gone_at_its_rim() {
++        let at = Vec3::new(3.0, 1.0, -2.0);
++        let eye = Vec3::new(3.0, 1.0, 8.0);
++        let v = glow_sprite(at, eye, 0.5, 0.7);
++        assert_eq!(v.len(), SEGMENTS * 8);
++        // Every vertex within the radius, in the plane facing the eye.
++        for x in &v {
++            let p = Vec3::from_array(x.pos);
++            assert!(p.distance(at) <= 0.25 + 1.0e-4, "{p}");
++            assert!((p.z - at.z).abs() < 1.0e-4, "flat to the view: {p}");
++        }
++        let core = v
++            .iter()
++            .filter(|x| Vec3::from_array(x.pos).distance(at) < 1.0e-4)
++            .map(|x| x.color[3])
++            .fold(0.0, f32::max);
++        let rim = v
++            .iter()
++            .filter(|x| Vec3::from_array(x.pos).distance(at) > 0.25 - 1.0e-4)
++            .map(|x| x.color[3])
++            .fold(0.0, f32::max);
++        assert!((core - 0.7).abs() < 1.0e-5, "{core}");
++        assert!(rim < 1.0e-6, "{rim}");
++    }
++}
+diff --git a/crates/benilla-app/src/lib.rs b/crates/benilla-app/src/lib.rs
+index 34b5170b..183debdd 100644
+--- a/crates/benilla-app/src/lib.rs
++++ b/crates/benilla-app/src/lib.rs
+@@ -189,6 +189,7 @@ mod video;
+ mod vm_pass;
+ mod vplates;
+ mod wdb;
++mod go_glow;
+ mod missile_look;
+ mod unit_rope;
+ mod weapon_trail;
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 65c9b02c..ccbf150f 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -199,6 +199,10 @@
+ //! - An action clip asked for while another plays crossfades from it over 0.12 s instead of
+ //!   cutting, as does the switch between the whole body and the upper body as the unit starts or
+ //!   stops moving (a jump clip into a landing clip no longer pops the legs).
++//! - A game object whose `GAMEOBJECT_FLAGS` carry `0x08000000` glows: a soft white sprite about
++//!   half a yard across at the top of its model, pulsing, and a small white light there, lighting
++//!   the ground under it (`benilla-app`'s `go_glow`: an arrow planted in the grass, found at
++//!   night). Without the bit, nothing.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+-- 
+2.56.0.windows.4
+

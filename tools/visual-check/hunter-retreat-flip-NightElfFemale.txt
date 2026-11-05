@@ -1,0 +1,14 @@
+# Ensnaring Retreat's flip with another model's Jump (Corey: "try 3-4 different jump styles"):
+# NightElfFemale (ScourgeFemale is today's). Seen from the open side (west), close, so the whole arc is in frame.
+# The rule is tuned for the take and put back after. Standing still, creature in front.
+hero hunter
+cam -90 -6 9
+include _setup
+4.2 .es dummy clear
+4.3 .es tune ability.ensnaring_retreat.leap_from NightElfFemale
+4.5 .es target grunt 4 still
+5.0 .es slot 1 ensnaring_retreat
+6.5 .es in ab 2 0
+6.3 shots flip 8 0.2
+9.0 .es tune ability.ensnaring_retreat.leap_from ScourgeFemale
+10 end

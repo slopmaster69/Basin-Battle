@@ -1,0 +1,18 @@
+# No words (#135), Valor given back: a kill with a Valor ability refunds its cost. No card in
+# survival.toml has refund_kill yet, so it's tuned on for Multi-Shot for the take (and off again
+# after). The bar is set part full first, so the refund is seen filling it back. Look for: the
+# Valor bar's two blinks as it fills, Clearcasting's chime; no words.
+hero hunter
+cam 0 -10 10
+include _setup
+4.2 .es dummy clear
+4.4 .es target grunt 10 still 5%
+5.0 .es slot q aimed_arrow
+5.3 .es tune ability.multi_shot.refund_kill true
+5.6 .es valor 40
+6.5 .es in ab 0 1                    # Ctrl+Q: Multi-Shot (25 Valor); the kill gives it back
+6.8 .es in a {facing} 0.0
+6.9 .es in au {facing} 0.0
+6.7 shots valor 12 0.2
+9.0 .es tune ability.multi_shot.refund_kill false
+12 end

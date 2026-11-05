@@ -1,0 +1,17 @@
+# No words (#135), Arrow Recall with no arrows planted, in the hero's own voice: Ctrl+2 on
+# Tripwire's key with nothing planted: "No arrows planted" flashes and the dwarf says "I have no
+# ammo."; then once more with Error Speech off (.es speech 0): the words alone.
+hero hunter
+cam 0 -10 9
+include _setup
+4.2 .es dummy clear
+5.0 .es slot 2 tripwire
+5.3 .es speech 1
+6.0 .es in ab 3 1                    # Arrow Recall: the flash and the voice
+5.8 shots voice 8 0.25
+8.5 .es speech 0                     # Error Speech unticked
+9.0 .es valor full
+9.5 .es in ab 3 1                    # the flash, no voice
+9.3 shots mute 8 0.25
+11.0 .es speech 1
+13 end
