@@ -365,7 +365,8 @@ pub(crate) const VERSION: u32 = 2;
 /// ground (the `AB` line's shape `fan`).
 /// 29: the `ML` line's spin axis (a tumble, patch 0036).
 /// 30: the add-on preloads a cast's borrowed model before it plays (Reverse Grapple's pull).
-pub(crate) const ADDON_NEWEST: u32 = 30;
+/// 31: the fan's points sit where the arrows really go, and bigger.
+pub(crate) const ADDON_NEWEST: u32 = 31;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1919,6 +1920,10 @@ impl SurvivalGame {
         let shape = |d: &htl_survival::content::AbilityDef| if d.at_self { "self" } else { shape(d) };
         // The circle drawn where it's aimed: a lob's is its burst.
         let reach = |d: &htl_survival::content::AbilityDef| if d.lob { d.splash } else { htl_survival::content::AbilityDef::at(d.radius, 1.0) };
+        // A fan's arc is its whole spread, outermost arrow to outermost arrow (degrees), so the
+        // reticle can put its points where the arrows go (the visual check, run 040: drawn at a
+        // fixed width, the fan read as a ninth of the real spread).
+        let arc = |d: &htl_survival::content::AbilityDef| if d.kind == "projectile" && d.count > 1 && !d.lob { d.spread * (d.count - 1) as f32 } else { d.arc };
         let charge = |d: &htl_survival::content::AbilityDef| -> (f32, f32) {
             if d.kind == "shot" {
                 let r = self.sim.ranged_of(p);
@@ -1951,7 +1956,7 @@ impl SurvivalGame {
                         shape(x),
                         htl_survival::content::AbilityDef::at(x.range, 1.0),
                         reach(x),
-                        x.arc
+                        arc(x)
                     ),
                     None => "~~~~~~~~".to_string(),
                 };
@@ -1973,7 +1978,7 @@ impl SurvivalGame {
                     shape(d),
                     if p.cd_off { d.charges.max(1) } else { cd.charges },
                     d.charges.max(1),
-                    d.arc,
+                    arc(d),
                     d.valor,
                     clean(&d.text),
                     clean(&ability_facts(d, None, c.valor.max)),
@@ -2015,7 +2020,8 @@ impl SurvivalGame {
                                 d.key,
                                 clean(&d.name),
                                 htl_survival::content::AbilityDef::at(d.range, 1.0),
-                                d.arc,
+                                // A fan's whole spread, as the bar's line sends it.
+                                if shape == "fan" { d.spread * (d.count - 1) as f32 } else { d.arc },
                                 u8::from(d.aimed()),
                                 d.charge[0],
                                 d.charge[1]
