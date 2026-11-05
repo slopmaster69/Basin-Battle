@@ -1,0 +1,268 @@
+From 07326c5dfef95f2dbb421d42c8d059761b255f1d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 12:44:31 -0600
+Subject: [PATCH] One action clip gives way to the next over a crossfade, not a
+ cut
+
+A clip asked for while another plays swapped nodes at once: the new clip's node took the whole
+blend in the frame the old one's was stopped, and the pose jumped between them. On a jump clip
+followed by a landing clip the legs snapped from the jump's last pose into the landing's first
+(Corey's review: "the legs start to clip and do weird things when he goes to land"). The outgoing
+nodes now fade out over 0.12 s (`CROSS_FADE`), each kept on the clip with its weight at the swap
+and ramped to nothing before it's stopped, and the automatic full/upper switch as the body starts
+or stops moving crossfades the same way instead of stopping the node it leaves. A clip's own fade
+in at its start and fade out at its end are as they were.
+---
+ .../benilla-app/src/creature_anim/action.rs   | 136 ++++++++++++++----
+ crates/benilla-ui/src/action_combat.rs        |   3 +
+ 2 files changed, 115 insertions(+), 24 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 90f48604..62732c77 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -54,6 +54,10 @@ const COIL_SNAP_RATE: f32 = 1.8;
+ /// An action clip fades in and out over these.
+ const FADE_IN: f32 = 0.08;
+ const FADE_OUT: f32 = 0.16;
++/// A clip giving way to the next (a replacement, or the body switch between the whole body and
++/// the upper body) fades its outgoing node out over this, so the pose never cuts between them (a
++/// jump's last pose snapped into a landing's first: the legs popped).
++const CROSS_FADE: f32 = 0.12;
+ /// Faster than this (yd/s) the legs are the gait's and the clip takes the upper body; slower than
+ /// the second, the whole body again.
+ const MOVING_ABOVE: f32 = 1.2;
+@@ -132,9 +136,10 @@ pub(crate) struct ActionClip {
+     reaction: bool,
+     /// A creature's slow wind-up, played as a held coil and a snap (see [`COIL_SLOW`]).
+     coil: bool,
+-    /// Nodes of the clips it replaced, to stop before it plays (gathered across replacements in
+-    /// one frame, so none is left playing frozen).
+-    release: Vec<AnimationNodeIndex>,
++    /// Nodes on their way out: a replaced clip's, and the node the body switch left, each as
++    /// `(node, when the fade began, its weight then)`, ramped to nothing over [`CROSS_FADE`] and
++    /// stopped. A fade not yet begun (gathered before the player was seen) has a negative time.
++    fading: Vec<(AnimationNodeIndex, f32, f32)>,
+ }
+ 
+ impl ActionClip {
+@@ -358,10 +363,18 @@ impl ActionClip {
+             shuffle: false,
+             reaction: false,
+             coil: false,
+-            release: Vec::new(),
++            fading: Vec::new(),
+         }
+     }
+ 
++    /// A node on its way out, unless it's one this clip plays or is already fading.
++    fn fade_out(&mut self, node: AnimationNodeIndex, now: f32, weight: f32) {
++        if self.nodes().any(|n| n == node) || self.fading.iter().any(|(n, ..)| *n == node) {
++            return;
++        }
++        self.fading.push((node, now, weight));
++    }
++
+     /// The coil's two marks on the clip clock and the snap's real seconds.
+     fn coil_marks(&self) -> (f32, f32, f32) {
+         let b = self.key * (COIL_AT + COIL_CREEP);
+@@ -523,21 +536,32 @@ fn start_clip(
+ }
+ 
+ /// A clip in place of the one playing: it keeps the blend (unless that one was letting go), and
+-/// the old one's nodes, with any still waiting to stop, are stopped before it plays.
++/// the old one's nodes, with any still fading from before, fade out under it ([`CROSS_FADE`])
++/// rather than cutting to it.
+ fn replace_clip(old: &mut ActionClip, clip: ActionClip) {
+     let lambda = if old.stopping.is_some() {
+         0.0
+     } else {
+         old.lambda
+     };
+-    let mut release = std::mem::take(&mut old.release);
+-    release.extend(old.nodes().filter(|n| !clip.nodes().any(|k| k == *n)));
+-    release.retain(|n| !clip.nodes().any(|k| k == *n));
+-    *old = ActionClip {
++    let mut fading = std::mem::take(&mut old.fading);
++    fading.retain(|(n, ..)| !clip.nodes().any(|k| k == *n));
++    let mut next = ActionClip {
+         lambda,
+-        release,
++        fading,
+         ..clip
+     };
++    for n in old.nodes() {
++        // Its weight is read from the player as the fade begins.
++        next.fade_out(n, -1.0, 0.0);
++    }
++    *old = next;
++}
++
++/// A fading node's weight `secs` after its fade began from `w0`; `None` once it's done.
++fn fade_weight(w0: f32, secs: f32) -> Option<f32> {
++    let u = secs / CROSS_FADE;
++    (u < 1.0).then(|| (w0 * (1.0 - u.max(0.0))).max(1.0e-4))
+ }
+ 
+ /// Apply the scripts' calls: clips, stops, reactions, hit-stops, shakes, rolls, the lock-on.
+@@ -957,9 +981,6 @@ pub(super) fn apply_action_clips(
+     let now = time.elapsed_secs();
+     for (entity, mut clip, mut player, anims, t, stop, guid, mine) in &mut units {
+         let clip = &mut *clip;
+-        for n in std::mem::take(&mut clip.release) {
+-            player.stop(n);
+-        }
+         let frozen = stop.is_some_and(|s| now < s.until);
+         if !frozen && dt > 0.0 {
+             clip.advance(dt);
+@@ -982,7 +1003,7 @@ pub(super) fn apply_action_clips(
+             None => clip.lambda = (clip.lambda + dt / FADE_IN).min(1.0),
+         }
+         if clip.lambda <= 0.0 && clip.stopping.is_some() {
+-            for n in clip.nodes() {
++            for n in clip.nodes().chain(clip.fading.iter().map(|f| f.0)) {
+                 player.stop(n);
+             }
+             commands.entity(entity).try_remove::<ActionClip>();
+@@ -1016,16 +1037,49 @@ pub(super) fn apply_action_clips(
+             }
+         };
+         let on = clip.on_node();
+-        for off in clip.nodes().filter(|n| *n != on) {
+-            if player.animation(off).is_some() {
+-                player.stop(off);
++        // The node the body switch leaves fades out under the one it goes to.
++        let offs: Vec<AnimationNodeIndex> = clip.nodes().filter(|n| *n != on).collect();
++        for off in offs {
++            if let Some(w) = player.animation(off).map(|a| a.weight()) {
++                clip.fade_out(off, now, w);
++            }
++        }
++        // The outgoing nodes: each ramps from the weight it had to nothing, then stops. One the
++        // clip has come back to (the body switched twice in a moment) is its own again.
++        clip.fading.retain(|(n, ..)| *n != on);
++        let mut fading = Vec::with_capacity(clip.fading.len());
++        for (node, t0, w0) in std::mem::take(&mut clip.fading) {
++            let (t0, w0) = if t0 < 0.0 {
++                match player.animation(node) {
++                    Some(a) => (now, a.weight()),
++                    None => continue,
++                }
++            } else {
++                (t0, w0)
++            };
++            match fade_weight(w0, now - t0) {
++                Some(w) => {
++                    if let Some(a) = player.animation_mut(node) {
++                        a.set_weight(w);
++                    }
++                    fading.push((node, t0, w0));
++                }
++                None => {
++                    player.stop(node);
++                }
+             }
+         }
++        clip.fading = fading;
+         // Its weight against everything else playing (the gait, the driver's one-shots), the
+-        // hands' grip overlays apart, so the share it takes is `lambda`.
++        // hands' grip overlays and its own outgoing nodes apart, so the share it takes is
++        // `lambda`.
+         let others: f32 = player
+             .playing_animations()
+-            .filter(|(n, _)| **n != on && !anims.hand_close.contains(&Some(**n)))
++            .filter(|(n, _)| {
++                **n != on
++                    && !anims.hand_close.contains(&Some(**n))
++                    && !clip.fading.iter().any(|(f, ..)| f == *n)
++            })
+             .map(|(_, a)| a.weight())
+             .sum();
+         let others = if others > 1.0e-3 { others } else { 1.0 };
+@@ -1620,7 +1674,7 @@ mod tests {
+             shuffle: false,
+             reaction: false,
+             coil: false,
+-            release: Vec::new(),
++            fading: Vec::new(),
+         }
+     }
+ 
+@@ -1720,15 +1774,15 @@ mod tests {
+         assert_eq!(c.on_node(), AnimationNodeIndex::new(2));
+         c.on_upper = false;
+         assert_eq!(c.on_node(), AnimationNodeIndex::new(1));
+-        // A replacement stops only the nodes the new clip doesn't play.
++        // A replacement fades out only the nodes the new clip doesn't play.
+         let mut next = clip(0.0, 0.0, 0.0);
+         next.full = AnimationNodeIndex::new(7);
+         c.lower = Some(AnimationNodeIndex::new(3));
+         replace_clip(&mut c, next);
+-        let mut released = c.release.clone();
+-        released.sort_by_key(|n| n.index());
++        let mut outgoing: Vec<AnimationNodeIndex> = c.fading.iter().map(|f| f.0).collect();
++        outgoing.sort_by_key(|n| n.index());
+         assert_eq!(
+-            released,
++            outgoing,
+             [
+                 AnimationNodeIndex::new(1),
+                 AnimationNodeIndex::new(2),
+@@ -1737,6 +1791,40 @@ mod tests {
+         );
+     }
+ 
++    #[test]
++    fn a_replaced_clips_nodes_fade_out_over_the_crossfade_instead_of_cutting() {
++        // The old clip, at full blend, on its whole-body node.
++        let mut c = clip(0.0, 0.0, 0.0);
++        c.lambda = 1.0;
++        c.upper = Some(AnimationNodeIndex::new(2));
++        // The new clip plays node 7 (and the same upper node 2, which it keeps as its own).
++        let mut next = clip(0.0, 0.0, 0.0);
++        next.full = AnimationNodeIndex::new(7);
++        next.upper = Some(AnimationNodeIndex::new(2));
++        replace_clip(&mut c, next);
++        assert_eq!(c.lambda, 1.0, "the blend carries over, so nothing flashes under it");
++        assert_eq!(c.full, AnimationNodeIndex::new(7));
++        let fading: Vec<_> = c.fading.iter().map(|f| f.0).collect();
++        assert_eq!(fading, [AnimationNodeIndex::new(1)], "only the node it doesn't play");
++        assert!(c.fading[0].1 < 0.0, "its weight is read as the fade begins");
++        // Asked again before the fade is seen: still one entry, not two.
++        let mut again = clip(0.0, 0.0, 0.0);
++        again.full = AnimationNodeIndex::new(9);
++        replace_clip(&mut c, again);
++        let mut fading: Vec<_> = c.fading.iter().map(|f| f.0.index()).collect();
++        fading.sort();
++        assert_eq!(fading, [1, 2, 7]);
++        // The ramp: the weight it had, down to nothing over CROSS_FADE, then stopped.
++        assert!((fade_weight(4.0, 0.0).unwrap() - 4.0).abs() < 1.0e-5);
++        assert!((fade_weight(4.0, CROSS_FADE * 0.5).unwrap() - 2.0).abs() < 1.0e-5);
++        assert_eq!(fade_weight(4.0, CROSS_FADE), None);
++        assert_eq!(fade_weight(4.0, 1.0), None);
++        // A node the clip plays is never its own outgoing one.
++        let mut d = clip(0.0, 0.0, 0.0);
++        d.fade_out(d.full, 0.0, 1.0);
++        assert!(d.fading.is_empty());
++    }
++
+     #[test]
+     fn a_held_looping_reaction_loops_until_its_hold_is_spent() {
+         let mut c = clip(0.0, 0.0, 0.0);
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index a0554916..65c9b02c 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -196,6 +196,9 @@
+ //!
+ //! - `PlayUnitAnimation`'s `body` may be `"lower"`: the clip drives the legs and the pelvis alone,
+ //!   and the upper body keeps whatever it's doing (a landing's legs under a drawn bow).
++//! - An action clip asked for while another plays crossfades from it over 0.12 s instead of
++//!   cutting, as does the switch between the whole body and the upper body as the unit starts or
++//!   stops moving (a jump clip into a landing clip no longer pops the legs).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+-- 
+2.56.0.windows.4
+
