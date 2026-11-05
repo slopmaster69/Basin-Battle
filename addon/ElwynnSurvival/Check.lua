@@ -9,6 +9,10 @@
 --   release (Fire): hold, and let go as the closing ring meets the school ring.
 --   rhythm (Arcane): a closing ring for every beat, a pip for each; press as each ring meets,
 --     and let a rest (the hollow, slashed diamond) pass.
+--   sweep (Frost, Cone of Cold): a frost dial; the foes in reach marked with frost sigils at
+--     their bearings, a needle of cold light sweeping across them with the jet; stop it on one.
+--   orb (Frost, Frozen Orb): a frost track ahead of the reticle, the foes along the orb's line
+--     marked at their distance, the orb climbing it; stop it on one (not in the red at the foot).
 --
 -- No words but a first-time hint under the ring. Drawn on WorldFrame, so it shows with the rest
 -- of the interface put away. Written for the 1.12 client's Lua 5.0: no #, no %, table.getn, `this`.
@@ -51,7 +55,15 @@ local CLOSER_LINE = 0.849
 -- a rhythm's ring appears.
 local START_OUT = 2.6
 local LEAD = 0.75
-local HINTS = { release = "Release as the rings meet", rhythm = "Press as each ring meets  -  let the hollow one pass" }
+local HINTS = {
+  release = "Release as the rings meet",
+  rhythm = "Press as each ring meets  -  let the hollow one pass",
+  sweep = "Press again as the light crosses a mark",
+  orb = "Press again as the orb reaches a mark",
+}
+-- The dial spreads a sweep's bearings this much wider than life, so 120 degrees fill its top half.
+local DIAL_SPREAD = 1.5
+local BAR = "Interface\\AddOns\\ElwynnSurvival\\art\\bar"
 
 local check = CreateFrame("Frame", "ElwynnSurvivalCheck", WorldFrame)
 check:SetWidth(1)
@@ -105,6 +117,21 @@ local rests = {}
 for i = 1, 3 do rests[i] = Tex("pip_rest", "OVERLAY") end
 local pips = {}
 for i = 1, 10 do pips[i] = Tex("pip_arcane", "OVERLAY") end
+-- The frost marks (a foe on the dial or the track), the needle's light and its trail, the track.
+local marks = {}
+for i = 1, 6 do marks[i] = Tex("sigil_frost", "OVERLAY") end
+local needle = Tex("check_glow", "OVERLAY")
+local needleCore = Tex("check_critical", "OVERLAY")
+local trail = {}
+for i = 1, 4 do trail[i] = Tex("check_glow", "ARTWORK") end
+local track = check:CreateTexture(nil, "BORDER")
+track:SetTexture(BAR)
+track:SetBlendMode("ADD")
+track:Hide()
+local danger = check:CreateTexture(nil, "ARTWORK")
+danger:SetTexture(BAR)
+danger:SetBlendMode("ADD")
+danger:Hide()
 local hint = check:CreateFontString(nil, "OVERLAY")
 hint:SetFont(FONT, 13, "OUTLINE")
 hint:SetTextColor(1, 0.95, 0.85)
@@ -121,6 +148,9 @@ local beatcore = Tex("check_critical", "OVERLAY")
 
 local function HideRing()
   ring:Hide(); ring2:Hide(); halo:Hide(); spark:Hide(); hint:Hide()
+  needle:Hide(); needleCore:Hide(); track:Hide(); danger:Hide()
+  for i = 1, table.getn(marks) do marks[i]:Hide() end
+  for i = 1, table.getn(trail) do trail[i]:Hide() end
   for i = 1, table.getn(closers) do closers[i]:Hide() end
   for i = 1, table.getn(rests) do rests[i]:Hide() end
   for i = 1, table.getn(pips) do pips[i]:Hide() end
@@ -228,6 +258,19 @@ function ES.CheckLine(f)
     end
     c.n = table.getn(c.beats)
     c.next = c.free + 1
+  elseif kind == "sweep" then
+    c.secs, c.sweep, c.perfect = a, b, crit
+    local _, _, way, arc, list = string.find(f[8] or "", "^(%a+)|([^|]*)|(.*)$")
+    c.dir = (way == "rl") and -1 or 1
+    c.arc = tonumber(arc) or 30
+    c.marks = {}
+    for m in string.gfind(list or "", "[^,]+") do table.insert(c.marks, tonumber(m) or 0) end
+  elseif kind == "orb" then
+    c.secs, c.range, c.perfect = a, b, crit
+    local _, _, back, ahead, list = string.find(f[8] or "", "^([^|]*)|([^|]*)|(.*)$")
+    c.backfire, c.ahead = tonumber(back) or 3, tonumber(ahead) or 1
+    c.marks = {}
+    for m in string.gfind(list or "", "[^,]+") do table.insert(c.marks, tonumber(m) or 0) end
   else
     return
   end
@@ -328,8 +371,35 @@ ES.Heavy = function(state)
   if state == "down" then check.pressAt = GetTime() end
   return Heavy(state)
 end
+-- Where a sweep's jet points now (degrees off the front, + left), and an orb's yards out.
+local function JetAt(c, now)
+  local share = Clamp((now - c.start) / math.max(0.1, c.secs), 0, 1)
+  return c.dir * c.sweep / 2 - c.dir * c.sweep * share
+end
+local function OrbAt(c, now)
+  return c.ahead + (c.range - c.ahead) * Clamp((now - c.start) / math.max(0.1, c.secs), 0, 1)
+end
+local function JudgeStop(c, now)
+  if c.kind == "sweep" then
+    local jet, best = JetAt(c, now), 999
+    for i = 1, table.getn(c.marks) do best = math.min(best, math.abs(c.marks[i] - jet)) end
+    if best <= c.perfect then return "perfect" end
+    if best <= c.arc / 2 then return "good" end
+    return "fail"
+  end
+  local at, best = OrbAt(c, now), 999
+  if at <= c.backfire then return "fail" end
+  for i = 1, table.getn(c.marks) do best = math.min(best, math.abs(c.marks[i] - at)) end
+  if best <= c.perfect then return "perfect" end
+  return "good"
+end
+
 ES.Ability = function(n, ex, state)
   local c = check.cur
+  if state ~= "up" and c and (c.kind == "sweep" or c.kind == "orb") and GetTime() - c.start > 0.08 then
+    Finish(JudgeStop(c, GetTime()))
+    return Ability(n, ex, state)
+  end
   if state ~= "up" and c and c.kind == "rhythm" and not ES.exHold then
     local g = JudgeBeat(c, GetTime())
     if g == "fail" then
@@ -347,7 +417,8 @@ end
 local function DrawRing(c, now, open, inCrit)
   local sc = SCHOOL[c.school]
   local t = now
-  local size = sc.size
+  -- A sweep's dial is wider: its marks sit round the ring's line.
+  local size = (c.kind == "sweep") and sc.size * 1.45 or sc.size
   local alpha, a2 = 0.92, 0.42
   local scale = 1
   if c.school == "fire" then
@@ -456,21 +527,21 @@ local function StepRhythm(c, now)
   for i = used + 1, table.getn(closers) do closers[i]:Hide() end
   for i = usedRest + 1, table.getn(rests) do rests[i]:Hide() end
   -- The pips: one a beat, under the ring; lit as they go, the next one breathing.
-  local gap = 21
+  local gap = 30
   local x0 = -(c.n - 1) * gap / 2
   for k = 1, table.getn(pips) do
     local p = pips[k]
     local b = c.beats[k]
     if b then
       if b.rest then p:SetTexture(ART .. "pip_rest") else p:SetTexture(ART .. "pip_arcane") end
-      local size, alpha, r, g, bl = 20, 0.28, 0.75, 0.6, 0.8
+      local size, alpha, r, g, bl = 28, 0.3, 0.75, 0.6, 0.8
       if b.done then
         if b.grade == "critical" then
-          size, alpha, r, g, bl = 26, 1, 1, 1, 1
+          size, alpha, r, g, bl = 38, 1, 1, 1, 1
         elseif b.rest then
-          size, alpha = 20, 0.5
+          size, alpha = 28, 0.5
         else
-          size, alpha, r, g, bl = 24, 0.95, 1, 1, 1
+          size, alpha, r, g, bl = 34, 0.95, 1, 1, 1
         end
         -- Lit just now: it pops.
         local since = now - (b.litAt or now)
@@ -478,9 +549,9 @@ local function StepRhythm(c, now)
         size = size * (1 + 0.6 * Clamp(1 - since / 0.25, 0, 1))
       elseif k == c.next then
         local beat = 0.5 + 0.5 * math.sin(now * 9)
-        size, alpha = 22 + 3 * beat, 0.55 + 0.3 * beat
+        size, alpha = 30 + 5 * beat, 0.55 + 0.35 * beat
       end
-      Draw(p, size, 0, alpha, r, g, bl, x0 + (k - 1) * gap, -line - 26)
+      Draw(p, size, 0, alpha, r, g, bl, x0 + (k - 1) * gap, -line - 30)
     else
       p:Hide()
     end
@@ -488,7 +559,97 @@ local function StepRhythm(c, now)
   if c.hint then
     hint:SetText(c.hint)
     hint:ClearAllPoints()
-    hint:SetPoint("TOP", check, "CENTER", 0, -line - 46)
+    hint:SetPoint("TOP", check, "CENTER", 0, -line - 54)
+    hint:Show()
+  end
+end
+
+-- A mark on the dial or the track: a frost sigil, brightening and swelling as the light nears it.
+local function DrawMark(t, x, y, near)
+  local size = 30 + 16 * near
+  Draw(t, size, GetTime() * 0.4, 0.55 + 0.45 * near, 1, 1, 1, x, y)
+end
+
+local function StepSweep(c, now)
+  local line = DrawRing(c, now, false, false)
+  local jet = JetAt(c, now)
+  local best = 999
+  for i = 1, table.getn(marks) do
+    local m = c.marks[i]
+    if m then
+      local phi = math.rad(m * DIAL_SPREAD)
+      local d = math.abs(m - jet)
+      best = math.min(best, d)
+      local near = Clamp(1 - d / (c.arc / 2), 0, 1)
+      if d <= c.perfect then near = 1 end
+      DrawMark(marks[i], -line * math.sin(phi), line * math.cos(phi), near)
+    else
+      marks[i]:Hide()
+    end
+  end
+  -- The needle: the jet's light on the dial, its trail fading behind it.
+  local sc = SCHOOL.frost
+  local hot = best <= c.perfect
+  for k = 1, table.getn(trail) do
+    local back = jet + c.dir * k * 4
+    local phi = math.rad(back * DIAL_SPREAD)
+    Draw(trail[k], 34 - 4 * k, 0, 0.5 - 0.1 * k, sc.tint[1], sc.tint[2], sc.tint[3], -line * math.sin(phi), line * math.cos(phi))
+  end
+  local phi = math.rad(jet * DIAL_SPREAD)
+  local x, y = -line * math.sin(phi), line * math.cos(phi)
+  Draw(needle, hot and 58 or 44, 0, 1, hot and 1 or sc.tint[1], hot and 1 or sc.tint[2], 1, x, y)
+  Draw(needleCore, hot and 40 or 26, now * 3, hot and 1 or 0.7, 1, 1, 1, x, y)
+  if c.hint then
+    hint:SetText(c.hint)
+    hint:ClearAllPoints()
+    hint:SetPoint("TOP", check, "CENTER", 0, -line - 30)
+    hint:Show()
+  end
+end
+
+-- The orb's track: from the foot (the caster) up through the reticle to its reach.
+local TRACK_FOOT, TRACK_TOP = -120, 150
+local function TrackY(c, yd) return TRACK_FOOT + (TRACK_TOP - TRACK_FOOT) * Clamp(yd / math.max(1, c.range), 0, 1) end
+
+local function StepOrb(c, now)
+  local sc = SCHOOL.frost
+  local len = TRACK_TOP - TRACK_FOOT
+  track:SetWidth(5)
+  track:SetHeight(len)
+  track:ClearAllPoints()
+  track:SetPoint("BOTTOM", check, "CENTER", 0, TRACK_FOOT)
+  track:SetVertexColor(sc.tint[1], sc.tint[2], sc.tint[3], 0.55 + 0.15 * math.sin(now * 2.3))
+  track:Show()
+  local dl = TrackY(c, c.backfire) - TRACK_FOOT
+  danger:SetWidth(9)
+  danger:SetHeight(math.max(2, dl))
+  danger:ClearAllPoints()
+  danger:SetPoint("BOTTOM", check, "CENTER", 0, TRACK_FOOT)
+  danger:SetVertexColor(1, 0.2, 0.15, 0.7 + 0.25 * math.sin(now * 8))
+  danger:Show()
+  local at = OrbAt(c, now)
+  for i = 1, table.getn(marks) do
+    local m = c.marks[i]
+    if m then
+      local near = Clamp(1 - math.abs(m - at) / 3, 0, 1)
+      if math.abs(m - at) <= c.perfect then near = 1 end
+      DrawMark(marks[i], 0, TrackY(c, m), near)
+    else
+      marks[i]:Hide()
+    end
+  end
+  local y = TrackY(c, at)
+  for k = 1, table.getn(trail) do
+    Draw(trail[k], 34 - 5 * k, 0, 0.5 - 0.1 * k, sc.tint[1], sc.tint[2], sc.tint[3], 0, TrackY(c, at - k * 0.6))
+  end
+  -- The orb: a frost star spinning in a ball of light.
+  Draw(needle, 60, 0, 1, sc.tint[1], sc.tint[2], 1, 0, y)
+  Draw(needleCore, 40, now * 5, 1, 1, 1, 1, 0, y)
+  ring:Hide(); ring2:Hide(); halo:Hide()
+  if c.hint then
+    hint:SetText(c.hint)
+    hint:ClearAllPoints()
+    hint:SetPoint("TOP", check, "CENTER", 0, TRACK_FOOT - 14)
     hint:Show()
   end
 end
@@ -577,6 +738,13 @@ check:SetScript("OnUpdate", function()
     elseif c.kind == "rhythm" then
       StepRhythm(c, now)
       if c.beats[c.n] and now - c.start > c.beats[c.n].t + 2 then check.cur = nil; HideRing() end
+    elseif c.kind == "sweep" then
+      StepSweep(c, now)
+      -- Let run the whole way: nothing stopped, it goes quietly.
+      if now - c.start > c.secs + 0.15 then check.cur = nil; HideRing() end
+    elseif c.kind == "orb" then
+      StepOrb(c, now)
+      if now - c.start > c.secs + 0.15 then check.cur = nil; HideRing() end
     end
   end
   StepBeatFx(now)

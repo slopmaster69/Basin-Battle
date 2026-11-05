@@ -78,6 +78,15 @@ fn sweep(s: &mut Survival, p: Id) {
         s.input(p, Input::AttackUp);
     }
     assert_eq!(s.players[&p].action.name(), "sweep", "{:?}", s.players[&p].action.name());
+    // Each cast rolls its way across and its pace; these tests sweep the plain way: left to
+    // right in the ability's own time (`every_sweep_rolls...` tests the roll).
+    let secs = s.content.abilities[s.content.ability("cone_of_cold").unwrap()].secs;
+    let pl = s.players.get_mut(&p).unwrap();
+    pl.sweep_dir = 1.0;
+    pl.sweep_secs = secs;
+    if let Action::Sweep { since, until, .. } = &mut pl.action {
+        *until = *since + secs;
+    }
 }
 
 #[test]
@@ -172,3 +181,42 @@ fn the_guard_does_not_interrupt_a_sweep_and_the_cooldown_is_spent_once() {
     assert_eq!(s.players[&p].action, Action::Ready, "on cooldown: no second sweep");
 }
 
+
+#[test]
+fn every_sweep_rolls_its_way_and_pace_and_the_caster_is_shown_where_the_foes_stand() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let left = dummy_at(&mut s, 6.0, 30.0);
+    let right = dummy_at(&mut s, 6.0, -30.0);
+    let _ = (left, right);
+    s.set_cooldowns(p, true);
+    s.slot_ability(p, "close", "cone_of_cold").unwrap();
+    let mut ways = std::collections::BTreeSet::new();
+    let mut paces = Vec::new();
+    for _ in 0..12 {
+        // The last sweep left the hero facing where it ended: face the front again.
+        s.players.get_mut(&p).unwrap().facing = 0.0;
+        s.input(p, Input::Ability(key_of("close"), false));
+        if matches!(s.players[&p].action, Action::Aim { .. }) {
+            s.input(p, Input::Attack);
+            s.input(p, Input::AttackUp);
+        }
+        let ev = s.step(0.0);
+        let sent = ev.iter().find_map(|e| match e {
+            Event::CheckStart { player, kind: "sweep", a, pattern, .. } if *player == p => Some((*a, pattern.clone())),
+            _ => None,
+        });
+        let (secs, pattern) = sent.expect("the caster is told the sweep");
+        let parts: Vec<&str> = pattern.split('|').collect();
+        ways.insert(parts[0].to_string());
+        paces.push(secs);
+        let mut marks: Vec<f32> = parts[2].split(',').filter_map(|m| m.parse().ok()).collect();
+        marks.sort_by(|a, b| a.total_cmp(b));
+        assert_eq!(marks.len(), 2, "both foes marked: {pattern}");
+        assert!((marks[0] + 30.0).abs() < 1.0 && (marks[1] - 30.0).abs() < 1.0, "at their bearings: {marks:?}");
+        run(&mut s, 2.0);
+    }
+    assert_eq!(ways.len(), 2, "both ways across: {ways:?}");
+    paces.sort_by(|a, b| a.total_cmp(b));
+    assert!(paces[11] - paces[0] > 0.05, "paces differ: {paces:?}");
+}

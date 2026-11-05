@@ -42,9 +42,36 @@ impl Survival {
         let p = &self.players[&id];
         let dir = [yaw.cos(), yaw.sin()];
         let start = self.ground_near(p.pos[0] + dir[0] * START_AHEAD, p.pos[1] + dir[1] * START_AHEAD, p.pos[2]);
-        let secs = d.linger.max(0.1);
+        // Each cast rolls at its own pace (the same reach), so the stop is read, not counted.
+        let secs = d.linger.max(0.1) * (0.85 + 0.3 * rand::Rng::gen::<f32>(&mut self.rng));
         let speed = d.range[0] / secs;
         let tick = if d.tick > 0.0 { d.tick } else { 0.5 };
+        // The foes along its line, by how far along it they stand, for the caster's track.
+        let reach = d.radius[1].max(1.5);
+        let pos = self.players[&id].pos;
+        let mut along: Vec<f32> = self
+            .mobs
+            .values()
+            .filter(|m| m.health > 0 && !m.hidden)
+            .map(|m| m.pos)
+            .filter_map(|q| {
+                let (dx, dy) = (q[0] - pos[0], q[1] - pos[1]);
+                let ahead = dx * dir[0] + dy * dir[1];
+                let side = (dx * dir[1] - dy * dir[0]).abs();
+                (ahead > 0.0 && ahead <= d.range[0] + 1.0 && side <= reach).then_some(ahead)
+            })
+            .collect();
+        along.sort_by(|a, b| a.total_cmp(b));
+        let marks: Vec<String> = along.iter().map(|a| format!("{a:.1}")).collect();
+        self.events.push(Event::CheckStart {
+            player: id,
+            ability,
+            kind: "orb",
+            a: secs,
+            b: d.range[0],
+            c: d.perfect_yd,
+            pattern: format!("{:.1}|{:.1}|{}", d.backfire_yd, START_AHEAD, marks.join(",")),
+        });
         self.orbs.push(Orb { owner: id, ability, pos: start, dir, speed, until: now + secs, next_tick: now + tick, next_look: now });
     }
 

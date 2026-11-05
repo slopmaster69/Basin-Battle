@@ -3282,8 +3282,9 @@ kind = "projectile"
 charge = [0.3, 1.5]
 # Released on the flare: 20% more, the fast missile, and a perfect's Valor.
 perfect = true
-# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
-perfect_kit = 984
+# A perfect bursts out of the cast at the hands: Fireball's own cast flare (Fire Nova's ring
+# flooded the screen and left the caster burning, which read as a shield).
+perfect_kit = 38
 # A critical (the middle of the window): the burn lasts twice as long.
 crit_effects = [{ kind = "burn", secs = [8.0, 8.0], amount = 4.0 }]
 damage = [16.0, 36.0]
@@ -3314,8 +3315,9 @@ hold = 1.0
 perfect = true
 # All or nothing: anything but its moment fizzles, its Valor spent (Corey, Nov 5).
 stakes = "all"
-# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
-perfect_kit = 984
+# A perfect bursts out of the cast at the hands: Fireball's own cast flare (Fire Nova's ring
+# flooded the screen and left the caster burning, which read as a shield).
+perfect_kit = 38
 # A critical: the blast stuns them for a moment.
 crit_effects = [{ kind = "stun", secs = [1.0, 1.0] }]
 fragile = true
@@ -3528,8 +3530,8 @@ sweep = 120.0
 secs = 1.0
 stop_secs = 0.5
 perfect_arc = 10.0
-# A perfect bursts out of the cast: Frost Nova's ring.
-perfect_kit = 160
+# A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
+perfect_kit = 1027
 cooldown = 8.0
 # The cone's own look where it stops; a Frostbolt streams to the jet's reach while it sweeps.
 spell = 120
@@ -5866,8 +5868,9 @@ bench = true
 # Held, and let go on the flare for the perfect.
 charge = [0.3, 1.2]
 perfect = true
-# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
-perfect_kit = 984
+# A perfect bursts out of the cast at the hands: Fireball's own cast flare (Fire Nova's ring
+# flooded the screen and left the caster burning, which read as a shield).
+perfect_kit = 38
 # A critical: the burn twice as long.
 crit_effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 4.0 }]
 stamina = 22.0
@@ -5910,8 +5913,8 @@ bench = true
 # Held, and let go on the flare for the perfect.
 charge = [0.3, 1.2]
 perfect = true
-# A perfect bursts out of the cast: Frost Nova's ring.
-perfect_kit = 160
+# A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
+perfect_kit = 1027
 # A critical: everything the lance passes through is rooted a moment.
 crit_effects = [{ kind = "root", secs = [1.5, 1.5] }]
 stamina = 22.0
@@ -5982,8 +5985,9 @@ radius = [5.0, 7.0]
 # Held to call it down: let go early it's half the meteor; on the flare, the whole of it and more.
 charge = [0.5, 1.5]
 perfect = true
-# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
-perfect_kit = 984
+# A perfect bursts out of the cast at the hands: Fireball's own cast flare (Fire Nova's ring
+# flooded the screen and left the caster burning, which read as a shield).
+perfect_kit = 38
 delay = 1.5
 # Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
 # moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
@@ -6007,8 +6011,8 @@ effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4
 # claude/mage-kit-draft.md.)
 [[ability]]
 key = "frozen_orb"
-# A perfect bursts out of the cast: Frost Nova's ring.
-perfect_kit = 160
+# A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
+perfect_kit = 1027
 name = "Frozen Orb"
 text = "An orb of frost rolls out along the reticle for up to 4 sec, 25 yd: 15 damage per sec to everything within 2 yd of it, slowing them. Press again to stop it: it bursts for 30 damage within 6 yd. Stop it on an enemy and it bursts for 40 and freezes everything within 6 yd for 2 sec (1 sec against heroes). Stop it at your own feet and you freeze. Let it roll the whole way and it fades."
 icon = "Spell_Frost_FrostShock"
