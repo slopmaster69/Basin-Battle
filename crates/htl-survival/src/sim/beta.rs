@@ -648,6 +648,7 @@ impl Survival {
             damage,
             spell,
             allies: false,
+            critical: false,
             hits: vec![h],
             pierce: 0,
             stage: Stage::Out,

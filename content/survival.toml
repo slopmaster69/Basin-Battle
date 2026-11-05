@@ -404,8 +404,15 @@ break_kit = 2729
 window = 0.1
 perfect_damage = 1.2
 perfect_valor = 10.0
-# The burst (the shatter's kit, to replace once seen).
-perfect_kit = 450
+# The burst for a check without its own (`perfect_kit` on the ability: each school's ring).
+perfect_kit = 1004
+# The flare comes, at random, from this share of a ranged charge's top to the top (a fixed
+# charge's up to `flare_late` sec after it), so no two casts keep the same time; the critical is
+# the middle `crit_share` of a window. A fizzle (all or nothing, missed) shows Dispel's puff.
+flare_from = 0.72
+flare_late = 0.35
+crit_share = 0.3
+fizzle_kit = 226
 
 # --- heroes against heroes ------------------------------------------------------------------------
 
@@ -3275,6 +3282,10 @@ kind = "projectile"
 charge = [0.3, 1.5]
 # Released on the flare: 20% more, the fast missile, and a perfect's Valor.
 perfect = true
+# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
+perfect_kit = 984
+# A critical (the middle of the window): the burn lasts twice as long.
+crit_effects = [{ kind = "burn", secs = [8.0, 8.0], amount = 4.0 }]
 damage = [16.0, 36.0]
 range = [32.0, 34.0]
 radius = [0.35, 0.9]
@@ -3301,6 +3312,12 @@ valor = 25
 charge = [1.5, 1.5]
 hold = 1.0
 perfect = true
+# All or nothing: anything but its moment fizzles, its Valor spent (Corey, Nov 5).
+stakes = "all"
+# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
+perfect_kit = 984
+# A critical: the blast stuns them for a moment.
+crit_effects = [{ kind = "stun", secs = [1.0, 1.0] }]
 fragile = true
 damage = [48.0, 48.0]
 range = [36.0, 36.0]
@@ -3488,6 +3505,10 @@ spell = 7268
 charge_spell = 5143
 # The beat's pulse: Blink's quick violet flash (the orange 448 said nothing of a tempo).
 beat_kit = 3394
+# A perfect bursts out of the cast: Arcane Explosion's ring.
+perfect_kit = 1004
+# A critical press: that missile staggers what it strikes.
+crit_effects = [{ kind = "stagger", secs = [0.4, 0.4] }]
 
 # The stop check: a jet of frost sweeps across the front; the key again stops it where it is, and
 # what's in it freezes. (The Mage design, claude/mage-kit-draft.md: Frost stops things.)
@@ -3507,6 +3528,8 @@ sweep = 120.0
 secs = 1.0
 stop_secs = 0.5
 perfect_arc = 10.0
+# A perfect bursts out of the cast: Frost Nova's ring.
+perfect_kit = 160
 cooldown = 8.0
 # The cone's own look where it stops; a Frostbolt streams to the jet's reach while it sweeps.
 spell = 120
@@ -3543,6 +3566,10 @@ cooldown = 7.0
 spell = 1449
 # The beat's pulse: Blink's quick violet flash (the orange 448 said nothing of a tempo).
 beat_kit = 3394
+# A perfect bursts out of the cast: Arcane Explosion's ring.
+perfect_kit = 1004
+# A critical press: that burst shoves them back a little.
+crit_effects = [{ kind = "knockback", amount = 2.0 }]
 finisher_effects = [{ kind = "knockback", amount = 4.0 }]
 
 [[ability]]
@@ -5839,6 +5866,10 @@ bench = true
 # Held, and let go on the flare for the perfect.
 charge = [0.3, 1.2]
 perfect = true
+# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
+perfect_kit = 984
+# A critical: the burn twice as long.
+crit_effects = [{ kind = "burn", secs = [6.0, 6.0], amount = 4.0 }]
 stamina = 22.0
 damage = [24.0, 34.0]
 range = [30.0, 30.0]
@@ -5879,6 +5910,10 @@ bench = true
 # Held, and let go on the flare for the perfect.
 charge = [0.3, 1.2]
 perfect = true
+# A perfect bursts out of the cast: Frost Nova's ring.
+perfect_kit = 160
+# A critical: everything the lance passes through is rooted a moment.
+crit_effects = [{ kind = "root", secs = [1.5, 1.5] }]
 stamina = 22.0
 damage = [20.0, 30.0]
 range = [32.0, 32.0]
@@ -5920,6 +5955,10 @@ bench = true
 # Held, and let go on the flare for the perfect.
 charge = [0.3, 1.2]
 perfect = true
+# A perfect bursts out of the cast: Arcane Explosion's ring.
+perfect_kit = 1004
+# A critical: the orb throws them back.
+crit_effects = [{ kind = "knockback", amount = 3.0 }]
 stamina = 20.0
 damage = [18.0, 28.0]
 range = [30.0, 30.0]
@@ -5943,6 +5982,8 @@ radius = [5.0, 7.0]
 # Held to call it down: let go early it's half the meteor; on the flare, the whole of it and more.
 charge = [0.5, 1.5]
 perfect = true
+# A perfect bursts out of the cast: Fire Nova's ring and the hands' flare (not a shield on the caster).
+perfect_kit = 984
 delay = 1.5
 # Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
 # moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
@@ -5966,6 +6007,8 @@ effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4
 # claude/mage-kit-draft.md.)
 [[ability]]
 key = "frozen_orb"
+# A perfect bursts out of the cast: Frost Nova's ring.
+perfect_kit = 160
 name = "Frozen Orb"
 text = "An orb of frost rolls out along the reticle for up to 4 sec, 25 yd: 15 damage per sec to everything within 2 yd of it, slowing them. Press again to stop it: it bursts for 30 damage within 6 yd. Stop it on an enemy and it bursts for 40 and freezes everything within 6 yd for 2 sec (1 sec against heroes). Stop it at your own feet and you freeze. Let it roll the whole way and it fades."
 icon = "Spell_Frost_FrostShock"
