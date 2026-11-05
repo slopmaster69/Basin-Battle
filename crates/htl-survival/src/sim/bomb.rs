@@ -42,7 +42,9 @@ impl Survival {
     /// When flare `k` (1 to `bomb_flares`) comes.
     fn flare_at(&self, b: &Bomb, k: u32) -> f32 {
         let d = &self.content.abilities[b.ability];
-        b.since + d.bomb_secs * k as f32 / d.bomb_flares.max(1) as f32
+        // Spread inside its time, the last well before the burst (on the burst itself it could
+        // never be pressed in time).
+        b.since + d.bomb_secs * k as f32 / (d.bomb_flares + 1) as f32
     }
 
     /// The caster's bomb of this key's base ability that's ticking, if any.
