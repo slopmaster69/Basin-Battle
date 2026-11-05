@@ -180,7 +180,7 @@ impl Survival {
         let own_yd = self.players.get(&id).map(|p| dist2d(p.pos, at)).unwrap_or(f32::MAX);
         let backfire = d.backfire_yd > 0.0 && own_yd <= d.backfire_yd;
         let grade = if backfire { "fail" } else if perfect { "perfect" } else { "good" };
-        self.events.push(Event::CheckResult { player: id, ability: o.ability, grade });
+        self.check_result(id, o.ability, grade);
         // Stopped at the caster's own feet: the cold takes them too.
         let own = self.players.get(&id).map(|p| dist2d(p.pos, at)).unwrap_or(f32::MAX);
         if d.backfire_yd > 0.0 && own <= d.backfire_yd && !d.backfire_effects.is_empty() {

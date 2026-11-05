@@ -383,11 +383,15 @@ pub struct WardDef {
     pub block_kit: u32,
     pub perfect_kit: u32,
     pub break_kit: u32,
+    /// While up, `block_kit` crackles on the hero every `crackle_full` sec with the bar whole,
+    /// down to every `crackle_empty` sec as it runs dry (0: never).
+    pub crackle_full: f32,
+    pub crackle_empty: f32,
 }
 
 impl Default for WardDef {
     fn default() -> Self {
-        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7 }
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0 }
     }
 }
 

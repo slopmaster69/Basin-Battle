@@ -392,6 +392,10 @@ break_secs = 1.0
 # breaks (2729). All in the ward's own colour, apart from the steel of a shield's parry.
 aura = 12042
 block_kit = 381
+# While up, it crackles: once every `crackle_full` sec when the bar is whole, down to every
+# `crackle_empty` sec as it runs dry (Corey: the lower the ward, the more it crackles).
+crackle_full = 1.4
+crackle_empty = 0.18
 perfect_kit = 1005
 break_kit = 2729
 
@@ -3507,6 +3511,8 @@ spell = 7268
 charge_spell = 5143
 # The beat's pulse: Blink's quick violet flash (the orange 448 said nothing of a tempo).
 beat_kit = 3394
+# Each missile thrown with the next of these casts: the hands take turns (Corey: not one loop).
+beat_clips = [53, 54, 53, 51, 53, 54, 52, 54]
 # A perfect bursts out of the cast: Arcane Explosion's ring.
 perfect_kit = 1004
 # A critical press: that missile staggers what it strikes.
@@ -3536,9 +3542,9 @@ cooldown = 8.0
 # The cone's own look where it stops; a Frostbolt streams to the jet's reach while it sweeps.
 spell = 120
 tick_spell = 116
-# The jet itself, for clients with patch 0026: a wedge of frost flashed on the ground along it
-# every pulse, so it reads as one jet turning (the frostbolt stream read as a line of bolts).
-burst = { secs = 0.3, colour = "B4ECFF" }
+# The jet: a stream of Frostbolt's missile to its reach, and Cone of Cold's own spray from the
+# hands with it, so it reads as a channelled cone (Corey, Nov 5: the stream over the ground wedge).
+channel_kit = 1027
 effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.5 }]
 stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
 

@@ -900,6 +900,12 @@ impl Survival {
         }
         if up {
             p.ward_down_at = now;
+            // It crackles, more often as it runs dry.
+            if w.crackle_full > 0.0 && w.block_kit != 0 && now >= p.ward_crackle_at {
+                let left = (p.ward / w.bar.max(1.0)).clamp(0.0, 1.0);
+                p.ward_crackle_at = now + w.crackle_empty + (w.crackle_full - w.crackle_empty) * left;
+                self.events.push(Event::Visual { id, kit: w.block_kit, by: None });
+            }
         } else if p.ward < w.bar && now - p.ward_down_at >= w.refill_delay {
             let before = p.ward.floor();
             p.ward = (p.ward + w.refill * dt).min(w.bar);

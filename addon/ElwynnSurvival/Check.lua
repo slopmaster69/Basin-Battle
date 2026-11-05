@@ -14,6 +14,10 @@
 --   orb (Frost, Frozen Orb): a frost track ahead of the reticle, the foes along the orb's line
 --     marked at their distance, the orb climbing it; stop it on one (not in the red at the foot).
 --
+-- Placement differs by school and spell: Fireball's ring on the reticle; Meteor's on the ground
+-- round its circle and Arcane Explosion's round the caster's feet (on a client with
+-- `SetGroundRing`); Frost's marks hovering over the foes themselves, on their nameplates.
+--
 -- No words but a first-time hint under the ring. Drawn on WorldFrame, so it shows with the rest
 -- of the interface put away. Written for the 1.12 client's Lua 5.0: no #, no %, table.getn, `this`.
 
@@ -61,6 +65,19 @@ local HINTS = {
   sweep = "Press again as the light crosses a mark",
   orb = "Press again as the orb reaches a mark",
 }
+-- Checks drawn on the ground (a client with SetGroundRing): where, and the ring's radius in yards.
+local GROUND = {
+  meteor = { at = "aim", radius = 6.0 },
+  arcane_explosion = { at = "feet", radius = 6.0, grow = 1.0 },
+}
+-- Each ground texture's target line, as a share of its half-width; the closing ring's line.
+local GROUND_TEX = {
+  fire = { tex = "ground_fire", line = 0.84 },
+  frost = { tex = "ground_frost", line = 0.80 },
+  arcane = { tex = "ground_arcane", line = 0.80 },
+}
+local GROUND_CLOSER = 0.60
+
 -- The dial spreads a sweep's bearings this much wider than life, so 120 degrees fill its top half.
 local DIAL_SPREAD = 1.5
 local BAR = "Interface\\AddOns\\ElwynnSurvival\\art\\bar"
@@ -146,7 +163,10 @@ local tick = Tex("check_closer", "OVERLAY")
 local fizzle = Tex("check_fizzle", "OVERLAY")
 local beatcore = Tex("check_critical", "OVERLAY")
 
+local ClearGroundAll, HidePlatesAll
 local function HideRing()
+  if ClearGroundAll then ClearGroundAll() end
+  if HidePlatesAll then HidePlatesAll() end
   ring:Hide(); ring2:Hide(); halo:Hide(); spark:Hide(); hint:Hide()
   needle:Hide(); needleCore:Hide(); track:Hide(); danger:Hide()
   for i = 1, table.getn(marks) do marks[i]:Hide() end
@@ -275,6 +295,11 @@ function ES.CheckLine(f)
     return
   end
   c.hint = HintFor(kind)
+  c.ground = SetGroundRing and GROUND[c.key]
+  if c.ground and c.ground.at == "aim" and GetAimPoint then
+    local x, y, z = GetAimPoint()
+    c.gx, c.gy, c.gz = x, y, z
+  end
   local sc = SCHOOL[c.school]
   ring:SetTexture(ART .. sc.ring)
   ring2:SetTexture(ART .. sc.ring)
@@ -459,13 +484,157 @@ local function DrawCloser(t, r, alpha, col, spinAt)
   Draw(t, size, spinAt, alpha, col[1], col[2], col[3])
 end
 
+-- A ring on the ground: the school's (turning, flickering as its school does) and the ring of light
+-- closing on it, `q` of the way in (0 out wide, 1 on the line); `open` brightens it.
+local function GroundRing(key, c, tex, radius, rgba, yaw)
+  local tpath = ART .. tex
+  if c.ground.at == "feet" then
+    SetGroundRingOnUnit(key, "player", radius, tpath, rgba[1], rgba[2], rgba[3], rgba[4], yaw)
+  else
+    -- Meteor's circle follows the reticle while it's held.
+    if GetAimPoint then
+      local x, y, z = GetAimPoint()
+      if x then c.gx, c.gy, c.gz = x, y, z end
+    end
+    if c.gx then SetGroundRing(key, c.gx, c.gy, c.gz, radius, tpath, rgba[1], rgba[2], rgba[3], rgba[4], yaw) end
+  end
+end
+
+local function DrawGround(c, now, q, open, closerCol, grow)
+  local g = GROUND_TEX[c.school] or GROUND_TEX.arcane
+  local sc = SCHOOL[c.school]
+  local radius = c.ground.radius + (grow or 0)
+  local a = 0.9
+  if c.school == "fire" then
+    a = 0.82 + 0.16 * (0.5 * math.sin(now * 13.1) + 0.3 * math.sin(now * 23.7 + 1.3) + 0.2 * math.sin(now * 37.3))
+  elseif c.school == "frost" then
+    a = 0.85 + 0.12 * math.sin(now * 2.3)
+  else
+    a = 0.86 + 0.12 * math.sin(now * 4.2)
+  end
+  if open then a = 1 end
+  local line = radius * g.line
+  GroundRing("es_check_ring", c, g.tex, radius * (open and 1.04 or 1), { 1, 1, 1, a }, now * sc.spin)
+  GroundRing("es_check_ring2", c, g.tex, radius * 1.03, { sc.glow[1], sc.glow[2], sc.glow[3], open and 0.7 or 0.32 }, now * sc.spin2 + 1.1)
+  if q then
+    local L = line * (1 + (START_OUT - 1) * (1 - Clamp(q, 0, 1)))
+    local col = closerCol or sc.tint
+    GroundRing("es_check_closer", c, "check_closer", L / GROUND_CLOSER, { col[1], col[2], col[3], 0.4 + 0.6 * Clamp(q, 0, 1) }, 0)
+  else
+    ClearGroundRing("es_check_closer")
+  end
+end
+
+local function ClearGround()
+  if ClearGroundRing then
+    ClearGroundRing("es_check_ring")
+    ClearGroundRing("es_check_ring2")
+    ClearGroundRing("es_check_closer")
+  end
+end
+ClearGroundAll = ClearGround
+
+-- The foes' nameplates now (the client's anonymous WorldFrame children with a plate's border), with
+-- their screen centres.
+local PLATE_BORDER = "Interface\\Tooltips\\Nameplate-Border"
+local function Plates()
+  local out = {}
+  if not WorldFrame or not WorldFrame.GetChildren then return out end
+  local kids = { WorldFrame:GetChildren() }
+  for i = 1, table.getn(kids) do
+    local f = kids[i]
+    if f and f.GetRegions and not f:GetName() and f:IsShown() then
+      local border = f:GetRegions()
+      if border and border.GetTexture and border:GetTexture() == PLATE_BORDER then
+        local x, y = f:GetCenter()
+        if x then table.insert(out, { f = f, x = x, y = y }) end
+      end
+    end
+  end
+  return out
+end
+
+-- The frost sigils over the foes: each mark matched to a plate (a sweep's by bearing, left to
+-- right; an orb's by distance, near to far), brightening and swelling as the frost reaches it.
+local plateSigils = {}
+for i = 1, 6 do
+  local t = WorldFrame:CreateTexture(nil, "OVERLAY")
+  t:SetTexture(ART .. "sigil_frost")
+  t:SetBlendMode("ADD")
+  t:Hide()
+  plateSigils[i] = t
+end
+local function HidePlateSigils()
+  for i = 1, table.getn(plateSigils) do plateSigils[i]:Hide() end
+end
+HidePlatesAll = HidePlateSigils
+
+local function DrawPlateSigils(c, nears)
+  local plates = Plates()
+  local n = table.getn(c.marks)
+  if n == 0 or table.getn(plates) ~= n then
+    HidePlateSigils()
+    return false
+  end
+  -- Order the marks and the plates the same way.
+  local order = {}
+  for i = 1, n do order[i] = i end
+  if c.kind == "sweep" then
+    table.sort(order, function(a, b) return c.marks[a] > c.marks[b] end)
+    table.sort(plates, function(a, b) return a.x < b.x end)
+  else
+    table.sort(order, function(a, b) return c.marks[a] < c.marks[b] end)
+    table.sort(plates, function(a, b) return a.y < b.y end)
+  end
+  local now = GetTime()
+  for k = 1, table.getn(plateSigils) do
+    local t = plateSigils[k]
+    local pl, mi = plates[k], order[k]
+    if pl and mi then
+      local near = nears[mi] or 0
+      local size = 34 + 26 * near
+      local cs, sn = math.cos(now * 0.6) * H, math.sin(now * 0.6) * H
+      t:SetTexCoord(0.5 - cs + sn, 0.5 - sn - cs, 0.5 - cs - sn, 0.5 - sn + cs, 0.5 + cs + sn, 0.5 + sn - cs, 0.5 + cs - sn, 0.5 + sn + cs)
+      t:SetWidth(size)
+      t:SetHeight(size)
+      t:ClearAllPoints()
+      t:SetPoint("BOTTOM", pl.f, "TOP", 0, 2 + 6 * near)
+      t:SetVertexColor(1, 1, 1, 0.55 + 0.45 * near)
+      t:Show()
+    else
+      t:Hide()
+    end
+  end
+  return true
+end
+
+local StepPips
+
 local function StepRelease(c, now)
   local t = now - c.start
   local open = math.abs(t - c.flare) <= c.window
   local inCrit = math.abs(t - c.flare) <= c.window * c.crit
-  local line = DrawRing(c, now, open, inCrit)
   local sc = SCHOOL[c.school]
   local q = Curve(c.curve, t / math.max(0.05, c.flare))
+  if c.ground then
+    if t > c.flare + c.window then
+      DrawGround(c, now, nil, false)
+    else
+      DrawGround(c, now, Clamp(q, 0, 1), open, open and { 1, 1, 1 } or sc.tint)
+    end
+    ring:Hide(); ring2:Hide(); halo:Hide(); closers[1]:Hide()
+    local near = Clamp(1 - math.abs(t - c.flare) / (c.window * 3), 0, 1)
+    local blaze = inCrit and 1 or near * 0.6
+    Draw(spark, 22 + 30 * blaze, now * 1.5, 0.35 + 0.65 * blaze, 1, 1, 1, 0, 0)
+    if c.hint then
+      hint:SetText(c.hint)
+      hint:ClearAllPoints()
+      hint:SetPoint("TOP", check, "CENTER", 0, -40)
+      hint:Show()
+    end
+    return
+  end
+  local line = DrawRing(c, now, open, inCrit)
   if t > c.flare + c.window then
     -- Past its moment: the ring sinks inside and fades; the school ring dims.
     local late = (t - c.flare - c.window) / 0.35
@@ -493,6 +662,34 @@ local function StepRhythm(c, now)
   -- Open: the next pressed beat's window.
   local nb = c.beats[c.next]
   local open = nb and not nb.rest and math.abs(t - nb.t) <= BeatWindow(c, c.next)
+  if c.ground then
+    -- The ring round the feet grows a yard a beat, as the bursts do; the next beat's ring of light
+    -- closes on it.
+    local done = 0
+    for k = 1, c.n do if c.beats[k].done then done = done + 1 end end
+    local q
+    if nb then q = 1 - Clamp((nb.t - t) / LEAD, 0, 1) end
+    DrawGround(c, now, q, open, nil, (c.ground.grow or 0) * math.max(0, done - 1))
+    ring:Hide(); ring2:Hide(); halo:Hide()
+    for i = 1, table.getn(closers) do closers[i]:Hide() end
+    for k = 1, c.n do
+      local b = c.beats[k]
+      if k <= c.free and not b.done and t >= b.t then
+        b.done = true
+        b.grade = "free"
+        check.beatfx = { grade = "free", at = now, school = c.school }
+        PlaySoundFile(TICK)
+      end
+    end
+    StepPips(c, now, 40)
+    if c.hint then
+      hint:SetText(c.hint)
+      hint:ClearAllPoints()
+      hint:SetPoint("TOP", check, "CENTER", 0, -80)
+      hint:Show()
+    end
+    return
+  end
   local line = DrawRing(c, now, open, false)
   -- The closing rings: each beat's, from LEAD before it to its moment.
   local used, usedRest = 0, 0
@@ -526,7 +723,17 @@ local function StepRhythm(c, now)
   end
   for i = used + 1, table.getn(closers) do closers[i]:Hide() end
   for i = usedRest + 1, table.getn(rests) do rests[i]:Hide() end
-  -- The pips: one a beat, under the ring; lit as they go, the next one breathing.
+  StepPips(c, now, line + 30)
+  if c.hint then
+    hint:SetText(c.hint)
+    hint:ClearAllPoints()
+    hint:SetPoint("TOP", check, "CENTER", 0, -line - 54)
+    hint:Show()
+  end
+end
+
+-- The pips: one a beat, `below` pixels under the reticle; lit as they go, the next one breathing.
+StepPips = function(c, now, below)
   local gap = 30
   local x0 = -(c.n - 1) * gap / 2
   for k = 1, table.getn(pips) do
@@ -551,16 +758,10 @@ local function StepRhythm(c, now)
         local beat = 0.5 + 0.5 * math.sin(now * 9)
         size, alpha = 30 + 5 * beat, 0.55 + 0.35 * beat
       end
-      Draw(p, size, 0, alpha, r, g, bl, x0 + (k - 1) * gap, -line - 30)
+      Draw(p, size, 0, alpha, r, g, bl, x0 + (k - 1) * gap, -below)
     else
       p:Hide()
     end
-  end
-  if c.hint then
-    hint:SetText(c.hint)
-    hint:ClearAllPoints()
-    hint:SetPoint("TOP", check, "CENTER", 0, -line - 54)
-    hint:Show()
   end
 end
 
@@ -574,6 +775,12 @@ local function StepSweep(c, now)
   local line = DrawRing(c, now, false, false)
   local jet = JetAt(c, now)
   local best = 999
+  local nears = {}
+  for i = 1, table.getn(c.marks) do
+    local d = math.abs(c.marks[i] - jet)
+    nears[i] = (d <= c.perfect) and 1 or Clamp(1 - d / (c.arc / 2), 0, 1)
+  end
+  DrawPlateSigils(c, nears)
   for i = 1, table.getn(marks) do
     local m = c.marks[i]
     if m then
@@ -628,6 +835,12 @@ local function StepOrb(c, now)
   danger:SetVertexColor(1, 0.2, 0.15, 0.7 + 0.25 * math.sin(now * 8))
   danger:Show()
   local at = OrbAt(c, now)
+  local nears = {}
+  for i = 1, table.getn(c.marks) do
+    local d = math.abs(c.marks[i] - at)
+    nears[i] = (d <= c.perfect) and 1 or Clamp(1 - d / 3, 0, 1)
+  end
+  DrawPlateSigils(c, nears)
   for i = 1, table.getn(marks) do
     local m = c.marks[i]
     if m then
