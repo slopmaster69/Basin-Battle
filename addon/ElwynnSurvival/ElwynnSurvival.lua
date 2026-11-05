@@ -2385,11 +2385,19 @@ function ES.DrawAimMarker()
   end
 end
 
--- Whether cover sits between the hands and the point the reticle is on (ac26).
+-- Whether cover sits between the hands and the point the reticle is on (ac26), once it has for a
+-- moment: the reticle's line can slip through a seam in a model for a frame, and a red flicker
+-- there would say nothing.
+ES.BLOCKED_HOLD = 0.12
 function ES.ReticleBlocked()
   if not GetReticlePoint then return false end
   local _, _, _, blocked = GetReticlePoint()
-  return blocked and true or false
+  local now = GetTime()
+  if not blocked or not ES.blockedSince or now - ES.blockedSeen > 0.1 then
+    ES.blockedSince = blocked and now or nil
+  end
+  ES.blockedSeen = now
+  return ES.blockedSince ~= nil and now - ES.blockedSince >= ES.BLOCKED_HOLD
 end
 
 aim:SetScript("OnUpdate", function()
