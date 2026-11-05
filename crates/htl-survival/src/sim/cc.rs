@@ -630,6 +630,10 @@ impl Survival {
                 out.push(a);
             }
             // The ward up: its barrier on them.
+            // Broken: the debuff's look until the bar is whole again.
+            if p.ward_broken && self.content.ward.broken_aura != 0 {
+                out.push(self.content.ward.broken_aura);
+            }
             if p.ward_up && self.content.ward.aura != 0 {
                 out.push(self.content.ward.aura);
             }

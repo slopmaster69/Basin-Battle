@@ -268,16 +268,22 @@ fn an_arcane_staffs_bolts_gather_charges_and_the_heavy_orb_spends_them_harder_fo
             _ => None,
         }).max().unwrap_or(0)
     };
-    let plain = heavy(&mut s);
-    assert!(plain > 0);
+    // Nothing stored, nothing goes.
+    assert_eq!(heavy(&mut s), 0, "no charge: no orb");
+    run(&mut s, 1.0);
+    for _ in 0..3 {
+        bolt(&mut s, p, k);
+    }
+    assert_eq!(s.players[&p].staff_charges, 3);
+    let full = heavy(&mut s);
+    assert!(full > 0);
     run(&mut s, 1.0);
     bolt(&mut s, p, k);
     let ev = bolt(&mut s, p, k);
     assert_eq!(stacks(&ev, p, "charge"), vec![2]);
-    assert_eq!(s.players[&p].staff_charges, 2);
-    let spent = heavy(&mut s);
-    let want = (plain as f32 * (1.0 + 2.0 * s.content.staffs.spend_share)).round() as u32;
-    assert!(spent.abs_diff(want) <= 1, "two charges: {spent}, about {want}");
+    let two = heavy(&mut s);
+    let want = (full as f32 * s.content.staffs.charge_scale[2]).round() as u32;
+    assert!(two.abs_diff(want) <= 1, "two charges: {two}, about half the full {full}");
     assert_eq!(s.players[&p].staff_charges, 0, "spent");
     // Charges fade a while after the last bolt.
     bolt(&mut s, p, k);

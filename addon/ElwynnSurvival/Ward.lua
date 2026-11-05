@@ -177,134 +177,100 @@ end)
 
 ES.PlaceWard()
 
--- --- the ward on the reticle ----------------------------------------------------------------------
--- While it's held up (WA's fifth field), the ward stands round the left of the reticle as an
--- arcane arc: whole, cracked once below two thirds of the bar, twice below a third. A blow it stops
--- shakes it and flashes it; a perfect ward flares it; a ward that breaks shatters into shards that
--- fly off and fade. Down, it fades away (the bar under stamina still shows it refilling).
+-- --- the barrier round the warder ----------------------------------------------------------------
+-- Corey's notes on the fourth film: no arc on the reticle (there's no reticle unless a spell is
+-- aimed) and no exact bar: a barrier round the body, seen by everyone, so how much is left is
+-- gauged by eye. While a ward is up (the `WB` line, for every warder in sight) a bubble of Corey's
+-- hexagon lattice stands round them on a client with SetUnitSprite (patch 0045): whole, cracked
+-- once below two thirds, twice below a third, dimmer as it drains. A stopped blow shakes it and
+-- flashes it, a perfect ward flares and swells it, a broken one shatters into shards and fades.
+-- The slim bar under stamina is no longer shown.
 
-local ARC_ART = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
-local ARC = 150
-local arc = CreateFrame("Frame", "ElwynnSurvivalWardArc", WorldFrame)
-arc:SetWidth(1)
-arc:SetHeight(1)
-arc:SetPoint("CENTER", WorldFrame, "CENTER", 0, 0)
-arc:SetFrameStrata("HIGH")
--- Hidden at load and shown as its lines come, as the staff's mark and the checks are: a frame
--- shown before the world is up never got its updates in the lab's client.
-arc:Hide()
-arc.tex = arc:CreateTexture(nil, "ARTWORK")
-arc.tex:SetBlendMode("ADD")
-arc.tex:SetWidth(ARC)
-arc.tex:SetHeight(ARC)
-arc.tex:SetPoint("CENTER", arc, "CENTER", 0, 0)
-arc.shards = arc:CreateTexture(nil, "OVERLAY")
-arc.shards:SetTexture(ARC_ART .. "ward_shatter")
-arc.shards:SetBlendMode("ADD")
-arc.shards:Hide()
-arc.up, arc.alpha, arc.share = false, 0, 1
-arc.hitAt, arc.flareAt, arc.breakAt = nil, nil, nil
-arc.stage = nil
+local BARRIER = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
+local SIZE = 2.6      -- yards across
+local HEIGHT = 1.05   -- its middle, yards up the body
+local wards = {}      -- by unit ("player" or a guid): up, share, broken, alpha, hitAt, flareAt, breakAt
 
-local function ArcStage(share)
-  if share > 0.66 then return "ward_whole" end
-  if share > 0.33 then return "ward_crack1" end
-  return "ward_crack2"
+local function Stage(share)
+  if share > 0.66 then return "barrier_whole" end
+  if share > 0.33 then return "barrier_crack1" end
+  return "barrier_crack2"
 end
 
--- From the WA line: whether it's up, its share, and whether it just broke.
-local function ArcLine(up, share, broke)
+local barrier = CreateFrame("Frame", "ElwynnSurvivalBarrier", WorldFrame)
+barrier:Hide()
+
+-- `WB guid own up share broken`.
+function ES.WardBarrierLine(f)
+  local unit = (f[3] == "1") and "player" or f[2]
+  if not unit then return end
+  local w = wards[unit]
+  if not w then
+    w = { up = false, share = 1, broken = false, alpha = 0 }
+    wards[unit] = w
+  end
+  local up, share, broken = f[4] == "1", tonumber(f[5]) or 1, f[6] == "1"
   local now = GetTime()
-  -- Shown as a line comes (see above).
-  arc:Show()
-  if broke then
-    arc.breakAt = now
-    arc.up = false
-    arc.alpha = 0
-  elseif up and arc.up then
-    if share < arc.share - 0.001 then
-      arc.hitAt = now
-    elseif share > arc.share + 0.001 then
-      arc.flareAt = now
-    end
+  if broken and not w.broken then
+    w.breakAt = now
+    w.alpha = 0
+  elseif up and w.up then
+    if share < w.share - 0.001 then w.hitAt = now
+    elseif share > w.share + 0.001 then w.flareAt = now end
   end
-  if not broke then arc.up = up end
-  arc.share = share
-  local stage = ArcStage(share)
-  if stage ~= arc.stage then
-    arc.stage = stage
-    arc.tex:SetTexture(ARC_ART .. stage)
-  end
+  w.up, w.share, w.broken = up and not broken, share, broken
+  barrier:Show()
 end
 
-local wardLine = ES.WardLine
+-- The bar under stamina is the barrier's now: never shown.
 function ES.WardLine(f)
-  local wasBroken = ward.broken
-  wardLine(f)
-  local now = tonumber(f[2])
-  if not now then
-    arc.up = false
-    return
+  if ward.shown then
+    ward.shown = false
+    ward:Hide()
+    if ES.PlaceVitals then ES.PlaceVitals() end
   end
-  local most = math.max(1, tonumber(f[3]) or 100)
-  local broken = (tonumber(f[4]) or 0) > 0
-  ArcLine((tonumber(f[5]) or 0) > 0 and not broken, now / most, broken and not wasBroken)
 end
 
-arc:SetScript("OnUpdate", function()
+barrier:SetScript("OnUpdate", function()
+  if not SetUnitSprite then return end
   local now = GetTime()
-  -- The frame's time from the clock (not arg1, which a client may leave unset).
   local dt = math.min(0.1, now - (this.last or now))
   this.last = now
-  -- In and out: quick up, a little slower down.
-  local want = this.up and 0.9 or 0
-  local rate = this.up and 8 or 5
-  this.alpha = this.alpha + (want - this.alpha) * math.min(1, dt * rate)
-  local a, x, size = this.alpha, 0, ARC
-  -- A stopped blow: a shake and a flash.
-  if this.hitAt then
-    local t = (now - this.hitAt) / 0.25
-    if t >= 1 then
-      this.hitAt = nil
-    else
-      x = math.sin(t * 40) * 5 * (1 - t)
-      a = math.min(1, a + 0.5 * (1 - t))
+  local any = false
+  for unit, w in pairs(wards) do
+    local key = "es_ward_" .. unit
+    -- In quick, out a little slower; dimmer as it drains.
+    local want = w.up and (0.55 + 0.4 * w.share) or 0
+    local rate = w.up and 8 or 5
+    w.alpha = w.alpha + (want - w.alpha) * math.min(1, dt * rate)
+    local size, spin, a = SIZE, now * 0.25, w.alpha
+    if w.hitAt then
+      local t = (now - w.hitAt) / 0.25
+      if t >= 1 then w.hitAt = nil else
+        spin = spin + math.sin(t * 40) * 0.08 * (1 - t)
+        a = math.min(1, a + 0.45 * (1 - t))
+        size = size * (1 + 0.04 * (1 - t))
+      end
     end
-  end
-  -- A perfect ward: it flares and swells.
-  if this.flareAt then
-    local t = (now - this.flareAt) / 0.35
-    if t >= 1 then
-      this.flareAt = nil
-    else
-      size = size * (1 + 0.12 * (1 - t))
-      a = 1
+    if w.flareAt then
+      local t = (now - w.flareAt) / 0.35
+      if t >= 1 then w.flareAt = nil else
+        size = size * (1 + 0.15 * (1 - t))
+        a = 1
+      end
     end
-  end
-  if a > 0.01 then
-    this.tex:SetWidth(size)
-    this.tex:SetHeight(size)
-    this.tex:ClearAllPoints()
-    this.tex:SetPoint("CENTER", this, "CENTER", x, 0)
-    this.tex:SetVertexColor(1, 1, 1, a)
-    this.tex:Show()
-  else
-    this.tex:Hide()
-  end
-  -- Broken: the shards fly out and fade.
-  if this.breakAt then
-    local t = (now - this.breakAt) / 0.55
-    if t >= 1 then
-      this.breakAt = nil
-      this.shards:Hide()
-    else
-      local s = ARC * (1 + 0.35 * t)
-      this.shards:SetWidth(s)
-      this.shards:SetHeight(s)
-      this.shards:ClearAllPoints()
-      this.shards:SetPoint("CENTER", this, "CENTER", 18 * t, 0)
-      this.shards:SetVertexColor(1, 1, 1, 1 - t * t)
-      this.shards:Show()
+    if a > 0.01 then
+      any = true
+      SetUnitSprite(key, unit, BARRIER .. Stage(w.share), size, HEIGHT, 1, 1, 1, a, spin)
     end
+    if w.breakAt then
+      local t = (now - w.breakAt) / 0.55
+      if t >= 1 then w.breakAt = nil else
+        any = true
+        SetUnitSprite(key .. "_shatter", unit, BARRIER .. "barrier_shatter", SIZE * (1 + 0.45 * t), HEIGHT, 1, 1, 1, 1 - t * t, now * 0.25)
+      end
+    end
+    if a <= 0.01 and not w.breakAt and not w.up then wards[unit] = nil end
   end
+  if not any and not next(wards) then this:Hide() end
 end)

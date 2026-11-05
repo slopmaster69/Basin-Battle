@@ -571,11 +571,13 @@ SH	0.30	1.20
 !local m = ElwynnSurvival.staffMark for i = 1, 40 do this = m arg1 = 0.04 m:GetScript("OnUpdate")() end table.insert(SAID, "arcane: charges " .. tostring(m.n) .. " shown " .. tostring(m:IsShown()))
 SF	
 !table.insert(SAID, "no staff: mark shown " .. tostring(ElwynnSurvival.staffMark:IsShown()))
+!SetUnitSprite = function(key, unit, tex, size, h, r, g, b, a) ElwynnSurvival.lastSprite = key .. ' ' .. unit .. ' ' .. tex .. ' ' .. string.format('%.2f', a) end
 WA	100	100	0	1
-WA	60	100	0	1
-!local a = ElwynnSurvivalWardArc for i = 1, 10 do this = a arg1 = 0.04 a:GetScript("OnUpdate")() end table.insert(SAID, "ward arc: up " .. tostring(a.up) .. " stage " .. tostring(a.stage) .. " shaking " .. tostring(a.hitAt ~= nil))
-WA	0	100	1	0
-!local a = ElwynnSurvivalWardArc for i = 1, 5 do this = a arg1 = 0.04 a:GetScript("OnUpdate")() end table.insert(SAID, "ward broke: up " .. tostring(a.up) .. " shards " .. tostring(a.shards:IsShown()))
+WB	0x2A	1	1	1.00	0
+WB	0x2A	1	1	0.50	0
+!local f = ElwynnSurvivalBarrier for i = 1, 10 do this = f f:GetScript("OnUpdate")() end table.insert(SAID, "barrier: " .. tostring(ElwynnSurvival.lastSprite) .. ", bar shown " .. tostring(ElwynnSurvival.ward:IsShown()))
+WB	0x2A	1	0	0.00	1
+!local f = ElwynnSurvivalBarrier ElwynnSurvival.lastSprite = nil for i = 1, 3 do this = f f:GetScript("OnUpdate")() end table.insert(SAID, "barrier broken: " .. tostring(ElwynnSurvival.lastSprite))
 @PLAYER_LEAVING_WORLD
 !table.insert(SAID, "asleep: " .. tostring(ElwynnSurvival.awake) .. ", S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. ", catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()) .. ", action bar back " .. tostring(MainMenuBar:IsVisible()) .. ", bar " .. tostring(ElwynnSurvivalBar:IsVisible()))
 !table.insert(SAID, "after leaving: action bar visible " .. tostring(MainMenuBar:IsVisible()) .. ", player frame " .. tostring(PlayerFrame:IsVisible()))

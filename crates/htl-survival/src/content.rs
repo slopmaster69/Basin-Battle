@@ -441,11 +441,14 @@ pub struct WardDef {
     /// `upper` (the legs free) or `full`.
     pub clip_hold: f32,
     pub clip_body: String,
+    /// While broken (until the bar is whole again), this spell's aura on the warder: a debuff's
+    /// look, so a broken ward reads as a weakness, not a cleanse (0: none).
+    pub broken_aura: u32,
 }
 
 impl Default for WardDef {
     fn default() -> Self {
-        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0, clip: 0, clip_take: 0, clip_from: String::new(), clip_hold: 8.0, clip_body: String::new() }
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0, clip: 0, clip_take: 0, clip_from: String::new(), clip_hold: 8.0, clip_body: String::new(), broken_aura: 0 }
     }
 }
 
@@ -475,11 +478,18 @@ pub struct StaffsDef {
     /// heavy bolt spending them all throws the foe back this far.
     pub charged_kit: u32,
     pub charged_knockback: f32,
+    /// An Arcane staff's heavy orb carries the charges stored in the staff (Corey, Nov 5): its
+    /// strength, a share of its full damage by how many (none: nothing goes, a fizzle on the
+    /// caster), and its look by how many (bigger with each); with them all, `charge_full_kit`
+    /// bursts on what it strikes.
+    pub charge_scale: [f32; 4],
+    pub charge_spells: [u32; 4],
+    pub charge_full_kit: u32,
 }
 
 impl Default for StaffsDef {
     fn default() -> Self {
-        Self { most: 3, keep: 5.0, spend_share: 0.4, ignite_damage: 18.0, ignite_radius: 2.5, ignite_spell: 11113, chill_slow: 0.15, freeze_secs: 1.5, charged_kit: 3394, charged_knockback: 3.0 }
+        Self { most: 3, keep: 5.0, spend_share: 0.4, ignite_damage: 18.0, ignite_radius: 2.5, ignite_spell: 11113, chill_slow: 0.15, freeze_secs: 1.5, charged_kit: 3394, charged_knockback: 3.0, charge_scale: [0.0, 0.3, 0.5, 1.0], charge_spells: [0; 4], charge_full_kit: 0 }
     }
 }
 

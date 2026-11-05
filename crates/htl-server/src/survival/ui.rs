@@ -113,6 +113,8 @@
 //!   reticle (`Staff.lua`); empty for none.
 //! - `SK\t<heat|chill|charge>\t<n>\t<most>\t<guid>`: a staff's stacks changed: heat or
 //!   chill on that foe, or the hero's charges (guid 0); `n` the most: it just ignited or froze.
+//! - `WB\t<guid>\t<own>\t<up>\t<share>\t<broken>`: a warder's barrier, for everyone who sees them:
+//!   up or not, the bar's share left, broken (drawn round the body with `SetUnitSprite`).
 //! - `WP\t<guid>\t<clip>\t<secs>\t<own>`: a pose held on a unit (the ward's arm out): the clip
 //!   looped for `secs` (`ReactUnit`'s hold), renewed while it lasts; `secs` 0 lets it go.
 //! - `SH\t<lo>\t<hi>`: a staff's heavy bolt began its charge (goes from `lo` sec, whole at
