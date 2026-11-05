@@ -5861,9 +5861,9 @@ damage = [16.0, 16.0]
 range = [30.0, 30.0]
 radius = [0.35, 0.35]
 speed = 32.0
-# The old small frostbolt (zzOLDFreeze III's missile), a shard, not Frostbolt's own; thrust out
-# with the staff (the two-handed thrust, 18).
-spell = 2130
+# Frost Shot's small shard of ice, not Frostbolt's own (the old small frostbolt, 2130, draws
+# nothing in the client); thrust out with the staff (the two-handed thrust, 18).
+spell = 6984
 clip = 18
 effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
 
@@ -5902,9 +5902,10 @@ damage = [14.0, 14.0]
 range = [30.0, 30.0]
 radius = [0.3, 0.3]
 speed = 44.0
-# Viper Sting's mana shot: a small violet bolt that isn't Arcane Missiles' (which the Q spell keeps).
-# Cast with both hands (SpellCastOmni).
-spell = 3034
+# A crackling blue-violet streak (Force Reactive Disk's lightning streak), not Arcane Missiles'
+# (which the Q spell keeps); Viper Sting's mana shot (3034) draws nothing in the client. Cast with
+# both hands (SpellCastOmni).
+spell = 22600
 clip = 54
 
 [[ability]]
@@ -5986,8 +5987,9 @@ perfect_yd = 1.5
 backfire_yd = 3.0
 cooldown = 40.0
 # Frostbolt's missile rolled along the ground for the orb; Frost Nova's ring for the burst.
-# A ball of ice (Ice Tomb's missile) to where the orb is, often enough to read as one thing rolling.
-tick_spell = 16869
+# A ball of ice (the low ice missile; Ice Tomb's streaked) to where the orb is, often enough to
+# read as one thing rolling.
+tick_spell = 3120
 spell = 122
 effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.3 }]
 stop_effects = [{ kind = "petrify", secs = [2.0, 2.0] }]
