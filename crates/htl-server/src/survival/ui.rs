@@ -383,7 +383,9 @@ pub(crate) const VERSION: u32 = 2;
 /// hang on the legs alone.
 /// 35: Kill Shot's weight on the hunter's screen (`BT`: its speed lines as it goes, its hit-stop
 /// and shake as it kills).
-pub(crate) const ADDON_NEWEST: u32 = 35;
+/// 36: those speed lines redrawn (finer, soft-ended, laid over the screen as a square so none is
+/// cut at an edge, and quicker).
+pub(crate) const ADDON_NEWEST: u32 = 36;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground

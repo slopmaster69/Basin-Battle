@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 35
+local VERSION = 36
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2224,11 +2224,16 @@ empower:SetScript("OnUpdate", function()
 end)
 ES.empower = empower
 
--- Kill Shot going, on our screen: an action scene's speed lines rush in from the edges, over the
--- world and under the windows, and swell a little as they fade in a third of a second (Corey's
--- review, Nov 4: the shot should read as the strongest). The frame is sized to the screen and
--- anchored at its middle, so the swell is about the aim. (`ES.killlines`, not a local: the main
--- chunk is near Lua 5.0's limit.)
+-- Kill Shot going, on our screen: an action scene's speed lines rush in toward the aim, over the
+-- world and under the windows, settling from a touch small to their size as they ease out in a
+-- quarter of a second (Corey's review, Nov 4: the shot should read as the strongest; then of the
+-- first ones, "amateur ... cut off around the edges of the screen"). The art is square, its rays
+-- running from about 0.55 to 0.9 of the way out and soft at both ends, so it's laid over the
+-- screen as a square (not stretched to it) of side 1.15 times the screen's longer side, centred:
+-- the rays keep their aspect, their far ends lie outside the screen's long edges and inside its
+-- corners (what crosses an edge is the soft tail), and the clear middle covers the aim. The
+-- settle is a shrink that stops at 1, never past it. (`ES.killlines`, not a local: the main chunk
+-- is near Lua 5.0's limit.)
 ES.killlines = CreateFrame("Frame", "ElwynnSurvivalKillLines", UIParent)
 ES.killlines:SetFrameStrata("FULLSCREEN")
 ES.killlines:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
@@ -2242,17 +2247,18 @@ ES.killlines:SetScript("OnUpdate", function()
     this:Hide()
     return
   end
-  local share = this.left / 0.35
-  this:SetAlpha(share)
-  this:SetScale(1 + 0.08 * (1 - share))
+  local share = this.left / 0.28
+  this:SetAlpha(share * share)
+  this:SetScale(1 - 0.03 * share)
 end)
 function ES.KillLines()
   local f = ES.killlines
-  f:SetWidth(UIParent:GetWidth())
-  f:SetHeight(UIParent:GetHeight())
-  f:SetScale(1)
+  local side = math.max(UIParent:GetWidth(), UIParent:GetHeight()) * 1.15
+  f:SetWidth(side)
+  f:SetHeight(side)
+  f:SetScale(0.97)
   f:SetAlpha(1)
-  f.left = 0.35
+  f.left = 0.28
   f:Show()
 end
 

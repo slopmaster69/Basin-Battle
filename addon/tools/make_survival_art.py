@@ -142,11 +142,16 @@ def vignette():
 
 
 def speedlines():
-    """Thin streaks rushing in from the edges toward the middle, each a wedge that tapers to a
-    point and feathers across its width, the middle itself clear so the aim stays readable: an
-    action scene's speed lines, over the whole screen as Kill Shot goes. Forty-eight rays, their
-    places, widths, reaches and brightness scattered by a little generator of our own (not
-    numpy's), so the picture is the same every run and in any port of this."""
+    """Thin streaks rushing in toward the middle, each a fine wedge feathered across its width
+    and soft at both ends, the middle itself clear so the aim stays readable: an action scene's
+    speed lines as Kill Shot goes. Thirty-six rays, each running from about r 0.55 out to about
+    r 0.9 of the square (fading in over its first 15% and out over its last 25%), so none reaches
+    the texture's edge: laid over the screen as a square wider than it is (the add-on), their
+    far ends lie off the screen and no ray is cut hard at an edge (Corey's review, Nov 4: the
+    first ones, stretched to the screen and brightest at its edges, "look amateur ... cut off
+    around the edges"). Their places, widths, reaches and brightness are scattered by a little
+    generator of our own (not numpy's), so the picture is the same every run and in any port of
+    this."""
     n = 512
     px, py = grid(n, n, 2)
     dx = px / n * 2 - 1
@@ -159,22 +164,30 @@ def speedlines():
         state[0] = (state[0] * 1664525 + 1013904223) & 0xFFFFFFFF
         return state[0] / 4294967296.0
 
+    def smooth(t):
+        t = np.clip(t, 0, 1)
+        return t * t * (3 - 2 * t)
+
     tau = 2 * math.pi
     a = np.zeros(r.shape)
-    for k in range(48):
-        centre = (k + 0.5 + (roll() - 0.5) * 0.8) / 48 * tau - math.pi
-        # Its half-width at the edge (radians), how far in it comes, how bright.
-        half = 0.0025 + 0.0075 * roll()
-        reach = 0.42 + 0.22 * roll()
-        bright = 0.55 + 0.45 * roll()
+    for k in range(36):
+        centre = (k + 0.5 + (roll() - 0.5) * 0.7) / 36 * tau - math.pi
+        # Its half-width at its far end (radians), where it starts and ends, how bright.
+        half = 0.002 + 0.004 * roll()
+        start = 0.55 + 0.04 * roll()
+        end = 0.86 + 0.05 * roll()
+        bright = 0.6 + 0.4 * roll()
         d = ang - centre
         d = np.abs(d - tau * np.floor((d + math.pi) / tau))
-        along = np.clip((r - reach) / (1 - reach), 0, 1)
-        width = half * (0.15 + 0.85 * along)
-        across = np.clip(1 - d / width, 0, 1)
-        a = np.maximum(a, across * across * (3 - 2 * across) * np.sqrt(along) * bright)
-    a *= np.clip((r - 0.35) / 0.12, 0, 1)
-    save_tga("speedlines", white(down(a, 2) * 0.9))
+        along = np.clip((r - start) / (end - start), 0, 1)
+        # A point toward the middle, its full width out at its far end.
+        width = half * (0.4 + 0.6 * along)
+        across = smooth(1 - d / width)
+        ends = smooth(along / 0.15) * (1 - smooth((along - 0.75) / 0.25))
+        a = np.maximum(a, across * ends * bright)
+    # The middle clear whatever the rays do.
+    a *= np.clip((r - 0.5) / 0.04, 0, 1)
+    save_tga("speedlines", white(down(a, 2)))
 
 
 def band():
