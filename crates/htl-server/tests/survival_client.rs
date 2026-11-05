@@ -350,7 +350,12 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     c.drain(0.5);
     // The ability bar arrives; Aimed Shot (off the bench, on Q) draws the bow for one shot, and
     // it's put away.
-    assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~hurled_axe~"))), "the bar");
+    let bar = c.seen.iter().find_map(|p| match p { ServerPacket::MessageChat(m) if m.text.starts_with("ES\tAB\tranged~hurled_axe~") => Some(m.text.clone()), _ => None }).expect("the bar");
+    // Every key's entry carries its count and its EX's last (a fan's reticle draws that many points).
+    for entry in bar.trim_start_matches("ES\tAB\t").split('^') {
+        assert_eq!(entry.split('~').count(), 34, "34 fields, the counts last: {entry}");
+    }
+    assert!(bar.trim_start_matches("ES\tAB\t").split('^').next().is_some_and(|e| e.ends_with("~1~1")), "the Hurled Axe throws one, and so does its EX: {bar}");
     c.chat(".es slot q aimed_shot");
     c.drain(0.2);
     c.chat(".es in ab 0 0");
