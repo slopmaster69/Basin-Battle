@@ -2404,15 +2404,16 @@ function ES.DrawAim()
 end
 
 -- The marker an aimed ability gets: a ground ability's circle, a cone's wedge, and (on the eighth
--- round, which draws a strip) a projectile's or a beam's path from the feet along the view, its
--- range long and its radius either side. Nil: none (a dash, a tether, help for a friend).
+-- round, which draws a strip) a beam's path from the feet along the view, its range long and its
+-- radius either side, or a grappling hook's to where it would catch. A shot (Aimed Shot, Axe
+-- Throw) has none: the reticle says where it goes. Nil: none (a dash, a tether, help for a friend).
 function ES.AimMarkerShape(d)
   -- A fan's reticle shows its spread (aim.fan): nothing on the ground.
   if not d or d.shape == "fan" then return nil end
   if d.shape == "circle" or d.shape == "cone" then return d.shape end
-  if (d.kind == "projectile" or d.kind == "beam") and HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8 then
-    return "line"
-  end
+  if not (HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8) then return nil end
+  if d.kind == "beam" then return "line" end
+  if d.kind == "projectile" and ES.CatchNow and ES.CatchNow() then return "line" end
   return nil
 end
 

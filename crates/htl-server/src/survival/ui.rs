@@ -404,6 +404,8 @@ pub(crate) const VERSION: u32 = 2;
 /// server's `ST`, not only a swing.
 /// 41: a fan's reticle shows as many points as it looses (the `AB` entry's and the `RC` line's
 /// count: Fan of Knives three, Multi-Shot five).
+/// 45: no strip on the ground under an aimed shot (Aimed Shot, Axe Throw): the reticle says where
+/// it goes. Beams and grappling hooks keep theirs.
 /// 47: over heads, a thin bar over a hurt foe and nothing else (no names, levels, borders or
 /// friends' plates); the bar across the top names the champion and the foe fought.
 pub(crate) const ADDON_NEWEST: u32 = 47;
