@@ -335,6 +335,24 @@ fn shadow_word_death_is_18_or_45_below_20_percent_and_bites_back_12_if_it_doesnt
 }
 
 #[test]
+fn shadow_word_death_flashes_the_body_it_struck_for_everyone_bigger_for_a_judgement_or_a_kill() {
+    for (health, n, a) in [(1000, 1, 0.0), (150, 1, 1.0), (40, 2, 1.0)] {
+        let mut s = world();
+        let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+        s.set_aim_line(p, EAST, 0.0);
+        let m = grunt(&mut s, [12.0, 0.0, 0.0], true);
+        s.mobs.get_mut(&m).unwrap().health = health;
+        cast(&mut s, p, "mind_blast", true);
+        let ev = run_pinned(&mut s, 0.4, &[(m, [12.0, 0.0, 0.0])]);
+        let flash = ev.iter().find_map(|e| match e {
+            Event::PriestLook { kind: "death", n, on, a, .. } if *on == Some(m) => Some((*n, *a)),
+            _ => None,
+        });
+        assert_eq!(flash, Some((n, a)), "the lance on a grunt at {health}: the flash on its body");
+    }
+}
+
+#[test]
 fn a_kill_with_shadow_word_death_gives_one_free_death_within_3_sec_and_that_one_gives_no_other() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);

@@ -138,7 +138,8 @@
 //!   hero), light (`n` stacks of Holy Light, `a` their seconds), shell (`n` stored, `a` its share
 //!   of the most, `b` 1 let go), rift (`n` foes caught, `a` its reach, `b` seconds left), hollow
 //!   (the orb at `n` health, `a` its reach, `b` its most), empower (`n` 1: the shadow staff's next
-//!   bolt is Empowered). `own` 1 on the hero's own client. Shield and fade go to everyone; the
+//!   bolt is Empowered), death (Death's lance struck that unit: `n` 2 a kill, `a` 1 its judgement
+//!   on a foe low on health). `own` 1 on the hero's own client. Shield and fade go to everyone; the
 //!   rest to the hero.
 //! - `PG\t<kind>\t<key>\t<x>\t<y>\t<z>\t<radius>\t<secs>`: a Priest's mark on the ground, for
 //!   everyone: `feather` (Angelic Feather) or `rift` (Void Rift), `radius` yards, for `secs`
@@ -502,6 +503,8 @@ pub(crate) const ADDON_NEWEST: u32 = 53;
 /// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048), the body
 /// facing the aim while an ability is aimed and the upper body holding it as the legs walk
 /// (0049), and our own drawn bow's line steered onto the reticle (0050).
+/// (0058 adds `SetSpellAttach`, which hangs a spell's effects from another attachment: Salvation's
+/// wings on the back. No round of its own: the add-on calls it only where it exists.)
 pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
