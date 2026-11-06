@@ -1,0 +1,2082 @@
+From 2b8f5212d7bfc358316eaaeca4ae6f9d85285f2f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 12:47:41 -0700
+Subject: [PATCH] Light from torches and spells: the new look lights the ground
+ around a Fireball, a torch and a heal
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Under the new look (`worldLook 1`) torches, lamps and spells now light the world around them per
+pixel, WoW Forever's secondary lights in a Classic style. 1.12's own point lights, three a draw
+summed per vertex, are kept exactly; this is a second table on top, and the classic look has none.
+
+- Torches, braziers, lamps and lit rooms (every authored point light benilla already reads: M2
+  lights on props and carried items, WMO MOLT omni lights, glowing objects) cast a warm pool of
+  about 6 to 9 yd with a slow, small flicker for a flame. They come up through dusk (17:00 to
+  21:00), burn full at night and are all but out by day (6 % at noon); inside a building, 70 %.
+- A missile carries a light of its spell's colour (its Basin Battle trail's, else its school's:
+  holy gold, fire orange, nature green, frost ice blue, shadow violet, arcane pink-violet), so the
+  ground under a Fireball's path turns orange. An impact flashes brighter and shorter (0.5 s); a
+  heal glows softer and longer on the hero (1.4 s); a cast glows on its caster while drawn up; an
+  aura with a visual breathes faintly on its unit; a ground area glows over its circle.
+
+`benilla_world::look::lights` ranks every candidate within 100 yd of the camera by brightness
+against distance and packs up to 24 into the shared light buffer after the point table (row 20 `.y`
+the count): the best 16 lit, the other 8 slots fading out, so a light entering or leaving the set
+fades over 0.4 s instead of popping, and one whose entity went fades where it was. No per-frame
+allocation once warm. `terrain.wgsl`, `wow_model.wgsl` and `static_gx.wgsl` add each light as
+`texture · rgb · (1 − (d/r)²)² · wrap(N·L)` inside the final clamp, before the fog; not on unlit,
+additive, Mod or Mod2x batches or the sky shell. A pixel loops over the live entries only (none
+under the classic look); an out-of-range light costs two storage reads and a distance test.
+`benilla-app`'s `look_lights` hangs the spell lights from the missile spawns, the GO hit lists, the
+arrivals, the kit edges and the DynamicObject creates, all in `PostUpdate` through commands.
+
+Every number is in `look::lights::tune`. `looklights <scale>` (0 to 4, `tuned` to go back) scales
+them all live, for tuning on film. benilla's own; no reference behaviour.
+---
+ crates/benilla-app/src/game_plugins.rs        |   1 +
+ crates/benilla-app/src/lib.rs                 |   1 +
+ crates/benilla-app/src/look_lights.rs         | 412 ++++++++
+ crates/benilla-app/src/world_console.rs       |  58 ++
+ .../benilla-assets/src/shaders/terrain.wgsl   |  43 +-
+ .../benilla-assets/src/shaders/wow_model.wgsl |  46 +-
+ .../src/lighting/global_light.rs              | 153 ++-
+ crates/benilla-world/src/look/lights.rs       | 957 ++++++++++++++++++
+ crates/benilla-world/src/look/mod.rs          |  10 +-
+ .../benilla-world/src/shaders/static_gx.wgsl  |  37 +
+ 10 files changed, 1698 insertions(+), 20 deletions(-)
+ create mode 100644 crates/benilla-app/src/look_lights.rs
+ create mode 100644 crates/benilla-world/src/look/lights.rs
+
+diff --git a/crates/benilla-app/src/game_plugins.rs b/crates/benilla-app/src/game_plugins.rs
+index c275350..616dcd7 100644
+--- a/crates/benilla-app/src/game_plugins.rs
++++ b/crates/benilla-app/src/game_plugins.rs
+@@ -109,6 +109,7 @@ impl PluginGroup for GamePlugins {
+             .add(crate::missile_look::MissileLookPlugin)
+             .add(crate::unit_rope::UnitRopePlugin)
+             .add(crate::go_glow::GoGlowPlugin)
++            .add(crate::look_lights::LookLightsPlugin)
+             .add(FishingLinePlugin)
+             .add(QuestMarkersPlugin)
+             .add(crate::pipe_warm::plugin)
+diff --git a/crates/benilla-app/src/lib.rs b/crates/benilla-app/src/lib.rs
+index 183debd..103c202 100644
+--- a/crates/benilla-app/src/lib.rs
++++ b/crates/benilla-app/src/lib.rs
+@@ -190,6 +190,7 @@ mod vm_pass;
+ mod vplates;
+ mod wdb;
+ mod go_glow;
++mod look_lights;
+ mod missile_look;
+ mod unit_rope;
+ mod weapon_trail;
+diff --git a/crates/benilla-app/src/look_lights.rs b/crates/benilla-app/src/look_lights.rs
+new file mode 100644
+index 0000000..3d3c60d
+--- /dev/null
++++ b/crates/benilla-app/src/look_lights.rs
+@@ -0,0 +1,412 @@
++//! The new look's light from spells, benilla's own (no reference behaviour): the game hangs a
++//! [`LookLight`] on what a spell shows, and `benilla_world::look::lights` ranks and packs them with
++//! the torches for the per-pixel pass. Only under the new look (`worldLook 1`); the classic look
++//! hangs none.
++//!
++//! - A missile in flight (Fireball, Frostbolt, Shadow Bolt) carries a light of its spell's colour,
++//!   so it lights the ground under its path; an arrow carries one only when Basin Battle's missile
++//!   look gives it a glowing trail, in the trail's colour.
++//! - An impact flashes a brighter, shorter light on the unit hit or at the point it burst: a
++//!   missile's arrival, or a spell with no missile landing on each unit it hit (the first
++//!   [`tune::MAX_FLASHES_PER_CAST`]). A heal (Holy Light, Flash Heal) glows softer and longer on
++//!   the hero instead.
++//! - A cast being drawn up (the precast kit, a channel) glows on the caster until the cast ends,
++//!   and an aura with a visual of its own breathes faintly on its unit until it goes.
++//! - A ground area (a DynamicObject: Flamestrike, Consecration, Blizzard) glows over its circle
++//!   while it lasts.
++//!
++//! A spell's colour is its trail's, if it has one, else its school's ([`school_color`]); a
++//! physical spell with no trail casts no light. Every number is in [`tune`].
++
++use bevy::ecs::system::SystemParam;
++use bevy::prelude::*;
++
++use benilla_formats::SpellDisplay;
++use benilla_protocol::EntityKind;
++use benilla_ui::action_combat;
++use benilla_world::look::lights::{school_color, school_flickers, tune};
++use benilla_world::look::{LookLight, LookPulse, WorldLook};
++
++use crate::creature_anim::{CastEvent, CastEventKind, FxClass, SpellGoTargets, SpellKitFx};
++use crate::entities::{Missile, MissileSpell};
++use crate::net::{NetEntity, ObjectStore};
++
++/// `SPELL_EFFECT_HEAL`, the effect that makes a landing a heal's glow rather than a flash.
++const EFFECT_HEAL: u32 = 10;
++
++/// A missile or DynamicObject already given its light (or found to have none).
++#[derive(Component)]
++struct SpellLit;
++
++/// A light entity of this module's own, which it despawns when its pulse ends or its unit goes.
++#[derive(Component)]
++struct SpellLightEntity;
++
++/// A cast's or an aura's glow on a unit, until the kit's reap: `(unit, spell, class)` is the key
++/// `SpellKitFx` reaps by.
++#[derive(Component, Clone, Copy, PartialEq, Debug)]
++struct KitGlow {
++    owner: Entity,
++    spell: u32,
++    class: FxClass,
++}
++
++/// A spell's light colour, its strength's share and whether it flickers: Basin Battle's trail
++/// colour first (a physical spell lit only by it at [`tune::TRAIL_ONLY_SCALE`]), else its school's.
++fn spell_hue(
++    display: Option<&SpellDisplay>,
++    trail: Option<[f32; 3]>,
++) -> Option<([f32; 3], f32, bool)> {
++    let school = display.map_or(0, |d| d.school);
++    let flame = school_flickers(school);
++    match (trail, school_color(school)) {
++        (Some(rgb), Some(_)) => Some((rgb, 1.0, flame)),
++        (Some(rgb), None) => Some((rgb, tune::TRAIL_ONLY_SCALE, false)),
++        (None, Some(rgb)) => Some((rgb, 1.0, flame)),
++        (None, None) => None,
++    }
++}
++
++/// The glowing trail Basin Battle's missile look gives a spell, if any.
++fn trail_of(spell: u32) -> Option<[f32; 3]> {
++    action_combat::missile_look(spell)
++        .filter(|l| l.width > 0.0 && l.secs > 0.0)
++        .and_then(|l| l.trail)
++}
++
++/// Whether a spell heals (an effect is `SPELL_EFFECT_HEAL`).
++fn is_heal(display: Option<&SpellDisplay>) -> bool {
++    display.is_some_and(|d| d.effects.contains(&EFFECT_HEAL))
++}
++
++/// A missile's light, carried on the missile itself.
++fn missile_light(display: Option<&SpellDisplay>, trail: Option<[f32; 3]>) -> Option<LookLight> {
++    let (rgb, share, flame) = spell_hue(display, trail)?;
++    let light = LookLight::new(rgb, tune::MISSILE_INTENSITY * share, tune::MISSILE_RADIUS);
++    Some(if flame {
++        light.flickering(tune::MISSILE_FLICKER, tune::MISSILE_FLICKER_HZ)
++    } else {
++        light
++    })
++}
++
++/// A landing's light and its pulse, born `now`: a heal's soft glow, or an impact's flash.
++fn landing_light(
++    display: Option<&SpellDisplay>,
++    trail: Option<[f32; 3]>,
++    now: f32,
++) -> Option<(LookLight, LookPulse)> {
++    let (rgb, share, _) = spell_hue(display, trail)?;
++    Some(if is_heal(display) {
++        (
++            LookLight::new(rgb, tune::HEAL_INTENSITY * share, tune::HEAL_RADIUS),
++            LookPulse::flash(now, tune::HEAL_RISE, tune::HEAL_HOLD, tune::HEAL_FALL),
++        )
++    } else {
++        (
++            LookLight::new(rgb, tune::IMPACT_INTENSITY * share, tune::IMPACT_RADIUS),
++            LookPulse::flash(now, tune::IMPACT_RISE, tune::IMPACT_HOLD, tune::IMPACT_FALL),
++        )
++    })
++}
++
++/// A cast's glow (`FxClass::Hold`) or an aura's (`FxClass::AuraState`) on `owner`, born `now`.
++fn kit_glow(
++    display: Option<&SpellDisplay>,
++    class: FxClass,
++    owner: Entity,
++    now: f32,
++) -> Option<(LookLight, LookPulse)> {
++    let (rgb, share, flame) = spell_hue(display, None)?;
++    let at = Vec3::Y * tune::UNIT_HEIGHT;
++    Some(match class {
++        FxClass::Hold => {
++            let light = LookLight::new(rgb, tune::CAST_INTENSITY * share, tune::CAST_RADIUS);
++            let light = if flame {
++                light.flickering(tune::MISSILE_FLICKER, tune::MISSILE_FLICKER_HZ)
++            } else {
++                light
++            };
++            (
++                light.on(owner, at),
++                LookPulse::flash(now, tune::CAST_RISE, tune::CAST_MAX_SECS, tune::CAST_FALL),
++            )
++        }
++        FxClass::AuraState => (
++            LookLight::new(rgb, tune::AURA_INTENSITY * share, tune::AURA_RADIUS)
++                .flickering(tune::AURA_BREATH, tune::AURA_BREATH_HZ)
++                .on(owner, at),
++            LookPulse::held(now, tune::AURA_RISE),
++        ),
++    })
++}
++
++/// A ground area's glow over its circle of `radius` yards, riding its DynamicObject.
++fn area_glow(display: Option<&SpellDisplay>, radius: f32, area: Entity) -> Option<LookLight> {
++    let (rgb, share, flame) = spell_hue(display, None)?;
++    let reach = (radius + tune::AREA_PAD).clamp(tune::AREA_MIN_RADIUS, tune::AREA_MAX_RADIUS);
++    let light = LookLight::new(rgb, tune::AREA_INTENSITY * share, reach)
++        .on(area, Vec3::Y * tune::AREA_HEIGHT);
++    Some(if flame {
++        light.flickering(tune::FLAME_FLICKER, tune::FLAME_FLICKER_HZ)
++    } else {
++        light
++    })
++}
++
++/// A missile not yet given its light.
++type UnlitMissiles = (With<Missile>, Without<SpellLit>);
++
++/// What [`hang_spell_lights`] reads, as one system parameter.
++#[derive(SystemParam)]
++struct SpellLightInputs<'w, 's> {
++    look: Res<'w, WorldLook>,
++    time: Res<'w, Time>,
++    spells: Option<Res<'w, crate::ui_action::Spells>>,
++    casts: MessageReader<'w, 's, CastEvent>,
++    gos: MessageReader<'w, 's, SpellGoTargets>,
++    kits: MessageReader<'w, 's, SpellKitFx>,
++    missiles: Query<'w, 's, (Entity, &'static MissileSpell), UnlitMissiles>,
++    areas: Query<'w, 's, (Entity, &'static NetEntity, &'static ObjectStore), Added<ObjectStore>>,
++    glows: Query<'w, 's, (Entity, &'static KitGlow)>,
++}
++
++/// Hangs this frame's spell lights: on new missiles and ground areas, on each impact and landing,
++/// and on each cast and aura kit, and takes a kit's glow away at its reap.
++fn hang_spell_lights(
++    mut commands: Commands,
++    mut i: SpellLightInputs,
++    // This run's new kit glows, so a second `Begin` in the same frame adds no second one and a
++    // `Reap` in the same frame still finds it.
++    mut fresh: Local<Vec<(KitGlow, Entity)>>,
++) {
++    if !i.look.on {
++        i.casts.clear();
++        i.gos.clear();
++        i.kits.clear();
++        return;
++    }
++    let now = i.time.elapsed_secs();
++    let spells = i.spells.as_deref();
++    let display = |spell: u32| spells.and_then(|s| s.catalog.get(spell));
++    let flash = |commands: &mut Commands, spell: u32, at: Result<Entity, Vec3>| {
++        let Some((light, pulse)) = landing_light(display(spell), trail_of(spell), now) else {
++            return;
++        };
++        match at {
++            Ok(unit) => {
++                commands.spawn((
++                    light.on(unit, Vec3::Y * tune::UNIT_HEIGHT),
++                    pulse,
++                    SpellLightEntity,
++                ));
++            }
++            Err(pos) => {
++                let pos = pos + Vec3::Y * tune::GROUND_HEIGHT;
++                commands.spawn((
++                    light,
++                    pulse,
++                    SpellLightEntity,
++                    Transform::from_translation(pos),
++                    GlobalTransform::from_translation(pos),
++                ));
++            }
++        }
++    };
++    for (entity, spell) in &i.missiles {
++        let mut e = commands.entity(entity);
++        if let Some(light) = missile_light(display(spell.spell), trail_of(spell.spell)) {
++            e.try_insert(light);
++        }
++        e.try_insert(SpellLit);
++    }
++    for ev in i.casts.read() {
++        match ev.kind {
++            CastEventKind::Impact { .. } => flash(&mut commands, ev.spell_id, Ok(ev.entity)),
++            CastEventKind::GroundImpact { pos } => flash(&mut commands, ev.spell_id, Err(pos)),
++            _ => {}
++        }
++    }
++    for go in i.gos.read() {
++        // A missile's landing is its arrival's (above); a spell with none lands now.
++        if display(go.spell_id).is_none_or(|d| d.speed > 0.0) {
++            continue;
++        }
++        for &unit in go.hits.iter().take(tune::MAX_FLASHES_PER_CAST) {
++            flash(&mut commands, go.spell_id, Ok(unit));
++        }
++        if let (Some(dest), false) = (go.dest, is_heal(display(go.spell_id))) {
++            flash(&mut commands, go.spell_id, Err(dest));
++        }
++    }
++    fresh.clear();
++    for kit in i.kits.read() {
++        match *kit {
++            SpellKitFx::Begin {
++                entity,
++                spell_id,
++                persistent: true,
++                class,
++                ref effects,
++                ..
++            } if !effects.is_empty() => {
++                let key = KitGlow {
++                    owner: entity,
++                    spell: spell_id,
++                    class,
++                };
++                if fresh.iter().any(|(g, _)| *g == key) || i.glows.iter().any(|(_, g)| *g == key) {
++                    continue;
++                }
++                if let Some((light, pulse)) = kit_glow(display(spell_id), class, entity, now) {
++                    let glow = commands.spawn((light, pulse, key, SpellLightEntity)).id();
++                    fresh.push((key, glow));
++                }
++            }
++            SpellKitFx::Reap {
++                entity,
++                spell_id,
++                class,
++                ..
++            } => {
++                for (glow, g) in &i.glows {
++                    if g.owner == entity && g.spell == spell_id && g.class == class {
++                        commands.entity(glow).try_despawn();
++                    }
++                }
++                fresh.retain(|(g, glow)| {
++                    let reaped = g.owner == entity && g.spell == spell_id && g.class == class;
++                    if reaped {
++                        commands.entity(*glow).try_despawn();
++                    }
++                    !reaped
++                });
++            }
++            _ => {}
++        }
++    }
++    for (area, net, store) in &i.areas {
++        if net.kind != EntityKind::DynamicObject {
++            continue;
++        }
++        commands.entity(area).try_insert(SpellLit);
++        let Some(spell) = store.0.dynamicobject_spell_id() else {
++            continue;
++        };
++        let radius = store.0.dynamicobject_radius().unwrap_or(0.0);
++        if let Some(light) = area_glow(display(spell), radius, area) {
++            commands.spawn((light, SpellLightEntity));
++        }
++    }
++}
++
++/// Despawns this module's light entities whose pulse has ended or whose unit has gone, and every
++/// one of them under the classic look.
++fn retire_spell_lights(
++    mut commands: Commands,
++    look: Res<WorldLook>,
++    time: Res<Time>,
++    lights: Query<(Entity, &LookLight, Option<&LookPulse>), With<SpellLightEntity>>,
++    alive: Query<()>,
++) {
++    let now = time.elapsed_secs();
++    for (entity, light, pulse) in &lights {
++        let ended = pulse.is_some_and(|p| p.done(now));
++        let orphaned = light.anchor.is_some_and(|a| !alive.contains(a));
++        if !look.on || ended || orphaned {
++            commands.entity(entity).try_despawn();
++        }
++    }
++}
++
++/// Registers the spell lights. Both systems run in `PostUpdate`, after every writer of the
++/// messages they read (all in `Update`), and touch the world only through commands.
++pub(crate) struct LookLightsPlugin;
++
++impl Plugin for LookLightsPlugin {
++    fn build(&self, app: &mut App) {
++        app.add_systems(PostUpdate, (hang_spell_lights, retire_spell_lights));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn spell(school: u32, effects: [u32; 3]) -> SpellDisplay {
++        SpellDisplay {
++            school,
++            effects,
++            ..SpellDisplay::default()
++        }
++    }
++
++    /// Fire is orange and flickers, frost is blue and steady, a physical spell has no light
++    /// unless its trail gives it one, and a trail colours any spell.
++    #[test]
++    fn a_spell_takes_its_trail_or_its_school_colour() {
++        let fire = spell(2, [2, 0, 0]);
++        let (rgb, share, flame) = spell_hue(Some(&fire), None).unwrap();
++        assert_eq!((rgb, share, flame), (school_color(2).unwrap(), 1.0, true));
++        let frost = spell(4, [2, 0, 0]);
++        assert!(!spell_hue(Some(&frost), None).unwrap().2);
++        let arrow = spell(0, [2, 0, 0]);
++        assert!(spell_hue(Some(&arrow), None).is_none());
++        let (rgb, share, _) = spell_hue(Some(&arrow), Some([1.0, 0.4, 0.1])).unwrap();
++        assert_eq!((rgb, share), ([1.0, 0.4, 0.1], tune::TRAIL_ONLY_SCALE));
++        let (rgb, share, _) = spell_hue(Some(&frost), Some([0.2, 1.0, 0.2])).unwrap();
++        assert_eq!((rgb, share), ([0.2, 1.0, 0.2], 1.0));
++        assert!(
++            spell_hue(None, None).is_none(),
++            "an unknown spell casts nothing"
++        );
++    }
++
++    /// A Fireball's missile light, its impact's brighter, shorter flash, and Holy Light's softer,
++    /// longer glow.
++    #[test]
++    fn missiles_carry_light_and_landings_flash_or_glow() {
++        let fireball = spell(2, [2, 0, 0]);
++        let m = missile_light(Some(&fireball), None).unwrap();
++        assert_eq!(m.radius, tune::MISSILE_RADIUS);
++        assert!(m.flicker > 0.0);
++        let (impact, pulse) = landing_light(Some(&fireball), None, 5.0).unwrap();
++        assert!(
++            impact.intensity > m.intensity,
++            "the burst outshines the flight"
++        );
++        let secs = pulse.rise + pulse.hold + pulse.fall;
++        assert!((0.3..=0.6).contains(&secs), "an impact lasts {secs} s");
++        assert!(pulse.done(5.0 + secs) && !pulse.done(5.0 + secs - 0.01));
++        let holy_light = spell(1, [10, 0, 0]);
++        let (glow, gp) = landing_light(Some(&holy_light), None, 0.0).unwrap();
++        assert!(glow.intensity < impact.intensity && glow.radius < impact.radius);
++        assert!(gp.rise + gp.hold + gp.fall > secs, "a heal glows longer");
++        assert!(missile_light(Some(&spell(0, [2, 0, 0])), None).is_none());
++    }
++
++    /// A cast glows on its caster until reaped; an aura breathes; a ground area spans its circle.
++    #[test]
++    fn casts_auras_and_areas_glow() {
++        let owner = Entity::from_raw_u32(7).unwrap();
++        let fire = spell(2, [2, 0, 0]);
++        let (cast, cp) = kit_glow(Some(&fire), FxClass::Hold, owner, 1.0).unwrap();
++        assert_eq!(cast.anchor, Some(owner));
++        assert_eq!(cp.gain(10.0), 1.0, "held until the reap");
++        assert!(cp.done(1.0 + tune::CAST_RISE + tune::CAST_MAX_SECS + tune::CAST_FALL));
++        let shield = spell(1, [6, 0, 0]);
++        let (aura, _) = kit_glow(Some(&shield), FxClass::AuraState, owner, 1.0).unwrap();
++        assert!(aura.flicker > 0.0 && aura.intensity < cast.intensity);
++        assert!(kit_glow(Some(&spell(0, [6, 0, 0])), FxClass::AuraState, owner, 1.0).is_none());
++        let flamestrike = area_glow(Some(&fire), 8.0, owner).unwrap();
++        assert_eq!(flamestrike.radius, 8.0 + tune::AREA_PAD);
++        assert_eq!(
++            area_glow(Some(&fire), 40.0, owner).unwrap().radius,
++            tune::AREA_MAX_RADIUS
++        );
++        assert_eq!(
++            area_glow(Some(&fire), 0.0, owner).unwrap().radius,
++            tune::AREA_MIN_RADIUS
++        );
++    }
++}
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 40aaa9d..dc54c83 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -90,6 +90,13 @@ impl Plugin for WorldConsolePlugin {
+         );
+         // benilla's own: the new look's mist held for tuning on film.
+         app.console_command("lookmist", GRAPHICS, Some("<scale> | grade"), look_mist);
++        // benilla's own: the new look's lights from torches and spells, scaled for tuning on film.
++        app.console_command(
++            "looklights",
++            GRAPHICS,
++            Some("<scale 0-4> | tuned"),
++            look_lights,
++        );
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -181,6 +188,23 @@ fn look_mist(world: &mut World, args: &str) -> Vec<String> {
+     }
+ }
+ 
++/// `looklights <scale>`, benilla's own (1.12 has no such command): scales every light of the new
++/// look's from torches and spells (`benilla_world::look::lights`), 0 to 4, for tuning on film;
++/// `looklights tuned`, or no argument, puts them back at their tuned strength. The classic look
++/// (`worldLook 0`) has none either way.
++fn look_lights(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::LookLightTune;
++    let Some(tune) = LookLightTune::parse(args) else {
++        return vec!["Usage: looklights <scale 0-4> | tuned".to_string()];
++    };
++    *world.get_resource_or_init::<LookLightTune>() = tune;
++    vec![if tune == LookLightTune::default() {
++        "Look lights at their tuned strength.".to_string()
++    } else {
++        format!("Look lights held at {}.", tune.scale)
++    }]
++}
++
+ /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
+ /// a clear one set with the second, each through `ConsoleWrite` in class 0.
+ fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
+@@ -520,6 +544,40 @@ mod tests {
+         assert_eq!(scale(&mut app), None, "no argument lets go too");
+     }
+ 
++    /// `looklights`: a scale holds every look light at it, `tuned` or nothing puts them back, and
++    /// anything out of range leaves the scale as it was with the usage line.
++    #[test]
++    fn the_look_lights_scale_and_go_back() {
++        use benilla_world::look::LookLightTune;
++        let mut app = world_app();
++        let scale = |app: &mut App| {
++            app.world_mut()
++                .get_resource_or_init::<LookLightTune>()
++                .scale
++        };
++        assert_eq!(
++            run(&mut app, "looklights 1.5"),
++            ["Look lights held at 1.5."]
++        );
++        assert_eq!(scale(&mut app), 1.5);
++        assert_eq!(run(&mut app, "looklights 0"), ["Look lights held at 0."]);
++        assert_eq!(scale(&mut app), 0.0);
++        assert_eq!(
++            run(&mut app, "looklights 5"),
++            ["Usage: looklights <scale 0-4> | tuned"]
++        );
++        assert_eq!(run(&mut app, "looklights bright").len(), 1);
++        assert_eq!(scale(&mut app), 0.0, "a bad value changes nothing");
++        assert_eq!(
++            run(&mut app, "looklights tuned"),
++            ["Look lights at their tuned strength."]
++        );
++        assert_eq!(scale(&mut app), 1.0);
++        run(&mut app, "looklights 2");
++        run(&mut app, "looklights");
++        assert_eq!(scale(&mut app), 1.0, "no argument goes back too");
++    }
++
+     /// The six toggles flip their bit and print the state they leave (`ConsoleWrite` class 0):
+     /// the five world-flag bits start set (`0x7100b73`, `0x66f6cb`), the simple-doodad word clear
+     /// (`0x66f714`). None reads its arguments.
+diff --git a/crates/benilla-assets/src/shaders/terrain.wgsl b/crates/benilla-assets/src/shaders/terrain.wgsl
+index 638ac1d..a8fc606 100644
+--- a/crates/benilla-assets/src/shaders/terrain.wgsl
++++ b/crates/benilla-assets/src/shaders/terrain.wgsl
+@@ -43,9 +43,13 @@ struct WowLight {
+     grade: vec4<f32>,         // row 17: reserved, layout only.
+     _wmo_fog: array<vec4<f32>, 2>, // rows 18-19: interior fog, unread by terrain.
+     // The dynamic point-light table (`global_light::build_light_data`): row 20 `.x` = live count,
+-    // then two rows per light, `[pos.xyz, range]` and `[rgb, 0]`.
++    // then two rows per light, `[pos.xyz, range]` and `[rgb, 0]`. Row 20 `.y` = the new look's
++    // live light count, its table after the point table.
+     point_count: vec4<f32>,
+     points: array<vec4<f32>, 512>,
++    // The new look's lights from torches and spells (`look::lights`, MAX_LOOK_LIGHTS = 24), two
++    // rows per light, `[pos.xyz, radius]` and `[rgb, 0]`.
++    look_lights: array<vec4<f32>, 48>,
+ };
+ @group(#{MATERIAL_BIND_GROUP}) @binding(90) var<storage, read> wow_light: WowLight;
+ 
+@@ -61,6 +65,8 @@ struct TerrainVsOut {
+     // carried torch is (1.4, 0.87, 0.40)) saturates one vertex and falls off linearly from it,
+     // where clamping per pixel would pin a wide plateau at white.
+     @location(6) primary: vec3<f32>,
++    // The MCNR normal, for the new look's per-pixel lights.
++    @location(7) world_normal: vec3<f32>,
+ }
+ 
+ // Terrain's point-light candidacy half-width (yd): `w + 10`, `w` being the chunk's bounding-sphere
+@@ -116,6 +122,32 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
+     return sum;
+ }
+ 
++// The new look's light from torches and spells, benilla's own (no reference behaviour): every
++// live entry of the look's table, per pixel, `rgb · (1 − (d/r)²)² · wrap(N·L)` with the N·L
++// wrapped by LOOK_WRAP for a soft side. The table is empty (row 20 `.y` = 0) under the classic
++// look. Mirrored in wow_model.wgsl and static_gx.wgsl, and by `look::lights::light_at`.
++const LOOK_WRAP: f32 = 0.5;
++
++fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
++    let count = u32(wow_light.point_count.y);
++    var sum = vec3<f32>(0.0);
++    for (var i = 0u; i < count; i = i + 1u) {
++        let pos_radius = wow_light.look_lights[2u * i];
++        let to_light = pos_radius.xyz - P;
++        let d2 = dot(to_light, to_light);
++        let r2 = pos_radius.w * pos_radius.w;
++        if (d2 >= r2) {
++            continue;
++        }
++        let x2 = d2 / r2;
++        let window = (1.0 - x2) * (1.0 - x2);
++        let l = to_light * inverseSqrt(max(d2, 1e-6));
++        let wrapped = clamp((dot(N, l) + LOOK_WRAP) / (1.0 + LOOK_WRAP), 0.0, 1.0);
++        sum += wow_light.look_lights[2u * i + 1u].rgb * (window * wrapped);
++    }
++    return sum;
++}
++
+ // The MCNK chunk cell centre under a world point: the reference's light anchor, the chunk's world
+ // AABB centre `CMapChunk+0x5c..0x64` (written by `0x6b0e50`). The grid is fixed world-wide (chunk
+ // 533.33333/16 yd, half-extent 32 tiles) and symmetric, and WoW x/y are Bevy −z/−x, so snapping
+@@ -161,6 +193,7 @@ fn vertex(in: Vertex) -> TerrainVsOut {
+         vec3<f32>(0.0),
+         vec3<f32>(1.0),
+     );
++    out.world_normal = n;
+     return out;
+ }
+ 
+@@ -223,7 +256,13 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
+     //   specular = sheen · mask · shadow                 (none in shadow)
+     let diffuse_term = color * primary * (0.3 * shadow_lit + 0.7);
+     let spec_term = in.specular * specmask * shadow_lit;
+-    var tuned = clamp(diffuse_term + spec_term, vec3<f32>(0.0), vec3<f32>(1.0));
++    var lit_sum = diffuse_term + spec_term;
++    // The new look's torches and spells, on the texture colour beside the baked light (no MCSH:
++    // the sun's shadow is not theirs); none under the classic look.
++    if (wow_light.point_count.y > 0.5) {
++        lit_sum += color * look_light_sum(in.world_position.xyz, normalize(in.world_normal));
++    }
++    var tuned = clamp(lit_sum, vec3<f32>(0.0), vec3<f32>(1.0));
+ 
+     // Gamma-space GL_LINEAR fog on planar eye-Z, as the reference computes `fogcoord`, not radial
+     // distance. Per pixel matches its per-vertex fog, since a linear factor interpolates exactly.
+diff --git a/crates/benilla-assets/src/shaders/wow_model.wgsl b/crates/benilla-assets/src/shaders/wow_model.wgsl
+index 52b1b87..7397831 100644
+--- a/crates/benilla-assets/src/shaders/wow_model.wgsl
++++ b/crates/benilla-assets/src/shaders/wow_model.wgsl
+@@ -80,9 +80,13 @@ struct WowLight {
+     wmo_fog_color: vec4<f32>,    // rgb interior fog (gamma); w = enable (mirrors fog_color.w)
+     wmo_fog_params: vec4<f32>,   // x = start yd, y = end yd; zw unused
+     // Row 20 `.x` = the point-light count, then per light `[pos.xyz, range]`, `[rgb, 0]`. Here, not
+-    // in Bevy's clusterables, which the view layout gives the fragment stage only.
++    // in Bevy's clusterables, which the view layout gives the fragment stage only. Row 20 `.y` =
++    // the new look's live light count.
+     point_count: vec4<f32>,
+     points: array<vec4<f32>, 512>,
++    // The new look's lights from torches and spells (`look::lights`, MAX_LOOK_LIGHTS = 24), two
++    // rows per light, `[pos.xyz, radius]` and `[rgb, 0]`, lit per pixel (`look_light_sum`).
++    look_lights: array<vec4<f32>, 48>,
+     // The interior-prop SH probes, 7 rows per slot (`MAX_PROP_PROBES` = 8192 slots). Only this
+     // shader declares this tail; the other shaders bind the same buffer by its prefix.
+     prop_probes: array<vec4<f32>, 57344>,
+@@ -234,6 +238,31 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
+     return sum;
+ }
+ 
++// The new look's light from torches and spells, benilla's own (no reference behaviour): every
++// live entry of the look's table, per pixel, `rgb · (1 − (d/r)²)² · wrap(N·L)`. Mirrored from
++// terrain.wgsl (keep in sync), and by `look::lights::light_at`.
++const LOOK_WRAP: f32 = 0.5;
++
++fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
++    let count = u32(wow_light.point_count.y);
++    var sum = vec3<f32>(0.0);
++    for (var i = 0u; i < count; i = i + 1u) {
++        let pos_radius = wow_light.look_lights[2u * i];
++        let to_light = pos_radius.xyz - P;
++        let d2 = dot(to_light, to_light);
++        let r2 = pos_radius.w * pos_radius.w;
++        if (d2 >= r2) {
++            continue;
++        }
++        let x2 = d2 / r2;
++        let window = (1.0 - x2) * (1.0 - x2);
++        let l = to_light * inverseSqrt(max(d2, 1e-6));
++        let wrapped = clamp((dot(N, l) + LOOK_WRAP) / (1.0 + LOOK_WRAP), 0.0, 1.0);
++        sum += wow_light.look_lights[2u * i + 1u].rgb * (window * wrapped);
++    }
++    return sum;
++}
++
+ // The centre of the MCNK chunk under P, the light anchor for world-merged clutter, since the
+ // reference gathers lights per terrain chunk (mirrored in terrain.wgsl). WoW x/y are Bevy −z/−x
+ // and the grid is symmetric, so snapping Bevy x/z lands on the same cells. The height is the
+@@ -780,6 +809,9 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+     // WMO, the body tint on M2). The WMO branch divides Bevy's MOCV fold back out, guarded; a dim
+     // channel's product is ~0 either way.
+     var lit_rgb: vec3<f32>;
++    // The texture colour the new look's lights modulate: the M2's albedo, or a WMO's texel without
++    // its MOCV (the bake is the room's own light, not the surface's colour).
++    var look_albedo = albedo;
+ #ifdef VERTEX_COLORS
+     if (is_wmo) {
+         let vc = in.color.rgb;
+@@ -790,6 +822,7 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+         );
+         let tex_rgb = base.rgb / max(vc, vec3<f32>(1.0 / 255.0));
+         lit_rgb = tex_rgb * m.tint.rgb * primary;
++        look_albedo = tex_rgb * m.tint.rgb;
+         if (is_interior && m.tint.w > 0.5 && m.tint.w < 1.5) {
+             // INT: the reference's interior pixel shader, `tex·MOCV.rgb·(1 + 4·MOCV.a)` with only
+             // the framebuffer's final clamp.
+@@ -843,6 +876,17 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+     if ((is_mod || is_mod2x) && !is_wmo) {
+         rgb = base.rgb;
+     }
++    // The new look's torches and spells, per pixel on the lit surface, inside the final clamp: not
++    // on an unlit, additive, Mod or Mod2x batch (a glow lights nothing), nor the WMO sky shell
++    // (bit 13); none under the classic look, whose table is empty.
++    let look_skips = (u32(m.clutter_fade.z) & (4u | 128u | 256u | 8192u)) != 0u;
++    if (wow_light.point_count.y > 0.5 && !is_emissive && !look_skips) {
++        rgb = clamp(
++            rgb + look_albedo * look_light_sum(in.world_position.xyz, n_lit),
++            vec3<f32>(0.0),
++            vec3<f32>(1.0),
++        );
++    }
+     // Stage 1 combines with the stage-0 result, the lit texel, before the fog.
+     if (stage1_on) {
+         // The diffuse alpha is the batch and instance alpha, the shader's `obj_fade`.
+diff --git a/crates/benilla-world/src/lighting/global_light.rs b/crates/benilla-world/src/lighting/global_light.rs
+index e605198..b85b80d 100644
+--- a/crates/benilla-world/src/lighting/global_light.rs
++++ b/crates/benilla-world/src/lighting/global_light.rs
+@@ -14,6 +14,7 @@ use bevy::render::{Render, RenderApp, RenderSystems};
+ use super::prop_probes::MAX_PROP_PROBES;
+ use super::{sh, WowLighting};
+ use crate::dev_state::DebugState;
++use crate::look::lights::{LookLightInputs, LOOK_LIGHT_ROWS};
+ use crate::view::ViewDistance;
+ use crate::view::WorldCamera;
+ 
+@@ -27,9 +28,12 @@ use crate::view::WorldCamera;
+ ///   17 grade: `.x` the SIDN night fraction, `.yzw` the sun's SH DC at intensity 1 ·
+ ///   18 wmo_fog_color · 19 wmo_fog_params (x=start y=end): the interior fog triple, read by
+ ///      interior-tagged content in place of 4-5 ·
+-///   20 point_count (x = live entries) · 21+ the point-light table, two rows per light,
+-///      `[pos.xyz, range]` and `[rgb, 0]`, here because Bevy's clusterable buffer is
+-///      fragment-only in the view layout and the point term is per vertex.
++///   20 point_count (x = live entries; y = the look's live lights) · 21+ the point-light table,
++///      two rows per light, `[pos.xyz, range]` and `[rgb, 0]`, here because Bevy's clusterable
++///      buffer is fragment-only in the view layout and the point term is per vertex ·
++///   then the new look's light table (`look::lights`), two rows per light, `[pos.xyz, radius]` and
++///      `[rgb, 0]`, lit per pixel; empty (count 0) under the classic look and in every off-world
++///      blob.
+ ///
+ /// The GPU buffer is larger: the interior-prop probes and the skin-palette regions follow this
+ /// prefix. They stay out of this struct because the extract clones it by value every frame, and
+@@ -39,6 +43,7 @@ use crate::view::WorldCamera;
+ struct LightStd430 {
+     rows: [[f32; 4]; LIGHT_HEADER_ROWS],
+     points: [[f32; 4]; 2 * MAX_POINT_LIGHTS],
++    look: [[f32; 4]; LOOK_LIGHT_ROWS],
+ }
+ 
+ /// Header row count of the layout above (rows 0..=20), which every light blob sizes against.
+@@ -125,6 +130,7 @@ impl Default for WowLightData {
+         Self(LightStd430 {
+             rows: [[0.0; 4]; 21],
+             points: [[0.0; 4]; 2 * MAX_POINT_LIGHTS],
++            look: [[0.0; 4]; LOOK_LIGHT_ROWS],
+         })
+     }
+ }
+@@ -187,19 +193,26 @@ pub(super) fn per_frame_blob_bytes() -> u64 {
+     std::mem::size_of::<LightStd430>() as u64
+ }
+ 
+-/// Packs the resolved [`WowLighting`], the fog toggle, the farclip and the nearest point lights
+-/// into the std430 blob.
+-#[allow(clippy::type_complexity)]
++/// Packs the resolved [`WowLighting`], the fog toggle, the farclip, the nearest point lights and,
++/// under the new look, its ranked lights from torches and spells into the std430 blob.
++#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+ fn build_light_data(
+     light: Res<WowLighting>,
+     debug: Res<DebugState>,
+     view: Res<ViewDistance>,
+     cam: Query<&GlobalTransform, With<WorldCamera>>,
+-    lights_q: Query<(&WorldPointLight, &GlobalTransform, Option<&LightRooms>)>,
++    lights_q: Query<(
++        Entity,
++        &WorldPointLight,
++        &GlobalTransform,
++        Option<&LightRooms>,
++    )>,
+     // The per-frame portal PVS, for the rooms term.
+     portals: Query<&crate::wmo_portal::WmoPortalInstance>,
+     mut data: ResMut<WowLightData>,
+     time: Res<Time>,
++    // The new look's lights from torches and spells (`look::lights`).
++    mut look: LookLightInputs,
+     mut last_dump: Local<f64>,
+     mut last_rows_dump: Local<f64>,
+ ) {
+@@ -210,7 +223,7 @@ fn build_light_data(
+     let (rs, rd, rsa, rda) = l.water_colors(LiquidKind::Still);
+     let (os, od, osa, oda) = l.water_colors(LiquidKind::Ocean);
+     // Built in a scratch copy and written through `ResMut` only when a row moved: the extract
+-    // clones this 8.5 KB blob every frame it reads as changed.
++    // clones this 9.3 KB blob every frame it reads as changed.
+     let mut fresh = data.0;
+     fresh.rows = [[0.0; 4]; LIGHT_HEADER_ROWS];
+     let rows = &mut fresh.rows;
+@@ -239,7 +252,7 @@ fn build_light_data(
+     let cam_pos = cam.single().map(|t| t.translation()).unwrap_or(Vec3::ZERO);
+     let mut pts: Vec<(f32, Vec3, f32, [f32; 3])> = lights_q
+         .iter()
+-        .filter(|(_, _, rooms)| {
++        .filter(|(_, _, _, rooms)| {
+             // A culled room's light registers nothing in the reference ([`LightRooms`]); a light
+             // that names no rooms always passes.
+             crate::wmo_portal::room_admits(
+@@ -247,7 +260,7 @@ fn build_light_data(
+                 rooms.and_then(|r| portals.get(r.0.instance).ok()),
+             )
+         })
+-        .filter_map(|(pl, gt, _)| {
++        .filter_map(|(_, pl, gt, _)| {
+             let p = gt.translation();
+             let d2 = p.distance_squared(cam_pos);
+             (d2 < POINT_PACK_RADIUS * POINT_PACK_RADIUS).then(|| {
+@@ -265,6 +278,26 @@ fn build_light_data(
+         fresh.points[2 * i] = [p.x, p.y, p.z, *range];
+         fresh.points[2 * i + 1] = [rgb[0], rgb[1], rgb[2], 0.0];
+     }
++    // The new look's table: the same authored lights, admitted by the same rooms, as warm pools,
++    // and every spell's light, ranked about the camera; count 0 under the classic look. Entries
++    // past the count stay stale, as the point table's do.
++    let torches = lights_q
++        .iter()
++        .filter(|(_, _, _, rooms)| {
++            crate::wmo_portal::room_admits(
++                rooms.map(|r| &r.0),
++                rooms.and_then(|r| portals.get(r.0.instance).ok()),
++            )
++        })
++        .map(|(e, pl, gt, _)| (e, pl, gt.translation()));
++    let looked = look.pack(
++        cam_pos,
++        time.elapsed_secs(),
++        time.delta_secs(),
++        torches,
++        &mut fresh.look,
++    );
++    fresh.rows[20][1] = looked as f32;
+     // `WOW_POINTS_DUMP=1` prints the nearest 8 packed lights once a second; `=frame` every frame,
+     // which a pool that changes frame to frame needs.
+     static POINTS_DUMP: std::sync::OnceLock<Option<std::ffi::OsString>> =
+@@ -441,17 +474,27 @@ mod tests {
+         );
+     }
+ 
+-    /// A held torch, authored `(0.467, 0.290, 0.133) × 3.0`, commits its raw product through the
+-    /// real packer, red 40% past white (`0x71ca80` encodes, `0x593040` decodes it back).
+-    #[test]
+-    fn the_torch_commits_the_raw_authored_product() {
++    /// The packer's app: its resources, the classic look unless `look`, the camera at the origin.
++    fn packer_app(look: crate::look::WorldLook) -> App {
+         let mut app = App::new();
+         app.init_resource::<WowLighting>()
+             .init_resource::<crate::dev_state::DebugState>()
+             .init_resource::<crate::view::ViewDistance>()
+             .init_resource::<WowLightData>()
+             .init_resource::<Time>()
++            .init_resource::<super::super::GameClock>()
++            .init_resource::<super::super::WmoCrossfade>()
++            .insert_resource(look)
+             .add_systems(Update, build_light_data);
++        crate::look::lights::init_resources(&mut app);
++        app
++    }
++
++    /// A held torch, authored `(0.467, 0.290, 0.133) × 3.0`, commits its raw product through the
++    /// real packer, red 40% past white (`0x71ca80` encodes, `0x593040` decodes it back).
++    #[test]
++    fn the_torch_commits_the_raw_authored_product() {
++        let mut app = packer_app(crate::look::WorldLook::CLASSIC);
+         app.world_mut()
+             .spawn((crate::view::WorldCamera, GlobalTransform::IDENTITY));
+         // The authored torch light, through the spawn recipe.
+@@ -474,6 +517,88 @@ mod tests {
+             "green commits raw: {rgb:?}"
+         );
+         assert!((rgb[2] - 0.4).abs() < 1e-4, "blue commits raw: {rgb:?}");
++        assert_eq!(
++            rows.rows[20][1], 0.0,
++            "the classic look packs no look light"
++        );
++    }
++
++    /// Under the new look the same torch at midnight is also a warm pool in the look's table, after
++    /// the point table, which is packed exactly as under the classic look; at noon it is all but
++    /// out; and a spell's light rides its anchor.
++    #[test]
++    fn the_new_look_packs_a_torch_pool_beside_the_reference_table() {
++        use crate::look::lights::{tune, LookLight, LookPulse};
++        let run = |look, minute| {
++            let mut app = packer_app(look);
++            app.world_mut()
++                .resource_mut::<super::super::GameClock>()
++                .minute = minute;
++            app.world_mut()
++                .spawn((crate::view::WorldCamera, GlobalTransform::IDENTITY));
++            app.world_mut().spawn((
++                crate::terrain_stream::point_light([0.466_666_7, 0.290_196_1, 0.133_333_34], 3.0),
++                GlobalTransform::from_translation(Vec3::new(0.0, 1.5, 0.0)),
++            ));
++            // A frame's step, which the fades move by.
++            app.world_mut()
++                .resource_mut::<Time>()
++                .advance_by(std::time::Duration::from_secs_f32(0.1));
++            app
++        };
++        let mut classic = run(crate::look::WorldLook::CLASSIC, 0);
++        classic.update();
++        let mut new = run(crate::look::WorldLook::NEW, 0);
++        new.update();
++        let c = classic.world().resource::<WowLightData>().0;
++        let n = new.world().resource::<WowLightData>().0;
++        assert_eq!(c.points, n.points, "the reference's table is untouched");
++        assert_eq!(n.rows[20][1], 1.0, "one look light");
++        assert_eq!(n.look[0], [0.0, 1.5, 0.0, tune::TORCH_RADIUS]);
++        // Fading in from its first frame; its colour is the torch's hue, warm.
++        let rgb = n.look[1];
++        assert!(
++            rgb[0] > 0.0 && rgb[0] > rgb[1] && rgb[1] > rgb[2],
++            "{rgb:?}"
++        );
++
++        // Noon: the same torch packs a twentieth or so of midnight's.
++        let mut noon = run(crate::look::WorldLook::NEW, 720);
++        noon.update();
++        let day = noon.world().resource::<WowLightData>().0.look[1][0];
++        let ratio = day / rgb[0];
++        assert!(ratio < 0.1, "noon {day} against midnight {}", rgb[0]);
++
++        // A flash on a unit 20 yd off, fresh: full at once, at its anchor's height.
++        let unit = new
++            .world_mut()
++            .spawn(GlobalTransform::from_translation(Vec3::new(20.0, 0.0, 0.0)))
++            .id();
++        let now = new.world().resource::<Time>().elapsed_secs();
++        new.world_mut().spawn((
++            LookLight::new([1.0, 0.55, 0.2], 1.0, 10.0).on(unit, Vec3::Y),
++            LookPulse::flash(now - 0.1, 0.0, 1.0, 0.5),
++        ));
++        new.update();
++        let n = new.world().resource::<WowLightData>().0;
++        assert_eq!(n.rows[20][1], 2.0);
++        let flash = (0..2)
++            .find(|i| n.look[2 * i][0] == 20.0)
++            .expect("the flash is packed");
++        assert_eq!(n.look[2 * flash], [20.0, 1.0, 0.0, 10.0]);
++        assert_eq!(n.look[2 * flash + 1], [1.0, 0.55, 0.2, 0.0]);
++        // Its unit gone, it fades out quickly and leaves the table.
++        new.world_mut().entity_mut(unit).despawn();
++        new.update();
++        new.world_mut()
++            .resource_mut::<Time>()
++            .advance_by(std::time::Duration::from_secs_f32(0.5));
++        new.update();
++        assert_eq!(new.world().resource::<WowLightData>().0.rows[20][1], 1.0);
++        // Back to the classic look: the table empties at once.
++        *new.world_mut().resource_mut::<crate::look::WorldLook>() = crate::look::WorldLook::CLASSIC;
++        new.update();
++        assert_eq!(new.world().resource::<WowLightData>().0.rows[20][1], 0.0);
+     }
+ 
+     /// The packed SH block gives `Model2.bls`'s `clamp01(A + D·I·(3 + 16μ + 15μ²)/34)` at each
+diff --git a/crates/benilla-world/src/look/lights.rs b/crates/benilla-world/src/look/lights.rs
+new file mode 100644
+index 0000000..2b0fa9d
+--- /dev/null
++++ b/crates/benilla-world/src/look/lights.rs
+@@ -0,0 +1,957 @@
++//! Light from torches and spells, the new look's own (no reference behaviour): WoW Forever's
++//! secondary lights in a Classic style. A Fireball lights the ground and the walls as it flies and
++//! where it bursts, a torch casts a warm pool on the ground at night, and a heal glows on the hero.
++//!
++//! The reference lights every surface with at most three point lights, chosen per draw and summed
++//! per vertex (`lighting::global_light`), which benilla keeps exactly. On top of that, under
++//! [`WorldLook::NEW`] only, the light packer (`build_light_data`) ranks the look's candidates near
++//! the camera and writes up to [`MAX_LOOK_LIGHTS`] of them after the reference's point table, and
++//! the terrain, model and static-world shaders add them per pixel (`look_light_sum` in
++//! `terrain.wgsl`, `wow_model.wgsl` and `static_gx.wgsl`, which mirror [`light_at`]). The
++//! candidates are:
++//! - every authored point light ([`WorldPointLight`]: a prop's M2 light, a WMO's MOLT omni, a
++//!   carried torch, a glowing object), as a warm pool scaled by the hour ([`night_weight`]), with a
++//!   slow, small flicker for a flame ([`torch_light`]);
++//! - every [`LookLight`] entity: the spells' lights, which the game hangs on missiles, impacts,
++//!   casts, auras and ground areas, shaped in time by a [`LookPulse`].
++//!
++//! The ranking ([`LookLightSlots`]) keeps the [`ACTIVE_LOOK_LIGHTS`] that matter most to the
++//! camera, brightness against distance ([`score`]), and fades a light in and out as it enters or
++//! leaves that set, so nothing pops; the rest of the table holds the ones fading out. A light whose
++//! entity goes (a missile that lands) fades out from where it last was. Every tunable is in
++//! [`tune`]; `looklights <scale>` ([`LookLightTune`]) scales them all live, for tuning on film.
++
++use bevy::ecs::system::SystemParam;
++use bevy::prelude::*;
++
++use super::WorldLook;
++use crate::lighting::{GameClock, WmoCrossfade, WorldPointLight};
++
++/// Capacity of the look's light table, fixed in the WGSL mirror structs as
++/// `array<vec4<f32>, 48>` (two rows a light): keep in sync.
++pub const MAX_LOOK_LIGHTS: usize = 24;
++
++/// Rows the table takes in the shared light buffer: `[pos.xyz, radius]` and `[rgb, 0]` a light.
++pub const LOOK_LIGHT_ROWS: usize = 2 * MAX_LOOK_LIGHTS;
++
++/// How many lights the ranking keeps lit at once; the other table slots hold lights fading out, so
++/// a light leaving the set never has to vanish to make room. This is also the per-pixel cost's
++/// ceiling: a pixel loops over at most [`MAX_LOOK_LIGHTS`] entries and lights only those in range.
++pub const ACTIVE_LOOK_LIGHTS: usize = 16;
++
++/// Every tunable of the look's lights, in one place. The first values are a guess, to be tuned on
++/// film with `looklights <scale>`. Colours are the gamma frame's own 0..1 values (the world is lit
++/// in gamma, as the reference's), intensities how much of that colour a surface right at the light
++/// takes on top of its own light, radii in yards.
++pub mod tune {
++    /// A torch or lamp's strength at night, for the stock torch's committed colour.
++    pub const TORCH_INTENSITY: f32 = 0.7;
++    /// The stock torch's committed peak, `(0.467, 0.290, 0.133) × 3` (red 1.4): an authored
++    /// light this bright gets [`TORCH_INTENSITY`], a dimmer or brighter one in proportion.
++    pub const TORCH_REF_PEAK: f32 = 1.4;
++    /// The proportion's floor and ceiling, so a dim candle still reads and a bonfire doesn't
++    /// blind.
++    pub const TORCH_PEAK_MIN: f32 = 0.4;
++    pub const TORCH_PEAK_MAX: f32 = 1.5;
++    /// An authored light dimmer than this (peak) casts no pool.
++    pub const TORCH_PEAK_CUTOFF: f32 = 0.05;
++    /// A torch's pool: the ground is lit out to about 6 yd and nothing past 9.
++    pub const TORCH_RADIUS: f32 = 9.0;
++    /// A light authored with a short reach (a glowing object's 4 yd) gets this many times that.
++    pub const TORCH_RANGE_SCALE: f32 = 1.5;
++    /// A flame's flicker: ±8 % at about one beat a second, slow and small.
++    pub const FLAME_FLICKER: f32 = 0.08;
++    pub const FLAME_FLICKER_HZ: f32 = 1.1;
++    /// A light is a flame when its red is at least this many times its blue (the stock torch's
++    /// is 3.5); a white or blue light burns steady.
++    pub const FLAME_RED_OVER_BLUE: f32 = 1.5;
++
++    /// The hour scaling of torches ([`super::night_weight`]): full from dusk's end to dawn's
++    /// start, [`DAY_FLOOR`] from dawn's end to dusk's start, smoothstepped between (game minutes).
++    pub const DUSK_START: f32 = 17.0 * 60.0;
++    pub const DUSK_END: f32 = 21.0 * 60.0;
++    pub const DAWN_START: f32 = 5.0 * 60.0;
++    pub const DAWN_END: f32 = 9.0 * 60.0;
++    /// What a torch keeps by day: near zero at noon.
++    pub const DAY_FLOOR: f32 = 0.06;
++    /// What a torch keeps by day with the camera inside a building, where the lamps burn all day
++    /// (times the 4 s interior crossfade, so walking in brings them up smoothly).
++    pub const INDOOR_FLOOR: f32 = 0.7;
++
++    /// A missile in flight (Fireball, Frostbolt, Shadow Bolt): it lights the ground under its path.
++    pub const MISSILE_INTENSITY: f32 = 0.9;
++    pub const MISSILE_RADIUS: f32 = 8.0;
++    /// A fire missile's flicker, a touch quicker than a torch's.
++    pub const MISSILE_FLICKER: f32 = 0.1;
++    pub const MISSILE_FLICKER_HZ: f32 = 2.3;
++    /// A physical missile (an arrow) is lit only by Basin Battle's glowing trail colour, at this
++    /// share of a spell's strength.
++    pub const TRAIL_ONLY_SCALE: f32 = 0.6;
++
++    /// An impact: a brighter, shorter light, 0.5 s in all.
++    pub const IMPACT_INTENSITY: f32 = 1.3;
++    pub const IMPACT_RADIUS: f32 = 10.0;
++    pub const IMPACT_RISE: f32 = 0.04;
++    pub const IMPACT_HOLD: f32 = 0.06;
++    pub const IMPACT_FALL: f32 = 0.4;
++
++    /// A heal landing (Holy Light, Flash Heal, Healing Touch): a softer, longer glow on the hero.
++    pub const HEAL_INTENSITY: f32 = 0.8;
++    pub const HEAL_RADIUS: f32 = 5.5;
++    pub const HEAL_RISE: f32 = 0.15;
++    pub const HEAL_HOLD: f32 = 0.35;
++    pub const HEAL_FALL: f32 = 0.9;
++
++    /// A cast being drawn up (the precast and a channel): a glow on the caster that grows in.
++    pub const CAST_INTENSITY: f32 = 0.45;
++    pub const CAST_RADIUS: f32 = 4.5;
++    pub const CAST_RISE: f32 = 0.3;
++    /// The longest a cast's glow stays without its reap (a lost cast-end packet), and how fast it
++    /// then goes.
++    pub const CAST_MAX_SECS: f32 = 20.0;
++    pub const CAST_FALL: f32 = 0.3;
++
++    /// An aura with a visual of its own (a shield, a ward): a faint, breathing glow on its unit.
++    pub const AURA_INTENSITY: f32 = 0.3;
++    pub const AURA_RADIUS: f32 = 4.0;
++    pub const AURA_RISE: f32 = 0.5;
++    pub const AURA_BREATH: f32 = 0.15;
++    pub const AURA_BREATH_HZ: f32 = 0.4;
++
++    /// A ground area (Flamestrike, Consecration, Blizzard): its whole circle glows softly.
++    pub const AREA_INTENSITY: f32 = 0.55;
++    /// The glow reaches this far past the area's own radius, within these bounds.
++    pub const AREA_PAD: f32 = 2.0;
++    pub const AREA_MIN_RADIUS: f32 = 4.0;
++    pub const AREA_MAX_RADIUS: f32 = 14.0;
++    /// Height of an area's light over its centre.
++    pub const AREA_HEIGHT: f32 = 0.6;
++
++    /// Where on a unit its light sits: about the chest of a human.
++    pub const UNIT_HEIGHT: f32 = 1.2;
++    /// Height of a ground impact's light over the point.
++    pub const GROUND_HEIGHT: f32 = 0.5;
++    /// The most impacts one cast lights (an area that hits a crowd lights the first few).
++    pub const MAX_FLASHES_PER_CAST: usize = 6;
++
++    /// Seconds a light takes to fade in on entering the ranked set, and out on leaving it.
++    pub const FADE_IN_SECS: f32 = 0.4;
++    pub const FADE_OUT_SECS: f32 = 0.4;
++    /// Seconds a light whose entity went (a missile that landed) takes to fade out where it was.
++    pub const GONE_FADE_SECS: f32 = 0.15;
++    /// No light farther than this from the camera is a candidate: past it a pool is small and
++    /// fogged.
++    pub const REACH: f32 = 100.0;
++
++    /// The wrap of a light's N·L, the painterly soft side: a surface turned 120° from the light
++    /// still takes a little. Mirrored by `LOOK_WRAP` in the three shaders.
++    pub const WRAP: f32 = 0.5;
++
++    /// The most `looklights` scales by.
++    pub const SCALE_MAX: f32 = 4.0;
++}
++
++/// The colour of a spell's light by its `Spell.dbc` school (1 holy, 2 fire, 3 nature, 4 frost,
++/// 5 shadow, 6 arcane), warm and soft; physical (0) and anything else casts none.
++pub fn school_color(school: u32) -> Option<[f32; 3]> {
++    match school {
++        1 => Some([1.0, 0.85, 0.5]), // holy: a warm gold
++        2 => Some([1.0, 0.55, 0.2]), // fire: orange
++        3 => Some([0.55, 1.0, 0.4]), // nature: green
++        4 => Some([0.45, 0.7, 1.0]), // frost: ice blue
++        5 => Some([0.6, 0.3, 1.0]),  // shadow: violet, the light shadow magic gives off
++        6 => Some([0.85, 0.5, 1.0]), // arcane: pink-violet
++        _ => None,
++    }
++}
++
++/// Whether a school's light is fire's, which flickers.
++pub fn school_flickers(school: u32) -> bool {
++    school == 2
++}
++
++/// A light the game hangs in the world under the new look: a spell's. It sits at its own
++/// transform, or at `anchor` (a unit), `offset` above its origin, and is gone with the anchor.
++#[derive(Component, Clone, Copy, Debug, PartialEq)]
++pub struct LookLight {
++    /// The light's colour, gamma 0..1.
++    pub color: [f32; 3],
++    /// How much of `color` a surface right at the light takes (see [`tune`]).
++    pub intensity: f32,
++    /// Yards; the light falls smoothly to nothing there ([`falloff`]).
++    pub radius: f32,
++    /// The flicker's depth (0 steady) and its base rate in Hz ([`flicker`]).
++    pub flicker: f32,
++    pub flicker_hz: f32,
++    /// The entity it rides, instead of its own transform.
++    pub anchor: Option<Entity>,
++    /// Where on its anchor (or its own transform) it sits.
++    pub offset: Vec3,
++}
++
++impl LookLight {
++    /// A steady light of `color` at `intensity`, out to `radius`, at the entity's own transform.
++    pub fn new(color: [f32; 3], intensity: f32, radius: f32) -> Self {
++        Self {
++            color,
++            intensity,
++            radius,
++            flicker: 0.0,
++            flicker_hz: 0.0,
++            anchor: None,
++            offset: Vec3::ZERO,
++        }
++    }
++
++    /// The same, flickering `depth` at `hz`.
++    pub fn flickering(mut self, depth: f32, hz: f32) -> Self {
++        self.flicker = depth;
++        self.flicker_hz = hz;
++        self
++    }
++
++    /// The same, riding `anchor` at `offset` above its origin.
++    pub fn on(mut self, anchor: Entity, offset: Vec3) -> Self {
++        self.anchor = Some(anchor);
++        self.offset = offset;
++        self
++    }
++}
++
++/// A [`LookLight`]'s shape in time: it rises over `rise`, holds for `hold` (infinite for a glow
++/// that lasts until its owner takes it away) and falls over `fall`, from `born` (seconds of the
++/// app clock). The owner despawns it once [`LookPulse::done`].
++#[derive(Component, Clone, Copy, Debug, PartialEq)]
++pub struct LookPulse {
++    pub born: f32,
++    pub rise: f32,
++    pub hold: f32,
++    pub fall: f32,
++}
++
++impl LookPulse {
++    /// A flash: up over `rise`, held, down over `fall`.
++    pub fn flash(born: f32, rise: f32, hold: f32, fall: f32) -> Self {
++        Self {
++            born,
++            rise,
++            hold,
++            fall,
++        }
++    }
++
++    /// A glow that grows in over `rise` and stays.
++    pub fn held(born: f32, rise: f32) -> Self {
++        Self {
++            born,
++            rise,
++            hold: f32::INFINITY,
++            fall: 0.0,
++        }
++    }
++
++    /// The gain at `now`: smoothstepped up, 1 through the hold, eased out `(1 − t)²` after.
++    pub fn gain(&self, now: f32) -> f32 {
++        let age = now - self.born;
++        if age < 0.0 {
++            return 0.0;
++        }
++        if age < self.rise {
++            return smoothstep(age / self.rise);
++        }
++        let after = age - self.rise - self.hold;
++        if after <= 0.0 {
++            return 1.0;
++        }
++        if after >= self.fall {
++            return 0.0;
++        }
++        let t = 1.0 - after / self.fall;
++        t * t
++    }
++
++    /// Whether it has fallen to nothing for good.
++    pub fn done(&self, now: f32) -> bool {
++        now - self.born >= self.rise + self.hold + self.fall
++    }
++}
++
++/// `looklights <scale>`: every look light's strength, times this (1 is the tuned look).
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookLightTune {
++    pub scale: f32,
++}
++
++impl Default for LookLightTune {
++    fn default() -> Self {
++        Self { scale: 1.0 }
++    }
++}
++
++impl LookLightTune {
++    /// The console's argument: a scale from 0 to [`tune::SCALE_MAX`], or nothing (or `tuned`) for
++    /// the tuned look; `None` for anything else, which changes nothing.
++    pub fn parse(args: &str) -> Option<Self> {
++        let arg = args.trim();
++        if arg.is_empty() || arg.eq_ignore_ascii_case("tuned") {
++            return Some(Self::default());
++        }
++        arg.parse::<f32>()
++            .ok()
++            .filter(|v| (0.0..=tune::SCALE_MAX).contains(v))
++            .map(|scale| Self { scale })
++    }
++}
++
++fn smoothstep(t: f32) -> f32 {
++    let t = t.clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++/// How strongly torches burn at `minute` of the game day: 1 through the night, [`tune::DAY_FLOOR`]
++/// through the day, smoothstepped across dusk and dawn.
++pub fn night_weight(minute: f32) -> f32 {
++    let m = minute.rem_euclid(1440.0);
++    let night = if m >= tune::DUSK_END || m <= tune::DAWN_START {
++        1.0
++    } else if m < tune::DAWN_END {
++        1.0 - smoothstep((m - tune::DAWN_START) / (tune::DAWN_END - tune::DAWN_START))
++    } else if m <= tune::DUSK_START {
++        0.0
++    } else {
++        smoothstep((m - tune::DUSK_START) / (tune::DUSK_END - tune::DUSK_START))
++    };
++    tune::DAY_FLOOR + (1.0 - tune::DAY_FLOOR) * night
++}
++
++/// The flicker multiplier at `now` for a light seeded `seed`: three slow sines, so it never
++/// repeats visibly, within `1 ± depth`.
++pub fn flicker(depth: f32, hz: f32, now: f32, seed: f32) -> f32 {
++    if depth <= 0.0 || hz <= 0.0 {
++        return 1.0;
++    }
++    let tau = std::f32::consts::TAU;
++    let w = 0.55 * (tau * hz * now + seed).sin()
++        + 0.3 * (tau * hz * 2.37 * now + 1.9 * seed).sin()
++        + 0.15 * (tau * hz * 5.1 * now + 0.7 * seed).sin();
++    1.0 + depth * w
++}
++
++/// A stable phase for an entity's flicker, so two torches never beat together.
++fn seed_of(e: Entity) -> f32 {
++    let bits = e.to_bits().wrapping_mul(0x9e37_79b9_7f4a_7c15);
++    (bits >> 40) as f32 / (1u64 << 24) as f32 * std::f32::consts::TAU
++}
++
++/// The light's fall with distance: `(1 − (d/r)²)²`, full at the light, smooth to nothing at its
++/// radius and beyond. Mirrored by the shaders' `look_light_sum`.
++pub fn falloff(d: f32, radius: f32) -> f32 {
++    if radius <= 0.0 || d >= radius {
++        return 0.0;
++    }
++    let x2 = (d * d) / (radius * radius);
++    (1.0 - x2) * (1.0 - x2)
++}
++
++/// The wrapped N·L, `clamp((N·L + w)/(1 + w))`: a soft side, never a hard terminator.
++pub fn wrap(n_dot_l: f32) -> f32 {
++    ((n_dot_l + tune::WRAP) / (1.0 + tune::WRAP)).clamp(0.0, 1.0)
++}
++
++/// What one packed light adds to a surface at `p` facing `n` (unit): `rgb × falloff × wrap`, the
++/// shaders' `look_light_sum` term, which multiplies the surface's texture colour.
++pub fn light_at(p: Vec3, n: Vec3, light: Vec3, radius: f32, rgb: [f32; 3]) -> [f32; 3] {
++    let to = light - p;
++    let d = to.length();
++    let f = falloff(d, radius);
++    if f <= 0.0 {
++        return [0.0; 3];
++    }
++    let l = to / d.max(1e-3);
++    let k = f * wrap(n.dot(l));
++    rgb.map(|c| c * k)
++}
++
++/// How much a light matters to the camera: its brightest channel against its distance, as
++/// `peak × r²/(d² + r²)`, so a bright light far off can outrank a dim one nearby.
++pub fn score(peak: f32, radius: f32, distance: f32) -> f32 {
++    let r2 = radius * radius;
++    peak * r2 / (distance * distance + r2).max(1e-6)
++}
++
++/// The look's light for an authored point light at night (`night` from [`night_weight`]): its
++/// hue, at a strength set by its authored peak, out to [`tune::TORCH_RADIUS`]; a flame flickers.
++/// `None` for a light too dim to cast a pool.
++pub fn torch_light(pl: &WorldPointLight) -> Option<LookLight> {
++    // `intensity` is `4π ×` the authored scale (the `PointLight` convention).
++    let s = pl.intensity / (4.0 * std::f32::consts::PI);
++    let rgb = pl.color.map(|c| (c * s).max(0.0));
++    let peak = rgb[0].max(rgb[1]).max(rgb[2]);
++    if peak < tune::TORCH_PEAK_CUTOFF {
++        return None;
++    }
++    let hue = rgb.map(|c| c / peak);
++    let strength = (peak / tune::TORCH_REF_PEAK).clamp(tune::TORCH_PEAK_MIN, tune::TORCH_PEAK_MAX);
++    let radius = tune::TORCH_RADIUS.min(pl.range * tune::TORCH_RANGE_SCALE);
++    let light = LookLight::new(hue, tune::TORCH_INTENSITY * strength, radius);
++    Some(if rgb[0] >= tune::FLAME_RED_OVER_BLUE * rgb[2] {
++        light.flickering(tune::FLAME_FLICKER, tune::FLAME_FLICKER_HZ)
++    } else {
++        light
++    })
++}
++
++/// One candidate for this frame's table.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct LookCandidate {
++    /// The entity it comes from: the ranking's identity across frames.
++    pub key: Entity,
++    pub pos: Vec3,
++    pub radius: f32,
++    /// The colour times every gain (intensity, pulse, flicker, hour, scale).
++    pub rgb: [f32; 3],
++    pub score: f32,
++    /// Seen for the first time this frame with its own rise ([`LookPulse`]): it comes in at full
++    /// fade, since its pulse already shapes the start.
++    pub fresh: bool,
++}
++
++/// One table slot: a light lit or fading, and where it last was.
++#[derive(Clone, Copy, Debug, PartialEq)]
++struct Slot {
++    key: Entity,
++    pos: Vec3,
++    radius: f32,
++    rgb: [f32; 3],
++    fade: f32,
++}
++
++/// The ranking's state across frames: which lights hold a slot and how far each has faded, plus
++/// the candidate list, kept to reuse its allocation.
++#[derive(Resource, Default)]
++pub struct LookLightSlots {
++    slots: [Option<Slot>; MAX_LOOK_LIGHTS],
++    /// The frame's candidates, cleared and refilled each frame (no allocation once warm).
++    pub(crate) scratch: Vec<LookCandidate>,
++}
++
++impl LookLightSlots {
++    /// Empty every slot: the classic look, or a switch back to it.
++    pub fn clear(&mut self) {
++        self.slots = [None; MAX_LOOK_LIGHTS];
++        self.scratch.clear();
++    }
++
++    /// One frame of `dt` seconds over `cands` (reordered in place): the [`ACTIVE_LOOK_LIGHTS`]
++    /// best by score are lit, a slot's light fades toward 1 while it's among them and toward 0
++    /// otherwise (faster once its entity has gone), and a newcomer takes a free slot, fading in
++    /// (or at once when `fresh`). A light with no free slot waits for one.
++    pub fn step(&mut self, cands: &mut [LookCandidate], dt: f32) {
++        let k = cands.len().min(ACTIVE_LOOK_LIGHTS);
++        let by_score = |a: &LookCandidate, b: &LookCandidate| {
++            b.score
++                .total_cmp(&a.score)
++                .then_with(|| a.key.to_bits().cmp(&b.key.to_bits()))
++        };
++        if cands.len() > k {
++            cands.select_nth_unstable_by(k, by_score);
++        }
++        let (active, rest) = cands.split_at(k);
++        let dt = dt.max(0.0);
++        for slot in self.slots.iter_mut() {
++            let Some(s) = slot.as_mut() else { continue };
++            let lit = active.iter().find(|c| c.key == s.key);
++            let ranked_out = lit.is_none().then(|| rest.iter().find(|c| c.key == s.key));
++            let (target, secs) = match (lit, ranked_out.flatten()) {
++                (Some(c), _) => {
++                    (s.pos, s.radius, s.rgb) = (c.pos, c.radius, c.rgb);
++                    (1.0, tune::FADE_IN_SECS)
++                }
++                (None, Some(c)) => {
++                    (s.pos, s.radius, s.rgb) = (c.pos, c.radius, c.rgb);
++                    (0.0, tune::FADE_OUT_SECS)
++                }
++                (None, None) => (0.0, tune::GONE_FADE_SECS),
++            };
++            let step = dt / secs;
++            s.fade = if s.fade < target {
++                (s.fade + step).min(target)
++            } else {
++                (s.fade - step).max(target)
++            };
++            if target == 0.0 && s.fade <= 0.0 {
++                *slot = None;
++            }
++        }
++        for c in active {
++            if self.slots.iter().flatten().any(|s| s.key == c.key) {
++                continue;
++            }
++            let Some(free) = self.slots.iter_mut().find(|s| s.is_none()) else {
++                break;
++            };
++            let fade = if c.fresh {
++                1.0
++            } else {
++                (dt / tune::FADE_IN_SECS).min(1.0)
++            };
++            *free = Some(Slot {
++                key: c.key,
++                pos: c.pos,
++                radius: c.radius,
++                rgb: c.rgb,
++                fade,
++            });
++        }
++    }
++
++    /// Writes the lit and fading slots into `rows` (two a light, the colour times its fade) and
++    /// returns how many; rows past the count keep stale values, which the count guards.
++    pub fn pack(&self, rows: &mut [[f32; 4]; LOOK_LIGHT_ROWS]) -> usize {
++        let mut n = 0;
++        for s in self.slots.iter().flatten() {
++            if s.fade <= 0.0 {
++                continue;
++            }
++            rows[2 * n] = [s.pos.x, s.pos.y, s.pos.z, s.radius];
++            rows[2 * n + 1] = [s.rgb[0] * s.fade, s.rgb[1] * s.fade, s.rgb[2] * s.fade, 0.0];
++            n += 1;
++        }
++        n
++    }
++
++    /// How far the light from `key` has faded in, `None` without a slot (for tests and the
++    /// debug dump).
++    pub fn fade_of(&self, key: Entity) -> Option<f32> {
++        self.slots
++            .iter()
++            .flatten()
++            .find(|s| s.key == key)
++            .map(|s| s.fade)
++    }
++}
++
++/// A spell light as the ranking reads it: its entity, the light (whether it is new this frame),
++/// its own transform and its pulse.
++type LookLightItem = (
++    Entity,
++    Ref<'static, LookLight>,
++    Option<&'static GlobalTransform>,
++    Option<&'static LookPulse>,
++);
++
++/// What the light packer reads to rank and pack the look's lights, as one system parameter.
++#[derive(SystemParam)]
++pub(crate) struct LookLightInputs<'w, 's> {
++    look: Res<'w, WorldLook>,
++    tune: Res<'w, LookLightTune>,
++    clock: Res<'w, GameClock>,
++    indoors: Res<'w, WmoCrossfade>,
++    slots: ResMut<'w, LookLightSlots>,
++    lights: Query<'w, 's, LookLightItem>,
++    anchors: Query<'w, 's, &'static GlobalTransform>,
++}
++
++impl LookLightInputs<'_, '_> {
++    /// One frame: ranks `torches` (each authored light, admitted by its rooms, at its world
++    /// position) and the [`LookLight`]s around `cam`, steps the fades and packs the table into
++    /// `rows`, returning its count. Under the classic look the table is empty.
++    pub(crate) fn pack<'a>(
++        &mut self,
++        cam: Vec3,
++        now: f32,
++        dt: f32,
++        torches: impl Iterator<Item = (Entity, &'a WorldPointLight, Vec3)>,
++        rows: &mut [[f32; 4]; LOOK_LIGHT_ROWS],
++    ) -> usize {
++        if !self.look.on {
++            if self.slots.slots.iter().any(Option::is_some) {
++                self.slots.clear();
++            }
++            return 0;
++        }
++        let scale = self.tune.scale.max(0.0);
++        let hour =
++            night_weight(self.clock.minute as f32).max(tune::INDOOR_FLOOR * self.indoors.t());
++        let slots = &mut *self.slots;
++        let mut cands = std::mem::take(&mut slots.scratch);
++        cands.clear();
++        let mut push = |key: Entity, pos: Vec3, light: &LookLight, gain: f32, fresh: bool| {
++            let d = pos.distance(cam);
++            if d > tune::REACH + light.radius || gain <= 0.0 {
++                return;
++            }
++            let g = light.intensity
++                * gain
++                * flicker(light.flicker, light.flicker_hz, now, seed_of(key))
++                * scale;
++            let rgb = light.color.map(|c| (c * g).max(0.0));
++            let peak = rgb[0].max(rgb[1]).max(rgb[2]);
++            if peak <= 0.0 {
++                return;
++            }
++            cands.push(LookCandidate {
++                key,
++                pos,
++                radius: light.radius,
++                rgb,
++                score: score(peak, light.radius, d),
++                fresh,
++            });
++        };
++        for (key, pl, pos) in torches {
++            if let Some(light) = torch_light(pl) {
++                push(key, pos, &light, hour, false);
++            }
++        }
++        for (key, light, own, pulse) in &self.lights {
++            let base = match light.anchor {
++                Some(a) => match self.anchors.get(a) {
++                    Ok(gt) => gt.translation(),
++                    Err(_) => continue, // its unit is gone; its owner despawns it
++                },
++                None => match own {
++                    Some(gt) => gt.translation(),
++                    None => continue,
++                },
++            };
++            let gain = pulse.map_or(1.0, |p| p.gain(now));
++            push(
++                key,
++                base + light.offset,
++                &light,
++                gain,
++                light.is_added() && pulse.is_some(),
++            );
++        }
++        slots.step(&mut cands, dt);
++        let n = slots.pack(rows);
++        slots.scratch = cands;
++        n
++    }
++}
++
++/// The look's light resources, for the light packer.
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<LookLightTune>()
++        .init_resource::<LookLightSlots>();
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn key(i: u32) -> Entity {
++        Entity::from_raw_u32(i).expect("a valid index")
++    }
++
++    fn cand(i: u32, score: f32) -> LookCandidate {
++        LookCandidate {
++            key: key(i),
++            pos: Vec3::new(i as f32, 0.0, 0.0),
++            radius: 8.0,
++            rgb: [1.0, 0.5, 0.2],
++            score,
++            fresh: false,
++        }
++    }
++
++    /// Full at the light, smooth to nothing at the radius and none past it, never rising.
++    #[test]
++    fn the_falloff_is_smooth_to_zero_at_the_radius() {
++        assert_eq!(falloff(0.0, 9.0), 1.0);
++        assert_eq!(falloff(9.0, 9.0), 0.0);
++        assert_eq!(falloff(12.0, 9.0), 0.0);
++        assert_eq!(
++            falloff(1.0, 0.0),
++            0.0,
++            "a light of no radius lights nothing"
++        );
++        let mut last = 1.0;
++        for i in 1..=90 {
++            let f = falloff(i as f32 * 0.1, 9.0);
++            assert!(f <= last, "falls monotonically");
++            last = f;
++        }
++        // Smooth at the edge: the slope there is zero, so no ring shows where the pool ends.
++        let edge = (falloff(8.99, 9.0) - falloff(8.98, 9.0)).abs();
++        assert!(edge < 1e-4, "flat at the radius: {edge}");
++        // A torch's readable pool: over half at 3 yd, a fifth at 6, nearly gone at 8.
++        assert!(falloff(3.0, 9.0) > 0.75);
++        assert!((falloff(6.0, 9.0) - 0.309).abs() < 0.01);
++        assert!(falloff(8.0, 9.0) < 0.05);
++    }
++
++    /// The wrap: full facing the light, a third side-on, and none only past 120°.
++    #[test]
++    fn the_wrap_is_soft() {
++        assert_eq!(wrap(1.0), 1.0);
++        assert!((wrap(0.0) - 1.0 / 3.0).abs() < 1e-6);
++        assert_eq!(wrap(-0.5), 0.0);
++        assert_eq!(wrap(-1.0), 0.0);
++        // The full term: a floor under a light 2 yd up, and the same floor past its radius.
++        let lit = light_at(
++            Vec3::ZERO,
++            Vec3::Y,
++            Vec3::new(0.0, 2.0, 0.0),
++            9.0,
++            [1.0, 0.5, 0.2],
++        );
++        let k = falloff(2.0, 9.0);
++        assert!((lit[0] - k).abs() < 1e-5 && (lit[1] - 0.5 * k).abs() < 1e-5);
++        let dark = light_at(
++            Vec3::ZERO,
++            Vec3::Y,
++            Vec3::new(0.0, 10.0, 0.0),
++            9.0,
++            [1.0; 3],
++        );
++        assert_eq!(dark, [0.0; 3]);
++    }
++
++    /// Brightness against distance: nearer wins at equal brightness, brighter at equal distance,
++    /// and a bright light a little farther can beat a dim one at hand.
++    #[test]
++    fn the_ranking_weighs_brightness_against_distance() {
++        assert!(score(1.0, 8.0, 5.0) > score(1.0, 8.0, 20.0));
++        assert!(score(1.3, 8.0, 10.0) > score(0.7, 8.0, 10.0));
++        assert!(score(1.3, 10.0, 12.0) > score(0.3, 4.0, 6.0));
++        assert!(score(1.0, 8.0, 0.0) <= 1.0, "never more than its peak");
++
++        // Twenty candidates: the sixteen best take the slots, the four worst wait.
++        let mut slots = LookLightSlots::default();
++        let mut cands: Vec<LookCandidate> = (0..20).map(|i| cand(i, i as f32)).collect();
++        slots.step(&mut cands, 1.0);
++        let mut seated: Vec<u32> = (0..20)
++            .filter(|i| slots.fade_of(key(*i)).is_some())
++            .collect();
++        seated.sort();
++        assert_eq!(seated, (4..20).collect::<Vec<_>>());
++    }
++
++    /// A light fades in as it enters the set and out as it leaves it, never jumping, and one
++    /// whose entity went fades out quickly from where it was.
++    #[test]
++    fn a_light_fades_in_and_out_of_the_set_without_popping() {
++        let mut slots = LookLightSlots::default();
++        let dt = 0.1;
++        let mut rows = [[0.0; 4]; LOOK_LIGHT_ROWS];
++        // A fresh table: 16 strong lights and one weak one (index 99), which waits.
++        let strong: Vec<LookCandidate> = (0..16).map(|i| cand(i, 10.0)).collect();
++        let mut cands = strong.clone();
++        cands.push(cand(99, 1.0));
++        slots.step(&mut cands, dt);
++        assert_eq!(slots.fade_of(key(99)), None);
++        let first = slots.fade_of(key(0)).unwrap();
++        assert!(
++            (first - dt / tune::FADE_IN_SECS).abs() < 1e-6,
++            "fades in: {first}"
++        );
++        // Up by one step a frame, to full.
++        let mut last = first;
++        for _ in 0..10 {
++            let mut c = strong.clone();
++            c.push(cand(99, 1.0));
++            slots.step(&mut c, dt);
++            let f = slots.fade_of(key(0)).unwrap();
++            assert!(
++                f >= last && f - last <= dt / tune::FADE_IN_SECS + 1e-5,
++                "{last} to {f}"
++            );
++            last = f;
++        }
++        assert_eq!(last, 1.0);
++        // Light 0 drops below 99: it fades out over FADE_OUT_SECS while 99 fades in beside it.
++        let mut c: Vec<LookCandidate> = (1..16).map(|i| cand(i, 10.0)).collect();
++        c.push(cand(0, 0.5));
++        c.push(cand(99, 5.0));
++        slots.step(&mut c, dt);
++        let out = slots.fade_of(key(0)).unwrap();
++        assert!(
++            (out - (1.0 - dt / tune::FADE_OUT_SECS)).abs() < 1e-6,
++            "fading out: {out}"
++        );
++        assert!(
++            slots.fade_of(key(99)).unwrap() > 0.0,
++            "the newcomer took a spare slot"
++        );
++        assert_eq!(slots.pack(&mut rows), 17, "both in the table while 0 fades");
++        // Its colour rides the fade.
++        let mut c: Vec<LookCandidate> = (1..16).map(|i| cand(i, 10.0)).collect();
++        c.push(cand(0, 0.5));
++        c.push(cand(99, 5.0));
++        slots.step(&mut c, dt);
++        let f0 = slots.fade_of(key(0)).unwrap();
++        assert!((f0 - 0.5).abs() < 1e-6, "{f0}");
++        slots.pack(&mut rows);
++        let row = (0..17)
++            .find(|i| rows[2 * i][0] == 0.0 && rows[2 * i][3] == 8.0)
++            .expect("light 0 packed");
++        assert!(
++            (rows[2 * row + 1][0] - 0.5).abs() < 1e-6,
++            "its red, at half fade"
++        );
++        // Light 0's entity goes: it fades out at the quicker gone rate, then frees its slot.
++        let mut c: Vec<LookCandidate> = (1..16).map(|i| cand(i, 10.0)).collect();
++        c.push(cand(99, 5.0));
++        slots.step(&mut c, 0.05);
++        let gone = slots.fade_of(key(0)).unwrap();
++        assert!(
++            (gone - (0.5 - 0.05 / tune::GONE_FADE_SECS)).abs() < 1e-6,
++            "{gone}"
++        );
++        slots.step(&mut c, 1.0);
++        assert_eq!(slots.fade_of(key(0)), None, "its slot is free again");
++    }
++
++    /// A fresh spell light (one with its own pulse) comes in at once; its pulse shapes the rise.
++    #[test]
++    fn a_fresh_spell_light_comes_in_at_once() {
++        let mut slots = LookLightSlots::default();
++        let mut c = vec![LookCandidate {
++            fresh: true,
++            ..cand(7, 1.0)
++        }];
++        slots.step(&mut c, 0.016);
++        assert_eq!(slots.fade_of(key(7)), Some(1.0));
++    }
++
++    /// The packed rows: position and radius, then the colour times the fade.
++    #[test]
++    fn the_table_packs_two_rows_a_light() {
++        let mut slots = LookLightSlots::default();
++        let mut c = vec![LookCandidate {
++            fresh: true,
++            ..cand(3, 1.0)
++        }];
++        slots.step(&mut c, 0.016);
++        let mut rows = [[9.0; 4]; LOOK_LIGHT_ROWS];
++        assert_eq!(slots.pack(&mut rows), 1);
++        assert_eq!(rows[0], [3.0, 0.0, 0.0, 8.0]);
++        assert_eq!(rows[1], [1.0, 0.5, 0.2, 0.0]);
++        slots.clear();
++        assert_eq!(slots.pack(&mut rows), 0);
++    }
++
++    /// Torches burn by night and all but go out at noon, with smooth dusks and dawns.
++    #[test]
++    fn torches_scale_by_the_hour() {
++        let full = |m: f32| (night_weight(m) - 1.0).abs() < 1e-6;
++        assert!(full(0.0) && full(23.0 * 60.0) && full(4.0 * 60.0));
++        assert_eq!(
++            night_weight(12.0 * 60.0),
++            tune::DAY_FLOOR,
++            "near zero at noon"
++        );
++        assert!(night_weight(12.0 * 60.0) < 0.1);
++        let dusk = night_weight(19.0 * 60.0);
++        assert!((dusk - (tune::DAY_FLOOR + (1.0 - tune::DAY_FLOOR) * 0.5)).abs() < 1e-5);
++        let dawn = night_weight(7.0 * 60.0);
++        assert!((dawn - dusk).abs() < 1e-5, "dawn mirrors dusk");
++        // Never a step through the day: under 0.7 % a game minute.
++        let mut last = night_weight(0.0);
++        for m in 1..1440 {
++            let w = night_weight(m as f32);
++            assert!((w - last).abs() < 0.007, "minute {m}: {last} to {w}");
++            last = w;
++        }
++        assert_eq!(
++            night_weight(1440.0 + 60.0),
++            night_weight(60.0),
++            "wraps the day"
++        );
++    }
++
++    /// A pulse rises, holds, falls and is done; a held glow never falls.
++    #[test]
++    fn a_pulse_rises_holds_and_falls() {
++        let p = LookPulse::flash(8.0, 0.125, 0.25, 0.5);
++        assert_eq!(p.gain(7.5), 0.0);
++        assert_eq!(p.gain(8.0), 0.0);
++        assert!((p.gain(8.0625) - 0.5).abs() < 1e-5);
++        assert_eq!(p.gain(8.25), 1.0);
++        assert!((p.gain(8.625) - 0.25).abs() < 1e-5, "eased out");
++        assert_eq!(p.gain(8.875), 0.0);
++        assert!(!p.done(8.75) && p.done(8.875));
++        let h = LookPulse::held(0.0, 0.3);
++        assert_eq!(h.gain(1000.0), 1.0);
++        assert!(!h.done(1.0e6));
++    }
++
++    /// The flicker stays within its depth and differs between two seeds.
++    #[test]
++    fn a_flame_flickers_a_little() {
++        let mut lo: f32 = 2.0;
++        let mut hi: f32 = 0.0;
++        for i in 0..2000 {
++            let t = i as f32 * 0.01;
++            let f = flicker(0.08, 1.1, t, 1.0);
++            lo = lo.min(f);
++            hi = hi.max(f);
++            assert_ne!(f, flicker(0.08, 1.1, t, 4.0), "another seed, another phase");
++        }
++        assert!(lo >= 0.92 - 1e-6 && hi <= 1.08 + 1e-6, "{lo}..{hi}");
++        assert!(hi - lo > 0.08, "it does move: {lo}..{hi}");
++        assert_eq!(flicker(0.0, 1.1, 3.0, 1.0), 1.0, "a steady light");
++    }
++
++    /// The stock torch is a warm, flickering pool of the tuned strength; a white glow is steady
++    /// and short; a dark light casts none.
++    #[test]
++    fn an_authored_light_becomes_a_pool() {
++        let torch =
++            crate::terrain_stream::point_light([0.466_666_7, 0.290_196_1, 0.133_333_34], 3.0);
++        let l = torch_light(&torch).expect("the torch casts a pool");
++        assert!((l.intensity - tune::TORCH_INTENSITY).abs() < 1e-4);
++        assert_eq!(l.color[0], 1.0);
++        assert!(l.color[2] < 0.3, "warm: {:?}", l.color);
++        assert_eq!(l.radius, tune::TORCH_RADIUS);
++        assert_eq!(l.flicker, tune::FLAME_FLICKER);
++        let glow = WorldPointLight {
++            range: 4.0,
++            ..crate::terrain_stream::point_light([1.0; 3], 1.0)
++        };
++        let g = torch_light(&glow).expect("a glowing object's light");
++        assert_eq!(g.flicker, 0.0, "white burns steady");
++        assert_eq!(g.radius, 6.0);
++        let dark = crate::terrain_stream::point_light([0.01; 3], 1.0);
++        assert!(torch_light(&dark).is_none());
++    }
++
++    /// `looklights`: a scale from 0 to 4, nothing or `tuned` for 1, anything else refused.
++    #[test]
++    fn the_console_scale_parses() {
++        assert_eq!(
++            LookLightTune::parse("1.5"),
++            Some(LookLightTune { scale: 1.5 })
++        );
++        assert_eq!(
++            LookLightTune::parse(" 0 "),
++            Some(LookLightTune { scale: 0.0 })
++        );
++        assert_eq!(
++            LookLightTune::parse("4"),
++            Some(LookLightTune { scale: 4.0 })
++        );
++        assert_eq!(LookLightTune::parse(""), Some(LookLightTune::default()));
++        assert_eq!(
++            LookLightTune::parse("Tuned"),
++            Some(LookLightTune::default())
++        );
++        assert_eq!(LookLightTune::parse("4.5"), None);
++        assert_eq!(LookLightTune::parse("-1"), None);
++        assert_eq!(LookLightTune::parse("bright"), None);
++        assert_eq!(LookLightTune::parse("nan"), None);
++    }
++
++    /// The school colours: fire flickers, physical casts no light.
++    #[test]
++    fn every_magic_school_has_a_colour() {
++        for school in 1..=6 {
++            assert!(school_color(school).is_some(), "school {school}");
++        }
++        assert!(school_color(0).is_none());
++        assert!(school_color(7).is_none());
++        assert!(school_flickers(2) && !school_flickers(4));
++    }
++}
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index 51cd7ee..7960a02 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -1,7 +1,8 @@
+ //! The new look, benilla's own (no reference behaviour): WoW Forever's idea of keeping 1.12's
+ //! models and textures and re-lighting the world, zone by zone. A zone's light is hand-tuned by
+-//! time of day ([`grade`]) over the `Light.dbc` sample. One switch, [`WorldLook`] (the game's
+-//! `worldLook` CVar), turns all of it off, and the classic look is then exactly the reference's.
++//! time of day ([`grade`]) over the `Light.dbc` sample, and torches and spells light the ground
++//! around them per pixel ([`lights`]). One switch, [`WorldLook`] (the game's `worldLook` CVar),
++//! turns all of it off, and the classic look is then exactly the reference's.
+ 
+ use bevy::ecs::system::SystemParam;
+ use bevy::prelude::*;
+@@ -11,9 +12,11 @@ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
+ use benilla_formats::{AreaTableCatalog, Atmosphere};
+ 
+ pub mod grade;
++pub mod lights;
+ pub mod pass;
+ pub mod rays;
+ pub use grade::{GradeKey, PostLook, Tint};
++pub use lights::{LookLight, LookLightTune, LookPulse};
+ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+ 
+ /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
+@@ -197,11 +200,12 @@ fn sync_view_look(look: Res<WorldLook>, mut view: ResMut<crate::view::ViewDistan
+     }
+ }
+ 
+-/// The look's resources, for the lighting plugin, whose resolve reads them.
++/// The look's resources, for the lighting plugin, whose resolve and light packer read them.
+ pub(crate) fn init_resources(app: &mut App) {
+     app.init_resource::<WorldLook>()
+         .init_resource::<ZoneRamp>()
+         .init_resource::<LookGrade>();
++    lights::init_resources(app);
+ }
+ 
+ /// The new look's world side: its resources, the area table its zone lookup reads, and the
+diff --git a/crates/benilla-world/src/shaders/static_gx.wgsl b/crates/benilla-world/src/shaders/static_gx.wgsl
+index fd7888c..a867efa 100644
+--- a/crates/benilla-world/src/shaders/static_gx.wgsl
++++ b/crates/benilla-world/src/shaders/static_gx.wgsl
+@@ -27,8 +27,11 @@ struct WowLight {
+     grade: vec4<f32>,
+     wmo_fog_color: vec4<f32>,
+     wmo_fog_params: vec4<f32>,
++    // `.x` the point lights, `.y` the new look's lights.
+     point_count: vec4<f32>,
+     points: array<vec4<f32>, 512>,
++    // The new look's lights from torches and spells (`look::lights`, 24 lights of two rows).
++    look_lights: array<vec4<f32>, 48>,
+     // lighting::prop_probes: 8192 slots of 7 rows; the buffer's later regions are not mirrored.
+     prop_probes: array<vec4<f32>, 57344>,
+ }
+@@ -113,6 +116,30 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
+     return sum;
+ }
+ 
++// The new look's light from torches and spells, benilla's own (no reference behaviour): every
++// live entry of the look's table, per pixel. Mirrored from terrain.wgsl (keep in sync).
++const LOOK_WRAP: f32 = 0.5;
++
++fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
++    let count = u32(wow_light.point_count.y);
++    var sum = vec3<f32>(0.0);
++    for (var i = 0u; i < count; i = i + 1u) {
++        let pos_radius = wow_light.look_lights[2u * i];
++        let to_light = pos_radius.xyz - P;
++        let d2 = dot(to_light, to_light);
++        let r2 = pos_radius.w * pos_radius.w;
++        if (d2 >= r2) {
++            continue;
++        }
++        let x2 = d2 / r2;
++        let window = (1.0 - x2) * (1.0 - x2);
++        let l = to_light * inverseSqrt(max(d2, 1e-6));
++        let wrapped = clamp((dot(N, l) + LOOK_WRAP) / (1.0 + LOOK_WRAP), 0.0, 1.0);
++        sum += wow_light.look_lights[2u * i + 1u].rgb * (window * wrapped);
++    }
++    return sum;
++}
++
+ // ---- the pass ----
+ 
+ struct GxVertex {
+@@ -236,6 +263,8 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
+     let vc = select(vec4<f32>(1.0), in.color, has_vc);
+     let folded = select(base.rgb, base.rgb * vc.rgb, has_vc);
+     var rgb: vec3<f32>;
++    // The texture colour the new look's lights modulate; a WMO's leaves its MOCV bake out.
++    var look_albedo = folded;
+     if ((in.word & WORD_WMO) != 0u) {
+         // ---- WMO surfaces: wow_model.wgsl's is_wmo branch ----
+         let interior = (in.word & WORD_INTERIOR) != 0u;
+@@ -287,6 +316,7 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
+         // The entity path's algebra: (tex×vc)/max(vc, 1/255) is not tex in floats; keep it.
+         let tex_rgb = folded / max(vc.rgb, vec3<f32>(1.0 / 255.0));
+         rgb = tex_rgb * primary;
++        look_albedo = tex_rgb;
+         if (interior && class_int && has_vc) {
+             // INT self-illumination, the reference's interior pixel shader (literal 4.0):
+             // tex·MOCV·(1 + 4·MOCV.a), clamped once. A colour-less INT batch keeps tex × lit.
+@@ -354,6 +384,13 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
+     // Unlit (M2 UNLIT 0x01, WMO UNLIT on an exterior group): texture × vertex colour, no light.
+     if ((in.word & WORD_UNLIT) != 0u) {
+         rgb = folded;
++    } else if (wow_light.point_count.y > 0.5) {
++        // The new look's torches and spells, inside the clamp; none under the classic look.
++        rgb = clamp(
++            rgb + look_albedo * look_light_sum(in.world_position.xyz, n_lit),
++            vec3<f32>(0.0),
++            vec3<f32>(1.0),
++        );
+     }
+     // Planar eye-Z fog; other fog modes belong to blends never admitted here. The interior triple
+     // keys on the per-frame record bit, not `WORD_INTERIOR`: the client sets it per group under
+-- 
+2.43.0
+
