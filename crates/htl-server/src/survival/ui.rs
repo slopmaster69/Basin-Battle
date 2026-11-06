@@ -131,6 +131,12 @@
 //!   spot's share of the sweep, `crit` the perfect zone either side, `pattern` "lr|rl|<good zone>");
 //!   otherwise `crit` the critical's share of a
 //!   window; `school` fire, frost or arcane.
+//! - `PL\t<kind>\t<n>\t<guid>\t<a>\t<b>\t<own>`: a Priest look in Corey's art (`Priest.lua`):
+//!   grace (`n` its level; `a` 1: spent by a Heal), shield (a perfect Shield on that unit), flay
+//!   (`n` 1 taut, `a` the cord's share of its range, `b` where taut begins), snap, penance (`n`
+//!   bolts landed, `a` a friend hit, `b` a foe), kindle (`n` stacks on that foe), fade (an
+//!   afterimage on that hero), light (`n` stacks of Holy Light, `a` their seconds). `own` 1 on
+//!   the hero's own client. Shield, kindle and fade go to everyone; the rest to the hero.
 //! - `SV\t<key>\t<x>\t<y>\t<z>\t<radius>\t<beats>`: Holy Word: Salvation laid, for everyone: its
 //!   circle at that spot, `radius` yards, its rim closing on the centre on each beat (`beats` the
 //!   seconds from now, comma-separated). Drawn on a client with SetGroundRing (`Priest.lua`).

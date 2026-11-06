@@ -24,12 +24,15 @@ pub(crate) struct Flay {
     pub last_taut: f32,
     /// Its perfect paid (once a cast).
     pub rang: bool,
+    /// The cord's share of its range last told to the add-on, and when (its gauge).
+    pub shown: f32,
+    pub shown_at: f32,
 }
 
 impl Survival {
     /// A flay begins (its channel already set going), slack.
     pub(crate) fn start_flay(&mut self, id: Id) {
-        self.flays.insert(id, Flay { taut_since: None, last_taut: f32::NEG_INFINITY, rang: false });
+        self.flays.insert(id, Flay { taut_since: None, last_taut: f32::NEG_INFINITY, rang: false, shown: -1.0, shown_at: f32::NEG_INFINITY });
     }
 
     /// The hero's flay in hand: its channel, the ability, the foe, until when, its share.
@@ -79,6 +82,15 @@ impl Survival {
         }
         // Taut or slack: the look of the cord, and the ring of a whole taut second.
         let taut = dist >= f.taut;
+        // The gauge on the caster's screen: where the cord stands in its range, told as it moves.
+        let share_now = (dist / range.max(0.1)).clamp(0.0, 1.0);
+        if let Some(x) = self.flays.get_mut(&id) {
+            if (share_now - x.shown).abs() >= 0.02 || now - x.shown_at >= 0.25 {
+                x.shown = share_now;
+                x.shown_at = now;
+                self.events.push(Event::PriestLook { player: id, kind: "flay", n: u32::from(taut), on: Some(target), a: share_now, b: (f.taut / range.max(0.1)).clamp(0.0, 1.0) });
+            }
+        }
         let was = self.flays.get(&id).and_then(|x| x.taut_since);
         let ms = ((until - now) * 1000.0).max(0.0) as u32;
         match (taut, was) {
@@ -166,6 +178,7 @@ impl Survival {
     /// Stretched past its range: the cord snaps back with a crack, and the caster flinches.
     fn overstretched(&mut self, id: Id, from: Vec3, f: &crate::content::FlayDef) {
         self.let_go(id);
+        self.events.push(Event::PriestLook { player: id, kind: "snap", n: 0, on: None, a: 0.0, b: 0.0 });
         if f.snap_kit != 0 {
             self.events.push(Event::Visual { id, kit: f.snap_kit, by: None });
         }
@@ -187,6 +200,7 @@ impl Survival {
     /// cord snapping into them with black lightning: a perfect (Valor, the burst everyone sees).
     pub(crate) fn snap_blast(&mut self, id: Id, ability: usize, target: Id) {
         let now = self.clock;
+        self.events.push(Event::PriestLook { player: id, kind: "snap", n: 1, on: Some(target), a: 0.0, b: 0.0 });
         let d = self.content.abilities[ability].clone();
         let Some(pos) = self.players.get(&id).map(|p| p.pos) else { return };
         let Some(at) = self.unit_pos(target) else { return };

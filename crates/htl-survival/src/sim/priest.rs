@@ -137,6 +137,7 @@ impl Survival {
         if p.priest.grace > 0 {
             p.priest.grace = 0;
             self.events.push(Event::Auras { id });
+            self.events.push(Event::PriestLook { player: id, kind: "grace", n: 0, on: None, a: 1.0, b: 0.0 });
         }
     }
 
@@ -193,14 +194,18 @@ impl Survival {
         let Some(p) = self.players.get_mut(&id).filter(|p| p.health > 0) else { return };
         p.priest.grace = (p.priest.grace + 1).min(most);
         p.priest.grace_at = now;
+        let n = p.priest.grace;
         self.events.push(Event::Auras { id });
+        self.events.push(Event::PriestLook { player: id, kind: "grace", n, on: None, a: 0.0, b: 0.0 });
     }
 
     /// A blow that hurt the hero: a level of Grace lost.
     pub(crate) fn lose_grace(&mut self, id: Id) {
         let Some(p) = self.players.get_mut(&id).filter(|p| p.priest.grace > 0) else { return };
         p.priest.grace -= 1;
+        let n = p.priest.grace;
         self.events.push(Event::Auras { id });
+        self.events.push(Event::PriestLook { player: id, kind: "grace", n, on: None, a: 0.0, b: 0.0 });
     }
 
     /// Each tick, as its events go out: every Priest's perfect among them raises its hero's
@@ -226,6 +231,7 @@ impl Survival {
                 p.priest.grace = 0;
             }
             self.events.push(Event::Auras { id });
+            self.events.push(Event::PriestLook { player: id, kind: "grace", n: 0, on: None, a: 0.0, b: 0.0 });
         }
     }
 
@@ -274,6 +280,7 @@ impl Survival {
         self.parry_pays(s.victim, s.attacker);
         self.parry_looks(s.victim, from);
         self.events.push(Event::Swing { attacker: s.attacker, victim: Some(s.victim), damage: 0, outcome: Outcome::Parried, anim: false, style: s.style });
+        self.events.push(Event::PriestLook { player: mark.by, kind: "shield", n: 1, on: Some(s.victim), a: 0.0, b: 0.0 });
         self.trade_blows(s.attacker, s.victim);
         if !mark.paid {
             if let Some(m) = self.players.get_mut(&s.victim).and_then(|p| p.priest.shield.as_mut()) {

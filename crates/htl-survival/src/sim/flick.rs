@@ -28,6 +28,7 @@ impl Survival {
         let now = self.clock;
         self.light.flicks.retain(|f| f.owner != id);
         self.light.flicks.push(Flick { owner: id, ability, since: now, landed: 0, friend: false, foe: false });
+        self.events.push(Event::PriestLook { player: id, kind: "penance", n: 0, on: None, a: 0.0, b: 0.0 });
     }
 
     pub(crate) fn step_flicks(&mut self) {
@@ -47,6 +48,9 @@ impl Survival {
         } else {
             f.foe = true;
         }
+        let (n, a, b, owner) = (f.landed, f32::from(u8::from(f.friend)), f32::from(u8::from(f.foe)), f.owner);
+        self.events.push(Event::PriestLook { player: owner, kind: "penance", n, on: None, a, b });
+        let f = &mut self.light.flicks[k];
         if f.landed < most {
             return;
         }
@@ -89,6 +93,8 @@ impl Survival {
         let Some((_, step, most, base, secs)) = fans.into_iter().find(|f| f.0 == c.source) else { return };
         c.amount = (c.amount + step).min(base + most);
         c.until = c.until.max(now + secs * share);
+        let n = ((c.amount - base) / step.max(1.0e-3)).round().max(0.0) as u32;
         self.events.push(Event::Auras { id: on });
+        self.events.push(Event::PriestLook { player: owner, kind: "kindle", n, on: Some(on), a: 0.0, b: 0.0 });
     }
 }

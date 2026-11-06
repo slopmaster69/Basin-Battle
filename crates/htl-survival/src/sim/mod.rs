@@ -232,6 +232,11 @@ pub enum Event {
     /// Holy Word: Salvation laid (for everyone, a client with SetGroundRing draws it in Corey's
     /// art): `look` its key, where, how wide, and its beats in seconds from now.
     SigilLaid { look: Id, at: Vec3, radius: f32, beats: Vec<f32> },
+    /// A Priest look the add-on draws in Corey's art (`PL`): `kind` grace (its level `n`), shield
+    /// (a perfect Shield on `on`), flay (`n` 1 taut; `a` the cord's share of its range, `b` where
+    /// taut begins), snap, penance (`n` bolts landed; `a` a friend hit, `b` a foe), kindle (`n`
+    /// stacks on `on`), fade (an afterimage on the hero), light (`n` stacks of Holy Light).
+    PriestLook { player: Id, kind: &'static str, n: u32, on: Option<Id>, a: f32, b: f32 },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.

@@ -6633,6 +6633,8 @@ function ES.Line(line)
     if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
   elseif verb == "SV" then
     if ES.SigilLine then ES.SigilLine(f) end
+  elseif verb == "PL" then
+    if ES.PriestLookLine then ES.PriestLookLine(f) end
   elseif verb == "OB" then
     if ES.OrbLine then ES.OrbLine(f) end
   elseif verb == "OX" then

@@ -3547,6 +3547,7 @@ impl Survival {
         self.events.push(Event::Perfect { player: id, ability });
         // Fade: the foes round where they stood slowed, the hero quickened, an afterimage left.
         if !d.slip_effects.is_empty() {
+            self.events.push(Event::PriestLook { player: id, kind: "fade", n: 1, on: Some(id), a: 0.0, b: 0.0 });
             let (mobs, heroes) = self.in_wedge(id, ability, from, 0.0, 360.0, d.slip_radius);
             let was = self.fx_from.replace(from);
             for u in mobs.into_iter().chain(heroes) {

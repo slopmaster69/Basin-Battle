@@ -234,6 +234,7 @@ impl Survival {
         p.effects.retain(|e| e.name != st.name);
         p.effects.push(Effect { kind: "might".into(), amount: st.might * stacks as f32, until: now + st.secs, name: st.name.clone() });
         self.events.push(Event::Effects { player: id });
+        self.events.push(Event::PriestLook { player: id, kind: "light", n: stacks, on: None, a: st.secs, b: 0.0 });
         self.events.push(Event::Auras { id });
     }
 

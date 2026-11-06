@@ -434,6 +434,21 @@ impl SurvivalGame {
                     self.ui_line(c, &line);
                 }
             }
+            Event::PriestLook { player, kind, n, on, a, b } => {
+                // A Priest look in Corey's art (`PL`): on the hero's own screen, or (a perfect
+                // Shield, Kindle, Fade's afterimage) for everyone who sees the unit it's on.
+                let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                let mine = self.conn_of(player);
+                let line = |own: u8| format!("PL\t{kind}\t{n}\t{g:#X}\t{a:.2}\t{b:.2}\t{own}");
+                if matches!(kind, "shield" | "kindle" | "fade") {
+                    let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                    for c in conns {
+                        self.ui_line(c, &line(u8::from(Some(c) == mine)));
+                    }
+                } else if let Some(c) = mine {
+                    self.ui_line(c, &line(1));
+                }
+            }
             Event::OrbGone { look } => {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
                 for c in conns {
