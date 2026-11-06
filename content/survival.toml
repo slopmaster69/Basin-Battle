@@ -6683,8 +6683,10 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-# The add-on's afterimage where they stood. (Fade's own aura, 586, was on the body too: its shimmer
-# stayed long after the step. Corey: the animation played too long.)
+# The add-on's afterimage where they stood, and Mind Blast's short dark burst on the Priest as they
+# slip. (Fade's own aura, 586, was the look: its shimmer stayed on the body long after the step.
+# Corey: the animation played too long.)
+spell = 8092
 
 [[ability]]
 key = "greater_fade"
@@ -6706,6 +6708,7 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }, { kind = "weaken", secs = [3.0, 3.0], amount = 0.2 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
+spell = 8092
 
 # 2: take it, give it back. A shell for up to 2 sec: half of every blow stopped and stored; the key
 # again (or its time up) throws it at the first foe along the reticle. Let go just after a blow
