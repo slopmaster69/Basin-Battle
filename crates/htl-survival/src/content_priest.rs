@@ -119,9 +119,6 @@ pub struct RiftDef {
     pub per_foe: f32,
     pub perfect_foes: u32,
     pub collapse: f32,
-    /// The cords from its heart to each foe it drags (a channel's beam, 0: none).
-    #[serde(default)]
-    pub cord_spell: u32,
 }
 
 /// The Hollow Star (a `place`d orb): it has `health` (up to `most`) and lasts the ability's

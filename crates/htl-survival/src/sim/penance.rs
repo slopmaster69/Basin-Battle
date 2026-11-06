@@ -194,7 +194,8 @@ impl Survival {
             self.events.push(Event::Clip { id: owner, clip, take: 0, from: None, secs: pd.gap.max(0.3), at: 0.1, body: ClipBody::Upper });
         }
         self.events.push(Event::Missile { caster: owner, spell: d.spell, target: Target::Unit(on) });
-        if critical && d.impact_kit != 0 {
+        // Dead on: the holy flash on a friend (a foe's comes with the blow, `channel_hit`).
+        if critical && friend && d.impact_kit != 0 {
             self.events.push(Event::Visual { id: on, kit: d.impact_kit, by: Some(owner) });
         }
         if friend {

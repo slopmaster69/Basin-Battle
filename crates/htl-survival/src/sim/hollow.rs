@@ -106,7 +106,7 @@ impl Survival {
                 .iter()
                 .filter(|(mid, m)| **mid != h.mob && m.health > 0 && !m.hidden && !self.content.mobs[m.def].totem && !self.content.mobs[m.def].critter && dist2d(m.pos, at) <= reach + 0.5 * self.content.mobs[m.def].scale)
                 .map(|(id, _)| *id)
-                .chain(self.players.iter().filter(|(p, x)| self.hostile(h.owner, **p) && !self.spared(h.owner, **p, h.ability) && x.health > 0 && dist2d(x.pos, at) <= reach + abilities::HERO_SIZE).map(|(p, _)| *p))
+                .chain(self.players.iter().filter(|(p, x)| self.hostile(h.owner, **p) && !self.helpable(h.owner, **p) && !self.spared(h.owner, **p, h.ability) && x.health > 0 && dist2d(x.pos, at) <= reach + abilities::HERO_SIZE).map(|(p, _)| *p))
                 .collect();
             let mut gained = 0.0;
             for f in foes {

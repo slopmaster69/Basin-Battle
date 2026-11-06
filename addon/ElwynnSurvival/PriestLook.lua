@@ -104,7 +104,10 @@ function ES.PriestGroundLine(f)
 end
 
 local function Gone(key, g)
-  if ClearGroundRing then ClearGroundRing("es_pg_" .. key) end
+  if ClearGroundRing then
+    ClearGroundRing("es_pg_" .. key)
+    ClearGroundRing("es_pg_" .. key .. "_glow")
+  end
   onGround[key] = nil
 end
 
@@ -127,8 +130,12 @@ local function StepGround(now)
       local into = math.min(1, age / 0.25)
       if g.kind == "feather" then
         -- Lying there, breathing, turning slowly; the last two seconds it fades.
+        -- A thin feather flat on the ground hides in the grass seen from behind (the first film):
+        -- drawn bigger, with a breathing ring of gold round it that reads from any angle.
         local left = math.min(1, (g.secs - age) / 2)
-        SetGroundRing(k, g.x, g.y, g.z + 0.05, 1.3 * (1 + 0.06 * math.sin(now * 3)), ART .. "priest_feather", 1, 1, 1, into * fade * math.max(0.25, left), now * 0.25)
+        local a = into * fade * math.max(0.25, left)
+        SetGroundRing(k, g.x, g.y, g.z + 0.08, 2.4 * (1 + 0.06 * math.sin(now * 3)), ART .. "priest_feather", 1, 1, 1, a, now * 0.25)
+        SetGroundRing(k .. "_glow", g.x, g.y, g.z + 0.06, (g.r + 0.3) / 0.68 * (1 + 0.08 * math.sin(now * 4)), ART .. "priest_penance_ring", 1, 0.9, 0.6, a * 0.8, -now * 0.4)
       elseif g.kind == "rift" then
         -- Growing for 2 sec to 1.75 times as wide, turning inward faster as it grows.
         local grow = 1 + 0.75 * math.min(1, age / 2)
