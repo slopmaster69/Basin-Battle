@@ -60,6 +60,26 @@ impl Survival {
         (left("shield"), left("overhealth"))
     }
 
+    /// The healing still to come to hero `id` from what is on them now, if nothing hurts them:
+    /// a meal's or a salve's (a share of their health a second, until it ends) and a mending
+    /// boon's (its share at each tick left). What WoW's incoming heal shows on the health bar
+    /// (Corey); never more than they're missing. Gear's lasting regeneration has no end, so it
+    /// isn't counted.
+    pub fn heal_ahead(&self, id: Id) -> u32 {
+        let Some(p) = self.players.get(&id) else { return 0 };
+        if p.health == 0 || p.health >= p.max_health {
+            return 0;
+        }
+        let now = self.clock;
+        let most = p.max_health as f32;
+        let mut ahead: f32 = p.effects.iter().filter(|e| (e.kind == "regen" || e.kind == super::MEAL) && e.until > now).map(|e| e.amount * most * (e.until - now)).sum();
+        for c in self.cc_of(id).iter().filter(|c| c.kind == "regen" && c.until > now && c.next_tick <= c.until) {
+            let ticks = (c.until - c.next_tick).floor() + 1.0;
+            ahead += (c.amount * most).round() * ticks;
+        }
+        (ahead.round() as u32).min(p.max_health - p.health)
+    }
+
     pub fn has_cc(&self, id: Id, kind: &str) -> bool {
         let now = self.clock;
         self.cc_of(id).iter().any(|c| c.kind == kind && c.until > now)
