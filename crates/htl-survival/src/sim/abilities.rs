@@ -1098,16 +1098,29 @@ impl Survival {
         self.events.push(Event::CheckResult { player: id, ability, grade });
     }
 
+    /// A Priest ability of the Shadow, by its key (the server's `check_school` draws the same line).
+    pub(crate) fn priest_shadow(key: &str) -> bool {
+        ["shadow", "mind", "void", "tether", "fade", "death"].iter().any(|w| key.contains(w))
+    }
+
     /// The burst a perfect of this ability shows: its own, or the checks' default.
     pub(crate) fn perfect_kit_of(&self, ability: usize) -> u32 {
         let own = self.content.abilities[ability].perfect_kit;
         if own != 0 {
             return own;
         }
-        // A Priest's perfect is holy, never the Mage's Arcane Explosion (Corey's review).
-        let priest = self.content.priest.perfect_kit;
-        if priest != 0 && self.content.abilities[self.content.base_of(ability)].school == "priest" {
-            return priest;
+        // A Priest's perfect is holy, never the Mage's Arcane Explosion (Corey's review); a Shadow
+        // spell's is dark, never the Light's column.
+        let base = &self.content.abilities[self.content.base_of(ability)];
+        if base.school == "priest" {
+            let shadow = self.content.priest.shadow_perfect_kit;
+            if shadow != 0 && Self::priest_shadow(&base.key) {
+                return shadow;
+            }
+            let priest = self.content.priest.perfect_kit;
+            if priest != 0 {
+                return priest;
+            }
         }
         self.content.checks.perfect_kit
     }
@@ -2689,10 +2702,9 @@ impl Survival {
         // Shadow Word: Death that didn't kill: its backlash on the caster.
         if d.backlash > 0.0 && !killed && self.players.get(&owner).is_some_and(|p| p.health > 0) {
             let dmg = d.backlash.round() as u32;
+            // (No burst on the caster: the impact kit there was a flame on the Priest's head for
+            // 2 sec on film. The number says what it cost.)
             self.events.push(Event::Swing { attacker: victim, victim: Some(owner), damage: dmg, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
-            if d.impact_kit != 0 {
-                self.events.push(Event::Visual { id: owner, kit: d.impact_kit, by: None });
-            }
             self.hurt_player_by(owner, dmg, victim, &d.name);
         }
     }

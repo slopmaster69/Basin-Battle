@@ -31,6 +31,11 @@ local RING_OPEN, RING_SHUT, RING_LEAD = 4.2, 1.5, 0.9
 local HIT, LOST = 0.35, 0.9
 -- Mind Blast's heart (yards: the rules' `heart`), drawn inside its edge.
 local BLAST_HEART = 1.0
+
+-- The shadow casts' hands (Shadow Bolt's and Mind Blast's precast, `Shadow_Precast_Low_Hand`)
+-- burn with green rims in the game's data: tinted violet on a client that recolours effects
+-- (patch 0042), so Death's and Mind Blast's hands match their bolts (Chandrian's film).
+if SetEffectTint then SetEffectTint("Spells\\Shadow_Precast_Low_Hand", "B266FF") end
 -- The shadow staff's glow while the next bolt waits Empowered.
 local EMPOWER_GLOW = "B266FF"
 
@@ -93,8 +98,11 @@ function ES.PriestLookLine(f)
     elseif kind == "death" then
       -- Death's lance struck this body: a flash of shadow on it (Corey couldn't tell it had hit),
       -- bigger for a judgement (`a`) and a kill (`n` 2).
-      local big = (n >= 2) and 3.4 or (a >= 1 and 2.9) or 2.2
-      Body("death" .. guid, { unit = guid, tex = "priest_weave_shard", secs = (n >= 2) and 0.7 or 0.5, size = big, height = 1.3, kind = "pop" })
+      -- (A 2.2 flash read as a small glint at the top of the body on film, beside Mind Blast's
+      -- head burst: bigger, longer, lower, and a ring of shadow bursting out round it.)
+      local big = (n >= 2) and 5.0 or (a >= 1 and 4.2) or 3.4
+      Body("death" .. guid, { unit = guid, tex = "priest_weave_shard", secs = (n >= 2) and 0.8 or 0.6, size = big, height = 1.1, kind = "pop" })
+      Body("deathring" .. guid, { unit = guid, tex = "priest_ring_white", secs = (n >= 2) and 0.8 or 0.6, size = big * 1.3, height = 1.1, kind = "pop" })
     end
   end
 end

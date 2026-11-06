@@ -512,6 +512,9 @@ empower_valor = 4.0
 # Shadowform's dark swirl at the Priest's feet while the next bolt waits, Empowered.
 empower_aura = 15473
 perfect_kit = 431
+# A Shadow perfect with no burst of its own (the Shadowcaller's heavy): Fade's dark burst, as every
+# Shadow spell's (2350, Void Blast's, burst white-gold on film).
+shadow_perfect_kit = 117
 
 # --- heroes against heroes ------------------------------------------------------------------------
 
@@ -6260,7 +6263,7 @@ key = "mind_blast"
 name = "Mind Blast"
 text = "Marks the ground at the reticle, up to 30 yd away, with a dark sigil. 0.9 sec later it erupts, dealing 24 damage within 2.5 yd. An enemy within 1 yd of its heart takes 30 instead, or 36 if it was moving, and you gain 5 Valor. Enemies under Shadow Weaving or a Warlock's shadow take 25% more."
 icon = "Spell_Shadow_UnholyFrenzy"
-perfect_kit = 2350
+perfect_kit = 117
 school = "priest"
 slot = "ranged"
 choice = 2
@@ -6285,7 +6288,7 @@ name = "Shadow Word: Death"
 ex_of = "mind_blast"
 text = "Deals 18 damage to the first enemy along the reticle, up to 30 yd, or 45 to an enemy below 20% health. If it doesn't kill, you take 12 damage. If it kills, you can cast it once more within 3 sec for free."
 icon = "Spell_Shadow_DemonicFortitude"
-perfect_kit = 2350
+perfect_kit = 117
 slot = "ranged"
 kind = "projectile"
 valor = 25
@@ -6359,10 +6362,9 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-# The add-on's afterimage where they stood, and Mind Blast's short dark burst on the Priest as they
-# slip. (Fade's own aura, 586, was the look: its shimmer stayed on the body long after the step.
-# Corey: the animation played too long.)
-spell = 8092
+# The add-on's afterimage where they stood, for everyone, and the perfect's dark burst. (Fade's own
+# aura, 586, was the look: its shimmer stayed on the body long after the step. Mind Blast's cast
+# in its place put a flame on the Priest's head for 2 sec. Corey: the animation played too long.)
 
 [[ability]]
 key = "greater_fade"
@@ -6384,7 +6386,6 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }, { kind = "weaken", secs = [3.0, 3.0], amount = 0.2 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-spell = 8092
 
 # 2: take it, give it back. A shell for up to 2 sec: half of every blow stopped and stored; the key
 # again (or its time up) throws it at the first foe along the reticle. Let go just after a blow
@@ -6394,7 +6395,7 @@ key = "shadowguard"
 name = "Shadowguard"
 text = "Wraps you in shadow for up to 2 sec. You take 50% less damage and move slowly, but can't attack, and the damage it stops is stored, up to 40. Press again (or wait it out) to hurl it at the first enemy along the reticle. Let go just after a blow lands on you and it deals 50% more, up to 45."
 icon = "Spell_Shadow_AntiShadow"
-perfect_kit = 2350
+perfect_kit = 117
 school = "priest"
 slot = "defense"
 choice = 2
@@ -6422,7 +6423,7 @@ radius = [0.6, 0.6]
 speed = 40.0
 # The death-bolt (Void Blast has no missile in this client), Void Blast's burst where it strikes.
 spell = 26006
-impact_kit = 2350
+impact_kit = 2709
 
 # Shadow wants to deal damage: a grip that turns the Priest's own damage into their health (only
 # theirs: Corey's ruling).
@@ -6449,7 +6450,7 @@ key = "void_rift"
 name = "Void Rift"
 text = "Tears open the void at the reticle, up to 30 yd away: 4 yd wide, growing to 7 yd over 2 sec. Each second it drags enemies in it 3 yd toward its heart (heroes 5 yd at most) and deals 6 damage. Press again to implode it: 40 damage, plus 8 for each enemy it caught, up to 80. Left alone, it collapses after 4 sec for 20."
 icon = "Spell_Shadow_SealOfKings"
-perfect_kit = 2350
+perfect_kit = 117
 school = "priest"
 slot = "ultimate"
 choice = 2
@@ -6947,7 +6948,7 @@ range = [30.0, 30.0]
 radius = [0.5, 0.5]
 speed = 60.0
 spell = 26006
-impact_kit = 2350
+impact_kit = 2709
 
 # The Staff of the Hollow Star: the left click held is the Void Tether; the right click throws the
 # Hollow Star, a living orb that hurts foes and heals friends, filling and draining as it does.
