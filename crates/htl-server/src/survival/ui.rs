@@ -115,7 +115,8 @@
 //! - `GP\t<catch 1|0>\t<x>\t<y>\t<z>\t<yards>\t<ground z>\t<ability key>`: while a grappling hook
 //!   is aimed, where its line ends (`yards` along the ground from the hero) and whether it catches there; the
 //!   add-on answers with `.es in al <facing> <elevation>` as the reticle moves. `GP` alone: the
-//!   aim let go.
+//!   aim let go. Any aim line may end with `<x> <y> <z>`, the point the client's reticle is on
+//!   (ac26); the server takes it when it lies on the line and fires from the hands to it.
 //! - `FP\t<guid>\t<secs>\t<clip>\t<take>\t<from>\t<flip 1|0>\t<mine>`: a hero's leap with its own
 //!   look (a Disengage): the clip over the whole body for the flight, from another character
 //!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
@@ -410,7 +411,9 @@ pub(crate) const VERSION: u32 = 2;
 /// friends' plates); the bar across the top names the champion and the foe fought.
 /// 48: an aimed charge (Aimed Shot's draw, Axe Throw's wind-up) shows no bar under the hero: the
 /// reticle's ring closes in and turns gold as it builds.
-pub(crate) const ADDON_NEWEST: u32 = 48;
+/// 49: the add-on says `ac26`, sends the point its reticle is on with every aim line, and the
+/// reticle turns red while cover sits between the hero's hands and that point.
+pub(crate) const ADDON_NEWEST: u32 = 49;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -420,7 +423,10 @@ pub(crate) const ADDON_NEWEST: u32 = 48;
 /// 21: a rope from a unit's hand (0031).
 /// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
 /// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
-pub(crate) const CLIENT_NEWEST: u8 = 23;
+/// 26: the reticle's own point (`GetReticlePoint`: where the camera's centre line first meets
+/// the world, and whether cover sits between the hands and it), and the aim's circle laid on
+/// that line (0046).
+pub(crate) const CLIENT_NEWEST: u8 = 26;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1348,6 +1354,9 @@ impl SurvivalGame {
                     if let Ok(f) = rest.parse::<f32>() {
                         let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                         self.sim.set_aim_line(me, f, e);
+                        if let Some(at) = aim_point_words(&mut words) {
+                            self.sim.set_aim_point(me, at);
+                        }
                     }
                 }
                 // An attack, its release and an ability key carry the reticle's line (the
@@ -1355,6 +1364,10 @@ impl SurvivalGame {
                 if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
                     let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                     self.sim.set_aim_line(me, f, e);
+                    // And, from a client that reports it (`ac26`), the point its reticle is on.
+                    if let Some(at) = aim_point_words(&mut words) {
+                        self.sim.set_aim_point(me, at);
+                    }
                 }
                 if let Some(i) = input {
                     self.sim.input(me, i);
@@ -2242,5 +2255,28 @@ mod facts_tests {
             let base = (0..c.abilities.len()).find(|b| c.ex_of(*b) == Some(i)).map(|b| &c.abilities[b]);
             println!("{}: {}", a.name, ability_facts(a, base, c.valor.max));
         }
+    }
+}
+
+/// The aim point after a line's facing and elevation (`... <facing> <elevation> <x> <y> <z>`, the
+/// world point the client's reticle is on): all three, or none.
+fn aim_point_words<'a>(words: &mut impl Iterator<Item = &'a str>) -> Option<[f32; 3]> {
+    let x = words.next()?.parse::<f32>().ok()?;
+    let y = words.next()?.parse::<f32>().ok()?;
+    let z = words.next()?.parse::<f32>().ok()?;
+    Some([x, y, z])
+}
+
+#[cfg(test)]
+mod aim_point_tests {
+    use super::aim_point_words;
+
+    #[test]
+    fn an_aim_line_takes_all_three_of_the_points_words_or_none() {
+        let mut w = "1.5 -2.25 30".split_whitespace();
+        assert_eq!(aim_point_words(&mut w), Some([1.5, -2.25, 30.0]));
+        assert_eq!(aim_point_words(&mut "".split_whitespace()), None, "an older client sends none");
+        assert_eq!(aim_point_words(&mut "1 2".split_whitespace()), None);
+        assert_eq!(aim_point_words(&mut "1 x 3".split_whitespace()), None);
     }
 }

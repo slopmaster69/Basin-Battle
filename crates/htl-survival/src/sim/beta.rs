@@ -259,7 +259,7 @@ impl Survival {
         let (yaw, _) = self.aim_of(id);
         let (o, dir) = self.reticle(id);
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
-        let from = self.hands(id, yaw);
+        let from = self.shot_from(id, yaw);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { unit3(sub3(aim.point, from)) };
         let t = self.catch_solid(ability, from, base, self.trace_with(from, base, range, radius, id, d.friends()));
         Some((t.point, t.unit.is_some() || t.solid))

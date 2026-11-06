@@ -548,7 +548,7 @@ impl Survival {
     }
 
     fn start_swing_with(&mut self, id: Id, kind: StrikeKind, pay: bool) {
-        // Avenging Wrath: every heavy attack sends a wave of light along the hero's facing.
+        // Avenging Wrath: every heavy attack sends a wave of light toward the reticle.
         if kind == StrikeKind::Heavy && self.has_cc(id, "wrath") {
             self.avenging_wave(id);
         }
@@ -2373,7 +2373,7 @@ impl Survival {
         let (o, dir) = self.reticle(id);
         let t = self.trace(o, dir, range + 3.0, 0.9, id);
         let p = &self.players[&id];
-        let (pos, lock, aim) = (p.pos, p.lock, self.aim_of(id).0);
+        let (pos, lock, aim) = (p.pos, p.lock, self.aim_yaw(id, range));
         let foe_at = |u: Id| match (self.mobs.get(&u), self.players.get(&u)) {
             (Some(m), _) if m.health > 0 && !self.content.mobs[m.def].totem => Some((m.pos, m.facing)),
             (_, Some(h)) if u != id && h.health > 0 && self.hostile(id, u) => Some((h.pos, h.facing)),

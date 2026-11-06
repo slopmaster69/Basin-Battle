@@ -327,6 +327,32 @@ fn avenging_wrath_sends_a_wave_with_each_heavy_attack_that_strikes_foes_and_shie
     assert!(!s.has_cc(a, "wrath"), "for 10 s");
 }
 
+/// The wave goes where the reticle is, like the other strips: a foe under it off to the side is
+/// struck, and one straight ahead of the body (not aimed at) is not.
+#[test]
+fn avenging_wraths_wave_goes_toward_what_the_reticle_is_on() {
+    let mut s = world_with(false);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let aimed = mob(&mut s, "grunt", [6.0, -4.0, 0.0], 0.0);
+    let ahead = mob(&mut s, "grunt", [7.0, 0.0, 0.0], 0.0);
+    let (aimed_health, ahead_health) = (s.mobs[&aimed].health, s.mobs[&ahead].health);
+    s.set_valor(a, 100.0);
+    cast(&mut s, a, "ultimate", "avenging_wrath", false);
+    assert!(s.has_cc(a, "wrath"));
+    run(&mut s, 0.8);
+    calm(&mut s, aimed);
+    calm(&mut s, ahead);
+    s.mobs.get_mut(&aimed).unwrap().pos = [6.0, -4.0, 0.0];
+    s.mobs.get_mut(&ahead).unwrap().pos = [7.0, 0.0, 0.0];
+    let toward = (-4.0f32).atan2(6.0);
+    s.set_aim_line(a, toward, (-0.9f32).atan2(7.2));
+    s.set_aim_point(a, [6.0, -4.0, 1.0]);
+    s.input(a, Input::Heavy);
+    run(&mut s, 0.3);
+    assert!(s.mobs[&aimed].health < aimed_health, "the wave reaches the foe under the reticle");
+    assert_eq!(s.mobs[&ahead].health, ahead_health, "not the one along the body's facing");
+}
+
 #[test]
 fn cold_snap_freezes_what_is_near_as_the_ice_block_breaks_and_fire_shatters_it() {
     let mut s = world_with(false);
