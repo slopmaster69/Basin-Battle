@@ -1,4 +1,4 @@
-From 9a63ca66d2656197121b5ed8889131a8e6125dab Mon Sep 17 00:00:00 2001
+From 75d721b7ade89afea50653e3d210e441c749cd86 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 08:25:46 -0700
 Subject: [PATCH] God rays and morning mist: light shafts through Elwynn's
@@ -26,31 +26,1072 @@ the shader in both variants.
 
 `LookMistTune` holds the mist at a multiple of the hour's own, for filming a range from subtle to
 the densest still playable (the console's `lookmist`).
+
+The mist has no one strength: it changes with the day, the weather and the game's events
+(`look::mist`), the same for every hero. Each game day rolls 0 to 2 times the hour's own, and about
+one day in seven is a fog day at 3 to 4 times, from a fixed hash of the server's date: a new
+`WorldTime::date`, the calendar day number of the server's clock, which every client agrees on
+(moon02's day count does not after a short month's end), and which the film clock never moves. An
+overcast lifts it to 3 times and heavy rain to 4, the higher of the day's and the weather's showing;
+either change eases in over about 20 s of real time, and the day turns over at midnight, when the
+night's own mist is thin. A server event calls for mist through the add-on's new
+`SetWorldMist(scale[, seconds])` and `ClearWorldMist([seconds])` (benilla-ui `world_mist`), which
+win over the day and the weather, eased over their own time (20 s when none is given), and go at
+once on leaving the world. A held `LookMistTune` still wins over everything, and can roll a given
+day instead of the server's.
 ---
- crates/benilla-world/src/look/mod.rs          |   3 +-
- crates/benilla-world/src/look/pass.rs         | 336 +++++++++++++++---
- crates/benilla-world/src/look/rays.rs         | 222 ++++++++++++
- .../benilla-world/src/shaders/world_look.wgsl | 111 +++++-
- 4 files changed, 615 insertions(+), 57 deletions(-)
+ crates/benilla-app/src/net/game_time.rs       |  42 ++
+ crates/benilla-app/src/target/mod.rs          |  13 +
+ crates/benilla-app/src/target/world_mist.rs   |  76 +++
+ crates/benilla-ui/src/lib.rs                  |   2 +
+ crates/benilla-ui/src/script/mod.rs           |   2 +
+ crates/benilla-ui/src/world_mist.rs           | 141 ++++
+ crates/benilla-world/src/lighting/mod.rs      |   7 +
+ crates/benilla-world/src/look/mist.rs         | 622 ++++++++++++++++++
+ crates/benilla-world/src/look/mod.rs          |   6 +-
+ crates/benilla-world/src/look/pass.rs         | 351 ++++++++--
+ crates/benilla-world/src/look/rays.rs         | 222 +++++++
+ .../benilla-world/src/shaders/world_look.wgsl | 111 +++-
+ 12 files changed, 1538 insertions(+), 57 deletions(-)
+ create mode 100644 crates/benilla-app/src/target/world_mist.rs
+ create mode 100644 crates/benilla-ui/src/world_mist.rs
+ create mode 100644 crates/benilla-world/src/look/mist.rs
  create mode 100644 crates/benilla-world/src/look/rays.rs
 
+diff --git a/crates/benilla-app/src/net/game_time.rs b/crates/benilla-app/src/net/game_time.rs
+index 79bcae0..1650908 100644
+--- a/crates/benilla-app/src/net/game_time.rs
++++ b/crates/benilla-app/src/net/game_time.rs
+@@ -140,6 +140,11 @@ impl GameTime {
+         self.day_count
+     }
+ 
++    /// The clock's date as a calendar day number ([`day_number`]), for [`WorldTime::date`].
++    pub(crate) fn date_number(&self) -> i64 {
++        i64::from(day_number(&self.time))
++    }
++
+     /// `0x6435a0(dt)`, each frame (`0x6c5d50`): `dt` at the rate builds the fraction of a minute.
+     /// Banked skips take their whole minutes of it first, and each whole minute left steps the
+     /// clock. The sum is the x87's 53 bits rounded to the float on the store; a NaN rate makes the
+@@ -498,6 +503,7 @@ pub(crate) fn publish_world_time(
+             minute: clock.minute_of_day(),
+             minute_f: phase * 1440.0,
+             day: clock.day_count() as f64 + f64::from(phase),
++            date: clock.date_number(),
+             live: true,
+         }
+     } else {
+@@ -1104,6 +1110,42 @@ mod tests {
+         assert!((t.minute_f - 870.0).abs() < 1e-3);
+         let serial = (26 * 372 + 9 * 31 + 17) as f64;
+         assert!((t.day - (serial + 870.0 / 1440.0)).abs() < 1e-6);
++        assert_eq!(t.date, 20_744, "2026-10-18, days from 1970");
++        assert_eq!(idle.date, 0);
++    }
++
++    /// The date's day number is the calendar's whether the clock stepped over a short month's end
++    /// or was set after it, so every hero's mist of the day agrees (the day count does not).
++    #[test]
++    fn the_date_number_agrees_over_a_month_end() {
++        let nov30 = WowTime {
++            minute: 59,
++            hour: 23,
++            weekday: 1,
++            day: 29,
++            month: 10,
++            year: 26,
++            spare: 0,
++        };
++        let mut stayed = GameTime::new(0);
++        stayed.set(nov30, 0);
++        stayed.advance_minute(1);
++        let mut fresh = GameTime::new(0);
++        fresh.set(
++            WowTime {
++                minute: 0,
++                hour: 0,
++                weekday: 2,
++                day: 0,
++                month: 11,
++                ..nov30
++            },
++            0,
++        );
++        assert_eq!(stayed.minute_of_day(), 0);
++        assert_eq!(stayed.date_number(), fresh.date_number());
++        assert_eq!(fresh.date_number(), 20_788, "2026-12-01");
++        assert_ne!(stayed.day_count(), fresh.day_count());
+     }
+ 
+     /// The clock and its two systems under the real lifecycle gate, the screen set by `start`.
+diff --git a/crates/benilla-app/src/target/mod.rs b/crates/benilla-app/src/target/mod.rs
+index fcbb743..6c55e5e 100644
+--- a/crates/benilla-app/src/target/mod.rs
++++ b/crates/benilla-app/src/target/mod.rs
+@@ -14,6 +14,7 @@ use benilla_world::schedule::WorldStage;
+ mod aim_marker;
+ mod by_name;
+ mod world_fog;
++mod world_mist;
+ // `pub(crate)` for the chest live probe, which drives the mouse's own `click::resolve_go_action`.
+ pub(crate) mod click;
+ // `pub(crate)` for the hover inspector, which runs the cursor's `cursor_mode::go_highlightable`.
+@@ -470,9 +471,21 @@ impl Plugin for TargetPlugin {
+                     // The add-on's outdoor fog, for the light resolve (a frame late at worst).
+                     world_fog::apply_world_fog
+                         .run_if(resource_exists::<benilla_world::lighting::FogOverride>),
++                    // The add-on's call for mist, for the new look's mist resolve (the same).
++                    (
++                        world_mist::release_world_mist_on_new_vm,
++                        world_mist::apply_world_mist,
++                    )
++                        .chain()
++                        .run_if(resource_exists::<benilla_world::look::WorldMist>),
+                 )
+                     .after(TargetUpdate),
+             )
++            .add_systems(
++                OnExit(crate::client_state::ClientState::InWorld),
++                world_mist::reset_world_mist
++                    .run_if(resource_exists::<benilla_world::look::WorldMist>),
++            )
+             .add_systems(PostUpdate, highlight::apply_highlight)
+             // The ring's stream push, after the frame's stream clear.
+             .add_systems(
+diff --git a/crates/benilla-app/src/target/world_mist.rs b/crates/benilla-app/src/target/world_mist.rs
+new file mode 100644
+index 0000000..44bc1d5
+--- /dev/null
++++ b/crates/benilla-app/src/target/world_mist.rs
+@@ -0,0 +1,76 @@
++//! Basin Battle's call for mist: the add-on's `SetWorldMist` and `ClearWorldMist`
++//! (`benilla_ui::world_mist`) onto the world's [`WorldMist`], which the new look's mist resolve
++//! eases in over the day's and the weather's (`benilla_world::look::mist`).
++
++use benilla_ui::world_mist::{self, WorldMistCall};
++use benilla_world::look::{MistEvent, WorldMist};
++use bevy::prelude::*;
++
++/// Hand the frame's mist calls to the world in the order they came.
++pub(super) fn apply_world_mist(mut mist: ResMut<WorldMist>) {
++    apply_calls(&mut mist, world_mist::take_world_mist());
++}
++
++fn apply_calls(mist: &mut WorldMist, calls: Vec<WorldMistCall>) {
++    for call in calls {
++        mist.request(match call {
++            WorldMistCall::Set { scale, secs } => MistEvent::Set { scale, secs },
++            WorldMistCall::Clear { secs } => MistEvent::Clear { secs },
++        });
++    }
++}
++
++/// Leaving the world: an event's mist goes at once (and any call still queued with it), so it
++/// never carries into the next world.
++pub(super) fn reset_world_mist(mut mist: ResMut<WorldMist>) {
++    world_mist::take_world_mist();
++    mist.reset();
++}
++
++/// A new UI VM (a `ReloadUI`, an add-on turned off): nothing is left to clear the old add-on's
++/// event, so it eases out; an add-on that wants it again asks again.
++pub(super) fn release_world_mist_on_new_vm(
++    script: Option<NonSend<benilla_ui::script::UiScript>>,
++    mut seen: Local<u64>,
++    mut mist: ResMut<WorldMist>,
++) {
++    let Some(script) = script else { return };
++    let now = script.session();
++    if *seen != 0 && now != *seen && mist.active() {
++        mist.request(MistEvent::Clear { secs: None });
++    }
++    *seen = now;
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_calls_reach_the_world_in_order_and_leaving_drops_them() {
++        let mut mist = WorldMist::default();
++        apply_calls(
++            &mut mist,
++            vec![
++                WorldMistCall::Set {
++                    scale: 3.5,
++                    secs: Some(2.0),
++                },
++                WorldMistCall::Clear { secs: None },
++            ],
++        );
++        let mut want = WorldMist::default();
++        want.request(MistEvent::Set {
++            scale: 3.5,
++            secs: Some(2.0),
++        });
++        want.request(MistEvent::Clear { secs: None });
++        assert_eq!(mist, want);
++
++        let mut app = App::new();
++        app.insert_resource(mist)
++            .add_systems(Update, reset_world_mist);
++        app.update();
++        assert_eq!(*app.world().resource::<WorldMist>(), WorldMist::default());
++    }
++}
+diff --git a/crates/benilla-ui/src/lib.rs b/crates/benilla-ui/src/lib.rs
+index 7eb3794..066b775 100644
+--- a/crates/benilla-ui/src/lib.rs
++++ b/crates/benilla-ui/src/lib.rs
+@@ -27,3 +27,5 @@ pub mod strings;
+ pub mod test_support;
+ pub mod toc;
+ pub mod widget;
++// Basin Battle's call for the new look's mist (`SetWorldMist`).
++pub mod world_mist;
+diff --git a/crates/benilla-ui/src/script/mod.rs b/crates/benilla-ui/src/script/mod.rs
+index 12b3bf1..e3203ed 100644
+--- a/crates/benilla-ui/src/script/mod.rs
++++ b/crates/benilla-ui/src/script/mod.rs
+@@ -746,6 +746,8 @@ fn install_in_game(lua: &Lua) -> mlua::Result<()> {
+     input_verbs::install(lua)?;
+     // Basin Battle's action-combat extension (`SetActionMouse`, `SetAimCamera`).
+     crate::action_combat::install(lua)?;
++    // Basin Battle's call for mist (`SetWorldMist`, `ClearWorldMist`).
++    crate::world_mist::install(lua)?;
+     session::install(lua)?;
+     pvp::install(lua)?;
+     worn_display::install(lua)?;
+diff --git a/crates/benilla-ui/src/world_mist.rs b/crates/benilla-ui/src/world_mist.rs
+new file mode 100644
+index 0000000..7ebc862
+--- /dev/null
++++ b/crates/benilla-ui/src/world_mist.rs
+@@ -0,0 +1,141 @@
++//! Basin Battle's call for mist, benilla's own (1.12 has none): the new look's mist (`worldLook 1`)
++//! is thickest on fog days and in bad weather, and a server event (a boss arriving, a raid on the
++//! camp) can call for it through the add-on:
++//!
++//! - `SetWorldMist(scale[, seconds])`: the mist at `scale` times the hour's own (0 to 6; 3 to 4 is
++//!   a fog day's), winning over the day's and the weather's until cleared, eased in over `seconds`
++//!   (0 to 600; about 20 with none given). Called again, it eases from where it is to the new one.
++//! - `ClearWorldMist([seconds])`: ease back to the day's and the weather's mist (about 20 seconds
++//!   with none given, at once with 0). Leaving the world clears it at once.
++//!
++//! Every hero must see the same mist, so call them for everyone at once (from a server line), not
++//! from one hero's own doing. A client without them has neither global: test `SetWorldMist` before
++//! calling it. The classic look has no mist, and ignores both.
++
++use mlua::{Lua, MultiValue, Value};
++
++/// A mist call, as the add-on made it: `secs` is `None` when no time was given.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub enum WorldMistCall {
++    Set { scale: f32, secs: Option<f32> },
++    Clear { secs: Option<f32> },
++}
++
++/// The thickest a call can ask for, times the hour's (the film's `lookmist` range).
++const SCALE_MAX: f32 = 6.0;
++/// The longest ease a call can ask for, seconds.
++const SECS_MAX: f32 = 600.0;
++
++static WORLD_MIST: std::sync::Mutex<Vec<WorldMistCall>> = std::sync::Mutex::new(Vec::new());
++
++/// The mist calls since the last call, oldest first.
++pub fn take_world_mist() -> Vec<WorldMistCall> {
++    WORLD_MIST
++        .lock()
++        .map(|mut v| std::mem::take(&mut *v))
++        .unwrap_or_default()
++}
++
++fn push(call: WorldMistCall) {
++    if let Ok(mut v) = WORLD_MIST.lock() {
++        // Only the last few matter: each eases from where the one before left it.
++        if v.len() >= 16 {
++            v.remove(0);
++        }
++        v.push(call);
++    }
++}
++
++/// A number argument held to `0..=hi`, `None` when missing or not a number.
++fn number(v: Option<&Value>, hi: f32) -> Option<f32> {
++    let n = match v? {
++        Value::Integer(i) => *i as f32,
++        Value::Number(n) => *n as f32,
++        Value::String(s) => s.to_str().ok()?.trim().parse::<f32>().ok()?,
++        _ => return None,
++    };
++    n.is_finite().then(|| n.clamp(0.0, hi))
++}
++
++pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
++    let g = lua.globals();
++    g.set(
++        "SetWorldMist",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            // No strength, no call.
++            if let Some(scale) = number(v.first(), SCALE_MAX) {
++                push(WorldMistCall::Set {
++                    scale,
++                    secs: number(v.get(1), SECS_MAX),
++                });
++            }
++            Ok(())
++        })?,
++    )?;
++    g.set(
++        "ClearWorldMist",
++        lua.create_function(|_, args: MultiValue| {
++            push(WorldMistCall::Clear {
++                secs: number(args.front(), SECS_MAX),
++            });
++            Ok(())
++        })?,
++    )?;
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn world_mist_calls_queue_clamped_and_in_order() {
++        let lua = Lua::new();
++        install(&lua).unwrap();
++        take_world_mist();
++        lua.load(
++            r#"SetWorldMist(3.5, 2) SetWorldMist(9) SetWorldMist() SetWorldMist("x", 4)
++               SetWorldMist("1.5", -3) ClearWorldMist(2) ClearWorldMist() ClearWorldMist(9999)"#,
++        )
++        .exec()
++        .unwrap();
++        assert_eq!(
++            take_world_mist(),
++            vec![
++                WorldMistCall::Set {
++                    scale: 3.5,
++                    secs: Some(2.0)
++                },
++                WorldMistCall::Set {
++                    scale: 6.0,
++                    secs: None
++                },
++                WorldMistCall::Set {
++                    scale: 1.5,
++                    secs: Some(0.0)
++                },
++                WorldMistCall::Clear { secs: Some(2.0) },
++                WorldMistCall::Clear { secs: None },
++                WorldMistCall::Clear { secs: Some(600.0) },
++            ],
++            "a call with no strength is dropped; the strength is held to 6, the time to 0..600"
++        );
++        assert!(take_world_mist().is_empty(), "taken once");
++        // Only the last sixteen are kept.
++        for i in 0..20 {
++            lua.load(format!("SetWorldMist({}, 1)", i % 6))
++                .exec()
++                .unwrap();
++        }
++        let calls = take_world_mist();
++        assert_eq!(calls.len(), 16);
++        assert_eq!(
++            calls[0],
++            WorldMistCall::Set {
++                scale: 4.0,
++                secs: Some(1.0)
++            }
++        );
++    }
++}
+diff --git a/crates/benilla-world/src/lighting/mod.rs b/crates/benilla-world/src/lighting/mod.rs
+index 11cbe08..1467fe6 100644
+--- a/crates/benilla-world/src/lighting/mod.rs
++++ b/crates/benilla-world/src/lighting/mod.rs
+@@ -162,6 +162,12 @@ pub struct WorldTime {
+     pub minute_f: f32,
+     /// The continuous day count for moon02's phase clock (days plus day fraction, unwrapped).
+     pub day: f64,
++    /// The clock's date as a calendar day number (days from 1970-01-01, `WowTime::GetDayNumber`),
++    /// 0 before a clock lands: benilla's own, for the new look's mist of the day
++    /// (`crate::look::mist`). Unlike [`Self::day`], which steps one each midnight from a
++    /// `year·372 + month·31 + day` serial, it is the same on every client of one server however
++    /// long each has been in the world.
++    pub date: i64,
+     /// Whether a real clock has landed; `false` means the noon fallback (`ClockSource::Fallback`).
+     pub live: bool,
+ }
+@@ -173,6 +179,7 @@ impl Default for WorldTime {
+             minute: 720,
+             minute_f: 720.0,
+             day: 0.5,
++            date: 0,
+             live: false,
+         }
+     }
+diff --git a/crates/benilla-world/src/look/mist.rs b/crates/benilla-world/src/look/mist.rs
+new file mode 100644
+index 0000000..4ed3eb1
+--- /dev/null
++++ b/crates/benilla-world/src/look/mist.rs
+@@ -0,0 +1,622 @@
++//! How thick the new look's mist is today, benilla's own (no reference behaviour): a multiple of
++//! the hour's own mist (the grade's `height_fog`) that changes with the day, the weather and the
++//! game's events, the same for every hero in the world.
++//!
++//! - Each game day rolls a strength from 0 to [`DAY_MAX`] times the hour's, and about one day in
++//!   [`FOG_DAY_ONE_IN`] is a fog day, [`FOG_DAY_MIN`] to [`FOG_DAY_MAX`] times. The roll is a fixed
++//!   hash of the server's day number ([`server_day`]), never a local random, so every client rolls
++//!   the same day, and it turns over at midnight, when the night's own mist is thin anyway. The
++//!   film clock (`worldclock`) moves the light only, not the day.
++//! - The server's weather lifts it: a full overcast to [`OVERCAST_SCALE`], heavy rain on top of it
++//!   to [`OVERCAST_SCALE`] + [`RAIN_SCALE`]. The day and the weather take the higher of the two.
++//! - An event (the add-on's `SetWorldMist`, called for by the server) wins over both, eased in and
++//!   out over its own time ([`WorldMist`]).
++//! - A held tune (`lookmist <scale>`, for film) wins over everything, at once.
++//!
++//! A change of the day or the weather eases in over about [`MIST_EASE_SECS`] of real time (two
++//! chained exponential follows, so it starts and lands gently and never pops).
++
++use bevy::prelude::*;
++
++use super::LookMistTune;
++use crate::lighting::WorldTime;
++use crate::weather::{WeatherKind, WeatherState};
++
++/// The most an ordinary day's roll gives, times the hour's mist.
++pub const DAY_MAX: f32 = 2.0;
++/// About one day in this many is a fog day.
++pub const FOG_DAY_ONE_IN: u32 = 7;
++/// A fog day's strength, from this...
++pub const FOG_DAY_MIN: f32 = 3.0;
++/// ...to this.
++pub const FOG_DAY_MAX: f32 = 4.0;
++/// A full overcast (`WeatherState::sky_density` at its 0.25 top) lifts the mist to this.
++pub const OVERCAST_SCALE: f32 = 3.0;
++/// Rain at its full density adds this over the overcast's.
++pub const RAIN_SCALE: f32 = 1.0;
++/// About how long a new strength takes to ease in, seconds of real time (to within 5%).
++pub const MIST_EASE_SECS: f32 = 20.0;
++/// The two follows' time constant: a two-pole follow is within 4% of a step after five of them.
++const EASE_TAU: f32 = MIST_EASE_SECS / 5.0;
++/// The thickest any call or tune can ask for (the film's `lookmist` range).
++pub const SCALE_MAX: f32 = 6.0;
++
++/// The server's game day: its clock's date as a calendar day number ([`WorldTime::date`]), the
++/// same on every client and untouched by the film clock. Before a server clock lands it is day 0.
++pub fn server_day(time: &WorldTime) -> i64 {
++    time.date
++}
++
++/// One day's roll.
++#[derive(Clone, Copy, Debug, Default, PartialEq)]
++pub struct DayRoll {
++    /// Times the hour's mist.
++    pub scale: f32,
++    /// A fog day ([`FOG_DAY_MIN`] to [`FOG_DAY_MAX`]).
++    pub fog_day: bool,
++}
++
++/// SplitMix64's finaliser: a fixed, well-mixed hash, the same on every machine.
++fn mix(x: u64) -> u64 {
++    let mut z = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
++    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
++    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
++    z ^ (z >> 31)
++}
++
++/// The top 24 bits of a hash as 0..1 (exact in an `f32`).
++fn unit(h: u64) -> f32 {
++    (h >> 40) as f32 / (1u64 << 24) as f32
++}
++
++/// Mixed into the day so the mist's dice are its own (a later per-day roll takes another).
++const DAY_SALT: u64 = 0x6D69_7374_6461_7973; // "mistdays"
++
++/// The day's roll: deterministic in `day` alone.
++pub fn day_roll(day: i64) -> DayRoll {
++    let h = mix(day as u64 ^ DAY_SALT);
++    let fog_day = unit(h) < 1.0 / FOG_DAY_ONE_IN as f32;
++    let u = unit(mix(h));
++    DayRoll {
++        scale: if fog_day {
++            FOG_DAY_MIN + (FOG_DAY_MAX - FOG_DAY_MIN) * u
++        } else {
++            DAY_MAX * u
++        },
++        fog_day,
++    }
++}
++
++/// What the weather lifts the mist to: the overcast's share of its full 0.25 times
++/// [`OVERCAST_SCALE`], plus rain's density times [`RAIN_SCALE`]. Snow and sand count only for
++/// their overcast.
++pub fn weather_scale(weather: &WeatherState) -> f32 {
++    let overcast = crate::weather::storm_blend(weather.sky_density);
++    let rain = if weather.effect_kind == WeatherKind::Rain {
++        weather.effect_density.clamp(0.0, 1.0)
++    } else {
++        0.0
++    };
++    OVERCAST_SCALE * overcast + RAIN_SCALE * rain
++}
++
++/// An event's mist asked for, or let go (the add-on's `SetWorldMist`, `ClearWorldMist`); `secs`
++/// is the ease, [`MIST_EASE_SECS`] when not given.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub enum MistEvent {
++    Set { scale: f32, secs: Option<f32> },
++    Clear { secs: Option<f32> },
++}
++
++/// An event's ease: from the strength shown when it was called to its own, or (a clear) back to
++/// the day's and the weather's as they are while it eases.
++#[derive(Clone, Copy, Debug, PartialEq)]
++struct EventEase {
++    from: f32,
++    /// `None` eases back out.
++    to: Option<f32>,
++    started: f64,
++    secs: f32,
++}
++
++impl EventEase {
++    fn t(&self, now: f64) -> f32 {
++        if self.secs <= 0.0 {
++            return 1.0;
++        }
++        let t = (((now - self.started) as f32) / self.secs).clamp(0.0, 1.0);
++        t * t * (3.0 - 2.0 * t)
++    }
++
++    fn value(&self, ambient: f32, now: f64) -> f32 {
++        let to = self.to.unwrap_or(ambient);
++        self.from + (to - self.from) * self.t(now)
++    }
++}
++
++/// The game's call for mist: the add-on's requests, and the event easing in or out.
++#[derive(Resource, Clone, Debug, Default, PartialEq)]
++pub struct WorldMist {
++    pending: Vec<MistEvent>,
++    ease: Option<EventEase>,
++}
++
++impl WorldMist {
++    /// Queue an event's call; the next resolve eases from the strength it is showing then.
++    pub fn request(&mut self, call: MistEvent) {
++        // Only the last few matter: each eases from where the one before left it.
++        if self.pending.len() >= 16 {
++            self.pending.remove(0);
++        }
++        self.pending.push(call);
++    }
++
++    /// Whether an event's mist is showing (easing in, held, or easing back out).
++    pub fn active(&self) -> bool {
++        self.ease.is_some()
++    }
++
++    /// Let go at once (leaving the world).
++    pub fn reset(&mut self) {
++        *self = Self::default();
++    }
++
++    fn apply_pending(&mut self, shown: f32, ambient: f32, now: f64) {
++        for call in std::mem::take(&mut self.pending) {
++            let from = self.ease.map_or(shown, |e| e.value(ambient, now));
++            match call {
++                MistEvent::Set { scale, secs } => {
++                    self.ease = Some(EventEase {
++                        from,
++                        to: Some(scale.clamp(0.0, SCALE_MAX)),
++                        started: now,
++                        secs: secs.unwrap_or(MIST_EASE_SECS).max(0.0),
++                    });
++                }
++                MistEvent::Clear { secs } => {
++                    if self.ease.is_some() {
++                        self.ease = Some(EventEase {
++                            from,
++                            to: None,
++                            started: now,
++                            secs: secs.unwrap_or(MIST_EASE_SECS).max(0.0),
++                        });
++                    }
++                }
++            }
++        }
++    }
++
++    /// The event's strength at `now`, `None` with none; a clear that has eased all the way out
++    /// ends here.
++    fn value(&mut self, ambient: f32, now: f64) -> Option<f32> {
++        let e = self.ease?;
++        if e.to.is_none() && e.t(now) >= 1.0 {
++            self.ease = None;
++            return None;
++        }
++        Some(e.value(ambient, now))
++    }
++}
++
++/// What decided the mist this frame, for `lookmist why`.
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
++pub enum MistSource {
++    #[default]
++    DayRoll,
++    FogDay,
++    Weather,
++    Event,
++    Held,
++}
++
++impl MistSource {
++    pub fn describe(self) -> &'static str {
++        match self {
++            MistSource::DayRoll => "the day's roll",
++            MistSource::FogDay => "a fog day",
++            MistSource::Weather => "the weather",
++            MistSource::Event => "an event",
++            MistSource::Held => "the held tune",
++        }
++    }
++}
++
++/// One frame's inputs to [`LookMist::step`].
++#[derive(Clone, Copy, Debug, Default, PartialEq)]
++pub struct MistInputs {
++    /// The day the roll is for: the server's, or the one `lookmist day` holds.
++    pub day: i64,
++    /// What the weather lifts it to ([`weather_scale`]).
++    pub weather: f32,
++    /// `lookmist <scale>`.
++    pub held: Option<f32>,
++    /// Whether the clock is the server's yet ([`WorldTime::live`]).
++    pub live: bool,
++    /// Whether the day is one `lookmist day` holds.
++    pub forced: bool,
++}
++
++/// The mist as resolved this frame: the multiple of the hour's own that the look's pass applies,
++/// and why.
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookMist {
++    /// Times the hour's mist, this frame.
++    pub scale: f32,
++    pub source: MistSource,
++    /// The day rolled, and its roll.
++    pub day: i64,
++    pub roll: DayRoll,
++    /// What the weather lifts it to.
++    pub weather: f32,
++    /// The day's and the weather's together, eased: what shows with no event or tune.
++    pub ambient: f32,
++    /// The event's strength, while one shows.
++    pub event: Option<f32>,
++    /// The two follows behind [`Self::ambient`].
++    follow: [f32; 2],
++    /// The strength with no tune held, which an event eases from.
++    unheld: f32,
++    /// The clock's and the held day's state the follow last snapped on; `None` before the first.
++    seeded: Option<(bool, bool, i64)>,
++}
++
++impl Default for LookMist {
++    fn default() -> Self {
++        Self {
++            scale: 1.0,
++            source: MistSource::DayRoll,
++            day: 0,
++            roll: DayRoll::default(),
++            weather: 0.0,
++            ambient: 1.0,
++            event: None,
++            follow: [1.0; 2],
++            unheld: 1.0,
++            seeded: None,
++        }
++    }
++}
++
++impl LookMist {
++    /// One frame of `dt` real seconds, at real time `now`.
++    pub fn step(&mut self, input: MistInputs, event: &mut WorldMist, dt: f32, now: f64) {
++        let roll = day_roll(input.day);
++        let target = roll.scale.max(input.weather);
++        // Snap, not ease, on the first frame, when the server's clock lands (the first real day
++        // replaces the fallback's) and when the film holds a day or lets it go; the day turning
++        // over at midnight eases.
++        let key = (
++            input.live,
++            input.forced,
++            if input.forced { input.day } else { 0 },
++        );
++        if self.seeded != Some(key) {
++            self.seeded = Some(key);
++            self.follow = [target; 2];
++        } else {
++            let k = 1.0 - (-dt.max(0.0) / EASE_TAU).exp();
++            self.follow[0] += (target - self.follow[0]) * k;
++            self.follow[1] += (self.follow[0] - self.follow[1]) * k;
++        }
++        let ambient = self.follow[1];
++        event.apply_pending(self.unheld, ambient, now);
++        let ev = event.value(ambient, now);
++        let unheld = ev.unwrap_or(ambient);
++        let source = if input.held.is_some() {
++            MistSource::Held
++        } else if ev.is_some() {
++            MistSource::Event
++        } else if input.weather > roll.scale {
++            MistSource::Weather
++        } else if roll.fog_day {
++            MistSource::FogDay
++        } else {
++            MistSource::DayRoll
++        };
++        *self = Self {
++            scale: input.held.unwrap_or(unheld).clamp(0.0, SCALE_MAX),
++            source,
++            day: input.day,
++            roll,
++            weather: input.weather,
++            ambient,
++            event: ev,
++            follow: self.follow,
++            unheld,
++            seeded: self.seeded,
++        };
++    }
++}
++
++/// The frame's mist, before the look's frame copy reads it.
++pub(super) fn resolve_mist(
++    time: Res<Time<Real>>,
++    clock: Option<Res<WorldTime>>,
++    weather: Option<Res<WeatherState>>,
++    tune: Res<LookMistTune>,
++    mut event: ResMut<WorldMist>,
++    mut mist: ResMut<LookMist>,
++) {
++    let clock = clock.map(|c| *c).unwrap_or_default();
++    let input = MistInputs {
++        day: tune.day.unwrap_or_else(|| server_day(&clock)),
++        weather: weather.map_or(0.0, |w| weather_scale(&w)),
++        held: tune.scale,
++        live: clock.live,
++        forced: tune.day.is_some(),
++    };
++    mist.step(
++        input,
++        &mut event,
++        time.delta_secs(),
++        time.elapsed_secs_f64(),
++    );
++}
++
++pub(super) fn init_resources(app: &mut App) {
++    app.init_resource::<LookMist>().init_resource::<WorldMist>();
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn input(day: i64) -> MistInputs {
++        MistInputs {
++            day,
++            live: true,
++            ..default()
++        }
++    }
++
++    /// Runs `secs` of 60 fps frames from `t0`, returning the time it ends at.
++    fn run(mist: &mut LookMist, ev: &mut WorldMist, inp: MistInputs, t0: f64, secs: f32) -> f64 {
++        let dt = 1.0 / 60.0;
++        let mut t = t0;
++        for _ in 0..(secs / dt).round() as u32 {
++            t += f64::from(dt);
++            mist.step(inp, ev, dt, t);
++        }
++        t
++    }
++
++    #[test]
++    fn the_day_roll_is_fixed_and_in_range() {
++        for day in (-50..5000).chain([20_763, 739_000, i64::MAX, i64::MIN]) {
++            let r = day_roll(day);
++            assert_eq!(r, day_roll(day), "day {day}");
++            if r.fog_day {
++                assert!(
++                    (FOG_DAY_MIN..=FOG_DAY_MAX).contains(&r.scale),
++                    "{day}: {r:?}"
++                );
++            } else {
++                assert!((0.0..=DAY_MAX).contains(&r.scale), "{day}: {r:?}");
++            }
++        }
++        // Pinned, so a change to the hash (which would re-roll every hero's day) is seen.
++        let pinned: Vec<(bool, u32)> = [20_763i64, 20_764, 20_765]
++            .iter()
++            .map(|&d| {
++                let r = day_roll(d);
++                (r.fog_day, (r.scale * 1000.0).round() as u32)
++            })
++            .collect();
++        assert_eq!(pinned, PINNED_ROLLS);
++        // The days spread over the whole range, not bunched.
++        let plain: Vec<f32> = (0..2000)
++            .map(day_roll)
++            .filter(|r| !r.fog_day)
++            .map(|r| r.scale)
++            .collect();
++        let low = plain.iter().filter(|s| **s < 0.5).count() as f32 / plain.len() as f32;
++        let high = plain.iter().filter(|s| **s > 1.5).count() as f32 / plain.len() as f32;
++        assert!(
++            (0.2..0.3).contains(&low) && (0.2..0.3).contains(&high),
++            "{low} {high}"
++        );
++    }
++
++    /// 2026-11-06, -07 and -08.
++    const PINNED_ROLLS: [(bool, u32); 3] = [(false, 1344), (false, 834), (true, 3352)];
++
++    /// Ten years of days from 2026-01-01 (the calendar day numbers the server's date gives):
++    /// about one in seven is a fog day, and they do not bunch.
++    #[test]
++    fn about_one_day_in_seven_is_a_fog_day() {
++        let days: Vec<i64> = (20_454..20_454 + 3652).collect();
++        let fog: Vec<bool> = days.iter().map(|&d| day_roll(d).fog_day).collect();
++        let share = fog.iter().filter(|f| **f).count() as f32 / fog.len() as f32;
++        assert!(
++            (share - 1.0 / 7.0).abs() < 0.015,
++            "{share} over {} days",
++            fog.len()
++        );
++        let longest = fog.split(|f| !*f).map(<[bool]>::len).max().unwrap_or(0);
++        assert!(longest <= 4, "{longest} fog days running");
++        // A thousand-day stretch anywhere is near the share too.
++        for chunk in fog.chunks(1000).filter(|c| c.len() == 1000) {
++            let n = chunk.iter().filter(|f| **f).count();
++            assert!((110..=180).contains(&n), "{n} in a thousand");
++        }
++    }
++
++    #[test]
++    fn the_weather_lifts_it() {
++        let mut w = WeatherState::default();
++        assert_eq!(weather_scale(&w), 0.0);
++        w.sky_density = 0.125;
++        assert!((weather_scale(&w) - OVERCAST_SCALE / 2.0).abs() < 1e-5);
++        w.sky_density = 0.25;
++        assert!((weather_scale(&w) - OVERCAST_SCALE).abs() < 1e-5);
++        w.effect_kind = WeatherKind::Rain;
++        w.effect_density = 1.0;
++        assert!((weather_scale(&w) - OVERCAST_SCALE - RAIN_SCALE).abs() < 1e-5);
++        w.effect_kind = WeatherKind::Snow;
++        assert!(
++            (weather_scale(&w) - OVERCAST_SCALE).abs() < 1e-5,
++            "snow: its overcast only"
++        );
++
++        // The higher of the day's and the weather's: a thin day under a full overcast mists to
++        // the overcast's, a fog day's stronger roll stays its own.
++        let thin = (0..).find(|&d| day_roll(d).scale < 0.5).unwrap();
++        let fog = (0..).find(|&d| day_roll(d).scale > OVERCAST_SCALE).unwrap();
++        let mut mist = LookMist::default();
++        let mut ev = WorldMist::default();
++        let overcast = MistInputs {
++            weather: OVERCAST_SCALE,
++            ..input(thin)
++        };
++        mist.step(overcast, &mut ev, 0.0, 0.0);
++        assert_eq!(mist.scale, OVERCAST_SCALE);
++        assert_eq!(mist.source, MistSource::Weather);
++        let fog_held = MistInputs {
++            day: fog,
++            forced: true,
++            ..overcast
++        };
++        mist.step(fog_held, &mut ev, 0.0, 0.0);
++        assert_eq!(mist.scale, day_roll(fog).scale);
++        assert_eq!(mist.source, MistSource::FogDay);
++    }
++
++    /// A new strength eases in over about twenty seconds: no step between frames, little in the
++    /// first seconds, within 5% at twenty, there at forty.
++    #[test]
++    fn a_change_eases_in() {
++        let mut mist = LookMist::default();
++        let mut ev = WorldMist::default();
++        let thin = (0..).find(|&d| day_roll(d).scale < 0.3).unwrap();
++        let from = day_roll(thin).scale;
++        mist.step(input(thin), &mut ev, 0.0, 0.0);
++        assert_eq!(mist.scale, from, "the first frame snaps");
++        // The rain comes: four times the hour's.
++        let rain = MistInputs {
++            weather: 4.0,
++            ..input(thin)
++        };
++        let dt = 1.0 / 60.0;
++        let (mut t, mut last) = (0.0, mist.scale);
++        let mut at = |secs: f32, mist: &mut LookMist, ev: &mut WorldMist| {
++            while t < f64::from(secs) - 1e-6 {
++                t += f64::from(dt);
++                mist.step(rain, ev, dt, t);
++                assert!((mist.scale - last).abs() < 0.01, "a pop at {t}");
++                assert!(mist.scale >= last - 1e-6, "monotonic");
++                last = mist.scale;
++            }
++            (mist.scale - from) / (4.0 - from)
++        };
++        assert!(at(2.0, &mut mist, &mut ev) < 0.1, "a gentle start");
++        let half = at(8.0, &mut mist, &mut ev);
++        assert!((0.3..0.8).contains(&half), "{half}");
++        assert!(at(20.0, &mut mist, &mut ev) > 0.95);
++        assert!(at(40.0, &mut mist, &mut ev) > 0.999);
++        // Holding a day for film snaps to it, as does letting it go.
++        let other = (0..).find(|&d| day_roll(d).scale > 1.5).unwrap();
++        mist.step(
++            MistInputs {
++                day: other,
++                forced: true,
++                ..input(thin)
++            },
++            &mut ev,
++            dt,
++            t,
++        );
++        assert_eq!(mist.scale, day_roll(other).scale);
++    }
++
++    /// An event wins over the day and the weather, eased in and out over its own time; a held
++    /// tune wins over all, at once, and lets go to what was under it.
++    #[test]
++    fn an_event_wins_and_a_held_tune_wins_over_all() {
++        let mut mist = LookMist::default();
++        let mut ev = WorldMist::default();
++        let day = (0..)
++            .find(|&d| (0.5..1.5).contains(&day_roll(d).scale))
++            .unwrap();
++        let base = day_roll(day).scale;
++        let stormy = MistInputs {
++            weather: 2.0,
++            ..input(day)
++        };
++        let t = run(&mut mist, &mut ev, stormy, 0.0, 60.0);
++        assert!((mist.scale - 2.0).abs() < 1e-3);
++        ev.request(MistEvent::Set {
++            scale: 3.5,
++            secs: Some(2.0),
++        });
++        let t = run(&mut mist, &mut ev, stormy, t, 1.0);
++        assert!(mist.scale > 2.0 && mist.scale < 3.5, "{}", mist.scale);
++        assert_eq!(mist.source, MistSource::Event);
++        let t = run(&mut mist, &mut ev, stormy, t, 1.5);
++        assert!((mist.scale - 3.5).abs() < 1e-4);
++        // An event's thin mist wins over a heavy day too.
++        ev.request(MistEvent::Set {
++            scale: 0.0,
++            secs: Some(0.0),
++        });
++        let t = run(&mut mist, &mut ev, stormy, t, 0.1);
++        assert_eq!(mist.scale, 0.0);
++        ev.request(MistEvent::Set {
++            scale: 9.0,
++            secs: None,
++        });
++        let t = run(&mut mist, &mut ev, stormy, t, 0.1);
++        assert!(mist.scale < 0.2, "no time given: the twenty-second ease");
++        let t = run(&mut mist, &mut ev, stormy, t, MIST_EASE_SECS);
++        assert_eq!(mist.scale, SCALE_MAX, "held to the most");
++
++        // A tune held wins at once, and lets go to the event under it.
++        let held = MistInputs {
++            held: Some(0.5),
++            ..stormy
++        };
++        let t = run(&mut mist, &mut ev, held, t, 0.1);
++        assert_eq!((mist.scale, mist.source), (0.5, MistSource::Held));
++        ev.request(MistEvent::Clear { secs: Some(2.0) });
++        let t = run(&mut mist, &mut ev, held, t, 1.0);
++        assert_eq!(mist.scale, 0.5, "held over a clearing event");
++        let t = run(&mut mist, &mut ev, stormy, t, 0.1);
++        assert!(mist.scale > 2.0 && mist.scale < SCALE_MAX, "{}", mist.scale);
++        let t = run(&mut mist, &mut ev, stormy, t, 2.0);
++        assert!(!ev.active());
++        assert!((mist.scale - 2.0).abs() < 1e-3, "back to the weather's");
++        // The weather passes; the day's own eases back.
++        run(&mut mist, &mut ev, input(day), t, 60.0);
++        assert!((mist.scale - base).abs() < 1e-3);
++        assert_eq!(mist.source, MistSource::DayRoll);
++        // A clear with no event is nothing.
++        ev.request(MistEvent::Clear { secs: None });
++        run(&mut mist, &mut ev, input(day), t + 60.0, 0.1);
++        assert!(!ev.active());
++    }
++
++    /// The system reads the server's day (not the film clock), the weather and the tune.
++    #[test]
++    fn the_system_follows_the_servers_day() {
++        let mut app = App::new();
++        app.init_resource::<Time<Real>>()
++            .init_resource::<LookMistTune>()
++            .insert_resource(WorldTime {
++                minute: 330,
++                minute_f: 330.0,
++                day: 10_002.0 + 330.0 / 1440.0,
++                date: 20_763,
++                live: true,
++            })
++            .add_systems(Update, resolve_mist);
++        init_resources(&mut app);
++        app.update();
++        let mist = *app.world().resource::<LookMist>();
++        assert_eq!(mist.day, 20_763, "the date, not the moon's day count");
++        assert_eq!(mist.scale, day_roll(20_763).scale);
++        app.world_mut().resource_mut::<LookMistTune>().day = Some(5);
++        app.update();
++        assert_eq!(app.world().resource::<LookMist>().day, 5);
++        assert_eq!(app.world().resource::<LookMist>().scale, day_roll(5).scale);
++    }
++}
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index e525a21..51cd7ee 100644
+index e525a21..b5065c7 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
-@@ -12,8 +12,9 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
+@@ -11,9 +11,12 @@ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
+ use benilla_formats::{AreaTableCatalog, Atmosphere};
  
  pub mod grade;
++pub mod mist;
  pub mod pass;
 +pub mod rays;
  pub use grade::{GradeKey, PostLook, Tint};
 -pub use pass::{LookBloomTune, LookFrame, LookView};
++pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
 +pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
  
  /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
  /// test) is the reference; the game turns it on from its `worldLook` CVar.
+@@ -201,6 +204,7 @@ pub(crate) fn init_resources(app: &mut App) {
+     app.init_resource::<WorldLook>()
+         .init_resource::<ZoneRamp>()
+         .init_resource::<LookGrade>();
++    mist::init_resources(app);
+ }
+ 
+ /// The new look's world side: its resources, the area table its zone lookup reads, and the
 diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
-index d39cb4e..bf06dd7 100644
+index d39cb4e..0b48d59 100644
 --- a/crates/benilla-world/src/look/pass.rs
 +++ b/crates/benilla-world/src/look/pass.rs
 @@ -1,7 +1,8 @@
@@ -96,23 +1137,26 @@ index d39cb4e..bf06dd7 100644
  }
  
  impl LookFrame {
-@@ -49,14 +60,35 @@ impl LookFrame {
+@@ -49,14 +60,38 @@ impl LookFrame {
      }
  }
  
 -fn publish_frame(look: Res<WorldLook>, grade: Res<LookGrade>, mut frame: ResMut<LookFrame>) {
-+/// The mist held at a multiple of the hour's own for tuning on film (`lookmist <scale>`, benilla's
-+/// console), so one take can run from subtle to the densest still playable; `None` follows the
-+/// grade. Inert under the classic look, which has no mist.
++/// The mist held for film (benilla's console): `scale` at a multiple of the hour's own
++/// (`lookmist <scale>`), so one take can run from subtle to the densest still playable, winning
++/// over the day, the weather and any event; `day` rolls the mist for that day instead of the
++/// server's (`lookmist day <n>`). `None` follows the game ([`super::mist`]). Inert under the
++/// classic look, which has no mist.
 +#[derive(Resource, Clone, Copy, Default, Debug, PartialEq)]
 +pub struct LookMistTune {
 +    pub scale: Option<f32>,
++    pub day: Option<i64>,
 +}
 +
 +fn publish_frame(
 +    look: Res<WorldLook>,
 +    grade: Res<LookGrade>,
-+    mist: Res<LookMistTune>,
++    mist: Res<super::LookMist>,
 +    lighting: Res<crate::lighting::WowLighting>,
 +    viewer: Res<crate::view::Viewer>,
 +    mut frame: ResMut<LookFrame>,
@@ -122,7 +1166,7 @@ index d39cb4e..bf06dd7 100644
          post: if look.on {
 -            grade.post
 +            let mut post = grade.post;
-+            post.height_fog *= mist.scale.unwrap_or(1.0);
++            post.height_fog *= mist.scale;
 +            post
          } else {
              PostLook::NEUTRAL
@@ -134,7 +1178,7 @@ index d39cb4e..bf06dd7 100644
      };
      if *frame != next {
          *frame = next;
-@@ -130,6 +162,22 @@ fn sync_bloom(
+@@ -130,6 +165,22 @@ fn sync_bloom(
      }
  }
  
@@ -157,7 +1201,7 @@ index d39cb4e..bf06dd7 100644
  // ---------------------------------------------------------------- the grade, on the CPU
  
  /// Rec. 709 luminance weights, the shader's `LUMA`.
-@@ -173,18 +221,54 @@ pub fn srgb_to_linear(c: f32) -> f32 {
+@@ -173,18 +224,54 @@ pub fn srgb_to_linear(c: f32) -> f32 {
  
  // ---------------------------------------------------------------- render world
  
@@ -214,7 +1258,7 @@ index d39cb4e..bf06dd7 100644
          }
      }
  }
-@@ -194,30 +278,53 @@ const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
+@@ -194,30 +281,53 @@ const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
  #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
  pub(crate) struct LookLabel;
  
@@ -275,7 +1319,7 @@ index d39cb4e..bf06dd7 100644
  }
  
  impl SpecializedRenderPipeline for LookPipeline {
-@@ -226,7 +333,7 @@ impl SpecializedRenderPipeline for LookPipeline {
+@@ -226,7 +336,7 @@ impl SpecializedRenderPipeline for LookPipeline {
      fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
          RenderPipelineDescriptor {
              label: Some("world_look".into()),
@@ -284,7 +1328,7 @@ index d39cb4e..bf06dd7 100644
              vertex: self.fullscreen.to_vertex_state(),
              fragment: Some(FragmentState {
                  shader: self.shader.clone(),
-@@ -248,19 +355,23 @@ fn init_pipeline(
+@@ -248,19 +358,23 @@ fn init_pipeline(
      fullscreen: Res<FullscreenShader>,
      asset_server: Res<AssetServer>,
  ) {
@@ -319,7 +1363,7 @@ index d39cb4e..bf06dd7 100644
          shader: asset_server.load("embedded://benilla_world/shaders/world_look.wgsl"),
          fullscreen: fullscreen.clone(),
      });
-@@ -270,7 +381,7 @@ fn init_pipeline(
+@@ -270,7 +384,7 @@ fn init_pipeline(
  #[derive(Component)]
  struct LookViewGpu {
      pipeline: CachedRenderPipelineId,
@@ -328,7 +1372,7 @@ index d39cb4e..bf06dd7 100644
      uniform: Buffer,
  }
  
-@@ -280,14 +391,17 @@ fn prepare_look_views(
+@@ -280,14 +394,17 @@ fn prepare_look_views(
      cache: Res<PipelineCache>,
      pipeline: Res<LookPipeline>,
      mut pipelines: ResMut<SpecializedRenderPipelines<LookPipeline>>,
@@ -351,7 +1395,7 @@ index d39cb4e..bf06dd7 100644
          let uniform = device.create_buffer(&BufferDescriptor {
              label: Some("world_look_uniform"),
              size: UNIFORM_BYTES,
-@@ -296,7 +410,7 @@ fn prepare_look_views(
+@@ -296,7 +413,7 @@ fn prepare_look_views(
          });
          commands.entity(entity).insert(LookViewGpu {
              pipeline: id,
@@ -360,7 +1404,7 @@ index d39cb4e..bf06dd7 100644
              uniform,
          });
      }
-@@ -306,13 +420,18 @@ fn prepare_look_views(
+@@ -306,13 +423,18 @@ fn prepare_look_views(
  struct LookNode;
  
  impl ViewNode for LookNode {
@@ -381,7 +1425,7 @@ index d39cb4e..bf06dd7 100644
          world: &'w World,
      ) -> Result<(), NodeRunError> {
          let frame = *world.resource::<LookFrame>();
-@@ -324,17 +443,38 @@ impl ViewNode for LookNode {
+@@ -324,17 +446,38 @@ impl ViewNode for LookNode {
          let Some(pipeline) = cache.get_render_pipeline(gpu.pipeline) else {
              return Ok(()); // still compiling: this frame is ungraded
          };
@@ -426,7 +1470,7 @@ index d39cb4e..bf06dd7 100644
          );
          let diagnostics = render_context.diagnostic_recorder();
          let mut pass = render_context
-@@ -365,13 +505,14 @@ impl ViewNode for LookNode {
+@@ -365,13 +508,18 @@ impl ViewNode for LookNode {
  pub(super) fn build(app: &mut App) {
      app.init_resource::<LookFrame>()
          .init_resource::<LookBloomTune>()
@@ -438,11 +1482,15 @@ index d39cb4e..bf06dd7 100644
          .add_systems(
              Update,
 -            (publish_frame, sync_bloom)
-+            (publish_frame, (sync_bloom, sync_depth_binding))
++            (
++                super::mist::resolve_mist,
++                publish_frame,
++                (sync_bloom, sync_depth_binding),
++            )
                  .chain()
                  .in_set(crate::lighting::LightingConsumeSet),
          );
-@@ -428,12 +569,14 @@ mod tests {
+@@ -428,12 +576,14 @@ mod tests {
          }
          assert!(!LookFrame {
              on: true,
@@ -459,7 +1507,7 @@ index d39cb4e..bf06dd7 100644
          }
          .grades());
      }
-@@ -469,16 +612,73 @@ mod tests {
+@@ -469,16 +619,73 @@ mod tests {
          assert!(grade_linear([0.05; 3], &c)[0] < 0.05);
      }
  
@@ -538,16 +1586,19 @@ index d39cb4e..bf06dd7 100644
      }
  
      #[test]
-@@ -490,6 +690,38 @@ mod tests {
+@@ -490,6 +697,46 @@ mod tests {
          assert_eq!(b.prefilter.threshold_softness, 0.5);
      }
  
-+    /// A held mist scales the hour's own, lets go to it again, and never mists the classic look.
++    /// The day's mist scales the hour's own, a held one wins at once and lets go to the day's
++    /// again, and the classic look is never misted.
 +    #[test]
 +    fn a_held_mist_scales_the_hours() {
 +        let mut app = App::new();
++        super::super::mist::init_resources(&mut app);
 +        app.init_resource::<LookFrame>()
 +            .init_resource::<LookMistTune>()
++            .init_resource::<Time<Real>>()
 +            .init_resource::<crate::lighting::WowLighting>()
 +            .init_resource::<crate::view::Viewer>()
 +            .insert_resource(WorldLook::NEW)
@@ -558,16 +1609,21 @@ index d39cb4e..bf06dd7 100644
 +                },
 +                strength: 1.0,
 +            })
-+            .add_systems(Update, publish_frame);
++            .add_systems(
++                Update,
++                (super::super::mist::resolve_mist, publish_frame).chain(),
++            );
 +        let fog = |app: &App| app.world().resource::<LookFrame>().post.height_fog;
++        // No server clock yet: day 0's roll.
++        let day = super::super::mist::day_roll(0).scale;
 +        app.update();
-+        assert!((fog(&app) - 0.6).abs() < 1e-6);
++        assert!((fog(&app) - 0.6 * day).abs() < 1e-6);
 +        app.world_mut().resource_mut::<LookMistTune>().scale = Some(2.5);
 +        app.update();
 +        assert!((fog(&app) - 1.5).abs() < 1e-6);
 +        app.world_mut().resource_mut::<LookMistTune>().scale = None;
 +        app.update();
-+        assert!((fog(&app) - 0.6).abs() < 1e-6);
++        assert!((fog(&app) - 0.6 * day).abs() < 1e-6);
 +        app.world_mut().resource_mut::<LookMistTune>().scale = Some(3.0);
 +        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
 +        app.update();
