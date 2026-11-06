@@ -338,7 +338,9 @@ impl Survival {
         if !self.players.contains_key(&g.owner) {
             return;
         }
-        let damage = (d.damage[0] + d.per_lander * landers.len() as f32).min(d.damage[1]);
+        // Capped after the caster's own might (Holy Light's stacks): 110 is the most it lands for.
+        let might = self.players.get(&g.owner).map_or(1.0, |p| 1.0 + self.effect_of(p, "might")).max(1.0);
+        let damage = (d.damage[0] + d.per_lander * landers.len() as f32).min(d.damage[1] / might);
         let look = if d.full_spell != 0 { d.full_spell } else { d.spell };
         if look != 0 {
             self.events.push(Event::Missile { caster: g.owner, spell: look, target: Target::Point(g.at) });

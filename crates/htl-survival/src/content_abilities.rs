@@ -909,6 +909,10 @@ pub struct AbilityDef {
     /// dodge does: Fade's sidestep.
     #[serde(default)]
     pub sidestep: bool,
+    /// Stronger on a foe for the caster's Shadow Weaving on it, as the bolts that weave it are
+    /// (Shadow Burst).
+    #[serde(default)]
+    pub woven: bool,
 }
 
 /// A sigil's gift for each beat a hero lands (Holy Light): `might` more damage a stack (as a

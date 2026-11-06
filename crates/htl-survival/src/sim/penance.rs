@@ -119,6 +119,10 @@ impl Survival {
         self.light.penances.retain(|x| x.owner != id);
         for (k, r) in rings.iter().enumerate() {
             self.events.push(Event::PriestLook { player: id, kind: "penance", n: k as u32 + 1, on: Some(r.on), a: r.at - now, b: if r.friend { 1.0 } else { 0.0 } });
+            // A friend sees a faint ring on themself too: light is coming (nothing for them to press).
+            if r.friend && r.on != id {
+                self.events.push(Event::PriestLook { player: r.on, kind: "penance_ally", n: k as u32 + 1, on: Some(r.on), a: r.at - now, b: 1.0 });
+            }
         }
         self.light.penances.push(Penance { owner: id, ability, rings });
         true

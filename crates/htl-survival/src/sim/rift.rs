@@ -54,6 +54,8 @@ impl Survival {
             self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         }
         self.events.push(Event::PriestGround { kind: "rift", key: look, at, radius: d.radius[0], secs: life });
+        // On the caster's screen: open (the ultimate's key again implodes it at once, no hold).
+        self.events.push(Event::PriestLook { player: id, kind: "rift", n: 0, on: None, a: d.radius[0], b: life });
         let tick = if d.tick > 0.0 { d.tick } else { 1.0 };
         self.light.rifts.push(Rift { owner: id, ability, at, since: now, until: now + life, next_tick: now + tick.min(0.5), caught: BTreeSet::new(), dragged: BTreeMap::new(), look });
     }
@@ -200,6 +202,6 @@ impl Survival {
     fn rift_gone(&mut self, r: &Rift) {
         self.unmark(r.look);
         self.events.push(Event::PriestGround { kind: "rift", key: r.look, at: r.at, radius: 0.0, secs: 0.0 });
-        self.events.push(Event::PriestLook { player: r.owner, kind: "rift", n: 0, on: None, a: 0.0, b: 0.0 });
+        self.events.push(Event::PriestLook { player: r.owner, kind: "rift", n: 0, on: None, a: 0.0, b: -1.0 });
     }
 }

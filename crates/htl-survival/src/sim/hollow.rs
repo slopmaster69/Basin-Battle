@@ -130,6 +130,9 @@ impl Survival {
                     self.apply_effects(h.owner, f, &d.effects, 1.0, &d.name);
                 }
             }
+            // What it deals fills it, but never more than one foe's worth a pulse: a crowd of foes
+            // mustn't keep it alive while it heals a crowd of friends (ChatGPT's review).
+            let gained = gained.min(hd.damage);
             self.hollow_fill(h.mob, gained - given);
             k += 1;
         }
