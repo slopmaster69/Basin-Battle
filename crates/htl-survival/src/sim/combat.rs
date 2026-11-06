@@ -224,6 +224,12 @@ impl Survival {
                 self.ability_release(id);
                 true
             }
+            // The Void Tether held from the click: let go, it ends.
+            Input::AttackUp if matches!(p.action, Action::Channel { ability, .. } if self.content.abilities[ability].tether.is_some()) => {
+                self.end_ability_action(id);
+                self.set_action(id, Action::Ready);
+                true
+            }
             Input::Attack | Input::Heavy => {
                 if matches!(p.action, Action::Charge { .. } | Action::Channel { .. } | Action::Stance { .. } | Action::Dash { .. }) {
                     return true;
@@ -1770,11 +1776,7 @@ impl Survival {
         // out before it came, it's slipped where it's swung; see `slip_from`.)
         let grace = v.rtt.min(self.content.combat.max_grace);
         let blinked = s.how != HitKind::Projectile && self.slips.get(&s.victim).is_some_and(|b| b.at >= s.at - grace - 1.0e-4);
-        // A friend's Holy Nova or Leap of Faith as it landed (or since, while it waited): caught.
         let vpos = v.pos;
-        if self.covered(s.victim, s.attacker, s.at - grace, s.style) {
-            return;
-        }
         // Out of it by now: a whiff.
         let inside = match s.area {
             None => true,
@@ -2119,9 +2121,9 @@ impl Survival {
             self.set_cause(victim, recap::Cause::blow(attacker, recap::blow_word(style, heavy), caught));
             let before = p_health(self, victim);
             self.hurt_player(victim, landed);
-            // A blow that hurts (past any shield) costs a level of Grace.
-            if p_health(self, victim) < before {
-                self.lose_grace(victim);
+            // Shadowguard: what the shell stopped of it, stored.
+            if p_health(self, victim) <= before {
+                self.shell_store(victim, attacker, landed);
             }
         }
         outcome
@@ -2748,10 +2750,11 @@ impl Survival {
                 _ => {}
             }
         }
-        // A stance that cuts what reaches them (Dispersion).
+        // A stance that cuts what reaches them (a counter's `cut`, Shadowguard's shell).
         if let Some(c) = self.stances.get(&id).filter(|s| s.until > now).and_then(|s| self.content.abilities[s.ability].counter.as_ref()) {
             k *= (1.0 - c.cut).max(0.0);
         }
+        k *= (1.0 - self.shell_cut(id)).max(0.0);
         k
     }
 

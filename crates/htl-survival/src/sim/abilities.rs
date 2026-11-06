@@ -45,6 +45,8 @@ pub(crate) struct Projectile {
     pub look: Option<Id>,
     /// Loosed on a critical: the ability's `crit_effects` on what it strikes.
     pub critical: bool,
+    /// A shadow staff's Empowered bolt: its Valor on a hit.
+    pub empowered: bool,
 }
 
 /// Where a projectile is in its flight: going out (every projectile, at first); coming back to
@@ -127,6 +129,8 @@ pub struct Stance {
     pub shown: f32,
     /// The whole seconds it has mended its hero for (Dispersion's `mend`).
     pub mended: u32,
+    /// What a shell has stopped so far (Shadowguard's `shell`).
+    pub stored: f32,
 }
 
 /// How often a stance's lasting look is played again while it holds (the game's look is a
@@ -587,6 +591,23 @@ impl Survival {
             self.press_bomb(id, k);
             return true;
         }
+        // Penance under way: its key again is a press for the next ring.
+        if !ex && self.light.penances.iter().any(|x| x.owner == id && self.content.base_of(x.ability) == base) {
+            self.press_penance(id);
+            return true;
+        }
+        // Shadowguard: its key again lets the stored shadow go.
+        if let Action::Stance { ability, .. } = p.action {
+            if self.content.abilities[ability].shell.is_some() && self.content.base_of(ability) == base {
+                self.end_stance(id);
+                return true;
+            }
+        }
+        // A Void Rift open: its key again implodes it.
+        if let Some(k) = self.rift_of(id, base) {
+            self.implode_rift(id, k);
+            return true;
+        }
         // A rhythm going: its key again is a press for the next beat (the rhythm check).
         if let Action::Rhythm { ability, .. } = p.action {
             if self.content.base_of(ability) == base {
@@ -952,6 +973,9 @@ impl Survival {
             let early = held < self.players[&id].check_flare;
             self.events.push(Event::CheckResult { player: id, ability, grade: if early { "early" } else { "late" } });
         }
+        // Held well past its flare, it weakens (Greater Smite): back to its least.
+        let over = d.overcharge;
+        let share = if !perfect && over[0] > 0.0 && held > self.players[&id].check_flare + k.window + over[0] { over[1] } else { share };
         if let Some(p) = self.players.get_mut(&id) {
             p.cast_critical = critical;
         }
@@ -998,7 +1022,15 @@ impl Survival {
     /// The burst a perfect of this ability shows: its own, or the checks' default.
     pub(crate) fn perfect_kit_of(&self, ability: usize) -> u32 {
         let own = self.content.abilities[ability].perfect_kit;
-        if own != 0 { own } else { self.content.checks.perfect_kit }
+        if own != 0 {
+            return own;
+        }
+        // A Priest's perfect is holy, never the Mage's Arcane Explosion (Corey's review).
+        let priest = self.content.priest.perfect_kit;
+        if priest != 0 && self.content.abilities[self.content.base_of(ability)].school == "priest" {
+            return priest;
+        }
+        self.content.checks.perfect_kit
     }
 
     /// An aim or a charge called off (right click, a roll, the key again): no cooldown spent.
@@ -1025,13 +1057,9 @@ impl Survival {
         }
     }
 
-    /// An ability's charge (least, full), the bow's for a shot; a Heal begun with Grace, quicker.
+    /// An ability's charge (least, full), the bow's for a shot.
     pub(crate) fn charge_of(&self, id: Id, ability: usize) -> (f32, f32) {
         let d = &self.content.abilities[ability];
-        if d.spends_grace {
-            let k = 1.0 - self.grace_haste(id);
-            return (d.charge[0] * k, d.charge[1] * k);
-        }
         if d.kind == "shot" {
             let r = self.ranged_of(&self.players[&id]);
             if r.draw_secs <= 0.0 {
@@ -1164,6 +1192,10 @@ impl Survival {
         // A cast brings them out of a veil.
         self.end_veil(id);
         let cost = if free.is_some() { 0.0 } else { self.valor_cost(&d) };
+        // Shadow Word: Death: whether this one is the free one (a kill with it gives no other).
+        if d.kill_recast > 0.0 {
+            self.light.deaths.insert(id, free.is_some());
+        }
         if let Some(p) = self.players.get_mut(&id) {
             p.valor = (p.valor - cost).max(0.0);
             p.release_at_least = false;
@@ -1263,6 +1295,14 @@ impl Survival {
             }
             "projectile" | "shot" => {
                 self.launch(id, ability, share);
+                // Greater Smite let go in the air: thrown back.
+                if d.air_recoil > 0.0 {
+                    self.air_recoil(id, ability);
+                }
+                self.set_action(id, next);
+            }
+            "ground" if d.rift.is_some() => {
+                self.open_rift(id, ability, share);
                 self.set_action(id, next);
             }
             "ground" => {
@@ -1316,6 +1356,10 @@ impl Survival {
                 self.plant_banner(id, ability, share);
                 self.set_action(id, next);
             }
+            "place" if d.hollow.is_some() => {
+                self.throw_hollow(id, ability, share);
+                self.set_action(id, next);
+            }
             "place" => {
                 let range = AbilityDef::at(d.range, share);
                 let at = self.aim_point(id, range);
@@ -1332,13 +1376,20 @@ impl Survival {
                 self.start_orb(id, ability);
                 self.set_action(id, next);
             }
-            "rhythm" => {
-                // Penance's bolts, counted as they land (the flick).
-                if d.flick {
-                    self.start_flick(id, ability);
+            "rhythm" => self.start_rhythm(id, ability),
+            // Penance's rings, on the bodies in front of them; no one there, nothing spent.
+            "penance" => {
+                if !self.start_penance(id, ability) {
+                    self.refund_cast(id, ability, free.is_some());
                 }
-                self.start_rhythm(id, ability);
+                self.set_action(id, next);
             }
+            "feather" => {
+                self.lay_feather(id, ability, share);
+                self.set_action(id, next);
+            }
+            // Shadowguard: a stance whose key again lets the stored shadow go.
+            "shell" => self.start_stance(id, ability),
             // Salvation's circle where they stand.
             "sigil" => {
                 self.start_sigil(id, ability);
@@ -1351,10 +1402,6 @@ impl Survival {
             "nova" => {
                 let at = self.players[&id].pos;
                 self.nova(id, ability, at, share);
-                // Holy Nova: the friends in it covered, a blow landing on them caught.
-                if d.covers {
-                    self.cover_nova(id, ability, at, AbilityDef::at(d.radius, share));
-                }
                 self.set_action(id, next);
             }
             "line" => {
@@ -1378,18 +1425,16 @@ impl Survival {
                 self.place_trap(id, ability, share);
                 self.set_action(id, next);
             }
+            "channel" if d.tether.is_some() => self.start_tether(id, ability, share),
             "channel" => self.start_channel(id, ability, share),
             "beam" => self.start_beam(id, ability, share),
             "ally" if d.intervene > 0.0 => self.intervene(id, ability, share),
-            "ally" if d.spends_grace => {
-                self.grace_heal(id, ability, share);
-                self.set_action(id, next);
-            }
             "ally" => {
                 self.ally(id, ability, share);
                 self.set_action(id, next);
             }
             "dash" if d.crash.is_some() => self.start_tackle(id, ability, yaw, share),
+            "dash" if d.sidestep => self.sidestep(id, ability, share),
             "dash" => self.start_dash(id, ability, yaw, share),
             "blink" if d.anchor > 0.0 => {
                 self.return_to_anchor(id, ability);
@@ -1449,6 +1494,17 @@ impl Survival {
         };
         // A beat's own strength (a rhythm's), when it has one.
         let damage = self.players.get(&id).and_then(|p| p.cast_damage).unwrap_or(damage);
+        // A shadow staff's bolt after a pause: Empowered (faster, farther, harder, and Valor).
+        let empowered = self.empowered_now(id, ability);
+        let (speed, range, damage) = if empowered {
+            let k = &self.content.priest;
+            (speed * k.empower_speed, range + k.empower_range, damage * k.empower_damage)
+        } else {
+            (speed, range, damage)
+        };
+        if d.builds == "weave" {
+            self.bolt_fired(id);
+        }
         let damage = damage * self.perfect_mult(id);
         // An Arcane staff's heavy orb carries what the staff stored: its strength and look by how
         // many charges; none, and nothing goes but a fizzle in the hands.
@@ -1530,6 +1586,7 @@ impl Survival {
                 spell,
                 allies: d.friends(),
                 critical: all_charges || self.players.get(&id).is_some_and(|p| p.cast_critical),
+                empowered,
                 hits: Vec::new(),
                 // A full draw can go through more (Aimed Shot's).
                 pierce: if AbilityDef::full(share) { d.pierce.max(d.full_pierce) } else { d.pierce },
@@ -1859,6 +1916,7 @@ impl Survival {
                 born: self.clock,
                 bounced: 0,
                 look: Some(anchor),
+                empowered: false,
             };
             let end = self.look_end(&shot);
             self.events.push(Event::MissileFrom { anchor, caster: p.owner, spell: s.spell, from, target: Target::Point(end) });
@@ -1878,10 +1936,19 @@ impl Survival {
         if let Some(a) = p.look {
             self.hunt.anchors.push((a, self.clock + 1.0));
         }
+        // Healing Gust that met no friend: what's left of it comes back to its caster.
+        let d = &self.content.abilities[p.ability];
+        if d.self_heal > 0.0 && d.friends_only && p.hits.is_empty() && p.stage == Stage::Out {
+            let (heal, name) = (d.ally_heal * d.self_heal, d.name.clone());
+            if let Some(amount) = self.players.get(&p.owner).filter(|o| o.health > 0).map(|o| (o.max_health as f32 * heal * self.weakened(p.owner)).round() as u32) {
+                self.heal_hero_by(p.owner, amount, p.owner, &name);
+                self.events.push(Event::Missile { caster: p.owner, spell: HEAL_LOOK, target: Target::Unit(p.owner) });
+            }
+        }
     }
 
     /// The line `from` along `dir` for `range` to the first ground or wall, through every body.
-    fn wall_trace(&self, from: Vec3, dir: Vec3, range: f32, owner: Id) -> Trace {
+    pub(crate) fn wall_trace(&self, from: Vec3, dir: Vec3, range: f32, owner: Id) -> Trace {
         let all: Vec<Id> = self.bodies_with(owner, true).into_iter().map(|b| b.0).collect();
         if all.is_empty() {
             return self.trace(from, dir, range, 0.0, owner);
@@ -1991,6 +2058,7 @@ impl Survival {
             born,
             bounced: 0,
             look: None,
+            empowered: false,
         });
     }
 
@@ -2201,18 +2269,10 @@ impl Survival {
         // (Outside Siege that's any other hero, friendly fire or not: a bolt that would both heal
         // and hurt them heals them, as the caster meant.)
         if p.allies && self.players.contains_key(&victim) && self.helpable(p.owner, victim) {
-            if self.content.abilities[p.ability].flick {
-                self.flick_landed(p, true);
-            }
             self.friend_hit(p, victim);
             return;
         }
         let d = self.content.abilities[p.ability].clone();
-        if d.flick {
-            self.flick_landed(p, false);
-        }
-        // Kindle: the caster's Holy Fire burning on the foe it reaches burns hotter.
-        self.kindle(p.owner, victim);
         if d.splash > 0.0 {
             self.burst(p, p.pos, Some(victim));
             return;
@@ -2237,6 +2297,14 @@ impl Survival {
     fn strike_with(&mut self, p: &Projectile, victim: Id, from: Vec3) {
         // A staff's heavy bolt spends what its plain bolts built, harder for each.
         let spent = self.staff_spend(p.owner, victim, p.ability);
+        // Dark Reckoning on a foe with nothing woven into it: it finds nothing to rip out.
+        if spent <= 0.0 {
+            let kit = self.content.checks.fizzle_kit;
+            if kit != 0 {
+                self.events.push(Event::Visual { id: victim, kit, by: Some(p.owner) });
+            }
+            return;
+        }
         let p = &Projectile { damage: p.damage * spent, ..p.clone() };
         // Fire Ward's own Fire Blasts and the like are owned by whoever fired them back.
         let landed = if self.players.contains_key(&victim) {
@@ -2265,9 +2333,13 @@ impl Survival {
                 self.events.push(Event::Visual { id: victim, kit: full, by: Some(p.owner) });
             }
         }
-        // A staff's plain bolt builds its heat, chill or charge.
+        // A staff's plain bolt builds its heat, chill or charge (or the Priest's Weaving or mark).
         if self.alive(victim) {
             self.staff_build(p.owner, victim, p.ability);
+        }
+        if p.empowered {
+            let v = self.content.priest.empower_valor;
+            self.gain_valor(p.owner, v);
         }
     }
 
@@ -2279,12 +2351,6 @@ impl Survival {
         if d.friends_only {
             self.friendly_bolt_lands(p.owner, friend, p.ability);
             return;
-        }
-        // Leap of Faith: the friend it pulls is covered, a blow landing on them as it does missed.
-        if d.covers {
-            if let Some(from) = self.players.get(&friend).map(|f| f.pos) {
-                self.cover_pull(p.owner, p.ability, friend, from);
-            }
         }
         if d.mend > 0.0 {
             // A flat heal (Penance's bolt).
@@ -2333,6 +2399,8 @@ impl Survival {
         }
         let mark = self.take_mark(victim);
         dmg *= 1.0 + mark;
+        // The Priest's: Shadow Weaving on the foe, a shadowed foe, Searing Light torn out.
+        dmg = self.priest_damage(owner, victim, ability, dmg);
         if mark > 0.0 && mark_crit > 1.0 {
             dmg *= mark_crit;
             // A critical shows in its blow: Heroic Strike's flash, a heavy weapon's crit and the
@@ -2527,6 +2595,10 @@ impl Survival {
             self.gain_valor(owner, d.valor as f32);
             // No word: the Valor bar fills back with a flare and Clearcasting's chime.
             self.cue(Some(owner), owner, 0, cues::SOUND_VALOR_BACK, cues::BEAT_VALOR_BACK);
+        }
+        // Shadow Word: Death that killed: one free cast of it, a moment (not from a free one).
+        if killed && d.kill_recast > 0.0 {
+            self.death_kill(owner, ability);
         }
         // Shadow Word: Death that didn't kill: its backlash on the caster.
         if d.backlash > 0.0 && !killed && self.players.get(&owner).is_some_and(|p| p.health > 0) {
@@ -2816,6 +2888,11 @@ impl Survival {
             self.events.push(Event::Cast { caster: id, spell: d.spell, ms: (d.delay * 1000.0) as u32 });
         }
         let perfect = self.players.get(&id).is_some_and(|p| p.cast_perfect);
+        // Mind Blast's sigil, drawn narrowing to its heart (`PG blast`) on the clients that draw it.
+        if d.heart[0] > 0.0 && d.delay > 0.0 {
+            let key = self.alloc();
+            self.events.push(Event::PriestGround { kind: "blast", key, at, radius, secs: d.delay });
+        }
         self.grounds.push(GroundCast { owner: id, ability, at, radius, share, land_at, mark, shown: false, perfect });
         if d.delay <= 0.0 {
             self.step_grounds();
@@ -2848,7 +2925,21 @@ impl Survival {
                 self.events.push(Event::Missile { caster: g.owner, spell: d.spell, target });
             }
             let damage = AbilityDef::at(d.damage, g.share) * if g.perfect { self.content.checks.perfect_damage } else { 1.0 };
+            // Mind Blast's heart: the foe in it struck true (the perfect, once).
+            if d.heart[0] > 0.0 {
+                self.light.heart = Some((g.at, d.heart[0], d.heart[1], damage));
+                self.light.heart_struck = false;
+            }
             self.area(g.owner, g.ability, g.at, g.radius, g.share, damage, None);
+            if self.light.heart.take().is_some() && std::mem::take(&mut self.light.heart_struck) {
+                self.gain_valor(g.owner, d.heart[2]);
+                let kit = self.perfect_kit_of(g.ability);
+                if kit != 0 {
+                    self.events.push(Event::Visual { id: g.owner, kit, by: None });
+                }
+                self.events.push(Event::Perfect { player: g.owner, ability: g.ability });
+                self.check_result(g.owner, g.ability, "perfect");
+            }
             self.linger_at(g.owner, g.ability, g.at, g.radius);
             // What it calls down stands there (an Infernal).
             if d.totem.is_some() {
@@ -2909,7 +3000,7 @@ impl Survival {
         }
         // A flat heal for friends in it (Holy Nova's); a sigil's pillar heals only those who
         // landed its beat (`sigil.rs`).
-        let mend = self.content.abilities[ability].mend;
+        let mend = self.content.abilities[ability].mend * if self.light.boost > 0.0 { self.light.boost } else { 1.0 };
         if mend > 0.0 && self.content.abilities[ability].kind != "sigil" {
             let friends: Vec<Id> = self.players.iter().filter(|(h, p)| self.helpable(owner, **h) && p.health > 0 && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
             let name = self.content.abilities[ability].name.clone();
@@ -3078,7 +3169,16 @@ impl Survival {
             self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         }
         let damage = AbilityDef::at(d.damage, share);
-        self.area(id, ability, at, radius, share, damage, None);
+        // Holy Nova: stronger for every other hero inside it.
+        let boost = if d.per_hero[0] > 0.0 {
+            let n = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.helpable(id, **h) && dist2d(p.pos, at) <= radius + HERO_SIZE).count();
+            1.0 + (d.per_hero[0] * n as f32).min(d.per_hero[1])
+        } else {
+            1.0
+        };
+        self.light.boost = boost;
+        self.area(id, ability, at, radius, share, damage * boost, None);
+        self.light.boost = 0.0;
         if self.debug_draws() {
             self.mark(at, radius, 0.8);
         }
@@ -3221,6 +3321,12 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             p.action = Action::Channel { ability, target, until, next: next + d.tick.max(0.2), share };
         }
+        // The Void Tether: ramping, and what it does by what it holds.
+        if d.tether.is_some() {
+            let held = d.secs - (until - now);
+            self.tether_tick(id, target, ability, d.tick.max(0.2), held);
+            return;
+        }
         let per = AbilityDef::at(d.damage, share) * d.tick.max(0.2);
         self.channel_hit(id, target, ability, share, per, 1.0);
     }
@@ -3361,7 +3467,7 @@ impl Survival {
     /// (5649), which buried the whole rush in the lab.
     const KIT_RUSH_DUST: u32 = 44;
 
-    fn start_dash(&mut self, id: Id, ability: usize, yaw: f32, share: f32) {
+    pub(crate) fn start_dash(&mut self, id: Id, ability: usize, yaw: f32, share: f32) {
         let d = self.content.abilities[ability].clone();
         let range = AbilityDef::at(d.range, share);
         let pos = self.players[&id].pos;
@@ -3472,10 +3578,10 @@ impl Survival {
 
     // --- stances (counters) ---------------------------------------------------------------------------
 
-    fn start_stance(&mut self, id: Id, ability: usize) {
+    pub(crate) fn start_stance(&mut self, id: Id, ability: usize) {
         let now = self.clock;
         let d = self.content.abilities[ability].clone();
-        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY, mended: 0 });
+        self.stances.insert(id, Stance { ability, until: now + d.secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY, mended: 0, stored: 0.0 });
         self.set_action(id, Action::Stance { ability, until: now + d.secs });
         if d.counter.as_ref().is_some_and(|c| c.guard_pose) {
             self.events.push(Event::Guard { player: id, up: true });
@@ -3512,7 +3618,7 @@ impl Survival {
     }
 
     /// A blink with `slip`: where it went from and when, for the blows it slips.
-    fn note_slip(&mut self, id: Id, ability: usize, from: Vec3) {
+    pub(crate) fn note_slip(&mut self, id: Id, ability: usize, from: Vec3) {
         let at = self.clock;
         self.slips.insert(id, moves::Slip { ability, at, from, paid: false });
     }
@@ -3540,18 +3646,30 @@ impl Survival {
             self.hasten(id, ability, d.slip_hasten);
         }
         self.gain_valor(id, self.content.valor.counter);
-        let k = self.content.checks.perfect_kit;
+        let k = self.perfect_kit_of(ability);
         if k != 0 {
             self.events.push(Event::Visual { id, kit: k, by: None });
         }
         self.events.push(Event::Perfect { player: id, ability });
-        // Fade: the foes round where they stood slowed, the hero quickened, an afterimage left.
+        // Fade: the striker slowed (and the foes round where they stood, given a reach), the
+        // hero quickened, an afterimage left.
         if !d.slip_effects.is_empty() {
             self.events.push(Event::PriestLook { player: id, kind: "fade", n: 1, on: Some(id), a: 0.0, b: 0.0 });
-            let (mobs, heroes) = self.in_wedge(id, ability, from, 0.0, 360.0, d.slip_radius);
+            let mut struck: Vec<Id> = if d.slip_radius > 0.0 {
+                let (mobs, heroes) = self.in_wedge(id, ability, from, 0.0, 360.0, d.slip_radius);
+                mobs.into_iter().chain(heroes).collect()
+            } else {
+                Vec::new()
+            };
+            if self.alive(attacker) && !struck.contains(&attacker) {
+                struck.push(attacker);
+            }
             let was = self.fx_from.replace(from);
-            for u in mobs.into_iter().chain(heroes) {
+            for u in struck {
                 self.apply_effects(id, u, &d.slip_effects, 1.0, &d.name);
+                if d.impact_kit != 0 {
+                    self.events.push(Event::Visual { id: u, kit: d.impact_kit, by: Some(id) });
+                }
             }
             self.fx_from = was;
         }
@@ -3581,6 +3699,13 @@ impl Survival {
     pub(crate) fn end_stance(&mut self, id: Id) {
         let Some(s) = self.stances.remove(&id) else { return };
         let d = self.content.abilities[s.ability].clone();
+        // Shadowguard: the stored shadow flies.
+        if d.shell.is_some() && self.players.contains_key(&id) {
+            if matches!(self.players[&id].action, Action::Stance { .. }) {
+                self.set_action(id, Action::Ready);
+            }
+            self.shell_release(id, s.ability, s.stored, s.struck);
+        }
         // Cold Snap: its ice bursts as it breaks.
         if let (Some(nova), Some(at)) = (self.content.ability(&d.leaves), self.players.get(&id).filter(|p| p.health > 0).map(|p| p.pos)) {
             self.nova(id, nova, at, 1.0);
@@ -3815,6 +3940,7 @@ impl Survival {
             born,
             bounced: 0,
             look: None,
+            empowered: false,
         });
     }
 
@@ -4017,7 +4143,7 @@ impl Survival {
                 let free = !self.stances.contains_key(&mid);
                 if free && (now % 4.0) < 0.06 {
                     let secs = self.content.abilities[a].secs;
-                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY, mended: 0 });
+                    self.stances.insert(mid, Stance { ability: a, until: now + secs, caught: false, since: now, struck: None, shown: now - STANCE_LOOK_EVERY, mended: 0, stored: 0.0 });
                     self.events.push(Event::Auras { id: mid });
                 }
             }

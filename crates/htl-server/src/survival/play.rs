@@ -440,13 +440,22 @@ impl SurvivalGame {
                 let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
                 let mine = self.conn_of(player);
                 let line = |own: u8| format!("PL\t{kind}\t{n}\t{g:#X}\t{a:.2}\t{b:.2}\t{own}");
-                if matches!(kind, "shield" | "kindle" | "fade") {
+                if matches!(kind, "shield" | "fade") {
                     let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
                     for c in conns {
                         self.ui_line(c, &line(u8::from(Some(c) == mine)));
                     }
                 } else if let Some(c) = mine {
                     self.ui_line(c, &line(1));
+                }
+            }
+            Event::PriestGround { kind, key, at, radius, secs } => {
+                // A Priest's mark on the ground for everyone with the add-on (`PG`): a feather to
+                // step on, a rift to keep out of.
+                let line = format!("PG\t{kind}\t{key}\t{:.2}\t{:.2}\t{:.2}\t{radius:.2}\t{secs:.2}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
                 }
             }
             Event::OrbGone { look } => {
@@ -456,9 +465,15 @@ impl SurvivalGame {
                 }
             }
             Event::Stacks { player, kind, n, on } => {
-                // A staff's heat, chill or charges, for the caster's reticle mark.
+                // A staff's heat, chill or charges, for the caster's reticle mark (the Priest's
+                // Weaving and Searing Light on the foe).
                 if let Some(c) = self.conn_of(player) {
-                    let most = self.sim.content.staffs.most;
+                    let k = &self.sim.content;
+                    let most = match kind {
+                        "weave" => k.priest.weave_most,
+                        "sear" => 1,
+                        _ => k.staffs.most,
+                    };
                     let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
                     self.ui_line(c, &format!("SK	{kind}	{n}	{most}	{g:#X}"));
                 }

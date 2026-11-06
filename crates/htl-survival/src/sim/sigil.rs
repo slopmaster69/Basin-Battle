@@ -1,13 +1,16 @@
 //! The group check: Holy Word: Salvation. A great circle of light where the Priest stands, seen
-//! by everyone, friend and foe: the one floor mark the Priest makes, and the point of it. Its rim
-//! closes on the centre on each of its `beats` (2 sec, then 1.5, then 1), drawn as a friend's
-//! ring shrinking step by step, and flashes as it touches. Every hero inside who acts (attacks,
-//! dodges, guards, casts: any action key) within `[checks] window` of a beat lands it: their own
-//! perfect, and a stack of Holy Light (more damage, their blows glowing gold). A hero who misses
-//! one just has a smaller gift. The last beat calls a pillar of light at the centre: its damage
-//! grows with every hero who landed it, and it heals each of them.
+//! by everyone, friend and foe: the one floor mark the Priest makes, and the point of it. On each
+//! of its `beats` (2 sec, then 1.5, then 1) a ring runs out from the Priest to the circle's edge
+//! (Corey: the edge is the line everyone can see), drawn as a friend's ring growing step by step,
+//! and flashes as it reaches it. Every hero inside who acts (attacks, dodges, guards, casts: any
+//! action key) within `[checks] window` of a beat lands it: their own perfect, and a stack of
+//! Holy Light (more damage, their blows glowing gold). A hero who misses one just has a smaller
+//! gift. The last beat calls a pillar of light at the centre: its damage grows with every hero
+//! who landed it, and it heals each of them.
 //!
-//! The Priest gets a perfect for each beat any friend lands (Grace is fed from it).
+//! The Priest rises on wings of light (`float`) while it lasts: held up there, nothing reaching
+//! them, still able to fight (and so to land the beats themselves, alone). They come down slowly
+//! as it ends, as Skyfall's hunter does.
 //!
 //! Lag: each hero's press is judged on their own screen (its arrival less their round trip, as
 //! far back as `combat.max_rewind`), and where they stood then; a beat waits that long before
@@ -70,6 +73,10 @@ impl Survival {
             .collect();
         let n = beats.len();
         let life = t - now + self.settle_wait() + 0.2;
+        // Up on wings of light till the last beat is settled.
+        if d.float > 0.0 {
+            self.float_up(id, ability, t + self.settle_wait());
+        }
         // The circle, for everyone: a friend's ring (the deliberate floor mark), and its light on
         // the ground.
         let ring = self.mark_kind(at, radius, life, true);
@@ -126,7 +133,7 @@ impl Survival {
                         self.unmark(m);
                         self.light.drawn_marks.remove(&m);
                     }
-                    let r = d.radius[1] * (RIM_STEPS - step) as f32 / (RIM_STEPS + 1) as f32;
+                    let r = d.radius[1] * (step + 1) as f32 / RIM_STEPS as f32;
                     let m = self.mark_kind(g.at, r, span / RIM_STEPS as f32 + 0.05, true);
                     self.light.drawn_marks.insert(m);
                     self.light.sigils[k].rim = Some((m, step, b));
@@ -135,12 +142,17 @@ impl Survival {
                 self.unmark(m);
                 self.light.sigils[k].rim = None;
             }
-            // Each beat's flash as the rim touches the centre: the light, and a ring running out.
+            // Each beat's flash as the ring reaches the edge: the light there, and the edge's ring.
             let fallen = g.beats.iter().filter(|b| **b <= now + 1.0e-4).count();
             if fallen > g.flashed {
                 self.light.sigils[k].flashed = fallen;
                 if d.tick_spell != 0 {
-                    self.events.push(Event::Missile { caster: g.owner, spell: d.tick_spell, target: Target::Point(g.at) });
+                    let r = d.radius[1];
+                    for k in 0..6 {
+                        let a = k as f32 * std::f32::consts::TAU / 6.0;
+                        let at = self.ground_near(g.at[0] + a.cos() * r, g.at[1] + a.sin() * r, g.at[2] + 1.0);
+                        self.events.push(Event::Missile { caster: g.owner, spell: d.tick_spell, target: Target::Point(at) });
+                    }
                 }
                 if let Some(b) = &d.burst {
                     self.events.push(Event::GroundBurst { at: g.at, yaw: 0.0, shape: "ring", reach: d.radius[1], arc: 360.0, width: 0.0, secs: b.secs, colour: b.colour.clone() });
@@ -207,21 +219,16 @@ impl Survival {
     fn land_beat(&mut self, k: usize, b: usize, id: Id) {
         let g = &mut self.light.sigils[k];
         g.landed[b].insert(id);
-        let (owner, ability) = (g.owner, g.ability);
-        let pay_owner = id != owner && !g.paid[b];
-        if pay_owner {
-            g.paid[b] = true;
-        }
+        let ability = g.ability;
+        g.paid[b] = true;
         let c = self.content.checks.clone();
         self.gain_valor(id, c.perfect_valor);
-        if c.perfect_kit != 0 {
-            self.events.push(Event::Visual { id, kit: c.perfect_kit, by: None });
+        let kit = self.perfect_kit_of(ability);
+        if kit != 0 {
+            self.events.push(Event::Visual { id, kit, by: None });
         }
         self.events.push(Event::Perfect { player: id, ability });
         self.stack_up(id, ability);
-        if pay_owner && self.players.contains_key(&owner) {
-            self.events.push(Event::Perfect { player: owner, ability });
-        }
     }
 
     /// One more stack of a sigil's gift on a hero (at most its most), all held anew.
@@ -236,6 +243,65 @@ impl Survival {
         self.events.push(Event::Effects { player: id });
         self.events.push(Event::PriestLook { player: id, kind: "light", n: stacks, on: None, a: st.secs, b: 0.0 });
         self.events.push(Event::Auras { id });
+    }
+
+    /// Salvation lifts its caster: up `float` yards, then held there (rooted in the air, nothing
+    /// reaching them, wings on) until `until`.
+    fn float_up(&mut self, id: Id, ability: usize, until: f32) {
+        let now = self.clock;
+        let height = self.content.abilities[ability].float;
+        // The lift that tops out `height` up (as Skyfall reckons its leap: half its air time up).
+        let g = 2.0 / super::moves::airtime(1.0).max(0.01);
+        let lift = (2.0 * g * height).sqrt();
+        let rise = super::moves::airtime(lift) / 2.0;
+        let Some(f) = self.players.get(&id).map(|p| p.facing) else { return };
+        self.events.push(Event::Hop { player: id, dir: f, speed: 0.0, lift, roll: false, style: "" });
+        self.light.aloft.retain(|a| a.0 != id);
+        self.light.aloft.push((id, ability, now + rise, until, false));
+        if let Some(p) = self.players.get_mut(&id) {
+            p.untouchable_until = p.untouchable_until.max(until + 0.2);
+        }
+        self.events.push(Event::Auras { id });
+    }
+
+    /// Up on Salvation's wings: rising or held.
+    pub(crate) fn salvation_aloft(&self, id: Id) -> bool {
+        self.light.aloft.iter().any(|a| a.0 == id)
+    }
+
+    /// Held still at the top of Salvation's rise.
+    pub(crate) fn salvation_held(&self, id: Id) -> bool {
+        self.light.aloft.iter().any(|a| a.0 == id && a.4)
+    }
+
+    /// Salvation's hang: held at the top as they reach it (the hover's pose on the legs, falling
+    /// slowly if anything lets go); at its end, or as they fall, let go and down slowly.
+    pub(crate) fn step_aloft(&mut self) {
+        let now = self.clock;
+        for (id, _, top, until, held) in self.light.aloft.clone() {
+            let alive = self.players.get(&id).is_some_and(|p| p.health > 0);
+            if !alive || now >= until {
+                self.light.aloft.retain(|a| a.0 != id);
+                self.update_rooted(id);
+                if alive {
+                    // Down slowly, as Skyfall's hunter comes down (`skyfall_landed` ends it).
+                    self.hunt.floating.retain(|(h, _)| *h != id);
+                    self.hunt.floating.push((id, now + super::hunter::DESCENT_SECS));
+                    self.events.push(Event::FeatherFall { player: id, on: true });
+                    self.events.push(Event::ClipStop { id });
+                }
+                self.events.push(Event::Auras { id });
+                continue;
+            }
+            if !held && now >= top {
+                if let Some(a) = self.light.aloft.iter_mut().find(|a| a.0 == id) {
+                    a.4 = true;
+                }
+                self.update_rooted(id);
+                self.events.push(Event::FeatherFall { player: id, on: true });
+                self.events.push(Event::Clip { id, clip: super::hunter::HOVER_CLIP, take: 0, from: None, secs: (until - now) + 0.5, at: 0.0, body: ClipBody::Lower });
+            }
+        }
     }
 
     /// How many stacks of a sigil's gift a hero has now.

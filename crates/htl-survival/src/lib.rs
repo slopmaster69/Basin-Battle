@@ -5,6 +5,7 @@
 
 pub mod content;
 pub mod content_abilities;
+pub mod content_priest;
 pub mod land;
 pub mod save;
 pub mod sim;

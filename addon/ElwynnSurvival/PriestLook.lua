@@ -1,213 +1,231 @@
--- ElwynnSurvival: the Priest's own looks in Corey's art (`PL kind n guid a b own`).
+-- ElwynnSurvival: the Priest's own looks in Corey's art (docs/priest-draft3.md). Every one is in the
+-- world, on the body or the ground it's about (Corey: a spell's state shows in the spell, not in a
+-- gauge on the reticle).
 --
--- On the caster's screen, round the reticle: Grace's motes circling it (a halo at III, flying in as
--- a Heal spends them), Mind Flay's tension gauge arched over it (the cord's place along its range,
--- the taut zone glowing, the snap), Penance's three bolts under it lighting as they land, Holy
--- Light's gems beside it. On the bodies, for everyone (SetUnitSprite, patch 0045): a perfect
--- Shield's flare on the friend, Kindle's flame over a burning foe, Fade's afterimage.
+-- On bodies (SetUnitSprite, patch 0045): Penance's rings closing on each body in turn (`PL penance`,
+-- and `penance_hit` as each lands or is lost), a perfect Shield's flare on the friend, Fade's
+-- afterimage, Shadowguard's shard over the Priest's shoulder growing with what it stores, Shadow
+-- Weaving's shards and Searing Light's brand over the foe (`SK weave` and `SK sear`).
+-- On the ground (SetGroundRing, patch 0041; `PG kind key x y z radius secs`): Angelic Feather,
+-- Void Rift (growing and turning inward), Mind Blast's sigil narrowing to its heart; the Hollow
+-- Star's reach round the orb (`PL hollow`, SetGroundRingOnUnit).
 
 local ES = ElwynnSurvival
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
 
--- A padded texture is sampled within its middle (turned about its centre); an unpadded one whole.
-local H = 0.35355
 local look = CreateFrame("Frame", "ElwynnSurvivalPriestLook", WorldFrame)
-look:SetWidth(1)
-look:SetHeight(1)
-look:SetPoint("CENTER", WorldFrame, "CENTER", 0, 0)
 look:Hide()
 
-local function Tex(file, layer)
-  local t = look:CreateTexture(nil, layer or "ARTWORK")
-  t:SetTexture(ART .. file)
-  t:SetBlendMode("ADD")
-  t:Hide()
-  return t
-end
-
--- `t` at `size` px, turned `ang`, at (x, y) from the reticle; `whole`: an unpadded texture, unturned.
-local function Put(t, size, ang, alpha, x, y, whole, r, g, b)
-  if whole then
-    t:SetTexCoord(0, 1, 0, 1)
-  else
-    local c, s = math.cos(ang) * H, math.sin(ang) * H
-    t:SetTexCoord(0.5 - c + s, 0.5 - s - c, 0.5 - c - s, 0.5 - s + c, 0.5 + c + s, 0.5 + s - c, 0.5 + c - s, 0.5 + s + c)
-  end
-  t:SetWidth(size)
-  t:SetHeight(size)
-  t:ClearAllPoints()
-  t:SetPoint("CENTER", look, "CENTER", x or 0, y or 0)
-  t:SetVertexColor(r or 1, g or 1, b or 1, math.max(0, math.min(1, alpha)))
-  t:Show()
-end
-
-local GRACE_R = 74
-local motes = {}
-for i = 1, 3 do motes[i] = Tex("priest_grace_mote", "OVERLAY") end
-local halo = Tex("priest_grace_halo", "ARTWORK")
-local gauge = Tex("priest_flay_gauge", "ARTWORK")
-local taut = Tex("priest_flay_taut", "OVERLAY")
-local cursor = Tex("check_glow", "OVERLAY")
-local snap = Tex("priest_flay_snap", "OVERLAY")
-local bolts = {}
-for i = 1, 3 do bolts[i] = Tex("priest_penance", "OVERLAY") end
-local gems = {}
-for i = 1, 3 do gems[i] = Tex("priest_holy_light", "OVERLAY") end
-
--- What each look last heard.
-local L = { grace = 0, spent = 0, spentAt = nil, flayAt = nil, flay = 0, flayTaut = 0, flayFrom = 0.87,
-  snapAt = nil, penance = 0, penanceAt = nil, friend = 0, foe = 0, light = 0, lightUntil = 0 }
--- Looks on bodies: key -> { unit, tex, at, secs, size, height, kind, n }.
+-- Looks on bodies: key -> { unit, tex, at, secs, size, height, kind, ... }.
 local onUnits = {}
+-- Marks on the ground: key -> { kind, x, y, z, r, at, secs }.
+local onGround = {}
 
--- Mind Flay's gauge: an arc over the reticle, its channel `FLAY_R` px out, spanning 120 degrees.
-local FLAY_SIZE, FLAY_R, FLAY_SPAN = 345, 118, 2.0944
+-- Penance's rings: how long a ring takes to close, and its size (yards) open and closed.
+-- (The ring's art fills the middle 70% of its texture: a size of 1.5 draws a ring a yard across.)
+local RING_OPEN, RING_SHUT, RING_LEAD = 4.2, 1.5, 0.9
+-- How a ring that landed flares, and one that was lost fades.
+local HIT, LOST = 0.35, 0.5
 
-local function ArcXY(share)
-  local th = -FLAY_SPAN / 2 + FLAY_SPAN * share
-  return FLAY_R * math.sin(th), FLAY_R * math.cos(th)
+local function Body(key, t)
+  t.at = t.at or GetTime()
+  onUnits[key] = t
+  look:Show()
 end
 
 function ES.PriestLookLine(f)
   local kind, n = f[2], tonumber(f[3]) or 0
   local guid, a, b, own = f[4], tonumber(f[5]) or 0, tonumber(f[6]) or 0, f[7] == "1"
   local now = GetTime()
-  if kind == "grace" then
-    -- `a` 1: a Heal spent it (the motes fly in).
-    if a >= 1 and L.grace > 0 then L.spentAt, L.spent = now, L.grace end
-    L.grace = n
-  elseif kind == "flay" then
-    L.flayAt, L.flay, L.flayTaut = now, a, n
-    if b > 0 then L.flayFrom = b end
-  elseif kind == "snap" then
-    L.snapAt, L.flayAt = now, nil
-  elseif kind == "penance" then
-    L.penance, L.penanceAt, L.friend, L.foe = n, now, a, b
-  elseif kind == "light" then
-    L.light, L.lightUntil = n, now + ((a > 0) and a or 10)
-  elseif SetUnitSprite and guid and guid ~= "0x0" then
+  if not guid or guid == "0x0" then guid = nil end
+  if kind == "penance" and guid and SetUnitSprite then
+    -- Ring `n` closes on that body `a` seconds from now (`b` 1 a friend).
+    Body("pen" .. n, { unit = guid, tex = "priest_penance_ring", kind = "ring", beat = now + a, friend = b >= 1, height = 1.1 })
+  elseif kind == "penance_hit" then
+    local u = onUnits["pen" .. n]
+    if u then
+      u.done, u.doneAt, u.dead = (a >= 1) and "hit" or "lost", now, b >= 1
+    end
+  elseif kind == "shell" then
+    if b >= 1 or n == 0 then
+      local u = onUnits["shell"]
+      if u then u.doneAt = now end
+    elseif SetUnitSprite then
+      local u = onUnits["shell"] or { unit = "player", tex = "priest_guard_shard", kind = "shell", height = 2.3 }
+      u.share, u.doneAt = a, nil
+      Body("shell", u)
+    end
+  elseif kind == "hollow" then
+    if n == 0 or not guid then
+      if onUnits["hollow"] then onUnits["hollow"].doneAt = now end
+    elseif SetGroundRingOnUnit then
+      Body("hollow", { unit = guid, kind = "hollow", reach = a, share = n / math.max(1, b) })
+    end
+  elseif SetUnitSprite and guid then
     -- On a body, for everyone: the hero's own when it's theirs.
     local unit = (own and kind == "fade") and "player" or guid
     if kind == "shield" then
-      onUnits["shield" .. guid] = { unit = unit, tex = "priest_shield_perfect", at = now, secs = 0.6, size = 2.6, height = 1.0, kind = kind }
-    elseif kind == "kindle" then
-      onUnits["kindle" .. guid] = { unit = unit, tex = "priest_kindled", at = now, secs = 6, size = 0.55, height = 2.7, kind = kind, n = n }
+      Body("shield" .. guid, { unit = unit, tex = "priest_shield_perfect", secs = 0.6, size = 2.6, height = 1.0, kind = kind })
     elseif kind == "fade" then
-      onUnits["fade" .. guid] = { unit = unit, tex = "priest_fade", at = now, secs = 0.8, size = 2.4, height = 1.0, kind = kind }
+      Body("fade" .. guid, { unit = unit, tex = "priest_fade", secs = 0.8, size = 2.4, height = 1.0, kind = kind })
     end
   end
+end
+
+-- `SK weave|sear <n> <most> <guid>`: the Priest's stacks on a foe (other kinds are the Mage's).
+function ES.PriestStacksLine(f)
+  local kind, n, most, guid = f[2], tonumber(f[3]) or 0, tonumber(f[4]) or 1, f[5]
+  if (kind ~= "weave" and kind ~= "sear") or not guid or guid == "" or not SetUnitSprite then return end
+  local key = kind .. guid
+  if n <= 0 then
+    if onUnits[key] then onUnits[key].doneAt = GetTime() end
+    return
+  end
+  local u = onUnits[key] or { unit = guid, kind = kind, tex = (kind == "weave") and "priest_weave_shard" or "priest_sear_brand", height = (kind == "weave") and 2.6 or 1.4 }
+  if (u.n or 0) < n then u.stepAt = GetTime() end
+  u.n, u.most, u.doneAt = n, most, nil
+  Body(key, u)
+end
+
+-- `PG kind key x y z radius secs`: a Priest's mark on the ground (radius 0: it's gone).
+function ES.PriestGroundLine(f)
+  if not SetGroundRing then return end
+  local kind, key = f[2], f[3]
+  local x, y, z, r, secs = tonumber(f[4]), tonumber(f[5]), tonumber(f[6]), tonumber(f[7]) or 0, tonumber(f[8]) or 0
+  if not (kind and key and x and y and z) then return end
+  local now = GetTime()
+  if r <= 0 then
+    local g = onGround[key]
+    if g then g.goneAt = now end
+    return
+  end
+  onGround[key] = { kind = kind, x = x, y = y, z = z, r = r, at = now, secs = secs }
   look:Show()
 end
 
-local function StepGrace(now)
+local function Gone(key, g)
+  if ClearGroundRing then ClearGroundRing("es_pg_" .. key) end
+  onGround[key] = nil
+end
+
+local function StepGround(now)
+  if not SetGroundRing then
+    onGround = {}
+    return false
+  end
   local busy = false
-  local spin = now * 1.4
-  for i = 1, 3 do
-    local m = motes[i]
-    local th = spin + (i - 1) * 2.0944
-    if i <= L.grace then
-      busy = true
-      Put(m, 34 + 4 * math.sin(now * 3 + i), 0, 0.9, GRACE_R * math.cos(th), GRACE_R * math.sin(th))
-    elseif L.spentAt and i <= L.spent and now - L.spentAt < 0.35 then
-      busy = true
-      local q = (now - L.spentAt) / 0.35
-      Put(m, 34 * (1 + q), 0, 1 - q, GRACE_R * (1 - q) * math.cos(th), GRACE_R * (1 - q) * math.sin(th))
+  for key, g in pairs(onGround) do
+    local age = now - g.at
+    local fade = 1
+    if g.goneAt then fade = 1 - (now - g.goneAt) / 0.35 end
+    if age > g.secs + 1.5 then fade = 0 end
+    if fade <= 0 then
+      Gone(key, g)
     else
-      m:Hide()
-    end
-  end
-  if L.grace >= 3 then
-    busy = true
-    Put(halo, 2 * GRACE_R * 1.25 * (1 + 0.03 * math.sin(now * 2.2)), now * 0.2, 0.75 + 0.2 * math.sin(now * 3.1))
-  elseif L.spentAt and L.spent >= 3 and now - L.spentAt < 0.45 then
-    busy = true
-    local q = (now - L.spentAt) / 0.45
-    Put(halo, 2 * GRACE_R * 1.25 * (1 + 0.6 * q), now * 0.2, 1 - q)
-  else
-    halo:Hide()
-  end
-  return busy
-end
-
-local function StepFlay(now)
-  local busy = false
-  -- The gauge while the cord is told (gone half a second after its last word).
-  if L.flayAt and now - L.flayAt < 0.6 then
-    busy = true
-    Put(gauge, FLAY_SIZE, 0, 0.95, 0, 0, true)
-    local tx, ty = ArcXY((L.flayFrom + 1) / 2)
-    local tension = (L.flayTaut == 1) and (0.8 + 0.2 * math.sin(now * 31)) or 0.35
-    Put(taut, 120, 0, tension, tx, ty, true)
-    local x, y = ArcXY(L.flay)
-    local shake = (L.flayTaut == 1) and 2 * math.sin(now * 47) or 0
-    Put(cursor, (L.flayTaut == 1) and 34 or 26, 0, 1, x + shake, y, false, 0.85, 0.7, 1)
-  else
-    gauge:Hide()
-    taut:Hide()
-    cursor:Hide()
-  end
-  if L.snapAt and now - L.snapAt < 0.5 then
-    busy = true
-    local q = (now - L.snapAt) / 0.5
-    Put(snap, 260 * (1 + 0.4 * q), 0, 1 - q * q, 0, FLAY_R)
-  else
-    snap:Hide()
-  end
-  return busy
-end
-
-local function StepPenance(now)
-  -- Three bolts under the reticle, lit as each lands (gone 1.5 sec after the last).
-  if L.penanceAt and now - L.penanceAt < 1.5 then
-    local done = L.penance >= 3 and L.friend >= 1 and L.foe >= 1
-    local since = now - L.penanceAt
-    for i = 1, 3 do
-      local lit = i <= L.penance
-      local pulse = (done and since < 0.4) and (1 + 0.5 * (1 - since / 0.4)) or 1
-      Put(bolts[i], (lit and 46 or 34) * pulse, 0, lit and 1 or 0.3, (i - 2) * 26, -64)
-    end
-    return true
-  end
-  for i = 1, 3 do bolts[i]:Hide() end
-  return false
-end
-
-local function StepLight(now)
-  -- A gem a stack of Holy Light, beside the reticle, dimming as it runs out.
-  if L.light > 0 and now < L.lightUntil then
-    local left = math.min(1, (L.lightUntil - now) / 3)
-    for i = 1, 3 do
-      if i <= L.light then
-        Put(gems[i], 30 + 3 * math.sin(now * 4 + i), 0, 0.5 + 0.5 * left, 84 + (i - 1) * 22, 0)
-      else
-        gems[i]:Hide()
+      busy = true
+      local k = "es_pg_" .. key
+      local into = math.min(1, age / 0.25)
+      if g.kind == "feather" then
+        -- Lying there, breathing, turning slowly; the last two seconds it fades.
+        local left = math.min(1, (g.secs - age) / 2)
+        SetGroundRing(k, g.x, g.y, g.z + 0.05, 1.3 * (1 + 0.06 * math.sin(now * 3)), ART .. "priest_feather", 1, 1, 1, into * fade * math.max(0.25, left), now * 0.25)
+      elseif g.kind == "rift" then
+        -- Growing for 2 sec to 1.75 times as wide, turning inward faster as it grows.
+        local grow = 1 + 0.75 * math.min(1, age / 2)
+        SetGroundRing(k, g.x, g.y, g.z + 0.05, g.r * grow / 0.72, ART .. "priest_void_rift", 1, 1, 1, into * fade, -now * (0.6 + 0.6 * grow))
+      elseif g.kind == "blast" then
+        -- Narrowing to its heart until it erupts.
+        local q = math.min(1, age / math.max(0.1, g.secs))
+        SetGroundRing(k, g.x, g.y, g.z + 0.05, g.r * (1.15 - 0.45 * q) / 0.72, ART .. "priest_blast_sigil", 1, 1, 1, into * fade * (0.6 + 0.4 * q), now * 1.2)
+        if age > g.secs + 0.1 then g.goneAt = g.goneAt or now end
       end
     end
-    return true
   end
-  for i = 1, 3 do gems[i]:Hide() end
-  return false
+  return busy
 end
 
 local function StepBodies(now)
+  -- A client without the sprites (or the harness's stand-ins gone): nothing to draw on bodies.
+  if not SetUnitSprite then
+    onUnits = {}
+    return false
+  end
   local busy = false
   for key, u in pairs(onUnits) do
-    local q = (now - u.at) / u.secs
-    if q >= 1 or not SetUnitSprite then
-      if ClearUnitSprite then ClearUnitSprite("es_pl_" .. key) end
+    local sk = "es_pl_" .. key
+    local alpha, size, done = 1, u.size or 1, false
+    if u.kind == "ring" then
+      -- Closing on the body as its beat comes; a flare as it lands, grey as it's lost.
+      local left = u.beat - now
+      if u.done then
+        local q = (now - u.doneAt) / ((u.done == "hit") and HIT or LOST)
+        if q >= 1 then done = true end
+        if u.done == "hit" then
+          size, alpha = RING_SHUT * (1 + (u.dead and 1.2 or 0.7) * q), 1 - q
+        else
+          size, alpha = RING_SHUT * (1 + 0.3 * q), 0.6 * (1 - q)
+        end
+      elseif left > RING_LEAD + 0.6 then
+        alpha = 0
+      elseif left < -0.6 then
+        done = true
+      else
+        local q = math.max(0, math.min(1, 1 - left / RING_LEAD))
+        size = RING_OPEN + (RING_SHUT - RING_OPEN) * q
+        alpha = math.min(1, (RING_LEAD + 0.6 - left) / 0.3) * (0.55 + 0.45 * q)
+      end
+      if not done then
+        local r, g, b = 1, 0.86, 0.45
+        if u.friend then r, g, b = 0.9, 1, 0.75 end
+        if u.done == "lost" then r, g, b = 0.6, 0.6, 0.6 end
+        SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, r, g, b, alpha, now * 0.8, 1)
+      end
+    elseif u.kind == "hollow" then
+      if u.doneAt and now - u.doneAt > 0.3 then
+        done = true
+      else
+        local fade = u.doneAt and (1 - (now - u.doneAt) / 0.3) or 1
+        if SetGroundRingOnUnit then SetGroundRingOnUnit(sk, u.unit, (u.reach or 3) / 0.68, ART .. "priest_hollow_reach", 0.85, 0.7, 1, (0.55 + 0.35 * (u.share or 0.5)) * fade, -now * 0.4) end
+      end
+    elseif u.kind == "weave" or u.kind == "sear" or u.kind == "shell" then
+      local fade = u.doneAt and (1 - (now - u.doneAt) / 0.3) or 1
+      if fade <= 0 then
+        done = true
+      else
+        local swell = 0
+        if u.stepAt and now - u.stepAt < 0.2 then swell = 1 - (now - u.stepAt) / 0.2 end
+        if u.kind == "weave" then
+          -- A shard a stack: bigger and darker-bright with each, turning.
+          size = (0.35 + 0.12 * (u.n or 1)) * (1 + 0.3 * swell)
+          alpha = (0.5 + 0.1 * (u.n or 1)) * fade
+          SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, 1, 1, 1, alpha, now * 0.9, 1)
+        elseif u.kind == "sear" then
+          size = 0.7 * (1 + 0.08 * math.sin(now * 7)) * (1 + 0.4 * swell)
+          SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, 1, 1, 1, 0.9 * fade, 0, 1)
+        else
+          size = (0.35 + 0.75 * (u.share or 0)) * (1 + 0.05 * math.sin(now * 9))
+          SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, 1, 1, 1, (0.6 + 0.4 * (u.share or 0)) * fade, now * 0.5, 1)
+        end
+      end
+    else
+      local q = (now - u.at) / u.secs
+      if q >= 1 then
+        done = true
+      elseif u.kind == "shield" then
+        SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (0.8 + 0.6 * q), u.height, 1, 1, 1, 1 - q * q, 0, 1)
+      else
+        SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (1 + 0.2 * q), u.height, 1, 1, 1, 0.9 * (1 - q), 0, 1)
+      end
+    end
+    if done then
+      if u.kind == "hollow" then
+        if ClearGroundRing then ClearGroundRing(sk) end
+      elseif ClearUnitSprite then
+        ClearUnitSprite(sk)
+      end
       onUnits[key] = nil
     else
       busy = true
-      local size, alpha = u.size, 1
-      if u.kind == "shield" then
-        size, alpha = u.size * (0.8 + 0.6 * q), 1 - q * q
-      elseif u.kind == "fade" then
-        size, alpha = u.size * (1 + 0.2 * q), 0.9 * (1 - q)
-      else
-        size = u.size * (1 + 0.12 * (u.n or 0)) * (1 + 0.05 * math.sin(now * 6))
-        alpha = math.min(1, 0.5 + 0.1 * (u.n or 0)) * math.min(1, (1 - q) * 4)
-      end
-      SetUnitSprite("es_pl_" .. key, u.unit, ART .. u.tex, size, u.height, 1, 1, 1, alpha, 0, 1)
     end
   end
   return busy
@@ -215,10 +233,7 @@ end
 
 look:SetScript("OnUpdate", function()
   local now = GetTime()
-  local a = StepGrace(now)
-  local b = StepFlay(now)
-  local c = StepPenance(now)
-  local d = StepLight(now)
-  local e = StepBodies(now)
-  if not (a or b or c or d or e) then this:Hide() end
+  local a = StepBodies(now)
+  local b = StepGround(now)
+  if not (a or b) then this:Hide() end
 end)

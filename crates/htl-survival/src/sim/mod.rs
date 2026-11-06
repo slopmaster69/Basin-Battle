@@ -41,8 +41,11 @@ mod staff;
 mod sweep;
 pub mod wager;
 // The Light Priest's (Penance's flick, Holy Fire's Kindle, counters for others, Salvation).
-mod aid;
-mod flick;
+mod feather;
+mod hollow;
+mod penance;
+mod rift;
+mod shell;
 pub(crate) mod light;
 mod sigil;
 mod tactics;
@@ -232,11 +235,17 @@ pub enum Event {
     /// Holy Word: Salvation laid (for everyone, a client with SetGroundRing draws it in Corey's
     /// art): `look` its key, where, how wide, and its beats in seconds from now.
     SigilLaid { look: Id, at: Vec3, radius: f32, beats: Vec<f32> },
-    /// A Priest look the add-on draws in Corey's art (`PL`): `kind` grace (its level `n`), shield
-    /// (a perfect Shield on `on`), flay (`n` 1 taut; `a` the cord's share of its range, `b` where
-    /// taut begins), snap, penance (`n` bolts landed; `a` a friend hit, `b` a foe), kindle (`n`
-    /// stacks on `on`), fade (an afterimage on the hero), light (`n` stacks of Holy Light).
+    /// A Priest look the add-on draws in Corey's art (`PL`): `kind` shield (a perfect Shield on
+    /// `on`), flay (`n` 1 taut; `a` the cord's share of its range, `b` where taut begins), snap,
+    /// penance (ring `n` closing on `on` in `a` seconds, `b` 1 a friend), penance_hit (ring `n`:
+    /// `a` 1 landed, `b` 1 dead on), fade (an afterimage on the hero), light (`n` stacks of Holy
+    /// Light), shell (`n` stored, `a` its share of the most; `b` 1 let go), rift (`n` foes
+    /// caught, `a` its reach, `b` seconds left), hollow (the orb `on` at `n` health, `a` its reach,
+    /// `b` its most), empower (`n` 1 the staff's next bolt is Empowered), sear (`n` 1 on `on`).
     PriestLook { player: Id, kind: &'static str, n: u32, on: Option<Id>, a: f32, b: f32 },
+    /// A Priest's mark on the ground the add-on draws in Corey's art (`PG`): `kind` feather or
+    /// rift, `key` its look, where, how wide, for how long (`radius` 0: it's gone).
+    PriestGround { kind: &'static str, key: Id, at: Vec3, radius: f32, secs: f32 },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
@@ -1285,8 +1294,6 @@ impl Survival {
         }
         self.record_trails();
         self.close_checks();
-        // The Priest's perfects among what goes out raise Grace (wherever they were pushed).
-        self.step_grace();
         std::mem::take(&mut self.events)
     }
 
