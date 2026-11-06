@@ -1,0 +1,994 @@
+From 52e0c34dfd3f468ca84aa58831c7542b5e3ddabb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 07:00:20 -0700
+Subject: [PATCH] Elwynn's own light: the new look re-lights the forest by time
+ of day (worldLook)
+
+The new look starts here, WoW Forever's way: 1.12's models and textures kept, the light and colour
+hand-tuned zone by zone over Light.dbc. In Elwynn Forest the light now runs warm against cool
+shadows through the day: a rose first light with the morning mist, clear far views at noon, a
+golden hour, a violet dusk and a brighter blue night. Each key of the table nudges the sampled
+light (sun, ambient, fog and all five sky stops get a tint at their own weight, and the fog end
+a multiplier), smoothstepped between keys across the whole game day; the same table carries the
+values the later full-screen pass reads (saturation, contrast, warmth, bloom, mist and rays).
+
+The grade comes in over 3 s on entering Elwynn, from any of its sub-zones (Goldshire, Northshire
+and the rest, resolved to zone 12 through AreaTable's parents), and goes over 3 s on leaving, so
+the border never snaps. Under water and as a ghost the reference's own atmospheres keep the
+screen. A new CVar, `worldLook` (default 1), switches all of it: `worldLook 0` is 1.12's look
+exactly, so the two can be compared side by side.
+---
+ crates/benilla-app/src/cvars/mod.rs          |  34 ++
+ crates/benilla-app/src/cvars/table.rs        |  10 +
+ crates/benilla-app/src/video.rs              |  15 +-
+ crates/benilla-world/src/lib.rs              |   1 +
+ crates/benilla-world/src/lighting/mod.rs     |   2 +
+ crates/benilla-world/src/lighting/resolve.rs |  11 +-
+ crates/benilla-world/src/look/grade.rs       | 439 +++++++++++++++++++
+ crates/benilla-world/src/look/mod.rs         | 325 ++++++++++++++
+ crates/benilla-world/src/world_plugins.rs    |   2 +
+ 9 files changed, 835 insertions(+), 4 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/grade.rs
+ create mode 100644 crates/benilla-world/src/look/mod.rs
+
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index 159d67e..af7ed84 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1588,6 +1588,38 @@ mod tests {
+         assert_eq!(d["renderScale"], 1.0);
+     }
+ 
++    /// `worldLook` (benilla's own) switches the look live: a Lua `SetCVar` drained into the
++    /// registry runs the observer, which writes `WorldLook`, read by the lighting resolve, the
++    /// view distance and the look pass every frame. No restart, and `farclip` keeps the reference's
++    /// range under either look.
++    #[test]
++    fn world_look_switches_live_from_lua() {
++        use benilla_world::look::WorldLook;
++        let mut app = cvar_app();
++        assert_eq!(*res::<WorldLook>(&app), WorldLook::NEW, "registered \"1\"");
++        let set = |app: &mut App, value: &str| {
++            let world = app.world_mut();
++            let mut script = UiScript::new().unwrap();
++            world.resource::<Cvars>().seed_vm(&mut script);
++            script
++                .run(&format!("SetCVar(\"worldLook\", \"{value}\")"))
++                .unwrap();
++            let events = {
++                let mut cvars = world.resource_mut::<Cvars>();
++                cvars.drain_vm(&mut script);
++                cvars.take_events()
++            };
++            for event in events {
++                world.trigger(event);
++            }
++        };
++        set(&mut app, "0");
++        assert_eq!(*res::<WorldLook>(&app), WorldLook::CLASSIC);
++        set(&mut app, "1");
++        assert_eq!(*res::<WorldLook>(&app), WorldLook::NEW);
++        assert_eq!(apply(&mut app, "farclip", "1000"), SetOutcome::Vetoed);
++    }
++
+     /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
+     #[test]
+     fn the_ffx_switches_reach_the_pass() {
+@@ -2702,6 +2734,8 @@ mod tests {
+             .init_resource::<FollowConfig>()
+             .init_resource::<VideoConfig>()
+             .init_resource::<benilla_world::ffx_glow::FfxSwitches>()
++            // `worldLook`'s registered "1", as `VideoPlugin` inserts it.
++            .insert_resource(benilla_world::look::WorldLook::NEW)
+             // Literal, not Default: RenderScale::default() reads $WOW_RENDER_SCALE.
+             .insert_resource(RenderScale(1.0))
+             // Literal: `Realmlist::default()` reads `$WOW_HOST`.
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index a741b13..e8c1952 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -836,6 +836,16 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — the reference has no off-screen buffer to hang a resolution dial \
+          on; its nearest equivalent, `gxResolution`, drops the interface with the world",
+     ),
++    // benilla's own: the new look (WoW Forever-style zone light, a longer view, bloom and a
++    // colour grade, god rays and mist), "0" for 1.12's exactly. The knob is
++    // `benilla_world::look::WorldLook`, set by `video::on_cvar`.
++    ours(
++        "worldLook",
++        "1",
++        "benilla's own — 1.12 has one look; this switches benilla's re-lit one (hand-tuned zone \
++         light, a longer view, bloom, a colour grade, god rays and mist) on, or off for the \
++         reference's",
++    ),
+     // benilla's own: `/console fpsJournal 1` appends a per-second row of position, frame cost and
+     // per-pass GPU time to `benilla-config/Diagnostics/fps-journal.csv`. The knob is
+     // [`crate::perf::FpsJournalSetting`].
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index b6420f1..6a07f0e 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -327,6 +327,7 @@ pub(crate) fn on_cvar(
+     mut spell_effect_level: ResMut<SpellEffectLevel>,
+     mut ffx: ResMut<benilla_world::ffx_glow::FfxSwitches>,
+     mut widescreen: ResMut<Widescreen>,
++    mut look: ResMut<benilla_world::look::WorldLook>,
+     mut cvars: ResMut<crate::cvars::Cvars>,
+ ) {
+     use benilla_world::view::{FARCLIP_RANGE, MSAA_RANGE};
+@@ -354,6 +355,15 @@ pub(crate) fn on_cvar(
+             }
+             info!("video: full-screen effects {:?}", *ffx);
+         }
++        // benilla's own: the new look (`benilla_world::look`) or 1.12's, read every frame, so a
++        // write shows on the next one.
++        "worldlook" => {
++            look.on = ev.flag();
++            info!(
++                "video: the {} look",
++                if look.on { "new" } else { "classic" }
++            );
++        }
+         // The registry refuses a value outside the callback's range (`0x688d40`); the clamp only
+         // keeps the knob in it.
+         "farclip" => view.farclip = v.clamp(*FARCLIP_RANGE.start(), *FARCLIP_RANGE.end()),
+@@ -453,7 +463,10 @@ pub(crate) fn spell_effect_scale(level: i32) -> f32 {
+ impl Plugin for VideoPlugin {
+     fn build(&self, app: &mut App) {
+         app.init_resource::<SpellEffectLevel>()
+-            .init_resource::<Widescreen>();
++            .init_resource::<Widescreen>()
++            // `worldLook`'s registered "1": the engine defaults to the classic look, the game to
++            // the new one, and the CVar's observer fires only on a change.
++            .insert_resource(benilla_world::look::WorldLook::NEW);
+         app.add_observer(on_cvar);
+         app.init_resource::<VideoConfig>()
+             .init_resource::<GxRestarts>()
+diff --git a/crates/benilla-world/src/lib.rs b/crates/benilla-world/src/lib.rs
+index 6941d9d..04d6a8b 100644
+--- a/crates/benilla-world/src/lib.rs
++++ b/crates/benilla-world/src/lib.rs
+@@ -126,6 +126,7 @@ pub mod layout_keys;
+ pub mod lighting;
+ pub mod liquid;
+ pub mod log_ring;
++pub mod look;
+ 
+ /// macOS `Cmd+Q`, re-pointed at the window close so the shutdown systems run.
+ pub mod mac_quit;
+diff --git a/crates/benilla-world/src/lighting/mod.rs b/crates/benilla-world/src/lighting/mod.rs
+index 1ee9da8..11cbe08 100644
+--- a/crates/benilla-world/src/lighting/mod.rs
++++ b/crates/benilla-world/src/lighting/mod.rs
+@@ -211,6 +211,8 @@ impl Plugin for LightingPlugin {
+     fn build(&self, app: &mut App) {
+         // Readers of the resolve run after it.
+         configure_lighting_sets(app);
++        // The new look's grade inputs, which the resolve reads (`crate::look`).
++        crate::look::init_resources(app);
+         app.init_resource::<WowLighting>()
+             .init_resource::<PropProbes>()
+             .init_resource::<GameClock>()
+diff --git a/crates/benilla-world/src/lighting/resolve.rs b/crates/benilla-world/src/lighting/resolve.rs
+index 36272b4..9390ecd 100644
+--- a/crates/benilla-world/src/lighting/resolve.rs
++++ b/crates/benilla-world/src/lighting/resolve.rs
+@@ -179,11 +179,12 @@ pub(super) fn update_time_lighting(
+     weather: Option<Res<crate::weather::WeatherState>>,
+     view: Res<crate::view::ViewDistance>,
+     time: Res<Time>,
+-    // The camera's WMO fog, and a script's outdoor fog (`FogOverride`, benilla's own; absent
+-    // reads as none).
+-    (wmo_fog, fog_override): (
++    // The camera's WMO fog, a script's outdoor fog (`FogOverride`, benilla's own; absent reads as
++    // none) and the new look's zone grade (`crate::look`, benilla's own).
++    (wmo_fog, fog_override, mut look): (
+         Res<crate::wmo_portal::CameraWmoFog>,
+         Option<Res<super::FogOverride>>,
++        crate::look::LookInputs,
+     ),
+     mut wmo_ramp: ResMut<WmoCrossfade>,
+     mut clock: ResMut<GameClock>,
+@@ -256,6 +257,10 @@ pub(super) fn update_time_lighting(
+         Some(o) if !submerged.any() => o.apply(atmo, time.elapsed_secs()),
+         _ => atmo,
+     };
++    // The new look's zone grade over both (benilla's own, `crate::look`): a zone's hand-tuned light
++    // for the time of day, ramped in over 3 s on entering it. None under water or as a ghost, whose
++    // `LightParams` slots own the atmosphere, and none at all under `worldLook 0`.
++    let atmo = look.apply(atmo, minute_f, time.delta_secs(), submerged.any() || ghost);
+     let sun_dir = daynight::sun_direction(minute_f);
+     let celestial_dir = daynight::celestial_sun_direction(minute_f);
+ 
+diff --git a/crates/benilla-world/src/look/grade.rs b/crates/benilla-world/src/look/grade.rs
+new file mode 100644
+index 0000000..1d8f385
+--- /dev/null
++++ b/crates/benilla-world/src/look/grade.rs
+@@ -0,0 +1,439 @@
++//! A zone's hand-tuned light by time of day, benilla's own (no reference behaviour): keyframes over
++//! the game clock that nudge the `Light.dbc` sample rather than replace it, each key a tint blended
++//! into the sampled colour at its own weight, plus the post-pass values the `look` pass reads, so
++//! one table drives the whole look of a zone. Elwynn Forest's is [`ELWYNN`].
++
++use benilla_formats::Atmosphere;
++
++/// A tint and how much of it is blended into the sampled colour (`0` keeps the sample).
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct Tint {
++    /// sRGB 0..1, as `Atmosphere`'s colours.
++    pub color: [f32; 3],
++    pub weight: f32,
++}
++
++impl Tint {
++    /// No tint: the sample passes through.
++    pub const NONE: Self = Self {
++        color: [0.0; 3],
++        weight: 0.0,
++    };
++
++    const fn new(r: f32, g: f32, b: f32, weight: f32) -> Self {
++        Self {
++            color: [r, g, b],
++            weight,
++        }
++    }
++
++    /// `sample` with this tint blended in at `weight × strength`.
++    fn over(&self, sample: [f32; 3], strength: f32) -> [f32; 3] {
++        let w = (self.weight * strength).clamp(0.0, 1.0);
++        std::array::from_fn(|i| sample[i] + (self.color[i] - sample[i]) * w)
++    }
++
++    fn lerp(&self, other: &Tint, t: f32) -> Tint {
++        Tint {
++            color: std::array::from_fn(|i| lerp(self.color[i], other.color[i], t)),
++            weight: lerp(self.weight, other.weight, t),
++        }
++    }
++}
++
++/// The values the new look's full-screen pass reads (its grade, bloom, rays and mist), at their
++/// neutral when the grade is off: the frame then passes through it unchanged.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct PostLook {
++    /// Saturation around luminance; 1 is the frame's own.
++    pub saturation: f32,
++    /// Contrast around mid-grey 0.18 in log space; 1 is the frame's own.
++    pub contrast: f32,
++    /// White balance: positive warms the highlights and cools the shadows.
++    pub warmth: f32,
++    /// Bloom intensity (Bevy's `Bloom`, additive).
++    pub bloom: f32,
++    /// Height-fog (mist) strength, 0..1.
++    pub height_fog: f32,
++    /// God-ray strength, 0..1.
++    pub rays: f32,
++}
++
++impl PostLook {
++    pub const NEUTRAL: Self = Self {
++        saturation: 1.0,
++        contrast: 1.0,
++        warmth: 0.0,
++        bloom: 0.0,
++        height_fog: 0.0,
++        rays: 0.0,
++    };
++
++    /// The frame passes through untouched.
++    pub fn is_neutral(&self) -> bool {
++        *self == Self::NEUTRAL
++    }
++
++    fn lerp(&self, other: &PostLook, t: f32) -> PostLook {
++        PostLook {
++            saturation: lerp(self.saturation, other.saturation, t),
++            contrast: lerp(self.contrast, other.contrast, t),
++            warmth: lerp(self.warmth, other.warmth, t),
++            bloom: lerp(self.bloom, other.bloom, t),
++            height_fog: lerp(self.height_fog, other.height_fog, t),
++            rays: lerp(self.rays, other.rays, t),
++        }
++    }
++}
++
++impl Default for PostLook {
++    fn default() -> Self {
++        Self::NEUTRAL
++    }
++}
++
++/// One keyframe of a zone grade, at a minute of the game day.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct GradeKey {
++    /// Minute of the game day, `0..1440`.
++    pub minute: f32,
++    /// The sun's direct light (`Light.dbc` diffuse).
++    pub sun: Tint,
++    /// The ambient light, which is what the shadows are lit by.
++    pub ambient: Tint,
++    pub fog: Tint,
++    /// All five sky-dome stops.
++    pub sky: Tint,
++    /// The fog end's multiplier: above 1 sees further (the consumer still takes `min(end, reach)`).
++    pub fog_end_scale: f32,
++    pub post: PostLook,
++}
++
++impl GradeKey {
++    /// The identity: the sample untouched, the post pass neutral.
++    pub const NEUTRAL: Self = Self {
++        minute: 0.0,
++        sun: Tint::NONE,
++        ambient: Tint::NONE,
++        fog: Tint::NONE,
++        sky: Tint::NONE,
++        fog_end_scale: 1.0,
++        post: PostLook::NEUTRAL,
++    };
++
++    /// Field-wise blend toward `other` (`t = 0` is `self`); the minute is not blended.
++    pub fn lerp(&self, other: &GradeKey, t: f32) -> GradeKey {
++        GradeKey {
++            minute: self.minute,
++            sun: self.sun.lerp(&other.sun, t),
++            ambient: self.ambient.lerp(&other.ambient, t),
++            fog: self.fog.lerp(&other.fog, t),
++            sky: self.sky.lerp(&other.sky, t),
++            fog_end_scale: lerp(self.fog_end_scale, other.fog_end_scale, t),
++            post: self.post.lerp(&other.post, t),
++        }
++    }
++
++    /// The sampled atmosphere with this key folded in at `strength` (the zone weight, 0..1): each
++    /// tint blended into its colour, the fog end scaled. `0` returns the sample unchanged.
++    pub fn apply(&self, atmo: Atmosphere, strength: f32) -> Atmosphere {
++        if strength <= 0.0 {
++            return atmo;
++        }
++        let s = strength.min(1.0);
++        let mut out = atmo;
++        out.sun_diffuse = self.sun.over(atmo.sun_diffuse, s);
++        out.ambient = self.ambient.over(atmo.ambient, s);
++        out.fog_color = self.fog.over(atmo.fog_color, s);
++        for stop in &mut out.sky {
++            *stop = self.sky.over(*stop, s);
++        }
++        out.fog_end = atmo.fog_end * lerp(1.0, self.fog_end_scale, s);
++        out
++    }
++
++    /// The post values at `strength`: neutral at 0, this key's at 1.
++    pub fn post_at(&self, strength: f32) -> PostLook {
++        PostLook::NEUTRAL.lerp(&self.post, strength.clamp(0.0, 1.0))
++    }
++}
++
++fn lerp(a: f32, b: f32, t: f32) -> f32 {
++    a + (b - a) * t
++}
++
++/// A key at `h:m` from the palette's columns: sun, ambient, fog and sky tints with their weights
++/// (as fractions), the fog-end multiplier, then saturation, contrast, warmth, bloom, height fog
++/// and rays.
++#[allow(clippy::too_many_arguments)]
++const fn key(
++    h: u32,
++    m: u32,
++    sun: Tint,
++    ambient: Tint,
++    fog: Tint,
++    sky: Tint,
++    fog_end_scale: f32,
++    [saturation, contrast, warmth, bloom, height_fog, rays]: [f32; 6],
++) -> GradeKey {
++    GradeKey {
++        minute: (h * 60 + m) as f32,
++        sun,
++        ambient,
++        fog,
++        sky,
++        fog_end_scale,
++        post: PostLook {
++            saturation,
++            contrast,
++            warmth,
++            bloom,
++            height_fog,
++            rays,
++        },
++    }
++}
++
++/// Elwynn's night, held from 21:30 across midnight.
++const ELWYNN_NIGHT: (Tint, Tint, Tint, Tint, f32, [f32; 6]) = (
++    Tint::new(0.55, 0.65, 0.95, 0.30),
++    Tint::new(0.45, 0.55, 0.90, 0.35),
++    Tint::new(0.20, 0.26, 0.42, 0.40),
++    Tint::new(0.18, 0.24, 0.45, 0.25),
++    1.3,
++    [0.95, 1.05, -0.10, 0.06, 0.25, 0.0],
++);
++
++/// Elwynn Forest, the first pass to tune on video. The aim is WoW Forever's: warm light against
++/// cool shadows, golden evenings, clear far views at noon and mist at dawn. Keys in minute order;
++/// the last wraps to the first across midnight.
++pub const ELWYNN: [GradeKey; 7] = [
++    key(
++        0,
++        0,
++        ELWYNN_NIGHT.0,
++        ELWYNN_NIGHT.1,
++        ELWYNN_NIGHT.2,
++        ELWYNN_NIGHT.3,
++        ELWYNN_NIGHT.4,
++        ELWYNN_NIGHT.5,
++    ),
++    // First light: rose sun and fog, the thickest mist, the first rays.
++    key(
++        5,
++        30,
++        Tint::new(1.00, 0.70, 0.55, 0.35),
++        Tint::new(0.60, 0.55, 0.85, 0.30),
++        Tint::new(0.85, 0.65, 0.62, 0.45),
++        Tint::new(0.95, 0.70, 0.65, 0.30),
++        1.2,
++        [1.00, 1.05, 0.10, 0.10, 0.70, 0.8],
++    ),
++    // Morning: the mist lifting, the view opening.
++    key(
++        7,
++        30,
++        Tint::new(1.00, 0.88, 0.70, 0.25),
++        Tint::new(0.60, 0.70, 0.90, 0.25),
++        Tint::new(0.85, 0.82, 0.75, 0.30),
++        Tint::new(0.70, 0.82, 0.98, 0.15),
++        1.8,
++        [1.08, 1.08, 0.08, 0.10, 0.35, 0.6],
++    ),
++    // Noon: clear and far, cool blue shadows.
++    key(
++        12,
++        0,
++        Tint::new(1.00, 0.97, 0.90, 0.15),
++        Tint::new(0.55, 0.68, 0.95, 0.30),
++        Tint::new(0.78, 0.86, 0.96, 0.20),
++        Tint::new(0.45, 0.65, 0.98, 0.20),
++        2.5,
++        [1.10, 1.10, 0.04, 0.08, 0.05, 0.3],
++    ),
++    // Golden hour.
++    key(
++        17,
++        30,
++        Tint::new(1.00, 0.78, 0.45, 0.45),
++        Tint::new(0.50, 0.62, 0.95, 0.35),
++        Tint::new(0.95, 0.75, 0.50, 0.40),
++        Tint::new(0.98, 0.78, 0.55, 0.25),
++        2.0,
++        [1.12, 1.12, 0.18, 0.14, 0.15, 0.9],
++    ),
++    // Dusk: rose and violet.
++    key(
++        19,
++        30,
++        Tint::new(0.95, 0.55, 0.55, 0.40),
++        Tint::new(0.55, 0.50, 0.85, 0.35),
++        Tint::new(0.65, 0.45, 0.60, 0.45),
++        Tint::new(0.75, 0.45, 0.70, 0.35),
++        1.5,
++        [1.05, 1.08, 0.05, 0.12, 0.35, 0.5],
++    ),
++    key(
++        21,
++        30,
++        ELWYNN_NIGHT.0,
++        ELWYNN_NIGHT.1,
++        ELWYNN_NIGHT.2,
++        ELWYNN_NIGHT.3,
++        ELWYNN_NIGHT.4,
++        ELWYNN_NIGHT.5,
++    ),
++];
++
++/// The grade at `minute` (fractional, wrapped into `0..1440`): exact at each key, smoothstepped
++/// between neighbours so the light never kinks at a key, and wrapping from the last key to the
++/// first across midnight. `keys` must be in minute order.
++pub fn sample(keys: &[GradeKey], minute: f32) -> GradeKey {
++    let Some(first) = keys.first() else {
++        return GradeKey::NEUTRAL;
++    };
++    let m = minute.rem_euclid(1440.0);
++    // The last key at or before `m`, else (before the first key) the last key of the day.
++    let i = keys
++        .iter()
++        .rposition(|k| k.minute <= m)
++        .unwrap_or(keys.len() - 1);
++    let a = &keys[i];
++    let b = keys.get(i + 1).unwrap_or(first);
++    let span = (b.minute - a.minute).rem_euclid(1440.0);
++    if span <= 0.0 {
++        return *a;
++    }
++    let t = ((m - a.minute).rem_euclid(1440.0) / span).clamp(0.0, 1.0);
++    let s = t * t * (3.0 - 2.0 * t);
++    GradeKey {
++        minute: m,
++        ..a.lerp(b, s)
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn close(a: f32, b: f32) -> bool {
++        (a - b).abs() < 1e-5
++    }
++
++    #[test]
++    fn the_keys_are_in_minute_order_inside_the_day() {
++        assert!(ELWYNN.windows(2).all(|w| w[0].minute < w[1].minute));
++        assert!(ELWYNN.iter().all(|k| (0.0..1440.0).contains(&k.minute)));
++        assert_eq!(ELWYNN[3].minute, 720.0, "noon");
++    }
++
++    #[test]
++    fn exact_at_every_key() {
++        for k in &ELWYNN {
++            let s = sample(&ELWYNN, k.minute);
++            assert_eq!(
++                GradeKey { minute: 0.0, ..s },
++                GradeKey { minute: 0.0, ..*k }
++            );
++        }
++    }
++
++    /// Smoothstep is ½ at the middle, so midway between two keys is their average.
++    #[test]
++    fn midway_between_two_keys_is_their_average() {
++        let (morning, noon) = (&ELWYNN[2], &ELWYNN[3]);
++        let mid = sample(&ELWYNN, (morning.minute + noon.minute) / 2.0);
++        assert!(close(
++            mid.fog_end_scale,
++            (morning.fog_end_scale + noon.fog_end_scale) / 2.0
++        ));
++        assert!(close(
++            mid.sun.weight,
++            (morning.sun.weight + noon.sun.weight) / 2.0
++        ));
++        assert!(close(
++            mid.post.height_fog,
++            (morning.post.height_fog + noon.post.height_fog) / 2.0
++        ));
++        // Not linear off the middle: a quarter of the way in is under a quarter of the change.
++        let q = sample(
++            &ELWYNN,
++            morning.minute + (noon.minute - morning.minute) / 4.0,
++        );
++        let lin = morning.fog_end_scale + (noon.fog_end_scale - morning.fog_end_scale) / 4.0;
++        assert!(q.fog_end_scale < lin);
++    }
++
++    /// From 21:30 to 05:30 the grade runs across midnight: night held to 00:00, then toward first
++    /// light, with no jump at 1439 → 0.
++    #[test]
++    fn it_wraps_across_midnight() {
++        let night = &ELWYNN[0];
++        let before = sample(&ELWYNN, 1439.9);
++        let after = sample(&ELWYNN, 0.1);
++        assert!(close(before.fog_end_scale, night.fog_end_scale));
++        assert!((before.sun.weight - after.sun.weight).abs() < 1e-3);
++        // A minute past 24:00 is a minute past midnight.
++        assert_eq!(sample(&ELWYNN, 1440.0 + 60.0), sample(&ELWYNN, 60.0));
++        assert_eq!(sample(&ELWYNN, -60.0), sample(&ELWYNN, 1380.0));
++        // Before the first key of a table that starts after midnight, the last key leads.
++        let late = [
++            GradeKey {
++                minute: 600.0,
++                fog_end_scale: 2.0,
++                ..GradeKey::NEUTRAL
++            },
++            GradeKey {
++                minute: 1200.0,
++                fog_end_scale: 4.0,
++                ..GradeKey::NEUTRAL
++            },
++        ];
++        // 20:00 → 10:00 spans 840 minutes: 00:00 is 240 in, under half way; 03:00 is the middle.
++        let s = sample(&late, 0.0);
++        assert!(
++            s.fog_end_scale < 4.0 && s.fog_end_scale > 3.0,
++            "{}",
++            s.fog_end_scale
++        );
++        assert!(close(sample(&late, 180.0).fog_end_scale, 3.0));
++    }
++
++    #[test]
++    fn strength_zero_returns_the_sample_untouched() {
++        let atmo = Atmosphere::DEFAULT;
++        let out = ELWYNN[4].apply(atmo, 0.0);
++        assert_eq!(out.sun_diffuse, atmo.sun_diffuse);
++        assert_eq!(out.fog_end, atmo.fog_end);
++        assert_eq!(out.sky, atmo.sky);
++        assert!(ELWYNN[4].post_at(0.0).is_neutral());
++    }
++
++    /// A tint blends toward its colour by its weight; the fog end scales.
++    #[test]
++    fn a_key_nudges_the_sample() {
++        let atmo = Atmosphere::DEFAULT;
++        let golden = &ELWYNN[4];
++        let out = golden.apply(atmo, 1.0);
++        let w = golden.sun.weight;
++        for i in 0..3 {
++            let want = atmo.sun_diffuse[i] + (golden.sun.color[i] - atmo.sun_diffuse[i]) * w;
++            assert!(close(out.sun_diffuse[i], want));
++        }
++        assert!(close(out.fog_end, atmo.fog_end * golden.fog_end_scale));
++        // Golden hour warms the sun: more red than blue gained.
++        assert!(
++            out.sun_diffuse[0] - out.sun_diffuse[2] > atmo.sun_diffuse[0] - atmo.sun_diffuse[2]
++        );
++        // Half strength is half way.
++        let half = golden.apply(atmo, 0.5);
++        assert!(close(
++            half.fog_end,
++            atmo.fog_end * (1.0 + (golden.fog_end_scale - 1.0) / 2.0)
++        ));
++        assert!(close(
++            golden.post_at(0.5).saturation,
++            1.0 + (golden.post.saturation - 1.0) / 2.0
++        ));
++    }
++}
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+new file mode 100644
+index 0000000..a82d16d
+--- /dev/null
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -0,0 +1,325 @@
++//! The new look, benilla's own (no reference behaviour): WoW Forever's idea of keeping 1.12's
++//! models and textures and re-lighting the world, zone by zone. A zone's light is hand-tuned by
++//! time of day ([`grade`]) over the `Light.dbc` sample. One switch, [`WorldLook`] (the game's
++//! `worldLook` CVar), turns all of it off, and the classic look is then exactly the reference's.
++
++use bevy::ecs::system::SystemParam;
++use bevy::prelude::*;
++use std::collections::HashMap;
++
++use benilla_assets::{AssetSet, LockRecover, WorldAssets};
++use benilla_formats::{AreaTableCatalog, Atmosphere};
++
++pub mod grade;
++pub use grade::{GradeKey, PostLook, Tint};
++
++/// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
++/// test) is the reference; the game turns it on from its `worldLook` CVar.
++#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq, Default)]
++pub struct WorldLook {
++    pub on: bool,
++}
++
++impl WorldLook {
++    /// 1.12's look, exactly.
++    pub const CLASSIC: Self = Self { on: false };
++    /// The new look.
++    pub const NEW: Self = Self { on: true };
++}
++
++/// Elwynn Forest's `AreaTable.dbc` id, the top-level zone of Goldshire, Northshire Valley and the
++/// rest of its sub-zones.
++pub const ELWYNN_ZONE: u32 = 12;
++
++/// The grade table of a top-level zone; only Elwynn has one so far.
++pub fn zone_grade(zone: u32) -> Option<&'static [GradeKey]> {
++    match zone {
++        ELWYNN_ZONE => Some(&grade::ELWYNN),
++        _ => None,
++    }
++}
++
++/// Every `AreaTable.dbc` area's top-level zone, walked up the parent chain once at load, so the
++/// sub-zone under the player ([`crate::terrain_stream::CurrentArea`]) names its zone in a lookup.
++#[derive(Resource, Default, Debug)]
++pub struct LookAreas(HashMap<u32, u32>);
++
++impl LookAreas {
++    pub fn from_catalog(catalog: &AreaTableCatalog) -> Self {
++        Self(
++            catalog
++                .rows_in_order()
++                .filter_map(|(id, _)| catalog.top_zone(id).map(|zone| (id, zone)))
++                .collect(),
++        )
++    }
++
++    /// The top-level zone of `area`, or `None` for an area the table does not have.
++    pub fn zone(&self, area: u32) -> Option<u32> {
++        self.0.get(&area).copied()
++    }
++}
++
++fn load_look_areas(mut commands: Commands, assets: Option<Res<WorldAssets>>) {
++    let Some(assets) = assets else { return };
++    let loaded = {
++        let mut chain = assets.chain.lock_recover();
++        benilla_formats::load_area_table_catalog(&mut chain)
++    };
++    match loaded {
++        Ok(cat) => commands.insert_resource(LookAreas::from_catalog(&cat)),
++        Err(e) => warn!("look: AreaTable failed to load, no zone grades: {e:#}"),
++    }
++}
++
++/// Seconds a zone grade takes to come in on entering its zone, and to go on leaving, so the
++/// border never snaps.
++pub const ZONE_RAMP_SECS: f32 = 3.0;
++
++/// The zone weight: 0 to 1 over [`ZONE_RAMP_SECS`] while the player is in a graded zone, back to 0
++/// outside it; `zone` is the table it ramps (kept while it ramps out).
++#[derive(Resource, Default, Debug, Clone, Copy, PartialEq)]
++pub struct ZoneRamp {
++    pub weight: f32,
++    pub zone: Option<u32>,
++}
++
++impl ZoneRamp {
++    /// One frame of `dt` seconds with the player in `zone` (`None`: no zone known).
++    pub fn advance(&mut self, zone: Option<u32>, dt: f32) {
++        let graded = zone.filter(|z| zone_grade(*z).is_some());
++        let step = dt.max(0.0) / ZONE_RAMP_SECS;
++        match graded {
++            // Entering, or still in, a graded zone.
++            Some(z) if self.zone == Some(z) || self.weight <= 0.0 => {
++                self.zone = Some(z);
++                self.weight = (self.weight + step).min(1.0);
++            }
++            // Out of the zone (or into another graded one): the old grade ramps out first.
++            _ => {
++                self.weight = (self.weight - step).max(0.0);
++                if self.weight <= 0.0 {
++                    self.zone = graded;
++                }
++            }
++        }
++    }
++}
++
++/// The grade the lighting resolve applied this frame: its post-pass values (neutral outside a
++/// graded zone, under the classic look, under water or as a ghost) and the zone weight they carry.
++#[derive(Resource, Default, Debug, Clone, Copy, PartialEq)]
++pub struct LookGrade {
++    pub post: PostLook,
++    pub strength: f32,
++}
++
++/// What the lighting resolve needs to grade the atmosphere, as one system parameter.
++#[derive(SystemParam)]
++pub(crate) struct LookInputs<'w> {
++    look: Res<'w, WorldLook>,
++    areas: Option<Res<'w, LookAreas>>,
++    area: Option<Res<'w, crate::terrain_stream::CurrentArea>>,
++    ramp: ResMut<'w, ZoneRamp>,
++    grade: ResMut<'w, LookGrade>,
++}
++
++impl LookInputs<'_> {
++    /// The zone grade over `atmo` at `minute` (fractional), after advancing the zone ramp by `dt`;
++    /// `suppressed` (under water, a ghost) applies none. Publishes [`LookGrade`].
++    pub(crate) fn apply(
++        &mut self,
++        atmo: Atmosphere,
++        minute: f32,
++        dt: f32,
++        suppressed: bool,
++    ) -> Atmosphere {
++        let zone = self
++            .area
++            .as_ref()
++            .and_then(|a| a.0)
++            .and_then(|a| self.areas.as_ref()?.zone(a));
++        let (atmo, post, strength) = graded(
++            *self.look,
++            &mut self.ramp,
++            zone,
++            atmo,
++            minute,
++            dt,
++            suppressed,
++        );
++        let next = LookGrade { post, strength };
++        if *self.grade != next {
++            *self.grade = next;
++        }
++        atmo
++    }
++}
++
++/// [`LookInputs::apply`] without the ECS: the graded atmosphere, the post values and the strength.
++/// The classic look resets the ramp and returns the sample untouched.
++pub fn graded(
++    look: WorldLook,
++    ramp: &mut ZoneRamp,
++    zone: Option<u32>,
++    atmo: Atmosphere,
++    minute: f32,
++    dt: f32,
++    suppressed: bool,
++) -> (Atmosphere, PostLook, f32) {
++    if !look.on {
++        *ramp = ZoneRamp::default();
++        return (atmo, PostLook::NEUTRAL, 0.0);
++    }
++    ramp.advance(zone, dt);
++    let table = ramp.zone.and_then(zone_grade);
++    match table {
++        Some(keys) if !suppressed && ramp.weight > 0.0 => {
++            let key = grade::sample(keys, minute);
++            (
++                key.apply(atmo, ramp.weight),
++                key.post_at(ramp.weight),
++                ramp.weight,
++            )
++        }
++        _ => (atmo, PostLook::NEUTRAL, 0.0),
++    }
++}
++
++/// The look's resources, for the lighting plugin, whose resolve reads them.
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<WorldLook>()
++        .init_resource::<ZoneRamp>()
++        .init_resource::<LookGrade>();
++}
++
++/// The new look's world side: its resources and the area table its zone lookup reads.
++pub(crate) struct LookPlugin;
++
++impl Plugin for LookPlugin {
++    fn build(&self, app: &mut App) {
++        init_resources(app);
++        app.add_systems(Startup, load_look_areas.after(AssetSet::Open));
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use benilla_formats::AreaTableRow;
++
++    fn row(zone_id: u32, name: &str) -> AreaTableRow {
++        AreaTableRow {
++            map_id: 0,
++            zone_id,
++            explore_flag: 0,
++            flags: 0,
++            faction_group_mask: 0,
++            exploration_level: 0,
++            name: name.into(),
++        }
++    }
++
++    /// Goldshire (87) and Northshire Valley (9) are Elwynn's sub-zones; the Northshire Abbey row
++    /// (24) sits two hops down. Westfall (40) is its own zone.
++    #[test]
++    fn an_elwynn_sub_zone_resolves_to_zone_12() {
++        let areas = LookAreas::from_catalog(&AreaTableCatalog::from_rows(vec![
++            (12, row(0, "Elwynn Forest")),
++            (87, row(12, "Goldshire")),
++            (9, row(12, "Northshire Valley")),
++            (24, row(9, "Northshire Abbey")),
++            (40, row(0, "Westfall")),
++        ]));
++        assert_eq!(areas.zone(87), Some(ELWYNN_ZONE));
++        assert_eq!(areas.zone(9), Some(ELWYNN_ZONE));
++        assert_eq!(areas.zone(24), Some(ELWYNN_ZONE));
++        assert_eq!(areas.zone(12), Some(ELWYNN_ZONE));
++        assert_eq!(areas.zone(40), Some(40));
++        assert_eq!(areas.zone(999), None);
++        assert!(zone_grade(ELWYNN_ZONE).is_some());
++        assert!(zone_grade(40).is_none());
++    }
++
++    /// 0 to 1 over three seconds in Elwynn, and back out over three on leaving.
++    #[test]
++    fn the_zone_weight_ramps_in_and_out() {
++        let mut ramp = ZoneRamp::default();
++        ramp.advance(Some(ELWYNN_ZONE), 1.5);
++        assert!((ramp.weight - 0.5).abs() < 1e-6);
++        ramp.advance(Some(ELWYNN_ZONE), 1.5);
++        assert_eq!(ramp.weight, 1.0);
++        ramp.advance(Some(ELWYNN_ZONE), 10.0);
++        assert_eq!(ramp.weight, 1.0, "held at one");
++        // Into Westfall: Elwynn's grade ramps out, still Elwynn's while it does.
++        ramp.advance(Some(40), 1.0);
++        assert!((ramp.weight - 2.0 / 3.0).abs() < 1e-6);
++        assert_eq!(ramp.zone, Some(ELWYNN_ZONE));
++        ramp.advance(Some(40), 2.0);
++        assert_eq!(ramp.weight, 0.0);
++        assert_eq!(ramp.zone, None, "Westfall has no grade");
++        // No area known (no avatar) is outside every zone.
++        ramp.advance(Some(ELWYNN_ZONE), 3.0);
++        ramp.advance(None, 1.5);
++        assert!((ramp.weight - 0.5).abs() < 1e-6);
++    }
++
++    /// `worldLook 0`: the sample comes back untouched, with no post values, at full zone weight.
++    #[test]
++    fn the_classic_look_returns_the_sample_untouched() {
++        let atmo = Atmosphere::DEFAULT;
++        let mut ramp = ZoneRamp {
++            weight: 1.0,
++            zone: Some(ELWYNN_ZONE),
++        };
++        let (out, post, strength) = graded(
++            WorldLook::CLASSIC,
++            &mut ramp,
++            Some(ELWYNN_ZONE),
++            atmo,
++            1050.0,
++            0.016,
++            false,
++        );
++        assert_eq!(out.sun_diffuse, atmo.sun_diffuse);
++        assert_eq!(out.ambient, atmo.ambient);
++        assert_eq!(out.fog_color, atmo.fog_color);
++        assert_eq!(out.fog_end, atmo.fog_end);
++        assert_eq!(out.sky, atmo.sky);
++        assert!(post.is_neutral());
++        assert_eq!(strength, 0.0);
++        assert_eq!(
++            ramp,
++            ZoneRamp::default(),
++            "the ramp starts over on switching back"
++        );
++    }
++
++    #[test]
++    fn the_new_look_grades_elwynn_and_nothing_else() {
++        let atmo = Atmosphere::DEFAULT;
++        let mut ramp = ZoneRamp::default();
++        let mut run = |zone, suppressed| {
++            graded(
++                WorldLook::NEW,
++                &mut ramp,
++                zone,
++                atmo,
++                1050.0,
++                5.0,
++                suppressed,
++            )
++        };
++        let (out, post, strength) = run(Some(ELWYNN_ZONE), false);
++        assert_eq!(strength, 1.0);
++        assert!(out.fog_end > atmo.fog_end, "golden hour sees further");
++        assert!(post.rays > 0.0 && post.warmth > 0.0);
++        // Under water or as a ghost, none (the ramp keeps running underneath).
++        let (out, post, strength) = run(Some(ELWYNN_ZONE), true);
++        assert_eq!(out.fog_end, atmo.fog_end);
++        assert!(post.is_neutral());
++        assert_eq!(strength, 0.0);
++        let (out, _, _) = run(Some(40), false);
++        assert_eq!(out.fog_end, atmo.fog_end, "out of Elwynn after the ramp");
++    }
++}
+diff --git a/crates/benilla-world/src/world_plugins.rs b/crates/benilla-world/src/world_plugins.rs
+index 2ad9a86..5d4e1fe 100644
+--- a/crates/benilla-world/src/world_plugins.rs
++++ b/crates/benilla-world/src/world_plugins.rs
+@@ -79,6 +79,8 @@ impl PluginGroup for WorldPlugins {
+             // Map.dbc and the current map, keyed off by the streamers, loading screen and lighting.
+             .add(crate::world_map::WorldMapPlugin)
+             .add(crate::lighting::LightingPlugin)
++            // The new look (benilla's own): zone grades over the lighting, behind `WorldLook`.
++            .add(crate::look::LookPlugin)
+             // Sky dome: the Light.dbc gradient backdrop (camera-centred), driven by the lighting.
+             .add(crate::sky::SkyPlugin)
+             // The WMO skybox, after `SkyPlugin`, whose dome it stands down.
+-- 
+2.43.0
+
