@@ -1984,11 +1984,11 @@ local ST_PER_PX = 0.42
 local VIT_HEALTH, VIT_STAMINA = 13, 8
 local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
--- Overhealth (health over the most) in a dark green past the health (red is danger), and what
+-- Overhealth (health over the most) in a deep crimson past the health (green read as stamina), and what
 -- shields have left to soak in translucent white over the health from the bar's left end (Corey;
 -- ES.DrawAbsorbs).
 vit.health.over = Tex(vit.health, "ARTWORK", "bar")
-vit.health.over:SetVertexColor(0.1, 0.45, 0.2, 1)
+vit.health.over:SetVertexColor(0.62, 0.04, 0.2, 1)
 vit.health.over:Hide()
 vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
 vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
@@ -3868,7 +3868,7 @@ function ES.DrawHud()
   ES.DrawAbsorbs(hp, maxhp, shield, over)
   -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
   local text = hp
-  if over > 0 then text = text .. "|cff6fdc84+" .. over .. "|r" end
+  if over > 0 then text = text .. "|cffff6f8f+" .. over .. "|r" end
   text = text .. " / " .. maxhp
   if shield > 0 then text = text .. " |cffffffff+" .. shield .. "|r" end
   vit.healthText:SetText(text)
