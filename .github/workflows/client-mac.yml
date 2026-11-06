@@ -1,9 +1,9 @@
-# The game on a Mac, built the way a Mac player's folder builds it: the pinned benilla client
+# The game client on a Mac, built the way a Mac player's folder builds it: the pinned benilla
 # with every patch in patches/benilla (scripts/common.sh's build_benilla_if_needed, as
-# scripts/play.sh runs it), the server (setup-mac.sh) and the War Table launcher
-# (scripts/mac-launcher.sh). The other checks build the client only on Windows and Linux, so a
+# scripts/play.sh runs it). The other checks build the client only on Windows and Linux, so a
 # patch that won't build on a Mac shows up here. It doesn't play: the runner has no WoW.
-name: The game builds on a Mac
+# (The launcher on a Mac is launcher-mac.yml's.)
+name: The client builds on a Mac
 
 on:
   pull_request:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  mac-build:
+  mac-client:
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
@@ -27,16 +27,9 @@ jobs:
           git clone -q "$BENILLA_REPO" benilla
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            benilla
-            .
-            dist/windows/buttons
+          workspaces: benilla
       - name: Build the client with every patch (as scripts/play.sh does)
         run: |
           . scripts/common.sh
           build_benilla_if_needed
           ls -la benilla/target/release/benilla
-      - name: Build the server (as setup-mac.sh does)
-        run: cargo build --release -p htl-server
-      - name: Build the launcher and Basin Battle.app
-        run: bash scripts/mac-launcher.sh
