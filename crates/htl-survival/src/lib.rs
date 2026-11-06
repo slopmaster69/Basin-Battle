@@ -52,6 +52,8 @@ mod tests_support;
 #[cfg(test)]
 mod tests_duel;
 #[cfg(test)]
+mod tests_priest_duel;
+#[cfg(test)]
 mod tests_tactics;
 #[cfg(test)]
 mod tests_hunter_wild;

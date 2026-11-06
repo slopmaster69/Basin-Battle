@@ -195,6 +195,10 @@ impl Survival {
         for k in 0..self.light.sigils.len() {
             let g = &self.light.sigils[k];
             let radius = self.content.abilities[g.ability].radius[1];
+            // The Priest's and their friends' beats: a foe in it (a duel's) lands nothing.
+            if id != g.owner && !self.helpable(g.owner, id) {
+                continue;
+            }
             if dist2d(pos, g.at) > radius + abilities::HERO_SIZE || t < g.since {
                 continue;
             }
