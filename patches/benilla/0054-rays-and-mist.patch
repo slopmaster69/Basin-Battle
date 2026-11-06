@@ -1,4 +1,4 @@
-From df55e2b7e3622cb6a87cfd37abb7968d47734e5b Mon Sep 17 00:00:00 2001
+From 9f39f728756cc656ea78d20ebae27639799c5ec2 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 08:25:46 -0700
 Subject: [PATCH] God rays and morning mist: light shafts through Elwynn's
@@ -32,7 +32,7 @@ the shader in both variants.
  create mode 100644 crates/benilla-world/src/look/rays.rs
 
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index 416a400..898109b 100644
+index e525a21..78bbd59 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -12,6 +12,7 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
@@ -41,10 +41,10 @@ index 416a400..898109b 100644
  pub mod pass;
 +pub mod rays;
  pub use grade::{GradeKey, PostLook, Tint};
- pub use pass::{LookFrame, LookView};
+ pub use pass::{LookBloomTune, LookFrame, LookView};
  
 diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
-index 3249f24..506821d 100644
+index d39cb4e..5e6bdc5 100644
 --- a/crates/benilla-world/src/look/pass.rs
 +++ b/crates/benilla-world/src/look/pass.rs
 @@ -1,7 +1,8 @@
@@ -116,7 +116,7 @@ index 3249f24..506821d 100644
      };
      if *frame != next {
          *frame = next;
-@@ -107,6 +128,22 @@ fn sync_bloom(
+@@ -130,6 +151,22 @@ fn sync_bloom(
      }
  }
  
@@ -139,7 +139,7 @@ index 3249f24..506821d 100644
  // ---------------------------------------------------------------- the grade, on the CPU
  
  /// Rec. 709 luminance weights, the shader's `LUMA`.
-@@ -150,18 +187,54 @@ pub fn srgb_to_linear(c: f32) -> f32 {
+@@ -173,18 +210,54 @@ pub fn srgb_to_linear(c: f32) -> f32 {
  
  // ---------------------------------------------------------------- render world
  
@@ -196,7 +196,7 @@ index 3249f24..506821d 100644
          }
      }
  }
-@@ -171,30 +244,53 @@ const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
+@@ -194,30 +267,53 @@ const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
  #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
  pub(crate) struct LookLabel;
  
@@ -257,7 +257,7 @@ index 3249f24..506821d 100644
  }
  
  impl SpecializedRenderPipeline for LookPipeline {
-@@ -203,7 +299,7 @@ impl SpecializedRenderPipeline for LookPipeline {
+@@ -226,7 +322,7 @@ impl SpecializedRenderPipeline for LookPipeline {
      fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
          RenderPipelineDescriptor {
              label: Some("world_look".into()),
@@ -266,7 +266,7 @@ index 3249f24..506821d 100644
              vertex: self.fullscreen.to_vertex_state(),
              fragment: Some(FragmentState {
                  shader: self.shader.clone(),
-@@ -225,19 +321,23 @@ fn init_pipeline(
+@@ -248,19 +344,23 @@ fn init_pipeline(
      fullscreen: Res<FullscreenShader>,
      asset_server: Res<AssetServer>,
  ) {
@@ -301,7 +301,7 @@ index 3249f24..506821d 100644
          shader: asset_server.load("embedded://benilla_world/shaders/world_look.wgsl"),
          fullscreen: fullscreen.clone(),
      });
-@@ -247,7 +347,7 @@ fn init_pipeline(
+@@ -270,7 +370,7 @@ fn init_pipeline(
  #[derive(Component)]
  struct LookViewGpu {
      pipeline: CachedRenderPipelineId,
@@ -310,7 +310,7 @@ index 3249f24..506821d 100644
      uniform: Buffer,
  }
  
-@@ -257,14 +357,17 @@ fn prepare_look_views(
+@@ -280,14 +380,17 @@ fn prepare_look_views(
      cache: Res<PipelineCache>,
      pipeline: Res<LookPipeline>,
      mut pipelines: ResMut<SpecializedRenderPipelines<LookPipeline>>,
@@ -333,7 +333,7 @@ index 3249f24..506821d 100644
          let uniform = device.create_buffer(&BufferDescriptor {
              label: Some("world_look_uniform"),
              size: UNIFORM_BYTES,
-@@ -273,7 +376,7 @@ fn prepare_look_views(
+@@ -296,7 +399,7 @@ fn prepare_look_views(
          });
          commands.entity(entity).insert(LookViewGpu {
              pipeline: id,
@@ -342,7 +342,7 @@ index 3249f24..506821d 100644
              uniform,
          });
      }
-@@ -283,13 +386,18 @@ fn prepare_look_views(
+@@ -306,13 +409,18 @@ fn prepare_look_views(
  struct LookNode;
  
  impl ViewNode for LookNode {
@@ -363,7 +363,7 @@ index 3249f24..506821d 100644
          world: &'w World,
      ) -> Result<(), NodeRunError> {
          let frame = *world.resource::<LookFrame>();
-@@ -301,17 +409,38 @@ impl ViewNode for LookNode {
+@@ -324,17 +432,38 @@ impl ViewNode for LookNode {
          let Some(pipeline) = cache.get_render_pipeline(gpu.pipeline) else {
              return Ok(()); // still compiling: this frame is ungraded
          };
@@ -408,7 +408,7 @@ index 3249f24..506821d 100644
          );
          let diagnostics = render_context.diagnostic_recorder();
          let mut pass = render_context
-@@ -347,7 +476,7 @@ pub(super) fn build(app: &mut App) {
+@@ -371,7 +500,7 @@ pub(super) fn build(app: &mut App) {
          ))
          .add_systems(
              Update,
@@ -417,7 +417,7 @@ index 3249f24..506821d 100644
                  .chain()
                  .in_set(crate::lighting::LightingConsumeSet),
          );
-@@ -404,12 +533,14 @@ mod tests {
+@@ -428,12 +557,14 @@ mod tests {
          }
          assert!(!LookFrame {
              on: true,
@@ -434,7 +434,7 @@ index 3249f24..506821d 100644
          }
          .grades());
      }
-@@ -445,16 +576,73 @@ mod tests {
+@@ -469,16 +600,73 @@ mod tests {
          assert!(grade_linear([0.05; 3], &c)[0] < 0.05);
      }
  

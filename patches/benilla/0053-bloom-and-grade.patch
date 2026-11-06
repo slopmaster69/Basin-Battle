@@ -1,4 +1,4 @@
-From 84ed8d9ce02fc3309cbeef76c4c9f0389c2e944b Mon Sep 17 00:00:00 2001
+From 17814cc5cab467e73d29cf810e8c71288a5a0e46 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 07:29:33 -0700
 Subject: [PATCH] Bloom and a colour grade: the new look's own full-screen pass
@@ -20,15 +20,20 @@ combine path reads it. Bevy's bloom runs after the glow on the same frame, as it
 `Tonemapping::None` with `Hdr`. The shader is validated and translated by naga in the app's shader
 test, the grade has a CPU twin with its own tests, and `worldLook 0` leaves the camera exactly as
 it was.
+
+The bloom's prefilter is 0.65 with a knee of 0.5. The first film had it at 0.8 and 0.3 with the grade's
+0.06 to 0.14, and a Fireball at night showed no bloom at all: past 0.8 a 0..1 gamma pixel has at most
+0.2 to give. `LookBloomTune` holds an intensity and a threshold over the grade's, for tuning on film
+(the console's `lookbloom`).
 ---
  crates/benilla-app/src/player/setup.rs        |   2 +
  crates/benilla-app/src/shaders.rs             | 127 +++--
  crates/benilla-world/src/ffx_glow.rs          |   3 +-
  crates/benilla-world/src/look/mod.rs          |  10 +-
- crates/benilla-world/src/look/pass.rs         | 475 ++++++++++++++++++
+ crates/benilla-world/src/look/pass.rs         | 532 ++++++++++++++++++
  crates/benilla-world/src/shaders.rs           |   3 +-
  .../benilla-world/src/shaders/world_look.wgsl |  54 ++
- 7 files changed, 622 insertions(+), 52 deletions(-)
+ 7 files changed, 679 insertions(+), 52 deletions(-)
  create mode 100644 crates/benilla-world/src/look/pass.rs
  create mode 100644 crates/benilla-world/src/shaders/world_look.wgsl
 
@@ -216,7 +221,7 @@ index 7c60367..f469371 100644
  /// The layouts, samplers, wave LUT and pipelines, built once at startup.
  #[derive(Resource)]
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index 411efaa..416a400 100644
+index 411efaa..e525a21 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -11,7 +11,9 @@ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
@@ -225,7 +230,7 @@ index 411efaa..416a400 100644
  pub mod grade;
 +pub mod pass;
  pub use grade::{GradeKey, PostLook, Tint};
-+pub use pass::{LookFrame, LookView};
++pub use pass::{LookBloomTune, LookFrame, LookView};
  
  /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
  /// test) is the reference; the game turns it on from its `worldLook` CVar.
@@ -253,10 +258,10 @@ index 411efaa..416a400 100644
  
 diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
 new file mode 100644
-index 0000000..3249f24
+index 0000000..d39cb4e
 --- /dev/null
 +++ b/crates/benilla-world/src/look/pass.rs
-@@ -0,0 +1,475 @@
+@@ -0,0 +1,532 @@
 +//! The new look's full-screen pass and bloom, benilla's own (no reference behaviour): a colour
 +//! grade in linear light (white balance, contrast, saturation) from the zone grade's current
 +//! values ([`super::LookGrade`]), and Bevy's own `Bloom` on the world camera, all on the camera
@@ -322,22 +327,37 @@ index 0000000..3249f24
 +    }
 +}
 +
-+/// The bloom prefilter: the frame is still 0..1 gamma here, so only the brightest parts (the sun,
-+/// spells, lit windows) pass it.
-+const BLOOM_THRESHOLD: f32 = 0.8;
-+const BLOOM_SOFTNESS: f32 = 0.3;
++/// The bloom prefilter: the frame is still 0..1 gamma here, so nothing in it is brighter than 1.
++/// Filmed at 0.8 with a soft knee of 0.3 and the grade's 0.06-0.14, a Fireball at night showed no
++/// bloom at all: past 0.8 a 0..1 pixel has at most 0.2 to give, and a tenth of that is nothing. At
++/// 0.65 with a wide knee the sun, spells and lit windows pass it, and a sunlit wall mostly doesn't.
++const BLOOM_THRESHOLD: f32 = 0.65;
++const BLOOM_SOFTNESS: f32 = 0.5;
 +
-+/// The new look's bloom at `intensity`: additive, with the prefilter above.
++/// The new look's bloom at `intensity`: additive, with the prefilter above (or `threshold`).
 +pub fn look_bloom(intensity: f32) -> Bloom {
++    look_bloom_at(intensity, BLOOM_THRESHOLD)
++}
++
++fn look_bloom_at(intensity: f32, threshold: f32) -> Bloom {
 +    Bloom {
 +        intensity,
 +        composite_mode: BloomCompositeMode::Additive,
 +        prefilter: BloomPrefilter {
-+            threshold: BLOOM_THRESHOLD,
++            threshold,
 +            threshold_softness: BLOOM_SOFTNESS,
 +        },
 +        ..Bloom::NATURAL
 +    }
++}
++
++/// A held bloom for tuning on film (`lookbloom <intensity> [threshold]`, benilla's console): each
++/// value set wins over the grade's for as long as it's held; `None` follows the grade. Inert under
++/// the classic look, which has no bloom.
++#[derive(Resource, Clone, Copy, Default, Debug, PartialEq)]
++pub struct LookBloomTune {
++    pub intensity: Option<f32>,
++    pub threshold: Option<f32>,
 +}
 +
 +/// Puts Bevy's `Bloom` on the look camera while the grade asks for some, at its intensity, and
@@ -345,18 +365,26 @@ index 0000000..3249f24
 +fn sync_bloom(
 +    mut commands: Commands,
 +    frame: Res<LookFrame>,
++    tune: Res<LookBloomTune>,
 +    mut cams: Query<(Entity, Option<&mut Bloom>), With<LookView>>,
 +) {
-+    let want = frame.on && frame.post.bloom > 0.0;
++    let intensity = tune.intensity.unwrap_or(frame.post.bloom);
++    let threshold = tune.threshold.unwrap_or(BLOOM_THRESHOLD);
++    let want = frame.on && intensity > 0.0;
 +    for (entity, bloom) in &mut cams {
 +        match (want, bloom) {
 +            (true, Some(mut b)) => {
-+                if b.intensity != frame.post.bloom {
-+                    b.intensity = frame.post.bloom;
++                if b.intensity != intensity {
++                    b.intensity = intensity;
++                }
++                if b.prefilter.threshold != threshold {
++                    b.prefilter.threshold = threshold;
 +                }
 +            }
 +            (true, None) => {
-+                commands.entity(entity).insert(look_bloom(frame.post.bloom));
++                commands
++                    .entity(entity)
++                    .insert(look_bloom_at(intensity, threshold));
 +            }
 +            (false, Some(_)) => {
 +                commands.entity(entity).remove::<Bloom>();
@@ -600,6 +628,7 @@ index 0000000..3249f24
 +/// FFXGlow plugin has added the node this one is ordered against.
 +pub(super) fn build(app: &mut App) {
 +    app.init_resource::<LookFrame>()
++        .init_resource::<LookBloomTune>()
 +        .add_plugins((
 +            ExtractComponentPlugin::<LookView>::default(),
 +            ExtractResourcePlugin::<LookFrame>::default(),
@@ -721,8 +750,41 @@ index 0000000..3249f24
 +        let b = look_bloom(0.12);
 +        assert_eq!(b.intensity, 0.12);
 +        assert!(matches!(b.composite_mode, BloomCompositeMode::Additive));
-+        assert_eq!(b.prefilter.threshold, 0.8);
-+        assert_eq!(b.prefilter.threshold_softness, 0.3);
++        assert_eq!(b.prefilter.threshold, 0.65);
++        assert_eq!(b.prefilter.threshold_softness, 0.5);
++    }
++
++    /// A held tune wins over the grade's bloom, and lets go to it again.
++    #[test]
++    fn a_held_tune_wins_over_the_grade() {
++        let mut app = App::new();
++        app.init_resource::<LookFrame>()
++            .init_resource::<LookBloomTune>()
++            .add_systems(Update, sync_bloom);
++        app.world_mut().resource_mut::<LookFrame>().on = true;
++        app.world_mut().resource_mut::<LookFrame>().post.bloom = 0.2;
++        let cam = app.world_mut().spawn(LookView).id();
++        app.update();
++        let bloom = |app: &App| {
++            let b = app.world().get::<Bloom>(cam).expect("bloom on");
++            (b.intensity, b.prefilter.threshold)
++        };
++        assert_eq!(bloom(&app), (0.2, 0.65));
++        *app.world_mut().resource_mut::<LookBloomTune>() = LookBloomTune {
++            intensity: Some(0.9),
++            threshold: Some(0.5),
++        };
++        app.update();
++        assert_eq!(bloom(&app), (0.9, 0.5));
++        *app.world_mut().resource_mut::<LookBloomTune>() = LookBloomTune::default();
++        app.update();
++        assert_eq!(bloom(&app), (0.2, 0.65));
++        app.world_mut().resource_mut::<LookFrame>().on = false;
++        app.update();
++        assert!(
++            app.world().get::<Bloom>(cam).is_none(),
++            "the classic look has none"
++        );
 +    }
 +
 +    #[test]
