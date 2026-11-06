@@ -1,24 +1,65 @@
-From 7afc3d47b4156c255ad8239f5ea562a672bc2976 Mon Sep 17 00:00:00 2001
+From 334e12ccd9afe9491edb7384d85f54e742388252 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Thu, 5 Nov 2026 19:07:54 -0600
-Subject: [PATCH] The nocked arrow points along the bow
+Date: Thu, 5 Nov 2026 19:29:14 -0600
+Subject: [PATCH] The nocked arrow points along the shot
 
-The arrow on the string hand (HandArrow) turns to face the bow's grip
-(HandLeft) from its own seat: 1.12's hold pose sets the string hand's
-bone across the bow, and with the shoulders turned to the aim the arrow
-lay sideways along the old stance. Riders take the turn in the rig lane,
-a plain child of its bone's anchor under it.
+The arrow on the string hand (HandArrow) turns to face a mark from its own
+seat: our own hero's, while the aiming camera is up, the reticle's point;
+everyone else's the bow's grip (HandLeft). 1.12's hold pose sets the string
+hand's bone across the bow, and with the shoulders turned to the aim the
+arrow lay sideways along the old stance. Riders take the turn in the rig
+lane, a plain child of its bone's anchor under it.
 ---
- .../src/entities/equipment/spawn.rs           | 18 ++++
- crates/benilla-world/src/rig_palette.rs       |  8 ++
- crates/benilla-world/src/rig_rider.rs         | 93 ++++++++++++++++++-
- 3 files changed, 115 insertions(+), 4 deletions(-)
+ .../benilla-app/src/creature_anim/action.rs   |  21 ++++
+ .../src/entities/equipment/spawn.rs           |  19 +++
+ crates/benilla-world/src/rig_palette.rs       |   8 ++
+ crates/benilla-world/src/rig_rider.rs         | 109 +++++++++++++++++-
+ 4 files changed, 153 insertions(+), 4 deletions(-)
 
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index e7af7e0d..74da7f3c 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1164,6 +1164,26 @@ pub(super) fn aim_pitch(time: Res<Time>, mut me: Query<&mut BodyTwist, With<Self
+     };
+ }
+ 
++/// Our own hero's nocked arrow points where the reticle is while the aiming camera is up (the
++/// reticle's point, `aim_marker`); everyone else's, and ours otherwise, along the bow.
++pub(super) fn aim_own_arrow(
++    mut arrows: Query<(
++        &mut benilla_world::rig_rider::RiderAimAt,
++        Option<&benilla_world::rig_rider::RigRider>,
++        Option<&benilla_world::rig_rider::AimedChild>,
++    )>,
++    me: Query<(), With<SelfPlayer>>,
++) {
++    let point = action_combat::reticle_point().map(|(p, _)| benilla_assets::coords::wow_to_bevy(p));
++    for (mut aim, rider, child) in &mut arrows {
++        let host = rider.map(|r| r.host).or(child.map(|c| c.host));
++        let want = if host.is_some_and(|h| me.contains(h)) { point } else { None };
++        if aim.world != want {
++            aim.world = want;
++        }
++    }
++}
++
+ /// A bone's tilted pose, given back part by part: whatever still holds what the tilt wrote returns
+ /// to the pose under it.
+ fn restore(cur: &mut Transform, base: &Transform, last: &Transform) -> bool {
+@@ -1538,6 +1558,7 @@ pub(super) fn plugin(app: &mut App) {
+                     .after(super::drive_animations)
+                     .after(crate::aura_visual::apply_aura_anim_rate),
+                 aim_pitch,
++                aim_own_arrow,
+                 collect_occluders,
+                 collect_nearby,
+                 track_lock_on,
 diff --git a/crates/benilla-app/src/entities/equipment/spawn.rs b/crates/benilla-app/src/entities/equipment/spawn.rs
-index 410ea53d..0b178e7b 100644
+index 410ea53d..547d0eaf 100644
 --- a/crates/benilla-app/src/entities/equipment/spawn.rs
 +++ b/crates/benilla-app/src/entities/equipment/spawn.rs
-@@ -398,6 +398,24 @@ fn spawn_slot(
+@@ -398,6 +398,25 @@ fn spawn_slot(
              slot
          }),
      };
@@ -30,6 +71,7 @@ index 410ea53d..0b178e7b 100644
 +            commands.entity(root).insert(benilla_world::rig_rider::RiderAimAt {
 +                bone: grip_bone,
 +                local: grip_local,
++                world: None,
 +            });
 +            if rider.is_none() {
 +                commands.entity(root).insert(benilla_world::rig_rider::AimedChild {
@@ -63,7 +105,7 @@ index 752fdaf2..d47cc251 100644
      if let Some(render) = app.get_sub_app_mut(RenderApp) {
          render.add_systems(
 diff --git a/crates/benilla-world/src/rig_rider.rs b/crates/benilla-world/src/rig_rider.rs
-index c4091f88..919d1ecc 100644
+index c4091f88..dd0bfc32 100644
 --- a/crates/benilla-world/src/rig_rider.rs
 +++ b/crates/benilla-world/src/rig_rider.rs
 @@ -11,6 +11,7 @@
@@ -74,7 +116,7 @@ index c4091f88..919d1ecc 100644
  use bevy::prelude::*;
  
  use crate::rig_anim::RigPose;
-@@ -31,6 +32,67 @@ pub struct RigRider {
+@@ -31,6 +32,86 @@ pub struct RigRider {
      pub slot: u16,
  }
  
@@ -87,6 +129,20 @@ index c4091f88..919d1ecc 100644
 +pub struct RiderAimAt {
 +    pub bone: u16,
 +    pub local: Vec3,
++    /// A world point (Bevy space) to face instead, while one is set: our own hero's nocked arrow
++    /// points where the reticle is.
++    pub world: Option<Vec3>,
++}
++
++impl RiderAimAt {
++    /// The mark in the host rig's model space: the world point brought in through the rig's own
++    /// frame, else the host's point.
++    fn mark(&self, root: &GlobalTransform, model: &[Affine3A]) -> Option<Vec3> {
++        match self.world {
++            Some(w) => Some(root.affine().inverse().transform_point3(w)),
++            None => model.get(self.bone as usize).map(|t| t.transform_point3(self.local)),
++        }
++    }
 +}
 +
 +/// The turn that sends local -Z along `dir` (a unit vector) with local +Y as near up as the line
@@ -103,8 +159,12 @@ index c4091f88..919d1ecc 100644
 +/// A seat at `bone`'s point `local`, turned toward `target`'s point `target_local`, all in the
 +/// host rig's model space; none when the two points meet.
 +pub fn aimed_seat(bone: &Affine3A, local: Vec3, target: &Affine3A, target_local: Vec3) -> Option<Affine3A> {
++    aimed_seat_to(bone, local, target.transform_point3(target_local))
++}
++
++/// [`aimed_seat`] toward a point already in model space.
++pub fn aimed_seat_to(bone: &Affine3A, local: Vec3, to: Vec3) -> Option<Affine3A> {
 +    let from = bone.transform_point3(local);
-+    let to = target.transform_point3(target_local);
 +    let d = to - from;
 +    (d.length_squared() > 1e-8).then(|| Affine3A::from_rotation_translation(facing_along(d.normalize()), from))
 +}
@@ -123,13 +183,14 @@ index c4091f88..919d1ecc 100644
 +pub fn aim_child_models(
 +    mut children: Query<(&RiderAimAt, &AimedChild, &mut Transform), Without<RigRider>>,
 +    poses: Query<&RigPose>,
++    frames: Query<&GlobalTransform>,
 +) {
 +    for (aim, child, mut t) in &mut children {
 +        let Ok(pose) = poses.get(child.host) else { continue };
-+        let (Some(bone), Some(target)) = (pose.model.get(child.bone as usize), pose.model.get(aim.bone as usize)) else {
-+            continue;
-+        };
-+        let Some(seat) = aimed_seat(bone, child.local, target, aim.local) else { continue };
++        let Ok(root) = frames.get(pose.joints_root) else { continue };
++        let Some(bone) = pose.model.get(child.bone as usize) else { continue };
++        let Some(to) = aim.mark(root, &pose.model) else { continue };
++        let Some(seat) = aimed_seat_to(bone, child.local, to) else { continue };
 +        let (_, bone_turn, _) = bone.to_scale_rotation_translation();
 +        let (_, seat_turn, _) = seat.to_scale_rotation_translation();
 +        let turn = (bone_turn.inverse() * seat_turn).normalize();
@@ -142,7 +203,7 @@ index c4091f88..919d1ecc 100644
  /// Writes every rider's frame, with the palette's writers ([`crate::rig_palette::plugin`]): after
  /// propagation and the billboard joint pass, before the publish. A missing host, pose or bone
  /// leaves the rows at their last frame; [`RigPalettes::write_rider`] is idempotent, so a standing
-@@ -38,7 +100,7 @@ pub struct RigRider {
+@@ -38,7 +119,7 @@ pub struct RigRider {
  /// re-arms on `[CGUnit+0xd24]`'s instance (BowPull 160 at `$BWP`, BowRelease 161 or Stand 0 at
  /// `$BWR`), writes row `b` as `F × own.model[b] × ibp[b]`, every frame.
  pub(crate) fn write_rig_riders(
@@ -151,7 +212,7 @@ index c4091f88..919d1ecc 100644
      poses: Query<&RigPose>,
      skins: Query<&RigSkin>,
      frames: Query<&GlobalTransform>,
-@@ -47,7 +109,7 @@ pub(crate) fn write_rig_riders(
+@@ -47,7 +128,7 @@ pub(crate) fn write_rig_riders(
      mut scratch: Local<Vec<GlobalTransform>>,
      mut palettes: ResMut<RigPalettes>,
  ) {
@@ -160,16 +221,13 @@ index c4091f88..919d1ecc 100644
          let Ok(pose) = poses.get(rider.host) else {
              continue;
          };
-@@ -62,7 +124,15 @@ pub(crate) fn write_rig_riders(
+@@ -62,7 +143,12 @@ pub(crate) fn write_rig_riders(
          let origin = rebase_origin(root_g.translation());
          let mut basis = root_g.affine();
          basis.translation -= bevy::math::Vec3A::from(origin);
 -        let frame = basis * *bone * bevy::math::Affine3A::from_translation(rider.local);
 +        // Turned to its mark when it has one (the nocked arrow along the bow).
-+        let seat = aim.and_then(|a| {
-+            let target = pose.model.get(a.bone as usize)?;
-+            aimed_seat(bone, rider.local, target, a.local)
-+        });
++        let seat = aim.and_then(|a| aimed_seat_to(bone, rider.local, a.mark(root_g, &pose.model)?));
 +        let frame = match seat {
 +            Some(seat) => basis * seat,
 +            None => basis * *bone * bevy::math::Affine3A::from_translation(rider.local),
@@ -177,7 +235,7 @@ index c4091f88..919d1ecc 100644
          // A prop with its own pose: its bone frames compose onto the placement and are written as
          // a body's rows.
          let posed = poses
-@@ -315,4 +385,19 @@ mod tests {
+@@ -315,4 +401,19 @@ mod tests {
              "absolute route vs f64 oracle: {abs_err} yd — expected the world coordinate's ULP"
          );
      }
