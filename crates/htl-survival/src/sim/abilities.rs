@@ -801,7 +801,7 @@ impl Survival {
             // A thrown one: the arm drawn back while it's aimed (the harpoon held ready, the axe
             // wound up), till it goes or the aim is let go.
             if thrown(&d) {
-                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0, body: ClipBody::Full });
+                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0, body: ClipBody::Upper });
             }
         } else {
             if d.bow {
@@ -901,7 +901,7 @@ impl Survival {
             let ms = ((hi + d.hold.max(0.5)) * 1000.0) as u32;
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
-            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0, body: ClipBody::Full });
+            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0, body: ClipBody::Upper });
         }
         let _ = lo;
     }

@@ -429,7 +429,9 @@ pub(crate) const ADDON_NEWEST: u32 = 50;
 /// the world, and whether cover sits between the hands and it), and the aim's circle laid on
 /// that line (0046).
 /// 27: our own hero's shoulders turned as the add-on asks, the head turned back (`SetAimTurn`,
-/// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048).
+/// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048), the body
+/// facing the aim while an ability is aimed and the upper body holding it as the legs walk
+/// (0049).
 pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
