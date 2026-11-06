@@ -203,7 +203,8 @@ local ICON_FIRST = 10
 local DULL = "Sound\\Interface\\iDeselectTarget.wav"
 -- The meter (Cone of Cold, after Gladius's swing meter), in Corey's frost art: the ice arc over the
 -- reticle, its good zone lit in blue along the channel, the sweet spot's ice gem pulsing on it, the
--- cracked overrun past its end, and the ice-shard cursor running the channel, pointing outward.
+-- cracked overrun past its end, and the ice-shard cursor sliding along the channel, standing upright
+-- (Corey: a cursor that tilts reads as pointing at the middle; it's a side-scrolling indicator).
 local METER_N, METER_OVER = 40, 0
 local METER_R, METER_HALF = 156, 55
 -- The frame's square, drawn so its circle's centre is the reticle (its channel `METER_R` out).
@@ -948,9 +949,11 @@ local TRACK_FOOT, TRACK_TOP = -120, 150
 local function TrackY(c, yd) return TRACK_FOOT + (TRACK_TOP - TRACK_FOOT) * Clamp(yd / math.max(1, c.range), 0, 1) end
 
 -- The meter at share `at` of its run (nil: no cursor), faded by `fade`.
+-- Also the turn that lays a piece along the arc there, in `Draw`'s sense (`Draw` turns the art
+-- the other way to its angle: a positive angle tips it left, so the arc's own angle is negated).
 local function MeterXY(c, sh, r)
   local ang = math.rad((-METER_HALF + 2 * METER_HALF * sh) * c.dir)
-  return (r or METER_R) * math.sin(ang), (r or METER_R) * math.cos(ang), ang
+  return (r or METER_R) * math.sin(ang), (r or METER_R) * math.cos(ang), -ang
 end
 local function DrawMeter(c, at, fade)
   local now = GetTime()
@@ -976,8 +979,8 @@ local function DrawMeter(c, at, fade)
   local ox, oy, oang = MeterXY(c, 1.1)
   Draw(meterOver, 96, oang, 0.9 * fade, 1, 1, 1, ox, oy)
   if at then
-    local x, y, ang = MeterXY(c, Clamp(at, 0, 1.12))
-    Draw(meterCursor, 100, ang, fade, 1, 1, 1, x, y)
+    local x, y = MeterXY(c, Clamp(at, 0, 1.12))
+    Draw(meterCursor, 100, 0, fade, 1, 1, 1, x, y)
     -- A glow under the shard, so it reads over the jet.
     Draw(halo, 60, 0, 0.6 * fade, 0.7, 0.9, 1, x, y)
   else
@@ -1126,8 +1129,8 @@ local function StepFx(now)
     local shake = (1 - t) * 6 * math.sin(age * 60)
     local ox, oy, oang = MeterXY(f.meter, 1.1)
     Draw(meterOver, 96 * (1 + 0.25 * (1 - t)), oang, 1 - t * t, 1, 0.35 + 0.3 * t, 0.3 + 0.3 * t, ox + shake, oy)
-    local cx, cy, cang = MeterXY(f.meter, 1.1)
-    Draw(meterCursor, 100, cang, 1 - t, 1, 0.5, 0.5, cx + shake, cy)
+    local cx, cy = MeterXY(f.meter, 1.1)
+    Draw(meterCursor, 100, 0, 1 - t, 1, 0.5, 0.5, cx + shake, cy)
     pop:Hide(); core:Hide(); burst:Hide(); tick:Hide(); star:Hide(); wave:Hide(); ghost:Hide(); target:Hide(); crack:Hide(); fizzle:Hide()
   else
     -- Failed: the red crack bursts apart with a jolt; a fizzle puffs out of the middle and dies.
