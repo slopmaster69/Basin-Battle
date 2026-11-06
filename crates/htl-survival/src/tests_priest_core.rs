@@ -725,6 +725,41 @@ fn the_hollow_star_is_an_orb_that_hurts_foes_and_heals_friends_and_fills_and_dra
 }
 
 #[test]
+fn a_crowd_of_foes_fills_the_hollow_star_no_faster_than_one_does() {
+    // ChatGPT's review: three foes feeding it shouldn't keep it alive while it heals three friends.
+    let mut s = world();
+    let p = armed(&mut s, "Ayla", ORIGIN, EAST, "hollow_star_staff");
+    s.input(p, Input::Guard);
+    s.step(0.0);
+    s.input(p, Input::GuardUp);
+    let h = s.light.hollows.iter().find(|h| h.owner == p).unwrap().clone();
+    let at = s.mobs[&h.mob].pos;
+    let foes: Vec<Id> = (0..3).map(|k| post(&mut s, [at[0] + 1.5, at[1] - 1.5 + 1.5 * k as f32, 0.0])).collect();
+    let dealt0: u32 = foes.iter().map(|g| hp(&s, *g)).sum();
+    run_pinned(&mut s, 1.05, &foes);
+    let dealt = dealt0 - foes.iter().map(|g| hp(&s, *g)).sum::<u32>();
+    assert_eq!(dealt, 15, "5 to each of three");
+    assert_eq!(hp(&s, h.mob), 45, "filled 5, not 15");
+}
+
+#[test]
+fn shadow_burst_rides_the_weaving_too() {
+    let mut s = world();
+    let p = armed(&mut s, "Ayla", ORIGIN, EAST, "shadowcaller_staff");
+    let k = idx(&s, "shadowcaller_bolt_heavy");
+    assert!(s.content.abilities[k].woven, "Shadow Burst is woven");
+    let d = mob(&mut s, "training_dummy", [10.0, 0.0, 0.0]);
+    let plain = s.ability_damage(p, d, k, 20.0);
+    s.light.last_bolt.insert(p, s.clock);
+    for _ in 0..5 {
+        click(&mut s, p);
+        run(&mut s, 0.6);
+    }
+    assert_eq!(marks(&s, p, d, "weave"), 5);
+    assert_eq!(s.ability_damage(p, d, k, 20.0), (plain as f32 * 1.4).round() as u32, "40% more at 5 stacks");
+}
+
+#[test]
 fn a_hollow_stars_reach_grows_from_3_to_5_yd_as_it_fills() {
     let mut s = world();
     let p = armed(&mut s, "Ayla", ORIGIN, EAST, "hollow_star_staff");

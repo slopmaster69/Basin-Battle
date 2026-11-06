@@ -259,7 +259,7 @@ impl Survival {
         let k = self.content.priest.clone();
         let mut dmg = dmg;
         let weave = self.staff_marks.iter().find(|m| m.owner == owner && m.on == victim && m.kind == "weave").map_or(0, |m| m.n);
-        if weave > 0 && d.builds == "weave" {
+        if weave > 0 && (d.builds == "weave" || d.woven) {
             dmg *= 1.0 + k.weave_step * weave as f32;
         }
         if d.shadowed > 0.0 && (weave > 0 || self.shadow_burning(victim)) {

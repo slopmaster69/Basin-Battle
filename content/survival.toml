@@ -6831,7 +6831,7 @@ spell = 2812
 full_spell = 10318
 impact_kit = 3153
 charge_pose = 28
-charge_kit = 3154
+charge_kit = 193
 
 [[ability]]
 key = "healing_gust"
@@ -6880,12 +6880,14 @@ spell = 686
 [[ability]]
 key = "shadowcaller_bolt_heavy"
 name = "Shadow Burst"
-text = "Hold for a heavy bolt of shadow, 14 to 26 damage. Release on the flare for a perfect."
+text = "Hold for a heavy bolt of shadow, 14 to 26 damage, 8% stronger for each stack of Shadow Weaving on the enemy. Release on the flare for a perfect."
 icon = "Spell_Shadow_ShadowBolt"
 school = "priest"
 slot = "ranged"
 kind = "projectile"
 bench = true
+# Weaving rides it too (31 perfect, 44 at 5 stacks: inside the board's 45).
+woven = true
 charge = [0.3, 1.2]
 perfect = true
 stamina = 20.0
@@ -6936,7 +6938,7 @@ spell = 15407
 [[ability]]
 key = "hollow_star"
 name = "Hollow Star"
-text = "Throws a dark orb to the reticle, up to 15 yd. It has 40 health (up to 60) and lasts 10 sec. Every second it deals 5 damage to each enemy and heals each ally 5 within 3 yd (5 yd when full). The damage it deals fills it; the healing it gives drains it. Standing in it, you run 15% faster. Enemies can break it."
+text = "Throws a dark orb to the reticle, up to 15 yd. It has 40 health (up to 60) and lasts 10 sec. Every second it deals 5 damage to each enemy and heals each ally 5 within 3 yd (5 yd when full). The damage it deals fills it, 5 a second at most; the healing it gives drains it. Standing in it, you run 15% faster. Enemies can break it."
 icon = "Spell_Shadow_ShadowWordDominate"
 school = "priest"
 slot = "ranged"

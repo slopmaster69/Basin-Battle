@@ -41,6 +41,12 @@ function ES.PriestLookLine(f)
   if kind == "penance" and guid and SetUnitSprite then
     -- Ring `n` closes on that body `a` seconds from now (`b` 1 a friend).
     Body("pen" .. n, { unit = guid, tex = "priest_penance_ring", kind = "ring", beat = now + a, friend = b >= 1, height = 1.1 })
+  elseif kind == "penance_ally" and SetUnitSprite then
+    -- A friend's Penance ring closing on us: faint (nothing to press), so we know light is coming.
+    Body("penally" .. n, { unit = "player", tex = "priest_penance_ring", kind = "ring", beat = now + a, friend = true, faint = true, height = 1.1 })
+  elseif kind == "rift" then
+    -- Our Void Rift open (`b` its seconds left; -1 gone): its key again implodes it at once.
+    ES.riftOpenUntil = (b > 0) and (now + b) or nil
   elseif kind == "penance_hit" then
     local u = onUnits["pen" .. n]
     if u then
@@ -185,6 +191,7 @@ local function StepBodies(now)
         local r, g, b = 1, 0.86, 0.45
         if u.friend then r, g, b = 0.9, 1, 0.75 end
         if u.done == "lost" then r, g, b = 0.6, 0.6, 0.6 end
+        if u.faint then alpha, size = alpha * 0.45, size * 0.8 end
         SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, r, g, b, alpha, now * 0.8, 1)
       end
     elseif u.kind == "hollow" then

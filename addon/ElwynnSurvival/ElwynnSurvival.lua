@@ -1669,6 +1669,12 @@ function ES.Ability(n, ex, state)
     SendAbility(n, false)
     return
   end
+  -- A Void Rift of ours open: the ultimate's key again implodes it, at once (the hold guards only
+  -- the bar's spending).
+  if n == ULT and ES.riftOpenUntil and GetTime() < ES.riftOpenUntil then
+    SendAbility(n, false)
+    return
+  end
   if n == ULT and s and s.key ~= "" and not ex then
     ES.exHold = { n = n, at = GetTime(), wait = true, ult = true, sent = false }
     return
