@@ -25,7 +25,9 @@
 //!   `meter:perfect|good|early|late` stops a meter sweep (Cone of Cold) against its rolled sweet
 //!   spot; `release:crit|edge|early|late` lets go against this cast's rolled flare (dead on, at the
 //!   window's edge, 0.4 s early, past the window); `beats` presses a rhythm's rolled beats dead on
-//!   (`beats:good` a little off, `beats:3` the first three then none, `beats:rest` on the rest).
+//!   (`beats:good` a little off, `beats:3` the first three then none, `beats:rest` on the rest);
+//!   `walk:1.5` runs the hero forward that long at their own pace now (`walk:1:back`, `:left`,
+//!   `:right`): the client moves the hero, so the add-on runs it (`ActionDash`).
 //! - `weapon ember_staff` puts that weapon in the caster's hands for the run (a staff's bolts,
 //!   the ward), wherever the stage is.
 //! - Everything the rules sent that touches the hero or the scene, until the burst is over, goes
@@ -425,10 +427,30 @@ impl SurvivalGame {
         while lab.steps.front().is_some_and(|(at, _)| *at <= now) {
             due.push(lab.steps.pop_front().unwrap().1);
         }
-        let (me, start, slot, ground, aim_ally) = (lab.hero, lab.start, lab.slot, lab.ground, lab.aim_ally);
+        let (me, start, slot, ground, aim_ally, conn) = (lab.hero, lab.start, lab.slot, lab.ground, lab.aim_ally, lab.conn);
         let target = lab.mobs.get(lab.mobs.len() / 2).copied();
         let nearest = lab.mobs.first().copied();
         for step in due {
+            // The client walks the hero (it moves itself; the rules only hear where it went), and an
+            // add-on can't hold a move key (the client refuses it), so the add-on runs the body with
+            // the action layer's dash, at the hero's own pace now (a haste's too): `walk:1.5` that
+            // long forward, `walk:1:back|left|right` another way.
+            if let Some(how) = step.strip_prefix("walk:") {
+                let mut it = how.split(':');
+                let secs = it.next().and_then(|n| n.parse::<f32>().ok()).unwrap_or(1.0).clamp(0.1, 10.0);
+                let keys = match it.next() {
+                    Some("back") => "b",
+                    Some("left") => "l",
+                    Some("right") => "r",
+                    _ => "f",
+                };
+                let speed = self.sim.players.get(&me).map_or(7.0, |p| p.sent_speed);
+                self.ui_line(conn, &format!("LW\t{secs:.2}\t{speed:.2}\t{keys}"));
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> walks {keys} {secs:.2} s at {speed:.2} yd/s", now - start));
+                }
+                continue;
+            }
             // Steps timed against what this cast rolled: they queue the press or the release.
             if let Some(how) = step.strip_prefix("release:") {
                 let mut queued = String::from("no charge");

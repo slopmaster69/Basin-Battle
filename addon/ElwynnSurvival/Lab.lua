@@ -2,6 +2,7 @@
 --
 -- The server sends, when a lab run starts:
 --   LB n ms label [cam] [secs]   (cam: behind, close or none; behind if it's missing)
+--   LW secs speed keys           (a `walk:` step: the body runs that long, that fast, that way)
 -- and this takes n screenshots, one every ms milliseconds, from now: the frames the server's
 -- trace (logs/lab/<label>.txt) is timed against. The client numbers shots taken within one second
 -- (WoWScrnShot_<date>_<time>_2.png ...), so a burst keeps every frame. The "Screen captured"
@@ -72,6 +73,12 @@ local function Frame(cam)
   if CameraZoomIn then
     if cam == "side" or cam == "close" then CameraZoomIn(5) else CameraZoomIn(3) end
   end
+end
+
+-- A `walk:` step. The client moves the hero and an add-on may not hold a move key, so the body
+-- runs it as a dash does (the action layer's), at the pace the server says is the hero's now.
+function ES.LabWalk(f)
+  if ActionDash then ActionDash(tonumber(f[2]) or 1, tonumber(f[3]) or 7, f[4] or "f") end
 end
 
 function ES.LabLine(f)

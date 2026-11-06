@@ -6770,6 +6770,8 @@ function ES.Line(line)
     if ES.FightMeter then ES.FightMeter(f) end
   elseif verb == "LB" then
     if ES.LabLine then ES.LabLine(f) end
+  elseif verb == "LW" then
+    if ES.LabWalk then ES.LabWalk(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "CU" then
