@@ -19,6 +19,7 @@ use crate::world::{ConnId, Inbound};
 
 pub mod board;
 mod draw;
+mod duel_ui;
 mod heroes;
 mod lab;
 pub mod land;
@@ -656,6 +657,26 @@ impl SurvivalGame {
                 }
                 self.sync_items(conn);
             }
+            // A spell cast from the client's own spellbook: only the Duel spell is one (from a
+            // hero's portrait, or `/duel`).
+            op::CMSG_CAST_SPELL => {
+                let spell = r.u32()?;
+                let flags = r.u16().unwrap_or(0);
+                let target = if flags & 0x0002 != 0 { r.packed_guid().ok() } else { None };
+                if let Some(me) = me {
+                    self.cast_from_book(conn, me, spell, target);
+                }
+            }
+            op::CMSG_DUEL_ACCEPTED => {
+                if let Some(me) = me {
+                    self.sim.duel_accept(me);
+                }
+            }
+            op::CMSG_DUEL_CANCELLED => {
+                if let Some(me) = me {
+                    self.sim.duel_cancel(me);
+                }
+            }
             op::CMSG_MESSAGECHAT => self.chat(conn, &mut r)?,
             o if MOVE_OPCODES.contains(&o) => self.movement(conn, o, body)?,
             _ => {}
@@ -731,7 +752,7 @@ impl SurvivalGame {
         self.send(conn, packets::tutorial_flags_all_seen());
         self.send(conn, packets::bindpoint(spawn, self.realm.map, self.realm.area));
         self.send(conn, packets::login_set_time_speed_at(self.clock()));
-        self.send(conn, packets::initial_spells(&[]));
+        self.send(conn, packets::initial_spells(&[packets::DUEL_SPELL]));
         self.send(conn, packets::action_buttons_empty());
         self.send(conn, packets::initialize_factions_empty());
         self.push_templates(conn);

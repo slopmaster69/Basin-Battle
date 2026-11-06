@@ -568,7 +568,7 @@ impl Survival {
         if let Some((mid, _)) = mob {
             return Some(*mid);
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             return self.players.iter().find(|(h, p)| self.hostile(t.owner, **h) && p.health > 0 && dist2d(p.pos, t.at) <= radius + HERO_SIZE && (p.pos[2] - t.at[2]).abs() < 3.0).map(|(h, _)| *h);
         }
         None

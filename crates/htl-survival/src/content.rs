@@ -51,6 +51,9 @@ pub struct Content {
     pub ai: AiDef,
     #[serde(default)]
     pub pvp: PvpDef,
+    /// Two heroes' duel: a challenge, a countdown, and a fight until one would fall.
+    #[serde(default)]
+    pub duel: DuelDef,
     /// How strikes chain, cancel and lunge, and how far the server makes allowances for lag.
     #[serde(default)]
     pub combat: CombatDef,
@@ -923,6 +926,33 @@ pub struct PvpDef {
     /// A fall leaves no sack: what a hero carries stays with them.
     #[serde(default)]
     pub keep_supplies: bool,
+}
+
+/// A duel between two heroes (WoW's own: the challenge's popup, its countdown, the flag between
+/// them). Outside Siege only.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct DuelDef {
+    /// How near the one challenged must be.
+    pub reach: f32,
+    /// How long a challenge waits for an answer.
+    pub ask_secs: f32,
+    /// The countdown once it's taken.
+    pub countdown_secs: f32,
+    /// How far from the flag a duellist can go; out past it, they must be back within
+    /// `return_secs` or forfeit. Back inside `back_in` counts as back.
+    pub bounds: f32,
+    pub back_in: f32,
+    pub return_secs: f32,
+    /// The flag planted between them (`GameObjectDisplayInfo`: 787 is the 1.12 dueling flag).
+    pub flag_display: u32,
+    pub flag_scale: f32,
+}
+
+impl Default for DuelDef {
+    fn default() -> Self {
+        Self { reach: 30.0, ask_secs: 60.0, countdown_secs: 3.0, bounds: 50.0, back_in: 45.0, return_secs: 10.0, flag_display: 787, flag_scale: 1.0 }
+    }
 }
 
 /// A bow or crossbow.

@@ -523,6 +523,21 @@ respawn_secs = 1.0
 respawn_health = 1.0
 keep_supplies = true
 
+# A duel: Duel on a hero's portrait (or /duel, or .es duel <name>), their popup's Accept, a
+# countdown, and a fight until one would fall (left at 1 health, the duel lost). While it's on the
+# two are each other's foes alone: struck, never healed, and nobody else can strike or help either.
+[duel]
+# The one challenged within 30 yd; a challenge unanswered for 60 sec lapses (the popup's own time).
+reach = 30.0
+ask_secs = 60.0
+countdown_secs = 3.0
+# More than 50 yd from the flag, a duellist has 10 sec to come back within 45 yd or forfeit.
+bounds = 50.0
+back_in = 45.0
+return_secs = 10.0
+# The 1.12 dueling flag, planted between them.
+flag_display = 787
+
 # --- bows -----------------------------------------------------------------------------------------
 
 [[ranged]]

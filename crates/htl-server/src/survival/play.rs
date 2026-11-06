@@ -979,6 +979,7 @@ impl SurvivalGame {
             Event::Siege { player } => {
                 self.siege_dirty.insert(player);
             }
+            Event::Duel { a, b, news } => self.duel_news(a, b, news),
             Event::CastDone { caster, spell } => {
                 // Its look ends too: the precast (a glow in the hands) stays on a caster standing
                 // still until a GO of that same spell or a failure, and what goes is often

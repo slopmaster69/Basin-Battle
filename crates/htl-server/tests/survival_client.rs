@@ -2018,3 +2018,38 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
         assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if guid == g)), "its stand-in {g:#x} goes");
     }
 }
+
+#[test]
+fn two_heroes_duel_through_the_clients_own_duel() {
+    // Co-op rules (no friendly fire): only the duel makes them foes.
+    let server = start_with(None, false);
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let ag = enter(&mut a);
+    let mut b = Client::connect(server.login, "ben", "hold", REALM).unwrap();
+    let bg = enter(&mut b);
+    assert!(a.wait(2.0, |p| creates_guid(p, bg)).is_some(), "ann sees ben");
+    // The Duel spell is known, so the client offers Duel on a hero's portrait (and /duel).
+    assert!(a.seen.iter().any(|p| matches!(p, ServerPacket::InitialSpells { spell_ids, .. } if spell_ids.contains(&7266))), "Duel is in the book");
+    const TEAM: u16 = 196;
+    // Ann's Duel at Ben: both are told, the flag between them.
+    a.send(op::CMSG_CAST_SPELL, &messages::cast_spell(7266, Some(bg)));
+    let ok = a.wait(2.0, |p| matches!(p, ServerPacket::CastResult { spell_id: 7266, .. }));
+    assert!(matches!(ok, Some(ServerPacket::CastResult { outcome: messages::CastOutcome::Ok, .. })), "the cast goes");
+    let asked = b.wait(2.0, |p| matches!(p, ServerPacket::DuelRequested { .. }));
+    let Some(ServerPacket::DuelRequested { arbiter, challenger }) = asked else { panic!("ben is asked") };
+    assert_eq!(challenger, ag);
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::DuelRequested { .. })).is_some(), "ann too");
+    // Ben takes it: the countdown on both screens, then each is the other's foe on the client too.
+    b.send(op::CMSG_DUEL_ACCEPTED, &messages::duel_accepted(arbiter));
+    for c in [&mut a, &mut b] {
+        assert!(c.wait(2.0, |p| matches!(p, ServerPacket::DuelCountdown { seconds: 3 })).is_some(), "duel starting: 3");
+    }
+    assert!(a.until(5.0, |c| value_of(c, bg, TEAM) == Some(2)), "ben on side 2");
+    assert!(b.until(1.0, |c| value_of(c, ag, TEAM) == Some(1)), "ann on side 1");
+    // Ben gives it away (/forfeit): over for both, Ann the winner, everyone told.
+    b.send(op::CMSG_DUEL_CANCELLED, &messages::duel_cancelled(arbiter));
+    assert!(b.wait(2.0, |p| matches!(p, ServerPacket::DuelComplete { started: true })).is_some(), "over");
+    let won = a.wait(2.0, |p| matches!(p, ServerPacket::DuelWinner { .. }));
+    assert!(matches!(won, Some(ServerPacket::DuelWinner { fled: true, ref winner, ref loser }) if winner == "Ann" && loser == "Ben"), "Ann won, Ben fled");
+    assert!(a.until(2.0, |c| value_of(c, bg, TEAM) == Some(0)), "friends again");
+}

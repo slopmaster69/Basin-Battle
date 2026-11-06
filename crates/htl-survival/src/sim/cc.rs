@@ -533,6 +533,22 @@ impl Survival {
         }
     }
 
+    /// End everything `from` put on a hero (a duel over: the foe's slows, burns and holds).
+    pub(crate) fn cleanse_from(&mut self, id: Id, from: Id) {
+        let now = self.clock;
+        let Some(list) = self.cc.get_mut(&id) else { return };
+        let mut gone = Vec::new();
+        for c in list.iter_mut() {
+            if c.from == from && c.until > now {
+                c.until = now;
+                gone.push(c.kind.clone());
+            }
+        }
+        if !gone.is_empty() {
+            self.cc_ended(id, &gone);
+        }
+    }
+
     /// Take a unit's effects off (a blink out of roots, Tremor Totem's pulse on a panic).
     pub(crate) fn cleanse(&mut self, id: Id, kinds: &[&str]) {
         let now = self.clock;

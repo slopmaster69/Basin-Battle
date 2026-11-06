@@ -769,7 +769,7 @@ impl Survival {
                 consider(*mid, m.pos, lean(*mid, false, m.state.foe().is_some()));
             }
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             for (hid, h) in &self.players {
                 if *hid != id && h.health > 0 && self.hostile(id, *hid) {
                     consider(*hid, h.pos, lean(*hid, true, true));
@@ -871,7 +871,7 @@ impl Survival {
         for (mid, m) in self.mobs.iter().filter(|(_, m)| m.health > 0) {
             consider(where_(*mid, m.pos), 0.5 * self.content.mobs[m.def].scale);
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             for (hid, h) in &self.players {
                 if *hid != id && h.health > 0 && self.hostile(id, *hid) {
                     consider(where_(*hid, h.pos), HERO_SIZE);
@@ -1409,8 +1409,8 @@ impl Survival {
             }
             hits.push((d, mid));
         }
-        // Other heroes, with friendly fire on.
-        if self.content.pvp.friendly_fire {
+        // Other heroes it can strike: with friendly fire on, or a duel's foe.
+        if self.heroes_clash() {
             for (&hid, h) in &self.players {
                 if hid == id || h.health == 0 || struck.contains(&hid) || !self.hostile(id, hid) {
                     continue;
@@ -2319,6 +2319,8 @@ impl Survival {
         let damage = self.cc_on_damage(id, damage);
         // Cheating death: a blow that would fell them leaves them at 1 health (the boon spent).
         let damage = self.cheat_death(id, damage);
+        // A duel's last blow leaves them standing, the duel lost.
+        let damage = self.duel_knockout(id, damage);
         let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
         let before = p.health;
@@ -2591,13 +2593,13 @@ impl Survival {
         if d.unblockable {
             self.events.push(Event::Glow { id, secs: windup });
         }
-        if d.unblockable && self.content.pvp.friendly_fire {
+        if d.unblockable && self.heroes_clash() {
             let p = &self.players[&id];
             let (pos, f) = (p.pos, p.facing);
             let near: Vec<Id> = self
                 .players
                 .iter()
-                .filter(|(h, v)| **h != id && v.health > 0 && dist2d(v.pos, pos) <= range + 3.0 && angle_between(f, facing(pos, v.pos)) <= arc / 2.0 + 30.0)
+                .filter(|(h, v)| **h != id && v.health > 0 && self.hostile(id, **h) && dist2d(v.pos, pos) <= range + 3.0 && angle_between(f, facing(pos, v.pos)) <= arc / 2.0 + 30.0)
                 .map(|(h, _)| *h)
                 .collect();
             for h in near {
@@ -2672,7 +2674,7 @@ impl Survival {
             }
             hits.push((dd, mid, at, m.facing));
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             for (&hid, h) in &self.players {
                 if hid == id || h.health == 0 || struck.contains(&hid) || !self.hostile(id, hid) {
                     continue;
