@@ -208,6 +208,8 @@ fn a_thrown_abilitys_aim_holds_the_arm_drawn_back_till_it_goes_or_is_let_go() {
         _ => None,
     });
     assert!(hold.is_some_and(|secs| secs >= 10.0), "the arm drawn back for as long as the aim may last: {hold:?}");
+    // On the upper body alone: the legs walk under it in any direction.
+    assert!(ev.iter().any(|e| matches!(e, Event::Clip { id, clip: 111, body: ClipBody::Upper, .. } if *id == p)), "the arms alone");
     assert!(clip_stop_at(&ev, p).is_none(), "and held");
     s.input(p, Input::Cancel);
     let ev = s.step(DT);
@@ -419,4 +421,16 @@ fn the_rules_say_what_each_projectile_mechanic_needs() {
         c.abilities.extend(abilities(&format!("{head}{body}\n")));
         assert!(c.validate_abilities().is_err(), "{what} is refused");
     }
+}
+
+/// A jump calls off an aim and a charge, as a roll and the guard do: an aimed ability is let go,
+/// not carried into the air.
+#[test]
+fn a_jump_calls_off_an_aim_and_a_charge() {
+    let mut s = world(PROJECTILES);
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    arm(&mut s, p, "t_throw");
+    assert!(matches!(s.players[&p].action, Action::Aim { .. }), "aiming");
+    s.jumped(p);
+    assert_eq!(s.players[&p].action, Action::Ready, "the aim let go");
 }
