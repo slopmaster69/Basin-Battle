@@ -5,7 +5,7 @@
 //! - `V\t<version>`: the server answers the add-on's hello (the add-on wakes only then).
 //! - `EF\t<name~seconds left~kind>^...`: what used items are still doing for the hero.
 //! - `GL\t<place>\t<goals>\t<title>\t<what to do>\t<have>\t<need>`: the camp journal's goal.
-//! - `H\t<health>\t<max>\t<stamina>\t<max>\t<kit>\t<weapon>\t<bags used>\t<bag slots>\t<cache yd>\t<cache bearing>\t<raid>\t<raid secs>\t<raiders left>\t<at camp>\t<foes in reach>\t<meals>\t<foe name>\t<foe health>\t<foe max>\t<ranged>\t<light clip>\t<light impact>\t<light secs>\t<heavy clip>\t<heavy impact>\t<heavy secs>\t<light stamina>\t<heavy stamina>\t<dodge stamina>\t<quick item>\t<its count>\t<armor %>\t<the raid's name>\t<sheathed>\t<jump stamina>`
+//! - `H\t<health>\t<max>\t<stamina>\t<max>\t<kit>\t<weapon>\t<bags used>\t<bag slots>\t<cache yd>\t<cache bearing>\t<raid>\t<raid secs>\t<raiders left>\t<at camp>\t<foes in reach>\t<meals>\t<foe name>\t<foe health>\t<foe max>\t<ranged>\t<light clip>\t<light impact>\t<light secs>\t<heavy clip>\t<heavy impact>\t<heavy secs>\t<light stamina>\t<heavy stamina>\t<dodge stamina>\t<quick item>\t<its count>\t<armor %>\t<the raid's name>\t<sheathed>\t<jump stamina>\t<place unfound>\t<its yd>\t<its bearing>\t<north>\t<shield>\t<overhealth>` (what the hero's shields have left to soak, and their health over the most: the health bar's white and pale-red ends)
 //! - `A\t<action>\t<seconds in>\t<seconds long>`: what the hero is doing, for the action bar.
 //! - `S\t<item~name~count~gear>^...`: the camp chest, while its window is open.
 //! - `W\t<station>\t<name>\t<recipe~output~cost~can>^...`: a station's work.
@@ -465,6 +465,10 @@ pub(crate) const VERSION: u32 = 2;
 /// (patches 0041 to 0044).
 /// 43: a staff's mark and stacks (`SF`, `SK`, `SH`, `Staff.lua`), and the ward on the reticle (the
 /// `WA` line's fifth field, whether it's up); the add-on says `ac25` (patch 0045).
+/// 45: no strip on the ground under an aimed shot (Aimed Shot, Axe Throw): the reticle says where
+/// it goes. Beams and grappling hooks keep theirs.
+/// 47: over heads, a thin bar over a hurt foe and nothing else (no names, levels, borders or
+/// friends' plates); the bar across the top names the champion and the foe fought.
 /// 48: the right mouse carries the reticle's line (`in g <facing> <elevation>`): a Priest's staff
 /// casts its right click along it (Flash Heal, Drain). An older add-on's press goes along the
 /// hero's facing. (44 to 47 are claimed by #201, #203, #204 and #205.)
@@ -692,8 +696,9 @@ impl SurvivalGame {
         let (quick, quick_n) = self.sim.quick_item(p).map_or((String::new(), 0), |i| (clean(&c.items[i].name), p.bag.get(&i).copied().unwrap_or(0)));
         let armor = (self.sim.armor_reduce(p) * 100.0).round() as u32;
         let raid_title = clean(&self.sim.current_raid().title);
+        let (shield, over) = self.sim.absorbs(id);
         Some(format!(
-            "H\t{}\t{}\t{}\t{}\t{kit}\t{}\t{used}\t{}\t{cd}\t{cb}\t{phase}\t{}\t{left}\t{}\t{reach}\t{meals}\t{foe}\t{foe_hp}\t{foe_max}\t{ranged}\t{swings}\t{quick}\t{quick_n}\t{armor}\t{raid_title}\t{}\t{:.0}\t{pn}\t{pd}\t{pb}\t{north}",
+            "H\t{}\t{}\t{}\t{}\t{kit}\t{}\t{used}\t{}\t{cd}\t{cb}\t{phase}\t{}\t{left}\t{}\t{reach}\t{meals}\t{foe}\t{foe_hp}\t{foe_max}\t{ranged}\t{swings}\t{quick}\t{quick_n}\t{armor}\t{raid_title}\t{}\t{:.0}\t{pn}\t{pd}\t{pb}\t{north}\t{shield}\t{over}",
             p.health,
             p.max_health,
             p.stamina.floor() as u32,

@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>] [ccaura <kind>/<spell>] [perfectkit <kit>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>] [ccaura <kind>/<spell>] [perfectkit <kit>] [hud] [fx <kind>/<amount>/<secs>]`
 //!
 //! - `by tauren-f` has a stand-in hero of that race cast it, the hero (and camera) at its side.
 //! - `anim` tries another clip on the ability for that run only (its take, and the model every race
@@ -137,6 +137,8 @@ impl SurvivalGame {
         let mut anim: Option<(u16, u32, Option<String>)> = None;
         let mut allies = 0usize;
         let mut hurt = false;
+        let mut hud = false;
+        let mut fx: Vec<(String, f32, f32)> = Vec::new();
         let mut by: Option<(u8, u8)> = None;
         let mut weapon: Option<String> = None;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
@@ -173,6 +175,18 @@ impl SurvivalGame {
                     let kind = it.next().filter(|w| !w.is_empty()).ok_or("Try ccaura <kind>/<spell>.")?;
                     let sp: u32 = it.next().and_then(|n| n.parse().ok()).ok_or("Try ccaura <kind>/<spell>.")?;
                     self.sim.content.cc.auras.insert(kind.to_lowercase(), sp);
+                    k += 1;
+                }
+                // The hero's own bars kept in the film (the interface is hidden otherwise).
+                "hud" => hud = true,
+                // An effect on the hero as the run starts: `fx overhealth/20/8`, `fx shield/30/6`.
+                "fx" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    let mut it = spec.split('/');
+                    let kind = it.next().filter(|w| !w.is_empty()).ok_or("Try fx <kind>/<amount>/<secs>.")?;
+                    let amount: f32 = it.next().and_then(|n| n.parse().ok()).ok_or("Try fx <kind>/<amount>/<secs>.")?;
+                    let secs: f32 = it.next().and_then(|n| n.parse().ok()).unwrap_or(8.0);
+                    fx.push((kind.to_lowercase(), amount, secs));
                     k += 1;
                 }
                 // The Priest's Light perfect for this run and the ones after: `perfectkit 433` (a
@@ -315,6 +329,9 @@ impl SurvivalGame {
                 }
             }
         }
+        for (kind, amount, secs) in &fx {
+            self.sim.lab_effect(me, kind, *amount, *secs);
+        }
         let _ = me_conn;
         // The steps, timed from a moment after the burst starts (and after the client has set the
         // hero down, if the stage moved them).
@@ -352,7 +369,7 @@ impl SurvivalGame {
             // With video, no stills (the video holds every frame; a night's stills once filled the
             // lab's budget): the shots' count and spacing only time the run, and the add-on keeps
             // the interface hidden for the video's length.
-            burst: Some((now + SETTLE, format!("LB\t{}\t{every}\t{label}\t{cam}\t{:.2}", if video { 0 } else { shots }, secs + 0.6), secs + 0.6)),
+            burst: Some((now + SETTLE, format!("LB\t{}\t{every}\t{label}\t{cam}\t{:.2}\t{}", if video { 0 } else { shots }, secs + 0.6, if hud { "hud" } else { "" }), secs + 0.6)),
             mobs,
             trace,
             slot,

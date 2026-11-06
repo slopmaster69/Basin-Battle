@@ -110,6 +110,12 @@ impl Survival {
         self.lab_blow(mob, hero);
     }
 
+    /// An effect on a lab hero, from themselves: a shield, overhealth (`fx` in a lab run).
+    pub fn lab_effect(&mut self, hero: Id, kind: &str, amount: f32, secs: f32) {
+        self.apply_cc(hero, hero, kind, secs, amount, 0.0, "Lab");
+        self.events.push(Event::Effects { player: hero });
+    }
+
     pub fn lab_blow(&mut self, mob: Id, hero: Id) {
         let Some(at) = self.players.get(&hero).map(|p| p.pos) else { return };
         if self.mobs.get(&mob).is_some_and(|m| m.health > 0) {

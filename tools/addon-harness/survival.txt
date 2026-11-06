@@ -119,7 +119,8 @@ A	cast	0.00	0.40	frostbolt
 A	aim	0.00	0.00	flamestrike
 !function SetAimMarker(shape, range, radius) table.insert(SAID, "marker " .. tostring(shape) .. " " .. tostring(range) .. " " .. tostring(radius)) end ElwynnSurvival.DrawAim()
 !ElwynnSurvival.Guard("down") ElwynnSurvival.Guard("up")
-# On the eighth round a projectile's (a beam's) path is drawn as a strip: its range, its radius.
+# On the eighth round a beam's path (a grappling hook's) is drawn as a strip, its range and its
+# radius; a shot (this thrown axe) has none: the reticle says where it goes.
 !HasActionCombat = function() return 8 end
 A	aim	0.00	0.00	aimed_throw
 !table.insert(SAID, "path marker: " .. tostring(SAID[table.getn(SAID)]))
@@ -521,6 +522,12 @@ A	ready	0.00	0.00
 !OLDRU = RollUnit function RollUnit(u, s, st, p, t) table.insert(SAID, "flip " .. u .. string.format(" %.2f ", s) .. tostring(st) .. " tuck " .. tostring(t)) end
 FP	0X1	0.52	38	0	ScourgeFemale	1	1
 !RollUnit = OLDRU
+# The health bar's ends: overhealth past the health in a paler red, the shield past it in white;
+# past the bar's end they lie over the health from the right. Then nothing left of either.
+H	150	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90	30	20
+!local h = ElwynnSurvivalVitals.health table.insert(SAID, string.format("absorbs: over %s at %.0f wide %.0f, shield %s wide %.0f, text %s", tostring(h.over:IsShown()), h.full, h.over:GetWidth(), tostring(h.shield:IsShown()), h.shield:GetWidth(), tostring(ElwynnSurvivalVitals.healthText:GetText())))
+H	150	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90	0	0
+!local h = ElwynnSurvivalVitals.health table.insert(SAID, "absorbs gone: over " .. tostring(h.over:IsShown()) .. ", shield " .. tostring(h.shield:IsShown()) .. ", text " .. tostring(ElwynnSurvivalVitals.healthText:GetText()))
 # Below, with nothing else to point at: the corner's arrow points north.
 WR	below
 H	200	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90

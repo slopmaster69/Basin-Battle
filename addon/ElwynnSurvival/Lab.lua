@@ -1,7 +1,8 @@
 -- Elwynn Survival: the spell lab's camera (dev builds' `.es lab`, see docs/spell-lab.md).
 --
 -- The server sends, when a lab run starts:
---   LB n ms label [cam] [secs]   (cam: behind, close or none; behind if it's missing)
+--   LB n ms label [cam] [secs] [hud]   (cam: behind, close or none; behind if it's missing;
+--                                       hud: the hero's own bars kept in the film)
 --   LW secs speed keys           (a `walk:` step: the body runs that long, that fast, that way)
 -- and this takes n screenshots, one every ms milliseconds, from now: the frames the server's
 -- trace (logs/lab/<label>.txt) is timed against. The client numbers shots taken within one second
@@ -22,11 +23,17 @@ frame:Hide()
 
 -- The aiming reticle stays in the film while the interface is hidden (Corey couldn't see the
 -- Shield aimed at the friend): lifted onto the world for the burst, put back after.
-local function KeepReticle(on)
-  local aim = ElwynnSurvivalAim
-  if not aim then return end
-  if on then aim:SetParent(WorldFrame) else aim:SetParent(UIParent) end
-  aim:SetFrameStrata("HIGH")
+local function KeepReticle(on, hud)
+  local frames = { ElwynnSurvivalAim }
+  -- `hud`: the health and stamina bars too (the health bar's shield and overhealth on film).
+  if hud or not on then table.insert(frames, ElwynnSurvivalVitals) end
+  for i = 1, table.getn(frames) do
+    local f = frames[i]
+    if f then
+      if on then f:SetParent(WorldFrame) else f:SetParent(UIParent) end
+      f:SetFrameStrata("HIGH")
+    end
+  end
 end
 
 local function Quiet(on)
@@ -103,7 +110,7 @@ function ES.LabLine(f)
   if secs < lab.left * lab.every then secs = lab.left * lab.every end
   lab.show_at = lab.next + secs + 1.0
   Quiet(true)
-  KeepReticle(true)
+  KeepReticle(true, f[7] == "hud")
   if UIParent then UIParent:Hide() end
   frame:Show()
 end

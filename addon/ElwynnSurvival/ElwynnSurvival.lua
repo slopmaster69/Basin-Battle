@@ -1831,22 +1831,83 @@ end
 function ES.StepLockHold()
 end
 
--- V: the health bars over heads, on and off (everyone's: foes' and friends').
+-- V: the health bars over foes' heads, on and off.
 function ES.Bars()
   if not ES.awake then return end
   local set = Settings()
   if set.noBars then
     set.noBars = nil
     if ShowNameplates then pcall(ShowNameplates) end
-    if ShowFriendNameplates then pcall(ShowFriendNameplates) end
     ES.Message("Health bars shown.")
   else
     set.noBars = 1
     if HideNameplates then pcall(HideNameplates) end
-    if HideFriendNameplates then pcall(HideFriendNameplates) end
     ES.Message("Health bars hidden. Press " .. (KeyName("ES_BARS") or "V") .. " to show them.")
   end
 end
+
+-- Over heads: no names, levels, borders or skulls. A foe's plate is a thin bar, shown only while
+-- it's hurt, so a pack's wounded read at a glance and the untouched show nothing. The bar across
+-- the top is the one with the name and the numbers (the champion's, and the foe the hero fights);
+-- the champion's own plate stays empty, so it isn't shown twice. Friends' plates stay off.
+ES.PLATE_W, ES.PLATE_H = 64, 5
+
+-- The client's plates (1.12's): an unnamed button on the WorldFrame whose first region is the
+-- nameplate border, its health bar its one child.
+function ES.IsPlate(f)
+  if f.esPlate then return true end
+  if not f.GetRegions or not f.GetChildren then return false end
+  local border = f:GetRegions()
+  if not border or not border.GetTexture then return false end
+  local tex = border:GetTexture()
+  if type(tex) ~= "string" or not string.find(string.lower(tex), "nameplate%-border") then return false end
+  f.esPlate = true
+  return true
+end
+
+function ES.SkinPlate(plate)
+  local bar = plate:GetChildren()
+  if not bar or not bar.GetValue then return end
+  if not plate.esSkinned then
+    plate.esSkinned = true
+    bar:ClearAllPoints()
+    bar:SetPoint("CENTER", plate, "CENTER", 0, -4)
+    bar:SetWidth(ES.PLATE_W)
+    bar:SetHeight(ES.PLATE_H)
+    if bar.SetStatusBarTexture then bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8") end
+    local back = bar:CreateTexture(nil, "BACKGROUND")
+    back:SetTexture(0, 0, 0, 0.7)
+    back:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
+    back:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
+  end
+  -- The border, the mouse-over glow, the name, the level and the skull: every frame, as the
+  -- client shows them again as the unit changes.
+  local border, glow, name, level, skull = plate:GetRegions()
+  if border then border:Hide() end
+  if glow then glow:Hide() end
+  if name then name:Hide() end
+  if level then level:Hide() end
+  if skull then skull:Hide() end
+  local _, most = bar:GetMinMaxValues()
+  local now = bar:GetValue()
+  local hurt = most and now and most > 0 and now < most
+  local b = ES.boss
+  if hurt and b and b.who and name and name.GetText and name:GetText() == b.who then
+    hurt = false
+  end
+  bar:SetStatusBarColor(0.85, 0.13, 0.08)
+  plate:SetAlpha(hurt and 1 or 0)
+end
+
+ES.plateWatch = CreateFrame("Frame")
+ES.plateWatch:SetScript("OnUpdate", function()
+  if not ES.awake or not WorldFrame or not WorldFrame.GetChildren then return end
+  local kids = { WorldFrame:GetChildren() }
+  for i = 1, table.getn(kids) do
+    local k = kids[i]
+    if k:IsShown() and ES.IsPlate(k) then ES.SkinPlate(k) end
+  end
+end)
 
 -- F: use what's in front of you; while placing, put the station down.
 function ES.Use()
@@ -1933,6 +1994,15 @@ local ST_PER_PX = 0.42
 local VIT_HEALTH, VIT_STAMINA = 13, 8
 local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
+-- Overhealth (health over the most) in a paler red past the health, and what shields have left
+-- to soak in translucent white past that (Corey); where they run past the bar's end they lie over
+-- the health from the right, the health showing through.
+vit.health.over = Tex(vit.health, "ARTWORK", "bar")
+vit.health.over:SetVertexColor(1.0, 0.55, 0.48, 0.95)
+vit.health.over:Hide()
+vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
+vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
+vit.health.shield:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
 -- Room for "1000 / 1000" at any bar size (left to size itself, it was cut to "200 / 2...").
@@ -2003,6 +2073,27 @@ function ES.PlaceVitals()
   ES.DrawVitalsLength()
   if ES.PlaceTop then ES.PlaceTop() end
 end
+-- The health bar's overhealth and shield (`H`'s last two): laid on past the health, as wide as
+-- they'd be at the bar's scale; what runs past the end lies over the health from the right.
+function ES.DrawAbsorbs(hp, maxhp, shield, over)
+  local b = vit.health
+  local full = b.full
+  local per = full / math.max(1, maxhp)
+  local ow, sw = math.min(full, over * per), math.min(full, shield * per)
+  local x = math.max(0, math.min(hp * per, full - ow - sw))
+  local function Lay(t, w)
+    if w < 0.5 then t:Hide() return end
+    t:ClearAllPoints()
+    t:SetPoint("TOPLEFT", b, "TOPLEFT", x, 0)
+    t:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", x, 0)
+    t:SetWidth(w)
+    t:Show()
+    x = x + w
+  end
+  Lay(b.over, ow)
+  Lay(b.shield, sw)
+end
+
 -- The bars' lengths: the dock's width by the hero, by what they hold in the corner.
 function ES.DrawVitalsLength()
   local h = ES.h
@@ -2353,15 +2444,16 @@ function ES.DrawAim()
 end
 
 -- The marker an aimed ability gets: a ground ability's circle, a cone's wedge, and (on the eighth
--- round, which draws a strip) a projectile's or a beam's path from the feet along the view, its
--- range long and its radius either side. Nil: none (a dash, a tether, help for a friend).
+-- round, which draws a strip) a beam's path from the feet along the view, its range long and its
+-- radius either side, or a grappling hook's to where it would catch. A shot (Aimed Shot, Axe
+-- Throw) has none: the reticle says where it goes. Nil: none (a dash, a tether, help for a friend).
 function ES.AimMarkerShape(d)
   -- A fan's reticle shows its spread (aim.fan): nothing on the ground.
   if not d or d.shape == "fan" then return nil end
   if d.shape == "circle" or d.shape == "cone" then return d.shape end
-  if (d.kind == "projectile" or d.kind == "beam") and HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8 then
-    return "line"
-  end
+  if not (HasActionCombat and (tonumber(HasActionCombat()) or 0) >= 8) then return nil end
+  if d.kind == "beam" then return "line" end
+  if d.kind == "projectile" and ES.CatchNow and ES.CatchNow() then return "line" end
   return nil
 end
 
@@ -3782,7 +3874,14 @@ function ES.DrawHud()
   end
   ES.lastHp = hp
   vit.health:Set(hp / math.max(1, maxhp))
-  vit.healthText:SetText(hp .. " / " .. maxhp)
+  local shield, over = tonumber(h[41]) or 0, tonumber(h[42]) or 0
+  ES.DrawAbsorbs(hp, maxhp, shield, over)
+  -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
+  local text = hp
+  if over > 0 then text = text .. "|cffff9a8f+" .. over .. "|r" end
+  text = text .. " / " .. maxhp
+  if shield > 0 then text = text .. " |cffffffff+" .. shield .. "|r" end
+  vit.healthText:SetText(text)
   vit.stamina:Set(st / math.max(1, maxst))
   local reach = tonumber(h[16]) or 0
   if reach > 0 then
@@ -5465,7 +5564,16 @@ function ES.HideChrome()
     if HideFriendNameplates then pcall(HideFriendNameplates) end
   else
     if ShowNameplates then pcall(ShowNameplates) end
-    if ShowFriendNameplates then pcall(ShowFriendNameplates) end
+    if HideFriendNameplates then pcall(HideFriendNameplates) end
+  end
+  -- No names floating over creatures (the bar across the top names the one fought); the
+  -- player's own setting comes back with the stock interface.
+  if GetCVar and SetCVar and not ES.npcNames then
+    local ok, was = pcall(GetCVar, "UnitNameNPC")
+    if ok and was then
+      ES.npcNames = was
+      pcall(SetCVar, "UnitNameNPC", "0")
+    end
   end
   -- The chat stays where it is, for talking, and fades between lines (the client lays it out
   -- again as it likes, so it isn't moved).
@@ -5490,6 +5598,10 @@ function ES.RestoreChrome()
   end
   ES.parents = nil
   if HideFriendNameplates then pcall(HideFriendNameplates) end
+  if ES.npcNames and SetCVar then
+    pcall(SetCVar, "UnitNameNPC", ES.npcNames)
+    ES.npcNames = nil
+  end
   if ChatFrame1 and ChatFrame1.SetTimeVisible then
     pcall(ChatFrame1.SetTimeVisible, ChatFrame1, 120)
   end
