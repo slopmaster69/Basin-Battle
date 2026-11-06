@@ -416,7 +416,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 50: the add-on says `ac27` and squares the shoulders to the aim while the bow is drawn
 /// (`SetAimTurn`): 1.12's draw stands side-on.
 /// 51: the shoulders no longer turned while the bow is drawn: the client steers the bow itself.
-pub(crate) const ADDON_NEWEST: u32 = 51;
+/// 52: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
+pub(crate) const ADDON_NEWEST: u32 = 52;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -433,7 +434,8 @@ pub(crate) const ADDON_NEWEST: u32 = 51;
 /// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048), the body
 /// facing the aim while an ability is aimed and the upper body holding it as the legs walk
 /// (0049), and our own drawn bow's line steered onto the reticle (0050).
-pub(crate) const CLIENT_NEWEST: u8 = 27;
+/// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0056).
+pub(crate) const CLIENT_NEWEST: u8 = 28;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
