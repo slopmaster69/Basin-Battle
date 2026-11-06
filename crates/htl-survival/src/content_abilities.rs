@@ -1430,7 +1430,9 @@ impl Default for CcDef {
             ("steadfast", 10060),
             ("shield", 17),
             ("regen", 774),
-            ("haste", 2983),
+            // Blessing of Freedom's glow at the feet: Sprint's (2983) is a ribbon trail this client
+            // never draws, so a hastened hero showed nothing.
+            ("haste", 1044),
             ("veil", 1784),
         ]
             .into_iter()
