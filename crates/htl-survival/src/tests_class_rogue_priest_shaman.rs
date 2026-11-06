@@ -282,42 +282,41 @@ fn channelling(s: &Survival, p: Id) -> bool {
     matches!(s.players[&p].action, Action::Channel { .. })
 }
 
-fn halve(s: &mut Survival, p: Id) -> u32 {
-    let h = s.players.get_mut(&p).unwrap();
-    h.health = h.max_health / 2;
-    h.health
-}
-
-// Penance is no longer a lance held out: three bolts along the reticle, and Holy Fire its EX
-// (the Light Priest, claude/priest-kit-draft.md; the flick and Kindle in tests_priest_light.rs).
+// Penance (draft 3, docs/priest-draft3.md): no lance held out, no bolts along the reticle, but
+// rings closing on the bodies in front of the Priest, Q as each closes sending its bolt; Greater
+// Penance its EX, five rings. (The rings' rules are in tests_priest_light.rs.)
 #[test]
-fn penance_fires_three_bolts_along_the_reticle_not_a_lance() {
+fn penance_sends_a_bolt_to_the_body_whose_ring_q_lands_on_not_a_lance() {
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let near = grunt(&mut s, [10.0, 0.0, 0.0]);
-    let far = grunt(&mut s, [20.0, 0.5, 0.0]);
-    let pins: Vec<(Id, Vec3)> = [near, far].iter().map(|m| (*m, s.mobs[m].pos)).collect();
+    let pins: Vec<(Id, Vec3)> = [near].iter().map(|m| (*m, s.mobs[m].pos)).collect();
     let mut ev = cast(&mut s, p, "penance", false);
     assert!(!channelling(&s, p), "not a beam held");
-    ev.extend(run_pinned(&mut s, 1.5, &pins));
-    assert_eq!(hits(&ev, p, near), 3, "three bolts, each stopped by the first foe");
-    assert_eq!(hits(&ev, p, far), 0, "none through it");
+    let mut rings = 0;
+    while let Some((_, at, on)) = s.penance_next(p) {
+        assert_eq!(on, near, "every ring on the grunt, the one body in front");
+        while s.clock + DT * 0.5 < at {
+            ev.extend(run_pinned(&mut s, DT, &pins));
+        }
+        ev.extend(press(&mut s, p, "ranged", false));
+        rings += 1;
+    }
+    ev.extend(run_pinned(&mut s, 0.3, &pins));
+    assert_eq!(rings, 3, "three rings");
+    assert_eq!(hits(&ev, p, near), 3, "a bolt for each ring landed");
 }
 
 #[test]
-fn holy_fire_is_penances_ex_a_pillar_of_holy_fire_that_burns() {
+fn greater_penance_is_penances_ex_five_rings() {
     let mut s = world(false);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let m = grunt(&mut s, [12.0, 0.0, 0.0]);
-    let pins = [(m, [12.0, 0.0, 0.0])];
-    let before = hp(&s, m);
-    let ev = cast(&mut s, p, "penance", true);
-    assert!(!channelling(&s, p), "not the bolts");
-    assert!(!ev.iter().any(|e| matches!(e, Event::Mark { .. })), "no ring on the ground");
-    assert!((s.players[&p].valor - 75.0).abs() < 7.0, "a segment of Valor (some back for the hit)");
-    assert!(hp(&s, m) < before, "it landed at once");
-    run_pinned(&mut s, 0.1, &pins);
-    assert!(s.has_cc(m, "burn"), "and burns");
+    let _m = grunt(&mut s, [12.0, 0.0, 0.0]);
+    cast(&mut s, p, "penance", true);
+    assert!(!channelling(&s, p), "no channel");
+    assert!((s.players[&p].valor - 75.0).abs() < 0.5, "a segment of Valor: {}", s.players[&p].valor);
+    let n = s.light.penances.iter().find(|x| x.owner == p).map(|x| x.rings.len());
+    assert_eq!(n, Some(5), "five rings");
 }
 
 #[test]
@@ -379,19 +378,21 @@ fn an_old_save_with_the_priests_old_cards_loads_with_their_successors() {
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let mut save = s.leave(p).unwrap();
     save.owned = ["mind_blast", "holy_nova", "leap_of_faith", "power_word_shield"].into_iter().map(String::from).collect();
-    save.loadout = [("ranged", "mind_blast"), ("close", "holy_nova"), ("defense", "power_word_shield")]
+    save.loadout = [("ranged", "mind_blast"), ("close", "holy_nova"), ("utility", "leap_of_faith"), ("defense", "power_word_shield")]
         .into_iter()
         .map(|(a, b)| (a.to_string(), b.to_string()))
         .collect();
     let q = s.join("ayla", "Ayla", Some(&save));
     let h = &s.players[&q];
     // (Power Word: Shield is the defense's card again: a save from when it was the Barrier's EX
-    // loads with it as it is now; see tests_priest_core.rs for one with the Barrier on the key.)
-    for k in ["penance", "holy_nova", "leap_of_faith", "power_word_shield"] {
+    // loads with it as it is now; see tests_priest_core.rs for one with the Barrier on the key.
+    // Draft 3: Mind Blast is Shadow's Q card again, and Leap of Faith became Angelic Feather.)
+    for k in ["mind_blast", "holy_nova", "angelic_feather", "power_word_shield"] {
         assert!(h.owned.contains(k), "owns {k}: {:?}", h.owned);
     }
-    assert!(!h.owned.contains("mind_blast") && !h.owned.contains("power_word_barrier"), "not the EX versions: they come with their cards");
-    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("penance"));
+    assert!(!h.owned.contains("leap_of_faith") && !h.owned.contains("power_word_barrier"), "no gone card, no EX version: they come with their cards");
+    assert_eq!(h.loadout.get("ranged").map(String::as_str), Some("mind_blast"));
+    assert_eq!(h.loadout.get("utility").map(String::as_str), Some("angelic_feather"));
     assert_eq!(h.loadout.get("defense").map(String::as_str), Some("power_word_shield"));
 }
 

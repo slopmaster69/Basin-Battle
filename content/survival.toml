@@ -6116,15 +6116,17 @@ ally_effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.3 }]
 [[ability]]
 key = "angelic_feather"
 name = "Angelic Feather"
-text = "Lays a feather of light at the reticle, up to 20 yd away. The first hero to touch it, you or an ally, runs 40% faster for 3 sec and is freed of slows and roots. It lasts 15 sec, and up to 3 can lie at once. Holds 2 charges."
+text = "Lays a feather of light at the reticle, up to 20 yd away. The first hero to touch it, you or an ally, runs 40% faster for 3 sec and is freed of slows and roots. It lasts 15 sec. Holds 2 charges."
 icon = "Spell_Holy_DivineSpirit"
 school = "priest"
 slot = "utility"
 kind = "feather"
 range = [20.0, 20.0]
-cooldown = 12.0
+# 2 charges, 20 sec each: one every 10 sec over a fight (the board's least for a utility), two to
+# lay a road at once.
+cooldown = 20.0
 charges = 2
-feather = { reach = 1.6, secs = 15.0, most = 3 }
+feather = { reach = 1.6, secs = 15.0, most = 2 }
 effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.4 }]
 # Levitate's light where it's laid and on whoever takes it.
 spell = 1706
@@ -6290,14 +6292,15 @@ effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 key = "psychic_horror"
 name = "Psychic Horror"
 ex_of = "psychic_scream"
-text = "Every enemy within 8 yd flees in terror for 4 sec (1.5 sec against heroes). Enough damage ends it early."
+text = "Every enemy within 9 yd flees in terror for 3 sec (1.5 sec against heroes). Enough damage ends it early."
 icon = "Spell_Shadow_PsychicHorrors"
 slot = "close"
 kind = "nova"
 valor = 25
-radius = [8.0, 8.0]
+radius = [9.0, 9.0]
 spell = 8122
-effects = [{ kind = "panic", secs = [4.0, 4.0] }]
+# 3 sec: heroes get half (1.5, the board's most for a fear).
+effects = [{ kind = "panic", secs = [3.0, 3.0] }]
 
 # 1: the sidestep (Corey: a dodge, not a Mage's blink). A quick step the way you're moving, in
 # Fade's shadow, nothing touching you for a moment. A blow that misses because of it: the striker
@@ -6365,7 +6368,7 @@ choice = 2
 kind = "shell"
 cooldown = 12.0
 secs = 2.0
-shell = { shard = "shadowguard_shard", secs = 2.0, cut = 0.5, pace = 0.5, cap = 40.0, window = 0.3, perfect = 1.5, perfect_cap = 45.0 }
+shell = { shard = "shadowguard_shard", secs = 2.0, cut = 0.5, cap = 40.0, window = 0.3, perfect = 1.5, perfect_cap = 45.0 }
 # Shadow Shell's dark bubble round the Priest while it holds.
 spell = 9657
 aura = 9657
@@ -6427,8 +6430,9 @@ linger_damage = 6.0
 tick = 1.0
 cooldown = 40.0
 rift = { grow_to = 7.0, grow_secs = 2.0, pull = 3.0, hero_most = 5.0, per_foe = 8.0, perfect_foes = 3, collapse = 20.0 }
-# Shadow Fissure on the ground while it's open; Void Blast's burst as it collapses, Mind Blast's
-# with it as it implodes.
+# Shadow Fissure as it tears open and on the ground while it lasts; Void Blast's burst as it
+# collapses, Mind Blast's with it as it implodes.
+spell = 27810
 linger_spell = 27810
 burst_spell = 27812
 full_spell = 8092

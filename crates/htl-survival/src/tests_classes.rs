@@ -38,7 +38,7 @@ fn run(s: &mut Survival, secs: f32) -> Vec<Event> {
 }
 
 /// The board's cards (and their EX versions).
-fn board(c: &Content) -> Vec<(usize, Option<usize>)> {
+pub(super) fn board(c: &Content) -> Vec<(usize, Option<usize>)> {
     c.abilities.iter().enumerate().filter(|(_, a)| a.on_board()).map(|(k, _)| (k, c.ex_of(k))).collect()
 }
 
@@ -139,7 +139,7 @@ fn every_card_goes_off_in_a_duel() {
 
 /// What a card's hit is worth in damage: its blow (every projectile, every leap of a chain), and
 /// half of what burns after (it can be walked out of).
-fn worth(d: &AbilityDef) -> f32 {
+pub(super) fn worth(d: &AbilityDef) -> f32 {
     // A rhythm's hit: its hardest beat (the finisher).
     if d.kind == "rhythm" {
         return rhythm_beats(d).into_iter().fold(0.0, f32::max);
@@ -171,7 +171,7 @@ fn worth(d: &AbilityDef) -> f32 {
 }
 
 /// Every beat of a full rhythm chain, as hard as each strikes.
-fn rhythm_beats(d: &AbilityDef) -> Vec<f32> {
+pub(super) fn rhythm_beats(d: &AbilityDef) -> Vec<f32> {
     (0..d.most_beats)
         .map(|k| {
             let b = d.damage[0] + d.beat_step * k as f32;
@@ -182,7 +182,7 @@ fn rhythm_beats(d: &AbilityDef) -> Vec<f32> {
 
 /// [`worth`], with the spray it bursts into (`splits`): every arrow of it can go through the one
 /// foe it burst in.
-fn worth_with_spray(c: &Content, d: &AbilityDef) -> f32 {
+pub(super) fn worth_with_spray(c: &Content, d: &AbilityDef) -> f32 {
     let spray = c.ability(&d.splits).map_or(0.0, |k| {
         let s = &c.abilities[k];
         (s.damage[0] + s.damage[1]) / 2.0 * s.count.max(1) as f32
@@ -191,7 +191,7 @@ fn worth_with_spray(c: &Content, d: &AbilityDef) -> f32 {
 }
 
 /// The hard crowd control a hero gets from it (half a creature's).
-fn hard_cc(d: &AbilityDef) -> f32 {
+pub(super) fn hard_cc(d: &AbilityDef) -> f32 {
     d.effects
         .iter()
         .chain(&d.tick_effects)

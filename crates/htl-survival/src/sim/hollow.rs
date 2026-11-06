@@ -20,8 +20,11 @@ pub(crate) struct Hollow {
     pub look: Id,
     pub next: f32,
     pub until: f32,
-    /// Where its look last rolled to (a drag rolls it on from there).
+    /// Where it last stood (a drag moves it on from there).
     pub shown: Vec3,
+    /// Its health to the fraction (the body's is whole: a tether's quarter-second sips would each
+    /// round up).
+    pub hp: f32,
 }
 
 impl Survival {
@@ -52,7 +55,7 @@ impl Survival {
         let lifted = [at[0], at[1], at[2] + 1.0];
         let scale = self.hollow_scale(&hd, hd.health);
         self.events.push(Event::Grow { id: mid, scale });
-        self.light.hollows.push(Hollow { mob: mid, owner: id, ability, look, next: now + 0.5, until: now + d.secs.max(1.0), shown: lifted });
+        self.light.hollows.push(Hollow { mob: mid, owner: id, ability, look, next: now + 0.5, until: now + d.secs.max(1.0), shown: lifted, hp: hd.health });
     }
 
     /// Its size at this health.
@@ -142,7 +145,10 @@ impl Survival {
         let h = self.light.hollows[k].clone();
         let Some(hd) = self.content.abilities[h.ability].hollow.clone() else { return };
         let Some(m) = self.mobs.get_mut(&mob) else { return };
-        let health = (m.health as f32 + by).clamp(0.0, hd.most);
+        // A blow on the body since: taken off the fraction too.
+        let had = if (m.health as f32 - h.hp.round()).abs() >= 1.0 { m.health as f32 } else { h.hp };
+        let health = (had + by).clamp(0.0, hd.most);
+        self.light.hollows[k].hp = health;
         m.health = health.round() as u32;
         let (hp, max) = (m.health, m.max_health);
         self.events.push(Event::Health { id: mob, health: hp, max });

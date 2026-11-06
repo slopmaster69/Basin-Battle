@@ -33,7 +33,7 @@ Healing never waits on damage (Gust recharges by itself); good damage makes it c
 
 | Input | What it does |
 | --- | --- |
-| Click | **Shadow Bolt**: 9 damage. Each hit weaves a stack of **Shadow Weaving** into the foe (6 sec, up to 5); each stack makes your staff's bolts 8% stronger on it. |
+| Click | **Shadow Bolt**: 9 damage. Each hit weaves a stack of **Shadow Weaving** into the foe (6 sec, up to 5); each stack makes your Shadow Bolts 8% stronger on it. |
 | Patience | 2 sec without firing, the staff darkens: the next bolt is **Empowered**: half again as fast, 10 yd farther, 1.5 times the damage, and 4 Valor on a hit. |
 | Hold click | **Shadow Burst**: a charged bolt, 14 to 26, its flare a perfect (as before). |
 | Right click | **Dark Reckoning**: rips the Weaving out of the first foe along the reticle, 7 damage a stack (35 at 5). Cooldown 8 sec. |
@@ -64,10 +64,10 @@ Healing never waits on damage (Gust recharges by itself); good damage makes it c
 - **Holy Nova** (cooldown 9 sec). Light bursts 8 yd around you: 16 damage to foes, 16 healing to you
   and friends; each other hero inside makes it 25% stronger (up to 75%). No timing check: where you
   stand is the skill.
-- **Angelic Feather** (2 charges, 12 sec each). A feather of light at the reticle (20 yd), or at your
-  feet. The first hero to touch it (you or a friend, by choice) runs 40% faster for 3 sec and slows
-  and roots on them end. It lasts 15 sec; 3 can lie at once. Lay your own escape, or a road for a
-  friend.
+- **Angelic Feather** (2 charges, 20 sec each: one every 10 sec over a fight). A feather of light at
+  the reticle (20 yd), or at your feet. The first hero to touch it (you or a friend, by choice) runs
+  40% faster for 3 sec and slows and roots on them end. It lasts 15 sec; 2 can lie at once. Lay
+  your own escape, or a road for a friend.
 - **Power Word: Shield** (2 charges, 24 sec each). Absorbs 30 for 6 sec on the friend under the
   reticle, or you. Shield a friend just as a blow lands on them and it's parried for them: the
   Priest's perfect, with its own holy burst (no Mage looks).
@@ -96,7 +96,7 @@ Healing never waits on damage (Gust recharges by itself); good damage makes it c
   below 20% health. If it doesn't kill, 12 comes back at you. A kill gives one free Death within
   3 sec (that one gives no other).
 - **Psychic Scream** (cooldown 18 sec). Every foe within 6 yd flees for 3 sec (heroes 1.5); damage
-  ends it. **Psychic Horror** (EX): 8 yd, 4 sec. The Warlock's fear is one foe, aimed; this one is
+  ends it. **Psychic Horror** (EX): 9 yd, 3 sec (heroes 1.5). The Warlock's fear is one foe, aimed; this one is
   everyone around you, and it breaks.
 - **Fade** (cooldown 10 sec). A quick sidestep 5 yd the way you're moving (back if you're not), in
   Fade's shadow; nothing touches you for 0.4 sec. A blow that misses because of it: the striker is

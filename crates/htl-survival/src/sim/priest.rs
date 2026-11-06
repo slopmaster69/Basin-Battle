@@ -74,6 +74,10 @@ impl Survival {
             if !p.guard_held || !free {
                 return true;
             }
+            // Its charges spent: nothing to aim.
+            if !self.ready(id, ability) {
+                return true;
+            }
             self.unsheathe(id);
             self.set_action(id, Action::Aim { ability });
             return true;

@@ -3312,7 +3312,9 @@ impl Survival {
         let pos = self.players[&id].pos;
         let alive = self.alive(target);
         let at = self.unit_pos(target);
-        let holds = alive && at.is_some_and(|a| dist2d(a, pos) <= range + 2.0 && clear_line(self.land.as_ref(), pos, a));
+        // (A tether holds 3 yd past its reach, as its card says: 20, breaking past 23.)
+        let slack = if d.tether.is_some() { 3.0 } else { 2.0 };
+        let holds = alive && at.is_some_and(|a| dist2d(a, pos) <= range + slack && clear_line(self.land.as_ref(), pos, a));
         if !holds || now >= until {
             // Out of reach or out of sight: no word, the beam ends, and they say "Out of range."
             if !holds {
