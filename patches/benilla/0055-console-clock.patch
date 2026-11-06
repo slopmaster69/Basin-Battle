@@ -1,4 +1,4 @@
-From c60f38c57b1a70d8fdbb02b162d46ece5884dd81 Mon Sep 17 00:00:00 2001
+From 04a351074d4fe84dbf67d03622377b270e47f856 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 09:04:58 -0700
 Subject: [PATCH] A console clock for the visual check: `worldclock <minute>`
@@ -13,15 +13,18 @@ is not one prints the usage line and changes nothing. benilla's own; 1.12 has no
 
 `lookbloom <intensity> [threshold]` holds the new look's bloom the same way, so one take can
 compare several; `lookbloom grade`, or no argument, lets the hour's grade decide again.
+
+`lookmist <scale>` holds the mist at a multiple of the hour's own (0 to 6), and `lookmist grade`
+lets go.
 ---
- crates/benilla-app/src/world_console.rs | 166 ++++++++++++++++++++++++
- 1 file changed, 166 insertions(+)
+ crates/benilla-app/src/world_console.rs | 214 ++++++++++++++++++++++++
+ 1 file changed, 214 insertions(+)
 
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 0fbf678..731b517 100644
+index 0fbf678..40aaa9d 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
-@@ -74,6 +74,20 @@ impl Plugin for WorldConsolePlugin {
+@@ -74,6 +74,22 @@ impl Plugin for WorldConsolePlugin {
          }
          // Registered by `InitSky` at the first map load (`0x6d1d43`-`0x6d1d4d`).
          app.console_command("SkySunGlare", GRAPHICS, Some("0, 1"), sky_sun_glare);
@@ -39,10 +42,12 @@ index 0fbf678..731b517 100644
 +            Some("<intensity> [threshold] | grade"),
 +            look_bloom,
 +        );
++        // benilla's own: the new look's mist held for tuning on film.
++        app.console_command("lookmist", GRAPHICS, Some("<scale> | grade"), look_mist);
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -83,6 +97,68 @@ impl Plugin for WorldConsolePlugin {
+@@ -83,6 +99,88 @@ impl Plugin for WorldConsolePlugin {
      }
  }
  
@@ -108,10 +113,30 @@ index 0fbf678..731b517 100644
 +    }]
 +}
 +
++/// `lookmist <scale>`, benilla's own (1.12 has no such command): holds the new look's mist at a
++/// multiple of the hour's own (0 to 6: 0 none, 1 the grade's, 3 three times as thick), so one take
++/// can run from subtle to the densest still playable; `lookmist grade`, or no argument, lets the
++/// hour decide again. The classic look (`worldLook 0`) has no mist either way.
++fn look_mist(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::LookMistTune;
++    let arg = args.trim();
++    if arg.is_empty() || arg.eq_ignore_ascii_case("grade") {
++        *world.get_resource_or_init::<LookMistTune>() = LookMistTune::default();
++        return vec!["Mist follows the grade.".to_string()];
++    }
++    match arg.parse::<f32>().ok().filter(|v| (0.0..=6.0).contains(v)) {
++        Some(scale) => {
++            world.get_resource_or_init::<LookMistTune>().scale = Some(scale);
++            vec![format!("Mist held at {scale} times the hour's.")]
++        }
++        None => vec!["Usage: lookmist <scale 0-6> | grade".to_string()],
++    }
++}
++
  /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
  /// a clear one set with the second, each through `ConsoleWrite` in class 0.
  fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
-@@ -306,6 +382,96 @@ mod tests {
+@@ -306,6 +404,122 @@ mod tests {
          *app.world().resource::<WorldLevels>()
      }
  
@@ -203,6 +228,32 @@ index 0fbf678..731b517 100644
 +            LookBloomTune::default(),
 +            "no argument lets go too"
 +        );
++    }
++
++    /// `lookmist`: a scale holds the mist, `grade` or nothing lets go, and anything out of range
++    /// leaves it as it was with the usage line.
++    #[test]
++    fn the_look_mist_holds_and_lets_go() {
++        use benilla_world::look::LookMistTune;
++        let mut app = world_app();
++        let scale = |app: &mut App| app.world_mut().get_resource_or_init::<LookMistTune>().scale;
++        assert_eq!(
++            run(&mut app, "lookmist 2.5"),
++            ["Mist held at 2.5 times the hour's."]
++        );
++        assert_eq!(scale(&mut app), Some(2.5));
++        assert_eq!(
++            run(&mut app, "lookmist 7"),
++            ["Usage: lookmist <scale 0-6> | grade"]
++        );
++        assert_eq!(run(&mut app, "lookmist thick").len(), 1);
++        assert_eq!(scale(&mut app), Some(2.5), "a bad value changes nothing");
++        assert_eq!(run(&mut app, "lookmist grade"), ["Mist follows the grade."]);
++        assert_eq!(scale(&mut app), None);
++        run(&mut app, "lookmist 0");
++        assert_eq!(scale(&mut app), Some(0.0));
++        run(&mut app, "lookmist");
++        assert_eq!(scale(&mut app), None, "no argument lets go too");
 +    }
 +
      /// The six toggles flip their bit and print the state they leave (`ConsoleWrite` class 0):

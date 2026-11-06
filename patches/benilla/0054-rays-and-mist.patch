@@ -1,4 +1,4 @@
-From 9f39f728756cc656ea78d20ebae27639799c5ec2 Mon Sep 17 00:00:00 2001
+From 9a63ca66d2656197121b5ed8889131a8e6125dab Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 08:25:46 -0700
 Subject: [PATCH] God rays and morning mist: light shafts through Elwynn's
@@ -23,28 +23,34 @@ the camera's depth buffer, made sampleable while the new look is on, single-samp
 multisampled (`gxMultisample`), each its own pipeline. The sun's projection and fades and the
 mist's integral (against a numeric one) are tested on the CPU, and naga validates and translates
 the shader in both variants.
+
+`LookMistTune` holds the mist at a multiple of the hour's own, for filming a range from subtle to
+the densest still playable (the console's `lookmist`).
 ---
- crates/benilla-world/src/look/mod.rs          |   1 +
- crates/benilla-world/src/look/pass.rs         | 290 +++++++++++++++---
- crates/benilla-world/src/look/rays.rs         | 222 ++++++++++++++
- .../benilla-world/src/shaders/world_look.wgsl | 111 ++++++-
- 4 files changed, 569 insertions(+), 55 deletions(-)
+ crates/benilla-world/src/look/mod.rs          |   3 +-
+ crates/benilla-world/src/look/pass.rs         | 336 +++++++++++++++---
+ crates/benilla-world/src/look/rays.rs         | 222 ++++++++++++
+ .../benilla-world/src/shaders/world_look.wgsl | 111 +++++-
+ 4 files changed, 615 insertions(+), 57 deletions(-)
  create mode 100644 crates/benilla-world/src/look/rays.rs
 
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index e525a21..78bbd59 100644
+index e525a21..51cd7ee 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
-@@ -12,6 +12,7 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
+@@ -12,8 +12,9 @@ use benilla_formats::{AreaTableCatalog, Atmosphere};
  
  pub mod grade;
  pub mod pass;
 +pub mod rays;
  pub use grade::{GradeKey, PostLook, Tint};
- pub use pass::{LookBloomTune, LookFrame, LookView};
+-pub use pass::{LookBloomTune, LookFrame, LookView};
++pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
  
+ /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
+ /// test) is the reference; the game turns it on from its `worldLook` CVar.
 diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
-index d39cb4e..5e6bdc5 100644
+index d39cb4e..bf06dd7 100644
 --- a/crates/benilla-world/src/look/pass.rs
 +++ b/crates/benilla-world/src/look/pass.rs
 @@ -1,7 +1,8 @@
@@ -90,14 +96,23 @@ index d39cb4e..5e6bdc5 100644
  }
  
  impl LookFrame {
-@@ -49,7 +60,13 @@ impl LookFrame {
+@@ -49,14 +60,35 @@ impl LookFrame {
      }
  }
  
 -fn publish_frame(look: Res<WorldLook>, grade: Res<LookGrade>, mut frame: ResMut<LookFrame>) {
++/// The mist held at a multiple of the hour's own for tuning on film (`lookmist <scale>`, benilla's
++/// console), so one take can run from subtle to the densest still playable; `None` follows the
++/// grade. Inert under the classic look, which has no mist.
++#[derive(Resource, Clone, Copy, Default, Debug, PartialEq)]
++pub struct LookMistTune {
++    pub scale: Option<f32>,
++}
++
 +fn publish_frame(
 +    look: Res<WorldLook>,
 +    grade: Res<LookGrade>,
++    mist: Res<LookMistTune>,
 +    lighting: Res<crate::lighting::WowLighting>,
 +    viewer: Res<crate::view::Viewer>,
 +    mut frame: ResMut<LookFrame>,
@@ -105,7 +120,10 @@ index d39cb4e..5e6bdc5 100644
      let next = LookFrame {
          on: look.on,
          post: if look.on {
-@@ -57,6 +74,10 @@ fn publish_frame(look: Res<WorldLook>, grade: Res<LookGrade>, mut frame: ResMut<
+-            grade.post
++            let mut post = grade.post;
++            post.height_fog *= mist.scale.unwrap_or(1.0);
++            post
          } else {
              PostLook::NEUTRAL
          },
@@ -116,7 +134,7 @@ index d39cb4e..5e6bdc5 100644
      };
      if *frame != next {
          *frame = next;
-@@ -130,6 +151,22 @@ fn sync_bloom(
+@@ -130,6 +162,22 @@ fn sync_bloom(
      }
  }
  
@@ -139,7 +157,7 @@ index d39cb4e..5e6bdc5 100644
  // ---------------------------------------------------------------- the grade, on the CPU
  
  /// Rec. 709 luminance weights, the shader's `LUMA`.
-@@ -173,18 +210,54 @@ pub fn srgb_to_linear(c: f32) -> f32 {
+@@ -173,18 +221,54 @@ pub fn srgb_to_linear(c: f32) -> f32 {
  
  // ---------------------------------------------------------------- render world
  
@@ -196,7 +214,7 @@ index d39cb4e..5e6bdc5 100644
          }
      }
  }
-@@ -194,30 +267,53 @@ const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
+@@ -194,30 +278,53 @@ const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
  #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
  pub(crate) struct LookLabel;
  
@@ -257,7 +275,7 @@ index d39cb4e..5e6bdc5 100644
  }
  
  impl SpecializedRenderPipeline for LookPipeline {
-@@ -226,7 +322,7 @@ impl SpecializedRenderPipeline for LookPipeline {
+@@ -226,7 +333,7 @@ impl SpecializedRenderPipeline for LookPipeline {
      fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
          RenderPipelineDescriptor {
              label: Some("world_look".into()),
@@ -266,7 +284,7 @@ index d39cb4e..5e6bdc5 100644
              vertex: self.fullscreen.to_vertex_state(),
              fragment: Some(FragmentState {
                  shader: self.shader.clone(),
-@@ -248,19 +344,23 @@ fn init_pipeline(
+@@ -248,19 +355,23 @@ fn init_pipeline(
      fullscreen: Res<FullscreenShader>,
      asset_server: Res<AssetServer>,
  ) {
@@ -301,7 +319,7 @@ index d39cb4e..5e6bdc5 100644
          shader: asset_server.load("embedded://benilla_world/shaders/world_look.wgsl"),
          fullscreen: fullscreen.clone(),
      });
-@@ -270,7 +370,7 @@ fn init_pipeline(
+@@ -270,7 +381,7 @@ fn init_pipeline(
  #[derive(Component)]
  struct LookViewGpu {
      pipeline: CachedRenderPipelineId,
@@ -310,7 +328,7 @@ index d39cb4e..5e6bdc5 100644
      uniform: Buffer,
  }
  
-@@ -280,14 +380,17 @@ fn prepare_look_views(
+@@ -280,14 +391,17 @@ fn prepare_look_views(
      cache: Res<PipelineCache>,
      pipeline: Res<LookPipeline>,
      mut pipelines: ResMut<SpecializedRenderPipelines<LookPipeline>>,
@@ -333,7 +351,7 @@ index d39cb4e..5e6bdc5 100644
          let uniform = device.create_buffer(&BufferDescriptor {
              label: Some("world_look_uniform"),
              size: UNIFORM_BYTES,
-@@ -296,7 +399,7 @@ fn prepare_look_views(
+@@ -296,7 +410,7 @@ fn prepare_look_views(
          });
          commands.entity(entity).insert(LookViewGpu {
              pipeline: id,
@@ -342,7 +360,7 @@ index d39cb4e..5e6bdc5 100644
              uniform,
          });
      }
-@@ -306,13 +409,18 @@ fn prepare_look_views(
+@@ -306,13 +420,18 @@ fn prepare_look_views(
  struct LookNode;
  
  impl ViewNode for LookNode {
@@ -363,7 +381,7 @@ index d39cb4e..5e6bdc5 100644
          world: &'w World,
      ) -> Result<(), NodeRunError> {
          let frame = *world.resource::<LookFrame>();
-@@ -324,17 +432,38 @@ impl ViewNode for LookNode {
+@@ -324,17 +443,38 @@ impl ViewNode for LookNode {
          let Some(pipeline) = cache.get_render_pipeline(gpu.pipeline) else {
              return Ok(()); // still compiling: this frame is ungraded
          };
@@ -408,7 +426,14 @@ index d39cb4e..5e6bdc5 100644
          );
          let diagnostics = render_context.diagnostic_recorder();
          let mut pass = render_context
-@@ -371,7 +500,7 @@ pub(super) fn build(app: &mut App) {
+@@ -365,13 +505,14 @@ impl ViewNode for LookNode {
+ pub(super) fn build(app: &mut App) {
+     app.init_resource::<LookFrame>()
+         .init_resource::<LookBloomTune>()
++        .init_resource::<LookMistTune>()
+         .add_plugins((
+             ExtractComponentPlugin::<LookView>::default(),
+             ExtractResourcePlugin::<LookFrame>::default(),
          ))
          .add_systems(
              Update,
@@ -417,7 +442,7 @@ index d39cb4e..5e6bdc5 100644
                  .chain()
                  .in_set(crate::lighting::LightingConsumeSet),
          );
-@@ -428,12 +557,14 @@ mod tests {
+@@ -428,12 +569,14 @@ mod tests {
          }
          assert!(!LookFrame {
              on: true,
@@ -434,7 +459,7 @@ index d39cb4e..5e6bdc5 100644
          }
          .grades());
      }
-@@ -469,16 +600,73 @@ mod tests {
+@@ -469,16 +612,73 @@ mod tests {
          assert!(grade_linear([0.05; 3], &c)[0] < 0.05);
      }
  
@@ -513,6 +538,45 @@ index d39cb4e..5e6bdc5 100644
      }
  
      #[test]
+@@ -490,6 +690,38 @@ mod tests {
+         assert_eq!(b.prefilter.threshold_softness, 0.5);
+     }
+ 
++    /// A held mist scales the hour's own, lets go to it again, and never mists the classic look.
++    #[test]
++    fn a_held_mist_scales_the_hours() {
++        let mut app = App::new();
++        app.init_resource::<LookFrame>()
++            .init_resource::<LookMistTune>()
++            .init_resource::<crate::lighting::WowLighting>()
++            .init_resource::<crate::view::Viewer>()
++            .insert_resource(WorldLook::NEW)
++            .insert_resource(LookGrade {
++                post: PostLook {
++                    height_fog: 0.6,
++                    ..PostLook::NEUTRAL
++                },
++                strength: 1.0,
++            })
++            .add_systems(Update, publish_frame);
++        let fog = |app: &App| app.world().resource::<LookFrame>().post.height_fog;
++        app.update();
++        assert!((fog(&app) - 0.6).abs() < 1e-6);
++        app.world_mut().resource_mut::<LookMistTune>().scale = Some(2.5);
++        app.update();
++        assert!((fog(&app) - 1.5).abs() < 1e-6);
++        app.world_mut().resource_mut::<LookMistTune>().scale = None;
++        app.update();
++        assert!((fog(&app) - 0.6).abs() < 1e-6);
++        app.world_mut().resource_mut::<LookMistTune>().scale = Some(3.0);
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        app.update();
++        assert_eq!(fog(&app), 0.0, "the classic look has no mist");
++    }
++
+     /// A held tune wins over the grade's bloom, and lets go to it again.
+     #[test]
+     fn a_held_tune_wins_over_the_grade() {
 diff --git a/crates/benilla-world/src/look/rays.rs b/crates/benilla-world/src/look/rays.rs
 new file mode 100644
 index 0000000..4d2d91d

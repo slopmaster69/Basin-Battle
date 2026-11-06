@@ -1,4 +1,4 @@
-From 93be3f2261165b8d8c77150a6e288ca2ae3ab6a5 Mon Sep 17 00:00:00 2001
+From 49264209e4f125fc9c3251b212b10c393243e3e7 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 07:00:20 -0700
 Subject: [PATCH] Elwynn's own light: the new look re-lights the forest by time
@@ -21,6 +21,10 @@ exactly, so the two can be compared side by side.
 After the first films: noon is a cool-white sun, a little desaturated, a lighter contrast and cool
 (it read as golden as the evening); each hour's bloom is 0.15 at noon to 0.5 at night and at golden
 hour, from a filmed sweep where 0.6 at night read well and 1.2 washed the ground out.
+
+Night, after Corey's review ("darker and spookier"): the first pass's pale moon-blue tints lit 1.12's
+near-black night into a readable blue one. They now pull toward a deep blue-black, the fog end is
+0.85 of 1.12's, saturation 0.75, contrast 1.15, and the mist lies on the ground (0.45).
 ---
  crates/benilla-app/src/cvars/mod.rs          |  34 ++
  crates/benilla-app/src/cvars/table.rs        |  10 +
@@ -28,10 +32,10 @@ hour, from a filmed sweep where 0.6 at night read well and 1.2 washed the ground
  crates/benilla-world/src/lib.rs              |   1 +
  crates/benilla-world/src/lighting/mod.rs     |   2 +
  crates/benilla-world/src/lighting/resolve.rs |  11 +-
- crates/benilla-world/src/look/grade.rs       | 441 +++++++++++++++++++
+ crates/benilla-world/src/look/grade.rs       | 444 +++++++++++++++++++
  crates/benilla-world/src/look/mod.rs         | 325 ++++++++++++++
  crates/benilla-world/src/world_plugins.rs    |   2 +
- 9 files changed, 837 insertions(+), 4 deletions(-)
+ 9 files changed, 840 insertions(+), 4 deletions(-)
  create mode 100644 crates/benilla-world/src/look/grade.rs
  create mode 100644 crates/benilla-world/src/look/mod.rs
 
@@ -206,10 +210,10 @@ index 36272b4..9390ecd 100644
  
 diff --git a/crates/benilla-world/src/look/grade.rs b/crates/benilla-world/src/look/grade.rs
 new file mode 100644
-index 0000000..e468921
+index 0000000..8a37bb2
 --- /dev/null
 +++ b/crates/benilla-world/src/look/grade.rs
-@@ -0,0 +1,441 @@
+@@ -0,0 +1,444 @@
 +//! A zone's hand-tuned light by time of day, benilla's own (no reference behaviour): keyframes over
 +//! the game clock that nudge the `Light.dbc` sample rather than replace it, each key a tint blended
 +//! into the sampled colour at its own weight, plus the post-pass values the `look` pass reads, so
@@ -406,14 +410,17 @@ index 0000000..e468921
 +    }
 +}
 +
-+/// Elwynn's night, held from 21:30 across midnight.
++/// Elwynn's night, held from 21:30 across midnight: dark and a little eerie. The first pass tinted
++/// toward a pale moon blue, which lit 1.12's near-black night up into a readable blue one; the review
++/// asked for a darker, spookier night. The tints now pull toward a deep blue-black, the fog closes in,
++/// the colour drains out and the mist lies on the ground, so torches and spells carry the night.
 +const ELWYNN_NIGHT: (Tint, Tint, Tint, Tint, f32, [f32; 6]) = (
-+    Tint::new(0.55, 0.65, 0.95, 0.30),
-+    Tint::new(0.45, 0.55, 0.90, 0.35),
-+    Tint::new(0.20, 0.26, 0.42, 0.40),
-+    Tint::new(0.18, 0.24, 0.45, 0.25),
-+    1.3,
-+    [0.95, 1.05, -0.10, 0.50, 0.25, 0.0],
++    Tint::new(0.10, 0.14, 0.26, 0.45),
++    Tint::new(0.08, 0.10, 0.20, 0.45),
++    Tint::new(0.03, 0.04, 0.08, 0.50),
++    Tint::new(0.02, 0.03, 0.08, 0.45),
++    0.85,
++    [0.75, 1.15, -0.12, 0.50, 0.45, 0.0],
 +);
 +
 +/// Elwynn Forest, the first pass to tune on video. The aim is WoW Forever's: warm light against
