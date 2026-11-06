@@ -57,7 +57,8 @@ local SCHOOL = {
     tint = { 0.7, 0.42, 1.0 }, glow = { 0.85, 0.7, 1.0 }, ringTint = { 0.72, 0.45, 1.0 },
     -- A shadow perfect bursts violet, not the white-gold the other schools share (Corey: it read
     -- as gold on the Shadowcaller's staff).
-    top = { pop = { 0.88, 0.76, 1.0 }, star = { 0.8, 0.6, 1.0 }, wave = { 0.72, 0.45, 1.0 } },
+    -- (The pop's own art is painted gold: a white copy of it takes the violet.)
+    top = { popTex = "check_perfect_white", pop = { 0.78, 0.55, 1.0 }, star = { 0.8, 0.6, 1.0 }, wave = { 0.72, 0.45, 1.0 } },
     spin = 0.18, spin2 = -0.25, sound = "Sound\\Spells\\ArcaneMissileImpact1a.wav",
     fizzle = "Sound\\Spells\\Fizzle\\FizzleShadowA.wav",
   },
@@ -1117,6 +1118,7 @@ local function StepFx(now)
     local top = (g == "perfect" or g == "full")
     local own = top and sc.top
     local tint = (own and own.pop) or (top and { 1, 1, 0.92 }) or { 0.5 + 0.5 * sc.glow[1], 0.5 + 0.5 * sc.glow[2], 0.5 + 0.5 * sc.glow[3] }
+    pop:SetTexture(ART .. ((own and own.popTex) or "check_perfect"))
     Draw(pop, (top and 300 or 240) * (0.55 + 0.75 * e), age * 0.9, (1 - t) * (1 - t) * 1.0, tint[1], tint[2], tint[3])
     if top then
       Draw(core, 60 + 260 * e, -age * 2.2, (1 - t), 1, 1, 1)

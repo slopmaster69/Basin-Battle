@@ -100,9 +100,9 @@ function ES.PriestLookLine(f)
       -- bigger for a judgement (`a`) and a kill (`n` 2).
       -- (A 2.2 flash read as a small glint at the top of the body on film, beside Mind Blast's
       -- head burst: bigger, longer, lower, and a ring of shadow bursting out round it.)
-      local big = (n >= 2) and 5.0 or (a >= 1 and 4.2) or 3.4
-      Body("death" .. guid, { unit = guid, tex = "priest_weave_shard", secs = (n >= 2) and 0.8 or 0.6, size = big, height = 1.1, kind = "pop" })
-      Body("deathring" .. guid, { unit = guid, tex = "priest_ring_white", secs = (n >= 2) and 0.8 or 0.6, size = big * 1.3, height = 1.1, kind = "pop" })
+      local big = (n >= 2) and 8.0 or (a >= 1 and 7.0) or 6.0
+      Body("death" .. guid, { unit = guid, tex = "priest_weave_shard", secs = (n >= 2) and 0.9 or 0.7, size = big, height = 1.0, kind = "pop" })
+      Body("deathring" .. guid, { unit = guid, tex = "priest_ring_white", secs = (n >= 2) and 0.9 or 0.7, size = big * 1.5, height = 1.0, kind = "pop" })
     end
   end
 end
