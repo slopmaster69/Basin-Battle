@@ -423,7 +423,7 @@ pub(crate) const ADDON_NEWEST: u32 = 48;
 /// the world, and whether cover sits between the hands and it), and the aim's circle laid on
 /// that line (0046).
 /// 27: our own hero's shoulders turned as the add-on asks, the head turned back (`SetAimTurn`,
-/// 0047).
+/// 0047), and the nocked arrow along the bow, from the string hand to the grip (0048).
 pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
