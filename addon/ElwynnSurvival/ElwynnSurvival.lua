@@ -2012,10 +2012,11 @@ vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
 vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
 vit.health.shield:Hide()
 -- The healing still to come (a meal, a salve, a mending: `H`'s 43rd), as WoW shows an incoming
--- heal: a pale ghost of the health past it, to where the health will be if nothing hurts them
--- (Corey).
-vit.health.ahead = Tex(vit.health, "ARTWORK", "bar")
-vit.health.ahead:SetVertexColor(1, 0.55, 0.5, 0.55)
+-- heal: a pale rose stroke behind the health, as the amber chunk of a blow is, reaching to where
+-- the health will be if nothing hurts them (Corey). Its brushed end marks the spot: laid only past
+-- the health, a short one was all ragged edge, lost under the numbers.
+vit.health.ahead = Tex(vit.health, "BORDER", "bar")
+vit.health.ahead:SetVertexColor(1, 0.62, 0.56, 0.7)
 vit.health.ahead:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
@@ -2106,9 +2107,13 @@ function ES.DrawAbsorbs(hp, maxhp, shield, over, ahead)
   local ow = math.min(b.full, over * per)
   Lay(b.over, math.max(0, math.min(hp * per, b.full - ow)), ow)
   Lay(b.shield, 0, math.min(b.full, shield * per))
-  -- The heal still to come from the health's end, never past the bar's.
-  local hx = math.min(b.full, hp * per)
-  Lay(b.ahead, hx, math.min(b.full - hx, (ahead or 0) * per))
+  -- The heal still to come: behind the health from the bar's left end to where the health will
+  -- be, never past the bar's end.
+  if (ahead or 0) > 0 then
+    Lay(b.ahead, 0, math.min(b.full, (hp + ahead) * per))
+  else
+    b.ahead:Hide()
+  end
 end
 
 -- The bars' lengths: the dock's width by the hero, by what they hold in the corner.
