@@ -386,7 +386,8 @@ pub enum Event {
     Channel { caster: Id, target: Option<Id>, spell: u32, ms: u32 },
     /// A hero healed by this much (a green number).
     Healed { id: Id, amount: u32 },
-    /// `healer` mended another hero, `target`, by `amount` (shown to the healer).
+    /// `healer` mended another hero or an allied creature, `target`, by `amount` (shown to the
+    /// healer).
     HealedOther { healer: Id, target: Id, amount: u32 },
     /// A unit says something (`SoundEntries.dbc`): a creature's voice.
     Sound { id: Id, sound: u32 },
@@ -931,6 +932,10 @@ pub struct Mob {
     /// Called up by this creature in its fight (a boss's adds, at a turn): it goes when that
     /// fight ends, its own or the boss's, instead of standing where the boss stood.
     pub summoned_by: Option<Id>,
+    /// On the heroes' side (its rules' `friendly`, or set down by `.es ally`): it never takes up
+    /// a fight against a hero, their blows pass it by, and help aimed at a friend can reach it
+    /// (unless it's a totem: [`Survival::takes_help`]).
+    pub friendly: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1168,8 +1168,8 @@ impl SurvivalGame {
                 *self.healed.entry(id).or_default() += amount;
             }
             Event::HealedOther { healer, target, amount } => {
-                // The healer sees what they mended on a friend: from `ac28` a green number over
-                // the friend's head, as WoW floats it (`SMSG_SPELLHEALLOG`, spell 0 as the mend
+                // The healer sees what they mended on a friend (a hero or an allied creature):
+                // from `ac28` a green number over the friend's head, as WoW floats it (`SMSG_SPELLHEALLOG`, spell 0 as the mend
                 // has no 1.12 spell; patch 0056); on an older client the add-on's `HO` line,
                 // `<amount> <name>` rising mid-screen.
                 let Some(c) = self.conn_of(healer) else { return };
@@ -1178,7 +1178,10 @@ impl SurvivalGame {
                         self.send(c, packets::spell_heal(t, h, 0, amount, false));
                     }
                 } else if self.has_addon(c) {
-                    let name = self.sim.players.get(&target).map(|p| p.name.clone()).unwrap_or_default();
+                    let name = match self.sim.players.get(&target) {
+                        Some(p) => p.name.clone(),
+                        None => self.sim.mobs.get(&target).map(|m| self.sim.content.mobs[m.def].name.clone()).unwrap_or_default(),
+                    };
                     self.ui_line(c, &format!("HO\t{name}\t{amount}"));
                 }
             }

@@ -350,6 +350,7 @@ impl Survival {
                 retarget_at: 0.0,
                 drawn_off: None,
                 summoned_by: None,
+                friendly: self.content.mobs[def].friendly,
             },
         );
         // An ambusher lies unseen until a hero comes near (or its chest is opened).
@@ -471,7 +472,8 @@ impl Survival {
         while let Some(m) = queue.pop() {
             let foe = if m == mid { first } else { self.spread_foe(m, first) };
             let Some(mob) = self.mobs.get_mut(&m) else { continue };
-            if mob.health == 0 {
+            // An ally of the heroes never takes up a fight against one.
+            if mob.health == 0 || mob.friendly {
                 continue;
             }
             // A harmless creature runs instead.
@@ -1667,7 +1669,7 @@ impl Survival {
                     return;
                 }
                 // Notice a hero in sight.
-                if d.aggro > 0.0 {
+                if d.aggro > 0.0 && !self.mobs[&id].friendly {
                     let seen = self
                         .players
                         .iter()
