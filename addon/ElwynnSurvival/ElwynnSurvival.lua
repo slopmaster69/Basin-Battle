@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 45
+local VERSION = 47
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1821,22 +1821,83 @@ end
 function ES.StepLockHold()
 end
 
--- V: the health bars over heads, on and off (everyone's: foes' and friends').
+-- V: the health bars over foes' heads, on and off.
 function ES.Bars()
   if not ES.awake then return end
   local set = Settings()
   if set.noBars then
     set.noBars = nil
     if ShowNameplates then pcall(ShowNameplates) end
-    if ShowFriendNameplates then pcall(ShowFriendNameplates) end
     ES.Message("Health bars shown.")
   else
     set.noBars = 1
     if HideNameplates then pcall(HideNameplates) end
-    if HideFriendNameplates then pcall(HideFriendNameplates) end
     ES.Message("Health bars hidden. Press " .. (KeyName("ES_BARS") or "V") .. " to show them.")
   end
 end
+
+-- Over heads: no names, levels, borders or skulls. A foe's plate is a thin bar, shown only while
+-- it's hurt, so a pack's wounded read at a glance and the untouched show nothing. The bar across
+-- the top is the one with the name and the numbers (the champion's, and the foe the hero fights);
+-- the champion's own plate stays empty, so it isn't shown twice. Friends' plates stay off.
+ES.PLATE_W, ES.PLATE_H = 64, 5
+
+-- The client's plates (1.12's): an unnamed button on the WorldFrame whose first region is the
+-- nameplate border, its health bar its one child.
+function ES.IsPlate(f)
+  if f.esPlate then return true end
+  if not f.GetRegions or not f.GetChildren then return false end
+  local border = f:GetRegions()
+  if not border or not border.GetTexture then return false end
+  local tex = border:GetTexture()
+  if type(tex) ~= "string" or not string.find(string.lower(tex), "nameplate%-border") then return false end
+  f.esPlate = true
+  return true
+end
+
+function ES.SkinPlate(plate)
+  local bar = plate:GetChildren()
+  if not bar or not bar.GetValue then return end
+  if not plate.esSkinned then
+    plate.esSkinned = true
+    bar:ClearAllPoints()
+    bar:SetPoint("CENTER", plate, "CENTER", 0, -4)
+    bar:SetWidth(ES.PLATE_W)
+    bar:SetHeight(ES.PLATE_H)
+    if bar.SetStatusBarTexture then bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8") end
+    local back = bar:CreateTexture(nil, "BACKGROUND")
+    back:SetTexture(0, 0, 0, 0.7)
+    back:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
+    back:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
+  end
+  -- The border, the mouse-over glow, the name, the level and the skull: every frame, as the
+  -- client shows them again as the unit changes.
+  local border, glow, name, level, skull = plate:GetRegions()
+  if border then border:Hide() end
+  if glow then glow:Hide() end
+  if name then name:Hide() end
+  if level then level:Hide() end
+  if skull then skull:Hide() end
+  local _, most = bar:GetMinMaxValues()
+  local now = bar:GetValue()
+  local hurt = most and now and most > 0 and now < most
+  local b = ES.boss
+  if hurt and b and b.who and name and name.GetText and name:GetText() == b.who then
+    hurt = false
+  end
+  bar:SetStatusBarColor(0.85, 0.13, 0.08)
+  plate:SetAlpha(hurt and 1 or 0)
+end
+
+ES.plateWatch = CreateFrame("Frame")
+ES.plateWatch:SetScript("OnUpdate", function()
+  if not ES.awake or not WorldFrame or not WorldFrame.GetChildren then return end
+  local kids = { WorldFrame:GetChildren() }
+  for i = 1, table.getn(kids) do
+    local k = kids[i]
+    if k:IsShown() and ES.IsPlate(k) then ES.SkinPlate(k) end
+  end
+end)
 
 -- F: use what's in front of you; while placing, put the station down.
 function ES.Use()
@@ -5456,7 +5517,16 @@ function ES.HideChrome()
     if HideFriendNameplates then pcall(HideFriendNameplates) end
   else
     if ShowNameplates then pcall(ShowNameplates) end
-    if ShowFriendNameplates then pcall(ShowFriendNameplates) end
+    if HideFriendNameplates then pcall(HideFriendNameplates) end
+  end
+  -- No names floating over creatures (the bar across the top names the one fought); the
+  -- player's own setting comes back with the stock interface.
+  if GetCVar and SetCVar and not ES.npcNames then
+    local ok, was = pcall(GetCVar, "UnitNameNPC")
+    if ok and was then
+      ES.npcNames = was
+      pcall(SetCVar, "UnitNameNPC", "0")
+    end
   end
   -- The chat stays where it is, for talking, and fades between lines (the client lays it out
   -- again as it likes, so it isn't moved).
@@ -5481,6 +5551,10 @@ function ES.RestoreChrome()
   end
   ES.parents = nil
   if HideFriendNameplates then pcall(HideFriendNameplates) end
+  if ES.npcNames and SetCVar then
+    pcall(SetCVar, "UnitNameNPC", ES.npcNames)
+    ES.npcNames = nil
+  end
   if ChatFrame1 and ChatFrame1.SetTimeVisible then
     pcall(ChatFrame1.SetTimeVisible, ChatFrame1, 120)
   end
