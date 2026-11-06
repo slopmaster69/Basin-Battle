@@ -88,10 +88,11 @@ Healing never waits on damage (Gust recharges by itself); good damage makes it c
 | 2 | **Shadowguard**: take it, give it back | **Vampiric Touch** (25) |
 | 3 | **Void Rift**: gather, then implode | |
 
-- **Mind Blast** (cooldown 8 sec). A dark sigil on the ground at the reticle (30 yd); 0.9 sec later
-  it erupts, 26 damage within 2.5 yd. A foe within 1 yd of its heart is struck true: 34 and 5
-  Valor (the perfect). A foe with Shadow Weaving on it, or a Warlock's shadow on it, takes 30% more
-  (44 at most). Lead your target.
+- **Mind Blast** (cooldown 8 sec). A dark sigil on the ground at the reticle (30 yd), its edge and
+  its heart drawn still; 0.9 sec later it erupts. Four hits (Corey's review, Nov 6): the edge
+  (2.5 yd) 24; the heart (1 yd) 30; the heart on a foe on the move, the read that was right, 36
+  and 5 Valor (the perfect); a foe with Shadow Weaving or a Warlock's shadow on it takes 25% more
+  of any of them (45 at most). Lead your target.
 - **Shadow Word: Death** (EX, 25). A lance at the first foe along the reticle: 18, or 45 to a foe
   below 20% health. If it doesn't kill, 12 comes back at you. A kill gives one free Death within
   3 sec (that one gives no other).

@@ -260,6 +260,7 @@ impl Survival {
         let rise = super::moves::airtime(lift) / 2.0;
         let Some(f) = self.players.get(&id).map(|p| p.facing) else { return };
         self.events.push(Event::Hop { player: id, dir: f, speed: 0.0, lift, roll: false, style: "" });
+        self.events.push(Event::Beat { player: id, beat: super::cues::BEAT_SALVATION.to_string(), on: Some(id) });
         self.light.aloft.retain(|a| a.0 != id);
         self.light.aloft.push((id, ability, now + rise, until, false));
         if let Some(p) = self.players.get_mut(&id) {

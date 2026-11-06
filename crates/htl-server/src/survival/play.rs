@@ -703,7 +703,13 @@ impl SurvivalGame {
                 let Some(c) = self.conn_of(player) else { return };
                 // A dodge tumbles, on the clients that roll bodies themselves.
                 if roll {
-                    let secs = self.sim.content.dodge.secs;
+                    // A dodge's time; a sidestep riding a dash (Fade) sways only as long as the dash
+                    // runs (Corey: the step kept going in place after the Fade was over).
+                    let dodge = self.sim.content.dodge.secs;
+                    let secs = match self.sim.players.get(&player).map(|p| &p.action) {
+                        Some(htl_survival::Action::Dash { t, secs, .. }) => (secs - t + 0.05).clamp(0.12, dodge),
+                        _ => dodge,
+                    };
                     let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                     for k in conns {
                         self.ui_line(k, &format!("RO\t{g:#X}\t{secs:.2}\t{}\t{style}", u8::from(k == c)));
@@ -1198,11 +1204,19 @@ impl SurvivalGame {
     }
 }
 
-/// The school a skill check is drawn in: the ability's own `check_school` when it says, else from
-/// its look (a fire, frost or arcane spell), else arcane (a mage's).
+/// The school a skill check is drawn in: from its look (a fire, frost or arcane spell; a Priest's
+/// holy or shadow one, never the Mage's arcane: Corey saw the arcane ring on Greater Smite), else
+/// arcane (a mage's).
 fn check_school(d: &htl_survival::content::AbilityDef) -> &'static str {
     let k = d.key.as_str();
-    if k.contains("fire") || k.contains("pyro") || k.contains("meteor") || k.contains("ember") || k.contains("flame") {
+    let priest = d.school == "priest" || ["smite", "shadow_burst", "shadow_bolt", "gust", "tether"].iter().any(|w| k.contains(w));
+    if priest {
+        if ["shadow", "mind", "void", "tether", "fade", "death"].iter().any(|w| k.contains(w)) {
+            "shadow"
+        } else {
+            "holy"
+        }
+    } else if k.contains("fire") || k.contains("pyro") || k.contains("meteor") || k.contains("ember") || k.contains("flame") {
         "fire"
     } else if k.contains("frost") || k.contains("cold") || k.contains("ice") || k.contains("rime") || k.contains("orb") && !k.contains("arcane") {
         "frost"

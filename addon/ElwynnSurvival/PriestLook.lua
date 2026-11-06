@@ -5,10 +5,13 @@
 -- On bodies (SetUnitSprite, patch 0045): Penance's rings closing on each body in turn (`PL penance`,
 -- and `penance_hit` as each lands or is lost), a perfect Shield's flare on the friend, Fade's
 -- afterimage, Shadowguard's shard over the Priest's shoulder growing with what it stores, Shadow
--- Weaving's shards and Searing Light's brand over the foe (`SK weave` and `SK sear`).
+-- Weaving's shards and Searing Light's brand over the foe (`SK weave` and `SK sear`), and the
+-- Weaving's count in a ring of five under it; the shadow staff glowing while its next bolt waits
+-- Empowered (`PL empower`, SetUnitWeaponGlow).
 -- On the ground (SetGroundRing, patch 0041; `PG kind key x y z radius secs`): Angelic Feather,
--- Void Rift (growing and turning inward), Mind Blast's sigil narrowing to its heart; the Hollow
--- Star's reach round the orb (`PL hollow`, SetGroundRingOnUnit).
+-- Void Rift (growing and turning inward, its true edge drawn, collapsing into its heart as it
+-- implodes), Mind Blast's sigil at its true edge with its heart; the Hollow Star's reach round
+-- the orb (`PL hollow`, SetGroundRingOnUnit).
 
 local ES = ElwynnSurvival
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
@@ -24,8 +27,12 @@ local onGround = {}
 -- Penance's rings: how long a ring takes to close, and its size (yards) open and closed.
 -- (The ring's art fills the middle 70% of its texture: a size of 1.5 draws a ring a yard across.)
 local RING_OPEN, RING_SHUT, RING_LEAD = 4.2, 1.5, 0.9
--- How a ring that landed flares, and one that was lost fades.
-local HIT, LOST = 0.35, 0.5
+-- How a ring that landed flares, and one that was lost breaks apart.
+local HIT, LOST = 0.35, 0.7
+-- Mind Blast's heart (yards: the rules' `heart`), drawn inside its edge.
+local BLAST_HEART = 1.0
+-- The shadow staff's glow while the next bolt waits Empowered.
+local EMPOWER_GLOW = "B266FF"
 
 local function Body(key, t)
   t.at = t.at or GetTime()
@@ -47,6 +54,15 @@ function ES.PriestLookLine(f)
   elseif kind == "rift" then
     -- Our Void Rift open (`b` its seconds left; -1 gone): its key again implodes it at once.
     ES.riftOpenUntil = (b > 0) and (now + b) or nil
+  elseif kind == "empower" then
+    -- The next bolt waits Empowered (Corey: a very clear sign when it's up): the staff glows
+    -- violet, pulsing, until it goes; a pop of shadow at the hands as it comes up.
+    if SetUnitWeaponGlow then
+      if n >= 1 then SetUnitWeaponGlow("player", EMPOWER_GLOW, 60) else SetUnitWeaponGlow("player", nil) end
+    end
+    if n >= 1 and SetUnitSprite then
+      Body("empower", { unit = "player", tex = "priest_weave_shard", secs = 0.45, size = 1.6, height = 1.3, kind = "pop" })
+    end
   elseif kind == "penance_hit" then
     local u = onUnits["pen" .. n]
     if u then
@@ -71,7 +87,7 @@ function ES.PriestLookLine(f)
     -- On a body, for everyone: the hero's own when it's theirs.
     local unit = (own and kind == "fade") and "player" or guid
     if kind == "shield" then
-      Body("shield" .. guid, { unit = unit, tex = "priest_shield_perfect", secs = 0.6, size = 2.6, height = 1.0, kind = kind })
+      Body("shield" .. guid, { unit = unit, tex = "priest_shield_perfect_light", secs = 0.6, size = 2.6, height = 1.0, kind = kind })
     elseif kind == "fade" then
       Body("fade" .. guid, { unit = unit, tex = "priest_fade", secs = 0.8, size = 2.4, height = 1.0, kind = kind })
     end
@@ -126,7 +142,8 @@ local function StepGround(now)
   for key, g in pairs(onGround) do
     local age = now - g.at
     local fade = 1
-    if g.goneAt then fade = 1 - (now - g.goneAt) / 0.35 end
+    if g.goneAt and g.kind ~= "rift" then fade = 1 - (now - g.goneAt) / 0.35 end
+    if g.goneAt and g.kind == "rift" and now - g.goneAt > 0.35 then fade = 0 end
     if age > g.secs + 1.5 then fade = 0 end
     if fade <= 0 then
       Gone(key, g)
@@ -143,13 +160,24 @@ local function StepGround(now)
         SetGroundRing(k, g.x, g.y, g.z + 0.08, 2.4 * (1 + 0.06 * math.sin(now * 3)), ART .. "priest_feather", 1, 1, 1, a, now * 0.25)
         SetGroundRing(k .. "_glow", g.x, g.y, g.z + 0.06, (g.r + 0.3) / 0.68 * (1 + 0.08 * math.sin(now * 4)), ART .. "priest_penance_ring", 1, 0.9, 0.6, a * 0.8, -now * 0.4)
       elseif g.kind == "rift" then
-        -- Growing for 2 sec to 1.75 times as wide, turning inward faster as it grows.
-        local grow = 1 + 0.75 * math.min(1, age / 2)
-        SetGroundRing(k, g.x, g.y, g.z + 0.05, g.r * grow / 0.72, ART .. "priest_void_rift", 1, 1, 1, into * fade, -now * (0.6 + 0.6 * grow))
+        -- Growing for 2 sec to 1.75 times as wide (the rules' 4 to 7 yd), turning inward faster as
+        -- it grows, its true edge a thin violet line (Corey: the circle drawn where it reaches).
+        -- Gone, it collapses into its heart in a moment: the implosion fills it, edge to middle.
+        local grow = 1 + 0.75 * math.min(1, ((g.goneAt or now) - g.at) / 2)
+        local r = g.r * grow
+        if g.goneAt then
+          local q = math.min(1, (now - g.goneAt) / 0.35)
+          r = r * (1 - 0.85 * q)
+          fade = 1 - q * q
+        end
+        SetGroundRing(k, g.x, g.y, g.z + 0.05, r / 0.72, ART .. "priest_void_rift", 1, 1, 1, into * fade, -now * (0.6 + 0.6 * grow) * (g.goneAt and 4 or 1))
+        SetGroundRing(k .. "_glow", g.x, g.y, g.z + 0.07, r / 0.68, ART .. "priest_penance_ring", 0.7, 0.4, 1, into * fade * 0.85, now * 0.3)
       elseif g.kind == "blast" then
-        -- Narrowing to its heart until it erupts.
+        -- At its true edge, still: it never narrows (Corey: a ring closing read as a press to
+        -- time). Its heart a violet ring in the middle, beating; both brighten until it erupts.
         local q = math.min(1, age / math.max(0.1, g.secs))
-        SetGroundRing(k, g.x, g.y, g.z + 0.05, g.r * (1.15 - 0.45 * q) / 0.72, ART .. "priest_blast_sigil", 1, 1, 1, into * fade * (0.6 + 0.4 * q), now * 1.2)
+        SetGroundRing(k, g.x, g.y, g.z + 0.05, g.r / 0.72, ART .. "priest_blast_sigil", 1, 1, 1, into * fade * (0.55 + 0.45 * q), now * 0.5)
+        SetGroundRing(k .. "_glow", g.x, g.y, g.z + 0.07, BLAST_HEART / 0.68 * (1 + 0.08 * math.sin(now * 12)), ART .. "priest_penance_ring", 0.75, 0.45, 1, into * fade * (0.65 + 0.35 * q), -now * 1.5)
         if age > g.secs + 0.1 then g.goneAt = g.goneAt or now end
       end
     end
@@ -175,8 +203,6 @@ local function StepBodies(now)
         if q >= 1 then done = true end
         if u.done == "hit" then
           size, alpha = RING_SHUT * (1 + (u.dead and 1.2 or 0.7) * q), 1 - q
-        else
-          size, alpha = RING_SHUT * (1 + 0.3 * q), 0.6 * (1 - q)
         end
       elseif left > RING_LEAD + 0.6 then
         alpha = 0
@@ -190,9 +216,17 @@ local function StepBodies(now)
       if not done then
         local r, g, b = 1, 0.86, 0.45
         if u.friend then r, g, b = 0.9, 1, 0.75 end
-        if u.done == "lost" then r, g, b = 0.6, 0.6, 0.6 end
+        local tex, spin = u.tex, now * 0.8
+        if u.done == "lost" then
+          -- Let pass: that body's own ring breaks, grey, its pieces flying apart (Corey: the miss
+          -- shows on the ring that was missed).
+          local q = (now - u.doneAt) / LOST
+          r, g, b = 0.62, 0.62, 0.7
+          tex, spin = "priest_penance_ring_broken", now * 0.8 + 1.2 * q
+          size, alpha = RING_SHUT * (1.1 + 0.9 * q), 0.95 * (1 - q * q)
+        end
         if u.faint then alpha, size = alpha * 0.45, size * 0.8 end
-        SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, r, g, b, alpha, now * 0.8, 1)
+        SetUnitSprite(sk, u.unit, ART .. tex, size, u.height, r, g, b, alpha, spin, 1)
       end
     elseif u.kind == "hollow" then
       if u.doneAt and now - u.doneAt > 0.3 then
@@ -213,6 +247,10 @@ local function StepBodies(now)
           size = (0.35 + 0.12 * (u.n or 1)) * (1 + 0.3 * swell)
           alpha = (0.5 + 0.1 * (u.n or 1)) * fade
           SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, 1, 1, 1, alpha, now * 0.9, 1)
+          -- And the count, plain from any side: five segments under the foe, one lit a stack.
+          if SetGroundRingOnUnit then
+            SetGroundRingOnUnit(sk .. "_n", u.unit, 1.25 * (1 + 0.15 * swell), ART .. "priest_weave_count" .. math.max(1, math.min(5, u.n or 1)), 1, 1, 1, 0.9 * fade, 0)
+          end
         elseif u.kind == "sear" then
           size = 0.7 * (1 + 0.08 * math.sin(now * 7)) * (1 + 0.4 * swell)
           SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, 1, 1, 1, 0.9 * fade, 0, 1)
@@ -225,6 +263,8 @@ local function StepBodies(now)
       local q = (now - u.at) / u.secs
       if q >= 1 then
         done = true
+      elseif u.kind == "pop" then
+        SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (0.5 + 0.8 * q), u.height, 0.85, 0.6, 1, 1 - q, now * 3, 1)
       elseif u.kind == "shield" then
         SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (0.8 + 0.6 * q), u.height, 1, 1, 1, 1 - q * q, 0, 1)
       else
@@ -235,6 +275,7 @@ local function StepBodies(now)
       if u.kind == "hollow" then
         if ClearGroundRing then ClearGroundRing(sk) end
       elseif ClearUnitSprite then
+        if u.kind == "weave" and ClearGroundRing then ClearGroundRing(sk .. "_n") end
         ClearUnitSprite(sk)
       end
       onUnits[key] = nil

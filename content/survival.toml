@@ -586,6 +586,16 @@ subclass = 18
 # night, with no spell effect in the data that fixed it (Corey's review; 14 missiles were tried
 # for Bank Shot alone). Keyed by the spell: every ability flying it looks so.
 
+# Shadow Word: Death's lance: Twisted Reflection's dark bolt (its own spell, so no other ability's
+# missile changes), bigger, with a violet streak behind it, at the lance's own 40 yd a second.
+[[missile_look]]
+spell = 21064
+trail = "8A4CFF"
+width = 0.3
+secs = 0.35
+scale = 1.6
+speed = 40.0
+
 # The plain arrow (Aimed Shot short of full, Bank Shot, the arrows Arrow Recall calls home,
 # Skyfall's volley): a thin pale streak.
 [[missile_look]]
@@ -6393,11 +6403,11 @@ damage = [14.0, 14.0]
 mend = 14.0
 cooldown = 9.0
 penance = { beats = 3, targets = 3, cone = 70.0, first = 0.6, gap = 0.55, window = 0.16, crit = 18.0 }
-# Holy Wrath's bolt to each body, the hands taking turns; dead on, a holy flash on it; the perfect's
-# last bolt bursts as Holy Nova's ring.
+# Holy Wrath's bolt to each body, the hands taking turns; dead on, a holy flash on it; all landed,
+# the Priest's own perfect (`[priest] perfect_kit`). Holy Nova's flood on the last bolt read as
+# arcane (Corey's review) and is gone.
 spell = 2812
 impact_kit = 3153
-burst_spell = 15237
 beat_clips = [53, 54]
 
 [[ability]]
@@ -6416,7 +6426,6 @@ mend = 14.0
 penance = { beats = 5, targets = 5, cone = 80.0, first = 0.55, gap = 0.45, window = 0.14, crit = 18.0 }
 spell = 2812
 impact_kit = 3153
-burst_spell = 15237
 beat_clips = [53, 54]
 
 # E: standing together. Light bursts round you, stronger for every other hero inside. No timing
@@ -6550,28 +6559,29 @@ damage = [30.0, 110.0]
 per_lander = 15.0
 mend = 20.0
 cooldown = 40.0
-float = 2.5
+# Up high enough to look down on the fight (Corey: higher, the camera rising with them).
+float = 5.0
 float_aura = 24742
-# Prayer of Healing at its centre as it's laid, Consecration's light on the ground while it lasts,
-# Holy Nova's burst at the edge on each beat, Starshards for the pillar.
+# Prayer of Healing at its centre as it's laid, Starshards for the pillar. The circle, its floor
+# and its rings are the add-on's, in pale light: Consecration's ground is a Paladin's and Holy
+# Nova's flood on each beat was orange (Corey's review).
 spell = 596
-linger_spell = 20116
-tick_spell = 15237
 full_spell = 10797
-burst = { secs = 0.5, colour = "FFE680" }
+burst = { secs = 0.5, colour = "FFF8E0" }
 clip = 54
 # Holy Light: Holy Strength's gold glow on whoever has it.
 stack = { name = "Holy Light", might = 0.1, most = 3, secs = 10.0, aura = 20007 }
 
 # --- Priest, Shadow (choice 2) -----------------------------------------------------------------
 
-# Q: prediction. A dark sigil at the reticle erupts 0.9 sec later: lead your target. Its heart
-# (1 yd) strikes true, the perfect. A foe under Shadow Weaving or a Warlock's shadow takes 30% more
-# (44 at most: the board's 45 a hit). 26 to 44 over 8 sec, 3.3 to 5.5 a second.
+# Q: prediction. A dark sigil at the reticle erupts 0.9 sec later: lead your target. Four hits
+# (Corey, Nov 6): its edge 24; its heart (1 yd) 30; the heart on a foe on the move, the read that
+# was right, 36, Valor and the perfect; a foe under Shadow Weaving or a Warlock's shadow 25% more
+# on any of them (45 at most: the board's 45 a hit). 24 to 45 over 8 sec, 3 to 5.6 a second.
 [[ability]]
 key = "mind_blast"
 name = "Mind Blast"
-text = "Marks the ground at the reticle, up to 30 yd away, with a dark sigil. 0.9 sec later it erupts, dealing 26 damage within 2.5 yd. An enemy within 1 yd of its heart takes 34 instead, and you gain 5 Valor. Enemies under Shadow Weaving or a Warlock's shadow take 30% more."
+text = "Marks the ground at the reticle, up to 30 yd away, with a dark sigil. 0.9 sec later it erupts, dealing 24 damage within 2.5 yd. An enemy within 1 yd of its heart takes 30 instead, or 36 if it was moving, and you gain 5 Valor. Enemies under Shadow Weaving or a Warlock's shadow take 25% more."
 icon = "Spell_Shadow_UnholyFrenzy"
 perfect_kit = 2350
 school = "priest"
@@ -6581,9 +6591,10 @@ kind = "ground"
 range = [30.0, 30.0]
 radius = [2.5, 2.5]
 delay = 0.9
-damage = [26.0, 26.0]
-heart = [1.0, 34.0, 5.0]
-shadowed = 0.3
+damage = [24.0, 24.0]
+heart = [1.0, 30.0, 5.0]
+heart_moving = 36.0
+shadowed = 0.25
 cooldown = 8.0
 # Mind Blast's own burst where it erupts and on each foe it strikes.
 spell = 8092
@@ -6604,12 +6615,14 @@ valor = 25
 damage = [18.0, 18.0]
 range = [30.0, 30.0]
 radius = [0.5, 0.5]
-speed = 80.0
+# Slow enough to follow, with a violet streak behind it (Corey couldn't tell it was a shot at
+# all at 80 yd a second, a tenth of a second at 8 yd): `[[missile_look]]` 21064.
+speed = 40.0
 low_health = 0.2
 low_mult = 2.5
 backlash = 12.0
 kill_recast = 3.0
-spell = 26006
+spell = 21064
 impact_kit = 219
 clip = 54
 
@@ -6651,7 +6664,8 @@ key = "fade"
 name = "Fade"
 text = "Sidesteps 5 yd the way you're moving (back if you aren't) in a fade of shadow. Nothing can harm you for 0.4 sec. An enemy whose blow misses you because of it is slowed by 40% for 2 sec, and you run 30% faster for 1.5 sec."
 icon = "Spell_Magic_LesserInvisibilty"
-perfect_kit = 2350
+# A small dark flash on a slip, not Void Blast's pillar (Corey's review: a giant pillar of purple).
+perfect_kit = 117
 school = "priest"
 slot = "utility"
 choice = 2
@@ -6667,9 +6681,8 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-# Fade's own shadow on the Priest; Void Blast's smear where they stood, on a perfect.
+# Fade's own shadow on the Priest, and the add-on's afterimage where they stood.
 spell = 586
-burst_spell = 27812
 
 [[ability]]
 key = "greater_fade"
@@ -6677,7 +6690,7 @@ name = "Greater Fade"
 ex_of = "fade"
 text = "Fade, 7 yd. An enemy whose blow misses you because of it is slowed by 40% for 2 sec and deals 20% less damage for 3 sec."
 icon = "Spell_Shadow_Twilight"
-perfect_kit = 2350
+perfect_kit = 117
 slot = "utility"
 kind = "dash"
 sidestep = true

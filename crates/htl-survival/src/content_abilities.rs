@@ -891,6 +891,10 @@ pub struct AbilityDef {
     /// place of its damage, and the caster gets `heart[2]` Valor and the perfect (Mind Blast).
     #[serde(default)]
     pub heart: [f32; 3],
+    /// With it, the heart strikes true only on a foe on the move (read where it's going): that
+    /// foe takes this, and the Valor and the perfect; one standing still in it takes `heart[1]`.
+    #[serde(default)]
+    pub heart_moving: f32,
     /// A kill with it gives one free cast of it within this long (that one gives no other):
     /// Shadow Word: Death.
     #[serde(default)]

@@ -252,7 +252,8 @@ impl Survival {
 
     /// The Priest's part of an ability's damage on a foe: the caster's Shadow Weaving on it makes
     /// their staff's bolts stronger; a shadowed foe (Weaving, or a shadow burning on it) takes a
-    /// Mind Blast's `shadowed` more; a Mind Blast's heart strikes true; and any other Priest spell
+    /// Mind Blast's `shadowed` more; a Mind Blast's heart strikes harder, true on a foe on the
+    /// move; and any other Priest spell
     /// on a foe the caster's Smite marked tears the mark out, harder, Healing Gust sooner back.
     pub(crate) fn priest_damage(&mut self, owner: Id, victim: Id, ability: usize, dmg: f32) -> f32 {
         let d = self.content.abilities[ability].clone();
@@ -265,11 +266,17 @@ impl Survival {
         if d.shadowed > 0.0 && (weave > 0 || self.shadow_burning(victim)) {
             dmg *= 1.0 + d.shadowed;
         }
-        // A Mind Blast's heart: the foe within it takes the heart's damage in place of its own.
-        if let Some((at, r, heart, base)) = self.light.heart {
+        // A Mind Blast's heart: the foe within it takes the heart's damage in place of its own;
+        // struck true (the perfect) if it was on the move, when the blast asks that.
+        if let Some((at, r, heart, base, moving)) = self.light.heart {
             if d.heart[0] > 0.0 && self.unit_pos(victim).is_some_and(|p| dist2d(p, at) <= r + 0.3) && base > 0.0 {
-                dmg *= heart / base;
-                self.light.heart_struck = true;
+                if moving <= 0.0 || !self.on_the_move(victim) {
+                    dmg *= heart / base;
+                    self.light.heart_struck |= moving <= 0.0;
+                } else {
+                    dmg *= moving / base;
+                    self.light.heart_struck = true;
+                }
             }
         }
         let priest = self.content.abilities[self.content.base_of(ability)].school == "priest" || d.school == "priest";
@@ -288,6 +295,15 @@ impl Survival {
             }
         }
         dmg
+    }
+
+    /// Whether this body is on the move: a hero holding a way to go, a creature walking a path.
+    pub(crate) fn on_the_move(&self, id: Id) -> bool {
+        if let Some(p) = self.players.get(&id) {
+            let m = &p.moving;
+            return m.forward || m.back || m.left || m.right;
+        }
+        self.mobs.get(&id).is_some_and(|m| !m.path.is_empty() && m.speed > 0.0)
     }
 
     /// Whether a shadow burns on this body (a Warlock's rot, a shadow DoT of anyone's).
