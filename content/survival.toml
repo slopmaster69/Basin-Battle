@@ -6624,7 +6624,8 @@ low_mult = 2.5
 backlash = 12.0
 kill_recast = 3.0
 spell = 29317
-impact_kit = 219
+# Mind Blast's dark burst on the body it strikes (Death Coil's, 219, flashed fel green: Corey).
+impact_kit = 2709
 clip = 54
 
 # E: space. Every foe round you flees, and the first real blow ends it. The Warlock's fear is one
@@ -6682,8 +6683,8 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-# Fade's own shadow on the Priest, and the add-on's afterimage where they stood.
-spell = 586
+# The add-on's afterimage where they stood. (Fade's own aura, 586, was on the body too: its shimmer
+# stayed long after the step. Corey: the animation played too long.)
 
 [[ability]]
 key = "greater_fade"
@@ -6705,8 +6706,6 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }, { kind = "weaken", secs = [3.0, 3.0], amount = 0.2 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-spell = 586
-burst_spell = 27812
 
 # 2: take it, give it back. A shell for up to 2 sec: half of every blow stopped and stored; the key
 # again (or its time up) throws it at the first foe along the reticle. Let go just after a blow
@@ -6813,7 +6812,7 @@ cooldown = 9.0
 spell = 15407
 clip = 54
 effects = [{ kind = "snare", secs = [0.6, 0.6], amount = 0.3 }]
-flay = { taut = 26.0, taut_secs = 1.0, snap = 2.0, snap_cap = 45.0, taut_spell = 5138, taut_kit = 457, whip_spell = 27812, snap_kit = 219, flinch = 0.3 }
+flay = { taut = 26.0, taut_secs = 1.0, snap = 2.0, snap_cap = 45.0, taut_spell = 5138, taut_kit = 457, whip_spell = 27812, snap_kit = 2709, flinch = 0.3 }
 
 # ----------------------------------------------------------------------------------- Shaman --
 
@@ -7305,7 +7304,9 @@ tick = 1.0
 cooldown = 18.0
 hollow = { mob = "hollow_star", health = 40.0, most = 60.0, reach = [3.0, 5.0], damage = 5.0, heal = 5.0, scale = [0.9, 1.7] }
 effects = [{ kind = "haste", secs = [1.2, 1.2], amount = 0.15 }]
-spell = 27812
+# The orb flies as the death-bolt (Void Blast's throw, 27812, threw up a magenta pillar where it
+# landed: Corey); the dark bubble on the body it lands as is the orb you see.
+spell = 29317
 
 # ------------------------------------------------------------------------------------- Mage --
 

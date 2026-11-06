@@ -55,6 +55,9 @@ local SCHOOL = {
   shadow = {
     ring = "priest_ring_white", line = 0.68, size = 160,
     tint = { 0.7, 0.42, 1.0 }, glow = { 0.85, 0.7, 1.0 }, ringTint = { 0.72, 0.45, 1.0 },
+    -- A shadow perfect bursts violet, not the white-gold the other schools share (Corey: it read
+    -- as gold on the Shadowcaller's staff).
+    top = { pop = { 0.88, 0.76, 1.0 }, star = { 0.8, 0.6, 1.0 }, wave = { 0.72, 0.45, 1.0 } },
     spin = 0.18, spin2 = -0.25, sound = "Sound\\Spells\\ArcaneMissileImpact1a.wav",
     fizzle = "Sound\\Spells\\Fizzle\\FizzleShadowA.wav",
   },
@@ -1112,17 +1115,19 @@ local function StepFx(now)
     -- for a perfect); a critical's star blazes over it.
     Draw(burst, sc.size * (1 + 0.75 * e), age * 1.4, (1 - t) * 0.95, 1, 1, 1)
     local top = (g == "perfect" or g == "full")
-    local tint = top and { 1, 1, 0.92 } or { 0.5 + 0.5 * sc.glow[1], 0.5 + 0.5 * sc.glow[2], 0.5 + 0.5 * sc.glow[3] }
+    local own = top and sc.top
+    local tint = (own and own.pop) or (top and { 1, 1, 0.92 }) or { 0.5 + 0.5 * sc.glow[1], 0.5 + 0.5 * sc.glow[2], 0.5 + 0.5 * sc.glow[3] }
     Draw(pop, (top and 300 or 240) * (0.55 + 0.75 * e), age * 0.9, (1 - t) * (1 - t) * 1.0, tint[1], tint[2], tint[3])
     if top then
       Draw(core, 60 + 260 * e, -age * 2.2, (1 - t), 1, 1, 1)
       -- The critical's star (Corey's): blazing over it all, turning as it fades.
-      Draw(star, 110 + 320 * e, age * 0.7, (1 - t) * (1 - t), 1, 0.95, 0.8)
+      local st = (own and own.star) or { 1, 0.95, 0.8 }
+      Draw(star, 110 + 320 * e, age * 0.7, (1 - t) * (1 - t), st[1], st[2], st[3])
     else
       core:Hide(); star:Hide()
     end
     -- The shockwave out from the ring's line: white-gold for a critical, the school's for a perfect.
-    local wc = top and { 1, 0.9, 0.65 } or sc.tint
+    local wc = (own and own.wave) or (top and { 1, 0.9, 0.65 }) or sc.tint
     Draw(wave, (2 * line / WAVE_LINE) * (1 + 1.2 * e), 0, (1 - t) * 0.95, wc[1], wc[2], wc[3])
     ghost:Hide(); target:Hide()
     crack:Hide(); fizzle:Hide(); tick:Hide()
