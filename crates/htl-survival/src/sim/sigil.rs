@@ -73,7 +73,9 @@ impl Survival {
         // The circle, for everyone: a friend's ring (the deliberate floor mark), and its light on
         // the ground.
         let ring = self.mark_kind(at, radius, life, true);
+        self.light.drawn_marks.insert(ring);
         let look = self.mark_unseen(life);
+        self.events.push(Event::SigilLaid { look, at, radius, beats: beats.iter().map(|b| b - now).collect() });
         let spell = if d.linger_spell != 0 { d.linger_spell } else { d.spell };
         if spell != 0 {
             self.events.push(Event::AreaLook { id: look, caster: id, spell, pos: at, radius });
@@ -122,9 +124,11 @@ impl Survival {
                 if g.rim.is_none_or(|(_, s, beat)| s != step || beat != b) {
                     if let Some((m, ..)) = g.rim {
                         self.unmark(m);
+                        self.light.drawn_marks.remove(&m);
                     }
                     let r = d.radius[1] * (RIM_STEPS - step) as f32 / (RIM_STEPS + 1) as f32;
                     let m = self.mark_kind(g.at, r, span / RIM_STEPS as f32 + 0.05, true);
+                    self.light.drawn_marks.insert(m);
                     self.light.sigils[k].rim = Some((m, step, b));
                 }
             } else if let Some((m, ..)) = g.rim {
@@ -154,8 +158,10 @@ impl Survival {
                 let g = self.light.sigils.remove(k);
                 self.unmark(g.ring);
                 self.unmark(g.look);
+                self.light.drawn_marks.remove(&g.ring);
                 if let Some((m, ..)) = g.rim {
                     self.unmark(m);
+                    self.light.drawn_marks.remove(&m);
                 }
                 continue;
             }

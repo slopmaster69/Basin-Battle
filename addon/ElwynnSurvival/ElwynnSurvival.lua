@@ -6631,6 +6631,8 @@ function ES.Line(line)
     if ES.StacksLine then ES.StacksLine(f) end
   elseif verb == "SH" then
     if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
+  elseif verb == "SV" then
+    if ES.SigilLine then ES.SigilLine(f) end
   elseif verb == "OB" then
     if ES.OrbLine then ES.OrbLine(f) end
   elseif verb == "OX" then

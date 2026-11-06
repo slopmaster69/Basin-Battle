@@ -229,6 +229,9 @@ pub enum Event {
     OrbRoll { look: Id, from: Vec3, to: Vec3, secs: f32, model: String, scale: f32 },
     /// That orb stopped or spent.
     OrbGone { look: Id },
+    /// Holy Word: Salvation laid (for everyone, a client with SetGroundRing draws it in Corey's
+    /// art): `look` its key, where, how wide, and its beats in seconds from now.
+    SigilLaid { look: Id, at: Vec3, radius: f32, beats: Vec<f32> },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.

@@ -424,6 +424,16 @@ impl SurvivalGame {
                     self.ui_line(c, &line);
                 }
             }
+            Event::SigilLaid { look, at, radius, beats } => {
+                // Salvation for everyone with the add-on: a client with SetGroundRing draws its
+                // circle, the rim closing on each beat and the centre's sigil (`SV`).
+                let beats = beats.iter().map(|b| format!("{b:.2}")).collect::<Vec<_>>().join(",");
+                let line = format!("SV	{look}	{:.2}	{:.2}	{:.2}	{radius:.2}	{beats}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::OrbGone { look } => {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
                 for c in conns {
@@ -772,7 +782,13 @@ impl SurvivalGame {
                 let p = self.mark_create(id, pos, radius);
                 let line = self.mark_line(id, pos, radius);
                 let conns: Vec<(ConnId, Id, u8)> = self.in_world().map(|(c, _, w)| (*c, w.id, if w.addon { w.level } else { 0 })).collect();
+                // Salvation's circle and rim: drawn by the add-on itself from `SV` on a client
+                // with ground rings (ac24, patch 0041); the rest get the circle.
+                let drawn = self.sim.drawn_by_addon(id);
                 for (c, hero, level) in conns {
+                    if drawn && level >= 24 {
+                        continue;
+                    }
                     // A leap's landing isn't drawn for the hero leaping (others still see it).
                     if tele.is_some_and(|t| t.own_hidden && t.mob == hero) {
                         continue;

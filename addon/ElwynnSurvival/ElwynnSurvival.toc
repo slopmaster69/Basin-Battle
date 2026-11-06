@@ -18,3 +18,4 @@ Lab.lua
 Ward.lua
 Check.lua
 Staff.lua
+Priest.lua

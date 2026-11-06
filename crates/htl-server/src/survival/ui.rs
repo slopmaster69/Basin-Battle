@@ -131,6 +131,9 @@
 //!   spot's share of the sweep, `crit` the perfect zone either side, `pattern` "lr|rl|<good zone>");
 //!   otherwise `crit` the critical's share of a
 //!   window; `school` fire, frost or arcane.
+//! - `SV\t<key>\t<x>\t<y>\t<z>\t<radius>\t<beats>`: Holy Word: Salvation laid, for everyone: its
+//!   circle at that spot, `radius` yards, its rim closing on the centre on each beat (`beats` the
+//!   seconds from now, comma-separated). Drawn on a client with SetGroundRing (`Priest.lua`).
 //! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
 //!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
 //! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
