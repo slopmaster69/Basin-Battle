@@ -33,11 +33,18 @@ pub mod lab;
 mod raid;
 pub mod siege;
 mod bomb;
+mod flay;
+pub mod priest;
 mod orb;
 mod rhythm;
 mod staff;
 mod sweep;
 pub mod wager;
+// The Light Priest's (Penance's flick, Holy Fire's Kindle, counters for others, Salvation).
+mod aid;
+mod flick;
+pub(crate) mod light;
+mod sigil;
 mod tactics;
 mod world;
 
@@ -757,6 +764,8 @@ pub struct Player {
     pub panic_stride: f32,
     /// Keys armed for a recast, cards empowered, a dash going through bodies.
     pub combos: recasts::Combos,
+    /// Grace, the Heal begun with it, a friend's shield on them (the Priest's core).
+    pub priest: priest::Priest,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -1003,6 +1012,8 @@ pub struct Survival {
     pub(crate) bombs: Vec<bomb::Bomb>,
     /// Heat and chill a staff's bolts left on foes, until they fade.
     pub(crate) staff_marks: Vec<staff::StaffMark>,
+    /// Each hero's Mind Flay held, and how taut its cord has been.
+    pub(crate) flays: BTreeMap<Id, flay::Flay>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
@@ -1013,6 +1024,8 @@ pub struct Survival {
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Each hero's last blink that slips blows (Blink's counter check).
     pub(crate) slips: BTreeMap<Id, moves::Slip>,
+    /// The Light Priest's: covers on friends, Salvation's circles, Penance's bolts.
+    pub(crate) light: light::Light,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
@@ -1135,6 +1148,7 @@ impl Survival {
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             slips: BTreeMap::new(),
+            light: light::Light::default(),
             fx_from: None,
             fx_vs_bosses: false,
             fx_pull_look: None,
@@ -1150,6 +1164,7 @@ impl Survival {
             orbs: Vec::new(),
             bombs: Vec::new(),
             staff_marks: Vec::new(),
+            flays: BTreeMap::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
@@ -1223,6 +1238,7 @@ impl Survival {
         self.step_projectiles(dt);
         self.step_orbs(dt);
         self.step_bombs();
+        self.step_light();
         self.step_moves();
         self.step_grounds();
         self.step_bounces();
@@ -1261,6 +1277,8 @@ impl Survival {
         }
         self.record_trails();
         self.close_checks();
+        // The Priest's perfects among what goes out raise Grace (wherever they were pushed).
+        self.step_grace();
         std::mem::take(&mut self.events)
     }
 
@@ -1418,6 +1436,7 @@ impl Survival {
             rooted: false,
             panic_stride: 0.0,
             combos: recasts::Combos::default(),
+            priest: priest::Priest::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];

@@ -2281,6 +2281,11 @@ impl Survival {
                 self.slipped(h, id, Blow::Light);
                 continue;
             }
+            // Pulled out of it by a friend's Leap of Faith just as it came: missed.
+            if !caught(hp) && self.pulled_from(h).is_some_and(caught) {
+                self.pulled_out(h, id, Blow::Light);
+                continue;
+            }
             if dist <= a.range + 0.4 && (angle_between(f, facing(pos, hp)) <= a.arc / 2.0 || dist < 0.8) {
                 any = true;
                 // Settled once the hero's round trip is up: out of it by then (as they saw it), missed.

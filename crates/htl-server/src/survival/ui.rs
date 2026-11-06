@@ -241,13 +241,16 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.area_heal > 0.0 {
         out.push(format!("{}% healing", pct(d.area_heal)));
     }
+    if d.mend > 0.0 {
+        out.push(format!("{} healing", n(d.mend)));
+    }
     match d.kind.as_str() {
         _ if d.hunt == "tripwire" && d.inner => out.push(format!("Within {} yd of the first arrow", n(htl_survival::sim::hunter::WIRE_SPAN))),
         _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire at most · {} sec duration", n(d.range[1]), n(htl_survival::sim::hunter::WIRE_SPAN), n(d.secs))),
         _ if d.hunt == "call" || d.hunt == "double_call" => out.push(format!("{} yd range", n(d.range[1]))),
         _ if d.hunt == "recall" => out.push("Every planted arrow · Lacerates at 3+ arrows".to_string()),
         _ if d.hunt == "volley" => out.push(format!("{} arrows · {} yd range · {} yd radius", d.count, n(d.range[1]), n(d.radius[1]))),
-        "nova" => out.push(format!("{} yd radius", n(d.radius[1]))),
+        "nova" | "sigil" => out.push(format!("{} yd radius", n(d.radius[1]))),
         "ground" if d.at_self => out.push(format!("{} yd radius", n(d.radius[1]))),
         "ground" => out.push(format!("{} yd range · {} yd radius", n(d.range[1]), n(d.radius[1]))),
         "cone" => out.push(format!("{} yd cone", n(d.range[1]))),
@@ -442,7 +445,10 @@ pub(crate) const VERSION: u32 = 2;
 /// (patches 0041 to 0044).
 /// 43: a staff's mark and stacks (`SF`, `SK`, `SH`, `Staff.lua`), and the ward on the reticle (the
 /// `WA` line's fifth field, whether it's up); the add-on says `ac25` (patch 0045).
-pub(crate) const ADDON_NEWEST: u32 = 43;
+/// 48: the right mouse carries the reticle's line (`in g <facing> <elevation>`): a Priest's staff
+/// casts its right click along it (Flash Heal, Drain). An older add-on's press goes along the
+/// hero's facing. (44 to 47 are claimed by #201, #203, #204 and #205.)
+pub(crate) const ADDON_NEWEST: u32 = 48;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1407,9 +1413,9 @@ impl SurvivalGame {
                         self.sim.set_aim_line(me, f, e);
                     }
                 }
-                // An attack, its release and an ability key carry the reticle's line (the
-                // client's own camera, as a facing and an elevation).
-                if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
+                // An attack, its release, an ability key and the right mouse carry the reticle's
+                // line (the client's own camera, as a facing and an elevation).
+                if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..) | Input::Guard), Ok(f)) = (input, rest.parse::<f32>()) {
                     let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                     self.sim.set_aim_line(me, f, e);
                 }
@@ -2022,7 +2028,7 @@ impl SurvivalGame {
             "projectile" if d.count > 1 => "fan",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
-            "nova" | "stance" | "art" | "buff" => "self",
+            "nova" | "stance" | "art" | "buff" | "sigil" => "self",
             _ => "line",
         };
         let shape = |d: &htl_survival::content::AbilityDef| if d.at_self { "self" } else { shape(d) };
@@ -2118,7 +2124,7 @@ impl SurvivalGame {
                             "projectile" if d.count > 1 && !d.lob => "fan",
                             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
                             "cone" => "cone",
-                            "nova" | "stance" | "art" | "buff" => "self",
+                            "nova" | "stance" | "art" | "buff" | "sigil" => "self",
                             _ => "line",
                         };
                         let shape = if d.at_self || !d.aimed() { "self" } else { shape };

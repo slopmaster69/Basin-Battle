@@ -98,3 +98,9 @@ mod tests_bomb;
 mod tests_alter;
 #[cfg(test)]
 mod tests_counters;
+#[cfg(test)]
+mod tests_priest_light;
+#[cfg(test)]
+mod tests_priest_shadow;
+#[cfg(test)]
+mod tests_priest_core;

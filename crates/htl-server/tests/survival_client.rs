@@ -1290,14 +1290,14 @@ fn an_eighth_round_client_sees_a_sky_fall_laid_at_its_spot_and_an_older_one_its_
     a.drain(0.6);
     b.drain(0.3);
     c.drain(0.3);
-    // Mind Blast (a dark star at the reticle 0.6 s later): Penance's EX version, on Q with Ctrl.
-    a.chat(".es slot q penance");
+    // Void Rift (the void torn open at the reticle 0.8 s later), on the 3 key.
+    a.chat(".es slot 3 void_rift");
     a.chat(".es valor full");
     a.drain(0.2);
     a.seen.clear();
     b.seen.clear();
     c.seen.clear();
-    a.chat(".es in ab 0 1");
+    a.chat(".es in ab 4 0");
     a.chat(".es in a");
     a.chat(".es in au 0.0 -0.3");
     let ta = c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tTA\t")));
