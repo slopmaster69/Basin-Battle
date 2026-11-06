@@ -2008,6 +2008,9 @@ impl Survival {
         if self.ends_on_action(id) {
             self.end_stance(id);
         }
+        // And calls off an aim or a charge, as a roll and the guard do (Corey: jumping, dodging
+        // and blocking all cancel an aimed ability).
+        self.ability_cancel(id);
         let cost = self.content.player.jump_stamina;
         let now = self.clock;
         let dash = self.content.dodge.dash_secs + COREY_GRACE;
