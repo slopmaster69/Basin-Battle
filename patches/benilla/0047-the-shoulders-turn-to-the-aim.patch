@@ -74,13 +74,13 @@ index 16b5f5c5..a4a43897 100644
 -            if t.yaw_gap != 0.0 || t.pitch != 0.0 {
 +            if t.yaw_gap != 0.0 || t.pitch != 0.0 || t.turn != 0.0 {
                  info!(
-                     "twist: STOOD DOWN (WOW_NO_TWIST) ? yaw_gap was {:.5} rad",
+                     "twist: STOOD DOWN (WOW_NO_TWIST) — yaw_gap was {:.5} rad",
                      t.yaw_gap
 @@ -106,6 +111,9 @@ pub(super) fn apply_body_twist(
              .is_ok_and(|s| s.0.unit_mount_display_id() != 0);
          let (spine, head) = armed_shares(twist.yaw_gap, mounted);
          let pitch = if mounted { 0.0 } else { twist.pitch };
-+        // The turn right is a negative yaw about up (forward is ?Z); the head undoes it.
++        // The turn right is a negative yaw about up (forward is −Z); the head undoes it.
 +        let turn = if mounted { 0.0 } else { twist.turn };
 +        let (spine, head) = (spine - turn, head + turn);
          let twist = &mut *twist;
