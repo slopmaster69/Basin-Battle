@@ -1,0 +1,128 @@
+From 846df3830a798f1730693a8064f5aadb5bb8f9a9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 16:39:14 -0600
+Subject: [PATCH] The camera over the shoulder by default: SetCameraShoulder
+
+The ordinary camera's pivot to the hero's right (and up) as the add-on asks, eased in and out and
+given way to the aiming camera and the lock-on, so the reticle at the screen's centre falls past
+the shoulder instead of on the hero's back (Corey's playtest: a staff's reticle sat on the hero).
+---
+ crates/benilla-app/src/player/camera.rs | 19 +++++++++++--
+ crates/benilla-ui/src/action_combat.rs  | 36 +++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+), 2 deletions(-)
+
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index ef138d8c..f896caa5 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -601,6 +601,10 @@ pub(crate) struct CameraControl {
+     /// Basin Battle's lock-on framing, 0 to 1: the hero a little left of centre, so the locked
+     /// unit stands clear past the right shoulder.
+     pub(super) lock_blend: f32,
++    /// Basin Battle's ordinary camera over the shoulder (yards right and up), eased toward what
++    /// [`benilla_ui::action_combat::camera_shoulder`] asks for.
++    pub(super) shoulder_right: f32,
++    pub(super) shoulder_up: f32,
+ }
+ 
+ impl CameraControl {
+@@ -1393,8 +1397,19 @@ pub(super) fn seat_camera(
+     let distance = distance + lock_back * lock;
+     // A heavy blow's punch in.
+     let distance = distance * (1.0 - benilla_ui::action_combat::camera_kick(dt));
+-    let shoulder = (arm_rotation * Vec3::X) * (aim_right * blend + lock_right * lock)
+-        + Vec3::Y * (aim_up * blend + lock_up * lock);
++    // Basin Battle: the ordinary camera over the shoulder (`SetCameraShoulder`), so the reticle
++    // falls past the hero; eased with the rest and given way to the aiming camera and the
++    // lock-on, which seat themselves.
++    let (rest_right, rest_up) = benilla_ui::action_combat::camera_shoulder();
++    rig.shoulder_right += (rest_right - rig.shoulder_right) * (1.0 - (-AIM_EASE_RATE * dt).exp());
++    rig.shoulder_up += (rest_up - rig.shoulder_up) * (1.0 - (-AIM_EASE_RATE * dt).exp());
++    let rest = if rig.distance < 0.75 {
++        0.0
++    } else {
++        (1.0 - blend) * (1.0 - rig.lock_blend)
++    };
++    let shoulder = (arm_rotation * Vec3::X) * (aim_right * blend + lock_right * lock + rig.shoulder_right * rest)
++        + Vec3::Y * (aim_up * blend + lock_up * lock + rig.shoulder_up * rest);
+     let pivot = player_pos + Vec3::Y * cam_pivot_height + shoulder;
+     let seat = pivot - cam_fwd * distance;
+     let boom = seat - head;
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 78631cc8..e93d26fb 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -281,6 +281,15 @@
+ //!   nothing for none, at most 1.5. The add-on sets it while a bow is drawn: 1.12's draw stands
+ //!   side-on, and from the camera over the right shoulder the turned back and head hid the view
+ //!   and the bow pointed off the reticle.
++//!
++//! The camera over the shoulder by default (no level of its own; the add-on asks whether
++//! `SetCameraShoulder` is there):
++//!
++//! - `SetCameraShoulder(right[, up])`: the ordinary camera's pivot that many yards to the hero's
++//!   right (left, negative) and up, so the reticle at the screen's centre falls past the shoulder
++//!   instead of on the hero's back. Eased in and out, and given way to the aiming camera and the
++//!   lock-on, which seat themselves. `0` or nothing for the stock centred camera; at most 2 yd
++//!   either side and 1.5 up.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -295,6 +304,9 @@ static AIM_UP: AtomicU32 = AtomicU32::new(0.25f32.to_bits());
+ static AIM_PITCH: AtomicU32 = AtomicU32::new(0);
+ /// `SetAimTurn`'s turn of the shoulders (radians, right positive).
+ static AIM_TURN: AtomicU32 = AtomicU32::new(0);
++/// `SetCameraShoulder`: the ordinary camera's pivot to the hero's right and up (yards).
++static SHOULDER_RIGHT: AtomicU32 = AtomicU32::new(0);
++static SHOULDER_UP: AtomicU32 = AtomicU32::new(0);
+ static UNIT_COLLISION: AtomicBool = AtomicBool::new(false);
+ static VIEW_FACING: AtomicU32 = AtomicU32::new(0);
+ /// The view's elevation (radians, up positive), written by the camera each frame.
+@@ -619,6 +631,12 @@ pub fn aim_pitch() -> f32 {
+     f32::from_bits(AIM_PITCH.load(Ordering::Relaxed))
+ }
+ 
++/// The ordinary camera's pivot off the hero: yards to the right and up (`SetCameraShoulder`).
++pub fn camera_shoulder() -> (f32, f32) {
++    let f = |a: &AtomicU32| f32::from_bits(a.load(Ordering::Relaxed));
++    (f(&SHOULDER_RIGHT), f(&SHOULDER_UP))
++}
++
+ /// How far the add-on wants our own hero's shoulders turned right (radians; `SetAimTurn`).
+ pub fn aim_turn() -> f32 {
+     f32::from_bits(AIM_TURN.load(Ordering::Relaxed))
+@@ -1221,6 +1239,17 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetCameraShoulder",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let right = number(v.first(), -2.0, 2.0).unwrap_or(0.0);
++            let up = number(v.get(1), -1.0, 1.5).unwrap_or(0.0);
++            SHOULDER_RIGHT.store(right.to_bits(), Ordering::Relaxed);
++            SHOULDER_UP.store(up.to_bits(), Ordering::Relaxed);
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "HasActionCombat",
+         lua.create_function(|_, _: MultiValue| Ok(27))?,
+@@ -2298,6 +2327,13 @@ mod tests {
+         assert_eq!(aim_turn(), 1.5);
+         lua.load("SetAimTurn()").exec().unwrap();
+         assert_eq!(aim_turn(), 0.0);
++        // The camera over the shoulder: set, held within reach, and centred with nothing.
++        lua.load("SetCameraShoulder(0.6, 0.2)").exec().unwrap();
++        assert_eq!(camera_shoulder(), (0.6, 0.2));
++        lua.load("SetCameraShoulder(-9)").exec().unwrap();
++        assert_eq!(camera_shoulder(), (-2.0, 0.0));
++        lua.load("SetCameraShoulder()").exec().unwrap();
++        assert_eq!(camera_shoulder(), (0.0, 0.0));
+     }
+ 
+     #[test]
+-- 
+2.56.0.windows.4
+
