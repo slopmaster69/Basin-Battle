@@ -3179,6 +3179,13 @@ impl Survival {
         self.light.boost = boost;
         self.area(id, ability, at, radius, share, damage * boost, None);
         self.light.boost = 0.0;
+        // Body and Soul: everyone it reaches (the caster too) freed of slows and roots.
+        if d.cleanse {
+            let friends: Vec<Id> = self.players.iter().filter(|(h, p)| p.health > 0 && (**h == id || self.helpable(id, **h)) && dist2d(p.pos, at) <= radius + HERO_SIZE).map(|(h, _)| *h).collect();
+            for f in friends {
+                self.cleanse(f, &["root", "snare"]);
+            }
+        }
         if self.debug_draws() {
             self.mark(at, radius, 0.8);
         }

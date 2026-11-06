@@ -229,6 +229,10 @@ impl Survival {
             "right"
         };
         self.start_dash(id, ability, yaw, share);
+        // A sidestep strikes nothing it passes (a dash `through` bodies would strike each).
+        if let Some(p) = self.players.get_mut(&id) {
+            p.combos.through.clear();
+        }
         // The body sways aside as a dodge's does (the dash itself carries them).
         self.events.push(Event::Hop { player: id, dir: yaw, speed: 0.0, lift: 0.0, roll: true, style });
         if d.slip {
