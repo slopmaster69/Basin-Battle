@@ -2082,7 +2082,8 @@ impl Survival {
             Blow::Dot => 0.0,
         };
         // A heavy creature's blow that lands puts a hero on the ground.
-        let felled = outcome == Outcome::Hit && heavy && self.mobs.contains_key(&attacker) && landed < p_health(self, victim);
+        // (Not a hero nothing staggers: steadfast under a Barrier, in Shadowguard's shell.)
+        let felled = outcome == Outcome::Hit && heavy && self.mobs.contains_key(&attacker) && landed < p_health(self, victim) && !self.unstaggerable(victim);
         match outcome {
             Outcome::Hit if felled => {
                 let secs = c.combat.knockdown;
@@ -2747,9 +2748,10 @@ impl Survival {
     }
 
     /// Nothing staggers them now: steadfast (Sanctuary, Berserker Rage) or rallied (Rallying Cry)
-    /// on them, or in the wind-up of an art that won't be stopped.
+    /// on them, in Shadowguard's shell (it takes the blow, to throw it back), or in the wind-up
+    /// of an art that won't be stopped.
     pub(crate) fn unstaggerable(&self, id: Id) -> bool {
-        if self.has_cc(id, "rallied") || self.has_cc(id, "steadfast") || self.untouchable(id) {
+        if self.has_cc(id, "rallied") || self.has_cc(id, "steadfast") || self.untouchable(id) || self.shell_cut(id) > 0.0 {
             return true;
         }
         matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { t, strike, .. })
