@@ -1173,29 +1173,31 @@ icon = "INV_Staff_07"
 kind = "weapon"
 text = "Two-handed. Attacks cast quick bolts of arcane force that deal 10 damage and store charges in the staff. Heavy attacks release them as an orb that deals up to 64 damage. Guards with a ward."
 
-# The Priest's staffs: the Scarlet chaplains' staff for the holy one (472), the conjurers' (5415)
-# for the shadow one, and the dark staff set with orbs (34811) for the Hollow Star, until staffs of
-# their own are picked.
+# The Priest's staffs, each its own (none shared with the Mage's): the holy staff, a black one with
+# a shadow flame, and one holding a purple orb.
 [[item]]
 key = "acolyte_staff"
 name = "Acolyte's Staff"
-display = 472
-icon = "INV_Staff_10"
+# The 1.12 "holy" staff (Stave_2H_Long_B_02Holy), white and gold.
+display = 20384
+icon = "INV_Staff_23"
 kind = "weapon"
 text = "Two-handed. Attacks cast Smite, marking enemies with Searing Light. Hold the heavy attack for Greater Smite. Hold right-click to aim Healing Gust, then click to send it through your allies. Cannot block or parry."
 
 [[item]]
 key = "shadowcaller_staff"
 name = "Shadowcaller's Staff"
-display = 5415
-icon = "INV_Staff_02"
+# A black jeweled staff with a shadow flame at its head (Stave_2H_Flaming_D_01).
+display = 20272
+icon = "Spell_Shadow_Haunting"
 kind = "weapon"
 text = "Two-handed. Attacks cast Shadow Bolts that weave Shadow Weaving into the enemy, and a bolt after a pause is Empowered. The heavy attack casts a charged Shadow Burst. Right-click casts Dark Reckoning, ripping the Weaving out. Cannot block or parry."
 
 [[item]]
 key = "hollow_star_staff"
 name = "Staff of the Hollow Star"
-display = 34811
+# A staff holding a purple orb (Stave_2H_Jeweled_D_01), the Hollow Star in its head.
+display = 20254
 icon = "INV_Staff_13"
 kind = "weapon"
 text = "Two-handed. Hold attack for the Void Tether: it hurts an enemy, heals an ally, or fills your Hollow Star and draws it to you. Right-click throws the Hollow Star, an orb that hurts enemies and heals allies near it. Cannot block or parry."
