@@ -507,7 +507,7 @@ impl SurvivalGame {
                 // guard taking the blow meant for them).
                 "blowally" => {
                     if let (Some(m), Some(a)) = (nearest, self.lab_allies.first().copied()) {
-                        self.sim.lab_blow(m, a);
+                        self.sim.lab_blow_near(m, a, me);
                     }
                     None
                 }

@@ -27,6 +27,8 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
         "row" => &[(6.0, 0.0), (10.0, 0.0), (14.0, 0.0)],
         // One at 12 yd: a bolt's flight.
         "mid" => &[(12.0, 0.0)],
+        // One within arm's reach at the hero's side: a dodge or a glide forward leaves its blow.
+        "side" => &[(1.8, 90.0)],
         // At the edge of a long reach: Mind Flay's taut zone (26 to 30 yd).
         "edge" => &[(28.0, 0.0)],
         _ => return None,
@@ -36,7 +38,7 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
 /// The account every spell lab stand-in ally hero's starts with: never saved.
 pub const LAB_ALLY: &str = "lab~ally";
 
-pub const LAB_SCENES: &str = "one, pack, close, ring, far, line, spread, row, mid or edge";
+pub const LAB_SCENES: &str = "one, pack, close, ring, far, line, spread, row, mid, edge or side";
 
 impl Survival {
     /// Sets out a scene in front of hero `id`: `creature`s (a `[[mob]]` key; "dummy" for the
@@ -91,6 +93,20 @@ impl Survival {
     }
 
     /// One of the lab's creatures swings at the hero now (its own blow, wind-up and all).
+    /// The creature brought within arm's reach of `hero` first (just beyond them from the lab's
+    /// hero, so a ray or the reticle meets the ally first, facing them), then its blow: a blow meant for a stand-in ally that stands farther off.
+    pub fn lab_blow_near(&mut self, mob: Id, hero: Id, from: Id) {
+        let (Some(at), Some(me)) = (self.players.get(&hero).map(|p| p.pos), self.players.get(&from).map(|p| p.pos)) else { return };
+        let d = dist2d(at, me).max(0.1);
+        let pos = [at[0] - (me[0] - at[0]) / d * 1.8, at[1] - (me[1] - at[1]) / d * 1.8, at[2]];
+        if let Some(m) = self.mobs.get_mut(&mob) {
+            m.pos = pos;
+            m.facing = facing(pos, at);
+        }
+        self.events.push(Event::MobStop { id: mob, pos, facing: facing(pos, at) });
+        self.lab_blow(mob, hero);
+    }
+
     pub fn lab_blow(&mut self, mob: Id, hero: Id) {
         let Some(at) = self.players.get(&hero).map(|p| p.pos) else { return };
         if self.mobs.get(&mob).is_some_and(|m| m.health > 0) {
