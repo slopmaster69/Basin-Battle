@@ -189,10 +189,11 @@ impl Survival {
         self.meter_healed(healer, id, healed, label);
     }
 
-    /// Whether `healer`'s heal lands critical just now ([`Survival::critical_heals`]): a skill
-    /// check's perfect, never a plain heal.
+    /// Whether `healer`'s heal lands critical just now: a skill check's perfect (a release on
+    /// its flare while what it sends out is made, `cast_perfect`; a Penance ring dead on the beat,
+    /// [`Survival::critical_heals`]), or `.es crit`. Never a heal with no skill check.
     pub(crate) fn heal_is_critical(&self, healer: Id) -> bool {
-        self.critical_heals.contains(&healer)
+        self.critical_heals.contains(&healer) || self.players.get(&healer).is_some_and(|p| p.cast_perfect)
     }
 
     /// Heal a creature help can reach (an ally, a Priest's orb: [`Self::takes_help`]), counting it
