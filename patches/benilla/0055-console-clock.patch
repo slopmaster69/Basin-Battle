@@ -1,4 +1,4 @@
-From 19e9ca1f449227d7b41ff503fd5434ff63879c06 Mon Sep 17 00:00:00 2001
+From c60f38c57b1a70d8fdbb02b162d46ece5884dd81 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 09:04:58 -0700
 Subject: [PATCH] A console clock for the visual check: `worldclock <minute>`
@@ -10,15 +10,18 @@ the server's clock again. It is for the scripted visual check, whose scenarios s
 set hour with `ConsoleExec("worldclock 1050")`: the light, the sky and the new look's grade follow
 on the next frame, and the server's own clock is untouched. A minute out of range or a word that
 is not one prints the usage line and changes nothing. benilla's own; 1.12 has no such command.
+
+`lookbloom <intensity> [threshold]` holds the new look's bloom the same way, so one take can
+compare several; `lookbloom grade`, or no argument, lets the hour's grade decide again.
 ---
- crates/benilla-app/src/world_console.rs | 73 +++++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
+ crates/benilla-app/src/world_console.rs | 166 ++++++++++++++++++++++++
+ 1 file changed, 166 insertions(+)
 
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 0fbf678..a390f05 100644
+index 0fbf678..731b517 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
-@@ -74,6 +74,13 @@ impl Plugin for WorldConsolePlugin {
+@@ -74,6 +74,20 @@ impl Plugin for WorldConsolePlugin {
          }
          // Registered by `InitSky` at the first map load (`0x6d1d43`-`0x6d1d4d`).
          app.console_command("SkySunGlare", GRAPHICS, Some("0, 1"), sky_sun_glare);
@@ -29,10 +32,17 @@ index 0fbf678..a390f05 100644
 +            Some("<minute 0-1439> | server"),
 +            world_clock,
 +        );
++        // benilla's own: the new look's bloom held for tuning on film.
++        app.console_command(
++            "lookbloom",
++            GRAPHICS,
++            Some("<intensity> [threshold] | grade"),
++            look_bloom,
++        );
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -83,6 +90,32 @@ impl Plugin for WorldConsolePlugin {
+@@ -83,6 +97,68 @@ impl Plugin for WorldConsolePlugin {
      }
  }
  
@@ -62,10 +72,46 @@ index 0fbf678..a390f05 100644
 +    }
 +}
 +
++/// `lookbloom <intensity> [threshold]`, benilla's own (1.12 has no such command): holds the new
++/// look's bloom at an intensity (and its prefilter's threshold, 0..1 of the gamma frame) whatever
++/// the hour's grade asks, so one take can compare several; `lookbloom grade`, or no argument, lets
++/// the grade decide again. The classic look (`worldLook 0`) has no bloom either way.
++fn look_bloom(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::LookBloomTune;
++    let mut words = args.split_whitespace();
++    let first = words.next();
++    if first.is_none() || first.is_some_and(|w| w.eq_ignore_ascii_case("grade")) {
++        *world.get_resource_or_init::<LookBloomTune>() = LookBloomTune::default();
++        return vec!["Bloom follows the grade.".to_string()];
++    }
++    let usage = || vec!["Usage: lookbloom <intensity> [threshold] | grade".to_string()];
++    let Some(intensity) = first
++        .and_then(|w| w.parse::<f32>().ok())
++        .filter(|v| (0.0..=4.0).contains(v))
++    else {
++        return usage();
++    };
++    let threshold = match words.next() {
++        None => None,
++        Some(w) => match w.parse::<f32>().ok().filter(|v| (0.0..=1.0).contains(v)) {
++            Some(t) => Some(t),
++            None => return usage(),
++        },
++    };
++    *world.get_resource_or_init::<LookBloomTune>() = LookBloomTune {
++        intensity: Some(intensity),
++        threshold,
++    };
++    vec![match threshold {
++        Some(t) => format!("Bloom held at {intensity} (threshold {t})."),
++        None => format!("Bloom held at {intensity}."),
++    }]
++}
++
  /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
  /// a clear one set with the second, each through `ConsoleWrite` in class 0.
  fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
-@@ -306,6 +339,46 @@ mod tests {
+@@ -306,6 +382,96 @@ mod tests {
          *app.world().resource::<WorldLevels>()
      }
  
@@ -106,6 +152,56 @@ index 0fbf678..a390f05 100644
 +            clock(&mut app),
 +            (true, 330),
 +            "no argument follows the server too"
++        );
++    }
++
++    /// `lookbloom`: a value holds the bloom, a second its threshold, `grade` or nothing lets go,
++    /// and anything out of range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_bloom_holds_and_lets_go() {
++        use benilla_world::look::LookBloomTune;
++        let mut app = world_app();
++        let tune = |app: &mut App| *app.world_mut().get_resource_or_init::<LookBloomTune>();
++        assert_eq!(run(&mut app, "lookbloom 0.4"), ["Bloom held at 0.4."]);
++        assert_eq!(
++            tune(&mut app),
++            LookBloomTune {
++                intensity: Some(0.4),
++                threshold: None
++            }
++        );
++        assert_eq!(
++            run(&mut app, "lookbloom 1 0.5"),
++            ["Bloom held at 1 (threshold 0.5)."]
++        );
++        assert_eq!(
++            tune(&mut app),
++            LookBloomTune {
++                intensity: Some(1.0),
++                threshold: Some(0.5)
++            }
++        );
++        assert_eq!(
++            run(&mut app, "lookbloom 9"),
++            ["Usage: lookbloom <intensity> [threshold] | grade"]
++        );
++        assert_eq!(run(&mut app, "lookbloom 0.3 2").len(), 1);
++        assert_eq!(
++            tune(&mut app).intensity,
++            Some(1.0),
++            "a bad value changes nothing"
++        );
++        assert_eq!(
++            run(&mut app, "lookbloom grade"),
++            ["Bloom follows the grade."]
++        );
++        assert_eq!(tune(&mut app), LookBloomTune::default());
++        run(&mut app, "lookbloom 0.2");
++        run(&mut app, "lookbloom");
++        assert_eq!(
++            tune(&mut app),
++            LookBloomTune::default(),
++            "no argument lets go too"
 +        );
 +    }
 +
