@@ -413,7 +413,9 @@ pub(crate) const VERSION: u32 = 2;
 /// reticle's ring closes in and turns gold as it builds.
 /// 49: the add-on says `ac26`, sends the point its reticle is on with every aim line, and the
 /// reticle turns red while cover sits between the hero's hands and that point.
-pub(crate) const ADDON_NEWEST: u32 = 49;
+/// 50: the add-on says `ac27` and squares the shoulders to the aim while the bow is drawn
+/// (`SetAimTurn`): 1.12's draw stands side-on.
+pub(crate) const ADDON_NEWEST: u32 = 50;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -426,7 +428,9 @@ pub(crate) const ADDON_NEWEST: u32 = 49;
 /// 26: the reticle's own point (`GetReticlePoint`: where the camera's centre line first meets
 /// the world, and whether cover sits between the hands and it), and the aim's circle laid on
 /// that line (0046).
-pub(crate) const CLIENT_NEWEST: u8 = 26;
+/// 27: our own hero's shoulders turned as the add-on asks, the head turned back (`SetAimTurn`,
+/// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048).
+pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
