@@ -202,6 +202,13 @@ impl Survival {
                 }
                 Input::Bash => return self.try_act(id, Input::Attack),
                 Input::Kick => return self.try_act(id, Input::Heavy),
+                // The holy staff's heal aimed on the right click: with the button still held, the
+                // next click aims and casts it again (Corey: right click held is the heal's aim).
+                Input::Attack | Input::Heavy if self.content.abilities[alt].aim_alt && self.players.get(&id).is_some_and(|p| p.guard_held && matches!(p.action, Action::Ready | Action::Guard)) => {
+                    self.set_action(id, Action::Aim { ability: alt });
+                    self.ability_press(id);
+                    return true;
+                }
                 _ => {}
             }
         }
