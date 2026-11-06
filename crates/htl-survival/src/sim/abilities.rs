@@ -519,7 +519,7 @@ impl Survival {
                 (*id, m.pos, HERO_TALL * s, 0.5 * s)
             })
             .collect();
-        if self.content.pvp.friendly_fire || allies {
+        if allies || self.heroes_clash() {
             out.extend(self.players.iter().filter(|(id, p)| **id != skip && p.health > 0 && (allies || self.hostile(skip, **id))).map(|(id, p)| (*id, p.pos, HERO_TALL, HERO_SIZE)));
         }
         out
@@ -3025,7 +3025,7 @@ impl Survival {
             }
         };
         let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner) && !self.spirit_body(**mid)).map(|(id, _)| *id).collect();
-        let heroes: Vec<Id> = if self.content.pvp.friendly_fire {
+        let heroes: Vec<Id> = if self.heroes_clash() {
             // (Not one it mends: a healing area spares a hero it can help.)
             self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
         } else {
@@ -3063,7 +3063,7 @@ impl Survival {
     /// take its boon.
     fn area_tick(&mut self, owner: Id, ability: usize, at: Vec3, radius: f32, dps: f32) {
         let d = self.content.abilities[ability].clone();
-        let ff = self.content.pvp.friendly_fire;
+        let ff = self.heroes_clash();
         let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| m.health > 0 && dist2d(m.pos, at) <= radius && !self.own_totem(**mid, owner) && !self.content.mobs[m.def].totem).map(|(id, _)| *id).collect();
         let damage = dps.round().max(1.0) as u32;
         for m in &mobs {
