@@ -255,6 +255,32 @@ jitter = 0.25
 # pack's, before it gives up. A wager's farther chase, 1.75, is the farther of this and its own:
 # this one, now.)
 leash_scale = 4.0
+# A boss is harder to learn, alone above all. (Play-test: up close a boss threw the same string
+# again and again, and its charges and throws never came while you stayed on it.)
+# The string a boss just began is `repeat` times as likely to come again next, so it seldom does
+# the same thing twice running.
+repeat = 0.3
+# A quarter of a boss's strings up close have one blow held a beat, up to `hold_secs` longer in
+# its wind-up (at least 40% of that, so it shows): the delayed swing, so a parry timed by rote
+# comes early. Its wind-up shows the whole of it.
+hold = 0.25
+hold_secs = 0.45
+# A boss's string up close of three blows or more stops one short, this often; and of two or more,
+# runs one longer (its last blow again), `extend` as often: you can't count it out.
+cut = 0.2
+extend = 0.2
+# A boss's string up close done: this often it goes straight into another, no rest between (not
+# past three close strings in a row).
+chain = 0.25
+# A boss's string up close done: the chance it backs off, facing you, to where one of its blows
+# from afar can come from (a charge, a lunge, a throw: a string whose `min_range` is 3 yards or
+# more), and uses it as it gets there (never straight after one from afar). `space`, and `space_streak` more for each close string in
+# a row before this one, up to `space_most`: three close strings running, it's 70%. With two
+# heroes or more on it, half (a band has others for it to go for, and its charges reach them).
+space = 0.3
+space_streak = 0.2
+space_most = 0.8
+space_band = 0.5
 
 # Each grip's blows. `clip` is the game's own animation (AnimationData id) and `take` which of the
 # model's versions of it; `windup` and `recovery` are shares of the weapon's own times, `damage`

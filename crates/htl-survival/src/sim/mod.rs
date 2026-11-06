@@ -922,6 +922,18 @@ pub struct Mob {
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,
+    /// The string it began last (so it seldom begins the same one again next), how many of its
+    /// strings up close in a row it has done, and how many blows of the string it's in it will
+    /// throw (0: as many as it has; a boss's may stop short or run one longer).
+    pub last_pattern: Option<usize>,
+    pub close_run: u32,
+    pub string_len: usize,
+    /// The blow of its string a boss holds a beat (the delayed swing), and how much longer that
+    /// blow's wind-up is now.
+    pub held_step: Option<usize>,
+    pub hold: f32,
+    /// A boss making space: backing off until then, to use this string of its from there.
+    pub space: Option<(f32, usize)>,
     /// Who has hurt it, how much, and when last (it fades): whom it goes for.
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.
