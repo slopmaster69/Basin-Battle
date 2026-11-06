@@ -1,19 +1,21 @@
-From 3e653d4ae28f4e841d6ace4fcfd9ba8f6806efbb Mon Sep 17 00:00:00 2001
+From a4b5202897495e808686f5662c884933476d7af5 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 5 Nov 2026 20:18:41 -0600
-Subject: [PATCH] The body faces the aim, and the upper body holds it while the
+Subject: [PATCH] The hero faces the aim, and the upper body holds it while the
  legs walk
 
-While the aiming camera is up our own hero's body faces the aim at once,
-standing too (the stock chase held a 90-degree ceiling while the view was
-steered, so a draw began on a body still facing elsewhere). Walking, the legs
-keep their slide's turn and the spine takes the whole gap, up to 100
-degrees, so the shoulders and what they hold stay on the aim.
+While the aiming camera is up our own hero faces the way the view looks and
+the body turns with it at once, standing too (the stock chase held a
+90-degree ceiling while the view was steered, and a camera turned without
+the mouse left the facing behind, so a draw began on a body facing
+elsewhere). Walking, the legs keep their slide's turn and the spine takes
+the whole gap, up to 100 degrees, so the shoulders and what they hold stay
+on the aim.
 ---
  .../benilla-app/src/creature_anim/action.rs   |  2 ++
  crates/benilla-app/src/creature_anim/twist.rs | 31 +++++++++++++++++--
- crates/benilla-app/src/player/gait.rs         |  6 +++-
- 3 files changed, 36 insertions(+), 3 deletions(-)
+ crates/benilla-app/src/player/gait.rs         | 11 +++++++
+ 3 files changed, 42 insertions(+), 2 deletions(-)
 
 diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
 index 74da7f3c..ae4c1d4a 100644
@@ -106,22 +108,27 @@ index a4a43897..eafa2d83 100644
      fn zero_gap_is_zero_twist() {
          assert_eq!(twist_shares(0.0), (0.0, 0.0));
 diff --git a/crates/benilla-app/src/player/gait.rs b/crates/benilla-app/src/player/gait.rs
-index 3f56bd14..e7d49621 100644
+index 3f56bd14..82d3fad9 100644
 --- a/crates/benilla-app/src/player/gait.rs
 +++ b/crates/benilla-app/src/player/gait.rs
-@@ -35,7 +35,11 @@ pub(super) fn drive_body_heading(
-         player.model_yaw = player.face_yaw;
-     } else if strafe_offset != 0.0 {
+@@ -37,6 +37,17 @@ pub(super) fn drive_body_heading(
          player.model_yaw = ease_strafe_yaw(player.model_yaw, player.face_yaw, strafe_offset, dt);
--    } else if moving || airborne {
-+    } else if moving || airborne || benilla_ui::action_combat::aim_camera() {
-+        // Basin Battle: while an ability is aimed the body faces the aim at once, standing too.
-+        // The stock chase held a 90-degree ceiling while the view was steered, so a hero who faced
-+        // the inn and then aimed at an orc drew with the body still on the inn and the spine and
-+        // head twisted round, and the draw broke (Corey's review).
+     } else if moving || airborne {
          player.model_yaw = player.face_yaw;
++    } else if benilla_ui::action_combat::aim_camera() {
++        // Basin Battle: while an ability is aimed the hero faces the aim, the way the view looks,
++        // and the body with it at once, standing too. The stock chase held a 90-degree ceiling
++        // while the view was steered, and a camera turned without the mouse left the facing
++        // behind, so a hero who faced the inn and then aimed at an orc drew with the body still
++        // on the inn and the spine and head twisted round, and the draw broke (Corey's review).
++        let view = benilla_ui::action_combat::view_facing();
++        if view.is_finite() {
++            player.face_yaw = wrap_pi(view);
++        }
++        player.model_yaw = player.face_yaw;
      } else {
          let delta = wrap_pi(player.face_yaw - player.model_yaw);
+         let mut step = (delta.abs() - std::f32::consts::FRAC_PI_2).max(0.0); // the ceiling
 -- 
 2.56.0.windows.4
 
