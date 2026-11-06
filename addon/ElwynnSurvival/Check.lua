@@ -44,7 +44,7 @@ local SCHOOL = {
     spin = 0.08, spin2 = -0.12, sound = "Sound\\Spells\\FrostNova.wav",
     fizzle = "Sound\\Spells\\Fizzle\\FizzleFrostA.wav",
   },
-  -- The Priest's: Penance's gold ring of light, and the same in shadow's violet (never the Mage's
+  -- The Priest's: Penance's gold ring of light, and the same in white made shadow's violet (never the Mage's
   -- arcane on a Priest's staff: Corey).
   holy = {
     ring = "priest_penance_ring", line = 0.68, size = 160,
@@ -53,7 +53,7 @@ local SCHOOL = {
     fizzle = "Sound\\Spells\\Fizzle\\FizzleHolyA.wav",
   },
   shadow = {
-    ring = "priest_penance_ring", line = 0.68, size = 160,
+    ring = "priest_ring_white", line = 0.68, size = 160,
     tint = { 0.7, 0.42, 1.0 }, glow = { 0.85, 0.7, 1.0 }, ringTint = { 0.72, 0.45, 1.0 },
     spin = 0.18, spin2 = -0.25, sound = "Sound\\Spells\\ArcaneMissileImpact1a.wav",
     fizzle = "Sound\\Spells\\Fizzle\\FizzleShadowA.wav",
@@ -65,7 +65,7 @@ local SCHOOL = {
     fizzle = "Sound\\Spells\\Fizzle\\FizzleShadowA.wav",
   },
 }
--- A school ring drawn in its own colours (the shadow's is Penance's gold ring made violet).
+-- A school ring drawn in its own colours (the shadow's is Penance's ring in white, made violet).
 local WHITE3 = { 1, 1, 1 }
 local TICK = "Sound\\interface\\MagicClick.wav"
 local CHIME = "Sound\\interface\\igTextPopupPing02.wav"
