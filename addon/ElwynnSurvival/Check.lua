@@ -459,8 +459,13 @@ function ES.CheckResultLine(f)
     end
     return
   end
-  check.last = { key = key, grade = grade, at = GetTime(), school = "arcane" }
-  Outcome(grade, "arcane")
+  -- No ring up: shown in its own school (the server's third field; arcane from an older one), or
+  -- not on the reticle at all when it's shown on the bodies (`world`: Penance's rings).
+  local school = f[4]
+  if school == "world" then return end
+  if not SCHOOL[school or ""] then school = "arcane" end
+  check.last = { key = key, grade = grade, at = GetTime(), school = school }
+  Outcome(grade, school)
 end
 
 -- --- the press, as this side sees it ---------------------------------------------------------------

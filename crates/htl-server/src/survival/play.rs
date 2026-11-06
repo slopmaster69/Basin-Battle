@@ -501,8 +501,13 @@ impl SurvivalGame {
             }
             Event::CheckResult { player, ability, grade } => {
                 if let Some(c) = self.conn_of(player) {
-                    let key = self.sim.content.abilities[ability].key.clone();
-                    self.ui_line(c, &format!("CR\t{key}\t{grade}"));
+                    let d = &self.sim.content.abilities[ability];
+                    let key = d.key.clone();
+                    // Its school, for an outcome with no ring up to show it on (it showed as the
+                    // Mage's arcane burst after Penance: Corey); `world`, an outcome shown on the
+                    // bodies it's about, nothing on the reticle (Penance's rings).
+                    let school = if d.kind == "penance" { "world" } else { check_school(d) };
+                    self.ui_line(c, &format!("CR\t{key}\t{grade}\t{school}"));
                 }
             }
             Event::Speed { player, speed, back } => {

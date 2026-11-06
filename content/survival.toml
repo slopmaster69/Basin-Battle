@@ -586,10 +586,11 @@ subclass = 18
 # night, with no spell effect in the data that fixed it (Corey's review; 14 missiles were tried
 # for Bank Shot alone). Keyed by the spell: every ability flying it looks so.
 
-# Shadow Word: Death's lance: Twisted Reflection's dark bolt (its own spell, so no other ability's
-# missile changes), bigger, with a violet streak behind it, at the lance's own 40 yd a second.
+# Shadow Word: Death's lance: the death-bolt (a Shadow Bolt no one else here flies, so no other
+# ability's missile changes; Twisted Reflection's burned fel green), bigger, with a violet streak
+# behind it, at the lance's own 40 yd a second.
 [[missile_look]]
-spell = 21064
+spell = 29317
 trail = "8A4CFF"
 width = 0.3
 secs = 0.35
@@ -6292,13 +6293,13 @@ damage = [18.0, 18.0]
 range = [30.0, 30.0]
 radius = [0.5, 0.5]
 # Slow enough to follow, with a violet streak behind it (Corey couldn't tell it was a shot at
-# all at 80 yd a second, a tenth of a second at 8 yd): `[[missile_look]]` 21064.
+# all at 80 yd a second, a tenth of a second at 8 yd): `[[missile_look]]` 29317.
 speed = 40.0
 low_health = 0.2
 low_mult = 2.5
 backlash = 12.0
 kill_recast = 3.0
-spell = 21064
+spell = 29317
 impact_kit = 219
 clip = 54
 

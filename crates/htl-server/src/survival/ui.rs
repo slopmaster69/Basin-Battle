@@ -155,7 +155,9 @@
 //!   from one spot to another over `secs` (Frozen Orb), its model and size, for a client that draws
 //!   it (`PlayGroundOrb`); `OX\t<key>`: it stopped or was spent.
 //! - `CR\t<ability key>\t<grade>`: its outcome: perfect, good, early, late, full (a whole rhythm), fail, fizzle,
-//!   or `cancel` (its cast called off or cut short: the ring goes quietly).
+//!   or `cancel` (its cast called off or cut short: the ring goes quietly); then its school (fire,
+//!   frost, arcane, holy, shadow) for an outcome with no ring up, or `world` for one shown on the
+//!   bodies it's about (Penance's rings), drawn on nothing.
 //! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
 //!   on their own screen; its burst and Valor come as ever).
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
