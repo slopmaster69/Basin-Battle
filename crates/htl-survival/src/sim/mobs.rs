@@ -2123,7 +2123,9 @@ impl Survival {
         let breaks = self.content.ai.guard_break.max(0.0);
         // (A boss: a pack's creatures pick as they always have.)
         let again = if d.boss { self.content.ai.repeat.max(0.0) } else { 1.0 };
-        let (last, planned) = (m.last_pattern, m.space.map(|(_, k)| k));
+        // (A plan to back off and use one from afar keeps only until its wait is out.)
+        let now = self.clock;
+        let (last, planned) = (m.last_pattern, m.space.filter(|(until, _)| now < *until).map(|(_, k)| k));
         let fits: Vec<(usize, f32)> = d
             .patterns
             .iter()
