@@ -530,6 +530,11 @@ impl SurvivalGame {
                     lab.aim_ally = true;
                     lab.trace.push(format!("{:+.3} STEP aimally", now - start));
                 }
+                // The camera turns to the friend too, so the reticle the film shows is on them (it
+                // stayed on the scene's creature, the reticle on the grass beside the friend).
+                if let Some(g) = self.lab_allies.first().copied().and_then(|a| self.guid_of(a)) {
+                    self.ui_line(conn, &format!("LO\t{g:#X}"));
+                }
                 continue;
             }
             if let Some(how) = step.strip_prefix("beats") {
