@@ -642,6 +642,23 @@ fn shadowguard_let_go_just_after_a_blow_is_half_again_as_hard_45_at_most_the_per
 }
 
 #[test]
+fn a_heavy_blow_on_shadowguard_neither_fells_nor_staggers_her_so_the_key_again_throws_it_back() {
+    // The second film: a Bloodhoof Brave's heavy blow knocked the shelled Priest down, and the
+    // key again went nowhere until the shell ran out.
+    let mut s = world();
+    let (p, t, k, pins) = guard_set_up(&mut s);
+    let ht = hp(&s, t);
+    press(&mut s, p, "defense", false);
+    s.strike_player(k, p, 52, [0.0, 2.0, 0.0], true, true, true, Blow::Light);
+    run_pinned(&mut s, 0.1, &pins);
+    assert!(shelled(&s, p), "still in the shell, not on the ground: {:?}", s.players[&p].action);
+    let mut ev = press(&mut s, p, "defense", false);
+    ev.extend(run_pinned(&mut s, 0.6, &pins));
+    assert_eq!(ht - hp(&s, t), 39, "26 stored x 1.5");
+    assert_eq!(perfects(&ev, p), vec![idx(&s, "shadowguard")], "the perfect");
+}
+
+#[test]
 fn shadowguard_judges_the_let_go_on_the_priests_own_screen() {
     let mut s = world();
     let (p, t, k, pins) = guard_set_up(&mut s);
