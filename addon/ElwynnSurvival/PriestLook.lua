@@ -249,7 +249,7 @@ local function StepBodies(now)
           SetUnitSprite(sk, u.unit, ART .. u.tex, size, u.height, 1, 1, 1, alpha, now * 0.9, 1)
           -- And the count, plain from any side: five segments under the foe, one lit a stack.
           if SetGroundRingOnUnit then
-            SetGroundRingOnUnit(sk .. "_n", u.unit, 1.25 * (1 + 0.15 * swell), ART .. "priest_weave_count" .. math.max(1, math.min(5, u.n or 1)), 1, 1, 1, 0.9 * fade, 0)
+            SetGroundRingOnUnit(sk .. "_n", u.unit, 1.75 * (1 + 0.15 * swell), ART .. "priest_weave_count" .. math.max(1, math.min(5, u.n or 1)), 1, 1, 1, 0.9 * fade, 0)
           end
         elseif u.kind == "sear" then
           size = 0.7 * (1 + 0.08 * math.sin(now * 7)) * (1 + 0.4 * swell)
@@ -266,7 +266,8 @@ local function StepBodies(now)
       elseif u.kind == "pop" then
         SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (0.5 + 0.8 * q), u.height, 0.85, 0.6, 1, 1 - q, now * 3, 1)
       elseif u.kind == "shield" then
-        SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (0.8 + 0.6 * q), u.height, 1, 1, 1, 1 - q * q, 0, 1)
+        -- Cooled toward white: the art's gold read as a Paladin's on the grass (Corey).
+        SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (0.8 + 0.6 * q), u.height, 0.8, 0.9, 1, 1 - q * q, 0, 1)
       else
         SetUnitSprite(sk, u.unit, ART .. u.tex, u.size * (1 + 0.2 * q), u.height, 1, 1, 1, 0.9 * (1 - q), 0, 1)
       end
