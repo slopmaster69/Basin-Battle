@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 53
+local VERSION = 54
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -7055,7 +7055,10 @@ events:SetScript("OnEvent", function()
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
     -- ac26: the point the reticle is on (GetReticlePoint), and whether cover is in the way.
     -- ac27: the shoulders turned to the aim (SetAimTurn) while the bow is drawn.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
+    -- ac28: a heal on a friend floats green over their head (the server sends the heal log).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 28 then
+      Say(".es hello " .. VERSION .. " ac28")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
       Say(".es hello " .. VERSION .. " ac27")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and (tonumber(HasActionCombat()) or 0) >= 26 then
       Say(".es hello " .. VERSION .. " ac26")

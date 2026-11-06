@@ -1,0 +1,175 @@
+From c7ecc08db9623c19dd76feee9f563c5ae453bbb5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 10:22:52 -0600
+Subject: [PATCH] A heal on a friend floats green over their head
+
+SMSG_SPELLHEALLOG from me or my pet onto someone else spawns a green number over them (a crit pops), as later WoW does; 1.12 floats no heal. HasActionCombat() is 28 so the server sends the log only to this client.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/combat_log/mod.rs  |  3 +-
+ crates/benilla-app/src/combat_log/text.rs | 92 ++++++++++++++++++++++-
+ crates/benilla-ui/src/action_combat.rs    |  6 +-
+ 3 files changed, 97 insertions(+), 4 deletions(-)
+
+diff --git a/crates/benilla-app/src/combat_log/mod.rs b/crates/benilla-app/src/combat_log/mod.rs
+index d8c5de8f..5b0023eb 100644
+--- a/crates/benilla-app/src/combat_log/mod.rs
++++ b/crates/benilla-app/src/combat_log/mod.rs
+@@ -193,10 +193,11 @@ fn on_periodic_aura_log(In(ev): In<SessionEvent>, c: Ctx, mut l: Sinks) {
+     }
+ }
+ 
+-fn on_spell_heal_log(In(ev): In<SessionEvent>, c: Ctx, l: Sinks) {
++fn on_spell_heal_log(In(ev): In<SessionEvent>, c: Ctx, mut l: Sinks) {
+     if let SessionEvent::SpellHealLog(s) = ev {
+         let ctx = c.ctx();
+         chat::spell_heal_log(s, &ctx, &l.stores, &l.poses, &l.log);
++        text::spell_heal_log(s, &c.index, &c.self_guid, &l.stores, &mut l.text);
+     }
+ }
+ 
+diff --git a/crates/benilla-app/src/combat_log/text.rs b/crates/benilla-app/src/combat_log/text.rs
+index 37cadd0c..c5821e9f 100644
+--- a/crates/benilla-app/src/combat_log/text.rs
++++ b/crates/benilla-app/src/combat_log/text.rs
+@@ -8,8 +8,8 @@
+ use bevy::prelude::*;
+ 
+ use benilla_protocol::messages::{
+-    DamageShield, ExplorationXp, PeriodicAuraLog, PeriodicTick, SpellDamageLog, SpellLogMiss,
+-    XpGain,
++    DamageShield, ExplorationXp, PeriodicAuraLog, PeriodicTick, SpellDamageLog, SpellHealLog,
++    SpellLogMiss, XpGain,
+ };
+ 
+ use crate::combat_text::{
+@@ -197,6 +197,34 @@ pub(super) fn damage_shield(
+     }
+ }
+ 
++/// Basin Battle's heal green, the add-on's own (0.4, 1, 0.45): the number over a friend you mend
++/// matches the one over your own health bar.
++pub(crate) const COLOR_HEAL_GREEN: u32 = 0xFF66_FF73;
++
++/// `SMSG_SPELLHEALLOG`, our own leg (1.12 floats no heal anywhere): a heal I or my pet cast on
++/// someone else floats its number in green over them, as later WoW does; a crit pops like a damage
++/// crit. A heal on me floats nothing here (the add-on shows it at the health bar), nor does anyone
++/// else's heal. No spell record is needed: the server sends spell 0 for a mend with no 1.12 spell.
++pub(super) fn spell_heal_log(
++    s: SpellHealLog,
++    index: &GuidIndex,
++    self_guid: &SelfGuid,
++    stores: &Query<&mut ObjectStore>,
++    text: &mut MessageWriter<CombatTextSpawn>,
++) {
++    if s.amount == 0 || classify_source(s.healer, index, self_guid, stores).is_none() {
++        return;
++    }
++    if let Some(anchor) = gated_anchor(s.target, index, self_guid, stores) {
++        text.write(CombatTextSpawn {
++            anchor,
++            text: TextBody::Literal(s.amount.to_string()),
++            category: if s.critical { 2 } else { 0 },
++            color: Some(COLOR_HEAL_GREEN),
++        });
++    }
++}
++
+ /// The colour a spell's miss words take, or `None` where `0x607140` draws nothing: the same
+ /// source class and three CVars as the number emitter, `CombatDamage` (`0x60718f`),
+ /// `PetSpellDamage` (`0x6071a6`) and `PetMeleeDamage` (`0x6071c5`), with the spell's record pushed,
+@@ -496,6 +524,66 @@ mod tests {
+         );
+     }
+ 
++    /// My heal on a friend floats green over them (a crit pops); a heal on me, or someone else's
++    /// heal on the friend, floats nothing.
++    #[test]
++    fn my_heal_on_a_friend_floats_green_over_them() {
++        let mut app = App::new();
++        app.add_message::<CombatTextSpawn>()
++            .init_resource::<GuidIndex>()
++            .init_resource::<SelfGuid>();
++        let self_e = app.world_mut().spawn((Guid(10), SelfPlayer, unit())).id();
++        let friend_e = app.world_mut().spawn((Guid(20), unit())).id();
++        let other_e = app.world_mut().spawn((Guid(30), unit())).id();
++        {
++            let mut index = app.world_mut().resource_mut::<GuidIndex>();
++            index.0.insert(10, self_e);
++            index.0.insert(20, friend_e);
++            index.0.insert(30, other_e);
++        }
++        app.world_mut().resource_mut::<SelfGuid>().0 = Some(10);
++        let heal = |healer, target, amount, critical| SpellHealLog {
++            target,
++            healer,
++            spell_id: 0,
++            amount,
++            critical,
++        };
++        let sent = [
++            heal(10, 20, 18, false), // mine on the friend
++            heal(10, 20, 40, true),  // mine, a crit
++            heal(10, 10, 25, false), // mine on me
++            heal(30, 20, 12, false), // someone else's
++            heal(10, 20, 0, false),  // nothing mended
++        ];
++        app.world_mut()
++            .run_system_once(
++                move |index: Res<GuidIndex>,
++                      self_guid: Res<SelfGuid>,
++                      stores: Query<&mut ObjectStore>,
++                      mut text: MessageWriter<CombatTextSpawn>| {
++                    for s in sent {
++                        spell_heal_log(s, &index, &self_guid, &stores, &mut text);
++                    }
++                },
++            )
++            .unwrap();
++        let spawned: Vec<_> = app
++            .world_mut()
++            .resource_mut::<Messages<CombatTextSpawn>>()
++            .drain()
++            .map(|s| (s.text, s.category, s.color, s.anchor))
++            .collect();
++        assert_eq!(
++            spawned,
++            vec![
++                (TextBody::Literal("18".into()), 0, Some(COLOR_HEAL_GREEN), friend_e),
++                (TextBody::Literal("40".into()), 2, Some(COLOR_HEAL_GREEN), friend_e),
++            ],
++            "only my heals on the friend, green, the crit popping"
++        );
++    }
++
+     const ME: u64 = 10;
+     const MOB: u64 = 20;
+     const FIREBALL: u32 = 133;
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 82086c3b..55ca194b 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -275,6 +275,10 @@
+ //!   nothing for none, at most 1.5. The add-on sets it while a bow is drawn: 1.12's draw stands
+ //!   side-on, and from the camera over the right shoulder the turned back and head hid the view
+ //!   and the bow pointed off the reticle.
++//!
++//! The twenty-eighth (`HasActionCombat() >= 28`): a heal you or your pet cast on someone else
++//! floats its number in green over them (`SMSG_SPELLHEALLOG`; 1.12 floats no heal). Nothing new
++//! to call: the server sends the heal log only to a client this new.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -1207,7 +1211,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(27))?,
++        lua.create_function(|_, _: MultiValue| Ok(28))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+-- 
+2.56.0.windows.4
+
