@@ -149,10 +149,9 @@ pub struct Content {
     /// A fresh hero's ability keys: slot to ability.
     #[serde(default)]
     pub loadout: LoadoutDef,
-    /// Grace, the Light Priest's thread (`[grace]`): raised by the Priest's perfects, spent by
-    /// the holy staff's Heal.
+    /// The Priest's staffs' marks and stacks, and the burst of a Priest's perfect (`[priest]`).
     #[serde(default)]
-    pub grace: GraceDef,
+    pub priest: PriestDef,
     /// The text it was read from, for tuning in play ([`crate::tune`]), and the file, if any.
     #[serde(skip)]
     pub source: String,
@@ -533,42 +532,6 @@ pub struct ChecksDef {
 impl Default for ChecksDef {
     fn default() -> Self {
         Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0, flare_from: 0.72, flare_late: 0.35, crit_share: 0.3, fizzle_kit: 0 }
-    }
-}
-
-/// Grace (the Priest design, claude/priest-kit-draft.md): a hero's level, 0 to `most`. Every
-/// perfect of a Priest's spell (its card's column `priest`) raises it one; it fades `secs` after
-/// the last rise, and a blow that hurts the hero costs a level. The next Heal that spends it
-/// (`spends_grace`) is cast `haste` faster for the level it had (1: instant), and healing past
-/// full health stays on as a shield `overheal` times the excess, for `overheal_secs`. Each level
-/// shows on the hero as one more of `auras` (a spell's state look), no words; a Heal at the top
-/// level lands with `top_spell` on whoever it heals.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(default)]
-pub struct GraceDef {
-    pub most: u32,
-    pub secs: f32,
-    /// By level, I first.
-    pub haste: Vec<f32>,
-    pub overheal: Vec<f32>,
-    pub overheal_secs: f32,
-    pub auras: Vec<u32>,
-    pub top_spell: u32,
-}
-
-impl Default for GraceDef {
-    fn default() -> Self {
-        Self { most: 3, secs: 10.0, haste: vec![0.3, 0.6, 1.0], overheal: vec![0.0, 1.0, 2.0], overheal_secs: 8.0, auras: vec![139, 6346, 588], top_spell: 24171 }
-    }
-}
-
-impl GraceDef {
-    /// A level's share of something given by level (0 below I).
-    pub fn at(list: &[f32], level: u32) -> f32 {
-        if level == 0 {
-            return 0.0;
-        }
-        list.get(level as usize - 1).or(list.last()).copied().unwrap_or(0.0)
     }
 }
 
@@ -3250,9 +3213,10 @@ impl Content {
             if w.two_handed && self.shield(&w.guard).is_none() {
                 bail!("weapon {}: two-handed, and its guard {:?} isn't a [[shield]]", w.key, w.guard);
             }
-            // (A heavy bolt may be help at the reticle instead: the holy staff's Heal. The right
-            // click's ability is a bolt, or a cord held while the button is.)
-            for (what, key, kinds) in [("bolt", &w.bolt, &["projectile"][..]), ("heavy_bolt", &w.heavy_bolt, &["projectile", "ally"][..]), ("alt", &w.alt, &["projectile", "channel"][..])] {
+            // (The click may be a cord held while the button is: the Hollow Star's Void Tether. A
+            // heavy bolt may be help at the reticle instead. The right click's ability is a bolt, a
+            // cord held while the button is, or a thing it places: the Hollow Star.)
+            for (what, key, kinds) in [("bolt", &w.bolt, &["projectile", "channel"][..]), ("heavy_bolt", &w.heavy_bolt, &["projectile", "ally"][..]), ("alt", &w.alt, &["projectile", "channel", "place"][..])] {
                 if key.is_empty() {
                     continue;
                 }
@@ -3557,8 +3521,8 @@ impl Content {
             }
             // (A banner's recast moves the banner its first cast planted: it needs none of its own.)
             let banner = a.banner.is_some() || (a.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == a.key));
-            if a.kind == "place" && a.totem.is_some() == banner {
-                bail!("{what}: a placed ability needs a [ability.totem] or a `banner` (one of them)");
+            if a.kind == "place" && a.hollow.is_none() && a.totem.is_some() == banner {
+                bail!("{what}: a placed ability needs a [ability.totem], a `banner` or a `hollow` (one of them)");
             }
             if a.banner.is_some() && (a.kind != "place" || a.object == 0 || a.secs <= 0.0) {
                 bail!("{what}: a banner is placed (`kind = \"place\"`), with its look (`object`) and how long it stands (`secs`)");
@@ -3686,8 +3650,33 @@ impl Content {
             if a.friends_only && (a.kind != "projectile" || a.ally_heal <= 0.0) {
                 bail!("{what}: only a healing projectile passes foes by (`friends_only` needs `ally_heal`)");
             }
-            if a.spends_grace && a.kind != "ally" {
-                bail!("{what}: only help on a friend (`ally`) spends Grace");
+            if a.penance.is_some() != (a.kind == "penance") {
+                bail!("{what}: a `penance` kind and its `penance` table go together");
+            }
+            if a.feather.is_some() != (a.kind == "feather") {
+                bail!("{what}: a `feather` kind and its `feather` table go together");
+            }
+            if a.shell.is_some() != (a.kind == "shell") {
+                bail!("{what}: a `shell` kind and its `shell` table go together");
+            }
+            if let Some(sd) = &a.shell {
+                if self.ability(&sd.shard).is_none_or(|x| self.abilities[x].kind != "projectile") {
+                    bail!("{what}: its shell's `shard` must be a projectile");
+                }
+            }
+            if a.rift.is_some() && a.kind != "ground" {
+                bail!("{what}: only a ground cast opens a rift (`rift`)");
+            }
+            if let Some(h) = &a.hollow {
+                if a.kind != "place" || a.totem.is_some() || a.banner.is_some() {
+                    bail!("{what}: only a placed thing is a Hollow Star (`hollow`), and it's no totem or banner");
+                }
+                if self.mob(&h.mob).is_none_or(|m| !self.mobs[m].totem) {
+                    bail!("{what}: its Hollow Star's body {} must be a totem [[mob]]", h.mob);
+                }
+            }
+            if a.tether.is_some() && a.kind != "channel" {
+                bail!("{what}: only a channel is a tether (`tether`)");
             }
             if a.parry_for && (a.kind != "ally" || !a.effects.iter().any(|e| e.kind == "shield")) {
                 bail!("{what}: only a shield given to a friend (`ally` with a `shield`) parries for them (`parry_for`)");
@@ -3700,15 +3689,15 @@ impl Content {
                     bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
                 }
             }
-            if a.slip && a.kind != "blink" {
-                bail!("{what}: only a blink slips blows (`slip`)");
+            if a.slip && a.kind != "blink" && !(a.kind == "dash" && a.sidestep) {
+                bail!("{what}: only a blink or a sidestep slips blows (`slip`)");
+            }
+            if a.sidestep && a.kind != "dash" {
+                bail!("{what}: only a dash is a sidestep (`sidestep`)");
             }
             // The Shadow Priest's mechanics.
             if (a.slip_radius > 0.0 || !a.slip_effects.is_empty() || !a.slip_self.is_empty()) && !a.slip {
                 bail!("{what}: `slip_radius`, `slip_effects` and `slip_self` are a slip's (they need `slip`)");
-            }
-            if !a.slip_effects.is_empty() && a.slip_radius <= 0.0 {
-                bail!("{what}: `slip_effects` need the reach they land in (`slip_radius`)");
             }
             if let Some(f) = &a.flay {
                 if a.kind != "channel" || f.taut <= 0.0 || f.taut >= a.range[1] || f.taut_secs <= 0.0 || f.snap <= 0.0 || f.snap_cap <= 0.0 {
@@ -3751,15 +3740,6 @@ impl Content {
                 bail!("{what}: `pulse` and `rewind_health` (0 to 1) are an anchor's (they need `anchor`)");
             }
             // The Light Priest's.
-            if a.flick && !(a.kind == "rhythm" && a.beat_kind == "projectile" && a.free_beats >= a.most_beats && a.most_beats > 0) {
-                bail!("{what}: a flick is a rhythm of bolts that all go by themselves (`beat_kind = \"projectile\"`, `free_beats` = `most_beats`)");
-            }
-            if (a.kindle > 0.0) != (a.kindle_most > 0.0) || (a.kindle > 0.0 && !a.effects.iter().any(|e| e.kind == "burn")) {
-                bail!("{what}: Kindle fans its own burn (`kindle` and `kindle_most`, and a burn among its `effects`)");
-            }
-            if a.covers && !matches!(a.kind.as_str(), "nova" | "projectile") {
-                bail!("{what}: only a nova or a projectile covers a friend (`covers`)");
-            }
             if a.kind == "sigil" && (a.beats.is_empty() || a.beats.iter().any(|b| *b <= 0.0) || a.radius[1] <= 0.0 || a.stack.is_none()) {
                 bail!("{what}: a sigil needs its `beats` (each after the last), its `radius` and its `stack`");
             }

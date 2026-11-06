@@ -241,6 +241,12 @@ const RENAMED: &[(&str, &str)] = &[
     // hero saved with the Barrier on the key has the Shield there, the Barrier its EX. Mind Blast
     // is a card again, Shadow's E: see `RENAMED_ON`)
     ("power_word_barrier", "power_word_shield"),
+    // Draft 3 (docs/priest-draft3.md): Leap of Faith became Angelic Feather, Dispersion
+    // Shadowguard; Holy Fire and Mind Grip (EX versions, never saved) are gone; Mind Flay is
+    // benched and Mind Blast is Shadow's Q, so a Mind Flay on the Q key is Mind Blast now.
+    ("leap_of_faith", "angelic_feather"),
+    ("dispersion", "shadowguard"),
+    ("mind_flay", "mind_blast"),
     // Shaman
     ("lightning_bolt", "lava_burst"),
     // Mage
@@ -258,9 +264,9 @@ pub fn renamed(k: &str) -> &str {
 
 /// Cards whose key is another row's card now: a save with the old card on its old key (`slot`,
 /// old key, new key) has the card that took its place there, owned and on that key. Anywhere else
-/// the key is the new card. (Mind Blast was the Priest's Q card, then Penance's EX; it's Shadow's E
-/// card now.)
-const RENAMED_ON: &[(&str, &str, &str)] = &[("ranged", "mind_blast", "penance")];
+/// the key is the new card. (Mind Blast was Shadow's E card in draft 2; it's Shadow's Q card now,
+/// and Psychic Scream has the E key.)
+const RENAMED_ON: &[(&str, &str, &str)] = &[("close", "mind_blast", "psychic_scream")];
 
 /// A saved card on a key, as it is now.
 fn renamed_on<'a>(slot: &str, k: &'a str) -> &'a str {

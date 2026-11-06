@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 48
+local VERSION = 49
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6629,12 +6629,15 @@ function ES.Line(line)
     if ES.StaffLine then ES.StaffLine(f) end
   elseif verb == "SK" then
     if ES.StacksLine then ES.StacksLine(f) end
+    if ES.PriestStacksLine then ES.PriestStacksLine(f) end
   elseif verb == "SH" then
     if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
   elseif verb == "SV" then
     if ES.SigilLine then ES.SigilLine(f) end
   elseif verb == "PL" then
     if ES.PriestLookLine then ES.PriestLookLine(f) end
+  elseif verb == "PG" then
+    if ES.PriestGroundLine then ES.PriestGroundLine(f) end
   elseif verb == "OB" then
     if ES.OrbLine then ES.OrbLine(f) end
   elseif verb == "OX" then

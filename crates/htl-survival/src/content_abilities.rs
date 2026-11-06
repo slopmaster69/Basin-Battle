@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
+pub use crate::content_priest::*;
+
 /// A hero's five ability keys, each a row of the board: reaching the foe (Q), in the brawl (E),
 /// moving and control (1), staying alive (2), and the ultimate (3).
 pub const SLOTS: [&str; 5] = ["ranged", "close", "utility", "defense", "ultimate"];
@@ -38,7 +40,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 22] = [
+pub const KINDS: [&str; 25] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -96,6 +98,11 @@ pub const KINDS: [&str; 22] = [
     // A great circle of light where the caster stands, seen by everyone: its rim closes on its
     // centre on `beats`, and every hero inside who acts on a beat lands it (the group check).
     "sigil",
+    // The Priest's own (docs/priest-draft3.md): Penance's rings on the bodies in front of the
+    // caster, a feather laid for whoever steps on it, and Shadowguard's shell.
+    "penance",
+    "feather",
+    "shell",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -793,23 +800,6 @@ pub struct AbilityDef {
     /// beat this much.
     #[serde(default)]
     pub mend: f32,
-    /// Penance's flick: a rhythm whose beats all go by themselves (no chain to keep), each a
-    /// bolt along the reticle as it goes; every bolt landing, on at least one friend and at
-    /// least one foe, is a perfect (the last bolt's `burst_spell` where it lands).
-    #[serde(default)]
-    pub flick: bool,
-    /// Kindle: the burn this lays on a foe is fanned by each of the caster's projectiles that
-    /// strikes it after: `kindle` more a second, at most `kindle_most` more, and it starts over.
-    #[serde(default)]
-    pub kindle: f32,
-    #[serde(default)]
-    pub kindle_most: f32,
-    /// A counter for others (Holy Nova, Leap of Faith): a blow landing on a friend it reaches
-    /// within `[checks] window` of it (on the caster's screen), or while the blow waits on that
-    /// friend's round trip, is caught whole (a nova) or misses them (a pull). The first pays the
-    /// caster a counter's Valor and the perfect.
-    #[serde(default)]
-    pub covers: bool,
     /// A sigil (`kind = "sigil"`, the group check): seconds from the cast to its first beat, and
     /// from each beat to the next. Its rim closes on its centre over each. A hero inside its
     /// `radius` who acts within `[checks] window` of a beat (on their own screen) lands it: a
@@ -853,21 +843,72 @@ pub struct AbilityDef {
     pub slip_effects: Vec<AbilityEffect>,
     #[serde(default)]
     pub slip_self: Vec<AbilityEffect>,
-    /// The Priest's core (claude/priest-kit-draft.md).
+    /// The Priest's (docs/priest-draft3.md).
     /// A healing projectile that passes through foes and stops on the first friend it reaches
-    /// (the holy staff's Flash Heal).
+    /// (with `pierce`, on through each friend it meets: Healing Gust).
     #[serde(default)]
     pub friends_only: bool,
-    /// Help on a friend that spends the caster's Grace as it begins (`[grace]`): cast faster, and
-    /// healing past full health stays on as a shield (the holy staff's Heal).
-    #[serde(default)]
-    pub spends_grace: bool,
     /// A shield given to a friend (not the caster) within `[checks] window` before a blow lands
     /// on them (the caster's round trip allowed early), or while that blow waits on the friend's
     /// round trip, parries the blow for them: it fails as a parry of theirs, the striker reeling,
     /// and the caster gets a counter's Valor and the perfect (Power Word: Shield).
     #[serde(default)]
     pub parry_for: bool,
+    /// Penance's rings, Angelic Feather, Shadowguard's shell, Void Rift, the Hollow Star and the
+    /// Void Tether: see each one's own (`content_priest.rs`).
+    #[serde(default)]
+    pub penance: Option<PenanceDef>,
+    #[serde(default)]
+    pub feather: Option<FeatherDef>,
+    #[serde(default)]
+    pub shell: Option<ShellDef>,
+    #[serde(default)]
+    pub rift: Option<RiftDef>,
+    #[serde(default)]
+    pub hollow: Option<HollowDef>,
+    #[serde(default)]
+    pub tether: Option<TetherDef>,
+    /// On a weapon's right click: held, it aims this, and the click casts it (Healing Gust: the
+    /// holy staff's heavy). Let go, the aim ends.
+    #[serde(default)]
+    pub aim_alt: bool,
+    /// A release check held past its window by `overcharge[0]` seconds or more: it goes at
+    /// `overcharge[1]` of full strength (Greater Smite weakens). 0: as charged, as ever.
+    #[serde(default)]
+    pub overcharge: [f32; 2],
+    /// Let go in the air, the caster is thrown back this many yards (once a jump).
+    #[serde(default)]
+    pub air_recoil: f32,
+    /// A projectile for friends that met none: its caster healed this share of its heal as it
+    /// fades (Healing Gust with no one in its path).
+    #[serde(default)]
+    pub self_heal: f32,
+    /// This much more damage on a foe under the caster's Shadow Weaving or any shadow burn
+    /// (Mind Blast).
+    #[serde(default)]
+    pub shadowed: f32,
+    /// A ground cast's heart: a foe within `heart[0]` yards of where it lands takes `heart[1]` in
+    /// place of its damage, and the caster gets `heart[2]` Valor and the perfect (Mind Blast).
+    #[serde(default)]
+    pub heart: [f32; 3],
+    /// A kill with it gives one free cast of it within this long (that one gives no other):
+    /// Shadow Word: Death.
+    #[serde(default)]
+    pub kill_recast: f32,
+    /// A nova this much stronger for each other hero inside it, up to `per_hero[1]` (Holy Nova).
+    #[serde(default)]
+    pub per_hero: [f32; 2],
+    /// A sigil whose caster rises this high and hangs there (untouchable, held still, still able
+    /// to act) until it's over: Salvation's wings.
+    #[serde(default)]
+    pub float: f32,
+    /// The look the floating caster wears (a spell's state look: Magic Wings).
+    #[serde(default)]
+    pub float_aura: u32,
+    /// A dash the way the hero is moving (back if they aren't), its body swaying aside as a
+    /// dodge does: Fade's sidestep.
+    #[serde(default)]
+    pub sidestep: bool,
 }
 
 /// A sigil's gift for each beat a hero lands (Holy Light): `might` more damage a stack (as a

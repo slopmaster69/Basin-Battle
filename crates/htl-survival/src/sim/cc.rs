@@ -132,7 +132,7 @@ impl Survival {
         // A boon (Rallying Cry, holy ground's) helps: the rules that soften what harms don't touch it.
         let boon = crate::content::BOONS.contains(&kind);
         // Nothing reaches someone in Ice Block, in Retaliation's answer, or up on Skyfall.
-        if (self.untouchable(target) || self.skyfall_aloft(target)) && !boon {
+        if (self.untouchable(target) || self.skyfall_aloft(target) || self.salvation_aloft(target)) && !boon {
             return false;
         }
         // Freed (Blessing of Freedom): no root, slow or stun takes hold.
@@ -298,8 +298,9 @@ impl Survival {
         let now = self.clock;
         let still = self.held_still(id)
             || self.players.get(&id).is_some_and(|p| p.hold_until > now && p.health > 0)
-            // Skyfall's hang: held up there in the air.
+            // Skyfall's hang, or Salvation's: held up there in the air.
             || self.hanging(id)
+            || self.salvation_held(id)
             || self.players.get(&id).is_some_and(|p| matches!(&p.action, Action::Stance { ability, .. } if self.content.abilities[*ability].counter.as_ref().is_some_and(|c| c.immune)));
         let Some(p) = self.players.get_mut(&id) else { return };
         if p.rooted != still {
@@ -643,8 +644,8 @@ impl Survival {
             if p.ward_up && self.content.ward.aura != 0 {
                 out.push(self.content.ward.aura);
             }
-            // Grace: one more look for each level (the Priest's core).
-            out.extend(self.grace_auras(p));
+            // The Priest's own: an Empowered staff, Salvation's wings.
+            out.extend(self.priest_auras(id));
         }
         // A creature's own look (a spirit beast's glow).
         if let Some(m) = self.mobs.get(&id) {

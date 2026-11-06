@@ -131,15 +131,24 @@
 //!   spot's share of the sweep, `crit` the perfect zone either side, `pattern` "lr|rl|<good zone>");
 //!   otherwise `crit` the critical's share of a
 //!   window; `school` fire, frost or arcane.
-//! - `PL\t<kind>\t<n>\t<guid>\t<a>\t<b>\t<own>`: a Priest look in Corey's art (`Priest.lua`):
-//!   grace (`n` its level; `a` 1: spent by a Heal), shield (a perfect Shield on that unit), flay
-//!   (`n` 1 taut, `a` the cord's share of its range, `b` where taut begins), snap, penance (`n`
-//!   bolts landed, `a` a friend hit, `b` a foe), kindle (`n` stacks on that foe), fade (an
-//!   afterimage on that hero), light (`n` stacks of Holy Light, `a` their seconds). `own` 1 on
-//!   the hero's own client. Shield, kindle and fade go to everyone; the rest to the hero.
+//! - `PL\t<kind>\t<n>\t<guid>\t<a>\t<b>\t<own>`: a Priest look in Corey's art (`PriestLook.lua`):
+//!   shield (a perfect Shield on that unit), flay (`n` 1 taut, `a` the cord's share of its range,
+//!   `b` where taut begins), snap, penance (ring `n` closing on that unit in `a` seconds, `b` 1 a
+//!   friend), penance_hit (ring `n`: `a` 1 landed, `b` 1 dead on), fade (an afterimage on that
+//!   hero), light (`n` stacks of Holy Light, `a` their seconds), shell (`n` stored, `a` its share
+//!   of the most, `b` 1 let go), rift (`n` foes caught, `a` its reach, `b` seconds left), hollow
+//!   (the orb at `n` health, `a` its reach, `b` its most), empower (`n` 1: the shadow staff's next
+//!   bolt is Empowered). `own` 1 on the hero's own client. Shield and fade go to everyone; the
+//!   rest to the hero.
+//! - `PG\t<kind>\t<key>\t<x>\t<y>\t<z>\t<radius>\t<secs>`: a Priest's mark on the ground, for
+//!   everyone: `feather` (Angelic Feather) or `rift` (Void Rift), `radius` yards, for `secs`
+//!   (`radius` 0: it's gone). Drawn on a client with SetGroundRing (`PriestLook.lua`).
 //! - `SV\t<key>\t<x>\t<y>\t<z>\t<radius>\t<beats>`: Holy Word: Salvation laid, for everyone: its
-//!   circle at that spot, `radius` yards, its rim closing on the centre on each beat (`beats` the
-//!   seconds from now, comma-separated). Drawn on a client with SetGroundRing (`Priest.lua`).
+//!   circle at that spot, `radius` yards, a ring running out from the centre to the edge on each
+//!   beat (`beats` the seconds from now, comma-separated). Drawn on a client with SetGroundRing
+//!   (`Priest.lua`). (Up to add-on 48 the ring closed on the centre.)
+//! - `SK\t<kind>\t<n>\t<most>\t<guid>`: a staff's stacks: heat, chill, charge (the Mage's), weave
+//!   (Shadow Weaving on that foe) or sear (Searing Light on it), `n` of `most`.
 //! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
 //!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
 //! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
@@ -457,7 +466,9 @@ pub(crate) const VERSION: u32 = 2;
 /// 48: the right mouse carries the reticle's line (`in g <facing> <elevation>`): a Priest's staff
 /// casts its right click along it (Flash Heal, Drain). An older add-on's press goes along the
 /// hero's facing. (44 to 47 are claimed by #201, #203, #204 and #205.)
-pub(crate) const ADDON_NEWEST: u32 = 48;
+/// 49: the Priest's draft 3 (`PG`, the `PL` kinds penance to empower, `SK` weave and sear, and
+/// Salvation's ring running out to the edge).
+pub(crate) const ADDON_NEWEST: u32 = 49;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
