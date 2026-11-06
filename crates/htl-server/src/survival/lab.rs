@@ -82,6 +82,8 @@ pub(crate) struct Lab {
     /// A clip tried for this run only (`anim <clip>[/<take>[/<Model>]]`): the ability and the
     /// clip, take and model it had.
     pub anim_was: Option<(usize, u16, u32, Option<String>)>,
+    /// Aims go at the first stand-in ally's feet from this step on (`aimally`: Angelic Feather).
+    pub aim_ally: bool,
 }
 
 impl SurvivalGame {
@@ -132,6 +134,7 @@ impl SurvivalGame {
         let mut body: Option<(u8, u8)> = None;
         let mut anim: Option<(u16, u32, Option<String>)> = None;
         let mut allies = 0usize;
+        let mut hurt = false;
         let mut by: Option<(u8, u8)> = None;
         let mut weapon: Option<String> = None;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
@@ -188,6 +191,8 @@ impl SurvivalGame {
                     allies = words.get(k + 1).and_then(|n| n.parse().ok()).unwrap_or(2).min(4);
                     k += 1;
                 }
+                // The hero and the stand-in allies start at 60% of their health (for heals).
+                "hurt" => hurt = true,
                 // A clip to try for this run only: `anim 18/0/TaurenMale` (the clip, its take, the
                 // model whose take every race plays), `anim 18` (the hero's own take 0).
                 "anim" => {
@@ -284,6 +289,13 @@ impl SurvivalGame {
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
         self.lab_set_allies(me, allies);
+        if hurt {
+            for h in std::iter::once(me).chain(self.lab_allies.clone()) {
+                if let Some(p) = self.sim.players.get_mut(&h) {
+                    p.health = (p.max_health as f32 * 0.6).round() as u32;
+                }
+            }
+        }
         let _ = me_conn;
         // The steps, timed from a moment after the burst starts (and after the client has set the
         // hero down, if the stage moved them).
@@ -331,6 +343,7 @@ impl SurvivalGame {
             asked: std::time::SystemTime::now(),
             look_was,
             anim_was,
+            aim_ally: false,
         });
         // Debug's rings and marks would be in every shot: off while the run lasts.
         self.sim.debug = false;
@@ -402,7 +415,7 @@ impl SurvivalGame {
         while lab.steps.front().is_some_and(|(at, _)| *at <= now) {
             due.push(lab.steps.pop_front().unwrap().1);
         }
-        let (me, start, slot, ground) = (lab.hero, lab.start, lab.slot, lab.ground);
+        let (me, start, slot, ground, aim_ally) = (lab.hero, lab.start, lab.slot, lab.ground, lab.aim_ally);
         let target = lab.mobs.get(lab.mobs.len() / 2).copied();
         let nearest = lab.mobs.first().copied();
         for step in due {
@@ -447,6 +460,38 @@ impl SurvivalGame {
                 }
                 continue;
             }
+            // Penance's rings: its key pressed as each closes (`rings`), a little late but in the
+            // window (`rings:good`), or one let pass (`rings:skip2`).
+            if let Some(how) = step.strip_prefix("rings") {
+                let how = how.trim_start_matches(':');
+                let mut queued = String::from("no penance");
+                let rings = self.sim.lab_penance(me);
+                if !rings.is_empty() {
+                    let key = ["q", "e", "1", "2", "3"].get(slot as usize).copied().unwrap_or("q").to_string();
+                    let skip: usize = how.strip_prefix("skip").and_then(|n| n.parse().ok()).unwrap_or(0);
+                    let mut list = Vec::new();
+                    for (k, (at, w)) in rings.iter().enumerate() {
+                        if k + 1 == skip {
+                            continue;
+                        }
+                        let off = if how == "good" { 0.6 * w } else { -0.025 };
+                        self.lab_step_at(at + off, key.clone());
+                        list.push(format!("{:+.2}", at + off - start));
+                    }
+                    queued = format!("presses at {}", list.join(","));
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
+            if step == "aimally" {
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.aim_ally = true;
+                    lab.trace.push(format!("{:+.3} STEP aimally", now - start));
+                }
+                continue;
+            }
             if let Some(how) = step.strip_prefix("beats") {
                 let how = how.trim_start_matches(':');
                 let mut queued = String::from("no rhythm");
@@ -481,8 +526,12 @@ impl SurvivalGame {
                 }
                 continue;
             }
-            // Aimed at the scene's middle body: its chest, or its feet for the ground's.
-            if let Some(t) = target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos) {
+            // Aimed at the scene's middle body: its chest, or its feet for the ground's (or at the
+            // first stand-in ally's feet, after `aimally`).
+            let ally = self.lab_allies.first().and_then(|a| self.sim.players.get(a)).map(|p| p.pos);
+            if let (true, Some(a)) = (aim_ally, ally) {
+                self.sim.lab_aim_at(me, a);
+            } else if let Some(t) = target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos) {
                 self.sim.lab_aim_at(me, if ground { t } else { [t[0], t[1], t[2] + 1.0] });
             }
             let input = match step.as_str() {

@@ -194,6 +194,13 @@ impl Survival {
 
     /// A rhythm under way: when it began, its rolled beats, its free beats and each beat's window,
     /// for the lab to press them.
+    /// Penance under way: when each of its rings closes (the game clock) and its window.
+    pub fn lab_penance(&self, id: Id) -> Vec<(f32, f32)> {
+        let Some(x) = self.light.penances.iter().find(|x| x.owner == id) else { return Vec::new() };
+        let w = self.content.abilities[x.ability].penance.as_ref().map_or(0.15, |p| p.window);
+        x.rings.iter().map(|r| (r.at, w)).collect()
+    }
+
     pub fn lab_rhythm(&self, id: Id) -> Option<(f32, Vec<(f32, bool, f32)>, u32)> {
         let p = self.players.get(&id)?;
         let Action::Rhythm { ability, since, .. } = p.action else { return None };
