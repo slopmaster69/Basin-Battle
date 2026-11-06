@@ -424,6 +424,40 @@ impl SurvivalGame {
                     self.ui_line(c, &line);
                 }
             }
+            Event::SigilLaid { look, at, radius, beats } => {
+                // Salvation for everyone with the add-on: a client with SetGroundRing draws its
+                // circle, the rim closing on each beat and the centre's sigil (`SV`).
+                let beats = beats.iter().map(|b| format!("{b:.2}")).collect::<Vec<_>>().join(",");
+                let line = format!("SV	{look}	{:.2}	{:.2}	{:.2}	{radius:.2}	{beats}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::PriestLook { player, kind, n, on, a, b } => {
+                // A Priest look in Corey's art (`PL`): on the hero's own screen, or (a perfect
+                // Shield, Kindle, Fade's afterimage) for everyone who sees the unit it's on.
+                let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                let mine = self.conn_of(player);
+                let line = |own: u8| format!("PL\t{kind}\t{n}\t{g:#X}\t{a:.2}\t{b:.2}\t{own}");
+                if matches!(kind, "shield" | "fade") {
+                    let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                    for c in conns {
+                        self.ui_line(c, &line(u8::from(Some(c) == mine)));
+                    }
+                } else if let Some(c) = mine {
+                    self.ui_line(c, &line(1));
+                }
+            }
+            Event::PriestGround { kind, key, at, radius, secs } => {
+                // A Priest's mark on the ground for everyone with the add-on (`PG`): a feather to
+                // step on, a rift to keep out of.
+                let line = format!("PG\t{kind}\t{key}\t{:.2}\t{:.2}\t{:.2}\t{radius:.2}\t{secs:.2}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::OrbGone { look } => {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
                 for c in conns {
@@ -431,9 +465,15 @@ impl SurvivalGame {
                 }
             }
             Event::Stacks { player, kind, n, on } => {
-                // A staff's heat, chill or charges, for the caster's reticle mark.
+                // A staff's heat, chill or charges, for the caster's reticle mark (the Priest's
+                // Weaving and Searing Light on the foe).
                 if let Some(c) = self.conn_of(player) {
-                    let most = self.sim.content.staffs.most;
+                    let k = &self.sim.content;
+                    let most = match kind {
+                        "weave" => k.priest.weave_most,
+                        "sear" => 1,
+                        _ => k.staffs.most,
+                    };
                     let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
                     self.ui_line(c, &format!("SK	{kind}	{n}	{most}	{g:#X}"));
                 }
@@ -461,8 +501,13 @@ impl SurvivalGame {
             }
             Event::CheckResult { player, ability, grade } => {
                 if let Some(c) = self.conn_of(player) {
-                    let key = self.sim.content.abilities[ability].key.clone();
-                    self.ui_line(c, &format!("CR\t{key}\t{grade}"));
+                    let d = &self.sim.content.abilities[ability];
+                    let key = d.key.clone();
+                    // Its school, for an outcome with no ring up to show it on (it showed as the
+                    // Mage's arcane burst after Penance: Corey); `world`, an outcome shown on the
+                    // bodies it's about, nothing on the reticle (Penance's rings).
+                    let school = if d.kind == "penance" { "world" } else { check_school(d) };
+                    self.ui_line(c, &format!("CR\t{key}\t{grade}\t{school}"));
                 }
             }
             Event::Speed { player, speed, back } => {
@@ -663,7 +708,13 @@ impl SurvivalGame {
                 let Some(c) = self.conn_of(player) else { return };
                 // A dodge tumbles, on the clients that roll bodies themselves.
                 if roll {
-                    let secs = self.sim.content.dodge.secs;
+                    // A dodge's time; a sidestep riding a dash (Fade) sways only as long as the dash
+                    // runs (Corey: the step kept going in place after the Fade was over).
+                    let dodge = self.sim.content.dodge.secs;
+                    let secs = match self.sim.players.get(&player).map(|p| &p.action) {
+                        Some(htl_survival::Action::Dash { t, secs, .. }) => (secs - t + 0.05).clamp(0.12, dodge),
+                        _ => dodge,
+                    };
                     let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                     for k in conns {
                         self.ui_line(k, &format!("RO\t{g:#X}\t{secs:.2}\t{}\t{style}", u8::from(k == c)));
@@ -772,7 +823,13 @@ impl SurvivalGame {
                 let p = self.mark_create(id, pos, radius);
                 let line = self.mark_line(id, pos, radius);
                 let conns: Vec<(ConnId, Id, u8)> = self.in_world().map(|(c, _, w)| (*c, w.id, if w.addon { w.level } else { 0 })).collect();
+                // Salvation's circle and rim: drawn by the add-on itself from `SV` on a client
+                // with ground rings (ac24, patch 0041); the rest get the circle.
+                let drawn = self.sim.drawn_by_addon(id);
                 for (c, hero, level) in conns {
+                    if drawn && level >= 24 {
+                        continue;
+                    }
                     // A leap's landing isn't drawn for the hero leaping (others still see it).
                     if tele.is_some_and(|t| t.own_hidden && t.mob == hero) {
                         continue;
@@ -933,6 +990,7 @@ impl SurvivalGame {
             Event::Siege { player } => {
                 self.siege_dirty.insert(player);
             }
+            Event::Duel { a, b, news } => self.duel_news(a, b, news),
             Event::CastDone { caster, spell } => {
                 // Its look ends too: the precast (a glow in the hands) stays on a caster standing
                 // still until a GO of that same spell or a failure, and what goes is often
@@ -1151,11 +1209,19 @@ impl SurvivalGame {
     }
 }
 
-/// The school a skill check is drawn in: the ability's own `check_school` when it says, else from
-/// its look (a fire, frost or arcane spell), else arcane (a mage's).
+/// The school a skill check is drawn in: from its look (a fire, frost or arcane spell; a Priest's
+/// holy or shadow one, never the Mage's arcane: Corey saw the arcane ring on Greater Smite), else
+/// arcane (a mage's).
 fn check_school(d: &htl_survival::content::AbilityDef) -> &'static str {
     let k = d.key.as_str();
-    if k.contains("fire") || k.contains("pyro") || k.contains("meteor") || k.contains("ember") || k.contains("flame") {
+    let priest = d.school == "priest" || ["smite", "shadow_burst", "shadow_bolt", "gust", "tether"].iter().any(|w| k.contains(w));
+    if priest {
+        if ["shadow", "mind", "void", "tether", "fade", "death"].iter().any(|w| k.contains(w)) {
+            "shadow"
+        } else {
+            "holy"
+        }
+    } else if k.contains("fire") || k.contains("pyro") || k.contains("meteor") || k.contains("ember") || k.contains("flame") {
         "fire"
     } else if k.contains("frost") || k.contains("cold") || k.contains("ice") || k.contains("rime") || k.contains("orb") && !k.contains("arcane") {
         "frost"

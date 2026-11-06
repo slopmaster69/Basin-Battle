@@ -693,6 +693,7 @@ impl Survival {
             born,
             bounced: 0,
             look: None,
+            empowered: false,
         });
         self.mirror_caught(h, stance, m.owner);
         true

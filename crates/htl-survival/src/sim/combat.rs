@@ -75,6 +75,8 @@ impl Survival {
     /// What a hero pressed or let go.
     pub fn input(&mut self, id: Id, input: Input) {
         let now = self.clock;
+        // Salvation's beats: any action key in a circle on a beat lands it.
+        self.sigil_act(id, input);
         let Some(p) = self.players.get_mut(&id) else { return };
         match input {
             Input::Guard => {
@@ -188,6 +190,32 @@ impl Survival {
                 return true;
             }
         }
+        // A weapon whose right click is an ability (a holy staff's Flash Heal, a shadow staff's
+        // Drain): no guard at all. The right click is that ability; with the button held, a
+        // click is a click (no bash or kick: there's no guard to bash from).
+        if let Some(alt) = self.players.get(&id).and_then(|p| self.alt_of(p)) {
+            match input {
+                Input::Guard => return self.alt_press(id, alt),
+                Input::GuardUp => {
+                    self.alt_release(id, alt);
+                    return true;
+                }
+                Input::Bash => return self.try_act(id, Input::Attack),
+                Input::Kick => return self.try_act(id, Input::Heavy),
+                // The holy staff's heal aimed on the right click: with the button still held, the
+                // next click aims and casts it again (Corey: right click held is the heal's aim).
+                Input::Attack | Input::Heavy if self.content.abilities[alt].aim_alt && self.players.get(&id).is_some_and(|p| p.guard_held && matches!(p.action, Action::Ready | Action::Guard)) => {
+                    // (Its charges spent: the click does nothing.)
+                    if !self.ready(id, alt) {
+                        return true;
+                    }
+                    self.set_action(id, Action::Aim { ability: alt });
+                    self.ability_press(id);
+                    return true;
+                }
+                _ => {}
+            }
+        }
         let Some(p) = self.players.get(&id) else { return true };
         let aiming = matches!(p.action, Action::Aim { .. });
         let charging = matches!(p.action, Action::Charge { .. });
@@ -205,6 +233,12 @@ impl Survival {
             Input::Attack | Input::Heavy if charging => true,
             Input::AttackUp if charging => {
                 self.ability_release(id);
+                true
+            }
+            // The Void Tether held from the click: let go, it ends.
+            Input::AttackUp if matches!(p.action, Action::Channel { ability, .. } if self.content.abilities[ability].tether.is_some()) => {
+                self.end_ability_action(id);
+                self.set_action(id, Action::Ready);
                 true
             }
             Input::Attack | Input::Heavy => {
@@ -735,7 +769,7 @@ impl Survival {
                 consider(*mid, m.pos, lean(*mid, false, m.state.foe().is_some()));
             }
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             for (hid, h) in &self.players {
                 if *hid != id && h.health > 0 && self.hostile(id, *hid) {
                     consider(*hid, h.pos, lean(*hid, true, true));
@@ -837,7 +871,7 @@ impl Survival {
         for (mid, m) in self.mobs.iter().filter(|(_, m)| m.health > 0) {
             consider(where_(*mid, m.pos), 0.5 * self.content.mobs[m.def].scale);
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             for (hid, h) in &self.players {
                 if *hid != id && h.health > 0 && self.hostile(id, *hid) {
                     consider(where_(*hid, h.pos), HERO_SIZE);
@@ -1305,7 +1339,8 @@ impl Survival {
         }
         let Some(p) = self.players.get(&id) else { return };
         // The held guard comes back up, unless it's a ward still broken.
-        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) { Action::Guard } else { Action::Ready };
+        // (A weapon whose right click is an ability has no guard to come back up.)
+        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) && !self.weapon_of(p).has_alt() { Action::Guard } else { Action::Ready };
         let buffered = p.buffered;
         // A dodge with an attack pressed in it: the attack out of it, now, or as the hero lands.
         if matches!(p.action, Action::Dodge { .. }) && p.dodge_attack {
@@ -1374,8 +1409,8 @@ impl Survival {
             }
             hits.push((d, mid));
         }
-        // Other heroes, with friendly fire on.
-        if self.content.pvp.friendly_fire {
+        // Other heroes it can strike: with friendly fire on, or a duel's foe.
+        if self.heroes_clash() {
             for (&hid, h) in &self.players {
                 if hid == id || h.health == 0 || struck.contains(&hid) || !self.hostile(id, hid) {
                     continue;
@@ -1752,15 +1787,16 @@ impl Survival {
         // out before it came, it's slipped where it's swung; see `slip_from`.)
         let grace = v.rtt.min(self.content.combat.max_grace);
         let blinked = s.how != HitKind::Projectile && self.slips.get(&s.victim).is_some_and(|b| b.at >= s.at - grace - 1.0e-4);
+        let vpos = v.pos;
         // Out of it by now: a whiff.
         let inside = match s.area {
             None => true,
             Some(Area::Arc { pos, facing: f, range, arc }) => {
-                let d = dist2d(pos, v.pos);
-                d <= range + 0.4 && (angle_between(f, facing(pos, v.pos)) <= arc / 2.0 || d < 0.8)
+                let d = dist2d(pos, vpos);
+                d <= range + 0.4 && (angle_between(f, facing(pos, vpos)) <= arc / 2.0 || d < 0.8)
             }
-            Some(Area::Circle { at, radius }) => dist2d(v.pos, at) <= radius,
-            Some(Area::Line { pos, facing: f, len, half }) => in_strip(pos, f, len, half + 0.4, v.pos),
+            Some(Area::Circle { at, radius }) => dist2d(vpos, at) <= radius,
+            Some(Area::Line { pos, facing: f, len, half }) => in_strip(pos, f, len, half + 0.4, vpos),
         };
         // A blink that left the blow's area slipped it (its reward); one that stayed inside it
         // (a few yards within a slam, or through the attacker) didn't. A blow on them alone
@@ -1771,6 +1807,10 @@ impl Survival {
         }
         if !inside {
             self.events.push(Event::Swing { attacker: s.attacker, victim: Some(s.victim), damage: 0, outcome: Outcome::Miss, anim: false, style: s.style });
+            return;
+        }
+        // A friend's shield landed on them just in time (Power Word: Shield): parried for them.
+        if self.shield_parries(&s) {
             return;
         }
         // A counter's stance meets it first.
@@ -1930,6 +1970,13 @@ impl Survival {
         // Retaliation's answer going out: the blow finds nothing to take hold of, and the swing
         // carries on (no block clip over it).
         let shrugged = !self.immune(victim) && self.untouchable(victim);
+        // Fade's untouchable moment: a blow it lets pass is slipped (the striker slowed, the Priest
+        // quicker), even before their body has left the blow's reach.
+        let faded = self.slips.get(&victim).is_some_and(|s| !s.paid && self.content.abilities[s.ability].sidestep && now - s.at <= self.content.abilities[s.ability].secs + p.rtt.min(c.combat.max_rewind) + 1.0e-3);
+        if faded && (dashing || self.untouchable(victim)) {
+            self.slipped(victim, attacker, style);
+            return Outcome::Dodged;
+        }
         let outcome = match &p.action {
             _ if self.untouchable(victim) => Outcome::Blocked,
             _ if dashing => Outcome::Dodged,
@@ -2035,7 +2082,8 @@ impl Survival {
             Blow::Dot => 0.0,
         };
         // A heavy creature's blow that lands puts a hero on the ground.
-        let felled = outcome == Outcome::Hit && heavy && self.mobs.contains_key(&attacker) && landed < p_health(self, victim);
+        // (Not a hero nothing staggers: steadfast under a Barrier, in Shadowguard's shell.)
+        let felled = outcome == Outcome::Hit && heavy && self.mobs.contains_key(&attacker) && landed < p_health(self, victim) && !self.unstaggerable(victim);
         match outcome {
             Outcome::Hit if felled => {
                 let secs = c.combat.knockdown;
@@ -2090,7 +2138,12 @@ impl Survival {
         if landed > 0 {
             let caught = recap::caught_word(&doing, outcome, blockable);
             self.set_cause(victim, recap::Cause::blow(attacker, recap::blow_word(style, heavy), caught));
+            let before = p_health(self, victim);
             self.hurt_player(victim, landed);
+            // Shadowguard: what the shell stopped of it, stored.
+            if p_health(self, victim) <= before {
+                self.shell_store(victim, attacker, landed);
+            }
         }
         outcome
     }
@@ -2269,6 +2322,8 @@ impl Survival {
         let damage = self.cc_on_damage(id, damage);
         // Cheating death: a blow that would fell them leaves them at 1 health (the boon spent).
         let damage = self.cheat_death(id, damage);
+        // A duel's last blow leaves them standing, the duel lost.
+        let damage = self.duel_knockout(id, damage);
         let now = self.clock;
         let Some(p) = self.players.get_mut(&id) else { return };
         let before = p.health;
@@ -2541,13 +2596,13 @@ impl Survival {
         if d.unblockable {
             self.events.push(Event::Glow { id, secs: windup });
         }
-        if d.unblockable && self.content.pvp.friendly_fire {
+        if d.unblockable && self.heroes_clash() {
             let p = &self.players[&id];
             let (pos, f) = (p.pos, p.facing);
             let near: Vec<Id> = self
                 .players
                 .iter()
-                .filter(|(h, v)| **h != id && v.health > 0 && dist2d(v.pos, pos) <= range + 3.0 && angle_between(f, facing(pos, v.pos)) <= arc / 2.0 + 30.0)
+                .filter(|(h, v)| **h != id && v.health > 0 && self.hostile(id, **h) && dist2d(v.pos, pos) <= range + 3.0 && angle_between(f, facing(pos, v.pos)) <= arc / 2.0 + 30.0)
                 .map(|(h, _)| *h)
                 .collect();
             for h in near {
@@ -2622,7 +2677,7 @@ impl Survival {
             }
             hits.push((dd, mid, at, m.facing));
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             for (&hid, h) in &self.players {
                 if hid == id || h.health == 0 || struck.contains(&hid) || !self.hostile(id, hid) {
                     continue;
@@ -2698,9 +2753,10 @@ impl Survival {
     }
 
     /// Nothing staggers them now: steadfast (Sanctuary, Berserker Rage) or rallied (Rallying Cry)
-    /// on them, or in the wind-up of an art that won't be stopped.
+    /// on them, in Shadowguard's shell (it takes the blow, to throw it back), or in the wind-up
+    /// of an art that won't be stopped.
     pub(crate) fn unstaggerable(&self, id: Id) -> bool {
-        if self.has_cc(id, "rallied") || self.has_cc(id, "steadfast") || self.untouchable(id) {
+        if self.has_cc(id, "rallied") || self.has_cc(id, "steadfast") || self.untouchable(id) || self.shell_cut(id) > 0.0 {
             return true;
         }
         matches!(self.players.get(&id).map(|p| &p.action), Some(Action::Swing { t, strike, .. })
@@ -2719,6 +2775,11 @@ impl Survival {
                 _ => {}
             }
         }
+        // A stance that cuts what reaches them (a counter's `cut`, Shadowguard's shell).
+        if let Some(c) = self.stances.get(&id).filter(|s| s.until > now).and_then(|s| self.content.abilities[s.ability].counter.as_ref()) {
+            k *= (1.0 - c.cut).max(0.0);
+        }
+        k *= (1.0 - self.shell_cut(id)).max(0.0);
         k
     }
 
