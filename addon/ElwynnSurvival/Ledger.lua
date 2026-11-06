@@ -934,6 +934,9 @@ local function SkinHud()
     vit.ledger = true
     InkBar(vit.health, HEALTH, { 0.95, 0.8, 0.5 })
     InkBar(vit.stamina, STAMINA, { 0.85, 0.9, 0.62 }, true)
+    -- The health's overhealth and shield in the same brush.
+    if vit.health.over then vit.health.over:SetTexture(A .. "bar_brush_fill") end
+    if vit.health.shield then vit.health.shield:SetTexture(A .. "bar_brush_fill") end
     Refont(vit.healthText)
     vit.healthText:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
     Cream(vit.state, TITLE, 15)
