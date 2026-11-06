@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>] [ccaura <kind>/<spell>] [perfectkit <kit>] [hud] [fx <kind>/<amount>/<secs>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>] [ccaura <kind>/<spell>] [perfectkit <kit>] [hud] [barlook <look>] [fx <kind>/<amount>/<secs>]`
 //!
 //! - `by tauren-f` has a stand-in hero of that race cast it, the hero (and camera) at its side.
 //! - `anim` tries another clip on the ability for that run only (its take, and the model every race
@@ -138,6 +138,7 @@ impl SurvivalGame {
         let mut allies = 0usize;
         let mut hurt = false;
         let mut hud = false;
+        let mut bar_look = String::new();
         let mut fx: Vec<(String, f32, f32)> = Vec::new();
         let mut by: Option<(u8, u8)> = None;
         let mut weapon: Option<String> = None;
@@ -179,6 +180,13 @@ impl SurvivalGame {
                 }
                 // The hero's own bars kept in the film (the interface is hidden otherwise).
                 "hud" => hud = true,
+                // The hero's bars' frame in another look, kept in the film: `barlook dark` (the
+                // add-on's Ledger.lua says which there are).
+                "barlook" => {
+                    hud = true;
+                    bar_look = words.get(k + 1).copied().unwrap_or("").to_lowercase();
+                    k += 1;
+                }
                 // An effect on the hero as the run starts: `fx overhealth/20/8`, `fx shield/30/6`.
                 "fx" => {
                     let spec = words.get(k + 1).copied().unwrap_or("");
@@ -369,7 +377,7 @@ impl SurvivalGame {
             // With video, no stills (the video holds every frame; a night's stills once filled the
             // lab's budget): the shots' count and spacing only time the run, and the add-on keeps
             // the interface hidden for the video's length.
-            burst: Some((now + SETTLE, format!("LB\t{}\t{every}\t{label}\t{cam}\t{:.2}\t{}", if video { 0 } else { shots }, secs + 0.6, if hud { "hud" } else { "" }), secs + 0.6)),
+            burst: Some((now + SETTLE, format!("LB\t{}\t{every}\t{label}\t{cam}\t{:.2}\t{}", if video { 0 } else { shots }, secs + 0.6, if !hud { String::new() } else if bar_look.is_empty() { "hud".to_string() } else { format!("hud:{bar_look}") }), secs + 0.6)),
             mobs,
             trace,
             slot,

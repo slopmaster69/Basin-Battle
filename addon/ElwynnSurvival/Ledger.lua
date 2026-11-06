@@ -903,6 +903,42 @@ local function InkBar(b, color, lagColor, thin)
 end
 L.InkBar = InkBar
 
+-- The lab's `barlook` (the lab branch only): the hero's bars' trough in another look, filmed side
+-- by side. parchment (as above), dark (the same torn rim in a deep brown), thin (the thin rim on
+-- the health too, dark), none (no rim, the dark trough alone).
+local LOOK_DARK = { 0.3, 0.23, 0.17 }
+function L.BarLook(look)
+  local vit = ElwynnSurvivalVitals
+  if not vit then return end
+  local bars = { { vit.health, false }, { vit.stamina, true } }
+  for i = 1, 2 do
+    local b, thinBar = bars[i][1], bars[i][2]
+    local tr = b and b.trough
+    if tr then
+      local thin = thinBar or look == "thin"
+      local capPx = thin and 24 or 32
+      local pad = thin and 3 or 4
+      tr:SetTexture(thin and "bar_frame_thin" or "bar_frame")
+      tr.l:SetTexCoord(0, capPx / 512, 0, 1)
+      tr.m:SetTexCoord(capPx / 512, 1 - capPx / 512, 0, 1)
+      tr.r:SetTexCoord(1 - capPx / 512, 1, 0, 1)
+      tr.l:ClearAllPoints()
+      tr.r:ClearAllPoints()
+      tr.l:SetWidth(thin and 8 or 12)
+      tr.r:SetWidth(thin and 8 or 12)
+      tr.l:SetPoint("TOPLEFT", b, "TOPLEFT", -pad - 2, pad)
+      tr.l:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", -pad - 2, -pad)
+      tr.r:SetPoint("TOPRIGHT", b, "TOPRIGHT", pad + 2, pad)
+      tr.r:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", pad + 2, -pad)
+      local c = (look == "dark" or look == "thin") and LOOK_DARK or { 1, 1, 1 }
+      for k = 1, 3 do
+        tr.pieces[k]:SetVertexColor(c[1], c[2], c[3], 1)
+        if look == "none" then tr.pieces[k]:Hide() else tr.pieces[k]:Show() end
+      end
+    end
+  end
+end
+
 -- A scrap of paper behind a HUD piece.
 local function Scrap(f, file, w, h, ox, oy, layer)
   local t = Tex(f, layer or "BACKGROUND", file)

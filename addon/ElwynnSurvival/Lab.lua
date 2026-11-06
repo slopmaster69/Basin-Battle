@@ -110,7 +110,11 @@ function ES.LabLine(f)
   if secs < lab.left * lab.every then secs = lab.left * lab.every end
   lab.show_at = lab.next + secs + 1.0
   Quiet(true)
-  KeepReticle(true, f[7] == "hud")
+  local hud = f[7] or ""
+  KeepReticle(true, string.sub(hud, 1, 3) == "hud")
+  if string.sub(hud, 1, 4) == "hud:" and ElwynnSurvivalLedger and ElwynnSurvivalLedger.BarLook then
+    ElwynnSurvivalLedger.BarLook(string.sub(hud, 5))
+  end
   if UIParent then UIParent:Hide() end
   frame:Show()
 end
