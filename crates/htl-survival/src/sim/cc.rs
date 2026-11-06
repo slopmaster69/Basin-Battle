@@ -182,7 +182,11 @@ impl Survival {
         let list = self.cc.entry(target).or_default();
         // One of each kind: the longer stands (a stronger snare replaces a weaker).
         if let Some(c) = list.iter_mut().find(|c| c.kind == kind && c.until > now) {
-            c.until = c.until.max(now + secs);
+            // A weaker burn doesn't keep a stronger one going (a staff's light bolts under a
+            // Fireball's burn): it only stretches one as strong or weaker.
+            if !(kind == "burn" && amount + 1.0e-3 < c.amount) {
+                c.until = c.until.max(now + secs);
+            }
             c.amount = c.amount.max(amount);
             c.left = c.left.max(left);
             c.from = from;
@@ -337,6 +341,8 @@ impl Survival {
         }
         for c in list.iter_mut().filter(|c| c.until > now) {
             match c.kind.as_str() {
+                // A staff's freeze holds without soaking: the shards come through and it stays.
+                "petrify" if c.amount < 0.0 => {}
                 "petrify" => {
                     let took = through.min(c.left);
                     c.left -= took;
@@ -638,6 +644,14 @@ impl Survival {
             };
             if a != 0 {
                 out.push(a);
+            }
+            // The ward up: its barrier on them.
+            // Broken: the debuff's look until the bar is whole again.
+            if p.ward_broken && self.content.ward.broken_aura != 0 {
+                out.push(self.content.ward.broken_aura);
+            }
+            if p.ward_up && self.content.ward.aura != 0 {
+                out.push(self.content.ward.aura);
             }
         }
         // A creature's own look (a spirit beast's glow).

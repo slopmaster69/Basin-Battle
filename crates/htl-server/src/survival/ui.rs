@@ -107,6 +107,39 @@
 //! The abilities:
 //! - `AB\t...`: the ability bar, one entry per key (see [`SurvivalGame::bar_line`]).
 //! - `VA\t<valor>\t<most>\t<segment>`; `CC\t<kind~secs left~share>^...`: the effects on the hero.
+//! - `WA\t<ward>\t<most>\t<broken>\t<up>`: the ward bar of a hero whose guard is a ward (a staff's);
+//!   `WA` alone: no ward, the bar hidden. Sent with the HUD and the moment it changes.
+//! - `SF\t<ember|rime|arcane|>`: the casting staff in the hero's hands, for its mark on the
+//!   reticle (`Staff.lua`); empty for none.
+//! - `SK\t<heat|chill|charge>\t<n>\t<most>\t<guid>`: a staff's stacks changed: heat or
+//!   chill on that foe, or the hero's charges (guid 0); `n` the most: it just ignited or froze.
+//!   `SK	empty	0	<most>	0`: a heavy let go with nothing stored (the mark sputters).
+//! - `WB\t<guid>\t<own>\t<up>\t<share>\t<broken>`: a warder's barrier, for everyone who sees them:
+//!   up or not, the bar's share left, broken (drawn round the body with `SetUnitSprite`).
+//! - `WP\t<guid>\t<clip>\t<secs>\t<own>\t<model>`: a pose held on a unit (the ward's arm out, a
+//!   staff heavy's ready stance): the clip held `secs`, renewed while it lasts; `secs` 0 lets it go.
+//!   `model` (if any) is the character model whose take every race plays.
+//! - `SH\t<lo>\t<hi>`: a staff's heavy bolt began its charge (goes from `lo` sec, whole at
+//!   `hi`).
+//! - `CK\t<ability key>\t<kind>\t<school>\t<a>\t<b>\t<crit>\t<pattern>`: a skill check begins
+//!   (`Event::CheckStart`): "release" (`a` the flare's second from the charge's start, `b` the
+//!   window either side, `pattern` the ring's curve), "rhythm" (`a`, `b` the first and last
+//!   pressed beats' windows, `pattern` "free|name|t0,t1,t2r,..."), "sweep" (`a` its seconds, `b`
+//!   its arc in degrees, `crit` how near a mark is perfect, `pattern` "lr|rl|<jet arc>|<marks' bearings>"),
+//!   "orb" (`a` its seconds, `b` its reach in yards, `crit` how near a mark is perfect, `pattern`
+//!   "<backfire yd>|<start yd>|<marks' distances>"), "meter" (`a` its seconds, `b` the sweet
+//!   spot's share of the sweep, `crit` the perfect zone either side, `pattern` "lr|rl|<good zone>");
+//!   otherwise `crit` the critical's share of a
+//!   window; `school` fire, frost or arcane.
+//! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
+//!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
+//! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
+//!   from one spot to another over `secs` (Frozen Orb), its model and size, for a client that draws
+//!   it (`PlayGroundOrb`); `OX\t<key>`: it stopped or was spent.
+//! - `CR\t<ability key>\t<grade>`: its outcome: perfect, good, early, late, full (a whole rhythm), fail, fizzle,
+//!   or `cancel` (its cast called off or cut short: the ring goes quietly).
+//! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
+//!   on their own screen; its burst and Valor come as ever).
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
 //!   beta page's cards, each with its page (see [`SurvivalGame::tree_line`]).
 //! - `MK\t<id>\t<x>\t<y>\t<z>\t<radius>\t<secs>\t<friendly>`: ground marked (holy ground is a
@@ -115,7 +148,8 @@
 //! - `GP\t<catch 1|0>\t<x>\t<y>\t<z>\t<yards>\t<ground z>\t<ability key>`: while a grappling hook
 //!   is aimed, where its line ends (`yards` along the ground from the hero) and whether it catches there; the
 //!   add-on answers with `.es in al <facing> <elevation>` as the reticle moves. `GP` alone: the
-//!   aim let go.
+//!   aim let go. Any aim line may end with `<x> <y> <z>`, the point the client's reticle is on
+//!   (ac26); the server takes it when it lies on the line and fires from the hands to it.
 //! - `FP\t<guid>\t<secs>\t<clip>\t<take>\t<from>\t<flip 1|0>\t<mine>`: a hero's leap with its own
 //!   look (a Disengage): the clip over the whole body for the flight, from another character
 //!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
@@ -404,11 +438,25 @@ pub(crate) const VERSION: u32 = 2;
 /// server's `ST`, not only a swing.
 /// 41: a fan's reticle shows as many points as it looses (the `AB` entry's and the `RC` line's
 /// count: Fan of Knives three, Multi-Shot five).
+/// 42: the Mage: the ward bar (`WA`, `Ward.lua`), and the skill checks drawn (`CK`, `CR`, `OB`,
+/// `OX`, `MO`, `Check.lua`): rings, beats, the orb and their outcomes; the add-on says `ac24`
+/// (patches 0041 to 0044).
+/// 43: a staff's mark and stacks (`SF`, `SK`, `SH`, `Staff.lua`), and the ward on the reticle (the
+/// `WA` line's fifth field, whether it's up); the add-on says `ac25` (patch 0045).
 /// 45: no strip on the ground under an aimed shot (Aimed Shot, Axe Throw): the reticle says where
 /// it goes. Beams and grappling hooks keep theirs.
 /// 47: over heads, a thin bar over a hurt foe and nothing else (no names, levels, borders or
 /// friends' plates); the bar across the top names the champion and the foe fought.
-pub(crate) const ADDON_NEWEST: u32 = 47;
+/// 48: an aimed charge (Aimed Shot's draw, Axe Throw's wind-up) shows no bar under the hero: the
+/// reticle's ring closes in and turns gold as it builds.
+/// 49: the add-on says `ac26`, sends the point its reticle is on with every aim line, and the
+/// reticle turns red while cover sits between the hero's hands and that point.
+/// 50: the add-on says `ac27` and squares the shoulders to the aim while the bow is drawn
+/// (`SetAimTurn`): 1.12's draw stands side-on.
+/// 51: the shoulders no longer turned while the bow is drawn: the client steers the bow itself.
+/// 52: the Mage (42, 43) and the bow's aim (45 to 51) together: the add-on says `ac27`, `ac26`,
+/// `ac25` or `ac24` by what the client has.
+pub(crate) const ADDON_NEWEST: u32 = 52;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -418,7 +466,16 @@ pub(crate) const ADDON_NEWEST: u32 = 47;
 /// 21: a rope from a unit's hand (0031).
 /// 22: the bowstring on its bow (0032), units that never fade (0033), the aiming camera's tip down (0034), the arrow display (0035) and a missile's tumble (0036).
 /// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
-pub(crate) const CLIENT_NEWEST: u8 = 23;
+/// 24: the Mage's skill checks: rings on the ground (0041), recoloured spell looks (0042), an orb rolled on the ground (0043) and missiles from a held staff's tip (0044).
+/// 25: sprites on units (the ward's barrier) and a clip's last pose held (0045).
+/// 26: the reticle's own point (`GetReticlePoint`: where the camera's centre line first meets
+/// the world, and whether cover sits between the hands and it), and the aim's circle laid on
+/// that line (0046).
+/// 27: our own hero's shoulders turned as the add-on asks, the head turned back (`SetAimTurn`,
+/// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048), the body
+/// facing the aim while an ability is aimed and the upper body holding it as the legs walk
+/// (0049), and our own drawn bow's line steered onto the reticle (0050).
+pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -499,6 +556,11 @@ impl SurvivalGame {
                 (secs - (until - now), secs)
             }
             Action::Dash { t, secs, .. } => (*t, *secs),
+            Action::Sweep { since, until, .. } => (now - since, until - since),
+            Action::Rhythm { since, ability, .. } => {
+                let d = &c.abilities[*ability];
+                (now - since, d.beat_secs * d.most_beats as f32)
+            }
             Action::Eat { t, item } => (*t, c.items[*item].use_secs),
             Action::Gather { t, node, .. } => {
                 let secs = match self.sim.objs.get(node).map(|o| &o.kind) {
@@ -518,7 +580,7 @@ impl SurvivalGame {
         let started = now - elapsed;
         // What's aimed or charged: its key, so the bar and the reticle show it.
         let what = match &p.action {
-            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Channel { ability, .. } | Action::Stance { ability, .. } | Action::Dash { ability, .. } => c.abilities[*ability].key.as_str(),
+            Action::Aim { ability } | Action::Charge { ability, .. } | Action::Cast { ability, .. } | Action::Channel { ability, .. } | Action::Stance { ability, .. } | Action::Dash { ability, .. } | Action::Sweep { ability, .. } | Action::Rhythm { ability, .. } => c.abilities[*ability].key.as_str(),
             // Work: what it makes, builds or mends, by name.
             Action::Work { job, .. } => match job {
                 htl_survival::Job::Craft { recipe, .. } => c.recipes.iter().find(|r| &r.key == recipe).and_then(|r| c.item(&r.output)).map_or("", |i| c.items[i].name.as_str()),
@@ -860,6 +922,8 @@ impl SurvivalGame {
                 if let Some(va) = self.valor_line(id) {
                     self.ui_line_changed(conn, "VA", va);
                 }
+                let wa = self.ward_line(id);
+                self.ui_line_changed(conn, "WA", wa);
                 let cc = self.cc_line(id);
                 self.ui_line_changed(conn, "CC", cc);
                 // What the use key would use, for its prompt (empty: nothing in reach).
@@ -1291,6 +1355,22 @@ impl SurvivalGame {
                 }
                 self.sim.set_local_moves(me, local);
                 self.ui_line(conn, &format!("V\t{VERSION}"));
+                // After `V` (an add-on asleep drops every line before it): who holds a casting
+                // staff now, for this client to launch their bolts from its tip (`MO` otherwise
+                // goes out only as gear changes), and this hero's own staff for its mark.
+                let staffs: Vec<String> = self
+                    .sim
+                    .players
+                    .iter()
+                    .filter(|(_, p)| self.sim.weapon_of(p).casts())
+                    .filter_map(|(id, _)| self.guid_of(*id))
+                    .map(|g| format!("MO\t{g:#X}\tweapon"))
+                    .collect();
+                for line in staffs {
+                    self.ui_line(conn, &line);
+                }
+                let line = self.staff_line(me);
+                self.ui_line(conn, &line);
                 // `ac20` draws a missile's look (patch 0030): every spell's that has one.
                 if level >= super::draw::MISSILE_LOOK_LEVEL {
                     for l in &self.sim.content.missile_looks {
@@ -1347,6 +1427,9 @@ impl SurvivalGame {
                     if let Ok(f) = rest.parse::<f32>() {
                         let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                         self.sim.set_aim_line(me, f, e);
+                        if let Some(at) = aim_point_words(&mut words) {
+                            self.sim.set_aim_point(me, at);
+                        }
                     }
                 }
                 // An attack, its release and an ability key carry the reticle's line (the
@@ -1354,6 +1437,10 @@ impl SurvivalGame {
                 if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
                     let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                     self.sim.set_aim_line(me, f, e);
+                    // And, from a client that reports it (`ac26`), the point its reticle is on.
+                    if let Some(at) = aim_point_words(&mut words) {
+                        self.sim.set_aim_point(me, at);
+                    }
                 }
                 if let Some(i) = input {
                     self.sim.input(me, i);
@@ -2114,6 +2201,31 @@ impl SurvivalGame {
         Some(format!("VA\t{:.0}\t{:.0}\t{:.0}", p.valor.floor(), v.max, v.segment))
     }
 
+    /// The hero's own staff, for its mark on their screen (`SF ember|rime|arcane`, empty for
+    /// none): what its bolts build. Sent as gear changes and on the add-on's hello.
+    pub(crate) fn staff_line(&self, player: Id) -> String {
+        let builds = self.sim.players.get(&player).and_then(|p| {
+            let w = self.sim.weapon_of(p);
+            self.sim.content.ability(&w.bolt).map(|i| self.sim.content.abilities[i].builds.clone())
+        });
+        let school = match builds.as_deref() {
+            Some("heat") => "ember",
+            Some("chill") => "rime",
+            Some("charge") => "arcane",
+            _ => "",
+        };
+        format!("SF\t{school}")
+    }
+
+    /// The ward bar of a hero whose guard is a ward (a staff's): `WA\t<ward>\t<most>\t<broken>\t<up>`;
+    /// `WA` alone for a hero who guards with something else (the bar hidden).
+    pub(crate) fn ward_line(&self, id: Id) -> String {
+        match self.sim.players.get(&id) {
+            Some(p) if self.sim.guard_of(p).ward => format!("WA\t{:.0}\t{:.0}\t{}\t{}", p.ward.floor(), self.sim.content.ward.bar, u8::from(p.ward_broken), u8::from(p.ward_up)),
+            _ => "WA".to_string(),
+        }
+    }
+
     /// The crowd control on the hero: `CC\t<kind~seconds left~share>^...` (the grace as `grace`).
     fn cc_line(&self, id: Id) -> String {
         let now = self.sim.clock;
@@ -2241,5 +2353,28 @@ mod facts_tests {
             let base = (0..c.abilities.len()).find(|b| c.ex_of(*b) == Some(i)).map(|b| &c.abilities[b]);
             println!("{}: {}", a.name, ability_facts(a, base, c.valor.max));
         }
+    }
+}
+
+/// The aim point after a line's facing and elevation (`... <facing> <elevation> <x> <y> <z>`, the
+/// world point the client's reticle is on): all three, or none.
+fn aim_point_words<'a>(words: &mut impl Iterator<Item = &'a str>) -> Option<[f32; 3]> {
+    let x = words.next()?.parse::<f32>().ok()?;
+    let y = words.next()?.parse::<f32>().ok()?;
+    let z = words.next()?.parse::<f32>().ok()?;
+    Some([x, y, z])
+}
+
+#[cfg(test)]
+mod aim_point_tests {
+    use super::aim_point_words;
+
+    #[test]
+    fn an_aim_line_takes_all_three_of_the_points_words_or_none() {
+        let mut w = "1.5 -2.25 30".split_whitespace();
+        assert_eq!(aim_point_words(&mut w), Some([1.5, -2.25, 30.0]));
+        assert_eq!(aim_point_words(&mut "".split_whitespace()), None, "an older client sends none");
+        assert_eq!(aim_point_words(&mut "1 2".split_whitespace()), None);
+        assert_eq!(aim_point_words(&mut "1 x 3".split_whitespace()), None);
     }
 }

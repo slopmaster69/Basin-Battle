@@ -404,6 +404,183 @@ fn an_aimed_shot_from_the_shoulder_camera_flies_along_its_line() {
     assert!(hits_on(&ev, body_line).is_empty());
 }
 
+/// An aimed shot loosed with the client's line and, when given, the point its reticle is on.
+fn loose_at(s: &mut Survival, p: Id, line: (f32, f32), at: Option<Vec3>) -> Vec<Event> {
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    let _ = s.slot_ability(p, "ranged", "aimed_shot");
+    s.input(p, SHOT);
+    s.input(p, Input::Attack);
+    let mut ev = run(s, 0.8);
+    s.set_aim_line(p, line.0, line.1);
+    if let Some(at) = at {
+        s.set_aim_point(p, at);
+    }
+    s.input(p, Input::AttackUp);
+    ev.extend(run(s, 1.2));
+    ev
+}
+
+/// The reticle is the truth: where the client's own camera saw its reticle meet the world is
+/// where the shot goes (from the hands), though the server's pivot would have looked past it.
+#[test]
+fn a_shot_goes_to_the_point_the_clients_reticle_was_on() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    // A grunt off the server's own line (which runs 0.75 yd right of the hero, straight ahead).
+    let g = mob(&mut s, "grunt", [20.0, 1.5, 0.0]);
+    let ev = loose_at(&mut s, p, (0.0, 0.0), None);
+    assert!(hits_on(&ev, g).is_empty(), "the server's own line goes past it");
+    let ev = loose_at(&mut s, p, (0.0, 0.0), Some([20.0, 1.5, 1.0]));
+    assert_eq!(hits_on(&ev, g).len(), 1, "the client's reticle was on it: {ev:?}");
+}
+
+/// A reported point is checked against the line sent with it: far off it, behind the hero or out
+/// of reach, it's dropped and the server's own line is used; and a new line drops the old point.
+#[test]
+fn a_reported_aim_point_off_its_line_behind_or_stale_is_not_taken() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.set_aim_line(p, 0.0, 0.0);
+    s.set_aim_point(p, [20.0, 1.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_some(), "on the line: taken");
+    s.set_aim_line(p, 0.0, 0.0);
+    assert!(s.players[&p].aim_at.is_none(), "a new line without a point: none");
+    s.set_aim_point(p, [0.0, 20.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_none(), "a quarter turn off the line: dropped");
+    s.set_aim_point(p, [-10.0, 0.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_none(), "behind the hero: dropped");
+    s.set_aim_point(p, [400.0, 0.0, 1.5]);
+    assert!(s.players[&p].aim_at.is_none(), "out of reach: dropped");
+    s.set_aim_point(p, [f32::NAN, 0.0, 0.0]);
+    assert!(s.players[&p].aim_at.is_none(), "not a number: dropped");
+}
+/// A near point can't turn the shot sideways, and a point goes only with a line sent with it.
+#[test]
+fn a_near_point_off_to_the_side_or_sent_without_its_line_is_not_taken() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    s.set_aim_line(p, 0.0, 0.0);
+    // 1.2 yd to the side of the line and only 0.3 yd along it: close, but 76 degrees off.
+    s.set_aim_point(p, [0.3, 0.45, 1.9]);
+    assert!(s.players[&p].aim_at.is_none(), "near but sideways: dropped");
+    // A line the server refused leaves the last one standing: a point can't ride on it later.
+    run(&mut s, 0.1);
+    s.set_aim_line(p, f32::NAN, 0.0);
+    s.set_aim_point(p, [20.0, -0.75, 1.9]);
+    assert!(s.players[&p].aim_at.is_none(), "no line just sent: dropped");
+}
+
+/// A point the hero has run past since it was sent isn't aimed at: the shot goes along the line.
+#[test]
+fn a_point_the_hero_ran_past_is_not_aimed_at() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    s.set_aim_line(p, 0.0, 0.0);
+    s.set_aim_point(p, [5.0, -0.75, 1.9]);
+    assert!(s.players[&p].aim_at.is_some());
+    s.players.get_mut(&p).unwrap().pos = [8.0, 0.0, 0.0];
+    let (_, dir) = s.reticle(p);
+    assert!(dir[0] > 0.99, "ahead along the line, not back at the point: {dir:?}");
+}
+
+/// A shape laid from the feet (a cone, a strip, a beam, a dash) goes toward what the reticle is
+/// on, not along the facing beside it: a foe right under the reticle off to the right is in it.
+#[test]
+fn a_cone_from_the_feet_goes_toward_what_the_reticle_is_on() {
+    let mut s = world();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().shoulder_cam = true;
+    let g = mob(&mut s, "grunt", [3.0, -1.5, 0.0]);
+    let foe = s.mobs[&g].pos;
+    s.set_aim_line(p, 0.0, -0.29);
+    s.set_aim_point(p, [3.0, -1.5, 1.0]);
+    assert!(s.players[&p].aim_at.is_some());
+    let yaw = s.aim_yaw(p, 4.0);
+    let want = (foe[1] - ORIGIN[1]).atan2(foe[0] - ORIGIN[0]).rem_euclid(std::f32::consts::TAU);
+    let gap = (yaw - want).rem_euclid(std::f32::consts::TAU);
+    let gap = gap.min(std::f32::consts::TAU - gap);
+    assert!(gap < 0.15, "toward the grunt under the reticle: {yaw} against {want}");
+    // Without a fresh line (a cast going off by itself), the facing as before.
+    run(&mut s, 1.0);
+    assert_eq!(s.aim_yaw(p, 4.0), s.players[&p].facing);
+}
+
+/// A thin wall across x = 10 (to 10.15): a hero pressed to it reaches past it with their hands.
+struct ThinWall;
+impl crate::land::Land for ThinWall {
+    fn height(&self, _x: f32, _y: f32) -> f32 {
+        0.0
+    }
+    fn blocked_near(&self, x: f32, _y: f32, _z: f32) -> bool {
+        (10.0..10.15).contains(&x)
+    }
+    fn blocked(&self, x: f32, _y: f32) -> bool {
+        (10.0..10.15).contains(&x)
+    }
+}
+
+/// A hero pressed to a wall has their hands past it: the shot starts from their chest instead,
+/// and the wall takes it, not the foe on its far side.
+#[test]
+fn a_shot_from_a_hero_pressed_to_a_wall_does_not_start_past_it() {
+    let mut c = Content::dev();
+    c.pvp = Default::default();
+    let mut s = Survival::new(c, Box::new(ThinWall), 1, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    let p = hero(&mut s, "Bren", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().pos = [9.6, 0.0, 0.0];
+    let g = mob(&mut s, "grunt", [12.0, 0.0, 0.0]);
+    let ev = loose_at(&mut s, p, (0.0, 0.0), None);
+    assert!(ev.iter().any(|e| matches!(e, Event::Missile { caster, .. } if *caster == p)), "the arrow is loosed");
+    assert!(hits_on(&ev, g).is_empty(), "the wall takes it");
+}
+
+/// A held charge that goes off by itself (Pyroblast held past its hold) goes along the last line
+/// the client sent while it was held, though that line is more than a moment old by then; a line
+/// from before the charge began is not kept alive for it.
+#[test]
+fn a_held_charge_that_goes_off_by_itself_goes_along_the_line_sent_while_it_was_held() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    // Chaos Bolt (Seed of Corruption's EX): held past its hold it goes off by itself. (Pyroblast,
+    // the Mage's, fizzles instead: its check stakes it all.)
+    let _ = s.slot_ability(p, "ranged", "seed_of_corruption");
+    let key = crate::content::SLOTS.iter().position(|k| *k == "ranged").unwrap() as u8;
+    // Off to the left of the body's facing.
+    let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
+    let toward = std::f32::consts::FRAC_PI_4;
+    s.set_valor(p, 100.0);
+    s.input(p, Input::Ability(key, true));
+    s.input(p, Input::Attack);
+    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "Chaos Bolt held");
+    run(&mut s, 0.5);
+    // Aimed at the grunt once, then held on past its full charge (1 s) and hold (1 s).
+    s.set_aim_line(p, toward, 0.0);
+    let mut ev = run(&mut s, 2.2);
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "chaos_bolt"), "it went off by itself");
+    ev.extend(run(&mut s, 2.0));
+    assert!(!hits_on(&ev, g).is_empty(), "along the line sent while it was held");
+    // A line sent before the charge began: stale when it goes off, the body's facing as ever.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.players.get_mut(&p).unwrap().cd_off = true;
+    let _ = s.slot_ability(p, "ranged", "seed_of_corruption");
+    let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
+    s.set_valor(p, 100.0);
+    s.set_aim_line(p, toward, 0.0);
+    run(&mut s, 0.1);
+    s.input(p, Input::Ability(key, true));
+    s.input(p, Input::Attack);
+    let ev = run(&mut s, 4.7);
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "chaos_bolt"), "it went off by itself");
+    assert!(hits_on(&ev, g).is_empty(), "an old line isn't kept alive for it");
+}
+
 #[test]
 fn a_heavy_attack_is_slower_harder_and_throws_a_hero_back() {
     let mut s = pvp_world();
