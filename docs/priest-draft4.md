@@ -37,6 +37,13 @@ Body and Soul, Power Word: Barrier, Shadowguard, Vampiric Touch, Greater Fade.
   who touches it is healed 15, 3 times in all.
 - **Power Infusion** (EX, 25). The friend under the reticle, or you, for 8 sec: cooldowns run 30%
   faster, and their next ability is its EX for no Valor.
+- **Power Word: Shield** (2 charges, 24 sec each), Corey's call on how it's played: shield ahead,
+  brace on the beat. You Shield a friend ahead of time, aimed at your own pace (absorbs 30 for 6
+  sec): choosing who is the skill. While any friend wears your Shield, every blow winding up on
+  them draws a gold ring closing on that friend in time with the hit; press 2 again as it closes,
+  with no aiming, and the blow is parried for them (the striker reels, the perfect). Missed, the
+  Shield still soaks the blow. (Draft 3's cast-at-the-blow asked for a read, an aim and a timing
+  inside one wind-up.)
 - **Pain Suppression** (EX, 25). The friend under the reticle, or you: 40% less damage and
   nothing staggers them, 4 sec.
 
