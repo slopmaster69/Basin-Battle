@@ -425,7 +425,7 @@ pub(crate) const ADDON_NEWEST: u32 = 48;
 /// 27: our own hero's shoulders turned as the add-on asks, the head turned back (`SetAimTurn`,
 /// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048), the body
 /// facing the aim while an ability is aimed and the upper body holding it as the legs walk
-/// (0049), and its lean with the aim's pitch bowing toward the aim (0050).
+/// (0049), and our own drawn bow's line steered onto the reticle (0050).
 pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
