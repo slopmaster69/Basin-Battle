@@ -53,13 +53,78 @@ fn main() {
         classic::start(&paths, &args);
         return;
     }
-    let game = args.iter().position(|a| a.eq_ignore_ascii_case("-Game")).and_then(|i| args.get(i + 1)).map(|g| g.to_string_lossy().to_string());
+    // A menu Play may not read (macOS keeps an app out of Documents, Desktop and Downloads until
+    // it's allowed): said in a window, not a blank one.
+    if let Err(e) = std::fs::read(paths.ui.join("index.html")) {
+        if e.kind() == std::io::ErrorKind::PermissionDenied {
+            blocked(&paths.root);
+            return;
+        }
+    }
+    #[cfg(target_os = "macos")]
+    refresh_on_a_mac(&paths, &exe);
+    let game =args.iter().position(|a| a.eq_ignore_ascii_case("-Game")).and_then(|i| args.get(i + 1)).map(|g| g.to_string_lossy().to_string());
     let opts = Options { change: flag("-Change"), no_update: flag("-NoUpdate"), game, bench: flag("-Bench") };
     let (log, kind, root) = (paths.log.clone(), paths.kind, paths.root.clone());
     if let Err(e) = run(paths, opts) {
         // No WebView2 on this PC (or it wouldn't start): the plain launcher.
         let _ = std::fs::write(log, format!("Play: the menu couldn't open ({e}), so the plain launcher instead.\r\n"));
         classic::start(&if kind == Kind::Download { Paths::download(root) } else { Paths::checkout(root) }, &args);
+    }
+}
+
+/// The system won't let Play read its own folder: what to do about it, in a dialog.
+fn blocked(root: &Path) {
+    let what = if cfg!(target_os = "macos") {
+        format!(
+            "macOS isn't letting Basin Battle open its folder:\n{}\n\nAllow it in System Settings → Privacy & Security → Files & Folders (or add Basin Battle.app to Full Disk Access), or move the folder out of Documents, Desktop and Downloads. Then open Basin Battle again.",
+            root.display()
+        )
+    } else {
+        format!("Play isn't allowed to open its folder:\n{}\n\nCheck the folder's permissions, then open Play again.", root.display())
+    };
+    rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Warning)
+        .set_title("Basin Battle can't open its folder")
+        .set_description(what)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+}
+
+/// On a Mac, Play is Basin Battle.app's own program, so macOS asks for the folders it needs on
+/// the app's behalf. Before the window it does what the app's script once did: Play rebuilt if
+/// its code changed (scripts/mac-launcher.sh, seconds when nothing did), and started again if it
+/// was; then the dispatches written from this folder's history.
+#[cfg(target_os = "macos")]
+fn refresh_on_a_mac(paths: &Paths, exe: &Path) {
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+    let in_app = exe.ancestors().any(|a| a.extension().is_some_and(|x| x == "app"));
+    if paths.kind != Kind::Checkout || !in_app || std::env::var_os("BB_REFRESHED").is_some() {
+        return;
+    }
+    let root = &paths.root;
+    // Opened from the Finder, an app has the system's PATH only: cargo is where rustup puts it.
+    let mut path = OsString::new();
+    if let Some(home) = dirs::home_dir() {
+        path.push(home.join(".cargo").join("bin"));
+        path.push(":");
+    }
+    path.push(std::env::var_os("PATH").unwrap_or_else(|| "/usr/bin:/bin:/usr/sbin:/sbin".into()));
+    let quiet = |c: &mut Command| {
+        let _ = c.current_dir(root).env("PATH", &path).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+    };
+    let stamp = |p: &Path| std::fs::metadata(p).ok().map(|m| (m.len(), m.modified().ok()));
+    let before = stamp(exe);
+    quiet(Command::new("bash").arg(root.join("scripts").join("mac-launcher.sh")).arg("--quiet"));
+    // python3 comes with Apple's command line tools (without them it would ask to install them).
+    let tools = Command::new("xcode-select").arg("-p").stdout(Stdio::null()).stderr(Stdio::null()).status();
+    if tools.is_ok_and(|s| s.success()) {
+        quiet(Command::new("python3").arg(root.join("scripts").join("launcher-news.py")).arg(paths.ui.join("news.json")));
+    }
+    if stamp(exe) != before {
+        // The new Play, in this process. If it can't start, this one carries on.
+        let _ = Command::new(exe).args(std::env::args_os().skip(1)).env("BB_REFRESHED", "1").exec();
     }
 }
 
