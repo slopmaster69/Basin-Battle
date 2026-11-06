@@ -183,7 +183,7 @@ fn blast_at(s: &mut Survival, p: Id, at: Vec3) -> Vec<Event> {
 }
 
 #[test]
-fn mind_blast_marks_the_ground_and_erupts_09_sec_later_for_26_within_25_yd() {
+fn mind_blast_marks_the_ground_and_erupts_09_sec_later_for_24_within_25_yd() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
     let near = grunt(&mut s, [12.0, 2.0, 0.0], true);
@@ -195,25 +195,52 @@ fn mind_blast_marks_the_ground_and_erupts_09_sec_later_for_26_within_25_yd() {
     ev.extend(run_pinned(&mut s, 0.8, &pins));
     assert_eq!(hp(&s, near), hn, "not before 0.9 sec");
     ev.extend(run_pinned(&mut s, 0.2, &pins));
-    assert_eq!(hn - hp(&s, near), 26, "26 within 2.5 yd");
+    assert_eq!(hn - hp(&s, near), 24, "24 within 2.5 yd");
     assert_eq!(hp(&s, out), ho, "not 3.8 yd out");
     assert!(perfects(&ev, p).is_empty(), "nothing in its heart: no perfect");
     assert_eq!(s.content.abilities[idx(&s, "mind_blast")].cooldown, 8.0);
 }
 
 #[test]
-fn a_foe_in_mind_blasts_heart_is_struck_true_34_and_5_valor() {
+fn a_foe_standing_in_mind_blasts_heart_takes_30_and_no_perfect() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
     let g = grunt(&mut s, [12.0, 0.0, 0.0], true);
     let side = grunt(&mut s, [12.0, 2.0, 0.0], true);
     let pins = [(g, [12.0, 0.0, 0.0]), (side, [12.0, 2.0, 0.0])];
     let (hg, hs) = (hp(&s, g), hp(&s, side));
-    let valor = s.players[&p].valor;
     let mut ev = blast_at(&mut s, p, [12.0, 0.0, 0.0]);
     ev.extend(run_pinned(&mut s, 1.0, &pins));
-    assert_eq!(hg - hp(&s, g), 34, "struck true");
-    assert_eq!(hs - hp(&s, side), 26, "the one beside it, as ever");
+    assert_eq!(hg - hp(&s, g), 30, "the heart, standing still");
+    assert_eq!(hs - hp(&s, side), 24, "the one beside it, at the edge");
+    assert!(perfects(&ev, p).is_empty(), "a foe standing still is no read: no perfect");
+}
+
+/// Runs `secs` with `g` walking a long path but held at `at`: on the move, in the same place.
+fn run_walking(s: &mut Survival, secs: f32, g: Id, at: Vec3) -> Vec<Event> {
+    let mut out = Vec::new();
+    for _ in 0..(secs / DT).round() as usize {
+        if let Some(m) = s.mobs.get_mut(&g) {
+            m.state = MobState::Idle { wander_at: 1e9 };
+            m.pos = at;
+            m.path = vec![[at[0], at[1] + 20.0, at[2]]];
+            m.speed = m.speed.max(3.0);
+        }
+        out.extend(s.step(DT));
+    }
+    out
+}
+
+#[test]
+fn a_foe_on_the_move_in_mind_blasts_heart_is_struck_true_36_and_5_valor() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, EAST);
+    let g = grunt(&mut s, [12.0, 0.0, 0.0], true);
+    let hg = hp(&s, g);
+    let valor = s.players[&p].valor;
+    let mut ev = blast_at(&mut s, p, [12.0, 0.0, 0.0]);
+    ev.extend(run_walking(&mut s, 1.0, g, [12.0, 0.0, 0.0]));
+    assert_eq!(hg - hp(&s, g), 36, "struck true: the read was right");
     assert_eq!(perfects(&ev, p), vec![idx(&s, "mind_blast")], "the perfect, once");
     assert!(s.players[&p].valor >= valor + 5.0, "5 Valor: {} from {valor}", s.players[&p].valor);
     assert!(priest_burst(&s, &ev, p, "mind_blast"), "the Priest's own burst");
@@ -221,7 +248,7 @@ fn a_foe_in_mind_blasts_heart_is_struck_true_34_and_5_valor() {
 }
 
 #[test]
-fn mind_blast_is_30_percent_harder_on_a_woven_or_shadow_burnt_foe() {
+fn mind_blast_is_25_percent_harder_on_a_woven_or_shadow_burnt_foe() {
     // Shadow Weaving from the staff's bolts.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
@@ -240,9 +267,9 @@ fn mind_blast_is_30_percent_harder_on_a_woven_or_shadow_burnt_foe() {
     let (hg, hs) = (hp(&s, g), hp(&s, side));
     blast_at(&mut s, p, [12.0, 0.0, 0.0]);
     run_pinned(&mut s, 1.0, &pins);
-    assert_eq!(hs - hp(&s, side), 34, "26 x 1.3 on the woven one");
-    assert_eq!(hg - hp(&s, g), 34, "the heart, unwoven: 34");
-    // Woven, in its heart: 34 x 1.3, 44.
+    assert_eq!(hs - hp(&s, side), 30, "24 x 1.25 on the woven one");
+    assert_eq!(hg - hp(&s, g), 30, "the heart, unwoven and still: 30");
+    // Woven, in its heart: 30 x 1.25, 38; on the move, 36 x 1.25, 45.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
     let rack = s.objs[&s.rack_id()].pos;
@@ -258,7 +285,16 @@ fn mind_blast_is_30_percent_harder_on_a_woven_or_shadow_burnt_foe() {
     let hg = hp(&s, g);
     blast_at(&mut s, p, [12.0, 0.0, 0.0]);
     run_pinned(&mut s, 1.0, &pins);
-    assert_eq!(hg - hp(&s, g), 44, "34 x 1.3");
+    assert_eq!(hg - hp(&s, g), 38, "30 x 1.25");
+    run_pinned(&mut s, 8.0, &pins);
+    s.set_aim_line(p, EAST, 0.0);
+    s.input(p, Input::Attack);
+    s.input(p, Input::AttackUp);
+    run_pinned(&mut s, 1.0, &pins);
+    let hg = hp(&s, g);
+    blast_at(&mut s, p, [12.0, 0.0, 0.0]);
+    run_walking(&mut s, 1.0, g, [12.0, 0.0, 0.0]);
+    assert_eq!(hg - hp(&s, g), 45, "36 x 1.25: the board's 45 a hit");
     // A Warlock's shadow burning on it.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, EAST);
@@ -269,7 +305,7 @@ fn mind_blast_is_30_percent_harder_on_a_woven_or_shadow_burnt_foe() {
     let hg = hp(&s, g);
     blast_at(&mut s, p, [12.0, 0.0, 0.0]);
     run_pinned(&mut s, 1.0, &pins);
-    assert_eq!(hg - hp(&s, g), 34, "shadowed by a Warlock's burn: 26 x 1.3");
+    assert_eq!(hg - hp(&s, g), 30, "shadowed by a Warlock's burn: 24 x 1.25");
 }
 
 // --- Shadow Word: Death ---------------------------------------------------------------------------
@@ -341,7 +377,8 @@ fn the_free_death_waits_only_3_sec() {
     s.mobs.get_mut(&a).unwrap().health = 40;
     let mb = idx(&s, "mind_blast");
     cast(&mut s, p, "mind_blast", true);
-    run(&mut s, 3.2);
+    // The lance takes 0.3 sec to 12 yd; the 3 sec run from the kill.
+    run(&mut s, 3.5);
     s.set_valor(p, 0.0);
     let _b = grunt(&mut s, [12.0, 0.0, 0.0], true);
     press(&mut s, p, "ranged", false);

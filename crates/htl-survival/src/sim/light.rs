@@ -24,7 +24,7 @@ pub(crate) struct Light {
     pub deaths: std::collections::BTreeMap<Id, bool>,
     /// A Mind Blast landing now: its heart (where, how wide, its damage, the blast's own), and
     /// whether a foe was in it.
-    pub heart: Option<(Vec3, f32, f32, f32)>,
+    pub heart: Option<(Vec3, f32, f32, f32, f32)>,
     pub heart_struck: bool,
     /// A Holy Nova going off now: how much stronger it is for the heroes inside (0: as ever).
     pub boost: f32,

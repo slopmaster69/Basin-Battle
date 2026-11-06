@@ -2888,7 +2888,7 @@ impl Survival {
             self.events.push(Event::Cast { caster: id, spell: d.spell, ms: (d.delay * 1000.0) as u32 });
         }
         let perfect = self.players.get(&id).is_some_and(|p| p.cast_perfect);
-        // Mind Blast's sigil, drawn narrowing to its heart (`PG blast`) on the clients that draw it.
+        // Mind Blast's sigil, its edge and its heart (`PG blast`), on the clients that draw it.
         if d.heart[0] > 0.0 && d.delay > 0.0 {
             let key = self.alloc();
             self.events.push(Event::PriestGround { kind: "blast", key, at, radius, secs: d.delay });
@@ -2927,7 +2927,7 @@ impl Survival {
             let damage = AbilityDef::at(d.damage, g.share) * if g.perfect { self.content.checks.perfect_damage } else { 1.0 };
             // Mind Blast's heart: the foe in it struck true (the perfect, once).
             if d.heart[0] > 0.0 {
-                self.light.heart = Some((g.at, d.heart[0], d.heart[1], damage));
+                self.light.heart = Some((g.at, d.heart[0], d.heart[1], damage, d.heart_moving));
                 self.light.heart_struck = false;
             }
             self.area(g.owner, g.ability, g.at, g.radius, g.share, damage, None);

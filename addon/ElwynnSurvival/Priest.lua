@@ -1,7 +1,9 @@
 -- ElwynnSurvival: the Priest's looks drawn by the add-on (Corey's art, art/check/priest_*).
 --
--- Holy Word: Salvation (`SV key x y z radius beats`): a great circle of consecrated stone on the
--- ground where the Priest stood, for everyone; on each beat a ring of golden light runs out from
+-- Holy Word: Salvation (`SV key x y z radius beats`): a great circle of pale stone on the ground
+-- where the Priest stood, round a floor of light with rays turning out to it (in place of
+-- Consecration's, a Paladin's: Corey), for everyone; in pale light, not orange (Corey: less
+-- orange, more light). On each beat a ring of light runs out from
 -- the centre to the edge, smoothly (the server's stepped friend's ring is left off on a client
 -- that draws this), and flashes as it reaches it: the edge is the line everyone times their blow
 -- to (Corey). The centre's sigil flares as each ring sets out. Drawn with SetGroundRing (patch
@@ -13,6 +15,7 @@ local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
 -- Where each texture's own line sits, as a share of the radius it's drawn at: the ground circle's
 -- stone band near its edge, the rim's thin ring inside its padding.
 local GROUND_LINE = 0.92
+local FLOOR_LINE = 0.92
 local RIM_LINE = 0.69
 local SIGIL_SIZE = 1.6
 -- How long a beat's flash lasts, and the circle's fade after its last beat.
@@ -47,6 +50,7 @@ end
 
 local function Clear(key)
   if ClearGroundRing then
+    ClearGroundRing(key .. "_floor")
     ClearGroundRing(key .. "_ground")
     ClearGroundRing(key .. "_rim")
     ClearGroundRing(key .. "_sigil")
@@ -71,7 +75,8 @@ frame:SetScript("OnUpdate", function()
       local a = math.min(1, (now - s.since) / 0.3)
       if now > last then a = 1 - (now - last) / FADE end
       a = a * (0.85 + 0.1 * math.sin(now * 2.1))
-      Ring(k .. "_ground", s, "priest_salvation_ground", s.r / GROUND_LINE, a, now * 0.08)
+      Ring(k .. "_floor", s, "priest_salvation_floor", s.r / FLOOR_LINE, a * 0.6, -now * 0.05)
+      Ring(k .. "_ground", s, "priest_salvation_ground_light", s.r / GROUND_LINE, a, now * 0.08)
       -- The ring: from the centre out to the edge over each beat's span.
       local from, to = s.since, nil
       for i = 1, n do
@@ -83,7 +88,7 @@ frame:SetScript("OnUpdate", function()
         local q = (now - from) / math.max(0.05, to - from)
         local rr = s.r * q
         if rr > 0.15 then
-          Ring(k .. "_rim", s, "priest_salvation_rim", rr / RIM_LINE, 0.55 + 0.45 * q, now * 0.6)
+          Ring(k .. "_rim", s, "priest_salvation_rim_light", rr / RIM_LINE, 0.55 + 0.45 * q, now * 0.6)
         end
         glow = q * q
       elseif ClearGroundRing then
@@ -93,9 +98,9 @@ frame:SetScript("OnUpdate", function()
       -- ring sets out from it.
       local since = now - from
       local flash = (from > s.since and since < FLASH) and (1 - since / FLASH) or 0
-      Ring(k .. "_sigil", s, "priest_salvation_sigil", SIGIL_SIZE * (1 + 0.5 * flash), math.min(1, a * (0.5 + 0.3 * (1 - glow)) + flash), -now * 0.3)
+      Ring(k .. "_sigil", s, "priest_salvation_sigil_light", SIGIL_SIZE * (1 + 0.5 * flash), math.min(1, a * (0.5 + 0.3 * (1 - glow)) + flash), -now * 0.3)
       if flash > 0 then
-        Ring(k .. "_flash", s, "priest_salvation_rim", (s.r * (1 + 0.12 * (1 - flash))) / RIM_LINE, flash, 0, 1, 0.95, 0.75)
+        Ring(k .. "_flash", s, "priest_salvation_rim_light", (s.r * (1 + 0.12 * (1 - flash))) / RIM_LINE, flash, 0, 1, 1, 0.95)
       elseif ClearGroundRing then
         ClearGroundRing(k .. "_flash")
       end
