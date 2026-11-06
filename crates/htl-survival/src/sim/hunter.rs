@@ -514,7 +514,7 @@ impl Survival {
             .filter(|(m, x)| x.health > 0 && !x.hidden && !self.content.mobs[x.def].totem && !self.own_totem(**m, owner) && dist2d(x.pos, at) <= reach)
             .map(|(m, x)| (*m, x.pos))
             .collect();
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             out.extend(self.players.iter().filter(|(h, p)| **h != owner && p.health > 0 && self.hostile(owner, **h) && dist2d(p.pos, at) <= reach).map(|(h, p)| (*h, p.pos)));
         }
         out

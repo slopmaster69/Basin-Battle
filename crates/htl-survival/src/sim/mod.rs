@@ -19,6 +19,7 @@ mod building;
 pub use building::StationActions;
 mod combat;
 pub mod dungeon;
+pub mod duel;
 mod journal;
 pub mod meter;
 pub mod mobs;
@@ -331,6 +332,8 @@ pub enum Event {
     Arena { player: Id },
     /// How Siege stands changed for a hero in its world (the hall, the match).
     Siege { player: Id },
+    /// A duel between `a` (who challenged) and `b`: what's new in it.
+    Duel { a: Id, b: Id, news: duel::DuelNews },
     /// A line for the server's log only.
     Log(String),
     /// Something worth saving changed.
@@ -926,6 +929,8 @@ pub struct Survival {
     pub(crate) traps: Vec<moves::Trap>,
     /// The Hunter's: planted arrows, tripwires, Call of the Wild's chains and beasts.
     pub hunt: hunter::Hunt,
+    /// Duels asked and under way.
+    pub duels: Vec<duel::Duel>,
     pub(crate) windups: Vec<moves::Windup>,
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Where the blow whose effects are being given came from (a knockback's centre).
@@ -1047,6 +1052,7 @@ impl Survival {
             landings: Vec::new(),
             traps: Vec::new(),
             hunt: hunter::Hunt::default(),
+            duels: Vec::new(),
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             fx_from: None,
@@ -1145,6 +1151,7 @@ impl Survival {
         self.step_holds();
         self.step_dummies();
         self.step_missiles();
+        self.step_duels();
         self.step_pending();
         if online {
             self.step_mobs(dt);
@@ -1320,6 +1327,8 @@ impl Survival {
         let p = self.players.get_mut(&id)?;
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
+        // A duel of theirs given away.
+        self.duel_gone(id);
         self.meters.remove(&id);
         // Creatures fighting them turn on whoever else is in the fight, or go home.
         self.foe_gone(id);
@@ -2008,7 +2017,7 @@ impl Survival {
                 && crate::land::clear_line(self.land.as_ref(), p.pos, at)
         };
         let mobs = self.mobs.values().filter(|m| m.health > 0 && reaches(m.pos, 0.5 * self.content.mobs[m.def].scale)).count();
-        let heroes = if self.content.pvp.friendly_fire {
+        let heroes = if self.heroes_clash() {
             self.players.iter().filter(|(hid, h)| **hid != id && h.health > 0 && self.hostile(id, **hid) && reaches(h.pos, 0.4)).count()
         } else {
             0

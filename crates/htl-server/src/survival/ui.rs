@@ -77,7 +77,7 @@
 //! - `RO\t<guid>\t<secs>\t<mine>`: a hero rolls (a dodge).
 //!
 //! And to the third round (`ac3`), which runs its own dashes and lunges:
-//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<friendly fire>\t<out of a dodge>\t<out of a Corey roll>`:
+//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<strikes heroes: friendly fire, or a duel under way>\t<out of a dodge>\t<out of a Corey roll>`:
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
 //! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
 //!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
@@ -763,7 +763,7 @@ impl SurvivalGame {
             light.join("^"),
             shove(&c.bash),
             shove(&c.kick),
-            u8::from(c.pvp.friendly_fire),
+            u8::from(self.sim.strikes_heroes(id)),
         ))
     }
 
@@ -1450,6 +1450,7 @@ impl SurvivalGame {
                 let mode: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("dummy")).skip(1).collect();
                 self.sim.spawn_dummy(me, &mode.join(" ")).map(|t| self.tell(conn, &format!("{t} stands before you.")))
             }
+            "duel" => self.duel_command(me, &arg),
             "cc" if arg == "log" => {
                 let log = self.sim.cc_log_of(me);
                 if log.is_empty() {
