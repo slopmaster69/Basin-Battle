@@ -1,4 +1,4 @@
-From b33e382a92152026b1de58df2c28f282a48f8a9f Mon Sep 17 00:00:00 2001
+From b3ad37f1cc7f20491b40beec453d0b10ef1136a6 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 07:00:58 -0700
 Subject: [PATCH] Seeing further: the new look's view reaches 1200 yd by
@@ -59,10 +59,10 @@ index efd018f..747ab21 100644
      );
  }
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
-index 0297e5d..ca05c08 100644
+index af7ed84..b6f0259 100644
 --- a/crates/benilla-app/src/cvars/mod.rs
 +++ b/crates/benilla-app/src/cvars/mod.rs
-@@ -2670,6 +2670,7 @@ mod tests {
+@@ -2702,6 +2702,7 @@ mod tests {
              .insert_resource(ViewDistance {
                  farclip: 350.0,
                  nearclip: benilla_world::view::NEARCLIP_DEFAULT,

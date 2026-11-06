@@ -1,4 +1,4 @@
-From 9c113230e158f8153ef942209792d438eb31d4b0 Mon Sep 17 00:00:00 2001
+From 84ed8d9ce02fc3309cbeef76c4c9f0389c2e944b Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 07:29:33 -0700
 Subject: [PATCH] Bloom and a colour grade: the new look's own full-screen pass

@@ -1,4 +1,4 @@
-From 53ffc07b2450f1ea5ee2bab32f8ab80819a5c83f Mon Sep 17 00:00:00 2001
+From 52e0c34dfd3f468ca84aa58831c7542b5e3ddabb Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 07:00:20 -0700
 Subject: [PATCH] Elwynn's own light: the new look re-lights the forest by time
@@ -18,7 +18,7 @@ the border never snaps. Under water and as a ghost the reference's own atmospher
 screen. A new CVar, `worldLook` (default 1), switches all of it: `worldLook 0` is 1.12's look
 exactly, so the two can be compared side by side.
 ---
- crates/benilla-app/src/cvars/mod.rs          |   2 +
+ crates/benilla-app/src/cvars/mod.rs          |  34 ++
  crates/benilla-app/src/cvars/table.rs        |  10 +
  crates/benilla-app/src/video.rs              |  15 +-
  crates/benilla-world/src/lib.rs              |   1 +
@@ -27,15 +27,54 @@ exactly, so the two can be compared side by side.
  crates/benilla-world/src/look/grade.rs       | 439 +++++++++++++++++++
  crates/benilla-world/src/look/mod.rs         | 325 ++++++++++++++
  crates/benilla-world/src/world_plugins.rs    |   2 +
- 9 files changed, 803 insertions(+), 4 deletions(-)
+ 9 files changed, 835 insertions(+), 4 deletions(-)
  create mode 100644 crates/benilla-world/src/look/grade.rs
  create mode 100644 crates/benilla-world/src/look/mod.rs
 
 diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
-index 159d67e..0297e5d 100644
+index 159d67e..af7ed84 100644
 --- a/crates/benilla-app/src/cvars/mod.rs
 +++ b/crates/benilla-app/src/cvars/mod.rs
-@@ -2702,6 +2702,8 @@ mod tests {
+@@ -1588,6 +1588,38 @@ mod tests {
+         assert_eq!(d["renderScale"], 1.0);
+     }
+ 
++    /// `worldLook` (benilla's own) switches the look live: a Lua `SetCVar` drained into the
++    /// registry runs the observer, which writes `WorldLook`, read by the lighting resolve, the
++    /// view distance and the look pass every frame. No restart, and `farclip` keeps the reference's
++    /// range under either look.
++    #[test]
++    fn world_look_switches_live_from_lua() {
++        use benilla_world::look::WorldLook;
++        let mut app = cvar_app();
++        assert_eq!(*res::<WorldLook>(&app), WorldLook::NEW, "registered \"1\"");
++        let set = |app: &mut App, value: &str| {
++            let world = app.world_mut();
++            let mut script = UiScript::new().unwrap();
++            world.resource::<Cvars>().seed_vm(&mut script);
++            script
++                .run(&format!("SetCVar(\"worldLook\", \"{value}\")"))
++                .unwrap();
++            let events = {
++                let mut cvars = world.resource_mut::<Cvars>();
++                cvars.drain_vm(&mut script);
++                cvars.take_events()
++            };
++            for event in events {
++                world.trigger(event);
++            }
++        };
++        set(&mut app, "0");
++        assert_eq!(*res::<WorldLook>(&app), WorldLook::CLASSIC);
++        set(&mut app, "1");
++        assert_eq!(*res::<WorldLook>(&app), WorldLook::NEW);
++        assert_eq!(apply(&mut app, "farclip", "1000"), SetOutcome::Vetoed);
++    }
++
+     /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
+     #[test]
+     fn the_ffx_switches_reach_the_pass() {
+@@ -2702,6 +2734,8 @@ mod tests {
              .init_resource::<FollowConfig>()
              .init_resource::<VideoConfig>()
              .init_resource::<benilla_world::ffx_glow::FfxSwitches>()
