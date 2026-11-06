@@ -1,6 +1,6 @@
 //! Creatures' tactics: whom they go for, an opening pressed at once, a guard met with the blow
 //! no guard stops, ground given after a string, a hero's back sought while waiting a turn, a
-//! raider drawn off its station by a hero near.
+//! raider drawn off its station by a hero near; a boss that varies its strings and makes space.
 
 use crate::content::Content;
 use crate::land::FlatLand;
@@ -285,4 +285,235 @@ fn a_cast_naming_a_clip_plays_it_and_one_that_doesnt_plays_its_spells_own() {
         }
         assert_eq!(seen.map(|c| c.0), clip, "with a clip: {with}");
     }
+}
+
+/// A real boss from the Deadmines, alone with a hero who can't fall, its health past dying too.
+fn boss(s: &mut Survival, key: &str, at: Vec3) -> Id {
+    let k = mob(s, key, at);
+    assert!(s.content.mobs[s.mobs[&k].def].boss, "{key} is a boss");
+    let m = s.mobs.get_mut(&k).unwrap();
+    m.health = 1_000_000;
+    m.max_health = 1_000_000;
+    k
+}
+
+fn sturdy(s: &mut Survival, name: &str, pos: Vec3) -> Id {
+    let p = hero(s, name, pos, 0.0);
+    let pl = s.players.get_mut(&p).unwrap();
+    pl.health = 10_000_000;
+    pl.max_health = 10_000_000;
+    p
+}
+
+fn pattern(s: &Survival, k: Id, name: &str) -> usize {
+    s.content.mobs[s.mobs[&k].def].patterns.iter().position(|p| p.name == name).unwrap_or_else(|| panic!("{name}"))
+}
+
+#[test]
+fn a_boss_seldom_begins_the_same_string_twice_running() {
+    let mut s = world();
+    let k = boss(&mut s, "dm_rhahkzor", ORIGIN);
+    let two = pattern(&s, k, "two swings");
+    let picks = |s: &mut Survival| {
+        let mut again = 0;
+        for _ in 0..2000 {
+            s.mobs.get_mut(&k).unwrap().last_pattern = Some(two);
+            if s.pick_pattern(k, 2.0, 0.4) == Some(two) {
+                again += 1;
+            }
+        }
+        again
+    };
+    s.content.ai.repeat = 1.0;
+    let free = picks(&mut s);
+    s.content.ai.repeat = 0.3;
+    let damped = picks(&mut s);
+    assert!(free > 700, "its heaviest string up close, most of the time: {free}");
+    assert!((damped as f32) < free as f32 * 0.6, "seldom twice running: {damped} against {free}");
+    assert!(damped > 0, "still now and then");
+}
+
+#[test]
+fn alone_up_close_a_boss_backs_off_and_uses_a_blow_from_afar() {
+    let mut s = world();
+    s.content.ai.space = 1.0;
+    let p = sturdy(&mut s, "Ayla", ORIGIN);
+    let k = boss(&mut s, "dm_rhahkzor", [2.5, 0.0, 0.0]);
+    s.engage(k, Foe::Hero(p));
+    // Ayla stands her ground, right on it.
+    let mut farthest: f32 = 0.0;
+    let mut from_afar = None;
+    for _ in 0..(30.0 / DT) as usize {
+        s.step(DT);
+        let m = &s.mobs[&k];
+        farthest = farthest.max(dist2d(m.pos, ORIGIN));
+        if let (Some((pk, 0)), MobState::Windup { .. }) = (m.pattern, &m.state) {
+            let pat = &s.content.mobs[m.def].patterns[pk];
+            if pat.min_range >= 3.0 {
+                from_afar = Some(pat.name.clone());
+                break;
+            }
+        }
+    }
+    assert!(farthest >= 6.0, "it backed off: {farthest}");
+    assert_eq!(from_afar.as_deref(), Some("rush"), "and charged from there");
+}
+
+#[test]
+fn a_boss_that_never_makes_space_never_charges_a_hero_standing_on_it() {
+    // What it was before: alone, up close, its charge never came.
+    let mut s = world();
+    s.content.ai.space = 0.0;
+    let p = sturdy(&mut s, "Ayla", ORIGIN);
+    let k = boss(&mut s, "dm_rhahkzor", [2.5, 0.0, 0.0]);
+    s.engage(k, Foe::Hero(p));
+    let rush = pattern(&s, k, "rush");
+    for _ in 0..(20.0 / DT) as usize {
+        s.step(DT);
+        assert_ne!(s.mobs[&k].pattern.map(|p| p.0), Some(rush), "no room for a rush");
+    }
+}
+
+#[test]
+fn with_a_band_on_it_a_boss_makes_space_less_often() {
+    let tries = |band: bool| {
+        let mut s = world();
+        s.content.ai.space = 0.4;
+        s.content.ai.space_streak = 0.0;
+        let p = sturdy(&mut s, "Ayla", ORIGIN);
+        let k = boss(&mut s, "dm_rhahkzor", [2.5, 0.0, 0.0]);
+        if band {
+            let b = sturdy(&mut s, "Bren", [0.0, 3.0, 0.0]);
+            s.engage(k, Foe::Hero(p));
+            s.hurt_mob(k, b, 1);
+        } else {
+            s.engage(k, Foe::Hero(p));
+        }
+        let mut made = 0;
+        for _ in 0..400 {
+            let m = s.mobs.get_mut(&k).unwrap();
+            m.pos = [2.5, 0.0, 0.0];
+            m.path.clear();
+            m.space = None;
+            m.stagger_until = 0.0;
+            m.close_run = 1;
+            if s.maybe_make_space(k, p) {
+                made += 1;
+            }
+        }
+        made
+    };
+    let (alone, band) = (tries(false), tries(true));
+    assert!(alone > 120 && alone < 200, "about 40% alone: {alone}");
+    assert!(band < alone * 2 / 3, "about half that with a band: {band} against {alone}");
+}
+
+#[test]
+fn a_boss_holds_one_blow_of_a_string_up_close_a_beat_now_and_then() {
+    let mut s = world();
+    s.content.ai.hold = 1.0;
+    s.content.ai.cut = 0.0;
+    s.content.ai.extend = 0.0;
+    let p = sturdy(&mut s, "Ayla", ORIGIN);
+    let k = boss(&mut s, "dm_rhahkzor", [2.0, 0.0, 0.0]);
+    let two = pattern(&s, k, "two swings");
+    s.begin_pattern(k, two, true);
+    let Some(held) = s.mobs[&k].held_step else { panic!("one of its blows is held") };
+    assert!(held < 2, "one of its two");
+    let mut beats = Vec::new();
+    for step in 0..2 {
+        s.mobs.get_mut(&k).unwrap().pattern = Some((two, step));
+        let own = s.pattern_step(k).unwrap().windup.unwrap_or(s.content.mobs[s.mobs[&k].def].attack.windup);
+        s.windup(k, Foe::Hero(p), ORIGIN);
+        let hold = s.mobs[&k].hold;
+        assert!((s.attack_now(k).windup - (own + hold)).abs() < 1e-3, "its whole wind-up the longer");
+        beats.push(hold);
+    }
+    let most = s.content.ai.hold_secs;
+    let h = beats[held];
+    assert!(h >= most * 0.4 - 1e-4 && h <= most + 1e-4, "held a beat: {h}");
+    assert_eq!(beats[1 - held], 0.0, "the other comes on time");
+    // Never a blow from afar (its charge comes as it always has), nor a grunt's.
+    let rush = pattern(&s, k, "rush");
+    s.begin_pattern(k, rush, true);
+    assert_eq!(s.mobs[&k].held_step, None, "a charge isn't held");
+    let g = mob(&mut s, "grunt", [-2.0, 0.0, 0.0]);
+    if !s.content.mobs[s.mobs[&g].def].patterns.is_empty() {
+        s.begin_pattern(g, 0, true);
+        assert_eq!(s.mobs[&g].held_step, None, "a grunt holds none");
+    }
+}
+
+/// How many blows a boss throws of a string it begins.
+fn blows_of(s: &mut Survival, k: Id, p: Id, which: usize) -> usize {
+    s.engage(k, Foe::Hero(p));
+    s.begin_pattern(k, which, true);
+    s.windup(k, Foe::Hero(p), ORIGIN);
+    let mut blows = 0;
+    let mut was_windup = true;
+    for _ in 0..(15.0 / DT) as usize {
+        s.step(DT);
+        let w = matches!(s.mobs[&k].state, MobState::Windup { .. });
+        if was_windup && !w {
+            blows += 1;
+        }
+        was_windup = w;
+        if s.mobs[&k].pattern.is_none() {
+            break;
+        }
+    }
+    blows
+}
+
+#[test]
+fn a_boss_stops_a_long_string_short_or_runs_it_one_longer_now_and_then() {
+    let calm = |s: &mut Survival| {
+        s.content.ai.space = 0.0;
+        s.content.ai.chain = 0.0;
+        s.content.ai.hold = 0.0;
+    };
+    let mut s = world();
+    calm(&mut s);
+    s.content.ai.cut = 1.0;
+    let p = sturdy(&mut s, "Ayla", ORIGIN);
+    let k = boss(&mut s, "dm_vancleef", [2.0, 0.0, 0.0]);
+    let string = pattern(&s, k, "string");
+    assert_eq!(s.content.mobs[s.mobs[&k].def].patterns[string].steps.len(), 4);
+    assert_eq!(blows_of(&mut s, k, p, string), 3, "one short of its four");
+
+    let mut s = world();
+    calm(&mut s);
+    s.content.ai.cut = 0.0;
+    s.content.ai.extend = 1.0;
+    let p = sturdy(&mut s, "Ayla", ORIGIN);
+    let k = boss(&mut s, "dm_vancleef", [2.0, 0.0, 0.0]);
+    assert_eq!(blows_of(&mut s, k, p, string), 5, "one past its four");
+
+    let mut s = world();
+    calm(&mut s);
+    s.content.ai.cut = 0.0;
+    s.content.ai.extend = 0.0;
+    let p = sturdy(&mut s, "Ayla", ORIGIN);
+    let k = boss(&mut s, "dm_vancleef", [2.0, 0.0, 0.0]);
+    assert_eq!(blows_of(&mut s, k, p, string), 4, "as written, otherwise");
+}
+
+#[test]
+fn a_boss_goes_straight_into_another_string_now_and_then() {
+    let mut s = world();
+    s.content.ai.chain = 1.0;
+    let _p = sturdy(&mut s, "Ayla", ORIGIN);
+    let k = boss(&mut s, "dm_rhahkzor", [2.0, 0.0, 0.0]);
+    let now = s.clock;
+    let m = s.mobs.get_mut(&k).unwrap();
+    m.ready_at = now + 3.0;
+    m.close_run = 1;
+    s.maybe_chain(k);
+    assert!(s.mobs[&k].ready_at <= now + 0.2, "no rest: {}", s.mobs[&k].ready_at - now);
+    // Not a fourth close string in a row.
+    let m = s.mobs.get_mut(&k).unwrap();
+    m.ready_at = now + 3.0;
+    m.close_run = 3;
+    s.maybe_chain(k);
+    assert!(s.mobs[&k].ready_at >= now + 2.9, "it rests after three");
 }
