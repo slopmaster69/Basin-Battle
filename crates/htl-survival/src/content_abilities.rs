@@ -1101,7 +1101,7 @@ impl AbilityDef {
     }
     /// It's aimed with the reticle (the shoulder camera comes up for it).
     pub fn aimed(&self) -> bool {
-        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff" | "sigil")
+        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff" | "sigil" | "shell")
             && !self.at_once
             && !self.at_self
             && !(self.kind == "leap" && self.back)

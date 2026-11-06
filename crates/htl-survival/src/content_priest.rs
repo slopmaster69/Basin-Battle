@@ -89,7 +89,7 @@ pub struct FeatherDef {
 }
 
 /// Shadowguard (`kind = "shell"`): a shell for `secs` at most. The caster takes `cut` less and
-/// moves at `pace` of their speed, and can't attack; what it stops is stored, `cap` at most. The
+/// moves at a guard's pace, and can't attack; what it stops is stored, `cap` at most. The
 /// key again (or its time up) lets it go: the stored shadow flies at the first foe along the
 /// reticle (the `shard`, an ability). Let go within `window` of a blow landing on them, `perfect`
 /// times as much (`perfect_cap` at most).
@@ -98,7 +98,6 @@ pub struct ShellDef {
     pub shard: String,
     pub secs: f32,
     pub cut: f32,
-    pub pace: f32,
     pub cap: f32,
     pub window: f32,
     pub perfect: f32,
@@ -119,9 +118,6 @@ pub struct RiftDef {
     pub per_foe: f32,
     pub perfect_foes: u32,
     pub collapse: f32,
-    /// The cords from its heart to each foe it drags (a channel's beam, 0: none).
-    #[serde(default)]
-    pub cord_spell: u32,
 }
 
 /// The Hollow Star (a `place`d orb): it has `health` (up to `most`) and lasts the ability's

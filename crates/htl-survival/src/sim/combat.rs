@@ -205,6 +205,10 @@ impl Survival {
                 // The holy staff's heal aimed on the right click: with the button still held, the
                 // next click aims and casts it again (Corey: right click held is the heal's aim).
                 Input::Attack | Input::Heavy if self.content.abilities[alt].aim_alt && self.players.get(&id).is_some_and(|p| p.guard_held && matches!(p.action, Action::Ready | Action::Guard)) => {
+                    // (Its charges spent: the click does nothing.)
+                    if !self.ready(id, alt) {
+                        return true;
+                    }
                     self.set_action(id, Action::Aim { ability: alt });
                     self.ability_press(id);
                     return true;
@@ -1966,6 +1970,13 @@ impl Survival {
         // Retaliation's answer going out: the blow finds nothing to take hold of, and the swing
         // carries on (no block clip over it).
         let shrugged = !self.immune(victim) && self.untouchable(victim);
+        // Fade's untouchable moment: a blow it lets pass is slipped (the striker slowed, the Priest
+        // quicker), even before their body has left the blow's reach.
+        let faded = self.slips.get(&victim).is_some_and(|s| !s.paid && self.content.abilities[s.ability].sidestep && now - s.at <= self.content.abilities[s.ability].secs + p.rtt.min(c.combat.max_rewind) + 1.0e-3);
+        if faded && (dashing || self.untouchable(victim)) {
+            self.slipped(victim, attacker, style);
+            return Outcome::Dodged;
+        }
         let outcome = match &p.action {
             _ if self.untouchable(victim) => Outcome::Blocked,
             _ if dashing => Outcome::Dodged,

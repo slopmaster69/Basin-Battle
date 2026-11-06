@@ -83,7 +83,7 @@ impl Survival {
         let heroes: Vec<Id> = self
             .players
             .iter()
-            .filter(|(h, p)| self.hostile(r.owner, **h) && !self.spared(r.owner, **h, r.ability) && p.health > 0 && dist2d(p.pos, at) <= reach + abilities::HERO_SIZE)
+            .filter(|(h, p)| self.hostile(r.owner, **h) && !self.helpable(r.owner, **h) && !self.spared(r.owner, **h, r.ability) && p.health > 0 && dist2d(p.pos, at) <= reach + abilities::HERO_SIZE)
             .map(|(h, _)| *h)
             .collect();
         (mobs, heroes)
@@ -135,9 +135,7 @@ impl Survival {
                     if self.alive(m) {
                         let pull = crate::content::AbilityEffect { kind: "pull".into(), amount: rd.pull, ..Default::default() };
                         self.apply_effects(r.owner, m, &[pull], 1.0, &d.name);
-                        if rd.cord_spell != 0 || true {
-                            self.events.push(Event::Tether { from: m, to: Target::Point([r.at[0], r.at[1], r.at[2] + 0.3]), secs: CORD_SECS });
-                        }
+                        self.events.push(Event::Tether { from: m, to: Target::Point([r.at[0], r.at[1], r.at[2] + 0.3]), secs: CORD_SECS });
                     }
                 }
                 for h in heroes.iter().copied() {
