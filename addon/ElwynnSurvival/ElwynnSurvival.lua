@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 50
+local VERSION = 51
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6503,11 +6503,10 @@ function ES.BowDrawn()
   return d and d.kind ~= "shot" and (d.hi <= 0 or d.isEx) and true or false
 end
 
--- The shoulders squared to the aim while the bow is drawn (ac27): 1.12's draw stands side-on, and
--- from the camera over the right shoulder the turned back and head hid the view and the bow
--- pointed off the reticle. The client turns the spine right by this much (radians) and the head
--- back by as much, so the eyes stay on the aim.
-ES.BOW_TURN = 0.7
+-- A turn of the shoulders while the bow is drawn (ac27): the client turns the spine right by this
+-- much (radians) and the head back by as much. 0: the client steers the drawn bow onto the reticle
+-- itself (its patch 0050), and a fixed turn only swung the bow out to the right as it came up.
+ES.BOW_TURN = 0
 function ES.StepAimTurn()
   if not SetAimTurn then return end
   local want = ES.BowDrawn() and ES.BOW_TURN or 0
