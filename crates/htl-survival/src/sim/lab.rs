@@ -97,8 +97,11 @@ impl Survival {
     /// hero, so a ray or the reticle meets the ally first, facing them), then its blow: a blow meant for a stand-in ally that stands farther off.
     pub fn lab_blow_near(&mut self, mob: Id, hero: Id, from: Id) {
         let (Some(at), Some(me)) = (self.players.get(&hero).map(|p| p.pos), self.players.get(&from).map(|p| p.pos)) else { return };
+        // Beside the ally, square to the hero's view: seen side on, the blow is plainly at them
+        // (stood behind the ally, facing the hero, it read as a swing at the hero: Corey).
         let d = dist2d(at, me).max(0.1);
-        let pos = [at[0] - (me[0] - at[0]) / d * 1.8, at[1] - (me[1] - at[1]) / d * 1.8, at[2]];
+        let (ux, uy) = ((at[0] - me[0]) / d, (at[1] - me[1]) / d);
+        let pos = [at[0] + uy * 1.8, at[1] - ux * 1.8, at[2]];
         if let Some(m) = self.mobs.get_mut(&mob) {
             m.pos = pos;
             m.facing = facing(pos, at);

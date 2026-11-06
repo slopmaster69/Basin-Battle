@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>] [ccaura <kind>/<spell>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>] [ccaura <kind>/<spell>] [perfectkit <kit>]`
 //!
 //! - `by tauren-f` has a stand-in hero of that race cast it, the hero (and camera) at its side.
 //! - `anim` tries another clip on the ability for that run only (its take, and the model every race
@@ -173,6 +173,13 @@ impl SurvivalGame {
                     let kind = it.next().filter(|w| !w.is_empty()).ok_or("Try ccaura <kind>/<spell>.")?;
                     let sp: u32 = it.next().and_then(|n| n.parse().ok()).ok_or("Try ccaura <kind>/<spell>.")?;
                     self.sim.content.cc.auras.insert(kind.to_lowercase(), sp);
+                    k += 1;
+                }
+                // The Priest's Light perfect for this run and the ones after: `perfectkit 433` (a
+                // SpellVisualKit), to put looks side by side.
+                "perfectkit" => {
+                    let kit: u32 = words.get(k + 1).and_then(|n| n.parse().ok()).ok_or("Try perfectkit <kit>.")?;
+                    self.sim.content.priest.perfect_kit = kit;
                     k += 1;
                 }
                 // A look to try for this run only: `look 3631` (its spell and aura both),

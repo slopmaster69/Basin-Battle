@@ -20,6 +20,15 @@ ES.lab = lab
 local frame = CreateFrame("Frame")
 frame:Hide()
 
+-- The aiming reticle stays in the film while the interface is hidden (Corey couldn't see the
+-- Shield aimed at the friend): lifted onto the world for the burst, put back after.
+local function KeepReticle(on)
+  local aim = ElwynnSurvivalAim
+  if not aim then return end
+  if on then aim:SetParent(WorldFrame) else aim:SetParent(UIParent) end
+  aim:SetFrameStrata("HIGH")
+end
+
 local function Quiet(on)
   if not ScreenshotStatus then return end
   if on then
@@ -39,6 +48,7 @@ frame:SetScript("OnUpdate", function()
     if lab.show_at and now < lab.show_at then return end
     lab.show_at = nil
     if UIParent then UIParent:Show() end
+    KeepReticle(false)
     frame:Hide()
     Quiet(false)
     if DEFAULT_CHAT_FRAME and lab.taken > 0 then
@@ -93,6 +103,7 @@ function ES.LabLine(f)
   if secs < lab.left * lab.every then secs = lab.left * lab.every end
   lab.show_at = lab.next + secs + 1.0
   Quiet(true)
+  KeepReticle(true)
   if UIParent then UIParent:Hide() end
   frame:Show()
 end
