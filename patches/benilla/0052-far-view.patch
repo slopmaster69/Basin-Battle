@@ -1,0 +1,473 @@
+From b33e382a92152026b1de58df2c28f282a48f8a9f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 07:00:58 -0700
+Subject: [PATCH] Seeing further: the new look's view reaches 1200 yd by
+ default and up to 2000
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+1.12 stops the detailed world at `farclip` (177 to 777 yd, 350 by default), and Elwynn's own fog
+ends near 500 yd by day, so raising one without the other shows nothing. Under the new look the
+world's reach is mapped from the same `farclip`: 350 (the default) reaches 1200 yd, the slider's
+top (777) 2000, its bottom (177) 600, linear between. The 1.12 Video Options slider keeps working
+over its whole travel under either look, and the `farclip` CVar keeps the reference's range and
+refusal, so the classic look is untouched. Elwynn's grade (0051) scales its fog end out by time of
+day (×2.5 at noon) to meet the longer view, so the far hills come out of the haze.
+
+Everything the far wall bounds follows the reach: the per-pixel wall and the fog's cap, the CPU
+cull of doodads and WMOs, the WMO interior fog's clamp, the particle draw set and the terrain
+residency window, which widens by the reference's own formula (±39 chunks, at most 6×6 tiles, at
+1200 yd; ±63 chunks, at most 9×9, at 2000; 5×5 at the classic 777). The art caches' sweep never
+undercuts the wider block. The camera's far plane (3000) and the WDL horizon ring (5 tiles) already
+cover 2000 yd. Small props already fade out by size well before the wall (the reference's
+size-bucketed fade), so nothing new pops in the distance.
+---
+ .../src/capture/probes/particle_census.rs     |  4 +-
+ crates/benilla-app/src/cvars/mod.rs           |  1 +
+ crates/benilla-world/src/art_scope.rs         | 13 ++-
+ .../src/lighting/global_light.rs              |  2 +-
+ crates/benilla-world/src/lighting/resolve.rs  | 27 +++++-
+ crates/benilla-world/src/look/mod.rs          | 11 ++-
+ .../src/model_render/visibility.rs            |  2 +-
+ crates/benilla-world/src/particles/sim.rs     |  2 +-
+ crates/benilla-world/src/static_gx/cull.rs    |  6 +-
+ crates/benilla-world/src/terrain_stream.rs    |  4 +-
+ .../src/terrain_stream/window.rs              | 28 ++++++
+ crates/benilla-world/src/view.rs              | 94 ++++++++++++++++++-
+ 12 files changed, 176 insertions(+), 18 deletions(-)
+
+diff --git a/crates/benilla-app/src/capture/probes/particle_census.rs b/crates/benilla-app/src/capture/probes/particle_census.rs
+index efd018f..747ab21 100644
+--- a/crates/benilla-app/src/capture/probes/particle_census.rs
++++ b/crates/benilla-app/src/capture/probes/particle_census.rs
+@@ -90,7 +90,7 @@ fn fire_particle_census(
+             if drawn {
+                 max_drawn_depth = max_drawn_depth.max(d);
+             }
+-            if d > view.farclip {
++            if d > view.reach() {
+                 beyond_wall += 1;
+                 if drawn {
+                     drawn_beyond_wall += 1;
+@@ -164,6 +164,6 @@ fn fire_particle_census(
+         "PARTICLE_CENSUS emitters={n} booth={booth} live_total={total} farclip={:.0} \
+          beyond_wall={beyond_wall} drawn_beyond_wall={drawn_beyond_wall} \
+          drawn_beyond_wall_live={drawn_beyond_wall_live} max_drawn_depth={max_drawn_depth:.1}{where_}",
+-        view.farclip,
++        view.reach(),
+     );
+ }
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index 0297e5d..ca05c08 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -2670,6 +2670,7 @@ mod tests {
+             .insert_resource(ViewDistance {
+                 farclip: 350.0,
+                 nearclip: benilla_world::view::NEARCLIP_DEFAULT,
++                look: false,
+             })
+             .insert_resource(MsaaSetting { samples: 1 })
+             // Literal: `TexFilterSetting::default()` reads `$WOW_TRILINEAR`/`$WOW_ANISO`.
+diff --git a/crates/benilla-world/src/art_scope.rs b/crates/benilla-world/src/art_scope.rs
+index 101f22f..0500d66 100644
+--- a/crates/benilla-world/src/art_scope.rs
++++ b/crates/benilla-world/src/art_scope.rs
+@@ -130,6 +130,9 @@ pub struct ArtScopeState {
+     last_sweep: f32,
+     /// Real seconds since app start this frame; the cache's dwell floor is measured on it.
+     now: f32,
++    /// The streamer's own reach at this frame's view distance: the new look's longer view
++    /// (`view::look_reach`) holds tiles past the classic floor, which a sweep must not undercut.
++    reach_floor: f32,
+ }
+ 
+ impl ArtScopeState {
+@@ -151,9 +154,11 @@ impl ArtScope<'_> {
+     /// Sweeps one cache on sweep frames and records its residency.
+     pub fn apply<K: Eq + Hash, V>(&mut self, cache: &mut SpatialCache<K, V>, slot: ArtSlot) {
+         let dropped = match self.state.focus {
+-            Some(focus) if self.state.due && self.state.radius > 0.0 => {
+-                cache.scope(focus, self.state.radius, self.state.now)
+-            }
++            Some(focus) if self.state.due && self.state.radius > 0.0 => cache.scope(
++                focus,
++                self.state.radius.max(self.state.reach_floor),
++                self.state.now,
++            ),
+             _ => 0,
+         };
+         let i = slot.idx();
+@@ -189,7 +194,9 @@ fn track_art_scope(
+     time: Res<Time<Real>>,
+     focus: Res<crate::terrain_stream::ViewFocus>,
+     camera: Query<&Transform, With<crate::view::WorldCamera>>,
++    view: Res<crate::view::ViewDistance>,
+ ) {
++    state.reach_floor = crate::terrain_stream::window::max_resident_reach_yd(view.reach());
+     let cam = camera.single().ok().map(|c| c.translation);
+     state.focus = (focus.body_pos().is_some() || cam.is_some()).then(|| focus.resolve(cam));
+     let now = time.elapsed_secs();
+diff --git a/crates/benilla-world/src/lighting/global_light.rs b/crates/benilla-world/src/lighting/global_light.rs
+index 44a4b28..e605198 100644
+--- a/crates/benilla-world/src/lighting/global_light.rs
++++ b/crates/benilla-world/src/lighting/global_light.rs
+@@ -205,7 +205,7 @@ fn build_light_data(
+ ) {
+     let l = &*light;
+     let fog_enable = if debug.lighting.disable_fog { 0.0 } else { 1.0 };
+-    let farclip = view.farclip;
++    let farclip = view.reach();
+     // River and lake share the non-ocean swatch.
+     let (rs, rd, rsa, rda) = l.water_colors(LiquidKind::Still);
+     let (os, od, osa, oda) = l.water_colors(LiquidKind::Ocean);
+diff --git a/crates/benilla-world/src/lighting/resolve.rs b/crates/benilla-world/src/lighting/resolve.rs
+index 9390ecd..1fd2970 100644
+--- a/crates/benilla-world/src/lighting/resolve.rs
++++ b/crates/benilla-world/src/lighting/resolve.rs
+@@ -121,7 +121,7 @@ pub(super) fn setup_lighting(
+         "Elwynn noon lighting from Light.dbc: sun diffuse {:?}, ambient {:?}",
+         atmo.sun_diffuse, atmo.ambient
+     );
+-    let (fog_start, fog_end) = scene_fog(atmo.fog_end, atmo.fog_start_frac, view.farclip);
++    let (fog_start, fog_end) = scene_fog(atmo.fog_end, atmo.fog_start_frac, view.reach());
+     commands.insert_resource(WowLighting {
+         ambient: atmo.ambient,
+         diffuse: atmo.sun_diffuse,
+@@ -266,7 +266,9 @@ pub(super) fn update_time_lighting(
+ 
+     // Elwynn commits 125/500 clear and −139/278 at full storm (`0x6cee30`): the negative start is
+     // the near veil, and the short storm end whites out the middle distance.
+-    let (fog_start, fog_end) = scene_fog(atmo.fog_end, atmo.fog_start_frac, view.farclip);
++    // The fog's cap is the reach: under the new look the zone grade's longer fog end meets the
++    // longer view (`view::look_reach`).
++    let (fog_start, fog_end) = scene_fog(atmo.fog_end, atmo.fog_start_frac, view.reach());
+     // The interior crossfade is its own triple; the scene fog stays untouched. Submerged, the
+     // underwater param owns the fog and the ramp is bypassed, as the reference snaps it for magma
+     // and slime inside an MFOG interior (`0x6cef6f`); the reference's MFOG underwater block
+@@ -279,7 +281,7 @@ pub(super) fn update_time_lighting(
+             atmo.fog_color,
+             fog_start,
+             fog_end,
+-            view.farclip,
++            view.reach(),
+             time.delta_secs(),
+         )
+     };
+@@ -507,6 +509,25 @@ mod tests {
+         assert!(ramp.staged.is_none(), "latch releases at t = 0");
+     }
+ 
++    /// The new look's fog: the zone grade scales Elwynn's end (500 yd by day) and `scene_fog`'s
++    /// cap is the reach, so the longer fog shows up to the longer view and no further.
++    #[test]
++    fn the_scaled_fog_end_meets_the_reach() {
++        use crate::view::{look_reach, LOOK_REACH_MAX};
++        // Classic: 500 under the default 350 farclip ends at the wall.
++        assert_eq!(scene_fog(500.0, 0.25, 350.0), (87.5, 350.0));
++        // New look at noon (×2.5): 1250, capped at the default reach of 1200.
++        assert_eq!(
++            scene_fog(500.0 * 2.5, 0.25, look_reach(350.0)),
++            (300.0, 1200.0)
++        );
++        // At the longest reach the fog's own end shows.
++        assert_eq!(
++            scene_fog(500.0 * 2.5, 0.25, LOOK_REACH_MAX),
++            (312.5, 1250.0)
++        );
++    }
++
+     /// A record end past the farclip commits the farclip (`0x6cef43` against `[0xce9b94]`), and
+     /// the start scales off the clamped end.
+     #[test]
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index a82d16d..411efaa 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -186,6 +186,14 @@ pub fn graded(
+     }
+ }
+ 
++/// Keeps [`crate::view::ViewDistance::look`] in step with the switch, before this frame's
++/// consumers read the reach: the new look sees further (`view::look_reach`).
++fn sync_view_look(look: Res<WorldLook>, mut view: ResMut<crate::view::ViewDistance>) {
++    if view.look != look.on {
++        view.look = look.on;
++    }
++}
++
+ /// The look's resources, for the lighting plugin, whose resolve reads them.
+ pub(crate) fn init_resources(app: &mut App) {
+     app.init_resource::<WorldLook>()
+@@ -199,7 +207,8 @@ pub(crate) struct LookPlugin;
+ impl Plugin for LookPlugin {
+     fn build(&self, app: &mut App) {
+         init_resources(app);
+-        app.add_systems(Startup, load_look_areas.after(AssetSet::Open));
++        app.add_systems(Startup, load_look_areas.after(AssetSet::Open))
++            .add_systems(PreUpdate, sync_view_look);
+     }
+ }
+ 
+diff --git a/crates/benilla-world/src/model_render/visibility.rs b/crates/benilla-world/src/model_render/visibility.rs
+index 3038a64..594a15a 100644
+--- a/crates/benilla-world/src/model_render/visibility.rs
++++ b/crates/benilla-world/src/model_render/visibility.rs
+@@ -148,7 +148,7 @@ pub(super) fn apply_model_visibility(
+                     };
+                     // The particle draw-set gate reads the same rule, so no emitter outlives its
+                     // doodad past the wall.
+-                    crate::view::within_farclip(view.farclip, c, fwd, center, radius)
++                    crate::view::within_farclip(view.reach(), c, fwd, center, radius)
+                 }
+             };
+ 
+diff --git a/crates/benilla-world/src/particles/sim.rs b/crates/benilla-world/src/particles/sim.rs
+index bcc523c..30cc7f2 100644
+--- a/crates/benilla-world/src/particles/sim.rs
++++ b/crates/benilla-world/src/particles/sim.rs
+@@ -217,7 +217,7 @@ impl SceneGates<'_, '_> {
+         cam: Option<(&GlobalTransform, &Projection)>,
+     ) -> (f32, crate::exterior_cull::ExteriorGate, Option<Entity>) {
+         (
+-            self.view.farclip,
++            self.view.reach(),
+             crate::exterior_cull::ExteriorGate::build(&self.exterior_windows, cam),
+             self.camera_claim.0.map(|c| c.room.instance),
+         )
+diff --git a/crates/benilla-world/src/static_gx/cull.rs b/crates/benilla-world/src/static_gx/cull.rs
+index 4be68f0..2c3bf8b 100644
+--- a/crates/benilla-world/src/static_gx/cull.rs
++++ b/crates/benilla-world/src/static_gx/cull.rs
+@@ -327,7 +327,7 @@ pub(super) fn cull_cells(
+         for (&cell, draw) in &world.cells {
+             let center = draw.origin + Vec3::from(draw.aabb.center);
+             let radius = Vec3::from(draw.aabb.half_extents).length();
+-            if !crate::view::within_farclip(view.farclip, cam_pos, cam_fwd, center, radius) {
++            if !crate::view::within_farclip(view.reach(), cam_pos, cam_fwd, center, radius) {
+                 continue;
+             }
+             let sphere = bevy::camera::primitives::Sphere {
+@@ -379,7 +379,7 @@ pub(super) fn cull_cells(
+                 }
+                 let center = draw.origin + Vec3::from(aabb.center);
+                 let radius = Vec3::from(aabb.half_extents).length();
+-                if !crate::view::within_farclip(view.farclip, cam_pos, cam_fwd, center, radius) {
++                if !crate::view::within_farclip(view.reach(), cam_pos, cam_fwd, center, radius) {
+                     continue;
+                 }
+                 let sphere = bevy::camera::primitives::Sphere {
+@@ -441,7 +441,7 @@ pub(super) fn cull_cells(
+                 }
+                 let center = draw.origin + Vec3::from(aabb.center);
+                 let radius = Vec3::from(aabb.half_extents).length();
+-                if !crate::view::within_farclip(view.farclip, cam_pos, cam_fwd, center, radius) {
++                if !crate::view::within_farclip(view.reach(), cam_pos, cam_fwd, center, radius) {
+                     continue;
+                 }
+                 let sphere = bevy::camera::primitives::Sphere {
+diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
+index 92570b5..a3ccc86 100644
+--- a/crates/benilla-world/src/terrain_stream.rs
++++ b/crates/benilla-world/src/terrain_stream.rs
+@@ -658,7 +658,7 @@ fn stream_terrain(
+ 
+     // The residency window is the reference's, from the live `farclip` in chunk units.
+     let center = focus.resolve(camera.single().ok().map(|c| c.translation));
+-    let window = StreamWindow::at(view.farclip, center[0], center[1]);
++    let window = StreamWindow::at(view.reach(), center[0], center[1]);
+     let (cx, cy) = window.focus_tile();
+     let same_window = state.streamed(&window);
+     // Skip an unchanged frame only in a paced, complete, presentable world, since the tail it
+@@ -686,7 +686,7 @@ fn stream_terrain(
+             window.outer,
+             window.outer as f32 * benilla_formats::CHUNK_SIZE,
+             window.outer + window::KEEP_BAND_CHUNKS,
+-            view.farclip
++            view.reach()
+         );
+     }
+ 
+diff --git a/crates/benilla-world/src/terrain_stream/window.rs b/crates/benilla-world/src/terrain_stream/window.rs
+index f3c55dd..af9b2f2 100644
+--- a/crates/benilla-world/src/terrain_stream/window.rs
++++ b/crates/benilla-world/src/terrain_stream/window.rs
+@@ -141,6 +141,34 @@ mod tests {
+         StreamWindow::at(farclip, wx, wy)
+     }
+ 
++    /// The most tiles the outer window touches at `farclip`, over every focus chunk in a tile.
++    fn widest_block(farclip: f32) -> usize {
++        (0..16)
++            .flat_map(|cx| (0..16).map(move |cy| (cx, cy)))
++            .map(|chunk| at_chunk(farclip, (32, 44), chunk).wanted_tiles().len())
++            .max()
++            .unwrap()
++    }
++
++    /// The new look's view distances (`view::look_reach`) widen the window as the reference's
++    /// formula does: 1200 yd (the new look's default) is ±39 chunks, at most 6×6 tiles; 2000 yd
++    /// (its longest) ±63 chunks, at most 9×9; 777, the classic longest, ±26 and 5×5.
++    #[test]
++    fn the_streaming_radius_at_777_1200_and_2000() {
++        assert_eq!(outer_radius(inner_radius(777.0)), 26);
++        assert_eq!(outer_radius(inner_radius(1200.0)), 39);
++        assert_eq!(outer_radius(inner_radius(2000.0)), 63);
++        assert_eq!(widest_block(777.0), 25);
++        assert_eq!(widest_block(1200.0), 36);
++        assert_eq!(widest_block(2000.0), 81);
++        // The art sweep's floor follows (`art_scope`): the corner of the widest block, plus a tile.
++        assert!(
++            (max_resident_reach_yd(2000.0) - 4304.0).abs() < 2.0,
++            "{}",
++            max_resident_reach_yd(2000.0)
++        );
++    }
++
+     /// At 777 the outer window reaches 26 chunks: two tiles each way from the middle band (5×5);
+     /// from a corner chunk, two behind and one ahead (4×4).
+     #[test]
+diff --git a/crates/benilla-world/src/view.rs b/crates/benilla-world/src/view.rs
+index ed8b864..654d5bf 100644
+--- a/crates/benilla-world/src/view.rs
++++ b/crates/benilla-world/src/view.rs
+@@ -63,14 +63,51 @@ impl Viewer {
+ 
+ /// View distance in yards. `farclip`, the `farclip` CVar, is the one view distance: the detailed
+ /// world's far wall and the reach of terrain residency; its default, 350, is the reference's
+-/// registered one.
++/// registered one. Under the new look ([`Self::look`]) the world reaches further than the CVar
++/// says, by [`look_reach`]; every consumer reads [`Self::reach`].
+ /// `nearclip` shares the resource because `0x511bc0` stamps both onto the camera every frame, the
+ /// `nearclip` record's float to `[cam+0x38]` (`0x511bd4`) and the `farclip` one's to `[cam+0x3c]`.
+ #[derive(Resource, Clone, Copy)]
+ pub struct ViewDistance {
++    /// The `farclip` CVar, in 1.12's range ([`FARCLIP_RANGE`]) under either look.
+     pub farclip: f32,
+     /// The camera near plane in yards, the `nearclip` CVar ([`stamp_near_clip`]).
+     pub nearclip: f32,
++    /// The new look's longer view (benilla's own, `crate::look`), kept in step with
++    /// `look::WorldLook`; `false` is the reference's view distance exactly.
++    pub look: bool,
++}
++
++/// The new look's view distance at the default `farclip` (350): Elwynn's own fog ends near
++/// 500 yd by day, and the new look's grade pushes it out to meet this.
++pub const LOOK_REACH_DEFAULT: f32 = 1200.0;
++
++/// The new look's longest view, at `farclip` 777, the 1.12 slider's top.
++pub const LOOK_REACH_MAX: f32 = 2000.0;
++
++/// The new look's reach at three `farclip` stops: the slider's bottom, the registered default and
++/// the slider's top. Piecewise linear between them, so the 1.12 slider keeps working over its whole
++/// travel under either look, and the `farclip` CVar keeps the reference's range and refusal.
++const LOOK_REACH_STOPS: [(f32, f32); 3] = [
++    (177.0, 600.0),
++    (350.0, LOOK_REACH_DEFAULT),
++    (777.0, LOOK_REACH_MAX),
++];
++
++/// The new look's view distance for a `farclip` CVar value (benilla's own): 177 → 600 yd, 350 →
++/// 1200, 777 → 2000, linear between, held at the ends.
++pub fn look_reach(farclip: f32) -> f32 {
++    let [(x0, y0), (x1, y1), (x2, y2)] = LOOK_REACH_STOPS;
++    let seg = |a: f32, fa: f32, b: f32, fb: f32| fa + (fb - fa) * ((farclip - a) / (b - a));
++    if farclip <= x0 {
++        y0
++    } else if farclip <= x1 {
++        seg(x0, y0, x1, y1)
++    } else if farclip <= x2 {
++        seg(x1, y1, x2, y2)
++    } else {
++        y2
++    }
+ }
+ 
+ /// The settable range of [`ViewDistance::farclip`]: the range the reference's `farclip` callback
+@@ -246,6 +283,17 @@ impl Plugin for MsaaSupportPlugin {
+ pub const CAM_FAR: f32 = 3000.0;
+ 
+ impl ViewDistance {
++    /// How far the detailed world reaches, in yards: the far wall, the per-object cull, the fog's
++    /// cap and the terrain residency window. `farclip` under the classic look, [`look_reach`] of it
++    /// under the new one.
++    pub fn reach(&self) -> f32 {
++        if self.look {
++            look_reach(self.farclip)
++        } else {
++            self.farclip
++        }
++    }
++
+     /// Set the near plane from a `nearclip` write, clamped to [`NEARCLIP_RANGE`].
+     pub fn set_nearclip(&mut self, v: f32) {
+         self.nearclip = v.clamp(*NEARCLIP_RANGE.start(), *NEARCLIP_RANGE.end());
+@@ -265,6 +313,7 @@ impl Default for ViewDistance {
+         Self {
+             farclip,
+             nearclip: NEARCLIP_DEFAULT,
++            look: false,
+         }
+     }
+ }
+@@ -405,6 +454,7 @@ mod tests {
+         app.insert_resource(ViewDistance {
+             farclip: 350.0,
+             nearclip: 0.3,
++            look: false,
+         });
+         app.update();
+         let near = |app: &App| match app.world().get::<Projection>(cam).unwrap() {
+@@ -525,6 +575,48 @@ mod tests {
+         );
+     }
+ 
++    /// The reach under each look: the classic one is `farclip` itself, capped at 777 by the CVar;
++    /// the new one maps the same 1.12 range onto 600..2000, 1200 at the default.
++    #[test]
++    fn the_reach_under_each_look() {
++        let at = |farclip, look| {
++            ViewDistance {
++                farclip,
++                nearclip: NEARCLIP_DEFAULT,
++                look,
++            }
++            .reach()
++        };
++        for f in [177.0, 350.0, 500.0, 777.0] {
++            assert_eq!(at(f, false), f, "classic: the CVar, untouched");
++        }
++        assert_eq!(
++            *FARCLIP_RANGE.end(),
++            777.0,
++            "the classic cap is the reference's"
++        );
++        assert_eq!(at(350.0, true), LOOK_REACH_DEFAULT);
++        assert_eq!(at(777.0, true), LOOK_REACH_MAX);
++        assert_eq!(at(177.0, true), 600.0);
++        assert!(
++            (at(563.5, true) - 1600.0).abs() < 1e-3,
++            "linear between stops"
++        );
++        assert!((at(263.5, true) - 900.0).abs() < 1e-3);
++        // Monotonic over the slider, and never past the new cap.
++        let mut last = 0.0;
++        for i in 0..=600 {
++            let r = at(177.0 + i as f32, true);
++            assert!(r >= last && r <= LOOK_REACH_MAX);
++            last = r;
++        }
++        assert_eq!(at(5000.0, true), LOOK_REACH_MAX);
++        assert!(
++            LOOK_REACH_MAX + 100.0 < CAM_FAR,
++            "the projection covers the longest view"
++        );
++    }
++
+     /// Behind the camera is inside the wall; the frustum's side planes reject it, never an `abs()`.
+     #[test]
+     fn behind_the_camera_is_not_this_tests_job() {
+-- 
+2.43.0
+
