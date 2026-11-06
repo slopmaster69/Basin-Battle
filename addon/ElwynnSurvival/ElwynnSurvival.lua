@@ -1996,12 +1996,13 @@ local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
 -- Overhealth (health over the most) in a paler red past the health, and what shields have left
 -- to soak in translucent white past that (Corey); where they run past the bar's end they lie over
--- the health from the right, the health showing through.
+-- the health from the right, the health showing through a little. (Half-white read grey over the
+-- dark track on film, and the first paler red blurred into the health.)
 vit.health.over = Tex(vit.health, "ARTWORK", "bar")
-vit.health.over:SetVertexColor(1.0, 0.55, 0.48, 0.95)
+vit.health.over:SetVertexColor(1.0, 0.74, 0.66, 1)
 vit.health.over:Hide()
 vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
-vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
+vit.health.shield:SetVertexColor(1, 1, 1, 0.78)
 vit.health.shield:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
@@ -3878,7 +3879,7 @@ function ES.DrawHud()
   ES.DrawAbsorbs(hp, maxhp, shield, over)
   -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
   local text = hp
-  if over > 0 then text = text .. "|cffff9a8f+" .. over .. "|r" end
+  if over > 0 then text = text .. "|cffffbdaa+" .. over .. "|r" end
   text = text .. " / " .. maxhp
   if shield > 0 then text = text .. " |cffffffff+" .. shield .. "|r" end
   vit.healthText:SetText(text)
