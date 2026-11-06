@@ -119,7 +119,8 @@ A	cast	0.00	0.40	frostbolt
 A	aim	0.00	0.00	flamestrike
 !function SetAimMarker(shape, range, radius) table.insert(SAID, "marker " .. tostring(shape) .. " " .. tostring(range) .. " " .. tostring(radius)) end ElwynnSurvival.DrawAim()
 !ElwynnSurvival.Guard("down") ElwynnSurvival.Guard("up")
-# On the eighth round a projectile's (a beam's) path is drawn as a strip: its range, its radius.
+# On the eighth round a beam's path (a grappling hook's) is drawn as a strip, its range and its
+# radius; a shot (this thrown axe) has none: the reticle says where it goes.
 !HasActionCombat = function() return 8 end
 A	aim	0.00	0.00	aimed_throw
 !table.insert(SAID, "path marker: " .. tostring(SAID[table.getn(SAID)]))
