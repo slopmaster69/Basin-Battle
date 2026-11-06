@@ -897,7 +897,7 @@ pub const OTHER_EFFECTS: [&str; 27] = [
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 16] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner"];
+pub const BOONS: [&str; 17] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).

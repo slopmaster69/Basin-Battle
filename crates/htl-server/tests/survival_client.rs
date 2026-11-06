@@ -288,7 +288,9 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "ES\tV\t2")).is_some(), "the hello is answered");
     c.drain(0.4);
     let h = hud(&c).expect("a HUD line");
-    assert_eq!(h.len(), 40, "{h:?}");
+    assert_eq!(h.len(), 42, "{h:?}");
+    // Nothing shielding them and no health over the most, yet: the health bar's two ends empty.
+    assert_eq!((h[40].as_str(), h[41].as_str()), ("0", "0"), "{h:?}");
     // And which way north is, relative to the hero's heading (facing 0 is north).
     let north: i32 = h[39].parse().unwrap();
     assert!((-180..=180).contains(&north), "{h:?}");

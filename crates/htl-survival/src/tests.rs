@@ -3521,3 +3521,36 @@ fn a_honed_copy_found_or_one_already_in_the_chest_puts_its_piece_on_the_rack() {
     assert!(keys(&s).contains(&piece), "{piece}: one honed copy in the chest");
     assert_eq!(s.content.base_key(honed), piece);
 }
+
+#[test]
+fn a_shield_soaks_first_then_overhealth_then_health_and_the_bar_hears_both() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", [0.0, 0.0, 0.0], 0.0);
+    let max = s.players[&p].max_health;
+    s.players.get_mut(&p).unwrap().health = max;
+    s.apply_cc(p, p, "shield", 6.0, 30.0, 0.0, "Power Word: Shield");
+    s.apply_cc(p, p, "overhealth", 6.0, 20.0, 0.0, "Overhealth");
+    assert_eq!(s.absorbs(p), (30, 20), "both told to the health bar");
+    s.hurt_player(p, 40);
+    assert_eq!(s.absorbs(p), (0, 10), "the shield first, all of it, then 10 of the overhealth");
+    assert_eq!(s.players[&p].health, max, "none of the hero's own yet");
+    s.hurt_player(p, 25);
+    assert_eq!(s.absorbs(p), (0, 0));
+    assert_eq!(s.players[&p].health, max - 15, "what the overhealth couldn't take");
+}
+
+#[test]
+fn shields_and_overhealth_left_to_wear_off_leave_the_bar() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", [0.0, 0.0, 0.0], 0.0);
+    s.apply_cc(p, p, "shield", 2.0, 30.0, 0.0, "Power Word: Shield");
+    s.apply_cc(p, p, "overhealth", 3.0, 20.0, 0.0, "Overhealth");
+    for _ in 0..50 {
+        s.step(DT);
+    }
+    assert_eq!(s.absorbs(p), (0, 20), "the shield's 2 sec are up, the overhealth's 3 aren't");
+    for _ in 0..30 {
+        s.step(DT);
+    }
+    assert_eq!(s.absorbs(p), (0, 0));
+}

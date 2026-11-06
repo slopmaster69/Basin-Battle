@@ -1984,6 +1984,15 @@ local ST_PER_PX = 0.42
 local VIT_HEALTH, VIT_STAMINA = 13, 8
 local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
+-- Overhealth (health over the most) in a paler red past the health, and what shields have left
+-- to soak in translucent white past that (Corey); where they run past the bar's end they lie over
+-- the health from the right, the health showing through.
+vit.health.over = Tex(vit.health, "ARTWORK", "bar")
+vit.health.over:SetVertexColor(1.0, 0.55, 0.48, 0.95)
+vit.health.over:Hide()
+vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
+vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
+vit.health.shield:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
 -- Room for "1000 / 1000" at any bar size (left to size itself, it was cut to "200 / 2...").
@@ -2054,6 +2063,27 @@ function ES.PlaceVitals()
   ES.DrawVitalsLength()
   if ES.PlaceTop then ES.PlaceTop() end
 end
+-- The health bar's overhealth and shield (`H`'s last two): laid on past the health, as wide as
+-- they'd be at the bar's scale; what runs past the end lies over the health from the right.
+function ES.DrawAbsorbs(hp, maxhp, shield, over)
+  local b = vit.health
+  local full = b.full
+  local per = full / math.max(1, maxhp)
+  local ow, sw = math.min(full, over * per), math.min(full, shield * per)
+  local x = math.max(0, math.min(hp * per, full - ow - sw))
+  local function Lay(t, w)
+    if w < 0.5 then t:Hide() return end
+    t:ClearAllPoints()
+    t:SetPoint("TOPLEFT", b, "TOPLEFT", x, 0)
+    t:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", x, 0)
+    t:SetWidth(w)
+    t:Show()
+    x = x + w
+  end
+  Lay(b.over, ow)
+  Lay(b.shield, sw)
+end
+
 -- The bars' lengths: the dock's width by the hero, by what they hold in the corner.
 function ES.DrawVitalsLength()
   local h = ES.h
@@ -3834,7 +3864,14 @@ function ES.DrawHud()
   end
   ES.lastHp = hp
   vit.health:Set(hp / math.max(1, maxhp))
-  vit.healthText:SetText(hp .. " / " .. maxhp)
+  local shield, over = tonumber(h[41]) or 0, tonumber(h[42]) or 0
+  ES.DrawAbsorbs(hp, maxhp, shield, over)
+  -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
+  local text = hp
+  if over > 0 then text = text .. "|cffff9a8f+" .. over .. "|r" end
+  text = text .. " / " .. maxhp
+  if shield > 0 then text = text .. " |cffffffff+" .. shield .. "|r" end
+  vit.healthText:SetText(text)
   vit.stamina:Set(st / math.max(1, maxst))
   local reach = tonumber(h[16]) or 0
   if reach > 0 then
