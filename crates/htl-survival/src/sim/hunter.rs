@@ -737,6 +737,7 @@ impl Survival {
         if let (Some(a), Some(p)) = (self.unit_pos(attacker), self.players.get_mut(&id)) {
             p.facing = facing(at, a);
             p.aim_line = None;
+            p.aim_at = None;
         }
         self.leap_to(id, leap, 1.0, None);
     }

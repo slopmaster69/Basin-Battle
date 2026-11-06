@@ -86,7 +86,8 @@ function ES.StepCatch()
   local moved = not c.f or math.abs(f - c.f) > TURNED or math.abs(e - c.e) > TURNED
   if (moved and since >= SEND_EVERY) or since >= SEND_STILL then
     c.sent, c.f, c.e = now, f, e
-    ES.Say(".es in al" .. string.format(" %.4f %.4f", f, e))
+    -- With the point the reticle is on (ac26), so where it says it catches is where it goes.
+    ES.Say(".es in al" .. ES.AimLine())
   end
 end
 

@@ -148,7 +148,8 @@
 //! - `GP\t<catch 1|0>\t<x>\t<y>\t<z>\t<yards>\t<ground z>\t<ability key>`: while a grappling hook
 //!   is aimed, where its line ends (`yards` along the ground from the hero) and whether it catches there; the
 //!   add-on answers with `.es in al <facing> <elevation>` as the reticle moves. `GP` alone: the
-//!   aim let go.
+//!   aim let go. Any aim line may end with `<x> <y> <z>`, the point the client's reticle is on
+//!   (ac26); the server takes it when it lies on the line and fires from the hands to it.
 //! - `FP\t<guid>\t<secs>\t<clip>\t<take>\t<from>\t<flip 1|0>\t<mine>`: a hero's leap with its own
 //!   look (a Disengage): the clip over the whole body for the flight, from another character
 //!   model (`from`, empty: their own), and a tumble head over heels along the way it flies.
@@ -442,7 +443,20 @@ pub(crate) const VERSION: u32 = 2;
 /// (patches 0041 to 0044).
 /// 43: a staff's mark and stacks (`SF`, `SK`, `SH`, `Staff.lua`), and the ward on the reticle (the
 /// `WA` line's fifth field, whether it's up); the add-on says `ac25` (patch 0045).
-pub(crate) const ADDON_NEWEST: u32 = 43;
+/// 45: no strip on the ground under an aimed shot (Aimed Shot, Axe Throw): the reticle says where
+/// it goes. Beams and grappling hooks keep theirs.
+/// 47: over heads, a thin bar over a hurt foe and nothing else (no names, levels, borders or
+/// friends' plates); the bar across the top names the champion and the foe fought.
+/// 48: an aimed charge (Aimed Shot's draw, Axe Throw's wind-up) shows no bar under the hero: the
+/// reticle's ring closes in and turns gold as it builds.
+/// 49: the add-on says `ac26`, sends the point its reticle is on with every aim line, and the
+/// reticle turns red while cover sits between the hero's hands and that point.
+/// 50: the add-on says `ac27` and squares the shoulders to the aim while the bow is drawn
+/// (`SetAimTurn`): 1.12's draw stands side-on.
+/// 51: the shoulders no longer turned while the bow is drawn: the client steers the bow itself.
+/// 52: the Mage (42, 43) and the bow's aim (45 to 51) together: the add-on says `ac27`, `ac26`,
+/// `ac25` or `ac24` by what the client has.
+pub(crate) const ADDON_NEWEST: u32 = 52;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -454,7 +468,14 @@ pub(crate) const ADDON_NEWEST: u32 = 43;
 /// 23: an action clip on the legs alone (`PlayUnitAnimation`'s body `"lower"`, 0037), a crossfade from one clip to the next (0038), a game object flagged `0x08000000` glowing at its top (0039) and a missile's own speed (the `ML` line's tenth field, 0040).
 /// 24: the Mage's skill checks: rings on the ground (0041), recoloured spell looks (0042), an orb rolled on the ground (0043) and missiles from a held staff's tip (0044).
 /// 25: sprites on units (the ward's barrier) and a clip's last pose held (0045).
-pub(crate) const CLIENT_NEWEST: u8 = 25;
+/// 26: the reticle's own point (`GetReticlePoint`: where the camera's centre line first meets
+/// the world, and whether cover sits between the hands and it), and the aim's circle laid on
+/// that line (0046).
+/// 27: our own hero's shoulders turned as the add-on asks, the head turned back (`SetAimTurn`,
+/// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048), the body
+/// facing the aim while an ability is aimed and the upper body holding it as the legs walk
+/// (0049), and our own drawn bow's line steered onto the reticle (0050).
+pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.
@@ -1405,6 +1426,9 @@ impl SurvivalGame {
                     if let Ok(f) = rest.parse::<f32>() {
                         let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                         self.sim.set_aim_line(me, f, e);
+                        if let Some(at) = aim_point_words(&mut words) {
+                            self.sim.set_aim_point(me, at);
+                        }
                     }
                 }
                 // An attack, its release and an ability key carry the reticle's line (the
@@ -1412,6 +1436,10 @@ impl SurvivalGame {
                 if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
                     let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                     self.sim.set_aim_line(me, f, e);
+                    // And, from a client that reports it (`ac26`), the point its reticle is on.
+                    if let Some(at) = aim_point_words(&mut words) {
+                        self.sim.set_aim_point(me, at);
+                    }
                 }
                 if let Some(i) = input {
                     self.sim.input(me, i);
@@ -2324,5 +2352,28 @@ mod facts_tests {
             let base = (0..c.abilities.len()).find(|b| c.ex_of(*b) == Some(i)).map(|b| &c.abilities[b]);
             println!("{}: {}", a.name, ability_facts(a, base, c.valor.max));
         }
+    }
+}
+
+/// The aim point after a line's facing and elevation (`... <facing> <elevation> <x> <y> <z>`, the
+/// world point the client's reticle is on): all three, or none.
+fn aim_point_words<'a>(words: &mut impl Iterator<Item = &'a str>) -> Option<[f32; 3]> {
+    let x = words.next()?.parse::<f32>().ok()?;
+    let y = words.next()?.parse::<f32>().ok()?;
+    let z = words.next()?.parse::<f32>().ok()?;
+    Some([x, y, z])
+}
+
+#[cfg(test)]
+mod aim_point_tests {
+    use super::aim_point_words;
+
+    #[test]
+    fn an_aim_line_takes_all_three_of_the_points_words_or_none() {
+        let mut w = "1.5 -2.25 30".split_whitespace();
+        assert_eq!(aim_point_words(&mut w), Some([1.5, -2.25, 30.0]));
+        assert_eq!(aim_point_words(&mut "".split_whitespace()), None, "an older client sends none");
+        assert_eq!(aim_point_words(&mut "1 2".split_whitespace()), None);
+        assert_eq!(aim_point_words(&mut "1 x 3".split_whitespace()), None);
     }
 }

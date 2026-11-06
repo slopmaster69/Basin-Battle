@@ -175,6 +175,14 @@ const HAND_AHEAD: f32 = 0.6;
 const HAND_RIGHT: f32 = 0.3;
 /// The reticle's line a cast carries counts this long, and this near the hero's facing.
 const AIM_FRESH: f32 = 0.6;
+/// A reported aim point is taken this far from the hero at most, and when it lies this close (yd)
+/// to the reported line from the aiming camera or within this angle (radians) of it. The client's
+/// camera sits a little behind and above the server's pivot (a gap of tenths of a yard), and its
+/// view can tip up from the line it reports while it presses on the ground (the smart pivot's
+/// bias), a gap that grows with range.
+const AIM_POINT_MOST: f32 = 120.0;
+const AIM_POINT_NEAR: f32 = 1.5;
+const AIM_POINT_SLACK: f32 = 0.2;
 /// After letting an ability go, a beat before the next thing.
 const CAST_RECOVERY: f32 = 0.35;
 /// The throw's clip (AttackThrown) and the pose a thrown charge holds till it goes (HoldThrown):
@@ -483,7 +491,51 @@ impl Survival {
         let (yaw, pitch) = self.aim_of(id);
         let right = if p.shoulder_cam { SHOULDER } else { 0.0 };
         let o = [p.pos[0] + yaw.sin() * right, p.pos[1] - yaw.cos() * right, p.pos[2] + EYE];
+        // Their own reticle's point, when their client sent one with this line: the line goes
+        // through it, so what the server finds along it is what their reticle was on.
+        // Checked again from where the hero is now: a hero who ran or dashed past it since aims
+        // along their line instead of sideways at it.
+        if let (Some(at), Some((_, _, when))) = (p.aim_at, p.aim_line) {
+            if self.clock - when <= AIM_FRESH && point_on_line(o, look_dir(yaw, pitch), at) {
+                return (o, norm([at[0] - o[0], at[1] - o[1], at[2] - o[2]]));
+            }
+        }
         (o, look_dir(yaw, pitch))
+    }
+
+    /// A reported aim point is believable: sent with a line set this very moment (not one left
+    /// from before, or one the server refused), within reach, in front of the hero and on (or near)
+    /// that line from the aiming camera.
+    pub(crate) fn aim_point_ok(&self, id: Id, at: Vec3) -> bool {
+        let Some(p) = self.players.get(&id) else { return false };
+        if !matches!(p.aim_line, Some((_, _, when)) if when == self.clock) {
+            return false;
+        }
+        let (yaw, pitch) = self.aim_of(id);
+        let right = if p.shoulder_cam { SHOULDER } else { 0.0 };
+        let o = [p.pos[0] + yaw.sin() * right, p.pos[1] - yaw.cos() * right, p.pos[2] + EYE];
+        point_on_line(o, look_dir(yaw, pitch), at)
+    }
+
+    /// The facing a shape laid from the hero's feet goes along (a cone, a strip, a beam, a dash):
+    /// toward what their reticle is on, within `reach` (8 yd at least, and on 3, as the server's
+    /// own line runs past the range). The reticle's line runs over the right shoulder, beside the
+    /// feet's: along the facing alone a cone missed a foe right under the reticle. Without a fresh
+    /// line (a cast going off by itself), or with the point at their feet, the facing as before.
+    pub(crate) fn aim_yaw(&self, id: Id, reach: f32) -> f32 {
+        let (yaw, _) = self.aim_of(id);
+        let Some(p) = self.players.get(&id) else { return yaw };
+        if !matches!(p.aim_line, Some((_, _, when)) if self.clock - when <= AIM_FRESH) {
+            return yaw;
+        }
+        let pos = p.pos;
+        let (o, dir) = self.reticle(id);
+        let at = self.trace(o, dir, reach.max(8.0) + 3.0, 0.0, id).point;
+        if dist2d(pos, at) > 1.0 {
+            facing(pos, at)
+        } else {
+            yaw
+        }
     }
 
     /// Where a cast leaves the hero's hands.
@@ -494,6 +546,33 @@ impl Survival {
             p.pos[1] + yaw.sin() * HAND_AHEAD - yaw.cos() * HAND_RIGHT,
             p.pos[2] + HAND_UP,
         ]
+    }
+
+    /// Where a shot starts: the hands, unless something solid stands between them and the chest
+    /// (a hero pressed to a wall reaches past it, and a shot started there flew on beyond the
+    /// wall), then the chest, so the wall in front takes it. Looked at every tenth of a yard:
+    /// [`crate::land::clear_line`] can't tell, as it leaves the 0.6 yd at each end of its line to
+    /// the bodies there, and the hands are hardly more than that out. A chest already in a solid
+    /// cell (at its edge) gives no telling which side the wall is: the hands, as before.
+    pub(crate) fn shot_from(&self, id: Id, yaw: f32) -> Vec3 {
+        let hands = self.hands(id, yaw);
+        let pos = self.players[&id].pos;
+        let chest = [pos[0], pos[1], pos[2] + HAND_UP];
+        // As a flying shot meets them: a wall, or the ground over it.
+        let solid = |at: Vec3| self.land.blocked_near(at[0], at[1], at[2]) || at[2] < self.land.height_near(at[0], at[1], at[2] + 0.6) - 0.05;
+        if solid(chest) {
+            return hands;
+        }
+        let steps = (dist2d(chest, hands) / 0.1).ceil().max(1.0) as usize;
+        let walled = (1..=steps).any(|k| {
+            let t = k as f32 / steps as f32;
+            solid([chest[0] + (hands[0] - chest[0]) * t, chest[1] + (hands[1] - chest[1]) * t, chest[2] + (hands[2] - chest[2]) * t])
+        });
+        if walled {
+            chest
+        } else {
+            hands
+        }
     }
 
     /// The bodies a line can meet: (unit, feet, height, width), not `skip`'s (and heroes only with
@@ -755,7 +834,7 @@ impl Survival {
             // A thrown one: the arm drawn back while it's aimed (the harpoon held ready, the axe
             // wound up), till it goes or the aim is let go.
             if thrown(&d) {
-                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0, body: ClipBody::Full });
+                self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: AIM_HOLD_SECS, at: 0.0, body: ClipBody::Upper });
             }
         } else {
             if d.bow {
@@ -881,7 +960,7 @@ impl Survival {
             let ms = ((hi + d.hold.max(0.5)) * 1000.0) as u32;
             self.events.push(Event::Cast { caster: id, spell, ms });
         } else if d.clip == THROW_CLIP {
-            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0, body: ClipBody::Full });
+            self.events.push(Event::Clip { id, clip: HOLD_THROWN, take: 0, from: None, secs: hi + d.hold.max(0.5), at: 0.0, body: ClipBody::Upper });
         }
         // A staff's heavy bolt builds up: the weapon held at the ready, a flash in the hands.
         if d.charge_pose != 0 {
@@ -1192,7 +1271,7 @@ impl Survival {
         if d.counter.is_none() && !matches!(free, Some(Free::Recast { .. })) {
             self.spend_charge(id, ability, 1.0);
         }
-        let (yaw, _) = self.aim_of(id);
+        let yaw = self.aim_yaw(id, AbilityDef::at(d.range, share));
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = yaw;
         }
@@ -1423,7 +1502,7 @@ impl Survival {
         };
         // Where the reticle points: the projectile flies from the hands to there, and on.
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
-        let from = self.hands(id, yaw);
+        let from = self.shot_from(id, yaw);
         let to_aim = norm([aim.point[0] - from[0], aim.point[1] - from[1], aim.point[2] - from[2]]);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { to_aim };
         // A thrown axe that comes back skims the ground along the aim's line, at hand height over
@@ -2532,7 +2611,7 @@ impl Survival {
             d = next;
         }
         // Near it: the friend closest to the line, within the cone and the range, in sight.
-        let (yaw, _) = self.aim_of(id);
+        let yaw = self.aim_yaw(id, range);
         let (c, s) = (yaw.cos(), yaw.sin());
         let off = |at: Vec3| (-(at[0] - pos[0]) * s + (at[1] - pos[1]) * c).abs();
         friends
@@ -2602,14 +2681,16 @@ impl Survival {
         }
     }
 
-    /// Avenging Wrath's wave: along the hero's facing, foes struck (a share of the weapon) and
-    /// friends shielded for a share of their health (a new shield replaces the old).
+    /// Avenging Wrath's wave: toward what the reticle is on (as every strip from the feet goes),
+    /// foes struck (a share of the weapon) and friends shielded for a share of their health (a
+    /// new shield replaces the old). Along the body's facing it missed the foe the player aimed at.
     pub(crate) fn avenging_wave(&mut self, id: Id) {
         let Some(wave) = self.content.ability("avenging_wave") else { return };
         let d = self.content.abilities[wave].clone();
-        let Some(p) = self.players.get(&id) else { return };
-        let (pos, yaw) = (p.pos, p.facing);
         let len = AbilityDef::at(d.range, 1.0);
+        let yaw = self.aim_yaw(id, len);
+        let Some(p) = self.players.get(&id) else { return };
+        let pos = p.pos;
         let half = AbilityDef::at(d.radius, 1.0).max(0.5);
         let w = self.weapon_of(p).damage;
         let damage = self.roll(w) as f32 * d.weapon;
@@ -3180,8 +3261,8 @@ impl Survival {
             p.action = Action::Channel { ability, target, until, next: next + tick, share };
         }
         let pos = self.players[&id].pos;
-        let (yaw, _) = self.aim_of(id);
         let len = AbilityDef::at(d.range, share);
+        let yaw = self.aim_yaw(id, len);
         let half = AbilityDef::at(d.radius, share);
         let (c, s) = (yaw.cos(), yaw.sin());
         let along = |at: Vec3| (at[0] - pos[0]) * c + (at[1] - pos[1]) * s;
@@ -3668,6 +3749,7 @@ impl Survival {
                     if checked {
                         self.events.push(Event::CheckResult { player: id, ability, grade: "early" });
                     }
+                    self.keep_charge_aim(id, since);
                     self.fire(id, ability, if hi > lo { ((held - lo) / (hi - lo)).clamp(0.0, 1.0) } else { 1.0 });
                 } else if all && held > self.players[&id].check_flare + self.content.checks.window + 0.05 {
                     self.fizzle(id, ability);
@@ -3675,6 +3757,7 @@ impl Survival {
                     if checked {
                         self.events.push(Event::CheckResult { player: id, ability, grade: "late" });
                     }
+                    self.keep_charge_aim(id, since);
                     self.fire(id, ability, 1.0);
                 }
             }
@@ -3717,6 +3800,22 @@ impl Survival {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// A charge going off by itself (held past its hold, or let go before its least and reaching
+    /// it now): the player's last line, sent while it was held, is still where they aim, though
+    /// none has come for more than a moment (a view held still on its mark sends none). Made
+    /// fresh again for it, as Skyfall's volley does its own; stale, the cast went level along the
+    /// body's facing. A line from before the charge began stays stale: it's no aim at this cast.
+    fn keep_charge_aim(&mut self, id: Id, since: f32) {
+        let now = self.clock;
+        if let Some(p) = self.players.get_mut(&id) {
+            if let Some((f, e, when)) = p.aim_line {
+                if when >= since && now - when > AIM_FRESH {
+                    p.aim_line = Some((f, e, now));
+                }
+            }
         }
     }
 
@@ -3872,3 +3971,20 @@ impl Survival {
 
 /// How long the bow's drawn pose is cast for: held until the shot or the aim is let go.
 pub(crate) const DRAW_HOLD_MS: u32 = 60_000;
+
+/// A point on the reticle's line from `o` along `d`: finite, within reach, ahead (never more than
+/// 45 degrees off it, so a near point can't turn the shot sideways) and close to the line, by
+/// distance or by angle (`AIM_POINT_NEAR`, `AIM_POINT_SLACK`).
+fn point_on_line(o: Vec3, d: Vec3, at: Vec3) -> bool {
+    if !at.iter().all(|v| v.is_finite()) {
+        return false;
+    }
+    let v = [at[0] - o[0], at[1] - o[1], at[2] - o[2]];
+    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if !(0.5..=AIM_POINT_MOST).contains(&len) {
+        return false;
+    }
+    let along = v[0] * d[0] + v[1] * d[1] + v[2] * d[2];
+    let off = ((len * len - along * along).max(0.0)).sqrt();
+    along > 0.0 && off <= along && (off <= AIM_POINT_NEAR || off <= along * AIM_POINT_SLACK.tan())
+}
