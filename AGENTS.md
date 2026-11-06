@@ -43,8 +43,11 @@ gh pr list                              # what others are working on right now
   `dave/siege-balance`.
 - Keep a branch to one purpose. A pull request a reviewer can read in ten minutes gets merged the
   same day; a sprawling one rots while `main` moves under it.
-- Rebase on `main` before opening the pull request and again before it merges
-  (`git pull --rebase origin main`), and rerun the checks after rebasing.
+- Start from the latest `main`. A pull request's checks are only that it builds (Linux, Windows,
+  macOS) and merges into `main` without a conflict; bring it up to `main`
+  (`git pull --rebase origin main`) when "Merges cleanly with main" fails, not after every merge.
+  The tests run on `main` after each merge: run them yourself before pushing
+  (`cargo test --workspace`, `scripts/check-addon.sh`), or with "Run workflow" on the CI workflow.
 - Commit messages: a short summary line of what changes for the player or the code ("A left click
   no longer runs the hero forward"), then why, if it isn't obvious.
 - Open a **draft** pull request early to show what you're on; mark it ready when the checks pass.
