@@ -203,8 +203,8 @@ local ICON_FIRST = 10
 local DULL = "Sound\\Interface\\iDeselectTarget.wav"
 -- The meter (Cone of Cold, after Gladius's swing meter), in Corey's frost art: the ice arc over the
 -- reticle, its good zone lit in blue along the channel, the sweet spot's ice gem pulsing on it, the
--- cracked overrun past its end, and the ice-shard cursor sliding along the channel, standing upright
--- (Corey: a cursor that tilts reads as pointing at the middle; it's a side-scrolling indicator).
+-- cracked overrun past its end, and the ice-shard cursor riding the channel, square to the curve with
+-- its tip outward, like a gauge's needle.
 local METER_N, METER_OVER = 40, 0
 local METER_R, METER_HALF = 156, 55
 -- The frame's square, drawn so its circle's centre is the reticle (its channel `METER_R` out).
@@ -979,8 +979,8 @@ local function DrawMeter(c, at, fade)
   local ox, oy, oang = MeterXY(c, 1.1)
   Draw(meterOver, 96, oang, 0.9 * fade, 1, 1, 1, ox, oy)
   if at then
-    local x, y = MeterXY(c, Clamp(at, 0, 1.12))
-    Draw(meterCursor, 100, 0, fade, 1, 1, 1, x, y)
+    local x, y, ang = MeterXY(c, Clamp(at, 0, 1.12))
+    Draw(meterCursor, 100, ang, fade, 1, 1, 1, x, y)
     -- A glow under the shard, so it reads over the jet.
     Draw(halo, 60, 0, 0.6 * fade, 0.7, 0.9, 1, x, y)
   else
@@ -1129,8 +1129,8 @@ local function StepFx(now)
     local shake = (1 - t) * 6 * math.sin(age * 60)
     local ox, oy, oang = MeterXY(f.meter, 1.1)
     Draw(meterOver, 96 * (1 + 0.25 * (1 - t)), oang, 1 - t * t, 1, 0.35 + 0.3 * t, 0.3 + 0.3 * t, ox + shake, oy)
-    local cx, cy = MeterXY(f.meter, 1.1)
-    Draw(meterCursor, 100, 0, 1 - t, 1, 0.5, 0.5, cx + shake, cy)
+    local cx, cy, cang = MeterXY(f.meter, 1.1)
+    Draw(meterCursor, 100, cang, 1 - t, 1, 0.5, 0.5, cx + shake, cy)
     pop:Hide(); core:Hide(); burst:Hide(); tick:Hide(); star:Hide(); wave:Hide(); ghost:Hide(); target:Hide(); crack:Hide(); fizzle:Hide()
   else
     -- Failed: the red crack bursts apart with a jolt; a fizzle puffs out of the middle and dies.
