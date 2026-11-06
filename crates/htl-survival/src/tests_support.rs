@@ -365,8 +365,9 @@ fn with_friendly_fire_on_holy_nova_heals_a_co_op_friend_and_never_strikes_them()
     let b = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
     let hb = halve(&mut s, b);
     let ev = cast(&mut s, a, "holy_nova");
-    let max = s.players[&b].max_health;
-    assert_eq!(s.players[&b].health, hb + (max as f32 * 0.06).round() as u32, "mended, not struck");
+    // (Holy Nova heals 16, not a share of their health, and 25% more for Bren, the other hero
+    // inside it: draft 3's Light Priest.)
+    assert_eq!(s.players[&b].health, hb + 20, "mended, not struck");
     assert_eq!(hits_on(&ev, b), 0, "no blow on him");
     // A nova that mends nobody still strikes whoever friendly fire allows.
     run_still(&mut s, &[], 1.0);

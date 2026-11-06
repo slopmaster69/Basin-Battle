@@ -140,7 +140,7 @@ impl Survival {
         // A boon (Rallying Cry, holy ground's) helps: the rules that soften what harms don't touch it.
         let boon = crate::content::BOONS.contains(&kind);
         // Nothing reaches someone in Ice Block, in Retaliation's answer, or up on Skyfall.
-        if (self.untouchable(target) || self.skyfall_aloft(target)) && !boon {
+        if (self.untouchable(target) || self.skyfall_aloft(target) || self.salvation_aloft(target)) && !boon {
             return false;
         }
         // Freed (Blessing of Freedom): no root, slow or stun takes hold.
@@ -306,8 +306,9 @@ impl Survival {
         let now = self.clock;
         let still = self.held_still(id)
             || self.players.get(&id).is_some_and(|p| p.hold_until > now && p.health > 0)
-            // Skyfall's hang: held up there in the air.
+            // Skyfall's hang, or Salvation's: held up there in the air.
             || self.hanging(id)
+            || self.salvation_held(id)
             || self.players.get(&id).is_some_and(|p| matches!(&p.action, Action::Stance { ability, .. } if self.content.abilities[*ability].counter.as_ref().is_some_and(|c| c.immune)));
         let Some(p) = self.players.get_mut(&id) else { return };
         if p.rooted != still {
@@ -542,6 +543,22 @@ impl Survival {
         }
     }
 
+    /// End everything `from` put on a hero (a duel over: the foe's slows, burns and holds).
+    pub(crate) fn cleanse_from(&mut self, id: Id, from: Id) {
+        let now = self.clock;
+        let Some(list) = self.cc.get_mut(&id) else { return };
+        let mut gone = Vec::new();
+        for c in list.iter_mut() {
+            if c.from == from && c.until > now {
+                c.until = now;
+                gone.push(c.kind.clone());
+            }
+        }
+        if !gone.is_empty() {
+            self.cc_ended(id, &gone);
+        }
+    }
+
     /// Take a unit's effects off (a blink out of roots, Tremor Totem's pulse on a panic).
     pub(crate) fn cleanse(&mut self, id: Id, kinds: &[&str]) {
         let now = self.clock;
@@ -653,6 +670,8 @@ impl Survival {
             if p.ward_up && self.content.ward.aura != 0 {
                 out.push(self.content.ward.aura);
             }
+            // The Priest's own: an Empowered staff, Salvation's wings.
+            out.extend(self.priest_auras(id));
         }
         // A creature's own look (a spirit beast's glow).
         if let Some(m) = self.mobs.get(&id) {
@@ -663,6 +682,8 @@ impl Survival {
         }
         // A sticky projectile's fuse burning on them.
         out.extend(self.fuse_auras(id));
+        // Salvation's Holy Light.
+        out.extend(self.sigil_auras(id));
         out.sort_unstable();
         out.dedup();
         out

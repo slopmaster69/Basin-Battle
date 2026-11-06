@@ -77,7 +77,7 @@
 //! - `RO\t<guid>\t<secs>\t<mine>`: a hero rolls (a dodge).
 //!
 //! And to the third round (`ac3`), which runs its own dashes and lunges:
-//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<friendly fire>\t<out of a dodge>\t<out of a Corey roll>`:
+//! - `MV\t<two-handed>\t<chain after>\t<cancel after>\t<heavy cancel after>\t<combo grace>\t<lunge secs>\t<dodge secs>\t<dodge speed>\t<dash secs>\t<light blows ^>\t<heavy>\t<running>\t<bash>\t<kick>\t<strikes heroes: friendly fire, or a duel under way>\t<out of a dodge>\t<out of a Corey roll>`:
 //!   the hero's blows, each `clip~take~impact~recovery~lunge~stamina~range~arc`.
 //! - `AN` goes on `\t<take>\t<recovery>\t<lunge>\t<kind>\t<step>\t<from>`: `from` another
 //!   character model whose take on the clip to play (`ScourgeFemale`), empty for the unit's own
@@ -131,13 +131,33 @@
 //!   spot's share of the sweep, `crit` the perfect zone either side, `pattern` "lr|rl|<good zone>");
 //!   otherwise `crit` the critical's share of a
 //!   window; `school` fire, frost or arcane.
+//! - `PL\t<kind>\t<n>\t<guid>\t<a>\t<b>\t<own>`: a Priest look in Corey's art (`PriestLook.lua`):
+//!   shield (a perfect Shield on that unit), flay (`n` 1 taut, `a` the cord's share of its range,
+//!   `b` where taut begins), snap, penance (ring `n` closing on that unit in `a` seconds, `b` 1 a
+//!   friend), penance_hit (ring `n`: `a` 1 landed, `b` 1 dead on), fade (an afterimage on that
+//!   hero), light (`n` stacks of Holy Light, `a` their seconds), shell (`n` stored, `a` its share
+//!   of the most, `b` 1 let go), rift (`n` foes caught, `a` its reach, `b` seconds left), hollow
+//!   (the orb at `n` health, `a` its reach, `b` its most), empower (`n` 1: the shadow staff's next
+//!   bolt is Empowered). `own` 1 on the hero's own client. Shield and fade go to everyone; the
+//!   rest to the hero.
+//! - `PG\t<kind>\t<key>\t<x>\t<y>\t<z>\t<radius>\t<secs>`: a Priest's mark on the ground, for
+//!   everyone: `feather` (Angelic Feather) or `rift` (Void Rift), `radius` yards, for `secs`
+//!   (`radius` 0: it's gone). Drawn on a client with SetGroundRing (`PriestLook.lua`).
+//! - `SV\t<key>\t<x>\t<y>\t<z>\t<radius>\t<beats>`: Holy Word: Salvation laid, for everyone: its
+//!   circle at that spot, `radius` yards, a ring running out from the centre to the edge on each
+//!   beat (`beats` the seconds from now, comma-separated). Drawn on a client with SetGroundRing
+//!   (`Priest.lua`). (Up to add-on 48 the ring closed on the centre.)
+//! - `SK\t<kind>\t<n>\t<most>\t<guid>`: a staff's stacks: heat, chill, charge (the Mage's), weave
+//!   (Shadow Weaving on that foe) or sear (Searing Light on it), `n` of `most`.
 //! - `MO\t<guid>\t<origin>`: where that hero's missiles leave from: `weapon` (a casting staff's
 //!   tip, on a client with SetUnitMissileOrigin), empty for the hands.
 //! - `OB\t<key>\t<x>\t<y>\t<z>\t<x2>\t<y2>\t<z2>\t<secs>\t<model>\t<scale>`: an orb set rolling
 //!   from one spot to another over `secs` (Frozen Orb), its model and size, for a client that draws
 //!   it (`PlayGroundOrb`); `OX\t<key>`: it stopped or was spent.
 //! - `CR\t<ability key>\t<grade>`: its outcome: perfect, good, early, late, full (a whole rhythm), fail, fizzle,
-//!   or `cancel` (its cast called off or cut short: the ring goes quietly).
+//!   or `cancel` (its cast called off or cut short: the ring goes quietly); then its school (fire,
+//!   frost, arcane, holy, shadow) for an outcome with no ring up, or `world` for one shown on the
+//!   bodies it's about (Penance's rings), drawn on nothing.
 //! - `PF\t<ability key>`: the hero released that ability on its flare, a perfect cast (for a beat
 //!   on their own screen; its burst and Valor come as ever).
 //! - `TR\t<dev>\t<count>\t<card...>^...`: the board (N), five rows of a card a class, and the
@@ -242,13 +262,16 @@ pub(crate) fn ability_facts(d: &htl_survival::content::AbilityDef, base: Option<
     if d.area_heal > 0.0 {
         out.push(format!("{}% healing", pct(d.area_heal)));
     }
+    if d.mend > 0.0 {
+        out.push(format!("{} healing", n(d.mend)));
+    }
     match d.kind.as_str() {
         _ if d.hunt == "tripwire" && d.inner => out.push(format!("Within {} yd of the first arrow", n(htl_survival::sim::hunter::WIRE_SPAN))),
         _ if d.hunt == "tripwire" => out.push(format!("{} yd range · {} yd wire at most · {} sec duration", n(d.range[1]), n(htl_survival::sim::hunter::WIRE_SPAN), n(d.secs))),
         _ if d.hunt == "call" || d.hunt == "double_call" => out.push(format!("{} yd range", n(d.range[1]))),
         _ if d.hunt == "recall" => out.push("Every planted arrow · Lacerates at 3+ arrows".to_string()),
         _ if d.hunt == "volley" => out.push(format!("{} arrows · {} yd range · {} yd radius", d.count, n(d.range[1]), n(d.radius[1]))),
-        "nova" => out.push(format!("{} yd radius", n(d.radius[1]))),
+        "nova" | "sigil" => out.push(format!("{} yd radius", n(d.radius[1]))),
         "ground" if d.at_self => out.push(format!("{} yd radius", n(d.radius[1]))),
         "ground" => out.push(format!("{} yd range · {} yd radius", n(d.range[1]), n(d.radius[1]))),
         "cone" => out.push(format!("{} yd cone", n(d.range[1]))),
@@ -456,7 +479,11 @@ pub(crate) const VERSION: u32 = 2;
 /// 51: the shoulders no longer turned while the bow is drawn: the client steers the bow itself.
 /// 52: the Mage (42, 43) and the bow's aim (45 to 51) together: the add-on says `ac27`, `ac26`,
 /// `ac25` or `ac24` by what the client has.
-pub(crate) const ADDON_NEWEST: u32 = 52;
+/// 53: the Priest. The right mouse carries the reticle's line (`in g <facing> <elevation>`): a
+/// Priest's staff casts its right click along it (Flash Heal, Drain); an older add-on's press
+/// goes along the hero's facing. Draft 3's lines: `PG`, the `PL` kinds penance to empower, `SK`
+/// weave and sear, and Salvation's ring running out to the edge.
+pub(crate) const ADDON_NEWEST: u32 = 53;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -830,7 +857,7 @@ impl SurvivalGame {
             light.join("^"),
             shove(&c.bash),
             shove(&c.kick),
-            u8::from(c.pvp.friendly_fire),
+            u8::from(self.sim.strikes_heroes(id)),
         ))
     }
 
@@ -1432,9 +1459,9 @@ impl SurvivalGame {
                         }
                     }
                 }
-                // An attack, its release and an ability key carry the reticle's line (the
-                // client's own camera, as a facing and an elevation).
-                if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..)), Ok(f)) = (input, rest.parse::<f32>()) {
+                // An attack, its release, an ability key and the right mouse carry the reticle's
+                // line (the client's own camera, as a facing and an elevation).
+                if let (Some(Input::Attack | Input::Heavy | Input::AttackUp | Input::Ability(..) | Input::Guard), Ok(f)) = (input, rest.parse::<f32>()) {
                     let e = words.next().and_then(|w| w.parse::<f32>().ok()).unwrap_or(0.0);
                     self.sim.set_aim_line(me, f, e);
                     // And, from a client that reports it (`ac26`), the point its reticle is on.
@@ -1542,6 +1569,7 @@ impl SurvivalGame {
                 let mode: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("dummy")).skip(1).collect();
                 self.sim.spawn_dummy(me, &mode.join(" ")).map(|t| self.tell(conn, &format!("{t} stands before you.")))
             }
+            "duel" => self.duel_command(me, &arg),
             "cc" if arg == "log" => {
                 let log = self.sim.cc_log_of(me);
                 if log.is_empty() {
@@ -2051,7 +2079,7 @@ impl SurvivalGame {
             "projectile" if d.count > 1 => "fan",
             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
             "cone" => "cone",
-            "nova" | "stance" | "art" | "buff" => "self",
+            "nova" | "stance" | "art" | "buff" | "sigil" => "self",
             _ => "line",
         };
         let shape = |d: &htl_survival::content::AbilityDef| if d.at_self { "self" } else { shape(d) };
@@ -2147,7 +2175,7 @@ impl SurvivalGame {
                             "projectile" if d.count > 1 && !d.lob => "fan",
                             "ground" | "place" | "trap" | "leap" | "blink" => "circle",
                             "cone" => "cone",
-                            "nova" | "stance" | "art" | "buff" => "self",
+                            "nova" | "stance" | "art" | "buff" | "sigil" => "self",
                             _ => "line",
                         };
                         let shape = if d.at_self || !d.aimed() { "self" } else { shape };

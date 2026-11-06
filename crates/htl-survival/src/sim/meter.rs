@@ -147,7 +147,21 @@ impl Survival {
     pub(crate) fn meter_dealt(&mut self, by: Id, victim: Id, amount: u32, label: &str) {
         if by != victim {
             self.meter_count(by, Kind::Dealt, amount, label, true);
+            self.vampiric(by, victim, amount);
         }
+    }
+
+    /// Vampiric Touch: what a hero deals a foe they've touched heals them a share of it (only
+    /// them: another's blows on it heal no one).
+    fn vampiric(&mut self, by: Id, victim: Id, amount: u32) {
+        let now = self.clock;
+        if amount == 0 || !self.players.contains_key(&by) {
+            return;
+        }
+        let Some(share) = self.cc_of(victim).iter().find(|c| c.kind == "vampiric" && c.from == by && c.until > now).map(|c| c.amount) else { return };
+        let heal = (amount as f32 * share).round() as u32;
+        let label = self.cc_of(victim).iter().find(|c| c.kind == "vampiric").map_or_else(String::new, |c| c.source.clone());
+        self.heal_hero_by(by, heal, by, &label);
     }
 
     /// A hero lost `amount` of health.

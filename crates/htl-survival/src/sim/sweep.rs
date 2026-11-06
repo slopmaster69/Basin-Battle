@@ -274,7 +274,7 @@ impl Survival {
             dd <= range + size && (pos[2] - at[2]).abs() <= 4.0 && (dd < 0.8 || angle_between(yaw, facing(at, pos)) <= arc / 2.0)
         };
         let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| **mid != owner && m.health > 0 && !m.hidden && inside(m.pos, 0.5 * self.content.mobs[m.def].scale) && !self.own_totem(**mid, owner) && !self.spirit_body(**mid)).map(|(id, _)| *id).collect();
-        let heroes: Vec<Id> = if self.content.pvp.friendly_fire {
+        let heroes: Vec<Id> = if self.heroes_clash() {
             self.players.iter().filter(|(h, p)| self.hostile(owner, **h) && !self.spared(owner, **h, ability) && p.health > 0 && inside(p.pos, HERO_SIZE)).map(|(h, _)| *h).collect()
         } else {
             Vec::new()

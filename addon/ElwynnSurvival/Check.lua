@@ -44,6 +44,20 @@ local SCHOOL = {
     spin = 0.08, spin2 = -0.12, sound = "Sound\\Spells\\FrostNova.wav",
     fizzle = "Sound\\Spells\\Fizzle\\FizzleFrostA.wav",
   },
+  -- The Priest's: Penance's gold ring of light, and the same in white made shadow's violet (never the Mage's
+  -- arcane on a Priest's staff: Corey).
+  holy = {
+    ring = "priest_penance_ring", line = 0.68, size = 160,
+    tint = { 1.0, 0.9, 0.6 }, glow = { 1.0, 0.97, 0.85 },
+    spin = 0.12, spin2 = -0.2, sound = "Sound\\Spells\\ArcaneMissileImpact1a.wav",
+    fizzle = "Sound\\Spells\\Fizzle\\FizzleHolyA.wav",
+  },
+  shadow = {
+    ring = "priest_ring_white", line = 0.68, size = 160,
+    tint = { 0.7, 0.42, 1.0 }, glow = { 0.85, 0.7, 1.0 }, ringTint = { 0.72, 0.45, 1.0 },
+    spin = 0.18, spin2 = -0.25, sound = "Sound\\Spells\\ArcaneMissileImpact1a.wav",
+    fizzle = "Sound\\Spells\\Fizzle\\FizzleShadowA.wav",
+  },
   arcane = {
     ring = "ring_arcane", line = 0.71, size = 170,
     tint = { 1.0, 0.36, 0.92 }, glow = { 1.0, 0.75, 1.0 },
@@ -51,6 +65,8 @@ local SCHOOL = {
     fizzle = "Sound\\Spells\\Fizzle\\FizzleShadowA.wav",
   },
 }
+-- A school ring drawn in its own colours (the shadow's is Penance's ring in white, made violet).
+local WHITE3 = { 1, 1, 1 }
 local TICK = "Sound\\interface\\MagicClick.wav"
 local CHIME = "Sound\\interface\\igTextPopupPing02.wav"
 -- The closing ring's texture draws its line at 0.30 of the square: 0.849 of a turned quad's half.
@@ -443,8 +459,13 @@ function ES.CheckResultLine(f)
     end
     return
   end
-  check.last = { key = key, grade = grade, at = GetTime(), school = "arcane" }
-  Outcome(grade, "arcane")
+  -- No ring up: shown in its own school (the server's third field; arcane from an older one), or
+  -- not on the reticle at all when it's shown on the bodies (`world`: Penance's rings).
+  local school = f[4]
+  if school == "world" then return end
+  if not SCHOOL[school or ""] then school = "arcane" end
+  check.last = { key = key, grade = grade, at = GetTime(), school = school }
+  Outcome(grade, school)
 end
 
 -- --- the press, as this side sees it ---------------------------------------------------------------
@@ -594,7 +615,8 @@ local function DrawRing(c, now, open, inCrit)
     a2 = a2 + 0.35
     scale = scale * 1.05
   end
-  Draw(ring, size * scale, t * sc.spin, alpha, 1, 1, 1)
+  local rt = sc.ringTint or WHITE3
+  Draw(ring, size * scale, t * sc.spin, alpha, rt[1], rt[2], rt[3])
   Draw(ring2, size * scale * 1.025, t * sc.spin2 + 1.1, a2, sc.glow[1], sc.glow[2], sc.glow[3])
   if open then
     Draw(halo, size * 1.35, 0, inCrit and 0.55 or 0.32, sc.tint[1], sc.tint[2], sc.tint[3])

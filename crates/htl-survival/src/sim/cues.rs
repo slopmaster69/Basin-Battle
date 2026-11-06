@@ -71,6 +71,8 @@ pub const BEAT_VALOR_BACK: &str = "valor";
 /// Thrown up by a blow's leap (Raptor Strike's Uppercut): the camera in and tipped down on the
 /// fight, to aim the dive. A camera beat, no stop and no shake.
 pub const BEAT_RISE: &str = "rise";
+/// Raised on Salvation's wings: the camera up with the Priest, looking down on the field.
+pub const BEAT_SALVATION: &str = "salvation";
 
 // --- the hero's voice on a refusal --------------------------------------------------------------------
 
