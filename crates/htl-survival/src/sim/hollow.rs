@@ -5,8 +5,8 @@
 //! Tether: a cord to whatever is under the reticle, ramping up the longer it holds. On a foe it
 //! hurts, on a friend it heals, and on the Priest's own orb it fills it and draws it toward them.
 //!
-//! The orb is drawn as a model rolling between where it was and where it's going (`OrbRoll`), on
-//! an unseen body the blows find.
+//! The orb is an unseen body the blows find, wearing Shadow Shell's dark bubble (its mob's `aura`),
+//! grown and shrunk with its health (`Grow`).
 
 use super::*;
 use crate::content::AbilityDef;
@@ -50,9 +50,8 @@ impl Survival {
             self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(at) });
         }
         let lifted = [at[0], at[1], at[2] + 1.0];
-        let from = self.players.get(&id).map_or(lifted, |p| [p.pos[0], p.pos[1], p.pos[2] + 1.3]);
         let scale = self.hollow_scale(&hd, hd.health);
-        self.events.push(Event::OrbRoll { look, from, to: lifted, secs: 0.35, model: d.orb_model.clone(), scale });
+        self.events.push(Event::Grow { id: mid, scale });
         self.light.hollows.push(Hollow { mob: mid, owner: id, ability, look, next: now + 0.5, until: now + d.secs.max(1.0), shown: lifted });
     }
 
@@ -153,8 +152,7 @@ impl Survival {
             return;
         }
         let scale = self.hollow_scale(&hd, health);
-        let model = self.content.abilities[h.ability].orb_model.clone();
-        self.events.push(Event::OrbRoll { look: h.look, from: h.shown, to: h.shown, secs: 0.2, model, scale });
+        self.events.push(Event::Grow { id: mob, scale });
         self.events.push(Event::PriestLook { player: h.owner, kind: "hollow", n: hp, on: Some(mob), a: Self::hollow_reach(&hd, health), b: max as f32 });
     }
 
@@ -177,14 +175,7 @@ impl Survival {
             m.pos = to;
         }
         self.events.push(Event::MobStop { id: mob, pos: to, facing: f });
-        let h = self.light.hollows[k].clone();
-        let lifted = [to[0], to[1], to[2] + 1.0];
-        let hd = self.content.abilities[h.ability].hollow.clone();
-        let health = self.mobs.get(&mob).map_or(0.0, |m| m.health as f32);
-        let scale = hd.as_ref().map_or(1.0, |hd| self.hollow_scale(hd, health));
-        let model = self.content.abilities[h.ability].orb_model.clone();
-        self.events.push(Event::OrbRoll { look: h.look, from: h.shown, to: lifted, secs: 0.25, model, scale });
-        self.light.hollows[k].shown = lifted;
+        self.light.hollows[k].shown = [to[0], to[1], to[2] + 1.0];
     }
 
     fn hollow_gone(&mut self, h: &Hollow) {

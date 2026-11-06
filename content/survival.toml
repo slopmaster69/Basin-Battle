@@ -4612,10 +4612,12 @@ impact_kit = 728
 
 [[mob]]
 # The Hollow Star's body (the Staff of the Hollow Star's right click): an unseen totem the blows
-# find, its health the orb's; the orb itself is drawn rolling where it is (`OrbRoll`).
+# find, its health the orb's, wearing Shadow Shell's dark bubble.
 key = "hollow_star"
 name = "Hollow Star"
 display = 1359
+# Shadow Shell's dark bubble: the orb you see.
+aura = 9657
 health = 40
 run_speed = 0.0
 walk_speed = 0.0
@@ -6364,9 +6366,9 @@ kind = "shell"
 cooldown = 12.0
 secs = 2.0
 shell = { shard = "shadowguard_shard", secs = 2.0, cut = 0.5, pace = 0.5, cap = 40.0, window = 0.3, perfect = 1.5, perfect_cap = 45.0 }
-# Shadowform's dark swirl on the Priest while it holds.
-spell = 15473
-aura = 15473
+# Shadow Shell's dark bubble round the Priest while it holds.
+spell = 9657
+aura = 9657
 
 [[ability]]
 key = "shadowguard_shard"
@@ -6943,7 +6945,6 @@ cooldown = 18.0
 hollow = { mob = "hollow_star", health = 40.0, most = 60.0, reach = [3.0, 5.0], damage = 5.0, heal = 5.0, scale = [0.9, 1.7] }
 effects = [{ kind = "haste", secs = [1.2, 1.2], amount = 0.15 }]
 spell = 27812
-orb_model = "Spells\\Shadow_Snare_High_base.mdx"
 
 # ------------------------------------------------------------------------------------- Mage --
 
