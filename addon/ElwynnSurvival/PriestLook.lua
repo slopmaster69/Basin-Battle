@@ -28,7 +28,7 @@ local onGround = {}
 -- (The ring's art fills the middle 70% of its texture: a size of 1.5 draws a ring a yard across.)
 local RING_OPEN, RING_SHUT, RING_LEAD = 4.2, 1.5, 0.9
 -- How a ring that landed flares, and one that was lost breaks apart.
-local HIT, LOST = 0.35, 0.7
+local HIT, LOST = 0.35, 0.9
 -- Mind Blast's heart (yards: the rules' `heart`), drawn inside its edge.
 local BLAST_HEART = 1.0
 -- The shadow staff's glow while the next bolt waits Empowered.
@@ -221,9 +221,11 @@ local function StepBodies(now)
           -- Let pass: that body's own ring breaks, grey, its pieces flying apart (Corey: the miss
           -- shows on the ring that was missed).
           local q = (now - u.doneAt) / LOST
-          r, g, b = 0.62, 0.62, 0.7
+          -- A dull red, bigger than the ring was, so it reads from behind at a pack's distance
+          -- (grey was lost in the grass on the first film).
+          r, g, b = 1, 0.42, 0.32
           tex, spin = "priest_penance_ring_broken", now * 0.8 + 1.2 * q
-          size, alpha = RING_SHUT * (1.1 + 0.9 * q), 0.95 * (1 - q * q)
+          size, alpha = RING_SHUT * (1.6 + 1.2 * q), 1 - q * q
         end
         if u.faint then alpha, size = alpha * 0.45, size * 0.8 end
         SetUnitSprite(sk, u.unit, ART .. tex, size, u.height, r, g, b, alpha, spin, 1)
