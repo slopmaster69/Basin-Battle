@@ -1994,15 +1994,14 @@ local ST_PER_PX = 0.42
 local VIT_HEALTH, VIT_STAMINA = 13, 8
 local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
--- Overhealth (health over the most) in a paler red past the health, and what shields have left
--- to soak in translucent white past that (Corey); where they run past the bar's end they lie over
--- the health from the right, the health showing through a little. (Half-white read grey over the
--- dark track on film, and the first paler red blurred into the health.)
+-- Overhealth (health over the most) in a dark green past the health (red is danger), and what
+-- shields have left to soak in translucent white over the health from the bar's left end (Corey;
+-- ES.DrawAbsorbs).
 vit.health.over = Tex(vit.health, "ARTWORK", "bar")
-vit.health.over:SetVertexColor(1.0, 0.74, 0.66, 1)
+vit.health.over:SetVertexColor(0.1, 0.45, 0.2, 1)
 vit.health.over:Hide()
 vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
-vit.health.shield:SetVertexColor(1, 1, 1, 0.78)
+vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
 vit.health.shield:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
@@ -2074,25 +2073,25 @@ function ES.PlaceVitals()
   ES.DrawVitalsLength()
   if ES.PlaceTop then ES.PlaceTop() end
 end
--- The health bar's overhealth and shield (`H`'s last two): laid on past the health, as wide as
--- they'd be at the bar's scale; what runs past the end lies over the health from the right.
+-- The health bar's overhealth and shield (`H`'s last two), each as long as it'd be at the bar's
+-- scale (Corey). The overhealth past the health, lying over the health from the right where it runs
+-- past the bar's end. The shield over the health from the bar's left end, like a fighting game's
+-- second bar over the first, translucent so the health shows through, and shrinking to the left as
+-- it's spent (laid past the health too, it squeezed under the numbers at full health).
 function ES.DrawAbsorbs(hp, maxhp, shield, over)
   local b = vit.health
-  local full = b.full
-  local per = full / math.max(1, maxhp)
-  local ow, sw = math.min(full, over * per), math.min(full, shield * per)
-  local x = math.max(0, math.min(hp * per, full - ow - sw))
-  local function Lay(t, w)
+  local per = b.full / math.max(1, maxhp)
+  local function Lay(t, x, w)
     if w < 0.5 then t:Hide() return end
     t:ClearAllPoints()
     t:SetPoint("TOPLEFT", b, "TOPLEFT", x, 0)
     t:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", x, 0)
     t:SetWidth(w)
     t:Show()
-    x = x + w
   end
-  Lay(b.over, ow)
-  Lay(b.shield, sw)
+  local ow = math.min(b.full, over * per)
+  Lay(b.over, math.max(0, math.min(hp * per, b.full - ow)), ow)
+  Lay(b.shield, 0, math.min(b.full, shield * per))
 end
 
 -- The bars' lengths: the dock's width by the hero, by what they hold in the corner.
@@ -3879,7 +3878,7 @@ function ES.DrawHud()
   ES.DrawAbsorbs(hp, maxhp, shield, over)
   -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
   local text = hp
-  if over > 0 then text = text .. "|cffffbdaa+" .. over .. "|r" end
+  if over > 0 then text = text .. "|cff6fdc84+" .. over .. "|r" end
   text = text .. " / " .. maxhp
   if shield > 0 then text = text .. " |cffffffff+" .. shield .. "|r" end
   vit.healthText:SetText(text)
