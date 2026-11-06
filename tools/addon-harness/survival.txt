@@ -522,6 +522,12 @@ A	ready	0.00	0.00
 !OLDRU = RollUnit function RollUnit(u, s, st, p, t) table.insert(SAID, "flip " .. u .. string.format(" %.2f ", s) .. tostring(st) .. " tuck " .. tostring(t)) end
 FP	0X1	0.52	38	0	ScourgeFemale	1	1
 !RollUnit = OLDRU
+# The health bar's overhealth past the health in a deep crimson, the shield over the health from the
+# bar's left end in white. Then nothing left of either.
+H	150	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90	30	20
+!local h = ElwynnSurvivalVitals.health table.insert(SAID, string.format("absorbs: over %s of %.0f wide %.0f tall %.1f, shield %s wide %.0f tall %.1f, text %s", tostring(h.over:IsShown()), h.full, h.over:GetWidth(), h.over:GetHeight(), tostring(h.shield:IsShown()), h.shield:GetWidth(), h.shield:GetHeight(), tostring(ElwynnSurvivalVitals.healthText:GetText())))
+H	150	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90	0	0
+!local h = ElwynnSurvivalVitals.health table.insert(SAID, "absorbs gone: over " .. tostring(h.over:IsShown()) .. ", shield " .. tostring(h.shield:IsShown()) .. ", text " .. tostring(ElwynnSurvivalVitals.healthText:GetText()))
 # Below, with nothing else to point at: the corner's arrow points north.
 WR	below
 H	200	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90

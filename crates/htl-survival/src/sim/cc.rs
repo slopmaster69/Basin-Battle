@@ -52,6 +52,14 @@ impl Survival {
         self.cc.get(&id).map_or(&[], |v| v.as_slice())
     }
 
+    /// What stands between a unit and its health now: what its shields have left to soak, and its
+    /// overhealth (health over its most, lost before its own), for the health bar.
+    pub fn absorbs(&self, id: Id) -> (u32, u32) {
+        let now = self.clock;
+        let left = |kind: &str| self.cc_of(id).iter().filter(|c| c.kind == kind && c.until > now).map(|c| c.left.max(0.0)).sum::<f32>().round() as u32;
+        (left("shield"), left("overhealth"))
+    }
+
     pub fn has_cc(&self, id: Id, kind: &str) -> bool {
         let now = self.clock;
         self.cc_of(id).iter().any(|c| c.kind == kind && c.until > now)
@@ -167,7 +175,7 @@ impl Survival {
         }
         let left = match kind {
             "petrify" => self.content.cc.petrify_shield,
-            "shield" => amount,
+            "shield" | "overhealth" => amount,
             "panic" => self.max_health_of(target) as f32 * self.content.cc.panic_break,
             _ => 0.0,
         };
@@ -319,14 +327,16 @@ impl Survival {
         let Some(list) = self.cc.get_mut(&id) else { return damage };
         let mut through = damage as f32;
         let mut ended = Vec::new();
-        // A shield soaks it first.
-        for c in list.iter_mut().filter(|c| c.until > now && c.kind == "shield") {
-            let took = through.min(c.left);
-            c.left -= took;
-            through -= took;
-            if c.left <= 0.0 {
-                c.until = now;
-                ended.push(c.kind.clone());
+        // A shield soaks it first, then overhealth (health over the most, lost before your own).
+        for kind in ["shield", "overhealth"] {
+            for c in list.iter_mut().filter(|c| c.until > now && c.kind == kind) {
+                let took = through.min(c.left);
+                c.left -= took;
+                through -= took;
+                if c.left <= 0.0 {
+                    c.until = now;
+                    ended.push(c.kind.clone());
+                }
             }
         }
         for c in list.iter_mut().filter(|c| c.until > now) {
