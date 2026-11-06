@@ -1,4 +1,4 @@
-From c9b61ba6abcf2a1a016823913f01ac00c691b165 Mon Sep 17 00:00:00 2001
+From 60c5016b7661cd604917e7a5990a6f38bcdf9b90 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Thu, 5 Nov 2026 09:10:23 -0600
 Subject: [PATCH] The reticle's own line: GetReticlePoint, the aim's circle on
@@ -198,13 +198,13 @@ index 9f4f9f82..eebe8e42 100644
              state.shown = !state.circle.verts.is_empty();
              action_combat::set_aim_point(Some(bevy_to_wow(at)));
 diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
-index 73e6f3ff..4a7e9f05 100644
+index 895abdc1..dde00367 100644
 --- a/crates/benilla-ui/src/action_combat.rs
 +++ b/crates/benilla-ui/src/action_combat.rs
-@@ -207,6 +207,16 @@
- //!   argument flies the dressed missile at that many yards a second from where it is, over the
- //!   speed its spell gives it and over the 100 yd/s cap the launch keeps (up to 400). `0` or
- //!   nothing keeps the spell's own; a line with nine arguments reads as before.
+@@ -257,6 +257,16 @@
+ //!
+ //! The twenty-fifth (`HasActionCombat() >= 25`): sprites on units (`SetUnitSprite`, patch 0045):
+ //! the ward's barrier round the warder.
 +//!
 +//! The twenty-sixth (`HasActionCombat() >= 26`; 24 and 25 are the Mage's):
 +//!
@@ -218,7 +218,7 @@ index 73e6f3ff..4a7e9f05 100644
  
  use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
  
-@@ -562,6 +572,7 @@ pub struct AimMarker {
+@@ -614,6 +624,7 @@ pub struct AimMarker {
  
  static AIM_MARKER: std::sync::Mutex<Option<AimMarker>> = std::sync::Mutex::new(None);
  static AIM_POINT: std::sync::Mutex<Option<[f32; 3]>> = std::sync::Mutex::new(None);
@@ -226,7 +226,7 @@ index 73e6f3ff..4a7e9f05 100644
  
  /// The aim's circle, while one is asked for.
  pub fn aim_marker() -> Option<AimMarker> {
-@@ -579,6 +590,18 @@ pub fn aim_point() -> Option<[f32; 3]> {
+@@ -631,6 +642,18 @@ pub fn aim_point() -> Option<[f32; 3]> {
      AIM_POINT.lock().ok().and_then(|a| *a)
  }
  
@@ -245,16 +245,16 @@ index 73e6f3ff..4a7e9f05 100644
  /// A timed ground marker asked for or taken away.
  #[derive(Clone, Debug, PartialEq)]
  pub enum GroundMarkerCall {
-@@ -997,7 +1020,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -1168,7 +1191,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
      )?;
      g.set(
          "HasActionCombat",
--        lua.create_function(|_, _: MultiValue| Ok(23))?,
+-        lua.create_function(|_, _: MultiValue| Ok(25))?,
 +        lua.create_function(|_, _: MultiValue| Ok(26))?,
      )?;
      g.set(
          "SetCameraUnitCollision",
-@@ -1407,6 +1430,15 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -1736,6 +1759,15 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
              Ok(())
          })?,
      )?;
@@ -270,16 +270,16 @@ index 73e6f3ff..4a7e9f05 100644
      g.set(
          "GetAimPoint",
          lua.create_function(|_, _: MultiValue| {
-@@ -1687,7 +1719,7 @@ mod tests {
+@@ -2016,7 +2048,7 @@ mod tests {
          let lua = Lua::new();
          install(&lua).unwrap();
          lua.load(
--            r#"assert(HasActionCombat() >= 23)
+-            r#"assert(HasActionCombat() >= 25)
 +            r#"assert(HasActionCombat() >= 26)
                 SetMissileLook(19434, "F2E6C8", 0.18, 0.3)
                 SetMissileLook(16075, nil, 0.3, 0.35, 1.8, 2.5)
                 SetMissileLook(19434, "FF3A1A", 0.3, 0.4, 1, 0, "0xF13000000000002A")
-@@ -1857,6 +1889,16 @@ mod tests {
+@@ -2186,6 +2218,16 @@ mod tests {
              .eval()
              .unwrap();
          assert_eq!((x, z), (1.0, 3.0));
@@ -297,5 +297,5 @@ index 73e6f3ff..4a7e9f05 100644
  
      #[test]
 -- 
-2.56.0.windows.4
+2.46.2.windows.1
 

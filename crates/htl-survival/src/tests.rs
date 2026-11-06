@@ -547,7 +547,9 @@ fn a_held_charge_that_goes_off_by_itself_goes_along_the_line_sent_while_it_was_h
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.players.get_mut(&p).unwrap().cd_off = true;
-    let _ = s.slot_ability(p, "ranged", "fireball");
+    // Chaos Bolt (Seed of Corruption's EX): held past its hold it goes off by itself. (Pyroblast,
+    // the Mage's, fizzles instead: its check stakes it all.)
+    let _ = s.slot_ability(p, "ranged", "seed_of_corruption");
     let key = crate::content::SLOTS.iter().position(|k| *k == "ranged").unwrap() as u8;
     // Off to the left of the body's facing.
     let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
@@ -555,20 +557,19 @@ fn a_held_charge_that_goes_off_by_itself_goes_along_the_line_sent_while_it_was_h
     s.set_valor(p, 100.0);
     s.input(p, Input::Ability(key, true));
     s.input(p, Input::Attack);
-    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "Pyroblast held");
+    assert!(matches!(s.players[&p].action, Action::Charge { .. }), "Chaos Bolt held");
     run(&mut s, 0.5);
-    // Aimed at the grunt once, then held on past its full charge (1.5 s) and hold (1 s).
+    // Aimed at the grunt once, then held on past its full charge (1 s) and hold (1 s).
     s.set_aim_line(p, toward, 0.0);
     let mut ev = run(&mut s, 2.2);
-    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "pyroblast"), "it went off by itself");
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "chaos_bolt"), "it went off by itself");
     ev.extend(run(&mut s, 2.0));
-    // (Its burn ticks after the blow: hits of their own.)
     assert!(!hits_on(&ev, g).is_empty(), "along the line sent while it was held");
     // A line sent before the charge began: stale when it goes off, the body's facing as ever.
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     s.players.get_mut(&p).unwrap().cd_off = true;
-    let _ = s.slot_ability(p, "ranged", "fireball");
+    let _ = s.slot_ability(p, "ranged", "seed_of_corruption");
     let g = mob(&mut s, "grunt", [10.0, 10.0, 0.0]);
     s.set_valor(p, 100.0);
     s.set_aim_line(p, toward, 0.0);
@@ -576,7 +577,7 @@ fn a_held_charge_that_goes_off_by_itself_goes_along_the_line_sent_while_it_was_h
     s.input(p, Input::Ability(key, true));
     s.input(p, Input::Attack);
     let ev = run(&mut s, 4.7);
-    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "pyroblast"), "it went off by itself");
+    assert!(s.players[&p].last_cast.is_some_and(|(a, _)| s.content.abilities[a].key == "chaos_bolt"), "it went off by itself");
     assert!(hits_on(&ev, g).is_empty(), "an old line isn't kept alive for it");
 }
 

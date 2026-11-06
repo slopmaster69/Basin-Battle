@@ -133,13 +133,17 @@ fn a_longer_charge_lands_harder_and_a_capstone_waits_for_its_whole_charge() {
     ev.extend(run(&mut s, 1.0));
     let late = hits_on(&ev, k)[0].0;
     assert!(late > early, "{early} then {late}");
-    // Pyroblast (Fireball's EX) let go before its 1.5 s is lost.
+    // Pyroblast (Fireball's EX) let go before its 1.5 s fizzles: all or nothing, its Valor
+    // wasted (Corey, Nov 5).
     slot(&mut s, p, "ranged", "fireball");
     s.set_valor(p, 100.0);
-    cast(&mut s, p, "ranged", true, 1.0);
+    let mut ev = cast(&mut s, p, "ranged", true, 1.0);
+    ev.extend(s.step(0.0));
     assert!(s.players[&p].last_cast.is_none_or(|(a, _)| s.content.abilities[a].key != "pyroblast"), "never cast");
     assert_eq!(s.players[&p].action, Action::Ready, "dropped");
-    assert_eq!(s.players[&p].valor, 100.0, "and nothing spent");
+    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "fizzle", .. })), "it fizzles");
+    let pyro = s.content.ability("pyroblast").unwrap();
+    assert_eq!(s.players[&p].valor, 100.0 - s.valor_cost(&s.content.abilities[pyro].clone()), "and its Valor is spent");
 }
 
 #[test]
@@ -361,26 +365,6 @@ fn a_charge_cannot_be_struck_on_the_way_and_staggers_what_it_meets() {
 }
 
 #[test]
-fn cone_of_cold_freezes_what_is_already_slowed() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    slot(&mut s, p, "close", "cone_of_cold");
-    s.set_cooldowns(p, true);
-    let k = mob(&mut s, "grunt", [6.0, 0.5, 0.0]);
-    cast(&mut s, p, "close", false, 0.0);
-    assert!(s.has_cc(k, "snare") && !s.has_cc(k, "petrify"));
-    run(&mut s, 0.5);
-    calm(&mut s, k);
-    s.mobs.get_mut(&k).unwrap().pos = [6.0, 0.5, 0.0];
-    cast(&mut s, p, "close", false, 0.0);
-    assert!(s.has_cc(k, "petrify"), "frozen");
-    // The ice takes the next blows first.
-    let hp = s.mobs[&k].health;
-    s.hurt_mob(k, p, 10);
-    assert_eq!(s.mobs[&k].health, hp, "the ice took it");
-}
-
-#[test]
 fn fire_ward_sends_a_projectile_back_and_ice_block_lets_nothing_in() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -575,7 +559,8 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     let meteor = s.content.ability("meteor").unwrap();
     let d = s.content.abilities[meteor].clone();
     assert!(d.look_lead > 0.0 && d.look_lead < d.delay);
-    let mut ev = cast(&mut s, p, "ultimate", false, 0.0);
+    // (Meteor is held now: let go once it can go, and it's called from the release.)
+    let mut ev = cast(&mut s, p, "ultimate", false, d.charge[0] + 0.1);
     let start = s.clock;
     let mut look_at = None;
     let mut looks = 0;

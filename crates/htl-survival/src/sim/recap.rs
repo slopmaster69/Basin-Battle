@@ -73,7 +73,7 @@ pub fn caught_word(action: &Action, outcome: Outcome, blockable: bool) -> &'stat
         Action::Guard => "around your guard",
         Action::Dodge { .. } => "outside your dodge",
         Action::Swing { .. } => "mid-swing",
-        Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } => "mid-cast",
+        Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Sweep { .. } | Action::Rhythm { .. } => "mid-cast",
         Action::Stance { .. } => "in your stance",
         Action::Dash { .. } => "mid-dash",
         Action::Eat { .. } => "while eating",

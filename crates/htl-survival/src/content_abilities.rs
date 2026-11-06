@@ -38,7 +38,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 17] = [
+pub const KINDS: [&str; 21] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -80,6 +80,19 @@ pub const KINDS: [&str; 17] = [
     // (times the tick) to each foe in it, with `effects`, and heals each friend in it `ally_heal`
     // a second.
     "beam",
+    // A jet `arc` wide sweeping `sweep` degrees across the front over `secs`, striking each foe
+    // it passes once; the key again stops it where it is (`stop_secs`, `stop_effects`), a foe
+    // within `perfect_arc` of its centre a perfect (the stop check).
+    "sweep",
+    // An orb rolling out along the reticle, hurting what it passes; the key again stops it where
+    // it is and it bursts, a foe under it a perfect (the stop check).
+    "orb",
+    // Beats: the first few by themselves, then one more for every press on the beat, up to its
+    // most; a press out of time or a beat let pass ends it (the rhythm check).
+    "rhythm",
+    // A bolt that plants a bomb on what it hits; it flares, then bursts; its key again on a flare
+    // sets it off early and harder (the release check on a foe).
+    "bomb",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -115,6 +128,38 @@ pub struct AbilityDef {
     /// A full charge can be held this long past full before it goes by itself (0: until let go).
     #[serde(default)]
     pub hold: f32,
+    /// A release check: the charge flares as it tops out, and a release inside `[checks]`'s
+    /// window of the top is a perfect cast (stronger, Valor, a burst everyone sees).
+    #[serde(default)]
+    pub perfect: bool,
+    /// What a missed check costs: "" (safe: it still goes, weaker) or "all" (all or nothing:
+    /// anything but a perfect fizzles, the Valor spent and half the cooldown with it).
+    #[serde(default)]
+    pub stakes: String,
+    /// A critical (the very middle of a check's window): these effects on what it strikes, on
+    /// top of the perfect. Each spell its own: a longer burn, a freeze, a silence.
+    #[serde(default)]
+    pub crit_effects: Vec<AbilityEffect>,
+    /// This ability's own burst for a perfect (a spell visual kit), in place of `[checks]`'s:
+    /// the spell's school bursting from the hands, not a shield on the caster.
+    #[serde(default)]
+    pub perfect_kit: u32,
+    /// A channel's look on the caster while it lasts (a sweep's: Cone of Cold's spray from the
+    /// hands), replayed every `CHANNEL_EVERY` sec.
+    #[serde(default)]
+    pub channel_kit: u32,
+    /// An orb's own rolling model, drawn by the clients that can (`PlayGroundOrb`), and its size.
+    #[serde(default)]
+    pub orb_model: String,
+    #[serde(default)]
+    pub orb_scale: f32,
+    /// Each cast's clip drawn at random from these (`"clip/take/Model"`, the model's own take on
+    /// every race and gender alike), in place of `clip` (Corey: the staff's light swings mixed).
+    #[serde(default)]
+    pub clip_pool: Vec<String>,
+    /// A rhythm's casts, beat by beat (cycled): the body's clip for each missile.
+    #[serde(default)]
+    pub beat_clips: Vec<u16>,
     /// Damage, range and radius at the least and the full charge (one value: both).
     #[serde(default)]
     pub damage: [f32; 2],
@@ -369,6 +414,16 @@ pub struct AbilityDef {
     /// On a frozen foe it shatters the ice for half again its damage.
     #[serde(default)]
     pub shatter: bool,
+    /// A staff's plain bolt: what each hit builds (`heat` or `chill` on the foe, `charge` on the
+    /// caster; `[staffs]`). Empty: nothing.
+    #[serde(default)]
+    pub builds: String,
+    /// A staff's heavy bolt: what it spends, harder for each (the same words).
+    #[serde(default)]
+    pub spends: String,
+    /// A bomb's burst, yards (`kind = "bomb"`); its bolt flies with `radius` like any projectile.
+    #[serde(default)]
+    pub bomb_radius: f32,
     /// A projectile that touches a friend heals them this share of their health (and, with
     /// `cleanse`, ends what's on them); so does an `ally` on whoever it picks. A `beam` heals each
     /// friend in it this share a second.
@@ -422,6 +477,21 @@ pub struct AbilityDef {
     /// again within this many seconds, the hero steps back to it.
     #[serde(default)]
     pub anchor: f32,
+    /// Alter Time (the rhythm check, on an anchor): the mark pulses every this many seconds
+    /// (`tick_spell` at it, `beat_kit` on the hero); the step back within `[checks] window` of a
+    /// pulse is a perfect: foes within `radius` get `stop_effects` (the throw back), and the
+    /// perfect's Valor and look.
+    #[serde(default)]
+    pub pulse: f32,
+    /// The step back to the anchor gives back this share of the health lost since it was set.
+    #[serde(default)]
+    pub rewind_health: f32,
+    /// A blink that slips a blow (the counter check, Blink): a creature's or a hero's blow that
+    /// would have caught the hero where they blinked from, landing within `[checks] window` of
+    /// the blink (their round trip allowed), misses. The first one pays: the cooldown halved,
+    /// a counter's Valor and the perfect's burst.
+    #[serde(default)]
+    pub slip: bool,
     /// Another ability fired as well, at once, from the same aim (a Disengage's Net).
     #[serde(default)]
     pub also: String,
@@ -450,6 +520,96 @@ pub struct AbilityDef {
     /// beam's, from the caster to the first foe in it or its far end.
     #[serde(default)]
     pub tick_spell: u32,
+    /// A sweep (`kind = "sweep"`, the stop check): a jet `arc` wide and `range` long that
+    /// sweeps `sweep` degrees across the hero's front over `secs`, striking each foe it passes
+    /// once (`damage`, `effects`). The key again stops it: the jet holds for `stop_secs` and the
+    /// foes in it take `stop_effects` (a freeze); a foe within `perfect_arc` of the jet's centre
+    /// makes the stop a perfect (`[checks]`). Not stopped, it finishes its sweep.
+    #[serde(default)]
+    pub sweep: f32,
+    #[serde(default)]
+    pub stop_secs: f32,
+    #[serde(default)]
+    pub stop_effects: Vec<AbilityEffect>,
+    /// A sweep graded on a meter (Gladius's swing meter, Corey's notes on the fourth film): each
+    /// cast rolls where its sweet spot falls along the sweep; stopped within `meter_perfect` of it
+    /// (a share of the sweep's time either side) is perfect, the stop's full effects; within
+    /// `meter_good`, good, the stop's least (its `secs[0]`); off it, early or late, the jet's slow
+    /// alone; never stopped, it runs into the overrun, a fail.
+    /// A held charge's build-up (a staff's heavy bolt): this clip held, looping, on the caster
+    /// while it charges (`WP`; a two-handed weapon's ready stance, the staff out), let go as it goes
+    /// or is called off; and this visual kit on them as the charge begins (0: none).
+    #[serde(default)]
+    pub charge_pose: u16,
+    #[serde(default)]
+    pub charge_kit: u32,
+    #[serde(default)]
+    pub meter: bool,
+    #[serde(default)]
+    pub meter_perfect: f32,
+    #[serde(default)]
+    pub meter_good: f32,
+    #[serde(default)]
+    pub perfect_arc: f32,
+    /// A rhythm (`kind = "rhythm"`, the rhythm check): it goes off on beats `beat_secs` seconds
+    /// apart, the first `free_beats` by themselves, then each further one only if its key is
+    /// pressed within its window of the beat (`beat_window`: the first's, tightening to the
+    /// last's), up to `most_beats`. A press out of time, or a beat let pass, ends it where it is.
+    /// Each beat is `beat_kind`: a `projectile` along the reticle or a `nova` round the caster
+    /// (its `radius` growing from the low end to the high over the beats), for `damage` plus
+    /// `beat_step` a beat; the last beat is the finisher, `finisher_damage` times as hard and
+    /// with `finisher_effects`. A full chain is a perfect.
+    #[serde(default)]
+    pub beat_secs: f32,
+    #[serde(default)]
+    pub free_beats: u32,
+    #[serde(default)]
+    pub most_beats: u32,
+    #[serde(default)]
+    pub beat_window: [f32; 2],
+    #[serde(default)]
+    pub beat_step: f32,
+    #[serde(default)]
+    pub beat_kind: String,
+    #[serde(default)]
+    pub finisher_damage: f32,
+    #[serde(default)]
+    pub finisher_effects: Vec<AbilityEffect>,
+    /// The pulse on the caster on every beat to come (a spell visual kit): the beat to press on.
+    #[serde(default)]
+    pub beat_kit: u32,
+    /// A bomb (`kind = "bomb"`, the release check on a foe): a bolt that plants it on what it
+    /// hits; it flares `bomb_flares` times over `bomb_secs`, then bursts for `damage`'s low end in
+    /// `radius` with `bomb_effects`. The key again on a flare (within `[checks] window`) sets it
+    /// off early: the high end, `stop_effects` too, a perfect; off a flare, it goes at once,
+    /// plain.
+    #[serde(default)]
+    pub bomb_secs: f32,
+    #[serde(default)]
+    pub bomb_flares: u32,
+    #[serde(default)]
+    pub bomb_effects: Vec<AbilityEffect>,
+    /// The pulse on the bombed foe at each flare (a spell visual kit).
+    #[serde(default)]
+    pub bomb_kit: u32,
+    /// Combustion: what burns on the foe this reaches catches on every foe within this many yards.
+    #[serde(default)]
+    pub spread_burns: f32,
+    /// An orb (`kind = "orb"`, the stop check): it rolls out along the reticle `range` yards
+    /// over `linger` seconds, `linger_damage` a second to every foe within `radius` (with the
+    /// ability's `effects`), every `tick`. The key again stops it where it is and it bursts:
+    /// `damage` (the low end; the high end on a perfect) in `stop_radius`; a foe within
+    /// `perfect_yd` of it makes the stop a perfect and the burst carries `stop_effects` (the
+    /// freeze). Stopped within `backfire_yd` of the caster, `backfire_effects` fall on them.
+    /// Rolled the whole way, it fades with no burst.
+    #[serde(default)]
+    pub stop_radius: f32,
+    #[serde(default)]
+    pub perfect_yd: f32,
+    #[serde(default)]
+    pub backfire_yd: f32,
+    #[serde(default)]
+    pub backfire_effects: Vec<AbilityEffect>,
     /// A second activation (Battlerite's recast): once this goes, its key is armed for
     /// `recast_secs`, and pressed again meanwhile it fires this `inner` ability from the hero's
     /// aim, for no Valor and no cooldown (the cooldown was spent by the first cast). An EX
@@ -931,6 +1091,11 @@ pub struct CounterDef {
     /// What it does to a melee attacker (and, `any_attacker`, a shooter too): an effect each.
     #[serde(default)]
     pub attacker: Vec<AbilityEffect>,
+    /// The counter check on an immune stance (Ice Block): broken out of within `[checks] window`
+    /// of a blow landing on it (the hero's round trip allowed), it bursts: these effects on the
+    /// one who struck it, and the perfect's burst.
+    #[serde(default)]
+    pub perfect_break: Vec<AbilityEffect>,
     #[serde(default)]
     pub any_attacker: bool,
     /// Only melee blows set it off (Retaliation, Nature's Grasp); else projectiles too.
@@ -950,6 +1115,11 @@ pub struct CounterDef {
     /// through as ever. Nothing else (no block, dodge, ward or `reflect` with it).
     #[serde(default)]
     pub mirror: bool,
+    /// The counter check on a mirror (Spell Mirror): only what reaches the hero within
+    /// `[checks] window` of raising it (plus their round trip) flies back, a perfect; later in the
+    /// stance it's only swallowed.
+    #[serde(default)]
+    pub perfect_mirror: bool,
     /// A counter that catches something comes back this much sooner (a share of its cooldown).
     #[serde(default = "half")]
     pub caught_cooldown: f32,

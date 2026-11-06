@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 51
+local VERSION = 52
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1644,6 +1644,9 @@ function ES.ExAffordable(s)
 end
 
 local function SendAbility(n, ex)
+  -- A skill check this starts is drawn from this moment, as one started by a click is (Check.lua):
+  -- the server's clock for it starts the same one-way trip after.
+  if ES.check then ES.check.pressAt = GetTime() end
   Say(".es in ab " .. (n - 1) .. " " .. (ex and "1" or "0") .. ES.AimLine())
 end
 
@@ -6714,6 +6717,43 @@ function ES.Line(line)
     ES.EmpowerLine(f)
   elseif verb == "VA" then
     ES.ValorLine(f)
+  elseif verb == "WA" then
+    if ES.WardLine then ES.WardLine(f) end
+  elseif verb == "CK" then
+    if ES.CheckLine then ES.CheckLine(f) end
+  elseif verb == "CR" then
+    if ES.CheckResultLine then ES.CheckResultLine(f) end
+  elseif verb == "MO" then
+    -- Where a hero's missiles leave from (a casting staff's tip), on a client that can say so.
+    if SetUnitMissileOrigin then SetUnitMissileOrigin(f[2] or "", f[3] or "") end
+  elseif verb == "WB" then
+    if ES.WardBarrierLine then ES.WardBarrierLine(f) end
+  elseif verb == "WP" then
+    -- A held pose (the ward's arm out): the clip looped for its hold, or let go.
+    local guid = (f[5] == "1") and "player" or f[2]
+    local clip, secs = tonumber(f[3]), tonumber(f[4]) or 0
+    local from = (f[6] and f[6] ~= "") and f[6] or nil
+    if guid and clip then
+      if secs > 0 and from and SetUnitSprite and PlayUnitAnimation then
+        -- One model's take on every race (patch 0045 holds its last pose).
+        if PreloadAnimationSource then PreloadAnimationSource(from) end
+        PlayUnitAnimation(guid, clip, 0.25, nil, nil, 0, 0, "upper", from, secs)
+      elseif secs > 0 and ReactUnit then
+        ReactUnit(guid, clip, 0, 0, 0, secs)
+      elseif StopUnitAnimation then
+        StopUnitAnimation(guid, 0.15)
+      end
+    end
+  elseif verb == "SF" then
+    if ES.StaffLine then ES.StaffLine(f) end
+  elseif verb == "SK" then
+    if ES.StacksLine then ES.StacksLine(f) end
+  elseif verb == "SH" then
+    if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
+  elseif verb == "OB" then
+    if ES.OrbLine then ES.OrbLine(f) end
+  elseif verb == "OX" then
+    if ES.OrbGoneLine then ES.OrbGoneLine(f) end
   elseif verb == "CC" then
     ES.CcLine(f)
   elseif verb == "TR" then
@@ -6968,6 +7008,13 @@ events:SetScript("OnEvent", function()
       Say(".es hello " .. VERSION .. " ac27")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and (tonumber(HasActionCombat()) or 0) >= 26 then
       Say(".es hello " .. VERSION .. " ac26")
+    -- ac24: the Mage's skill checks: rings on the ground, recoloured spell looks, an orb rolled on
+    -- the ground, missiles from a staff's tip (patches 0041 to 0044).
+    -- ac25: sprites on units (the ward's barrier) and a clip's last pose held (patch 0045).
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 25 then
+      Say(".es hello " .. VERSION .. " ac25")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and SetGroundRing and (tonumber(HasActionCombat()) or 0) >= 24 then
+      Say(".es hello " .. VERSION .. " ac24")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
       Say(".es hello " .. VERSION .. " ac23")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 22 then
