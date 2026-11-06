@@ -1497,8 +1497,8 @@ icon = "INV_Staff_07"
 kind = "weapon"
 text = "Two-handed. Attacks cast quick bolts of arcane force that deal 10 damage and store charges in the staff. Heavy attacks release them as an orb that deals up to 64 damage. Guards with a ward."
 
-# The Priest's staffs, each its own (none shared with the Mage's): the holy staff, a black one with
-# a shadow flame, and one holding a purple orb.
+# The Priest's staffs, each its own (none shared with the Mage's): the holy staff, a purple one of
+# Ahn'Qiraj, and one holding a purple orb.
 [[item]]
 key = "acolyte_staff"
 name = "Acolyte's Staff"
@@ -1511,9 +1511,9 @@ text = "Two-handed. Attacks cast Smite, marking enemies with Searing Light. Hold
 [[item]]
 key = "shadowcaller_staff"
 name = "Shadowcaller's Staff"
-# A black jeweled staff with a shadow flame at its head (Stave_2H_Flaming_D_01).
-display = 20272
-icon = "Spell_Shadow_Haunting"
+# A purple staff of Ahn'Qiraj (Stave_2H_AhnQiraj_D_04): the flaming staff's fire burns fel green.
+display = 34135
+icon = "INV_Staff_20"
 kind = "weapon"
 text = "Two-handed. Attacks cast Shadow Bolts that weave Shadow Weaving into the enemy, and a bolt after a pause is Empowered. The heavy attack casts a charged Shadow Burst. Right-click casts Dark Reckoning, ripping the Weaving out. Cannot block or parry."
 
