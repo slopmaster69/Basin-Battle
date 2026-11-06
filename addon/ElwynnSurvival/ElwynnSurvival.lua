@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 44
+local VERSION = 48
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -6427,6 +6427,20 @@ function ES.BowDrawn()
   return d and d.kind ~= "shot" and (d.hi <= 0 or d.isEx) and true or false
 end
 
+-- The shoulders squared to the aim while the bow is drawn (ac27): 1.12's draw stands side-on, and
+-- from the camera over the right shoulder the turned back and head hid the view and the bow
+-- pointed off the reticle. The client turns the spine right by this much (radians) and the head
+-- back by as much, so the eyes stay on the aim.
+ES.BOW_TURN = 0.7
+function ES.StepAimTurn()
+  if not SetAimTurn then return end
+  local want = ES.BowDrawn() and ES.BOW_TURN or 0
+  if want ~= ES.aimTurn then
+    ES.aimTurn = want
+    SetAimTurn(want)
+  end
+end
+
 function ES.BowWalk()
   local want = false
   if ActionLayer() and ActionMoveKeys and ES.BowDrawn() then
@@ -6460,6 +6474,7 @@ poll:SetScript("OnUpdate", function()
   ES.RunTimers()
   ES.Markers()
   ES.BowWalk()
+  ES.StepAimTurn()
   ES.HangOut()
   ES.StepExHold()
   ES.StepLockHold()
@@ -6524,6 +6539,10 @@ function ES.Wake()
 end
 
 function ES.Sleep()
+  if SetAimTurn and ES.aimTurn and ES.aimTurn ~= 0 then
+    SetAimTurn(0)
+    ES.aimTurn = 0
+  end
   if ES.lookHeld and MouselookStop then MouselookStop() end
   ES.Steer(false)
   -- Whatever holds the look now lets go, so the next screen (a logout's) has its cursor.
@@ -6869,7 +6888,10 @@ events:SetScript("OnEvent", function()
     -- ac22: the bowstring on its bow, units that never fade, the aiming camera's tip down.
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
     -- ac26: the point the reticle is on (GetReticlePoint), and whether cover is in the way.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and (tonumber(HasActionCombat()) or 0) >= 26 then
+    -- ac27: the shoulders turned to the aim (SetAimTurn) while the bow is drawn.
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
+      Say(".es hello " .. VERSION .. " ac27")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and (tonumber(HasActionCombat()) or 0) >= 26 then
       Say(".es hello " .. VERSION .. " ac26")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and (tonumber(HasActionCombat()) or 0) >= 23 then
       Say(".es hello " .. VERSION .. " ac23")
