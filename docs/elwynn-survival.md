@@ -353,7 +353,8 @@ away), `.es give <item> [n]` (an item into your bags, by its key in `content/`),
 puts its back to you, for a shot or a blow into a creature's back; `.es
 target clear` takes them away), `.es ally <creature> [yards] [hp%]` (a creature on your side, standing
 still: it never fights you, your blows pass it by, and a heal aimed at a friend lands on it;
-`.es target clear` takes it away too), `.es hop [yards]` (a jump on the spot, for trying an ability
+`.es target clear` takes it away too), `.es crit [off]` (your heals land critical, a bigger number
+over the friend, as a skill check's perfect makes them), `.es hop [yards]` (a jump on the spot, for trying an ability
 mid-jump), `.es cc log` and `.es pvp on|off` (and, in any build, `.es duel <name>|accept|forfeit`). `.es debug` turns debug over
 (`.es debug on` and `.es debug off` set it); it also draws projectiles' bodies and every ground
 area on the ground (`.es debug quiet`: debug's commands without that drawing). [The visual

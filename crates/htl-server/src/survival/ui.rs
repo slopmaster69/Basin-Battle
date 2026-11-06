@@ -1564,6 +1564,18 @@ impl SurvivalGame {
                 let hp = rest.iter().find_map(|w| w.strip_suffix('%').and_then(|n| n.parse::<f32>().ok())).map_or(1.0, |n| n / 100.0);
                 self.sim.spawn_ally(me, &arg, yards, hp).map(|name| self.tell(conn, &format!("{name} stands with you {yards:.0} yd ahead.")))
             }
+            // `.es crit [off]`: your heals land critical, as on a skill check's perfect, until
+            // `.es crit off` (to try the bigger number over a friend).
+            "crit" if self.dev_ok() => {
+                let on = arg != "off";
+                if on {
+                    self.sim.critical_heals.insert(me);
+                } else {
+                    self.sim.critical_heals.remove(&me);
+                }
+                self.tell(conn, if on { "Your heals land critical." } else { "Your heals land as they do." });
+                Ok(())
+            }
             // `.es hop [yards]`: a jump the visual check can make (a script can't press the jump
             // key), to try an ability mid-jump.
             "hop" if self.dev_ok() => {
@@ -1625,7 +1637,7 @@ impl SurvivalGame {
                 let n = arg2.parse::<u32>().unwrap_or(1).clamp(1, 99);
                 self.sim.give_for_testing(me, &arg, n).map(|name| self.tell(conn, &format!("{n} {name} into your bags.")))
             }
-            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" | "target" | "ally" | "hop" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
+            "valor" | "cd" | "heal" | "dummy" | "pvp" | "freebuild" | "free" | "mats" | "materials" | "give" | "target" | "ally" | "crit" | "hop" => Err("That's only for dev builds with [dev] full_tree, or with .es debug on.".into()),
             // The add-on's answer to a ping: the round trip.
             "po" => {
                 let n = arg.parse::<u32>().unwrap_or(0);
