@@ -1,4 +1,4 @@
-From 2b8f5212d7bfc358316eaaeca4ae6f9d85285f2f Mon Sep 17 00:00:00 2001
+From 8f0edfa665dfc37f8a813e78a06fa68d2d7ecf13 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Fri, 6 Nov 2026 12:47:41 -0700
 Subject: [PATCH] Light from torches and spells: the new look lights the ground
@@ -13,7 +13,7 @@ summed per vertex, are kept exactly; this is a second table on top, and the clas
 
 - Torches, braziers, lamps and lit rooms (every authored point light benilla already reads: M2
   lights on props and carried items, WMO MOLT omni lights, glowing objects) cast a warm pool of
-  about 6 to 9 yd with a slow, small flicker for a flame. They come up through dusk (17:00 to
+  about 7 to 10 yd with a slow, small flicker for a flame. They come up through dusk (17:00 to
   21:00), burn full at night and are all but out by day (6 % at noon); inside a building, 70 %.
 - A missile carries a light of its spell's colour (its Basin Battle trail's, else its school's:
   holy gold, fire orange, nature green, frost ice blue, shadow violet, arcane pink-violet), so the
@@ -32,20 +32,31 @@ under the classic look); an out-of-range light costs two storage reads and a dis
 `benilla-app`'s `look_lights` hangs the spell lights from the missile spawns, the GO hit lists, the
 arrivals, the kit edges and the DynamicObject creates, all in `PostUpdate` through commands.
 
-Every number is in `look::lights::tune`. `looklights <scale>` (0 to 4, `tuned` to go back) scales
+Every number is in `look::lights::tune`. `looklights <scale>` (0 to 10, `tuned` to go back) scales
 them all live, for tuning on film. benilla's own; no reference behaviour.
+
+Tuned after the first night films, where a lamp post cast no pool you could see and even `looklights
+3` moved Goldshire's frame by under a level in 255: torches burn at 2.1 (from 0.7, the dimmest
+authored lamp at 1.3), missiles at 2.7 (from 0.9) and impacts 3.0, heals 1.6, casts 1.0, areas 1.2
+and auras 0.5. Every authored light casts a full 10 yd torch pool whatever its authored reach; only
+Basin Battle's glowing objects (a planted arrow's 4 yd light) stay a small find-me glow. A look
+light multiplies the texture no darker than 0.15 a channel, so Elwynn's near-black night ground
+takes the light's own hue rather than nothing. A cool light (Frostbolt) leans 30% toward white and
+burns 1.5 times brighter, to show on warm ground, and every spell light's colour is taken at full
+peak. With the camera outdoors a building's interior lights rank at 30%, so the street's lamps and
+the spells win the 16 slots. `looklights` reaches 10.
 ---
- crates/benilla-app/src/game_plugins.rs        |   1 +
- crates/benilla-app/src/lib.rs                 |   1 +
- crates/benilla-app/src/look_lights.rs         | 412 ++++++++
- crates/benilla-app/src/world_console.rs       |  58 ++
- .../benilla-assets/src/shaders/terrain.wgsl   |  43 +-
- .../benilla-assets/src/shaders/wow_model.wgsl |  46 +-
- .../src/lighting/global_light.rs              | 153 ++-
- crates/benilla-world/src/look/lights.rs       | 957 ++++++++++++++++++
- crates/benilla-world/src/look/mod.rs          |  10 +-
- .../benilla-world/src/shaders/static_gx.wgsl  |  37 +
- 10 files changed, 1698 insertions(+), 20 deletions(-)
+ crates/benilla-app/src/game_plugins.rs        |    1 +
+ crates/benilla-app/src/lib.rs                 |    1 +
+ crates/benilla-app/src/look_lights.rs         |  419 +++++++
+ crates/benilla-app/src/world_console.rs       |   58 +
+ .../benilla-assets/src/shaders/terrain.wgsl   |   46 +-
+ .../benilla-assets/src/shaders/wow_model.wgsl |   49 +-
+ .../src/lighting/global_light.rs              |  161 ++-
+ crates/benilla-world/src/look/lights.rs       | 1084 +++++++++++++++++
+ crates/benilla-world/src/look/mod.rs          |   10 +-
+ .../benilla-world/src/shaders/static_gx.wgsl  |   40 +
+ 10 files changed, 1849 insertions(+), 20 deletions(-)
  create mode 100644 crates/benilla-app/src/look_lights.rs
  create mode 100644 crates/benilla-world/src/look/lights.rs
 
@@ -75,10 +86,10 @@ index 183debd..103c202 100644
  mod weapon_trail;
 diff --git a/crates/benilla-app/src/look_lights.rs b/crates/benilla-app/src/look_lights.rs
 new file mode 100644
-index 0000000..3d3c60d
+index 0000000..ccd4b01
 --- /dev/null
 +++ b/crates/benilla-app/src/look_lights.rs
-@@ -0,0 +1,412 @@
+@@ -0,0 +1,419 @@
 +//! The new look's light from spells, benilla's own (no reference behaviour): the game hangs a
 +//! [`LookLight`] on what a spell shows, and `benilla_world::look::lights` ranks and packs them with
 +//! the torches for the per-pixel pass. Only under the new look (`worldLook 1`); the classic look
@@ -105,7 +116,7 @@ index 0000000..3d3c60d
 +use benilla_formats::SpellDisplay;
 +use benilla_protocol::EntityKind;
 +use benilla_ui::action_combat;
-+use benilla_world::look::lights::{school_color, school_flickers, tune};
++use benilla_world::look::lights::{school_color, school_flickers, spell_light_hue, tune};
 +use benilla_world::look::{LookLight, LookPulse, WorldLook};
 +
 +use crate::creature_anim::{CastEvent, CastEventKind, FxClass, SpellGoTargets, SpellKitFx};
@@ -140,12 +151,15 @@ index 0000000..3d3c60d
 +) -> Option<([f32; 3], f32, bool)> {
 +    let school = display.map_or(0, |d| d.school);
 +    let flame = school_flickers(school);
-+    match (trail, school_color(school)) {
-+        (Some(rgb), Some(_)) => Some((rgb, 1.0, flame)),
-+        (Some(rgb), None) => Some((rgb, tune::TRAIL_ONLY_SCALE, false)),
-+        (None, Some(rgb)) => Some((rgb, 1.0, flame)),
-+        (None, None) => None,
-+    }
++    let (rgb, share, flame) = match (trail, school_color(school)) {
++        (Some(rgb), Some(_)) => (rgb, 1.0, flame),
++        (Some(rgb), None) => (rgb, tune::TRAIL_ONLY_SCALE, false),
++        (None, Some(rgb)) => (rgb, 1.0, flame),
++        (None, None) => return None,
++    };
++    // At full peak, and a cool light lifted to show on warm ground.
++    let (rgb, gain) = spell_light_hue(rgb);
++    Some((rgb, share * gain, flame))
 +}
 +
 +/// The glowing trail Basin Battle's missile look gives a spell, if any.
@@ -437,6 +451,10 @@ index 0000000..3d3c60d
 +        assert_eq!((rgb, share), ([1.0, 0.4, 0.1], tune::TRAIL_ONLY_SCALE));
 +        let (rgb, share, _) = spell_hue(Some(&frost), Some([0.2, 1.0, 0.2])).unwrap();
 +        assert_eq!((rgb, share), ([0.2, 1.0, 0.2], 1.0));
++        // Frost's own blue is lifted toward white and brighter, to show on the night's ground.
++        let (rgb, share, _) = spell_hue(Some(&frost), None).unwrap();
++        assert_eq!((rgb, share), spell_light_hue(school_color(4).unwrap()));
++        assert!(share > 1.0 && rgb[0] > school_color(4).unwrap()[0]);
 +        assert!(
 +            spell_hue(None, None).is_none(),
 +            "an unknown spell casts nothing"
@@ -492,35 +510,35 @@ index 0000000..3d3c60d
 +    }
 +}
 diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
-index 40aaa9d..dc54c83 100644
+index 32c4339..43bd9bc 100644
 --- a/crates/benilla-app/src/world_console.rs
 +++ b/crates/benilla-app/src/world_console.rs
-@@ -90,6 +90,13 @@ impl Plugin for WorldConsolePlugin {
+@@ -95,6 +95,13 @@ impl Plugin for WorldConsolePlugin {
+             Some("<scale> | day <number> | why | grade"),
+             look_mist,
          );
-         // benilla's own: the new look's mist held for tuning on film.
-         app.console_command("lookmist", GRAPHICS, Some("<scale> | grade"), look_mist);
 +        // benilla's own: the new look's lights from torches and spells, scaled for tuning on film.
 +        app.console_command(
 +            "looklights",
 +            GRAPHICS,
-+            Some("<scale 0-4> | tuned"),
++            Some("<scale 0-10> | tuned"),
 +            look_lights,
 +        );
          // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
          // worldport's own load is `benilla_world::sun`'s.
          app.add_systems(
-@@ -181,6 +188,23 @@ fn look_mist(world: &mut World, args: &str) -> Vec<String> {
-     }
+@@ -271,6 +278,23 @@ fn mist_why(world: &mut World) -> Vec<String> {
+     lines
  }
  
 +/// `looklights <scale>`, benilla's own (1.12 has no such command): scales every light of the new
-+/// look's from torches and spells (`benilla_world::look::lights`), 0 to 4, for tuning on film;
++/// look's from torches and spells (`benilla_world::look::lights`), 0 to 10, for tuning on film;
 +/// `looklights tuned`, or no argument, puts them back at their tuned strength. The classic look
 +/// (`worldLook 0`) has none either way.
 +fn look_lights(world: &mut World, args: &str) -> Vec<String> {
 +    use benilla_world::look::LookLightTune;
 +    let Some(tune) = LookLightTune::parse(args) else {
-+        return vec!["Usage: looklights <scale 0-4> | tuned".to_string()];
++        return vec!["Usage: looklights <scale 0-10> | tuned".to_string()];
 +    };
 +    *world.get_resource_or_init::<LookLightTune>() = tune;
 +    vec![if tune == LookLightTune::default() {
@@ -533,8 +551,8 @@ index 40aaa9d..dc54c83 100644
  /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
  /// a clear one set with the second, each through `ConsoleWrite` in class 0.
  fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
-@@ -520,6 +544,40 @@ mod tests {
-         assert_eq!(scale(&mut app), None, "no argument lets go too");
+@@ -672,6 +696,40 @@ mod tests {
+         );
      }
  
 +    /// `looklights`: a scale holds every look light at it, `tuned` or nothing puts them back, and
@@ -556,8 +574,8 @@ index 40aaa9d..dc54c83 100644
 +        assert_eq!(run(&mut app, "looklights 0"), ["Look lights held at 0."]);
 +        assert_eq!(scale(&mut app), 0.0);
 +        assert_eq!(
-+            run(&mut app, "looklights 5"),
-+            ["Usage: looklights <scale 0-4> | tuned"]
++            run(&mut app, "looklights 11"),
++            ["Usage: looklights <scale 0-10> | tuned"]
 +        );
 +        assert_eq!(run(&mut app, "looklights bright").len(), 1);
 +        assert_eq!(scale(&mut app), 0.0, "a bad value changes nothing");
@@ -575,7 +593,7 @@ index 40aaa9d..dc54c83 100644
      /// the five world-flag bits start set (`0x7100b73`, `0x66f6cb`), the simple-doodad word clear
      /// (`0x66f714`). None reads its arguments.
 diff --git a/crates/benilla-assets/src/shaders/terrain.wgsl b/crates/benilla-assets/src/shaders/terrain.wgsl
-index 638ac1d..a8fc606 100644
+index 638ac1d..3339f0f 100644
 --- a/crates/benilla-assets/src/shaders/terrain.wgsl
 +++ b/crates/benilla-assets/src/shaders/terrain.wgsl
 @@ -43,9 +43,13 @@ struct WowLight {
@@ -602,7 +620,7 @@ index 638ac1d..a8fc606 100644
  }
  
  // Terrain's point-light candidacy half-width (yd): `w + 10`, `w` being the chunk's bounding-sphere
-@@ -116,6 +122,32 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
+@@ -116,6 +122,35 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
      return sum;
  }
  
@@ -611,6 +629,9 @@ index 638ac1d..a8fc606 100644
 +// wrapped by LOOK_WRAP for a soft side. The table is empty (row 20 `.y` = 0) under the classic
 +// look. Mirrored in wow_model.wgsl and static_gx.wgsl, and by `look::lights::light_at`.
 +const LOOK_WRAP: f32 = 0.5;
++// The darkest a surface counts as under a look light, per channel, so a near-black night texel
++// still takes the light's hue (`look::lights::tune::ALBEDO_FLOOR`, `lit_albedo`).
++const LOOK_FLOOR: f32 = 0.15;
 +
 +fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
 +    let count = u32(wow_light.point_count.y);
@@ -635,7 +656,7 @@ index 638ac1d..a8fc606 100644
  // The MCNK chunk cell centre under a world point: the reference's light anchor, the chunk's world
  // AABB centre `CMapChunk+0x5c..0x64` (written by `0x6b0e50`). The grid is fixed world-wide (chunk
  // 533.33333/16 yd, half-extent 32 tiles) and symmetric, and WoW x/y are Bevy −z/−x, so snapping
-@@ -161,6 +193,7 @@ fn vertex(in: Vertex) -> TerrainVsOut {
+@@ -161,6 +196,7 @@ fn vertex(in: Vertex) -> TerrainVsOut {
          vec3<f32>(0.0),
          vec3<f32>(1.0),
      );
@@ -643,7 +664,7 @@ index 638ac1d..a8fc606 100644
      return out;
  }
  
-@@ -223,7 +256,13 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
+@@ -223,7 +259,13 @@ fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
      //   specular = sheen · mask · shadow                 (none in shadow)
      let diffuse_term = color * primary * (0.3 * shadow_lit + 0.7);
      let spec_term = in.specular * specmask * shadow_lit;
@@ -652,14 +673,14 @@ index 638ac1d..a8fc606 100644
 +    // The new look's torches and spells, on the texture colour beside the baked light (no MCSH:
 +    // the sun's shadow is not theirs); none under the classic look.
 +    if (wow_light.point_count.y > 0.5) {
-+        lit_sum += color * look_light_sum(in.world_position.xyz, normalize(in.world_normal));
++        lit_sum += max(color, vec3<f32>(LOOK_FLOOR)) * look_light_sum(in.world_position.xyz, normalize(in.world_normal));
 +    }
 +    var tuned = clamp(lit_sum, vec3<f32>(0.0), vec3<f32>(1.0));
  
      // Gamma-space GL_LINEAR fog on planar eye-Z, as the reference computes `fogcoord`, not radial
      // distance. Per pixel matches its per-vertex fog, since a linear factor interpolates exactly.
 diff --git a/crates/benilla-assets/src/shaders/wow_model.wgsl b/crates/benilla-assets/src/shaders/wow_model.wgsl
-index 52b1b87..7397831 100644
+index 52b1b87..50c8373 100644
 --- a/crates/benilla-assets/src/shaders/wow_model.wgsl
 +++ b/crates/benilla-assets/src/shaders/wow_model.wgsl
 @@ -80,9 +80,13 @@ struct WowLight {
@@ -677,7 +698,7 @@ index 52b1b87..7397831 100644
      // The interior-prop SH probes, 7 rows per slot (`MAX_PROP_PROBES` = 8192 slots). Only this
      // shader declares this tail; the other shaders bind the same buffer by its prefix.
      prop_probes: array<vec4<f32>, 57344>,
-@@ -234,6 +238,31 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
+@@ -234,6 +238,34 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
      return sum;
  }
  
@@ -685,6 +706,9 @@ index 52b1b87..7397831 100644
 +// live entry of the look's table, per pixel, `rgb · (1 − (d/r)²)² · wrap(N·L)`. Mirrored from
 +// terrain.wgsl (keep in sync), and by `look::lights::light_at`.
 +const LOOK_WRAP: f32 = 0.5;
++// The darkest a surface counts as under a look light, per channel, so a near-black night texel
++// still takes the light's hue (`look::lights::tune::ALBEDO_FLOOR`, `lit_albedo`).
++const LOOK_FLOOR: f32 = 0.15;
 +
 +fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
 +    let count = u32(wow_light.point_count.y);
@@ -709,7 +733,7 @@ index 52b1b87..7397831 100644
  // The centre of the MCNK chunk under P, the light anchor for world-merged clutter, since the
  // reference gathers lights per terrain chunk (mirrored in terrain.wgsl). WoW x/y are Bevy −z/−x
  // and the grid is symmetric, so snapping Bevy x/z lands on the same cells. The height is the
-@@ -780,6 +809,9 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+@@ -780,6 +812,9 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
      // WMO, the body tint on M2). The WMO branch divides Bevy's MOCV fold back out, guarded; a dim
      // channel's product is ~0 either way.
      var lit_rgb: vec3<f32>;
@@ -719,7 +743,7 @@ index 52b1b87..7397831 100644
  #ifdef VERTEX_COLORS
      if (is_wmo) {
          let vc = in.color.rgb;
-@@ -790,6 +822,7 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+@@ -790,6 +825,7 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
          );
          let tex_rgb = base.rgb / max(vc, vec3<f32>(1.0 / 255.0));
          lit_rgb = tex_rgb * m.tint.rgb * primary;
@@ -727,7 +751,7 @@ index 52b1b87..7397831 100644
          if (is_interior && m.tint.w > 0.5 && m.tint.w < 1.5) {
              // INT: the reference's interior pixel shader, `tex·MOCV.rgb·(1 + 4·MOCV.a)` with only
              // the framebuffer's final clamp.
-@@ -843,6 +876,17 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
+@@ -843,6 +879,17 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
      if ((is_mod || is_mod2x) && !is_wmo) {
          rgb = base.rgb;
      }
@@ -737,7 +761,7 @@ index 52b1b87..7397831 100644
 +    let look_skips = (u32(m.clutter_fade.z) & (4u | 128u | 256u | 8192u)) != 0u;
 +    if (wow_light.point_count.y > 0.5 && !is_emissive && !look_skips) {
 +        rgb = clamp(
-+            rgb + look_albedo * look_light_sum(in.world_position.xyz, n_lit),
++            rgb + max(look_albedo, vec3<f32>(LOOK_FLOOR)) * look_light_sum(in.world_position.xyz, n_lit),
 +            vec3<f32>(0.0),
 +            vec3<f32>(1.0),
 +        );
@@ -746,7 +770,7 @@ index 52b1b87..7397831 100644
      if (stage1_on) {
          // The diffuse alpha is the batch and instance alpha, the shader's `obj_fade`.
 diff --git a/crates/benilla-world/src/lighting/global_light.rs b/crates/benilla-world/src/lighting/global_light.rs
-index e605198..b85b80d 100644
+index e605198..017bb59 100644
 --- a/crates/benilla-world/src/lighting/global_light.rs
 +++ b/crates/benilla-world/src/lighting/global_light.rs
 @@ -14,6 +14,7 @@ use bevy::render::{Render, RenderApp, RenderSystems};
@@ -847,7 +871,7 @@ index e605198..b85b80d 100644
              let p = gt.translation();
              let d2 = p.distance_squared(cam_pos);
              (d2 < POINT_PACK_RADIUS * POINT_PACK_RADIUS).then(|| {
-@@ -265,6 +278,26 @@ fn build_light_data(
+@@ -265,6 +278,34 @@ fn build_light_data(
          fresh.points[2 * i] = [p.x, p.y, p.z, *range];
          fresh.points[2 * i + 1] = [rgb[0], rgb[1], rgb[2], 0.0];
      }
@@ -862,7 +886,15 @@ index e605198..b85b80d 100644
 +                rooms.and_then(|r| portals.get(r.0.instance).ok()),
 +            )
 +        })
-+        .map(|(e, pl, gt, _)| (e, pl, gt.translation()));
++        .map(|(e, pl, gt, rooms)| {
++            // A light in one of a building's interior rooms ranks lower with the camera outside.
++            let interior = rooms.is_some_and(|r| {
++                portals
++                    .get(r.0.instance)
++                    .is_ok_and(|inst| r.0.interior_fogged_by(inst))
++            });
++            (e, pl, gt.translation(), interior)
++        });
 +    let looked = look.pack(
 +        cam_pos,
 +        time.elapsed_secs(),
@@ -874,7 +906,7 @@ index e605198..b85b80d 100644
      // `WOW_POINTS_DUMP=1` prints the nearest 8 packed lights once a second; `=frame` every frame,
      // which a pool that changes frame to frame needs.
      static POINTS_DUMP: std::sync::OnceLock<Option<std::ffi::OsString>> =
-@@ -441,17 +474,27 @@ mod tests {
+@@ -441,17 +482,27 @@ mod tests {
          );
      }
  
@@ -906,7 +938,7 @@ index e605198..b85b80d 100644
          app.world_mut()
              .spawn((crate::view::WorldCamera, GlobalTransform::IDENTITY));
          // The authored torch light, through the spawn recipe.
-@@ -474,6 +517,88 @@ mod tests {
+@@ -474,6 +525,88 @@ mod tests {
              "green commits raw: {rgb:?}"
          );
          assert!((rgb[2] - 0.4).abs() < 1e-4, "blue commits raw: {rgb:?}");
@@ -997,10 +1029,10 @@ index e605198..b85b80d 100644
      /// The packed SH block gives `Model2.bls`'s `clamp01(A + D·I·(3 + 16μ + 15μ²)/34)` at each
 diff --git a/crates/benilla-world/src/look/lights.rs b/crates/benilla-world/src/look/lights.rs
 new file mode 100644
-index 0000000..2b0fa9d
+index 0000000..192a8e9
 --- /dev/null
 +++ b/crates/benilla-world/src/look/lights.rs
-@@ -0,0 +1,957 @@
+@@ -0,0 +1,1084 @@
 +//! Light from torches and spells, the new look's own (no reference behaviour): WoW Forever's
 +//! secondary lights in a Classic style. A Fireball lights the ground and the walls as it flies and
 +//! where it bursts, a torch casts a warm pool on the ground at night, and a heal glows on the hero.
@@ -1047,21 +1079,30 @@ index 0000000..2b0fa9d
 +/// in gamma, as the reference's), intensities how much of that colour a surface right at the light
 +/// takes on top of its own light, radii in yards.
 +pub mod tune {
-+    /// A torch or lamp's strength at night, for the stock torch's committed colour.
-+    pub const TORCH_INTENSITY: f32 = 0.7;
++    /// A torch or lamp's strength at night, for the stock torch's committed colour. Filmed at
++    /// 0.7 in Goldshire at 23:00, a lamp post cast no pool you could see and even `looklights 3`
++    /// moved the frame's mean by under a level in 255: Elwynn's night ground is dark, so a pool
++    /// has to be about three times that to read from 15 to 20 yd.
++    pub const TORCH_INTENSITY: f32 = 2.1;
 +    /// The stock torch's committed peak, `(0.467, 0.290, 0.133) × 3` (red 1.4): an authored
 +    /// light this bright gets [`TORCH_INTENSITY`], a dimmer or brighter one in proportion.
 +    pub const TORCH_REF_PEAK: f32 = 1.4;
 +    /// The proportion's floor and ceiling, so a dim candle still reads and a bonfire doesn't
 +    /// blind.
-+    pub const TORCH_PEAK_MIN: f32 = 0.4;
++    pub const TORCH_PEAK_MIN: f32 = 0.6;
 +    pub const TORCH_PEAK_MAX: f32 = 1.5;
 +    /// An authored light dimmer than this (peak) casts no pool.
 +    pub const TORCH_PEAK_CUTOFF: f32 = 0.05;
-+    /// A torch's pool: the ground is lit out to about 6 yd and nothing past 9.
-+    pub const TORCH_RADIUS: f32 = 9.0;
-+    /// A light authored with a short reach (a glowing object's 4 yd) gets this many times that.
-+    pub const TORCH_RANGE_SCALE: f32 = 1.5;
++    /// A torch's pool: every authored light (a lamp post's, a lantern's, a brazier's, a WMO's
++    /// MOLT) casts one this size, whatever its authored reach. From a lamp's head about 4 yd up
++    /// the ground is lit out to about 7 yd, and nothing past 9.
++    pub const TORCH_RADIUS: f32 = 10.0;
++    /// Basin Battle's glowing objects (a planted arrow's 4 yd light, `go_glow`), the only lights
++    /// authored with a reach this short or shorter: a small find-me glow, not a torch, so they
++    /// keep [`GLOW_INTENSITY`] out to [`GLOW_RANGE_SCALE`] times their reach.
++    pub const GLOW_MAX_RANGE: f32 = 6.0;
++    pub const GLOW_RANGE_SCALE: f32 = 1.5;
++    pub const GLOW_INTENSITY: f32 = 0.7;
 +    /// A flame's flicker: ±8 % at about one beat a second, slow and small.
 +    pub const FLAME_FLICKER: f32 = 0.08;
 +    pub const FLAME_FLICKER_HZ: f32 = 1.1;
@@ -1082,8 +1123,9 @@ index 0000000..2b0fa9d
 +    pub const INDOOR_FLOOR: f32 = 0.7;
 +
 +    /// A missile in flight (Fireball, Frostbolt, Shadow Bolt): it lights the ground under its path.
-+    pub const MISSILE_INTENSITY: f32 = 0.9;
-+    pub const MISSILE_RADIUS: f32 = 8.0;
++    /// Three times the first films' 0.9, which only just showed on Goldshire's night fence.
++    pub const MISSILE_INTENSITY: f32 = 2.7;
++    pub const MISSILE_RADIUS: f32 = 9.0;
 +    /// A fire missile's flicker, a touch quicker than a torch's.
 +    pub const MISSILE_FLICKER: f32 = 0.1;
 +    pub const MISSILE_FLICKER_HZ: f32 = 2.3;
@@ -1092,21 +1134,21 @@ index 0000000..2b0fa9d
 +    pub const TRAIL_ONLY_SCALE: f32 = 0.6;
 +
 +    /// An impact: a brighter, shorter light, 0.5 s in all.
-+    pub const IMPACT_INTENSITY: f32 = 1.3;
-+    pub const IMPACT_RADIUS: f32 = 10.0;
++    pub const IMPACT_INTENSITY: f32 = 3.0;
++    pub const IMPACT_RADIUS: f32 = 11.0;
 +    pub const IMPACT_RISE: f32 = 0.04;
 +    pub const IMPACT_HOLD: f32 = 0.06;
 +    pub const IMPACT_FALL: f32 = 0.4;
 +
 +    /// A heal landing (Holy Light, Flash Heal, Healing Touch): a softer, longer glow on the hero.
-+    pub const HEAL_INTENSITY: f32 = 0.8;
++    pub const HEAL_INTENSITY: f32 = 1.6;
 +    pub const HEAL_RADIUS: f32 = 5.5;
 +    pub const HEAL_RISE: f32 = 0.15;
 +    pub const HEAL_HOLD: f32 = 0.35;
 +    pub const HEAL_FALL: f32 = 0.9;
 +
 +    /// A cast being drawn up (the precast and a channel): a glow on the caster that grows in.
-+    pub const CAST_INTENSITY: f32 = 0.45;
++    pub const CAST_INTENSITY: f32 = 1.0;
 +    pub const CAST_RADIUS: f32 = 4.5;
 +    pub const CAST_RISE: f32 = 0.3;
 +    /// The longest a cast's glow stays without its reap (a lost cast-end packet), and how fast it
@@ -1115,14 +1157,14 @@ index 0000000..2b0fa9d
 +    pub const CAST_FALL: f32 = 0.3;
 +
 +    /// An aura with a visual of its own (a shield, a ward): a faint, breathing glow on its unit.
-+    pub const AURA_INTENSITY: f32 = 0.3;
++    pub const AURA_INTENSITY: f32 = 0.5;
 +    pub const AURA_RADIUS: f32 = 4.0;
 +    pub const AURA_RISE: f32 = 0.5;
 +    pub const AURA_BREATH: f32 = 0.15;
 +    pub const AURA_BREATH_HZ: f32 = 0.4;
 +
 +    /// A ground area (Flamestrike, Consecration, Blizzard): its whole circle glows softly.
-+    pub const AREA_INTENSITY: f32 = 0.55;
++    pub const AREA_INTENSITY: f32 = 1.2;
 +    /// The glow reaches this far past the area's own radius, within these bounds.
 +    pub const AREA_PAD: f32 = 2.0;
 +    pub const AREA_MIN_RADIUS: f32 = 4.0;
@@ -1150,8 +1192,26 @@ index 0000000..2b0fa9d
 +    /// still takes a little. Mirrored by `LOOK_WRAP` in the three shaders.
 +    pub const WRAP: f32 = 0.5;
 +
-+    /// The most `looklights` scales by.
-+    pub const SCALE_MAX: f32 = 4.0;
++    /// The darkest a surface counts as under a look light, per channel: the light multiplies
++    /// `max(texture, this)`, so a near-black night texel (a dark bark, a shadowed path) still
++    /// takes the light's own hue, a warm pool rather than nothing, and a bright one is unchanged.
++    /// Mirrored by `LOOK_FLOOR` in the three shaders.
++    pub const ALBEDO_FLOOR: f32 = 0.15;
++
++    /// A cool spell light (blue its brightest channel: Frostbolt, a frost nova) on Elwynn's warm
++    /// green and brown ground: its other channels lean this far toward white, so it shows as a
++    /// pale ice light rather than vanishing into texels with little blue, and it burns this many
++    /// times brighter.
++    pub const COOL_LIFT: f32 = 0.3;
++    pub const COOL_GAIN: f32 = 1.5;
++
++    /// With the camera outdoors, a building's interior light (a candle in the inn) ranks at this
++    /// share of its brightness, so the street's lamps and the spells win the table's slots; it
++    /// still lights what the doorway shows when there is room.
++    pub const INTERIOR_RANK_OUTSIDE: f32 = 0.3;
++
++    /// The most `looklights` scales by, so a film can sweep 1, 3, 6 and 10.
++    pub const SCALE_MAX: f32 = 10.0;
 +}
 +
 +/// The colour of a spell's light by its `Spell.dbc` school (1 holy, 2 fire, 3 nature, 4 frost,
@@ -1166,6 +1226,31 @@ index 0000000..2b0fa9d
 +        6 => Some([0.85, 0.5, 1.0]), // arcane: pink-violet
 +        _ => None,
 +    }
++}
++
++/// A spell light's colour as it is cast: its hue at a peak of 1 (a dim trail colour is not a dim
++/// light) and, for a cool light, leaned toward white by [`tune::COOL_LIFT`] with
++/// [`tune::COOL_GAIN`]; returns the colour and its strength's gain.
++pub fn spell_light_hue(rgb: [f32; 3]) -> ([f32; 3], f32) {
++    let peak = rgb[0].max(rgb[1]).max(rgb[2]);
++    if peak <= 0.0 {
++        return (rgb, 1.0);
++    }
++    let hue = rgb.map(|c| (c / peak).max(0.0));
++    if hue[2] >= 1.0 && hue[0] < 1.0 && hue[1] < 1.0 {
++        (
++            hue.map(|c| c + (1.0 - c) * tune::COOL_LIFT),
++            tune::COOL_GAIN,
++        )
++    } else {
++        (hue, 1.0)
++    }
++}
++
++/// The colour a look light multiplies on a surface: its texture colour, no darker than
++/// [`tune::ALBEDO_FLOOR`] a channel. The shaders' `max(color, vec3(LOOK_FLOOR))`.
++pub fn lit_albedo(texture: [f32; 3]) -> [f32; 3] {
++    texture.map(|c| c.max(tune::ALBEDO_FLOOR))
 +}
 +
 +/// Whether a school's light is fire's, which flickers.
@@ -1384,7 +1469,8 @@ index 0000000..2b0fa9d
 +
 +/// The look's light for an authored point light at night (`night` from [`night_weight`]): its
 +/// hue, at a strength set by its authored peak, out to [`tune::TORCH_RADIUS`]; a flame flickers.
-+/// `None` for a light too dim to cast a pool.
++/// A light authored with a reach of [`tune::GLOW_MAX_RANGE`] or less is Basin Battle's glowing
++/// object, a small glow and not a torch. `None` for a light too dim to cast a pool.
 +pub fn torch_light(pl: &WorldPointLight) -> Option<LookLight> {
 +    // `intensity` is `4π ×` the authored scale (the `PointLight` convention).
 +    let s = pl.intensity / (4.0 * std::f32::consts::PI);
@@ -1395,8 +1481,12 @@ index 0000000..2b0fa9d
 +    }
 +    let hue = rgb.map(|c| c / peak);
 +    let strength = (peak / tune::TORCH_REF_PEAK).clamp(tune::TORCH_PEAK_MIN, tune::TORCH_PEAK_MAX);
-+    let radius = tune::TORCH_RADIUS.min(pl.range * tune::TORCH_RANGE_SCALE);
-+    let light = LookLight::new(hue, tune::TORCH_INTENSITY * strength, radius);
++    let (base, radius) = if pl.range <= tune::GLOW_MAX_RANGE {
++        (tune::GLOW_INTENSITY, pl.range * tune::GLOW_RANGE_SCALE)
++    } else {
++        (tune::TORCH_INTENSITY, tune::TORCH_RADIUS)
++    };
++    let light = LookLight::new(hue, base * strength, radius);
 +    Some(if rgb[0] >= tune::FLAME_RED_OVER_BLUE * rgb[2] {
 +        light.flickering(tune::FLAME_FLICKER, tune::FLAME_FLICKER_HZ)
 +    } else {
@@ -1557,14 +1647,15 @@ index 0000000..2b0fa9d
 +
 +impl LookLightInputs<'_, '_> {
 +    /// One frame: ranks `torches` (each authored light, admitted by its rooms, at its world
-+    /// position) and the [`LookLight`]s around `cam`, steps the fades and packs the table into
++    /// position, and whether it is a building's interior light) and the [`LookLight`]s around
++    /// `cam`, steps the fades and packs the table into
 +    /// `rows`, returning its count. Under the classic look the table is empty.
 +    pub(crate) fn pack<'a>(
 +        &mut self,
 +        cam: Vec3,
 +        now: f32,
 +        dt: f32,
-+        torches: impl Iterator<Item = (Entity, &'a WorldPointLight, Vec3)>,
++        torches: impl Iterator<Item = (Entity, &'a WorldPointLight, Vec3, bool)>,
 +        rows: &mut [[f32; 4]; LOOK_LIGHT_ROWS],
 +    ) -> usize {
 +        if !self.look.on {
@@ -1579,32 +1670,37 @@ index 0000000..2b0fa9d
 +        let slots = &mut *self.slots;
 +        let mut cands = std::mem::take(&mut slots.scratch);
 +        cands.clear();
-+        let mut push = |key: Entity, pos: Vec3, light: &LookLight, gain: f32, fresh: bool| {
-+            let d = pos.distance(cam);
-+            if d > tune::REACH + light.radius || gain <= 0.0 {
-+                return;
-+            }
-+            let g = light.intensity
-+                * gain
-+                * flicker(light.flicker, light.flicker_hz, now, seed_of(key))
-+                * scale;
-+            let rgb = light.color.map(|c| (c * g).max(0.0));
-+            let peak = rgb[0].max(rgb[1]).max(rgb[2]);
-+            if peak <= 0.0 {
-+                return;
-+            }
-+            cands.push(LookCandidate {
-+                key,
-+                pos,
-+                radius: light.radius,
-+                rgb,
-+                score: score(peak, light.radius, d),
-+                fresh,
-+            });
-+        };
-+        for (key, pl, pos) in torches {
++        // Outdoors (the interior crossfade at 0), a building's own lights rank lower.
++        let interior_rank = tune::INTERIOR_RANK_OUTSIDE
++            + (1.0 - tune::INTERIOR_RANK_OUTSIDE) * self.indoors.t().clamp(0.0, 1.0);
++        let mut push =
++            |key: Entity, pos: Vec3, light: &LookLight, gain: f32, fresh: bool, rank: f32| {
++                let d = pos.distance(cam);
++                if d > tune::REACH + light.radius || gain <= 0.0 {
++                    return;
++                }
++                let g = light.intensity
++                    * gain
++                    * flicker(light.flicker, light.flicker_hz, now, seed_of(key))
++                    * scale;
++                let rgb = light.color.map(|c| (c * g).max(0.0));
++                let peak = rgb[0].max(rgb[1]).max(rgb[2]);
++                if peak <= 0.0 {
++                    return;
++                }
++                cands.push(LookCandidate {
++                    key,
++                    pos,
++                    radius: light.radius,
++                    rgb,
++                    score: score(peak, light.radius, d) * rank,
++                    fresh,
++                });
++            };
++        for (key, pl, pos, interior) in torches {
 +            if let Some(light) = torch_light(pl) {
-+                push(key, pos, &light, hour, false);
++                let rank = if interior { interior_rank } else { 1.0 };
++                push(key, pos, &light, hour, false, rank);
 +            }
 +        }
 +        for (key, light, own, pulse) in &self.lights {
@@ -1625,6 +1721,7 @@ index 0000000..2b0fa9d
 +                &light,
 +                gain,
 +                light.is_added() && pulse.is_some(),
++                1.0,
 +            );
 +        }
 +        slots.step(&mut cands, dt);
@@ -1916,12 +2013,24 @@ index 0000000..2b0fa9d
 +        };
 +        let g = torch_light(&glow).expect("a glowing object's light");
 +        assert_eq!(g.flicker, 0.0, "white burns steady");
-+        assert_eq!(g.radius, 6.0);
++        assert_eq!(g.radius, 6.0, "a planted arrow's glow stays small");
++        assert!(g.intensity <= tune::GLOW_INTENSITY * tune::TORCH_PEAK_MAX);
++        // A lamp post's or a lantern's light, however short or long its authored reach past a
++        // glow's, casts a full torch's pool.
++        for range in [8.0, 12.0, 48.0] {
++            let lamp = WorldPointLight {
++                range,
++                ..crate::terrain_stream::point_light([1.0, 0.8, 0.5], 1.0)
++            };
++            let l = torch_light(&lamp).unwrap();
++            assert_eq!(l.radius, tune::TORCH_RADIUS, "reach {range}");
++            assert!(l.intensity >= tune::TORCH_INTENSITY * tune::TORCH_PEAK_MIN);
++        }
 +        let dark = crate::terrain_stream::point_light([0.01; 3], 1.0);
 +        assert!(torch_light(&dark).is_none());
 +    }
 +
-+    /// `looklights`: a scale from 0 to 4, nothing or `tuned` for 1, anything else refused.
++    /// `looklights`: a scale from 0 to 10, nothing or `tuned` for 1, anything else refused.
 +    #[test]
 +    fn the_console_scale_parses() {
 +        assert_eq!(
@@ -1941,10 +2050,60 @@ index 0000000..2b0fa9d
 +            LookLightTune::parse("Tuned"),
 +            Some(LookLightTune::default())
 +        );
-+        assert_eq!(LookLightTune::parse("4.5"), None);
++        assert_eq!(
++            LookLightTune::parse("10"),
++            Some(LookLightTune { scale: 10.0 })
++        );
++        assert_eq!(LookLightTune::parse("10.5"), None);
 +        assert_eq!(LookLightTune::parse("-1"), None);
 +        assert_eq!(LookLightTune::parse("bright"), None);
 +        assert_eq!(LookLightTune::parse("nan"), None);
++    }
++
++    /// A spell light's hue is at full peak whatever its trail's brightness; a cool light leans
++    /// toward white and burns brighter, a warm one is as it is.
++    #[test]
++    fn a_cool_spell_light_is_lifted() {
++        let (fire, g) = spell_light_hue(school_color(2).unwrap());
++        assert_eq!((fire, g), (school_color(2).unwrap(), 1.0));
++        let (dim, g) = spell_light_hue([0.5, 0.2, 0.1]);
++        assert_eq!((dim, g), ([1.0, 0.4, 0.2], 1.0));
++        let (frost, g) = spell_light_hue(school_color(4).unwrap());
++        assert_eq!(g, tune::COOL_GAIN);
++        assert_eq!(frost[2], 1.0);
++        assert!(
++            frost[0] > 0.45 && frost[1] > 0.7 && frost[0] < frost[1],
++            "{frost:?}"
++        );
++        assert_eq!(spell_light_hue([0.0; 3]), ([0.0; 3], 1.0));
++        // A light on a dark texel takes the floor; a bright one is its own.
++        assert_eq!(lit_albedo([0.02, 0.3, 0.9]), [tune::ALBEDO_FLOOR, 0.3, 0.9]);
++    }
++
++    /// Outdoors a building's interior light ranks below a street lamp of the same brightness
++    /// further off, so the street's lamps take the slots.
++    #[test]
++    fn an_interior_light_ranks_lower_outdoors() {
++        let mut app = App::new();
++        app.insert_resource(WorldLook::NEW)
++            .init_resource::<GameClock>()
++            .init_resource::<WmoCrossfade>();
++        init_resources(&mut app);
++        let lamp =
++            crate::terrain_stream::point_light([0.466_666_7, 0.290_196_1, 0.133_333_34], 3.0);
++        let keys: Vec<Entity> = (0..2).map(|_| app.world_mut().spawn_empty().id()).collect();
++        let mut state = bevy::ecs::system::SystemState::<LookLightInputs>::new(app.world_mut());
++        let mut inputs = state.get_mut(app.world_mut());
++        let mut rows = [[0.0; 4]; LOOK_LIGHT_ROWS];
++        // The candle 8 yd off inside, the lamp 12 yd off outside.
++        let torches = [
++            (keys[0], &lamp, Vec3::new(8.0, 0.0, 0.0), true),
++            (keys[1], &lamp, Vec3::new(-12.0, 0.0, 0.0), false),
++        ];
++        inputs.pack(Vec3::ZERO, 0.0, 0.1, torches.into_iter(), &mut rows);
++        let cands = &inputs.slots.scratch;
++        let score_of = |k| cands.iter().find(|c| c.key == k).unwrap().score;
++        assert!(score_of(keys[1]) > score_of(keys[0]));
 +    }
 +
 +    /// The school colours: fire flickers, physical casts no light.
@@ -1959,7 +2118,7 @@ index 0000000..2b0fa9d
 +    }
 +}
 diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
-index 51cd7ee..7960a02 100644
+index b5065c7..fb92899 100644
 --- a/crates/benilla-world/src/look/mod.rs
 +++ b/crates/benilla-world/src/look/mod.rs
 @@ -1,7 +1,8 @@
@@ -1973,19 +2132,20 @@ index 51cd7ee..7960a02 100644
  
  use bevy::ecs::system::SystemParam;
  use bevy::prelude::*;
-@@ -11,9 +12,11 @@ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
+@@ -11,10 +12,12 @@ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
  use benilla_formats::{AreaTableCatalog, Atmosphere};
  
  pub mod grade;
 +pub mod lights;
+ pub mod mist;
  pub mod pass;
  pub mod rays;
  pub use grade::{GradeKey, PostLook, Tint};
 +pub use lights::{LookLight, LookLightTune, LookPulse};
+ pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
  pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
  
- /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
-@@ -197,11 +200,12 @@ fn sync_view_look(look: Res<WorldLook>, mut view: ResMut<crate::view::ViewDistan
+@@ -199,12 +202,13 @@ fn sync_view_look(look: Res<WorldLook>, mut view: ResMut<crate::view::ViewDistan
      }
  }
  
@@ -1995,12 +2155,13 @@ index 51cd7ee..7960a02 100644
      app.init_resource::<WorldLook>()
          .init_resource::<ZoneRamp>()
          .init_resource::<LookGrade>();
+     mist::init_resources(app);
 +    lights::init_resources(app);
  }
  
  /// The new look's world side: its resources, the area table its zone lookup reads, and the
 diff --git a/crates/benilla-world/src/shaders/static_gx.wgsl b/crates/benilla-world/src/shaders/static_gx.wgsl
-index fd7888c..a867efa 100644
+index fd7888c..ac67e47 100644
 --- a/crates/benilla-world/src/shaders/static_gx.wgsl
 +++ b/crates/benilla-world/src/shaders/static_gx.wgsl
 @@ -27,8 +27,11 @@ struct WowLight {
@@ -2015,13 +2176,16 @@ index fd7888c..a867efa 100644
      // lighting::prop_probes: 8192 slots of 7 rows; the buffer's later regions are not mirrored.
      prop_probes: array<vec4<f32>, 57344>,
  }
-@@ -113,6 +116,30 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
+@@ -113,6 +116,33 @@ fn point_light_sum(P: vec3<f32>, N: vec3<f32>, anchor: vec3<f32>) -> vec3<f32> {
      return sum;
  }
  
 +// The new look's light from torches and spells, benilla's own (no reference behaviour): every
 +// live entry of the look's table, per pixel. Mirrored from terrain.wgsl (keep in sync).
 +const LOOK_WRAP: f32 = 0.5;
++// The darkest a surface counts as under a look light, per channel, so a near-black night texel
++// still takes the light's hue (`look::lights::tune::ALBEDO_FLOOR`, `lit_albedo`).
++const LOOK_FLOOR: f32 = 0.15;
 +
 +fn look_light_sum(P: vec3<f32>, N: vec3<f32>) -> vec3<f32> {
 +    let count = u32(wow_light.point_count.y);
@@ -2046,7 +2210,7 @@ index fd7888c..a867efa 100644
  // ---- the pass ----
  
  struct GxVertex {
-@@ -236,6 +263,8 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
+@@ -236,6 +266,8 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
      let vc = select(vec4<f32>(1.0), in.color, has_vc);
      let folded = select(base.rgb, base.rgb * vc.rgb, has_vc);
      var rgb: vec3<f32>;
@@ -2055,7 +2219,7 @@ index fd7888c..a867efa 100644
      if ((in.word & WORD_WMO) != 0u) {
          // ---- WMO surfaces: wow_model.wgsl's is_wmo branch ----
          let interior = (in.word & WORD_INTERIOR) != 0u;
-@@ -287,6 +316,7 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
+@@ -287,6 +319,7 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
          // The entity path's algebra: (tex×vc)/max(vc, 1/255) is not tex in floats; keep it.
          let tex_rgb = folded / max(vc.rgb, vec3<f32>(1.0 / 255.0));
          rgb = tex_rgb * primary;
@@ -2063,14 +2227,14 @@ index fd7888c..a867efa 100644
          if (interior && class_int && has_vc) {
              // INT self-illumination, the reference's interior pixel shader (literal 4.0):
              // tex·MOCV·(1 + 4·MOCV.a), clamped once. A colour-less INT batch keeps tex × lit.
-@@ -354,6 +384,13 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
+@@ -354,6 +387,13 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
      // Unlit (M2 UNLIT 0x01, WMO UNLIT on an exterior group): texture × vertex colour, no light.
      if ((in.word & WORD_UNLIT) != 0u) {
          rgb = folded;
 +    } else if (wow_light.point_count.y > 0.5) {
 +        // The new look's torches and spells, inside the clamp; none under the classic look.
 +        rgb = clamp(
-+            rgb + look_albedo * look_light_sum(in.world_position.xyz, n_lit),
++            rgb + max(look_albedo, vec3<f32>(LOOK_FLOOR)) * look_light_sum(in.world_position.xyz, n_lit),
 +            vec3<f32>(0.0),
 +            vec3<f32>(1.0),
 +        );
