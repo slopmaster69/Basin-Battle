@@ -27,6 +27,8 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
         "row" => &[(6.0, 0.0), (10.0, 0.0), (14.0, 0.0)],
         // One at 12 yd: a bolt's flight.
         "mid" => &[(12.0, 0.0)],
+        // At the edge of a long reach: Mind Flay's taut zone (26 to 30 yd).
+        "edge" => &[(28.0, 0.0)],
         _ => return None,
     })
 }
@@ -34,7 +36,7 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
 /// The account every spell lab stand-in ally hero's starts with: never saved.
 pub const LAB_ALLY: &str = "lab~ally";
 
-pub const LAB_SCENES: &str = "one, pack, close, ring, far, line, spread, row or mid";
+pub const LAB_SCENES: &str = "one, pack, close, ring, far, line, spread, row, mid or edge";
 
 impl Survival {
     /// Sets out a scene in front of hero `id`: `creature`s (a `[[mob]]` key; "dummy" for the
