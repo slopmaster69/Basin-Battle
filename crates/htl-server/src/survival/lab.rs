@@ -444,7 +444,8 @@ impl SurvivalGame {
                     Some("right") => "r",
                     _ => "f",
                 };
-                let speed = self.sim.players.get(&me).map_or(7.0, |p| p.sent_speed);
+                // (Backing away at the backpedal's pace, as the client's own walk would.)
+                let speed = self.sim.players.get(&me).map_or(7.0, |p| if keys == "b" { p.sent_back } else { p.sent_speed });
                 self.ui_line(conn, &format!("LW\t{secs:.2}\t{speed:.2}\t{keys}"));
                 if let Some(lab) = self.lab.as_mut() {
                     lab.trace.push(format!("{:+.3} STEP {step} -> walks {keys} {secs:.2} s at {speed:.2} yd/s", now - start));
