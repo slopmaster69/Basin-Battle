@@ -105,6 +105,11 @@ pub(crate) fn fight(foes: &[&str], seed: u64, who: Profile) -> Outcome {
         h.max_health = 1_000_000;
         h.health = 1_000_000;
     }
+    // `FAIR_HERO_WEAPON=maul`: the hero fights with that weapon instead.
+    if let Ok(w) = std::env::var("FAIR_HERO_WEAPON") {
+        let i = s.content.weapons.iter().position(|x| x.key == w).unwrap_or_else(|| panic!("no weapon {w}"));
+        s.players.get_mut(&p).unwrap().weapon = i;
+    }
     let mut ids = Vec::new();
     for (i, key) in foes.iter().enumerate() {
         let def = s.content.mob(key).unwrap_or_else(|| panic!("no creature {key}"));
