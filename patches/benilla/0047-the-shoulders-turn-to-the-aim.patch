@@ -1,0 +1,187 @@
+From a3ecf59ac858abc02ddcbd5b5dcf2aac38050588 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 5 Nov 2026 18:23:56 -0600
+Subject: [PATCH] The shoulders turn to the aim: SetAimTurn, and the
+ twenty-seventh round
+
+Our own hero's spine turns right by what the add-on asks (SetAimTurn,
+radians, eased) and the head back by as much, so 1.12's side-on bow draw
+squares to the aim under the camera over the right shoulder.
+HasActionCombat says 27.
+---
+ .../benilla-app/src/creature_anim/action.rs   | 12 ++++++-
+ crates/benilla-app/src/creature_anim/twist.rs | 10 +++++-
+ crates/benilla-ui/src/action_combat.rs        | 36 +++++++++++++++++--
+ 3 files changed, 54 insertions(+), 4 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 7c55e0ee..e7af7e0d 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1135,7 +1135,8 @@ pub(super) fn apply_hit_stops(
+     }
+ }
+ 
+-/// The upper body follows the aiming camera's pitch (our own hero, while aiming).
++/// The upper body follows the aiming camera's pitch (our own hero, while aiming), and turns as the
++/// add-on asks (`SetAimTurn`).
+ pub(super) fn aim_pitch(time: Res<Time>, mut me: Query<&mut BodyTwist, With<SelfPlayer>>) {
+     let Ok(mut twist) = me.single_mut() else {
+         return;
+@@ -1152,6 +1153,15 @@ pub(super) fn aim_pitch(time: Res<Time>, mut me: Query<&mut BodyTwist, With<Self
+     } else {
+         next
+     };
++    // And the add-on's turn of the shoulders (a side-on bow draw squared to the aim), eased the
++    // same way.
++    let want = action_combat::aim_turn();
++    let next = twist.turn + (want - twist.turn) * k;
++    twist.turn = if (next - want).abs() < 1.0e-3 {
++        want
++    } else {
++        next
++    };
+ }
+ 
+ /// A bone's tilted pose, given back part by part: whatever still holds what the tilt wrote returns
+diff --git a/crates/benilla-app/src/creature_anim/twist.rs b/crates/benilla-app/src/creature_anim/twist.rs
+index 16b5f5c5..a4a43897 100644
+--- a/crates/benilla-app/src/creature_anim/twist.rs
++++ b/crates/benilla-app/src/creature_anim/twist.rs
+@@ -14,6 +14,10 @@ pub(crate) struct BodyTwist {
+     /// Basin Battle's aim pitch (radians, up positive): the spine leans back to look up and
+     /// forward to look down, composed after the yaw twist.
+     pub(crate) pitch: f32,
++    /// Basin Battle's aim turn (radians, right positive): the spine turns right by it and the
++    /// head back by as much, so a side-on bow draw squares the shoulders and keeps the eyes on
++    /// the aim (`SetAimTurn`).
++    pub(crate) turn: f32,
+     spine: Option<Channel>,
+     head: Option<Channel>,
+ }
+@@ -23,6 +27,7 @@ impl BodyTwist {
+         Self {
+             yaw_gap: 0.0,
+             pitch: 0.0,
++            turn: 0.0,
+             spine: spine.map(Channel::new),
+             head: head.map(Channel::new),
+         }
+@@ -91,7 +96,7 @@ pub(super) fn apply_body_twist(
+     // `WOW_NO_TWIST=1` stands the pass down and logs the gap it would have closed.
+     if twist_off() {
+         for (_, t) in &units {
+-            if t.yaw_gap != 0.0 || t.pitch != 0.0 {
++            if t.yaw_gap != 0.0 || t.pitch != 0.0 || t.turn != 0.0 {
+                 info!(
+                     "twist: STOOD DOWN (WOW_NO_TWIST) — yaw_gap was {:.5} rad",
+                     t.yaw_gap
+@@ -106,6 +111,9 @@ pub(super) fn apply_body_twist(
+             .is_ok_and(|s| s.0.unit_mount_display_id() != 0);
+         let (spine, head) = armed_shares(twist.yaw_gap, mounted);
+         let pitch = if mounted { 0.0 } else { twist.pitch };
++        // The turn right is a negative yaw about up (forward is −Z); the head undoes it.
++        let turn = if mounted { 0.0 } else { twist.turn };
++        let (spine, head) = (spine - turn, head + turn);
+         let twist = &mut *twist;
+         for (channel, angle, lean) in [(&mut twist.spine, spine, pitch), (&mut twist.head, head, 0.0)] {
+             let Some(ch) = channel else { continue };
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 4a7e9f05..e28c47ea 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -217,6 +217,14 @@
+ //!   add-on sends the point with each shot and the server fires there from the hands.
+ //! - The aim's circle (`SetAimMarker` `circle`, `GetAimPoint`) lies on that line too, so the
+ //!   circle, the reticle and the shot agree.
++//!
++//! The twenty-seventh (`HasActionCombat() >= 27`):
++//!
++//! - `SetAimTurn(radians)`: our own hero's shoulders turned right by that much (left, negative),
++//!   the head turned back by as much so the eyes stay on the aim; eased in and out, `0` or
++//!   nothing for none, at most 1.5. The add-on sets it while a bow is drawn: 1.12's draw stands
++//!   side-on, and from the camera over the right shoulder the turned back and head hid the view
++//!   and the bow pointed off the reticle.
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -229,6 +237,8 @@ static AIM_RIGHT: AtomicU32 = AtomicU32::new(0.75f32.to_bits());
+ static AIM_UP: AtomicU32 = AtomicU32::new(0.25f32.to_bits());
+ /// The aiming camera's tip down (radians, down positive), `SetAimCamera`'s fifth number.
+ static AIM_PITCH: AtomicU32 = AtomicU32::new(0);
++/// `SetAimTurn`'s turn of the shoulders (radians, right positive).
++static AIM_TURN: AtomicU32 = AtomicU32::new(0);
+ static UNIT_COLLISION: AtomicBool = AtomicBool::new(false);
+ static VIEW_FACING: AtomicU32 = AtomicU32::new(0);
+ /// The view's elevation (radians, up positive), written by the camera each frame.
+@@ -551,6 +561,11 @@ pub fn aim_pitch() -> f32 {
+     f32::from_bits(AIM_PITCH.load(Ordering::Relaxed))
+ }
+ 
++/// How far the add-on wants our own hero's shoulders turned right (radians; `SetAimTurn`).
++pub fn aim_turn() -> f32 {
++    f32::from_bits(AIM_TURN.load(Ordering::Relaxed))
++}
++
+ /// The aim marker's shape: a circle where the reticle lands, a strip or a cone from the feet
+ /// along the view, or a ring round the feet.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -902,6 +917,7 @@ fn push_ground(call: GroundMarkerCall) {
+ pub fn reset() {
+     ACTION_MOUSE.store(false, Ordering::Relaxed);
+     AIM_CAMERA.store(false, Ordering::Relaxed);
++    AIM_TURN.store(0.0f32.to_bits(), Ordering::Relaxed);
+     UNIT_COLLISION.store(false, Ordering::Relaxed);
+     push(ActionCall::Lock { unit: None });
+     if let Ok(mut m) = AIM_MARKER.lock() {
+@@ -1020,7 +1036,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(26))?,
++        lua.create_function(|_, _: MultiValue| Ok(27))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1430,6 +1446,15 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetAimTurn",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let turn = number(v.first(), -1.5, 1.5).unwrap_or(0.0);
++            AIM_TURN.store(turn.to_bits(), Ordering::Relaxed);
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "GetReticlePoint",
+         lua.create_function(|_, _: MultiValue| {
+@@ -1719,7 +1744,7 @@ mod tests {
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(
+-            r#"assert(HasActionCombat() >= 26)
++            r#"assert(HasActionCombat() >= 27)
+                SetMissileLook(19434, "F2E6C8", 0.18, 0.3)
+                SetMissileLook(16075, nil, 0.3, 0.35, 1.8, 2.5)
+                SetMissileLook(19434, "FF3A1A", 0.3, 0.4, 1, 0, "0xF13000000000002A")
+@@ -1899,6 +1924,13 @@ mod tests {
+         set_reticle_point(None);
+         let none: bool = lua.load("return GetReticlePoint() == nil").eval().unwrap();
+         assert!(none, "nil with no aiming camera");
++        // The shoulders' turn: set, held within reach, and off with nothing.
++        lua.load("SetAimTurn(0.6)").exec().unwrap();
++        assert_eq!(aim_turn(), 0.6);
++        lua.load("SetAimTurn(9)").exec().unwrap();
++        assert_eq!(aim_turn(), 1.5);
++        lua.load("SetAimTurn()").exec().unwrap();
++        assert_eq!(aim_turn(), 0.0);
+     }
+ 
+     #[test]
+-- 
+2.56.0.windows.4
+

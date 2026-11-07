@@ -55,15 +55,25 @@ apply_benilla_patches() {
     done
 }
 
-# Build the client if it's missing or its patches changed since it was built.
+# Build the client if it's missing, its patches changed since it was built, or it was built in
+# another folder.
 build_benilla_if_needed() {
-    local stamp
+    local stamp built_in
     stamp="$(patches_stamp)"
-    if [ -x "$ROOT/benilla/target/release/benilla" ] && [ "$(cat "$ROOT/benilla/.htl-patches" 2>/dev/null)" = "$stamp" ]; then
+    built_in="$(cat "$ROOT/benilla/.htl-root" 2>/dev/null || true)"
+    if [ -x "$ROOT/benilla/target/release/benilla" ] && [ "$(cat "$ROOT/benilla/.htl-patches" 2>/dev/null)" = "$stamp" ] \
+        && [ "$built_in" = "$ROOT" ]; then
         return 0
     fi
     echo "Building the benilla client with this folder's changes (a few minutes after an update)..."
     apply_benilla_patches
+    # The client remembers the folder it was built in, and keeps its settings and add-ons there
+    # (benilla/benilla-config). Cargo doesn't notice a moved or copied folder, so a client
+    # built elsewhere would keep using the old folder's: its package is cleaned and rebuilt here.
+    if [ "$built_in" != "$ROOT" ]; then
+        (cd "$ROOT/benilla" && cargo clean --release -q -p benilla) || true
+    fi
     (cd "$ROOT/benilla" && cargo build --release -p benilla)
     echo "$stamp" > "$ROOT/benilla/.htl-patches"
+    printf '%s\n' "$ROOT" > "$ROOT/benilla/.htl-root"
 }

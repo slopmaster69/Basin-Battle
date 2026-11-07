@@ -11,11 +11,20 @@ use super::moves::{airtime, Landing, Trap};
 use super::*;
 use crate::content::{AbilityDef, AbilityEffect};
 
+/// How long a haul's line shows: a pull's flight (about 0.3 s, `moves::PULL_LIFT`), and a moment.
+const HAUL_LINE_SECS: f32 = 0.45;
+
 /// A yank runs this fast (yards a second), stopping this far short of a wall and this far from a
-/// foe's body (beside it, not in it).
-const YANK_SPEED: f32 = 24.0;
-/// The pose a yanked hero flies in: the arm held out along the line (SpellCastDirected).
-const YANK_CLIP: u16 = 53;
+/// foe's body (beside it, not in it). Was 24 (Corey's review: the flight should be quicker).
+const YANK_SPEED: f32 = 40.0;
+/// The pose a yanked hero flies in: flat and headlong along the line (Swim), the add-on fitting
+/// one pass of it to the flight. Was the arm held out (SpellCastDirected, 53), which read as no
+/// flight at all.
+const YANK_CLIP: u16 = 42;
+/// Whose Swim: the dwarf man's, on every hero but a dwarf (Corey's review: the human's swim while
+/// flying looked silly; the dwarf's read as a flight). A dwarf flies with their own.
+const YANK_FROM: &str = "DwarfMale";
+const DWARF: u8 = 3;
 const YANK_WALL: f32 = 0.6;
 const YANK_BESIDE: f32 = 0.3;
 /// A cheated death mends what it does over this long.
@@ -60,6 +69,8 @@ pub(crate) struct Later {
     pub victim: Id,
     pub effects: Vec<AbilityEffect>,
     pub source: String,
+    /// A body hitting the wall it was thrown at: its crash shows as it lands.
+    pub slam: bool,
 }
 
 /// An echo a hero left (`ability`, the card): where, with what health, and how they come back to
@@ -116,6 +127,11 @@ impl Survival {
         self.beta.later = keep;
         for l in due {
             if self.alive(l.victim) {
+                if l.slam {
+                    // No word: it crashes into the wall, dust and a boulder's thud, and a hard beat
+                    // for the hero who threw it.
+                    self.cue(Some(l.owner), l.victim, combat::KIT_DUST, cues::SOUND_WALL, cues::BEAT_WALL);
+                }
                 self.apply_effects(l.owner, l.victim, &l.effects, 1.0, &l.source);
             }
         }
@@ -152,6 +168,10 @@ impl Survival {
             self.yank_to(p.owner, p.ability, p.share, at, Some(v));
             return;
         }
+        // Hauled in on the line (Reverse Grapple): it runs from the fist to the foe as it comes.
+        if haul {
+            self.events.push(Event::Tether { from: p.owner, to: Target::Unit(v), secs: HAUL_LINE_SECS });
+        }
         if swap {
             self.swap_with(p.owner, v, p.ability);
         } else if tether {
@@ -168,6 +188,7 @@ impl Survival {
             return;
         }
         let from = p.pos;
+        let swim_from = if p.look.race == DWARF { String::new() } else { YANK_FROM.to_string() };
         let (spot, stop) = match unit.and_then(|u| self.unit_pos(u).map(|pos| (u, pos))) {
             Some((u, pos)) => (pos, self.body_of(u) + HERO_SIZE + YANK_BESIDE),
             None => (at, YANK_WALL),
@@ -183,19 +204,27 @@ impl Survival {
             return;
         }
         // At least long enough to be seen flying (the visual check: a 6 yd pull at 32 yd a
-        // second was over in 5 frames).
-        let secs = (moved / YANK_SPEED).max(0.3);
+        // second was over in 5 frames); a little shorter than it was (0.3) now that the flight
+        // itself is quicker.
+        let secs = (moved / YANK_SPEED).max(0.25);
         self.interrupt_hero(id);
         if let Some(p) = self.players.get_mut(&id) {
             p.facing = dir;
         }
         self.set_action(id, Action::Dash { t: 0.0, secs, ability, target: None, share });
+        // The line it flies in on, from the fist to what it bit (Corey's review: "needs a visible
+        // rope").
+        let to = match unit {
+            Some(u) => Target::Unit(u),
+            None => Target::Point(at),
+        };
+        self.events.push(Event::Tether { from: id, to, secs });
         // Pulled through the air on the line, the way a hookshot flies you (play-test: a run along
-        // the ground read as a Charge): a flat arc that lands as the line's time is up, the arm
-        // held out along it.
+        // the ground read as a Charge): a flat arc that lands as the line's time is up, the body
+        // flat along it, in the dwarf man's Swim (a dwarf's own).
         let lift = secs / airtime(1.0);
         self.events.push(Event::Hop { player: id, dir, speed: moved / secs, lift, roll: false, style: "" });
-        self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: String::new(), flip: false });
+        self.events.push(Event::LeapLook { player: id, secs, clip: YANK_CLIP, take: 0, from: swim_from, flip: false });
         self.beta.yanks.insert(id, (end, now + secs));
     }
 
@@ -230,7 +259,7 @@ impl Survival {
         let (yaw, _) = self.aim_of(id);
         let (o, dir) = self.reticle(id);
         let aim = self.catch_solid(ability, o, dir, self.trace(o, dir, range + 4.0, 0.0, id));
-        let from = self.hands(id, yaw);
+        let from = self.shot_from(id, yaw);
         let base = if dist2d(from, aim.point) < 2.0 { dir } else { unit3(sub3(aim.point, from)) };
         let t = self.catch_solid(ability, from, base, self.trace_with(from, base, range, radius, id, d.friends()));
         Some((t.point, t.unit.is_some() || t.solid))
@@ -286,8 +315,8 @@ impl Survival {
             return;
         }
         if self.holds_ground(v) || self.immune(v) || self.unstaggerable(v) {
-            let text = format!("{} holds its ground", self.unit_name(v));
-            self.events.push(Event::Flash { player: id, text });
+            // No word: the swap glances off it in a clash of sparks, as any control it shrugs off.
+            self.events.push(Event::Visual { id: v, kit: combat::KIT_PARRY, by: None });
             return;
         }
         let (Some(a), Some(b)) = (self.unit_pos(id), self.unit_pos(v)) else { return };
@@ -414,11 +443,10 @@ impl Survival {
         let pull = AbilityEffect { kind: "pull".into(), amount: dist2d(a, b) + 1.0, lift: TETHER_LIFT, from_caster: true, vs_bosses: d.slot == "ultimate", ..Default::default() };
         self.displace(t.owner, t.foe, &pull);
         if !d.tether_effects.is_empty() {
-            self.beta.later.push(Later { at: self.clock + airtime(TETHER_LIFT), owner: t.owner, victim: t.foe, effects: d.tether_effects.clone(), source: d.name.clone() });
+            self.beta.later.push(Later { at: self.clock + airtime(TETHER_LIFT), owner: t.owner, victim: t.foe, effects: d.tether_effects.clone(), source: d.name.clone(), slam: false });
         }
-        if self.players.contains_key(&t.owner) {
-            self.events.push(Event::Flash { player: t.owner, text: format!("{} pulled them back", d.name) });
-        }
+        // No word: the chain yanks them back through the air, with its clank on them.
+        self.cue(None, t.foe, 0, cues::SOUND_TETHER, "");
     }
 
     // --- a knockback into a wall ---------------------------------------------------------------------
@@ -434,10 +462,7 @@ impl Survival {
     /// A body thrown into a wall is stunned `secs` as it hits it, `air` from now.
     pub(crate) fn wall_slam(&mut self, owner: Id, victim: Id, secs: f32, air: f32) {
         let stun = AbilityEffect { kind: "stun".into(), secs: [secs, secs], ..Default::default() };
-        self.beta.later.push(Later { at: self.clock + air, owner, victim, effects: vec![stun], source: "Wall slam".into() });
-        if self.players.contains_key(&owner) {
-            self.events.push(Event::Flash { player: owner, text: "Into the wall!".into() });
-        }
+        self.beta.later.push(Later { at: self.clock + air, owner, victim, effects: vec![stun], source: "Wall slam".into(), slam: true });
     }
 
     // --- echoes (Rewind) ------------------------------------------------------------------------------
@@ -579,7 +604,10 @@ impl Survival {
         if c.amount > 0.0 {
             self.apply_cc(id, c.from, "regen", CHEAT_SECS, c.amount / CHEAT_SECS, 0.0, &c.source);
         }
-        self.events.push(Event::Flash { player: id, text: "Death cheated!".into() });
+        // No word: a Soulstone's rising and Flash of Light's glow on them, and the world held a
+        // beat around them.
+        self.events.push(Event::Missile { caster: id, spell: abilities::HEAL_LOOK, target: Target::Unit(id) });
+        self.cue(Some(id), id, 0, cues::SOUND_CHEAT_DEATH, cues::BEAT_CHEAT_DEATH);
         self.cc_note(id, format!("{}: a killing blow cheated", c.source));
         h - 1
     }
@@ -598,6 +626,12 @@ impl Survival {
         let Some(stance) = self.mirror_of(v) else { return false };
         if p.owner == v || (p.allies && self.players.contains_key(&v) && self.helpable(p.owner, v)) {
             return false;
+        }
+        // Spell Mirror raised too soon: it's only swallowed (gone where it reached them).
+        if !self.mirror_in_time(v, stance) {
+            p.left = 0.0;
+            self.swallowed(v, stance);
+            return true;
         }
         let thrower = p.owner;
         let back = self.unit_pos(thrower).map(|o| [o[0], o[1], o[2] + 1.0]);
@@ -627,6 +661,10 @@ impl Survival {
         }
         let found = self.players.iter().filter(|(_, p)| p.health > 0 && dist2d(p.pos, m.at) <= m.radius.max(HERO_SIZE)).find_map(|(h, _)| self.mirror_of(*h).map(|s| (*h, s)));
         let Some((h, stance)) = found else { return false };
+        if !self.mirror_in_time(h, stance) {
+            self.swallowed(h, stance);
+            return true;
+        }
         let (Some(start), Some(to)) = (self.unit_pos(h), self.unit_pos(m.owner)) else { return false };
         let start = [start[0], start[1], start[2] + HAND_UP];
         let to = [to[0], to[1], to[2] + 1.0];
@@ -648,28 +686,56 @@ impl Survival {
             damage,
             spell,
             allies: false,
+            critical: false,
             hits: vec![h],
             pierce: 0,
             stage: Stage::Out,
             born,
             bounced: 0,
             look: None,
+            empowered: false,
         });
         self.mirror_caught(h, stance, m.owner);
         true
     }
 
+    /// Whether what reaches `v` now flies back: always, but a perfect mirror only within
+    /// `[checks] window` of raising it (judged on the hero's own screen: their round trip back).
+    fn mirror_in_time(&self, v: Id, stance: usize) -> bool {
+        if !self.content.abilities[stance].counter.as_ref().is_some_and(|c| c.perfect_mirror) {
+            return true;
+        }
+        let Some(s) = self.stances.get(&v) else { return true };
+        let rtt = self.players.get(&v).map_or(0.0, |p| p.rtt.min(self.content.combat.max_rewind));
+        self.clock - s.since <= self.content.checks.window + rtt + 1.0e-4
+    }
+
+    /// A perfect mirror raised too soon swallowed something: its look on the hero, nothing more.
+    fn swallowed(&mut self, v: Id, stance: usize) {
+        let d = &self.content.abilities[stance];
+        let look = if d.charge_spell != 0 { d.charge_spell } else { d.spell };
+        self.events.push(Event::Missile { caster: v, spell: look, target: Target::Unit(v) });
+    }
+
     /// A mirror caught something: Valor and its name for the hero, its look, what it does to the
-    /// thrower (as a counter's `attacker`), and a `once` stance ends.
+    /// thrower (as a counter's `attacker`), and a `once` stance ends. A perfect mirror's catch
+    /// is a perfect (the burst, no name).
     fn mirror_caught(&mut self, v: Id, stance: usize, thrower: Id) {
         let d = self.content.abilities[stance].clone();
         let Some(c) = d.counter.clone() else { return };
         if let Some(s) = self.stances.get_mut(&v) {
             s.caught = true;
         }
+        // No word names it: its look plays on the hero (below) and its answer on the thrower.
         if self.players.contains_key(&v) {
             self.gain_valor(v, self.content.valor.counter);
-            self.events.push(Event::Flash { player: v, text: d.name.clone() });
+            if c.perfect_mirror {
+                let k = self.content.checks.perfect_kit;
+                if k != 0 {
+                    self.events.push(Event::Visual { id: v, kit: k, by: None });
+                }
+                self.events.push(Event::Perfect { player: v, ability: stance });
+            }
         }
         self.events.push(Event::Missile { caster: v, spell: d.spell, target: Target::Unit(v) });
         let close = self.unit_pos(thrower).zip(self.unit_pos(v)).is_some_and(|(a, b)| dist2d(a, b) <= 6.0);

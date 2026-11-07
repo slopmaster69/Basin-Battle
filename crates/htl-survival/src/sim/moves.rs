@@ -10,10 +10,10 @@ use super::*;
 use crate::content::{AbilityDef, AbilityEffect};
 
 /// Gravity in the client's own units (yards a second, a second).
-const GRAVITY: f32 = 19.29;
+pub(super) const GRAVITY: f32 = 19.29;
 /// A knockback's and a pull's arc (their upward speed) where the effect names none.
 const KNOCK_LIFT: f32 = 4.5;
-const PULL_LIFT: f32 = 3.0;
+pub(crate) const PULL_LIFT: f32 = 3.0;
 /// A pull stops this far short of where it pulls to.
 const PULL_STOP: f32 = 1.6;
 /// The farthest a knockback or a pull moves a training dummy (it has no legs to walk back).
@@ -38,6 +38,10 @@ pub(crate) const DIVE_FULL_HEIGHT: f32 = 5.0;
 /// A dive's clip (Special2H, a two-handed blow driven down), played so that it strikes as the
 /// hero lands, with a short recovery after: the landing is the blow.
 const DIVE_CLIP: u16 = 58;
+/// The landing of a leap with a borrowed look (Ensnaring Retreat's flip): the hero's own JumpEnd,
+/// over this long, as the feet touch down.
+const LAND_CLIP: u16 = 39;
+const LAND_SECS: f32 = 0.35;
 
 /// A leap in the air: it lands at `at` then, striking what's there.
 #[derive(Debug, Clone)]
@@ -85,6 +89,21 @@ pub(crate) struct Anchor {
     pub at: Vec3,
     pub until: f32,
     pub mark: Id,
+    /// When it was set, and the hero's health then (Alter Time gives some of what's lost since
+    /// back), and how many of its pulses have shown.
+    pub since: f32,
+    pub health: u32,
+    pub pulsed: u32,
+}
+
+/// A blink that slips blows (Blink's counter check): which, when, from where, and whether its
+/// perfect has paid.
+#[derive(Debug, Clone)]
+pub(crate) struct Slip {
+    pub ability: usize,
+    pub at: f32,
+    pub from: Vec3,
+    pub paid: bool,
 }
 
 /// How long a body thrown up at `lift` stays in the air.
@@ -192,6 +211,11 @@ impl Survival {
         let line = format!("{} on {} ({moved:.1} yd) from {}", e.kind, self.unit_name(victim), self.unit_name(owner));
         self.cc_note(victim, line.clone());
         self.cc_note(owner, line);
+        // The hauler's own look over the flight (Reverse Grapple: a pull, not the bow's release
+        // pose), on the clients that play clips, for as long as what it hauls is in the air.
+        if let Some((clip, from)) = self.fx_pull_look.clone().filter(|_| pull && self.players.contains_key(&owner)) {
+            self.events.push(Event::Clip { id: owner, clip, take: 0, from: if from.is_empty() { None } else { Some(from) }, secs: air, at: 0.0, body: ClipBody::Full });
+        }
         if self.players.contains_key(&victim) {
             self.interrupt_hero(victim);
             self.set_action(victim, Action::Stagger { until: now + air });
@@ -205,6 +229,12 @@ impl Survival {
             // creature up: it rises and falls over its time in the air, and everyone sees it.
             let up = if !pull && e.lift > KNOCK_LIFT { lift } else { 0.0 };
             self.throw_mob(victim, to, air, Some(owner), up);
+            // Hauled in, it flies flat and headlong (Swim) for the haul, on the clients that play
+            // clips: a humanoid's reads as flight (Corey's review of Reverse Grapple); another
+            // model plays whatever it has for it.
+            if pull {
+                self.events.push(Event::Clip { id: victim, clip: 42, secs: air, take: 0, from: None, at: 0.0, body: ClipBody::Full });
+            }
             // A dummy isn't stepped (it only stands there): it's where the throw ends at once,
             // while everyone's client flies it there.
             if dummy {
@@ -307,7 +337,7 @@ impl Survival {
         // Its swing held up through the air, the blow landing as it comes down (a clip's impact
         // is half its length).
         if d.clip != 0 {
-            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: air * 2.0, at: 0.0 });
+            self.events.push(Event::Clip { id, clip: d.clip, take: d.take, from: d.from.clone(), secs: air * 2.0, at: 0.0, body: ClipBody::Full });
         }
         let radius = AbilityDef::at(d.radius, share);
         // `unmarked`: nothing on the ground where it comes down (only the warning over a rival).
@@ -391,7 +421,7 @@ impl Survival {
         // (Some way along it, however little: a throw with none isn't sent.)
         self.events.push(Event::Hop { player: id, dir, speed: (dist / DIVE_SECS).max(0.1), lift, roll: false, style: "" });
         // The blow driven down with it, striking as it lands.
-        self.events.push(Event::Clip { id, clip: DIVE_CLIP, take: 0, from: None, secs: DIVE_SECS * 2.0, at: 0.0 });
+        self.events.push(Event::Clip { id, clip: DIVE_CLIP, take: 0, from: None, secs: DIVE_SECS * 2.0, at: 0.0, body: ClipBody::Full });
         self.set_action(id, Action::Dash { t: 0.0, secs: DIVE_SECS, ability, target: None, share });
         let radius = AbilityDef::at(d.radius, share);
         let mark = (radius > 0.0).then(|| self.mark_as(target, radius, DIVE_SECS + 0.05, Some(Telegraph { own_hidden: true, ..Telegraph::hero_shape(id, radius, 360.0, 0.0, DIVE_SECS, Some((target, dir))) })));
@@ -442,7 +472,7 @@ impl Survival {
         self.events.push(Event::Missile { caster: id, spell: d.spell, target: Target::Point(end) });
         let damage = AbilityDef::at(d.damage, share);
         self.area_shape(id, ability, at, len, share, damage, Shape::Line(yaw, len, half));
-        if self.debug {
+        if self.debug_draws() {
             for k in 0..=4 {
                 let t = len * k as f32 / 4.0;
                 self.mark([at[0] + yaw.cos() * t, at[1] + yaw.sin() * t, at[2]], half, 0.8);
@@ -513,6 +543,12 @@ impl Survival {
         self.traps.push(Trap { owner: id, ability, at, share, armed_at: now + d.delay, until: now + life, mark, obj });
     }
 
+    /// Whether an object is a trap lying set (drawn without the client's fade-in: it should be
+    /// there the moment it's set, Corey's review).
+    pub fn is_trap_obj(&self, id: Id) -> bool {
+        self.traps.iter().any(|t| t.obj == Some(id))
+    }
+
     /// A trap gone (sprung, faded, or the oldest of too many): its mark and the trap itself.
     fn clear_trap(&mut self, t: &Trap) {
         self.unmark(t.mark);
@@ -532,7 +568,7 @@ impl Survival {
         if let Some((mid, _)) = mob {
             return Some(*mid);
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             return self.players.iter().find(|(h, p)| self.hostile(t.owner, **h) && p.health > 0 && dist2d(p.pos, t.at) <= radius + HERO_SIZE && (p.pos[2] - t.at[2]).abs() < 3.0).map(|(h, _)| *h);
         }
         None
@@ -546,7 +582,10 @@ impl Survival {
         let radius = AbilityDef::at(d.radius, t.share);
         let burst = if d.splash > 0.0 { d.splash } else { radius };
         if d.burst_spell != 0 {
-            self.events.push(Event::Missile { caster: t.owner, spell: d.burst_spell, target: Target::Point(t.at) });
+            // From the trap's spot, not the hunter: a spell cast by them plays its caster-side
+            // look on them (Freezing Trap's nova rang out round the hunter too, Corey's review).
+            let anchor = self.alloc();
+            self.events.push(Event::MissileFrom { anchor, caster: t.owner, spell: d.burst_spell, from: t.at, target: Target::Point(t.at) });
         }
         let damage = AbilityDef::at(d.damage, t.share);
         self.area(t.owner, t.ability, t.at, burst, t.share, damage, None);
@@ -570,10 +609,12 @@ impl Survival {
         if let Some(old) = self.anchors.remove(&id) {
             self.unmark(old.mark);
         }
-        let mark = self.mark_kind(pos, 1.5, d.anchor, true);
+        // A pulsing mark (Alter Time) has no circle: its pulses show it, and no words.
+        let mark = if d.pulse > 0.0 { self.mark_unseen(d.anchor) } else { self.mark_kind(pos, 1.5, d.anchor, true) };
         self.events.push(Event::Missile { caster: id, spell: d.charge_spell.max(d.spell), target: Target::Point(pos) });
-        self.events.push(Event::Flash { player: id, text: format!("Cast {} again to return", d.name) });
-        self.anchors.insert(id, Anchor { ability: base, at: pos, until: now + d.anchor, mark });
+        // No word: the circle on the ground is where the key (lit for its recast) brings them back.
+        let health = self.players[&id].health;
+        self.anchors.insert(id, Anchor { ability: base, at: pos, until: now + d.anchor, mark, since: now, health, pulsed: 0 });
         self.events.push(Event::Abilities { player: id });
     }
 
@@ -584,7 +625,46 @@ impl Survival {
         self.anchors.remove(&id);
         self.unmark(a.mark);
         self.step_back_to(id, ability, a.at);
+        let d = self.content.abilities[ability].clone();
+        // Alter Time: some of the health lost since comes back.
+        if d.rewind_health > 0.0 {
+            let lost = a.health.saturating_sub(self.players[&id].health);
+            let back = (lost as f32 * d.rewind_health).round() as u32;
+            if back > 0 {
+                self.heal_hero_by(id, back, id, &d.name);
+            }
+        }
+        // On a pulse (judged when they pressed, their round trip back): a perfect.
+        if d.pulse > 0.0 {
+            let rewind = self.players[&id].rtt.min(self.content.combat.max_rewind);
+            let t = self.clock - rewind - a.since;
+            let k = (t / d.pulse).round();
+            let w = self.content.checks.window;
+            if k >= 1.0 && (t - k * d.pulse).abs() <= w + 1.0e-4 {
+                self.alter_perfect(id, ability, a.at);
+            }
+        }
         true
+    }
+
+    /// A step back on the pulse: foes near where they came back are thrown back, and the
+    /// perfect's Valor and look.
+    fn alter_perfect(&mut self, id: Id, ability: usize, at: Vec3) {
+        let d = self.content.abilities[ability].clone();
+        if !d.stop_effects.is_empty() {
+            let (mobs, heroes) = self.in_wedge(id, ability, at, 0.0, 360.0, d.radius[1]);
+            let was = self.fx_from.replace(at);
+            for u in mobs.into_iter().chain(heroes) {
+                self.apply_effects(id, u, &d.stop_effects, 1.0, &d.name);
+            }
+            self.fx_from = was;
+        }
+        let c = self.content.checks.clone();
+        self.gain_valor(id, c.perfect_valor);
+        if c.perfect_kit != 0 {
+            self.events.push(Event::Visual { id, kit: c.perfect_kit, by: None });
+        }
+        self.events.push(Event::Perfect { player: id, ability });
     }
 
     /// A blink back to a spot it left (an anchor; where the cast a recast follows began): its
@@ -617,7 +697,8 @@ impl Survival {
         let Some(t) = hit.cloned() else { return false };
         let at = self.mobs[&t.mob].pos;
         self.events.push(Event::Missile { caster: p.owner, spell: p.spell, target: Target::Point([at[0], at[1], at[2] + 1.0]) });
-        self.events.push(Event::Flash { player: t.owner, text: "Grounded".into() });
+        // No word: the missile flies into the totem, which swallows it and breaks.
+        self.grounding_breaks(t.mob);
         self.remove_totem(t.mob);
         true
     }
@@ -628,9 +709,14 @@ impl Survival {
             self.content.abilities[t.ability].grounding && self.mobs.get(&t.mob).is_some_and(|m| dist2d(m.pos, at) <= self.content.abilities[t.ability].totem.as_ref().map_or(8.0, |x| x.radius))
         });
         let Some(t) = hit.cloned() else { return false };
-        self.events.push(Event::Flash { player: t.owner, text: "Grounded".into() });
+        self.grounding_breaks(t.mob);
         self.remove_totem(t.mob);
         true
+    }
+
+    /// A grounding totem swallowing a missile: its absorb and a puff of dust as it breaks.
+    fn grounding_breaks(&mut self, totem: Id) {
+        self.cue(None, totem, super::combat::KIT_DUST, super::cues::SOUND_ABSORB, "");
     }
 
     // --- every tick -----------------------------------------------------------------------------------
@@ -652,6 +738,13 @@ impl Survival {
             }
             let d = self.content.abilities[l.ability].clone();
             let radius = AbilityDef::at(d.radius, l.share);
+            // A leap with a borrowed look lands on its own legs: the hero's JumpEnd as the feet
+            // touch down (Corey's review: the borrowed clip's legs twisted at the landing). Not
+            // over a stun's held pose (struck out of the air, they come down as the blow left
+            // them).
+            if d.leap_clip != 0 && !self.held_still(l.owner) {
+                self.events.push(Event::Clip { id: l.owner, clip: LAND_CLIP, secs: LAND_SECS, take: 0, from: None, at: 0.0, body: ClipBody::Full });
+            }
             if d.impact_kit != 0 {
                 self.events.push(Event::Visual { id: l.owner, kit: d.impact_kit, by: None });
             }
@@ -713,6 +806,30 @@ impl Survival {
         }
         keep.extend(std::mem::take(&mut self.traps));
         self.traps = keep;
+        // A pulsing mark's pulses, shown `[checks] window` early (the window opens with the look),
+        // at the mark for everyone and in the hero's hands.
+        let w = self.content.checks.window;
+        let due: Vec<(Id, Vec3, u32, u32)> = self
+            .anchors
+            .iter_mut()
+            .filter_map(|(h, a)| {
+                let d = &self.content.abilities[a.ability];
+                let next = a.pulsed + 1;
+                let at = a.since + d.pulse * (next as f32);
+                (d.pulse > 0.0 && at - w <= now + 1.0e-4 && at < a.until).then(|| {
+                    a.pulsed = next;
+                    (*h, a.at, d.tick_spell, d.beat_kit)
+                })
+            })
+            .collect();
+        for (h, at, look, kit) in due {
+            if look != 0 {
+                self.events.push(Event::Missile { caster: h, spell: look, target: Target::Point(at) });
+            }
+            if kit != 0 {
+                self.events.push(Event::Visual { id: h, kit, by: None });
+            }
+        }
         let gone: Vec<Id> = self.anchors.iter().filter(|(h, a)| a.until <= now || !self.players.contains_key(h)).map(|(h, _)| *h).collect();
         for h in gone {
             if let Some(a) = self.anchors.remove(&h) {

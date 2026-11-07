@@ -19,7 +19,9 @@ use crate::world::{ConnId, Inbound};
 
 pub mod board;
 mod draw;
+mod duel_ui;
 mod heroes;
+mod lab;
 pub mod land;
 mod meter_ui;
 mod play;
@@ -217,6 +219,8 @@ pub struct SurvivalGame {
     pub(crate) stand_ins: BTreeMap<Id, play::StandIn>,
     /// Lingering ground's looks (DynamicObjects), by the mark they go with.
     pub(crate) area_looks: HashMap<Id, u64>,
+    /// Ropes drawn (Tripwire's wire), by the mark they go with.
+    pub(crate) ropes: std::collections::HashSet<Id>,
     /// Danger marks on the ground: where, and how wide.
     pub(crate) mark_at: HashMap<Id, ([f32; 3], f32)>,
     /// The creatures whose weapons were last shown red, until when (one `WG` per wind-up).
@@ -258,6 +262,18 @@ pub struct SurvivalGame {
     pub(crate) wagers: Vec<htl_survival::sim::wager::WagerRun>,
     /// The Bookmaker's Board (shared with the login port, which serves it as the board host).
     pub(crate) board: Option<board::Shared>,
+    /// The spell lab's run under way (`.es lab`), and the bodies its last scene set out.
+    pub(crate) lab: Option<lab::Lab>,
+    pub(crate) lab_mobs: Vec<Id>,
+    /// Where every lab run starts (open ground near the spawn), once found.
+    pub(crate) lab_stage: Option<([f32; 3], f32)>,
+    /// The lab's ally heroes (`allies <n>`): stand-ins beside the hero for what reaches allies.
+    pub(crate) lab_allies: Vec<Id>,
+    /// The lab's stand-in caster (`by <race>-<m|f>`): a hero of that race who casts the run's
+    /// ability while the camera watches from the side.
+    pub(crate) lab_caster: Option<Id>,
+    /// When the lab's queue file was last looked at.
+    pub(crate) lab_polled: Instant,
     dirty: bool,
     saved_at: Instant,
     /// When the pinned game clock (`[world] clock`) was last sent to everyone.
@@ -335,6 +351,7 @@ impl SurvivalGame {
             rings: HashMap::new(),
             stand_ins: BTreeMap::new(),
             area_looks: HashMap::new(),
+            ropes: Default::default(),
             mark_at: HashMap::new(),
             warned_glow: HashMap::new(),
             hud_at: Instant::now(),
@@ -359,6 +376,12 @@ impl SurvivalGame {
             dirty: true,
             saved_at: Instant::now(),
             clock_at: Instant::now(),
+            lab: None,
+            lab_mobs: Vec::new(),
+            lab_stage: None,
+            lab_allies: Vec::new(),
+            lab_caster: None,
+            lab_polled: Instant::now(),
         };
         g.bind_world();
         g
@@ -371,7 +394,10 @@ impl SurvivalGame {
     /// One tick: the rules step, their events play out, the add-ons hear what changed, and the
     /// world is saved now and then.
     pub(crate) fn tick(&mut self) {
+                self.lab_queue();
+                self.lab_steps();
                 let events = self.sim.step(TICK.as_secs_f32());
+                self.lab_trace(&events);
                 self.play(events);
                 self.ui_flush();
                 self.hold_clock();
@@ -631,6 +657,26 @@ impl SurvivalGame {
                 }
                 self.sync_items(conn);
             }
+            // A spell cast from the client's own spellbook: only the Duel spell is one (from a
+            // hero's portrait, or `/duel`).
+            op::CMSG_CAST_SPELL => {
+                let spell = r.u32()?;
+                let flags = r.u16().unwrap_or(0);
+                let target = if flags & 0x0002 != 0 { r.packed_guid().ok() } else { None };
+                if let Some(me) = me {
+                    self.cast_from_book(conn, me, spell, target);
+                }
+            }
+            op::CMSG_DUEL_ACCEPTED => {
+                if let Some(me) = me {
+                    self.sim.duel_accept(me);
+                }
+            }
+            op::CMSG_DUEL_CANCELLED => {
+                if let Some(me) = me {
+                    self.sim.duel_cancel(me);
+                }
+            }
             op::CMSG_MESSAGECHAT => self.chat(conn, &mut r)?,
             o if MOVE_OPCODES.contains(&o) => self.movement(conn, o, body)?,
             _ => {}
@@ -706,7 +752,7 @@ impl SurvivalGame {
         self.send(conn, packets::tutorial_flags_all_seen());
         self.send(conn, packets::bindpoint(spawn, self.realm.map, self.realm.area));
         self.send(conn, packets::login_set_time_speed_at(self.clock()));
-        self.send(conn, packets::initial_spells(&[]));
+        self.send(conn, packets::initial_spells(&[packets::DUEL_SPELL]));
         self.send(conn, packets::action_buttons_empty());
         self.send(conn, packets::initialize_factions_empty());
         self.push_templates(conn);

@@ -456,7 +456,7 @@ impl Survival {
                     0 => self.events.push(Event::Cast { caster: id, spell, ms: (secs * 1000.0) as u32 }),
                     clip => {
                         self.unsheathe(id);
-                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: CHOP_SECS, at: 0.0 });
+                        self.events.push(Event::Clip { id, clip, take: 0, from: None, secs: CHOP_SECS, at: 0.0, body: ClipBody::Full });
                     }
                 }
             }
@@ -523,7 +523,8 @@ impl Survival {
             let gold = g * got;
             self.add_gold(id, gold);
             self.tell(id, format!("+{gold} gold from the vein."));
-            self.events.push(Event::Flash { player: id, text: format!("+{gold} gold") });
+            // The coins' clink (the count is in the line above and on the gold shown).
+            self.events.push(Event::Hear { player: id, sound: super::cues::SOUND_COINS });
             return;
         }
         let carried = self.players[&id].bag.get(&item).copied().unwrap_or(0);

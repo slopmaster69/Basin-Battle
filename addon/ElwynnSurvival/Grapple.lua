@@ -86,7 +86,8 @@ function ES.StepCatch()
   local moved = not c.f or math.abs(f - c.f) > TURNED or math.abs(e - c.e) > TURNED
   if (moved and since >= SEND_EVERY) or since >= SEND_STILL then
     c.sent, c.f, c.e = now, f, e
-    ES.Say(".es in al" .. string.format(" %.4f %.4f", f, e))
+    -- With the point the reticle is on (ac26), so where it says it catches is where it goes.
+    ES.Say(".es in al" .. ES.AimLine())
   end
 end
 
@@ -107,6 +108,12 @@ function ES.FlipLine(f)
   end
   if clip > 0 and PlayUnitAnimation and layer then
     if from and PreloadAnimationSource then PreloadAnimationSource(from) end
-    PlayUnitAnimation(guid, clip, 0, nil, nil, take, secs, "full", from)
+    -- The clip fitted to the flight (a hook's Swim, a borrowed jump): one pass over it, its fade
+    -- (0.16 sec) done as the hero lands, so a tucked leg is never still posed when the feet touch
+    -- down (the server's JumpEnd takes the landing from there). A flip's tumble keeps the clip at
+    -- its own pace.
+    local fit = 0
+    if not flip then fit = math.max(0.05, secs - 0.16) end
+    PlayUnitAnimation(guid, clip, fit, nil, nil, take, secs, "full", from)
   end
 end

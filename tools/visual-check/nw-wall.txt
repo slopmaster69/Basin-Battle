@@ -1,0 +1,21 @@
+# No words (#135), a body into a wall: at Jasperlode Mine (Goldshire's start spot has no wall the
+# server knows within 13 yd in any direction: knockbacks there flew their whole 10 yd), facing
+# north at the rock face, Haymaker (Ctrl+E on Wall Slam's key: a 10 yd knockback) on a creature
+# 3 yd off throws it ~3 yd into the rock. A cone is aimed like a shot: its key, then the click.
+# Look for: dust on it as it hits, a boulder's thud, the hard stop and thump of the view; no
+# "Stunned" or wall word. (In the diagnostic run the slam came 0.5 s after the throw.)
+hero hunter
+cam 0 -12 10
+include _setup
+4.2 .es dummy clear
+4.4 .es goto jasperlode
+4.6 .es slot e wall_slam
+4.5 .es target grunt 3 still         # 1.5 s before the throw, so it has faded in (Corey: it was half invisible)
+6.0 .es in ab 1 1                    # Haymaker, aimed
+6.3 .es in a {facing} 0.0            # thrown; into the rock ~0.5 s later
+6.4 .es in au {facing} 0.0
+6.2 shots wall 14 0.15
+8.5 .es cc log
+9.0 .es target clear
+9.2 .es goto goldshire
+11 end

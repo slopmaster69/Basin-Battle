@@ -136,14 +136,24 @@ fn frost_nova_makes_the_next_fireball_a_free_pyroblast_that_shatters_the_frozen(
     assert_eq!(em[0].0, key_of("ranged") as usize, "the Fireball's");
     assert!((em[0].1 - (s.clock + 5.0)).abs() < 0.2, "for 5 s");
     let valor = s.players[&p].valor;
-    // The plain Fireball key now aims a Pyroblast; held its 1.5 s it goes, for no Valor.
+    // The plain Fireball key now aims a Pyroblast; held to its moment (all or nothing: rolled as
+    // the charge begins) it goes, for no Valor.
     run_pinned(&mut s, 0.3, &pins);
     press(&mut s, p, "ranged", false);
     assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Pyroblast");
-    let mut ev = hold(&mut s, p, 1.6, &pins);
+    s.input(p, Input::Attack);
+    let mut ev = s.step(DT);
+    let flare = s.players[&p].check_flare;
+    ev.extend(run_pinned(&mut s, flare - DT, &pins));
+    s.input(p, Input::AttackUp);
+    ev.extend(s.step(DT));
     assert!(missile(&ev, 11366), "the Pyroblast flies");
     ev.extend(run_pinned(&mut s, 0.6, &pins));
-    assert!(flashed(&ev, p, "Shatter!"), "the frozen boar shatters");
+    assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST), "the frozen boar shatters");
+    // The same shatter as a Hunter's: the action lines' burst on the frozen one too, and the
+    // server adds no fire of its own (Pyroblast's own impact is the client's, from its spell).
+    assert!(s.content.shatter.burst_kit != 0 && crate::sim::cues::seen::looked(&ev, k, s.content.shatter.burst_kit), "the shatter's action lines");
+    assert!(!flashed(&ev, p, "Shatter"), "no word");
     assert!(hits(&ev, p, k).iter().any(|d| *d >= 70), "half again its 48: {:?}", hits(&ev, p, k));
     assert!(s.players[&p].valor + 0.001 >= valor, "no Valor spent: {} then {}", valor, s.players[&p].valor);
     assert!(s.empowered_keys(p).is_empty(), "the combo spent");

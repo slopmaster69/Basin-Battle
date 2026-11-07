@@ -175,6 +175,47 @@ pub fn initial_spells(spells: &[u16]) -> Packet {
     Packet::new(op::SMSG_INITIAL_SPELLS, b)
 }
 
+/// The Duel spell (`SPELL_EFFECT_DUEL`): known, the client offers Duel on a hero's portrait and
+/// takes `/duel`, casting it at them (`CMSG_CAST_SPELL`).
+pub const DUEL_SPELL: u16 = 7266;
+
+/// `SPELL_FAILED_BAD_TARGETS`: "Invalid target" (a refused Duel; why, said in chat).
+pub const SPELL_FAILED_BAD_TARGETS: u8 = 0x0A;
+
+/// `SMSG_DUEL_REQUESTED`: the flag (the duel's arbiter) and who challenged, to both duellists; the
+/// one challenged gets the popup, the challenger "You have requested a duel."
+pub fn duel_requested(flag: u64, challenger: u64) -> Packet {
+    let mut b = Body::new();
+    b.u64(flag).u64(challenger);
+    Packet::new(op::SMSG_DUEL_REQUESTED, b)
+}
+
+/// `SMSG_DUEL_COUNTDOWN`, in milliseconds ("Duel starting: 3").
+pub fn duel_countdown(ms: u32) -> Packet {
+    let mut b = Body::new();
+    b.u32(ms);
+    Packet::new(op::SMSG_DUEL_COUNTDOWN, b)
+}
+
+/// `SMSG_DUEL_OUTOFBOUNDS` (the client's retreat warning) or `SMSG_DUEL_INBOUNDS`.
+pub fn duel_bounds(out: bool) -> Packet {
+    Packet::empty(if out { op::SMSG_DUEL_OUTOFBOUNDS } else { op::SMSG_DUEL_INBOUNDS })
+}
+
+/// `SMSG_DUEL_COMPLETE`: over; `started` false says "Duel cancelled."
+pub fn duel_complete(started: bool) -> Packet {
+    let mut b = Body::new();
+    b.u8(u8::from(started));
+    Packet::new(op::SMSG_DUEL_COMPLETE, b)
+}
+
+/// `SMSG_DUEL_WINNER`: "X has defeated Y in a duel" (or "Y has fled from X in a duel").
+pub fn duel_winner(fled: bool, winner: &str, loser: &str) -> Packet {
+    let mut b = Body::new();
+    b.u8(u8::from(fled)).cstr(winner).cstr(loser);
+    Packet::new(op::SMSG_DUEL_WINNER, b)
+}
+
 pub fn action_buttons_empty() -> Packet {
     let mut b = Body::new();
     for _ in 0..120 {
@@ -802,6 +843,14 @@ pub fn play_object_sound(guid: u64, sound: u32) -> Packet {
     let mut b = Body::new();
     b.u32(sound).u64(guid);
     Packet::new(op::SMSG_PLAY_OBJECT_SOUND, b)
+}
+
+/// `SMSG_PLAY_SOUND`: a sound kit (`SoundEntries.dbc`) played flat, to whoever it's sent to (a
+/// hero's own voice on a refusal).
+pub fn play_sound(sound: u32) -> Packet {
+    let mut b = Body::new();
+    b.u32(sound);
+    Packet::new(op::SMSG_PLAY_SOUND, b)
 }
 
 /// `SMSG_PLAY_SPELL_VISUAL`: a spell visual kit (an impact's look and sound) on a unit.

@@ -43,6 +43,9 @@ pub mod idx {
     pub const UNIT_RESISTANCES: u16 = 155;
     pub const UNIT_BASE_HEALTH: u16 = 163;
     pub const UNIT_ATTACK_POWER: u16 = 165;
+    /// The duel's flag (two words), and the hero's side in it (1 or 2; 0 none, or not yet on).
+    pub const PLAYER_DUEL_ARBITER: u16 = 188;
+    pub const PLAYER_DUEL_TEAM: u16 = 196;
     pub const PLAYER_FLAGS: u16 = 190;
     pub const PLAYER_BYTES: u16 = 193;
     pub const PLAYER_BYTES_2: u16 = 194;
@@ -94,6 +97,7 @@ pub mod idx {
     pub const GAMEOBJECT_FACING: u16 = 18;
     pub const GAMEOBJECT_FACTION: u16 = 20;
     pub const GAMEOBJECT_TYPE_ID: u16 = 21;
+    pub const GAMEOBJECT_LEVEL: u16 = 22;
     pub const GAMEOBJECT_ANIMPROGRESS: u16 = 24;
 }
 
@@ -120,6 +124,10 @@ pub const TYPEMASK_PLAYER: u32 = 0x01 | 0x08 | 0x10;
 pub const UNIT_FLAG_PVP_ATTACKABLE: u32 = 0x08;
 /// `UNIT_DYNFLAG_DEAD`: drawn as a corpse.
 pub const UNIT_DYNFLAG_DEAD: u32 = 0x20;
+/// Ours, read by client patch 0033 (`ac22`): the unit is drawn at once and gone at once, with no
+/// appear fade and no teardown fade (a spirit beast called in for one strike). Far above the bits
+/// the data uses; a stock client ignores it.
+pub const UNIT_DYNFLAG_NO_FADE: u32 = 0x1000;
 
 /// Faction templates: monsters hostile to everyone, and a friend to everyone.
 pub const FACTION_MONSTER: u32 = 14;

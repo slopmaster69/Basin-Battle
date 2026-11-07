@@ -122,7 +122,7 @@ a heavy blow in its recovery, a knockdown) takes a riposte: half again damage.
 **Giants can't be parried**: a boss that's a giant beast, an elemental or a construct (Old
 Blackfang, Rumbler, Fenrus, the Avatar of Agamaggan, Sneed's Shredder and the like: `unparryable`
 on the creature) swings a paw, a stomp or a slab of stone, not a blade. A guard still blocks it,
-but a guard raised just in time only blocks it too ("Too heavy to parry!"): dodge those instead.
+but a guard raised just in time only blocks it too (a shield's dull thud, no parry's clang): dodge those instead.
 Humanoid bosses can be parried as ever.
 
 **Attack windows**: a creature's wind-up goes through your blows, a heavy one too, so getting your
@@ -190,10 +190,17 @@ it) to cast that for Valor instead. An ultimate has none: it is the bar's whole 
   up with the foe, then the Stoop, a dive anywhere within 12 yd). 1: Grapple Arrow (its EX hauls the
   foe to you, or you to a boss) or Ensnaring Retreat, a leap back with a net that works mid-jump
   (its EX, Trapper's Instinct, turns a blow into a net, scattered arrows and a leap away). 2:
-  Tripwire, two arrows placed a press each and a wire that knocks down the first to cross, or the traps. 3:
+  Tripwire, two arrows placed a press each and a wire that knocks down the first to cross (a rope
+  stretched between the arrows, on a client with patch 0028; older ones see a strip on the ground),
+  or the traps. 3:
   Kill Shot, or Skyfall: a leap straight up, a 5.5 s hang there with the bow drawn on a ring below,
   and a volley of 12 arrows where you aim (they plant), then a slow fall. Every bow ability brings
-  the bow into the hands and draws it with the base game's bow draw.
+  the bow into the hands and draws it with the base game's bow draw. On a client with patch 0030
+  the Hunter's arrows trail a glowing ribbon (pale, burning for a full Aimed Shot, gold-red for
+  Kill Shot, frost for Multi-Shot), and Bank Shot's turns from yellow to orange to red with each
+  bounce. `[[missile_look]]` in `content/survival.toml` sets a spell's. On a client with patch
+  0031, Grapple Arrow and Harpoon Dive pull the hunter in on a rope from the fist, and Reverse
+  Grapple hauls a foe in on one.
 - **Rogue**: in and out before they turn round. Fan of Knives, three poisoned knives that all land
   up close (the EX throws one blade through two); Shadowstep in, and its key again within 3 s steps
   you straight back (its EX blinds everyone where you come out); Backstab, three times from behind;
@@ -337,10 +344,21 @@ stun, incapacitate or panic you're unshakable for 3 seconds (`[cc]`).
 The numbers live in `[[ability]]` in `content/survival.toml`. For testing, with `.es debug` on (or
 in this build): `.es tree` (the board; `full`, `reset`), `.es slot <q|e|1|2|3> <ability>` (a bench
 ability too, on its row's key), `.es valor <n|full>`,
-`.es cd off|on`, `.es heal`, `.es dummy [guard|roll|counter <school>]` (a training dummy in front
+`.es cd off|on`, `.es heal`, `.es dummy [yards] [guard|roll|counter <school>]` (a training dummy in front
 of you: it takes everything a foe does, traps, ground, bounces, beasts, tripwires and crowd
-control, and a knockback or a pull throws it a step at most), `.es cc log` and `.es pvp on|off`.
-`.es debug` also draws projectiles' bodies and every ground area on the ground.
+control, and a knockback or a pull throws it a step at most; `.es dummy clear` takes every dummy
+away), `.es give <item> [n]` (an item into your bags, by its key in `content/`), `.es target
+<creature> [yards] [still] [away] [hp%]` (a real creature `yards` ahead to try abilities on: standing
+`still`, it moves and strikes only when something moves it; otherwise it comes at you; `away`
+puts its back to you, for a shot or a blow into a creature's back; `.es
+target clear` takes them away), `.es ally <creature> [yards] [hp%]` (a creature on your side, standing
+still: it never fights you, your blows pass it by, and a heal aimed at a friend lands on it;
+`.es target clear` takes it away too), `.es crit [off]` (your heals land critical, a bigger number
+over the friend, as a skill check's perfect makes them), `.es hop [yards]` (a jump on the spot, for trying an ability
+mid-jump), `.es cc log` and `.es pvp on|off` (and, in any build, `.es duel <name>|accept|forfeit`). `.es debug` turns debug over
+(`.es debug on` and `.es debug off` set it); it also draws projectiles' bodies and every ground
+area on the ground (`.es debug quiet`: debug's commands without that drawing). [The visual
+check](visual-check.md) uses these to cast abilities in the real client and photograph them.
 
 ### The beta page
 
@@ -610,6 +628,22 @@ aside. A felled hero gets up a second later where they fell, at full health, wit
 they carried (no sack), and the camp hears who felled whom. Set `friendly_fire = false` and remove
 `respawn_secs`, `respawn_health` and `keep_supplies` to go back to co-op rules.
 
+Friendly fire decides only who can be harmed: every other hero is still a friend to help, so a
+spell that heals and hurts (Holy Nova, a healing bolt) mends them rather than strikes them.
+
+## Duels
+
+A **duel** is WoW's own: right-click a hero's portrait and pick Duel (or `/duel`, or `.es duel
+<name>`), and they get the challenge's popup (`.es duel accept` to type it). After a 3-second
+countdown the two are each other's foes, friendly fire or not: blows, bolts and areas strike the
+other, and nothing of either's heals or helps the other (a Holy Nova burns the foe). The duel is
+theirs alone: nobody else can strike either duellist or help them, and neither can strike anyone
+else. The blow that would fell one leaves them at 1 health and ends it, the other the winner, and
+what each put on the other (a slow, a burn, a hold) wears off. `/forfeit` (`.es duel forfeit`),
+logging out, or straying more than 50 yd from the flag for 10 seconds gives it away. Duels are
+for outside Siege, and not in the Proving Ring. `[duel]` in `content/survival.toml` sets the
+reach, the countdown and the bounds.
+
 Chat commands, if you'd rather type: `.bank`, `.take <item> <n>`, `.equip <item>`, `.arm <weapon>`
 (at the rack), `.build [station]`, `.place`, `.rotate`, `.cancel`, `.craft <recipe>`, `.status`,
 `.where`, `.debug` (marks your swing's reach on the ground; `.raid reset` and `.es spawn <creature>`
@@ -789,7 +823,7 @@ hero instead; a hazard (a cannon's blast, a spell's ground) keeps the **!** ever
 
 **Posture.** The heavy fighters and the champions have a stance to break: enough damage within six
 seconds (110 for the Overseer, 100 for the Brave, 130 for the Captain, 150 for the Shadow Hunter,
-240 for the Warlord) and it reels for a couple of seconds, open to a riposte ("Stance broken!").
+240 for the Warlord) and it reels for a couple of seconds, open to a riposte (dust bursts off it with a great crack, and the view shakes).
 Blows and parries both fill it (a parry a quarter of it, and a champion isn't stopped by one);
 it holds a second after the last, then drains, the whole of it over those six seconds. A boss's
 shows under its health bar, Sekiro's way: it fills from the middle out, amber, then orange, then

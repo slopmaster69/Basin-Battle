@@ -49,8 +49,20 @@ A	craft	0.40	2.50	Roast Boar
 A	build	0.00	4.00	Cooking Fire
 A	repair	1.00	3.00	Smithing Anvil
 A	ready	0.00	0.00
-FL	Parry!
+FL	No enemy in range
 !table.insert(SAID, "flash: " .. tostring(ElwynnSurvivalFlash:IsShown()))
+CU	crit	0xF130000000000025
+CU	shatter	0xF130000000000025
+CU	execute	0xF130000000000025
+CU	backstab	0xF130000000000025
+CU	break	0xF130000000000025
+CU	too_heavy	0x0
+CU	wall	0xF130000000000025
+CU	cheat_death	0x0
+CU	valor	0x0
+CU	readied	0x0
+CU	nothing_known	0x0
+!table.insert(SAID, "cues: valor glow " .. tostring(ElwynnSurvival.cueValorAt ~= nil) .. ", keys flaring " .. tostring(ElwynnSurvival.abar and ElwynnSurvival.abar.slots and ElwynnSurvival.abar.slots[1] and ElwynnSurvival.abar.slots[1].fullAt ~= nil))
 !table.insert(SAID, "quick item: key " .. tostring(ElwynnSurvivalDock.quick.key:GetText()) .. " count " .. tostring(ElwynnSurvivalDock.quick.count:GetText()))
 BN	Kobold Raid	From the south-west road in 25 seconds
 BN	Discovered: Fargodeep Mine	4 of 35 places in Elwynn
@@ -107,7 +119,8 @@ A	cast	0.00	0.40	frostbolt
 A	aim	0.00	0.00	flamestrike
 !function SetAimMarker(shape, range, radius) table.insert(SAID, "marker " .. tostring(shape) .. " " .. tostring(range) .. " " .. tostring(radius)) end ElwynnSurvival.DrawAim()
 !ElwynnSurvival.Guard("down") ElwynnSurvival.Guard("up")
-# On the eighth round a projectile's (a beam's) path is drawn as a strip: its range, its radius.
+# On the eighth round a beam's path (a grappling hook's) is drawn as a strip, its range and its
+# radius; a shot (this thrown axe) has none: the reticle says where it goes.
 !HasActionCombat = function() return 8 end
 A	aim	0.00	0.00	aimed_throw
 !table.insert(SAID, "path marker: " .. tostring(SAID[table.getn(SAID)]))
@@ -509,14 +522,86 @@ A	ready	0.00	0.00
 !OLDRU = RollUnit function RollUnit(u, s, st, p, t) table.insert(SAID, "flip " .. u .. string.format(" %.2f ", s) .. tostring(st) .. " tuck " .. tostring(t)) end
 FP	0X1	0.52	38	0	ScourgeFemale	1	1
 !RollUnit = OLDRU
+# The health bar's overhealth past the health in a deep crimson, the shield over the health from the
+# bar's left end in white. Then nothing left of either.
+H	150	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90	30	20
+!local h = ElwynnSurvivalVitals.health table.insert(SAID, string.format("absorbs: over %s of %.0f wide %.0f tall %.1f, shield %s wide %.0f tall %.1f, text %s", tostring(h.over:IsShown()), h.full, h.over:GetWidth(), h.over:GetHeight(), tostring(h.shield:IsShown()), h.shield:GetWidth(), h.shield:GetHeight(), tostring(ElwynnSurvivalVitals.healthText:GetText())))
+H	150	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90	0	0
+!local h = ElwynnSurvivalVitals.health table.insert(SAID, "absorbs gone: over " .. tostring(h.over:IsShown()) .. ", shield " .. tostring(h.shield:IsShown()) .. ", text " .. tostring(ElwynnSurvivalVitals.healthText:GetText()))
 # Below, with nothing else to point at: the corner's arrow points north.
 WR	below
 H	200	200	100	100	melee	Footman's Axe	4	80	-1	0	idle	0	0	0	0	1		0	0	bow	17	0.32	0.86	57	0.50	1.12	14	22	18	Roast Meat	1	0	Warsong Raid	0	8		-1	0	90
 !table.insert(SAID, "below, the arrow: " .. tostring(ElwynnSurvivalInfo:IsShown() and "info" or "no info") .. " / " .. tostring(ElwynnSurvival.infoCacheText and ElwynnSurvival.infoCacheText() or "?"))
 WR	camp
+# The skill checks (Check.lua): a release check's ring closes on its moment; a press judged at once,
+# the server's word after; a rhythm's beats, a rest, a fail; every outcome plays out and goes.
+!ElwynnSurvival.check.pressAt = GetTime()
+CK	fireball	release	fire	1.200	0.100	0.300	stutter
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "release check: shown " .. tostring(c:IsShown()) .. " kind " .. tostring(c.cur and c.cur.kind) .. " flare " .. tostring(c.cur and c.cur.flare) .. " curve " .. tostring(c.cur and c.cur.curve))
+!ElwynnSurvival.attackHeld = true ElwynnSurvival.Attack("up") table.insert(SAID, "released: judged " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade) .. ", ring gone " .. tostring(ElwynnSurvival.check.cur == nil))
+!table.insert(SAID, "frozen ring at " .. tostring(ElwynnSurvival.check.fx and math.floor(ElwynnSurvival.check.fx.ghost or 0)) .. " (the line at 64): early is outside")
+CR	fireball	fizzle
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "after the outcome: shown " .. tostring(c:IsShown()) .. " fx " .. tostring(c.fx))
+CK	fireball	release	fire	1.200	0.100	0.300	steady
+CR	fireball	cancel
+!table.insert(SAID, "called off: ring gone " .. tostring(ElwynnSurvival.check.cur == nil))
+CK	arcane_missiles	rhythm	arcane	0.150	0.080	0.300	3|swing|0.000,0.420,0.700,1.120,1.400r,1.820,2.100,2.520
+!local c = ElwynnSurvival.check table.insert(SAID, "rhythm: beats " .. tostring(c.cur and c.cur.n) .. " free " .. tostring(c.cur and c.cur.free) .. " rest " .. tostring(c.cur and c.cur.beats[5].rest) .. " next " .. tostring(c.cur and c.cur.next))
+!local c = ElwynnSurvival.check for i = 1, 20 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end
+CR	arcane_missiles	good
+CR	arcane_missiles	perfect
+!local c = ElwynnSurvival.check table.insert(SAID, "two beats from the server: next " .. tostring(c.cur and c.cur.next))
+!local c = ElwynnSurvival.check for i = 1, 20 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end
+CR	arcane_missiles	fail
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "rhythm failed: ring gone " .. tostring(c.cur == nil) .. ", shown " .. tostring(c:IsShown()))
+CK	arcane_explosion	rhythm	arcane	0.150	0.080	0.300	1|steady|0.000,0.500,1.000
+!ElwynnSurvival.Ability(2, false, "down") table.insert(SAID, "pressed far off the beat: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade))
+CR	arcane_explosion	full
+!local c = ElwynnSurvival.check for i = 1, 30 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "all done: shown " .. tostring(c:IsShown()))
+CK	cone_of_cold	sweep	frost	1.050	120.000	10.000	rl|30.0|-28.0,0.5,27.9
+!local c = ElwynnSurvival.check for i = 1, 10 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "sweep: marks " .. tostring(c.cur and table.getn(c.cur.marks)) .. " dir " .. tostring(c.cur and c.cur.dir))
+!ElwynnSurvival.check.cur.start = GetTime() - 0.52 ElwynnSurvival.Ability(2, false, "down") table.insert(SAID, "sweep stopped mid-way: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade))
+CK	frozen_orb	orb	frost	3.800	25.000	1.500	3.0|1.0|6.0,10.0,14.0
+!local c = ElwynnSurvival.check for i = 1, 10 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "orb: marks " .. tostring(c.cur and table.getn(c.cur.marks)) .. " backfire " .. tostring(c.cur and c.cur.backfire))
+!ElwynnSurvival.check.cur.start = GetTime() ElwynnSurvival.check.cur.start = GetTime() - 0.1 ElwynnSurvival.Ability(4, false, "down") table.insert(SAID, "orb stopped at once: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade))
+# A staff's mark (Staff.lua): heat closing in and igniting, charges lit, a heavy filling; the ward
+# on the reticle (Ward.lua): whole, cracked, shattered.
+SF	ember
+SK	heat	1	3	0x1F
+SK	heat	2	3	0x1F
+!local m = ElwynnSurvival.staffMark for i = 1, 10 do this = m arg1 = 0.04 m:GetScript("OnUpdate")() end table.insert(SAID, "ember mark: shown " .. tostring(m:IsShown()) .. " heat " .. tostring(m.n))
+SK	heat	3	3	0x1F
+!local m = ElwynnSurvival.staffMark table.insert(SAID, "ignited: heat " .. tostring(m.n) .. " burst " .. tostring(m.popAt ~= nil))
+SF	arcane
+SK	charge	2	3	0x0
+SH	0.30	1.20
+!local m = ElwynnSurvival.staffMark for i = 1, 40 do this = m arg1 = 0.04 m:GetScript("OnUpdate")() end table.insert(SAID, "arcane: charges " .. tostring(m.n) .. " shown " .. tostring(m:IsShown()))
+SK	empty	0	3	0x0
+!table.insert(SAID, "sputter: " .. tostring(ElwynnSurvival.staffMark.emptyAt ~= nil))
+SF	
+!table.insert(SAID, "no staff: mark shown " .. tostring(ElwynnSurvival.staffMark:IsShown()))
+!SetUnitSprite = function(key, unit, tex, size, h, r, g, b, a) ElwynnSurvival.lastSprite = key .. ' ' .. unit .. ' ' .. tex .. ' ' .. string.format('%.2f', a) end
+WA	100	100	0	1
+WB	0x2A	1	1	1.00	0
+WB	0x2A	1	1	0.50	0
+!local f = ElwynnSurvivalBarrier for i = 1, 10 do this = f f:GetScript("OnUpdate")() end table.insert(SAID, "barrier: " .. tostring(ElwynnSurvival.lastSprite) .. ", bar shown " .. tostring(ElwynnSurvival.ward:IsShown()))
+WB	0x2A	1	0	0.00	1
+!local f = ElwynnSurvivalBarrier ElwynnSurvival.lastSprite = nil for i = 1, 3 do this = f f:GetScript("OnUpdate")() end table.insert(SAID, "barrier broken: " .. tostring(ElwynnSurvival.lastSprite))
+CK	cone_of_cold	meter	frost	1.000	0.600	0.060	lr|0.160
+!local c = ElwynnSurvival.check for i = 1, 10 do this = c arg1 = 0.04 c:GetScript("OnUpdate")() end table.insert(SAID, "meter: kind " .. tostring(c.cur and c.cur.kind) .. " spot " .. tostring(c.cur and c.cur.spot) .. " good " .. tostring(c.cur and c.cur.good))
+!ElwynnSurvival.check.cur.start = GetTime() - 0.2 ElwynnSurvival.Ability(2, false, "down") table.insert(SAID, "meter stopped early: " .. tostring(ElwynnSurvival.check.last and ElwynnSurvival.check.last.grade) .. ", frozen at " .. tostring(ElwynnSurvival.check.fx and ElwynnSurvival.check.fx.meterAt))
 @PLAYER_LEAVING_WORLD
 !table.insert(SAID, "asleep: " .. tostring(ElwynnSurvival.awake) .. ", S is " .. tostring(GetBindingAction("S")) .. ", A is " .. tostring(GetBindingAction("A")) .. ", catcher " .. tostring(ElwynnSurvivalCatcher:IsShown()) .. ", action bar back " .. tostring(MainMenuBar:IsVisible()) .. ", bar " .. tostring(ElwynnSurvivalBar:IsVisible()))
 !table.insert(SAID, "after leaving: action bar visible " .. tostring(MainMenuBar:IsVisible()) .. ", player frame " .. tostring(PlayerFrame:IsVisible()))
 # Trying a clip on our own hero: its own take, or another character model's.
 !local a = {} for _, m in ipairs({"17", "17 1", "17 ScourgeFemale", "57 0 OrcMale 0.5"}) do local c, t, f, i = ElwynnSurvival.ClipArgs(m) table.insert(a, c .. "/" .. t .. "/" .. tostring(f) .. "/" .. i) end table.insert(SAID, "clip args: " .. table.concat(a, ", "))
 !OLDPUA, OLDPRE = PlayUnitAnimation, PreloadAnimationSource function PreloadAnimationSource(f) table.insert(SAID, "preload " .. f) end function PlayUnitAnimation(u, c, i, tr, ms, t, r, b, f) table.insert(SAID, "esclip plays " .. u .. " " .. c .. " take " .. t .. " from " .. tostring(f)) end ElwynnSurvival.TryClip("17 0 ScourgeFemale") PlayUnitAnimation, PreloadAnimationSource = OLDPUA, OLDPRE
+!SetGroundRing = function(k) RINGS = RINGS or {} RINGS[k] = true end ClearGroundRing = function(k) if RINGS then RINGS[k] = nil end end
+!table.insert(SAID, "awake for salvation: " .. tostring(ElwynnSurvival.awake)) ElwynnSurvival.SigilLine({"SV", "9", "1.0", "2.0", "3.0", "10.0", "2.00,3.50,4.50"})
+!local f = ElwynnSurvivalPriest this = f f:GetScript("OnUpdate")() local n = 0 for _ in pairs(RINGS or {}) do n = n + 1 end table.insert(SAID, "salvation drawn: " .. n .. " rings, shown " .. tostring(f:IsShown()))
+!SetGroundRing = nil ClearGroundRing = nil RINGS = nil
+!SetUnitSprite = function(k) SPRITES = SPRITES or {} SPRITES[k] = true end ClearUnitSprite = function(k) if SPRITES then SPRITES[k] = nil end end SetGroundRing = function(k) RINGS = RINGS or {} RINGS[k] = true end ClearGroundRing = function(k) if RINGS then RINGS[k] = nil end end SetGroundRingOnUnit = SetGroundRing
+!local E = ElwynnSurvival E.PriestLookLine({"PL","penance","1","0xF13000001","0.5","0","1"}) E.PriestLookLine({"PL","penance","2","0x12","1.0","1","1"}) E.PriestLookLine({"PL","shield","1","0x12","0","0","0"}) E.PriestLookLine({"PL","fade","1","0x13","0","0","1"}) E.PriestLookLine({"PL","shell","20","0x0","0.5","0","1"}) E.PriestLookLine({"PL","hollow","40","0xF13000003","4","60","1"}) E.PriestStacksLine({"SK","weave","3","5","0xF13000001"}) E.PriestStacksLine({"SK","sear","1","1","0xF13000002"}) E.PriestGroundLine({"PG","feather","21","1.0","2.0","3.0","1.6","15"}) E.PriestGroundLine({"PG","rift","22","4.0","2.0","3.0","4","4"}) E.PriestGroundLine({"PG","blast","23","6.0","2.0","3.0","2.5","0.9"})
+!local f = ElwynnSurvivalPriestLook this = f f:GetScript("OnUpdate")() local n, m = 0, 0 for _ in pairs(SPRITES or {}) do n = n + 1 end for _ in pairs(RINGS or {}) do m = m + 1 end table.insert(SAID, "priest looks: shown " .. tostring(f:IsShown()) .. ", sprites " .. n .. ", ground " .. m)
+!ElwynnSurvival.PriestLookLine({"PL","penance_hit","1","0xF13000001","1","1","1"}) ElwynnSurvival.PriestLookLine({"PL","shell","0","0x0","0","1","1"}) ElwynnSurvival.PriestGroundLine({"PG","feather","21","1.0","2.0","3.0","0","0"}) local f = ElwynnSurvivalPriestLook this = f f:GetScript("OnUpdate")() table.insert(SAID, "penance landed, shell let go, feather taken: shown " .. tostring(f:IsShown()))
+!SetUnitSprite = nil ClearUnitSprite = nil SPRITES = nil SetGroundRing = nil ClearGroundRing = nil SetGroundRingOnUnit = nil RINGS = nil

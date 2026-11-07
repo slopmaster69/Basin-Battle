@@ -61,6 +61,7 @@ impl Survival {
         self.cc.remove(&id);
         self.stances.remove(&id);
         self.anchors.remove(&id);
+        self.slips.remove(&id);
         self.grace.remove(&id);
         for m in self.mobs.values_mut() {
             if m.state.target() == Some(id) {

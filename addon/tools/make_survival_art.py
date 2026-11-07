@@ -4,9 +4,9 @@
     python3 addon/tools/make_survival_art.py
 
 Writes into addon/ElwynnSurvival/art/: the aiming reticle and its dot, the hit marker, the
-equipment slots' frame and well, the vitals' frame, the screen-edge vignette (the hit flash), a
-soft band for the death screen and the kill feed, a diamond, and the windows' panel, frame, row
-band and divider. The older pieces there (bar,
+equipment slots' frame and well, the vitals' frame, the screen-edge vignette (the hit flash), the
+speed lines of Kill Shot's release, a soft band for the death screen and the kill feed, a diamond,
+and the windows' panel, frame, row band and divider. The older pieces there (bar,
 banner, button, card, circle, ring) come from make_art.py. Every side is a power of two no larger
 than 512, as the 1.12 client requires. Needs numpy and Pillow.
 """
@@ -141,6 +141,55 @@ def vignette():
     save_tga("vignette", white(a))
 
 
+def speedlines():
+    """Thin streaks rushing in toward the middle, each a fine wedge feathered across its width
+    and soft at both ends, the middle itself clear so the aim stays readable: an action scene's
+    speed lines as Kill Shot goes. Thirty-six rays, each running from about r 0.55 out to about
+    r 0.9 of the square (fading in over its first 15% and out over its last 25%), so none reaches
+    the texture's edge: laid over the screen as a square wider than it is (the add-on), their
+    far ends lie off the screen and no ray is cut hard at an edge (Corey's review, Nov 4: the
+    first ones, stretched to the screen and brightest at its edges, "look amateur ... cut off
+    around the edges"). Their places, widths, reaches and brightness are scattered by a little
+    generator of our own (not numpy's), so the picture is the same every run and in any port of
+    this."""
+    n = 512
+    px, py = grid(n, n, 2)
+    dx = px / n * 2 - 1
+    dy = py / n * 2 - 1
+    r = np.sqrt(dx * dx + dy * dy)
+    ang = np.arctan2(dy, dx)
+    state = [20261104]
+
+    def roll():
+        state[0] = (state[0] * 1664525 + 1013904223) & 0xFFFFFFFF
+        return state[0] / 4294967296.0
+
+    def smooth(t):
+        t = np.clip(t, 0, 1)
+        return t * t * (3 - 2 * t)
+
+    tau = 2 * math.pi
+    a = np.zeros(r.shape)
+    for k in range(36):
+        centre = (k + 0.5 + (roll() - 0.5) * 0.7) / 36 * tau - math.pi
+        # Its half-width at its far end (radians), where it starts and ends, how bright.
+        half = 0.002 + 0.004 * roll()
+        start = 0.55 + 0.04 * roll()
+        end = 0.86 + 0.05 * roll()
+        bright = 0.6 + 0.4 * roll()
+        d = ang - centre
+        d = np.abs(d - tau * np.floor((d + math.pi) / tau))
+        along = np.clip((r - start) / (end - start), 0, 1)
+        # A point toward the middle, its full width out at its far end.
+        width = half * (0.4 + 0.6 * along)
+        across = smooth(1 - d / width)
+        ends = smooth(along / 0.15) * (1 - smooth((along - 0.75) / 0.25))
+        a = np.maximum(a, across * ends * bright)
+    # The middle clear whatever the rays do.
+    a *= np.clip((r - 0.5) / 0.04, 0, 1)
+    save_tga("speedlines", white(down(a, 2)))
+
+
 def band():
     """A soft horizontal band, fading at both ends and the edges: the death screen's backdrop and
     the kill feed's rows."""
@@ -258,6 +307,7 @@ def main():
     slot()
     frame()
     vignette()
+    speedlines()
     band()
     diamond()
     print("wrote", sorted(f for f in os.listdir(OUT) if f.endswith(".tga")))

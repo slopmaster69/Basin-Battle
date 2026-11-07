@@ -131,6 +131,9 @@ const CROWDED: f32 = 0.45;
 const BACK_OFF: f32 = 3.0;
 /// Seconds between a creature's decisions while it walks.
 const THINK: f32 = 0.25;
+/// A string whose foe must be at least this far off is one for afar (a charge, a lunge, a throw);
+/// nearer, one up close.
+pub(crate) const SPACE_FROM: f32 = 3.0;
 /// A creature this near home after a chase is back.
 const HOME: f32 = 2.0;
 /// ...and on home's own floor: not this far above or below it with a floor between (a deck over a
@@ -346,10 +349,17 @@ impl Survival {
                 fighters: 1,
                 wary_until: 0.0,
                 whiff_until: 0.0,
+                last_pattern: None,
+                close_run: 0,
+                string_len: 0,
+                held_step: None,
+                hold: 0.0,
+                space: None,
                 threat: Vec::new(),
                 retarget_at: 0.0,
                 drawn_off: None,
                 summoned_by: None,
+                friendly: self.content.mobs[def].friendly,
             },
         );
         // An ambusher lies unseen until a hero comes near (or its chest is opened).
@@ -471,7 +481,8 @@ impl Survival {
         while let Some(m) = queue.pop() {
             let foe = if m == mid { first } else { self.spread_foe(m, first) };
             let Some(mob) = self.mobs.get_mut(&m) else { continue };
-            if mob.health == 0 {
+            // An ally of the heroes never takes up a fight against one.
+            if mob.health == 0 || mob.friendly {
                 continue;
             }
             // A harmless creature runs instead.
@@ -647,8 +658,10 @@ impl Survival {
         m.posture = 0;
         m.posture_guard = now + POSTURE_BREAK + POSTURE_GRACE;
         self.stagger_mob(mid, POSTURE_BREAK, true);
-        self.events.push(Event::Flash { player: by, text: "Stance broken!".into() });
+        // No word: it reels, dust bursts off it, a great mace's crack on metal, and a heavy beat
+        // on the screen of the hero who broke it.
         self.events.push(Event::Visual { id: mid, kit: combat::KIT_DUST, by: None });
+        self.cue(Some(by), mid, 0, super::cues::SOUND_BREAK, super::cues::BEAT_BREAK);
         true
     }
 
@@ -772,7 +785,7 @@ impl Survival {
         let k = self.content.mobs[def].patterns.iter().position(|p| p.name == e.pattern);
         match (k, self.foe_pos(foe)) {
             (Some(k), Some(to)) => {
-                self.mobs.get_mut(&mid).unwrap().pattern = Some((k, 0));
+                self.begin_pattern(mid, k, false);
                 self.windup(mid, foe, to);
             }
             _ => {
@@ -847,6 +860,10 @@ impl Survival {
     fn mob_died(&mut self, mid: Id, killer: Id) {
         let now = self.clock;
         self.death_mark_reset(mid);
+        // Its marks go down with it (Corey: "take the mark down with the foe"): the Death Mark's
+        // arrow, a Mark, a burn, none hangs over the body until its time runs out. The effects'
+        // looks go the moment it falls, as a fallen hero's do.
+        self.clear_cc(mid);
         if matches!(self.mobs.get(&mid).map(|m| &m.state), Some(MobState::Windup { .. })) && self.attack_now(mid).ranged {
             self.events.push(Event::CastEnd { caster: mid });
         }
@@ -1132,6 +1149,11 @@ impl Survival {
                 }
             } else {
                 self.walk(id, dt);
+            }
+            // A target put up to stand still (`.es target ... still`): moved by what moves it,
+            // never of its own will.
+            if self.targets.get(&id).copied().unwrap_or(false) {
+                continue;
             }
             if self.disabled(id) {
                 continue;
@@ -1656,7 +1678,7 @@ impl Survival {
                     return;
                 }
                 // Notice a hero in sight.
-                if d.aggro > 0.0 {
+                if d.aggro > 0.0 && !self.mobs[&id].friendly {
                     let seen = self
                         .players
                         .iter()
@@ -1791,7 +1813,7 @@ impl Survival {
                 // A caster's patterns: a blast up close, a volley from afar.
                 if a.ranged && !d.patterns.is_empty() && ready && sees {
                     if let Some(k) = self.pick_pattern(id, dist, size) {
-                        self.mobs.get_mut(&id).unwrap().pattern = Some((k, 0));
+                        self.begin_pattern(id, k, true);
                         self.windup(id, foe, to);
                         return;
                     }
@@ -1830,6 +1852,16 @@ impl Survival {
                             self.circle_foe(id, h, to, CIRCLE_RADIUS + 1.0);
                             return;
                         }
+                        // A boss making space: it backs off facing its foe, and waits there for
+                        // its blow from afar (an opening still draws it at once).
+                        let spacing = self.mobs[&id].space.is_some_and(|(until, _)| now < until);
+                        if spacing && !ready {
+                            if self.mobs[&id].path.is_empty() {
+                                let face = facing(pos, to);
+                                self.mobs.get_mut(&id).unwrap().facing = face;
+                            }
+                            return;
+                        }
                         // Between attacks, up close: it keeps its distance, circling, until ready.
                         if !ready && close {
                             self.circle_foe(id, h, to, CIRCLE_RADIUS);
@@ -1844,7 +1876,7 @@ impl Survival {
                             // loose one while two others are at the hero (it isn't one of the two).
                             let shot = d.patterns[k].steps.first().and_then(|st| st.ranged) == Some(true);
                             if (shot || !busy) && (!shot || clear_line(self.land.as_ref(), pos, to)) {
-                                self.mobs.get_mut(&id).unwrap().pattern = Some((k, 0));
+                                self.begin_pattern(id, k, true);
                                 self.show_guard(id, false);
                                 self.windup(id, foe, to);
                                 return;
@@ -1955,16 +1987,30 @@ impl Survival {
                     }
                     self.release(id, foe);
                     self.halt(id);
-                    let steps = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k)).map_or(0, |p| p.steps.len());
+                    let pat = self.mobs[&id].pattern.and_then(|(k, _)| self.content.mobs[self.mobs[&id].def].patterns.get(k));
+                    let steps = pat.map_or(0, |p| p.steps.len());
+                    let close = pat.is_some_and(|p| p.min_range < SPACE_FROM);
+                    // (A boss's string may stop short, or run one longer.)
+                    let steps = match self.mobs[&id].string_len {
+                        0 => steps,
+                        n => n,
+                    };
                     let m = self.mobs.get_mut(&id).unwrap();
                     m.state = MobState::Recover { foe, until: now + a.recovery };
                     m.special = false;
                     m.lunged = false;
+                    m.hold = 0.0;
                     match m.pattern {
                         // The next blow of the string comes after this one's recovery.
                         Some((k, s)) if s + 1 < steps => m.pattern = Some((k, s + 1)),
-                        _ => {
+                        Some(_) => {
                             m.pattern = None;
+                            m.string_len = 0;
+                            m.close_run = if close { m.close_run + 1 } else { 0 };
+                            let cd = self.string_cooldown(a.cooldown);
+                            self.mobs.get_mut(&id).unwrap().ready_at = now + cd;
+                        }
+                        None => {
                             let cd = self.string_cooldown(a.cooldown);
                             self.mobs.get_mut(&id).unwrap().ready_at = now + cd;
                         }
@@ -1994,10 +2040,14 @@ impl Survival {
                             let m = self.mobs.get_mut(&id).unwrap();
                             let strung = m.pattern.take().is_some();
                             m.state = MobState::Chase { foe };
-                            // A string done: now and then it gives ground.
+                            // A string done: now and then it gives ground (a boss: it makes
+                            // space for a blow from afar, or goes straight into another string).
                             if let (false, Foe::Hero(h)) = (strung, foe) {
                                 if !self.content.mobs[self.mobs[&id].def].patterns.is_empty() {
                                     self.maybe_give_ground(id, h);
+                                    if !self.maybe_make_space(id, h) {
+                                        self.maybe_chain(id);
+                                    }
                                 }
                             }
                         }
@@ -2016,6 +2066,8 @@ impl Survival {
             (None, Some(s), true) => s.over(&d.attack),
             _ => d.attack.clone(),
         };
+        // A blow held a beat (the delayed swing).
+        a.windup += m.hold;
         // Quicker (and harder) in its later phases.
         if let Some(e) = self.phase_now(id) {
             a.windup *= e.speed;
@@ -2046,7 +2098,9 @@ impl Survival {
     pub(crate) fn pattern_step(&self, id: Id) -> Option<&crate::content::SpecialDef> {
         let m = self.mobs.get(&id)?;
         let (k, s) = m.pattern?;
-        self.content.mobs[m.def].patterns.get(k)?.steps.get(s)
+        // (A boss's string run one longer: its last blow again.)
+        let steps = &self.content.mobs[m.def].patterns.get(k)?.steps;
+        steps.get(s.min(steps.len().saturating_sub(1)))
     }
 
     /// The clip a creature swings with by default: by what it holds.
@@ -2069,6 +2123,11 @@ impl Survival {
         // A raised guard in front of it: it reaches for the blow no guard stops.
         let guarded = m.state.target().is_some_and(|h| self.hero_guarding(h));
         let breaks = self.content.ai.guard_break.max(0.0);
+        // (A boss: a pack's creatures pick as they always have.)
+        let again = if d.boss { self.content.ai.repeat.max(0.0) } else { 1.0 };
+        // (A plan to back off and use one from afar keeps only until its wait is out.)
+        let now = self.clock;
+        let (last, planned) = (m.last_pattern, m.space.filter(|(until, _)| now < *until).map(|(_, k)| k));
         let fits: Vec<(usize, f32)> = d
             .patterns
             .iter()
@@ -2079,9 +2138,14 @@ impl Survival {
                 let reach = first.range.unwrap_or(d.attack.range) + size - 0.3 + first.lunge;
                 let max = if p.max_range > 0.0 { p.max_range } else { reach };
                 let w = if guarded && p.steps.iter().any(|s| s.blockable == Some(false) || s.heavy == Some(true)) { p.weight * breaks } else { p.weight };
+                let w = if last == Some(k) { w * again } else { w };
                 (dist >= p.min_range && dist <= max).then_some((k, w.max(0.0)))
             })
             .collect();
+        // Backed off to use this one: it does, if its foe is still where it fits.
+        if let Some(k) = planned.filter(|k| fits.iter().any(|f| f.0 == *k)) {
+            return Some(k);
+        }
         let total: f32 = fits.iter().map(|f| f.1).sum();
         if fits.is_empty() || total <= 0.0 {
             return None;
@@ -2097,6 +2161,10 @@ impl Survival {
     }
 
     pub(crate) fn windup(&mut self, id: Id, foe: Foe, to: Vec3) {
+        // A spell lab body swings only when the lab asks it to.
+        if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) {
+            return;
+        }
         self.halt(id);
         if let Some(m) = self.mobs.get_mut(&id) {
             m.lost_at = None;
@@ -2116,6 +2184,8 @@ impl Survival {
         };
         self.mobs.get_mut(&id).unwrap().special = special.is_some() && !in_pattern;
         self.mobs.get_mut(&id).unwrap().lunged = false;
+        let hold = self.hold_beat(id);
+        self.mobs.get_mut(&id).unwrap().hold = hold;
         let a = self.attack_now(id);
         let m = &self.mobs[&id];
         let a = &a;
@@ -2257,6 +2327,15 @@ impl Survival {
         let mut any = false;
         for (h, hp) in heroes {
             let dist = dist2d(pos, hp);
+            let caught = |at: Vec3| {
+                let dist = dist2d(pos, at);
+                dist <= a.range + 0.4 && (angle_between(f, facing(pos, at)) <= a.arc / 2.0 || dist < 0.8)
+            };
+            // Blinked out of it just as it came: slipped (Blink's counter check).
+            if !caught(hp) && self.slip_from(h).is_some_and(caught) {
+                self.slipped(h, id, Blow::Light);
+                continue;
+            }
             if dist <= a.range + 0.4 && (angle_between(f, facing(pos, hp)) <= a.arc / 2.0 || dist < 0.8) {
                 any = true;
                 // Settled once the hero's round trip is up: out of it by then (as they saw it), missed.

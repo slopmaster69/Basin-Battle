@@ -16,10 +16,13 @@ const EMOTE_SHIELD_BLOCK: u32 = 43;
 /// The guard's held pose: the shield up (ShieldBlock), or a two-handed weapon at the ready.
 pub(crate) const POSE_SHIELD: u32 = 43;
 const POSE_TWO_HANDED: u32 = 375;
+/// A ward held up: the spell-precast stance (the arm raised, channelling), not a weapon's guard.
+const POSE_WARD: u32 = 193;
 const ARROW_DISPLAY: u32 = packets::ARROW_DISPLAY;
 /// The hunter's shots whose own look has no missile model: flown from a spot, they carry the
-/// arrow (as Basin Battle's server sends them), or the client flies nothing to see.
-const ARROW_SPELLS: [u32; 3] = [2643, 3044, 19434];
+/// arrow (as Basin Battle's server sends them), or the client flies nothing to see. (10346: Fire
+/// Shot's, Kill Shot's arrow, carried the same way.)
+const ARROW_SPELLS: [u32; 4] = [2643, 3044, 10346, 19434];
 /// Where a missile coming home is aimed: this far over the feet of whoever threw it (chest high
 /// on a dwarf, the hands on a human), so it flies to the body, not the ground.
 const HOME_HEIGHT: f32 = 1.2;
@@ -61,6 +64,9 @@ const MISS_PARRY: u8 = 4;
 const MISS_BLOCK: u8 = 5;
 /// A tick of damage over time shows as this spell's (Immolate's burn).
 const DOT_SPELL: u32 = 348;
+/// From this client level a heal on a friend floats over their head (patch 0060), so the healer is
+/// sent the heal log instead of the add-on's `HO` line.
+pub(crate) const HEAL_FLOAT_LEVEL: u8 = 28;
 
 impl SurvivalGame {
     pub(crate) fn play(&mut self, events: Vec<Event>) {
@@ -379,6 +385,134 @@ impl SurvivalGame {
                 f.set(idx::UNIT_POWER1 + 3, p.stamina.floor() as u32);
                 self.to_player(player, packets::update_object(&[], &[(g, &f)]));
             }
+            Event::Ward { player } => {
+                let Some(warder) = self.sim.players.get(&player).map(|p| self.sim.guard_of(p).ward) else { return };
+                if warder {
+                    if let Some(c) = self.conn_of(player) {
+                        let line = self.ward_line(player);
+                        self.ui_line(c, &line);
+                    }
+                }
+                // The warder's barrier for everyone who sees them (`WB guid own up share broken`):
+                // drawn round the body on a client with SetUnitSprite. No ward staff now: none.
+                let Some(g) = self.guid_of(player) else { return };
+                let Some(p) = self.sim.players.get(&player) else { return };
+                let share = (p.ward / self.sim.content.ward.bar.max(1.0)).clamp(0.0, 1.0);
+                let (up, broken) = (u8::from(p.ward_up && warder), u8::from(p.ward_broken && warder));
+                let mine = self.conn_of(player);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let own = u8::from(Some(c) == mine);
+                    self.ui_line(c, &format!("WB\t{g:#X}\t{own}\t{up}\t{share:.2}\t{broken}"));
+                }
+            }
+            Event::Perfect { player, ability } => {
+                if let Some(c) = self.conn_of(player) {
+                    let key = self.sim.content.abilities[ability].key.clone();
+                    self.ui_line(c, &format!("PF\t{key}"));
+                }
+            }
+            Event::CheckStart { player, ability, kind, a, b, c: crit, pattern } => {
+                if let Some(c) = self.conn_of(player) {
+                    let d = &self.sim.content.abilities[ability];
+                    let (key, school) = (d.key.clone(), check_school(d));
+                    self.ui_line(c, &format!("CK\t{key}\t{kind}\t{school}\t{a:.3}\t{b:.3}\t{crit:.3}\t{pattern}"));
+                }
+            }
+            Event::OrbRoll { look, from, to, secs, model, scale } => {
+                // Everyone with the add-on sees it roll (a client with PlayGroundOrb draws it).
+                let line = format!("OB\t{look}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{:.2}\t{secs:.2}\t{}\t{scale:.2}", from[0], from[1], from[2], to[0], to[1], to[2], model.replace('\t', " "));
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::SigilLaid { look, at, radius, beats } => {
+                // Salvation for everyone with the add-on: a client with SetGroundRing draws its
+                // circle, the rim closing on each beat and the centre's sigil (`SV`).
+                let beats = beats.iter().map(|b| format!("{b:.2}")).collect::<Vec<_>>().join(",");
+                let line = format!("SV	{look}	{:.2}	{:.2}	{:.2}	{radius:.2}	{beats}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::PriestLook { player, kind, n, on, a, b } => {
+                // A Priest look in Corey's art (`PL`): on the hero's own screen, or (a perfect
+                // Shield, Kindle, Fade's afterimage) for everyone who sees the unit it's on.
+                let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                let mine = self.conn_of(player);
+                let line = |own: u8| format!("PL\t{kind}\t{n}\t{g:#X}\t{a:.2}\t{b:.2}\t{own}");
+                if matches!(kind, "shield" | "fade") {
+                    let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                    for c in conns {
+                        self.ui_line(c, &line(u8::from(Some(c) == mine)));
+                    }
+                } else if let Some(c) = mine {
+                    self.ui_line(c, &line(1));
+                }
+            }
+            Event::PriestGround { kind, key, at, radius, secs } => {
+                // A Priest's mark on the ground for everyone with the add-on (`PG`): a feather to
+                // step on, a rift to keep out of.
+                let line = format!("PG\t{kind}\t{key}\t{:.2}\t{:.2}\t{:.2}\t{radius:.2}\t{secs:.2}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::OrbGone { look } => {
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &format!("OX\t{look}"));
+                }
+            }
+            Event::Stacks { player, kind, n, on } => {
+                // A staff's heat, chill or charges, for the caster's reticle mark (the Priest's
+                // Weaving and Searing Light on the foe).
+                if let Some(c) = self.conn_of(player) {
+                    let k = &self.sim.content;
+                    let most = match kind {
+                        "weave" => k.priest.weave_most,
+                        "sear" => 1,
+                        _ => k.staffs.most,
+                    };
+                    let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                    self.ui_line(c, &format!("SK	{kind}	{n}	{most}	{g:#X}"));
+                }
+            }
+            Event::HoldPose { id, clip, secs, from } => {
+                // A held pose (the ward's arm out), for every client that plays clips: `WP guid clip
+                // secs own model` (secs 0: let go; the model whose take every race plays, if named).
+                let Some(g) = self.guid_of(id) else { return };
+                let mine = self.conn_of(id);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    let own = u8::from(Some(c) == mine);
+                    self.ui_line(c, &format!("WP\t{g:#X}\t{clip}\t{secs:.2}\t{own}\t{}", from.as_deref().unwrap_or("")));
+                }
+            }
+            Event::StaffHeavy { player, lo, hi } => {
+                if let Some(c) = self.conn_of(player) {
+                    self.ui_line(c, &format!("SH	{lo:.2}	{hi:.2}"));
+                }
+            }
+            Event::WardCheck { player, grade } => {
+                if let Some(c) = self.conn_of(player) {
+                    self.ui_line(c, &format!("CR	ward	{grade}"));
+                }
+            }
+            Event::CheckResult { player, ability, grade } => {
+                if let Some(c) = self.conn_of(player) {
+                    let d = &self.sim.content.abilities[ability];
+                    let key = d.key.clone();
+                    // Its school, for an outcome with no ring up to show it on (it showed as the
+                    // Mage's arcane burst after Penance: Corey); `world`, an outcome shown on the
+                    // bodies it's about, nothing on the reticle (Penance's rings).
+                    let school = if d.kind == "penance" { "world" } else { check_school(d) };
+                    self.ui_line(c, &format!("CR\t{key}\t{grade}\t{school}"));
+                }
+            }
             Event::Speed { player, speed, back } => {
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(c) = self.conn_of(player) else { return };
@@ -451,7 +585,24 @@ impl SurvivalGame {
                     }
                 }
             }
-            Event::Gear { player } => self.show_gear(player),
+            Event::Gear { player } => {
+                self.show_gear(player);
+                // A casting staff in hand: every add-on's client launches this hero's bolts from
+                // its tip (a client with SetUnitMissileOrigin, patch 0044); anything else, the hands.
+                if let Some(g) = self.guid_of(player) {
+                    let staff = self.sim.players.get(&player).is_some_and(|p| self.sim.weapon_of(p).casts());
+                    let line = format!("MO	{g:#X}	{}", if staff { "weapon" } else { "" });
+                    let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon).map(|(c, _, _)| *c).collect();
+                    for c in conns {
+                        self.ui_line(c, &line);
+                    }
+                    // The hero's own staff, for its mark on their screen.
+                    if let Some(c) = self.conn_of(player) {
+                        let line = self.staff_line(player);
+                        self.ui_line(c, &line);
+                    }
+                }
+            }
             // The add-on's effects line follows on the next flush.
             Event::Effects { .. } | Event::Goal | Event::Sites => {}
             Event::Guard { player, up } => {
@@ -551,12 +702,22 @@ impl SurvivalGame {
                     }
                 }
             }
+            Event::Hear { player, sound } => {
+                // The stock client plays it itself: no add-on needed.
+                self.to_player(player, packets::play_sound(sound));
+            }
             Event::Hop { player, dir, speed, lift, roll, style } => {
                 let Some(g) = self.guid_of(player) else { return };
                 let Some(c) = self.conn_of(player) else { return };
                 // A dodge tumbles, on the clients that roll bodies themselves.
                 if roll {
-                    let secs = self.sim.content.dodge.secs;
+                    // A dodge's time; a sidestep riding a dash (Fade) sways only as long as the dash
+                    // runs (Corey: the step kept going in place after the Fade was over).
+                    let dodge = self.sim.content.dodge.secs;
+                    let secs = match self.sim.players.get(&player).map(|p| &p.action) {
+                        Some(htl_survival::Action::Dash { t, secs, .. }) => (secs - t + 0.05).clamp(0.12, dodge),
+                        _ => dodge,
+                    };
                     let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                     for k in conns {
                         self.ui_line(k, &format!("RO\t{g:#X}\t{secs:.2}\t{}\t{style}", u8::from(k == c)));
@@ -665,7 +826,13 @@ impl SurvivalGame {
                 let p = self.mark_create(id, pos, radius);
                 let line = self.mark_line(id, pos, radius);
                 let conns: Vec<(ConnId, Id, u8)> = self.in_world().map(|(c, _, w)| (*c, w.id, if w.addon { w.level } else { 0 })).collect();
+                // Salvation's circle and rim: drawn by the add-on itself from `SV` on a client
+                // with ground rings (ac24, patch 0041); the rest get the circle.
+                let drawn = self.sim.drawn_by_addon(id);
                 for (c, hero, level) in conns {
+                    if drawn && level >= 24 {
+                        continue;
+                    }
                     // A leap's landing isn't drawn for the hero leaping (others still see it).
                     if tele.is_some_and(|t| t.own_hidden && t.mob == hero) {
                         continue;
@@ -698,9 +865,59 @@ impl SurvivalGame {
                 self.broadcast(&super::draw::area_create(guid, caster, spell, pos, radius));
                 self.area_looks.insert(id, guid);
             }
+            Event::Rope { id, a, b } => {
+                // On the clients that stretch a rope from end to end (patch 0028), in place of the
+                // strip on the ground laid for it just before (taken off theirs as a gone mark's
+                // is: floor clutter, Corey's review); the rest keep the strip.
+                let p = self.rope_create(id, a, b);
+                let conns: Vec<(ConnId, bool)> = self.in_world().filter(|(_, _, w)| w.level >= super::draw::ROPE_LEVEL).map(|(c, _, w)| (*c, w.addon)).collect();
+                for (c, addon) in conns {
+                    self.send(c, p.clone());
+                    if addon {
+                        self.ui_line(c, &format!("MK\t{id}"));
+                        self.ui_line(c, &format!("TG\t{id}"));
+                    }
+                }
+                self.ropes.insert(id);
+            }
+            Event::Tether { from, to, secs } => {
+                // A taut line from the hand (patch 0031): `RP <key> <from> <to's guid or -> <x> <y>
+                // <z> <secs>`, keyed by who holds it, so a new line replaces theirs.
+                let Some(g) = self.guid_of(from) else { return };
+                let (to_guid, at) = match to {
+                    Target::Unit(u) => match self.guid_of(u) {
+                        Some(t) => (format!("0x{t:016X}"), [0.0; 3]),
+                        None => return,
+                    },
+                    Target::Point(p) => ("-".to_string(), p),
+                };
+                let line = format!("RP\t{g:X}\t0x{g:016X}\t{to_guid}\t{:.2}\t{:.2}\t{:.2}\t{secs:.2}", at[0], at[1], at[2]);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::UNIT_ROPE_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
+            Event::MissileTint { caster, spell, ability, bounce } => {
+                // The next missile `caster` flies of the spell takes its bounce's colour, on the
+                // clients that draw a missile's look (patch 0030): Bank Shot hotter each bounce.
+                // A stand-in flies the arrow on from a ricochet, so its own guid names that one.
+                let Some(g) = self.stand_ins.get(&caster).map(|s| s.guid).or_else(|| self.guid_of(caster)) else { return };
+                let c = &self.sim.content;
+                let Some(colour) = c.abilities.get(ability).and_then(|d| d.bounce_trail.get((bounce as usize).min(d.bounce_trail.len().saturating_sub(1)))) else { return };
+                let base = c.missile_looks.iter().find(|l| l.spell == spell);
+                let (width, secs, scale, spin, tumble, speed) = base.map_or((0.3, 0.4, 1.0, 0.0, false, 0.0), |l| (l.width.max(0.3), l.secs.max(0.4), l.scale, l.spin, l.tumble, l.speed));
+                let line = super::draw::missile_look_line(spell, colour, width, secs, scale, spin, Some(g), tumble, speed);
+                let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= super::draw::MISSILE_LOOK_LEVEL).map(|(c, _, _)| *c).collect();
+                for c in conns {
+                    self.ui_line(c, &line);
+                }
+            }
             Event::MarkGone { id } => {
                 if let Some(g) = self.area_looks.remove(&id) {
                     self.broadcast(&packets::destroy_object(g));
+                }
+                if self.ropes.remove(&id) {
+                    self.broadcast(&packets::destroy_object(super::draw::rope_guid(id)));
                 }
                 self.mark_at.remove(&id);
                 let conns: Vec<(ConnId, u8)> = self.in_world().filter(|(_, _, w)| w.addon && w.level >= 5).map(|(c, _, w)| (*c, w.level)).collect();
@@ -776,6 +993,7 @@ impl SurvivalGame {
             Event::Siege { player } => {
                 self.siege_dirty.insert(player);
             }
+            Event::Duel { a, b, news } => self.duel_news(a, b, news),
             Event::CastDone { caster, spell } => {
                 // Its look ends too: the precast (a glow in the hands) stays on a caster standing
                 // still until a GO of that same spell or a failure, and what goes is often
@@ -796,6 +1014,17 @@ impl SurvivalGame {
                 self.casting.remove(&caster);
                 if let (Some(c), true) = (self.guid_of(caster), spell != 0) {
                     self.broadcast(&packets::spell_go(c, spell, Aim::Caster, &[], None));
+                }
+            }
+            Event::Beat { player, beat, on } => {
+                // The hero's own screen alone (what everyone sees and hears went as its own
+                // looks and sounds): nothing is forced on anyone else's view.
+                let g = on.and_then(|u| self.guid_of(u)).unwrap_or(0);
+                if let Some(c) = self.conn_of(player).filter(|c| self.has_addon(*c)) {
+                    // Kill Shot's weight goes as `BT`; an outcome's beat (`cues::BEAT_*`) as `CU`, where the
+                    // add-on plays its hit-stop, shake and kick.
+                    let line = if beat.starts_with("kill_shot") { "BT" } else { "CU" };
+                    self.ui_line(c, &format!("{line}\t{}\t{g:#X}", clean(&beat)));
                 }
             }
             Event::Auras { id } => self.show_auras(id),
@@ -859,7 +1088,7 @@ impl SurvivalGame {
             }
             // The add-on's Valor line follows on the next flush.
             Event::Valor { .. } => {}
-            Event::Clip { id, clip, take, from, secs, at } => {
+            Event::Clip { id, clip, take, from, secs, at, body } => {
                 // A cast (a throw, a spell), for the clients that play clips: the caster's own
                 // marked as theirs. The impact where the event says, else half way.
                 let Some(g) = self.guid_of(id) else { return };
@@ -868,7 +1097,7 @@ impl SurvivalGame {
                 let conns: Vec<ConnId> = self.in_world().filter(|(_, _, w)| w.anim).map(|(c, _, _)| *c).collect();
                 for c in conns {
                     let own = u8::from(Some(c) == mine);
-                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}", secs - impact, from.as_deref().unwrap_or(""));
+                    let line = format!("AN\t{g:#X}\t{clip}\t{impact:.3}\t-\t0\t{own}\t{take}\t{:.3}\t0\tcast\t0\t{}\t{}", secs - impact, from.as_deref().unwrap_or(""), body.word());
                     self.ui_line(c, &line);
                 }
             }
@@ -938,10 +1167,21 @@ impl SurvivalGame {
             Event::Healed { id, amount } => {
                 *self.healed.entry(id).or_default() += amount;
             }
-            Event::HealedOther { healer, target, amount } => {
-                // `HO\t<name>\t<amount>`: the healer sees what they mended on a friend.
-                let name = self.sim.players.get(&target).map(|p| p.name.clone()).unwrap_or_default();
-                if let Some(c) = self.conn_of(healer).filter(|c| self.has_addon(*c)) {
+            Event::HealedOther { healer, target, amount, critical } => {
+                // The healer sees what they mended on a friend (a hero or an allied creature):
+                // from `ac28` a green number over the friend's head, as WoW floats it (`SMSG_SPELLHEALLOG`, spell 0 as the mend
+                // has no 1.12 spell; patch 0060); on an older client the add-on's `HO` line,
+                // `<amount> <name>` rising mid-screen.
+                let Some(c) = self.conn_of(healer) else { return };
+                if self.world_of(c).is_some_and(|w| w.level >= HEAL_FLOAT_LEVEL) {
+                    if let (Some(t), Some(h)) = (self.guid_of(target), self.guid_of(healer)) {
+                        self.send(c, packets::spell_heal(t, h, 0, amount, critical));
+                    }
+                } else if self.has_addon(c) {
+                    let name = match self.sim.players.get(&target) {
+                        Some(p) => p.name.clone(),
+                        None => self.sim.mobs.get(&target).map(|m| self.sim.content.mobs[m.def].name.clone()).unwrap_or_default(),
+                    };
                     self.ui_line(c, &format!("HO\t{name}\t{amount}"));
                 }
             }
@@ -976,9 +1216,31 @@ impl SurvivalGame {
     /// The pose a hero's raised guard shows.
     pub(crate) fn guard_pose(&self, player: Id) -> u32 {
         match self.sim.players.get(&player) {
+            Some(p) if self.sim.guard_of(p).ward => POSE_WARD,
             Some(p) if self.sim.weapon_of(p).two_handed => POSE_TWO_HANDED,
             _ => POSE_SHIELD,
         }
+    }
+}
+
+/// The school a skill check is drawn in: from its look (a fire, frost or arcane spell; a Priest's
+/// holy or shadow one, never the Mage's arcane: Corey saw the arcane ring on Greater Smite), else
+/// arcane (a mage's).
+fn check_school(d: &htl_survival::content::AbilityDef) -> &'static str {
+    let k = d.key.as_str();
+    let priest = d.school == "priest" || ["smite", "shadow_burst", "shadow_bolt", "gust", "tether"].iter().any(|w| k.contains(w));
+    if priest {
+        if ["shadow", "mind", "void", "tether", "fade", "death"].iter().any(|w| k.contains(w)) {
+            "shadow"
+        } else {
+            "holy"
+        }
+    } else if k.contains("fire") || k.contains("pyro") || k.contains("meteor") || k.contains("ember") || k.contains("flame") {
+        "fire"
+    } else if k.contains("frost") || k.contains("cold") || k.contains("ice") || k.contains("rime") || k.contains("orb") && !k.contains("arcane") {
+        "frost"
+    } else {
+        "arcane"
     }
 }
 

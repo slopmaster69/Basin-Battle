@@ -133,13 +133,17 @@ fn a_longer_charge_lands_harder_and_a_capstone_waits_for_its_whole_charge() {
     ev.extend(run(&mut s, 1.0));
     let late = hits_on(&ev, k)[0].0;
     assert!(late > early, "{early} then {late}");
-    // Pyroblast (Fireball's EX) let go before its 1.5 s is lost.
+    // Pyroblast (Fireball's EX) let go before its 1.5 s fizzles: all or nothing, its Valor
+    // wasted (Corey, Nov 5).
     slot(&mut s, p, "ranged", "fireball");
     s.set_valor(p, 100.0);
-    cast(&mut s, p, "ranged", true, 1.0);
+    let mut ev = cast(&mut s, p, "ranged", true, 1.0);
+    ev.extend(s.step(0.0));
     assert!(s.players[&p].last_cast.is_none_or(|(a, _)| s.content.abilities[a].key != "pyroblast"), "never cast");
     assert_eq!(s.players[&p].action, Action::Ready, "dropped");
-    assert_eq!(s.players[&p].valor, 100.0, "and nothing spent");
+    assert!(ev.iter().any(|e| matches!(e, Event::CheckResult { grade: "fizzle", .. })), "it fizzles");
+    let pyro = s.content.ability("pyroblast").unwrap();
+    assert_eq!(s.players[&p].valor, 100.0 - s.valor_cost(&s.content.abilities[pyro].clone()), "and its Valor is spent");
 }
 
 #[test]
@@ -361,26 +365,6 @@ fn a_charge_cannot_be_struck_on_the_way_and_staggers_what_it_meets() {
 }
 
 #[test]
-fn cone_of_cold_freezes_what_is_already_slowed() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    slot(&mut s, p, "close", "cone_of_cold");
-    s.set_cooldowns(p, true);
-    let k = mob(&mut s, "grunt", [6.0, 0.5, 0.0]);
-    cast(&mut s, p, "close", false, 0.0);
-    assert!(s.has_cc(k, "snare") && !s.has_cc(k, "petrify"));
-    run(&mut s, 0.5);
-    calm(&mut s, k);
-    s.mobs.get_mut(&k).unwrap().pos = [6.0, 0.5, 0.0];
-    cast(&mut s, p, "close", false, 0.0);
-    assert!(s.has_cc(k, "petrify"), "frozen");
-    // The ice takes the next blows first.
-    let hp = s.mobs[&k].health;
-    s.hurt_mob(k, p, 10);
-    assert_eq!(s.mobs[&k].health, hp, "the ice took it");
-}
-
-#[test]
 fn fire_ward_sends_a_projectile_back_and_ice_block_lets_nothing_in() {
     let mut s = pvp();
     let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -575,7 +559,8 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     let meteor = s.content.ability("meteor").unwrap();
     let d = s.content.abilities[meteor].clone();
     assert!(d.look_lead > 0.0 && d.look_lead < d.delay);
-    let mut ev = cast(&mut s, p, "ultimate", false, 0.0);
+    // (Meteor is held now: let go once it can go, and it's called from the release.)
+    let mut ev = cast(&mut s, p, "ultimate", false, d.charge[0] + 0.1);
     let start = s.clock;
     let mut look_at = None;
     let mut looks = 0;
@@ -594,6 +579,77 @@ fn meteors_look_starts_coming_down_before_it_lands_so_its_blow_lands_with_it() {
     assert!((t - want).abs() < 0.1, "shown {t:.2} s in, {want:.2} wanted");
 }
 
+/// `.es dummy clear`, which the visual check runs before it puts up its one dummy.
+#[test]
+fn clearing_the_dummies_takes_every_dummy_and_nothing_else() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.spawn_dummy(p, "").unwrap();
+    s.spawn_dummy(p, "guard").unwrap();
+    let boar = s.content.mob("boar").unwrap();
+    let boar = s.spawn_mob(boar, [20.0, 0.0, 0.0], None, false);
+    let _ = s.step(DT);
+    let dummies = |s: &Survival| s.mobs.values().filter(|m| s.content.mobs[m.def].dummy).count();
+    assert_eq!(dummies(&s), 2);
+    assert_eq!(s.clear_dummies(), 2);
+    let ev = s.step(DT);
+    assert_eq!(dummies(&s), 0, "every dummy is gone");
+    assert!(s.dummies.is_empty(), "and its mode with it");
+    assert!(s.mobs.contains_key(&boar), "the boar stays");
+    assert!(!ev.iter().any(|e| matches!(e, Event::MobGone { id } if *id == boar)));
+    assert_eq!(s.clear_dummies(), 0, "again, nothing to clear");
+}
+
+/// `.es dummy 3`: a dummy that near (the visual check's melee scenarios), the mode after it.
+#[test]
+fn a_dummy_can_be_put_up_nearer_or_farther() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_dummy(p, "3 guard").unwrap();
+    let (d, m) = s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].dummy).expect("a dummy");
+    assert!((m.pos[0] - 3.0).abs() < 0.1, "3 yd ahead: {:?}", m.pos);
+    assert_eq!(s.dummies.get(d).map(|x| x.as_str()), Some("guard"));
+}
+
+/// `.es hop`: the visual check's jump, so an ability can be tried mid-jump.
+#[test]
+fn a_test_hop_throws_the_hero_up_where_they_stand() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.test_hop(p, 1.6);
+    let ev = s.step(DT);
+    assert!(ev.iter().any(|e| matches!(e, Event::Hop { player, lift, speed, .. } if *player == p && (*lift - 1.6).abs() < 1.0e-4 && *speed < 0.5)), "up, in place: {ev:?}");
+}
+
+/// `.es target`: a real creature to look at, standing still (or coming at you), at some health.
+#[test]
+fn a_still_target_stands_and_strikes_nothing_but_is_moved_like_any_creature() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_target(p, "grunt", 3.0, true, false, 0.2).unwrap();
+    let t = *s.targets.keys().next().expect("a target");
+    let from = s.mobs[&t].pos;
+    assert!((from[0] - 3.0).abs() < 0.1, "3 yd ahead: {from:?}");
+    assert!(angle_between(s.mobs[&t].facing, std::f32::consts::PI) < 1.0, "facing the hero: {}", s.mobs[&t].facing);
+    assert!(s.mobs[&t].health * 5 <= s.mobs[&t].max_health + 5, "a fifth of its health: {}", s.mobs[&t].health);
+    let hp = s.players[&p].health;
+    for _ in 0..60 {
+        let _ = s.step(0.05);
+    }
+    assert_eq!(s.mobs[&t].pos, from, "it stood still");
+    assert_eq!(s.players[&p].health, hp, "and struck nothing");
+    // A knockback throws it as far as any creature (it isn't a dummy).
+    let push = crate::content::AbilityEffect { kind: "knockback".into(), amount: 6.0, from_caster: true, ..Default::default() };
+    s.displace(p, t, &push);
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    let moved = ((s.mobs[&t].pos[0] - from[0]).powi(2) + (s.mobs[&t].pos[1] - from[1]).powi(2)).sqrt();
+    assert!(moved > 3.0, "thrown: {moved:.2}");
+    assert_eq!(s.clear_targets(), 1);
+    assert!(!s.mobs.contains_key(&t));
+}
+
 /// A creature's own look (`aura` on its `[[mob]]`: a spirit beast's glow) is on it from the start.
 #[test]
 fn a_creature_wears_its_own_look_from_the_start() {
@@ -604,6 +660,25 @@ fn a_creature_wears_its_own_look_from_the_start() {
     let ev = s.step(0.0);
     assert!(s.auras_of(m).contains(&27827), "its look: {:?}", s.auras_of(m));
     assert!(ev.iter().any(|e| matches!(e, Event::Auras { id } if *id == m)), "shown as it comes");
+}
+
+/// `.es target <creature> <yards> still away`: it stands with its back to the hero (a shot or a
+/// blow into its back), and keeps it turned until something turns it.
+#[test]
+fn a_target_put_up_away_stands_with_its_back_to_the_hero() {
+    let mut s = world();
+    let p = hero(&mut s, "Practiser", [0.0, 0.0, 0.0], 0.0);
+    s.spawn_target(p, "grunt", 8.0, true, true, 1.0).unwrap();
+    let t = *s.targets.keys().next().expect("a target");
+    assert!((s.mobs[&t].pos[0] - 8.0).abs() < 0.1, "8 yd ahead: {:?}", s.mobs[&t].pos);
+    assert!(angle_between(s.mobs[&t].facing, 0.0) < 1.0, "its back to the hero: {}", s.mobs[&t].facing);
+    for _ in 0..40 {
+        let _ = s.step(0.05);
+    }
+    assert!(angle_between(s.mobs[&t].facing, 0.0) < 1.0, "and still turned away: {}", s.mobs[&t].facing);
+    // A blow in its back from where the hero stands counts as from behind.
+    assert!(angle_between(s.mobs[&t].facing, facing(s.mobs[&t].pos, s.players[&p].pos)) > 120.0);
+    s.clear_targets();
 }
 
 /// A training dummy is there to practice on: crowd control takes hold on it and a knockback
