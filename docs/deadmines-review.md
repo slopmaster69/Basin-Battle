@@ -193,13 +193,39 @@ lab before and after, then played.
   first; if it doesn't read, the ring gets the drawn red circle under the Heated Ground
   (`mark_as` as well as `mark_ground`).
 
-### Open questions for Corey
+### Corey's answers (Nov 7)
 
-- Did any fall feel like a one-shot or a burst, or were they all the slow wear the log shows?
-- Could you see Cookie's pot rings on the sand? Did the ladle read as a heavy blow?
-- Did you hear the pirates wind up at all?
-- Markers off is the test the tells have to pass; do you want them off by default once the tells
-  pass it, or on by default with a Controls card switch (as now)?
+- **No fall was a one-shot.** "A shitshow of enemies rushing you, both doing the same animation
+  in different frames. They rush you as fast as possible and begin swinging while the caster is
+  free-casting in the back." The right play is the caster first, but the two pirates swing so
+  quick and so together that there's no gap to go for it.
+- **Cookie's pot rings could not be seen on the sand.** His animations were the easiest in the
+  dungeon to read for a parry or a dodge, and still hard; and **his hits don't line up with his
+  swings**, "that's most of them": the blow lands on a different frame than the blade.
+- **No wind-up could be heard**, and "almost NONE of the spells you made originally have ANY
+  sound at all, makes for a very lame experience."
+- **Markers off is the goal**: a game telegraphed well enough that you dodge, block and parry
+  without them.
+
+What that adds to the proposals above:
+
+- **The approach reads.** Pirates run at 7.5 (the hero at 7.0) from 14 yards and swing on
+  arrival. A foot soldier should come in at a jog, stop at reach for a beat (the souls games'
+  "arrive, then wind up"), and only then start its first string; the lunge is the exception, and
+  it has the 0.8 s tell.
+- **Two never swing on the same beat.** With two pressing one hero (`MAX_ATTACKERS`), the second
+  waits until the first's string lands before it starts its own (`sim/mobs.rs`, the turn rule),
+  so the hero answers one blow at a time and the "same animation in different frames" goes.
+- **The blow lands on the blade's frame.** Measured in the lab: a pirate's slash and Cookie's
+  cleaver filmed with `blow`, the frame the weapon connects read against the trace's `Swing`
+  time. Any gap over 0.1 s is a client bug (patch 0006's coil-and-snap) or a wrong clip, and is
+  fixed before any tuning is judged, since every parry is learned against it.
+- **The pot ring is a bug.** Heated Ground does not read on the beach: the drawn red ring under
+  every lob (`mark_as` as well as `mark_ground`), always.
+- **Sound is its own track.** Every creature wind-up gets a sound (the weapon's swish, a grunt,
+  the cast's own), played with the clip, and every ability a cast and an impact sound; there are
+  none today (`content/survival.toml` has no ability sound fields at all). Souls telegraphs a blow
+  from behind by its sound first.
 
 ## Mend first
 
@@ -207,7 +233,13 @@ Broken or unverified things from the Nov 6 session that are fixes, not features,
 the next encounter's tuning is judged (a tuning judged against a broken hero is wrong twice):
 
 - **Bladestorm did no damage** (3 casts in the log). Reproduce in the lab against a pack.
-- **The combat meter kept resetting and lost damage.** Reproduce with two heroes.
+- **The combat meter kept resetting and lost damage.** A likely cause is by design: the Fight
+  tab shows "the fight you're in or were last in", and a fight ends after a lull of
+  `player.combat_secs` (5 s) with no blow dealt or taken (`sim/meter.rs`). Five seconds of
+  dodging pots, or walking to the caster, starts a new fight and the tab starts over. Confirm
+  with two heroes, then: a fight lasts while any foe is still on you, and the lull is longer.
+- **No ability has a sound** (no sound fields exist on `[[ability]]`), and no creature wind-up
+  does: see encounter 1's sound track.
 - **Fireball and Meteor did almost nothing** (58 and 7 casts): read their damage against a
   176-health pirate in the lab and against Corey's account of it.
 - **"Priest just didn't work."** 23 Mind Blasts, 7 Fades, 3 Shields, 2 Penances, 1 Salvation,
