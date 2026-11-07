@@ -99,3 +99,24 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
 | #242 | Wind-up voices | playtest |
 | #243 | Rings always drawn under ground looks | playtest |
 | bestiary | `blow:<string>` and `bestiary dm_*` in the lab | main (tooling) |
+
+## Nov 7, before dawn
+
+- **The repository's rule changed** (#231, merged on the owner account): a pull request never
+  waits for someone to play it; once its checks pass it goes ready with auto-merge, `main` is
+  where it's played, and what nobody has seen in the client carries `needs playtest`. Bladestorm
+  (#233) merged that way. My gameplay PRs are ready and labelled; `claude/playtest` and the
+  playtest folder are only a convenience until they're on `main`.
+- **Filmed on the playtest build** (patch 0060 in the client): a pirate's cutlass now travels from
+  raised to through the hero over about 100 ms (three frames at 20 a second), where it stood
+  still and then was there; Cookie's cleaver the same. After the blow the arm goes straight
+  back and the last pose holds through the recovery: no slow second swing. The sparks still come
+  about 0.1 s after the health drops. The pirate's shout plays with its wind-up (`Sound 1295`).
+  Bladestorm spins on the key alone, 33 strikes on three pirates.
+- **Crowded casters' rings flew as bolts** (#245): 25 strings in 9 dungeons were missing
+  `ranged = false` and fired an unblockable point-blank missile instead of a ring at the
+  caster's feet. A content check now fails on any.
+- **Encounter 2** (`claude/scaffold-lessons`): the scaffold Wizard stands with the Squallshaper,
+  not beside the first pirates; the Crossbowman notices at 24 yd and its bolt is 30, not 40.
+- **Merging**: `gh pr merge` from here is denied by the permission settings, so ready PRs wait for
+  the owner account's merge.
