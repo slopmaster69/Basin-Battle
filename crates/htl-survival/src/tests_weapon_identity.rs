@@ -130,3 +130,72 @@ fn the_executioners_axe_hits_twice_as_hard_on_a_foe_near_its_end() {
     let w = s.content.weapon("warlord_axe").unwrap();
     assert!(near as f32 >= w.damage[0] as f32 * 2.0 - 1.0, "near its end: {near} (fresh {full})");
 }
+
+// --- the off hand -----------------------------------------------------------------------------------
+
+#[test]
+fn with_two_blades_the_right_click_swings_the_off_hand_instead_of_guarding() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "sword");
+    s.players.get_mut(&p).unwrap().off_weapon = s.content.item("axe");
+    let m = foe(&mut s, "dm_woodcutter");
+    s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+    s.input(p, Input::Guard);
+    assert!(matches!(&s.players[&p].action, Action::Swing { strike, .. } if strike.kind == StrikeKind::Off), "an off-hand blow: {:?}", s.players[&p].action);
+    let mut ev = Vec::new();
+    for _ in 0..40 {
+        ev.extend(s.step(0.02));
+    }
+    assert!(hits_on(&ev, m).iter().any(|(d, o)| *o == Outcome::Hit && *d > 0), "it lands");
+    assert!(!matches!(s.players[&p].action, Action::Guard), "and no guard comes up");
+}
+
+#[test]
+fn left_and_right_alternating_four_times_ends_in_a_finisher() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "sword");
+    s.players.get_mut(&p).unwrap().off_weapon = s.content.item("sword");
+    let m = foe(&mut s, "dm_woodcutter");
+    s.mobs.get_mut(&m).unwrap().health = 100_000;
+    s.mobs.get_mut(&m).unwrap().max_health = 100_000;
+    let mut damage = Vec::new();
+    for k in 0..4 {
+        s.players.get_mut(&p).unwrap().stamina = 100.0;
+        s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+        s.input(p, if k % 2 == 0 { Input::Attack } else { Input::Guard });
+        let mut ev = Vec::new();
+        // Each blow pressed again late in the last one's recovery, as a run is.
+        for _ in 0..60 {
+            ev.extend(s.step(0.02));
+            if matches!(&s.players[&p].action, Action::Swing { t, strike, .. } if *t >= strike.windup + strike.active + strike.recovery * 0.75) {
+                break;
+            }
+        }
+        damage.push(hits_on(&ev, m).iter().map(|h| h.0).max().unwrap_or(0));
+    }
+    let w = s.content.weapon("sword").unwrap();
+    assert!(damage[..3].iter().all(|d| *d > 0), "each blow lands: {damage:?}");
+    assert!(damage[3] as f32 > w.damage[1] as f32 * 1.5, "the fourth, both blades, hits far harder: {damage:?}");
+}
+
+#[test]
+fn a_weapon_alone_guards_with_its_blade_and_parries_wider() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "sword");
+    let shielded = s.guard_of(&s.players[&p]).key.clone();
+    s.players.get_mut(&p).unwrap().off_empty = true;
+    assert_eq!(s.guard_of(&s.players[&p]).key, crate::sim::ONE_HAND_GUARD, "its own blade (was {shielded})");
+    assert!(s.one_hand_alone(&s.players[&p]));
+}
+
+#[test]
+fn a_save_keeps_the_off_hand() {
+    let (mut s, p) = world();
+    wield(&mut s, p, "sword");
+    s.players.get_mut(&p).unwrap().off_weapon = s.content.item("axe");
+    let saved = crate::save::save_player(&s.content, &s.players[&p]);
+    assert_eq!(saved.off_hand, "axe");
+    let (mut t, _) = world();
+    let q = t.join("bren", "Bren", Some(&saved));
+    assert_eq!(t.players[&q].off_weapon, t.content.item("axe"), "the axe is back in the off hand");
+}
