@@ -907,7 +907,8 @@ respawn = 0.0
   weight = 2.0
   below = 0.5
   max_range = 26.0
-  steps = [ { clip = 55, take = 0, ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.3 } ]
+  # Its follow-ups wind up 0.6 s: at its quickest pace, quicker left no time to dodge the next after dodging one.
+  steps = [ { clip = 55, take = 0, ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.6, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.6, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.3 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.85
@@ -1053,7 +1054,8 @@ respawn = 0.0
   weight = 2.0
   below = 0.5
   max_range = 26.0
-  steps = [ { clip = 55, take = 0, ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.45, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.2 } ]
+  # Its follow-ups wind up 0.6 s: at its quickest pace, quicker left no time to dodge the next after dodging one.
+  steps = [ { clip = 55, take = 0, ranged = true, windup = 0.9, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 0.1 }, { ranged = true, windup = 0.6, damage = 18, range = 26.0, radius = 3.0, speed = 26.0, spell = 403, look = 10604, blockable = false, recovery = 1.2 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.85

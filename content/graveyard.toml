@@ -823,7 +823,8 @@ then_look = 10604
   weight = 2.0
   below = 0.4
   max_range = 26.0
-  steps = [ { clip = 53, take = 0, ranged = true, windup = 0.9, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.5, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 1.4 } ]
+  # Its follow-ups wind up 0.55 s: at its quickest pace, quicker left no time to dodge the next after dodging one.
+  steps = [ { clip = 53, take = 0, ranged = true, windup = 0.9, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.55, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 0.15 }, { ranged = true, windup = 0.55, damage = 22, range = 26.0, radius = 3.5, speed = 16.0, spell = 133, look = 10604, blockable = false, recovery = 1.4 } ]
   [[mob.phase]]
   at = 0.66
   speed = 0.88
