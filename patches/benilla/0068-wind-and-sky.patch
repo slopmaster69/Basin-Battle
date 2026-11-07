@@ -1,0 +1,3426 @@
+From dde844a78ffb63c8a9429466ac2830b6deb62ba0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 14:22:51 -0700
+Subject: [PATCH] Wind and a painted sky under the new look: swaying trees and
+ grass, drifting clouds
+
+The world never stands still now, as WoW Forever's doesn't. One wind
+blows for the whole world, the same for every hero: a fixed function of
+the server's clock (a steady prevailing push and three slowly turning
+parts, so it drifts over hours), a breeze rolled per server day, calmer
+at night, wilder in a storm, with soft gust fronts crossing the ground
+downwind so neighbouring trees bend one after another. In the vertex
+stage the trees and bushes (doodads whose model names a plant) lean and
+sway with height above their base, each on its own phase, the trunk
+still and the leaves fluttering a little; the ground clutter bends from
+its roots in a ripple running downwind; the shadow pass sways them too.
+Models that sway by their own bones are skinned and left alone.
+
+The sky is painted: one layer over 1.12's dome, discs and stars, in its
+cloud dome's slot. Soft domain-warped clouds drift in the same wind,
+thin on a clear day and thicker as the day, the zone or a storm says,
+lit by the hour (pink at dawn, white at noon, gold underneath at golden
+hour, blue-grey at night) in soft painted bands with silver edges toward
+the sun, going into the haze at the horizon. The sun gets a warm halo
+on the god rays' own sun, the moon a pale one; the clouds cover the
+stars and the discs, and the cloud over the sun dims its glare, its
+rays and the water's glint. The water's mirror runs the same clouds, so
+the lakes reflect them.
+
+worldWind 0 and worldSky 0 turn each off on its own; lookwind
+<strength 0-3> [gust 0-3] | grade and looksky clouds <0-1> | grade hold
+them for film; worldLook 0 is 1.12 untouched.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/cvars/mod.rs           |  27 +
+ crates/benilla-app/src/cvars/table.rs         |  19 +
+ crates/benilla-app/src/video.rs               |  27 +-
+ crates/benilla-app/src/world_console.rs       | 144 +++
+ crates/benilla-assets/src/shaders/liquid.wgsl | 126 ++-
+ .../benilla-assets/src/shaders/wow_model.wgsl | 111 ++-
+ crates/benilla-world/src/clouds/layer.rs      |  21 +-
+ crates/benilla-world/src/clouds/mod.rs        |   1 +
+ crates/benilla-world/src/clutter.rs           |  16 +-
+ .../src/lighting/global_light.rs              |  11 +-
+ crates/benilla-world/src/lighting/mod.rs      |   8 +
+ crates/benilla-world/src/look/mod.rs          |  43 +-
+ crates/benilla-world/src/look/pass.rs         |   4 +
+ crates/benilla-world/src/look/sky.rs          | 864 ++++++++++++++++++
+ crates/benilla-world/src/look/water.rs        |  64 +-
+ crates/benilla-world/src/look/wind.rs         | 622 +++++++++++++
+ crates/benilla-world/src/model_render.rs      | 105 ++-
+ crates/benilla-world/src/shaders.rs           |   3 +-
+ .../benilla-world/src/shaders/look_sky.wgsl   | 122 +++
+ .../benilla-world/src/shaders/static_gx.wgsl  | 106 ++-
+ .../src/shaders/world_shadow.wgsl             | 103 ++-
+ crates/benilla-world/src/sky.rs               |   5 +-
+ crates/benilla-world/src/sky_order.rs         |  10 +
+ crates/benilla-world/src/static_gx/bake.rs    |   1 +
+ crates/benilla-world/src/static_gx/mod.rs     |   9 +
+ crates/benilla-world/src/static_gx/render.rs  |  19 +-
+ crates/benilla-world/src/sun/follow.rs        |   8 +-
+ .../src/terrain_stream/spawn/assemble.rs      |  12 +-
+ 28 files changed, 2548 insertions(+), 63 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/sky.rs
+ create mode 100644 crates/benilla-world/src/look/wind.rs
+ create mode 100644 crates/benilla-world/src/shaders/look_sky.wgsl
+
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index 70ea2ee..bf8a264 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1676,6 +1676,31 @@ mod tests {
+         assert!(res::<LookWater>(&app).on);
+     }
+ 
++    /// `worldWind` and `worldSky` (benilla's own) turn the new look's wind and its painted sky off
++    /// and on, each by itself, registered "1" to match `LookWind`'s and `LookSky`'s defaults.
++    #[test]
++    fn world_wind_and_world_sky_switch_alone() {
++        use benilla_world::look::{LookSky, LookWind, WorldLook};
++        let mut app = cvar_app();
++        assert!(
++            res::<LookWind>(&app).on && res::<LookSky>(&app).on,
++            "registered \"1\""
++        );
++        assert_eq!(apply(&mut app, "worldWind", "0"), SetOutcome::Changed);
++        assert!(!res::<LookWind>(&app).on);
++        assert!(res::<LookSky>(&app).on, "the sky stays");
++        assert_eq!(apply(&mut app, "worldSky", "0"), SetOutcome::Changed);
++        assert!(!res::<LookSky>(&app).on);
++        assert_eq!(
++            *res::<WorldLook>(&app),
++            WorldLook::NEW,
++            "the rest of the look stays"
++        );
++        apply(&mut app, "worldWind", "1");
++        apply(&mut app, "worldSky", "1");
++        assert!(res::<LookWind>(&app).on && res::<LookSky>(&app).on);
++    }
++
+     /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
+     #[test]
+     fn the_ffx_switches_reach_the_pass() {
+@@ -2796,6 +2821,8 @@ mod tests {
+             .init_resource::<benilla_world::look::LookAo>()
+             .init_resource::<benilla_world::look::LookShadows>()
+             .init_resource::<benilla_world::look::LookWater>()
++            .init_resource::<benilla_world::look::LookWind>()
++            .init_resource::<benilla_world::look::LookSky>()
+             // Literal, not Default: RenderScale::default() reads $WOW_RENDER_SCALE.
+             .insert_resource(RenderScale(1.0))
+             // Literal: `Realmlist::default()` reads `$WOW_HOST`.
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index 374e516..51803fb 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -873,6 +873,25 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — 1.12's water is a tinted sheet; this turns the new look's water \
+          (reflections, clear shallows, glint and foam) off on its own, for a slower GPU",
+     ),
++    // benilla's own: the new look's wind (trees, bushes and grass sway; gusts cross the ground),
++    // "0" for 1.12's still world under the rest of the new look. The knob is
++    // `benilla_world::look::LookWind::on`, set by `video::on_cvar`; inert under `worldLook 0`.
++    ours(
++        "worldWind",
++        "1",
++        "benilla's own — 1.12's trees stand still but for a few of their own; this turns the new \
++         look's wind (trees, bushes and grass swaying, gusts) off on its own",
++    ),
++    // benilla's own: the new look's painted sky (drifting clouds lit by the hour, the sun's and
++    // the moon's halos, the clouds in the water), "0" for 1.12's sky under the rest of the new
++    // look. The knob is `benilla_world::look::LookSky::on`, set by `video::on_cvar`; inert under
++    // `worldLook 0`.
++    ours(
++        "worldSky",
++        "1",
++        "benilla's own — 1.12's sky is a gradient with its own clouds; this turns the new look's \
++         painted sky (drifting clouds, the sun's and the moon's halos) off on its own",
++    ),
+     // benilla's own: `/console fpsJournal 1` appends a per-second row of position, frame cost and
+     // per-pass GPU time to `benilla-config/Diagnostics/fps-journal.csv`. The knob is
+     // [`crate::perf::FpsJournalSetting`].
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index 2c855a6..4bdb888 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -317,6 +317,8 @@ type LookSwitches<'w> = (
+     Option<ResMut<'w, benilla_world::look::LookAo>>,
+     Option<ResMut<'w, benilla_world::look::LookShadows>>,
+     Option<ResMut<'w, benilla_world::look::LookWater>>,
++    Option<ResMut<'w, benilla_world::look::LookWind>>,
++    Option<ResMut<'w, benilla_world::look::LookSky>>,
+ );
+ 
+ /// The change callbacks of the reference's video-options registration block (`0x688470`); each
+@@ -335,8 +337,9 @@ pub(crate) fn on_cvar(
+     mut ffx: ResMut<benilla_world::ffx_glow::FfxSwitches>,
+     mut widescreen: ResMut<Widescreen>,
+     mut look: ResMut<benilla_world::look::WorldLook>,
+-    // The new look's own switches: its contact shadows, its sun shadows and its water.
+-    (ao, shadows, water): LookSwitches,
++    // The new look's own switches: its contact shadows, its sun shadows, its water, its wind and
++    // its sky.
++    (ao, shadows, water, wind, sky): LookSwitches,
+     mut cvars: ResMut<crate::cvars::Cvars>,
+ ) {
+     use benilla_world::view::{FARCLIP_RANGE, MSAA_RANGE};
+@@ -384,6 +387,26 @@ pub(crate) fn on_cvar(
+                 );
+             }
+         }
++        // benilla's own: the new look's wind on its own, read every frame.
++        "worldwind" => {
++            if let Some(mut wind) = wind {
++                wind.on = ev.flag();
++                info!(
++                    "video: the new look's wind {}",
++                    if wind.on { "on" } else { "off" }
++                );
++            }
++        }
++        // benilla's own: the new look's painted sky on its own, read every frame.
++        "worldsky" => {
++            if let Some(mut sky) = sky {
++                sky.on = ev.flag();
++                info!(
++                    "video: the new look's sky {}",
++                    if sky.on { "on" } else { "off" }
++                );
++            }
++        }
+         // benilla's own: the new look's water on its own, read every frame.
+         "worldwater" => {
+             if let Some(mut water) = water {
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 050bf71..d37bafa 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -123,6 +123,15 @@ impl Plugin for WorldConsolePlugin {
+             Some("<reflect 0-2> [clarity 0-2] | grade"),
+             look_water,
+         );
++        // benilla's own: the new look's wind held for tuning on film.
++        app.console_command(
++            "lookwind",
++            GRAPHICS,
++            Some("<strength 0-3> [gust 0-3] | grade"),
++            look_wind,
++        );
++        // benilla's own: the new look's painted sky held for tuning on film.
++        app.console_command("looksky", GRAPHICS, Some("clouds <0-1> | grade"), look_sky);
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -410,6 +419,66 @@ fn look_water(world: &mut World, args: &str) -> Vec<String> {
+     lines
+ }
+ 
++/// `lookwind <strength> [gust]`, benilla's own (1.12 has no such command): holds the new look's
++/// wind (`benilla_world::look::wind`) for tuning on film: its strength at a multiple of the
++/// world's own, 0 to 3 (0 still, 1 the world's, 3 three times it), and optionally its gusts, 0 to
++/// 3; `lookwind grade`, or no argument, lets go. `worldWind 0` and the classic look (`worldLook 0`)
++/// keep 1.12's still world either way.
++fn look_wind(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::{LookWind, WorldLook};
++    let Some((strength, gust)) = LookWind::parse(args) else {
++        return vec!["Usage: lookwind <strength 0-3> [gust 0-3] | grade".to_string()];
++    };
++    let on = {
++        let mut wind = world.get_resource_or_init::<LookWind>();
++        wind.strength = strength;
++        wind.gust = gust;
++        wind.on
++    };
++    let mut lines = vec![match (strength, gust) {
++        (None, _) => "Wind follows the world's.".to_string(),
++        (Some(s), None) => format!("Wind held at {s} times the world's."),
++        (Some(s), Some(g)) => {
++            format!("Wind held at {s} times the world's, its gusts at {g} times.")
++        }
++    }];
++    if !on {
++        lines.push("worldWind is 0: the world stands still.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has no wind.".to_string());
++    }
++    lines
++}
++
++/// `looksky clouds <cover>`, benilla's own (1.12 has no such command): holds the new look's
++/// painted sky (`benilla_world::look::sky`) at a cloud cover from 0 (none) to 1 (overcast), what
++/// the day and the weather say notwithstanding, for tuning on film (the server sends no weather
++/// yet); `looksky grade`, or no argument, lets go. `worldSky 0` and the classic look (`worldLook
++/// 0`) have 1.12's sky either way.
++fn look_sky(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::{LookSky, WorldLook};
++    let Some(clouds) = LookSky::parse(args) else {
++        return vec!["Usage: looksky clouds <0-1> | grade".to_string()];
++    };
++    let on = {
++        let mut sky = world.get_resource_or_init::<LookSky>();
++        sky.clouds = clouds;
++        sky.on
++    };
++    let mut lines = vec![match clouds {
++        None => "Sky follows the day and the weather.".to_string(),
++        Some(c) => format!("Cloud cover held at {c}."),
++    }];
++    if !on {
++        lines.push("worldSky is 0: 1.12's sky.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has 1.12's sky.".to_string());
++    }
++    lines
++}
++
+ /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
+ /// a clear one set with the second, each through `ConsoleWrite` in class 0.
+ fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
+@@ -964,6 +1033,81 @@ mod tests {
+         assert_eq!(lines[1], "worldWater is 0: 1.12's water.");
+     }
+ 
++    /// `lookwind`: a strength (and a gust) holds the wind, `grade` or nothing lets go, and anything
++    /// out of range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_wind_holds_and_lets_go() {
++        use benilla_world::look::{LookWind, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        let held = |app: &mut App| *app.world_mut().get_resource_or_init::<LookWind>();
++        assert_eq!(
++            run(&mut app, "lookwind 2"),
++            ["Wind held at 2 times the world's."]
++        );
++        assert_eq!(
++            run(&mut app, "lookwind 0 3"),
++            ["Wind held at 0 times the world's, its gusts at 3 times."]
++        );
++        assert_eq!(
++            (held(&mut app).strength, held(&mut app).gust),
++            (Some(0.0), Some(3.0))
++        );
++        assert_eq!(
++            run(&mut app, "lookwind 5"),
++            ["Usage: lookwind <strength 0-3> [gust 0-3] | grade"]
++        );
++        assert_eq!(
++            held(&mut app).strength,
++            Some(0.0),
++            "a bad value changes nothing"
++        );
++        assert_eq!(
++            run(&mut app, "lookwind grade"),
++            ["Wind follows the world's."]
++        );
++        assert_eq!(held(&mut app), LookWind::default());
++        app.world_mut().resource_mut::<LookWind>().on = false;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        let lines = run(&mut app, "lookwind 1");
++        assert_eq!(lines.len(), 3, "{lines:?}");
++        assert_eq!(lines[1], "worldWind is 0: the world stands still.");
++    }
++
++    /// `looksky`: `clouds <cover>` holds the cover, `grade` or nothing lets go, and anything out
++    /// of range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_sky_holds_and_lets_go() {
++        use benilla_world::look::{LookSky, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        let held = |app: &mut App| *app.world_mut().get_resource_or_init::<LookSky>();
++        assert_eq!(
++            run(&mut app, "looksky clouds 0.8"),
++            ["Cloud cover held at 0.8."]
++        );
++        assert_eq!(held(&mut app).clouds, Some(0.8));
++        assert_eq!(
++            run(&mut app, "looksky clouds 2"),
++            ["Usage: looksky clouds <0-1> | grade"]
++        );
++        assert_eq!(
++            held(&mut app).clouds,
++            Some(0.8),
++            "a bad value changes nothing"
++        );
++        assert_eq!(
++            run(&mut app, "looksky grade"),
++            ["Sky follows the day and the weather."]
++        );
++        assert_eq!(held(&mut app), LookSky::default());
++        app.world_mut().resource_mut::<LookSky>().on = false;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        let lines = run(&mut app, "looksky clouds 0");
++        assert_eq!(lines.len(), 3, "{lines:?}");
++        assert_eq!(lines[1], "worldSky is 0: 1.12's sky.");
++    }
++
+     /// The six toggles flip their bit and print the state they leave (`ConsoleWrite` class 0):
+     /// the five world-flag bits start set (`0x7100b73`, `0x66f6cb`), the simple-doodad word clear
+     /// (`0x66f714`). None reads its arguments.
+diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
+index 26b7783..abf81c2 100644
+--- a/crates/benilla-assets/src/shaders/liquid.wgsl
++++ b/crates/benilla-assets/src/shaders/liquid.wgsl
+@@ -75,18 +75,19 @@ struct WowLight {
+ 
+ // The new look's water (`look::water`): the sun-shadow map (`textureLoad` only), the scene copied
+ // under the water (gamma colour, sampled; device depth, by texel) and the water block
+-// (`look::water::pack_rows`, WATER_ROWS = 10; keep in sync):
++// (`look::water::pack_rows`, WATER_ROWS = 23; keep in sync):
+ //   0 [on, mirror, clarity (yd), foam] · 1 [glint body (camera to it), glint] ·
+ //   2 [glint colour (linear), sharpness] · 3 [sky zenith (linear), ripple slope] ·
+ //   4 [sky horizon (linear), ripple wavelength (yd)] · 5 [shallow (sRGB), tint weight] ·
+ //   6 [deep (sRGB), deep at (yd)] · 7 [march reach (yd), F0, foam depth (yd), shore soft (yd)] ·
+-//   8 [sky middle (linear), sheen] · 9 [classic ripples, shadow dim, ocean clarity (yd), 0].
++//   8 [sky middle (linear), sheen] · 9 [classic ripples, shadow dim, ocean clarity (yd), 0] ·
++//   10-22 the new look's painted sky (`look::sky::pack_rows`, `LookSkyRows`), all zero while off.
+ @group(#{MATERIAL_BIND_GROUP}) @binding(112) var shadow_map: texture_depth_2d_array;
+ @group(#{MATERIAL_BIND_GROUP}) @binding(113) var scene_tex: texture_2d<f32>;
+ @group(#{MATERIAL_BIND_GROUP}) @binding(114) var scene_samp: sampler;
+ @group(#{MATERIAL_BIND_GROUP}) @binding(115) var scene_depth: texture_2d<f32>;
+ struct WaterBlock {
+-    rows: array<vec4<f32>, 10>,
++    rows: array<vec4<f32>, 23>,
+ };
+ @group(#{MATERIAL_BIND_GROUP}) @binding(116) var<storage, read> water: WaterBlock;
+ 
+@@ -341,11 +342,126 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
+     return vec4<f32>(0.0);
+ }
+ 
+-// The hour's sky in direction R (linear): horizon to middle to zenith.
++
++// ---- look sky: mirrored from look_sky.wgsl (keep in sync; `look::sky`'s tests compare the two) ----
++// The rows `look::sky::pack_rows` writes (SKY_ROWS = 13):
++//   0 [on, threshold, softness, opacity] · 1 [offset x, z (cells), plane (yd), cell (yd)] ·
++//   2 [lit (sRGB), silver power] · 3 [shade (sRGB), light step (cells)] ·
++//   4 [eye to sun, sun halo] · 5 [halo colour (sRGB), silver] · 6 [eye to moon, moon halo] ·
++//   7 [moon colour (sRGB), haze (yd)] · 8 [haze colour (sRGB), warp (cells)] ·
++//   9 [period (cells), shade contrast, horizon from, horizon to] ·
++//   10 [sun inner power, sun wide power, moon inner power, moon wide power] ·
++//   11 [sun inner, sun wide, moon inner, moon wide] · 12 [octaves, water octaves, pixel angle, 0].
++struct LookSkyRows {
++    r: array<vec4<f32>, 13>,
++}
++
++// A lattice point's hash, wrapped to `period`, as 24 bits (`look::sky::hash`).
++fn look_sky_hash(c: vec2<i32>, period: i32) -> f32 {
++    let p = vec2<i32>(period);
++    let w = ((c % p) + p) % p;
++    var h = u32(w.x) * 374761393u + u32(w.y) * 668265263u;
++    h = (h ^ (h >> 13u)) * 1274126177u;
++    h = h ^ (h >> 16u);
++    return f32(h >> 8u) * (1.0 / 16777216.0);
++}
++
++// Value noise, smoothstep-faded, tiling every `period` cells (`look::sky::noise`).
++fn look_sky_noise(p: vec2<f32>, period: i32) -> f32 {
++    let i = floor(p);
++    let f = p - i;
++    let c = vec2<i32>(i);
++    let a = look_sky_hash(c, period);
++    let b = look_sky_hash(c + vec2<i32>(1, 0), period);
++    let d = look_sky_hash(c + vec2<i32>(0, 1), period);
++    let e = look_sky_hash(c + vec2<i32>(1, 1), period);
++    let u = f * f * (vec2<f32>(3.0) - 2.0 * f);
++    return mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
++}
++
++// The cloud field at `p` (cells): domain-warped fbm in 0..1, each octave faded to its mean as a
++// pixel (`lod` cells) grows past half its cell (`look::sky::density`).
++fn look_sky_density(p: vec2<f32>, period: i32, warp: f32, octaves: u32, lod: f32) -> f32 {
++    let half = period / 2;
++    let q = vec2<f32>(
++        look_sky_noise(p * 0.5 + vec2<f32>(5.2, 1.3), half),
++        look_sky_noise(p * 0.5 + vec2<f32>(1.7, 9.2), half),
++    );
++    let pw = p + warp * (q - vec2<f32>(0.5));
++    var sum = 0.0;
++    var norm = 0.0;
++    var amp = 1.0;
++    var freq = 1.0;
++    var per = period;
++    for (var i = 0u; i < octaves; i = i + 1u) {
++        let fade = clamp(2.0 - 2.0 * lod * freq, 0.0, 1.0);
++        let off = vec2<f32>(f32(i) * 7.31, f32(i) * 3.17);
++        let n = look_sky_noise(pw * freq + off, per);
++        sum += amp * (0.5 + (n - 0.5) * fade);
++        norm += amp;
++        amp *= 0.5;
++        freq *= 2.0;
++        per *= 2;
++    }
++    return sum / norm;
++}
++
++// The sky toward `dir` (unit, from the eye) over what is drawn behind it: premultiplied gamma
++// colour and coverage. The halos add under the clouds; `octaves` fewer for the water's mirror.
++fn look_sky_clouds(dir: vec3<f32>, s: LookSkyRows, octaves: u32) -> vec4<f32> {
++    let cs = max(dot(dir, s.r[4].xyz), 0.0);
++    let cm = max(dot(dir, s.r[6].xyz), 0.0);
++    var halo = s.r[5].rgb * (s.r[4].w * (s.r[11].x * pow(cs, s.r[10].x) + s.r[11].y * pow(cs, s.r[10].y)));
++    halo += s.r[7].rgb * (s.r[6].w * (s.r[11].z * pow(cm, s.r[10].z) + s.r[11].w * pow(cm, s.r[10].w)));
++    if (dir.y <= s.r[9].z) {
++        return vec4<f32>(halo, 0.0);
++    }
++    // The ray's crossing with the layer, in cells, and the cells a pixel spans there.
++    let dist = s.r[1].z / dir.y;
++    let cell = s.r[1].w;
++    let p = s.r[1].xy + dir.xz * (dist / cell);
++    let lod = dist * s.r[12].z / (dir.y * cell);
++    let period = i32(s.r[9].x);
++    let d = look_sky_density(p, period, s.r[8].w, octaves, lod);
++    let th = s.r[0].y;
++    let a = smoothstep(th, th + s.r[0].z, d) * smoothstep(s.r[9].z, s.r[9].w, dir.y) * s.r[0].w;
++    if (a <= 0.001) {
++        return vec4<f32>(halo, 0.0);
++    }
++    // The light: where the cloud thickens toward the sun it is in its own shade; thin edges glow;
++    // soft painted bands, not a smooth ramp.
++    let sun_xz = s.r[4].xz;
++    let toward = sun_xz / max(length(sun_xz), 1e-3);
++    let d2 = look_sky_density(p + toward * s.r[3].w, period, s.r[8].w, min(octaves, 3u), lod);
++    var light = clamp(0.5 + (d - d2) * s.r[9].y, 0.0, 1.0);
++    light = mix(light, 1.0, (1.0 - a) * 0.5);
++    light = smoothstep(0.15, 0.85, light);
++    var col = mix(s.r[3].rgb, s.r[2].rgb, light);
++    // A silver lining on the thin edges toward the sun.
++    col += s.r[5].rgb * (s.r[5].w * s.r[4].w * pow(cs, s.r[2].w) * (1.0 - a));
++    // Far clouds go into the haze.
++    col = mix(col, s.r[8].rgb, 1.0 - exp(-dist / s.r[7].w));
++    return vec4<f32>(halo * (1.0 - a) + col * a, a);
++}
++// ---- end look sky ----
++
++// The hour's sky in direction R (linear): horizon to middle to zenith, and under the new look's
++// painted sky its clouds and halos over it, composed in gamma as the sky itself is, on the
++// water's fewer octaves.
+ fn water_sky(R: vec3<f32>) -> vec3<f32> {
+     let up = clamp(R.y, 0.0, 1.0);
+     let low = mix(water.rows[4].rgb, water.rows[8].rgb, smoothstep(0.0, 0.25, up));
+-    return mix(low, water.rows[3].rgb, smoothstep(0.2, 0.8, up));
++    let sky = mix(low, water.rows[3].rgb, smoothstep(0.2, 0.8, up));
++    if (water.rows[10].x < 0.5) {
++        return sky;
++    }
++    let s = LookSkyRows(array<vec4<f32>, 13>(
++        water.rows[10], water.rows[11], water.rows[12], water.rows[13], water.rows[14],
++        water.rows[15], water.rows[16], water.rows[17], water.rows[18], water.rows[19],
++        water.rows[20], water.rows[21], water.rows[22],
++    ));
++    let c = look_sky_clouds(R, s, u32(s.r[12].y));
++    return water_decode(water_encode(sky) * (1.0 - c.a) + c.rgb);
+ }
+ 
+ // One texel's compare of the sun-shadow map, and a bilinear-weighted compare of the four around
+diff --git a/crates/benilla-assets/src/shaders/wow_model.wgsl b/crates/benilla-assets/src/shaders/wow_model.wgsl
+index 275c1ca..d51b27c 100644
+--- a/crates/benilla-assets/src/shaders/wow_model.wgsl
++++ b/crates/benilla-assets/src/shaders/wow_model.wgsl
+@@ -45,7 +45,9 @@ struct ModelParams {
+     // Rows of `wow_light.matanim`, 0 = identity: x = UV scroll, y = tint, z = texture-transform
+     // affine, w = the UI tile's cell clip.
+     anim_slots: vec4<f32>,
+-    // The second texture stage: x = bound (1) or not (0), y = its combine preset 0-5; zw unused.
++    // The second texture stage: x = bound (1) or not (0), y = its combine preset 0-5; z the
++    // stage-0 combine preset plus one; w the new look's wind: 1 a plant that sways, 2 its leaves
++    // (an alpha-tested batch), 0 still.
+     stage1: vec4<f32>,
+ };
+ @group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> m: ModelParams;
+@@ -93,6 +95,9 @@ struct WowLight {
+     // The new look's sun shadows (`look::shadows::pack_rows`, SHADOW_ROWS = 14); all zero, none,
+     // under the classic look and in every off-world blob.
+     shadow: array<vec4<f32>, 14>,
++    // The new look's wind (`look::wind::pack_rows`, WIND_ROWS = 5), read in the vertex stage to
++    // sway the plants and the grass; all zero (still) under the classic look.
++    wind: array<vec4<f32>, 5>,
+     // The interior-prop SH probes, 7 rows per slot (`MAX_PROP_PROBES` = 8192 slots). Only this
+     // shader declares this tail; the other shaders bind the same buffer by its prefix.
+     prop_probes: array<vec4<f32>, 57344>,
+@@ -114,6 +119,88 @@ struct WowLight {
+ };
+ @group(#{MATERIAL_BIND_GROUP}) @binding(90) var<storage, read> wow_light: WowLight;
+ 
++// ---- look wind: mirrored in wow_model.wgsl, static_gx.wgsl and world_shadow.wgsl (keep in sync;
++// `look::wind`'s tests compare them) ----
++// The new look's wind (`look::wind::pack_rows`, WIND_ROWS = 5), benilla's own (no reference
++// behaviour): 0 [downwind x, z, strength, on] · 1 [gust, front spacing (yd), travel (yd), fronts] ·
++// 2 [front origin x, z, sway clock (s), front half-width] · 3 [tree bend, bend knee (yd), leaf
++// flutter (yd), grass bend (yd)] · 4 [the sway's angular speeds (rad/s)]. Row 0 `.w` = 0 under the
++// classic look and `worldWind 0`, and every caller then draws 1.12's still geometry.
++fn wind_hash(n: u32) -> f32 {
++    var h = n * 2654435761u;
++    h = (h ^ (h >> 15u)) * 2246822519u;
++    h = h ^ (h >> 13u);
++    return f32(h >> 8u) * (1.0 / 16777216.0);
++}
++
++// How hard the gusts blow at `p` (world x, z): soft fronts crossing downwind, each with its own
++// strength, wavy and patchy across the wind.
++fn wind_gust(p: vec2<f32>) -> f32 {
++    let dir = wow_light.wind[0].xy;
++    let q = p - wow_light.wind[2].xy;
++    let along = dot(q, dir);
++    let across = dot(q, vec2<f32>(-dir.y, dir.x));
++    let a = along + 18.0 * sin(across * 0.013 + 1.7) + 9.0 * sin(across * 0.031);
++    let x = (a - wow_light.wind[1].z) / wow_light.wind[1].y;
++    let k = floor(x + 0.5);
++    let f = x - k;
++    let n = i32(k) - i32(wow_light.wind[1].w);
++    let w = wow_light.wind[2].w;
++    let patchy = 0.55 + 0.45 * sin(across * 0.009 + f32(n) * 2.1);
++    return wow_light.wind[1].x * (0.35 + 0.65 * wind_hash(bitcast<u32>(n))) * patchy
++        * exp(-(f * f) / (w * w));
++}
++
++// A plant's sway at `rel` from its base `anchor` (world): it leans downwind and sways with its
++// height, little at the trunk, each plant on its own phase; a gust bends it further as it passes;
++// `leaf` (an alpha-tested batch) flutters a little on top.
++fn wind_sway(rel: vec3<f32>, anchor: vec3<f32>, leaf: bool) -> vec3<f32> {
++    let h = max(rel.y, 0.0);
++    let bend = h * h / (h + wow_light.wind[3].y);
++    let dir = vec3<f32>(wow_light.wind[0].x, 0.0, wow_light.wind[0].y);
++    let side = vec3<f32>(-dir.z, 0.0, dir.x);
++    let s = wow_light.wind[0].z;
++    let t = wow_light.wind[2].z;
++    let sp = wow_light.wind[4];
++    let cell = bitcast<vec2<u32>>(vec2<i32>(floor(anchor.xz * 2.0)));
++    let ph = 6.2831853 * wind_hash(cell.x * 73856093u ^ cell.y * 19349663u);
++    let osc = 0.6 * sin(t * sp.x + ph) + 0.4 * sin(t * sp.y + 1.7 * ph);
++    let g = wind_gust(anchor.xz);
++    let lean = s * (0.55 + 0.45 * osc) + g * (1.0 + 0.3 * osc);
++    var off = dir * (wow_light.wind[3].x * bend * lean);
++    off += side * (wow_light.wind[3].x * bend * (0.25 * s + 0.5 * g) * sin(t * sp.z + 2.3 * ph));
++    if (leaf) {
++        let lp = dot(rel, vec3<f32>(1.7, 2.3, 1.3)) + 3.0 * ph;
++        let fl = wow_light.wind[3].z * min(h / 3.0, 1.0) * (s + 2.0 * g);
++        off += vec3<f32>(
++            sin(t * sp.w + lp),
++            0.5 * sin(t * (sp.w + sp.z) + 1.3 * lp),
++            -0.7 * sin(t * sp.w + lp),
++        ) * fl;
++    }
++    // A bent crown dips a little, as a bent stem would.
++    off.y -= 0.35 * dot(off.xz, off.xz) / max(h, 0.5);
++    return off;
++}
++
++// A ground-clutter tuft's bend at `world`, `w` its height on the tuft (0 root, 1 tip): a ripple
++// running downwind through the grass, and the gusts. Measured from the fronts' origin like the
++// gusts, so f32 keeps its precision far out; the ripple's phase steps when that origin moves a
++// grid square under a travelling camera, about once a kilometre.
++fn wind_grass(world: vec3<f32>, w: f32) -> vec3<f32> {
++    let dir = wow_light.wind[0].xy;
++    let q = world.xz - wow_light.wind[2].xy;
++    let s = wow_light.wind[0].z;
++    let t = wow_light.wind[2].z;
++    let wave = 0.5 + 0.5 * sin(t * wow_light.wind[4].y - dot(q, dir) * 0.35
++        + 0.8 * sin(dot(q, vec2<f32>(0.13, 0.11))));
++    let lean = s * (0.35 + 0.65 * wave) + 1.6 * wind_gust(world.xz);
++    var off = vec3<f32>(dir.x, 0.0, dir.y) * (wow_light.wind[3].w * w * w * lean);
++    off.y = -0.4 * length(off.xz) * w;
++    return off;
++}
++// ---- end look wind ----
++
+ // The M2 cutout alpha-test reference, 224/255; in sync with `materials::VANILLA_ALPHA_KEY_REF`.
+ const VANILLA_ALPHA_KEY: f32 = 0.8784314;
+ 
+@@ -565,8 +652,21 @@ fn vertex(vertex: WowVertex) -> WowVsOut {
+     // Precision: camera-relative to clip space; `clip_from_world × p_world` cancels
+     // catastrophically with camera and geometry near 9 k yd. `world_position` is absolute again:
+     // lighting and fog need no such precision.
+-    let p_cam = (frame_from_local * vec4<f32>(vertex.position, 1.0)).xyz
+-        + (frame_origin - view.world_position);
++    var rel = (frame_from_local * vec4<f32>(vertex.position, 1.0)).xyz;
++#ifndef WOW_RIG_SKIN
++    // The new look's wind: a plant sways from its origin (`stage1.w`), a clutter tuft bends from
++    // its root (its vertex alpha, its height on the tuft). A skinned model sways by its own bones.
++    if (wow_light.wind[0].w > 0.5) {
++        if (m.stage1.w > 0.5) {
++            rel += wind_sway(rel, frame_origin, m.stage1.w > 1.5);
++        } else if (m.clutter_fade.w > 0.5) {
++#ifdef VERTEX_COLORS
++            rel += wind_grass(rel + frame_origin, vertex.color.a);
++#endif
++        }
++    }
++#endif
++    let p_cam = rel + (frame_origin - view.world_position);
+     out.world_position = vec4<f32>(p_cam + view.world_position, 1.0);
+     let view_rot = mat3x3<f32>(
+         view.view_from_world[0].xyz,
+@@ -625,6 +725,11 @@ fn vertex(vertex: WowVertex) -> WowVsOut {
+ 
+ #ifdef VERTEX_COLORS
+     out.color = vertex.color;
++    // A clutter tuft's vertex alpha is its height on the tuft, for the wind; its colour's alpha
++    // is 1, as the tuft's tint always was.
++    if (m.clutter_fade.w > 0.5) {
++        out.color.a = 1.0;
++    }
+ #endif
+ 
+ #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+diff --git a/crates/benilla-world/src/clouds/layer.rs b/crates/benilla-world/src/clouds/layer.rs
+index c1abfe8..395782a 100644
+--- a/crates/benilla-world/src/clouds/layer.rs
++++ b/crates/benilla-world/src/clouds/layer.rs
+@@ -169,21 +169,26 @@ pub(super) fn setup_cloud_layer(
+ 
+ /// Hides the dome with the rest of the sky: under a WMO skybox past weight 0.99, as `CSky::Render`
+ /// skips all six sky elements on one flag (`0x6d4a3b`), and while submerged, as the scene skips
+-/// `CSky::Render` (`0x6812a4`).
++/// `CSky::Render` (`0x6812a4`). The new look's painted sky (`look::sky`) takes its place while
++/// it draws; under the classic look its frame is off and this is 1.12's gate alone.
+ pub(super) fn apply_cloud_visibility(
+     debug: Res<DebugState>,
+     skybox: Res<crate::skybox::SkyboxWeight>,
+     underwater: Res<crate::liquid::Underwater>,
++    look_sky: Option<Res<crate::look::SkyFrame>>,
+     mut dome: Query<&mut Visibility, With<CloudDome>>,
+ ) {
++    let painted = look_sky.is_some_and(|s| s.on);
+     if let Ok(mut vis) = dome.single_mut() {
+-        *vis =
+-            if debug.lighting.disable_sky_dome || skybox.replaces_celestial() || underwater.0.any()
+-            {
+-                Visibility::Hidden
+-            } else {
+-                Visibility::Inherited
+-            };
++        *vis = if debug.lighting.disable_sky_dome
++            || skybox.replaces_celestial()
++            || underwater.0.any()
++            || painted
++        {
++            Visibility::Hidden
++        } else {
++            Visibility::Inherited
++        };
+     }
+ }
+ 
+diff --git a/crates/benilla-world/src/clouds/mod.rs b/crates/benilla-world/src/clouds/mod.rs
+index aca2e21..09b76c0 100644
+--- a/crates/benilla-world/src/clouds/mod.rs
++++ b/crates/benilla-world/src/clouds/mod.rs
+@@ -67,6 +67,7 @@ impl Plugin for CloudsPlugin {
+                     // After the skybox resolve and the submersion verdict, so the dome hides in
+                     // the same frame as the rest of the sky.
+                     layer::apply_cloud_visibility
++                        .after(crate::look::sky::SkyPublish)
+                         .after(crate::skybox::SkyboxResolve)
+                         .after(crate::liquid::SubmersionVerdict),
+                 ),
+diff --git a/crates/benilla-world/src/clutter.rs b/crates/benilla-world/src/clutter.rs
+index dbd4314..8a1dacd 100644
+--- a/crates/benilla-world/src/clutter.rs
++++ b/crates/benilla-world/src/clutter.rs
+@@ -328,6 +328,15 @@ fn build_chunk_clutter(
+             let mut normals = Vec::with_capacity(vcount);
+             let mut colors = Vec::with_capacity(vcount);
+             let mut indices = Vec::with_capacity(sub.indices.len() * placements.len());
++            // Each vertex's height on the tuft (0 at its root, 1 at its tip) rides in the colour's
++            // alpha, which the shader puts back to 1: the new look's wind bends the tuft from the
++            // root by it (`wow_model.wgsl`'s `wind_grass`).
++            let (lo, hi) = sub
++                .positions
++                .iter()
++                .map(|p| wow_to_bevy(*p).y)
++                .fold((f32::MAX, f32::MIN), |(lo, hi), y| (lo.min(y), hi.max(y)));
++            let tuft_h = (hi - lo).max(1e-3);
+             for sp in placements {
+                 let d = &sp.placement;
+                 let base = positions.len() as u32;
+@@ -339,12 +348,13 @@ fn build_chunk_clutter(
+                 // on ambient and diffuse, `0x59cfec`), `clamp(grey × light) × texture`; the shader
+                 // multiplies it outside the clamp, `texture × grey × clamp(light)`, so under light
+                 // above 1.0 a shadowed tuft comes out darker than the reference's.
+-                let tint = [sp.tint, sp.tint, sp.tint, 1.0];
+                 for (i, p) in sub.positions.iter().enumerate() {
+-                    positions.push((rot * (wow_to_bevy(*p) * inst_scale) + origin).to_array());
++                    let local = wow_to_bevy(*p);
++                    positions.push((rot * (local * inst_scale) + origin).to_array());
+                     uvs.push(sub.uvs[i]);
+                     normals.push(sp.ground_normal);
+-                    colors.push(tint);
++                    let up = ((local.y - lo) / tuft_h).clamp(0.0, 1.0);
++                    colors.push([sp.tint, sp.tint, sp.tint, up]);
+                 }
+                 indices.extend(sub.indices.iter().map(|idx| base + idx));
+             }
+diff --git a/crates/benilla-world/src/lighting/global_light.rs b/crates/benilla-world/src/lighting/global_light.rs
+index 9dfba76..c09cef9 100644
+--- a/crates/benilla-world/src/lighting/global_light.rs
++++ b/crates/benilla-world/src/lighting/global_light.rs
+@@ -16,6 +16,7 @@ use super::{sh, WowLighting};
+ use crate::dev_state::DebugState;
+ use crate::look::lights::{LookLightInputs, LOOK_LIGHT_ROWS};
+ use crate::look::shadows::{ShadowInputs, SHADOW_ROWS};
++use crate::look::wind::{WindFrame, WIND_ROWS};
+ use crate::view::ViewDistance;
+ use crate::view::WorldCamera;
+ 
+@@ -36,7 +37,9 @@ use crate::view::WorldCamera;
+ ///      `[rgb, 0]`, lit per pixel; empty (count 0) under the classic look and in every off-world
+ ///      blob ·
+ ///   then the new look's sun-shadow block (`look::shadows::pack_rows`), all zero (none) under the
+-///      classic look and in every off-world blob.
++///      classic look and in every off-world blob ·
++///   then the new look's wind block (`look::wind::pack_rows`), read in the vertex stage to sway
++///      the plants; all zero (still) under the classic look and in every off-world blob.
+ ///
+ /// The GPU buffer is larger: the interior-prop probes and the skin-palette regions follow this
+ /// prefix. They stay out of this struct because the extract clones it by value every frame, and
+@@ -48,6 +51,7 @@ struct LightStd430 {
+     points: [[f32; 4]; 2 * MAX_POINT_LIGHTS],
+     look: [[f32; 4]; LOOK_LIGHT_ROWS],
+     shadow: [[f32; 4]; SHADOW_ROWS],
++    wind: [[f32; 4]; WIND_ROWS],
+ }
+ 
+ /// Header row count of the layout above (rows 0..=20), which every light blob sizes against.
+@@ -136,6 +140,7 @@ impl Default for WowLightData {
+             points: [[0.0; 4]; 2 * MAX_POINT_LIGHTS],
+             look: [[0.0; 4]; LOOK_LIGHT_ROWS],
+             shadow: [[0.0; 4]; SHADOW_ROWS],
++            wind: [[0.0; 4]; WIND_ROWS],
+         })
+     }
+ }
+@@ -220,6 +225,8 @@ fn build_light_data(
+     // (`look::shadows`).
+     mut look: LookLightInputs,
+     mut shadows: ShadowInputs,
++    // The new look's wind (`look::wind`), published in `Update`.
++    wind: Option<Res<WindFrame>>,
+     mut last_dump: Local<f64>,
+     mut last_rows_dump: Local<f64>,
+ ) {
+@@ -315,6 +322,8 @@ fn build_light_data(
+     fresh.rows[20][1] = looked as f32;
+     // The sun shadows' block, fitted to this frame's camera; all zero under the classic look.
+     fresh.shadow = shadows.pack(cam.single().ok(), l.celestial_dir, l.moon_dir_white);
++    // The wind's block; all zero under the classic look or `worldWind 0`.
++    fresh.wind = wind.map_or([[0.0; 4]; WIND_ROWS], |w| w.rows);
+     // `WOW_POINTS_DUMP=1` prints the nearest 8 packed lights once a second; `=frame` every frame,
+     // which a pool that changes frame to frame needs.
+     static POINTS_DUMP: std::sync::OnceLock<Option<std::ffi::OsString>> =
+diff --git a/crates/benilla-world/src/lighting/mod.rs b/crates/benilla-world/src/lighting/mod.rs
+index fe42315..ecfa3d3 100644
+--- a/crates/benilla-world/src/lighting/mod.rs
++++ b/crates/benilla-world/src/lighting/mod.rs
+@@ -314,6 +314,14 @@ mod ordering_tests {
+                 "look/water.rs",
+                 "publish_water joins LightingConsumeSet where look/mod.rs adds it",
+             ),
++            (
++                "look/wind.rs",
++                "publish_wind joins LightingConsumeSet where look/mod.rs adds it",
++            ),
++            (
++                "look/sky.rs",
++                "publish_sky joins LightingConsumeSet where look/mod.rs adds it",
++            ),
+         ];
+         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+         let mut offenders = Vec::new();
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index 267b1be..aa9be1c 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -2,8 +2,9 @@
+ //! models and textures and re-lighting the world, zone by zone. A zone's light is hand-tuned by
+ //! time of day ([`grade`]) over the `Light.dbc` sample, and torches and spells light the ground
+ //! around them per pixel ([`lights`]), things that meet shade each other ([`ao`]), the sun and
+-//! the moon cast real shadows ([`shadows`]), and the water mirrors the shore and shows its bed
+-//! ([`water`]). One
++//! the moon cast real shadows ([`shadows`]), the water mirrors the shore and shows its bed
++//! ([`water`]), one wind sways the trees and the grass ([`wind`]) and the sky is painted, its
++//! clouds drifting in that wind ([`sky`]). One
+ //! switch, [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look
+ //! is then exactly the reference's.
+ 
+@@ -22,15 +23,19 @@ pub mod pass;
+ pub mod rays;
+ pub mod shadow_pass;
+ pub mod shadows;
++pub mod sky;
+ pub mod water;
+ pub mod water_pass;
++pub mod wind;
+ pub use ao::LookAo;
+ pub use grade::{GradeKey, PostLook, Tint};
+ pub use lights::{LookLight, LookLightTune, LookPulse};
+ pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
+ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+ pub use shadows::{LookShadows, ShadowFrame};
++pub use sky::{LookSky, SkyFrame};
+ pub use water::{LookWater, WaterFrame};
++pub use wind::{LookWind, WindFrame};
+ 
+ /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
+ /// test) is the reference; the game turns it on from its `worldLook` CVar.
+@@ -222,6 +227,8 @@ pub(crate) fn init_resources(app: &mut App) {
+     lights::init_resources(app);
+     shadows::init_resources(app);
+     water::init_resources(app);
++    wind::init_resources(app);
++    sky::init_resources(app);
+ }
+ 
+ /// The new look's world side: its resources, the area table its zone lookup reads, and the
+@@ -231,15 +238,37 @@ pub(crate) struct LookPlugin;
+ impl Plugin for LookPlugin {
+     fn build(&self, app: &mut App) {
+         init_resources(app);
+-        app.add_systems(Startup, load_look_areas.after(AssetSet::Open))
++        app.add_plugins(bevy::pbr::MaterialPlugin::<sky::LookSkyMaterial>::default())
++            .add_systems(
++                Startup,
++                (load_look_areas, sky::setup_look_sky).after(AssetSet::Open),
++            )
+             .add_systems(PreUpdate, sync_view_look)
+-            // The water's block after the light it reads is resolved, and its scene copy sized to
+-            // the view once that is known.
++            // The wind and the sky after the light they read is resolved; the water's block after
++            // the sky it mirrors, and its scene copy sized to the view once that is known.
++            .add_systems(
++                Update,
++                (
++                    wind::publish_wind,
++                    sky::publish_sky.in_set(sky::SkyPublish),
++                    water::publish_water.after(sky::SkyPublish),
++                )
++                    .in_set(crate::lighting::LightingConsumeSet),
++            )
++            // With the rest of the sky's gates, so the layer and 1.12's clouds swap in one frame.
+             .add_systems(
+                 Update,
+-                water::publish_water.in_set(crate::lighting::LightingConsumeSet),
++                sky::apply_look_sky_visibility
++                    .after(sky::SkyPublish)
++                    .after(crate::skybox::SkyboxResolve)
++                    .after(crate::liquid::SubmersionVerdict),
+             )
+-            .add_systems(PostUpdate, water::size_water_scene);
++            .add_systems(PostUpdate, water::size_water_scene)
++            // Camera-anchored after transform propagation, like 1.12's cloud dome.
++            .add_systems(
++                PostUpdate,
++                sky::follow_look_sky.in_set(crate::billboard::BillboardPlace),
++            );
+         pass::build(app);
+         shadow_pass::build(app);
+         water_pass::build(app);
+diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
+index c40af52..0835ddd 100644
+--- a/crates/benilla-world/src/look/pass.rs
++++ b/crates/benilla-world/src/look/pass.rs
+@@ -83,6 +83,7 @@ fn publish_frame(
+     ao: Res<LookAo>,
+     lighting: Res<crate::lighting::WowLighting>,
+     viewer: Res<crate::view::Viewer>,
++    sky: Option<Res<super::SkyFrame>>,
+     mut frame: ResMut<LookFrame>,
+ ) {
+     let next = LookFrame {
+@@ -91,6 +92,8 @@ fn publish_frame(
+             let mut post = grade.post;
+             post.height_fog *= mist.scale;
+             post.ao = ao.strength(post.ao);
++            // A cloud over the sun takes its rays (`look::sky`; 1 with the painted sky off).
++            post.rays *= sky.map_or(1.0, |s| s.sun_clear);
+             post
+         } else {
+             PostLook::NEUTRAL
+@@ -565,6 +568,7 @@ pub(super) fn build(app: &mut App) {
+                 (sync_bloom, sync_depth_binding),
+             )
+                 .chain()
++                .after(super::sky::SkyPublish)
+                 .in_set(crate::lighting::LightingConsumeSet),
+         );
+ }
+diff --git a/crates/benilla-world/src/look/sky.rs b/crates/benilla-world/src/look/sky.rs
+new file mode 100644
+index 0000000..2f299d8
+--- /dev/null
++++ b/crates/benilla-world/src/look/sky.rs
+@@ -0,0 +1,864 @@
++//! A painted sky, the new look's own (no reference behaviour): WoW Forever's sky is painted, and
++//! its clouds drift. 1.12's sky dome (`crate::sky`), its sun and moon discs and its stars stay as
++//! they are; over them the new look draws one layer of its own (`look_sky.wgsl`), in the slot of
++//! 1.12's cloud dome ([`crate::sky_order::LOOK_CLOUDS_BIAS`], after the discs and the stars, before
++//! the glares), which it hides while it draws:
++//! 1. **clouds** ([`density`]): a soft, Wind Waker-ish layer on a plane [`tune::PLANE_YD`] over the
++//!    eye, domain-warped value noise that tiles every [`tune::PERIOD_CELLS`], drifting downwind with
++//!    the world's wind (`look::wind::drift`, the same on every client); thin on a clear day, thicker
++//!    as the day's roll ([`day_cover`]) or the zone's authored cloud says, near full in a storm, or
++//!    held by `looksky clouds`. Each cloud is lit by the hour ([`tune::KEYS`]): bright toward the
++//!    sun and shaded where the cloud thickens toward it, in soft painted bands, gold underneath at
++//!    golden hour, pink at dawn, dark blue-grey at night, with a silver lining on its thin edges
++//!    near the sun; far clouds go into the haze and thin out at the horizon;
++//! 2. **the sun**: a warm halo round 1.12's disc, on the god rays' own sun (`celestial_dir`), wider
++//!    and warmer as it sets; **the moon**: a pale halo round 1.12's;
++//! 3. **the stars**: 1.12's, which fade in after dusk and out before dawn; the clouds draw over
++//!    them, so a cloud hides them, and over the discs;
++//! 4. **the water** (`look::water`): the mirror's sky, where a reflected ray leaves the screen,
++//!    runs the same cloud function on fewer octaves, so the lakes mirror the clouds;
++//! 5. **the light**: the cloud over the sun (computed here on the CPU, [`cover_toward`]) dims the
++//!    glare, the god rays and the water's glint, as 1.12's own cloud field does for its glare.
++//!
++//! Every tunable is in [`tune`]; [`pack_rows`] carries them to the layer's material and the water
++//! block. `worldSky 0` ([`LookSky::on`]) brings back 1.12's clouds under the rest of the new look;
++//! `looksky clouds <0-1>` holds the cover for film and `looksky grade` lets it go. `worldLook 0`
++//! hides the layer and 1.12's sky draws untouched.
++
++use bevy::camera::Projection;
++use bevy::mesh::MeshVertexBufferLayoutRef;
++use bevy::pbr::{
++    ExtendedMaterial, MaterialExtension, MaterialExtensionKey, MaterialExtensionPipeline,
++};
++use bevy::prelude::*;
++use bevy::render::render_resource::{
++    AsBindGroup, RenderPipelineDescriptor, SpecializedMeshPipelineError,
++};
++use bevy::shader::ShaderRef;
++
++use super::wind;
++use super::WorldLook;
++use crate::lighting::{GameClock, WorldTime, WowLighting};
++use crate::sky_order::{sky_pipeline_state, SKY_VERTEX_SHADER};
++use crate::view::WorldCamera;
++
++/// Every tunable of the sky, in one place. A first pass, to tune on film with `looksky`. Lengths
++/// are yards, colours sRGB 0..1 (the sky blends raw gamma, as 1.12's does).
++pub mod tune {
++    /// The cloud layer's height over the eye, and the noise's big cell on it.
++    pub const PLANE_YD: f32 = 1400.0;
++    pub const CELL_YD: f32 = 650.0;
++    /// The noise tiles every this many cells (even), so the drift wraps without a seam.
++    pub const PERIOD_CELLS: i32 = 64;
++    /// Octaves on the sky, and on the water's mirror (cheaper).
++    pub const OCTAVES: u32 = 5;
++    pub const WATER_OCTAVES: u32 = 3;
++    /// The domain warp (cells): how far the shapes are pushed about, for a painted look.
++    pub const WARP: f32 = 0.7;
++    /// The yards a pixel spans per yard of distance (a 1080p view's), which fades each octave out
++    /// as it would shimmer: far clouds go smooth.
++    pub const PIXEL_ANGLE: f32 = 0.0012;
++    /// The cover (0 none, 1 overcast) sets the field's threshold, from clear to full; the edge's
++    /// softness; the layer's most opacity, and under full overcast.
++    pub const THRESHOLD_CLEAR: f32 = 0.78;
++    pub const THRESHOLD_FULL: f32 = 0.22;
++    pub const SOFTNESS: f32 = 0.13;
++    pub const OPACITY: f32 = 0.9;
++    pub const OPACITY_OVERCAST: f32 = 0.97;
++    /// An ordinary day's cover rolls between these; about one day in [`CLEAR_DAY_ONE_IN`] is
++    /// clear, at [`CLEAR_COVER`]. It wanders by [`COVER_WANDER`] over [`COVER_WANDER_H`] hours, and
++    /// a storm takes it to [`OVERCAST_COVER`].
++    pub const COVER_MIN: f32 = 0.22;
++    pub const COVER_MAX: f32 = 0.52;
++    pub const CLEAR_DAY_ONE_IN: u32 = 5;
++    pub const CLEAR_COVER: f32 = 0.1;
++    pub const COVER_WANDER: f32 = 0.07;
++    pub const COVER_WANDER_H: f32 = 3.7;
++    pub const OVERCAST_COVER: f32 = 0.95;
++    /// The self-shade: how far toward the sun (cells) a cloud looks for more of itself, and how
++    /// hard that shades it.
++    pub const LIGHT_STEP: f32 = 0.35;
++    pub const SHADE_CONTRAST: f32 = 3.0;
++    /// The layer thins out between these heights of the view ray (sine of elevation), and goes
++    /// into the haze (the fog colour) over about this many yards.
++    pub const HORIZON_FROM: f32 = 0.025;
++    pub const HORIZON_TO: f32 = 0.16;
++    pub const HAZE_YD: f32 = 18000.0;
++    /// The live sky's horizon colour blended into the keys' by this much, so another zone's sky
++    /// tints its clouds; and how much a full overcast greys them.
++    pub const SKY_BLEND: f32 = 0.2;
++    pub const OVERCAST_GREY: f32 = 0.6;
++    /// The silver lining on thin edges toward the sun: its strength and its tightness.
++    pub const SILVER: f32 = 0.5;
++    pub const SILVER_POWER: f32 = 8.0;
++    /// The sun's halo: a tight glow round the disc and a wide warm one, as power of the cosine to
++    /// the sun and share; scaled by the hour's `halo` and coloured by the disc's tint warmed by the
++    /// hour's `warm` toward [`HALO_WARM`].
++    pub const SUN_INNER_POWER: f32 = 600.0;
++    pub const SUN_WIDE_POWER: f32 = 14.0;
++    pub const SUN_INNER: f32 = 0.45;
++    pub const SUN_WIDE: f32 = 0.16;
++    pub const HALO_WARM: [f32; 3] = [1.0, 0.72, 0.42];
++    /// The moon's halo, pale and small, at night only.
++    pub const MOON_INNER_POWER: f32 = 900.0;
++    pub const MOON_WIDE_POWER: f32 = 60.0;
++    pub const MOON_INNER: f32 = 0.22;
++    pub const MOON_WIDE: f32 = 0.07;
++    pub const MOON_HALO: f32 = 1.0;
++    pub const MOON_TINT: [f32; 3] = [0.70, 0.80, 1.0];
++    /// A body's halo comes in as it rises over this band of elevation (degrees).
++    pub const RISE_FROM_DEG: f32 = -2.0;
++    pub const RISE_TO_DEG: f32 = 3.0;
++
++    /// The clouds' light by the hour (the lighting's clock, minutes), interpolated: `lit` the side
++    /// toward the light, `shade` the thick undersides, `halo` the sun halo's strength, `warm` how
++    /// far its colour goes toward [`HALO_WARM`].
++    #[derive(Clone, Copy, Debug)]
++    pub struct CloudKey {
++        pub minute: f32,
++        pub lit: [f32; 3],
++        pub shade: [f32; 3],
++        pub halo: f32,
++        pub warm: f32,
++    }
++
++    const fn key(minute: f32, lit: [f32; 3], shade: [f32; 3], halo: f32, warm: f32) -> CloudKey {
++        CloudKey {
++            minute,
++            lit,
++            shade,
++            halo,
++            warm,
++        }
++    }
++
++    /// Night blue-grey, pink dawn, white day, gold under the clouds at golden hour, a purple dusk.
++    pub const KEYS: [CloudKey; 12] = [
++        key(0.0, [0.30, 0.34, 0.46], [0.10, 0.12, 0.19], 0.0, 0.0),
++        key(300.0, [0.32, 0.34, 0.47], [0.12, 0.13, 0.21], 0.0, 0.0),
++        key(360.0, [1.00, 0.74, 0.74], [0.56, 0.42, 0.56], 1.0, 0.7),
++        key(420.0, [1.00, 0.88, 0.80], [0.68, 0.62, 0.70], 0.8, 0.45),
++        key(540.0, [1.00, 0.98, 0.95], [0.72, 0.76, 0.84], 0.6, 0.15),
++        key(720.0, [1.00, 1.00, 1.00], [0.74, 0.79, 0.88], 0.55, 0.05),
++        key(960.0, [1.00, 0.97, 0.91], [0.72, 0.74, 0.82], 0.6, 0.2),
++        key(1050.0, [1.00, 0.86, 0.58], [0.82, 0.60, 0.42], 0.95, 0.65),
++        key(1140.0, [1.00, 0.64, 0.42], [0.64, 0.41, 0.42], 1.1, 0.9),
++        key(1200.0, [0.72, 0.47, 0.56], [0.31, 0.25, 0.37], 0.7, 0.9),
++        key(1260.0, [0.38, 0.38, 0.52], [0.15, 0.16, 0.25], 0.0, 0.0),
++        key(1440.0, [0.30, 0.34, 0.46], [0.10, 0.12, 0.19], 0.0, 0.0),
++    ];
++}
++
++/// Rows the layer's uniform takes (`look_sky.wgsl`'s `LookSkyRows`), and which the water block
++/// carries after its own (`liquid.wgsl`); keep in sync:
++///   0 `[on, threshold, softness, opacity]` · 1 `[offset x, z (cells), plane (yd), cell (yd)]` ·
++///   2 `[lit (sRGB), silver power]` · 3 `[shade (sRGB), light step (cells)]` ·
++///   4 `[eye to sun (unit), sun halo]` · 5 `[halo colour (sRGB), silver]` ·
++///   6 `[eye to moon (unit), moon halo]` · 7 `[moon colour (sRGB), haze (yd)]` ·
++///   8 `[haze colour (sRGB), warp (cells)]` ·
++///   9 `[period (cells), shade contrast, horizon from, horizon to (sine of elevation)]` ·
++///   10 `[sun inner power, sun wide power, moon inner power, moon wide power]` ·
++///   11 `[sun inner, sun wide, moon inner, moon wide]` · 12 `[octaves, water octaves, pixel angle, 0]`.
++pub const SKY_ROWS: usize = 13;
++
++/// `worldSky` and the film's hold: `on` (on by default, inert under the classic look); `clouds`
++/// holds the cover (0 none to 1 overcast) whatever the day and the weather say (`looksky`).
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookSky {
++    pub on: bool,
++    pub clouds: Option<f32>,
++}
++
++impl Default for LookSky {
++    /// On, the `worldSky` CVar's registered "1".
++    fn default() -> Self {
++        Self {
++            on: true,
++            clouds: None,
++        }
++    }
++}
++
++impl LookSky {
++    /// `looksky`'s arguments: `clouds <0-1>` holds the cover, `grade` (or nothing, or `clouds`
++    /// alone) lets it go: `Some(new hold)`; `None` for anything else, which changes nothing.
++    pub fn parse(args: &str) -> Option<Option<f32>> {
++        let mut words = args.split_whitespace();
++        let held = match words.next() {
++            None => None,
++            Some(w) if w.eq_ignore_ascii_case("grade") => None,
++            Some(w) if w.eq_ignore_ascii_case("clouds") => match words.next() {
++                None => None,
++                Some(v) => Some(v.parse::<f32>().ok().filter(|c| (0.0..=1.0).contains(c))?),
++            },
++            Some(_) => return None,
++        };
++        words.next().is_none().then_some(held)
++    }
++}
++
++fn mix64(x: u64) -> u64 {
++    let mut z = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
++    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
++    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
++    z ^ (z >> 31)
++}
++
++fn unit64(h: u64) -> f32 {
++    (h >> 40) as f32 / (1u64 << 24) as f32
++}
++
++/// Mixed into the day so the sky's dice are its own.
++const DAY_SALT: u64 = 0x636C_6F75_6464_6179; // "cloudday"
++
++/// One server day's cover: a fixed hash of the day number, clear about one day in five.
++pub fn day_cover(day: i64) -> f32 {
++    let h = mix64(day as u64 ^ DAY_SALT);
++    if unit64(h) < 1.0 / tune::CLEAR_DAY_ONE_IN as f32 {
++        tune::CLEAR_COVER
++    } else {
++        tune::COVER_MIN + (tune::COVER_MAX - tune::COVER_MIN) * unit64(mix64(h))
++    }
++}
++
++fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
++    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++/// The cover at `secs` of the server's clock before the weather: the day's roll, eased into the
++/// next over the last two hours of the day, wandering a little through it.
++pub fn cover_at(secs: f64) -> f32 {
++    let day = (secs / 86_400.0).floor();
++    let minute = ((secs - day * 86_400.0) / 60.0) as f32;
++    let (a, b) = (day_cover(day as i64), day_cover(day as i64 + 1));
++    let t = smoothstep(wind::tune::DAY_EASE_FROM_MIN, 1440.0, minute);
++    let wander_w = std::f64::consts::TAU / (f64::from(tune::COVER_WANDER_H) * 3600.0);
++    let wander =
++        tune::COVER_WANDER * ((secs * wander_w).rem_euclid(std::f64::consts::TAU) as f32).sin();
++    (a + (b - a) * t + wander).clamp(0.0, 1.0)
++}
++
++/// The hour's cloud key at `minute` (0..1440), interpolated.
++pub fn key_at(minute: f32) -> tune::CloudKey {
++    let m = minute.rem_euclid(1440.0);
++    let keys = &tune::KEYS;
++    let i = keys
++        .windows(2)
++        .position(|w| m >= w[0].minute && m < w[1].minute)
++        .unwrap_or(keys.len() - 2);
++    let (a, b) = (keys[i], keys[i + 1]);
++    let t = ((m - a.minute) / (b.minute - a.minute)).clamp(0.0, 1.0);
++    let l = |x: [f32; 3], y: [f32; 3]| std::array::from_fn(|c| x[c] + (y[c] - x[c]) * t);
++    tune::CloudKey {
++        minute: m,
++        lit: l(a.lit, b.lit),
++        shade: l(a.shade, b.shade),
++        halo: a.halo + (b.halo - a.halo) * t,
++        warm: a.warm + (b.warm - a.warm) * t,
++    }
++}
++
++// ---------------------------------------------------------------- the field, mirrored on the GPU
++
++/// `look_sky_hash` (keep in sync): a fixed integer hash of a lattice point, wrapped to `period`,
++/// as 24 bits (exact in an `f32`, so the CPU and the GPU agree).
++fn hash(cx: i32, cy: i32, period: i32) -> f32 {
++    let wx = cx.rem_euclid(period) as u32;
++    let wy = cy.rem_euclid(period) as u32;
++    let mut h = wx
++        .wrapping_mul(374_761_393)
++        .wrapping_add(wy.wrapping_mul(668_265_263));
++    h = (h ^ (h >> 13)).wrapping_mul(1_274_126_177);
++    h ^= h >> 16;
++    (h >> 8) as f32 * (1.0 / 16_777_216.0)
++}
++
++/// `look_sky_noise` (keep in sync): value noise, smoothstep-faded, tiling every `period` cells.
++fn noise(p: Vec2, period: i32) -> f32 {
++    let i = p.floor();
++    let f = p - i;
++    let (cx, cy) = (i.x as i32, i.y as i32);
++    let a = hash(cx, cy, period);
++    let b = hash(cx + 1, cy, period);
++    let d = hash(cx, cy + 1, period);
++    let e = hash(cx + 1, cy + 1, period);
++    let u = f * f * (Vec2::splat(3.0) - 2.0 * f);
++    let lerp = |x: f32, y: f32, t: f32| x + (y - x) * t;
++    lerp(lerp(a, b, u.x), lerp(d, e, u.x), u.y)
++}
++
++/// `look_sky_density` (keep in sync): the cloud field at `p` (cells), domain-warped fbm in 0..1;
++/// `lod` the cells a pixel spans, which fades each octave to its mean as it would shimmer.
++pub fn density(p: Vec2, period: i32, warp: f32, octaves: u32, lod: f32) -> f32 {
++    let half = period / 2;
++    let q = Vec2::new(
++        noise(p * 0.5 + Vec2::new(5.2, 1.3), half),
++        noise(p * 0.5 + Vec2::new(1.7, 9.2), half),
++    );
++    let pw = p + warp * (q - Vec2::splat(0.5));
++    let mut sum = 0.0;
++    let mut norm = 0.0;
++    let mut amp = 1.0;
++    let mut freq = 1.0;
++    let mut per = period;
++    for i in 0..octaves {
++        let fade = (2.0 - 2.0 * lod * freq).clamp(0.0, 1.0);
++        let off = Vec2::new(i as f32 * 7.31, i as f32 * 3.17);
++        let n = noise(pw * freq + off, per);
++        sum += amp * (0.5 + (n - 0.5) * fade);
++        norm += amp;
++        amp *= 0.5;
++        freq *= 2.0;
++        per *= 2;
++    }
++    sum / norm
++}
++
++/// The layer's coverage (its alpha, 0..1) toward `dir` (unit, from the eye) under `rows`, as
++/// `look_sky_clouds` computes it: what [`SkyFrame::sun_clear`] reads at the sun.
++pub fn cover_toward(dir: Vec3, rows: &[[f32; 4]; SKY_ROWS]) -> f32 {
++    if rows[0][0] < 0.5 || dir.y <= rows[9][2] {
++        return 0.0;
++    }
++    let dist = rows[1][2] / dir.y;
++    let cell = rows[1][3];
++    let p = Vec2::new(rows[1][0], rows[1][1]) + Vec2::new(dir.x, dir.z) * (dist / cell);
++    let lod = dist * rows[12][2] / (dir.y * cell);
++    let d = density(p, rows[9][0] as i32, rows[8][3], rows[12][0] as u32, lod);
++    let th = rows[0][1];
++    smoothstep(th, th + rows[0][2], d) * smoothstep(rows[9][2], rows[9][3], dir.y) * rows[0][3]
++}
++
++// ---------------------------------------------------------------- this frame
++
++/// The inputs [`pack_rows`] takes besides the light: the server's clock, the lighting's minute,
++/// the eye and the hold.
++#[derive(Clone, Copy, Debug)]
++pub struct SkyInputs {
++    pub secs: f64,
++    pub minute: f32,
++    pub cam: Vec3,
++    pub held: Option<f32>,
++}
++
++fn elevation_deg(to_body: Vec3) -> f32 {
++    to_body
++        .normalize_or_zero()
++        .y
++        .clamp(-1.0, 1.0)
++        .asin()
++        .to_degrees()
++}
++
++/// The cover this frame: the hold, else the day's (or the zone's authored cloud, if more), taken
++/// toward overcast by a storm.
++pub fn cover(input: &SkyInputs, light: &WowLighting) -> f32 {
++    if let Some(c) = input.held {
++        return c.clamp(0.0, 1.0);
++    }
++    let base = cover_at(input.secs).max(light.cloud_density.clamp(0.0, 1.0));
++    let storm = light.storm_bcc.clamp(0.0, 1.0);
++    base + (tune::OVERCAST_COVER - base).max(0.0) * storm
++}
++
++/// The layer's rows for this frame ([`SKY_ROWS`]); all zero, no layer, when `on` is false.
++pub fn pack_rows(on: bool, input: &SkyInputs, light: &WowLighting) -> [[f32; 4]; SKY_ROWS] {
++    let mut rows = [[0.0; 4]; SKY_ROWS];
++    if !on {
++        return rows;
++    }
++    let cover = cover(input, light);
++    let overcast = ((cover - 0.6) / 0.35)
++        .clamp(0.0, 1.0)
++        .max(light.storm_bcc.clamp(0.0, 1.0));
++    let key = key_at(input.minute);
++    // The live horizon tints the keys; a full overcast greys them.
++    let horizon = light.sky[4];
++    let grey = |c: [f32; 3], dim: f32| -> [f32; 3] {
++        let l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
++        std::array::from_fn(|i| {
++            let tinted = c[i] + (horizon[i] - c[i]) * tune::SKY_BLEND;
++            (tinted + (l * dim - tinted) * tune::OVERCAST_GREY * overcast).clamp(0.0, 1.0)
++        })
++    };
++    let lit = grey(key.lit, 0.85);
++    let shade = grey(key.shade, 0.8);
++    // The drift: the eye's own place plus the wind's carry, in cells, wrapped to the period.
++    let period = f64::from(tune::PERIOD_CELLS);
++    let carry = wind::drift(input.secs) * f64::from(wind::tune::CLOUD_SPEED_YD);
++    let cell = f64::from(tune::CELL_YD);
++    let off_x = ((f64::from(input.cam.x) - carry.x) / cell).rem_euclid(period) as f32;
++    let off_z = ((f64::from(input.cam.z) - carry.y) / cell).rem_euclid(period) as f32;
++    let sun = light.celestial_dir.normalize_or_zero();
++    let moon = light.moon_dir_white.normalize_or_zero();
++    let rise = |d: Vec3| smoothstep(tune::RISE_FROM_DEG, tune::RISE_TO_DEG, elevation_deg(d));
++    let sun_up = rise(sun);
++    let clear = 1.0 - overcast;
++    let halo_col: [f32; 3] = std::array::from_fn(|i| {
++        let t = light.celestial_tint[i];
++        t + (tune::HALO_WARM[i] - t) * key.warm
++    });
++    rows[0] = [
++        1.0,
++        tune::THRESHOLD_CLEAR + (tune::THRESHOLD_FULL - tune::THRESHOLD_CLEAR) * cover,
++        tune::SOFTNESS,
++        tune::OPACITY + (tune::OPACITY_OVERCAST - tune::OPACITY) * overcast,
++    ];
++    rows[1] = [off_x, off_z, tune::PLANE_YD, tune::CELL_YD];
++    rows[2] = [lit[0], lit[1], lit[2], tune::SILVER_POWER];
++    rows[3] = [shade[0], shade[1], shade[2], tune::LIGHT_STEP];
++    rows[4] = [sun.x, sun.y, sun.z, key.halo * sun_up * clear];
++    rows[5] = [halo_col[0], halo_col[1], halo_col[2], tune::SILVER];
++    rows[6] = [
++        moon.x,
++        moon.y,
++        moon.z,
++        tune::MOON_HALO * rise(moon) * (1.0 - sun_up) * clear,
++    ];
++    let fog = light.fog_color;
++    rows[7] = [
++        tune::MOON_TINT[0],
++        tune::MOON_TINT[1],
++        tune::MOON_TINT[2],
++        tune::HAZE_YD,
++    ];
++    rows[8] = [fog[0], fog[1], fog[2], tune::WARP];
++    rows[9] = [
++        tune::PERIOD_CELLS as f32,
++        tune::SHADE_CONTRAST,
++        tune::HORIZON_FROM,
++        tune::HORIZON_TO,
++    ];
++    rows[10] = [
++        tune::SUN_INNER_POWER,
++        tune::SUN_WIDE_POWER,
++        tune::MOON_INNER_POWER,
++        tune::MOON_WIDE_POWER,
++    ];
++    rows[11] = [
++        tune::SUN_INNER,
++        tune::SUN_WIDE,
++        tune::MOON_INNER,
++        tune::MOON_WIDE,
++    ];
++    rows[12] = [
++        tune::OCTAVES as f32,
++        tune::WATER_OCTAVES as f32,
++        tune::PIXEL_ANGLE,
++        0.0,
++    ];
++    rows
++}
++
++/// This frame's sky, from [`publish_sky`] to the layer, the water block (`look::water`), the
++/// glares (`sun::follow`) and the god rays (`look::pass`): `on` draws the layer and hides 1.12's
++/// cloud dome; `sun_clear` and `moon_clear` are how much of each body the clouds let through (1
++/// when off).
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct SkyFrame {
++    pub on: bool,
++    pub rows: [[f32; 4]; SKY_ROWS],
++    pub sun_clear: f32,
++    pub moon_clear: f32,
++}
++
++impl Default for SkyFrame {
++    fn default() -> Self {
++        Self {
++            on: false,
++            rows: [[0.0; 4]; SKY_ROWS],
++            sun_clear: 1.0,
++            moon_clear: 1.0,
++        }
++    }
++}
++
++impl SkyFrame {
++    /// The frame for `rows` (all zero: off).
++    pub fn new(rows: [[f32; 4]; SKY_ROWS]) -> Self {
++        if rows[0][0] < 0.5 {
++            return Self::default();
++        }
++        let sun = Vec3::new(rows[4][0], rows[4][1], rows[4][2]);
++        let moon = Vec3::new(rows[6][0], rows[6][1], rows[6][2]);
++        Self {
++            on: true,
++            rows,
++            sun_clear: 1.0 - cover_toward(sun, &rows),
++            moon_clear: 1.0 - cover_toward(moon, &rows),
++        }
++    }
++}
++
++/// Orders the sky's publish before its readers this frame (the water block, the look frame).
++#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
++pub struct SkyPublish;
++
++/// The layer: 1.12's own sky draws underneath; this blends premultiplied in gamma over it.
++pub type LookSkyMaterial = ExtendedMaterial<StandardMaterial, LookSkyExt>;
++
++/// The layer's rows ([`pack_rows`]) on one uniform, `look_sky.wgsl`'s `LookSkyRows`.
++#[derive(Asset, AsBindGroup, Clone, TypePath)]
++pub struct LookSkyExt {
++    #[uniform(100)]
++    pub(crate) rows: [Vec4; SKY_ROWS],
++}
++
++impl MaterialExtension for LookSkyExt {
++    /// The shared sky vertex stage, the far-depth pin ([`crate::sky_order`]).
++    fn vertex_shader() -> ShaderRef {
++        SKY_VERTEX_SHADER.into()
++    }
++
++    fn fragment_shader() -> ShaderRef {
++        "embedded://benilla_world/shaders/look_sky.wgsl".into()
++    }
++
++    fn specialize(
++        _pipeline: &MaterialExtensionPipeline,
++        descriptor: &mut RenderPipelineDescriptor,
++        _layout: &MeshVertexBufferLayoutRef,
++        _key: MaterialExtensionKey<Self>,
++    ) -> Result<(), SpecializedMeshPipelineError> {
++        if let Some(depth) = descriptor.depth_stencil.as_mut() {
++            depth.depth_write_enabled = false;
++        }
++        sky_pipeline_state(descriptor);
++        Ok(())
++    }
++}
++
++/// Marker for the layer's entity.
++#[derive(Component)]
++pub(crate) struct LookSkyLayer;
++
++/// Spawns the layer, hidden until the new look's sky is on.
++pub(crate) fn setup_look_sky(
++    mut commands: Commands,
++    mut meshes: ResMut<Assets<Mesh>>,
++    mut materials: ResMut<Assets<LookSkyMaterial>>,
++) {
++    let material = materials.add(LookSkyMaterial {
++        base: StandardMaterial {
++            unlit: true,
++            cull_mode: None, // viewed from inside
++            alpha_mode: AlphaMode::Premultiplied,
++            depth_bias: crate::sky_order::LOOK_CLOUDS_BIAS,
++            ..default()
++        },
++        extension: LookSkyExt {
++            rows: [Vec4::ZERO; SKY_ROWS],
++        },
++    });
++    commands.spawn((
++        Mesh3d(meshes.add(crate::sky::dome_mesh())),
++        MeshMaterial3d(material),
++        Transform::default(),
++        Visibility::Hidden,
++        LookSkyLayer,
++    ));
++}
++
++/// Publishes this frame's [`SkyFrame`] and writes its rows into the layer's material.
++#[allow(clippy::too_many_arguments)]
++pub(crate) fn publish_sky(
++    look: Res<WorldLook>,
++    sky: Res<LookSky>,
++    world_time: Res<WorldTime>,
++    clock: Res<GameClock>,
++    time: Res<Time>,
++    light: Res<WowLighting>,
++    cam: Query<&GlobalTransform, With<WorldCamera>>,
++    layer: Query<&MeshMaterial3d<LookSkyMaterial>, With<LookSkyLayer>>,
++    mut materials: ResMut<Assets<LookSkyMaterial>>,
++    mut frame: ResMut<SkyFrame>,
++) {
++    let on = look.on && sky.on;
++    let input = SkyInputs {
++        secs: wind::server_secs(&world_time, time.elapsed_secs_f64()),
++        minute: clock.minute as f32,
++        cam: cam.iter().next().map_or(Vec3::ZERO, |g| g.translation()),
++        held: sky.clouds,
++    };
++    let next = SkyFrame::new(pack_rows(on, &input, &light));
++    if *frame != next {
++        *frame = next;
++    }
++    // Only while it draws: under the classic look the material is never touched.
++    if !on {
++        return;
++    }
++    let Ok(handle) = layer.single() else { return };
++    let rows = next.rows.map(Vec4::from_array);
++    if materials
++        .get(&handle.0)
++        .is_some_and(|m| m.extension.rows != rows)
++    {
++        if let Some(m) = materials.get_mut(&handle.0) {
++            m.extension.rows = rows;
++        }
++    }
++}
++
++/// Shows the layer while the new look's sky is on and 1.12's sky would draw: not under a WMO
++/// skybox, not while submerged, not with the debug sky off.
++pub(crate) fn apply_look_sky_visibility(
++    frame: Res<SkyFrame>,
++    debug: Res<crate::dev_state::DebugState>,
++    skybox: Res<crate::skybox::SkyboxWeight>,
++    underwater: Res<crate::liquid::Underwater>,
++    mut layer: Query<&mut Visibility, With<LookSkyLayer>>,
++) {
++    let Ok(mut vis) = layer.single_mut() else {
++        return;
++    };
++    let want = if frame.on
++        && !debug.lighting.disable_sky_dome
++        && !skybox.replaces_celestial()
++        && !underwater.0.any()
++    {
++        Visibility::Inherited
++    } else {
++        Visibility::Hidden
++    };
++    if *vis != want {
++        *vis = want;
++    }
++}
++
++/// Centres the layer on the camera inside the cloud dome's radius; occlusion is the far pin.
++#[allow(clippy::type_complexity)]
++pub(crate) fn follow_look_sky(
++    cam: Query<(&GlobalTransform, &Projection), With<WorldCamera>>,
++    mut layer: Query<
++        (&mut Transform, &mut GlobalTransform),
++        (With<LookSkyLayer>, Without<WorldCamera>),
++    >,
++) {
++    let Some((cam_gt, proj)) = cam.iter().next() else {
++        return;
++    };
++    let Ok((mut tf, mut gt)) = layer.single_mut() else {
++        return;
++    };
++    let far = match proj {
++        Projection::Perspective(p) => p.far,
++        _ => 3000.0,
++    };
++    tf.translation = cam_gt.translation();
++    tf.rotation = Quat::IDENTITY;
++    tf.scale = Vec3::splat(far * 0.86);
++    *gt = GlobalTransform::from(*tf);
++}
++
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<LookSky>().init_resource::<SkyFrame>();
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn noon() -> WowLighting {
++        WowLighting {
++            celestial_dir: Vec3::new(0.3, 0.9, 0.2).normalize(),
++            moon_dir_white: Vec3::new(0.0, -1.0, 0.0),
++            celestial_tint: [1.0, 0.9, 0.7],
++            sky: [[0.2, 0.4, 0.9]; 5],
++            fog_color: [0.7, 0.75, 0.8],
++            ..default()
++        }
++    }
++
++    fn input(minute: f32, held: Option<f32>) -> SkyInputs {
++        SkyInputs {
++            secs: 1.76e9,
++            minute,
++            cam: Vec3::new(9_000.0, 60.0, -300.0),
++            held,
++        }
++    }
++
++    /// The sky's cloud function is mirrored in the water's shader, so the lakes mirror the same
++    /// clouds: the copies must match to the letter (from the rows' struct to the block's end).
++    #[test]
++    fn the_water_mirrors_the_same_clouds() {
++        fn block(src: &str) -> &str {
++            let start = src
++                .find("struct LookSkyRows")
++                .expect("the sky block's start");
++            let end = src.find("// ---- end look sky ----").expect("its end");
++            &src[start..end]
++        }
++        let sky = block(include_str!("../shaders/look_sky.wgsl"));
++        let water = block(include_str!(
++            "../../../benilla-assets/src/shaders/liquid.wgsl"
++        ));
++        assert_eq!(sky, water);
++        assert!(sky.contains(&format!("array<vec4<f32>, {SKY_ROWS}>")));
++    }
++
++    #[test]
++    fn the_rows_are_zero_when_off() {
++        assert_eq!(
++            pack_rows(false, &input(720.0, None), &noon()),
++            [[0.0; 4]; SKY_ROWS]
++        );
++        assert_eq!(SkyFrame::new([[0.0; 4]; SKY_ROWS]), SkyFrame::default());
++    }
++
++    /// The field: in 0..1, the same at a point a whole period away (the drift's wrap is seamless),
++    /// and it varies.
++    #[test]
++    fn the_field_tiles_and_varies() {
++        let per = tune::PERIOD_CELLS;
++        let mut lo = f32::MAX;
++        let mut hi = f32::MIN;
++        for i in 0..200 {
++            let p = Vec2::new(i as f32 * 0.37, i as f32 * 0.21 - 3.0);
++            let d = density(p, per, tune::WARP, tune::OCTAVES, 0.0);
++            let w = density(
++                p + Vec2::new(per as f32, -per as f32),
++                per,
++                tune::WARP,
++                tune::OCTAVES,
++                0.0,
++            );
++            assert!((d - w).abs() < 1e-4, "{p}: {d} vs {w}");
++            assert!((0.0..=1.0).contains(&d));
++            lo = lo.min(d);
++            hi = hi.max(d);
++        }
++        assert!(hi - lo > 0.3, "{lo}..{hi}");
++    }
++
++    /// Far off, the fine octaves fade to their mean: the field goes smooth, not noisy.
++    #[test]
++    fn far_clouds_go_smooth() {
++        let p = Vec2::new(3.3, 7.9);
++        let far = density(p, tune::PERIOD_CELLS, tune::WARP, tune::OCTAVES, 10.0);
++        assert!((far - 0.5).abs() < 1e-6);
++    }
++
++    /// More cover, more cloud: the share of the sky the layer covers grows with the hold.
++    #[test]
++    fn the_cover_sets_how_much_sky_is_cloud() {
++        let share = |c: f32| {
++            let rows = pack_rows(true, &input(720.0, Some(c)), &noon());
++            let mut n = 0.0;
++            let mut covered = 0.0;
++            for i in 0..24 {
++                for j in 2..10 {
++                    let az = i as f32 / 24.0 * std::f32::consts::TAU;
++                    let el = (j as f32 * 9.0f32).to_radians();
++                    let dir = Vec3::new(el.cos() * az.cos(), el.sin(), el.cos() * az.sin());
++                    covered += cover_toward(dir, &rows);
++                    n += 1.0;
++                }
++            }
++            covered / n
++        };
++        let (none, fair, overcast) = (share(0.0), share(0.35), share(1.0));
++        assert!(none < 0.02, "{none}");
++        assert!(
++            fair > none + 0.05 && overcast > fair + 0.3,
++            "{none} {fair} {overcast}"
++        );
++        assert!(overcast > 0.8, "{overcast}");
++    }
++
++    /// The hours: pink at dawn, white at noon, gold underneath at golden hour, blue-grey at night;
++    /// no sun halo at night.
++    #[test]
++    fn the_clouds_take_the_hour() {
++        let dawn = key_at(360.0);
++        assert!(
++            dawn.lit[0] > dawn.lit[1] && dawn.shade[2] > dawn.shade[1],
++            "pink"
++        );
++        let noon_k = key_at(720.0);
++        assert_eq!(noon_k.lit, [1.0; 3]);
++        let golden = key_at(1050.0);
++        assert!(
++            golden.shade[0] > golden.shade[1] && golden.shade[1] > golden.shade[2],
++            "gold"
++        );
++        let night = key_at(60.0);
++        assert!(
++            night.shade[2] > night.shade[0] && night.halo == 0.0,
++            "blue-grey"
++        );
++        // Interpolated between keys, and wrapped.
++        let between = key_at(390.0);
++        assert!((between.lit[1] - 0.5 * (0.74 + 0.88)).abs() < 1e-5);
++        assert_eq!(key_at(1440.0 + 720.0).lit, noon_k.lit);
++    }
++
++    /// Each day rolls its own cover, about one in five clear, and the next eases in.
++    #[test]
++    fn each_day_rolls_its_cover() {
++        let covers: Vec<f32> = (20_000..20_500).map(day_cover).collect();
++        let clear = covers.iter().filter(|c| **c == tune::CLEAR_COVER).count();
++        assert!((60..=150).contains(&clear), "{clear}");
++        let midnight = 20_401.0 * 86_400.0;
++        assert!((cover_at(midnight - 0.5) - cover_at(midnight + 0.5)).abs() < 1e-3);
++    }
++
++    /// A storm takes the sky toward overcast; the hold wins over both.
++    #[test]
++    fn a_storm_covers_the_sky_and_the_hold_wins() {
++        let storm = WowLighting {
++            storm_bcc: 1.0,
++            ..noon()
++        };
++        assert!((cover(&input(720.0, None), &storm) - tune::OVERCAST_COVER).abs() < 1e-5);
++        assert_eq!(cover(&input(720.0, Some(0.8)), &storm), 0.8);
++        let rows = pack_rows(true, &input(720.0, Some(0.0)), &noon());
++        assert!((rows[0][1] - tune::THRESHOLD_CLEAR).abs() < 1e-6);
++    }
++
++    /// The sun's halo is up by day and gone by night; the moon's the other way.
++    #[test]
++    fn the_halos_follow_the_bodies() {
++        let day = pack_rows(true, &input(720.0, Some(0.0)), &noon());
++        assert!(day[4][3] > 0.0 && day[6][3] == 0.0);
++        let night_light = WowLighting {
++            celestial_dir: Vec3::new(0.0, -0.6, 1.0).normalize(),
++            moon_dir_white: Vec3::new(0.2, 0.6, -0.7).normalize(),
++            ..noon()
++        };
++        let night = pack_rows(true, &input(60.0, Some(0.0)), &night_light);
++        assert!(night[4][3] == 0.0 && night[6][3] > 0.0);
++    }
++
++    /// A clear sky lets the sun through whole; a held overcast hides most of it.
++    #[test]
++    fn the_cloud_over_the_sun_is_measured() {
++        let clear = SkyFrame::new(pack_rows(true, &input(720.0, Some(0.0)), &noon()));
++        assert_eq!(clear.sun_clear, 1.0);
++        let grey = SkyFrame::new(pack_rows(true, &input(720.0, Some(1.0)), &noon()));
++        assert!(grey.sun_clear < 0.3, "{}", grey.sun_clear);
++    }
++
++    /// The drift's offset stays inside one period, so the GPU's f32 keeps its precision.
++    #[test]
++    fn the_offset_is_wrapped() {
++        let rows = pack_rows(true, &input(720.0, None), &noon());
++        let per = tune::PERIOD_CELLS as f32;
++        assert!((0.0..per).contains(&rows[1][0]) && (0.0..per).contains(&rows[1][1]));
++    }
++
++    #[test]
++    fn looksky_parses_its_arguments() {
++        assert_eq!(LookSky::parse(""), Some(None));
++        assert_eq!(LookSky::parse("grade"), Some(None));
++        assert_eq!(LookSky::parse("clouds"), Some(None));
++        assert_eq!(LookSky::parse("clouds 0.8"), Some(Some(0.8)));
++        assert_eq!(LookSky::parse("CLOUDS 0"), Some(Some(0.0)));
++        assert_eq!(LookSky::parse("clouds 1.5"), None);
++        assert_eq!(LookSky::parse("clouds lots"), None);
++        assert_eq!(LookSky::parse("clouds 0.5 1"), None);
++        assert_eq!(LookSky::parse("rain"), None);
++    }
++}
+diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
+index 6ddd346..51196b7 100644
+--- a/crates/benilla-world/src/look/water.rs
++++ b/crates/benilla-world/src/look/water.rs
+@@ -105,8 +105,10 @@ pub mod tune {
+ ///   2 `[glint colour (linear), sharpness]` · 3 `[sky zenith (linear), ripple slope]` ·
+ ///   4 `[sky horizon (linear), ripple wavelength (yd)]` · 5 `[shallow (sRGB), tint weight]` ·
+ ///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
+-///   8 `[sky middle (linear), sheen]` · 9 `[classic ripples, shadow dim, ocean clarity (yd), 0]`.
+-pub const WATER_ROWS: usize = 10;
++///   8 `[sky middle (linear), sheen]` · 9 `[classic ripples, shadow dim, ocean clarity (yd), 0]` ·
++///   10 to 22 the new look's painted sky (`look::sky::pack_rows`, all zero while it is off), which
++///   the mirror's sky runs through, so the lakes mirror the clouds.
++pub const WATER_ROWS: usize = 10 + super::sky::SKY_ROWS;
+ 
+ /// `worldWater` and the film's hold: `on` (on by default, inert under the classic look); `reflect`
+ /// holds the mirror at a multiple of the tuned one, `clarity` the clarity (`lookwater`).
+@@ -255,15 +257,30 @@ pub fn ripple_slope(light: &WowLighting) -> f32 {
+ }
+ 
+ /// The water block for this frame ([`WATER_ROWS`]); all zero, which `liquid.wgsl` reads as 1.12's
+-/// water, when `on` is false.
+-pub fn pack_rows(on: bool, held: &LookWater, light: &WowLighting) -> [[f32; 4]; WATER_ROWS] {
++/// water, when `on` is false. Under the painted sky (`sky.on`) the mirror's sky takes its rows and
++/// its cloud over the glint's body dims the glint.
++pub fn pack_rows(
++    on: bool,
++    held: &LookWater,
++    light: &WowLighting,
++    sky: &super::SkyFrame,
++) -> [[f32; 4]; WATER_ROWS] {
+     let mut rows = [[0.0; 4]; WATER_ROWS];
+     if !on {
+         return rows;
+     }
+     let mirror = tune::MIRROR * held.reflect.unwrap_or(1.0);
+     let clarity = held.clarity.unwrap_or(1.0);
+-    let (body, strength, color, sharpness) = glint(light);
++    let (body, mut strength, color, sharpness) = glint(light);
++    if sky.on {
++        let sun = light.celestial_dir.normalize_or_zero();
++        strength *= if body.dot(sun) > 0.999 {
++            sky.sun_clear
++        } else {
++            sky.moon_clear
++        };
++        rows[10..].copy_from_slice(&sky.rows);
++    }
+     // The sky's reflection: the hour's dome, toward the fog under cloud.
+     let overcast = tune::OVERCAST_SKY * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
+     let sky = |i: usize| {
+@@ -306,12 +323,13 @@ pub(crate) fn publish_water(
+     look: Res<WorldLook>,
+     water: Res<LookWater>,
+     light: Res<WowLighting>,
++    sky: Res<super::SkyFrame>,
+     mut frame: ResMut<WaterFrame>,
+ ) {
+     let on = look.on && water.on;
+     let next = WaterFrame {
+         on,
+-        rows: pack_rows(on, &water, &light),
++        rows: pack_rows(on, &water, &light, &sky),
+     };
+     if *frame != next {
+         *frame = next;
+@@ -384,9 +402,11 @@ mod tests {
+         }
+     }
+ 
++    use crate::look::SkyFrame;
++
+     #[test]
+     fn the_block_is_zero_when_off() {
+-        let rows = pack_rows(false, &LookWater::default(), &noon());
++        let rows = pack_rows(false, &LookWater::default(), &noon(), &SkyFrame::default());
+         assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
+     }
+ 
+@@ -394,7 +414,7 @@ mod tests {
+     /// mirror and the clarity, and lets go again.
+     #[test]
+     fn the_block_carries_the_tuning_and_the_hold() {
+-        let rows = pack_rows(true, &LookWater::default(), &noon());
++        let rows = pack_rows(true, &LookWater::default(), &noon(), &SkyFrame::default());
+         assert_eq!(rows[0], [1.0, tune::MIRROR, tune::CLEAR_YD, tune::FOAM]);
+         assert_eq!(rows[7][0], tune::SSR_REACH);
+         assert_eq!(rows[6][3], tune::DEEP_AT);
+@@ -403,7 +423,7 @@ mod tests {
+             clarity: Some(0.5),
+             ..default()
+         };
+-        let rows = pack_rows(true, &held, &noon());
++        let rows = pack_rows(true, &held, &noon(), &SkyFrame::default());
+         assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
+         assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
+         assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
+@@ -477,6 +497,7 @@ mod tests {
+         app.insert_resource(WorldLook::NEW)
+             .init_resource::<LookWater>()
+             .init_resource::<WaterFrame>()
++            .init_resource::<SkyFrame>()
+             .insert_resource(noon())
+             .add_systems(Update, publish_water);
+         app.update();
+@@ -499,9 +520,28 @@ mod tests {
+         assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
+     }
+ 
+-    /// The block's size is its rows'.
++    /// The block's size is its rows': its own ten and the painted sky's thirteen.
+     #[test]
+-    fn the_block_is_ten_rows() {
+-        assert_eq!(WATER_BLOCK_BYTES, 160);
++    fn the_block_is_twenty_three_rows() {
++        assert_eq!(WATER_BLOCK_BYTES, 368);
++    }
++
++    /// Under the painted sky the mirror takes its rows, and the cloud over the sun dims the glint;
++    /// with it off, those rows stay zero and the glint whole.
++    #[test]
++    fn the_painted_sky_reaches_the_water() {
++        let off = pack_rows(true, &LookWater::default(), &noon(), &SkyFrame::default());
++        assert!(off[10..].iter().all(|r| *r == [0.0; 4]));
++        let input = crate::look::sky::SkyInputs {
++            secs: 1.76e9,
++            minute: 720.0,
++            cam: Vec3::ZERO,
++            held: Some(1.0),
++        };
++        let sky = SkyFrame::new(crate::look::sky::pack_rows(true, &input, &noon()));
++        let on = pack_rows(true, &LookWater::default(), &noon(), &sky);
++        assert_eq!(on[10..], sky.rows[..]);
++        assert!((on[1][3] - off[1][3] * sky.sun_clear).abs() < 1e-5);
++        assert!(sky.sun_clear < 1.0);
+     }
+ }
+diff --git a/crates/benilla-world/src/look/wind.rs b/crates/benilla-world/src/look/wind.rs
+new file mode 100644
+index 0000000..094e810
+--- /dev/null
++++ b/crates/benilla-world/src/look/wind.rs
+@@ -0,0 +1,622 @@
++//! One wind for the whole world, the new look's own (no reference behaviour): WoW Forever's world
++//! never stands still. 1.12 sways only the few models that author their own bone animation; under
++//! the new look the trees, bushes and grass all lean and sway in one wind:
++//! 1. **the wind** ([`velocity`]): a steady prevailing push plus three slowly turning parts, so its
++//!    direction and speed drift over hours, the same for every hero: it is a fixed function of the
++//!    server's clock ([`server_secs`]), never a local random. Each server day rolls how breezy it is
++//!    ([`day_roll`], a fixed hash of the day number, eased into the next over the last two hours);
++//!    it calms at night and rises in a storm;
++//! 2. **gusts** ([`gusts`]): soft fronts that cross the ground downwind every so often, so
++//!    neighbouring trees bend one after another; each front has its own strength and is patchy
++//!    across the wind;
++//! 3. **the sway** (`static_gx.wgsl`, `wow_model.wgsl`, `world_shadow.wgsl`, `wind_sway`): in the
++//!    vertex stage, a plant (a doodad whose model path names a tree, bush, fern and the like,
++//!    [`sways`]) leans downwind and sways with height above its base, little or none at the trunk,
++//!    each tree on its own phase; its leaves (alpha-tested batches) flutter a little more; the
++//!    ground clutter's tufts bend from the root (`wind_grass`). Models that animate their own bones
++//!    (1.12's own swaying trees) are skinned and left alone, so nothing sways twice;
++//! 4. **the clouds** drift with the same wind ([`drift`], the closed-form integral of
++//!    [`velocity`], so it too is the same on every client), in `look::sky`.
++//!
++//! Every tunable is in [`tune`]; [`pack_rows`] carries them to the shaders each frame in the shared
++//! light buffer's wind block. `worldWind 0` ([`LookWind::on`]) stills it on its own; `lookwind
++//! <strength> [gust]` holds it for film. `worldLook 0` packs an all-zero block, and every shader
++//! then draws 1.12's still geometry untouched.
++
++use bevy::math::DVec2;
++use bevy::prelude::*;
++
++use super::WorldLook;
++use crate::lighting::{WorldTime, WowLighting};
++use crate::view::WorldCamera;
++
++/// Every tunable of the wind, in one place. A first pass, to tune on film with `lookwind`. Speeds
++/// are in the wind's own units (about 1 on an ordinary breezy afternoon), lengths in yards, times
++/// in seconds.
++pub mod tune {
++    /// The steady prevailing wind (Bevy x, z): from the west-south-west, as Elwynn's clouds go.
++    pub const PREVAILING: [f32; 2] = [0.55, 0.2];
++    /// The turning parts: amplitude, period (hours, negative turns the other way) and phase
++    /// (radians). Their sum wanders the direction over hours and the speed between about 0.1 and 2.
++    pub const TURNING: [(f32, f32, f32); 3] =
++        [(0.55, 29.0, 0.7), (0.3, -11.3, 2.9), (0.15, 4.7, 5.1)];
++    /// A day's breeze, times the wind's speed: an ordinary day rolls between these...
++    pub const DAY_MIN: f32 = 0.55;
++    pub const DAY_MAX: f32 = 1.05;
++    /// ...and about one day in this many is a windy day, at this.
++    pub const WINDY_DAY_ONE_IN: u32 = 6;
++    pub const WINDY_DAY: f32 = 1.6;
++    /// The minute of the server's day from which the next day's roll eases in (to midnight).
++    pub const DAY_EASE_FROM_MIN: f32 = 1320.0;
++    /// The breeze at night, as a share of the day's; it rises with the sun between these
++    /// elevations (degrees).
++    pub const NIGHT_CALM: f32 = 0.55;
++    pub const CALM_FROM_DEG: f32 = -6.0;
++    pub const CALM_TO_DEG: f32 = 25.0;
++    /// How much a full storm adds to the strength.
++    pub const STORM: f32 = 1.2;
++    /// The strength the shaders take is this times the speed times the day's roll; the floor keeps
++    /// a little life in the stillest hour.
++    pub const STRENGTH_FLOOR: f32 = 0.2;
++    /// Gusts: their speed over the ground (yd/s), the spacing of the fronts downwind (yards, one
++    /// every spacing ÷ speed seconds at a point), a front's soft half-width as a share of the
++    /// spacing, and a front's strength at most (a day's roll scales it, 0.5 to 1).
++    pub const GUST_SPEED_YD: f32 = 9.0;
++    pub const GUST_SPACING_YD: f32 = 270.0;
++    pub const GUST_WIDTH: f32 = 0.09;
++    pub const GUST: f32 = 0.9;
++    /// The fronts are measured from a grid point near the camera, so the wind's slow turn does not
++    /// sweep them across the far world; the grid's size (yards).
++    pub const ORIGIN_GRID_YD: f32 = 1024.0;
++    /// A tree's lean: at height `h` above its base it moves `TREE_BEND × h² / (h + BEND_KNEE_YD)`
++    /// yards per unit of strength, so a 15 yd crown leans about 0.25 yd on a breezy day and a bush
++    /// barely moves but for its leaves.
++    pub const TREE_BEND: f32 = 0.021;
++    pub const BEND_KNEE_YD: f32 = 4.0;
++    /// The leaves' flutter (yards per unit of strength, full from 3 yd up), and the grass's bend
++    /// at a tuft's tip.
++    pub const LEAF_FLUTTER_YD: f32 = 0.035;
++    pub const GRASS_BEND_YD: f32 = 0.16;
++    /// The sway's clock wraps every this many seconds; the sway's angular speeds (radians a second)
++    /// are whole turns per wrap, so the wrap never shows: a crown's two sways, its sway across the
++    /// wind, and the leaves' flutter.
++    pub const CLOCK_WRAP_S: f64 = 120.0;
++    pub const SWAY_TURNS: [f32; 4] = [26.0, 41.0, 19.0, 170.0];
++    /// The cloud layer's speed over the ground per unit of wind (yd/s).
++    pub const CLOUD_SPEED_YD: f32 = 7.0;
++    /// The most `lookwind` scales the strength and the gusts by.
++    pub const SCALE_MAX: f32 = 3.0;
++}
++
++/// Rows the wind block takes at the end of the shared light buffer's prefix
++/// (`lighting::global_light`), mirrored as `wind: array<vec4<f32>, 5>` in `wow_model.wgsl`,
++/// `static_gx.wgsl` and `world_shadow.wgsl`; keep in sync:
++///   0 `[downwind x, downwind z (unit), strength, on]` ·
++///   1 `[gust strength, front spacing (yd), the train's travel mod spacing (yd), its front count
++///      mod 4096]` · 2 `[front origin x, z, sway clock (s, wrapped), front half-width (share)]` ·
++///   3 `[tree bend, bend knee (yd), leaf flutter (yd), grass bend (yd)]` ·
++///   4 the sway's four angular speeds (rad/s).
++pub const WIND_ROWS: usize = 5;
++
++/// `worldWind` and the film's hold: `on` (on by default, inert under the classic look); `strength`
++/// holds the strength at a multiple of the wind's own, `gust` the gusts (`lookwind`).
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookWind {
++    pub on: bool,
++    pub strength: Option<f32>,
++    pub gust: Option<f32>,
++}
++
++impl Default for LookWind {
++    /// On, the `worldWind` CVar's registered "1".
++    fn default() -> Self {
++        Self {
++            on: true,
++            strength: None,
++            gust: None,
++        }
++    }
++}
++
++impl LookWind {
++    /// `lookwind`'s arguments: a strength scale from 0 to [`tune::SCALE_MAX`] and an optional gust
++    /// scale over the same range, or nothing (or `grade`) to follow the world's wind again; `None`
++    /// for anything else, which changes nothing.
++    pub fn parse(args: &str) -> Option<(Option<f32>, Option<f32>)> {
++        let in_range = |w: &str| {
++            w.parse::<f32>()
++                .ok()
++                .filter(|v| (0.0..=tune::SCALE_MAX).contains(v))
++        };
++        let mut words = args.split_whitespace();
++        let first = match words.next() {
++            None => return Some((None, None)),
++            Some(w) if w.eq_ignore_ascii_case("grade") => {
++                return words.next().is_none().then_some((None, None));
++            }
++            Some(w) => w,
++        };
++        let strength = in_range(first)?;
++        let gust = match words.next() {
++            None => None,
++            Some(w) => Some(in_range(w)?),
++        };
++        words.next().is_none().then_some((Some(strength), gust))
++    }
++}
++
++/// Whether a doodad's model sways in the wind: its path names a plant. Lower-case match on the
++/// whole path, so `World\Azeroth\Elwynn\PassiveDoodads\Trees\ElwynnTreeCanopy02.m2` and
++/// `ElwynnBush09.m2` sway, and a stump, a log, a lamppost or a treehouse don't.
++pub fn sways(path: &str) -> bool {
++    const PLANTS: [&str; 18] = [
++        "tree", "bush", "shrub", "fern", "grass", "plant", "flower", "reed", "cattail", "vine",
++        "ivy", "leaf", "leaves", "canopy", "hedge", "weed", "wheat", "sapling",
++    ];
++    // A vineyard's fence or post is not a vine.
++    const STILL: [&str; 13] = [
++        "stump",
++        "log",
++        "root",
++        "treehouse",
++        "trunk",
++        "dead",
++        "fallen",
++        "fence",
++        "post",
++        "pole",
++        "stake",
++        "sign",
++        "crate",
++    ];
++    let p = path.to_ascii_lowercase();
++    PLANTS.iter().any(|w| p.contains(w)) && !STILL.iter().any(|w| p.contains(w))
++}
++
++/// SplitMix64's finaliser, as `look::mist`'s: a fixed hash, the same on every machine.
++fn mix(x: u64) -> u64 {
++    let mut z = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
++    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
++    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
++    z ^ (z >> 31)
++}
++
++fn unit(h: u64) -> f32 {
++    (h >> 40) as f32 / (1u64 << 24) as f32
++}
++
++/// Mixed into the day so the wind's dice are its own.
++const DAY_SALT: u64 = 0x7769_6E64_6461_7973; // "winddays"
++
++/// One server day's wind: how breezy (times the wind's speed) and how gusty (0.5 to 1).
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct WindDay {
++    pub breeze: f32,
++    pub gust: f32,
++}
++
++/// The day's roll: deterministic in `day` alone.
++pub fn day_roll(day: i64) -> WindDay {
++    let h = mix(day as u64 ^ DAY_SALT);
++    let windy = unit(h) < 1.0 / tune::WINDY_DAY_ONE_IN as f32;
++    let breeze = if windy {
++        tune::WINDY_DAY
++    } else {
++        tune::DAY_MIN + (tune::DAY_MAX - tune::DAY_MIN) * unit(mix(h))
++    };
++    WindDay {
++        breeze,
++        gust: 0.5 + 0.5 * unit(mix(h ^ 0x5555)),
++    }
++}
++
++/// The server's clock in seconds (its date and the fraction of its day), the same on every client
++/// and untouched by the film clock (`worldclock` moves the light only). Before a server clock
++/// lands, the local clock from noon, so the world viewer's wind still moves.
++pub fn server_secs(time: &WorldTime, local_secs: f64) -> f64 {
++    if time.live {
++        time.date as f64 * 86_400.0 + f64::from(time.minute_f) * 60.0
++    } else {
++        43_200.0 + local_secs
++    }
++}
++
++fn turning_omega(period_h: f32) -> f64 {
++    std::f64::consts::TAU / (f64::from(period_h) * 3600.0)
++}
++
++/// The world's wind at `secs` of the server's clock (Bevy x, z), in the wind's own units.
++pub fn velocity(secs: f64) -> Vec2 {
++    let mut v = DVec2::new(
++        f64::from(tune::PREVAILING[0]),
++        f64::from(tune::PREVAILING[1]),
++    );
++    for (a, period, phase) in tune::TURNING {
++        let ang = turning_omega(period) * secs + f64::from(phase);
++        v += f64::from(a) * DVec2::new(ang.cos(), ang.sin());
++    }
++    v.as_vec2()
++}
++
++/// How far the wind has carried the air by `secs` (the integral of [`velocity`], closed form, in
++/// wind-unit seconds), up to a constant: what the clouds drift by. f64 throughout; a caller wraps
++/// it to its own period before handing it to f32.
++pub fn drift(secs: f64) -> DVec2 {
++    let mut d = DVec2::new(
++        f64::from(tune::PREVAILING[0]),
++        f64::from(tune::PREVAILING[1]),
++    ) * secs;
++    for (a, period, phase) in tune::TURNING {
++        let w = turning_omega(period);
++        let ang = w * secs + f64::from(phase);
++        d += f64::from(a) / w * DVec2::new(ang.sin(), -ang.cos());
++    }
++    d
++}
++
++fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
++    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++/// The day's roll at `secs`, eased into the next day's over the last two hours of the server's
++/// day, so it never steps at midnight.
++pub fn day_at(secs: f64) -> WindDay {
++    let day = (secs / 86_400.0).floor();
++    let minute = ((secs - day * 86_400.0) / 60.0) as f32;
++    let (a, b) = (day_roll(day as i64), day_roll(day as i64 + 1));
++    let t = smoothstep(tune::DAY_EASE_FROM_MIN, 1440.0, minute);
++    WindDay {
++        breeze: a.breeze + (b.breeze - a.breeze) * t,
++        gust: a.gust + (b.gust - a.gust) * t,
++    }
++}
++
++/// The wind the world feels this frame: downwind (unit, Bevy x, z), the strength the sway takes
++/// and the gusts' strength, before any `lookwind` hold.
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct WindState {
++    pub dir: Vec2,
++    pub strength: f32,
++    pub gust: f32,
++}
++
++/// The wind at `secs` of the server's clock under `light` (the sun's height calms the night, a
++/// storm raises it).
++pub fn wind_state(secs: f64, light: &WowLighting) -> WindState {
++    let v = velocity(secs);
++    let day = day_at(secs);
++    let elev = light
++        .celestial_dir
++        .normalize_or_zero()
++        .y
++        .clamp(-1.0, 1.0)
++        .asin()
++        .to_degrees();
++    let calm = tune::NIGHT_CALM
++        + (1.0 - tune::NIGHT_CALM) * smoothstep(tune::CALM_FROM_DEG, tune::CALM_TO_DEG, elev);
++    let storm = light.storm_bcc.clamp(0.0, 1.0);
++    let strength = (tune::STRENGTH_FLOOR + v.length() * day.breeze) * calm + tune::STORM * storm;
++    WindState {
++        dir: v.normalize_or(Vec2::X),
++        strength,
++        gust: tune::GUST * day.gust * (calm + storm).min(1.0),
++    }
++}
++
++/// The gust train at `secs`: how far its fronts have travelled modulo their spacing (yards), and
++/// how many whole spacings, modulo 4096 (each front's strength is a hash of its number).
++pub fn gusts(secs: f64) -> (f32, f32) {
++    let spacing = f64::from(tune::GUST_SPACING_YD);
++    let travelled = f64::from(tune::GUST_SPEED_YD) * secs;
++    let n = (travelled / spacing).floor();
++    (
++        (travelled - n * spacing) as f32,
++        n.rem_euclid(4096.0) as f32,
++    )
++}
++
++/// The fronts' origin: the camera snapped to the grid, so their lines stay put while it moves.
++pub fn front_origin(cam: Vec3) -> Vec2 {
++    let g = tune::ORIGIN_GRID_YD;
++    Vec2::new((cam.x / g).round() * g, (cam.z / g).round() * g)
++}
++
++/// The wind block for this frame ([`WIND_ROWS`]); all zero, which the shaders read as no wind, when
++/// `on` is false.
++pub fn pack_rows(
++    on: bool,
++    held: &LookWind,
++    state: WindState,
++    secs: f64,
++    cam: Vec3,
++) -> [[f32; 4]; WIND_ROWS] {
++    let mut rows = [[0.0; 4]; WIND_ROWS];
++    if !on {
++        return rows;
++    }
++    let strength = state.strength * held.strength.unwrap_or(1.0);
++    let gust = state.gust * held.gust.unwrap_or(1.0);
++    let (travel, count) = gusts(secs);
++    let origin = front_origin(cam);
++    let clock = secs.rem_euclid(tune::CLOCK_WRAP_S) as f32;
++    let turn = |turns: f32| turns * std::f32::consts::TAU / tune::CLOCK_WRAP_S as f32;
++    rows[0] = [state.dir.x, state.dir.y, strength, 1.0];
++    rows[1] = [gust, tune::GUST_SPACING_YD, travel, count];
++    rows[2] = [origin.x, origin.y, clock, tune::GUST_WIDTH];
++    rows[3] = [
++        tune::TREE_BEND,
++        tune::BEND_KNEE_YD,
++        tune::LEAF_FLUTTER_YD,
++        tune::GRASS_BEND_YD,
++    ];
++    rows[4] = tune::SWAY_TURNS.map(turn);
++    rows
++}
++
++/// This frame's wind, from [`publish_wind`] to the shared light's pack (`build_light_data`) and the
++/// clouds (`look::sky`): `rows` are [`pack_rows`]'s, all zero when off; `secs` the server's clock
++/// it was taken at.
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct WindFrame {
++    pub on: bool,
++    pub rows: [[f32; 4]; WIND_ROWS],
++    pub secs: f64,
++}
++
++impl Default for WindFrame {
++    fn default() -> Self {
++        Self {
++            on: false,
++            rows: [[0.0; 4]; WIND_ROWS],
++            secs: 43_200.0,
++        }
++    }
++}
++
++/// Publishes this frame's [`WindFrame`] from the switch, the hold, the server's clock and the
++/// resolved light.
++pub(crate) fn publish_wind(
++    look: Res<WorldLook>,
++    wind: Res<LookWind>,
++    world_time: Res<WorldTime>,
++    time: Res<Time>,
++    light: Res<WowLighting>,
++    cam: Query<&GlobalTransform, With<WorldCamera>>,
++    mut frame: ResMut<WindFrame>,
++) {
++    let on = look.on && wind.on;
++    let secs = server_secs(&world_time, time.elapsed_secs_f64());
++    let cam = cam.iter().next().map_or(Vec3::ZERO, |g| g.translation());
++    *frame = WindFrame {
++        on,
++        rows: pack_rows(on, &wind, wind_state(secs, &light), secs, cam),
++        secs,
++    };
++}
++
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<LookWind>().init_resource::<WindFrame>();
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn noon() -> WowLighting {
++        WowLighting {
++            celestial_dir: Vec3::new(0.3, 0.9, 0.2).normalize(),
++            ..default()
++        }
++    }
++
++    /// The wind's WGSL is one block mirrored in three shaders (naga_oil cannot import a function
++    /// that reads another module's binding): the copies must match to the letter.
++    #[test]
++    fn the_three_wind_blocks_match() {
++        fn block(src: &str) -> &str {
++            let start = src
++                .find("// ---- look wind:")
++                .expect("the wind block's start");
++            let end = src.find("// ---- end look wind ----").expect("its end");
++            &src[start..end]
++        }
++        let model = block(include_str!(
++            "../../../benilla-assets/src/shaders/wow_model.wgsl"
++        ));
++        assert_eq!(model, block(include_str!("../shaders/static_gx.wgsl")));
++        assert_eq!(model, block(include_str!("../shaders/world_shadow.wgsl")));
++        assert!(model.contains("fn wind_sway(") && model.contains("fn wind_grass("));
++    }
++
++    #[test]
++    fn plants_sway_and_the_rest_stands_still() {
++        for p in [
++            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Trees\\ElwynnTreeCanopy02.m2",
++            "elwynnbush09.m2",
++            "World\\Generic\\PassiveDoodads\\Plants\\Fern01.m2",
++            "world/azeroth/elwynn/passivedoodads/detail/elwynngrass01.m2",
++        ] {
++            assert!(sways(p), "{p}");
++        }
++        for p in [
++            "world/azeroth/elwynn/passivedoodads/lamppost/lamppost.m2",
++            "World\\Generic\\PassiveDoodads\\Trees\\TreeStump01.m2",
++            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Trees\\ElwynnLog01.m2",
++            "World\\Generic\\Human\\Passive Doodads\\Carts\\Cart01.m2",
++            "World\\Azeroth\\Elwynn\\PassiveDoodads\\Vineyard\\VineyardFencePost01.m2",
++        ] {
++            assert!(!sways(p), "{p}");
++        }
++    }
++
++    /// The day's roll is a fixed function of the day, ordinary days within their band, and about
++    /// one in six windy.
++    #[test]
++    fn each_day_rolls_its_own_breeze() {
++        assert_eq!(day_roll(20_400), day_roll(20_400));
++        let rolls: Vec<_> = (20_000..20_600).map(day_roll).collect();
++        let windy = rolls.iter().filter(|r| r.breeze == tune::WINDY_DAY).count();
++        assert!((60..=150).contains(&windy), "{windy} windy days in 600");
++        for r in &rolls {
++            assert!(
++                r.breeze == tune::WINDY_DAY || (tune::DAY_MIN..=tune::DAY_MAX).contains(&r.breeze)
++            );
++            assert!((0.5..=1.0).contains(&r.gust));
++        }
++    }
++
++    /// The roll never steps at midnight: the next day's eases in over the last two hours.
++    #[test]
++    fn the_day_eases_into_the_next() {
++        let midnight = 20_401.0 * 86_400.0;
++        let before = day_at(midnight - 0.5);
++        let after = day_at(midnight + 0.5);
++        assert!((before.breeze - after.breeze).abs() < 1e-3);
++        assert_eq!(day_at(midnight - 3.0 * 3600.0), day_roll(20_400));
++    }
++
++    /// The drift is the wind's integral: its change over a second is the wind's speed.
++    #[test]
++    fn the_drift_is_the_integral_of_the_wind() {
++        for secs in [0.0, 1.0e5, 1.76e9, 1.7612345e9] {
++            let d = drift(secs + 0.5) - drift(secs - 0.5);
++            let v = velocity(secs);
++            assert!((d.as_vec2() - v).length() < 1e-4, "{secs}: {d} vs {v}");
++        }
++    }
++
++    /// The wind turns and changes speed slowly: a minute apart it has barely moved, hours apart it
++    /// has.
++    #[test]
++    fn the_wind_drifts_slowly() {
++        let t = 1.76e9;
++        let a = velocity(t);
++        let b = velocity(t + 60.0);
++        assert!(a.angle_to(b).abs() < 0.05, "{a} {b}");
++        let spread: Vec<f32> = (0..48)
++            .map(|h| velocity(t + h as f64 * 3600.0).length())
++            .collect();
++        let lo = spread.iter().copied().fold(f32::MAX, f32::min);
++        let hi = spread.iter().copied().fold(0.0, f32::max);
++        assert!(hi - lo > 0.3, "the speed wanders over two days: {lo}..{hi}");
++        let turned = (0..48)
++            .map(|h| velocity(t).angle_to(velocity(t + h as f64 * 3600.0)).abs())
++            .fold(0.0, f32::max);
++        assert!(turned > 0.5, "the direction wanders: {turned}");
++    }
++
++    /// Calm at night, a breeze by day, more in a storm.
++    #[test]
++    fn the_night_is_calmer_and_a_storm_wilder() {
++        let t = 1.76e9;
++        let day = wind_state(t, &noon());
++        let night = wind_state(
++            t,
++            &WowLighting {
++                celestial_dir: Vec3::new(0.0, -0.6, 1.0).normalize(),
++                ..noon()
++            },
++        );
++        let storm = wind_state(
++            t,
++            &WowLighting {
++                storm_bcc: 1.0,
++                ..noon()
++            },
++        );
++        assert!(night.strength < day.strength && storm.strength > day.strength + 1.0);
++        assert!((day.dir.length() - 1.0).abs() < 1e-5);
++    }
++
++    #[test]
++    fn the_gust_train_travels_and_counts_its_fronts() {
++        let (a, n) = gusts(0.0);
++        assert_eq!((a, n), (0.0, 0.0));
++        let (a, n) = gusts(31.0);
++        assert!((a - (31.0 * tune::GUST_SPEED_YD - tune::GUST_SPACING_YD)).abs() < 1e-3);
++        assert_eq!(n, 1.0);
++        let (a, n) = gusts(1.76e9);
++        assert!((0.0..tune::GUST_SPACING_YD).contains(&a) && (0.0..4096.0).contains(&n));
++        assert_eq!(n.fract(), 0.0);
++    }
++
++    #[test]
++    fn the_block_is_zero_when_off_and_carries_the_hold() {
++        let state = wind_state(1.76e9, &noon());
++        assert_eq!(
++            pack_rows(false, &LookWind::default(), state, 1.76e9, Vec3::ZERO),
++            [[0.0; 4]; WIND_ROWS]
++        );
++        let rows = pack_rows(true, &LookWind::default(), state, 1.76e9, Vec3::ZERO);
++        assert_eq!(rows[0], [state.dir.x, state.dir.y, state.strength, 1.0]);
++        assert_eq!(rows[1][0], state.gust);
++        assert!((0.0..tune::CLOCK_WRAP_S as f32).contains(&rows[2][2]));
++        let held = LookWind {
++            strength: Some(2.0),
++            gust: Some(0.0),
++            ..default()
++        };
++        let rows = pack_rows(true, &held, state, 1.76e9, Vec3::ZERO);
++        assert_eq!(rows[0][2], 2.0 * state.strength);
++        assert_eq!(rows[1][0], 0.0);
++    }
++
++    /// The sway's speeds are whole turns per wrap of its clock, so the wrap never shows.
++    #[test]
++    fn the_sway_clock_wraps_seamlessly() {
++        let rows = pack_rows(
++            true,
++            &LookWind::default(),
++            wind_state(0.0, &noon()),
++            0.0,
++            Vec3::ZERO,
++        );
++        for w in rows[4] {
++            let turns = w * tune::CLOCK_WRAP_S as f32 / std::f32::consts::TAU;
++            assert!((turns - turns.round()).abs() < 1e-3, "{turns}");
++        }
++    }
++
++    #[test]
++    fn the_front_origin_snaps_to_its_grid() {
++        let o = front_origin(Vec3::new(9_100.0, 50.0, -300.0));
++        assert_eq!(o, Vec2::new(9_216.0, 0.0));
++    }
++
++    #[test]
++    fn lookwind_parses_its_arguments() {
++        assert_eq!(LookWind::parse(""), Some((None, None)));
++        assert_eq!(LookWind::parse("grade"), Some((None, None)));
++        assert_eq!(LookWind::parse("2"), Some((Some(2.0), None)));
++        assert_eq!(LookWind::parse("0 3"), Some((Some(0.0), Some(3.0))));
++        assert_eq!(LookWind::parse("4"), None);
++        assert_eq!(LookWind::parse("1 -1"), None);
++        assert_eq!(LookWind::parse("1 1 1"), None);
++        assert_eq!(LookWind::parse("grade 1"), None);
++        assert_eq!(LookWind::parse("gale"), None);
++    }
++
++    /// The wind follows `worldLook` and `worldWind` both.
++    #[test]
++    fn the_frame_follows_both_switches() {
++        let mut app = App::new();
++        app.insert_resource(WorldLook::NEW)
++            .init_resource::<LookWind>()
++            .init_resource::<WindFrame>()
++            .init_resource::<WorldTime>()
++            .init_resource::<Time>()
++            .insert_resource(noon())
++            .add_systems(Update, publish_wind);
++        app.update();
++        assert!(app.world().resource::<WindFrame>().on);
++        app.world_mut().resource_mut::<LookWind>().on = false;
++        app.update();
++        let f = *app.world().resource::<WindFrame>();
++        assert!(!f.on && f.rows == [[0.0; 4]; WIND_ROWS]);
++        app.world_mut().resource_mut::<LookWind>().on = true;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        app.update();
++        assert!(!app.world().resource::<WindFrame>().on);
++    }
++}
+diff --git a/crates/benilla-world/src/model_render.rs b/crates/benilla-world/src/model_render.rs
+index 5126939..608c719 100644
+--- a/crates/benilla-world/src/model_render.rs
++++ b/crates/benilla-world/src/model_render.rs
+@@ -84,6 +84,8 @@ pub struct MatKey {
+     /// The placement owning this material when its animated loop follows the instance's sequence
+     /// (the BRM lava bubbles' flipbook); `None` for the shared material.
+     instance: Option<Entity>,
++    /// How the batch moves in the new look's wind ([`Sway`]).
++    sway: Sway,
+ }
+ 
+ /// The static terrain-shade selector in `sun_scale.x`, which the shader thresholds into the
+@@ -131,6 +133,7 @@ pub(crate) fn forget_instance(cache: &mut MaterialCache, instance: Entity) {
+ /// blend twin every fade rides, built with the source blend, never `Blend`: the twin always blends
+ /// (`0x70c1fd`) but its alpha test keys on the stored mode (`0x70c237`), so AlphaKey keeps its
+ /// 224/255 cutout and Opaque has none.
++#[allow(clippy::too_many_arguments)]
+ pub fn model_material(
+     cache: &mut MaterialCache,
+     materials: &mut Assets<WowModelMaterial>,
+@@ -158,6 +161,103 @@ pub fn model_material(
+     sky_depth: bool,
+     light: &Buffer,
+     instance: Option<Entity>,
++) -> Handle<WowModelMaterial> {
++    model_material_swaying(
++        Sway::Still,
++        cache,
++        materials,
++        texture,
++        blend,
++        two_sided,
++        is_wmo,
++        is_interior,
++        is_emissive,
++        is_additive,
++        fade_variant,
++        no_depth_write,
++        no_depth_test,
++        fog_policy,
++        env_map,
++        stage1,
++        combine,
++        shade,
++        batch_order,
++        uv_anim,
++        rgb_anim,
++        wmo_class,
++        sidn,
++        window,
++        sky_depth,
++        light,
++        instance,
++    )
++}
++
++/// How a batch moves in the new look's wind (`look::wind`), `stage1.w` in `wow_model.wgsl`: a
++/// plant's wood sways, its leaves (an alpha-tested batch) sway and flutter; everything else is
++/// still. Inert under the classic look, whose wind block is zero.
++#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
++pub enum Sway {
++    #[default]
++    Still,
++    Plant,
++    Leaves,
++}
++
++impl Sway {
++    /// A batch of a model at `path`: a plant's sways ([`crate::look::wind::sways`]), its
++    /// alpha-tested batches as leaves; `still` (a WMO, an interior prop) never does.
++    pub fn of(path: &str, blend: ModelBlend, still: bool) -> Self {
++        if still || !crate::look::wind::sways(path) {
++            Sway::Still
++        } else if blend == ModelBlend::AlphaTest {
++            Sway::Leaves
++        } else {
++            Sway::Plant
++        }
++    }
++
++    /// The `stage1.w` lane the shader reads.
++    pub fn lane(self) -> f32 {
++        match self {
++            Sway::Still => 0.0,
++            Sway::Plant => 1.0,
++            Sway::Leaves => 2.0,
++        }
++    }
++}
++
++/// [`model_material`] for a batch that moves in the new look's wind as `sway` says; a swaying
++/// batch is its own material (the wind lane is uniform data, never a pipeline key).
++#[allow(clippy::too_many_arguments)]
++pub fn model_material_swaying(
++    sway: Sway,
++    cache: &mut MaterialCache,
++    materials: &mut Assets<WowModelMaterial>,
++    texture: Option<Handle<Image>>,
++    blend: ModelBlend,
++    two_sided: bool,
++    is_wmo: bool,
++    is_interior: bool,
++    is_emissive: bool,
++    is_additive: bool,
++    fade_variant: bool,
++    no_depth_write: bool,
++    no_depth_test: bool,
++    fog_policy: benilla_formats::FogPolicy,
++    env_map: bool,
++    stage1: Option<&benilla_assets::Stage1>,
++    combine: Option<u8>,
++    shade: ShadeSel,
++    batch_order: u16,
++    uv_anim: Option<&std::sync::Arc<benilla_formats::UvAnim>>,
++    rgb_anim: Option<&std::sync::Arc<benilla_formats::RgbAnim>>,
++    wmo_class: Option<WmoBatchClass>,
++    sidn: Option<[u8; 3]>,
++    window: bool,
++    sky_depth: bool,
++    light: &Buffer,
++    instance: Option<Entity>,
+ ) -> Handle<WowModelMaterial> {
+     let key = MatKey {
+         light: light.id(),
+@@ -185,6 +285,7 @@ pub fn model_material(
+         zfill: false,
+         sky_depth,
+         instance,
++        sway,
+     };
+     if let Some(h) = cache.fetch(&key) {
+         return h;
+@@ -329,7 +430,8 @@ pub fn model_material(
+                 },
+                 // Zero until a sampler registers this material and bakes its table slot in once.
+                 anim_slots: Vec4::ZERO,
+-                stage1: stage1_params(stage1, combine),
++                // `w` the new look's wind lane ([`Sway::lane`]).
++                stage1: stage1_params(stage1, combine).with_w(sway.lane()),
+                 stage1_texture: stage1.map(|s| s.texture.clone()),
+                 light_buf: light.clone(),
+                 shadow_map: benilla_assets::materials::SHADOW_MAP,
+@@ -428,6 +530,7 @@ pub fn zfill_material(
+         // No skybox batch has a twin: the sky writes no depth.
+         sky_depth: false,
+         instance: None,
++        sway: Sway::Still,
+     };
+     if let Some(h) = cache.fetch(&key) {
+         return h;
+diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
+index 797dc7b..c9bbb51 100644
+--- a/crates/benilla-world/src/shaders.rs
++++ b/crates/benilla-world/src/shaders.rs
+@@ -21,6 +21,7 @@ pub(crate) fn plugin(app: &mut App) {
+     bevy::asset::embedded_asset!(app, "shaders/world_ao.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_shadow.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_water.wgsl");
++    bevy::asset::embedded_asset!(app, "shaders/look_sky.wgsl");
+     // The new look's sun-shadow map, which every terrain and model material binds: inserted before
+     // any material is made, so none waits on it.
+     app.add_systems(PreStartup, crate::look::shadow_pass::insert_shadow_map);
+@@ -62,6 +63,6 @@ mod tests {
+             );
+         }
+         // One per `embedded_asset!` line in `plugin`.
+-        assert_eq!(found, 12, "the engine's shader set changed size");
++        assert_eq!(found, 13, "the engine's shader set changed size");
+     }
+ }
+diff --git a/crates/benilla-world/src/shaders/look_sky.wgsl b/crates/benilla-world/src/shaders/look_sky.wgsl
+new file mode 100644
+index 0000000..f1aae4f
+--- /dev/null
++++ b/crates/benilla-world/src/shaders/look_sky.wgsl
+@@ -0,0 +1,122 @@
++// The new look's painted sky (`look::sky`), benilla's own (no reference behaviour): one layer over
++// 1.12's dome, discs and stars, in its cloud dome's slot, blended premultiplied in gamma space as
++// every sky element is. The sun's and the moon's halos add under the clouds; the clouds cover
++// whatever 1.12 drew behind them. Depth is the far pin in `sky_vertex.wgsl`.
++
++#import bevy_pbr::{
++    forward_io::VertexOutput,
++    mesh_view_bindings::view,
++}
++
++// ---- look sky: mirrored in liquid.wgsl (keep in sync; `look::sky`'s tests compare the two) ----
++// The rows `look::sky::pack_rows` writes (SKY_ROWS = 13):
++//   0 [on, threshold, softness, opacity] · 1 [offset x, z (cells), plane (yd), cell (yd)] ·
++//   2 [lit (sRGB), silver power] · 3 [shade (sRGB), light step (cells)] ·
++//   4 [eye to sun, sun halo] · 5 [halo colour (sRGB), silver] · 6 [eye to moon, moon halo] ·
++//   7 [moon colour (sRGB), haze (yd)] · 8 [haze colour (sRGB), warp (cells)] ·
++//   9 [period (cells), shade contrast, horizon from, horizon to] ·
++//   10 [sun inner power, sun wide power, moon inner power, moon wide power] ·
++//   11 [sun inner, sun wide, moon inner, moon wide] · 12 [octaves, water octaves, pixel angle, 0].
++struct LookSkyRows {
++    r: array<vec4<f32>, 13>,
++}
++
++// A lattice point's hash, wrapped to `period`, as 24 bits (`look::sky::hash`).
++fn look_sky_hash(c: vec2<i32>, period: i32) -> f32 {
++    let p = vec2<i32>(period);
++    let w = ((c % p) + p) % p;
++    var h = u32(w.x) * 374761393u + u32(w.y) * 668265263u;
++    h = (h ^ (h >> 13u)) * 1274126177u;
++    h = h ^ (h >> 16u);
++    return f32(h >> 8u) * (1.0 / 16777216.0);
++}
++
++// Value noise, smoothstep-faded, tiling every `period` cells (`look::sky::noise`).
++fn look_sky_noise(p: vec2<f32>, period: i32) -> f32 {
++    let i = floor(p);
++    let f = p - i;
++    let c = vec2<i32>(i);
++    let a = look_sky_hash(c, period);
++    let b = look_sky_hash(c + vec2<i32>(1, 0), period);
++    let d = look_sky_hash(c + vec2<i32>(0, 1), period);
++    let e = look_sky_hash(c + vec2<i32>(1, 1), period);
++    let u = f * f * (vec2<f32>(3.0) - 2.0 * f);
++    return mix(mix(a, b, u.x), mix(d, e, u.x), u.y);
++}
++
++// The cloud field at `p` (cells): domain-warped fbm in 0..1, each octave faded to its mean as a
++// pixel (`lod` cells) grows past half its cell (`look::sky::density`).
++fn look_sky_density(p: vec2<f32>, period: i32, warp: f32, octaves: u32, lod: f32) -> f32 {
++    let half = period / 2;
++    let q = vec2<f32>(
++        look_sky_noise(p * 0.5 + vec2<f32>(5.2, 1.3), half),
++        look_sky_noise(p * 0.5 + vec2<f32>(1.7, 9.2), half),
++    );
++    let pw = p + warp * (q - vec2<f32>(0.5));
++    var sum = 0.0;
++    var norm = 0.0;
++    var amp = 1.0;
++    var freq = 1.0;
++    var per = period;
++    for (var i = 0u; i < octaves; i = i + 1u) {
++        let fade = clamp(2.0 - 2.0 * lod * freq, 0.0, 1.0);
++        let off = vec2<f32>(f32(i) * 7.31, f32(i) * 3.17);
++        let n = look_sky_noise(pw * freq + off, per);
++        sum += amp * (0.5 + (n - 0.5) * fade);
++        norm += amp;
++        amp *= 0.5;
++        freq *= 2.0;
++        per *= 2;
++    }
++    return sum / norm;
++}
++
++// The sky toward `dir` (unit, from the eye) over what is drawn behind it: premultiplied gamma
++// colour and coverage. The halos add under the clouds; `octaves` fewer for the water's mirror.
++fn look_sky_clouds(dir: vec3<f32>, s: LookSkyRows, octaves: u32) -> vec4<f32> {
++    let cs = max(dot(dir, s.r[4].xyz), 0.0);
++    let cm = max(dot(dir, s.r[6].xyz), 0.0);
++    var halo = s.r[5].rgb * (s.r[4].w * (s.r[11].x * pow(cs, s.r[10].x) + s.r[11].y * pow(cs, s.r[10].y)));
++    halo += s.r[7].rgb * (s.r[6].w * (s.r[11].z * pow(cm, s.r[10].z) + s.r[11].w * pow(cm, s.r[10].w)));
++    if (dir.y <= s.r[9].z) {
++        return vec4<f32>(halo, 0.0);
++    }
++    // The ray's crossing with the layer, in cells, and the cells a pixel spans there.
++    let dist = s.r[1].z / dir.y;
++    let cell = s.r[1].w;
++    let p = s.r[1].xy + dir.xz * (dist / cell);
++    let lod = dist * s.r[12].z / (dir.y * cell);
++    let period = i32(s.r[9].x);
++    let d = look_sky_density(p, period, s.r[8].w, octaves, lod);
++    let th = s.r[0].y;
++    let a = smoothstep(th, th + s.r[0].z, d) * smoothstep(s.r[9].z, s.r[9].w, dir.y) * s.r[0].w;
++    if (a <= 0.001) {
++        return vec4<f32>(halo, 0.0);
++    }
++    // The light: where the cloud thickens toward the sun it is in its own shade; thin edges glow;
++    // soft painted bands, not a smooth ramp.
++    let sun_xz = s.r[4].xz;
++    let toward = sun_xz / max(length(sun_xz), 1e-3);
++    let d2 = look_sky_density(p + toward * s.r[3].w, period, s.r[8].w, min(octaves, 3u), lod);
++    var light = clamp(0.5 + (d - d2) * s.r[9].y, 0.0, 1.0);
++    light = mix(light, 1.0, (1.0 - a) * 0.5);
++    light = smoothstep(0.15, 0.85, light);
++    var col = mix(s.r[3].rgb, s.r[2].rgb, light);
++    // A silver lining on the thin edges toward the sun.
++    col += s.r[5].rgb * (s.r[5].w * s.r[4].w * pow(cs, s.r[2].w) * (1.0 - a));
++    // Far clouds go into the haze.
++    col = mix(col, s.r[8].rgb, 1.0 - exp(-dist / s.r[7].w));
++    return vec4<f32>(halo * (1.0 - a) + col * a, a);
++}
++// ---- end look sky ----
++
++@group(#{MATERIAL_BIND_GROUP}) @binding(100) var<uniform> look_sky: LookSkyRows;
++
++@fragment
++fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
++    if (look_sky.r[0].x < 0.5) {
++        return vec4<f32>(0.0);
++    }
++    let dir = normalize(in.world_position.xyz - view.world_position.xyz);
++    return look_sky_clouds(dir, look_sky, u32(look_sky.r[12].x));
++}
+diff --git a/crates/benilla-world/src/shaders/static_gx.wgsl b/crates/benilla-world/src/shaders/static_gx.wgsl
+index c46fde8..e8aef98 100644
+--- a/crates/benilla-world/src/shaders/static_gx.wgsl
++++ b/crates/benilla-world/src/shaders/static_gx.wgsl
+@@ -34,6 +34,8 @@ struct WowLight {
+     look_lights: array<vec4<f32>, 48>,
+     // The new look's sun shadows (`look::shadows::pack_rows`, SHADOW_ROWS = 14).
+     shadow: array<vec4<f32>, 14>,
++    // The new look's wind (`look::wind::pack_rows`, WIND_ROWS = 5), read in the vertex stage.
++    wind: array<vec4<f32>, 5>,
+     // lighting::prop_probes: 8192 slots of 7 rows; the buffer's later regions are not mirrored.
+     prop_probes: array<vec4<f32>, 57344>,
+ }
+@@ -48,8 +50,9 @@ struct GxCell {
+ }
+ @group(1) @binding(0) var<uniform> cell: GxCell;
+ // The per-item records, indexed by the vertex word's low 16 bits: x the texture-array layer, y
+-// the WMO batch order (0 on cells), z the MOMT SIDN colour r|g<<8|b<<16 in gamma bytes, w flags:
+-// bit 0 exile kill, bits 1..=13 the interior-prop probe slot, bit 14 interior fog (`[0xca7f00]`).
++// the WMO batch order (0 on cells), z on a WMO the MOMT SIDN colour r|g<<8|b<<16 in gamma bytes,
++// on an M2 bit 31 a plant that sways in the new look's wind (GX_SWAY), w flags: bit 0 exile kill,
++// bits 1..=13 the interior-prop probe slot, bit 14 interior fog (`[0xca7f00]`).
+ @group(1) @binding(1) var<storage, read> recs: array<vec4<u32>>;
+ @group(1) @binding(2) var tex_array: texture_2d_array<f32>;
+ // Repeat and clamp model-albedo samplers: trilinear, aniso 8, the same as the entity path's.
+@@ -73,10 +76,94 @@ const WORD_HAS_VC: u32 = 134217728u;   // 1 << 27: the batch authors vertex colo
+ // INTERIOR without WMO is an interior M2 prop, the entity shader's `interior_prop =
+ // flags.z && !flags.x`: probe lighting, interior fog, no point lights.
+ const WORD_MATTE: u32 = 268435456u;    // 1 << 28: ShadeSel::Matte, fixed intensity 1.0
++// Record z bit 31 on an M2 item: a plant, swayed by the new look's wind (static_gx/mod.rs GX_SWAY).
++const GX_SWAY: u32 = 2147483648u;
+ 
+ // The alpha-test cutout reference 224/255, as wow_model.wgsl's VANILLA_ALPHA_KEY.
+ const VANILLA_ALPHA_KEY: f32 = 0.8784314;
+ 
++// ---- look wind: mirrored in wow_model.wgsl, static_gx.wgsl and world_shadow.wgsl (keep in sync;
++// `look::wind`'s tests compare them) ----
++// The new look's wind (`look::wind::pack_rows`, WIND_ROWS = 5), benilla's own (no reference
++// behaviour): 0 [downwind x, z, strength, on] · 1 [gust, front spacing (yd), travel (yd), fronts] ·
++// 2 [front origin x, z, sway clock (s), front half-width] · 3 [tree bend, bend knee (yd), leaf
++// flutter (yd), grass bend (yd)] · 4 [the sway's angular speeds (rad/s)]. Row 0 `.w` = 0 under the
++// classic look and `worldWind 0`, and every caller then draws 1.12's still geometry.
++fn wind_hash(n: u32) -> f32 {
++    var h = n * 2654435761u;
++    h = (h ^ (h >> 15u)) * 2246822519u;
++    h = h ^ (h >> 13u);
++    return f32(h >> 8u) * (1.0 / 16777216.0);
++}
++
++// How hard the gusts blow at `p` (world x, z): soft fronts crossing downwind, each with its own
++// strength, wavy and patchy across the wind.
++fn wind_gust(p: vec2<f32>) -> f32 {
++    let dir = wow_light.wind[0].xy;
++    let q = p - wow_light.wind[2].xy;
++    let along = dot(q, dir);
++    let across = dot(q, vec2<f32>(-dir.y, dir.x));
++    let a = along + 18.0 * sin(across * 0.013 + 1.7) + 9.0 * sin(across * 0.031);
++    let x = (a - wow_light.wind[1].z) / wow_light.wind[1].y;
++    let k = floor(x + 0.5);
++    let f = x - k;
++    let n = i32(k) - i32(wow_light.wind[1].w);
++    let w = wow_light.wind[2].w;
++    let patchy = 0.55 + 0.45 * sin(across * 0.009 + f32(n) * 2.1);
++    return wow_light.wind[1].x * (0.35 + 0.65 * wind_hash(bitcast<u32>(n))) * patchy
++        * exp(-(f * f) / (w * w));
++}
++
++// A plant's sway at `rel` from its base `anchor` (world): it leans downwind and sways with its
++// height, little at the trunk, each plant on its own phase; a gust bends it further as it passes;
++// `leaf` (an alpha-tested batch) flutters a little on top.
++fn wind_sway(rel: vec3<f32>, anchor: vec3<f32>, leaf: bool) -> vec3<f32> {
++    let h = max(rel.y, 0.0);
++    let bend = h * h / (h + wow_light.wind[3].y);
++    let dir = vec3<f32>(wow_light.wind[0].x, 0.0, wow_light.wind[0].y);
++    let side = vec3<f32>(-dir.z, 0.0, dir.x);
++    let s = wow_light.wind[0].z;
++    let t = wow_light.wind[2].z;
++    let sp = wow_light.wind[4];
++    let cell = bitcast<vec2<u32>>(vec2<i32>(floor(anchor.xz * 2.0)));
++    let ph = 6.2831853 * wind_hash(cell.x * 73856093u ^ cell.y * 19349663u);
++    let osc = 0.6 * sin(t * sp.x + ph) + 0.4 * sin(t * sp.y + 1.7 * ph);
++    let g = wind_gust(anchor.xz);
++    let lean = s * (0.55 + 0.45 * osc) + g * (1.0 + 0.3 * osc);
++    var off = dir * (wow_light.wind[3].x * bend * lean);
++    off += side * (wow_light.wind[3].x * bend * (0.25 * s + 0.5 * g) * sin(t * sp.z + 2.3 * ph));
++    if (leaf) {
++        let lp = dot(rel, vec3<f32>(1.7, 2.3, 1.3)) + 3.0 * ph;
++        let fl = wow_light.wind[3].z * min(h / 3.0, 1.0) * (s + 2.0 * g);
++        off += vec3<f32>(
++            sin(t * sp.w + lp),
++            0.5 * sin(t * (sp.w + sp.z) + 1.3 * lp),
++            -0.7 * sin(t * sp.w + lp),
++        ) * fl;
++    }
++    // A bent crown dips a little, as a bent stem would.
++    off.y -= 0.35 * dot(off.xz, off.xz) / max(h, 0.5);
++    return off;
++}
++
++// A ground-clutter tuft's bend at `world`, `w` its height on the tuft (0 root, 1 tip): a ripple
++// running downwind through the grass, and the gusts. Measured from the fronts' origin like the
++// gusts, so f32 keeps its precision far out; the ripple's phase steps when that origin moves a
++// grid square under a travelling camera, about once a kilometre.
++fn wind_grass(world: vec3<f32>, w: f32) -> vec3<f32> {
++    let dir = wow_light.wind[0].xy;
++    let q = world.xz - wow_light.wind[2].xy;
++    let s = wow_light.wind[0].z;
++    let t = wow_light.wind[2].z;
++    let wave = 0.5 + 0.5 * sin(t * wow_light.wind[4].y - dot(q, dir) * 0.35
++        + 0.8 * sin(dot(q, vec2<f32>(0.13, 0.11))));
++    let lean = s * (0.35 + 0.65 * wave) + 1.6 * wind_gust(world.xz);
++    var off = vec3<f32>(dir.x, 0.0, dir.y) * (wow_light.wind[3].w * w * w * lean);
++    off.y = -0.4 * length(off.xz) * w;
++    return off;
++}
++// ---- end look wind ----
++
+ // ---- mirrored law (wow_model.wgsl) ----
+ 
+ fn wow_normalize(v: vec3<f32>) -> vec3<f32> {
+@@ -320,9 +407,20 @@ fn vertex(v: GxVertex) -> GxVsOut {
+         out.color = vec4<f32>(1.0);
+         return out;
+     }
++    // The new look's wind sways a plant (an M2 item marked GX_SWAY); its leaves are the cutouts.
++    var pos = v.position;
++    if (wow_light.wind[0].w > 0.5 && (v.word & WORD_WMO) == 0u
++        && (recs[v.word & 0xffffu].z & GX_SWAY) != 0u) {
++#ifdef GX_CUTOUT
++        let leaf = true;
++#else
++        let leaf = false;
++#endif
++        pos += wind_sway(v.position + cell.origin.xyz - v.anchor, v.anchor, leaf);
++    }
+     // Camera-relative for f32 precision: the recentred vertex plus (cell origin - camera).
+-    let p_cam = v.position + (cell.origin.xyz - view.world_position);
+-    let world = v.position + cell.origin.xyz;
++    let p_cam = pos + (cell.origin.xyz - view.world_position);
++    let world = pos + cell.origin.xyz;
+     out.world_position = vec4<f32>(world, 1.0);
+     let view_rot = mat3x3<f32>(
+         view.view_from_world[0].xyz,
+diff --git a/crates/benilla-world/src/shaders/world_shadow.wgsl b/crates/benilla-world/src/shaders/world_shadow.wgsl
+index b8255db..d89f702 100644
+--- a/crates/benilla-world/src/shaders/world_shadow.wgsl
++++ b/crates/benilla-world/src/shaders/world_shadow.wgsl
+@@ -21,12 +21,14 @@ struct ShadowSlice {
+ @group(0) @binding(0) var<uniform> slice: ShadowSlice;
+ 
+ // The shared light buffer's layout up to the skin palettes, as `wow_model.wgsl` declares it; only
+-// the rig regions are read here. Keep in sync with `lighting::global_light`.
++// the wind and the rig regions are read here. Keep in sync with `lighting::global_light`.
+ struct WowLight {
+     _head: array<vec4<f32>, 21>,
+     _points: array<vec4<f32>, 512>,
+     _look_lights: array<vec4<f32>, 48>,
+     _shadow: array<vec4<f32>, 14>,
++    // The new look's wind (`look::wind::pack_rows`): a swaying plant casts where it sways to.
++    wind: array<vec4<f32>, 5>,
+     _prop_probes: array<vec4<f32>, 57344>,
+     rig_table: array<u32, 2048>,
+     _rig_tint: array<u32, 2048>,
+@@ -37,6 +39,88 @@ struct WowLight {
+ }
+ @group(0) @binding(1) var<storage, read> wow_light: WowLight;
+ 
++// ---- look wind: mirrored in wow_model.wgsl, static_gx.wgsl and world_shadow.wgsl (keep in sync;
++// `look::wind`'s tests compare them) ----
++// The new look's wind (`look::wind::pack_rows`, WIND_ROWS = 5), benilla's own (no reference
++// behaviour): 0 [downwind x, z, strength, on] · 1 [gust, front spacing (yd), travel (yd), fronts] ·
++// 2 [front origin x, z, sway clock (s), front half-width] · 3 [tree bend, bend knee (yd), leaf
++// flutter (yd), grass bend (yd)] · 4 [the sway's angular speeds (rad/s)]. Row 0 `.w` = 0 under the
++// classic look and `worldWind 0`, and every caller then draws 1.12's still geometry.
++fn wind_hash(n: u32) -> f32 {
++    var h = n * 2654435761u;
++    h = (h ^ (h >> 15u)) * 2246822519u;
++    h = h ^ (h >> 13u);
++    return f32(h >> 8u) * (1.0 / 16777216.0);
++}
++
++// How hard the gusts blow at `p` (world x, z): soft fronts crossing downwind, each with its own
++// strength, wavy and patchy across the wind.
++fn wind_gust(p: vec2<f32>) -> f32 {
++    let dir = wow_light.wind[0].xy;
++    let q = p - wow_light.wind[2].xy;
++    let along = dot(q, dir);
++    let across = dot(q, vec2<f32>(-dir.y, dir.x));
++    let a = along + 18.0 * sin(across * 0.013 + 1.7) + 9.0 * sin(across * 0.031);
++    let x = (a - wow_light.wind[1].z) / wow_light.wind[1].y;
++    let k = floor(x + 0.5);
++    let f = x - k;
++    let n = i32(k) - i32(wow_light.wind[1].w);
++    let w = wow_light.wind[2].w;
++    let patchy = 0.55 + 0.45 * sin(across * 0.009 + f32(n) * 2.1);
++    return wow_light.wind[1].x * (0.35 + 0.65 * wind_hash(bitcast<u32>(n))) * patchy
++        * exp(-(f * f) / (w * w));
++}
++
++// A plant's sway at `rel` from its base `anchor` (world): it leans downwind and sways with its
++// height, little at the trunk, each plant on its own phase; a gust bends it further as it passes;
++// `leaf` (an alpha-tested batch) flutters a little on top.
++fn wind_sway(rel: vec3<f32>, anchor: vec3<f32>, leaf: bool) -> vec3<f32> {
++    let h = max(rel.y, 0.0);
++    let bend = h * h / (h + wow_light.wind[3].y);
++    let dir = vec3<f32>(wow_light.wind[0].x, 0.0, wow_light.wind[0].y);
++    let side = vec3<f32>(-dir.z, 0.0, dir.x);
++    let s = wow_light.wind[0].z;
++    let t = wow_light.wind[2].z;
++    let sp = wow_light.wind[4];
++    let cell = bitcast<vec2<u32>>(vec2<i32>(floor(anchor.xz * 2.0)));
++    let ph = 6.2831853 * wind_hash(cell.x * 73856093u ^ cell.y * 19349663u);
++    let osc = 0.6 * sin(t * sp.x + ph) + 0.4 * sin(t * sp.y + 1.7 * ph);
++    let g = wind_gust(anchor.xz);
++    let lean = s * (0.55 + 0.45 * osc) + g * (1.0 + 0.3 * osc);
++    var off = dir * (wow_light.wind[3].x * bend * lean);
++    off += side * (wow_light.wind[3].x * bend * (0.25 * s + 0.5 * g) * sin(t * sp.z + 2.3 * ph));
++    if (leaf) {
++        let lp = dot(rel, vec3<f32>(1.7, 2.3, 1.3)) + 3.0 * ph;
++        let fl = wow_light.wind[3].z * min(h / 3.0, 1.0) * (s + 2.0 * g);
++        off += vec3<f32>(
++            sin(t * sp.w + lp),
++            0.5 * sin(t * (sp.w + sp.z) + 1.3 * lp),
++            -0.7 * sin(t * sp.w + lp),
++        ) * fl;
++    }
++    // A bent crown dips a little, as a bent stem would.
++    off.y -= 0.35 * dot(off.xz, off.xz) / max(h, 0.5);
++    return off;
++}
++
++// A ground-clutter tuft's bend at `world`, `w` its height on the tuft (0 root, 1 tip): a ripple
++// running downwind through the grass, and the gusts. Measured from the fronts' origin like the
++// gusts, so f32 keeps its precision far out; the ripple's phase steps when that origin moves a
++// grid square under a travelling camera, about once a kilometre.
++fn wind_grass(world: vec3<f32>, w: f32) -> vec3<f32> {
++    let dir = wow_light.wind[0].xy;
++    let q = world.xz - wow_light.wind[2].xy;
++    let s = wow_light.wind[0].z;
++    let t = wow_light.wind[2].z;
++    let wave = 0.5 + 0.5 * sin(t * wow_light.wind[4].y - dot(q, dir) * 0.35
++        + 0.8 * sin(dot(q, vec2<f32>(0.13, 0.11))));
++    let lean = s * (0.35 + 0.65 * wave) + 1.6 * wind_gust(world.xz);
++    var off = vec3<f32>(dir.x, 0.0, dir.y) * (wow_light.wind[3].w * w * w * lean);
++    off.y = -0.4 * length(off.xz) * w;
++    return off;
++}
++// ---- end look wind ----
++
+ // Per entity draw: the rows of its world matrix's linear part (w 0) and its translation, apart for
+ // f32 precision at 9 000 yd; `origin.w` is the rig slot (bits), read under SHADOW_SKIN.
+ struct ShadowInst {
+@@ -60,13 +144,17 @@ struct GxCell {
+ @group(1) @binding(3) var samp_repeat: sampler;
+ @group(1) @binding(4) var samp_clamp: sampler;
+ 
+-// static_gx/mod.rs WORD_* (keep in sync).
++// static_gx/mod.rs WORD_* and GX_SWAY (keep in sync).
++const WORD_WMO: u32 = 4194304u;      // 1 << 22
+ const WORD_INTERIOR: u32 = 8388608u; // 1 << 23
++const GX_SWAY: u32 = 2147483648u;    // record z bit 31 on an M2 item
+ 
+ struct CasterVertex {
+     @location(0) position: vec3<f32>,
+     @location(2) uv: vec2<f32>,
+     @location(3) word: u32,
++    // The placement's origin, the plant's base for the wind.
++    @location(4) anchor: vec3<f32>,
+ }
+ #else
+ #ifdef SHADOW_CUTOUT
+@@ -138,7 +226,16 @@ fn vs_main(v: CasterVertex) -> CasterOut {
+         out.position = vec4<f32>(0.0, 0.0, 2.0, 1.0);
+         return out;
+     }
+-    out.position = slice_clip(v.position + (cell.origin.xyz - slice.centre.xyz));
++    var pos = v.position;
++    if (wow_light.wind[0].w > 0.5 && (v.word & WORD_WMO) == 0u && (rec.z & GX_SWAY) != 0u) {
++#ifdef SHADOW_CUTOUT
++        let leaf = true;
++#else
++        let leaf = false;
++#endif
++        pos += wind_sway(v.position + cell.origin.xyz - v.anchor, v.anchor, leaf);
++    }
++    out.position = slice_clip(pos + (cell.origin.xyz - slice.centre.xyz));
+     out.uv = v.uv;
+     out.layer = i32(rec.x);
+ #else
+diff --git a/crates/benilla-world/src/sky.rs b/crates/benilla-world/src/sky.rs
+index 265fd9d..ab6e68f 100644
+--- a/crates/benilla-world/src/sky.rs
++++ b/crates/benilla-world/src/sky.rs
+@@ -119,8 +119,9 @@ fn col(c: [f32; 3]) -> Vec4 {
+     Vec4::new(c[0], c[1], c[2], 1.0)
+ }
+ 
+-/// A unit UV sphere (Y-up); the gradient is per fragment, so a modest tessellation suffices.
+-fn dome_mesh() -> Mesh {
++/// A unit UV sphere (Y-up); the gradient is per fragment, so a modest tessellation suffices. The
++/// new look's painted sky (`look::sky`) draws on one too.
++pub(crate) fn dome_mesh() -> Mesh {
+     const STACKS: usize = 24;
+     const SECTORS: usize = 48;
+     let mut positions = Vec::new();
+diff --git a/crates/benilla-world/src/sky_order.rs b/crates/benilla-world/src/sky_order.rs
+index 45f8aeb..4b26b36 100644
+--- a/crates/benilla-world/src/sky_order.rs
++++ b/crates/benilla-world/src/sky_order.rs
+@@ -48,6 +48,9 @@ pub(crate) const WHITE_MOON_BIAS: f32 = -8.1e5;
+ pub(crate) const MOON02_BIAS: f32 = -8.0e5;
+ /// The cloud dome, the sky pass's last draw (`0x6d4a71`): clouds blend over a setting sun.
+ pub(crate) const CLOUDS_BIAS: f32 = -6.0e5;
++/// The new look's painted sky (`look::sky`), benilla's own: in the cloud dome's slot, which it
++/// hides while it draws, so its clouds cover the stars and the discs as 1.12's do, under the glare.
++pub(crate) const LOOK_CLOUDS_BIAS: f32 = -5.0e5;
+ /// Far-side model transparents, the water-plane interleave's early half: the reference splits M2
+ /// transparents per model (`0x707680`; per emitter for particles, `0x7084a0`) and `0x483460` draws
+ /// the eye's far side of the water plane before the water pass, the near side after, flipping on
+@@ -134,6 +137,8 @@ const _: () = {
+     assert!(SUN_DISC_BIAS - STARS_BIAS > 1.0e4);
+     assert!(WHITE_MOON_BIAS > SUN_DISC_BIAS && MOON02_BIAS > WHITE_MOON_BIAS);
+     assert!(CLOUDS_BIAS - MOON02_BIAS > 1.0e4);
++    assert!(LOOK_CLOUDS_BIAS - CLOUDS_BIAS > 1.0e4);
++    assert!(FAR_SIDE_BIAS - LOOK_CLOUDS_BIAS > 1.0e4);
+     // sky < far-side transparents < water < near-side transparents; a far-side draw's own offsets
+     // (zfill −8, owner rung, batch eps) stay far under 1e4.
+     assert!(FAR_SIDE_BIAS - CLOUDS_BIAS > 1.0e4);
+@@ -185,6 +190,7 @@ fn the_sky_depth_is_pinned_at_the_vertex_and_nowhere_else() {
+         ("star.wgsl", include_str!("shaders/star.wgsl")),
+         ("cloud.wgsl", include_str!("shaders/cloud.wgsl")),
+         ("celestial.wgsl", include_str!("shaders/celestial.wgsl")),
++        ("look_sky.wgsl", include_str!("shaders/look_sky.wgsl")),
+         // The WMO skybox draws on the shared model lane, whose `WOW_SKY_DEPTH` branch is held to
+         // the same law in `benilla_assets::materials`.
+     ] {
+@@ -220,4 +226,8 @@ fn the_sky_depth_is_pinned_at_the_vertex_and_nowhere_else() {
+         "CelestialMaterial",
+         <crate::sun::CelestialMaterial as Material>::vertex_shader(),
+     );
++    shared(
++        "LookSkyMaterial",
++        <crate::look::sky::LookSkyMaterial as Material>::vertex_shader(),
++    );
+ }
+diff --git a/crates/benilla-world/src/static_gx/bake.rs b/crates/benilla-world/src/static_gx/bake.rs
+index ea8caff..cdd3f1f 100644
+--- a/crates/benilla-world/src/static_gx/bake.rs
++++ b/crates/benilla-world/src/static_gx/bake.rs
+@@ -278,6 +278,7 @@ fn bake_cell(items: &[GxItem], meshes: &mut Assets<Mesh>) -> render::GxCellDraw
+             group: sel_group,
+             order: item.wmo.as_ref().map_or(0, |w| w.order),
+             sidn: item.wmo.as_ref().map_or([0; 3], |w| w.sidn),
++            sway: item.sway && item.wmo.is_none(),
+             slot: item.prop.as_ref().and_then(|p| p.slot).unwrap_or(0),
+             radius: if gmx.x >= gmn.x {
+                 (0.5 * (gmx - gmn).length()) as f32
+diff --git a/crates/benilla-world/src/static_gx/mod.rs b/crates/benilla-world/src/static_gx/mod.rs
+index d00e280..4e0cce0 100644
+--- a/crates/benilla-world/src/static_gx/mod.rs
++++ b/crates/benilla-world/src/static_gx/mod.rs
+@@ -65,6 +65,9 @@ const WORD_HAS_VC: u32 = 1 << 27;
+ // `ShadeSel::Matte`, fixed 1.0: a map doodad never reaches the 2.5 site (`0x69e4ad`). Not
+ // `WORD_SHADE_LIT`, so lifting the shader's `min(I, 1)` cap leaves this at 1.0.
+ const WORD_MATTE: u32 = 1 << 28;
++/// Record column z bit 31 on an M2 item (a WMO's z is its SIDN colour): a plant the new look's
++/// wind sways (`look::wind`), as `static_gx.wgsl` and `world_shadow.wgsl` read it.
++pub(crate) const GX_SWAY: u32 = 1 << 31;
+ // An interior M2 prop is WORD_INTERIOR with WORD_WMO clear, the entity shader's `interior_prop =
+ // flags.z && !flags.x`: SH-probe light from its record slot, interior fog, no live point lights.
+ 
+@@ -157,6 +160,8 @@ struct GxItem {
+     wrap_y: bool,
+     /// The `ShadeSel::Matte` sun family, intensity fixed at 1.0.
+     matte: bool,
++    /// A plant the new look's wind sways ([`GX_SWAY`]); never on a WMO batch.
++    sway: bool,
+     wmo: Option<GxItemWmo>,
+     prop: Option<GxItemProp>,
+     /// `Some(uid)` on a fader item: the placement it exiles with.
+@@ -332,6 +337,8 @@ pub struct GxBatch<'a> {
+     pub prop: Option<GxPropBatch>,
+     /// `Some` for a fader batch: its exile seed. Never set on WMO or prop batches.
+     pub fade: Option<GxFadeSeed>,
++    /// A plant the new look's wind sways (`look::wind::sways`); unread on WMO group batches.
++    pub sway: bool,
+ }
+ 
+ /// The prop half of [`GxBatch`]: the building's instance entity (region key, PVS source and
+@@ -580,6 +587,7 @@ impl StaticGx {
+             fog_off: matches!(b.fog_policy, benilla_formats::FogPolicy::Off),
+             shade_lit,
+             matte,
++            sway: b.sway && wmo.is_none(),
+             wrap_x: b.geometry.wrap_x,
+             wrap_y: b.geometry.wrap_y,
+             wmo,
+@@ -766,6 +774,7 @@ pub(crate) mod testkit {
+             wmo: None,
+             prop: None,
+             fade: None,
++            sway: false,
+         }
+     }
+ 
+diff --git a/crates/benilla-world/src/static_gx/render.rs b/crates/benilla-world/src/static_gx/render.rs
+index 7f85220..e370ad5 100644
+--- a/crates/benilla-world/src/static_gx/render.rs
++++ b/crates/benilla-world/src/static_gx/render.rs
+@@ -50,6 +50,8 @@ pub(crate) struct GxItemDraw {
+     pub order: u16,
+     /// The MOMT SIDN night-glow colour (gamma bytes; zero on cell items).
+     pub sidn: [u8; 3],
++    /// A plant the new look's wind sways: record column z's [`super::GX_SWAY`] (M2 items only).
++    pub sway: bool,
+     /// The interior prop's SH-probe slot, record column w bits 1..=13; 0 elsewhere.
+     pub slot: u16,
+     /// Half the diagonal of the item's world box: the sun-shadow pass leaves a small one out of
+@@ -597,9 +599,9 @@ fn assemble_region(
+             }
+         });
+     }
+-    // The per-item record table, indexed by the word's low bits: [layer, batch-order nudge, SIDN,
+-    // flags]. Flags: bit 0 the kill bit, re-synced by revision (hence COPY_DST); bits 1..=13 the
+-    // probe slot, 13 bits being `MAX_PROP_PROBES` exactly.
++    // The per-item record table, indexed by the word's low bits: [layer, batch-order nudge, SIDN
++    // (WMO) or the wind's sway bit (M2), flags]. Flags: bit 0 the kill bit, re-synced by revision
++    // (hence COPY_DST); bits 1..=13 the probe slot, 13 bits being `MAX_PROP_PROBES` exactly.
+     let records: Vec<[u32; 4]> = draw
+         .draws
+         .iter()
+@@ -610,7 +612,8 @@ fn assemble_region(
+                 u32::from(item.order),
+                 u32::from(item.sidn[0])
+                     | (u32::from(item.sidn[1]) << 8)
+-                    | (u32::from(item.sidn[2]) << 16),
++                    | (u32::from(item.sidn[2]) << 16)
++                    | if item.sway { super::GX_SWAY } else { 0 },
+                 kill_bit(&draw.killed, i) | (u32::from(item.slot) << 1),
+             ]
+         })
+@@ -828,13 +831,14 @@ pub(crate) fn draw_shadow_casters<'w>(
+     draws
+ }
+ 
+-/// The baked vertex layout as the sun-shadow pass reads it: position, uv and the word only, at the
+-/// bake's stride (`vertex_layout`).
++/// The baked vertex layout as the sun-shadow pass reads it: position, uv, the word and the anchor
++/// only, at the bake's stride (`vertex_layout`).
+ pub(crate) fn shadow_vertex_layout() -> VertexBufferLayout {
+     let mut layout = vertex_layout();
+     layout
+         .attributes
+-        .retain(|a| matches!(a.shader_location, 0 | 2 | 3));
++        // The anchor (4) is the base a plant sways from in the new look's wind.
++        .retain(|a| matches!(a.shader_location, 0 | 2 | 3 | 4));
+     layout
+ }
+ 
+@@ -1095,6 +1099,7 @@ mod tests {
+             group: None,
+             order: 0,
+             sidn: [0; 3],
++            sway: false,
+             slot: 0,
+             radius: 1.0,
+         }
+diff --git a/crates/benilla-world/src/sun/follow.rs b/crates/benilla-world/src/sun/follow.rs
+index a2314ff..76507a9 100644
+--- a/crates/benilla-world/src/sun/follow.rs
++++ b/crates/benilla-world/src/sun/follow.rs
+@@ -181,6 +181,9 @@ pub(super) struct FlareGate<'w, 's> {
+     submerged: Res<'w, crate::liquid::SubmergedEye>,
+     /// The cloud coverage `occ1` samples; as in the reference, the visible clouds draw from it too.
+     clouds: Res<'w, CloudCoverage>,
++    /// The new look's painted sky (`look::sky`), whose clouds stand in for 1.12's while it draws:
++    /// the sun's glare then dims with the painted cloud over it.
++    look_sky: Option<Res<'w, crate::look::SkyFrame>>,
+     /// Both glares' enabled word; the start-up 1 where none is registered.
+     glare: Option<Res<'w, super::SunGlare>>,
+     env: Local<'s, f32>,
+@@ -291,7 +294,10 @@ pub(super) fn follow_sun(
+     // The occlusion probe (`0x7e5220`) covers the disc's own quad: its angular half-size.
+     let sun_half = (0.5 * SUN_SIZE * light.sun_disc_scale).atan();
+     // occ1: the cloud cover at the glare point, `cam + 12·dir` (`0x6cf7b0`), dims the flare.
+-    let occ1 = occ1_sun(gate.clouds.coverage(to_light * GLARE_DIST));
++    let occ1 = match gate.look_sky.as_deref().filter(|s| s.on) {
++        Some(sky) => sky.sun_clear,
++        None => occ1_sun(gate.clouds.coverage(to_light * GLARE_DIST)),
++    };
+     let env30 = gate.envelope(
+         cam_pos,
+         to_light,
+diff --git a/crates/benilla-world/src/terrain_stream/spawn/assemble.rs b/crates/benilla-world/src/terrain_stream/spawn/assemble.rs
+index 6ca6c7a..7dea7a7 100644
+--- a/crates/benilla-world/src/terrain_stream/spawn/assemble.rs
++++ b/crates/benilla-world/src/terrain_stream/spawn/assemble.rs
+@@ -14,7 +14,7 @@ use crate::billboard::BillboardCard;
+ use crate::doodad_anim::DoodadAnimHost;
+ use crate::mesh_tag::alpha_bits;
+ use crate::model_fade::DoodadFade;
+-use crate::model_render::{model_material, MaterialCache, ShadeSel};
++use crate::model_render::{model_material_swaying, MaterialCache, ShadeSel, Sway};
+ use crate::model_render::{ModelKind, ModelPart};
+ use benilla_assets::materials::WowModelMaterial;
+ 
+@@ -165,7 +165,11 @@ pub fn spawn_model_entities(
+         // host it shares and stays at the built seed.
+         let per_seq = sub.uv_seq.is_some() || sub.rgb_seq.is_some();
+         let seq_owner = per_seq.then_some(rig_root).flatten();
+-        let cutout = model_material(
++        // The new look's wind: a plant's batches sway, its leaves flutter; a WMO or anything
++        // indoors stands still. Inert under the classic look.
++        let sway = Sway::of(&object.label, sub.blend, is_wmo || interior);
++        let cutout = model_material_swaying(
++            sway,
+             mat_cache,
+             materials,
+             sub.texture.clone(),
+@@ -204,7 +208,8 @@ pub fn spawn_model_entities(
+             cutout.clone()
+         } else {
+             // The source blend decides the twin's cutout: only AlphaKey alpha-tests while fading.
+-            model_material(
++            model_material_swaying(
++                sway,
+                 mat_cache,
+                 materials,
+                 sub.texture.clone(),
+@@ -383,6 +388,7 @@ pub fn spawn_model_entities(
+                     wmo,
+                     prop,
+                     fade,
++                    sway: sway != Sway::Still,
+                 }) {
+                     continue;
+                 }
+-- 
+2.43.0
+
