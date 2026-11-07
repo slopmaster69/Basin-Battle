@@ -94,15 +94,16 @@ text = "Trade it to the quartermaster at any lamp. You drop all of it when you f
 
 # --- area 1: the cove's east beach ------------------------------------------------------------------
 
-# The smugglers' tunnel runs back from the landing into the cliff: a pirate waits in its mouth,
-# unseen until you're on him, and two more guard its strongbox where it drops away.
+# The smugglers' tunnel runs back from the landing into the cliff: a pirate stands in its mouth,
+# and two more guard its strongbox where it drops away. (He was hidden until you were on him: the
+# first creature below taught nothing but a hit from the dark. Now one pirate, alone and seen
+# coming, is the first lesson; two at the strongbox the second. Nov 7 2026.)
 [[dungeon.pack]]
 mob = "dm_pirate"
 at = [-85.0, -958.0]
 z = 42.5
 radius = 0.0
 count = 1
-hidden = 5.0
 
 [[dungeon.pack]]
 mob = "dm_pirate"
@@ -112,16 +113,17 @@ radius = 2.0
 count = 2
 link = 12.0
 
-# A squallshaper on the slope down to the pier, casting up at the landing.
+# A squallshaper on the slope down to the pier, casting up at the landing. (Not linked to the
+# pirates: it comes when it sees you, not when they're struck.)
 [[dungeon.pack]]
 mob = "dm_squallshaper"
 at = [-67.4, -914.1]
 z = 17.7
 radius = 0.0
 count = 1
-link = 10.0
 
-# Pirates in twos on the sand, walking the beach.
+# Pirates in twos on the sand. (They walked the beach to within 12 yd of Cookie's pot: a fight
+# with them there brought the boss. They stand now. Nov 7 2026, the pull report.)
 [[dungeon.pack]]
 mob = "dm_pirate"
 at = [-74.0, -922.0]
@@ -129,8 +131,6 @@ z = 32.0
 radius = 2.0
 count = 2
 link = 14.0
-route = [[-62.0, -912.0]]
-wait = 6.0
 
 # Cookie at his stew pot by the pier.
 [[dungeon.pack]]
@@ -434,7 +434,8 @@ clips_from = "TaurenFemale"
 health = 85
 run_speed = 7.0
 walk_speed = 2.0
-aggro = 24.0
+# Sees a fight 16 yd off (24 took in every fight on the beach). Nov 7 2026.
+aggro = 16.0
 leash = 32.0
 weapon = 5415
 grip = "staff"
@@ -554,7 +555,7 @@ then_look = 10987
   turn_rate = 200.0
   lock = 0.3
   blockable = true
-  # Three turns as he weakens: the ladle all round him, then pots of stew three at a time
+  # Three turns as he weakens: the ladle all round him, then pots of stew two at a time
   # (each marked where it'll land), then the pot boiling over at his feet.
   [[mob.phase]]
   at = 0.75
@@ -566,7 +567,7 @@ then_look = 10987
   at = 0.5
   speed = 0.9
   might = 1.1
-  pattern = "three pots"
+  pattern = "two pots"
   text = "\"Mmmrrrggglll! Stew's ready!\""
   [[mob.phase]]
   at = 0.2
@@ -595,10 +596,11 @@ then_look = 10987
   max_range = 22.0
   steps = [ { ranged = true, windup = 1.2, damage = 22, range = 22.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.2 } ]
   [[mob.pattern]]
-  name = "three pots"
+  name = "two pots"
   weight = 0.0
   max_range = 30.0
-  steps = [ { ranged = true, windup = 1.1, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.35 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.35 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.6 } ]
+  # (Two pots, not three: Cookie is the lesson in a ring on the ground, one at a time.)
+  steps = [ { ranged = true, windup = 1.1, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 0.6 }, { ranged = true, windup = 0.85, damage = 20, range = 24.0, radius = 3.0, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.6 } ]
   # From his first turn: the ladle swung all the way round him.
   [[mob.pattern]]
   name = "ladle spin"
@@ -612,7 +614,8 @@ then_look = 10987
   weight = 1.0
   below = 0.2
   max_range = 30.0
-  steps = [ { clip = 58, take = 0, windup = 1.1, range = 5.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 0.2, kit = 356, look = 10987 }, { ranged = true, windup = 0.9, damage = 22, range = 24.0, radius = 3.5, speed = 12.0, spell = 14814, look = 10987, kit = 30, blockable = false, recovery = 1.4 } ]
+  # (The ring alone: the pot thrown after it, 0.2 s later, made two blows no guard stops back to back.)
+  steps = [ { clip = 58, take = 0, windup = 1.1, range = 5.0, arc = 360.0, damage = 24, heavy = true, blockable = false, recovery = 1.4, kit = 356, look = 10987 } ]
   [[mob.pattern]]
   name = "pots"
   weight = 1.5
