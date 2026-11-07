@@ -150,3 +150,24 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   strike patch (#237) was open. The strike patch is now 0061 (a merge of `main` and a rename,
   not a rebase), and the whole series through 0061 is built on the pinned client before it goes
   ready.
+- **Every ability, heard and measured** (lab, the client's sound probe on): 194 abilities cast
+  against three Deadmines pirates, the 18 charged or timed ones again played properly. All but six
+  start at least one sound in the client through their spell's look. The six that started nothing
+  (Arcane Bolt, Frozen Orb, Intervene, Jump Pad, Launch Rig, Void Tether) now have a sound of their
+  own (#248). So "almost no ability has a sound" on Nov 6 is mostly Corey's volume: Master 10%
+  and Sound effects 10% in his saved settings, 1% together. A first read said 29 were silent; it
+  had matched sounds to a fixed time after each run began, and runs that set the stage pressed up
+  to 5 s later. Matching by the run each sound fell in fixed it.
+- **Damage per cast against a pirate (176 health)**, played well, from the same sweep:
+  - Mage: Fireball 47 on one (1.2 s charge, 3 s cooldown), Frostbolt 32, Pyroblast 58 for 25
+    Valor; Meteor 141 split over three for all 100 Valor (47 each: not one pirate).
+  - Shaman: Lava Burst 96 over three (32 each) on a 4 s cooldown; Earthquake, Chain Lightning
+    and Thunderstorm all hit all three.
+  - Warrior: Shockwave 84 and Cleave 72 over three, every 8 s.
+  The Mage's main spells hit one target for about what the Shaman's every-4-seconds spell does to
+  each of three. That is Corey's "did almost no damage, single target". Not tuned: Corey put
+  class work after the enemies. The numbers are for him. (Channels and damage over time are
+  under-counted: a run records about 3 s.)
+- **A stale build**: worktrees sharing one cargo target dir reuse each other's builds. The
+  playtest server built at 01:00 was the fair-blows branch's rules. Rebuilt in its own target;
+  the playtest folder now also has the client with the whole series through 0061.
