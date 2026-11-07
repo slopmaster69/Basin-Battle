@@ -301,7 +301,7 @@ impl Survival {
         let now = self.clock;
         self.trials.insert(def, Trial { obj, by: id, near_at: now });
         self.events.push(Event::Banner { player: Some(id), title: format!("The Trial of {}", c.name), sub: "Defeat its guardians to learn what it teaches".into() });
-        self.tell(id, format!("{} wakes and its guardians attack. Defeat them and everyone nearby learns its cards.", c.name));
+        self.tell(id, format!("{} wakes and its guardians attack. Defeat them and everyone nearby learns its abilities.", c.name));
     }
 
     /// Trials under way: passed when the last guardian falls (everyone near learns, the first

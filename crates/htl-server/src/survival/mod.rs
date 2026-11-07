@@ -800,7 +800,7 @@ impl SurvivalGame {
         }
         if self.realm.siege {
             let page = self.sim.content.siege.as_ref().map_or(String::new(), |d| d.page.clone());
-            self.say_to(conn, &format!("{page}. You're in Trollbane Hall. Muster at the banner to join a way to play: 1 against 1, 2 against 2, or 3 or 4 heroes each for themselves. Every match starts the same, with your class's (Q) and (E) cards and the plain kit. Your camp's items wait at Goldshire. The banner takes you home."));
+            self.say_to(conn, &format!("{page}. You're in Trollbane Hall. Muster at the banner to join a way to play: 1 against 1, 2 against 2, or 3 or 4 heroes each for themselves. Every match starts the same, with your class's (Q) and (E) abilities and the plain kit. Your camp's items wait at Goldshire. The banner takes you home."));
         }
         if self.realm.below {
             let own = self.sim.content.dungeon.as_ref().map(|d| d.welcome.clone()).filter(|w| !w.is_empty());
