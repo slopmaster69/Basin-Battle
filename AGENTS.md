@@ -86,7 +86,8 @@ the comment. A reviewer can be wrong; a comment nobody answered is the one that 
 
 Run what covers the files you changed. A pull request isn't ready until these pass, except what
 can't be run where you are (the visual check, a script on another system): list that as not
-tested and add the `needs playtest` label, rather than holding the pull request for it.
+tested and add the `needs playtest` label, rather than holding the pull request for it. Building
+the client for a client patch isn't one of these: that still holds the pull request.
 
 | You changed | Run |
 | --- | --- |
