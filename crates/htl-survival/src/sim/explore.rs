@@ -485,8 +485,25 @@ impl Survival {
         self.events.push(Event::Dirty);
     }
 
-    /// Testing (debug): set a hero down at one of Elwynn's places.
+    /// Testing (debug): set a hero down at one of Elwynn's places, or at `x y [z] [facing]`
+    /// anywhere, a dungeon's floors too (give z there: the ground has several, and without it the
+    /// lowest found is taken). The visual check films a spot of a dungeon without walking there.
     pub fn goto_site(&mut self, id: Id, key: &str) -> Result<String, String> {
+        let words: Vec<&str> = key.split_whitespace().collect();
+        let nums: Vec<f32> = words.iter().filter_map(|w| w.parse().ok()).collect();
+        if words.len() >= 2 && nums.len() == words.len() {
+            if self.in_arena(id) {
+                return Err("Not from here.".into());
+            }
+            let at = match nums.get(2) {
+                Some(&z) => [nums[0], nums[1], z],
+                None => self.ground(nums[0], nums[1]),
+            };
+            let facing = nums.get(3).copied().unwrap_or(0.0);
+            self.put_at(id, [at[0], at[1], at[2] + ARRIVE_LIFT], facing);
+            self.land_from_far(id);
+            return Ok(format!("{:.1}, {:.1}, {:.1}", at[0], at[1], at[2]));
+        }
         let Some(site) = self.content.sites.iter().find(|s| s.key == key).cloned() else {
             let keys: Vec<&str> = self.content.sites.iter().map(|s| s.key.as_str()).collect();
             return Err(format!("No place called {key}. Try {}.", keys.join(", ")));
