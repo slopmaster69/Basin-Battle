@@ -488,7 +488,8 @@ pub(crate) const VERSION: u32 = 2;
 /// health to where it will be. (54 is #217's.)
 /// 56: the ordinary camera over the right shoulder (`SetCameraShoulder`, client patch 0059), so a
 /// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
-pub(crate) const ADDON_NEWEST: u32 = 56;
+/// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
+pub(crate) const ADDON_NEWEST: u32 = 57;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -509,9 +510,10 @@ pub(crate) const ADDON_NEWEST: u32 = 56;
 /// (0049), and our own drawn bow's line steered onto the reticle (0050).
 /// (0058 adds `SetSpellAttach`, which hangs a spell's effects from another attachment: Salvation's
 /// wings on the back. No round of its own: the add-on calls it only where it exists.)
-/// (0060 paces a creature's strike so it's seen to swing, and its return so it never crawls. No
+/// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0060).
+/// (0061 paces a creature's strike so it's seen to swing, and its return so it never crawls. No
 /// round of its own: nothing new for the add-on to call.)
-pub(crate) const CLIENT_NEWEST: u8 = 27;
+pub(crate) const CLIENT_NEWEST: u8 = 28;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
 /// hero, or none when both are current.

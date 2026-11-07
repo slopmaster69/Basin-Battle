@@ -178,14 +178,17 @@ radius = 0.0
 count = 1
 
 # On the Juggernaut (off the way: up from the scaffold's south-west platform): Captain Greenskin
-# and his crew on the main deck, and Edwin VanCleef at the stern.
+# and his crew on the main deck, and Edwin VanCleef at the stern. Three fights in turn, not one:
+# the two deck hands, then the Evokers, then the captain on his quarterdeck (he calls his own
+# hands at half). Linked, the Evokers between them brought all five at once.
 [[dungeon.pack]]
 mob = "dm_pirate"
 at = [-62.0, -797.0]
 z = 39.5
 radius = 2.5
 count = 2
-link = 16.0
+# Each other only: at 16 they called the Evokers 14 yd aft.
+link = 6.0
 
 [[dungeon.pack]]
 key = "greenskin"
@@ -195,7 +198,6 @@ at = [-62.0, -815.0]
 z = 41.5
 radius = 0.0
 count = 1
-link = 16.0
 
 [[dungeon.pack]]
 key = "vancleef"
@@ -735,7 +737,8 @@ scale = 1.5
 health = 520
 run_speed = 7.0
 walk_speed = 2.0
-aggro = 16.0
+# He holds his quarterdeck until you come up to it: at 16 he came down into the deck hands' fight.
+aggro = 12.0
 leash = 30.0
 weapon = 1853
 grip = "1h"
@@ -2336,11 +2339,14 @@ count = 1
 
 [[dungeon.pack]]
 mob = "dm_evoker"
-at = [-70.0, -808.0]
-z = 40.0
-radius = 3.0
+# On the raised fore deck, 17 yd from the deck hands and from the captain (they stood 11 yd from
+# him and 14 from the hands, and each brought the others).
+at = [-48.0, -807.0]
+z = 42.7
+# A pair that stands together and comes together.
+radius = 1.5
 count = 2
-link = 10.0
+link = 5.0
 
 # A goblin craftsman over the cannon gallery's floor.
 [[dungeon.pack]]
@@ -2902,7 +2908,8 @@ clips_from = "TrollMale"
 health = 90
 run_speed = 7.0
 walk_speed = 2.0
-aggro = 18.0
+# A caster notices late (as the beach Squallshaper): at 18 it joined every fight near it.
+aggro = 13.0
 leash = 30.0
 weapon = 472
 grip = "staff"
