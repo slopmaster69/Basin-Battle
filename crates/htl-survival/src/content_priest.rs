@@ -35,6 +35,9 @@ pub struct PriestDef {
     pub empower_valor: f32,
     pub empower_aura: u32,
     pub perfect_kit: u32,
+    /// A Shadow spell's perfect with no burst of its own: dark, never the Light's column
+    /// (Chandrian's film: the Shadowcaller's heavy burst white-gold).
+    pub shadow_perfect_kit: u32,
 }
 
 impl Default for PriestDef {
@@ -55,6 +58,7 @@ impl Default for PriestDef {
             empower_valor: 4.0,
             empower_aura: 0,
             perfect_kit: 0,
+            shadow_perfect_kit: 0,
         }
     }
 }

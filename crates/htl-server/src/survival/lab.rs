@@ -418,6 +418,17 @@ impl SurvivalGame {
         // `find [missile] <word>... [spell <id>...]`: the game's own spell looks that show a model
         // by that name, written to logs/lab/find-<words>.txt, to pick a look from instead of
         // guessing. Any world takes it; it reads the game data off the rules' thread.
+        // `bestiary <creature|prefix>...`: a run for each string of each creature named (or whose
+        // key starts with a word ending in `*`: `dm_*` is every creature of the Deadmines), put in
+        // the queue in its place, each filmed the same way: the scene near enough for the string,
+        // a second's lead-in, the whole string (`blow:<string>`), the HUD on.
+        if words.first() == Some(&"bestiary") {
+            let runs = self.bestiary_runs(&words[1..]);
+            let mut out: Vec<String> = runs;
+            out.extend(lines[1..].iter().map(|l| l.to_string()));
+            let _ = std::fs::write(&path, if out.is_empty() { String::new() } else { out.join("\n") + "\n" });
+            return;
+        }
         if words.first() == Some(&"find") {
             let rest = lines[1..].join("\n");
             let _ = std::fs::write(&path, if rest.is_empty() { String::new() } else { rest + "\n" });
@@ -435,6 +446,31 @@ impl SurvivalGame {
             eprintln!("[lab] queued run failed: {line}: {e}");
             self.tell(conn, &format!("Lab: {e}"));
         }
+    }
+
+    /// The bestiary's runs for these creature keys (`dm_*`: every key with that start): one a
+    /// string, its scene by how near the string wants its foe.
+    fn bestiary_runs(&self, keys: &[&str]) -> Vec<String> {
+        let mut out = Vec::new();
+        for d in &self.sim.content.mobs {
+            let picked = keys.iter().any(|k| match k.strip_suffix('*') {
+                Some(start) => d.key.starts_with(start),
+                None => d.key == *k,
+            });
+            if !picked || d.inert() || d.critter {
+                continue;
+            }
+            for p in &d.patterns {
+                if p.name.is_empty() {
+                    continue;
+                }
+                out.push(format!("whirlwind {} {} do wait:1.0,blow:{} shots 80@50 cam close hud", bestiary_scene(p), d.key, p.name.replace(' ', "_")));
+            }
+            if d.patterns.is_empty() {
+                out.push(format!("whirlwind close {} do wait:1.0,blow shots 60@50 cam close hud", d.key));
+            }
+        }
+        out
     }
 
     /// Before the rules step: the lab's steps that are due.
@@ -619,6 +655,15 @@ impl SurvivalGame {
                 "blow" => {
                     if let Some(m) = nearest {
                         self.sim.lab_blow(m, me);
+                    }
+                    None
+                }
+                // One of its strings by name, the whole of it (`blow:two_slashes`).
+                s if s.starts_with("blow:") => {
+                    if let Some(m) = nearest {
+                        if !self.sim.lab_blow_string(m, me, &s["blow:".len()..]) {
+                            self.tell(conn, &format!("Lab: no string \"{}\" on that creature.", &s["blow:".len()..]));
+                        }
                     }
                     None
                 }
@@ -990,6 +1035,19 @@ fn copy_shots(since: std::time::SystemTime, upto: std::time::SystemTime, to: &st
     }
 }
 
+/// The scene a bestiary run films a string in: up close (`close`, 1.8 yd) for a string from arm's
+/// reach, 5 yd (`one`) for one that wants its foe a few strides off (a lunge, a charge), 14 yd
+/// (`far`) for one from afar (a throw, a bolt).
+fn bestiary_scene(p: &htl_survival::content::PatternDef) -> &'static str {
+    if p.min_range <= 0.0 {
+        "close"
+    } else if p.min_range <= 5.0 && (p.max_range <= 0.0 || p.max_range >= 5.0) {
+        "one"
+    } else {
+        "far"
+    }
+}
+
 /// The event's text names one of these ids: the number as a field's value (`: 12`, `Some(12)`,
 /// `Unit(12)`, `[12, 30]`), not part of a longer number or a position.
 fn mentions(text: &str, ids: &[Id]) -> bool {
@@ -1014,6 +1072,17 @@ mod tests {
         assert_eq!(race_gender("night_elf-m"), Some((4, 0)));
         assert_eq!(race_gender("goblin-m"), None);
         assert_eq!(race_gender("orc"), None);
+    }
+
+    #[test]
+    fn a_bestiary_string_is_filmed_from_as_near_as_it_wants_its_foe() {
+        let content = htl_survival::content::Content::builtin();
+        let pirate = content.mobs.iter().find(|d| d.key == "dm_pirate").unwrap();
+        let scene = |name: &str| super::bestiary_scene(pirate.patterns.iter().find(|p| p.name == name).unwrap());
+        assert_eq!(scene("two slashes"), "close");
+        assert_eq!(scene("lunge"), "one");
+        let cookie = content.mobs.iter().find(|d| d.key == "dm_cookie").unwrap();
+        assert_eq!(super::bestiary_scene(cookie.patterns.iter().find(|p| p.name == "pot").unwrap()), "far");
     }
 
     #[test]

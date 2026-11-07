@@ -142,6 +142,10 @@ pub struct PlayerSave {
     pub stamina: f32,
     pub weapon: String,
     pub shield: String,
+    /// The off hand when it holds no shield: a one-handed weapon's key (dual wield), or "none"
+    /// (one weapon alone). Empty (an older save, or a shield): the shield.
+    #[serde(default)]
+    pub off_hand: String,
     pub bow: String,
     pub bag: BTreeMap<String, u32>,
     /// Down when they left: they get up at the camp on their return.
@@ -184,6 +188,11 @@ pub fn save_player(c: &Content, p: &Player) -> PlayerSave {
         stamina: p.stamina,
         weapon: c.items[p.weapon].key.clone(),
         shield: c.items[p.shield].key.clone(),
+        off_hand: match (p.off_weapon, p.off_empty) {
+            (Some(i), _) => c.items[i].key.clone(),
+            (None, true) => "none".into(),
+            (None, false) => String::new(),
+        },
         bow: c.items[p.bow].key.clone(),
         bag: p.bag.iter().filter(|(_, n)| **n > 0).map(|(i, n)| (c.items[*i].key.clone(), *n)).collect(),
         dead: p.health == 0 || matches!(p.action, Action::Dead { .. }),
@@ -283,6 +292,8 @@ pub fn restore_player(c: &Content, p: &mut Player, s: &PlayerSave, height: impl 
     p.stamina = s.stamina.clamp(0.0, c.player.stamina);
     p.weapon = item(&s.weapon, p.weapon);
     p.shield = item(&s.shield, p.shield);
+    p.off_empty = s.off_hand == "none";
+    p.off_weapon = (!s.off_hand.is_empty() && !p.off_empty).then(|| c.item(&s.off_hand)).flatten().filter(|i| c.items[*i].kind == crate::ItemKind::Weapon);
     p.bow = item(&s.bow, p.bow);
     p.bag = s.bag.iter().filter_map(|(k, n)| Some((c.item(k)?, *n))).collect();
     p.armor = s.armor.iter().filter_map(|(slot, k)| Some((slot.clone(), c.item(k).filter(|i| c.items[*i].kind == crate::ItemKind::Armor)?))).collect();

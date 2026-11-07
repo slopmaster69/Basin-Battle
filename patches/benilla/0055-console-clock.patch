@@ -1,0 +1,422 @@
+From 9710997a5c5018cbe6c0b78123a182cf7ed1fb92 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 09:04:58 -0700
+Subject: [PATCH] A console clock for the visual check: `worldclock <minute>`
+ holds the time of day
+
+`worldclock 1050` holds the world's light at 17:30 (any minute of the game day, 0 to 1439, 720
+noon), as the debug panel's clock scrub does; `worldclock server`, or `worldclock` alone, follows
+the server's clock again. It is for the scripted visual check, whose scenarios shoot Elwynn at a
+set hour with `ConsoleExec("worldclock 1050")`: the light, the sky and the new look's grade follow
+on the next frame, and the server's own clock is untouched. A minute out of range or a word that
+is not one prints the usage line and changes nothing. benilla's own; 1.12 has no such command.
+
+`lookbloom <intensity> [threshold]` holds the new look's bloom the same way, so one take can
+compare several; `lookbloom grade`, or no argument, lets the hour's grade decide again.
+
+`lookmist <scale>` holds the mist at a multiple of the hour's own (0 to 6), and `lookmist grade`
+lets go.
+
+`lookmist day <number>` rolls the mist for a given day (a calendar day number: 20763 is 2026-11-06)
+instead of the server's, at once, so one take can show several days; `lookmist day server` goes back
+to the server's. `lookmist why` prints the strength the mist resolved to and what decided it (the
+day's roll, a fog day, the weather, an event or the held tune), then each of those inputs. `lookmist
+grade` lets go of both, and the mist follows the day, the weather and events again.
+---
+ crates/benilla-app/src/world_console.rs | 366 ++++++++++++++++++++++++
+ 1 file changed, 366 insertions(+)
+
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 0fbf678..32c4339 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -74,6 +74,27 @@ impl Plugin for WorldConsolePlugin {
+         }
+         // Registered by `InitSky` at the first map load (`0x6d1d43`-`0x6d1d4d`).
+         app.console_command("SkySunGlare", GRAPHICS, Some("0, 1"), sky_sun_glare);
++        // benilla's own, not a 1.12 command: the visual check's clock.
++        app.console_command(
++            "worldclock",
++            GRAPHICS,
++            Some("<minute 0-1439> | server"),
++            world_clock,
++        );
++        // benilla's own: the new look's bloom held for tuning on film.
++        app.console_command(
++            "lookbloom",
++            GRAPHICS,
++            Some("<intensity> [threshold] | grade"),
++            look_bloom,
++        );
++        // benilla's own: the new look's mist held for tuning on film, and why it is as it is.
++        app.console_command(
++            "lookmist",
++            GRAPHICS,
++            Some("<scale> | day <number> | why | grade"),
++            look_mist,
++        );
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -83,6 +104,173 @@ impl Plugin for WorldConsolePlugin {
+     }
+ }
+ 
++/// `worldclock <minute>`, benilla's own (1.12 has no such command): holds the world's time of day
++/// at a minute of the game day (0 to 1439, 720 noon), as the debug panel's clock scrub does, so a
++/// scripted visual check (`ConsoleExec("worldclock 1050")`) can shoot a scene at a set hour.
++/// `worldclock server`, or no argument, follows the server's clock again. The light, the sky and
++/// the new look's grade all follow on the next frame; the server's clock is untouched.
++fn world_clock(world: &mut World, args: &str) -> Vec<String> {
++    let arg = args.trim();
++    let mut debug = world.get_resource_or_init::<benilla_world::dev_state::DebugState>();
++    if arg.is_empty() || arg.eq_ignore_ascii_case("server") {
++        debug.lighting.follow_server_time = true;
++        return vec!["World clock follows the server.".to_string()];
++    }
++    match arg.parse::<u32>() {
++        Ok(minute) if minute < 1440 => {
++            debug.lighting.follow_server_time = false;
++            debug.lighting.manual_minute = minute;
++            vec![format!(
++                "World clock held at {:02}:{:02}.",
++                minute / 60,
++                minute % 60
++            )]
++        }
++        _ => vec!["Usage: worldclock <minute 0-1439> | server".to_string()],
++    }
++}
++
++/// `lookbloom <intensity> [threshold]`, benilla's own (1.12 has no such command): holds the new
++/// look's bloom at an intensity (and its prefilter's threshold, 0..1 of the gamma frame) whatever
++/// the hour's grade asks, so one take can compare several; `lookbloom grade`, or no argument, lets
++/// the grade decide again. The classic look (`worldLook 0`) has no bloom either way.
++fn look_bloom(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::LookBloomTune;
++    let mut words = args.split_whitespace();
++    let first = words.next();
++    if first.is_none() || first.is_some_and(|w| w.eq_ignore_ascii_case("grade")) {
++        *world.get_resource_or_init::<LookBloomTune>() = LookBloomTune::default();
++        return vec!["Bloom follows the grade.".to_string()];
++    }
++    let usage = || vec!["Usage: lookbloom <intensity> [threshold] | grade".to_string()];
++    let Some(intensity) = first
++        .and_then(|w| w.parse::<f32>().ok())
++        .filter(|v| (0.0..=4.0).contains(v))
++    else {
++        return usage();
++    };
++    let threshold = match words.next() {
++        None => None,
++        Some(w) => match w.parse::<f32>().ok().filter(|v| (0.0..=1.0).contains(v)) {
++            Some(t) => Some(t),
++            None => return usage(),
++        },
++    };
++    *world.get_resource_or_init::<LookBloomTune>() = LookBloomTune {
++        intensity: Some(intensity),
++        threshold,
++    };
++    vec![match threshold {
++        Some(t) => format!("Bloom held at {intensity} (threshold {t})."),
++        None => format!("Bloom held at {intensity}."),
++    }]
++}
++
++/// `lookmist`, benilla's own (1.12 has no such command), for filming the new look's mist:
++///
++/// - `lookmist <scale>` holds it at a multiple of the hour's own (0 to 6: 0 none, 1 the hour's,
++///   3 three times as thick) over the day, the weather and any event, so one take can run from
++///   subtle to the densest still playable.
++/// - `lookmist day <number>` rolls it for that day (a calendar day number, days from 1970-01-01:
++///   2026-11-06 is 20763) instead of the server's, at once, so one take can show several days;
++///   `lookmist day` or `lookmist day server` goes back to the server's.
++/// - `lookmist why` prints the strength and what decided it: the day's roll, a fog day, the
++///   weather, an event or the held tune.
++/// - `lookmist grade`, or no argument, lets go of both.
++///
++/// The classic look (`worldLook 0`) has no mist either way.
++fn look_mist(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::LookMistTune;
++    let usage = || vec!["Usage: lookmist <scale 0-6> | day <number> | why | grade".to_string()];
++    let mut words = args.split_whitespace();
++    match words.next() {
++        None => {
++            *world.get_resource_or_init::<LookMistTune>() = LookMistTune::default();
++            vec!["Mist follows the day, the weather and events.".to_string()]
++        }
++        Some(w) if w.eq_ignore_ascii_case("grade") => {
++            *world.get_resource_or_init::<LookMistTune>() = LookMistTune::default();
++            vec!["Mist follows the day, the weather and events.".to_string()]
++        }
++        Some(w) if w.eq_ignore_ascii_case("why") => mist_why(world),
++        Some(w) if w.eq_ignore_ascii_case("day") => match words.next() {
++            None => {
++                world.get_resource_or_init::<LookMistTune>().day = None;
++                vec!["Mist rolls the server's day.".to_string()]
++            }
++            Some(w) if w.eq_ignore_ascii_case("server") => {
++                world.get_resource_or_init::<LookMistTune>().day = None;
++                vec!["Mist rolls the server's day.".to_string()]
++            }
++            Some(w) => match w
++                .parse::<i64>()
++                .ok()
++                .filter(|d| (0..=1_000_000).contains(d))
++            {
++                Some(day) => {
++                    world.get_resource_or_init::<LookMistTune>().day = Some(day);
++                    let roll = benilla_world::look::mist::day_roll(day);
++                    vec![format!(
++                        "Mist rolls day {day} ({}): {:.2} times the hour's{}.",
++                        date_of(day),
++                        roll.scale,
++                        if roll.fog_day { ", a fog day" } else { "" }
++                    )]
++                }
++                None => usage(),
++            },
++        },
++        Some(w) => match w.parse::<f32>().ok().filter(|v| (0.0..=6.0).contains(v)) {
++            Some(scale) => {
++                world.get_resource_or_init::<LookMistTune>().scale = Some(scale);
++                vec![format!("Mist held at {scale} times the hour's.")]
++            }
++            None => usage(),
++        },
++    }
++}
++
++/// A calendar day number (days from 1970-01-01) as `2026-11-06`.
++fn date_of(day: i64) -> String {
++    let c = benilla_ui::civil::from_unix(day.saturating_mul(86_400));
++    format!("{:04}-{:02}-{:02}", c.year, c.month, c.day)
++}
++
++/// `lookmist why`: the strength the mist resolved to on the last frame and what decided it, then
++/// each of its inputs.
++fn mist_why(world: &mut World) -> Vec<String> {
++    use benilla_world::look::{LookMist, LookMistTune};
++    let mist = *world.get_resource_or_init::<LookMist>();
++    let tune = *world.get_resource_or_init::<LookMistTune>();
++    let on = world
++        .get_resource::<benilla_world::look::WorldLook>()
++        .is_some_and(|l| l.on);
++    let event = mist.event.map_or("none".to_string(), |e| format!("{e:.2}"));
++    let held = tune.scale.map_or("no".to_string(), |s| format!("{s:.2}"));
++    let mut lines = vec![
++        format!(
++            "Mist at {:.2} times the hour's, from {}.",
++            mist.scale,
++            mist.source.describe()
++        ),
++        format!(
++            "Day {} ({}{}): {:.2}{}. Weather: {:.2}. Day and weather eased: {:.2}. Event: {event}. \
++             Held: {held}.",
++            mist.day,
++            date_of(mist.day),
++            if tune.day.is_some() { ", held" } else { ", the server's" },
++            mist.roll.scale,
++            if mist.roll.fog_day { ", a fog day" } else { "" },
++            mist.weather,
++            mist.ambient,
++        ),
++    ];
++    if !on {
++        lines.push("The classic look (worldLook 0) has no mist.".to_string());
++    }
++    lines
++}
++
+ /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
+ /// a clear one set with the second, each through `ConsoleWrite` in class 0.
+ fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
+@@ -306,6 +494,184 @@ mod tests {
+         *app.world().resource::<WorldLevels>()
+     }
+ 
++    /// `worldclock`: a minute holds the lighting's clock there, `server` or nothing lets it go,
++    /// and anything else leaves it as it was with the usage line.
++    #[test]
++    fn the_world_clock_holds_and_lets_go() {
++        use benilla_world::dev_state::DebugState;
++        let mut app = world_app();
++        let clock = |app: &mut App| {
++            let d = app.world_mut().get_resource_or_init::<DebugState>();
++            (d.lighting.follow_server_time, d.lighting.manual_minute)
++        };
++        assert_eq!(
++            run(&mut app, "worldclock 1050"),
++            ["World clock held at 17:30."]
++        );
++        assert_eq!(clock(&mut app), (false, 1050));
++        assert_eq!(
++            run(&mut app, "worldclock 0"),
++            ["World clock held at 00:00."]
++        );
++        assert_eq!(clock(&mut app), (false, 0));
++        assert_eq!(
++            run(&mut app, "worldclock 1440"),
++            ["Usage: worldclock <minute 0-1439> | server"]
++        );
++        assert_eq!(run(&mut app, "worldclock dusk").len(), 1);
++        assert_eq!(clock(&mut app), (false, 0), "a bad minute changes nothing");
++        assert_eq!(
++            run(&mut app, "worldclock server"),
++            ["World clock follows the server."]
++        );
++        assert!(clock(&mut app).0);
++        run(&mut app, "worldclock 330");
++        run(&mut app, "worldclock");
++        assert_eq!(
++            clock(&mut app),
++            (true, 330),
++            "no argument follows the server too"
++        );
++    }
++
++    /// `lookbloom`: a value holds the bloom, a second its threshold, `grade` or nothing lets go,
++    /// and anything out of range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_bloom_holds_and_lets_go() {
++        use benilla_world::look::LookBloomTune;
++        let mut app = world_app();
++        let tune = |app: &mut App| *app.world_mut().get_resource_or_init::<LookBloomTune>();
++        assert_eq!(run(&mut app, "lookbloom 0.4"), ["Bloom held at 0.4."]);
++        assert_eq!(
++            tune(&mut app),
++            LookBloomTune {
++                intensity: Some(0.4),
++                threshold: None
++            }
++        );
++        assert_eq!(
++            run(&mut app, "lookbloom 1 0.5"),
++            ["Bloom held at 1 (threshold 0.5)."]
++        );
++        assert_eq!(
++            tune(&mut app),
++            LookBloomTune {
++                intensity: Some(1.0),
++                threshold: Some(0.5)
++            }
++        );
++        assert_eq!(
++            run(&mut app, "lookbloom 9"),
++            ["Usage: lookbloom <intensity> [threshold] | grade"]
++        );
++        assert_eq!(run(&mut app, "lookbloom 0.3 2").len(), 1);
++        assert_eq!(
++            tune(&mut app).intensity,
++            Some(1.0),
++            "a bad value changes nothing"
++        );
++        assert_eq!(
++            run(&mut app, "lookbloom grade"),
++            ["Bloom follows the grade."]
++        );
++        assert_eq!(tune(&mut app), LookBloomTune::default());
++        run(&mut app, "lookbloom 0.2");
++        run(&mut app, "lookbloom");
++        assert_eq!(
++            tune(&mut app),
++            LookBloomTune::default(),
++            "no argument lets go too"
++        );
++    }
++
++    /// `lookmist`: a scale holds the mist, `day` holds the day it rolls for, `grade` or nothing
++    /// lets go of both, and anything out of range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_mist_holds_and_lets_go() {
++        use benilla_world::look::LookMistTune;
++        let mut app = world_app();
++        let tune = |app: &mut App| *app.world_mut().get_resource_or_init::<LookMistTune>();
++        let usage = ["Usage: lookmist <scale 0-6> | day <number> | why | grade"];
++        assert_eq!(
++            run(&mut app, "lookmist 2.5"),
++            ["Mist held at 2.5 times the hour's."]
++        );
++        assert_eq!(tune(&mut app).scale, Some(2.5));
++        assert_eq!(run(&mut app, "lookmist 7"), usage);
++        assert_eq!(run(&mut app, "lookmist thick"), usage);
++        assert_eq!(
++            tune(&mut app).scale,
++            Some(2.5),
++            "a bad value changes nothing"
++        );
++        assert_eq!(
++            run(&mut app, "lookmist grade"),
++            ["Mist follows the day, the weather and events."]
++        );
++        assert_eq!(tune(&mut app), LookMistTune::default());
++        run(&mut app, "lookmist 0");
++        assert_eq!(tune(&mut app).scale, Some(0.0));
++        run(&mut app, "lookmist");
++        assert_eq!(
++            tune(&mut app),
++            LookMistTune::default(),
++            "no argument lets go too"
++        );
++
++        let roll = benilla_world::look::mist::day_roll(20_765);
++        assert_eq!(
++            run(&mut app, "lookmist day 20765"),
++            [format!(
++                "Mist rolls day 20765 (2026-11-08): {:.2} times the hour's, a fog day.",
++                roll.scale
++            )]
++        );
++        assert_eq!(tune(&mut app).day, Some(20_765));
++        assert_eq!(run(&mut app, "lookmist day soon"), usage);
++        assert_eq!(run(&mut app, "lookmist day -3"), usage);
++        assert_eq!(tune(&mut app).day, Some(20_765));
++        run(&mut app, "lookmist 3");
++        assert_eq!(
++            run(&mut app, "lookmist day server"),
++            ["Mist rolls the server's day."]
++        );
++        assert_eq!(
++            tune(&mut app),
++            LookMistTune {
++                scale: Some(3.0),
++                day: None
++            },
++            "the day lets go alone"
++        );
++        run(&mut app, "lookmist day 4");
++        run(&mut app, "lookmist grade");
++        assert_eq!(tune(&mut app), LookMistTune::default());
++    }
++
++    /// `lookmist why` prints the strength the mist resolved to and what decided it.
++    #[test]
++    fn the_look_mist_says_why() {
++        use benilla_world::look::{LookMist, MistSource};
++        let mut app = world_app();
++        let mut mist = LookMist::default();
++        mist.scale = 3.5;
++        mist.source = MistSource::Event;
++        mist.day = 20_763;
++        mist.event = Some(3.5);
++        app.world_mut().insert_resource(mist);
++        let lines = run(&mut app, "lookmist why");
++        assert_eq!(lines[0], "Mist at 3.50 times the hour's, from an event.");
++        assert!(
++            lines[1].starts_with("Day 20763 (2026-11-06, the server's): ")
++                && lines[1].contains("Event: 3.50. Held: no."),
++            "{lines:?}"
++        );
++        assert_eq!(
++            lines.last().map(String::as_str),
++            Some("The classic look (worldLook 0) has no mist.")
++        );
++    }
++
+     /// The six toggles flip their bit and print the state they leave (`ConsoleWrite` class 0):
+     /// the five world-flag bits start set (`0x7100b73`, `0x66f6cb`), the simple-doodad word clear
+     /// (`0x66f714`). None reads its arguments.
+-- 
+2.43.0
+

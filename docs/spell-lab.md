@@ -80,6 +80,12 @@ what it sent, side by side on one sheet.
   `LAB_DIR` if it's set (the lab helper sets it to a folder on a second drive), else
   `logs/lab`; the queue stays in `logs/lab`. Delete old runs when you're done with them: past
   3 GB there, the lab refuses new runs and says so.
+- **A creature's strings:** the step `blow:<string>` has the scene's creature play that string of
+  its, every blow, by its name with `_` for spaces (`blow:two_slashes`). A queue line
+  `bestiary <creature>...` (or `dm_*`, every creature whose key starts so) puts a run in the queue
+  for each string of each creature: the scene as near as the string wants its foe, a second's
+  lead-in, the whole string, the HUD on (`whirlwind close dm_pirate do wait:1.0,blow:two_slashes
+  shots 80@50 cam close hud`). The ability named is only the lab's way in; nothing is cast.
 - **Finding a look:** a queue line `find <word>...` lists the game's spells whose cast, impact or
   lasting look shows a model with one of those words in its path into
   `logs/lab/find-<words>.txt`, read from your own game data. `find missile <word>...` looks at

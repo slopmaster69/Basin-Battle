@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 53
+local VERSION = 58
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2011,6 +2011,13 @@ vit.health.over:Hide()
 vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
 vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
 vit.health.shield:Hide()
+-- The healing still to come (a meal, a salve, a mending: `H`'s 43rd), as WoW shows an incoming
+-- heal: a pale rose stroke behind the health, as the amber chunk of a blow is, reaching to where
+-- the health will be if nothing hurts them (Corey). Its brushed end marks the spot: laid only past
+-- the health, a short one was all ragged edge, lost under the numbers.
+vit.health.ahead = Tex(vit.health, "BORDER", "bar")
+vit.health.ahead:SetVertexColor(1, 0.62, 0.56, 0.7)
+vit.health.ahead:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
 -- Room for "1000 / 1000" at any bar size (left to size itself, it was cut to "200 / 2...").
@@ -2086,7 +2093,7 @@ end
 -- past the bar's end. The shield over the health from the bar's left end, like a fighting game's
 -- second bar over the first, translucent so the health shows through, and shrinking to the left as
 -- it's spent (laid past the health too, it squeezed under the numbers at full health).
-function ES.DrawAbsorbs(hp, maxhp, shield, over)
+function ES.DrawAbsorbs(hp, maxhp, shield, over, ahead)
   local b = vit.health
   local per = b.full / math.max(1, maxhp)
   local function Lay(t, x, w)
@@ -2100,6 +2107,13 @@ function ES.DrawAbsorbs(hp, maxhp, shield, over)
   local ow = math.min(b.full, over * per)
   Lay(b.over, math.max(0, math.min(hp * per, b.full - ow)), ow)
   Lay(b.shield, 0, math.min(b.full, shield * per))
+  -- The heal still to come: behind the health from the bar's left end to where the health will
+  -- be, never past the bar's end.
+  if (ahead or 0) > 0 then
+    Lay(b.ahead, 0, math.min(b.full, (hp + ahead) * per))
+  else
+    b.ahead:Hide()
+  end
 end
 
 -- The bars' lengths: the dock's width by the hero, by what they hold in the corner.
@@ -3100,8 +3114,8 @@ function ES.AbilityTip(b)
   local s = ES.slots[b.n]
   GameTooltip:SetOwner(b, "ANCHOR_TOP")
   if not s or s.key == "" then
-    GameTooltip:SetText("No card on this key")
-    GameTooltip:AddLine("Open the board (" .. (KeyName("ES_TREE") or "N") .. ") to choose a card for it.", 0.8, 0.8, 0.8, 1)
+    GameTooltip:SetText("No ability on this key")
+    GameTooltip:AddLine("Open the board (" .. (KeyName("ES_TREE") or "N") .. ") to choose an ability for it.", 0.8, 0.8, 0.8, 1)
     GameTooltip:Show()
     return
   end
@@ -3901,8 +3915,8 @@ function ES.DrawHud()
   end
   ES.lastHp = hp
   vit.health:Set(hp / math.max(1, maxhp))
-  local shield, over = tonumber(h[41]) or 0, tonumber(h[42]) or 0
-  ES.DrawAbsorbs(hp, maxhp, shield, over)
+  local shield, over, ahead = tonumber(h[41]) or 0, tonumber(h[42]) or 0, tonumber(h[43]) or 0
+  ES.DrawAbsorbs(hp, maxhp, shield, over, ahead)
   -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
   local text = hp
   if over > 0 then text = text .. "|cffff6f8f+" .. over .. "|r" end
@@ -4703,7 +4717,7 @@ Pins.icons = {
 }
 Pins.words = {
   camp = "Your camp", town = "A town", horde = "Held by the Horde", foes = "Hostile ground",
-  sanctum = "A sanctum whose trial teaches the camp new cards", lair = "A lair",
+  sanctum = "A sanctum whose trial teaches the camp new abilities", lair = "A lair",
   landmark = "A landmark", arena = "The Proving Ring", dungeon = "A way below",
   fishing = "Fishing waters", mine = "A mine", herbs = "Herbs grow here",
 }
@@ -4945,7 +4959,7 @@ local ACTION_ICONS = { upgrade = "Spell_ChargePositive", move = "INV_Misc_Note_0
 function ES.Station(name, list, icon, actions, health, most)
   local note = "Materials come from your bags first, then storage."
   if ES.siege then
-    note = "Buy your class's other cards with gold. A new card goes on its key if the key is free. Swap cards on the board (N)."
+    note = "Buy your class's other abilities with gold. A new ability goes on its key if the key is free. Swap abilities on the board (N)."
   elseif health and most and most ~= "" then
     note = "Health " .. health .. " of " .. most .. ". " .. note
   end
@@ -4953,7 +4967,7 @@ function ES.Station(name, list, icon, actions, health, most)
   local items = Items(list)
   local acts = Items(actions)
   if table.getn(items) == 0 and table.getn(acts) == 0 then
-    Rest(ES.siege and "You know every card of your class." or "Nothing to make here yet.", "", "")
+    Rest(ES.siege and "You know every ability of your class." or "Nothing to make here yet.", "", "")
   end
   -- Upgrading, moving and tearing down come first: room for them before the recipes.
   local top = 0
@@ -4993,13 +5007,21 @@ end
 -- --- the weapon rack (AR: key~name~kind~held~text~icon) ----------------------------------------------
 
 function ES.Rack(list)
-  OpenWindow("rack", "Weapon Rack", "Equip any weapon to try it. Two-handed weapons guard without a shield.")
+  OpenWindow("rack", "Weapon Rack", "Equip any weapon to try it. Two-handed weapons guard without a shield. A one-handed weapon in your off hand swings with right click instead of guarding.")
   ES.rackList = list
   local items = Items(list)
   local first = PageOf("rack", table.getn(items), LIST_ROWS)
   for i = 1, math.min(LIST_ROWS, table.getn(items) - first) do
     local f = Split(items[first + i], "~")
     local held = f[4] == "1"
+    -- A one-handed weapon goes in either hand (dual wield); a shield held can be put away (one
+    -- weapon alone).
+    local alt, altCmd
+    if f[3] == "one-handed" then
+      alt, altCmd = "Off hand", ".es arm " .. (f[1] or "") .. " off"
+    elseif f[3] == "shield" and held then
+      alt, altCmd = "Put away", ".es arm none"
+    end
     Row(i, {
       icon = f[6],
       name = f[2] or "?",
@@ -5010,6 +5032,8 @@ function ES.Rack(list)
       can = not held,
       chosen = held,
       detail = f[5] or "",
+      alt = alt,
+      altCmd = altCmd,
     })
     if i == 1 then Rest(f[2] or "?", f[5] or "", "") end
   end
@@ -5300,7 +5324,7 @@ end
 -- --- Siege's muster banner (SL: open, status, secs, then key~name~text~seats~heroes~mine) ----------
 
 function ES.Muster(f)
-  OpenWindow("muster", "The Siege Muster", "Join a mode. It begins when its seats are full, or start it early with whoever is waiting. Every match starts with your class's plain Q and E cards.", "INV_BannerPVP_02")
+  OpenWindow("muster", "The Siege Muster", "Join a mode. It begins when its seats are full, or start it early with whoever is waiting. Every match starts with your class's plain Q and E abilities.", "INV_BannerPVP_02")
   local ways = Items(f[5])
   local mine = nil
   for i = 1, table.getn(ways) do
@@ -5766,7 +5790,7 @@ tree.reset:SetPoint("LEFT", tree.full, "RIGHT", 8, 0)
 tree.hint = Text(tree, FONT_BODY, 10)
 tree.hint:SetPoint("BOTTOM", tree, "BOTTOM", 0, 46)
 tree.hint:SetTextColor(0.65, 0.63, 0.58)
-tree.hint:SetText("Click a card to put it on its key.  Hold the key a moment (or Ctrl with it) for its charged-up version.")
+tree.hint:SetText("Click an ability to put it on its key.  Hold the key a moment (or Ctrl with it) for its charged-up version.")
 
 -- The column heads.
 local function ColX(c)
@@ -5968,11 +5992,11 @@ ES.boardKit = {
 function ES.BoardDetail(d)
   local r, c = tree.regular, tree.charged
   if not d then
-    r.title:SetText("Choose a card for each key")
+    r.title:SetText("Choose an ability for each key")
     r.title:SetTextColor(0.95, 0.9, 0.8)
     r.tag:SetText("")
     r.how:SetText("")
-    r.text:SetText("Two keys to deal damage (one to reach the foe, one for the brawl), one for getting in, out or through, one for staying alive, and an ultimate that takes the whole Valor bar. Any card goes with any other.")
+    r.text:SetText("Two keys to deal damage (one to reach the foe, one for the brawl), one for getting in, out or through, one for staying alive, and an ultimate that takes the whole Valor bar. Any ability goes with any other.")
     r.facts:SetText("")
     c.title:SetText("")
     c.tag:SetText("")
@@ -6649,6 +6673,9 @@ function ES.Wake()
   ES.SetMode("action")
   -- The camera stops short of other bodies instead of entering them.
   if AnimClient() and SetCameraUnitCollision then SetCameraUnitCollision(1) end
+  -- And sits over the right shoulder, so the reticle at the screen's centre falls past the hero
+  -- instead of on their back (Corey's playtest: a staff's reticle sat on the hero).
+  if SetCameraShoulder then SetCameraShoulder(ES.SHOULDER_RIGHT, ES.SHOULDER_UP) end
   ES.Message(string.format("%s attacks, %s guards, %s dodges. Abilities are on %s %s %s %s. Hold %s for the ultimate. %s shows every key.",
     KeyName("ES_ATTACK") or "Left mouse", KeyName("ES_GUARD") or "right mouse", KeyName("ES_DODGE") or "Space",
     KeyName("ES_AB1") or "-", KeyName("ES_AB2") or "-", KeyName("ES_AB3") or "-", KeyName("ES_AB4") or "-", KeyName("ES_AB5") or "-",
@@ -6659,6 +6686,9 @@ function ES.Wake()
     end
   end
 end
+
+-- The ordinary camera's seat over the right shoulder (yards right and up; `SetCameraShoulder`).
+ES.SHOULDER_RIGHT, ES.SHOULDER_UP = 0.9, 0.2
 
 function ES.Sleep()
   if SetAimTurn and ES.aimTurn and ES.aimTurn ~= 0 then
@@ -6681,6 +6711,7 @@ function ES.Sleep()
   if SetActionMouse then SetActionMouse(nil) end
   if SetAimCamera then SetAimCamera(nil) end
   if SetCameraUnitCollision then SetCameraUnitCollision(nil) end
+  if SetCameraShoulder then SetCameraShoulder(0) end
   ES.predicted, ES.predictedRoll = nil, nil
   ES.mine, ES.comboUntil, ES.moves, ES.lockOn = nil, nil, nil, nil
   ES.timers = {}
@@ -7057,7 +7088,10 @@ events:SetScript("OnEvent", function()
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
     -- ac26: the point the reticle is on (GetReticlePoint), and whether cover is in the way.
     -- ac27: the shoulders turned to the aim (SetAimTurn) while the bow is drawn.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
+    -- ac28: a heal on a friend floats green over their head (the server sends the heal log).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 28 then
+      Say(".es hello " .. VERSION .. " ac28")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
       Say(".es hello " .. VERSION .. " ac27")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and (tonumber(HasActionCombat()) or 0) >= 26 then
       Say(".es hello " .. VERSION .. " ac26")
