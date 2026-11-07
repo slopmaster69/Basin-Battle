@@ -143,6 +143,8 @@ struct App {
     ready_since: Option<Instant>,
     /// The game started (Ready → Launching) only once.
     launched: bool,
+    /// The picture asked for once (`--shot`).
+    shot_asked: bool,
     solo: bool,
     server_child: Option<Child>,
     game_child: Option<Child>,
@@ -212,6 +214,7 @@ impl App {
             started: Instant::now(),
             ready_since: None,
             launched: false,
+            shot_asked: false,
             server_child: None,
             game_child: None,
             game_since: None,
@@ -426,13 +429,31 @@ impl App {
                     self.become_ready();
                 }
                 Msg::ServerStarted(child) => self.server_child = Some(child),
-                Msg::GameStarted(child) => {
+                Msg::GameStarted(mut game) => {
                     self.log("the game is open");
-                    self.game_child = Some(child);
                     self.game_since = Some(Instant::now());
                     self.stage = Stage::Playing;
                     self.status = "Have fun.".into();
                     self.progress = Some(1.0);
+                    if let Some(mut server) = self.server_child.take() {
+                        // Running the server for the game: a thread waits for the game to close,
+                        // then stops the server and Play with it. (Not the window's own loop: a
+                        // hidden window stops being drawn, so it would never notice.)
+                        let log = self.paths.log.clone();
+                        thread::spawn(move || {
+                            let _ = game.wait();
+                            let _ = server.kill();
+                            let _ = server.wait();
+                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open(&log) {
+                                use std::io::Write;
+                                let _ = writeln!(f, "        the game closed; your server is stopped");
+                            }
+                            std::process::exit(0);
+                        });
+                        self.solo = true;
+                    } else {
+                        self.game_child = Some(game);
+                    }
                 }
                 Msg::Failed(why) => {
                     self.log(&format!("failed: {why}"));
@@ -469,22 +490,14 @@ impl eframe::App for App {
         self.take_messages(ctx);
         ctx.request_repaint_after(Duration::from_millis(if self.stage == Stage::Playing { 500 } else { 50 }));
 
-        // Once the game is open: gone, or, running the server for it, hidden until the game closes.
+        // Once the game is open: gone, or, running the server for it, hidden until the game
+        // closes (the thread in `take_messages` ends Play then).
         if self.stage == Stage::Playing {
-            if let Some(child) = &mut self.game_child {
-                let over = matches!(child.try_wait(), Ok(Some(_)));
-                let solo = self.server_child.is_some();
-                let since = self.game_since.map(|t| t.elapsed()).unwrap_or_default();
-                if !solo && since > Duration::from_millis(1200) {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                } else if solo && since > Duration::from_millis(1200) {
+            let since = self.game_since.map(|t| t.elapsed()).unwrap_or_default();
+            if since > Duration::from_millis(1200) {
+                if self.solo {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
-                }
-                if over {
-                    if let Some(mut s) = self.server_child.take() {
-                        self.log("the game closed; stopping your server");
-                        let _ = s.kill();
-                    }
+                } else {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             }
@@ -510,7 +523,8 @@ impl eframe::App for App {
                     Err(e) => self.log(&format!("couldn't save the picture: {e}")),
                 }
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            } else if self.stage == Stage::Ready && self.ready_since.map(|t| t.elapsed() > Duration::from_millis(600)).unwrap_or(false) {
+            } else if self.stage == Stage::Ready && !self.shot_asked && self.ready_since.map(|t| t.elapsed() > Duration::from_millis(600)).unwrap_or(false) {
+                self.shot_asked = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             }
         }
