@@ -2339,6 +2339,11 @@ impl Survival {
                 Some(self.mark_as(center, a.range * 0.6, a.windup + 0.2, Some(tele)))
             }
         };
+        // The blow's own sound as it begins to wind up (a crossbow drawn, a spell gathered), from
+        // where it stands: one whose look is silent is heard coming.
+        if a.sound != 0 {
+            self.events.push(Event::Sound { id, sound: a.sound });
+        }
         if a.emote != 0 {
             self.events.push(Event::Emote { id, emote: a.emote });
         }

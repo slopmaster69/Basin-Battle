@@ -361,3 +361,14 @@ fn fair_blows_report() {
     }
     println!("too fast to answer at all: {}; catch a light swing: {}; follow-ups too soon: {}", bad.0, bad.1, bad.2);
 }
+
+#[test]
+fn no_follow_up_that_must_be_dodged_comes_before_a_hero_can_dodge_again() {
+    let c = Content::builtin();
+    let late: Vec<String> = blows(&c)
+        .iter()
+        .filter(|b| !verdict(&c, b).2)
+        .map(|b| format!("{} {} #{}: gap {:.2}", b.mob, b.string, b.step + 1, b.gap.unwrap_or(0.0)))
+        .collect();
+    assert!(late.is_empty(), "too soon after the last to dodge: {late:#?}");
+}
