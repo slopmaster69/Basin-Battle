@@ -514,7 +514,7 @@ respawn = 0.0
   [[mob.pattern]]
   name = "kick"
   weight = 4.0
-  steps = [ { clip = 17, take = 1, ranged = false, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6 } ]
+  steps = [ { clip = 17, take = 1, ranged = false, windup = 0.35, damage = 6, range = 2.6, arc = 80.0, heavy = false, recovery = 0.6, sound = 0 } ]
 
 # Cookie, the Brotherhood's cook: an early lesson in reading a wind-up and a ring on the ground.
 [[mob]]
