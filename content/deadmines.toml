@@ -2855,7 +2855,9 @@ clips_from = "TaurenFemale"
 health = 85
 run_speed = 7.0
 walk_speed = 2.0
-aggro = 18.0
+# Notices at 12 yd: it stands behind the pirates and the Squallshaper, not with them (at 18 it came
+# with the scaffold's first pirates from 16 yd off). Nov 7 2026.
+aggro = 12.0
 leash = 30.0
 weapon = 5415
 grip = "staff"
