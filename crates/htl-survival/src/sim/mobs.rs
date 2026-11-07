@@ -1332,10 +1332,17 @@ impl Survival {
         self.events.push(Event::MobMove { id, path: vec![from, to], speed, face: Some(foe) });
     }
 
-    /// A creature waiting its turn: it stops where it is and faces `to`.
+    /// A creature waiting its turn: it stands where it is, facing `to` (unless it's backing off to
+    /// make space, which it finishes).
     fn hold_facing(&mut self, id: Id, to: Vec3) {
+        let now = self.clock;
         let Some(m) = self.mobs.get(&id) else { return };
-        let (pos, moving) = (m.pos, !m.path.is_empty());
+        let moving = !m.path.is_empty();
+        // Backing off to make space: it finishes that.
+        if moving && m.space.is_some_and(|(until, _)| now < until) {
+            return;
+        }
+        let pos = m.pos;
         let face = facing(pos, to);
         let turned = (face - m.facing + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
         if moving {

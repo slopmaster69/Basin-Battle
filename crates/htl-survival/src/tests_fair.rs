@@ -277,6 +277,31 @@ fn a_string_stops_at_the_guard_it_breaks_and_nothing_strikes_the_reeling_hero() 
 }
 
 #[test]
+fn a_string_stops_at_the_knockdown_it_gives() {
+    // Rhahk'Zor's pound knocked a hero down and its second blow knocked them down again where
+    // they lay (filmed, Nov 7).
+    let (mut s, p) = turns_world();
+    let ogre = s.content.mob("dm_rhahkzor").unwrap();
+    let m = s.spawn_mob(ogre, [2.0, 0.0, 0.0], None, false);
+    let k = s.content.mobs[ogre].patterns.iter().position(|x| x.name == "pound").unwrap();
+    if let Some(h) = s.players.get_mut(&p) {
+        h.max_health = 100_000;
+        h.health = 100_000;
+    }
+    s.begin_pattern(m, k, false);
+    s.windup(m, Foe::Hero(p), s.players[&p].pos);
+    let mut hits = 0;
+    for _ in 0..150 {
+        for e in s.step(0.02) {
+            if matches!(e, Event::Swing { attacker, victim: Some(v), outcome: Outcome::Hit, .. } if attacker == m && v == p) {
+                hits += 1;
+            }
+        }
+    }
+    assert_eq!(hits, 1, "one knockdown, then the string ends");
+}
+
+#[test]
 fn a_creature_that_just_walked_up_settles_before_its_first_blow() {
     let (mut s, p) = turns_world();
     // A miner: strings up close only (a pirate lunges in from afar, a tell of its own).
