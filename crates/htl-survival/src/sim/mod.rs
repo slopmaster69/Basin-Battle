@@ -1042,6 +1042,8 @@ pub struct Survival {
     /// `lab_blowing` while it does).
     pub(crate) lab_quiet: Vec<Id>,
     pub(crate) lab_blowing: Option<Id>,
+    /// The lab's body playing a whole string it was asked for (`blow:<string>`), until it ends.
+    pub(crate) lab_string: Option<Id>,
     /// Orbs rolling out (Frozen Orb), until stopped or spent.
     pub(crate) orbs: Vec<orb::Orb>,
     /// Bombs ticking on foes (Living Bomb), until they burst.
@@ -1200,6 +1202,7 @@ impl Survival {
             burnings: Vec::new(),
             lab_quiet: Vec::new(),
             lab_blowing: None,
+            lab_string: None,
             orbs: Vec::new(),
             bombs: Vec::new(),
             staff_marks: Vec::new(),
