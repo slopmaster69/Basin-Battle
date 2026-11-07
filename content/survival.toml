@@ -3817,6 +3817,8 @@ spell = 53
 
 [[ability]]
 key = "ambush"
+# Silent in the lab (its look plays no sound): a heavy weapon's critical as it goes.
+sound = 236
 name = "Ambush"
 ex_of = "backstab"
 text = "Steps through the shadows behind the enemy under your reticle, up to 12 yd away, then stabs for 140% weapon damage. Always counts as from behind."
@@ -3839,6 +3841,8 @@ spell = 8676
 # twice as hard. Miss a beat and the volley ends where it is. (The Mage design.)
 [[ability]]
 key = "arcane_missiles"
+# Silent in the lab (its look plays no sound): an arcane cast as it goes.
+sound = 1641
 name = "Arcane Missiles"
 text = "Fires arcane missiles along the reticle, 1 every 0.35 sec. The first 3 fire by themselves. Press again on the beat for 1 more, up to 8. The first deals 5 damage and each deals 1 more than the last. The eighth deals 100% more. Miss the beat and the volley ends. You can walk slowly while it lasts."
 icon = "Spell_Nature_StarFall"
@@ -4017,6 +4021,8 @@ effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 # Shadow: in and out.
 [[ability]]
 key = "shadowstep"
+# Silent in the lab (its look plays no sound): Vanish as it goes.
+sound = 3324
 name = "Shadowstep"
 text = "Steps through the shadows to the reticle, up to 20 yd, breaking roots and slows. Press again within 3 sec to step straight back to where you were. \"Dive, stab, gone.\""
 icon = "Ability_Vanish"
@@ -4060,6 +4066,8 @@ effects = [{ kind = "panic", secs = [2.0, 2.0] }]
 # Elements: out of reach.
 [[ability]]
 key = "blink"
+# Silent in the lab (its look plays no sound): WoW's teleport as it goes.
+sound = 3226
 name = "Blink"
 text = "Teleports you to the reticle, up to 20 yd. Breaks roots and slows. Blink just as an attack lands to make it miss and take 6 sec off Blink's cooldown."
 icon = "Spell_Arcane_Blink"
@@ -4075,6 +4083,8 @@ spell = 1953
 
 [[ability]]
 key = "frost_blink"
+# Silent in the lab (its look plays no sound): WoW's teleport as it goes.
+sound = 3226
 name = "Frost Blink"
 ex_of = "blink"
 text = "Blinks to the reticle, up to 20 yd, breaking roots and slows. Leaves a Frost Nova where you stood."
@@ -4094,6 +4104,8 @@ spell = 1953
 # the burst is small and the point is where and when it goes.)
 [[ability]]
 key = "living_bomb"
+# Silent in the lab (its look plays no sound): a fire cast as it goes.
+sound = 1484
 name = "Living Bomb"
 text = "Plants a bomb on the enemy the bolt reaches, up to 25 yd. It flares 3 times over 3 sec, then bursts for 10 damage within 5 yd and burns enemies for 2 damage per sec for 3 sec. Press again on a flare to set it off early for 14 damage, knocking enemies back 4 yd."
 icon = "Spell_Fire_SelfDestruct"
@@ -5884,6 +5896,8 @@ crash = { wall_damage = 20.0, wall_stun = 2.0, foe_damage = 14.0, knockdown = 2.
 # 1's EX: the same moment (close the gap now), the other answer: toward a friend.
 [[ability]]
 key = "intervene"
+# Silent in the lab (its look plays no sound): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Intervene"
 ex_of = "tackle"
 text = "Rushes up to 25 yd to the ally nearest your reticle. For 3 sec, the first blow aimed at them strikes you instead. If your guard is up when it lands, your guard takes it."
@@ -6057,6 +6071,8 @@ effects = [{ kind = "incapacitate", secs = [3.0, 3.0] }]
 # or a cast shows you till then) and slows the foes in it. You're hidden the moment it goes.
 [[ability]]
 key = "smoke_bomb"
+# Silent in the lab (its look plays no sound): Vanish as it goes.
+sound = 3324
 name = "Smoke Bomb"
 text = "Smashes a bomb at your feet, filling 5 yd with smoke for 4 sec. You and allies inside are hidden, so enemies lose track of you and locks break. Enemies inside are slowed by 30%. Strike from it, or slip away."
 icon = "INV_Misc_Bomb_01"
@@ -6396,6 +6412,8 @@ spell = 8092
 
 [[ability]]
 key = "greater_fade"
+# Silent in the lab (its look plays no sound): stealth's hush as it goes.
+sound = 3325
 name = "Greater Fade"
 ex_of = "fade"
 text = "Fade, 7 yd. An enemy whose blow misses you because of it is slowed by 40% for 2 sec and deals 20% less damage for 3 sec."
@@ -6421,6 +6439,8 @@ spell = 8092
 # lands on you: half again as much (45 at most), the perfect.
 [[ability]]
 key = "shadowguard"
+# Silent in the lab (its look plays no sound): Shadow Ward as it goes.
+sound = 3219
 name = "Shadowguard"
 text = "Wraps you in shadow for up to 2 sec. You take 50% less damage and move slowly, but can't attack, and the damage it stops is stored, up to 40. Press again (or wait it out) to hurl it at the first enemy along the reticle. Let go just after a blow lands on you and it deals 50% more, up to 45."
 icon = "Spell_Shadow_AntiShadow"
@@ -6791,6 +6811,8 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 
 [[ability]]
 key = "arcane_bolt"
+# Silent in the lab (its look plays no sound): an arcane cast as it goes.
+sound = 1641
 name = "Arcane Bolt"
 text = "A quick bolt of arcane force that deals 10 damage. Each hit stores an arcane charge in the staff for 5 sec, up to 3."
 icon = "Spell_Arcane_StarFire"
@@ -6983,6 +7005,8 @@ impact_kit = 2350
 # Hollow Star, a living orb that hurts foes and heals friends, filling and draining as it does.
 [[ability]]
 key = "void_tether"
+# Silent in the lab (its look plays no sound): a shadow cast as it goes.
+sound = 2560
 name = "Void Tether"
 text = "Hold to bind the first body along the reticle, up to 20 yd, with a cord of the void. An enemy takes 6 damage per sec, rising to 12 over 2 sec. An ally is healed 4 per sec, rising to 8. Your Hollow Star is filled 6 per sec and drawn toward you."
 icon = "Spell_Shadow_Requiem"
@@ -7059,6 +7083,8 @@ effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4
 # claude/mage-kit-draft.md.)
 [[ability]]
 key = "frozen_orb"
+# Silent in the lab (its look plays no sound): an ice cast as it goes.
+sound = 2559
 # A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
 perfect_kit = 1027
 name = "Frozen Orb"
@@ -7255,6 +7281,8 @@ effects = [{ kind = "stagger", secs = [1.0, 1.0] }]
 
 [[ability]]
 key = "pounce"
+# Silent in the lab (its look plays no sound): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Pounce"
 ex_of = "feral_leap"
 text = "Feral Leap, and every enemy it lands on takes 14 damage and is stunned for 2 sec (1 sec against heroes)."
@@ -7272,6 +7300,8 @@ effects = [{ kind = "stun", secs = [2.0, 2.0] }]
 
 [[ability]]
 key = "barkskin"
+# Silent in the lab (its look plays no sound): a nature cast as it goes.
+sound = 2561
 name = "Barkskin"
 text = "For 5 sec, you take 30% less damage from all sources and cannot be staggered. You can still fight."
 icon = "Spell_Nature_StoneClawTotem"
@@ -7432,6 +7462,8 @@ clip = 54
 
 [[ability]]
 key = "displacer_pulse"
+# Silent in the lab (its look plays no sound): an arcane cast as it goes.
+sound = 1641
 name = "Displacer Pulse"
 ex_of = "displacer_orb"
 text = "The same swap, and an enemy you trade places with takes 8 damage and is slowed by 40% for 2 sec, stranded where you were."
@@ -7452,6 +7484,8 @@ effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4 }]
 # E: spin and keep walking.
 [[ability]]
 key = "whirlwind"
+# Silent in the lab (its look plays no sound): Whirlwind's spin as it goes.
+sound = 5674
 name = "Whirlwind"
 text = "Spins for 2 sec while you keep moving. Every enemy within 4 yd in front of you and to your sides takes 5 damage every 0.5 sec. Turn to carve through a pack. Press again to stop."
 icon = "Ability_Whirlwind"
@@ -7583,6 +7617,8 @@ spell = 1856
 
 [[ability]]
 key = "phase_strike"
+# Silent in the lab (its look plays no sound): a heavy weapon's critical as it goes.
+sound = 236
 name = "Phase Strike"
 ex_of = "blink_dagger"
 text = "Both blinks, and each lands with a strike for 8 damage to every enemy within 3 yd of where you come out."
@@ -7622,6 +7658,8 @@ spell = 6343
 # 1: through them, leaving them burning.
 [[ability]]
 key = "phase_dash"
+# Silent in the lab (its look plays no sound): WoW's teleport as it goes.
+sound = 3226
 name = "Phase Dash"
 text = "Dashes 10 yd along the reticle straight through enemies. You cannot be hit during the dash. Each enemy you pass through takes 4 damage and burns for 4 damage per sec for 3 sec."
 icon = "Ability_Rogue_Sprint"
@@ -7639,6 +7677,8 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }]
 
 [[ability]]
 key = "searing_dash"
+# Silent in the lab (its look plays no sound): a fire cast as it goes.
+sound = 1484
 name = "Searing Dash"
 ex_of = "phase_dash"
 text = "A longer dash, 14 yd. Every enemy you pass through burns and is slowed by 40% for 2 sec."
@@ -7656,6 +7696,8 @@ effects = [{ kind = "burn", secs = [3.0, 3.0], amount = 4.0 }, { kind = "snare",
 # 1: an echo to come back to.
 [[ability]]
 key = "rewind"
+# Silent in the lab (its look plays no sound): an arcane cast as it goes.
+sound = 1641
 name = "Rewind"
 text = "Leaves an echo where you stand. Press again within 4 sec to snap back to the echo with the health you had when you left it, never less than now. Dive in, take the hit, undo it."
 icon = "Spell_Nature_TimeStop"
@@ -7707,6 +7749,8 @@ spell = 1449
 # 1: a pad for the whole party.
 [[ability]]
 key = "jump_pad"
+# Silent in the lab (its look plays no sound): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Jump Pad"
 text = "Throws down a pad at the reticle, up to 8 yd away. It lasts 8 sec, 2 at a time. You or any ally who steps on it is launched 14 yd the way they face. Enemies cannot use it."
 icon = "INV_Gizmo_RocketBoot_01"
@@ -7723,6 +7767,8 @@ burst_spell = 1953
 
 [[ability]]
 key = "launch_rig"
+# Silent in the lab (its look plays no sound): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Launch Rig"
 ex_of = "jump_pad"
 text = "A stronger pad that launches 20 yd. Whoever it throws lands with a shove, dealing 6 damage and knocking enemies within 1.5 yd back 3 yd."

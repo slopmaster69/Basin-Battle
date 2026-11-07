@@ -294,6 +294,10 @@ pub struct AbilityDef {
     pub through_kit: u32,
     #[serde(default)]
     pub through_sound: u32,
+    /// As it goes: this `SoundEntries` id from the caster, for everyone near (0: none), for an
+    /// ability whose spell look plays no sound of its own (a blink, a dash, a stance).
+    #[serde(default)]
+    pub sound: u32,
     /// A kill with it: this `SoundEntries` id from the foe's spot, for everyone near (0: none).
     #[serde(default)]
     pub kill_sound: u32,
