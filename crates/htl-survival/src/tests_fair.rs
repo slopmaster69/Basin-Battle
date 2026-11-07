@@ -372,3 +372,35 @@ fn no_follow_up_that_must_be_dodged_comes_before_a_hero_can_dodge_again() {
         .collect();
     assert!(late.is_empty(), "too soon after the last to dodge: {late:#?}");
 }
+
+#[test]
+fn a_pirates_blade_and_a_casters_bolt_never_land_together() {
+    let (mut s, p) = turns_world();
+    if let Some(h) = s.players.get_mut(&p) {
+        h.max_health = 100_000;
+        h.health = 100_000;
+    }
+    let pirate = s.content.mob("dm_pirate").unwrap();
+    let caster = s.content.mob("dm_squallshaper").unwrap();
+    let a = s.spawn_mob(pirate, [2.0, 1.0, 0.0], None, false);
+    let b = s.spawn_mob(pirate, [2.0, -1.0, 0.0], None, false);
+    let c = s.spawn_mob(caster, [14.0, 0.0, 0.0], None, false);
+    for m in [a, b, c] {
+        s.mobs.get_mut(&m).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    }
+    let (mut blades, mut bolts) = (Vec::new(), Vec::new());
+    for _ in 0..1500 {
+        for e in s.step(0.02) {
+            if let Event::Swing { attacker, victim: Some(v), .. } = e {
+                if v == p && (attacker == a || attacker == b) {
+                    blades.push(s.clock);
+                } else if v == p && attacker == c {
+                    bolts.push(s.clock);
+                }
+            }
+        }
+    }
+    assert!(!blades.is_empty() && !bolts.is_empty(), "both came: {} blades, {} bolts", blades.len(), bolts.len());
+    let close: Vec<(f32, f32)> = bolts.iter().flat_map(|&t| blades.iter().filter(move |&&u| (u - t).abs() < 0.3).map(move |&u| (t, u))).collect();
+    assert!(close.is_empty(), "a bolt and a blade within 0.3 s: {close:?}");
+}
