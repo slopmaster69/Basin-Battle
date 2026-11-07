@@ -12,6 +12,10 @@
 local ES = ElwynnSurvival
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\check\\"
 
+-- Salvation's wings (Magic Wings, 24742: a head attachment) hang from the back on a client with
+-- SetSpellAttach (patch 0058): on the shoulder blades, not the head (Corey).
+if SetSpellAttach then SetSpellAttach(24742, 12) end
+
 -- Where each texture's own line sits, as a share of the radius it's drawn at: the ground circle's
 -- stone band near its edge, the rim's thin ring inside its padding.
 local GROUND_LINE = 0.92

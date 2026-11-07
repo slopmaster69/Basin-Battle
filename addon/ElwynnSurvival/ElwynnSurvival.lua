@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 54
+local VERSION = 57
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -2011,6 +2011,13 @@ vit.health.over:Hide()
 vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
 vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
 vit.health.shield:Hide()
+-- The healing still to come (a meal, a salve, a mending: `H`'s 43rd), as WoW shows an incoming
+-- heal: a pale rose stroke behind the health, as the amber chunk of a blow is, reaching to where
+-- the health will be if nothing hurts them (Corey). Its brushed end marks the spot: laid only past
+-- the health, a short one was all ragged edge, lost under the numbers.
+vit.health.ahead = Tex(vit.health, "BORDER", "bar")
+vit.health.ahead:SetVertexColor(1, 0.62, 0.56, 0.7)
+vit.health.ahead:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
 -- Room for "1000 / 1000" at any bar size (left to size itself, it was cut to "200 / 2...").
@@ -2086,7 +2093,7 @@ end
 -- past the bar's end. The shield over the health from the bar's left end, like a fighting game's
 -- second bar over the first, translucent so the health shows through, and shrinking to the left as
 -- it's spent (laid past the health too, it squeezed under the numbers at full health).
-function ES.DrawAbsorbs(hp, maxhp, shield, over)
+function ES.DrawAbsorbs(hp, maxhp, shield, over, ahead)
   local b = vit.health
   local per = b.full / math.max(1, maxhp)
   local function Lay(t, x, w)
@@ -2100,6 +2107,13 @@ function ES.DrawAbsorbs(hp, maxhp, shield, over)
   local ow = math.min(b.full, over * per)
   Lay(b.over, math.max(0, math.min(hp * per, b.full - ow)), ow)
   Lay(b.shield, 0, math.min(b.full, shield * per))
+  -- The heal still to come: behind the health from the bar's left end to where the health will
+  -- be, never past the bar's end.
+  if (ahead or 0) > 0 then
+    Lay(b.ahead, 0, math.min(b.full, (hp + ahead) * per))
+  else
+    b.ahead:Hide()
+  end
 end
 
 -- The bars' lengths: the dock's width by the hero, by what they hold in the corner.
@@ -3901,8 +3915,8 @@ function ES.DrawHud()
   end
   ES.lastHp = hp
   vit.health:Set(hp / math.max(1, maxhp))
-  local shield, over = tonumber(h[41]) or 0, tonumber(h[42]) or 0
-  ES.DrawAbsorbs(hp, maxhp, shield, over)
+  local shield, over, ahead = tonumber(h[41]) or 0, tonumber(h[42]) or 0, tonumber(h[43]) or 0
+  ES.DrawAbsorbs(hp, maxhp, shield, over, ahead)
   -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
   local text = hp
   if over > 0 then text = text .. "|cffff6f8f+" .. over .. "|r" end
@@ -6649,6 +6663,9 @@ function ES.Wake()
   ES.SetMode("action")
   -- The camera stops short of other bodies instead of entering them.
   if AnimClient() and SetCameraUnitCollision then SetCameraUnitCollision(1) end
+  -- And sits over the right shoulder, so the reticle at the screen's centre falls past the hero
+  -- instead of on their back (Corey's playtest: a staff's reticle sat on the hero).
+  if SetCameraShoulder then SetCameraShoulder(ES.SHOULDER_RIGHT, ES.SHOULDER_UP) end
   ES.Message(string.format("%s attacks, %s guards, %s dodges. Abilities are on %s %s %s %s. Hold %s for the ultimate. %s shows every key.",
     KeyName("ES_ATTACK") or "Left mouse", KeyName("ES_GUARD") or "right mouse", KeyName("ES_DODGE") or "Space",
     KeyName("ES_AB1") or "-", KeyName("ES_AB2") or "-", KeyName("ES_AB3") or "-", KeyName("ES_AB4") or "-", KeyName("ES_AB5") or "-",
@@ -6659,6 +6676,9 @@ function ES.Wake()
     end
   end
 end
+
+-- The ordinary camera's seat over the right shoulder (yards right and up; `SetCameraShoulder`).
+ES.SHOULDER_RIGHT, ES.SHOULDER_UP = 0.9, 0.2
 
 function ES.Sleep()
   if SetAimTurn and ES.aimTurn and ES.aimTurn ~= 0 then
@@ -6681,6 +6701,7 @@ function ES.Sleep()
   if SetActionMouse then SetActionMouse(nil) end
   if SetAimCamera then SetAimCamera(nil) end
   if SetCameraUnitCollision then SetCameraUnitCollision(nil) end
+  if SetCameraShoulder then SetCameraShoulder(0) end
   ES.predicted, ES.predictedRoll = nil, nil
   ES.mine, ES.comboUntil, ES.moves, ES.lockOn = nil, nil, nil, nil
   ES.timers = {}
@@ -6927,6 +6948,8 @@ function ES.Line(line)
     if ES.FightMeter then ES.FightMeter(f) end
   elseif verb == "LB" then
     if ES.LabLine then ES.LabLine(f) end
+  elseif verb == "LW" then
+    if ES.LabWalk then ES.LabWalk(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "CU" then
