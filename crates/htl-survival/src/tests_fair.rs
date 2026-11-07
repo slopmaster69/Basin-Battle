@@ -158,7 +158,7 @@ fn a_pirates_first_slash_waits_for_the_floor_and_its_second_keeps_its_pace() {
 fn turns_world() -> (Survival, Id) {
     let mut c = Content::dev();
     c.pvp = Default::default();
-    c.ai.turn_beat = 0.35;
+    c.ai.turn_beat = 0.8;
     c.ai.arrive_beat = 0.35;
     let mut s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
     s.mobs.clear();
@@ -201,6 +201,43 @@ fn two_pirates_on_one_hero_never_wind_up_at_once() {
     }
     assert!(windups >= 4, "they did swing: {windups}");
     assert_eq!(both, 0, "never both winding up at once");
+}
+
+#[test]
+fn a_caster_casts_between_the_blows_up_close_never_during_one() {
+    // The Deadmines beach: a squallshaper bolting from the slope while two pirates swing.
+    let (mut s, p) = turns_world();
+    let pirate = s.content.mob("dm_pirate").unwrap();
+    let shaper = s.content.mob("dm_squallshaper").unwrap();
+    let a = s.spawn_mob(pirate, [1.8, 0.6, 0.0], None, false);
+    let b = s.spawn_mob(pirate, [1.8, -0.6, 0.0], None, false);
+    let c = s.spawn_mob(shaper, [-13.0, 0.0, 0.0], None, false);
+    for m in [a, b, c] {
+        let x = s.mobs.get_mut(&m).unwrap();
+        x.state = MobState::Chase { foe: Foe::Hero(p) };
+        x.ready_at = 0.0;
+    }
+    let (mut casts, mut clashes) = (0, 0);
+    let mut was = false;
+    let w = |s: &Survival, m: Id| matches!(s.mobs[&m].state, MobState::Windup { .. });
+    for _ in 0..600 {
+        if let Some(h) = s.players.get_mut(&p) {
+            h.health = h.max_health;
+        }
+        let _ = s.step(0.02);
+        let casting = w(&s, c);
+        // A cast begun while a pirate still winds up (one whose blow landed in the same step, its
+        // wind-up over, is fine: the bolt comes long after).
+        if casting && !was {
+            casts += 1;
+            if w(&s, a) || w(&s, b) {
+                clashes += 1;
+            }
+        }
+        was = casting;
+    }
+    assert!(casts >= 3, "it still casts: {casts}");
+    assert_eq!(clashes, 0, "{clashes} of {casts} casts began while a pirate wound up");
 }
 
 #[test]

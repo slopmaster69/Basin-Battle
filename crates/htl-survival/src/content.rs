@@ -881,8 +881,9 @@ pub struct AiDef {
     /// swing. A string's later blows keep their own pace. 0: no floor.
     #[serde(default)]
     pub first_blow: f32,
-    /// One blow at a time on a hero: while another creature winds up a blow up close at them, or
-    /// for this long after its blow lands, a creature waits its turn (0: no turns).
+    /// One string at a time on a hero: while another creature is in a string at them up close
+    /// (winding up or recovering), and for this long after it's done, a creature waits its turn
+    /// (0: no turns).
     #[serde(default)]
     pub turn_beat: f32,
     /// A creature that has just walked up settles this long before a string up close (not a lunge
