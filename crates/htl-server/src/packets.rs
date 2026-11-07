@@ -165,6 +165,14 @@ pub fn login_set_time_speed_at(clock: Option<[u32; 2]>) -> Packet {
     Packet::new(op::SMSG_LOGIN_SETTIMESPEED, b)
 }
 
+/// `SMSG_WEATHER`: type (0 clear, 1 rain), grade (0 to 1), the rain's sound loop (0 none), and
+/// whether it shows at once (a hero coming in) or eases (1.12's ramp, about 10 s).
+pub fn weather(kind: u32, grade: f32, sound: u32, instant: bool) -> Packet {
+    let mut b = Body::new();
+    b.u32(kind).f32(grade).u32(sound).u8(u8::from(instant));
+    Packet::new(op::SMSG_WEATHER, b)
+}
+
 pub fn initial_spells(spells: &[u16]) -> Packet {
     let mut b = Body::new();
     b.u8(0).u16(spells.len() as u16);

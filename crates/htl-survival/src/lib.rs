@@ -10,6 +10,7 @@ pub mod land;
 pub mod save;
 pub mod sim;
 pub mod tune;
+pub mod weather;
 
 pub use content::{Content, ItemKind};
 pub use land::{FlatLand, Land};

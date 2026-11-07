@@ -155,6 +155,9 @@ pub struct Content {
     /// The Priest's staffs' marks and stacks, and the burst of a Priest's perfect (`[priest]`).
     #[serde(default)]
     pub priest: PriestDef,
+    /// Elwynn's weather above ground (`[weather]`): how often each kind comes and how it eases.
+    #[serde(default)]
+    pub weather: crate::weather::WeatherDef,
     /// The text it was read from, for tuning in play ([`crate::tune`]), and the file, if any.
     #[serde(skip)]
     pub source: String,
