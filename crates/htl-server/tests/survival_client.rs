@@ -785,7 +785,9 @@ fn the_guard_shows_its_pose_the_rack_arms_and_a_timed_guard_parries() {
         .find(|(g, t, ..)| *t == ObjectType::Unit && ((g >> 24) & 0xFF_FFFF) as u32 == wolf_entry)
         .map(|(g, ..)| g)
         .expect("a wolf near the camp");
-    let end = Instant::now() + Duration::from_secs(20);
+    // (30 s: since a first blow winds up 0.6 s at least and a creature settles after it moves,
+    // the bites come slower, and a busy machine left 20 s short.)
+    let end = Instant::now() + Duration::from_secs(30);
     let mut parried = false;
     while Instant::now() < end && !parried {
         let w = unit_at(&c, wolf).unwrap();
