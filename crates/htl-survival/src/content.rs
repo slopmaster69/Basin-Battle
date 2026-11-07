@@ -1954,6 +1954,11 @@ pub struct AttackDef {
     /// all round at the creature's feet): a splash, a burst, a shockwave. 0: none.
     #[serde(default)]
     pub look: u32,
+    /// Its own sound as its wind-up begins, from the creature, for everyone near: a crossbow
+    /// drawn, a spell gathered, where its spell's look plays none and a hero must hear it coming.
+    /// 0: none.
+    #[serde(default)]
+    pub sound: u32,
 }
 
 impl AttackDef {
@@ -2003,6 +2008,9 @@ pub struct SpecialDef {
     /// Where it lands, the look of this spell (see [`AttackDef::look`]).
     #[serde(default)]
     pub look: Option<u32>,
+    /// Its own sound as it winds up (see [`AttackDef::sound`]).
+    #[serde(default)]
+    pub sound: Option<u32>,
 }
 
 fn one_u32() -> u32 {
@@ -2026,6 +2034,7 @@ impl SpecialDef {
         b.radius = self.radius.unwrap_or(a.radius);
         b.spell = self.spell.unwrap_or(a.spell);
         b.look = self.look.unwrap_or(a.look);
+        b.sound = self.sound.unwrap_or(a.sound);
         b
     }
 }

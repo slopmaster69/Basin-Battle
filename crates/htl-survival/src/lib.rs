@@ -28,6 +28,8 @@ mod tests_abilities;
 #[cfg(test)]
 mod tests_bow;
 #[cfg(test)]
+mod tests_blow_sounds;
+#[cfg(test)]
 mod tests_arena;
 #[cfg(test)]
 mod tests_board;
