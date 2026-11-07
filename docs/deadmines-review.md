@@ -227,12 +227,43 @@ What that adds to the proposals above:
   none today (`content/survival.toml` has no ability sound fields at all). Souls telegraphs a blow
   from behind by its sound first.
 
+### Measured in the lab (Nov 7)
+
+A pirate's slash and Cookie's cleaver filmed with a one-second lead-in (`do wait:1.0,blow`, HUD
+on), the film read at 20 frames a second against the trace:
+
+- **The floor telegraph is right.** The wedge appears with the wind-up, fills over exactly the
+  wind-up, and vanishes on the frame the health drops. Nothing to fix there.
+- **The impact sparks lag the hit by 2 to 3 frames** (about 0.1 s): the health bar drops, the
+  blade is through, then the flash. Small, but it's the one thing a player's eye waits for.
+- **The strike itself is a 40 to 80 ms snap.** The patched client plays a slow wind-up as a
+  coil, a near-still creep, and a snap at 1.8 times the clip's speed (`COIL_SNAP_RATE`): for a
+  one-handed attack clip whose impact key is 0.3 s in, the snap is 42 ms, under 3 frames at 60.
+  The pirate's cutlass is raised and motionless from 0.85 to 1.30 s on the film and through the
+  hero at 1.40. A pose that cuts to a hit is what Corey read as "the hits don't line up with the
+  swings": there is no swing to line up with.
+- **After the blow the clip crawls.** The clip's remainder (the return to ready) is stretched
+  over the whole recovery (0.7 to 0.9 s), at 0.4 to 0.6 times its speed. On film the pirate's arm
+  drifts out to the side and slowly back across for 0.6 s after the hit: a second, slower swing
+  with no blow in it.
+
+So the fix is in the client's clip pacing (`creature_anim/action.rs`, patch 0059): the strike
+takes a readable share of the wind-up (35%, at most 0.3 s) from a coil reached a little earlier,
+and after the impact the clip plays no slower than its own pace and holds its last pose for the
+rest of the recovery (the vulnerable pose, the souls games' punish window), instead of crawling
+back to ready. Filmed again before and after.
+
 ## Mend first
 
 Broken or unverified things from the Nov 6 session that are fixes, not features, and come before
 the next encounter's tuning is judged (a tuning judged against a broken hero is wrong twice):
 
-- **Bladestorm did no damage** (3 casts in the log). Reproduce in the lab against a pack.
+- **Bladestorm did no damage** (3 casts in the log). Lab, Nov 7: the rules land it, 5 to 16 a
+  strike on every pirate within 5 yards, 126 over the 6 s. Two faults instead: the key puts the
+  hero into an *aim* (the reticle comes up, nothing spins) and the spin starts only on a left
+  click, because a `beam` counts as aimed even when it's a ring round the caster (`around`); and
+  5 to 16 a strike is invisible next to a 176-health pirate (the whole ultimate kills none).
+  Fix: it goes on the key press (`at_once`), and its numbers are set against the real foes.
 - **The combat meter kept resetting and lost damage.** A likely cause is by design: the Fight
   tab shows "the fight you're in or were last in", and a fight ends after a lull of
   `player.combat_secs` (5 s) with no blow dealt or taken (`sim/meter.rs`). Five seconds of
@@ -240,10 +271,16 @@ the next encounter's tuning is judged (a tuning judged against a broken hero is 
   with two heroes, then: a fight lasts while any foe is still on you, and the lull is longer.
 - **No ability has a sound** (no sound fields exist on `[[ability]]`), and no creature wind-up
   does: see encounter 1's sound track.
-- **Fireball and Meteor did almost nothing** (58 and 7 casts): read their damage against a
-  176-health pirate in the lab and against Corey's account of it.
+- **Fireball and Meteor did almost nothing** (58 and 7 casts). Lab, Nov 7: they do what their
+  cards say. A tapped Fireball 17 and a 4-a-second burn, a full charge 36 (43 on the flare);
+  Meteor 70 (84 on the flare) and its burns. Not a bug: a design that's weak against foes at 1.6
+  times their health. A full Fireball every 3 s, standing still, is less damage a second than a
+  starting sword. The Mage's numbers are tuned with the enemies', not before.
 - **"Priest just didn't work."** 23 Mind Blasts, 7 Fades, 3 Shields, 2 Penances, 1 Salvation,
-  1 Holy Nova in the log and no refusals: find what each did on screen.
+  1 Holy Nova in the log and no refusals. Lab, Nov 7: every one lands in the rules (Mind Blast
+  30, Death 18 and 12 back on the caster, Flay 3 a tick, Holy Nova 16 each, the Shield ate a
+  pirate's blow, Fade made one miss). Whatever failed is in what showed, or in the staff and
+  Light/Shadow flow: Corey names one spell and what he saw, and that's chased on screen.
 - **The lab shares Corey's saved settings** (`benilla-config/saved/ElwynnSurvival.lua`): it set
   `noMarks = 1` on Nov 4 and nothing restored it. The lab gets its own config, or restores the
   file when it finishes.
