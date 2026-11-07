@@ -201,6 +201,29 @@ impl Survival {
         true
     }
 
+    /// Creature `id`'s temperament, if it has one.
+    pub(crate) fn temper(&self, id: Id) -> Option<&crate::content::TemperDef> {
+        let m = self.mobs.get(&id)?;
+        let key = &self.content.mobs[m.def].temper;
+        if key.is_empty() {
+            return None;
+        }
+        self.content.tempers.iter().find(|t| &t.key == key)
+    }
+
+    /// Its cooldown between strings, as its temperament paces it.
+    pub(crate) fn pace(&self, id: Id) -> f32 {
+        self.temper(id).map_or(1.0, |t| t.pace)
+    }
+
+    /// Whether creature `id` stands behind `hero` (outside the half of the world they face).
+    pub(crate) fn behind(&self, id: Id, hero: Id) -> bool {
+        let (Some(m), Some(p)) = (self.mobs.get(&id), self.players.get(&hero)) else { return false };
+        let to = facing(p.pos, m.pos);
+        let off = (to - p.facing + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+        off.abs() > std::f32::consts::FRAC_PI_2 * 1.1
+    }
+
     /// Whether a creature presses an opening on `hero` now: open, near, and its cooldown nearly
     /// done.
     pub(crate) fn presses(&self, id: Id, hero: Id, dist: f32) -> bool {
@@ -221,28 +244,33 @@ impl Survival {
     /// fighter stepping out of reach to make you come to it).
     pub(crate) fn maybe_give_ground(&mut self, id: Id, hero: Id) {
         let ai = self.content.ai.clone();
+        // Its temperament's own: a boss too, when it says so.
+        let (chance, yards, own) = match self.temper(id) {
+            Some(t) => (t.retreat.unwrap_or(ai.retreat), t.retreat_yards.unwrap_or(ai.retreat_yards), t.retreat.is_some()),
+            None => (ai.retreat, ai.retreat_yards, false),
+        };
         let Some(m) = self.mobs.get(&id) else { return };
         let d = &self.content.mobs[m.def];
-        if ai.retreat <= 0.0 || d.boss || d.attack.ranged || m.raider && self.is_siege_foe(id) && self.rng.gen::<f32>() < 0.5 {
+        if chance <= 0.0 || (d.boss && !own) || d.attack.ranged || m.raider && self.is_siege_foe(id) && self.rng.gen::<f32>() < 0.5 {
             return;
         }
-        if self.rng.gen::<f32>() >= ai.retreat {
+        if self.rng.gen::<f32>() >= chance {
             return;
         }
         let Some(to) = self.players.get(&hero).map(|p| p.pos) else { return };
         let pos = m.pos;
         let away = facing(to, pos) + (self.rng.gen::<f32>() - 0.5) * 0.9;
-        let goal = self.ground_near(pos[0] + away.cos() * ai.retreat_yards, pos[1] + away.sin() * ai.retreat_yards, pos[2]);
+        let goal = self.ground_near(pos[0] + away.cos() * yards, pos[1] + away.sin() * yards, pos[2]);
         let speed = d.walk_speed.max(2.5) * 1.4;
         self.sidle_to(id, goal, speed, hero);
         let m = self.mobs.get_mut(&id).unwrap();
-        m.ready_at = m.ready_at.max(self.clock + ai.retreat_yards / speed);
+        m.ready_at = m.ready_at.max(self.clock + yards / speed);
     }
 
     /// Which way round a waiting creature steps: toward the hero's back (the shorter way), or its
     /// own way once it's there.
     pub(crate) fn flank_way(&self, id: Id, hero: Id) -> Option<f32> {
-        if !self.content.ai.flank {
+        if !self.temper(id).and_then(|t| t.flank).unwrap_or(self.content.ai.flank) {
             return None;
         }
         let m = self.mobs.get(&id)?;
