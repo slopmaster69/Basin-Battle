@@ -101,6 +101,11 @@ const LUNGE_SECS: f32 = 0.25;
 pub(crate) const MAX_ATTACKERS: usize = 2;
 /// An opening this near draws a creature in at once (past its turn).
 pub(crate) const PRESS_RANGE: f32 = 7.0;
+/// A creature this far from its foe is coming at them from afar: reaching them within
+/// `ARRIVE_WINDOW` seconds, it settles `ai.arrive_beat` before its blow. Closer, it's only stepping
+/// round them, and swings without stopping first (Corey, Nov 7: "bosses stutter step").
+pub(crate) const ARRIVE_FAR: f32 = 6.0;
+const ARRIVE_WINDOW: f32 = 2.0;
 const CIRCLE_RADIUS: f32 = 3.5;
 const CIRCLE_STEP: f32 = 0.6;
 /// Stepping back out of a heavy blow: this far, over this long, with the Dodge clip.
@@ -326,6 +331,7 @@ impl Survival {
                 pattern: None,
                 lunged: false,
                 moved_at: -1.0e9,
+                far_at: -1.0e9,
                 string_done_at: -1.0e9,
                 guarding: false,
                 circle: if id % 2 == 0 { 1.0 } else { -1.0 },
@@ -1372,6 +1378,12 @@ impl Survival {
     /// same hero, winding up or recovering, or finished one less than `ai.turn_beat` ago (the
     /// hero's breath between strings); or (a blow up close, `settle`) it ran up less than
     /// `ai.arrive_beat` ago.
+    /// Whether creature `id` has just run up to its foe from afar and settles before its blow.
+    pub(crate) fn settling(&self, id: Id, dist: f32) -> bool {
+        let (now, ai) = (self.clock, &self.content.ai);
+        self.mobs.get(&id).is_some_and(|me| ai.arrive_beat > 0.0 && now - me.moved_at < ai.arrive_beat && now - me.far_at < ARRIVE_WINDOW && dist <= PRESS_RANGE)
+    }
+
     pub(crate) fn waits_turn(&self, id: Id, foe: Foe, dist: f32, settle: bool) -> bool {
         let Foe::Hero(h) = foe else { return false };
         let (now, ai) = (self.clock, &self.content.ai);
@@ -1382,11 +1394,25 @@ impl Survival {
         if ai.turn_beat > 0.0 && self.players.get(&h).is_some_and(|p| matches!(p.action, Action::Stagger { .. })) {
             return true;
         }
-        if settle && ai.arrive_beat > 0.0 && now - me.moved_at < ai.arrive_beat && dist <= PRESS_RANGE {
+        if settle && self.settling(id, dist) {
             return true;
         }
         if ai.turn_beat <= 0.0 {
             return false;
+        }
+        // An opening (their swing's follow-through, a spell cast or charged, a meal): it comes at once,
+        // its turn or not (a greedy swing is punished, as in the souls games), unless another's
+        // blow or a bolt is already on its way to them.
+        let open = self.players.get(&h).is_some_and(|p| match &p.action {
+            Action::Eat { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } => true,
+            Action::Swing { t, strike, .. } => *t > strike.windup + strike.active,
+            _ => false,
+        });
+        if open {
+            let hp = self.players.get(&h).map(|p| p.pos);
+            let bolt = hp.is_some_and(|hp| self.missiles.iter().any(|ms| ms.owner != id && ms.land_at > now && dist2d(ms.at, hp) <= ms.radius + 4.0));
+            let winding = self.mobs.iter().any(|(oid, o)| *oid != id && o.health > 0 && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h));
+            return bolt || winding;
         }
         // Nor while a bolt or a pot is in the air at them: the blade and the bolt would land
         // together (two pirates and a Squallshaper, Nov 6: "no gap").
@@ -1895,6 +1921,9 @@ impl Survival {
                     }).unwrap_or(1.0),
                 };
                 let dist = dist2d(pos, to);
+                if dist > ARRIVE_FAR {
+                    self.mobs.get_mut(&id).unwrap().far_at = now;
+                }
                 let reach = if a.ranged { a.range } else { a.range + size - 0.3 };
                 let sees = !a.ranged || clear_line(self.land.as_ref(), pos, to);
                 let ready = now >= self.mobs[&id].ready_at;
@@ -1967,8 +1996,17 @@ impl Survival {
                             let near = d.patterns[k].min_range < SPACE_FROM;
                             let shot = d.patterns[k].steps.first().and_then(|st| st.ranged) == Some(true);
                             if !shot && self.waits_turn(id, foe, dist, near) {
-                                // It holds where it is, facing its foe, ready.
-                                self.hold_facing(id, to);
+                                // Settling after its run-up, it holds, facing its foe; waiting its
+                                // turn, it works round them toward their back, in reach and ready
+                                // (Corey, Nov 7: standing there, they "don't even try to fight").
+                                match foe {
+                                    // (Not at a hero reeling: it holds off, as it did.)
+                                    Foe::Hero(h) if !(near && self.settling(id, dist)) && !self.players.get(&h).is_some_and(|p| matches!(p.action, Action::Stagger { .. })) => {
+                                        let r = dist.clamp(1.5, reach.max(1.5));
+                                        self.circle_foe(id, h, to, r);
+                                    }
+                                    _ => self.hold_facing(id, to),
+                                }
                                 return;
                             }
                             // A fighter's own missile wants a clear line, like a caster's; it may

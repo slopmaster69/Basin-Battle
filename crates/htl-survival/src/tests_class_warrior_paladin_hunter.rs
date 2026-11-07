@@ -928,6 +928,10 @@ fn shockwave_throws_a_pack_back_and_stuns_only_the_one_it_drives_into_a_wall() {
     let walled = mob(&mut s, "brave", [3.0, 0.0, 0.0]);
     let open = mob(&mut s, "brave", [3.0, 1.2, 0.0]);
     let from = s.mobs[&open].pos;
+    // Both stand where they are for the cast (one waiting its turn now steps round the hero).
+    for m in [walled, open] {
+        s.mobs.get_mut(&m).unwrap().state = crate::sim::mobs::MobState::Recover { foe: crate::sim::mobs::Foe::Hero(p), until: 5.0 };
+    }
     press(&mut s, p, "shockwave", false);
     s.set_aim_line(p, 0.0, 0.0);
     let mut ev = click(&mut s, p);

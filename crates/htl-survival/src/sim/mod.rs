@@ -876,6 +876,9 @@ pub struct Mob {
     /// all: the beat it settles for before a blow up close, and the breath the others wait for.
     pub moved_at: f32,
     pub string_done_at: f32,
+    /// When it was last well off its foe (`mobs::ARRIVE_FAR`): a run-up ending in reach is what
+    /// it settles after, not a step round them.
+    pub far_at: f32,
     /// Its shield is up (shown).
     pub guarding: bool,
     /// Which way it circles a foe while it waits its turn (1 or -1), and the foe it keeps facing
