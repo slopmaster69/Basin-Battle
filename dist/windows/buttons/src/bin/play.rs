@@ -185,7 +185,7 @@ impl App {
         let exe = std::env::current_exe().unwrap_or_default();
         let paths = Paths::find(&exe).unwrap_or_else(|| Paths::download(PathBuf::from(".")));
         let project = Project::built_in();
-        let settings = folder::read_settings(&paths.settings);
+        let settings = paths.read_settings();
         let version = paths.installed_version();
         let channel = folder::channel(&version);
 

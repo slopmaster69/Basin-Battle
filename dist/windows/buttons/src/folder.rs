@@ -106,7 +106,8 @@ impl Paths {
             exe: root.join("benilla").join("target").join("release").join("benilla"),
             server_dir: root.clone(),
             server_exe: root.join("target").join("release").join("htl-server"),
-            settings: root.join("settings.sh"),
+            // Not settings.sh: that is the Mac scripts', in shell, read by bash ([`Paths::read_settings`]).
+            settings: root.join("settings-play.txt"),
             version: root.join("version.txt"),
             log: root.join("logs").join("launcher.log"),
             root,
@@ -235,6 +236,72 @@ pub fn read_settings(file: &Path) -> Settings {
     s
 }
 
+impl Paths {
+    /// Play's and Host's choices. A checkout keeps them in settings-play.txt, beside the Mac
+    /// scripts' settings.sh (shell, which bash reads, so never written in this file's format): the
+    /// WoW folder comes from settings.sh's `WOW_DATA` while Play has none of its own, and a
+    /// settings.sh an earlier Play wrote over is put back first.
+    pub fn read_settings(&self) -> Settings {
+        if self.kind != Kind::Checkout {
+            return read_settings(&self.settings);
+        }
+        repair_settings_sh(&self.root, &self.settings);
+        let mut s = read_settings(&self.settings);
+        if !s.contains_key("wow") {
+            if let Some(w) = shell_wow_data(&self.root) {
+                s.insert("wow".into(), w);
+            }
+        }
+        s
+    }
+}
+
+/// The header [`save_settings`] writes, as found at the top of a settings.sh Play wrote over.
+const PLAY_HEADER: &str = "\u{FEFF}# Your choices, kept across updates.";
+
+/// A settings.sh in Play's format (an earlier Play wrote its choices there): its scripts' lines
+/// back as shell (`KEY=value`, as they were before Play read them), and Play's own into its file.
+/// The WoW folder Play picked then is dropped when settings.sh names one: it was found only
+/// because Play couldn't read `WOW_DATA`.
+fn repair_settings_sh(root: &Path, play_file: &Path) {
+    let sh = root.join("settings.sh");
+    let Ok(bytes) = fs::read(&sh) else { return };
+    if !bytes.starts_with(PLAY_HEADER.as_bytes()) {
+        return;
+    }
+    let all = read_settings(&sh);
+    let script = |k: &str| k.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
+    let mut out = String::new();
+    for (k, v) in all.iter().filter(|(k, _)| script(k)) {
+        out.push_str(&format!("{k}={v}\n"));
+    }
+    let mut play: Settings = all.iter().filter(|(k, _)| !script(k)).map(|(k, v)| (k.clone(), v.clone())).collect();
+    if all.contains_key("WOW_DATA") {
+        play.remove("wow");
+    }
+    if !play_file.exists() && !play.is_empty() {
+        save_settings(play_file, &play);
+    }
+    let _ = fs::write(&sh, out);
+}
+
+/// settings.sh's `WOW_DATA`, as the scripts see it: bash reads the file, whatever its quoting.
+fn shell_wow_data(root: &Path) -> Option<String> {
+    let sh = root.join("settings.sh");
+    if !sh.is_file() {
+        return None;
+    }
+    let out = std::process::Command::new("bash")
+        .args(["-c", ". \"$1\" >/dev/null 2>&1; printf %s \"${WOW_DATA:-}\"", "bash"])
+        .arg(&sh)
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    let w = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!w.is_empty()).then_some(w)
+}
+
 pub fn save_settings(file: &Path, s: &Settings) {
     let mut out = String::from("\u{FEFF}# Your choices, kept across updates. Delete this file to be asked again.\r\n");
     for (k, v) in s {
@@ -265,6 +332,31 @@ pub fn account_name(s: &Settings) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A settings.sh an earlier Play wrote over in its own format: put back as shell bash reads,
+    /// Play's choices moved to its own file, and the WoW folder settings.sh names, not Play's guess.
+    #[cfg(unix)]
+    #[test]
+    fn a_checkout_keeps_settings_sh_as_shell() {
+        let root = std::env::temp_dir().join(format!("bb-settings-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("settings.sh"),
+            "\u{FEFF}# Your choices, kept across updates. Delete this file to be asked again.\r\nHTL_HOST = 24.64.116.126\r\nWOW_DATA = '/Users/a/WoW Classic/Data'\r\ngame = survival\r\nwow = /Users/a/Other/Data\r\n",
+        )
+        .unwrap();
+        let paths = Paths::checkout(root.clone());
+        let s = paths.read_settings();
+        let sh = fs::read_to_string(root.join("settings.sh")).unwrap();
+        assert_eq!(sh, "HTL_HOST=24.64.116.126\nWOW_DATA='/Users/a/WoW Classic/Data'\n");
+        assert_eq!(s.get("wow").map(String::as_str), Some("/Users/a/WoW Classic/Data"), "settings.sh's folder");
+        assert_eq!(s.get("game").map(String::as_str), Some("survival"), "Play's choice kept, in its own file");
+        // Play saving its choices leaves settings.sh alone.
+        save_settings(&paths.settings, &s);
+        assert_eq!(fs::read_to_string(root.join("settings.sh")).unwrap(), sh);
+        let _ = fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn the_repositorys_project_toml_reads() {
