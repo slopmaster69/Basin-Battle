@@ -548,7 +548,8 @@ fn resources_spread_across_the_whole_land_beside_trees_or_in_the_open_clear_of_t
 #[test]
 fn every_foe_is_tougher_by_the_one_share_but_a_critter_or_a_dummy_isnt() {
     let mut s = world("", false);
-    assert!((s.content.combat.foe_health - 1.6).abs() < 1e-6, "the rules' share");
+    // The share as the rules may set it (they're at 1.0, each foe as written, since Nov 7 2026).
+    s.content.combat.foe_health = 1.6;
     for key in ["boar", "grunt"] {
         let def = s.content.mob(key).unwrap();
         let id = s.spawn_mob(def, [0.0, 0.0, 0.0], None, false);
