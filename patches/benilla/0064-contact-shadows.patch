@@ -1,0 +1,1888 @@
+From 3e18bfca43a06f31e4b23d786f71fb26b6d9e3ad Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 11:50:32 -0700
+Subject: [PATCH] Contact shadows where things meet: the new look's ambient
+ occlusion
+
+A wall's foot, the ground under eaves and carts, between roots and in a
+doorway now sit in a soft shade about a yard wide, as WoW Forever's do.
+Screen-space, from the depth buffer the look pass already samples
+(Bevy's SSAO needs prepasses our shaders don't write): twelve taps at
+half resolution with normals rebuilt from depth, a depth-aware blur,
+and a depth-aware upsample in the look pass that darkens only the lit
+part under 1.12's fog, weighted by how much of a pixel is ambient light.
+Weaker at noon, stronger at golden hour and night, cool by day.
+
+worldAO 0 turns it off alone; worldLook 0 is untouched 1.12.
+lookao <scale 0-4> [radius] | grade holds it for film.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/cvars/mod.rs           |  19 +
+ crates/benilla-app/src/cvars/table.rs         |   9 +
+ crates/benilla-app/src/shaders.rs             |  16 +
+ crates/benilla-app/src/video.rs               |  11 +
+ crates/benilla-app/src/world_console.rs       |  77 ++
+ crates/benilla-world/src/look/ao.rs           | 814 ++++++++++++++++++
+ crates/benilla-world/src/look/grade.rs        |  39 +-
+ crates/benilla-world/src/look/mod.rs          |   7 +-
+ crates/benilla-world/src/look/pass.rs         | 135 ++-
+ crates/benilla-world/src/shaders.rs           |   3 +-
+ .../benilla-world/src/shaders/world_ao.wgsl   | 170 ++++
+ .../benilla-world/src/shaders/world_look.wgsl |  77 +-
+ 12 files changed, 1351 insertions(+), 26 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/ao.rs
+ create mode 100644 crates/benilla-world/src/shaders/world_ao.wgsl
+
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index b6f0259..28a0e10 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1620,6 +1620,24 @@ mod tests {
+         assert_eq!(apply(&mut app, "farclip", "1000"), SetOutcome::Vetoed);
+     }
+ 
++    /// `worldAO` (benilla's own) turns the new look's contact shadows off and on by themselves,
++    /// registered "1" to match `LookAo`'s default.
++    #[test]
++    fn world_ao_switches_the_occlusion_alone() {
++        use benilla_world::look::{LookAo, WorldLook};
++        let mut app = cvar_app();
++        assert!(res::<LookAo>(&app).on, "registered \"1\"");
++        assert_eq!(apply(&mut app, "worldAO", "0"), SetOutcome::Changed);
++        assert!(!res::<LookAo>(&app).on);
++        assert_eq!(
++            *res::<WorldLook>(&app),
++            WorldLook::NEW,
++            "the rest of the look stays"
++        );
++        apply(&mut app, "worldAO", "1");
++        assert!(res::<LookAo>(&app).on);
++    }
++
+     /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
+     #[test]
+     fn the_ffx_switches_reach_the_pass() {
+@@ -2737,6 +2755,7 @@ mod tests {
+             .init_resource::<benilla_world::ffx_glow::FfxSwitches>()
+             // `worldLook`'s registered "1", as `VideoPlugin` inserts it.
+             .insert_resource(benilla_world::look::WorldLook::NEW)
++            .init_resource::<benilla_world::look::LookAo>()
+             // Literal, not Default: RenderScale::default() reads $WOW_RENDER_SCALE.
+             .insert_resource(RenderScale(1.0))
+             // Literal: `Realmlist::default()` reads `$WOW_HOST`.
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index e8c1952..2c009e6 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -846,6 +846,15 @@ pub(crate) const REGISTERED: &[Registered] = &[
+          light, a longer view, bloom, a colour grade, god rays and mist) on, or off for the \
+          reference's",
+     ),
++    // benilla's own: the new look's contact shadows (ambient occlusion), "0" to spare their cost
++    // and keep the rest of the new look. The knob is `benilla_world::look::LookAo::on`, set by
++    // `video::on_cvar`; inert under `worldLook 0`.
++    ours(
++        "worldAO",
++        "1",
++        "benilla's own — 1.12 has no ambient occlusion; this turns the new look's contact \
++         shadows off on their own, for a slower GPU",
++    ),
+     // benilla's own: `/console fpsJournal 1` appends a per-second row of position, frame cost and
+     // per-pass GPU time to `benilla-config/Diagnostics/fps-journal.csv`. The knob is
+     // [`crate::perf::FpsJournalSetting`].
+diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
+index cb3f45b..2724f04 100644
+--- a/crates/benilla-app/src/shaders.rs
++++ b/crates/benilla-app/src/shaders.rs
+@@ -135,6 +135,22 @@ mod tests {
+         }
+     }
+ 
++    /// The new look's ambient occlusion (`benilla_world::look::ao`): its occlusion and blur entry
++    /// points, composed with each def set its pipelines specialise on, validated and translated.
++    #[test]
++    fn the_world_ao_shader_composes_and_translates() {
++        let (mut cache, ids) = embedded_shader_cache();
++        let ao = *ids
++            .get("benilla_world/shaders/world_ao.wgsl")
++            .expect("world_ao.wgsl is embedded");
++        for defs in benilla_world::look::ao::shader_def_sets() {
++            let module = cache
++                .get(&(), 0, ao, &defs)
++                .unwrap_or_else(|e| panic!("{defs:?}: world_ao.wgsl does not compose: {e:?}"));
++            validate_and_translate(&module, &format!("{defs:?}: world_ao.wgsl"));
++        }
++    }
++
+     /// Bevy's `ShaderCache` over every embedded shader library, as the pipeline cache composes,
+     /// and each shader's id by its embedded path.
+     #[expect(
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index 6a07f0e..66dc00d 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -328,6 +328,7 @@ pub(crate) fn on_cvar(
+     mut ffx: ResMut<benilla_world::ffx_glow::FfxSwitches>,
+     mut widescreen: ResMut<Widescreen>,
+     mut look: ResMut<benilla_world::look::WorldLook>,
++    ao: Option<ResMut<benilla_world::look::LookAo>>,
+     mut cvars: ResMut<crate::cvars::Cvars>,
+ ) {
+     use benilla_world::view::{FARCLIP_RANGE, MSAA_RANGE};
+@@ -364,6 +365,16 @@ pub(crate) fn on_cvar(
+                 if look.on { "new" } else { "classic" }
+             );
+         }
++        // benilla's own: the new look's contact shadows on their own, read every frame.
++        "worldao" => {
++            if let Some(mut ao) = ao {
++                ao.on = ev.flag();
++                info!(
++                    "video: ambient occlusion {}",
++                    if ao.on { "on" } else { "off" }
++                );
++            }
++        }
+         // The registry refuses a value outside the callback's range (`0x688d40`); the clamp only
+         // keeps the knob in it.
+         "farclip" => view.farclip = v.clamp(*FARCLIP_RANGE.start(), *FARCLIP_RANGE.end()),
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 43bd9bc..2754685 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -102,6 +102,13 @@ impl Plugin for WorldConsolePlugin {
+             Some("<scale 0-10> | tuned"),
+             look_lights,
+         );
++        // benilla's own: the new look's contact shadows held for tuning on film.
++        app.console_command(
++            "lookao",
++            GRAPHICS,
++            Some("<scale 0-4> [radius 0.25-4] | grade"),
++            look_ao,
++        );
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -295,6 +302,38 @@ fn look_lights(world: &mut World, args: &str) -> Vec<String> {
+     }]
+ }
+ 
++/// `lookao <scale> [radius]`, benilla's own (1.12 has no such command): holds the new look's
++/// contact shadows (`benilla_world::look::ao`) at a multiple of the hour's strength, 0 to 4 (0 none,
++/// 1 the grade's own, 2 twice it), and optionally their reach in yards, for tuning on film;
++/// `lookao grade`, or no argument, lets the grade decide again. `worldAO 0` and the classic look
++/// (`worldLook 0`) have none either way.
++fn look_ao(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::{LookAo, WorldLook};
++    let Some((scale, radius)) = LookAo::parse(args) else {
++        return vec!["Usage: lookao <scale 0-4> [radius 0.25-4] | grade".to_string()];
++    };
++    let on = {
++        let mut ao = world.get_resource_or_init::<LookAo>();
++        ao.scale = scale;
++        ao.radius = radius;
++        ao.on
++    };
++    let mut lines = vec![match (scale, radius) {
++        (None, _) => "Ambient occlusion follows the grade.".to_string(),
++        (Some(s), None) => format!("Ambient occlusion held at {s} times the hour's."),
++        (Some(s), Some(r)) => {
++            format!("Ambient occlusion held at {s} times the hour's, {r} yd wide.")
++        }
++    }];
++    if !on {
++        lines.push("worldAO is 0: no ambient occlusion.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has no ambient occlusion.".to_string());
++    }
++    lines
++}
++
+ /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
+ /// a clear one set with the second, each through `ConsoleWrite` in class 0.
+ fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
+@@ -730,6 +769,44 @@ mod tests {
+         assert_eq!(scale(&mut app), 1.0, "no argument goes back too");
+     }
+ 
++    /// `lookao`: a scale (and a radius) holds the contact shadows, `grade` or nothing lets go, and
++    /// anything out of range leaves them as they were with the usage line.
++    #[test]
++    fn the_look_ao_holds_and_lets_go() {
++        use benilla_world::look::{LookAo, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        let ao = |app: &mut App| *app.world_mut().get_resource_or_init::<LookAo>();
++        assert_eq!(
++            run(&mut app, "lookao 2"),
++            ["Ambient occlusion held at 2 times the hour's."]
++        );
++        assert_eq!((ao(&mut app).scale, ao(&mut app).radius), (Some(2.0), None));
++        assert_eq!(
++            run(&mut app, "lookao 0 1.5"),
++            ["Ambient occlusion held at 0 times the hour's, 1.5 yd wide."]
++        );
++        assert_eq!(ao(&mut app).radius, Some(1.5));
++        assert_eq!(
++            run(&mut app, "lookao 5"),
++            ["Usage: lookao <scale 0-4> [radius 0.25-4] | grade"]
++        );
++        assert_eq!(ao(&mut app).scale, Some(0.0), "a bad value changes nothing");
++        assert_eq!(
++            run(&mut app, "lookao grade"),
++            ["Ambient occlusion follows the grade."]
++        );
++        assert_eq!(ao(&mut app), LookAo::default());
++        run(&mut app, "lookao 3");
++        run(&mut app, "lookao");
++        assert_eq!(ao(&mut app), LookAo::default(), "no argument lets go too");
++        app.world_mut().resource_mut::<LookAo>().on = false;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        let lines = run(&mut app, "lookao 1");
++        assert_eq!(lines.len(), 3, "{lines:?}");
++        assert_eq!(lines[1], "worldAO is 0: no ambient occlusion.");
++    }
++
+     /// The six toggles flip their bit and print the state they leave (`ConsoleWrite` class 0):
+     /// the five world-flag bits start set (`0x7100b73`, `0x66f6cb`), the simple-doodad word clear
+     /// (`0x66f714`). None reads its arguments.
+diff --git a/crates/benilla-world/src/look/ao.rs b/crates/benilla-world/src/look/ao.rs
+new file mode 100644
+index 0000000..2bf2417
+--- /dev/null
++++ b/crates/benilla-world/src/look/ao.rs
+@@ -0,0 +1,814 @@
++//! Ambient occlusion, the new look's own (no reference behaviour): soft contact shadows where
++//! things meet, at a wall's foot, under eaves, between roots, in a doorway, under a cart or a
++//! fence, and in the creases of the ground. WoW Forever has them, and they set every model on the
++//! ground it stands on.
++//!
++//! Bevy's `ScreenSpaceAmbientOcclusion` reads the depth and normal prepasses, which benilla's own
++//! terrain, model and static-world shaders do not write, so this is a compact depth-only kernel of
++//! the SAO kind, with the normal rebuilt from depth, run inside the look pass's node
++//! (`look::pass`), before it, on the depth buffer the rays and the mist already sample:
++//! 1. **occlusion** (`world_ao.wgsl`'s `fs_ao`, half resolution): for each pixel, twelve depth taps
++//!    on a spiral over a disk [`tune::RADIUS`] yards wide, each counting how far it rises over the
++//!    pixel's own surface, faded to nothing at the radius (so a post in front of a far hill never
++//!    shades the hill: no halo), turned per pixel and blurred out. The result is already the
++//!    darkening a pixel takes: times the hour's strength, times how much of that pixel is lit by
++//!    ambient rather than by the sun ([`ambient_share`]), faded out with distance;
++//! 2. **blur** (`fs_blur_x`, `fs_blur_y`): a depth-aware 9-tap Gaussian each way, so the shade
++//!    stays on its own surface and never bleeds over an edge;
++//! 3. **apply** (`world_look.wgsl`): each full-resolution pixel takes the four nearest half-
++//!    resolution values weighted by how close their depth is to its own, then darkens the lit part
++//!    of the frame under 1.12's fog ([`darken`]), slightly cool by day, neutral at night, and less
++//!    on what is already bright (a torch's pool, a spell, the sun's glare).
++//!
++//! Every tunable is in [`tune`] but the hour's strength and coolness, which are the grade's
++//! (`grade::PostLook::ao`, `ao_cool`). `worldAO 0` turns it off on its own ([`LookAo::on`]);
++//! `lookao <scale> [radius]` holds it at a multiple of the hour's for film.
++
++use bevy::core_pipeline::FullscreenShader;
++use bevy::prelude::*;
++use bevy::render::diagnostic::RecordDiagnostics;
++use bevy::render::render_resource::binding_types::{
++    texture_2d, texture_depth_2d, texture_depth_2d_multisampled, uniform_buffer_sized,
++};
++use bevy::render::render_resource::*;
++use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
++use bevy::render::texture::{CachedTexture, TextureCache};
++use bevy::render::view::{ExtractedView, Msaa, ViewDepthTexture, ViewTarget};
++
++use super::pass::{LookFrame, LookView};
++
++/// Every tunable of the ambient occlusion, in one place, but the hour's strength and coolness
++/// (the grade's `ao` and `ao_cool`). A first pass, to tune on film with `lookao`. Lengths are
++/// yards (Bevy units), shades fractions of the lit colour.
++pub mod tune {
++    /// How far from a crease the shade reaches: soft and wide at the hero's feet (a wall's foot
++    /// shades about a yard of the ground out from it), never an outline.
++    pub const RADIUS: f32 = 1.2;
++    /// The radii `lookao` takes.
++    pub const RADIUS_MIN: f32 = 0.25;
++    pub const RADIUS_MAX: f32 = 4.0;
++    /// A tap counts only past this cosine over the pixel's own surface, so the faceted terrain
++    /// and a flat wall never shade themselves.
++    pub const BIAS: f32 = 0.1;
++    /// The kernel's mean to an occlusion of 0..1: a right-angled crease (a wall's foot) averages
++    /// about 0.2 over the disk, which this lifts to about a half.
++    pub const GAIN: f32 = 2.5;
++    /// The most a pixel ever darkens, whatever the strength: a deep crease is shaded, never black.
++    pub const MAX_DARKEN: f32 = 0.55;
++    /// The shade fades out from this distance (planar eye depth) to the next, so far hills don't
++    /// grey out and the fog's own falloff takes over.
++    pub const FADE_NEAR: f32 = 40.0;
++    pub const FADE_FAR: f32 = 120.0;
++    /// The share of the shade a surface keeps when the sun lights it square on: the sun fills a
++    /// contact shadow (there are no sun shadows yet), but a wall's foot in the sun still sits on
++    /// the ground.
++    pub const DIRECT_FLOOR: f32 = 0.35;
++    /// The most full-resolution pixels the radius spans, with the camera right at a wall, so the
++    /// disk never covers the screen.
++    pub const MAX_PIXELS: f32 = 160.0;
++    /// Pixels brighter than this (gamma luma) lose their shade on the way to white: a torch's
++    /// pool, a spell's light and the sun's glare are direct light, not ambient.
++    pub const BRIGHT_KNEE: f32 = 0.7;
++    /// The shade's colour at full `ao_cool`: blue darkens least, so a day shadow reads cool; its
++    /// luminance is about 1, so coolness doesn't change how dark. `world_look.wgsl`'s `AO_COOL`
++    /// mirrors it.
++    pub const COOL: [f32; 3] = [1.05, 0.99, 0.80];
++    /// The most `lookao` scales the hour's strength by.
++    pub const SCALE_MAX: f32 = 4.0;
++    /// Below this ambient luminance the sun-to-ambient ratio stops growing (a black ambient).
++    pub const AMBIENT_FLOOR: f32 = 0.02;
++}
++
++/// The ambient occlusion's switch and the film's hold: `on` is `worldAO` (on by default, inert
++/// under the classic look), `scale` holds the strength at a multiple of the hour's
++/// (`lookao <scale>`), `radius` the kernel's reach in yards.
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookAo {
++    pub on: bool,
++    pub scale: Option<f32>,
++    pub radius: Option<f32>,
++}
++
++impl Default for LookAo {
++    fn default() -> Self {
++        Self {
++            on: true,
++            scale: None,
++            radius: None,
++        }
++    }
++}
++
++impl LookAo {
++    /// The strength this frame from the hour's: none with `worldAO 0`, else the hour's times the
++    /// held scale.
++    pub fn strength(&self, hour: f32) -> f32 {
++        if self.on {
++            hour * self.scale.unwrap_or(1.0)
++        } else {
++            0.0
++        }
++    }
++
++    /// The kernel's reach, held or tuned.
++    pub fn radius(&self) -> f32 {
++        self.radius.unwrap_or(tune::RADIUS)
++    }
++
++    /// `lookao`'s arguments: a scale from 0 to [`tune::SCALE_MAX`] and an optional radius from
++    /// [`tune::RADIUS_MIN`] to [`tune::RADIUS_MAX`], or nothing (or `grade`) to follow the grade
++    /// again; `None` for anything else, which changes nothing.
++    pub fn parse(args: &str) -> Option<(Option<f32>, Option<f32>)> {
++        let mut words = args.split_whitespace();
++        let first = match words.next() {
++            None => return Some((None, None)),
++            Some(w) if w.eq_ignore_ascii_case("grade") => {
++                return words.next().is_none().then_some((None, None));
++            }
++            Some(w) => w,
++        };
++        let scale = first
++            .parse::<f32>()
++            .ok()
++            .filter(|v| (0.0..=tune::SCALE_MAX).contains(v))?;
++        let radius = match words.next() {
++            None => None,
++            Some(w) => Some(
++                w.parse::<f32>()
++                    .ok()
++                    .filter(|v| (tune::RADIUS_MIN..=tune::RADIUS_MAX).contains(v))?,
++            ),
++        };
++        words.next().is_none().then_some((Some(scale), radius))
++    }
++}
++
++/// What the occlusion needs of the frame's light besides the grade: the kernel's reach, the
++/// ambient's and the sun's luminance (the gamma `Light.dbc` colours the world is lit with), the
++/// direction the sun's light travels, and 1.12's fog pair.
++#[derive(Clone, Copy, Debug, Default, PartialEq)]
++pub struct AoLight {
++    pub radius: f32,
++    pub ambient_luma: f32,
++    pub diffuse_luma: f32,
++    /// The direction the sun's light travels (`WowLighting::sun_dir`), Bevy space.
++    pub light_dir: Vec3,
++    /// 1.12's linear fog on planar eye depth, yards.
++    pub fog_start: f32,
++    pub fog_end: f32,
++}
++
++/// Rec. 709 luminance of a colour.
++pub fn luma(c: [f32; 3]) -> f32 {
++    0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
++}
++
++/// The sun's light over the ambient's, the ratio [`ambient_share`] takes.
++pub fn sun_over_ambient(light: &AoLight) -> f32 {
++    light.diffuse_luma / light.ambient_luma.max(tune::AMBIENT_FLOOR)
++}
++
++/// How much of a surface's light is ambient, 0..1, the shade's weight: 1.12 lights a surface
++/// `albedo × (ambient + diffuse × n·l)`, so its ambient share is `1 / (1 + ratio × n·l)`
++/// (`ratio` = [`sun_over_ambient`]), lifted to at least [`tune::DIRECT_FLOOR`]. `world_ao.wgsl`
++/// mirrors it.
++pub fn ambient_share(ratio: f32, n_dot_l: f32) -> f32 {
++    let share = 1.0 / (1.0 + ratio * n_dot_l.max(0.0));
++    tune::DIRECT_FLOOR + (1.0 - tune::DIRECT_FLOOR) * share
++}
++
++fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
++    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++/// The shade's distance fade at planar eye depth `z`: 1 near, 0 from [`tune::FADE_FAR`] out.
++pub fn distance_fade(z: f32) -> f32 {
++    1.0 - smoothstep(tune::FADE_NEAR, tune::FADE_FAR, z)
++}
++
++/// One tap's occlusion: `v` from the pixel to the tap, `n` the pixel's normal (unit), `radius` the
++/// kernel's reach. How far the tap rises over the surface (the cosine past [`tune::BIAS`]), faded
++/// to 0 at the radius, so a tap on something far in front counts for nothing.
++/// `world_ao.wgsl`'s `fs_ao` sums the same; keep them in step.
++pub fn tap_occlusion(v: Vec3, n: Vec3, radius: f32) -> f32 {
++    let vv = v.length_squared();
++    let falloff = (1.0 - vv / (radius * radius)).max(0.0);
++    falloff * (v.dot(n) / (vv + 1e-6).sqrt() - tune::BIAS).max(0.0)
++}
++
++/// The kernel's taps to an occlusion of 0..1: their mean times [`tune::GAIN`].
++pub fn occlusion(taps: &[f32]) -> f32 {
++    if taps.is_empty() {
++        return 0.0;
++    }
++    (taps.iter().sum::<f32>() / taps.len() as f32 * tune::GAIN).clamp(0.0, 1.0)
++}
++
++/// How dark a pixel goes, 0..[`tune::MAX_DARKEN`]: `strength × occlusion × share × fade`.
++pub fn darkening(strength: f32, occlusion: f32, share: f32, fade: f32) -> f32 {
++    (strength * occlusion * share * fade).clamp(0.0, tune::MAX_DARKEN)
++}
++
++/// The shade applied to one gamma pixel `g` (`world_look.wgsl` runs the same; keep them in step):
++/// 1.12 fogged it `mix(lit, fog, f)` in gamma, so only the lit part `g − f·fog` is darkened, by
++/// `dark` in linear light (tinted by `cool`) and eased off the brightest pixels. A pixel under the
++/// fog's own colour (one the fog never reached: a WMO's interior fog, a particle) only darkens.
++pub fn darken(g: [f32; 3], dark: f32, cool: f32, fog: f32, fog_gamma: [f32; 3]) -> [f32; 3] {
++    let bright = 1.0 - smoothstep(tune::BRIGHT_KNEE, 1.0, luma(g));
++    std::array::from_fn(|i| {
++        let tint = 1.0 + (tune::COOL[i] - 1.0) * cool;
++        let keep = (1.0 - dark * bright * tint).clamp(0.0, 1.0).powf(1.0 / 2.2);
++        let lit = (g[i] - fog_gamma[i] * fog).max(0.0);
++        g[i] - lit * (1.0 - keep)
++    })
++}
++
++/// 1.12's fog amount at planar eye depth `z`: `GL_LINEAR` from `start` to `end`.
++pub fn fog_amount(z: f32, start: f32, end: f32) -> f32 {
++    1.0 - ((end - z) / (end - start).max(0.001)).clamp(0.0, 1.0)
++}
++
++// ---------------------------------------------------------------- render world
++
++/// The occlusion pass's uniform, `world_ao.wgsl`'s `Ao`, field for field.
++#[repr(C)]
++#[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
++pub struct AoUniform {
++    /// Clip space back to view space, for each tap's position.
++    pub view_from_clip: [[f32; 4]; 4],
++    /// The radius (yd), full-resolution pixels per yard at 1 yd, the bias, the gain.
++    pub kernel: [f32; 4],
++    /// The strength, the most a pixel darkens, the fade's start and end (yd).
++    pub shade: [f32; 4],
++    /// Toward the sun, view space (unit), and the sun over the ambient.
++    pub light: [f32; 4],
++    /// The floor of the ambient share, the most pixels the radius spans, 0, 0.
++    pub misc: [f32; 4],
++}
++
++impl AoUniform {
++    /// One view's uniform: `clip_from_view` its projection, `view_from_world` its inverse
++    /// transform, `height` the depth buffer's height in pixels.
++    pub fn new(
++        frame: &LookFrame,
++        clip_from_view: Mat4,
++        view_from_world: Mat4,
++        height: f32,
++    ) -> Self {
++        let light = &frame.ao;
++        let to_light = view_from_world
++            .transform_vector3(-light.light_dir)
++            .normalize_or_zero();
++        Self {
++            view_from_clip: clip_from_view.inverse().to_cols_array_2d(),
++            kernel: [
++                light.radius,
++                clip_from_view.y_axis.y * height * 0.5,
++                tune::BIAS,
++                tune::GAIN,
++            ],
++            shade: [
++                frame.post.ao,
++                tune::MAX_DARKEN,
++                tune::FADE_NEAR,
++                tune::FADE_FAR,
++            ],
++            light: to_light.extend(sun_over_ambient(light)).to_array(),
++            misc: [tune::DIRECT_FLOOR, tune::MAX_PIXELS, 0.0, 0.0],
++        }
++    }
++}
++
++const UNIFORM_BYTES: u64 = std::mem::size_of::<AoUniform>() as u64;
++
++/// The occlusion's half-resolution target: the shade in red, the pixel's planar eye depth in
++/// green, for the depth-aware blur and the upsample.
++pub(crate) const AO_FORMAT: TextureFormat = TextureFormat::Rg16Float;
++
++/// The three passes, each its own pipeline.
++#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
++pub(crate) enum AoStage {
++    Occlusion,
++    BlurX,
++    BlurY,
++}
++
++#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
++pub(crate) struct AoKey {
++    stage: AoStage,
++    /// The view's depth buffer is multisampled (`gxMultisample`): the occlusion reads sample 0.
++    msaa: bool,
++}
++
++fn shader_defs(msaa: bool) -> Vec<bevy::shader::ShaderDefVal> {
++    if msaa {
++        vec!["MSAA".into()]
++    } else {
++        vec![]
++    }
++}
++
++/// Every def set `world_ao.wgsl` is specialised on, for the app's shader translation test.
++pub fn shader_def_sets() -> Vec<Vec<bevy::shader::ShaderDefVal>> {
++    vec![shader_defs(false), shader_defs(true)]
++}
++
++#[derive(Resource)]
++pub(crate) struct AoPipeline {
++    occlusion: BindGroupLayoutDescriptor,
++    occlusion_msaa: BindGroupLayoutDescriptor,
++    blur: BindGroupLayoutDescriptor,
++    shader: Handle<Shader>,
++    fullscreen: FullscreenShader,
++    /// A 1×1 target of zeros (no shade, no depth) the look pass binds when there is no occlusion.
++    pub(crate) empty: TextureView,
++}
++
++impl AoPipeline {
++    fn layout(&self, key: AoKey) -> &BindGroupLayoutDescriptor {
++        match (key.stage, key.msaa) {
++            (AoStage::Occlusion, false) => &self.occlusion,
++            (AoStage::Occlusion, true) => &self.occlusion_msaa,
++            _ => &self.blur,
++        }
++    }
++}
++
++impl SpecializedRenderPipeline for AoPipeline {
++    type Key = AoKey;
++
++    fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
++        let (label, entry) = match key.stage {
++            AoStage::Occlusion => ("world_ao", "fs_ao"),
++            AoStage::BlurX => ("world_ao_blur_x", "fs_blur_x"),
++            AoStage::BlurY => ("world_ao_blur_y", "fs_blur_y"),
++        };
++        RenderPipelineDescriptor {
++            label: Some(label.into()),
++            layout: vec![self.layout(key).clone()],
++            vertex: self.fullscreen.to_vertex_state(),
++            fragment: Some(FragmentState {
++                shader: self.shader.clone(),
++                shader_defs: shader_defs(key.msaa && key.stage == AoStage::Occlusion),
++                entry_point: Some(entry.into()),
++                targets: vec![Some(ColorTargetState {
++                    format: AO_FORMAT,
++                    blend: None,
++                    write_mask: ColorWrites::ALL,
++                })],
++            }),
++            ..default()
++        }
++    }
++}
++
++pub(crate) fn init_pipeline(
++    mut commands: Commands,
++    device: Res<RenderDevice>,
++    fullscreen: Res<FullscreenShader>,
++    asset_server: Res<AssetServer>,
++) {
++    // Every read is a `textureLoad`: no sampler. The blur's source sits at binding 2, apart from
++    // the occlusion's depth and uniform, so one shader file holds all three entry points.
++    let occlusion = |label: &'static str, depth: BindGroupLayoutEntryBuilder| {
++        BindGroupLayoutDescriptor::new(
++            label,
++            &BindGroupLayoutEntries::sequential(
++                ShaderStages::FRAGMENT,
++                (
++                    depth,
++                    uniform_buffer_sized(false, std::num::NonZero::new(UNIFORM_BYTES)),
++                ),
++            ),
++        )
++    };
++    let blur = BindGroupLayoutDescriptor::new(
++        "world_ao_blur_layout",
++        &BindGroupLayoutEntries::with_indices(
++            ShaderStages::FRAGMENT,
++            ((
++                2,
++                texture_2d(TextureSampleType::Float { filterable: false }),
++            ),),
++        ),
++    );
++    // Created zeroed, never written: no shade.
++    let empty = device
++        .create_texture(&TextureDescriptor {
++            label: Some("world_ao_empty"),
++            size: Extent3d {
++                width: 1,
++                height: 1,
++                depth_or_array_layers: 1,
++            },
++            mip_level_count: 1,
++            sample_count: 1,
++            dimension: TextureDimension::D2,
++            format: AO_FORMAT,
++            usage: TextureUsages::TEXTURE_BINDING,
++            view_formats: &[],
++        })
++        .create_view(&TextureViewDescriptor::default());
++    commands.insert_resource(AoPipeline {
++        occlusion: occlusion("world_ao_layout", texture_depth_2d()),
++        occlusion_msaa: occlusion("world_ao_layout_msaa", texture_depth_2d_multisampled()),
++        blur,
++        shader: asset_server.load("embedded://benilla_world/shaders/world_ao.wgsl"),
++        fullscreen: fullscreen.clone(),
++        empty,
++    });
++}
++
++/// One look view's occlusion: its three pipelines, its uniform, and this frame's two
++/// half-resolution targets (none while the occlusion is off).
++#[derive(Component)]
++pub(crate) struct LookAoGpu {
++    pipelines: [CachedRenderPipelineId; 3],
++    msaa: bool,
++    uniform: Buffer,
++    targets: Option<[CachedTexture; 2]>,
++}
++
++/// Whether the occlusion runs this frame: the new look on, with some strength.
++pub(crate) fn wanted(frame: &LookFrame) -> bool {
++    frame.on && frame.post.ao > 0.0 && frame.ao.radius > 0.0
++}
++
++pub(crate) fn prepare_ao_views(
++    mut commands: Commands,
++    device: Res<RenderDevice>,
++    cache: Res<PipelineCache>,
++    pipeline: Res<AoPipeline>,
++    mut pipelines: ResMut<SpecializedRenderPipelines<AoPipeline>>,
++    mut textures: ResMut<TextureCache>,
++    frame: Res<LookFrame>,
++    views: Query<(Entity, &ViewTarget, &Msaa, Option<&LookAoGpu>), With<LookView>>,
++) {
++    let want = wanted(&frame);
++    for (entity, target, msaa, existing) in &views {
++        let msaa = msaa.samples() > 1;
++        let (pipeline_ids, uniform) = match existing {
++            Some(gpu) if gpu.msaa == msaa => (gpu.pipelines, gpu.uniform.clone()),
++            _ => {
++                let mut id = |stage| pipelines.specialize(&cache, &pipeline, AoKey { stage, msaa });
++                (
++                    [
++                        id(AoStage::Occlusion),
++                        id(AoStage::BlurX),
++                        id(AoStage::BlurY),
++                    ],
++                    device.create_buffer(&BufferDescriptor {
++                        label: Some("world_ao_uniform"),
++                        size: UNIFORM_BYTES,
++                        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
++                        mapped_at_creation: false,
++                    }),
++                )
++            }
++        };
++        let targets = want.then(|| {
++            let size = target.main_texture().size();
++            let half = Extent3d {
++                width: size.width.div_ceil(2).max(1),
++                height: size.height.div_ceil(2).max(1),
++                depth_or_array_layers: 1,
++            };
++            let mut get = |label| {
++                textures.get(
++                    &device,
++                    TextureDescriptor {
++                        label: Some(label),
++                        size: half,
++                        mip_level_count: 1,
++                        sample_count: 1,
++                        dimension: TextureDimension::D2,
++                        format: AO_FORMAT,
++                        usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
++                        view_formats: &[],
++                    },
++                )
++            };
++            [get("world_ao_a"), get("world_ao_b")]
++        });
++        commands.entity(entity).insert(LookAoGpu {
++            pipelines: pipeline_ids,
++            msaa,
++            uniform,
++            targets,
++        });
++    }
++}
++
++/// One full-screen draw into `target` from `bind`.
++fn draw(
++    render_context: &mut RenderContext,
++    label: &'static str,
++    pipeline: &RenderPipeline,
++    bind: &BindGroup,
++    target: &TextureView,
++) {
++    let diagnostics = render_context.diagnostic_recorder();
++    let mut pass = render_context
++        .command_encoder()
++        .begin_render_pass(&RenderPassDescriptor {
++            label: Some(label),
++            color_attachments: &[Some(RenderPassColorAttachment {
++                view: target,
++                depth_slice: None,
++                resolve_target: None,
++                ops: Operations {
++                    load: LoadOp::Clear(Default::default()),
++                    store: StoreOp::Store,
++                },
++            })],
++            depth_stencil_attachment: None,
++            timestamp_writes: None,
++            occlusion_query_set: None,
++        });
++    let span = diagnostics.pass_span(&mut pass, label);
++    pass.set_pipeline(pipeline);
++    pass.set_bind_group(0, bind, &[]);
++    pass.draw(0..3, 0..1);
++    span.end(&mut pass);
++}
++
++/// Runs the occlusion and its blur for one view, ahead of the look pass, and returns the target
++/// the look pass reads; `None` (the look pass then binds [`AoPipeline::empty`] and applies none)
++/// while the occlusion is off or its pipelines still compile.
++pub(crate) fn encode(
++    render_context: &mut RenderContext,
++    world: &World,
++    frame: &LookFrame,
++    view: &ExtractedView,
++    depth: &ViewDepthTexture,
++    gpu: Option<&LookAoGpu>,
++) -> Option<TextureView> {
++    let gpu = gpu?;
++    let [a, b] = gpu.targets.as_ref()?;
++    if !wanted(frame) {
++        return None;
++    }
++    let cache = world.resource::<PipelineCache>();
++    let [occlusion, blur_x, blur_y] = gpu.pipelines.map(|id| cache.get_render_pipeline(id));
++    let (occlusion, blur_x, blur_y) = (occlusion?, blur_x?, blur_y?);
++    let ao_pipeline = world.resource::<AoPipeline>();
++    let height = depth.texture.size().height as f32;
++    let uniform = AoUniform::new(
++        frame,
++        view.clip_from_view,
++        Mat4::from(view.world_from_view.affine().inverse()),
++        height,
++    );
++    world
++        .resource::<RenderQueue>()
++        .write_buffer(&gpu.uniform, 0, bytemuck::bytes_of(&uniform));
++    let device = render_context.render_device().clone();
++    let occlusion_layout = cache.get_bind_group_layout(ao_pipeline.layout(AoKey {
++        stage: AoStage::Occlusion,
++        msaa: gpu.msaa,
++    }));
++    let blur_layout = cache.get_bind_group_layout(&ao_pipeline.blur);
++    let occlusion_bind = device.create_bind_group(
++        "world_ao",
++        &occlusion_layout,
++        &BindGroupEntries::sequential((depth.view(), gpu.uniform.as_entire_binding())),
++    );
++    let blur_bind = |label, source: &TextureView| {
++        device.create_bind_group(
++            label,
++            &blur_layout,
++            &BindGroupEntries::with_indices(((2, source),)),
++        )
++    };
++    let x_bind = blur_bind("world_ao_blur_x", &a.default_view);
++    let y_bind = blur_bind("world_ao_blur_y", &b.default_view);
++    draw(
++        render_context,
++        "world_ao",
++        occlusion,
++        &occlusion_bind,
++        &a.default_view,
++    );
++    draw(
++        render_context,
++        "world_ao_blur_x",
++        blur_x,
++        &x_bind,
++        &b.default_view,
++    );
++    draw(
++        render_context,
++        "world_ao_blur_y",
++        blur_y,
++        &y_bind,
++        &a.default_view,
++    );
++    Some(a.default_view.clone())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::look::PostLook;
++
++    /// A flat floor shades nothing: every tap lies in its plane.
++    #[test]
++    fn a_flat_floor_has_no_occlusion() {
++        let n = Vec3::Y;
++        let taps: Vec<f32> = (0..12)
++            .map(|i| {
++                let a = i as f32 * 0.6;
++                tap_occlusion(Vec3::new(a.cos(), 0.0, a.sin()) * 0.7, n, tune::RADIUS)
++            })
++            .collect();
++        assert_eq!(occlusion(&taps), 0.0);
++    }
++
++    /// The ground `d` yards in front of a wall that faces the camera, as the kernel's spiral sees
++    /// it: a tap above the pixel on screen lands on the wall (as high as it is far up the disk),
++    /// one below on the ground, three times further for the ground's foreshortening.
++    fn before_a_wall(d: f32) -> f32 {
++        let taps: Vec<f32> = (0..12)
++            .map(|i| {
++                let a = (i as f32 + 0.5) / 12.0;
++                let ang = a * 7.0 * std::f32::consts::TAU + 0.3;
++                let r = a * tune::RADIUS;
++                let (x, y) = (ang.cos() * r, ang.sin() * r);
++                let v = if y > 0.0 {
++                    Vec3::new(x, y, -d)
++                } else {
++                    Vec3::new(x, 0.0, -3.0 * y)
++                };
++                tap_occlusion(v, Vec3::Y, tune::RADIUS)
++            })
++            .collect();
++        occlusion(&taps)
++    }
++
++    /// A wall's foot is shaded deepest right at the wall and less a yard out, never past its
++    /// cap.
++    #[test]
++    fn a_walls_foot_is_shaded() {
++        let (at, near, out) = (before_a_wall(0.05), before_a_wall(0.5), before_a_wall(1.3));
++        assert!(at > 0.4, "{at}");
++        assert!(at > near && near > out, "{at} {near} {out}");
++        assert_eq!(out, 0.0, "past the radius: none");
++        assert!(darkening(1.0, at, 1.0, 1.0) <= tune::MAX_DARKEN);
++    }
++
++    /// A tap on something far in front (a post before a distant hill) counts for nothing: no
++    /// halo round the post.
++    #[test]
++    fn a_tap_beyond_the_radius_counts_for_nothing() {
++        assert_eq!(
++            tap_occlusion(Vec3::new(0.0, 30.0, 40.0), Vec3::Y, tune::RADIUS),
++            0.0
++        );
++        // Just inside the radius and straight up: almost the full cosine, faded to near nothing.
++        let edge = tap_occlusion(
++            Vec3::new(0.0, tune::RADIUS * 0.99, 0.0),
++            Vec3::Y,
++            tune::RADIUS,
++        );
++        assert!(edge > 0.0 && edge < 0.05, "{edge}");
++        // Near and straight up: nearly the full cosine.
++        let near = tap_occlusion(Vec3::new(0.0, 0.1, 0.0), Vec3::Y, tune::RADIUS);
++        assert!(near > 0.85, "{near}");
++    }
++
++    /// Facing away from the sun (or at night) a surface is all ambient and takes all the shade;
++    /// square to a bright sun it keeps the floor.
++    #[test]
++    fn the_shade_follows_the_ambient_share() {
++        assert_eq!(ambient_share(3.0, -0.5), 1.0);
++        assert_eq!(ambient_share(0.0, 1.0), 1.0);
++        let lit = ambient_share(3.0, 1.0);
++        assert!((lit - (tune::DIRECT_FLOOR + (1.0 - tune::DIRECT_FLOOR) * 0.25)).abs() < 1e-6);
++        assert!(ambient_share(1e6, 1.0) >= tune::DIRECT_FLOOR);
++        let light = AoLight {
++            ambient_luma: 0.0,
++            diffuse_luma: 0.5,
++            ..default()
++        };
++        assert!(sun_over_ambient(&light).is_finite());
++    }
++
++    #[test]
++    fn the_shade_fades_with_distance_and_is_capped() {
++        assert_eq!(distance_fade(10.0), 1.0);
++        assert_eq!(distance_fade(tune::FADE_FAR + 1.0), 0.0);
++        let mid = distance_fade((tune::FADE_NEAR + tune::FADE_FAR) / 2.0);
++        assert!((mid - 0.5).abs() < 1e-6);
++        assert_eq!(darkening(4.0, 1.0, 1.0, 1.0), tune::MAX_DARKEN);
++        assert_eq!(darkening(1.0, 0.5, 1.0, 0.0), 0.0);
++    }
++
++    /// The fog's part of a pixel keeps its colour; only the lit part darkens, a bright pixel not
++    /// at all, and a cool shade keeps more blue than red.
++    #[test]
++    fn darken_keeps_the_fog_and_the_light() {
++        let fog = [0.6, 0.7, 0.8];
++        // All fog: untouched.
++        let g = darken(fog, 0.5, 0.0, 1.0, fog);
++        for i in 0..3 {
++            assert!((g[i] - fog[i]).abs() < 1e-6);
++        }
++        // No fog: the linear keep, re-encoded.
++        let g = darken([0.4; 3], 0.5, 0.0, 0.0, fog);
++        assert!((g[0] - 0.4 * 0.5f32.powf(1.0 / 2.2)).abs() < 1e-5);
++        // White stays white.
++        assert_eq!(darken([1.0; 3], 0.5, 0.0, 0.0, fog), [1.0; 3]);
++        // Cool: blue keeps more than red.
++        let g = darken([0.4; 3], 0.5, 1.0, 0.0, fog);
++        assert!(g[2] > g[0], "{g:?}");
++        // No shade: the pixel as it was.
++        assert_eq!(darken([0.3, 0.2, 0.1], 0.0, 1.0, 0.4, fog), [0.3, 0.2, 0.1]);
++    }
++
++    #[test]
++    fn the_fog_is_linear_on_eye_depth() {
++        assert_eq!(fog_amount(10.0, 100.0, 300.0), 0.0);
++        assert_eq!(fog_amount(400.0, 100.0, 300.0), 1.0);
++        assert!((fog_amount(200.0, 100.0, 300.0) - 0.5).abs() < 1e-6);
++        // A storm's negative start, and a degenerate pair.
++        assert!(fog_amount(0.0, -50.0, 150.0) > 0.0);
++        assert_eq!(fog_amount(5.0, 10.0, 10.0), 0.0);
++    }
++
++    /// The cool tint barely moves the luminance: coolness is a hue, not a darkness.
++    #[test]
++    fn the_cool_tint_keeps_luminance() {
++        assert!((luma(tune::COOL) - 1.0).abs() < 0.02);
++    }
++
++    #[test]
++    fn lookao_parses_a_scale_a_radius_or_the_grade() {
++        assert_eq!(LookAo::parse(""), Some((None, None)));
++        assert_eq!(LookAo::parse(" grade "), Some((None, None)));
++        assert_eq!(LookAo::parse("2"), Some((Some(2.0), None)));
++        assert_eq!(LookAo::parse("0 1.5"), Some((Some(0.0), Some(1.5))));
++        assert_eq!(LookAo::parse("5"), None);
++        assert_eq!(LookAo::parse("1 9"), None);
++        assert_eq!(LookAo::parse("dark"), None);
++        assert_eq!(LookAo::parse("1 1 1"), None);
++        assert_eq!(LookAo::parse("grade 2"), None);
++    }
++
++    #[test]
++    fn world_ao_off_has_no_strength() {
++        let mut ao = LookAo::default();
++        assert_eq!(ao.strength(0.8), 0.8);
++        ao.scale = Some(2.0);
++        assert_eq!(ao.strength(0.8), 1.6);
++        ao.on = false;
++        assert_eq!(ao.strength(0.8), 0.0);
++        assert_eq!(ao.radius(), tune::RADIUS);
++    }
++
++    /// `world_ao.wgsl`'s `Ao`: a `mat4x4<f32>` then four `vec4<f32>` rows, 128 bytes.
++    #[test]
++    fn the_uniform_layout_matches_the_shader() {
++        assert_eq!(UNIFORM_BYTES, 64 + 4 * 16);
++        assert_eq!(std::mem::offset_of!(AoUniform, kernel), 64);
++    }
++
++    /// The uniform carries the hour's strength, the projection's scale and the sun turned into
++    /// view space.
++    #[test]
++    fn a_view_uniform_carries_the_frame() {
++        let proj =
++            Mat4::perspective_infinite_reverse_rh(std::f32::consts::FRAC_PI_2, 16.0 / 9.0, 0.1);
++        // A camera looking down -Z: view space is world space.
++        let frame = LookFrame {
++            on: true,
++            post: PostLook {
++                ao: 0.8,
++                ..PostLook::NEUTRAL
++            },
++            ao: AoLight {
++                radius: 1.2,
++                ambient_luma: 0.2,
++                diffuse_luma: 0.6,
++                light_dir: Vec3::NEG_Y,
++                fog_start: 100.0,
++                fog_end: 300.0,
++            },
++            ..default()
++        };
++        let u = AoUniform::new(&frame, proj, Mat4::IDENTITY, 1080.0);
++        assert_eq!(u.shade[0], 0.8);
++        assert_eq!(u.kernel[0], 1.2);
++        // A 90° vertical field: one yard at one yard is half the screen's height.
++        assert!((u.kernel[1] - 540.0).abs() < 1e-2, "{:?}", u.kernel);
++        assert!((Vec3::from_slice(&u.light[..3]) - Vec3::Y).length() < 1e-6);
++        assert!((u.light[3] - 3.0).abs() < 1e-5);
++        // A point ten yards ahead comes back from clip space.
++        let p = Vec3::new(1.0, -2.0, -10.0);
++        let clip = proj * p.extend(1.0);
++        let back = Mat4::from_cols_array_2d(&u.view_from_clip) * (clip / clip.w);
++        assert!((back.truncate() / back.w - p).length() < 1e-3);
++        assert!(wanted(&frame));
++        assert!(!wanted(&LookFrame { on: false, ..frame }));
++    }
++}
+diff --git a/crates/benilla-world/src/look/grade.rs b/crates/benilla-world/src/look/grade.rs
+index 8a37bb2..ac8e1d4 100644
+--- a/crates/benilla-world/src/look/grade.rs
++++ b/crates/benilla-world/src/look/grade.rs
+@@ -57,6 +57,11 @@ pub struct PostLook {
+     pub height_fog: f32,
+     /// God-ray strength, 0..1.
+     pub rays: f32,
++    /// Ambient-occlusion strength ([`super::ao`]): how dark the contact shadows go, 1 the tuned
++    /// look's own; 0 has none.
++    pub ao: f32,
++    /// How cool the contact shadows are, 0..1: blue shade by day, neutral at night.
++    pub ao_cool: f32,
+ }
+ 
+ impl PostLook {
+@@ -67,6 +72,8 @@ impl PostLook {
+         bloom: 0.0,
+         height_fog: 0.0,
+         rays: 0.0,
++        ao: 0.0,
++        ao_cool: 0.0,
+     };
+ 
+     /// The frame passes through untouched.
+@@ -82,6 +89,8 @@ impl PostLook {
+             bloom: lerp(self.bloom, other.bloom, t),
+             height_fog: lerp(self.height_fog, other.height_fog, t),
+             rays: lerp(self.rays, other.rays, t),
++            ao: lerp(self.ao, other.ao, t),
++            ao_cool: lerp(self.ao_cool, other.ao_cool, t),
+         }
+     }
+ }
+@@ -164,7 +173,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
+ 
+ /// A key at `h:m` from the palette's columns: sun, ambient, fog and sky tints with their weights
+ /// (as fractions), the fog-end multiplier, then saturation, contrast, warmth, bloom, height fog
+-/// and rays.
++/// and rays, then the ambient occlusion's strength and coolness.
+ #[allow(clippy::too_many_arguments)]
+ const fn key(
+     h: u32,
+@@ -175,6 +184,7 @@ const fn key(
+     sky: Tint,
+     fog_end_scale: f32,
+     [saturation, contrast, warmth, bloom, height_fog, rays]: [f32; 6],
++    [ao, ao_cool]: [f32; 2],
+ ) -> GradeKey {
+     GradeKey {
+         minute: (h * 60 + m) as f32,
+@@ -190,6 +200,8 @@ const fn key(
+             bloom,
+             height_fog,
+             rays,
++            ao,
++            ao_cool,
+         },
+     }
+ }
+@@ -198,13 +210,15 @@ const fn key(
+ /// toward a pale moon blue, which lit 1.12's near-black night up into a readable blue one; the review
+ /// asked for a darker, spookier night. The tints now pull toward a deep blue-black, the fog closes in,
+ /// the colour drains out and the mist lies on the ground, so torches and spells carry the night.
+-const ELWYNN_NIGHT: (Tint, Tint, Tint, Tint, f32, [f32; 6]) = (
++const ELWYNN_NIGHT: (Tint, Tint, Tint, Tint, f32, [f32; 6], [f32; 2]) = (
+     Tint::new(0.10, 0.14, 0.26, 0.45),
+     Tint::new(0.08, 0.10, 0.20, 0.45),
+     Tint::new(0.03, 0.04, 0.08, 0.50),
+     Tint::new(0.02, 0.03, 0.08, 0.45),
+     0.85,
+     [0.75, 1.15, -0.12, 0.50, 0.45, 0.0],
++    // Contact shadows strong and neutral: the dark is ambient light only.
++    [1.0, 0.0],
+ );
+ 
+ /// Elwynn Forest, the first pass to tune on video. The aim is WoW Forever's: warm light against
+@@ -220,6 +234,7 @@ pub const ELWYNN: [GradeKey; 7] = [
+         ELWYNN_NIGHT.3,
+         ELWYNN_NIGHT.4,
+         ELWYNN_NIGHT.5,
++        ELWYNN_NIGHT.6,
+     ),
+     // First light: rose sun and fog, the thickest mist, the first rays.
+     key(
+@@ -231,6 +246,7 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.95, 0.70, 0.65, 0.30),
+         1.2,
+         [1.00, 1.05, 0.10, 0.40, 0.70, 0.8],
++        [0.85, 0.35],
+     ),
+     // Morning: the mist lifting, the view opening.
+     key(
+@@ -242,6 +258,7 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.70, 0.82, 0.98, 0.15),
+         1.8,
+         [1.08, 1.08, 0.08, 0.25, 0.35, 0.6],
++        [0.75, 0.6],
+     ),
+     // Noon: clear and far, cool blue shadows. Filmed first at saturation 1.10 and warmth +0.04
+     // with a warm-white sun, noon read as golden as the evening; it's now a cool-white sun, no
+@@ -255,6 +272,8 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.45, 0.65, 0.98, 0.20),
+         2.5,
+         [0.95, 1.06, -0.10, 0.15, 0.05, 0.3],
++        // The weakest contact shadows of the day: the sun fills them; the coolest.
++        [0.6, 0.8],
+     ),
+     // Golden hour.
+     key(
+@@ -266,6 +285,8 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.98, 0.78, 0.55, 0.25),
+         2.0,
+         [1.12, 1.12, 0.18, 0.50, 0.15, 0.9],
++        // Low sun, long shade: the contact shadows at their strongest, cool against the gold.
++        [1.0, 0.6],
+     ),
+     // Dusk: rose and violet.
+     key(
+@@ -277,6 +298,7 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.75, 0.45, 0.70, 0.35),
+         1.5,
+         [1.05, 1.08, 0.05, 0.45, 0.35, 0.5],
++        [0.95, 0.3],
+     ),
+     key(
+         21,
+@@ -287,6 +309,7 @@ pub const ELWYNN: [GradeKey; 7] = [
+         ELWYNN_NIGHT.3,
+         ELWYNN_NIGHT.4,
+         ELWYNN_NIGHT.5,
++        ELWYNN_NIGHT.6,
+     ),
+ ];
+ 
+@@ -404,6 +427,18 @@ mod tests {
+         assert!(close(sample(&late, 180.0).fog_end_scale, 3.0));
+     }
+ 
++    /// The contact shadows: weakest at noon, strongest at golden hour and through the night;
++    /// cool by day, neutral at night.
++    #[test]
++    fn the_occlusion_is_weak_at_noon_and_strong_at_golden_hour_and_night() {
++        let (night, noon, golden) = (&ELWYNN[0].post, &ELWYNN[3].post, &ELWYNN[4].post);
++        assert!(ELWYNN.iter().all(|k| k.post.ao >= noon.ao));
++        assert!(golden.ao > noon.ao && night.ao > noon.ao);
++        assert_eq!(night.ao_cool, 0.0);
++        assert!(noon.ao_cool > golden.ao_cool && golden.ao_cool > 0.0);
++        assert_eq!(sample(&ELWYNN, 1439.0).post.ao_cool, 0.0);
++    }
++
+     #[test]
+     fn strength_zero_returns_the_sample_untouched() {
+         let atmo = Atmosphere::DEFAULT;
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index fb92899..3e8dc4e 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -1,8 +1,9 @@
+ //! The new look, benilla's own (no reference behaviour): WoW Forever's idea of keeping 1.12's
+ //! models and textures and re-lighting the world, zone by zone. A zone's light is hand-tuned by
+ //! time of day ([`grade`]) over the `Light.dbc` sample, and torches and spells light the ground
+-//! around them per pixel ([`lights`]). One switch, [`WorldLook`] (the game's `worldLook` CVar),
+-//! turns all of it off, and the classic look is then exactly the reference's.
++//! around them per pixel ([`lights`]), and things that meet shade each other ([`ao`]). One
++//! switch, [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look
++//! is then exactly the reference's.
+ 
+ use bevy::ecs::system::SystemParam;
+ use bevy::prelude::*;
+@@ -11,11 +12,13 @@ use std::collections::HashMap;
+ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
+ use benilla_formats::{AreaTableCatalog, Atmosphere};
+ 
++pub mod ao;
+ pub mod grade;
+ pub mod lights;
+ pub mod mist;
+ pub mod pass;
+ pub mod rays;
++pub use ao::LookAo;
+ pub use grade::{GradeKey, PostLook, Tint};
+ pub use lights::{LookLight, LookLightTune, LookPulse};
+ pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
+diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
+index 0b48d59..c40af52 100644
+--- a/crates/benilla-world/src/look/pass.rs
++++ b/crates/benilla-world/src/look/pass.rs
+@@ -1,5 +1,6 @@
+-//! The new look's full-screen pass and bloom, benilla's own (no reference behaviour): god rays
+-//! toward the sun and a morning mist in the hollows ([`super::rays`]), then a colour grade in
++//! The new look's full-screen pass and bloom, benilla's own (no reference behaviour): contact
++//! shadows from the depth buffer ([`super::ao`]), god rays toward the sun and a morning mist in the
++//! hollows ([`super::rays`]), then a colour grade in
+ //! linear light (white balance, contrast, saturation), all from the zone grade's current values
+ //! ([`super::LookGrade`]), and Bevy's own `Bloom` on the world camera, all on the camera marked
+ //! [`LookView`] and only under the new look.
+@@ -29,6 +30,7 @@ use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
+ use bevy::render::view::{ExtractedView, Msaa, ViewDepthTexture, ViewTarget};
+ use bevy::render::{Render, RenderApp, RenderStartup, RenderSystems};
+ 
++use super::ao::{self, AoLight, LookAo, LookAoGpu};
+ use super::{LookGrade, PostLook, WorldLook};
+ 
+ /// The camera the new look's pass and bloom run on: the game's world camera.
+@@ -51,6 +53,9 @@ pub struct LookFrame {
+     pub fog_color: [f32; 3],
+     /// The player's feet height (Bevy +Y), the mist's base reference; `None` with no avatar.
+     pub feet_y: Option<f32>,
++    /// What the ambient occlusion needs of the light besides the grade (`post.ao` is its strength,
++    /// already `worldAO` and `lookao`'s).
++    pub ao: AoLight,
+ }
+ 
+ impl LookFrame {
+@@ -75,6 +80,7 @@ fn publish_frame(
+     look: Res<WorldLook>,
+     grade: Res<LookGrade>,
+     mist: Res<super::LookMist>,
++    ao: Res<LookAo>,
+     lighting: Res<crate::lighting::WowLighting>,
+     viewer: Res<crate::view::Viewer>,
+     mut frame: ResMut<LookFrame>,
+@@ -84,6 +90,7 @@ fn publish_frame(
+         post: if look.on {
+             let mut post = grade.post;
+             post.height_fog *= mist.scale;
++            post.ao = ao.strength(post.ao);
+             post
+         } else {
+             PostLook::NEUTRAL
+@@ -92,6 +99,14 @@ fn publish_frame(
+         sun_color: lighting.celestial_tint.map(srgb_to_linear),
+         fog_color: lighting.fog_color.map(srgb_to_linear),
+         feet_y: viewer.at.map(|p| p.y),
++        ao: AoLight {
++            radius: ao.radius(),
++            ambient_luma: ao::luma(lighting.ambient),
++            diffuse_luma: ao::luma(lighting.diffuse),
++            light_dir: lighting.sun_dir,
++            fog_start: lighting.fog_start,
++            fog_end: lighting.fog_end,
++        },
+     };
+     if *frame != next {
+         *frame = next;
+@@ -243,13 +258,26 @@ pub struct LookUniform {
+     pub camera: [f32; 4],
+     /// Camera to sun, unit, 0.
+     pub sun_dir: [f32; 4],
++    /// The ambient occlusion: 1 to apply it (0 binds no shade), its coolness, 1.12's fog start and
++    /// end on planar eye depth.
++    pub ao: [f32; 4],
++    /// The camera's forward (unit), for planar eye depth, and the brightness the shade eases off
++    /// above.
++    pub ao_fwd: [f32; 4],
+     /// Clip space back to world space, for the mist's per-pixel position.
+     pub world_from_clip: [[f32; 4]; 4],
+ }
+ 
+ impl LookUniform {
+-    /// One view's uniform from this frame's look and the view's camera.
+-    pub fn new(frame: &LookFrame, clip_from_world: Mat4, cam_pos: Vec3, cam_fwd: Vec3) -> Self {
++    /// One view's uniform from this frame's look and the view's camera; `ao` the occlusion ran
++    /// this frame and its target is bound.
++    pub fn new(
++        frame: &LookFrame,
++        clip_from_world: Mat4,
++        cam_pos: Vec3,
++        cam_fwd: Vec3,
++        ao: bool,
++    ) -> Self {
+         use super::rays;
+         let p = frame.post;
+         let (sun_uv, visibility) =
+@@ -271,6 +299,13 @@ impl LookUniform {
+             ],
+             camera: [cam_pos.x, cam_pos.y, cam_pos.z, 0.0],
+             sun_dir: frame.sun_dir.extend(0.0).to_array(),
++            ao: [
++                if ao { 1.0 } else { 0.0 },
++                p.ao_cool,
++                frame.ao.fog_start,
++                frame.ao.fog_end,
++            ],
++            ao_fwd: cam_fwd.extend(ao::tune::BRIGHT_KNEE).to_array(),
+             world_from_clip: clip_from_world.inverse().to_cols_array_2d(),
+         }
+     }
+@@ -368,6 +403,8 @@ fn init_pipeline(
+                     texture_2d(TextureSampleType::Float { filterable: false }),
+                     uniform_buffer_sized(false, std::num::NonZero::new(UNIFORM_BYTES)),
+                     depth,
++                    // The ambient occlusion's half-resolution shade (`ao::AO_FORMAT`).
++                    texture_2d(TextureSampleType::Float { filterable: false }),
+                 ),
+             ),
+         )
+@@ -428,13 +465,14 @@ impl ViewNode for LookNode {
+         &'static LookViewGpu,
+         &'static ExtractedView,
+         &'static ViewDepthTexture,
++        Option<&'static LookAoGpu>,
+     );
+ 
+     fn run<'w>(
+         &self,
+         _graph: &mut RenderGraphContext,
+         render_context: &mut RenderContext<'w>,
+-        (view_target, gpu, view, depth): QueryItem<'w, '_, Self::ViewQuery>,
++        (view_target, gpu, view, depth, ao_gpu): QueryItem<'w, '_, Self::ViewQuery>,
+         world: &'w World,
+     ) -> Result<(), NodeRunError> {
+         let frame = *world.resource::<LookFrame>();
+@@ -456,6 +494,8 @@ impl ViewNode for LookNode {
+         }
+         let layout =
+             cache.get_bind_group_layout(world.resource::<LookPipeline>().layout(gpu.key.msaa));
++        // The contact shadows first, from the same depth buffer, at half resolution.
++        let ao_view = ao::encode(render_context, world, &frame, view, depth, ao_gpu);
+         let world_from_view = view.world_from_view;
+         let clip_from_world = view.clip_from_world.unwrap_or_else(|| {
+             view.clip_from_view * Mat4::from(world_from_view.affine().inverse())
+@@ -465,10 +505,12 @@ impl ViewNode for LookNode {
+             clip_from_world,
+             world_from_view.translation(),
+             world_from_view.forward().into(),
++            ao_view.is_some(),
+         );
+         world
+             .resource::<RenderQueue>()
+             .write_buffer(&gpu.uniform, 0, bytemuck::bytes_of(&uniform));
++        let empty = &world.resource::<ao::AoPipeline>().empty;
+         let post = view_target.post_process_write();
+         let bind = render_context.render_device().create_bind_group(
+             "world_look",
+@@ -477,6 +519,7 @@ impl ViewNode for LookNode {
+                 post.source,
+                 gpu.uniform.as_entire_binding(),
+                 depth.view(),
++                ao_view.as_ref().unwrap_or(empty),
+             )),
+         );
+         let diagnostics = render_context.diagnostic_recorder();
+@@ -507,6 +550,7 @@ impl ViewNode for LookNode {
+ /// FFXGlow plugin has added the node this one is ordered against.
+ pub(super) fn build(app: &mut App) {
+     app.init_resource::<LookFrame>()
++        .init_resource::<LookAo>()
+         .init_resource::<LookBloomTune>()
+         .init_resource::<LookMistTune>()
+         .add_plugins((
+@@ -531,10 +575,11 @@ pub(super) fn finish(app: &mut App) {
+     };
+     render_app
+         .init_resource::<SpecializedRenderPipelines<LookPipeline>>()
+-        .add_systems(RenderStartup, init_pipeline)
++        .init_resource::<SpecializedRenderPipelines<ao::AoPipeline>>()
++        .add_systems(RenderStartup, (init_pipeline, ao::init_pipeline))
+         .add_systems(
+             Render,
+-            prepare_look_views.in_set(RenderSystems::PrepareResources),
++            (prepare_look_views, ao::prepare_ao_views).in_set(RenderSystems::PrepareResources),
+         )
+         .add_render_graph_node::<ViewNodeRunner<LookNode>>(Core3d, LookLabel)
+         .add_render_graph_edges(
+@@ -619,13 +664,13 @@ mod tests {
+         assert!(grade_linear([0.05; 3], &c)[0] < 0.05);
+     }
+ 
+-    /// `world_look.wgsl`'s `Look`: seven `vec4<f32>` rows then a `mat4x4<f32>`, 176 bytes, the
++    /// `world_look.wgsl`'s `Look`: nine `vec4<f32>` rows then a `mat4x4<f32>`, 208 bytes, the
+     /// matrix at a 16-byte boundary.
+     #[test]
+     fn the_uniform_layout_matches_the_shader() {
+-        assert_eq!(UNIFORM_BYTES, 7 * 16 + 64);
++        assert_eq!(UNIFORM_BYTES, 9 * 16 + 64);
+         assert_eq!(UNIFORM_BYTES % 16, 0);
+-        assert_eq!(std::mem::offset_of!(LookUniform, world_from_clip), 112);
++        assert_eq!(std::mem::offset_of!(LookUniform, world_from_clip), 144);
+         assert_eq!(
+             std::mem::align_of::<LookUniform>(),
+             4,
+@@ -652,8 +697,13 @@ mod tests {
+             sun_color: [1.0, 0.8, 0.6],
+             fog_color: [0.5, 0.5, 0.6],
+             feet_y: Some(52.0),
++            ao: AoLight {
++                fog_start: 120.0,
++                fog_end: 400.0,
++                ..default()
++            },
+         };
+-        let u = LookUniform::new(&frame, clip_from_world, cam, Vec3::NEG_Z);
++        let u = LookUniform::new(&frame, clip_from_world, cam, Vec3::NEG_Z, true);
+         assert_eq!(u.grade, [1.1, 1.05, 0.2, 0.0]);
+         assert!(
+             (u.sun[0] - 0.5).abs() < 1e-3 && u.sun[1] < 0.5,
+@@ -663,6 +713,13 @@ mod tests {
+         assert!(u.sun[2] > 0.9 && u.sun[3] == 0.8);
+         assert!((u.sun_color[3] - 0.7 * super::super::rays::MIST_DENSITY).abs() < 1e-7);
+         assert_eq!(u.fog_color[3], 54.0, "two yards over the feet");
++        assert_eq!(u.ao, [1.0, 0.0, 120.0, 400.0]);
++        assert_eq!(u.ao_fwd, [0.0, 0.0, -1.0, ao::tune::BRIGHT_KNEE]);
++        assert_eq!(
++            LookUniform::new(&frame, clip_from_world, cam, Vec3::NEG_Z, false).ao[0],
++            0.0,
++            "no occlusion this frame: none applied"
++        );
+         // A point in front of the camera survives the round trip through clip space.
+         let p = Vec3::new(3.0, 55.0, -40.0);
+         let clip = clip_from_world * p.extend(1.0);
+@@ -674,7 +731,7 @@ mod tests {
+             ..frame
+         };
+         assert_eq!(
+-            LookUniform::new(&calm, clip_from_world, cam, Vec3::NEG_Z).sun[3],
++            LookUniform::new(&calm, clip_from_world, cam, Vec3::NEG_Z, false).sun[3],
+             0.0
+         );
+     }
+@@ -705,6 +762,7 @@ mod tests {
+         super::super::mist::init_resources(&mut app);
+         app.init_resource::<LookFrame>()
+             .init_resource::<LookMistTune>()
++            .init_resource::<LookAo>()
+             .init_resource::<Time<Real>>()
+             .init_resource::<crate::lighting::WowLighting>()
+             .init_resource::<crate::view::Viewer>()
+@@ -737,6 +795,59 @@ mod tests {
+         assert_eq!(fog(&app), 0.0, "the classic look has no mist");
+     }
+ 
++    /// The occlusion's strength is the hour's, times `lookao`'s scale, none with `worldAO 0` or
++    /// under the classic look; its light comes from the frame's own.
++    #[test]
++    fn the_occlusion_follows_the_hour_world_ao_and_lookao() {
++        let mut app = App::new();
++        super::super::mist::init_resources(&mut app);
++        app.init_resource::<LookFrame>()
++            .init_resource::<LookAo>()
++            .init_resource::<Time<Real>>()
++            .init_resource::<crate::view::Viewer>()
++            .insert_resource(crate::lighting::WowLighting {
++                ambient: [0.2, 0.2, 0.2],
++                diffuse: [0.6, 0.6, 0.6],
++                sun_dir: Vec3::NEG_Y,
++                ..default()
++            })
++            .insert_resource(WorldLook::NEW)
++            .insert_resource(LookGrade {
++                post: PostLook {
++                    ao: 0.8,
++                    ao_cool: 0.5,
++                    ..PostLook::NEUTRAL
++                },
++                strength: 1.0,
++            })
++            .add_systems(Update, publish_frame);
++        let frame = |app: &App| *app.world().resource::<LookFrame>();
++        app.update();
++        assert_eq!(frame(&app).post.ao, 0.8);
++        assert_eq!(frame(&app).post.ao_cool, 0.5);
++        assert_eq!(frame(&app).ao.radius, ao::tune::RADIUS);
++        assert!((frame(&app).ao.diffuse_luma - 0.6).abs() < 1e-5);
++        assert_eq!(frame(&app).ao.light_dir, Vec3::NEG_Y);
++        assert!(ao::wanted(&frame(&app)));
++        *app.world_mut().resource_mut::<LookAo>() = LookAo {
++            scale: Some(2.0),
++            radius: Some(2.5),
++            ..default()
++        };
++        app.update();
++        assert_eq!(frame(&app).post.ao, 1.6);
++        assert_eq!(frame(&app).ao.radius, 2.5);
++        app.world_mut().resource_mut::<LookAo>().on = false;
++        app.update();
++        assert_eq!(frame(&app).post.ao, 0.0, "worldAO 0");
++        assert!(!ao::wanted(&frame(&app)));
++        app.world_mut().resource_mut::<LookAo>().on = true;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        app.update();
++        assert!(frame(&app).post.is_neutral(), "the classic look has none");
++        assert!(!ao::wanted(&frame(&app)));
++    }
++
+     /// A held tune wins over the grade's bloom, and lets go to it again.
+     #[test]
+     fn a_held_tune_wins_over_the_grade() {
+diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
+index 8ea85aa..c6bdd03 100644
+--- a/crates/benilla-world/src/shaders.rs
++++ b/crates/benilla-world/src/shaders.rs
+@@ -18,6 +18,7 @@ pub(crate) fn plugin(app: &mut App) {
+     bevy::asset::embedded_asset!(app, "shaders/wow_effect.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/static_gx.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_look.wgsl");
++    bevy::asset::embedded_asset!(app, "shaders/world_ao.wgsl");
+ }
+ 
+ #[cfg(test)]
+@@ -54,6 +55,6 @@ mod tests {
+             );
+         }
+         // One per `embedded_asset!` line in `plugin`.
+-        assert_eq!(found, 9, "the engine's shader set changed size");
++        assert_eq!(found, 10, "the engine's shader set changed size");
+     }
+ }
+diff --git a/crates/benilla-world/src/shaders/world_ao.wgsl b/crates/benilla-world/src/shaders/world_ao.wgsl
+new file mode 100644
+index 0000000..85418ad
+--- /dev/null
++++ b/crates/benilla-world/src/shaders/world_ao.wgsl
+@@ -0,0 +1,170 @@
++// The new look's ambient occlusion, benilla's own (`look::ao`): soft contact shadows from the
++// depth buffer alone, at half resolution, ahead of the look pass (`world_look.wgsl`), which
++// upsamples and applies them. Three entry points, each its own pipeline:
++//   fs_ao      = per half-resolution pixel, the full-resolution pixel at twice its coordinate:
++//                its view-space position and normal rebuilt from depth, then twelve taps on a
++//                turned spiral over a disk `radius` yards wide, each counting how far it rises
++//                over the surface (`look::ao::tap_occlusion`), faded to nothing at the radius so
++//                nothing far in front halos; the mean times the gain is the occlusion, which
++//                leaves as the darkening itself: × the strength × the ambient share
++//                (`look::ao::ambient_share`) × the distance fade, capped
++//   fs_blur_x  = a depth-aware 9-tap Gaussian along x, then
++//   fs_blur_y  = along y, so the shade stays on its surface
++// Each target is (darkening, planar eye depth, 0, 0); the sky is (0, 0). `MSAA` reads sample 0 of
++// a multisampled depth buffer. The kernel mirrors `look::ao`; keep the two in step.
++
++#import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
++
++struct Ao {
++    view_from_clip: mat4x4<f32>,
++    // x = radius (yd), y = full-resolution pixels per yard at 1 yd, z = bias, w = gain.
++    kernel: vec4<f32>,
++    // x = strength, y = the most a pixel darkens, z = the fade's start, w = its end (yd).
++    shade: vec4<f32>,
++    // xyz = toward the sun, view space; w = the sun's luminance over the ambient's.
++    light: vec4<f32>,
++    // x = the ambient share's floor, y = the most pixels the radius spans, zw unused.
++    misc: vec4<f32>,
++}
++
++#ifdef MSAA
++@group(0) @binding(0) var depth_tex: texture_depth_multisampled_2d;
++#else
++@group(0) @binding(0) var depth_tex: texture_depth_2d;
++#endif
++@group(0) @binding(1) var<uniform> ao: Ao;
++// The blur's source: the occlusion, then the first blur.
++@group(0) @binding(2) var src_tex: texture_2d<f32>;
++
++// Taps per pixel, and the spiral's turns across them (prime to the count, so no two line up).
++const SAMPLES: i32 = 12;
++const TURNS: f32 = 7.0;
++const TAU: f32 = 6.28318530718;
++// The blur: taps either side, their Gaussian's sigma (half-resolution pixels), and how fast a
++// neighbour's weight falls with its depth's difference relative to the centre's.
++const BLUR_RADIUS: i32 = 4;
++const BLUR_SIGMA: f32 = 2.5;
++const BLUR_SHARPNESS: f32 = 40.0;
++
++fn load_depth(px: vec2<i32>) -> f32 {
++#ifdef MSAA
++    return textureLoad(depth_tex, px, 0);
++#else
++    return textureLoad(depth_tex, px, 0);
++#endif
++}
++
++// The view-space position of full-resolution pixel `px` at reverse-Z depth `d` (> 0).
++fn view_pos(px: vec2<i32>, d: f32, dims: vec2<f32>) -> vec3<f32> {
++    let uv = (vec2<f32>(px) + vec2<f32>(0.5)) / dims;
++    let v = ao.view_from_clip * vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, d, 1.0);
++    return v.xyz / v.w;
++}
++
++// A neighbour's position, the sky pushed far away so the nearer side wins the normal.
++fn neighbour(px: vec2<i32>, dims: vec2<f32>) -> vec3<f32> {
++    let top = vec2<i32>(dims) - vec2<i32>(1);
++    let q = clamp(px, vec2<i32>(0), top);
++    return view_pos(q, max(load_depth(q), 1e-7), dims);
++}
++
++// The surface normal at `c` from its four neighbours, each axis taking the side whose depth is
++// closer, so a silhouette's edge keeps its own surface's normal; facing the camera.
++fn normal_at(px: vec2<i32>, c: vec3<f32>, dims: vec2<f32>) -> vec3<f32> {
++    let r = neighbour(px + vec2<i32>(1, 0), dims);
++    let l = neighbour(px - vec2<i32>(1, 0), dims);
++    let d = neighbour(px + vec2<i32>(0, 1), dims);
++    let u = neighbour(px - vec2<i32>(0, 1), dims);
++    let dx = select(c - l, r - c, abs(r.z - c.z) < abs(c.z - l.z));
++    let dy = select(c - u, d - c, abs(d.z - c.z) < abs(c.z - u.z));
++    let n = normalize(cross(dy, dx));
++    return select(n, -n, dot(n, -c) < 0.0);
++}
++
++// Interleaved gradient noise (Jimenez 2014): each pixel's spiral turned its own way, which the
++// blur then evens out.
++fn ign(p: vec2<f32>) -> f32 {
++    return fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))));
++}
++
++@fragment
++fn fs_ao(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
++    let q = vec2<i32>(in.position.xy);
++    let px = q * 2;
++    let dims = vec2<f32>(textureDimensions(depth_tex));
++    if px.x >= i32(dims.x) || px.y >= i32(dims.y) {
++        return vec4<f32>(0.0);
++    }
++    let depth = load_depth(px);
++    // Reverse-Z: the sky (never depth-written) is still the clear 0.
++    if depth <= 0.0 {
++        return vec4<f32>(0.0);
++    }
++    let c = view_pos(px, depth, dims);
++    let z = -c.z;
++    let fade = 1.0 - smoothstep(ao.shade.z, ao.shade.w, z);
++    let radius = ao.kernel.x;
++    let r_px = min(radius * ao.kernel.y / max(z, 1e-3), ao.misc.y);
++    if fade <= 0.0 || r_px < 1.0 {
++        return vec4<f32>(0.0, z, 0.0, 0.0);
++    }
++    let n = normal_at(px, c, dims);
++    let phi = TAU * ign(vec2<f32>(q));
++    let r2 = radius * radius;
++    var sum = 0.0;
++    for (var i = 0; i < SAMPLES; i++) {
++        let a = (f32(i) + 0.5) / f32(SAMPLES);
++        let angle = a * TURNS * TAU + phi;
++        let sp = px + vec2<i32>(round(vec2<f32>(cos(angle), sin(angle)) * (a * r_px)));
++        if any(sp < vec2<i32>(0)) || any(sp >= vec2<i32>(dims)) {
++            continue;
++        }
++        let sd = load_depth(sp);
++        if sd <= 0.0 {
++            continue;
++        }
++        let v = view_pos(sp, sd, dims) - c;
++        let vv = dot(v, v);
++        let falloff = max(1.0 - vv / r2, 0.0);
++        sum += falloff * max(dot(v, n) * inverseSqrt(vv + 1e-6) - ao.kernel.z, 0.0);
++    }
++    let occlusion = clamp(sum / f32(SAMPLES) * ao.kernel.w, 0.0, 1.0);
++    // The share of the light that is ambient: 1.12 lights `ambient + diffuse × n·l`.
++    let share = 1.0 / (1.0 + ao.light.w * max(dot(n, ao.light.xyz), 0.0));
++    let ambient = mix(ao.misc.x, 1.0, share);
++    let dark = min(ao.shade.x * occlusion * ambient * fade, ao.shade.y);
++    return vec4<f32>(dark, z, 0.0, 0.0);
++}
++
++fn blur(q: vec2<i32>, step: vec2<i32>) -> vec4<f32> {
++    let top = vec2<i32>(textureDimensions(src_tex)) - vec2<i32>(1);
++    let c = textureLoad(src_tex, q, 0);
++    if c.y <= 0.0 {
++        return c;
++    }
++    var sum = c.x;
++    var weight = 1.0;
++    for (var i = -BLUR_RADIUS; i <= BLUR_RADIUS; i++) {
++        if i == 0 {
++            continue;
++        }
++        let s = textureLoad(src_tex, clamp(q + step * i, vec2<i32>(0), top), 0);
++        let fi = f32(i);
++        let w = exp(-fi * fi / (2.0 * BLUR_SIGMA * BLUR_SIGMA))
++            * exp(-abs(s.y - c.y) * BLUR_SHARPNESS / c.y)
++            * select(0.0, 1.0, s.y > 0.0);
++        sum += s.x * w;
++        weight += w;
++    }
++    return vec4<f32>(sum / weight, c.y, 0.0, 0.0);
++}
++
++@fragment
++fn fs_blur_x(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
++    return blur(vec2<i32>(in.position.xy), vec2<i32>(1, 0));
++}
++
++@fragment
++fn fs_blur_y(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
++    return blur(vec2<i32>(in.position.xy), vec2<i32>(0, 1));
++}
+diff --git a/crates/benilla-world/src/shaders/world_look.wgsl b/crates/benilla-world/src/shaders/world_look.wgsl
+index 8b7f390..de5620e 100644
+--- a/crates/benilla-world/src/shaders/world_look.wgsl
++++ b/crates/benilla-world/src/shaders/world_look.wgsl
+@@ -1,14 +1,16 @@
+ // The new look's full-screen pass, benilla's own (`look::pass`): the world camera's frame, still
+-// the gamma bytes here (its decode is the FFXGlow combine, after this), decoded to linear, given
+-// its god rays and morning mist, graded and encoded back. Off under the classic look: the node
+-// does not run at all.
++// the gamma bytes here (its decode is the FFXGlow combine, after this), given its contact shadows,
++// decoded to linear, given its god rays and morning mist, graded and encoded back. Off under the
++// classic look: the node does not run at all.
++//   ao    = the half-resolution occlusion (`world_ao.wgsl`) upsampled by depth and applied to the
++//           lit part of the gamma frame under 1.12's fog (`look::ao::darken`)
+ //   rays  = screen-space light shafts toward the sun (GPU Gems 3 ch. 13): a march over the depth
+ //           buffer, where a sky sample (reverse-Z far, depth 0) lets the sun through
+ //   mist  = exponential height fog integrated along the view ray in closed form (`look::rays`)
+ //   grade = white balance (warm highlights, cool shadows) → contrast around mid-grey in log space
+ //           → saturation around luminance
+-// `grade` mirrors `look::pass::grade_linear` and `mist_depth` `look::rays::mist_optical_depth`;
+-// keep each pair in step. `MSAA` reads sample 0 of a multisampled depth buffer.
++// `grade` mirrors `look::pass::grade_linear`, `mist_depth` `look::rays::mist_optical_depth` and
++// `apply_ao` `look::ao::darken`; keep each pair in step. `MSAA` reads sample 0 of a multisampled depth buffer.
+ 
+ #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
+ 
+@@ -28,6 +30,10 @@ struct Look {
+     camera: vec4<f32>,
+     // xyz = camera to sun, unit, w unused.
+     sun_dir: vec4<f32>,
++    // x = 1 to apply the occlusion, y = its coolness, z = 1.12's fog start, w = its end (yd).
++    ao: vec4<f32>,
++    // xyz = the camera's forward, unit; w = the brightness (gamma luma) the shade eases off above.
++    ao_fwd: vec4<f32>,
+     world_from_clip: mat4x4<f32>,
+ }
+ @group(0) @binding(1) var<uniform> look: Look;
+@@ -36,11 +42,15 @@ struct Look {
+ #else
+ @group(0) @binding(2) var depth_tex: texture_depth_2d;
+ #endif
++// The occlusion: (darkening, planar eye depth) at half resolution; a 1×1 of zeros when off.
++@group(0) @binding(3) var ao_tex: texture_2d<f32>;
+ 
+ const LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
+ const MID_GREY: f32 = 0.18;
+ const WARM: vec3<f32> = vec3<f32>(1.0, 0.92, 0.82);
+ const COOL: vec3<f32> = vec3<f32>(0.88, 0.94, 1.0);
++// The contact shadow's tint at full coolness (`look::ao::tune::COOL`).
++const AO_COOL: vec3<f32> = vec3<f32>(1.05, 0.99, 0.80);
+ 
+ // The march: samples per pixel, the share of the way to the sun it covers, the decay per sample.
+ const RAY_SAMPLES: i32 = 40;
+@@ -115,6 +125,41 @@ fn mist_depth(density: f32, base: f32, falloff: f32, y0: f32, y1: f32, dist: f32
+     return k * dist * (1.0 - exp(min(-a, MIST_EXP_LIMIT))) / a;
+ }
+ 
++// The occlusion at full-resolution pixel `px` (planar eye depth `z`): the four nearest
++// half-resolution values (texel `k` sits on pixel `2k`), each by its bilinear weight and by how
++// close its depth is to this pixel's, so the shade never crosses a silhouette.
++fn ao_at(px: vec2<i32>, z: f32) -> f32 {
++    let top = vec2<i32>(textureDimensions(ao_tex)) - vec2<i32>(1);
++    let base = px / 2;
++    let t = vec2<f32>(px % vec2<i32>(2)) * 0.5;
++    var sum = 0.0;
++    var weight = 0.0;
++    for (var j = 0; j < 2; j++) {
++        for (var i = 0; i < 2; i++) {
++            let s = textureLoad(ao_tex, min(base + vec2<i32>(i, j), top), 0);
++            let bx = select(1.0 - t.x, t.x, i == 1);
++            let by = select(1.0 - t.y, t.y, j == 1);
++            let w = bx * by / (1e-3 + abs(s.y - z) / max(z, 1e-3));
++            sum += s.x * w;
++            weight += w;
++        }
++    }
++    return select(0.0, sum / weight, weight > 0.0);
++}
++
++// The contact shadow on gamma pixel `g`: only its lit part (`g` less 1.12's fog `f·fog`, which
++// was mixed in gamma) darkens, by `dark` in linear light, tinted by the coolness, eased off the
++// brightest pixels (`look::ao::darken`).
++fn apply_ao(g: vec3<f32>, dark: f32, z: f32) -> vec3<f32> {
++    let bright = 1.0 - smoothstep(look.ao_fwd.w, 1.0, dot(g, LUMA));
++    let tint = mix(vec3<f32>(1.0), AO_COOL, look.ao.y);
++    let keep = pow(clamp(vec3<f32>(1.0) - dark * bright * tint, vec3<f32>(0.0), vec3<f32>(1.0)),
++        vec3<f32>(1.0 / 2.2));
++    let fog = 1.0 - clamp((look.ao.w - z) / max(look.ao.w - look.ao.z, 0.001), 0.0, 1.0);
++    let lit = max(g - linear_to_srgb(look.fog_color.rgb) * fog, vec3<f32>(0.0));
++    return g - lit * (vec3<f32>(1.0) - keep);
++}
++
+ @fragment
+ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+     let px = vec2<i32>(in.position.xy);
+@@ -122,14 +167,28 @@ fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+     let uv = in.position.xy / dims;
+     let scene = textureLoad(scene_tex, px, 0);
+     // Clamped as every FFX read is: the float target does not saturate, the 1.12 frame does.
+-    var lin = srgb_to_linear(clamp(scene.rgb, vec3<f32>(0.0), vec3<f32>(1.0)));
++    var gamma = clamp(scene.rgb, vec3<f32>(0.0), vec3<f32>(1.0));
+     let depth = load_depth(px);
++    // The pixel's world position, for the occlusion and the mist (geometry only).
++    var world = look.camera.xyz;
++    if depth > 0.0 {
++        let ndc = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
++        let w4 = look.world_from_clip * ndc;
++        world = w4.xyz / w4.w;
++    }
++
++    // Contact shadows, on geometry only, before anything is added over the frame.
++    if look.ao.x > 0.0 && depth > 0.0 {
++        let z = dot(world - look.camera.xyz, look.ao_fwd.xyz);
++        let dark = ao_at(px, z);
++        if dark > 0.0 {
++            gamma = apply_ao(gamma, dark, z);
++        }
++    }
++    var lin = srgb_to_linear(gamma);
+ 
+     // Mist, on geometry only: the sky keeps its own dome.
+     if look.sun_color.w > 0.0 && depth > 0.0 {
+-        let ndc = vec4<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth, 1.0);
+-        let w4 = look.world_from_clip * ndc;
+-        let world = w4.xyz / w4.w;
+         let ray = world - look.camera.xyz;
+         let dist = length(ray);
+         let od = mist_depth(
+-- 
+2.43.0
+
