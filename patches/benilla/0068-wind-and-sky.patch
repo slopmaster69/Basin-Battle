@@ -1,4 +1,4 @@
-From dde844a78ffb63c8a9429466ac2830b6deb62ba0 Mon Sep 17 00:00:00 2001
+From 585db5fc9534c57f2b5e68b065068418d8229231 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sat, 7 Nov 2026 14:22:51 -0700
 Subject: [PATCH] Wind and a painted sky under the new look: swaying trees and
@@ -38,7 +38,7 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-app/src/cvars/table.rs         |  19 +
  crates/benilla-app/src/video.rs               |  27 +-
  crates/benilla-app/src/world_console.rs       | 144 +++
- crates/benilla-assets/src/shaders/liquid.wgsl | 126 ++-
+ crates/benilla-assets/src/shaders/liquid.wgsl | 139 ++-
  .../benilla-assets/src/shaders/wow_model.wgsl | 111 ++-
  crates/benilla-world/src/clouds/layer.rs      |  21 +-
  crates/benilla-world/src/clouds/mod.rs        |   1 +
@@ -47,14 +47,14 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-world/src/lighting/mod.rs      |   8 +
  crates/benilla-world/src/look/mod.rs          |  43 +-
  crates/benilla-world/src/look/pass.rs         |   4 +
- crates/benilla-world/src/look/sky.rs          | 864 ++++++++++++++++++
+ crates/benilla-world/src/look/sky.rs          | 943 ++++++++++++++++++
  crates/benilla-world/src/look/water.rs        |  64 +-
- crates/benilla-world/src/look/wind.rs         | 622 +++++++++++++
- crates/benilla-world/src/model_render.rs      | 105 ++-
+ crates/benilla-world/src/look/wind.rs         | 622 ++++++++++++
+ crates/benilla-world/src/model_render.rs      | 105 +-
  crates/benilla-world/src/shaders.rs           |   3 +-
- .../benilla-world/src/shaders/look_sky.wgsl   | 122 +++
- .../benilla-world/src/shaders/static_gx.wgsl  | 106 ++-
- .../src/shaders/world_shadow.wgsl             | 103 ++-
+ .../benilla-world/src/shaders/look_sky.wgsl   | 135 +++
+ .../benilla-world/src/shaders/static_gx.wgsl  | 106 +-
+ .../src/shaders/world_shadow.wgsl             | 103 +-
  crates/benilla-world/src/sky.rs               |   5 +-
  crates/benilla-world/src/sky_order.rs         |  10 +
  crates/benilla-world/src/static_gx/bake.rs    |   1 +
@@ -62,7 +62,7 @@ Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
  crates/benilla-world/src/static_gx/render.rs  |  19 +-
  crates/benilla-world/src/sun/follow.rs        |   8 +-
  .../src/terrain_stream/spawn/assemble.rs      |  12 +-
- 28 files changed, 2548 insertions(+), 63 deletions(-)
+ 28 files changed, 2653 insertions(+), 63 deletions(-)
  create mode 100644 crates/benilla-world/src/look/sky.rs
  create mode 100644 crates/benilla-world/src/look/wind.rs
  create mode 100644 crates/benilla-world/src/shaders/look_sky.wgsl
@@ -364,7 +364,7 @@ index 050bf71..d37bafa 100644
      /// the five world-flag bits start set (`0x7100b73`, `0x66f6cb`), the simple-doodad word clear
      /// (`0x66f714`). None reads its arguments.
 diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
-index 26b7783..abf81c2 100644
+index 26b7783..db5da61 100644
 --- a/crates/benilla-assets/src/shaders/liquid.wgsl
 +++ b/crates/benilla-assets/src/shaders/liquid.wgsl
 @@ -75,18 +75,19 @@ struct WowLight {
@@ -390,7 +390,7 @@ index 26b7783..abf81c2 100644
  };
  @group(#{MATERIAL_BIND_GROUP}) @binding(116) var<storage, read> water: WaterBlock;
  
-@@ -341,11 +342,126 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
+@@ -341,11 +342,139 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
      return vec4<f32>(0.0);
  }
  
@@ -404,10 +404,18 @@ index 26b7783..abf81c2 100644
 +//   7 [moon colour (sRGB), haze (yd)] · 8 [haze colour (sRGB), warp (cells)] ·
 +//   9 [period (cells), shade contrast, horizon from, horizon to] ·
 +//   10 [sun inner power, sun wide power, moon inner power, moon wide power] ·
-+//   11 [sun inner, sun wide, moon inner, moon wide] · 12 [octaves, water octaves, pixel angle, 0].
++//   11 [sun inner, sun wide, moon inner, moon wide] ·
++//   12 [octaves, water octaves, pixel angle, thick shade].
 +struct LookSkyRows {
 +    r: array<vec4<f32>, 13>,
 +}
++
++// `look::sky::tune`'s `LIT_CAP` and `SUN_HOLLOW_POWER` (its tests compare them): a cloud is never
++// brighter than the hour's lit colour times the cap, so a golden-hour cloud by the sun stays gold
++// and never blooms white; the sun's wide halo is hollowed inside about 6° of the sun, where 1.12's
++// own glare already shines, so it rings that glare instead of adding a second glow on it.
++const LOOK_SKY_LIT_CAP: f32 = 1.08;
++const LOOK_SKY_HOLLOW_POWER: f32 = 120.0;
 +
 +// A lattice point's hash, wrapped to `period`, as 24 bits (`look::sky::hash`).
 +fn look_sky_hash(c: vec2<i32>, period: i32) -> f32 {
@@ -464,7 +472,9 @@ index 26b7783..abf81c2 100644
 +fn look_sky_clouds(dir: vec3<f32>, s: LookSkyRows, octaves: u32) -> vec4<f32> {
 +    let cs = max(dot(dir, s.r[4].xyz), 0.0);
 +    let cm = max(dot(dir, s.r[6].xyz), 0.0);
-+    var halo = s.r[5].rgb * (s.r[4].w * (s.r[11].x * pow(cs, s.r[10].x) + s.r[11].y * pow(cs, s.r[10].y)));
++    let hollow = 1.0 - pow(cs, LOOK_SKY_HOLLOW_POWER);
++    var halo = s.r[5].rgb
++        * (s.r[4].w * (s.r[11].x * pow(cs, s.r[10].x) + s.r[11].y * pow(cs, s.r[10].y) * hollow));
 +    halo += s.r[7].rgb * (s.r[6].w * (s.r[11].z * pow(cm, s.r[10].z) + s.r[11].w * pow(cm, s.r[10].w)));
 +    if (dir.y <= s.r[9].z) {
 +        return vec4<f32>(halo, 0.0);
@@ -489,9 +499,12 @@ index 26b7783..abf81c2 100644
 +    var light = clamp(0.5 + (d - d2) * s.r[9].y, 0.0, 1.0);
 +    light = mix(light, 1.0, (1.0 - a) * 0.5);
 +    light = smoothstep(0.15, 0.85, light);
++    // Under an overcast the thick of the cloud goes dark beneath, so a heavy sky keeps its shape.
++    light *= 1.0 - s.r[12].w * smoothstep(th, th + 0.35, d);
 +    var col = mix(s.r[3].rgb, s.r[2].rgb, light);
 +    // A silver lining on the thin edges toward the sun.
 +    col += s.r[5].rgb * (s.r[5].w * s.r[4].w * pow(cs, s.r[2].w) * (1.0 - a));
++    col = min(col, s.r[2].rgb * LOOK_SKY_LIT_CAP);
 +    // Far clouds go into the haze.
 +    col = mix(col, s.r[8].rgb, 1.0 - exp(-dist / s.r[7].w));
 +    return vec4<f32>(halo * (1.0 - a) + col * a, a);
@@ -952,10 +965,10 @@ index c40af52..0835ddd 100644
  }
 diff --git a/crates/benilla-world/src/look/sky.rs b/crates/benilla-world/src/look/sky.rs
 new file mode 100644
-index 0000000..2f299d8
+index 0000000..4060641
 --- /dev/null
 +++ b/crates/benilla-world/src/look/sky.rs
-@@ -0,0 +1,864 @@
+@@ -0,0 +1,943 @@
 +//! A painted sky, the new look's own (no reference behaviour): WoW Forever's sky is painted, and
 +//! its clouds drift. 1.12's sky dome (`crate::sky`), its sun and moon discs and its stars stay as
 +//! they are; over them the new look draws one layer of its own (`look_sky.wgsl`), in the slot of
@@ -1019,7 +1032,10 @@ index 0000000..2f299d8
 +    /// The cover (0 none, 1 overcast) sets the field's threshold, from clear to full; the edge's
 +    /// softness; the layer's most opacity, and under full overcast.
 +    pub const THRESHOLD_CLEAR: f32 = 0.78;
-+    pub const THRESHOLD_FULL: f32 = 0.22;
++    /// 0.26, was 0.22: `looksky clouds 0.8` closed the sky into one sheet on film; a heavy
++    /// cover keeps a few more breaks (its threshold 0.36, was 0.33), a full one still covers
++    /// most of the sky.
++    pub const THRESHOLD_FULL: f32 = 0.26;
 +    pub const SOFTNESS: f32 = 0.13;
 +    pub const OPACITY: f32 = 0.9;
 +    pub const OPACITY_OVERCAST: f32 = 0.97;
@@ -1045,7 +1061,25 @@ index 0000000..2f299d8
 +    /// The live sky's horizon colour blended into the keys' by this much, so another zone's sky
 +    /// tints its clouds; and how much a full overcast greys them.
 +    pub const SKY_BLEND: f32 = 0.2;
-+    pub const OVERCAST_GREY: f32 = 0.6;
++    /// 0.9, was 0.6: heavy cover read as a bright white sheet at noon and golden hour on film;
++    /// an overcast greys the clouds most of the way to [`OVERCAST_LIT_DIM`] and
++    /// [`OVERCAST_SHADE_DIM`] of their luminance (were 0.85 and 0.8), so it dims as a real one
++    /// does, darker underneath.
++    pub const OVERCAST_GREY: f32 = 0.9;
++    pub const OVERCAST_LIT_DIM: f32 = 0.62;
++    pub const OVERCAST_SHADE_DIM: f32 = 0.4;
++    /// The cover over which a sky turns overcast (was 0.6 to 0.95): an ordinary day's (at most
++    /// [`COVER_MAX`]) stays white, `looksky clouds 0.8` is most of the way grey, and the weather's
++    /// overcast all of it.
++    pub const OVERCAST_FROM: f32 = 0.5;
++    pub const OVERCAST_TO: f32 = 0.9;
++    /// How much darker the thick of the cloud goes under a full overcast, so a heavy sky keeps
++    /// its shape (`look_sky_clouds`).
++    pub const THICK_SHADE: f32 = 0.45;
++    /// No cloud is brighter than the hour's lit colour times this (`look_sky.wgsl`'s
++    /// `LOOK_SKY_LIT_CAP`): the silver lining and the halo under a thin edge pushed golden-hour
++    /// clouds by the sun past white into the bloom on film.
++    pub const LIT_CAP: f32 = 1.08;
 +    /// The silver lining on thin edges toward the sun: its strength and its tightness.
 +    pub const SILVER: f32 = 0.5;
 +    pub const SILVER_POWER: f32 = 8.0;
@@ -1054,8 +1088,13 @@ index 0000000..2f299d8
 +    /// hour's `warm` toward [`HALO_WARM`].
 +    pub const SUN_INNER_POWER: f32 = 600.0;
 +    pub const SUN_WIDE_POWER: f32 = 14.0;
-+    pub const SUN_INNER: f32 = 0.45;
++    /// 0, was 0.45: the tight glow round the disc is 1.12's own glare's place; ours on top of it
++    /// merged with it into a white bloom at golden hour on film.
++    pub const SUN_INNER: f32 = 0.0;
 +    pub const SUN_WIDE: f32 = 0.16;
++    /// The wide halo is hollowed inside about 6° of the sun (`1 − cos^power`), where 1.12's glare
++    /// shines, so it rings that glare (`look_sky.wgsl`'s `LOOK_SKY_HOLLOW_POWER`).
++    pub const SUN_HOLLOW_POWER: f32 = 120.0;
 +    pub const HALO_WARM: [f32; 3] = [1.0, 0.72, 0.42];
 +    /// The moon's halo, pale and small, at night only.
 +    pub const MOON_INNER_POWER: f32 = 900.0;
@@ -1099,7 +1138,9 @@ index 0000000..2f299d8
 +        key(540.0, [1.00, 0.98, 0.95], [0.72, 0.76, 0.84], 0.6, 0.15),
 +        key(720.0, [1.00, 1.00, 1.00], [0.74, 0.79, 0.88], 0.55, 0.05),
 +        key(960.0, [1.00, 0.97, 0.91], [0.72, 0.74, 0.82], 0.6, 0.2),
-+        key(1050.0, [1.00, 0.86, 0.58], [0.82, 0.60, 0.42], 0.95, 0.65),
++        // Golden hour: gold lit, warmer and darker underneath (was lit 1.00, 0.86, 0.58 and shade
++        // 0.82, 0.60, 0.42, which read white-yellow by the sun on film).
++        key(1050.0, [1.00, 0.80, 0.50], [0.62, 0.42, 0.32], 0.95, 0.65),
 +        key(1140.0, [1.00, 0.64, 0.42], [0.64, 0.41, 0.42], 1.1, 0.9),
 +        key(1200.0, [0.72, 0.47, 0.56], [0.31, 0.25, 0.37], 0.7, 0.9),
 +        key(1260.0, [0.38, 0.38, 0.52], [0.15, 0.16, 0.25], 0.0, 0.0),
@@ -1116,7 +1157,8 @@ index 0000000..2f299d8
 +///   8 `[haze colour (sRGB), warp (cells)]` ·
 +///   9 `[period (cells), shade contrast, horizon from, horizon to (sine of elevation)]` ·
 +///   10 `[sun inner power, sun wide power, moon inner power, moon wide power]` ·
-+///   11 `[sun inner, sun wide, moon inner, moon wide]` · 12 `[octaves, water octaves, pixel angle, 0]`.
++///   11 `[sun inner, sun wide, moon inner, moon wide]` ·
++///   12 `[octaves, water octaves, pixel angle, thick shade]`.
 +pub const SKY_ROWS: usize = 13;
 +
 +/// `worldSky` and the film's hold: `on` (on by default, inert under the classic look); `clouds`
@@ -1327,8 +1369,7 @@ index 0000000..2f299d8
 +        return rows;
 +    }
 +    let cover = cover(input, light);
-+    let overcast = ((cover - 0.6) / 0.35)
-+        .clamp(0.0, 1.0)
++    let overcast = smoothstep(tune::OVERCAST_FROM, tune::OVERCAST_TO, cover)
 +        .max(light.storm_bcc.clamp(0.0, 1.0));
 +    let key = key_at(input.minute);
 +    // The live horizon tints the keys; a full overcast greys them.
@@ -1340,8 +1381,8 @@ index 0000000..2f299d8
 +            (tinted + (l * dim - tinted) * tune::OVERCAST_GREY * overcast).clamp(0.0, 1.0)
 +        })
 +    };
-+    let lit = grey(key.lit, 0.85);
-+    let shade = grey(key.shade, 0.8);
++    let lit = grey(key.lit, tune::OVERCAST_LIT_DIM);
++    let shade = grey(key.shade, tune::OVERCAST_SHADE_DIM);
 +    // The drift: the eye's own place plus the wind's carry, in cells, wrapped to the period.
 +    let period = f64::from(tune::PERIOD_CELLS);
 +    let carry = wind::drift(input.secs) * f64::from(wind::tune::CLOUD_SPEED_YD);
@@ -1404,7 +1445,7 @@ index 0000000..2f299d8
 +        tune::OCTAVES as f32,
 +        tune::WATER_OCTAVES as f32,
 +        tune::PIXEL_ANGLE,
-+        0.0,
++        tune::THICK_SHADE * overcast,
 +    ];
 +    rows
 +}
@@ -1642,6 +1683,26 @@ index 0000000..2f299d8
 +    /// clouds: the copies must match to the letter (from the rows' struct to the block's end).
 +    #[test]
 +    fn the_water_mirrors_the_same_clouds() {
++        for src in [
++            include_str!("../shaders/look_sky.wgsl"),
++            include_str!("../../../benilla-assets/src/shaders/liquid.wgsl"),
++        ] {
++            let read = |name: &str| -> f32 {
++                let line = src
++                    .lines()
++                    .find(|l| l.starts_with(&format!("const {name}: f32 = ")))
++                    .unwrap_or_else(|| panic!("{name} missing"));
++                line.split('=')
++                    .nth(1)
++                    .unwrap()
++                    .trim()
++                    .trim_end_matches(';')
++                    .parse()
++                    .unwrap()
++            };
++            assert_eq!(read("LOOK_SKY_LIT_CAP"), tune::LIT_CAP);
++            assert_eq!(read("LOOK_SKY_HOLLOW_POWER"), tune::SUN_HOLLOW_POWER);
++        }
 +        fn block(src: &str) -> &str {
 +            let start = src
 +                .find("struct LookSkyRows")
@@ -1751,6 +1812,37 @@ index 0000000..2f299d8
 +        let between = key_at(390.0);
 +        assert!((between.lit[1] - 0.5 * (0.74 + 0.88)).abs() < 1e-5);
 +        assert_eq!(key_at(1440.0 + 720.0).lit, noon_k.lit);
++    }
++
++    /// Heavy cover dims the clouds grey, darker underneath and thick-shaded, as an overcast does;
++    /// an ordinary day's cover leaves them white. Golden hour is gold, never white.
++    #[test]
++    fn heavy_cover_goes_grey_and_golden_hour_stays_gold() {
++        let lum = |c: [f32; 4]| 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
++        let fair = pack_rows(true, &input(720.0, Some(tune::COVER_MAX)), &noon());
++        let heavy = pack_rows(true, &input(720.0, Some(0.8)), &noon());
++        assert!(fair[12][3] < 0.01, "an ordinary day: no overcast shade");
++        assert!(lum(fair[2]) > 0.85, "white: {:?}", fair[2]);
++        assert!(lum(heavy[2]) < lum(fair[2]) - 0.15, "grey: {:?}", heavy[2]);
++        assert!(
++            lum(heavy[3]) < lum(fair[3]) - 0.2,
++            "darker underneath: {:?}",
++            heavy[3]
++        );
++        assert!(heavy[12][3] > 0.3, "thick cores shaded");
++        let golden = key_at(1050.0);
++        assert!(
++            golden.lit[2] < 0.6 && golden.lit[1] < 0.85,
++            "gold: {:?}",
++            golden.lit
++        );
++        assert!(
++            golden.shade.iter().all(|c| *c < 0.65),
++            "dark underneath: {:?}",
++            golden.shade
++        );
++        // The cap is gold at golden hour: blue can never reach white's.
++        assert!(golden.lit[2] * tune::LIT_CAP < 0.6);
 +    }
 +
 +    /// Each day rolls its own cover, about one in five clear, and the next eases in.
@@ -2758,10 +2850,10 @@ index 797dc7b..c9bbb51 100644
  }
 diff --git a/crates/benilla-world/src/shaders/look_sky.wgsl b/crates/benilla-world/src/shaders/look_sky.wgsl
 new file mode 100644
-index 0000000..f1aae4f
+index 0000000..277630f
 --- /dev/null
 +++ b/crates/benilla-world/src/shaders/look_sky.wgsl
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,135 @@
 +// The new look's painted sky (`look::sky`), benilla's own (no reference behaviour): one layer over
 +// 1.12's dome, discs and stars, in its cloud dome's slot, blended premultiplied in gamma space as
 +// every sky element is. The sun's and the moon's halos add under the clouds; the clouds cover
@@ -2780,10 +2872,18 @@ index 0000000..f1aae4f
 +//   7 [moon colour (sRGB), haze (yd)] · 8 [haze colour (sRGB), warp (cells)] ·
 +//   9 [period (cells), shade contrast, horizon from, horizon to] ·
 +//   10 [sun inner power, sun wide power, moon inner power, moon wide power] ·
-+//   11 [sun inner, sun wide, moon inner, moon wide] · 12 [octaves, water octaves, pixel angle, 0].
++//   11 [sun inner, sun wide, moon inner, moon wide] ·
++//   12 [octaves, water octaves, pixel angle, thick shade].
 +struct LookSkyRows {
 +    r: array<vec4<f32>, 13>,
 +}
++
++// `look::sky::tune`'s `LIT_CAP` and `SUN_HOLLOW_POWER` (its tests compare them): a cloud is never
++// brighter than the hour's lit colour times the cap, so a golden-hour cloud by the sun stays gold
++// and never blooms white; the sun's wide halo is hollowed inside about 6° of the sun, where 1.12's
++// own glare already shines, so it rings that glare instead of adding a second glow on it.
++const LOOK_SKY_LIT_CAP: f32 = 1.08;
++const LOOK_SKY_HOLLOW_POWER: f32 = 120.0;
 +
 +// A lattice point's hash, wrapped to `period`, as 24 bits (`look::sky::hash`).
 +fn look_sky_hash(c: vec2<i32>, period: i32) -> f32 {
@@ -2840,7 +2940,9 @@ index 0000000..f1aae4f
 +fn look_sky_clouds(dir: vec3<f32>, s: LookSkyRows, octaves: u32) -> vec4<f32> {
 +    let cs = max(dot(dir, s.r[4].xyz), 0.0);
 +    let cm = max(dot(dir, s.r[6].xyz), 0.0);
-+    var halo = s.r[5].rgb * (s.r[4].w * (s.r[11].x * pow(cs, s.r[10].x) + s.r[11].y * pow(cs, s.r[10].y)));
++    let hollow = 1.0 - pow(cs, LOOK_SKY_HOLLOW_POWER);
++    var halo = s.r[5].rgb
++        * (s.r[4].w * (s.r[11].x * pow(cs, s.r[10].x) + s.r[11].y * pow(cs, s.r[10].y) * hollow));
 +    halo += s.r[7].rgb * (s.r[6].w * (s.r[11].z * pow(cm, s.r[10].z) + s.r[11].w * pow(cm, s.r[10].w)));
 +    if (dir.y <= s.r[9].z) {
 +        return vec4<f32>(halo, 0.0);
@@ -2865,9 +2967,12 @@ index 0000000..f1aae4f
 +    var light = clamp(0.5 + (d - d2) * s.r[9].y, 0.0, 1.0);
 +    light = mix(light, 1.0, (1.0 - a) * 0.5);
 +    light = smoothstep(0.15, 0.85, light);
++    // Under an overcast the thick of the cloud goes dark beneath, so a heavy sky keeps its shape.
++    light *= 1.0 - s.r[12].w * smoothstep(th, th + 0.35, d);
 +    var col = mix(s.r[3].rgb, s.r[2].rgb, light);
 +    // A silver lining on the thin edges toward the sun.
 +    col += s.r[5].rgb * (s.r[5].w * s.r[4].w * pow(cs, s.r[2].w) * (1.0 - a));
++    col = min(col, s.r[2].rgb * LOOK_SKY_LIT_CAP);
 +    // Far clouds go into the haze.
 +    col = mix(col, s.r[8].rgb, 1.0 - exp(-dist / s.r[7].w));
 +    return vec4<f32>(halo * (1.0 - a) + col * a, a);
