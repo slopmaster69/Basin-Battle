@@ -1004,3 +1004,16 @@ fn a_hero_with_no_juggernaut_card_on_a_key_has_no_momentum() {
     s.slot_ability(p, "defense", "berserker_rage").unwrap();
     assert!(s.momentum_on(p), "one of the Juggernaut's is enough");
 }
+
+#[test]
+fn intervene_whose_look_is_silent_sounds_from_its_caster_as_it_goes() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    let sound = s.content.abilities[s.content.ability("intervene").unwrap()].sound;
+    assert!(sound != 0, "Intervene has a sound of its own");
+    s.set_valor(a, 25.0);
+    let mut ev = cast(&mut s, a, "tackle", true, 0.0, 0.0);
+    ev.extend(run(&mut s, 0.5));
+    assert!(ev.iter().any(|e| matches!(e, Event::Sound { id, sound: x } if *id == a && *x == sound)), "heard as it goes: {ev:?}");
+}

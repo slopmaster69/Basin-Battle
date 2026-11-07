@@ -1297,6 +1297,10 @@ impl Survival {
         if cost > 0.0 {
             self.events.push(Event::Valor { player: id });
         }
+        // Its own sound as it goes, where its look has none.
+        if d.sound != 0 {
+            self.events.push(Event::Sound { id, sound: d.sound });
+        }
         // A perfect release: its pay and its burst, for everyone to see. (Its strength is read
         // by what goes out, below, and the flag cleared as the cast ends.)
         if self.players[&id].cast_perfect {
