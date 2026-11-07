@@ -434,3 +434,78 @@ fn two_pirates_on_one_hero_take_the_turns_in_turn() {
     assert!(na >= 3 && nb >= 3, "blows wound up: {na} and {nb}");
     assert!((na as i32 - nb as i32).abs() <= na.max(nb) as i32 / 2, "shared: {na} and {nb}");
 }
+
+#[test]
+fn a_creature_stepping_round_its_hero_swings_without_settling_first() {
+    // Settling is for a run-up from afar; a boss keeping up with a hero who steps about stopped
+    // for it at every step (Corey, Nov 7: "bosses stutter step").
+    let (mut s, p) = turns_world();
+    let pirate = s.content.mob("dm_pirate").unwrap();
+    let a = s.spawn_mob(pirate, [2.0, 0.0, 0.0], None, false);
+    s.mobs.get_mut(&a).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    let now = s.clock;
+    // It just stepped, but it was never far off: no settling.
+    s.mobs.get_mut(&a).unwrap().moved_at = now;
+    assert!(!s.settling(a, 2.0), "a step round them");
+    // Run up from afar just now: it settles.
+    s.mobs.get_mut(&a).unwrap().far_at = now - 0.5;
+    assert!(s.settling(a, 2.0), "a run-up");
+}
+
+#[test]
+fn a_second_pirate_punishes_a_swing_its_turn_or_not() {
+    let (mut s, p) = turns_world();
+    if let Some(h) = s.players.get_mut(&p) {
+        h.max_health = 100_000;
+        h.health = 100_000;
+    }
+    let pirate = s.content.mob("dm_pirate").unwrap();
+    let a = s.spawn_mob(pirate, [2.0, 1.0, 0.0], None, false);
+    let b = s.spawn_mob(pirate, [2.0, -1.0, 0.0], None, false);
+    // A has just done a string: B would wait the hero's breath...
+    s.mobs.get_mut(&a).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    s.mobs.get_mut(&a).unwrap().string_done_at = s.clock;
+    s.mobs.get_mut(&a).unwrap().ready_at = s.clock + 5.0;
+    assert!(s.waits_turn(b, Foe::Hero(p), 2.2, false), "waiting the breath");
+    // ...but not while the hero is in a swing's follow-through.
+    s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+    s.input(p, Input::Attack);
+    let mut open = false;
+    for _ in 0..40 {
+        let _ = s.step(0.02);
+        if s.hero_open(p) && matches!(s.players[&p].action, Action::Swing { .. }) {
+            open = true;
+            break;
+        }
+    }
+    assert!(open, "the swing's follow-through came");
+    assert!(!s.waits_turn(b, Foe::Hero(p), 2.2, false), "an opening: it comes");
+}
+
+#[test]
+fn a_pirate_waiting_its_turn_works_round_the_hero_instead_of_standing() {
+    let (mut s, p) = turns_world();
+    if let Some(h) = s.players.get_mut(&p) {
+        h.max_health = 100_000;
+        h.health = 100_000;
+    }
+    let pirate = s.content.mob("dm_pirate").unwrap();
+    let a = s.spawn_mob(pirate, [2.0, 1.0, 0.0], None, false);
+    let b = s.spawn_mob(pirate, [2.0, -1.0, 0.0], None, false);
+    for m in [a, b] {
+        s.mobs.get_mut(&m).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    }
+    // Over 10 s, whichever waits moves while it waits.
+    let mut waited_moving = 0;
+    for _ in 0..500 {
+        let before = [s.mobs[&a].pos, s.mobs[&b].pos];
+        let _ = s.step(0.02);
+        for (i, m) in [a, b].iter().enumerate() {
+            let other_busy = [a, b].iter().any(|o| o != m && matches!(s.mobs[o].state, MobState::Windup { .. }));
+            if other_busy && matches!(s.mobs[m].state, MobState::Chase { .. }) && dist2d(before[i], s.mobs[m].pos) > 0.01 {
+                waited_moving += 1;
+            }
+        }
+    }
+    assert!(waited_moving > 20, "it moved while the other wound up: {waited_moving} moments");
+}
