@@ -1,6 +1,6 @@
-From d0f2b145b05e0b684f1aac6596ca4d4a91249a69 Mon Sep 17 00:00:00 2001
+From 4b96ed21a69487dbdad03d7ec4de5d11af71c5cd Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Sat, 7 Nov 2026 14:44:29 -0600
+Date: Sat, 7 Nov 2026 15:11:08 -0600
 Subject: [PATCH] A shrunken building's torches cast shrunken pools: the look's
  torch light follows its host's scale
 
@@ -47,7 +47,7 @@ index 017bb592..af6ae69f 100644
      let looked = look.pack(
          cam_pos,
 diff --git a/crates/benilla-world/src/look/lights.rs b/crates/benilla-world/src/look/lights.rs
-index 192a8e9e..30ca2ecf 100644
+index 192a8e9e..1aabb5de 100644
 --- a/crates/benilla-world/src/look/lights.rs
 +++ b/crates/benilla-world/src/look/lights.rs
 @@ -436,7 +436,13 @@ pub fn score(peak: f32, radius: f32, distance: f32) -> f32 {
@@ -140,11 +140,11 @@ index 192a8e9e..30ca2ecf 100644
 -        assert!(torch_light(&dark).is_none());
 +        assert!(torch_light(&dark, 1.0).is_none());
 +        // A camp building at two fifths of its size: its torches cast pools two fifths as far and
-+        // two fifths as strong. A host bigger than life casts a full torch's, no more.
-+        let wall_torch = WorldPointLight {
-+            range: 1.9,
-+            ..crate::terrain_stream::point_light([1.0, 0.86, 0.5], 1.0)
-+        };
++        // two fifths as strong. A host bigger than life casts a full torch's, no more. The light
++        // is a guard tower's wall torch as the client spawns it: `point_light` gives every
++        // authored M2 light the same 48 yd selection range (its authored 1.9 yd reach is not
++        // read), so it takes the torch branch, never the glow's.
++        let wall_torch = crate::terrain_stream::point_light([1.0, 0.86, 0.5], 1.0);
 +        let full = torch_light(&wall_torch, 1.0).unwrap();
 +        let small = torch_light(&wall_torch, 0.42).unwrap();
 +        assert!((small.radius - 0.42 * tune::TORCH_RADIUS).abs() < 1e-4);
