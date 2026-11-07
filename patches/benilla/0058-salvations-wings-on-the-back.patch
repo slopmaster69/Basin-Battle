@@ -1,0 +1,96 @@
+From 4c31efe706a5172807fc76caf29a706e8cbcc80d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 15:31:41 -0600
+Subject: [PATCH] A spell's kit effects hung where an add-on asks:
+ SetSpellAttach (patch 0058)
+
+SetSpellAttach(spell, tag) hangs every kit effect of that spell from M2 attachment `tag` in place
+of its own slot (nil puts it back). Basin Battle moves Holy Word: Salvation's wings (Magic Wings,
+24742, a head attachment) to the back, on the shoulder blades.
+---
+ .../benilla-app/src/entities/spell_fx/mod.rs  |  4 +-
+ crates/benilla-ui/src/action_combat.rs        | 38 +++++++++++++++++++
+ 2 files changed, 41 insertions(+), 1 deletion(-)
+
+diff --git a/crates/benilla-app/src/entities/spell_fx/mod.rs b/crates/benilla-app/src/entities/spell_fx/mod.rs
+index 084e1675..225b6213 100644
+--- a/crates/benilla-app/src/entities/spell_fx/mod.rs
++++ b/crates/benilla-app/src/entities/spell_fx/mod.rs
+@@ -845,8 +845,10 @@ pub(super) fn attach_spell_fx(
+                 (root, true)
+             } else {
+                 // `CMissile`'s cascade: the slot's tag, `0xf`, `0x13`, else the unit root.
++                // Basin Battle: the slot an add-on asked for this spell (`SetSpellAttach`) first.
++                let tag = benilla_ui::action_combat::spell_attach(inst.spell_id).unwrap_or(inst.tag);
+                 let point = bones.and_then(|b| {
+-                    std::iter::once(inst.tag)
++                    std::iter::once(tag)
+                         .chain(ATTACH_FALLBACKS)
+                         .find_map(|tag| b.points.get(&tag).copied().map(|p| (tag, p)))
+                         .and_then(|(tag, (bone, offset))| {
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 82086c3b..78631cc8 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -124,6 +124,12 @@
+ //!   `spinDegrees` a second (540 unless given).
+ //! - `StopGroundOrb(key)`: it stops where it is and shrinks away.
+ //!
++//! Spell effects moved on the body (when `SetSpellAttach` exists):
++//!
++//! - `SetSpellAttach(spell, tag)`: every kit effect of that spell hangs from M2 attachment `tag`
++//!   (11 the helm, 12 the back) instead of its own slot; nil puts it back. Basin Battle hangs Holy
++//!   Word: Salvation's wings (Magic Wings, 24742, a head attachment) from the back.
++//!
+ //! Recoloured spell looks (when `SetEffectTint` exists):
+ //!
+ //! - `SetEffectTint(model, colour)`: every effect drawn from that model (`"Spells\\CounterSpell_
+@@ -951,6 +957,16 @@ pub fn effect_tint(path: &str) -> Option<[u8; 3]> {
+     EFFECT_TINTS.lock().ok().and_then(|m| m.as_ref().and_then(|m| m.get(&k).copied()))
+ }
+ 
++/// Where a spell's kit effects are asked to hang on the body (`SetSpellAttach`): the M2
++/// attachment id, in place of each effect's own slot. Basin Battle moves Holy Word: Salvation's
++/// wings (Magic Wings, a head attachment) to the back.
++static SPELL_ATTACH: std::sync::Mutex<Option<std::collections::HashMap<u32, u16>>> = std::sync::Mutex::new(None);
++
++/// The attachment asked for a spell's effects (`SetSpellAttach`), if any.
++pub fn spell_attach(spell: u32) -> Option<u16> {
++    SPELL_ATTACH.lock().ok().and_then(|m| m.as_ref().and_then(|m| m.get(&spell).copied()))
++}
++
+ /// The ground rings asked for since the last call.
+ pub fn take_ground_rings() -> Vec<GroundRingCall> {
+     RINGS
+@@ -1589,6 +1605,28 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetSpellAttach",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            let spell = number(v.first(), 0.0, 1.0e9).unwrap_or(0.0) as u32;
++            let tag = number(v.get(1), 0.0, 255.0).map(|n| n as u16);
++            if spell != 0 {
++                if let Ok(mut m) = SPELL_ATTACH.lock() {
++                    let m = m.get_or_insert_with(Default::default);
++                    match tag {
++                        Some(t) => {
++                            m.insert(spell, t);
++                        }
++                        None => {
++                            m.remove(&spell);
++                        }
++                    }
++                }
++            }
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "SetEffectTint",
+         lua.create_function(|_, args: MultiValue| {
+-- 
+2.46.2.windows.1
+

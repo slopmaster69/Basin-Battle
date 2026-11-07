@@ -46,6 +46,9 @@ ES.CUE = {
   -- right, up, the tip down (radians; the sixteenth client, older ones only come in), and for
   -- how long (the rise's time in the air), then back to the aiming camera or off.
   rise = { cam = { 2.6, 0.4, 1.2, 0.55, 1.4 } },
+  -- Raised on Salvation's wings: the camera rises with the Priest and looks down on the field
+  -- below (Corey's review), for the circle's time (its 3 beats and the pillar), then back.
+  salvation = { cam = { 9.0, 0, 3.0, 0.5, 5.2 } },
 }
 
 function ES.CueLine(f)

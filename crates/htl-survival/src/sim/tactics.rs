@@ -4,7 +4,9 @@
 //! a hero nobody's pressing, pressing an opening at
 //! once, reaching for the blow no guard stops against a raised guard, now and then giving ground
 //! after a string, working round to a hero's back while it waits its turn, and blows that don't
-//! come on a metronome.
+//! come on a metronome. A boss is harder to learn still: it seldom begins the same string twice
+//! running, holds a blow a beat now and then, stops a long string short or goes straight into
+//! another, and backs off to where its charges, lunges and throws can come from.
 
 use super::mobs::{Foe, MobState};
 use super::*;
@@ -13,6 +15,12 @@ use super::*;
 const LOOK: f32 = 22.0;
 /// A raider on its way to a station turns on a hero this near.
 const RAIDER_TURN: f32 = 9.0;
+/// A boss making space backs off this much quicker than it walks.
+const SPACE_PACE: f32 = 1.6;
+/// It backs off no farther than this from where it stands (yards), and not for less than a yard.
+const SPACE_MOST: f32 = 12.0;
+/// Backed off, it waits this long at most for its blow from afar before it closes in again.
+const SPACE_WAIT: f32 = 2.0;
 
 impl Survival {
     /// A hero hurt this creature: it remembers (the memory fades).
@@ -57,7 +65,8 @@ impl Survival {
 
     /// Whether a hero holds their guard up.
     pub(crate) fn hero_guarding(&self, hero: Id) -> bool {
-        self.players.get(&hero).is_some_and(|p| matches!(p.action, Action::Guard) || p.guard_held)
+        // (A right mouse held on a weapon with no guard, a Drain, guards nothing.)
+        self.players.get(&hero).is_some_and(|p| matches!(p.action, Action::Guard) || (p.guard_held && !self.weapon_of(p).has_alt()))
     }
 
     /// Creatures other than `except` on `hero` now (chasing them, winding up, between blows).
@@ -246,5 +255,144 @@ impl Survival {
             return None;
         }
         Some(if off > 0.0 { -1.0 } else { 1.0 })
+    }
+
+    /// A creature begins one of its strings: remembered (a boss seldom begins the same one next).
+    /// With `vary`, a boss's string up close may stop one short or run one longer, and may have
+    /// one of its blows held a beat.
+    pub(crate) fn begin_pattern(&mut self, id: Id, k: usize, vary: bool) {
+        let ai = self.content.ai.clone();
+        let Some(m) = self.mobs.get(&id) else { return };
+        let d = &self.content.mobs[m.def];
+        let close = d.patterns.get(k).filter(|p| {
+            vary && d.boss && !d.attack.ranged && p.weight > 0.0 && p.min_range < mobs::SPACE_FROM && p.steps.iter().all(|s| s.ranged != Some(true))
+        });
+        let n = close.map_or(0, |p| p.steps.len());
+        let (mut len, mut held) = (0, None);
+        if n > 0 {
+            let roll = self.rng.gen::<f32>();
+            if n >= 3 && roll < ai.cut {
+                len = n - 1;
+            } else if n >= 2 && roll < ai.cut + ai.extend {
+                len = n + 1;
+            }
+            if ai.hold > 0.0 && ai.hold_secs > 0.0 && self.rng.gen::<f32>() < ai.hold {
+                let blows = if len > 0 { len } else { n };
+                held = Some(self.rng.gen_range(0..blows));
+            }
+        }
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.pattern = Some((k, 0));
+        m.last_pattern = Some(k);
+        m.string_len = len;
+        m.held_step = held;
+        m.space = None;
+    }
+
+    /// The blow a boss winds up: how much longer it holds it (its string's held blow, a beat).
+    pub(crate) fn hold_beat(&mut self, id: Id) -> f32 {
+        let secs = self.content.ai.hold_secs;
+        let Some(m) = self.mobs.get(&id) else { return 0.0 };
+        match (m.pattern, m.held_step) {
+            // Never so slight a delay it can't be seen, nor longer than set.
+            (Some((_, s)), Some(h)) if s == h => secs * (0.4 + 0.6 * self.rng.gen::<f32>()),
+            _ => 0.0,
+        }
+    }
+
+    /// A boss's string up close done: now and then it goes straight into another (its rest cut
+    /// to nothing), not past three close strings in a row.
+    pub(crate) fn maybe_chain(&mut self, id: Id) {
+        let chain = self.content.ai.chain;
+        let Some(m) = self.mobs.get(&id) else { return };
+        let d = &self.content.mobs[m.def];
+        if !d.boss || d.attack.ranged || m.close_run == 0 || m.close_run >= 3 || chain <= 0.0 {
+            return;
+        }
+        if self.rng.gen::<f32>() >= chain {
+            return;
+        }
+        let now = self.clock;
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.ready_at = m.ready_at.min(now + 0.15);
+    }
+
+    /// A boss's string up close done: now and then it backs off, facing its foe, to where one of
+    /// its blows from afar (a charge, a lunge, a throw) can come from, the likelier the more
+    /// close strings it has done in a row, and less with a band on it. Whether it did.
+    pub(crate) fn maybe_make_space(&mut self, id: Id, hero: Id) -> bool {
+        let ai = self.content.ai.clone();
+        let now = self.clock;
+        let Some(m) = self.mobs.get(&id) else { return false };
+        let d = self.content.mobs[m.def].clone();
+        // (After a string up close: never straight after one from afar.)
+        if !d.boss || d.attack.ranged || d.patterns.is_empty() || ai.space <= 0.0 || m.stagger_until > now || m.close_run == 0 {
+            return false;
+        }
+        let Some(at) = self.players.get(&hero).filter(|p| p.health > 0).map(|p| p.pos) else { return false };
+        let (pos, home, health, max) = (m.pos, m.home, m.health, m.max_health);
+        let dist = dist2d(pos, at);
+        // Its blows from afar it has now (by its health), each with the distance it wants.
+        let far: Vec<(usize, f32, f32, f32)> = d
+            .patterns
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.weight > 0.0 && p.min_range >= mobs::SPACE_FROM && health as f32 <= p.below * max as f32)
+            .filter_map(|(k, p)| {
+                let first = p.steps.first()?;
+                let reach = first.range.unwrap_or(d.attack.range) + 0.1 + first.lunge;
+                let most = if p.max_range > 0.0 { p.max_range } else { reach };
+                (most > p.min_range + 0.5 && dist < p.min_range).then_some((k, p.weight, p.min_range, most))
+            })
+            .collect();
+        if far.is_empty() {
+            return false;
+        }
+        // (Its first close string counts nothing more; each one after it, `space_streak`.)
+        let run = self.mobs[&id].close_run.saturating_sub(1) as f32;
+        let band = if self.heroes_in_fight(id) > 1 { ai.space_band } else { 1.0 };
+        let chance = (ai.space + ai.space_streak * run).min(ai.space_most) * band;
+        if self.rng.gen::<f32>() >= chance {
+            return false;
+        }
+        // Which of them, weighted.
+        let total: f32 = far.iter().map(|f| f.1).sum();
+        let mut roll = self.rng.gen::<f32>() * total;
+        let mut pick = far[far.len() - 1];
+        for f in &far {
+            if roll < f.1 {
+                pick = *f;
+                break;
+            }
+            roll -= f.1;
+        }
+        let (k, _, lo, hi) = pick;
+        // A little past the nearest it can use it from, so a hero's step after it doesn't spoil it.
+        let want = (lo + 1.0 + self.rng.gen::<f32>() * 2.5).min(hi - 0.5).min(dist + SPACE_MOST);
+        // Straight away from its foe, else a little to either side (a wall behind it), inside its
+        // leash.
+        let leash = self.leash_of(self.mobs[&id].def) * 0.8;
+        let away = facing(at, pos);
+        let goal = [0.0f32, 0.5, -0.5, 1.0, -1.0].iter().find_map(|off| {
+            let b = away + off;
+            let to = self.ground_near(at[0] + b.cos() * want, at[1] + b.sin() * want, pos[2]);
+            let ok = dist2d(to, pos) >= 1.0
+                && dist2d(to, home) <= leash
+                && self.land.walk_clear(pos, to)
+                && !self.land.blocked_near(to[0], to[1], to[2]);
+            ok.then_some(to)
+        });
+        let Some(to) = goal else { return false };
+        let speed = d.walk_speed.max(2.5) * SPACE_PACE;
+        self.sidle_to(id, to, speed, hero);
+        if self.mobs[&id].path.is_empty() {
+            return false;
+        }
+        let back = dist2d(pos, to) / (speed * self.speed_share(id)).max(0.5);
+        let m = self.mobs.get_mut(&id).unwrap();
+        // Backing off is its rest: its blow comes as it gets there.
+        m.ready_at = now + back + 0.2;
+        m.space = Some((now + back + SPACE_WAIT, k));
+        true
     }
 }

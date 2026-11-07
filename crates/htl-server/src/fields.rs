@@ -43,6 +43,9 @@ pub mod idx {
     pub const UNIT_RESISTANCES: u16 = 155;
     pub const UNIT_BASE_HEALTH: u16 = 163;
     pub const UNIT_ATTACK_POWER: u16 = 165;
+    /// The duel's flag (two words), and the hero's side in it (1 or 2; 0 none, or not yet on).
+    pub const PLAYER_DUEL_ARBITER: u16 = 188;
+    pub const PLAYER_DUEL_TEAM: u16 = 196;
     pub const PLAYER_FLAGS: u16 = 190;
     pub const PLAYER_BYTES: u16 = 193;
     pub const PLAYER_BYTES_2: u16 = 194;
