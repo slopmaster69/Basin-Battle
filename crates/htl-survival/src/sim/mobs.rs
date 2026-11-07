@@ -1386,13 +1386,21 @@ impl Survival {
         if ai.turn_beat <= 0.0 {
             return false;
         }
+        // Nor while a bolt or a pot is in the air at them: the blade and the bolt would land
+        // together (two pirates and a Squallshaper, Nov 6: "no gap").
+        let hp = self.players.get(&h).map(|p| p.pos);
+        if hp.is_some_and(|hp| self.missiles.iter().any(|ms| ms.owner != id && ms.land_at > now && dist2d(ms.at, hp) <= ms.radius + 4.0)) {
+            return true;
+        }
         self.mobs.iter().any(|(oid, o)| {
+            let ranged = self.attack_now(*oid).ranged;
             *oid != id
                 && o.health > 0
-                && !self.attack_now(*oid).ranged
                 && match o.state {
-                    MobState::Windup { foe: Foe::Hero(x), .. } | MobState::Recover { foe: Foe::Hero(x), .. } => x == h,
-                    MobState::Chase { foe: Foe::Hero(x) } => x == h && now - o.string_done_at < ai.turn_beat,
+                    // A caster gathering a bolt at them counts as a turn too, up to its loosing.
+                    MobState::Windup { foe: Foe::Hero(x), .. } => x == h,
+                    MobState::Recover { foe: Foe::Hero(x), .. } => x == h && !ranged,
+                    MobState::Chase { foe: Foe::Hero(x) } => x == h && !ranged && now - o.string_done_at < ai.turn_beat,
                     _ => false,
                 }
         })
