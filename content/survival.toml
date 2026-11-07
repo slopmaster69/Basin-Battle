@@ -255,6 +255,32 @@ jitter = 0.25
 # pack's, before it gives up. A wager's farther chase, 1.75, is the farther of this and its own:
 # this one, now.)
 leash_scale = 4.0
+# A boss is harder to learn, alone above all. (Play-test: up close a boss threw the same string
+# again and again, and its charges and throws never came while you stayed on it.)
+# The string a boss just began is `repeat` times as likely to come again next, so it seldom does
+# the same thing twice running.
+repeat = 0.3
+# A quarter of a boss's strings up close have one blow held a beat, up to `hold_secs` longer in
+# its wind-up (at least 40% of that, so it shows): the delayed swing, so a parry timed by rote
+# comes early. Its wind-up shows the whole of it.
+hold = 0.25
+hold_secs = 0.45
+# A boss's string up close of three blows or more stops one short, this often; and of two or more,
+# runs one longer (its last blow again), `extend` as often: you can't count it out.
+cut = 0.2
+extend = 0.2
+# A boss's string up close done: this often it goes straight into another, no rest between (not
+# past three close strings in a row).
+chain = 0.25
+# A boss's string up close done: the chance it backs off, facing you, to where one of its blows
+# from afar can come from (a charge, a lunge, a throw: a string whose `min_range` is 3 yards or
+# more), and uses it as it gets there (never straight after one from afar). `space`, and `space_streak` more for each close string in
+# a row before this one, up to `space_most`: three close strings running, it's 70%. With two
+# heroes or more on it, half (a band has others for it to go for, and its charges reach them).
+space = 0.3
+space_streak = 0.2
+space_most = 0.8
+space_band = 0.5
 
 # Each grip's blows. `clip` is the game's own animation (AnimationData id) and `take` which of the
 # model's versions of it; `windup` and `recovery` are shares of the weapon's own times, `damage`
@@ -486,6 +512,33 @@ flare_late = 0.35
 crit_share = 0.3
 fizzle_kit = 226
 
+[priest]
+# The Priest's staffs and perfects (docs/priest-draft3.md). Searing Light: a Smite marks its foe
+# for 5 sec; any other Priest spell (or a Greater Smite) striking the marked foe tears it out for 8
+# more, and Healing Gust's recharge jumps 3 sec. Shadow Weaving: each Shadow Bolt weaves a stack
+# into its foe, up to 5 for 6 sec, each 8% more for the staff's bolts on it; 2 sec without a bolt
+# and the next is Empowered (half again as fast, 10 yd farther, 1.5 times as hard, 4 Valor).
+# Every Light perfect is a column of holy light on the hero (Holy Light's impact, kit 431; Holy Nova's
+# ground burst flooded 10 yd and read as an area spell), a Shadow one Void Blast's burst (each Shadow
+# spell's own `perfect_kit`); never the Mage's Arcane Explosion.
+sear_secs = 5.0
+sear_damage = 8.0
+sear_refund = 3.0
+gust = "healing_gust"
+# Holy Fire's flash on the foe as the mark is torn out.
+sear_kit = 3153
+weave_most = 5
+weave_secs = 6.0
+weave_step = 0.08
+weave_after = 2.0
+empower_speed = 1.5
+empower_range = 10.0
+empower_damage = 1.5
+empower_valor = 4.0
+# Shadowform's dark swirl at the Priest's feet while the next bolt waits, Empowered.
+empower_aura = 15473
+perfect_kit = 431
+
 # --- heroes against heroes ------------------------------------------------------------------------
 
 [pvp]
@@ -495,6 +548,21 @@ friendly_fire = true
 respawn_secs = 1.0
 respawn_health = 1.0
 keep_supplies = true
+
+# A duel: Duel on a hero's portrait (or /duel, or .es duel <name>), their popup's Accept, a
+# countdown, and a fight until one would fall (left at 1 health, the duel lost). While it's on the
+# two are each other's foes alone: struck, never healed, and nobody else can strike or help either.
+[duel]
+# The one challenged within 30 yd; a challenge unanswered for 60 sec lapses (the popup's own time).
+reach = 30.0
+ask_secs = 60.0
+countdown_secs = 3.0
+# More than 50 yd from the flag, a duellist has 10 sec to come back within 45 yd or forfeit.
+bounds = 50.0
+back_in = 45.0
+return_secs = 10.0
+# The 1.12 dueling flag, planted between them.
+flag_display = 787
 
 # --- bows -----------------------------------------------------------------------------------------
 
@@ -543,6 +611,17 @@ subclass = 18
 # its size, and `spin` turns a second, flat. Arrows and a thrown axe were too thin to follow at
 # night, with no spell effect in the data that fixed it (Corey's review; 14 missiles were tried
 # for Bank Shot alone). Keyed by the spell: every ability flying it looks so.
+
+# Shadow Word: Death's lance: the death-bolt (a Shadow Bolt no one else here flies, so no other
+# ability's missile changes; Twisted Reflection's burned fel green), bigger, with a violet streak
+# behind it, at the lance's own 40 yd a second.
+[[missile_look]]
+spell = 29317
+trail = "8A4CFF"
+width = 0.3
+secs = 0.35
+scale = 1.6
+speed = 40.0
 
 # The plain arrow (Aimed Shot short of full, Bank Shot, the arrows Arrow Recall calls home,
 # Skyfall's volley): a thin pale streak.
@@ -868,6 +947,65 @@ subclass = 10
 bolt = "arcane_bolt"
 heavy_bolt = "arcane_bolt_heavy"
 
+# The Priest's staffs (docs/priest-draft3.md): their right click is an ability, not a guard (`alt`),
+# so whoever wields one gives up their block and parry, Priest or not. The `guard` is only what the
+# rules that read a two-handed weapon's guard find: it's never raised.
+# Holy: Smite, Greater Smite on the heavy, Healing Gust aimed on the right click.
+[[weapon]]
+key = "acolyte_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [8, 12]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 10
+bolt = "acolyte_smite"
+heavy_bolt = "acolyte_greater_smite"
+alt = "healing_gust"
+
+# Shadow: Shadow Bolt weaving, Shadow Burst on the heavy, Dark Reckoning on the right click.
+[[weapon]]
+key = "shadowcaller_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [7, 11]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 10
+bolt = "shadowcaller_bolt"
+heavy_bolt = "shadowcaller_bolt_heavy"
+alt = "dark_reckoning"
+
+# Void: the Void Tether held on the click, the Hollow Star on the right click.
+[[weapon]]
+key = "hollow_star_staff"
+windup = 0.40
+active = 0.14
+recovery = 0.50
+stamina = 16.0
+damage = [7, 11]
+range = 3.6
+arc = 120.0
+targets = 2
+two_handed = true
+guard = "haft_guard"
+emote = 37
+subclass = 10
+bolt = "void_tether"
+alt = "hollow_star"
+
 [[shield]]
 key = "buckler"
 # The arc in front a raised shield covers.
@@ -1071,6 +1209,35 @@ display = 34811
 icon = "INV_Staff_07"
 kind = "weapon"
 text = "Two-handed. Attacks cast quick bolts of arcane force that deal 10 damage and store charges in the staff. Heavy attacks release them as an orb that deals up to 64 damage. Guards with a ward."
+
+# The Priest's staffs, each its own (none shared with the Mage's): the holy staff, a purple one of
+# Ahn'Qiraj, and one holding a purple orb.
+[[item]]
+key = "acolyte_staff"
+name = "Acolyte's Staff"
+# The 1.12 "holy" staff (Stave_2H_Long_B_02Holy), white and gold.
+display = 20384
+icon = "INV_Staff_23"
+kind = "weapon"
+text = "Two-handed. Attacks cast Smite, marking enemies with Searing Light. Hold the heavy attack for Greater Smite. Hold right-click to aim Healing Gust, then click to send it through your allies. Cannot block or parry."
+
+[[item]]
+key = "shadowcaller_staff"
+name = "Shadowcaller's Staff"
+# A purple staff of Ahn'Qiraj (Stave_2H_AhnQiraj_D_04): the flaming staff's fire burns fel green.
+display = 34135
+icon = "INV_Staff_20"
+kind = "weapon"
+text = "Two-handed. Attacks cast Shadow Bolts that weave Shadow Weaving into the enemy, and a bolt after a pause is Empowered. The heavy attack casts a charged Shadow Burst. Right-click casts Dark Reckoning, ripping the Weaving out. Cannot block or parry."
+
+[[item]]
+key = "hollow_star_staff"
+name = "Staff of the Hollow Star"
+# A staff holding a purple orb (Stave_2H_Jeweled_D_01), the Hollow Star in its head.
+display = 20254
+icon = "INV_Staff_13"
+kind = "weapon"
+text = "Two-handed. Hold attack for the Void Tether: it hurts an enemy, heals an ally, or fills your Hollow Star and draws it to you. Right-click throws the Hollow Star, an orb that hurts enemies and heals allies near it. Cannot block or parry."
 
 [[item]]
 key = "buckler"
@@ -4498,6 +4665,31 @@ impact_kit = 728
 # --- what abilities set down, and what to practise on ---------------------------------------------
 
 [[mob]]
+# The Hollow Star's body (the Staff of the Hollow Star's right click): an unseen totem the blows
+# find, its health the orb's, wearing Shadow Shell's dark bubble.
+key = "hollow_star"
+name = "Hollow Star"
+display = 1359
+# Shadow Shell's dark bubble: the orb you see.
+aura = 9657
+health = 40
+run_speed = 0.0
+walk_speed = 0.0
+aggro = 0.0
+leash = 0.0
+totem = true
+respawn = 0.0
+  [mob.attack]
+  windup = 1.0
+  damage = 0
+  range = 0.0
+  arc = 0.0
+  recovery = 1.0
+  cooldown = 99.0
+  turn_rate = 0.0
+  lock = 0.0
+
+[[mob]]
 key = "earthbind_totem"
 name = "Earthbind Totem"
 display = 4588
@@ -5893,129 +6085,156 @@ spell = 1856
 effects = [{ kind = "veil", secs = [5.0, 5.0] }, { kind = "haste", secs = [2.0, 2.0], amount = 0.3 }]
 
 # ----------------------------------------------------------------------------------- Priest --
+# Draft 3 (docs/priest-draft3.md): every spell asks for a different decision, and every one is
+# worth taking alone. Light is choice 1, Shadow choice 2. Looks are 1.12's own, picked with the
+# lab's `find`; a Priest's perfect bursts in Holy Nova's light (`[priest] perfect_kit`).
 
-# Light steered by hand: one lance that burns foes and mends friends, swept as you turn.
+# Q: the timing, while you fight. Rings close on up to 3 bodies in front of you (hurt friends and
+# foes taking turns); Q as each closes sends a bolt of light to it. You keep moving and rolling.
+# 14 a bolt (18 dead on): 42 to 54 on one foe over a 9 sec cooldown, 4.7 to 6 a second.
 [[ability]]
 key = "penance"
 name = "Penance"
-text = "Holds a lance of light out from you for 1.5 sec, sweeping as you turn. Enemies in it take 20 damage per sec. Allies in it heal 4% of maximum health per sec. Rake it across a pack, or across an ally in trouble."
-icon = "Spell_Holy_HolySmite"
+text = "Rings of light close on up to 3 allies and enemies in front of you, up to 30 yd away, one after another. Press Penance again as each ring closes to send a bolt of light to that target: an enemy takes 14 damage, an ally is healed for 14, or 18 either way dead on the beat. A ring you miss is a bolt lost. Land all 3 for a burst of light. You can move and dodge throughout."
+icon = "Spell_Holy_Penance"
 school = "priest"
 slot = "ranged"
-kind = "beam"
-range = [22.0, 22.0]
-# Half its width: a lance 2 yd wide.
-radius = [1.0, 1.0]
-secs = 1.5
-tick = 0.25
-# A second in it: 24 over its 1.5 s on each foe it holds.
-# 20 a second (was 16): the solo sim had the priest the slowest class at clearing a pack, its
-# heals going to friends a lone priest hasn't got. 30 a cast, 6 a second over its cooldown.
-damage = [20.0, 20.0]
-ally_heal = 0.04
-cooldown = 5.0
-# A golden glow on you while you hold it (Power Infusion), and bolts of holy light streaming down
-# it to the first foe in it (a holy missile with no cast pose of its own, so each tick doesn't
-# jerk the priest).
-spell = 10060
-aura = 10060
-tick_spell = 6685
-clip = 53
+kind = "penance"
+at_once = true
+range = [30.0, 30.0]
+damage = [14.0, 14.0]
+mend = 14.0
+cooldown = 9.0
+penance = { beats = 3, targets = 3, cone = 70.0, first = 0.6, gap = 0.55, window = 0.16, crit = 18.0 }
+# Holy Wrath's bolt to each body, the hands taking turns; dead on, a holy flash on it; all landed,
+# the Priest's own perfect (`[priest] perfect_kit`). Holy Nova's flood on the last bolt read as
+# arcane (Corey's review) and is gone.
+spell = 2812
+impact_kit = 3153
+beat_clips = [53, 54]
 
-# The old Mind Blast's bigger, terrifying version, now Penance's EX.
 [[ability]]
-key = "mind_blast"
-name = "Mind Blast"
+key = "greater_penance"
+name = "Greater Penance"
 ex_of = "penance"
-text = "A dark star bursts at the reticle, up to 30 yd away, 0.6 sec later. Its spot is shown to everyone. Deals 28 damage to all within 3.5 yd, and they flee in terror for 2 sec (1 sec against heroes). Lead your target."
-icon = "Spell_Shadow_UnholyFrenzy"
+text = "Penance with 5 rings, closing quicker: on up to 5 allies and enemies in front of you."
+icon = "Spell_Holy_Penance"
 slot = "ranged"
-kind = "ground"
+kind = "penance"
+at_once = true
 valor = 25
 range = [30.0, 30.0]
-radius = [3.5, 3.5]
-delay = 0.6
-damage = [28.0, 28.0]
-# A burst of void out of the ground where it lands (Void Blast).
-spell = 27812
-clip = 54
-effects = [{ kind = "panic", secs = [2.0, 2.0] }]
+damage = [14.0, 14.0]
+mend = 14.0
+penance = { beats = 5, targets = 5, cone = 80.0, first = 0.55, gap = 0.45, window = 0.14, crit = 18.0 }
+spell = 2812
+impact_kit = 3153
+beat_clips = [53, 54]
 
+# E: standing together. Light bursts round you, stronger for every other hero inside. No timing
+# check: where you stand is the skill. Alone it's still a heal and a burst.
 [[ability]]
 key = "holy_nova"
 name = "Holy Nova"
-text = "Light bursts from you, dealing 12 damage to every enemy within 7 yd. You and every ally in it heal 6% of maximum health."
+text = "Light bursts from you, dealing 16 damage to enemies within 8 yd and healing you and your allies in it for 16. 25% stronger for each other hero inside, up to 75%."
 icon = "Spell_Holy_HolyNova"
 school = "priest"
 slot = "close"
 kind = "nova"
-radius = [7.0, 7.0]
-damage = [12.0, 12.0]
-area_heal = 0.06
-cooldown = 8.0
+radius = [8.0, 8.0]
+damage = [16.0, 16.0]
+mend = 16.0
+per_hero = [0.25, 0.75]
+cooldown = 9.0
 spell = 15237
 
 [[ability]]
-key = "psychic_scream"
-name = "Psychic Scream"
+key = "surge_of_light"
+name = "Surge of Light"
 ex_of = "holy_nova"
-text = "Every enemy within 8 yd flees in terror for 3 sec (1.5 sec against heroes). Enough damage ends it early."
-icon = "Spell_Shadow_PsychicScream"
+text = "A greater nova: 24 damage to enemies within 10 yd and 24 healing to you and your allies in it, stronger for each other hero inside as Holy Nova is. Your allies in it run 30% faster for 3 sec."
+icon = "Spell_Holy_SurgeOfLight"
 slot = "close"
 kind = "nova"
 valor = 25
-radius = [8.0, 8.0]
-spell = 8122
-effects = [{ kind = "panic", secs = [3.0, 3.0] }]
+radius = [10.0, 10.0]
+damage = [24.0, 24.0]
+mend = 24.0
+per_hero = [0.25, 0.75]
+spell = 15237
+ally_effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.3 }]
 
+# 1: the road out. A feather of light at the reticle; the first hero to touch it (you or a friend,
+# by choice) runs faster and is freed of slows and roots. No one is moved who didn't step on it.
 [[ability]]
-key = "leap_of_faith"
-name = "Leap of Faith"
-text = "Sends a ray of light along the reticle, up to 22 yd. The first target it touches, ally or enemy, is pulled to you. Save an ally from a pack, or drag an enemy into your Holy Nova."
-icon = "Spell_Holy_SealOfSalvation"
+key = "angelic_feather"
+name = "Angelic Feather"
+text = "Lays a feather of light at the reticle, up to 20 yd away. The first hero to touch it, you or an ally, runs 40% faster for 3 sec and is freed of slows and roots. It lasts 15 sec. Holds 2 charges."
+icon = "Spell_Holy_DivineSpirit"
 school = "priest"
 slot = "utility"
-kind = "projectile"
-friendly = true
-range = [22.0, 22.0]
-radius = [0.5, 0.5]
-speed = 20.0
-cooldown = 14.0
-spell = 2812
-clip = 54
-effects = [{ kind = "pull", amount = 22.0, from_caster = true }]
+kind = "feather"
+range = [20.0, 20.0]
+# 2 charges, 20 sec each: one every 10 sec over a fight (the board's least for a utility), two to
+# lay a road at once.
+cooldown = 20.0
+charges = 2
+feather = { reach = 1.6, secs = 15.0, most = 2 }
+effects = [{ kind = "haste", secs = [3.0, 3.0], amount = 0.4 }]
+# Levitate's light where it's laid and on whoever takes it.
+spell = 1706
+burst_spell = 1706
+impact_kit = 6095
 
 [[ability]]
-key = "mind_grip"
-name = "Mind Grip"
-ex_of = "leap_of_faith"
-text = "A faster ray of shadow. An enemy is pulled to you and rooted for 2 sec (1 sec against heroes). An ally is pulled to you and shielded for 30 damage for 5 sec."
-icon = "Spell_Shadow_Possession"
+key = "body_and_soul"
+name = "Body and Soul"
+ex_of = "angelic_feather"
+text = "You and every ally within 10 yd run 40% faster for 4 sec and are freed of slows and roots."
+icon = "Spell_Holy_SymbolOfHope"
 slot = "utility"
-kind = "projectile"
+kind = "nova"
 valor = 25
-friendly = true
-range = [24.0, 24.0]
-radius = [0.5, 0.5]
-speed = 40.0
-spell = 23394
-clip = 54
-effects = [{ kind = "pull", amount = 24.0, from_caster = true }, { kind = "root", secs = [2.0, 2.0] }, { kind = "shield", secs = [5.0, 5.0], amount = 30.0 }]
+radius = [10.0, 10.0]
+cleanse = true
+ally_effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }]
+self_effects = [{ kind = "haste", secs = [4.0, 4.0], amount = 0.4 }]
+spell = 1706
 
-# A place to hold: friends under the dome take less and stand their ground. Each second it gives
-# them both (its boon, and the boon among its tick effects) for 1.5 s; you have both at once.
+# Power Word: Shield, the heart of the class (Corey's ruling): the only way a Priest saves a friend
+# from a blow. On the friend under the reticle, else on you. Given to a friend just as a blow lands
+# on them (`parry_for`: within `[checks] window` of it, the Priest's round trip allowed early, or
+# while the blow waits on the friend's), the blow is parried for them: the striker reels, the
+# shield stays, and the Priest gets a counter's Valor and the perfect. On yourself it only
+# absorbs. Two charges, a charge back every 24 sec.
+[[ability]]
+key = "power_word_shield"
+name = "Power Word: Shield"
+text = "Shields the ally under your reticle, up to 30 yd away, or you if there's none. Absorbs 30 damage for 6 sec. Shield an ally just as an enemy's blow lands on them and the blow is parried for them. Holds 2 charges."
+icon = "Spell_Holy_PowerWordShield"
+school = "priest"
+slot = "defense"
+kind = "ally"
+range = [30.0, 30.0]
+cooldown = 24.0
+charges = 2
+parry_for = true
+spell = 17
+effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 30.0 }]
+
+# The dome: a place to hold, no parry (its own job, not the Shield's twice).
 [[ability]]
 key = "power_word_barrier"
 name = "Power Word: Barrier"
+ex_of = "power_word_shield"
 text = "Raises a 6 yd dome of light around you for 5 sec. You and every ally under it take 25% less damage and cannot be staggered. Hold the line inside it."
 icon = "Spell_Holy_PowerInfusion"
-school = "priest"
 slot = "defense"
 kind = "ground"
+valor = 25
 at_self = true
 radius = [6.0, 6.0]
 linger = 5.0
-cooldown = 18.0
 # A column of light on you as it rises (Sanctuary's), and holy light on the ground while it lasts.
 spell = 24171
 linger_spell = 20116
@@ -6024,41 +6243,281 @@ boon_amount = 0.25
 tick_effects = [{ kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
 self_effects = [{ kind = "hallowed", secs = [1.5, 1.5], amount = 0.25 }, { kind = "steadfast", secs = [1.5, 1.5], amount = 1.0 }]
 
-# Now given away: on the friend under the reticle, else on you.
+# The group's beat: a circle where you stand, for everyone. You rise on wings of light (Magic
+# Wings), out of reach, still able to fight from the air. Three times a ring runs out from you to
+# the rim; every hero inside who acts as it reaches the rim lands the beat (a stack of Holy Light).
+# The third calls a pillar that grows with them. Alone, you land the beats yourself.
 [[ability]]
-key = "power_word_shield"
-name = "Power Word: Shield"
-ex_of = "power_word_barrier"
-text = "Shields the ally under your reticle, or you. The shield absorbs 45 damage for 6 sec, and they run 20% faster while it holds."
-icon = "Spell_Holy_PowerWordShield"
-slot = "defense"
-kind = "ally"
-valor = 25
-range = [30.0, 30.0]
-spell = 17
-effects = [{ kind = "shield", secs = [6.0, 6.0], amount = 45.0 }, { kind = "haste", secs = [6.0, 6.0], amount = 0.2 }]
+key = "holy_word_salvation"
+name = "Holy Word: Salvation"
+text = "Lays a circle of light 10 yd wide where you stand, for everyone to see, and lifts you up on wings of light: you can't be harmed or move, but can still fight. 3 times a ring runs out from you to the edge, each faster. Every hero inside who attacks, dodges, guards or casts as it reaches the edge gains a stack of Holy Light: 10% more damage per stack, up to 3, for 10 sec. The third calls a pillar of light: 30 damage to enemies in the circle, plus 15 for each hero who timed it, up to 110. Each of them is healed for 20."
+icon = "Spell_Holy_PrayerOfHealing02"
+school = "priest"
+slot = "ultimate"
+kind = "sigil"
+valor = 100
+radius = [10.0, 10.0]
+beats = [2.0, 1.5, 1.0]
+damage = [30.0, 110.0]
+per_lander = 15.0
+mend = 20.0
+cooldown = 40.0
+# Up high enough to look down on the fight (Corey: higher, the camera rising with them).
+float = 5.0
+float_aura = 24742
+# Prayer of Healing at its centre as it's laid, Starshards for the pillar. The circle, its floor
+# and its rings are the add-on's, in pale light: Consecration's ground is a Paladin's and Holy
+# Nova's flood on each beat was orange (Corey's review).
+spell = 596
+full_spell = 10797
+burst = { secs = 0.5, colour = "FFF8E0" }
+clip = 54
+# Holy Light: Holy Strength's gold glow on whoever has it.
+stack = { name = "Holy Light", might = 0.1, most = 3, secs = 10.0, aura = 20007 }
 
+# --- Priest, Shadow (choice 2) -----------------------------------------------------------------
+
+# Q: prediction. A dark sigil at the reticle erupts 0.9 sec later: lead your target. Four hits
+# (Corey, Nov 6): its edge 24; its heart (1 yd) 30; the heart on a foe on the move, the read that
+# was right, 36, Valor and the perfect; a foe under Shadow Weaving or a Warlock's shadow 25% more
+# on any of them (45 at most: the board's 45 a hit). 24 to 45 over 8 sec, 3 to 5.6 a second.
+[[ability]]
+key = "mind_blast"
+name = "Mind Blast"
+text = "Marks the ground at the reticle, up to 30 yd away, with a dark sigil. 0.9 sec later it erupts, dealing 24 damage within 2.5 yd. An enemy within 1 yd of its heart takes 30 instead, or 36 if it was moving, and you gain 5 Valor. Enemies under Shadow Weaving or a Warlock's shadow take 25% more."
+icon = "Spell_Shadow_UnholyFrenzy"
+perfect_kit = 2350
+school = "priest"
+slot = "ranged"
+choice = 2
+kind = "ground"
+range = [30.0, 30.0]
+radius = [2.5, 2.5]
+delay = 0.9
+damage = [24.0, 24.0]
+heart = [1.0, 30.0, 5.0]
+heart_moving = 36.0
+shadowed = 0.25
+cooldown = 8.0
+# Mind Blast's own burst where it erupts and on each foe it strikes.
+spell = 8092
+impact_kit = 2709
+
+# A judgement, not a timing: much harder on a foe that's nearly done, and it bites back if it
+# isn't. A kill gives one free Death within 3 sec (that one gives no other).
+[[ability]]
+key = "shadow_word_death"
+name = "Shadow Word: Death"
+ex_of = "mind_blast"
+text = "Deals 18 damage to the first enemy along the reticle, up to 30 yd, or 45 to an enemy below 20% health. If it doesn't kill, you take 12 damage. If it kills, you can cast it once more within 3 sec for free."
+icon = "Spell_Shadow_DemonicFortitude"
+perfect_kit = 2350
+slot = "ranged"
+kind = "projectile"
+valor = 25
+damage = [18.0, 18.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+# Slow enough to follow, with a violet streak behind it (Corey couldn't tell it was a shot at
+# all at 80 yd a second, a tenth of a second at 8 yd): `[[missile_look]]` 29317.
+speed = 40.0
+low_health = 0.2
+low_mult = 2.5
+backlash = 12.0
+kill_recast = 3.0
+spell = 29317
+# Mind Blast's dark burst on the body it strikes (Death Coil's, 219, flashed fel green: Corey).
+impact_kit = 2709
+clip = 54
+
+# E: space. Every foe round you flees, and the first real blow ends it. The Warlock's fear is one
+# foe, aimed; this is everyone near you, and it breaks.
+[[ability]]
+key = "psychic_scream"
+name = "Psychic Scream"
+text = "Every enemy within 6 yd flees in terror for 3 sec (1.5 sec against heroes). Enough damage ends it early."
+icon = "Spell_Shadow_PsychicScream"
+school = "priest"
+slot = "close"
+choice = 2
+kind = "nova"
+radius = [6.0, 6.0]
+cooldown = 18.0
+spell = 8122
+effects = [{ kind = "panic", secs = [3.0, 3.0] }]
+
+[[ability]]
+key = "psychic_horror"
+name = "Psychic Horror"
+ex_of = "psychic_scream"
+text = "Every enemy within 9 yd flees in terror for 3 sec (1.5 sec against heroes). Enough damage ends it early."
+icon = "Spell_Shadow_PsychicHorrors"
+slot = "close"
+kind = "nova"
+valor = 25
+radius = [9.0, 9.0]
+spell = 8122
+# 3 sec: heroes get half (1.5, the board's most for a fear).
+effects = [{ kind = "panic", secs = [3.0, 3.0] }]
+
+# 1: the sidestep (Corey: a dodge, not a Mage's blink). A quick step the way you're moving, in
+# Fade's shadow, nothing touching you for a moment. A blow that misses because of it: the striker
+# slowed (shadow clinging to its legs), you quicker.
+[[ability]]
+key = "fade"
+name = "Fade"
+text = "Sidesteps 5 yd the way you're moving (back if you aren't) in a fade of shadow. Nothing can harm you for 0.4 sec. An enemy whose blow misses you because of it is slowed by 40% for 2 sec, and you run 30% faster for 1.5 sec."
+icon = "Spell_Magic_LesserInvisibilty"
+# A small dark flash on a slip, not Void Blast's pillar (Corey's review: a giant pillar of purple).
+perfect_kit = 117
+school = "priest"
+slot = "utility"
+choice = 2
+kind = "dash"
+sidestep = true
+at_once = true
+through = true
+range = [5.0, 5.0]
+cooldown = 10.0
+invulnerable = true
+secs = 0.4
+slip = true
+slip_hasten = 0.0
+slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }]
+slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
+# The add-on's afterimage where they stood, and Mind Blast's short dark burst on the Priest as they
+# slip. (Fade's own aura, 586, was the look: its shimmer stayed on the body long after the step.
+# Corey: the animation played too long.)
+spell = 8092
+
+[[ability]]
+key = "greater_fade"
+name = "Greater Fade"
+ex_of = "fade"
+text = "Fade, 7 yd. An enemy whose blow misses you because of it is slowed by 40% for 2 sec and deals 20% less damage for 3 sec."
+icon = "Spell_Shadow_Twilight"
+perfect_kit = 117
+slot = "utility"
+kind = "dash"
+sidestep = true
+at_once = true
+through = true
+valor = 25
+range = [7.0, 7.0]
+invulnerable = true
+secs = 0.4
+slip = true
+slip_hasten = 0.0
+slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }, { kind = "weaken", secs = [3.0, 3.0], amount = 0.2 }]
+slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
+spell = 8092
+
+# 2: take it, give it back. A shell for up to 2 sec: half of every blow stopped and stored; the key
+# again (or its time up) throws it at the first foe along the reticle. Let go just after a blow
+# lands on you: half again as much (45 at most), the perfect.
+[[ability]]
+key = "shadowguard"
+name = "Shadowguard"
+text = "Wraps you in shadow for up to 2 sec. You take 50% less damage and move slowly, but can't attack, and the damage it stops is stored, up to 40. Press again (or wait it out) to hurl it at the first enemy along the reticle. Let go just after a blow lands on you and it deals 50% more, up to 45."
+icon = "Spell_Shadow_AntiShadow"
+perfect_kit = 2350
+school = "priest"
+slot = "defense"
+choice = 2
+kind = "shell"
+cooldown = 12.0
+secs = 2.0
+shell = { shard = "shadowguard_shard", secs = 2.0, cut = 0.5, cap = 40.0, window = 0.3, perfect = 1.5, perfect_cap = 45.0 }
+# Shadow Shell's dark bubble round the Priest while it holds.
+spell = 9657
+aura = 9657
+
+[[ability]]
+key = "shadowguard_shard"
+name = "Shadowguard"
+text = "The stored shadow, hurled."
+icon = "Spell_Shadow_AntiShadow"
+school = "priest"
+slot = "defense"
+kind = "projectile"
+bench = true
+inner = true
+damage = [0.0, 0.0]
+range = [30.0, 30.0]
+radius = [0.6, 0.6]
+speed = 40.0
+# The death-bolt (Void Blast has no missile in this client), Void Blast's burst where it strikes.
+spell = 26006
+impact_kit = 2350
+
+# Shadow wants to deal damage: a grip that turns the Priest's own damage into their health (only
+# theirs: Corey's ruling).
+[[ability]]
+key = "vampiric_touch"
+name = "Vampiric Touch"
+ex_of = "shadowguard"
+text = "Grips the enemy in front of you with a hand of shadow for 8 sec. Your damage to it heals you for 20% of the damage dealt."
+icon = "Spell_Shadow_UnsummonBuilding"
+slot = "defense"
+kind = "cone"
+valor = 25
+at_once = true
+range = [3.5, 3.5]
+arc = 60.0
+spell = 15286
+effects = [{ kind = "vampiric", secs = [8.0, 8.0], amount = 0.2, aura = 15286 }]
+
+# 3: gather, then implode. A wound at the reticle grows for 2 sec; cords drag the foes in it toward
+# its heart each second (a hero 5 yd at most). The key again implodes it: 40, and 8 more for every
+# foe it caught (80 at most); 3 or more caught is the perfect. Left 4 sec, it collapses for 20.
 [[ability]]
 key = "void_rift"
 name = "Void Rift"
-text = "Tears open the void at the reticle, up to 30 yd away, after 0.8 sec. Deals 10 damage, then for 4 sec drags every enemy in its 8 yd radius 3 yd toward its center each second, dealing 6 damage per sec. Pull them into a trap, a Volley or a Meteor."
+text = "Tears open the void at the reticle, up to 30 yd away: 4 yd wide, growing to 7 yd over 2 sec. Each second it drags enemies in it 3 yd toward its heart (heroes 5 yd at most) and deals 6 damage. Press again to implode it: 40 damage, plus 8 for each enemy it caught, up to 80. Left alone, it collapses after 4 sec for 20."
 icon = "Spell_Shadow_SealOfKings"
+perfect_kit = 2350
 school = "priest"
 slot = "ultimate"
+choice = 2
 kind = "ground"
 valor = 100
 range = [30.0, 30.0]
-radius = [8.0, 8.0]
-delay = 0.8
-damage = [10.0, 10.0]
+radius = [4.0, 4.0]
+damage = [40.0, 80.0]
 linger = 4.0
 linger_damage = 6.0
+tick = 1.0
 cooldown = 40.0
-# A rift of shadow that swirls on the ground while it lasts (Shadow Fissure).
+rift = { grow_to = 7.0, grow_secs = 2.0, pull = 3.0, hero_most = 5.0, per_foe = 8.0, perfect_foes = 3, collapse = 20.0 }
+# Shadow Fissure as it tears open and on the ground while it lasts; Void Blast's burst as it
+# collapses, Mind Blast's with it as it implodes.
 spell = 27810
-tick_spell = 8092
+linger_spell = 27810
+burst_spell = 27812
+full_spell = 8092
+burst = { secs = 0.6, colour = "7A3CFF" }
 clip = 54
-tick_effects = [{ kind = "pull", amount = 3.0, lift = 1.5 }]
+
+# Benched (rules kept, off the board): Mind Flay's tension, a reserve for the Void staff's tether.
+[[ability]]
+key = "mind_flay"
+name = "Mind Flay"
+text = "Binds the first enemy along the reticle with a cord of shadow for 3 sec, slowing it by 30%. Deals 4 damage per sec up close, rising to 14 per sec from 26 to 30 yd. Beyond 30 yd the cord snaps. Press again while it is taut to deal twice the damage left in it at once, up to 45. You can walk slowly while it lasts."
+icon = "Spell_Shadow_SiphonMana"
+school = "priest"
+slot = "ranged"
+choice = 2
+kind = "channel"
+bench = true
+damage = [4.0, 14.0]
+range = [30.0, 30.0]
+secs = 3.0
+tick = 0.5
+cooldown = 9.0
+spell = 15407
+clip = 54
+effects = [{ kind = "snare", secs = [0.6, 0.6], amount = 0.3 }]
+flay = { taut = 26.0, taut_secs = 1.0, snap = 2.0, snap_cap = 45.0, taut_spell = 5138, taut_kit = 457, whip_spell = 27812, snap_kit = 2709, flinch = 0.3 }
 
 # ----------------------------------------------------------------------------------- Shaman --
 
@@ -6382,6 +6841,177 @@ range = [30.0, 30.0]
 radius = [0.7, 0.7]
 speed = 26.0
 spell = 7268
+
+# The Priest's staffs' clicks (docs/priest-draft3.md): a staff is a playstyle with a loop.
+# The holy staff: Smite marks with Searing Light; the heavy, held, is Greater Smite (let go on the
+# flare, it pierces; held past it, it weakens; let go in the air, it throws you back); the right
+# click held aims Healing Gust, the click casts it.
+[[ability]]
+key = "acolyte_smite"
+name = "Smite"
+text = "A bolt of holy light from the staff that deals 9 damage and marks the enemy with Searing Light for 5 sec. Your other Priest spells and Greater Smite tear the mark out for 8 more damage, and Healing Gust recharges 3 sec sooner."
+icon = "Spell_Holy_HolySmite"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+builds = "sear"
+stamina = 8.0
+damage = [9.0, 9.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 40.0
+# The small holy bolt (Holy_Missile_Low), Smite's flash where it lands.
+spell = 6685
+impact_kit = 291
+
+[[ability]]
+key = "acolyte_greater_smite"
+name = "Greater Smite"
+text = "Hold up to 1 sec for a bigger bolt of holy light, 12 to 22 damage. Release on the flare for 26 damage that pierces. Held past the flare it weakens back to 12. Released in the air, it throws you back 4 yd."
+icon = "Spell_Holy_HolyBolt"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+charge = [0.3, 1.0]
+perfect = true
+overcharge = [0.35, 0.0]
+air_recoil = 4.0
+stamina = 16.0
+damage = [12.0, 22.0]
+full_pierce = 2
+range = [34.0, 34.0]
+radius = [0.6, 0.6]
+speed = 40.0
+full_speed = 60.0
+# Holy Wrath's bolt; the staff held at the ready the whole charge, a holy glow in the hands.
+spell = 2812
+full_spell = 10318
+impact_kit = 3153
+charge_pose = 28
+charge_kit = 193
+
+[[ability]]
+key = "healing_gust"
+name = "Healing Gust"
+text = "Hold right-click to aim, then click: a slow wave of light that heals every ally it passes through for 10% of their health. If it meets no ally, it heals you for 7.5% as it fades. Holds 2 charges."
+icon = "Spell_Holy_FlashHeal"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+aim_alt = true
+friends_only = true
+pierce = 9
+charges = 2
+cooldown = 10.0
+stamina = 6.0
+ally_heal = 0.10
+self_heal = 0.75
+range = [30.0, 30.0]
+radius = [1.2, 1.2]
+speed = 18.0
+valor_hit = 2.0
+spell = 6685
+burst_spell = 2061
+
+# The shadow staff: each Shadow Bolt weaves a stack of Shadow Weaving into its foe; patience
+# Empowers the next; the right click rips the Weaving out. (Pain is gone: damage over time is the
+# Warlock's.)
+[[ability]]
+key = "shadowcaller_bolt"
+name = "Shadow Bolt"
+text = "A bolt of shadow from the staff that deals 9 damage and weaves a stack of Shadow Weaving into the enemy for 6 sec, up to 5: each makes your staff's bolts 8% stronger on it. After 2 sec without firing, your next bolt is Empowered: faster, 10 yd farther, 50% stronger, and worth 4 Valor."
+icon = "Spell_Shadow_ShadowBolt"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+builds = "weave"
+stamina = 8.0
+damage = [9.0, 9.0]
+range = [30.0, 30.0]
+radius = [0.35, 0.35]
+speed = 32.0
+spell = 686
+
+[[ability]]
+key = "shadowcaller_bolt_heavy"
+name = "Shadow Burst"
+text = "Hold for a heavy bolt of shadow, 14 to 26 damage, 8% stronger for each stack of Shadow Weaving on the enemy. Release on the flare for a perfect."
+icon = "Spell_Shadow_ShadowBolt"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+# Weaving rides it too (31 perfect, 44 at 5 stacks: inside the board's 45).
+woven = true
+charge = [0.3, 1.2]
+perfect = true
+stamina = 20.0
+damage = [14.0, 26.0]
+range = [30.0, 30.0]
+radius = [0.6, 0.6]
+speed = 26.0
+spell = 686
+
+[[ability]]
+key = "dark_reckoning"
+name = "Dark Reckoning"
+text = "Rips the Shadow Weaving out of the first enemy along the reticle, up to 30 yd: 7 damage per stack, 35 at 5."
+icon = "Spell_Shadow_BlackPlague"
+school = "priest"
+slot = "ranged"
+kind = "projectile"
+bench = true
+spends = "weave"
+cooldown = 8.0
+stamina = 8.0
+damage = [7.0, 7.0]
+range = [30.0, 30.0]
+radius = [0.5, 0.5]
+speed = 60.0
+spell = 26006
+impact_kit = 2350
+
+# The Staff of the Hollow Star: the left click held is the Void Tether; the right click throws the
+# Hollow Star, a living orb that hurts foes and heals friends, filling and draining as it does.
+[[ability]]
+key = "void_tether"
+name = "Void Tether"
+text = "Hold to bind the first body along the reticle, up to 20 yd, with a cord of the void. An enemy takes 6 damage per sec, rising to 12 over 2 sec. An ally is healed 4 per sec, rising to 8. Your Hollow Star is filled 6 per sec and drawn toward you."
+icon = "Spell_Shadow_Requiem"
+school = "priest"
+slot = "ranged"
+kind = "channel"
+bench = true
+damage = [6.0, 12.0]
+range = [20.0, 20.0]
+secs = 20.0
+tick = 0.25
+tether = { ramp = 2.0, heal = [4.0, 8.0], fill = 6.0, drag = 3.0, valor = 1.0 }
+# Mind Flay's cord.
+spell = 15407
+
+[[ability]]
+key = "hollow_star"
+name = "Hollow Star"
+text = "Throws a dark orb to the reticle, up to 15 yd. It has 40 health (up to 60) and lasts 10 sec. Every second it deals 5 damage to each enemy and heals each ally 5 within 3 yd (5 yd when full). The damage it deals fills it, 5 a second at most; the healing it gives drains it. Standing in it, you run 15% faster. Enemies can break it."
+icon = "Spell_Shadow_ShadowWordDominate"
+school = "priest"
+slot = "ranged"
+kind = "place"
+bench = true
+range = [15.0, 15.0]
+secs = 10.0
+tick = 1.0
+cooldown = 18.0
+hollow = { mob = "hollow_star", health = 40.0, most = 60.0, reach = [3.0, 5.0], damage = 5.0, heal = 5.0, scale = [0.9, 1.7] }
+effects = [{ kind = "haste", secs = [1.2, 1.2], amount = 0.15 }]
+# The orb flies as the death-bolt (Void Blast's throw, 27812, threw up a magenta pillar where it
+# landed: Corey); the dark bubble on the body it lands as is the orb you see.
+spell = 29317
 
 # ------------------------------------------------------------------------------------- Mage --
 
@@ -7327,7 +7957,6 @@ cooldown = 40.0
 spell = 23394
 tick_spell = 689
 clip = 54
-
 
 # --------------------------------------------------------------------------- their totems --
 
@@ -9532,7 +10161,8 @@ respawn = 1500.0
   steps = [ { from = "GnomeMale", clip = 19, take = 0, windup = 0.85, damage = 18, range = 4.2, arc = 360.0, blockable = false, recovery = 1.3, kit = 124, look = 10860 } ]
 
 # Brother Malach, a priest of the Abbey who listened to the Void: he walks the Abbey's old
-# vineyard tower. He is the priest's trial: the camp learns Void Rift when he falls.
+# vineyard tower. He is the priest's trial: the camp learns the priest's ultimates (Salvation,
+# and Void Rift) when he falls.
 [[mob]]
 key = "malach"
 name = "Brother Malach"
@@ -9552,7 +10182,7 @@ boss = true
 posture = 140
 drops = { linen = [2, 3], mageroyal = [1, 2] }
 trophy = { silver = 2, mageroyal = 3 }
-teaches = ["void_rift"]
+teaches = ["holy_word_salvation", "void_rift"]
 respawn = 1200.0
   [mob.attack]
   ranged = true
@@ -11402,7 +12032,7 @@ name = "Altar of the Abbey"
 at = [-8935.0, -165.0]
 display = 1527
 scale = 0.45
-teaches = ["penance", "holy_nova"]
+teaches = ["penance", "holy_nova", "mind_blast", "psychic_scream"]
 keep = true
 secs = 3.0
 text = "The Abbey's altar remembers its priests. The Light, and the shadow behind it."
@@ -11508,7 +12138,7 @@ trial = ["trial_relic_warrior_0", "trial_relic_warrior_1"]
 key = "relic_priest"
 name = "The Abbey Reliquary"
 at = [-8865.0, -150.0]
-teaches = ["leap_of_faith", "power_word_barrier"]
+teaches = ["angelic_feather", "power_word_shield", "fade", "shadowguard"]
 loot = { linen = 3 }
 display = 259
 secret = 7.0

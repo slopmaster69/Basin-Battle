@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 52
+local VERSION = 53
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1602,7 +1602,8 @@ function ES.Guard(state)
     elseif mv and MineBusy() and MineAt((ES.mine.kind == "heavy") and mv.heavyCancel or mv.cancelAfter) then
       CancelMine()
     end
-    Say(".es in g")
+    -- (With the reticle's line: a staff whose right click is a spell casts it along it.)
+    Say(".es in g" .. ES.AimLine())
   else
     if not ES.guardHeld then return end
     ES.guardHeld = false
@@ -1673,6 +1674,12 @@ function ES.Ability(n, ex, state)
   -- A key armed for its recast, or empowered (its EX version, free): pressed, it goes at once
   -- (the server knows which it fires), with no hold to wait for.
   if ES.recasts[n] or ES.empowers[n] then
+    SendAbility(n, false)
+    return
+  end
+  -- A Void Rift of ours open: the ultimate's key again implodes it, at once (the hold guards only
+  -- the bar's spending).
+  if n == ULT and ES.riftOpenUntil and GetTime() < ES.riftOpenUntil then
     SendAbility(n, false)
     return
   end
@@ -6785,8 +6792,15 @@ function ES.Line(line)
     if ES.StaffLine then ES.StaffLine(f) end
   elseif verb == "SK" then
     if ES.StacksLine then ES.StacksLine(f) end
+    if ES.PriestStacksLine then ES.PriestStacksLine(f) end
   elseif verb == "SH" then
     if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
+  elseif verb == "SV" then
+    if ES.SigilLine then ES.SigilLine(f) end
+  elseif verb == "PL" then
+    if ES.PriestLookLine then ES.PriestLookLine(f) end
+  elseif verb == "PG" then
+    if ES.PriestGroundLine then ES.PriestGroundLine(f) end
   elseif verb == "OB" then
     if ES.OrbLine then ES.OrbLine(f) end
   elseif verb == "OX" then
@@ -6913,6 +6927,8 @@ function ES.Line(line)
     if ES.FightMeter then ES.FightMeter(f) end
   elseif verb == "LB" then
     if ES.LabLine then ES.LabLine(f) end
+  elseif verb == "LW" then
+    if ES.LabWalk then ES.LabWalk(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "CU" then

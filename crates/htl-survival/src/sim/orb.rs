@@ -151,7 +151,7 @@ impl Survival {
     fn near_orb(&self, o: &Orb, radius: f32) -> (Vec<Id>, Vec<Id>) {
         let at = o.pos;
         let mobs: Vec<Id> = self.mobs.iter().filter(|(mid, m)| m.health > 0 && !m.hidden && dist2d(m.pos, at) <= radius + 0.5 * self.content.mobs[m.def].scale && !self.own_totem(**mid, o.owner) && !self.spirit_body(**mid)).map(|(id, _)| *id).collect();
-        let heroes: Vec<Id> = if self.content.pvp.friendly_fire {
+        let heroes: Vec<Id> = if self.heroes_clash() {
             self.players.iter().filter(|(h, p)| self.hostile(o.owner, **h) && !self.spared(o.owner, **h, o.ability) && p.health > 0 && dist2d(p.pos, at) <= radius + abilities::HERO_SIZE).map(|(h, _)| *h).collect()
         } else {
             Vec::new()
