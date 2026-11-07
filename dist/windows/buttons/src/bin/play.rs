@@ -69,12 +69,41 @@ fn main() {
             let _ = std::fs::write(f, format!("Play stopped: {info}\n"));
         }
     }));
+    // A folder Play may not read (macOS keeps an app out of Documents, Desktop and Downloads
+    // until it's allowed): said in a dialog, not a splash that does nothing.
+    if let Some(paths) = std::env::current_exe().ok().and_then(|e| Paths::find(&e)) {
+        if let Err(e) = std::fs::read(paths.root.join("project.toml")) {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                blocked(&paths.root);
+                return;
+            }
+        }
+    }
     if let Err(e) = run() {
         if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.to_path_buf())) {
             let _ = std::fs::write(dir.join("play-crash.txt"), format!("Play couldn't open its window: {e}\n"));
         }
         std::process::exit(1);
     }
+}
+
+/// The system won't let Play read its own folder: what to do about it, in a dialog.
+fn blocked(root: &std::path::Path) {
+    let title = Project::built_in().title;
+    let what = if cfg!(target_os = "macos") {
+        format!(
+            "macOS isn't letting {title} open its folder:\n{}\n\nAllow it in System Settings → Privacy & Security → Files & Folders (or add {title}.app to Full Disk Access), or move the folder out of Documents, Desktop and Downloads. Then open {title} again.",
+            root.display()
+        )
+    } else {
+        format!("Play isn't allowed to open its folder:\n{}\n\nCheck the folder's permissions, then open Play again.", root.display())
+    };
+    rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Warning)
+        .set_title(format!("{title} can't open its folder"))
+        .set_description(what)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
 }
 
 fn run() -> eframe::Result<()> {

@@ -20,4 +20,5 @@ __pycache__/
 /dist/windows/buttons/target
 /dist/windows/launcher/ui/news.json
 /dist/windows/launcher/ui/shield.png
-/Basin Battle.app
+# The Mac app scripts/mac-launcher.sh makes, named for project.toml's title.
+/*.app
