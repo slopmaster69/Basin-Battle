@@ -150,10 +150,12 @@ stagger = 0.6
 knockback = [9.0, 2.5]
 
 [combat]
-# Every foe's health, as a share of its own `health` (critters, dummies and totems as they are):
-# 1.6 makes a fight last about 60% longer than the numbers below say (the classes' cards hit
-# hard). A creature's posture, its blows and its damage stay as they are.
-foe_health = 1.6
+# Every foe's health, as a share of its own `health` (critters, dummies and totems as they are).
+# A creature's posture, its blows and its damage stay as they are. (Was 1.6, "the classes' cards
+# hit hard"; they don't: in the spell lab a full Fireball is 36, Bladestorm's whole 6 s is 126,
+# and the Nov 6 play-test found every fight too long for the kits. At 1.6 a Deadmines pirate took
+# 11 starting-sword hits, about 15 swings with its shield; at 1.0, 7. Nov 7 2026.)
+foe_health = 1.0
 # Every foe's blows (and burns) on a hero: this many times the damage written below.
 foe_damage = 1.35
 # For each hero in a foe's fight past the first (anyone standing within 25 yards of it, or on it
