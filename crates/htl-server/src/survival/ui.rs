@@ -5,7 +5,7 @@
 //! - `V\t<version>`: the server answers the add-on's hello (the add-on wakes only then).
 //! - `EF\t<name~seconds left~kind>^...`: what used items are still doing for the hero.
 //! - `GL\t<place>\t<goals>\t<title>\t<what to do>\t<have>\t<need>`: the camp journal's goal.
-//! - `H\t<health>\t<max>\t<stamina>\t<max>\t<kit>\t<weapon>\t<bags used>\t<bag slots>\t<cache yd>\t<cache bearing>\t<raid>\t<raid secs>\t<raiders left>\t<at camp>\t<foes in reach>\t<meals>\t<foe name>\t<foe health>\t<foe max>\t<ranged>\t<light clip>\t<light impact>\t<light secs>\t<heavy clip>\t<heavy impact>\t<heavy secs>\t<light stamina>\t<heavy stamina>\t<dodge stamina>\t<quick item>\t<its count>\t<armor %>\t<the raid's name>\t<sheathed>\t<jump stamina>\t<place unfound>\t<its yd>\t<its bearing>\t<north>\t<shield>\t<overhealth>` (what the hero's shields have left to soak, and their health over the most: the health bar's white and pale-red ends)
+//! - `H\t<health>\t<max>\t<stamina>\t<max>\t<kit>\t<weapon>\t<bags used>\t<bag slots>\t<cache yd>\t<cache bearing>\t<raid>\t<raid secs>\t<raiders left>\t<at camp>\t<foes in reach>\t<meals>\t<foe name>\t<foe health>\t<foe max>\t<ranged>\t<light clip>\t<light impact>\t<light secs>\t<heavy clip>\t<heavy impact>\t<heavy secs>\t<light stamina>\t<heavy stamina>\t<dodge stamina>\t<quick item>\t<its count>\t<armor %>\t<the raid's name>\t<sheathed>\t<jump stamina>\t<place unfound>\t<its yd>\t<its bearing>\t<north>\t<shield>\t<overhealth>\t<heal ahead>` (what the hero's shields have left to soak, and their health over the most: the health bar's white and pale-red ends; the healing still to come from meals, salves and mending, a ghost of the health past it)
 //! - `A\t<action>\t<seconds in>\t<seconds long>`: what the hero is doing, for the action bar.
 //! - `S\t<item~name~count~gear>^...`: the camp chest, while its window is open.
 //! - `W\t<station>\t<name>\t<recipe~output~cost~can>^...`: a station's work.
@@ -484,7 +484,9 @@ pub(crate) const VERSION: u32 = 2;
 /// Priest's staff casts its right click along it (Flash Heal, Drain); an older add-on's press
 /// goes along the hero's facing. Draft 3's lines: `PG`, the `PL` kinds penance to empower, `SK`
 /// weave and sear, and Salvation's ring running out to the edge.
-pub(crate) const ADDON_NEWEST: u32 = 53;
+/// 55: the health bar shows the healing still to come (`H`'s 43rd) as a rose stroke behind the
+/// health to where it will be. (54 is #217's.)
+pub(crate) const ADDON_NEWEST: u32 = 55;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -716,8 +718,9 @@ impl SurvivalGame {
         let armor = (self.sim.armor_reduce(p) * 100.0).round() as u32;
         let raid_title = clean(&self.sim.current_raid().title);
         let (shield, over) = self.sim.absorbs(id);
+        let ahead = self.sim.heal_ahead(id);
         Some(format!(
-            "H\t{}\t{}\t{}\t{}\t{kit}\t{}\t{used}\t{}\t{cd}\t{cb}\t{phase}\t{}\t{left}\t{}\t{reach}\t{meals}\t{foe}\t{foe_hp}\t{foe_max}\t{ranged}\t{swings}\t{quick}\t{quick_n}\t{armor}\t{raid_title}\t{}\t{:.0}\t{pn}\t{pd}\t{pb}\t{north}\t{shield}\t{over}",
+            "H\t{}\t{}\t{}\t{}\t{kit}\t{}\t{used}\t{}\t{cd}\t{cb}\t{phase}\t{}\t{left}\t{}\t{reach}\t{meals}\t{foe}\t{foe_hp}\t{foe_max}\t{ranged}\t{swings}\t{quick}\t{quick_n}\t{armor}\t{raid_title}\t{}\t{:.0}\t{pn}\t{pd}\t{pb}\t{north}\t{shield}\t{over}\t{ahead}",
             p.health,
             p.max_health,
             p.stamina.floor() as u32,
