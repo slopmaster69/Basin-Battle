@@ -1,0 +1,291 @@
+From 5cb806115970b218949d54a2b64fa89c26b8fc4a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 15:26:57 -0700
+Subject: [PATCH] Contact shadows you notice, no band at the water's edge, a
+ path of moonlight and froth round wading legs
+
+Tuning from the first films of the contact shadows (#262) and the water
+(#265), every changed number commented with why:
+
+- The contact shadows' default is now what lookao 2 was, which read as a
+  soft yard-wide shade along a step, under a barrel and in a wall's
+  crease, with no rims or halos: the grade's per-hour strengths doubled
+  (GAIN acts before the occlusion's clamp, so raising it is not the x2
+  that was filmed). lookao stays relative to the new default.
+- The water's mirror fades out over 22% of the screen toward its edge
+  (was 6%) and the ripples break the hand-over to the sky up, so no
+  straight, lighter band shows near the camera where mirrored rays leave
+  the screen.
+- The moon's path: the water's moon is the sky's (moon_dir_white, north-
+  west, 24 to 55 degrees up from 23:00 to midnight); the first night film
+  faced away from it. Its glint is broader and brighter (sharpness 160 to
+  64, strength 1.2 to 2.0), a pale shimmer of small glints on the ripples.
+- Froth round something standing in the water: a ring of six points on
+  the surface finds the step the legs make in the bed behind it, and a
+  lumpy froth spreads out from their outline, thinning over the ripples,
+  where the shore's band drew a crisp, thin, bright oval (and a white
+  ring round every reed base in the shallows). The shore's
+  band is a little dimmer (0.75 to 0.6) and patchy with the ripples.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-assets/src/shaders/liquid.wgsl | 52 +++++++++++++++--
+ crates/benilla-world/src/look/grade.rs        | 26 +++++----
+ crates/benilla-world/src/look/water.rs        | 58 ++++++++++++++++++-
+ 3 files changed, 119 insertions(+), 17 deletions(-)
+
+diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
+index abf81c2..71b51a4 100644
+--- a/crates/benilla-assets/src/shaders/liquid.wgsl
++++ b/crates/benilla-assets/src/shaders/liquid.wgsl
+@@ -223,6 +223,14 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
+ const WATER_SSR_STEPS: u32 = 24u;
+ const WATER_SSR_REFINE: u32 = 5u;
+ const WATER_SSR_START: f32 = 0.3;
++// `look::water::tune`'s `SSR_EDGE` and `SSR_BREAK`, `FROTH`, `FROTH_YD`, `FROTH_REACH` and
++// `FROTH_TAPS` (keep in sync; `look::water`'s tests compare them).
++const WATER_SSR_EDGE: f32 = 0.22;
++const WATER_SSR_BREAK: f32 = 0.6;
++const WATER_FROTH: f32 = 0.55;
++const WATER_FROTH_YD: f32 = 0.45;
++const WATER_FROTH_REACH: f32 = 40.0;
++const WATER_FROTH_TAPS: u32 = 6u;
+ const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
+ // The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
+ const WATER_SHADOW_TAPS: u32 = 6u;
+@@ -333,7 +341,9 @@ fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4
+             }
+             let uh = water_uv(view.clip_from_world * vec4<f32>(P + R * hi, 1.0));
+             let border = min(min(uh.x, 1.0 - uh.x), min(uh.y, 1.0 - uh.y));
+-            let weight = smoothstep(0.0, 0.06, border) * (1.0 - smoothstep(0.6 * reach, reach, hi));
++            // Faded out over the last `WATER_SSR_EDGE` of the screen toward its edge: a hit near
++            // the edge hands over to the sky gradually, not along the screen's straight line.
++            let weight = smoothstep(0.0, WATER_SSR_EDGE, border) * (1.0 - smoothstep(0.6 * reach, reach, hi));
+             return vec4<f32>(textureSampleLevel(scene_tex, scene_samp, uh, 0.0).rgb, weight);
+         }
+         t_prev = t;
+@@ -601,6 +611,10 @@ fn look_water(
+     if (fres > 0.01) {
+         hit = water_reflection(P, R, jitter, water.rows[7].x);
+     }
++    // The ripples' own tilt, -1 to 1 whatever the hour's slope: it breaks up the mirror's
++    // hand-over to the sky where the mirrored rays leave the screen, and the foam.
++    let rip = clamp((N.x - N.z) / max(water.rows[3].w, 0.02), -1.0, 1.0);
++    hit.a = clamp(hit.a + WATER_SSR_BREAK * rip * hit.a * (1.0 - hit.a) * 4.0, 0.0, 1.0);
+     var mirror = mix(water_sky(R), water_decode(hit.rgb), hit.a);
+     mirror *= 1.0 - water.rows[9].y * (1.0 - vis);
+ 
+@@ -617,12 +631,42 @@ fn look_water(
+ 
+     // The foam: a soft line just off the waterline under the foam depth, broken up and lapping.
+     let fd = max(water.rows[7].z, 0.01);
+-    let band = smoothstep(0.0, 0.04, depth_v) * (1.0 - smoothstep(0.15 * fd, fd, depth_v));
++    // Something standing in the water (a wading hero's legs, a post) is a step in the bed behind
++    // the surface, where the shore is a slope: a ring of points round P on the surface each read
++    // the bed under them. `stand` is the share whose bed is a step shallower than P's (P is
++    // beside the legs: froth), `on_step` whether P is itself on a step's shallow side (in front of
++    // the legs, where the shore's band would draw a crisp ring hugging their outline).
++    var stand = 0.0;
++    var on_step = 0.0;
++    if (eye_z < WATER_FROTH_REACH && water.rows[0].w > 0.0) {
++        for (var k = 0u; k < WATER_FROTH_TAPS; k = k + 1u) {
++            let ang = f32(k) * 2.3999632 + jitter * 6.2831853;
++            let r = WATER_FROTH_YD * sqrt((f32(k) + 0.5) / f32(WATER_FROTH_TAPS));
++            let Q = P + vec3<f32>(cos(ang) * r, 0.0, sin(ang) * r);
++            let cq = view.clip_from_world * vec4<f32>(Q, 1.0);
++            if (cq.w <= 0.05) {
++                continue;
++            }
++            let zq = water_scene_z(water_uv(cq));
++            if (zq <= 0.0) {
++                continue;
++            }
++            let dq = max(cam.y - Q.y, 0.0) * max(zq - cq.w, 0.0) / cq.w;
++            stand += (1.0 - smoothstep(0.1 * fd, fd, dq))
++                * smoothstep(0.5 * fd, 1.5 * fd, depth_v - dq);
++            on_step = max(on_step, smoothstep(0.5 * fd, 1.5 * fd, dq - depth_v));
++        }
++        stand = stand / f32(WATER_FROTH_TAPS);
++    }
++    let band = smoothstep(0.0, 0.06, depth_v) * (1.0 - smoothstep(0.1 * fd, fd, depth_v))
++        * (1.0 - on_step);
+     let na = water_noise(P.xz * 0.9 + vec2<f32>(0.05, -0.03) * t).x;
+     let nb = water_noise(P.xz * 2.7 + vec2<f32>(31.0, 7.0) - vec2<f32>(0.11, 0.07) * t).x;
+     let lap = 0.5 + 0.5 * sin(depth_v / fd * 9.0 - t * 1.4 + na * 4.0);
+-    let foam = water.rows[0].w * band
+-        * smoothstep(0.42, 0.78, 0.45 * na + 0.25 * nb + 0.35 * lap)
++    // The shore's band, patchy with the noise and the ripples; the froth lumpier and finer.
++    let shore_mask = smoothstep(0.38, 0.86, 0.4 * na + 0.25 * nb + 0.3 * lap + 0.15 * rip);
++    let froth_mask = smoothstep(0.25, 0.75, 0.55 * nb + 0.3 * na + 0.25 * rip);
++    let foam = min(water.rows[0].w * band * shore_mask + WATER_FROTH * stand * froth_mask, 1.0)
+         * (1.0 - smoothstep(60.0, 120.0, eye_z));
+     let foam_rgb = water_decode(lit_g) * 0.8;
+ 
+diff --git a/crates/benilla-world/src/look/grade.rs b/crates/benilla-world/src/look/grade.rs
+index ac8e1d4..e8762af 100644
+--- a/crates/benilla-world/src/look/grade.rs
++++ b/crates/benilla-world/src/look/grade.rs
+@@ -57,8 +57,9 @@ pub struct PostLook {
+     pub height_fog: f32,
+     /// God-ray strength, 0..1.
+     pub rays: f32,
+-    /// Ambient-occlusion strength ([`super::ao`]): how dark the contact shadows go, 1 the tuned
+-    /// look's own; 0 has none.
++    /// Ambient-occlusion strength ([`super::ao`]): how dark the contact shadows go, the darkening
++    /// a crease's occlusion gives (capped at `ao::tune::MAX_DARKEN`); 0 has none. Elwynn's run
++    /// 1.2 at noon to 2 at golden hour and night.
+     pub ao: f32,
+     /// How cool the contact shadows are, 0..1: blue shade by day, neutral at night.
+     pub ao_cool: f32,
+@@ -217,8 +218,8 @@ const ELWYNN_NIGHT: (Tint, Tint, Tint, Tint, f32, [f32; 6], [f32; 2]) = (
+     Tint::new(0.02, 0.03, 0.08, 0.45),
+     0.85,
+     [0.75, 1.15, -0.12, 0.50, 0.45, 0.0],
+-    // Contact shadows strong and neutral: the dark is ambient light only.
+-    [1.0, 0.0],
++    // Contact shadows strong and neutral: the dark is ambient light only. 2.0: x2 of the first pass: at 1x the first films (#262) could not find it.
++    [2.0, 0.0],
+ );
+ 
+ /// Elwynn Forest, the first pass to tune on video. The aim is WoW Forever's: warm light against
+@@ -246,7 +247,8 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.95, 0.70, 0.65, 0.30),
+         1.2,
+         [1.00, 1.05, 0.10, 0.40, 0.70, 0.8],
+-        [0.85, 0.35],
++        // 1.7: x2 of the first pass: at 1x the first films (#262) could not find it.
++        [1.7, 0.35],
+     ),
+     // Morning: the mist lifting, the view opening.
+     key(
+@@ -258,7 +260,8 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.70, 0.82, 0.98, 0.15),
+         1.8,
+         [1.08, 1.08, 0.08, 0.25, 0.35, 0.6],
+-        [0.75, 0.6],
++        // 1.5: x2 of the first pass: at 1x the first films (#262) could not find it.
++        [1.5, 0.6],
+     ),
+     // Noon: clear and far, cool blue shadows. Filmed first at saturation 1.10 and warmth +0.04
+     // with a warm-white sun, noon read as golden as the evening; it's now a cool-white sun, no
+@@ -272,8 +275,8 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.45, 0.65, 0.98, 0.20),
+         2.5,
+         [0.95, 1.06, -0.10, 0.15, 0.05, 0.3],
+-        // The weakest contact shadows of the day: the sun fills them; the coolest.
+-        [0.6, 0.8],
++        // The weakest contact shadows of the day: the sun fills them; the coolest. 1.2: x2 of the first pass: at 1x the first films (#262) could not find it.
++        [1.2, 0.8],
+     ),
+     // Golden hour.
+     key(
+@@ -286,7 +289,9 @@ pub const ELWYNN: [GradeKey; 7] = [
+         2.0,
+         [1.12, 1.12, 0.18, 0.50, 0.15, 0.9],
+         // Low sun, long shade: the contact shadows at their strongest, cool against the gold.
+-        [1.0, 0.6],
++        // 2.0: x2 of the first pass: at 1x the first films (#262) could not find it; at 2x it read as a soft yard-wide shade along the step, under the
++        // barrel and in the wall's crease, with no rims or halos.
++        [2.0, 0.6],
+     ),
+     // Dusk: rose and violet.
+     key(
+@@ -298,7 +303,8 @@ pub const ELWYNN: [GradeKey; 7] = [
+         Tint::new(0.75, 0.45, 0.70, 0.35),
+         1.5,
+         [1.05, 1.08, 0.05, 0.45, 0.35, 0.5],
+-        [0.95, 0.3],
++        // 1.9: x2 of the first pass: at 1x the first films (#262) could not find it.
++        [1.9, 0.3],
+     ),
+     key(
+         21,
+diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
+index 51196b7..4738bf8 100644
+--- a/crates/benilla-world/src/look/water.rs
++++ b/crates/benilla-world/src/look/water.rs
+@@ -72,8 +72,13 @@ pub mod tune {
+     /// Blinn sharpness, and the moon's (broader, a path across the water, pale and faint).
+     pub const SUN_GLINT: f32 = 6.0;
+     pub const SUN_SHARPNESS: f32 = 900.0;
+-    pub const MOON_GLINT: f32 = 1.2;
+-    pub const MOON_SHARPNESS: f32 = 160.0;
++    /// 2.0, was 1.2: the first night film found no path at 1.2 (it also faced away from the
++    /// moon); a broad, pale shimmer wants more of it spread wider.
++    pub const MOON_GLINT: f32 = 2.0;
++    /// 64, was 160: a lobe about 8° wide instead of 5°, so the night's calm ripples spread the
++    /// moon into a path of small glints across the water, still sharp enough not to read as a
++    /// mirror of the disc.
++    pub const MOON_SHARPNESS: f32 = 64.0;
+     pub const MOON_TINT: [f32; 3] = [0.78, 0.86, 1.0];
+     /// The glint fades in as its body rises over this band of elevation (degrees), and goes in
+     /// cloud: a full overcast keeps this share of it.
+@@ -86,9 +91,27 @@ pub mod tune {
+     pub const SHADOW_DIM: f32 = 0.3;
+     /// The reflection march: how far a mirrored ray is followed (yards).
+     pub const SSR_REACH: f32 = 160.0;
++    /// The share of the screen toward its edge over which a mirrored hit fades to the sky
++    /// fallback: 0.22, was 0.06 (in the shader), whose short fade drew a straight, lighter band
++    /// near the camera at a low angle on the first films, where the mirrored rays left the screen.
++    pub const SSR_EDGE: f32 = 0.22;
++    /// How far the ripples' tilt moves that hand-over (a share of the fade, at its middle), so it
++    /// breaks up with them instead of following the screen's straight edge.
++    pub const SSR_BREAK: f32 = 0.6;
+     /// Shore foam: under this many yards deep, strongest just off the waterline, at this most.
+     pub const FOAM_DEPTH: f32 = 0.5;
+-    pub const FOAM: f32 = 0.75;
++    /// 0.6, was 0.75: the shore's band read a fairly bright, even white on the first films; the
++    /// ripples now break it up as well (`liquid.wgsl`).
++    pub const FOAM: f32 = 0.6;
++    /// Froth round something standing in the water (a wading hero's legs, a post), where the
++    /// shore's band drew a crisp, thin, bright oval at the waterline: [`FROTH_TAPS`] points on the
++    /// surface within [`FROTH_YD`] of a pixel find the step in the bed the legs make, and the froth
++    /// spreads that far out from their outline, lumpy and thinning, at most this strong.
++    pub const FROTH: f32 = 0.55;
++    pub const FROTH_YD: f32 = 0.45;
++    pub const FROTH_TAPS: u32 = 6;
++    /// The froth's reach (planar eye depth, yards): past it a hero's legs are a few pixels wide.
++    pub const FROTH_REACH: f32 = 40.0;
+     /// The mirror and the ripples come in over this depth at the waterline, so the shore has no
+     /// hard edge.
+     pub const SHORE_SOFT: f32 = 0.15;
+@@ -520,6 +543,35 @@ mod tests {
+         assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
+     }
+ 
++    /// `liquid.wgsl`'s mirrored constants are [`tune`]'s.
++    #[test]
++    fn the_shader_mirrors_the_tuned_numbers() {
++        let src = include_str!("../../../benilla-assets/src/shaders/liquid.wgsl");
++        let read = |name: &str, ty: &str| -> String {
++            let line = src
++                .lines()
++                .find(|l| l.starts_with(&format!("const {name}: {ty} = ")))
++                .unwrap_or_else(|| panic!("{name} missing"));
++            line.split('=')
++                .nth(1)
++                .unwrap()
++                .trim()
++                .trim_end_matches(';')
++                .to_string()
++        };
++        let f = |name: &str| read(name, "f32").parse::<f32>().unwrap();
++        assert_eq!(f("WATER_SSR_EDGE"), tune::SSR_EDGE);
++        assert_eq!(f("WATER_SSR_BREAK"), tune::SSR_BREAK);
++        assert_eq!(f("WATER_FROTH"), tune::FROTH);
++        assert_eq!(f("WATER_FROTH_YD"), tune::FROTH_YD);
++        assert_eq!(f("WATER_FROTH_REACH"), tune::FROTH_REACH);
++        let taps = read("WATER_FROTH_TAPS", "u32");
++        assert_eq!(
++            taps.trim_end_matches('u').parse::<u32>().unwrap(),
++            tune::FROTH_TAPS
++        );
++    }
++
+     /// The block's size is its rows': its own ten and the painted sky's thirteen.
+     #[test]
+     fn the_block_is_twenty_three_rows() {
+-- 
+2.43.0
+
