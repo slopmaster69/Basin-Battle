@@ -461,7 +461,7 @@ respawn = 0.0
   name = "frost ring"
   weight = 2.0
   max_range = 3.5
-  steps = [ { from = "HumanMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  steps = [ { ranged = false, from = "HumanMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
 
 [[mob]]
 key = "gy_zombie"
@@ -599,7 +599,7 @@ respawn = 0.0
   name = "keening"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 1.0, range = 5.0, arc = 360.0, damage = 13, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27812 } ]
+  steps = [ { ranged = false, clip = 54, windup = 1.0, range = 5.0, arc = 360.0, damage = 13, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 27812 } ]
 
 # --- the Graveyard's bosses -------------------------------------------------------------------------------
 
@@ -817,7 +817,7 @@ then_look = 10604
   name = "fire nova"
   weight = 2.0
   max_range = 4.0
-  steps = [ { from = "ScourgeMale", clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  steps = [ { ranged = false, from = "ScourgeMale", clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
   [[mob.pattern]]
   name = "blood rite"
   weight = 2.0
@@ -1028,7 +1028,7 @@ respawn = 0.0
   name = "terrify"
   weight = 2.0
   max_range = 5.0
-  steps = [ { clip = 54, windup = 1.1, range = 6.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.1, kit = 218, look = 27812 } ]
+  steps = [ { ranged = false, clip = 54, windup = 1.1, range = 6.5, arc = 360.0, damage = 20, heavy = true, blockable = false, recovery = 1.1, kit = 218, look = 27812 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.82

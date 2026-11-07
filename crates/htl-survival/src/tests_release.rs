@@ -314,3 +314,68 @@ fn a_charge_called_off_calls_its_check_off_so_its_ring_goes() {
     let ev = run(&mut s, 0.5);
     assert_eq!(grade_in(&ev, p), None, "nothing judged after");
 }
+
+/// Ticks of a burn (or any damage over time) on `victim`.
+fn ticks_on(events: &[Event], victim: Id) -> usize {
+    events.iter().filter(|e| matches!(e, Event::Swing { victim: Some(v), style: Blow::Dot, .. } if *v == victim)).count()
+}
+
+#[test]
+fn fireball_explodes_on_the_foe_it_hits_and_catches_the_one_beside_it() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let fb = s.content.ability("fireball").unwrap();
+    let (top, full_dmg, splash) = (s.content.abilities[fb].charge[1], s.content.abilities[fb].damage[1], s.content.abilities[fb].splash);
+    assert!(splash >= 2.0, "it explodes: {splash}");
+    let k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    let beside = dummy(&mut s, [14.0, 2.0, 0.0]);
+    let far = dummy(&mut s, [14.0, 7.0, 0.0]);
+    charge_and_release(&mut s, p, "ranged", top + 0.4);
+    let landed = run(&mut s, 1.5);
+    assert_eq!(damage_on(&landed, k), full_dmg as u32, "the one it hit");
+    assert_eq!(damage_on(&landed, beside), full_dmg as u32, "the one beside it, as hard");
+    assert_eq!(damage_on(&landed, far), 0, "not one well outside it");
+    // Its explosion shows where it struck; no second fireball flies there from the caster.
+    let (spell, look) = (s.content.abilities[fb].spell, s.content.abilities[fb].burst_spell);
+    let missiles = |sp: u32| landed.iter().filter(|e| matches!(e, Event::Missile { caster, spell, .. } if *caster == p && *spell == sp)).count();
+    assert_eq!(missiles(spell), 0, "no second fireball");
+    assert!(look != 0 && missiles(look) == 1, "its burst, once");
+}
+
+#[test]
+fn a_perfect_fireball_still_burns_the_one_it_hit_longer_though_it_explodes() {
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    s.slot_ability(p, "ranged", "fireball").unwrap();
+    let fb = s.content.ability("fireball").unwrap();
+    assert!(!s.content.abilities[fb].crit_effects.is_empty());
+    let k = dummy(&mut s, [14.0, 0.0, 0.0]);
+    let beside = dummy(&mut s, [14.0, 2.0, 0.0]);
+    let ev = release_at_flare(&mut s, p, "ranged", 0.0);
+    assert!(perfect_in(&ev, p));
+    run(&mut s, 1.5);
+    // Past the plain burn's 4 sec, only the perfect's longer one still ticks.
+    run(&mut s, 4.5);
+    let late = run(&mut s, 3.0);
+    assert!(ticks_on(&late, k) > 0, "the one it hit still burns");
+    assert_eq!(ticks_on(&late, beside), 0, "the one beside it had the plain burn");
+}
+
+#[test]
+fn pyroblast_stays_one_target_and_outhits_a_perfect_fireball() {
+    let s = world();
+    let (fb, pyro) = (s.content.ability("fireball").unwrap(), s.content.ability("pyroblast").unwrap());
+    let (fb, pyro) = (&s.content.abilities[fb], &s.content.abilities[pyro]);
+    assert_eq!(pyro.splash, 0.0, "the one big ball, for one foe");
+    assert!(pyro.damage[0] > fb.damage[1] * s.content.checks.perfect_damage * 1.3, "well over a perfect Fireball");
+}
+
+#[test]
+fn meteor_leaves_what_it_knocks_back_inside_its_crater() {
+    let s = world();
+    let mt = &s.content.abilities[s.content.ability("meteor").unwrap()];
+    let knock = mt.effects.iter().find(|e| e.kind == "knockback").map_or(0.0, |e| e.amount);
+    // A foe a yard from the middle, thrown back, still stands in the smallest crater.
+    assert!(1.0 + knock < mt.radius[0], "knocked {knock} yd out of a {} yd crater", mt.radius[0]);
+}

@@ -602,7 +602,7 @@ respawn = 0.0
   name = "shock ring"
   weight = 2.0
   max_range = 3.5
-  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  steps = [ { ranged = false, clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
 
 # Earthborers: out of the walls when you pass, a bite and a burrowing lunge.
 [[mob]]
@@ -680,7 +680,7 @@ respawn = 0.0
   name = "fire ring"
   weight = 2.0
   max_range = 3.5
-  steps = [ { from = "HumanFemale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
+  steps = [ { ranged = false, from = "HumanFemale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 10604 } ]
 
 # Searing Blade enforcers: a two-handed axe, and the cult's fury in it.
 [[mob]]

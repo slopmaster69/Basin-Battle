@@ -1121,6 +1121,24 @@ pub struct WeaponDef {
     /// Its blows count this many times over towards breaking a foe's stance (0: once).
     #[serde(default)]
     pub posture: f32,
+    /// A blow on a foe reeling from a parry does this many times its damage (0: `[parry]
+    /// riposte`): the sword's.
+    #[serde(default)]
+    pub riposte: f32,
+    /// Each hit bleeds the foe this much a second for `BLEED_SECS` (the axe's).
+    #[serde(default)]
+    pub bleed: f32,
+    /// Its blows go through a creature's raised shield (the spear's thrust).
+    #[serde(default)]
+    pub through_guard: bool,
+    /// Swinging it, a heavy blow doesn't put the hero down: they take it and finish the swing
+    /// (the greatsword's).
+    #[serde(default)]
+    pub swing_poise: bool,
+    /// On a foe under a third of its health, its blows do this many times their damage (0: no
+    /// more): the executioner's axe.
+    #[serde(default)]
+    pub execute: f32,
     /// A staff that casts instead of swinging: the left click casts this ability (a benched
     /// projectile, the staff's bolt), and the heavy attack this one (empty: the heavy swings).
     #[serde(default)]
@@ -1953,6 +1971,11 @@ pub struct AttackDef {
     /// all round at the creature's feet): a splash, a burst, a shockwave. 0: none.
     #[serde(default)]
     pub look: u32,
+    /// Its own sound as its wind-up begins, from the creature, for everyone near: a crossbow
+    /// drawn, a spell gathered, where its spell's look plays none and a hero must hear it coming.
+    /// 0: none.
+    #[serde(default)]
+    pub sound: u32,
 }
 
 impl AttackDef {
@@ -2002,6 +2025,9 @@ pub struct SpecialDef {
     /// Where it lands, the look of this spell (see [`AttackDef::look`]).
     #[serde(default)]
     pub look: Option<u32>,
+    /// Its own sound as it winds up (see [`AttackDef::sound`]).
+    #[serde(default)]
+    pub sound: Option<u32>,
 }
 
 fn one_u32() -> u32 {
@@ -2025,6 +2051,7 @@ impl SpecialDef {
         b.radius = self.radius.unwrap_or(a.radius);
         b.spell = self.spell.unwrap_or(a.spell);
         b.look = self.look.unwrap_or(a.look);
+        b.sound = self.sound.unwrap_or(a.sound);
         b
     }
 }
@@ -2147,6 +2174,15 @@ pub struct MobDef {
     /// Harmless: it never fights back, and runs from a blow (a rabbit, a sheep).
     #[serde(default)]
     pub critter: bool,
+    /// An ally of the heroes: it never takes up a fight against one, their blows and shots pass
+    /// it by, and a heal aimed at a friend can land on it (its number floats over it). None in the
+    /// rules yet; `.es ally` sets one down to try.
+    #[serde(default)]
+    pub friendly: bool,
+    /// Set down by a hero (a `totem`) yet a heal can reach it: help aimed at a friend lands on
+    /// it as on an ally (a Priest's orb). A totem without it never takes a heal.
+    #[serde(default)]
+    pub healable: bool,
     /// Its voice (`SoundEntries.dbc`): as it turns on a foe, at its second wind, as it falls.
     #[serde(default)]
     pub aggro_sound: u32,
@@ -2157,6 +2193,13 @@ pub struct MobDef {
     /// Said over a hero it has just felled.
     #[serde(default)]
     pub slay_sound: u32,
+    /// Its voice as it begins a string up close (the first blow's wind-up), from where it stands,
+    /// so a blow from behind is heard coming: a grunt, a shout. `heavy_sound` for a heavy first
+    /// blow (else `windup_sound`). 0: none.
+    #[serde(default)]
+    pub windup_sound: u32,
+    #[serde(default)]
+    pub heavy_sound: u32,
 }
 
 impl MobDef {
@@ -2945,6 +2988,27 @@ impl Content {
     /// Put what's read in the order it's played: each creature's phases, its enrage among them,
     /// highest share of health first.
     fn settle(&mut self) {
+        // A weapon that names nothing of its own takes its kind's (docs/weapon-identities.md): a
+        // sword the duelist's, an axe a bleed, a polearm reach, a two-handed sword the sweep.
+        for w in &mut self.weapons {
+            let own = w.parry > 0.0 || w.riposte > 0.0 || w.bleed > 0.0 || w.posture > 0.0 || w.backstab > 0.0 || w.through_guard || w.swing_poise || w.execute > 0.0 || w.stagger > 0.0;
+            if own || !w.bolt.is_empty() || !w.alt.is_empty() {
+                continue;
+            }
+            match w.subclass {
+                7 => {
+                    w.parry = 0.1;
+                    w.riposte = 2.25;
+                }
+                0 => w.bleed = if w.two_handed { 6.0 } else { 4.0 },
+                4 | 5 => w.posture = 2.0,
+                15 => w.backstab = 2.5,
+                6 => w.through_guard = true,
+                8 => w.swing_poise = true,
+                1 => w.execute = 2.0,
+                _ => {}
+            }
+        }
         let grow = self.combat.boss_scale.max(0.1);
         for m in &mut self.mobs {
             if m.boss {

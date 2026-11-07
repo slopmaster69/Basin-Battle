@@ -94,7 +94,7 @@ impl SurvivalGame {
         let cards = self.sim.siege_trainer(id);
         if !self.has_addon(conn) {
             let list: Vec<String> = cards.iter().map(|(k, n, p, ..)| format!(".es craft {k} ({n}, {p} gold)")).collect();
-            self.say_to(conn, &format!("Battle Trainer. {}", if list.is_empty() { "You know every card of your class.".to_string() } else { list.join(", ") }));
+            self.say_to(conn, &format!("Battle Trainer. {}", if list.is_empty() { "You know every ability of your class.".to_string() } else { list.join(", ") }));
             return;
         }
         let rows: Vec<String> = cards

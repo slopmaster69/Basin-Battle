@@ -1,0 +1,180 @@
+From 897237906b21399709f85c953cf515ebc29649c8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 21:22:24 -0600
+Subject: [PATCH] A creature's strike is seen to swing, and its blow's return
+ never crawls (patch 0060)
+
+A slow wind-up's snap takes at least 35% of the wind-up (at most 0.3 s), from a coil reached
+earlier; after the impact the clip plays no slower than its own pace and holds its last pose for
+the rest of the recovery. Filmed: a one-handed snap was 42 ms after a 0.45 s frozen pose, and the
+return crawled at half speed through the recovery, reading as a second swing.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../benilla-app/src/creature_anim/action.rs   | 89 ++++++++++++++++---
+ 1 file changed, 77 insertions(+), 12 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index bce1b80b..da11d2df 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -48,10 +48,16 @@ const RATE_RANGE: (f32, f32) = (0.25, 4.0);
+ /// strike at `COIL_SNAP_RATE` times its own speed, so a heavy is read in the gathering pose and
+ /// lands fast without the body ever looking stopped.
+ const COIL_SLOW: f32 = 1.35;
+-const COIL_AT: f32 = 0.55;
+-const COIL_CREEP: f32 = 0.2;
++const COIL_AT: f32 = 0.5;
++const COIL_CREEP: f32 = 0.1;
+ const COIL_APPROACH: f32 = 0.4;
+ const COIL_SNAP_RATE: f32 = 1.8;
++/// The strike itself (the coil's end to the impact) takes at least this share of the wind-up,
++/// and at most this long: a blade seen to swing, not a pose that cuts to a hit. (Filmed Nov 7
++/// 2026: a one-handed clip's snap at 1.8 times its speed was 42 ms, under three frames; the
++/// cutlass stood raised for 0.45 s and was through the hero the next frame.)
++const SNAP_SHARE: f32 = 0.35;
++const SNAP_MOST: f32 = 0.3;
+ /// An action clip fades in and out over these.
+ const FADE_IN: f32 = 0.08;
+ const FADE_OUT: f32 = 0.16;
+@@ -379,7 +385,8 @@ impl ActionClip {
+     /// The coil's two marks on the clip clock and the snap's real seconds.
+     fn coil_marks(&self) -> (f32, f32, f32) {
+         let b = self.key * (COIL_AT + COIL_CREEP);
+-        let snap = ((self.key - b) / COIL_SNAP_RATE).max(0.04);
++        let floor = (self.windup * SNAP_SHARE).min(SNAP_MOST);
++        let snap = ((self.key - b) / COIL_SNAP_RATE).max(0.04).max(floor);
+         (self.key * COIL_AT, b, snap)
+     }
+ 
+@@ -432,7 +439,10 @@ impl ActionClip {
+                     1.0
+                 }
+             } else if self.recovery > 0.0 {
+-                (self.len - self.key) / self.recovery
++                // After the blow the clip never crawls: its own pace at least (the rest of the
++                // recovery holds its last pose). Stretched over the recovery, a return to ready
++                // at half speed read as a second, slower swing with no blow in it.
++                ((self.len - self.key) / self.recovery).max(1.0)
+             } else {
+                 1.0
+             }
+@@ -447,6 +457,8 @@ impl ActionClip {
+     /// Advance the clip clock by `dt` real seconds: to the impact at the wind-up's pace, then the
+     /// recovery's; past the end it loops (a held looping clip) or holds the last pose.
+     fn advance(&mut self, dt: f32) {
++        // Whether it was already at its end (a one-shot's hold counts only time spent there).
++        let ended = !self.looping && self.t >= self.len - 2.0e-3;
+         let mut left = dt;
+         for _ in 0..4 {
+             let rate = self.rate();
+@@ -477,15 +489,32 @@ impl ActionClip {
+                 self.stopping = Some(FADE_OUT);
+             }
+         } else if self.t >= self.len - 2.0e-3 {
+-            // A one-shot holds its last pose for its hold, then lets go.
++            // A one-shot holds its last pose for its hold, then lets go; a blow's, for what's
++            // left of its recovery after the clip's own return (the open moment after a swing).
++            // Reaching the end this step, only the time past it counts.
++            let past = if ended {
++                dt
++            } else {
++                ((self.t - (self.len - 1.0e-3)) / self.rate()).clamp(0.0, dt)
++            };
+             self.t = self.t.min(self.len - 1.0e-3);
+-            self.held += dt;
+-            if self.held >= self.hold && self.stopping.is_none() {
++            self.held += past;
++            if self.held >= self.hold.max(self.recovery_rest()) && self.stopping.is_none() {
+                 self.stopping = Some(FADE_OUT);
+             }
+         }
+     }
+ 
++    /// What's left of a blow's recovery once the clip has played its return at its own pace: held
++    /// in the last pose. 0 for a clip with no impact or no recovery, or one whose return is longer.
++    fn recovery_rest(&self) -> f32 {
++        if self.key > 0.0 && self.recovery > 0.0 {
++            (self.recovery - (self.len - self.key)).max(0.0)
++        } else {
++            0.0
++        }
++    }
++
+     /// About how long it plays in real seconds: its wind-up and recovery as asked, the clip's own
+     /// pace where not, and its hold.
+     fn real_len(&self) -> f32 {
+@@ -1821,6 +1850,28 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn a_creatures_strike_takes_a_readable_share_of_its_wind_up() {
++        // A one-handed clip's impact 0.3 s in, wound up over 0.55 s (a pirate's slash): the
++        // strike takes 35% of the wind-up, not the 42 ms its snap at 1.8 times would.
++        let mut c = clip(0.3, 0.55, 0.7);
++        c.coil = true;
++        let (_, _, snap) = c.coil_marks();
++        assert!((snap - 0.55 * SNAP_SHARE).abs() < 1.0e-5, "{snap}");
++        // A long wind-up's strike is capped, the rest the coil and its creep.
++        let mut d = clip(0.35, 1.5, 0.9);
++        d.coil = true;
++        let (_, _, snap) = d.coil_marks();
++        assert!((snap - SNAP_MOST).abs() < 1.0e-5, "{snap}");
++        // And the impact still lands on time.
++        let mut real = 0.0_f32;
++        while c.t < 0.3 - 1.0e-4 && real < 3.0 {
++            c.advance(0.01);
++            real += 0.01;
++        }
++        assert!((real - 0.55).abs() < 0.021, "the impact at 0.55 s: {real}");
++    }
++
+     #[test]
+     fn a_slow_creature_wind_up_holds_its_coil_and_snaps_onto_the_impact_on_time() {
+         // A 0.4 s swing to its impact asked to land at 1.2 s.
+@@ -1868,7 +1919,8 @@ mod tests {
+     #[test]
+     fn a_clip_lands_its_impact_on_time_and_takes_the_recovery_after() {
+         let mut c = clip(0.4, 0.2, 1.2);
+-        // To the impact twice as fast; after it, 0.6 s of clip over 1.2 s.
++        // To the impact twice as fast; after it, the clip's own pace (0.6 s of clip, never
++        // stretched over the 1.2 s), and the last pose held for the 0.6 s left.
+         assert!((c.rate() - 2.0).abs() < 1.0e-5);
+         let mut real = 0.0_f32;
+         while c.t < 0.4 - 1.0e-4 {
+@@ -1879,14 +1931,27 @@ mod tests {
+             (real - 0.2).abs() < 0.011,
+             "the impact keyframe at 0.2 s: {real}"
+         );
+-        assert!((c.rate() - 0.5).abs() < 1.0e-5);
++        assert!((c.rate() - 1.0).abs() < 1.0e-5);
++        assert!((c.recovery_rest() - 0.6).abs() < 1.0e-5);
+         // One step across the keyframe is split at it.
+         let mut c = clip(0.4, 0.2, 1.2);
+         c.advance(0.25);
+-        assert!((c.t - (0.4 + 0.05 * 0.5)).abs() < 1.0e-4, "{}", c.t);
+-        // The end holds the last pose and lets go.
+-        c.advance(5.0);
++        assert!((c.t - (0.4 + 0.05)).abs() < 1.0e-4, "{}", c.t);
++        // The return done (0.55 s more), the last pose holds through the rest of the recovery,
++        // then lets go: not before the recovery is up.
++        c.advance(0.55);
++        assert!(c.t >= 1.0 - 2.0e-3 && c.stopping.is_none());
++        c.advance(0.5);
++        assert!(c.stopping.is_none(), "held through the recovery");
++        c.advance(0.2);
+         assert!(c.t < 1.0 && c.stopping.is_some());
++        // A recovery shorter than the clip's return still hurries it (0.6 s of clip in 0.3 s),
++        // with nothing left to hold.
++        let mut d = clip(0.4, 0.2, 0.3);
++        assert!((d.rate() - 2.0).abs() < 1.0e-5);
++        d.advance(0.2);
++        assert!((d.rate() - 2.0).abs() < 1.0e-5);
++        assert_eq!(d.recovery_rest(), 0.0);
+     }
+ 
+     #[test]
+-- 
+2.46.2.windows.1
+

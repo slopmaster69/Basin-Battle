@@ -311,15 +311,15 @@ impl Survival {
         }
         if !self.reachable(&owned, key) {
             if def.is_beta() && def.on_board() && self.is_siege() {
-                return Err(format!("{} is a beta card. Siege doesn't use beta cards.", def.name));
+                return Err(format!("{} is a beta ability. Siege doesn't use beta abilities.", def.name));
             }
             let at = self.learned_where(key);
-            return Err(if at.is_empty() { "That card isn't on the board.".into() } else { format!("Learn {} in Elwynn first. {at}.", def.name) });
+            return Err(if at.is_empty() { "That ability isn't on the board.".into() } else { format!("Learn {} in Elwynn first. {at}.", def.name) });
         }
         // Siege: bought, in a match.
         if self.is_siege() && !self.debug {
             if self.camp_of(id).is_none() {
-                return Err("Buy cards during a match.".into());
+                return Err("Buy abilities during a match.".into());
             }
             let price = self.card_price(key).unwrap_or(0);
             self.spend_gold(id, price)?;
@@ -654,7 +654,7 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return true };
         let Some(slot_name) = SLOTS.get(slot) else { return true };
         let Some(base) = p.loadout.get(*slot_name).and_then(|k| self.content.ability(k)) else {
-            self.tell(id, format!("Nothing on that key. Open the board (N) and choose a card for the {} key.", slot_role(slot_name)));
+            self.tell(id, format!("Nothing on that key. Open the board (N) and choose an ability for the {} key.", slot_role(slot_name)));
             return true;
         };
         // Ice Block (and Dispersion): its key again breaks out of it.
@@ -1098,16 +1098,29 @@ impl Survival {
         self.events.push(Event::CheckResult { player: id, ability, grade });
     }
 
+    /// A Priest ability of the Shadow, by its key (the server's `check_school` draws the same line).
+    pub(crate) fn priest_shadow(key: &str) -> bool {
+        ["shadow", "mind", "void", "tether", "fade", "death"].iter().any(|w| key.contains(w))
+    }
+
     /// The burst a perfect of this ability shows: its own, or the checks' default.
     pub(crate) fn perfect_kit_of(&self, ability: usize) -> u32 {
         let own = self.content.abilities[ability].perfect_kit;
         if own != 0 {
             return own;
         }
-        // A Priest's perfect is holy, never the Mage's Arcane Explosion (Corey's review).
-        let priest = self.content.priest.perfect_kit;
-        if priest != 0 && self.content.abilities[self.content.base_of(ability)].school == "priest" {
-            return priest;
+        // A Priest's perfect is holy, never the Mage's Arcane Explosion (Corey's review); a Shadow
+        // spell's is dark, never the Light's column.
+        let base = &self.content.abilities[self.content.base_of(ability)];
+        if base.school == "priest" {
+            let shadow = self.content.priest.shadow_perfect_kit;
+            if shadow != 0 && Self::priest_shadow(&base.key) {
+                return shadow;
+            }
+            let priest = self.content.priest.perfect_kit;
+            if priest != 0 {
+                return priest;
+            }
         }
         self.content.checks.perfect_kit
     }
@@ -1283,6 +1296,10 @@ impl Survival {
         }
         if cost > 0.0 {
             self.events.push(Event::Valor { player: id });
+        }
+        // Its own sound as it goes, where its look has none.
+        if d.sound != 0 {
+            self.events.push(Event::Sound { id, sound: d.sound });
         }
         // A perfect release: its pay and its burst, for everyone to see. (Its strength is read
         // by what goes out, below, and the flag cleared as the cast ends.)
@@ -2266,9 +2283,15 @@ impl Survival {
 
     /// A bursting projectile goes off at `at`: everyone in its burst struck (and its effects from
     /// there).
-    fn burst(&mut self, p: &Projectile, at: Vec3, _direct: Option<Id>) {
-        let spell = self.content.abilities[p.ability].spell;
-        self.burst_look(p, at, Some(spell));
+    fn burst(&mut self, p: &Projectile, at: Vec3, direct: Option<Id>) {
+        let d = &self.content.abilities[p.ability];
+        // On a foe it struck its own missile's impact plays already, so only a burst look of its
+        // own: its spell cast again at the spot flew a second missile there from the caster.
+        let look = match direct {
+            Some(_) => (d.burst_spell != 0).then_some(d.burst_spell),
+            None => Some(d.spell),
+        };
+        self.burst_look(p, at, look);
     }
 
     /// [`Self::burst`], showing `look` at the spot (none: nothing of its own).
@@ -2353,7 +2376,14 @@ impl Survival {
         }
         let d = self.content.abilities[p.ability].clone();
         if d.splash > 0.0 {
+            let before = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
             self.burst(p, p.pos, Some(victim));
+            let after = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
+            // A critical's own effects on the one it struck, as without a burst (a perfect
+            // Fireball's longer burn); not if the burst came to nothing on them (dodged, guarded).
+            if p.critical && !d.crit_effects.is_empty() && self.alive(victim) && after != before {
+                self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
+            }
             return;
         }
         // A bomb's bolt plants it, and Combustion's spreads what burns on the foe it reaches.
@@ -2689,10 +2719,9 @@ impl Survival {
         // Shadow Word: Death that didn't kill: its backlash on the caster.
         if d.backlash > 0.0 && !killed && self.players.get(&owner).is_some_and(|p| p.health > 0) {
             let dmg = d.backlash.round() as u32;
+            // (No burst on the caster: the impact kit there was a flame on the Priest's head for
+            // 2 sec on film. The number says what it cost.)
             self.events.push(Event::Swing { attacker: victim, victim: Some(owner), damage: dmg, outcome: Outcome::Hit, anim: false, style: Blow::Dot });
-            if d.impact_kit != 0 {
-                self.events.push(Event::Visual { id: owner, kit: d.impact_kit, by: None });
-            }
             self.hurt_player_by(owner, dmg, victim, &d.name);
         }
     }
@@ -2760,7 +2789,9 @@ impl Survival {
     pub(crate) fn ally_target(&self, id: Id, range: f32, radius: f32) -> Id {
         let Some(me) = self.players.get(&id) else { return id };
         let pos = me.pos;
-        let friends: Vec<(Id, Vec3)> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.helpable(id, **h)).map(|(h, p)| (*h, p.pos)).collect();
+        let mut friends: Vec<(Id, Vec3)> = self.players.iter().filter(|(h, p)| **h != id && p.health > 0 && self.helpable(id, **h)).map(|(h, p)| (*h, p.pos)).collect();
+        // And the creatures help can reach (allies, a Priest's orb; never a totem).
+        friends.extend(self.mobs.iter().filter(|(mid, _)| self.takes_help(id, **mid)).map(|(mid, m)| (*mid, m.pos)));
         if friends.is_empty() {
             return id;
         }
@@ -2833,23 +2864,31 @@ impl Survival {
         if d.impact_kit != 0 {
             self.events.push(Event::Visual { id: target, kit: d.impact_kit, by: None });
         }
-        if d.ally_heal > 0.0 {
-            let amount = self.players.get(&target).map_or(0, |p| (p.max_health as f32 * d.ally_heal * self.weakened(id)).round() as u32);
-            self.heal_hero_by(target, amount, id, &d.name);
+        // On an allied creature: its heal only (a cleanse and boons are a hero's).
+        if let Some(max) = self.mobs.get(&target).map(|m| m.max_health) {
+            if d.ally_heal > 0.0 {
+                let amount = (max as f32 * d.ally_heal * self.weakened(id)).round() as u32;
+                self.heal_creature_by(target, amount, id, &d.name);
+            }
+        } else {
+            if d.ally_heal > 0.0 {
+                let amount = self.players.get(&target).map_or(0, |p| (p.max_health as f32 * d.ally_heal * self.weakened(id)).round() as u32);
+                self.heal_hero_by(target, amount, id, &d.name);
+            }
+            if d.cleanse {
+                self.cleanse(target, &crate::content::HARMFUL);
+            }
+            let boons: Vec<_> = d.effects.iter().filter(|e| crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
+            if !boons.is_empty() {
+                self.apply_effects(id, target, &boons, share, &d.name);
+            }
+            // Power Word: Shield on a friend: marked for the blow about to land on them.
+            if d.parry_for && target != id {
+                self.mark_shield(id, target, ability);
+            }
         }
-        if d.cleanse {
-            self.cleanse(target, &crate::content::HARMFUL);
-        }
-        let boons: Vec<_> = d.effects.iter().filter(|e| crate::content::BOONS.contains(&e.kind.as_str())).cloned().collect();
-        if !boons.is_empty() {
-            self.apply_effects(id, target, &boons, share, &d.name);
-        }
-        // Power Word: Shield on a friend: marked for the blow about to land on them.
-        if d.parry_for && target != id {
-            self.mark_shield(id, target, ability);
-        }
-        // On another hero: Valor for it (not for helping yourself). No word names them: the
-        // spell's look lands on them, and a heal's green number for them comes (`HO`).
+        // On another hero or an ally: Valor for it (not for helping yourself). No word names
+        // them: the spell's look lands on them, and a heal's green number floats over them.
         if target != id {
             let v = if d.valor_hit > 0.0 { d.valor_hit } else { self.content.valor.ability };
             self.gain_valor(id, v);
@@ -3210,9 +3249,28 @@ impl Survival {
 
     /// A hero's totem or summon (Summon Infernal's demon) that `by` mustn't hurt: their own, or a
     /// friend's (a hero they can't harm: always in co-op, only a Siege partner in Siege). With
-    /// friendly fire on in the open world, another hero's is fair game; your own never is.
+    /// friendly fire on in the open world, another hero's is fair game; your own never is. An ally
+    /// of the heroes (a `friendly` creature) is spared every hero, friendly fire or not.
     pub(crate) fn own_totem(&self, mid: Id, by: Id) -> bool {
+        if self.players.contains_key(&by) && self.mobs.get(&mid).is_some_and(|m| m.friendly) {
+            return true;
+        }
         self.totems.iter().any(|t| t.mob == mid && (t.owner == by || (self.players.contains_key(&by) && !self.hostile(by, t.owner))))
+    }
+
+    /// Whether help from hero `by` (a heal aimed at a friend) can reach creature `mid`: one on the
+    /// heroes' side (a `friendly` creature, or set down by `by` or a friend of theirs) that isn't
+    /// a totem, or a totem its rules make `healable` (a Priest's orb). A totem never otherwise.
+    pub(crate) fn takes_help(&self, by: Id, mid: Id) -> bool {
+        let Some(m) = self.mobs.get(&mid) else { return false };
+        if m.health == 0 || m.hidden {
+            return false;
+        }
+        let d = &self.content.mobs[m.def];
+        if d.totem && !d.healable {
+            return false;
+        }
+        m.friendly || self.totems.iter().any(|t| t.mob == mid && (t.owner == by || self.helpable(by, t.owner)))
     }
 
     fn cone(&mut self, id: Id, ability: usize, yaw: f32, share: f32) {
@@ -4212,6 +4270,27 @@ impl Survival {
         if !still {
             self.engage(mid, mobs::Foe::Hero(id));
         }
+        Ok(self.content.mobs[def].name.clone())
+    }
+
+    /// An ally to try help on (a dev command, `.es ally`): creature `key` set down `yards` ahead
+    /// (1 to 40) on the heroes' side, standing still, at `hp` of its health (a share, 0.01 to 1):
+    /// a heal aimed at a friend can land on it. `.es target clear` takes it away.
+    pub fn spawn_ally(&mut self, id: Id, key: &str, yards: f32, hp: f32) -> Result<String, String> {
+        let def = self.content.mob(key).ok_or_else(|| format!("No creature called {key}."))?;
+        let p = self.players.get(&id).ok_or("No hero.")?;
+        let yards = yards.clamp(1.0, 40.0);
+        let at = self.ground_near(p.pos[0] + p.facing.cos() * yards, p.pos[1] + p.facing.sin() * yards, p.pos[2]);
+        let face = facing(at, p.pos);
+        let mid = self.spawn_mob(def, at, None, false);
+        if let Some(m) = self.mobs.get_mut(&mid) {
+            m.friendly = true;
+            m.facing = face;
+            m.home = at;
+            m.state = mobs::MobState::Idle { wander_at: f32::MAX };
+            m.health = ((m.max_health as f32 * hp.clamp(0.01, 1.0)).round() as u32).max(1);
+        }
+        self.targets.insert(mid, true);
         Ok(self.content.mobs[def].name.clone())
     }
 

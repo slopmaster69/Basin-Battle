@@ -3,8 +3,10 @@
 //!
 //! Only what landed counts: a blow's overkill, a heal past full health and ice that soaks a blow
 //! don't. A fight begins with the first blow dealt or taken after a lull of `player.combat_secs`
-//! and lasts until the next lull; a heal carries one on (or counts towards a friend's), but a heal
-//! out of any fight doesn't begin one. Not saved: a restart starts every meter over.
+//! and lasts until the next lull with no creature still on the hero (a walk to the caster, a few
+//! seconds dodging pots, is still the same fight); a heal carries one on (or counts towards a
+//! friend's), but a heal out of any fight doesn't begin one. Not saved: a restart starts every
+//! meter over. (Nov 6 play-test: "the combat meter kept resetting".)
 
 use super::{dist2d, Id, Survival};
 
@@ -91,6 +93,17 @@ impl Survival {
         self.content.player.combat_secs.max(1.0)
     }
 
+    /// Whether a creature is still on hero `id` (chasing them, or mid-blow at them).
+    fn engaged(&self, id: Id) -> bool {
+        self.mobs.values().any(|m| m.health > 0 && m.state.target() == Some(id))
+    }
+
+    /// Whether hero `id`'s fight is still on: a blow within the lull, or a creature still on them.
+    fn fight_on(&self, id: Id) -> bool {
+        let now = self.clock;
+        self.meters.get(&id).is_some_and(|m| m.fight.seen && (now - m.fight.last <= self.fight_gap() || self.engaged(id)))
+    }
+
     /// Count `amount` on hero `id`'s meter. `begins`: it may begin a fight (a blow; a heal only
     /// carries one on).
     fn meter_count(&mut self, id: Id, kind: Kind, amount: u32, label: &str, begins: bool) {
@@ -99,8 +112,8 @@ impl Survival {
         }
         let now = self.clock;
         let gap = self.fight_gap();
+        let fighting = self.fight_on(id);
         let m = self.meters.entry(id).or_default();
-        let fighting = m.fight.seen && now - m.fight.last <= gap;
         if !fighting && begins {
             m.fight = Fight { seen: true, start: now, last: now, ..Fight::default() };
         }
@@ -172,10 +185,7 @@ impl Survival {
     /// A hero's card mended `target` (themselves too) by `amount`: it counts in the healer's
     /// fight, or carries a friend's on.
     pub(crate) fn meter_healed(&mut self, healer: Id, target: Id, amount: u32, label: &str) {
-        let gap = self.fight_gap();
-        let now = self.clock;
-        let in_fight = |s: &Self, h: Id| s.meters.get(&h).is_some_and(|m| m.fight.seen && now - m.fight.last <= gap);
-        let begins = in_fight(self, target) && !in_fight(self, healer);
+        let begins = self.fight_on(target) && !self.fight_on(healer);
         self.meter_count(healer, Kind::Healed, amount, label, begins);
     }
 
@@ -183,9 +193,39 @@ impl Survival {
     pub(crate) fn heal_hero_by(&mut self, id: Id, amount: u32, healer: Id, label: &str) {
         let healed = self.heal_hero(id, amount);
         if healed > 0 && healer != id && self.players.contains_key(&healer) {
-            self.events.push(super::Event::HealedOther { healer, target: id, amount: healed });
+            let critical = self.heal_is_critical(healer);
+            self.events.push(super::Event::HealedOther { healer, target: id, amount: healed, critical });
         }
         self.meter_healed(healer, id, healed, label);
+    }
+
+    /// Whether `healer`'s heal lands critical just now: a skill check's perfect (a release on
+    /// its flare while what it sends out is made, `cast_perfect`; a Penance ring dead on the beat,
+    /// [`Survival::critical_heals`]), or `.es crit`. Never a heal with no skill check.
+    pub(crate) fn heal_is_critical(&self, healer: Id) -> bool {
+        self.critical_heals.contains(&healer) || self.players.get(&healer).is_some_and(|p| p.cast_perfect)
+    }
+
+    /// Heal a creature help can reach (an ally, a Priest's orb: [`Self::takes_help`]), counting it
+    /// on `healer`'s meter as `label`; a hero healing it sees the number over it.
+    pub(crate) fn heal_creature_by(&mut self, mid: Id, amount: u32, healer: Id, label: &str) {
+        if !self.takes_help(healer, mid) {
+            return;
+        }
+        let Some(m) = self.mobs.get_mut(&mid) else { return };
+        let before = m.health;
+        m.health = m.health.saturating_add(amount).min(m.max_health);
+        let (h, max) = (m.health, m.max_health);
+        let healed = h - before;
+        if healed == 0 {
+            return;
+        }
+        self.events.push(super::Event::Health { id: mid, health: h, max });
+        if self.players.contains_key(&healer) {
+            let critical = self.heal_is_critical(healer);
+            self.events.push(super::Event::HealedOther { healer, target: mid, amount: healed, critical });
+        }
+        self.meter_healed(healer, mid, healed, label);
     }
 
     /// Hurt a hero, counting what it took on `by`'s meter as `label` (when `by` is a hero).
@@ -235,7 +275,7 @@ impl Survival {
             .collect();
         rows.sort_by(|a, b| b.dealt.cmp(&a.dealt).then_with(|| b.healed.cmp(&a.healed)).then_with(|| a.name.cmp(&b.name)));
         // While it's on, its clock runs; once over, it stopped at its last blow.
-        let live = self.clock - mine.last <= gap;
+        let live = self.fight_on(id);
         let secs = if live { (self.clock - mine.start).max(1.0) } else { mine.secs() };
         Some(FightMeter { secs, live, rows })
     }

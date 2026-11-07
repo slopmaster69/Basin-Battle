@@ -13,7 +13,7 @@ anything with a story**. Every line has one job, and its job decides how it's wr
 | Kind | Where | How it reads |
 | --- | --- | --- |
 | **Interface** | Window titles and notes, buttons, click hints, prompts, errors | Imperative, verb first, plain. Short. No story. |
-| **Stats** | What an item, card, station or building does | WoW tooltip lines: one effect per sentence, numbers as numerals. |
+| **Stats** | What an item, ability, station or building does | WoW tooltip lines: one effect per sentence, numbers as numerals. |
 | **Flavor** | The story under a name: a chest's find, an item's past, a place | One line, at most two. Concrete, a little grim, never a mechanic. |
 | **News** | Announcements, chat from the camp, the journal, banners | Who did what, or what to do next, in one plain sentence. |
 
@@ -41,7 +41,7 @@ A single `text` that needs both stats and flavor puts the stats first, then the 
 - **One effect per sentence**, the strongest first. Name what's affected ("Heavy attacks",
   "Resting nearby", "Raiders who touch it").
 - **Present tense, no "you" unless it's needed.** "Deals 36 damage to every enemy in a line." For
-  a card's how-to, "you" is fine: "Hold to charge. Release to throw."
+  an ability's how-to, "you" is fine: "Hold to charge. Release to throw."
 - **Game terms are capitalized when they're the game's**: Valor, Draughts, stance, EX. The
   rest stay lowercase.
 
@@ -84,6 +84,7 @@ Use these words, and only these, for these things.
 | **Damage**, **health**, **stamina** | blow (in stats), wound |
 | **Gather** | chop, pick (except in flavor) |
 | **Respawn** | get up, come back |
+| **Ability**, **abilities** (what goes on a key; **spell** for a caster's) | card (Elwynn Survival; Basin Battle's run-cards are cards) |
 
 US spelling throughout (defense, armor, color), as WoW 1.12 has it.
 

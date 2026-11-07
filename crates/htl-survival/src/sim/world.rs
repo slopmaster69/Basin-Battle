@@ -864,7 +864,9 @@ impl Survival {
                     // they're off the rack; their [[ranged]] stays for the towers and saves.
                     _ => return None,
                 };
-                let held = i == p.weapon || i == p.shield;
+                let dual = p.off_weapon.is_some() && !self.weapon_of(p).two_handed;
+                let shielded = p.off_weapon.is_none() && !p.off_empty;
+                let held = i == p.weapon || (i == p.shield && shielded) || (dual && p.off_weapon == Some(i));
                 let text = match self.weapon_stats(&d.key) {
                     Some(stats) => format!("{} {stats}", d.text),
                     None => d.text.clone(),
@@ -930,6 +932,35 @@ impl Survival {
 
     /// Take up a weapon or shield from the rack (free while the armory is open).
     pub fn arm(&mut self, id: Id, key: &str) -> Result<String, String> {
+        self.arm_hand(id, key, false)
+    }
+
+    /// Take up a one-handed weapon in the off hand (dual wield), from the rack.
+    pub fn arm_off(&mut self, id: Id, key: &str) -> Result<String, String> {
+        self.arm_hand(id, key, true)
+    }
+
+    /// Put the shield (or the off hand's weapon) back: one weapon alone, guarded by its own blade.
+    pub fn stow_off(&mut self, id: Id) -> Result<String, String> {
+        let p = self.players.get(&id).ok_or("No such hero.")?;
+        if self.weapon_of(p).two_handed {
+            return Err("A two-handed weapon takes both hands already.".into());
+        }
+        if !matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. }) {
+            return Err("Finish what you're doing first.".into());
+        }
+        let p = self.players.get_mut(&id).unwrap();
+        p.off_weapon = None;
+        p.off_empty = true;
+        p.action = Action::Ready;
+        p.guard_held = false;
+        self.events.push(Event::Guard { player: id, up: false });
+        self.events.push(Event::Gear { player: id });
+        self.events.push(Event::Dirty);
+        Ok("one weapon alone".into())
+    }
+
+    fn arm_hand(&mut self, id: Id, key: &str, off: bool) -> Result<String, String> {
         if !self.content.world.armory {
             return Err("The rack is empty.".into());
         }
@@ -957,10 +988,22 @@ impl Survival {
         if !matches!(p.action, Action::Ready | Action::Guard | Action::Aim { .. }) {
             return Err("Finish what you're doing first.".into());
         }
+        if off && (kind != ItemKind::Weapon || self.content.weapon(key).is_none_or(|w| w.two_handed || !w.bolt.is_empty() || !w.alt.is_empty())) {
+            return Err("Only a one-handed weapon goes in the off hand.".into());
+        }
         let p = self.players.get_mut(&id).unwrap();
         match kind {
+            ItemKind::Weapon if off => {
+                p.off_weapon = Some(item);
+                p.off_empty = false;
+            }
             ItemKind::Weapon => p.weapon = item,
-            ItemKind::Shield => p.shield = item,
+            // A shield in the off hand: no second weapon, no empty hand.
+            ItemKind::Shield => {
+                p.shield = item;
+                p.off_weapon = None;
+                p.off_empty = false;
+            }
             _ => return Err("That isn't a weapon.".into()),
         }
         // Whatever is up comes down with the swap.

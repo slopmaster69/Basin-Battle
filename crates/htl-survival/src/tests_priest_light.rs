@@ -204,6 +204,9 @@ fn penance_rings_friend_and_foe_in_turn_and_q_on_each_ring_sends_its_bolt() {
     ev.extend(keep_time(&mut s, p, &[Some(0.0), Some(0.0), Some(0.0)], &[]));
     assert_eq!(hd - hp(&s, d), 36, "two bolts on the dummy, 18 each");
     assert_eq!(s.players[&f].health, hf + 18, "one on Bren");
+    // Dead on the beat, the heal on Bren lands critical (its bigger number over him).
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, critical: true, .. } if *healer == p && *target == f)), "a critical heal");
+    assert!(s.critical_heals.is_empty(), "and only that heal");
     assert_eq!(perfects(&ev, p), 1, "every ring landed: the perfect");
     assert!(s.players[&p].valor >= valor + s.content.checks.perfect_valor, "its Valor");
     assert!(priest_burst(&s, &ev, p, "penance"), "the Priest's holy burst");
@@ -224,6 +227,8 @@ fn a_press_in_the_window_but_off_the_beat_is_14_and_still_counts() {
     let ev = keep_time(&mut s, p, &[Some(0.1), Some(-0.1), Some(0.1)], &[]);
     assert_eq!(hd - hp(&s, d), 28, "14 a bolt");
     assert_eq!(s.players[&f].health, hf + 14);
+    // Off the beat, the heal is a plain one.
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, critical: false, .. } if *healer == p && *target == f)), "a plain heal");
     assert_eq!(perfects(&ev, p), 1, "every ring landed is still the perfect");
 }
 
