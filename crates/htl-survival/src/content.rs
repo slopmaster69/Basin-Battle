@@ -873,6 +873,29 @@ pub struct AiDef {
     /// foes follow, in the open and below. A wager's own farther chase isn't stacked on it
     /// (the farther of the two).
     pub leash_scale: f32,
+    /// The string a boss just began is this many times as likely to come again next: it seldom
+    /// does the same thing twice running.
+    pub repeat: f32,
+    /// One blow of a boss's string up close is now and then held a beat (this chance a string,
+    /// up to `hold_secs` longer in its wind-up): the delayed swing, so a parry timed by rote
+    /// comes early.
+    pub hold: f32,
+    pub hold_secs: f32,
+    /// A boss's string up close of three blows or more stops one short, this often; of two or
+    /// more, runs one longer (its last blow again), `extend` as often.
+    pub cut: f32,
+    pub extend: f32,
+    /// A boss's string up close done, this often it goes straight into another instead of
+    /// resting (not past three close strings in a row).
+    pub chain: f32,
+    /// A boss's string up close done, the chance it backs off (facing its foe) to where one of
+    /// its blows for farther off (a charge, a lunge, a throw) can come from, and uses it:
+    /// `space`, and `space_streak` more for each close string in a row before, up to
+    /// `space_most`; times `space_band` with two heroes or more in its fight.
+    pub space: f32,
+    pub space_streak: f32,
+    pub space_most: f32,
+    pub space_band: f32,
 }
 
 impl Default for AiDef {
@@ -893,6 +916,16 @@ impl Default for AiDef {
             flank: true,
             jitter: 0.25,
             leash_scale: 1.0,
+            repeat: 0.3,
+            hold: 0.25,
+            hold_secs: 0.45,
+            cut: 0.2,
+            extend: 0.2,
+            chain: 0.25,
+            space: 0.3,
+            space_streak: 0.2,
+            space_most: 0.8,
+            space_band: 0.5,
         }
     }
 }
@@ -2097,6 +2130,15 @@ pub struct MobDef {
     /// Harmless: it never fights back, and runs from a blow (a rabbit, a sheep).
     #[serde(default)]
     pub critter: bool,
+    /// An ally of the heroes: it never takes up a fight against one, their blows and shots pass
+    /// it by, and a heal aimed at a friend can land on it (its number floats over it). None in the
+    /// rules yet; `.es ally` sets one down to try.
+    #[serde(default)]
+    pub friendly: bool,
+    /// Set down by a hero (a `totem`) yet a heal can reach it: help aimed at a friend lands on
+    /// it as on an ally (a Priest's orb). A totem without it never takes a heal.
+    #[serde(default)]
+    pub healable: bool,
     /// Its voice (`SoundEntries.dbc`): as it turns on a foe, at its second wind, as it falls.
     #[serde(default)]
     pub aggro_sound: u32,

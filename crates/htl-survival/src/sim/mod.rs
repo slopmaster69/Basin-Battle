@@ -386,8 +386,9 @@ pub enum Event {
     Channel { caster: Id, target: Option<Id>, spell: u32, ms: u32 },
     /// A hero healed by this much (a green number).
     Healed { id: Id, amount: u32 },
-    /// `healer` mended another hero, `target`, by `amount` (shown to the healer).
-    HealedOther { healer: Id, target: Id, amount: u32 },
+    /// `healer` mended another hero or an allied creature, `target`, by `amount` (shown to the
+    /// healer).
+    HealedOther { healer: Id, target: Id, amount: u32, critical: bool },
     /// A unit says something (`SoundEntries.dbc`): a creature's voice.
     Sound { id: Id, sound: u32 },
     /// How the Proving Ring stands changed for a hero (in it, or just out of it).
@@ -922,6 +923,18 @@ pub struct Mob {
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,
+    /// The string it began last (so it seldom begins the same one again next), how many of its
+    /// strings up close in a row it has done, and how many blows of the string it's in it will
+    /// throw (0: as many as it has; a boss's may stop short or run one longer).
+    pub last_pattern: Option<usize>,
+    pub close_run: u32,
+    pub string_len: usize,
+    /// The blow of its string a boss holds a beat (the delayed swing), and how much longer that
+    /// blow's wind-up is now.
+    pub held_step: Option<usize>,
+    pub hold: f32,
+    /// A boss making space: backing off until then, to use this string of its from there.
+    pub space: Option<(f32, usize)>,
     /// Who has hurt it, how much, and when last (it fades): whom it goes for.
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.
@@ -931,6 +944,10 @@ pub struct Mob {
     /// Called up by this creature in its fight (a boss's adds, at a turn): it goes when that
     /// fight ends, its own or the boss's, instead of standing where the boss stood.
     pub summoned_by: Option<Id>,
+    /// On the heroes' side (its rules' `friendly`, or set down by `.es ally`): it never takes up
+    /// a fight against a hero, their blows pass it by, and help aimed at a friend can reach it
+    /// (unless it's a totem: [`Survival::takes_help`]).
+    pub friendly: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1073,6 +1090,10 @@ pub struct Survival {
     /// Creatures put up to practise on and look at (`.es target`): `true` for one that stands
     /// still, never moving or striking of itself (thrown, pulled and knocked up all the same).
     pub targets: BTreeMap<Id, bool>,
+    /// Heroes whose heals land critical just now (a bigger number over the friend): while a
+    /// spell's skill check is a perfect and what it sends out is made, or by `.es crit` (dev).
+    /// A heal with no skill check is never critical.
+    pub critical_heals: BTreeSet<Id>,
     /// Crowd control on units, the heroes' grace after a hard one, and each hero's log of it.
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
@@ -1196,6 +1217,7 @@ impl Survival {
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
             targets: BTreeMap::new(),
+            critical_heals: BTreeSet::new(),
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),

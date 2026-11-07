@@ -713,7 +713,7 @@ impl SurvivalGame {
             display_id: d.display,
             scale: d.scale,
             level,
-            faction: fields::FACTION_MONSTER,
+            faction: if m.friendly { fields::FACTION_FRIENDLY } else { fields::FACTION_MONSTER },
             health: m.health,
             max_health: m.max_health,
             attack_ms: 2000,

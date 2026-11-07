@@ -205,7 +205,12 @@ impl Survival {
         if friend {
             let base = if critical { pd.crit } else { d.mend };
             let amount = (base * self.weakened(owner)).round() as u32;
+            // Dead on the beat, the heal lands critical: its bigger number over the friend.
+            let mark = critical && self.critical_heals.insert(owner);
             self.heal_hero_by(on, amount, owner, &d.name);
+            if mark {
+                self.critical_heals.remove(&owner);
+            }
             self.events.push(Event::Missile { caster: owner, spell: abilities::HEAL_LOOK, target: Target::Unit(on) });
             self.gain_valor(owner, self.content.valor.ability / 3.0);
         } else {
