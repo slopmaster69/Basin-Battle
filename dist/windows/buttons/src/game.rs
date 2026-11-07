@@ -91,7 +91,7 @@ pub fn wait_until_open(paths: &Paths, child: &mut Child, mut say: impl FnMut(Str
     }
     let log = paths.root.join("logs").join("launcher-game.log");
     let t0 = Instant::now();
-    let mut building = false;
+    let mut said: Option<u64> = None;   // the minutes last shown while the client builds
     loop {
         std::thread::sleep(Duration::from_millis(700));
         if crate::proc::game_running() {
@@ -100,14 +100,14 @@ pub fn wait_until_open(paths: &Paths, child: &mut Child, mut say: impl FnMut(Str
         let text = std::fs::read_to_string(&log).unwrap_or_default();
         if text.contains("Building") || text.contains("Compiling") {
             let mins = t0.elapsed().as_secs() / 60;
-            if !building || t0.elapsed().as_secs() % 30 == 0 {
+            if said != Some(mins) {
+                said = Some(mins);
                 say(if mins == 0 {
                     "Building the game with the latest changes. The first time can take 20 min…".into()
                 } else {
                     format!("Building the game with the latest changes ({mins} min). The first time can take 20 min…")
                 });
             }
-            building = true;
         }
         if let Ok(Some(status)) = child.try_wait() {
             if crate::proc::game_running() {
