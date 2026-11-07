@@ -96,8 +96,6 @@ mod tests_sweep;
 #[cfg(test)]
 mod tests_orb;
 #[cfg(test)]
-mod tests_content_rules;
-#[cfg(test)]
 mod tests_rhythm;
 #[cfg(test)]
 mod tests_bomb;
@@ -111,3 +109,5 @@ mod tests_priest_light;
 mod tests_priest_shadow;
 #[cfg(test)]
 mod tests_priest_core;
+#[cfg(test)]
+mod tests_content_rules;
