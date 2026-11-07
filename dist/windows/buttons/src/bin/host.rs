@@ -140,7 +140,7 @@ fn update_and_restart(paths: &Paths, project: &Project, extra: &[String]) -> Opt
             None
         }
         Ok(Some(r)) => {
-            if let Some(why) = update::not_now() {
+            if let Some(why) = update::not_now(&paths.root) {
                 say(&format!("{} is out, but: {why}", r.version));
                 return None;
             }
