@@ -241,6 +241,42 @@ fn a_caster_casts_between_the_blows_up_close_never_during_one() {
 }
 
 #[test]
+fn a_string_stops_at_the_guard_it_breaks_and_nothing_strikes_the_reeling_hero() {
+    // Mr. Smite's flurry broke a buckler on its third blow and its fourth landed in the stagger.
+    let (mut s, p) = turns_world();
+    let smite = s.content.mob("dm_smite").unwrap();
+    let m = s.spawn_mob(smite, [2.0, 0.0, 0.0], None, false);
+    let k = s.content.mobs[smite].patterns.iter().position(|x| x.name == "flurry").unwrap();
+    let blows = s.content.mobs[smite].patterns[k].steps.len();
+    assert!(blows >= 3);
+    // Guard up, nearly winded: the first blocked blow breaks it.
+    s.input(p, Input::Guard);
+    let _ = s.step(0.02);
+    if let Some(h) = s.players.get_mut(&p) {
+        h.stamina = 5.0;
+        h.max_health = 100_000;
+        h.health = 100_000;
+    }
+    s.begin_pattern(m, k, false);
+    s.windup(m, Foe::Hero(p), s.players[&p].pos);
+    let mut broke: Option<f32> = None;
+    let mut after = 0;
+    for _ in 0..200 {
+        for e in s.step(0.02) {
+            match e {
+                Event::Swing { attacker, victim: Some(v), outcome: Outcome::GuardBroken, .. } if attacker == m && v == p => broke = broke.or(Some(s.clock)),
+                // The string's next blow would begin within its recovery (0.12 s), and a new one
+                // as an opening while the hero reels (0.8 s).
+                Event::MobWindup { id, .. } if id == m && broke.is_some_and(|t| s.clock - t < 0.6) => after += 1,
+                _ => {}
+            }
+        }
+    }
+    assert!(broke.is_some(), "the guard broke");
+    assert_eq!(after, 0, "no blow while the hero reels from the break");
+}
+
+#[test]
 fn a_creature_that_just_walked_up_settles_before_its_first_blow() {
     let (mut s, p) = turns_world();
     // A miner: strings up close only (a pirate lunges in from afar, a tell of its own).

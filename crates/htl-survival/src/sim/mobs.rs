@@ -1367,6 +1367,12 @@ impl Survival {
         let Foe::Hero(h) = foe else { return false };
         let (now, ai) = (self.clock, &self.content.ai);
         let Some(me) = self.mobs.get(&id) else { return false };
+        // Not at a hero reeling or knocked down: the stagger was the punishment, not a free blow.
+        // (Mr. Smite broke a guard and began a new string 0.5 s later, landing 0.3 s after the
+        // hero could move again.)
+        if ai.turn_beat > 0.0 && self.players.get(&h).is_some_and(|p| matches!(p.action, Action::Stagger { .. })) {
+            return true;
+        }
         if settle && ai.arrive_beat > 0.0 && now - me.moved_at < ai.arrive_beat && dist <= PRESS_RANGE {
             return true;
         }
