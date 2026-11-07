@@ -44,3 +44,17 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   any phase's pace. Whitemane's unblockable second staff swing now comes 0.3 s after the first,
   so it can be dodged out of the first's dodge. Nine ranged multi-casts still come too close
   together; they go with the bolt work.
+- **One blow at a time** (branch `claude/fair-blows`): with two on a hero, the second never winds
+  up while the first does, nor for 0.35 s after its blow lands (`[ai] turn_beat`); it holds where
+  it is, facing the hero. A creature that has just run up stands 0.35 s before its first blow up
+  close (`[ai] arrive_beat`); a lunge or a charge from afar doesn't wait to settle but still waits
+  its turn. Tested: two pirates on one hero for 8 s never wind up together.
+- **The meter** (#236): a fight now lasts while any creature is still on the hero; a lull alone
+  no longer starts the Fight tab over.
+- **Foe health** (branch `claude/fight-length`): `foe_health` 1.6 to 1.0. A pirate in 7 starting
+  sword hits, not 11 (15 swings with its shield). Cookie 650, Smite 1100: long, but bosses.
+- **The bestiary lab** (branch `claude/bestiary-lab`): `blow:<string>` plays a creature's whole
+  named string; a queue line `bestiary dm_*` films every string of every Deadmines creature.
+- **Client patch 0060** (#237): the strike pacing, the whole series applied on the pinned client.
+  My first test build was on an older base (it lacked 17 lines of the Mage's held-pose fix in the
+  same file): rebuilt from main's exact series plus 0060 (`main-0060` in the client clone).
