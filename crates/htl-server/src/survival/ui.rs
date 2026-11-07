@@ -489,7 +489,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 56: the ordinary camera over the right shoulder (`SetCameraShoulder`, client patch 0059), so a
 /// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
 /// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
-pub(crate) const ADDON_NEWEST: u32 = 57;
+/// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
+pub(crate) const ADDON_NEWEST: u32 = 58;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -1784,11 +1785,23 @@ impl SurvivalGame {
                 self.tell(conn, &format!("The quartermaster hands back your {what}."));
                 self.refresh_lamp(conn, me);
             }),
-            "arm" => self.sim.arm(me, &arg).map(|name| {
-                self.tell(conn, &format!("You equipped the {name}."));
-                let rack = self.world_of(conn).and_then(|w| w.station).filter(|s| matches!(self.sim.objs.get(s).map(|o| &o.kind), Some(ObjKind::Rack))).unwrap_or_else(|| self.sim.rack_id());
-                self.ui_station(conn, me, rack);
-            }),
+            // `.arm <key>`, `.arm <key> off` (the off hand), `.arm none` (one weapon alone).
+            "arm" => {
+                let off = arg2.trim() == "off";
+                let done = if arg == "none" { self.sim.stow_off(me) } else if off { self.sim.arm_off(me, &arg) } else { self.sim.arm(me, &arg) };
+                done.map(|name| {
+                    let said = if arg == "none" {
+                        "Your off hand is empty: you fight with one weapon alone.".to_string()
+                    } else if off {
+                        format!("You took the {name} in your off hand.")
+                    } else {
+                        format!("You equipped the {name}.")
+                    };
+                    self.tell(conn, &said);
+                    let rack = self.world_of(conn).and_then(|w| w.station).filter(|s| matches!(self.sim.objs.get(s).map(|o| &o.kind), Some(ObjKind::Rack))).unwrap_or_else(|| self.sim.rack_id());
+                    self.ui_station(conn, me, rack);
+                })
+            },
             "siege" => {
                 let rest = arg2.to_string();
                 self.siege_command(conn, me, &arg, &rest)
