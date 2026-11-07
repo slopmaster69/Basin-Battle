@@ -1,0 +1,169 @@
+From d0f2b145b05e0b684f1aac6596ca4d4a91249a69 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 14:44:29 -0600
+Subject: [PATCH] A shrunken building's torches cast shrunken pools: the look's
+ torch light follows its host's scale
+
+Elwynn Survival puts Elwynn's own buildings in the camp at a fraction of their size (the Watchtower
+is `HumanWatchTower.m2` at a third, the Guard Tower `HumanGuardTower.m2` at two fifths). Those
+models carry four wall torches, each an M2 point light of colour (1.0, 0.86, 0.5) with an authored
+reach under 2 yd, which the entity path spawns as carried lights. The new look (patch 0057) turned
+every authored light into a full torch's pool, 10 yd across at about 1.5 of its strength, whatever
+the object's scale: on a tower 7 yd a side the four pools lay over each other on its own pale
+stone, the walls took two or three times their own colour and went white from the door to the
+roof, and the yard around it lit up torch-yellow for 8 yd. Elwynn's full-size towers show the same
+four torches a long stride apart on a wall three times as big, where it reads as a lit doorway.
+
+`look::lights::torch_light` now takes the world scale of what carries the light (the light's
+`GlobalTransform`, packed by `build_light_data`), and a host below full size shrinks the pool the
+same way, in reach and in strength: a two-fifths tower's torch casts a 4 yd pool at two fifths of
+a torch's strength, a candle to a torch. Nothing grows past a full torch's pool, however big its
+host, so a planted arrow's glow (scale 1.5) and every placed lamp, brazier and WMO light are as
+they were.
+
+Tests: `an_authored_light_becomes_a_pool` covers the 0.42 host (radius and strength two fifths,
+the hue its own) and a 2.5 host (a full torch's), and the packer's tests carry the new field.
+Filmed on the test server's camp (always 23:30): a Watchtower built at the campfire, before and
+after.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ .../src/lighting/global_light.rs              |  3 +-
+ crates/benilla-world/src/look/lights.rs       | 51 ++++++++++++++-----
+ 2 files changed, 40 insertions(+), 14 deletions(-)
+
+diff --git a/crates/benilla-world/src/lighting/global_light.rs b/crates/benilla-world/src/lighting/global_light.rs
+index 017bb592..af6ae69f 100644
+--- a/crates/benilla-world/src/lighting/global_light.rs
++++ b/crates/benilla-world/src/lighting/global_light.rs
+@@ -296,7 +296,8 @@ fn build_light_data(
+                     .get(r.0.instance)
+                     .is_ok_and(|inst| r.0.interior_fogged_by(inst))
+             });
+-            (e, pl, gt.translation(), interior)
++            // Its host's world scale: a shrunken building's torches cast shrunken pools.
++            (e, pl, gt.translation(), gt.scale().abs().max_element(), interior)
+         });
+     let looked = look.pack(
+         cam_pos,
+diff --git a/crates/benilla-world/src/look/lights.rs b/crates/benilla-world/src/look/lights.rs
+index 192a8e9e..30ca2ecf 100644
+--- a/crates/benilla-world/src/look/lights.rs
++++ b/crates/benilla-world/src/look/lights.rs
+@@ -436,7 +436,13 @@ pub fn score(peak: f32, radius: f32, distance: f32) -> f32 {
+ /// hue, at a strength set by its authored peak, out to [`tune::TORCH_RADIUS`]; a flame flickers.
+ /// A light authored with a reach of [`tune::GLOW_MAX_RANGE`] or less is Basin Battle's glowing
+ /// object, a small glow and not a torch. `None` for a light too dim to cast a pool.
+-pub fn torch_light(pl: &WorldPointLight) -> Option<LookLight> {
++///
++/// `host_scale` is the world scale of what carries the light. A model shrunk to a fraction of its
++/// size (Elwynn Survival's camp buildings: Elwynn's own guard tower at two fifths, its four wall
++/// torches with it) casts pools shrunk the same, in reach and in strength: a miniature's torch is a
++/// candle, not four full torches a stride apart on one pale wall. Nothing grows past a full
++/// torch's pool, however big its host.
++pub fn torch_light(pl: &WorldPointLight, host_scale: f32) -> Option<LookLight> {
+     // `intensity` is `4π ×` the authored scale (the `PointLight` convention).
+     let s = pl.intensity / (4.0 * std::f32::consts::PI);
+     let rgb = pl.color.map(|c| (c * s).max(0.0));
+@@ -451,7 +457,12 @@ pub fn torch_light(pl: &WorldPointLight) -> Option<LookLight> {
+     } else {
+         (tune::TORCH_INTENSITY, tune::TORCH_RADIUS)
+     };
+-    let light = LookLight::new(hue, base * strength, radius);
++    let miniature = if host_scale.is_finite() {
++        host_scale.clamp(0.0, 1.0)
++    } else {
++        1.0
++    };
++    let light = LookLight::new(hue, base * strength * miniature, radius * miniature);
+     Some(if rgb[0] >= tune::FLAME_RED_OVER_BLUE * rgb[2] {
+         light.flickering(tune::FLAME_FLICKER, tune::FLAME_FLICKER_HZ)
+     } else {
+@@ -612,15 +623,15 @@ pub(crate) struct LookLightInputs<'w, 's> {
+ 
+ impl LookLightInputs<'_, '_> {
+     /// One frame: ranks `torches` (each authored light, admitted by its rooms, at its world
+-    /// position, and whether it is a building's interior light) and the [`LookLight`]s around
+-    /// `cam`, steps the fades and packs the table into
++    /// position, at its host's world scale, and whether it is a building's interior light) and
++    /// the [`LookLight`]s around `cam`, steps the fades and packs the table into
+     /// `rows`, returning its count. Under the classic look the table is empty.
+     pub(crate) fn pack<'a>(
+         &mut self,
+         cam: Vec3,
+         now: f32,
+         dt: f32,
+-        torches: impl Iterator<Item = (Entity, &'a WorldPointLight, Vec3, bool)>,
++        torches: impl Iterator<Item = (Entity, &'a WorldPointLight, Vec3, f32, bool)>,
+         rows: &mut [[f32; 4]; LOOK_LIGHT_ROWS],
+     ) -> usize {
+         if !self.look.on {
+@@ -662,8 +673,8 @@ impl LookLightInputs<'_, '_> {
+                     fresh,
+                 });
+             };
+-        for (key, pl, pos, interior) in torches {
+-            if let Some(light) = torch_light(pl) {
++        for (key, pl, pos, host_scale, interior) in torches {
++            if let Some(light) = torch_light(pl, host_scale) {
+                 let rank = if interior { interior_rank } else { 1.0 };
+                 push(key, pos, &light, hour, false, rank);
+             }
+@@ -966,7 +977,7 @@ mod tests {
+     fn an_authored_light_becomes_a_pool() {
+         let torch =
+             crate::terrain_stream::point_light([0.466_666_7, 0.290_196_1, 0.133_333_34], 3.0);
+-        let l = torch_light(&torch).expect("the torch casts a pool");
++        let l = torch_light(&torch, 1.0).expect("the torch casts a pool");
+         assert!((l.intensity - tune::TORCH_INTENSITY).abs() < 1e-4);
+         assert_eq!(l.color[0], 1.0);
+         assert!(l.color[2] < 0.3, "warm: {:?}", l.color);
+@@ -976,7 +987,7 @@ mod tests {
+             range: 4.0,
+             ..crate::terrain_stream::point_light([1.0; 3], 1.0)
+         };
+-        let g = torch_light(&glow).expect("a glowing object's light");
++        let g = torch_light(&glow, 1.0).expect("a glowing object's light");
+         assert_eq!(g.flicker, 0.0, "white burns steady");
+         assert_eq!(g.radius, 6.0, "a planted arrow's glow stays small");
+         assert!(g.intensity <= tune::GLOW_INTENSITY * tune::TORCH_PEAK_MAX);
+@@ -987,12 +998,26 @@ mod tests {
+                 range,
+                 ..crate::terrain_stream::point_light([1.0, 0.8, 0.5], 1.0)
+             };
+-            let l = torch_light(&lamp).unwrap();
++            let l = torch_light(&lamp, 1.0).unwrap();
+             assert_eq!(l.radius, tune::TORCH_RADIUS, "reach {range}");
+             assert!(l.intensity >= tune::TORCH_INTENSITY * tune::TORCH_PEAK_MIN);
+         }
+         let dark = crate::terrain_stream::point_light([0.01; 3], 1.0);
+-        assert!(torch_light(&dark).is_none());
++        assert!(torch_light(&dark, 1.0).is_none());
++        // A camp building at two fifths of its size: its torches cast pools two fifths as far and
++        // two fifths as strong. A host bigger than life casts a full torch's, no more.
++        let wall_torch = WorldPointLight {
++            range: 1.9,
++            ..crate::terrain_stream::point_light([1.0, 0.86, 0.5], 1.0)
++        };
++        let full = torch_light(&wall_torch, 1.0).unwrap();
++        let small = torch_light(&wall_torch, 0.42).unwrap();
++        assert!((small.radius - 0.42 * tune::TORCH_RADIUS).abs() < 1e-4);
++        assert!((small.intensity - 0.42 * full.intensity).abs() < 1e-4);
++        assert_eq!(small.color, full.color, "the hue is its own");
++        let big = torch_light(&wall_torch, 2.5).unwrap();
++        assert_eq!(big.radius, full.radius);
++        assert_eq!(big.intensity, full.intensity);
+     }
+ 
+     /// `looklights`: a scale from 0 to 10, nothing or `tuned` for 1, anything else refused.
+@@ -1062,8 +1087,8 @@ mod tests {
+         let mut rows = [[0.0; 4]; LOOK_LIGHT_ROWS];
+         // The candle 8 yd off inside, the lamp 12 yd off outside.
+         let torches = [
+-            (keys[0], &lamp, Vec3::new(8.0, 0.0, 0.0), true),
+-            (keys[1], &lamp, Vec3::new(-12.0, 0.0, 0.0), false),
++            (keys[0], &lamp, Vec3::new(8.0, 0.0, 0.0), 1.0, true),
++            (keys[1], &lamp, Vec3::new(-12.0, 0.0, 0.0), 1.0, false),
+         ];
+         inputs.pack(Vec3::ZERO, 0.0, 0.1, torches.into_iter(), &mut rows);
+         let cands = &inputs.slots.scratch;
