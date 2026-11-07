@@ -325,6 +325,8 @@ impl Survival {
                 special: false,
                 pattern: None,
                 lunged: false,
+                moved_at: -1.0e9,
+                landed_at: -1.0e9,
                 guarding: false,
                 circle: if id % 2 == 0 { 1.0 } else { -1.0 },
                 sidle: None,
@@ -1194,6 +1196,10 @@ impl Survival {
             }
         }
         let walked = m.speed * dt - left;
+        // Running up (not stepping round or back facing its foe, which it does settled).
+        if walked > 1.0e-3 && m.sidle.is_none() {
+            m.moved_at = now;
+        }
         let (x, y, was) = (m.pos[0], m.pos[1], m.pos[2]);
         let leg_end = m.path.first().map(|p| p[2]);
         let mut z = self.land.height_near(x, y, was);
@@ -1324,6 +1330,46 @@ impl Survival {
         m.speed = speed;
         m.sidle = Some(foe);
         self.events.push(Event::MobMove { id, path: vec![from, to], speed, face: Some(foe) });
+    }
+
+    /// A creature waiting its turn: it stops where it is and faces `to`.
+    fn hold_facing(&mut self, id: Id, to: Vec3) {
+        let Some(m) = self.mobs.get(&id) else { return };
+        let (pos, moving) = (m.pos, !m.path.is_empty());
+        let face = facing(pos, to);
+        let turned = (face - m.facing + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+        if moving {
+            self.halt(id);
+        }
+        if moving || turned.abs() > 0.35 {
+            self.mobs.get_mut(&id).unwrap().facing = face;
+            self.events.push(Event::MobStop { id, pos, facing: face });
+        }
+    }
+
+    /// Whether creature `id` holds its blow at `foe`: another is winding one up at the same hero
+    /// (or landed one less than `ai.turn_beat` ago), or (a blow up close, `settle`) it ran up less
+    /// than `ai.arrive_beat` ago.
+    pub(crate) fn waits_turn(&self, id: Id, foe: Foe, dist: f32, settle: bool) -> bool {
+        let Foe::Hero(h) = foe else { return false };
+        let (now, ai) = (self.clock, &self.content.ai);
+        let Some(me) = self.mobs.get(&id) else { return false };
+        if settle && ai.arrive_beat > 0.0 && now - me.moved_at < ai.arrive_beat && dist <= PRESS_RANGE {
+            return true;
+        }
+        if ai.turn_beat <= 0.0 {
+            return false;
+        }
+        self.mobs.iter().any(|(oid, o)| {
+            *oid != id
+                && o.health > 0
+                && !self.attack_now(*oid).ranged
+                && match o.state {
+                    MobState::Windup { foe: Foe::Hero(x), .. } => x == h,
+                    MobState::Recover { foe: Foe::Hero(x), .. } => x == h && now - o.landed_at < ai.turn_beat,
+                    _ => false,
+                }
+        })
     }
 
     /// Hero `hero`'s foes in the middle of an attack on them (winding up or between blows).
@@ -1870,6 +1916,15 @@ impl Survival {
                     // farther off, a combo up close).
                     if ready {
                         if let Some(k) = self.pick_pattern(id, dist, size) {
+                            // One blow at a time on a hero, and a beat to settle after walking
+                            // up (but a lunge or a charge from afar is its own tell).
+                            let near = d.patterns[k].min_range < SPACE_FROM;
+                            let shot = d.patterns[k].steps.first().and_then(|st| st.ranged) == Some(true);
+                            if !shot && self.waits_turn(id, foe, dist, near) {
+                                // It holds where it is, facing its foe, ready.
+                                self.hold_facing(id, to);
+                                return;
+                            }
                             // A fighter's own missile wants a clear line, like a caster's; it may
                             // loose one while two others are at the hero (it isn't one of the two).
                             let shot = d.patterns[k].steps.first().and_then(|st| st.ranged) == Some(true);
@@ -1882,7 +1937,11 @@ impl Survival {
                         }
                     }
                 } else if dist <= reach && sees && (ready || matches!(foe, Foe::Hero(h) if self.presses(id, h, dist))) {
-                    self.windup(id, foe, to);
+                    if a.ranged || !self.waits_turn(id, foe, dist, true) {
+                        self.windup(id, foe, to);
+                        return;
+                    }
+                    self.hold_facing(id, to);
                     return;
                 }
                 // Close in (a caster stops at its distance).
@@ -2284,6 +2343,9 @@ impl Survival {
     /// committed facing, or a station in the way.
     fn release(&mut self, id: Id, foe: Foe) {
         let now = self.clock;
+        if let Some(m) = self.mobs.get_mut(&id) {
+            m.landed_at = now;
+        }
         let a = self.attack_now(id);
         let m = &self.mobs[&id];
         let (pos, f) = (m.pos, m.facing);

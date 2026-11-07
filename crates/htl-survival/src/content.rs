@@ -881,6 +881,14 @@ pub struct AiDef {
     /// swing. A string's later blows keep their own pace. 0: no floor.
     #[serde(default)]
     pub first_blow: f32,
+    /// One blow at a time on a hero: while another creature winds up a blow up close at them, or
+    /// for this long after its blow lands, a creature waits its turn (0: no turns).
+    #[serde(default)]
+    pub turn_beat: f32,
+    /// A creature that has just walked up settles this long before a string up close (not a lunge
+    /// or a charge from afar, nor a lone creature's own reach). 0: none.
+    #[serde(default)]
+    pub arrive_beat: f32,
     /// One blow of a boss's string up close is now and then held a beat (this chance a string,
     /// up to `hold_secs` longer in its wind-up): the delayed swing, so a parry timed by rote
     /// comes early.
@@ -923,6 +931,8 @@ impl Default for AiDef {
             leash_scale: 1.0,
             repeat: 0.3,
             first_blow: 0.0,
+            turn_beat: 0.0,
+            arrive_beat: 0.0,
             hold: 0.25,
             hold_secs: 0.45,
             cut: 0.2,

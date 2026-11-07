@@ -154,6 +154,79 @@ fn a_pirates_first_slash_waits_for_the_floor_and_its_second_keeps_its_pace() {
     let _ = Foe::Hero(p);
 }
 
+/// A quiet world with the built-in rules, the turns and the arrival beat on.
+fn turns_world() -> (Survival, Id) {
+    let mut c = Content::dev();
+    c.pvp = Default::default();
+    c.ai.turn_beat = 0.35;
+    c.ai.arrive_beat = 0.35;
+    let mut s = Survival::new(c, Box::new(FlatLand::default()), 3, 1_000_000.0);
+    s.mobs.clear();
+    s.respawns.clear();
+    let p = s.join("ayla", "Ayla", None);
+    s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+    let _ = s.step(0.0);
+    (s, p)
+}
+
+#[test]
+fn two_pirates_on_one_hero_never_wind_up_at_once() {
+    // Corey, Nov 7: "two pirates are spam attacking so quick and together that you don't really
+    // feel like you have a gap", "both doing the same animation in different frames".
+    let (mut s, p) = turns_world();
+    let def = s.content.mob("dm_pirate").unwrap();
+    let a = s.spawn_mob(def, [1.8, 0.6, 0.0], None, false);
+    let b = s.spawn_mob(def, [1.8, -0.6, 0.0], None, false);
+    for m in [a, b] {
+        let x = s.mobs.get_mut(&m).unwrap();
+        x.state = MobState::Chase { foe: Foe::Hero(p) };
+        x.ready_at = 0.0;
+    }
+    let mut both = 0;
+    let mut windups = 0;
+    let mut was = (false, false);
+    for _ in 0..400 {
+        // The hero stands, full health, where they are.
+        if let Some(h) = s.players.get_mut(&p) {
+            h.health = h.max_health;
+        }
+        let _ = s.step(0.02);
+        let w = |s: &Survival, m: Id| matches!(s.mobs[&m].state, MobState::Windup { .. });
+        let now = (w(&s, a), w(&s, b));
+        if now.0 && now.1 {
+            both += 1;
+        }
+        windups += usize::from(now.0 && !was.0) + usize::from(now.1 && !was.1);
+        was = now;
+    }
+    assert!(windups >= 4, "they did swing: {windups}");
+    assert_eq!(both, 0, "never both winding up at once");
+}
+
+#[test]
+fn a_creature_that_just_walked_up_settles_before_its_first_blow() {
+    let (mut s, p) = turns_world();
+    // A miner: strings up close only (a pirate lunges in from afar, a tell of its own).
+    let def = s.content.mob("dm_miner").unwrap();
+    assert!(s.content.mobs[def].patterns.iter().all(|p| p.min_range < 3.0));
+    let m = s.spawn_mob(def, [12.0, 0.0, 0.0], None, false);
+    let x = s.mobs.get_mut(&m).unwrap();
+    x.state = MobState::Chase { foe: Foe::Hero(p) };
+    x.ready_at = 0.0;
+    // Until its first wind-up: when it last walked, and when it began.
+    let mut began = None;
+    for _ in 0..300 {
+        let _ = s.step(0.02);
+        if matches!(s.mobs[&m].state, MobState::Windup { .. }) {
+            began = Some(s.clock);
+            break;
+        }
+    }
+    let began = began.expect("it swung");
+    let moved = s.mobs[&m].moved_at;
+    assert!(began - moved >= 0.35 - 0.021, "settled {:.2} s after walking up", began - moved);
+}
+
 #[test]
 #[ignore]
 fn fair_blows_report() {
