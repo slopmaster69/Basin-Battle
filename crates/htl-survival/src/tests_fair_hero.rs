@@ -36,6 +36,25 @@ const PARRY_LEAD: f32 = 0.12;
 /// How close a caster must be for the shield bash to reach it (the bash's 2.5 yd, less a little).
 const BASH_REACH: f32 = 2.2;
 
+/// How well the hero plays.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Profile {
+    pub name: &'static str,
+    /// From a wind-up starting (or a bolt flying) to the hero acting on it.
+    pub reaction: f32,
+    /// ...for a string's follow-up, its first already seen.
+    pub follow: f32,
+    /// The share of blows misread: not answered at all.
+    pub miss: f32,
+    /// Waits out a boss's string and keeps a roll's stamina back.
+    pub patient: bool,
+}
+
+/// One who knows the game and plays it cleanly.
+pub(crate) const CAREFUL: Profile = Profile { name: "careful", reaction: REACTION, follow: FOLLOW_REACTION, miss: 0.0, patient: true };
+/// One still learning it: slower, misreads a quarter of the blows, swings when they shouldn't.
+pub(crate) const LEARNING: Profile = Profile { name: "learning", reaction: 0.45, follow: 0.3, miss: 0.25, patient: false };
+
 /// What one fight cost.
 #[derive(Default, Debug)]
 pub(crate) struct Outcome {
@@ -70,7 +89,16 @@ fn world(seed: u64) -> (Survival, Id) {
 }
 
 /// One fight: these creatures (by key) set 10 yd ahead of a fresh hero, played to the end.
-pub(crate) fn fight(foes: &[&str], seed: u64) -> Outcome {
+pub(crate) fn fight(foes: &[&str], seed: u64, who: Profile) -> Outcome {
+    let (reaction, follow) = (who.reaction, who.follow);
+    // The hero's own dice (a misread), apart from the world's.
+    let mut dice = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+    let mut misread = move || {
+        dice ^= dice << 13;
+        dice ^= dice >> 7;
+        dice ^= dice << 17;
+        ((dice >> 11) as f64 / (1u64 << 53) as f64) < who.miss as f64
+    };
     let (mut s, p) = world(seed);
     if let Some(h) = s.players.get_mut(&p) {
         // Played to the end however it goes: what it cost is the measure, against `max`.
@@ -115,7 +143,7 @@ pub(crate) fn fight(foes: &[&str], seed: u64) -> Outcome {
                 if trace {
                     println!("{:6.2} bolt flies, lands at {:.2} within {:.1} yd, {:.1} yd from the hero", now - start, ms.land_at - start, ms.radius, dist2d(ms.at, me));
                 }
-                threats.push(Threat { land: ms.land_at, seen: now + REACTION, from: ms.owner, parry: false, pressed: false });
+                threats.push(Threat { land: ms.land_at, seen: now + reaction, from: ms.owner, parry: false, pressed: misread() });
             }
         }
         threats.retain(|t| t.land + 0.3 > now);
@@ -204,7 +232,7 @@ pub(crate) fn fight(foes: &[&str], seed: u64) -> Outcome {
         });
         // And keeps a roll's worth of stamina back (a swing costs about 17 at its dearest).
         let spare = s.players[&p].stamina >= s.content.dodge.needs() + 17.0;
-        let busy = !spare || mid_string || threats.iter().any(|t| t.land > now && t.land - now < lock + mid);
+        let busy = (who.patient && (!spare || mid_string)) || threats.iter().any(|t| t.land > now && t.land - now < lock + mid);
         if matches!(s.players[&p].action, Action::Ready) && !dodge && parry.is_none() {
             let f = facing(me, tpos);
             if d <= weapon.range + 0.5 {
@@ -220,6 +248,14 @@ pub(crate) fn fight(foes: &[&str], seed: u64) -> Outcome {
             }
         }
         for e in s.step(DT) {
+            // When each foe's blow at the hero last landed (or was answered): a string's next
+            // blow is read faster.
+            if let Event::Swing { attacker, victim: Some(v), .. } = &e {
+                if *v == p && ids.contains(attacker) {
+                    landed_at.retain(|(m, _)| m != attacker);
+                    landed_at.push((*attacker, s.clock));
+                }
+            }
             match e {
                 // A creature's cast (its bolt) is told as a cast, not a swing's wind-up.
                 Event::Cast { caster, ms, .. } if ids.contains(&caster) => {
@@ -232,8 +268,8 @@ pub(crate) fn fight(foes: &[&str], seed: u64) -> Outcome {
                         let a = s.attack_now(caster);
                         let far = dist2d(s.mobs[&caster].pos, s.players[&p].pos);
                         let flight = if a.speed > 0.0 { far / a.speed } else { 0.0 };
-                        casts.push((caster, now + REACTION, now + windup));
-                        threats.push(Threat { land: now + windup + flight, seen: now + REACTION, from: caster, parry: false, pressed: false });
+                        casts.push((caster, now + reaction, now + windup));
+                        threats.push(Threat { land: now + windup + flight, seen: now + reaction, from: caster, parry: false, pressed: misread() });
                     }
                 }
                 Event::MobWindup { id, windup, blockable, .. } => {
@@ -244,20 +280,19 @@ pub(crate) fn fight(foes: &[&str], seed: u64) -> Outcome {
                     }
                     let a = s.attack_now(id);
                     // A string's follow-up, its first already seen: read faster.
-                    let react = if landed_at.iter().any(|(m, t)| *m == id && now - *t < 0.6) { FOLLOW_REACTION } else { REACTION };
+                    let react = if landed_at.iter().any(|(m, t)| *m == id && now - *t < 0.6) { follow } else { reaction };
                     if at_me && !a.ranged {
                         // A heavy blow (its weapon glows red) tears through a guard: rolled, not parried.
-                        threats.push(Threat { land: now + windup, seen: now + react, from: id, parry: blockable && !a.heavy, pressed: false });
+                        threats.push(Threat { land: now + windup, seen: now + react, from: id, parry: blockable && !a.heavy, pressed: misread() });
                     } else if at_me && !casts.iter().any(|c| c.0 == id) {
                         // A cast at the hero: its bolt lands its flight after the cast. Up close the
                         // cast is bashed aside; further off, rolled out of at the bolt's landing.
                         let far = s.mobs.get(&id).map_or(0.0, |m| dist2d(m.pos, s.players[&p].pos));
                         let flight = if a.speed > 0.0 { far / a.speed } else { 0.0 };
-                        casts.push((id, now + REACTION, now + windup));
-                        threats.push(Threat { land: now + windup + flight, seen: now + REACTION, from: id, parry: false, pressed: false });
+                        casts.push((id, now + reaction, now + windup));
+                        threats.push(Threat { land: now + windup + flight, seen: now + reaction, from: id, parry: false, pressed: misread() });
                     }
                 }
-                Event::Swing { attacker, victim: Some(v), .. } if v == p && ids.contains(&attacker) && { landed_at.retain(|(m, _)| *m != attacker); landed_at.push((attacker, s.clock)); false } => {}
                 Event::Swing { attacker, victim: Some(v), damage, style, .. } if v == p && attacker != p && damage > 0 => {
                     out.damage += damage;
                     if trace {
@@ -320,45 +355,80 @@ fn fights(c: &Content) -> Vec<(String, Vec<String>)> {
     out
 }
 
+/// Each pack's place in `deadmines.toml`: the `# --- ... ---` heading it stands under.
+fn pack_areas() -> Vec<String> {
+    let mut area = String::new();
+    let mut out = Vec::new();
+    for line in crate::content::DEFAULT_DUNGEON.lines() {
+        if let Some(h) = line.strip_prefix("# --- ") {
+            area = h.trim_end_matches(['-', ' ']).to_string();
+        } else if line.trim() == "[[dungeon.pack]]" {
+            out.push(area.clone());
+        }
+    }
+    out
+}
+
 #[test]
 #[ignore]
 fn fair_hero_report() {
     let c = Content::dev();
     let (s, p) = world(1);
     let max = s.players[&p].max_health;
-    println!("A hero with {max} health, a {:.2} s reaction, no markers: dodges what it sees, swings otherwise.", REACTION);
-    println!("{:<44} {:>6} {:>6} {:>6} {:>6} {:>5} {:>5} {:>5} {:>6} {:>6} {:>6}", "fight (mean of 5)", "secs", "dmg", "of hp", "worst", "hits", "quick", "busy", "dodged", "parried", "bashed");
-    // Each fight 5 times over (the creatures' choices are rolled): the mean, and the worst.
+    println!("A hero with {max} health and no markers. Careful: {:.2} s reaction, parries and rolls what it sees,", CAREFUL.reaction);
+    println!("waits out strings. Learning: {:.2} s, misreads {:.0}% of blows, swings when it shouldn't. Mean of 5 runs.", LEARNING.reaction, LEARNING.miss * 100.0);
+    println!(
+        "{:<40} | {:>5} {:>5} {:>5} {:>5} | {:>5} {:>5} {:>5}",
+        "fight", "secs", "dmg", "quick", "busy", "secs", "dmg", "worst"
+    );
     const SEEDS: u64 = 5;
-    for (what, foes) in fights(&c) {
+    let areas = pack_areas();
+    let mut by_area: Vec<(String, f32, f32)> = Vec::new();
+    for (i, (what, foes)) in fights(&c).into_iter().enumerate() {
         let keys: Vec<&str> = foes.iter().map(String::as_str).collect();
-        let runs: Vec<Outcome> = (1..=SEEDS).map(|seed| fight(&keys, seed)).collect();
+        let careful: Vec<Outcome> = (1..=SEEDS).map(|seed| fight(&keys, seed, CAREFUL)).collect();
+        let learning: Vec<Outcome> = (1..=SEEDS).map(|seed| fight(&keys, seed, LEARNING)).collect();
         let n = SEEDS as f32;
-        let mean = |f: &dyn Fn(&Outcome) -> f32| runs.iter().map(f).sum::<f32>() / n;
-        let worst = runs.iter().map(|o| o.damage).max().unwrap_or(0);
-        let cleared = runs.iter().filter(|o| o.cleared).count();
+        let mean = |runs: &[Outcome], f: &dyn Fn(&Outcome) -> f32| runs.iter().map(f).sum::<f32>() / n;
+        let pct = |d: f32| 100.0 * d / max as f32;
+        let (cd, ld) = (mean(&careful, &|o| o.damage as f32), mean(&learning, &|o| o.damage as f32));
+        let worst = learning.iter().map(|o| o.damage).max().unwrap_or(0) as f32;
+        let uncleared = careful.iter().chain(&learning).filter(|o| !o.cleared).count();
         println!(
-            "{:<44} {:>6.1} {:>6.0} {:>5.0}% {:>5.0}% {:>5.1} {:>5.1} {:>5.1} {:>6.1} {:>6.1} {:>6.1}{}",
+            "{:<40} | {:>5.0} {:>4.0}% {:>5.1} {:>5.1} | {:>5.0} {:>4.0}% {:>4.0}%{}",
             what,
-            mean(&|o| o.secs),
-            mean(&|o| o.damage as f32),
-            100.0 * mean(&|o| o.damage as f32) / max as f32,
-            100.0 * worst as f32 / max as f32,
-            mean(&|o| o.landed as f32),
-            mean(&|o| o.too_quick as f32),
-            mean(&|o| o.committed as f32),
-            mean(&|o| o.dodged as f32),
-            mean(&|o| o.parried as f32),
-            mean(&|o| o.bashed as f32),
-            if cleared < runs.len() { format!("  ({cleared} of {} cleared)", runs.len()) } else { String::new() }
+            mean(&careful, &|o| o.secs),
+            pct(cd),
+            mean(&careful, &|o| o.too_quick as f32),
+            mean(&careful, &|o| o.committed as f32),
+            mean(&learning, &|o| o.secs),
+            pct(ld),
+            pct(worst),
+            if uncleared > 0 { format!("  ({uncleared} of {} runs uncleared at {CAP:.0} s)", 2 * SEEDS) } else { String::new() }
         );
+        if let Some(a) = areas.get(i) {
+            match by_area.iter_mut().find(|x| x.0 == *a) {
+                Some(x) => {
+                    x.1 += cd;
+                    x.2 += ld;
+                }
+                None => by_area.push((a.clone(), cd, ld)),
+            }
+        }
+    }
+    println!();
+    println!("Every pack of each heading in deadmines.toml, fought once (a lamp gives {max} health and 3 Draughts of 40%):");
+    for (a, cd, ld) in by_area {
+        println!("{:<44} careful {:>5.0} ({:>3.0}%)   learning {:>5.0} ({:>3.0}%)", a, cd, 100.0 * cd / max as f32, ld, 100.0 * ld / max as f32);
     }
 }
 
 #[test]
 fn a_hero_who_answers_what_they_see_beats_one_pirate_without_a_blow_too_quick_to_answer() {
+    // (The hero's reaction is `tests_fair`'s REACTION and FOLLOW_REACTION: retuned there, this
+    // can fail with nothing in the game changed.)
     for seed in 1..=3 {
-        let o = fight(&["dm_pirate"], seed);
+        let o = fight(&["dm_pirate"], seed, CAREFUL);
         assert!(o.cleared, "one pirate falls: {o:?}");
         assert_eq!(o.too_quick, 0, "no pirate blow comes quicker than a hero can see and answer: {o:?}");
         assert!(o.parried > 0, "its blades are parried: {o:?}");
@@ -371,6 +441,7 @@ fn fair_hero_one() {
     let foes = std::env::var("FAIR_HERO_FOES").unwrap_or_else(|_| "dm_squallshaper".into());
     let keys: Vec<&str> = foes.split(',').collect();
     let seed = std::env::var("FAIR_HERO_SEED").ok().and_then(|x| x.parse().ok()).unwrap_or(7);
-    println!("{:?}", fight(&keys, seed));
+    let who = if std::env::var("FAIR_HERO_LEARNING").is_ok() { LEARNING } else { CAREFUL };
+    println!("{:?}", fight(&keys, seed, who));
 }
 
