@@ -133,3 +133,20 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   past the pirates to the Wizard still brings all four, so the walkway order matters.
 - **CI is green on all eleven open PRs** (#236 to #246). None has auto-merge on: `gh pr merge` is
   denied here, so they wait for the owner account.
+
+## Nov 7, small hours
+
+- **Encounter 3, the Juggernaut's deck** (#247): walking onto it brought two pirates, two Evokers
+  and Captain Greenskin at once (plus his two summoned pirates at half). The Evokers stood
+  between the two packs and the links passed the fight along. Now the deck hands link only to
+  each other, Greenskin has no link and notices at 12 yd, the Evokers stand together on the
+  raised fore deck 17 yd from both (walkable, probed), and an Evoker notices at 13 yd. The pull
+  report: four fights, each alone. VanCleef's fight is unchanged; his strings read on film.
+- **Encounter 4, the Foundry**: nothing changed. One oddity in the Nov 6 log: a ring Engineer
+  "fell through the floor" at Gilnid's pit and was put back 200 yd up, then home. A scratch test
+  chasing a hero round the pit from both ring Engineers didn't reproduce it (they stay on the
+  ring and throw down). Once in all the logs; the game's own recovery handled it.
+- **Two patches numbered 0060**: `main` took 0060 for the heal over a friend (#217) while the
+  strike patch (#237) was open. The strike patch is now 0061 (a merge of `main` and a rename,
+  not a rebase), and the whole series through 0061 is built on the pinned client before it goes
+  ready.
