@@ -73,6 +73,44 @@ fn cast(s: &mut Survival, p: Id, key: &str) {
     assert!(!matches!(s.players[&p].action, Action::Ready), "{key} went off");
 }
 
+/// A creature held where it stands, still on the hero (chasing them) or not, while the world runs.
+fn run_on(s: &mut Survival, secs: f32, m: Id, on: Option<Id>) {
+    let at = s.mobs[&m].pos;
+    for _ in 0..(secs / DT).round() as usize {
+        if let Some(x) = s.mobs.get_mut(&m) {
+            x.state = match on {
+                Some(h) => MobState::Chase { foe: mobs::Foe::Hero(h) },
+                None => MobState::Idle { wander_at: 1e9 },
+            };
+            x.path.clear();
+            x.pos = at;
+            x.ready_at = 1e9;
+        }
+        s.step(DT);
+    }
+}
+
+#[test]
+fn a_fight_lasts_while_a_creature_is_still_on_the_hero_however_long_the_lull() {
+    // Nov 6 play-test: "the combat meter kept resetting". Eight seconds without a blow (a walk
+    // to the caster, dodging pots) ended the fight and the Fight tab started over.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = grunt(&mut s, [30.0, 0.0, 0.0]);
+    s.meter_dealt(p, m, 10, "Melee");
+    run_on(&mut s, 8.0, m, Some(p));
+    assert!(s.fight_meter(p).unwrap().live, "still on: a creature is on them");
+    s.meter_dealt(p, m, 15, "Melee");
+    let f = s.fight_meter(p).unwrap();
+    assert_eq!(f.rows[0].dealt, 25, "one fight, both blows");
+    assert!(f.secs >= 8.0, "its clock ran through the lull: {}", f.secs);
+    // Nothing on them now: the lull ends it, and the next blow begins another.
+    run_on(&mut s, 8.0, m, None);
+    assert!(!s.fight_meter(p).unwrap().live, "over");
+    s.meter_dealt(p, m, 5, "Melee");
+    assert_eq!(s.fight_meter(p).unwrap().rows[0].dealt, 5, "a new fight");
+}
+
 fn row<'a>(m: &'a meter::OwnMeter, label: &str) -> Option<&'a (String, u64, u64)> {
     m.rows.iter().find(|r| r.0 == label)
 }

@@ -373,6 +373,7 @@ impl Survival {
                 retarget_at: 0.0,
                 drawn_off: None,
                 summoned_by: None,
+                friendly: self.content.mobs[def].friendly,
             },
         );
         // An ambusher lies unseen until a hero comes near (or its chest is opened).
@@ -494,7 +495,8 @@ impl Survival {
         while let Some(m) = queue.pop() {
             let foe = if m == mid { first } else { self.spread_foe(m, first) };
             let Some(mob) = self.mobs.get_mut(&m) else { continue };
-            if mob.health == 0 {
+            // An ally of the heroes never takes up a fight against one.
+            if mob.health == 0 || mob.friendly {
                 continue;
             }
             // A harmless creature runs instead.
@@ -1838,7 +1840,7 @@ impl Survival {
                     return;
                 }
                 // Notice a hero in sight.
-                if d.aggro > 0.0 {
+                if d.aggro > 0.0 && !self.mobs[&id].friendly {
                     let seen = self
                         .players
                         .iter()
@@ -2381,7 +2383,7 @@ impl Survival {
 
     pub(crate) fn windup(&mut self, id: Id, foe: Foe, to: Vec3) {
         // A spell lab body swings only when the lab asks it to.
-        if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) {
+        if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) && !self.lab_stringing(id) {
             return;
         }
         self.halt(id);
@@ -2429,15 +2431,16 @@ impl Survival {
                 let fly = lob_flight(dist2d(pos, at), a.speed);
                 let secs = a.windup + fly + 0.3;
                 let look = ground_look(a.spell, a.look);
-                // Its spell's own look on the ground where it has one; else a warning ring laid
-                // there (the clients' plain hostile circle is the "can't cast here" texture, a
-                // red stop sign: play-test).
-                let mk = if look != 0 && a.radius >= GROUND_LOOK_MIN {
-                    self.mark_ground(at, a.radius, secs, look)
-                } else {
-                    let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false, own_hidden: false };
-                    self.mark_as(at, a.radius, secs, Some(tele))
-                };
+                // A warning ring laid there, always, and its spell's own look on the ground under
+                // it where it has one (the clients' plain hostile circle is the "can't cast here"
+                // texture, a red stop sign: play-test). The look alone didn't read on dark sand:
+                // Corey couldn't see Cookie's pots coming down, Nov 6. The look goes by itself as
+                // the pot lands; the ring is the throw's own.
+                if look != 0 && a.radius >= GROUND_LOOK_MIN {
+                    self.mark_ground(at, a.radius, secs, look);
+                }
+                let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false, own_hidden: false };
+                let mk = self.mark_as(at, a.radius, secs, Some(tele));
                 self.mobs.get_mut(&id).unwrap().lob = Some((at, mk));
             }
             None
@@ -2455,8 +2458,22 @@ impl Survival {
                 Some(self.mark_as(center, a.range * 0.6, a.windup + 0.2, Some(tele)))
             }
         };
+        // The blow's own sound as it begins to wind up (a crossbow drawn, a spell gathered), from
+        // where it stands: one whose look is silent is heard coming.
+        if a.sound != 0 {
+            self.events.push(Event::Sound { id, sound: a.sound });
+        }
         if a.emote != 0 {
             self.events.push(Event::Emote { id, emote: a.emote });
+        }
+        // Its voice as a string up close begins, from where it stands: a blow from behind is heard
+        // coming (Corey, Nov 7: no wind-up could be heard).
+        if !a.ranged && self.mobs[&id].pattern.is_none_or(|(_, s)| s == 0) {
+            let d = &self.content.mobs[def];
+            let voice = if a.heavy && d.heavy_sound != 0 { d.heavy_sound } else { d.windup_sound };
+            if voice != 0 {
+                self.events.push(Event::Sound { id, sound: voice });
+            }
         }
         // A blow no guard stops: its foe is warned (dodge it), and with a blow all round, everyone
         // it would reach.

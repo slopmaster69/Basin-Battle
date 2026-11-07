@@ -7,7 +7,9 @@ SETTINGS="$ROOT/settings.sh"
 # This folder's own changes to the client (the action-combat mouse and the aiming camera for
 # Elwynn Survival), applied on top of the pinned revision.
 BENILLA_PATCHES="$ROOT/patches/benilla"
-[ -f "$SETTINGS" ] && . "$SETTINGS"
+# Only its NAME=value lines: a line of anything else (Play once wrote "key = value" lines here)
+# would stop every script that runs with set -e.
+[ -f "$SETTINGS" ] && eval "$(tr -d '\r' < "$SETTINGS" | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' || true)"
 # A name from project.toml (the one place the project's player-facing names live), or the default.
 project_name() { # key default
     local v

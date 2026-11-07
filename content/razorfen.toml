@@ -630,7 +630,7 @@ respawn = 0.0
   name = "dust devil"
   weight = 2.0
   max_range = 3.5
-  steps = [ { clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 22786 } ]
+  steps = [ { ranged = false, clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 22786 } ]
 
 [[mob]]
 key = "rk_acolyte"
@@ -851,7 +851,7 @@ respawn = 0.0
   name = "nova"
   weight = 2
   max_range = 4
-  steps = [ { clip = 54, windup = 0.9, damage = 22, range = 5.5, arc = 360, look = 26271, kit = 356, heavy = true, blockable = false, recovery = 1 } ]
+  steps = [ { ranged = false, clip = 54, windup = 0.9, damage = 22, range = 5.5, arc = 360, look = 26271, kit = 356, heavy = true, blockable = false, recovery = 1 } ]
 
 [[mob]]
 key = "rk_jargba"
@@ -896,7 +896,7 @@ respawn = 0.0
   name = "death's word"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 24050 } ]
+  steps = [ { ranged = false, clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 218, look = 24050 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.85
@@ -1127,7 +1127,7 @@ then_look = 26271
   name = "thorn wall"
   weight = 2.0
   max_range = 4.0
-  steps = [ { clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 26271 } ]
+  steps = [ { ranged = false, clip = 54, windup = 1.0, range = 6.0, arc = 360.0, damage = 22, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 26271 } ]
   [[mob.pattern]]
   name = "chain lightning"
   weight = 2.0
@@ -1293,7 +1293,7 @@ respawn = 0.0
   name = "nova"
   weight = 2
   max_range = 4
-  steps = [ { clip = 54, windup = 0.9, damage = 22, range = 5.5, arc = 360, look = 26271, kit = 356, heavy = true, blockable = false, recovery = 1 } ]
+  steps = [ { ranged = false, clip = 54, windup = 0.9, damage = 22, range = 5.5, arc = 360, look = 26271, kit = 356, heavy = true, blockable = false, recovery = 1 } ]
 
 # --- the polish pass: its set, its signature weapons, perks on what the secrets keep ---------------
 

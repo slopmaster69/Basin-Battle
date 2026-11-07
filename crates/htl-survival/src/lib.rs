@@ -28,6 +28,8 @@ mod tests_abilities;
 #[cfg(test)]
 mod tests_bow;
 #[cfg(test)]
+mod tests_blow_sounds;
+#[cfg(test)]
 mod tests_arena;
 #[cfg(test)]
 mod tests_board;
@@ -92,6 +94,8 @@ mod tests_staff;
 #[cfg(test)]
 mod tests_release;
 #[cfg(test)]
+mod tests_weapon_identity;
+#[cfg(test)]
 mod tests_sweep;
 #[cfg(test)]
 mod tests_orb;
@@ -99,6 +103,8 @@ mod tests_orb;
 mod tests_fair;
 #[cfg(test)]
 mod tests_temper;
+#[cfg(test)]
+mod tests_fair_hero;
 #[cfg(test)]
 mod tests_rhythm;
 #[cfg(test)]
@@ -113,3 +119,5 @@ mod tests_priest_light;
 mod tests_priest_shadow;
 #[cfg(test)]
 mod tests_priest_core;
+#[cfg(test)]
+mod tests_content_rules;

@@ -18,6 +18,7 @@ impl Survival {
             stamina: c.player.stamina,
             weapon: item(&c.start.weapon),
             shield: item(&c.start.shield),
+            off_hand: String::new(),
             bow: item(&c.start.bow),
             bag: c.start.items.clone(),
             dead: false,
@@ -78,7 +79,7 @@ impl Survival {
         self.events.push(Event::Effects { player: id });
         self.events.push(Event::Gear { player: id });
         self.events.push(Event::Dirty);
-        self.tell(id, "You started over on the camp's first day, with your class's first 2 cards (Q) and (E), an axe, a buckler, a bow and a roast.");
+        self.tell(id, "You started over on the camp's first day, with your class's first 2 abilities (Q) and (E), an axe, a buckler, a bow and a roast.");
         Ok(())
     }
 

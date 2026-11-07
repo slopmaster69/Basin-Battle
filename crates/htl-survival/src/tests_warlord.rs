@@ -772,6 +772,21 @@ fn bladestorm_ramps_a_point_a_strike_up_to_16() {
 }
 
 #[test]
+fn bladestorm_spins_on_the_key_press_with_no_aim_and_no_click() {
+    // Play-test, Nov 6 2026 (Corey): "Bladestorm did no damage". The key put the hero into an
+    // aim (the reticle up, nothing spinning) and only a left click began the spin, since a beam
+    // counts as aimed; a ring round the caster has nowhere to aim.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "warlord", [3.5, 0.0, 0.0]);
+    s.set_valor(p, 100.0);
+    let mut ev = press(&mut s, p, "warrior_bladestorm", false);
+    assert!(matches!(s.players[&p].action, Action::Channel { .. }), "spinning on the key alone: {:?}", s.players[&p].action);
+    ev.extend(run(&mut s, 1.2));
+    assert!(!struck(&ev, k).is_empty(), "and it strikes");
+}
+
+#[test]
 fn bladestorm_tells_the_clients_its_flurry_and_flashes_each_cut_that_lands() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
@@ -939,7 +954,9 @@ fn momentum_stacks_with_each_hit_up_to_5() {
     assert!(s.momentum_on(p), "a new Warrior's keys are the Juggernaut's");
     for n in 1..=6u32 {
         let ev = light(&mut s, p);
-        assert_eq!(struck(&ev, k).len(), 1, "hit {n} lands");
+        // (Its blow, not the axe's bleed ticking.)
+        let blows = ev.iter().filter(|e| matches!(e, Event::Swing { victim: Some(v), outcome: Outcome::Hit, style, .. } if *v == k && *style != Blow::Dot)).count();
+        assert_eq!(blows, 1, "hit {n} lands");
         s.players.get_mut(&p).unwrap().stamina = 100.0;
         assert_eq!(s.momentum(p), n.min(5), "a stack a hit, 5 at most");
     }
@@ -986,4 +1003,17 @@ fn a_hero_with_no_juggernaut_card_on_a_key_has_no_momentum() {
     assert_eq!(s.momentum(p), 0);
     s.slot_ability(p, "defense", "berserker_rage").unwrap();
     assert!(s.momentum_on(p), "one of the Juggernaut's is enough");
+}
+
+#[test]
+fn intervene_whose_look_is_silent_sounds_from_its_caster_as_it_goes() {
+    let mut s = world();
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let _b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+    let sound = s.content.abilities[s.content.ability("intervene").unwrap()].sound;
+    assert!(sound != 0, "Intervene has a sound of its own");
+    s.set_valor(a, 25.0);
+    let mut ev = cast(&mut s, a, "tackle", true, 0.0, 0.0);
+    ev.extend(run(&mut s, 0.5));
+    assert!(ev.iter().any(|e| matches!(e, Event::Sound { id, sound: x } if *id == a && *x == sound)), "heard as it goes: {ev:?}");
 }
