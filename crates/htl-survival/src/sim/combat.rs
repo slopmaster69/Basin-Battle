@@ -2130,6 +2130,26 @@ impl Survival {
             Outcome::Parried => self.parry_looks(victim, from),
             _ => {}
         }
+        // A creature whose blow leaves the hero reeling (a guard broken, a knockdown) stops its
+        // string there: the stagger it gave ends the string, it isn't a free blow for the next one.
+        // (Mr. Smite's flurry broke a buckler on its third blow and its fourth landed in the
+        // stagger, 0.07 s after the hero could move; Rhahk'Zor's pound knocked a hero down and its
+        // second blow knocked them down again where they lay. "While reeling" felled heroes seven
+        // times on Nov 6.)
+        let reeling = self.players.get(&victim).is_some_and(|p| matches!(p.action, Action::Stagger { .. }));
+        if outcome == Outcome::GuardBroken || (reeling && matches!(outcome, Outcome::Hit)) {
+            let clock = self.clock;
+            if let Some(m) = self.mobs.get_mut(&attacker) {
+                if let Some((k, _)) = m.pattern.take() {
+                    // And it rests as after any string, before its next; a string up close counts
+                    // as one done (a boss makes space after a run of them).
+                    let d = &self.content.mobs[m.def];
+                    let close = d.patterns.get(k).is_some_and(|p| p.min_range < mobs::SPACE_FROM);
+                    m.close_run = if close { m.close_run + 1 } else { 0 };
+                    m.ready_at = m.ready_at.max(clock + d.attack.cooldown);
+                }
+            }
+        }
         self.events.push(Event::Swing { attacker, victim: Some(victim), damage: landed, outcome, anim: false, style });
         self.trade_blows(attacker, victim);
         if let Some(p) = self.players.get_mut(&victim) {

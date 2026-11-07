@@ -1516,7 +1516,9 @@ fn the_call_brings_the_nearest_pack_at_rest_after_a_few_seconds_and_only_once() 
     let p = s.players.get_mut(&id).unwrap();
     p.max_health = 1_000_000;
     p.health = 1_000_000;
-    s.move_player(id, [20.0, 0.0, 0.0], 0.0, Moving::default());
+    // Near enough that the caller fights within the Call's 30 yd of the resting pack, wherever it
+    // stands to swing.
+    s.move_player(id, [25.0, 0.0, 0.0], 0.0, Moving::default());
     let grunt_at = |s: &Survival, x: f32| *s.mobs.iter().find(|(_, m)| s.content.mobs[m.def].key == "grunt" && (m.home[0] - x).abs() < 1.0).unwrap().0;
     let (a, b) = (grunt_at(&s, 30.0), grunt_at(&s, 50.0));
     let resting = |s: &Survival, m: Id| matches!(s.mobs[&m].state, mobs::MobState::Idle { .. });
