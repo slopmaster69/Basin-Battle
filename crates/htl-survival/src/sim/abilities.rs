@@ -2363,10 +2363,12 @@ impl Survival {
         }
         let d = self.content.abilities[p.ability].clone();
         if d.splash > 0.0 {
+            let before = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
             self.burst(p, p.pos, Some(victim));
+            let after = self.mobs.get(&victim).map(|m| m.health).or_else(|| self.players.get(&victim).map(|h| h.health));
             // A critical's own effects on the one it struck, as without a burst (a perfect
-            // Fireball's longer burn).
-            if p.critical && !d.crit_effects.is_empty() && self.alive(victim) {
+            // Fireball's longer burn); not if the burst came to nothing on them (dodged, guarded).
+            if p.critical && !d.crit_effects.is_empty() && self.alive(victim) && after != before {
                 self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
             }
             return;
