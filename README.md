@@ -33,46 +33,35 @@ on that server.
 One download does everything: playing, hosting and updating.
 
 1. From the [Releases](https://github.com/slopmaster69/Basin-Battle/releases) page, download the
-   newest **Basin Battle for Windows.zip** and unzip it anywhere, e.g. `Documents\Basin Battle`.
-   This is the last time you download it by hand: from then on it updates itself.
+   newest **Elwynn Survival for Windows.zip** and unzip it anywhere, e.g. `Documents\Elwynn
+   Survival`. This is the last time you download it by hand: from then on it updates itself.
 2. Double-click **Play** (the shield). If Windows says it protected your PC: More info → Run anyway.
-   The launcher opens on the War Table, a painted map: pick the game at the top (Elwynn
-   Survival or Basin Battle) and press **Play**.
-   - It finds your WoW 1.12.1 install by itself (or asks for the folder once).
-   - It goes to **the group's server** (the `server` line in `project.toml`), so joining the
-     group is one click and nothing else to install. The lamp by the server's name, bottom left,
-     says whether it's up. If it doesn't answer, Play tries the next one by itself (`backup`, then
-     `backup2`), and if none is up it offers Try Again or Play Single Player. Each server is its
-     own world. Click the server's name to choose another of the group's servers, **single
-     player** (your own server on this PC) or **someone else's server** (type the address they
-     give you). It remembers what you chose.
-   - The map needs WebView2, which Windows 10 and 11 come with. Without it, Play opens its plain
-     window instead (`Play.exe -Classic` always does), which plays the same.
-   - On a PC named in `project.toml` as one of the group's servers (`server_pc`, `backup_pc`),
-     Play starts that server right there, and Host takes its ports by itself: the second host
-     behind one router uses 3725, 8087 and 8088.
-   - A group server reached over Tailscale (a 100.x address) needs
-     [Tailscale](https://tailscale.com/download) and its host's invite; Play says so when it's
-     missing or off.
-   - On your own server it starts the server for you, in a second window: leave that open.
-3. Log in with **any name** (it becomes your hero) and the password (**hold** unless the host
-   changed it).
+   A splash with a painting comes up, says what it's doing, and the game opens, logged in on the
+   group's server (the `server` line in `project.toml`) as a hero named after you. That's it.
+   - It finds your WoW 1.12.1 install by itself, or asks for the folder once.
+   - Move the mouse over the splash for **Play alone** (your own server, started quietly on this
+     PC and stopped with the game) and the cog: your name, **someone else's server** (type the
+     address they give you), the other game, where your WoW is, and **Make a test copy** (below).
+   - When a new version is out, Play brings the whole folder up to date first (a progress line,
+     under a minute). Your settings, keys and mouse speed are kept, and the worlds in
+     `server\saves` are backed up first, to `server\saves-backups`.
+   - Nothing is ever compiled on a player's PC, and there is nothing else to install.
 
-**Hosting without playing**, or for a group: double-click **Host** and leave its window open.
-The server comes ready-made in the download (nothing to install or build), and its window shows
-the addresses friends join with (see [Friends joining](#friends-joining)). Options go after it:
-`Host.exe --password ember`, or `--game survival` for only Elwynn Survival. Allow `htl-server` on
-the network when Windows asks.
+**Hosting for friends:** double-click **Host** and leave its window open. The server comes
+ready-made in the download, and its window shows the addresses friends join with (see
+[Friends joining](#friends-joining)). Options go after it: `Host.exe --password ember`, or
+`--game survival` for only Elwynn Survival. Allow `htl-server` on the network when Windows asks.
+Host checks for a new version when it starts and after a warned restart (`Restart Basin
+Battle.command`, or the minutes written in `restart.request`).
 
-**Updates are automatic.** Play gets the newest release before it starts the game. Host checks
-every 15 minutes while it runs; when there's a new release it warns everyone in the game 5
-minutes ahead, saves the worlds, and comes back on the new version by itself. So a host and the
-friends who update by playing always match. Your settings, keys and mouse speed are kept, and
-the worlds (in `server\saves`) are backed up first, to `server\saves-backups`.
+**Playtesting the newest main:** every merge to main publishes the same download as the `latest`
+pre-release, minutes later. Under Play's cog, **Make a test copy** makes `<folder> (test)` beside
+your game, on that channel: its Play updates itself to the newest main every time, with its own
+heroes and saves, and your real folder never sees it.
 
 **What's in the folder:** Play, Host and README.txt are all you use. `benilla.exe` and
-`benilla-config` are the game, `server` is the server and your saved worlds, and `launcher` is
-what the two buttons run (with `project.toml`, the names, and `version.txt`).
+`benilla-config` are the game, `server` is the server and your saved worlds, `version.txt` is what
+Play updates from, and `settings.txt` is your choices. `play.log` says what Play did last time.
 
 **Hosting from the source instead** (to try a branch, or change the server): get the code (below)
 and double-click **Host Basin Battle.bat** in it. The first run installs Rust if it's missing (no
@@ -88,14 +77,12 @@ builds the server (5-10 minutes). Players join it with Play as usual.
    folder (or asks for it) and builds everything.
 3. Host, and leave that window open: `scripts/host.sh` (password **hold**), or
    `scripts/host.sh --password ember`. Or double-click **Host Basin Battle.command**.
-4. Play: double-click **Play Basin Battle.command**. It opens the War Table, the same launcher
-   as the Windows download's Play: pick the game at the top, check the server at the bottom
-   left (the group's servers from `project.toml`, a friend's address, or single player on this
-   Mac) and press **Play**. The first time it builds the launcher (a few minutes) and puts
-   **Basin Battle.app** in this folder: open that from then on, or drag it to the Dock. It plays
-   through `scripts/play.sh`, so the client still rebuilds itself after an update, and each time
-   it opens it brings this folder up to date with GitHub (`git pull` of `main`, and only when
-   you haven't changed anything here yourself).
+4. Play: double-click **Play Basin Battle.command**. It builds Play (the same launcher as the
+   Windows download's, a few minutes the first time) and puts **Elwynn Survival.app** in this
+   folder: open that from then on, or drag it to the Dock. Play's splash joins the group's server
+   logged in, or, under the cog, a friend's address or your own server on this Mac. It plays
+   through `scripts/play.sh`, so the client still rebuilds itself after an update; the folder
+   itself is updated with `git pull`, not by Play.
    The plain way still works, in Terminal: `scripts/play-survival.sh` for Elwynn Survival or
    `scripts/play.sh` for Basin Battle. For a friend's game add their address:
    `scripts/play-survival.sh 192.168.1.20`.
