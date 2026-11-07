@@ -126,7 +126,7 @@ local function Button(label, w, onClick, tip)
 end
 
 f.you = Button("You", 38, function() m.tab = "own" m.folded = false ES.DrawMeter() end,
-  "Your own damage or healing by card, since you last reset it.")
+  "Your own damage or healing by ability, since you last reset it.")
 f.you:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
 f.fightTab = Button("Fight", 42, function() m.tab = "fight" m.folded = false ES.DrawMeter() end,
   "You and the heroes fighting with you, this fight or the last.")
