@@ -2363,6 +2363,15 @@ impl Survival {
         if a.emote != 0 {
             self.events.push(Event::Emote { id, emote: a.emote });
         }
+        // Its voice as a string up close begins, from where it stands: a blow from behind is heard
+        // coming (Corey, Nov 7: no wind-up could be heard).
+        if !a.ranged && self.mobs[&id].pattern.is_none_or(|(_, s)| s == 0) {
+            let d = &self.content.mobs[def];
+            let voice = if a.heavy && d.heavy_sound != 0 { d.heavy_sound } else { d.windup_sound };
+            if voice != 0 {
+                self.events.push(Event::Sound { id, sound: voice });
+            }
+        }
         // A blow no guard stops: its foe is warned (dodge it), and with a blow all round, everyone
         // it would reach.
         if !a.blockable {

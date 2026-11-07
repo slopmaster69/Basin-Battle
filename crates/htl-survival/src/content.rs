@@ -2193,6 +2193,13 @@ pub struct MobDef {
     /// Said over a hero it has just felled.
     #[serde(default)]
     pub slay_sound: u32,
+    /// Its voice as it begins a string up close (the first blow's wind-up), from where it stands,
+    /// so a blow from behind is heard coming: a grunt, a shout. `heavy_sound` for a heavy first
+    /// blow (else `windup_sound`). 0: none.
+    #[serde(default)]
+    pub windup_sound: u32,
+    #[serde(default)]
+    pub heavy_sound: u32,
 }
 
 impl MobDef {
