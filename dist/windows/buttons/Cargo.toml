@@ -1,43 +1,49 @@
-# Play.exe and Host.exe: the two buttons at the top of the Windows download, each carrying the
-# project's icon (the release workflow puts it on them with rcedit).
-# - Play.exe is the launcher: its own window, the War Table menu (launcher\ui, drawn by the
-#   WebView2 that Windows 10 and 11 come with). Without WebView2, or with Play.exe -Classic, it
-#   starts launcher\play.ps1 instead, the plain window it had before.
-# - Host.exe runs launcher\host.ps1 in its own console. No dependencies.
-# Built on its own, outside the repository's workspace:
-#   cargo build --release --manifest-path dist/windows/buttons/Cargo.toml
 [package]
-name = "buttons"
+name = "launcher"
 version = "0.2.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+description = "Play and Host: the two buttons in the Windows download (Play is the Mac app too)"
 publish = false
+
+[lib]
+path = "src/lib.rs"
 
 [[bin]]
 name = "Play"
-path = "src/bin/play/main.rs"
+path = "src/bin/play.rs"
 
 [[bin]]
 name = "Host"
 path = "src/bin/host.rs"
 
+[features]
+# Play with a console behind it, to see what it says while working on it.
+console = []
+
 [dependencies]
-tao = "0.37"
-wry = "0.57"
-rfd = { version = "0.17", default-features = false }
+# The splash: one window, a picture, two fonts, a progress line. glow draws it on any PC.
+eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+# GitHub and the download, over the system's own TLS (no C compiler needed to build this).
+ureq = { version = "2.12", default-features = false, features = ["native-tls", "json"] }
+native-tls = "0.2"
 serde_json = "1"
+zip = { version = "2.4", default-features = false, features = ["deflate"] }
+# The one dialog: picking the WoW folder.
+rfd = { version = "0.17", default-features = false }
 dirs = "7"
 
-# Linux only for trying the launcher out on a Linux PC (the dialogs need GTK there).
+# Linux only for trying the launcher out on a Linux PC (the dialog needs GTK there).
 [target.'cfg(target_os = "linux")'.dependencies]
 rfd = { version = "0.17", default-features = false, features = ["gtk3"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_ToolHelp"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Console"] }
 
-# Not a member of the repository's workspace.
+# Not a member of the repository's workspace: built on its own,
+#   cargo build --release --manifest-path dist/windows/buttons/Cargo.toml
 [workspace]
 
+# (Not stripped: a stripped exe from the GNU toolchain can fail to start on Windows.)
 [profile.release]
-opt-level = "s"
-strip = true
+opt-level = 2
