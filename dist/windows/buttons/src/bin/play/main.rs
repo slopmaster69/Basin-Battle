@@ -63,7 +63,7 @@ fn main() {
     }
     #[cfg(target_os = "macos")]
     refresh_on_a_mac(&paths, &exe);
-    let game =args.iter().position(|a| a.eq_ignore_ascii_case("-Game")).and_then(|i| args.get(i + 1)).map(|g| g.to_string_lossy().to_string());
+    let game = args.iter().position(|a| a.eq_ignore_ascii_case("-Game")).and_then(|i| args.get(i + 1)).map(|g| g.to_string_lossy().to_string());
     let opts = Options { change: flag("-Change"), no_update: flag("-NoUpdate"), game, bench: flag("-Bench") };
     let (log, kind, root) = (paths.log.clone(), paths.kind, paths.root.clone());
     if let Err(e) = run(paths, opts) {
