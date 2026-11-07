@@ -2210,15 +2210,16 @@ impl Survival {
                 let fly = lob_flight(dist2d(pos, at), a.speed);
                 let secs = a.windup + fly + 0.3;
                 let look = ground_look(a.spell, a.look);
-                // Its spell's own look on the ground where it has one; else a warning ring laid
-                // there (the clients' plain hostile circle is the "can't cast here" texture, a
-                // red stop sign: play-test).
-                let mk = if look != 0 && a.radius >= GROUND_LOOK_MIN {
-                    self.mark_ground(at, a.radius, secs, look)
-                } else {
-                    let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false, own_hidden: false };
-                    self.mark_as(at, a.radius, secs, Some(tele))
-                };
+                // A warning ring laid there, always, and its spell's own look on the ground under
+                // it where it has one (the clients' plain hostile circle is the "can't cast here"
+                // texture, a red stop sign: play-test). The look alone didn't read on dark sand:
+                // Corey couldn't see Cookie's pots coming down, Nov 6. The look goes by itself as
+                // the pot lands; the ring is the throw's own.
+                if look != 0 && a.radius >= GROUND_LOOK_MIN {
+                    self.mark_ground(at, a.radius, secs, look);
+                }
+                let tele = Telegraph { mob: id, reach: a.radius, arc: 360.0, secs, blockable: false, foe: None, width: 0.0, at: Some((at, 0.0)), hero: false, own_hidden: false };
+                let mk = self.mark_as(at, a.radius, secs, Some(tele));
                 self.mobs.get_mut(&id).unwrap().lob = Some((at, mk));
             }
             None
