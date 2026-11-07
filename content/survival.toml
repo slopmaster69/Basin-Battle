@@ -5952,6 +5952,10 @@ passive = "momentum"
 valor = 100
 cooldown = 40.0
 around = true
+# On the key press, no aim and no click: a spin round the caster has nowhere to aim. (Play-test,
+# Nov 6 2026: the key brought up the reticle and nothing spun until a left click; "Bladestorm did
+# no damage".)
+at_once = true
 bail = true
 radius = [5.0, 5.0]
 secs = 6.0
