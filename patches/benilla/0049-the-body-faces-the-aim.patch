@@ -1,0 +1,134 @@
+From a4b5202897495e808686f5662c884933476d7af5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 5 Nov 2026 20:18:41 -0600
+Subject: [PATCH] The hero faces the aim, and the upper body holds it while the
+ legs walk
+
+While the aiming camera is up our own hero faces the way the view looks and
+the body turns with it at once, standing too (the stock chase held a
+90-degree ceiling while the view was steered, and a camera turned without
+the mouse left the facing behind, so a draw began on a body facing
+elsewhere). Walking, the legs keep their slide's turn and the spine takes
+the whole gap, up to 100 degrees, so the shoulders and what they hold stay
+on the aim.
+---
+ .../benilla-app/src/creature_anim/action.rs   |  2 ++
+ crates/benilla-app/src/creature_anim/twist.rs | 31 +++++++++++++++++--
+ crates/benilla-app/src/player/gait.rs         | 11 +++++++
+ 3 files changed, 42 insertions(+), 2 deletions(-)
+
+diff --git a/crates/benilla-app/src/creature_anim/action.rs b/crates/benilla-app/src/creature_anim/action.rs
+index 74da7f3c..ae4c1d4a 100644
+--- a/crates/benilla-app/src/creature_anim/action.rs
++++ b/crates/benilla-app/src/creature_anim/action.rs
+@@ -1153,6 +1153,8 @@ pub(super) fn aim_pitch(time: Res<Time>, mut me: Query<&mut BodyTwist, With<Self
+     } else {
+         next
+     };
++    // The upper body held on the aim while an ability is aimed (the legs walk under it).
++    twist.aim_lock = action_combat::aim_camera();
+     // And the add-on's turn of the shoulders (a side-on bow draw squared to the aim), eased the
+     // same way.
+     let want = action_combat::aim_turn();
+diff --git a/crates/benilla-app/src/creature_anim/twist.rs b/crates/benilla-app/src/creature_anim/twist.rs
+index a4a43897..eafa2d83 100644
+--- a/crates/benilla-app/src/creature_anim/twist.rs
++++ b/crates/benilla-app/src/creature_anim/twist.rs
+@@ -18,6 +18,10 @@ pub(crate) struct BodyTwist {
+     /// head back by as much, so a side-on bow draw squares the shoulders and keeps the eyes on
+     /// the aim (`SetAimTurn`).
+     pub(crate) turn: f32,
++    /// Basin Battle: an ability aimed (our own hero, the aiming camera up). The legs keep their
++    /// slide's turn and the spine takes the whole gap, so the upper body stays on the aim whichever
++    /// way the hero walks.
++    pub(crate) aim_lock: bool,
+     spine: Option<Channel>,
+     head: Option<Channel>,
+ }
+@@ -28,6 +32,7 @@ impl BodyTwist {
+             yaw_gap: 0.0,
+             pitch: 0.0,
+             turn: 0.0,
++            aim_lock: false,
+             spine: spine.map(Channel::new),
+             head: head.map(Channel::new),
+         }
+@@ -80,6 +85,16 @@ fn armed_shares(gap: f32, mounted: bool) -> (f32, f32) {
+     (if mounted { 0.0 } else { spine }, head)
+ }
+ 
++/// The most the spine turns from the legs while an ability is aimed: past it the legs follow.
++const AIM_SPINE_MOST: f32 = 1.75;
++
++/// The `(spine, head)` twist while an ability is aimed: the spine takes the whole gap, up to
++/// [`AIM_SPINE_MOST`], so the shoulders, the arms and what they hold face the aim, and the head
++/// rides on them.
++fn aim_locked_shares(gap: f32) -> (f32, f32) {
++    (gap.clamp(-AIM_SPINE_MOST, AIM_SPINE_MOST), 0.0)
++}
++
+ /// Compose the twist onto the bone locals in [`benilla_world::rig_anim::PosePost`]: each channel
+ /// yaws its subtree about world up through the bone's pivot, `local' = local · Quat(g⁻¹·Y, θ)`
+ /// with `g` the bone's rotation up to the unit. The head runs after the spine, so it turns relative
+@@ -109,7 +124,11 @@ pub(super) fn apply_body_twist(
+         let mounted = stores
+             .get(unit)
+             .is_ok_and(|s| s.0.unit_mount_display_id() != 0);
+-        let (spine, head) = armed_shares(twist.yaw_gap, mounted);
++        let (spine, head) = if twist.aim_lock && !mounted {
++            aim_locked_shares(twist.yaw_gap)
++        } else {
++            armed_shares(twist.yaw_gap, mounted)
++        };
+         let pitch = if mounted { 0.0 } else { twist.pitch };
+         // The turn right is a negative yaw about up (forward is −Z); the head undoes it.
+         let turn = if mounted { 0.0 } else { twist.turn };
+@@ -211,7 +230,7 @@ fn twist_off() -> bool {
+ 
+ #[cfg(test)]
+ mod tests {
+-    use super::{armed_shares, twist_shares};
++    use super::{aim_locked_shares, armed_shares, twist_shares};
+     use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+ 
+     /// The mount gate disarms SpineLow alone; the head keeps its share, off the aim.
+@@ -252,6 +271,14 @@ mod tests {
+         assert_eq!(head, FRAC_PI_4);
+     }
+ 
++    /// Aimed, the spine takes a strafe's whole quarter turn and the head none, so the shoulders
++    /// stay on the aim; past its limit the rest stays with the legs.
++    #[test]
++    fn an_aimed_spine_takes_the_whole_gap() {
++        assert_eq!(aim_locked_shares(-FRAC_PI_2), (-FRAC_PI_2, 0.0));
++        assert_eq!(aim_locked_shares(PI), (1.75, 0.0));
++    }
++
+     #[test]
+     fn zero_gap_is_zero_twist() {
+         assert_eq!(twist_shares(0.0), (0.0, 0.0));
+diff --git a/crates/benilla-app/src/player/gait.rs b/crates/benilla-app/src/player/gait.rs
+index 3f56bd14..82d3fad9 100644
+--- a/crates/benilla-app/src/player/gait.rs
++++ b/crates/benilla-app/src/player/gait.rs
+@@ -37,6 +37,17 @@ pub(super) fn drive_body_heading(
+         player.model_yaw = ease_strafe_yaw(player.model_yaw, player.face_yaw, strafe_offset, dt);
+     } else if moving || airborne {
+         player.model_yaw = player.face_yaw;
++    } else if benilla_ui::action_combat::aim_camera() {
++        // Basin Battle: while an ability is aimed the hero faces the aim, the way the view looks,
++        // and the body with it at once, standing too. The stock chase held a 90-degree ceiling
++        // while the view was steered, and a camera turned without the mouse left the facing
++        // behind, so a hero who faced the inn and then aimed at an orc drew with the body still
++        // on the inn and the spine and head twisted round, and the draw broke (Corey's review).
++        let view = benilla_ui::action_combat::view_facing();
++        if view.is_finite() {
++            player.face_yaw = wrap_pi(view);
++        }
++        player.model_yaw = player.face_yaw;
+     } else {
+         let delta = wrap_pi(player.face_yaw - player.model_yaw);
+         let mut step = (delta.abs() - std::f32::consts::FRAC_PI_2).max(0.0); // the ceiling
+-- 
+2.56.0.windows.4
+

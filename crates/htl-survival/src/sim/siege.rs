@@ -257,19 +257,24 @@ impl Survival {
         }
     }
 
-    /// Whether `a` can strike `b` (both heroes): in Siege, rivals; elsewhere, friendly fire.
-    pub(crate) fn hostile(&self, a: Id, b: Id) -> bool {
+    /// Whether `a` can strike `b` (both heroes): in Siege, rivals; elsewhere, foes in a duel, and
+    /// with friendly fire on anyone not in one (a duel is its two duellists' alone).
+    pub fn hostile(&self, a: Id, b: Id) -> bool {
         if a == b {
             return false;
         }
         if self.is_siege() {
             return self.siege_foes(a, b);
         }
+        if self.in_duel(a) || self.in_duel(b) {
+            return self.duel_foes(a, b);
+        }
         self.content.pvp.friendly_fire
     }
 
     /// Whether `a` can help hero `b` (a heal, a shield, a boon, a pull to safety): in Siege,
-    /// teammates only; elsewhere every hero, as friendly fire decides only who can be harmed.
+    /// teammates only; elsewhere every hero, as friendly fire decides only who can be harmed,
+    /// except a duellist, whom nobody else helps (their foe in it least of all).
     pub(crate) fn helpable(&self, a: Id, b: Id) -> bool {
         if a == b {
             return true;
@@ -280,7 +285,7 @@ impl Survival {
         if self.is_siege() {
             return !self.siege_foes(a, b);
         }
-        true
+        !self.in_duel(b)
     }
 
     /// Whether hero `b` is spared `a`'s ability: one that mends friends (`heals`) neither strikes
@@ -759,6 +764,7 @@ impl Survival {
         self.cc.remove(&id);
         self.stances.remove(&id);
         self.anchors.remove(&id);
+        self.slips.remove(&id);
         self.events.push(Event::Health { id, health: h, max: m });
         self.events.push(Event::Bags { player: id });
         self.events.push(Event::Abilities { player: id });

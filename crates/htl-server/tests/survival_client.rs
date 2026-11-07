@@ -288,7 +288,9 @@ fn a_hero_fights_gathers_builds_cooks_falls_and_gets_up() {
     assert!(c.wait(2.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text == "ES\tV\t2")).is_some(), "the hello is answered");
     c.drain(0.4);
     let h = hud(&c).expect("a HUD line");
-    assert_eq!(h.len(), 40, "{h:?}");
+    assert_eq!(h.len(), 42, "{h:?}");
+    // Nothing shielding them and no health over the most, yet: the health bar's two ends empty.
+    assert_eq!((h[40].as_str(), h[41].as_str()), ("0", "0"), "{h:?}");
     // And which way north is, relative to the hero's heading (facing 0 is north).
     let north: i32 = h[39].parse().unwrap();
     assert!((-180..=180).contains(&north), "{h:?}");
@@ -1290,14 +1292,15 @@ fn an_eighth_round_client_sees_a_sky_fall_laid_at_its_spot_and_an_older_one_its_
     a.drain(0.6);
     b.drain(0.3);
     c.drain(0.3);
-    // Mind Blast (a dark star at the reticle 0.6 s later): Penance's EX version, on Q with Ctrl.
-    a.chat(".es slot q penance");
+    // Mind Blast (its sigil erupting at the reticle 0.9 s later), on the Q key. (Draft 3's Void
+    // Rift opens at once: nothing to lay ahead of it.)
+    a.chat(".es slot q mind_blast");
     a.chat(".es valor full");
     a.drain(0.2);
     a.seen.clear();
     b.seen.clear();
     c.seen.clear();
-    a.chat(".es in ab 0 1");
+    a.chat(".es in ab 0 0");
     a.chat(".es in a");
     a.chat(".es in au 0.0 -0.3");
     let ta = c.wait(1.0, |p| matches!(p, ServerPacket::MessageChat(m) if m.text.starts_with("ES\tTA\t")));
@@ -2016,4 +2019,39 @@ fn the_axes_way_back_and_each_recalled_arrow_fly_from_a_stand_in_and_a_planted_a
     for (g, _) in home.iter().chain(&back) {
         assert!(c.seen.iter().any(|p| matches!(p, ServerPacket::DestroyObject { guid } if guid == g)), "its stand-in {g:#x} goes");
     }
+}
+
+#[test]
+fn two_heroes_duel_through_the_clients_own_duel() {
+    // Co-op rules (no friendly fire): only the duel makes them foes.
+    let server = start_with(None, false);
+    let mut a = Client::connect(server.login, "ann", "hold", REALM).unwrap();
+    let ag = enter(&mut a);
+    let mut b = Client::connect(server.login, "ben", "hold", REALM).unwrap();
+    let bg = enter(&mut b);
+    assert!(a.wait(2.0, |p| creates_guid(p, bg)).is_some(), "ann sees ben");
+    // The Duel spell is known, so the client offers Duel on a hero's portrait (and /duel).
+    assert!(a.seen.iter().any(|p| matches!(p, ServerPacket::InitialSpells { spell_ids, .. } if spell_ids.contains(&7266))), "Duel is in the book");
+    const TEAM: u16 = 196;
+    // Ann's Duel at Ben: both are told, the flag between them.
+    a.send(op::CMSG_CAST_SPELL, &messages::cast_spell(7266, Some(bg)));
+    let ok = a.wait(2.0, |p| matches!(p, ServerPacket::CastResult { spell_id: 7266, .. }));
+    assert!(matches!(ok, Some(ServerPacket::CastResult { outcome: messages::CastOutcome::Ok, .. })), "the cast goes");
+    let asked = b.wait(2.0, |p| matches!(p, ServerPacket::DuelRequested { .. }));
+    let Some(ServerPacket::DuelRequested { arbiter, challenger }) = asked else { panic!("ben is asked") };
+    assert_eq!(challenger, ag);
+    assert!(a.wait(1.0, |p| matches!(p, ServerPacket::DuelRequested { .. })).is_some(), "ann too");
+    // Ben takes it: the countdown on both screens, then each is the other's foe on the client too.
+    b.send(op::CMSG_DUEL_ACCEPTED, &messages::duel_accepted(arbiter));
+    for c in [&mut a, &mut b] {
+        assert!(c.wait(2.0, |p| matches!(p, ServerPacket::DuelCountdown { seconds: 3 })).is_some(), "duel starting: 3");
+    }
+    assert!(a.until(5.0, |c| value_of(c, bg, TEAM) == Some(2)), "ben on side 2");
+    assert!(b.until(1.0, |c| value_of(c, ag, TEAM) == Some(1)), "ann on side 1");
+    // Ben gives it away (/forfeit): over for both, Ann the winner, everyone told.
+    b.send(op::CMSG_DUEL_CANCELLED, &messages::duel_cancelled(arbiter));
+    assert!(b.wait(2.0, |p| matches!(p, ServerPacket::DuelComplete { started: true })).is_some(), "over");
+    let won = a.wait(2.0, |p| matches!(p, ServerPacket::DuelWinner { .. }));
+    assert!(matches!(won, Some(ServerPacket::DuelWinner { fled: true, ref winner, ref loser }) if winner == "Ann" && loser == "Ben"), "Ann won, Ben fled");
+    assert!(a.until(2.0, |c| value_of(c, bg, TEAM) == Some(0)), "friends again");
 }

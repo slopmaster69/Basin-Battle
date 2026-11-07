@@ -5,6 +5,7 @@
 
 pub mod content;
 pub mod content_abilities;
+pub mod content_priest;
 pub mod land;
 pub mod save;
 pub mod sim;
@@ -49,6 +50,10 @@ mod tests_control;
 #[cfg(test)]
 mod tests_support;
 #[cfg(test)]
+mod tests_duel;
+#[cfg(test)]
+mod tests_priest_duel;
+#[cfg(test)]
 mod tests_tactics;
 #[cfg(test)]
 mod tests_hunter_wild;
@@ -80,3 +85,27 @@ mod tests_building;
 mod tests_raptor;
 #[cfg(test)]
 mod tests_hunter_bow;
+#[cfg(test)]
+mod tests_ward;
+#[cfg(test)]
+mod tests_staff;
+#[cfg(test)]
+mod tests_release;
+#[cfg(test)]
+mod tests_sweep;
+#[cfg(test)]
+mod tests_orb;
+#[cfg(test)]
+mod tests_rhythm;
+#[cfg(test)]
+mod tests_bomb;
+#[cfg(test)]
+mod tests_alter;
+#[cfg(test)]
+mod tests_counters;
+#[cfg(test)]
+mod tests_priest_light;
+#[cfg(test)]
+mod tests_priest_shadow;
+#[cfg(test)]
+mod tests_priest_core;

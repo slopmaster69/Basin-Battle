@@ -1,7 +1,7 @@
 //! The spell lab (`.es lab`, dev builds only): cast an ability the same way every time and see
 //! exactly what it looked like.
 //!
-//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>]`
+//! `.es lab <ability> [scene] [creature] [do <steps>] [shots <n>@<ms>] [cam behind|close|none] [stage here] [look <spell>[/<aura>]] [anim <clip>[/<take>[/<Model>]]] [as <race>-<m|f>] [by <race>-<m|f>] [allies <n>] [weapon <item>] [ward <aura>/<hold>/<crackle>/<clip>] [ccaura <kind>/<spell>] [perfectkit <kit>] [hud] [barlook <look>] [fx <kind>/<amount>/<secs>]`
 //!
 //! - `by tauren-f` has a stand-in hero of that race cast it, the hero (and camera) at its side.
 //! - `anim` tries another clip on the ability for that run only (its take, and the model every race
@@ -20,7 +20,16 @@
 //!   `Lab.lua`), and a moment later plays the steps: by default the ability's key (with Ctrl for
 //!   an EX) and a click if it's aimed. Steps, comma-separated: `q e 1 2 3` (a key), `^q`... (with
 //!   Ctrl), `click`, `attack`, `heavy`, `guard`, `guardup`, `dodge`, `bash`, `blow` (the nearest
-//!   creature of the scene swings at the hero), `wait:<secs>`.
+//!   creature of the scene swings at the hero), `wait:<secs>`; `press` holds the button down and
+//!   `release` lets it go (a charge held to its flare: `q,press,wait:1.45,release`);
+//!   `meter:perfect|good|early|late` stops a meter sweep (Cone of Cold) against its rolled sweet
+//!   spot; `release:crit|edge|early|late` lets go against this cast's rolled flare (dead on, at the
+//!   window's edge, 0.4 s early, past the window); `beats` presses a rhythm's rolled beats dead on
+//!   (`beats:good` a little off, `beats:3` the first three then none, `beats:rest` on the rest);
+//!   `walk:1.5` runs the hero forward that long at their own pace now (`walk:1:back`, `:left`,
+//!   `:right`): the client moves the hero, so the add-on runs it (`ActionDash`).
+//! - `weapon ember_staff` puts that weapon in the caster's hands for the run (a staff's bolts,
+//!   the ward), wherever the stage is.
 //! - Everything the rules sent that touches the hero or the scene, until the burst is over, goes
 //!   to `logs/lab/<label>.txt`, each line with its time from the first step. `tools/spell-lab`
 //!   lays the screenshots and that trace out side by side (docs/spell-lab.md).
@@ -75,6 +84,8 @@ pub(crate) struct Lab {
     /// A clip tried for this run only (`anim <clip>[/<take>[/<Model>]]`): the ability and the
     /// clip, take and model it had.
     pub anim_was: Option<(usize, u16, u32, Option<String>)>,
+    /// Aims go at the first stand-in ally's feet from this step on (`aimally`: Angelic Feather).
+    pub aim_ally: bool,
 }
 
 impl SurvivalGame {
@@ -125,7 +136,12 @@ impl SurvivalGame {
         let mut body: Option<(u8, u8)> = None;
         let mut anim: Option<(u16, u32, Option<String>)> = None;
         let mut allies = 0usize;
+        let mut hurt = false;
+        let mut hud = false;
+        let mut bar_look = String::new();
+        let mut fx: Vec<(String, f32, f32)> = Vec::new();
         let mut by: Option<(u8, u8)> = None;
+        let mut weapon: Option<String> = None;
         // With video on this computer, the stills are only the sheet's: a few, spread over the run.
         let video = cfg!(windows) && ffmpeg().is_some();
         let (mut shots, mut every) = if video { (VIDEO_STILLS, VIDEO_EVERY_MS) } else { (SHOTS, EVERY_MS) };
@@ -135,6 +151,57 @@ impl SurvivalGame {
             match words[k] {
                 "do" => {
                     steps = words.get(k + 1).map(|s| s.to_string());
+                    k += 1;
+                }
+                // The ward's looks for this run and the ones after: `ward 12042/5143/1/124` (its aura,
+                // the held glow in the hand, whether it crackles while up, the arm's clip; 0 for none).
+                "ward" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    let n: Vec<u32> = spec.split('/').map(|n| n.parse().unwrap_or(0)).collect();
+                    let w = &mut self.sim.content.ward;
+                    w.aura = n.first().copied().unwrap_or(0);
+                    w.hold_spell = n.get(1).copied().unwrap_or(0);
+                    w.crackle_full = if n.get(2).copied().unwrap_or(0) != 0 { 1.4 } else { 0.0 };
+                    w.clip = n.get(3).copied().unwrap_or(0) as u16;
+                    // Fifth and sixth: the clip's hold in tenths of a second, and 1 for the full body.
+                    w.clip_hold = n.get(4).copied().filter(|t| *t > 0).map_or(8.0, |t| t as f32 / 10.0);
+                    w.clip_body = if n.get(5).copied().unwrap_or(0) == 1 { "full".into() } else { "upper".into() };
+                    k += 1;
+                }
+                // A crowd control's look for this run and the ones after: `ccaura haste/1850` (the
+                // kind, and the spell whose lasting look it wears; 0 for none).
+                "ccaura" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    let mut it = spec.split('/');
+                    let kind = it.next().filter(|w| !w.is_empty()).ok_or("Try ccaura <kind>/<spell>.")?;
+                    let sp: u32 = it.next().and_then(|n| n.parse().ok()).ok_or("Try ccaura <kind>/<spell>.")?;
+                    self.sim.content.cc.auras.insert(kind.to_lowercase(), sp);
+                    k += 1;
+                }
+                // The hero's own bars kept in the film (the interface is hidden otherwise).
+                "hud" => hud = true,
+                // The hero's bars' frame in another look, kept in the film: `barlook dark` (the
+                // add-on's Ledger.lua says which there are).
+                "barlook" => {
+                    hud = true;
+                    bar_look = words.get(k + 1).copied().unwrap_or("").to_lowercase();
+                    k += 1;
+                }
+                // An effect on the hero as the run starts: `fx overhealth/20/8`, `fx shield/30/6`.
+                "fx" => {
+                    let spec = words.get(k + 1).copied().unwrap_or("");
+                    let mut it = spec.split('/');
+                    let kind = it.next().filter(|w| !w.is_empty()).ok_or("Try fx <kind>/<amount>/<secs>.")?;
+                    let amount: f32 = it.next().and_then(|n| n.parse().ok()).ok_or("Try fx <kind>/<amount>/<secs>.")?;
+                    let secs: f32 = it.next().and_then(|n| n.parse().ok()).unwrap_or(8.0);
+                    fx.push((kind.to_lowercase(), amount, secs));
+                    k += 1;
+                }
+                // The Priest's Light perfect for this run and the ones after: `perfectkit 433` (a
+                // SpellVisualKit), to put looks side by side.
+                "perfectkit" => {
+                    let kit: u32 = words.get(k + 1).and_then(|n| n.parse().ok()).ok_or("Try perfectkit <kit>.")?;
+                    self.sim.content.priest.perfect_kit = kit;
                     k += 1;
                 }
                 // A look to try for this run only: `look 3631` (its spell and aura both),
@@ -165,6 +232,8 @@ impl SurvivalGame {
                     allies = words.get(k + 1).and_then(|n| n.parse().ok()).unwrap_or(2).min(4);
                     k += 1;
                 }
+                // The hero and the stand-in allies start at 60% of their health (for heals).
+                "hurt" => hurt = true,
                 // A clip to try for this run only: `anim 18/0/TaurenMale` (the clip, its take, the
                 // model whose take every race plays), `anim 18` (the hero's own take 0).
                 "anim" => {
@@ -177,6 +246,10 @@ impl SurvivalGame {
                 }
                 "stage" => {
                     stage = words.get(k + 1).is_none_or(|w| *w != "here");
+                    k += 1;
+                }
+                "weapon" => {
+                    weapon = words.get(k + 1).map(|w| w.to_lowercase());
                     k += 1;
                 }
                 "cam" => {
@@ -251,9 +324,22 @@ impl SurvivalGame {
             }
         };
         let moved = moved || by.is_some();
+        if let Some(w) = &weapon {
+            self.sim.lab_arm(me, w)?;
+        }
         let mobs = self.sim.lab_scene(me, &scene, &creature)?;
         self.lab_mobs = mobs.clone();
         self.lab_set_allies(me, allies);
+        if hurt {
+            for h in std::iter::once(me).chain(self.lab_allies.clone()) {
+                if let Some(p) = self.sim.players.get_mut(&h) {
+                    p.health = (p.max_health as f32 * 0.6).round() as u32;
+                }
+            }
+        }
+        for (kind, amount, secs) in &fx {
+            self.sim.lab_effect(me, kind, *amount, *secs);
+        }
         let _ = me_conn;
         // The steps, timed from a moment after the burst starts (and after the client has set the
         // hero down, if the stage moved them).
@@ -291,7 +377,7 @@ impl SurvivalGame {
             // With video, no stills (the video holds every frame; a night's stills once filled the
             // lab's budget): the shots' count and spacing only time the run, and the add-on keeps
             // the interface hidden for the video's length.
-            burst: Some((now + SETTLE, format!("LB\t{}\t{every}\t{label}\t{cam}\t{:.2}", if video { 0 } else { shots }, secs + 0.6), secs + 0.6)),
+            burst: Some((now + SETTLE, format!("LB\t{}\t{every}\t{label}\t{cam}\t{:.2}\t{}", if video { 0 } else { shots }, secs + 0.6, if !hud { String::new() } else if bar_look.is_empty() { "hud".to_string() } else { format!("hud:{bar_look}") }), secs + 0.6)),
             mobs,
             trace,
             slot,
@@ -301,6 +387,7 @@ impl SurvivalGame {
             asked: std::time::SystemTime::now(),
             look_was,
             anim_was,
+            aim_ally: false,
         });
         // Debug's rings and marks would be in every shot: off while the run lasts.
         self.sim.debug = false;
@@ -372,18 +459,158 @@ impl SurvivalGame {
         while lab.steps.front().is_some_and(|(at, _)| *at <= now) {
             due.push(lab.steps.pop_front().unwrap().1);
         }
-        let (me, start, slot, ground) = (lab.hero, lab.start, lab.slot, lab.ground);
+        let (me, start, slot, ground, aim_ally, conn) = (lab.hero, lab.start, lab.slot, lab.ground, lab.aim_ally, lab.conn);
         let target = lab.mobs.get(lab.mobs.len() / 2).copied();
         let nearest = lab.mobs.first().copied();
         for step in due {
-            // Aimed at the scene's middle body: its chest, or its feet for the ground's.
-            if let Some(t) = target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos) {
+            // The client walks the hero (it moves itself; the rules only hear where it went), and an
+            // add-on can't hold a move key (the client refuses it), so the add-on runs the body with
+            // the action layer's dash, at the hero's own pace now (a haste's too): `walk:1.5` that
+            // long forward, `walk:1:back|left|right` another way.
+            if let Some(how) = step.strip_prefix("walk:") {
+                let mut it = how.split(':');
+                let secs = it.next().and_then(|n| n.parse::<f32>().ok()).unwrap_or(1.0).clamp(0.1, 10.0);
+                let keys = match it.next() {
+                    Some("back") => "b",
+                    Some("left") => "l",
+                    Some("right") => "r",
+                    _ => "f",
+                };
+                // (Backing away at the backpedal's pace, as the client's own walk would.)
+                let speed = self.sim.players.get(&me).map_or(7.0, |p| if keys == "b" { p.sent_back } else { p.sent_speed });
+                self.ui_line(conn, &format!("LW\t{secs:.2}\t{speed:.2}\t{keys}"));
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> walks {keys} {secs:.2} s at {speed:.2} yd/s", now - start));
+                }
+                continue;
+            }
+            // Steps timed against what this cast rolled: they queue the press or the release.
+            if let Some(how) = step.strip_prefix("release:") {
+                let mut queued = String::from("no charge");
+                if let Some((since, flare)) = self.sim.lab_check_flare(me) {
+                    let w = self.sim.content.checks.window;
+                    // A step runs on the first tick at or after its time (0.05 s), so aim half a
+                    // tick early: dead on lands inside the critical, the edge inside the window.
+                    let off = match how {
+                        "edge" => 0.45 * w,
+                        "early" => -0.4,
+                        "late" => w + 0.3,
+                        _ => -0.025,
+                    };
+                    let at = since + flare + off;
+                    self.lab_step_at(at, "release".into());
+                    queued = format!("flare {flare:.3} release at {:+.3}", at - start);
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
+            if let Some(how) = step.strip_prefix("meter:") {
+                let mut queued = String::from("no meter");
+                if let Some((since, secs, spot)) = self.sim.lab_meter(me) {
+                    let off = match how {
+                        "early" => -0.3,
+                        "late" => 0.25,
+                        "good" => 0.11,
+                        _ => 0.0,
+                    };
+                    // Half a tick early, as a release is (a step runs on the tick at or after it).
+                    let at = since + secs * (spot + off).clamp(0.02, 0.97) - 0.025;
+                    self.lab_step_at(at, "key".into());
+                    queued = format!("spot {spot:.2} stop at {:+.3}", at - start);
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
+            // Penance's rings: its key pressed as each closes (`rings`), a little late but in the
+            // window (`rings:good`), or one let pass (`rings:skip2`).
+            if let Some(how) = step.strip_prefix("rings") {
+                let how = how.trim_start_matches(':');
+                let mut queued = String::from("no penance");
+                let rings = self.sim.lab_penance(me);
+                if !rings.is_empty() {
+                    let key = ["q", "e", "1", "2", "3"].get(slot as usize).copied().unwrap_or("q").to_string();
+                    let skip: usize = how.strip_prefix("skip").and_then(|n| n.parse().ok()).unwrap_or(0);
+                    let mut list = Vec::new();
+                    for (k, (at, w)) in rings.iter().enumerate() {
+                        if k + 1 == skip {
+                            continue;
+                        }
+                        let off = if how == "good" { 0.6 * w } else { -0.025 };
+                        self.lab_step_at(at + off, key.clone());
+                        list.push(format!("{:+.2}", at + off - start));
+                    }
+                    queued = format!("presses at {}", list.join(","));
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
+            if step == "aimally" {
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.aim_ally = true;
+                    lab.trace.push(format!("{:+.3} STEP aimally", now - start));
+                }
+                // The camera turns to the friend too, so the reticle the film shows is on them (it
+                // stayed on the scene's creature, the reticle on the grass beside the friend).
+                if let Some(g) = self.lab_allies.first().copied().and_then(|a| self.guid_of(a)) {
+                    self.ui_line(conn, &format!("LO\t{g:#X}"));
+                }
+                continue;
+            }
+            if let Some(how) = step.strip_prefix("beats") {
+                let how = how.trim_start_matches(':');
+                let mut queued = String::from("no rhythm");
+                if let Some((since, beats, free)) = self.sim.lab_rhythm(me) {
+                    let key = ["q", "e", "1", "2", "3"].get(slot as usize).copied().unwrap_or("q").to_string();
+                    let most: usize = how.parse().unwrap_or(usize::MAX);
+                    let mut n = 0;
+                    let mut list = Vec::new();
+                    for (k, (t, rest, w)) in beats.iter().enumerate() {
+                        if (k as u32) < free {
+                            continue;
+                        }
+                        if *rest {
+                            if how == "rest" {
+                                self.lab_step_at(since + t, key.clone());
+                                list.push(format!("{t:.2}r"));
+                            }
+                            continue;
+                        }
+                        if n >= most {
+                            break;
+                        }
+                        let off = if how == "good" { 0.6 * w } else { 0.0 };
+                        self.lab_step_at(since + t + off, key.clone());
+                        list.push(format!("{:.2}", t + off));
+                        n += 1;
+                    }
+                    queued = format!("presses at {}", list.join(","));
+                }
+                if let Some(lab) = self.lab.as_mut() {
+                    lab.trace.push(format!("{:+.3} STEP {step} -> {queued}", now - start));
+                }
+                continue;
+            }
+            // Aimed at the scene's middle body: its chest, or its feet for the ground's (or at the
+            // first stand-in ally's feet, after `aimally`).
+            let ally = self.lab_allies.first().and_then(|a| self.sim.players.get(a)).map(|p| p.pos);
+            if let (true, Some(a)) = (aim_ally, ally) {
+                self.sim.lab_aim_at(me, a);
+            } else if let Some(t) = target.and_then(|t| self.sim.mobs.get(&t)).map(|m| m.pos) {
                 self.sim.lab_aim_at(me, if ground { t } else { [t[0], t[1], t[2] + 1.0] });
             }
             let input = match step.as_str() {
                 "click" | "attack" => Some(Input::Attack),
                 "click?" if self.sim.lab_aiming(me) => Some(Input::Attack),
                 "click?" => None,
+                // The button held down, and let go later (a charge held to its flare).
+                "press" => Some(Input::Attack),
+                "release" | "attackup" => Some(Input::AttackUp),
                 "heavy" => Some(Input::Heavy),
                 "guard" => Some(Input::Guard),
                 "guardup" => Some(Input::GuardUp),
@@ -392,6 +619,14 @@ impl SurvivalGame {
                 "blow" => {
                     if let Some(m) = nearest {
                         self.sim.lab_blow(m, me);
+                    }
+                    None
+                }
+                // The nearest creature swings at the first stand-in ally instead (an Intervene's
+                // guard taking the blow meant for them).
+                "blowally" => {
+                    if let (Some(m), Some(a)) = (nearest, self.lab_allies.first().copied()) {
+                        self.sim.lab_blow_near(m, a, me);
                     }
                     None
                 }
@@ -405,8 +640,8 @@ impl SurvivalGame {
             };
             if let Some(i) = input {
                 self.sim.input(me, i);
-                // A click is let go at once, as a tap.
-                if i == Input::Attack {
+                // A click is let go at once, as a tap; a press stays down until its release.
+                if i == Input::Attack && step != "press" {
                     self.sim.input(me, Input::AttackUp);
                 }
             }
@@ -414,6 +649,14 @@ impl SurvivalGame {
             if let Some(lab) = self.lab.as_mut() {
                 lab.trace.push(format!("{:+.3} STEP {step} -> {what}", now - start));
             }
+        }
+    }
+
+    /// A step queued for `at`, in time order among the others.
+    fn lab_step_at(&mut self, at: f32, step: String) {
+        if let Some(lab) = self.lab.as_mut() {
+            let i = lab.steps.iter().position(|(t, _)| *t > at).unwrap_or(lab.steps.len());
+            lab.steps.insert(i, (at, step));
         }
     }
 

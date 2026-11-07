@@ -681,6 +681,7 @@ impl SurvivalGame {
             f.set(idx::UNIT_NPC_EMOTESTATE, *pose);
         }
         self.gear_fields(id, &mut f);
+        self.duel_fields(id, &mut f);
         // The whole of the world map shown: every place is known from the start.
         if is_self {
             for slot in 0..idx::PLAYER_EXPLORED_ZONES_SLOTS {
@@ -1163,9 +1164,9 @@ impl SurvivalGame {
     }
 
     /// How a hero's ability on the ground shows to `viewer`: theirs or a friend's (`friendly`), or
-    /// a foe's (`unblockable`: red).
+    /// a foe's (`unblockable`: red), a duel's foe too.
     fn hero_tele_kind(&self, owner: htl_survival::Id, viewer: htl_survival::Id) -> &'static str {
-        if owner == viewer || !self.sim.content.pvp.friendly_fire {
+        if owner == viewer || !self.sim.hostile(owner, viewer) {
             "friendly"
         } else {
             "unblockable"

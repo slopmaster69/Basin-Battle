@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
+pub use crate::content_priest::*;
+
 /// A hero's five ability keys, each a row of the board: reaching the foe (Q), in the brawl (E),
 /// moving and control (1), staying alive (2), and the ultimate (3).
 pub const SLOTS: [&str; 5] = ["ranged", "close", "utility", "defense", "ultimate"];
@@ -38,7 +40,7 @@ pub fn class_id_of(school: &str) -> u8 {
 }
 
 /// How an ability is used.
-pub const KINDS: [&str; 17] = [
+pub const KINDS: [&str; 25] = [
     // A leap through the air to the reticle's point (or, `back`, away from the facing): where it
     // lands is drawn for everyone, and what's there when it does is struck.
     "leap",
@@ -80,6 +82,27 @@ pub const KINDS: [&str; 17] = [
     // (times the tick) to each foe in it, with `effects`, and heals each friend in it `ally_heal`
     // a second.
     "beam",
+    // A jet `arc` wide sweeping `sweep` degrees across the front over `secs`, striking each foe
+    // it passes once; the key again stops it where it is (`stop_secs`, `stop_effects`), a foe
+    // within `perfect_arc` of its centre a perfect (the stop check).
+    "sweep",
+    // An orb rolling out along the reticle, hurting what it passes; the key again stops it where
+    // it is and it bursts, a foe under it a perfect (the stop check).
+    "orb",
+    // Beats: the first few by themselves, then one more for every press on the beat, up to its
+    // most; a press out of time or a beat let pass ends it (the rhythm check).
+    "rhythm",
+    // A bolt that plants a bomb on what it hits; it flares, then bursts; its key again on a flare
+    // sets it off early and harder (the release check on a foe).
+    "bomb",
+    // A great circle of light where the caster stands, seen by everyone: its rim closes on its
+    // centre on `beats`, and every hero inside who acts on a beat lands it (the group check).
+    "sigil",
+    // The Priest's own (docs/priest-draft3.md): Penance's rings on the bodies in front of the
+    // caster, a feather laid for whoever steps on it, and Shadowguard's shell.
+    "penance",
+    "feather",
+    "shell",
 ];
 
 /// One ability, or an ability's EX version (`ex_of` names the ability it's the EX of).
@@ -115,6 +138,38 @@ pub struct AbilityDef {
     /// A full charge can be held this long past full before it goes by itself (0: until let go).
     #[serde(default)]
     pub hold: f32,
+    /// A release check: the charge flares as it tops out, and a release inside `[checks]`'s
+    /// window of the top is a perfect cast (stronger, Valor, a burst everyone sees).
+    #[serde(default)]
+    pub perfect: bool,
+    /// What a missed check costs: "" (safe: it still goes, weaker) or "all" (all or nothing:
+    /// anything but a perfect fizzles, the Valor spent and half the cooldown with it).
+    #[serde(default)]
+    pub stakes: String,
+    /// A critical (the very middle of a check's window): these effects on what it strikes, on
+    /// top of the perfect. Each spell its own: a longer burn, a freeze, a silence.
+    #[serde(default)]
+    pub crit_effects: Vec<AbilityEffect>,
+    /// This ability's own burst for a perfect (a spell visual kit), in place of `[checks]`'s:
+    /// the spell's school bursting from the hands, not a shield on the caster.
+    #[serde(default)]
+    pub perfect_kit: u32,
+    /// A channel's look on the caster while it lasts (a sweep's: Cone of Cold's spray from the
+    /// hands), replayed every `CHANNEL_EVERY` sec.
+    #[serde(default)]
+    pub channel_kit: u32,
+    /// An orb's own rolling model, drawn by the clients that can (`PlayGroundOrb`), and its size.
+    #[serde(default)]
+    pub orb_model: String,
+    #[serde(default)]
+    pub orb_scale: f32,
+    /// Each cast's clip drawn at random from these (`"clip/take/Model"`, the model's own take on
+    /// every race and gender alike), in place of `clip` (Corey: the staff's light swings mixed).
+    #[serde(default)]
+    pub clip_pool: Vec<String>,
+    /// A rhythm's casts, beat by beat (cycled): the body's clip for each missile.
+    #[serde(default)]
+    pub beat_clips: Vec<u16>,
     /// Damage, range and radius at the least and the full charge (one value: both).
     #[serde(default)]
     pub damage: [f32; 2],
@@ -369,6 +424,16 @@ pub struct AbilityDef {
     /// On a frozen foe it shatters the ice for half again its damage.
     #[serde(default)]
     pub shatter: bool,
+    /// A staff's plain bolt: what each hit builds (`heat` or `chill` on the foe, `charge` on the
+    /// caster; `[staffs]`). Empty: nothing.
+    #[serde(default)]
+    pub builds: String,
+    /// A staff's heavy bolt: what it spends, harder for each (the same words).
+    #[serde(default)]
+    pub spends: String,
+    /// A bomb's burst, yards (`kind = "bomb"`); its bolt flies with `radius` like any projectile.
+    #[serde(default)]
+    pub bomb_radius: f32,
     /// A projectile that touches a friend heals them this share of their health (and, with
     /// `cleanse`, ends what's on them); so does an `ally` on whoever it picks. A `beam` heals each
     /// friend in it this share a second.
@@ -422,6 +487,21 @@ pub struct AbilityDef {
     /// again within this many seconds, the hero steps back to it.
     #[serde(default)]
     pub anchor: f32,
+    /// Alter Time (the rhythm check, on an anchor): the mark pulses every this many seconds
+    /// (`tick_spell` at it, `beat_kit` on the hero); the step back within `[checks] window` of a
+    /// pulse is a perfect: foes within `radius` get `stop_effects` (the throw back), and the
+    /// perfect's Valor and look.
+    #[serde(default)]
+    pub pulse: f32,
+    /// The step back to the anchor gives back this share of the health lost since it was set.
+    #[serde(default)]
+    pub rewind_health: f32,
+    /// A blink that slips a blow (the counter check, Blink): a creature's or a hero's blow that
+    /// would have caught the hero where they blinked from, landing within `[checks] window` of
+    /// the blink (their round trip allowed), misses. The first one pays: the cooldown halved,
+    /// a counter's Valor and the perfect's burst.
+    #[serde(default)]
+    pub slip: bool,
     /// Another ability fired as well, at once, from the same aim (a Disengage's Net).
     #[serde(default)]
     pub also: String,
@@ -450,6 +530,96 @@ pub struct AbilityDef {
     /// beam's, from the caster to the first foe in it or its far end.
     #[serde(default)]
     pub tick_spell: u32,
+    /// A sweep (`kind = "sweep"`, the stop check): a jet `arc` wide and `range` long that
+    /// sweeps `sweep` degrees across the hero's front over `secs`, striking each foe it passes
+    /// once (`damage`, `effects`). The key again stops it: the jet holds for `stop_secs` and the
+    /// foes in it take `stop_effects` (a freeze); a foe within `perfect_arc` of the jet's centre
+    /// makes the stop a perfect (`[checks]`). Not stopped, it finishes its sweep.
+    #[serde(default)]
+    pub sweep: f32,
+    #[serde(default)]
+    pub stop_secs: f32,
+    #[serde(default)]
+    pub stop_effects: Vec<AbilityEffect>,
+    /// A sweep graded on a meter (Gladius's swing meter, Corey's notes on the fourth film): each
+    /// cast rolls where its sweet spot falls along the sweep; stopped within `meter_perfect` of it
+    /// (a share of the sweep's time either side) is perfect, the stop's full effects; within
+    /// `meter_good`, good, the stop's least (its `secs[0]`); off it, early or late, the jet's slow
+    /// alone; never stopped, it runs into the overrun, a fail.
+    /// A held charge's build-up (a staff's heavy bolt): this clip held, looping, on the caster
+    /// while it charges (`WP`; a two-handed weapon's ready stance, the staff out), let go as it goes
+    /// or is called off; and this visual kit on them as the charge begins (0: none).
+    #[serde(default)]
+    pub charge_pose: u16,
+    #[serde(default)]
+    pub charge_kit: u32,
+    #[serde(default)]
+    pub meter: bool,
+    #[serde(default)]
+    pub meter_perfect: f32,
+    #[serde(default)]
+    pub meter_good: f32,
+    #[serde(default)]
+    pub perfect_arc: f32,
+    /// A rhythm (`kind = "rhythm"`, the rhythm check): it goes off on beats `beat_secs` seconds
+    /// apart, the first `free_beats` by themselves, then each further one only if its key is
+    /// pressed within its window of the beat (`beat_window`: the first's, tightening to the
+    /// last's), up to `most_beats`. A press out of time, or a beat let pass, ends it where it is.
+    /// Each beat is `beat_kind`: a `projectile` along the reticle or a `nova` round the caster
+    /// (its `radius` growing from the low end to the high over the beats), for `damage` plus
+    /// `beat_step` a beat; the last beat is the finisher, `finisher_damage` times as hard and
+    /// with `finisher_effects`. A full chain is a perfect.
+    #[serde(default)]
+    pub beat_secs: f32,
+    #[serde(default)]
+    pub free_beats: u32,
+    #[serde(default)]
+    pub most_beats: u32,
+    #[serde(default)]
+    pub beat_window: [f32; 2],
+    #[serde(default)]
+    pub beat_step: f32,
+    #[serde(default)]
+    pub beat_kind: String,
+    #[serde(default)]
+    pub finisher_damage: f32,
+    #[serde(default)]
+    pub finisher_effects: Vec<AbilityEffect>,
+    /// The pulse on the caster on every beat to come (a spell visual kit): the beat to press on.
+    #[serde(default)]
+    pub beat_kit: u32,
+    /// A bomb (`kind = "bomb"`, the release check on a foe): a bolt that plants it on what it
+    /// hits; it flares `bomb_flares` times over `bomb_secs`, then bursts for `damage`'s low end in
+    /// `radius` with `bomb_effects`. The key again on a flare (within `[checks] window`) sets it
+    /// off early: the high end, `stop_effects` too, a perfect; off a flare, it goes at once,
+    /// plain.
+    #[serde(default)]
+    pub bomb_secs: f32,
+    #[serde(default)]
+    pub bomb_flares: u32,
+    #[serde(default)]
+    pub bomb_effects: Vec<AbilityEffect>,
+    /// The pulse on the bombed foe at each flare (a spell visual kit).
+    #[serde(default)]
+    pub bomb_kit: u32,
+    /// Combustion: what burns on the foe this reaches catches on every foe within this many yards.
+    #[serde(default)]
+    pub spread_burns: f32,
+    /// An orb (`kind = "orb"`, the stop check): it rolls out along the reticle `range` yards
+    /// over `linger` seconds, `linger_damage` a second to every foe within `radius` (with the
+    /// ability's `effects`), every `tick`. The key again stops it where it is and it bursts:
+    /// `damage` (the low end; the high end on a perfect) in `stop_radius`; a foe within
+    /// `perfect_yd` of it makes the stop a perfect and the burst carries `stop_effects` (the
+    /// freeze). Stopped within `backfire_yd` of the caster, `backfire_effects` fall on them.
+    /// Rolled the whole way, it fades with no burst.
+    #[serde(default)]
+    pub stop_radius: f32,
+    #[serde(default)]
+    pub perfect_yd: f32,
+    #[serde(default)]
+    pub backfire_yd: f32,
+    #[serde(default)]
+    pub backfire_effects: Vec<AbilityEffect>,
     /// A second activation (Battlerite's recast): once this goes, its key is armed for
     /// `recast_secs`, and pressed again meanwhile it fires this `inner` ability from the hero's
     /// aim, for no Valor and no cooldown (the cooldown was spent by the first cast). An EX
@@ -624,6 +794,187 @@ pub struct AbilityDef {
     /// `momentum`, the Juggernaut's.
     #[serde(default)]
     pub passive: String,
+    // --- the Light Priest's (claude/priest-kit-draft.md) ---------------------------------------
+    /// A flat heal: a friend a projectile of it meets, or a nova of it reaches, is healed this
+    /// much (not a share of their health); a sigil's pillar heals each hero who landed its last
+    /// beat this much.
+    #[serde(default)]
+    pub mend: f32,
+    /// A sigil (`kind = "sigil"`, the group check): seconds from the cast to its first beat, and
+    /// from each beat to the next. Its rim closes on its centre over each. A hero inside its
+    /// `radius` who acts within `[checks] window` of a beat (on their own screen) lands it: a
+    /// perfect, and a stack of its `stack`. The last beat calls a pillar at the centre: the low
+    /// end of `damage`, `per_lander` more for each hero who landed it, the high end at most, to
+    /// foes inside; `mend` to each who landed it.
+    #[serde(default)]
+    pub beats: Vec<f32>,
+    #[serde(default)]
+    pub per_lander: f32,
+    #[serde(default)]
+    pub stack: Option<StackDef>,
+    /// The Shadow Priest's.
+    /// A `channel` held as a cord under tension (Mind Flay): see [`FlayDef`]. Its `damage` is a
+    /// second's, from its low end up close to its high end at the taut zone; past its `range` the
+    /// cord snaps.
+    #[serde(default)]
+    pub flay: Option<FlayDef>,
+    /// Its key pressed while the caster's Mind Flay is taut (judged on their screen): it goes at
+    /// once on the flayed foe, wherever the reticle is, for this many times its damage: the snap,
+    /// a perfect (Mind Blast).
+    #[serde(default)]
+    pub on_taut: f32,
+    /// On a foe below this share of its health, it deals `low_mult` times its damage; one it
+    /// doesn't kill sends `backlash` damage back at the caster (Shadow Word: Death).
+    #[serde(default)]
+    pub low_health: f32,
+    #[serde(default)]
+    pub low_mult: f32,
+    #[serde(default)]
+    pub backlash: f32,
+    /// A blink that slips a blow (`slip`): the share of its cooldown the slip gives back (Blink's
+    /// half), and what else the slip does: `slip_effects` on every foe within `slip_radius` of
+    /// where the hero stood, `slip_self` on the hero, and `burst_spell`'s look left there (Fade's
+    /// afterimage).
+    #[serde(default = "half")]
+    pub slip_hasten: f32,
+    #[serde(default)]
+    pub slip_radius: f32,
+    #[serde(default)]
+    pub slip_effects: Vec<AbilityEffect>,
+    #[serde(default)]
+    pub slip_self: Vec<AbilityEffect>,
+    /// The Priest's (docs/priest-draft3.md).
+    /// A healing projectile that passes through foes and stops on the first friend it reaches
+    /// (with `pierce`, on through each friend it meets: Healing Gust).
+    #[serde(default)]
+    pub friends_only: bool,
+    /// A shield given to a friend (not the caster) within `[checks] window` before a blow lands
+    /// on them (the caster's round trip allowed early), or while that blow waits on the friend's
+    /// round trip, parries the blow for them: it fails as a parry of theirs, the striker reeling,
+    /// and the caster gets a counter's Valor and the perfect (Power Word: Shield).
+    #[serde(default)]
+    pub parry_for: bool,
+    /// Penance's rings, Angelic Feather, Shadowguard's shell, Void Rift, the Hollow Star and the
+    /// Void Tether: see each one's own (`content_priest.rs`).
+    #[serde(default)]
+    pub penance: Option<PenanceDef>,
+    #[serde(default)]
+    pub feather: Option<FeatherDef>,
+    #[serde(default)]
+    pub shell: Option<ShellDef>,
+    #[serde(default)]
+    pub rift: Option<RiftDef>,
+    #[serde(default)]
+    pub hollow: Option<HollowDef>,
+    #[serde(default)]
+    pub tether: Option<TetherDef>,
+    /// On a weapon's right click: held, it aims this, and the click casts it (Healing Gust: the
+    /// holy staff's heavy). Let go, the aim ends.
+    #[serde(default)]
+    pub aim_alt: bool,
+    /// A release check held past its window by `overcharge[0]` seconds or more: it goes at
+    /// `overcharge[1]` of full strength (Greater Smite weakens). 0: as charged, as ever.
+    #[serde(default)]
+    pub overcharge: [f32; 2],
+    /// Let go in the air, the caster is thrown back this many yards (once a jump).
+    #[serde(default)]
+    pub air_recoil: f32,
+    /// A projectile for friends that met none: its caster healed this share of its heal as it
+    /// fades (Healing Gust with no one in its path).
+    #[serde(default)]
+    pub self_heal: f32,
+    /// This much more damage on a foe under the caster's Shadow Weaving or any shadow burn
+    /// (Mind Blast).
+    #[serde(default)]
+    pub shadowed: f32,
+    /// A ground cast's heart: a foe within `heart[0]` yards of where it lands takes `heart[1]` in
+    /// place of its damage, and the caster gets `heart[2]` Valor and the perfect (Mind Blast).
+    #[serde(default)]
+    pub heart: [f32; 3],
+    /// With it, the heart strikes true only on a foe on the move (read where it's going): that
+    /// foe takes this, and the Valor and the perfect; one standing still in it takes `heart[1]`.
+    #[serde(default)]
+    pub heart_moving: f32,
+    /// A kill with it gives one free cast of it within this long (that one gives no other):
+    /// Shadow Word: Death.
+    #[serde(default)]
+    pub kill_recast: f32,
+    /// A nova this much stronger for each other hero inside it, up to `per_hero[1]` (Holy Nova).
+    #[serde(default)]
+    pub per_hero: [f32; 2],
+    /// A sigil whose caster rises this high and hangs there (untouchable, held still, still able
+    /// to act) until it's over: Salvation's wings.
+    #[serde(default)]
+    pub float: f32,
+    /// The look the floating caster wears (a spell's state look: Magic Wings).
+    #[serde(default)]
+    pub float_aura: u32,
+    /// A dash the way the hero is moving (back if they aren't), its body swaying aside as a
+    /// dodge does: Fade's sidestep.
+    #[serde(default)]
+    pub sidestep: bool,
+    /// Stronger on a foe for the caster's Shadow Weaving on it, as the bolts that weave it are
+    /// (Shadow Burst).
+    #[serde(default)]
+    pub woven: bool,
+}
+
+/// A sigil's gift for each beat a hero lands (Holy Light): `might` more damage a stack (as a
+/// draught of might gives), `most` stacks at most, all held `secs` from the last one; their look
+/// (`aura`) while they have any. Named `name` on their buffs.
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct StackDef {
+    pub name: String,
+    pub might: f32,
+    pub most: u32,
+    pub secs: f32,
+    #[serde(default)]
+    pub aura: u32,
+}
+
+/// Mind Flay's tension (a `channel`'s `flay`). The cord to the first foe along the reticle grows
+/// stronger the farther the caster stands: from `taut` yards out to the ability's range it's taut
+/// (`taut_spell`'s tighter look on it, `taut_kit` on the caster as it tightens). Held taut for
+/// `taut_secs` without a break, once a cast, it rings: a perfect. Its key again while it's taut
+/// whips it into the foe for `snap` times what the rest of the channel would have dealt (at most
+/// `snap_cap`; `whip_spell` on them). Past the range it snaps by itself: the channel ends with
+/// `snap_kit` on the caster, who flinches for `flinch` seconds. Foes within `spill_radius` of its
+/// foe take `spill` of each of its blows (Mind Sear).
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct FlayDef {
+    pub taut: f32,
+    pub taut_secs: f32,
+    pub snap: f32,
+    pub snap_cap: f32,
+    #[serde(default)]
+    pub taut_spell: u32,
+    #[serde(default)]
+    pub taut_kit: u32,
+    #[serde(default)]
+    pub whip_spell: u32,
+    #[serde(default)]
+    pub snap_kit: u32,
+    #[serde(default)]
+    pub flinch: f32,
+    #[serde(default)]
+    pub spill_radius: f32,
+    #[serde(default)]
+    pub spill: f32,
+}
+
+impl FlayDef {
+    /// The cord's damage a second at `dist` yards (the ability's `damage`, low up close, high from
+    /// the taut zone out).
+    pub fn dps(&self, damage: [f32; 2], dist: f32) -> f32 {
+        AbilityDef::at(damage, dist / self.taut.max(0.1))
+    }
+
+    /// The most one cast can deal its foe (its `damage` held `secs` at the taut end, cashed in by
+    /// its snap at the worst moment): for the board's budget.
+    pub fn most(&self, damage: [f32; 2], secs: f32) -> f32 {
+        let top = damage[1];
+        (0..=100).map(|k| secs * k as f32 / 100.0).map(|t| top * t + (self.snap * top * (secs - t)).min(self.snap_cap)).fold(0.0, f32::max)
+    }
 }
 
 /// The passives an ability on a key can give its hero.
@@ -758,7 +1109,7 @@ impl AbilityDef {
     }
     /// It's aimed with the reticle (the shoulder camera comes up for it).
     pub fn aimed(&self) -> bool {
-        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff")
+        !matches!(self.kind.as_str(), "nova" | "stance" | "art" | "buff" | "sigil" | "shell")
             && !self.at_once
             && !self.at_self
             && !(self.kind == "leap" && self.back)
@@ -783,12 +1134,12 @@ impl AbilityDef {
     }
     /// A projectile that meets friends too (to heal them, to pull them to safety, to swap places).
     pub fn friends(&self) -> bool {
-        self.ally_heal > 0.0 || self.friendly || self.swap
+        self.ally_heal > 0.0 || self.friendly || self.swap || self.mend > 0.0
     }
     /// It mends friends (a heal on whoever it reaches, a nova's, holy ground's mending or boon):
     /// a hero it can help is never harmed by it, friendly fire or not.
     pub fn heals(&self) -> bool {
-        self.ally_heal > 0.0 || self.area_heal > 0.0 || self.linger_heal > 0.0 || !self.boon.is_empty()
+        self.ally_heal > 0.0 || self.area_heal > 0.0 || self.linger_heal > 0.0 || !self.boon.is_empty() || self.mend > 0.0
     }
     pub fn is_ex(&self) -> bool {
         !self.ex_of.is_empty()
@@ -883,6 +1234,9 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// from falling: a blow that would fell them leaves them at 1 health instead, ends it, and mends
 /// `amount` of their health over the next 3 s.
 ///
+/// The Shadow Priest's: `vampiric` (everything whoever gave it deals them heals that one for
+/// `amount` of it: Vampiric Touch).
+///
 /// The Warrior's: `guarded` (the first blow meant for them strikes the one who gave it instead:
 /// Intervene), `rallied` (any stagger or knockdown ends as it lands; nothing staggers them, and
 /// their attacks come `amount` faster: Rallying Cry), `fury` (their attacks cost no stamina and
@@ -892,12 +1246,12 @@ pub const CC_KINDS: [&str; 9] = ["stun", "incapacitate", "petrify", "panic", "ro
 /// hero's hit on them deals `amount` more and staggers longer: Rising Cut), `momentum` (the
 /// Juggernaut's stacks, `amount` of them), `war_banner` (near a War Banner: kept on for a moment
 /// at a time while they stand by it).
-pub const OTHER_EFFECTS: [&str; 27] = [
-    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner",
+pub const OTHER_EFFECTS: [&str; 28] = [
+    "knockdown", "burn", "mark", "heal", "cleanse_panic", "deathmark", "sunder", "freedom", "steed", "wrath", "hallowed", "steadfast", "knockback", "pull", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "cowed", "exposed", "momentum", "war_banner", "vampiric",
 ];
 /// The effects that help whoever has them (a hero's own, or a friend's from holy ground): never
 /// shortened on heroes, never stopped by the grace, never ended by a cleanse.
-pub const BOONS: [&str; 16] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner"];
+pub const BOONS: [&str; 17] = ["freedom", "steed", "wrath", "hallowed", "steadfast", "shield", "overhealth", "regen", "haste", "veil", "cheat_death", "guarded", "rallied", "fury", "grown", "momentum", "war_banner"];
 /// The effects that move a body (applied at once, not kept).
 pub const DISPLACE: [&str; 2] = ["knockback", "pull"];
 /// What a cleanse on a friend ends (Purifying Shock).
@@ -931,6 +1285,11 @@ pub struct CounterDef {
     /// What it does to a melee attacker (and, `any_attacker`, a shooter too): an effect each.
     #[serde(default)]
     pub attacker: Vec<AbilityEffect>,
+    /// The counter check on an immune stance (Ice Block): broken out of within `[checks] window`
+    /// of a blow landing on it (the hero's round trip allowed), it bursts: these effects on the
+    /// one who struck it, and the perfect's burst.
+    #[serde(default)]
+    pub perfect_break: Vec<AbilityEffect>,
     #[serde(default)]
     pub any_attacker: bool,
     /// Only melee blows set it off (Retaliation, Nature's Grasp); else projectiles too.
@@ -950,6 +1309,11 @@ pub struct CounterDef {
     /// through as ever. Nothing else (no block, dodge, ward or `reflect` with it).
     #[serde(default)]
     pub mirror: bool,
+    /// The counter check on a mirror (Spell Mirror): only what reaches the hero within
+    /// `[checks] window` of raising it (plus their round trip) flies back, a perfect; later in the
+    /// stance it's only swallowed.
+    #[serde(default)]
+    pub perfect_mirror: bool,
     /// A counter that catches something comes back this much sooner (a share of its cooldown).
     #[serde(default = "half")]
     pub caught_cooldown: f32,
@@ -982,6 +1346,21 @@ pub struct CounterDef {
     /// harder, and the stance holds on after it (Shield Wall's Shield Bash).
     #[serde(default)]
     pub bash: bool,
+    /// Its key again comes out of it, as Ice Block's does (Dispersion).
+    #[serde(default)]
+    pub key_ends: bool,
+    /// While it holds the hero takes this share less damage and mends `mend` of their health a
+    /// second (Dispersion).
+    #[serde(default)]
+    pub cut: f32,
+    #[serde(default)]
+    pub mend: f32,
+    /// The counter check on entering it (Dispersion): a melee blow or a projectile that reaches
+    /// the hero within `[checks] window` of entering (their round trip allowed) passes clean
+    /// through them, these effects land on whoever struck, and it's a perfect. Later blows land
+    /// as ever (cut by `cut`).
+    #[serde(default)]
+    pub perfect_pass: Vec<AbilityEffect>,
 }
 
 fn whole() -> f32 {
@@ -1055,7 +1434,9 @@ impl Default for CcDef {
             ("steadfast", 10060),
             ("shield", 17),
             ("regen", 774),
-            ("haste", 2983),
+            // Blessing of Freedom's glow at the feet: Sprint's (2983) is a ribbon trail this client
+            // never draws, so a hastened hero showed nothing.
+            ("haste", 1044),
             ("veil", 1784),
         ]
             .into_iter()

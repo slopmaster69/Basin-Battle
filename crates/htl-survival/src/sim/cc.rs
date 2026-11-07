@@ -52,6 +52,14 @@ impl Survival {
         self.cc.get(&id).map_or(&[], |v| v.as_slice())
     }
 
+    /// What stands between a unit and its health now: what its shields have left to soak, and its
+    /// overhealth (health over its most, lost before its own), for the health bar.
+    pub fn absorbs(&self, id: Id) -> (u32, u32) {
+        let now = self.clock;
+        let left = |kind: &str| self.cc_of(id).iter().filter(|c| c.kind == kind && c.until > now).map(|c| c.left.max(0.0)).sum::<f32>().round() as u32;
+        (left("shield"), left("overhealth"))
+    }
+
     pub fn has_cc(&self, id: Id, kind: &str) -> bool {
         let now = self.clock;
         self.cc_of(id).iter().any(|c| c.kind == kind && c.until > now)
@@ -132,7 +140,7 @@ impl Survival {
         // A boon (Rallying Cry, holy ground's) helps: the rules that soften what harms don't touch it.
         let boon = crate::content::BOONS.contains(&kind);
         // Nothing reaches someone in Ice Block, in Retaliation's answer, or up on Skyfall.
-        if (self.untouchable(target) || self.skyfall_aloft(target)) && !boon {
+        if (self.untouchable(target) || self.skyfall_aloft(target) || self.salvation_aloft(target)) && !boon {
             return false;
         }
         // Freed (Blessing of Freedom): no root, slow or stun takes hold.
@@ -167,14 +175,18 @@ impl Survival {
         }
         let left = match kind {
             "petrify" => self.content.cc.petrify_shield,
-            "shield" => amount,
+            "shield" | "overhealth" => amount,
             "panic" => self.max_health_of(target) as f32 * self.content.cc.panic_break,
             _ => 0.0,
         };
         let list = self.cc.entry(target).or_default();
         // One of each kind: the longer stands (a stronger snare replaces a weaker).
         if let Some(c) = list.iter_mut().find(|c| c.kind == kind && c.until > now) {
-            c.until = c.until.max(now + secs);
+            // A weaker burn doesn't keep a stronger one going (a staff's light bolts under a
+            // Fireball's burn): it only stretches one as strong or weaker.
+            if !(kind == "burn" && amount + 1.0e-3 < c.amount) {
+                c.until = c.until.max(now + secs);
+            }
             c.amount = c.amount.max(amount);
             c.left = c.left.max(left);
             c.from = from;
@@ -294,8 +306,9 @@ impl Survival {
         let now = self.clock;
         let still = self.held_still(id)
             || self.players.get(&id).is_some_and(|p| p.hold_until > now && p.health > 0)
-            // Skyfall's hang: held up there in the air.
+            // Skyfall's hang, or Salvation's: held up there in the air.
             || self.hanging(id)
+            || self.salvation_held(id)
             || self.players.get(&id).is_some_and(|p| matches!(&p.action, Action::Stance { ability, .. } if self.content.abilities[*ability].counter.as_ref().is_some_and(|c| c.immune)));
         let Some(p) = self.players.get_mut(&id) else { return };
         if p.rooted != still {
@@ -315,18 +328,22 @@ impl Survival {
         let Some(list) = self.cc.get_mut(&id) else { return damage };
         let mut through = damage as f32;
         let mut ended = Vec::new();
-        // A shield soaks it first.
-        for c in list.iter_mut().filter(|c| c.until > now && c.kind == "shield") {
-            let took = through.min(c.left);
-            c.left -= took;
-            through -= took;
-            if c.left <= 0.0 {
-                c.until = now;
-                ended.push(c.kind.clone());
+        // A shield soaks it first, then overhealth (health over the most, lost before your own).
+        for kind in ["shield", "overhealth"] {
+            for c in list.iter_mut().filter(|c| c.until > now && c.kind == kind) {
+                let took = through.min(c.left);
+                c.left -= took;
+                through -= took;
+                if c.left <= 0.0 {
+                    c.until = now;
+                    ended.push(c.kind.clone());
+                }
             }
         }
         for c in list.iter_mut().filter(|c| c.until > now) {
             match c.kind.as_str() {
+                // A staff's freeze holds without soaking: the shards come through and it stays.
+                "petrify" if c.amount < 0.0 => {}
                 "petrify" => {
                     let took = through.min(c.left);
                     c.left -= took;
@@ -526,6 +543,22 @@ impl Survival {
         }
     }
 
+    /// End everything `from` put on a hero (a duel over: the foe's slows, burns and holds).
+    pub(crate) fn cleanse_from(&mut self, id: Id, from: Id) {
+        let now = self.clock;
+        let Some(list) = self.cc.get_mut(&id) else { return };
+        let mut gone = Vec::new();
+        for c in list.iter_mut() {
+            if c.from == from && c.until > now {
+                c.until = now;
+                gone.push(c.kind.clone());
+            }
+        }
+        if !gone.is_empty() {
+            self.cc_ended(id, &gone);
+        }
+    }
+
     /// Take a unit's effects off (a blink out of roots, Tremor Totem's pulse on a panic).
     pub(crate) fn cleanse(&mut self, id: Id, kinds: &[&str]) {
         let now = self.clock;
@@ -629,6 +662,16 @@ impl Survival {
             if a != 0 {
                 out.push(a);
             }
+            // The ward up: its barrier on them.
+            // Broken: the debuff's look until the bar is whole again.
+            if p.ward_broken && self.content.ward.broken_aura != 0 {
+                out.push(self.content.ward.broken_aura);
+            }
+            if p.ward_up && self.content.ward.aura != 0 {
+                out.push(self.content.ward.aura);
+            }
+            // The Priest's own: an Empowered staff, Salvation's wings.
+            out.extend(self.priest_auras(id));
         }
         // A creature's own look (a spirit beast's glow).
         if let Some(m) = self.mobs.get(&id) {
@@ -639,6 +682,8 @@ impl Survival {
         }
         // A sticky projectile's fuse burning on them.
         out.extend(self.fuse_auras(id));
+        // Salvation's Holy Light.
+        out.extend(self.sigil_auras(id));
         out.sort_unstable();
         out.dedup();
         out

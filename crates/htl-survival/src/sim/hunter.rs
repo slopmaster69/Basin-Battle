@@ -110,9 +110,9 @@ const HANG_GRACE: f32 = 0.5;
 /// The pose held through the hang: the Jump clip (38), a character's mid-air pose with the legs
 /// drawn up (1.12 has no hover of its own), played on the lower body only for the whole hang
 /// (`ClipBody::Lower`): the arms stay on the bow's draw.
-const HOVER_CLIP: u16 = 38;
+pub(crate) const HOVER_CLIP: u16 = 38;
 /// After the volley: feather fall, untouchable, till they land (or this long at most).
-const DESCENT_SECS: f32 = 3.0;
+pub(crate) const DESCENT_SECS: f32 = 3.0;
 /// Each of its arrows strikes everyone within this of where it lands.
 const VOLLEY_SPLASH: f32 = 2.5;
 
@@ -514,7 +514,7 @@ impl Survival {
             .filter(|(m, x)| x.health > 0 && !x.hidden && !self.content.mobs[x.def].totem && !self.own_totem(**m, owner) && dist2d(x.pos, at) <= reach)
             .map(|(m, x)| (*m, x.pos))
             .collect();
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             out.extend(self.players.iter().filter(|(h, p)| **h != owner && p.health > 0 && self.hostile(owner, **h) && dist2d(p.pos, at) <= reach).map(|(h, p)| (*h, p.pos)));
         }
         out
@@ -737,6 +737,7 @@ impl Survival {
         if let (Some(a), Some(p)) = (self.unit_pos(attacker), self.players.get_mut(&id)) {
             p.facing = facing(at, a);
             p.aim_line = None;
+            p.aim_at = None;
         }
         self.leap_to(id, leap, 1.0, None);
     }

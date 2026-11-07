@@ -19,6 +19,7 @@ mod building;
 pub use building::StationActions;
 mod combat;
 pub mod dungeon;
+pub mod duel;
 mod journal;
 pub mod meter;
 pub mod mobs;
@@ -32,7 +33,22 @@ pub mod hunter;
 pub mod lab;
 mod raid;
 pub mod siege;
+mod bomb;
+mod flay;
+pub mod priest;
+mod orb;
+mod rhythm;
+mod staff;
+mod sweep;
 pub mod wager;
+// The Light Priest's (Penance's flick, Holy Fire's Kindle, counters for others, Salvation).
+mod feather;
+mod hollow;
+mod penance;
+mod rift;
+mod shell;
+pub(crate) mod light;
+mod sigil;
 mod tactics;
 mod world;
 
@@ -184,6 +200,53 @@ pub enum Event {
     Pose { id: Id, pose: u32 },
     Health { id: Id, health: u32, max: u32 },
     Stamina { player: Id },
+    /// The hero's ward bar changed (a staff's guard), or broke, or is whole again.
+    Ward { player: Id },
+    /// A perfect cast: the hero released an ability on its flare (its burst and Valor are their
+    /// own events; this is for the hero's own screen, a beat).
+    Perfect { player: Id, ability: usize },
+    /// A skill check begins for the hero, with what this cast rolled, for their add-on to draw
+    /// before it's due: `kind` "release" (`a` the flare's second from the charge's start, `b` the
+    /// window either side, `c` the critical's share of it, `pattern` how the ring closes), or
+    /// "rhythm" (`a`, `b` the first and last pressed beats' windows, `c` the critical's share,
+    /// `pattern` "free|name|t0,t1,t2r,..." the beats' seconds from the start, `r` a rest).
+    CheckStart { player: Id, ability: usize, kind: &'static str, a: f32, b: f32, c: f32, pattern: String },
+    /// A skill check's outcome, in Corey's words: "perfect" (the very middle, the best), "good" (in
+    /// the window: the standard result), "early" or "late" (a release off its window: weaker, or
+    /// plain), "full" (a whole rhythm chain), "fail" (a missed beat, a stop on nothing), "fizzle"
+    /// (all or nothing, and nothing) or "cancel" (called off).
+    CheckResult { player: Id, ability: usize, grade: &'static str },
+    /// The ward's own check: a perfect ward ("perfect") or the ward breaking ("fail"), for the
+    /// warder's add-on to flash as a spell's check does.
+    WardCheck { player: Id, grade: &'static str },
+    /// A staff's stacks changed (`[staffs]`): `kind` heat or chill on `on`, charge on the caster;
+    /// `n` how many now (the most: it just ignited, froze, or gathered its last).
+    Stacks { player: Id, kind: &'static str, n: u32, on: Option<Id> },
+    /// A pose held on a unit (the ward's arm held out): `clip` looped for `secs` (0: let go), for
+    /// the clients that hold one (`WP`).
+    HoldPose { id: Id, clip: u16, secs: f32, from: Option<String> },
+    /// A staff's heavy bolt began its charge: it can go from `lo` seconds, and is whole at `hi`
+    /// (for the staff's mark on the caster's screen; no ring, no flare on the body).
+    StaffHeavy { player: Id, lo: f32, hi: f32 },
+    /// An orb set rolling (Frozen Orb), for the clients that draw it rolling: `look` its key, from
+    /// where to where over how long, the model and its size (`orb_model`, `orb_scale`).
+    OrbRoll { look: Id, from: Vec3, to: Vec3, secs: f32, model: String, scale: f32 },
+    /// That orb stopped or spent.
+    OrbGone { look: Id },
+    /// Holy Word: Salvation laid (for everyone, a client with SetGroundRing draws it in Corey's
+    /// art): `look` its key, where, how wide, and its beats in seconds from now.
+    SigilLaid { look: Id, at: Vec3, radius: f32, beats: Vec<f32> },
+    /// A Priest look the add-on draws in Corey's art (`PL`): `kind` shield (a perfect Shield on
+    /// `on`), flay (`n` 1 taut; `a` the cord's share of its range, `b` where taut begins), snap,
+    /// penance (ring `n` closing on `on` in `a` seconds, `b` 1 a friend), penance_hit (ring `n`:
+    /// `a` 1 landed, `b` 1 dead on), fade (an afterimage on the hero), light (`n` stacks of Holy
+    /// Light), shell (`n` stored, `a` its share of the most; `b` 1 let go), rift (`n` foes
+    /// caught, `a` its reach, `b` seconds left), hollow (the orb `on` at `n` health, `a` its reach,
+    /// `b` its most), empower (`n` 1 the staff's next bolt is Empowered), sear (`n` 1 on `on`).
+    PriestLook { player: Id, kind: &'static str, n: u32, on: Option<Id>, a: f32, b: f32 },
+    /// A Priest's mark on the ground the add-on draws in Corey's art (`PG`): `kind` feather or
+    /// rift, `key` its look, where, how wide, for how long (`radius` 0: it's gone).
+    PriestGround { kind: &'static str, key: Id, at: Vec3, radius: f32, secs: f32 },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
@@ -331,6 +394,8 @@ pub enum Event {
     Arena { player: Id },
     /// How Siege stands changed for a hero in its world (the hall, the match).
     Siege { player: Id },
+    /// A duel between `a` (who challenged) and `b`: what's new in it.
+    Duel { a: Id, b: Id, news: duel::DuelNews },
     /// A line for the server's log only.
     Log(String),
     /// Something worth saving changed.
@@ -450,6 +515,12 @@ pub enum Action {
     Channel { ability: usize, target: Id, until: f32, next: f32, share: f32 },
     /// A counter's stance until then.
     Stance { ability: usize, until: f32 },
+    /// A rhythm spell going off on its beats since then: `done` beats gone, `pressed` beats
+    /// earned by a press (the free ones count without), `cued` beats whose pulse has shown.
+    Rhythm { ability: usize, since: f32, done: u32, pressed: u32, cued: u32 },
+    /// A jet sweeping across the hero's front from `from` (a facing) since then until `until`,
+    /// whom it has struck; `held`: stopped at that moment, holding where it was.
+    Sweep { ability: usize, from: f32, since: f32, until: f32, struck: Vec<Id>, held: Option<f32> },
     /// A dash along the ground, `t` of `secs` in, into whoever's at its end.
     Dash { t: f32, secs: f32, ability: usize, target: Option<Id>, share: f32 },
     /// Eating, `t` seconds in.
@@ -478,6 +549,8 @@ impl Action {
             Action::Aim { .. } => "aim",
             Action::Charge { .. } => "charge",
             Action::Cast { .. } => "cast",
+            Action::Sweep { .. } => "sweep",
+            Action::Rhythm { .. } => "channel",
             Action::Channel { .. } => "channel",
             Action::Stance { .. } => "stance",
             Action::Dash { .. } => "dash",
@@ -574,6 +647,37 @@ pub struct Player {
     /// When the guard last went up, and the time before that (a parry needs a fresh guard).
     pub guard_at: f32,
     pub prev_guard_at: f32,
+    /// The ward bar (a staff's guard), what's left of it; broken, it can't go up until it's full
+    /// again; and when it last came down or broke (it refills a moment after).
+    pub ward: f32,
+    pub ward_broken: bool,
+    pub ward_down_at: f32,
+    /// The ward is up (its look is on them).
+    pub ward_up: bool,
+    /// The cast going out now was released on its flare (a perfect): its strength and its pay.
+    pub cast_perfect: bool,
+    /// ...and in the very middle of it (a critical): its `crit_effects` too.
+    pub cast_critical: bool,
+    /// The charge held now flares this long after it began (rolled as it began).
+    pub check_flare: f32,
+    /// A rhythm's beats, seconds from its start, and which are rests (rolled as it began).
+    pub rhythm_beats: Vec<(f32, bool)>,
+    /// A sweep's way across (+1 left to right, -1 right to left) and its time (rolled as it began).
+    pub sweep_dir: f32,
+    pub sweep_secs: f32,
+    /// The ward's next crackle, while it's up.
+    pub ward_crackle_at: f32,
+    /// A meter sweep's sweet spot this cast, a share of its time.
+    pub meter_at: f32,
+    /// When the ward's held arm is next renewed (its clip).
+    pub ward_clip_at: f32,
+    /// An Arcane staff's charges, and when they fade.
+    pub staff_charges: u32,
+    pub staff_charges_until: f32,
+    /// The skill check on the reticle under way (its ability), until its result.
+    pub check_open: Option<usize>,
+    /// What the cast going out now strikes for, when its own numbers don't say (a beat's).
+    pub cast_damage: Option<f32>,
     pub sprint_held: bool,
     /// Sprinting now (held, moving, not walking, not committed to anything, stamina left).
     pub sprinting: bool,
@@ -613,6 +717,10 @@ pub struct Player {
     /// The reticle's line as their client last told it with a shot: a facing, an elevation
     /// (radians, up positive) and when.
     pub aim_line: Option<(f32, f32, f32)>,
+    /// The point that line meets in the world as the client's own camera sees it (where its
+    /// reticle is), sent with it and checked (`set_aim_point`): the reticle is the truth, and a shot
+    /// goes there from the hands. None: the client sent none (an older one) or it didn't pass.
+    pub aim_at: Option<Vec3>,
     pub kit: Kit,
     pub weapon: usize,
     pub shield: usize,
@@ -680,6 +788,8 @@ pub struct Player {
     pub panic_stride: f32,
     /// Keys armed for a recast, cards empowered, a dash going through bodies.
     pub combos: recasts::Combos,
+    /// Grace, the Heal begun with it, a friend's shield on them (the Priest's core).
+    pub priest: priest::Priest,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -812,6 +922,18 @@ pub struct Mob {
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,
+    /// The string it began last (so it seldom begins the same one again next), how many of its
+    /// strings up close in a row it has done, and how many blows of the string it's in it will
+    /// throw (0: as many as it has; a boss's may stop short or run one longer).
+    pub last_pattern: Option<usize>,
+    pub close_run: u32,
+    pub string_len: usize,
+    /// The blow of its string a boss holds a beat (the delayed swing), and how much longer that
+    /// blow's wind-up is now.
+    pub held_step: Option<usize>,
+    pub hold: f32,
+    /// A boss making space: backing off until then, to use this string of its from there.
+    pub space: Option<(f32, usize)>,
     /// Who has hurt it, how much, and when last (it fades): whom it goes for.
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.
@@ -920,14 +1042,28 @@ pub struct Survival {
     /// `lab_blowing` while it does).
     pub(crate) lab_quiet: Vec<Id>,
     pub(crate) lab_blowing: Option<Id>,
+    /// Orbs rolling out (Frozen Orb), until stopped or spent.
+    pub(crate) orbs: Vec<orb::Orb>,
+    /// Bombs ticking on foes (Living Bomb), until they burst.
+    pub(crate) bombs: Vec<bomb::Bomb>,
+    /// Heat and chill a staff's bolts left on foes, until they fade.
+    pub(crate) staff_marks: Vec<staff::StaffMark>,
+    /// Each hero's Mind Flay held, and how taut its cord has been.
+    pub(crate) flays: BTreeMap<Id, flay::Flay>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
     pub(crate) traps: Vec<moves::Trap>,
     /// The Hunter's: planted arrows, tripwires, Call of the Wild's chains and beasts.
     pub hunt: hunter::Hunt,
+    /// Duels asked and under way.
+    pub duels: Vec<duel::Duel>,
     pub(crate) windups: Vec<moves::Windup>,
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
+    /// Each hero's last blink that slips blows (Blink's counter check).
+    pub(crate) slips: BTreeMap<Id, moves::Slip>,
+    /// The Light Priest's: covers on friends, Salvation's circles, Penance's bolts.
+    pub(crate) light: light::Light,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
@@ -1047,8 +1183,11 @@ impl Survival {
             landings: Vec::new(),
             traps: Vec::new(),
             hunt: hunter::Hunt::default(),
+            duels: Vec::new(),
             windups: Vec::new(),
             anchors: BTreeMap::new(),
+            slips: BTreeMap::new(),
+            light: light::Light::default(),
             fx_from: None,
             fx_vs_bosses: false,
             fx_pull_look: None,
@@ -1061,6 +1200,10 @@ impl Survival {
             burnings: Vec::new(),
             lab_quiet: Vec::new(),
             lab_blowing: None,
+            orbs: Vec::new(),
+            bombs: Vec::new(),
+            staff_marks: Vec::new(),
+            flays: BTreeMap::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
@@ -1132,6 +1275,9 @@ impl Survival {
         self.reckon_players(dt);
         self.step_players(dt);
         self.step_projectiles(dt);
+        self.step_orbs(dt);
+        self.step_bombs();
+        self.step_light();
         self.step_moves();
         self.step_grounds();
         self.step_bounces();
@@ -1145,6 +1291,7 @@ impl Survival {
         self.step_holds();
         self.step_dummies();
         self.step_missiles();
+        self.step_duels();
         self.step_pending();
         if online {
             self.step_mobs(dt);
@@ -1169,7 +1316,52 @@ impl Survival {
             self.step_weekly_chest();
         }
         self.record_trails();
+        self.close_checks();
         std::mem::take(&mut self.events)
+    }
+
+    /// A skill check on the reticle (a release, a rhythm, a sweep) whose action ended this step
+    /// without a result (called off, a stagger, a stun) is called off for the caster's screen, so
+    /// its ring goes and no late press is judged against it. An orb's outlives its cast.
+    fn close_checks(&mut self) {
+        for e in &self.events {
+            match e {
+                Event::CheckStart { player, ability, kind, .. } if *kind != "orb" => {
+                    if let Some(p) = self.players.get_mut(player) {
+                        p.check_open = Some(*ability);
+                    }
+                }
+                Event::CheckResult { player, ability, grade } => {
+                    if let Some(p) = self.players.get_mut(player) {
+                        // A rhythm's beat judged mid-chain isn't its end: still open, so an
+                        // interrupt after it tells the add-on to take the ring down.
+                        let beat = matches!(p.action, Action::Rhythm { ability: a, .. } if a == *ability) && matches!(*grade, "good" | "critical");
+                        if !beat {
+                            p.check_open = None;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let gone: Vec<(Id, usize)> = self
+            .players
+            .iter()
+            .filter_map(|(id, p)| {
+                let a = p.check_open?;
+                let live = match &p.action {
+                    Action::Charge { ability, .. } | Action::Rhythm { ability, .. } | Action::Sweep { ability, .. } => *ability == a,
+                    _ => false,
+                };
+                (!live).then_some((*id, a))
+            })
+            .collect();
+        for (id, ability) in gone {
+            if let Some(p) = self.players.get_mut(&id) {
+                p.check_open = None;
+            }
+            self.events.push(Event::CheckResult { player: id, ability, grade: "cancel" });
+        }
     }
 
     pub(crate) fn tell(&mut self, player: Id, text: impl Into<String>) {
@@ -1211,6 +1403,23 @@ impl Survival {
             attack_held: false,
             guard_at: -100.0,
             prev_guard_at: -100.0,
+            ward: c.ward.bar,
+            ward_broken: false,
+            ward_down_at: -100.0,
+            ward_up: false,
+            cast_perfect: false,
+            cast_critical: false,
+            check_flare: 0.0,
+            rhythm_beats: Vec::new(),
+            sweep_dir: 1.0,
+            sweep_secs: 1.0,
+            ward_crackle_at: 0.0,
+            ward_clip_at: 0.0,
+            meter_at: 0.0,
+            staff_charges: 0,
+            staff_charges_until: 0.0,
+            check_open: None,
+            cast_damage: None,
             sprint_held: false,
             sprinting: false,
             air: None,
@@ -1228,6 +1437,7 @@ impl Survival {
             foe: None,
             shoulder_cam: false,
             aim_line: None,
+            aim_at: None,
             kit: Kit::Melee,
             weapon: item(&c.start.weapon),
             shield: item(&c.start.shield),
@@ -1265,6 +1475,7 @@ impl Survival {
             rooted: false,
             panic_stride: 0.0,
             combos: recasts::Combos::default(),
+            priest: priest::Priest::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];
@@ -1295,6 +1506,8 @@ impl Survival {
     /// eaten, a gather not finished); where they stand and what they carry is kept.
     pub fn leave(&mut self, id: Id) -> Option<crate::save::PlayerSave> {
         self.cancel_preview(id);
+        // Their heat and chill on foes go with them (only their own bolts ever cleared them).
+        self.staff_marks.retain(|m| m.owner != id);
         let p = self.players.get_mut(&id)?;
         if !matches!(p.action, Action::Dead { .. } | Action::Stagger { .. }) {
             p.action = Action::Ready;
@@ -1320,6 +1533,8 @@ impl Survival {
         let p = self.players.get_mut(&id)?;
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
+        // A duel of theirs given away.
+        self.duel_gone(id);
         self.meters.remove(&id);
         // Creatures fighting them turn on whoever else is in the fight, or go home.
         self.foe_gone(id);
@@ -1724,7 +1939,7 @@ impl Survival {
             Action::Guard => c.guard_speed,
             // Bladestorm's spin walks at its own pace, near a run.
             Action::Channel { ability, .. } if self.content.abilities[ability].around => c.run_speed * crate::content::AROUND_PACE,
-            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } => c.aim_speed,
+            Action::Aim { .. } | Action::Charge { .. } | Action::Cast { .. } | Action::Channel { .. } | Action::Sweep { .. } | Action::Rhythm { .. } => c.aim_speed,
             Action::Stance { .. } => c.guard_speed,
             Action::Eat { .. } => c.use_speed,
             Action::Gather { .. } | Action::Work { .. } | Action::Stagger { .. } => c.use_speed,
@@ -1741,7 +1956,21 @@ impl Survival {
         if let Some(p) = self.players.get_mut(&id) {
             if facing.is_finite() && elevation.is_finite() {
                 p.aim_line = Some((facing.rem_euclid(std::f32::consts::TAU), elevation.clamp(-1.4, 1.4), now));
+                // A new line: the point sent with the last one no longer goes with it.
+                p.aim_at = None;
             }
+        }
+    }
+
+    /// Where the hero's reticle meets the world on their own screen, sent with the line just set
+    /// (`set_aim_line`): taken when it lies within reach, in front of them and on (or near) that
+    /// line from the aiming camera; anything else is dropped and the server's own line is used.
+    /// The client already says which way it aims; the point only says how far along, so it gives
+    /// a client nothing it couldn't aim at anyway, and the shot's flight is still the server's.
+    pub fn set_aim_point(&mut self, id: Id, at: Vec3) {
+        let ok = self.aim_point_ok(id, at);
+        if let Some(p) = self.players.get_mut(&id) {
+            p.aim_at = ok.then_some(at);
         }
     }
 
@@ -2008,7 +2237,7 @@ impl Survival {
                 && crate::land::clear_line(self.land.as_ref(), p.pos, at)
         };
         let mobs = self.mobs.values().filter(|m| m.health > 0 && reaches(m.pos, 0.5 * self.content.mobs[m.def].scale)).count();
-        let heroes = if self.content.pvp.friendly_fire {
+        let heroes = if self.heroes_clash() {
             self.players.iter().filter(|(hid, h)| **hid != id && h.health > 0 && self.hostile(id, **hid) && reaches(h.pos, 0.4)).count()
         } else {
             0

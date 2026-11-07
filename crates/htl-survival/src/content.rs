@@ -31,6 +31,16 @@ pub struct Content {
     pub player: PlayerDef,
     pub dodge: DodgeDef,
     pub parry: ParryDef,
+    /// A caster's guard: the ward a staff raises, with a bar of its own (`[ward]`).
+    #[serde(default)]
+    pub ward: WardDef,
+    /// The skill checks built into spells: the window a perfect must land in, and what a perfect
+    /// pays (`[checks]`).
+    #[serde(default)]
+    pub checks: ChecksDef,
+    /// What a casting staff's bolts build and its heavy bolt spends (`[staffs]`).
+    #[serde(default)]
+    pub staffs: StaffsDef,
     #[serde(default)]
     pub heavy: HeavyDef,
     #[serde(default)]
@@ -41,6 +51,9 @@ pub struct Content {
     pub ai: AiDef,
     #[serde(default)]
     pub pvp: PvpDef,
+    /// Two heroes' duel: a challenge, a countdown, and a fight until one would fall.
+    #[serde(default)]
+    pub duel: DuelDef,
     /// How strikes chain, cancel and lunge, and how far the server makes allowances for lag.
     #[serde(default)]
     pub combat: CombatDef,
@@ -139,6 +152,9 @@ pub struct Content {
     /// A fresh hero's ability keys: slot to ability.
     #[serde(default)]
     pub loadout: LoadoutDef,
+    /// The Priest's staffs' marks and stacks, and the burst of a Priest's perfect (`[priest]`).
+    #[serde(default)]
+    pub priest: PriestDef,
     /// The text it was read from, for tuning in play ([`crate::tune`]), and the file, if any.
     #[serde(skip)]
     pub source: String,
@@ -387,6 +403,138 @@ pub struct ShatterDef {
 impl Default for ShatterDef {
     fn default() -> Self {
         Self { burst_kit: 121 }
+    }
+}
+
+/// The ward: what a staff guards with. An arcane barrier with a bar of its own in place of
+/// stamina. Every blow it stops drains the bar (the guard's `cost`s); a guard raised in the parry
+/// window is a perfect ward, which costs nothing and reels the attacker as a parry does; a blow
+/// too heavy for what's left breaks it, and a broken ward can't go up again until the bar is full.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct WardDef {
+    /// The bar.
+    pub bar: f32,
+    /// How fast it refills, a second, while the ward is down...
+    pub refill: f32,
+    /// ...starting this long after it came down (or broke).
+    pub refill_delay: f32,
+    /// A perfect ward gives this much of the bar back.
+    pub perfect_refill: f32,
+    /// A broken ward's stagger.
+    pub break_secs: f32,
+    /// The look on a hero holding the ward up (a spell whose aura the clients show).
+    pub aura: u32,
+    /// The crackle on the ward as it stops a blow, the burst of a perfect ward, and the fizzle of
+    /// one that breaks (spell visual kits).
+    pub block_kit: u32,
+    pub perfect_kit: u32,
+    pub break_kit: u32,
+    /// While up, `block_kit` crackles on the hero every `crackle_full` sec with the bar whole,
+    /// down to every `crackle_empty` sec as it runs dry (0: never).
+    pub crackle_full: f32,
+    pub crackle_empty: f32,
+    /// A spell whose precast plays in the hands for as long as the ward is up (a held glow in the
+    /// raised hand, where the aura wrapped the chest and hid the arm); 0 for none.
+    pub hold_spell: u32,
+    /// The arm raised while it's up: this clip on the upper body (the legs free), held at its
+    /// peak until the ward comes down (`clip_take` of it, from `clip_from`'s model if given; 0:
+    /// the guard's own pose alone).
+    pub clip: u16,
+    pub clip_take: u32,
+    pub clip_from: String,
+    /// How long each play of it holds (renewed a second before it ends), and on which body:
+    /// `upper` (the legs free) or `full`.
+    pub clip_hold: f32,
+    pub clip_body: String,
+    /// While broken (until the bar is whole again), this spell's aura on the warder: a debuff's
+    /// look, so a broken ward reads as a weakness, not a cleanse (0: none).
+    pub broken_aura: u32,
+}
+
+impl Default for WardDef {
+    fn default() -> Self {
+        Self { bar: 100.0, refill: 35.0, refill_delay: 0.4, perfect_refill: 20.0, break_secs: 1.0, aura: 1463, block_kit: 0, perfect_kit: 555, break_kit: 7, crackle_full: 0.0, crackle_empty: 0.0, hold_spell: 0, clip: 0, clip_take: 0, clip_from: String::new(), clip_hold: 8.0, clip_body: String::new(), broken_aura: 0 }
+    }
+}
+
+/// What a casting staff's plain bolts build and its heavy bolt spends: the spells keep the skill
+/// checks, the staffs build and spend (Corey's playtest, Nov 5: staff attacks should feel apart
+/// from their school's spells). An Ember staff heats the foe it hits and the last heat ignites; a
+/// Rime staff chills it, slower with each, and the last chill freezes it; an Arcane staff gathers
+/// charges at the caster's staff. The heavy bolt spends them, harder for each.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct StaffsDef {
+    /// The most of any kind: the bolt that reaches it ignites or freezes (heat, chill).
+    pub most: u32,
+    /// How long heat or chill stays on a foe after the last bolt, and charges on the caster.
+    pub keep: f32,
+    /// A heavy bolt is this much harder for each stack it spends.
+    pub spend_share: f32,
+    /// Heat's ignite: this much damage round the foe, within `ignite_radius`, with the bolt's
+    /// burn, and this spell's look there (Blast Wave's burst).
+    pub ignite_damage: f32,
+    pub ignite_radius: f32,
+    pub ignite_spell: u32,
+    /// Chill: each stack slows the foe this much more; the last freezes it this long.
+    pub chill_slow: f32,
+    pub freeze_secs: f32,
+    /// Charges: the flash at the caster's hands as the last gathers (a spell visual kit), and a
+    /// heavy bolt spending them all throws the foe back this far.
+    pub charged_kit: u32,
+    pub charged_knockback: f32,
+    /// An Arcane staff's heavy orb carries the charges stored in the staff (Corey, Nov 5): its
+    /// strength, a share of its full damage by how many (none: nothing goes, a fizzle on the
+    /// caster), and its look by how many (bigger with each); with them all, `charge_full_kit`
+    /// bursts on what it strikes.
+    pub charge_scale: [f32; 4],
+    pub charge_spells: [u32; 4],
+    pub charge_full_kit: u32,
+    /// The burst on a foe the last chill freezes, and on one each chill takes (visual kits; 0:
+    /// none), so the ice reads (Corey: hard to see).
+    pub freeze_kit: u32,
+    pub chill_kit: u32,
+}
+
+impl Default for StaffsDef {
+    fn default() -> Self {
+        Self { most: 3, keep: 5.0, spend_share: 0.4, ignite_damage: 18.0, ignite_radius: 2.5, ignite_spell: 11113, chill_slow: 0.15, freeze_secs: 1.5, charged_kit: 3394, charged_knockback: 3.0, charge_scale: [0.0, 0.3, 0.5, 1.0], charge_spells: [0; 4], charge_full_kit: 0, freeze_kit: 0, chill_kit: 0 }
+    }
+}
+
+/// The skill checks built into spells. The first kind, the release: a charged spell with
+/// `perfect = true` flares as its charge tops out, and a release within `window` of the top is a
+/// perfect cast: full strength and `perfect_damage` times more, `perfect_valor` to the caster,
+/// and a burst on them everyone sees. Let go earlier it goes at its charge, as ever; held past
+/// the window it's full and no more. A missed check is still a working spell.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct ChecksDef {
+    /// Half the window, seconds either side of the moment.
+    pub window: f32,
+    /// A perfect's damage, times the full charge's.
+    pub perfect_damage: f32,
+    /// The Valor a perfect gives (a parry's).
+    pub perfect_valor: f32,
+    /// The burst on the caster at a perfect release (a spell visual kit).
+    pub perfect_kit: u32,
+    /// A full rhythm chain's Valor (a whole segment).
+    pub chain_valor: f32,
+    /// The flare (the release check's moment) comes, at random, anywhere from this share of a
+    /// ranged charge's top to the top; a fixed charge's (Pyroblast's) up to `flare_late` seconds
+    /// after it. No two casts keep quite the same time.
+    pub flare_from: f32,
+    pub flare_late: f32,
+    /// The critical: the middle this share of any check's window.
+    pub crit_share: f32,
+    /// The look of an all-or-nothing cast that fizzles (a spell visual kit on the caster).
+    pub fizzle_kit: u32,
+}
+
+impl Default for ChecksDef {
+    fn default() -> Self {
+        Self { window: 0.1, perfect_damage: 1.2, perfect_valor: 10.0, perfect_kit: 450, chain_valor: 25.0, flare_from: 0.72, flare_late: 0.35, crit_share: 0.3, fizzle_kit: 0 }
     }
 }
 
@@ -725,6 +873,29 @@ pub struct AiDef {
     /// foes follow, in the open and below. A wager's own farther chase isn't stacked on it
     /// (the farther of the two).
     pub leash_scale: f32,
+    /// The string a boss just began is this many times as likely to come again next: it seldom
+    /// does the same thing twice running.
+    pub repeat: f32,
+    /// One blow of a boss's string up close is now and then held a beat (this chance a string,
+    /// up to `hold_secs` longer in its wind-up): the delayed swing, so a parry timed by rote
+    /// comes early.
+    pub hold: f32,
+    pub hold_secs: f32,
+    /// A boss's string up close of three blows or more stops one short, this often; of two or
+    /// more, runs one longer (its last blow again), `extend` as often.
+    pub cut: f32,
+    pub extend: f32,
+    /// A boss's string up close done, this often it goes straight into another instead of
+    /// resting (not past three close strings in a row).
+    pub chain: f32,
+    /// A boss's string up close done, the chance it backs off (facing its foe) to where one of
+    /// its blows for farther off (a charge, a lunge, a throw) can come from, and uses it:
+    /// `space`, and `space_streak` more for each close string in a row before, up to
+    /// `space_most`; times `space_band` with two heroes or more in its fight.
+    pub space: f32,
+    pub space_streak: f32,
+    pub space_most: f32,
+    pub space_band: f32,
 }
 
 impl Default for AiDef {
@@ -745,6 +916,16 @@ impl Default for AiDef {
             flank: true,
             jitter: 0.25,
             leash_scale: 1.0,
+            repeat: 0.3,
+            hold: 0.25,
+            hold_secs: 0.45,
+            cut: 0.2,
+            extend: 0.2,
+            chain: 0.25,
+            space: 0.3,
+            space_streak: 0.2,
+            space_most: 0.8,
+            space_band: 0.5,
         }
     }
 }
@@ -778,6 +959,33 @@ pub struct PvpDef {
     /// A fall leaves no sack: what a hero carries stays with them.
     #[serde(default)]
     pub keep_supplies: bool,
+}
+
+/// A duel between two heroes (WoW's own: the challenge's popup, its countdown, the flag between
+/// them). Outside Siege only.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct DuelDef {
+    /// How near the one challenged must be.
+    pub reach: f32,
+    /// How long a challenge waits for an answer.
+    pub ask_secs: f32,
+    /// The countdown once it's taken.
+    pub countdown_secs: f32,
+    /// How far from the flag a duellist can go; out past it, they must be back within
+    /// `return_secs` or forfeit. Back inside `back_in` counts as back.
+    pub bounds: f32,
+    pub back_in: f32,
+    pub return_secs: f32,
+    /// The flag planted between them (`GameObjectDisplayInfo`: 787 is the 1.12 dueling flag).
+    pub flag_display: u32,
+    pub flag_scale: f32,
+}
+
+impl Default for DuelDef {
+    fn default() -> Self {
+        Self { reach: 30.0, ask_secs: 60.0, countdown_secs: 3.0, bounds: 50.0, back_in: 45.0, return_secs: 10.0, flag_display: 787, flag_scale: 1.0 }
+    }
 }
 
 /// A bow or crossbow.
@@ -896,6 +1104,30 @@ pub struct WeaponDef {
     /// Its blows count this many times over towards breaking a foe's stance (0: once).
     #[serde(default)]
     pub posture: f32,
+    /// A staff that casts instead of swinging: the left click casts this ability (a benched
+    /// projectile, the staff's bolt), and the heavy attack this one (empty: the heavy swings).
+    #[serde(default)]
+    pub bolt: String,
+    #[serde(default)]
+    pub heavy_bolt: String,
+    /// The right click as an ability instead of a guard (a holy staff's Flash Heal, a shadow
+    /// staff's Drain): a benched ability, cast as the right mouse goes down. A `channel` is held
+    /// while the button is (let go, it ends); anything else goes on the press, as often as its
+    /// `cooldown` lets it (the fire rate). A weapon with one has no guard at all: no block, no
+    /// parry, no ward.
+    #[serde(default)]
+    pub alt: String,
+}
+
+impl WeaponDef {
+    /// The weapon casts its light attack.
+    pub fn casts(&self) -> bool {
+        !self.bolt.is_empty()
+    }
+    /// Its right click is an ability, not a guard.
+    pub fn has_alt(&self) -> bool {
+        !self.alt.is_empty()
+    }
 }
 
 fn turn_rate() -> f32 {
@@ -977,6 +1209,9 @@ pub struct ShieldDef {
     pub cost_per_damage: f32,
     pub break_secs: f32,
     pub break_share: f32,
+    /// A ward (a staff's guard): its costs come off the ward bar, not stamina (`[ward]`).
+    #[serde(default)]
+    pub ward: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -3041,6 +3276,22 @@ impl Content {
             if w.two_handed && self.shield(&w.guard).is_none() {
                 bail!("weapon {}: two-handed, and its guard {:?} isn't a [[shield]]", w.key, w.guard);
             }
+            // (The click may be a cord held while the button is: the Hollow Star's Void Tether. A
+            // heavy bolt may be help at the reticle instead. The right click's ability is a bolt, a
+            // cord held while the button is, or a thing it places: the Hollow Star.)
+            for (what, key, kinds) in [("bolt", &w.bolt, &["projectile", "channel"][..]), ("heavy_bolt", &w.heavy_bolt, &["projectile", "ally"][..]), ("alt", &w.alt, &["projectile", "channel", "place"][..])] {
+                if key.is_empty() {
+                    continue;
+                }
+                match self.ability(key) {
+                    Some(a) if kinds.contains(&self.abilities[a].kind.as_str()) => {}
+                    Some(_) => bail!("weapon {}: its {what} {key} must be one of {kinds:?}", w.key),
+                    None => bail!("weapon {}: no [[ability]] {key} for its {what}", w.key),
+                }
+            }
+            if !w.heavy_bolt.is_empty() && w.bolt.is_empty() {
+                bail!("weapon {}: a heavy_bolt needs a bolt", w.key);
+            }
         }
         if self.ranged(&self.start.bow).is_none() {
             bail!("start: {} isn't a [[ranged]]", self.start.bow);
@@ -3333,8 +3584,8 @@ impl Content {
             }
             // (A banner's recast moves the banner its first cast planted: it needs none of its own.)
             let banner = a.banner.is_some() || (a.inner && self.abilities.iter().any(|b| b.banner.is_some() && b.recast == a.key));
-            if a.kind == "place" && a.totem.is_some() == banner {
-                bail!("{what}: a placed ability needs a [ability.totem] or a `banner` (one of them)");
+            if a.kind == "place" && a.hollow.is_none() && a.totem.is_some() == banner {
+                bail!("{what}: a placed ability needs a [ability.totem], a `banner` or a `hollow` (one of them)");
             }
             if a.banner.is_some() && (a.kind != "place" || a.object == 0 || a.secs <= 0.0) {
                 bail!("{what}: a banner is placed (`kind = \"place\"`), with its look (`object`) and how long it stands (`secs`)");
@@ -3458,6 +3709,41 @@ impl Content {
             if a.launch < 0.0 || (a.launch > 0.0 && a.kind != "trap") {
                 bail!("{what}: only a trap launches (`launch`)");
             }
+            // The Priest's core.
+            if a.friends_only && (a.kind != "projectile" || a.ally_heal <= 0.0) {
+                bail!("{what}: only a healing projectile passes foes by (`friends_only` needs `ally_heal`)");
+            }
+            if a.penance.is_some() != (a.kind == "penance") {
+                bail!("{what}: a `penance` kind and its `penance` table go together");
+            }
+            if a.feather.is_some() != (a.kind == "feather") {
+                bail!("{what}: a `feather` kind and its `feather` table go together");
+            }
+            if a.shell.is_some() != (a.kind == "shell") {
+                bail!("{what}: a `shell` kind and its `shell` table go together");
+            }
+            if let Some(sd) = &a.shell {
+                if self.ability(&sd.shard).is_none_or(|x| self.abilities[x].kind != "projectile") {
+                    bail!("{what}: its shell's `shard` must be a projectile");
+                }
+            }
+            if a.rift.is_some() && a.kind != "ground" {
+                bail!("{what}: only a ground cast opens a rift (`rift`)");
+            }
+            if let Some(h) = &a.hollow {
+                if a.kind != "place" || a.totem.is_some() || a.banner.is_some() {
+                    bail!("{what}: only a placed thing is a Hollow Star (`hollow`), and it's no totem or banner");
+                }
+                if self.mob(&h.mob).is_none_or(|m| !self.mobs[m].totem) {
+                    bail!("{what}: its Hollow Star's body {} must be a totem [[mob]]", h.mob);
+                }
+            }
+            if a.tether.is_some() && a.kind != "channel" {
+                bail!("{what}: only a channel is a tether (`tether`)");
+            }
+            if a.parry_for && (a.kind != "ally" || !a.effects.iter().any(|e| e.kind == "shield")) {
+                bail!("{what}: only a shield given to a friend (`ally` with a `shield`) parries for them (`parry_for`)");
+            }
             if !a.end_burst.is_empty() && a.linger <= 0.0 {
                 bail!("{what}: only lingering ground bursts as it ends (`end_burst` needs `linger`)");
             }
@@ -3466,7 +3752,67 @@ impl Content {
                     bail!("{what}: a mirror only turns projectiles back (no block, dodge, immune, absorb_heal, reflect or melee_only with it)");
                 }
             }
-            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects) {
+            if a.slip && a.kind != "blink" && !(a.kind == "dash" && a.sidestep) {
+                bail!("{what}: only a blink or a sidestep slips blows (`slip`)");
+            }
+            if a.sidestep && a.kind != "dash" {
+                bail!("{what}: only a dash is a sidestep (`sidestep`)");
+            }
+            // The Shadow Priest's mechanics.
+            if (a.slip_radius > 0.0 || !a.slip_effects.is_empty() || !a.slip_self.is_empty()) && !a.slip {
+                bail!("{what}: `slip_radius`, `slip_effects` and `slip_self` are a slip's (they need `slip`)");
+            }
+            if let Some(f) = &a.flay {
+                if a.kind != "channel" || f.taut <= 0.0 || f.taut >= a.range[1] || f.taut_secs <= 0.0 || f.snap <= 0.0 || f.snap_cap <= 0.0 {
+                    bail!("{what}: a flay is a channel's, taut from `taut` yd short of its range, with `taut_secs`, `snap` and `snap_cap`");
+                }
+                if (f.spill > 0.0) != (f.spill_radius > 0.0) {
+                    bail!("{what}: a flay's `spill` and `spill_radius` go together");
+                }
+            }
+            if a.on_taut < 0.0 || (a.on_taut > 0.0 && a.kind != "projectile") {
+                bail!("{what}: only a projectile snaps a taut cord (`on_taut`)");
+            }
+            if (a.low_health > 0.0) != (a.low_mult > 1.0) || !(0.0..1.0).contains(&a.low_health) {
+                bail!("{what}: `low_health` (below 1) and `low_mult` (above 1) go together");
+            }
+            if a.backlash < 0.0 {
+                bail!("{what}: `backlash` is damage back at the caster (0 or more)");
+            }
+            if a.counter.as_ref().is_some_and(|c| !(0.0..1.0).contains(&c.cut) || c.mend < 0.0) {
+                bail!("{what}: a stance's `cut` is a share below 1, its `mend` 0 or more");
+            }
+            if a.counter.as_ref().is_some_and(|c| !c.perfect_pass.is_empty() && (c.immune || c.mirror || c.block || c.dodge)) {
+                bail!("{what}: `perfect_pass` lets a blow through clean (no immune, mirror, block or dodge with it)");
+            }
+            for e in a.slip_effects.iter().chain(&a.slip_self).chain(a.counter.iter().flat_map(|c| c.perfect_pass.iter())) {
+                effect_ok(e, &what)?;
+            }
+            if a.counter.as_ref().is_some_and(|c| !c.perfect_break.is_empty() && !c.immune) {
+                bail!("{what}: `perfect_break` is an immune stance's (Ice Block's) check");
+            }
+            if let Some(c) = &a.counter {
+                for e in &c.perfect_break {
+                    effect_ok(e, &what)?;
+                }
+            }
+            if a.counter.as_ref().is_some_and(|c| c.perfect_mirror && !c.mirror) {
+                bail!("{what}: `perfect_mirror` is a mirror's check (it needs `mirror`)");
+            }
+            if (a.pulse < 0.0 || a.rewind_health < 0.0 || a.rewind_health > 1.0) || ((a.pulse > 0.0 || a.rewind_health > 0.0) && a.anchor <= 0.0) {
+                bail!("{what}: `pulse` and `rewind_health` (0 to 1) are an anchor's (they need `anchor`)");
+            }
+            // The Light Priest's.
+            if a.kind == "sigil" && (a.beats.is_empty() || a.beats.iter().any(|b| *b <= 0.0) || a.radius[1] <= 0.0 || a.stack.is_none()) {
+                bail!("{what}: a sigil needs its `beats` (each after the last), its `radius` and its `stack`");
+            }
+            if a.kind != "sigil" && (!a.beats.is_empty() || a.stack.is_some() || a.per_lander > 0.0) {
+                bail!("{what}: `beats`, `stack` and `per_lander` are a sigil's");
+            }
+            if a.stack.as_ref().is_some_and(|k| k.most == 0 || k.might < 0.0 || k.secs <= 0.0) {
+                bail!("{what}: a stack needs `most`, `might` and `secs`");
+            }
+            for e in a.effects.iter().chain(&a.self_effects).chain(&a.tick_effects).chain(&a.tether_effects).chain(&a.ally_effects).chain(&a.crit_effects).chain(&a.stop_effects).chain(&a.finisher_effects).chain(&a.bomb_effects).chain(&a.backfire_effects) {
                 effect_ok(e, &what)?;
             }
             if let Some(c) = &a.counter {
