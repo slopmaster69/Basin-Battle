@@ -1,0 +1,211 @@
+From 1275e0ac8a366f88fa462935e0b944f710371e89 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 5 Nov 2026 04:36:27 -0600
+Subject: [PATCH] A unit's missiles from its weapon's tip
+ (SetUnitMissileOrigin, patch 0044)
+
+And the twenty-fourth round: HasActionCombat() says 24, for patches 0041 to 0044.
+---
+ crates/benilla-app/src/entities.rs            |  2 +
+ crates/benilla-app/src/entities/missile.rs    |  4 ++
+ crates/benilla-app/src/entities/weapon_tip.rs | 53 +++++++++++++++++++
+ crates/benilla-app/src/weapon_trail.rs        |  5 ++
+ crates/benilla-ui/src/action_combat.rs        | 36 ++++++++++++-
+ 5 files changed, 98 insertions(+), 2 deletions(-)
+ create mode 100644 crates/benilla-app/src/entities/weapon_tip.rs
+
+diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
+index bc89563d..aeed5d98 100644
+--- a/crates/benilla-app/src/entities.rs
++++ b/crates/benilla-app/src/entities.rs
+@@ -75,6 +75,7 @@ pub(crate) use collision_height::CollisionHeight;
+ /// Spell missiles: the projectile a cast with a `Spell.dbc` Speed above 0 flies at each target.
+ mod missile;
+ mod ground_orb;
++mod weapon_tip;
+ use missile::{attach_missile_models, move_missiles, spawn_missiles};
+ pub(crate) use missile::{
+     attach_world_pos, AttachPosQuery, Missile, MissileMiss, MissileSound, MissileSpell,
+@@ -743,6 +744,7 @@ impl Plugin for EntitiesPlugin {
+                 (
+                     attach_missile_models,
+                     (ground_orb::drive_ground_orbs, ground_orb::attach_ground_orb_models).chain(),
++                    weapon_tip::track_weapon_tips,
+                     attach_ground_fx_models,
+                     spell_fx::tend_world_plants,
+                 ),
+diff --git a/crates/benilla-app/src/entities/missile.rs b/crates/benilla-app/src/entities/missile.rs
+index 471c3d9c..881a91fe 100644
+--- a/crates/benilla-app/src/entities/missile.rs
++++ b/crates/benilla-app/src/entities/missile.rs
+@@ -257,6 +257,10 @@ fn launch_world_pos(
+     units: &AttachPosQuery,
+     joints: &Query<&GlobalTransform>,
+ ) -> Option<Vec3> {
++    // Basin Battle: a hero with a casting staff launches from its tip.
++    if let Some(tip) = super::weapon_tip::tip_of(caster) {
++        return Some(tip);
++    }
+     let (base, bones, pose) = units.get(caster).ok()?;
+     let point = bones.zip(pose).and_then(|(b, p)| {
+         let (bone, offset) = fired
+diff --git a/crates/benilla-app/src/entities/weapon_tip.rs b/crates/benilla-app/src/entities/weapon_tip.rs
+new file mode 100644
+index 00000000..7a4af24f
+--- /dev/null
++++ b/crates/benilla-app/src/entities/weapon_tip.rs
+@@ -0,0 +1,53 @@
++//! Basin Battle: a hero's missiles leaving a casting staff's tip (`SetUnitMissileOrigin(unit,
++//! "weapon")`, the add-on telling it which heroes hold one): each frame the flagged units' held
++//! weapon's blade tip (its trail's `$WTT` anchor) in the world, which the missile launch takes
++//! before its hand cascade. Anything not flagged launches from the hands as ever.
++
++use std::collections::HashMap;
++use std::sync::Mutex;
++
++use bevy::prelude::*;
++
++static TIPS: Mutex<Option<HashMap<Entity, Vec3>>> = Mutex::new(None);
++
++/// A flagged unit's weapon tip this frame, if it has one.
++pub(crate) fn tip_of(unit: Entity) -> Option<Vec3> {
++    TIPS.lock().ok()?.as_ref()?.get(&unit).copied()
++}
++
++/// The flagged units' weapon tips, found afresh each frame.
++pub(super) fn track_weapon_tips(
++    me: Query<Entity, With<crate::net::SelfPlayer>>,
++    index: Option<Res<crate::net::GuidIndex>>,
++    held: Query<&super::HeldAttached>,
++    props: Query<(&GlobalTransform, &crate::weapon_trail::WeaponTrail)>,
++) {
++    let units = benilla_ui::action_combat::missile_origins();
++    let mut out = HashMap::new();
++    if !units.is_empty() {
++        let mine = me.single().ok();
++        for u in units {
++            let e = if u.eq_ignore_ascii_case("player") {
++                mine
++            } else {
++                let guid = u
++                    .strip_prefix("0x")
++                    .or_else(|| u.strip_prefix("0X"))
++                    .and_then(|h| u64::from_str_radix(h, 16).ok())
++                    .or_else(|| u.parse().ok());
++                guid.and_then(|g| index.as_ref().and_then(|i| i.0.get(&g).copied()))
++            };
++            let Some(e) = e else { continue };
++            let Ok(h) = held.get(e) else { continue };
++            for slot in h.spawned_slots().iter().flatten() {
++                if let Ok((gt, trail)) = props.get(*slot) {
++                    out.insert(e, gt.transform_point(trail.top()));
++                    break;
++                }
++            }
++        }
++    }
++    if let Ok(mut t) = TIPS.lock() {
++        *t = Some(out);
++    }
++}
+diff --git a/crates/benilla-app/src/weapon_trail.rs b/crates/benilla-app/src/weapon_trail.rs
+index 3742e47c..668e4d5b 100644
+--- a/crates/benilla-app/src/weapon_trail.rs
++++ b/crates/benilla-app/src/weapon_trail.rs
+@@ -80,6 +80,11 @@ pub(crate) struct WeaponTrail {
+ }
+ 
+ impl WeaponTrail {
++    /// Basin Battle: the blade tip, in the prop root's frame (a casting staff's bolts leave it).
++    pub(crate) fn top(&self) -> Vec3 {
++        self.top
++    }
++
+     /// The component a spawned weapon prop takes, given its model's baked anchors.
+     pub(crate) fn new(top: Vec3, bottom: Vec3) -> Self {
+         Self {
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index c73e99d5..2e6b3a8f 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -111,6 +111,11 @@
+ //!   `parrySeconds` (the parry's window); `focus` false draws only a faint outline.
+ //! - `ClearTelegraph([key])`: take one away (all with no key).
+ //!
++//! Where a unit's missiles leave from (when `SetUnitMissileOrigin` exists):
++//!
++//! - `SetUnitMissileOrigin(unit, origin)`: `"weapon"` launches that unit's missiles (`"player"`,
++//!   a guid) from its held weapon's tip (a casting staff's); anything else, from the hands again.
++//!
+ //! An orb rolling on the ground (when `PlayGroundOrb` exists; Frozen Orb):
+ //!
+ //! - `PlayGroundOrb(key, model, x, y, z, x2, y2, z2, seconds, scale[, spinDegrees])`: a spell
+@@ -233,6 +238,10 @@
+ //!   argument flies the dressed missile at that many yards a second from where it is, over the
+ //!   speed its spell gives it and over the 100 yd/s cap the launch keeps (up to 400). `0` or
+ //!   nothing keeps the spell's own; a line with nine arguments reads as before.
++//!
++//! The twenty-fourth (`HasActionCombat() >= 24`): the Mage's skill checks, patches 0041 to 0044:
++//! rings on the ground (`SetGroundRing`), recoloured spell looks (`SetEffectTint`), an orb rolling
++//! on the ground (`PlayGroundOrb`), and missiles from a held staff's tip (`SetUnitMissileOrigin`).
+ 
+ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+ 
+@@ -813,6 +822,13 @@ pub enum GroundOrbCall {
+ 
+ static ORBS: std::sync::Mutex<Vec<GroundOrbCall>> = std::sync::Mutex::new(Vec::new());
+ 
++static ORIGINS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
++
++/// The units whose missiles leave their weapon's tip (`SetUnitMissileOrigin`).
++pub fn missile_origins() -> Vec<String> {
++    ORIGINS.lock().map(|v| v.clone()).unwrap_or_default()
++}
++
+ /// The orb calls since the last.
+ pub fn take_ground_orbs() -> Vec<GroundOrbCall> {
+     ORBS.lock().map(|mut v| std::mem::take(&mut *v)).unwrap_or_default()
+@@ -1098,7 +1114,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+     )?;
+     g.set(
+         "HasActionCombat",
+-        lua.create_function(|_, _: MultiValue| Ok(23))?,
++        lua.create_function(|_, _: MultiValue| Ok(24))?,
+     )?;
+     g.set(
+         "SetCameraUnitCollision",
+@@ -1431,6 +1447,22 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetUnitMissileOrigin",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(unit) = text(v.first()) {
++                let weapon = text(v.get(1)).is_some_and(|o| o.eq_ignore_ascii_case("weapon"));
++                if let Ok(mut list) = ORIGINS.lock() {
++                    list.retain(|u| !u.eq_ignore_ascii_case(&unit));
++                    if weapon && list.len() < 256 {
++                        list.push(unit);
++                    }
++                }
++            }
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "PlayGroundOrb",
+         lua.create_function(|_, args: MultiValue| {
+@@ -1898,7 +1930,7 @@ mod tests {
+         let lua = Lua::new();
+         install(&lua).unwrap();
+         lua.load(
+-            r#"assert(HasActionCombat() >= 23)
++            r#"assert(HasActionCombat() >= 24)
+                SetMissileLook(19434, "F2E6C8", 0.18, 0.3)
+                SetMissileLook(16075, nil, 0.3, 0.35, 1.8, 2.5)
+                SetMissileLook(19434, "FF3A1A", 0.3, 0.4, 1, 0, "0xF13000000000002A")
+-- 
+2.46.2.windows.1
+

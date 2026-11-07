@@ -1,25 +1,85 @@
-# Every pull request and every push to main: the server builds (on Linux and Windows), the tests
-# pass and the add-ons load without a Lua error. Tests that need the WoW 1.12.1 data are #[ignore]d
-# and don't run here.
+# A pull request is checked for two things only: it builds on every system a player hosts on
+# (Linux, Windows, macOS), and it merges into main without a conflict. With this many pull
+# requests open side by side, that keeps each one quick to check, and a branch only needs
+# bringing up to main when it actually conflicts.
 #
-# Required for merging: "Tests and add-ons (Linux)" and "Server builds on Windows". The
-# end-to-end job plays against a live server in real time; on a shared runner a timing test can
-# miss its window, so it retries a failure twice and doesn't block a merge on its own: a test it
-# lists as flaky or failing wants a look (and an issue) all the same.
+# The tests, the add-on check and the end-to-end run go on main after every merge (and by hand,
+# "Run workflow" on any branch), so a merge that breaks something shows on main at once. Tests
+# that need the WoW 1.12.1 data are #[ignore]d and don't run here.
+#
+# Required for merging (the `main` ruleset): "Builds on Linux", "Server builds on Windows" and
+# "Merges cleanly with main". The end-to-end job plays against a live server in real time; on a
+# shared runner a timing test can miss its window, so it retries a failure twice: a test it lists
+# as flaky or failing wants a look (and an issue) all the same.
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push to a pull request replaces its run; on main every merge gets its own.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Pull requests: everything compiles (the server, the tools, the tests), nothing runs.
+  linux-build:
+    name: Builds on Linux
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build everything, tests included
+        run: cargo build --release --workspace --all-targets
+
+  macos-build:
+    name: Server builds on macOS
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the server, as "Host Basin Battle.command" does
+        run: cargo build --release -p htl-server
+      - name: The server starts
+        run: target/release/htl-server --help
+
+  # Pull requests: the branch and main merge without a conflict. If not, bring it up to main
+  # (`git pull --rebase origin main`), fix the conflicts and push.
+  merges:
+    name: Merges cleanly with main
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Merge main into the branch (not pushed)
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags origin "$BASE"
+          if ! git -c user.name=ci -c user.email=ci@localhost merge --no-commit --no-ff "origin/$BASE" >/dev/null; then
+            echo "::error::This branch conflicts with $BASE. Bring it up to $BASE (git pull --rebase origin $BASE), fix these files and push:"
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+          echo "Merges into $BASE without a conflict."
+
+  # main (after each merge) and by hand: the tests and the add-ons.
   test:
     name: Tests and add-ons (Linux)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -47,6 +107,7 @@ jobs:
 
   end-to-end:
     name: End-to-end, real time (Linux)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

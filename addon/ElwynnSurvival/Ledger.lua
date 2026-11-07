@@ -859,13 +859,19 @@ end
 
 -- --- the HUD -------------------------------------------------------------------------------------
 
--- A MakeLagBar (or MakeBar) as a brush stroke in a torn parchment trough.
-local function InkBar(b, color, lagColor, thin)
+-- A MakeLagBar (or MakeBar) as a brush stroke in a torn parchment trough. `dark`: the trough's
+-- torn rim in a deep brown instead of cream, so the fill and what lies on it (the shield, the
+-- overhealth, the lost chunk) stand out (Corey, from four looks filmed side by side).
+local RIM_DARK = { 0.3, 0.23, 0.17 }
+local function InkBar(b, color, lagColor, thin, dark)
   if not b or b.ledger then return end
   b.ledger = true
   if b.frame then Retire(b.frame) end
   local h = b:GetHeight() or 10
   b.trough = Strip(b, thin and "bar_frame_thin" or "bar_frame", "OVERLAY", 512, thin and 24 or 32, 0)
+  if dark then
+    for k = 1, 3 do b.trough.pieces[k]:SetVertexColor(RIM_DARK[1], RIM_DARK[2], RIM_DARK[3], 1) end
+  end
   -- The trough's ink line sits a little outside the bar.
   local pad = thin and 3 or 4
   b.trough.l:ClearAllPoints()
@@ -903,6 +909,42 @@ local function InkBar(b, color, lagColor, thin)
 end
 L.InkBar = InkBar
 
+-- The lab's `barlook` (the lab branch only): the hero's bars' trough in another look, filmed side
+-- by side. parchment (as above), dark (the same torn rim in a deep brown), thin (the thin rim on
+-- the health too, dark), none (no rim, the dark trough alone).
+local LOOK_DARK = { 0.3, 0.23, 0.17 }
+function L.BarLook(look)
+  local vit = ElwynnSurvivalVitals
+  if not vit then return end
+  local bars = { { vit.health, false }, { vit.stamina, true } }
+  for i = 1, 2 do
+    local b, thinBar = bars[i][1], bars[i][2]
+    local tr = b and b.trough
+    if tr then
+      local thin = thinBar or look == "thin"
+      local capPx = thin and 24 or 32
+      local pad = thin and 3 or 4
+      tr:SetTexture(thin and "bar_frame_thin" or "bar_frame")
+      tr.l:SetTexCoord(0, capPx / 512, 0, 1)
+      tr.m:SetTexCoord(capPx / 512, 1 - capPx / 512, 0, 1)
+      tr.r:SetTexCoord(1 - capPx / 512, 1, 0, 1)
+      tr.l:ClearAllPoints()
+      tr.r:ClearAllPoints()
+      tr.l:SetWidth(thin and 8 or 12)
+      tr.r:SetWidth(thin and 8 or 12)
+      tr.l:SetPoint("TOPLEFT", b, "TOPLEFT", -pad - 2, pad)
+      tr.l:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", -pad - 2, -pad)
+      tr.r:SetPoint("TOPRIGHT", b, "TOPRIGHT", pad + 2, pad)
+      tr.r:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", pad + 2, -pad)
+      local c = (look == "dark" or look == "thin") and LOOK_DARK or { 1, 1, 1 }
+      for k = 1, 3 do
+        tr.pieces[k]:SetVertexColor(c[1], c[2], c[3], 1)
+        if look == "none" then tr.pieces[k]:Hide() else tr.pieces[k]:Show() end
+      end
+    end
+  end
+end
+
 -- A scrap of paper behind a HUD piece.
 local function Scrap(f, file, w, h, ox, oy, layer)
   local t = Tex(f, layer or "BACKGROUND", file)
@@ -932,8 +974,12 @@ local function SkinHud()
   local vit = ElwynnSurvivalVitals
   if vit and not vit.ledger then
     vit.ledger = true
-    InkBar(vit.health, HEALTH, { 0.95, 0.8, 0.5 })
-    InkBar(vit.stamina, STAMINA, { 0.85, 0.9, 0.62 }, true)
+    -- The hero's own bars in the thin, dark rim.
+    InkBar(vit.health, HEALTH, { 0.95, 0.8, 0.5 }, true, true)
+    InkBar(vit.stamina, STAMINA, { 0.85, 0.9, 0.62 }, true, true)
+    -- The health's overhealth and shield in the same brush.
+    if vit.health.over then vit.health.over:SetTexture(A .. "bar_brush_fill") end
+    if vit.health.shield then vit.health.shield:SetTexture(A .. "bar_brush_fill") end
     Refont(vit.healthText)
     vit.healthText:SetTextColor(CREAM[1], CREAM[2], CREAM[3])
     Cream(vit.state, TITLE, 15)

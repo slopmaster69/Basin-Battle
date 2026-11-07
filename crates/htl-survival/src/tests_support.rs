@@ -365,8 +365,9 @@ fn with_friendly_fire_on_holy_nova_heals_a_co_op_friend_and_never_strikes_them()
     let b = hero(&mut s, "Bren", [3.0, 0.0, 0.0], 0.0);
     let hb = halve(&mut s, b);
     let ev = cast(&mut s, a, "holy_nova");
-    let max = s.players[&b].max_health;
-    assert_eq!(s.players[&b].health, hb + (max as f32 * 0.06).round() as u32, "mended, not struck");
+    // (Holy Nova heals 16, not a share of their health, and 25% more for Bren, the other hero
+    // inside it: draft 3's Light Priest.)
+    assert_eq!(s.players[&b].health, hb + 20, "mended, not struck");
     assert_eq!(hits_on(&ev, b), 0, "no blow on him");
     // A nova that mends nobody still strikes whoever friendly fire allows.
     run_still(&mut s, &[], 1.0);
@@ -422,4 +423,39 @@ fn a_silence_or_its_key_again_ends_a_beam() {
     let hp = s.mobs[&m].health;
     run_still(&mut s, &[m], 0.6);
     assert_eq!(s.mobs[&m].health, hp, "no more ticks");
+}
+
+/// The health bar's heal ahead (Corey: "showing what your health will likely end up at after the
+/// heal is finished assuming no damage"): a meal's and a mending boon's healing still to come, and
+/// the hero ends up there if nothing hurts them. Their own regeneration between fights isn't in it.
+#[test]
+fn the_heal_ahead_is_where_the_health_ends_up_if_nothing_hurts() {
+    let mut s = world(false, MEND);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    assert_eq!(s.heal_ahead(a), 0, "nothing coming");
+    let max = s.players[&a].max_health;
+    s.players.get_mut(&a).unwrap().health = max * 3 / 10;
+    assert_eq!(s.heal_ahead(a), 0, "hurt, but nothing coming");
+    let now = s.clock;
+    // A meal: a tenth of their health a second for 3 sec; a mending: a twentieth at each of 4 ticks.
+    s.players.get_mut(&a).unwrap().effects.push(Effect { kind: MEAL.to_string(), amount: 0.1, until: now + 3.0, name: "Roast".into() });
+    assert!(s.apply_cc(a, a, "regen", 4.0, 0.05, 0.0, "Renew"));
+    let ahead = s.heal_ahead(a);
+    let want = (max as f32 * 0.5).round() as u32;
+    assert!(ahead.abs_diff(want) <= 2, "half their health to come: {ahead} of {want}");
+    let from = s.players[&a].health;
+    // In a fight throughout, so no regeneration of their own adds to it (the bar leaves that out).
+    for _ in 0..120 {
+        let now = s.clock;
+        s.players.get_mut(&a).unwrap().combat_at = now;
+        let _ = s.step(DT);
+    }
+    let end = s.players[&a].health;
+    assert!(end.abs_diff(from + ahead) <= 3, "they end where it said: {end}, said {}", from + ahead);
+    assert_eq!(s.heal_ahead(a), 0, "and nothing's left to come");
+    // Never more than they're missing.
+    s.players.get_mut(&a).unwrap().health = max - 5;
+    let now = s.clock;
+    s.players.get_mut(&a).unwrap().effects.push(Effect { kind: MEAL.to_string(), amount: 0.1, until: now + 3.0, name: "Roast".into() });
+    assert_eq!(s.heal_ahead(a), 5, "capped at what they're missing");
 }

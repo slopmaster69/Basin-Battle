@@ -89,6 +89,21 @@ pub(crate) struct Anchor {
     pub at: Vec3,
     pub until: f32,
     pub mark: Id,
+    /// When it was set, and the hero's health then (Alter Time gives some of what's lost since
+    /// back), and how many of its pulses have shown.
+    pub since: f32,
+    pub health: u32,
+    pub pulsed: u32,
+}
+
+/// A blink that slips blows (Blink's counter check): which, when, from where, and whether its
+/// perfect has paid.
+#[derive(Debug, Clone)]
+pub(crate) struct Slip {
+    pub ability: usize,
+    pub at: f32,
+    pub from: Vec3,
+    pub paid: bool,
 }
 
 /// How long a body thrown up at `lift` stays in the air.
@@ -553,7 +568,7 @@ impl Survival {
         if let Some((mid, _)) = mob {
             return Some(*mid);
         }
-        if self.content.pvp.friendly_fire {
+        if self.heroes_clash() {
             return self.players.iter().find(|(h, p)| self.hostile(t.owner, **h) && p.health > 0 && dist2d(p.pos, t.at) <= radius + HERO_SIZE && (p.pos[2] - t.at[2]).abs() < 3.0).map(|(h, _)| *h);
         }
         None
@@ -594,10 +609,12 @@ impl Survival {
         if let Some(old) = self.anchors.remove(&id) {
             self.unmark(old.mark);
         }
-        let mark = self.mark_kind(pos, 1.5, d.anchor, true);
+        // A pulsing mark (Alter Time) has no circle: its pulses show it, and no words.
+        let mark = if d.pulse > 0.0 { self.mark_unseen(d.anchor) } else { self.mark_kind(pos, 1.5, d.anchor, true) };
         self.events.push(Event::Missile { caster: id, spell: d.charge_spell.max(d.spell), target: Target::Point(pos) });
         // No word: the circle on the ground is where the key (lit for its recast) brings them back.
-        self.anchors.insert(id, Anchor { ability: base, at: pos, until: now + d.anchor, mark });
+        let health = self.players[&id].health;
+        self.anchors.insert(id, Anchor { ability: base, at: pos, until: now + d.anchor, mark, since: now, health, pulsed: 0 });
         self.events.push(Event::Abilities { player: id });
     }
 
@@ -608,7 +625,46 @@ impl Survival {
         self.anchors.remove(&id);
         self.unmark(a.mark);
         self.step_back_to(id, ability, a.at);
+        let d = self.content.abilities[ability].clone();
+        // Alter Time: some of the health lost since comes back.
+        if d.rewind_health > 0.0 {
+            let lost = a.health.saturating_sub(self.players[&id].health);
+            let back = (lost as f32 * d.rewind_health).round() as u32;
+            if back > 0 {
+                self.heal_hero_by(id, back, id, &d.name);
+            }
+        }
+        // On a pulse (judged when they pressed, their round trip back): a perfect.
+        if d.pulse > 0.0 {
+            let rewind = self.players[&id].rtt.min(self.content.combat.max_rewind);
+            let t = self.clock - rewind - a.since;
+            let k = (t / d.pulse).round();
+            let w = self.content.checks.window;
+            if k >= 1.0 && (t - k * d.pulse).abs() <= w + 1.0e-4 {
+                self.alter_perfect(id, ability, a.at);
+            }
+        }
         true
+    }
+
+    /// A step back on the pulse: foes near where they came back are thrown back, and the
+    /// perfect's Valor and look.
+    fn alter_perfect(&mut self, id: Id, ability: usize, at: Vec3) {
+        let d = self.content.abilities[ability].clone();
+        if !d.stop_effects.is_empty() {
+            let (mobs, heroes) = self.in_wedge(id, ability, at, 0.0, 360.0, d.radius[1]);
+            let was = self.fx_from.replace(at);
+            for u in mobs.into_iter().chain(heroes) {
+                self.apply_effects(id, u, &d.stop_effects, 1.0, &d.name);
+            }
+            self.fx_from = was;
+        }
+        let c = self.content.checks.clone();
+        self.gain_valor(id, c.perfect_valor);
+        if c.perfect_kit != 0 {
+            self.events.push(Event::Visual { id, kit: c.perfect_kit, by: None });
+        }
+        self.events.push(Event::Perfect { player: id, ability });
     }
 
     /// A blink back to a spot it left (an anchor; where the cast a recast follows began): its
@@ -750,6 +806,30 @@ impl Survival {
         }
         keep.extend(std::mem::take(&mut self.traps));
         self.traps = keep;
+        // A pulsing mark's pulses, shown `[checks] window` early (the window opens with the look),
+        // at the mark for everyone and in the hero's hands.
+        let w = self.content.checks.window;
+        let due: Vec<(Id, Vec3, u32, u32)> = self
+            .anchors
+            .iter_mut()
+            .filter_map(|(h, a)| {
+                let d = &self.content.abilities[a.ability];
+                let next = a.pulsed + 1;
+                let at = a.since + d.pulse * (next as f32);
+                (d.pulse > 0.0 && at - w <= now + 1.0e-4 && at < a.until).then(|| {
+                    a.pulsed = next;
+                    (*h, a.at, d.tick_spell, d.beat_kit)
+                })
+            })
+            .collect();
+        for (h, at, look, kit) in due {
+            if look != 0 {
+                self.events.push(Event::Missile { caster: h, spell: look, target: Target::Point(at) });
+            }
+            if kit != 0 {
+                self.events.push(Event::Visual { id: h, kit, by: None });
+            }
+        }
         let gone: Vec<Id> = self.anchors.iter().filter(|(h, a)| a.until <= now || !self.players.contains_key(h)).map(|(h, _)| *h).collect();
         for h in gone {
             if let Some(a) = self.anchors.remove(&h) {

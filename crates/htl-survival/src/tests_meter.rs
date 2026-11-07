@@ -81,7 +81,7 @@ fn row<'a>(m: &'a meter::OwnMeter, label: &str) -> Option<&'a (String, u64, u64)
 fn a_cards_damage_and_healing_count_under_its_name_and_only_what_landed() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let f = hero(&mut s, "Bren", [6.0, -0.5, 0.0], 0.0);
+    let f = hero(&mut s, "Bren", [6.0, -3.0, 0.0], 0.0);
     let g = grunt(&mut s, [10.0, 0.0, 0.0]);
     let half = {
         let h = s.players.get_mut(&f).unwrap();
@@ -91,11 +91,21 @@ fn a_cards_damage_and_healing_count_under_its_name_and_only_what_landed() {
     let full = s.mobs[&g].health;
     assert!(s.own_meter(p).unwrap().rows.is_empty(), "nothing before a blow");
     assert!(s.fight_meter(p).is_none(), "and no fight yet");
+    // Penance's rings (draft 3): on the grunt (the fight begins), Bren, the grunt again; Q
+    // pressed as each closes sends its bolt.
+    s.set_aim_line(p, 0.0, 0.0);
     cast(&mut s, p, "penance");
-    run_pinned(&mut s, 1.6, &[g]);
+    while let Some((_, at, _)) = s.penance_next(p) {
+        while s.clock + DT * 0.5 < at {
+            run_pinned(&mut s, DT, &[g]);
+        }
+        s.input(p, Input::Ability(0, false));
+        s.step(0.0);
+    }
+    run_pinned(&mut s, 0.3, &[g]);
     let dealt = u64::from(full - s.mobs[&g].health);
     let healed = u64::from(s.players[&f].health - half);
-    assert!(dealt > 0 && healed > 0, "the lance burned the grunt ({dealt}) and mended Bren ({healed})");
+    assert!(dealt > 0 && healed > 0, "its bolts burned the grunt ({dealt}) and mended Bren ({healed})");
     let own = s.own_meter(p).unwrap();
     assert_eq!(own.dealt, dealt, "her meter holds what the grunt lost");
     assert_eq!(own.healed, healed, "and what Bren gained");

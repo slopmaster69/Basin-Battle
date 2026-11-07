@@ -18,6 +18,12 @@ fi
 # This folder's client changes (Elwynn Survival's mouse and aiming camera): rebuilt once after
 # they change.
 build_benilla_if_needed
+# A first game starts from the settings the Windows download ships: the user agreements already
+# read, since an install without tos.html shows an empty Terms of Use that can't be accepted.
+if [ ! -f benilla/benilla-config/config.toml ]; then
+    mkdir -p benilla/benilla-config
+    cp dist/windows/benilla-config/config.toml benilla/benilla-config/config.toml
+fi
 # The add-ons (Basin Battle's card picker and trackers; Elwynn Survival's action layout and
 # windows), fresh from this folder every launch. Each sleeps on the other's realm.
 mkdir -p benilla/benilla-config/AddOns

@@ -136,11 +136,17 @@ fn frost_nova_makes_the_next_fireball_a_free_pyroblast_that_shatters_the_frozen(
     assert_eq!(em[0].0, key_of("ranged") as usize, "the Fireball's");
     assert!((em[0].1 - (s.clock + 5.0)).abs() < 0.2, "for 5 s");
     let valor = s.players[&p].valor;
-    // The plain Fireball key now aims a Pyroblast; held its 1.5 s it goes, for no Valor.
+    // The plain Fireball key now aims a Pyroblast; held to its moment (all or nothing: rolled as
+    // the charge begins) it goes, for no Valor.
     run_pinned(&mut s, 0.3, &pins);
     press(&mut s, p, "ranged", false);
     assert_eq!(aiming(&s, p), Some(idx(&s, "pyroblast")), "the key's EX version, Pyroblast");
-    let mut ev = hold(&mut s, p, 1.6, &pins);
+    s.input(p, Input::Attack);
+    let mut ev = s.step(DT);
+    let flare = s.players[&p].check_flare;
+    ev.extend(run_pinned(&mut s, flare - DT, &pins));
+    s.input(p, Input::AttackUp);
+    ev.extend(s.step(DT));
     assert!(missile(&ev, 11366), "the Pyroblast flies");
     ev.extend(run_pinned(&mut s, 0.6, &pins));
     assert!(crate::sim::cues::seen::beat(&ev, p, crate::sim::cues::BEAT_SHATTER) && crate::sim::cues::seen::looked(&ev, k, crate::sim::cues::KIT_FROST_BURST), "the frozen boar shatters");

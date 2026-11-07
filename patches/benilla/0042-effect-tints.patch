@@ -1,0 +1,311 @@
+From d55df0e444b9b5ed672676c838951a672bae4f91 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 4 Nov 2026 23:35:18 -0600
+Subject: [PATCH] Recoloured spell looks for the add-on (SetEffectTint, patch
+ 0042)
+
+---
+ crates/benilla-app/src/entities.rs            |  2 +-
+ crates/benilla-app/src/entities/missile.rs    |  8 ++++
+ .../benilla-app/src/entities/spell_fx/mod.rs  | 24 ++++++++++
+ crates/benilla-ui/src/action_combat.rs        | 45 +++++++++++++++++++
+ crates/benilla-world/src/model_fade.rs        | 13 ++++++
+ crates/benilla-world/src/particles.rs         |  3 ++
+ crates/benilla-world/src/particles/quads.rs   |  6 +++
+ crates/benilla-world/src/particles/sim.rs     |  6 +++
+ crates/benilla-world/src/ribbons.rs           |  4 +-
+ 9 files changed, 109 insertions(+), 2 deletions(-)
+
+diff --git a/crates/benilla-app/src/entities.rs b/crates/benilla-app/src/entities.rs
+index 63ee0950..39e1d122 100644
+--- a/crates/benilla-app/src/entities.rs
++++ b/crates/benilla-app/src/entities.rs
+@@ -737,7 +737,7 @@ impl Plugin for EntitiesPlugin {
+                 spawn_wmo_gameobject_props,
+                 attach_held_items,
+                 // Spell-kit effect models and held-item glows, after the item roots exist.
+-                (attach_item_glows, attach_spell_fx),
++                (attach_item_glows, attach_spell_fx, spell_fx::apply_effect_tints.after(attach_spell_fx)),
+                 (
+                     attach_missile_models,
+                     attach_ground_fx_models,
+diff --git a/crates/benilla-app/src/entities/missile.rs b/crates/benilla-app/src/entities/missile.rs
+index e02f9cdf..471c3d9c 100644
+--- a/crates/benilla-app/src/entities/missile.rs
++++ b/crates/benilla-app/src/entities/missile.rs
+@@ -802,6 +802,14 @@ pub(super) fn attach_missile_models(
+         let Some(dm) = fx.models.get(&key) else {
+             continue; // unreachable: just inserted
+         };
++        // Basin Battle: a recoloured look (`SetEffectTint`).
++        if let Some(c) = benilla_ui::action_combat::effect_tint(&key) {
++            commands.entity(entity).insert(benilla_world::model_fade::EffectTint([
++                f32::from(c[0]) / 255.0,
++                f32::from(c[1]) / 255.0,
++                f32::from(c[2]) / 255.0,
++            ]));
++        }
+         // `false` means still loading; a later pass attaches mid-flight.
+         if !attach_effect_visuals(
+             &mut commands,
+diff --git a/crates/benilla-app/src/entities/spell_fx/mod.rs b/crates/benilla-app/src/entities/spell_fx/mod.rs
+index 77837979..084e1675 100644
+--- a/crates/benilla-app/src/entities/spell_fx/mod.rs
++++ b/crates/benilla-app/src/entities/spell_fx/mod.rs
+@@ -59,6 +59,22 @@ pub(super) fn ensure_model(fx: &mut SpellFx, asset_server: &AssetServer, path: &
+         });
+ }
+ 
++/// Basin Battle: a recoloured effect's meshes take its colour through its rig slot's tint (the
++/// same table a unit's tint uses), once the slot is there.
++#[allow(clippy::type_complexity)]
++pub(crate) fn apply_effect_tints(
++    q: Query<
++        (&benilla_world::model_fade::EffectTint, &benilla_world::rig_palette::RigSkin),
++        Or<(Added<benilla_world::rig_palette::RigSkin>, Changed<benilla_world::model_fade::EffectTint>)>,
++    >,
++    mut tints: ResMut<benilla_world::instance_tint::InstanceTints>,
++) {
++    for (t, skin) in &q {
++        let c = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
++        tints.set(skin.slot, benilla_world::instance_tint::pack([c(t.0[0]), c(t.0[1]), c(t.0[2])]));
++    }
++}
++
+ /// Per-instance tint clones, material id → `(RGB loop, attach time)`: one cast is one phase, so an
+ /// animated M2Color cannot share the doodad lane's global clock. An entry drops with its material.
+ #[derive(Resource, Default)]
+@@ -871,6 +887,14 @@ pub(super) fn attach_spell_fx(
+                 None, // an attach-point kit effect opens on its model's own `Stand`
+             );
+             inst.root = Some(root);
++            // Basin Battle: a recoloured look (`SetEffectTint`).
++            if let Some(c) = benilla_ui::action_combat::effect_tint(&inst.path) {
++                commands.entity(root).insert(benilla_world::model_fade::EffectTint([
++                    f32::from(c[0]) / 255.0,
++                    f32::from(c[1]) / 255.0,
++                    f32::from(c[2]) / 255.0,
++                ]));
++            }
+             if !inst.persistent {
+                 // One pass of sequence 0, from the raw sequence table: a sequence with no bone
+                 // keys builds no clip (the eat/drink tankard). A looping one counts as one pass;
+diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
+index 27c45a9e..e779e5db 100644
+--- a/crates/benilla-ui/src/action_combat.rs
++++ b/crates/benilla-ui/src/action_combat.rs
+@@ -111,6 +111,13 @@
+ //!   `parrySeconds` (the parry's window); `focus` false draws only a faint outline.
+ //! - `ClearTelegraph([key])`: take one away (all with no key).
+ //!
++//! Recoloured spell looks (when `SetEffectTint` exists):
++//!
++//! - `SetEffectTint(model, colour)`: every effect drawn from that model (`"Spells\\CounterSpell_
++//!   Impact_Chest"`, with or without its extension) is multiplied by `colour` (`"RRGGBB"`), its
++//!   particles, ribbons and meshes: a white crackle made violet, a blue streak pink. `nil` puts it
++//!   back. For the effects spawned after the call.
++//!
+ //! Rings on the ground (when `SetGroundRing` exists; Basin Battle's skill checks):
+ //!
+ //! - `SetGroundRing(key, x, y, z, radius, texture, r, g, b, a[, facing])`: an add-on texture
+@@ -789,6 +796,23 @@ pub enum GroundRingCall {
+ 
+ static RINGS: std::sync::Mutex<Vec<GroundRingCall>> = std::sync::Mutex::new(Vec::new());
+ 
++static EFFECT_TINTS: std::sync::Mutex<Option<std::collections::HashMap<String, [u8; 3]>>> = std::sync::Mutex::new(None);
++
++/// An effect model's path as the tints key it: lower case, back slashes, no extension.
++fn tint_key(path: &str) -> String {
++    let p = path.replace('/', "\\").to_ascii_lowercase();
++    match p.rfind('.') {
++        Some(i) if p[i..].len() <= 4 && !p[i..].contains('\\') => p[..i].to_string(),
++        _ => p,
++    }
++}
++
++/// The recolour asked for an effect model (`SetEffectTint`), if any.
++pub fn effect_tint(path: &str) -> Option<[u8; 3]> {
++    let k = tint_key(path);
++    EFFECT_TINTS.lock().ok().and_then(|m| m.as_ref().and_then(|m| m.get(&k).copied()))
++}
++
+ /// The ground rings asked for since the last call.
+ pub fn take_ground_rings() -> Vec<GroundRingCall> {
+     RINGS
+@@ -1377,6 +1401,27 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+             Ok(())
+         })?,
+     )?;
++    g.set(
++        "SetEffectTint",
++        lua.create_function(|_, args: MultiValue| {
++            let v: Vec<Value> = args.into_iter().collect();
++            if let Some(path) = text(v.first()) {
++                let c = colour(v.get(1));
++                if let Ok(mut m) = EFFECT_TINTS.lock() {
++                    let m = m.get_or_insert_with(Default::default);
++                    match c {
++                        Some(c) => {
++                            m.insert(tint_key(&path), [((c >> 16) & 0xFF) as u8, ((c >> 8) & 0xFF) as u8, (c & 0xFF) as u8]);
++                        }
++                        None => {
++                            m.remove(&tint_key(&path));
++                        }
++                    }
++                }
++            }
++            Ok(())
++        })?,
++    )?;
+     g.set(
+         "SetGroundRing",
+         lua.create_function(|_, args: MultiValue| {
+diff --git a/crates/benilla-world/src/model_fade.rs b/crates/benilla-world/src/model_fade.rs
+index 5019c6ac..98bb7571 100644
+--- a/crates/benilla-world/src/model_fade.rs
++++ b/crates/benilla-world/src/model_fade.rs
+@@ -170,9 +170,22 @@ pub struct ModelAlphas<'w, 's> {
+             Option<&'static ParentModel>,
+         ),
+     >,
++    /// Basin Battle: an effect instance's recolour ([`EffectTint`]), for its particles and ribbons.
++    tints: Query<'w, 's, &'static EffectTint>,
+ }
+ 
++/// Basin Battle: a colour multiplied into an effect model's particles, ribbons and (through its
++/// rig slot's tint) meshes: a spell look recoloured by the add-on (`SetEffectTint`). On the effect
++/// instance's root, which its emitters and ribbons take their render alpha from.
++#[derive(Component, Clone, Copy, Debug, PartialEq)]
++pub struct EffectTint(pub [f32; 3]);
++
+ impl ModelAlphas<'_, '_> {
++    /// Basin Battle: `instance`'s recolour, if it has one.
++    pub fn tint(&self, instance: Entity) -> Option<[f32; 3]> {
++        self.tints.get(instance).ok().map(|t| t.0)
++    }
++
+     /// `instance`'s composed alpha; a despawned link (its effects freed with it) ends the walk.
+     pub fn get(&self, instance: Entity) -> f32 {
+         let mut alpha = 1.0;
+diff --git a/crates/benilla-world/src/particles.rs b/crates/benilla-world/src/particles.rs
+index c6b43aa1..c308244f 100644
+--- a/crates/benilla-world/src/particles.rs
++++ b/crates/benilla-world/src/particles.rs
+@@ -111,6 +111,8 @@ pub struct ParticleEmitter {
+     /// in by the over-life sampler (`0x7b9b10` @`0x7b9b42`). A doodad multiplies its distance fade.
+     alpha_src: Option<Entity>,
+     alpha: f32,
++    /// Basin Battle: the owning effect's recolour ([`crate::model_fade::EffectTint`]), white without.
++    tint: [f32; 3],
+     /// The model (never the bone joint) whose live translation is this pool's sort point, and
+     /// only that: a world-mode store is frozen at birth. `None` sorts at the spawn placement.
+     anchor: Option<Entity>,
+@@ -516,6 +518,7 @@ pub fn spawn_emitter(
+             draining: false,
+             alpha_src: frames.alpha,
+             alpha: 1.0,
++            tint: [1.0; 3],
+             anchor: frames.anchor,
+             light_node: frames.light_node,
+             anchor_pos: placement.translation,
+diff --git a/crates/benilla-world/src/particles/quads.rs b/crates/benilla-world/src/particles/quads.rs
+index e9f915d3..17327a26 100644
+--- a/crates/benilla-world/src/particles/quads.rs
++++ b/crates/benilla-world/src/particles/quads.rs
+@@ -53,6 +53,8 @@ pub(super) struct DrawFrame {
+     pub(crate) ride: crate::ride_frame::StoredFrame,
+     /// The owning model's render alpha, folded into every particle's alpha (`emitter+0x1a8`).
+     pub(crate) alpha: f32,
++    /// Basin Battle: the owning effect's recolour, multiplied into every particle's RGB.
++    pub(crate) tint: [f32; 3],
+     /// One model unit of half-extent in the stored frame: 1.0 in the world, a UI tile's pixels per
+     /// unit (the reference's `768·√(a²+1)` FrameXML units, instance scale excluded, `0x7b2ba6`).
+     pub(crate) size_scale: f32,
+@@ -145,6 +147,9 @@ pub(super) fn expand_quads(
+         let (mut rgba, size) = (ol.color, ol.size);
+         // The model's render alpha scales alpha alone, never RGB (`0x7b9b10`, the `0x7b9b42` fmul).
+         rgba[3] *= frame.alpha;
++        rgba[0] *= frame.tint[0];
++        rgba[1] *= frame.tint[1];
++        rgba[2] *= frame.tint[2];
+         // Raw authored gamma RGB: additive stacks sum in gamma like the reference's bytes, and
+         // the FFX chain's scene reads apply their 255 saturation (`ffx_glow.wgsl`), not this.
+         let center = particle_center(frame, placement, p);
+@@ -279,6 +284,7 @@ mod tests {
+                 anchored: true,
+                 ride: crate::ride_frame::StoredFrame::default(),
+                 alpha,
++                tint: [1.0; 3],
+                 size_scale: 1.0,
+             };
+             let mut out = Vec::new();
+diff --git a/crates/benilla-world/src/particles/sim.rs b/crates/benilla-world/src/particles/sim.rs
+index fbcb9995..bcc523c9 100644
+--- a/crates/benilla-world/src/particles/sim.rs
++++ b/crates/benilla-world/src/particles/sim.rs
+@@ -582,6 +582,7 @@ pub(super) fn simulate_particles(
+             draining,
+             alpha_src,
+             alpha,
++            tint,
+             anchor,
+             anchor_pos,
+             particles,
+@@ -691,6 +692,7 @@ pub(super) fn simulate_particles(
+         // entity cloud's composed model alpha, or a placed doodad's distance fade.
+         *alpha = alpha_src.map_or(1.0, |e| owner_mul.alpha(e))
+             * fade.as_ref().map_or(1.0, |f| f.distance_alpha(cam_pos));
++        *tint = alpha_src.and_then(|e| owner_mul.alphas.tint(e)).unwrap_or([1.0; 3]);
+         // The model's live translation, or the last known while the pool drains.
+         match *anchor {
+             Some(a) => {
+@@ -956,6 +958,7 @@ pub(super) fn simulate_particles(
+         let frame = DrawFrame {
+             anchored,
+             alpha: *alpha,
++            tint: *tint,
+             ride: *ride,
+             size_scale: *size_scale,
+         };
+@@ -1386,6 +1389,7 @@ mod tests {
+         let frame = DrawFrame {
+             anchored: true, // 0x10 clear: the world store
+             alpha: 1.0,
++            tint: [1.0; 3],
+             ride: crate::ride_frame::StoredFrame::default(), // on the ground: no fold
+             size_scale: 1.0,
+         };
+@@ -1424,6 +1428,7 @@ mod tests {
+         let mut frame = DrawFrame {
+             anchored: true,
+             alpha: 1.0,
++            tint: [1.0; 3],
+             ride,
+             size_scale: 1.0,
+         };
+@@ -1452,6 +1457,7 @@ mod tests {
+         let frame = DrawFrame {
+             anchored: false, // 0x10 set: the emitter-local store
+             alpha: 1.0,
++            tint: [1.0; 3],
+             ride: crate::ride_frame::StoredFrame::default(),
+             size_scale: 1.0,
+         };
+diff --git a/crates/benilla-world/src/ribbons.rs b/crates/benilla-world/src/ribbons.rs
+index f4d0802e..acc70c50 100644
+--- a/crates/benilla-world/src/ribbons.rs
++++ b/crates/benilla-world/src/ribbons.rs
+@@ -418,7 +418,9 @@ pub(crate) fn simulate_ribbons(
+         );
+         // Raw authored RGB and alpha: the effect shader decodes gamma once, texture included.
+         let rgb = def.color.sample_ms(ms);
+-        let rgba = [rgb[0], rgb[1], rgb[2], def.alpha.sample_ms(ms).max(0.0)];
++        // Basin Battle: the owning effect's recolour.
++        let tint = alpha_src.and_then(|e| model_alphas.tint(e)).unwrap_or([1.0; 3]);
++        let rgba = [rgb[0] * tint[0], rgb[1] * tint[1], rgb[2] * tint[2], def.alpha.sample_ms(ms).max(0.0)];
+         // The sort anchor: the live head, or a draining trail's newest edge. The draw fold maps
+         // stored to world (`0xcf5b68 = A · T · S`); the head is already world.
+         let out = |p: Vec3| to_world.map_or(p, |a| a.transform_point3(p));
+-- 
+2.46.2.windows.1
+
