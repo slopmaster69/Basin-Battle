@@ -96,6 +96,8 @@ mod tests_sweep;
 #[cfg(test)]
 mod tests_orb;
 #[cfg(test)]
+mod tests_fair;
+#[cfg(test)]
 mod tests_rhythm;
 #[cfg(test)]
 mod tests_bomb;

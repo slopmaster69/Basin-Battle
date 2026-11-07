@@ -2079,6 +2079,12 @@ impl Survival {
         if slow > 0.0 {
             a.windup *= 1.0 + slow;
         }
+        // A string's first blow up close (or a lone one) never comes quicker than a hero can
+        // answer from inside their own swing.
+        let first = m.pattern.is_none_or(|(_, s)| s == 0);
+        if first && !a.ranged {
+            a.windup = a.windup.max(self.content.ai.first_blow);
+        }
         let cut = self.cowed_cut(id);
         if cut > 0.0 {
             a.damage = (a.damage as f32 * (1.0 - cut)).round() as u32;

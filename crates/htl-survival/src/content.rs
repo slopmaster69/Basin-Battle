@@ -876,6 +876,11 @@ pub struct AiDef {
     /// The string a boss just began is this many times as likely to come again next: it seldom
     /// does the same thing twice running.
     pub repeat: f32,
+    /// The first blow of a string (or a lone blow) up close never winds up quicker than this,
+    /// whatever its own wind-up or its phase's pace: long enough to answer from inside a light
+    /// swing. A string's later blows keep their own pace. 0: no floor.
+    #[serde(default)]
+    pub first_blow: f32,
     /// One blow of a boss's string up close is now and then held a beat (this chance a string,
     /// up to `hold_secs` longer in its wind-up): the delayed swing, so a parry timed by rote
     /// comes early.
@@ -917,6 +922,7 @@ impl Default for AiDef {
             jitter: 0.25,
             leash_scale: 1.0,
             repeat: 0.3,
+            first_blow: 0.0,
             hold: 0.25,
             hold_secs: 0.45,
             cut: 0.2,
