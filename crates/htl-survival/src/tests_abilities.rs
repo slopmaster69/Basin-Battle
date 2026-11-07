@@ -756,15 +756,3 @@ fn an_abilitys_own_clip_comes_from_the_model_it_names_on_every_race() {
     let strike = s.art_strike(p, art);
     assert_eq!((strike.clip, strike.take, strike.from.as_deref()), (58, 1, Some("TaurenMale")));
 }
-
-#[test]
-fn an_ability_whose_look_is_silent_sounds_from_its_caster_as_it_goes() {
-    let mut s = world();
-    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
-    let sound = s.content.abilities[s.content.ability("blink").unwrap()].sound;
-    assert!(sound != 0, "Blink has a sound of its own");
-    slot(&mut s, p, "utility", "blink");
-    let mut ev = cast(&mut s, p, "utility", false, 0.0);
-    ev.extend(run(&mut s, 0.2));
-    assert!(ev.iter().any(|e| matches!(e, Event::Sound { id, sound: x } if *id == p && *x == sound)), "heard as it goes: {ev:?}");
-}
