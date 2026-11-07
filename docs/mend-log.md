@@ -129,6 +129,7 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   swing, about 0.4 s apart, and each finisher winds up longer (0.75 and 0.7 s) with its own ring.
   Held block is the answer to both; a dodge answers the finisher.
 - **Who comes, checked again** after the scaffold change: the scaffold's first pull is the two
-  pirates alone; the Squallshaper and the Wizard come together, without the pirates.
+  pirates alone, met first on the walkway; the Squallshaper brings the Wizard. A hero who walks
+  past the pirates to the Wizard still brings all four, so the walkway order matters.
 - **CI is green on all eleven open PRs** (#236 to #246). None has auto-merge on: `gh pr merge` is
   denied here, so they wait for the owner account.
