@@ -58,3 +58,20 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
 - **Client patch 0060** (#237): the strike pacing, the whole series applied on the pinned client.
   My first test build was on an older base (it lacked 17 lines of the Mage's held-pose fix in the
   same file): rebuilt from main's exact series plus 0060 (`main-0060` in the client clone).
+- **Cookie's pot rings were markers.** A thrown splash under 6 yd (`GROUND_LOOK_MIN`) is warned by
+  the drawn ring (the floor markers' `TA` line), not by Heated Ground: Cookie's 3-yard pots were
+  invisible on Nov 6 because the markers were off, not because the sand hid them. With markers off,
+  a pot's only tell is Cookie's smoking hand and the pot's arc. A splash of 6 yd or more now gets
+  the drawn ring as well as its spell's ground look (`claude/rings-read`), since a look's size
+  isn't its blast's.
+- **Who comes** (`claude/pull-report`, results in the review): the beach caster and patrol always
+  fight together; the patrol turned 12 yd from Cookie's pot; the Juggernaut's evokers bring
+  Captain Greenskin.
+- **Encounter 1** (`claude/beach-lessons`): the first pirate stands in plain sight (no ambush), the
+  beach Squallshaper isn't linked to the pirates and notices at 16 yd (24 took in the whole beach),
+  the beach pirates stand instead of walking to Cookie's pot, and Cookie throws two pots at his
+  half-way turn (three) and his boil-over has no pot after the ring.
+- **One string at a time, with a breath**: turn-taking blow by blow still left one pirate always
+  winding up (two alternating strings cover the clock). Now the next waits for the other's whole
+  string, recovery included, and 0.8 s after (`turn_beat`); casters cast only while no blow up
+  close winds up at their hero.
