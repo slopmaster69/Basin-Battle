@@ -120,3 +120,15 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   not beside the first pirates; the Crossbowman notices at 24 yd and its bolt is 30, not 40.
 - **Merging**: `gh pr merge` from here is denied by the permission settings, so ready PRs wait for
   the owner account's merge.
+- **The bestiary** (#244): every Deadmines creature's every string filmed the same way on the
+  playtest build, 95 runs. Every blow up close landed about its wind-up after it began, and every
+  creature shouted. One string was wrong: Rhahk'Zor's pound knocked the hero down and its second
+  blow knocked them down again where they lay (67 damage with no way to act). Now any blow that
+  leaves the hero reeling or down ends the creature's string, not only one that breaks a guard
+  (#238). Mr. Smite's flurry and VanCleef's thousand cuts read on film: each blow is its own wide
+  swing, about 0.4 s apart, and each finisher winds up longer (0.75 and 0.7 s) with its own ring.
+  Held block is the answer to both; a dodge answers the finisher.
+- **Who comes, checked again** after the scaffold change: the scaffold's first pull is the two
+  pirates alone; the Squallshaper and the Wizard come together, without the pirates.
+- **CI is green on all eleven open PRs** (#236 to #246). None has auto-merge on: `gh pr merge` is
+  denied here, so they wait for the owner account.
