@@ -1,0 +1,35 @@
+# The game client on a Mac, built the way a Mac player's folder builds it: the pinned benilla
+# with every patch in patches/benilla (scripts/common.sh's build_benilla_if_needed, as
+# scripts/play.sh runs it). The other checks build the client only on Windows and Linux, so a
+# patch that won't build on a Mac shows up here. It doesn't play: the runner has no WoW.
+# (The launcher on a Mac is launcher-mac.yml's.)
+name: The client builds on a Mac
+
+on:
+  pull_request:
+    paths:
+      - "patches/benilla/**"
+      - "scripts/common.sh"
+      - "scripts/play.sh"
+      - "scripts/setup-mac.sh"
+      - ".github/workflows/client-mac.yml"
+  workflow_dispatch:
+
+jobs:
+  mac-client:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fetch the pinned benilla
+        run: |
+          . scripts/common.sh
+          git clone -q "$BENILLA_REPO" benilla
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: benilla
+      - name: Build the client with every patch (as scripts/play.sh does)
+        run: |
+          . scripts/common.sh
+          build_benilla_if_needed
+          ls -la benilla/target/release/benilla

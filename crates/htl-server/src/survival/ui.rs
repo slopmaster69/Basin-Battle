@@ -5,7 +5,7 @@
 //! - `V\t<version>`: the server answers the add-on's hello (the add-on wakes only then).
 //! - `EF\t<name~seconds left~kind>^...`: what used items are still doing for the hero.
 //! - `GL\t<place>\t<goals>\t<title>\t<what to do>\t<have>\t<need>`: the camp journal's goal.
-//! - `H\t<health>\t<max>\t<stamina>\t<max>\t<kit>\t<weapon>\t<bags used>\t<bag slots>\t<cache yd>\t<cache bearing>\t<raid>\t<raid secs>\t<raiders left>\t<at camp>\t<foes in reach>\t<meals>\t<foe name>\t<foe health>\t<foe max>\t<ranged>\t<light clip>\t<light impact>\t<light secs>\t<heavy clip>\t<heavy impact>\t<heavy secs>\t<light stamina>\t<heavy stamina>\t<dodge stamina>\t<quick item>\t<its count>\t<armor %>\t<the raid's name>\t<sheathed>\t<jump stamina>\t<place unfound>\t<its yd>\t<its bearing>\t<north>\t<shield>\t<overhealth>` (what the hero's shields have left to soak, and their health over the most: the health bar's white and pale-red ends)
+//! - `H\t<health>\t<max>\t<stamina>\t<max>\t<kit>\t<weapon>\t<bags used>\t<bag slots>\t<cache yd>\t<cache bearing>\t<raid>\t<raid secs>\t<raiders left>\t<at camp>\t<foes in reach>\t<meals>\t<foe name>\t<foe health>\t<foe max>\t<ranged>\t<light clip>\t<light impact>\t<light secs>\t<heavy clip>\t<heavy impact>\t<heavy secs>\t<light stamina>\t<heavy stamina>\t<dodge stamina>\t<quick item>\t<its count>\t<armor %>\t<the raid's name>\t<sheathed>\t<jump stamina>\t<place unfound>\t<its yd>\t<its bearing>\t<north>\t<shield>\t<overhealth>\t<heal ahead>` (what the hero's shields have left to soak, and their health over the most: the health bar's white and pale-red ends; the healing still to come from meals, salves and mending, a ghost of the health past it)
 //! - `A\t<action>\t<seconds in>\t<seconds long>`: what the hero is doing, for the action bar.
 //! - `S\t<item~name~count~gear>^...`: the camp chest, while its window is open.
 //! - `W\t<station>\t<name>\t<recipe~output~cost~can>^...`: a station's work.
@@ -138,7 +138,8 @@
 //!   hero), light (`n` stacks of Holy Light, `a` their seconds), shell (`n` stored, `a` its share
 //!   of the most, `b` 1 let go), rift (`n` foes caught, `a` its reach, `b` seconds left), hollow
 //!   (the orb at `n` health, `a` its reach, `b` its most), empower (`n` 1: the shadow staff's next
-//!   bolt is Empowered). `own` 1 on the hero's own client. Shield and fade go to everyone; the
+//!   bolt is Empowered), death (Death's lance struck that unit: `n` 2 a kill, `a` 1 its judgement
+//!   on a foe low on health). `own` 1 on the hero's own client. Shield and fade go to everyone; the
 //!   rest to the hero.
 //! - `PG\t<kind>\t<key>\t<x>\t<y>\t<z>\t<radius>\t<secs>`: a Priest's mark on the ground, for
 //!   everyone: `feather` (Angelic Feather) or `rift` (Void Rift), `radius` yards, for `secs`
@@ -483,8 +484,12 @@ pub(crate) const VERSION: u32 = 2;
 /// Priest's staff casts its right click along it (Flash Heal, Drain); an older add-on's press
 /// goes along the hero's facing. Draft 3's lines: `PG`, the `PL` kinds penance to empower, `SK`
 /// weave and sear, and Salvation's ring running out to the edge.
-/// 54: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
-pub(crate) const ADDON_NEWEST: u32 = 54;
+/// 55: the health bar shows the healing still to come (`H`'s 43rd) as a rose stroke behind the
+/// health to where it will be. (54 is #217's.)
+/// 56: the ordinary camera over the right shoulder (`SetCameraShoulder`, client patch 0059), so a
+/// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
+/// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
+pub(crate) const ADDON_NEWEST: u32 = 57;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -503,7 +508,9 @@ pub(crate) const ADDON_NEWEST: u32 = 54;
 /// 0047), and the nocked arrow pointing where the reticle is (along the bow for others, 0048), the body
 /// facing the aim while an ability is aimed and the upper body holding it as the legs walk
 /// (0049), and our own drawn bow's line steered onto the reticle (0050).
-/// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0056).
+/// (0058 adds `SetSpellAttach`, which hangs a spell's effects from another attachment: Salvation's
+/// wings on the back. No round of its own: the add-on calls it only where it exists.)
+/// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0060).
 pub(crate) const CLIENT_NEWEST: u8 = 28;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
@@ -715,8 +722,9 @@ impl SurvivalGame {
         let armor = (self.sim.armor_reduce(p) * 100.0).round() as u32;
         let raid_title = clean(&self.sim.current_raid().title);
         let (shield, over) = self.sim.absorbs(id);
+        let ahead = self.sim.heal_ahead(id);
         Some(format!(
-            "H\t{}\t{}\t{}\t{}\t{kit}\t{}\t{used}\t{}\t{cd}\t{cb}\t{phase}\t{}\t{left}\t{}\t{reach}\t{meals}\t{foe}\t{foe_hp}\t{foe_max}\t{ranged}\t{swings}\t{quick}\t{quick_n}\t{armor}\t{raid_title}\t{}\t{:.0}\t{pn}\t{pd}\t{pb}\t{north}\t{shield}\t{over}",
+            "H\t{}\t{}\t{}\t{}\t{kit}\t{}\t{used}\t{}\t{cd}\t{cb}\t{phase}\t{}\t{left}\t{}\t{reach}\t{meals}\t{foe}\t{foe_hp}\t{foe_max}\t{ranged}\t{swings}\t{quick}\t{quick_n}\t{armor}\t{raid_title}\t{}\t{:.0}\t{pn}\t{pd}\t{pb}\t{north}\t{shield}\t{over}\t{ahead}",
             p.health,
             p.max_health,
             p.stamina.floor() as u32,

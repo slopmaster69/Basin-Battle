@@ -64,7 +64,7 @@ const MISS_PARRY: u8 = 4;
 const MISS_BLOCK: u8 = 5;
 /// A tick of damage over time shows as this spell's (Immolate's burn).
 const DOT_SPELL: u32 = 348;
-/// From this client level a heal on a friend floats over their head (patch 0056), so the healer is
+/// From this client level a heal on a friend floats over their head (patch 0060), so the healer is
 /// sent the heal log instead of the add-on's `HO` line.
 pub(crate) const HEAL_FLOAT_LEVEL: u8 = 28;
 
@@ -1170,7 +1170,7 @@ impl SurvivalGame {
             Event::HealedOther { healer, target, amount } => {
                 // The healer sees what they mended on a friend (a hero or an allied creature):
                 // from `ac28` a green number over the friend's head, as WoW floats it (`SMSG_SPELLHEALLOG`, spell 0 as the mend
-                // has no 1.12 spell; patch 0056); on an older client the add-on's `HO` line,
+                // has no 1.12 spell; patch 0060); on an older client the add-on's `HO` line,
                 // `<amount> <name>` rising mid-screen.
                 let Some(c) = self.conn_of(healer) else { return };
                 if self.world_of(c).is_some_and(|w| w.level >= HEAL_FLOAT_LEVEL) {
