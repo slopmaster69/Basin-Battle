@@ -405,6 +405,19 @@ running = { from = "ScourgeMale", clip = 17, take = 1, recovery = 1.1, damage = 
 roll = { from = "ScourgeMale", clip = 17, take = 1, windup = 0.8, recovery = 1.1, damage = 1.1, lunge = 1.6 }
 leap = { from = "ScourgeMale", clip = 17, take = 2, windup = 0.85, recovery = 1.35, damage = 1.45, stamina = 1.3, lunge = 3.6, range = 1.1 }
 
+# Dual wield's right click (docs/weapon-identities.md): the off hand's own chain, `AttackOff` on
+# the hero's own model. Lighter and quicker than the main hand's; left and right alternating four
+# times ends in the finisher with both blades (`DUAL_FINISH_*` in sim/mod.rs).
+[[moveset]]
+key = "off_hand"
+light = [
+  { clip = 87, take = 0, windup = 0.85, recovery = 0.8, damage = 0.8, stamina = 0.7, lunge = 0.5 },
+  { clip = 87, take = 0, windup = 0.85, recovery = 0.8, damage = 0.8, stamina = 0.7, lunge = 0.5 },
+  { clip = 87, take = 0, windup = 0.9, recovery = 1.0, damage = 1.0, stamina = 0.8, lunge = 0.7 },
+]
+heavy = { clip = 87, take = 0, lunge = 0.8 }
+running = { clip = 87, take = 0, recovery = 1.1, damage = 1.1, lunge = 2.2 }
+
 [[moveset]]
 key = "dagger"
 light = [

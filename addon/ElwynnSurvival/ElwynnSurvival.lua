@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 57
+local VERSION = 58
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -5007,13 +5007,21 @@ end
 -- --- the weapon rack (AR: key~name~kind~held~text~icon) ----------------------------------------------
 
 function ES.Rack(list)
-  OpenWindow("rack", "Weapon Rack", "Equip any weapon to try it. Two-handed weapons guard without a shield.")
+  OpenWindow("rack", "Weapon Rack", "Equip any weapon to try it. Two-handed weapons guard without a shield. A one-handed weapon in your off hand swings with right click instead of guarding.")
   ES.rackList = list
   local items = Items(list)
   local first = PageOf("rack", table.getn(items), LIST_ROWS)
   for i = 1, math.min(LIST_ROWS, table.getn(items) - first) do
     local f = Split(items[first + i], "~")
     local held = f[4] == "1"
+    -- A one-handed weapon goes in either hand (dual wield); a shield held can be put away (one
+    -- weapon alone).
+    local alt, altCmd
+    if f[3] == "one-handed" then
+      alt, altCmd = "Off hand", ".es arm " .. (f[1] or "") .. " off"
+    elseif f[3] == "shield" and held then
+      alt, altCmd = "Put away", ".es arm none"
+    end
     Row(i, {
       icon = f[6],
       name = f[2] or "?",
@@ -5024,6 +5032,8 @@ function ES.Rack(list)
       can = not held,
       chosen = held,
       detail = f[5] or "",
+      alt = alt,
+      altCmd = altCmd,
     })
     if i == 1 then Rest(f[2] or "?", f[5] or "", "") end
   end

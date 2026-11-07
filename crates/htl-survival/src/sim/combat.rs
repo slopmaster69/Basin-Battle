@@ -190,6 +190,17 @@ impl Survival {
                 return true;
             }
         }
+        // Two weapons in hand (dual wield): no guard at all. The right click swings the off hand,
+        // and a click with it held is a click (no bash or kick: there's no shield to bash with).
+        if self.players.get(&id).is_some_and(|p| self.off_weapon_of(p).is_some()) {
+            match input {
+                Input::Guard => return self.off_press(id),
+                Input::GuardUp => return true,
+                Input::Bash => return self.try_act(id, Input::Attack),
+                Input::Kick => return self.try_act(id, Input::Heavy),
+                _ => {}
+            }
+        }
         // A weapon whose right click is an ability (a holy staff's Flash Heal, a shadow staff's
         // Drain): no guard at all. The right click is that ability; with the button held, a
         // click is a click (no bash or kick: there's no guard to bash from).
@@ -271,7 +282,7 @@ impl Survival {
                 // Late in a light blow's recovery, the next of the chain comes at once.
                 if let Action::Swing { t, strike, .. } = &p.action {
                     let chain = input == Input::Attack
-                        && matches!(strike.kind, StrikeKind::Light | StrikeKind::Running | StrikeKind::Roll | StrikeKind::Leap)
+                        && matches!(strike.kind, StrikeKind::Light | StrikeKind::Off | StrikeKind::Running | StrikeKind::Roll | StrikeKind::Leap)
                         && *t >= strike.windup + strike.active + strike.recovery * c.combat.chain_after;
                     if !chain {
                         return false;
@@ -576,7 +587,11 @@ impl Survival {
     /// The blow a hero's swing of this kind is: its place in the chain, its timing and look.
     pub(crate) fn strike_for(&self, id: Id, kind: StrikeKind) -> Strike {
         let p = &self.players[&id];
-        let step = if kind == StrikeKind::Light && self.clock <= p.combo_until { p.combo_next as usize } else { 0 };
+        let step = match kind {
+            StrikeKind::Light if self.clock <= p.combo_until => p.combo_next as usize,
+            StrikeKind::Off if self.clock <= p.combo_until => p.off_next as usize,
+            _ => 0,
+        };
         self.strike_at(id, kind, step)
     }
 
@@ -584,8 +599,11 @@ impl Survival {
     pub fn strike_at(&self, id: Id, kind: StrikeKind, step: usize) -> Strike {
         let c = &self.content;
         let p = &self.players[&id];
-        let w = self.weapon_of(p);
-        let set = c.moveset_of(w);
+        // The off hand's blow: its own weapon, and the off hand's chain.
+        let (w, set) = match (kind, self.off_weapon_of(p)) {
+            (StrikeKind::Off, Some(o)) => (o, c.movesets.iter().find(|m| m.key == OFF_HAND_MOVES).unwrap_or_else(|| c.moveset_of(o))),
+            _ => (self.weapon_of(p), c.moveset_of(self.weapon_of(p))),
+        };
         let h = &c.heavy;
         let step = step % set.light.len();
         let (m, windup, recovery) = match kind {
@@ -618,6 +636,32 @@ impl Survival {
         }
     }
 
+    /// Dual wield's right click: the off hand's blow, at once when free, or as the next of a run
+    /// late in the last blow's recovery (either hand's).
+    fn off_press(&mut self, id: Id) -> bool {
+        let Some(p) = self.players.get(&id) else { return true };
+        if matches!(p.action, Action::Aim { .. } | Action::Charge { .. }) {
+            self.ability_cancel(id);
+        }
+        let p = &self.players[&id];
+        let c = &self.content;
+        let fresh = p.stamina >= c.player.exhausted_below || self.tireless(id);
+        let free = matches!(p.action, Action::Ready);
+        let chain = matches!(&p.action, Action::Swing { t, strike, .. }
+            if matches!(strike.kind, StrikeKind::Light | StrikeKind::Off | StrikeKind::Running | StrikeKind::Roll | StrikeKind::Leap)
+                && *t >= strike.windup + strike.active + strike.recovery * c.combat.chain_after);
+        if !(free || chain) {
+            return false;
+        }
+        if !fresh {
+            self.winded(id);
+            return true;
+        }
+        self.unsheathe(id);
+        self.start_swing(id, StrikeKind::Off);
+        true
+    }
+
     fn start_swing(&mut self, id: Id, kind: StrikeKind) {
         self.start_swing_with(id, kind, true);
     }
@@ -643,17 +687,51 @@ impl Survival {
         if kind == StrikeKind::Heavy && self.has_cc(id, "wrath") {
             self.avenging_wave(id);
         }
-        let weapon = self.players[&id].weapon;
+        let off = kind == StrikeKind::Off;
+        let weapon = match (off, self.players[&id].off_weapon) {
+            (true, Some(i)) => i,
+            _ => self.players[&id].weapon,
+        };
         let wdef = self.content.weapon(&self.content.items[weapon].key).cloned().expect("a melee weapon");
         let windex = self.content.weapons.iter().position(|w| w.key == wdef.key).unwrap();
-        let strike = self.strike_for(id, kind);
-        let set_len = self.content.moveset_of(&wdef).light.len().max(1) as u8;
+        let mut strike = self.strike_for(id, kind);
+        let set_len = if off {
+            self.content.movesets.iter().find(|m| m.key == OFF_HAND_MOVES).map_or(1, |m| m.light.len()).max(1) as u8
+        } else {
+            self.content.moveset_of(&wdef).light.len().max(1) as u8
+        };
+        // Dual wield: blows from alternate hands build a run; the run's last is the finisher with
+        // both blades.
+        let dual = self.players.get(&id).is_some_and(|p| self.off_weapon_of(p).is_some());
+        if dual && matches!(kind, StrikeKind::Light | StrikeKind::Off) {
+            let p = &self.players[&id];
+            let alternate = p.dual_run > 0 && p.dual_last_off != off && self.clock <= p.combo_until + DUAL_WINDOW;
+            let run = if alternate { p.dual_run + 1 } else { 1 };
+            let finish = run >= DUAL_FINISH_AT;
+            if finish {
+                strike.damage *= DUAL_FINISH_DAMAGE;
+                strike.stagger = strike.stagger.max(DUAL_FINISH_STAGGER);
+                strike.clip = DUAL_FINISH_CLIP;
+                strike.take = 0;
+                strike.from = None;
+            }
+            let p = self.players.get_mut(&id).unwrap();
+            p.dual_run = if finish { 0 } else { run };
+            p.dual_last_off = off;
+        }
         if pay {
             self.spend_attack(id, strike.stamina);
         }
         {
             let p = self.players.get_mut(&id).unwrap();
-            p.combo_next = if kind == StrikeKind::Light { (strike.step + 1) % set_len } else { 0 };
+            match kind {
+                StrikeKind::Light => p.combo_next = (strike.step + 1) % set_len,
+                StrikeKind::Off => p.off_next = (strike.step + 1) % set_len,
+                _ => {
+                    p.combo_next = 0;
+                    p.off_next = 0;
+                }
+            }
             p.combo_until = f32::INFINITY;
         }
         self.set_action(id, Action::Swing { t: 0.0, struck: Vec::new(), weapon: windex, strike });
@@ -1340,7 +1418,7 @@ impl Survival {
         let Some(p) = self.players.get(&id) else { return };
         // The held guard comes back up, unless it's a ward still broken.
         // (A weapon whose right click is an ability has no guard to come back up.)
-        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) && !self.weapon_of(p).has_alt() { Action::Guard } else { Action::Ready };
+        let next = if p.guard_held && !(p.ward_broken && self.guard_of(p).ward) && !self.weapon_of(p).has_alt() && self.off_weapon_of(p).is_none() { Action::Guard } else { Action::Ready };
         let buffered = p.buffered;
         // A dodge with an attack pressed in it: the attack out of it, now, or as the hero lands.
         if matches!(p.action, Action::Dodge { .. }) && p.dodge_attack {
@@ -1983,7 +2061,8 @@ impl Survival {
         let giant = self.mobs.get(&attacker).is_some_and(|m| c.mobs[m.def].unparryable);
         let parryable = parryable && !giant;
         // The guard raised just in time: a parry, if the blow can be parried at all.
-        let timed = now - p.guard_at <= c.parry.window + self.weapon_of(p).parry && p.guard_at - p.prev_guard_at >= c.parry.cooldown;
+        let alone = if self.one_hand_alone(p) { ONE_HAND_PARRY } else { 0.0 };
+        let timed = now - p.guard_at <= c.parry.window + self.weapon_of(p).parry + alone && p.guard_at - p.prev_guard_at >= c.parry.cooldown;
         // Retaliation's answer going out: the blow finds nothing to take hold of, and the swing
         // carries on (no block clip over it).
         let shrugged = !self.immune(victim) && self.untouchable(victim);
