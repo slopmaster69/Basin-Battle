@@ -246,3 +246,79 @@ mod tests {
         let _ = fs::remove_dir_all(dir);
     }
 }
+
+/// What a checkout's update did.
+pub enum CheckoutUpdate {
+    /// Play itself changed and was rebuilt: the new one should take over.
+    NewPlay,
+    /// Nothing for Play to do, with a line to show if there's something to say.
+    Note(Option<String>),
+}
+
+/// A checkout (a Mac's folder): `main` fast-forwarded from GitHub, only when the folder is on
+/// main with nothing changed by hand, so someone's own work is never touched. The game client
+/// rebuilds itself when it next starts (scripts/play.sh). On a Mac, Play is then rebuilt into its
+/// app (scripts/mac-launcher.sh), which takes seconds when nothing in Play changed.
+pub fn checkout(paths: &Paths, mut say: impl FnMut(String)) -> CheckoutUpdate {
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+    let root = &paths.root;
+    let git = |args: &[&str]| -> Option<String> {
+        let out = Command::new("git").arg("-C").arg(root).args(args).stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+    };
+    let mut note = None;
+    let on_main = git(&["rev-parse", "--abbrev-ref", "HEAD"]).as_deref() == Some("main");
+    let clean = git(&["status", "--porcelain", "--untracked-files=no"]).map(|o| o.is_empty()).unwrap_or(false);
+    if on_main && clean {
+        say("Checking for a new version…".into());
+        // Offline, a fetch can hang for a long time: given 30 sec.
+        let fetched = Command::new("git").arg("-C").arg(root).args(["fetch", "-q", "origin", "main"])
+            .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn()
+            .map(|mut c| {
+                let t0 = Instant::now();
+                loop {
+                    if let Ok(Some(st)) = c.try_wait() { break st.success(); }
+                    if t0.elapsed() > Duration::from_secs(30) { let _ = c.kill(); break false; }
+                    std::thread::sleep(Duration::from_millis(200));
+                }
+            })
+            .unwrap_or(false);
+        let behind: u32 = if fetched { git(&["rev-list", "--count", "HEAD..FETCH_HEAD"]).and_then(|n| n.parse().ok()).unwrap_or(0) } else { 0 };
+        if behind > 0 {
+            say(format!("Updating ({behind} new changes)…"));
+            if git(&["merge", "--ff-only", "-q", "FETCH_HEAD"]).is_some() {
+                note = Some("Updated. The game rebuilds itself when it starts, which can take a while.".to_string());
+            } else {
+                note = Some("The update didn't work, so this folder is as it was.".to_string());
+            }
+        } else if !fetched {
+            note = Some("Couldn't reach GitHub to check for a new version.".to_string());
+        }
+    }
+    if cfg!(target_os = "macos") && root.join("scripts").join("mac-launcher.sh").is_file() {
+        let exe = std::env::current_exe().ok();
+        let before = exe.as_ref().and_then(|e| fs::metadata(e).ok()).and_then(|m| m.modified().ok());
+        say("Getting Play ready…".into());
+        let _ = Command::new("bash").arg(root.join("scripts").join("mac-launcher.sh")).arg("--quiet")
+            .current_dir(root).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+        let after = exe.as_ref().and_then(|e| fs::metadata(e).ok()).and_then(|m| m.modified().ok());
+        if before.is_some() && after.is_some() && before != after {
+            return CheckoutUpdate::NewPlay;
+        }
+    }
+    CheckoutUpdate::Note(note)
+}
+
+/// The new Play, started in this one's place: on a Mac its app (so it opens as the app does),
+/// elsewhere the program itself. It skips the update, which just happened.
+pub fn start_new_play() -> Result<(), String> {
+    use std::process::Command;
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let app = exe.ancestors().find(|a| a.extension().map(|x| x == "app").unwrap_or(false)).map(Path::to_path_buf);
+    let started = match app {
+        Some(app) if cfg!(target_os = "macos") => Command::new("open").arg("-n").arg(&app).args(["--args", "--no-update"]).spawn(),
+        _ => Command::new(&exe).arg("--no-update").spawn(),
+    };
+    started.map(|_| ()).map_err(|e| e.to_string())
+}

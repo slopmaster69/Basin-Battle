@@ -141,6 +141,8 @@ enum Msg {
     ServerStarted(Child),
     GameStarted(Child),
     Failed(String),
+    /// A Mac's Play was rebuilt by the update: the new one takes over.
+    Relaunch,
 }
 
 struct App {
@@ -272,12 +274,19 @@ impl App {
         let paths = self.paths.clone();
         let project = self.project.clone();
         let check = !self.opts.no_update && self.channel != Channel::Fixed && self.paths.kind == Kind::Download;
+        let check_checkout = !self.opts.no_update && self.paths.kind == Kind::Checkout;
         thread::spawn(move || {
             if !wow_known {
                 let found = wow::find_wow_data(&paths.root);
                 let _ = tx.send(Msg::Wow(found));
             }
-            if check {
+            if check_checkout {
+                // A Mac's folder: main from GitHub, then Play itself rebuilt if that changed it.
+                match update::checkout(&paths, |s| { let _ = tx.send(Msg::Status(s)); }) {
+                    update::CheckoutUpdate::NewPlay => { let _ = tx.send(Msg::Relaunch); }
+                    update::CheckoutUpdate::Note(n) => { let _ = tx.send(Msg::UpToDate(n)); }
+                }
+            } else if check {
                 let _ = tx.send(Msg::Status("Checking for a new version…".into()));
                 match update::check(&paths, &project) {
                     Ok(Some(r)) => { let _ = tx.send(Msg::UpdateFound(r)); }
@@ -397,7 +406,13 @@ impl App {
             let _ = tx.send(Msg::Status("Starting the game…".into()));
             let launch = game::Launch { data: &data, address: &address, realm: &realm, user: &user, pass: &pass, hero: Some(&hero) };
             match game::start(&paths, &launch) {
-                Ok(child) => { let _ = tx.send(Msg::GameStarted(child)); }
+                Ok(mut child) => {
+                    // A Mac builds the client first: Play waits on screen until the game is up.
+                    match game::wait_until_open(&paths, &mut child, |s| { let _ = tx.send(Msg::Status(s)); }) {
+                        Ok(()) => { let _ = tx.send(Msg::GameStarted(child)); }
+                        Err(why) => { let _ = tx.send(Msg::Failed(why)); }
+                    }
+                }
                 Err(why) => { let _ = tx.send(Msg::Failed(why)); }
             }
         });
@@ -451,6 +466,15 @@ impl App {
                     self.log(&format!("update failed: {why}"));
                     self.note = why;
                     self.become_ready();
+                }
+                Msg::Relaunch => {
+                    self.log("Play was rebuilt by the update; starting the new one");
+                    if update::start_new_play().is_ok() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    } else {
+                        self.note = "Play was updated. Open it again to use the new one.".into();
+                        self.become_ready();
+                    }
                 }
                 Msg::ServerStarted(child) => self.server_child = Some(child),
                 Msg::GameStarted(mut game) => {
