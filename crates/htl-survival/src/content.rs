@@ -49,6 +49,9 @@ pub struct Content {
     /// give ground (`[ai]`).
     #[serde(default)]
     pub ai: AiDef,
+    /// How each kind of creature fights (`[[temper]]`): a creature's `temper` names one.
+    #[serde(rename = "temper", default)]
+    pub tempers: Vec<TemperDef>,
     #[serde(default)]
     pub pvp: PvpDef,
     /// Two heroes' duel: a challenge, a countdown, and a fight until one would fall.
@@ -830,6 +833,44 @@ fn default_kick() -> ShoveDef {
         push: [8.0, 2.0],
         lunge: 0.4,
     }
+}
+
+/// A temperament: how a kind of creature fights, over `[ai]` (Corey, Nov 7: "not all enemies
+/// need to behave the exact same way"). What it leaves out is `[ai]`'s. The fairness rules hold
+/// for every one: nothing at a reeling hero, no blade with a bolt in the air, no two wind-ups at
+/// once.
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TemperDef {
+    pub key: String,
+    /// It comes at an opening (a swing's follow-through, a cast, a meal), its turn or not.
+    #[serde(default)]
+    pub punish: Option<bool>,
+    /// It takes turns with the others on its hero (and their breath after a string).
+    #[serde(default)]
+    pub waits_turn: Option<bool>,
+    /// Waiting, it works round toward its hero's back.
+    #[serde(default)]
+    pub flank: Option<bool>,
+    /// It strikes only from behind its hero (or at an opening); otherwise it circles round.
+    #[serde(default)]
+    pub backstab: bool,
+    /// After a string, the chance it gives ground, and how far (a boss too, when set here).
+    #[serde(default)]
+    pub retreat: Option<f32>,
+    #[serde(default)]
+    pub retreat_yards: Option<f32>,
+    /// A light blow doesn't knock its wind-up aside (a heavy one or a shove still does).
+    #[serde(default)]
+    pub poise: bool,
+    /// Below this share of its health it runs from its hero, once, before it comes back.
+    #[serde(default)]
+    pub flee_below: f32,
+    /// It holds back, circling at a distance, while others of its fight are on its hero.
+    #[serde(default)]
+    pub hold_back: bool,
+    /// Its cooldown between strings, times this (under 1: it presses harder).
+    #[serde(default = "one_f")]
+    pub pace: f32,
 }
 
 /// A creature's tactics, as Yharnam's hunters learned them the hard way: it goes for whoever
@@ -2037,6 +2078,9 @@ fn yes() -> bool {
 pub struct MobDef {
     pub key: String,
     pub name: String,
+    /// How it fights (a `[[temper]]`'s key; none: `[ai]` as it is).
+    #[serde(default)]
+    pub temper: String,
     pub display: u32,
     /// A creature on a character model (an orc, a Defias): every blow of its from this character
     /// model's clips (`"ScourgeFemale"`…) where the step names none, on a client that can.
@@ -3156,6 +3200,9 @@ impl Content {
             }
         }
         for m in &self.mobs {
+            if !m.temper.is_empty() && !self.tempers.iter().any(|t| t.key == m.temper) {
+                bail!("mob {}: temper {} is no [[temper]]", m.key, m.temper);
+            }
             for k in m.drops.keys().chain(m.trophy.keys()).chain(m.gear.iter()) {
                 item(k, &format!("mob {}", m.key))?;
             }

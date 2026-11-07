@@ -105,6 +105,11 @@ pub(crate) const PRESS_RANGE: f32 = 7.0;
 /// `ARRIVE_WINDOW` seconds, it settles `ai.arrive_beat` before its blow. Closer, it's only stepping
 /// round them, and swings without stopping first (Corey, Nov 7: "bosses stutter step").
 pub(crate) const ARRIVE_FAR: f32 = 6.0;
+/// A coward's run from its hero (its temperament's `flee_below`), and its breath before it comes
+/// back; a commander's distance while it holds back.
+const FLEE_YARDS: f32 = 10.0;
+const FLEE_BREATH: f32 = 1.5;
+const HOLD_BACK: f32 = 7.0;
 const ARRIVE_WINDOW: f32 = 2.0;
 const CIRCLE_RADIUS: f32 = 3.5;
 const CIRCLE_STEP: f32 = 0.6;
@@ -356,6 +361,7 @@ impl Survival {
                 turn_on: None,
                 fighters: 1,
                 wary_until: 0.0,
+                fled: false,
                 whiff_until: 0.0,
                 last_pattern: None,
                 close_run: 0,
@@ -1406,10 +1412,22 @@ impl Survival {
             Action::Swing { t, strike, .. } => *t > strike.windup + strike.active,
             _ => false,
         });
-        if open {
-            let hp = self.players.get(&h).map(|p| p.pos);
-            let bolt = hp.is_some_and(|hp| self.missiles.iter().any(|ms| ms.owner != id && ms.land_at > now && dist2d(ms.at, hp) <= ms.radius + 4.0));
-            let winding = self.mobs.iter().any(|(oid, o)| *oid != id && o.health > 0 && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h));
+        // The rules every temperament keeps: no blow while another's winds up at them, nor while
+        // a bolt is in the air at them.
+        let hp = self.players.get(&h).map(|p| p.pos);
+        let bolt = hp.is_some_and(|hp| self.missiles.iter().any(|ms| ms.owner != id && ms.land_at > now && dist2d(ms.at, hp) <= ms.radius + 4.0));
+        let winding = self.mobs.iter().any(|(oid, o)| *oid != id && o.health > 0 && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h));
+        let temper = self.temper(id);
+        // A backstabber strikes from behind its hero (or at an opening), whoever's turn it is;
+        // facing it, it waits and works round.
+        if temper.is_some_and(|t| t.backstab) {
+            return !(open || self.behind(id, h)) || bolt || winding;
+        }
+        if open && temper.and_then(|t| t.punish).unwrap_or(true) {
+            return bolt || winding;
+        }
+        // One that doesn't take turns: only the rules everyone keeps.
+        if temper.and_then(|t| t.waits_turn) == Some(false) {
             return bolt || winding;
         }
         // Nor while a bolt or a pot is in the air at them: the blade and the bolt would land
@@ -1477,6 +1495,36 @@ impl Survival {
         if self.rng.gen::<f32>() < 0.15 {
             self.mobs.get_mut(&id).unwrap().circle = -dir;
         }
+    }
+
+    /// A coward's run from its hero (once): straight away from them at a run, and a breath before
+    /// it comes back.
+    fn run_from(&mut self, id: Id, hero: Id, yards: f32) {
+        let now = self.clock;
+        let (Some(m), Some(p)) = (self.mobs.get(&id), self.players.get(&hero)) else { return };
+        let (pos, away) = (m.pos, facing(p.pos, m.pos));
+        let speed = self.content.mobs[m.def].run_speed * self.speed_share(id);
+        let goal = self.ground_near(pos[0] + away.cos() * yards, pos[1] + away.sin() * yards, pos[2]);
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.fled = true;
+        m.ready_at = m.ready_at.max(now + yards / speed.max(1.0) + FLEE_BREATH);
+        if !self.land.walk_clear(pos, goal) {
+            return;
+        }
+        let m = self.mobs.get_mut(&id).unwrap();
+        m.path = vec![goal];
+        m.plan_to = None;
+        m.speed = speed;
+        m.sidle = None;
+        self.events.push(Event::MobMove { id, path: vec![pos, goal], speed, face: None });
+    }
+
+    /// Whether others of creature `id`'s kind of fight (not ones holding back) are on `hero`.
+    fn others_on(&self, hero: Id, id: Id) -> bool {
+        let Some(hp) = self.players.get(&hero).map(|p| p.pos) else { return false };
+        self.mobs.iter().any(|(oid, o)| {
+            *oid != id && o.health > 0 && o.state.target() == Some(hero) && dist2d(o.pos, hp) <= 15.0 && !self.temper(*oid).is_some_and(|t| t.hold_back)
+        })
     }
 
     /// A hero heals in front of their foes: those close and on them come at once (a heal is an
@@ -1954,6 +2002,23 @@ impl Survival {
                     let mut busy = false;
                     let mut ready = ready;
                     if let Foe::Hero(h) = foe {
+                        // Its temperament's: a coward hurt runs from its hero, once, and comes
+                        // back; a commander holds back while others of its fight are on its hero.
+                        if let Some(t) = self.temper(id).cloned() {
+                            let m = &self.mobs[&id];
+                            if t.flee_below > 0.0 && !m.fled && (m.health as f32) < t.flee_below * m.max_health as f32 {
+                                self.run_from(id, h, FLEE_YARDS);
+                                return;
+                            }
+                            // Running: it keeps running until it's there.
+                            if m.fled && !m.path.is_empty() && m.sidle.is_none() && now < m.ready_at {
+                                return;
+                            }
+                            if t.hold_back && self.others_on(h, id) {
+                                self.circle_foe(id, h, to, HOLD_BACK);
+                                return;
+                            }
+                        }
                         // An opening near it: it comes at once, past its turn.
                         let press = self.presses(id, h, dist);
                         ready = ready || press;
@@ -2147,11 +2212,11 @@ impl Survival {
                             m.pattern = None;
                             m.string_len = 0;
                             m.close_run = if close { m.close_run + 1 } else { 0 };
-                            let cd = self.string_cooldown(a.cooldown);
+                            let cd = self.string_cooldown(a.cooldown * self.pace(id));
                             self.mobs.get_mut(&id).unwrap().ready_at = now + cd;
                         }
                         None => {
-                            let cd = self.string_cooldown(a.cooldown);
+                            let cd = self.string_cooldown(a.cooldown * self.pace(id));
                             self.mobs.get_mut(&id).unwrap().ready_at = now + cd;
                         }
                     }

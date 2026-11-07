@@ -381,6 +381,7 @@ perks = [{ kind = "ward", amount = 0.04 }]
 [[mob]]
 key = "dm_pirate"
 name = "Defias Pirate"
+temper = "brawler"
 subname = "Defias Brotherhood"
 display = 2347
 clips_from = "TaurenMale"
@@ -428,6 +429,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_squallshaper"
 name = "Defias Squallshaper"
+temper = "caster"
 subname = "Defias Brotherhood"
 display = 2349
 clips_from = "TaurenFemale"
@@ -476,6 +478,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_crossbowman"
 name = "Defias Crossbowman"
+temper = "skirmisher"
 subname = "Defias Brotherhood"
 display = 2318
 health = 90
@@ -518,6 +521,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_cookie"
 name = "Cookie"
+temper = "erratic"
 subname = "The Brotherhood's Cook"
 display = 1305
 scale = 1.3
@@ -623,6 +627,7 @@ then_look = 10987
 [[mob]]
 key = "dm_smite"
 name = "Mr. Smite"
+temper = "bruiser"
 subname = "The Juggernaut's First Mate"
 display = 2026
 clips_from = "TaurenFemale"
@@ -714,6 +719,7 @@ enrage_sound = 5778
 [[mob]]
 key = "dm_greenskin"
 name = "Captain Greenskin"
+temper = "captain"
 subname = "The Juggernaut's Captain"
 display = 7113
 scale = 1.5
@@ -780,6 +786,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_vancleef"
 name = "Edwin VanCleef"
+temper = "duelist"
 subname = "Defias Kingpin"
 display = 2029
 clips_from = "OrcMale"
@@ -882,6 +889,7 @@ slay_sound = 5781
 [[mob]]
 key = "dm_blackguard"
 name = "Defias Blackguard"
+temper = "backstabber"
 subname = "Defias Brotherhood"
 display = 2357
 clips_from = "ScourgeMale"
@@ -1236,6 +1244,7 @@ text = "Quick. Blows from behind deal 300% damage. \"Sneed's own.\""
 [[mob]]
 key = "dm_engineer"
 name = "Goblin Engineer"
+temper = "skirmisher"
 subname = "Defias Brotherhood"
 display = 7047
 health = 80
@@ -1284,6 +1293,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_woodcutter"
 name = "Goblin Woodcutter"
+temper = "bruiser"
 subname = "Defias Brotherhood"
 display = 7048
 health = 120
@@ -1320,6 +1330,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_gilnid"
 name = "Gilnid"
+temper = "bruiser"
 subname = "The Smelter"
 display = 7125
 scale = 1.6
@@ -1406,6 +1417,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_shredder"
 name = "Sneed's Shredder"
+temper = "bruiser"
 subname = "Lumbermaster"
 display = 1269
 scale = 1.1
@@ -1462,6 +1474,7 @@ then_text = "\"My shredder! Oh, you'll pay for that, you will!\""
 [[mob]]
 key = "dm_sneed"
 name = "Sneed"
+temper = "brawler"
 subname = "Lumbermaster"
 display = 7124
 health = 700
@@ -1819,6 +1832,7 @@ text = "The ogre foreman's mail cap, padded for a human head."
 [[mob]]
 key = "dm_miner"
 name = "Defias Miner"
+temper = "coward"
 subname = "Defias Brotherhood"
 display = 2311
 clips_from = "TaurenMale"
@@ -1856,6 +1870,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_overseer"
 name = "Defias Overseer"
+temper = "commander"
 subname = "Defias Brotherhood"
 display = 3341
 clips_from = "ScourgeFemale"
@@ -1903,6 +1918,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_dynamiter"
 name = "Defias Dynamiter"
+temper = "skirmisher"
 subname = "Defias Brotherhood"
 display = 2345
 clips_from = "ScourgeFemale"
@@ -1951,6 +1967,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_rhahkzor"
 name = "Rhahk'Zor"
+temper = "bruiser"
 subname = "The Foreman"
 display = 1051
 health = 1900
@@ -2489,6 +2506,7 @@ perks = [{ kind = "regen", amount = 0.003 }]
 [[mob]]
 key = "dm_cookie_gorged"
 name = "Cookie"
+temper = "erratic"
 subname = "Gorged on the Stew"
 display = 1773
 scale = 0.85
@@ -2554,6 +2572,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_vancleef_unbowed"
 name = "Edwin VanCleef"
+temper = "duelist"
 subname = "Unbowed"
 display = 2029
 clips_from = "DwarfMale"
@@ -2626,6 +2645,7 @@ slay_sound = 5781
 [[mob]]
 key = "dm_miner_johnson"
 name = "Miner Johnson"
+temper = "coward"
 subname = "Silver-Mad"
 display = 2363
 clips_from = "TaurenMale"
@@ -2686,6 +2706,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_marisa"
 name = "Marisa du'Paige"
+temper = "caster"
 subname = "Brotherhood Spellblade"
 display = 2317
 clips_from = "OrcMale"
@@ -2747,6 +2768,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_noble"
 name = "Brainwashed Noble"
+temper = "caster"
 subname = "Not Himself"
 display = 2364
 clips_from = "TrollMale"
@@ -2815,6 +2837,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_wizard"
 name = "Defias Wizard"
+temper = "caster"
 subname = "Defias Brotherhood"
 display = 2329
 clips_from = "TaurenFemale"
@@ -2859,6 +2882,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_evoker"
 name = "Defias Evoker"
+temper = "caster"
 subname = "Defias Brotherhood"
 display = 2353
 clips_from = "TrollMale"
@@ -2904,6 +2928,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_craftsman"
 name = "Goblin Craftsman"
+temper = "skirmisher"
 subname = "Venture Co."
 display = 7049
 health = 100
@@ -2942,6 +2967,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_taskmaster"
 name = "Defias Taskmaster"
+temper = "commander"
 subname = "Defias Brotherhood"
 display = 2316
 clips_from = "TaurenMale"
@@ -2986,6 +3012,7 @@ respawn = 0.0
 [[mob]]
 key = "dm_strip_miner"
 name = "Defias Strip Miner"
+temper = "coward"
 subname = "Defias Brotherhood"
 display = 2312
 clips_from = "ScourgeFemale"
