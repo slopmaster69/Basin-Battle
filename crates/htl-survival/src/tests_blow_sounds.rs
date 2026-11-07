@@ -43,3 +43,9 @@ fn the_brainwashed_nobles_voice_is_heard_as_it_gathers() {
     let (sound, heard) = heard_as_it_winds_up("dm_noble", "the voice");
     assert!(sound != 0 && heard, "sound {sound}");
 }
+
+#[test]
+fn the_crossbowmans_kick_is_no_bow_drawn() {
+    let (sound, _) = heard_as_it_winds_up("dm_crossbowman", "kick");
+    assert_eq!(sound, 0);
+}
