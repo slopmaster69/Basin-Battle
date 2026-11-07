@@ -160,7 +160,8 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   to 5 s later. Matching by the run each sound fell in fixed it.
 - **Damage per cast against a pirate (176 health)**, played well, from the same sweep:
   - Mage: Fireball 47 on one (1.2 s charge, 3 s cooldown), Frostbolt 32, Pyroblast 58 for 25
-    Valor; Meteor 141 split over three for all 100 Valor (47 each: not one pirate).
+    Valor; Meteor 141 over three (47 each). That Meteor was a short tap; held full it is 70 on
+    each, 84 on the flare (a misreading of mine, corrected Nov 7).
   - Shaman: Lava Burst 96 over three (32 each) on a 4 s cooldown; Earthquake, Chain Lightning
     and Thunderstorm all hit all three.
   - Warrior: Shockwave 84 and Cleave 72 over three, every 8 s.
@@ -184,3 +185,34 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   their hero. That made the pirate already in reach take every turn (10 strings to 0), so the
   turn goes to the one that has waited longest. Now 5 strings each, nothing together, something
   winding up at the hero 59% of the time (68% before), the longest quiet spell 1.5 s.
+
+## Nov 7, morning
+
+- **The Mage, tuned** (Corey: "tune the mage, then we focus on enemies all day"). Fireball now
+  explodes on what it hits: its damage and burn on every enemy within 2.5 yd, Lava Burst's burst
+  of fire where it struck. Pyroblast stays one target, 48 to 64, the pick for one big foe. Meteor
+  45 to 90 (108 on the flare), knocked back 3 yd instead of 6, which threw them out of its own
+  burning crater. Two bugs found on the way: a bursting projectile that struck a foe cast its
+  spell again at the spot, flying a second missile there from the caster (Gravity Lance and
+  Collapse did it too), and it dropped its critical's effects (a perfect Fireball's 8 sec burn).
+- **The sparks' 0.1 s**: the server sends a creature's blow and the health drop in one tick, and
+  the client spawns the blood on the frame it hears the blow. The likely lag is the effect's own
+  emitter, which births its first particle only once its rate has added up to one. Not yet
+  changed: a client patch that primes a one-shot effect's emitters.
+- **Corey's run, 06:15 to 06:30** (the Playtest folder, a Warrior, filmed by the session
+  recorder): three falls, to Mr. Smite (unguarded), Marisa (a heavy blow, mid-swing) and Gilnid
+  (a heavy blow through the guard). Read from the film's health bar, he met each boss already
+  worn down: 32 of 200 ten seconds before Smite, 27 before Marisa's ring, 6 at Gilnid. No fall was
+  one unfair blow; each was the first big blow after a long drain.
+- **A careful player, simulated** (#251, `tests_fair_hero.rs`): 0.3 s reaction, no markers;
+  parries what it can block, rolls heavy blows and bolts, bashes casts in reach, keeps a roll's
+  stamina, waits out a boss's string. Every pack 5 times. No blow anywhere is too quick to
+  answer (one Evoker pair's, once in 5), and almost every ordinary pack costs it nothing. Bosses
+  cost some: VanCleef 49% of health on average (96% worst), Rhahk'Zor 56%, the Shredder 35%,
+  Smite 7%. No boss falls to 90 s of the starting sword.
+- **So "too hard" is not unanswerable blows now; it's what a human misses adding up.** Each
+  missed parry on a pirate is 12 to 18, a heavy one 30 to 60, and a lamp gives 200 health and 3
+  Draughts of 80. The film shows the drain: 200 to 27 over the minute before Marisa. The levers
+  are the health between lamps, the heavy blows' cost when misread (a guard against a heavy one
+  breaks: two of the three falls), and how long a boss takes to kill.
+
