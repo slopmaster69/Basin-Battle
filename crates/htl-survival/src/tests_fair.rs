@@ -404,3 +404,33 @@ fn a_pirates_blade_and_a_casters_bolt_never_land_together() {
     let close: Vec<(f32, f32)> = bolts.iter().flat_map(|&t| blades.iter().filter(move |&&u| (u - t).abs() < 0.3).map(move |&u| (t, u))).collect();
     assert!(close.is_empty(), "a bolt and a blade within 0.3 s: {close:?}");
 }
+
+#[test]
+fn two_pirates_on_one_hero_take_the_turns_in_turn() {
+    // The one already in reach took every turn and the other only circled (30 s, none).
+    let (mut s, p) = turns_world();
+    if let Some(h) = s.players.get_mut(&p) {
+        h.max_health = 100_000;
+        h.health = 100_000;
+    }
+    let pirate = s.content.mob("dm_pirate").unwrap();
+    let a = s.spawn_mob(pirate, [2.0, 1.0, 0.0], None, false);
+    let b = s.spawn_mob(pirate, [6.0, -2.0, 0.0], None, false);
+    for m in [a, b] {
+        s.mobs.get_mut(&m).unwrap().state = MobState::Chase { foe: Foe::Hero(p) };
+    }
+    let (mut na, mut nb) = (0, 0);
+    for _ in 0..1500 {
+        for e in s.step(0.02) {
+            if let Event::MobWindup { id, .. } = e {
+                if id == a {
+                    na += 1;
+                } else if id == b {
+                    nb += 1;
+                }
+            }
+        }
+    }
+    assert!(na >= 3 && nb >= 3, "blows wound up: {na} and {nb}");
+    assert!((na as i32 - nb as i32).abs() <= na.max(nb) as i32 / 2, "shared: {na} and {nb}");
+}
