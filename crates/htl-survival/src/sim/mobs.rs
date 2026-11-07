@@ -325,6 +325,8 @@ impl Survival {
                 special: false,
                 pattern: None,
                 lunged: false,
+                moved_at: -1.0e9,
+                string_done_at: -1.0e9,
                 guarding: false,
                 circle: if id % 2 == 0 { 1.0 } else { -1.0 },
                 sidle: None,
@@ -1194,6 +1196,10 @@ impl Survival {
             }
         }
         let walked = m.speed * dt - left;
+        // Running up (not stepping round or back facing its foe, which it does settled).
+        if walked > 1.0e-3 && m.sidle.is_none() {
+            m.moved_at = now;
+        }
         let (x, y, was) = (m.pos[0], m.pos[1], m.pos[2]);
         let leg_end = m.path.first().map(|p| p[2]);
         let mut z = self.land.height_near(x, y, was);
@@ -1324,6 +1330,59 @@ impl Survival {
         m.speed = speed;
         m.sidle = Some(foe);
         self.events.push(Event::MobMove { id, path: vec![from, to], speed, face: Some(foe) });
+    }
+
+    /// A creature waiting its turn: it stops where it is and faces `to`.
+    fn hold_facing(&mut self, id: Id, to: Vec3) {
+        let Some(m) = self.mobs.get(&id) else { return };
+        let (pos, moving) = (m.pos, !m.path.is_empty());
+        let face = facing(pos, to);
+        let turned = (face - m.facing + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+        if moving {
+            self.halt(id);
+        }
+        if moving || turned.abs() > 0.35 {
+            self.mobs.get_mut(&id).unwrap().facing = face;
+            self.events.push(Event::MobStop { id, pos, facing: face });
+        }
+    }
+
+    /// Whether a caster holds its cast at `foe`: a blow up close winds up at the same hero. (With
+    /// one string at a time and a breath after each, there are gaps to cast in.)
+    pub(crate) fn caster_waits(&self, id: Id, foe: Foe) -> bool {
+        let Foe::Hero(h) = foe else { return false };
+        if self.content.ai.turn_beat <= 0.0 {
+            return false;
+        }
+        self.mobs.iter().any(|(oid, o)| {
+            *oid != id && o.health > 0 && !self.attack_now(*oid).ranged && matches!(o.state, MobState::Windup { foe: Foe::Hero(x), .. } if x == h)
+        })
+    }
+
+    /// Whether creature `id` holds its blow at `foe`: another is in a string (or a lone blow) at the
+    /// same hero, winding up or recovering, or finished one less than `ai.turn_beat` ago (the
+    /// hero's breath between strings); or (a blow up close, `settle`) it ran up less than
+    /// `ai.arrive_beat` ago.
+    pub(crate) fn waits_turn(&self, id: Id, foe: Foe, dist: f32, settle: bool) -> bool {
+        let Foe::Hero(h) = foe else { return false };
+        let (now, ai) = (self.clock, &self.content.ai);
+        let Some(me) = self.mobs.get(&id) else { return false };
+        if settle && ai.arrive_beat > 0.0 && now - me.moved_at < ai.arrive_beat && dist <= PRESS_RANGE {
+            return true;
+        }
+        if ai.turn_beat <= 0.0 {
+            return false;
+        }
+        self.mobs.iter().any(|(oid, o)| {
+            *oid != id
+                && o.health > 0
+                && !self.attack_now(*oid).ranged
+                && match o.state {
+                    MobState::Windup { foe: Foe::Hero(x), .. } | MobState::Recover { foe: Foe::Hero(x), .. } => x == h,
+                    MobState::Chase { foe: Foe::Hero(x) } => x == h && now - o.string_done_at < ai.turn_beat,
+                    _ => false,
+                }
+        })
     }
 
     /// Hero `hero`'s foes in the middle of an attack on them (winding up or between blows).
@@ -1808,8 +1867,10 @@ impl Survival {
                 let reach = if a.ranged { a.range } else { a.range + size - 0.3 };
                 let sees = !a.ranged || clear_line(self.land.as_ref(), pos, to);
                 let ready = now >= self.mobs[&id].ready_at;
-                // A caster's patterns: a blast up close, a volley from afar.
-                if a.ranged && !d.patterns.is_empty() && ready && sees {
+                // A caster's patterns: a blast up close, a volley from afar. It begins a cast at a
+                // hero only between the blows up close on them (not while one winds up, nor just
+                // after it lands): a bolt and a slash never come at once.
+                if a.ranged && !d.patterns.is_empty() && ready && sees && !self.caster_waits(id, foe) {
                     if let Some(k) = self.pick_pattern(id, dist, size) {
                         self.begin_pattern(id, k, true);
                         self.windup(id, foe, to);
@@ -1870,6 +1931,15 @@ impl Survival {
                     // farther off, a combo up close).
                     if ready {
                         if let Some(k) = self.pick_pattern(id, dist, size) {
+                            // One blow at a time on a hero, and a beat to settle after walking
+                            // up (but a lunge or a charge from afar is its own tell).
+                            let near = d.patterns[k].min_range < SPACE_FROM;
+                            let shot = d.patterns[k].steps.first().and_then(|st| st.ranged) == Some(true);
+                            if !shot && self.waits_turn(id, foe, dist, near) {
+                                // It holds where it is, facing its foe, ready.
+                                self.hold_facing(id, to);
+                                return;
+                            }
                             // A fighter's own missile wants a clear line, like a caster's; it may
                             // loose one while two others are at the hero (it isn't one of the two).
                             let shot = d.patterns[k].steps.first().and_then(|st| st.ranged) == Some(true);
@@ -1882,7 +1952,12 @@ impl Survival {
                         }
                     }
                 } else if dist <= reach && sees && (ready || matches!(foe, Foe::Hero(h) if self.presses(id, h, dist))) {
-                    self.windup(id, foe, to);
+                    let waits = if a.ranged { self.caster_waits(id, foe) } else { self.waits_turn(id, foe, dist, true) };
+                    if !waits {
+                        self.windup(id, foe, to);
+                        return;
+                    }
+                    self.hold_facing(id, to);
                     return;
                 }
                 // Close in (a caster stops at its distance).
@@ -2032,12 +2107,20 @@ impl Survival {
                         }
                     }
                     match (self.mobs[&id].pattern, self.foe_pos(foe)) {
+                        // A caster's next cast in a string waits too while a blow up close
+                        // winds up at its hero (or has just landed).
+                        (Some(_), Some(to)) if self.attack_now(id).ranged && self.caster_waits(id, foe) => {
+                            if let Some(m) = self.mobs.get_mut(&id) {
+                                m.state = MobState::Recover { foe, until: now + 0.1 };
+                            }
+                        }
                         // Mid-string: the next blow, turned on the foe wherever they've got to.
                         (Some(_), Some(to)) => self.windup(id, foe, to),
                         _ => {
                             let m = self.mobs.get_mut(&id).unwrap();
                             let strung = m.pattern.take().is_some();
                             m.state = MobState::Chase { foe };
+                            m.string_done_at = now;
                             // A string done: now and then it gives ground (a boss: it makes
                             // space for a blow from afar, or goes straight into another string).
                             if let (false, Foe::Hero(h)) = (strung, foe) {
@@ -2078,6 +2161,12 @@ impl Survival {
         let slow = self.cowed_slow(id);
         if slow > 0.0 {
             a.windup *= 1.0 + slow;
+        }
+        // A string's first blow up close (or a lone one) never comes quicker than a hero can
+        // answer from inside their own swing.
+        let first = m.pattern.is_none_or(|(_, s)| s == 0);
+        if first && !a.ranged {
+            a.windup = a.windup.max(self.content.ai.first_blow);
         }
         let cut = self.cowed_cut(id);
         if cut > 0.0 {

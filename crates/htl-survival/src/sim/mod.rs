@@ -871,6 +871,10 @@ pub struct Mob {
     /// has begun.
     pub pattern: Option<(usize, usize)>,
     pub lunged: bool,
+    /// When it last ran a step, and when its last string (or lone blow) was done, recovery and
+    /// all: the beat it settles for before a blow up close, and the breath the others wait for.
+    pub moved_at: f32,
+    pub string_done_at: f32,
     /// Its shield is up (shown).
     pub guarding: bool,
     /// Which way it circles a foe while it waits its turn (1 or -1), and the foe it keeps facing
