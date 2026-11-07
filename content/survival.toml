@@ -260,6 +260,20 @@ leash_scale = 4.0
 # The string a boss just began is `repeat` times as likely to come again next, so it seldom does
 # the same thing twice running.
 repeat = 0.3
+# A string's first blow (or a lone blow) up close winds up at least this long, at any phase's pace.
+# (Nov 7 2026: half of every creature's first blows, 170 of 340, came quicker than a hero can
+# answer from inside the starting sword's light swing, which commits for 0.50 s before a dodge can
+# cut it; "mid-swing" was the commonest way a foot soldier felled a hero on Nov 6. The sword's 0.50
+# and a dodge's first 0.04 is 0.54: 0.6 leaves a little to read it by. See tests_fair.rs.)
+first_blow = 0.6
+# One string at a time on a hero: while another creature is in a string at them up close (winding
+# up or recovering), and for this long after it's done, the next waits: the hero's breath, to hit
+# back or go for the caster. And one that has just run up settles this long before its string up
+# close. (Nov 7 2026, Corey: "the two pirates are spam attacking so quick and
+# together that you don't really feel like you have a gap", "both doing the same animation in
+# different frames".)
+turn_beat = 0.8
+arrive_beat = 0.35
 # A quarter of a boss's strings up close have one blow held a beat, up to `hold_secs` longer in
 # its wind-up (at least 40% of that, so it shows): the delayed swing, so a parry timed by rote
 # comes early. Its wind-up shows the whole of it.

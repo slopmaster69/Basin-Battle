@@ -858,7 +858,9 @@ then_look = 24171
   name = "staff"
   weight = 2.0
   max_range = 3.0
-  steps = [ { from = "ScourgeFemale", clip = 17, take = 0, ranged = false, windup = 0.55, damage = 18, range = 2.9, arc = 100.0, recovery = 0.15 }, { from = "GnomeFemale", clip = 17, take = 1, ranged = false, windup = 0.45, damage = 18, range = 2.9, arc = 100.0, recovery = 0.9 } ]
+  # (The second swing no guard stops: 0.3 after the first, not 0.15, so a hero out of the first's
+  # dodge can dodge again: tests_fair.rs, Nov 7 2026.)
+  steps = [ { from = "ScourgeFemale", clip = 17, take = 0, ranged = false, windup = 0.55, damage = 18, range = 2.9, arc = 100.0, recovery = 0.3 }, { from = "GnomeFemale", clip = 17, take = 1, ranged = false, windup = 0.45, damage = 18, range = 2.9, arc = 100.0, recovery = 0.9 } ]
   [[mob.pattern]]
   name = "deep sleep"
   weight = 2.0

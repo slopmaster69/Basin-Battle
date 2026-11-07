@@ -111,8 +111,10 @@ fn the_guard_raised_while_a_blow_winds_up_calls_it_off_and_gives_its_stamina_bac
 
 #[test]
 fn a_forward_swing_spares_what_is_behind_or_beyond_a_wall() {
-    // A wall between the hero and an enemy right in front, at swinging distance.
-    let land = FlatLand { walls: vec![([1.4, 6.0], 0.4)], ..Default::default() };
+    // A wall between the hero and an enemy right in front, at swinging distance: on the line from
+    // where the hero swings at it (it stood 0.8 yd off that line, and only passed while the enemy
+    // happened to have walked out of the arc).
+    let land = FlatLand { walls: vec![([1.3, 4.75], 0.4)], ..Default::default() };
     let mut s = world_with(land);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let ahead = mob(&mut s, "grunt", [2.6, 0.0, 0.0]);
@@ -125,11 +127,19 @@ fn a_forward_swing_spares_what_is_behind_or_beyond_a_wall() {
     let ev = run(&mut s, 1.0);
     assert_eq!(hits_on(&ev, ahead).len(), 1, "the one in front is struck once");
     assert!(hits_on(&ev, behind).is_empty(), "nothing behind is struck");
-    // Facing the walled one: the wall takes it.
+    // Facing the walled one: the wall takes it. (It's held behind its wall: roused, it would come
+    // round to the hero, and the swing is about the wall.)
     s.move_player(p, [0.0, 3.5, 0.0], facing([0.0, 3.5, 0.0], [2.6, 6.0, 0.0]), Moving::default());
     run(&mut s, 0.5);
     s.input(p, Input::Attack);
-    let ev = run(&mut s, 1.0);
+    let mut ev = Vec::new();
+    for _ in 0..(1.0 / DT) as usize {
+        let w = s.mobs.get_mut(&walled).unwrap();
+        w.pos = [2.6, 6.0, 0.0];
+        w.path.clear();
+        w.state = MobState::Idle { wander_at: 1e9 };
+        ev.extend(s.step(DT));
+    }
     assert!(hits_on(&ev, walled).is_empty(), "not through a wall");
 }
 
