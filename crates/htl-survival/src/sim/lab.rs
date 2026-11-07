@@ -116,6 +116,26 @@ impl Survival {
         self.events.push(Event::Effects { player: hero });
     }
 
+    /// One of the lab's creatures plays one of its strings at the hero, the whole of it: the string
+    /// named `name` (spaces as `_`, any case), every blow, each after the last one's recovery. False
+    /// if it has no string by that name. (The bestiary: every creature's every string filmed the
+    /// same way.)
+    pub fn lab_blow_string(&mut self, mob: Id, hero: Id, name: &str) -> bool {
+        let want = name.replace('_', " ").to_lowercase();
+        let Some(def) = self.mobs.get(&mob).map(|m| m.def) else { return false };
+        let Some(k) = self.content.mobs[def].patterns.iter().position(|p| p.name.to_lowercase() == want) else { return false };
+        // Played as written: no boss's cut, extended or held blow.
+        self.begin_pattern(mob, k, false);
+        self.lab_string = Some(mob);
+        self.lab_blow(mob, hero);
+        true
+    }
+
+    /// Whether `mob` is playing a string the lab asked for (it may wind up its next blow).
+    pub(crate) fn lab_stringing(&self, mob: Id) -> bool {
+        self.lab_string == Some(mob) && self.mobs.get(&mob).is_some_and(|m| m.pattern.is_some())
+    }
+
     pub fn lab_blow(&mut self, mob: Id, hero: Id) {
         let Some(at) = self.players.get(&hero).map(|p| p.pos) else { return };
         if self.mobs.get(&mob).is_some_and(|m| m.health > 0) {
@@ -133,7 +153,14 @@ impl Survival {
     /// they never start one of their own (`lab_quiet`): a struck brave's own blow once staggered
     /// the hero and the run's next ability never came out.
     pub fn lab_hold(&mut self, mobs: &[Id]) {
+        // A string the lab asked for plays to its end, then the body is held again.
+        if self.lab_string.is_some_and(|m| !self.lab_stringing(m)) {
+            self.lab_string = None;
+        }
         for m in mobs {
+            if self.lab_stringing(*m) {
+                continue;
+            }
             let chasing = self.mobs.get(m).is_some_and(|x| matches!(x.state, MobState::Chase { .. } | MobState::Recover { .. }));
             if chasing {
                 self.halt_mob(*m);
@@ -411,6 +438,31 @@ mod tests {
         // Cleared away, it's an ordinary creature again.
         s.lab_clear(&[m]);
         assert!(s.lab_quiet.is_empty());
+    }
+
+    #[test]
+    fn a_blow_step_by_a_strings_name_plays_every_blow_of_it_then_the_body_is_held() {
+        let mut s = Survival::new(Content::dev(), Box::new(FlatLand::default()), 7, 1_000_000.0);
+        s.mobs.clear();
+        s.respawns.clear();
+        let p = s.join("ayla", "Ayla", None);
+        s.move_player(p, [0.0, 0.0, 0.0], 0.0, Moving::default());
+        let _ = s.step(0.0);
+        // The Deadmines pirate's two slashes, right then left.
+        let m = s.lab_scene(p, "close", "dm_pirate").unwrap()[0];
+        assert!(!s.lab_blow_string(m, p, "no such string"));
+        assert!(s.lab_blow_string(m, p, "TWO_SLASHES"), "found by its name, any case");
+        // Both blows wind up, the lab holding its bodies between steps as it does.
+        let mut windups = 0;
+        for _ in 0..300 {
+            s.lab_hold(&[m]);
+            windups += s.step(0.02).iter().filter(|e| matches!(e, Event::MobWindup { id, .. } if *id == m)).count();
+        }
+        assert_eq!(windups, 2, "both slashes");
+        // (The server holds its bodies before each step of the rules.)
+        s.lab_hold(&[m]);
+        assert!(s.lab_string.is_none(), "done, it's held again");
+        assert!(matches!(s.mobs[&m].state, MobState::Idle { .. }), "{:?}", s.mobs[&m].state);
     }
 
     #[test]
