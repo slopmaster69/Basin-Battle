@@ -2,6 +2,7 @@
 
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
 use crate::folder::{Kind, Paths};
 
@@ -78,4 +79,49 @@ fn start_checkout(paths: &Paths, l: &Launch) -> Result<Child, String> {
         c.process_group(0);
     }
     c.spawn().map_err(|e| format!("The game didn't start ({e})."))
+}
+
+/// On a Mac, scripts/play.sh may rebuild the client for many minutes before the game starts (after
+/// an update, or the first time). The game counts as open once its process is up, so Play stays on
+/// screen, saying what's happening, until then. If play.sh ends first, the last line it wrote
+/// (logs/launcher-game.log) says why.
+pub fn wait_until_open(paths: &Paths, child: &mut Child, mut say: impl FnMut(String)) -> Result<(), String> {
+    if paths.kind != Kind::Checkout {
+        return Ok(());
+    }
+    let log = paths.root.join("logs").join("launcher-game.log");
+    let t0 = Instant::now();
+    let mut building = false;
+    loop {
+        std::thread::sleep(Duration::from_millis(700));
+        if crate::proc::game_running() {
+            return Ok(());
+        }
+        let text = std::fs::read_to_string(&log).unwrap_or_default();
+        if text.contains("Building") || text.contains("Compiling") {
+            let mins = t0.elapsed().as_secs() / 60;
+            if !building || t0.elapsed().as_secs() % 30 == 0 {
+                say(if mins == 0 {
+                    "Building the game with the latest changes. The first time can take 20 min…".into()
+                } else {
+                    format!("Building the game with the latest changes ({mins} min). The first time can take 20 min…")
+                });
+            }
+            building = true;
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            if crate::proc::game_running() {
+                return Ok(());
+            }
+            let last = text.lines().rev().map(str::trim).find(|l| !l.is_empty()).unwrap_or("").to_string();
+            return Err(if last.is_empty() {
+                format!("The game closed before it opened ({status}). See logs/launcher-game.log.")
+            } else {
+                format!("The game didn't start: {last} (more in logs/launcher-game.log)")
+            });
+        }
+        if t0.elapsed() > Duration::from_secs(60 * 60) {
+            return Err("The game took over an hour to start. See logs/launcher-game.log.".into());
+        }
+    }
 }
