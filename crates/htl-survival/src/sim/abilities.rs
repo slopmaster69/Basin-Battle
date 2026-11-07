@@ -2679,6 +2679,13 @@ impl Survival {
         if killed && d.kill_recast > 0.0 {
             self.death_kill(owner, ability);
         }
+        // Shadow Word: Death's lance landing: a flash of shadow on the body it struck, for everyone
+        // (Corey couldn't tell on film that the foe was hit), bigger when it judged or killed.
+        if d.low_health > 0.0 {
+            let (h, max) = self.players.get(&victim).map(|p| (p.health, p.max_health)).or_else(|| self.mobs.get(&victim).map(|m| (m.health, m.max_health))).unwrap_or((1, 1));
+            let judged = ((h as f32) + (damage as f32)) < d.low_health * (max as f32);
+            self.events.push(Event::PriestLook { player: owner, kind: "death", n: if killed { 2 } else { 1 }, on: Some(victim), a: if judged { 1.0 } else { 0.0 }, b: 0.0 });
+        }
         // Shadow Word: Death that didn't kill: its backlash on the caster.
         if d.backlash > 0.0 && !killed && self.players.get(&owner).is_some_and(|p| p.health > 0) {
             let dmg = d.backlash.round() as u32;

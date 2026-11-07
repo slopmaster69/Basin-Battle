@@ -1,7 +1,9 @@
 -- Elwynn Survival: the spell lab's camera (dev builds' `.es lab`, see docs/spell-lab.md).
 --
 -- The server sends, when a lab run starts:
---   LB n ms label [cam] [secs]   (cam: behind, close or none; behind if it's missing)
+--   LB n ms label [cam] [secs] [hud]   (cam: behind, close or none; behind if it's missing;
+--                                       hud: the hero's own bars kept in the film)
+--   LW secs speed keys           (a `walk:` step: the body runs that long, that fast, that way)
 -- and this takes n screenshots, one every ms milliseconds, from now: the frames the server's
 -- trace (logs/lab/<label>.txt) is timed against. The client numbers shots taken within one second
 -- (WoWScrnShot_<date>_<time>_2.png ...), so a burst keeps every frame. The "Screen captured"
@@ -18,6 +20,21 @@ ES.lab = lab
 
 local frame = CreateFrame("Frame")
 frame:Hide()
+
+-- The aiming reticle stays in the film while the interface is hidden (Corey couldn't see the
+-- Shield aimed at the friend): lifted onto the world for the burst, put back after.
+local function KeepReticle(on, hud)
+  local frames = { ElwynnSurvivalAim }
+  -- `hud`: the health and stamina bars too (the health bar's shield and overhealth on film).
+  if hud or not on then table.insert(frames, ElwynnSurvivalVitals) end
+  for i = 1, table.getn(frames) do
+    local f = frames[i]
+    if f then
+      if on then f:SetParent(WorldFrame) else f:SetParent(UIParent) end
+      f:SetFrameStrata("HIGH")
+    end
+  end
+end
 
 local function Quiet(on)
   if not ScreenshotStatus then return end
@@ -38,6 +55,7 @@ frame:SetScript("OnUpdate", function()
     if lab.show_at and now < lab.show_at then return end
     lab.show_at = nil
     if UIParent then UIParent:Show() end
+    KeepReticle(false)
     frame:Hide()
     Quiet(false)
     if DEFAULT_CHAT_FRAME and lab.taken > 0 then
@@ -74,6 +92,12 @@ local function Frame(cam)
   end
 end
 
+-- A `walk:` step. The client moves the hero and an add-on may not hold a move key, so the body
+-- runs it as a dash does (the action layer's), at the pace the server says is the hero's now.
+function ES.LabWalk(f)
+  if ActionDash then ActionDash(tonumber(f[2]) or 1, tonumber(f[3]) or 7, f[4] or "f") end
+end
+
 function ES.LabLine(f)
   Frame(f[5] or "behind")
   lab.left = tonumber(f[2]) or 30
@@ -86,6 +110,11 @@ function ES.LabLine(f)
   if secs < lab.left * lab.every then secs = lab.left * lab.every end
   lab.show_at = lab.next + secs + 1.0
   Quiet(true)
+  local hud = f[7] or ""
+  KeepReticle(true, string.sub(hud, 1, 3) == "hud")
+  if string.sub(hud, 1, 4) == "hud:" and ElwynnSurvivalLedger and ElwynnSurvivalLedger.BarLook then
+    ElwynnSurvivalLedger.BarLook(string.sub(hud, 5))
+  end
   if UIParent then UIParent:Hide() end
   frame:Show()
 end

@@ -7,13 +7,9 @@ SMSG_SPELLHEALLOG from me or my pet onto someone else spawns a green number over
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 ---
- crates/benilla-app/src/combat_log/mod.rs  |  3 +-
- crates/benilla-app/src/combat_log/text.rs | 92 ++++++++++++++++++++++-
- crates/benilla-ui/src/action_combat.rs    |  6 +-
- 3 files changed, 97 insertions(+), 4 deletions(-)
 
 diff --git a/crates/benilla-app/src/combat_log/mod.rs b/crates/benilla-app/src/combat_log/mod.rs
-index d8c5de8f..5b0023eb 100644
+index d8c5de8..5b0023e 100644
 --- a/crates/benilla-app/src/combat_log/mod.rs
 +++ b/crates/benilla-app/src/combat_log/mod.rs
 @@ -193,10 +193,11 @@ fn on_periodic_aura_log(In(ev): In<SessionEvent>, c: Ctx, mut l: Sinks) {
@@ -30,7 +26,7 @@ index d8c5de8f..5b0023eb 100644
  }
  
 diff --git a/crates/benilla-app/src/combat_log/text.rs b/crates/benilla-app/src/combat_log/text.rs
-index 37cadd0c..c5821e9f 100644
+index 37cadd0..c5821e9 100644
 --- a/crates/benilla-app/src/combat_log/text.rs
 +++ b/crates/benilla-app/src/combat_log/text.rs
 @@ -8,8 +8,8 @@
@@ -147,13 +143,13 @@ index 37cadd0c..c5821e9f 100644
      const MOB: u64 = 20;
      const FIREBALL: u32 = 133;
 diff --git a/crates/benilla-ui/src/action_combat.rs b/crates/benilla-ui/src/action_combat.rs
-index 82086c3b..55ca194b 100644
+index e93d26f..d0f97be 100644
 --- a/crates/benilla-ui/src/action_combat.rs
 +++ b/crates/benilla-ui/src/action_combat.rs
-@@ -275,6 +275,10 @@
- //!   nothing for none, at most 1.5. The add-on sets it while a bow is drawn: 1.12's draw stands
- //!   side-on, and from the camera over the right shoulder the turned back and head hid the view
- //!   and the bow pointed off the reticle.
+@@ -290,6 +290,10 @@
+ //!   instead of on the hero's back. Eased in and out, and given way to the aiming camera and the
+ //!   lock-on, which seat themselves. `0` or nothing for the stock centred camera; at most 2 yd
+ //!   either side and 1.5 up.
 +//!
 +//! The twenty-eighth (`HasActionCombat() >= 28`): a heal you or your pet cast on someone else
 +//! floats its number in green over them (`SMSG_SPELLHEALLOG`; 1.12 floats no heal). Nothing new
@@ -161,7 +157,7 @@ index 82086c3b..55ca194b 100644
  
  use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
  
-@@ -1207,7 +1211,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
+@@ -1252,7 +1256,7 @@ pub(crate) fn install(lua: &Lua) -> mlua::Result<()> {
      )?;
      g.set(
          "HasActionCombat",
@@ -170,6 +166,3 @@ index 82086c3b..55ca194b 100644
      )?;
      g.set(
          "SetCameraUnitCollision",
--- 
-2.56.0.windows.4
-
