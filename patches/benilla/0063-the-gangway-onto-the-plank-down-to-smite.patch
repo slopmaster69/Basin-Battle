@@ -1,0 +1,86 @@
+From f3b76f1a1a18e41063f2df16213cda3e4b52c67a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 11:59:56 -0600
+Subject: [PATCH] The gangway off the Juggernaut onto the plank down to Mr.
+ Smite is solid
+
+Corey (7 Nov): the ramp down to Mr. Smite is broken right where you step off the ship onto it; you can't walk onto it and have to jump. The Deadmines' data leaves a 5 yd hole between the gun deck's sloping edge (z 30) and the plank's top (z 31.5), over a trough at z 27.7; neither the client nor the server's map has anything there, so a walking hero fell into the trough and a running jump was the only way across. Basin Battle adds its own pieces to a map's floor: a MapBridge walkable collider (nothing drawn: the planks are in the art), spawned with a WMO-only map's building and dropped with the map, from a per-map list the server's htl-map mirrors (DEADMINES_BRIDGES).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ crates/benilla-world/src/terrain_stream.rs | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+
+diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
+index a3ccc86f..9d591f5c 100644
+--- a/crates/benilla-world/src/terrain_stream.rs
++++ b/crates/benilla-world/src/terrain_stream.rs
+@@ -575,6 +575,8 @@ fn stream_terrain(
+         // `None` only under `WOW_STATIC_GX=0`.
+         Option<ResMut<crate::static_gx::StaticGx>>,
+     ),
++    // Basin Battle: the pieces it adds to a map's floor ([`MapBridge`]), dropped with the map.
++    bridges: Query<Entity, With<MapBridge>>,
+ ) {
+     let (mut welds, mut static_merge, mut staticgx) = batchers;
+     let (current_map, map_catalog, view) = location;
+@@ -612,6 +614,9 @@ fn stream_terrain(
+         state.map_dir = Some(dir.clone());
+         state.wdt = Some(asset_server.load(format!("mpq://World/Maps/{dir}/{dir}.wdt")));
+         state.wdt_ungated = false;
++        for e in &bridges {
++            commands.entity(e).despawn();
++        }
+     }
+     // A failed WDT falls back to ungated probing, warned once per map, never to no world.
+     let wdt_index = state.wdt.as_ref().and_then(|h| wdts.get(h));
+@@ -652,6 +657,18 @@ fn stream_terrain(
+                     name_set: g.name_set,
+                 },
+             );
++            // Basin Battle: the pieces Elwynn Survival adds to this dungeon's floor, walkable
++            // from either side (both windings), beside the building's own colliders.
++            for tri in map_bridges(&dir) {
++                let verts: Vec<Vec3> = tri.iter().map(|&p| wow_to_bevy(p)).collect();
++                commands.spawn((
++                    MapBridge,
++                    avian3d::prelude::RigidBody::Static,
++                    avian3d::prelude::Collider::trimesh(verts, vec![[0, 1, 2], [0, 2, 1]]),
++                    walk_layers(),
++                    Transform::default(),
++                ));
++            }
+             state.global_wmo = true;
+         }
+     }
+@@ -1186,6 +1203,30 @@ fn register_doodad(
+ }
+ 
+ /// Register one WMO placement, or bump its refcount; a 1.12 WMO placement has no scale.
++/// Basin Battle: a piece Elwynn Survival adds to a map's floor where the game's data leaves a
++/// gap, a walkable collider with nothing drawn (the planks are there in the art already).
++#[derive(Component)]
++pub(crate) struct MapBridge;
++
++/// The Deadmines' added pieces, triangles in WoW coordinates; the server's htl-map
++/// (`deadmines.rs`, `DEADMINES_BRIDGES`) holds the same list: change both together.
++/// 1. The gangway off the Juggernaut's gun deck onto the plank down to Mr. Smite's dock: the
++///    data leaves a 5 yd hole between the deck's sloping edge (z 30) and the plank's top
++///    (z 31.5), over a trough at z 27.7, which players had to jump.
++const DEADMINES_BRIDGES: [[[f32; 3]; 3]; 2] = [
++    [[-33.0, -799.3, 30.2], [-36.5, -802.0, 31.4], [-34.6, -807.0, 30.5]],
++    [[-33.0, -799.3, 30.2], [-34.6, -807.0, 30.5], [-31.0, -804.3, 31.5]],
++];
++
++/// The pieces added to the map in directory `dir`.
++fn map_bridges(dir: &str) -> &'static [[[f32; 3]; 3]] {
++    if dir.eq_ignore_ascii_case("DeadminesInstance") {
++        &DEADMINES_BRIDGES
++    } else {
++        &[]
++    }
++}
++
+ fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &WmoInstance) {
+     if let Some(p) = placements.by_id.get_mut(&w.unique_id) {
+         p.refs += 1;
