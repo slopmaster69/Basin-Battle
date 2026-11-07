@@ -75,3 +75,27 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   winding up (two alternating strings cover the clock). Now the next waits for the other's whole
   string, recovery included, and 0.8 s after (`turn_beat`); casters cast only while no blow up
   close winds up at their hero.
+- **No free hits on a broken guard** (#238): Mr. Smite's four-blow flurry broke a buckler on its
+  third blow (a block costs 6 stamina and 90% of the blow) and the fourth landed 0.07 s after the
+  hero could move; a creature also took a reeling hero as an opening and began a new string.
+  Now the breaker's string ends, and no creature begins a blow up close at a reeling or
+  knocked-down hero. "While reeling" felled heroes seven times on Nov 6.
+- **Wind-up voices** (#242): each Deadmines creature shouts as a string up close begins, from
+  where it stands (the pirates' own attack shouts, goblins', a murloc's for Cookie, a tauren's
+  for Smite, an ogre's for Rhahk'Zor). Found with the htl-map `soundfind` example.
+
+### The pull requests so far
+
+| PR | What | Lands on |
+| --- | --- | --- |
+| #232 | This review, the plan and this log | main, when Corey has read it |
+| #233 | Bladestorm spins on its key | playtest |
+| #236 | The meter's fight lasts while a creature is on you | playtest |
+| #237 | Client patch 0060: the strike is seen to swing | playtest (film to attach) |
+| #238 | Enemies you can answer (first-blow floor, string turns, casters, guard breaks) | playtest |
+| #239 | Foe health 1.6 to 1.0 | playtest |
+| #240 | The Deadmines' first encounter | playtest |
+| #241 | The pull report | main (tooling) |
+| #242 | Wind-up voices | playtest |
+| #243 | Rings always drawn under ground looks | playtest |
+| bestiary | `blow:<string>` and `bestiary dm_*` in the lab | main (tooling) |
