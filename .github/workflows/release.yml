@@ -188,6 +188,7 @@ jobs:
           retention-days: 7
 
       - name: Zip
+        if: ${{ !inputs.dev }}
         shell: pwsh
         run: Compress-Archive -Path "dist-out/$env:PACKAGE" -DestinationPath "dist-out/$env:PACKAGE.zip"
 
