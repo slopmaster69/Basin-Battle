@@ -1764,8 +1764,11 @@ impl SurvivalGame {
                 self.sim.travel(me, &to)
             }
             "home" => self.sim.travel(me, "camp"),
-            // Testing: straight to one of Elwynn's places.
-            "goto" if self.dev_ok() => self.sim.goto_site(me, &arg).map(|name| self.tell(conn, &format!("You're at {name}."))),
+            // Testing: straight to one of Elwynn's places, or to `x y [z] [facing]`.
+            "goto" if self.dev_ok() => {
+                let rest: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("goto")).skip(1).collect();
+                self.sim.goto_site(me, &rest.join(" ")).map(|name| self.tell(conn, &format!("You're at {name}.")))
+            }
             // The Proving Ring's banner: the next wave now.
             "arena" | "ring" => match arg.as_str() {
                 "next" | "" => self.sim.arena_next_now(me).map(|_| {
