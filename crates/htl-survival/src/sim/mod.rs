@@ -927,6 +927,8 @@ pub struct Mob {
     pub fighters: u32,
     /// Its wind-up was knocked aside lately: not again until then.
     pub wary_until: f32,
+    /// It has run from its hero once already (its temperament's `flee_below`).
+    pub fled: bool,
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,

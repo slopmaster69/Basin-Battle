@@ -102,6 +102,8 @@ mod tests_fair;
 #[cfg(test)]
 mod tests_content_rules;
 #[cfg(test)]
+mod tests_temper;
+#[cfg(test)]
 mod tests_rhythm;
 #[cfg(test)]
 mod tests_bomb;

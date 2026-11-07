@@ -1563,7 +1563,9 @@ impl Survival {
             let standing = self.mobs.get(&mid).is_some_and(|m| m.health > 0);
             // A shove knocks a creature reeling; a blow, one winding up (when blows do) or a heavy
             // one just after its own blow.
-            if standing && !changed && strike.stagger > 0.0 && (winding || shoved || recovering) {
+            // A creature of poise (a bruiser) isn't knocked out of its wind-up by a light blow.
+            let poised = !shoved && !strike.heavy() && self.temper(mid).is_some_and(|t| t.poise);
+            if standing && !changed && strike.stagger > 0.0 && (winding || shoved || recovering) && !poised {
                 let riposte = self.content.combat.riposte_any_stagger;
                 // Near a War Banner a heavy attack's stagger lasts longer; on an Exposed one, any.
                 let longer = self.stagger_share(id, mid, strike.heavy());
