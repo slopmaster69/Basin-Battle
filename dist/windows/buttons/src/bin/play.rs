@@ -39,6 +39,27 @@ fn ink() -> Color32 { Color32::from_rgb(240, 228, 205) }
 fn dim() -> Color32 { Color32::from_rgb(190, 176, 150) }
 fn ember() -> Color32 { Color32::from_rgb(240, 150, 120) }
 
+/// A smooth patch of night: a grid of columns `xs` and rows `ys`, each `(position, darkness 0..1)`,
+/// a vertex's darkness being the two multiplied. One mesh, so no banding.
+fn shade(p: &egui::Painter, xs: &[(f32, f32)], ys: &[(f32, f32)]) {
+    let mut mesh = egui::Mesh::default();
+    for &(y, ay) in ys {
+        for &(x, ax) in xs {
+            let a = (ax * ay * 225.0).round().clamp(0.0, 255.0) as u8;
+            mesh.colored_vertex(Pos2::new(x, y), Color32::from_rgba_unmultiplied(12, 9, 7, a));
+        }
+    }
+    let w = xs.len() as u32;
+    for r in 0..ys.len() as u32 - 1 {
+        for c in 0..w - 1 {
+            let i = r * w + c;
+            mesh.add_triangle(i, i + 1, i + w);
+            mesh.add_triangle(i + 1, i + w + 1, i + w);
+        }
+    }
+    p.add(egui::Shape::mesh(mesh));
+}
+
 fn main() {
     // A window program has no console to complain in: anything that goes badly wrong is written
     // beside Play.exe instead, in play-crash.txt.
@@ -550,29 +571,42 @@ impl eframe::App for App {
             } else {
                 p.rect_filled(screen, 0.0, Color32::from_rgb(24, 21, 17));
             }
-            // Night rising from the bottom, for the words.
-            let band = 190.0;
-            let steps = 38;
-            for i in 0..steps {
-                let t = i as f32 / steps as f32;
-                let y0 = screen.max.y - band + band * t;
-                let a = (t * t * 215.0) as u8;
-                p.rect_filled(Rect::from_min_max(Pos2::new(screen.min.x, y0), Pos2::new(screen.max.x, y0 + band / steps as f32 + 1.0)), 0.0, Color32::from_rgba_unmultiplied(12, 9, 7, a));
-            }
+            // Night rising from the bottom, for the words: smooth (one mesh, no steps), and dark by
+            // the time it reaches the name.
+            let band = 240.0;
+            shade(p, &[(screen.min.x, 1.0), (screen.max.x, 1.0)], &[(screen.max.y - band, 0.0), (screen.max.y - band * 0.55, 0.42), (screen.max.y, 1.0)]);
             // The name, the line, the note.
             let left = screen.min.x + 40.0;
-            p.text(Pos2::new(left, screen.max.y - 78.0), Align2::LEFT_BOTTOM, &self.project.title, FontId::new(50.0, FontFamily::Name("title".into())), ink());
+            let title_font = FontId::new(50.0, FontFamily::Name("title".into()));
+            let status_font = FontId::new(19.0, FontFamily::Proportional);
+            let note_font = FontId::new(14.5, FontFamily::Proportional);
+            // A deeper shadow behind the words themselves, fading out to the right and upwards, so
+            // they read over the brightest part of the painting without sitting in a box.
+            let widest = [(&self.project.title, &title_font), (&self.status, &status_font), (&self.note, &note_font)]
+                .iter()
+                .map(|(s, f)| p.layout_no_wrap(s.to_string(), (*f).clone(), ink()).size().x)
+                .fold(0.0f32, f32::max);
+            let right = left + widest;
+            shade(
+                p,
+                &[(screen.min.x, 0.85), (right - 60.0, 0.85), (right + 160.0, 0.0)],
+                &[(screen.max.y - 200.0, 0.0), (screen.max.y - 140.0, 1.0), (screen.max.y, 1.0)],
+            );
+            p.text(Pos2::new(left, screen.max.y - 78.0), Align2::LEFT_BOTTOM, &self.project.title, title_font, ink());
             let status_color = if self.stage == Stage::Failed { ember() } else { ink() };
-            p.text(Pos2::new(left + 2.0, screen.max.y - 46.0), Align2::LEFT_BOTTOM, &self.status, FontId::new(19.0, FontFamily::Proportional), status_color);
+            p.text(Pos2::new(left + 2.0, screen.max.y - 46.0), Align2::LEFT_BOTTOM, &self.status, status_font, status_color);
             if !self.note.is_empty() {
-                p.text(Pos2::new(left + 2.0, screen.max.y - 24.0), Align2::LEFT_BOTTOM, &self.note, FontId::new(14.5, FontFamily::Proportional), dim());
+                p.text(Pos2::new(left + 2.0, screen.max.y - 24.0), Align2::LEFT_BOTTOM, &self.note, note_font, dim());
             }
-            // The version, small, in the corner.
+            // The version, small, in the corner, on a little shade of its own.
             let v = match self.channel {
                 Channel::Latest => format!("TEST BUILD  {}", self.version),
                 _ => self.version.clone(),
             };
-            p.text(Pos2::new(screen.max.x - 16.0, screen.min.y + 12.0), Align2::RIGHT_TOP, v, FontId::new(12.5, FontFamily::Proportional), Color32::from_rgba_unmultiplied(240, 228, 205, 150));
+            let version_font = FontId::new(12.5, FontFamily::Proportional);
+            let vw = p.layout_no_wrap(v.clone(), version_font.clone(), ink()).size().x;
+            shade(p, &[(screen.max.x - vw - 120.0, 0.0), (screen.max.x - vw - 30.0, 0.6), (screen.max.x, 0.6)], &[(screen.min.y, 1.0), (screen.min.y + 34.0, 1.0), (screen.min.y + 70.0, 0.0)]);
+            p.text(Pos2::new(screen.max.x - 16.0, screen.min.y + 12.0), Align2::RIGHT_TOP, v, version_font, Color32::from_rgba_unmultiplied(240, 228, 205, 190));
             // The progress line along the bottom edge.
             let track = Rect::from_min_max(Pos2::new(screen.min.x, screen.max.y - 4.0), screen.max);
             p.rect_filled(track, 0.0, Color32::from_rgba_unmultiplied(0, 0, 0, 120));
