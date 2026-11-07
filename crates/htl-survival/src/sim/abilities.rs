@@ -2270,9 +2270,15 @@ impl Survival {
 
     /// A bursting projectile goes off at `at`: everyone in its burst struck (and its effects from
     /// there).
-    fn burst(&mut self, p: &Projectile, at: Vec3, _direct: Option<Id>) {
-        let spell = self.content.abilities[p.ability].spell;
-        self.burst_look(p, at, Some(spell));
+    fn burst(&mut self, p: &Projectile, at: Vec3, direct: Option<Id>) {
+        let d = &self.content.abilities[p.ability];
+        // On a foe it struck its own missile's impact plays already, so only a burst look of its
+        // own: its spell cast again at the spot flew a second missile there from the caster.
+        let look = match direct {
+            Some(_) => (d.burst_spell != 0).then_some(d.burst_spell),
+            None => Some(d.spell),
+        };
+        self.burst_look(p, at, look);
     }
 
     /// [`Self::burst`], showing `look` at the spot (none: nothing of its own).
@@ -2358,6 +2364,11 @@ impl Survival {
         let d = self.content.abilities[p.ability].clone();
         if d.splash > 0.0 {
             self.burst(p, p.pos, Some(victim));
+            // A critical's own effects on the one it struck, as without a burst (a perfect
+            // Fireball's longer burn).
+            if p.critical && !d.crit_effects.is_empty() && self.alive(victim) {
+                self.apply_effects(p.owner, victim, &d.crit_effects, 1.0, &d.name);
+            }
             return;
         }
         // A bomb's bolt plants it, and Combustion's spreads what burns on the foe it reaches.

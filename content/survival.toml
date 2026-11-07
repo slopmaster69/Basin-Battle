@@ -3645,7 +3645,7 @@ impact_kit = 2709
 [[ability]]
 key = "fireball"
 name = "Fireball"
-text = "Charge for 0.3 to 1.5 sec to deal 16 to 36 damage. Release on the flare for 20% more damage. Burns the target for 4 damage per sec for 4 sec. Shatters a frozen enemy for 50% more damage."
+text = "Charge for 0.3 to 1.5 sec to hurl a fireball that explodes on what it hits, dealing 16 to 36 damage to enemies within 2.5 yd. Release on the flare for 20% more damage. Burns them for 4 damage per sec for 4 sec. Shatters a frozen enemy for 50% more damage."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
@@ -3659,6 +3659,13 @@ perfect_kit = 38
 # A critical (the middle of the window): the burn lasts twice as long.
 crit_effects = [{ kind = "burn", secs = [8.0, 8.0], amount = 4.0 }]
 damage = [16.0, 36.0]
+# Mage tune, Nov 7: it explodes. One target at a time, its best (43 on the flare) was under half
+# of what Lava Burst does to a pack every 4 sec (96 over three), and the Deadmines is packs (Corey,
+# Nov 6: "single target, so useless against big groups"). 2.5 yd, not Lava Burst's 3: it hits
+# harder and its burn goes on each.
+splash = 2.5
+# Its explosion where it strikes: Lava Burst's and the Explosive Trap's burst of fire.
+burst_spell = 5162
 range = [32.0, 34.0]
 radius = [0.35, 0.9]
 speed = 24.0
@@ -3676,7 +3683,7 @@ effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 key = "pyroblast"
 name = "Pyroblast"
 ex_of = "fireball"
-text = "Hold for 1.5 sec, then release on the flare to hurl a huge, slow fireball. Deals 48 damage and burns the target for 5 damage per sec for 6 sec. Shatters a frozen enemy for 50% more damage. Released off the flare, it fizzles. A heavy attack on you while you hold interrupts it."
+text = "Hold for 1.5 sec, then release on the flare to hurl a huge, slow fireball. Deals 64 damage and burns the target for 5 damage per sec for 6 sec. Shatters a frozen enemy for 50% more damage. Released off the flare, it fizzles. A heavy attack on you while you hold interrupts it."
 icon = "Spell_Fire_Fireball02"
 slot = "ranged"
 kind = "projectile"
@@ -3692,7 +3699,9 @@ perfect_kit = 38
 # A critical: the blast stuns them for a moment.
 crit_effects = [{ kind = "stun", secs = [1.0, 1.0] }]
 fragile = true
-damage = [48.0, 48.0]
+# Mage tune, Nov 7: Fireball now explodes; Pyroblast stays one target, the choice for one big foe
+# (48 was barely more than a full Fireball's 43).
+damage = [64.0, 64.0]
 range = [36.0, 36.0]
 radius = [0.8, 0.8]
 speed = 24.0
@@ -7044,7 +7053,7 @@ spell = 29317
 [[ability]]
 key = "meteor"
 name = "Meteor"
-text = "Hold for 0.5 to 1.5 sec to call a meteor down on the reticle, up to 34 yd away. Release on the flare for 20% more damage. It lands 1.5 sec later in a 5 to 7 yd radius shown to everyone. Deals 35 to 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 8 damage per sec for 4 sec more. Shatters frozen enemies for 50% more damage."
+text = "Hold for 0.5 to 1.5 sec to call a meteor down on the reticle, up to 34 yd away. Release on the flare for 20% more damage. It lands 1.5 sec later in a 5 to 7 yd radius shown to everyone. Deals 45 to 90 damage, knocks enemies back 3 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 8 damage per sec for 4 sec more. Shatters frozen enemies for 50% more damage."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ultimate"
@@ -7062,7 +7071,10 @@ delay = 1.5
 # Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
 # moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
 look_lead = 0.8
-damage = [35.0, 70.0]
+# Mage tune, Nov 7: a perfect Meteor was 84 on each, under half a Deadmines pirate (176), for all
+# 100 Valor. Now 108. And it knocked them 6 yd, out of its own 5 to 7 yd crater: 3 leaves them
+# in the fire.
+damage = [45.0, 90.0]
 linger = 4.0
 linger_damage = 8.0
 cooldown = 40.0
@@ -7072,7 +7084,7 @@ shatter = true
 spell = 24340
 linger_spell = 2120
 clip = 54
-effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4.0], amount = 5.0 }]
+effects = [{ kind = "knockback", amount = 3.0 }, { kind = "burn", secs = [4.0, 4.0], amount = 5.0 }]
 
 # 3, the second choice: Frost's ultimate, the stop check rolling. An orb rolls out along the
 # reticle; the key again stops it where it is and it bursts. Stopped on a foe it's a perfect: the
