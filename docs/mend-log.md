@@ -171,3 +171,10 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
 - **A stale build**: worktrees sharing one cargo target dir reuse each other's builds. The
   playtest server built at 01:00 was the fair-blows branch's rules. Rebuilt in its own target;
   the playtest folder now also has the client with the whole series through 0061.
+- **Every Deadmines string, heard** (#249): the bestiary again with the sound probe on. All but
+  three strings start a creature sound (a shout, a precast, a missile). The Crossbowman's shot
+  and the Evoker's and Noble's shadow pillar (spell 27812, silent) now sound as they wind up.
+  The pillar is the pillar's only tell with markers off: seen for its last 0.75 s.
+- **Bolt chains elsewhere** (#238): nine unblockable follow-up bolts in Ragefire, the Wailing
+  Caverns, Razorfen Kraul and the Graveyard came too soon to dodge after dodging the last. Wind-ups
+  raised 0.05 to 0.15 s; a test now holds every string to it. The fair-blows report flags nothing.
