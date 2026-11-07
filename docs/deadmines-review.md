@@ -319,3 +319,58 @@ its pack. Most packs come alone. The ones that don't:
 So the beach's "first open fight" is always two pirates and a caster, and walking up to the
 Juggernaut's deck can bring an elite captain with two casters. Not yet changed: encounter 1's
 content change takes the beach.
+
+## Encounter 2: the scaffold round the Juggernaut, and Mr. Smite
+
+From the beach up the scaffold that rings the Juggernaut, round the stern to the dry dock, Mr.
+Smite on the island where it comes down. The Juggernaut's deck (Captain Greenskin, VanCleef) is
+up a side stair, off the way. Numbers are effective (`foe_health` 1.0 from #239, `foe_damage`
+1.35), with the first-blow floor (#238).
+
+### The packs in order
+
+| # | Pack | Notes |
+| --- | --- | --- |
+| 5 | 1 Defias Crossbowman | the scaffold's upper ring, over the walkway; notices at **32 yd** |
+| 6 | 2 Defias Pirates | the lower ring as it rounds the bow; brings 37 (a Wizard 7 yd off) |
+| 7 | 1 Defias Squallshaper | 21 yd past them, linked 14 |
+| 37 | 1 Defias Wizard | beside the pirates |
+| 8 | **Mr. Smite** | the island at the dry dock |
+
+### Defias Crossbowman (90 health)
+
+One slow, hard bolt: 1.8 s aimed, **40 damage** (a fifth of a hero), 55 yd a second, from up to
+40 yd, noticed from 32. It sits over the walkway the hero fights the lower ring's pirates on, so
+its bolts come from above and behind while a pirate is in front. With #238 it no longer starts
+a bolt while a pirate winds up at the hero, but it still shoots between their strings. Its kick
+up close is now 0.6 s (it was 0.35).
+
+### Mr. Smite (1100 health, posture 260)
+
+| String | Wind-up (s) at full / at his quickest | Damage | Notes |
+| --- | --- | --- | --- |
+| sweep | 0.9 / 0.67 | 49 | arc 170 |
+| delayed overhead | 1.5 / 1.12 | **78** | waits out a panicked dodge |
+| stomp | 0.8 / 0.6 | 30 heavy, knocks down | all round, 4.8 yd |
+| stamp (his turns) | 1.3 / 0.97 | 35, **no guard stops it** | all round, 6.5 yd |
+| maul (below a third) | 1.25, then 0.7 | 70, then 35 unblockable | the floor cracks |
+| flurry (below two thirds) | 0.6, 0.4, 0.4, 0.75 | 38 x3, then 59 | 173 if none is stopped |
+| charge (below two thirds) | 1.0 / 0.75 | 62 | from 5 to 12 yd, a 7 yd lunge |
+
+The flurry broke a buckler on its third blow (a block costs 6 stamina and 90% of the blow: 40 a
+blow against 100 stamina) and its fourth landed in the stagger, 0.07 s after the hero could
+move: a forced hit worth 59. Since #238 the string stops at the guard it breaks, and nothing
+swings at a reeling hero. Three falls to him on Nov 6: a heavy blow unguarded (42), a blow
+mid-swing (26), a heavy blow while reeling (20).
+
+What's left to judge in the client: whether the delayed overhead (78, a hero's 39%) reads as
+delayed, and whether the flurry's four blows read as one string to dodge or to guard.
+
+### Proposed
+
+- **The crossbowman notices at 24 yd, not 32**, and its bolt is 30 (22 in the file), not 40: a
+  sniper over the fight, not the fight's biggest blow.
+- **The Wizard beside the pirates moves back** to stand with the Squallshaper (pack 7), or its
+  notice drops to 12: the lower ring's first fight is two pirates, not two and a caster.
+- **Smite stays**: with the flurry fixed his strings are long, well told, and his numbers are a
+  boss's. Film the delayed overhead and the flurry first.
