@@ -1,24 +1,26 @@
-# Push a tag (git tag v0.4.0 && git push origin v0.4.0) to build "<title> for Windows.zip" (the
-# title is project.toml's): the pinned benilla client with this repo's patches, the server, both
-# built for Windows, the add-ons, the server's content, and Play.exe and Host.exe with their
-# launcher (all three exes wearing dist/windows/art/icon.ico; Play's menu is launcher\ui), attached to a GitHub release for that tag. It holds no WoW files. A folder unzipped
-# from it updates itself from later releases (launcher\update.ps1, by the tag in
-# launcher\version.txt).
+# The Windows download, "<title> for Windows.zip" (the title is project.toml's): the pinned
+# benilla client with this repo's patches, the server, both built for Windows, the add-ons, the
+# server's content, and Play.exe and Host.exe (dist/windows/buttons), all three exes wearing
+# dist/windows/art/icon.ico. It holds no WoW files.
 #
-# To try a branch's Windows build before a release: Actions -> Release -> Run workflow on that
-# branch (or `gh workflow run release.yml --ref <branch>`). The zip's folder is then the run's
-# artifact, and no release is made; its version says it's a branch build, so it never updates
-# itself over to a release.
+# - A tag (git tag v0.5.0 && git push origin v0.5.0) attaches it to a GitHub release for that tag.
+#   A folder unzipped from it updates itself from later releases (Play, by version.txt).
+# - Every push to main publishes it as the `latest` pre-release, replaced each time, so the newest
+#   main is playable minutes after a merge: Play's cog > "Make a test copy" plays it in a folder
+#   of its own. Players' Play never updates to it (it only looks at releases).
+# - Actions -> Release -> Run workflow on a branch (or `gh workflow run release.yml --ref <branch>`)
+#   builds a branch's folder as the run's artifact; its version says so, and it never updates.
 #
 # The visual check's client (docs/visual-check.md): Run workflow with "dev" ticked (or
 # `gh workflow run release.yml --ref <branch> -f dev=true`) builds benilla's dev build instead,
 # whose scripted probes (log in, type chat, take screenshots, quit) drive the check. It's kept as
-# the run's "Basin Battle for Windows (visual check)" artifact and never attached to a release.
+# the run's "<title> for Windows (visual check)" artifact and never attached to a release.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+    branches: ["main"]
   workflow_dispatch:
     inputs:
       dev:
@@ -29,18 +31,20 @@ on:
 permissions:
   contents: write
 
+# Two merges in quick succession: only the newer main is built as `latest`.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
 jobs:
   windows-zip:
     runs-on: windows-latest
     timeout-minutes: 120
     env:
-      # A tag push has no inputs: the player build.
-      PACKAGE: ${{ inputs.dev && 'Basin Battle for Windows (visual check)' || 'Basin Battle for Windows' }}
+      # A tag or main push has no inputs: the player build.
+      PACKAGE: ${{ inputs.dev && 'Elwynn Survival for Windows (visual check)' || 'Elwynn Survival for Windows' }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          # Enough history for the launcher's dispatches (scripts/launcher-news.py).
-          fetch-depth: 100
 
       # The script that drives the dev client, under the Windows PowerShell players have: every
       # scenario read and turned into the client's Lua, nothing run.
@@ -105,13 +109,21 @@ jobs:
           target\release\htl-server.exe --help | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "htl-server.exe --help failed (exit $LASTEXITCODE)" }
 
-      # Play.exe and Host.exe, the two buttons; then the project's shield on them and on the game
-      # (rcedit writes the icon into an exe that's already built: no change to the client).
+      # Play and Host, the two buttons, with their own tests; then the project's shield on them
+      # and on the game (rcedit writes the icon into an exe that's already built).
+      - uses: Swatinem/rust-cache@v2
+        if: ${{ !inputs.dev }}
+        with:
+          workspaces: dist/windows/buttons
+          key: buttons
+
       - name: Build the buttons, and put the icon on them and on the game
         if: ${{ !inputs.dev }}
         env:
           RUSTFLAGS: -C target-feature=+crt-static
         run: |
+          cargo test --release --manifest-path dist/windows/buttons/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw "the buttons' tests failed" }
           cargo build --release --manifest-path dist/windows/buttons/Cargo.toml
           if ($LASTEXITCODE -ne 0) { throw "the buttons didn't build" }
           Invoke-WebRequest -UseBasicParsing -OutFile rcedit.exe -Uri https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
@@ -125,64 +137,53 @@ jobs:
         shell: pwsh
         run: |
           # The title players see, from project.toml.
-          $title = "Basin Battle"
+          $title = "Elwynn Survival"
           foreach ($line in Get-Content project.toml) { if ($line -match '^\s*title\s*=\s*"([^"]+)"') { $title = $Matches[1] } }
           $package = "$title for Windows"
           "PACKAGE=$package" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $out = "dist-out/$package"
-          New-Item -ItemType Directory -Force -Path "$out/benilla-config/AddOns", "$out/launcher", "$out/server" | Out-Null
-          # The top of the folder: the two buttons, the read-me and the game.
+          New-Item -ItemType Directory -Force -Path "$out/benilla-config/AddOns", "$out/server", "$out/licenses" | Out-Null
+          # The folder: the two buttons, the game, the read-me, and nothing a player never opens.
           Copy-Item dist/windows/buttons/target/release/Play.exe, dist/windows/buttons/target/release/Host.exe, dist/windows/README.txt "$out/"
           Copy-Item benilla/target/release/benilla.exe "$out/"
           # As config.default.toml: Play copies it to config.toml on a first run only.
           Copy-Item dist/windows/benilla-config/config.toml "$out/benilla-config/config.default.toml"
           Copy-Item -Recurse addon/BasinBattle, addon/ElwynnSurvival "$out/benilla-config/AddOns/"
-          # What the buttons run, the names, the licences and the version it updates from.
-          Copy-Item dist/windows/launcher/*.ps1, project.toml, dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/launcher/"
-          # The shield: the launcher's window shows it, and its title bar's icon.
-          Copy-Item dist/windows/art/icon.ico, dist/windows/art/shield.png "$out/launcher/"
-          # Play's menu (the War Table), with the shield, and the latest changes as its dispatches.
-          Copy-Item -Recurse dist/windows/launcher/ui "$out/launcher/ui"
-          Copy-Item dist/windows/art/shield.png "$out/launcher/ui/"
-          python scripts/launcher-news.py "$out/launcher/ui/news.json"
-          if ($LASTEXITCODE -ne 0) { throw "the launcher's news didn't build" }
-          $version = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "branch $env:GITHUB_REF_NAME ($($env:GITHUB_SHA.Substring(0, 7)))" }
-          Set-Content -Path "$out/launcher/version.txt" -Value $version
           # The server and its content (saves and logs are made beside them on the host's PC).
           Copy-Item target/release/htl-server.exe "$out/server/"
           Copy-Item -Recurse content "$out/server/content"
+          Copy-Item dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE, dist/windows/buttons/fonts/OFL.txt "$out/licenses/"
+          # The version Play updates from: a release's tag; "latest <commit>" for main, which the
+          # `latest` pre-release replaces at every merge; a branch's build, which never updates.
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          $version = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } elseif ($env:GITHUB_REF -eq "refs/heads/main") { "latest $sha" } else { "branch $env:GITHUB_REF_NAME ($sha)" }
+          Set-Content -Path "$out/version.txt" -Value $version
+          # The buttons answer for themselves.
+          & "$out/Host.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "Host.exe --version failed (exit $LASTEXITCODE)" }
 
-      # Play opens on this runner as on a player's PC: its window, the menu in WebView2, the map
-      # drawn. A picture of the screen is kept as an artifact. What it wrote while it ran (its log,
-      # settings.txt) is removed before the zip is made. A dev build has no Play to open.
-      - name: Play opens its menu
+      # Play draws its splash on this runner and keeps a picture of it, so the first thing a
+      # player sees can be seen here without running anything. The runner may have no OpenGL:
+      # then there is no picture, and the folder is still good.
+      - name: Play draws its splash
         if: ${{ !inputs.dev }}
+        continue-on-error: true
         shell: pwsh
         run: |
           $out = "dist-out/$env:PACKAGE"
-          $log = "$out/launcher/play.log"
-          Start-Process -FilePath "$out/Play.exe" -ArgumentList "-NoUpdate" -WorkingDirectory $out
-          $deadline = (Get-Date).AddSeconds(90)
-          while ((Get-Date) -lt $deadline -and -not ((Test-Path $log) -and (Select-String -Path $log -Pattern "the menu is drawn" -Quiet))) { Start-Sleep -Seconds 1 }
-          Start-Sleep -Seconds 4
-          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          $shot = New-Object System.Drawing.Bitmap $b.Width, $b.Height
-          [System.Drawing.Graphics]::FromImage($shot).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
-          $shot.Save("$PWD/dist-out/play-menu.png")
-          Get-Process Play -ErrorAction SilentlyContinue | Stop-Process -Force
-          Start-Sleep -Seconds 2
-          if (Test-Path $log) { Get-Content $log }
-          $drawn = (Test-Path $log) -and (Select-String -Path $log -Pattern "the menu is drawn" -Quiet)
-          Remove-Item $log, "$out/settings.txt" -Force -ErrorAction SilentlyContinue
-          if (-not $drawn) { throw "Play's menu didn't open (see the picture in the play-menu artifact)" }
+          $p = Start-Process -FilePath "$out/Play.exe" -ArgumentList "--shot", "$PWD/dist-out/play-splash.png" -WorkingDirectory $out -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "Play didn't finish its picture in a minute" }
+          if (Test-Path "$out/play.log") { Get-Content "$out/play.log" }
+          if (Test-Path "$out/play-crash.txt") { Get-Content "$out/play-crash.txt" }
+          Remove-Item "$out/play.log", "$out/play-crash.txt", "$out/settings.txt" -Force -ErrorAction SilentlyContinue
+          if (-not (Test-Path "dist-out/play-splash.png")) { throw "no picture of the splash (no OpenGL on this runner?)" }
 
-      - name: The picture of Play's menu
-        if: ${{ always() && !inputs.dev }}
+      - name: The picture of Play's splash
+        if: ${{ !inputs.dev }}
         uses: actions/upload-artifact@v7
         with:
-          name: play-menu
-          path: dist-out/play-menu.png
+          name: play-splash
+          path: dist-out/play-splash.png
           if-no-files-found: ignore
           retention-days: 7
 
@@ -192,7 +193,7 @@ jobs:
         run: Compress-Archive -Path "dist-out/$env:PACKAGE" -DestinationPath "dist-out/$env:PACKAGE.zip"
 
       # The exe alone: the visual check brings the branch's own add-ons and a settings folder of
-      # its own each run, and the player launchers would start this build without them.
+      # its own each run, and Play would start this build without them.
       - name: Package the dev client
         if: ${{ inputs.dev }}
         shell: pwsh
@@ -202,7 +203,7 @@ jobs:
           Copy-Item benilla/target/release/benilla.exe "$out/"
           Copy-Item dist/windows/LICENSE-MIT, dist/windows/LICENSE-APACHE "$out/"
           Set-Content "$out/README.txt" @(
-            "The dev build of the Basin Battle client, for the visual check only. Don't play with it.",
+            "The dev build of the client, for the visual check only. Don't play with it.",
             "Built from $env:GITHUB_REF_NAME ($env:GITHUB_SHA).",
             "Run it with Visual Check.bat from the repository, which docs/visual-check.md explains."
           )
@@ -221,3 +222,17 @@ jobs:
         with:
           files: dist-out/${{ env.PACKAGE }}.zip
           generate_release_notes: true
+
+      # The newest main, as the `latest` pre-release: the one before it is removed, tag and all,
+      # so there is always exactly one, pointing at the commit it was built from.
+      - name: Publish as the latest pre-release
+        if: github.ref == 'refs/heads/main' && !inputs.dev
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>$null
+          if ($LASTEXITCODE -ne 0) { "No earlier latest to remove." }
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          gh release create latest "dist-out/$env:PACKAGE.zip" --prerelease --target $env:GITHUB_SHA --title "Latest main ($sha)" --notes "The newest main ($env:GITHUB_SHA), rebuilt at every merge, for playtests. Not a release: players' Play never updates to it. In Play, the cog > Make a test copy plays it in a folder of its own."
+          if ($LASTEXITCODE -ne 0) { throw "couldn't publish the latest pre-release" }
