@@ -648,7 +648,7 @@ respawn = 0.0
   name = "holy nova"
   weight = 2.0
   max_range = 3.5
-  steps = [ { from = "NightElfMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 24171 } ]
+  steps = [ { ranged = false, from = "NightElfMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 24171 } ]
 
 # --- the Cathedral's bosses ---------------------------------------------------------------------------------
 
@@ -697,7 +697,7 @@ respawn = 0.0
   name = "holy nova"
   weight = 2.0
   max_range = 4.0
-  steps = [ { from = "TrollFemale", clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 24171 } ]
+  steps = [ { ranged = false, from = "TrollFemale", clip = 54, windup = 0.9, range = 5.5, arc = 360.0, damage = 18, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 24171 } ]
   [[mob.phase]]
   at = 0.5
   speed = 0.82
@@ -863,7 +863,7 @@ then_look = 24171
   name = "deep sleep"
   weight = 2.0
   max_range = 5.0
-  steps = [ { from = "OrcMale", clip = 54, windup = 1.1, range = 7.0, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 27808 } ]
+  steps = [ { ranged = false, from = "OrcMale", clip = 54, windup = 1.1, range = 7.0, arc = 360.0, damage = 16, heavy = true, blockable = false, recovery = 1.2, kit = 218, look = 27808 } ]
   # At half: "Arise, my champion!", and Mograine stands again beside her.
   [[mob.phase]]
   at = 0.5
