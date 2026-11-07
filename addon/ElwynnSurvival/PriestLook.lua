@@ -90,6 +90,11 @@ function ES.PriestLookLine(f)
       Body("shield" .. guid, { unit = unit, tex = "priest_shield_perfect_light", secs = 0.6, size = 2.6, height = 1.0, kind = kind })
     elseif kind == "fade" then
       Body("fade" .. guid, { unit = unit, tex = "priest_fade", secs = 0.8, size = 2.4, height = 1.0, kind = kind })
+    elseif kind == "death" then
+      -- Death's lance struck this body: a flash of shadow on it (Corey couldn't tell it had hit),
+      -- bigger for a judgement (`a`) and a kill (`n` 2).
+      local big = (n >= 2) and 3.4 or (a >= 1 and 2.9) or 2.2
+      Body("death" .. guid, { unit = guid, tex = "priest_weave_shard", secs = (n >= 2) and 0.7 or 0.5, size = big, height = 1.3, kind = "pop" })
     end
   end
 end
