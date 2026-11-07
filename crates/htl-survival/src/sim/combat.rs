@@ -1481,7 +1481,7 @@ impl Survival {
             });
             // (Exposed, it can't.)
             let shielded = shielded && !self.has_cc(mid, "exposed");
-            if shielded && !strike.heavy() && !strike.shove() {
+            if shielded && !strike.heavy() && !strike.shove() && !w.through_guard {
                 let chance = self.mobs.get(&mid).map_or(0.0, |m| self.content.mobs[m.def].block);
                 if self.rng.gen::<f32>() < chance {
                     self.events.push(Event::Swing { attacker: id, victim: Some(mid), damage: 0, outcome: Outcome::Blocked, anim: false, style: Blow::Light });
@@ -1528,7 +1528,17 @@ impl Survival {
             // Stabbed in the back again and again, it's ready for it: each backstab lately (more
             // so with more heroes on it) takes from the next one's bonus.
             let stab = if behind { self.backstab_bonus(mid, stab) } else { stab };
-            let damage = if behind { (rolled as f32 * stab).round() as u32 } else { self.riposted(mid, rolled) };
+            let damage = if behind {
+                (rolled as f32 * stab).round() as u32
+            } else if reeling && w.riposte > 0.0 && !strike.shove() {
+                // The weapon's own riposte (the sword's), in place of the rules'.
+                (rolled as f32 * w.riposte).round() as u32
+            } else {
+                self.riposted(mid, rolled)
+            };
+            // An executioner's blow on a foe near its end.
+            let low = self.mobs.get(&mid).is_some_and(|m| (m.health as f32) < m.max_health as f32 / 3.0);
+            let damage = if w.execute > 0.0 && low && !strike.shove() { (damage as f32 * w.execute).round() as u32 } else { damage };
             let damage = (damage as f32 * self.taken_share(mid)).round() as u32;
             if behind {
                 self.backstabbed(mid, id);
@@ -1554,6 +1564,11 @@ impl Survival {
                     _ => "Melee",
                 };
                 self.hurt_mob_as(mid, id, damage, label);
+                // An axe's hit bleeds.
+                if w.bleed > 0.0 && !strike.shove() && self.alive(mid) {
+                    let bleed = crate::content_abilities::AbilityEffect { kind: "burn".into(), secs: [BLEED_SECS, BLEED_SECS], amount: w.bleed, ..Default::default() };
+                    self.apply_effects(id, mid, &[bleed], 1.0, "Bleed");
+                }
             }
             if damage > 0 && !self.content.mobs[self.mobs[&mid].def].totem {
                 let v = if strike.heavy() { self.content.valor.heavy } else { self.content.valor.light };
@@ -2083,7 +2098,9 @@ impl Survival {
         };
         // A heavy creature's blow that lands puts a hero on the ground.
         // (Not a hero nothing staggers: steadfast under a Barrier, in Shadowguard's shell.)
-        let felled = outcome == Outcome::Hit && heavy && self.mobs.contains_key(&attacker) && landed < p_health(self, victim) && !self.unstaggerable(victim);
+        // (Nor one in the swing of a weapon that carries through it: the greatsword's.)
+        let carried = self.players.get(&victim).is_some_and(|p| matches!(p.action, Action::Swing { .. }) && self.weapon_of(p).swing_poise);
+        let felled = outcome == Outcome::Hit && heavy && self.mobs.contains_key(&attacker) && landed < p_health(self, victim) && !self.unstaggerable(victim) && !carried;
         match outcome {
             Outcome::Hit if felled => {
                 let secs = c.combat.knockdown;
@@ -2819,6 +2836,8 @@ pub(crate) struct WallBash {
     pub stagger: f32,
     pub push: f32,
 }
+/// How long an axe's hit bleeds (its `bleed` a second).
+pub(crate) const BLEED_SECS: f32 = 3.0;
 pub(crate) const WALL_BASH: WallBash = WallBash { damage: 2.0, reach: 0.5, arc: 150.0, targets: 3, stagger: 2.0, push: 2.5 };
 /// Retaliation's heavy answer: untouchable this long past the moment it strikes.
 const UNTOUCHABLE_GRACE: f32 = 0.05;

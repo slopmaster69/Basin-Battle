@@ -1104,6 +1104,24 @@ pub struct WeaponDef {
     /// Its blows count this many times over towards breaking a foe's stance (0: once).
     #[serde(default)]
     pub posture: f32,
+    /// A blow on a foe reeling from a parry does this many times its damage (0: `[parry]
+    /// riposte`): the sword's.
+    #[serde(default)]
+    pub riposte: f32,
+    /// Each hit bleeds the foe this much a second for `BLEED_SECS` (the axe's).
+    #[serde(default)]
+    pub bleed: f32,
+    /// Its blows go through a creature's raised shield (the spear's thrust).
+    #[serde(default)]
+    pub through_guard: bool,
+    /// Swinging it, a heavy blow doesn't put the hero down: they take it and finish the swing
+    /// (the greatsword's).
+    #[serde(default)]
+    pub swing_poise: bool,
+    /// On a foe under a third of its health, its blows do this many times their damage (0: no
+    /// more): the executioner's axe.
+    #[serde(default)]
+    pub execute: f32,
     /// A staff that casts instead of swinging: the left click casts this ability (a benched
     /// projectile, the staff's bolt), and the heavy attack this one (empty: the heavy swings).
     #[serde(default)]
@@ -2937,6 +2955,27 @@ impl Content {
     /// Put what's read in the order it's played: each creature's phases, its enrage among them,
     /// highest share of health first.
     fn settle(&mut self) {
+        // A weapon that names nothing of its own takes its kind's (docs/weapon-identities.md): a
+        // sword the duelist's, an axe a bleed, a polearm reach, a two-handed sword the sweep.
+        for w in &mut self.weapons {
+            let own = w.parry > 0.0 || w.riposte > 0.0 || w.bleed > 0.0 || w.posture > 0.0 || w.backstab > 0.0 || w.through_guard || w.swing_poise || w.execute > 0.0 || w.stagger > 0.0;
+            if own || !w.bolt.is_empty() || !w.alt.is_empty() {
+                continue;
+            }
+            match w.subclass {
+                7 => {
+                    w.parry = 0.1;
+                    w.riposte = 2.25;
+                }
+                0 => w.bleed = if w.two_handed { 6.0 } else { 4.0 },
+                4 | 5 => w.posture = 2.0,
+                15 => w.backstab = 2.5,
+                6 => w.through_guard = true,
+                8 => w.swing_poise = true,
+                1 => w.execute = 2.0,
+                _ => {}
+            }
+        }
         let grow = self.combat.boss_scale.max(0.1);
         for m in &mut self.mobs {
             if m.boss {
