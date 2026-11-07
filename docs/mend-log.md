@@ -215,4 +215,17 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
   Draughts of 80. The film shows the drain: 200 to 27 over the minute before Marisa. The levers
   are the health between lamps, the heavy blows' cost when misread (a guard against a heavy one
   breaks: two of the three falls), and how long a boss takes to kill.
+- **A learning player, simulated** (#251): 0.45 s reaction, a quarter of blows misread, swings
+  into strings. On the playtest build, mean of 5 runs, share of a 200-health bar: ordinary packs
+  2 to 30% each; Greenskin 36%; the Noble, Cookie, Marisa and Johnson about 150%; Sneed, Gilnid,
+  VanCleef 260 to 270%; Rhahk'Zor 313%; Mr. Smite 449%. The careful player takes 0 to 56% from the
+  same bosses. So the bosses are fair (nothing too quick) but long and punishing: most outlast
+  90 s of the starting sword, and every misread blow is 28 to 66. Corey's run agrees: Smite never
+  fell (his last word heard was at a third of his health).
+- **The sparks' 0.1 s, measured** (the client's own trace, `WOW_MOVE_TRACE`, tags fct and fx):
+  the blood kit spawns 1 to 13 ms after the blow arrives (59 ms the first time, loading it). The
+  lag is inside `BloodSpurt.mdl`'s emitter, as the stock client draws it. A client patch could
+  prime a one-shot kit's emitters; not done.
+- **Fireball and Meteor filmed** (#250, lab on the playtest build): one fireball, one burst of
+  fire, 43 over each of three pirates and all three burning; Meteor 108 on each of three.
 
