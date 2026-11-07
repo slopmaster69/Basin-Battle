@@ -193,9 +193,39 @@ impl Survival {
     pub(crate) fn heal_hero_by(&mut self, id: Id, amount: u32, healer: Id, label: &str) {
         let healed = self.heal_hero(id, amount);
         if healed > 0 && healer != id && self.players.contains_key(&healer) {
-            self.events.push(super::Event::HealedOther { healer, target: id, amount: healed });
+            let critical = self.heal_is_critical(healer);
+            self.events.push(super::Event::HealedOther { healer, target: id, amount: healed, critical });
         }
         self.meter_healed(healer, id, healed, label);
+    }
+
+    /// Whether `healer`'s heal lands critical just now: a skill check's perfect (a release on
+    /// its flare while what it sends out is made, `cast_perfect`; a Penance ring dead on the beat,
+    /// [`Survival::critical_heals`]), or `.es crit`. Never a heal with no skill check.
+    pub(crate) fn heal_is_critical(&self, healer: Id) -> bool {
+        self.critical_heals.contains(&healer) || self.players.get(&healer).is_some_and(|p| p.cast_perfect)
+    }
+
+    /// Heal a creature help can reach (an ally, a Priest's orb: [`Self::takes_help`]), counting it
+    /// on `healer`'s meter as `label`; a hero healing it sees the number over it.
+    pub(crate) fn heal_creature_by(&mut self, mid: Id, amount: u32, healer: Id, label: &str) {
+        if !self.takes_help(healer, mid) {
+            return;
+        }
+        let Some(m) = self.mobs.get_mut(&mid) else { return };
+        let before = m.health;
+        m.health = m.health.saturating_add(amount).min(m.max_health);
+        let (h, max) = (m.health, m.max_health);
+        let healed = h - before;
+        if healed == 0 {
+            return;
+        }
+        self.events.push(super::Event::Health { id: mid, health: h, max });
+        if self.players.contains_key(&healer) {
+            let critical = self.heal_is_critical(healer);
+            self.events.push(super::Event::HealedOther { healer, target: mid, amount: healed, critical });
+        }
+        self.meter_healed(healer, mid, healed, label);
     }
 
     /// Hurt a hero, counting what it took on `by`'s meter as `label` (when `by` is a hero).

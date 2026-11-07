@@ -148,6 +148,100 @@ fn help_aimed_at_a_friend_heals_and_shields_them_not_the_caster() {
     assert!(!ev.iter().any(|e| matches!(e, Event::Flash { player, .. } if *player == a)), "no word");
 }
 
+/// An ally among the creatures (none in the rules yet; `.es ally` sets one down): help aimed at a
+/// friend can land on it, and the healer sees the number over it.
+#[test]
+fn help_aimed_at_a_friend_heals_an_allied_creature() {
+    let mut s = world(false, MEND);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ha = halve(&mut s, a);
+    s.spawn_ally(a, "grunt", 10.0, 0.5).unwrap();
+    let ally = *s.targets.keys().next().expect("the ally");
+    assert!(s.mobs[&ally].friendly, "on her side");
+    let (before, max) = (s.mobs[&ally].health, s.mobs[&ally].max_health);
+    let ev = cast(&mut s, a, "t_mend");
+    assert!(looked_at(&ev, a, 2061, ally), "its look from her to it");
+    assert_eq!(s.mobs[&ally].health, before + (max as f32 * 0.2).round() as u32, "a fifth of its health");
+    assert!(ev.iter().any(|e| matches!(e, Event::HealedOther { healer, target, .. } if *healer == a && *target == ally)), "she sees what she mended");
+    assert!(ev.iter().any(|e| matches!(e, Event::Health { id, .. } if *id == ally)), "its bar fills");
+    assert_eq!(s.players[&a].health, ha, "not hers");
+    assert!(!s.has_cc(a, "shield"), "and the shield isn't hers either");
+}
+
+/// Two kinds of thing a hero sets down: a totem never takes a heal (the help goes to the caster),
+/// but one its rules make `healable` (a Priest's orb) does, as an ally.
+#[test]
+fn a_totem_takes_no_heal_but_a_healable_one_does() {
+    for healable in [false, true] {
+        let mut s = world(false, MEND);
+        let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let ha = halve(&mut s, a);
+        let orb = mob(&mut s, "healing_stream_totem", [10.0, 0.0, 0.0]);
+        let def = s.mobs[&orb].def;
+        assert!(s.content.mobs[def].totem, "a totem");
+        s.content.mobs[def].healable = healable;
+        let max = s.mobs[&orb].max_health;
+        s.mobs.get_mut(&orb).unwrap().health = max / 2;
+        s.totems.push(crate::sim::abilities::Totem { mob: orb, owner: a, ability: 0, until: 1e9, next: 1e9 });
+        let ev = cast(&mut s, a, "t_mend");
+        let healed_it = ev.iter().any(|e| matches!(e, Event::HealedOther { target, .. } if *target == orb));
+        if healable {
+            assert!(healed_it && s.mobs[&orb].health > max / 2, "the orb takes it");
+            assert_eq!(s.players[&a].health, ha, "not her");
+        } else {
+            assert!(!healed_it && s.mobs[&orb].health == max / 2, "the totem takes nothing");
+            assert!(s.players[&a].health > ha, "it lands on her instead");
+        }
+    }
+}
+
+/// A heal is critical only on a skill check's perfect (`critical_heals` while it's made): a plain
+/// one never is.
+#[test]
+fn a_heal_on_a_friend_is_critical_only_on_a_perfect() {
+    for perfect in [false, true] {
+        let mut s = world(false, MEND);
+        let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+        halve(&mut s, b);
+        if perfect {
+            s.critical_heals.insert(a);
+        }
+        let ev = cast(&mut s, a, "t_mend");
+        let crit = ev.iter().find_map(|e| match e {
+            Event::HealedOther { healer, target, critical, .. } if *healer == a && *target == b => Some(*critical),
+            _ => None,
+        });
+        assert_eq!(crit, Some(perfect), "critical only on a perfect");
+    }
+}
+
+/// An allied creature never turns on a hero, and a hero's blows and shots pass it by, friendly
+/// fire or not.
+#[test]
+fn an_allied_creature_never_fights_a_hero_and_their_blows_pass_it_by() {
+    let mut s = world(true, MEND);
+    let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let ally = mob(&mut s, "grunt", [2.0, 0.0, 0.0]);
+    s.mobs.get_mut(&ally).unwrap().friendly = true;
+    let hp = s.players[&a].health;
+    for _ in 0..60 {
+        let _ = s.step(DT);
+    }
+    assert!(matches!(s.mobs[&ally].state, MobState::Idle { .. }), "it never took her on: {:?}", s.mobs[&ally].state);
+    assert_eq!(s.players[&a].health, hp, "nor struck her");
+    s.engage(ally, crate::sim::mobs::Foe::Hero(a));
+    assert!(matches!(s.mobs[&ally].state, MobState::Idle { .. }), "even drawn in");
+    let h = s.mobs[&ally].health;
+    s.hurt_mob_as(ally, a, 10, "Melee");
+    assert_eq!(s.mobs[&ally].health, h, "her blow takes nothing");
+    assert!(!s.bodies(a).iter().any(|b| b.0 == ally), "her shots go past it");
+    // A creature that isn't an ally takes her on.
+    let foe = mob(&mut s, "grunt", [-2.0, 0.0, 0.0]);
+    s.engage(foe, crate::sim::mobs::Foe::Hero(a));
+    assert!(!matches!(s.mobs[&foe].state, MobState::Idle { .. }), "a foe does");
+}
+
 #[test]
 fn help_aimed_at_nothing_finds_a_friend_near_the_reticle_or_lands_on_the_caster() {
     // A friend behind her, far off the reticle: it's hers.
