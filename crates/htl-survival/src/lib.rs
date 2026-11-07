@@ -109,3 +109,5 @@ mod tests_priest_light;
 mod tests_priest_shadow;
 #[cfg(test)]
 mod tests_priest_core;
+#[cfg(test)]
+mod tests_content_rules;

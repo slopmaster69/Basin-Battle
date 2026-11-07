@@ -2853,7 +2853,7 @@ respawn = 0.0
   name = "frost ring"
   weight = 2.0
   max_range = 3.5
-  steps = [ { from = "DwarfMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
+  steps = [ { ranged = false, from = "DwarfMale", clip = 54, windup = 0.9, range = 4.5, arc = 360.0, damage = 12, heavy = true, blockable = false, recovery = 1.0, kit = 356, look = 27808 } ]
 
 # Defias Evokers: shadow from the Juggernaut's deck.
 [[mob]]
