@@ -505,6 +505,8 @@ pub(crate) const ADDON_NEWEST: u32 = 53;
 /// (0049), and our own drawn bow's line steered onto the reticle (0050).
 /// (0058 adds `SetSpellAttach`, which hangs a spell's effects from another attachment: Salvation's
 /// wings on the back. No round of its own: the add-on calls it only where it exists.)
+/// (0060 paces a creature's strike so it's seen to swing, and its return so it never crawls. No
+/// round of its own: nothing new for the add-on to call.)
 pub(crate) const CLIENT_NEWEST: u8 = 27;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
