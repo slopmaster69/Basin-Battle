@@ -188,6 +188,27 @@ impl Survival {
         self.meter_healed(healer, id, healed, label);
     }
 
+    /// Heal a creature help can reach (an ally, a Priest's orb: [`Self::takes_help`]), counting it
+    /// on `healer`'s meter as `label`; a hero healing it sees the number over it.
+    pub(crate) fn heal_creature_by(&mut self, mid: Id, amount: u32, healer: Id, label: &str) {
+        if !self.takes_help(healer, mid) {
+            return;
+        }
+        let Some(m) = self.mobs.get_mut(&mid) else { return };
+        let before = m.health;
+        m.health = m.health.saturating_add(amount).min(m.max_health);
+        let (h, max) = (m.health, m.max_health);
+        let healed = h - before;
+        if healed == 0 {
+            return;
+        }
+        self.events.push(super::Event::Health { id: mid, health: h, max });
+        if self.players.contains_key(&healer) {
+            self.events.push(super::Event::HealedOther { healer, target: mid, amount: healed });
+        }
+        self.meter_healed(healer, mid, healed, label);
+    }
+
     /// Hurt a hero, counting what it took on `by`'s meter as `label` (when `by` is a hero).
     pub(crate) fn hurt_player_by(&mut self, id: Id, damage: u32, by: Id, label: &str) {
         let before = self.players.get(&id).map_or(0, |p| p.health);
