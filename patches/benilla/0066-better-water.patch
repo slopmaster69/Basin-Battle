@@ -1,0 +1,1764 @@
+From 2732d9d85f840a8865be83885eec369ae4616c98 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 13:18:58 -0700
+Subject: [PATCH] Better water under the new look: reflections, clear shallows,
+ glint and foam
+
+Lakes, rivers and the sea now look alive, as WoW Forever's do. The shore's
+trees, hills and buildings are mirrored in the water, broken up by small
+ripples, with the hour's sky where nothing stands; it is a mirror at
+grazing angles and see-through looking down. The bed shows through in the
+shallows, clear turquoise going to deep blue-green with depth; a soft
+white foam line laps at the waterline and rings a hero's legs as they
+wade; the sun glints sharp and warm on the ripples, which the bloom picks
+up, and the moon lays a pale path at night. A sun shadow on the water dims
+its glint and a little of its mirror. The water is glassy at dawn, dusk
+and night and takes a breeze by day.
+
+Between the opaque and the transparent passes, the world as it stands
+and its depth are copied (one full-screen draw), and liquid.wgsl's new
+look_water arm reads them: the length of water a pixel's ray crosses to
+the bed sets how much of the bed shows, a mirrored ray is marched through
+the copied depth to the shore (screen-space reflection, the sky colours
+where it leaves the screen), and the frame's own alpha blend lays the
+water over the bed, so anything drawn behind it still shows. The tuning
+rides in a small water block each liquid material binds.
+
+worldWater 0 keeps 1.12's water under the rest of the new look;
+lookwater <reflect 0-2> [clarity 0-2] | grade holds the mirror and the
+clarity for film; worldLook 0, and a camera under the water, run 1.12's
+water untouched.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/cvars/mod.rs           |  19 +
+ crates/benilla-app/src/cvars/table.rs         |   9 +
+ crates/benilla-app/src/shaders.rs             |  16 +
+ crates/benilla-app/src/video.rs               |  24 +-
+ crates/benilla-app/src/world_console.rs       |  78 +++
+ crates/benilla-assets/src/materials.rs        |  71 +++
+ crates/benilla-assets/src/shaders/liquid.wgsl | 349 ++++++++++++
+ crates/benilla-world/src/lighting/mod.rs      |   4 +
+ crates/benilla-world/src/liquid/surface.rs    |  15 +-
+ crates/benilla-world/src/look/mod.rs          |  20 +-
+ crates/benilla-world/src/look/water.rs        | 507 ++++++++++++++++++
+ crates/benilla-world/src/look/water_pass.rs   | 287 ++++++++++
+ crates/benilla-world/src/shaders.rs           |   5 +-
+ .../src/shaders/world_water.wgsl              |  37 ++
+ 14 files changed, 1431 insertions(+), 10 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/water.rs
+ create mode 100644 crates/benilla-world/src/look/water_pass.rs
+ create mode 100644 crates/benilla-world/src/shaders/world_water.wgsl
+
+diff --git a/crates/benilla-app/src/cvars/mod.rs b/crates/benilla-app/src/cvars/mod.rs
+index 6d49233..70ea2ee 100644
+--- a/crates/benilla-app/src/cvars/mod.rs
++++ b/crates/benilla-app/src/cvars/mod.rs
+@@ -1658,6 +1658,24 @@ mod tests {
+         assert_eq!(res::<LookShadows>(&app).level, 1);
+     }
+ 
++    /// `worldWater` (benilla's own) turns the new look's water off and on by itself, registered
++    /// "1" to match `LookWater`'s default, leaving the rest of the look.
++    #[test]
++    fn world_water_switches_the_water_alone() {
++        use benilla_world::look::{LookWater, WorldLook};
++        let mut app = cvar_app();
++        assert!(res::<LookWater>(&app).on, "registered \"1\"");
++        assert_eq!(apply(&mut app, "worldWater", "0"), SetOutcome::Changed);
++        assert!(!res::<LookWater>(&app).on);
++        assert_eq!(
++            *res::<WorldLook>(&app),
++            WorldLook::NEW,
++            "the rest of the look stays"
++        );
++        apply(&mut app, "worldWater", "1");
++        assert!(res::<LookWater>(&app).on);
++    }
++
+     /// The FFX pass's three switches reach it one by one (`ffx`, `ffxGlow`, `ffxDeath`).
+     #[test]
+     fn the_ffx_switches_reach_the_pass() {
+@@ -2777,6 +2795,7 @@ mod tests {
+             .insert_resource(benilla_world::look::WorldLook::NEW)
+             .init_resource::<benilla_world::look::LookAo>()
+             .init_resource::<benilla_world::look::LookShadows>()
++            .init_resource::<benilla_world::look::LookWater>()
+             // Literal, not Default: RenderScale::default() reads $WOW_RENDER_SCALE.
+             .insert_resource(RenderScale(1.0))
+             // Literal: `Realmlist::default()` reads `$WOW_HOST`.
+diff --git a/crates/benilla-app/src/cvars/table.rs b/crates/benilla-app/src/cvars/table.rs
+index c260a4b..374e516 100644
+--- a/crates/benilla-app/src/cvars/table.rs
++++ b/crates/benilla-app/src/cvars/table.rs
+@@ -864,6 +864,15 @@ pub(crate) const REGISTERED: &[Registered] = &[
+         "benilla's own — 1.12 has only the blob under a unit and the baked terrain shadow; this \
+          sets the new look's real sun shadows: 0 off, 1 low, 2 high",
+     ),
++    // benilla's own: the new look's water (reflections, see-through shallows, ripples, sun glint
++    // and shore foam), "0" for 1.12's water under the rest of the new look. The knob is
++    // `benilla_world::look::LookWater::on`, set by `video::on_cvar`; inert under `worldLook 0`.
++    ours(
++        "worldWater",
++        "1",
++        "benilla's own — 1.12's water is a tinted sheet; this turns the new look's water \
++         (reflections, clear shallows, glint and foam) off on its own, for a slower GPU",
++    ),
+     // benilla's own: `/console fpsJournal 1` appends a per-second row of position, frame cost and
+     // per-pass GPU time to `benilla-config/Diagnostics/fps-journal.csv`. The knob is
+     // [`crate::perf::FpsJournalSetting`].
+diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
+index ab119ab..3a8939f 100644
+--- a/crates/benilla-app/src/shaders.rs
++++ b/crates/benilla-app/src/shaders.rs
+@@ -167,6 +167,22 @@ mod tests {
+         }
+     }
+ 
++    /// The new look's water scene copy (`benilla_world::look::water_pass`): both def sets its
++    /// pipeline specialises on, composed, validated and translated.
++    #[test]
++    fn the_world_water_shader_composes_and_translates() {
++        let (mut cache, ids) = embedded_shader_cache();
++        let id = *ids
++            .get("benilla_world/shaders/world_water.wgsl")
++            .expect("world_water.wgsl is embedded");
++        for defs in benilla_world::look::water_pass::shader_def_sets() {
++            let module = cache
++                .get(&(), 0, id, &defs)
++                .unwrap_or_else(|e| panic!("{defs:?}: world_water.wgsl does not compose: {e:?}"));
++            validate_and_translate(&module, &format!("{defs:?}: world_water.wgsl"));
++        }
++    }
++
+     /// Bevy's `ShaderCache` over every embedded shader library, as the pipeline cache composes,
+     /// and each shader's id by its embedded path.
+     #[expect(
+diff --git a/crates/benilla-app/src/video.rs b/crates/benilla-app/src/video.rs
+index 651742c..2c855a6 100644
+--- a/crates/benilla-app/src/video.rs
++++ b/crates/benilla-app/src/video.rs
+@@ -312,6 +312,13 @@ impl Default for Widescreen {
+     }
+ }
+ 
++/// The new look's own switches [`on_cvar`] writes, each absent in an app without the look.
++type LookSwitches<'w> = (
++    Option<ResMut<'w, benilla_world::look::LookAo>>,
++    Option<ResMut<'w, benilla_world::look::LookShadows>>,
++    Option<ResMut<'w, benilla_world::look::LookWater>>,
++);
++
+ /// The change callbacks of the reference's video-options registration block (`0x688470`); each
+ /// arm writes only its own resource.
+ pub(crate) fn on_cvar(
+@@ -328,11 +335,8 @@ pub(crate) fn on_cvar(
+     mut ffx: ResMut<benilla_world::ffx_glow::FfxSwitches>,
+     mut widescreen: ResMut<Widescreen>,
+     mut look: ResMut<benilla_world::look::WorldLook>,
+-    // The new look's own switches: its contact shadows and its sun shadows.
+-    (ao, shadows): (
+-        Option<ResMut<benilla_world::look::LookAo>>,
+-        Option<ResMut<benilla_world::look::LookShadows>>,
+-    ),
++    // The new look's own switches: its contact shadows, its sun shadows and its water.
++    (ao, shadows, water): LookSwitches,
+     mut cvars: ResMut<crate::cvars::Cvars>,
+ ) {
+     use benilla_world::view::{FARCLIP_RANGE, MSAA_RANGE};
+@@ -380,6 +384,16 @@ pub(crate) fn on_cvar(
+                 );
+             }
+         }
++        // benilla's own: the new look's water on its own, read every frame.
++        "worldwater" => {
++            if let Some(mut water) = water {
++                water.on = ev.flag();
++                info!(
++                    "video: the new look's water {}",
++                    if water.on { "on" } else { "off" }
++                );
++            }
++        }
+         // benilla's own: the new look's contact shadows on their own, read every frame.
+         "worldao" => {
+             if let Some(mut ao) = ao {
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index 14ca4b4..050bf71 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -116,6 +116,13 @@ impl Plugin for WorldConsolePlugin {
+             Some("<strength 0-2> [distance 30-400] | grade"),
+             look_shadow,
+         );
++        // benilla's own: the new look's water held for tuning on film.
++        app.console_command(
++            "lookwater",
++            GRAPHICS,
++            Some("<reflect 0-2> [clarity 0-2] | grade"),
++            look_water,
++        );
+         // Every world entry loads the map, which re-runs `InitSky` and re-arms the glares; a
+         // worldport's own load is `benilla_world::sun`'s.
+         app.add_systems(
+@@ -371,6 +378,38 @@ fn look_shadow(world: &mut World, args: &str) -> Vec<String> {
+     lines
+ }
+ 
++/// `lookwater <reflect> [clarity]`, benilla's own (1.12 has no such command): holds the new look's
++/// water (`benilla_world::look::water`) for tuning on film: its mirror at a multiple of the tuned
++/// one, 0 to 2 (0 none, 1 the tuned, 2 twice it), and optionally its clarity, 0 to 2 (toward 0
++/// murky, 2 twice as clear); `lookwater grade`, or no argument, lets go. `worldWater 0` and the
++/// classic look (`worldLook 0`) have 1.12's water either way.
++fn look_water(world: &mut World, args: &str) -> Vec<String> {
++    use benilla_world::look::{LookWater, WorldLook};
++    let Some((reflect, clarity)) = LookWater::parse(args) else {
++        return vec!["Usage: lookwater <reflect 0-2> [clarity 0-2] | grade".to_string()];
++    };
++    let on = {
++        let mut water = world.get_resource_or_init::<LookWater>();
++        water.reflect = reflect;
++        water.clarity = clarity;
++        water.on
++    };
++    let mut lines = vec![match (reflect, clarity) {
++        (None, _) => "Water at its tuning.".to_string(),
++        (Some(r), None) => format!("Water's mirror held at {r} times its own."),
++        (Some(r), Some(c)) => {
++            format!("Water's mirror held at {r} times its own, its clarity at {c} times.")
++        }
++    }];
++    if !on {
++        lines.push("worldWater is 0: 1.12's water.".to_string());
++    }
++    if !world.get_resource::<WorldLook>().is_some_and(|l| l.on) {
++        lines.push("The classic look (worldLook 0) has 1.12's water.".to_string());
++    }
++    lines
++}
++
+ /// A world-flag toggle (`0x673050` and its siblings): the bit set is cleared with the first line,
+ /// a clear one set with the second, each through `ConsoleWrite` in class 0.
+ fn toggle(world: &mut World, bit: u32, off: &str, on: &str) -> Vec<String> {
+@@ -886,6 +925,45 @@ mod tests {
+         assert_eq!(lines[1], "worldShadows is 0: no sun shadows.");
+     }
+ 
++    /// `lookwater`: a mirror (and a clarity) holds the water, `grade` or nothing lets go, and
++    /// anything out of range leaves it as it was with the usage line.
++    #[test]
++    fn the_look_water_holds_and_lets_go() {
++        use benilla_world::look::{LookWater, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        let held = |app: &mut App| *app.world_mut().get_resource_or_init::<LookWater>();
++        assert_eq!(
++            run(&mut app, "lookwater 1.5"),
++            ["Water's mirror held at 1.5 times its own."]
++        );
++        assert_eq!(
++            (held(&mut app).reflect, held(&mut app).clarity),
++            (Some(1.5), None)
++        );
++        assert_eq!(
++            run(&mut app, "lookwater 0 2"),
++            ["Water's mirror held at 0 times its own, its clarity at 2 times."]
++        );
++        assert_eq!(held(&mut app).clarity, Some(2.0));
++        assert_eq!(
++            run(&mut app, "lookwater 3"),
++            ["Usage: lookwater <reflect 0-2> [clarity 0-2] | grade"]
++        );
++        assert_eq!(
++            held(&mut app).reflect,
++            Some(0.0),
++            "a bad value changes nothing"
++        );
++        assert_eq!(run(&mut app, "lookwater grade"), ["Water at its tuning."]);
++        assert_eq!(held(&mut app), LookWater::default());
++        app.world_mut().resource_mut::<LookWater>().on = false;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        let lines = run(&mut app, "lookwater 1");
++        assert_eq!(lines.len(), 3, "{lines:?}");
++        assert_eq!(lines[1], "worldWater is 0: 1.12's water.");
++    }
++
+     /// The six toggles flip their bit and print the state they leave (`ConsoleWrite` class 0):
+     /// the five world-flag bits start set (`0x7100b73`, `0x66f6cb`), the simple-doodad word clear
+     /// (`0x66f714`). None reads its arguments.
+diff --git a/crates/benilla-assets/src/materials.rs b/crates/benilla-assets/src/materials.rs
+index ec4dbf8..ea94dab 100644
+--- a/crates/benilla-assets/src/materials.rs
++++ b/crates/benilla-assets/src/materials.rs
+@@ -71,6 +71,57 @@ pub fn shadow_map_image(size: u32, layers: u32) -> Image {
+     image
+ }
+ 
++/// The new look's water (`benilla_world::look::water`): the world as it stands before any water or
++/// other blended draw, copied each frame between the opaque and the transparent passes, which the
++/// liquid material binds at 113 (with its sampler at 114) to mirror the shore in the water. Fixed
++/// handles, as [`SHADOW_MAP`]: the world inserts them at startup at a token size and resizes them
++/// to the view while the water is on.
++pub const WATER_SCENE: Handle<Image> =
++    bevy::asset::uuid_handle!("5ad0a0e1-0066-4c0a-9e5b-5ad0a0e10066");
++
++/// [`WATER_SCENE`]'s depth: the device depth (reverse-Z) of the same frame, one `R32Float` texel a
++/// pixel, which the liquid material binds at 115 and reads with `textureLoad`: how deep the water
++/// is under each of its pixels, and where a mirrored ray meets the shore.
++pub const WATER_DEPTH: Handle<Image> =
++    bevy::asset::uuid_handle!("5ad0a0e1-0066-4c0a-9e5b-5ad0a0e1d066");
++
++/// [`WATER_SCENE`]'s and [`WATER_DEPTH`]'s images at `width` × `height`: the colour in the world
++/// camera's own `Rgba16Float` (it holds 1.12's gamma bytes), sampled linear and clamped; the depth
++/// in `R32Float`, read by texel. Uninitialised (the copy writes every texel before the water reads
++/// any), render-world only.
++pub fn water_scene_images(width: u32, height: u32) -> (Image, Image) {
++    use bevy::asset::RenderAssetUsages;
++    use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor};
++    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
++    let make = |label: &'static str, format: TextureFormat| {
++        let mut image = Image::new_uninit(
++            Extent3d {
++                width: width.max(1),
++                height: height.max(1),
++                depth_or_array_layers: 1,
++            },
++            TextureDimension::D2,
++            format,
++            RenderAssetUsages::RENDER_WORLD,
++        );
++        image.texture_descriptor.label = Some(label);
++        image.texture_descriptor.usage =
++            TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT;
++        image
++    };
++    let mut scene = make("look_water_scene", TextureFormat::Rgba16Float);
++    scene.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
++        label: Some("look_water_scene".into()),
++        address_mode_u: ImageAddressMode::ClampToEdge,
++        address_mode_v: ImageAddressMode::ClampToEdge,
++        mag_filter: ImageFilterMode::Linear,
++        min_filter: ImageFilterMode::Linear,
++        ..Default::default()
++    });
++    let depth = make("look_water_depth", TextureFormat::R32Float);
++    (scene, depth)
++}
++
+ /// `StandardMaterial` plus the per-tile layer-blend extension.
+ pub type TerrainMaterial = ExtendedMaterial<StandardMaterial, TerrainExtension>;
+ 
+@@ -419,6 +470,26 @@ pub struct LiquidExt {
+     /// The shared global light, read in both stages (the vertex stage evaluates the sun sheen).
+     #[storage(90, read_only, buffer, visibility(vertex, fragment))]
+     pub light_buf: Buffer,
++    /// The new look's sun-shadow map, always [`SHADOW_MAP`]: a shadow on the water dims its glint
++    /// and mirror.
++    #[texture(
++        112,
++        dimension = "2d_array",
++        sample_type = "depth",
++        visibility(fragment)
++    )]
++    pub shadow_map: Handle<Image>,
++    /// The new look's water: the world before the water, always [`WATER_SCENE`], and its depth,
++    /// always [`WATER_DEPTH`]; read only while the water block says the new water is on.
++    #[texture(113, visibility(fragment))]
++    #[sampler(114, visibility(fragment))]
++    pub scene: Handle<Image>,
++    #[texture(115, filterable = false, visibility(fragment))]
++    pub scene_depth: Handle<Image>,
++    /// The new look's water block (`benilla_world::look::water::pack_rows`), rewritten each frame;
++    /// all zero (1.12's water) under the classic look and with `worldWater 0`.
++    #[storage(116, read_only, buffer, visibility(fragment))]
++    pub water_buf: Buffer,
+ }
+ 
+ impl MaterialExtension for LiquidExt {
+diff --git a/crates/benilla-assets/src/shaders/liquid.wgsl b/crates/benilla-assets/src/shaders/liquid.wgsl
+index 375750b..26b7783 100644
+--- a/crates/benilla-assets/src/shaders/liquid.wgsl
++++ b/crates/benilla-assets/src/shaders/liquid.wgsl
+@@ -21,6 +21,12 @@
+ //
+ // Culling is off for every kind: all four reference liquid passes disable GL_CULL_FACE. Water
+ // blends with depth write off; magma and slime are opaque and write depth. Output is raw gamma.
++//
++// The new look's water (`look_water`, benilla's own, no reference behaviour; `look::water`): while
++// the water block's row 0 `.x` is set (`worldLook 1`, `worldWater 1`), water seen from above is
++// shaded per pixel instead: reflections, see-through shallows, ripples, sun glint and shore foam,
++// from the scene copied under it (`look::water_pass`). An all-zero block, or a camera under the
++// surface, runs 1.12's arms below untouched.
+ 
+ #import bevy_pbr::{
+     mesh_functions,
+@@ -58,9 +64,32 @@ struct WowLight {
+     _grade: vec4<f32>,             // 17
+     wmo_fog_color: vec4<f32>,      // 18 rgb = interior fog (block 2); w = enable
+     wmo_fog_params: vec4<f32>,     // 19 x = start yd; y = end yd
++    // Rows 20 on, read only by the new look's water: the point table (unread), the new look's
++    // lights (unread) and its sun shadows (`look::shadows::pack_rows`, SHADOW_ROWS = 14).
++    _point_count: vec4<f32>,       // 20
++    _points: array<vec4<f32>, 512>,
++    _look_lights: array<vec4<f32>, 48>,
++    shadow: array<vec4<f32>, 14>,
+ };
+ @group(#{MATERIAL_BIND_GROUP}) @binding(90) var<storage, read> wow_light: WowLight;
+ 
++// The new look's water (`look::water`): the sun-shadow map (`textureLoad` only), the scene copied
++// under the water (gamma colour, sampled; device depth, by texel) and the water block
++// (`look::water::pack_rows`, WATER_ROWS = 10; keep in sync):
++//   0 [on, mirror, clarity (yd), foam] · 1 [glint body (camera to it), glint] ·
++//   2 [glint colour (linear), sharpness] · 3 [sky zenith (linear), ripple slope] ·
++//   4 [sky horizon (linear), ripple wavelength (yd)] · 5 [shallow (sRGB), tint weight] ·
++//   6 [deep (sRGB), deep at (yd)] · 7 [march reach (yd), F0, foam depth (yd), shore soft (yd)] ·
++//   8 [sky middle (linear), sheen] · 9 [classic ripples, shadow dim, ocean clarity (yd), 0].
++@group(#{MATERIAL_BIND_GROUP}) @binding(112) var shadow_map: texture_depth_2d_array;
++@group(#{MATERIAL_BIND_GROUP}) @binding(113) var scene_tex: texture_2d<f32>;
++@group(#{MATERIAL_BIND_GROUP}) @binding(114) var scene_samp: sampler;
++@group(#{MATERIAL_BIND_GROUP}) @binding(115) var scene_depth: texture_2d<f32>;
++struct WaterBlock {
++    rows: array<vec4<f32>, 10>,
++};
++@group(#{MATERIAL_BIND_GROUP}) @binding(116) var<storage, read> water: WaterBlock;
++
+ struct LiquidVsOut {
+     @builtin(position) clip_position: vec4<f32>,
+     @location(0) world_position: vec4<f32>,
+@@ -184,6 +213,317 @@ fn swatch_at(shallow: vec4<f32>, deep: vec4<f32>, v: f32, ocean: bool) -> vec4<f
+     );
+ }
+ 
++// ── The new look's water ─────────────────────────────────────────────────────────────────────
++//
++// benilla's own (no reference behaviour; `look::water`). Every tunable comes from the water block
++// but the march's steps, `look::water::tune`'s mirror. Linear light inside; 1.12's gamma at the
++// edges (the scene copy, the zone's colours and light, the output and its fog).
++
++const WATER_SSR_STEPS: u32 = 24u;
++const WATER_SSR_REFINE: u32 = 5u;
++const WATER_SSR_START: f32 = 0.3;
++const WATER_LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
++// The low filter of the sun shadows (`look::shadows::tune`), mirrored from terrain.wgsl.
++const WATER_SHADOW_TAPS: u32 = 6u;
++const WATER_SHADOW_TEXELS: f32 = 1.5;
++
++fn water_decode(c: vec3<f32>) -> vec3<f32> {
++    let x = max(c, vec3<f32>(0.0));
++    return select(pow((x + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4)), x / 12.92, x <= vec3<f32>(0.04045));
++}
++
++fn water_encode(c: vec3<f32>) -> vec3<f32> {
++    let x = max(c, vec3<f32>(0.0));
++    return select(1.055 * pow(x, vec3<f32>(1.0 / 2.4)) - vec3<f32>(0.055), x * 12.92, x <= vec3<f32>(0.0031308));
++}
++
++fn water_hash(c: vec2<i32>) -> f32 {
++    var h = bitcast<u32>(c.x) * 374761393u + bitcast<u32>(c.y) * 668265263u;
++    h = (h ^ (h >> 13u)) * 1274126177u;
++    h = h ^ (h >> 16u);
++    return f32(h) * (1.0 / 4294967296.0);
++}
++
++// Value noise at p and its gradient: (value, d/dx, d/dy), quintic so the gradient is smooth.
++fn water_noise(p: vec2<f32>) -> vec3<f32> {
++    let i = floor(p);
++    let f = p - i;
++    let c = vec2<i32>(i);
++    let a = water_hash(c);
++    let b = water_hash(c + vec2<i32>(1, 0));
++    let d = water_hash(c + vec2<i32>(0, 1));
++    let e = water_hash(c + vec2<i32>(1, 1));
++    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
++    let du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
++    let k = a - b - d + e;
++    return vec3<f32>(
++        a + (b - a) * u.x + (d - a) * u.y + k * u.x * u.y,
++        du.x * ((b - a) + k * u.y),
++        du.y * ((d - a) + k * u.x),
++    );
++}
++
++// The rippled normal at `p` (the surface's XZ) at time `t`: three octaves of scrolling noise, each
++// faded out as a pixel grows past a quarter of its wavelength (`fp`, yards a pixel), so far water
++// goes smooth instead of shimmering.
++fn water_normal(p: vec2<f32>, t: f32, slope: f32, wavelength: f32, fp: f32) -> vec3<f32> {
++    let k1 = 1.0 / max(wavelength, 0.1);
++    let k2 = k1 * 1.9;
++    let k3 = k1 * 3.1;
++    let n1 = water_noise(p * k1 + t * vec2<f32>(0.060, 0.035));
++    let n2 = water_noise(p * k2 + vec2<f32>(17.3, 5.1) - t * vec2<f32>(0.045, 0.070));
++    let n3 = water_noise(p * k3 + vec2<f32>(-3.7, 11.2) + t * vec2<f32>(-0.110, 0.090));
++    let f1 = 1.0 - smoothstep(0.12, 0.35, fp * k1);
++    let f2 = 1.0 - smoothstep(0.12, 0.35, fp * k2);
++    let f3 = 1.0 - smoothstep(0.12, 0.35, fp * k3);
++    // Each octave's gradient in its own units, weighted so the mean tilt is about `slope`.
++    let g = slope * 0.66 * (n1.yz * f1 + 1.14 * n2.yz * f2 + 1.08 * n3.yz * f3);
++    return normalize(vec3<f32>(-g.x, 1.0, -g.y));
++}
++
++// The copy's planar eye depth at `uv`; 0 where it holds the sky (reverse-Z clear) or past its
++// edge.
++fn water_scene_z(uv: vec2<f32>) -> f32 {
++    let dims = vec2<f32>(textureDimensions(scene_depth));
++    let px = vec2<i32>(clamp(uv * dims, vec2<f32>(0.0), dims - vec2<f32>(1.0)));
++    let d = textureLoad(scene_depth, px, 0).r;
++    if (d <= 0.0) {
++        return 0.0;
++    }
++    let v = view.view_from_clip * vec4<f32>(0.0, 0.0, d, 1.0);
++    return -v.z / v.w;
++}
++
++fn water_uv(clip: vec4<f32>) -> vec2<f32> {
++    return (clip.xy / clip.w) * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5);
++}
++
++// The shore mirrored: a ray from P along R marched through the copied depth (screen-space
++// reflection), geometric steps out to `reach` yards, then halved in on the crossing. The hit's
++// colour (gamma) and its weight (faded at the screen's edge and toward the reach); weight 0 where
++// the ray leaves the screen or meets only sky.
++fn water_reflection(P: vec3<f32>, R: vec3<f32>, jitter: f32, reach: f32) -> vec4<f32> {
++    let grow = pow(reach / WATER_SSR_START, 1.0 / f32(WATER_SSR_STEPS));
++    var t_prev = 0.0;
++    var t = WATER_SSR_START * (1.0 + 0.5 * jitter);
++    for (var i = 0u; i < WATER_SSR_STEPS; i = i + 1u) {
++        let clip = view.clip_from_world * vec4<f32>(P + R * t, 1.0);
++        if (clip.w <= 0.05) {
++            break;
++        }
++        let uv = water_uv(clip);
++        if (any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0))) {
++            break;
++        }
++        let sz = water_scene_z(uv);
++        // Behind what the copy holds there, and not far behind it: the ray crossed its surface.
++        if (sz > 0.0 && clip.w > sz && clip.w - sz < max(0.6, 1.5 * (t - t_prev))) {
++            var lo = t_prev;
++            var hi = t;
++            for (var j = 0u; j < WATER_SSR_REFINE; j = j + 1u) {
++                let mid = 0.5 * (lo + hi);
++                let cm = view.clip_from_world * vec4<f32>(P + R * mid, 1.0);
++                let zm = water_scene_z(water_uv(cm));
++                if (zm > 0.0 && cm.w > zm) {
++                    hi = mid;
++                } else {
++                    lo = mid;
++                }
++            }
++            let uh = water_uv(view.clip_from_world * vec4<f32>(P + R * hi, 1.0));
++            let border = min(min(uh.x, 1.0 - uh.x), min(uh.y, 1.0 - uh.y));
++            let weight = smoothstep(0.0, 0.06, border) * (1.0 - smoothstep(0.6 * reach, reach, hi));
++            return vec4<f32>(textureSampleLevel(scene_tex, scene_samp, uh, 0.0).rgb, weight);
++        }
++        t_prev = t;
++        t = t * grow;
++    }
++    return vec4<f32>(0.0);
++}
++
++// The hour's sky in direction R (linear): horizon to middle to zenith.
++fn water_sky(R: vec3<f32>) -> vec3<f32> {
++    let up = clamp(R.y, 0.0, 1.0);
++    let low = mix(water.rows[4].rgb, water.rows[8].rgb, smoothstep(0.0, 0.25, up));
++    return mix(low, water.rows[3].rgb, smoothstep(0.2, 0.8, up));
++}
++
++// One texel's compare of the sun-shadow map, and a bilinear-weighted compare of the four around
++// `t` (texel units), as terrain.wgsl's.
++fn water_shadow_texel(c: vec2<i32>, layer: i32, z: f32, lim: i32) -> f32 {
++    let t = clamp(c, vec2<i32>(0), vec2<i32>(lim));
++    return select(0.0, 1.0, z <= textureLoad(shadow_map, t, layer, 0));
++}
++
++fn water_shadow_tap(t: vec2<f32>, layer: i32, z: f32, lim: i32) -> f32 {
++    let f = t - vec2<f32>(0.5);
++    let i = floor(f);
++    let w2 = f - i;
++    let c = vec2<i32>(i);
++    let s00 = water_shadow_texel(c, layer, z, lim);
++    let s10 = water_shadow_texel(c + vec2<i32>(1, 0), layer, z, lim);
++    let s01 = water_shadow_texel(c + vec2<i32>(0, 1), layer, z, lim);
++    let s11 = water_shadow_texel(c + vec2<i32>(1, 1), layer, z, lim);
++    return mix(mix(s00, s10, w2.x), mix(s01, s11, w2.x), w2.y);
++}
++
++// How much of the sun reaches the water surface at P (eye depth `eye_z`), 1 lit, at the hour's
++// strength: the sun shadows' low filter on the slice P falls in (`look::shadows`; the receivers'
++// `sun_shadow` in terrain.wgsl is the full one), faded out over the reach's last share.
++fn water_shadow(P: vec3<f32>, eye_z: f32, pix: vec2<f32>) -> f32 {
++    let head = wow_light.shadow[0];
++    if (head.x < 0.5 || eye_z >= head.w) {
++        return 1.0;
++    }
++    let count = u32(head.x);
++    var c = 0u;
++    for (var i = 0u; i + 1u < count; i = i + 1u) {
++        if (eye_z > wow_light.shadow[1][i]) {
++            c = i + 1u;
++        }
++    }
++    let centre = wow_light.shadow[6u + 2u * c];
++    let depth = wow_light.shadow[7u + 2u * c]; // near, 1/range, texel (yd), blend start
++    let res = wow_light.shadow[2].w;
++    let travel = wow_light.shadow[4].xyz;
++    // The surface faces up: pushed off it along its normal, more as the light grazes it.
++    let facing = clamp(-travel.y, 0.0, 1.0);
++    let push = depth.z * wow_light.shadow[4].w * (1.0 - 0.5 * facing);
++    let d = (P + vec3<f32>(0.0, push, 0.0)) - centre.xyz;
++    let uv = vec2<f32>(dot(d, wow_light.shadow[2].xyz), -dot(d, wow_light.shadow[3].xyz))
++        * (0.5 * centre.w) + vec2<f32>(0.5);
++    if (any(uv < vec2<f32>(0.0)) || any(uv > vec2<f32>(1.0))) {
++        return 1.0;
++    }
++    let z = (dot(d, travel) - depth.x) * depth.y - depth.z * wow_light.shadow[5].w * depth.y;
++    let t = uv * res;
++    let lim = i32(res) - 1;
++    let turn = 6.2831853 * fract(52.9829189 * fract(dot(pix, vec2<f32>(0.06711056, 0.00583715))));
++    var lit = 0.0;
++    for (var i = 0u; i < WATER_SHADOW_TAPS; i = i + 1u) {
++        let r = sqrt((f32(i) + 0.5) / f32(WATER_SHADOW_TAPS));
++        let a = f32(i) * 2.3999632 + turn;
++        lit += water_shadow_tap(t + vec2<f32>(cos(a), sin(a)) * r * WATER_SHADOW_TEXELS, i32(c), z, lim);
++    }
++    lit = lit / f32(WATER_SHADOW_TAPS);
++    lit = mix(lit, 1.0, smoothstep(head.z, head.w, eye_z));
++    return 1.0 - head.y * (1.0 - lit);
++}
++
++// The new look's water seen from above: `detail` is 1.12's ripple frame, `fp` the yards a pixel
++// spans, `shallow_g`/`deep_g` the zone's `Light.dbc` water colours (gamma). Composed over the bed
++// by the frame's own alpha blend: `a` is how much the water hides of what lies behind it, so the
++// bed, and anything drawn behind the water, shows through as much as it should.
++fn look_water(
++    in: LiquidVsOut,
++    detail: vec4<f32>,
++    fp2: vec2<f32>,
++    shallow_g: vec3<f32>,
++    deep_g: vec3<f32>,
++) -> vec4<f32> {
++    let P = in.world_position.xyz;
++    let cam = view.world_position.xyz;
++    let to_cam = cam - P;
++    let dist = length(to_cam);
++    let V = to_cam / max(dist, 1e-4);
++    let eye_z = max(-(view.view_from_world * vec4<f32>(P, 1.0)).z, 1e-3);
++    let t = anim_time();
++    let pix = in.clip_position.xy;
++    let fp = max(fp2.x, fp2.y);
++
++    // The bed under this pixel: how far the view ray runs through water to reach it, and how
++    // deep the water stands over it. The sky (no bed in reach) is deep.
++    let uv = (pix - view.viewport.xy) / view.viewport.zw;
++    let bed_z = water_scene_z(uv);
++    var path = 1.0e4;
++    var depth_v = 1.0e4;
++    if (bed_z > 0.0) {
++        let beyond = max(bed_z - eye_z, 0.0) / eye_z;
++        path = beyond * dist;
++        depth_v = max(cam.y - P.y, 0.0) * beyond;
++    }
++    let shore = smoothstep(0.0, water.rows[7].w, depth_v);
++
++    // Ripples, calmed into the shore.
++    let N = water_normal(P.xz, t, water.rows[3].w * (0.3 + 0.7 * shore), water.rows[4].w, fp);
++
++    // The sun's share at the surface, for the body, the glint and the mirror.
++    let vis = water_shadow(P, eye_z, pix);
++
++    // The water's own colour: shallow to deep, ours blended with the zone's, lit by its light.
++    let tint_w = water.rows[5].w;
++    let sh = mix(shallow_g, water.rows[5].rgb, tint_w);
++    let dp = mix(deep_g, water.rows[6].rgb, tint_w);
++    let to_light = -normalize(wow_light.light_sun.xyz);
++    let lit_g = clamp(
++        wow_light.light_ambient.rgb + wow_light.light_diffuse.rgb * max(to_light.y, 0.0) * vis,
++        vec3<f32>(0.0),
++        vec3<f32>(1.0),
++    );
++    var body = water_decode(mix(sh, dp, smoothstep(0.0, water.rows[6].w, depth_v)) * lit_g);
++    // 1.12's ripple flipbook, kept faintly over it (its `ocean0_s.bls` sheen term).
++    body += water_decode((in.secondary_vtx + vec3<f32>(0.25)) * detail.a) * water.rows[9].x * shore;
++
++    // How much of the bed's light comes through: e^(−path / clarity).
++    var clarity = water.rows[0].z;
++    if (w.kind.y > 0.5) {
++        clarity = water.rows[9].z;
++    }
++    let trans = exp(-path / max(clarity, 0.05));
++
++    // The mirror: Fresnel (Schlick), held by `lookwater`, in from the waterline.
++    let cos_v = clamp(dot(N, V), 0.0, 1.0);
++    let f0 = water.rows[7].y;
++    let fres = clamp((f0 + (1.0 - f0) * pow(1.0 - cos_v, 5.0)) * water.rows[0].y, 0.0, 1.0) * shore;
++    var R = reflect(-V, N);
++    // A ripple never mirrors into the water itself.
++    R.y = max(R.y, 0.01);
++    R = normalize(R);
++    let jitter = fract(52.9829189 * fract(dot(pix, vec2<f32>(0.06711056, 0.00583715))));
++    // The march only where the mirror shows: looking straight down it is all but clear.
++    var hit = vec4<f32>(0.0);
++    if (fres > 0.01) {
++        hit = water_reflection(P, R, jitter, water.rows[7].x);
++    }
++    var mirror = mix(water_sky(R), water_decode(hit.rgb), hit.a);
++    mirror *= 1.0 - water.rows[9].y * (1.0 - vis);
++
++    // The glint: the sun's (or the moon's) highlight on the ripples, sharp, with a soft sheen.
++    let body_dir = water.rows[1].xyz;
++    var glint = vec3<f32>(0.0);
++    if (water.rows[1].w > 0.0 && body_dir.y > -0.05) {
++        let H = normalize(normalize(body_dir) + V);
++        let nh = clamp(dot(N, H), 0.0, 1.0);
++        let sharp = water.rows[2].w;
++        let spec = pow(nh, sharp) + water.rows[8].w * pow(nh, sharp * 0.04);
++        glint = water.rows[2].rgb * (water.rows[1].w * spec * vis * shore);
++    }
++
++    // The foam: a soft line just off the waterline under the foam depth, broken up and lapping.
++    let fd = max(water.rows[7].z, 0.01);
++    let band = smoothstep(0.0, 0.04, depth_v) * (1.0 - smoothstep(0.15 * fd, fd, depth_v));
++    let na = water_noise(P.xz * 0.9 + vec2<f32>(0.05, -0.03) * t).x;
++    let nb = water_noise(P.xz * 2.7 + vec2<f32>(31.0, 7.0) - vec2<f32>(0.11, 0.07) * t).x;
++    let lap = 0.5 + 0.5 * sin(depth_v / fd * 9.0 - t * 1.4 + na * 4.0);
++    let foam = water.rows[0].w * band
++        * smoothstep(0.42, 0.78, 0.45 * na + 0.25 * nb + 0.35 * lap)
++        * (1.0 - smoothstep(60.0, 120.0, eye_z));
++    let foam_rgb = water_decode(lit_g) * 0.8;
++
++    // Over the bed: the mirror takes `fres`, the body the rest of what the bed loses; the glint
++    // adds; the foam lies on top.
++    let w_body = (1.0 - fres) * (1.0 - trans);
++    var a = fres + w_body;
++    var c = mirror * fres + body * w_body;
++    c += glint;
++    a = max(a, min(dot(glint, WATER_LUMA), 1.0));
++    c = c * (1.0 - foam) + foam_rgb * foam;
++    a = a * (1.0 - foam) + foam;
++    a = clamp(a, 0.0, 1.0);
++    let rgb = water_encode(c / max(a, 1e-4));
++    return vec4<f32>(apply_fog(rgb, P, in.room_fog), a);
++}
++
+ @fragment
+ fn fragment(in: LiquidVsOut) -> @location(0) vec4<f32> {
+     // The far-clip wall, as terrain and models: discard beyond `fog_params.w` (0 disables it).
+@@ -202,6 +542,9 @@ fn fragment(in: LiquidVsOut) -> @location(0) vec4<f32> {
+         frame_layer(),
+         view.mip_bias,
+     );
++    // The new look's water: yards a pixel spans on the surface, taken here in uniform control
++    // flow, for its ripples' level of detail.
++    let footprint = fwidth(in.world_position.xz);
+ 
+     // Magma/slime: the sheet is the opaque body, unmodulated (the ADT vertex has no colour, the WMO
+     // one is `0xffffffff`) and unlit (lighting off on both paths), but fogged.
+@@ -219,6 +562,12 @@ fn fragment(in: LiquidVsOut) -> @location(0) vec4<f32> {
+         shallow = wow_light.water_ocean[0];
+         deep = wow_light.water_ocean[1];
+     }
++    // The new look's water, from above, on open water (ADT and WMO exterior; an interior pool
++    // keeps 1.12's).
++    if (water.rows[0].x > 0.5 && w.path.x < 1.5
++        && view.world_position.y > in.world_position.y + 0.02) {
++        return look_water(in, detail, footprint, shallow.rgb, deep.rgb);
++    }
+     // ---- The WMO water arms: opacity is the per-vertex authored byte through the zone's linear
+     // alpha ramp, carried in `in.depth`.
+     let vtx_alpha = mix(shallow.w, deep.w, depth);
+diff --git a/crates/benilla-world/src/lighting/mod.rs b/crates/benilla-world/src/lighting/mod.rs
+index 1467fe6..fe42315 100644
+--- a/crates/benilla-world/src/lighting/mod.rs
++++ b/crates/benilla-world/src/lighting/mod.rs
+@@ -310,6 +310,10 @@ mod ordering_tests {
+                 "the celestial follows: PostUpdate, BillboardPlace",
+             ),
+             ("weather/precip/mod.rs", "push_precip: PostUpdate"),
++            (
++                "look/water.rs",
++                "publish_water joins LightingConsumeSet where look/mod.rs adds it",
++            ),
+         ];
+         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+         let mut offenders = Vec::new();
+diff --git a/crates/benilla-world/src/liquid/surface.rs b/crates/benilla-world/src/liquid/surface.rs
+index 015a9b7..6257971 100644
+--- a/crates/benilla-world/src/liquid/surface.rs
++++ b/crates/benilla-world/src/liquid/surface.rs
+@@ -324,12 +324,19 @@ pub(super) fn setup_liquid(
+     mut commands: Commands,
+     config: Option<Res<RenderConfig>>,
+     world_assets: Option<ResMut<WorldAssets>>,
++    device: Option<Res<bevy::render::renderer::RenderDevice>>,
+     mut images: ResMut<Assets<Image>>,
+     mut materials: ResMut<Assets<LiquidMaterial>>,
+ ) {
+-    let (Some(_config), Some(mut world_assets)) = (config, world_assets) else {
++    let (Some(_config), Some(mut world_assets), Some(device)) = (config, world_assets, device)
++    else {
+         return; // no client data → no terrain, so no water either
+     };
++    // The new look's water block (`look::water`), which every liquid material binds; all zero,
++    // 1.12's water, until the look writes it.
++    let water = crate::look::water::new_water_buffer(&device);
++    let water_buf = water.0.clone();
++    commands.insert_resource(water);
+     // Light, fog and the water swatches come off the shared global-light buffer, as for terrain.
+     let mut assets = LiquidAssets::default();
+     for &(kind, dir, stem, count) in FRAME_SETS {
+@@ -406,6 +413,12 @@ pub(super) fn setup_liquid(
+                         },
+                     ),
+                     light_buf: world_assets.shared_light.clone(),
++                    // The new look's: the sun-shadow map, the scene under the water and its
++                    // depth, and the water block.
++                    shadow_map: benilla_assets::materials::SHADOW_MAP,
++                    scene: benilla_assets::materials::WATER_SCENE,
++                    scene_depth: benilla_assets::materials::WATER_DEPTH,
++                    water_buf: water_buf.clone(),
+                 },
+             });
+             assets
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index 01937af..267b1be 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -1,8 +1,9 @@
+ //! The new look, benilla's own (no reference behaviour): WoW Forever's idea of keeping 1.12's
+ //! models and textures and re-lighting the world, zone by zone. A zone's light is hand-tuned by
+ //! time of day ([`grade`]) over the `Light.dbc` sample, and torches and spells light the ground
+-//! around them per pixel ([`lights`]), things that meet shade each other ([`ao`]), and the sun
+-//! and the moon cast real shadows ([`shadows`]). One
++//! around them per pixel ([`lights`]), things that meet shade each other ([`ao`]), the sun and
++//! the moon cast real shadows ([`shadows`]), and the water mirrors the shore and shows its bed
++//! ([`water`]). One
+ //! switch, [`WorldLook`] (the game's `worldLook` CVar), turns all of it off, and the classic look
+ //! is then exactly the reference's.
+ 
+@@ -21,12 +22,15 @@ pub mod pass;
+ pub mod rays;
+ pub mod shadow_pass;
+ pub mod shadows;
++pub mod water;
++pub mod water_pass;
+ pub use ao::LookAo;
+ pub use grade::{GradeKey, PostLook, Tint};
+ pub use lights::{LookLight, LookLightTune, LookPulse};
+ pub use mist::{LookMist, MistEvent, MistSource, WorldMist};
+ pub use pass::{LookBloomTune, LookFrame, LookMistTune, LookView};
+ pub use shadows::{LookShadows, ShadowFrame};
++pub use water::{LookWater, WaterFrame};
+ 
+ /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
+ /// test) is the reference; the game turns it on from its `worldLook` CVar.
+@@ -217,6 +221,7 @@ pub(crate) fn init_resources(app: &mut App) {
+     mist::init_resources(app);
+     lights::init_resources(app);
+     shadows::init_resources(app);
++    water::init_resources(app);
+ }
+ 
+ /// The new look's world side: its resources, the area table its zone lookup reads, and the
+@@ -227,14 +232,23 @@ impl Plugin for LookPlugin {
+     fn build(&self, app: &mut App) {
+         init_resources(app);
+         app.add_systems(Startup, load_look_areas.after(AssetSet::Open))
+-            .add_systems(PreUpdate, sync_view_look);
++            .add_systems(PreUpdate, sync_view_look)
++            // The water's block after the light it reads is resolved, and its scene copy sized to
++            // the view once that is known.
++            .add_systems(
++                Update,
++                water::publish_water.in_set(crate::lighting::LightingConsumeSet),
++            )
++            .add_systems(PostUpdate, water::size_water_scene);
+         pass::build(app);
+         shadow_pass::build(app);
++        water_pass::build(app);
+     }
+ 
+     fn finish(&self, app: &mut App) {
+         pass::finish(app);
+         shadow_pass::finish(app);
++        water_pass::finish(app);
+     }
+ }
+ 
+diff --git a/crates/benilla-world/src/look/water.rs b/crates/benilla-world/src/look/water.rs
+new file mode 100644
+index 0000000..6ddd346
+--- /dev/null
++++ b/crates/benilla-world/src/look/water.rs
+@@ -0,0 +1,507 @@
++//! Better water, the new look's own (no reference behaviour): lakes, rivers and the sea that look
++//! alive, as WoW Forever's do. 1.12's water is a flat tinted sheet with a flipbook of ripples and a
++//! per-vertex sun sheen; under the new look it is shaded per pixel in `liquid.wgsl`'s `look_water`:
++//! 1. **the scene under it** (`look::water_pass`): between the opaque and the transparent passes
++//!    the world as it stands and its depth are copied ([`benilla_assets::materials::WATER_SCENE`],
++//!    [`benilla_assets::materials::WATER_DEPTH`]), so each water pixel knows the bed behind it;
++//! 2. **see-through shallows**: the water's own colour comes in with the length of water a ray
++//!    crosses to the bed (`1 − e^(−path / clarity)`), clear turquoise in the shallows going to deep
++//!    blue-green ([`tune::SHALLOW`], [`tune::DEEP`], blended with the zone's own `Light.dbc` water
++//!    colours and lit by its light), and the bed shows through near the shore; the frame's alpha
++//!    blend lays it over the bed, so anything drawn behind the water still shows;
++//! 3. **reflections**: a ray mirrored off the rippled surface is marched through the copied depth
++//!    (screen-space reflection) to the shore's trees, hills and buildings, falling back to the
++//!    hour's sky colours where it leaves the screen or meets the sky, weighted by Fresnel (a mirror
++//!    at grazing angles, see-through looking down), softened in at the shoreline;
++//! 4. **ripples**: two scrolling octaves of gradient noise bend the normal, calm and glassy at dawn,
++//!    dusk and night, a breeze by day, rougher in a storm, fading with distance; 1.12's own ripple
++//!    flipbook still shows, faintly;
++//! 5. **sun glint**: a sharp warm highlight on the ripples toward the visible sun (its colour the
++//!    disc's), which the bloom picks up, and by night the moon's broader, paler path; a sun shadow
++//!    on the water (`look::shadows`) dims the glint and a little of the mirror;
++//! 6. **shore foam**: a soft white line where the water is under [`tune::FOAM_DEPTH`] deep, broken
++//!    up and lapping, which also rings a hero's legs as they wade.
++//!
++//! Every tunable is in [`tune`]; [`pack_rows`] carries them to the shader each frame in the water
++//! block. `worldWater 0` (`LookWater::on`) turns it off on its own; `lookwater <reflect> [clarity]`
++//! holds the mirror and the clarity for film. `worldLook 0` packs an all-zero block, and
++//! `liquid.wgsl` then runs 1.12's water untouched; so does a camera under the water.
++
++use bevy::prelude::*;
++use bevy::render::extract_resource::ExtractResource;
++use bevy::render::render_resource::{Buffer, BufferDescriptor, BufferUsages};
++use bevy::render::renderer::RenderDevice;
++
++use super::WorldLook;
++use crate::lighting::WowLighting;
++
++/// Every tunable of the water, in one place; the shader reads them from the water block
++/// ([`pack_rows`]) but for the march's step count, mirrored in `liquid.wgsl` as `WATER_SSR_STEPS`.
++/// A first pass, to tune on film with `lookwater`. Lengths are yards, colours sRGB 0..1.
++pub mod tune {
++    /// The mirror looking straight down (Schlick's F0): water's 0.02, doubled for the painterly
++    /// look; at grazing angles it climbs to a full mirror.
++    pub const F0: f32 = 0.04;
++    /// How much of the Fresnel mirror shows at `lookwater 1`.
++    pub const MIRROR: f32 = 1.0;
++    /// The yards of water that let through about a third (1/e) of the bed's light at
++    /// `lookwater _ 1`: Elwynn's lakes are clear, the bed shows to about two yards deep.
++    pub const CLEAR_YD: f32 = 1.4;
++    /// The ocean is murkier.
++    pub const OCEAN_CLEAR_YD: f32 = 2.2;
++    /// The water's own colour in the shallows and in the deep, blended with the zone's `Light.dbc`
++    /// water colours at [`TINT_WEIGHT`] (1 ours only, 0 the zone's), then lit by its light.
++    pub const SHALLOW: [f32; 3] = [0.18, 0.60, 0.56];
++    pub const DEEP: [f32; 3] = [0.04, 0.20, 0.24];
++    pub const TINT_WEIGHT: f32 = 0.6;
++    /// Vertical yards from shallow to deep colour.
++    pub const DEEP_AT: f32 = 3.0;
++    /// Ripples: the normal's slope at the big octave's peak, and that octave's wavelength in yards
++    /// (the small one is a third of it). Calm (dawn, dusk, night: glassy) to breeze (day), and how
++    /// much rougher a full storm makes it.
++    pub const RIPPLE_CALM: f32 = 0.05;
++    pub const RIPPLE_BREEZE: f32 = 0.13;
++    pub const RIPPLE_STORM: f32 = 0.12;
++    pub const RIPPLE_YD: f32 = 2.6;
++    /// The sun's elevation (degrees) over which the breeze comes in: calm below, full above.
++    pub const BREEZE_FROM_DEG: f32 = 8.0;
++    pub const BREEZE_TO_DEG: f32 = 35.0;
++    /// 1.12's own ripple flipbook kept under the new shading, as a share of its 1.12 brightness.
++    pub const CLASSIC_RIPPLES: f32 = 0.35;
++    /// Sun glint: its strength (linear light; a few times white, so the bloom takes it), its
++    /// Blinn sharpness, and the moon's (broader, a path across the water, pale and faint).
++    pub const SUN_GLINT: f32 = 6.0;
++    pub const SUN_SHARPNESS: f32 = 900.0;
++    pub const MOON_GLINT: f32 = 1.2;
++    pub const MOON_SHARPNESS: f32 = 160.0;
++    pub const MOON_TINT: [f32; 3] = [0.78, 0.86, 1.0];
++    /// The glint fades in as its body rises over this band of elevation (degrees), and goes in
++    /// cloud: a full overcast keeps this share of it.
++    pub const GLINT_RISE_FROM_DEG: f32 = -1.0;
++    pub const GLINT_RISE_TO_DEG: f32 = 4.0;
++    pub const GLINT_OVERCAST: f32 = 0.25;
++    /// A soft sheen around the glint, as a share of it, and its sharpness.
++    pub const SHEEN: f32 = 0.06;
++    /// How much of the mirror a full sun shadow on the water takes (the glint goes whole).
++    pub const SHADOW_DIM: f32 = 0.3;
++    /// The reflection march: how far a mirrored ray is followed (yards).
++    pub const SSR_REACH: f32 = 160.0;
++    /// Shore foam: under this many yards deep, strongest just off the waterline, at this most.
++    pub const FOAM_DEPTH: f32 = 0.5;
++    pub const FOAM: f32 = 0.75;
++    /// The mirror and the ripples come in over this depth at the waterline, so the shore has no
++    /// hard edge.
++    pub const SHORE_SOFT: f32 = 0.15;
++    /// The sky's reflection goes toward the fog colour by this much under a full overcast.
++    pub const OVERCAST_SKY: f32 = 0.6;
++    /// The most `lookwater` scales the mirror and the clarity by.
++    pub const SCALE_MAX: f32 = 2.0;
++}
++
++/// Rows the water block takes in its own storage buffer ([`LookWaterBuffer`], the liquid
++/// material's binding 116), mirrored as `water: array<vec4<f32>, 10>` in `liquid.wgsl`; keep in
++/// sync:
++///   0 `[on, mirror, clarity (yd), foam]` · 1 `[glint body (camera to it, unit), glint]` ·
++///   2 `[glint colour (linear), sharpness]` · 3 `[sky zenith (linear), ripple slope]` ·
++///   4 `[sky horizon (linear), ripple wavelength (yd)]` · 5 `[shallow (sRGB), tint weight]` ·
++///   6 `[deep (sRGB), deep at (yd)]` · 7 `[march reach (yd), F0, foam depth (yd), shore soft (yd)]` ·
++///   8 `[sky middle (linear), sheen]` · 9 `[classic ripples, shadow dim, ocean clarity (yd), 0]`.
++pub const WATER_ROWS: usize = 10;
++
++/// `worldWater` and the film's hold: `on` (on by default, inert under the classic look); `reflect`
++/// holds the mirror at a multiple of the tuned one, `clarity` the clarity (`lookwater`).
++#[derive(Resource, Clone, Copy, Debug, PartialEq)]
++pub struct LookWater {
++    pub on: bool,
++    pub reflect: Option<f32>,
++    pub clarity: Option<f32>,
++}
++
++impl Default for LookWater {
++    /// On, the `worldWater` CVar's registered "1".
++    fn default() -> Self {
++        Self {
++            on: true,
++            reflect: None,
++            clarity: None,
++        }
++    }
++}
++
++impl LookWater {
++    /// `lookwater`'s arguments: a mirror scale from 0 to [`tune::SCALE_MAX`] and an optional
++    /// clarity scale over the same range, or nothing (or `grade`) to follow the tuning again;
++    /// `None` for anything else, which changes nothing.
++    pub fn parse(args: &str) -> Option<(Option<f32>, Option<f32>)> {
++        let in_range = |w: &str| {
++            w.parse::<f32>()
++                .ok()
++                .filter(|v| (0.0..=tune::SCALE_MAX).contains(v))
++        };
++        let mut words = args.split_whitespace();
++        let first = match words.next() {
++            None => return Some((None, None)),
++            Some(w) if w.eq_ignore_ascii_case("grade") => {
++                return words.next().is_none().then_some((None, None));
++            }
++            Some(w) => w,
++        };
++        let reflect = in_range(first)?;
++        let clarity = match words.next() {
++            None => None,
++            Some(w) => Some(in_range(w)?),
++        };
++        words.next().is_none().then_some((Some(reflect), clarity))
++    }
++}
++
++/// This frame's water, from [`publish_water`] to the scene copy (`look::water_pass`) and the
++/// block's upload: `on` runs the copy; `rows` are [`pack_rows`]'s, all zero when off.
++#[derive(Resource, Clone, Copy, Debug, PartialEq, ExtractResource)]
++pub struct WaterFrame {
++    pub on: bool,
++    pub rows: [[f32; 4]; WATER_ROWS],
++}
++
++impl Default for WaterFrame {
++    fn default() -> Self {
++        Self {
++            on: false,
++            rows: [[0.0; 4]; WATER_ROWS],
++        }
++    }
++}
++
++/// The water block's storage buffer, which every liquid material binds at 116 and the render
++/// world rewrites each frame from [`WaterFrame`]; a `Buffer` clone shares the GPU resource.
++#[derive(Resource, Clone, ExtractResource)]
++pub struct LookWaterBuffer(pub Buffer);
++
++/// The block's size in bytes.
++pub const WATER_BLOCK_BYTES: u64 = (WATER_ROWS * 16) as u64;
++
++/// Makes the water block's buffer from the main-world `RenderDevice`; the liquid setup
++/// (`liquid::surface::setup_liquid`) builds it with the materials that bind it.
++pub(crate) fn new_water_buffer(device: &RenderDevice) -> LookWaterBuffer {
++    LookWaterBuffer(device.create_buffer(&BufferDescriptor {
++        label: Some("look_water_block"),
++        size: WATER_BLOCK_BYTES,
++        usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
++        mapped_at_creation: false,
++    }))
++}
++
++fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
++    let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
++    t * t * (3.0 - 2.0 * t)
++}
++
++fn elevation_deg(to_body: Vec3) -> f32 {
++    to_body
++        .normalize_or_zero()
++        .y
++        .clamp(-1.0, 1.0)
++        .asin()
++        .to_degrees()
++}
++
++fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
++    c.map(super::pass::srgb_to_linear)
++}
++
++/// The glint's body this frame: the visible sun while it is up, else the white moon, each fading
++/// in as it rises and dimmed by cloud: `(camera to body, strength, colour (linear), sharpness)`;
++/// strength 0 while neither is up.
++pub fn glint(light: &WowLighting) -> (Vec3, f32, [f32; 3], f32) {
++    let rise = |dir: Vec3| {
++        smoothstep(
++            tune::GLINT_RISE_FROM_DEG,
++            tune::GLINT_RISE_TO_DEG,
++            elevation_deg(dir),
++        )
++    };
++    let cloud = 1.0
++        - (1.0 - tune::GLINT_OVERCAST) * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
++    let sun = light.celestial_dir.normalize_or_zero();
++    let sun_up = rise(sun);
++    if sun_up > 0.0 {
++        return (
++            sun,
++            tune::SUN_GLINT * sun_up * cloud,
++            srgb_to_linear(light.celestial_tint),
++            tune::SUN_SHARPNESS,
++        );
++    }
++    let moon = light.moon_dir_white.normalize_or_zero();
++    (
++        moon,
++        tune::MOON_GLINT * rise(moon) * cloud,
++        tune::MOON_TINT,
++        tune::MOON_SHARPNESS,
++    )
++}
++
++/// The ripples' slope this frame: calm with the sun low or down, a breeze by day, rougher in a
++/// storm.
++pub fn ripple_slope(light: &WowLighting) -> f32 {
++    let day = smoothstep(
++        tune::BREEZE_FROM_DEG,
++        tune::BREEZE_TO_DEG,
++        elevation_deg(light.celestial_dir),
++    );
++    tune::RIPPLE_CALM
++        + (tune::RIPPLE_BREEZE - tune::RIPPLE_CALM) * day
++        + tune::RIPPLE_STORM * light.storm_bcc.clamp(0.0, 1.0)
++}
++
++/// The water block for this frame ([`WATER_ROWS`]); all zero, which `liquid.wgsl` reads as 1.12's
++/// water, when `on` is false.
++pub fn pack_rows(on: bool, held: &LookWater, light: &WowLighting) -> [[f32; 4]; WATER_ROWS] {
++    let mut rows = [[0.0; 4]; WATER_ROWS];
++    if !on {
++        return rows;
++    }
++    let mirror = tune::MIRROR * held.reflect.unwrap_or(1.0);
++    let clarity = held.clarity.unwrap_or(1.0);
++    let (body, strength, color, sharpness) = glint(light);
++    // The sky's reflection: the hour's dome, toward the fog under cloud.
++    let overcast = tune::OVERCAST_SKY * light.cloud_density.max(light.storm_bcc).clamp(0.0, 1.0);
++    let sky = |i: usize| {
++        let s = light.sky[i];
++        srgb_to_linear(std::array::from_fn(|c| {
++            s[c] + (light.fog_color[c] - s[c]) * overcast
++        }))
++    };
++    let (zenith, middle, horizon) = (sky(0), sky(2), sky(4));
++    rows[0] = [1.0, mirror, tune::CLEAR_YD * clarity, tune::FOAM];
++    rows[1] = [body.x, body.y, body.z, strength];
++    rows[2] = [color[0], color[1], color[2], sharpness];
++    rows[3] = [zenith[0], zenith[1], zenith[2], ripple_slope(light)];
++    rows[4] = [horizon[0], horizon[1], horizon[2], tune::RIPPLE_YD];
++    rows[5] = [
++        tune::SHALLOW[0],
++        tune::SHALLOW[1],
++        tune::SHALLOW[2],
++        tune::TINT_WEIGHT,
++    ];
++    rows[6] = [tune::DEEP[0], tune::DEEP[1], tune::DEEP[2], tune::DEEP_AT];
++    rows[7] = [
++        tune::SSR_REACH,
++        tune::F0,
++        tune::FOAM_DEPTH,
++        tune::SHORE_SOFT,
++    ];
++    rows[8] = [middle[0], middle[1], middle[2], tune::SHEEN];
++    rows[9] = [
++        tune::CLASSIC_RIPPLES,
++        tune::SHADOW_DIM,
++        tune::OCEAN_CLEAR_YD * clarity,
++        0.0,
++    ];
++    rows
++}
++
++/// Publishes this frame's [`WaterFrame`] from the switch, the hold and the resolved light.
++pub(crate) fn publish_water(
++    look: Res<WorldLook>,
++    water: Res<LookWater>,
++    light: Res<WowLighting>,
++    mut frame: ResMut<WaterFrame>,
++) {
++    let on = look.on && water.on;
++    let next = WaterFrame {
++        on,
++        rows: pack_rows(on, &water, &light),
++    };
++    if *frame != next {
++        *frame = next;
++    }
++}
++
++/// The size the scene copy wants: the look camera's target while the water is on, else a token
++/// texel, so the classic look holds no copy at all.
++pub fn scene_size(on: bool, target: Option<UVec2>) -> UVec2 {
++    match (on, target) {
++        (true, Some(t)) if t.x > 0 && t.y > 0 => t,
++        _ => UVec2::ONE,
++    }
++}
++
++/// Keeps the scene copy's two images at the look camera's size (a token texel while off), and on a
++/// change re-makes every liquid material's bind group, which holds the old textures until it is
++/// prepared again.
++pub(crate) fn size_water_scene(
++    frame: Res<WaterFrame>,
++    cams: Query<&Camera, With<super::LookView>>,
++    mut images: ResMut<Assets<Image>>,
++    mut materials: ResMut<Assets<benilla_assets::materials::LiquidMaterial>>,
++) {
++    use benilla_assets::materials::{water_scene_images, WATER_DEPTH, WATER_SCENE};
++    let target = cams.iter().find_map(|c| c.physical_target_size());
++    let want = scene_size(frame.on, target);
++    let have = images.get(WATER_SCENE.id()).map(|i| i.size());
++    if have == Some(want) {
++        return;
++    }
++    let (scene, depth) = water_scene_images(want.x, want.y);
++    let _ = images.insert(WATER_SCENE.id(), scene);
++    let _ = images.insert(WATER_DEPTH.id(), depth);
++    // Touch every liquid material: `iter_mut` marks each modified, so each is prepared again
++    // against the new images.
++    for (_, _material) in materials.iter_mut() {}
++    debug!("look water: scene copy at {}x{}", want.x, want.y);
++}
++
++/// Inserts the scene copy's images at a token size before any liquid material is made, so none
++/// waits on them.
++pub(crate) fn insert_water_scene(images: Option<ResMut<Assets<Image>>>) {
++    use benilla_assets::materials::{water_scene_images, WATER_DEPTH, WATER_SCENE};
++    let Some(mut images) = images else { return };
++    if images.get(WATER_SCENE.id()).is_none() {
++        let (scene, depth) = water_scene_images(1, 1);
++        let _ = images.insert(WATER_SCENE.id(), scene);
++        let _ = images.insert(WATER_DEPTH.id(), depth);
++    }
++}
++
++pub(crate) fn init_resources(app: &mut App) {
++    app.init_resource::<LookWater>()
++        .init_resource::<WaterFrame>();
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn noon() -> WowLighting {
++        WowLighting {
++            celestial_dir: Vec3::new(0.3, 0.9, 0.2).normalize(),
++            moon_dir_white: Vec3::new(0.0, -1.0, 0.0),
++            celestial_tint: [1.0, 0.9, 0.7],
++            sky: [[0.2, 0.4, 0.9]; 5],
++            fog_color: [0.7, 0.75, 0.8],
++            ..default()
++        }
++    }
++
++    #[test]
++    fn the_block_is_zero_when_off() {
++        let rows = pack_rows(false, &LookWater::default(), &noon());
++        assert_eq!(rows, [[0.0; 4]; WATER_ROWS]);
++    }
++
++    /// On, row 0 carries the switch, the mirror, the clarity and the foam; a hold scales the
++    /// mirror and the clarity, and lets go again.
++    #[test]
++    fn the_block_carries_the_tuning_and_the_hold() {
++        let rows = pack_rows(true, &LookWater::default(), &noon());
++        assert_eq!(rows[0], [1.0, tune::MIRROR, tune::CLEAR_YD, tune::FOAM]);
++        assert_eq!(rows[7][0], tune::SSR_REACH);
++        assert_eq!(rows[6][3], tune::DEEP_AT);
++        let held = LookWater {
++            reflect: Some(2.0),
++            clarity: Some(0.5),
++            ..default()
++        };
++        let rows = pack_rows(true, &held, &noon());
++        assert_eq!(rows[0][1], 2.0 * tune::MIRROR);
++        assert_eq!(rows[0][2], 0.5 * tune::CLEAR_YD);
++        assert_eq!(rows[9][2], 0.5 * tune::OCEAN_CLEAR_YD);
++    }
++
++    /// By day the glint is the sun's, sharp and in the disc's colour; by night the moon's, broad
++    /// and pale; with neither up, none.
++    #[test]
++    fn the_glint_follows_the_sun_then_the_moon() {
++        let day = noon();
++        let (dir, s, color, sharp) = glint(&day);
++        assert!((dir - day.celestial_dir).length() < 1e-6);
++        assert!((s - tune::SUN_GLINT).abs() < 1e-4, "{s}");
++        assert_eq!(sharp, tune::SUN_SHARPNESS);
++        assert!((color[0] - 1.0).abs() < 1e-5 && color[2] < color[1]);
++        let night = WowLighting {
++            celestial_dir: Vec3::new(0.0, -0.5, 1.0).normalize(),
++            moon_dir_white: Vec3::new(0.2, 0.6, -0.7).normalize(),
++            ..noon()
++        };
++        let (dir, s, color, sharp) = glint(&night);
++        assert!((dir - night.moon_dir_white).length() < 1e-6);
++        assert!((s - tune::MOON_GLINT).abs() < 1e-4);
++        assert_eq!((color, sharp), (tune::MOON_TINT, tune::MOON_SHARPNESS));
++        let dark = WowLighting {
++            moon_dir_white: Vec3::new(0.0, -0.3, 1.0).normalize(),
++            ..night
++        };
++        assert_eq!(glint(&dark).1, 0.0);
++        // Overcast keeps only a share.
++        let grey = WowLighting {
++            cloud_density: 1.0,
++            ..noon()
++        };
++        assert!((glint(&grey).1 - tune::SUN_GLINT * tune::GLINT_OVERCAST).abs() < 1e-4);
++    }
++
++    /// Glassy with the sun low, a breeze with it high, rougher in a storm.
++    #[test]
++    fn the_ripples_are_calm_at_dawn_and_a_breeze_by_day() {
++        let low = WowLighting {
++            celestial_dir: Vec3::new(1.0, 0.05, 0.0).normalize(),
++            ..noon()
++        };
++        assert!((ripple_slope(&low) - tune::RIPPLE_CALM).abs() < 1e-6);
++        assert!((ripple_slope(&noon()) - tune::RIPPLE_BREEZE).abs() < 1e-6);
++        let storm = WowLighting {
++            storm_bcc: 1.0,
++            ..noon()
++        };
++        assert!(ripple_slope(&storm) > ripple_slope(&noon()));
++    }
++
++    #[test]
++    fn lookwater_parses_its_arguments() {
++        assert_eq!(LookWater::parse(""), Some((None, None)));
++        assert_eq!(LookWater::parse("grade"), Some((None, None)));
++        assert_eq!(LookWater::parse("1.5"), Some((Some(1.5), None)));
++        assert_eq!(LookWater::parse("0 2"), Some((Some(0.0), Some(2.0))));
++        assert_eq!(LookWater::parse("3"), None);
++        assert_eq!(LookWater::parse("1 -1"), None);
++        assert_eq!(LookWater::parse("1 1 1"), None);
++        assert_eq!(LookWater::parse("grade 1"), None);
++        assert_eq!(LookWater::parse("lots"), None);
++    }
++
++    /// The water follows `worldLook` and `worldWater` both.
++    #[test]
++    fn the_frame_follows_both_switches() {
++        let mut app = App::new();
++        app.insert_resource(WorldLook::NEW)
++            .init_resource::<LookWater>()
++            .init_resource::<WaterFrame>()
++            .insert_resource(noon())
++            .add_systems(Update, publish_water);
++        app.update();
++        assert!(app.world().resource::<WaterFrame>().on);
++        app.world_mut().resource_mut::<LookWater>().on = false;
++        app.update();
++        assert_eq!(*app.world().resource::<WaterFrame>(), WaterFrame::default());
++        app.world_mut().resource_mut::<LookWater>().on = true;
++        *app.world_mut().resource_mut::<WorldLook>() = WorldLook::CLASSIC;
++        app.update();
++        assert_eq!(*app.world().resource::<WaterFrame>(), WaterFrame::default());
++    }
++
++    #[test]
++    fn the_copy_is_the_view_while_on_and_a_texel_while_off() {
++        let t = Some(UVec2::new(1920, 1080));
++        assert_eq!(scene_size(true, t), UVec2::new(1920, 1080));
++        assert_eq!(scene_size(false, t), UVec2::ONE);
++        assert_eq!(scene_size(true, None), UVec2::ONE);
++        assert_eq!(scene_size(true, Some(UVec2::new(0, 720))), UVec2::ONE);
++    }
++
++    /// The block's size is its rows'.
++    #[test]
++    fn the_block_is_ten_rows() {
++        assert_eq!(WATER_BLOCK_BYTES, 160);
++    }
++}
+diff --git a/crates/benilla-world/src/look/water_pass.rs b/crates/benilla-world/src/look/water_pass.rs
+new file mode 100644
+index 0000000..18fc0fa
+--- /dev/null
++++ b/crates/benilla-world/src/look/water_pass.rs
+@@ -0,0 +1,287 @@
++//! The new look's water, its render half, benilla's own (no reference behaviour): the water
++//! block's upload into [`LookWaterBuffer`] each frame, and the scene copy (`world_water.wgsl`)
++//! between the opaque and the transparent passes, which the liquid shader reads (`look::water`).
++//!
++//! The copy runs on the look camera ([`super::LookView`]) only while the water is on
++//! ([`WaterFrame::on`]): one full-screen draw into [`WATER_SCENE`] (the colour) and [`WATER_DEPTH`]
++//! (the device depth), at the view's size. Everything opaque is in the frame by then (the static
++//! pass draws first in the main pass, the opaque pass after it); the sky, the water and every
++//! blended draw are not, which is what the water wants: the sky is the shader's own fallback.
++
++use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
++use bevy::core_pipeline::FullscreenShader;
++use bevy::ecs::query::QueryItem;
++use bevy::prelude::*;
++use bevy::render::diagnostic::RecordDiagnostics;
++use bevy::render::extract_resource::ExtractResourcePlugin;
++use bevy::render::render_asset::RenderAssets;
++use bevy::render::render_graph::{
++    NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
++};
++use bevy::render::render_resource::binding_types::{
++    texture_2d, texture_depth_2d, texture_depth_2d_multisampled,
++};
++use bevy::render::render_resource::*;
++use bevy::render::renderer::{RenderContext, RenderQueue};
++use bevy::render::texture::GpuImage;
++use bevy::render::view::{Msaa, ViewDepthTexture, ViewTarget};
++use bevy::render::{Render, RenderApp, RenderStartup, RenderSystems};
++
++use benilla_assets::materials::{WATER_DEPTH, WATER_SCENE};
++
++use super::pass::LookView;
++use super::water::{LookWaterBuffer, WaterFrame};
++
++#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
++pub(crate) struct LookWaterLabel;
++
++/// The copy's targets: the colour as the camera holds it, the depth as one float.
++const SCENE_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
++const DEPTH_FORMAT: TextureFormat = TextureFormat::R32Float;
++
++/// The copy's shader defs: `MSAA` reads a multisampled depth buffer.
++fn shader_defs(msaa: bool) -> Vec<bevy::shader::ShaderDefVal> {
++    if msaa {
++        vec!["MSAA".into()]
++    } else {
++        vec![]
++    }
++}
++
++/// Every def set the copy specialises `world_water.wgsl` on, for the app's shader translation
++/// test (naga validates each).
++pub fn shader_def_sets() -> Vec<Vec<bevy::shader::ShaderDefVal>> {
++    vec![shader_defs(false), shader_defs(true)]
++}
++
++#[derive(Resource)]
++struct WaterCopyPipeline {
++    layout: BindGroupLayoutDescriptor,
++    layout_msaa: BindGroupLayoutDescriptor,
++    shader: Handle<Shader>,
++    fullscreen: FullscreenShader,
++}
++
++impl WaterCopyPipeline {
++    fn layout(&self, msaa: bool) -> &BindGroupLayoutDescriptor {
++        if msaa {
++            &self.layout_msaa
++        } else {
++            &self.layout
++        }
++    }
++}
++
++impl SpecializedRenderPipeline for WaterCopyPipeline {
++    /// Whether the view's depth buffer is multisampled.
++    type Key = bool;
++
++    fn specialize(&self, msaa: bool) -> RenderPipelineDescriptor {
++        let target = |format| {
++            Some(ColorTargetState {
++                format,
++                blend: None,
++                write_mask: ColorWrites::ALL,
++            })
++        };
++        RenderPipelineDescriptor {
++            label: Some("look_water_copy".into()),
++            layout: vec![self.layout(msaa).clone()],
++            vertex: self.fullscreen.to_vertex_state(),
++            fragment: Some(FragmentState {
++                shader: self.shader.clone(),
++                shader_defs: shader_defs(msaa),
++                entry_point: Some("fs_copy".into()),
++                targets: vec![target(SCENE_FORMAT), target(DEPTH_FORMAT)],
++            }),
++            ..default()
++        }
++    }
++}
++
++fn init_pipeline(
++    mut commands: Commands,
++    fullscreen: Res<FullscreenShader>,
++    asset_server: Res<AssetServer>,
++) {
++    // Both reads are a `textureLoad` at a pixel: no sampler.
++    let layout = |label: &'static str, depth: BindGroupLayoutEntryBuilder| {
++        BindGroupLayoutDescriptor::new(
++            label,
++            &BindGroupLayoutEntries::sequential(
++                ShaderStages::FRAGMENT,
++                (
++                    texture_2d(TextureSampleType::Float { filterable: false }),
++                    depth,
++                ),
++            ),
++        )
++    };
++    commands.insert_resource(WaterCopyPipeline {
++        layout: layout("look_water_copy_layout", texture_depth_2d()),
++        layout_msaa: layout(
++            "look_water_copy_layout_msaa",
++            texture_depth_2d_multisampled(),
++        ),
++        shader: asset_server.load("embedded://benilla_world/shaders/world_water.wgsl"),
++        fullscreen: fullscreen.clone(),
++    });
++}
++
++/// One look view's copy pipeline, kept across frames.
++#[derive(Component)]
++struct WaterCopyGpu {
++    pipeline: CachedRenderPipelineId,
++    msaa: bool,
++}
++
++fn prepare_water_views(
++    mut commands: Commands,
++    cache: Res<PipelineCache>,
++    pipeline: Res<WaterCopyPipeline>,
++    mut pipelines: ResMut<SpecializedRenderPipelines<WaterCopyPipeline>>,
++    views: Query<(Entity, &Msaa, Option<&WaterCopyGpu>), With<LookView>>,
++) {
++    for (entity, msaa, existing) in &views {
++        let msaa = msaa.samples() > 1;
++        if existing.is_some_and(|g| g.msaa == msaa) {
++            continue;
++        }
++        let id = pipelines.specialize(&cache, &pipeline, msaa);
++        commands
++            .entity(entity)
++            .insert(WaterCopyGpu { pipeline: id, msaa });
++    }
++}
++
++/// Render world, in `PrepareResources`: writes the water block into its buffer before any liquid
++/// draw reads it (all zero, 1.12's water, while off).
++fn upload_water(
++    queue: Res<RenderQueue>,
++    buffer: Option<Res<LookWaterBuffer>>,
++    frame: Option<Res<WaterFrame>>,
++) {
++    let (Some(buffer), Some(frame)) = (buffer, frame) else {
++        return;
++    };
++    queue.write_buffer(&buffer.0, 0, bytemuck::cast_slice(&frame.rows));
++}
++
++#[derive(Default)]
++struct LookWaterNode;
++
++impl ViewNode for LookWaterNode {
++    type ViewQuery = (
++        &'static ViewTarget,
++        &'static ViewDepthTexture,
++        &'static WaterCopyGpu,
++    );
++
++    fn run<'w>(
++        &self,
++        _graph: &mut RenderGraphContext,
++        render_context: &mut RenderContext<'w>,
++        (view_target, depth, gpu): QueryItem<'w, '_, Self::ViewQuery>,
++        world: &'w World,
++    ) -> Result<(), NodeRunError> {
++        if !world.resource::<WaterFrame>().on {
++            return Ok(());
++        }
++        // The frame the look asks for a sampleable depth buffer, it is not one yet.
++        if !depth
++            .texture
++            .usage()
++            .contains(TextureUsages::TEXTURE_BINDING)
++        {
++            return Ok(());
++        }
++        let cache = world.resource::<PipelineCache>();
++        let Some(pipeline) = cache.get_render_pipeline(gpu.pipeline) else {
++            return Ok(()); // still compiling: the water reads last frame's copy
++        };
++        let images = world.resource::<RenderAssets<GpuImage>>();
++        let (Some(scene), Some(scene_depth)) = (images.get(&WATER_SCENE), images.get(&WATER_DEPTH))
++        else {
++            return Ok(());
++        };
++        let layout =
++            cache.get_bind_group_layout(world.resource::<WaterCopyPipeline>().layout(gpu.msaa));
++        let bind = render_context.render_device().create_bind_group(
++            "look_water_copy",
++            &layout,
++            &BindGroupEntries::sequential((view_target.main_texture_view(), depth.view())),
++        );
++        let attachment = |view| {
++            Some(RenderPassColorAttachment {
++                view,
++                depth_slice: None,
++                resolve_target: None,
++                ops: Operations::default(),
++            })
++        };
++        let diagnostics = render_context.diagnostic_recorder();
++        let mut pass = render_context
++            .command_encoder()
++            .begin_render_pass(&RenderPassDescriptor {
++                label: Some("look_water_copy"),
++                color_attachments: &[
++                    attachment(&scene.texture_view),
++                    attachment(&scene_depth.texture_view),
++                ],
++                depth_stencil_attachment: None,
++                timestamp_writes: None,
++                occlusion_query_set: None,
++            });
++        let span = diagnostics.pass_span(&mut pass, "look_water_copy");
++        pass.set_pipeline(pipeline);
++        pass.set_bind_group(0, &bind, &[]);
++        pass.draw(0..3, 0..1);
++        span.end(&mut pass);
++        Ok(())
++    }
++}
++
++/// The main-world half: the frame's and the buffer's extracts; the render half in [`finish`].
++pub(super) fn build(app: &mut App) {
++    app.add_plugins((
++        ExtractResourcePlugin::<WaterFrame>::default(),
++        ExtractResourcePlugin::<LookWaterBuffer>::default(),
++    ));
++}
++
++/// The render half, once the render app exists: the pipeline, the upload, and the copy between
++/// the opaque (and transmissive) passes and the transparent one, where the water draws.
++pub(super) fn finish(app: &mut App) {
++    let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
++        return;
++    };
++    render_app
++        .init_resource::<SpecializedRenderPipelines<WaterCopyPipeline>>()
++        .add_systems(RenderStartup, init_pipeline)
++        .add_systems(
++            Render,
++            (prepare_water_views, upload_water).in_set(RenderSystems::PrepareResources),
++        )
++        .add_render_graph_node::<ViewNodeRunner<LookWaterNode>>(Core3d, LookWaterLabel)
++        .add_render_graph_edges(
++            Core3d,
++            (
++                Node3d::MainTransmissivePass,
++                LookWaterLabel,
++                Node3d::MainTransparentPass,
++            ),
++        );
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn the_copy_is_specialised_with_and_without_msaa() {
++        let sets = shader_def_sets();
++        assert_eq!(sets.len(), 2);
++        assert!(sets[0].is_empty());
++        assert_eq!(sets[1].len(), 1);
++    }
++}
+diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
+index fa2b9cd..797dc7b 100644
+--- a/crates/benilla-world/src/shaders.rs
++++ b/crates/benilla-world/src/shaders.rs
+@@ -20,9 +20,12 @@ pub(crate) fn plugin(app: &mut App) {
+     bevy::asset::embedded_asset!(app, "shaders/world_look.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_ao.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_shadow.wgsl");
++    bevy::asset::embedded_asset!(app, "shaders/world_water.wgsl");
+     // The new look's sun-shadow map, which every terrain and model material binds: inserted before
+     // any material is made, so none waits on it.
+     app.add_systems(PreStartup, crate::look::shadow_pass::insert_shadow_map);
++    // And the new look's water scene copy, which every liquid material binds.
++    app.add_systems(PreStartup, crate::look::water::insert_water_scene);
+ }
+ 
+ #[cfg(test)]
+@@ -59,6 +62,6 @@ mod tests {
+             );
+         }
+         // One per `embedded_asset!` line in `plugin`.
+-        assert_eq!(found, 11, "the engine's shader set changed size");
++        assert_eq!(found, 12, "the engine's shader set changed size");
+     }
+ }
+diff --git a/crates/benilla-world/src/shaders/world_water.wgsl b/crates/benilla-world/src/shaders/world_water.wgsl
+new file mode 100644
+index 0000000..32dc8c7
+--- /dev/null
++++ b/crates/benilla-world/src/shaders/world_water.wgsl
+@@ -0,0 +1,37 @@
++// The new look's water, its scene copy (`look::water_pass`), benilla's own (no reference
++// behaviour): between the opaque and the transparent passes, the world as it stands (no sky yet,
++// no water, no blended draw) and its depth are copied for the liquid shader, which cannot read the
++// target it draws into: the colour to mirror the shore in the water, the depth to know how deep
++// the water is under each of its pixels and where a mirrored ray meets the shore.
++//
++// The colour is copied as it is (1.12's gamma bytes, in the camera's `Rgba16Float`); the depth is
++// the device depth (reverse-Z, 0 the sky), one `R32Float` texel a pixel. `MSAA` reads sample 0 of a
++// multisampled depth buffer; the colour is the opaque pass's resolve. The copy is drawn at its own
++// size and reads the source at the same place, so a frame where the two differ (a resize, before
++// the copy follows) is stretched, never torn.
++
++#import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
++
++@group(0) @binding(0) var scene_tex: texture_2d<f32>;
++#ifdef MSAA
++@group(0) @binding(1) var depth_tex: texture_depth_multisampled_2d;
++#else
++@group(0) @binding(1) var depth_tex: texture_depth_2d;
++#endif
++
++struct CopyOut {
++    @location(0) color: vec4<f32>,
++    @location(1) depth: vec4<f32>,
++}
++
++@fragment
++fn fs_copy(in: FullscreenVertexOutput) -> CopyOut {
++    let dims = vec2<f32>(textureDimensions(scene_tex));
++    let px = vec2<i32>(clamp(in.uv * dims, vec2<f32>(0.0), dims - vec2<f32>(1.0)));
++    let ddims = vec2<f32>(textureDimensions(depth_tex));
++    let dpx = vec2<i32>(clamp(in.uv * ddims, vec2<f32>(0.0), ddims - vec2<f32>(1.0)));
++    var out: CopyOut;
++    out.color = vec4<f32>(textureLoad(scene_tex, px, 0).rgb, 1.0);
++    out.depth = vec4<f32>(textureLoad(depth_tex, dpx, 0), 0.0, 0.0, 1.0);
++    return out;
++}
+-- 
+2.43.0
+
