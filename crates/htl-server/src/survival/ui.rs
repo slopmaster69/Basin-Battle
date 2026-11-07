@@ -512,6 +512,8 @@ pub(crate) const ADDON_NEWEST: u32 = 58;
 /// (0058 adds `SetSpellAttach`, which hangs a spell's effects from another attachment: Salvation's
 /// wings on the back. No round of its own: the add-on calls it only where it exists.)
 /// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0060).
+/// (0061 paces a creature's strike so it's seen to swing, and its return so it never crawls. No
+/// round of its own: nothing new for the add-on to call.)
 pub(crate) const CLIENT_NEWEST: u8 = 28;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
