@@ -43,7 +43,7 @@ B.tabs[2]:SetEnabledLook(false)
 B.head = K.Text(tree, K.TITLE, 13, "OUTLINE")
 B.head:SetPoint("CENTER", tree, "TOPLEFT", LEFT + WIDE / 2, -K.RowY(1) + 28)
 B.head:SetTextColor(LOOK[1], LOOK[2], LOOK[3])
-B.head:SetText("Beta cards")
+B.head:SetText("Beta abilities")
 B.head:Hide()
 B.sub = K.Text(tree, K.BODY, 10)
 B.sub:SetPoint("CENTER", tree, "TOPLEFT", LEFT + WIDE / 2, -K.RowY(1) + 11)
@@ -52,9 +52,9 @@ B.sub:SetText("Any class can slot these. They're here to try out.")
 B.sub:Hide()
 
 B.hintClasses = tree.hint:GetText()
-B.hintBeta = "Click a card to take it (free) and put it on its key.  Hold the key a moment (or Ctrl with it) for its charged-up version."
-B.blurb = "Cards of no one class: take one for free and put it on its row's key, in place of your class's card there. "
-  .. "Its charged-up version works as any card's. They're here to be tried, so they may change or go; Siege leaves them out."
+B.hintBeta = "Click an ability to take it (free) and put it on its key.  Hold the key a moment (or Ctrl with it) for its charged-up version."
+B.blurb = "Abilities of no one class: take one for free and put it on its row's key, in place of your class's ability there. "
+  .. "Its charged-up version works as any ability's. They're here to be tried, so they may change or go; Siege leaves them out."
 
 -- --- the cards -----------------------------------------------------------------------------------
 
@@ -80,7 +80,7 @@ function B.Click(b)
     ES.Say(".es tree take " .. d.key)
     ES.Say(".es slot " .. d.row .. " " .. d.key)
   else
-    ES.Message(d.name .. ": beta cards aren't in play here.")
+    ES.Message(d.name .. ": beta abilities aren't in play here.")
   end
 end
 
@@ -204,7 +204,7 @@ local BoardDetail = ES.BoardDetail
 function ES.BoardDetail(d)
   BoardDetail(d)
   if not d and B.page == 2 then
-    tree.regular.title:SetText("Beta cards")
+    tree.regular.title:SetText("Beta abilities")
     tree.regular.text:SetText(B.blurb)
   end
 end

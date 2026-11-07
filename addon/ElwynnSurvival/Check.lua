@@ -57,7 +57,8 @@ local SCHOOL = {
     tint = { 0.7, 0.42, 1.0 }, glow = { 0.85, 0.7, 1.0 }, ringTint = { 0.72, 0.45, 1.0 },
     -- A shadow perfect bursts violet, not the white-gold the other schools share (Corey: it read
     -- as gold on the Shadowcaller's staff).
-    top = { pop = { 0.88, 0.76, 1.0 }, star = { 0.8, 0.6, 1.0 }, wave = { 0.72, 0.45, 1.0 } },
+    -- (The pop's own art is painted gold: a white copy of it takes the violet.)
+    top = { popTex = "check_perfect_white", pop = { 0.78, 0.55, 1.0 }, star = { 0.8, 0.6, 1.0 }, wave = { 0.72, 0.45, 1.0 } },
     spin = 0.18, spin2 = -0.25, sound = "Sound\\Spells\\ArcaneMissileImpact1a.wav",
     fizzle = "Sound\\Spells\\Fizzle\\FizzleShadowA.wav",
   },
@@ -222,7 +223,8 @@ local ICON_FIRST = 10
 local DULL = "Sound\\Interface\\iDeselectTarget.wav"
 -- The meter (Cone of Cold, after Gladius's swing meter), in Corey's frost art: the ice arc over the
 -- reticle, its good zone lit in blue along the channel, the sweet spot's ice gem pulsing on it, the
--- cracked overrun past its end, and the ice-shard cursor running the channel, pointing outward.
+-- cracked overrun past its end, and the ice-shard cursor riding the channel, square to the curve with
+-- its tip outward, like a gauge's needle.
 local METER_N, METER_OVER = 40, 0
 local METER_R, METER_HALF = 156, 55
 -- The frame's square, drawn so its circle's centre is the reticle (its channel `METER_R` out).
@@ -973,9 +975,11 @@ local TRACK_FOOT, TRACK_TOP = -120, 150
 local function TrackY(c, yd) return TRACK_FOOT + (TRACK_TOP - TRACK_FOOT) * Clamp(yd / math.max(1, c.range), 0, 1) end
 
 -- The meter at share `at` of its run (nil: no cursor), faded by `fade`.
+-- Also the turn that lays a piece along the arc there, in `Draw`'s sense (`Draw` turns the art
+-- the other way to its angle: a positive angle tips it left, so the arc's own angle is negated).
 local function MeterXY(c, sh, r)
   local ang = math.rad((-METER_HALF + 2 * METER_HALF * sh) * c.dir)
-  return (r or METER_R) * math.sin(ang), (r or METER_R) * math.cos(ang), ang
+  return (r or METER_R) * math.sin(ang), (r or METER_R) * math.cos(ang), -ang
 end
 local function DrawMeter(c, at, fade)
   local now = GetTime()
@@ -1117,6 +1121,7 @@ local function StepFx(now)
     local top = (g == "perfect" or g == "full")
     local own = top and sc.top
     local tint = (own and own.pop) or (top and { 1, 1, 0.92 }) or { 0.5 + 0.5 * sc.glow[1], 0.5 + 0.5 * sc.glow[2], 0.5 + 0.5 * sc.glow[3] }
+    pop:SetTexture(ART .. ((own and own.popTex) or "check_perfect"))
     Draw(pop, (top and 300 or 240) * (0.55 + 0.75 * e), age * 0.9, (1 - t) * (1 - t) * 1.0, tint[1], tint[2], tint[3])
     if top then
       Draw(core, 60 + 260 * e, -age * 2.2, (1 - t), 1, 1, 1)

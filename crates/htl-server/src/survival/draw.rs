@@ -548,8 +548,15 @@ impl SurvivalGame {
     pub(crate) fn worn(&self, id: Id) -> Vec<(u8, u32)> {
         let Some(p) = self.sim.players.get(&id) else { return Vec::new() };
         let armor: Vec<(&str, usize)> = p.armor.iter().map(|(s, i)| (s.as_str(), *i)).collect();
-        // A two-handed grip leaves no hand for the shield.
-        let shield = Some(p.shield).filter(|_| !self.sim.weapon_of(p).two_handed);
+        // A two-handed grip leaves no hand for the shield; the off hand holds a second weapon, or
+        // nothing, or the shield.
+        let shield = if self.sim.weapon_of(p).two_handed || p.off_empty {
+            None
+        } else if self.sim.off_weapon_of(p).is_some() {
+            p.off_weapon
+        } else {
+            Some(p.shield)
+        };
         // (A bow ability's bow in hand: the one it draws.)
         worn_of(&armor, Some(p.weapon), shield, Some(self.sim.ranged_shown(p)))
     }

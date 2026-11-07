@@ -162,6 +162,8 @@ struct App {
     rx: Receiver<Msg>,
     started: Instant,
     ready_since: Option<Instant>,
+    /// When the pointer last moved over the window.
+    pointer_moved: Option<Instant>,
     /// The game started (Ready → Launching) only once.
     launched: bool,
     /// The picture asked for once (`--shot`).
@@ -185,7 +187,7 @@ impl App {
         let exe = std::env::current_exe().unwrap_or_default();
         let paths = Paths::find(&exe).unwrap_or_else(|| Paths::download(PathBuf::from(".")));
         let project = Project::built_in();
-        let settings = folder::read_settings(&paths.settings);
+        let settings = paths.read_settings();
         let version = paths.installed_version();
         let channel = folder::channel(&version);
 
@@ -234,6 +236,7 @@ impl App {
             tx, rx,
             started: Instant::now(),
             ready_since: None,
+            pointer_moved: None,
             launched: false,
             shot_asked: false,
             server_child: None,
@@ -524,7 +527,13 @@ impl eframe::App for App {
             }
         }
 
-        let hovered = ctx.input(|i| i.pointer.hover_pos()).is_some();
+        let (hovered, moved) = ctx.input(|i| (i.pointer.hover_pos().is_some(), i.pointer.delta() != egui::Vec2::ZERO || i.pointer.any_down()));
+        if hovered && moved {
+            self.pointer_moved = Some(Instant::now());
+        }
+        // A hand on its way to the buttons holds the game back; a mouse merely resting where the
+        // window happened to open (the middle of the screen, often) doesn't.
+        let reaching = hovered && self.pointer_moved.map(|t| t.elapsed() < Duration::from_millis(1500)).unwrap_or(false);
         if ctx.input(|i| i.key_pressed(egui::Key::Escape)) && self.stage != Stage::Playing {
             if self.panel { self.panel = false; } else { ctx.send_viewport_cmd(egui::ViewportCommand::Close); }
         }
@@ -551,7 +560,7 @@ impl eframe::App for App {
         }
         // Ready, and nobody reaching for the cog: the game starts by itself.
         if self.stage == Stage::Ready && !self.panel && self.opts.shot.is_none() {
-            if hovered {
+            if reaching {
                 self.ready_since = Some(Instant::now());
             } else if self.opts.solo || self.ready_since.map(|t| t.elapsed() > PAUSE).unwrap_or(false) {
                 let solo = self.opts.solo;

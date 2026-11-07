@@ -57,7 +57,8 @@ fn hits_on(events: &[Event], victim: Id) -> Vec<(u32, Outcome)> {
     events
         .iter()
         .filter_map(|e| match e {
-            Event::Swing { victim: Some(v), damage, outcome, anim: false, .. } if *v == victim => Some((*damage, *outcome)),
+            // (A blow, not a bleed's or a burn's tick.)
+            Event::Swing { victim: Some(v), damage, outcome, anim: false, style, .. } if *v == victim && *style != Blow::Dot => Some((*damage, *outcome)),
             _ => None,
         })
         .collect()
@@ -110,8 +111,10 @@ fn the_guard_raised_while_a_blow_winds_up_calls_it_off_and_gives_its_stamina_bac
 
 #[test]
 fn a_forward_swing_spares_what_is_behind_or_beyond_a_wall() {
-    // A wall between the hero and an enemy right in front, at swinging distance.
-    let land = FlatLand { walls: vec![([1.4, 6.0], 0.4)], ..Default::default() };
+    // A wall between the hero and an enemy right in front, at swinging distance: on the line from
+    // where the hero swings at it (it stood 0.8 yd off that line, and only passed while the enemy
+    // happened to have walked out of the arc).
+    let land = FlatLand { walls: vec![([1.3, 4.75], 0.4)], ..Default::default() };
     let mut s = world_with(land);
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
     let ahead = mob(&mut s, "grunt", [2.6, 0.0, 0.0]);
@@ -124,11 +127,19 @@ fn a_forward_swing_spares_what_is_behind_or_beyond_a_wall() {
     let ev = run(&mut s, 1.0);
     assert_eq!(hits_on(&ev, ahead).len(), 1, "the one in front is struck once");
     assert!(hits_on(&ev, behind).is_empty(), "nothing behind is struck");
-    // Facing the walled one: the wall takes it.
+    // Facing the walled one: the wall takes it. (It's held behind its wall: roused, it would come
+    // round to the hero, and the swing is about the wall.)
     s.move_player(p, [0.0, 3.5, 0.0], facing([0.0, 3.5, 0.0], [2.6, 6.0, 0.0]), Moving::default());
     run(&mut s, 0.5);
     s.input(p, Input::Attack);
-    let ev = run(&mut s, 1.0);
+    let mut ev = Vec::new();
+    for _ in 0..(1.0 / DT) as usize {
+        let w = s.mobs.get_mut(&walled).unwrap();
+        w.pos = [2.6, 6.0, 0.0];
+        w.path.clear();
+        w.state = MobState::Idle { wander_at: 1e9 };
+        ev.extend(s.step(DT));
+    }
     assert!(hits_on(&ev, walled).is_empty(), "not through a wall");
 }
 
@@ -3730,4 +3741,25 @@ fn shields_and_overhealth_left_to_wear_off_leave_the_bar() {
         s.step(DT);
     }
     assert_eq!(s.absorbs(p), (0, 0));
+}
+
+#[test]
+fn a_creature_voices_the_start_of_its_string_from_where_it_stands_not_each_blow() {
+    // Corey, Nov 7: no wind-up could be heard. A pirate's two slashes: its grunt as the first
+    // begins, heard from it, and none for the second.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = mob(&mut s, "dm_pirate", [2.0, 0.0, 0.0]);
+    let def = s.mobs[&m].def;
+    let voice = s.content.mobs[def].windup_sound;
+    assert_ne!(voice, 0, "the pirate has a voice");
+    let k = s.content.mobs[def].patterns.iter().position(|x| x.name == "two slashes").unwrap();
+    s.begin_pattern(m, k, false);
+    s.windup(m, Foe::Hero(p), s.players[&p].pos);
+    let first: Vec<Event> = s.step(0.0);
+    assert!(first.iter().any(|e| matches!(e, Event::Sound { id, sound } if *id == m && *sound == voice)), "its grunt as the string begins");
+    s.mobs.get_mut(&m).unwrap().pattern = Some((k, 1));
+    s.windup(m, Foe::Hero(p), s.players[&p].pos);
+    let second: Vec<Event> = s.step(0.0);
+    assert!(!second.iter().any(|e| matches!(e, Event::Sound { id, .. } if *id == m)), "none for the second blow");
 }

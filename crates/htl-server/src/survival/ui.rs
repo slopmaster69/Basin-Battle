@@ -489,7 +489,8 @@ pub(crate) const VERSION: u32 = 2;
 /// 56: the ordinary camera over the right shoulder (`SetCameraShoulder`, client patch 0059), so a
 /// staff's reticle falls past the hero. (54 and 55 are #217's and #224's.)
 /// 57: the add-on says `ac28`: a heal on a friend floats over their head, not mid-screen.
-pub(crate) const ADDON_NEWEST: u32 = 57;
+/// 58: the weapon rack's "Off hand" (dual wield) and "Put away" (one weapon alone) buttons.
+pub(crate) const ADDON_NEWEST: u32 = 58;
 /// 12: the night's fog (patch 0018), building previews that follow the hero (0017) and
 /// Westbrook's garrison taken out of the map for the camp (0019). 18: a spell look's own anim
 /// off a borrowed clip (0024), Bladestorm's flurry of cuts (0025), a shape flashed on the ground
@@ -511,6 +512,8 @@ pub(crate) const ADDON_NEWEST: u32 = 57;
 /// (0058 adds `SetSpellAttach`, which hangs a spell's effects from another attachment: Salvation's
 /// wings on the back. No round of its own: the add-on calls it only where it exists.)
 /// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0060).
+/// (0061 paces a creature's strike so it's seen to swing, and its return so it never crawls. No
+/// round of its own: nothing new for the add-on to call.)
 pub(crate) const CLIENT_NEWEST: u8 = 28;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
@@ -1502,7 +1505,7 @@ impl SurvivalGame {
                 }),
                 "full" | "reset" if self.dev_ok() => {
                     self.sim.set_tree(me, arg == "full");
-                    self.tell(conn, if arg == "full" { "Every card on the board is yours." } else { "The board is back to your class's first cards." });
+                    self.tell(conn, if arg == "full" { "Every ability on the board is yours." } else { "The board is back to your class's first abilities." });
                     self.ui_tree(conn, me);
                     Ok(())
                 }
@@ -1522,7 +1525,7 @@ impl SurvivalGame {
             "spells" | "allspells" if self.dev_ok() => {
                 let full = arg != "reset";
                 self.sim.set_tree(me, full);
-                self.tell(conn, if full { "Every spell is yours. Open the board (N) to put them on your keys." } else { "The board is back to your class's first cards." });
+                self.tell(conn, if full { "Every spell is yours. Open the board (N) to put them on your keys." } else { "The board is back to your class's first abilities." });
                 self.ui_tree(conn, me);
                 Ok(())
             }
@@ -1764,8 +1767,11 @@ impl SurvivalGame {
                 self.sim.travel(me, &to)
             }
             "home" => self.sim.travel(me, "camp"),
-            // Testing: straight to one of Elwynn's places.
-            "goto" if self.dev_ok() => self.sim.goto_site(me, &arg).map(|name| self.tell(conn, &format!("You're at {name}."))),
+            // Testing: straight to one of Elwynn's places, or to `x y [z] [facing]`.
+            "goto" if self.dev_ok() => {
+                let rest: Vec<&str> = cmd.split_whitespace().skip_while(|w| !w.eq_ignore_ascii_case("goto")).skip(1).collect();
+                self.sim.goto_site(me, &rest.join(" ")).map(|name| self.tell(conn, &format!("You're at {name}.")))
+            }
             // The Proving Ring's banner: the next wave now.
             "arena" | "ring" => match arg.as_str() {
                 "next" | "" => self.sim.arena_next_now(me).map(|_| {
@@ -1784,11 +1790,23 @@ impl SurvivalGame {
                 self.tell(conn, &format!("The quartermaster hands back your {what}."));
                 self.refresh_lamp(conn, me);
             }),
-            "arm" => self.sim.arm(me, &arg).map(|name| {
-                self.tell(conn, &format!("You equipped the {name}."));
-                let rack = self.world_of(conn).and_then(|w| w.station).filter(|s| matches!(self.sim.objs.get(s).map(|o| &o.kind), Some(ObjKind::Rack))).unwrap_or_else(|| self.sim.rack_id());
-                self.ui_station(conn, me, rack);
-            }),
+            // `.arm <key>`, `.arm <key> off` (the off hand), `.arm none` (one weapon alone).
+            "arm" => {
+                let off = arg2.trim() == "off";
+                let done = if arg == "none" { self.sim.stow_off(me) } else if off { self.sim.arm_off(me, &arg) } else { self.sim.arm(me, &arg) };
+                done.map(|name| {
+                    let said = if arg == "none" {
+                        "Your off hand is empty: you fight with one weapon alone.".to_string()
+                    } else if off {
+                        format!("You took the {name} in your off hand.")
+                    } else {
+                        format!("You equipped the {name}.")
+                    };
+                    self.tell(conn, &said);
+                    let rack = self.world_of(conn).and_then(|w| w.station).filter(|s| matches!(self.sim.objs.get(s).map(|o| &o.kind), Some(ObjKind::Rack))).unwrap_or_else(|| self.sim.rack_id());
+                    self.ui_station(conn, me, rack);
+                })
+            },
             "siege" => {
                 let rest = arg2.to_string();
                 self.siege_command(conn, me, &arg, &rest)
@@ -2026,7 +2044,7 @@ impl SurvivalGame {
         if !self.has_addon(conn) {
             let Some(p) = self.sim.players.get(&id) else { return };
             let owned: Vec<String> = p.owned.iter().cloned().collect();
-            self.say_to(conn, &format!("Your cards: {}. Keys: {:?}. .es slot <q|e|r|f> <ability> puts one on a key.", owned.join(", "), p.loadout));
+            self.say_to(conn, &format!("Your abilities: {}. Keys: {:?}. .es slot <q|e|r|f> <ability> puts one on a key.", owned.join(", "), p.loadout));
             return;
         }
         if let Some(line) = self.tree_line(id) {
@@ -2085,11 +2103,11 @@ impl SurvivalGame {
         };
         let ((owned, all), (beta_owned, beta_all)) = (count(false), count(true));
         let points = if dev {
-            "Dev build: every card".to_string()
+            "Dev build: every ability".to_string()
         } else if beta_all > 0 {
-            format!("{owned} of {all} cards · beta page {beta_owned} of {beta_all}")
+            format!("{owned} of {all} abilities · beta page {beta_owned} of {beta_all}")
         } else {
-            format!("{owned} of {all} cards")
+            format!("{owned} of {all} abilities")
         };
         Some(format!("TR\t{}\t{points}\t{}", u8::from(dev), cards.join("^")))
     }

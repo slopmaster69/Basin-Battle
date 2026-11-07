@@ -150,10 +150,12 @@ stagger = 0.6
 knockback = [9.0, 2.5]
 
 [combat]
-# Every foe's health, as a share of its own `health` (critters, dummies and totems as they are):
-# 1.6 makes a fight last about 60% longer than the numbers below say (the classes' cards hit
-# hard). A creature's posture, its blows and its damage stay as they are.
-foe_health = 1.6
+# Every foe's health, as a share of its own `health` (critters, dummies and totems as they are).
+# A creature's posture, its blows and its damage stay as they are. (Was 1.6, "the classes' cards
+# hit hard"; they don't: in the spell lab a full Fireball is 36, Bladestorm's whole 6 s is 126,
+# and the Nov 6 play-test found every fight too long for the kits. At 1.6 a Deadmines pirate took
+# 11 starting-sword hits, about 15 swings with its shield; at 1.0, 7. Nov 7 2026.)
+foe_health = 1.0
 # Every foe's blows (and burns) on a hero: this many times the damage written below.
 foe_damage = 1.35
 # For each hero in a foe's fight past the first (anyone standing within 25 yards of it, or on it
@@ -260,6 +262,20 @@ leash_scale = 4.0
 # The string a boss just began is `repeat` times as likely to come again next, so it seldom does
 # the same thing twice running.
 repeat = 0.3
+# A string's first blow (or a lone blow) up close winds up at least this long, at any phase's pace.
+# (Nov 7 2026: half of every creature's first blows, 170 of 340, came quicker than a hero can
+# answer from inside the starting sword's light swing, which commits for 0.50 s before a dodge can
+# cut it; "mid-swing" was the commonest way a foot soldier felled a hero on Nov 6. The sword's 0.50
+# and a dodge's first 0.04 is 0.54: 0.6 leaves a little to read it by. See tests_fair.rs.)
+first_blow = 0.6
+# One string at a time on a hero: while another creature is in a string at them up close (winding
+# up or recovering), and for this long after it's done, the next waits: the hero's breath, to hit
+# back or go for the caster. And one that has just run up settles this long before its string up
+# close. (Nov 7 2026, Corey: "the two pirates are spam attacking so quick and
+# together that you don't really feel like you have a gap", "both doing the same animation in
+# different frames".)
+turn_beat = 0.8
+arrive_beat = 0.35
 # A quarter of a boss's strings up close have one blow held a beat, up to `hold_secs` longer in
 # its wind-up (at least 40% of that, so it shows): the delayed swing, so a parry timed by rote
 # comes early. Its wind-up shows the whole of it.
@@ -314,6 +330,19 @@ heavy = { from = "ScourgeMale", clip = 17, take = 2, lunge = 1.0 }
 running = { from = "ScourgeMale", clip = 17, take = 1, recovery = 1.1, damage = 1.2, lunge = 2.4 }
 roll = { from = "ScourgeMale", clip = 17, take = 1, windup = 0.8, recovery = 1.1, damage = 1.1, lunge = 1.6 }
 leap = { from = "ScourgeMale", clip = 17, take = 2, windup = 0.85, recovery = 1.35, damage = 1.45, stamina = 1.3, lunge = 3.6, range = 1.1 }
+
+# Dual wield's right click (docs/weapon-identities.md): the off hand's own chain, `AttackOff` on
+# the hero's own model. Lighter and quicker than the main hand's; left and right alternating four
+# times ends in the finisher with both blades (`DUAL_FINISH_*` in sim/mod.rs).
+[[moveset]]
+key = "off_hand"
+light = [
+  { clip = 87, take = 0, windup = 0.85, recovery = 0.8, damage = 0.8, stamina = 0.7, lunge = 0.5 },
+  { clip = 87, take = 0, windup = 0.85, recovery = 0.8, damage = 0.8, stamina = 0.7, lunge = 0.5 },
+  { clip = 87, take = 0, windup = 0.9, recovery = 1.0, damage = 1.0, stamina = 0.8, lunge = 0.7 },
+]
+heavy = { clip = 87, take = 0, lunge = 0.8 }
+running = { clip = 87, take = 0, recovery = 1.1, damage = 1.1, lunge = 2.2 }
 
 [[moveset]]
 key = "dagger"
@@ -538,6 +567,9 @@ empower_valor = 4.0
 # Shadowform's dark swirl at the Priest's feet while the next bolt waits, Empowered.
 empower_aura = 15473
 perfect_kit = 431
+# A Shadow perfect with no burst of its own (the Shadowcaller's heavy): Fade's dark burst, as every
+# Shadow spell's (2350, Void Blast's, burst white-gold on film).
+shadow_perfect_kit = 117
 
 # --- heroes against heroes ------------------------------------------------------------------------
 
@@ -743,7 +775,8 @@ range = 3.2
 arc = 110.0
 targets = 2
 subclass = 0
-
+# Identity: the bleeder; each hit bleeds 4 a second for 3 sec (docs/weapon-identities.md).
+bleed = 4.0
 [[weapon]]
 key = "bearded_axe"
 windup = 0.42
@@ -756,7 +789,8 @@ arc = 110.0
 targets = 2
 stagger = 0.5
 subclass = 0
-
+# The bleeder (docs/weapon-identities.md).
+bleed = 6.0
 [[weapon]]
 key = "sword"
 windup = 0.26
@@ -768,7 +802,9 @@ range = 3.0
 arc = 90.0
 targets = 1
 subclass = 7
-
+# Identity (Nov 7, docs/weapon-identities.md): the duelist's blade, a wider parry and a harder riposte.
+parry = 0.1
+riposte = 2.25
 [[weapon]]
 key = "mace"
 windup = 0.36
@@ -781,7 +817,8 @@ arc = 100.0
 targets = 1
 stagger = 0.8
 subclass = 4
-
+# Identity: the stance breaker; its hits count twice towards a foe's stance (docs/weapon-identities.md).
+posture = 2.0
 [[weapon]]
 key = "dagger"
 windup = 0.18
@@ -793,7 +830,8 @@ range = 2.4
 arc = 70.0
 targets = 1
 subclass = 15
-
+# Identity: the assassin; 2.5 times the damage from behind (docs/weapon-identities.md).
+backstab = 2.5
 [[weapon]]
 key = "greatsword"
 windup = 0.50
@@ -808,7 +846,8 @@ two_handed = true
 guard = "blade_guard"
 emote = 37
 subclass = 8
-
+# Identity: the sweeper; a heavy blow doesn't put you down mid-swing (docs/weapon-identities.md).
+swing_poise = true
 [[weapon]]
 key = "halberd"
 windup = 0.42
@@ -823,7 +862,8 @@ two_handed = true
 guard = "haft_guard"
 emote = 38
 subclass = 6
-
+# Identity: reach; its thrust goes through a raised shield (docs/weapon-identities.md).
+through_guard = true
 [[weapon]]
 key = "maul"
 windup = 0.70
@@ -858,6 +898,8 @@ emote = 37
 subclass = 1
 
 # The Shadow Hunter's spear: only from him.
+# Identity: the executioner; twice the damage on a foe under a third of its health (docs/weapon-identities.md).
+execute = 2.0
 [[weapon]]
 key = "zanjin_spear"
 windup = 0.36
@@ -878,6 +920,8 @@ subclass = 6
 # (`bolt`, a benched projectile defined with them, below the abilities) and their heavy attack a
 # heavier one (`heavy_bolt`). Their swing numbers stand for a shove and for the rules that read a
 # weapon's reach. (The Mage design, claude/mage-kit-draft.md.)
+# Reach, through a raised shield (docs/weapon-identities.md).
+through_guard = true
 [[weapon]]
 key = "apprentice_staff"
 windup = 0.40
@@ -3258,7 +3302,7 @@ reward = { stone = 4, linen = 2 }
 
 [[goal]]
 title = "A shrine's lesson"
-text = "Use one of Elwynn's class shrines, the marked sanctums on the map, and beat the guardians it wakes. Each hero there learns 2 of its cards. Open the board (N) to slot them."
+text = "Use one of Elwynn's class shrines, the marked sanctums on the map, and beat the guardians it wakes. Each hero there learns 2 of its abilities. Open the board (N) to slot them."
 kind = "learn"
 what = "any"
 count = 2
@@ -3419,7 +3463,7 @@ reward = { stone = 4, wood = 6 }
 
 [[goal]]
 title = "The classes' trials"
-text = "Learn 16 cards between you, from shrines, hidden relics and champions. Everyone who fights a champion learns its card. The champions are Warlord Gorzak, Brother Malach, Morvane, the Unbound Flame, Rumbler, Vexx, Morgan, Old Blackfang and Moonfeather."
+text = "Learn 16 abilities between you, from shrines, hidden relics and champions. Everyone who fights a champion learns its ability. The champions are Warlord Gorzak, Brother Malach, Morvane, the Unbound Flame, Rumbler, Vexx, Morgan, Old Blackfang and Moonfeather."
 kind = "learn"
 what = "any"
 count = 16
@@ -3629,7 +3673,7 @@ impact_kit = 2709
 [[ability]]
 key = "fireball"
 name = "Fireball"
-text = "Charge for 0.3 to 1.5 sec to deal 16 to 36 damage. Release on the flare for 20% more damage. Burns the target for 4 damage per sec for 4 sec. Shatters a frozen enemy for 50% more damage."
+text = "Charge for 0.3 to 1.5 sec to hurl a fireball that explodes on what it hits, dealing 16 to 36 damage to enemies within 2.5 yd. Release on the flare for 20% more damage. Burns them for 4 damage per sec for 4 sec. Shatters a frozen enemy for 50% more damage."
 icon = "Spell_Fire_FlameBolt"
 school = "mage"
 slot = "ranged"
@@ -3643,6 +3687,13 @@ perfect_kit = 38
 # A critical (the middle of the window): the burn lasts twice as long.
 crit_effects = [{ kind = "burn", secs = [8.0, 8.0], amount = 4.0 }]
 damage = [16.0, 36.0]
+# Mage tune, Nov 7: it explodes. One target at a time, its best (43 on the flare) was under half
+# of what Lava Burst does to a pack every 4 sec (96 over three), and the Deadmines is packs (Corey,
+# Nov 6: "single target, so useless against big groups"). 2.5 yd, not Lava Burst's 3: it hits
+# harder and its burn goes on each.
+splash = 2.5
+# Its explosion where it strikes: Lava Burst's and the Explosive Trap's burst of fire.
+burst_spell = 5162
 range = [32.0, 34.0]
 radius = [0.35, 0.9]
 speed = 24.0
@@ -3660,7 +3711,7 @@ effects = [{ kind = "burn", secs = [4.0, 4.0], amount = 4.0 }]
 key = "pyroblast"
 name = "Pyroblast"
 ex_of = "fireball"
-text = "Hold for 1.5 sec, then release on the flare to hurl a huge, slow fireball. Deals 48 damage and burns the target for 5 damage per sec for 6 sec. Shatters a frozen enemy for 50% more damage. Released off the flare, it fizzles. A heavy attack on you while you hold interrupts it."
+text = "Hold for 1.5 sec, then release on the flare to hurl a huge, slow fireball. Deals 64 damage and burns the target for 5 damage per sec for 6 sec. Shatters a frozen enemy for 50% more damage. Released off the flare, it fizzles. A heavy attack on you while you hold interrupts it."
 icon = "Spell_Fire_Fireball02"
 slot = "ranged"
 kind = "projectile"
@@ -3676,7 +3727,9 @@ perfect_kit = 38
 # A critical: the blast stuns them for a moment.
 crit_effects = [{ kind = "stun", secs = [1.0, 1.0] }]
 fragile = true
-damage = [48.0, 48.0]
+# Mage tune, Nov 7: Fireball now explodes; Pyroblast stays one target, the choice for one big foe
+# (48 was barely more than a full Fireball's 43).
+damage = [64.0, 64.0]
 range = [36.0, 36.0]
 radius = [0.8, 0.8]
 speed = 24.0
@@ -5884,6 +5937,8 @@ crash = { wall_damage = 20.0, wall_stun = 2.0, foe_damage = 14.0, knockdown = 2.
 # 1's EX: the same moment (close the gap now), the other answer: toward a friend.
 [[ability]]
 key = "intervene"
+# Silent in the lab (its look has no sound of its own): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Intervene"
 ex_of = "tackle"
 text = "Rushes up to 25 yd to the ally nearest your reticle. For 3 sec, the first blow aimed at them strikes you instead. If your guard is up when it lands, your guard takes it."
@@ -6290,7 +6345,7 @@ key = "mind_blast"
 name = "Mind Blast"
 text = "Marks the ground at the reticle, up to 30 yd away, with a dark sigil. 0.9 sec later it erupts, dealing 24 damage within 2.5 yd. An enemy within 1 yd of its heart takes 30 instead, or 36 if it was moving, and you gain 5 Valor. Enemies under Shadow Weaving or a Warlock's shadow take 25% more."
 icon = "Spell_Shadow_UnholyFrenzy"
-perfect_kit = 2350
+perfect_kit = 117
 school = "priest"
 slot = "ranged"
 choice = 2
@@ -6315,7 +6370,7 @@ name = "Shadow Word: Death"
 ex_of = "mind_blast"
 text = "Deals 18 damage to the first enemy along the reticle, up to 30 yd, or 45 to an enemy below 20% health. If it doesn't kill, you take 12 damage. If it kills, you can cast it once more within 3 sec for free."
 icon = "Spell_Shadow_DemonicFortitude"
-perfect_kit = 2350
+perfect_kit = 117
 slot = "ranged"
 kind = "projectile"
 valor = 25
@@ -6389,10 +6444,9 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-# The add-on's afterimage where they stood, and Mind Blast's short dark burst on the Priest as they
-# slip. (Fade's own aura, 586, was the look: its shimmer stayed on the body long after the step.
-# Corey: the animation played too long.)
-spell = 8092
+# The add-on's afterimage where they stood, for everyone, and the perfect's dark burst. (Fade's own
+# aura, 586, was the look: its shimmer stayed on the body long after the step. Mind Blast's cast
+# in its place put a flame on the Priest's head for 2 sec. Corey: the animation played too long.)
 
 [[ability]]
 key = "greater_fade"
@@ -6414,7 +6468,6 @@ slip = true
 slip_hasten = 0.0
 slip_effects = [{ kind = "snare", secs = [2.0, 2.0], amount = 0.4, aura = 15407 }, { kind = "weaken", secs = [3.0, 3.0], amount = 0.2 }]
 slip_self = [{ kind = "haste", secs = [1.5, 1.5], amount = 0.3 }]
-spell = 8092
 
 # 2: take it, give it back. A shell for up to 2 sec: half of every blow stopped and stored; the key
 # again (or its time up) throws it at the first foe along the reticle. Let go just after a blow
@@ -6424,7 +6477,7 @@ key = "shadowguard"
 name = "Shadowguard"
 text = "Wraps you in shadow for up to 2 sec. You take 50% less damage and move slowly, but can't attack, and the damage it stops is stored, up to 40. Press again (or wait it out) to hurl it at the first enemy along the reticle. Let go just after a blow lands on you and it deals 50% more, up to 45."
 icon = "Spell_Shadow_AntiShadow"
-perfect_kit = 2350
+perfect_kit = 117
 school = "priest"
 slot = "defense"
 choice = 2
@@ -6452,7 +6505,7 @@ radius = [0.6, 0.6]
 speed = 40.0
 # The death-bolt (Void Blast has no missile in this client), Void Blast's burst where it strikes.
 spell = 26006
-impact_kit = 2350
+impact_kit = 2709
 
 # Shadow wants to deal damage: a grip that turns the Priest's own damage into their health (only
 # theirs: Corey's ruling).
@@ -6479,7 +6532,7 @@ key = "void_rift"
 name = "Void Rift"
 text = "Tears open the void at the reticle, up to 30 yd away: 4 yd wide, growing to 7 yd over 2 sec. Each second it drags enemies in it 3 yd toward its heart (heroes 5 yd at most) and deals 6 damage. Press again to implode it: 40 damage, plus 8 for each enemy it caught, up to 80. Left alone, it collapses after 4 sec for 20."
 icon = "Spell_Shadow_SealOfKings"
-perfect_kit = 2350
+perfect_kit = 117
 school = "priest"
 slot = "ultimate"
 choice = 2
@@ -6791,6 +6844,8 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 
 [[ability]]
 key = "arcane_bolt"
+# Silent in the lab (its look has no sound of its own): an arcane cast as it goes.
+sound = 1641
 name = "Arcane Bolt"
 text = "A quick bolt of arcane force that deals 10 damage. Each hit stores an arcane charge in the staff for 5 sec, up to 3."
 icon = "Spell_Arcane_StarFire"
@@ -6977,12 +7032,14 @@ range = [30.0, 30.0]
 radius = [0.5, 0.5]
 speed = 60.0
 spell = 26006
-impact_kit = 2350
+impact_kit = 2709
 
 # The Staff of the Hollow Star: the left click held is the Void Tether; the right click throws the
 # Hollow Star, a living orb that hurts foes and heals friends, filling and draining as it does.
 [[ability]]
 key = "void_tether"
+# Silent in the lab (its look has no sound of its own): a shadow cast as it goes.
+sound = 2560
 name = "Void Tether"
 text = "Hold to bind the first body along the reticle, up to 20 yd, with a cord of the void. An enemy takes 6 damage per sec, rising to 12 over 2 sec. An ally is healed 4 per sec, rising to 8. Your Hollow Star is filled 6 per sec and drawn toward you."
 icon = "Spell_Shadow_Requiem"
@@ -7022,7 +7079,7 @@ spell = 29317
 [[ability]]
 key = "meteor"
 name = "Meteor"
-text = "Hold for 0.5 to 1.5 sec to call a meteor down on the reticle, up to 34 yd away. Release on the flare for 20% more damage. It lands 1.5 sec later in a 5 to 7 yd radius shown to everyone. Deals 35 to 70 damage, knocks enemies back 6 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 8 damage per sec for 4 sec more. Shatters frozen enemies for 50% more damage."
+text = "Hold for 0.5 to 1.5 sec to call a meteor down on the reticle, up to 34 yd away. Release on the flare for 20% more damage. It lands 1.5 sec later in a 5 to 7 yd radius shown to everyone. Deals 45 to 90 damage, knocks enemies back 3 yd and burns them for 5 damage per sec for 4 sec. The crater burns for 8 damage per sec for 4 sec more. Shatters frozen enemies for 50% more damage."
 icon = "Spell_Fire_Fireball02"
 school = "mage"
 slot = "ultimate"
@@ -7040,7 +7097,10 @@ delay = 1.5
 # Its look (spell 24340 has no missile speed) is a meteor falling inside the effect model from the
 # moment it shows: shown this much early so the blow lands with it. A first guess: tune it in play.
 look_lead = 0.8
-damage = [35.0, 70.0]
+# Mage tune, Nov 7: a perfect Meteor was 84 on each, under half a Deadmines pirate (176), for all
+# 100 Valor. Now 108. And it knocked them 6 yd, out of its own 5 to 7 yd crater: 3 leaves them
+# in the fire.
+damage = [45.0, 90.0]
 linger = 4.0
 linger_damage = 8.0
 cooldown = 40.0
@@ -7050,7 +7110,7 @@ shatter = true
 spell = 24340
 linger_spell = 2120
 clip = 54
-effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4.0], amount = 5.0 }]
+effects = [{ kind = "knockback", amount = 3.0 }, { kind = "burn", secs = [4.0, 4.0], amount = 5.0 }]
 
 # 3, the second choice: Frost's ultimate, the stop check rolling. An orb rolls out along the
 # reticle; the key again stops it where it is and it bursts. Stopped on a foe it's a perfect: the
@@ -7059,6 +7119,8 @@ effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4
 # claude/mage-kit-draft.md.)
 [[ability]]
 key = "frozen_orb"
+# Silent in the lab (its look has no sound of its own): an ice cast as it goes.
+sound = 2559
 # A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
 perfect_kit = 1027
 name = "Frozen Orb"
@@ -7373,7 +7435,7 @@ effects = [{ kind = "stun", secs = [0.75, 0.75] }]
 [[ability]]
 key = "gravity_lance"
 name = "Gravity Lance"
-text = "Fires a heavy bolt of shadow along the reticle, up to 24 yd. Every other enemy within 5 yd of the one it hits is dragged into it, and all of them take 14 damage. Bunch them up for any area card."
+text = "Fires a heavy bolt of shadow along the reticle, up to 24 yd. Every other enemy within 5 yd of the one it hits is dragged into it, and all of them take 14 damage. Bunch them up for any area ability."
 icon = "Spell_Arcane_StarFire"
 school = "beta"
 slot = "ranged"
@@ -7560,7 +7622,7 @@ effects = [{ kind = "knockback", amount = 10.0, wall_stun = 2.0 }]
 [[ability]]
 key = "blink_dagger"
 name = "Blink Dagger"
-text = "Blinks 12 yd to the reticle. Press again within 3 sec to blink again. The most mobile card on the board, and nothing else."
+text = "Blinks 12 yd to the reticle. Press again within 3 sec to blink again. The most mobile ability on the board, and nothing else."
 icon = "INV_Weapon_ShortBlade_05"
 school = "beta"
 slot = "utility"
@@ -7707,6 +7769,8 @@ spell = 1449
 # 1: a pad for the whole party.
 [[ability]]
 key = "jump_pad"
+# Silent in the lab (its look has no sound of its own): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Jump Pad"
 text = "Throws down a pad at the reticle, up to 8 yd away. It lasts 8 sec, 2 at a time. You or any ally who steps on it is launched 14 yd the way they face. Enemies cannot use it."
 icon = "INV_Gizmo_RocketBoot_01"
@@ -7723,6 +7787,8 @@ burst_spell = 1953
 
 [[ability]]
 key = "launch_rig"
+# Silent in the lab (its look has no sound of its own): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Launch Rig"
 ex_of = "jump_pad"
 text = "A stronger pad that launches 20 yd. Whoever it throws lands with a shove, dealing 6 damage and knocking enemies within 1.5 yd back 3 yd."
@@ -7885,7 +7951,7 @@ effects = [{ kind = "stun", secs = [1.0, 1.0] }, { kind = "knockback", amount = 
 [[ability]]
 key = "black_hole"
 name = "Black Hole"
-text = "Lobs a singularity to the reticle, up to 26 yd away. Its landing is shown to everyone. For 3 sec it drags every enemy within 7 yd 3 yd toward its center each second, dealing 6 damage per sec. Then it collapses, dealing 30 damage and knocking everything in it 6 yd out. Feed it to your area cards first."
+text = "Lobs a singularity to the reticle, up to 26 yd away. Its landing is shown to everyone. For 3 sec it drags every enemy within 7 yd 3 yd toward its center each second, dealing 6 damage per sec. Then it collapses, dealing 30 damage and knocking everything in it 6 yd out. Feed it to your area abilities first."
 icon = "Spell_Arcane_PortalUndercity"
 school = "beta"
 slot = "ultimate"
@@ -10669,6 +10735,8 @@ stagger = 1.0
 subclass = 4
 
 # A silver-edged sword: the sword's quickness, the axe's bite.
+# The stance breaker (docs/weapon-identities.md).
+posture = 2.0
 [[weapon]]
 key = "silver_sword"
 windup = 0.26
@@ -10680,7 +10748,9 @@ range = 3.1
 arc = 95.0
 targets = 1
 subclass = 7
-
+# The duelist's blade (docs/weapon-identities.md).
+parry = 0.1
+riposte = 2.25
 [[recipe]]
 key = "grilled_fish"
 station = "cooking"

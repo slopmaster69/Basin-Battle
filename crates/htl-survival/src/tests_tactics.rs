@@ -485,6 +485,11 @@ fn a_boss_stops_a_long_string_short_or_runs_it_one_longer_now_and_then() {
     calm(&mut s);
     s.content.ai.cut = 0.0;
     s.content.ai.extend = 1.0;
+    // Its fourth blow light here: a heavy one knocks the hero down, and a knockdown ends a string.
+    let def = s.content.mob("dm_vancleef").unwrap();
+    for step in s.content.mobs[def].patterns[string].steps.iter_mut() {
+        step.heavy = Some(false);
+    }
     let p = sturdy(&mut s, "Ayla", ORIGIN);
     let k = boss(&mut s, "dm_vancleef", [2.0, 0.0, 0.0]);
     assert_eq!(blows_of(&mut s, k, p, string), 5, "one past its four");

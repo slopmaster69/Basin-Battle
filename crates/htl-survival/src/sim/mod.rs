@@ -98,6 +98,8 @@ pub enum Blow {
 pub enum StrikeKind {
     /// A blow of the light chain.
     Light,
+    /// A blow of the off hand's chain (dual wield's right click).
+    Off,
     Heavy,
     /// An attack while sprinting.
     Running,
@@ -468,6 +470,21 @@ pub struct Air {
 
 /// A jump this late after a dodge's dash still counts as taken in it (a frame or two of the
 /// client's word on its way).
+/// A one-handed weapon held alone guards with its blade (a `[[shield]]` key), and its parry comes
+/// this much wider (docs/weapon-identities.md: the duelist).
+pub const ONE_HAND_GUARD: &str = "blade_guard";
+pub const ONE_HAND_PARRY: f32 = 0.1;
+/// Dual wield: this many blows alternating between the hands, the last is the finisher with both
+/// blades, this many times as hard and staggering this long; and how long after a blow's end the
+/// next still counts as alternating.
+pub const DUAL_FINISH_AT: u8 = 4;
+pub const DUAL_FINISH_DAMAGE: f32 = 2.2;
+pub const DUAL_FINISH_STAGGER: f32 = 0.8;
+pub const DUAL_WINDOW: f32 = 0.8;
+/// The finisher's clip (`Attack1H`: both blades round together, on the hero's own model), and the
+/// off hand's chain (a `[[moveset]]` key).
+pub const DUAL_FINISH_CLIP: u16 = 17;
+pub const OFF_HAND_MOVES: &str = "off_hand";
 pub(crate) const COREY_GRACE: f32 = 0.06;
 /// A hero whose landing never came (a teleport, a lost packet) is back on the ground after this.
 pub(crate) const AIR_MOST: f32 = 3.0;
@@ -543,7 +560,7 @@ impl Action {
                 StrikeKind::Heavy => "heavy",
                 StrikeKind::Bash => "bash",
                 StrikeKind::Kick => "kick",
-                StrikeKind::Light | StrikeKind::Running | StrikeKind::Roll | StrikeKind::Leap => "swing",
+                StrikeKind::Light | StrikeKind::Off | StrikeKind::Running | StrikeKind::Roll | StrikeKind::Leap => "swing",
             },
             Action::Guard => "guard",
             Action::Dodge { .. } => "dodge",
@@ -725,6 +742,16 @@ pub struct Player {
     pub kit: Kit,
     pub weapon: usize,
     pub shield: usize,
+    /// The off hand when it holds no shield (docs/weapon-identities.md): a one-handed weapon (dual
+    /// wield: the right click swings it), or nothing (`off_empty`: the weapon's own guard, and a
+    /// wider parry).
+    pub off_weapon: Option<usize>,
+    pub off_empty: bool,
+    /// Dual wield: how many blows lately came from alternate hands, and whether the last was the
+    /// off hand's; and where the off hand's own chain is.
+    pub dual_run: u8,
+    pub dual_last_off: bool,
+    pub off_next: u8,
     pub bow: usize,
     /// What's carried, by item.
     pub bag: BTreeMap<usize, u32>,
@@ -872,6 +899,10 @@ pub struct Mob {
     /// has begun.
     pub pattern: Option<(usize, usize)>,
     pub lunged: bool,
+    /// When it last ran a step, and when its last string (or lone blow) was done, recovery and
+    /// all: the beat it settles for before a blow up close, and the breath the others wait for.
+    pub moved_at: f32,
+    pub string_done_at: f32,
     /// Its shield is up (shown).
     pub guarding: bool,
     /// Which way it circles a foe while it waits its turn (1 or -1), and the foe it keeps facing
@@ -1047,6 +1078,8 @@ pub struct Survival {
     /// `lab_blowing` while it does).
     pub(crate) lab_quiet: Vec<Id>,
     pub(crate) lab_blowing: Option<Id>,
+    /// The lab's body playing a whole string it was asked for (`blow:<string>`), until it ends.
+    pub(crate) lab_string: Option<Id>,
     /// Orbs rolling out (Frozen Orb), until stopped or spent.
     pub(crate) orbs: Vec<orb::Orb>,
     /// Bombs ticking on foes (Living Bomb), until they burst.
@@ -1209,6 +1242,7 @@ impl Survival {
             burnings: Vec::new(),
             lab_quiet: Vec::new(),
             lab_blowing: None,
+            lab_string: None,
             orbs: Vec::new(),
             bombs: Vec::new(),
             staff_marks: Vec::new(),
@@ -1451,6 +1485,11 @@ impl Survival {
             kit: Kit::Melee,
             weapon: item(&c.start.weapon),
             shield: item(&c.start.shield),
+            off_weapon: None,
+            off_empty: false,
+            dual_run: 0,
+            dual_last_off: false,
+            off_next: 0,
             bow: item(&c.start.bow),
             bag: c.start.items.iter().filter_map(|(k, n)| Some((c.item(k)?, *n))).collect(),
             combat_at: -100.0,
@@ -2198,11 +2237,33 @@ impl Survival {
         c.weapon(&c.items[p.weapon].key).or_else(|| c.weapons.first()).expect("a weapon")
     }
 
-    /// What a hero guards with: the shield, or a two-handed weapon's own guard.
+    /// The one-handed weapon in a hero's off hand, if they fight with two (and their main hand
+    /// is one-handed too).
+    pub fn off_weapon_of(&self, p: &Player) -> Option<&crate::content::WeaponDef> {
+        let i = p.off_weapon?;
+        if self.weapon_of(p).two_handed {
+            return None;
+        }
+        self.content.weapon(&self.content.items[i].key).filter(|w| !w.two_handed && w.bolt.is_empty() && w.alt.is_empty())
+    }
+
+    /// One weapon in hand and nothing in the other: it guards with the weapon itself.
+    pub fn one_hand_alone(&self, p: &Player) -> bool {
+        p.off_empty && !self.weapon_of(p).two_handed
+    }
+
+    /// What a hero guards with: the shield, or a two-handed weapon's own guard (or a one-handed
+    /// one's, held alone).
     pub fn guard_of(&self, p: &Player) -> &crate::content::ShieldDef {
         let c = &self.content;
         let w = self.weapon_of(p);
-        let key = if w.two_handed { w.guard.as_str() } else { c.items[p.shield].key.as_str() };
+        let key = if w.two_handed {
+            w.guard.as_str()
+        } else if self.one_hand_alone(p) {
+            ONE_HAND_GUARD
+        } else {
+            c.items[p.shield].key.as_str()
+        };
         c.shield(key).or_else(|| c.shields.first()).expect("a shield")
     }
 
