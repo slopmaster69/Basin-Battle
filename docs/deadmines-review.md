@@ -294,3 +294,28 @@ the next encounter's tuning is judged (a tuning judged against a broken hero is 
    Gilnid.
 5. Sneed and his Shredder.
 6. The mine galleries and Rhahk'Zor: miners, overseers, dynamiters; the hazards.
+
+## Who comes when you walk into a pack (Nov 7)
+
+`crates/htl-server/tests/pulls.rs` (branch `claude/pull-report`): on the Deadmines' own ground,
+a hero stands in each pack in turn for 12 s and every creature that ends up on them is listed by
+its pack. Most packs come alone. The ones that don't:
+
+| You walk into | It brings |
+| --- | --- |
+| 2: the beach's Squallshaper | 3: the two patrolling pirates |
+| 3: the two patrolling pirates | 2: the Squallshaper (it sits on their patrol, with a 24 yd aggro) |
+| 4: Cookie | 2 and 3, if they're still standing (the patrol turns 12 yd from his pot) |
+| 6: the two pirates on the scaffold's lower ring | 7: a Squallshaper and 37: a Wizard |
+| 9: the Juggernaut's deck pirates | 38: two Evokers |
+| 10: Captain Greenskin | 38: two Evokers |
+| 38: the Evokers | 10: Captain Greenskin |
+| 19, 20: the foundry's two engineers | each other |
+| 34: Miner Johnson | 30: a Dynamiter |
+| 35: Marisa du'Paige | 15: a Blackguard |
+| 40, 41: the Taskmaster and his three strip miners | each other (by design) |
+| 43 to 46: the Blackguards and Evokers | their own pairs (by design) |
+
+So the beach's "first open fight" is always two pirates and a caster, and walking up to the
+Juggernaut's deck can bring an elite captain with two casters. Not yet changed: encounter 1's
+content change takes the beach.
