@@ -1,18 +1,18 @@
-From f3b76f1a1a18e41063f2df16213cda3e4b52c67a Mon Sep 17 00:00:00 2001
+From 66f24fead99e55250f085edc50630a29a4147b7e Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Sat, 7 Nov 2026 11:59:56 -0600
+Date: Sat, 7 Nov 2026 12:48:52 -0600
 Subject: [PATCH] The gangway off the Juggernaut onto the plank down to Mr.
  Smite is solid
 
-Corey (7 Nov): the ramp down to Mr. Smite is broken right where you step off the ship onto it; you can't walk onto it and have to jump. The Deadmines' data leaves a 5 yd hole between the gun deck's sloping edge (z 30) and the plank's top (z 31.5), over a trough at z 27.7; neither the client nor the server's map has anything there, so a walking hero fell into the trough and a running jump was the only way across. Basin Battle adds its own pieces to a map's floor: a MapBridge walkable collider (nothing drawn: the planks are in the art), spawned with a WMO-only map's building and dropped with the map, from a per-map list the server's htl-map mirrors (DEADMINES_BRIDGES).
+Corey (7 Nov): the ramp down to Mr. Smite is broken right where you step off the ship onto it; you can't walk onto it and have to jump. The Deadmines' data leaves a 5 yd hole between the gun deck's sloping edge (z 30) and the plank's top (z 31.5), over a trough at z 27.7; neither the client nor the server's map has anything there, so a walking hero fell into the trough and a running jump was the only way across. Basin Battle adds its own pieces to a map's floor: a MapBridge walkable collider (nothing drawn: the planks are in the art), spawned when a map is entered and dropped when it is left, from a per-map list the server's htl-map mirrors (DEADMINES_BRIDGES). The spawn rides the map change, not the WMO-only branch: the Deadmines has tiles, and its ship is placed through one.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 ---
- crates/benilla-world/src/terrain_stream.rs | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ crates/benilla-world/src/terrain_stream.rs | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
 diff --git a/crates/benilla-world/src/terrain_stream.rs b/crates/benilla-world/src/terrain_stream.rs
-index a3ccc86f..9d591f5c 100644
+index a3ccc86f..b9c52f64 100644
 --- a/crates/benilla-world/src/terrain_stream.rs
 +++ b/crates/benilla-world/src/terrain_stream.rs
 @@ -575,6 +575,8 @@ fn stream_terrain(
@@ -24,41 +24,36 @@ index a3ccc86f..9d591f5c 100644
  ) {
      let (mut welds, mut static_merge, mut staticgx) = batchers;
      let (current_map, map_catalog, view) = location;
-@@ -612,6 +614,9 @@ fn stream_terrain(
+@@ -612,6 +614,22 @@ fn stream_terrain(
          state.map_dir = Some(dir.clone());
          state.wdt = Some(asset_server.load(format!("mpq://World/Maps/{dir}/{dir}.wdt")));
          state.wdt_ungated = false;
 +        for e in &bridges {
 +            commands.entity(e).despawn();
 +        }
++        // Basin Battle: the pieces Elwynn Survival adds to this map's floor, walkable from either
++        // side (both windings), in world coordinates beside whatever the map's tiles place.
++        for tri in map_bridges(&dir) {
++            let verts: Vec<Vec3> = tri.iter().map(|&p| wow_to_bevy(p)).collect();
++            commands.spawn((
++                MapBridge,
++                avian3d::prelude::RigidBody::Static,
++                avian3d::prelude::Collider::trimesh(verts, vec![[0, 1, 2], [0, 2, 1]]),
++                walk_layers(),
++                Transform::default(),
++            ));
++            info!("terrain: map {dir} gets an added floor piece at {:?}", tri[0]);
++        }
      }
      // A failed WDT falls back to ungated probing, warned once per map, never to no world.
      let wdt_index = state.wdt.as_ref().and_then(|h| wdts.get(h));
-@@ -652,6 +657,18 @@ fn stream_terrain(
-                     name_set: g.name_set,
-                 },
-             );
-+            // Basin Battle: the pieces Elwynn Survival adds to this dungeon's floor, walkable
-+            // from either side (both windings), beside the building's own colliders.
-+            for tri in map_bridges(&dir) {
-+                let verts: Vec<Vec3> = tri.iter().map(|&p| wow_to_bevy(p)).collect();
-+                commands.spawn((
-+                    MapBridge,
-+                    avian3d::prelude::RigidBody::Static,
-+                    avian3d::prelude::Collider::trimesh(verts, vec![[0, 1, 2], [0, 2, 1]]),
-+                    walk_layers(),
-+                    Transform::default(),
-+                ));
-+            }
-             state.global_wmo = true;
-         }
-     }
-@@ -1186,6 +1203,30 @@ fn register_doodad(
+@@ -1185,6 +1203,31 @@ fn register_doodad(
+     placements.pending_spawns += 1;
  }
  
- /// Register one WMO placement, or bump its refcount; a 1.12 WMO placement has no scale.
 +/// Basin Battle: a piece Elwynn Survival adds to a map's floor where the game's data leaves a
 +/// gap, a walkable collider with nothing drawn (the planks are there in the art already).
++/// Spawned when a map is entered, dropped when it is left.
 +#[derive(Component)]
 +pub(crate) struct MapBridge;
 +
@@ -81,6 +76,6 @@ index a3ccc86f..9d591f5c 100644
 +    }
 +}
 +
+ /// Register one WMO placement, or bump its refcount; a 1.12 WMO placement has no scale.
  fn register_wmo(placements: &mut Placements, asset_server: &AssetServer, w: &WmoInstance) {
      if let Some(p) = placements.by_id.get_mut(&w.unique_id) {
-         p.refs += 1;
