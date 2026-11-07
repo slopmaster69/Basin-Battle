@@ -183,9 +183,17 @@ impl Survival {
     pub(crate) fn heal_hero_by(&mut self, id: Id, amount: u32, healer: Id, label: &str) {
         let healed = self.heal_hero(id, amount);
         if healed > 0 && healer != id && self.players.contains_key(&healer) {
-            self.events.push(super::Event::HealedOther { healer, target: id, amount: healed });
+            let critical = self.heal_is_critical(healer);
+            self.events.push(super::Event::HealedOther { healer, target: id, amount: healed, critical });
         }
         self.meter_healed(healer, id, healed, label);
+    }
+
+    /// Whether `healer`'s heal lands critical just now: a skill check's perfect (a release on
+    /// its flare while what it sends out is made, `cast_perfect`; a Penance ring dead on the beat,
+    /// [`Survival::critical_heals`]), or `.es crit`. Never a heal with no skill check.
+    pub(crate) fn heal_is_critical(&self, healer: Id) -> bool {
+        self.critical_heals.contains(&healer) || self.players.get(&healer).is_some_and(|p| p.cast_perfect)
     }
 
     /// Heal a creature help can reach (an ally, a Priest's orb: [`Self::takes_help`]), counting it
@@ -204,7 +212,8 @@ impl Survival {
         }
         self.events.push(super::Event::Health { id: mid, health: h, max });
         if self.players.contains_key(&healer) {
-            self.events.push(super::Event::HealedOther { healer, target: mid, amount: healed });
+            let critical = self.heal_is_critical(healer);
+            self.events.push(super::Event::HealedOther { healer, target: mid, amount: healed, critical });
         }
         self.meter_healed(healer, mid, healed, label);
     }

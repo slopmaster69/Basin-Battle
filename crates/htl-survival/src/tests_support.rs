@@ -195,6 +195,27 @@ fn a_totem_takes_no_heal_but_a_healable_one_does() {
     }
 }
 
+/// A heal is critical only on a skill check's perfect (`critical_heals` while it's made): a plain
+/// one never is.
+#[test]
+fn a_heal_on_a_friend_is_critical_only_on_a_perfect() {
+    for perfect in [false, true] {
+        let mut s = world(false, MEND);
+        let a = hero(&mut s, "Ayla", ORIGIN, 0.0);
+        let b = hero(&mut s, "Bren", [10.0, 0.0, 0.0], 0.0);
+        halve(&mut s, b);
+        if perfect {
+            s.critical_heals.insert(a);
+        }
+        let ev = cast(&mut s, a, "t_mend");
+        let crit = ev.iter().find_map(|e| match e {
+            Event::HealedOther { healer, target, critical, .. } if *healer == a && *target == b => Some(*critical),
+            _ => None,
+        });
+        assert_eq!(crit, Some(perfect), "critical only on a perfect");
+    }
+}
+
 /// An allied creature never turns on a hero, and a hero's blows and shots pass it by, friendly
 /// fire or not.
 #[test]
