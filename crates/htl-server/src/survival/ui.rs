@@ -510,7 +510,7 @@ pub(crate) const ADDON_NEWEST: u32 = 57;
 /// (0049), and our own drawn bow's line steered onto the reticle (0050).
 /// (0058 adds `SetSpellAttach`, which hangs a spell's effects from another attachment: Salvation's
 /// wings on the back. No round of its own: the add-on calls it only where it exists.)
-/// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0056).
+/// 28: a heal you cast on a friend floats its number in green over their head, as WoW does (0060).
 pub(crate) const CLIENT_NEWEST: u8 = 28;
 
 /// What's out of date in a hello (`.es hello <version> ac<level>`), if anything: a word for the
