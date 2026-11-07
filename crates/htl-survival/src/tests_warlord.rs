@@ -772,6 +772,21 @@ fn bladestorm_ramps_a_point_a_strike_up_to_16() {
 }
 
 #[test]
+fn bladestorm_spins_on_the_key_press_with_no_aim_and_no_click() {
+    // Play-test, Nov 6 2026 (Corey): "Bladestorm did no damage". The key put the hero into an
+    // aim (the reticle up, nothing spinning) and only a left click began the spin, since a beam
+    // counts as aimed; a ring round the caster has nowhere to aim.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let k = mob(&mut s, "warlord", [3.5, 0.0, 0.0]);
+    s.set_valor(p, 100.0);
+    let mut ev = press(&mut s, p, "warrior_bladestorm", false);
+    assert!(matches!(s.players[&p].action, Action::Channel { .. }), "spinning on the key alone: {:?}", s.players[&p].action);
+    ev.extend(run(&mut s, 1.2));
+    assert!(!struck(&ev, k).is_empty(), "and it strikes");
+}
+
+#[test]
 fn bladestorm_tells_the_clients_its_flurry_and_flashes_each_cut_that_lands() {
     let mut s = world();
     let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
