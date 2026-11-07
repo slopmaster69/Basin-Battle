@@ -1,0 +1,1159 @@
+From 43a66c787ccbfda9a1d3ef53a9fe0ccd68062e16 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 15:18:13 -0700
+Subject: [PATCH] Sun shadows with shapes: heroes, creatures, buildings and
+ small things cast
+
+The first films of the sun shadows (#263) found a broad darkening and not
+one object-shaped shadow. Four faults in 0065 kept the casters a player
+looks at out of the map, or out of the filter:
+
+- Every skinned body drew far outside the map. The pass writes a caster's
+  rig slot into its instance row as a float's value (37.0), and the
+  caster shader read it back with bitcast<u32>, slot 1 108 606 976 for
+  slot 37. Heroes, creatures, rigged game objects and animated doodads
+  (trees with their own sway) all went. It now reads u32().
+- Skinned gear and riders carry NoFrustumCulling, so Bevy gives them no
+  Aabb, and the extract skipped every mesh without one. A skinned part is
+  now bounded on its rig's origin, where its palette draws it, by its
+  bind-pose box plus a margin, or a loose 3 yd sphere with no box.
+- A building's interior WMO groups never cast, and they hold its walls
+  and roof as often as its rooms. They cast now; props inside still don't.
+- On high, the PCSS blocker search sampled a ring of six taps whose
+  nearest is 0.17 yd out, and read a narrower shadow (a post's, a
+  rail's) as lit. It now samples the receiver's own texel first.
+
+The broad darkening is not the filter shading the ground itself (a test
+of flat ground under the lowest sun reads 0.96 lit or better on every
+slice): with the casters above missing, what darkened was the terrain's
+own relief and the canopies, without the shapes standing in them.
+
+lookshadow map <slice> | off draws a slice of the shadow map in the top
+right corner, the world as the sun sees it, so the next films show what
+the casters left in it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016HDbPQHUmJRztjWftG8oKt
+---
+ crates/benilla-app/src/shaders.rs             |  14 +
+ crates/benilla-app/src/world_console.rs       |  79 ++-
+ .../benilla-assets/src/shaders/terrain.wgsl   |   8 +
+ .../benilla-assets/src/shaders/wow_model.wgsl |   8 +
+ crates/benilla-world/src/look/shadow_pass.rs  | 502 +++++++++++++++++-
+ crates/benilla-world/src/look/shadows.rs      | 103 +++-
+ crates/benilla-world/src/shaders.rs           |   3 +-
+ .../src/shaders/look_shadow_map.wgsl          |  59 ++
+ .../benilla-world/src/shaders/static_gx.wgsl  |   8 +
+ .../src/shaders/world_shadow.wgsl             |  14 +-
+ 10 files changed, 766 insertions(+), 32 deletions(-)
+ create mode 100644 crates/benilla-world/src/shaders/look_shadow_map.wgsl
+
+diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
+index 3a8939f..0140559 100644
+--- a/crates/benilla-app/src/shaders.rs
++++ b/crates/benilla-app/src/shaders.rs
+@@ -167,6 +167,20 @@ mod tests {
+         }
+     }
+ 
++    /// `lookshadow map`'s inset (`benilla_world::look::shadow_pass::LookShadowMapNode`), composed,
++    /// validated and translated.
++    #[test]
++    fn the_shadow_map_view_shader_composes_and_translates() {
++        let (mut cache, ids) = embedded_shader_cache();
++        let id = *ids
++            .get("benilla_world/shaders/look_shadow_map.wgsl")
++            .expect("look_shadow_map.wgsl is embedded");
++        let module = cache
++            .get(&(), 0, id, &[])
++            .unwrap_or_else(|e| panic!("look_shadow_map.wgsl does not compose: {e:?}"));
++        validate_and_translate(&module, "look_shadow_map.wgsl");
++    }
++
+     /// The new look's water scene copy (`benilla_world::look::water_pass`): both def sets its
+     /// pipeline specialises on, composed, validated and translated.
+     #[test]
+diff --git a/crates/benilla-app/src/world_console.rs b/crates/benilla-app/src/world_console.rs
+index d37bafa..39401b2 100644
+--- a/crates/benilla-app/src/world_console.rs
++++ b/crates/benilla-app/src/world_console.rs
+@@ -113,7 +113,7 @@ impl Plugin for WorldConsolePlugin {
+         app.console_command(
+             "lookshadow",
+             GRAPHICS,
+-            Some("<strength 0-2> [distance 30-400] | grade"),
++            Some("<strength 0-2> [distance 30-400] | grade | map <slice 0-3> | map off"),
+             look_shadow,
+         );
+         // benilla's own: the new look's water held for tuning on film.
+@@ -362,10 +362,50 @@ fn look_ao(world: &mut World, args: &str) -> Vec<String> {
+ /// 2 (0 none, 1 the hour's own; a full shadow never takes more than all the sun), and optionally
+ /// their reach in yards, for tuning on film; `lookshadow grade`, or no argument, lets the hour
+ /// decide again. `worldShadows 0` and the classic look (`worldLook 0`) have none either way.
++///
++/// `lookshadow map <slice 0-3>` draws that slice of the shadow map in the top-right corner, for
++/// film (what the casters left in it), and `lookshadow map off` hides it.
+ fn look_shadow(world: &mut World, args: &str) -> Vec<String> {
+     use benilla_world::look::{LookShadows, WorldLook};
++    let usage = || {
++        vec![
++            "Usage: lookshadow <strength 0-2> [distance 30-400] | grade | map <slice 0-3> | map off"
++                .to_string(),
++        ]
++    };
++    let trimmed = args.trim_start();
++    let map_args = trimmed
++        .get(..3)
++        .filter(|w| w.eq_ignore_ascii_case("map"))
++        .map(|_| &trimmed[3..])
++        .filter(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace));
++    if let Some(rest) = map_args {
++        let Some(map) = LookShadows::parse_map(rest) else {
++            return usage();
++        };
++        let (level, slices) = {
++            let mut shadows = world.get_resource_or_init::<LookShadows>();
++            shadows.map = map;
++            (shadows.level, shadows.layout().map_or(0, |(n, _)| n))
++        };
++        let mut lines = vec![match map {
++            None => "Shadow map hidden.".to_string(),
++            Some(s) => format!("Shadow map slice {s} drawn in the corner."),
++        }];
++        if let Some(s) = map {
++            if level > 0 && usize::from(s) >= slices {
++                lines.push(format!(
++                    "worldShadows {level} has {slices} slices: slice {s} shows once there are more."
++                ));
++            }
++        }
++        if level == 0 {
++            lines.push("worldShadows is 0: no sun shadows.".to_string());
++        }
++        return lines;
++    }
+     let Some((scale, distance)) = LookShadows::parse(args) else {
+-        return vec!["Usage: lookshadow <strength 0-2> [distance 30-400] | grade".to_string()];
++        return usage();
+     };
+     let level = {
+         let mut shadows = world.get_resource_or_init::<LookShadows>();
+@@ -975,7 +1015,7 @@ mod tests {
+         assert_eq!(held(&mut app).distance, Some(250.0));
+         assert_eq!(
+             run(&mut app, "lookshadow 3"),
+-            ["Usage: lookshadow <strength 0-2> [distance 30-400] | grade"]
++            ["Usage: lookshadow <strength 0-2> [distance 30-400] | grade | map <slice 0-3> | map off"]
+         );
+         assert_eq!(
+             held(&mut app).scale,
+@@ -994,6 +1034,39 @@ mod tests {
+         assert_eq!(lines[1], "worldShadows is 0: no sun shadows.");
+     }
+ 
++    /// `lookshadow map`: a slice draws in the corner and `off` hides it, leaving the strength and
++    /// the reach alone; a slice past low's two says when it will show; anything else is refused.
++    #[test]
++    fn the_look_shadow_map_shows_and_hides() {
++        use benilla_world::look::{LookShadows, WorldLook};
++        let mut app = world_app();
++        app.insert_resource(WorldLook::NEW);
++        let held = |app: &mut App| *app.world_mut().get_resource_or_init::<LookShadows>();
++        run(&mut app, "lookshadow 1.5");
++        assert_eq!(
++            run(&mut app, "lookshadow map 0"),
++            ["Shadow map slice 0 drawn in the corner."]
++        );
++        assert_eq!(held(&mut app).map, Some(0));
++        assert_eq!(held(&mut app).scale, Some(1.5), "the strength is untouched");
++        let lines = run(&mut app, "lookshadow MAP 3");
++        assert_eq!(lines.len(), 2, "{lines:?}");
++        assert_eq!(
++            lines[1],
++            "worldShadows 1 has 2 slices: slice 3 shows once there are more."
++        );
++        assert_eq!(run(&mut app, "lookshadow map off"), ["Shadow map hidden."]);
++        assert_eq!(held(&mut app).map, None);
++        assert_eq!(
++            run(&mut app, "lookshadow map 7"),
++            ["Usage: lookshadow <strength 0-2> [distance 30-400] | grade | map <slice 0-3> | map off"]
++        );
++        assert_eq!(
++            run(&mut app, "lookshadow mapx"),
++            ["Usage: lookshadow <strength 0-2> [distance 30-400] | grade | map <slice 0-3> | map off"]
++        );
++    }
++
+     /// `lookwater`: a mirror (and a clarity) holds the water, `grade` or nothing lets go, and
+     /// anything out of range leaves it as it was with the usage line.
+     #[test]
+diff --git a/crates/benilla-assets/src/shaders/terrain.wgsl b/crates/benilla-assets/src/shaders/terrain.wgsl
+index e221bff..e25b82f 100644
+--- a/crates/benilla-assets/src/shaders/terrain.wgsl
++++ b/crates/benilla-assets/src/shaders/terrain.wgsl
+@@ -208,6 +208,14 @@ fn shadow_slice(P: vec3<f32>, N: vec3<f32>, c: u32, turn: f32) -> f32 {
+         let search = max(SHADOW_BLOCKER_SEARCH / depth.z, 1.0);
+         var sum = 0.0;
+         var n = 0.0;
++        // The receiver's own texel first: the disk's nearest tap is 0.29 of the search (0.17 yd)
++        // out, so a shadow narrower than about twice that (a fence post's, a rail's, a blade's)
++        // fell between every tap and read lit.
++        let s0 = textureLoad(shadow_map, clamp(vec2<i32>(t), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
++        if (s0 < z) {
++            sum += s0;
++            n += 1.0;
++        }
+         for (var i = 0u; i < SHADOW_SEARCH_TAPS; i = i + 1u) {
+             let o = shadow_disk(i, SHADOW_SEARCH_TAPS, turn) * search;
+             let s = textureLoad(shadow_map, clamp(vec2<i32>(t + o), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
+diff --git a/crates/benilla-assets/src/shaders/wow_model.wgsl b/crates/benilla-assets/src/shaders/wow_model.wgsl
+index d51b27c..09ae6cc 100644
+--- a/crates/benilla-assets/src/shaders/wow_model.wgsl
++++ b/crates/benilla-assets/src/shaders/wow_model.wgsl
+@@ -408,6 +408,14 @@ fn shadow_slice(P: vec3<f32>, N: vec3<f32>, c: u32, turn: f32) -> f32 {
+         let search = max(SHADOW_BLOCKER_SEARCH / depth.z, 1.0);
+         var sum = 0.0;
+         var n = 0.0;
++        // The receiver's own texel first: the disk's nearest tap is 0.29 of the search (0.17 yd)
++        // out, so a shadow narrower than about twice that (a fence post's, a rail's, a blade's)
++        // fell between every tap and read lit.
++        let s0 = textureLoad(shadow_map, clamp(vec2<i32>(t), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
++        if (s0 < z) {
++            sum += s0;
++            n += 1.0;
++        }
+         for (var i = 0u; i < SHADOW_SEARCH_TAPS; i = i + 1u) {
+             let o = shadow_disk(i, SHADOW_SEARCH_TAPS, turn) * search;
+             let s = textureLoad(shadow_map, clamp(vec2<i32>(t + o), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
+diff --git a/crates/benilla-world/src/look/shadow_pass.rs b/crates/benilla-world/src/look/shadow_pass.rs
+index bdeb415..f7eef72 100644
+--- a/crates/benilla-world/src/look/shadow_pass.rs
++++ b/crates/benilla-world/src/look/shadow_pass.rs
+@@ -10,10 +10,14 @@
+ //! the far slices ([`tune::SMALL_CASTER_RADIUS`]). An entity caster is gated on Bevy's
+ //! `InheritedVisibility`, so a body the exterior-scene election hides (off screen) casts none; the
+ //! static world and the terrain are culled here alone, so a tree behind the camera still shades
+-//! the road in front of it. Translucent, additive, depth-less and interior batches never cast, nor
+-//! ground clutter.
++//! the road in front of it. Translucent, additive and depth-less batches never cast, nor props
++//! inside a building, nor ground clutter; a building's interior groups do, as they hold its walls.
++//! A skinned body is bounded on its rig's origin (the palette, not its transform, places it).
+ //!
+-//! `WOW_SHADOW_STATS=1` prints each slice's draw counts once a second.
++//! `WOW_SHADOW_STATS=1` prints each slice's draw counts once a second, and `lookshadow map
++//! <slice>` draws that slice's map in a corner of the screen ([`LookShadowMapNode`]): the world
++//! seen from the light, the terrain in grey bands every 8 yd of depth, a caster's outline bright
++//! where the depth jumps, nothing (no caster) dark blue, the camera a red dot.
+ 
+ use bevy::camera::primitives::Aabb;
+ use bevy::camera::visibility::RenderLayers;
+@@ -32,7 +36,7 @@ use bevy::render::render_graph::{
+     NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
+ };
+ use bevy::render::render_resource::binding_types::{
+-    sampler, storage_buffer_read_only_sized, texture_2d, uniform_buffer_sized,
++    sampler, storage_buffer_read_only_sized, texture_2d, texture_2d_array, uniform_buffer_sized,
+ };
+ use bevy::render::render_resource::*;
+ use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
+@@ -100,8 +104,9 @@ const NO_CAST_MARKERS: u32 = 1 | 2 | 4 | 0x80 | 0x100 | 0x200 | 0x800 | 0x2000;
+ const TWIN_CUTOUT_MARKER: u32 = 0x400;
+ 
+ /// Whether a model material casts, and how: `None` not at all; `Some(None)` solid; `Some(Some(t))`
+-/// cut by texture `t`'s alpha. Ground clutter, interiors, the authored-rig lane (glue scenes and
+-/// portraits) and translucent batches cast none; a fading doodad's blend twin casts as its source.
++/// cut by texture `t`'s alpha. Ground clutter, props inside a building, the authored-rig lane
++/// (glue scenes and portraits) and translucent batches cast none; a building's interior groups
++/// do (their walls and roof block the sun), and a fading doodad's blend twin casts as its source.
+ pub fn caster_kind(mat: &WowModelMaterial) -> Option<Option<AssetId<Image>>> {
+     let ext = &mat.extension;
+     caster_law(
+@@ -122,10 +127,9 @@ fn caster_law(
+     sun_scale: Vec4,
+ ) -> Option<Option<AssetId<Image>>> {
+     let markers = clutter_fade.z as u32;
+-    if clutter_fade.w > 0.5
+-        || markers & NO_CAST_MARKERS != 0
+-        || model_flags.z > 0.5
+-        || sun_scale.x >= 1.5
++    // `model_flags.x` a WMO surface, `.z` an interior group or a prop inside one.
++    let interior_prop = model_flags.z > 0.5 && model_flags.x <= 0.5;
++    if clutter_fade.w > 0.5 || markers & NO_CAST_MARKERS != 0 || interior_prop || sun_scale.x >= 1.5
+     {
+         return None;
+     }
+@@ -164,6 +168,29 @@ fn bounding_sphere(gt: &GlobalTransform, aabb: &Aabb) -> (Vec3, f32) {
+     (center, Vec3::from(aabb.half_extents).length() * s)
+ }
+ 
++/// A model caster's bounding sphere. A plain mesh: its box under its transform. A skinned part
++/// (`rig_origin`, its slot's origin, the point its palette draws it from): the palette replaces
++/// its world matrix, so its sphere sits on the rig, as wide as its bind-pose box plus
++/// [`tune::SKINNED_MARGIN`] for a swing; a part with no box at all (gear and riders carry
++/// `NoFrustumCulling`, so Bevy gives them none) is held to [`tune::SKINNED_LOOSE_RADIUS`].
++/// `None` for a plain mesh with no box yet (still loading).
++fn caster_bound(
++    gt: &GlobalTransform,
++    aabb: Option<&Aabb>,
++    rig_origin: Option<Vec3>,
++) -> Option<(Vec3, f32)> {
++    match (rig_origin, aabb) {
++        (None, aabb) => Some(bounding_sphere(gt, aabb?)),
++        (Some(o), Some(aabb)) => {
++            let (center, radius) = bounding_sphere(gt, aabb);
++            // The box's centre as far off the part's own origin as it is in the bind pose.
++            let lift = center - gt.translation();
++            Some((o + lift, radius + tune::SKINNED_MARGIN))
++        }
++        (Some(o), None) => Some((o, tune::SKINNED_LOOSE_RADIUS + tune::SKINNED_MARGIN)),
++    }
++}
++
+ type ModelCaster = (
+     &'static Mesh3d,
+     &'static MeshMaterial3d<WowModelMaterial>,
+@@ -172,6 +199,8 @@ type ModelCaster = (
+     &'static InheritedVisibility,
+     Option<&'static MeshTag>,
+     Option<&'static RenderLayers>,
++    // Only a skinned part carries it: an object's plain parts tag their instance slot too.
++    Has<crate::rig_palette::RigPart>,
+ );
+ 
+ type TerrainCaster = (
+@@ -187,6 +216,7 @@ fn extract_casters(
+     models: Extract<Query<ModelCaster>>,
+     terrain: Extract<Query<TerrainCaster, With<MeshMaterial3d<TerrainMaterial>>>>,
+     materials: Extract<Res<Assets<WowModelMaterial>>>,
++    rigs: Extract<Option<Res<crate::rig_palette::RigPalettes>>>,
+ ) {
+     out.0.clear();
+     if frame.cascades == 0 {
+@@ -199,15 +229,18 @@ fn extract_casters(
+             .any(|s| s.admits_sphere(&frame, c, r))
+     };
+     let world_layer = RenderLayers::default();
+-    for (mesh, mat, gt, aabb, vis, tag, layers) in &models {
++    for (mesh, mat, gt, aabb, vis, tag, layers, skinned) in &models {
+         if !vis.get() || layers.is_some_and(|l| !l.intersects(&world_layer)) {
+             continue;
+         }
+-        let Some(aabb) = aabb else { continue };
+         let rig = tag.map_or(0, |t| (t.0 >> 19) & 0x7ff);
+-        let (center, radius) = bounding_sphere(gt, aabb);
+-        // A rig's box is its bind pose's: a swing reaches past it.
+-        let radius = radius + if rig != 0 { tune::SKINNED_MARGIN } else { 0.0 };
++        // The palette draws a skinned part from its rig's origin, not from its transform.
++        let origin = (skinned && rig != 0)
++            .then(|| rigs.as_deref().and_then(|r| r.slot_origin(rig as u16)))
++            .flatten();
++        let Some((center, radius)) = caster_bound(gt, aabb, origin) else {
++            continue;
++        };
+         if !admits(center, radius) {
+             continue;
+         }
+@@ -745,6 +778,175 @@ fn report_stats(frame: &ShadowFrame, counts: &[(u32, u32); 4]) {
+     eprintln!("{line}");
+ }
+ 
++/// `lookshadow map`'s pipeline, one a target format, its layout, shader and uniform
++/// (`look_shadow_map.wgsl`'s `MapView`: `[inset x, y, side, slice]`, `[texels a side, yards a unit
++/// of depth, the camera's texel]`).
++#[derive(Resource)]
++struct MapViewPipelines {
++    layout: BindGroupLayoutDescriptor,
++    shader: Handle<Shader>,
++    uniform: Buffer,
++    by_format: HashMap<TextureFormat, CachedRenderPipelineId>,
++}
++
++const MAP_VIEW_BYTES: u64 = 32;
++
++fn init_map_view(mut commands: Commands, device: Res<RenderDevice>, assets: Res<AssetServer>) {
++    commands.insert_resource(MapViewPipelines {
++        layout: BindGroupLayoutDescriptor::new(
++            "look_shadow_map_view",
++            &BindGroupLayoutEntries::sequential(
++                ShaderStages::FRAGMENT,
++                (
++                    texture_2d_array(TextureSampleType::Depth),
++                    uniform_buffer_sized(false, std::num::NonZero::new(MAP_VIEW_BYTES)),
++                ),
++            ),
++        ),
++        shader: assets.load("embedded://benilla_world/shaders/look_shadow_map.wgsl"),
++        uniform: device.create_buffer(&BufferDescriptor {
++            label: Some("look_shadow_map_view"),
++            size: MAP_VIEW_BYTES,
++            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
++            mapped_at_creation: false,
++        }),
++        by_format: HashMap::default(),
++    });
++}
++
++/// Queues the inset's pipeline for each look view's target format, once, when it is asked for.
++fn prepare_map_view(
++    frame: Res<ShadowFrame>,
++    mut pipes: ResMut<MapViewPipelines>,
++    cache: Res<PipelineCache>,
++    views: Query<&bevy::render::view::ViewTarget, With<LookView>>,
++) {
++    if frame.map.is_none() {
++        return;
++    }
++    let pipes = &mut *pipes;
++    for target in &views {
++        let format = target.main_texture_format();
++        if pipes.by_format.contains_key(&format) {
++            continue;
++        }
++        let id = cache.queue_render_pipeline(RenderPipelineDescriptor {
++            label: Some("look_shadow_map_view".into()),
++            layout: vec![pipes.layout.clone()],
++            vertex: VertexState {
++                shader: pipes.shader.clone(),
++                shader_defs: vec![],
++                entry_point: Some("vs_main".into()),
++                buffers: vec![],
++            },
++            fragment: Some(FragmentState {
++                shader: pipes.shader.clone(),
++                shader_defs: vec![],
++                entry_point: Some("fs_main".into()),
++                targets: vec![Some(ColorTargetState {
++                    format,
++                    blend: None,
++                    write_mask: ColorWrites::ALL,
++                })],
++            }),
++            ..default()
++        });
++        pipes.by_format.insert(format, id);
++    }
++}
++
++/// The inset's place in a `width` × `height` frame: `[x, y, side]`, top right, a margin in.
++fn map_view_rect(width: f32, height: f32) -> [f32; 3] {
++    let side = (tune::MAP_INSET * height)
++        .min(width * 0.5)
++        .floor()
++        .max(16.0);
++    let margin = (0.02 * height).floor();
++    [(width - side - margin).max(0.0), margin, side]
++}
++
++#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
++pub struct LookShadowMapLabel;
++
++/// `lookshadow map <slice>`: draws that slice of the map into the top-right corner of the graded
++/// frame, after the look's own pass; nothing at all otherwise.
++#[derive(Default)]
++pub struct LookShadowMapNode;
++
++impl ViewNode for LookShadowMapNode {
++    type ViewQuery = (&'static bevy::render::view::ViewTarget, &'static LookView);
++
++    fn run<'w>(
++        &self,
++        _graph: &mut RenderGraphContext,
++        render_context: &mut RenderContext<'w>,
++        (target, _): QueryItem<'w, '_, Self::ViewQuery>,
++        world: &'w World,
++    ) -> Result<(), NodeRunError> {
++        let frame = world.resource::<ShadowFrame>();
++        let Some(slice) = frame.map.map(usize::from) else {
++            return Ok(());
++        };
++        if slice >= frame.cascades {
++            return Ok(());
++        }
++        let pipes = world.resource::<MapViewPipelines>();
++        let cache = world.resource::<PipelineCache>();
++        let images = world.resource::<RenderAssets<GpuImage>>();
++        let (Some(pipeline), Some(map)) = (
++            pipes
++                .by_format
++                .get(&target.main_texture_format())
++                .and_then(|id| cache.get_render_pipeline(*id)),
++            images.get(SHADOW_MAP.id()),
++        ) else {
++            return Ok(());
++        };
++        let size = target.main_texture().size();
++        let [x, y, side] = map_view_rect(size.width as f32, size.height as f32);
++        let cam = super::shadows::caster_texel(frame, slice, frame.cam)
++            .map_or(Vec2::splat(-1.0e6), |(t, _)| t);
++        let row: [f32; 8] = [
++            x,
++            y,
++            side,
++            slice as f32,
++            frame.res as f32,
++            frame.slices[slice].range,
++            cam.x,
++            cam.y,
++        ];
++        world
++            .resource::<RenderQueue>()
++            .write_buffer(&pipes.uniform, 0, bytemuck::cast_slice(&row));
++        let bind = render_context.render_device().create_bind_group(
++            "look_shadow_map_view",
++            &cache.get_bind_group_layout(&pipes.layout),
++            &BindGroupEntries::sequential((&map.texture_view, pipes.uniform.as_entire_binding())),
++        );
++        let mut pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
++            label: Some("look_shadow_map_view"),
++            color_attachments: &[Some(RenderPassColorAttachment {
++                view: target.main_texture_view(),
++                depth_slice: None,
++                resolve_target: None,
++                ops: Operations {
++                    load: LoadOp::Load,
++                    store: StoreOp::Store,
++                },
++            })],
++            depth_stencil_attachment: None,
++            timestamp_writes: None,
++            occlusion_query_set: None,
++        });
++        pass.set_viewport(x, y, side, side, 0.0, 1.0);
++        pass.set_render_pipeline(pipeline);
++        pass.set_bind_group(0, &bind, &[]);
++        pass.draw(0..3, 0..1);
++        Ok(())
++    }
++}
++
+ /// The main-world half: the frame's extract; the render half in [`finish`].
+ pub(super) fn build(app: &mut App) {
+     app.add_plugins(ExtractResourcePlugin::<ShadowFrame>::default());
+@@ -759,12 +961,12 @@ pub(super) fn finish(app: &mut App) {
+     render_app
+         .init_resource::<ShadowCasters>()
+         .init_resource::<ShadowGpu>()
+-        .add_systems(RenderStartup, init_pipelines)
++        .add_systems(RenderStartup, (init_pipelines, init_map_view))
+         .add_systems(ExtractSchedule, extract_casters)
+         .add_systems(
+             Render,
+             (
+-                prepare_shadows.in_set(RenderSystems::PrepareResources),
++                (prepare_shadows, prepare_map_view).in_set(RenderSystems::PrepareResources),
+                 prepare_shadow_binds.in_set(RenderSystems::PrepareBindGroups),
+             ),
+         )
+@@ -772,13 +974,267 @@ pub(super) fn finish(app: &mut App) {
+         .add_render_graph_edges(
+             Core3d,
+             (Node3d::EndPrepasses, LookShadowLabel, Node3d::StartMainPass),
++        )
++        // The debug inset, on the graded frame, before the glow combine decodes it.
++        .add_render_graph_node::<ViewNodeRunner<LookShadowMapNode>>(Core3d, LookShadowMapLabel)
++        .add_render_graph_edges(
++            Core3d,
++            (
++                super::pass::LookLabel,
++                LookShadowMapLabel,
++                crate::ffx_glow::FfxGlowLabel,
++            ),
+         );
+ }
+ 
+ #[cfg(test)]
+ mod tests {
++    use super::super::shadows::{pack_rows, shadow_light, SHADOW_ROWS};
+     use super::*;
+ 
++    /// `world_shadow.wgsl`'s `slice_clip` and the viewport, read from the pass's own uniform
++    /// ([`slice_rows`]) as the vertex stage reads it: a caster point's texel and stored depth in
++    /// slice `c`.
++    fn cast(rows: &[f32], c: usize, res: f32, p: Vec3) -> (Vec2, f32) {
++        let r = &rows[c * (SLICE_STRIDE / 4) as usize..];
++        let v = |i: usize| Vec3::new(r[i], r[i + 1], r[i + 2]);
++        let d = p - v(0);
++        let x = d.dot(v(8)) * r[3];
++        let y = d.dot(v(12)) * r[3];
++        let z = ((d.dot(v(16)) - r[4]) * r[5]).max(0.0);
++        (Vec2::new((x + 1.0) * 0.5 * res, (1.0 - y) * 0.5 * res), z)
++    }
++
++    /// The receivers' `shadow_slice` (`terrain.wgsl`, mirrored in `wow_model.wgsl` and
++    /// `static_gx.wgsl`), read from the light buffer's packed rows ([`pack_rows`]) as the fragment
++    /// stage reads them, over a map given texel by texel; `fixed` off reads as 0065 shipped (no
++    /// centre tap in the blocker search). Disk turn 0. -1 outside the slice.
++    fn receive(
++        rows: &[[f32; 4]; SHADOW_ROWS],
++        c: usize,
++        p: Vec3,
++        n: Vec3,
++        map: &dyn Fn(IVec2) -> f32,
++        fixed: bool,
++    ) -> f32 {
++        let v = |row: usize| Vec3::new(rows[row][0], rows[row][1], rows[row][2]);
++        let (centre, depth) = (rows[6 + 2 * c], rows[7 + 2 * c]);
++        let res = rows[2][3];
++        let travel = v(4);
++        let facing = n.dot(-travel).clamp(0.0, 1.0);
++        let push = depth[2] * rows[4][3] * (1.0 - 0.5 * facing);
++        let d = (p + n * push) - Vec3::new(centre[0], centre[1], centre[2]);
++        let uv = Vec2::new(d.dot(v(2)), -d.dot(v(3))) * (0.5 * centre[3]) + Vec2::splat(0.5);
++        if uv.min_element() < 0.0 || uv.max_element() > 1.0 {
++            return -1.0;
++        }
++        let z = (d.dot(travel) - depth[0]) * depth[1] - depth[2] * rows[5][3] * depth[1];
++        let t = uv * res;
++        let lim = res as i32 - 1;
++        let at = |q: IVec2| map(q.clamp(IVec2::ZERO, IVec2::splat(lim)));
++        let disk = |i: u32, n: u32| {
++            let r = ((i as f32 + 0.5) / n as f32).sqrt();
++            let a = i as f32 * 2.399_963_2;
++            Vec2::new(a.cos(), a.sin()) * r
++        };
++        let tap = |q: Vec2, z: f32| {
++            let f = q - Vec2::splat(0.5);
++            let i = f.floor();
++            let w = f - i;
++            let c = i.as_ivec2();
++            let s = |o: IVec2| if z <= at(c + o) { 1.0 } else { 0.0 };
++            let top = s(IVec2::ZERO) * (1.0 - w.x) + s(IVec2::X) * w.x;
++            let bottom = s(IVec2::Y) * (1.0 - w.x) + s(IVec2::ONE) * w.x;
++            top * (1.0 - w.y) + bottom * w.y
++        };
++        let (mut radius, mut taps) = (tune::PCF_LOW_TEXELS, 6u32);
++        if rows[3][3] > 0.5 {
++            let search = (tune::BLOCKER_SEARCH / depth[2]).max(1.0);
++            let (mut sum, mut n) = (0.0, 0.0);
++            let s0 = at(t.as_ivec2());
++            if fixed && s0 < z {
++                sum += s0;
++                n += 1.0;
++            }
++            for i in 0..6 {
++                let o = disk(i, 6) * search;
++                let s = at((t + o).as_ivec2());
++                if s < z {
++                    sum += s;
++                    n += 1.0;
++                }
++            }
++            if n < 0.5 {
++                return 1.0;
++            }
++            let gap = (z - sum / n) / depth[1];
++            radius =
++                (gap * tune::PENUMBRA / depth[2]).clamp(tune::PCF_MIN_TEXELS, tune::PCF_MAX_TEXELS);
++            taps = 10;
++        }
++        let mut lit = 0.0;
++        for i in 0..taps {
++            lit += tap(t + disk(i, taps) * radius, z);
++        }
++        lit / taps as f32
++    }
++
++    /// A frame at the Brackwell pumpkin patch's latitude in the world, the camera 5 yd behind and
++    /// above a hero looking north, under a sun `deg` above the horizon on its 45° bearing.
++    fn field_frame(deg: f32, cascades: usize, res: u32) -> ShadowFrame {
++        let e = deg.to_radians();
++        let h = std::f32::consts::FRAC_1_SQRT_2;
++        let sun = Vec3::new(-e.cos() * h, e.sin(), -e.cos() * h);
++        let below = Vec3::new(0.0, -1.0, 0.0);
++        super::super::shadows::fit(
++            Vec3::new(-9020.0, 62.0, 210.0),
++            Vec3::new(0.0, -0.25, -1.0).normalize(),
++            std::f32::consts::FRAC_PI_4,
++            16.0 / 9.0,
++            shadow_light(sun, below).unwrap(),
++            cascades,
++            res,
++            if cascades > 2 { 180.0 } else { 120.0 },
++        )
++    }
++
++    /// The test the first films asked for: a caster point drawn through the pass's uniform and a
++    /// receiver on the ground under it read through the light buffer's rows land on the same
++    /// texel, and the receiver reads shadowed while a point well beside it reads lit, in every
++    /// slice, on low and on high, the sun high and low. A transpose, a flipped row, a slice off by
++    /// one, a texel-snap mismatch or a flipped depth between the two packings fails here.
++    #[test]
++    fn a_caster_shades_the_ground_under_it_and_not_beside_it() {
++        for (cascades, res) in [(2, 1024), (4, 2048)] {
++            for deg in [57.0, 30.0, 12.0] {
++                let f = field_frame(deg, cascades, res);
++                let (cast_rows, rows) = (slice_rows(&f), pack_rows(&f));
++                for c in 0..cascades {
++                    // A point 1.5 yd up near the middle of the slice, and where its shadow falls on
++                    // the ground (y 60) along the light.
++                    let mid = f.slices[c].center;
++                    let caster = Vec3::new(mid.x, 61.5, mid.z);
++                    let ground = caster + f.travel * (1.5 / -f.travel.y);
++                    let (texel, z) = cast(&cast_rows, c, f.res as f32, caster);
++                    // The receiver's own reading of the same texel.
++                    let want = super::super::shadows::caster_texel(&f, c, caster).unwrap();
++                    assert!((want.0 - texel).length() < 1e-2 && (want.1 - z).abs() < 1e-5);
++                    // The map: the caster (a blob 25 texels square, a quarter yard on high's
++                    // first slice: a post's top), cleared elsewhere.
++                    let blob = texel.as_ivec2();
++                    let map = |q: IVec2| {
++                        if (q - blob).abs().max_element() <= 12 {
++                            z
++                        } else {
++                            1.0
++                        }
++                    };
++                    let what = format!("slice {c} of {cascades}, sun {deg}°");
++                    let under = receive(&rows, c, ground, Vec3::Y, &map, true);
++                    assert!(
++                        under >= 0.0 && under < 0.05,
++                        "{what}: the shadow reads {under}"
++                    );
++                    if cascades > 2 && c == 0 {
++                        // 0065's high: the blocker search's ring of taps, the nearest 0.17 yd
++                        // out, fell beside a caster this small, and the shadow read lit.
++                        let shipped = receive(&rows, c, ground, Vec3::Y, &map, false);
++                        assert!(shipped > 0.95, "{what}: 0065 read {shipped}");
++                    }
++                    // Clear of the blob and the widest filter (10 texels).
++                    let beside = ground + f.right * (40.0 * f.slices[c].texel).max(1.0);
++                    let lit = receive(&rows, c, beside, Vec3::Y, &map, true);
++                    assert!(lit > 0.95, "{what}: beside the shadow reads {lit}");
++                }
++            }
++        }
++    }
++
++    /// Flat ground under the lowest sun (held at 10°) all but never shades itself, on low or high:
++    /// the normal offset and the raster's slope bias hold, so the filter is not what laid the
++    /// first films' broad darkening over the open field. (On high's first slice the blocker search
++    /// still finds a little of the ground's climb toward the sun: it reads about 0.96 there.)
++    #[test]
++    fn the_ground_does_not_shade_itself_under_a_low_sun() {
++        for (cascades, res) in [(2, 1024), (4, 2048)] {
++            let f = field_frame(3.0, cascades, res);
++            let rows = pack_rows(&f);
++            for c in 0..cascades {
++                let s = f.slices[c];
++                let ground_y = 60.0;
++                // The map holds the ground: each texel's depth where its ray meets y = 60, plus
++                // the raster's slope bias (the ground climbs cot(e) texels of depth a texel).
++                let slope = (-f.travel.y).asin().tan().recip();
++                let bias = (tune::RASTER_CONSTANT_BIAS as f32) / 65536.0
++                    + tune::RASTER_SLOPE_BIAS * slope * s.texel / s.range;
++                let map = |q: IVec2| {
++                    let x = (q.x as f32 + 0.5) / f.res as f32 * 2.0 - 1.0;
++                    let y = 1.0 - (q.y as f32 + 0.5) / f.res as f32 * 2.0;
++                    let o = s.center + (f.right * x + f.up * y) * s.half;
++                    let along = (ground_y - o.y) / f.travel.y;
++                    let at = (o + f.travel * along - s.center).dot(f.travel);
++                    ((at - s.near) / s.range + bias).clamp(0.0, 1.0)
++                };
++                let p = Vec3::new(s.center.x, ground_y, s.center.z);
++                for fixed in [false, true] {
++                    let lit = receive(&rows, c, p, Vec3::Y, &map, fixed);
++                    assert!(
++                        lit > 0.95,
++                        "slice {c} of {cascades}: the ground reads {lit}"
++                    );
++                }
++            }
++        }
++    }
++
++    /// The rig slot crosses the instance row as a float's value, and the caster stage reads it
++    /// back with `u32()`: 0065 read its bits, slot 1 108 606 976 for slot 37, and drew every
++    /// skinned body (heroes, creatures, swaying doodads) far outside the map.
++    #[test]
++    fn the_rig_slot_crosses_the_instance_row_as_a_value() {
++        let w = inst_rows(&GlobalTransform::IDENTITY, 37)[3][3];
++        assert_eq!(w as u32, 37);
++        assert_ne!(w.to_bits(), 37, "its bits are not the slot");
++        let shader = include_str!("../shaders/world_shadow.wgsl");
++        assert!(shader.contains("let slot = u32(inst.origin.w);"));
++        assert!(!shader.contains("bitcast<u32>(inst.origin.w)"));
++    }
++
++    /// A plain mesh is bounded by its box; a skinned part on its rig's origin, as wide as its box
++    /// and a swing; a skinned part with no box (gear, `NoFrustumCulling`) by the loose radius.
++    #[test]
++    fn a_skinned_part_is_bounded_on_its_rig() {
++        let gt = GlobalTransform::from(Transform::from_xyz(5.0, 0.0, 0.0));
++        let aabb = Aabb {
++            center: Vec3::new(0.0, 1.0, 0.0).into(),
++            half_extents: Vec3::new(0.5, 1.0, 0.5).into(),
++        };
++        let (c, r) = caster_bound(&gt, Some(&aabb), None).unwrap();
++        assert!((c - Vec3::new(5.0, 1.0, 0.0)).length() < 1e-5);
++        assert!((r - Vec3::new(0.5, 1.0, 0.5).length()).abs() < 1e-5);
++        assert_eq!(caster_bound(&gt, None, None), None, "still loading");
++        let rig = Vec3::new(-9000.0, 60.0, 200.0);
++        let (c, r2) = caster_bound(&gt, Some(&aabb), Some(rig)).unwrap();
++        assert!(
++            (c - (rig + Vec3::Y)).length() < 1e-3,
++            "on the rig, not the part: {c}"
++        );
++        assert!((r2 - (r + tune::SKINNED_MARGIN)).abs() < 1e-5);
++        let (c, r3) = caster_bound(&gt, None, Some(rig)).unwrap();
++        assert_eq!(c, rig);
++        assert_eq!(r3, tune::SKINNED_LOOSE_RADIUS + tune::SKINNED_MARGIN);
++    }
++
++    /// The inset sits in the top-right corner, square, inside the frame.
++    #[test]
++    fn the_map_inset_sits_top_right() {
++        let [x, y, side] = map_view_rect(1280.0, 720.0);
++        assert_eq!(side, 360.0);
++        assert!(x + side <= 1280.0 && x > 640.0 && y < 20.0);
++        let [x, _, side] = map_view_rect(400.0, 900.0);
++        assert!(side <= 200.0 && x >= 0.0);
++    }
++
+     /// Solid and alpha-tested batches cast (the latter cut), translucent, additive, depth-less,
+     /// interior, clutter, rig-lane and sky ones never; a fading doodad's twin casts as its source.
+     #[test]
+@@ -816,11 +1272,17 @@ mod tests {
+                 "marker {m:#x}"
+             );
+         }
+-        let interior = Vec4::new(1.0, 0.0, 1.0, 0.0);
++        let interior_group = Vec4::new(1.0, 0.0, 1.0, 0.0);
++        assert_eq!(
++            law(AlphaMode::Opaque, 0, interior_group, 0.0, lit),
++            Some(None),
++            "a building's interior group holds its walls: it casts"
++        );
++        let interior_prop = Vec4::new(0.0, 0.0, 1.0, 0.0);
+         assert_eq!(
+-            law(AlphaMode::Opaque, 0, interior, 0.0, lit),
++            law(AlphaMode::Opaque, 0, interior_prop, 0.0, lit),
+             None,
+-            "interior"
++            "a prop inside a building"
+         );
+         assert_eq!(
+             law(AlphaMode::Mask(0.5), 0, Vec4::ZERO, 1.0, lit),
+diff --git a/crates/benilla-world/src/look/shadows.rs b/crates/benilla-world/src/look/shadows.rs
+index 0fe0dd4..316e2c9 100644
+--- a/crates/benilla-world/src/look/shadows.rs
++++ b/crates/benilla-world/src/look/shadows.rs
+@@ -109,6 +109,11 @@ pub mod tune {
+     pub const SMALL_CASTER_SLICES: usize = 2;
+     /// A skinned body's box is its bind pose's; this much more covers a swing or a stride.
+     pub const SKINNED_MARGIN: f32 = 1.5;
++    /// A skinned part with no box at all (gear and riders carry `NoFrustumCulling`, so Bevy gives
++    /// them none) is held to a sphere this wide about its rig's origin: a hero and what they carry.
++    pub const SKINNED_LOOSE_RADIUS: f32 = 3.0;
++    /// `lookshadow map`: the inset's side as a share of the view's height.
++    pub const MAP_INSET: f32 = 0.5;
+     /// 1.12's blob under a unit fades out as the real shadow comes in: gone once a full shadow
+     /// takes this much of the sun.
+     pub const BLOB_GONE_AT: f32 = 0.5;
+@@ -129,12 +134,13 @@ pub const SHADOW_ROWS: usize = 6 + 2 * tune::MAP_LAYERS as usize;
+ 
+ /// `worldShadows` and the film's hold: `level` 0 off, 1 low, 2 high (inert under the classic
+ /// look); `scale` holds the strength at a multiple of the hour's (`lookshadow <strength>`),
+-/// `distance` the reach.
++/// `distance` the reach; `map` the slice `lookshadow map` draws in a corner of the screen.
+ #[derive(Resource, Clone, Copy, Debug, PartialEq)]
+ pub struct LookShadows {
+     pub level: u8,
+     pub scale: Option<f32>,
+     pub distance: Option<f32>,
++    pub map: Option<u8>,
+ }
+ 
+ impl Default for LookShadows {
+@@ -144,6 +150,7 @@ impl Default for LookShadows {
+             level: 1,
+             scale: None,
+             distance: None,
++            map: None,
+         }
+     }
+ }
+@@ -204,6 +211,23 @@ impl LookShadows {
+         };
+         words.next().is_none().then_some((Some(scale), distance))
+     }
++
++    /// `lookshadow map <slice 0-3> | off`'s arguments (after `map`): `Some(Some(slice))` to draw
++    /// that slice's depth map in a corner, `Some(None)` to hide it, `None` for anything else.
++    pub fn parse_map(args: &str) -> Option<Option<u8>> {
++        let mut words = args.split_whitespace();
++        let arg = words.next()?;
++        if words.next().is_some() {
++            return None;
++        }
++        if arg.eq_ignore_ascii_case("off") {
++            return Some(None);
++        }
++        arg.parse::<u8>()
++            .ok()
++            .filter(|s| u32::from(*s) < tune::MAP_LAYERS)
++            .map(Some)
++    }
+ }
+ 
+ /// The shadows' light this frame: the direction it travels (Bevy space, downward), how much of the
+@@ -327,6 +351,10 @@ pub struct ShadowFrame {
+     pub splits: [f32; 4],
+     pub distance: f32,
+     pub slices: [Cascade; 4],
++    /// `lookshadow map`: the slice drawn in a corner of the screen, if it is one of this frame's.
++    pub map: Option<u8>,
++    /// The camera, which the drawn map marks.
++    pub cam: Vec3,
+ }
+ 
+ impl ShadowFrame {
+@@ -451,9 +479,29 @@ pub fn fit(
+         splits,
+         distance,
+         slices,
++        map: None,
++        cam: cam_pos,
+     }
+ }
+ 
++/// Where world point `p` lands in slice `c`'s map, as the caster pass rasterises it
++/// (`world_shadow.wgsl`'s `slice_clip` through the viewport): its texel `(column, row)` and its
++/// stored depth (0 at the slice's near face, 1 at its far; a caster nearer the light than the
++/// near face is flattened onto it). `None` outside the slice's square.
++pub fn caster_texel(f: &ShadowFrame, c: usize, p: Vec3) -> Option<(Vec2, f32)> {
++    let s = f.slices[c];
++    let d = p - s.center;
++    let x = d.dot(f.right) / s.half;
++    let y = d.dot(f.up) / s.half;
++    if x.abs() > 1.0 || y.abs() > 1.0 {
++        return None;
++    }
++    let z = ((d.dot(f.travel) - s.near) / s.range).max(0.0);
++    let res = f.res as f32;
++    // Clip y up, the framebuffer's rows down.
++    Some((Vec2::new((x + 1.0) * 0.5 * res, (1.0 - y) * 0.5 * res), z))
++}
++
+ /// The shadow block's rows ([`SHADOW_ROWS`]); all zero, which every shader reads as none, for a
+ /// frame with no shadows.
+ pub fn pack_rows(f: &ShadowFrame) -> [[f32; 4]; SHADOW_ROWS] {
+@@ -537,7 +585,7 @@ impl ShadowInputs<'_, '_> {
+         if light.strength <= 0.0 {
+             return ShadowFrame::default();
+         }
+-        fit(
++        let frame = fit(
+             cam.translation(),
+             cam.forward().as_vec3(),
+             p.fov,
+@@ -546,7 +594,14 @@ impl ShadowInputs<'_, '_> {
+             cascades,
+             res,
+             self.shadows.distance(),
+-        )
++        );
++        ShadowFrame {
++            map: self
++                .shadows
++                .map
++                .filter(|m| usize::from(*m) < frame.cascades),
++            ..frame
++        }
+     }
+ }
+ 
+@@ -726,6 +781,48 @@ mod tests {
+         assert_eq!(LookShadows { level: 0, ..low }.layout(), None);
+     }
+ 
++    /// `lookshadow map`: a slice of the map (0 to 3) or `off`; anything else is refused.
++    #[test]
++    fn the_map_view_parses() {
++        assert_eq!(LookShadows::parse_map("0"), Some(Some(0)));
++        assert_eq!(LookShadows::parse_map("3"), Some(Some(3)));
++        assert_eq!(LookShadows::parse_map("OFF"), Some(None));
++        assert_eq!(LookShadows::parse_map("4"), None);
++        assert_eq!(LookShadows::parse_map(""), None);
++        assert_eq!(LookShadows::parse_map("0 1"), None);
++        assert_eq!(LookShadows::parse_map("near"), None);
++    }
++
++    /// The three receivers' copies of the filter's constants are [`tune`]'s.
++    #[test]
++    fn the_receivers_filter_by_the_tuned_numbers() {
++        let receivers = [
++            include_str!("../../../benilla-assets/src/shaders/terrain.wgsl"),
++            include_str!("../../../benilla-assets/src/shaders/wow_model.wgsl"),
++            include_str!("../shaders/static_gx.wgsl"),
++        ];
++        let read = |src: &str, name: &str| -> f32 {
++            let line = src
++                .lines()
++                .find(|l| l.starts_with(&format!("const {name}: f32 = ")))
++                .unwrap_or_else(|| panic!("{name} missing"));
++            line.split('=')
++                .nth(1)
++                .unwrap()
++                .trim()
++                .trim_end_matches(';')
++                .parse()
++                .unwrap()
++        };
++        for src in receivers {
++            assert_eq!(read(src, "SHADOW_PCF_LOW_TEXELS"), tune::PCF_LOW_TEXELS);
++            assert_eq!(read(src, "SHADOW_PENUMBRA"), tune::PENUMBRA);
++            assert_eq!(read(src, "SHADOW_BLOCKER_SEARCH"), tune::BLOCKER_SEARCH);
++            assert_eq!(read(src, "SHADOW_PCF_MIN_TEXELS"), tune::PCF_MIN_TEXELS);
++            assert_eq!(read(src, "SHADOW_PCF_MAX_TEXELS"), tune::PCF_MAX_TEXELS);
++        }
++    }
++
+     /// The blob goes as the real shadow comes in, and stays whole with none.
+     #[test]
+     fn the_blob_gives_way_to_the_real_shadow() {
+diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
+index c9bbb51..9b73b4a 100644
+--- a/crates/benilla-world/src/shaders.rs
++++ b/crates/benilla-world/src/shaders.rs
+@@ -20,6 +20,7 @@ pub(crate) fn plugin(app: &mut App) {
+     bevy::asset::embedded_asset!(app, "shaders/world_look.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_ao.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_shadow.wgsl");
++    bevy::asset::embedded_asset!(app, "shaders/look_shadow_map.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/world_water.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/look_sky.wgsl");
+     // The new look's sun-shadow map, which every terrain and model material binds: inserted before
+@@ -63,6 +64,6 @@ mod tests {
+             );
+         }
+         // One per `embedded_asset!` line in `plugin`.
+-        assert_eq!(found, 13, "the engine's shader set changed size");
++        assert_eq!(found, 14, "the engine's shader set changed size");
+     }
+ }
+diff --git a/crates/benilla-world/src/shaders/look_shadow_map.wgsl b/crates/benilla-world/src/shaders/look_shadow_map.wgsl
+new file mode 100644
+index 0000000..d0bd179
+--- /dev/null
++++ b/crates/benilla-world/src/shaders/look_shadow_map.wgsl
+@@ -0,0 +1,59 @@
++// `lookshadow map <slice>` (`look::shadow_pass::LookShadowMapNode`), benilla's own debug view: one
++// slice of the new look's sun-shadow map drawn into a square in the top-right corner of the frame,
++// so a film shows what the casters left in it. The world as the light sees it: the terrain in grey
++// bands every 8 yd of depth along the light, a caster outlined bright where the depth jumps (its
++// silhouette), dark blue where nothing was drawn, the camera a red dot. Never under any setting a
++// player uses.
++
++struct MapView {
++    // xy the inset's top-left pixel, z its side in pixels, w the slice (the map's layer).
++    rect: vec4<f32>,
++    // x the slice's texels a side, y its yards per unit of depth, zw the camera's texel.
++    info: vec4<f32>,
++}
++@group(0) @binding(0) var shadow_map: texture_depth_2d_array;
++@group(0) @binding(1) var<uniform> view: MapView;
++
++// One triangle over the viewport, which the node sets to the inset.
++@vertex
++fn vs_main(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
++    let uv = vec2<f32>(f32((i << 1u) & 2u), f32(i & 2u));
++    return vec4<f32>(uv * 2.0 - 1.0, 0.0, 1.0);
++}
++
++fn map_depth(c: vec2<i32>, layer: i32, lim: i32) -> f32 {
++    return textureLoad(shadow_map, clamp(c, vec2<i32>(0), vec2<i32>(lim)), layer, 0);
++}
++
++@fragment
++fn fs_main(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
++    let local = (pos.xy - view.rect.xy) / view.rect.z;
++    let px = 2.0 / view.rect.z;
++    if (any(local < vec2<f32>(px)) || any(local > vec2<f32>(1.0 - px))) {
++        return vec4<f32>(1.0, 0.85, 0.3, 1.0); // the frame
++    }
++    let res = view.info.x;
++    let t = local * res;
++    if (distance(t, view.info.zw) < res * 0.012) {
++        return vec4<f32>(1.0, 0.1, 0.1, 1.0); // the camera
++    }
++    let lim = i32(res) - 1;
++    let layer = i32(view.rect.w);
++    let c = vec2<i32>(t);
++    let d = map_depth(c, layer, lim);
++    if (d >= 0.99998) {
++        return vec4<f32>(0.04, 0.07, 0.22, 1.0); // cleared: no caster here
++    }
++    // A screen pixel spans several texels: measure the jumps across its footprint. The second
++    // difference is zero on any plane, sloped or not, so the ground stays quiet and only a
++    // caster's edge (a step in depth) lights.
++    let s = max(i32(res / view.rect.z), 1);
++    let sx = vec2<i32>(s, 0);
++    let sy = vec2<i32>(0, s);
++    let jx = map_depth(c + sx, layer, lim) - 2.0 * d + map_depth(c - sx, layer, lim);
++    let jy = map_depth(c + sy, layer, lim) - 2.0 * d + map_depth(c - sy, layer, lim);
++    let jump = max(abs(jx), abs(jy)) * view.info.y;
++    let edge = smoothstep(0.3, 1.0, jump);
++    let band = 0.28 + 0.32 * fract(d * view.info.y / 8.0);
++    return vec4<f32>(mix(vec3<f32>(band), vec3<f32>(1.0, 0.95, 0.65), edge), 1.0);
++}
+diff --git a/crates/benilla-world/src/shaders/static_gx.wgsl b/crates/benilla-world/src/shaders/static_gx.wgsl
+index e8aef98..5ccee63 100644
+--- a/crates/benilla-world/src/shaders/static_gx.wgsl
++++ b/crates/benilla-world/src/shaders/static_gx.wgsl
+@@ -284,6 +284,14 @@ fn shadow_slice(P: vec3<f32>, N: vec3<f32>, c: u32, turn: f32) -> f32 {
+         let search = max(SHADOW_BLOCKER_SEARCH / depth.z, 1.0);
+         var sum = 0.0;
+         var n = 0.0;
++        // The receiver's own texel first: the disk's nearest tap is 0.29 of the search (0.17 yd)
++        // out, so a shadow narrower than about twice that (a fence post's, a rail's, a blade's)
++        // fell between every tap and read lit.
++        let s0 = textureLoad(shadow_map, clamp(vec2<i32>(t), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
++        if (s0 < z) {
++            sum += s0;
++            n += 1.0;
++        }
+         for (var i = 0u; i < SHADOW_SEARCH_TAPS; i = i + 1u) {
+             let o = shadow_disk(i, SHADOW_SEARCH_TAPS, turn) * search;
+             let s = textureLoad(shadow_map, clamp(vec2<i32>(t + o), vec2<i32>(0), vec2<i32>(lim)), layer, 0);
+diff --git a/crates/benilla-world/src/shaders/world_shadow.wgsl b/crates/benilla-world/src/shaders/world_shadow.wgsl
+index d89f702..3b1224d 100644
+--- a/crates/benilla-world/src/shaders/world_shadow.wgsl
++++ b/crates/benilla-world/src/shaders/world_shadow.wgsl
+@@ -122,7 +122,9 @@ fn wind_grass(world: vec3<f32>, w: f32) -> vec3<f32> {
+ // ---- end look wind ----
+ 
+ // Per entity draw: the rows of its world matrix's linear part (w 0) and its translation, apart for
+-// f32 precision at 9 000 yd; `origin.w` is the rig slot (bits), read under SHADOW_SKIN.
++// f32 precision at 9 000 yd; `origin.w` is the rig slot as a float's value (`shadow_pass::
++// inst_rows` writes `rig as f32`), read under SHADOW_SKIN with `u32()`, never `bitcast`: the bits
++// of 37.0 are slot 1 108 606 976, which drew every skinned body far outside the map.
+ struct ShadowInst {
+     row0: vec4<f32>,
+     row1: vec4<f32>,
+@@ -220,9 +222,11 @@ fn vs_main(v: CasterVertex) -> CasterOut {
+     out.layer = 0;
+ #ifdef SHADOW_STATIC
+     let rec = recs[v.word & 0xffffu];
+-    // A killed item (exiled to the entity path, which casts it) and the inside of a building
+-    // (interior WMO groups and their props: no sun reaches them) collapse to nothing.
+-    if ((rec.w & 1u) != 0u || (v.word & WORD_INTERIOR) != 0u) {
++    // A killed item (exiled to the entity path, which casts it) and the props inside a building
++    // (no sun reaches them) collapse to nothing. A building's interior groups cast: they hold its
++    // walls and roof as often as its rooms, and a wall blocks the sun whichever side is drawn.
++    if ((rec.w & 1u) != 0u
++        || ((v.word & WORD_INTERIOR) != 0u && (v.word & WORD_WMO) == 0u)) {
+         out.position = vec4<f32>(0.0, 0.0, 2.0, 1.0);
+         return out;
+     }
+@@ -241,7 +245,7 @@ fn vs_main(v: CasterVertex) -> CasterOut {
+ #else
+     let inst = insts[v.instance_index];
+ #ifdef SHADOW_SKIN
+-    let slot = bitcast<u32>(inst.origin.w);
++    let slot = u32(inst.origin.w);
+     let m = skin_model(slot, v.joint_indices, v.joint_weights);
+     let p = (m * vec4<f32>(v.position, 1.0)).xyz + (wow_light.rig_origin[slot].xyz - slice.centre.xyz);
+ #else
+-- 
+2.43.0
+
