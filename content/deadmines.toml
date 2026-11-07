@@ -481,7 +481,9 @@ display = 2318
 health = 90
 run_speed = 7.0
 walk_speed = 2.0
-aggro = 32.0
+# Notices at 24 yd: a sniper over the fight below, not one more in it (32 took in the whole
+# lower ring). Nov 7 2026.
+aggro = 24.0
 leash = 32.0
 bow = 2462
 grip = "bow"
@@ -493,7 +495,8 @@ respawn = 0.0
   ranged = true
   # One slow, hard bolt, aimed a long while: rush it during the reload.
   windup = 1.8
-  damage = 30
+  # 22 (30 with the foes' share): it was the hardest blow on the scaffold, a fifth of a hero.
+  damage = 22
   range = 40.0
   arc = 0.0
   recovery = 1.2
@@ -2298,11 +2301,13 @@ rare = true
 
 # --- the Brotherhood's other hands, on the way -------------------------------------------------------
 
-# A wizard on the beach behind the pirates, an evoker pair on the Juggernaut's deck.
+# A wizard with the squallshaper past the scaffold's lower ring (it stood 7 yd from the ring's
+# two pirates and came with them: the ring's first fight was two and a caster. Nov 7 2026), an
+# evoker pair on the Juggernaut's deck.
 [[dungeon.pack]]
 mob = "dm_wizard"
-at = [-40.0, -850.0]
-z = 18.7
+at = [-24.0, -836.0]
+z = 19.4
 radius = 0.0
 count = 1
 
@@ -2821,7 +2826,9 @@ clips_from = "TaurenFemale"
 health = 85
 run_speed = 7.0
 walk_speed = 2.0
-aggro = 18.0
+# Notices at 12 yd: it stands behind the pirates and the Squallshaper, not with them (at 18 it came
+# with the scaffold's first pirates from 16 yd off). Nov 7 2026.
+aggro = 12.0
 leash = 30.0
 weapon = 5415
 grip = "staff"
