@@ -171,7 +171,8 @@ impl SurvivalGame {
                             let impact = strike.windup + strike.active * 0.5;
                             let ms = ((strike.windup + strike.active + 0.15) * 1000.0) as u32;
                             let kind = match strike.kind {
-                                htl_survival::StrikeKind::Light => "light",
+                                // (The off hand's blow reads as a light one: an add-on knows no other.)
+                                htl_survival::StrikeKind::Light | htl_survival::StrikeKind::Off => "light",
                                 htl_survival::StrikeKind::Heavy => "heavy",
                                 htl_survival::StrikeKind::Running => "running",
                                 htl_survival::StrikeKind::Roll => "roll",

@@ -18,6 +18,7 @@ impl Survival {
             stamina: c.player.stamina,
             weapon: item(&c.start.weapon),
             shield: item(&c.start.shield),
+            off_hand: String::new(),
             bow: item(&c.start.bow),
             bag: c.start.items.clone(),
             dead: false,

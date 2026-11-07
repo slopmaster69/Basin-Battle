@@ -59,7 +59,7 @@ fn main() {
     if !paths.server_exe.is_file() {
         stop_here("server\\htl-server.exe is missing. Your anti-virus may have taken it: restore it, or download the game again.");
     }
-    let settings = folder::read_settings(&paths.settings);
+    let settings = paths.read_settings();
     let ports = server::own_ports(&settings);
     for port in [ports.login, ports.basin, ports.survival] {
         if net::reach("127.0.0.1", port, 400) {
