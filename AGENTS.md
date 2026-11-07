@@ -50,7 +50,19 @@ gh pr list                              # what others are working on right now
   (`cargo test --workspace`, `scripts/check-addon.sh`), or with "Run workflow" on the CI workflow.
 - Commit messages: a short summary line of what changes for the player or the code ("A left click
   no longer runs the hero forward"), then why, if it isn't obvious.
-- Open a **draft** pull request early to show what you're on; mark it ready when the checks pass.
+- Open a **draft** pull request early to show what you're on. A draft means the work isn't done
+  yet, or it waits on a decision; it never waits for someone to play it. Until the game is
+  released, `main` is where it gets played: once the checks pass, mark it ready and turn on
+  auto-merge, and whoever plays next tries it there.
+- What nobody has seen in the real client yet (anything an agent without a display or a WoW
+  install can't watch) goes under "not tested" in the pull request, and the pull request gets
+  the `needs playtest` label. Whoever plays it on `main` takes the label off, or opens an issue
+  for what's wrong.
+- One exception, until the Mac client check (#223) runs on pull requests: a pull request with a
+  client patch is ready only once the client has built with the whole series. A patch that
+  doesn't apply or build stops everyone's game from starting.
+- A big change everyone will see or feel (a new look, a slower frame) comes with a way to turn
+  it off, or in a pull request of its own, so one revert takes `main` back.
 - In the pull request say what you tested and how (which checks, what you played), and what you
   didn't.
 - Once it's ready, turn on **auto-merge** (`gh pr merge --auto --squash`, or the button on the
@@ -72,7 +84,9 @@ the comment. A reviewer can be wrong; a comment nobody answered is the one that 
 
 ## Checks before every push
 
-Run what covers the files you changed. A pull request isn't ready until these pass:
+Run what covers the files you changed. A pull request isn't ready until these pass, except what
+can't be run where you are (the visual check, a script on another system): list that as not
+tested and add the `needs playtest` label, rather than holding the pull request for it.
 
 | You changed | Run |
 | --- | --- |
@@ -80,7 +94,7 @@ Run what covers the files you changed. A pull request isn't ready until these pa
 | An add-on (`addon/`) | `scripts/check-addon.sh` (no Lua errors) |
 | A client patch (`patches/benilla/`) | Apply the whole series on a clean benilla checkout (`scripts/play.sh` does it) and build the client |
 | A script (`scripts/`, `*.command`, `*.bat`) | Run it on the system it's for |
-| An ability: what it does, its effects, animation, icon or key (`content/`, `crates/htl-survival/src/sim/`, the add-on's bar, `patches/benilla/`) | The [visual check](docs/visual-check.md): its scenario in the real client, the screenshots or video attached to the pull request (add or adjust the scenario in `tools/visual-check/`) |
+| An ability: what it does, its effects, animation, icon or key (`content/`, `crates/htl-survival/src/sim/`, the add-on's bar, `patches/benilla/`) | The [visual check](docs/visual-check.md): its scenario in the real client, the screenshots or video attached to the pull request (add or adjust the scenario in `tools/visual-check/`). With no client where you are, it's filmed on `main` after the merge, under `needs playtest` |
 | Anything | `scripts/check-pr.sh` (the repository rules, against `origin/main`) |
 
 Tests that need the WoW 1.12.1 data are marked `#[ignore]`; run them locally when you touch what
