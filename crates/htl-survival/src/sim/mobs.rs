@@ -2160,7 +2160,7 @@ impl Survival {
 
     pub(crate) fn windup(&mut self, id: Id, foe: Foe, to: Vec3) {
         // A spell lab body swings only when the lab asks it to.
-        if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) {
+        if self.lab_quiet.contains(&id) && self.lab_blowing != Some(id) && !self.lab_stringing(id) {
             return;
         }
         self.halt(id);
