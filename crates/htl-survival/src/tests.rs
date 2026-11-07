@@ -3731,3 +3731,24 @@ fn shields_and_overhealth_left_to_wear_off_leave_the_bar() {
     }
     assert_eq!(s.absorbs(p), (0, 0));
 }
+
+#[test]
+fn a_creature_voices_the_start_of_its_string_from_where_it_stands_not_each_blow() {
+    // Corey, Nov 7: no wind-up could be heard. A pirate's two slashes: its grunt as the first
+    // begins, heard from it, and none for the second.
+    let mut s = world();
+    let p = hero(&mut s, "Ayla", ORIGIN, 0.0);
+    let m = mob(&mut s, "dm_pirate", [2.0, 0.0, 0.0]);
+    let def = s.mobs[&m].def;
+    let voice = s.content.mobs[def].windup_sound;
+    assert_ne!(voice, 0, "the pirate has a voice");
+    let k = s.content.mobs[def].patterns.iter().position(|x| x.name == "two slashes").unwrap();
+    s.begin_pattern(m, k, false);
+    s.windup(m, Foe::Hero(p), s.players[&p].pos);
+    let first: Vec<Event> = s.step(0.0);
+    assert!(first.iter().any(|e| matches!(e, Event::Sound { id, sound } if *id == m && *sound == voice)), "its grunt as the string begins");
+    s.mobs.get_mut(&m).unwrap().pattern = Some((k, 1));
+    s.windup(m, Foe::Hero(p), s.players[&p].pos);
+    let second: Vec<Event> = s.step(0.0);
+    assert!(!second.iter().any(|e| matches!(e, Event::Sound { id, .. } if *id == m)), "none for the second blow");
+}
