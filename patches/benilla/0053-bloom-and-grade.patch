@@ -1,0 +1,879 @@
+From 17814cc5cab467e73d29cf810e8c71288a5a0e46 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 6 Nov 2026 07:29:33 -0700
+Subject: [PATCH] Bloom and a colour grade: the new look's own full-screen pass
+
+Under the new look the world camera gets a full-screen pass of its own and Bevy's bloom. The pass
+grades the frame in linear light from the zone grade's values for the hour (0051): a white
+balance that warms the highlights and cools the shadows (each tint normalised so it shifts hue,
+not brightness), contrast around mid-grey in log space, and saturation around luminance. Elwynn's
+golden hour comes out warmer and richer, its night cooler and a touch greyer, and outside a
+graded zone the values are neutral and the pass does not run at all. Bloom is Bevy's own on the
+world camera, additive, with a prefilter at 0.8 (softness 0.3) so only the brightest parts glow
+(the sun, spells, lit windows), at the grade's intensity; it is taken off the camera entirely
+when the grade asks for none and under the classic look.
+
+The pass runs before the 1.12 glow, not after it: the world camera's main texture still holds the
+gamma bytes there (the frame's one decode is the FFXGlow combine, drawn as the UI camera's
+ground), so the pass decodes, grades and encodes back, the glow blurs the graded frame, and every
+combine path reads it. Bevy's bloom runs after the glow on the same frame, as it does under
+`Tonemapping::None` with `Hdr`. The shader is validated and translated by naga in the app's shader
+test, the grade has a CPU twin with its own tests, and `worldLook 0` leaves the camera exactly as
+it was.
+
+The bloom's prefilter is 0.65 with a knee of 0.5. The first film had it at 0.8 and 0.3 with the grade's
+0.06 to 0.14, and a Fireball at night showed no bloom at all: past 0.8 a 0..1 gamma pixel has at most
+0.2 to give. `LookBloomTune` holds an intensity and a threshold over the grade's, for tuning on film
+(the console's `lookbloom`).
+---
+ crates/benilla-app/src/player/setup.rs        |   2 +
+ crates/benilla-app/src/shaders.rs             | 127 +++--
+ crates/benilla-world/src/ffx_glow.rs          |   3 +-
+ crates/benilla-world/src/look/mod.rs          |  10 +-
+ crates/benilla-world/src/look/pass.rs         | 532 ++++++++++++++++++
+ crates/benilla-world/src/shaders.rs           |   3 +-
+ .../benilla-world/src/shaders/world_look.wgsl |  54 ++
+ 7 files changed, 679 insertions(+), 52 deletions(-)
+ create mode 100644 crates/benilla-world/src/look/pass.rs
+ create mode 100644 crates/benilla-world/src/shaders/world_look.wgsl
+
+diff --git a/crates/benilla-app/src/player/setup.rs b/crates/benilla-app/src/player/setup.rs
+index cd3ebd5..314d655 100644
+--- a/crates/benilla-app/src/player/setup.rs
++++ b/crates/benilla-app/src/player/setup.rs
+@@ -111,6 +111,8 @@ pub(super) fn setup_player(
+         Tonemapping::None,
+         // FFXGlow, `scene + glow·blur²`: the blur here, the combine in the UI camera's ground pass.
+         benilla_world::ffx_glow::FfxGlow::WORLD,
++        // The new look's grade pass and bloom (`worldLook`); inert under the classic look.
++        benilla_world::look::LookView,
+         world_camera_output(),
+         Transform::from_translation(spawn + Vec3::new(0.0, 60.0, 60.0)).looking_at(spawn, Vec3::Y),
+         // No Bevy ambient or fog: the scene light is computed in-shader from Light.dbc.
+diff --git a/crates/benilla-app/src/shaders.rs b/crates/benilla-app/src/shaders.rs
+index 5f19e51..cb3f45b 100644
+--- a/crates/benilla-app/src/shaders.rs
++++ b/crates/benilla-app/src/shaders.rs
+@@ -92,12 +92,60 @@ mod tests {
+     /// gives each of the two vertex layouts it draws (the batch mesh and the minimap's tile quad).
+     /// The module must validate and translate for the backend this platform renders with.
+     #[test]
++    fn the_ui_quad_shader_composes_and_translates() {
++        use bevy::shader::ShaderDefVal;
++        let (mut cache, ids) = embedded_shader_cache();
++        let ui_quad = *ids
++            .get("benilla_app/shaders/ui_quad.wgsl")
++            .expect("ui_quad.wgsl is embedded");
++
++        let storage =
++            bevy::render::settings::WgpuLimits::default().max_storage_buffers_per_shader_stage;
++        for layout in [
++            ["VERTEX_POSITIONS", "VERTEX_UVS", "VERTEX_COLORS"],
++            ["VERTEX_POSITIONS", "VERTEX_NORMALS", "VERTEX_UVS"],
++        ] {
++            let mut defs: Vec<ShaderDefVal> = layout.iter().map(|&d| d.into()).collect();
++            defs.push(ShaderDefVal::UInt("MATERIAL_BIND_GROUP".into(), 2));
++            defs.push(ShaderDefVal::UInt(
++                "AVAILABLE_STORAGE_BUFFER_BINDINGS".into(),
++                storage,
++            ));
++            let module = cache
++                .get(&(), 0, ui_quad, &defs)
++                .unwrap_or_else(|e| panic!("{layout:?}: ui_quad.wgsl does not compose: {e:?}"));
++            validate_and_translate(&module, &format!("{layout:?}: ui_quad.wgsl"));
++        }
++    }
++
++    /// The new look's full-screen pass (`benilla_world::look::pass`), which no gate draws either:
++    /// composed as its pipeline composes it, with each def set it specialises on, then validated and
++    /// translated, so a WGSL mistake fails here instead of the game's first graded frame.
++    #[test]
++    fn the_world_look_shader_composes_and_translates() {
++        let (mut cache, ids) = embedded_shader_cache();
++        let look = *ids
++            .get("benilla_world/shaders/world_look.wgsl")
++            .expect("world_look.wgsl is embedded");
++        for defs in benilla_world::look::pass::shader_def_sets() {
++            let module = cache
++                .get(&(), 0, look, &defs)
++                .unwrap_or_else(|e| panic!("{defs:?}: world_look.wgsl does not compose: {e:?}"));
++            validate_and_translate(&module, &format!("{defs:?}: world_look.wgsl"));
++        }
++    }
++
++    /// Bevy's `ShaderCache` over every embedded shader library, as the pipeline cache composes,
++    /// and each shader's id by its embedded path.
+     #[expect(
+         clippy::result_large_err,
+         reason = "bevy's `ShaderCache` fixes the module loader's `PipelineCacheError` return"
+     )]
+-    fn the_ui_quad_shader_composes_and_translates() {
+-        use bevy::shader::{Shader, ShaderCache, ShaderCacheSource, ShaderDefVal};
++    fn embedded_shader_cache() -> (
++        bevy::shader::ShaderCache<naga::Module, ()>,
++        std::collections::HashMap<String, AssetId<bevy::shader::Shader>>,
++    ) {
++        use bevy::shader::{Shader, ShaderCache, ShaderCacheSource};
+         let app = crate::game_plugins::schedule_tests::headless_client_unrun();
+         let server = app.world().resource::<AssetServer>();
+         let source = server.get_source(AssetSourceId::from("embedded")).unwrap();
+@@ -112,59 +160,40 @@ mod tests {
+                 _ => panic!("a WGSL shader composes to a naga module"),
+             },
+         );
+-        let mut ui_quad = None;
++        let mut ids = std::collections::HashMap::new();
+         for (i, (path, text)) in files.into_iter().enumerate() {
+             let id = AssetId::<Shader>::Uuid {
+                 uuid: bevy::asset::uuid::Uuid::from_u128(i as u128 + 1),
+             };
+-            if path == "benilla_app/shaders/ui_quad.wgsl" {
+-                ui_quad = Some(id);
+-            }
+             cache.set_shader(id, Shader::from_wgsl(text, format!("embedded://{path}")));
++            ids.insert(path, id);
+         }
+-        let ui_quad = ui_quad.expect("ui_quad.wgsl is embedded");
++        (cache, ids)
++    }
+ 
+-        let storage =
+-            bevy::render::settings::WgpuLimits::default().max_storage_buffers_per_shader_stage;
+-        for layout in [
+-            ["VERTEX_POSITIONS", "VERTEX_UVS", "VERTEX_COLORS"],
+-            ["VERTEX_POSITIONS", "VERTEX_NORMALS", "VERTEX_UVS"],
+-        ] {
+-            let mut defs: Vec<ShaderDefVal> = layout.iter().map(|&d| d.into()).collect();
+-            defs.push(ShaderDefVal::UInt("MATERIAL_BIND_GROUP".into(), 2));
+-            defs.push(ShaderDefVal::UInt(
+-                "AVAILABLE_STORAGE_BUFFER_BINDINGS".into(),
+-                storage,
+-            ));
+-            let module = cache
+-                .get(&(), 0, ui_quad, &defs)
+-                .unwrap_or_else(|e| panic!("{layout:?}: ui_quad.wgsl does not compose: {e:?}"));
+-            let info = naga::valid::Validator::new(
+-                naga::valid::ValidationFlags::all(),
+-                naga::valid::Capabilities::default(),
+-            )
+-            .validate(&module)
+-            .unwrap_or_else(|e| panic!("{layout:?}: ui_quad.wgsl does not validate: {e:?}"));
+-            #[cfg(target_os = "macos")]
+-            naga::back::msl::write_string(
+-                &module,
+-                &info,
+-                // wgpu's Metal backend writes at the device's MSL 2.x; 1.0, the default, lacks
+-                // the instance index every 2D mesh shader reads.
+-                &naga::back::msl::Options {
+-                    lang_version: (2, 4),
+-                    ..Default::default()
+-                },
+-                &naga::back::msl::PipelineOptions::default(),
+-            )
+-            .unwrap_or_else(|e| {
+-                panic!("{layout:?}: ui_quad.wgsl does not translate to MSL: {e:?}")
+-            });
+-            #[cfg(not(target_os = "macos"))]
+-            naga::back::spv::write_vec(&module, &info, &naga::back::spv::Options::default(), None)
+-                .unwrap_or_else(|e| {
+-                    panic!("{layout:?}: ui_quad.wgsl does not translate to SPIR-V: {e:?}")
+-                });
+-        }
++    /// The module must validate and translate for the backend this platform renders with.
++    fn validate_and_translate(module: &naga::Module, what: &str) {
++        let info = naga::valid::Validator::new(
++            naga::valid::ValidationFlags::all(),
++            naga::valid::Capabilities::default(),
++        )
++        .validate(module)
++        .unwrap_or_else(|e| panic!("{what} does not validate: {e:?}"));
++        #[cfg(target_os = "macos")]
++        naga::back::msl::write_string(
++            module,
++            &info,
++            // wgpu's Metal backend writes at the device's MSL 2.x; 1.0, the default, lacks the
++            // instance index every 2D mesh shader reads.
++            &naga::back::msl::Options {
++                lang_version: (2, 4),
++                ..Default::default()
++            },
++            &naga::back::msl::PipelineOptions::default(),
++        )
++        .unwrap_or_else(|e| panic!("{what} does not translate to MSL: {e:?}"));
++        #[cfg(not(target_os = "macos"))]
++        naga::back::spv::write_vec(module, &info, &naga::back::spv::Options::default(), None)
++            .unwrap_or_else(|e| panic!("{what} does not translate to SPIR-V: {e:?}"));
+     }
+ }
+diff --git a/crates/benilla-world/src/ffx_glow.rs b/crates/benilla-world/src/ffx_glow.rs
+index 7c60367..f469371 100644
+--- a/crates/benilla-world/src/ffx_glow.rs
++++ b/crates/benilla-world/src/ffx_glow.rs
+@@ -342,8 +342,9 @@ fn ensure_ffx_glow(
+ 
+ // ---------------------------------------------------------------- render world
+ 
++/// The FFXGlow node; the new look's pass (`crate::look::pass`) runs just before it.
+ #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+-struct FfxGlowLabel;
++pub(crate) struct FfxGlowLabel;
+ 
+ /// The layouts, samplers, wave LUT and pipelines, built once at startup.
+ #[derive(Resource)]
+diff --git a/crates/benilla-world/src/look/mod.rs b/crates/benilla-world/src/look/mod.rs
+index 411efaa..e525a21 100644
+--- a/crates/benilla-world/src/look/mod.rs
++++ b/crates/benilla-world/src/look/mod.rs
+@@ -11,7 +11,9 @@ use benilla_assets::{AssetSet, LockRecover, WorldAssets};
+ use benilla_formats::{AreaTableCatalog, Atmosphere};
+ 
+ pub mod grade;
++pub mod pass;
+ pub use grade::{GradeKey, PostLook, Tint};
++pub use pass::{LookBloomTune, LookFrame, LookView};
+ 
+ /// The new look or the classic one. Off by default, so the engine alone (the world viewer, every
+ /// test) is the reference; the game turns it on from its `worldLook` CVar.
+@@ -201,7 +203,8 @@ pub(crate) fn init_resources(app: &mut App) {
+         .init_resource::<LookGrade>();
+ }
+ 
+-/// The new look's world side: its resources and the area table its zone lookup reads.
++/// The new look's world side: its resources, the area table its zone lookup reads, and the
++/// full-screen pass and bloom ([`pass`]).
+ pub(crate) struct LookPlugin;
+ 
+ impl Plugin for LookPlugin {
+@@ -209,6 +212,11 @@ impl Plugin for LookPlugin {
+         init_resources(app);
+         app.add_systems(Startup, load_look_areas.after(AssetSet::Open))
+             .add_systems(PreUpdate, sync_view_look);
++        pass::build(app);
++    }
++
++    fn finish(&self, app: &mut App) {
++        pass::finish(app);
+     }
+ }
+ 
+diff --git a/crates/benilla-world/src/look/pass.rs b/crates/benilla-world/src/look/pass.rs
+new file mode 100644
+index 0000000..d39cb4e
+--- /dev/null
++++ b/crates/benilla-world/src/look/pass.rs
+@@ -0,0 +1,532 @@
++//! The new look's full-screen pass and bloom, benilla's own (no reference behaviour): a colour
++//! grade in linear light (white balance, contrast, saturation) from the zone grade's current
++//! values ([`super::LookGrade`]), and Bevy's own `Bloom` on the world camera, all on the camera
++//! marked [`LookView`] and only under the new look.
++//!
++//! The pass runs between `StartMainPassPostProcessing` and the FFXGlow node. The world camera's
++//! main texture still holds the gamma bytes there (its combine, the frame's one decode, is the
++//! player-UI camera's ground draw: `crate::ffx_glow::FfxBackdrop`), so the pass decodes, grades in
++//! linear and encodes back; the 1.12 glow then blurs the graded frame, and every combine path reads
++//! it. Bloom (Bevy's node, after the glow) adds into the same gamma frame.
++
++use bevy::core_pipeline::core_3d::graph::{Core3d, Node3d};
++use bevy::core_pipeline::FullscreenShader;
++use bevy::ecs::query::QueryItem;
++use bevy::post_process::bloom::{Bloom, BloomCompositeMode, BloomPrefilter};
++use bevy::prelude::*;
++use bevy::render::diagnostic::RecordDiagnostics;
++use bevy::render::extract_component::{ExtractComponent, ExtractComponentPlugin};
++use bevy::render::extract_resource::{ExtractResource, ExtractResourcePlugin};
++use bevy::render::render_graph::{
++    NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
++};
++use bevy::render::render_resource::binding_types::{texture_2d, uniform_buffer_sized};
++use bevy::render::render_resource::*;
++use bevy::render::renderer::{RenderContext, RenderDevice, RenderQueue};
++use bevy::render::view::ViewTarget;
++use bevy::render::{Render, RenderApp, RenderStartup, RenderSystems};
++
++use super::{LookGrade, PostLook, WorldLook};
++
++/// The camera the new look's pass and bloom run on: the game's world camera.
++#[derive(Component, Clone, Copy, Default, ExtractComponent)]
++pub struct LookView;
++
++/// What the render world needs of the look this frame, copied from the lighting resolve's grade
++/// (never a second clock).
++#[derive(Resource, Clone, Copy, Default, Debug, PartialEq, ExtractResource)]
++pub struct LookFrame {
++    /// The new look is on (`worldLook 1`).
++    pub on: bool,
++    /// The grade's post values at the zone weight; neutral outside a graded zone.
++    pub post: PostLook,
++}
++
++impl LookFrame {
++    /// Whether the pass has anything to do: off, or neutral, it does not run at all.
++    pub fn grades(&self) -> bool {
++        self.on && !self.post.is_neutral()
++    }
++}
++
++fn publish_frame(look: Res<WorldLook>, grade: Res<LookGrade>, mut frame: ResMut<LookFrame>) {
++    let next = LookFrame {
++        on: look.on,
++        post: if look.on {
++            grade.post
++        } else {
++            PostLook::NEUTRAL
++        },
++    };
++    if *frame != next {
++        *frame = next;
++    }
++}
++
++/// The bloom prefilter: the frame is still 0..1 gamma here, so nothing in it is brighter than 1.
++/// Filmed at 0.8 with a soft knee of 0.3 and the grade's 0.06-0.14, a Fireball at night showed no
++/// bloom at all: past 0.8 a 0..1 pixel has at most 0.2 to give, and a tenth of that is nothing. At
++/// 0.65 with a wide knee the sun, spells and lit windows pass it, and a sunlit wall mostly doesn't.
++const BLOOM_THRESHOLD: f32 = 0.65;
++const BLOOM_SOFTNESS: f32 = 0.5;
++
++/// The new look's bloom at `intensity`: additive, with the prefilter above (or `threshold`).
++pub fn look_bloom(intensity: f32) -> Bloom {
++    look_bloom_at(intensity, BLOOM_THRESHOLD)
++}
++
++fn look_bloom_at(intensity: f32, threshold: f32) -> Bloom {
++    Bloom {
++        intensity,
++        composite_mode: BloomCompositeMode::Additive,
++        prefilter: BloomPrefilter {
++            threshold,
++            threshold_softness: BLOOM_SOFTNESS,
++        },
++        ..Bloom::NATURAL
++    }
++}
++
++/// A held bloom for tuning on film (`lookbloom <intensity> [threshold]`, benilla's console): each
++/// value set wins over the grade's for as long as it's held; `None` follows the grade. Inert under
++/// the classic look, which has no bloom.
++#[derive(Resource, Clone, Copy, Default, Debug, PartialEq)]
++pub struct LookBloomTune {
++    pub intensity: Option<f32>,
++    pub threshold: Option<f32>,
++}
++
++/// Puts Bevy's `Bloom` on the look camera while the grade asks for some, at its intensity, and
++/// takes it off otherwise, so the classic look renders no bloom textures at all.
++fn sync_bloom(
++    mut commands: Commands,
++    frame: Res<LookFrame>,
++    tune: Res<LookBloomTune>,
++    mut cams: Query<(Entity, Option<&mut Bloom>), With<LookView>>,
++) {
++    let intensity = tune.intensity.unwrap_or(frame.post.bloom);
++    let threshold = tune.threshold.unwrap_or(BLOOM_THRESHOLD);
++    let want = frame.on && intensity > 0.0;
++    for (entity, bloom) in &mut cams {
++        match (want, bloom) {
++            (true, Some(mut b)) => {
++                if b.intensity != intensity {
++                    b.intensity = intensity;
++                }
++                if b.prefilter.threshold != threshold {
++                    b.prefilter.threshold = threshold;
++                }
++            }
++            (true, None) => {
++                commands
++                    .entity(entity)
++                    .insert(look_bloom_at(intensity, threshold));
++            }
++            (false, Some(_)) => {
++                commands.entity(entity).remove::<Bloom>();
++            }
++            (false, None) => {}
++        }
++    }
++}
++
++// ---------------------------------------------------------------- the grade, on the CPU
++
++/// Rec. 709 luminance weights, the shader's `LUMA`.
++const LUMA: [f32; 3] = [0.2126, 0.7152, 0.0722];
++/// Mid-grey: contrast pivots on it, and the white balance splits shadows from highlights at it.
++const MID_GREY: f32 = 0.18;
++/// The highlights' and the shadows' white-balance targets at full `warmth`.
++const WARM: [f32; 3] = [1.0, 0.92, 0.82];
++const COOL: [f32; 3] = [0.88, 0.94, 1.0];
++
++fn luma(c: [f32; 3]) -> f32 {
++    c[0] * LUMA[0] + c[1] * LUMA[1] + c[2] * LUMA[2]
++}
++
++/// The grade `world_look.wgsl`'s `grade` runs, on one linear colour (keep the two in step):
++/// white balance (highlights toward [`WARM`], shadows toward [`COOL`], each normalised to keep
++/// its luminance, split at mid-grey by `lum / (lum + 0.18)`, scaled by `warmth`), then contrast
++/// around mid-grey in log space, then saturation around luminance.
++pub fn grade_linear(c: [f32; 3], post: &PostLook) -> [f32; 3] {
++    let lum = luma(c);
++    let s = lum / (lum + MID_GREY);
++    let (lw, lc) = (luma(WARM), luma(COOL));
++    let wb: [f32; 3] = std::array::from_fn(|i| {
++        let tint = COOL[i] / lc + (WARM[i] / lw - COOL[i] / lc) * s;
++        c[i] * (1.0 + (tint - 1.0) * post.warmth)
++    });
++    let con: [f32; 3] =
++        std::array::from_fn(|i| MID_GREY * (wb[i].max(1e-6) / MID_GREY).powf(post.contrast));
++    let l2 = luma(con);
++    std::array::from_fn(|i| (l2 + (con[i] - l2) * post.saturation).max(0.0))
++}
++
++/// The combine's sRGB decode, the transfer the pass reverses at its exit.
++pub fn srgb_to_linear(c: f32) -> f32 {
++    if c <= 0.04045 {
++        c / 12.92
++    } else {
++        ((c + 0.055) / 1.055).powf(2.4)
++    }
++}
++
++// ---------------------------------------------------------------- render world
++
++/// The pass's uniform, `world_look.wgsl`'s `Look`: `grade = (saturation, contrast, warmth, 0)`.
++#[repr(C)]
++#[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
++pub struct LookUniform {
++    pub grade: [f32; 4],
++}
++
++impl LookUniform {
++    pub fn new(frame: &LookFrame) -> Self {
++        let p = frame.post;
++        Self {
++            grade: [p.saturation, p.contrast, p.warmth, 0.0],
++        }
++    }
++}
++
++const UNIFORM_BYTES: u64 = std::mem::size_of::<LookUniform>() as u64;
++
++#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
++pub(crate) struct LookLabel;
++
++/// The pass's shader defs for one specialisation; one variant so far.
++fn shader_defs(_key: LookKey) -> Vec<bevy::shader::ShaderDefVal> {
++    vec![]
++}
++
++/// Every def set [`LookPipeline`] specialises `world_look.wgsl` on, for the app's shader
++/// translation test (naga validates each).
++pub fn shader_def_sets() -> Vec<Vec<bevy::shader::ShaderDefVal>> {
++    vec![shader_defs(LookKey {
++        format: ViewTarget::TEXTURE_FORMAT_HDR,
++    })]
++}
++
++#[derive(Resource)]
++struct LookPipeline {
++    layout: BindGroupLayoutDescriptor,
++    shader: Handle<Shader>,
++    fullscreen: FullscreenShader,
++}
++
++/// Specialised on the main texture's format, which the pass reads and writes.
++#[derive(Clone, Copy, PartialEq, Eq, Hash)]
++struct LookKey {
++    format: TextureFormat,
++}
++
++impl SpecializedRenderPipeline for LookPipeline {
++    type Key = LookKey;
++
++    fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
++        RenderPipelineDescriptor {
++            label: Some("world_look".into()),
++            layout: vec![self.layout.clone()],
++            vertex: self.fullscreen.to_vertex_state(),
++            fragment: Some(FragmentState {
++                shader: self.shader.clone(),
++                shader_defs: shader_defs(key),
++                entry_point: Some("fs_look".into()),
++                targets: vec![Some(ColorTargetState {
++                    format: key.format,
++                    blend: None,
++                    write_mask: ColorWrites::ALL,
++                })],
++            }),
++            ..default()
++        }
++    }
++}
++
++fn init_pipeline(
++    mut commands: Commands,
++    fullscreen: Res<FullscreenShader>,
++    asset_server: Res<AssetServer>,
++) {
++    let layout = BindGroupLayoutDescriptor::new(
++        "world_look_layout",
++        &BindGroupLayoutEntries::sequential(
++            ShaderStages::FRAGMENT,
++            (
++                // Read with `textureLoad` at the fragment's own pixel: no filtering, no sampler.
++                texture_2d(TextureSampleType::Float { filterable: false }),
++                uniform_buffer_sized(false, std::num::NonZero::new(UNIFORM_BYTES)),
++            ),
++        ),
++    );
++    commands.insert_resource(LookPipeline {
++        layout,
++        shader: asset_server.load("embedded://benilla_world/shaders/world_look.wgsl"),
++        fullscreen: fullscreen.clone(),
++    });
++}
++
++/// One look view's pipeline and uniform buffer, kept across frames.
++#[derive(Component)]
++struct LookViewGpu {
++    pipeline: CachedRenderPipelineId,
++    format: TextureFormat,
++    uniform: Buffer,
++}
++
++fn prepare_look_views(
++    mut commands: Commands,
++    device: Res<RenderDevice>,
++    cache: Res<PipelineCache>,
++    pipeline: Res<LookPipeline>,
++    mut pipelines: ResMut<SpecializedRenderPipelines<LookPipeline>>,
++    views: Query<(Entity, &ViewTarget, Option<&LookViewGpu>), With<LookView>>,
++) {
++    for (entity, target, existing) in &views {
++        let format = target.main_texture_format();
++        if existing.is_some_and(|g| g.format == format) {
++            continue;
++        }
++        let id = pipelines.specialize(&cache, &pipeline, LookKey { format });
++        let uniform = device.create_buffer(&BufferDescriptor {
++            label: Some("world_look_uniform"),
++            size: UNIFORM_BYTES,
++            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
++            mapped_at_creation: false,
++        });
++        commands.entity(entity).insert(LookViewGpu {
++            pipeline: id,
++            format,
++            uniform,
++        });
++    }
++}
++
++#[derive(Default)]
++struct LookNode;
++
++impl ViewNode for LookNode {
++    type ViewQuery = (&'static ViewTarget, &'static LookViewGpu);
++
++    fn run<'w>(
++        &self,
++        _graph: &mut RenderGraphContext,
++        render_context: &mut RenderContext<'w>,
++        (view_target, gpu): QueryItem<'w, '_, Self::ViewQuery>,
++        world: &'w World,
++    ) -> Result<(), NodeRunError> {
++        let frame = *world.resource::<LookFrame>();
++        // The classic look, or a neutral grade: no pass, no flip, the frame untouched.
++        if !frame.grades() {
++            return Ok(());
++        }
++        let cache = world.resource::<PipelineCache>();
++        let Some(pipeline) = cache.get_render_pipeline(gpu.pipeline) else {
++            return Ok(()); // still compiling: this frame is ungraded
++        };
++        let layout = cache.get_bind_group_layout(&world.resource::<LookPipeline>().layout);
++        world.resource::<RenderQueue>().write_buffer(
++            &gpu.uniform,
++            0,
++            bytemuck::bytes_of(&LookUniform::new(&frame)),
++        );
++        let post = view_target.post_process_write();
++        let bind = render_context.render_device().create_bind_group(
++            "world_look",
++            &layout,
++            &BindGroupEntries::sequential((post.source, gpu.uniform.as_entire_binding())),
++        );
++        let diagnostics = render_context.diagnostic_recorder();
++        let mut pass = render_context
++            .command_encoder()
++            .begin_render_pass(&RenderPassDescriptor {
++                label: Some("world_look"),
++                color_attachments: &[Some(RenderPassColorAttachment {
++                    view: post.destination,
++                    depth_slice: None,
++                    resolve_target: None,
++                    ops: Operations::default(),
++                })],
++                depth_stencil_attachment: None,
++                timestamp_writes: None,
++                occlusion_query_set: None,
++            });
++        let span = diagnostics.pass_span(&mut pass, "world_look");
++        pass.set_pipeline(pipeline);
++        pass.set_bind_group(0, &bind, &[]);
++        pass.draw(0..3, 0..1);
++        span.end(&mut pass);
++        Ok(())
++    }
++}
++
++/// The main-world half: the frame copy and the bloom; the render half in [`finish`], after the
++/// FFXGlow plugin has added the node this one is ordered against.
++pub(super) fn build(app: &mut App) {
++    app.init_resource::<LookFrame>()
++        .init_resource::<LookBloomTune>()
++        .add_plugins((
++            ExtractComponentPlugin::<LookView>::default(),
++            ExtractResourcePlugin::<LookFrame>::default(),
++        ))
++        .add_systems(
++            Update,
++            (publish_frame, sync_bloom)
++                .chain()
++                .in_set(crate::lighting::LightingConsumeSet),
++        );
++}
++
++pub(super) fn finish(app: &mut App) {
++    let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
++        return;
++    };
++    render_app
++        .init_resource::<SpecializedRenderPipelines<LookPipeline>>()
++        .add_systems(RenderStartup, init_pipeline)
++        .add_systems(
++            Render,
++            prepare_look_views.in_set(RenderSystems::PrepareResources),
++        )
++        .add_render_graph_node::<ViewNodeRunner<LookNode>>(Core3d, LookLabel)
++        .add_render_graph_edges(
++            Core3d,
++            (
++                Node3d::StartMainPassPostProcessing,
++                LookLabel,
++                crate::ffx_glow::FfxGlowLabel,
++            ),
++        );
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn post(saturation: f32, contrast: f32, warmth: f32) -> PostLook {
++        PostLook {
++            saturation,
++            contrast,
++            warmth,
++            ..PostLook::NEUTRAL
++        }
++    }
++
++    #[test]
++    fn neutral_values_are_the_identity() {
++        for c in [
++            [0.0, 0.0, 0.0],
++            [0.18, 0.18, 0.18],
++            [0.9, 0.4, 0.1],
++            [0.02, 0.3, 0.8],
++            [1.0, 1.0, 1.0],
++        ] {
++            let g = grade_linear(c, &PostLook::NEUTRAL);
++            for i in 0..3 {
++                assert!((g[i] - c[i]).abs() < 1e-5, "{c:?} → {g:?}");
++            }
++        }
++        assert!(!LookFrame {
++            on: true,
++            post: PostLook::NEUTRAL
++        }
++        .grades());
++        assert!(!LookFrame {
++            on: false,
++            post: post(1.2, 1.0, 0.0)
++        }
++        .grades());
++    }
++
++    /// Warmth tints a highlight warm (red up, blue down) and a shadow cool, keeping luminance
++    /// close.
++    #[test]
++    fn warmth_warms_highlights_and_cools_shadows() {
++        let warm = post(1.0, 1.0, 0.5);
++        let hi = grade_linear([0.8, 0.8, 0.8], &warm);
++        assert!(hi[0] > 0.8 && hi[2] < 0.8, "{hi:?}");
++        let lo = grade_linear([0.02, 0.02, 0.02], &warm);
++        assert!(lo[2] > 0.02 && lo[0] < 0.02, "{lo:?}");
++        assert!((luma(hi) - 0.8).abs() < 0.01);
++        // Negative warmth turns it round.
++        let cool = grade_linear([0.8, 0.8, 0.8], &post(1.0, 1.0, -0.5));
++        assert!(cool[2] > cool[0]);
++    }
++
++    #[test]
++    fn saturation_zero_is_grey() {
++        let g = grade_linear([0.9, 0.3, 0.05], &post(0.0, 1.0, 0.0));
++        assert!((g[0] - g[1]).abs() < 1e-6 && (g[1] - g[2]).abs() < 1e-6);
++        assert!((g[0] - luma([0.9, 0.3, 0.05])).abs() < 1e-5);
++    }
++
++    /// Contrast pivots on mid-grey: it stays, a brighter value rises and a darker one falls.
++    #[test]
++    fn contrast_pivots_on_mid_grey() {
++        let c = post(1.0, 1.2, 0.0);
++        assert!((grade_linear([0.18; 3], &c)[0] - 0.18).abs() < 1e-5);
++        assert!(grade_linear([0.6; 3], &c)[0] > 0.6);
++        assert!(grade_linear([0.05; 3], &c)[0] < 0.05);
++    }
++
++    /// `world_look.wgsl`'s `Look` is one `vec4<f32>`: 16 bytes, 16-aligned.
++    #[test]
++    fn the_uniform_layout_matches_the_shader() {
++        assert_eq!(UNIFORM_BYTES, 16);
++        assert_eq!(UNIFORM_BYTES % 16, 0);
++        let u = LookUniform::new(&LookFrame {
++            on: true,
++            post: post(1.1, 1.05, 0.2),
++        });
++        assert_eq!(u.grade, [1.1, 1.05, 0.2, 0.0]);
++    }
++
++    #[test]
++    fn the_bloom_is_additive_with_the_prefilter() {
++        let b = look_bloom(0.12);
++        assert_eq!(b.intensity, 0.12);
++        assert!(matches!(b.composite_mode, BloomCompositeMode::Additive));
++        assert_eq!(b.prefilter.threshold, 0.65);
++        assert_eq!(b.prefilter.threshold_softness, 0.5);
++    }
++
++    /// A held tune wins over the grade's bloom, and lets go to it again.
++    #[test]
++    fn a_held_tune_wins_over_the_grade() {
++        let mut app = App::new();
++        app.init_resource::<LookFrame>()
++            .init_resource::<LookBloomTune>()
++            .add_systems(Update, sync_bloom);
++        app.world_mut().resource_mut::<LookFrame>().on = true;
++        app.world_mut().resource_mut::<LookFrame>().post.bloom = 0.2;
++        let cam = app.world_mut().spawn(LookView).id();
++        app.update();
++        let bloom = |app: &App| {
++            let b = app.world().get::<Bloom>(cam).expect("bloom on");
++            (b.intensity, b.prefilter.threshold)
++        };
++        assert_eq!(bloom(&app), (0.2, 0.65));
++        *app.world_mut().resource_mut::<LookBloomTune>() = LookBloomTune {
++            intensity: Some(0.9),
++            threshold: Some(0.5),
++        };
++        app.update();
++        assert_eq!(bloom(&app), (0.9, 0.5));
++        *app.world_mut().resource_mut::<LookBloomTune>() = LookBloomTune::default();
++        app.update();
++        assert_eq!(bloom(&app), (0.2, 0.65));
++        app.world_mut().resource_mut::<LookFrame>().on = false;
++        app.update();
++        assert!(
++            app.world().get::<Bloom>(cam).is_none(),
++            "the classic look has none"
++        );
++    }
++
++    #[test]
++    fn the_decode_is_the_srgb_curve() {
++        assert_eq!(srgb_to_linear(0.0), 0.0);
++        assert!((srgb_to_linear(1.0) - 1.0).abs() < 1e-6);
++        assert!((srgb_to_linear(0.5) - 0.214_041).abs() < 1e-5);
++    }
++}
+diff --git a/crates/benilla-world/src/shaders.rs b/crates/benilla-world/src/shaders.rs
+index 6a1c343..8ea85aa 100644
+--- a/crates/benilla-world/src/shaders.rs
++++ b/crates/benilla-world/src/shaders.rs
+@@ -17,6 +17,7 @@ pub(crate) fn plugin(app: &mut App) {
+     bevy::asset::embedded_asset!(app, "shaders/ffx_glow.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/wow_effect.wgsl");
+     bevy::asset::embedded_asset!(app, "shaders/static_gx.wgsl");
++    bevy::asset::embedded_asset!(app, "shaders/world_look.wgsl");
+ }
+ 
+ #[cfg(test)]
+@@ -53,6 +54,6 @@ mod tests {
+             );
+         }
+         // One per `embedded_asset!` line in `plugin`.
+-        assert_eq!(found, 8, "the engine's shader set changed size");
++        assert_eq!(found, 9, "the engine's shader set changed size");
+     }
+ }
+diff --git a/crates/benilla-world/src/shaders/world_look.wgsl b/crates/benilla-world/src/shaders/world_look.wgsl
+new file mode 100644
+index 0000000..9e4772f
+--- /dev/null
++++ b/crates/benilla-world/src/shaders/world_look.wgsl
+@@ -0,0 +1,54 @@
++// The new look's full-screen pass, benilla's own (`look::pass`): the world camera's frame, still
++// the gamma bytes here (its decode is the FFXGlow combine, after this), decoded to linear, graded
++// and encoded back. Off under the classic look: the node does not run at all.
++//   grade = white balance (warm highlights, cool shadows) → contrast around mid-grey in log space
++//           → saturation around luminance
++// `grade` mirrors `look::pass::grade_linear`; keep the two in step.
++
++#import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
++
++@group(0) @binding(0) var scene_tex: texture_2d<f32>;
++struct Look {
++    // x = saturation, y = contrast, z = warmth, w unused.
++    grade: vec4<f32>,
++}
++@group(0) @binding(1) var<uniform> look: Look;
++
++const LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
++const MID_GREY: f32 = 0.18;
++const WARM: vec3<f32> = vec3<f32>(1.0, 0.92, 0.82);
++const COOL: vec3<f32> = vec3<f32>(0.88, 0.94, 1.0);
++
++fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
++    let lo = c / 12.92;
++    let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
++    return select(hi, lo, c <= vec3<f32>(0.04045));
++}
++
++fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
++    let lo = c * 12.92;
++    let hi = 1.055 * pow(c, vec3<f32>(1.0 / 2.4)) - vec3<f32>(0.055);
++    return select(hi, lo, c <= vec3<f32>(0.0031308));
++}
++
++fn grade(c: vec3<f32>, saturation: f32, contrast: f32, warmth: f32) -> vec3<f32> {
++    // White balance: the tint runs from the cool shadow target to the warm highlight one, split at
++    // mid-grey; each target is divided by its own luminance, so the shift keeps brightness.
++    let lum = dot(c, LUMA);
++    let s = lum / (lum + MID_GREY);
++    let tint = mix(COOL / dot(COOL, LUMA), WARM / dot(WARM, LUMA), s);
++    let wb = c * mix(vec3<f32>(1.0), tint, warmth);
++    let con = MID_GREY * pow(max(wb, vec3<f32>(1e-6)) / MID_GREY, vec3<f32>(contrast));
++    let l2 = dot(con, LUMA);
++    return max(mix(vec3<f32>(l2), con, saturation), vec3<f32>(0.0));
++}
++
++@fragment
++fn fs_look(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
++    let px = vec2<i32>(in.position.xy);
++    let scene = textureLoad(scene_tex, px, 0);
++    // Clamped as every FFX read is: the float target does not saturate, the 1.12 frame does.
++    let lin = srgb_to_linear(clamp(scene.rgb, vec3<f32>(0.0), vec3<f32>(1.0)));
++    let graded = grade(lin, look.grade.x, look.grade.y, look.grade.z);
++    return vec4<f32>(linear_to_srgb(clamp(graded, vec3<f32>(0.0), vec3<f32>(1.0))), scene.a);
++}
+-- 
+2.43.0
+

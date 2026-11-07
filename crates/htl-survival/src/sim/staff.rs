@@ -24,8 +24,9 @@ impl Survival {
 
     /// The staff's attack: the bolt cast now, aimed along the reticle; a bolt with a charge (a
     /// heavy one) begins its charge instead, let go with the button (its release check with it).
+    /// A Heal that spends Grace takes it as it begins (quicker for it; at the top, at once).
     pub(crate) fn cast_bolt(&mut self, id: Id, ability: usize) {
-        let hi = self.content.abilities[ability].charge[1];
+        let (_, hi) = self.charge_of(id, ability);
         if hi > 0.0 {
             self.begin_charge(id, ability, hi);
         } else {
@@ -50,6 +51,9 @@ fn stack_kind(word: &str) -> Option<&'static str> {
         "heat" => Some("heat"),
         "chill" => Some("chill"),
         "charge" => Some("charge"),
+        // The Priest's: Shadow Weaving (stacks on the foe) and Searing Light (a mark on it).
+        "weave" => Some("weave"),
+        "sear" => Some("sear"),
         _ => None,
     }
 }
@@ -62,6 +66,24 @@ impl Survival {
         let Some(kind) = stack_kind(&d.builds) else { return };
         let k = self.content.staffs.clone();
         let now = self.clock;
+        // The Priest's marks only build, up to their most: no burst at the top.
+        if kind == "weave" || kind == "sear" {
+            let pk = &self.content.priest;
+            let (most, keep) = if kind == "weave" { (pk.weave_most.max(1), pk.weave_secs) } else { (1, pk.sear_secs) };
+            let i = match self.staff_marks.iter().position(|m| m.owner == owner && m.on == victim && m.kind == kind) {
+                Some(i) => i,
+                None => {
+                    self.staff_marks.push(StaffMark { owner, on: victim, kind, n: 0, until: now });
+                    self.staff_marks.len() - 1
+                }
+            };
+            let m = &mut self.staff_marks[i];
+            m.n = (m.n + 1).min(most);
+            m.until = now + keep;
+            let n = m.n;
+            self.events.push(Event::Stacks { player: owner, kind, n, on: Some(victim) });
+            return;
+        }
         if kind == "charge" {
             let Some(p) = self.players.get_mut(&owner) else { return };
             let before = p.staff_charges;
@@ -151,6 +173,17 @@ impl Survival {
         // Charges are spent as the orb leaves (`staff_release`): ones built while it flies stay.
         if kind == "charge" {
             return 1.0;
+        }
+        // Dark Reckoning: the Weaving ripped out, its damage a stack's for each (none: nothing).
+        if kind == "weave" {
+            let n = match self.staff_marks.iter().position(|m| m.owner == owner && m.on == victim && m.kind == kind) {
+                Some(i) => self.staff_marks.remove(i).n,
+                None => 0,
+            };
+            if n > 0 {
+                self.events.push(Event::Stacks { player: owner, kind, n: 0, on: Some(victim) });
+            }
+            return n as f32;
         }
         let k = self.content.staffs.clone();
         let n = if kind == "charge" {

@@ -19,6 +19,7 @@ mod building;
 pub use building::StationActions;
 mod combat;
 pub mod dungeon;
+pub mod duel;
 mod journal;
 pub mod meter;
 pub mod mobs;
@@ -33,11 +34,21 @@ pub mod lab;
 mod raid;
 pub mod siege;
 mod bomb;
+mod flay;
+pub mod priest;
 mod orb;
 mod rhythm;
 mod staff;
 mod sweep;
 pub mod wager;
+// The Light Priest's (Penance's flick, Holy Fire's Kindle, counters for others, Salvation).
+mod feather;
+mod hollow;
+mod penance;
+mod rift;
+mod shell;
+pub(crate) mod light;
+mod sigil;
 mod tactics;
 mod world;
 
@@ -222,6 +233,20 @@ pub enum Event {
     OrbRoll { look: Id, from: Vec3, to: Vec3, secs: f32, model: String, scale: f32 },
     /// That orb stopped or spent.
     OrbGone { look: Id },
+    /// Holy Word: Salvation laid (for everyone, a client with SetGroundRing draws it in Corey's
+    /// art): `look` its key, where, how wide, and its beats in seconds from now.
+    SigilLaid { look: Id, at: Vec3, radius: f32, beats: Vec<f32> },
+    /// A Priest look the add-on draws in Corey's art (`PL`): `kind` shield (a perfect Shield on
+    /// `on`), flay (`n` 1 taut; `a` the cord's share of its range, `b` where taut begins), snap,
+    /// penance (ring `n` closing on `on` in `a` seconds, `b` 1 a friend), penance_hit (ring `n`:
+    /// `a` 1 landed, `b` 1 dead on), fade (an afterimage on the hero), light (`n` stacks of Holy
+    /// Light), shell (`n` stored, `a` its share of the most; `b` 1 let go), rift (`n` foes
+    /// caught, `a` its reach, `b` seconds left), hollow (the orb `on` at `n` health, `a` its reach,
+    /// `b` its most), empower (`n` 1 the staff's next bolt is Empowered), sear (`n` 1 on `on`).
+    PriestLook { player: Id, kind: &'static str, n: u32, on: Option<Id>, a: f32, b: f32 },
+    /// A Priest's mark on the ground the add-on draws in Corey's art (`PG`): `kind` feather or
+    /// rift, `key` its look, where, how wide, for how long (`radius` 0: it's gone).
+    PriestGround { kind: &'static str, key: Id, at: Vec3, radius: f32, secs: f32 },
     /// The hero's run speed and run-back speed.
     Speed { player: Id, speed: f32, back: f32 },
     /// The hero's kit or gear changed: what they hold, and how.
@@ -361,14 +386,17 @@ pub enum Event {
     Channel { caster: Id, target: Option<Id>, spell: u32, ms: u32 },
     /// A hero healed by this much (a green number).
     Healed { id: Id, amount: u32 },
-    /// `healer` mended another hero, `target`, by `amount` (shown to the healer).
-    HealedOther { healer: Id, target: Id, amount: u32 },
+    /// `healer` mended another hero or an allied creature, `target`, by `amount` (shown to the
+    /// healer).
+    HealedOther { healer: Id, target: Id, amount: u32, critical: bool },
     /// A unit says something (`SoundEntries.dbc`): a creature's voice.
     Sound { id: Id, sound: u32 },
     /// How the Proving Ring stands changed for a hero (in it, or just out of it).
     Arena { player: Id },
     /// How Siege stands changed for a hero in its world (the hall, the match).
     Siege { player: Id },
+    /// A duel between `a` (who challenged) and `b`: what's new in it.
+    Duel { a: Id, b: Id, news: duel::DuelNews },
     /// A line for the server's log only.
     Log(String),
     /// Something worth saving changed.
@@ -761,6 +789,8 @@ pub struct Player {
     pub panic_stride: f32,
     /// Keys armed for a recast, cards empowered, a dash going through bodies.
     pub combos: recasts::Combos,
+    /// Grace, the Heal begun with it, a friend's shield on them (the Priest's core).
+    pub priest: priest::Priest,
 }
 
 /// How a hero looks, as the creation screen made them: race, sex, skin, face, hair, its colour,
@@ -893,6 +923,18 @@ pub struct Mob {
     /// Walking home past its leash, it slipped a hero's blow lately (the whiff's look): not
     /// another until then.
     pub whiff_until: f32,
+    /// The string it began last (so it seldom begins the same one again next), how many of its
+    /// strings up close in a row it has done, and how many blows of the string it's in it will
+    /// throw (0: as many as it has; a boss's may stop short or run one longer).
+    pub last_pattern: Option<usize>,
+    pub close_run: u32,
+    pub string_len: usize,
+    /// The blow of its string a boss holds a beat (the delayed swing), and how much longer that
+    /// blow's wind-up is now.
+    pub held_step: Option<usize>,
+    pub hold: f32,
+    /// A boss making space: backing off until then, to use this string of its from there.
+    pub space: Option<(f32, usize)>,
     /// Who has hurt it, how much, and when last (it fades): whom it goes for.
     pub threat: Vec<(Id, f32, f32)>,
     /// When it next looks round for whom to fight.
@@ -902,6 +944,10 @@ pub struct Mob {
     /// Called up by this creature in its fight (a boss's adds, at a turn): it goes when that
     /// fight ends, its own or the boss's, instead of standing where the boss stood.
     pub summoned_by: Option<Id>,
+    /// On the heroes' side (its rules' `friendly`, or set down by `.es ally`): it never takes up
+    /// a fight against a hero, their blows pass it by, and help aimed at a friend can reach it
+    /// (unless it's a totem: [`Survival::takes_help`]).
+    pub friendly: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1007,16 +1053,22 @@ pub struct Survival {
     pub(crate) bombs: Vec<bomb::Bomb>,
     /// Heat and chill a staff's bolts left on foes, until they fade.
     pub(crate) staff_marks: Vec<staff::StaffMark>,
+    /// Each hero's Mind Flay held, and how taut its cord has been.
+    pub(crate) flays: BTreeMap<Id, flay::Flay>,
     pub(crate) totems: Vec<abilities::Totem>,
     /// Leaps in the air, traps set, wind-ups and strips about to go off, anchors to step back to.
     pub(crate) landings: Vec<moves::Landing>,
     pub(crate) traps: Vec<moves::Trap>,
     /// The Hunter's: planted arrows, tripwires, Call of the Wild's chains and beasts.
     pub hunt: hunter::Hunt,
+    /// Duels asked and under way.
+    pub duels: Vec<duel::Duel>,
     pub(crate) windups: Vec<moves::Windup>,
     pub(crate) anchors: BTreeMap<Id, moves::Anchor>,
     /// Each hero's last blink that slips blows (Blink's counter check).
     pub(crate) slips: BTreeMap<Id, moves::Slip>,
+    /// The Light Priest's: covers on friends, Salvation's circles, Penance's bolts.
+    pub(crate) light: light::Light,
     /// Where the blow whose effects are being given came from (a knockback's centre).
     pub(crate) fx_from: Option<Vec3>,
     /// The effect being given takes on a foe that holds its ground (an ultimate's).
@@ -1038,6 +1090,10 @@ pub struct Survival {
     /// Creatures put up to practise on and look at (`.es target`): `true` for one that stands
     /// still, never moving or striking of itself (thrown, pulled and knocked up all the same).
     pub targets: BTreeMap<Id, bool>,
+    /// Heroes whose heals land critical just now (a bigger number over the friend): while a
+    /// spell's skill check is a perfect and what it sends out is made, or by `.es crit` (dev).
+    /// A heal with no skill check is never critical.
+    pub critical_heals: BTreeSet<Id>,
     /// Crowd control on units, the heroes' grace after a hard one, and each hero's log of it.
     pub cc: BTreeMap<Id, Vec<Cc>>,
     pub grace: BTreeMap<Id, f32>,
@@ -1136,9 +1192,11 @@ impl Survival {
             landings: Vec::new(),
             traps: Vec::new(),
             hunt: hunter::Hunt::default(),
+            duels: Vec::new(),
             windups: Vec::new(),
             anchors: BTreeMap::new(),
             slips: BTreeMap::new(),
+            light: light::Light::default(),
             fx_from: None,
             fx_vs_bosses: false,
             fx_pull_look: None,
@@ -1154,10 +1212,12 @@ impl Survival {
             orbs: Vec::new(),
             bombs: Vec::new(),
             staff_marks: Vec::new(),
+            flays: BTreeMap::new(),
             totems: Vec::new(),
             stances: BTreeMap::new(),
             dummies: BTreeMap::new(),
             targets: BTreeMap::new(),
+            critical_heals: BTreeSet::new(),
             cc: BTreeMap::new(),
             grace: BTreeMap::new(),
             cc_log: BTreeMap::new(),
@@ -1227,6 +1287,7 @@ impl Survival {
         self.step_projectiles(dt);
         self.step_orbs(dt);
         self.step_bombs();
+        self.step_light();
         self.step_moves();
         self.step_grounds();
         self.step_bounces();
@@ -1240,6 +1301,7 @@ impl Survival {
         self.step_holds();
         self.step_dummies();
         self.step_missiles();
+        self.step_duels();
         self.step_pending();
         if online {
             self.step_mobs(dt);
@@ -1423,6 +1485,7 @@ impl Survival {
             rooted: false,
             panic_stride: 0.0,
             combos: recasts::Combos::default(),
+            priest: priest::Priest::default(),
         };
         if let Some(sv) = saved {
             let near = sv.pos[2];
@@ -1480,6 +1543,8 @@ impl Survival {
         let p = self.players.get_mut(&id)?;
         let save = crate::save::save_player(&self.content, p);
         self.players.remove(&id);
+        // A duel of theirs given away.
+        self.duel_gone(id);
         self.meters.remove(&id);
         // Creatures fighting them turn on whoever else is in the fight, or go home.
         self.foe_gone(id);
@@ -2182,7 +2247,7 @@ impl Survival {
                 && crate::land::clear_line(self.land.as_ref(), p.pos, at)
         };
         let mobs = self.mobs.values().filter(|m| m.health > 0 && reaches(m.pos, 0.5 * self.content.mobs[m.def].scale)).count();
-        let heroes = if self.content.pvp.friendly_fire {
+        let heroes = if self.heroes_clash() {
             self.players.iter().filter(|(hid, h)| **hid != id && h.health > 0 && self.hostile(id, **hid) && reaches(h.pos, 0.4)).count()
         } else {
             0

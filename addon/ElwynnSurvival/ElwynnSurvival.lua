@@ -40,7 +40,7 @@
 --
 -- Written for the 1.12 client's Lua 5.0: no #, no %, no ..., math.mod, table.getn, `this`.
 
-local VERSION = 52
+local VERSION = 57
 local ART = "Interface\\AddOns\\ElwynnSurvival\\art\\"
 local ICONS = "Interface\\Icons\\"
 local FONT_TITLE = "Fonts\\MORPHEUS.TTF"
@@ -1602,7 +1602,8 @@ function ES.Guard(state)
     elseif mv and MineBusy() and MineAt((ES.mine.kind == "heavy") and mv.heavyCancel or mv.cancelAfter) then
       CancelMine()
     end
-    Say(".es in g")
+    -- (With the reticle's line: a staff whose right click is a spell casts it along it.)
+    Say(".es in g" .. ES.AimLine())
   else
     if not ES.guardHeld then return end
     ES.guardHeld = false
@@ -1673,6 +1674,12 @@ function ES.Ability(n, ex, state)
   -- A key armed for its recast, or empowered (its EX version, free): pressed, it goes at once
   -- (the server knows which it fires), with no hold to wait for.
   if ES.recasts[n] or ES.empowers[n] then
+    SendAbility(n, false)
+    return
+  end
+  -- A Void Rift of ours open: the ultimate's key again implodes it, at once (the hold guards only
+  -- the bar's spending).
+  if n == ULT and ES.riftOpenUntil and GetTime() < ES.riftOpenUntil then
     SendAbility(n, false)
     return
   end
@@ -1995,6 +2002,22 @@ local ST_PER_PX = 0.42
 local VIT_HEALTH, VIT_STAMINA = 13, 8
 local DOCK_W = AB_N * 44 + (AB_N - 1) * 6
 vit.health = MakeLagBar(vit, 200 / HP_PER_PX, VIT_HEALTH, { r = 0.66, g = 0.09, b = 0.07 })
+-- Overhealth (health over the most) in a deep crimson past the health (green read as stamina), and what
+-- shields have left to soak in translucent white over the health from the bar's left end (Corey;
+-- ES.DrawAbsorbs).
+vit.health.over = Tex(vit.health, "ARTWORK", "bar")
+vit.health.over:SetVertexColor(0.62, 0.04, 0.2, 1)
+vit.health.over:Hide()
+vit.health.shield = Tex(vit.health, "OVERLAY", "bar")
+vit.health.shield:SetVertexColor(1, 1, 1, 0.5)
+vit.health.shield:Hide()
+-- The healing still to come (a meal, a salve, a mending: `H`'s 43rd), as WoW shows an incoming
+-- heal: a pale rose stroke behind the health, as the amber chunk of a blow is, reaching to where
+-- the health will be if nothing hurts them (Corey). Its brushed end marks the spot: laid only past
+-- the health, a short one was all ragged edge, lost under the numbers.
+vit.health.ahead = Tex(vit.health, "BORDER", "bar")
+vit.health.ahead:SetVertexColor(1, 0.62, 0.56, 0.7)
+vit.health.ahead:Hide()
 vit.healthText = Text(vit.health, FONT_NUM, 11, "OUTLINE")
 vit.healthText:SetPoint("RIGHT", vit.health, "RIGHT", -3, 0)
 -- Room for "1000 / 1000" at any bar size (left to size itself, it was cut to "200 / 2...").
@@ -2065,6 +2088,34 @@ function ES.PlaceVitals()
   ES.DrawVitalsLength()
   if ES.PlaceTop then ES.PlaceTop() end
 end
+-- The health bar's overhealth and shield (`H`'s last two), each as long as it'd be at the bar's
+-- scale (Corey). The overhealth past the health, lying over the health from the right where it runs
+-- past the bar's end. The shield over the health from the bar's left end, like a fighting game's
+-- second bar over the first, translucent so the health shows through, and shrinking to the left as
+-- it's spent (laid past the health too, it squeezed under the numbers at full health).
+function ES.DrawAbsorbs(hp, maxhp, shield, over, ahead)
+  local b = vit.health
+  local per = b.full / math.max(1, maxhp)
+  local function Lay(t, x, w)
+    if w < 0.5 then t:Hide() return end
+    t:ClearAllPoints()
+    t:SetPoint("TOPLEFT", b, "TOPLEFT", x, 0)
+    t:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", x, 0)
+    t:SetWidth(w)
+    t:Show()
+  end
+  local ow = math.min(b.full, over * per)
+  Lay(b.over, math.max(0, math.min(hp * per, b.full - ow)), ow)
+  Lay(b.shield, 0, math.min(b.full, shield * per))
+  -- The heal still to come: behind the health from the bar's left end to where the health will
+  -- be, never past the bar's end.
+  if (ahead or 0) > 0 then
+    Lay(b.ahead, 0, math.min(b.full, (hp + ahead) * per))
+  else
+    b.ahead:Hide()
+  end
+end
+
 -- The bars' lengths: the dock's width by the hero, by what they hold in the corner.
 function ES.DrawVitalsLength()
   local h = ES.h
@@ -3864,7 +3915,14 @@ function ES.DrawHud()
   end
   ES.lastHp = hp
   vit.health:Set(hp / math.max(1, maxhp))
-  vit.healthText:SetText(hp .. " / " .. maxhp)
+  local shield, over, ahead = tonumber(h[41]) or 0, tonumber(h[42]) or 0, tonumber(h[43]) or 0
+  ES.DrawAbsorbs(hp, maxhp, shield, over, ahead)
+  -- The numbers say it too, in the bar's colours: the overhealth with the health, the shield after.
+  local text = hp
+  if over > 0 then text = text .. "|cffff6f8f+" .. over .. "|r" end
+  text = text .. " / " .. maxhp
+  if shield > 0 then text = text .. " |cffffffff+" .. shield .. "|r" end
+  vit.healthText:SetText(text)
   vit.stamina:Set(st / math.max(1, maxst))
   local reach = tonumber(h[16]) or 0
   if reach > 0 then
@@ -6605,6 +6663,9 @@ function ES.Wake()
   ES.SetMode("action")
   -- The camera stops short of other bodies instead of entering them.
   if AnimClient() and SetCameraUnitCollision then SetCameraUnitCollision(1) end
+  -- And sits over the right shoulder, so the reticle at the screen's centre falls past the hero
+  -- instead of on their back (Corey's playtest: a staff's reticle sat on the hero).
+  if SetCameraShoulder then SetCameraShoulder(ES.SHOULDER_RIGHT, ES.SHOULDER_UP) end
   ES.Message(string.format("%s attacks, %s guards, %s dodges. Abilities are on %s %s %s %s. Hold %s for the ultimate. %s shows every key.",
     KeyName("ES_ATTACK") or "Left mouse", KeyName("ES_GUARD") or "right mouse", KeyName("ES_DODGE") or "Space",
     KeyName("ES_AB1") or "-", KeyName("ES_AB2") or "-", KeyName("ES_AB3") or "-", KeyName("ES_AB4") or "-", KeyName("ES_AB5") or "-",
@@ -6615,6 +6676,9 @@ function ES.Wake()
     end
   end
 end
+
+-- The ordinary camera's seat over the right shoulder (yards right and up; `SetCameraShoulder`).
+ES.SHOULDER_RIGHT, ES.SHOULDER_UP = 0.9, 0.2
 
 function ES.Sleep()
   if SetAimTurn and ES.aimTurn and ES.aimTurn ~= 0 then
@@ -6637,6 +6701,7 @@ function ES.Sleep()
   if SetActionMouse then SetActionMouse(nil) end
   if SetAimCamera then SetAimCamera(nil) end
   if SetCameraUnitCollision then SetCameraUnitCollision(nil) end
+  if SetCameraShoulder then SetCameraShoulder(0) end
   ES.predicted, ES.predictedRoll = nil, nil
   ES.mine, ES.comboUntil, ES.moves, ES.lockOn = nil, nil, nil, nil
   ES.timers = {}
@@ -6748,8 +6813,15 @@ function ES.Line(line)
     if ES.StaffLine then ES.StaffLine(f) end
   elseif verb == "SK" then
     if ES.StacksLine then ES.StacksLine(f) end
+    if ES.PriestStacksLine then ES.PriestStacksLine(f) end
   elseif verb == "SH" then
     if ES.StaffHeavyLine then ES.StaffHeavyLine(f) end
+  elseif verb == "SV" then
+    if ES.SigilLine then ES.SigilLine(f) end
+  elseif verb == "PL" then
+    if ES.PriestLookLine then ES.PriestLookLine(f) end
+  elseif verb == "PG" then
+    if ES.PriestGroundLine then ES.PriestGroundLine(f) end
   elseif verb == "OB" then
     if ES.OrbLine then ES.OrbLine(f) end
   elseif verb == "OX" then
@@ -6876,6 +6948,8 @@ function ES.Line(line)
     if ES.FightMeter then ES.FightMeter(f) end
   elseif verb == "LB" then
     if ES.LabLine then ES.LabLine(f) end
+  elseif verb == "LW" then
+    if ES.LabWalk then ES.LabWalk(f) end
   elseif verb == "FL" then
     ES.Flash(f[2] or "")
   elseif verb == "CU" then
@@ -7004,7 +7078,10 @@ events:SetScript("OnEvent", function()
     -- ac23: a clip on the legs alone (PlayUnitAnimation's body "lower"), a crossfade from one clip.
     -- ac26: the point the reticle is on (GetReticlePoint), and whether cover is in the way.
     -- ac27: the shoulders turned to the aim (SetAimTurn) while the bow is drawn.
-    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
+    -- ac28: a heal on a friend floats green over their head (the server sends the heal log).
+    if LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 28 then
+      Say(".es hello " .. VERSION .. " ac28")
+    elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and SetAimTurn and (tonumber(HasActionCombat()) or 0) >= 27 then
       Say(".es hello " .. VERSION .. " ac27")
     elseif LocalHits() and SetTelegraphAt and PreloadAnimationSource and SetWorldFog and PlayUnitFlurry and PlayGroundBurst and SetMissileLook and SetUnitRope and GetReticlePoint and (tonumber(HasActionCombat()) or 0) >= 26 then
       Say(".es hello " .. VERSION .. " ac26")

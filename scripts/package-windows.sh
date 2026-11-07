@@ -24,7 +24,7 @@ fi
 PACKAGE="$(project_name title "Basin Battle") for Windows"
 OUT="$ROOT/target/windows/$PACKAGE"
 rm -rf "$OUT"
-mkdir -p "$OUT/benilla-config" "$OUT/launcher" "$OUT/server"
+mkdir -p "$OUT/benilla-config" "$OUT/server" "$OUT/licenses"
 x86_64-w64-mingw32-strip -o "$OUT/benilla.exe" "$EXE"
 # The two buttons (the release builds them on Windows and puts the icon on them; here, built with
 # cargo build --release --target x86_64-pc-windows-gnu --manifest-path dist/windows/buttons/Cargo.toml).
@@ -33,9 +33,8 @@ for b in Play Host; do
     [ -f "$BUTTONS/$b.exe" ] && cp "$BUTTONS/$b.exe" "$OUT/" || echo "No $b.exe in $BUTTONS: the folder has no $b button." >&2
 done
 cp "$ROOT/dist/windows/README.txt" "$OUT/"
-cp "$ROOT/dist/windows/art/icon.ico" "$ROOT/dist/windows/art/shield.png" "$OUT/launcher/"
-cp "$ROOT"/dist/windows/launcher/*.ps1 "$ROOT/project.toml" "$ROOT/dist/windows/LICENSE-MIT" "$ROOT/dist/windows/LICENSE-APACHE" "$OUT/launcher/"
-echo "local build" > "$OUT/launcher/version.txt"
+cp "$ROOT/dist/windows/LICENSE-MIT" "$ROOT/dist/windows/LICENSE-APACHE" "$ROOT/dist/windows/buttons/fonts/OFL.txt" "$OUT/licenses/"
+echo "local build" > "$OUT/version.txt"
 x86_64-w64-mingw32-strip -o "$OUT/server/htl-server.exe" "$SERVER"
 cp -R "$ROOT/content" "$OUT/server/content"
 # As config.default.toml: Play copies it to config.toml only on a first run, so an update keeps

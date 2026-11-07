@@ -351,8 +351,11 @@ away), `.es give <item> [n]` (an item into your bags, by its key in `content/`),
 <creature> [yards] [still] [away] [hp%]` (a real creature `yards` ahead to try abilities on: standing
 `still`, it moves and strikes only when something moves it; otherwise it comes at you; `away`
 puts its back to you, for a shot or a blow into a creature's back; `.es
-target clear` takes them away), `.es hop [yards]` (a jump on the spot, for trying an ability
-mid-jump), `.es cc log` and `.es pvp on|off`. `.es debug` turns debug over
+target clear` takes them away), `.es ally <creature> [yards] [hp%]` (a creature on your side, standing
+still: it never fights you, your blows pass it by, and a heal aimed at a friend lands on it;
+`.es target clear` takes it away too), `.es crit [off]` (your heals land critical, a bigger number
+over the friend, as a skill check's perfect makes them), `.es hop [yards]` (a jump on the spot, for trying an ability
+mid-jump), `.es cc log` and `.es pvp on|off` (and, in any build, `.es duel <name>|accept|forfeit`). `.es debug` turns debug over
 (`.es debug on` and `.es debug off` set it); it also draws projectiles' bodies and every ground
 area on the ground (`.es debug quiet`: debug's commands without that drawing). [The visual
 check](visual-check.md) uses these to cast abilities in the real client and photograph them.
@@ -624,6 +627,22 @@ in the dodge's window. A heavy weapon (two-handed, mace, bearded axe) knocks a h
 aside. A felled hero gets up a second later where they fell, at full health, with everything
 they carried (no sack), and the camp hears who felled whom. Set `friendly_fire = false` and remove
 `respawn_secs`, `respawn_health` and `keep_supplies` to go back to co-op rules.
+
+Friendly fire decides only who can be harmed: every other hero is still a friend to help, so a
+spell that heals and hurts (Holy Nova, a healing bolt) mends them rather than strikes them.
+
+## Duels
+
+A **duel** is WoW's own: right-click a hero's portrait and pick Duel (or `/duel`, or `.es duel
+<name>`), and they get the challenge's popup (`.es duel accept` to type it). After a 3-second
+countdown the two are each other's foes, friendly fire or not: blows, bolts and areas strike the
+other, and nothing of either's heals or helps the other (a Holy Nova burns the foe). The duel is
+theirs alone: nobody else can strike either duellist or help them, and neither can strike anyone
+else. The blow that would fell one leaves them at 1 health and ends it, the other the winner, and
+what each put on the other (a slow, a burn, a hold) wears off. `/forfeit` (`.es duel forfeit`),
+logging out, or straying more than 50 yd from the flag for 10 seconds gives it away. Duels are
+for outside Siege, and not in the Proving Ring. `[duel]` in `content/survival.toml` sets the
+reach, the countdown and the bounds.
 
 Chat commands, if you'd rather type: `.bank`, `.take <item> <n>`, `.equip <item>`, `.arm <weapon>`
 (at the rack), `.build [station]`, `.place`, `.rotate`, `.cancel`, `.craft <recipe>`, `.status`,

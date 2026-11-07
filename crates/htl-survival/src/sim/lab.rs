@@ -21,6 +21,16 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
         // Two in a row along the hero's facing: a rush that drives one into the other, a shot
         // that pierces.
         "line" => &[(4.0, 0.0), (7.5, 0.0)],
+        // Three spread across the front at 8 yd: a jet that sweeps across them.
+        "spread" => &[(8.0, -28.0), (8.0, 0.0), (8.0, 28.0)],
+        // Three in a row at 6, 10 and 14 yd: an orb that rolls through them.
+        "row" => &[(6.0, 0.0), (10.0, 0.0), (14.0, 0.0)],
+        // One at 12 yd: a bolt's flight.
+        "mid" => &[(12.0, 0.0)],
+        // One within arm's reach at the hero's side: a dodge or a glide forward leaves its blow.
+        "side" => &[(1.8, 90.0)],
+        // At the edge of a long reach: Mind Flay's taut zone (26 to 30 yd).
+        "edge" => &[(28.0, 0.0)],
         _ => return None,
     })
 }
@@ -28,7 +38,7 @@ fn layout(scene: &str) -> Option<&'static [(f32, f32)]> {
 /// The account every spell lab stand-in ally hero's starts with: never saved.
 pub const LAB_ALLY: &str = "lab~ally";
 
-pub const LAB_SCENES: &str = "one, pack, close, ring, far or line";
+pub const LAB_SCENES: &str = "one, pack, close, ring, far, line, spread, row, mid, edge or side";
 
 impl Survival {
     /// Sets out a scene in front of hero `id`: `creature`s (a `[[mob]]` key; "dummy" for the
@@ -83,6 +93,29 @@ impl Survival {
     }
 
     /// One of the lab's creatures swings at the hero now (its own blow, wind-up and all).
+    /// The creature brought within arm's reach of `hero` first (just beyond them from the lab's
+    /// hero, so a ray or the reticle meets the ally first, facing them), then its blow: a blow meant for a stand-in ally that stands farther off.
+    pub fn lab_blow_near(&mut self, mob: Id, hero: Id, from: Id) {
+        let (Some(at), Some(me)) = (self.players.get(&hero).map(|p| p.pos), self.players.get(&from).map(|p| p.pos)) else { return };
+        // Beside the ally, square to the hero's view: seen side on, the blow is plainly at them
+        // (stood behind the ally, facing the hero, it read as a swing at the hero: Corey).
+        let d = dist2d(at, me).max(0.1);
+        let (ux, uy) = ((at[0] - me[0]) / d, (at[1] - me[1]) / d);
+        let pos = [at[0] + uy * 1.8, at[1] - ux * 1.8, at[2]];
+        if let Some(m) = self.mobs.get_mut(&mob) {
+            m.pos = pos;
+            m.facing = facing(pos, at);
+        }
+        self.events.push(Event::MobStop { id: mob, pos, facing: facing(pos, at) });
+        self.lab_blow(mob, hero);
+    }
+
+    /// An effect on a lab hero, from themselves: a shield, overhealth (`fx` in a lab run).
+    pub fn lab_effect(&mut self, hero: Id, kind: &str, amount: f32, secs: f32) {
+        self.apply_cc(hero, hero, kind, secs, amount, 0.0, "Lab");
+        self.events.push(Event::Effects { player: hero });
+    }
+
     pub fn lab_blow(&mut self, mob: Id, hero: Id) {
         let Some(at) = self.players.get(&hero).map(|p| p.pos) else { return };
         if self.mobs.get(&mob).is_some_and(|m| m.health > 0) {
@@ -123,6 +156,75 @@ impl Survival {
         if self.players.get(&id).is_some_and(|p| matches!(p.action, Action::Stagger { .. })) {
             self.set_action(id, Action::Ready);
         }
+        // An aim or a charge left from the last run would eat this run's first key.
+        self.ability_cancel(id);
+    }
+
+    /// A weapon or shield in the lab hero's hands for a run (`weapon ember_staff`), wherever they
+    /// stand: the rack's `arm` without the rack.
+    pub fn lab_arm(&mut self, id: Id, key: &str) -> Result<String, String> {
+        let item = self.content.item(key).ok_or_else(|| format!("No weapon called {key}."))?;
+        let kind = self.content.items[item].kind;
+        let p = self.players.get_mut(&id).ok_or("No such hero.")?;
+        match kind {
+            ItemKind::Weapon => p.weapon = item,
+            ItemKind::Shield => p.shield = item,
+            _ => return Err(format!("{key} isn't a weapon.")),
+        }
+        p.action = Action::Ready;
+        p.guard_held = false;
+        let name = self.content.items[item].name.clone();
+        self.events.push(Event::Guard { player: id, up: false });
+        self.events.push(Event::Gear { player: id });
+        self.update_speed(id);
+        self.events.push(Event::Dirty);
+        Ok(name)
+    }
+
+    /// A charge under way: when it began and this cast's rolled flare (the release check's
+    /// moment), for the lab to let go on it, or off it.
+    pub fn lab_check_flare(&self, id: Id) -> Option<(f32, f32)> {
+        let p = self.players.get(&id)?;
+        match p.action {
+            Action::Charge { since, .. } => Some((since, p.check_flare)),
+            _ => None,
+        }
+    }
+
+    /// A meter sweep under way: when it began, its rolled length and its sweet spot (a share), for
+    /// the lab to stop it on the spot, or off it.
+    pub fn lab_meter(&self, id: Id) -> Option<(f32, f32, f32)> {
+        let p = self.players.get(&id)?;
+        match p.action {
+            Action::Sweep { since, .. } => Some((since, p.sweep_secs, p.meter_at)),
+            _ => None,
+        }
+    }
+
+    /// A rhythm under way: when it began, its rolled beats, its free beats and each beat's window,
+    /// for the lab to press them.
+    /// Penance under way: when each of its rings closes (the game clock) and its window.
+    pub fn lab_penance(&self, id: Id) -> Vec<(f32, f32)> {
+        let Some(x) = self.light.penances.iter().find(|x| x.owner == id) else { return Vec::new() };
+        let w = self.content.abilities[x.ability].penance.as_ref().map_or(0.15, |p| p.window);
+        x.rings.iter().map(|r| (r.at, w)).collect()
+    }
+
+    pub fn lab_rhythm(&self, id: Id) -> Option<(f32, Vec<(f32, bool, f32)>, u32)> {
+        let p = self.players.get(&id)?;
+        let Action::Rhythm { ability, since, .. } = p.action else { return None };
+        let d = &self.content.abilities[ability];
+        let span = d.most_beats.saturating_sub(d.free_beats + 1).max(1) as f32;
+        let beats = p
+            .rhythm_beats
+            .iter()
+            .enumerate()
+            .map(|(k, (t, rest))| {
+                let s = ((k as u32).saturating_sub(d.free_beats) as f32 / span).clamp(0.0, 1.0);
+                (*t, *rest, d.beat_window[0] + (d.beat_window[1] - d.beat_window[0]) * s)
+            })
+            .collect();
+        Some((since, beats, d.free_beats))
     }
 
     /// The lab's bodies taken away.
