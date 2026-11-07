@@ -5884,6 +5884,8 @@ crash = { wall_damage = 20.0, wall_stun = 2.0, foe_damage = 14.0, knockdown = 2.
 # 1's EX: the same moment (close the gap now), the other answer: toward a friend.
 [[ability]]
 key = "intervene"
+# Silent in the lab (its look has no sound of its own): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Intervene"
 ex_of = "tackle"
 text = "Rushes up to 25 yd to the ally nearest your reticle. For 3 sec, the first blow aimed at them strikes you instead. If your guard is up when it lands, your guard takes it."
@@ -6791,6 +6793,8 @@ effects = [{ kind = "snare", secs = [3.0, 3.0], amount = 0.4 }]
 
 [[ability]]
 key = "arcane_bolt"
+# Silent in the lab (its look has no sound of its own): an arcane cast as it goes.
+sound = 1641
 name = "Arcane Bolt"
 text = "A quick bolt of arcane force that deals 10 damage. Each hit stores an arcane charge in the staff for 5 sec, up to 3."
 icon = "Spell_Arcane_StarFire"
@@ -6983,6 +6987,8 @@ impact_kit = 2350
 # Hollow Star, a living orb that hurts foes and heals friends, filling and draining as it does.
 [[ability]]
 key = "void_tether"
+# Silent in the lab (its look has no sound of its own): a shadow cast as it goes.
+sound = 2560
 name = "Void Tether"
 text = "Hold to bind the first body along the reticle, up to 20 yd, with a cord of the void. An enemy takes 6 damage per sec, rising to 12 over 2 sec. An ally is healed 4 per sec, rising to 8. Your Hollow Star is filled 6 per sec and drawn toward you."
 icon = "Spell_Shadow_Requiem"
@@ -7059,6 +7065,8 @@ effects = [{ kind = "knockback", amount = 6.0 }, { kind = "burn", secs = [4.0, 4
 # claude/mage-kit-draft.md.)
 [[ability]]
 key = "frozen_orb"
+# Silent in the lab (its look has no sound of its own): an ice cast as it goes.
+sound = 2559
 # A perfect bursts out of the cast at the hands: Cone of Cold's spray of frost.
 perfect_kit = 1027
 name = "Frozen Orb"
@@ -7707,6 +7715,8 @@ spell = 1449
 # 1: a pad for the whole party.
 [[ability]]
 key = "jump_pad"
+# Silent in the lab (its look has no sound of its own): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Jump Pad"
 text = "Throws down a pad at the reticle, up to 8 yd away. It lasts 8 sec, 2 at a time. You or any ally who steps on it is launched 14 yd the way they face. Enemies cannot use it."
 icon = "INV_Gizmo_RocketBoot_01"
@@ -7723,6 +7733,8 @@ burst_spell = 1953
 
 [[ability]]
 key = "launch_rig"
+# Silent in the lab (its look has no sound of its own): Heroic Leap's rush as it goes.
+sound = 3330
 name = "Launch Rig"
 ex_of = "jump_pad"
 text = "A stronger pad that launches 20 yd. Whoever it throws lands with a shove, dealing 6 damage and knocking enemies within 1.5 yd back 3 yd."
