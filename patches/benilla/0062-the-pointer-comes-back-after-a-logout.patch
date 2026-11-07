@@ -1,0 +1,62 @@
+From c61120498d8a546f99fc5b0396387a5bb4b21299 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 7 Nov 2026 09:28:42 -0600
+Subject: [PATCH] The pointer comes back at the login screen after a logout
+
+Corey (7 Nov): the mouse was gone at the login and character screens after every /logout. The client's mouse-look system runs only in the world, so the look session Elwynn Survival's action mouse holds (the add-on's MouselookStart) was never ended on the way out, and the glue inherited a locked, hidden pointer with nothing left to free it. Now OnExit(InWorld) ends any look session and clears the world's mouse word (a right button held at the logout the same), so the glue gets a free, shown pointer.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+---
+ crates/benilla-app/src/player.rs        |  6 ++++++
+ crates/benilla-app/src/player/camera.rs | 21 +++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/crates/benilla-app/src/player.rs b/crates/benilla-app/src/player.rs
+index 731d079a..61e8418c 100644
+--- a/crates/benilla-app/src/player.rs
++++ b/crates/benilla-app/src/player.rs
+@@ -360,6 +360,12 @@ impl Plugin for PlayerPlugin {
+                 .run_if(not(resource_exists::<crate::run_mode::CaptureMode>))
+                 .in_set(crate::client_state::InWorldGated),
+         )
++        // A look session the world leaves behind (a `/logout` under a held or scripted mouselook)
++        // ends on the way out, so the glue gets a free, shown pointer.
++        .add_systems(
++            OnExit(crate::client_state::ClientState::InWorld),
++            camera::release_look_on_world_exit,
++        )
+         // The posture queue (the `/sit` family), which `control` alone executes.
+         .add_message::<StandStateRequest>()
+         .add_message::<ServerStandState>()
+diff --git a/crates/benilla-app/src/player/camera.rs b/crates/benilla-app/src/player/camera.rs
+index f896caa5..3749c869 100644
+--- a/crates/benilla-app/src/player/camera.rs
++++ b/crates/benilla-app/src/player/camera.rs
+@@ -1144,6 +1144,27 @@ fn release_cursor(cursor_opts: &mut CursorOptions) {
+     cursor_opts.visible = true;
+ }
+ 
++/// `OnExit(InWorld)`: a look session still held as the world goes ends here, and the world's
++/// mouse word is cleared with it. [`run_look_session`] runs only in the world, so a session the
++/// world enter's clear (`0x5144c0`) would have ended never is: under Elwynn Survival's action
++/// mouse the add-on's `MouselookStart` holds one through every `/logout`, and the glue screens
++/// inherited a locked, hidden pointer with nothing left to free it.
++pub(super) fn release_look_on_world_exit(
++    mut rig: ResMut<CameraControl>,
++    window: Option<Single<(&mut Window, &mut CursorOptions), With<PrimaryWindow>>>,
++) {
++    rig.world_mouse = WorldMouse::default();
++    rig.freelook = false;
++    if rig.look.is_none() {
++        return;
++    }
++    let Some(window) = window else {
++        return;
++    };
++    let (mut window, mut cursor_opts) = window.into_inner();
++    disengage_look(&mut rig, &mut window, &mut cursor_opts);
++}
++
+ /// Hand the OS cursor back while the window is unfocused and take it again on focus, without
+ /// touching the session: the look state outlives a deactivate (`0x514490` keeps the mouse bits).
+ /// Platform behaviour, not a reference fact. On macOS winit's `Locked` is the global
