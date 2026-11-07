@@ -178,3 +178,9 @@ What Claude measured, changed and still sees wrong, as it happens (newest last).
 - **Bolt chains elsewhere** (#238): nine unblockable follow-up bolts in Ragefire, the Wailing
   Caverns, Razorfen Kraul and the Graveyard came too soon to dodge after dodging the last. Wind-ups
   raised 0.05 to 0.15 s; a test now holds every string to it. The fair-blows report flags nothing.
+- **The beach's rhythm, simulated** (#238): two pirates and a Squallshaper on a passive hero for
+  30 s. A pirate could still start its swing during the caster's 1.1 s cast, so blade and bolt
+  landed within 0.3 s four times. Blades now also wait for a bolt gathering at, or flying to,
+  their hero. That made the pirate already in reach take every turn (10 strings to 0), so the
+  turn goes to the one that has waited longest. Now 5 strings each, nothing together, something
+  winding up at the hero 59% of the time (68% before), the longest quiet spell 1.5 s.
