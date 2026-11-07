@@ -1,36 +1,28 @@
 # What players see this project called, and where it lives. Change a name here and the scripts,
-# the server's realm list and the next release's Windows download all use it: the download and
-# its folder, the window titles, the Play menu and the realm each game runs on.
+# the server's realm list, Play, Host and the next release's Windows download all use it: the
+# download and its folder, the window titles and the realm each game runs on.
 #
 # Keep every line `key = "value"` on one line: the Windows and Mac scripts read this file with a
-# plain search, not a TOML library. Code names (the htl-* crates, addon/ElwynnSurvival,
+# plain search, not a TOML library, and Play and Host have it built in at compile time
+# (dist/windows/buttons/src/folder.rs). Code names (the htl-* crates, addon/ElwynnSurvival,
 # BasinBattle) don't change with these, and neither does what the games say in play.
 
-# The whole project: the download is "<title> for Windows.zip", and the host window's title.
-title = "Basin Battle"
+# The whole project: the download is "<title> for Windows.zip", its folder, Play's window and
+# the host window's title.
+title = "Elwynn Survival"
 
-# Each game's name: its realm in the realm list, and its line in the Play menu.
+# Each game's name: its realm in the realm list, and its line under Play's cog.
 survival = "Elwynn Survival"
 basin = "Basin Battle"
 
-# Where releases (and the Windows download's updates) come from: owner/name on GitHub.
+# Where releases (and the download's updates) come from: owner/name on GitHub.
 repository = "slopmaster69/Basin-Battle"
 
-# The group's servers, in the order Play tries them. Each is an address, with :port when its
-# login port isn't 3724. Play goes to the first that answers by itself, so friends never type an
-# address: when `server` is down it tries `backup`, then `backup2` (an address on a Tailscale
-# network only when Tailscale is on this PC). Each is its own world: heroes made on one aren't on
-# the others. A `_name` is how Play shows it. Empty: unused.
-#
-# A `_pc` is the Windows name of the PC that hosts it (Settings > System > About). On that PC,
-# Host takes that server's ports by itself (login :port, worlds 8085 + 2 x (port - 3724) and the
-# next one: :3725 is 8087 and 8088), and Play, choosing that server, starts it there and plays on
-# it. Those are the ports the router forwards to that PC.
+# The group's server: the one address Play joins by itself, with :port when its login port isn't
+# 3724. Anyone else's server is typed under Play's cog ("Someone else's"). Each server is its own
+# world: heroes made on one aren't on the others.
 server = "24.64.116.126"
 server_name = "Corios's desktop"
-server_pc = "DESKTOP-688RB43"
-backup = "24.64.116.126:3725"
-backup_name = "Corios's laptop"
-backup_pc = "CHANDRIAN"
-backup2 = "100.125.4.34"
-backup2_name = "David's PC (Tailscale)"
+
+# The password everyone logs in with. Host passes it to the server; Play hands it to the game.
+password = "hold"

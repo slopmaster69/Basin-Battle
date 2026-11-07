@@ -954,7 +954,9 @@ fn momentum_stacks_with_each_hit_up_to_5() {
     assert!(s.momentum_on(p), "a new Warrior's keys are the Juggernaut's");
     for n in 1..=6u32 {
         let ev = light(&mut s, p);
-        assert_eq!(struck(&ev, k).len(), 1, "hit {n} lands");
+        // (Its blow, not the axe's bleed ticking.)
+        let blows = ev.iter().filter(|e| matches!(e, Event::Swing { victim: Some(v), outcome: Outcome::Hit, style, .. } if *v == k && *style != Blow::Dot)).count();
+        assert_eq!(blows, 1, "hit {n} lands");
         s.players.get_mut(&p).unwrap().stamina = 100.0;
         assert_eq!(s.momentum(p), n.min(5), "a stack a hit, 5 at most");
     }

@@ -1,12 +1,11 @@
 #!/bin/bash
-# The War Table launcher on a Mac: builds Play (dist/windows/buttons, the same launcher as the
-# Windows download's Play.exe) and makes "Basin Battle.app" in this folder, with the shield as its
-# icon. Play Basin Battle.command runs this; so does the app when it opens, to rebuild Play
-# after an update changed it (seconds when nothing did).
+# Play on a Mac: builds Play (dist/windows/buttons, the same launcher as the Windows download's
+# Play.exe) and makes "<title>.app" (project.toml's title) in this folder, with the shield as its
+# icon. Play Basin Battle.command runs this.
 #   scripts/mac-launcher.sh            build Play and the app
 #   scripts/mac-launcher.sh --quiet    the same, saying nothing unless it fails
-# The app plays through scripts/play.sh and hosts with Host Basin Battle.command, so the game
-# itself still needs setting up once (Build Basin Battle.command).
+# The app plays through scripts/play.sh, so the game itself still needs setting up once
+# (Build Basin Battle.command); the folder is updated with git pull, not by Play.
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 cd "$ROOT"
@@ -25,7 +24,10 @@ else
     cargo build --release --manifest-path dist/windows/buttons/Cargo.toml --bin Play
 fi
 
-app="$ROOT/Basin Battle.app"
+name="$(project_name title "Elwynn Survival")"
+app="$ROOT/$name.app"
+# The app under the project's old name, from before the title changed.
+[ "$name" != "Basin Battle" ] && [ -d "$ROOT/Basin Battle.app" ] && rm -rf "$ROOT/Basin Battle.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 changed=0
 # Each file goes in under a new name and is then moved over the old: the app runs this script
@@ -44,7 +46,6 @@ cmp -s "$built" "$built.in-app" && [ -f "$app/Contents/MacOS/Play" ] || { put "$
 # The script that was the app's program before Play was.
 [ -e "$app/Contents/MacOS/Basin Battle" ] && { rm -f "$app/Contents/MacOS/Basin Battle"; changed=1; }
 
-name="$(project_name title "Basin Battle")"
 tmp="$(mktemp)"
 cat > "$tmp" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

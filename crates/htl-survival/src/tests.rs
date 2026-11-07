@@ -57,7 +57,8 @@ fn hits_on(events: &[Event], victim: Id) -> Vec<(u32, Outcome)> {
     events
         .iter()
         .filter_map(|e| match e {
-            Event::Swing { victim: Some(v), damage, outcome, anim: false, .. } if *v == victim => Some((*damage, *outcome)),
+            // (A blow, not a bleed's or a burn's tick.)
+            Event::Swing { victim: Some(v), damage, outcome, anim: false, style, .. } if *v == victim && *style != Blow::Dot => Some((*damage, *outcome)),
             _ => None,
         })
         .collect()

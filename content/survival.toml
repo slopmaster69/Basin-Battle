@@ -833,7 +833,8 @@ range = 3.2
 arc = 110.0
 targets = 2
 subclass = 0
-
+# Identity: the bleeder; each hit bleeds 4 a second for 3 sec (docs/weapon-identities.md).
+bleed = 4.0
 [[weapon]]
 key = "bearded_axe"
 windup = 0.42
@@ -846,7 +847,8 @@ arc = 110.0
 targets = 2
 stagger = 0.5
 subclass = 0
-
+# The bleeder (docs/weapon-identities.md).
+bleed = 6.0
 [[weapon]]
 key = "sword"
 windup = 0.26
@@ -858,7 +860,9 @@ range = 3.0
 arc = 90.0
 targets = 1
 subclass = 7
-
+# Identity (Nov 7, docs/weapon-identities.md): the duelist's blade, a wider parry and a harder riposte.
+parry = 0.1
+riposte = 2.25
 [[weapon]]
 key = "mace"
 windup = 0.36
@@ -871,7 +875,8 @@ arc = 100.0
 targets = 1
 stagger = 0.8
 subclass = 4
-
+# Identity: the stance breaker; its hits count twice towards a foe's stance (docs/weapon-identities.md).
+posture = 2.0
 [[weapon]]
 key = "dagger"
 windup = 0.18
@@ -883,7 +888,8 @@ range = 2.4
 arc = 70.0
 targets = 1
 subclass = 15
-
+# Identity: the assassin; 2.5 times the damage from behind (docs/weapon-identities.md).
+backstab = 2.5
 [[weapon]]
 key = "greatsword"
 windup = 0.50
@@ -898,7 +904,8 @@ two_handed = true
 guard = "blade_guard"
 emote = 37
 subclass = 8
-
+# Identity: the sweeper; a heavy blow doesn't put you down mid-swing (docs/weapon-identities.md).
+swing_poise = true
 [[weapon]]
 key = "halberd"
 windup = 0.42
@@ -913,7 +920,8 @@ two_handed = true
 guard = "haft_guard"
 emote = 38
 subclass = 6
-
+# Identity: reach; its thrust goes through a raised shield (docs/weapon-identities.md).
+through_guard = true
 [[weapon]]
 key = "maul"
 windup = 0.70
@@ -948,6 +956,8 @@ emote = 37
 subclass = 1
 
 # The Shadow Hunter's spear: only from him.
+# Identity: the executioner; twice the damage on a foe under a third of its health (docs/weapon-identities.md).
+execute = 2.0
 [[weapon]]
 key = "zanjin_spear"
 windup = 0.36
@@ -968,6 +978,8 @@ subclass = 6
 # (`bolt`, a benched projectile defined with them, below the abilities) and their heavy attack a
 # heavier one (`heavy_bolt`). Their swing numbers stand for a shove and for the rules that read a
 # weapon's reach. (The Mage design, claude/mage-kit-draft.md.)
+# Reach, through a raised shield (docs/weapon-identities.md).
+through_guard = true
 [[weapon]]
 key = "apprentice_staff"
 windup = 0.40
@@ -10783,6 +10795,8 @@ stagger = 1.0
 subclass = 4
 
 # A silver-edged sword: the sword's quickness, the axe's bite.
+# The stance breaker (docs/weapon-identities.md).
+posture = 2.0
 [[weapon]]
 key = "silver_sword"
 windup = 0.26
@@ -10794,7 +10808,9 @@ range = 3.1
 arc = 95.0
 targets = 1
 subclass = 7
-
+# The duelist's blade (docs/weapon-identities.md).
+parry = 0.1
+riposte = 2.25
 [[recipe]]
 key = "grilled_fish"
 station = "cooking"
